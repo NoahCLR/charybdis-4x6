@@ -1520,6 +1520,10 @@ async function appendCombo(root, output, inputs) {
     for (const input of inputList) {
         assertSafeExpression(input, "combo input");
     }
+    const duplicateInput = duplicateComboInput(inputList);
+    if (duplicateInput) {
+        throw new Error(`Combo inputs must be unique; ${duplicateInput} appears more than once.`);
+    }
 
     const filePath = path.join(root, KEYMAP_RELATIVE_PATH);
     const text = await fs.readFile(filePath, "utf8");
@@ -1530,6 +1534,17 @@ async function appendCombo(root, output, inputs) {
     const row = `    COMBO(${output}, (${inputList.join(", ")}))                          \\`;
     lines.splice(insertionIndex, 0, row);
     await writeText(filePath, replaceRange(text, block.start, block.end, lines.join("\n")));
+}
+
+function duplicateComboInput(inputs) {
+    const seen = new Set();
+    for (const input of inputs || []) {
+        const normalized = normalizeExpr(input);
+        if (!normalized) continue;
+        if (seen.has(normalized)) return normalized;
+        seen.add(normalized);
+    }
+    return "";
 }
 
 async function appendKeyBehavior(root, behavior) {
@@ -2779,10 +2794,32 @@ function getStudioHtml() {
             box-shadow: 0 12px 32px rgba(0, 0, 0, 0.36);
             padding: 12px;
         }
+        .status-popup-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
         .status-popup-title {
             color: var(--muted);
             font-size: 12px;
             font-weight: 650;
+        }
+        .status-popup-dismiss {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            min-width: 28px;
+            padding: 0;
+            color: var(--muted);
+            font-size: 18px;
+            line-height: 1;
+        }
+        .status-popup-dismiss:hover {
+            color: var(--text);
+            border-color: var(--accent);
         }
         .status-popup-body {
             display: grid;
@@ -3633,7 +3670,8 @@ function getStudioHtml() {
             color: var(--text);
             box-shadow: 0 8px 24px rgba(0, 0, 0, 0.36);
             pointer-events: none;
-            white-space: normal;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
         }
         .modal-backdrop {
             position: fixed;
@@ -3914,6 +3952,7 @@ function getClientScript() {
     let lastLayoutKeyClick = { index: undefined, time: 0 };
     let keyPicker = undefined;
     let notice = "";
+    let dismissedStatusSignature = "";
     let layoutNotice = "";
     let localUndoStack = [];
     let localRedoStack = [];
@@ -3973,6 +4012,7 @@ function getClientScript() {
         startMacroRecording: "Start recording browser keydown and keyup events into the selected macro draft.",
         stopMacroRecording: "Stop recording and keep the generated payload in the selected macro draft.",
         clearMacroRecording: "Clear the current recording take and restore the payload captured when recording started.",
+        dismissStatus: "Dismiss the current status popup until the status changes.",
         addCombo: "Append a combo row with the entered output and input keys.",
         addLayoutCombo: "Append a combo row using the selected layout keys as inputs.",
         applyLayoutChanges: "Write pending layout drag/drop and paste edits back to keymap.c.",
@@ -4570,6 +4610,9 @@ function getClientScript() {
             commitLocalHistory(before);
         } else if (action === "openKeyPicker") {
             openKeyPicker(target.dataset.target, target.dataset.mode || "single");
+        } else if (action === "dismissStatus") {
+            dismissedStatusSignature = currentStatusSignature();
+            render();
         } else if (action === "insertMacroStep") {
             const before = currentLocalSnapshot || serializeLocalState();
             if (insertMacroStep(target)) {
@@ -5295,6 +5338,7 @@ function getClientScript() {
     }
 
     function post(message) {
+        dismissedStatusSignature = "";
         notice = "Working...";
         layoutNotice = "";
         render();
@@ -5491,7 +5535,6 @@ function getClientScript() {
     function initializeDirtyTracking() {
         for (const section of document.querySelectorAll("[data-dirty-section]")) {
             section.dataset.dirtyBaseline = dirtySnapshot(section);
-            validateSection(section, false);
             updateDirtySection(section);
         }
     }
@@ -5559,8 +5602,7 @@ function getClientScript() {
             }
         }
         if (firstInvalid && focusFirst) {
-            firstInvalid.focus();
-            firstInvalid.reportValidity?.();
+            reportInvalidControl(firstInvalid);
         }
         return !firstInvalid;
     }
@@ -5573,6 +5615,10 @@ function getClientScript() {
             return true;
         }
         const value = String(control.value || "").trim();
+        if (comboBuilderShouldStayNeutral(control)) {
+            clearComboBuilderFieldErrors(control.closest("[data-combo-builder]"));
+            return true;
+        }
         let error = "";
         if (rule === "uint8") {
             error = validateUint8(value, "Enter an integer from 0 to 255.");
@@ -5582,6 +5628,14 @@ function getClientScript() {
             error = validateOptionalTerm(value, "Enter 1-" + keyBehaviorTermMaxMs + " ms, or KEY_BEHAVIOR_TERM(ms).", false);
         } else if (rule === "optional-branch-term") {
             error = validateOptionalTerm(value, "Enter 0-" + keyBehaviorTermMaxMs + " ms, or KEY_BEHAVIOR_TERM(ms).", true);
+        } else if (rule === "layout-key") {
+            error = validateLayoutKeyInput(value);
+        } else if (rule === "combo-inputs") {
+            error = validateComboInputs(value);
+        } else if (rule === "macro-key-list") {
+            error = validateMacroKeyListInput(value, false);
+        } else if (rule === "macro-key-single") {
+            error = validateMacroKeyListInput(value, true);
         } else if (rule === "positive-int") {
             error = validatePositiveInteger(value, "Enter a positive integer.");
         } else if (rule === "macro-payload") {
@@ -5589,6 +5643,25 @@ function getClientScript() {
         }
         setFieldError(control, error);
         return !error;
+    }
+
+    function reportFieldError(control, message) {
+        setFieldError(control, message);
+        reportInvalidControl(control);
+    }
+
+    function reportInvalidControl(control) {
+        if (!control) return;
+        let parent = control.parentElement;
+        while (parent) {
+            if (parent.matches?.("details:not([open])")) {
+                parent.open = true;
+            }
+            parent = parent.parentElement;
+        }
+        control.scrollIntoView?.({ block: "center", inline: "nearest" });
+        control.focus?.({ preventScroll: true });
+        control.reportValidity?.();
     }
 
     function validateUint8(value, message) {
@@ -5621,6 +5694,48 @@ function getClientScript() {
         if (!allowZero && normalized === "0") return message;
         const max = String(keyBehaviorTermMaxMs);
         return normalized.length < max.length || (normalized.length === max.length && normalized <= max) ? "" : message;
+    }
+
+    function validateLayoutKeyInput(value) {
+        return layoutKeyExpressionError(canonicalLayoutKeyExpression(value));
+    }
+
+    function validateComboInputs(value) {
+        const parts = splitLayoutArguments(String(value || "")).filter(Boolean);
+        if (parts.length < 2) return "Combo inputs need at least two keycodes.";
+        const seen = new Set();
+        for (const part of parts) {
+            const canonical = canonicalLayoutKeyExpression(part);
+            const error = layoutKeyExpressionError(canonical);
+            if (error) return "Invalid combo input '" + part + "': " + error;
+            if (seen.has(canonical)) return "Combo inputs must be unique; " + displayKeyExpression(canonical) + " appears more than once.";
+            seen.add(canonical);
+        }
+        return "";
+    }
+
+    function comboBuilderShouldStayNeutral(control) {
+        const builder = control.closest?.("[data-combo-builder]");
+        if (!builder || !control.closest?.("[data-combo-output], [data-combo-inputs]")) return false;
+        const output = String(fieldValueFromMarker(builder, "[data-combo-output]") || "").trim();
+        const inputs = String(fieldValueFromMarker(builder, "[data-combo-inputs]") || "").trim();
+        return !output && !inputs && !layoutComboSelection.length;
+    }
+
+    function clearComboBuilderFieldErrors(builder) {
+        if (!builder) return;
+        for (const marker of builder.querySelectorAll("[data-combo-output], [data-combo-inputs]")) {
+            for (const control of marker.querySelectorAll("input, select, textarea")) {
+                clearFieldError(control);
+            }
+        }
+    }
+
+    function validateMacroKeyListInput(value, single) {
+        const keys = canonicalMacroKeySequence(value || "");
+        if (single && keys.length !== 1) return "Choose exactly one key.";
+        if (!single && !keys.length) return "Choose at least one key.";
+        return macroPayloadKeyListError(keys);
     }
 
     function validatePositiveInteger(value, message) {
@@ -5842,10 +5957,22 @@ function getClientScript() {
         for (const diagnostic of model.diagnostics || []) {
             items.push("<div class='warning'>" + escapeHtml(diagnostic) + "</div>");
         }
-        return items.length ? "<div class='status-popup' role='status' aria-live='polite'>" +
+        const signature = currentStatusSignature();
+        if (!items.length || signature === dismissedStatusSignature) return "";
+        return "<div class='status-popup' role='status' aria-live='polite'>" +
+            "<div class='status-popup-header'>" +
             "<div class='status-popup-title'>Status</div>" +
+            "<button type='button' class='status-popup-dismiss' data-action='dismissStatus' aria-label='Dismiss status popup'>&times;</button>" +
+            "</div>" +
             "<div class='status-popup-body'>" + items.join("") + "</div>" +
-            "</div>" : "";
+            "</div>";
+    }
+
+    function currentStatusSignature() {
+        return JSON.stringify({
+            notice: notice || "",
+            diagnostics: model?.diagnostics || []
+        });
     }
 
     function panel(title, body, open = true) {
@@ -5903,7 +6030,7 @@ function getClientScript() {
             "<div class='selected-key-edit-fields'>" +
             "<label><span>Layer</span><input disabled value='" + escapeAttr(layer.name) + "'></label>" +
             "<label><span>Layout index</span><input disabled value='" + selected.layoutIndex + "'></label>" +
-            renderKeyPickerInput("keycodeInput", "Key", selected.editLabel || selected.display || selected.keycode, "A, Enter, Space, _______", "single") +
+            renderKeyPickerInput("keycodeInput", "Key", selected.editLabel || selected.display || selected.keycode, "A, Enter, Space, _______", "single", "", "", "data-validate='layout-key'") +
             "<div><span class='muted'>Source</span><br><code class='source-pill'>" + escapeHtml(selected.keycode) + "</code></div>" +
             "<button data-action='applyKey' data-dirty-button class='primary'>Stage key</button>" +
             "</div>" +
@@ -5922,8 +6049,8 @@ function getClientScript() {
         return "<div id='layoutComboBuilder' class='card selected-key-edit-card layout-combo-builder-card' data-dirty-section data-combo-builder>" +
             "<h3>Create combo</h3>" +
             "<div class='selected-key-edit-fields'>" +
-            renderKeyPickerInput("layoutComboOutput", "Output", layoutComboOutput, "Tab", "single", "", "data-combo-output") +
-            renderKeyPickerInput("layoutComboInputs", "Inputs", inputValue, "D, F", "list", "", "data-combo-inputs") +
+            renderKeyPickerInput("layoutComboOutput", "Output", layoutComboOutput, "Tab", "single", "", "data-combo-output", "data-validate='layout-key'") +
+            renderKeyPickerInput("layoutComboInputs", "Inputs", inputValue, "D, F", "list", "", "data-combo-inputs", "data-validate='combo-inputs'") +
             "<div class='layout-combo-selected-list'>" + selectedList + "</div>" +
             "<div class='layout-combo-actions'>" +
             "<button type='button' class='" + (layoutComboPicking ? "active" : "") + "' aria-pressed='" + (layoutComboPicking ? "true" : "false") + "' data-action='toggleLayoutComboPicking'>" + inputPickingLabel + "</button>" +
@@ -6022,7 +6149,7 @@ function getClientScript() {
         const repeatHidden = action?.helper === "REPEAT_WHILE_HELD" ? "" : " hidden";
         return "<div class='stack behavior-action-editor'>" +
             renderHelperControl(id, label, helpers, action?.helper || "") +
-            renderKeyPickerInput(id + "Action", label + " action", editableActionValue(action), "Esc, Shift+\`, Cmd+Q", "single", "", "data-helper-action-prefix='" + escapeAttr(id) + "'" + actionHidden) +
+            renderKeyPickerInput(id + "Action", label + " action", editableActionValue(action), "Esc, Shift+\`, Cmd+Q", "single", "", "data-helper-action-prefix='" + escapeAttr(id) + "'" + actionHidden, "data-validate='layout-key'") +
             (hasRepeat ? "<label data-helper-field data-helper-prefix='" + id + "' data-helper-value='REPEAT_WHILE_HELD'" + repeatHidden + "><span>" + label + " repeat Hz</span><input id='" + id + "Repeat' data-validate='positive-int' inputmode='numeric' value='" + escapeAttr(action?.repeatHz || "") + "' placeholder='only for REPEAT_WHILE_HELD'></label>" : "") +
             "</div>";
     }
@@ -6036,12 +6163,13 @@ function getClientScript() {
             "</div>";
     }
 
-    function renderKeyPickerInput(id, label, value, placeholder, mode = "single", style = "", attrs = "") {
+    function renderKeyPickerInput(id, label, value, placeholder, mode = "single", style = "", attrs = "", inputAttrs = "") {
         const styleAttr = style ? " style='" + escapeAttr(style) + "'" : "";
         const extraAttrs = attrs ? " " + attrs : "";
+        const extraInputAttrs = inputAttrs ? " " + inputAttrs : "";
         const buttonLabel = mode === "list" ? "Pick keycodes" : "Pick keycode";
         return "<label" + styleAttr + extraAttrs + "><span>" + escapeHtml(label) + "</span><span class='input-with-button'>" +
-            "<input id='" + escapeAttr(id) + "' value='" + escapeAttr(value || "") + "' placeholder='" + escapeAttr(placeholder || "") + "'>" +
+            "<input id='" + escapeAttr(id) + "' value='" + escapeAttr(value || "") + "' placeholder='" + escapeAttr(placeholder || "") + "'" + extraInputAttrs + ">" +
             "<button type='button' data-action='openKeyPicker' data-target='" + escapeAttr(id) + "' data-mode='" + escapeAttr(mode) + "'>" + buttonLabel + "</button>" +
             "</span></label>";
     }
@@ -7035,7 +7163,7 @@ function getClientScript() {
         return "<div class='card' data-dirty-section>" +
             "<h3>Append simple single tap branch row</h3>" +
             "<div class='form-grid'>" +
-            "<label><span>Key</span><input id='behaviorKeycode' placeholder='A'></label>" +
+            "<label><span>Key</span><input id='behaviorKeycode' data-validate='layout-key' placeholder='A'></label>" +
             renderTimingInput("behaviorTapHoldTerm", "tap_hold_term", "", "") +
             renderActionInputs("tap", "Tap", ["", "TAP_SENDS"]) +
             renderActionInputs("hold", "Hold", ["", "PRESS_AND_HOLD_UNTIL_RELEASE", "TAP_AT_HOLD_THRESHOLD", "TAP_ON_RELEASE_AFTER_HOLD", "REPEAT_WHILE_HELD"]) +
@@ -7047,7 +7175,7 @@ function getClientScript() {
     function renderActionInputs(prefix, label, helpers) {
         const hasRepeat = helpers.includes("REPEAT_WHILE_HELD");
         return renderHelperControl(prefix, label, helpers, "") +
-            renderKeyPickerInput(prefix + "Action", label + " action", "", "Esc, Shift+\`, Cmd+Q", "single", "", "data-helper-action-prefix='" + escapeAttr(prefix) + "' hidden") +
+            renderKeyPickerInput(prefix + "Action", label + " action", "", "Esc, Shift+\`, Cmd+Q", "single", "", "data-helper-action-prefix='" + escapeAttr(prefix) + "' hidden", "data-validate='layout-key'") +
             (hasRepeat ? "<label data-helper-field data-helper-prefix='" + prefix + "' data-helper-value='REPEAT_WHILE_HELD' hidden><span>" + label + " repeat Hz</span><input id='" + prefix + "Repeat' data-validate='positive-int' inputmode='numeric' placeholder='only for REPEAT_WHILE_HELD'></label>" : "");
     }
 
@@ -7924,10 +8052,23 @@ function getClientScript() {
         const label = "VIA " + macroSlotNumber(slot.keycode);
         const state = dirty ? "edited" : empty ? "empty" : payload.length + " chars";
         const classes = ["macro-slot-button", active ? "active" : "", dirty ? "dirty" : "", empty ? "empty" : ""].filter(Boolean).join(" ");
-        return "<button type='button' role='option' aria-selected='" + (active ? "true" : "false") + "' class='" + classes + "' data-action='selectMacroSlot' data-keycode='" + escapeAttr(slot.keycode) + "'>" +
+        const tooltip = macroSlotTooltip(label, state, payload);
+        return "<button type='button' role='option' aria-selected='" + (active ? "true" : "false") + "' class='" + classes + "' data-action='selectMacroSlot' data-keycode='" + escapeAttr(slot.keycode) + "' data-tooltip='" + escapeAttr(tooltip) + "'>" +
             "<span class='macro-slot-title'>" + escapeHtml(label) + "</span>" +
             "<span class='macro-slot-state'>" + escapeHtml(state) + "</span>" +
             "</button>";
+    }
+
+    function macroSlotTooltip(label, state, payload) {
+        const text = String(payload || "");
+        const preview = text ? text : "empty";
+        return label + " - " + state + "\\nPayload: " + truncateTooltipText(preview, 420);
+    }
+
+    function truncateTooltipText(value, limit) {
+        const text = String(value || "");
+        if (text.length <= limit) return text;
+        return text.slice(0, Math.max(0, limit - 3)) + "...";
     }
 
     function renderMacroWorkbench(slot) {
@@ -7972,8 +8113,8 @@ function getClientScript() {
             "<label><span>Step type</span><select id='macroStepType' name='macroStepType'>" + optionsWithLabels(typeOptions, "tap") + "</select></label>" +
             "<div class='macro-step-fields'>" +
             "<label data-macro-step-field='text' hidden><span>Text</span><input id='macroStepText' placeholder='hello'></label>" +
-            renderKeyPickerInput("macroStepKeys", "Macro keys", "", "A, Cmd+Space, KC_LGUI, KC_SPC", "list", "", "data-macro-step-field='tap'") +
-            renderKeyPickerInput("macroStepKey", "Macro key", "", "Shift", "single", "", "data-macro-step-field='down up' hidden") +
+            renderKeyPickerInput("macroStepKeys", "Macro keys", "", "A, Cmd+Space, KC_LGUI, KC_SPC", "list", "", "data-macro-step-field='tap'", "data-validate='macro-key-list'") +
+            renderKeyPickerInput("macroStepKey", "Macro key", "", "Shift", "single", "", "data-macro-step-field='down up' hidden", "data-validate='macro-key-single'") +
             "<label data-macro-step-field='delay' hidden><span>Delay ms</span><input id='macroStepDelay' data-validate='positive-int' inputmode='numeric' value='250'></label>" +
             "</div>" +
             "<div class='macro-composer-actions'>" +
@@ -8618,11 +8759,11 @@ function getClientScript() {
             const input = workbench.querySelector("#macroStepText");
             const text = input?.value || "";
             if (!text) {
-                setFieldError(input, "Enter text to insert.");
+                reportFieldError(input, "Enter text to insert.");
                 return "";
             }
             if (/[{}]/.test(text)) {
-                setFieldError(input, "Text steps cannot include { or }.");
+                reportFieldError(input, "Text steps cannot include { or }.");
                 return "";
             }
             setFieldError(input, "");
@@ -8632,19 +8773,23 @@ function getClientScript() {
             const input = workbench.querySelector("#macroStepDelay");
             const delay = String(input?.value || "").trim();
             const error = validatePositiveInteger(delay, "Enter a positive delay in milliseconds.");
-            setFieldError(input, error);
-            return error ? "" : "{" + delay + "}";
+            if (error) {
+                reportFieldError(input, error);
+                return "";
+            }
+            setFieldError(input, "");
+            return "{" + delay + "}";
         }
         if (type === "tap") {
             const input = workbench.querySelector("#macroStepKeys");
             const keys = canonicalMacroKeySequence(input?.value || "");
             if (!keys.length) {
-                setFieldError(input, "Choose at least one key.");
+                reportFieldError(input, "Choose at least one key.");
                 return "";
             }
             const keyError = macroPayloadKeyListError(keys);
             if (keyError) {
-                setFieldError(input, keyError);
+                reportFieldError(input, keyError);
                 return "";
             }
             setFieldError(input, "");
@@ -8654,12 +8799,12 @@ function getClientScript() {
             const input = workbench.querySelector("#macroStepKey");
             const keys = canonicalMacroKeySequence(input?.value || "");
             if (keys.length !== 1) {
-                setFieldError(input, "Choose exactly one key.");
+                reportFieldError(input, "Choose exactly one key.");
                 return "";
             }
             const keyError = macroPayloadKeyListError(keys);
             if (keyError) {
-                setFieldError(input, keyError);
+                reportFieldError(input, keyError);
                 return "";
             }
             setFieldError(input, "");
