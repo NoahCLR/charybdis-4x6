@@ -3059,6 +3059,11 @@ function getStudioHtml() {
             border-color: var(--accent);
             background: #1f5d52;
         }
+        .layout-combo-actions .combo-pick-toggle:not(.active) {
+            border-color: #d45b5b;
+            background: #8a3030;
+            color: #fff0f0;
+        }
         .layout-combo-selected-list {
             display: flex;
             flex-wrap: wrap;
@@ -3087,8 +3092,11 @@ function getStudioHtml() {
         }
         .macro-slot-browser {
             display: grid;
+            grid-template-rows: auto minmax(0, 1fr);
             gap: 10px;
             min-width: 0;
+            min-height: 0;
+            overflow: hidden;
         }
         .macro-slot-browser h3 {
             margin-bottom: 0;
@@ -3096,8 +3104,9 @@ function getStudioHtml() {
         .macro-slot-list {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+            align-content: start;
             gap: 6px;
-            max-height: 620px;
+            min-height: 0;
             overflow: auto;
             padding-right: 2px;
         }
@@ -3262,7 +3271,7 @@ function getStudioHtml() {
             display: grid;
             grid-template-rows: auto 38px 14px;
             align-items: start;
-            justify-items: start;
+            justify-items: center;
             gap: 4px;
             min-height: 0;
             width: 100%;
@@ -3317,7 +3326,7 @@ function getStudioHtml() {
         }
         .macro-recorder-toggle-label {
             min-width: 0;
-            text-align: left;
+            text-align: center;
             white-space: nowrap;
             font-size: 11px;
         }
@@ -3866,10 +3875,12 @@ function getStudioHtml() {
             .macro-builder-grid,
             .macro-tool-row,
             .macro-composer-grid,
-            .macro-recorder-primary-row,
             .macro-recorder-controls,
             .macro-recorder-delay-fields {
                 grid-template-columns: 1fr;
+            }
+            .macro-recorder-primary-row {
+                grid-template-columns: minmax(0, 1fr) minmax(72px, 92px);
             }
             .macro-recorder-actions {
                 justify-content: stretch;
@@ -3958,6 +3969,7 @@ function getClientScript() {
     let localRedoStack = [];
     let currentLocalSnapshot = "";
     let restoringLocalSnapshot = false;
+    let macroSlotHeightFrame = 0;
     const localHistoryLimit = 100;
     const keyBehaviorTermMaxMs = ${KEY_BEHAVIOR_TERM_MAX_MS};
     const tapCountNames = ${JSON.stringify(TAP_COUNT_NAMES)};
@@ -4413,6 +4425,7 @@ function getClientScript() {
     });
     window.addEventListener("keydown", handleMacroRecorderKeyEvent, true);
     window.addEventListener("keyup", handleMacroRecorderKeyEvent, true);
+    window.addEventListener("resize", scheduleMacroSlotBrowserHeightSync);
     document.addEventListener("keydown", (event) => {
         if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
         const key = String(event.key || "").toLowerCase();
@@ -5381,6 +5394,30 @@ function getClientScript() {
         app.innerHTML = renderDiagnostics() + renderViewTabs() + renderActiveView();
         initializeDirtyTracking();
         hydrateTooltips();
+        scheduleMacroSlotBrowserHeightSync();
+    }
+
+    function scheduleMacroSlotBrowserHeightSync() {
+        if (macroSlotHeightFrame) return;
+        macroSlotHeightFrame = requestAnimationFrame(() => {
+            macroSlotHeightFrame = 0;
+            syncMacroSlotBrowserHeight();
+        });
+    }
+
+    function syncMacroSlotBrowserHeight() {
+        const browser = document.querySelector(".macro-slot-browser");
+        const main = document.querySelector(".macro-builder-main");
+        if (!browser || !main) return;
+        browser.style.height = "";
+        const browserRect = browser.getBoundingClientRect();
+        const mainRect = main.getBoundingClientRect();
+        const sideBySide = Math.abs(browserRect.top - mainRect.top) < 8 && browserRect.width > 0 && mainRect.width > 0;
+        if (!sideBySide) return;
+        const height = Math.ceil(mainRect.height);
+        if (height > 0) {
+            browser.style.height = height + "px";
+        }
     }
 
     function resetLocalHistory() {
@@ -6053,7 +6090,7 @@ function getClientScript() {
             renderKeyPickerInput("layoutComboInputs", "Inputs", inputValue, "D, F", "list", "", "data-combo-inputs", "data-validate='combo-inputs'") +
             "<div class='layout-combo-selected-list'>" + selectedList + "</div>" +
             "<div class='layout-combo-actions'>" +
-            "<button type='button' class='" + (layoutComboPicking ? "active" : "") + "' aria-pressed='" + (layoutComboPicking ? "true" : "false") + "' data-action='toggleLayoutComboPicking'>" + inputPickingLabel + "</button>" +
+            "<button type='button' class='combo-pick-toggle " + (layoutComboPicking ? "active" : "") + "' aria-pressed='" + (layoutComboPicking ? "true" : "false") + "' data-action='toggleLayoutComboPicking'>" + inputPickingLabel + "</button>" +
             "<button type='button' data-action='clearLayoutComboSelection'>Clear</button>" +
             "</div>" +
             "<button data-action='addLayoutCombo' data-dirty-button class='primary'>Append combo row</button>" +
@@ -8036,7 +8073,7 @@ function getClientScript() {
     }
 
     function renderMacroSlotBrowser(slots) {
-        return "<div class='macro-slot-browser'>" +
+        return "<div class='card macro-slot-browser'>" +
             "<h3>VIA Macro Slots</h3>" +
             "<div class='macro-slot-list' role='listbox' aria-label='VIA macro slots'>" +
             slots.map(renderMacroSlotButton).join("") +
@@ -8610,6 +8647,7 @@ function getClientScript() {
         recorder.innerHTML = renderMacroRecorderBody(slot);
         validateSection(recorder, false);
         hydrateTooltips();
+        scheduleMacroSlotBrowserHeightSync();
     }
 
     function refreshMacroSlotButton(keycode) {
@@ -8894,6 +8932,7 @@ function getClientScript() {
                 else clearFieldError(control);
             }
         }
+        scheduleMacroSlotBrowserHeightSync();
     }
 
     function refreshMacroPreview(workbench) {
@@ -8903,6 +8942,7 @@ function getClientScript() {
         if (preview) {
             preview.innerHTML = renderMacroPreviewBody(payload);
             hydrateTooltips();
+            scheduleMacroSlotBrowserHeightSync();
         }
     }
 
