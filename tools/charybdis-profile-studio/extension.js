@@ -505,7 +505,11 @@ async function handleWebviewMessage(panel, root, message) {
             return;
         }
         case "updateLayoutKeys":
-            await patchLayoutKeys(root, message.layer, message.changes);
+            if (Array.isArray(message.layers)) {
+                await patchLayoutKeyGroups(root, message.layers);
+            } else {
+                await patchLayoutKeys(root, message.layer, message.changes);
+            }
             await postModel(panel, root, "Updated keymap.c layout keys.");
             return;
         case "updateLayerColor":
@@ -1259,6 +1263,45 @@ async function patchLayoutKeys(root, layer, changes) {
     await writeText(context.filePath, next);
 }
 
+async function patchLayoutKeyGroups(root, groups) {
+    const normalizedGroups = (Array.isArray(groups) ? groups : [])
+        .map((group) => ({
+            layer: normalizeExpr(group?.layer || ""),
+            changes: Array.isArray(group?.changes) ? group.changes : [],
+        }))
+        .filter((group) => group.layer && group.changes.length);
+    if (!normalizedGroups.length) {
+        return;
+    }
+
+    const keymapPath = path.join(root, KEYMAP_RELATIVE_PATH);
+    let text = await fs.readFile(keymapPath, "utf8");
+    const knownTokens = knownLayoutKeyTokens(text);
+    const replacements = [];
+    for (const group of normalizedGroups) {
+        assertSafeIdentifier(group.layer, "layer");
+        const context = layoutSlotContextFromText(keymapPath, text, group.layer);
+        const normalizedChanges = normalizeLayoutKeyChanges(group.changes, knownTokens);
+        for (const change of normalizedChanges) {
+            const token = layoutSlotToken(context, change.layoutIndex);
+            replacements.push({
+                start: token.start,
+                end: token.end,
+                value: change.keycode,
+            });
+        }
+    }
+    if (!replacements.length) {
+        return;
+    }
+
+    replacements.sort((left, right) => right.start - left.start);
+    for (const replacement of replacements) {
+        text = replaceRange(text, replacement.start, replacement.end, replacement.value);
+    }
+    await writeText(keymapPath, text);
+}
+
 async function applyLayerChanges(root, adds, deletes) {
     const normalizedAdds = normalizeLayerAdds(adds);
     const normalizedDeletes = normalizeLayerDeletes(deletes);
@@ -1564,6 +1607,10 @@ function collectLayoutKeyTokens(expression, tokens) {
 async function readLayoutSlotContext(root, layer) {
     const filePath = path.join(root, KEYMAP_RELATIVE_PATH);
     const text = await fs.readFile(filePath, "utf8");
+    return layoutSlotContextFromText(filePath, text, layer);
+}
+
+function layoutSlotContextFromText(filePath, text, layer) {
     const array = findInitializerBody(text, /keymaps\s*\[\]\s*\[MATRIX_ROWS\]\s*\[MATRIX_COLS\]\s*=/);
     const layerCall = findLayerLayoutCall(array.body, layer);
     const argsBody = array.body.slice(layerCall.argsStart, layerCall.argsEnd);
@@ -5203,20 +5250,21 @@ function getClientScript() {
             layoutComboInputs = "";
             post({ type: "addCombo", ...payload });
         } else if (action === "applyLayoutChanges") {
-            if (pendingLayerAdd(activeLayer)) {
-                notice = "Use Apply layer changes to write staged new-layer key edits.";
+            const groups = pendingLayoutChangeGroups();
+            const stagedEditLayer = groups.find((group) => pendingLayerAdd(group.layer));
+            if (stagedEditLayer) {
+                notice = "Use Apply layer changes to write staged key edits on " + stagedEditLayer.layer + ".";
                 render();
                 return;
             }
-            const changes = pendingLayoutChanges(activeLayer);
-            const stagedLayer = pendingAddedLayerReference(changes);
+            const stagedLayer = pendingAddedLayerReference(groups.flatMap((group) => group.changes));
             if (stagedLayer) {
                 notice = "Apply layer changes before writing layout keys that reference " + stagedLayer.name + ".";
                 render();
                 return;
             }
-            if (changes.length) {
-                post({ type: "updateLayoutKeys", layer: activeLayer, changes });
+            if (groups.length) {
+                post({ type: "updateLayoutKeys", layers: groups });
             }
         } else if (action === "addBehavior") {
             post({ type: "addBehavior", behavior: readBehaviorForm() });
@@ -5575,6 +5623,22 @@ function getClientScript() {
                 return original && change.keycode && !layoutKeyEquivalent(change.keycode, original.keycode);
             })
             .sort((left, right) => left.layoutIndex - right.layoutIndex);
+    }
+
+    function pendingLayoutChangeGroups() {
+        return Object.keys(pendingLayoutEdits)
+            .map((layer) => ({ layer, changes: pendingLayoutChanges(layer) }))
+            .filter((group) => group.changes.length)
+            .sort((left, right) => layerOrderIndex(left.layer) - layerOrderIndex(right.layer));
+    }
+
+    function pendingLayoutChangeCount() {
+        return pendingLayoutChangeGroups().reduce((count, group) => count + group.changes.length, 0);
+    }
+
+    function layerOrderIndex(layerName) {
+        const index = layersForUi().findIndex((layer) => layer.name === layerName);
+        return index === -1 ? Number.MAX_SAFE_INTEGER : index;
     }
 
     function stageLayoutKey(layoutIndex, keycode, layerName = activeLayer) {
@@ -6894,7 +6958,7 @@ function getClientScript() {
     }
 
     function layoutViewHasUnsavedChanges() {
-        return Boolean(hasPendingLayerChanges() || Object.keys(pendingLayoutEdits).some((layerName) => pendingLayoutChanges(layerName).length));
+        return Boolean(hasPendingLayerChanges() || pendingLayoutChangeCount());
     }
 
     function macroViewHasUnsavedChanges() {
@@ -7632,17 +7696,17 @@ function getClientScript() {
     }
 
     function renderLayoutBoardFooter(layer) {
-        const changes = pendingLayoutChanges(layer.name);
-        if (!changes.length && !layoutNotice) return "";
+        const count = pendingLayoutChangeCount();
+        if (!count && !layoutNotice) return "";
         return "<div class='layout-board-footer'>" +
             (layoutNotice ? "<div class='layout-board-notice'>" + escapeHtml(layoutNotice) + "</div>" : "") +
-            renderLayoutBoardApplyButton(changes) +
+            renderLayoutBoardApplyButton(count) +
             "</div>";
     }
 
-    function renderLayoutBoardApplyButton(changes) {
-        if (!changes.length) return "";
-        const label = "Apply " + changes.length + " layout " + (changes.length === 1 ? "change" : "changes");
+    function renderLayoutBoardApplyButton(count) {
+        if (!count) return "";
+        const label = count === 1 ? "Apply layout change" : "Apply all " + count + " layout changes";
         return "<div class='layout-board-apply'>" +
             "<button type='button' data-action='applyLayoutChanges' class='primary dirty' aria-label='" + escapeAttr("Unsaved changes: " + label) + "'>" + escapeHtml(label) + "</button>" +
             "</div>";
