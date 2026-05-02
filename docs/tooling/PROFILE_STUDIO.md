@@ -3,9 +3,10 @@
 Charybdis Profile Studio is the repo-local VS Code extension under
 [`tools/charybdis-profile-studio/`](../../tools/charybdis-profile-studio/).
 
-It is intentionally standalone: the authored `.c` files remain the source of
+It is intentionally standalone: the authored source files remain the source of
 truth, and the extension writes only these files:
 
+- [`config.h`](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h)
 - [`keymap.c`](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c)
 - [`rgb_config.c`](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c)
 
@@ -17,6 +18,9 @@ back to the same blocks.
 
 - `keymaps[][]` layer keycode slots through a physical SVG board based on the
   profile introspection geometry
+- staged layer add/delete changes; applying them updates the layer enum in
+  `config.h`, transparent `keymaps[][]` blocks in `keymap.c`, and random
+  default `layer_colors[]` rows in `rgb_config.c`
 - `layer_colors[]`
 - `pd_mode_colors[]`
 - RGB LED group tables, including appending new inline `RGB_LED_GROUP(...)`
@@ -56,6 +60,12 @@ expressions such as `LT(LAYER_NAV, KC_F)` remain valid. Layout-slot rejection
 messages appear at the bottom of the Layout board beside the layout apply area.
 Staged layout edits are written to `keymap.c` only when the Layout board's
 apply button is pressed.
+Layer add/delete is a separate staged operation: the `+` button opens an inline
+new-layer form, the staged layer starts fully transparent, the `-` button
+stages deletion of the active non-base layer, and `Apply layer changes` is the
+only action that writes those structural changes to source. Deletes fail if
+references to the layer remain in the authored files after the owned enum,
+keymap block, layer color, and layer LED group rows are removed.
 The Layout page also has a combo sidecar below the selected-key editor. Its
 `Pick input keys on layout` action lets the active layer board choose multiple
 physical keys as the new combo inputs, and the input field also exposes the
@@ -93,7 +103,7 @@ Numeric-only fields such as HSV hue/saturation channels, timing overrides, and
 repeat-Hz values are validated inline before the studio sends a write request;
 the extension validates the request again before patching the backing `.c`
 file.
-The header Refresh button reloads `keymap.c` and `rgb_config.c` from disk and
+The header Refresh button reloads `keymap.c`, `config.h`, and `rgb_config.c` from disk and
 discards uncommitted Studio edits, including dirty fields, staged layout edits,
 combo input picking, RGB group selections, picker state, and undo/redo history.
 

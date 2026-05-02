@@ -499,6 +499,11 @@ async function handleWebviewMessage(panel, root, message) {
         case "openSource":
             await openSource(root, message.file);
             return;
+        case "applyLayerChanges": {
+            await applyLayerChanges(root, message.adds, message.deletes);
+            await postModel(panel, root, "Applied staged layer changes.", { activeLayer: message.activeLayer, appliedLayerChanges: true });
+            return;
+        }
         case "updateLayoutKeys":
             await patchLayoutKeys(root, message.layer, message.changes);
             await postModel(panel, root, "Updated keymap.c layout keys.");
@@ -549,14 +554,14 @@ async function handleWebviewMessage(panel, root, message) {
 }
 
 async function openSource(root, file) {
-    const relative = file === "rgb" ? RGB_RELATIVE_PATH : KEYMAP_RELATIVE_PATH;
+    const relative = file === "rgb" ? RGB_RELATIVE_PATH : file === "config" ? KEYMAP_CONFIG_RELATIVE_PATH : KEYMAP_RELATIVE_PATH;
     const document = await vscode.workspace.openTextDocument(path.join(root, relative));
     await vscode.window.showTextDocument(document, vscode.ViewColumn.Beside);
 }
 
-async function postModel(panel, root, notice) {
+async function postModel(panel, root, notice, options = {}) {
     const model = await buildModel(root);
-    panel.webview.postMessage({ type: "model", model, notice });
+    panel.webview.postMessage({ type: "model", model, notice, ...options });
 }
 
 async function buildModel(root) {
@@ -590,6 +595,7 @@ async function buildModel(root) {
         root,
         files: {
             keymap: KEYMAP_RELATIVE_PATH,
+            config: KEYMAP_CONFIG_RELATIVE_PATH,
             rgb: RGB_RELATIVE_PATH,
         },
         layers: safe("layers", [], () => parseLayers(keymapText)),
@@ -1253,6 +1259,270 @@ async function patchLayoutKeys(root, layer, changes) {
     await writeText(context.filePath, next);
 }
 
+async function applyLayerChanges(root, adds, deletes) {
+    const normalizedAdds = normalizeLayerAdds(adds);
+    const normalizedDeletes = normalizeLayerDeletes(deletes);
+    if (!normalizedAdds.length && !normalizedDeletes.length) {
+        return;
+    }
+
+    const duplicateAdd = duplicateLayerName(normalizedAdds.map((layer) => layer.name));
+    if (duplicateAdd) {
+        throw new Error(`Layer ${duplicateAdd} is staged more than once.`);
+    }
+    for (const layer of normalizedAdds) {
+        if (normalizedDeletes.includes(layer.name)) {
+            throw new Error(`Layer ${layer.name} cannot be added and deleted in the same apply.`);
+        }
+    }
+
+    const configPath = path.join(root, KEYMAP_CONFIG_RELATIVE_PATH);
+    const keymapPath = path.join(root, KEYMAP_RELATIVE_PATH);
+    const rgbPath = path.join(root, RGB_RELATIVE_PATH);
+    let configText = await fs.readFile(configPath, "utf8");
+    let keymapText = await fs.readFile(keymapPath, "utf8");
+    let rgbText = await fs.readFile(rgbPath, "utf8");
+
+    const existingLayerNames = new Set(parseLayers(keymapText).map((layer) => layer.name));
+    for (const layer of normalizedDeletes) {
+        if (layer === "LAYER_BASE") {
+            throw new Error("LAYER_BASE cannot be deleted.");
+        }
+        if (!existingLayerNames.has(layer)) {
+            throw new Error(`Cannot delete missing layer ${layer}.`);
+        }
+    }
+    for (const layer of normalizedAdds) {
+        if (existingLayerNames.has(layer.name)) {
+            throw new Error(`Layer ${layer.name} already exists.`);
+        }
+    }
+
+    for (const layer of normalizedDeletes) {
+        configText = removeLayerEnumEntry(configText, layer);
+        keymapText = removeKeymapLayerBlock(keymapText, layer);
+        rgbText = removeLayerColorEntry(rgbText, layer);
+        rgbText = removeLayerLedGroupRows(rgbText, layer);
+    }
+    for (const layer of normalizedAdds) {
+        configText = insertLayerEnumEntry(configText, layer.name);
+        keymapText = insertKeymapLayerBlock(keymapText, layer.name, layer.keycodes);
+        rgbText = insertLayerColorEntry(rgbText, layer);
+    }
+
+    for (const layer of normalizedDeletes) {
+        const remaining = remainingLayerReferences(layer, [configText, keymapText, rgbText]);
+        if (remaining.length) {
+            throw new Error(`Cannot delete ${layer}; references remain in ${remaining.join(", ")}.`);
+        }
+    }
+
+    await writeText(configPath, configText);
+    await writeText(keymapPath, keymapText);
+    await writeText(rgbPath, rgbText);
+}
+
+function normalizeLayerAdds(adds) {
+    return (Array.isArray(adds) ? adds : []).map((layer) => {
+        const name = normalizeLayerName(layer?.name);
+        assertSafeIdentifier(name, "layer");
+        const keycodes = (Array.isArray(layer?.keycodes) ? layer.keycodes : [])
+            .map((keycode) => normalizeUserKeyExpression(keycode || "_______"));
+        if (keycodes.length !== LAYOUT_SLOT_COUNT) {
+            throw new Error(`${name} expected ${LAYOUT_SLOT_COUNT} layout entries, got ${keycodes.length}`);
+        }
+        for (const keycode of keycodes) {
+            assertSafeExpression(keycode, `${name} keycode`);
+            assertLayoutKeyExpression(keycode, `${name} keycode`);
+        }
+
+        const hue = normalizeExpr(layer?.color?.h ?? "0");
+        const sat = normalizeExpr(layer?.color?.s ?? "255");
+        const val = normalizeExpr(layer?.color?.v ?? "RGB_MATRIX_MAXIMUM_BRIGHTNESS");
+        assertUint8Channel(hue, `${name} hue`);
+        assertUint8Channel(sat, `${name} saturation`);
+        assertSafeExpression(val, `${name} value`);
+        const mode = normalizeExpr(layer?.color?.mode || "KEYS_MAPPED_ON_THIS_LAYER_ONLY");
+        assertAllowed(mode, LAYER_COLOR_MODES, `${name} layer color mode`);
+        return { name, keycodes, color: { h: hue, s: sat, v: val }, mode };
+    });
+}
+
+function normalizeLayerDeletes(deletes) {
+    return uniqueStrings((Array.isArray(deletes) ? deletes : [])
+        .map((layer) => normalizeLayerName(layer))
+        .filter(Boolean));
+}
+
+function normalizeLayerName(value) {
+    const normalized = String(value || "").trim().toUpperCase().replace(/[^A-Z0-9_]+/g, "_").replace(/^_+|_+$/g, "");
+    if (!normalized) return "";
+    return normalized.startsWith("LAYER_") ? normalized : `LAYER_${normalized}`;
+}
+
+function duplicateLayerName(names) {
+    const seen = new Set();
+    for (const name of names || []) {
+        if (seen.has(name)) return name;
+        seen.add(name);
+    }
+    return "";
+}
+
+function insertLayerEnumEntry(text, layer) {
+    assertSafeIdentifier(layer, "layer");
+    const body = findEnumBody(text, /enum\s+charybdis_keymap_layers\s*\{/);
+    if (new RegExp(`\\b${escapeRegex(layer)}\\b`).test(body.body)) {
+        throw new Error(`Layer ${layer} already exists in config.h.`);
+    }
+    const sentinel = /^(\s*)LAYER_COUNT\b/m.exec(body.body);
+    if (!sentinel) {
+        throw new Error("Could not find LAYER_COUNT in layer enum.");
+    }
+    const insertAt = body.bodyStart + sentinel.index;
+    const indent = sentinel[1] || "    ";
+    return replaceRange(text, insertAt, insertAt, `${indent}${layer},\n`);
+}
+
+function removeLayerEnumEntry(text, layer) {
+    assertSafeIdentifier(layer, "layer");
+    const body = findEnumBody(text, /enum\s+charybdis_keymap_layers\s*\{/);
+    const pattern = new RegExp(`^\\s*${escapeRegex(layer)}\\b[^\\n]*(?:\\n|$)`, "m");
+    const match = pattern.exec(body.body);
+    if (!match) {
+        throw new Error(`Could not find ${layer} in layer enum.`);
+    }
+    return replaceRange(text, body.bodyStart + match.index, body.bodyStart + match.index + match[0].length, "");
+}
+
+function insertKeymapLayerBlock(text, layer, keycodes) {
+    assertSafeIdentifier(layer, "layer");
+    const array = findInitializerBody(text, /keymaps\s*\[\]\s*\[MATRIX_ROWS\]\s*\[MATRIX_COLS\]\s*=/);
+    if (new RegExp(`\\[${escapeRegex(layer)}\\]\\s*=`).test(array.body)) {
+        throw new Error(`Layer ${layer} already exists in keymap.c.`);
+    }
+    const clang = /(?:^|\n)\s*\/\/\s*clang-format on\b/.exec(array.body);
+    const insertAt = clang ? array.bodyStart + clang.index + (clang[0].startsWith("\n") ? 1 : 0) : array.bodyEnd;
+    return replaceRange(text, insertAt, insertAt, formatKeymapLayerBlock(layer, keycodes));
+}
+
+function removeKeymapLayerBlock(text, layer) {
+    assertSafeIdentifier(layer, "layer");
+    const array = findInitializerBody(text, /keymaps\s*\[\]\s*\[MATRIX_ROWS\]\s*\[MATRIX_COLS\]\s*=/);
+    const call = findLayerLayoutCall(array.body, layer);
+    const entryStart = text.lastIndexOf("\n", array.bodyStart + call.matchStart) + 1;
+    let entryEnd = array.bodyStart + call.argsEnd + 1;
+    while (entryEnd < text.length && /\s/.test(text[entryEnd])) entryEnd += 1;
+    if (text[entryEnd] === ",") entryEnd += 1;
+    if (text[entryEnd] === "\r") entryEnd += 1;
+    if (text[entryEnd] === "\n") entryEnd += 1;
+    return replaceRange(text, entryStart, entryEnd, "");
+}
+
+function formatKeymapLayerBlock(layer, keycodes) {
+    const rows = [
+        keycodes.slice(0, 12),
+        keycodes.slice(12, 24),
+        keycodes.slice(24, 36),
+        keycodes.slice(36, 48),
+        keycodes.slice(48, 53),
+        keycodes.slice(53, 56),
+    ];
+    const lines = [`    [${layer}] = LAYOUT(`];
+    lines.push("  // ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮");
+    lines.push(formatKeymapMainRow(rows[0]));
+    lines.push("  // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤");
+    lines.push(formatKeymapMainRow(rows[1]));
+    lines.push("  // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤");
+    lines.push(formatKeymapMainRow(rows[2]));
+    lines.push("  // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤");
+    lines.push(formatKeymapMainRow(rows[3]));
+    lines.push("  // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯");
+    lines.push(formatKeymapThumbRow(rows[4], 75));
+    lines.push(formatKeymapThumbRow(rows[5], 94, false));
+    lines.push("  //                                                                ╰────────────────────────────────────────────────────╯ ╰────────────────────────────────────────────────────╯");
+    lines.push("    ),");
+    lines.push("");
+    return lines.join("\n");
+}
+
+function formatKeymapMainRow(keys) {
+    const left = " ".repeat(18) + keys[0] + keys.slice(1, 6).map((keycode) => "," + keycode.padStart(18, " ")).join("");
+    const right = keys.slice(6);
+    return left + ",   " + right[0].padStart(18, " ") + right.slice(1).map((keycode) => "," + keycode.padStart(18, " ")).join("") + ",";
+}
+
+function formatKeymapThumbRow(keys, indent, trailingComma = true) {
+    const suffix = trailingComma ? "," : "";
+    return " ".repeat(indent) + keys[0] + keys.slice(1).map((keycode, index) => {
+        const gap = (keys.length === 5 && index === 2) || (keys.length === 3 && index === 1) ? ",   " : ",";
+        return gap + keycode.padStart(18, " ");
+    }).join("") + suffix;
+}
+
+function insertLayerColorEntry(text, layer) {
+    assertSafeIdentifier(layer.name, "layer");
+    const initializer = findInitializerBody(text, /layer_colors\s*\[LAYER_COUNT\]\s*=/);
+    if (new RegExp(`\\[${escapeRegex(layer.name)}\\]\\s*=`).test(initializer.body)) {
+        throw new Error(`Layer ${layer.name} already exists in layer_colors[].`);
+    }
+    const entry = `    [${layer.name}] =
+        {
+            .color = HSV(${layer.color.h}, ${layer.color.s}, ${layer.color.v}),
+            .mode  = ${layer.mode},
+        },
+`;
+    return replaceRange(text, initializer.bodyEnd, initializer.bodyEnd, entry);
+}
+
+function removeLayerColorEntry(text, layer) {
+    return removeDesignatedInitializerEntry(text, /layer_colors\s*\[LAYER_COUNT\]\s*=/, `[${layer}]`);
+}
+
+function removeDesignatedInitializerEntry(text, initializerPattern, designator) {
+    const initializer = findInitializerBody(text, initializerPattern);
+    const entries = splitTopLevelWithRanges(initializer.body);
+    const entry = entries.find((candidate) => initializer.body.slice(candidate.start, candidate.end).trim().startsWith(`${designator} =`));
+    if (!entry) {
+        throw new Error(`Could not find ${designator} entry.`);
+    }
+    const start = text.lastIndexOf("\n", initializer.bodyStart + entry.start) + 1;
+    let end = initializer.bodyStart + entry.end;
+    while (end < text.length && /\s/.test(text[end])) end += 1;
+    if (text[end] === ",") end += 1;
+    if (text[end] === "\r") end += 1;
+    if (text[end] === "\n") end += 1;
+    return replaceRange(text, start, end, "");
+}
+
+function removeLayerLedGroupRows(text, layer) {
+    const range = findCallRange(text, /layer_led_groups_data\s*\[\]\s*=\s*RGB_LED_GROUP_TABLE\s*/);
+    const rows = splitTopLevelWithRanges(range.body)
+        .filter((row) => {
+            const source = range.body.slice(row.start, row.end).trim();
+            if (!source || source.startsWith("//") || source.startsWith("/*")) return false;
+            return new RegExp(`\\.layer\\s*=\\s*${escapeRegex(layer)}\\b`).test(source);
+        })
+        .sort((left, right) => right.start - left.start);
+    let next = text;
+    for (const row of rows) {
+        let start = next.lastIndexOf("\n", range.bodyStart + row.start) + 1;
+        let end = range.bodyStart + row.end;
+        while (end < next.length && /\s/.test(next[end])) end += 1;
+        if (next[end] === ",") end += 1;
+        if (next[end] === "\r") end += 1;
+        if (next[end] === "\n") end += 1;
+        next = replaceRange(next, start, end, "");
+    }
+    return next;
+}
+
+function remainingLayerReferences(layer, texts) {
+    return texts.map((text, index) => ({ text, label: [KEYMAP_CONFIG_RELATIVE_PATH, KEYMAP_RELATIVE_PATH, RGB_RELATIVE_PATH][index] }))
+        .filter((entry) => new RegExp(`\\b${escapeRegex(layer)}\\b`).test(maskCommentsPreserveLength(entry.text)))
+        .map((entry) => entry.label);
+}
+
 function normalizeLayoutKeyChanges(changes, knownTokens = new Set()) {
     const byIndex = new Map();
     for (const change of Array.isArray(changes) ? changes : []) {
@@ -1743,6 +2013,7 @@ function findLayerLayoutCall(arrayBody, layer) {
     const open = arrayBody.indexOf("(", match.index);
     const close = findMatching(arrayBody, open, "(", ")");
     return {
+        matchStart: match.index,
         argsStart: open + 1,
         argsEnd: close,
     };
@@ -1784,6 +2055,24 @@ function findInitializerBody(text, pattern) {
     const open = text.indexOf("{", match.index + match[0].length);
     if (open === -1) {
         throw new Error(`Could not find initializer body for ${pattern}.`);
+    }
+    const close = findMatching(text, open, "{", "}");
+    return {
+        bodyStart: open + 1,
+        bodyEnd: close,
+        body: text.slice(open + 1, close),
+    };
+}
+
+function findEnumBody(text, pattern) {
+    pattern.lastIndex = 0;
+    const match = pattern.exec(text);
+    if (!match) {
+        throw new Error(`Could not find enum for ${pattern}.`);
+    }
+    const open = text.indexOf("{", match.index + match[0].length - 1);
+    if (open === -1) {
+        throw new Error(`Could not find enum body for ${pattern}.`);
     }
     const close = findMatching(text, open, "{", "}");
     return {
@@ -2462,6 +2751,9 @@ function editLabelForKeycode(keycode) {
 
 function displayKeyExpression(expression) {
     const normalized = normalizeExpr(expression);
+    if (normalized === "_______") {
+        return normalized;
+    }
     if (QMK_KEY_LABELS[normalized]) {
         return QMK_KEY_LABELS[normalized];
     }
@@ -2887,6 +3179,61 @@ function getStudioHtml() {
         .tab.active {
             border-color: var(--accent);
             background: #1f5d52;
+        }
+        .layer-tabs {
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .layer-tab.pending-add {
+            border-color: var(--warn);
+            color: #fff4d2;
+        }
+        .layer-tab.pending-delete {
+            border-color: var(--danger);
+            color: #ffd8d8;
+            text-decoration: line-through;
+        }
+        .layer-tab-action {
+            min-width: 34px;
+            padding-inline: 10px;
+            font-weight: 700;
+        }
+        .layer-flow-card {
+            display: grid;
+            gap: 10px;
+            margin: 0 0 12px;
+            padding: 10px;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: rgba(23, 28, 32, 0.34);
+        }
+        .layer-flow-row {
+            display: grid;
+            grid-template-columns: minmax(220px, 1fr) repeat(2, minmax(110px, auto));
+            gap: 8px;
+            align-items: end;
+        }
+        .layer-flow-actions {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(120px, auto) minmax(180px, auto);
+            gap: 8px;
+            align-items: center;
+        }
+        .layer-flow-summary {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            min-width: 0;
+        }
+        .layer-flow-card .macro-chip.delete {
+            border-color: rgba(255, 107, 107, 0.42);
+            color: #ffd8d8;
+        }
+        @media (max-width: 860px) {
+            .layer-flow-row,
+            .layer-flow-actions {
+                grid-template-columns: 1fr;
+            }
         }
         .board {
             overflow-x: auto;
@@ -3946,10 +4293,11 @@ function getStudioHtml() {
     <header>
         <div>
             <h1>Charybdis Profile Studio</h1>
-            <div id="subtitle" class="muted">Loading keymap.c and rgb_config.c</div>
+            <div id="subtitle" class="muted">Loading keymap.c, config.h, and rgb_config.c</div>
         </div>
         <div class="toolbar">
             <button id="openKeymap">Open keymap.c</button>
+            <button id="openConfig">Open config.h</button>
             <button id="openRgb">Open rgb_config.c</button>
             <button id="refresh" class="primary">Refresh</button>
         </div>
@@ -3994,6 +4342,10 @@ function getClientScript() {
     let macroRecorderNotice = "";
     let macroRecorderHistoryStart = "";
     let pendingLayoutEdits = {};
+    let pendingLayerAdds = [];
+    let pendingLayerDeletes = [];
+    let layerAddOpen = false;
+    let layerDraftName = "";
     let copiedLayoutKey = "";
     let layoutDragState = undefined;
     let suppressNextLayoutClick = false;
@@ -4008,6 +4360,7 @@ function getClientScript() {
     let restoringLocalSnapshot = false;
     let macroSlotHeightFrame = 0;
     const localHistoryLimit = 100;
+    const layoutSlotCount = ${LAYOUT_SLOT_COUNT};
     const keyBehaviorTermMaxMs = ${KEY_BEHAVIOR_TERM_MAX_MS};
     const tapCountNames = ${JSON.stringify(TAP_COUNT_NAMES)};
     const views = [
@@ -4017,8 +4370,9 @@ function getClientScript() {
     ];
     const headerTooltips = {
         openKeymap: "Open keymap.c beside the studio so you can inspect or hand-edit the source.",
+        openConfig: "Open config.h beside the studio so you can inspect layer enum and timing settings.",
         openRgb: "Open rgb_config.c beside the studio so you can inspect or hand-edit the source.",
-        refresh: "Reload keymap.c and rgb_config.c from disk, discarding uncommitted Studio edits."
+        refresh: "Reload keymap.c, config.h, and rgb_config.c from disk, discarding uncommitted Studio edits."
     };
     const viewTooltips = {
         layout: "Edit layer keys and behavior rows using the physical keyboard layout as the filter.",
@@ -4051,6 +4405,12 @@ function getClientScript() {
         updateAutomouseFade: "Write the auto-mouse fade color and mode back to rgb_config.c.",
         updateComboFeedback: "Write combo feedback color and locality back to rgb_config.c.",
         updateKeyBehaviorFeedback: "Write all key behavior feedback colors and policy fields back to rgb_config.c.",
+        showAddLayerDraft: "Open the staged new-layer form. Nothing is written until Apply layer changes.",
+        cancelLayerDraft: "Close the new-layer form without staging a layer.",
+        stageLayerDraft: "Stage a fully transparent layer with a random RGB color.",
+        deleteLayerDraft: "Stage deletion of the active layer. Apply will fail if firmware references still use it.",
+        discardLayerChanges: "Discard staged layer additions and deletions.",
+        applyLayerChanges: "Write staged layer additions and deletions to config.h, keymap.c, and rgb_config.c.",
         addRgbLedGroup: "Append a new LED group row using the selected LEDs and current color.",
         clearRgbSelection: "Remove all currently selected LEDs from the group builder.",
         toggleRgbTrackball: "Add or remove the trackball LED index 56 from the group builder.",
@@ -4408,8 +4768,9 @@ function getClientScript() {
         discardLocalDraftState();
         post({ type: "refresh" });
     });
-    document.getElementById("openKeymap").addEventListener("click", () => post({ type: "openSource", file: "keymap" }));
-    document.getElementById("openRgb").addEventListener("click", () => post({ type: "openSource", file: "rgb" }));
+    document.getElementById("openKeymap").addEventListener("click", () => vscode.postMessage({ type: "openSource", file: "keymap" }));
+    document.getElementById("openConfig").addEventListener("click", () => vscode.postMessage({ type: "openSource", file: "config" }));
+    document.getElementById("openRgb").addEventListener("click", () => vscode.postMessage({ type: "openSource", file: "rgb" }));
     document.addEventListener("pointerover", (event) => {
         const target = tooltipTarget(event.target);
         if (target) showTooltip(target, event);
@@ -4525,9 +4886,21 @@ function getClientScript() {
             macroPayloadKeycodes = new Set(model.macroPayloadKeycodes || []);
             notice = event.data.notice || "";
             layoutNotice = "";
-            if (!activeLayer && model.layers.length) {
-                activeLayer = model.layers[0].name;
+            if (event.data.appliedLayerChanges) {
+                const appliedLayerNames = new Set(pendingLayerAdds.map((layer) => layer.name).concat(pendingLayerDeletes));
+                pendingLayerAdds = [];
+                pendingLayerDeletes = [];
+                pendingLayoutEdits = Object.fromEntries(
+                    Object.entries(pendingLayoutEdits).filter(([layerName]) => !appliedLayerNames.has(layerName))
+                );
+                layerAddOpen = false;
+                layerDraftName = "";
             }
+            if (event.data.activeLayer) {
+                activeLayer = event.data.activeLayer;
+            }
+            reconcilePendingLayerStructure();
+            normalizeActiveLayer();
             reconcilePendingLayoutEdits();
             normalizeLayoutComboState();
             normalizeMacroBuilderState();
@@ -4580,7 +4953,37 @@ function getClientScript() {
         if (writeActions.has(action) && !validateWriteTarget(target)) {
             return;
         }
-        if (action === "selectLayer") {
+        if (action === "showAddLayerDraft") {
+            const before = currentLocalSnapshot || serializeLocalState();
+            layerAddOpen = true;
+            layerDraftName = nextLayerDraftName();
+            render();
+            commitLocalHistory(before);
+        } else if (action === "cancelLayerDraft") {
+            const before = currentLocalSnapshot || serializeLocalState();
+            layerAddOpen = false;
+            layerDraftName = "";
+            render();
+            commitLocalHistory(before);
+        } else if (action === "stageLayerDraft") {
+            const before = currentLocalSnapshot || serializeLocalState();
+            if (stageNewLayerDraft(target)) {
+                commitLocalHistory(before);
+            }
+        } else if (action === "deleteLayerDraft") {
+            const before = currentLocalSnapshot || serializeLocalState();
+            if (stageDeleteActiveLayer()) {
+                commitLocalHistory(before);
+            }
+        } else if (action === "discardLayerChanges") {
+            const before = currentLocalSnapshot || serializeLocalState();
+            discardLayerStructureDrafts();
+            render();
+            commitLocalHistory(before);
+        } else if (action === "applyLayerChanges") {
+            if (!hasPendingLayerChanges()) return;
+            post({ type: "applyLayerChanges", ...layerStructurePayload(), activeLayer });
+        } else if (action === "selectLayer") {
             activeLayer = target.dataset.layer;
             selectedKey = 0;
             layoutNotice = "";
@@ -4772,7 +5175,18 @@ function getClientScript() {
             layoutComboInputs = "";
             post({ type: "addCombo", ...payload });
         } else if (action === "applyLayoutChanges") {
+            if (pendingLayerAdd(activeLayer)) {
+                notice = "Use Apply layer changes to write staged new-layer key edits.";
+                render();
+                return;
+            }
             const changes = pendingLayoutChanges(activeLayer);
+            const stagedLayer = pendingAddedLayerReference(changes);
+            if (stagedLayer) {
+                notice = "Apply layer changes before writing layout keys that reference " + stagedLayer.name + ".";
+                render();
+                return;
+            }
             if (changes.length) {
                 post({ type: "updateLayoutKeys", layer: activeLayer, changes });
             }
@@ -4844,6 +5258,9 @@ function getClientScript() {
             layoutComboInputs = event.target.value;
             syncLayoutComboSelectionFromInputs();
             refreshLayoutComboSelection(event.target.closest("[data-combo-builder]"));
+        }
+        if (event.target?.id === "layerDraftName") {
+            layerDraftName = event.target.value;
         }
         if (event.target?.closest?.("[data-combo-builder]")) {
             updateLayoutComboClearState(event.target.closest("[data-combo-builder]"));
@@ -5037,8 +5454,64 @@ function getClientScript() {
         return layer.positions.find((position) => position.layoutIndex === layoutIndex) || layer.positions[layoutIndex];
     }
 
+    function layersForUi() {
+        const deleted = new Set(pendingLayerDeletes);
+        return (model.layers || [])
+            .filter((layer) => !deleted.has(layer.name))
+            .concat(pendingLayerAdds);
+    }
+
+    function pendingLayerAdd(name) {
+        return pendingLayerAdds.find((layer) => layer.name === name);
+    }
+
+    function originalLayer(name) {
+        return (model.layers || []).find((layer) => layer.name === name);
+    }
+
     function baseLayer(layerName = activeLayer) {
-        return model.layers.find((layer) => layer.name === layerName) || model.layers[0];
+        return layersForUi().find((layer) => layer.name === layerName) || layersForUi()[0];
+    }
+
+    function reconcilePendingLayerStructure() {
+        const modelNames = new Set((model.layers || []).map((layer) => layer.name));
+        const deleteNames = new Set();
+        pendingLayerDeletes = (Array.isArray(pendingLayerDeletes) ? pendingLayerDeletes : [])
+            .map(normalizeLayerNameInput)
+            .filter((name) => {
+                if (!name || name === "LAYER_BASE" || !modelNames.has(name) || deleteNames.has(name)) return false;
+                deleteNames.add(name);
+                return true;
+            });
+
+        const addNames = new Set();
+        pendingLayerAdds = (Array.isArray(pendingLayerAdds) ? pendingLayerAdds : []).filter((layer) => {
+            const name = normalizeLayerNameInput(layer?.name);
+            if (!name || modelNames.has(name) || addNames.has(name) || deleteNames.has(name)) return false;
+            if (!Array.isArray(layer.positions) || layer.positions.length !== layoutSlotCount) return false;
+            layer.name = name;
+            layer.pendingAdd = true;
+            if (!layer.rgbColor) layer.rgbColor = randomLayerColor();
+            addNames.add(name);
+            return true;
+        });
+    }
+
+    function normalizeActiveLayer() {
+        const layers = layersForUi();
+        if (!layers.length) {
+            activeLayer = "";
+            selectedKey = 0;
+            return;
+        }
+        if (!layers.some((layer) => layer.name === activeLayer)) {
+            activeLayer = layers[0].name;
+        }
+        const layer = layers.find((candidate) => candidate.name === activeLayer) || layers[0];
+        const positions = layer.positions || [];
+        if (!Number.isInteger(selectedKey) || selectedKey < 0 || selectedKey >= positions.length) {
+            selectedKey = 0;
+        }
     }
 
     function layerPendingLayoutEdits(layerName = activeLayer) {
@@ -5169,7 +5642,7 @@ function getClientScript() {
         const tokens = new Set(Object.keys(qmkKeyLabels));
         tokens.add("_______");
         tokens.add("XXXXXXX");
-        for (const layer of model?.layers || []) {
+        for (const layer of layersForUi()) {
             for (const position of layer.positions || []) {
                 collectLayoutKeyTokens(position.keycode, tokens);
             }
@@ -5347,6 +5820,158 @@ function getClientScript() {
         return true;
     }
 
+    function stageNewLayerDraft(target) {
+        const card = target.closest("[data-layer-flow]") || document;
+        const input = card.querySelector("#layerDraftName");
+        const name = normalizeLayerNameInput(input?.value || layerDraftName);
+        if (!name) {
+            notice = "Enter a layer name such as LAYER_MEDIA.";
+            render();
+            return false;
+        }
+        if (!/^LAYER_[A-Z0-9_]+$/.test(name)) {
+            notice = "Layer names must use letters, numbers, and underscores.";
+            render();
+            return false;
+        }
+        if (layersForUi().some((layer) => layer.name === name)) {
+            notice = name + " already exists.";
+            render();
+            return false;
+        }
+        if (pendingLayerDeletes.includes(name)) {
+            notice = name + " is already staged for deletion.";
+            render();
+            return false;
+        }
+
+        pendingLayerAdds = pendingLayerAdds.concat([createTransparentLayerDraft(name)]);
+        layerAddOpen = false;
+        layerDraftName = "";
+        activeLayer = name;
+        selectedKey = 0;
+        layoutComboPicking = false;
+        layoutComboSelection = [];
+        layoutComboOutput = "";
+        layoutComboInputs = "";
+        notice = "Staged " + name + ". Use Apply layer changes to write config.h, keymap.c, and rgb_config.c.";
+        render();
+        return true;
+    }
+
+    function stageDeleteActiveLayer() {
+        if (!activeLayer) return false;
+        if (activeLayer === "LAYER_BASE") {
+            notice = "LAYER_BASE cannot be deleted.";
+            render();
+            return false;
+        }
+
+        const deleteName = activeLayer;
+        const added = pendingLayerAdd(deleteName);
+        if (added) {
+            pendingLayerAdds = pendingLayerAdds.filter((layer) => layer.name !== deleteName);
+            delete pendingLayoutEdits[deleteName];
+            notice = "Discarded staged layer " + deleteName + ".";
+        } else if (!pendingLayerDeletes.includes(deleteName)) {
+            pendingLayerDeletes = pendingLayerDeletes.concat([deleteName]);
+            notice = "Staged deletion of " + deleteName + ". Use Apply layer changes to write source files.";
+        }
+
+        const nextLayers = layersForUi();
+        activeLayer = nextLayers[0]?.name || "";
+        selectedKey = 0;
+        layoutComboPicking = false;
+        layoutComboSelection = [];
+        layoutComboOutput = "";
+        layoutComboInputs = "";
+        render();
+        return true;
+    }
+
+    function discardLayerStructureDrafts() {
+        const addedNames = new Set(pendingLayerAdds.map((layer) => layer.name));
+        pendingLayerAdds = [];
+        pendingLayerDeletes = [];
+        pendingLayoutEdits = Object.fromEntries(
+            Object.entries(pendingLayoutEdits).filter(([layerName]) => !addedNames.has(layerName) && originalLayer(layerName))
+        );
+        layerAddOpen = false;
+        layerDraftName = "";
+        normalizeActiveLayer();
+        notice = "Discarded staged layer changes.";
+    }
+
+    function layerStructurePayload() {
+        return {
+            adds: pendingLayerAdds.map((layer) => ({
+                name: layer.name,
+                keycodes: Array.from({ length: layoutSlotCount }, (_, layoutIndex) => {
+                    const position = layer.positions.find((candidate) => candidate.layoutIndex === layoutIndex) || layer.positions[layoutIndex];
+                    const edit = pendingLayoutEdits[layer.name]?.[layoutIndex];
+                    return edit || position?.keycode || "_______";
+                }),
+                color: layer.rgbColor,
+            })),
+            deletes: pendingLayerDeletes.slice(),
+        };
+    }
+
+    function createTransparentLayerDraft(name) {
+        return {
+            name,
+            pendingAdd: true,
+            rgbColor: randomLayerColor(),
+            positions: Array.from({ length: layoutSlotCount }, (_, index) => ({
+                layoutIndex: index,
+                keycode: "_______",
+                display: displayKeyExpression("_______"),
+                editLabel: displayKeyExpression("_______"),
+            })),
+        };
+    }
+
+    function randomLayerColor() {
+        return {
+            h: String(Math.floor(Math.random() * 256)),
+            s: "255",
+            v: "RGB_MATRIX_MAXIMUM_BRIGHTNESS",
+            mode: "KEYS_MAPPED_ON_THIS_LAYER_ONLY",
+        };
+    }
+
+    function normalizeLayerNameInput(value) {
+        const normalized = String(value || "").trim().toUpperCase().replace(/[^A-Z0-9_]+/g, "_").replace(/^_+|_+$/g, "");
+        if (!normalized) return "";
+        return normalized.startsWith("LAYER_") ? normalized : "LAYER_" + normalized;
+    }
+
+    function nextLayerDraftName() {
+        let index = 1;
+        let name = "LAYER_NEW";
+        const used = new Set(layersForUi().map((layer) => layer.name).concat(pendingLayerDeletes));
+        while (used.has(name)) {
+            index += 1;
+            name = "LAYER_NEW_" + index;
+        }
+        return name;
+    }
+
+    function hasPendingLayerChanges() {
+        return Boolean(pendingLayerAdds.length || pendingLayerDeletes.length);
+    }
+
+    function pendingAddedLayerReference(changes) {
+        return pendingLayerAdds.find((layer) =>
+            changes.some((change) => expressionReferencesToken(change.keycode, layer.name))
+        );
+    }
+
+    function expressionReferencesToken(expression, token) {
+        const escaped = String(token || "").replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&");
+        return new RegExp("\\b" + escaped + "\\b").test(String(expression || ""));
+    }
+
     function canDragLayoutKey(event, target) {
         if (!target || activeView !== "layout" || layoutComboPicking || keyPicker) return false;
         if (event.button !== 0 || event.ctrlKey || event.metaKey || event.altKey) return false;
@@ -5502,6 +6127,10 @@ function getClientScript() {
         macroDrafts = {};
         resetMacroRecorderState();
         pendingLayoutEdits = {};
+        pendingLayerAdds = [];
+        pendingLayerDeletes = [];
+        layerAddOpen = false;
+        layerDraftName = "";
         copiedLayoutKey = "";
         layoutDragState = undefined;
         suppressNextLayoutClick = false;
@@ -5614,6 +6243,10 @@ function getClientScript() {
             macroRecorderDelayThreshold,
             macroRecorderDelayRound,
             pendingLayoutEdits,
+            pendingLayerAdds,
+            pendingLayerDeletes,
+            layerAddOpen,
+            layerDraftName,
             controls: localEditableControls().map(controlSnapshot)
         });
     }
@@ -5646,6 +6279,12 @@ function getClientScript() {
             macroRecorderDelayRound = state.macroRecorderDelayRound || macroRecorderDelayRound;
             clearMacroRecorderSession(false);
             pendingLayoutEdits = state.pendingLayoutEdits && typeof state.pendingLayoutEdits === "object" ? state.pendingLayoutEdits : {};
+            pendingLayerAdds = Array.isArray(state.pendingLayerAdds) ? state.pendingLayerAdds : [];
+            pendingLayerDeletes = Array.isArray(state.pendingLayerDeletes) ? state.pendingLayerDeletes : [];
+            layerAddOpen = Boolean(state.layerAddOpen);
+            layerDraftName = state.layerDraftName || "";
+            reconcilePendingLayerStructure();
+            normalizeActiveLayer();
             normalizeLayoutComboState();
             normalizeMacroBuilderState();
             normalizeRgbGroupState();
@@ -6182,10 +6821,44 @@ function getClientScript() {
             "</div>";
     }
 
-    function renderLayerTabs() {
-        return "<div class='tabs'>" + model.layers.map((layer) =>
-            "<button class='tab " + (layer.name === activeLayer ? "active" : "") + "' data-action='selectLayer' data-layer='" + escapeAttr(layer.name) + "'>" + escapeHtml(layer.name) + "</button>"
-        ).join("") + "</div>";
+    function renderLayerTabs(showLayerFlow = true) {
+        const layers = layersForUi();
+        const deleteDisabled = !activeLayer || activeLayer === "LAYER_BASE";
+        return "<div class='tabs layer-tabs'>" + layers.map((layer) => {
+            const pending = pendingLayerAdd(layer.name);
+            return "<button class='tab layer-tab " + (layer.name === activeLayer ? "active " : "") + (pending ? "pending-add" : "") + "' data-action='selectLayer' data-layer='" + escapeAttr(layer.name) + "'>" + escapeHtml(layer.name + (pending ? " *" : "")) + "</button>";
+        }).join("") + (showLayerFlow ?
+            "<button type='button' class='layer-tab-action' data-action='showAddLayerDraft' aria-label='Add layer'>+</button>" +
+            "<button type='button' class='layer-tab-action' data-action='deleteLayerDraft'" + (deleteDisabled ? " disabled" : "") + " aria-label='Delete active layer'>-</button>" : "") +
+            "</div>" +
+            (showLayerFlow ? renderLayerFlow() : "");
+    }
+
+    function renderLayerFlow() {
+        if (!layerAddOpen && !hasPendingLayerChanges()) return "";
+        return "<div class='layer-flow-card' data-layer-flow>" +
+            (layerAddOpen ? renderLayerAddForm() : "") +
+            (hasPendingLayerChanges() ? renderLayerStructureActions() : "") +
+            "</div>";
+    }
+
+    function renderLayerAddForm() {
+        const name = layerDraftName || nextLayerDraftName();
+        return "<div class='layer-flow-row'>" +
+            "<label><span>New layer</span><input id='layerDraftName' value='" + escapeAttr(name) + "' placeholder='LAYER_MEDIA' spellcheck='false'></label>" +
+            "<button type='button' data-action='cancelLayerDraft'>Cancel</button>" +
+            "<button type='button' class='primary' data-action='stageLayerDraft'>Stage layer</button>" +
+            "</div>";
+    }
+
+    function renderLayerStructureActions() {
+        const additions = pendingLayerAdds.map((layer) => "<span class='macro-chip'><strong>add</strong> " + escapeHtml(layer.name) + "</span>");
+        const deletions = pendingLayerDeletes.map((layer) => "<span class='macro-chip delete'><strong>delete</strong> " + escapeHtml(layer) + "</span>");
+        return "<div class='layer-flow-actions'>" +
+            "<div class='layer-flow-summary'>" + additions.concat(deletions).join("") + "</div>" +
+            "<button type='button' data-action='discardLayerChanges'>Discard</button>" +
+            "<button type='button' class='primary dirty' data-action='applyLayerChanges'>Apply layer changes</button>" +
+            "</div>";
     }
 
     function renderLayoutWithSelectedKeyEditor(layer, selected) {
@@ -6461,7 +7134,7 @@ function getClientScript() {
             if (section.id === "layers") {
                 return {
                     ...section,
-                    rows: model.layers.map((layer) => {
+                    rows: layersForUi().map((layer) => {
                         const actions = [{
                             value: "MO(" + layer.name + ")",
                             label: "Hold " + layerShortName(layer.name),
@@ -6985,6 +7658,10 @@ function getClientScript() {
     }
 
     function colorForLayer(layerName) {
+        const pending = pendingLayerAdd(layerName);
+        if (pending?.rgbColor) {
+            return { layer: pending.name, color: pending.rgbColor, mode: pending.rgbColor.mode || "KEYS_MAPPED_ON_THIS_LAYER_ONLY" };
+        }
         return (model.rgb?.layerColors || []).find((row) => row.layer === layerName);
     }
 
@@ -7546,13 +8223,13 @@ function getClientScript() {
             "<div class='rgb-selected-list'><span class='rgb-led-list-label'>new row</span>" + selected + "</div>" +
             "<div class='rgb-selected-list rgb-defined-list'><span class='rgb-led-list-label'>defined</span>" + defined + "</div>" +
             "</div>" +
-            renderLayerTabs() +
+            renderLayerTabs(false) +
             renderRgbGroupBoard(layer) +
             "</div>";
     }
 
     function rgbGroupOwners(target) {
-        if (target === "layer") return model.layers.map((layer) => layer.name);
+        if (target === "layer") return layersForUi().map((layer) => layer.name);
         if (target === "pdMode") return (model.rgb?.pdModeColors || []).map((row) => row.pointingMode);
         if (target === "keyBehavior") return keyBehaviorRgbSemantics;
         return [];
@@ -9176,7 +9853,7 @@ function getClientScript() {
     }
 
     function currentLayer() {
-        return layerWithPendingLayoutEdits(model.layers.find((layer) => layer.name === activeLayer) || model.layers[0]);
+        return layerWithPendingLayoutEdits(layersForUi().find((layer) => layer.name === activeLayer) || layersForUi()[0]);
     }
 
     function layerWithPendingLayoutEdits(layer) {
@@ -9215,6 +9892,7 @@ function getClientScript() {
     function displayKeyExpression(value) {
         const normalized = normalizeDisplayExpression(value);
         if (!normalized) return "";
+        if (normalized === "_______") return normalized;
         if (qmkKeyLabels[normalized]) return qmkKeyLabels[normalized];
 
         let match = normalized.match(/^LT\\(LAYER_([^,]+),\\s*(.+)\\)$/);

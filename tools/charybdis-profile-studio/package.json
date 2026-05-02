@@ -1,7 +1,7 @@
 {
   "name": "charybdis-profile-studio",
   "displayName": "Charybdis Profile Studio",
-  "description": "A standalone VS Code editor for this repo's keymap.c and rgb_config.c authoring surfaces.",
+  "description": "A standalone VS Code editor for this repo's keymap.c, config.h, and rgb_config.c authoring surfaces.",
   "version": "0.0.1",
   "publisher": "noah",
   "private": true,
@@ -33,7 +33,7 @@
       "editor/title": [
         {
           "command": "charybdisProfileStudio.open",
-          "when": "resourceFilename == keymap.c || resourceFilename == rgb_config.c",
+          "when": "resourceFilename == keymap.c || resourceFilename == config.h || resourceFilename == rgb_config.c",
           "group": "navigation"
         }
       ]

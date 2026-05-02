@@ -297,7 +297,8 @@ This repo ships with small maintenance tools:
   the visual profile report and SVG previews. Full workflow:
   [`docs/tooling/PROFILE_INTROSPECT.md`](./docs/tooling/PROFILE_INTROSPECT.md)
 - [`tools/charybdis-profile-studio/`](./tools/charybdis-profile-studio/):
-  standalone VS Code extension for editing `keymap.c` and `rgb_config.c`
+  standalone VS Code extension for editing `keymap.c`, keymap `config.h`, and
+  `rgb_config.c`
   directly. Full workflow:
   [`docs/tooling/PROFILE_STUDIO.md`](./docs/tooling/PROFILE_STUDIO.md)
 
@@ -342,7 +343,7 @@ Use the docs based on what you need:
 - [`docs/tooling/PROFILE_INTROSPECT.md`](./docs/tooling/PROFILE_INTROSPECT.md):
   how the visual profile report is generated and verified
 - [`docs/tooling/PROFILE_STUDIO.md`](./docs/tooling/PROFILE_STUDIO.md): local
-  VS Code GUI for editing `keymap.c` and `rgb_config.c`
+  VS Code GUI for editing `keymap.c`, keymap `config.h`, and `rgb_config.c`
 - [`docs/KEYMAP.md`](./docs/KEYMAP.md): the current concrete profile choices
   and how the layers are currently used
 - [`docs/INTERACTION_MODEL.md`](./docs/INTERACTION_MODEL.md): the interaction
