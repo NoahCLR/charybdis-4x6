@@ -5064,7 +5064,8 @@ function getClientScript() {
             render();
             commitLocalHistory(before);
         } else if (action === "openKeyPicker") {
-            openKeyPicker(target.dataset.target, target.dataset.mode || "single");
+            const pickerTarget = target.dataset.target;
+            openKeyPicker(pickerTarget, target.dataset.mode || "single", pickerTarget === "keycodeInput" ? { layoutStageIndex: selectedKey } : {});
         } else if (action === "dismissStatus") {
             dismissedStatusSignature = currentStatusSignature();
             render();
@@ -5451,7 +5452,13 @@ function getClientScript() {
     function currentLayoutPosition(layoutIndex = selectedKey) {
         const layer = currentLayer();
         if (!layer) return undefined;
-        return layer.positions.find((position) => position.layoutIndex === layoutIndex) || layer.positions[layoutIndex];
+        return layerPositionByLayoutIndex(layer, layoutIndex);
+    }
+
+    function layerPositionByLayoutIndex(layer, layoutIndex) {
+        if (!layer) return undefined;
+        const positions = layer.positions || [];
+        return positions.find((position) => position.layoutIndex === layoutIndex) || positions[layoutIndex];
     }
 
     function layersForUi() {
@@ -6813,7 +6820,7 @@ function getClientScript() {
     function renderLayerStudio() {
         const layer = currentLayer();
         if (!layer) return panel("Layers", "<p class='muted'>No LAYOUT blocks found.</p>", true);
-        const selected = layer.positions[selectedKey] || layer.positions[0];
+        const selected = layerPositionByLayoutIndex(layer, selectedKey) || layer.positions[0];
         const selectedBehavior = behaviorForKey(selected.keycode);
         return "<div class='stack'>" +
             panel("Layout", renderLayerTabs() + renderLayoutWithSelectedKeyEditor(layer, selected) + renderSelectedBehaviorEditor(selected, selectedBehavior), true) +
