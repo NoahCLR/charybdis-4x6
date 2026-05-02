@@ -6847,27 +6847,40 @@ function getClientScript() {
         };
     }
 
-    function renderSvgLabel(label, cx, cy, textColor) {
-        const lines = fitLabelLines(label);
-        const fontSize = lines.some((line) => line.length > 9) ? 9 : lines.length > 1 ? 10 : 12;
-        const startY = cy - ((lines.length - 1) * fontSize * 0.58);
-        return "<text font-size='" + fontSize + "' fill='" + escapeAttr(textColor || "#e7ecef") + "'>" + lines.map((line, index) =>
-            "<tspan x='" + cx + "' y='" + (startY + index * fontSize * 1.18) + "'>" + escapeHtml(line) + "</tspan>"
-        ).join("") + "</text>";
+    function renderSvgLabel(label, cx, cy, textColor, options = {}) {
+        const clean = String(label || "").replace(/\\s+/g, " ").trim();
+        if (!clean) return "";
+        const maxWidth = options.maxWidth || keyboardGeometry.keyWidth - 10;
+        const maxFontSize = options.maxFontSize || 12;
+        const minFontSize = options.minFontSize || 7;
+        const widthAtOnePx = svgTextWidthEstimate(clean, 1);
+        const preferredFontSize = widthAtOnePx > 0 ? Math.min(maxFontSize, maxWidth / widthAtOnePx) : maxFontSize;
+        const fontSize = Math.max(minFontSize, preferredFontSize);
+        const constrained = widthAtOnePx * maxFontSize > maxWidth;
+        const fitAttrs = constrained ? " textLength='" + svgNumber(maxWidth) + "' lengthAdjust='spacingAndGlyphs'" : "";
+        return "<text x='" + svgNumber(cx) + "' y='" + svgNumber(cy) + "' font-size='" + svgNumber(fontSize) + "'" + fitAttrs + " fill='" + escapeAttr(textColor || "#e7ecef") + "'>" + escapeHtml(clean) + "</text>";
     }
 
-    function fitLabelLines(label) {
-        const clean = String(label || "").replace(/\\s+/g, " ").trim();
-        if (clean.length <= 9) return [clean];
-        if (clean.includes(" / ")) {
-            return clean.split(" / ").slice(0, 2).map((part, index) => index === 0 ? part : "/ " + part);
+    function svgTextWidthEstimate(text, fontSize) {
+        let units = 0;
+        for (const char of String(text || "")) {
+            units += svgCharWidthUnit(char);
         }
-        const words = clean.split(" ");
-        if (words.length > 1) {
-            const midpoint = Math.ceil(words.length / 2);
-            return [words.slice(0, midpoint).join(" "), words.slice(midpoint).join(" ")].filter(Boolean);
-        }
-        return [clean.slice(0, 9), clean.slice(9, 18)].filter(Boolean);
+        return units * fontSize;
+    }
+
+    function svgCharWidthUnit(char) {
+        if (char === " ") return 0.32;
+        if (/^[.,:;!'|]$/.test(char)) return 0.26;
+        if (/^[/\\\\()[\\]{}]$/.test(char)) return 0.34;
+        if (/^[MW@#%&]$/.test(char)) return 0.82;
+        if (/^[A-Z0-9_]$/.test(char)) return 0.62;
+        if (/^[a-z]$/.test(char)) return 0.54;
+        return 0.58;
+    }
+
+    function svgNumber(value) {
+        return Number(Number(value || 0).toFixed(2));
     }
 
     function colorForLayer(layerName) {
@@ -7722,8 +7735,13 @@ function getClientScript() {
         const transform = visual.angle ? " transform='rotate(" + visual.angle + " " + cx + " " + cy + ")'" : "";
         return "<g class='svg-key " + (selected ? "rgb-selected" : "") + (definedPreview ? " rgb-defined" : "") + (allPreview ? " rgb-all-preview" : "") + "' data-action='toggleRgbLed' data-led='" + ledIndex + "' data-tooltip='" + escapeAttr(tooltipText) + "'" + transform + ">" +
             "<rect data-rgb-led-preview x='" + visual.x + "' y='" + visual.y + "' width='" + keyboardGeometry.keyWidth + "' height='" + keyboardGeometry.keyHeight + "' rx='" + keyboardGeometry.radius + "' fill='" + selectedFill + "' stroke='" + (selected ? "#ffffff" : style.stroke) + "'></rect>" +
-            renderSvgLabel((position.display || position.keycode) + " " + ledIndex, cx, cy, selectedText) +
+            renderSvgLabel(position.display || position.keycode, cx, cy, selectedText, { maxFontSize: 11.5 }) +
+            renderRgbLedIndexLabel(ledIndex, visual, selectedText) +
             "</g>";
+    }
+
+    function renderRgbLedIndexLabel(ledIndex, visual, textColor) {
+        return "<text x='" + (visual.x + keyboardGeometry.keyWidth - 7) + "' y='" + (visual.y + keyboardGeometry.keyHeight - 7) + "' fill='" + escapeAttr(textColor || "#e7ecef") + "' font-size='8.5' text-anchor='end' dominant-baseline='central' font-weight='700'>" + escapeHtml(ledIndex) + "</text>";
     }
 
     function renderExtraLed(ledIndex, cx, cy) {
