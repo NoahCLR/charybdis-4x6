@@ -911,15 +911,16 @@ def parse_key_behavior_feedback_colors(
         args_start = tap_branch_match.end() - 1
         args_end = find_matching(body, args_start, "(", ")")
         tap_branch_args = strip_comments(body[args_start + 1 : args_end])
-        for tap_index, expr in enumerate(split_top_level(tap_branch_args)):
+        for color_index, expr in enumerate(split_top_level(tap_branch_args)):
+            tap_count = color_index + 2
             authored_color = parse_hsv_expr(expr, known_values)
             colors.append(
                 (
-                    tap_branch_match.start() + tap_index,
+                    tap_branch_match.start() + color_index,
                     {
-                        "field": f"tap_index_{tap_index}_branch_color",
-                        "label": f"Tap Index {tap_index}",
-                        "meaning": "Configured branch-confirmation color for this zero-based tap index. Runtime branch feedback is emitted only for double-tap and higher committed indexes; higher committed tap indexes clamp to the last configured branch color.",
+                        "field": f"tap_count_{tap_count}_branch_color",
+                        "label": f"Tap Count {tap_count}",
+                        "meaning": "Configured branch-confirmation color for this committed tap count. The table starts at double-tap because the base single-tap branch never emits branch-confirm feedback; higher committed tap counts clamp to the last configured branch color.",
                         "color": authored_color,
                         "preview_color": dict(authored_color),
                     },
@@ -928,7 +929,7 @@ def parse_key_behavior_feedback_colors(
 
     default_meanings = {
         "tap_pending_color": "Neutral unresolved multi-tap state for double-tap and higher branches while the runtime is still waiting to know which tap index wins; the base single-tap candidate stays quiet.",
-        "tap_committed_color": "Action feedback after committed tap branches that do not already have state feedback.",
+        "tap_committed_color": "Action feedback after committed tap-count branches that do not already have state feedback.",
         "hold_active_color": "Authored hold-tier pending / active states and hold-tier commit pulses.",
         "long_hold_active_color": "Authored long-hold-tier active states and long-hold-tier commit pulses.",
     }
@@ -1010,9 +1011,9 @@ def key_behavior_feedback_locality_description(locality: str) -> str:
 
 def key_behavior_feedback_tap_commit_mode_description(mode: str) -> str:
     descriptions = {
-        "KEY_FEEDBACK_TAP_COMMIT_OFF": "Do not pulse when authored tap branches commit.",
-        "KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS": "Pulse only for double-tap and higher tap branches; the base single-tap branch stays quiet.",
-        "KEY_FEEDBACK_TAP_COMMIT_ALL_TAPS": "Pulse for every authored tap branch that commits.",
+        "KEY_FEEDBACK_TAP_COMMIT_OFF": "Do not pulse when authored tap-count branches commit.",
+        "KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS": "Pulse only for double-tap and higher tap-count branches; the base single-tap branch stays quiet.",
+        "KEY_FEEDBACK_TAP_COMMIT_ALL_TAPS": "Pulse for every authored tap-count branch that commits.",
     }
     return descriptions.get(mode, "Unknown key-behavior tap-commit feedback mode.")
 

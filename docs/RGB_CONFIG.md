@@ -328,11 +328,10 @@ const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
     .tap_pending_color = HSV(0, 0, 150),
 
     RGB_TAP_BRANCH_COLORS(
-        HSV(235, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), // tap index 0
-        HSV(200, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), // tap index 1
-        HSV(180, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), // tap index 2
-        HSV(143, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), // tap index 3
-        HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),  // tap index 4
+        HSV(200, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), // tap count 2
+        HSV(180, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), // tap count 3
+        HSV(143, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), // tap count 4
+        HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),  // tap count 5
     ),
 
     .tap_committed_color     = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
@@ -361,20 +360,20 @@ same pending window.
 
 The `RGB_TAP_BRANCH_COLORS(...)` macro declares the confirmation colors used
 while a committed double-tap or higher branch is being held in the model-level
-branch-confirm window. The color table is authored in zero-based tap-index
-order, matching `key_behaviors[].tap_counts[]`. The base single-tap index is
-normally quiet, while double-tap and higher committed indexes use their matching
-entry and clamp to the last configured branch color if they exceed the table.
+branch-confirm window. The color table starts at tap count 2 because the base
+single-tap branch is quiet and never enters branch-confirm feedback. Double-tap
+and higher committed branches use their matching entry and clamp to the last
+configured branch color if they exceed the table.
 Inline C comments next to those `HSV(...)` arguments are allowed and are
 ignored by the profile introspector.
 
-The `tap_commit_mode` field controls which committed tap branches pulse with
+The `tap_commit_mode` field controls which committed tap-count branches pulse with
 `tap_committed_color`:
 
 - `KEY_FEEDBACK_TAP_COMMIT_OFF`: disable tap-commit pulses
 - `KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS`: pulse only for double-tap and
-  higher tap branches; the base single-tap branch stays quiet
-- `KEY_FEEDBACK_TAP_COMMIT_ALL_TAPS`: pulse for every committed tap branch
+  higher tap-count branches; the base single-tap branch stays quiet
+- `KEY_FEEDBACK_TAP_COMMIT_ALL_TAPS`: pulse for every committed tap-count branch
 
 The `locality` field controls where the overlay paints:
 
@@ -394,9 +393,9 @@ In the shared runtime, those colors are used for these categories:
 
 - multi-tap pending: the engine has not resolved the winning double-tap or
   higher branch yet; the base single-tap candidate stays quiet
-- tap branch committed: the winning double-tap or higher branch is known and
+- tap-count branch committed: the winning double-tap or higher branch is known and
   the model is in the branch-confirm window before firing that branch's action
-- tap committed: an authored tap branch has resolved and emitted output
+- tap committed: an authored tap-count branch has resolved and emitted output
 - hold pending: a hold path exists, but the final action is not resolved yet
 - hold trigger: a hold-tier action has just fired
 - long-hold trigger: a longer-hold tier action has just fired

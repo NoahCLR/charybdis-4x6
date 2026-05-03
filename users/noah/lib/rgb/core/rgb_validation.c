@@ -131,7 +131,7 @@ static void rgb_validation_log_invalid_key_behavior_feedback_tap_commit_mode(uin
 
 static void rgb_validation_log_invalid_key_behavior_feedback_tap_branch_colors(void) {
 #        ifdef CONSOLE_ENABLE
-    uprintf("Invalid key_behavior_feedback_colors tap-branch colors; RGB_TAP_BRANCH_COLORS(...) must provide at least one color\n");
+    uprintf("Invalid key_behavior_feedback_colors tap-count branch colors; RGB_TAP_BRANCH_COLORS(...) must provide at least one color\n");
 #        endif
 }
 

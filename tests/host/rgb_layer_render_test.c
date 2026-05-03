@@ -231,7 +231,7 @@ static rgb_t rgb_from_feedback_semantic(key_feedback_semantic_t semantic, uint8_
         case KEY_FEEDBACK_SEMANTIC_UNRESOLVED_TAP_BRANCH:
             return rgb_from_hsv(key_behavior_feedback_colors.tap_pending_color);
         case KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED: {
-            uint8_t index = tap_branch <= 1u ? 0u : (uint8_t)(tap_branch - 1u);
+            uint8_t index = tap_branch <= 2u ? 0u : (uint8_t)(tap_branch - 2u);
             if (index >= key_behavior_feedback_colors.tap_branch_color_count) {
                 index = (uint8_t)(key_behavior_feedback_colors.tap_branch_color_count - 1u);
             }
@@ -958,7 +958,7 @@ static void test_tap_branch_commit_uses_branch_color(void) {
 
     CHECK(render_output());
 
-    check_pending_feedback_from_left_source(rgb_from_tap_branch_color(1));
+    check_pending_feedback_from_left_source(rgb_from_tap_branch_color(0));
 }
 
 static void test_tap_branch_commit_color_clamps_to_last_configured_color(void) {
@@ -983,7 +983,7 @@ static void test_slave_tap_branch_commit_uses_remote_branch_color(void) {
 
     CHECK(render_output());
 
-    check_pending_feedback_from_left_source(rgb_from_tap_branch_color(2));
+    check_pending_feedback_from_left_source(rgb_from_tap_branch_color(1));
 }
 
 #if RGB_LAYER_RENDER_TEST_FEEDBACK_GROUPS

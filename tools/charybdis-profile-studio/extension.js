@@ -1794,7 +1794,7 @@ async function patchKeyBehaviorFeedback(root, config) {
         holdActiveColor: normalizeHsvRequest(config?.holdActiveColor, "hold active color"),
         longHoldActiveColor: normalizeHsvRequest(config?.longHoldActiveColor, "long-hold active color"),
         tapBranchColors: Array.isArray(config?.tapBranchColors)
-            ? config.tapBranchColors.map((color, index) => normalizeHsvRequest(color, `tap branch ${index} color`))
+            ? config.tapBranchColors.map((color, index) => normalizeHsvRequest(color, `tap count ${index + 2} branch color`))
             : [],
     };
     const tapCommitMode = normalizeExpr(config?.tapCommitMode || "");
@@ -2288,7 +2288,7 @@ function patchRgbTapBranchColorsInInitializer(text, initializerPattern, colors) 
     const args = slice.slice(open + 1, close);
     const items = splitTopLevelWithRanges(args);
     if (items.length !== colors.length) {
-        throw new Error(`Expected ${items.length} tap branch colors, got ${colors.length}.`);
+        throw new Error(`Expected ${items.length} tap-count branch colors, got ${colors.length}.`);
     }
 
     let next = text;
@@ -2297,7 +2297,7 @@ function patchRgbTapBranchColorsInInitializer(text, initializerPattern, colors) 
         const itemText = args.slice(item.start, item.end);
         const hsvMatch = /HSV\s*\([^)]*\)/.exec(itemText);
         if (!hsvMatch) {
-            throw new Error(`Could not patch tap branch color ${index}.`);
+            throw new Error(`Could not patch tap count ${index + 2} branch color.`);
         }
         const absoluteStart = initializer.bodyStart + open + 1 + item.start + hsvMatch.index;
         const absoluteEnd = absoluteStart + hsvMatch[0].length;
@@ -4540,7 +4540,7 @@ function getClientScript() {
         "Pointing-mode LED Groups": "Inspect pointing-mode-specific LED group rows from rgb_config.c.",
         "Combo Feedback": "Edit combo feedback color and locality.",
         "Combo Feedback LED Groups": "Inspect combo feedback LED group rows from rgb_config.c.",
-        "Key Behavior Feedback": "Edit tap, hold, long-hold, and tap-branch feedback colors and policy.",
+        "Key Behavior Feedback": "Edit tap, hold, long-hold, and tap-count branch-confirm colors and policy.",
         "Key Behavior Feedback LED Groups": "Inspect key-behavior feedback LED group rows from rgb_config.c."
     };
     const actionTooltips = {
@@ -4601,7 +4601,7 @@ function getClientScript() {
         tap_hold_term: "Optional milliseconds before a tap can become a hold for this behavior row. Valid range: 1-65535 ms.",
         longer_hold_term: "Optional milliseconds before a hold can become a long hold. Valid range: 1-65535 ms.",
         multi_tap_term: "Optional milliseconds used to detect repeated taps. Valid range: 1-65535 ms.",
-        branch_confirm_term: "Optional milliseconds before a tap branch is committed. Valid range: 0-65535 ms. Plain numbers are written as KEY_BEHAVIOR_TERM(ms).",
+        branch_confirm_term: "Optional milliseconds before a selected tap-count branch commits. Valid range: 0-65535 ms. Plain numbers are written as KEY_BEHAVIOR_TERM(ms).",
         table: "Choose which rgb_config.c LED group table will receive the new row.",
         owner: "The owner value for the target LED group table. Combo feedback groups do not need one.",
         "pointing mode": "The pointing mode whose color or LED group is being edited.",
@@ -4633,7 +4633,7 @@ function getClientScript() {
         rgb: "The RGB color and locality associated with this reachable pointing mode.",
         badge: "The small badge shown on the layout preview for this combo.",
         behavior: "The key behavior row attached to this keycode.",
-        steps: "Tap branch actions for this behavior row.",
+        steps: "Actions for each tap-count branch in this behavior row.",
         "key on layer": "Keys on the active layer that use this behavior row.",
         "reachable via": "The visible key or behavior action that can reach this pointing mode."
     };
@@ -4659,7 +4659,7 @@ function getClientScript() {
     ];
     const keyBehaviorRgbSemanticLabels = {
         KEY_FEEDBACK_GROUP_UNRESOLVED_TAP_BRANCH: "Tap pending",
-        KEY_FEEDBACK_GROUP_TAP_BRANCH_COMMITTED: "Tap branch committed",
+        KEY_FEEDBACK_GROUP_TAP_BRANCH_COMMITTED: "Committed tap-count branch",
         KEY_FEEDBACK_GROUP_TAP_COMMITTED: "Tap committed",
         KEY_FEEDBACK_GROUP_HOLD_ACTIVE: "Hold active",
         KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE: "Long hold active"
@@ -6921,7 +6921,7 @@ function getClientScript() {
             return "RGB color row for " + title + ". Click to expand the HSV picker and channel fields.";
         }
         if (summary.closest(".behavior-step")) {
-            return "Behavior actions for the " + title + ". Click to expand or collapse this tap branch.";
+            return "Behavior actions for the " + title + ". Click to expand or collapse this tap-count branch.";
         }
         return "Click to expand or collapse this section.";
     }
@@ -8343,7 +8343,7 @@ function getClientScript() {
 
     function renderBehaviorForm() {
         return "<div class='card' data-dirty-section>" +
-            "<h3>Append simple single tap branch row</h3>" +
+            "<h3>Append simple single-tap branch row</h3>" +
             "<div class='form-grid'>" +
             "<label><span>Key</span><input id='behaviorKeycode' data-validate='layout-key' placeholder='A'></label>" +
             renderTimingInput("behaviorTapHoldTerm", "tap_hold_term", "", "") +
@@ -8653,7 +8653,7 @@ function getClientScript() {
             for (let index = 0; index < branchColors.length; index += 1) {
                 rows.push({
                     semantic: "KEY_FEEDBACK_GROUP_TAP_BRANCH_COMMITTED",
-                    label: "Tap branch " + index + " committed",
+                    label: "Tap count " + (index + 2) + " branch committed",
                     color: branchColors[index] || fallback
                 });
             }
@@ -8905,7 +8905,7 @@ function getClientScript() {
             ["Hold active", "holdActiveColor", config.holdActiveColor],
             ["Long hold active", "longHoldActiveColor", config.longHoldActiveColor],
         ];
-        const branchRows = (config.tapBranchColors || []).map((color, index) => ["Tap branch " + index, "tapBranchColor" + index, color]);
+        const branchRows = (config.tapBranchColors || []).map((color, index) => ["Tap count " + (index + 2), "tapBranchColor" + (index + 2), color]);
         return "<div id='keyBehaviorFeedbackCard' class='card-list' data-dirty-section>" +
             "<details class='card collapsible-card'>" +
             "<summary><h3>Policy</h3></summary>" +

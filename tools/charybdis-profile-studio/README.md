@@ -53,7 +53,7 @@ those two files.
 - numeric-only fields such as HSV hue/saturation channels, behavior timing
   overrides, and repeat-Hz values are validated inline before writes are sent;
   the extension validates again before patching the backing `.c` file
-- named tap branch sections in the behavior editor are collapsible, and
+- named tap-count branch sections in the behavior editor are collapsible, and
   repeat Hz is only shown when the selected hold helper is
   `REPEAT_WHILE_HELD`
 - RGB submenus such as layer colors, pointing-mode colors, auto-mouse fade,
@@ -76,7 +76,7 @@ those two files.
   `KEY_FEEDBACK_GROUP_ALL` and lets firmware use the active semantic's
   configured tap/commit/hold/long-hold color; specific feedback group rows act
   as overrides on top of that all-feedback base, and selected LEDs preview that
-  mode as equal vertical bands including every configured tap-branch color
+  mode as equal vertical bands including every configured tap-count branch-confirm color
 - inspect every active `rgb_config.c` surface, including LED group tables,
   automouse fade, combo feedback, and key-behavior feedback
 - edit `pd_mode_colors[]` HSV values and locality

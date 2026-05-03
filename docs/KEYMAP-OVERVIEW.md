@@ -311,19 +311,18 @@ Current authored tap-commit feedback mode: `KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAP
 
 | Available Tap-Commit Mode | Meaning |
 | --- | --- |
-| `KEY_FEEDBACK_TAP_COMMIT_OFF` | Do not pulse when authored tap branches commit. |
-| `KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS` | Pulse only for double-tap and higher tap branches; the base single-tap branch stays quiet. |
-| `KEY_FEEDBACK_TAP_COMMIT_ALL_TAPS` | Pulse for every authored tap branch that commits. |
+| `KEY_FEEDBACK_TAP_COMMIT_OFF` | Do not pulse when authored tap-count branches commit. |
+| `KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS` | Pulse only for double-tap and higher tap-count branches; the base single-tap branch stays quiet. |
+| `KEY_FEEDBACK_TAP_COMMIT_ALL_TAPS` | Pulse for every authored tap-count branch that commits. |
 
 | State | Meaning | Authored HSV | Preview Color |
 | --- | --- | --- | --- |
 | `Tap Pending` | Neutral unresolved multi-tap state for double-tap and higher branches while the runtime is still waiting to know which tap index wins; the base single-tap candidate stays quiet. | `HSV(0, 0, 150)` | <img alt="Tap Pending color" src="media/profile-introspection/profile-color-swatch-ffffff.svg" width="96" height="28" /> |
-| `Tap Index 0` | Configured branch-confirmation color for this zero-based tap index. Runtime branch feedback is emitted only for double-tap and higher committed indexes; higher committed tap indexes clamp to the last configured branch color. | `HSV(235, 255, 200)` | <img alt="Tap Index 0 color" src="media/profile-introspection/profile-color-swatch-ff0078.svg" width="96" height="28" /> |
-| `Tap Index 1` | Configured branch-confirmation color for this zero-based tap index. Runtime branch feedback is emitted only for double-tap and higher committed indexes; higher committed tap indexes clamp to the last configured branch color. | `HSV(200, 255, 200)` | <img alt="Tap Index 1 color" src="media/profile-introspection/profile-color-swatch-b400ff.svg" width="96" height="28" /> |
-| `Tap Index 2` | Configured branch-confirmation color for this zero-based tap index. Runtime branch feedback is emitted only for double-tap and higher committed indexes; higher committed tap indexes clamp to the last configured branch color. | `HSV(180, 255, 200)` | <img alt="Tap Index 2 color" src="media/profile-introspection/profile-color-swatch-3c00ff.svg" width="96" height="28" /> |
-| `Tap Index 3` | Configured branch-confirmation color for this zero-based tap index. Runtime branch feedback is emitted only for double-tap and higher committed indexes; higher committed tap indexes clamp to the last configured branch color. | `HSV(143, 255, 200)` | <img alt="Tap Index 3 color" src="media/profile-introspection/profile-color-swatch-00a2ff.svg" width="96" height="28" /> |
-| `Tap Index 4` | Configured branch-confirmation color for this zero-based tap index. Runtime branch feedback is emitted only for double-tap and higher committed indexes; higher committed tap indexes clamp to the last configured branch color. | `HSV(85, 255, 200)` | <img alt="Tap Index 4 color" src="media/profile-introspection/profile-color-swatch-00ff00.svg" width="96" height="28" /> |
-| `Tap Committed` | Used for committed tap branches that do not already have state feedback. | `HSV(85, 255, 200)` | <img alt="Tap Committed color" src="media/profile-introspection/profile-color-swatch-00ff00.svg" width="96" height="28" /> |
+| `Tap Count 2` | Configured branch-confirmation color for this committed tap count. The table starts at double-tap because the base single-tap branch never emits branch-confirm feedback; higher committed tap counts clamp to the last configured branch color. | `HSV(200, 255, 200)` | <img alt="Tap Count 2 color" src="media/profile-introspection/profile-color-swatch-b400ff.svg" width="96" height="28" /> |
+| `Tap Count 3` | Configured branch-confirmation color for this committed tap count. The table starts at double-tap because the base single-tap branch never emits branch-confirm feedback; higher committed tap counts clamp to the last configured branch color. | `HSV(180, 255, 200)` | <img alt="Tap Count 3 color" src="media/profile-introspection/profile-color-swatch-3c00ff.svg" width="96" height="28" /> |
+| `Tap Count 4` | Configured branch-confirmation color for this committed tap count. The table starts at double-tap because the base single-tap branch never emits branch-confirm feedback; higher committed tap counts clamp to the last configured branch color. | `HSV(143, 255, 200)` | <img alt="Tap Count 4 color" src="media/profile-introspection/profile-color-swatch-00a2ff.svg" width="96" height="28" /> |
+| `Tap Count 5` | Configured branch-confirmation color for this committed tap count. The table starts at double-tap because the base single-tap branch never emits branch-confirm feedback; higher committed tap counts clamp to the last configured branch color. | `HSV(85, 255, 200)` | <img alt="Tap Count 5 color" src="media/profile-introspection/profile-color-swatch-00ff00.svg" width="96" height="28" /> |
+| `Tap Committed` | Used for committed tap-count branches that do not already have state feedback. | `HSV(85, 255, 200)` | <img alt="Tap Committed color" src="media/profile-introspection/profile-color-swatch-00ff00.svg" width="96" height="28" /> |
 | `Hold Active` | Used for authored hold-tier pending / active states and commit pulses. | `HSV(18, 255, 200)` | <img alt="Hold Active color" src="media/profile-introspection/profile-color-swatch-ff6c00.svg" width="96" height="28" /> |
 | `Long Hold Active` | Used for authored long-hold-tier active states and commit pulses. | `HSV(148, 255, 200)` | <img alt="Long Hold Active color" src="media/profile-introspection/profile-color-swatch-0084ff.svg" width="96" height="28" /> |
 
@@ -368,7 +367,7 @@ No filled hardcoded macro slots.
 
 ### Shared Keycode Surfaces
 
-- Layers: `LAYER_BASE`, `LAYER_NUM`, `LAYER_SYM`, `LAYER_NAV`, `LAYER_POINTER`
+- Layers: `LAYER_BASE`, `LAYER_NUM`, `LAYER_SYM`, `LAYER_NAV`, `LAYER_POINTER`, `LAYER_NEW`
 - Keymap-local custom keycodes: `RIGHT_THUMB`, `LEFT_THUMB`, `CLICK_SPAM`
 - PD color overlays: `PD_MODE_DRAGSCROLL`, `PD_MODE_VOLUME`, `PD_MODE_BRIGHTNESS`, `PD_MODE_ARROW`, `PD_MODE_PINCH`, `PD_MODE_ZOOM`
 - Auto-mouse fade destination mode: `FOLLOW_REAL_DESTINATION`
@@ -463,9 +462,9 @@ These values come from the keymap config and the shared userspace config. When t
 | `PD_MODE_BRIGHTNESS_DPI` | `0` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
 | `PD_MODE_ZOOM_DPI` | `400` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
 | `PD_MODE_ARROW_DPI` | `400` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
-| `CHARYBDIS_MINIMUM_DEFAULT_DPI` | `800` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
+| `CHARYBDIS_MINIMUM_DEFAULT_DPI` | `400` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
 | `CHARYBDIS_DEFAULT_DPI_CONFIG_STEP` | `200` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
-| `CHARYBDIS_MINIMUM_SNIPING_DPI` | `200` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
+| `CHARYBDIS_MINIMUM_SNIPING_DPI` | `100` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
 | `CHARYBDIS_SNIPING_DPI_CONFIG_STEP` | `100` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
 | `CHARYBDIS_AUTO_SNIPING_ENABLE` | `defined` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
 | `CHARYBDIS_AUTO_SNIPING_LAYER` | `LAYER_NAV` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |

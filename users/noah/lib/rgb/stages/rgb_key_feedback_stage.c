@@ -166,11 +166,11 @@ static uint8_t rgb_runtime_key_feedback_stage_tap_branch_color_index(uint8_t tap
         return 0u;
     }
 
-    if (tap_branch <= 1u) {
+    if (tap_branch <= 2u) {
         return 0u;
     }
 
-    index = (uint8_t)(tap_branch - 1u);
+    index = (uint8_t)(tap_branch - 2u);
     if (index >= key_behavior_feedback_tap_branch_rgb_count) {
         index = (uint8_t)(key_behavior_feedback_tap_branch_rgb_count - 1u);
     }

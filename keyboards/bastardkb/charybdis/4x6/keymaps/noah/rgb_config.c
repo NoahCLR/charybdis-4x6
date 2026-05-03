@@ -242,12 +242,12 @@ static const combo_feedback_led_group_t combo_feedback_led_groups_data[] = RGB_L
 //     branches while the runtime is still waiting to know which tap index wins;
 //     the base single-tap candidate stays quiet
 //   - RGB_TAP_BRANCH_COLORS(...) = visible branch-confirmation window after a
-//     second-tap or higher index commits; tap indexes clamp to the last
-//     configured color
-//   - tap_committed_color = action feedback after committed tap branches that
+//     double-tap or higher branch commits; the table starts at tap count 2 and
+//     higher tap counts clamp to the last configured color
+//   - tap_committed_color = action feedback after committed tap-count branches that
 //     do not already have state feedback; layer and PD-mode state actions stay
 //     quiet because their state overlays own that feedback
-//   - tap_commit_mode chooses which committed tap branches pulse:
+//   - tap_commit_mode chooses which committed tap-count branches pulse:
 //     KEY_FEEDBACK_TAP_COMMIT_OFF, KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS, or
 //     KEY_FEEDBACK_TAP_COMMIT_ALL_TAPS
 //   - hold_active_color = authored hold-tier pending / active states and
@@ -281,17 +281,16 @@ static const combo_feedback_led_group_t combo_feedback_led_groups_data[] = RGB_L
 const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
     .tap_pending_color = HSV(0, 0, 150),
 
-    RGB_TAP_BRANCH_COLORS(HSV(235, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), // tap index 0
-                          HSV(200, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), // tap index 1
-                          HSV(180, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), // tap index 2
-                          HSV(143, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), // tap index 3
-                          HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS)   // tap index 4
+    RGB_TAP_BRANCH_COLORS(HSV(200, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), // tap count 2
+                          HSV(180, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), // tap count 3
+                          HSV(143, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), // tap count 4
+                          HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS)   // tap count 5
                           ),
 
-    // Used for committed tap branches that do not already have state feedback.
+    // Used for committed tap-count branches that do not already have state feedback.
     .tap_committed_color = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
 
-    // Commit feedback is most useful for double-tap and higher tap branches.
+    // Commit feedback is most useful for double-tap and higher tap-count branches.
     .tap_commit_mode = KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS,
 
     // Used for authored hold-tier pending / active states and commit pulses.

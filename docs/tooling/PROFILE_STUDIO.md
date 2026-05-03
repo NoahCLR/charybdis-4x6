@@ -31,10 +31,10 @@ back to the same blocks.
   `KEY_FEEDBACK_GROUP_ALL` and lets firmware resolve the active semantic's
   configured feedback color at render time; specific feedback group rows
   override that all-feedback base, and selected LEDs preview this mode as equal
-  vertical bands including every configured tap-branch color
+  vertical bands including every configured tap-count branch-confirm color
 - auto-mouse fade destination color and fade mode
 - combo feedback color/locality
-- key-behavior feedback colors, tap-branch colors, tap commit mode, and
+- key-behavior feedback colors, tap-count branch-confirm colors, tap commit mode, and
   locality
 - `VIA_MACROS(MACRO)` through a dedicated macro builder with a 64-slot browser,
   raw payload editor, step insertion controls, live key-event recording, and a
@@ -115,11 +115,11 @@ combo input picking, RGB group selections, picker state, and undo/redo history.
 All major panels are collapsible. The RGB page keeps a panel for every authored
 section in `rgb_config.c`, even when a table currently has no active rows.
 Nested RGB submenus such as layer colors, pointing-mode colors, auto-mouse
-fade, combo feedback, and key-behavior tap branches are collapsible too.
+fade, combo feedback, and key-behavior tap-count branch colors are collapsible too.
 LED group tables are nested under their owning RGB section: layer groups under
 Layer Colors, pointing-mode groups under Pointing-mode Colors, combo groups
 under Combo Feedback, and key-behavior groups under Key Behavior Feedback.
-Named tap branch sections inside the behavior editor are collapsible; repeat Hz
+Named tap-count branch sections inside the behavior editor are collapsible; repeat Hz
 is shown only when the selected hold-tier helper is `REPEAT_WHILE_HELD`.
 
 The RGB page includes compact color-picker controls for editable colors and

@@ -275,9 +275,9 @@ Shared semantics:
   higher branches; the base single-tap candidate stays quiet while it waits
 - committed double-tap and higher branches can show a branch-color confirmation
   during the same model-level branch-confirm window that delays the action
-- committed tap branches can pulse once after the tap output resolves; the
+- committed tap-count branches can pulse once after the tap output resolves; the
   authored RGB config can disable those pulses, limit them to double-tap and
-  higher branches, or allow them for every tap branch
+  higher branches, or allow them for every tap-count branch
 - pending momentary-layer holds can preview the target layer's authored color
   and LED groups before that layer actually commits
 - unresolved hold windows can show the hold color while the action is still
