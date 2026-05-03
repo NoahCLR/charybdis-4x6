@@ -21,7 +21,8 @@ enum charybdis_keymap_layers {
     LAYER_SYM,      // Symbols, brackets, and DPI controls
     LAYER_NAV,      // Navigation, media, macros, and mouse buttons (current sniping layer)
     LAYER_POINTER,  // Dedicated pointer layout; default auto-mouse target layer
-    LAYER_COUNT,    // sentinel — must be last — used for VIA Dynamic layer count
+    LAYER_NEW,
+    LAYER_COUNT, // sentinel — must be last — used for VIA Dynamic layer count
 };
 #endif
 
@@ -67,11 +68,11 @@ enum charybdis_keymap_layers {
 #    define PD_MODE_ARROW_DPI 400
 
 // Default pointer DPI ladder: 800, 1000, 1200, …
-#    define CHARYBDIS_MINIMUM_DEFAULT_DPI 800
+#    define CHARYBDIS_MINIMUM_DEFAULT_DPI 400
 #    define CHARYBDIS_DEFAULT_DPI_CONFIG_STEP 200
 
 // Sniping DPI ladder: 200, 300, 400, 500.
-#    define CHARYBDIS_MINIMUM_SNIPING_DPI 200
+#    define CHARYBDIS_MINIMUM_SNIPING_DPI 100
 #    define CHARYBDIS_SNIPING_DPI_CONFIG_STEP 100
 
 // Auto-sniping: engage sniping mode automatically while LAYER_NAV is active.
