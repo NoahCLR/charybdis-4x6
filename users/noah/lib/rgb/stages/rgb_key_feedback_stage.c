@@ -398,7 +398,7 @@ static bool rgb_runtime_key_feedback_stage_render_locality(const uint8_t *semant
 }
 
 static bool rgb_runtime_key_feedback_stage_render_group(const key_behavior_feedback_led_group_t *group, const uint8_t *semantic_map, const uint8_t *tap_branch_map, const uint8_t *flash_visibility_bitmap, const uint8_t *broad_owner_map, uint8_t led_min, uint8_t led_max) {
-    bool painted = false;
+    bool                                         painted         = false;
     const key_behavior_feedback_group_semantic_t all_semantics[] = {
         KEY_FEEDBACK_GROUP_UNRESOLVED_TAP_BRANCH, KEY_FEEDBACK_GROUP_TAP_BRANCH_COMMITTED, KEY_FEEDBACK_GROUP_TAP_COMMITTED, KEY_FEEDBACK_GROUP_HOLD_ACTIVE, KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE,
     };

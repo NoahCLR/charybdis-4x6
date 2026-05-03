@@ -20,4 +20,4 @@ typedef enum {
 } key_feedback_tap_commit_mode_t;
 
 key_feedback_branch_confirm_mode_t key_feedback_branch_confirm_mode(void);
-key_feedback_tap_commit_mode_t key_feedback_tap_commit_mode(void);
+key_feedback_tap_commit_mode_t     key_feedback_tap_commit_mode(void);

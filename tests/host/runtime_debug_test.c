@@ -41,17 +41,17 @@ enum {
     TEST_HELD_ACTION_KEY       = NOAH_KEYMAP_SAFE_RANGE + 0x18,
 };
 
-static uint16_t              fake_time;
-static uint8_t               fake_mods;
-static uint8_t               fake_weak_mods;
-static uint8_t               fake_oneshot_mods;
-static uint8_t               fake_oneshot_locked_mods;
-static uint8_t               send_keyboard_report_count;
-static uint16_t              last_emitted_action;
-static uint16_t              last_delayed_action;
-static delayed_action_mods_t last_delayed_mods;
-static uint8_t               delayed_action_count;
-static uint8_t               split_runtime_sync_count;
+static uint16_t                           fake_time;
+static uint8_t                            fake_mods;
+static uint8_t                            fake_weak_mods;
+static uint8_t                            fake_oneshot_mods;
+static uint8_t                            fake_oneshot_locked_mods;
+static uint8_t                            send_keyboard_report_count;
+static uint16_t                           last_emitted_action;
+static uint16_t                           last_delayed_action;
+static delayed_action_mods_t              last_delayed_mods;
+static uint8_t                            delayed_action_count;
+static uint8_t                            split_runtime_sync_count;
 static key_feedback_branch_confirm_mode_t fake_branch_confirm_mode;
 
 layer_state_t layer_state;
@@ -1246,9 +1246,9 @@ static void test_key_feedback_maps_show_final_tap_only_neutral_pending_then_bran
 }
 
 static void test_key_feedback_branch_confirm_mode_can_skip_branch_commit_window(void) {
-    uint8_t             semantic_map[KEY_FEEDBACK_SEMANTIC_MAP_SIZE];
-    uint8_t             tap_branch_map[KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE];
-    keypos_t            key_pos = test_keypos(6, 3);
+    uint8_t  semantic_map[KEY_FEEDBACK_SEMANTIC_MAP_SIZE];
+    uint8_t  tap_branch_map[KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE];
+    keypos_t key_pos = test_keypos(6, 3);
 
     test_reset_stubs();
     noah_runtime_reset_for_test();
