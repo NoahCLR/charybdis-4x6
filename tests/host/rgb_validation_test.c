@@ -60,6 +60,7 @@ const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
     .tap_committed_color    = HSV(0, 0, 2),
     .hold_active_color      = HSV(0, 0, 3),
     .long_hold_active_color = HSV(0, 0, 4),
+    .branch_confirm_mode    = (key_feedback_branch_confirm_mode_t)0xFFu,
     .tap_commit_mode        = (key_feedback_tap_commit_mode_t)0xFFu,
     .locality               = (rgb_locality_t)0xFFu,
 };
@@ -108,6 +109,7 @@ int main(void) {
     CHECK(strstr(log_buffer, "Invalid combo_feedback_colors.locality") != NULL);
     CHECK(strstr(log_buffer, "Invalid combo_feedback_led_groups") != NULL);
     CHECK(strstr(log_buffer, "Invalid key_behavior_feedback_colors.locality") != NULL);
+    CHECK(strstr(log_buffer, "Invalid key_behavior_feedback_colors.branch_confirm_mode") != NULL);
     CHECK(strstr(log_buffer, "Invalid key_behavior_feedback_colors.tap_commit_mode") != NULL);
     CHECK(strstr(log_buffer, "Invalid key_behavior_feedback_led_groups[0].semantic") != NULL);
     CHECK(strstr(log_buffer, "Invalid key_behavior_feedback_led_groups") != NULL);

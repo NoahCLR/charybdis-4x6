@@ -346,6 +346,7 @@ const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
         HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),  // tap count 5
     ),
 
+    .branch_confirm_mode    = KEY_FEEDBACK_BRANCH_CONFIRM_NON_BASE_TAPS,
     .tap_committed_color     = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
     .tap_commit_mode         = KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS,
     .hold_active_color       = HSV(18, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
@@ -359,6 +360,7 @@ Those rows populate the shared
 
 - `tap_pending_color`
 - `RGB_TAP_BRANCH_COLORS(...)`
+- `branch_confirm_mode`
 - `tap_committed_color`
 - `tap_commit_mode`
 - `hold_active_color`
@@ -378,6 +380,16 @@ and higher committed branches use their matching entry and clamp to the last
 configured branch color if they exceed the table.
 Inline C comments next to those `HSV(...)` arguments are allowed and are
 ignored by the profile introspector.
+
+The `branch_confirm_mode` field controls whether selected tap-count branches
+enter the model-level branch-confirm feedback window before their action fires:
+
+- `KEY_FEEDBACK_BRANCH_CONFIRM_OFF`: skip branch-confirm feedback windows and
+  emit the selected action or hold path as soon as normal tap/hold resolution
+  allows
+- `KEY_FEEDBACK_BRANCH_CONFIRM_NON_BASE_TAPS`: open a branch-confirm feedback
+  window only for double-tap and higher branches; the base single-tap branch
+  stays quiet
 
 The `tap_commit_mode` field controls which committed tap-count branches pulse with
 `tap_committed_color`:
@@ -405,7 +417,8 @@ In the shared runtime, those colors are used for these categories:
 - multi-tap pending: the engine has not resolved the winning double-tap or
   higher branch yet; the base single-tap candidate stays quiet
 - tap-count branch committed: the winning double-tap or higher branch is known and
-  the model is in the branch-confirm window before firing that branch's action
+  the model is in the branch-confirm feedback window before firing that branch's
+  action; `branch_confirm_mode` decides whether that window is used
 - tap committed: an authored tap-count branch has resolved and emitted output
 - hold pending: a hold path exists, but the final action is not resolved yet
 - hold trigger: a hold-tier action has just fired

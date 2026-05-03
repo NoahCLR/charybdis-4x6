@@ -32,8 +32,8 @@ back to the same blocks.
   color rather than a black override, including `KEY_FEEDBACK_GROUP_ALL`
 - auto-mouse fade destination color and fade mode
 - combo feedback color/locality
-- key-behavior feedback colors, tap-count branch-confirm colors, tap commit mode, and
-  locality
+- key-behavior feedback colors, tap-count branch-confirm colors, branch-confirm
+  mode, tap commit mode, and locality
 - `VIA_MACROS(MACRO)` through a dedicated macro builder with a 64-slot browser,
   raw payload editor, step insertion controls, live key-event recording, and a
   parsed payload preview

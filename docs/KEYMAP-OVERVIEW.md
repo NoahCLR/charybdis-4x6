@@ -299,7 +299,7 @@ Authored combo feedback LED groups repaint after the combo locality render insid
 
 These colors come from `key_behavior_feedback_colors` in [rgb_config.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c) and render last on top of the current layer, combo feedback, preview, and any pd-mode overlay. Internally the runtime keeps truthful per-key semantics, per-key flash visibility, and a broad-surface owner map. `RGB_KEYS_ONLY` stays per-key; broader authored localities follow the newest active owner for that surface and use that owner's real flash phase, so offset held keys do not fill each other's off windows.
 
-Tap feedback is staged as neutral unresolved pending first, then a model-level branch confirmation from `RGB_TAP_BRANCH_COLORS(...)`, then tap/hold/long-hold action feedback when that action has its own visible state.
+Tap feedback is staged as neutral unresolved pending first, then an optional model-level branch confirmation from `RGB_TAP_BRANCH_COLORS(...)`, then tap/hold/long-hold action feedback when that action has its own visible state.
 
 Current authored feedback locality: `RGB_KEY_HALF`.
 
@@ -310,6 +310,13 @@ Current authored feedback locality: `RGB_KEY_HALF`.
 | `RGB_RIGHT_HALF` | Always repaint the right half from the newest active key-behavior feedback owner. |
 | `RGB_KEY_HALF` | Repaint the half owned by the newest active key or tap series on each half. |
 | `RGB_KEYS_ONLY` | Repaint only the specific key currently driving the feedback state. |
+
+Current authored branch-confirm feedback mode: `KEY_FEEDBACK_BRANCH_CONFIRM_NON_BASE_TAPS`.
+
+| Available Branch-Confirm Mode | Meaning |
+| --- | --- |
+| `KEY_FEEDBACK_BRANCH_CONFIRM_OFF` | Skip the branch-confirm feedback window; the selected action or hold path runs as soon as normal tap/hold resolution allows. |
+| `KEY_FEEDBACK_BRANCH_CONFIRM_NON_BASE_TAPS` | Open a branch-confirm feedback window only for double-tap and higher branches; the base single-tap branch stays quiet. |
 
 Current authored tap-commit feedback mode: `KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS`.
 
@@ -375,6 +382,7 @@ No filled hardcoded macro slots.
 - PD color overlays: `PD_MODE_DRAGSCROLL`, `PD_MODE_VOLUME`, `PD_MODE_BRIGHTNESS`, `PD_MODE_ARROW`, `PD_MODE_PINCH`, `PD_MODE_ZOOM`
 - Auto-mouse fade destination mode: `FOLLOW_REAL_DESTINATION`
 - Key-behavior feedback locality: `RGB_KEY_HALF`
+- Key-behavior branch-confirm feedback: `KEY_FEEDBACK_BRANCH_CONFIRM_NON_BASE_TAPS`
 - Key-behavior tap-commit feedback: `KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS`
 - Combo feedback locality: `RGB_KEY_HALF`
 

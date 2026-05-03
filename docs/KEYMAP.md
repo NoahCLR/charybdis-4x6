@@ -253,10 +253,10 @@ Pending multi-tap feedback uses a neutral unresolved color only once the user
 has entered a double-tap or higher branch. The base single-tap candidate stays
 quiet while it waits to see whether another tap arrives, then dispatches
 without the branch-confirmation window. After a non-base branch commits, the
-current RGB config shows the committed branch color during the
-branch-confirmation window before any tap, hold, or long-hold action fires. If
-a higher hold tier commits after that, the higher-tier feedback takes over so
-the LEDs match the behavior that is now active.
+current RGB config's branch-confirm mode opens a feedback window that shows the
+committed branch color before any tap, hold, or long-hold action fires. If a
+higher hold tier commits after that, the higher-tier feedback takes over so the
+LEDs match the behavior that is now active.
 
 That `100 Hz` setting is also the current authored maximum: `100` repeats per
 second.

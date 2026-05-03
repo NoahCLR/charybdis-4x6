@@ -93,14 +93,15 @@ must not reopen the key's quick-release tap or first-tap multi-tap path.
 
 One practical consequence is that a single tap on a multi-tap key is delayed by
 one multi-tap window so the firmware can tell whether you meant one tap or
-more. The base single-tap branch skips the branch-confirm window; that extra
-window is only for double-tap and higher committed branches.
+more. The base single-tap branch skips the branch-confirm feedback window; that
+extra window is only for double-tap and higher committed branches when the
+authored RGB config enables it.
 
 Tap actions are release-settled. Reaching a tap-count branch on press selects
 the candidate branch, but `TAP_SENDS(...)` is selected by release or pending
-tap-series expiry, then emitted after any configured branch-confirm window. For
-terminal tap-only multi-tap branches, this means the final press can identify
-the branch before the action has actually been sent.
+tap-series expiry, then emitted after any enabled branch-confirm feedback
+window. For terminal tap-only multi-tap branches, this means the final press can
+identify the branch before the action has actually been sent.
 
 Those pending multi-tap windows are tracked per physical key. Pressing a
 different key does not flush an unrelated pending tap series by itself, so
@@ -273,11 +274,12 @@ Shared semantics:
 
 - multi-tap pending shows the neutral unresolved color only for double-tap and
   higher branches; the base single-tap candidate stays quiet while it waits
-- committed double-tap and higher branches can show a branch-color confirmation
-  during the same model-level branch-confirm window that delays the action
+- committed double-tap and higher branches can open a branch-confirm feedback
+  window that delays the selected action long enough to show the branch color;
+  the authored RGB config can also skip that window
 - committed tap-count branches can pulse once after the tap output resolves; the
-  authored RGB config can disable those pulses, limit them to double-tap and
-  higher branches, or allow them for every tap-count branch
+  authored RGB config can disable those pulses or limit them to double-tap and
+  higher branches
 - pending momentary-layer holds can preview the target layer's authored color
   and LED groups before that layer actually commits
 - unresolved hold windows can show the hold color while the action is still

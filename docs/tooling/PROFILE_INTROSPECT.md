@@ -51,8 +51,8 @@ includes:
 - combos, macro inventory, and VIA macro defaults
 - pointer-mode reachability, mode colors, LED groups, and layer-local mode
   entry paths
-- auto-mouse, combo-feedback, and key-behavior feedback colors with generated
-  swatches
+- auto-mouse, combo-feedback, and key-behavior feedback colors and policy with
+  generated swatches
 
 The parser accepts normal C comments in authored inputs. In RGB authoring, this
 includes comments next to `HSV(...)` arguments inside helper macros such as

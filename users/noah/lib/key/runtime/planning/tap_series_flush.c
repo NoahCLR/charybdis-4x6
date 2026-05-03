@@ -55,7 +55,14 @@ static uint16_t key_runtime_core_tap_series_flush_elapsed(uint16_t start, uint16
 }
 
 bool key_runtime_core_tap_count_uses_branch_confirm(uint8_t tap_count) {
-    return tap_count > 1u;
+    switch (key_feedback_branch_confirm_mode()) {
+        case KEY_FEEDBACK_BRANCH_CONFIRM_OFF:
+            return false;
+        case KEY_FEEDBACK_BRANCH_CONFIRM_NON_BASE_TAPS:
+            return tap_count > 1u;
+        default:
+            return false;
+    }
 }
 
 bool key_runtime_core_tap_series_branch_confirm_window_active(uint16_t started_at, uint16_t term_ms, uint16_t now) {

@@ -229,12 +229,23 @@ static bool key_feedback_tap_branch_is_higher_tier(uint8_t tap_count) {
     return tap_count > 1u;
 }
 
+static bool key_feedback_branch_confirm_mode_allows(uint8_t tap_count) {
+    switch (key_feedback_branch_confirm_mode()) {
+        case KEY_FEEDBACK_BRANCH_CONFIRM_OFF:
+            return false;
+        case KEY_FEEDBACK_BRANCH_CONFIRM_NON_BASE_TAPS:
+            return key_feedback_tap_branch_is_higher_tier(tap_count);
+        default:
+            return false;
+    }
+}
+
 static bool key_feedback_tap_series_shows_pending_feedback(const tap_series_t *series) {
     return series && series->active && !series->branch_confirmed && !series->branch_confirming && key_feedback_tap_branch_is_higher_tier(series->tap_count);
 }
 
 static bool key_feedback_tap_series_shows_branch_confirmation(const tap_series_t *series) {
-    return series && series->active && series->branch_confirming && key_feedback_tap_branch_is_higher_tier(series->branch_confirm_tap_count);
+    return series && series->active && series->branch_confirming && key_feedback_branch_confirm_mode_allows(series->branch_confirm_tap_count);
 }
 
 static key_feedback_semantic_t key_feedback_semantic_for_pulse(key_feedback_pulse_kind_t kind) {

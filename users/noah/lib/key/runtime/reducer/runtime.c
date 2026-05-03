@@ -28,6 +28,10 @@ __attribute__((weak)) uint8_t pd_mode_buffered_tap_masked_real_mods(uint16_t key
     return 0;
 }
 
+__attribute__((weak)) key_feedback_branch_confirm_mode_t key_feedback_branch_confirm_mode(void) {
+    return KEY_FEEDBACK_BRANCH_CONFIRM_NON_BASE_TAPS;
+}
+
 __attribute__((weak)) key_feedback_tap_commit_mode_t key_feedback_tap_commit_mode(void) {
     return KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS;
 }

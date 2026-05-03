@@ -251,6 +251,9 @@ static const combo_feedback_led_group_t combo_feedback_led_groups_data[] = RGB_L
 //   - RGB_TAP_BRANCH_COLORS(...) = visible branch-confirmation window after a
 //     double-tap or higher branch commits; the table starts at tap count 2 and
 //     higher tap counts clamp to the last configured color
+//   - branch_confirm_mode chooses which committed tap-count branches enter the
+//     branch-confirmation feedback window before their action fires:
+//     KEY_FEEDBACK_BRANCH_CONFIRM_OFF or KEY_FEEDBACK_BRANCH_CONFIRM_NON_BASE_TAPS
 //   - tap_committed_color = action feedback after committed tap-count branches that
 //     do not already have state feedback; layer and PD-mode state actions stay
 //     quiet because their state overlays own that feedback
@@ -292,6 +295,10 @@ const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
                           HSV(143, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), // tap count 4
                           HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS)   // tap count 5
                           ),
+
+    // Give double-tap and higher tap-count branches a branch-confirm feedback
+    // window before their action fires. Base single-tap branches never enter it.
+    .branch_confirm_mode = KEY_FEEDBACK_BRANCH_CONFIRM_NON_BASE_TAPS,
 
     // Used for committed non-base tap-count branches that do not already have
     // state feedback. Base single-tap commits stay quiet under the pulse mode below.

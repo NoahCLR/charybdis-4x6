@@ -1042,6 +1042,14 @@ def key_behavior_feedback_tap_commit_mode_description(mode: str) -> str:
     return descriptions.get(mode, "Unknown key-behavior tap-commit feedback mode.")
 
 
+def key_behavior_feedback_branch_confirm_mode_description(mode: str) -> str:
+    descriptions = {
+        "KEY_FEEDBACK_BRANCH_CONFIRM_OFF": "Skip the branch-confirm feedback window; the selected action or hold path runs as soon as normal tap/hold resolution allows.",
+        "KEY_FEEDBACK_BRANCH_CONFIRM_NON_BASE_TAPS": "Open a branch-confirm feedback window only for double-tap and higher branches; the base single-tap branch stays quiet.",
+    }
+    return descriptions.get(mode, "Unknown key-behavior branch-confirm feedback mode.")
+
+
 def parse_key_behavior_feedback_locality(raw_text: str) -> dict[str, object] | None:
     try:
         body = extract_initializer_body(raw_text, r"key_behavior_feedback_colors\s*=")
@@ -1058,6 +1066,25 @@ def parse_key_behavior_feedback_locality(raw_text: str) -> dict[str, object] | N
         "locality": normalized_locality,
         "label": humanize_identifier(normalized_locality.removeprefix("RGB_")),
         "meaning": key_behavior_feedback_locality_description(normalized_locality),
+    }
+
+
+def parse_key_behavior_feedback_branch_confirm_mode(raw_text: str) -> dict[str, object] | None:
+    try:
+        body = extract_initializer_body(raw_text, r"key_behavior_feedback_colors\s*=")
+    except SystemExit:
+        return None
+
+    fields = parse_designated_fields(strip_comments(body))
+    mode = fields.get(".branch_confirm_mode")
+    if mode is None:
+        return None
+
+    normalized_mode = normalize_expr(mode)
+    return {
+        "mode": normalized_mode,
+        "label": humanize_identifier(normalized_mode.removeprefix("KEY_FEEDBACK_BRANCH_CONFIRM_")),
+        "meaning": key_behavior_feedback_branch_confirm_mode_description(normalized_mode),
     }
 
 
@@ -1201,6 +1228,7 @@ def finalize_rgb_led_group_previews(
     pd_mode_color_map = {row["pointing_mode"]: row for row in pd_mode_colors}
     key_feedback_color_map = {
         "KEY_FEEDBACK_GROUP_UNRESOLVED_TAP_BRANCH": first_feedback_color_by_field(key_behavior_feedback_colors, "tap_pending_color"),
+        "KEY_FEEDBACK_GROUP_TAP_BRANCH_COMMITTED": first_feedback_color_by_field(key_behavior_feedback_colors, "tap_count_2_branch_color"),
         "KEY_FEEDBACK_GROUP_TAP_COMMITTED": first_feedback_color_by_field(key_behavior_feedback_colors, "tap_committed_color"),
         "KEY_FEEDBACK_GROUP_HOLD_ACTIVE": first_feedback_color_by_field(key_behavior_feedback_colors, "hold_active_color"),
         "KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE": first_feedback_color_by_field(key_behavior_feedback_colors, "long_hold_active_color"),
@@ -1693,6 +1721,11 @@ def build_profile_model() -> dict[str, object]:
     key_behavior_feedback_locality = (
         parse_key_behavior_feedback_locality(rgb_config_raw_text) if rgb_key_behavior_feedback_enabled else None
     )
+    key_behavior_feedback_branch_confirm_mode = (
+        parse_key_behavior_feedback_branch_confirm_mode(rgb_config_raw_text)
+        if rgb_key_behavior_feedback_enabled
+        else None
+    )
     key_behavior_feedback_tap_commit_mode = (
         parse_key_behavior_feedback_tap_commit_mode(rgb_config_raw_text) if rgb_key_behavior_feedback_enabled else None
     )
@@ -1778,6 +1811,7 @@ def build_profile_model() -> dict[str, object]:
             "combo_feedback_led_groups": combo_feedback_led_groups,
             "automouse_fade_end_config": automouse_fade_end_config,
             "key_behavior_feedback_locality": key_behavior_feedback_locality,
+            "key_behavior_feedback_branch_confirm_mode": key_behavior_feedback_branch_confirm_mode,
             "key_behavior_feedback_tap_commit_mode": key_behavior_feedback_tap_commit_mode,
             "key_behavior_feedback_colors": key_behavior_feedback_colors,
             "key_behavior_feedback_led_groups": key_behavior_feedback_led_groups,
@@ -1865,6 +1899,7 @@ def render_reference_section(profile: dict[str, object]) -> str:
     automouse_fade_end_config = rgb["automouse_fade_end_config"]
     combo_feedback_locality = rgb["combo_feedback_locality"]
     feedback_locality = rgb["key_behavior_feedback_locality"]
+    branch_confirm_mode = rgb["key_behavior_feedback_branch_confirm_mode"]
     tap_commit_mode = rgb["key_behavior_feedback_tap_commit_mode"]
     keymap_link = markdown_path_link(KEYMAP_FILE, "keymap.c")
     config_link = markdown_path_link(CONFIG_FILE, "keymap config.h")
@@ -1912,6 +1947,11 @@ def render_reference_section(profile: dict[str, object]) -> str:
             f"- Key-behavior feedback locality: `{feedback_locality['locality']}`"
             if feedback_locality is not None
             else "- Key-behavior feedback locality: `not authored`",
+        )
+        lines.append(
+            f"- Key-behavior branch-confirm feedback: `{branch_confirm_mode['mode']}`"
+            if branch_confirm_mode is not None
+            else "- Key-behavior branch-confirm feedback: `not authored`",
         )
         lines.append(
             f"- Key-behavior tap-commit feedback: `{tap_commit_mode['mode']}`"
@@ -2883,6 +2923,7 @@ def render_key_behavior_section(profile: dict[str, object]) -> str:
 def render_key_behavior_feedback_section(profile: dict[str, object]) -> str:
     feedback_colors = profile["rgb"]["key_behavior_feedback_colors"]
     feedback_locality = profile["rgb"]["key_behavior_feedback_locality"]
+    branch_confirm_mode = profile["rgb"]["key_behavior_feedback_branch_confirm_mode"]
     tap_commit_mode = profile["rgb"]["key_behavior_feedback_tap_commit_mode"]
     feedback_groups = profile["rgb"]["key_behavior_feedback_led_groups"]
     rgb_link = markdown_path_link(RGB_CONFIG_FILE, "rgb_config.c")
@@ -2904,7 +2945,7 @@ def render_key_behavior_feedback_section(profile: dict[str, object]) -> str:
         [
             f"These colors come from `key_behavior_feedback_colors` in {rgb_link} and render last on top of the current layer, combo feedback, preview, and any pd-mode overlay. Internally the runtime keeps truthful per-key semantics, per-key flash visibility, and a broad-surface owner map. `RGB_KEYS_ONLY` stays per-key; broader authored localities follow the newest active owner for that surface and use that owner's real flash phase, so offset held keys do not fill each other's off windows.",
             "",
-            "Tap feedback is staged as neutral unresolved pending first, then a model-level branch confirmation from `RGB_TAP_BRANCH_COLORS(...)`, then tap/hold/long-hold action feedback when that action has its own visible state.",
+            "Tap feedback is staged as neutral unresolved pending first, then an optional model-level branch confirmation from `RGB_TAP_BRANCH_COLORS(...)`, then tap/hold/long-hold action feedback when that action has its own visible state.",
             "",
         ]
     )
@@ -2921,6 +2962,19 @@ def render_key_behavior_feedback_section(profile: dict[str, object]) -> str:
                 f"| `RGB_RIGHT_HALF` | {key_behavior_feedback_locality_description('RGB_RIGHT_HALF')} |",
                 f"| `RGB_KEY_HALF` | {key_behavior_feedback_locality_description('RGB_KEY_HALF')} |",
                 f"| `RGB_KEYS_ONLY` | {key_behavior_feedback_locality_description('RGB_KEYS_ONLY')} |",
+                "",
+            ]
+        )
+
+    if branch_confirm_mode is not None:
+        lines.extend(
+            [
+                f"Current authored branch-confirm feedback mode: `{branch_confirm_mode['mode']}`.",
+                "",
+                "| Available Branch-Confirm Mode | Meaning |",
+                "| --- | --- |",
+                f"| `KEY_FEEDBACK_BRANCH_CONFIRM_OFF` | {key_behavior_feedback_branch_confirm_mode_description('KEY_FEEDBACK_BRANCH_CONFIRM_OFF')} |",
+                f"| `KEY_FEEDBACK_BRANCH_CONFIRM_NON_BASE_TAPS` | {key_behavior_feedback_branch_confirm_mode_description('KEY_FEEDBACK_BRANCH_CONFIRM_NON_BASE_TAPS')} |",
                 "",
             ]
         )

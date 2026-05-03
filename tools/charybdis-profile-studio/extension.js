@@ -52,6 +52,10 @@ const KEY_FEEDBACK_TAP_COMMIT_MODES = [
     "KEY_FEEDBACK_TAP_COMMIT_OFF",
     "KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS",
 ];
+const KEY_FEEDBACK_BRANCH_CONFIRM_MODES = [
+    "KEY_FEEDBACK_BRANCH_CONFIRM_OFF",
+    "KEY_FEEDBACK_BRANCH_CONFIRM_NON_BASE_TAPS",
+];
 const RGB_LAYER_GROUP_ALL = "RGB_LAYER_GROUP_ALL";
 const RGB_PD_MODE_GROUP_ALL = "RGB_PD_MODE_GROUP_ALL";
 const KEY_FEEDBACK_GROUP_ALL = "KEY_FEEDBACK_GROUP_ALL";
@@ -1217,6 +1221,7 @@ function parseKeyBehaviorFeedback(text) {
     return {
         tapPendingColor: parseHsv(fields[".tap_pending_color"]),
         tapBranchColors: branchColors,
+        branchConfirmMode: normalizeExpr(fields[".branch_confirm_mode"] || ""),
         tapCommittedColor: parseHsv(fields[".tap_committed_color"]),
         holdActiveColor: parseHsv(fields[".hold_active_color"]),
         longHoldActiveColor: parseHsv(fields[".long_hold_active_color"]),
@@ -1798,8 +1803,10 @@ async function patchKeyBehaviorFeedback(root, config) {
             ? config.tapBranchColors.map((color, index) => normalizeHsvRequest(color, `tap count ${index + 2} branch color`))
             : [],
     };
+    const branchConfirmMode = normalizeExpr(config?.branchConfirmMode || "");
     const tapCommitMode = normalizeExpr(config?.tapCommitMode || "");
     const locality = normalizeExpr(config?.locality || "");
+    assertAllowed(branchConfirmMode, KEY_FEEDBACK_BRANCH_CONFIRM_MODES, "branch confirm mode");
     assertAllowed(tapCommitMode, KEY_FEEDBACK_TAP_COMMIT_MODES, "tap commit mode");
     assertAllowed(locality, RGB_LOCALITIES, "key behavior feedback locality");
 
@@ -1807,6 +1814,7 @@ async function patchKeyBehaviorFeedback(root, config) {
     let text = await fs.readFile(filePath, "utf8");
     text = patchFieldInInitializer(text, /key_behavior_feedback_colors\s*=/, ".tap_pending_color", colors.tapPendingColor.expression);
     text = patchRgbTapBranchColorsInInitializer(text, /key_behavior_feedback_colors\s*=/, colors.tapBranchColors);
+    text = patchFieldInInitializer(text, /key_behavior_feedback_colors\s*=/, ".branch_confirm_mode", branchConfirmMode);
     text = patchFieldInInitializer(text, /key_behavior_feedback_colors\s*=/, ".tap_committed_color", colors.tapCommittedColor.expression);
     text = patchFieldInInitializer(text, /key_behavior_feedback_colors\s*=/, ".tap_commit_mode", tapCommitMode);
     text = patchFieldInInitializer(text, /key_behavior_feedback_colors\s*=/, ".hold_active_color", colors.holdActiveColor.expression);
@@ -4609,6 +4617,7 @@ function getClientScript() {
         semantic: "The key-behavior feedback semantic that owns this LED group.",
         mode: "Select the authored mode for this row, such as layer render mode or auto-mouse fade mode.",
         locality: "Choose which keyboard half or key region receives this RGB feedback.",
+        "branch confirm mode": "Choose whether selected tap-count branches get a branch-confirm feedback window before emitting.",
         "tap commit mode": "Choose when tap commit feedback is shown for key behavior taps.",
         picker: "Pick an approximate RGB color. The studio converts it into HSV channel values.",
         h: "HSV hue channel as QMK stores it, usually 0-255.",
@@ -4652,6 +4661,7 @@ function getClientScript() {
     const rgbLocalities = ${JSON.stringify(RGB_LOCALITIES)};
     const automouseFadeModes = ${JSON.stringify(AUTOMOUSE_FADE_MODES)};
     const keyFeedbackTapCommitModes = ${JSON.stringify(KEY_FEEDBACK_TAP_COMMIT_MODES)};
+    const keyFeedbackBranchConfirmModes = ${JSON.stringify(KEY_FEEDBACK_BRANCH_CONFIRM_MODES)};
     const keyBehaviorRgbSemantics = [
         keyBehaviorAllGroups,
         "KEY_FEEDBACK_GROUP_UNRESOLVED_TAP_BRANCH",
@@ -5296,6 +5306,7 @@ function getClientScript() {
                 config: {
                     tapPendingColor: readColorControl(card, "tapPendingColor"),
                     tapBranchColors: Array.from(card.querySelectorAll("[data-tap-branch-color]")).map(readColorControlFromNode),
+                    branchConfirmMode: value(card, "branchConfirmMode"),
                     tapCommittedColor: readColorControl(card, "tapCommittedColor"),
                     holdActiveColor: readColorControl(card, "holdActiveColor"),
                     longHoldActiveColor: readColorControl(card, "longHoldActiveColor"),
@@ -8928,6 +8939,7 @@ function getClientScript() {
             "<summary><h3>Policy</h3></summary>" +
             "<div class='rgb-subsection-body'>" +
             "<div class='form-grid four'>" +
+            "<label><span>branch confirm mode</span><select name='branchConfirmMode'>" + options(keyFeedbackBranchConfirmModes, config.branchConfirmMode) + "</select></label>" +
             "<label><span>tap commit mode</span><select name='tapCommitMode'>" + options(keyFeedbackTapCommitModes, config.tapCommitMode) + "</select></label>" +
             "<label><span>locality</span><select name='locality'>" + options(rgbLocalities, config.locality) + "</select></label>" +
             "</div>" +
