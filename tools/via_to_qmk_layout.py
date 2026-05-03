@@ -670,14 +670,13 @@ def render_via_macros_block(slot_map: dict[int, dict]) -> str:
         value = json.dumps(entry["via"]["value"])
         entries.append(f"    MACRO(VIA_MACRO_{slot}, {value})")
 
-    lines = [_VIA_MACROS_DEFINE]
     if not entries:
-        return "\n".join(lines)
-    else:
-        lines[0] += " \\"
-        for idx, entry_line in enumerate(entries):
-            suffix = " \\" if idx < len(entries) - 1 else ""
-            lines.append(f"{entry_line}{suffix}")
+        return _VIA_MACROS_DEFINE
+
+    continued_lines = [_VIA_MACROS_DEFINE, *entries[:-1]]
+    continuation_width = max(len(line) for line in continued_lines)
+    lines = [f"{line:<{continuation_width}} \\" for line in continued_lines]
+    lines.append(entries[-1])
     return "\n".join(lines)
 
 
