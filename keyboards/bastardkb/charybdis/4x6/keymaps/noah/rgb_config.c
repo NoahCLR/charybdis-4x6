@@ -15,6 +15,17 @@
 // users/noah/lib/rgb/core/rgb_config_helpers.h.
 // For split-safe LED helper functions, see users/noah/lib/rgb/core/rgb_helpers.h.
 //
+// Authoring rules:
+//   - Stage color tables define each renderer's normal color.
+//   - LED group tables repaint selected LEDs after that stage's normal render.
+//   - RGB_*_GROUP_ALL rows match every active item in that stage; they do not
+//     create layer, pd-mode, combo, or key-feedback state by themselves.
+//   - In LED group tables only, HSV(0, 0, 0) means inherit the active stage
+//     color. Nonzero HSV values override the stage color for that LED group.
+//   - In normal color tables, HSV(0, 0, 0) is just an authored black/off color.
+//     A layer with saturation 0 and value 0 is skipped by the layer renderer;
+//     for LAYER_BASE, that leaves the default RGB Matrix effect visible.
+//
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "lib/rgb/core/rgb_helpers.h"
@@ -95,11 +106,14 @@ const layer_color_config_t layer_colors[LAYER_COUNT] = {
 // Paint specific LEDs a different color when a layer is active.
 //
 // Layer LED groups repaint after normal layer colors. Rows keyed to LAYER_BASE
-// act as persistent underlay accents for the layer scene. Use
+// can act as persistent underlay accents for the layer scene. Use
 // RGB_LAYER_GROUP_ALL to apply one group row to every active layer.
 //
 // In LED group rows, HSV(0, 0, 0) inherits the matching layer color. Use a
 // nonzero HSV value only when the group should override that stage color.
+// Inheritance only paints when the matched layer has a solid authored color;
+// with the current black/off LAYER_BASE, use a nonzero group color if you want
+// a visible base-layer accent.
 static const layer_led_group_t layer_led_groups_data[] = RGB_LED_GROUP_TABLE(
     // { .layer = LAYER_NAV, .color = HSV(0, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_RIGHT_THUMB },
     // { .layer = RGB_LAYER_GROUP_ALL, .color = HSV(0, 0, 0), .led_group = RGB_LED_GROUP_THUMBS },
@@ -184,9 +198,10 @@ const pd_mode_color_t pd_mode_colors[] = {
 
 // ─── Pointing-Device Mode LED Groups ────────────────────────────────────────
 //
-// Paint specific LEDs while a pointing mode is active. These groups repaint
-// after the active pd-mode locality render. Use RGB_PD_MODE_GROUP_ALL to apply
-// one group row to every active pointing mode.
+// Paint specific LEDs while a pointing mode feedback state is active. These
+// groups repaint after the active pd-mode locality render. Use
+// RGB_PD_MODE_GROUP_ALL to make one group row follow whichever pointing mode is
+// currently active; it does not create pd-mode feedback when none is active.
 //
 // In LED group rows, HSV(0, 0, 0) inherits the active pointing-mode color. Use
 // a nonzero HSV value only when the group should override that stage color.
@@ -226,8 +241,9 @@ const combo_feedback_color_config_t combo_feedback_colors = {
 // Paint specific LEDs a different color while combo feedback is active.
 // These groups repaint after the combo locality render inside whichever combo
 // underlay/overlay substage is live.
-// Combo group rows have no semantic selector: every row paints whenever combo
-// feedback is visible. HSV(0, 0, 0) inherits the active combo color.
+// Combo group rows have no selector and no GROUP_ALL value: every row paints
+// whenever combo feedback is visible. HSV(0, 0, 0) inherits the active combo
+// color.
 //
 // Uncomment or add rows inside this table to enable persistent combo accents.
 static const combo_feedback_led_group_t combo_feedback_led_groups_data[] = RGB_LED_GROUP_TABLE({.color = HSV(0, 0, 0), .led_group = RGB_LED_GROUP_THUMBS}, //
@@ -244,21 +260,34 @@ static const combo_feedback_led_group_t combo_feedback_led_groups_data[] = RGB_L
 //   - hold tier = .hold on the winning tap index
 //   - long-hold tier = .long_hold on the winning tap index
 //
-// Feedback categories:
+// Tap feedback:
 //   - tap_pending_color = unresolved multi-tap state for second-tap and higher
 //     branches while the runtime is still waiting to know which tap index wins;
 //     the base single-tap candidate stays quiet
 //   - RGB_TAP_BRANCH_COLORS(...) = visible branch-confirmation window after a
 //     double-tap or higher branch commits; the table starts at tap count 2 and
 //     higher tap counts clamp to the last configured color
+//
+// Branch-confirm policy:
 //   - branch_confirm_mode chooses which committed tap-count branches enter the
-//     branch-confirmation feedback window before their action fires:
-//     KEY_FEEDBACK_BRANCH_CONFIRM_OFF or KEY_FEEDBACK_BRANCH_CONFIRM_NON_BASE_TAPS
+//     branch-confirmation window before their selected effect/action fires
+//   - KEY_FEEDBACK_BRANCH_CONFIRM_OFF skips that window and lets the resolved
+//     branch continue through the normal dispatch path
+//   - KEY_FEEDBACK_BRANCH_CONFIRM_NON_BASE_TAPS allows the window only for
+//     double-tap and higher branches
+//   - the per-key branch-confirm term controls the window duration; a zero or
+//     already-expired term also falls through to the normal dispatch path
+//
+// Tap-commit pulse policy:
 //   - tap_committed_color = action feedback after committed tap-count branches that
 //     do not already have state feedback; layer and PD-mode state actions stay
 //     quiet because their state overlays own that feedback
-//   - tap_commit_mode chooses which committed tap-count branches pulse:
-//     KEY_FEEDBACK_TAP_COMMIT_OFF or KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS
+//   - tap_commit_mode chooses which committed tap-count branches can pulse
+//   - KEY_FEEDBACK_TAP_COMMIT_OFF disables tap-commit pulses
+//   - KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS allows pulses only for double-tap
+//     and higher branches
+//
+// Hold feedback:
 //   - hold_active_color = authored hold-tier pending / active states and
 //     hold-tier commit pulses
 //   - long_hold_active_color = authored long-hold-tier active states and
@@ -296,8 +325,9 @@ const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
                           HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS)   // tap count 5
                           ),
 
-    // Give double-tap and higher tap-count branches a branch-confirm feedback
-    // window before their action fires. Base single-tap branches never enter it.
+    // Let double-tap and higher tap-count branches enter the branch-confirm
+    // window before their selected effect/action fires. OFF skips that state
+    // and its delay.
     .branch_confirm_mode = KEY_FEEDBACK_BRANCH_CONFIRM_NON_BASE_TAPS,
 
     // Used for committed non-base tap-count branches that do not already have
@@ -328,17 +358,18 @@ const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
 // .semantic chooses which visible key-behavior state can drive the group:
 //   - KEY_FEEDBACK_GROUP_UNRESOLVED_TAP_BRANCH = pending double-tap-or-higher
 //     tap branch while the runtime is still waiting for the winning tap count
-//   - KEY_FEEDBACK_GROUP_TAP_BRANCH_COMMITTED = branch-confirmation pulse after
-//     a non-base tap-count branch commits
+//   - KEY_FEEDBACK_GROUP_TAP_BRANCH_COMMITTED = branch-confirmation window after
+//     a non-base tap-count branch commits and before its selected effect/action
+//     fires
 //   - KEY_FEEDBACK_GROUP_TAP_COMMITTED = tap action commit pulse for non-base
 //     tap-count branches that do not already have state feedback
 //   - KEY_FEEDBACK_GROUP_HOLD_ACTIVE = hold-tier pending / active / commit
 //     feedback
 //   - KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE = long-hold-tier active / commit
 //     feedback
-//   - KEY_FEEDBACK_GROUP_ALL = one group row that follows any visible semantic
-//     above; rendered before specific semantic rows so narrower rows can
-//     override it
+//   - KEY_FEEDBACK_GROUP_ALL = one group row that follows any visible concrete
+//     semantic above; rendered before specific semantic rows so narrower rows
+//     can override it
 static const key_behavior_feedback_led_group_t key_behavior_feedback_led_groups_data[] = RGB_LED_GROUP_TABLE(
     // { .semantic = KEY_FEEDBACK_GROUP_UNRESOLVED_TAP_BRANCH, .color = HSV(0, 0, 150), .led_group = RGB_LED_GROUP_TRACKBALL },
     // { .semantic = KEY_FEEDBACK_GROUP_TAP_BRANCH_COMMITTED, .color = HSV(169, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },
