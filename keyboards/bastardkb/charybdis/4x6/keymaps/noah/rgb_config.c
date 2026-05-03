@@ -95,12 +95,14 @@ const layer_color_config_t layer_colors[LAYER_COUNT] = {
 // Paint specific LEDs a different color when a layer is active.
 //
 // Layer LED groups repaint after normal layer colors. Rows keyed to LAYER_BASE
-// act as persistent underlay accents for the layer scene.
+// act as persistent underlay accents for the layer scene. Use
+// RGB_LAYER_GROUP_ALL to apply one group row to every active layer.
 //
-// Uncomment or add rows inside this table to enable layer-specific LED
-// highlights.
+// In LED group rows, HSV(0, 0, 0) inherits the matching layer color. Use a
+// nonzero HSV value only when the group should override that stage color.
 static const layer_led_group_t layer_led_groups_data[] = RGB_LED_GROUP_TABLE(
     // { .layer = LAYER_NAV, .color = HSV(0, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_RIGHT_THUMB },
+    // { .layer = RGB_LAYER_GROUP_ALL, .color = HSV(0, 0, 0), .led_group = RGB_LED_GROUP_THUMBS },
     // { .layer = LAYER_SYM, .color = HSV(43, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_LEFT_THUMB },
 );
 
@@ -182,13 +184,16 @@ const pd_mode_color_t pd_mode_colors[] = {
 
 // ─── Pointing-Device Mode LED Groups ────────────────────────────────────────
 //
-// Paint specific LEDs a different color while a pointing mode is active.
-// These groups repaint after the active pd-mode locality render.
+// Paint specific LEDs while a pointing mode is active. These groups repaint
+// after the active pd-mode locality render. Use RGB_PD_MODE_GROUP_ALL to apply
+// one group row to every active pointing mode.
 //
-// Uncomment or add rows inside this table to enable per-mode LED highlights.
+// In LED group rows, HSV(0, 0, 0) inherits the active pointing-mode color. Use
+// a nonzero HSV value only when the group should override that stage color.
 static const pd_mode_led_group_t pd_mode_led_groups_data[] = RGB_LED_GROUP_TABLE(
     // { .pointing_mode = PD_MODE_VOLUME, .color = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },
-);
+    // { .pointing_mode = RGB_PD_MODE_GROUP_ALL, .color = HSV(0, 0, 0), .led_group = RGB_LED_GROUP_THUMBS },
+    {.pointing_mode = RGB_PD_MODE_GROUP_ALL, .color = HSV(0, 0, 0), .led_group = RGB_LED_GROUP_THUMBS}, );
 #    endif // POINTING_DEVICE_ENABLE && RGB_PD_MODE_FEEDBACK_ENABLE
 
 // ─── Combo feedback ────────────────────────────────────────────────────────
@@ -223,7 +228,7 @@ const combo_feedback_color_config_t combo_feedback_colors = {
 // underlay/overlay substage is live.
 //
 // Uncomment or add rows inside this table to enable persistent combo accents.
-static const combo_feedback_led_group_t combo_feedback_led_groups_data[] = RGB_LED_GROUP_TABLE({.color = HSV(191, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_THUMBS}, //
+static const combo_feedback_led_group_t combo_feedback_led_groups_data[] = RGB_LED_GROUP_TABLE({.color = HSV(0, 0, 0), .led_group = RGB_LED_GROUP_THUMBS}, //
 );
 #    endif // COMBO_ENABLE && RGB_COMBO_FEEDBACK_ENABLE
 
@@ -308,7 +313,8 @@ const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
 // These groups repaint after the feedback locality render when a matching
 // visible semantic category is live.
 //
-// Uncomment or add rows inside this table to enable feedback accents.
+// In LED group rows, HSV(0, 0, 0) inherits the active feedback color. Use a
+// nonzero HSV value only when the group should override that stage color.
 static const key_behavior_feedback_led_group_t key_behavior_feedback_led_groups_data[] = RGB_LED_GROUP_TABLE(
     // { .semantic = KEY_FEEDBACK_GROUP_UNRESOLVED_TAP_BRANCH, .color = HSV(0, 0, 150), .led_group = RGB_LED_GROUP_TRACKBALL },
     // { .semantic = KEY_FEEDBACK_GROUP_TAP_BRANCH_COMMITTED, .color = HSV(169, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },

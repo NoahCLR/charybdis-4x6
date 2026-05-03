@@ -137,7 +137,7 @@ const pd_mode_color_t pd_mode_colors[] = {
     {.pointing_mode = PD_MODE_ARROW, .color = HSV(210, 211, 212), .locality = RGB_RIGHT_HALF}, {.pointing_mode = PD_MODE_VOLUME, .color = HSV(220, 221, 222), .locality = RGB_LEFT_HALF}, {.pointing_mode = PD_MODE_BRIGHTNESS, .color = HSV(223, 224, 225), .locality = RGB_BOTH_HALVES}, {.pointing_mode = PD_MODE_ZOOM, .color = HSV(226, 227, 228), .locality = RGB_KEY_HALF}, {.pointing_mode = PD_MODE_PINCH, .color = HSV(233, 234, 235), .locality = RGB_KEYS_ONLY},
 };
 const uint8_t                    pd_mode_color_count       = (uint8_t)(sizeof(pd_mode_colors) / sizeof(pd_mode_colors[0]));
-static const pd_mode_led_group_t pd_mode_led_groups_data[] = RGB_LED_GROUP_TABLE({.pointing_mode = PD_MODE_VOLUME, .color = HSV(230, 231, 232), .led_group = RGB_LED_GROUP(1, 6)}, );
+static const pd_mode_led_group_t pd_mode_led_groups_data[] = RGB_LED_GROUP_TABLE({.pointing_mode = PD_MODE_VOLUME, .color = HSV(0, 0, 0), .led_group = RGB_LED_GROUP(1, 6)}, {.pointing_mode = RGB_PD_MODE_GROUP_ALL, .color = HSV(0, 0, 0), .led_group = RGB_LED_GROUP(6)}, );
 EXPORT_PD_MODE_LED_GROUP_TABLE(pd_mode_led_groups_data);
 const automouse_fade_end_config_t automouse_fade_end_config = {
 #if RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_OVERRIDE
@@ -154,7 +154,7 @@ const combo_feedback_color_config_t combo_feedback_colors = {
     .locality = RGB_KEYS_ONLY,
 };
 #if RGB_LAYER_RENDER_TEST_FEEDBACK_GROUPS
-static const combo_feedback_led_group_t combo_feedback_led_groups_data[] = RGB_LED_GROUP_TABLE({.color = HSV(153, 154, 155), .led_group = RGB_LED_GROUP(3)}, );
+static const combo_feedback_led_group_t combo_feedback_led_groups_data[] = RGB_LED_GROUP_TABLE({.color = HSV(0, 0, 0), .led_group = RGB_LED_GROUP(3)}, );
 EXPORT_COMBO_FEEDBACK_LED_GROUP_TABLE(combo_feedback_led_groups_data);
 #endif
 const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
@@ -177,7 +177,7 @@ const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
 #endif
 };
 #if RGB_LAYER_RENDER_TEST_FEEDBACK_GROUPS
-static const key_behavior_feedback_led_group_t key_behavior_feedback_led_groups_data[] = RGB_LED_GROUP_TABLE({.semantic = KEY_FEEDBACK_GROUP_UNRESOLVED_TAP_BRANCH, .color = HSV(11, 12, 13), .led_group = RGB_LED_GROUP(5)}, {.semantic = KEY_FEEDBACK_GROUP_TAP_BRANCH_COMMITTED, .color = HSV(14, 15, 16), .led_group = RGB_LED_GROUP(5)}, {.semantic = KEY_FEEDBACK_GROUP_TAP_COMMITTED, .color = HSV(17, 18, 19), .led_group = RGB_LED_GROUP(5)}, {.semantic = KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE, .color = HSV(20, 21, 22), .led_group = RGB_LED_GROUP(5)}, {.semantic = KEY_FEEDBACK_GROUP_ALL, .color = HSV(99, 99, 99), .led_group = RGB_LED_GROUP(5, 6)}, );
+static const key_behavior_feedback_led_group_t key_behavior_feedback_led_groups_data[] = RGB_LED_GROUP_TABLE({.semantic = KEY_FEEDBACK_GROUP_UNRESOLVED_TAP_BRANCH, .color = HSV(11, 12, 13), .led_group = RGB_LED_GROUP(5)}, {.semantic = KEY_FEEDBACK_GROUP_TAP_BRANCH_COMMITTED, .color = HSV(14, 15, 16), .led_group = RGB_LED_GROUP(5)}, {.semantic = KEY_FEEDBACK_GROUP_TAP_COMMITTED, .color = HSV(17, 18, 19), .led_group = RGB_LED_GROUP(5)}, {.semantic = KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE, .color = HSV(20, 21, 22), .led_group = RGB_LED_GROUP(5)}, {.semantic = KEY_FEEDBACK_GROUP_ALL, .color = HSV(0, 0, 0), .led_group = RGB_LED_GROUP(5, 6)}, );
 EXPORT_KEY_BEHAVIOR_FEEDBACK_LED_GROUP_TABLE(key_behavior_feedback_led_groups_data);
 #endif
 const pd_mode_def_t pd_modes[PD_MODE_COUNT] = {
@@ -218,10 +218,6 @@ static rgb_t rgb_from_tap_branch_color(uint8_t index) {
 }
 
 #if RGB_LAYER_RENDER_TEST_FEEDBACK_GROUPS
-static rgb_t rgb_from_combo_feedback_group(uint8_t index) {
-    return rgb_from_hsv(combo_feedback_led_groups[index].color);
-}
-
 static rgb_t rgb_from_key_feedback_group(uint8_t index) {
     return rgb_from_hsv(key_behavior_feedback_led_groups[index].color);
 }
@@ -766,7 +762,7 @@ static void test_combo_overlay_led_groups_repaint_after_combo_locality(void) {
     CHECK(render_output());
 
     check_led(0, rgb_from_combo_feedback());
-    check_led(3, rgb_from_combo_feedback_group(0));
+    check_led(3, rgb_from_combo_feedback());
 }
 
 static void test_combo_underlay_led_groups_stay_below_preview(void) {
@@ -791,7 +787,7 @@ static void test_combo_overlay_led_groups_repaint_after_pd_mode(void) {
 
     CHECK(render_output());
 
-    check_led(3, rgb_from_combo_feedback_group(0));
+    check_led(3, rgb_from_combo_feedback());
 }
 #endif
 
@@ -1294,10 +1290,10 @@ static void test_slave_full_scene_preserves_remote_preview_and_locked_pd_mode_wh
     CHECK(render_output());
 
     check_led(0, rgb_from_hsv(pd_mode_colors[1].color));
-    check_led(1, rgb_from_hsv(pd_mode_led_groups[0].color));
+    check_led(1, rgb_from_hsv(pd_mode_colors[1].color));
     check_led(2, rgb_from_hsv(pd_mode_colors[1].color));
     check_led(4, rgb_from_hsv(layer_colors[LAYER_NUM].color));
-    check_led(6, rgb_from_hsv(pd_mode_led_groups[0].color));
+    check_led(6, rgb_from_hsv(pd_mode_colors[1].color));
     check_led(7, rgb_from_hsv(layer_colors[LAYER_SYM].color));
 }
 
@@ -1340,7 +1336,7 @@ static void test_render_order_preview_then_pd_mode_then_pd_group(void) {
     check_led(0, rgb_from_hsv(pd_mode_colors[1].color));
     check_led(2, rgb_from_hsv(pd_mode_colors[1].color));
     check_led(4, rgb_from_hsv(layer_colors[LAYER_NUM].color));
-    check_led(6, rgb_from_hsv(pd_mode_led_groups[0].color));
+    check_led(6, rgb_from_hsv(pd_mode_colors[1].color));
 }
 
 #if !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY_HALF && !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY && !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_LEFT_HALF && !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_RIGHT_HALF
@@ -1358,7 +1354,7 @@ static void test_render_order_base_then_preview_then_pd_mode_then_feedback(void)
     check_led(0, rgb_from_hsv(pd_mode_colors[1].color));
     check_led(2, rgb_from_hsv(pd_mode_colors[1].color));
     check_led(4, rgb_from_hsv(layer_colors[LAYER_SYM].color));
-    check_led(6, rgb_from_hsv(pd_mode_led_groups[0].color));
+    check_led(6, rgb_from_hsv(pd_mode_colors[1].color));
 
     memset(led_output, 0, sizeof(led_output));
     test_local_feedback_semantic_add(0, 0, KEY_FEEDBACK_SEMANTIC_UNRESOLVED_TAP_BRANCH);
@@ -1479,6 +1475,7 @@ static void test_pointer_mode_overlay_paints_right_half(void) {
     CHECK(render_output());
 
     check_led(0, rgb_from_hsv(layer_colors[LAYER_SYM].color));
+    check_led(1, rgb_from_hsv(layer_colors[LAYER_SYM].color));
     check_led(2, rgb_from_hsv(layer_colors[LAYER_SYM].color));
     check_led(3, rgb_from_hsv(layer_colors[LAYER_SYM].color));
     check_led(4, rgb_from_hsv(pd_mode_colors[0].color));
@@ -1496,12 +1493,12 @@ static void test_pointer_mode_overlay_paints_left_half_and_groups(void) {
     CHECK(render_output());
 
     check_led(0, rgb_from_hsv(pd_mode_colors[1].color));
-    check_led(1, rgb_from_hsv(pd_mode_led_groups[0].color));
+    check_led(1, rgb_from_hsv(pd_mode_colors[1].color));
     check_led(2, rgb_from_hsv(pd_mode_colors[1].color));
     check_led(3, rgb_from_hsv(pd_mode_colors[1].color));
     check_led(4, rgb_from_hsv(layer_colors[LAYER_SYM].color));
     check_led(5, rgb_from_hsv(layer_colors[LAYER_SYM].color));
-    check_led(6, rgb_from_hsv(pd_mode_led_groups[0].color));
+    check_led(6, rgb_from_hsv(pd_mode_colors[1].color));
     check_led(7, rgb_from_hsv(layer_colors[LAYER_SYM].color));
 }
 
@@ -1784,7 +1781,7 @@ static void test_slave_locked_pd_mode_clamps_remote_automouse_progress(void) {
     CHECK(render_output());
 
     check_led(0, rgb_from_hsv(pd_mode_colors[1].color));
-    check_led(1, rgb_from_hsv(pd_mode_led_groups[0].color));
+    check_led(1, rgb_from_hsv(pd_mode_colors[1].color));
     check_led(2, rgb_from_hsv(pd_mode_colors[1].color));
 }
 

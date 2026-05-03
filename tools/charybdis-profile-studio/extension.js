@@ -53,6 +53,8 @@ const KEY_FEEDBACK_TAP_COMMIT_MODES = [
     "KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS",
     "KEY_FEEDBACK_TAP_COMMIT_ALL_TAPS",
 ];
+const RGB_LAYER_GROUP_ALL = "RGB_LAYER_GROUP_ALL";
+const RGB_PD_MODE_GROUP_ALL = "RGB_PD_MODE_GROUP_ALL";
 const KEY_FEEDBACK_GROUP_ALL = "KEY_FEEDBACK_GROUP_ALL";
 const QMK_KEYCODE_SECTION_GROUPS = [
     { id: "qmk-media", label: "Media", groups: ["media", "system"] },
@@ -4645,6 +4647,8 @@ function getClientScript() {
     const modWrapperLabels = ${JSON.stringify(MOD_WRAPPER_LABELS)};
     const layoutKeyCallFunctions = new Set(${JSON.stringify(LAYOUT_KEY_CALL_FUNCTIONS)});
     const userKeyAliases = ${JSON.stringify(USER_KEY_ALIASES)};
+    const rgbLayerAllGroups = ${JSON.stringify(RGB_LAYER_GROUP_ALL)};
+    const rgbPdModeAllGroups = ${JSON.stringify(RGB_PD_MODE_GROUP_ALL)};
     const keyBehaviorAllGroups = ${JSON.stringify(KEY_FEEDBACK_GROUP_ALL)};
     const rgbLocalities = ${JSON.stringify(RGB_LOCALITIES)};
     const automouseFadeModes = ${JSON.stringify(AUTOMOUSE_FADE_MODES)};
@@ -5371,7 +5375,7 @@ function getClientScript() {
         }
         if (event.target?.name === "owner" && event.target.closest("#rgbGroupBuilder")) {
             rgbGroupOwner = event.target.value;
-            if (rgbGroupTarget === "layer" && rgbGroupOwner) {
+            if (rgbGroupTarget === "layer" && rgbGroupOwner && rgbGroupOwner !== rgbLayerAllGroups) {
                 activeLayer = rgbGroupOwner;
                 selectedKey = 0;
                 layoutNotice = "";
@@ -6297,10 +6301,13 @@ function getClientScript() {
         if (!owners.length) {
             rgbGroupOwner = "";
         } else if (rgbGroupTarget === "layer") {
-            if (!owners.includes(activeLayer)) {
-                activeLayer = owners[0];
+            const layerNames = layersForUi().map((layer) => layer.name);
+            if (activeLayer === rgbLayerAllGroups || !layerNames.includes(activeLayer)) {
+                activeLayer = layerNames[0] || "";
             }
-            rgbGroupOwner = activeLayer;
+            if (!owners.includes(rgbGroupOwner)) {
+                rgbGroupOwner = activeLayer && owners.includes(activeLayer) ? activeLayer : owners[0];
+            }
         } else if (!owners.includes(rgbGroupOwner)) {
             rgbGroupOwner = owners[0];
         }
@@ -6308,6 +6315,7 @@ function getClientScript() {
 
     function syncRgbLayerOwnerToActiveLayer() {
         if (rgbGroupTarget !== "layer") return;
+        if (rgbGroupOwner === rgbLayerAllGroups) return;
         if (!activeLayer || !rgbGroupOwners("layer").includes(activeLayer)) return;
         if (rgbGroupOwner !== activeLayer) {
             rgbBuilderColor = undefined;
@@ -8446,13 +8454,12 @@ function getClientScript() {
     function readRgbLedGroupBuilder(form) {
         const target = value(form, "target");
         const owner = value(form, "owner");
-        const allKeyBehavior = target === "keyBehavior" && owner === keyBehaviorAllGroups;
         return {
             target,
             owner,
-            hue: allKeyBehavior ? "0" : value(form, "h"),
-            sat: allKeyBehavior ? "0" : value(form, "s"),
-            val: allKeyBehavior ? "0" : value(form, "v"),
+            hue: value(form, "h"),
+            sat: value(form, "s"),
+            val: value(form, "v"),
             ledIndices: rgbSelectedLeds
         };
     }
@@ -8508,13 +8515,19 @@ function getClientScript() {
     }
 
     function rgbGroupOwners(target) {
-        if (target === "layer") return layersForUi().map((layer) => layer.name);
-        if (target === "pdMode") return (model.rgb?.pdModeColors || []).map((row) => row.pointingMode);
+        if (target === "layer") return [rgbLayerAllGroups].concat(layersForUi().map((layer) => layer.name));
+        if (target === "pdMode") return [rgbPdModeAllGroups].concat((model.rgb?.pdModeColors || []).map((row) => row.pointingMode));
         if (target === "keyBehavior") return keyBehaviorRgbSemantics;
         return [];
     }
 
     function rgbGroupOwnerOptions(target) {
+        if (target === "layer") {
+            return rgbGroupOwners(target).map((owner) => [owner, owner === rgbLayerAllGroups ? "All layers" : owner]);
+        }
+        if (target === "pdMode") {
+            return rgbGroupOwners(target).map((owner) => [owner, owner === rgbPdModeAllGroups ? "All pointing modes" : owner]);
+        }
         if (target === "keyBehavior") {
             return keyBehaviorRgbSemantics.map((semantic) => [semantic, keyBehaviorRgbSemanticLabel(semantic)]);
         }
@@ -8568,7 +8581,8 @@ function getClientScript() {
             }
         }
         const row = matchingRows[matchingRows.length - 1];
-        const fill = hsvToHex(row.color) || rgbBuilderHex();
+        const previewColor = rgbGroupColorInherits(row.color) ? rgbLedGroupInheritedColor(row, rgbGroupTarget) : row.color;
+        const fill = hsvToHex(previewColor) || rgbBuilderHex();
         return {
             fill,
             text: idealText(fill),
@@ -8599,10 +8613,11 @@ function getClientScript() {
     }
 
     function renderRgbBuilderColorControl() {
-        if (rgbGroupTarget === "keyBehavior" && rgbGroupOwner === keyBehaviorAllGroups) {
+        if (rgbGroupTarget === "keyBehavior" && rgbGroupOwner === keyBehaviorAllGroups && rgbGroupColorInherits(defaultRgbBuilderColor())) {
             const rows = keyBehaviorRgbSemanticColorRows();
             return "<div class='color-control'>" +
-                "<div class='muted'>All mode writes one low-level KEY_FEEDBACK_GROUP_ALL row. The firmware uses the active feedback semantic's configured color at render time.</div>" +
+                "<div class='muted'>KEY_FEEDBACK_GROUP_ALL with HSV(0, 0, 0) inherits the active feedback semantic color at render time.</div>" +
+                "<input name='h' type='hidden' value='0'><input name='s' type='hidden' value='0'><input name='v' type='hidden' value='0'>" +
                 "<div class='rgb-all-color-grid'>" + rows.map((row) =>
                     "<div class='rgb-all-color-chip'>" +
                     renderInlineSwatch(row.color) +
@@ -8618,6 +8633,9 @@ function getClientScript() {
     function defaultRgbBuilderColor() {
         if (rgbBuilderColor) {
             return rgbBuilderColor;
+        }
+        if (rgbGroupOwner === rgbLayerAllGroups || rgbGroupOwner === rgbPdModeAllGroups || rgbGroupOwner === keyBehaviorAllGroups) {
+            return { h: "0", s: "0", v: "0" };
         }
         if (rgbGroupTarget === "layer") {
             return colorForLayer(rgbGroupOwner || activeLayer)?.color || { h: "0", s: "255", v: "RGB_MATRIX_MAXIMUM_BRIGHTNESS" };
@@ -8817,21 +8835,21 @@ function getClientScript() {
     function renderLayerRgbSection(rgb) {
         return "<div class='card-list'>" +
             (rgb.layerColors || []).map(renderLayerColorCard).join("") +
-            renderLedGroupSubsection("Layer LED Groups", rgb.layerLedGroups || [], "Layer") +
+            renderLedGroupSubsection("Layer LED Groups", rgb.layerLedGroups || [], "Layer", "layer") +
             "</div>";
     }
 
     function renderPdModeRgbSection(rgb) {
         return "<div class='card-list'>" +
             (rgb.pdModeColors || []).map(renderPdColorCard).join("") +
-            renderLedGroupSubsection("Pointing-mode LED Groups", rgb.pdModeLedGroups || [], "Pointing mode") +
+            renderLedGroupSubsection("Pointing-mode LED Groups", rgb.pdModeLedGroups || [], "Pointing mode", "pdMode") +
             "</div>";
     }
 
     function renderComboFeedbackSection(rgb) {
         return "<div class='card-list'>" +
             renderComboFeedbackCard(rgb.comboFeedback) +
-            renderLedGroupSubsection("Combo Feedback LED Groups", rgb.comboFeedbackLedGroups || [], "") +
+            renderLedGroupSubsection("Combo Feedback LED Groups", rgb.comboFeedbackLedGroups || [], "", "combo") +
             "</div>";
     }
 
@@ -8997,7 +9015,7 @@ function getClientScript() {
         const ownerHeader = ownerLabel ? "<th>" + escapeHtml(ownerLabel) + "</th>" : "";
         return "<table><thead><tr>" + ownerHeader + "<th>Color</th><th>LED group</th><th>LEDs</th></tr></thead><tbody>" +
             rows.map((row) => "<tr>" +
-                (ownerLabel ? "<td><code>" + escapeHtml(row.owner || "") + "</code></td>" : "") +
+                (ownerLabel ? "<td>" + renderLedGroupOwnerCell(row, tableKind) + "</td>" : "") +
                 renderLedGroupColorCell(row, tableKind) +
                 "<td><code>" + escapeHtml(row.ledGroup || "") + "</code></td>" +
                 "<td><code>" + escapeHtml((row.ledIndices || []).join(", ")) + "</code></td>" +
@@ -9005,11 +9023,69 @@ function getClientScript() {
             "</tbody></table>";
     }
 
+    function renderLedGroupOwnerCell(row, tableKind = "") {
+        const owner = row.owner || "";
+        const label = rgbLedGroupOwnerLabel(owner, tableKind);
+        if (label === owner) {
+            return "<code>" + escapeHtml(owner) + "</code>";
+        }
+        return "<code>" + escapeHtml(owner) + "</code><div class='muted'>" + escapeHtml(label) + "</div>";
+    }
+
+    function rgbLedGroupOwnerLabel(owner, tableKind = "") {
+        if (tableKind === "layer" && owner === rgbLayerAllGroups) return "All layers";
+        if (tableKind === "pdMode" && owner === rgbPdModeAllGroups) return "All pointing modes";
+        if (tableKind === "keyBehavior" && owner === keyBehaviorAllGroups) return "All feedback groups";
+        if (tableKind === "keyBehavior") return keyBehaviorRgbSemanticLabel(owner);
+        return owner || "";
+    }
+
     function renderLedGroupColorCell(row, tableKind = "") {
-        if (tableKind === "keyBehavior" && row.owner === keyBehaviorAllGroups) {
-            return "<td><div class='toolbar'>" + keyBehaviorRgbSemanticColorRows().map((semanticRow) => renderInlineSwatch(semanticRow.color)).join("") + "</div><code class='muted'>runtime feedback color</code></td>";
+        if (rgbGroupColorInherits(row.color)) {
+            if (tableKind === "keyBehavior" && row.owner === keyBehaviorAllGroups) {
+                return "<td><div class='toolbar'>" + keyBehaviorRgbSemanticColorRows().map((semanticRow) => renderInlineSwatch(semanticRow.color)).join("") + "</div><code class='muted'>inherits active feedback color</code></td>";
+            }
+            const inherited = rgbLedGroupInheritedColor(row, tableKind);
+            if (inherited) {
+                return "<td>" + renderInlineSwatch(inherited) + "<code class='muted'>" + escapeHtml(rgbLedGroupInheritedLabel(row, tableKind)) + "</code></td>";
+            }
+            return "<td><code class='muted'>" + escapeHtml(rgbLedGroupInheritedLabel(row, tableKind)) + "</code></td>";
         }
         return "<td>" + renderInlineSwatch(row.color) + "<code>" + escapeHtml(row.color?.expression || "") + "</code></td>";
+    }
+
+    function rgbGroupColorInherits(color) {
+        return String(color?.h || "") === "0" && String(color?.s || "") === "0" && String(color?.v || "") === "0";
+    }
+
+    function rgbLedGroupInheritedColor(row, tableKind = "") {
+        if (tableKind === "layer" && row.owner === rgbLayerAllGroups) {
+            return colorForLayer(activeLayer)?.color;
+        }
+        if (tableKind === "layer" && row.owner !== rgbLayerAllGroups) {
+            return colorForLayer(row.owner)?.color;
+        }
+        if (tableKind === "pdMode" && row.owner === rgbPdModeAllGroups) {
+            return (model.rgb?.pdModeColors || [])[0]?.color;
+        }
+        if (tableKind === "pdMode" && row.owner !== rgbPdModeAllGroups) {
+            return colorForPdMode(row.owner)?.color;
+        }
+        if (tableKind === "combo") {
+            return model.rgb?.comboFeedback?.color;
+        }
+        if (tableKind === "keyBehavior" && row.owner !== keyBehaviorAllGroups) {
+            return keyBehaviorSemanticColor(row.owner);
+        }
+        return undefined;
+    }
+
+    function rgbLedGroupInheritedLabel(row, tableKind = "") {
+        if (tableKind === "layer") return row.owner === rgbLayerAllGroups ? "inherits each active layer color" : "inherits layer color";
+        if (tableKind === "pdMode") return row.owner === rgbPdModeAllGroups ? "inherits each active pointing-mode color" : "inherits pointing-mode color";
+        if (tableKind === "combo") return "inherits combo feedback color";
+        if (tableKind === "keyBehavior") return "inherits active feedback color";
+        return "inherits stage color";
     }
 
     function renderHsvColorControl(color, id, extraAttrs = "", options = {}) {

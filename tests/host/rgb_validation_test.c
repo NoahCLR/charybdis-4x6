@@ -13,10 +13,12 @@ static char log_buffer[4096];
 
 static const layer_led_group_t layer_groups[] = {
     {.layer = LAYER_COUNT, .color = HSV(0, 0, 0), .led_group = RGB_LED_GROUP(0, RGB_MATRIX_LED_COUNT)},
+    {.layer = RGB_LAYER_GROUP_ALL, .color = HSV(0, 0, 0), .led_group = RGB_LED_GROUP(1)},
 };
 static const pd_mode_led_group_t pd_mode_groups[] = {
     {.pointing_mode = PD_MODE_VOLUME, .color = HSV(1, 1, 1), .led_group = RGB_LED_GROUP(RGB_MATRIX_LED_COUNT)},
     {.pointing_mode = (pd_mode_mask_t)0x8000u, .color = HSV(2, 2, 2), .led_group = RGB_LED_GROUP(1)},
+    {.pointing_mode = RGB_PD_MODE_GROUP_ALL, .color = HSV(0, 0, 0), .led_group = RGB_LED_GROUP(2)},
 };
 static const combo_feedback_led_group_t combo_feedback_groups[] = {
     {.color = HSV(4, 4, 4), .led_group = RGB_LED_GROUP(RGB_MATRIX_LED_COUNT)},

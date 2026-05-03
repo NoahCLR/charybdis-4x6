@@ -154,17 +154,19 @@ bool rgb_runtime_pd_mode_stage_render(uint8_t led_min, uint8_t led_max) {
     bool               painted     = false;
     uint8_t            active_mode = snapshot.display.active_index;
 
-    if (active_mode < PD_MODE_COUNT) {
-        painted |= rgb_runtime_pd_mode_stage_paint_locality(pd_mode_rgb[active_mode], pd_mode_render_locality[active_mode], snapshot, led_min, led_max);
+    if (active_mode >= PD_MODE_COUNT) {
+        return painted;
     }
 
+    painted |= rgb_runtime_pd_mode_stage_paint_locality(pd_mode_rgb[active_mode], pd_mode_render_locality[active_mode], snapshot, led_min, led_max);
+
     for (uint8_t group = 0; group < pd_mode_led_group_count; group++) {
-        if (snapshot.display.active_mode != pd_mode_led_groups[group].pointing_mode) {
+        if (pd_mode_led_groups[group].pointing_mode != RGB_PD_MODE_GROUP_ALL && snapshot.display.active_mode != pd_mode_led_groups[group].pointing_mode) {
             continue;
         }
 
         const rgb_led_group_t *led_group = &pd_mode_led_groups[group].led_group;
-        rgb_t                  group_rgb = hsv_to_rgb(pd_mode_led_groups[group].color);
+        rgb_t                  group_rgb = rgb_hsv_is_inherit_color(pd_mode_led_groups[group].color) ? pd_mode_rgb[active_mode] : hsv_to_rgb(pd_mode_led_groups[group].color);
         rgb_set_led_group(led_group->leds, led_group->count, led_min, led_max, group_rgb);
         painted |= rgb_runtime_pd_mode_stage_led_group_intersects(led_group->leds, led_group->count, led_min, led_max);
     }

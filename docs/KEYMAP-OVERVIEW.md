@@ -289,7 +289,7 @@ Authored combo feedback LED groups repaint after the combo locality render insid
 
 | Group | LEDs | Count | Authored HSV | Preview Color |
 | --- | --- | --- | --- | --- |
-| `1` | `26,27,28,25,24,53,54,55` | `8` | `HSV(191, 255, 200)` | <img alt="Combo feedback group 1 color" src="media/profile-introspection/profile-color-swatch-7e00ff.svg" width="96" height="28" /> |
+| `1` | `26,27,28,25,24,53,54,55` | `8` | `HSV(0, 0, 0)` | <img alt="Combo feedback group 1 color" src="media/profile-introspection/profile-color-swatch-7e00ff.svg" width="96" height="28" /> |
 
 ## Key-Behavior Feedback LEDs
 
@@ -330,7 +330,7 @@ Authored key-feedback LED groups repaint after the feedback locality render insi
 
 | Semantic Group | LEDs | Count | Authored HSV | Preview Color |
 | --- | --- | --- | --- | --- |
-| `KEY_FEEDBACK_GROUP_ALL` | `26,27,28,25,24,53,54,55` | `8` | `HSV(0, 0, 0)` | <img alt="All group color" src="media/profile-introspection/profile-color-swatch-000000.svg" width="96" height="28" /> |
+| `KEY_FEEDBACK_GROUP_ALL` | `26,27,28,25,24,53,54,55` | `8` | `HSV(0, 0, 0)` | inherits active feedback color |
 
 ## Macro Inventory
 

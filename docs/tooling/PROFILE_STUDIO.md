@@ -24,14 +24,12 @@ back to the same blocks.
 - `layer_colors[]`
 - `pd_mode_colors[]`
 - RGB LED group tables, including appending new inline `RGB_LED_GROUP(...)`
-  rows by selecting physical LEDs on the RGB layout
+  rows by selecting physical LEDs on the RGB layout; layer and pointing-mode
+  groups include all-target owner choices
 - the LED group builder previews already-defined groups for the currently
   selected table while keeping the pending new-row selection separate
-- a key-behavior LED group all-feedback mode that writes
-  `KEY_FEEDBACK_GROUP_ALL` and lets firmware resolve the active semantic's
-  configured feedback color at render time; specific feedback group rows
-  override that all-feedback base, and selected LEDs preview this mode as equal
-  vertical bands including every configured tap-count branch-confirm color
+- inherited LED group colors: `HSV(0, 0, 0)` is shown as an inherited stage
+  color rather than a black override, including `KEY_FEEDBACK_GROUP_ALL`
 - auto-mouse fade destination color and fade mode
 - combo feedback color/locality
 - key-behavior feedback colors, tap-count branch-confirm colors, tap commit mode, and
@@ -129,6 +127,9 @@ still writes the same `HSV(...)` expressions back to `rgb_config.c`. Layer
 color summaries follow the firmware pass-through rule for `HSV(0, 0, 0)`: the
 base layer preview uses the configured default RGB Matrix color, and higher
 layers are marked as pass-through instead of previewing literal black.
+LED group summaries follow the group inheritance rule for `HSV(0, 0, 0)`: layer,
+pointing-mode, combo, and key-behavior groups inherit their active stage color
+unless the row uses a nonzero HSV override.
 
 Most visible controls, tables, collapsed summaries, color previews, and SVG
 keys expose hover tooltips that describe what the field edits or displays.

@@ -39,6 +39,8 @@ RETIRED_JSON_OUTPUTS = [output_dir / "profile-summary.json" for output_dir in RE
 RETIRED_JSON_OUTPUTS.extend(asset_dir / "profile-summary.json" for asset_dir in RETIRED_ASSET_OUTPUT_DIRS)
 
 MARKDOWN_HEADER = "<!-- Generated file. Do not edit by hand. -->\n"
+RGB_LAYER_GROUP_ALL = "RGB_LAYER_GROUP_ALL"
+RGB_PD_MODE_GROUP_ALL = "RGB_PD_MODE_GROUP_ALL"
 
 DISPLAY_ALIASES = {
     "_______": "TRNS",
@@ -665,6 +667,29 @@ def parse_hsv_expr(expr: str, known_values: dict[str, str]) -> dict[str, object]
     return {"h": h, "s": s, "v": v, "hex": hsv_to_hex(h, s, v), "enabled": not (h == 0 and s == 0 and v == 0)}
 
 
+def rgb_hsv_is_inherit_color(color: dict[str, object] | None) -> bool:
+    return bool(color) and color.get("h") == 0 and color.get("s") == 0 and color.get("v") == 0
+
+
+def rgb_group_preview_label(stage: str, owner: str | None = None) -> str:
+    if stage == "layer":
+        return "inherits each active layer color" if owner == RGB_LAYER_GROUP_ALL else "inherits layer color"
+    if stage == "pd_mode":
+        return "inherits each active pointing-mode color" if owner == RGB_PD_MODE_GROUP_ALL else "inherits pointing-mode color"
+    if stage == "combo":
+        return "inherits combo feedback color"
+    if stage == "key_behavior":
+        return "inherits active feedback color"
+    return "inherits stage color"
+
+
+def rgb_group_preview_cell(row: dict[str, object], alt_text: str) -> str:
+    preview_color = row.get("preview_color")
+    if preview_color is not None:
+        return markdown_color_swatch(preview_color, alt_text)
+    return str(row.get("preview_label") or "inherits stage color")
+
+
 def normalize_color_name(label: str) -> str:
     lowered = label.strip().lower().replace("-", " ")
     lowered = re.sub(r"[^a-z\s]", " ", lowered)
@@ -1139,6 +1164,8 @@ def parse_exported_rgb_led_groups(
         row: dict[str, object] = {
             "color": color,
             "preview_color": dict(color),
+            "inherits_stage_color": rgb_hsv_is_inherit_color(color),
+            "preview_label": "",
             "led_group": led_group_name,
             "leds": normalize_expr(leds_expr),
             "count": normalize_expr(count_expr),
@@ -1159,6 +1186,79 @@ def parse_exported_rgb_led_groups(
         rows.append(row)
 
     return rows
+
+
+def finalize_rgb_led_group_previews(
+    layer_led_groups: list[dict[str, object]],
+    pd_mode_led_groups: list[dict[str, object]],
+    combo_feedback_led_groups: list[dict[str, object]],
+    key_behavior_feedback_led_groups: list[dict[str, object]],
+    layer_colors: list[dict[str, object]],
+    pd_mode_colors: list[dict[str, object]],
+    combo_feedback_color: dict[str, object] | None,
+    key_behavior_feedback_colors: list[dict[str, object]],
+) -> None:
+    layer_color_map = {row["layer"]: row for row in layer_colors}
+    pd_mode_color_map = {row["pointing_mode"]: row for row in pd_mode_colors}
+    key_feedback_color_map = {
+        "KEY_FEEDBACK_GROUP_UNRESOLVED_TAP_BRANCH": first_feedback_color_by_field(key_behavior_feedback_colors, "tap_pending_color"),
+        "KEY_FEEDBACK_GROUP_TAP_COMMITTED": first_feedback_color_by_field(key_behavior_feedback_colors, "tap_committed_color"),
+        "KEY_FEEDBACK_GROUP_HOLD_ACTIVE": first_feedback_color_by_field(key_behavior_feedback_colors, "hold_active_color"),
+        "KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE": first_feedback_color_by_field(key_behavior_feedback_colors, "long_hold_active_color"),
+    }
+
+    for row in layer_led_groups:
+        if not row["inherits_stage_color"]:
+            continue
+        owner = str(row.get("layer", ""))
+        row["preview_label"] = rgb_group_preview_label("layer", owner)
+        row["preview_color"] = None if owner == RGB_LAYER_GROUP_ALL else optional_preview_color(layer_color_map.get(owner))
+
+    for row in pd_mode_led_groups:
+        if not row["inherits_stage_color"]:
+            continue
+        owner = str(row.get("pointing_mode", ""))
+        row["preview_label"] = rgb_group_preview_label("pd_mode", owner)
+        row["preview_color"] = None if owner == RGB_PD_MODE_GROUP_ALL else optional_preview_color(pd_mode_color_map.get(owner))
+
+    for row in combo_feedback_led_groups:
+        if not row["inherits_stage_color"]:
+            continue
+        row["preview_label"] = rgb_group_preview_label("combo")
+        row["preview_color"] = optional_preview_color(combo_feedback_color)
+
+    for row in key_behavior_feedback_led_groups:
+        if not row["inherits_stage_color"]:
+            continue
+        semantic = str(row.get("semantic", ""))
+        row["preview_label"] = rgb_group_preview_label("key_behavior", semantic)
+        row["preview_color"] = optional_preview_color(key_feedback_color_map.get(semantic))
+
+
+def first_feedback_color_by_field(rows: list[dict[str, object]], field: str) -> dict[str, object] | None:
+    for row in rows:
+        if row.get("field") == field:
+            return row
+    return None
+
+
+def optional_preview_color(row: dict[str, object] | None) -> dict[str, object] | None:
+    if row is None:
+        return None
+    preview_color = row.get("preview_color")
+    return dict(preview_color) if preview_color is not None else None
+
+
+def layer_led_group_row_for_layer(row: dict[str, object], layer_color: dict[str, object]) -> dict[str, object]:
+    if row.get("layer") != RGB_LAYER_GROUP_ALL:
+        return row
+    if row.get("inherits_stage_color"):
+        return {
+            **row,
+            "preview_color": optional_preview_color(layer_color),
+            "preview_label": rgb_group_preview_label("layer", str(row.get("layer", ""))),
+        }
+    return row
 
 
 def resolve_rgb_default_color(known_values: dict[str, str]) -> dict[str, object]:
@@ -1608,6 +1708,17 @@ def build_profile_model() -> dict[str, object]:
         else []
     )
 
+    finalize_rgb_led_group_previews(
+        layer_led_groups,
+        pd_mode_led_groups,
+        combo_feedback_led_groups,
+        key_behavior_feedback_led_groups,
+        layer_colors,
+        pd_mode_colors,
+        combo_feedback_color,
+        key_behavior_feedback_colors,
+    )
+
     macro_usages = collect_macro_usages(parsed_layers, behaviors, combos, via_macros + hardcoded_macros)
 
     via_slots = []
@@ -1841,7 +1952,7 @@ def render_reference_section(profile: dict[str, object]) -> str:
         )
         for row in rgb["layer_led_groups"]:
             color = row["color"]
-            preview_swatch = markdown_color_swatch(row["preview_color"], f"{row['layer']} LED group color")
+            preview_swatch = rgb_group_preview_cell(row, f"{row['layer']} LED group color")
             lines.append(
                 f"| `{row['layer']}` | `{row['led_group']}` | `{row['leds']}` | `{row['count']}` | `HSV({color['h']}, {color['s']}, {color['v']})` | {preview_swatch} |"
             )
@@ -1892,9 +2003,13 @@ def render_config_defines_section(profile: dict[str, object]) -> str:
 def render_layer_maps_section(profile: dict[str, object]) -> str:
     features = profile["features"]
     layer_color_map = {row["layer"]: row for row in profile["rgb"]["layer_colors"]}
+    layer_led_groups_all_layers: list[dict[str, object]] = []
     layer_led_groups_by_layer: dict[str, list[dict[str, object]]] = {}
     for row in profile["rgb"]["layer_led_groups"]:
-        layer_led_groups_by_layer.setdefault(row["layer"], []).append(row)
+        if row["layer"] == RGB_LAYER_GROUP_ALL:
+            layer_led_groups_all_layers.append(row)
+        else:
+            layer_led_groups_by_layer.setdefault(row["layer"], []).append(row)
     keymap_link = markdown_path_link(KEYMAP_FILE, "keymap.c")
     config_link = markdown_path_link(CONFIG_FILE, "config.h")
     rgb_link = markdown_path_link(RGB_CONFIG_FILE, "rgb_config.c")
@@ -1938,11 +2053,14 @@ def render_layer_maps_section(profile: dict[str, object]) -> str:
         lines.append(f"- RGB matrix render mode: `{color_config['mode']}`")
         lines.append(f"- Authored layer color: `HSV({color_config['color']['h']}, {color_config['color']['s']}, {color_config['color']['v']})`")
         lines.append(f"- Preview color: {preview_swatch}")
-        layer_led_groups = layer_led_groups_by_layer.get(layer["name"], [])
+        layer_led_groups = [
+            layer_led_group_row_for_layer(row, color_config)
+            for row in layer_led_groups_all_layers + layer_led_groups_by_layer.get(layer["name"], [])
+        ]
         if layer_led_groups:
             rendered_groups: list[str] = []
             for row in layer_led_groups:
-                group_swatch = markdown_color_swatch(row["preview_color"], f"{row['layer']} LED group color")
+                group_swatch = rgb_group_preview_cell(row, f"{row['layer']} LED group color")
                 rendered_groups.append(f"`{row['led_group']}` LEDs `{row['leds']}` {group_swatch}")
             lines.append("- Active layer LED groups: " + ", ".join(rendered_groups))
         if combo_badge_map:
@@ -2012,7 +2130,7 @@ def render_pd_mode_color_section(profile: dict[str, object]) -> str:
         )
         for row in pd_mode_led_groups:
             color = row["color"]
-            preview_swatch = markdown_color_swatch(row["preview_color"], f"{row['pointing_mode']} LED group color")
+            preview_swatch = rgb_group_preview_cell(row, f"{row['pointing_mode']} LED group color")
             lines.append(
                 f"| `{row['pointing_mode']}` | `{row['led_group']}` | `{row['leds']}` | `{row['count']}` | `HSV({color['h']}, {color['s']}, {color['v']})` | {preview_swatch} |"
             )
@@ -2399,17 +2517,26 @@ def build_generated_assets(profile: dict[str, object]) -> dict[Path, str]:
     }
 
     layer_color_map = {row["layer"]: row for row in profile["rgb"]["layer_colors"]}
+    layer_led_groups_all_layers: list[dict[str, object]] = []
     layer_led_groups_by_layer: dict[str, list[dict[str, object]]] = {}
     for row in profile["rgb"]["layer_led_groups"]:
-        layer_led_groups_by_layer.setdefault(row["layer"], []).append(row)
+        if row["layer"] == RGB_LAYER_GROUP_ALL:
+            layer_led_groups_all_layers.append(row)
+        else:
+            layer_led_groups_by_layer.setdefault(row["layer"], []).append(row)
     behavior_indicator_map = build_behavior_indicator_map(profile)
     for layer in profile["layers"]:
         image_path = ASSET_OUTPUT_DIR / layer_image_name(layer["name"])
         combo_badge_map = build_layer_combo_badge_map(layer, profile)
+        layer_color = layer_color_map[layer["name"]]
+        layer_led_groups = [
+            layer_led_group_row_for_layer(row, layer_color)
+            for row in layer_led_groups_all_layers + layer_led_groups_by_layer.get(layer["name"], [])
+        ]
         assets[image_path] = render_layer_svg(
             layer,
-            layer_color_map[layer["name"]],
-            layer_led_groups_by_layer.get(layer["name"], []),
+            layer_color,
+            layer_led_groups,
             behavior_indicator_map,
             combo_badge_map,
         )
@@ -2421,13 +2548,15 @@ def build_generated_assets(profile: dict[str, object]) -> dict[Path, str]:
             swatch_colors.add(preview_color["hex"])
 
     for row in profile["rgb"]["layer_led_groups"]:
-        swatch_colors.add(row["preview_color"]["hex"])
+        if row["preview_color"] is not None:
+            swatch_colors.add(row["preview_color"]["hex"])
 
     for row in profile["rgb"]["pd_mode_colors"]:
         swatch_colors.add(row["preview_color"]["hex"])
 
     for row in profile["rgb"]["pd_mode_led_groups"]:
-        swatch_colors.add(row["preview_color"]["hex"])
+        if row["preview_color"] is not None:
+            swatch_colors.add(row["preview_color"]["hex"])
 
     automouse_fade_end_config = profile["rgb"]["automouse_fade_end_config"]
     if automouse_fade_end_config is not None:
@@ -2438,13 +2567,15 @@ def build_generated_assets(profile: dict[str, object]) -> dict[Path, str]:
         swatch_colors.add(combo_feedback_color["preview_color"]["hex"])
 
     for row in profile["rgb"]["combo_feedback_led_groups"]:
-        swatch_colors.add(row["preview_color"]["hex"])
+        if row["preview_color"] is not None:
+            swatch_colors.add(row["preview_color"]["hex"])
 
     for row in profile["rgb"]["key_behavior_feedback_colors"]:
         swatch_colors.add(row["preview_color"]["hex"])
 
     for row in profile["rgb"]["key_behavior_feedback_led_groups"]:
-        swatch_colors.add(row["preview_color"]["hex"])
+        if row["preview_color"] is not None:
+            swatch_colors.add(row["preview_color"]["hex"])
 
     for fill_hex in sorted(swatch_colors):
         assets[ASSET_OUTPUT_DIR / color_swatch_image_name(fill_hex)] = render_color_swatch_svg(fill_hex)
@@ -2455,6 +2586,8 @@ def build_generated_assets(profile: dict[str, object]) -> dict[Path, str]:
 def layer_led_group_colors_by_layout_index(layer_led_groups: list[dict[str, object]]) -> dict[int, dict[str, object]]:
     colors_by_layout_index: dict[int, dict[str, object]] = {}
     for row in layer_led_groups:
+        if row["preview_color"] is None:
+            continue
         for led_index in row["led_indices"]:
             layout_index = LED_TO_LAYOUT_INDEX.get(led_index)
             if layout_index is not None:
@@ -2465,6 +2598,8 @@ def layer_led_group_colors_by_layout_index(layer_led_groups: list[dict[str, obje
 def layer_led_group_colors_by_extra_led(layer_led_groups: list[dict[str, object]]) -> dict[int, dict[str, object]]:
     colors_by_led_index: dict[int, dict[str, object]] = {}
     for row in layer_led_groups:
+        if row["preview_color"] is None:
+            continue
         for led_index in row["led_indices"]:
             if led_index in EXTRA_LED_VISUALS:
                 colors_by_led_index[led_index] = row["preview_color"]
@@ -2831,7 +2966,7 @@ def render_key_behavior_feedback_section(profile: dict[str, object]) -> str:
         )
         for row in feedback_groups:
             color = row["color"]
-            preview_swatch = markdown_color_swatch(row["preview_color"], f"{row['label']} group color")
+            preview_swatch = rgb_group_preview_cell(row, f"{row['label']} group color")
             lines.append(
                 f"| `{row['semantic']}` | `{row['leds']}` | `{row['count']}` | `HSV({color['h']}, {color['s']}, {color['v']})` | {preview_swatch} |"
             )
@@ -2910,7 +3045,7 @@ def render_combo_feedback_section(profile: dict[str, object]) -> str:
         )
         for index, row in enumerate(combo_feedback_groups):
             group_color = row["color"]
-            group_swatch = markdown_color_swatch(row["preview_color"], f"Combo feedback group {index + 1} color")
+            group_swatch = rgb_group_preview_cell(row, f"Combo feedback group {index + 1} color")
             lines.append(
                 f"| `{index + 1}` | `{row['leds']}` | `{row['count']}` | `HSV({group_color['h']}, {group_color['s']}, {group_color['v']})` | {group_swatch} |"
             )

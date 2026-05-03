@@ -427,7 +427,7 @@ static bool rgb_runtime_key_feedback_stage_render_group(const key_behavior_feedb
             continue;
         }
 
-        if (group->semantic == KEY_FEEDBACK_GROUP_ALL) {
+        if (rgb_hsv_is_inherit_color(group->color)) {
             if (!rgb_runtime_key_feedback_stage_semantic_color(group_state.semantic, group_state.tap_branch, &group_rgb)) {
                 continue;
             }

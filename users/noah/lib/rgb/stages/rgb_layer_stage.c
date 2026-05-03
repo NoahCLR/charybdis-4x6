@@ -117,6 +117,39 @@ bool rgb_runtime_layer_stage_has_solid_color(uint8_t layer) {
     return !(layer_colors[layer].color.s == 0 && layer_colors[layer].color.v == 0);
 }
 
+static bool rgb_runtime_layer_stage_group_color(uint8_t layer, hsv_t group_color, rgb_t *out_color) {
+    if (!out_color || layer >= LAYER_COUNT) {
+        return false;
+    }
+
+    if (rgb_hsv_is_inherit_color(group_color)) {
+        if (!rgb_runtime_layer_stage_has_solid_color(layer)) {
+            return false;
+        }
+
+        *out_color = layer_rgb[layer];
+        return true;
+    }
+
+    *out_color = hsv_to_rgb(group_color);
+    return true;
+}
+
+static bool rgb_runtime_layer_stage_paint_group_for_layer(rgb_runtime_frame_t *frame, const layer_led_group_t *group, layer_state_t state, uint8_t layer, uint8_t led_min, uint8_t led_max) {
+    rgb_t group_rgb;
+
+    if (!(frame && group && rgb_runtime_layer_stage_layer_is_effectively_active(state, layer))) {
+        return false;
+    }
+
+    if (!rgb_runtime_layer_stage_group_color(layer, group->color, &group_rgb)) {
+        return false;
+    }
+
+    const rgb_led_group_t *led_group = &group->led_group;
+    return rgb_runtime_frame_paint_led_group(frame, led_group->leds, led_group->count, group_rgb, led_min, led_max);
+}
+
 void rgb_runtime_frame_clear(rgb_runtime_frame_t *frame, uint8_t led_min, uint8_t led_max) {
     for (uint8_t led = led_min; led < led_max; led++) {
         frame->colors[led]  = (rgb_t){0};
@@ -154,13 +187,18 @@ bool rgb_runtime_layer_stage_render_frame(rgb_runtime_frame_t *frame, layer_stat
     }
 
     for (uint8_t group = 0; group < layer_led_group_count; group++) {
-        if (!rgb_runtime_layer_stage_layer_is_effectively_active(state, layer_led_groups[group].layer)) {
+        const layer_led_group_t *group_config = &layer_led_groups[group];
+
+        if (group_config->layer == RGB_LAYER_GROUP_ALL) {
+            for (uint8_t layer = 0; layer < LAYER_COUNT; layer++) {
+                painted |= rgb_runtime_layer_stage_paint_group_for_layer(frame, group_config, state, layer, led_min, led_max);
+            }
             continue;
         }
 
-        const rgb_led_group_t *led_group = &layer_led_groups[group].led_group;
-        rgb_t                  group_rgb = hsv_to_rgb(layer_led_groups[group].color);
-        painted |= rgb_runtime_frame_paint_led_group(frame, led_group->leds, led_group->count, group_rgb, led_min, led_max);
+        if (group_config->layer < LAYER_COUNT) {
+            painted |= rgb_runtime_layer_stage_paint_group_for_layer(frame, group_config, state, group_config->layer, led_min, led_max);
+        }
     }
 
     return painted;

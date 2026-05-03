@@ -65,7 +65,7 @@ static uint8_t rgb_validation_pd_mode_color_match_count(pd_mode_mask_t mode) {
 
 static void rgb_validation_log_invalid_layer_led_group_layer(uint8_t group_index, uint8_t layer) {
 #    ifdef CONSOLE_ENABLE
-    uprintf("Invalid layer_led_groups[%u].layer %u; expected a layer in 0..%u\n", (unsigned int)group_index, (unsigned int)layer, (unsigned int)(LAYER_COUNT - 1u));
+    uprintf("Invalid layer_led_groups[%u].layer %u; expected a layer in 0..%u or RGB_LAYER_GROUP_ALL\n", (unsigned int)group_index, (unsigned int)layer, (unsigned int)(LAYER_COUNT - 1u));
 #    else
     (void)group_index;
     (void)layer;
@@ -194,7 +194,7 @@ static void rgb_validation_log_missing_pd_mode_color(pd_mode_mask_t mode, uint16
 
 static void rgb_validation_log_unknown_pd_mode_led_group(uint8_t group_index, pd_mode_mask_t mode) {
 #        ifdef CONSOLE_ENABLE
-    uprintf("Unknown pd_mode_led_groups[%u].pointing_mode 0x%04X; entry does not match any registered pd mode\n", (unsigned int)group_index, (unsigned int)mode);
+    uprintf("Unknown pd_mode_led_groups[%u].pointing_mode 0x%04X; entry does not match any registered pd mode or RGB_PD_MODE_GROUP_ALL\n", (unsigned int)group_index, (unsigned int)mode);
 #        else
     (void)group_index;
     (void)mode;
@@ -214,7 +214,7 @@ static void rgb_validation_validate_layer_led_groups(void) {
     for (uint8_t group_index = 0; group_index < layer_led_group_count; group_index++) {
         const layer_led_group_t *group = &layer_led_groups[group_index];
 
-        if (group->layer >= LAYER_COUNT) {
+        if (group->layer != RGB_LAYER_GROUP_ALL && group->layer >= LAYER_COUNT) {
             rgb_validation_log_invalid_layer_led_group_layer(group_index, group->layer);
         }
 
@@ -325,7 +325,7 @@ static void rgb_validation_validate_pd_mode_led_groups(void) {
     for (uint8_t group_index = 0; group_index < pd_mode_led_group_count; group_index++) {
         const pd_mode_led_group_t *group = &pd_mode_led_groups[group_index];
 
-        if (!rgb_validation_pd_mode_known(group->pointing_mode)) {
+        if (group->pointing_mode != RGB_PD_MODE_GROUP_ALL && !rgb_validation_pd_mode_known(group->pointing_mode)) {
             rgb_validation_log_unknown_pd_mode_led_group(group_index, group->pointing_mode);
         }
 

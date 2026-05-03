@@ -338,7 +338,9 @@ Use `.locality` to choose where the overlay paints: `RGB_BOTH_HALVES`,
 
 Optional: add or uncomment a `pd_mode_led_groups_data` row with
 `.led_group = RGB_LED_GROUP_*` if the mode wants a specific LED subset
-highlighted.
+highlighted. Use `.pointing_mode = RGB_PD_MODE_GROUP_ALL` with
+`.color = HSV(0, 0, 0)` when one LED group should inherit each active
+pointing-mode color instead of adding one row per mode.
 
 ### 8. Update User Docs If The Mode Is Real
 

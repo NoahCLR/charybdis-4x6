@@ -143,6 +143,10 @@ which color it uses:
 - `Combo Feedback LED Groups`
 - `Key-Behavior Feedback LED Groups`
 
+Inside LED group rows, `HSV(0, 0, 0)` means "inherit this stage's active
+color." It does not paint black. Use a nonzero `HSV(...)` only when that LED
+group should override the stage color.
+
 ### `layer_led_groups`
 
 `layer_led_groups` lets a layer highlight specific LEDs instead of, or in
@@ -165,10 +169,15 @@ Each row contains:
 - an HSV color
 - a `.led_group` value naming the LEDs to repaint
 
+Use `RGB_LAYER_GROUP_ALL` as the layer id when the same LED group should apply
+to every active layer. With `HSV(0, 0, 0)`, that one row inherits the color of
+whichever layer is currently painting it.
+
 Use rows like:
 
 ```c
 { .layer = LAYER_NAV, .color = HSV(0, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_RIGHT_THUMB },
+{ .layer = RGB_LAYER_GROUP_ALL, .color = HSV(0, 0, 0), .led_group = RGB_LED_GROUP_THUMBS },
 ```
 
 This is useful for things like:
@@ -256,12 +265,15 @@ Use this when one mode should highlight a very specific LED or cluster, such as
 the trackball LED or one side of the board.
 
 As above, leave row entries commented out when no per-mode LED groups are
-enabled and keep the table wrapped in `RGB_LED_GROUP_TABLE(...)`.
+enabled and keep the table wrapped in `RGB_LED_GROUP_TABLE(...)`. Use
+`RGB_PD_MODE_GROUP_ALL` when the same LED group should apply to every active
+pointing mode.
 
 Use rows like:
 
 ```c
 { .pointing_mode = PD_MODE_VOLUME, .color = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },
+{ .pointing_mode = RGB_PD_MODE_GROUP_ALL, .color = HSV(0, 0, 0), .led_group = RGB_LED_GROUP_THUMBS },
 ```
 
 ### `combo_feedback_colors`
@@ -315,7 +327,7 @@ Use rows like:
 
 ```c
 static const combo_feedback_led_group_t combo_feedback_led_groups_data[] = RGB_LED_GROUP_TABLE(
-    { .color = HSV(191, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },
+    { .color = HSV(0, 0, 0), .led_group = RGB_LED_GROUP_TRACKBALL },
 );
 ```
 
@@ -476,6 +488,10 @@ Flashing categories follow the same flash visibility as the main
 key-behavior feedback color. Later group rows can repaint LEDs painted by
 earlier group rows.
 
+Use `KEY_FEEDBACK_GROUP_ALL` when one row should apply to every visible
+key-feedback semantic. With `HSV(0, 0, 0)`, the group inherits the active
+semantic's configured color, including the correct tap-count branch color.
+
 Use rows like:
 
 ```c
@@ -485,6 +501,7 @@ static const key_behavior_feedback_led_group_t key_behavior_feedback_led_groups_
     { .semantic = KEY_FEEDBACK_GROUP_TAP_COMMITTED, .color = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },
     { .semantic = KEY_FEEDBACK_GROUP_HOLD_ACTIVE, .color = HSV(18, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },
     { .semantic = KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE, .color = HSV(148, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },
+    { .semantic = KEY_FEEDBACK_GROUP_ALL, .color = HSV(0, 0, 0), .led_group = RGB_LED_GROUP_THUMBS },
 );
 ```
 
@@ -592,12 +609,16 @@ That disables both `pd_mode_colors[]` and `pd_mode_led_groups`.
 1. Find the target LEDs in the LED map at the top of `rgb_config.c`.
 2. Use an existing `RGB_LED_GROUP_*` name, or define a new one under the LED map.
 3. Uncomment or add a row in `layer_led_groups_data` with `.led_group = RGB_LED_GROUP_*`.
+4. Use `.layer = RGB_LAYER_GROUP_ALL` and `.color = HSV(0, 0, 0)` for one
+   inherited-color group that works on every layer.
 
 ### Add a small highlight to one pd mode
 
 1. Find the target LEDs in the LED map at the top of `rgb_config.c`.
 2. Use an existing `RGB_LED_GROUP_*` name, or define a new one under the LED map.
 3. Uncomment or add a row in `pd_mode_led_groups_data` with `.led_group = RGB_LED_GROUP_*`.
+4. Use `.pointing_mode = RGB_PD_MODE_GROUP_ALL` and `.color = HSV(0, 0, 0)` for
+   one inherited-color group that works on every pointing mode.
 
 ### Add a small highlight to combo feedback
 

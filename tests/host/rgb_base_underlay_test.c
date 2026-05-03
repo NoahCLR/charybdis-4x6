@@ -42,6 +42,11 @@ static const layer_led_group_t layer_led_groups_data[] = {
         .color     = {.h = 7, .s = 8, .v = 9},
         .led_group = RGB_LED_GROUP(3),
     },
+    {
+        .layer     = RGB_LAYER_GROUP_ALL,
+        .color     = HSV(0, 0, 0),
+        .led_group = RGB_LED_GROUP(2),
+    },
 };
 
 const layer_led_group_t *const layer_led_groups      = layer_led_groups_data;
@@ -149,7 +154,7 @@ static void test_base_layer_remains_under_mapped_only_overlay_layers(void) {
 
     check_frame_led(&frame, 0, rgb_from_hsv(layer_colors[LAYER_BASE].color));
     check_frame_led(&frame, 1, rgb_from_hsv(layer_colors[LAYER_NAV].color));
-    check_frame_led(&frame, 2, rgb_from_hsv(layer_colors[LAYER_BASE].color));
+    check_frame_led(&frame, 2, rgb_from_hsv(layer_colors[LAYER_NAV].color));
     check_frame_led(&frame, 3, rgb_from_hsv(layer_led_groups[0].color));
 }
 

@@ -250,10 +250,12 @@ in [`rgb_config.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.
 The runtime supports:
 
 - per-layer colors
-- per-layer LED group highlights
+- per-layer LED group highlights, including one inherited-color group that can
+  apply to every active layer
 - optional per-mode RGB locality on both halves, a fixed half, the key half,
   or the exact triggering key footprint
-- optional per-mode LED group highlights
+- optional per-mode LED group highlights, including one inherited-color group
+  that can apply to every pointing mode
 - optional steady combo feedback that can sit above or below preview / PD
   depending on live ownership
 - optional combo feedback LED group highlights

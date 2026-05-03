@@ -72,11 +72,10 @@ those two files.
   including layer, pointing-mode, combo, and key-behavior feedback tables
 - the LED group builder previews already-defined groups for the currently
   selected table, separate from the pending new-row selection
-- key-behavior LED groups include a low-level all-feedback mode that writes
-  `KEY_FEEDBACK_GROUP_ALL` and lets firmware use the active semantic's
-  configured tap/commit/hold/long-hold color; specific feedback group rows act
-  as overrides on top of that all-feedback base, and selected LEDs preview that
-  mode as equal vertical bands including every configured tap-count branch-confirm color
+- layer and pointing-mode LED groups include all-target owners for one group row
+  that works across every layer or every pointing mode
+- LED group rows show `HSV(0, 0, 0)` as inherited stage color rather than a
+  black override, including `KEY_FEEDBACK_GROUP_ALL`
 - inspect every active `rgb_config.c` surface, including LED group tables,
   automouse fade, combo feedback, and key-behavior feedback
 - edit `pd_mode_colors[]` HSV values and locality

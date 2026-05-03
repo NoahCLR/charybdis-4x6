@@ -73,6 +73,13 @@ typedef struct {
     uint8_t        count;
 } rgb_led_group_t;
 
+#define RGB_LAYER_GROUP_ALL UINT8_MAX
+#define RGB_PD_MODE_GROUP_ALL ((pd_mode_mask_t)0u)
+
+static inline bool rgb_hsv_is_inherit_color(hsv_t color) {
+    return color.h == 0 && color.s == 0 && color.v == 0;
+}
+
 typedef struct {
     hsv_t           color;
     rgb_led_group_t led_group;
