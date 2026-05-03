@@ -52,4 +52,3 @@ separate because the work here changes RGB group render and authoring semantics.
   rejecting invalid owners.
 - Profile introspection renders inherited groups as inherited stage colors
   instead of black swatches.
-
