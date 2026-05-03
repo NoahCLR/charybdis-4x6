@@ -1038,7 +1038,6 @@ def key_behavior_feedback_tap_commit_mode_description(mode: str) -> str:
     descriptions = {
         "KEY_FEEDBACK_TAP_COMMIT_OFF": "Do not pulse when authored tap-count branches commit.",
         "KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS": "Pulse only for double-tap and higher tap-count branches; the base single-tap branch stays quiet.",
-        "KEY_FEEDBACK_TAP_COMMIT_ALL_TAPS": "Pulse for every authored tap-count branch that commits.",
     }
     return descriptions.get(mode, "Unknown key-behavior tap-commit feedback mode.")
 
@@ -1900,7 +1899,8 @@ def render_reference_section(profile: dict[str, object]) -> str:
         f"- Keymap-local custom keycodes: {', '.join(f'`{name}`' for name in profile['keymap_custom_keycodes']) or '`none`'}",
     ]
     if features["rgb_pd_mode_feedback_enabled"]:
-        lines.append(f"- PD color overlays: {', '.join(f'`{row['pointing_mode']}`' for row in rgb['pd_mode_colors']) or '`none`'}")
+        pd_color_modes = ", ".join(f"`{row['pointing_mode']}`" for row in rgb["pd_mode_colors"]) or "`none`"
+        lines.append(f"- PD color overlays: {pd_color_modes}")
     if features["rgb_automouse_gradient_enabled"]:
         lines.append(
             f"- Auto-mouse fade destination mode: `{automouse_fade_end_config['mode']}`"
@@ -2779,7 +2779,7 @@ def render_svg_key(
         total_width = sum(badge_widths) + (badge_spacing * (len(badge_widths) - 1))
         badge_x = x + ((KEY_WIDTH - total_width) / 2)
         badge_y = y + KEY_HEIGHT - badge_height - 5
-        for badge, badge_width in zip(combo_badges, badge_widths, strict=False):
+        for badge, badge_width in zip(combo_badges, badge_widths):
             parts.append(
                 f'    <rect x="{badge_x:.1f}" y="{badge_y:.1f}" width="{badge_width}" height="{badge_height}" rx="5" fill="#141714" fill-opacity="0.94" stroke="#f5f5f3" stroke-width="1"/>'
             )
@@ -2934,7 +2934,6 @@ def render_key_behavior_feedback_section(profile: dict[str, object]) -> str:
                 "| --- | --- |",
                 f"| `KEY_FEEDBACK_TAP_COMMIT_OFF` | {key_behavior_feedback_tap_commit_mode_description('KEY_FEEDBACK_TAP_COMMIT_OFF')} |",
                 f"| `KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS` | {key_behavior_feedback_tap_commit_mode_description('KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS')} |",
-                f"| `KEY_FEEDBACK_TAP_COMMIT_ALL_TAPS` | {key_behavior_feedback_tap_commit_mode_description('KEY_FEEDBACK_TAP_COMMIT_ALL_TAPS')} |",
                 "",
             ]
         )

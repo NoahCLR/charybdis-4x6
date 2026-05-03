@@ -226,6 +226,8 @@ const combo_feedback_color_config_t combo_feedback_colors = {
 // Paint specific LEDs a different color while combo feedback is active.
 // These groups repaint after the combo locality render inside whichever combo
 // underlay/overlay substage is live.
+// Combo group rows have no semantic selector: every row paints whenever combo
+// feedback is visible. HSV(0, 0, 0) inherits the active combo color.
 //
 // Uncomment or add rows inside this table to enable persistent combo accents.
 static const combo_feedback_led_group_t combo_feedback_led_groups_data[] = RGB_LED_GROUP_TABLE({.color = HSV(0, 0, 0), .led_group = RGB_LED_GROUP_THUMBS}, //
@@ -253,8 +255,7 @@ static const combo_feedback_led_group_t combo_feedback_led_groups_data[] = RGB_L
 //     do not already have state feedback; layer and PD-mode state actions stay
 //     quiet because their state overlays own that feedback
 //   - tap_commit_mode chooses which committed tap-count branches pulse:
-//     KEY_FEEDBACK_TAP_COMMIT_OFF, KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS, or
-//     KEY_FEEDBACK_TAP_COMMIT_ALL_TAPS
+//     KEY_FEEDBACK_TAP_COMMIT_OFF or KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS
 //   - hold_active_color = authored hold-tier pending / active states and
 //     hold-tier commit pulses
 //   - long_hold_active_color = authored long-hold-tier active states and
@@ -292,10 +293,11 @@ const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
                           HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS)   // tap count 5
                           ),
 
-    // Used for committed tap-count branches that do not already have state feedback.
+    // Used for committed non-base tap-count branches that do not already have
+    // state feedback. Base single-tap commits stay quiet under the pulse mode below.
     .tap_committed_color = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
 
-    // Commit feedback is most useful for double-tap and higher tap-count branches.
+    // Only double-tap and higher tap-count branches can pulse tap-commit feedback.
     .tap_commit_mode = KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS,
 
     // Used for authored hold-tier pending / active states and commit pulses.
@@ -315,6 +317,21 @@ const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
 //
 // In LED group rows, HSV(0, 0, 0) inherits the active feedback color. Use a
 // nonzero HSV value only when the group should override that stage color.
+//
+// .semantic chooses which visible key-behavior state can drive the group:
+//   - KEY_FEEDBACK_GROUP_UNRESOLVED_TAP_BRANCH = pending double-tap-or-higher
+//     tap branch while the runtime is still waiting for the winning tap count
+//   - KEY_FEEDBACK_GROUP_TAP_BRANCH_COMMITTED = branch-confirmation pulse after
+//     a non-base tap-count branch commits
+//   - KEY_FEEDBACK_GROUP_TAP_COMMITTED = tap action commit pulse for non-base
+//     tap-count branches that do not already have state feedback
+//   - KEY_FEEDBACK_GROUP_HOLD_ACTIVE = hold-tier pending / active / commit
+//     feedback
+//   - KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE = long-hold-tier active / commit
+//     feedback
+//   - KEY_FEEDBACK_GROUP_ALL = one group row that follows any visible semantic
+//     above; rendered before specific semantic rows so narrower rows can
+//     override it
 static const key_behavior_feedback_led_group_t key_behavior_feedback_led_groups_data[] = RGB_LED_GROUP_TABLE(
     // { .semantic = KEY_FEEDBACK_GROUP_UNRESOLVED_TAP_BRANCH, .color = HSV(0, 0, 150), .led_group = RGB_LED_GROUP_TRACKBALL },
     // { .semantic = KEY_FEEDBACK_GROUP_TAP_BRANCH_COMMITTED, .color = HSV(169, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },

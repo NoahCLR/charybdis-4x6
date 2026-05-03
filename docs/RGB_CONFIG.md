@@ -385,7 +385,6 @@ The `tap_commit_mode` field controls which committed tap-count branches pulse wi
 - `KEY_FEEDBACK_TAP_COMMIT_OFF`: disable tap-commit pulses
 - `KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS`: pulse only for double-tap and
   higher tap-count branches; the base single-tap branch stays quiet
-- `KEY_FEEDBACK_TAP_COMMIT_ALL_TAPS`: pulse for every committed tap-count branch
 
 The `locality` field controls where the overlay paints:
 

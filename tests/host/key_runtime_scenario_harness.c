@@ -133,7 +133,7 @@ void key_runtime_scenario_reset(void) {
     key_runtime_scenario_pd_mode_count          = 0;
     key_runtime_scenario_locked_layers          = 0;
     key_runtime_scenario_pd_locked_modes        = 0;
-    key_runtime_scenario_tap_commit_mode        = KEY_FEEDBACK_TAP_COMMIT_ALL_TAPS;
+    key_runtime_scenario_tap_commit_mode        = KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS;
     key_runtime_scenario_effect_count_value     = 0;
     key_runtime_scenario_split_sync_count_value = 0;
 

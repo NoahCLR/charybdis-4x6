@@ -123,7 +123,7 @@ static void rgb_validation_log_invalid_key_behavior_feedback_locality(uint8_t lo
 
 static void rgb_validation_log_invalid_key_behavior_feedback_tap_commit_mode(uint8_t mode) {
 #        ifdef CONSOLE_ENABLE
-    uprintf("Invalid key_behavior_feedback_colors.tap_commit_mode %u; expected KEY_FEEDBACK_TAP_COMMIT_OFF (0), KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS (1), or KEY_FEEDBACK_TAP_COMMIT_ALL_TAPS (2)\n", (unsigned int)mode);
+    uprintf("Invalid key_behavior_feedback_colors.tap_commit_mode %u; expected KEY_FEEDBACK_TAP_COMMIT_OFF (0) or KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS (1)\n", (unsigned int)mode);
 #        else
     (void)mode;
 #        endif
@@ -261,7 +261,7 @@ static void rgb_validation_validate_key_behavior_feedback_config(void) {
     if (key_behavior_feedback_colors.locality > RGB_KEYS_ONLY) {
         rgb_validation_log_invalid_key_behavior_feedback_locality((uint8_t)key_behavior_feedback_colors.locality);
     }
-    if (key_behavior_feedback_colors.tap_commit_mode > KEY_FEEDBACK_TAP_COMMIT_ALL_TAPS) {
+    if (key_behavior_feedback_colors.tap_commit_mode > KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS) {
         rgb_validation_log_invalid_key_behavior_feedback_tap_commit_mode((uint8_t)key_behavior_feedback_colors.tap_commit_mode);
     }
     if (!key_behavior_feedback_colors.tap_branch_colors || key_behavior_feedback_colors.tap_branch_color_count == 0u) {

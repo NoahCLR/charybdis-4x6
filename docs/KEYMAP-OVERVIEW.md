@@ -247,7 +247,11 @@ Key-local PD RGB localities are gated by `RGB_PD_MODE_ACTIVE_HALF_ENABLE` in [us
 
 ### PD Mode LED Groups
 
-No active authored PD-mode LED group rows are configured.
+Authored PD-mode LED groups repaint after the active PD-mode locality render.
+
+| Pointing Mode | LED Group | LEDs | Count | Authored HSV | Preview Color |
+| --- | --- | --- | --- | --- | --- |
+| `RGB_PD_MODE_GROUP_ALL` | `RGB_LED_GROUP_THUMBS` | `26,27,28,25,24,53,54,55` | `8` | `HSV(0, 0, 0)` | inherits each active pointing-mode color |
 
 ## Auto-mouse Fade
 
@@ -313,7 +317,6 @@ Current authored tap-commit feedback mode: `KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAP
 | --- | --- |
 | `KEY_FEEDBACK_TAP_COMMIT_OFF` | Do not pulse when authored tap-count branches commit. |
 | `KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS` | Pulse only for double-tap and higher tap-count branches; the base single-tap branch stays quiet. |
-| `KEY_FEEDBACK_TAP_COMMIT_ALL_TAPS` | Pulse for every authored tap-count branch that commits. |
 
 | State | Meaning | Authored HSV | Preview Color |
 | --- | --- | --- | --- |
@@ -322,7 +325,7 @@ Current authored tap-commit feedback mode: `KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAP
 | `Tap Count 3` | Configured branch-confirmation color for this committed tap count. The table starts at double-tap because the base single-tap branch never emits branch-confirm feedback; higher committed tap counts clamp to the last configured branch color. | `HSV(180, 255, 200)` | <img alt="Tap Count 3 color" src="media/profile-introspection/profile-color-swatch-3c00ff.svg" width="96" height="28" /> |
 | `Tap Count 4` | Configured branch-confirmation color for this committed tap count. The table starts at double-tap because the base single-tap branch never emits branch-confirm feedback; higher committed tap counts clamp to the last configured branch color. | `HSV(143, 255, 200)` | <img alt="Tap Count 4 color" src="media/profile-introspection/profile-color-swatch-00a2ff.svg" width="96" height="28" /> |
 | `Tap Count 5` | Configured branch-confirmation color for this committed tap count. The table starts at double-tap because the base single-tap branch never emits branch-confirm feedback; higher committed tap counts clamp to the last configured branch color. | `HSV(85, 255, 200)` | <img alt="Tap Count 5 color" src="media/profile-introspection/profile-color-swatch-00ff00.svg" width="96" height="28" /> |
-| `Tap Committed` | Used for committed tap-count branches that do not already have state feedback. | `HSV(85, 255, 200)` | <img alt="Tap Committed color" src="media/profile-introspection/profile-color-swatch-00ff00.svg" width="96" height="28" /> |
+| `Tap Committed` | Used for committed non-base tap-count branches that do not already have state feedback. Base single-tap commits stay quiet under the pulse mode below. | `HSV(85, 255, 200)` | <img alt="Tap Committed color" src="media/profile-introspection/profile-color-swatch-00ff00.svg" width="96" height="28" /> |
 | `Hold Active` | Used for authored hold-tier pending / active states and commit pulses. | `HSV(18, 255, 200)` | <img alt="Hold Active color" src="media/profile-introspection/profile-color-swatch-ff6c00.svg" width="96" height="28" /> |
 | `Long Hold Active` | Used for authored long-hold-tier active states and commit pulses. | `HSV(148, 255, 200)` | <img alt="Long Hold Active color" src="media/profile-introspection/profile-color-swatch-0084ff.svg" width="96" height="28" /> |
 
@@ -406,7 +409,7 @@ No active authored layer LED group rows are configured.
 | `pd_mode_count` | `6` |
 | `pd_mode_color_count` | `6` |
 | `layer_led_group_count` | `0` |
-| `pd_mode_led_group_count` | `0` |
+| `pd_mode_led_group_count` | `1` |
 | `combo_feedback_led_group_count` | `1` |
 | `key_behavior_feedback_led_group_count` | `1` |
 | `combo_feedback_configured` | `1` |

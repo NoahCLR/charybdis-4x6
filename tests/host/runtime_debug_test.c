@@ -934,13 +934,11 @@ static void test_key_runtime_core_active_release_effect_plan_releases_layer_and_
     CHECK(key_runtime_core_plan_active_release_effects(key_pos, TEST_INTERRUPTED_LAYER_KEY, &resolution, &plan));
     CHECK(plan.settlement == KEY_RUNTIME_CORE_RELEASE_SLOT_SETTLEMENT_RESET);
     CHECK(!plan.pending_multi_tap_seed.active);
-    CHECK(plan.count == 3u);
+    CHECK(plan.count == 2u);
     CHECK(plan.items[0].kind == KEY_RUNTIME_EFFECT_LAYER_RELEASE);
     CHECK(test_keypos_equal(plan.items[0].data.key_pos, key_pos));
     CHECK(plan.items[1].kind == KEY_RUNTIME_EFFECT_DISPATCH_ACTION);
     CHECK(plan.items[1].data.action == KC_V);
-    CHECK(plan.items[2].kind == KEY_RUNTIME_EFFECT_FEEDBACK_PULSE);
-    CHECK(plan.items[2].data.feedback_pulse.kind == KEY_FEEDBACK_PULSE_TAP_COMMITTED);
 }
 
 static void test_key_runtime_core_direct_active_release_helper_seeds_pending_multi_tap(void) {
@@ -1131,7 +1129,7 @@ static void test_base_tap_multi_tap_flush_skips_branch_confirm(void) {
 
     key_feedback_semantic_map(semantic_map);
     key_feedback_tap_branch_map(tap_branch_map);
-    CHECK(key_feedback_semantic_map_get(semantic_map, key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_COMMITTED);
+    CHECK(key_feedback_semantic_map_get(semantic_map, key_pos) == KEY_FEEDBACK_SEMANTIC_NONE);
     CHECK(key_feedback_tap_branch_map_get(tap_branch_map, key_pos) == 0u);
 }
 
@@ -1476,12 +1474,10 @@ static void test_key_runtime_core_transition_flush_foreign_multi_tap_clears_shad
     key_runtime_transition_plan_init(&plan);
     key_runtime_transition_flush_foreign_multi_tap(TEST_RELEASE_PRIMARY_KEY, other_key, &plan);
 
-    CHECK(plan.count == 2u);
+    CHECK(plan.count == 1u);
     CHECK(plan.items[0].kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
     CHECK(plan.items[0].data.delayed_action.action == TEST_ACTION);
     CHECK(plan.items[0].data.delayed_action.repeat_count == 1u);
-    CHECK(plan.items[1].kind == KEY_RUNTIME_EFFECT_FEEDBACK_PULSE);
-    CHECK(plan.items[1].data.feedback_pulse.kind == KEY_FEEDBACK_PULSE_TAP_COMMITTED);
 
     series = key_runtime_core_tap_series_at(pending_key);
     CHECK(series != NULL);

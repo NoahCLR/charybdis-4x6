@@ -29,7 +29,7 @@ __attribute__((weak)) uint8_t pd_mode_buffered_tap_masked_real_mods(uint16_t key
 }
 
 __attribute__((weak)) key_feedback_tap_commit_mode_t key_feedback_tap_commit_mode(void) {
-    return KEY_FEEDBACK_TAP_COMMIT_ALL_TAPS;
+    return KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS;
 }
 
 static press_token_t *key_runtime_core_press_token_state(key_runtime_core_state_t *state, keypos_t key_pos);

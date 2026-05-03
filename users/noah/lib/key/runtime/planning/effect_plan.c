@@ -145,9 +145,8 @@ static bool key_runtime_core_tap_commit_feedback_mode_allows(uint8_t tap_count) 
             return false;
         case KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS:
             return tap_count > 1u;
-        case KEY_FEEDBACK_TAP_COMMIT_ALL_TAPS:
         default:
-            return true;
+            return false;
     }
 }
 
