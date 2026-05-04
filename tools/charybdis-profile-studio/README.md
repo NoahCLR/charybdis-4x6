@@ -101,10 +101,13 @@ inputs outside those profile files.
 
 ## Native Workspace Use
 
-From the existing Charybdis workspace, run the VS Code task
-`Install Profile Studio Extension`, then reload VS Code. The extension is
-symlinked into VS Code's normal user extension directory, so it runs in the
-current workspace instead of an Extension Development Host.
+Open this repo folder in VS Code, then run the VS Code task
+`Install Profile Studio Extension` and reload VS Code. The repo includes that
+task in `.vscode/tasks.json`; a separate multi-root workspace file is not
+required.
+
+The task symlinks the extension into VS Code's normal user extension directory,
+so it runs in the current workspace instead of an Extension Development Host.
 
 After reload, use the `$(keyboard) Profile Studio` status bar item or run
 `Charybdis: Open Profile Studio` from the command palette.
@@ -126,10 +129,25 @@ the F5 extension-development flow.
 You can also launch the development host from a shell:
 
 ```sh
-code --extensionDevelopmentPath=/Users/noah/dev/charybdis/charybdis-4x6/tools/charybdis-profile-studio /Users/noah/dev/charybdis/charybdis.code-workspace
+cd /path/to/charybdis-4x6
+code --extensionDevelopmentPath="$PWD/tools/charybdis-profile-studio" "$PWD"
 ```
 
 Then run `Charybdis: Open Profile Studio` from the command palette.
+
+## Screenshots
+
+Regenerate the README/docs screenshots from the real Studio webview model:
+
+```sh
+npm run screenshots
+```
+
+The script starts headless Chrome, renders the Layout, Macros, and RGB tabs at
+a wide desktop viewport, and writes the PNGs to
+`docs/media/profile-studio/`. Use `npm run screenshots -- --width 1600` to
+override the capture width, or set `CHROME_BIN` if Chrome is not in a standard
+location.
 
 ## Checks
 

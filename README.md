@@ -381,7 +381,12 @@ Use Profile Studio when you want to:
 - build reusable LED groups by selecting LEDs on the board
 - edit auto-mouse fade settings, combo feedback, and key-behavior feedback
 
-From the existing Charybdis VS Code workspace:
+Screenshots:
+[`Layout`](./docs/media/profile-studio/studio-layout-tab.png),
+[`Macros`](./docs/media/profile-studio/studio-macros-tab.png), and
+[`RGB`](./docs/media/profile-studio/studio-rgb-tab.png).
+
+From VS Code with this repo folder open:
 
 1. Run the VS Code task `Install Profile Studio Extension`.
 2. Reload VS Code.

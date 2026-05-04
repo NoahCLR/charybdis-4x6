@@ -6,8 +6,8 @@
             "type": "extensionHost",
             "request": "launch",
             "args": [
-                "--extensionDevelopmentPath=${workspaceFolder:charybdis-4x6}/tools/charybdis-profile-studio",
-                "${workspaceFolder:charybdis-4x6}/../charybdis.code-workspace"
+                "--extensionDevelopmentPath=${workspaceFolder}/tools/charybdis-profile-studio",
+                "${workspaceFolder}"
             ]
         }
     ]
