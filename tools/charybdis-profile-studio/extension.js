@@ -3569,6 +3569,37 @@ function getStudioHtml() {
             display: grid;
             min-width: 0;
         }
+        .rgb-builder-card {
+            display: grid;
+            gap: 12px;
+        }
+        .rgb-builder-workspace {
+            display: grid;
+            gap: 14px;
+        }
+        .rgb-builder-subsection-title {
+            margin: 0;
+            font-size: 14px;
+            line-height: 1.25;
+        }
+        .rgb-builder-sidecar {
+            align-content: stretch;
+        }
+        .layout-with-key-editor.rgb-builder-layout {
+            margin-bottom: 0;
+        }
+        .rgb-builder-sidecar .form-grid.four {
+            grid-template-columns: 1fr;
+        }
+        .rgb-builder-sidecar button.primary {
+            width: 100%;
+        }
+        .rgb-builder-sidecar .toolbar {
+            align-items: stretch;
+        }
+        .rgb-builder-sidecar .rgb-selected-list {
+            align-items: flex-start;
+        }
         .layout-with-key-editor {
             display: grid;
             grid-template-columns: minmax(760px, 1fr) minmax(420px, 520px);
@@ -4280,7 +4311,7 @@ function getStudioHtml() {
         }
         .rgb-subsection > summary {
             cursor: pointer;
-            list-style-position: outside;
+            list-style-position: inside;
         }
         .rgb-summary {
             display: inline-grid;
@@ -4582,6 +4613,7 @@ function getStudioHtml() {
         }
         @media (max-width: 1240px) {
             .view-tab { min-width: 0; }
+            .rgb-builder-layout,
             .layout-with-key-editor {
                 grid-template-columns: 1fr;
             }
@@ -8767,13 +8799,19 @@ function getClientScript() {
     function renderRgbStudio() {
         const rgb = model.rgb || {};
         return "<div class='stack'>" +
-            panel("Reusable LED Groups", renderReusableLedGroupsSection(rgb), true) +
-            panel("RGB LED Group Builder", renderRgbGroupBuilder(), true) +
+            panel("RGB LED Group Builder", renderRgbBuilderWorkspace(rgb), true) +
             panel("Layer Colors", renderLayerRgbSection(rgb), true) +
             panel("Auto-mouse Fade", renderAutomouseCard(rgb.automouseFade), false) +
             panel("Pointing-mode Colors", renderPdModeRgbSection(rgb), true) +
             panel("Combo Feedback", renderComboFeedbackSection(rgb), false) +
             panel("Key Behavior Feedback", renderKeyBehaviorFeedbackSection(rgb), true) +
+            "</div>";
+    }
+
+    function renderRgbBuilderWorkspace(rgb) {
+        return "<div class='rgb-builder-workspace'>" +
+            renderRgbGroupBuilder() +
+            renderReusableLedGroupsSection(rgb) +
             "</div>";
     }
 
@@ -8799,22 +8837,32 @@ function getClientScript() {
         const defined = definedLedIndices.length
             ? definedLedIndices.map((led) => "<code>" + led + "</code>").join("")
             : "<span class='muted'>No defined LEDs for this table</span>";
-        return "<div id='rgbGroupBuilder' class='card' data-dirty-section>" +
+        return "<div id='rgbGroupBuilder' class='rgb-builder-card' data-dirty-section>" +
+            renderLayerTabs(false, false) +
+            "<div class='layout-with-key-editor rgb-builder-layout'>" +
+            renderRgbGroupBoard(layer) +
+            "<div class='layout-selected-key-column'>" +
+            "<div class='layout-sidecar-stack'>" +
+            "<div class='card selected-key-edit-card rgb-builder-sidecar'>" +
+            "<h3>LED group row</h3>" +
+            "<div class='selected-key-edit-fields'>" +
             "<div class='form-grid four'>" +
             "<label><span>table</span><select name='target'>" + optionsWithLabels(targetOptions, rgbGroupTarget) + "</select></label>" +
             ownerControl +
             renderRgbLedGroupSourceControl() +
-            "<div><button data-action='addRgbLedGroup' data-dirty-button class='primary'>Add LED group row</button></div>" +
             "</div>" +
             renderRgbBuilderColorControl() +
-            "<div class='toolbar' style='margin: 10px 0'>" +
-            "<button data-action='clearRgbSelection'>Clear LEDs</button>" +
-            "<button data-action='toggleRgbTrackball'>Trackball LED 56</button>" +
             "<div class='rgb-selected-list'><span class='rgb-led-list-label'>" + escapeHtml(selectedLabel) + "</span>" + selected + "</div>" +
             "<div class='rgb-selected-list rgb-defined-list'><span class='rgb-led-list-label'>defined</span>" + defined + "</div>" +
+            "<div class='toolbar'>" +
+            "<button data-action='clearRgbSelection'>Clear LEDs</button>" +
+            "<button data-action='addRgbLedGroup' data-dirty-button class='primary'>Add LED group row</button>" +
             "</div>" +
-            renderLayerTabs(false, false) +
-            renderRgbGroupBoard(layer) +
+            "</div>" +
+            "</div>" +
+            "</div>" +
+            "</div>" +
+            "</div>" +
             "</div>";
     }
 
@@ -8834,6 +8882,7 @@ function getClientScript() {
             : "<span class='muted'>Select LEDs on the RGB group builder board.</span>";
         const editing = Boolean(rgbReusableGroupOriginalName);
         return "<div id='rgbReusableGroups' class='card' data-dirty-section>" +
+            "<h3 class='rgb-builder-subsection-title'>Reusable LED Groups</h3>" +
             "<div class='form-grid four'>" +
             "<label><span>group name</span><input id='rgbReusableGroupName' data-validate='rgb-led-group-name' value='" + escapeAttr(rgbReusableGroupDraftName) + "' placeholder='RGB_LED_GROUP_THUMBS' spellcheck='false'></label>" +
             "<div class='rgb-selected-list'><span class='rgb-led-list-label'>selected LEDs</span>" + selected + "</div>" +
@@ -9189,14 +9238,19 @@ function getClientScript() {
         if (!layer) {
             return "<p class='muted'>No layer layout is available for LED selection.</p>";
         }
-        return "<div class='board'>" +
-            "<svg class='keyboard-svg' viewBox='0 0 " + keyboardGeometry.width + " " + keyboardGeometry.height + "' role='img' aria-label='RGB LED group selector'>" +
+        const viewBox = keyboardGeometry.layoutViewBox;
+        return "<div class='board layout-board-card'>" +
+            "<div class='layout-board-header'>" +
+            "<h3 class='layout-board-title'>LED group selector</h3>" +
+            "<p class='layout-board-subtitle'>Physical LED indices - " + escapeHtml(layer.name) + "</p>" +
+            "</div>" +
+            "<div class='layout-board-stage'>" +
+            "<svg class='keyboard-svg layout-board-svg' viewBox='" + viewBox.x + " " + viewBox.y + " " + viewBox.width + " " + viewBox.height + "' preserveAspectRatio='xMidYMid meet' role='img' aria-label='RGB LED group selector'>" +
             renderRgbAllFeedbackGradientDefs() +
-            "<text x='32' y='40' fill='#dbe6e8' font-size='24' font-weight='650'>LED group selector</text>" +
-            "<text x='32' y='68' fill='#a8b2b8' font-size='13'>Physical LED indices - " + escapeHtml(layer.name) + "</text>" +
             layer.positions.map(renderRgbSvgKey).join("") +
             renderExtraLed(56, 698, 522) +
             "</svg>" +
+            "</div>" +
             "</div>";
     }
 
