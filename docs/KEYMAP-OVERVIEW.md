@@ -291,9 +291,9 @@ Current authored combo feedback locality: `RGB_KEY_HALF`.
 
 Authored combo feedback LED groups repaint after the combo locality render inside the current combo underlay or overlay substage.
 
-| Group | LEDs | Count | Authored HSV | Preview Color |
-| --- | --- | --- | --- | --- |
-| `1` | `26,27,28,25,24,53,54,55` | `8` | `HSV(0, 0, 0)` | <img alt="Combo feedback group 1 color" src="media/profile-introspection/profile-color-swatch-7e00ff.svg" width="96" height="28" /> |
+| Group | LED Group | LEDs | Count | Authored HSV | Preview Color |
+| --- | --- | --- | --- | --- | --- |
+| `1` | `RGB_LED_GROUP_THUMBS` | `26,27,28,25,24,53,54,55` | `8` | `HSV(0, 0, 0)` | <img alt="Combo feedback group 1 color" src="media/profile-introspection/profile-color-swatch-7e00ff.svg" width="96" height="28" /> |
 
 ## Key-Behavior Feedback LEDs
 
@@ -338,9 +338,9 @@ Current authored tap-commit feedback mode: `KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAP
 
 Authored key-feedback LED groups repaint after the feedback locality render inside this stage.
 
-| Semantic Group | LEDs | Count | Authored HSV | Preview Color |
-| --- | --- | --- | --- | --- |
-| `KEY_FEEDBACK_GROUP_ALL` | `26,27,28,25,24,53,54,55` | `8` | `HSV(0, 0, 0)` | inherits active feedback color |
+| Semantic Group | LED Group | LEDs | Count | Authored HSV | Preview Color |
+| --- | --- | --- | --- | --- | --- |
+| `KEY_FEEDBACK_GROUP_ALL` | `RGB_LED_GROUP_THUMBS` | `26,27,28,25,24,53,54,55` | `8` | `HSV(0, 0, 0)` | inherits active feedback color |
 
 ## Macro Inventory
 
@@ -372,7 +372,7 @@ No filled hardcoded macro slots.
 | [keymap.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c) | custom keycodes, macro tables, combos, key behaviors, and current `LAYOUT()` layer contents |
 | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) | layer enum, timing, RGB defaults, and keymap-facing feature config |
 | [users/noah/config.h](../users/noah/config.h) | shared userspace config consumed by this profile report, including split, RGB Matrix, pointing, dragscroll, and VIA layer-count defaults |
-| [rgb_config.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c) | layer colors, layer LED groups, pd-mode colors and LED groups, auto-mouse fade config, combo feedback color and LED groups, key-behavior feedback colors and LED groups |
+| [rgb_config.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c) | reusable LED groups, layer colors, layer LED groups, pd-mode colors and LED groups, auto-mouse fade config, combo feedback color and LED groups, key-behavior feedback colors and LED groups |
 | [pd_mode_manifest.h](../users/noah/lib/pointing/defs/pd_mode_manifest.h) | shared pointing-mode identities, generated mode/lock keycodes, traits, DPI hooks, and lifecycle hook selections |
 
 ### Shared Keycode Surfaces
@@ -400,6 +400,17 @@ No filled hardcoded macro slots.
 
 No active authored layer LED group rows are configured.
 
+### Reusable LED Groups
+
+Reusable groups define physical LED sets once near the LED map in `rgb_config.c`; stage LED group rows reference those names when they want the same LEDs.
+
+| Group | LEDs | Count | Used By |
+| --- | --- | --- | --- |
+| `RGB_LED_GROUP_LEFT_THUMB` | `26,27,28,25,24` | `5` | `unused` |
+| `RGB_LED_GROUP_RIGHT_THUMB` | `53,54,55` | `3` | `unused` |
+| `RGB_LED_GROUP_THUMBS` | `26,27,28,25,24,53,54,55` | `8` | `all pointing modes`, `combo feedback`, `all feedback groups` |
+| `RGB_LED_GROUP_TRACKBALL` | `56` | `1` | `unused` |
+
 ## Summary
 
 | Field | Value |
@@ -416,6 +427,7 @@ No active authored layer LED group rows are configured.
 | `keymap_custom_keycode_count` | `3` |
 | `pd_mode_count` | `6` |
 | `pd_mode_color_count` | `6` |
+| `reusable_led_group_count` | `4` |
 | `layer_led_group_count` | `0` |
 | `pd_mode_led_group_count` | `1` |
 | `combo_feedback_led_group_count` | `1` |

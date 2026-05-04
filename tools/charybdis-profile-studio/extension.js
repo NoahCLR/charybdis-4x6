@@ -542,6 +542,14 @@ async function handleWebviewMessage(panel, root, message) {
             await patchKeyBehaviorFeedback(root, message.config);
             await postModel(panel, root, "Updated rgb_config.c key behavior feedback.");
             return;
+        case "saveRgbReusableLedGroup":
+            await saveRgbReusableLedGroup(root, message.group);
+            await postModel(panel, root, "Saved rgb_config.c reusable LED group.", { clearedRgbReusableGroupDraft: true });
+            return;
+        case "deleteRgbReusableLedGroup":
+            await deleteRgbReusableLedGroup(root, message.name);
+            await postModel(panel, root, "Deleted rgb_config.c reusable LED group.", { clearedRgbReusableGroupDraft: true });
+            return;
         case "addRgbLedGroup":
             await appendRgbLedGroup(root, message.group);
             await postModel(panel, root, "Added rgb_config.c LED group row.");
@@ -1059,18 +1067,23 @@ function resolveBehaviorTimingDefaults(macros) {
 }
 
 function parseRgbConfig(text, configMacros = {}) {
-    return {
+    const ledGroups = parseRgbReusableLedGroups(text);
+    const ledGroupMacros = Object.fromEntries(ledGroups.map((group) => [group.name, group.ledIndices]));
+    const config = {
+        ledGroups,
         layerColors: parseLayerColors(text),
-        layerLedGroups: parseRgbLedGroupTable(text, "layer_led_groups_data", ".layer"),
+        layerLedGroups: parseRgbLedGroupTable(text, "layer_led_groups_data", ".layer", ledGroupMacros),
         pdModeColors: parsePdModeColors(text),
-        pdModeLedGroups: parseRgbLedGroupTable(text, "pd_mode_led_groups_data", ".pointing_mode"),
+        pdModeLedGroups: parseRgbLedGroupTable(text, "pd_mode_led_groups_data", ".pointing_mode", ledGroupMacros),
         comboFeedback: parseSimpleColorStruct(text, /combo_feedback_colors\s*=/, [".color", ".locality"]),
-        comboFeedbackLedGroups: parseRgbLedGroupTable(text, "combo_feedback_led_groups_data"),
+        comboFeedbackLedGroups: parseRgbLedGroupTable(text, "combo_feedback_led_groups_data", undefined, ledGroupMacros),
         automouseFade: parseSimpleColorStruct(text, /automouse_fade_end_config\s*=/, [".mode", ".end_color"]),
         keyBehaviorFeedback: parseKeyBehaviorFeedback(text),
-        keyBehaviorFeedbackLedGroups: parseRgbLedGroupTable(text, "key_behavior_feedback_led_groups_data", ".semantic"),
+        keyBehaviorFeedbackLedGroups: parseRgbLedGroupTable(text, "key_behavior_feedback_led_groups_data", ".semantic", ledGroupMacros),
         defaultColor: resolveDefaultRgbColor(configMacros),
     };
+    attachRgbLedGroupUsages(config);
+    return config;
 }
 
 function resolveDefaultRgbColor(macros) {
@@ -1127,7 +1140,7 @@ function parsePdModeColors(text) {
         .filter((row) => row.pointingMode);
 }
 
-function parseRgbLedGroupTable(text, tableName, ownerField) {
+function parseRgbLedGroupTable(text, tableName, ownerField, macros = parseRgbLedGroupMacros(text)) {
     let body;
     try {
         body = findCallBody(text, new RegExp(`${escapeRegex(tableName)}\\s*\\[\\]\\s*=\\s*RGB_LED_GROUP_TABLE`));
@@ -1135,7 +1148,6 @@ function parseRgbLedGroupTable(text, tableName, ownerField) {
         return [];
     }
 
-    const macros = parseRgbLedGroupMacros(text);
     return splitTopLevelWithRanges(body)
         .map((item) => stripComments(body.slice(item.start, item.end)).trim())
         .map(trimOuterInitializer)
@@ -1143,10 +1155,12 @@ function parseRgbLedGroupTable(text, tableName, ownerField) {
         .map((entry) => {
             const fields = parseDesignatedFields(entry);
             const ledGroup = parseLedGroupExpression(fields[".led_group"] || "", macros);
+            const ledGroupExpression = normalizeExpr(fields[".led_group"] || "");
             const row = {
                 color: parseHsv(fields[".color"]),
-                ledGroup: normalizeExpr(fields[".led_group"] || ""),
+                ledGroup: ledGroupExpression,
                 ledIndices: ledGroup,
+                ledGroupKind: macros[ledGroupExpression] ? "reusable" : "inline",
             };
             if (ownerField) {
                 row.owner = normalizeExpr(fields[ownerField] || "");
@@ -1158,13 +1172,52 @@ function parseRgbLedGroupTable(text, tableName, ownerField) {
 }
 
 function parseRgbLedGroupMacros(text) {
-    const macros = {};
-    const pattern = /#\s*define\s+(RGB_LED_GROUP_[A-Z0-9_]+)\s+RGB_LED_GROUP\s*\(([^)]*)\)/g;
+    return Object.fromEntries(parseRgbReusableLedGroups(text).map((group) => [group.name, group.ledIndices]));
+}
+
+function parseRgbReusableLedGroups(text) {
+    const groups = [];
+    const pattern = /^\s*#\s*define\s+(RGB_LED_GROUP_[A-Z0-9_]+)\s+RGB_LED_GROUP\s*\(([^)]*)\)/gm;
     let match;
     while ((match = pattern.exec(text)) !== null) {
-        macros[match[1]] = splitTopLevel(match[2]).map(normalizeExpr).filter(Boolean);
+        const ledIndices = splitTopLevel(match[2]).map(normalizeExpr).filter(Boolean);
+        groups.push({
+            name: match[1],
+            expression: `RGB_LED_GROUP(${ledIndices.join(", ")})`,
+            ledIndices,
+            usageCount: 0,
+            usages: [],
+        });
     }
-    return macros;
+    return groups;
+}
+
+function attachRgbLedGroupUsages(config) {
+    const groups = Object.fromEntries((config.ledGroups || []).map((group) => [group.name, group]));
+    const tables = [
+        ["layer", config.layerLedGroups || []],
+        ["pdMode", config.pdModeLedGroups || []],
+        ["combo", config.comboFeedbackLedGroups || []],
+        ["keyBehavior", config.keyBehaviorFeedbackLedGroups || []],
+    ];
+
+    for (const [target, rows] of tables) {
+        for (const row of rows) {
+            const group = groups[row.ledGroup];
+            if (!group) {
+                continue;
+            }
+            group.usages.push({
+                target,
+                owner: row.owner || "",
+                color: row.color?.expression || "",
+            });
+        }
+    }
+
+    for (const group of config.ledGroups || []) {
+        group.usageCount = group.usages.length;
+    }
 }
 
 function parseLedGroupExpression(value, macros) {
@@ -1840,6 +1893,116 @@ function hsvExpression(hue, sat, val) {
     return `HSV(${normalizeExpr(hue)}, ${normalizeExpr(sat)}, ${normalizeExpr(val)})`;
 }
 
+async function saveRgbReusableLedGroup(root, group) {
+    const originalName = normalizeExpr(group?.originalName || "");
+    const name = normalizeExpr(group?.name || "");
+    assertSafeRgbLedGroupName(name);
+
+    const ledIndices = normalizeLedIndices(group?.ledIndices);
+    if (!ledIndices.length) {
+        throw new Error("Select at least one LED for the reusable RGB group.");
+    }
+
+    const filePath = path.join(root, RGB_RELATIVE_PATH);
+    let text = await fs.readFile(filePath, "utf8");
+    const groups = parseRgbReusableLedGroups(text);
+    const existingNames = new Set(groups.map((entry) => entry.name));
+
+    if (originalName) {
+        assertSafeRgbLedGroupName(originalName);
+        if (!existingNames.has(originalName)) {
+            throw new Error(`Reusable RGB LED group not found: ${originalName}`);
+        }
+        if (name !== originalName && existingNames.has(name)) {
+            throw new Error(`Reusable RGB LED group already exists: ${name}`);
+        }
+        text = replaceRgbReusableLedGroupDefine(text, originalName, name, ledIndices);
+        if (name !== originalName) {
+            text = text.replace(new RegExp(`\\b${escapeRegex(originalName)}\\b`, "g"), name);
+        }
+    } else if (existingNames.has(name)) {
+        throw new Error(`Reusable RGB LED group already exists: ${name}`);
+    } else {
+        text = insertRgbReusableLedGroupDefine(text, name, ledIndices);
+    }
+
+    await writeText(filePath, text);
+}
+
+async function deleteRgbReusableLedGroup(root, name) {
+    name = normalizeExpr(name || "");
+    assertSafeRgbLedGroupName(name);
+
+    const filePath = path.join(root, RGB_RELATIVE_PATH);
+    const text = await fs.readFile(filePath, "utf8");
+    const rgb = parseRgbConfig(text);
+    const group = (rgb.ledGroups || []).find((entry) => entry.name === name);
+    if (!group) {
+        throw new Error(`Reusable RGB LED group not found: ${name}`);
+    }
+    if (group.usageCount > 0) {
+        throw new Error(`Cannot delete ${name}; it is used by ${group.usageCount} active LED group row(s).`);
+    }
+
+    await writeText(filePath, removeRgbReusableLedGroupDefine(text, name));
+}
+
+function assertSafeRgbLedGroupName(name) {
+    assertSafeIdentifier(name, "reusable RGB LED group name");
+    if (!String(name).startsWith("RGB_LED_GROUP_")) {
+        throw new Error(`Reusable RGB LED group names must start with RGB_LED_GROUP_: ${name}`);
+    }
+}
+
+function rgbReusableLedGroupDefineLine(name, ledIndices) {
+    return `#    define ${name} RGB_LED_GROUP(${ledIndices.join(", ")})`;
+}
+
+function rgbReusableLedGroupDefineRange(text, name) {
+    const pattern = new RegExp(`^[ \\t]*#\\s*define\\s+${escapeRegex(name)}\\s+RGB_LED_GROUP\\s*\\([^\\n]*\\)(?:\\s*//[^\\n]*)?`, "m");
+    const match = pattern.exec(text);
+    if (!match) {
+        throw new Error(`Reusable RGB LED group define not found: ${name}`);
+    }
+    let end = match.index + match[0].length;
+    if (text[end] === "\r" && text[end + 1] === "\n") {
+        end += 2;
+    } else if (text[end] === "\n") {
+        end += 1;
+    }
+    return { start: match.index, end };
+}
+
+function replaceRgbReusableLedGroupDefine(text, originalName, name, ledIndices) {
+    const range = rgbReusableLedGroupDefineRange(text, originalName);
+    const trailingNewline = text.slice(range.start, range.end).endsWith("\n") ? "\n" : "";
+    return replaceRange(text, range.start, range.end, rgbReusableLedGroupDefineLine(name, ledIndices) + trailingNewline);
+}
+
+function removeRgbReusableLedGroupDefine(text, name) {
+    const range = rgbReusableLedGroupDefineRange(text, name);
+    return replaceRange(text, range.start, range.end, "");
+}
+
+function insertRgbReusableLedGroupDefine(text, name, ledIndices) {
+    const pattern = /^[ \t]*#\s*define\s+RGB_LED_GROUP_[A-Z0-9_]+\s+RGB_LED_GROUP\s*\([^\n]*\)(?:\s*\/\/[^\n]*)?/gm;
+    let match;
+    let last;
+    while ((match = pattern.exec(text)) !== null) {
+        last = match;
+    }
+    if (!last) {
+        throw new Error("Could not find reusable RGB LED group define block in rgb_config.c.");
+    }
+    let insertAt = last.index + last[0].length;
+    if (text[insertAt] === "\r" && text[insertAt + 1] === "\n") {
+        insertAt += 2;
+    } else if (text[insertAt] === "\n") {
+        insertAt += 1;
+    }
+    return replaceRange(text, insertAt, insertAt, `${rgbReusableLedGroupDefineLine(name, ledIndices)}\n`);
+}
+
 async function appendRgbLedGroup(root, group) {
     const target = normalizeExpr(group?.target || "");
     const config = RGB_LED_GROUP_TARGETS[target];
@@ -1847,12 +2010,26 @@ async function appendRgbLedGroup(root, group) {
         throw new Error(`Invalid RGB LED group target: ${target}`);
     }
 
-    const ledIndices = normalizeLedIndices(group?.ledIndices);
-    if (!ledIndices.length) {
-        throw new Error("Select at least one LED for the RGB group.");
-    }
-
     assertSafeHsv(group?.hue, group?.sat, group?.val);
+
+    const filePath = path.join(root, RGB_RELATIVE_PATH);
+    const text = await fs.readFile(filePath, "utf8");
+    const reusableGroupName = normalizeExpr(group?.ledGroupName || "");
+    let ledGroupExpression;
+    if (reusableGroupName) {
+        assertSafeRgbLedGroupName(reusableGroupName);
+        const reusableGroups = parseRgbReusableLedGroups(text).map((entry) => entry.name);
+        if (!reusableGroups.includes(reusableGroupName)) {
+            throw new Error(`Reusable RGB LED group not found: ${reusableGroupName}`);
+        }
+        ledGroupExpression = reusableGroupName;
+    } else {
+        const ledIndices = normalizeLedIndices(group?.ledIndices);
+        if (!ledIndices.length) {
+            throw new Error("Select at least one LED for the RGB group.");
+        }
+        ledGroupExpression = `RGB_LED_GROUP(${ledIndices.join(", ")})`;
+    }
 
     const fields = [];
     if (config.ownerField) {
@@ -1861,10 +2038,8 @@ async function appendRgbLedGroup(root, group) {
         fields.push(`${config.ownerField} = ${owner}`);
     }
     fields.push(`.color = HSV(${normalizeExpr(group?.hue)}, ${normalizeExpr(group?.sat)}, ${normalizeExpr(group?.val)})`);
-    fields.push(`.led_group = RGB_LED_GROUP(${ledIndices.join(", ")})`);
+    fields.push(`.led_group = ${ledGroupExpression}`);
 
-    const filePath = path.join(root, RGB_RELATIVE_PATH);
-    const text = await fs.readFile(filePath, "utf8");
     const call = findCallRange(text, new RegExp(`${escapeRegex(config.tableName)}\\s*\\[\\]\\s*=\\s*RGB_LED_GROUP_TABLE`));
     const prefix = call.body.endsWith("\n") ? "" : "\n";
     const insertion = `${prefix}    { ${fields.join(", ")} },\n`;
@@ -4478,6 +4653,9 @@ function getClientScript() {
     let rgbGroupTarget = "layer";
     let rgbGroupOwner = "";
     let rgbSelectedLeds = [];
+    let rgbLedGroupSource = "inline";
+    let rgbReusableGroupDraftName = "";
+    let rgbReusableGroupOriginalName = "";
     let rgbBuilderColor = undefined;
     let layoutComboPicking = false;
     let layoutComboSelection = [];
@@ -4561,6 +4739,11 @@ function getClientScript() {
         updateAutomouseFade: "Write the auto-mouse fade color and mode back to rgb_config.c.",
         updateComboFeedback: "Write combo feedback color and locality back to rgb_config.c.",
         updateKeyBehaviorFeedback: "Write all key behavior feedback colors and policy fields back to rgb_config.c.",
+        saveRgbReusableLedGroup: "Create, update, or rename a reusable RGB_LED_GROUP_* definition in rgb_config.c.",
+        deleteRgbReusableLedGroup: "Delete this unused reusable RGB_LED_GROUP_* definition from rgb_config.c.",
+        editReusableLedGroup: "Load this reusable LED group into the group editor.",
+        useReusableLedGroup: "Use this reusable LED group in the stage-row builder.",
+        clearReusableLedGroupDraft: "Clear the reusable LED group editor.",
         showAddLayerDraft: "Open the staged new-layer form. Nothing is written until Apply layer changes.",
         cancelLayerDraft: "Close the new-layer form without staging a layer.",
         stageLayerDraft: "Stage a fully transparent layer with a random RGB color.",
@@ -4597,6 +4780,8 @@ function getClientScript() {
         "updateAutomouseFade",
         "updateComboFeedback",
         "updateKeyBehaviorFeedback",
+        "saveRgbReusableLedGroup",
+        "deleteRgbReusableLedGroup",
         "addRgbLedGroup",
         "updateViaMacro",
         "addCombo",
@@ -4615,6 +4800,8 @@ function getClientScript() {
         owner: "The owner value for the target LED group table. Combo feedback groups do not need one.",
         "pointing mode": "The pointing mode whose color or LED group is being edited.",
         semantic: "The key-behavior feedback semantic that owns this LED group.",
+        "group name": "Reusable RGB_LED_GROUP_* name defined near the LED map in rgb_config.c.",
+        "LED group": "Choose an existing reusable LED group or use the current inline LED selection.",
         mode: "Select the authored mode for this row, such as layer render mode or auto-mouse fade mode.",
         locality: "Choose which keyboard half or key region receives this RGB feedback.",
         "branch confirm mode": "Choose whether selected tap-count branches get a branch-confirm feedback window before emitting.",
@@ -5049,6 +5236,10 @@ function getClientScript() {
             macroPayloadKeycodes = new Set(model.macroPayloadKeycodes || []);
             notice = event.data.notice || "";
             layoutNotice = "";
+            if (event.data.clearedRgbReusableGroupDraft) {
+                rgbReusableGroupDraftName = "";
+                rgbReusableGroupOriginalName = "";
+            }
             if (event.data.appliedLayerChanges) {
                 const appliedLayerNames = new Set(pendingLayerAdds.map((layer) => layer.name).concat(pendingLayerDeletes));
                 pendingLayerAdds = [];
@@ -5225,8 +5416,46 @@ function getClientScript() {
         } else if (action === "clearRgbSelection") {
             const before = currentLocalSnapshot || serializeLocalState();
             rgbSelectedLeds = [];
+            rgbLedGroupSource = "inline";
             render();
             commitLocalHistory(before);
+        } else if (action === "editReusableLedGroup") {
+            const before = currentLocalSnapshot || serializeLocalState();
+            const group = rgbReusableLedGroupByName(target.dataset.ledGroup || "");
+            if (group) {
+                rgbReusableGroupOriginalName = group.name;
+                rgbReusableGroupDraftName = group.name;
+                rgbSelectedLeds = (group.ledIndices || []).map(Number).filter(Number.isInteger);
+                rgbLedGroupSource = "inline";
+            }
+            render();
+            commitLocalHistory(before);
+        } else if (action === "useReusableLedGroup") {
+            const before = currentLocalSnapshot || serializeLocalState();
+            const group = rgbReusableLedGroupByName(target.dataset.ledGroup || "");
+            if (group) {
+                rgbLedGroupSource = group.name;
+                rgbSelectedLeds = [];
+            }
+            render();
+            commitLocalHistory(before);
+        } else if (action === "clearReusableLedGroupDraft") {
+            const before = currentLocalSnapshot || serializeLocalState();
+            rgbReusableGroupOriginalName = "";
+            rgbReusableGroupDraftName = "";
+            render();
+            commitLocalHistory(before);
+        } else if (action === "saveRgbReusableLedGroup") {
+            const form = document.getElementById("rgbReusableGroups");
+            post({
+                type: "saveRgbReusableLedGroup",
+                group: readRgbReusableLedGroupDraft(form)
+            });
+        } else if (action === "deleteRgbReusableLedGroup") {
+            post({
+                type: "deleteRgbReusableLedGroup",
+                name: target.dataset.ledGroup || ""
+            });
         } else if (action === "openKeyPicker") {
             const pickerTarget = target.dataset.target;
             openKeyPicker(pickerTarget, target.dataset.mode || "single", pickerTarget === "keycodeInput" ? { layoutStageIndex: selectedKey } : {});
@@ -5383,6 +5612,16 @@ function getClientScript() {
             commitLocalHistory(before);
             return;
         }
+        if (event.target?.name === "ledGroupSource" && event.target.closest("#rgbGroupBuilder")) {
+            rgbLedGroupSource = event.target.value || "inline";
+            if (rgbLedGroupSource !== "inline") {
+                rgbSelectedLeds = [];
+            }
+            normalizeRgbGroupState();
+            render();
+            commitLocalHistory(before);
+            return;
+        }
         if (event.target?.name === "owner" && event.target.closest("#rgbGroupBuilder")) {
             rgbGroupOwner = event.target.value;
             if (rgbGroupTarget === "layer" && rgbGroupOwner && rgbGroupOwner !== rgbLayerAllGroups) {
@@ -5438,6 +5677,9 @@ function getClientScript() {
         }
         if (event.target?.id === "layerDraftName") {
             layerDraftName = event.target.value;
+        }
+        if (event.target?.id === "rgbReusableGroupName") {
+            rgbReusableGroupDraftName = event.target.value;
         }
         if (event.target?.closest?.("[data-combo-builder]")) {
             updateLayoutComboClearState(event.target.closest("[data-combo-builder]"));
@@ -5504,6 +5746,10 @@ function getClientScript() {
 
     function toggleRgbLed(ledIndex) {
         if (!Number.isInteger(ledIndex)) return;
+        if (rgbBuilderUsesReusableGroup()) {
+            rgbSelectedLeds = effectiveRgbBuilderLedIndices();
+            rgbLedGroupSource = "inline";
+        }
         if (rgbSelectedLeds.includes(ledIndex)) {
             rgbSelectedLeds = rgbSelectedLeds.filter((candidate) => candidate !== ledIndex);
             return;
@@ -6307,6 +6553,7 @@ function getClientScript() {
         if (!["layer", "pdMode", "combo", "keyBehavior"].includes(rgbGroupTarget)) {
             rgbGroupTarget = "layer";
         }
+        normalizeRgbLedGroupSource();
         const owners = rgbGroupOwners(rgbGroupTarget);
         if (!owners.length) {
             rgbGroupOwner = "";
@@ -6320,6 +6567,13 @@ function getClientScript() {
             }
         } else if (!owners.includes(rgbGroupOwner)) {
             rgbGroupOwner = owners[0];
+        }
+    }
+
+    function normalizeRgbLedGroupSource() {
+        const names = rgbReusableLedGroups().map((group) => group.name);
+        if (rgbLedGroupSource !== "inline" && !names.includes(rgbLedGroupSource)) {
+            rgbLedGroupSource = "inline";
         }
     }
 
@@ -6345,6 +6599,9 @@ function getClientScript() {
     function discardLocalDraftState() {
         rgbGroupOwner = "";
         rgbSelectedLeds = [];
+        rgbLedGroupSource = "inline";
+        rgbReusableGroupDraftName = "";
+        rgbReusableGroupOriginalName = "";
         rgbBuilderColor = undefined;
         layoutComboPicking = false;
         layoutComboSelection = [];
@@ -6458,6 +6715,9 @@ function getClientScript() {
             rgbGroupTarget,
             rgbGroupOwner,
             rgbSelectedLeds,
+            rgbLedGroupSource,
+            rgbReusableGroupDraftName,
+            rgbReusableGroupOriginalName,
             rgbBuilderColor,
             layoutComboPicking,
             layoutComboSelection,
@@ -6493,6 +6753,9 @@ function getClientScript() {
             rgbGroupTarget = state.rgbGroupTarget || rgbGroupTarget;
             rgbGroupOwner = state.rgbGroupOwner || "";
             rgbSelectedLeds = Array.isArray(state.rgbSelectedLeds) ? state.rgbSelectedLeds : [];
+            rgbLedGroupSource = state.rgbLedGroupSource || "inline";
+            rgbReusableGroupDraftName = state.rgbReusableGroupDraftName || "";
+            rgbReusableGroupOriginalName = state.rgbReusableGroupOriginalName || "";
             rgbBuilderColor = state.rgbBuilderColor || undefined;
             layoutComboPicking = Boolean(state.layoutComboPicking);
             layoutComboSelection = Array.isArray(state.layoutComboSelection) ? state.layoutComboSelection : [];
@@ -6593,7 +6856,8 @@ function getClientScript() {
     function sectionHasCustomDirtyState(section) {
         if (section.id === "layoutComboBuilder") return Boolean(layoutComboOutput || layoutComboInputs || layoutComboSelection.length);
         if (section.matches?.("[data-macro-editor]")) return macroSlotDirty(section.dataset.keycode || "");
-        return section.id === "rgbGroupBuilder" && rgbSelectedLeds.length > 0;
+        if (section.id === "rgbReusableGroups") return Boolean(rgbReusableGroupDraftName || rgbReusableGroupOriginalName);
+        return section.id === "rgbGroupBuilder" && Boolean(effectiveRgbBuilderLedIndices().length || rgbBuilderColor || rgbBuilderUsesReusableGroup());
     }
 
     function setDirtyButtonState(button, dirty) {
@@ -6704,6 +6968,8 @@ function getClientScript() {
             error = validateOptionalTerm(value, "Enter 0-" + keyBehaviorTermMaxMs + " ms, or KEY_BEHAVIOR_TERM(ms).", true);
         } else if (rule === "layout-key") {
             error = validateLayoutKeyInput(value);
+        } else if (rule === "rgb-led-group-name") {
+            error = validateRgbLedGroupName(value);
         } else if (rule === "combo-inputs") {
             error = validateComboInputs(value);
         } else if (rule === "macro-key-list") {
@@ -6772,6 +7038,14 @@ function getClientScript() {
 
     function validateLayoutKeyInput(value) {
         return layoutKeyExpressionError(canonicalLayoutKeyExpression(value));
+    }
+
+    function validateRgbLedGroupName(value) {
+        if (!value) return "Enter a reusable RGB_LED_GROUP_* name.";
+        if (!/^RGB_LED_GROUP_[A-Z0-9_]+$/.test(value)) {
+            return "Use a name like RGB_LED_GROUP_THUMBS.";
+        }
+        return "";
     }
 
     function validateComboInputs(value) {
@@ -7092,7 +7366,13 @@ function getClientScript() {
     }
 
     function rgbViewHasUnsavedChanges() {
-        return Boolean(rgbSelectedLeds.length || rgbBuilderColor);
+        return Boolean(
+            effectiveRgbBuilderLedIndices().length ||
+            rgbBuilderColor ||
+            rgbBuilderUsesReusableGroup() ||
+            rgbReusableGroupDraftName ||
+            rgbReusableGroupOriginalName
+        );
     }
 
     function renderActiveView() {
@@ -8464,12 +8744,22 @@ function getClientScript() {
     function readRgbLedGroupBuilder(form) {
         const target = value(form, "target");
         const owner = value(form, "owner");
+        const ledGroupName = rgbBuilderUsesReusableGroup() ? rgbLedGroupSource : "";
         return {
             target,
             owner,
             hue: value(form, "h"),
             sat: value(form, "s"),
             val: value(form, "v"),
+            ledGroupName,
+            ledIndices: ledGroupName ? [] : rgbSelectedLeds
+        };
+    }
+
+    function readRgbReusableLedGroupDraft(form) {
+        return {
+            originalName: rgbReusableGroupOriginalName,
+            name: form?.querySelector("#rgbReusableGroupName")?.value || rgbReusableGroupDraftName,
             ledIndices: rgbSelectedLeds
         };
     }
@@ -8477,6 +8767,7 @@ function getClientScript() {
     function renderRgbStudio() {
         const rgb = model.rgb || {};
         return "<div class='stack'>" +
+            panel("Reusable LED Groups", renderReusableLedGroupsSection(rgb), true) +
             panel("RGB LED Group Builder", renderRgbGroupBuilder(), true) +
             panel("Layer Colors", renderLayerRgbSection(rgb), true) +
             panel("Auto-mouse Fade", renderAutomouseCard(rgb.automouseFade), false) +
@@ -8499,9 +8790,11 @@ function getClientScript() {
         const ownerControl = ownerChoices.length
             ? "<label><span>" + escapeHtml(rgbGroupOwnerLabel(rgbGroupTarget)) + "</span><select name='owner'>" + optionsWithLabels(ownerChoices, rgbGroupOwner) + "</select></label>"
             : "<label><span>owner</span><input name='owner' disabled value='combo feedback'></label>";
-        const selected = rgbSelectedLeds.length
-            ? rgbSelectedLeds.map((led) => "<code>" + led + "</code>").join("")
+        const pendingLedIndices = effectiveRgbBuilderLedIndices();
+        const selected = pendingLedIndices.length
+            ? pendingLedIndices.map((led) => "<code>" + led + "</code>").join("")
             : "<span class='muted'>No LEDs selected</span>";
+        const selectedLabel = rgbBuilderUsesReusableGroup() ? rgbLedGroupSource : "new row";
         const definedLedIndices = rgbBuilderDefinedLedIndices();
         const defined = definedLedIndices.length
             ? definedLedIndices.map((led) => "<code>" + led + "</code>").join("")
@@ -8510,18 +8803,87 @@ function getClientScript() {
             "<div class='form-grid four'>" +
             "<label><span>table</span><select name='target'>" + optionsWithLabels(targetOptions, rgbGroupTarget) + "</select></label>" +
             ownerControl +
+            renderRgbLedGroupSourceControl() +
             "<div><button data-action='addRgbLedGroup' data-dirty-button class='primary'>Add LED group row</button></div>" +
             "</div>" +
             renderRgbBuilderColorControl() +
             "<div class='toolbar' style='margin: 10px 0'>" +
             "<button data-action='clearRgbSelection'>Clear LEDs</button>" +
             "<button data-action='toggleRgbTrackball'>Trackball LED 56</button>" +
-            "<div class='rgb-selected-list'><span class='rgb-led-list-label'>new row</span>" + selected + "</div>" +
+            "<div class='rgb-selected-list'><span class='rgb-led-list-label'>" + escapeHtml(selectedLabel) + "</span>" + selected + "</div>" +
             "<div class='rgb-selected-list rgb-defined-list'><span class='rgb-led-list-label'>defined</span>" + defined + "</div>" +
             "</div>" +
             renderLayerTabs(false, false) +
             renderRgbGroupBoard(layer) +
             "</div>";
+    }
+
+    function renderRgbLedGroupSourceControl() {
+        const reusableOptions = rgbReusableLedGroups().map((group) => [
+            group.name,
+            group.name + " (" + numericLedIndices(group.ledIndices).length + " LEDs)"
+        ]);
+        const options = [["inline", "Inline LED selection"]].concat(reusableOptions);
+        return "<label><span>LED group</span><select name='ledGroupSource'>" + optionsWithLabels(options, rgbLedGroupSource) + "</select></label>";
+    }
+
+    function renderReusableLedGroupsSection(rgb) {
+        const groups = rgb.ledGroups || [];
+        const selected = rgbSelectedLeds.length
+            ? rgbSelectedLeds.map((led) => "<code>" + led + "</code>").join("")
+            : "<span class='muted'>Select LEDs on the RGB group builder board.</span>";
+        const editing = Boolean(rgbReusableGroupOriginalName);
+        return "<div id='rgbReusableGroups' class='card' data-dirty-section>" +
+            "<div class='form-grid four'>" +
+            "<label><span>group name</span><input id='rgbReusableGroupName' data-validate='rgb-led-group-name' value='" + escapeAttr(rgbReusableGroupDraftName) + "' placeholder='RGB_LED_GROUP_THUMBS' spellcheck='false'></label>" +
+            "<div class='rgb-selected-list'><span class='rgb-led-list-label'>selected LEDs</span>" + selected + "</div>" +
+            "<button type='button' data-action='clearReusableLedGroupDraft'>Clear editor</button>" +
+            "<button type='button' data-action='saveRgbReusableLedGroup' data-dirty-button class='primary'>" + (editing ? "Save group" : "Create group") + "</button>" +
+            "</div>" +
+            (editing ? "<p class='muted'>Editing <code>" + escapeHtml(rgbReusableGroupOriginalName) + "</code>; selected LEDs replace the reusable group definition.</p>" : "") +
+            renderReusableLedGroupsTable(groups) +
+            "</div>";
+    }
+
+    function renderReusableLedGroupsTable(groups) {
+        if (!groups.length) {
+            return "<p class='muted'>No reusable RGB_LED_GROUP_* definitions were parsed.</p>";
+        }
+        return "<table><thead><tr><th>Group</th><th>LEDs</th><th>Used by</th><th>Actions</th></tr></thead><tbody>" +
+            groups.map(renderReusableLedGroupRow).join("") +
+            "</tbody></table>";
+    }
+
+    function renderReusableLedGroupRow(group) {
+        const leds = numericLedIndices(group.ledIndices);
+        const deleteDisabled = group.usageCount > 0 ? " disabled" : "";
+        return "<tr>" +
+            "<td><code>" + escapeHtml(group.name) + "</code><div class='muted'>" + escapeHtml(group.expression || "") + "</div></td>" +
+            "<td><code>" + escapeHtml(leds.join(", ")) + "</code><div class='muted'>" + leds.length + " LEDs</div></td>" +
+            "<td>" + renderReusableLedGroupUsages(group) + "</td>" +
+            "<td><div class='toolbar'>" +
+            "<button type='button' data-action='useReusableLedGroup' data-led-group='" + escapeAttr(group.name) + "'>Use in row</button>" +
+            "<button type='button' data-action='editReusableLedGroup' data-led-group='" + escapeAttr(group.name) + "'>Edit</button>" +
+            "<button type='button' data-action='deleteRgbReusableLedGroup' data-led-group='" + escapeAttr(group.name) + "'" + deleteDisabled + ">Delete</button>" +
+            "</div></td>" +
+            "</tr>";
+    }
+
+    function renderReusableLedGroupUsages(group) {
+        const usages = group.usages || [];
+        if (!usages.length) return "<span class='muted'>unused</span>";
+        return usages.map((usage) => "<div><code>" + escapeHtml(reusableLedGroupUsageLabel(usage)) + "</code>" +
+            (usage.color ? " <code class='muted'>" + escapeHtml(usage.color) + "</code>" : "") +
+            "</div>").join("");
+    }
+
+    function reusableLedGroupUsageLabel(usage) {
+        const owner = usage.owner || "";
+        if (usage.target === "layer") return owner === rgbLayerAllGroups ? "all layers" : owner;
+        if (usage.target === "pdMode") return owner === rgbPdModeAllGroups ? "all pointing modes" : owner;
+        if (usage.target === "combo") return "combo feedback";
+        if (usage.target === "keyBehavior") return owner === keyBehaviorAllGroups ? "all feedback groups" : keyBehaviorRgbSemanticLabel(owner);
+        return owner || usage.target || "unknown";
     }
 
     function rgbGroupOwners(target) {
@@ -8561,6 +8923,39 @@ function getClientScript() {
 
     function rgbBuilderDefinedRows() {
         return rgbBuilderGroupRowsForTarget(rgbGroupTarget);
+    }
+
+    function rgbReusableLedGroups() {
+        return model.rgb?.ledGroups || [];
+    }
+
+    function rgbReusableLedGroupByName(name) {
+        return rgbReusableLedGroups().find((group) => group.name === name);
+    }
+
+    function rgbBuilderUsesReusableGroup() {
+        return Boolean(rgbLedGroupSource && rgbLedGroupSource !== "inline" && rgbReusableLedGroupByName(rgbLedGroupSource));
+    }
+
+    function effectiveRgbBuilderLedIndices() {
+        if (rgbBuilderUsesReusableGroup()) {
+            return numericLedIndices(rgbReusableLedGroupByName(rgbLedGroupSource)?.ledIndices || []);
+        }
+        return numericLedIndices(rgbSelectedLeds);
+    }
+
+    function numericLedIndices(values) {
+        const seen = new Set();
+        const result = [];
+        for (const value of Array.isArray(values) ? values : []) {
+            const index = Number(value);
+            if (!Number.isInteger(index) || seen.has(index)) {
+                continue;
+            }
+            seen.add(index);
+            result.push(index);
+        }
+        return result;
     }
 
     function rgbBuilderDefinedLedIndices() {
@@ -8808,7 +9203,7 @@ function getClientScript() {
     function renderRgbSvgKey(position) {
         const ledIndex = layoutToLedIndex[position.layoutIndex];
         const visual = keyVisual(position.layoutIndex);
-        const selected = rgbSelectedLeds.includes(ledIndex);
+        const selected = effectiveRgbBuilderLedIndices().includes(ledIndex);
         const definedPreview = rgbBuilderDefinedPreviewForLed(ledIndex);
         const style = keyStyle(position);
         const cx = visual.x + keyboardGeometry.keyWidth / 2;
@@ -8830,7 +9225,7 @@ function getClientScript() {
     }
 
     function renderExtraLed(ledIndex, cx, cy) {
-        const selected = rgbSelectedLeds.includes(ledIndex);
+        const selected = effectiveRgbBuilderLedIndices().includes(ledIndex);
         const definedPreview = rgbBuilderDefinedPreviewForLed(ledIndex);
         const allPreview = selected ? rgbBuilderUsesAllFeedbackPreview() : Boolean(definedPreview?.allFeedback);
         const fill = selected ? rgbBuilderPreviewFill() : definedPreview?.fill || "#20262a";
@@ -9028,10 +9423,15 @@ function getClientScript() {
             rows.map((row) => "<tr>" +
                 (ownerLabel ? "<td>" + renderLedGroupOwnerCell(row, tableKind) + "</td>" : "") +
                 renderLedGroupColorCell(row, tableKind) +
-                "<td><code>" + escapeHtml(row.ledGroup || "") + "</code></td>" +
+                "<td>" + renderLedGroupExpressionCell(row) + "</td>" +
                 "<td><code>" + escapeHtml((row.ledIndices || []).join(", ")) + "</code></td>" +
                 "</tr>").join("") +
             "</tbody></table>";
+    }
+
+    function renderLedGroupExpressionCell(row) {
+        const kind = row.ledGroupKind === "reusable" ? "reusable" : "inline";
+        return "<code>" + escapeHtml(row.ledGroup || "") + "</code><div class='muted'>" + kind + "</div>";
     }
 
     function renderLedGroupOwnerCell(row, tableKind = "") {

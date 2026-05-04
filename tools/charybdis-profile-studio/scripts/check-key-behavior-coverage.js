@@ -109,6 +109,31 @@ const appendedCheck = `
         throw new Error("Profile Studio missed combo layer membership: " + comboLayerMisses.join(", "));
     }
 
+    const reusableGroups = model.rgb?.ledGroups || [];
+    const thumbsGroup = reusableGroups.find((group) => group.name === "RGB_LED_GROUP_THUMBS");
+    assert(thumbsGroup, "Profile Studio missed RGB_LED_GROUP_THUMBS");
+    assert(
+        JSON.stringify((thumbsGroup.ledIndices || []).map(Number)) === JSON.stringify([26, 27, 28, 25, 24, 53, 54, 55]),
+        "Profile Studio parsed RGB_LED_GROUP_THUMBS with unexpected LEDs"
+    );
+    assert(thumbsGroup.usageCount > 0, "Profile Studio did not record RGB_LED_GROUP_THUMBS usages");
+
+    const reusableRows = []
+        .concat(model.rgb?.layerLedGroups || [])
+        .concat(model.rgb?.pdModeLedGroups || [])
+        .concat(model.rgb?.comboFeedbackLedGroups || [])
+        .concat(model.rgb?.keyBehaviorFeedbackLedGroups || [])
+        .filter((row) => row.ledGroup === "RGB_LED_GROUP_THUMBS");
+    assert(reusableRows.length === thumbsGroup.usageCount, "Profile Studio reusable LED group usage count is inconsistent");
+    assert(
+        reusableRows.every((row) => row.ledGroupKind === "reusable"),
+        "Profile Studio did not mark named RGB_LED_GROUP_THUMBS rows as reusable"
+    );
+    assert(
+        (model.rgb?.keyBehaviorFeedbackLedGroups || []).some((row) => row.owner === "KEY_FEEDBACK_GROUP_ALL" && row.ledGroup === "RGB_LED_GROUP_THUMBS"),
+        "Profile Studio missed the all-feedback reusable thumb LED group row"
+    );
+
     console.log(
         "Profile Studio key behavior coverage OK: " +
         (model.keyBehaviors || []).length +

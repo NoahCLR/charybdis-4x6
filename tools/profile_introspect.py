@@ -1115,6 +1115,25 @@ def parse_rgb_led_group_macros(raw_text: str) -> dict[str, list[str]]:
     return groups
 
 
+def parse_rgb_reusable_led_groups(raw_text: str, known_values: dict[str, str]) -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+    text = strip_comments(raw_text)
+    for match in re.finditer(r"^\s*#\s*define\s+(?P<name>RGB_LED_GROUP_[A-Za-z0-9_]+)\s+RGB_LED_GROUP\s*\((?P<leds>[^)]*)\)", text, re.MULTILINE):
+        leds = [normalize_expr(part) for part in split_top_level(match.group("leds"))]
+        rows.append(
+            {
+                "name": match.group("name"),
+                "expression": f"RGB_LED_GROUP({', '.join(leds)})",
+                "leds": normalize_expr(", ".join(leds)),
+                "count": str(len(leds)),
+                "led_indices": parse_rgb_led_indices(leds, known_values),
+                "usage_count": 0,
+                "usages": [],
+            }
+        )
+    return rows
+
+
 def parse_rgb_led_indices(leds: list[str], known_values: dict[str, str]) -> list[int]:
     indices: list[int] = []
     for led in leds:
@@ -1193,6 +1212,7 @@ def parse_exported_rgb_led_groups(
             "inherits_stage_color": rgb_hsv_is_inherit_color(color),
             "preview_label": "",
             "led_group": led_group_name,
+            "led_group_kind": "reusable" if led_group_name in led_group_macros else "inline",
             "leds": normalize_expr(leds_expr),
             "count": normalize_expr(count_expr),
             "led_indices": parse_rgb_led_indices(leds, known_values),
@@ -1212,6 +1232,36 @@ def parse_exported_rgb_led_groups(
         rows.append(row)
 
     return rows
+
+
+def attach_rgb_reusable_led_group_usages(
+    reusable_led_groups: list[dict[str, object]],
+    layer_led_groups: list[dict[str, object]],
+    pd_mode_led_groups: list[dict[str, object]],
+    combo_feedback_led_groups: list[dict[str, object]],
+    key_behavior_feedback_led_groups: list[dict[str, object]],
+) -> None:
+    groups = {str(group["name"]): group for group in reusable_led_groups}
+    tables = [
+        ("layer", "layer", layer_led_groups),
+        ("pd_mode", "pointing_mode", pd_mode_led_groups),
+        ("combo_feedback", None, combo_feedback_led_groups),
+        ("key_behavior_feedback", "semantic", key_behavior_feedback_led_groups),
+    ]
+    for stage, owner_key, rows in tables:
+        for row in rows:
+            group = groups.get(str(row.get("led_group", "")))
+            if group is None:
+                continue
+            usage = {
+                "stage": stage,
+                "owner": str(row.get(owner_key, "")) if owner_key is not None else "",
+                "label": str(row.get("label", "")),
+            }
+            group["usages"].append(usage)
+
+    for group in reusable_led_groups:
+        group["usage_count"] = len(group["usages"])
 
 
 def finalize_rgb_led_group_previews(
@@ -1670,6 +1720,7 @@ def build_profile_model() -> dict[str, object]:
     rgb_pd_mode_active_half_enabled = "RGB_PD_MODE_ACTIVE_HALF_ENABLE" in config_macros
     timing_defaults = resolve_behavior_timing_defaults(config_macros)
     layer_colors = finalize_layer_colors(parse_layer_colors(rgb_config_text, config_macros), resolve_rgb_default_color(config_macros))
+    reusable_led_groups = parse_rgb_reusable_led_groups(rgb_config_raw_text, config_macros)
     layer_led_groups = parse_exported_rgb_led_groups(
         rgb_config_raw_text,
         "EXPORT_LAYER_LED_GROUPS",
@@ -1740,6 +1791,14 @@ def build_profile_model() -> dict[str, object]:
         else []
     )
 
+    attach_rgb_reusable_led_group_usages(
+        reusable_led_groups,
+        layer_led_groups,
+        pd_mode_led_groups,
+        combo_feedback_led_groups,
+        key_behavior_feedback_led_groups,
+    )
+
     finalize_rgb_led_group_previews(
         layer_led_groups,
         pd_mode_led_groups,
@@ -1777,6 +1836,7 @@ def build_profile_model() -> dict[str, object]:
         "keymap_custom_keycode_count": len(keymap_custom_keycodes),
         "pd_mode_count": len(pd_modes),
         "pd_mode_color_count": len(pd_mode_colors),
+        "reusable_led_group_count": len(reusable_led_groups),
         "layer_led_group_count": len(layer_led_groups),
         "pd_mode_led_group_count": len(pd_mode_led_groups),
         "combo_feedback_led_group_count": len(combo_feedback_led_groups),
@@ -1802,6 +1862,7 @@ def build_profile_model() -> dict[str, object]:
         },
         "pd_modes": pd_modes,
         "rgb": {
+            "reusable_led_groups": reusable_led_groups,
             "layer_colors": layer_colors,
             "layer_led_groups": layer_led_groups,
             "pd_mode_colors": pd_mode_colors,
@@ -1906,7 +1967,7 @@ def render_reference_section(profile: dict[str, object]) -> str:
     user_config_link = markdown_path_link(USER_CONFIG_FILE, "users/noah/config.h")
     rgb_link = markdown_path_link(RGB_CONFIG_FILE, "rgb_config.c")
     pd_manifest_link = markdown_path_link(PD_MODE_MANIFEST_FILE, "pd_mode_manifest.h")
-    rgb_authored_surfaces = ["layer colors", "layer LED groups"]
+    rgb_authored_surfaces = ["reusable LED groups", "layer colors", "layer LED groups"]
     if features["rgb_pd_mode_feedback_enabled"]:
         rgb_authored_surfaces.append("pd-mode colors and LED groups")
     if features["rgb_automouse_gradient_enabled"]:
@@ -1999,7 +2060,53 @@ def render_reference_section(profile: dict[str, object]) -> str:
     else:
         lines.append("No active authored layer LED group rows are configured.")
 
+    lines.append(render_reusable_led_groups_reference(profile))
     lines.append("")
+    return "\n".join(lines)
+
+
+def render_reusable_led_group_usage_text(group: dict[str, object]) -> str:
+    usages = group.get("usages", [])
+    if not usages:
+        return "`unused`"
+
+    labels: list[str] = []
+    for usage in usages:
+        stage = str(usage.get("stage", ""))
+        owner = str(usage.get("owner", ""))
+        label = str(usage.get("label", ""))
+        if stage == "layer":
+            labels.append("all layers" if owner == RGB_LAYER_GROUP_ALL else owner)
+        elif stage == "pd_mode":
+            labels.append("all pointing modes" if owner == RGB_PD_MODE_GROUP_ALL else owner)
+        elif stage == "combo_feedback":
+            labels.append("combo feedback")
+        elif stage == "key_behavior_feedback":
+            labels.append("all feedback groups" if owner == "KEY_FEEDBACK_GROUP_ALL" else label or owner)
+        else:
+            labels.append(owner or stage)
+    return ", ".join(f"`{label}`" for label in labels)
+
+
+def render_reusable_led_groups_reference(profile: dict[str, object]) -> str:
+    groups = profile["rgb"]["reusable_led_groups"]
+    lines = ["", "### Reusable LED Groups", ""]
+    if not groups:
+        lines.append("No reusable `RGB_LED_GROUP_*` definitions are configured.")
+        return "\n".join(lines)
+
+    lines.extend(
+        [
+            "Reusable groups define physical LED sets once near the LED map in `rgb_config.c`; stage LED group rows reference those names when they want the same LEDs.",
+            "",
+            "| Group | LEDs | Count | Used By |",
+            "| --- | --- | --- | --- |",
+        ]
+    )
+    for group in groups:
+        lines.append(
+            f"| `{group['name']}` | `{group['leds']}` | `{group['count']}` | {render_reusable_led_group_usage_text(group)} |"
+        )
     return "\n".join(lines)
 
 
@@ -3013,15 +3120,15 @@ def render_key_behavior_feedback_section(profile: dict[str, object]) -> str:
                 "",
                 "Authored key-feedback LED groups repaint after the feedback locality render inside this stage.",
                 "",
-                "| Semantic Group | LEDs | Count | Authored HSV | Preview Color |",
-                "| --- | --- | --- | --- | --- |",
+                "| Semantic Group | LED Group | LEDs | Count | Authored HSV | Preview Color |",
+                "| --- | --- | --- | --- | --- | --- |",
             ]
         )
         for row in feedback_groups:
             color = row["color"]
             preview_swatch = rgb_group_preview_cell(row, f"{row['label']} group color")
             lines.append(
-                f"| `{row['semantic']}` | `{row['leds']}` | `{row['count']}` | `HSV({color['h']}, {color['s']}, {color['v']})` | {preview_swatch} |"
+                f"| `{row['semantic']}` | `{row['led_group']}` | `{row['leds']}` | `{row['count']}` | `HSV({color['h']}, {color['s']}, {color['v']})` | {preview_swatch} |"
             )
     else:
         lines.extend(
@@ -3092,15 +3199,15 @@ def render_combo_feedback_section(profile: dict[str, object]) -> str:
                 "",
                 "Authored combo feedback LED groups repaint after the combo locality render inside the current combo underlay or overlay substage.",
                 "",
-                "| Group | LEDs | Count | Authored HSV | Preview Color |",
-                "| --- | --- | --- | --- | --- |",
+                "| Group | LED Group | LEDs | Count | Authored HSV | Preview Color |",
+                "| --- | --- | --- | --- | --- | --- |",
             ]
         )
         for index, row in enumerate(combo_feedback_groups):
             group_color = row["color"]
             group_swatch = rgb_group_preview_cell(row, f"Combo feedback group {index + 1} color")
             lines.append(
-                f"| `{index + 1}` | `{row['leds']}` | `{row['count']}` | `HSV({group_color['h']}, {group_color['s']}, {group_color['v']})` | {group_swatch} |"
+                f"| `{index + 1}` | `{row['led_group']}` | `{row['leds']}` | `{row['count']}` | `HSV({group_color['h']}, {group_color['s']}, {group_color['v']})` | {group_swatch} |"
             )
     else:
         lines.extend(

@@ -23,9 +23,11 @@ back to the same blocks.
   default `layer_colors[]` rows in `rgb_config.c`
 - `layer_colors[]`
 - `pd_mode_colors[]`
-- RGB LED group tables, including appending new inline `RGB_LED_GROUP(...)`
-  rows by selecting physical LEDs on the RGB layout; layer and pointing-mode
-  groups include all-target owner choices
+- reusable `RGB_LED_GROUP_*` definitions near the LED map in `rgb_config.c`,
+  including create/update/rename and unused-group delete
+- RGB LED group tables, including appending rows from either a reusable
+  `RGB_LED_GROUP_*` definition or a one-off inline `RGB_LED_GROUP(...)`
+  selection; layer and pointing-mode groups include all-target owner choices
 - the LED group builder previews already-defined groups for the currently
   selected table while keeping the pending new-row selection separate
 - inherited LED group colors: `HSV(0, 0, 0)` is shown as an inherited stage
@@ -108,7 +110,8 @@ the extension validates the request again before patching the backing `.c`
 file.
 The header Reload button reloads `keymap.c`, `config.h`, and `rgb_config.c` from disk and
 discards uncommitted Studio edits, including dirty fields, staged layout edits,
-combo input picking, RGB group selections, picker state, and undo/redo history.
+combo input picking, RGB group selections, reusable LED group drafts, picker
+state, and undo/redo history.
 
 All major panels are collapsible. The RGB page keeps a panel for every authored
 section in `rgb_config.c`, even when a table currently has no active rows.
@@ -117,6 +120,9 @@ fade, combo feedback, and key-behavior tap-count branch colors are collapsible t
 LED group tables are nested under their owning RGB section: layer groups under
 Layer Colors, pointing-mode groups under Pointing-mode Colors, combo groups
 under Combo Feedback, and key-behavior groups under Key Behavior Feedback.
+The reusable LED group panel is global to the RGB page because those
+`RGB_LED_GROUP_*` definitions can be referenced by any stage-specific LED group
+table.
 Named tap-count branch sections inside the behavior editor are collapsible; repeat Hz
 is shown only when the selected hold-tier helper is `REPEAT_WHILE_HELD`.
 
