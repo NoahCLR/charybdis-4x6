@@ -391,6 +391,10 @@ enter the model-level branch-confirm feedback window before their action fires:
   window only for double-tap and higher branches; the base single-tap branch
   stays quiet
 
+Individual `key_behaviors[]` rows can tune that RGB-visible window with
+`.rgb_branch_confirm_term = ms`, or skip it for that row with
+`.skip_rgb_branch_confirm = true`.
+
 The `tap_commit_mode` field controls which committed tap-count branches pulse with
 `tap_committed_color`:
 

@@ -397,7 +397,7 @@ static void key_runtime_core_tap_series_note_tap(key_runtime_core_state_t *state
     hold                   = hold_behavior_none();
     long_hold              = hold_behavior_none();
     tap_hold_term_ms       = key_runtime_core_default_hold_term(token->resolved_keycode);
-    branch_confirm_term_ms = CUSTOM_TAP_BRANCH_CONFIRM_TERM;
+    branch_confirm_term_ms = CUSTOM_RGB_BRANCH_CONFIRM_TERM;
     tap_term_ms            = key_runtime_core_default_multi_tap_term();
     tap_count              = (uint8_t)(reuse_existing ? (uint8_t)(series->tap_count + 1u) : 1u);
     saved_mod_state        = reuse_existing ? series->saved_mod_state : keyboard_mod_policy_current_state();

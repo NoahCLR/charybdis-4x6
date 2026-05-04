@@ -20,7 +20,7 @@ typedef struct {
     uint16_t              tap_hold_term;       // resolved: per-key → TAPPING_TERM for authored LT() → CUSTOM_TAP_HOLD_TERM
     uint16_t              longer_hold_term;    // resolved: per-key → CUSTOM_LONGER_HOLD_TERM
     uint16_t              multi_tap_term;      // resolved: per-key → CUSTOM_MULTI_TAP_TERM
-    uint16_t              branch_confirm_term; // resolved: per-key → CUSTOM_TAP_BRANCH_CONFIRM_TERM
+    uint16_t              branch_confirm_term; // resolved RGB branch-confirm term; 0 = skipped
     key_behavior_step_t   single;
 } key_behavior_view_t;
 

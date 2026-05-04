@@ -114,7 +114,7 @@ static key_behavior_view_t key_runtime_scenario_default_behavior(uint16_t keycod
         .tap_hold_term       = CUSTOM_TAP_HOLD_TERM,
         .longer_hold_term    = CUSTOM_LONGER_HOLD_TERM,
         .multi_tap_term      = CUSTOM_MULTI_TAP_TERM,
-        .branch_confirm_term = CUSTOM_TAP_BRANCH_CONFIRM_TERM,
+        .branch_confirm_term = CUSTOM_RGB_BRANCH_CONFIRM_TERM,
     };
 }
 

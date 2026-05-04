@@ -210,7 +210,7 @@ static keypos_t test_keypos(uint8_t row, uint8_t col) {
 }
 
 static void test_finish_tap_branch_confirmation(void) {
-    key_runtime_integration_advance(&fake_time, CUSTOM_TAP_BRANCH_CONFIRM_TERM + 1);
+    key_runtime_integration_advance(&fake_time, CUSTOM_RGB_BRANCH_CONFIRM_TERM + 1);
     key_runtime_integration_scan();
 }
 

@@ -287,7 +287,8 @@ class KeyBehavior:
     tap_hold_term: int | None
     longer_hold_term: int | None
     multi_tap_term: int | None
-    branch_confirm_term: int | None
+    rgb_branch_confirm_term: int | None
+    skip_rgb_branch_confirm: bool
     steps: list[BehaviorStep]
 
 
@@ -1353,7 +1354,7 @@ def resolve_rgb_default_color(known_values: dict[str, str]) -> dict[str, object]
 
 
 def resolve_behavior_timing_defaults(known_values: dict[str, str]) -> dict[str, int]:
-    branch_confirm_expr = known_values.get("CUSTOM_TAP_BRANCH_CONFIRM_TERM", known_values["CUSTOM_MULTI_TAP_TERM"])
+    branch_confirm_expr = known_values.get("CUSTOM_RGB_BRANCH_CONFIRM_TERM", known_values["CUSTOM_MULTI_TAP_TERM"])
     return {
         "tap_hold": eval_numeric_expr(known_values["CUSTOM_TAP_HOLD_TERM"], known_values),
         "tap_hold_lt": eval_numeric_expr(known_values["TAPPING_TERM"], known_values),
@@ -1424,7 +1425,8 @@ def parse_key_behaviors(text: str, known_values: dict[str, str]) -> list[KeyBeha
                 tap_hold_term=parse_optional_int(fields.get(".tap_hold_term")),
                 longer_hold_term=parse_optional_int(fields.get(".longer_hold_term")),
                 multi_tap_term=parse_optional_int(fields.get(".multi_tap_term")),
-                branch_confirm_term=parse_optional_term(fields.get(".branch_confirm_term"), known_values),
+                rgb_branch_confirm_term=parse_optional_int(fields.get(".rgb_branch_confirm_term")),
+                skip_rgb_branch_confirm=parse_optional_bool(fields.get(".skip_rgb_branch_confirm")),
                 steps=steps,
             )
         )
@@ -1444,14 +1446,10 @@ def parse_optional_int(value: str | None) -> int | None:
         return None
 
 
-def parse_optional_term(value: str | None, known_values: dict[str, str]) -> int | None:
+def parse_optional_bool(value: str | None) -> bool:
     if value is None:
-        return None
-    normalized = normalize_expr(value)
-    match = re.fullmatch(r"KEY_BEHAVIOR_TERM\((?P<term>.+)\)", normalized)
-    if not match:
-        return None
-    return eval_numeric_expr(match.group("term"), known_values)
+        return False
+    return normalize_expr(value) in {"true", "1"}
 
 
 def parse_behavior_steps(tap_counts_body: str) -> list[BehaviorStep]:
@@ -2178,10 +2176,11 @@ def render_layer_maps_section(profile: dict[str, object]) -> str:
         "",
         "Timing legend for the layer-local behavior tables:",
         "",
-        f"- `tap_hold(...)`, `long_hold(...)`, `multi_tap(...)`, and `branch_confirm(...)` use the default timings from {config_link}",
-        "- `tap_hold=...`, `long_hold=...`, `multi_tap=...`, and `branch_confirm=...` are custom timings authored on that key",
+        f"- `tap_hold(...)`, `long_hold(...)`, `multi_tap(...)`, and `rgb_branch_confirm(...)` use the default timings from {config_link}",
+        "- `tap_hold=...`, `long_hold=...`, `multi_tap=...`, and `rgb_branch_confirm=...` are custom timings authored on that key",
         "- `release before tap_hold(...); otherwise normal hold` means the tap fires on a quick release; if you keep holding, the key keeps its normal hold behavior",
-        "- `branch_confirm(...)` is only applied to double-tap and higher committed branches; a base single tap on a multi-tap key waits only the multi-tap window",
+        "- `rgb_branch_confirm(...)` is only applied to double-tap and higher committed branches; a base single tap on a multi-tap key waits only the multi-tap window",
+        "- `rgb_branch_confirm=skip` means that row opts out of RGB branch-confirm feedback",
         "- Timing is shown per tap count, so each row lists only the timings that matter for that behavior",
         "",
     ]
@@ -3260,10 +3259,12 @@ def format_timing_for_step(
         else:
             parts.append(f"multi_tap({timing_defaults['multi_tap']})")
     if needs_multi_tap and step["tap_count"] > 0:
-        if behavior["branch_confirm_term"] is not None:
-            parts.append(f"branch_confirm={behavior['branch_confirm_term']}")
+        if behavior["skip_rgb_branch_confirm"]:
+            parts.append("rgb_branch_confirm=skip")
+        elif behavior["rgb_branch_confirm_term"] is not None and behavior["rgb_branch_confirm_term"] > 0:
+            parts.append(f"rgb_branch_confirm={behavior['rgb_branch_confirm_term']}")
         else:
-            parts.append(f"branch_confirm({timing_defaults['branch_confirm']})")
+            parts.append(f"rgb_branch_confirm({timing_defaults['branch_confirm']})")
 
     if parts:
         return ", ".join(parts)

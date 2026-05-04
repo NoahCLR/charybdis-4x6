@@ -182,7 +182,12 @@ key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
 
     uint16_t longer_term = config && config->longer_hold_term ? config->longer_hold_term : CUSTOM_LONGER_HOLD_TERM;
     uint16_t multi_term  = config && config->multi_tap_term ? config->multi_tap_term : CUSTOM_MULTI_TAP_TERM;
-    uint16_t branch_term = config && config->branch_confirm_term.set ? config->branch_confirm_term.term : CUSTOM_TAP_BRANCH_CONFIRM_TERM;
+    uint16_t branch_term = CUSTOM_RGB_BRANCH_CONFIRM_TERM;
+    if (config && config->skip_rgb_branch_confirm) {
+        branch_term = 0;
+    } else if (config && config->rgb_branch_confirm_term) {
+        branch_term = config->rgb_branch_confirm_term;
+    }
 
     return (key_behavior_view_t){
         .config              = config,

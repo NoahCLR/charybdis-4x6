@@ -323,7 +323,7 @@ static void test_advance_thumb_multi_tap_gap(void) {
 }
 
 static void test_finish_tap_branch_confirmation(void) {
-    key_runtime_integration_advance(&fake_time, CUSTOM_TAP_BRANCH_CONFIRM_TERM + 1);
+    key_runtime_integration_advance(&fake_time, CUSTOM_RGB_BRANCH_CONFIRM_TERM + 1);
     key_runtime_integration_scan();
 }
 
@@ -1182,7 +1182,7 @@ static void test_left_thumb_double_tap_hold_escape_feedback_sequence(void) {
     CHECK(test_feedback_semantic_for_key(key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED);
     CHECK(test_feedback_tap_branch_for_key(key_pos) == 2u);
 
-    key_runtime_integration_advance(&fake_time, CUSTOM_TAP_BRANCH_CONFIRM_TERM + 1);
+    key_runtime_integration_advance(&fake_time, CUSTOM_RGB_BRANCH_CONFIRM_TERM + 1);
     key_runtime_integration_scan();
 
     CHECK(noah_runtime_debug_slot_phase(key_pos) == KEY_RUNTIME_SLOT_PHASE_RELEASE_HOLD_PENDING);
@@ -1216,7 +1216,7 @@ static void test_left_thumb_double_tap_hold_escape_release_crossing_threshold_pu
     CHECK(test_feedback_semantic_for_key(key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED);
     CHECK(test_feedback_tap_branch_for_key(key_pos) == 2u);
 
-    key_runtime_integration_advance(&fake_time, CUSTOM_TAP_BRANCH_CONFIRM_TERM + 1);
+    key_runtime_integration_advance(&fake_time, CUSTOM_RGB_BRANCH_CONFIRM_TERM + 1);
     key_runtime_integration_scan();
 
     CHECK(test_delayed_action_count == 1u);
@@ -1254,7 +1254,7 @@ static void test_left_thumb_double_tap_hold_escape_release_during_branch_keeps_h
     CHECK(test_feedback_semantic_for_key(key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED);
     CHECK(test_feedback_tap_branch_for_key(key_pos) == 2u);
 
-    key_runtime_integration_advance(&fake_time, CUSTOM_TAP_BRANCH_CONFIRM_TERM + 1);
+    key_runtime_integration_advance(&fake_time, CUSTOM_RGB_BRANCH_CONFIRM_TERM + 1);
     key_runtime_integration_scan();
 
     CHECK(test_delayed_action_count == 1u);

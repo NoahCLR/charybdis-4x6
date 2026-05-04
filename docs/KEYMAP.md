@@ -56,7 +56,7 @@ The keymap currently sets these defaults in
 - `CUSTOM_TAP_HOLD_TERM = 150`
 - `CUSTOM_LONGER_HOLD_TERM = 400`
 - `CUSTOM_MULTI_TAP_TERM = 150`
-- `CUSTOM_TAP_BRANCH_CONFIRM_TERM = 150`
+- `CUSTOM_RGB_BRANCH_CONFIRM_TERM = 150`
 - `COMBO_TERM = 50`
 
 There are also current per-key exceptions:

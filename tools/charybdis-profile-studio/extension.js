@@ -35,7 +35,7 @@ const QMK_KEYCODE_DATA_RELATIVE_PATH = path.join("data", "constants", "keycodes"
 const MACRO_PAYLOAD_KEYCODES_RELATIVE_PATH = path.join("users", "noah", "lib", "macro", "macro_payload_keycodes.c");
 
 const LAYOUT_SLOT_COUNT = 56;
-const KEY_BEHAVIOR_TERM_MAX_MS = 65535;
+const KEY_BEHAVIOR_TIMING_MAX_MS = 65535;
 const TAP_COUNT_NAMES = ["Single Tap Branch", "Double Tap Branch", "Triple Tap Branch", "Quadruple Tap Branch", "Quintuple Tap Branch"];
 const HOLD_HELPERS = [
     "",
@@ -952,7 +952,8 @@ function parseKeyBehaviors(text) {
                 tapHoldTerm: normalizeExpr(fields[".tap_hold_term"] || ""),
                 longerHoldTerm: normalizeExpr(fields[".longer_hold_term"] || ""),
                 multiTapTerm: normalizeExpr(fields[".multi_tap_term"] || ""),
-                branchConfirmTerm: normalizeExpr(fields[".branch_confirm_term"] || ""),
+                rgbBranchConfirmTerm: normalizeExpr(fields[".rgb_branch_confirm_term"] || ""),
+                skipRgbBranchConfirm: ["true", "1"].includes(normalizeExpr(fields[".skip_rgb_branch_confirm"] || "")),
                 steps,
             };
         })
@@ -1062,7 +1063,7 @@ function resolveBehaviorTimingDefaults(macros) {
         tapHoldTerm: normalizeExpr(macros.CUSTOM_TAP_HOLD_TERM || ""),
         longerHoldTerm: normalizeExpr(macros.CUSTOM_LONGER_HOLD_TERM || ""),
         multiTapTerm: normalizeExpr(macros.CUSTOM_MULTI_TAP_TERM || ""),
-        branchConfirmTerm: normalizeExpr(macros.CUSTOM_TAP_BRANCH_CONFIRM_TERM || ""),
+        rgbBranchConfirmTerm: normalizeExpr(macros.CUSTOM_RGB_BRANCH_CONFIRM_TERM || ""),
     };
 }
 
@@ -2174,7 +2175,8 @@ function renderBehaviorRowFromRequest(behavior) {
     const tapHoldTerm = normalizeOptionalTerm(behavior?.tapHoldTerm, "tap_hold_term");
     const longerHoldTerm = normalizeOptionalTerm(behavior?.longerHoldTerm, "longer_hold_term");
     const multiTapTerm = normalizeOptionalTerm(behavior?.multiTapTerm, "multi_tap_term");
-    const branchConfirmTerm = normalizeOptionalBranchConfirmTerm(behavior?.branchConfirmTerm);
+    const skipRgbBranchConfirm = normalizeOptionalBool(behavior?.skipRgbBranchConfirm);
+    const rgbBranchConfirmTerm = skipRgbBranchConfirm ? "" : normalizeOptionalTerm(behavior?.rgbBranchConfirmTerm, "rgb_branch_confirm_term");
 
     let stepRequests = Array.isArray(behavior?.steps) ? behavior.steps : [];
     if (stepRequests.length === 0) {
@@ -2204,7 +2206,7 @@ function renderBehaviorRowFromRequest(behavior) {
         throw new Error("Add at least one tap, hold, or long-hold action.");
     }
 
-    return renderKeyBehaviorRow(normalizedKeycode, { tapHoldTerm, longerHoldTerm, multiTapTerm, branchConfirmTerm }, steps);
+    return renderKeyBehaviorRow(normalizedKeycode, { tapHoldTerm, longerHoldTerm, multiTapTerm, rgbBranchConfirmTerm, skipRgbBranchConfirm }, steps);
 }
 
 function normalizeOptionalTerm(value, label) {
@@ -2212,36 +2214,22 @@ function normalizeOptionalTerm(value, label) {
     if (!term) {
         return "";
     }
-    if (keyBehaviorTermInRange(term, false)) {
+    if (keyBehaviorTimingInRange(term, false)) {
         return term;
     }
-    throw new Error(`${label} must be a positive integer from 1 to ${KEY_BEHAVIOR_TERM_MAX_MS} ms, optionally wrapped as KEY_BEHAVIOR_TERM(ms), when provided.`);
+    throw new Error(`${label} must be a positive integer from 1 to ${KEY_BEHAVIOR_TIMING_MAX_MS} ms when provided.`);
 }
 
-function normalizeOptionalBranchConfirmTerm(value) {
-    const term = normalizeExpr(value || "");
-    if (!term) {
-        return "";
-    }
-    if (/^\d+$/.test(term) && keyBehaviorTermNumberInRange(term, true)) {
-        return `KEY_BEHAVIOR_TERM(${term})`;
-    }
-    if (keyBehaviorTermInRange(term, true)) {
-        return term;
-    }
-    throw new Error(`branch_confirm_term must be an integer from 0 to ${KEY_BEHAVIOR_TERM_MAX_MS} ms, optionally wrapped as KEY_BEHAVIOR_TERM(ms), when provided.`);
+function normalizeOptionalBool(value) {
+    return value === true || ["true", "1"].includes(normalizeExpr(value || ""));
 }
 
-function keyBehaviorTermInRange(value, allowZero) {
+function keyBehaviorTimingInRange(value, allowZero) {
     const normalized = normalizeExpr(value || "");
-    if (/^\d+$/.test(normalized)) {
-        return keyBehaviorTermNumberInRange(normalized, allowZero);
-    }
-    const wrapped = normalized.match(/^KEY_BEHAVIOR_TERM\((\d+)\)$/);
-    return Boolean(wrapped && keyBehaviorTermNumberInRange(wrapped[1], allowZero));
+    return /^\d+$/.test(normalized) && keyBehaviorTimingNumberInRange(normalized, allowZero);
 }
 
-function keyBehaviorTermNumberInRange(value, allowZero) {
+function keyBehaviorTimingNumberInRange(value, allowZero) {
     if (!/^\d+$/.test(value || "")) {
         return false;
     }
@@ -2249,7 +2237,7 @@ function keyBehaviorTermNumberInRange(value, allowZero) {
     if (!allowZero && normalized === "0") {
         return false;
     }
-    const max = String(KEY_BEHAVIOR_TERM_MAX_MS);
+    const max = String(KEY_BEHAVIOR_TIMING_MAX_MS);
     return normalized.length < max.length || (normalized.length === max.length && normalized <= max);
 }
 
@@ -2296,7 +2284,8 @@ function renderKeyBehaviorRow(keycode, timings, steps) {
     if (timings.tapHoldTerm) timingFields.push(`                .tap_hold_term = ${timings.tapHoldTerm},`);
     if (timings.longerHoldTerm) timingFields.push(`                .longer_hold_term = ${timings.longerHoldTerm},`);
     if (timings.multiTapTerm) timingFields.push(`                .multi_tap_term = ${timings.multiTapTerm},`);
-    if (timings.branchConfirmTerm) timingFields.push(`                .branch_confirm_term = ${timings.branchConfirmTerm},`);
+    if (timings.rgbBranchConfirmTerm) timingFields.push(`                .rgb_branch_confirm_term = ${timings.rgbBranchConfirmTerm},`);
+    if (timings.skipRgbBranchConfirm) timingFields.push("                .skip_rgb_branch_confirm = true,");
     const timing = timingFields.length ? `\n${timingFields.join("\n")}` : "";
     return `            {
                 .keycode = ${keycode},${timing}
@@ -4726,7 +4715,7 @@ function getClientScript() {
     let macroSlotHeightFrame = 0;
     const localHistoryLimit = 100;
     const layoutSlotCount = ${LAYOUT_SLOT_COUNT};
-    const keyBehaviorTermMaxMs = ${KEY_BEHAVIOR_TERM_MAX_MS};
+    const keyBehaviorTimingMaxMs = ${KEY_BEHAVIOR_TIMING_MAX_MS};
     const tapCountNames = ${JSON.stringify(TAP_COUNT_NAMES)};
     const views = [
         ["layout", "Layout"],
@@ -4827,7 +4816,8 @@ function getClientScript() {
         tap_hold_term: "Optional milliseconds before a tap can become a hold for this behavior row. Valid range: 1-65535 ms.",
         longer_hold_term: "Optional milliseconds before a hold can become a long hold. Valid range: 1-65535 ms.",
         multi_tap_term: "Optional milliseconds used to detect repeated taps. Valid range: 1-65535 ms.",
-        branch_confirm_term: "Optional milliseconds before a selected tap-count branch commits. Valid range: 0-65535 ms. Plain numbers are written as KEY_BEHAVIOR_TERM(ms).",
+        rgb_branch_confirm_term: "Optional milliseconds for the RGB-visible committed-branch window. Valid range: 1-65535 ms; empty uses the default.",
+        skip_rgb_branch_confirm: "Skip the RGB branch-confirm window for this behavior row.",
         table: "Choose which rgb_config.c LED group table will receive the new row.",
         owner: "The owner value for the target LED group table. Combo feedback groups do not need one.",
         "pointing mode": "The pointing mode whose color or LED group is being edited.",
@@ -6995,9 +6985,7 @@ function getClientScript() {
         } else if (rule === "hsv-value") {
             error = validateHsvValue(value);
         } else if (rule === "optional-term") {
-            error = validateOptionalTerm(value, "Enter 1-" + keyBehaviorTermMaxMs + " ms, or KEY_BEHAVIOR_TERM(ms).", false);
-        } else if (rule === "optional-branch-term") {
-            error = validateOptionalTerm(value, "Enter 0-" + keyBehaviorTermMaxMs + " ms, or KEY_BEHAVIOR_TERM(ms).", true);
+            error = validateOptionalTerm(value, "Enter 1-" + keyBehaviorTimingMaxMs + " ms.", false);
         } else if (rule === "layout-key") {
             error = validateLayoutKeyInput(value);
         } else if (rule === "rgb-led-group-name") {
@@ -7055,8 +7043,6 @@ function getClientScript() {
     function validateOptionalTerm(value, message, allowZero) {
         if (!value) return "";
         if (/^\\d+$/.test(value)) return validateMsTermNumber(value, message, allowZero);
-        const wrapped = value.match(/^KEY_BEHAVIOR_TERM\\((\\d+)\\)$/);
-        if (wrapped) return validateMsTermNumber(wrapped[1], message, allowZero);
         return message;
     }
 
@@ -7064,7 +7050,7 @@ function getClientScript() {
         if (!/^\\d+$/.test(value || "")) return message;
         const normalized = String(value).replace(/^0+(?=\\d)/, "");
         if (!allowZero && normalized === "0") return message;
-        const max = String(keyBehaviorTermMaxMs);
+        const max = String(keyBehaviorTimingMaxMs);
         return normalized.length < max.length || (normalized.length === max.length && normalized <= max) ? "" : message;
     }
 
@@ -7531,7 +7517,8 @@ function getClientScript() {
             tapHoldTerm: "",
             longerHoldTerm: "",
             multiTapTerm: "",
-            branchConfirmTerm: "",
+            rgbBranchConfirmTerm: "",
+            skipRgbBranchConfirm: false,
             steps: []
         };
         const steps = [];
@@ -7545,7 +7532,8 @@ function getClientScript() {
             renderTimingInput("selectedTapHoldTerm", "tap_hold_term", row.tapHoldTerm || "", row.keycode) +
             renderTimingInput("selectedLongerHoldTerm", "longer_hold_term", row.longerHoldTerm || "", row.keycode) +
             renderTimingInput("selectedMultiTapTerm", "multi_tap_term", row.multiTapTerm || "", row.keycode) +
-            renderTimingInput("selectedBranchConfirmTerm", "branch_confirm_term", row.branchConfirmTerm || "", row.keycode) +
+            renderTimingInput("selectedRgbBranchConfirmTerm", "rgb_branch_confirm_term", row.rgbBranchConfirmTerm || "", row.keycode) +
+            renderSkipRgbBranchConfirmToggle(row.skipRgbBranchConfirm) +
             "</div>" +
             "<div class='behavior-branch-grid'>" +
             steps.map(renderBehaviorStepEditor).join("") +
@@ -7557,8 +7545,12 @@ function getClientScript() {
         const fallback = behaviorTimingDefault(field, keycode);
         const placeholder = "default: " + fallback.label;
         const tooltip = timingTooltip(field, fallback);
-        const validation = field === "branch_confirm_term" ? "optional-branch-term" : "optional-term";
-        return "<label data-tooltip='" + escapeAttr(tooltip) + "'><span>" + field + "</span><input id='" + id + "' data-validate='" + validation + "' inputmode='numeric' value='" + escapeAttr(value || "") + "' placeholder='" + escapeAttr(placeholder) + "' data-tooltip='" + escapeAttr(tooltip) + "'></label>";
+        return "<label data-tooltip='" + escapeAttr(tooltip) + "'><span>" + field + "</span><input id='" + id + "' data-validate='optional-term' inputmode='numeric' value='" + escapeAttr(value || "") + "' placeholder='" + escapeAttr(placeholder) + "' data-tooltip='" + escapeAttr(tooltip) + "'></label>";
+    }
+
+    function renderSkipRgbBranchConfirmToggle(checked) {
+        const tooltip = fieldTooltips.skip_rgb_branch_confirm || "";
+        return "<label class='toggle-inline' data-tooltip='" + escapeAttr(tooltip) + "'><input type='checkbox' id='selectedSkipRgbBranchConfirm'" + (checked ? " checked" : "") + " data-tooltip='" + escapeAttr(tooltip) + "'><span class='toggle-switch' aria-hidden='true'></span><span class='toggle-label'>skip RGB branch confirm</span></label>";
     }
 
     function behaviorTimingDefault(field, keycode) {
@@ -7568,7 +7560,7 @@ function getClientScript() {
             tap_hold_term: useLtTapTerm ? defaults.tappingTerm : defaults.tapHoldTerm,
             longer_hold_term: defaults.longerHoldTerm,
             multi_tap_term: defaults.multiTapTerm,
-            branch_confirm_term: defaults.branchConfirmTerm
+            rgb_branch_confirm_term: defaults.rgbBranchConfirmTerm
         }[field] || "";
         return {
             expression,
@@ -7586,8 +7578,6 @@ function getClientScript() {
         const text = normalizeDisplayExpression(expression);
         if (!text) return "runtime default";
         if (/^\\d+$/.test(text)) return text + " ms";
-        const wrapped = text.match(/^KEY_BEHAVIOR_TERM\\((\\d+)\\)$/);
-        if (wrapped) return wrapped[1] + " ms";
         return text;
     }
 
@@ -8743,7 +8733,8 @@ function getClientScript() {
             tapHoldTerm: document.getElementById("selectedTapHoldTerm").value,
             longerHoldTerm: document.getElementById("selectedLongerHoldTerm").value,
             multiTapTerm: document.getElementById("selectedMultiTapTerm").value,
-            branchConfirmTerm: document.getElementById("selectedBranchConfirmTerm").value,
+            rgbBranchConfirmTerm: document.getElementById("selectedRgbBranchConfirmTerm").value,
+            skipRgbBranchConfirm: Boolean(document.getElementById("selectedSkipRgbBranchConfirm")?.checked),
             steps
         };
     }

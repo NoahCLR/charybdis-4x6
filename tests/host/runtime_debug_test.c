@@ -209,7 +209,7 @@ static handled_key_resolution_t test_handled_key_resolution(uint16_t keycode, ui
         .tap_hold_term       = keycode == TEST_PENDING_MULTI_TAP_KEY ? 120 : CUSTOM_TAP_HOLD_TERM,
         .longer_hold_term    = CUSTOM_LONGER_HOLD_TERM,
         .multi_tap_term      = keycode == TEST_PENDING_MULTI_TAP_KEY ? 180 : CUSTOM_MULTI_TAP_TERM,
-        .branch_confirm_term = CUSTOM_TAP_BRANCH_CONFIRM_TERM,
+        .branch_confirm_term = CUSTOM_RGB_BRANCH_CONFIRM_TERM,
         .layer               = layer,
         .pd_mode             = pd_mode_for_keycode(keycode),
         .has_more_taps       = has_more_taps,
@@ -1232,7 +1232,7 @@ static void test_key_feedback_maps_show_final_tap_only_neutral_pending_then_bran
     CHECK(key_feedback_semantic_map_get(semantic_map, key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED);
     CHECK(key_feedback_tap_branch_map_get(tap_branch_map, key_pos) == 2u);
 
-    fake_time = (uint16_t)(fake_time + CUSTOM_TAP_BRANCH_CONFIRM_TERM + 1u);
+    fake_time = (uint16_t)(fake_time + CUSTOM_RGB_BRANCH_CONFIRM_TERM + 1u);
     noah_key_runtime_scan();
 
     CHECK(last_delayed_action == TEST_SECOND_ACTION);

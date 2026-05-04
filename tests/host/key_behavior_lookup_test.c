@@ -163,8 +163,8 @@ const key_behavior_t key_behaviors[] = {
             },
     },
     {
-        .keycode             = TEST_BRANCH_CONFIRM_DISABLED_KEY,
-        .branch_confirm_term = KEY_BEHAVIOR_TERM(0),
+        .keycode                 = TEST_BRANCH_CONFIRM_DISABLED_KEY,
+        .skip_rgb_branch_confirm = true,
         .tap_counts =
             {
                 [0] = {.tap = TAP_SENDS(KC_C)},
@@ -172,8 +172,8 @@ const key_behavior_t key_behaviors[] = {
             },
     },
     {
-        .keycode             = TEST_BRANCH_CONFIRM_OVERRIDE_KEY,
-        .branch_confirm_term = KEY_BEHAVIOR_TERM(42),
+        .keycode                 = TEST_BRANCH_CONFIRM_OVERRIDE_KEY,
+        .rgb_branch_confirm_term = 42,
         .tap_counts =
             {
                 [0] = {.tap = TAP_SENDS(KC_C)},
@@ -331,7 +331,7 @@ static void test_authored_lt_uses_custom_runtime(void) {
 static void test_branch_confirm_term_resolution(void) {
     key_behavior_view_t behavior = key_behavior_lookup(TEST_MULTI_TAP_KEY);
 
-    CHECK(behavior.branch_confirm_term == CUSTOM_TAP_BRANCH_CONFIRM_TERM);
+    CHECK(behavior.branch_confirm_term == CUSTOM_RGB_BRANCH_CONFIRM_TERM);
 
     behavior = key_behavior_lookup(TEST_BRANCH_CONFIRM_DISABLED_KEY);
     CHECK(behavior.branch_confirm_term == 0u);
