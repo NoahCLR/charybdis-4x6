@@ -109,6 +109,25 @@ const appendedCheck = `
         throw new Error("Profile Studio missed combo layer membership: " + comboLayerMisses.join(", "));
     }
 
+    const editableCombo = (model.combos || []).find((combo) => combo.output !== "KC_ESC");
+    assert(editableCombo, "Profile Studio combo edit check needs at least one non-KC_ESC combo");
+    const nativeFs = require("fs");
+    const tempRoot = nativeFs.mkdtempSync(path.join(require("os").tmpdir(), "profile-studio-combo-edit-"));
+    try {
+        const sourceKeymap = path.join(${JSON.stringify(repoRoot)}, KEYMAP_RELATIVE_PATH);
+        const targetKeymap = path.join(tempRoot, KEYMAP_RELATIVE_PATH);
+        nativeFs.mkdirSync(path.dirname(targetKeymap), {recursive: true});
+        nativeFs.copyFileSync(sourceKeymap, targetKeymap);
+        await saveCombo(tempRoot, editableCombo.output, editableCombo.inputs.join(", "), "KC_ESC", editableCombo.inputs.join(", "));
+        const updated = nativeFs.readFileSync(targetKeymap, "utf8");
+        assert(
+            updated.includes("COMBO(KC_ESC, (" + editableCombo.inputs.join(", ") + "))"),
+            "Profile Studio did not replace the selected combo output"
+        );
+    } finally {
+        nativeFs.rmSync(tempRoot, {recursive: true, force: true});
+    }
+
     const reusableGroups = model.rgb?.ledGroups || [];
     const thumbsGroup = reusableGroups.find((group) => group.name === "RGB_LED_GROUP_THUMBS");
     assert(thumbsGroup, "Profile Studio missed RGB_LED_GROUP_THUMBS");

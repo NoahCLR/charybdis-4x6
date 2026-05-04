@@ -305,8 +305,9 @@ Use Profile Studio when you want to:
 
 - click keys on a visual Charybdis layout and edit layer slots
 - add or remove layers through the supported source patches
-- edit selected-key behavior rows
-- append simple combos from physical key selections
+- edit selected-key behavior rows and combo-output behavior rows
+- append simple combos from physical key selections, or load an existing combo
+  to edit its output and inputs
 - edit VIA macro slots with a macro builder and key-event recorder
 - choose layer and pointing-mode colors
 - build reusable LED groups by selecting LEDs on the board

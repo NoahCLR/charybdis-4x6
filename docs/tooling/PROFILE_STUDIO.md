@@ -75,8 +75,12 @@ The Layout page also has a combo sidecar below the selected-key editor. Its
 `Pick input keys on layout` action lets the active layer board choose multiple
 physical keys as the new combo inputs, and the input field also exposes the
 multi-key picker before appending a `COMBOS(COMBO)` row.
-Layer combo rows also show behavior rows triggered by the combo output keycode,
-so combo-driven key behaviors are visible from the active layer view.
+Layer combo rows also show behavior rows triggered by the combo output keycode.
+Use `Edit behavior` or `Create behavior` in that row to load the combo output
+into the same behavior editor used for selected physical keys.
+Use `Edit combo` to load that combo's output and inputs into the combo builder;
+when the exact existing combo inputs are selected on the layout, the builder
+also fills in the current output automatically.
 The layer overview also lists macros directly placed on the layer or reachable
 through visible behavior and combo output paths. The Macros page is dedicated to
 VIA macro authoring: select any `VIA_MACRO_0` through `VIA_MACRO_63`, edit its

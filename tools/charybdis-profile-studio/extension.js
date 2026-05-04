@@ -562,6 +562,10 @@ async function handleWebviewMessage(panel, root, message) {
             await appendCombo(root, message.output, message.inputs);
             await postModel(panel, root, "Added keymap.c combo row.");
             return;
+        case "saveCombo":
+            await saveCombo(root, message.originalOutput, message.originalInputs, message.output, message.inputs);
+            await postModel(panel, root, "Saved keymap.c combo row.");
+            return;
         case "addBehavior":
             await appendKeyBehavior(root, message.behavior);
             await postModel(panel, root, "Added keymap.c key behavior row.");
@@ -2085,13 +2089,42 @@ async function patchViaMacro(root, keycode, payload) {
 async function appendCombo(root, output, inputs) {
     const filePath = path.join(root, KEYMAP_RELATIVE_PATH);
     const text = await fs.readFile(filePath, "utf8");
+    const {output: normalizedOutput, inputList} = normalizeComboRequest(text, output, inputs);
+
+    const block = findMacroDefinitionBlock(text, "COMBOS");
+    const lines = block.text.split(/\r?\n/);
+    const insertLine = lines.findIndex((line, index) => index > 0 && line.includes("/* COMBO("));
+    const insertionIndex = insertLine === -1 ? Math.max(lines.length - 1, 1) : insertLine;
+    const row = renderComboMacroRow(normalizedOutput, inputList);
+    lines.splice(insertionIndex, 0, row);
+    await writeText(filePath, replaceRange(text, block.start, block.end, lines.join("\n")));
+}
+
+async function saveCombo(root, originalOutput, originalInputs, output, inputs) {
+    const filePath = path.join(root, KEYMAP_RELATIVE_PATH);
+    const text = await fs.readFile(filePath, "utf8");
+    const next = normalizeComboRequest(text, output, inputs);
+    const original = normalizeComboIdentity(originalOutput, originalInputs);
+    const block = findMacroDefinitionBlock(text, "COMBOS");
+    const lines = block.text.split(/\r?\n/);
+    const index = lines.findIndex((line) => {
+        const row = parseComboInvocationLine(line);
+        return row && row.output === original.output && comboInputSignature(row.inputs) === comboInputSignature(original.inputList);
+    });
+    if (index === -1) {
+        throw new Error("Could not find the original combo row to update.");
+    }
+
+    lines[index] = renderComboMacroRow(next.output, next.inputList);
+    await writeText(filePath, replaceRange(text, block.start, block.end, lines.join("\n")));
+}
+
+function normalizeComboRequest(text, output, inputs) {
     const knownTokens = knownLayoutKeyTokens(text);
-    output = normalizeUserKeyExpression(output || "");
-    const inputList = splitTopLevel(String(inputs || ""))
-        .map(normalizeUserKeyExpression)
-        .filter(Boolean);
-    assertSafeExpression(output, "combo output");
-    assertLayoutKeyExpression(output, "combo output", knownTokens);
+    const normalizedOutput = normalizeUserKeyExpression(output || "");
+    const inputList = normalizeComboInputList(inputs);
+    assertSafeExpression(normalizedOutput, "combo output");
+    assertLayoutKeyExpression(normalizedOutput, "combo output", knownTokens);
     if (inputList.length < 2) {
         throw new Error("Combo inputs must include at least two keycodes.");
     }
@@ -2103,14 +2136,43 @@ async function appendCombo(root, output, inputs) {
     if (duplicateInput) {
         throw new Error(`Combo inputs must be unique; ${duplicateInput} appears more than once.`);
     }
+    return {output: normalizedOutput, inputList};
+}
 
-    const block = findMacroDefinitionBlock(text, "COMBOS");
-    const lines = block.text.split(/\r?\n/);
-    const insertLine = lines.findIndex((line, index) => index > 0 && line.includes("/* COMBO("));
-    const insertionIndex = insertLine === -1 ? Math.max(lines.length - 1, 1) : insertLine;
-    const row = `    COMBO(${output}, (${inputList.join(", ")}))                          \\`;
-    lines.splice(insertionIndex, 0, row);
-    await writeText(filePath, replaceRange(text, block.start, block.end, lines.join("\n")));
+function normalizeComboIdentity(output, inputs) {
+    return {
+        output: normalizeUserKeyExpression(output || ""),
+        inputList: normalizeComboInputList(inputs),
+    };
+}
+
+function normalizeComboInputList(inputs) {
+    return splitTopLevel(String(inputs || ""))
+        .map(normalizeUserKeyExpression)
+        .filter(Boolean);
+}
+
+function renderComboMacroRow(output, inputList) {
+    return `    COMBO(${output}, (${inputList.join(", ")}))                          \\`;
+}
+
+function parseComboInvocationLine(rawLine) {
+    const line = stripInlineLineComment(rawLine).trim();
+    if (!line.startsWith("COMBO(")) {
+        return undefined;
+    }
+    const open = line.indexOf("(");
+    const close = findMatching(line, open, "(", ")");
+    const row = splitTopLevel(line.slice(open + 1, close)).map(normalizeExpr);
+    const inputs = (row[1] || "").replace(/^\(/, "").replace(/\)$/, "");
+    return {
+        output: normalizeExpr(row[0] || ""),
+        inputs: splitTopLevel(inputs).map(normalizeExpr).filter(Boolean),
+    };
+}
+
+function comboInputSignature(inputs) {
+    return (inputs || []).map(normalizeExpr).filter(Boolean).sort().join("\u0000");
 }
 
 function duplicateComboInput(inputs) {
@@ -4163,6 +4225,18 @@ function getStudioHtml() {
             text-align: left;
         }
         th { color: var(--muted); font-weight: 600; }
+        .table-cell-stack {
+            display: inline-grid;
+            justify-items: start;
+            gap: 5px;
+            max-width: 100%;
+        }
+        .table-cell-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 5px;
+        }
         code {
             color: #d7f9ef;
             overflow-wrap: anywhere;
@@ -4670,6 +4744,7 @@ function getClientScript() {
     let model = undefined;
     let activeLayer = undefined;
     let selectedKey = 0;
+    let activeBehaviorKeycode = "";
     let activeView = "layout";
     let rgbGroupTarget = "layer";
     let rgbGroupOwner = "";
@@ -4682,6 +4757,7 @@ function getClientScript() {
     let layoutComboSelection = [];
     let layoutComboOutput = "";
     let layoutComboInputs = "";
+    let activeLayoutComboOriginal = undefined;
     let activeMacroKeycode = "";
     let macroDrafts = {};
     let macroRecording = false;
@@ -4754,6 +4830,8 @@ function getClientScript() {
     const actionTooltips = {
         applyKey: "Stage the selected key value as a pending layout edit.",
         saveSelectedBehavior: "Create or replace the key_behaviors[] row for this selected keycode.",
+        editComboOutputBehavior: "Load this combo output keycode into the behavior editor.",
+        editLayoutCombo: "Load this combo into the combo builder so its output or inputs can be edited.",
         addBehavior: "Append a simple key_behaviors[] row to keymap.c.",
         updateLayerColor: "Write this layer color and render mode back to rgb_config.c.",
         updatePdModeColor: "Write this pointing-mode color and locality back to rgb_config.c.",
@@ -4783,7 +4861,7 @@ function getClientScript() {
         clearMacroRecording: "Clear the current recording take and restore the payload captured when recording started.",
         dismissStatus: "Dismiss the current status popup until the status changes.",
         addCombo: "Append a combo row with the entered output and input keys.",
-        addLayoutCombo: "Append a combo row using the selected layout keys as inputs.",
+        addLayoutCombo: "Append a combo row, or replace the loaded combo row, using the selected layout keys as inputs.",
         applyLayoutChanges: "Write pending layout drag/drop and paste edits back to keymap.c.",
         toggleLayoutComboPicking: "Switch the layout board into combo input picking mode; click keys on the board to add or remove inputs.",
         toggleLayoutComboKey: "Add or remove this key from the pending layout combo.",
@@ -5362,11 +5440,13 @@ function getClientScript() {
         } else if (action === "selectLayer") {
             activeLayer = target.dataset.layer;
             selectedKey = 0;
+            activeBehaviorKeycode = "";
             layoutNotice = "";
             layoutComboPicking = false;
             layoutComboSelection = [];
             layoutComboOutput = "";
             layoutComboInputs = "";
+            activeLayoutComboOriginal = undefined;
             syncRgbLayerOwnerToActiveLayer();
             lastLayoutKeyClick = { index: undefined, time: 0 };
             render();
@@ -5397,12 +5477,28 @@ function getClientScript() {
             const now = Date.now();
             const isDoubleClick = lastLayoutKeyClick.index === index && now - lastLayoutKeyClick.time < 450;
             selectedKey = index;
+            activeBehaviorKeycode = "";
             lastLayoutKeyClick = { index, time: isDoubleClick ? 0 : now };
             render();
             if (isDoubleClick) {
                 openLayoutKeyPicker(index);
             }
             currentLocalSnapshot = serializeLocalState();
+        } else if (action === "editComboOutputBehavior") {
+            activeBehaviorKeycode = target.dataset.keycode || "";
+            layoutComboPicking = false;
+            lastLayoutKeyClick = { index: undefined, time: 0 };
+            render();
+            app.querySelector(".selected-behavior-editor")?.scrollIntoView({ block: "start", behavior: "smooth" });
+            currentLocalSnapshot = serializeLocalState();
+        } else if (action === "editLayoutCombo") {
+            const combo = layerCombos(currentLayer()).find((row) => row.badge === target.dataset.badge);
+            if (combo) {
+                loadLayoutComboIntoBuilder(combo);
+                render();
+                document.getElementById("layoutComboBuilder")?.scrollIntoView({ block: "start", behavior: "smooth" });
+                currentLocalSnapshot = serializeLocalState();
+            }
         } else if (action === "toggleLayoutComboPicking") {
             const before = currentLocalSnapshot || serializeLocalState();
             captureLayoutComboBuilderInputs();
@@ -5415,6 +5511,7 @@ function getClientScript() {
             captureLayoutComboBuilderInputs();
             toggleLayoutComboKey(Number(target.dataset.index));
             syncLayoutComboInputsFromSelection();
+            syncLayoutComboMatchFromInputs();
             render();
             commitLocalHistory(before);
         } else if (action === "clearLayoutComboSelection") {
@@ -5423,6 +5520,7 @@ function getClientScript() {
             layoutComboSelection = [];
             layoutComboOutput = "";
             layoutComboInputs = "";
+            activeLayoutComboOriginal = undefined;
             render();
             commitLocalHistory(before);
         } else if (action === "toggleRgbLed") {
@@ -5586,11 +5684,13 @@ function getClientScript() {
             post({ type: "addCombo", ...readComboBuilder(target) });
         } else if (action === "addLayoutCombo") {
             const payload = readComboBuilder(target);
+            const original = activeLayoutComboOriginal;
             layoutComboPicking = false;
             layoutComboSelection = [];
             layoutComboOutput = "";
             layoutComboInputs = "";
-            post({ type: "addCombo", ...payload });
+            activeLayoutComboOriginal = undefined;
+            post(original ? { type: "saveCombo", ...payload, originalOutput: original.output, originalInputs: original.inputs.join(", ") } : { type: "addCombo", ...payload });
         } else if (action === "applyLayoutChanges") {
             const groups = pendingLayoutChangeGroups();
             const stagedEditLayer = groups.find((group) => pendingLayerAdd(group.layer));
@@ -5649,11 +5749,13 @@ function getClientScript() {
             if (rgbGroupTarget === "layer" && rgbGroupOwner && rgbGroupOwner !== rgbLayerAllGroups) {
                 activeLayer = rgbGroupOwner;
                 selectedKey = 0;
+                activeBehaviorKeycode = "";
                 layoutNotice = "";
                 layoutComboPicking = false;
                 layoutComboSelection = [];
                 layoutComboOutput = "";
                 layoutComboInputs = "";
+                activeLayoutComboOriginal = undefined;
                 lastLayoutKeyClick = { index: undefined, time: 0 };
             }
             rgbBuilderColor = undefined;
@@ -5695,6 +5797,7 @@ function getClientScript() {
         if (event.target?.id === "layoutComboInputs") {
             layoutComboInputs = event.target.value;
             syncLayoutComboSelectionFromInputs();
+            syncLayoutComboMatchFromInputs();
             refreshLayoutComboSelection(event.target.closest("[data-combo-builder]"));
         }
         if (event.target?.id === "layerDraftName") {
@@ -5783,6 +5886,7 @@ function getClientScript() {
         const layer = currentLayer();
         if (!layer) {
             layoutComboSelection = [];
+            activeLayoutComboOriginal = undefined;
             return;
         }
         const valid = new Set(layer.positions.map((position) => position.layoutIndex));
@@ -5792,6 +5896,9 @@ function getClientScript() {
             seen.add(index);
             return true;
         });
+        if (activeLayoutComboOriginal && !model.combos.some((combo) => comboIdentityEquals(combo, activeLayoutComboOriginal))) {
+            activeLayoutComboOriginal = undefined;
+        }
     }
 
     function normalizeMacroBuilderState() {
@@ -5854,6 +5961,51 @@ function getClientScript() {
             return;
         }
         layoutComboInputs = layoutComboSelectedPositions(layer).map((position) => position.keycode).join(", ");
+    }
+
+    function syncLayoutComboMatchFromInputs() {
+        const combo = exactLayoutComboForInputs(layoutComboInputs);
+        if (combo && (!activeLayoutComboOriginal || comboIdentityEquals(combo, activeLayoutComboOriginal))) {
+            layoutComboOutput = combo.output;
+            activeLayoutComboOriginal = comboIdentity(combo);
+        }
+    }
+
+    function exactLayoutComboForInputs(inputs) {
+        const layer = currentLayer();
+        if (!layer) return undefined;
+        const inputList = splitLayoutArguments(inputs || "");
+        if (inputList.length < 2) return undefined;
+        const signature = comboInputSignature(inputList);
+        return layerCombos(layer).find((combo) => comboInputSignature(combo.inputs) === signature);
+    }
+
+    function comboIdentity(combo) {
+        return combo ? {output: combo.output, inputs: (combo.inputs || []).slice()} : undefined;
+    }
+
+    function normalizeLayoutComboOriginal(value) {
+        if (!value || typeof value !== "object") return undefined;
+        const inputs = Array.isArray(value.inputs) ? value.inputs.map(normalizeDisplayExpression).filter(Boolean) : [];
+        const output = normalizeDisplayExpression(value.output || "");
+        return output && inputs.length ? {output, inputs} : undefined;
+    }
+
+    function comboIdentityEquals(combo, identity) {
+        return Boolean(combo && identity && keyExpressionsEquivalent(combo.output, identity.output) && comboInputSignature(combo.inputs) === comboInputSignature(identity.inputs));
+    }
+
+    function comboInputSignature(inputs) {
+        return (inputs || []).map(canonicalKeyExpression).filter(Boolean).sort().join("\\u0000");
+    }
+
+    function loadLayoutComboIntoBuilder(combo) {
+        if (!combo) return;
+        layoutComboOutput = combo.output || "";
+        layoutComboInputs = (combo.inputs || []).join(", ");
+        activeLayoutComboOriginal = comboIdentity(combo);
+        syncLayoutComboSelectionFromInputs();
+        layoutComboPicking = false;
     }
 
     function syncLayoutComboSelectionFromInputs() {
@@ -5953,15 +6105,18 @@ function getClientScript() {
         if (!layers.length) {
             activeLayer = "";
             selectedKey = 0;
+            activeBehaviorKeycode = "";
             return;
         }
         if (!layers.some((layer) => layer.name === activeLayer)) {
             activeLayer = layers[0].name;
+            activeBehaviorKeycode = "";
         }
         const layer = layers.find((candidate) => candidate.name === activeLayer) || layers[0];
         const positions = layer.positions || [];
         if (!Number.isInteger(selectedKey) || selectedKey < 0 || selectedKey >= positions.length) {
             selectedKey = 0;
+            activeBehaviorKeycode = "";
         }
     }
 
@@ -6317,10 +6472,12 @@ function getClientScript() {
         layerDraftName = "";
         activeLayer = name;
         selectedKey = 0;
+        activeBehaviorKeycode = "";
         layoutComboPicking = false;
         layoutComboSelection = [];
         layoutComboOutput = "";
         layoutComboInputs = "";
+        activeLayoutComboOriginal = undefined;
         notice = "Staged " + name + ". Use Apply layer changes to write config.h, keymap.c, and rgb_config.c.";
         render();
         return true;
@@ -6348,10 +6505,12 @@ function getClientScript() {
         const nextLayers = layersForUi();
         activeLayer = nextLayers[0]?.name || "";
         selectedKey = 0;
+        activeBehaviorKeycode = "";
         layoutComboPicking = false;
         layoutComboSelection = [];
         layoutComboOutput = "";
         layoutComboInputs = "";
+        activeLayoutComboOriginal = undefined;
         render();
         return true;
     }
@@ -6488,6 +6647,7 @@ function getClientScript() {
         const before = currentLocalSnapshot || serializeLocalState();
         stageLayoutSwap(state.sourceIndex, targetIndex);
         selectedKey = targetIndex;
+        activeBehaviorKeycode = "";
         render();
         commitLocalHistory(before);
     }
@@ -6583,6 +6743,7 @@ function getClientScript() {
             const layerNames = layersForUi().map((layer) => layer.name);
             if (activeLayer === rgbLayerAllGroups || !layerNames.includes(activeLayer)) {
                 activeLayer = layerNames[0] || "";
+                activeBehaviorKeycode = "";
             }
             if (!owners.includes(rgbGroupOwner)) {
                 rgbGroupOwner = activeLayer && owners.includes(activeLayer) ? activeLayer : owners[0];
@@ -6629,6 +6790,7 @@ function getClientScript() {
         layoutComboSelection = [];
         layoutComboOutput = "";
         layoutComboInputs = "";
+        activeLayoutComboOriginal = undefined;
         activeMacroKeycode = "";
         macroDrafts = {};
         resetMacroRecorderState();
@@ -6734,6 +6896,7 @@ function getClientScript() {
             activeView,
             activeLayer,
             selectedKey,
+            activeBehaviorKeycode,
             rgbGroupTarget,
             rgbGroupOwner,
             rgbSelectedLeds,
@@ -6745,6 +6908,7 @@ function getClientScript() {
             layoutComboSelection,
             layoutComboOutput,
             layoutComboInputs,
+            activeLayoutComboOriginal,
             activeMacroKeycode,
             macroDrafts,
             macroRecordDelays,
@@ -6772,6 +6936,7 @@ function getClientScript() {
             activeView = state.activeView || activeView;
             activeLayer = state.activeLayer || activeLayer;
             selectedKey = Number.isInteger(state.selectedKey) ? state.selectedKey : selectedKey;
+            activeBehaviorKeycode = state.activeBehaviorKeycode || "";
             rgbGroupTarget = state.rgbGroupTarget || rgbGroupTarget;
             rgbGroupOwner = state.rgbGroupOwner || "";
             rgbSelectedLeds = Array.isArray(state.rgbSelectedLeds) ? state.rgbSelectedLeds : [];
@@ -6783,6 +6948,7 @@ function getClientScript() {
             layoutComboSelection = Array.isArray(state.layoutComboSelection) ? state.layoutComboSelection : [];
             layoutComboOutput = state.layoutComboOutput || "";
             layoutComboInputs = state.layoutComboInputs || "";
+            activeLayoutComboOriginal = normalizeLayoutComboOriginal(state.activeLayoutComboOriginal);
             activeMacroKeycode = state.activeMacroKeycode || "";
             macroDrafts = state.macroDrafts && typeof state.macroDrafts === "object" ? state.macroDrafts : {};
             macroRecordDelays = typeof state.macroRecordDelays === "boolean" ? state.macroRecordDelays : macroRecordDelays;
@@ -7403,11 +7569,26 @@ function getClientScript() {
         const layer = currentLayer();
         if (!layer) return panel("Layers", "<p class='muted'>No LAYOUT blocks found.</p>", true);
         const selected = layerPositionByLayoutIndex(layer, selectedKey) || layer.positions[0];
-        const selectedBehavior = behaviorForKey(selected.keycode);
+        const behaviorTarget = behaviorEditorTarget(layer, selected);
+        const selectedBehavior = behaviorForKey(behaviorTarget.keycode);
         return "<div class='stack'>" +
-            panel("Layout", renderLayerTabs() + renderLayoutWithSelectedKeyEditor(layer, selected) + renderSelectedBehaviorEditor(selected, selectedBehavior), true) +
+            panel("Layout", renderLayerTabs() + renderLayoutWithSelectedKeyEditor(layer, selected) + renderSelectedBehaviorEditor(behaviorTarget, selectedBehavior), true) +
             panel("Layer Overview", renderLayerOverview(layer), true) +
             "</div>";
+    }
+
+    function behaviorEditorTarget(layer, selected) {
+        const combo = layerCombos(layer).find((row) => keyExpressionsEquivalent(row.output, activeBehaviorKeycode));
+        if (combo) {
+            return {
+                keycode: combo.output,
+                display: combo.outputDisplay || combo.output,
+                behaviorTitle: "Behavior for " + combo.badge + " output",
+                behaviorContext: (combo.inputDisplays || combo.inputs).join(" + ") + " -> " + (combo.outputDisplay || combo.output)
+            };
+        }
+        activeBehaviorKeycode = "";
+        return selected;
     }
 
     function renderLayerTabs(showLayerFlow = true, showDirty = true) {
@@ -7486,8 +7667,9 @@ function getClientScript() {
         const inputValue = layoutComboInputs || selectedPositions.map((position) => position.keycode).join(", ");
         const inputPickingLabel = layoutComboPicking ? "Done picking inputs" : "Pick input keys on layout";
         const canClear = Boolean(layoutComboOutput || layoutComboInputs || selectedPositions.length);
+        const editing = Boolean(activeLayoutComboOriginal);
         return "<div id='layoutComboBuilder' class='card selected-key-edit-card layout-combo-builder-card' data-dirty-section data-combo-builder>" +
-            "<h3>Create combo</h3>" +
+            "<h3>" + (editing ? "Edit combo" : "Create combo") + "</h3>" +
             "<div class='selected-key-edit-fields'>" +
             renderKeyPickerInput("layoutComboOutput", "Output", layoutComboOutput, "Tab", "single", "", "data-combo-output", "data-validate='layout-key'") +
             renderKeyPickerInput("layoutComboInputs", "Inputs", inputValue, "D, F", "list", "", "data-combo-inputs", "data-validate='combo-inputs'") +
@@ -7496,7 +7678,7 @@ function getClientScript() {
             "<button type='button' class='combo-pick-toggle " + (layoutComboPicking ? "active" : "") + "' aria-pressed='" + (layoutComboPicking ? "true" : "false") + "' data-action='toggleLayoutComboPicking'>" + inputPickingLabel + "</button>" +
             "<button type='button' data-action='clearLayoutComboSelection' data-layout-combo-clear" + (canClear ? "" : " disabled") + ">Clear</button>" +
             "</div>" +
-            "<button data-action='addLayoutCombo' data-dirty-button class='primary'>Append combo row</button>" +
+            "<button data-action='addLayoutCombo' data-dirty-button class='primary'>" + (editing ? "Save combo row" : "Append combo row") + "</button>" +
             "</div>" +
             "</div>";
     }
@@ -7525,9 +7707,14 @@ function getClientScript() {
         for (let index = 0; index < 5; index += 1) {
             steps.push(row.steps.find((step) => step.tapCount === index) || { tapCount: index, tapCountName: tapBranchName(index) });
         }
-        return "<div class='card selected-behavior-editor' data-dirty-section><h3>Behavior on this key</h3>" +
+        const title = selected.behaviorTitle || "Behavior on this key";
+        const context = selected.behaviorContext
+            ? "<div><span class='muted'>Reachable via</span><br><code>" + escapeHtml(selected.behaviorContext) + "</code></div>"
+            : "";
+        return "<div class='card selected-behavior-editor' data-dirty-section><h3>" + escapeHtml(title) + "</h3>" +
             "<input type='hidden' id='selectedBehaviorKeycode' value='" + escapeAttr(row.keycode) + "'>" +
             "<div><span class='muted'>Source</span><br><code class='source-pill'>" + escapeHtml(row.keycode) + "</code></div>" +
+            context +
             "<div class='form-grid four'>" +
             renderTimingInput("selectedTapHoldTerm", "tap_hold_term", row.tapHoldTerm || "", row.keycode) +
             renderTimingInput("selectedLongerHoldTerm", "longer_hold_term", row.longerHoldTerm || "", row.keycode) +
@@ -8497,15 +8684,16 @@ function getClientScript() {
         const behavior = behaviorForKey(combo.output);
         return "<tr><td><code>" + combo.badge + "</code></td>" +
             "<td>" + escapeHtml((combo.inputDisplays || combo.inputs).join(" + ")) + "</td>" +
-            "<td>" + escapeHtml(combo.outputDisplay || combo.output) + "<br><code class='muted'>" + escapeHtml(combo.output) + "</code></td>" +
-            "<td>" + renderComboOutputBehavior(behavior) + "</td></tr>";
+            "<td><div class='table-cell-stack'><span>" + escapeHtml(combo.outputDisplay || combo.output) + "</span><code class='muted'>" + escapeHtml(combo.output) + "</code><div class='table-cell-actions'><button type='button' data-action='editLayoutCombo' data-badge='" + escapeAttr(combo.badge) + "'>Edit combo</button></div></div></td>" +
+            "<td>" + renderComboOutputBehavior(combo, behavior) + "</td></tr>";
     }
 
-    function renderComboOutputBehavior(behavior) {
+    function renderComboOutputBehavior(combo, behavior) {
+        const button = "<div class='table-cell-actions'><button type='button' data-action='editComboOutputBehavior' data-keycode='" + escapeAttr(combo.output) + "'>" + (behavior ? "Edit behavior" : "Create behavior") + "</button></div>";
         if (!behavior) {
-            return "<span class='muted'>No key behavior row for this output.</span>";
+            return "<div class='table-cell-stack'><span class='muted'>No key behavior row for this output.</span>" + button + "</div>";
         }
-        return behavior.steps.map(renderStep).join("<br>");
+        return "<div class='table-cell-stack'>" + behavior.steps.map(renderStep).join("") + button + "</div>";
     }
 
     function renderLayerMacroTable(layer) {

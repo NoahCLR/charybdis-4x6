@@ -49,7 +49,10 @@ inputs outside those profile files.
   default `layer_colors[]` rows in `rgb_config.c`
 - the layer overview lists layer-reachable behaviors, macros, combos, and
   pointing modes
-- layer combo rows show any key behavior row triggered by the combo output
+- layer combo rows can load an existing combo into the combo builder and can
+  load the combo output into the behavior editor
+- selecting the exact inputs for an existing combo fills the combo output
+  automatically
 - append combo rows from the active layer by selecting multiple physical keys
   on the layout sidecar or by using the multi-key picker
 - behavior timing fields show the resolved default milliseconds in their
