@@ -36,8 +36,9 @@ inputs above, regenerate them in the same pass instead of editing the generated
 Markdown or SVG files by hand.
 
 Current generated profile assets live under `docs/media/profile-introspection/`.
-Older top-level `docs/generated/` paths are treated as stale and should be
-removed rather than recreated.
+Older scratch outputs under `docs/media/generated/` or top-level
+`docs/generated/` are treated as stale and should be removed rather than
+recreated.
 
 ## What The Generated Report Includes
 

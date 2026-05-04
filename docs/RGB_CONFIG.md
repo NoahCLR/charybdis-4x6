@@ -12,6 +12,24 @@ For the cross-system runtime ownership and RGB render flow, see
 [architecture/README.md](./architecture/README.md) and
 [architecture/runtime-flow.md](./architecture/runtime-flow.md).
 
+## Common Starting Points
+
+Most profile-level RGB changes are data edits in `rgb_config.c`:
+
+- change a layer color: edit `layer_colors[]`
+- change a pointing-mode color or placement: edit `pd_mode_colors[]`
+- add a small key or LED accent: add a row to the matching `*_led_groups_data`
+  table
+- tune combo feedback: edit `combo_feedback_colors` or
+  `combo_feedback_led_groups_data`
+- tune key-behavior feedback: edit `key_behavior_feedback_colors` or
+  `key_behavior_feedback_led_groups_data`
+- tune the auto-mouse timeout look: edit `automouse_fade_end_config` and the
+  configured auto-mouse layer color
+
+The rest of this file is reference material for the vocabulary, render order,
+and validation rules behind those edits.
+
 The interaction feedback stages are individually gated from the active keymap
 [`config.h`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h):
 

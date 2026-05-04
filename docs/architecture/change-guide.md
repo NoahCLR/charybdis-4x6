@@ -71,8 +71,8 @@ For documentation and layout changes, check for old package names:
 rg -n 'key/runtime/core|key/runtime/effects|key/runtime/interaction\.h|key/interaction|state/runtime|split_runtime_sync\.(c|h)|lib/state/runtime|#include "(core/|effects/)' users/noah tests docs keyboards/bastardkb/charybdis/4x6/keymaps/noah -g '!docs/architecture/change-guide.md'
 ```
 
-Review matches in historical review folders separately. Closed review folders
-are immutable history and should not be edited unless explicitly requested.
+The command excludes this guide because the audit pattern itself intentionally
+names retired paths. Any other match should be reviewed before handoff.
 
 ## Definition Of Done
 

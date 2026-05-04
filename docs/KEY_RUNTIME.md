@@ -10,6 +10,17 @@ the wider userspace architecture, start with
 semantics, see [INTERACTION_MODEL.md](./INTERACTION_MODEL.md). For the authored
 profile, see [KEYMAP.md](./KEYMAP.md).
 
+## How To Use This Doc
+
+Use this as a routing map when a behavior bug crosses press, release, scan,
+ownership, split, or RGB feedback boundaries.
+
+Skip this file for ordinary profile edits. If you are changing what one key,
+combo, macro, layer, or RGB table does, start with `keymap.c`,
+`rgb_config.c`, [INTERACTION_MODEL.md](./INTERACTION_MODEL.md), or
+[RGB_CONFIG.md](./RGB_CONFIG.md) instead. Runtime changes should usually land
+only after the authored-data path is not enough.
+
 ## Current Shape
 
 The key runtime is now a single-authority reducer-owned system.
@@ -22,9 +33,7 @@ The key runtime is now a single-authority reducer-owned system.
   points, effect transport, and QMK hook integration.
 - Long-lived external ownership still lives in the dedicated registries under
   `state/ownership/` and `key/ownership/`.
-- The reducer-owned code now uses the `key_runtime_core_*` symbol family.
-  Historical review notes may still mention `runtime_v2` because that was the
-  cutover thread name.
+- The reducer-owned code uses the `key_runtime_core_*` symbol family.
 
 The legacy slot reducers, slot result transport, slot/index shared state, and
 stub-backed mixed-runtime host surfaces were removed during the full cutover.

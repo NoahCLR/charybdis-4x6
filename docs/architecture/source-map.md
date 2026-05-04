@@ -4,6 +4,16 @@ This map groups the userspace runtime packages and repo-local profile tooling
 by responsibility. It is meant to help a maintainer or agent route changes
 without turning this document into a per-function encyclopedia.
 
+## How To Use This Map
+
+This is a lookup index, not a narrative guide. Use the first table to find
+top-level runtime and tooling entry points, the source-to-doc matrix to route a
+change by subsystem, and the file coverage sections when you need to check
+whether a package inventory still matches the tree.
+
+For behavior flow, use [runtime-flow.md](./runtime-flow.md). For "where should I
+edit this?" decisions, use [change-guide.md](./change-guide.md).
+
 ## Top-Level Runtime Surfaces
 
 These files are outside `users/noah/lib/`, but they are part of the source trace
