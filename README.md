@@ -11,6 +11,14 @@ one-off hacks. The point is to keep the interesting behavior centralized and
 editable, so the board can grow through authored profile data instead of
 scattered runtime rewrites.
 
+> **Opinionated userspace warning:** This repo depends on QMK, but it is not a
+> standard copy-paste QMK keymap. I have interpreted some QMK surfaces
+> differently and shaped them into a Charybdis-specific userspace with its own
+> runtime, data tables, RGB language, split sync, and Profile Studio workflow.
+> If you are looking for small snippets to drop into a normal keymap, this is
+> probably not the easiest place to start. It is more useful as an example of a
+> very opinionated firmware model.
+>
 > **Firmware note:** This userspace is updated for QMK `0.32.5` and builds
 > against my [`qmk-latest` firmware branch](https://github.com/NoahCLR/bastardkb-qmk/tree/qmk-latest)
 > rather than the older `bkb-master`-based setup. That branch also carries my
@@ -36,8 +44,10 @@ from a knockoff seller.
 
 ## What This Userspace Is For
 
-This userspace is a toolkit for making a Charybdis feel like one integrated
-input device rather than a normal keyboard with a trackball attached.
+This repo is my Charybdis 4x6 userspace and profile. The interesting part is
+how the profile is authored: key behavior lives in data tables, RGB feedback has
+its own authored language, and the shared runtime turns those choices into
+firmware behavior.
 
 The two main authoring files are:
 
@@ -67,14 +77,30 @@ behavior:
 - pointing-mode keys that can be simple momentary holds, locks, or richer
   tap/hold keys using the same behavior table as the rest of the board
 
-You can also make the trackball change roles instead of only moving the cursor:
+You can also make the trackball change roles instead of only moving the cursor.
+The current profile includes:
 
-- scroll with the ball
-- emulate pinch-style zoom on macOS
-- send keyboard zoom shortcuts
-- turn ball movement into arrow-key navigation
-- adjust volume or brightness from vertical ball motion
-- keep the pointer layer available automatically while pointer work is active
+- `DRAGSCROLL`: ball motion becomes scrolling, as either a momentary hold or a
+  lock
+- `PINCH_MODE`: command-modified scrolling for pinch-style zoom on macOS; in my
+  setup this expects third-party software such as
+  [BetterMouse](https://better-mouse.com/) to translate that gesture
+- `ZOOM_MODE`: explicit keyboard zoom using `Cmd+=` and `Cmd+-`
+- `ARROW_MODE`: dominant ball motion sends arrow-key taps instead of cursor
+  movement
+- `VOLUME_MODE` and `BRIGHTNESS_MODE`: vertical ball motion changes system
+  volume or display brightness
+- `CLICK_SPAM`: not a pointing mode, but a mouse-button combo output that uses
+  the behavior table to repeat left-click while held
+- auto-mouse and auto-sniping layers that keep pointer work available
+  automatically while you move between typing and trackball use
+
+Because mode keycodes and their generated `*_LOCK` keycodes are normal actions,
+`key_behaviors[]` can make one key hold a mode momentarily and toggle its lock on
+a double-tap or double-tap hold. Locks are also easy to leave: pressing or
+holding the same runtime-handled mode key while that mode is locked clears the
+lock, then behaves as a normal momentary mode until release. Activating or
+locking a different pointing mode clears the previous mode lock too.
 
 Those are capabilities, not a fixed layout prescription. `keymap.c` decides
 where these ideas live.
@@ -97,6 +123,17 @@ lets you author the visible language of the board:
 - auto-mouse timeout feedback that fades as the temporary pointer layer is
   about to clear
 
+`locality` is the RGB word for where a feedback surface paints. Depending on
+the table, it can mean both halves, one fixed half, the half that owns the
+triggering key or combo, or only the exact triggering keys with options such as
+`RGB_BOTH_HALVES`, `RGB_LEFT_HALF`, `RGB_RIGHT_HALF`, `RGB_KEY_HALF`, and
+`RGB_KEYS_ONLY`.
+
+My build also has one extra trackball LED at LED `56`, documented in the
+[`rgb_config.c` LED map](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c#L53).
+It is optional: boards without that physical LED are still compatible with this
+userspace; they just will not show trackball-specific LED group accents.
+
 In practice, the lights can answer a few simple questions while you use the
 board: which layer is active, which trackball mode is live, which physical keys
 created a combo, whether a key is waiting for another tap, which tap-count
@@ -109,11 +146,27 @@ layer look and then fade toward the board state that will remain after the
 auto-mouse layer drops. In plain terms: the lights can show how much time is
 left before the board returns to normal.
 
-The split sync matters here. A Charybdis has one controller per half, so RGB
-state cannot just live on whichever half saw the key first. This userspace
-mirrors runtime state for layers, auto-mouse progress, active or locked
-pointing modes, combo feedback, key-behavior feedback, and VIA dynamic-keymap
-writes so both halves can tell the same story.
+## Split Sync
+
+A Charybdis has one controller per half, so runtime state cannot just live on
+whichever half saw the key first. QMK's normal split settings cover the active
+layer set and activity timer; this userspace adds custom split RPCs in
+[`users/noah/config.h`](./users/noah/config.h#L42) and
+[`runtime_sync.h`](./users/noah/lib/split/runtime_sync.h):
+
+- `PUT_SPLIT_RUNTIME_BASE_SYNC`: auto-mouse RGB progress, active or locked
+  pointing-mode IDs, key-local pointing-mode ownership, and preview-layer state
+- `PUT_SPLIT_COMBO_FEEDBACK_SYNC`: combo underlay and overlay footprints, so
+  `RGB_KEY_HALF` and `RGB_KEYS_ONLY` know which half or exact keys caused the
+  combo
+- `PUT_SPLIT_KEY_FEEDBACK_SEMANTIC_SYNC` and
+  `PUT_SPLIT_KEY_FEEDBACK_BRANCH_SYNC`: key-feedback flash visibility, semantic
+  state, broad owner groups, and tap-branch colors
+- `PUT_VIA_KEYMAP_SYNC`: mirrored VIA dynamic-keymap writes
+
+You can forget those packet names immediately. The point is that both halves
+know the same layers, keys, combos, pointing modes, and feedback state, so the
+board behaves and lights up like one device instead of two disconnected halves.
 
 ## The Keymap Model
 
@@ -130,9 +183,14 @@ Use it for:
 - `key_behaviors[]`
 - pointing-mode key placement and richer mode gestures
 
-The important table is `key_behaviors[]`. A normal QMK key usually has one
-main role, or maybe a tap/hold role through helpers like `LT()` and `MT()`.
-This userspace lets an authored key branch more deliberately:
+The important table is `key_behaviors[]`. Stock QMK already has useful pieces
+of this idea: `LT()` and `MT()` cover common tap/hold keys, and Tap Dance can
+make tap counts choose different outputs. This userspace is a different model:
+one authored behavior row can combine tap counts, hold tiers, timing, RGB
+feedback, combo outputs, pointer-mode ownership, layer ownership, and split
+state in one place.
+
+That means a key can branch more deliberately:
 
 - tap can send one action
 - hold can keep a modifier, layer, mouse button, or pointing mode active
@@ -145,42 +203,50 @@ Combos can enter that same table too. If a combo emits a keycode that has a
 `key_behaviors[]` row, the chord can reuse the same tap, hold, longer-hold, and
 multi-tap behavior as a physical key.
 
-Branch confirm is the short RGB-visible pause after a double-tap or higher
-branch wins, before the action fires.
-
-Here is the shape of one authored row. The keycode and actions are examples;
-the point is the schema.
+Here is the shape of one authored row, based on the `RIGHT_THUMB` row in
+[`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c#L435).
+The timing lines are optional row-local overrides, and branch confirm is the
+short RGB-visible pause after a double-tap or higher branch wins, before the
+action fires. The snippet shows one useful helper mix, not the full helper
+vocabulary; the list below shows the other helpers you can use.
 
 ```c
 {
-    .keycode = KC_F24,
+    .keycode = RIGHT_THUMB,
     .tap_hold_term = 150,
     .longer_hold_term = 400,
     .multi_tap_term = 150,
-    .rgb_branch_confirm_term = 120,
+    .rgb_branch_confirm_term = 150,
+    .skip_rgb_branch_confirm = false,
     .tap_counts = {
         [0] = {
-            .tap = TAP_SENDS(KC_ESC),
+            .tap = TAP_SENDS(LOCK_LAYER(LAYER_NAV)),
             .hold = PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_NAV)),
-            .long_hold = TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_NAV)),
         },
         [1] = {
             .tap = TAP_SENDS(KC_MPLY),
-            .hold = TAP_ON_RELEASE_AFTER_HOLD(KC_MUTE),
+            .hold = TAP_ON_RELEASE_AFTER_HOLD(KC_ESCAPE),
+            .long_hold = TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_NUM)),
         },
         [2] = {
-            .tap = TAP_SENDS(VIA_MACRO_0),
-            .hold = REPEAT_WHILE_HELD(MS_BTN1, 20),
+            .tap = TAP_SENDS(KC_MNXT),
+            .long_hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_MNXT),
         },
         [3] = {
-            .tap = TAP_SENDS(DRAGSCROLL_LOCK),
+            .tap = TAP_SENDS(KC_MPRV),
+            .long_hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_MPRV),
         },
     },
 },
 ```
 
-In that example, `KC_F24` could be placed directly on a layer or emitted by a
+In that example, `RIGHT_THUMB` can be placed directly on a layer or emitted by a
 combo. Either way, the behavior row is the same.
+
+The double-tap `.hold` uses the release-based helper because that branch also
+has a later `.long_hold`. The single-tap layer hold and the media long-holds use
+the press-and-hold helper because those branches can stay active until key
+release.
 
 The vocabulary is:
 
@@ -216,8 +282,10 @@ lock through `LOCK_LAYER(layer)`. For custom momentary layer holds, use
 state. Inside any helper, `KC_TRNS` means "use the lower active layer's
 matching tap, hold, or long-hold behavior here."
 
-The matching key-behavior RGB config follows that same model. You do not need
-every field in every profile; this example shows the vocabulary.
+The matching key-behavior RGB config in
+[`rgb_config.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c#L319)
+follows that same model. You do not need every field in every profile; this
+example shows the vocabulary.
 
 ```c
 const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
