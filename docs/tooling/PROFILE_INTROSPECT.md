@@ -54,6 +54,10 @@ includes:
 - auto-mouse, combo-feedback, and key-behavior feedback colors and policy with
   generated swatches
 
+Layer enum entries without an authored `keymaps[][]` block remain visible in
+the report's reference section, but they do not get a layer preview until they
+have real authored layer data.
+
 The parser accepts normal C comments in authored inputs. In RGB authoring, this
 includes comments next to `HSV(...)` arguments inside helper macros such as
 `RGB_TAP_BRANCH_COLORS(...)`.

@@ -3,12 +3,13 @@
 Charybdis Profile Studio is a standalone VS Code extension for editing this
 repo's authored configuration surfaces directly:
 
+- `keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h`
 - `keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c`
 - `keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c`
 
-The `.c` files remain the source of truth. The extension does not use a sidecar
-profile database and does not write generated docs or firmware inputs outside
-those two files.
+Those authored source files remain the source of truth. The extension does not
+use a sidecar profile database and does not write generated docs or firmware
+inputs outside those profile files.
 
 ## Current Features
 
@@ -43,6 +44,9 @@ those two files.
 - view and save the selected key behavior directly inside the active layer
   layout panel; the layer filters visible behavior rows by keys currently
   present on that layer
+- stage layer add/delete changes; applying them updates the layer enum in
+  `config.h`, transparent `keymaps[][]` blocks in `keymap.c`, and random
+  default `layer_colors[]` rows in `rgb_config.c`
 - the layer overview lists layer-reachable behaviors, macros, combos, and
   pointing modes
 - layer combo rows show any key behavior row triggered by the combo output

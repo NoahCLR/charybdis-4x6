@@ -488,7 +488,9 @@ This is the actual control path for pd modes:
    [`pd_mode_state.c`](../users/noah/lib/pointing/runtime/pd_mode_state.c)
    exposes the mirrored mode state as display-state queries for UI consumers.
 9. [`users/noah/lib/rgb/core/rgb_runtime.c`](../users/noah/lib/rgb/core/rgb_runtime.c) orchestrates stage order, and
-   [`users/noah/lib/rgb/stages/rgb_pd_mode_stage.c`](../users/noah/lib/rgb/stages/rgb_pd_mode_stage.c) renders the mode overlay on the right half.
+   [`users/noah/lib/rgb/stages/rgb_pd_mode_stage.c`](../users/noah/lib/rgb/stages/rgb_pd_mode_stage.c)
+   renders the mode overlay according to the mode's authored
+   `pd_mode_colors[]` locality.
 
 That is why most new modes are mostly a data-registration job, not a runtime rewrite.
 

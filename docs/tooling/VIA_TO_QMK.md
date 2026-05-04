@@ -18,6 +18,11 @@ This profile expects VIA exports with 64 macro entries. VIA backups made from
 older 16-slot firmware need their `macros[]` array padded before this script
 will accept them.
 
+The checked-in VIA export currently covers the populated layer blocks. If a
+new layer is added in source or through Profile Studio, update the script's
+`LAYER_NAMES` mapping and inspect the generated layer names before using
+`--write`.
+
 In `--write` mode, it can rewrite either or both of those sections in
 [`keymap.c`](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c).
 
@@ -113,6 +118,9 @@ That means most keymap-local additions do not require manual script edits. If
 you add a new keymap-local custom keycode in `keymap.c`, the script can usually
 pick it up automatically.
 
+Layer enum changes are the exception: keep the script's layer-name mapping in
+sync with any layer that should be round-tripped from VIA.
+
 ## What It Treats As Source Of Truth
 
 If you run the script in `--write` mode and confirm a rewrite, the selected VIA
@@ -126,6 +134,8 @@ authored in [`keymap.c`](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/ke
 After syncing from VIA, check these things:
 
 - the right layers were rewritten
+- exported layer names still match the keymap enum, especially after adding or
+  deleting layers
 - `VIA_MACROS(MACRO)` matches the export you intended
 - custom keycodes still resolved to the expected symbolic names
 - no profile-specific authored behavior in `key_behaviors[]` now conflicts with
