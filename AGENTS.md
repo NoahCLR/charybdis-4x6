@@ -53,6 +53,7 @@ Required verification workflow:
    - hooks / ownership: `sh tests/host/run_hook_chaining_tests.sh`, `sh tests/host/run_keyboard_mod_ownership_tests.sh`, `sh tests/host/run_owned_keycode_tests.sh`, `sh tests/host/run_held_action_tests.sh`, `sh tests/host/run_layer_ownership_tests.sh`
    - macro / VIA / QMK-contract work: `sh tests/host/run_qmk_contract_checks.sh`, `sh tests/host/run_action_lifecycle_tests.sh`, `sh tests/host/run_macro_dispatch_tests.sh`, `sh tests/host/run_macro_payload_tests.sh`, `sh tests/host/run_via_macro_defaults_tests.sh`, `sh tests/host/run_via_macro_action_lifecycle_tests.sh`
    - shared runtime / tracing: `sh tests/host/run_runtime_init_order_tests.sh`, `sh tests/host/run_runtime_debug_tests.sh`, `sh tests/host/run_runtime_trace_tests.sh`
+   - Profile Studio extension/UI: from `tools/charybdis-profile-studio/`, run `npm run check` and `npm run screenshots`
 4. If authored keymap, combo, macro, or RGB data changed, also run:
    `sh tests/host/run_real_profile_validation_tests.sh`
 5. If runtime wiring, source lists, compat surfaces, or header boundaries changed, also run:

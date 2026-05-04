@@ -25,8 +25,9 @@ For the shorter user-facing guide and screenshot links, see
   `config.h`, transparent `keymaps[][]` blocks in `keymap.c`, and random
   default `layer_colors[]` rows in `rgb_config.c`
 - `config.h` defaults that are not already owned by the layer structure or RGB
-  color authoring flows, including timing, pointing DPI, auto-mouse, RGB Matrix,
-  and RGB feedback stage settings
+  color authoring flows, grouped by the behavior they affect: key timing,
+  normal pointer speed, pointing-mode speeds, sniping, auto-mouse, base
+  lighting, and lighting feedback
 - `layer_colors[]`
 - `pd_mode_colors[]`
 - reusable `RGB_LED_GROUP_*` definitions near the LED map in `rgb_config.c`,
@@ -116,6 +117,11 @@ Behavior timing override fields show the resolved default milliseconds in their
 placeholder text when the authored row leaves the override empty.
 The Defaults page writes the corresponding `config.h` default macros directly,
 so those placeholders follow the saved profile defaults after reload.
+Its sections are behavior-oriented rather than file-section mirrors: for
+example normal pointer speed is separate from pointing-mode speed overrides,
+sniping keeps its DPI ladder and auto-trigger together, base lighting includes
+the inactivity timeout, and lighting feedback includes feedback refresh
+cadence.
 Per-mode DPI override fields label `0` as the normal pointer DPI fallback
 instead of presenting it as a literal zero-DPI mode.
 Defaults controls have field-specific tooltips that describe the firmware

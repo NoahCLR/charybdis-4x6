@@ -380,8 +380,9 @@ Use Profile Studio when you want to:
 - choose layer and pointing-mode colors
 - build reusable LED groups by selecting LEDs on the board
 - edit auto-mouse fade settings, combo feedback, and key-behavior feedback
-- configure timing, pointing, RGB Matrix, and RGB feedback defaults from
-  `config.h`
+- configure behavior-specific `config.h` defaults for key timing, normal
+  pointer speed, pointing modes, sniping, auto-mouse, base lighting, and
+  lighting feedback
 
 Screenshots:
 [`Layout`](./docs/media/profile-studio/studio-layout-tab.png),

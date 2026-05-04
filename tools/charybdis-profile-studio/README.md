@@ -111,8 +111,9 @@ write either reusable groups or one-off inline group rows.
 Use the Defaults tab for `config.h` defaults that are not already owned by the
 Layout or RGB authoring flows.
 
-It edits timing defaults, pointing-device DPI and auto-mouse defaults, RGB
-Matrix defaults, and RGB feedback stage toggles directly in `config.h`.
+It edits key timing, normal pointer speed, pointing-mode speeds, sniping,
+auto-mouse, base lighting, and lighting feedback defaults directly in
+`config.h`.
 Per-mode DPI overrides show that `0` keeps the normal pointer DPI.
 
 ## Key Picker
