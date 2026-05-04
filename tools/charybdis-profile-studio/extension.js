@@ -404,7 +404,7 @@ function activate(context) {
     setupNativeEntryPoints(context);
 }
 
-function deactivate() {}
+function deactivate() { }
 
 async function setupNativeEntryPoints(context) {
     const root = await findProfileRoot();
@@ -857,7 +857,7 @@ function fallbackQmkKeycodeCatalog() {
     return {
         source: "built-in fallback",
         entries,
-        labels: {...QMK_KEY_LABELS},
+        labels: { ...QMK_KEY_LABELS },
         aliases: qmkKeyAliasesFromEntries(entries),
     };
 }
@@ -898,7 +898,7 @@ function compareQmkKeycodes(left, right) {
     if (leftGroup !== rightGroup) {
         return (leftGroup === -1 ? 999 : leftGroup) - (rightGroup === -1 ? 999 : rightGroup);
     }
-    return String(left.label || left.value).localeCompare(String(right.label || right.value), undefined, {numeric: true});
+    return String(left.label || left.value).localeCompare(String(right.label || right.value), undefined, { numeric: true });
 }
 
 function uniqueStrings(values) {
@@ -8855,7 +8855,7 @@ function getClientScript() {
             "<div class='rgb-selected-list'><span class='rgb-led-list-label'>" + escapeHtml(selectedLabel) + "</span>" + selected + "</div>" +
             "<div class='rgb-selected-list rgb-defined-list'><span class='rgb-led-list-label'>defined</span>" + defined + "</div>" +
             "<div class='toolbar'>" +
-            "<button data-action='clearRgbSelection'>Clear LEDs</button>" +
+            "<button data-action='clearRgbSelection'>Clear Selected LEDs</button>" +
             "<button data-action='addRgbLedGroup' data-dirty-button class='primary'>Add LED group row</button>" +
             "</div>" +
             "</div>" +
