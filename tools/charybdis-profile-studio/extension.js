@@ -9168,11 +9168,19 @@ function getClientScript() {
     }
 
     function rgbBuilderHex() {
-        return hsvToHex(defaultRgbBuilderColor()) || "#000000";
+        return hsvToHex(rgbBuilderPreviewColor()) || "#000000";
+    }
+
+    function rgbBuilderPreviewColor() {
+        const color = defaultRgbBuilderColor();
+        if (rgbGroupColorInherits(color)) {
+            return rgbLedGroupInheritedColor({ owner: rgbGroupOwner }, rgbGroupTarget) || baseLayerVisiblePreviewColor() || color;
+        }
+        return color;
     }
 
     function rgbBuilderUsesAllFeedbackPreview() {
-        return rgbGroupTarget === "keyBehavior" && rgbGroupOwner === keyBehaviorAllGroups;
+        return rgbGroupTarget === "keyBehavior" && rgbGroupOwner === keyBehaviorAllGroups && rgbGroupColorInherits(defaultRgbBuilderColor());
     }
 
     function rgbBuilderPreviewFill() {
@@ -9282,8 +9290,9 @@ function getClientScript() {
         const selected = effectiveRgbBuilderLedIndices().includes(ledIndex);
         const definedPreview = rgbBuilderDefinedPreviewForLed(ledIndex);
         const allPreview = selected ? rgbBuilderUsesAllFeedbackPreview() : Boolean(definedPreview?.allFeedback);
-        const fill = selected ? rgbBuilderPreviewFill() : definedPreview?.fill || "#20262a";
-        const textColor = selected ? rgbBuilderPreviewText() : definedPreview?.text || "#e7ecef";
+        const fallbackFill = hsvToHex(trackballUnderlyingPreviewColor()) || "#20262a";
+        const fill = selected ? rgbBuilderPreviewFill() : definedPreview?.fill || fallbackFill;
+        const textColor = selected ? rgbBuilderPreviewText() : definedPreview?.text || idealText(fallbackFill);
         const tooltipText = "Click to add or remove trackball LED " + ledIndex + " from the group builder.";
         return "<g class='extra-led " + (selected ? "rgb-selected" : "") + (definedPreview ? " rgb-defined" : "") + (allPreview ? " rgb-all-preview" : "") + "' data-action='toggleRgbTrackball' data-tooltip='" + escapeAttr(tooltipText) + "'>" +
             "<circle data-rgb-led-preview cx='" + cx + "' cy='" + cy + "' r='13' fill='" + fill + "' stroke='" + (selected ? "#ffffff" : "#31c6a4") + "'></circle>" +
@@ -9523,12 +9532,30 @@ function getClientScript() {
         return String(color?.h || "") === "0" && String(color?.s || "") === "0" && String(color?.v || "") === "0";
     }
 
+    function baseLayerVisiblePreviewColor() {
+        const baseLayer = colorForLayer("LAYER_BASE");
+        return layerPreviewColor(baseLayer) || model.rgb?.defaultColor || baseLayer?.color;
+    }
+
+    function layerLedGroupInheritedPreviewColor(layerName) {
+        const layerColor = colorForLayer(layerName);
+        return layerPreviewColor(layerColor) || baseLayerVisiblePreviewColor() || layerColor?.color;
+    }
+
+    function trackballUnderlyingPreviewColor() {
+        const activeLayerColor = colorForLayer(activeLayer);
+        if (activeLayerColor?.mode === "ALL_KEYS" && !layerColorIsPassthrough(activeLayerColor.color)) {
+            return activeLayerColor.color;
+        }
+        return baseLayerVisiblePreviewColor();
+    }
+
     function rgbLedGroupInheritedColor(row, tableKind = "") {
         if (tableKind === "layer" && row.owner === rgbLayerAllGroups) {
-            return colorForLayer(activeLayer)?.color;
+            return layerLedGroupInheritedPreviewColor(activeLayer);
         }
         if (tableKind === "layer" && row.owner !== rgbLayerAllGroups) {
-            return colorForLayer(row.owner)?.color;
+            return layerLedGroupInheritedPreviewColor(row.owner);
         }
         if (tableKind === "pdMode" && row.owner === rgbPdModeAllGroups) {
             return (model.rgb?.pdModeColors || [])[0]?.color;
