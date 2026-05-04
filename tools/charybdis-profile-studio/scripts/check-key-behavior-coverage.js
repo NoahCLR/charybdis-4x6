@@ -58,6 +58,10 @@ const appendedCheck = `
 
     const model = await buildModel(${JSON.stringify(repoRoot)});
     const aliases = model.qmkKeycodeAliases || {};
+    assert(
+        (model.configDefaults || []).some((section) => (section.fields || []).some((field) => field.macro === "AUTO_MOUSE_TIME" && field.value === "1200")),
+        "Profile Studio missed config.h defaults"
+    );
     const reachable = new Map();
     const rawReachable = new Set();
 
@@ -126,6 +130,32 @@ const appendedCheck = `
         );
     } finally {
         nativeFs.rmSync(tempRoot, {recursive: true, force: true});
+    }
+
+    {
+        const nativeFs = require("fs");
+        const tempRoot = nativeFs.mkdtempSync(path.join(require("os").tmpdir(), "profile-studio-config-defaults-"));
+        try {
+            const sourceConfig = path.join(${JSON.stringify(repoRoot)}, KEYMAP_CONFIG_RELATIVE_PATH);
+            const targetConfig = path.join(tempRoot, KEYMAP_CONFIG_RELATIVE_PATH);
+            nativeFs.mkdirSync(path.dirname(targetConfig), {recursive: true});
+            nativeFs.copyFileSync(sourceConfig, targetConfig);
+            await patchConfigDefaults(tempRoot, [
+                {macro: "TAPPING_TERM", value: "201"},
+                {macro: "RGB_AUTOMOUSE_GRADIENT_ENABLE", enabled: false},
+            ]);
+            const updated = nativeFs.readFileSync(targetConfig, "utf8");
+            assert(
+                updated.includes("#define TAPPING_TERM 201"),
+                "Profile Studio did not patch config.h value defaults"
+            );
+            assert(
+                updated.includes("// #        define RGB_AUTOMOUSE_GRADIENT_ENABLE"),
+                "Profile Studio did not disable config.h toggle defaults"
+            );
+        } finally {
+            nativeFs.rmSync(tempRoot, {recursive: true, force: true});
+        }
     }
 
     const reusableGroups = model.rgb?.ledGroups || [];

@@ -380,11 +380,14 @@ Use Profile Studio when you want to:
 - choose layer and pointing-mode colors
 - build reusable LED groups by selecting LEDs on the board
 - edit auto-mouse fade settings, combo feedback, and key-behavior feedback
+- configure timing, pointing, RGB Matrix, and RGB feedback defaults from
+  `config.h`
 
 Screenshots:
 [`Layout`](./docs/media/profile-studio/studio-layout-tab.png),
-[`Macros`](./docs/media/profile-studio/studio-macros-tab.png), and
-[`RGB`](./docs/media/profile-studio/studio-rgb-tab.png).
+[`Macros`](./docs/media/profile-studio/studio-macros-tab.png),
+[`RGB`](./docs/media/profile-studio/studio-rgb-tab.png), and
+[`Defaults`](./docs/media/profile-studio/studio-defaults-tab.png).
 
 From VS Code with this repo folder open:
 

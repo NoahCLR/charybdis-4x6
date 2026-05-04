@@ -56,6 +56,68 @@ const KEY_FEEDBACK_BRANCH_CONFIRM_MODES = [
     "KEY_FEEDBACK_BRANCH_CONFIRM_OFF",
     "KEY_FEEDBACK_BRANCH_CONFIRM_NON_BASE_TAPS",
 ];
+const CONFIG_DEFAULT_SECTIONS = [
+    {
+        id: "timing",
+        label: "Timing Defaults",
+        fields: [
+            { macro: "TAPPING_TERM", label: "QMK tapping term", kind: "number", validate: "timing-ms", tooltip: "Controls QMK dual-role keys such as LT() and MT(). Higher values give a press more time to count as a tap before it becomes a hold." },
+            { macro: "COMBO_TERM", label: "Combo term", kind: "number", validate: "timing-ms", tooltip: "Maximum gap between combo member key presses. Higher values make slower chords easier; lower values reduce accidental combo triggers." },
+            { macro: "CUSTOM_TAP_HOLD_TERM", label: "Tap-hold term", kind: "number", validate: "timing-ms", tooltip: "Default tap vs hold boundary for key_behaviors[] rows that leave tap_hold_term empty. Lower values make holds activate sooner." },
+            { macro: "CUSTOM_LONGER_HOLD_TERM", label: "Long hold term", kind: "number", validate: "timing-ms", tooltip: "Default hold vs long-hold boundary for key_behaviors[] rows that leave longer_hold_term empty. Higher values require a longer press for third-tier actions." },
+            { macro: "CUSTOM_MULTI_TAP_TERM", label: "Multi-tap term", kind: "number", validate: "timing-ms", tooltip: "Maximum gap between repeated taps in key_behaviors[] multi-tap branches. Higher values allow slower double/triple taps." },
+            { macro: "CUSTOM_RGB_BRANCH_CONFIRM_TERM", label: "RGB branch-confirm term", kind: "number", validate: "timing-ms", tooltip: "Default visible confirmation window for committed non-base tap branches before their action finishes. Lower values make branch feedback shorter." },
+        ],
+    },
+    {
+        id: "pointing",
+        label: "Pointing Defaults",
+        fields: [
+            { macro: "CHARYBDIS_DRAGSCROLL_DPI", label: "Drag-scroll DPI", kind: "number", validate: "positive-int", tooltip: "Pointer CPI used while dragscroll is active. Higher values make ball movement produce faster scrolling." },
+            { macro: "PD_MODE_VOLUME_DPI", label: "Volume mode DPI override", kind: "number", validate: "nonnegative-int", hint: "0 uses normal pointer DPI", tooltip: "Temporary pointer CPI while volume mode is active. 0 does not mean zero movement; it keeps the normal pointer DPI." },
+            { macro: "PD_MODE_BRIGHTNESS_DPI", label: "Brightness mode DPI override", kind: "number", validate: "nonnegative-int", hint: "0 uses normal pointer DPI", tooltip: "Temporary pointer CPI while brightness mode is active. 0 does not mean zero movement; it keeps the normal pointer DPI." },
+            { macro: "PD_MODE_ZOOM_DPI", label: "Zoom mode DPI override", kind: "number", validate: "nonnegative-int", hint: "0 uses normal pointer DPI", tooltip: "Temporary pointer CPI while zoom mode is active. 0 keeps normal pointer DPI; higher values make ball movement more sensitive in this mode." },
+            { macro: "PD_MODE_ARROW_DPI", label: "Arrow mode DPI override", kind: "number", validate: "nonnegative-int", hint: "0 uses normal pointer DPI", tooltip: "Temporary pointer CPI while arrow mode is active. 0 keeps normal pointer DPI; higher values make directional movement more sensitive." },
+            { macro: "CHARYBDIS_MINIMUM_DEFAULT_DPI", label: "Default DPI minimum", kind: "number", validate: "positive-int", tooltip: "Lowest value in the normal pointer DPI ladder. The configured default DPI steps upward from this base." },
+            { macro: "CHARYBDIS_DEFAULT_DPI_CONFIG_STEP", label: "Default DPI step", kind: "number", validate: "positive-int", tooltip: "Increment between entries in the normal pointer DPI ladder. Higher values make each DPI setting jump farther." },
+            { macro: "CHARYBDIS_MINIMUM_SNIPING_DPI", label: "Sniping DPI minimum", kind: "number", validate: "positive-int", tooltip: "Lowest value in the sniping DPI ladder. Sniping uses this lower-sensitivity range when active." },
+            { macro: "CHARYBDIS_SNIPING_DPI_CONFIG_STEP", label: "Sniping DPI step", kind: "number", validate: "positive-int", tooltip: "Increment between entries in the sniping DPI ladder. Higher values make sniping sensitivity steps farther apart." },
+            { macro: "CHARYBDIS_AUTO_SNIPING_ENABLE", label: "Auto-sniping", kind: "toggle", tooltip: "Enables automatic sniping while the configured sniping layer is active. Disable this if sniping should only be entered manually." },
+            { macro: "CHARYBDIS_AUTO_SNIPING_LAYER", label: "Auto-sniping layer", kind: "layer", validate: "layer", tooltip: "Layer that turns sniping on automatically while active. Changing this moves the auto-sniping trigger to another layer." },
+            { macro: "POINTING_DEVICE_AUTO_MOUSE_ENABLE", label: "Auto-mouse", kind: "toggle", tooltip: "Enables automatic pointer-layer activation from trackball movement. Disable this if pointer movement should not switch layers." },
+            { macro: "AUTO_MOUSE_DEFAULT_LAYER", label: "Auto-mouse layer", kind: "layer", validate: "layer", tooltip: "Layer activated by auto-mouse movement. Changing this chooses which layer appears while the trackball is in use." },
+            { macro: "AUTO_MOUSE_TIME", label: "Auto-mouse timeout", kind: "number", validate: "positive-int", tooltip: "How long auto-mouse stays active after the last pointing movement. Higher values keep the pointer layer active longer." },
+        ],
+    },
+    {
+        id: "rgbMatrix",
+        label: "RGB Matrix Defaults",
+        fields: [
+            { macro: "RGB_MATRIX_DEFAULT_MODE", label: "Default RGB mode", kind: "expression", validate: "identifier", tooltip: "Base QMK RGB Matrix effect used when profile overlays leave LEDs unpainted. Layer colors and feedback can still override it." },
+            { macro: "RGB_MATRIX_DEFAULT_HUE", label: "Default hue", kind: "number", validate: "uint8", tooltip: "Hue channel for the default RGB Matrix color. It affects the base color visible under pass-through layer colors." },
+            { macro: "RGB_MATRIX_DEFAULT_SAT", label: "Default saturation", kind: "number", validate: "uint8", tooltip: "Saturation channel for the default RGB Matrix color. 0 is white/gray; 255 is fully saturated." },
+            { macro: "RGB_MATRIX_MAXIMUM_BRIGHTNESS", label: "Maximum brightness", kind: "number", validate: "uint8", tooltip: "Brightness cap for RGB Matrix output. Lower values reduce LED brightness and current draw." },
+            { macro: "RGB_MATRIX_DEFAULT_VAL", label: "Default value", kind: "expression", validate: "safe-expression", tooltip: "Value/brightness channel for the default RGB Matrix color. This commonly follows the maximum-brightness cap." },
+            { macro: "RGB_MATRIX_LED_FLUSH_LIMIT", label: "LED flush limit", kind: "number", validate: "positive-int", tooltip: "Minimum milliseconds between RGB Matrix LED updates. Higher values reduce CPU/LED update load but make animations less smooth." },
+            { macro: "RGB_MATRIX_TIMEOUT", label: "RGB timeout", kind: "number", validate: "nonnegative-int", tooltip: "Milliseconds of inactivity before RGB Matrix turns off. 0 disables the timeout; higher values keep lighting on longer." },
+        ],
+    },
+    {
+        id: "rgbFeedback",
+        label: "RGB Feedback Defaults",
+        fields: [
+            { macro: "RGB_PD_MODE_FEEDBACK_ENABLE", label: "Pointing-mode feedback", kind: "toggle", tooltip: "Enables the RGB overlay for active pointing modes. Disable this to remove pointing-mode color feedback entirely." },
+            { macro: "RGB_COMBO_FEEDBACK_ENABLE", label: "Combo feedback", kind: "toggle", tooltip: "Enables the RGB overlay shown while combo keys are active. Disable this to remove combo footprint feedback." },
+            { macro: "RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE", label: "Key-behavior feedback", kind: "toggle", tooltip: "Enables RGB feedback for custom key behavior taps, holds, long holds, and tap-count branches. Disable this to remove that stage." },
+            { macro: "RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS", label: "Key feedback flash half-period", kind: "number", validate: "positive-int", tooltip: "Blink half-period for held or repeating key-behavior feedback. Lower values flash faster; higher values flash slower." },
+            { macro: "RGB_AUTOMOUSE_GRADIENT_ENABLE", label: "Auto-mouse gradient", kind: "toggle", tooltip: "Enables the RGB fade that shows auto-mouse approaching timeout. Disable this to remove the timeout fade overlay." },
+            { macro: "AUTOMOUSE_RGB_DEAD_TIME", label: "Auto-mouse RGB dead time", kind: "expression", validate: "safe-expression", tooltip: "Initial part of the auto-mouse timeout before the RGB fade starts. Higher values delay the visible timeout warning." },
+        ],
+    },
+];
+const CONFIG_DEFAULT_FIELD_BY_MACRO = new Map(
+    CONFIG_DEFAULT_SECTIONS.flatMap((section) => section.fields.map((field) => [field.macro, field]))
+);
 const RGB_LAYER_GROUP_ALL = "RGB_LAYER_GROUP_ALL";
 const RGB_PD_MODE_GROUP_ALL = "RGB_PD_MODE_GROUP_ALL";
 const KEY_FEEDBACK_GROUP_ALL = "KEY_FEEDBACK_GROUP_ALL";
@@ -542,6 +604,10 @@ async function handleWebviewMessage(panel, root, message) {
             await patchKeyBehaviorFeedback(root, message.config);
             await postModel(panel, root, "Updated rgb_config.c key behavior feedback.");
             return;
+        case "updateConfigDefaults":
+            await patchConfigDefaults(root, message.fields);
+            await postModel(panel, root, "Updated config.h defaults.");
+            return;
         case "saveRgbReusableLedGroup":
             await saveRgbReusableLedGroup(root, message.group);
             await postModel(panel, root, "Saved rgb_config.c reusable LED group.", { clearedRgbReusableGroupDraft: true });
@@ -612,6 +678,7 @@ async function buildModel(root) {
         }
     };
     const configMacros = safe("configMacros", {}, () => parseConfigMacros(configText));
+    const configDefines = safe("configDefines", {}, () => parseConfigDefineStates(configText));
     const qmkKeycodeCatalog = await loadQmkKeycodeCatalog(root).catch((error) => {
         diagnostics.push(`qmkKeycodes: ${error instanceof Error ? error.message : String(error)}`);
         return fallbackQmkKeycodeCatalog();
@@ -632,6 +699,7 @@ async function buildModel(root) {
             parseMacroTable(keymapText, "HARDCODED_MACROS", "MACRO").map((row) => parseMacroSlot(row, "hardcoded"))
         ),
         behaviorTimingDefaults: safe("behaviorTimingDefaults", {}, () => resolveBehaviorTimingDefaults(configMacros)),
+        configDefaults: safe("configDefaults", [], () => resolveConfigDefaultSections(configDefines)),
         rgb: safe("rgb", {}, () => parseRgbConfig(rgbText, configMacros)),
         qmkKeycodes: qmkKeycodeCatalog.entries,
         qmkKeyLabels: qmkKeycodeCatalog.labels,
@@ -1059,6 +1127,45 @@ function parseConfigMacros(text) {
         }
     }
     return macros;
+}
+
+function parseConfigDefineStates(text) {
+    const states = {};
+    for (const rawLine of String(text || "").split(/\r?\n/)) {
+        const active = rawLine.match(/^\s*#\s*define\s+([A-Z_][A-Z0-9_]*)(?:\s+(.*?))?\s*(?:\/\/.*)?$/);
+        if (active) {
+            states[active[1]] = {
+                defined: true,
+                value: normalizeExpr(active[2] || ""),
+            };
+            continue;
+        }
+
+        const commented = rawLine.match(/^\s*\/\/\s*#\s*define\s+([A-Z_][A-Z0-9_]*)(?:\s+(.*?))?\s*(?:\/\/.*)?$/);
+        if (commented && !states[commented[1]]) {
+            states[commented[1]] = {
+                defined: false,
+                value: normalizeExpr(commented[2] || ""),
+            };
+        }
+    }
+    return states;
+}
+
+function resolveConfigDefaultSections(defines) {
+    return CONFIG_DEFAULT_SECTIONS.map((section) => ({
+        id: section.id,
+        label: section.label,
+        fields: section.fields.map((field) => {
+            const state = defines[field.macro] || {};
+            return {
+                ...field,
+                value: normalizeExpr(state.value || ""),
+                enabled: state.defined === true,
+                present: Boolean(defines[field.macro]),
+            };
+        }),
+    }));
 }
 
 function resolveBehaviorTimingDefaults(macros) {
@@ -1879,6 +1986,154 @@ async function patchKeyBehaviorFeedback(root, config) {
     text = patchFieldInInitializer(text, /key_behavior_feedback_colors\s*=/, ".long_hold_active_color", colors.longHoldActiveColor.expression);
     text = patchFieldInInitializer(text, /key_behavior_feedback_colors\s*=/, ".locality", locality);
     await writeText(filePath, text);
+}
+
+async function patchConfigDefaults(root, fields) {
+    const normalizedFields = normalizeConfigDefaultRequests(fields);
+    if (!normalizedFields.length) {
+        return;
+    }
+
+    const filePath = path.join(root, KEYMAP_CONFIG_RELATIVE_PATH);
+    let text = await fs.readFile(filePath, "utf8");
+    for (const field of normalizedFields) {
+        text = field.kind === "toggle"
+            ? patchConfigToggleMacroInText(text, field.macro, field.enabled)
+            : patchConfigValueMacroInText(text, field.macro, field.value);
+    }
+    await writeText(filePath, text);
+}
+
+function normalizeConfigDefaultRequests(fields) {
+    return (Array.isArray(fields) ? fields : []).map((field) => {
+        const macro = normalizeExpr(field?.macro || "");
+        const descriptor = CONFIG_DEFAULT_FIELD_BY_MACRO.get(macro);
+        if (!descriptor) {
+            throw new Error(`Unsupported config default: ${macro}`);
+        }
+        if (descriptor.kind === "toggle") {
+            return {
+                macro,
+                kind: descriptor.kind,
+                enabled: Boolean(field?.enabled),
+            };
+        }
+        const value = normalizeExpr(field?.value || "");
+        assertConfigDefaultValue(descriptor, value);
+        return {
+            macro,
+            kind: descriptor.kind,
+            value,
+        };
+    });
+}
+
+function assertConfigDefaultValue(descriptor, value) {
+    if (!value) {
+        throw new Error(`${descriptor.label} cannot be empty.`);
+    }
+
+    switch (descriptor.validate) {
+        case "timing-ms":
+            if (!keyBehaviorTimingInRange(value, false)) {
+                throw new Error(`${descriptor.label} must be a positive integer from 1 to ${KEY_BEHAVIOR_TIMING_MAX_MS} ms.`);
+            }
+            return;
+        case "positive-int":
+            if (!/^\d+$/.test(value) || Number(value) <= 0) {
+                throw new Error(`${descriptor.label} must be a positive integer.`);
+            }
+            return;
+        case "nonnegative-int":
+            if (!/^\d+$/.test(value)) {
+                throw new Error(`${descriptor.label} must be zero or a positive integer.`);
+            }
+            return;
+        case "uint8":
+            assertUint8Channel(value, descriptor.label);
+            return;
+        case "identifier":
+            assertSafeIdentifier(value, descriptor.label);
+            return;
+        case "layer":
+            assertSafeIdentifier(value, descriptor.label);
+            if (!value.startsWith("LAYER_")) {
+                throw new Error(`${descriptor.label} must be a LAYER_* identifier.`);
+            }
+            return;
+        case "safe-expression":
+            assertSafeExpression(value, descriptor.label);
+            return;
+        default:
+            assertSafeExpression(value, descriptor.label);
+    }
+}
+
+function patchConfigValueMacroInText(text, macro, value) {
+    const line = findConfigDefineLine(text, macro, false);
+    if (!line) {
+        throw new Error(`Could not find active #define ${macro} in config.h.`);
+    }
+
+    const source = line.text;
+    const match = source.match(new RegExp(`^(\\s*#\\s*define\\s+${escapeRegex(macro)}\\b)(\\s+)([\\s\\S]*)$`));
+    if (!match) {
+        throw new Error(`Could not parse #define ${macro}.`);
+    }
+
+    const code = stripInlineLineComment(source);
+    const valueStart = match[1].length + match[2].length;
+    const valueEnd = code.replace(/\s+$/g, "").length;
+    if (valueEnd < valueStart) {
+        throw new Error(`Could not patch #define ${macro}.`);
+    }
+    return replaceRange(text, line.start + valueStart, line.start + valueEnd, value);
+}
+
+function patchConfigToggleMacroInText(text, macro, enabled) {
+    const line = findConfigDefineLine(text, macro, true);
+    if (!line) {
+        throw new Error(`Could not find #define ${macro} in config.h.`);
+    }
+    if (line.active === enabled) {
+        return text;
+    }
+
+    if (enabled) {
+        const uncommented = line.text.replace(/^(\s*)\/\/\s*/, "$1");
+        return replaceRange(text, line.start, line.end, uncommented);
+    }
+
+    const commented = line.text.replace(/^(\s*)/, "$1// ");
+    return replaceRange(text, line.start, line.end, commented);
+}
+
+function findConfigDefineLine(text, macro, includeCommented) {
+    const activePattern = new RegExp(`^([^\\S\\r\\n]*#\\s*define\\s+${escapeRegex(macro)}\\b[^\\r\\n]*)`, "m");
+    const active = activePattern.exec(text);
+    if (active) {
+        return {
+            start: active.index,
+            end: active.index + active[1].length,
+            text: active[1],
+            active: true,
+        };
+    }
+    if (!includeCommented) {
+        return undefined;
+    }
+
+    const commentedPattern = new RegExp(`^([^\\S\\r\\n]*//\\s*#\\s*define\\s+${escapeRegex(macro)}\\b[^\\r\\n]*)`, "m");
+    const commented = commentedPattern.exec(text);
+    if (!commented) {
+        return undefined;
+    }
+    return {
+        start: commented.index,
+        end: commented.index + commented[1].length,
+        text: commented[1],
+        active: false,
+    };
 }
 
 function normalizeHsvRequest(color, label) {
@@ -4251,6 +4506,41 @@ function getStudioHtml() {
             padding: 10px;
             background: var(--panel-2);
         }
+        .config-default-section {
+            display: grid;
+            gap: 12px;
+        }
+        .config-default-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 10px;
+            align-items: stretch;
+        }
+        .config-default-field {
+            display: grid;
+            grid-template-rows: auto 1fr;
+            gap: 9px;
+            min-width: 0;
+        }
+        .config-default-field-head {
+            display: grid;
+            gap: 3px;
+            min-width: 0;
+        }
+        .config-default-field-title {
+            font-weight: 650;
+        }
+        .config-default-field-hint {
+            color: var(--muted);
+            font-size: 11px;
+        }
+        .config-default-field label {
+            grid-template-rows: auto auto 14px;
+        }
+        .config-default-field .toggle-inline {
+            align-self: end;
+            margin-top: 20px;
+        }
         .behavior-step > summary,
         .collapsible-card > summary {
             cursor: pointer;
@@ -4796,7 +5086,8 @@ function getClientScript() {
     const views = [
         ["layout", "Layout"],
         ["macros", "Macros"],
-        ["rgb", "RGB"]
+        ["rgb", "RGB"],
+        ["defaults", "Defaults"]
     ];
     const headerTooltips = {
         openKeymap: "Open keymap.c beside the studio so you can inspect or hand-edit the source.",
@@ -4808,7 +5099,8 @@ function getClientScript() {
     const viewTooltips = {
         layout: "Edit layer keys and behavior rows using the physical keyboard layout as the filter.",
         macros: "Build and edit VIA macro payloads in keymap.c.",
-        rgb: "Edit rgb_config.c colors, feedback policies, and LED group tables."
+        rgb: "Edit rgb_config.c colors, feedback policies, and LED group tables.",
+        defaults: "Edit config.h timing, pointing, RGB Matrix, and feedback defaults."
     };
     const panelTooltips = {
         Status: "Parser messages, write status, and warnings from the current studio model.",
@@ -4825,7 +5117,11 @@ function getClientScript() {
         "Combo Feedback": "Edit combo feedback color and locality.",
         "Combo Feedback LED Groups": "Inspect combo feedback LED group rows from rgb_config.c.",
         "Key Behavior Feedback": "Edit tap, hold, long-hold, and tap-count branch-confirm colors and policy.",
-        "Key Behavior Feedback LED Groups": "Inspect key-behavior feedback LED group rows from rgb_config.c."
+        "Key Behavior Feedback LED Groups": "Inspect key-behavior feedback LED group rows from rgb_config.c.",
+        "Timing Defaults": "Edit config.h timing defaults used by QMK, combos, and the custom key behavior runtime.",
+        "Pointing Defaults": "Edit config.h pointer DPI, sniping, and auto-mouse defaults.",
+        "RGB Matrix Defaults": "Edit config.h RGB Matrix default mode, color, brightness, flush, and timeout settings.",
+        "RGB Feedback Defaults": "Edit config.h RGB feedback stage toggles and default timing fields."
     };
     const actionTooltips = {
         applyKey: "Stage the selected key value as a pending layout edit.",
@@ -4838,6 +5134,7 @@ function getClientScript() {
         updateAutomouseFade: "Write the auto-mouse fade color and mode back to rgb_config.c.",
         updateComboFeedback: "Write combo feedback color and locality back to rgb_config.c.",
         updateKeyBehaviorFeedback: "Write all key behavior feedback colors and policy fields back to rgb_config.c.",
+        updateConfigDefaults: "Write these default settings back to config.h.",
         saveRgbReusableLedGroup: "Create, update, or rename a reusable RGB_LED_GROUP_* definition in rgb_config.c.",
         deleteRgbReusableLedGroup: "Delete this unused reusable RGB_LED_GROUP_* definition from rgb_config.c.",
         editReusableLedGroup: "Load this reusable LED group into the group editor.",
@@ -4879,6 +5176,7 @@ function getClientScript() {
         "updateAutomouseFade",
         "updateComboFeedback",
         "updateKeyBehaviorFeedback",
+        "updateConfigDefaults",
         "saveRgbReusableLedGroup",
         "deleteRgbReusableLedGroup",
         "addRgbLedGroup",
@@ -4927,6 +5225,9 @@ function getClientScript() {
         leds: "The physical RGB LED indices contained in this group.",
         "led group": "The authored LED group expression in rgb_config.c.",
         color: "The HSV color expression used by this row.",
+        default: "The current value written for this config.h macro.",
+        setting: "The user-facing name for this config.h default.",
+        macro: "The exact config.h #define patched by this control.",
         rgb: "The RGB color and locality associated with this reachable pointing mode.",
         badge: "The small badge shown on the layout preview for this combo.",
         behavior: "The key behavior row attached to this keycode.",
@@ -5662,6 +5963,12 @@ function getClientScript() {
                     tapCommitMode: value(card, "tapCommitMode"),
                     locality: value(card, "locality")
                 }
+            });
+        } else if (action === "updateConfigDefaults") {
+            const section = target.closest("[data-config-section]");
+            post({
+                type: "updateConfigDefaults",
+                fields: readConfigDefaultFields(section)
             });
         } else if (action === "addRgbLedGroup") {
             const form = document.getElementById("rgbGroupBuilder");
@@ -7148,6 +7455,8 @@ function getClientScript() {
         let error = "";
         if (rule === "uint8") {
             error = validateUint8(value, "Enter an integer from 0 to 255.");
+        } else if (rule === "timing-ms") {
+            error = validateMsTermNumber(value, "Enter 1-" + keyBehaviorTimingMaxMs + " ms.", false);
         } else if (rule === "hsv-value") {
             error = validateHsvValue(value);
         } else if (rule === "optional-term") {
@@ -7164,6 +7473,14 @@ function getClientScript() {
             error = validateMacroKeyListInput(value, true);
         } else if (rule === "positive-int") {
             error = validatePositiveInteger(value, "Enter a positive integer.");
+        } else if (rule === "nonnegative-int") {
+            error = validateNonnegativeInteger(value, "Enter zero or a positive integer.");
+        } else if (rule === "identifier") {
+            error = validateIdentifier(value, "Enter a C identifier.");
+        } else if (rule === "layer") {
+            error = validateLayerIdentifier(value);
+        } else if (rule === "safe-expression") {
+            error = validateSafeConfigExpression(value);
         } else if (rule === "macro-payload") {
             error = validateMacroPayload(value);
         }
@@ -7273,6 +7590,27 @@ function getClientScript() {
     function validatePositiveInteger(value, message) {
         if (!/^\\d+$/.test(value)) return message;
         return Number(value) > 0 ? "" : message;
+    }
+
+    function validateNonnegativeInteger(value, message) {
+        return /^\\d+$/.test(value) ? "" : message;
+    }
+
+    function validateIdentifier(value, message) {
+        return /^[A-Z_][A-Z0-9_]*$/.test(value || "") ? "" : message;
+    }
+
+    function validateLayerIdentifier(value) {
+        const identifierError = validateIdentifier(value, "Enter a LAYER_* identifier.");
+        if (identifierError) return identifierError;
+        return String(value || "").startsWith("LAYER_") ? "" : "Enter a LAYER_* identifier.";
+    }
+
+    function validateSafeConfigExpression(value) {
+        if (!value || /[;"{}#\\n\\r]/.test(value)) {
+            return "Enter a safe C expression.";
+        }
+        return "";
     }
 
     function validateMacroPayload(value) {
@@ -7562,6 +7900,7 @@ function getClientScript() {
     function renderActiveView() {
         if (activeView === "macros") return renderMacroStudio();
         if (activeView === "rgb") return renderRgbStudio();
+        if (activeView === "defaults") return renderDefaultsStudio();
         return renderLayerStudio();
     }
 
@@ -8973,6 +9312,91 @@ function getClientScript() {
             name: form?.querySelector("#rgbReusableGroupName")?.value || rgbReusableGroupDraftName,
             ledIndices: rgbSelectedLeds
         };
+    }
+
+    function readConfigDefaultFields(section) {
+        return Array.from(section?.querySelectorAll("[data-config-field]") || []).map((field) => {
+            const macro = field.dataset.macro || "";
+            const kind = field.dataset.kind || "";
+            if (kind === "toggle") {
+                return {
+                    macro,
+                    enabled: Boolean(field.querySelector("input[type='checkbox']")?.checked)
+                };
+            }
+            return {
+                macro,
+                value: field.querySelector("input, select")?.value || ""
+            };
+        });
+    }
+
+    function renderDefaultsStudio() {
+        const sections = model.configDefaults || [];
+        if (!sections.length) {
+            return panel("Defaults", "<p class='muted'>No config.h default fields were parsed.</p>", true);
+        }
+        return "<div class='stack'>" + sections.map(renderConfigDefaultSection).join("") + "</div>";
+    }
+
+    function renderConfigDefaultSection(section) {
+        return "<details class='panel' open>" +
+            "<summary><h2>" + escapeHtml(section.label || "Defaults") + "</h2></summary>" +
+            "<div id='configDefaults-" + escapeAttr(section.id || "") + "' class='panel-body config-default-section' data-dirty-section data-config-section='" + escapeAttr(section.id || "") + "'>" +
+            "<div class='config-default-grid'>" + (section.fields || []).map(renderConfigDefaultField).join("") + "</div>" +
+            "<div class='toolbar'><button type='button' class='primary' data-action='updateConfigDefaults' data-dirty-button>Apply " + escapeHtml(section.label || "defaults") + "</button></div>" +
+            "</div></details>";
+    }
+
+    function renderConfigDefaultField(field) {
+        const tooltip = configDefaultTooltip(field);
+        return "<div class='card config-default-field' data-config-field data-macro='" + escapeAttr(field.macro || "") + "' data-kind='" + escapeAttr(field.kind || "") + "' data-tooltip='" + escapeAttr(tooltip) + "'>" +
+            "<div class='config-default-field-head'>" +
+            "<span class='config-default-field-title'>" + escapeHtml(field.label || field.macro || "Default") + "</span>" +
+            "<code class='muted'>" + escapeHtml(field.macro || "") + "</code>" +
+            (field.hint ? "<span class='config-default-field-hint'>" + escapeHtml(field.hint) + "</span>" : "") +
+            "</div>" +
+            renderConfigDefaultControl(field) +
+            "</div>";
+    }
+
+    function renderConfigDefaultControl(field) {
+        const tooltip = configDefaultTooltip(field);
+        if (field.kind === "toggle") {
+            return "<label class='toggle-inline' data-tooltip='" + escapeAttr(tooltip) + "'>" +
+                "<input type='checkbox' name='" + escapeAttr(field.macro || "") + "'" + (field.enabled ? " checked" : "") + " data-tooltip='" + escapeAttr(tooltip) + "'>" +
+                "<span class='toggle-switch' aria-hidden='true'></span><span class='toggle-label'>enabled</span>" +
+                "</label>";
+        }
+        if (field.kind === "layer") {
+            let layers = layersForUi().map((layer) => [layer.name, layer.name]);
+            const fieldValue = field.value || layers[0]?.[0] || "";
+            if (fieldValue && !layers.some(([value]) => value === fieldValue)) {
+                layers = [[fieldValue, fieldValue + " (missing)"]].concat(layers);
+            }
+            return "<label data-tooltip='" + escapeAttr(tooltip) + "'><span>default</span><select name='" + escapeAttr(field.macro || "") + "' data-validate='layer' data-tooltip='" + escapeAttr(tooltip) + "'>" + optionsWithLabels(layers, fieldValue) + "</select></label>";
+        }
+        const validate = configDefaultValidationRule(field);
+        const inputMode = configDefaultInputMode(field);
+        return "<label data-tooltip='" + escapeAttr(tooltip) + "'><span>default</span><input name='" + escapeAttr(field.macro || "") + "' value='" + escapeAttr(field.value || "") + "' spellcheck='false' data-tooltip='" + escapeAttr(tooltip) + "'" +
+            (inputMode ? " inputmode='" + escapeAttr(inputMode) + "'" : "") +
+            (validate ? " data-validate='" + escapeAttr(validate) + "'" : "") +
+            "></label>";
+    }
+
+    function configDefaultTooltip(field) {
+        return field.tooltip || ("Edits " + (field.macro || "this config.h macro") + " in config.h.");
+    }
+
+    function configDefaultValidationRule(field) {
+        if (field.validate === "timing-ms") return "timing-ms";
+        if (["positive-int", "nonnegative-int", "uint8", "identifier", "safe-expression", "layer"].includes(field.validate)) return field.validate;
+        return "";
+    }
+
+    function configDefaultInputMode(field) {
+        if (["timing-ms", "positive-int", "nonnegative-int", "uint8"].includes(field.validate)) return "numeric";
+        return "";
     }
 
     function renderRgbStudio() {

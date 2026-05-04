@@ -17,6 +17,7 @@ const defaultViews = [
     {id: "layout", label: "Layout", fileName: "studio-layout-tab.png"},
     {id: "macros", label: "Macros", fileName: "studio-macros-tab.png"},
     {id: "rgb", label: "RGB", fileName: "studio-rgb-tab.png"},
+    {id: "defaults", label: "Defaults", fileName: "studio-defaults-tab.png"},
 ];
 
 async function main() {

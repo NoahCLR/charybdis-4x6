@@ -3,7 +3,7 @@
 Charybdis Profile Studio is a repo-local VS Code extension for editing this
 userspace visually. It is meant for the authored profile parts of the repo:
 layout keys, layers, combos, behavior rows, VIA macros, RGB colors, and LED
-feedback tables.
+feedback tables, and profile-level defaults from `config.h`.
 
 The Studio does not create a separate profile format. The C files stay the
 source of truth, and every apply action patches those authored source blocks
@@ -29,6 +29,7 @@ reload the Studio and it will parse the current source again.
 - [Layout tab](../../docs/media/profile-studio/studio-layout-tab.png)
 - [Macros tab](../../docs/media/profile-studio/studio-macros-tab.png)
 - [RGB tab](../../docs/media/profile-studio/studio-rgb-tab.png)
+- [Defaults tab](../../docs/media/profile-studio/studio-defaults-tab.png)
 
 ## How To Open It
 
@@ -104,6 +105,15 @@ hold feedback.
 
 The LED group builder lets you select physical LED indices on the board and
 write either reusable groups or one-off inline group rows.
+
+## Defaults Tab
+
+Use the Defaults tab for `config.h` defaults that are not already owned by the
+Layout or RGB authoring flows.
+
+It edits timing defaults, pointing-device DPI and auto-mouse defaults, RGB
+Matrix defaults, and RGB feedback stage toggles directly in `config.h`.
+Per-mode DPI overrides show that `0` keeps the normal pointer DPI.
 
 ## Key Picker
 

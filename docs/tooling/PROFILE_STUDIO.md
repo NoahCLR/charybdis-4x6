@@ -24,6 +24,9 @@ For the shorter user-facing guide and screenshot links, see
 - staged layer add/delete changes; applying them updates the layer enum in
   `config.h`, transparent `keymaps[][]` blocks in `keymap.c`, and random
   default `layer_colors[]` rows in `rgb_config.c`
+- `config.h` defaults that are not already owned by the layer structure or RGB
+  color authoring flows, including timing, pointing DPI, auto-mouse, RGB Matrix,
+  and RGB feedback stage settings
 - `layer_colors[]`
 - `pd_mode_colors[]`
 - reusable `RGB_LED_GROUP_*` definitions near the LED map in `rgb_config.c`,
@@ -46,7 +49,7 @@ For the shorter user-facing guide and screenshot links, see
   active layout
 - appended simple `key_behaviors[]` rows
 
-The UI is split into Layout, Macros, and RGB work areas. The Layout
+The UI is split into Layout, Macros, RGB, and Defaults work areas. The Layout
 panel embeds selected-key behavior editing: if a key on the active layer has an
 authored `key_behaviors[]` row, the behavior appears there, including when a key
 is later changed to an existing behavior-owned keycode.
@@ -111,6 +114,12 @@ layer target first and then selecting the tap key. Read-only controls are styled
 separately from editable controls.
 Behavior timing override fields show the resolved default milliseconds in their
 placeholder text when the authored row leaves the override empty.
+The Defaults page writes the corresponding `config.h` default macros directly,
+so those placeholders follow the saved profile defaults after reload.
+Per-mode DPI override fields label `0` as the normal pointer DPI fallback
+instead of presenting it as a literal zero-DPI mode.
+Defaults controls have field-specific tooltips that describe the firmware
+behavior they influence and the practical effect of changing the value.
 Numeric-only fields such as HSV hue/saturation channels, timing overrides, and
 repeat-Hz values are validated inline before the studio sends a write request;
 the extension validates the request again before patching the backing `.c`
@@ -163,7 +172,7 @@ so it runs in the current workspace instead of an Extension Development Host.
 After reload, use the `$(keyboard) Profile Studio` status bar item or run
 `Charybdis: Open Profile Studio` from the command palette.
 The command is also contributed to the editor title when `keymap.c` or
-`rgb_config.c` is open.
+`config.h` or `rgb_config.c` is open.
 
 You can also install it from a shell, from the repo root:
 
@@ -196,7 +205,7 @@ npm run screenshots
 ```
 
 The script renders the real Studio webview model in headless Chrome and writes
-the Layout, Macros, and RGB PNGs to `docs/media/profile-studio/`. The default
+the Layout, Macros, RGB, and Defaults PNGs to `docs/media/profile-studio/`. The default
 capture width is a wide desktop viewport so the Charybdis layout is not
 cropped. Override it with:
 
