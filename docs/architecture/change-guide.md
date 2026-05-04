@@ -68,7 +68,7 @@ source manifest, build wiring, or generated firmware input changed.
 For documentation and layout changes, check for old package names:
 
 ```sh
-rg -n 'key/runtime/core|key/runtime/effects|key/runtime/interaction\.h|key/interaction|state/runtime|split_runtime_sync\.(c|h)|lib/state/runtime|#include "(core/|effects/)' users/noah tests docs keyboards/bastardkb/charybdis/4x6/keymaps/noah
+rg -n 'key/runtime/core|key/runtime/effects|key/runtime/interaction\.h|key/interaction|state/runtime|split_runtime_sync\.(c|h)|lib/state/runtime|#include "(core/|effects/)' users/noah tests docs keyboards/bastardkb/charybdis/4x6/keymaps/noah -g '!docs/architecture/change-guide.md'
 ```
 
 Review matches in historical review folders separately. Closed review folders

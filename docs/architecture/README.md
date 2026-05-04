@@ -1,18 +1,32 @@
 # Userspace Architecture
 
-This is the maintainer and agent entry point for the userspace architecture.
-The root `README.md` stays focused on end-user setup and profile behavior; this
-directory explains how the firmware runtime is shaped and where changes belong.
+This is the maintainer and agent entry point for the userspace architecture. It
+is for changes that touch runtime ownership, source layout, QMK integration,
+split sync, RGB rendering, profile tooling, or the tests that enforce those
+contracts.
 
-The source trace for this pack covers:
+The root `README.md` stays focused on user-facing setup and profile behavior.
+The generated `docs/KEYMAP-OVERVIEW.md` shows the current authored profile.
+This directory explains how the runtime is shaped and where changes belong.
 
-- `users/noah/source_manifest.mk`
-- `users/noah/runtime_init.c`
-- `users/noah/hooks.c`
-- every package under `users/noah/lib/`
-- the authored profile files under
-  `keyboards/bastardkb/charybdis/4x6/keymaps/noah/`
-- the repo-local profile tooling under `tools/`
+## How To Use This Pack
+
+- Start with this file when you need the ownership model.
+- Use [source-map.md](./source-map.md) when you need to find the right package
+  or understand what a tool writes.
+- Use [change-guide.md](./change-guide.md) when you know the behavior you want
+  to change and need the edit point plus checks.
+- Use [runtime-flow.md](./runtime-flow.md) when a bug crosses press/release,
+  scan, RGB, pointing-device, split, or macro boundaries.
+
+The source trace covers:
+
+- firmware entry and build wiring in `users/noah/source_manifest.mk`,
+  `users/noah/runtime_init.c`, and `users/noah/hooks.c`
+- runtime packages under `users/noah/lib/`
+- authored profile files under `keyboards/bastardkb/charybdis/4x6/keymaps/noah/`
+- repo-local profile tooling under `tools/`
+- generated documentation/media surfaces under `docs/`
 - host test runners under `tests/host/`
 
 ## Mental Model

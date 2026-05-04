@@ -26,7 +26,7 @@ source trace because they rewrite or verify human-facing firmware docs.
 | --- | --- | --- | --- |
 | `tools/profile_introspect.py` | Parse authored profile inputs and render the generated visual profile report | `docs/KEYMAP-OVERVIEW.md`, SVG assets under `docs/media/profile-introspection/` | `python3 tools/profile_introspect.py --check`, `run_profile_introspection_checks.sh`, full host suite |
 | `tools/via_to_qmk_layout.py` | Convert VIA export JSON back into source-owned keymap blocks | optionally `keymap.c` `VIA_MACROS(MACRO)` and `keymaps[][]` | script preview/write review, real-profile validation, full host suite when source changes |
-| `tools/charybdis-profile-studio/` | VS Code webview editor for current authored profile surfaces | keymap `config.h`, `keymap.c`, and `rgb_config.c` | `npm run check`, profile introspection, authored-profile and RGB checks after source edits |
+| `tools/charybdis-profile-studio/` | VS Code webview editor for current authored profile surfaces and generated Studio screenshots | keymap `config.h`, `keymap.c`, `rgb_config.c`; screenshot PNGs under `docs/media/profile-studio/` | `npm run check`, `npm run screenshots` for screenshot refresh, profile introspection, authored-profile and RGB checks after source edits |
 
 ## Source-To-Doc Matrix
 

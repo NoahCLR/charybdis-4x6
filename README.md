@@ -425,6 +425,8 @@ profile output:
 
 ```sh
 python3 tools/profile_introspect.py --write
+python3 tools/profile_introspect.py --check
+sh tests/host/run_profile_introspection_checks.sh
 ```
 
 ## Docs Map
@@ -441,6 +443,12 @@ Use the docs based on what you want to change:
   does once active
 - [`docs/RGB_CONFIG.md`](./docs/RGB_CONFIG.md): RGB authoring model, render
   order, LED groups, and auto-mouse fade
+- [`docs/ADDING_PD_MODE.md`](./docs/ADDING_PD_MODE.md): maintainer guide for
+  adding another pointing-device mode
+- [`docs/KEY_RUNTIME.md`](./docs/KEY_RUNTIME.md): maintainer map of the
+  handled-key runtime and ownership model
+- [`docs/HOOK_OVERRIDES.md`](./docs/HOOK_OVERRIDES.md): how to override QMK
+  hooks without dropping shared userspace behavior
 - [`docs/tooling/PROFILE_STUDIO.md`](./docs/tooling/PROFILE_STUDIO.md):
   Profile Studio workflow
 - [`docs/tooling/PROFILE_INTROSPECT.md`](./docs/tooling/PROFILE_INTROSPECT.md):

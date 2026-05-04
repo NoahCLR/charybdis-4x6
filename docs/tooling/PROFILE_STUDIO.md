@@ -14,6 +14,9 @@ There is no sidecar profile format. The extension parses the existing C
 authoring blocks, renders a VS Code webview, and applies narrow source patches
 back to the same blocks.
 
+For the shorter user-facing guide and screenshot links, see
+[`tools/charybdis-profile-studio/README.md`](../../tools/charybdis-profile-studio/README.md).
+
 ## Current Edit Surfaces
 
 - `keymaps[][]` layer keycode slots through a physical SVG board based on the
@@ -162,10 +165,10 @@ After reload, use the `$(keyboard) Profile Studio` status bar item or run
 The command is also contributed to the editor title when `keymap.c` or
 `rgb_config.c` is open.
 
-You can also install it from a shell:
+You can also install it from a shell, from the repo root:
 
 ```sh
-cd /Users/noah/dev/charybdis/charybdis-4x6/tools/charybdis-profile-studio
+cd tools/charybdis-profile-studio
 npm run install:local
 ```
 
