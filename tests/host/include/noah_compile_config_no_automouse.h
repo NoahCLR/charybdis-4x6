@@ -1,0 +1,23 @@
+#pragma once
+
+#include "noah_compile_config.h"
+
+#ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
+#    undef POINTING_DEVICE_AUTO_MOUSE_ENABLE
+#endif
+
+#ifdef AUTO_MOUSE_DEFAULT_LAYER
+#    undef AUTO_MOUSE_DEFAULT_LAYER
+#endif
+
+#ifdef AUTO_MOUSE_TIME
+#    undef AUTO_MOUSE_TIME
+#endif
+
+#ifdef RGB_AUTOMOUSE_GRADIENT_ENABLE
+#    undef RGB_AUTOMOUSE_GRADIENT_ENABLE
+#endif
+
+#ifdef AUTOMOUSE_RGB_DEAD_TIME
+#    undef AUTOMOUSE_RGB_DEAD_TIME
+#endif

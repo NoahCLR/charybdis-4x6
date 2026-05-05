@@ -11,11 +11,6 @@
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
-// Built-in QMK dual-role keys are still used in a few places, most notably
-// MT(MOD_LSFT, KC_CAPS). Favor the hold path for that key as soon as another
-// key is pressed so Shift chords beat the tap-side Caps Lock more reliably.
-#define HOLD_ON_OTHER_KEY_PRESS_PER_KEY
-
 // ─── Split keyboard sync ───────────────────────────────────────────────────
 //
 // The Charybdis 4x6 is a split keyboard — each half has its own MCU.
@@ -44,6 +39,23 @@
 #    endif
 #    define SPLIT_ACTIVITY_ENABLE
 
+// Register the custom split RPCs for:
+// - base runtime-visible state (automouse / pd / preview)
+// - combo feedback locality
+// - truthful key-feedback semantics and tap branch state
+// - mirrored VIA dynamic-keymap writes
+// so both halves render layer-owned RGB from the same runtime and keymap data.
+#    define SPLIT_TRANSACTION_IDS_USER PUT_SPLIT_RUNTIME_BASE_SYNC, PUT_SPLIT_COMBO_FEEDBACK_SYNC, PUT_SPLIT_KEY_FEEDBACK_SEMANTIC_SYNC, PUT_SPLIT_KEY_FEEDBACK_BRANCH_SYNC, PUT_VIA_KEYMAP_SYNC
+
+// Dynamic key-local placement for PD-mode RGB overlays.
+// Required only when a pd_mode_colors[] row uses RGB_KEY_HALF or
+// RGB_KEYS_ONLY.
+// Comment out RGB_PD_MODE_ACTIVE_HALF_ENABLE to keep the split runtime packet
+// smaller and limit PD overlays to fixed left/right/both placement modes.
+#    ifdef POINTING_DEVICE_ENABLE
+#        define RGB_PD_MODE_ACTIVE_HALF_ENABLE
+#    endif
+
 #endif // SPLIT_KEYBOARD
 
 // ─── RGB hardware geometry ──────────────────────────────────────────────────
@@ -69,12 +81,6 @@
 
 #ifdef POINTING_DEVICE_ENABLE
 
-// Register a custom split RPC transaction for syncing pointing device
-// state (auto-mouse RGB progress + mode flags) from master to slave.
-#    ifdef SPLIT_KEYBOARD
-#        define SPLIT_TRANSACTION_IDS_USER PUT_PD_SYNC
-#    endif
-
 // Keep split-pointing polling at the 1 ms cadence QMK already defaults to.
 // Higher values ease transport/main-loop pressure, but trade away responsiveness.
 #    undef POINTING_DEVICE_TASK_THROTTLE_MS
@@ -88,4 +94,63 @@
 #    define MOUSE_EXTENDED_REPORT
 #    define WHEEL_EXTENDED_REPORT
 
+// Hi-res scroll: each scroll unit = 1/120th of a notch.
+#    define POINTING_DEVICE_HIRES_SCROLL_ENABLE
+#    define POINTING_DEVICE_HIRES_SCROLL_MULTIPLIER 120
+
+// Shared idle-noise filter for tiny trackball motion seen while the board is
+// otherwise untouched. This exists for the transparent trackball setup here:
+// the sensor can occasionally emit a small mouse report even when the board is
+// idle. These mini reports are not noticeable during normal use, but they can
+// keep RGB activity alive and delay sleep.
+//
+// Comment out the enable define to compile this path out entirely. Leave it
+// off if your sensor is clean and produces no idle noise at all.
+//
+// IDLE_MS:
+//   Short quiet gap required before a tiny report can be treated as noise.
+// ARM_IDLE_MS:
+//   Longer "really idle" window before the filter is allowed to start
+//   suppressing tiny reports.
+// ABS_MAX:
+//   Maximum total absolute motion still considered idle noise.
+#    define NOAH_POINTING_IDLE_NOISE_SUPPRESSION_ENABLE
+#    define NOAH_POINTING_IDLE_NOISE_SUPPRESSION_IDLE_MS 1000
+#    define NOAH_POINTING_IDLE_NOISE_SUPPRESSION_ARM_IDLE_MS 300000
+#    define NOAH_POINTING_IDLE_NOISE_SUPPRESSION_ABS_MAX 2
+
+// Local drag-scroll tuning (DPI for the scroll speed lives in the keymap config).
+// The repo-owned NOAH_DRAGSCROLL_* surface controls the local gesture handler.
+//   Thresholds     = start moving one axis intentionally before it scrolls
+//   Divisors       = counts per emitted scroll unit
+//   Start ratio    = dominance needed to begin a one-axis gesture
+//   Sustain ratio  = looser dominance needed to keep the gesture on one axis
+//   Lock timeout   = pause window that ends the current gesture
+#    define NOAH_DRAGSCROLL_REVERSE_Y
+#    define NOAH_DRAGSCROLL_THRESHOLD_H 2
+#    define NOAH_DRAGSCROLL_THRESHOLD_V 3
+#    define NOAH_DRAGSCROLL_DIVISOR_H 6
+#    define NOAH_DRAGSCROLL_DIVISOR_V 8
+#    define NOAH_DRAGSCROLL_RATE_LIMIT_MS 8
+#    define NOAH_DRAGSCROLL_BUFFER_EXPIRE_MS 80
+#    define NOAH_DRAGSCROLL_LOCK_START_RATIO_NUM 7
+#    define NOAH_DRAGSCROLL_LOCK_START_RATIO_DEN 4
+#    define NOAH_DRAGSCROLL_LOCK_SUSTAIN_RATIO_NUM 5
+#    define NOAH_DRAGSCROLL_LOCK_SUSTAIN_RATIO_DEN 4
+#    define NOAH_DRAGSCROLL_LOCK_TIMEOUT_MS 55
+#    define NOAH_DRAGSCROLL_CROSS_AXIS_DECAY_DIVISOR 4
+
 #endif // POINTING_DEVICE_ENABLE
+
+// ─── VIA ────────────────────────────────────────────────────────────────────
+
+#ifdef VIA_ENABLE
+#    define DYNAMIC_KEYMAP_LAYER_COUNT LAYER_COUNT
+#    define DYNAMIC_KEYMAP_MACRO_COUNT 64
+// RP2040 wear-leveling exposes half of this backing region as logical EEPROM.
+// 32768 bytes backing gives this keymap roughly 15 KB of VIA macro payload
+// space after VIA's dynamic layer storage.
+#    if defined(MCU_RP)
+#        define WEAR_LEVELING_BACKING_SIZE 32768
+#    endif
+#endif

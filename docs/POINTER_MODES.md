@@ -1,12 +1,13 @@
 # Pointer Modes
 
-This file explains the raw behavior of the pointing-device modes after a mode
-is active.
+This doc explains what the pointing-device modes do after a mode is active,
+regardless of how that mode was entered.
 
-It does not describe the current keymap's physical placement, tap / hold
-gestures, or double-tap actions. Those are authored separately in `keymap.c`
-and described at a higher level in [INTERACTION_MODEL.md](./INTERACTION_MODEL.md)
-and the top-level [README](../README.md).
+It is about shared mode behavior, not the current keymap's physical placement,
+tap / hold gestures, or profile-specific double-tap actions. For the current
+authored choices, see [KEYMAP.md](./KEYMAP.md). For the shared tap / hold /
+multi-tap model, see [INTERACTION_MODEL.md](./INTERACTION_MODEL.md) and the
+top-level [README](../README.md).
 
 ## Shared Rules
 
@@ -15,23 +16,40 @@ Across the current pd-mode runtime:
 - an active mode can transform trackball motion
 - some modes also intercept key events while active
 - unlocked modes are exclusive while held: the newest active mode wins
-- locked modes are exclusive: locking one mode clears the others
-- the first active mode in `pd_modes[]` provides the active motion handler
+- locked modes are exclusive: activating or locking a different mode clears the
+  previous lock
+- pressing the same runtime-handled mode key while that mode is locked clears
+  the lock immediately, then behaves as a normal momentary hold until release
 - active modes can render a mode-specific RGB overlay
 
 One important non-rule:
 
-- auto-sniping is not a pd mode
+- auto-sniping is not a pd mode; it is layer state whose CPI change is applied
+  by the shared scan-time DPI policy
 
-The current keymap enables sniping from `LAYER_NAV`, but that is a separate
-layer-driven rule rather than part of any mode definition here.
+## Pointer-Layer Policy
+
+The shared pointer-layer policy is separate from the raw mode handlers, but it
+changes how the modes feel in practice.
+
+- non-arrow modes can keep the configured auto-mouse layer anchored while
+  active or locked
+- when `ARROW_MODE` is not active, the auto-mouse layer is allowed to overlap
+  other active keyboard layers instead of being forced off underneath them,
+  except for the configured auto-sniping layer, which keeps precedence over a
+  separate auto-mouse layer
+- `ARROW_MODE` prefers staying on the current typing or navigation surface
+  instead of forcing the pointer layer back underneath it
+- this policy follows pd-mode state itself, so it behaves the same whether the
+  mode was entered by a plain mode key, an authored `key_behaviors[]` row, or
+  a lock action
 
 ## Mode Reference
 
 | Mode | Raw behavior | Notable side effects |
 | --- | --- | --- |
-| `DRAGSCROLL` | trackball motion becomes scrolling instead of cursor movement | enables Charybdis dragscroll while active |
-| `PINCH_MODE` | same scroll path as `DRAGSCROLL`, but with `Cmd` held as a weak modifier | enables dragscroll and holds left `Cmd` while active |
+| `DRAGSCROLL` | trackball motion becomes scrolling instead of cursor movement | uses the local dragscroll handler while active |
+| `PINCH_MODE` | same scroll path as `DRAGSCROLL`, but with an owned real left `Cmd` hold | uses the local dragscroll handler and holds left `Cmd` while active |
 | `ZOOM_MODE` | vertical trackball motion sends `Cmd+=` / `Cmd+-` taps | no dragscroll; explicit keyboard zoom |
 | `ARROW_MODE` | dominant trackball motion emits arrow key taps instead of moving the cursor | repurposes mouse buttons for selection/copy/paste |
 | `VOLUME_MODE` | vertical trackball motion changes system volume in steps | no extra side effects |
@@ -44,10 +62,12 @@ layer-driven rule rather than part of any mode definition here.
 While active:
 
 - the cursor stays frozen
-- trackball motion is routed through Charybdis dragscroll
+- trackball motion is routed through the shared local dragscroll handler
 - forward / backward motion becomes vertical scrolling
-- horizontal motion can still contribute to horizontal scroll if the firmware
-  dragscroll path allows it
+- the handler uses a sticky single-axis gesture model, so near-diagonal motion
+  waits for one axis to win instead of emitting both axes together
+- horizontal motion can still contribute to horizontal scroll when the host
+  surface accepts horizontal wheel input
 
 This is the base mode that scroll-like modes build on.
 
@@ -58,8 +78,8 @@ This is the base mode that scroll-like modes build on.
 While active:
 
 - the cursor stays frozen
-- Charybdis dragscroll is enabled
-- left `Cmd` is held as a weak modifier
+- the same local dragscroll handler as `DRAGSCROLL` is active
+- left `Cmd` is held through the same owned real-mod path as other runtime modifiers
 - the ball is effectively producing command-scroll input
 
 On macOS, [BetterMouse](https://better-mouse.com/) can turn that
@@ -90,6 +110,9 @@ While active:
 - the cursor stays frozen
 - dominant horizontal motion emits left / right arrow taps
 - dominant vertical motion emits up / down arrow taps
+- horizontal arrow taps keep held modifiers such as `Alt` intact
+- vertical arrow taps temporarily mask held `Alt` modifiers so up / down stay
+  plain
 
 It also remaps mouse buttons while active:
 
@@ -121,4 +144,3 @@ While active:
 - one vertical direction brightens
 - the other dims
 - motion is accumulated and emitted in discrete steps
-

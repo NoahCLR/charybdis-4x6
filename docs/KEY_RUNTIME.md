@@ -1,0 +1,309 @@
+# Key Runtime
+
+This document is the maintainer-facing map for the handled-key runtime under
+[`users/noah/lib/key/`](../users/noah/lib/key/).
+
+Use this when you are changing runtime behavior, tests, or debug surfaces. For
+the wider userspace architecture, start with
+[architecture/README.md](./architecture/README.md) and
+[architecture/runtime-flow.md](./architecture/runtime-flow.md). For user-facing
+semantics, see [INTERACTION_MODEL.md](./INTERACTION_MODEL.md). For the authored
+profile, see [KEYMAP.md](./KEYMAP.md).
+
+## How To Use This Doc
+
+Use this as a routing map when a behavior bug crosses press, release, scan,
+ownership, split, or RGB feedback boundaries.
+
+Skip this file for ordinary profile edits. If you are changing what one key,
+combo, macro, layer, or RGB table does, start with `keymap.c`,
+`rgb_config.c`, [INTERACTION_MODEL.md](./INTERACTION_MODEL.md), or
+[RGB_CONFIG.md](./RGB_CONFIG.md) instead. Runtime changes should usually land
+only after the authored-data path is not enough.
+
+## Current Shape
+
+The key runtime is now a single-authority reducer-owned system.
+
+- Authored behavior resolution starts in `key/behavior/`.
+- Reducer-owned state now lives in `key/runtime/reducer/`, with planning,
+  projection, queue mechanics, slot helpers, and core trace helpers split into
+  adjacent role-based packages.
+- `users/noah/lib/key/runtime/` is now thin orchestration around reducer entry
+  points, effect transport, and QMK hook integration.
+- Long-lived external ownership still lives in the dedicated registries under
+  `state/ownership/` and `key/ownership/`.
+- The reducer-owned code uses the `key_runtime_core_*` symbol family.
+
+The legacy slot reducers, slot result transport, slot/index shared state, and
+stub-backed mixed-runtime host surfaces were removed during the full cutover.
+
+## Reducer Packages vs Integration
+
+The key runtime now lives under one permanent tree, but that tree still has
+two architectural layers.
+
+- [`users/noah/lib/key/runtime/reducer/`](../users/noah/lib/key/runtime/reducer/)
+  is the reducer/state-owner layer. It holds the canonical runtime state,
+  ownership mechanics, and read-only state query surface.
+- [`users/noah/lib/key/runtime/planning/`](../users/noah/lib/key/runtime/planning/)
+  owns release, scan, tap-series, and effect-plan construction.
+- [`users/noah/lib/key/runtime/projection/`](../users/noah/lib/key/runtime/projection/)
+  applies planned effects to QMK-facing registries and captures projection
+  snapshots.
+- [`users/noah/lib/key/runtime/queue/`](../users/noah/lib/key/runtime/queue/)
+  owns pending-release queue mechanics.
+- [`users/noah/lib/key/runtime/slot/`](../users/noah/lib/key/runtime/slot/)
+  owns packed key-position and slot interaction helpers.
+- The top-level files in
+  [`users/noah/lib/key/runtime/`](../users/noah/lib/key/runtime/) are the
+  QMK-facing integration layer. They own process/scan entry flow, preflight,
+  effect-plan transport, and trace/debug adapters.
+- The old slot/index runtime is no longer a live production subsystem. Release
+  semantics now live behind the core release planner instead of a `slot/`
+  helper.
+
+So when you see both layers, read that as "decision layer plus integration
+layer," not "old runtime plus new runtime running side by side."
+
+## Design Rules
+
+- Runtime authority is by physical key position, not by the keycode currently
+  visible on the active layer.
+- `key_runtime_core` is the only source of truth for active presses, tap series,
+  reducer-owned leases, persistent lock intents, pending release dispatches,
+  and shadow projection state.
+- The runtime plans effects first and projects them second. Runtime logic does
+  not reach into QMK side effects ad hoc.
+- Authored behavior remains keymap-owned. Shared runtime policy remains under
+  `users/noah/`.
+
+## Main Components
+
+| File | Responsibility |
+| --- | --- |
+| [`handled_key.h`](../users/noah/lib/key/behavior/handled_key.h), [`handled_key_lookup.c`](../users/noah/lib/key/behavior/handled_key_lookup.c), [`handled_key_materialize.c`](../users/noah/lib/key/behavior/handled_key_materialize.c) | Resolve authored behavior into `handled_key_resolution_t` and materialize it into runtime interaction contracts. |
+| [`slot/slot_interaction.h`](../users/noah/lib/key/runtime/slot/slot_interaction.h) | Shared interaction contract cached by the reducer after authored behavior materialization. |
+| [`reducer/runtime.h`](../users/noah/lib/key/runtime/reducer/runtime.h), [`reducer/runtime.c`](../users/noah/lib/key/runtime/reducer/runtime.c) | Single-authority runtime state type, reducer entry points, press/tap orchestration, and scan orchestration. |
+| [`planning/effect_plan.h`](../users/noah/lib/key/runtime/planning/effect_plan.h), [`planning/effect_plan.c`](../users/noah/lib/key/runtime/planning/effect_plan.c) | Internal effect-plan initialization, sink buffering, append helpers, tap-commit feedback filtering, and release-plan transfer shared by planning modules. |
+| [`projection/feedback_projection.h`](../users/noah/lib/key/runtime/projection/feedback_projection.h), [`projection/feedback_projection.c`](../users/noah/lib/key/runtime/projection/feedback_projection.c) | Feedback pulse projection and pulse queueing for key-runtime effects. |
+| [`reducer/ownership_state.h`](../users/noah/lib/key/runtime/reducer/ownership_state.h), [`reducer/ownership_state.c`](../users/noah/lib/key/runtime/reducer/ownership_state.c) | Reducer-owned lease and persistent-intent mechanics, shadow projection recomputation, held/repeat feedback visibility queries, and lock observation updates over `key_runtime_core_state_t` storage. |
+| [`projection/pd_projection.h`](../users/noah/lib/key/runtime/projection/pd_projection.h), [`projection/pd_projection.c`](../users/noah/lib/key/runtime/projection/pd_projection.c) | Key-runtime PD projection for held-action preemption, PD lock-tap effects, and explicit lock-state requests; actual PD mode state remains PD-runtime-owned. |
+| [`queue/pending_release_queue.h`](../users/noah/lib/key/runtime/queue/pending_release_queue.h), [`queue/pending_release_queue.c`](../users/noah/lib/key/runtime/queue/pending_release_queue.c) | Pending-release queue mechanics: allocation, ordering, drain snapshots, and released-token pending-emission markers over `key_runtime_core_state_t` storage. |
+| [`projection/projection.h`](../users/noah/lib/key/runtime/projection/projection.h), [`projection/projection.c`](../users/noah/lib/key/runtime/projection/projection.c) | Runtime effect execution into QMK-facing registries, pending-release dispatch projection, projection snapshot capture/comparison, and trace projection checkpoints. |
+| [`planning/release_planner.h`](../users/noah/lib/key/runtime/planning/release_planner.h), [`planning/release_planner.c`](../users/noah/lib/key/runtime/planning/release_planner.c) | Shared release decision contract, active-release resolution, pending multi-tap release resolution, and release effect planning. |
+| [`planning/scan_planner.h`](../users/noah/lib/key/runtime/planning/scan_planner.h), [`planning/scan_planner.c`](../users/noah/lib/key/runtime/planning/scan_planner.c) | Scan-time active hold promotion, release-hold-pending marking, fallback hold settlement, and pending multi-tap scan planning over core state. |
+| [`reducer/state_query.h`](../users/noah/lib/key/runtime/reducer/state_query.h), [`reducer/state_query.c`](../users/noah/lib/key/runtime/reducer/state_query.c) | Core state inspection and blocker-query surface for debug, feedback, projection snapshots, preflight, and deferred-release transport. |
+| [`planning/tap_series.h`](../users/noah/lib/key/runtime/planning/tap_series.h), [`planning/tap_series_flush.c`](../users/noah/lib/key/runtime/planning/tap_series_flush.c) | Internal tap-series helpers for pending multi-tap flush resolution, branch-confirm delayed action windows, delayed action completion, and foreign/global multi-tap flush planning. |
+| [`deferred_release.h`](../users/noah/lib/key/runtime/deferred_release.h), [`deferred_release.c`](../users/noah/lib/key/runtime/deferred_release.c) | Adapter that defers blocked release dispatch effects into the core pending-release queue and drains queued dispatches after release/scan execution. |
+| [`keyboard_mod_policy.h`](../users/noah/lib/state/modifiers/keyboard_mod_policy.h), [`keyboard_mod_policy.c`](../users/noah/lib/state/modifiers/keyboard_mod_policy.c) | Shared modifier snapshot, filtering, preservation-window, masked-emit, action-replay, and real-mod masking policy used by action dispatch, key-runtime processing, tap-series capture, deferred release, and PD mode modifier masking. |
+| [`process.c`](../users/noah/lib/key/runtime/process.c) | `process_record_user()` entry flow, preflight ordering, release-keycode recovery, and non-handled release finalization. |
+| [`preflight.c`](../users/noah/lib/key/runtime/preflight.c) | Cross-key interruption and default-suppression work before the current press proceeds, while unrelated pending multi-tap chains stay position-owned until timeout or same-key reuse. |
+| [`press.c`](../users/noah/lib/key/runtime/press.c), [`release.c`](../users/noah/lib/key/runtime/release.c), [`scan.c`](../users/noah/lib/key/runtime/scan.c) | Thin press/release/scan orchestration around reducer-owned effect plans. |
+| [`transition.c`](../users/noah/lib/key/runtime/transition.c), [`transition.h`](../users/noah/lib/key/runtime/transition.h) | Effect-plan transport between reducer decisions and concrete effect projection through `projection/projection.c`. |
+| [`planning/effect.h`](../users/noah/lib/key/runtime/planning/effect.h), [`planning/effect_queue.h`](../users/noah/lib/key/runtime/planning/effect_queue.h) | Shared runtime effect vocabulary and queue helper. |
+| [`held_action.c`](../users/noah/lib/key/ownership/held_action.c), [`held_repeat.c`](../users/noah/lib/key/ownership/held_repeat.c), [`layer_ownership.c`](../users/noah/lib/state/ownership/layer_ownership.c), [`keyboard_mod_ownership.c`](../users/noah/lib/state/ownership/keyboard_mod_ownership.c) | External ownership registries projected by runtime effects. |
+| [`pd_mode_key_runtime_bridge.h`](../users/noah/lib/pointing/runtime/pd_mode_key_runtime_bridge.h), [`pd_mode_key_runtime_bridge.c`](../users/noah/lib/pointing/runtime/pd_mode_key_runtime_bridge.c) | Narrow PD-to-key-runtime observer bridge for changed local PD lock state. |
+| [`runtime_debug.h`](../users/noah/lib/state/diagnostics/runtime_debug.h), [`runtime_reset.h`](../users/noah/lib/state/shared/runtime_reset.h), [`runtime_trace.h`](../users/noah/lib/state/diagnostics/runtime_trace.h) | Public debug, reset, and tracing seams used by host tests and runtime diagnostics. |
+
+## Reducer-Owned State
+
+`key_runtime_core` owns these runtime shapes:
+
+- `press_token_t`: immutable press identity plus live phase, authored
+  interaction contract, and release-time facts for one physical key.
+- `tap_series_t`: pending multi-tap chain state separated from the active press
+  lifetime.
+- `lease_t`: reducer-owned temporary ownership for layers, modifiers, held
+  actions, repeats, pd modes, and pointer anchors. Slots are stored in
+  `key_runtime_core_state_t` and managed by `reducer/ownership_state.c`.
+- `persistent_intent_t`: lock-like state that survives a single press lifetime,
+  such as layer locks, pd-mode locks, and pointer toggles. Slots are stored in
+  `key_runtime_core_state_t` and managed by `reducer/ownership_state.c`.
+- `pending_release_t`: deferred release dispatches that must drain in authored
+  order after blockers clear. Slots are stored in `key_runtime_core_state_t`
+  and managed by `queue/pending_release_queue.c`.
+- `key_runtime_core_shadow_projection_t`: reducer-owned projected view used by
+  blocking queries, debug snapshots, and overlap reasoning.
+
+If a future change needs new runtime state, it belongs in `key_runtime_core` unless
+it is purely an external ownership registry or a stateless authored-behavior
+helper.
+
+Pending multi-tap state is owned by `tap_series_t` inside `key_runtime_core`,
+while pending multi-tap release decisions are owned by
+`planning/release_planner.c`.
+Do not add a second state machine for multi-tap sequencing; new behavior should
+extend the core reducer and its release/scan planning tests.
+
+## Ownership Authority Map
+
+Runtime ownership is intentionally split between reducer-owned intent and
+QMK-facing applied registries. Use these labels when changing runtime behavior:
+
+- Authoritative: the source of truth for key-runtime decisions.
+- Projected: an applied registry or hardware-facing state sink updated from
+  reducer effects.
+- Compatibility-only: a bridge that repairs or normalizes upstream QMK/fork
+  behavior without becoming key-runtime ownership truth.
+
+| Runtime fact | Authoritative owner | Projected or compatibility surface | Write direction and guardrail |
+| --- | --- | --- | --- |
+| Physical press identity and active key phase | `press_token_t` in `key_runtime_core` | debug and trace snapshots | Physical events are observed into core first; other registries must not create or mutate press tokens. Covered by key runtime scenario, release matrix, and integration harness tests. |
+| Pending multi-tap chain state | `tap_series_t` in `key_runtime_core` | `planning/tap_series_flush.c` plans explicit flushes; `planning/scan_planner.c` owns scan-time thresholds; release planner reads the state | Core stores the chain; `planning/tap_series_flush.c` flushes expired or foreign chains, `planning/scan_planner.c` resolves scan-time hold/flush outcomes, and `planning/release_planner.c` resolves release decisions over it. Covered by release matrix, scenario, runtime debug, and integration harness tests. |
+| Release semantics | `planning/release_planner.c` | `deferred_release.c` adapts blocked dispatches into the core pending-release queue | Planner owns quick release, fallback suppression, buffered base tap, active releases, and pending multi-tap releases; adapters must not re-decide those semantics. |
+| Pending release dispatch queue | `pending_release_t` slots in `key_runtime_core`, with mechanics in `queue/pending_release_queue.c` | `deferred_release.c`, `release.c`, and `scan.c` drain through the adapter | Queue storage stays core-owned because blockers are press-token facts; `queue/pending_release_queue.c` owns allocation, ordering, drain snapshots, and pending-emission token cleanup. Covered by release matrix and runtime debug tests. |
+| Runtime inspection and blocker queries | `key_runtime_core_state_t` read through `reducer/state_query.c` | `debug.c`, `feedback.c`, projection snapshots, preflight, and deferred release transport | Query code reads reducer-owned state and reports derived facts; it must not mutate press, tap, lease, or pending-release storage. Covered by runtime debug, release matrix, scenario, trace, and integration harness tests. |
+| Temporary held ownership intent for held actions, repeats, momentary layers, managed modifiers, pd holds, and pointer anchors | `lease_t` in `key_runtime_core`, with mechanics in `reducer/ownership_state.c` | `held_action.c`, `held_repeat.c`, `layer_ownership.c`, `keyboard_mod_ownership.c`, `pd_mode_state.c`, and pointer layer policy | `projection/projection.c` writes outward from planned effects; applied registries perform QMK, action, repeat, layer, modifier, or pd-mode side effects. Those registries must not mint independent key-runtime leases. |
+| Lock-like runtime intent | `persistent_intent_t` in `key_runtime_core`, with mechanics in `reducer/ownership_state.c` | `layer_ownership.c` and `pd_mode_state.c` apply the actual layer or pd-mode lock | Current accepted bridge points are `layer_ownership_set_lock_state()` and `pd_mode_key_runtime_bridge_observe_local_lock_state()`, which update external state and then refresh core shadow state. `run_feature_gate_compile_tests.sh` enforces those bridge directions. Treat new two-way lock writes as architecture work, not local fixes. |
+| Physical keyboard modifier observation and replay filtering | QMK live modifier state plus `keyboard_mod_ownership.c` physical refcounts; `keyboard_mod_policy.c` owns shared snapshot/filter/replay helpers and preservation windows | core shadow projection stores physical and managed masks for overlap reasoning | `process.c` observes physical modifier events and preflight may suppress default release; action dispatch, delayed action replay, tap-series capture, deferred release, and PD mode modifier masking use `keyboard_mod_policy.h` instead of local snapshot/filter/preserve logic. QMK remains the live report sink. Covered by keyboard mod ownership, action dispatch, delayed action, modifier-hold, and PD-mode integration tests. |
+| PD runtime local, display, remote, and split state | `pd_mode_state.c` and split sync runtime | key-runtime leases and persistent intents request local pd behavior | Key runtime may request PD transitions through projected effects; PD runtime owns actual mode state and snapshots. Changed local PD lock state is observed into core through `pd_mode_key_runtime_bridge.c`. |
+| Feedback pulse lifecycle | feedback pulse fields in `key_runtime_core` | `projection/feedback_projection.c`, `key_feedback_pulse_observe()`, and RGB/split feedback snapshots | Core state remains authoritative; `projection/feedback_projection.c` queues key-runtime pulse effects and feedback/RGB surfaces render the projection. Covered by runtime debug, split sync, and RGB render tests. |
+| Combo origin recovery | `compat/qmk_combo_origin.c` plus `origin_registry.c` | key runtime, PD mode, RGB, and split feedback consume normalized origins | Compatibility-only. It repairs QMK combo records and origin bitmaps; it must not become an owner of key-runtime press, lease, or release state. Covered by combo origin, PD mode, RGB render, split sync, and real profile integration tests. |
+
+When a future change needs to touch both core state and one of the projected
+registries, update the core plan first and project outward through an explicit
+effect or bridge. If the projected registry has to write back into core, document
+the bridge here and cover it with projection or ownership tests in the same pass.
+
+## Combo Origin Compatibility Contract
+
+`compat/qmk_combo_origin.c` is a QMK/fork adapter, not a runtime authority. It
+exists because QMK combo records can arrive as `COMBO_EVENT` at `(0,0)`, while
+userspace needs the physical owner key and full combo footprint for runtime
+feedback, PD owner bitmaps, RGB combo feedback, and split sync.
+
+This adapter is allowed to mirror only the QMK combo facts needed to repair that
+origin:
+
+- live physical member key state observed before combo normalization
+- `key_combos[]` and `noah_combo_count`
+- QMK active/disabled combo state, including the `EXTRA_SHORT_COMBOS` state-bit
+  representation
+- combo keycode lookup through `COMBO_ONLY_FROM_LAYER` or `combo_ref_from_layer`
+- active and pending combo-output caches needed when QMK emits the combo record
+  after member release
+- fallback owner recovery from the latest or last physical combo member, using a
+  full-keyboard bitmap when no exact footprint can be proven
+
+It must not create or mutate key-runtime press tokens, tap series, release
+decisions, leases, layer locks, modifier ownership, or PD mode ownership. Its
+only handoff into the runtime ownership model is the normalized event key and
+origin bitmap stored in `origin_registry.c`.
+
+Coverage for this contract lives in `run_qmk_combo_origin_tests.sh`: reference
+layer lookup, stable combo owner selection, active and pending combo bitmaps,
+pending output after member release, cached release footprints, cross-half
+combos, three-key combos, duplicate-output combo union, reset behavior, and
+preview/PD owner partitioning for RGB underlay/overlay feedback.
+
+## End-To-End Flow
+
+### 1. Physical key event entry
+
+[`process.c`](../users/noah/lib/key/runtime/process.c)
+observes every physical event into `key_runtime_core` first.
+
+That observation step gives the reducer position-stable press/release identity
+before any QMK path, macro path, or pd-mode path narrows the event.
+
+### 2. Preflight
+
+[`preflight.c`](../users/noah/lib/key/runtime/preflight.c)
+does the cross-key work that must happen before the current press resolves:
+
+- suppress default modifier handling when ownership requires it
+- interrupt other active handled keys on foreign press
+- leave unrelated pending multi-tap chains live until their own timeout or
+  same-key continuation resolves them
+
+Behavior change note: the preflight path changed on `2026-04-20`. Before that
+change, a foreign press explicitly flushed unrelated pending multi-tap chains.
+The current runtime intentionally keeps those chains position-owned until they
+resolve themselves. If that behavior changes later, treat it as a regression
+unless the tests and docs are updated together; the locking checks are
+`sh tests/host/run_key_runtime_scenario_tests.sh` and
+`sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`.
+
+### 3. Press routing
+
+Handled presses go through [`press.c`](../users/noah/lib/key/runtime/press.c),
+which asks `key_runtime_core` for a press effect plan and executes it through
+[`transition.c`](../users/noah/lib/key/runtime/transition.c) and
+[`projection/projection.c`](../users/noah/lib/key/runtime/projection/projection.c).
+
+The reducer owns:
+
+- press-token creation and replacement
+- same-key multi-tap reuse
+- foreign active-key interruption
+- independent pending-multi-tap retention across foreign presses
+- same-locked-pd-mode unlock requests before momentary held-action registration
+- press-time lease activation
+
+### 4. Release routing
+
+Handled releases go through [`release.c`](../users/noah/lib/key/runtime/release.c).
+The reducer resolves release by physical key position, not by the raw release
+keycode currently visible to QMK.
+
+The release path now owns:
+
+- active release resolution
+- pending-multi-tap release resolution
+- release-time lease cleanup
+- suppression of release-time fallback or lock retoggle after a same-mode pd
+  lock was consumed on press
+- pending release dispatch queueing
+- token retirement and pending-series seeding
+
+Non-handled releases still pass through the shared process flow, but
+`process.c` now finalizes any reducer-owned observed state for
+those keys too. That keeps raw ownership keys such as `MO()`/modifier/pd-mode
+keys from leaving stale core leases behind.
+
+### 5. Scan
+
+[`scan.c`](../users/noah/lib/key/runtime/scan.c) asks
+`key_runtime_core` for the current scan plan and then drains pending release
+dispatches.
+
+The reducer scan path owns:
+
+- threshold hold and long-hold promotion through `planning/scan_planner.c`
+- pending multi-tap expiry and delayed action flush through `planning/scan_planner.c`
+- scan-time release blocker clearing
+
+## Debugging Expectations
+
+When you inspect runtime state, prefer the core debug surface:
+
+- `key_runtime_core_press_token_at(...)`
+- `key_runtime_core_tap_series_at(...)`
+- `key_runtime_core_projection_snapshot_capture()`
+- `key_runtime_core_shadow_projection()`
+
+Do not reintroduce slot/index mirrors for debug convenience. If a debug view is
+missing, add it to the core surface.
+
+## Verification
+
+Use the current runners that match the current core-owned runtime:
+
+- `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_key_runtime_integration_harness_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_runtime_trace_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+## Non-Goals
+
+This runtime no longer preserves the old slot/index internal shapes as API.
+The maintained contracts are user-visible behavior, overlap correctness, and
+the reducer-owned debug/projection surfaces described above.

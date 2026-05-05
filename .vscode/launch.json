@@ -1,0 +1,14 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Run Charybdis Profile Studio",
+            "type": "extensionHost",
+            "request": "launch",
+            "args": [
+                "--extensionDevelopmentPath=${workspaceFolder}/tools/charybdis-profile-studio",
+                "${workspaceFolder}"
+            ]
+        }
+    ]
+}

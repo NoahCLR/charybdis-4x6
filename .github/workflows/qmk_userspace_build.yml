@@ -52,6 +52,11 @@ jobs:
           ref: ${{ inputs.qmk_ref || 'master' }}
           submodules: recursive
 
+      - name: Configure Git safe directories
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE/qmk_firmware"
+
       - name: Configure QMK CLI
         run: |
           qmk config userspace_compile.parallel=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null)

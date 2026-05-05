@@ -4,6 +4,15 @@
 # full ruleset for the current Charybdis keymap, including feature toggles and
 # reusable runtime sources.
 
+NOAH_USERSPACE_ROOT := $(if $(QMK_USERSPACE),$(QMK_USERSPACE),$(abspath $(USER_PATH)/../..))
+NOAH_PROFILE_VALIDATION_RESULT := $(shell log="$$(mktemp "$${TMPDIR:-/tmp}/noah-profile-validation.XXXXXX")"; cd "$(NOAH_USERSPACE_ROOT)" && sh tests/host/run_real_profile_validation_tests.sh >"$$log" 2>&1; status=$$?; if [ $$status -ne 0 ]; then cat "$$log" >&2; echo failed; fi; rm -f "$$log")
+
+ifeq ($(strip $(NOAH_PROFILE_VALIDATION_RESULT)),failed)
+    $(error Noah authored profile validation failed; run `sh tests/host/run_real_profile_validation_tests.sh`)
+endif
+
+include $(USER_PATH)/source_manifest.mk
+
 # VIA support: enables runtime key remapping via the VIA desktop app.
 VIA_ENABLE = yes
 
@@ -13,33 +22,15 @@ COMBO_ENABLE = yes
 # Link-time optimization: reduces binary size.
 LTO_ENABLE = yes
 
-SRC += noah.c
-SRC += lib/split_role.c
-SRC += lib/key/key_behavior_lookup.c
-SRC += lib/key/key_runtime.c
-SRC += lib/key/key_runtime_process.c
-SRC += lib/key/key_runtime_scan.c
-SRC += lib/key/delayed_action.c
-SRC += lib/key/held_action.c
-SRC += lib/action/action_dispatch.c
-SRC += lib/action/macro_dispatch.c
-SRC += lib/macro/macro_payload.c
-SRC += lib/key/multi_tap_engine.c
-SRC += lib/state/keyboard_mod_state.c
+SRC += $(NOAH_COMMON_SOURCES)
 
 ifeq ($(strip $(POINTING_DEVICE_ENABLE)), yes)
-    SRC += lib/pointing/pointing_device_runtime.c
-    SRC += lib/pointing/pd_mode_key_runtime.c
-    SRC += lib/pointing/pd_mode_state.c
-    SRC += lib/pointing/pd_mode_registry.c
-    SRC += lib/pointing/pointer_layer_policy.c
-    SRC += lib/pointing/pointing_device_mode_handlers.c
-    SRC += lib/state/pd_shared_state.c
+    SRC += $(NOAH_POINTING_SOURCES)
 endif
 
 ifeq ($(strip $(RGB_MATRIX_ENABLE)), yes)
-    SRC += lib/rgb/rgb_runtime.c
-    SRC += lib/rgb/rgb_automouse.c
+    SRC += $(NOAH_AUTOMOUSE_SOURCES)
+    SRC += $(NOAH_RGB_KEYMAP_SOURCES)
 endif
 
 # Split role override: build with FORCE_MASTER=yes or FORCE_SLAVE=yes

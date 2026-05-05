@@ -8,3 +8,10 @@ CompileFlags:
       -D__has_include*,
       -D__has_include_next*,
     ]
+If:
+
+  PathMatch: .*keymap\.c
+
+InlayHints:
+
+  Designators: false

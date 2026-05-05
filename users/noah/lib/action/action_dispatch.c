@@ -2,66 +2,80 @@
 // Action Dispatch
 // ────────────────────────────────────────────────────────────────────────────
 
-#include QMK_KEYBOARD_H // QMK
+#include QMK_KEYBOARD_H // IWYU pragma: keep
 
-#ifdef VIA_ENABLE
-#    include "dynamic_keymap.h"
-#endif
-
-#include "noah_keymap.h"
-#include "../pointing/pointing_device_modes.h"
-#include "../state/pd_shared_state.h"
+#include "action_lifecycle.h"
+#include "synthetic_record.h"
+#include "../key/runtime/api.h"
+#include "../state/modifiers/keyboard_mod_policy.h"
 #include "action_dispatch.h"
 
-static uint8_t locked_layer = 0;
+typedef void (*noah_emit_tap_fn_t)(uint16_t keycode);
+typedef void (*noah_emit_tap_at_fn_t)(keypos_t key_pos, uint16_t keycode);
 
-bool action_dispatch_is_layer_lock(uint16_t action) {
-    return action >= LAYER_LOCK_BASE && action < LAYER_LOCK_BASE + LAYER_COUNT;
+static void noah_emit_run(uint16_t keycode, noah_emit_tap_fn_t emit, noah_emit_policy_t policy) {
+    keyboard_mod_state_t saved_mod_state = {0};
+
+    if (policy.settle_pending_fallback_holds) {
+        noah_key_runtime_settle_pending_fallback_hold();
+    }
+
+    if (policy.preserve_keyboard_mod_state) {
+        saved_mod_state = keyboard_mod_policy_begin_preserve_all();
+    }
+
+    emit(keycode);
+
+    if (policy.preserve_keyboard_mod_state) {
+        keyboard_mod_policy_end_preserve_all(saved_mod_state);
+    }
 }
 
-bool action_dispatch_is_macro(uint16_t action) {
-    return (action >= MACRO_0 && action <= MACRO_15) || IS_QK_MACRO(action);
+static void noah_emit_run_at(keypos_t key_pos, uint16_t keycode, noah_emit_tap_at_fn_t emit, noah_emit_policy_t policy) {
+    keyboard_mod_state_t saved_mod_state = {0};
+
+    if (policy.settle_pending_fallback_holds) {
+        noah_key_runtime_settle_pending_fallback_hold();
+    }
+
+    if (policy.preserve_keyboard_mod_state) {
+        saved_mod_state = keyboard_mod_policy_begin_preserve_all();
+    }
+
+    emit(key_pos, keycode);
+
+    if (policy.preserve_keyboard_mod_state) {
+        keyboard_mod_policy_end_preserve_all(saved_mod_state);
+    }
 }
 
-bool action_dispatch_layer_is_locked(uint8_t layer) {
-    return locked_layer == layer;
+void noah_emit_action_tap(uint16_t action, noah_emit_policy_t policy) {
+    noah_emit_run(action, noah_action_tap, policy);
+}
+
+void noah_emit_action_tap_at(keypos_t key_pos, uint16_t action, noah_emit_policy_t policy) {
+    noah_emit_run_at(key_pos, action, noah_action_tap_at, policy);
+}
+
+void noah_emit_synthetic_qmk_tap(uint16_t keycode, noah_emit_policy_t policy) {
+    noah_emit_run(keycode, noah_dispatch_synthetic_qmk_tap, policy);
+}
+
+void noah_emit_synthetic_qmk_tap_with_masked_keyboard_mods(uint16_t keycode, uint8_t masked_mods, bool settle_pending_fallback_holds) {
+    if (settle_pending_fallback_holds) {
+        noah_key_runtime_settle_pending_fallback_hold();
+    }
+
+    keyboard_mod_state_t saved_mod_state = keyboard_mod_policy_begin_masked_emit(masked_mods);
+
+    noah_dispatch_synthetic_qmk_tap(keycode);
+    keyboard_mod_policy_end_masked_emit(saved_mod_state);
+}
+
+void noah_emit_literal_tap(uint16_t keycode, noah_emit_policy_t policy) {
+    noah_emit_run(keycode, tap_code16, policy);
 }
 
 void action_dispatch(uint16_t action) {
-    if (action_dispatch_is_layer_lock(action)) {
-        uint8_t layer = action - LAYER_LOCK_BASE;
-
-        if (locked_layer == layer) {
-            layer_off(layer);
-            locked_layer = 0;
-        } else {
-            if (locked_layer) {
-                layer_off(locked_layer);
-            }
-            layer_on(layer);
-            locked_layer = layer;
-        }
-        return;
-    }
-
-    if (is_pd_mode_lock_action(action)) {
-        const pd_mode_def_t *def = pd_mode_lock_action_lookup(action);
-        if (def && pd_mode_toggle_lock_state(def->mode_flag)) {
-            pd_shared_state_sync();
-        }
-        return;
-    }
-
-#ifdef VIA_ENABLE
-    if (IS_QK_MACRO(action)) {
-        dynamic_keymap_macro_send((uint8_t)(action - QK_MACRO));
-        return;
-    }
-#endif
-
-    if (macro_dispatch(action)) {
-        return;
-    }
-
-    tap_code16(action);
+    noah_emit_action_tap(action, NOAH_EMIT_POLICY_SETTLE_FALLBACK_HOLDS);
 }

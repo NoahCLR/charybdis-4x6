@@ -1,11 +1,13 @@
 # Interaction Model
 
-This userspace has a custom key-behavior engine.
+This document explains the shared interaction semantics supported by the
+`noah` userspace.
 
-The point of that engine is simple: one authored keycode can do more than one
-thing, and the rules are consistent enough that the board stays usable.
-
-This document is a description of what the keys actually do and why those behaviors are useful.
+It is about the interaction model, not the current physical layout, exact
+bindings, or profile-specific timing tweaks. For the visual snapshot, see
+[KEYMAP-OVERVIEW.md](./KEYMAP-OVERVIEW.md). For the current authored profile,
+see [KEYMAP.md](./KEYMAP.md). For the maintainer-facing runtime map behind
+these semantics, see [KEY_RUNTIME.md](./KEY_RUNTIME.md).
 
 ## What The Engine Adds
 
@@ -18,255 +20,286 @@ between:
 - single tap through quintuple tap
 - hold styles that fire at different times
 
-That is what makes these behaviors possible:
+Each tap-count branch can define its own:
 
-- arrow keys that cover character, word, and line movement
-- thumb layer keys that also lock layers and control media
-- number and punctuation keys that expose shifted symbols on hold
-- pointer-mode keys that can lock, mute, or branch into another mode
+- tap action
+- hold tier
+- longer-hold tier
+- hold style
 
-## Default Timing
+That makes patterns like these possible:
 
-The default timing values come from the active keymap `config.h`:
+- a navigation key that covers character, word, and line movement
+- a thumb key that combines momentary layer access, persistent layer changes,
+  and media actions
+- a number or punctuation key that exposes shifted symbols on hold
+- a pointer-mode key that stays simple by default or grows richer tap /
+  double-tap behavior
 
-- `CUSTOM_TAP_HOLD_TERM = 150`
-- `CUSTOM_LONGER_HOLD_TERM = 400`
-- `CUSTOM_MULTI_TAP_TERM = 150`
-- `TAPPING_TERM = 200` for built-in QMK dual-role keys such as `LT()` and `MT()`
+Plain keys without an authored row keep their normal QMK behavior.
 
-Those are only the global defaults. Individual `key_behaviors[]` rows can
-override them with:
+## Timing Model
+
+Default timing lives in the active keymap
+[`config.h`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h).
+That keymap chooses:
+
+- `TAPPING_TERM` for built-in QMK dual-role keys such as `LT()` and `MT()`
+- `CUSTOM_TAP_HOLD_TERM`
+- `CUSTOM_LONGER_HOLD_TERM`
+- `CUSTOM_MULTI_TAP_TERM`
+- `CUSTOM_RGB_BRANCH_CONFIRM_TERM`
+
+Individual `key_behaviors[]` rows can override those defaults with:
 
 - `.tap_hold_term`
 - `.longer_hold_term`
 - `.multi_tap_term`
+- `.rgb_branch_confirm_term`
+- `.skip_rgb_branch_confirm`
 
-If one of those fields is omitted, C zero-initializes it. A value of `0` means
-"use the default timing for this row."
+For the scalar timing fields, omission means C zero-initializes the field and a
+value of `0` means "use the default timing for this row." That includes
+`rgb_branch_confirm_term`: omitting it or setting it to `0` uses
+`CUSTOM_RGB_BRANCH_CONFIRM_TERM`. To turn that RGB feedback window off for one
+row, set `.skip_rgb_branch_confirm = true`.
 
 In plain terms:
 
-- quick release before `150 ms` is treated as a tap
-- crossing `150 ms` can trigger the hold behavior
-- crossing `400 ms` can trigger the longer-hold behavior
-- repeated taps must stay within `150 ms` of each other to remain part of the same sequence
+- a quick release before the tap-hold term is treated as a tap
+- crossing the tap-hold term can trigger the hold tier
+- crossing the longer-hold term can promote to the longer-hold tier
+- repeated taps must stay within the multi-tap term to remain part of the same
+  sequence
+- once a double-tap or higher branch is committed, the RGB branch-confirm term
+  can hold the model in that committed branch before the tap, hold, or long-hold
+  action fires
 
-One practical consequence: a single tap on a multi-tap key is delayed by one multi-tap window so the firmware can tell whether you meant one tap or more.
+Foreign-key interruption only cancels the quick tap for true momentary-layer
+taps. Other authored hold families, such as press-registering modifier holds
+and pd-mode lock gestures, keep their own release contract instead of borrowing
+the momentary-layer interrupt rule.
 
-One important nuance: inside `key_behaviors[]`, omitted `.tap_hold_term`
+For runtime-handled pd-mode keys, pressing the same mode that is currently
+locked consumes that lock on press. The physical key still registers its normal
+momentary hold, so the mode stays active while the key remains down and
+deactivates on release. That unlock press does not later reopen the key's tap
+fallback or re-toggle the lock on release. Explicit `*_LOCK` actions remain
+normal tap actions and keep their toggle semantics.
+
+Immediate-hold keys still remember that another physical key overlapped them,
+but that overlap fact is separate from momentary-layer cancellation. Its job is
+narrower: once an immediate-hold key was actually used in an overlap, release
+must not reopen the key's quick-release tap or first-tap multi-tap path.
+
+One practical consequence is that a single tap on a multi-tap key is delayed by
+one multi-tap window so the firmware can tell whether you meant one tap or
+more. The base single-tap branch skips the branch-confirm feedback window; that
+extra window is only for double-tap and higher committed branches when the
+authored RGB config enables it.
+
+Tap actions are release-settled. Reaching a tap-count branch on press selects
+the candidate branch, but `TAP_SENDS(...)` is selected by release or pending
+tap-series expiry, then emitted after any enabled branch-confirm feedback
+window. For terminal tap-only multi-tap branches, this means the final press can
+identify the branch before the action has actually been sent.
+
+Those pending multi-tap windows are tracked per physical key. Pressing a
+different key does not flush an unrelated pending tap series by itself, so
+independent keys can keep separate tap counts and timing windows alive at the
+same time.
+
+Behavior change note: this per-key pending-series retention became the intended
+contract on `2026-04-20`. Older runtime policy flushed an unrelated pending
+multi-tap series as soon as a different key was pressed. If independent
+simultaneous tap sequences stop working again, treat that as a regression
+against this document and re-run
+`sh tests/host/run_key_runtime_scenario_tests.sh` plus
+`sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`.
+
+One important nuance: inside `key_behaviors[]`, an omitted `.tap_hold_term`
 inherits `TAPPING_TERM` for `LT()` rows, but `CUSTOM_TAP_HOLD_TERM` for other
 custom rows.
 
-## The Three Hold Modes
+## Normal Tap And Hold Fallbacks
 
-The important detail is that not every hold behaves the same way.
+An authored row does not automatically replace everything about a key.
+
+- if `.tap` is omitted for a tap-count branch, that branch keeps the key's
+  normal tap behavior
+- `KC_TRNS` inside any authored action helper is transparent for that field:
+  tap fields use the lower active layer's tap output, while hold and long-hold
+  fields use the lower active layer's same-tier behavior and mode-owned
+  metadata
+- if `.tap` is present but `.hold` and `.long_hold` are both omitted, keys
+  that already have a default held path keep using it for that branch
+- stacked pd-mode rows are the exception: when a first-tap override and a
+  later tap-count hold can enter a different pd mode, the first pd mode waits
+  until the hold threshold instead of activating while the tap count is still
+  unresolved
+- once `.hold` or `.long_hold` is authored for that branch, the normal held
+  fallback is no longer used for that branch
+
+In practice, the common families look like this:
+
+- ordinary keys such as `KC_A` can keep their normal held-key behavior when
+  only the tap is overridden
+- `KC_TRNS` keeps the current row's timing and multi-tap branching, but the
+  lower key still owns the actual transparent field behavior; for hold and
+  long-hold fields that includes helper mode and mode-owned metadata such as
+  lower momentary-layer or pd-mode ownership
+- `LT()` rows keep their normal momentary layer hold when only the tap is
+  overridden
+- plain pd-mode keycodes keep their default momentary mode hold when only the
+  tap is overridden
+- pd-mode keys whose tap path can branch into another pd mode defer the lower
+  mode until hold threshold so the two mode lifecycles cannot overlap during
+  tap disambiguation
+- keycodes without a default held path, such as most custom keycodes, do not
+  invent one just because a tap override exists
+
+## The Four Hold Modes
+
+Not every hold behaves the same way.
 
 ### `PRESS_AND_HOLD_UNTIL_RELEASE`
 
-The alternate action becomes active at the hold threshold and stays active until you let go.
+The alternate action becomes active at the hold threshold and stays active
+until you let go.
 
-Actual examples:
+Use this when the action should feel immediate and remain active while the key
+is held, such as:
 
-- hold `1` -> `!`
-- hold `2` -> `@`
-- hold `-` -> `_`
-- hold `Enter` -> `Shift+Enter`
-- hold the second tap of `7` -> keep `KC_MNXT` held
-- hold the second tap of `8` -> keep `KC_MPRV` held
+- a shifted symbol that should repeat naturally
+- a media or navigation action that should stay registered while held
+- a momentary layer hold
+- a momentary pointing-device mode hold
 
-Why it is useful:
+### `REPEAT_WHILE_HELD`
 
-- shifted symbols feel immediate
-- held symbols can repeat naturally
-- media next/previous can be held on the final tap instead of only tapped once
+The alternate action fires once at the hold threshold, then keeps firing at the
+authored repeat rate until you let go.
 
-For media keys, the exact result of holding `KC_MNXT` or `KC_MPRV` depends on the app:
+Use this when the action should behave like repeated taps rather than one held
+registration, such as:
 
-- some players treat it as repeated next/previous
-- some treat it more like scan / fast-forward / rewind
+- repeated left click or other mouse-button spam
+- repeated navigation taps
+- repeated media or macro triggers that should stop immediately on release
 
-The important point is that the userspace does not only give you "next song". It also gives you a held version of that media action on keys like `7`, `8`, and the higher-tap thumb gestures.
+Authored repeat rates are currently limited to `1..100 Hz`, with a maximum of
+`100` repeats per second.
 
 ### `TAP_AT_HOLD_THRESHOLD`
 
 The alternate action fires once as soon as the threshold is crossed.
 
-Actual examples:
+Use this when the action should happen as soon as the user has committed to the
+hold, such as:
 
-- double-tap-hold `MO(LAYER_SYM)` -> lock `LAYER_NUM`
-- double-tap-hold `MO(LAYER_NAV)` -> lock `LAYER_NUM`
-- double-tap-hold `/` -> lock `LAYER_NAV`
-- long hold `Esc` -> `Alt+Cmd+Esc`
-- long hold `Left Arrow` on `LAYER_NAV` -> `Cmd+Left`
-- long hold `Right Arrow` on `LAYER_NAV` -> `Cmd+Right`
-
-Why it is useful:
-
-- layer locks happen as soon as you commit to them
-- one-shot system shortcuts do not wait for release
-- a key can escalate cleanly from "hold" to "long hold"
+- a persistent layer or mode change
+- a one-shot system shortcut
+- a key that should escalate cleanly from hold to longer hold
 
 ### `TAP_ON_RELEASE_AFTER_HOLD`
 
-Nothing fires at the hold threshold. The action is sent when you release the key.
+Nothing fires at the hold threshold. The action is sent on release instead.
 If a longer-hold tier takes over before release, this release-based hold does
 not fire.
 
-Actual examples:
+Use this when the middle tier should stay tentative until the user commits to
+releasing, such as:
 
-- medium hold `Left Arrow` on `LAYER_NAV` -> `Option+Left` on release
-- medium hold `Right Arrow` on `LAYER_NAV` -> `Option+Right` on release
-
-This is one of the most useful details in the repo.
-
-On macOS, those arrows give you:
-
-- tap -> move by one character
-- medium hold -> move by one word
-- longer hold -> move to the beginning or end of the line
-
-That means the same left/right keys cover character, word, and line movement.
-
-The release-based middle tier matters because it avoids an early jump while you are still deciding whether you want a word move or a full line move.
+- a navigation key where the medium hold should not jump early
+- a key that distinguishes between a medium hold and a longer hold on the same
+  physical switch
 
 ## Multi-Tap Behavior
 
-Multi-tap is built into the same engine. It is not a side feature.
+Multi-tap is part of the same model. It is not a separate feature.
 
-The board can currently resolve:
+A key can define behavior for:
 
-- single tap / hold / longer hold
-- double tap / double-tap hold / double-tap longer hold
-- triple tap / triple-tap hold / triple-tap longer hold
-- quadruple tap / quadruple-tap hold / quadruple-tap longer hold
-- quintuple tap / quintuple-tap hold / quintuple-tap longer hold
+- first tap
+- second tap
+- third tap
+- fourth tap
+- fifth tap
 
-That is why the thumb layer keys can do all of this without extra physical keys:
+Each of those tap counts can also define its own tap, hold, and longer-hold
+behavior.
 
-- hold for the layer
-- single tap to lock the layer
-- double tap for play/pause
-- double-tap hold to lock `LAYER_NUM`
-- triple tap for next track
-- triple-tap hold to keep `KC_MNXT` held
-- quadruple tap for previous track
-- quadruple-tap hold to keep `KC_MPRV` held
+That lets one key combine patterns such as:
 
-Again, the held media behavior may act like repeated skip or scan depending on the player.
+- momentary layer access on hold
+- persistent layer change on a tap or higher-tap hold
+- media or alternate actions on later taps
+- branching into a different action family on a later press
 
-## Concrete Examples
+Combo outputs follow the same rules when their output keycode has an authored
+behavior row. A combo that emits `KC_LEFT_GUI`, for example, participates in
+the `KC_LEFT_GUI` tap series like the physical key, but tap actions still settle
+from the combo output release rather than from the combo output press.
 
-### Nav Arrows
+## Pointer-Mode Keys
 
-`KC_LEFT` and `KC_RIGHT` on `LAYER_NAV` are a good example of the engine being worth the complexity.
+Pointing-device mode keys do not use a separate timing system.
 
-`Left Arrow` on `LAYER_NAV`:
+- a plain pd-mode keycode placed directly in the keymap works as a default
+  momentary mode key
+- an authored `key_behaviors[]` row can add explicit tap, hold, longer-hold,
+  and multi-tap behavior on top of that default
+- if a `[0].tap` override is omitted, a quick single tap sends nothing and the
+  default momentary hold remains
+- if `[0].tap` is authored and a later hold enters a different pd mode, the
+  runtime treats the first mode like a normal threshold hold rather than an
+  immediate implicit hold
 
-- tap -> `Left`
-- hold past `150 ms`, release before `400 ms` -> `Option+Left`
-- hold past `400 ms` -> `Cmd+Left`
+That means a mode key can stay simple, or it can grow patterns such as:
 
-`Right Arrow` on `LAYER_NAV`:
+- double-tap lock
+- tap-to-character plus hold-for-mode
+- higher-tap mute or alternate action
+- a second-press branch into another pointing-device mode
 
-- tap -> `Right`
-- hold past `150 ms`, release before `400 ms` -> `Option+Right`
-- hold past `400 ms` -> `Cmd+Right`
+For the raw mode behavior and pointer-layer policy, see
+[POINTER_MODES.md](./POINTER_MODES.md). For the current authored patterns on
+this keymap, see [KEYMAP.md](./KEYMAP.md).
 
-User-facing value:
+## RGB Feedback
 
-- one key handles character movement
-- the same key handles word movement
-- the same key handles line movement
+If `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE` is enabled, the key-behavior engine can
+also project its state into the RGB overlay.
 
-This is better than putting separate shortcuts on separate keys, because the motion hierarchy stays under the same finger.
+Shared semantics:
 
-### Number Row
+- multi-tap pending shows the neutral unresolved color only for double-tap and
+  higher branches; the base single-tap candidate stays quiet while it waits
+- committed double-tap and higher branches can open a branch-confirm feedback
+  window that delays the selected action long enough to show the branch color;
+  the authored RGB config can also skip that window
+- committed tap-count branches can pulse once after the tap output resolves; the
+  authored RGB config can disable those pulses or limit them to double-tap and
+  higher branches
+- pending momentary-layer holds can preview the target layer's authored color
+  and LED groups before that layer actually commits
+- unresolved hold windows can show the hold color while the action is still
+  pending
+- threshold-fired hold or longer-hold actions can pulse once when they fire
+- held non-layer `PRESS_AND_HOLD_UNTIL_RELEASE(...)` actions can stay visibly
+  active while the action remains registered
+- held layer-switch actions use preview and active layer color instead of a
+  pulse or hold overlay
+- layer and pointing-device state taps stay on their layer/PD overlays instead
+  of also emitting tap-commit feedback
 
-The number row is not only numbers.
+For the full RGB authoring model, render order, and configuration surface, see
+[RGB_CONFIG.md](./RGB_CONFIG.md).
 
-Examples:
+## Related Docs
 
-- tap `1` -> `1`
-- hold `1` -> `!`
-- tap `6` twice -> play/pause
-- tap `7` twice -> next track
-- hold the second tap of `7` -> keep next-track held
-- tap `8` twice -> previous track
-- hold the second tap of `8` -> keep previous-track held
-
-User-facing value:
-
-- symbols stay on the number row
-- basic media stays on the number row
-- next/previous has both a tap version and a held version
-
-### Thumb Layer Keys
-
-`MO(LAYER_SYM)` and `MO(LAYER_NAV)` are not simple momentary layer keys.
-
-They currently do this:
-
-- hold -> momentary layer
-- single tap -> lock that layer
-- double tap -> play/pause
-- double-tap hold -> lock `LAYER_NUM`
-- triple tap -> next track
-- triple-tap hold -> keep next-track held
-- quadruple tap -> previous track
-- quadruple-tap hold -> keep previous-track held
-
-User-facing value:
-
-- the most important layers live on strong thumb keys
-- layer lock does not need a dedicated key
-- `LAYER_NUM` lock is reachable from either thumb
-- media control is available without moving away from the thumb cluster
-
-### Slash / Nav Key
-
-`LT(LAYER_NAV, KC_SLSH)` does three useful things:
-
-- tap -> `/`
-- hold -> `LAYER_NAV`
-- double-tap hold -> lock `LAYER_NAV`
-
-In the current keymap, `LAYER_NAV` also enables Charybdis sniping, so this key
-is part of the precise-cursor workflow as well as the navigation layer
-workflow.
-
-One important implementation detail: this key keeps the normal `LT()` tap
-timing instead of using the global custom threshold, so the slash key still
-types like a normal slash key.
-
-### Escape
-
-`Esc` is another compact example:
-
-- tap -> `Esc`
-- double tap -> `~`
-- long hold -> `Alt+Cmd+Esc`
-
-That gives you normal escape, tilde, and force quit on the same key without making plain `Esc` awkward.
-
-### Pointer-Mode Keys
-
-The pointer keys use the same timing model instead of inventing their own rules.
-
-Unless a `[0]` tap override is authored, a quick single tap on a pd-mode key
-still sends the base-layer key at that physical position. The examples below
-focus on the extra hold and second-press behavior.
-
-Examples:
-
-- `ARROW_MODE`: hold for momentary arrow mode, quick double tap to lock
-- `DRAGSCROLL`: hold for momentary scrolling, quick double tap to lock
-- `VOLUME_MODE`: hold for volume control, quick double tap to mute
-- `PINCH_MODE`: first hold for
-  [BetterMouse](https://better-mouse.com/)-backed command-scroll pinch on
-  macOS, second quick tap for Accessibility Zoom, second hold for `ZOOM_MODE`
-
-`PINCH_MODE` matters because it shows that the system can also branch into a completely different second-press path when needed.
-
-## Next Doc
-
-- Read [POINTER_MODES.md](./POINTER_MODES.md) for the trackball-specific side of the same interaction model.
+- [README.md](../README.md): top-level overview of the shared userspace
+- [KEY_RUNTIME.md](./KEY_RUNTIME.md): maintainer-facing handled-key runtime map
+- [KEYMAP.md](./KEYMAP.md): Noah's current concrete profile choices
+- [POINTER_MODES.md](./POINTER_MODES.md): raw pointing-device mode behavior
+- [RGB_CONFIG.md](./RGB_CONFIG.md): RGB authoring and render order

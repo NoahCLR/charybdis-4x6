@@ -12,11 +12,66 @@
             "problemMatcher": []
         },
         {
+            "label": "Build QMK with Compilation Database",
+            "type": "shell",
+            "command": "qmk compile --compiledb -kb bastardkb/charybdis/4x6 -km noah",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": []
+        },
+        {
             "label": "Run VIA to QMK Layout Sync",
             "type": "process",
             "command": "python3",
             "args": [
-                "${workspaceFolder}/via layouts/via_to_qmk_layout.py"
+                "${workspaceFolder}/tools/via_to_qmk_layout.py"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "Generate Layout Overview",
+            "type": "process",
+            "command": "python3",
+            "args": [
+                "${workspaceFolder}/tools/profile_introspect.py"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "Install Profile Studio Extension",
+            "type": "process",
+            "command": "${workspaceFolder}/tools/charybdis-profile-studio/scripts/install-local.sh",
+            "problemMatcher": []
+        },
+        {
+            "label": "Switch to Gmail Codex Account",
+            "type": "process",
+            "command": "codex-accounts",
+            "args": [
+                "switch",
+                "gmail"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "Switch to iCloud Codex Account",
+            "type": "process",
+            "command": "codex-accounts",
+            "args": [
+                "switch",
+                "iCloud"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "Format repo",
+            "type": "process",
+            "command": "bash",
+            "args": [
+                "-c",
+                "git ls-files '*.c' '*.cc' '*.cpp' '*.h' '*.hpp' | xargs clang-format -i"
             ],
             "problemMatcher": []
         }
