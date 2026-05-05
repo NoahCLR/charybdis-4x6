@@ -46,26 +46,6 @@
             "problemMatcher": []
         },
         {
-            "label": "Switch to Gmail Codex Account",
-            "type": "process",
-            "command": "codex-accounts",
-            "args": [
-                "switch",
-                "gmail"
-            ],
-            "problemMatcher": []
-        },
-        {
-            "label": "Switch to iCloud Codex Account",
-            "type": "process",
-            "command": "codex-accounts",
-            "args": [
-                "switch",
-                "iCloud"
-            ],
-            "problemMatcher": []
-        },
-        {
             "label": "Format repo",
             "type": "process",
             "command": "bash",
