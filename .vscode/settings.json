@@ -21,8 +21,7 @@
         "compile_commands.json": true,
         "**/__pycache__/**": true
     },
-},
-"[jsonc]": {
-    "editor.defaultFormatter": "vscode.json-language-features"
-}
+    "[jsonc]": {
+        "editor.defaultFormatter": "vscode.json-language-features"
+    }
 }
