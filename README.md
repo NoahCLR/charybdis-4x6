@@ -105,6 +105,67 @@ locking a different pointing mode clears the previous mode lock too.
 Those are capabilities, not a fixed layout prescription. `keymap.c` decides
 where these ideas live.
 
+## Profile Studio
+
+If you are new to this userspace, start with Charybdis Profile Studio. It is
+the repo-local VS Code extension for editing the profile visually, so you can
+click through the layout, macros, RGB, and defaults before digging into the C
+model.
+
+It works directly on the authored source files:
+
+- [`config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h)
+- [`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c)
+- [`rgb_config.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c)
+
+There is no sidecar profile database. The C files stay the source of truth.
+The Studio parses those files, shows a VS Code webview, stages edits, and
+patches the same authored blocks when you apply changes.
+
+For a read-only overview of my current config, start with the generated
+[`KEYMAP-OVERVIEW.md`](./docs/KEYMAP-OVERVIEW.md). The companion
+[`KEYMAP.md`](./docs/KEYMAP.md) explains the current profile choices in prose.
+
+Use Profile Studio when you want to:
+
+- click keys on a visual Charybdis layout and edit layer slots
+- add or remove layers through the supported source patches
+- edit selected-key behavior rows and combo-output behavior rows
+- append simple combos from physical key selections, or load an existing combo
+  to edit its output and inputs
+- edit VIA macro slots with a macro builder and key-event recorder
+- choose layer and pointing-mode colors
+- build reusable LED groups by selecting LEDs on the board
+- edit auto-mouse fade settings, combo feedback, and key-behavior feedback
+- configure behavior-specific `config.h` defaults for key timing, normal
+  pointer speed, pointing modes, sniping, auto-mouse, base lighting, and
+  lighting feedback
+
+Screenshots:
+[`Layout`](./docs/media/profile-studio/studio-layout-tab.png),
+[`Macros`](./docs/media/profile-studio/studio-macros-tab.png),
+[`RGB`](./docs/media/profile-studio/studio-rgb-tab.png), and
+[`Defaults`](./docs/media/profile-studio/studio-defaults-tab.png).
+
+From VS Code with this repo folder open:
+
+1. Run the VS Code task `Install Profile Studio Extension`.
+2. Reload VS Code.
+3. Open it from the `$(keyboard) Profile Studio` status bar item, or run
+   `Charybdis: Open Profile Studio` from the command palette.
+
+You can also install it from a shell:
+
+```sh
+cd tools/charybdis-profile-studio
+npm run install:local
+```
+
+The full Studio guide is
+[`docs/tooling/PROFILE_STUDIO.md`](./docs/tooling/PROFILE_STUDIO.md).
+
+The next sections explain the keymap and RGB models that the Studio edits.
+
 ## The Keymap Model
 
 [`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c) is the
@@ -345,59 +406,6 @@ layer set and activity timer; this userspace adds custom split RPCs in
 You can forget those packet names immediately. The point is that both halves
 know the same layers, keys, combos, pointing modes, and feedback state, so the
 board behaves and lights up like one device instead of two disconnected halves.
-
-## Profile Studio
-
-Charybdis Profile Studio is the repo-local VS Code extension for editing the
-profile visually.
-
-It works directly on the authored source files:
-
-- [`config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h)
-- [`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c)
-- [`rgb_config.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c)
-
-There is no sidecar profile database. The C files stay the source of truth.
-The Studio parses those files, shows a VS Code webview, stages edits, and
-patches the same authored blocks when you apply changes.
-
-Use Profile Studio when you want to:
-
-- click keys on a visual Charybdis layout and edit layer slots
-- add or remove layers through the supported source patches
-- edit selected-key behavior rows and combo-output behavior rows
-- append simple combos from physical key selections, or load an existing combo
-  to edit its output and inputs
-- edit VIA macro slots with a macro builder and key-event recorder
-- choose layer and pointing-mode colors
-- build reusable LED groups by selecting LEDs on the board
-- edit auto-mouse fade settings, combo feedback, and key-behavior feedback
-- configure behavior-specific `config.h` defaults for key timing, normal
-  pointer speed, pointing modes, sniping, auto-mouse, base lighting, and
-  lighting feedback
-
-Screenshots:
-[`Layout`](./docs/media/profile-studio/studio-layout-tab.png),
-[`Macros`](./docs/media/profile-studio/studio-macros-tab.png),
-[`RGB`](./docs/media/profile-studio/studio-rgb-tab.png), and
-[`Defaults`](./docs/media/profile-studio/studio-defaults-tab.png).
-
-From VS Code with this repo folder open:
-
-1. Run the VS Code task `Install Profile Studio Extension`.
-2. Reload VS Code.
-3. Open it from the `$(keyboard) Profile Studio` status bar item, or run
-   `Charybdis: Open Profile Studio` from the command palette.
-
-You can also install it from a shell:
-
-```sh
-cd tools/charybdis-profile-studio
-npm run install:local
-```
-
-The full Studio guide is
-[`docs/tooling/PROFILE_STUDIO.md`](./docs/tooling/PROFILE_STUDIO.md).
 
 ## Main Files
 
