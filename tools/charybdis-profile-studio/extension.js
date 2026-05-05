@@ -377,6 +377,7 @@ const USER_KEY_ALIASES = {
     ",": "KC_COMM",
     ".": "KC_DOT",
     "/": "KC_SLSH",
+    "?": "KC_QUES",
     "<": "KC_LABK",
     ">": "KC_RABK",
     "`": "KC_GRV",
@@ -450,6 +451,7 @@ const QMK_KEY_LABELS = {
     KC_COMM: ",",
     KC_DOT: ".",
     KC_SLSH: "/",
+    KC_QUES: "?",
     KC_LABK: "<",
     KC_RABK: ">",
     KC_GRV: "`",
@@ -465,6 +467,29 @@ const QMK_KEY_LABELS = {
     KC_LPRN: "(",
     KC_RPRN: ")",
 };
+const SHIFTED_KEY_OUTPUT_LABELS = {
+    KC_GRV: "~",
+    KC_1: "!",
+    KC_2: "@",
+    KC_3: "#",
+    KC_4: "$",
+    KC_5: "%",
+    KC_6: "^",
+    KC_7: "&",
+    KC_8: "*",
+    KC_9: "(",
+    KC_0: ")",
+    KC_MINS: "_",
+    KC_EQL: "+",
+    KC_LBRC: "{",
+    KC_RBRC: "}",
+    KC_BSLS: "|",
+    KC_SCLN: ":",
+    KC_QUOT: "\"",
+    KC_COMM: "<",
+    KC_DOT: ">",
+    KC_SLSH: "?",
+};
 
 for (let index = 0; index <= 9; index += 1) {
     QMK_KEY_LABELS[`KC_${index}`] = String(index);
@@ -476,6 +501,11 @@ for (let code = 65; code <= 90; code += 1) {
     USER_KEY_ALIASES[letter.toLowerCase()] = `KC_${letter}`;
     USER_KEY_ALIASES[letter] = `KC_${letter}`;
 }
+const SHIFTED_KEY_BASE_LABELS = Object.fromEntries(
+    Object.entries(SHIFTED_KEY_OUTPUT_LABELS)
+        .map(([baseKeycode, shiftedLabel]) => [USER_KEY_ALIASES[shiftedLabel], QMK_KEY_LABELS[baseKeycode] || baseKeycode])
+        .filter(([shiftedKeycode]) => Boolean(shiftedKeycode))
+);
 
 function activate(context) {
     context.subscriptions.push(
@@ -4093,6 +4123,10 @@ function getStudioHtml() {
             dominant-baseline: middle;
             pointer-events: none;
         }
+        .svg-key .alternate-output-label {
+            opacity: 0.56;
+            font-weight: 650;
+        }
         .extra-led {
             cursor: pointer;
         }
@@ -5262,6 +5296,8 @@ function getClientScript() {
     };
     const qmkKeyLabels = ${JSON.stringify(QMK_KEY_LABELS)};
     const qmkKeyAliases = ${JSON.stringify(qmkKeyAliasesFromEntries(fallbackQmkKeycodeCatalog().entries))};
+    const shiftedKeyOutputLabels = ${JSON.stringify(SHIFTED_KEY_OUTPUT_LABELS)};
+    const shiftedKeyBaseLabels = ${JSON.stringify(SHIFTED_KEY_BASE_LABELS)};
     let macroPayloadKeycodes = new Set();
     const qmkKeycodeSectionGroups = ${JSON.stringify(QMK_KEYCODE_SECTION_GROUPS)};
     const keyPickerKeyboardSvgLayout = ${JSON.stringify(KEY_PICKER_KEYBOARD_SVG_LAYOUT)};
@@ -8709,7 +8745,7 @@ function getClientScript() {
         const action = layoutComboPicking ? "toggleLayoutComboKey" : "selectKey";
         return "<g class='svg-key " + (selected ? "selected" : "") + (comboSelected ? " combo-input-selected" : "") + (position.pending ? " pending" : "") + "' tabindex='0' role='button' data-action='" + action + "' data-index='" + position.layoutIndex + "' data-keycode='" + escapeAttr(position.keycode) + "' data-tooltip='" + escapeAttr(tooltipText) + "'" + transform + ">" +
             "<rect x='" + visual.x + "' y='" + visual.y + "' width='" + keyboardGeometry.keyWidth + "' height='" + keyboardGeometry.keyHeight + "' rx='" + keyboardGeometry.radius + "' fill='" + style.fill + "' stroke='" + style.stroke + "'></rect>" +
-            renderSvgLabel(label, cx, cy, style.text) +
+            renderLayoutSvgLabel(position, label, cx, cy, style.text) +
             renderBehaviorDots(dots, visual, style.text) +
             renderComboBadges(badges, visual) +
             "</g>";
@@ -8717,8 +8753,10 @@ function getClientScript() {
 
     function layoutKeyTooltip(position, label) {
         const base = "Click to edit layout index " + position.layoutIndex + ": " + label + " (" + position.keycode + "). Double-click to pick a keycode, drag onto another key to swap, or copy/paste selected keys.";
+        const alternate = alternateOutputTooltip(position.keycode);
         const macroPreview = macroPayloadTooltipForExpression(position.keycode);
-        return macroPreview ? base + "\\n\\n" + macroPreview : base;
+        const alternatePreview = alternate ? "\\n" + alternate : "";
+        return (macroPreview ? base + alternatePreview + "\\n\\n" + macroPreview : base + alternatePreview);
     }
 
     function macroPayloadTooltipForExpression(expression) {
@@ -8772,18 +8810,70 @@ function getClientScript() {
         };
     }
 
+    function renderLayoutSvgLabel(position, label, cx, cy, textColor) {
+        const pair = shiftedOutputPair(position?.keycode);
+        if (!pair) return renderSvgLabel(label, cx, cy, textColor);
+        if (pair.active === "shifted") {
+            return renderSvgLabel(label, cx, cy, textColor);
+        }
+        return renderSvgLabel(pair.shifted, cx, cy - 8, textColor, { className: "alternate-output-label", maxFontSize: 9.5, minFontSize: 7, maxWidth: keyboardGeometry.keyWidth - 16 }) +
+            renderSvgLabel(pair.base, cx, cy + 7, textColor, { maxFontSize: 12, minFontSize: 7, maxWidth: keyboardGeometry.keyWidth - 12 });
+    }
+
+    function shiftedOutputPair(keycode) {
+        const key = shiftedOutputPairKeycode(keycode);
+        if (!key) return undefined;
+        if (shiftedKeyOutputLabels[key]) {
+            return { base: displayKeyExpression(key), shifted: shiftedKeyOutputLabels[key], active: "base" };
+        }
+        if (shiftedKeyBaseLabels[key]) {
+            return { base: shiftedKeyBaseLabels[key], shifted: displayKeyExpression(key), active: "shifted" };
+        }
+        return undefined;
+    }
+
+    function shiftedOutputPairKeycode(expression) {
+        const normalized = normalizeDisplayExpression(expression);
+        if (!normalized) return "";
+        const canonical = canonicalLayoutKeyExpression(normalized);
+        if (shiftedKeyOutputLabels[normalized] || shiftedKeyBaseLabels[normalized]) return normalized;
+        if (shiftedKeyOutputLabels[canonical] || shiftedKeyBaseLabels[canonical]) return canonical;
+        const open = normalized.indexOf("(");
+        if (open <= 0 || !normalized.endsWith(")")) return "";
+        const close = matchingLayoutParenIndex(normalized, open);
+        if (close !== normalized.length - 1) return "";
+        const helper = normalized.slice(0, open);
+        const args = splitLayoutArguments(normalized.slice(open + 1, -1));
+        if ((helper === "LT" || helper === "MT") && args.length >= 2) {
+            return shiftedOutputPairKeycode(args[1]);
+        }
+        return "";
+    }
+
+    function alternateOutputTooltip(keycode) {
+        const pair = shiftedOutputPair(keycode);
+        if (!pair) return "";
+        if (pair.active === "base") return "Shifted output: " + pair.shifted + " (" + shiftedChordLabel(pair.base) + " on a US layout).";
+        return "This keycode sends " + shiftedChordLabel(pair.base) + ", producing " + pair.shifted + " on a US layout.";
+    }
+
+    function shiftedChordLabel(baseLabel) {
+        return "Shift+" + baseLabel;
+    }
+
     function renderSvgLabel(label, cx, cy, textColor, options = {}) {
         const clean = String(label || "").replace(/\\s+/g, " ").trim();
         if (!clean) return "";
         const maxWidth = options.maxWidth || keyboardGeometry.keyWidth - 10;
         const maxFontSize = options.maxFontSize || 12;
         const minFontSize = options.minFontSize || 7;
+        const classAttr = options.className ? " class='" + escapeAttr(options.className) + "'" : "";
         const widthAtOnePx = svgTextWidthEstimate(clean, 1);
         const preferredFontSize = widthAtOnePx > 0 ? Math.min(maxFontSize, maxWidth / widthAtOnePx) : maxFontSize;
         const fontSize = Math.max(minFontSize, preferredFontSize);
         const constrained = widthAtOnePx * maxFontSize > maxWidth;
         const fitAttrs = constrained ? " textLength='" + svgNumber(maxWidth) + "' lengthAdjust='spacingAndGlyphs'" : "";
-        return "<text x='" + svgNumber(cx) + "' y='" + svgNumber(cy) + "' font-size='" + svgNumber(fontSize) + "'" + fitAttrs + " fill='" + escapeAttr(textColor || "#e7ecef") + "'>" + escapeHtml(clean) + "</text>";
+        return "<text" + classAttr + " x='" + svgNumber(cx) + "' y='" + svgNumber(cy) + "' font-size='" + svgNumber(fontSize) + "'" + fitAttrs + " fill='" + escapeAttr(textColor || "#e7ecef") + "'>" + escapeHtml(clean) + "</text>";
     }
 
     function svgTextWidthEstimate(text, fontSize) {
@@ -9954,11 +10044,12 @@ function getClientScript() {
         const selectedFill = selected ? rgbBuilderPreviewFill() : definedPreview?.fill || style.fill;
         const selectedText = selected ? rgbBuilderPreviewText() : definedPreview?.text || style.text;
         const state = selected ? "Selected for the pending row." : definedPreview ? "Already covered by an enabled row in this target table." : "Not selected for the pending row.";
-        const tooltipText = "LED " + ledIndex + " for " + (position.display || position.keycode) + " (" + position.keycode + "). " + state + " Click to add or remove it from the inline selection.";
+        const alternate = alternateOutputTooltip(position.keycode);
+        const tooltipText = "LED " + ledIndex + " for " + (position.display || position.keycode) + " (" + position.keycode + "). " + (alternate ? alternate + " " : "") + state + " Click to add or remove it from the inline selection.";
         const transform = visual.angle ? " transform='rotate(" + visual.angle + " " + cx + " " + cy + ")'" : "";
         return "<g class='svg-key " + (selected ? "rgb-selected" : "") + (definedPreview ? " rgb-defined" : "") + (allPreview ? " rgb-all-preview" : "") + "' data-action='toggleRgbLed' data-led='" + ledIndex + "' data-tooltip='" + escapeAttr(tooltipText) + "'" + transform + ">" +
             "<rect data-rgb-led-preview x='" + visual.x + "' y='" + visual.y + "' width='" + keyboardGeometry.keyWidth + "' height='" + keyboardGeometry.keyHeight + "' rx='" + keyboardGeometry.radius + "' fill='" + selectedFill + "' stroke='" + (selected ? "#ffffff" : style.stroke) + "'></rect>" +
-            renderSvgLabel(position.display || position.keycode, cx, cy, selectedText, { maxFontSize: 11.5 }) +
+            renderLayoutSvgLabel(position, position.display || position.keycode, cx, cy, selectedText) +
             renderRgbLedIndexLabel(ledIndex, visual, selectedText) +
             "</g>";
     }
