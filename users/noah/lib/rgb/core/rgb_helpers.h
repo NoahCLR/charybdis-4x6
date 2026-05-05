@@ -68,9 +68,17 @@ typedef struct {
     rgb_locality_t locality;
 } combo_feedback_color_config_t;
 
+#ifndef NOAH_RGB_LED_GROUP_MAX_LEDS
+#    ifdef RGB_MATRIX_LED_COUNT
+#        define NOAH_RGB_LED_GROUP_MAX_LEDS RGB_MATRIX_LED_COUNT
+#    else
+#        define NOAH_RGB_LED_GROUP_MAX_LEDS 58
+#    endif
+#endif
+
 typedef struct {
-    const uint8_t *leds;
-    uint8_t        count;
+    uint8_t leds[NOAH_RGB_LED_GROUP_MAX_LEDS];
+    uint8_t count;
 } rgb_led_group_t;
 
 #define RGB_LAYER_GROUP_ALL UINT8_MAX
