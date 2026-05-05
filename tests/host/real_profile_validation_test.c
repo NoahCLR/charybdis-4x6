@@ -16,8 +16,10 @@
 
 static char log_buffer[16384];
 
+#if defined(RGB_MATRIX_ENABLE) && defined(POINTING_DEVICE_ENABLE) && defined(RGB_PD_MODE_FEEDBACK_ENABLE)
 extern const pd_mode_color_t pd_mode_colors[];
 extern const uint8_t         pd_mode_color_count;
+#endif
 
 #define NOAH_PD_MODE_TEST_ROW(name, mode_keycode, handler, key_handler, reset, dpi, mode_traits, lifecycle) [PD_MODE_INDEX_##name] = {.mode_flag = PD_MODE_##name, .keycode = (mode_keycode), .lock_action = mode_keycode##_LOCK, .traits = (mode_traits)},
 const pd_mode_def_t pd_modes[PD_MODE_COUNT] = {NOAH_PD_MODE_LIST(NOAH_PD_MODE_TEST_ROW)};
@@ -164,7 +166,9 @@ uint16_t keycode_at_keymap_location(uint8_t layer_num, uint8_t row, uint8_t colu
 int main(void) {
     CHECK(key_behavior_count > 0);
     CHECK(noah_combo_output_count > 0);
+#if defined(RGB_MATRIX_ENABLE) && defined(POINTING_DEVICE_ENABLE) && defined(RGB_PD_MODE_FEEDBACK_ENABLE)
     CHECK(pd_mode_color_count == PD_MODE_COUNT);
+#endif
 
     uint8_t keymap_validation_errors = noah_keymap_validate();
     if (keymap_validation_errors != 0u && log_buffer[0] != '\0') {
