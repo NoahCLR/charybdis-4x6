@@ -59,6 +59,10 @@ const appendedCheck = `
     const model = await buildModel(${JSON.stringify(repoRoot)});
     const aliases = model.qmkKeycodeAliases || {};
     assert(
+        model.qmkKeyLabels.KC_BSLS === ${JSON.stringify("\\")},
+        "Profile Studio did not decode escaped QMK backslash labels"
+    );
+    assert(
         (model.configDefaults || []).some((section) => (section.fields || []).some((field) => field.macro === "AUTO_MOUSE_TIME" && field.value === "1200")),
         "Profile Studio missed config.h defaults"
     );

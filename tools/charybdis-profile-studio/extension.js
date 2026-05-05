@@ -869,7 +869,8 @@ function parseQmkKeycodeHjsonSectionEntries(text, sectionName) {
 }
 
 function extractHjsonStringField(body, field) {
-    return body.match(new RegExp(`"${escapeRegex(field)}"\\s*:\\s*"([^"]+)"`))?.[1] || "";
+    const match = body.match(new RegExp(`"${escapeRegex(field)}"\\s*:\\s*"((?:\\\\.|[^"\\\\])*)"`));
+    return match ? decodeHjsonString(match[1]) : "";
 }
 
 function extractHjsonStringListField(body, field) {
@@ -877,7 +878,15 @@ function extractHjsonStringListField(body, field) {
     if (!match) {
         return [];
     }
-    return Array.from(match[1].matchAll(/"([^"]+)"/g)).map((item) => item[1]);
+    return Array.from(match[1].matchAll(/"((?:\\.|[^"\\])*)"/g)).map((item) => decodeHjsonString(item[1]));
+}
+
+function decodeHjsonString(value) {
+    try {
+        return JSON.parse(`"${value}"`);
+    } catch {
+        return value;
+    }
 }
 
 function shouldSkipQmkKeycode(entry) {
