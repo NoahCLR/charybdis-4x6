@@ -105,69 +105,6 @@ locking a different pointing mode clears the previous mode lock too.
 Those are capabilities, not a fixed layout prescription. `keymap.c` decides
 where these ideas live.
 
-## The RGB Model
-
-RGB is used as feedback, not just decoration.
-
-[`rgb_config.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c)
-lets you author the visible language of the board:
-
-- layer colors, either across the board or only on keys used by that layer
-- reusable LED groups for thumbs, rows, halves, clusters, or any physical
-  group that makes sense on the board
-- pointing-mode colors that can paint both halves, one fixed half, the half
-  that triggered the mode, or only the exact triggering keys
-- combo feedback so chords can light near the keys that made them
-- key-behavior feedback for waiting, preview, tap-count, hold, and repeat
-  states
-- auto-mouse timeout feedback that fades as the temporary pointer layer is
-  about to clear
-
-`locality` is the RGB word for where a feedback surface paints. Depending on
-the table, it can mean both halves, one fixed half, the half that owns the
-triggering key or combo, or only the exact triggering keys with options such as
-`RGB_BOTH_HALVES`, `RGB_LEFT_HALF`, `RGB_RIGHT_HALF`, `RGB_KEY_HALF`, and
-`RGB_KEYS_ONLY`.
-
-My build also has one extra trackball LED at LED `56`, documented in the
-[`rgb_config.c` LED map](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c#L53).
-It is optional: boards without that physical LED are still compatible with this
-userspace; they just will not show trackball-specific LED group accents.
-
-In practice, the lights can answer a few simple questions while you use the
-board: which layer is active, which trackball mode is live, which physical keys
-created a combo, whether a key is waiting for another tap, which tap-count
-branch won, whether a hold or repeat action has committed, and how close the
-auto-mouse layer is to timing out.
-
-The auto-mouse RGB timer is a good example of the design style. When the
-trackball wakes the pointer layer, the LEDs can start from the authored pointer
-layer look and then fade toward the board state that will remain after the
-auto-mouse layer drops. In plain terms: the lights can show how much time is
-left before the board returns to normal.
-
-## Split Sync
-
-A Charybdis has one controller per half, so runtime state cannot just live on
-whichever half saw the key first. QMK's normal split settings cover the active
-layer set and activity timer; this userspace adds custom split RPCs in
-[`users/noah/config.h`](./users/noah/config.h#L42) and
-[`runtime_sync.h`](./users/noah/lib/split/runtime_sync.h):
-
-- `PUT_SPLIT_RUNTIME_BASE_SYNC`: auto-mouse RGB progress, active or locked
-  pointing-mode IDs, key-local pointing-mode ownership, and preview-layer state
-- `PUT_SPLIT_COMBO_FEEDBACK_SYNC`: combo underlay and overlay footprints, so
-  `RGB_KEY_HALF` and `RGB_KEYS_ONLY` know which half or exact keys caused the
-  combo
-- `PUT_SPLIT_KEY_FEEDBACK_SEMANTIC_SYNC` and
-  `PUT_SPLIT_KEY_FEEDBACK_BRANCH_SYNC`: key-feedback flash visibility, semantic
-  state, broad owner groups, and tap-branch colors
-- `PUT_VIA_KEYMAP_SYNC`: mirrored VIA dynamic-keymap writes
-
-You can forget those packet names immediately. The point is that both halves
-know the same layers, keys, combos, pointing modes, and feedback state, so the
-board behaves and lights up like one device instead of two disconnected halves.
-
 ## The Keymap Model
 
 [`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c) is the
@@ -338,21 +275,76 @@ static const key_behavior_feedback_led_group_t
   `KEY_FEEDBACK_GROUP_TAP_COMMITTED`, `KEY_FEEDBACK_GROUP_HOLD_ACTIVE`,
   `KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE`, or `KEY_FEEDBACK_GROUP_ALL`
 
-The other RGB feedback surfaces use the same idea at a larger scale:
+That behavior-specific feedback is the key-level part of the broader RGB
+language. It gives you room to design compact keys without turning the source
+into a pile of one-off feature code. The next section covers the layer,
+pointing-mode, combo, LED-group, preview, and auto-mouse surfaces that use the
+same authored RGB model.
 
-- `layer_colors[]` and `layer_led_groups`: show active layers and optional
-  layer-specific accents
-- preview overlay: shows a pending momentary-layer hold with that layer's
-  authored color and LED groups before the layer becomes active
-- `pd_mode_colors[]` and `pd_mode_led_groups`: show active pointing modes and
-  where they were triggered
-- `combo_feedback_colors` and `combo_feedback_led_groups`: show live combo
-  footprints and combo-specific accents
-- `automouse_fade_end_config`: shows the auto-mouse timeout by fading the
-  pointer layer toward the board state that will remain after it clears
+## The RGB Model
 
-That gives you room to design compact keys without turning the source into a
-pile of one-off feature code.
+RGB is used as feedback, not just decoration.
+
+[`rgb_config.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c)
+lets you author the visible language of the board:
+
+- layer colors, either across the board or only on keys used by that layer
+- reusable LED groups for thumbs, rows, halves, clusters, or any physical
+  group that makes sense on the board
+- pointing-mode colors that can paint both halves, one fixed half, the half
+  that triggered the mode, or only the exact triggering keys
+- combo feedback so chords can light near the keys that made them
+- key-behavior feedback for waiting, preview, tap-count, hold, and repeat
+  states
+- preview overlays that show a pending momentary-layer hold before the layer
+  becomes active
+- auto-mouse timeout feedback that fades as the temporary pointer layer is
+  about to clear
+
+`locality` is the RGB word for where a feedback surface paints. Depending on
+the table, it can mean both halves, one fixed half, the half that owns the
+triggering key or combo, or only the exact triggering keys with options such as
+`RGB_BOTH_HALVES`, `RGB_LEFT_HALF`, `RGB_RIGHT_HALF`, `RGB_KEY_HALF`, and
+`RGB_KEYS_ONLY`.
+
+My build also has one extra trackball LED at LED `56`, documented in the
+[`rgb_config.c` LED map](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c#L53).
+It is optional: boards without that physical LED are still compatible with this
+userspace; they just will not show trackball-specific LED group accents.
+
+In practice, the lights can answer a few simple questions while you use the
+board: which layer is active, which trackball mode is live, which physical keys
+created a combo, whether a key is waiting for another tap, which tap-count
+branch won, whether a hold or repeat action has committed, and how close the
+auto-mouse layer is to timing out.
+
+The auto-mouse RGB timer is a good example of the design style. When the
+trackball wakes the pointer layer, the LEDs can start from the authored pointer
+layer look and then fade toward the board state that will remain after the
+auto-mouse layer drops. In plain terms: the lights can show how much time is
+left before the board returns to normal.
+
+## Split Sync
+
+A Charybdis has one controller per half, so runtime state cannot just live on
+whichever half saw the key first. QMK's normal split settings cover the active
+layer set and activity timer; this userspace adds custom split RPCs in
+[`users/noah/config.h`](./users/noah/config.h#L42) and
+[`runtime_sync.h`](./users/noah/lib/split/runtime_sync.h):
+
+- `PUT_SPLIT_RUNTIME_BASE_SYNC`: auto-mouse RGB progress, active or locked
+  pointing-mode IDs, key-local pointing-mode ownership, and preview-layer state
+- `PUT_SPLIT_COMBO_FEEDBACK_SYNC`: combo underlay and overlay footprints, so
+  `RGB_KEY_HALF` and `RGB_KEYS_ONLY` know which half or exact keys caused the
+  combo
+- `PUT_SPLIT_KEY_FEEDBACK_SEMANTIC_SYNC` and
+  `PUT_SPLIT_KEY_FEEDBACK_BRANCH_SYNC`: key-feedback flash visibility, semantic
+  state, broad owner groups, and tap-branch colors
+- `PUT_VIA_KEYMAP_SYNC`: mirrored VIA dynamic-keymap writes
+
+You can forget those packet names immediately. The point is that both halves
+know the same layers, keys, combos, pointing modes, and feedback state, so the
+board behaves and lights up like one device instead of two disconnected halves.
 
 ## Profile Studio
 
@@ -421,17 +413,6 @@ If you want to adapt the profile, start here:
 Most profile work should stay in the first three files. The shared runtime
 under [`users/noah/`](./users/noah/) exists so those authored files can stay
 small and data-driven.
-
-## Tooling And Checks
-
-When you change authored profile inputs, regenerate and check the visual
-profile output:
-
-```sh
-python3 tools/profile_introspect.py --write
-python3 tools/profile_introspect.py --check
-sh tests/host/run_profile_introspection_checks.sh
-```
 
 ## Docs Map
 

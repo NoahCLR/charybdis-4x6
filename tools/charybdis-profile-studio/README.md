@@ -143,7 +143,7 @@ desktop capture so the Charybdis board is not cropped.
 Useful options:
 
 ```sh
-npm run screenshots -- --width 1600
+npm run screenshots -- --width 1920
 CHROME_BIN=/path/to/chrome npm run screenshots
 ```
 
