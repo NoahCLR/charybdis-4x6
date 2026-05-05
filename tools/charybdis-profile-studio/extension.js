@@ -5117,7 +5117,7 @@ function getClientScript() {
     const viewTooltips = {
         layout: "Edit layer keys and behavior rows using the physical keyboard layout as the filter.",
         macros: "Build and edit VIA macro payloads in keymap.c.",
-        rgb: "Edit rgb_config.c colors, feedback policies, and LED group tables.",
+        rgb: "Edit rgb_config.c layer colors, feedback colors, locality, and LED group tables.",
         defaults: "Edit config.h timing, pointing, RGB Matrix, and feedback defaults."
     };
     const panelTooltips = {
@@ -5126,16 +5126,16 @@ function getClientScript() {
         "Layer Overview": "Read-only summary of behavior rows, macros, combos, and pointing modes reachable from keys on the active layer.",
         "Macro Builder": "Build payload strings for the VIA_MACROS(MACRO) table in keymap.c.",
         "Combo Builder": "Append a new COMBOS(COMBO) row to keymap.c.",
-        "RGB LED Group Builder": "Select physical LEDs and append a row to one of the rgb_config.c LED group tables.",
-        "Layer Colors": "Edit layer_colors[] HSV values and layer render mode.",
-        "Layer LED Groups": "Inspect layer-specific LED group rows from rgb_config.c.",
-        "Auto-mouse Fade": "Edit the auto-mouse fade destination color and fade mode.",
-        "Pointing-mode Colors": "Edit pd_mode_colors[] HSV values and locality.",
-        "Pointing-mode LED Groups": "Inspect pointing-mode-specific LED group rows from rgb_config.c.",
-        "Combo Feedback": "Edit combo feedback color and locality.",
-        "Combo Feedback LED Groups": "Inspect combo feedback LED group rows from rgb_config.c.",
-        "Key Behavior Feedback": "Edit tap, hold, long-hold, and tap-count branch-confirm colors and policy.",
-        "Key Behavior Feedback LED Groups": "Inspect key-behavior feedback LED group rows from rgb_config.c.",
+        "RGB LED Group Builder": "Select physical LEDs and append a row to one of the rgb_config.c LED group tables. Reusable groups define LED sets; table rows decide where and how they are used.",
+        "Layer Colors": "Edit layer_colors[] HSV values and render mode for each layer. LED group rows can override specific LEDs.",
+        "Layer LED Groups": "Inspect layer_led_groups_data[] rows that override specific LEDs for one layer or all layers.",
+        "Auto-mouse Fade": "Edit the destination color and fade mode used as auto-mouse approaches its timeout.",
+        "Pointing-mode Colors": "Edit pd_mode_colors[] HSV values and locality for each active pointing mode.",
+        "Pointing-mode LED Groups": "Inspect pd_mode_led_groups_data[] rows that override specific LEDs for one pointing mode or all pointing modes.",
+        "Combo Feedback": "Edit combo feedback color and locality shown while combo member keys are active.",
+        "Combo Feedback LED Groups": "Inspect combo_feedback_led_groups_data[] rows that override the combo feedback footprint.",
+        "Key Behavior Feedback": "Edit key-behavior feedback colors, locality, and policy for tap, hold, long-hold, and tap-count branch states.",
+        "Key Behavior Feedback LED Groups": "Inspect key_behavior_feedback_led_groups_data[] rows that override specific feedback semantics or all feedback groups.",
         "Key Timing": "Edit config.h timing defaults for QMK dual-role keys, combos, and custom key_behaviors[] tap, hold, and multi-tap handling.",
         "Normal Pointer Speed": "Edit config.h normal pointer DPI ladder minimum and step size.",
         "Pointing Mode Speeds": "Edit config.h pointer CPI used while drag-scroll or pointing modes are active.",
@@ -5150,26 +5150,26 @@ function getClientScript() {
         editComboOutputBehavior: "Load this combo output keycode into the behavior editor so its key_behaviors[] row can be created or edited.",
         editLayoutCombo: "Load this existing combo into the combo builder so its output or physical input keys can be edited.",
         addBehavior: "Append a simple key_behaviors[] row to keymap.c.",
-        updateLayerColor: "Write this layer color and render mode back to rgb_config.c.",
-        updatePdModeColor: "Write this pointing-mode color and locality back to rgb_config.c.",
-        updateAutomouseFade: "Write the auto-mouse fade color and mode back to rgb_config.c.",
-        updateComboFeedback: "Write combo feedback color and locality back to rgb_config.c.",
-        updateKeyBehaviorFeedback: "Write all key behavior feedback colors and policy fields back to rgb_config.c.",
+        updateLayerColor: "Write this layer HSV color and render mode back to layer_colors[] in rgb_config.c.",
+        updatePdModeColor: "Write this pointing-mode HSV color and locality back to pd_mode_colors[] in rgb_config.c.",
+        updateAutomouseFade: "Write this auto-mouse fade destination color and fade mode back to rgb_config.c.",
+        updateComboFeedback: "Write combo feedback HSV color and locality back to rgb_config.c.",
+        updateKeyBehaviorFeedback: "Write all key behavior feedback colors, locality, and policy fields back to rgb_config.c.",
         updateConfigDefaults: "Write these default settings back to config.h.",
-        saveRgbReusableLedGroup: "Create, update, or rename a reusable RGB_LED_GROUP_* definition in rgb_config.c.",
-        deleteRgbReusableLedGroup: "Delete this unused reusable RGB_LED_GROUP_* definition from rgb_config.c.",
-        editReusableLedGroup: "Load this reusable LED group into the group editor.",
-        useReusableLedGroup: "Use this reusable LED group in the stage-row builder.",
-        clearReusableLedGroupDraft: "Clear the reusable LED group editor.",
+        saveRgbReusableLedGroup: "Create, update, or rename a reusable RGB_LED_GROUP_* definition in rgb_config.c using the currently selected LEDs.",
+        deleteRgbReusableLedGroup: "Delete this reusable RGB_LED_GROUP_* definition. Used groups are disabled because table rows still reference them.",
+        editReusableLedGroup: "Load this reusable LED group into the editor so its name or LED membership can be changed.",
+        useReusableLedGroup: "Use this reusable LED set as the LED group source for the row builder above.",
+        clearReusableLedGroupDraft: "Clear the reusable LED group editor without changing rgb_config.c.",
         showAddLayerDraft: "Open the staged new-layer form. Nothing is written until Apply layer changes.",
         cancelLayerDraft: "Close the new-layer form without staging a layer.",
         stageLayerDraft: "Stage a fully transparent layer with a random RGB color.",
         deleteLayerDraft: "Stage deletion of the active layer. Apply will fail if firmware references still use it.",
         discardLayerChanges: "Discard staged layer additions and deletions.",
         applyLayerChanges: "Write staged layer additions and deletions to config.h, keymap.c, and rgb_config.c.",
-        addRgbLedGroup: "Append a new LED group row using the selected LEDs and current color.",
-        clearRgbSelection: "Remove all currently selected LEDs from the group builder.",
-        toggleRgbTrackball: "Add or remove the trackball LED index 56 from the group builder.",
+        addRgbLedGroup: "Append a new row to the selected RGB LED group table using the chosen owner, LED group source, and HSV color.",
+        clearRgbSelection: "Remove all inline LED selections from the group builder. Reusable group definitions are not changed.",
+        toggleRgbTrackball: "Add or remove the trackball LED index 56 from the current inline LED selection.",
         updateViaMacro: "Write this VIA macro payload string back to keymap.c.",
         selectMacroSlot: "Select this VIA macro slot for editing.",
         insertMacroStep: "Insert the configured macro step into the selected payload.",
@@ -5218,20 +5218,20 @@ function getClientScript() {
         tap: "Enable the tap-tier action for this tap-count branch. When enabled, choose a helper and action below.",
         hold: "Enable the hold-tier action that can run after the tap-hold term for this branch.",
         "long hold": "Enable the long-hold-tier action that can run after the longer-hold term for this branch.",
-        table: "Choose which rgb_config.c LED group table will receive the new row.",
-        owner: "The owner value for the target LED group table. Combo feedback groups do not need one.",
-        "pointing mode": "The pointing mode whose color or LED group is being edited.",
-        semantic: "The key-behavior feedback semantic that owns this LED group.",
-        "group name": "Reusable RGB_LED_GROUP_* name defined near the LED map in rgb_config.c.",
-        "LED group": "Choose an existing reusable LED group or use the current inline LED selection.",
-        mode: "Select the authored mode for this row, such as layer render mode, auto-mouse fade mode, or a reachable pointing mode.",
-        locality: "Choose which keyboard half or key region receives this RGB feedback.",
-        "branch confirm mode": "Choose whether selected tap-count branches get a branch-confirm feedback window before emitting.",
-        "tap commit mode": "Choose when tap commit feedback is shown for key behavior taps.",
-        picker: "Pick an approximate RGB color. The studio converts it into HSV channel values.",
-        h: "HSV hue channel as QMK stores it, usually 0-255.",
-        s: "HSV saturation channel as QMK stores it, usually 0-255.",
-        v: "HSV value/brightness channel. Constants such as RGB_MATRIX_MAXIMUM_BRIGHTNESS are allowed.",
+        table: "Choose which rgb_config.c LED group table receives the new row: layer, pointing mode, combo feedback, or key-behavior feedback.",
+        owner: "Owner for the selected LED group table. It decides which layer, pointing mode, or feedback semantic the row applies to; combo feedback has one shared owner.",
+        "pointing mode": "Pointing mode whose RGB color or LED group row is being edited.",
+        semantic: "Key-behavior feedback state that owns this LED group, such as tap pending, tap committed, hold active, or all feedback groups.",
+        "group name": "Reusable RGB_LED_GROUP_* definition name near the LED map in rgb_config.c. The name stores only LED membership, not color or owner.",
+        "LED group": "Choose a reusable RGB_LED_GROUP_* LED set, or use the current inline LED selection from the board.",
+        mode: "Select how this RGB row behaves. For layers it controls which keys are painted; for auto-mouse it controls how the fade destination is reached.",
+        locality: "Choose where this feedback paints: both halves, one half, the triggering key half, or only the triggering keys.",
+        "branch confirm mode": "Choose which tap-count branches show a branch-confirm feedback window before their action finishes.",
+        "tap commit mode": "Choose which key-behavior taps show tap-commit feedback after the tap action commits.",
+        picker: "Pick an approximate RGB color. The studio converts the browser color into QMK HSV channels.",
+        h: "QMK HSV hue channel, 0-255. Hue chooses the color family.",
+        s: "QMK HSV saturation channel, 0-255. 0 is white/gray; 255 is fully saturated.",
+        v: "QMK HSV value/brightness channel. Use 0-255 or a safe constant such as RGB_MATRIX_MAXIMUM_BRIGHTNESS.",
         output: "The key or action produced by this combo, written as the combo output in keymap.c.",
         "output behavior": "The key behavior row that runs after this combo emits its output keycode, if one exists.",
         inputs: "Comma-separated physical combo input key expressions, such as D, F. Use the layout picker to choose slots from the active layer.",
@@ -5246,9 +5246,9 @@ function getClientScript() {
         "record delays": "Insert delay commands from elapsed time between recorded key events.",
         "delay threshold ms": "Only elapsed gaps at or above this many milliseconds become delay commands.",
         "delay round ms": "Round recorded delays to this many milliseconds.",
-        leds: "The physical RGB LED indices contained in this group.",
-        "led group": "The authored LED group expression in rgb_config.c.",
-        color: "The HSV color expression used by this row.",
+        leds: "Physical RGB LED indices contained in this row or reusable group.",
+        "led group": "Authored LED group expression in rgb_config.c. Reusable groups reference RGB_LED_GROUP_*; inline rows spell out RGB_LED_GROUP(...).",
+        color: "HSV color expression used by this row. HSV(0, 0, 0) means inherit the owning stage color for LED group rows.",
         default: "The current value written for this config.h macro.",
         setting: "The user-facing name for this config.h default.",
         macro: "The exact config.h #define patched by this control.",
@@ -9480,9 +9480,10 @@ function getClientScript() {
             ["keyBehavior", "Key-behavior LED groups"]
         ];
         const ownerChoices = rgbGroupOwnerOptions(rgbGroupTarget);
+        const ownerTooltip = rgbGroupOwnerTooltip(rgbGroupTarget);
         const ownerControl = ownerChoices.length
-            ? "<label><span>" + escapeHtml(rgbGroupOwnerLabel(rgbGroupTarget)) + "</span><select name='owner'>" + optionsWithLabels(ownerChoices, rgbGroupOwner) + "</select></label>"
-            : "<label><span>owner</span><input name='owner' disabled value='combo feedback'></label>";
+            ? "<label data-tooltip='" + escapeAttr(ownerTooltip) + "'><span>" + escapeHtml(rgbGroupOwnerLabel(rgbGroupTarget)) + "</span><select name='owner' data-tooltip='" + escapeAttr(ownerTooltip) + "'>" + optionsWithLabels(ownerChoices, rgbGroupOwner) + "</select></label>"
+            : "<label data-tooltip='Combo feedback LED group rows apply to the shared combo feedback stage, so no separate owner is needed.'><span>owner</span><input name='owner' disabled value='combo feedback' data-tooltip='Combo feedback LED group rows apply to the shared combo feedback stage, so no separate owner is needed.'></label>";
         const pendingLedIndices = effectiveRgbBuilderLedIndices();
         const selected = pendingLedIndices.length
             ? pendingLedIndices.map((led) => "<code>" + led + "</code>").join("")
@@ -9507,8 +9508,8 @@ function getClientScript() {
             renderRgbLedGroupSourceControl() +
             "</div>" +
             renderRgbBuilderColorControl() +
-            "<div class='rgb-selected-list'><span class='rgb-led-list-label'>" + escapeHtml(selectedLabel) + "</span>" + selected + "</div>" +
-            "<div class='rgb-selected-list rgb-defined-list'><span class='rgb-led-list-label'>defined</span>" + defined + "</div>" +
+            "<div class='rgb-selected-list' data-tooltip='" + escapeAttr(rgbBuilderSelectionTooltip()) + "'><span class='rgb-led-list-label'>" + escapeHtml(selectedLabel) + "</span>" + selected + "</div>" +
+            "<div class='rgb-selected-list rgb-defined-list' data-tooltip='" + escapeAttr(rgbBuilderDefinedTooltip()) + "'><span class='rgb-led-list-label'>defined</span>" + defined + "</div>" +
             "<div class='toolbar'>" +
             "<button data-action='clearRgbSelection'>Clear Selected LEDs</button>" +
             "<button data-action='addRgbLedGroup' data-dirty-button class='primary'>Add LED group row</button>" +
@@ -9530,6 +9531,24 @@ function getClientScript() {
         return "<label><span>LED group</span><select name='ledGroupSource'>" + optionsWithLabels(options, rgbLedGroupSource) + "</select></label>";
     }
 
+    function rgbGroupOwnerTooltip(target) {
+        if (target === "layer") return "Layer or all-layer owner for the new layer_led_groups_data[] row.";
+        if (target === "pdMode") return "Pointing mode or all-modes owner for the new pd_mode_led_groups_data[] row.";
+        if (target === "keyBehavior") return "Feedback semantic that owns the new key_behavior_feedback_led_groups_data[] row.";
+        return "Owner for the selected RGB LED group table.";
+    }
+
+    function rgbBuilderSelectionTooltip() {
+        if (rgbBuilderUsesReusableGroup()) {
+            return "LEDs from the selected reusable RGB_LED_GROUP_* definition. The new table row references that reusable group instead of writing inline LED indices.";
+        }
+        return "Inline LED indices selected on the board for the new table row. These are written as RGB_LED_GROUP(...).";
+    }
+
+    function rgbBuilderDefinedTooltip() {
+        return "LED indices already covered by enabled rows in the selected target table. They are previewed on the board but are not automatically selected for the new row.";
+    }
+
     function renderReusableLedGroupsSection(rgb) {
         const groups = rgb.ledGroups || [];
         const selected = rgbSelectedLeds.length
@@ -9540,11 +9559,11 @@ function getClientScript() {
             "<h3 class='rgb-builder-subsection-title'>Reusable LED Groups</h3>" +
             "<div class='form-grid four'>" +
             "<label><span>group name</span><input id='rgbReusableGroupName' data-validate='rgb-led-group-name' value='" + escapeAttr(rgbReusableGroupDraftName) + "' placeholder='RGB_LED_GROUP_THUMBS' spellcheck='false'></label>" +
-            "<div class='rgb-selected-list'><span class='rgb-led-list-label'>selected LEDs</span>" + selected + "</div>" +
+            "<div class='rgb-selected-list' data-tooltip='LED indices currently selected on the builder board. Saving a reusable group stores this LED membership only; color and owner stay in table rows.'><span class='rgb-led-list-label'>selected LEDs</span>" + selected + "</div>" +
             "<button type='button' data-action='clearReusableLedGroupDraft'>Clear editor</button>" +
             "<button type='button' data-action='saveRgbReusableLedGroup' data-dirty-button class='primary'>" + (editing ? "Save group" : "Create group") + "</button>" +
             "</div>" +
-            (editing ? "<p class='muted'>Editing <code>" + escapeHtml(rgbReusableGroupOriginalName) + "</code>; selected LEDs replace the reusable group definition.</p>" : "") +
+            (editing ? "<p class='muted' data-tooltip='Saving replaces the reusable group definition with the current name and selected LEDs. Existing table rows that reference the group keep using the updated LED set.'>Editing <code>" + escapeHtml(rgbReusableGroupOriginalName) + "</code>; selected LEDs replace the reusable group definition.</p>" : "") +
             renderReusableLedGroupsTable(groups) +
             "</div>";
     }
@@ -9553,7 +9572,12 @@ function getClientScript() {
         if (!groups.length) {
             return "<p class='muted'>No reusable RGB_LED_GROUP_* definitions were parsed.</p>";
         }
-        return "<table><thead><tr><th>Group</th><th>LEDs</th><th>Used by</th><th>Actions</th></tr></thead><tbody>" +
+        return "<table><thead><tr>" +
+            renderTooltipHeader("Group", "Reusable RGB_LED_GROUP_* definition name and source expression from rgb_config.c.") +
+            renderTooltipHeader("LEDs", "Physical LED indices stored by this reusable group.") +
+            renderTooltipHeader("Used by", "Enabled LED group table rows that reference this reusable definition.") +
+            renderTooltipHeader("Actions", "Load, use, or delete this reusable LED group definition.") +
+            "</tr></thead><tbody>" +
             groups.map(renderReusableLedGroupRow).join("") +
             "</tbody></table>";
     }
@@ -9576,7 +9600,7 @@ function getClientScript() {
     function renderReusableLedGroupUsages(group) {
         const usages = group.usages || [];
         if (!usages.length) return "<span class='muted'>unused</span>";
-        return usages.map((usage) => "<div><code>" + escapeHtml(reusableLedGroupUsageLabel(usage)) + "</code>" +
+        return usages.map((usage) => "<div data-tooltip='" + escapeAttr("This reusable LED group is referenced by " + reusableLedGroupUsageLabel(usage) + " in an enabled LED group table row.") + "'><code>" + escapeHtml(reusableLedGroupUsageLabel(usage)) + "</code>" +
             (usage.color ? " <code class='muted'>" + escapeHtml(usage.color) + "</code>" : "") +
             "</div>").join("");
     }
@@ -9905,7 +9929,7 @@ function getClientScript() {
         return "<div class='board layout-board-card'>" +
             "<div class='layout-board-header'>" +
             "<h3 class='layout-board-title'>LED group selector</h3>" +
-            "<p class='layout-board-subtitle'>Physical LED indices - " + escapeHtml(layer.name) + "</p>" +
+            "<p class='layout-board-subtitle' data-tooltip='Click board LEDs to build an inline RGB_LED_GROUP(...) row or a reusable RGB_LED_GROUP_* definition. The active layer only provides labels and geometry.'>Physical LED indices - " + escapeHtml(layer.name) + "</p>" +
             "</div>" +
             "<div class='layout-board-stage'>" +
             "<svg class='keyboard-svg layout-board-svg' viewBox='" + viewBox.x + " " + viewBox.y + " " + viewBox.width + " " + viewBox.height + "' preserveAspectRatio='xMidYMid meet' role='img' aria-label='RGB LED group selector'>" +
@@ -9928,7 +9952,8 @@ function getClientScript() {
         const allPreview = selected ? rgbBuilderUsesAllFeedbackPreview() : Boolean(definedPreview?.allFeedback);
         const selectedFill = selected ? rgbBuilderPreviewFill() : definedPreview?.fill || style.fill;
         const selectedText = selected ? rgbBuilderPreviewText() : definedPreview?.text || style.text;
-        const tooltipText = "Click to add or remove LED " + ledIndex + " for " + (position.display || position.keycode) + " (" + position.keycode + ")";
+        const state = selected ? "Selected for the pending row." : definedPreview ? "Already covered by an enabled row in this target table." : "Not selected for the pending row.";
+        const tooltipText = "LED " + ledIndex + " for " + (position.display || position.keycode) + " (" + position.keycode + "). " + state + " Click to add or remove it from the inline selection.";
         const transform = visual.angle ? " transform='rotate(" + visual.angle + " " + cx + " " + cy + ")'" : "";
         return "<g class='svg-key " + (selected ? "rgb-selected" : "") + (definedPreview ? " rgb-defined" : "") + (allPreview ? " rgb-all-preview" : "") + "' data-action='toggleRgbLed' data-led='" + ledIndex + "' data-tooltip='" + escapeAttr(tooltipText) + "'" + transform + ">" +
             "<rect data-rgb-led-preview x='" + visual.x + "' y='" + visual.y + "' width='" + keyboardGeometry.keyWidth + "' height='" + keyboardGeometry.keyHeight + "' rx='" + keyboardGeometry.radius + "' fill='" + selectedFill + "' stroke='" + (selected ? "#ffffff" : style.stroke) + "'></rect>" +
@@ -9948,7 +9973,8 @@ function getClientScript() {
         const fallbackFill = hsvToHex(trackballUnderlyingPreviewColor()) || "#20262a";
         const fill = selected ? rgbBuilderPreviewFill() : definedPreview?.fill || fallbackFill;
         const textColor = selected ? rgbBuilderPreviewText() : definedPreview?.text || idealText(fallbackFill);
-        const tooltipText = "Click to add or remove trackball LED " + ledIndex + " from the group builder.";
+        const state = selected ? "Selected for the pending row." : definedPreview ? "Already covered by an enabled row in this target table." : "Not selected for the pending row.";
+        const tooltipText = "Trackball LED " + ledIndex + ". " + state + " Click to add or remove it from the inline selection.";
         return "<g class='extra-led " + (selected ? "rgb-selected" : "") + (definedPreview ? " rgb-defined" : "") + (allPreview ? " rgb-all-preview" : "") + "' data-action='toggleRgbTrackball' data-tooltip='" + escapeAttr(tooltipText) + "'>" +
             "<circle data-rgb-led-preview cx='" + cx + "' cy='" + cy + "' r='13' fill='" + fill + "' stroke='" + (selected ? "#ffffff" : "#31c6a4") + "'></circle>" +
             "<text x='" + cx + "' y='" + (cy + 1) + "' fill='" + textColor + "' font-size='10' text-anchor='middle' dominant-baseline='middle'>" + ledIndex + "</text>" +
@@ -9985,23 +10011,28 @@ function getClientScript() {
 
     function renderLayerColorCard(row) {
         return "<details class='card rgb-subsection collapsible-card' data-dirty-section data-layer='" + escapeAttr(row.layer) + "'>" +
-            renderRgbConfigSummary(row.layer, row.color, row.mode, layerRgbSummaryOptions(row)) +
+            renderRgbConfigSummary(row.layer, row.color, row.mode, {
+                ...layerRgbSummaryOptions(row),
+                summaryTooltip: "Layer color row for " + row.layer + ". Click to edit its HSV color and render mode; LED group rows can override specific LEDs."
+            }) +
             "<div class='rgb-subsection-body'>" +
             renderHsvColorControl(row.color, "", "", { pickerColor: layerPreviewColor(row) || row.color }) +
             layerPassthroughNote(row) +
             "<div class='form-grid four'>" +
-            "<label><span>mode</span><select name='mode'>" + options(["ALL_KEYS", "KEYS_MAPPED_ON_THIS_LAYER_ONLY"], row.mode) + "</select></label>" +
+            "<label data-tooltip='Layer render mode. ALL_KEYS paints the whole layer; KEYS_MAPPED_ON_THIS_LAYER_ONLY paints only keys mapped on this layer and lets other LEDs pass through.'><span>mode</span><select name='mode' data-tooltip='Layer render mode. ALL_KEYS paints the whole layer; KEYS_MAPPED_ON_THIS_LAYER_ONLY paints only keys mapped on this layer and lets other LEDs pass through.'>" + options(["ALL_KEYS", "KEYS_MAPPED_ON_THIS_LAYER_ONLY"], row.mode) + "</select></label>" +
             "<button data-action='updateLayerColor' data-dirty-button class='primary'>Apply</button>" +
             "</div></div></details>";
     }
 
     function renderPdColorCard(row) {
         return "<details class='card rgb-subsection collapsible-card' data-dirty-section data-mode='" + escapeAttr(row.pointingMode) + "'>" +
-            renderRgbConfigSummary(row.pointingMode, row.color, row.locality) +
+            renderRgbConfigSummary(row.pointingMode, row.color, row.locality, {
+                summaryTooltip: "Pointing-mode feedback color for " + row.pointingMode + ". Click to edit HSV color and locality for this active mode."
+            }) +
             "<div class='rgb-subsection-body'>" +
             renderHsvColorControl(row.color) +
             "<div class='form-grid four'>" +
-            "<label><span>locality</span><select name='locality'>" + options(rgbLocalities, row.locality) + "</select></label>" +
+            "<label data-tooltip='Where this pointing-mode feedback paints while the mode is active.'><span>locality</span><select name='locality' data-tooltip='Where this pointing-mode feedback paints while the mode is active.'>" + options(rgbLocalities, row.locality) + "</select></label>" +
             "<button data-action='updatePdModeColor' data-dirty-button class='primary'>Apply</button>" +
             "</div></div></details>";
     }
@@ -10011,11 +10042,13 @@ function getClientScript() {
             return "<p class='muted'>No active automouse fade config parsed.</p>";
         }
         return "<details class='card rgb-subsection collapsible-card' data-dirty-section>" +
-            renderRgbConfigSummary("Fade destination", config.end_color, config.mode) +
+            renderRgbConfigSummary("Fade destination", config.end_color, config.mode, {
+                summaryTooltip: "Auto-mouse fade destination. Click to edit the HSV color and fade mode used as auto-mouse approaches timeout."
+            }) +
             "<div class='rgb-subsection-body'>" +
             renderHsvColorControl(config.end_color) +
             "<div class='form-grid four'>" +
-            "<label><span>mode</span><select name='mode'>" + options(automouseFadeModes, config.mode) + "</select></label>" +
+            "<label data-tooltip='Auto-mouse fade mode. It controls whether the timeout fade ends on the real destination color, where the base effect would show, or on all keys.'><span>mode</span><select name='mode' data-tooltip='Auto-mouse fade mode. It controls whether the timeout fade ends on the real destination color, where the base effect would show, or on all keys.'>" + options(automouseFadeModes, config.mode) + "</select></label>" +
             "<button data-action='updateAutomouseFade' data-dirty-button class='primary'>Apply</button>" +
             "</div>" +
             "</div></details>";
@@ -10026,11 +10059,13 @@ function getClientScript() {
             return "<p class='muted'>No active combo feedback config parsed.</p>";
         }
         return "<details class='card rgb-subsection collapsible-card' data-dirty-section>" +
-            renderRgbConfigSummary("Active combo color", config.color, config.locality) +
+            renderRgbConfigSummary("Active combo color", config.color, config.locality, {
+                summaryTooltip: "Combo feedback color shown while combo member keys are active. Click to edit HSV color and locality."
+            }) +
             "<div class='rgb-subsection-body'>" +
             renderHsvColorControl(config.color) +
             "<div class='form-grid four'>" +
-            "<label><span>locality</span><select name='locality'>" + options(rgbLocalities, config.locality) + "</select></label>" +
+            "<label data-tooltip='Where combo feedback paints while combo member keys are active.'><span>locality</span><select name='locality' data-tooltip='Where combo feedback paints while combo member keys are active.'>" + options(rgbLocalities, config.locality) + "</select></label>" +
             "<button data-action='updateComboFeedback' data-dirty-button class='primary'>Apply</button>" +
             "</div>" +
             "</div></details>";
@@ -10049,12 +10084,12 @@ function getClientScript() {
         const branchRows = (config.tapBranchColors || []).map((color, index) => ["Tap count " + (index + 2), "tapBranchColor" + (index + 2), color]);
         return "<div id='keyBehaviorFeedbackCard' class='card-list' data-dirty-section>" +
             "<details class='card collapsible-card'>" +
-            "<summary><h3>Policy</h3></summary>" +
+            "<summary data-tooltip='Key behavior feedback policy. Click to edit which tap branches show confirmation, when tap-commit feedback appears, and where feedback paints.'><h3>Policy</h3></summary>" +
             "<div class='rgb-subsection-body'>" +
             "<div class='form-grid four'>" +
             "<label><span>branch confirm mode</span><select name='branchConfirmMode'>" + options(keyFeedbackBranchConfirmModes, config.branchConfirmMode) + "</select></label>" +
             "<label><span>tap commit mode</span><select name='tapCommitMode'>" + options(keyFeedbackTapCommitModes, config.tapCommitMode) + "</select></label>" +
-            "<label><span>locality</span><select name='locality'>" + options(rgbLocalities, config.locality) + "</select></label>" +
+            "<label data-tooltip='Where key-behavior feedback paints for tap, hold, long-hold, and tap-count states.'><span>locality</span><select name='locality' data-tooltip='Where key-behavior feedback paints for tap, hold, long-hold, and tap-count states.'>" + options(rgbLocalities, config.locality) + "</select></label>" +
             "</div>" +
             "</div></details>" +
             colorRows.map(([label, id, color]) =>
@@ -10069,9 +10104,19 @@ function getClientScript() {
 
     function renderRgbColorSubpanel(label, id, color, extraAttrs = "") {
         return "<details class='card rgb-subsection'>" +
-            renderRgbConfigSummary(label, color) +
+            renderRgbConfigSummary(label, color, "", { summaryTooltip: rgbColorSubpanelTooltip(label) }) +
             "<div class='rgb-subsection-body'>" + renderHsvColorControl(color, id, extraAttrs) + "</div>" +
             "</details>";
+    }
+
+    function rgbColorSubpanelTooltip(label) {
+        const key = normalizeTooltipKey(label);
+        if (key === "tap pending") return "Color shown while a key behavior is waiting to decide which tap-count branch will win. Click to edit HSV channels.";
+        if (key === "tap committed") return "Color shown after a base tap commits when tap-commit feedback is enabled. Click to edit HSV channels.";
+        if (key === "hold active") return "Color shown while a key behavior hold action is active. Click to edit HSV channels.";
+        if (key === "long hold active") return "Color shown while a key behavior long-hold action is active. Click to edit HSV channels.";
+        if (key.startsWith("tap count ")) return "Color shown during the branch-confirm window for this committed tap-count branch. Click to edit HSV channels.";
+        return "RGB feedback color row for " + label + ". Click to edit HSV channels.";
     }
 
     function layerRgbSummaryOptions(row) {
@@ -10100,7 +10145,8 @@ function getClientScript() {
     function renderRgbConfigSummary(label, color, meta = "", options = {}) {
         const expression = options.expression || colorExpression(color);
         const previewColor = options.previewColor || color;
-        return "<summary><span class='rgb-summary'>" +
+        const summaryTooltip = options.summaryTooltip || ("RGB row for " + label + ". Click to expand HSV color controls." + (meta ? " Current policy: " + meta + "." : ""));
+        return "<summary data-tooltip='" + escapeAttr(summaryTooltip) + "'><span class='rgb-summary'>" +
             "<span class='rgb-summary-title'>" + escapeHtml(label) + "</span>" +
             renderSummarySwatch(previewColor, options.swatchTooltip || ("Collapsed color preview: " + expression), options) +
             "<span class='rgb-summary-meta'>" +
@@ -10136,29 +10182,44 @@ function getClientScript() {
         if (!rows.length) {
             return "<p class='muted'>No active LED group rows are enabled in this table.</p>";
         }
-        const ownerHeader = ownerLabel ? "<th>" + escapeHtml(ownerLabel) + "</th>" : "";
-        return "<table><thead><tr>" + ownerHeader + "<th>Color</th><th>LED group</th><th>LEDs</th></tr></thead><tbody>" +
+        const ownerHeader = ownerLabel ? renderTooltipHeader(ownerLabel, ledGroupOwnerHeaderTooltip(ownerLabel, tableKind)) : "";
+        return "<table><thead><tr>" + ownerHeader +
+            renderTooltipHeader("Color", "Color used by this LED group row. HSV(0, 0, 0) inherits the owning stage color.") +
+            renderTooltipHeader("LED group", "Reusable or inline RGB_LED_GROUP expression authored in rgb_config.c.") +
+            renderTooltipHeader("LEDs", "Physical LED indices contained by this row after resolving reusable groups.") +
+            "</tr></thead><tbody>" +
             rows.map((row) => "<tr>" +
                 (ownerLabel ? "<td>" + renderLedGroupOwnerCell(row, tableKind) + "</td>" : "") +
                 renderLedGroupColorCell(row, tableKind) +
                 "<td>" + renderLedGroupExpressionCell(row) + "</td>" +
-                "<td><code>" + escapeHtml((row.ledIndices || []).join(", ")) + "</code></td>" +
+                "<td data-tooltip='" + escapeAttr("Resolved physical LED indices for this row: " + ((row.ledIndices || []).join(", ") || "none")) + "'><code>" + escapeHtml((row.ledIndices || []).join(", ")) + "</code></td>" +
                 "</tr>").join("") +
             "</tbody></table>";
     }
 
+    function ledGroupOwnerHeaderTooltip(ownerLabel, tableKind = "") {
+        if (tableKind === "layer") return "Layer owner for this LED group row. All layers means the row applies to every layer.";
+        if (tableKind === "pdMode") return "Pointing-mode owner for this LED group row. All pointing modes means the row applies to every pointing mode.";
+        if (tableKind === "keyBehavior") return "Key-behavior feedback semantic that owns this LED group row.";
+        return ownerLabel + " owner for this LED group row.";
+    }
+
     function renderLedGroupExpressionCell(row) {
         const kind = row.ledGroupKind === "reusable" ? "reusable" : "inline";
-        return "<code>" + escapeHtml(row.ledGroup || "") + "</code><div class='muted'>" + kind + "</div>";
+        const tooltip = kind === "reusable"
+            ? "Reusable RGB_LED_GROUP_* reference. Editing the reusable definition changes every row that uses it."
+            : "Inline RGB_LED_GROUP(...) expression stored directly on this table row.";
+        return "<code data-tooltip='" + escapeAttr(tooltip) + "'>" + escapeHtml(row.ledGroup || "") + "</code><div class='muted'>" + kind + "</div>";
     }
 
     function renderLedGroupOwnerCell(row, tableKind = "") {
         const owner = row.owner || "";
         const label = rgbLedGroupOwnerLabel(owner, tableKind);
+        const tooltip = "Owner for this row: " + (label || owner || "shared combo feedback") + ".";
         if (label === owner) {
-            return "<code>" + escapeHtml(owner) + "</code>";
+            return "<code data-tooltip='" + escapeAttr(tooltip) + "'>" + escapeHtml(owner) + "</code>";
         }
-        return "<code>" + escapeHtml(owner) + "</code><div class='muted'>" + escapeHtml(label) + "</div>";
+        return "<code data-tooltip='" + escapeAttr(tooltip) + "'>" + escapeHtml(owner) + "</code><div class='muted'>" + escapeHtml(label) + "</div>";
     }
 
     function rgbLedGroupOwnerLabel(owner, tableKind = "") {
@@ -10172,15 +10233,15 @@ function getClientScript() {
     function renderLedGroupColorCell(row, tableKind = "") {
         if (rgbGroupColorInherits(row.color)) {
             if (tableKind === "keyBehavior" && row.owner === keyBehaviorAllGroups) {
-                return "<td><div class='toolbar'>" + keyBehaviorRgbSemanticColorRows().map((semanticRow) => renderInlineSwatch(semanticRow.color)).join("") + "</div><code class='muted'>inherits active feedback color</code></td>";
+                return "<td data-tooltip='HSV(0, 0, 0) for all feedback groups inherits whichever key-behavior feedback semantic is active at render time.'><div class='toolbar'>" + keyBehaviorRgbSemanticColorRows().map((semanticRow) => renderInlineSwatch(semanticRow.color)).join("") + "</div><code class='muted'>inherits active feedback color</code></td>";
             }
             const inherited = rgbLedGroupInheritedColor(row, tableKind);
             if (inherited) {
-                return "<td>" + renderInlineSwatch(inherited) + "<code class='muted'>" + escapeHtml(rgbLedGroupInheritedLabel(row, tableKind)) + "</code></td>";
+                return "<td data-tooltip='" + escapeAttr("HSV(0, 0, 0) inherits the owning stage color: " + rgbLedGroupInheritedLabel(row, tableKind) + ".") + "'>" + renderInlineSwatch(inherited) + "<code class='muted'>" + escapeHtml(rgbLedGroupInheritedLabel(row, tableKind)) + "</code></td>";
             }
-            return "<td><code class='muted'>" + escapeHtml(rgbLedGroupInheritedLabel(row, tableKind)) + "</code></td>";
+            return "<td data-tooltip='" + escapeAttr("HSV(0, 0, 0) inherits the owning stage color: " + rgbLedGroupInheritedLabel(row, tableKind) + ".") + "'><code class='muted'>" + escapeHtml(rgbLedGroupInheritedLabel(row, tableKind)) + "</code></td>";
         }
-        return "<td>" + renderInlineSwatch(row.color) + "<code>" + escapeHtml(row.color?.expression || "") + "</code></td>";
+        return "<td data-tooltip='" + escapeAttr("Explicit HSV color for this LED group row: " + (row.color?.expression || colorExpression(row.color))) + "'>" + renderInlineSwatch(row.color) + "<code>" + escapeHtml(row.color?.expression || "") + "</code></td>";
     }
 
     function rgbGroupColorInherits(color) {
@@ -10238,12 +10299,13 @@ function getClientScript() {
     function renderHsvColorControl(color, id, extraAttrs = "", options = {}) {
         const hex = hsvToHex(options.pickerColor || color) || "#000000";
         const idAttr = id ? " data-color-id='" + escapeAttr(id) + "'" : "";
+        const expression = colorExpression(color);
         return "<div class='color-control' data-color-control" + idAttr + extraAttrs + ">" +
             "<div class='color-row'>" +
             "<label><span>picker</span><input type='color' data-color-picker value='" + hex + "'></label>" +
             hsvInputs(color) +
             "</div>" +
-            "<code class='muted' data-color-expression>" + escapeHtml(colorExpression(color)) + "</code>" +
+            "<code class='muted' data-color-expression data-tooltip='" + escapeAttr("Authored HSV expression that will be written back to rgb_config.c: " + expression) + "'>" + escapeHtml(expression) + "</code>" +
             "</div>";
     }
 
@@ -10280,7 +10342,9 @@ function getClientScript() {
             picker.value = hex;
         }
         if (expression) {
-            expression.textContent = colorExpression(color);
+            const nextExpression = colorExpression(color);
+            expression.textContent = nextExpression;
+            expression.setAttribute("data-tooltip", "Authored HSV expression that will be written back to rgb_config.c: " + nextExpression);
         }
         const subsection = control.closest(".rgb-subsection");
         if (subsection) {
