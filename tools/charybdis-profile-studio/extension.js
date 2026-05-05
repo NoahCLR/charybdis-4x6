@@ -61,75 +61,75 @@ const CONFIG_DEFAULT_SECTIONS = [
         id: "keyTiming",
         label: "Key Timing",
         fields: [
-            { macro: "TAPPING_TERM", label: "QMK tapping term", kind: "number", validate: "timing-ms", tooltip: "Controls QMK dual-role keys such as LT() and MT(). Higher values give a press more time to count as a tap before it becomes a hold." },
-            { macro: "COMBO_TERM", label: "Combo term", kind: "number", validate: "timing-ms", tooltip: "Maximum gap between combo member key presses. Higher values make slower chords easier; lower values reduce accidental combo triggers." },
-            { macro: "CUSTOM_TAP_HOLD_TERM", label: "Tap-hold term", kind: "number", validate: "timing-ms", tooltip: "Default tap vs hold boundary for key_behaviors[] rows that leave tap_hold_term empty. Lower values make holds activate sooner." },
-            { macro: "CUSTOM_LONGER_HOLD_TERM", label: "Long hold term", kind: "number", validate: "timing-ms", tooltip: "Default hold vs long-hold boundary for key_behaviors[] rows that leave longer_hold_term empty. Higher values require a longer press for third-tier actions." },
-            { macro: "CUSTOM_MULTI_TAP_TERM", label: "Multi-tap term", kind: "number", validate: "timing-ms", tooltip: "Maximum gap between repeated taps in key_behaviors[] multi-tap branches. Higher values allow slower double/triple taps." },
+            { macro: "TAPPING_TERM", label: "QMK tapping term", kind: "number", validate: "timing-ms", tooltip: "Tap-vs-hold window for QMK dual-role keys such as LT() and MT(). It does not drive custom key_behaviors[] rows. Higher values make taps easier; lower values make holds start sooner." },
+            { macro: "COMBO_TERM", label: "Combo term", kind: "number", validate: "timing-ms", tooltip: "Maximum time between combo member key presses in COMBOS(...). Higher values allow slower chords; lower values reduce accidental combo triggers." },
+            { macro: "CUSTOM_TAP_HOLD_TERM", label: "Tap-hold term", kind: "number", validate: "timing-ms", tooltip: "Default tap-vs-hold boundary for key_behaviors[] rows that leave tap_hold_term empty. Row-level values override this. Lower values make holds activate sooner." },
+            { macro: "CUSTOM_LONGER_HOLD_TERM", label: "Long hold term", kind: "number", validate: "timing-ms", tooltip: "Default hold-vs-long-hold boundary for key_behaviors[] rows that leave longer_hold_term empty. Row-level values override this. Higher values require a longer press for third-tier actions." },
+            { macro: "CUSTOM_MULTI_TAP_TERM", label: "Multi-tap term", kind: "number", validate: "timing-ms", tooltip: "Default maximum gap between repeated taps in key_behaviors[] tap-count branches. Row-level values override this. Higher values allow slower double/triple taps." },
         ],
     },
     {
         id: "normalPointerSpeed",
         label: "Normal Pointer Speed",
         fields: [
-            { macro: "CHARYBDIS_MINIMUM_DEFAULT_DPI", label: "Default DPI minimum", kind: "number", validate: "positive-int", tooltip: "Lowest value in the normal pointer DPI ladder. The configured default DPI steps upward from this base." },
-            { macro: "CHARYBDIS_DEFAULT_DPI_CONFIG_STEP", label: "Default DPI step", kind: "number", validate: "positive-int", tooltip: "Increment between entries in the normal pointer DPI ladder. Higher values make each DPI setting jump farther." },
+            { macro: "CHARYBDIS_MINIMUM_DEFAULT_DPI", label: "Default DPI minimum", kind: "number", validate: "positive-int", tooltip: "Base CPI for the normal pointer DPI ladder used by DPI controls and by pointing modes set to fallback. Actual normal CPI is minimum + selected index * step." },
+            { macro: "CHARYBDIS_DEFAULT_DPI_CONFIG_STEP", label: "Default DPI step", kind: "number", validate: "positive-int", tooltip: "CPI distance between normal pointer DPI ladder entries. Higher values make each DPI up/down adjustment jump farther." },
         ],
     },
     {
         id: "pointingModeSpeeds",
         label: "Pointing Mode Speeds",
         fields: [
-            { macro: "CHARYBDIS_DRAGSCROLL_DPI", label: "Drag-scroll DPI", kind: "number", validate: "positive-int", tooltip: "Pointer CPI used while dragscroll is active. Higher values make ball movement produce faster scrolling." },
-            { macro: "PD_MODE_VOLUME_DPI", label: "Volume mode DPI override", kind: "number", validate: "nonnegative-int", hint: "0 uses normal pointer DPI", tooltip: "Temporary pointer CPI while volume mode is active. 0 does not mean zero movement; it keeps the normal pointer DPI." },
-            { macro: "PD_MODE_BRIGHTNESS_DPI", label: "Brightness mode DPI override", kind: "number", validate: "nonnegative-int", hint: "0 uses normal pointer DPI", tooltip: "Temporary pointer CPI while brightness mode is active. 0 does not mean zero movement; it keeps the normal pointer DPI." },
-            { macro: "PD_MODE_ZOOM_DPI", label: "Zoom mode DPI override", kind: "number", validate: "nonnegative-int", hint: "0 uses normal pointer DPI", tooltip: "Temporary pointer CPI while zoom mode is active. 0 keeps normal pointer DPI; higher values make ball movement more sensitive in this mode." },
-            { macro: "PD_MODE_ARROW_DPI", label: "Arrow mode DPI override", kind: "number", validate: "nonnegative-int", hint: "0 uses normal pointer DPI", tooltip: "Temporary pointer CPI while arrow mode is active. 0 keeps normal pointer DPI; higher values make directional movement more sensitive." },
+            { macro: "CHARYBDIS_DRAGSCROLL_DPI", label: "Drag-scroll DPI", kind: "number", validate: "positive-int", tooltip: "Explicit CPI while drag-scroll mode is active. Higher values make ball movement produce faster scrolling. This field does not use the 0 fallback convention." },
+            { macro: "PD_MODE_VOLUME_DPI", label: "Volume mode DPI override", kind: "number", validate: "nonnegative-int", hint: "0 uses normal pointer DPI", tooltip: "Temporary CPI while volume mode maps ball movement to volume changes. 0 keeps the current normal pointer DPI instead of meaning no movement." },
+            { macro: "PD_MODE_BRIGHTNESS_DPI", label: "Brightness mode DPI override", kind: "number", validate: "nonnegative-int", hint: "0 uses normal pointer DPI", tooltip: "Temporary CPI while brightness mode maps ball movement to brightness changes. 0 keeps the current normal pointer DPI instead of meaning no movement." },
+            { macro: "PD_MODE_ZOOM_DPI", label: "Zoom mode DPI override", kind: "number", validate: "nonnegative-int", hint: "0 uses normal pointer DPI", tooltip: "Temporary CPI while zoom mode is active. 0 keeps the current normal pointer DPI; higher values make zoom movement more sensitive." },
+            { macro: "PD_MODE_ARROW_DPI", label: "Arrow mode DPI override", kind: "number", validate: "nonnegative-int", hint: "0 uses normal pointer DPI", tooltip: "Temporary CPI while arrow mode turns ball movement into directional output. 0 keeps the current normal pointer DPI; higher values increase sensitivity." },
         ],
     },
     {
         id: "sniping",
         label: "Sniping",
         fields: [
-            { macro: "CHARYBDIS_MINIMUM_SNIPING_DPI", label: "Sniping DPI minimum", kind: "number", validate: "positive-int", tooltip: "Lowest value in the sniping DPI ladder. Sniping uses this lower-sensitivity range when active." },
-            { macro: "CHARYBDIS_SNIPING_DPI_CONFIG_STEP", label: "Sniping DPI step", kind: "number", validate: "positive-int", tooltip: "Increment between entries in the sniping DPI ladder. Higher values make sniping sensitivity steps farther apart." },
-            { macro: "CHARYBDIS_AUTO_SNIPING_ENABLE", label: "Auto-sniping", kind: "toggle", tooltip: "Enables automatic sniping while the configured sniping layer is active. Disable this if sniping should only be entered manually." },
-            { macro: "CHARYBDIS_AUTO_SNIPING_LAYER", label: "Auto-sniping layer", kind: "layer", validate: "layer", tooltip: "Layer that turns sniping on automatically while active. Changing this moves the auto-sniping trigger to another layer." },
+            { macro: "CHARYBDIS_MINIMUM_SNIPING_DPI", label: "Sniping DPI minimum", kind: "number", validate: "positive-int", tooltip: "Base CPI for the sniping DPI ladder. While sniping is active it uses this lower-sensitivity ladder and takes priority over pointing-mode DPI overrides." },
+            { macro: "CHARYBDIS_SNIPING_DPI_CONFIG_STEP", label: "Sniping DPI step", kind: "number", validate: "positive-int", tooltip: "CPI distance between sniping DPI ladder entries. Higher values make each sniping DPI adjustment jump farther." },
+            { macro: "CHARYBDIS_AUTO_SNIPING_ENABLE", label: "Auto-sniping", kind: "toggle", tooltip: "Automatically enters sniping while the configured auto-sniping layer is active. Disable this if sniping should only be entered by manual controls." },
+            { macro: "CHARYBDIS_AUTO_SNIPING_LAYER", label: "Auto-sniping layer", kind: "layer", validate: "layer", tooltip: "Layer that triggers automatic sniping while active. Changing this moves the sniping trigger; it does not change the layer's normal keymap contents." },
         ],
     },
     {
         id: "autoMouse",
         label: "Auto-mouse",
         fields: [
-            { macro: "POINTING_DEVICE_AUTO_MOUSE_ENABLE", label: "Auto-mouse", kind: "toggle", tooltip: "Enables automatic pointer-layer activation from trackball movement. Disable this if pointer movement should not switch layers." },
-            { macro: "AUTO_MOUSE_DEFAULT_LAYER", label: "Auto-mouse layer", kind: "layer", validate: "layer", tooltip: "Layer activated by auto-mouse movement. Changing this chooses which layer appears while the trackball is in use." },
-            { macro: "AUTO_MOUSE_TIME", label: "Auto-mouse timeout", kind: "number", validate: "positive-int", tooltip: "How long auto-mouse stays active after the last pointing movement. Higher values keep the pointer layer active longer." },
+            { macro: "POINTING_DEVICE_AUTO_MOUSE_ENABLE", label: "Auto-mouse", kind: "toggle", tooltip: "Enables automatic layer activation from trackball movement. Disable this if pointing movement should never switch to the auto-mouse layer." },
+            { macro: "AUTO_MOUSE_DEFAULT_LAYER", label: "Auto-mouse layer", kind: "layer", validate: "layer", tooltip: "Layer activated by auto-mouse movement. Changing this chooses which layer appears while the trackball is in use; it does not change the layer's key contents." },
+            { macro: "AUTO_MOUSE_TIME", label: "Auto-mouse timeout", kind: "number", validate: "positive-int", tooltip: "Milliseconds auto-mouse remains active after the last pointing movement. Higher values keep the layer active longer and also lengthen the auto-mouse RGB fade window." },
         ],
     },
     {
         id: "rgbAppearance",
         label: "Base Lighting",
         fields: [
-            { macro: "RGB_MATRIX_DEFAULT_MODE", label: "Default RGB mode", kind: "expression", validate: "identifier", tooltip: "Base QMK RGB Matrix effect used when profile overlays leave LEDs unpainted. Layer colors and feedback can still override it." },
-            { macro: "RGB_MATRIX_DEFAULT_HUE", label: "Default hue", kind: "number", validate: "uint8", tooltip: "Hue channel for the default RGB Matrix color. It affects the base color visible under pass-through layer colors." },
-            { macro: "RGB_MATRIX_DEFAULT_SAT", label: "Default saturation", kind: "number", validate: "uint8", tooltip: "Saturation channel for the default RGB Matrix color. 0 is white/gray; 255 is fully saturated." },
-            { macro: "RGB_MATRIX_MAXIMUM_BRIGHTNESS", label: "Maximum brightness", kind: "number", validate: "uint8", tooltip: "Brightness cap for RGB Matrix output. Lower values reduce LED brightness and current draw." },
-            { macro: "RGB_MATRIX_DEFAULT_VAL", label: "Default value", kind: "expression", validate: "safe-expression", tooltip: "Value/brightness channel for the default RGB Matrix color. This commonly follows the maximum-brightness cap." },
-            { macro: "RGB_MATRIX_TIMEOUT", label: "RGB timeout", kind: "number", validate: "nonnegative-int", tooltip: "Milliseconds of inactivity before RGB Matrix turns off. 0 disables the timeout; higher values keep lighting on longer." },
+            { macro: "RGB_MATRIX_DEFAULT_MODE", label: "Default RGB mode", kind: "expression", validate: "identifier", tooltip: "Base QMK RGB Matrix effect used when no layer color or feedback overlay paints an LED. Profile RGB rows can still override individual LEDs." },
+            { macro: "RGB_MATRIX_DEFAULT_HUE", label: "Default hue", kind: "number", validate: "uint8", tooltip: "Hue channel for the base RGB Matrix color. It is visible where layer colors pass through to the default effect." },
+            { macro: "RGB_MATRIX_DEFAULT_SAT", label: "Default saturation", kind: "number", validate: "uint8", tooltip: "Saturation channel for the base RGB Matrix color. 0 is white/gray; 255 is fully saturated." },
+            { macro: "RGB_MATRIX_MAXIMUM_BRIGHTNESS", label: "Maximum brightness", kind: "number", validate: "uint8", tooltip: "Global brightness cap for RGB Matrix output. Lower values reduce LED brightness and current draw; values are 0-255." },
+            { macro: "RGB_MATRIX_DEFAULT_VAL", label: "Default value", kind: "expression", validate: "safe-expression", tooltip: "Brightness channel for the base RGB Matrix color. This sets the default effect brightness, while maximum brightness caps the final output." },
+            { macro: "RGB_MATRIX_TIMEOUT", label: "RGB timeout", kind: "number", validate: "nonnegative-int", tooltip: "Milliseconds of keyboard inactivity before RGB Matrix turns off. 0 disables the timeout; higher values keep lighting on longer." },
         ],
     },
     {
         id: "lightingFeedback",
         label: "Lighting Feedback",
         fields: [
-            { macro: "RGB_PD_MODE_FEEDBACK_ENABLE", label: "Pointing-mode feedback", kind: "toggle", tooltip: "Enables the RGB overlay for active pointing modes. Disable this to remove pointing-mode color feedback entirely." },
-            { macro: "RGB_COMBO_FEEDBACK_ENABLE", label: "Combo feedback", kind: "toggle", tooltip: "Enables the RGB overlay shown while combo keys are active. Disable this to remove combo footprint feedback." },
-            { macro: "RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE", label: "Key-behavior feedback", kind: "toggle", tooltip: "Enables RGB feedback for custom key behavior taps, holds, long holds, and tap-count branches. Disable this to remove that stage." },
-            { macro: "CUSTOM_RGB_BRANCH_CONFIRM_TERM", label: "RGB branch-confirm term", kind: "number", validate: "timing-ms", tooltip: "Default visible confirmation window for committed non-base tap branches before their action finishes. Lower values make branch feedback shorter." },
-            { macro: "RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS", label: "Key feedback flash half-period", kind: "number", validate: "positive-int", tooltip: "Blink half-period for held or repeating key-behavior feedback. Lower values flash faster; higher values flash slower." },
-            { macro: "RGB_AUTOMOUSE_GRADIENT_ENABLE", label: "Auto-mouse gradient", kind: "toggle", tooltip: "Enables the RGB fade that shows auto-mouse approaching timeout. Disable this to remove the timeout fade overlay." },
-            { macro: "AUTOMOUSE_RGB_DEAD_TIME", label: "Auto-mouse RGB dead time", kind: "expression", validate: "safe-expression", tooltip: "Initial part of the auto-mouse timeout before the RGB fade starts. Higher values delay the visible timeout warning." },
-            { macro: "RGB_MATRIX_LED_FLUSH_LIMIT", label: "LED flush limit", kind: "number", validate: "positive-int", tooltip: "Minimum milliseconds between RGB Matrix LED updates. Higher values reduce CPU/LED update load but make animations and feedback less smooth." },
+            { macro: "RGB_PD_MODE_FEEDBACK_ENABLE", label: "Pointing-mode feedback", kind: "toggle", tooltip: "Enables the RGB overlay for active pointing modes such as volume, brightness, zoom, and arrows. Disable this to remove pointing-mode color feedback entirely." },
+            { macro: "RGB_COMBO_FEEDBACK_ENABLE", label: "Combo feedback", kind: "toggle", tooltip: "Enables the RGB overlay shown while combo member keys are active. Disable this to remove combo footprint feedback without changing combo behavior." },
+            { macro: "RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE", label: "Key-behavior feedback", kind: "toggle", tooltip: "Enables RGB feedback for custom key behavior taps, holds, long holds, and tap-count branches. Disable this to remove the visual stage without changing key output." },
+            { macro: "CUSTOM_RGB_BRANCH_CONFIRM_TERM", label: "RGB branch-confirm term", kind: "number", validate: "timing-ms", tooltip: "Default visible confirmation window for committed non-base tap-count branches. Row-level branch_confirm_term values override this; rows can also skip the confirm window." },
+            { macro: "RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS", label: "Key feedback flash half-period", kind: "number", validate: "positive-int", tooltip: "Blink half-period for held or repeating key-behavior feedback. One full blink cycle is twice this value; lower values flash faster." },
+            { macro: "RGB_AUTOMOUSE_GRADIENT_ENABLE", label: "Auto-mouse gradient", kind: "toggle", tooltip: "Enables the RGB fade that shows auto-mouse approaching its timeout. Disable this to remove the timeout fade while leaving auto-mouse layer activation unchanged." },
+            { macro: "AUTOMOUSE_RGB_DEAD_TIME", label: "Auto-mouse RGB dead time", kind: "expression", validate: "safe-expression", tooltip: "Initial part of AUTO_MOUSE_TIME before the auto-mouse RGB fade starts. Must stay below AUTO_MOUSE_TIME; higher values delay the visible timeout warning." },
+            { macro: "RGB_MATRIX_LED_FLUSH_LIMIT", label: "LED flush limit", kind: "number", validate: "positive-int", tooltip: "Global minimum milliseconds between RGB Matrix LED updates. Higher values reduce CPU/LED update load but make animation and feedback changes less smooth." },
         ],
     },
 ];
@@ -5122,8 +5122,8 @@ function getClientScript() {
     };
     const panelTooltips = {
         Status: "Parser messages, write status, and warnings from the current studio model.",
-        Layout: "Physical keyboard preview, selected-key editor, and selected-key behavior editor for the active layer.",
-        "Layer Overview": "Behavior rows, macros, combos, and pointing modes reachable from keys on the active layer.",
+        Layout: "Physical keyboard preview, layer tabs, selected-key editor, combo builder, and selected-key behavior editor for the active layer.",
+        "Layer Overview": "Read-only summary of behavior rows, macros, combos, and pointing modes reachable from keys on the active layer.",
         "Macro Builder": "Build payload strings for the VIA_MACROS(MACRO) table in keymap.c.",
         "Combo Builder": "Append a new COMBOS(COMBO) row to keymap.c.",
         "RGB LED Group Builder": "Select physical LEDs and append a row to one of the rgb_config.c LED group tables.",
@@ -5145,10 +5145,10 @@ function getClientScript() {
         "Lighting Feedback": "Edit config.h RGB feedback stage toggles, visible feedback timing, auto-mouse fade timing, and LED refresh cadence."
     };
     const actionTooltips = {
-        applyKey: "Stage the selected key value as a pending layout edit.",
-        saveSelectedBehavior: "Create or replace the key_behaviors[] row for this selected keycode.",
-        editComboOutputBehavior: "Load this combo output keycode into the behavior editor.",
-        editLayoutCombo: "Load this combo into the combo builder so its output or inputs can be edited.",
+        applyKey: "Stage the selected key value as a pending layout edit. Use Apply layout change to write staged edits to keymap.c.",
+        saveSelectedBehavior: "Create or replace the key_behaviors[] row for this selected keycode in keymap.c.",
+        editComboOutputBehavior: "Load this combo output keycode into the behavior editor so its key_behaviors[] row can be created or edited.",
+        editLayoutCombo: "Load this existing combo into the combo builder so its output or physical input keys can be edited.",
         addBehavior: "Append a simple key_behaviors[] row to keymap.c.",
         updateLayerColor: "Write this layer color and render mode back to rgb_config.c.",
         updatePdModeColor: "Write this pointing-mode color and locality back to rgb_config.c.",
@@ -5179,7 +5179,7 @@ function getClientScript() {
         clearMacroRecording: "Clear the current recording take and restore the payload captured when recording started.",
         dismissStatus: "Dismiss the current status popup until the status changes.",
         addCombo: "Append a combo row with the entered output and input keys.",
-        addLayoutCombo: "Append a combo row, or replace the loaded combo row, using the selected layout keys as inputs.",
+        addLayoutCombo: "Append a combo row, or replace the loaded combo row, using the selected physical layout keys as inputs.",
         applyLayoutChanges: "Write pending layout drag/drop and paste edits back to keymap.c.",
         toggleLayoutComboPicking: "Switch the layout board into combo input picking mode; click keys on the board to add or remove inputs.",
         toggleLayoutComboKey: "Add or remove this key from the pending layout combo.",
@@ -5206,22 +5206,25 @@ function getClientScript() {
         "addLayoutCombo"
     ]);
     const fieldTooltips = {
-        layer: "The active firmware layer. This is read from the LAYOUT() block and is not edited here.",
+        layer: "The active firmware layer shown in the board preview. Switch layers with the tabs above the board.",
         "layout index": "The physical LAYOUT() slot index for the selected key. It is fixed by the keyboard geometry.",
-        key: "User-facing key label or expression to write into the selected LAYOUT() slot, for example A, Enter, Space, _______, or Shift+Esc.",
+        key: "User-facing key label or expression to stage for the selected LAYOUT() slot, for example A, Enter, Space, _______, LT(LAYER_NAV, Slash), or Shift+Esc.",
         source: "The raw C expression currently stored in keymap.c.",
-        tap_hold_term: "Optional milliseconds before a tap can become a hold for this behavior row. Valid range: 1-65535 ms.",
-        longer_hold_term: "Optional milliseconds before a hold can become a long hold. Valid range: 1-65535 ms.",
-        multi_tap_term: "Optional milliseconds used to detect repeated taps. Valid range: 1-65535 ms.",
-        rgb_branch_confirm_term: "Optional milliseconds for the RGB-visible committed-branch window. Valid range: 1-65535 ms; empty uses the default.",
-        skip_rgb_branch_confirm: "Skip the RGB branch-confirm window for this behavior row.",
+        tap_hold_term: "Optional tap-vs-hold boundary for this key behavior row. Valid range: 1-65535 ms; empty uses the displayed default.",
+        longer_hold_term: "Optional hold-vs-long-hold boundary for this key behavior row. Valid range: 1-65535 ms; empty uses the displayed default.",
+        multi_tap_term: "Optional repeated-tap window for this key behavior row. Valid range: 1-65535 ms; empty uses the displayed default.",
+        rgb_branch_confirm_term: "Optional RGB-visible confirmation window for committed non-base tap-count branches. Valid range: 1-65535 ms; empty uses the displayed default.",
+        skip_rgb_branch_confirm: "Skip the RGB branch-confirm window for this behavior row. The key output still runs; only the visual pause is removed.",
+        tap: "Enable the tap-tier action for this tap-count branch. When enabled, choose a helper and action below.",
+        hold: "Enable the hold-tier action that can run after the tap-hold term for this branch.",
+        "long hold": "Enable the long-hold-tier action that can run after the longer-hold term for this branch.",
         table: "Choose which rgb_config.c LED group table will receive the new row.",
         owner: "The owner value for the target LED group table. Combo feedback groups do not need one.",
         "pointing mode": "The pointing mode whose color or LED group is being edited.",
         semantic: "The key-behavior feedback semantic that owns this LED group.",
         "group name": "Reusable RGB_LED_GROUP_* name defined near the LED map in rgb_config.c.",
         "LED group": "Choose an existing reusable LED group or use the current inline LED selection.",
-        mode: "Select the authored mode for this row, such as layer render mode or auto-mouse fade mode.",
+        mode: "Select the authored mode for this row, such as layer render mode, auto-mouse fade mode, or a reachable pointing mode.",
         locality: "Choose which keyboard half or key region receives this RGB feedback.",
         "branch confirm mode": "Choose whether selected tap-count branches get a branch-confirm feedback window before emitting.",
         "tap commit mode": "Choose when tap commit feedback is shown for key behavior taps.",
@@ -5229,9 +5232,9 @@ function getClientScript() {
         h: "HSV hue channel as QMK stores it, usually 0-255.",
         s: "HSV saturation channel as QMK stores it, usually 0-255.",
         v: "HSV value/brightness channel. Constants such as RGB_MATRIX_MAXIMUM_BRIGHTNESS are allowed.",
-        output: "The key or action produced by a combo.",
-        "output behavior": "The key behavior row that runs when this combo output keycode has authored behavior.",
-        inputs: "Comma-separated combo input keys, such as D, F.",
+        output: "The key or action produced by this combo, written as the combo output in keymap.c.",
+        "output behavior": "The key behavior row that runs after this combo emits its output keycode, if one exists.",
+        inputs: "Comma-separated physical combo input key expressions, such as D, F. Use the layout picker to choose slots from the active layer.",
         slot: "The VIA macro keycode slot.",
         payload: "The string payload sent by this VIA macro slot.",
         "step type": "Choose which payload command the macro step builder inserts.",
@@ -7780,13 +7783,13 @@ function getClientScript() {
         if (!key) return "";
         if (fieldTooltips[key]) return fieldTooltips[key];
         if (key.endsWith(" helper")) {
-            return "Choose the helper that controls this behavior action.";
+            return "Choose how this behavior action runs. The selected helper controls when and how the action keycode is sent.";
         }
         if (key.endsWith(" action")) {
-            return "User-facing key or action for this behavior branch, for example Esc, Shift+\`, Cmd+Q, or a pointing-mode key.";
+            return "Keycode or action passed to this behavior helper, for example Esc, Shift+\`, Cmd+Q, or a pointing-mode key.";
         }
         if (key.endsWith(" repeat hz")) {
-            return "Repeat frequency used only when the helper is REPEAT_WHILE_HELD.";
+            return "Repeat frequency used only when the helper is REPEAT_WHILE_HELD. Higher values send the action more often while held.";
         }
         return "";
     }
@@ -8016,7 +8019,7 @@ function getClientScript() {
             "<label><span>Layer</span><input disabled value='" + escapeAttr(layer.name) + "'></label>" +
             "<label><span>Layout index</span><input disabled value='" + selected.layoutIndex + "'></label>" +
             renderKeyPickerInput("keycodeInput", "Key", selected.editLabel || selected.display || selected.keycode, "A, Enter, Space, _______", "single", "", "", "data-validate='layout-key'") +
-            "<div><span class='muted'>Source</span><br><code class='source-pill'>" + escapeHtml(selected.keycode) + "</code></div>" +
+            "<div><span class='muted'>Source</span><br><code class='source-pill' data-tooltip='Raw keymap.c expression currently stored in this selected LAYOUT() slot.'>" + escapeHtml(selected.keycode) + "</code></div>" +
             "<button data-action='applyKey' data-dirty-button class='primary'>Stage key</button>" +
             "</div>" +
             "</div>";
@@ -8046,10 +8049,10 @@ function getClientScript() {
     function renderLayoutComboSelectedList(layer) {
         const selectedPositions = layoutComboSelectedPositions(layer);
         if (!selectedPositions.length) {
-            return "<span class='muted'>No layout input keys selected</span>";
+            return "<span class='muted' data-tooltip='No physical layout slots are selected as combo inputs yet. Use Pick input keys on layout, type Inputs manually, or open the key picker.'>No layout input keys selected</span>";
         }
         return selectedPositions.map((position) =>
-            "<button type='button' data-action='toggleLayoutComboKey' data-index='" + position.layoutIndex + "'><span>" + escapeHtml(position.display || position.keycode) + "</span><code>" + escapeHtml(position.keycode) + "</code></button>"
+            "<button type='button' data-action='toggleLayoutComboKey' data-index='" + position.layoutIndex + "' data-tooltip='" + escapeAttr("Remove layout index " + position.layoutIndex + " from this combo input draft: " + (position.display || position.keycode) + " (" + position.keycode + ")") + "'><span>" + escapeHtml(position.display || position.keycode) + "</span><code>" + escapeHtml(position.keycode) + "</code></button>"
         ).join("");
     }
 
@@ -8069,11 +8072,11 @@ function getClientScript() {
         }
         const title = selected.behaviorTitle || "Behavior on this key";
         const context = selected.behaviorContext
-            ? "<div><span class='muted'>Reachable via</span><br><code>" + escapeHtml(selected.behaviorContext) + "</code></div>"
+            ? "<div><span class='muted'>Reachable via</span><br><code data-tooltip='Visible selected key or combo output that reaches this behavior row.'>" + escapeHtml(selected.behaviorContext) + "</code></div>"
             : "";
         return "<div class='card selected-behavior-editor' data-dirty-section><h3>" + escapeHtml(title) + "</h3>" +
             "<input type='hidden' id='selectedBehaviorKeycode' value='" + escapeAttr(row.keycode) + "'>" +
-            "<div><span class='muted'>Source</span><br><code class='source-pill'>" + escapeHtml(row.keycode) + "</code></div>" +
+            "<div><span class='muted'>Source</span><br><code class='source-pill' data-tooltip='Raw keycode that owns this key_behaviors[] row in keymap.c.'>" + escapeHtml(row.keycode) + "</code></div>" +
             context +
             "<div class='form-grid four'>" +
             renderTimingInput("selectedTapHoldTerm", "tap_hold_term", row.tapHoldTerm || "", row.keycode) +
@@ -8656,10 +8659,11 @@ function getClientScript() {
     function renderBoard(layer) {
         const layerColor = colorForLayer(layer.name);
         const viewBox = keyboardGeometry.layoutViewBox;
+        const subtitle = layerColorSubtitle(layerColor);
         return "<div class='board layout-board-card'>" +
             "<div class='layout-board-header'>" +
             "<h3 class='layout-board-title'>" + escapeHtml(layer.name) + "</h3>" +
-            "<p class='layout-board-subtitle'>" + escapeHtml(layerColorSubtitle(layerColor)) + "</p>" +
+            "<p class='layout-board-subtitle' data-tooltip='Layer RGB summary: render mode, authored HSV color, and whether pass-through exposes the default RGB Matrix color.'>" + escapeHtml(subtitle) + "</p>" +
             "</div>" +
             "<div class='layout-board-stage'>" +
             "<svg class='keyboard-svg layout-board-svg' viewBox='" + viewBox.x + " " + viewBox.y + " " + viewBox.width + " " + viewBox.height + "' preserveAspectRatio='xMidYMid meet' role='img' aria-label='" + escapeAttr(layer.name + " keyboard layout") + "'>" +
@@ -9005,14 +9009,28 @@ function getClientScript() {
             "</div>";
     }
 
+    function renderTooltipHeader(label, tooltip) {
+        return "<th data-tooltip='" + escapeAttr(tooltip) + "'>" + escapeHtml(label) + "</th>";
+    }
+
+    function renderOverviewKeyButton(position) {
+        const label = position.display || position.keycode;
+        const tooltip = "Select layout index " + position.layoutIndex + " for editing: " + label + " (" + position.keycode + ").";
+        return "<button data-action='selectKey' data-index='" + position.layoutIndex + "' data-tooltip='" + escapeAttr(tooltip) + "'>" + escapeHtml(label) + "</button>";
+    }
+
     function renderLayerBehaviorTable(layer) {
         const rows = layerBehaviorRows(layer);
         if (!rows.length) {
             return "<p class='muted'>No authored behavior rows are active on this layer.</p>";
         }
-        return "<table><thead><tr><th>Key on layer</th><th>Behavior</th><th>Steps</th></tr></thead><tbody>" +
+        return "<table><thead><tr>" +
+            renderTooltipHeader("Key on layer", "Physical keys on the active layer that use this key_behaviors[] row.") +
+            renderTooltipHeader("Behavior", "Authored keycode that owns the key_behaviors[] row.") +
+            renderTooltipHeader("Steps", "Tap-count branch actions attached to this behavior row.") +
+            "</tr></thead><tbody>" +
             rows.map((row) =>
-                "<tr><td>" + row.positions.map((position) => "<button data-action='selectKey' data-index='" + position.layoutIndex + "'>" + escapeHtml(position.display) + "</button>").join(" ") +
+                "<tr><td>" + row.positions.map(renderOverviewKeyButton).join(" ") +
                 "</td><td>" + escapeHtml(displayAction(row.behavior.keycode)) + "<br><code class='muted'>" + escapeHtml(row.behavior.keycode) + "</code></td><td>" +
                 row.behavior.steps.map(renderStep).join("<br>") + "</td></tr>"
             ).join("") +
@@ -9035,7 +9053,12 @@ function getClientScript() {
         if (!combos.length) {
             return "<h3>Combos</h3><p class='muted'>No combos resolve entirely from keys on this layer.</p>";
         }
-        return "<h3>Combos</h3><table><thead><tr><th>Badge</th><th>Inputs</th><th>Output</th><th>Output behavior</th></tr></thead><tbody>" +
+        return "<h3>Combos</h3><table><thead><tr>" +
+            renderTooltipHeader("Badge", "Small combo badge shown on the physical layout preview for this active-layer combo.") +
+            renderTooltipHeader("Inputs", "Physical input keys that must be pressed together for this combo.") +
+            renderTooltipHeader("Output", "Keycode emitted by this combo, plus an edit action for the combo row.") +
+            renderTooltipHeader("Output behavior", "Behavior row that can run after the combo emits its output keycode.") +
+            "</tr></thead><tbody>" +
             combos.map(renderLayerComboRow).join("") +
             "</tbody></table>";
     }
@@ -9061,7 +9084,11 @@ function getClientScript() {
         if (!rows.length) {
             return "<h3>Macros</h3><p class='muted'>No macro keycodes are directly placed or reached by visible behavior actions on this layer.</p>";
         }
-        return "<h3>Macros</h3><table><thead><tr><th>Reachable via</th><th>Macro</th><th>Payload</th></tr></thead><tbody>" +
+        return "<h3>Macros</h3><table><thead><tr>" +
+            renderTooltipHeader("Reachable via", "Visible key, combo output, or behavior action on this layer that can trigger the macro.") +
+            renderTooltipHeader("Macro", "Macro keycode reached from the active layer.") +
+            renderTooltipHeader("Payload", "Parsed VIA or hardcoded macro payload sent by that macro keycode.") +
+            "</tr></thead><tbody>" +
             rows.map((row) =>
                 "<tr><td>" + escapeHtml(row.source) + "</td><td>" + escapeHtml(row.display || row.keycode) + "<br><code class='muted'>" + escapeHtml(row.keycode) + "</code></td><td>" + renderMacroPayload(row.slot) + "</td></tr>"
             ).join("") +
@@ -9126,7 +9153,11 @@ function getClientScript() {
         if (!rows.length) {
             return "<h3>PD Modes</h3><p class='muted'>No pointing modes are directly placed or reached by visible behavior actions on this layer.</p>";
         }
-        return "<h3>PD Modes</h3><table><thead><tr><th>Reachable via</th><th>Mode</th><th>RGB</th></tr></thead><tbody>" +
+        return "<h3>PD Modes</h3><table><thead><tr>" +
+            renderTooltipHeader("Reachable via", "Visible key, combo output, or behavior action on this layer that can activate the pointing mode.") +
+            renderTooltipHeader("Mode", "Pointing mode reached from this layer, with the action or lock keycode that activates it.") +
+            renderTooltipHeader("RGB", "Pointing-mode feedback color and locality used when this mode is active.") +
+            "</tr></thead><tbody>" +
             rows.map((row) => "<tr><td>" + escapeHtml(row.source) + "</td><td>" + renderPdModeCell(row) + "</td><td>" + renderInlineSwatch(row.color) + " <code class='muted'>" + escapeHtml(row.locality || "no override") + "</code></td></tr>").join("") +
             "</tbody></table>";
     }
