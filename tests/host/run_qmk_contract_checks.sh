@@ -3,7 +3,9 @@
 set -eu
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
-QMK_ROOT="${QMK_ROOT:-$ROOT/../bastardkb-qmk}"
+
+. "$ROOT/tests/host/noah_host_qmk_env.sh"
+noah_host_export_qmk_cpath "$ROOT"
 BUILD_DIR="$(mktemp -d)"
 STUB_BIN="$BUILD_DIR/qmk_contract_stub_probe"
 REAL_BIN="$BUILD_DIR/qmk_contract_real_probe"

@@ -4,6 +4,9 @@ set -eu
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 
+. "$ROOT/tests/host/noah_host_qmk_env.sh"
+noah_host_export_qmk_cpath "$ROOT"
+
 . "$ROOT/tests/host/noah_source_manifest.sh"
 COMMON_SOURCES="$(noah_source_manifest_userspace_paths "$ROOT" NOAH_COMMON_SOURCES)"
 POINTING_SOURCES="$(noah_source_manifest_userspace_paths "$ROOT" NOAH_POINTING_SOURCES)"
@@ -62,6 +65,12 @@ check_header_boundaries() {
     if rg -n '#include "(users/noah/)?noah_runtime.h"' "$ROOT/keyboards/bastardkb/charybdis/4x6/keymaps/noah" >/dev/null; then
         echo "keymap-owned translation units must not include noah_runtime.h directly" >&2
         rg -n '#include "(users/noah/)?noah_runtime.h"' "$ROOT/keyboards/bastardkb/charybdis/4x6/keymaps/noah" >&2
+        exit 1
+    fi
+
+    if rg -n '#include "\.\./.*(bastardkb-qmk|qmk_firmware)' "$ROOT/tests/host/include" >/dev/null; then
+        echo "host include shims must use the resolved QMK include path, not checkout-relative QMK paths" >&2
+        rg -n '#include "\.\./.*(bastardkb-qmk|qmk_firmware)' "$ROOT/tests/host/include" >&2
         exit 1
     fi
 }

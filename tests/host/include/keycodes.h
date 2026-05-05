@@ -1,3 +1,3 @@
 #pragma once
 
-#include "../../../../bastardkb-qmk/quantum/keycodes.h"
+#include "quantum/keycodes.h"

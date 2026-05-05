@@ -3,6 +3,9 @@
 set -eu
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
+
+. "$ROOT/tests/host/noah_host_qmk_env.sh"
+noah_host_export_qmk_cpath "$ROOT"
 BUILD_DIR="$(mktemp -d)"
 BIN="$BUILD_DIR/key_runtime_integration_harness_test"
 

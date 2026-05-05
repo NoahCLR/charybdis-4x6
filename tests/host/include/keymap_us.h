@@ -1,3 +1,3 @@
 #pragma once
 
-#include "../../../../bastardkb-qmk/quantum/keymap_extras/keymap_us.h"
+#include "quantum/keymap_extras/keymap_us.h"
