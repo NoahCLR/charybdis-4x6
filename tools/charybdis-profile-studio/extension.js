@@ -72,27 +72,27 @@ const CONFIG_DEFAULT_SECTIONS = [
         id: "normalPointerSpeed",
         label: "Normal Pointer Speed",
         fields: [
-            { macro: "CHARYBDIS_MINIMUM_DEFAULT_DPI", label: "Default DPI minimum", kind: "number", validate: "positive-int", tooltip: "Base CPI for the normal pointer DPI ladder used by DPI controls and by pointing modes set to fallback. Actual normal CPI is minimum + selected index * step." },
-            { macro: "CHARYBDIS_DEFAULT_DPI_CONFIG_STEP", label: "Default DPI step", kind: "number", validate: "positive-int", tooltip: "CPI distance between normal pointer DPI ladder entries. Higher values make each DPI up/down adjustment jump farther." },
+            { macro: "CHARYBDIS_MINIMUM_DEFAULT_DPI", label: "Default DPI minimum", kind: "number", validate: "positive-int", tooltip: "Base DPI/CPI for the normal pointer ladder used by DPI controls and by pointing modes whose override is 0. Actual normal DPI/CPI is minimum + selected index * step." },
+            { macro: "CHARYBDIS_DEFAULT_DPI_CONFIG_STEP", label: "Default DPI step", kind: "number", validate: "positive-int", tooltip: "DPI/CPI distance between normal pointer ladder entries. Higher values make each DPI up/down adjustment jump farther." },
         ],
     },
     {
         id: "pointingModeSpeeds",
         label: "Pointing Mode Speeds",
         fields: [
-            { macro: "CHARYBDIS_DRAGSCROLL_DPI", label: "Drag-scroll DPI", kind: "number", validate: "positive-int", tooltip: "Explicit CPI while drag-scroll mode is active. Higher values make ball movement produce faster scrolling. This field does not use the 0 fallback convention." },
-            { macro: "PD_MODE_VOLUME_DPI", label: "Volume mode DPI override", kind: "number", validate: "nonnegative-int", hint: "0 uses normal pointer DPI", tooltip: "Temporary CPI while volume mode maps ball movement to volume changes. 0 keeps the current normal pointer DPI instead of meaning no movement." },
-            { macro: "PD_MODE_BRIGHTNESS_DPI", label: "Brightness mode DPI override", kind: "number", validate: "nonnegative-int", hint: "0 uses normal pointer DPI", tooltip: "Temporary CPI while brightness mode maps ball movement to brightness changes. 0 keeps the current normal pointer DPI instead of meaning no movement." },
-            { macro: "PD_MODE_ZOOM_DPI", label: "Zoom mode DPI override", kind: "number", validate: "nonnegative-int", hint: "0 uses normal pointer DPI", tooltip: "Temporary CPI while zoom mode is active. 0 keeps the current normal pointer DPI; higher values make zoom movement more sensitive." },
-            { macro: "PD_MODE_ARROW_DPI", label: "Arrow mode DPI override", kind: "number", validate: "nonnegative-int", hint: "0 uses normal pointer DPI", tooltip: "Temporary CPI while arrow mode turns ball movement into directional output. 0 keeps the current normal pointer DPI; higher values increase sensitivity." },
+            { macro: "CHARYBDIS_DRAGSCROLL_DPI", label: "Drag-scroll DPI", kind: "number", validate: "positive-int", tooltip: "Explicit DPI/CPI while drag-scroll mode is active. Higher values make ball movement produce faster scrolling. This field does not use the 0 fallback convention." },
+            { macro: "PD_MODE_VOLUME_DPI", label: "Volume mode DPI override", kind: "number", validate: "nonnegative-int", hint: "0 uses normal pointer DPI", tooltip: "Temporary DPI/CPI while volume mode maps ball movement to volume changes. 0 keeps the current normal pointer DPI instead of meaning no movement." },
+            { macro: "PD_MODE_BRIGHTNESS_DPI", label: "Brightness mode DPI override", kind: "number", validate: "nonnegative-int", hint: "0 uses normal pointer DPI", tooltip: "Temporary DPI/CPI while brightness mode maps ball movement to brightness changes. 0 keeps the current normal pointer DPI instead of meaning no movement." },
+            { macro: "PD_MODE_ZOOM_DPI", label: "Zoom mode DPI override", kind: "number", validate: "nonnegative-int", hint: "0 uses normal pointer DPI", tooltip: "Temporary DPI/CPI while zoom mode is active. 0 keeps the current normal pointer DPI; higher values make zoom movement more sensitive." },
+            { macro: "PD_MODE_ARROW_DPI", label: "Arrow mode DPI override", kind: "number", validate: "nonnegative-int", hint: "0 uses normal pointer DPI", tooltip: "Temporary DPI/CPI while arrow mode turns ball movement into directional output. 0 keeps the current normal pointer DPI; higher values increase sensitivity." },
         ],
     },
     {
         id: "sniping",
         label: "Sniping",
         fields: [
-            { macro: "CHARYBDIS_MINIMUM_SNIPING_DPI", label: "Sniping DPI minimum", kind: "number", validate: "positive-int", tooltip: "Base CPI for the sniping DPI ladder. While sniping is active it uses this lower-sensitivity ladder and takes priority over pointing-mode DPI overrides." },
-            { macro: "CHARYBDIS_SNIPING_DPI_CONFIG_STEP", label: "Sniping DPI step", kind: "number", validate: "positive-int", tooltip: "CPI distance between sniping DPI ladder entries. Higher values make each sniping DPI adjustment jump farther." },
+            { macro: "CHARYBDIS_MINIMUM_SNIPING_DPI", label: "Sniping DPI minimum", kind: "number", validate: "positive-int", tooltip: "Base DPI/CPI for the sniping ladder. While sniping is active it uses this lower-sensitivity ladder and takes priority over pointing-mode DPI overrides." },
+            { macro: "CHARYBDIS_SNIPING_DPI_CONFIG_STEP", label: "Sniping DPI step", kind: "number", validate: "positive-int", tooltip: "DPI/CPI distance between sniping ladder entries. Higher values make each sniping DPI adjustment jump farther." },
             { macro: "CHARYBDIS_AUTO_SNIPING_ENABLE", label: "Auto-sniping", kind: "toggle", tooltip: "Automatically enters sniping while the configured auto-sniping layer is active. Disable this if sniping should only be entered by manual controls." },
             { macro: "CHARYBDIS_AUTO_SNIPING_LAYER", label: "Auto-sniping layer", kind: "layer", validate: "layer", tooltip: "Layer that triggers automatic sniping while active. Changing this moves the sniping trigger; it does not change the layer's normal keymap contents." },
         ],
@@ -5107,6 +5107,7 @@ function getClientScript() {
         ["rgb", "RGB"],
         ["defaults", "Defaults"]
     ];
+    // Tooltip copy should say what the control affects, where it writes or stages data, and any non-obvious fallback semantics.
     const headerTooltips = {
         openKeymap: "Open keymap.c beside the studio so you can inspect or hand-edit the source.",
         openConfig: "Open config.h beside the studio so you can inspect layer enum and timing settings.",
@@ -5116,16 +5117,16 @@ function getClientScript() {
     };
     const viewTooltips = {
         layout: "Edit layer keys and behavior rows using the physical keyboard layout as the filter.",
-        macros: "Build and edit VIA macro payloads in keymap.c.",
+        macros: "Build, record, preview, and edit VIA macro payload strings in keymap.c.",
         rgb: "Edit rgb_config.c layer colors, feedback colors, locality, and LED group tables.",
-        defaults: "Edit config.h timing, pointing, RGB Matrix, and feedback defaults."
+        defaults: "Edit config.h key timing, pointer speed, pointing-mode speed, sniping, auto-mouse, base lighting, and lighting feedback defaults."
     };
     const panelTooltips = {
         Status: "Parser messages, write status, and warnings from the current studio model.",
         Layout: "Physical keyboard preview, layer tabs, selected-key editor, combo builder, and selected-key behavior editor for the active layer.",
         "Layer Overview": "Read-only summary of behavior rows, macros, combos, and pointing modes reachable from keys on the active layer.",
-        "Macro Builder": "Build payload strings for the VIA_MACROS(MACRO) table in keymap.c.",
-        "Combo Builder": "Append a new COMBOS(COMBO) row to keymap.c.",
+        "Macro Builder": "Build, record, preview, and write payload strings for the VIA_MACROS(MACRO) table in keymap.c. Payload edits stay local until Apply macro.",
+        "Combo Builder": "Create or update COMBOS(COMBO) rows in keymap.c. Output chooses what the combo emits; inputs are physical key slots from the layout.",
         "RGB LED Group Builder": "Select physical LEDs and append a row to one of the rgb_config.c LED group tables. Reusable groups define LED sets; table rows decide where and how they are used.",
         "Layer Colors": "Edit layer_colors[] HSV values and render mode for each layer. LED group rows can override specific LEDs.",
         "Layer LED Groups": "Inspect layer_led_groups_data[] rows that override specific LEDs for one layer or all layers.",
@@ -5137,8 +5138,8 @@ function getClientScript() {
         "Key Behavior Feedback": "Edit key-behavior feedback colors, locality, and policy for tap, hold, long-hold, and tap-count branch states.",
         "Key Behavior Feedback LED Groups": "Inspect key_behavior_feedback_led_groups_data[] rows that override specific feedback semantics or all feedback groups.",
         "Key Timing": "Edit config.h timing defaults for QMK dual-role keys, combos, and custom key_behaviors[] tap, hold, and multi-tap handling.",
-        "Normal Pointer Speed": "Edit config.h normal pointer DPI ladder minimum and step size.",
-        "Pointing Mode Speeds": "Edit config.h pointer CPI used while drag-scroll or pointing modes are active.",
+        "Normal Pointer Speed": "Edit config.h normal pointer DPI/CPI ladder minimum and step size.",
+        "Pointing Mode Speeds": "Edit config.h pointer DPI/CPI used while drag-scroll or pointing modes are active. Pointing-mode overrides of 0 fall back to normal pointer speed.",
         "Sniping": "Edit config.h sniping sensitivity ladder and automatic sniping layer trigger.",
         "Auto-mouse": "Edit config.h auto-mouse enablement, destination layer, and timeout after pointing movement.",
         "Base Lighting": "Edit config.h base RGB Matrix mode, color, brightness cap, and inactivity timeout.",
@@ -5170,16 +5171,16 @@ function getClientScript() {
         addRgbLedGroup: "Append a new row to the selected RGB LED group table using the chosen owner, LED group source, and HSV color.",
         clearRgbSelection: "Remove all inline LED selections from the group builder. Reusable group definitions are not changed.",
         toggleRgbTrackball: "Add or remove the trackball LED index 56 from the current inline LED selection.",
-        updateViaMacro: "Write this VIA macro payload string back to keymap.c.",
-        selectMacroSlot: "Select this VIA macro slot for editing.",
-        insertMacroStep: "Insert the configured macro step into the selected payload.",
-        clearMacroPayload: "Clear the selected macro payload field.",
-        startMacroRecording: "Start recording browser keydown and keyup events into the selected macro draft.",
+        updateViaMacro: "Write the selected VIA macro payload draft back to the VIA_MACROS(MACRO) row in keymap.c.",
+        selectMacroSlot: "Select this VIA macro slot for editing. Unsaved drafts in other slots are kept locally.",
+        insertMacroStep: "Insert the configured step at the cursor in the selected payload draft.",
+        clearMacroPayload: "Clear the selected macro payload draft. Nothing is written to keymap.c until Apply macro.",
+        startMacroRecording: "Start capturing browser keydown and keyup events and append the generated payload to the selected macro draft.",
         stopMacroRecording: "Stop recording and keep the generated payload in the selected macro draft.",
         clearMacroRecording: "Clear the current recording take and restore the payload captured when recording started.",
         dismissStatus: "Dismiss the current status popup until the status changes.",
-        addCombo: "Append a combo row with the entered output and input keys.",
-        addLayoutCombo: "Append a combo row, or replace the loaded combo row, using the selected physical layout keys as inputs.",
+        addCombo: "Append a COMBOS(COMBO) row using the entered output keycode and input key expressions.",
+        addLayoutCombo: "Append a combo row, or replace the loaded combo row, using the selected physical layout slots as inputs.",
         applyLayoutChanges: "Write pending layout drag/drop and paste edits back to keymap.c.",
         toggleLayoutComboPicking: "Switch the layout board into combo input picking mode; click keys on the board to add or remove inputs.",
         toggleLayoutComboKey: "Add or remove this key from the pending layout combo.",
@@ -5209,7 +5210,7 @@ function getClientScript() {
         layer: "The active firmware layer shown in the board preview. Switch layers with the tabs above the board.",
         "layout index": "The physical LAYOUT() slot index for the selected key. It is fixed by the keyboard geometry.",
         key: "User-facing key label or expression to stage for the selected LAYOUT() slot, for example A, Enter, Space, _______, LT(LAYER_NAV, Slash), or Shift+Esc.",
-        source: "The raw C expression currently stored in keymap.c.",
+        source: "The raw C expression currently stored for this row or selected source slot.",
         tap_hold_term: "Optional tap-vs-hold boundary for this key behavior row. Valid range: 1-65535 ms; empty uses the displayed default.",
         longer_hold_term: "Optional hold-vs-long-hold boundary for this key behavior row. Valid range: 1-65535 ms; empty uses the displayed default.",
         multi_tap_term: "Optional repeated-tap window for this key behavior row. Valid range: 1-65535 ms; empty uses the displayed default.",
@@ -5235,17 +5236,17 @@ function getClientScript() {
         output: "The key or action produced by this combo, written as the combo output in keymap.c.",
         "output behavior": "The key behavior row that runs after this combo emits its output keycode, if one exists.",
         inputs: "Comma-separated physical combo input key expressions, such as D, F. Use the layout picker to choose slots from the active layer.",
-        slot: "The VIA macro keycode slot.",
-        payload: "The string payload sent by this VIA macro slot.",
-        "step type": "Choose which payload command the macro step builder inserts.",
-        text: "Plain ASCII text to type one character at a time.",
-        "macro keys": "One or more keys to tap together, such as A, Cmd+Space, or KC_LGUI, KC_SPC.",
-        "macro key": "One key used by a key-down or key-up macro step.",
-        "delay ms": "Milliseconds to wait before the next macro step.",
-        "record mode": "Compact turns matching down/up pairs into taps or chords; exact preserves key-down and key-up commands.",
-        "record delays": "Insert delay commands from elapsed time between recorded key events.",
+        slot: "The VIA macro keycode slot. Selecting a slot changes the editor target but does not write files.",
+        payload: "Raw VIA macro payload string for the selected slot. Plain ASCII types text; {KC_A} taps keys; {KC_LGUI,KC_SPC} taps chords; {+KC_A}/{-KC_A} hold and release; {250} waits milliseconds.",
+        "step type": "Choose which payload fragment the step builder inserts: tap/chord, text, key down, key up, or delay.",
+        text: "Plain ASCII text inserted directly into the macro payload. Braces are reserved for macro commands.",
+        "macro keys": "One or more raw macro keycodes to tap together, such as KC_A, KC_LGUI, KC_SPC. Friendly chords are converted before insertion.",
+        "macro key": "One raw macro keycode used by a key-down or key-up command.",
+        "delay ms": "Milliseconds to wait before the next macro step. Inserted as a {number} delay command.",
+        "record mode": "Compact turns matching down/up pairs into taps or chords and printable keys into text when possible. Exact preserves explicit key-down and key-up commands.",
+        "record delays": "Insert delay commands from elapsed time between recorded key events. Turning this off records only key events.",
         "delay threshold ms": "Only elapsed gaps at or above this many milliseconds become delay commands.",
-        "delay round ms": "Round recorded delays to this many milliseconds.",
+        "delay round ms": "Round recorded delays to this many milliseconds before applying the threshold.",
         leds: "Physical RGB LED indices contained in this row or reusable group.",
         "led group": "Authored LED group expression in rgb_config.c. Reusable groups reference RGB_LED_GROUP_*; inline rows spell out RGB_LED_GROUP(...).",
         color: "HSV color expression used by this row. HSV(0, 0, 0) means inherit the owning stage color for LED group rows.",
@@ -10502,16 +10503,16 @@ function getClientScript() {
         const edited = slots.filter((slot) => macroSlotDirty(slot.keycode)).length;
         const totalChars = payloads.reduce((sum, payload) => sum + payload.length, 0);
         return "<div class='macro-stat-row macro-builder-summary'>" +
-            renderMacroChip("slots", filled + " / " + slots.length + " filled") +
-            renderMacroChip("payload chars", String(totalChars)) +
-            (edited ? renderMacroChip("edited", String(edited), "warning") : "") +
-            renderMacroChip("target", "VIA_MACROS(MACRO)") +
+            renderMacroChip("slots", filled + " / " + slots.length + " filled", "", "Filled VIA macro slots out of all parsed VIA_MACROS(MACRO) rows.") +
+            renderMacroChip("payload chars", String(totalChars), "", "Total source characters across all current macro payload drafts.") +
+            (edited ? renderMacroChip("edited", String(edited), "warning", "Slots with local payload drafts that differ from keymap.c and still need Apply macro.") : "") +
+            renderMacroChip("target", "VIA_MACROS(MACRO)", "", "Macro payloads are written to the VIA_MACROS(MACRO) table in keymap.c.") +
             "</div>";
     }
 
     function renderMacroSlotBrowser(slots) {
         return "<div class='card macro-slot-browser'>" +
-            "<h3>VIA Macro Slots</h3>" +
+            "<h3 data-tooltip='Parsed VIA macro slots from the VIA_MACROS(MACRO) table. Select a slot to edit its payload draft.'>VIA Macro Slots</h3>" +
             "<div class='macro-slot-list' role='listbox' aria-label='VIA macro slots'>" +
             slots.map(renderMacroSlotButton).join("") +
             "</div>" +
@@ -10536,7 +10537,7 @@ function getClientScript() {
     function macroSlotTooltip(label, state, payload) {
         const text = String(payload || "");
         const preview = text ? text : "empty";
-        return label + " - " + state + "\\nPayload: " + truncateTooltipText(preview, 420);
+        return label + " - " + state + "\\nSelect to edit this VIA macro slot. Payload draft: " + truncateTooltipText(preview, 420);
     }
 
     function truncateTooltipText(value, limit) {
@@ -10563,11 +10564,18 @@ function getClientScript() {
         return "<div class='card macro-editor-card' data-dirty-section data-macro-editor data-keycode='" + escapeAttr(slot.keycode) + "'>" +
             "<div class='macro-builder-head'>" +
             "<div><h3>" + escapeHtml(displayKeyExpression(slot.keycode)) + "</h3>" +
-            "<div class='muted'><code>" + escapeHtml(slot.keycode) + "</code> - " + escapeHtml(status) + "</div></div>" +
+            "<div class='muted' data-tooltip='" + escapeAttr(macroEditorStatusTooltip(slot, status, parsed.error)) + "'><code>" + escapeHtml(slot.keycode) + "</code> - " + escapeHtml(status) + "</div></div>" +
             "<button data-action='updateViaMacro' data-dirty-button class='primary'>Apply macro</button>" +
             "</div>" +
             "<label><span>Payload</span><textarea class='macro-payload-textarea monospace' data-macro-payload data-validate='macro-payload' spellcheck='false'>" + escapeHtml(payload) + "</textarea></label>" +
             "</div>";
+    }
+
+    function macroEditorStatusTooltip(slot, status, error) {
+        const keycode = displayKeyExpression(slot?.keycode || "");
+        if (status === "invalid") return keycode + " payload has a parse error: " + error;
+        if (status === "ready") return keycode + " has a non-empty payload draft. Apply macro writes it back to keymap.c.";
+        return keycode + " is empty. Add text, insert steps, or record events before applying.";
     }
 
     function renderMacroComposer() {
@@ -10580,7 +10588,7 @@ function getClientScript() {
         ];
         return "<div class='card macro-composer-card' data-macro-composer>" +
             "<div class='macro-builder-head macro-composer-header'>" +
-            "<div><h3>Step Builder</h3>" +
+            "<div><h3 data-tooltip='Build one payload fragment and insert it into the selected macro draft at the cursor.'>Step Builder</h3>" +
             "<div class='muted macro-sidecar-state-spacer' aria-hidden='true'>idle</div></div>" +
             "</div>" +
             "<div class='macro-composer-grid'>" +
@@ -10606,6 +10614,7 @@ function getClientScript() {
     function renderMacroRecorderBody(slot) {
         const recordedPayload = recordedMacroPayload();
         const eventCount = macroRecordedEvents.filter((event) => event.kind === "key").length;
+        const stateText = macroRecording ? "recording" + (macroRecorderNotice ? " - " + macroRecorderNotice : "") : (macroRecorderNotice || "idle");
         const state = macroRecording
             ? "<span class='macro-recorder-dot' aria-hidden='true'></span> recording" + (macroRecorderNotice ? " - " + escapeHtml(macroRecorderNotice) : "")
             : escapeHtml(macroRecorderNotice || "idle");
@@ -10616,12 +10625,12 @@ function getClientScript() {
         const delayFieldClass = "macro-recorder-delay-fields" + (macroRecordDelays ? "" : " inactive");
         const delayFieldAttrs = macroRecordDelays ? " data-validate='positive-int'" : " tabindex='-1'";
         return "<div class='macro-builder-head macro-recorder-header'>" +
-            "<div><h3>Record Macro</h3>" +
-            "<div class='muted macro-recorder-state'>" + state + "</div></div>" +
+            "<div><h3 data-tooltip='Record keyboard events in the browser and append the generated payload to the selected VIA macro draft.'>Record Macro</h3>" +
+            "<div class='muted macro-recorder-state' data-tooltip='" + escapeAttr("Recorder state for " + displayKeyExpression(slot.keycode) + ": " + stateText) + "'>" + state + "</div></div>" +
             "<div class='macro-stat-row macro-recorder-stats'>" +
-            renderMacroChip("events", String(eventCount)) +
-            renderMacroChip("generated chars", String(recordedPayload.length)) +
-            (macroRecordDelays ? renderMacroChip("delays", "on") : renderMacroChip("delays", "off")) +
+            renderMacroChip("events", String(eventCount), "", "Captured key down/up events in the current recording take.") +
+            renderMacroChip("generated chars", String(recordedPayload.length), "", "Characters generated from the current recording take, excluding the payload that existed before recording started.") +
+            (macroRecordDelays ? renderMacroChip("delays", "on", "", "Delay recording is enabled; qualifying elapsed gaps become {number} commands.") : renderMacroChip("delays", "off", "", "Delay recording is disabled; only key events are captured.")) +
             "</div>" +
             "</div>" +
             "<div class='macro-recorder-controls'>" +
@@ -10649,25 +10658,38 @@ function getClientScript() {
     function renderMacroPreviewBody(payload) {
         const parsed = parseMacroPayloadPreview(payload || "");
         const stats = macroPayloadStats(parsed, payload || "");
-        return "<h3>Payload Preview</h3>" +
+        return "<h3 data-tooltip='Parsed preview of the selected macro payload draft. It shows how text, taps, chords, holds, releases, and delays will be interpreted.'>Payload Preview</h3>" +
             "<div class='macro-stat-row'>" +
-            renderMacroChip("source chars", String((payload || "").length)) +
-            renderMacroChip("encoded bytes", parsed.error ? "unknown" : String(stats.bytes)) +
-            renderMacroChip("steps", String(parsed.steps.length)) +
-            (parsed.error ? renderMacroChip("invalid", parsed.error, "warning") : "") +
+            renderMacroChip("source chars", String((payload || "").length), "", "Characters in the raw payload source string.") +
+            renderMacroChip("encoded bytes", parsed.error ? "unknown" : String(stats.bytes), "", "Approximate encoded macro payload bytes after parsing commands.") +
+            renderMacroChip("steps", String(parsed.steps.length), "", "Parsed text, tap/chord, down/up, and delay steps in this payload.") +
+            (parsed.error ? renderMacroChip("invalid", parsed.error, "warning", "Payload parse error. Apply macro is disabled until this is fixed.") : "") +
             "</div>" +
-            (parsed.steps.length ? "<div class='macro-preview-list'>" + parsed.steps.map(renderMacroPreviewStep).join("") + "</div>" : "<p class='muted'>This macro is empty.</p>");
+            (parsed.steps.length ? "<div class='macro-preview-list'>" + parsed.steps.map(renderMacroPreviewStep).join("") + "</div>" : "<p class='muted' data-tooltip='This slot currently has an empty payload draft.'>This macro is empty.</p>");
     }
 
     function renderMacroPreviewStep(step) {
-        return "<div class='macro-preview-step'>" +
+        const tooltip = macroPreviewStepTooltip(step);
+        return "<div class='macro-preview-step' data-tooltip='" + escapeAttr(tooltip) + "'>" +
             "<div class='macro-preview-kind'>" + escapeHtml(step.kindLabel) + "</div>" +
             "<div class='macro-preview-detail'>" + escapeHtml(step.detail) + (step.raw ? "<br><code class='muted'>" + escapeHtml(step.raw) + "</code>" : "") + "</div>" +
             "</div>";
     }
 
-    function renderMacroChip(label, value, extraClass = "") {
-        return "<span class='macro-chip " + escapeAttr(extraClass) + "'><strong>" + escapeHtml(label) + "</strong> " + escapeHtml(value) + "</span>";
+    function macroPreviewStepTooltip(step) {
+        if (!step) return "Parsed macro payload step.";
+        if (step.kind === "text") return "Plain text step. The macro types these ASCII characters directly.";
+        if (step.kind === "tap") return "Tap step. The macro presses and releases this key.";
+        if (step.kind === "chord") return "Chord step. The macro taps these keys together.";
+        if (step.kind === "down") return "Key-down step. The key remains held until a matching key-up step releases it.";
+        if (step.kind === "up") return "Key-up step. Releases a key previously held by a key-down step.";
+        if (step.kind === "delay") return "Delay step. The macro waits this many milliseconds before continuing.";
+        return "Parsed macro payload step.";
+    }
+
+    function renderMacroChip(label, value, extraClass = "", tooltip = "") {
+        const text = tooltip || (label + ": " + value);
+        return "<span class='macro-chip " + escapeAttr(extraClass) + "' data-tooltip='" + escapeAttr(text) + "'><strong>" + escapeHtml(label) + "</strong> " + escapeHtml(value) + "</span>";
     }
 
     function activeMacroSlot() {
