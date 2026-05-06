@@ -95,8 +95,10 @@ must not reopen the key's quick-release tap or first-tap multi-tap path.
 One practical consequence is that a single tap on a multi-tap key is delayed by
 one multi-tap window so the firmware can tell whether you meant one tap or
 more. The base single-tap branch skips the branch-confirm feedback window; that
-extra window is only for double-tap and higher committed branches when the
-authored RGB config enables it.
+extra window is only for double-tap and higher committed authored branches when
+the authored RGB config enables it. Inherited normal-tap repeats from branches
+that omit `.tap` can still show branch-confirm when that branch authors another
+tier, but they skip tap-commit feedback.
 
 Tap actions are release-settled. Reaching a tap-count branch on press selects
 the candidate branch, but `TAP_SENDS(...)` is selected by release or pending
@@ -126,7 +128,9 @@ custom rows.
 An authored row does not automatically replace everything about a key.
 
 - if `.tap` is omitted for a tap-count branch, that branch keeps the key's
-  normal tap behavior
+  normal tap behavior; a quick tap on that branch can still show branch-confirm
+  if the branch authors a hold or long-hold tier, but it does not show
+  tap-commit feedback
 - `KC_TRNS` inside any authored action helper is transparent for that field:
   tap fields use the lower active layer's tap output, while hold and long-hold
   fields use the lower active layer's same-tier behavior and mode-owned
@@ -275,12 +279,12 @@ Shared semantics:
 
 - multi-tap pending shows the neutral unresolved color only for double-tap and
   higher branches; the base single-tap candidate stays quiet while it waits
-- committed double-tap and higher branches can open a branch-confirm feedback
-  window that delays the selected action long enough to show the branch color;
-  the authored RGB config can also skip that window
-- committed tap-count branches can pulse once after the tap output resolves; the
-  authored RGB config can disable those pulses or limit them to double-tap and
-  higher branches
+- committed double-tap and higher authored branches can open a branch-confirm
+  feedback window that delays the selected action long enough to show the
+  branch color; the authored RGB config can also skip that window
+- committed authored tap-count branches can pulse once after the tap output
+  resolves; the authored RGB config can disable those pulses or limit them to
+  double-tap and higher branches
 - pending momentary-layer holds can preview the target layer's authored color
   and LED groups before that layer actually commits
 - unresolved hold windows can show the hold color while the action is still

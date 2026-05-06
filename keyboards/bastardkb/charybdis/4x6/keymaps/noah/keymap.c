@@ -238,9 +238,12 @@ enum keymap_custom_keycodes {
 //     follow
 //   - this means base single taps on multi-tap keys are delayed by
 //     .multi_tap_term, but skip the branch-confirm window
-//   - double-tap and higher terminal tap-only branches use the same pending
-//     window, then the branch-confirm window, so RGB can show the selected
-//     branch before the tap-commit pulse
+//   - double-tap and higher terminal tap branches that author .tap use the
+//     same pending window, then the branch-confirm window, so RGB can show the
+//     selected branch before the tap-commit pulse
+//   - if a non-base branch omits .tap, a quick tap keeps the key's normal tap
+//     behavior; branch-confirm still shows when that branch authors a hold or
+//     long-hold tier, but tap-commit feedback is skipped
 //
 // within one tap index:
 //   - .tap is the tap tier

@@ -132,6 +132,8 @@ typedef struct {
     uint16_t              single_action;
     uint16_t              tap_action;
     uint8_t               tap_repeat_count;
+    bool                  tap_branch_has_authored_step;
+    bool                  tap_branch_has_authored_tap;
     bool                  has_more_taps;
     hold_behavior_t       hold;
     hold_behavior_t       long_hold;

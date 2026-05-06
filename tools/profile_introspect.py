@@ -946,7 +946,7 @@ def parse_key_behavior_feedback_colors(
                     {
                         "field": f"tap_count_{tap_count}_branch_color",
                         "label": f"Tap Count {tap_count}",
-                        "meaning": "Configured branch-confirmation color for this committed tap count. The table starts at double-tap because the base single-tap branch never emits branch-confirm feedback; higher committed tap counts clamp to the last configured branch color.",
+                        "meaning": "Configured branch-confirmation color for this committed authored branch. The table starts at double-tap because the base single-tap branch never emits branch-confirm feedback; higher committed authored branches clamp to the last configured branch color.",
                         "color": authored_color,
                         "preview_color": dict(authored_color),
                     },
@@ -1038,7 +1038,7 @@ def key_behavior_feedback_locality_description(locality: str) -> str:
 def key_behavior_feedback_tap_commit_mode_description(mode: str) -> str:
     descriptions = {
         "KEY_FEEDBACK_TAP_COMMIT_OFF": "Do not pulse when authored tap-count branches commit.",
-        "KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS": "Pulse only for double-tap and higher tap-count branches; the base single-tap branch stays quiet.",
+        "KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS": "Pulse only for double-tap and higher authored tap-count branches; the base single-tap branch and inherited normal-tap branches stay quiet.",
     }
     return descriptions.get(mode, "Unknown key-behavior tap-commit feedback mode.")
 
@@ -1046,7 +1046,7 @@ def key_behavior_feedback_tap_commit_mode_description(mode: str) -> str:
 def key_behavior_feedback_branch_confirm_mode_description(mode: str) -> str:
     descriptions = {
         "KEY_FEEDBACK_BRANCH_CONFIRM_OFF": "Skip the branch-confirm feedback window; the selected action or hold path runs as soon as normal tap/hold resolution allows.",
-        "KEY_FEEDBACK_BRANCH_CONFIRM_NON_BASE_TAPS": "Open a branch-confirm feedback window only for double-tap and higher branches; the base single-tap branch stays quiet.",
+        "KEY_FEEDBACK_BRANCH_CONFIRM_NON_BASE_TAPS": "Open a branch-confirm feedback window only for double-tap and higher authored branches; the base single-tap branch stays quiet.",
     }
     return descriptions.get(mode, "Unknown key-behavior branch-confirm feedback mode.")
 

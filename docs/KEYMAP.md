@@ -203,6 +203,11 @@ These are small profile-specific quality-of-life keys:
 - `KC_LEFT_GUI`: single tap or hold normal left `Cmd`, double-tap hold
   `Left Alt`, triple tap one-shot `Shift`
 
+A quick double tap on `KC_LEFT_GUI` has no authored `.tap` branch, so it emits
+two normal `Cmd` taps without tap-commit feedback. The double-tap branch itself
+is still authored because it has a hold tier, so branch-confirm can still show
+that the double-tap branch won.
+
 `KC_RIGHT_ALT` is a good example of the profile using a plain key's default held
 path while still stealing its tap for something more specialized. That matters
 for `ARROW_MODE`, because the mode emits real arrow taps. Holding `Right Alt`
@@ -252,11 +257,11 @@ really spans both sides.
 Pending multi-tap feedback uses a neutral unresolved color only once the user
 has entered a double-tap or higher branch. The base single-tap candidate stays
 quiet while it waits to see whether another tap arrives, then dispatches
-without the branch-confirmation window. After a non-base branch commits, the
-current RGB config's branch-confirm mode opens a feedback window that shows the
-committed branch color before any tap, hold, or long-hold action fires. If a
-higher hold tier commits after that, the higher-tier feedback takes over so the
-LEDs match the behavior that is now active.
+without the branch-confirmation window. After a non-base authored branch
+commits, the current RGB config's branch-confirm mode can open a feedback window
+that shows the committed branch color before that branch fires. Inherited quick
+taps from branches that omit `.tap` do not show tap-commit feedback; hold and
+long-hold branches still use their hold-tier feedback when those tiers win.
 
 That `100 Hz` setting is also the current authored maximum: `100` repeats per
 second.

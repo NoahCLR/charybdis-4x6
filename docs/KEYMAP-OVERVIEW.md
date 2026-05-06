@@ -317,23 +317,23 @@ Current authored branch-confirm feedback mode: `KEY_FEEDBACK_BRANCH_CONFIRM_NON_
 | Available Branch-Confirm Mode | Meaning |
 | --- | --- |
 | `KEY_FEEDBACK_BRANCH_CONFIRM_OFF` | Skip the branch-confirm feedback window; the selected action or hold path runs as soon as normal tap/hold resolution allows. |
-| `KEY_FEEDBACK_BRANCH_CONFIRM_NON_BASE_TAPS` | Open a branch-confirm feedback window only for double-tap and higher branches; the base single-tap branch stays quiet. |
+| `KEY_FEEDBACK_BRANCH_CONFIRM_NON_BASE_TAPS` | Open a branch-confirm feedback window only for double-tap and higher authored branches; the base single-tap branch stays quiet. |
 
 Current authored tap-commit feedback mode: `KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS`.
 
 | Available Tap-Commit Mode | Meaning |
 | --- | --- |
 | `KEY_FEEDBACK_TAP_COMMIT_OFF` | Do not pulse when authored tap-count branches commit. |
-| `KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS` | Pulse only for double-tap and higher tap-count branches; the base single-tap branch stays quiet. |
+| `KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS` | Pulse only for double-tap and higher authored tap-count branches; the base single-tap branch and inherited normal-tap branches stay quiet. |
 
 | State | Meaning | Authored HSV | Preview Color |
 | --- | --- | --- | --- |
 | `Tap Pending` | Neutral unresolved multi-tap state for double-tap and higher branches while the runtime is still waiting to know which tap index wins; the base single-tap candidate stays quiet. | `HSV(0, 0, 150)` | <img alt="Tap Pending color" src="media/profile-introspection/profile-color-swatch-ffffff.svg" width="96" height="28" /> |
-| `Tap Count 2` | Configured branch-confirmation color for this committed tap count. The table starts at double-tap because the base single-tap branch never emits branch-confirm feedback; higher committed tap counts clamp to the last configured branch color. | `HSV(200, 255, 200)` | <img alt="Tap Count 2 color" src="media/profile-introspection/profile-color-swatch-b400ff.svg" width="96" height="28" /> |
-| `Tap Count 3` | Configured branch-confirmation color for this committed tap count. The table starts at double-tap because the base single-tap branch never emits branch-confirm feedback; higher committed tap counts clamp to the last configured branch color. | `HSV(180, 255, 200)` | <img alt="Tap Count 3 color" src="media/profile-introspection/profile-color-swatch-3c00ff.svg" width="96" height="28" /> |
-| `Tap Count 4` | Configured branch-confirmation color for this committed tap count. The table starts at double-tap because the base single-tap branch never emits branch-confirm feedback; higher committed tap counts clamp to the last configured branch color. | `HSV(143, 255, 200)` | <img alt="Tap Count 4 color" src="media/profile-introspection/profile-color-swatch-00a2ff.svg" width="96" height="28" /> |
-| `Tap Count 5` | Configured branch-confirmation color for this committed tap count. The table starts at double-tap because the base single-tap branch never emits branch-confirm feedback; higher committed tap counts clamp to the last configured branch color. | `HSV(85, 255, 200)` | <img alt="Tap Count 5 color" src="media/profile-introspection/profile-color-swatch-00ff00.svg" width="96" height="28" /> |
-| `Tap Committed` | Used for committed non-base tap-count branches that do not already have state feedback. Base single-tap commits stay quiet under the pulse mode below. | `HSV(85, 255, 200)` | <img alt="Tap Committed color" src="media/profile-introspection/profile-color-swatch-00ff00.svg" width="96" height="28" /> |
+| `Tap Count 2` | Configured branch-confirmation color for this committed authored branch. The table starts at double-tap because the base single-tap branch never emits branch-confirm feedback; higher committed authored branches clamp to the last configured branch color. | `HSV(200, 255, 200)` | <img alt="Tap Count 2 color" src="media/profile-introspection/profile-color-swatch-b400ff.svg" width="96" height="28" /> |
+| `Tap Count 3` | Configured branch-confirmation color for this committed authored branch. The table starts at double-tap because the base single-tap branch never emits branch-confirm feedback; higher committed authored branches clamp to the last configured branch color. | `HSV(180, 255, 200)` | <img alt="Tap Count 3 color" src="media/profile-introspection/profile-color-swatch-3c00ff.svg" width="96" height="28" /> |
+| `Tap Count 4` | Configured branch-confirmation color for this committed authored branch. The table starts at double-tap because the base single-tap branch never emits branch-confirm feedback; higher committed authored branches clamp to the last configured branch color. | `HSV(143, 255, 200)` | <img alt="Tap Count 4 color" src="media/profile-introspection/profile-color-swatch-00a2ff.svg" width="96" height="28" /> |
+| `Tap Count 5` | Configured branch-confirmation color for this committed authored branch. The table starts at double-tap because the base single-tap branch never emits branch-confirm feedback; higher committed authored branches clamp to the last configured branch color. | `HSV(85, 255, 200)` | <img alt="Tap Count 5 color" src="media/profile-introspection/profile-color-swatch-00ff00.svg" width="96" height="28" /> |
+| `Tap Committed` | Used for committed authored non-base tap branches that do not already have state feedback. Base single-tap commits stay quiet under the pulse mode below. | `HSV(85, 255, 200)` | <img alt="Tap Committed color" src="media/profile-introspection/profile-color-swatch-00ff00.svg" width="96" height="28" /> |
 | `Hold Active` | Used for authored hold-tier pending / active states and commit pulses. | `HSV(18, 255, 200)` | <img alt="Hold Active color" src="media/profile-introspection/profile-color-swatch-ff6c00.svg" width="96" height="28" /> |
 | `Long Hold Active` | Used for authored long-hold-tier active states and commit pulses. | `HSV(148, 255, 200)` | <img alt="Long Hold Active color" src="media/profile-introspection/profile-color-swatch-0084ff.svg" width="96" height="28" /> |
 

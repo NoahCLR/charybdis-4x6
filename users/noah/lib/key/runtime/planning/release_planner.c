@@ -275,6 +275,8 @@ bool key_runtime_core_plan_active_release_effects(keypos_t key_pos, uint16_t key
                         .tap_count           = resolution->interaction.selection.tap_count,
                         .tap_action          = contract.tap.action,
                         .tap_repeat_count    = contract.tap.repeat_count,
+                        .tap_branch_has_authored_step = key_behavior_step_present(resolution->interaction.selection.step),
+                        .tap_branch_has_authored_tap = resolution->interaction.selection.step.tap.present,
                         .tap_hold_term       = resolution->interaction.binding.tap_hold_term,
                         .multi_tap_term      = resolution->interaction.binding.multi_tap_term,
                         .branch_confirm_term = resolution->interaction.binding.branch_confirm_term,
@@ -315,6 +317,8 @@ bool key_runtime_core_resolve_pending_multi_tap_release(keypos_t key_pos, uint16
     bool                           preserve_chain;
     bool                           terminal_tap_only_feedback_window;
     bool                           tap_branch_feedback_on_release;
+    bool                           authored_branch;
+    bool                           authored_tap_branch;
 
     if (out) {
         *out = (key_runtime_core_pending_multi_tap_release_resolution_t){0};
@@ -332,6 +336,8 @@ bool key_runtime_core_resolve_pending_multi_tap_release(keypos_t key_pos, uint16
 
     elapsed          = key_runtime_core_release_elapsed(token->pressed_at, token->released_at);
     series_tap_count = series ? series->tap_count : 0u;
+    authored_branch = key_runtime_core_tap_series_has_authored_branch(series);
+    authored_tap_branch = key_runtime_core_tap_series_has_authored_tap_branch(series);
 
     if (series && series->active && series->branch_confirming && series->branch_confirm_kind != KEY_RUNTIME_TAP_SERIES_BRANCH_CONFIRM_DELAYED_ACTION) {
         key_feedback_pulse_kind_t action_feedback_kind = KEY_FEEDBACK_PULSE_HOLD;
@@ -425,8 +431,8 @@ bool key_runtime_core_resolve_pending_multi_tap_release(keypos_t key_pos, uint16
                 .outcome             = KEY_RUNTIME_CORE_PENDING_MULTI_TAP_RELEASE_OUTCOME_DELAYED_ACTION,
                 .action              = tap_action,
                 .repeat_count        = tap_repeat_count,
-                .tap_branch_feedback = key_runtime_core_tap_count_uses_branch_confirm(series_tap_count),
-                .tap_commit_feedback = true,
+                .tap_branch_feedback = authored_branch && key_runtime_core_tap_count_uses_branch_confirm(series_tap_count),
+                .tap_commit_feedback = authored_tap_branch,
                 .tap_count           = series_tap_count,
             };
             return true;
@@ -456,8 +462,8 @@ bool key_runtime_core_resolve_pending_multi_tap_release(keypos_t key_pos, uint16
                 .outcome             = KEY_RUNTIME_CORE_PENDING_MULTI_TAP_RELEASE_OUTCOME_DELAYED_ACTION,
                 .action              = tap_action,
                 .repeat_count        = tap_repeat_count,
-                .tap_branch_feedback = key_runtime_core_tap_count_uses_branch_confirm(series_tap_count),
-                .tap_commit_feedback = true,
+                .tap_branch_feedback = authored_branch && key_runtime_core_tap_count_uses_branch_confirm(series_tap_count),
+                .tap_commit_feedback = authored_tap_branch,
                 .tap_count           = series_tap_count,
             };
             return true;

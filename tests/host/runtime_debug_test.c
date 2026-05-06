@@ -175,6 +175,31 @@ static handled_key_resolution_t test_handled_key_resolution(uint16_t keycode, ui
                 .tap = TAP_SENDS(TEST_SECOND_ACTION),
             };
         }
+    } else if (keycode == KC_LEFT_GUI) {
+        flags |= HANDLED_KEY_FLAG_MULTI_TAP;
+        if (tap_count == 1u) {
+            step          = key_behavior_step_none();
+            has_more_taps = true;
+        } else if (tap_count == 2u) {
+            step = (key_behavior_step_t){
+                .hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_LEFT_ALT),
+            };
+            has_more_taps = true;
+        } else {
+            step = (key_behavior_step_t){
+                .tap = TAP_SENDS(OSM(MOD_LSFT)),
+            };
+        }
+    } else if (keycode == KC_RIGHT_GUI) {
+        flags |= HANDLED_KEY_FLAG_MULTI_TAP;
+        if (tap_count == 1u) {
+            step          = key_behavior_step_none();
+            has_more_taps = true;
+        } else {
+            step = (key_behavior_step_t){
+                .hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_RIGHT_ALT),
+            };
+        }
     } else if (keycode == TEST_INTERRUPTED_LAYER_KEY) {
         flags |= HANDLED_KEY_FLAG_MOMENTARY_LAYER | HANDLED_KEY_FLAG_LAYER_TAP;
         step = (key_behavior_step_t){
@@ -330,6 +355,12 @@ handled_key_resolution_t handled_key_lookup_tap_count(uint16_t keycode, uint8_t 
 
 bool key_behavior_has_more_taps(uint16_t keycode, uint8_t count) {
     if (keycode == TEST_PENDING_MULTI_TAP_KEY || keycode == TEST_FINAL_TAP_ONLY_KEY) {
+        return count < 2u;
+    }
+    if (keycode == KC_LEFT_GUI) {
+        return count < 3u;
+    }
+    if (keycode == KC_RIGHT_GUI) {
         return count < 2u;
     }
 
@@ -1132,6 +1163,106 @@ static void test_base_tap_multi_tap_flush_skips_branch_confirm(void) {
     CHECK(last_delayed_action == TEST_ACTION);
     CHECK(delayed_action_count == 1u);
     CHECK(!key_runtime_core_has_pending_multi_tap_at(key_pos));
+
+    key_feedback_semantic_map(semantic_map);
+    key_feedback_tap_branch_map(tap_branch_map);
+    CHECK(key_feedback_semantic_map_get(semantic_map, key_pos) == KEY_FEEDBACK_SEMANTIC_NONE);
+    CHECK(key_feedback_tap_branch_map_get(tap_branch_map, key_pos) == 0u);
+}
+
+static void test_inherited_non_base_modifier_tap_flush_keeps_branch_confirm_without_commit_feedback(void) {
+    uint8_t             semantic_map[KEY_FEEDBACK_SEMANTIC_MAP_SIZE];
+    uint8_t             tap_branch_map[KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE];
+    const tap_series_t *series;
+    keypos_t            key_pos = test_keypos(6, 2);
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+
+    CHECK(!test_process_record(KC_LEFT_GUI, key_pos, true));
+    fake_time = (uint16_t)(fake_time + 10u);
+    CHECK(!test_process_record(KC_LEFT_GUI, key_pos, false));
+    fake_time = (uint16_t)(fake_time + 20u);
+    CHECK(!test_process_record(KC_LEFT_GUI, key_pos, true));
+    fake_time = (uint16_t)(fake_time + 10u);
+    CHECK(!test_process_record(KC_LEFT_GUI, key_pos, false));
+
+    series = key_runtime_core_tap_series_at(key_pos);
+    CHECK(series != NULL);
+    CHECK(series->active);
+    CHECK(series->tap_count == 2u);
+    CHECK(series->tap_branch_has_authored_step);
+    CHECK(!series->tap_branch_has_authored_tap);
+
+    fake_time = (uint16_t)(fake_time + CUSTOM_MULTI_TAP_TERM + 1u);
+    noah_key_runtime_scan();
+
+    series = key_runtime_core_tap_series_at(key_pos);
+    CHECK(series != NULL);
+    CHECK(series->active);
+    CHECK(series->branch_confirming);
+    CHECK(series->branch_confirm_tap_count == 2u);
+    CHECK(last_delayed_action == KC_NO);
+    CHECK(delayed_action_count == 0u);
+
+    key_feedback_semantic_map(semantic_map);
+    key_feedback_tap_branch_map(tap_branch_map);
+    CHECK(key_feedback_semantic_map_get(semantic_map, key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED);
+    CHECK(key_feedback_tap_branch_map_get(tap_branch_map, key_pos) == 2u);
+
+    fake_time = (uint16_t)(fake_time + CUSTOM_RGB_BRANCH_CONFIRM_TERM + 1u);
+    noah_key_runtime_scan();
+
+    series = key_runtime_core_tap_series_at(key_pos);
+    CHECK(series != NULL);
+    CHECK(!series->active);
+    CHECK(last_delayed_action == KC_LEFT_GUI);
+    CHECK(delayed_action_count == 2u);
+
+    key_feedback_semantic_map(semantic_map);
+    key_feedback_tap_branch_map(tap_branch_map);
+    CHECK(key_feedback_semantic_map_get(semantic_map, key_pos) == KEY_FEEDBACK_SEMANTIC_NONE);
+    CHECK(key_feedback_tap_branch_map_get(tap_branch_map, key_pos) == 0u);
+}
+
+static void test_inherited_terminal_modifier_tap_release_keeps_branch_confirm_without_commit_feedback(void) {
+    uint8_t             semantic_map[KEY_FEEDBACK_SEMANTIC_MAP_SIZE];
+    uint8_t             tap_branch_map[KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE];
+    const tap_series_t *series;
+    keypos_t            key_pos = test_keypos(6, 3);
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+
+    CHECK(!test_process_record(KC_RIGHT_GUI, key_pos, true));
+    fake_time = (uint16_t)(fake_time + 10u);
+    CHECK(!test_process_record(KC_RIGHT_GUI, key_pos, false));
+    fake_time = (uint16_t)(fake_time + 20u);
+    CHECK(!test_process_record(KC_RIGHT_GUI, key_pos, true));
+    fake_time = (uint16_t)(fake_time + 10u);
+    CHECK(!test_process_record(KC_RIGHT_GUI, key_pos, false));
+
+    series = key_runtime_core_tap_series_at(key_pos);
+    CHECK(series != NULL);
+    CHECK(series->active);
+    CHECK(series->branch_confirming);
+    CHECK(series->branch_confirm_tap_count == 2u);
+    CHECK(series->tap_branch_has_authored_step);
+    CHECK(!series->tap_branch_has_authored_tap);
+    CHECK(last_delayed_action == KC_NO);
+    CHECK(delayed_action_count == 0u);
+
+    key_feedback_semantic_map(semantic_map);
+    key_feedback_tap_branch_map(tap_branch_map);
+    CHECK(key_feedback_semantic_map_get(semantic_map, key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED);
+    CHECK(key_feedback_tap_branch_map_get(tap_branch_map, key_pos) == 2u);
+
+    fake_time = (uint16_t)(fake_time + CUSTOM_RGB_BRANCH_CONFIRM_TERM + 1u);
+    noah_key_runtime_scan();
+
+    CHECK(!key_runtime_core_has_pending_multi_tap_at(key_pos));
+    CHECK(last_delayed_action == KC_RIGHT_GUI);
+    CHECK(delayed_action_count == 2u);
 
     key_feedback_semantic_map(semantic_map);
     key_feedback_tap_branch_map(tap_branch_map);
@@ -2335,6 +2466,8 @@ int main(void) {
     test_key_runtime_core_pending_multi_tap_release_effect_plan_delays_action();
     test_key_runtime_core_direct_pending_multi_tap_release_helper_resets_slot();
     test_base_tap_multi_tap_flush_skips_branch_confirm();
+    test_inherited_non_base_modifier_tap_flush_keeps_branch_confirm_without_commit_feedback();
+    test_inherited_terminal_modifier_tap_release_keeps_branch_confirm_without_commit_feedback();
     test_key_feedback_maps_keep_pending_hold_neutral_until_branch_commits();
     test_key_feedback_maps_show_final_tap_only_neutral_pending_then_branch_commit();
     test_key_feedback_branch_confirm_mode_can_skip_branch_commit_window();

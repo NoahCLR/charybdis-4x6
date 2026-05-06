@@ -472,14 +472,20 @@ void key_runtime_core_plan_pending_multi_tap_scan_for_key(key_runtime_core_state
 
     token = key_runtime_core_scan_press_token_state(state, key_pos);
     switch (resolution.outcome) {
-        case KEY_RUNTIME_CORE_PENDING_MULTI_TAP_SCAN_OUTCOME_FLUSH:
-            if (key_runtime_core_tap_series_start_delayed_action_branch_confirm(state, series, resolution.tap_count, (uint16_t)(series->last_tap_at + series->tap_term_ms), series->branch_confirm_term_ms, resolution.action, resolution.repeat_count, mods, true, false, KEY_FEEDBACK_PULSE_HOLD)) {
+        case KEY_RUNTIME_CORE_PENDING_MULTI_TAP_SCAN_OUTCOME_FLUSH: {
+            bool authored_branch     = key_runtime_core_tap_series_has_authored_branch(series);
+            bool authored_tap_branch = key_runtime_core_tap_series_has_authored_tap_branch(series);
+
+            if (authored_branch && key_runtime_core_tap_series_start_delayed_action_branch_confirm(state, series, resolution.tap_count, (uint16_t)(series->last_tap_at + series->tap_term_ms), series->branch_confirm_term_ms, resolution.action, resolution.repeat_count, mods, authored_tap_branch, false, KEY_FEEDBACK_PULSE_HOLD)) {
                 return;
             }
             key_runtime_core_effect_plan_push_delayed_action(plan, key_pos, resolution.action, mods, resolution.repeat_count);
-            key_runtime_core_effect_plan_push_tap_commit_feedback_pulse(plan, key_pos, resolution.action, resolution.tap_count);
+            if (authored_tap_branch) {
+                key_runtime_core_effect_plan_push_tap_commit_feedback_pulse(plan, key_pos, resolution.action, resolution.tap_count);
+            }
             key_runtime_core_tap_series_clear(state, series);
             return;
+        }
         case KEY_RUNTIME_CORE_PENDING_MULTI_TAP_SCAN_OUTCOME_HOLD_THRESHOLD:
             if (key_runtime_core_tap_series_start_threshold_branch_confirm(state, series, token, KEY_RUNTIME_TAP_SERIES_BRANCH_CONFIRM_THRESHOLD_HOLD, false)) {
                 return;

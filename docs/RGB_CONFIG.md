@@ -391,11 +391,11 @@ which tap index wins. The base single-tap candidate stays quiet during that
 same pending window.
 
 The `RGB_TAP_BRANCH_COLORS(...)` macro declares the confirmation colors used
-while a committed double-tap or higher branch is being held in the model-level
-branch-confirm window. The color table starts at tap count 2 because the base
-single-tap branch is quiet and never enters branch-confirm feedback. Double-tap
-and higher committed branches use their matching entry and clamp to the last
-configured branch color if they exceed the table.
+while a committed authored double-tap or higher branch is being held in the
+model-level branch-confirm window. The color table starts at tap count 2
+because the base single-tap branch is quiet and never enters branch-confirm
+feedback. Double-tap and higher committed authored branches use their matching
+entry and clamp to the last configured branch color if they exceed the table.
 Inline C comments next to those `HSV(...)` arguments are allowed and are
 ignored by the profile introspector.
 
@@ -406,8 +406,8 @@ enter the model-level branch-confirm feedback window before their action fires:
   emit the selected action or hold path as soon as normal tap/hold resolution
   allows
 - `KEY_FEEDBACK_BRANCH_CONFIRM_NON_BASE_TAPS`: open a branch-confirm feedback
-  window only for double-tap and higher branches; the base single-tap branch
-  stays quiet
+  window only for double-tap and higher authored branches; the base single-tap
+  branch stays quiet
 
 Individual `key_behaviors[]` rows can tune that RGB-visible window with
 `.rgb_branch_confirm_term = ms`, or skip it for that row with
@@ -418,7 +418,8 @@ The `tap_commit_mode` field controls which committed tap-count branches pulse wi
 
 - `KEY_FEEDBACK_TAP_COMMIT_OFF`: disable tap-commit pulses
 - `KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS`: pulse only for double-tap and
-  higher tap-count branches; the base single-tap branch stays quiet
+  higher authored tap-count branches; the base single-tap branch and inherited
+  normal-tap branches stay quiet
 
 The `locality` field controls where the overlay paints:
 

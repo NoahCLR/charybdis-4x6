@@ -60,6 +60,8 @@ typedef struct {
     uint8_t  tap_count;
     uint16_t tap_action;
     uint8_t  tap_repeat_count;
+    bool     tap_branch_has_authored_step;
+    bool     tap_branch_has_authored_tap;
     uint16_t tap_hold_term;
     uint16_t multi_tap_term;
     uint16_t branch_confirm_term;

@@ -65,6 +65,14 @@ bool key_runtime_core_tap_count_uses_branch_confirm(uint8_t tap_count) {
     }
 }
 
+bool key_runtime_core_tap_series_has_authored_tap_branch(const tap_series_t *series) {
+    return series && series->active && series->tap_count > 1u && series->tap_branch_has_authored_tap;
+}
+
+bool key_runtime_core_tap_series_has_authored_branch(const tap_series_t *series) {
+    return series && series->active && series->tap_count > 1u && series->tap_branch_has_authored_step;
+}
+
 bool key_runtime_core_tap_series_branch_confirm_window_active(uint16_t started_at, uint16_t term_ms, uint16_t now) {
     return term_ms != 0u && key_runtime_core_tap_series_flush_elapsed(started_at, now) < term_ms;
 }
@@ -207,7 +215,9 @@ static void key_runtime_core_tap_series_flush_plan_series(key_runtime_core_state
     }
 
     key_runtime_core_effect_plan_push_delayed_action(plan, key_pos, action, mods, repeat_count);
-    key_runtime_core_effect_plan_push_tap_commit_feedback_pulse(plan, key_pos, action, series->tap_count);
+    if (key_runtime_core_tap_series_has_authored_tap_branch(series)) {
+        key_runtime_core_effect_plan_push_tap_commit_feedback_pulse(plan, key_pos, action, series->tap_count);
+    }
     key_runtime_core_tap_series_clear(state, series);
 }
 

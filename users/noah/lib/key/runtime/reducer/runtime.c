@@ -377,6 +377,8 @@ static void key_runtime_core_tap_series_note_tap(key_runtime_core_state_t *state
     uint16_t             tap_term_ms;
     uint8_t              tap_count;
     bool                 pending_hold = false;
+    bool                 tap_branch_has_authored_step = false;
+    bool                 tap_branch_has_authored_tap = false;
     keyboard_mod_state_t saved_mod_state;
 
     if (!(state && token && token->active)) {
@@ -415,6 +417,8 @@ static void key_runtime_core_tap_series_note_tap(key_runtime_core_state_t *state
         hold                   = token->interaction.binding.hold;
         long_hold              = token->interaction.binding.long_hold;
         pending_hold           = reuse_existing && (hold.present || long_hold.present);
+        tap_branch_has_authored_step = key_behavior_step_present(token->interaction.selection.step);
+        tap_branch_has_authored_tap = token->interaction.selection.step.tap.present;
         tap_hold_term_ms       = token->interaction.binding.tap_hold_term;
         branch_confirm_term_ms = token->interaction.binding.branch_confirm_term;
         tap_term_ms            = token->interaction.binding.multi_tap_term;
@@ -440,6 +444,8 @@ static void key_runtime_core_tap_series_note_tap(key_runtime_core_state_t *state
         .single_action          = single_action,
         .tap_action             = tap_action,
         .tap_repeat_count       = tap_repeat_count,
+        .tap_branch_has_authored_step = tap_branch_has_authored_step,
+        .tap_branch_has_authored_tap = tap_branch_has_authored_tap,
         .has_more_taps          = has_more_taps,
         .hold                   = hold,
         .long_hold              = long_hold,
@@ -666,6 +672,8 @@ static void key_runtime_core_tap_series_seed(key_runtime_core_state_t *state, co
         .single_action          = seed->tap_action,
         .tap_action             = seed->tap_action,
         .tap_repeat_count       = seed->tap_repeat_count,
+        .tap_branch_has_authored_step = seed->tap_branch_has_authored_step,
+        .tap_branch_has_authored_tap = seed->tap_branch_has_authored_tap,
         .has_more_taps          = seed->has_more_taps,
         .hold                   = hold_behavior_none(),
         .long_hold              = hold_behavior_none(),
@@ -699,6 +707,8 @@ static void key_runtime_core_tap_series_update_for_press(key_runtime_core_state_
     series->single_action          = series->single_action == KC_NO ? token->interaction.binding.tap_action : series->single_action;
     series->tap_action             = token->interaction.binding.tap_action;
     series->tap_repeat_count       = token->interaction.binding.tap_repeat_count;
+    series->tap_branch_has_authored_step = key_behavior_step_present(token->interaction.selection.step);
+    series->tap_branch_has_authored_tap = token->interaction.selection.step.tap.present;
     series->has_more_taps          = token->interaction.binding.has_more_taps;
     series->hold                   = token->interaction.binding.hold;
     series->long_hold              = token->interaction.binding.long_hold;
@@ -794,7 +804,9 @@ bool key_runtime_core_handle_handled_key_press(uint16_t keycode, keypos_t key_po
         if (series->branch_confirming && series->branch_confirm_kind == KEY_RUNTIME_TAP_SERIES_BRANCH_CONFIRM_DELAYED_ACTION) {
             key_runtime_core_plan_same_key_branch_confirm_interruption(state, series, series_key_pos, plan);
         } else if (key_runtime_core_tap_series_take_flush(series, &action, &repeat_count, &mods)) {
-            key_runtime_core_effect_plan_push_deferred_delayed_action(plan, series_key_pos, action, mods, repeat_count, key_runtime_core_tap_commit_feedback_allowed(action, series->tap_count));
+            bool tap_commit_feedback = key_runtime_core_tap_series_has_authored_tap_branch(series) && key_runtime_core_tap_commit_feedback_allowed(action, series->tap_count);
+
+            key_runtime_core_effect_plan_push_deferred_delayed_action(plan, series_key_pos, action, mods, repeat_count, tap_commit_feedback);
             key_runtime_core_tap_series_clear(state, series);
         } else {
             key_runtime_core_tap_series_clear(state, series);

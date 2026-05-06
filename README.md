@@ -317,17 +317,18 @@ static const key_behavior_feedback_led_group_t
 - `RGB_TAP_BRANCH_COLORS(...)`: the colors shown while the branch is committed
   and the RGB branch-confirm window is active
 - `tap_committed_color`: a tap action just fired and does not already have a
-  layer or pointing-mode state to show
+  layer or pointing-mode state to show; inherited normal-tap repeats from a
+  branch that omits `.tap` stay quiet
 - `hold_active_color`: the `.hold` tier is pending, active, or committing
 - `long_hold_active_color`: the `.long_hold` tier is active or committing
 - `branch_confirm_mode`: chooses whether committed branches get the
   branch-color window; `KEY_FEEDBACK_BRANCH_CONFIRM_OFF` disables it and
   `KEY_FEEDBACK_BRANCH_CONFIRM_NON_BASE_TAPS` enables it for double-tap and
-  higher branches
+  higher authored branches
 - `tap_commit_mode`: chooses whether tap commits pulse;
   `KEY_FEEDBACK_TAP_COMMIT_OFF` disables pulses and
   `KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS` enables them for double-tap and
-  higher branches
+  higher authored tap branches
 - `locality`: chooses where the feedback paints with `RGB_BOTH_HALVES`,
   `RGB_LEFT_HALF`, `RGB_RIGHT_HALF`, `RGB_KEY_HALF`, or `RGB_KEYS_ONLY`
 - key-behavior LED group semantics let named LED groups follow

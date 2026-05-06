@@ -264,9 +264,9 @@ static const combo_feedback_led_group_t combo_feedback_led_groups_data[] = RGB_L
 //   - tap_pending_color = unresolved multi-tap state for second-tap and higher
 //     branches while the runtime is still waiting to know which tap index wins;
 //     the base single-tap candidate stays quiet
-//   - RGB_TAP_BRANCH_COLORS(...) = visible branch-confirmation window after a
-//     double-tap or higher branch commits; the table starts at tap count 2 and
-//     higher tap counts clamp to the last configured color
+//   - RGB_TAP_BRANCH_COLORS(...) = visible branch-confirmation window after an
+//     authored double-tap or higher branch commits; the table starts at tap
+//     count 2 and higher tap counts clamp to the last configured color
 //
 // Branch-confirm policy:
 //   - branch_confirm_mode chooses which committed tap-count branches enter the
@@ -274,18 +274,19 @@ static const combo_feedback_led_group_t combo_feedback_led_groups_data[] = RGB_L
 //   - KEY_FEEDBACK_BRANCH_CONFIRM_OFF skips that window and lets the resolved
 //     branch continue through the normal dispatch path
 //   - KEY_FEEDBACK_BRANCH_CONFIRM_NON_BASE_TAPS allows the window only for
-//     double-tap and higher branches
+//     double-tap and higher authored branches
 //   - the per-key branch-confirm term controls the window duration; a zero or
 //     already-expired term also falls through to the normal dispatch path
 //
 // Tap-commit pulse policy:
-//   - tap_committed_color = action feedback after committed tap-count branches that
-//     do not already have state feedback; layer and PD-mode state actions stay
-//     quiet because their state overlays own that feedback
+//   - tap_committed_color = action feedback after committed tap-count branches
+//     that author .tap and do not already have state feedback; layer and
+//     PD-mode state actions stay quiet because their state overlays own that
+//     feedback
 //   - tap_commit_mode chooses which committed tap-count branches can pulse
 //   - KEY_FEEDBACK_TAP_COMMIT_OFF disables tap-commit pulses
 //   - KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS allows pulses only for double-tap
-//     and higher branches
+//     and higher branches that author .tap
 //
 // Hold feedback:
 //   - hold_active_color = authored hold-tier pending / active states and
@@ -325,16 +326,17 @@ const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
                           HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS)   // tap count 5
                           ),
 
-    // Let double-tap and higher tap-count branches enter the branch-confirm
+    // Let authored double-tap and higher branches enter the branch-confirm
     // window before their selected effect/action fires. OFF skips that state
     // and its delay.
     .branch_confirm_mode = KEY_FEEDBACK_BRANCH_CONFIRM_NON_BASE_TAPS,
 
-    // Used for committed non-base tap-count branches that do not already have
-    // state feedback. Base single-tap commits stay quiet under the pulse mode below.
+    // Used for committed authored non-base tap branches that do not already
+    // have state feedback. Base single-tap commits stay quiet under the pulse
+    // mode below.
     .tap_committed_color = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
 
-    // Only double-tap and higher tap-count branches can pulse tap-commit feedback.
+    // Only authored double-tap and higher tap branches can pulse tap-commit feedback.
     .tap_commit_mode = KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS,
 
     // Used for authored hold-tier pending / active states and commit pulses.
@@ -359,10 +361,10 @@ const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
 //   - KEY_FEEDBACK_GROUP_UNRESOLVED_TAP_BRANCH = pending double-tap-or-higher
 //     tap branch while the runtime is still waiting for the winning tap count
 //   - KEY_FEEDBACK_GROUP_TAP_BRANCH_COMMITTED = branch-confirmation window after
-//     a non-base tap-count branch commits and before its selected effect/action
-//     fires
-//   - KEY_FEEDBACK_GROUP_TAP_COMMITTED = tap action commit pulse for non-base
-//     tap-count branches that do not already have state feedback
+//     an authored non-base tap branch commits and before its selected
+//     effect/action fires
+//   - KEY_FEEDBACK_GROUP_TAP_COMMITTED = tap action commit pulse for authored
+//     non-base tap branches that do not already have state feedback
 //   - KEY_FEEDBACK_GROUP_HOLD_ACTIVE = hold-tier pending / active / commit
 //     feedback
 //   - KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE = long-hold-tier active / commit
