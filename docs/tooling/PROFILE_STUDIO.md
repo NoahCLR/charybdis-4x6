@@ -14,7 +14,9 @@ There is no sidecar profile format. The Studio parses existing C authoring
 blocks, renders a VS Code webview, and applies narrow patches back to those
 same blocks.
 
-The extension writes only these files:
+The extension writes the selected profile under
+`keyboards/bastardkb/charybdis/4x6/keymaps/<name>/`. For the current `noah`
+profile, the editable files are:
 
 | File | Studio-owned edit surfaces |
 | --- | --- |
@@ -24,6 +26,42 @@ The extension writes only these files:
 
 For complex behavior rows, direct source editing is still expected after using
 the Studio as a starter.
+
+## Profiles And New Keymaps
+
+The header profile picker chooses the active keymap folder. Write actions carry
+that profile id back to the extension host, so a stale write is rejected if the
+profile changed before the patch applies.
+
+`New profile` creates a Charybdis 4x6 keymap from the starter templates under
+[`tools/charybdis-profile-studio/templates/charybdis-4x6/`](../../tools/charybdis-profile-studio/templates/charybdis-4x6/).
+The generated folder contains:
+
+| File | Starter role |
+| --- | --- |
+| `rules.mk` | sets `USER_NAME := noah` so QMK loads the shared runtime |
+| `config.h` | seeds compile-ready layer, timing, pointer, and RGB defaults |
+| `keymap.c` | starts fresh with empty macro payloads, no active combos, no active key behaviors, a plain base layer, and transparent support layers |
+| `rgb_config.c` | seeds compile-ready layer, pointing-mode, combo, key-feedback, and LED-group tables |
+
+The create flow also appends the profile to `qmk.json`. Build a generated
+profile with:
+
+```sh
+qmk compile -kb bastardkb/charybdis/4x6 -km <name>
+```
+
+Generic profile validation can target any generated profile directory:
+
+```sh
+sh tests/host/run_real_profile_validation_tests.sh keyboards/bastardkb/charybdis/4x6/keymaps/<name>
+```
+
+The generated overview docs still describe the current `noah` profile unless
+the introspection tooling is parameterized in a later pass.
+For that current-profile overview, see
+[`docs/KEYMAP-OVERVIEW.md`](../KEYMAP-OVERVIEW.md), with prose context in
+[`docs/KEYMAP.md`](../KEYMAP.md).
 
 ## Editing Model
 

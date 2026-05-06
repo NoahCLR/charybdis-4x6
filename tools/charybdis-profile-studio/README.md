@@ -11,7 +11,9 @@ directly.
 
 ## What It Edits
 
-Profile Studio reads and writes these files:
+Profile Studio reads and writes the selected Charybdis 4x6 profile under
+`keyboards/bastardkb/charybdis/4x6/keymaps/<name>/`. For the current `noah`
+profile, those files are:
 
 - [`config.h`](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h):
   layer names, timing defaults, and profile-level settings
@@ -23,6 +25,24 @@ Profile Studio reads and writes these files:
 
 There is no sidecar database to keep in sync. If you edit the C files by hand,
 reload the Studio and it will parse the current source again.
+
+The header profile picker can switch profiles or create a new one. `New
+profile` creates `rules.mk`, `config.h`, `keymap.c`, and `rgb_config.c` from
+the bundled starter templates, registers the keymap in `qmk.json`, and keeps
+the generated `keymap.c` intentionally blank: no active combos, no active key
+behavior rows, and empty macro payloads.
+
+Generated profiles reuse the shared runtime through `USER_NAME := noah` in
+their `rules.mk`, so they build with:
+
+```sh
+qmk compile -kb bastardkb/charybdis/4x6 -km <name>
+```
+
+For a read-only overview of the current `noah` profile, see
+[`docs/KEYMAP-OVERVIEW.md`](../../docs/KEYMAP-OVERVIEW.md). The companion
+[`docs/KEYMAP.md`](../../docs/KEYMAP.md) explains the same current config in
+prose.
 
 ## Screenshots
 

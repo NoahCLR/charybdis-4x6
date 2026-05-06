@@ -13,7 +13,7 @@
   ],
   "activationEvents": [
     "onCommand:charybdisProfileStudio.open",
-    "workspaceContains:keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c"
+    "workspaceContains:qmk.json"
   ],
   "main": "./extension.js",
   "contributes": {

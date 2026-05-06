@@ -164,8 +164,6 @@ uint16_t keycode_at_keymap_location(uint8_t layer_num, uint8_t row, uint8_t colu
 }
 
 int main(void) {
-    CHECK(key_behavior_count > 0);
-    CHECK(noah_combo_output_count > 0);
 #if defined(RGB_MATRIX_ENABLE) && defined(POINTING_DEVICE_ENABLE) && defined(RGB_PD_MODE_FEEDBACK_ENABLE)
     CHECK(pd_mode_color_count == PD_MODE_COUNT);
 #endif

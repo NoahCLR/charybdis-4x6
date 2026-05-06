@@ -4,33 +4,20 @@ const vscode = require("vscode");
 const fs = require("fs/promises");
 const path = require("path");
 
-const KEYMAP_RELATIVE_PATH = path.join(
+const PROFILE_KEYBOARD = "bastardkb/charybdis/4x6";
+const PROFILE_KEYMAPS_RELATIVE_PATH = path.join(
     "keyboards",
     "bastardkb",
     "charybdis",
     "4x6",
-    "keymaps",
-    "noah",
-    "keymap.c"
+    "keymaps"
 );
-const RGB_RELATIVE_PATH = path.join(
-    "keyboards",
-    "bastardkb",
-    "charybdis",
-    "4x6",
-    "keymaps",
-    "noah",
-    "rgb_config.c"
-);
-const KEYMAP_CONFIG_RELATIVE_PATH = path.join(
-    "keyboards",
-    "bastardkb",
-    "charybdis",
-    "4x6",
-    "keymaps",
-    "noah",
-    "config.h"
-);
+const DEFAULT_PROFILE_KEYMAP = "noah";
+const DEFAULT_PROFILE_TARGET = profileTargetForKeymap(DEFAULT_PROFILE_KEYMAP);
+const KEYMAP_RELATIVE_PATH = DEFAULT_PROFILE_TARGET.keymapPath;
+const RGB_RELATIVE_PATH = DEFAULT_PROFILE_TARGET.rgbPath;
+const KEYMAP_CONFIG_RELATIVE_PATH = DEFAULT_PROFILE_TARGET.configPath;
+const PROFILE_TEMPLATE_RELATIVE_PATH = path.join("templates", "charybdis-4x6");
 const QMK_KEYCODE_DATA_RELATIVE_PATH = path.join("data", "constants", "keycodes");
 const MACRO_PAYLOAD_KEYCODES_RELATIVE_PATH = path.join("users", "noah", "lib", "macro", "macro_payload_keycodes.c");
 
@@ -507,6 +494,221 @@ const SHIFTED_KEY_BASE_LABELS = Object.fromEntries(
         .filter(([shiftedKeycode]) => Boolean(shiftedKeycode))
 );
 
+function profileTargetForKeymap(keymap, source = {}) {
+    const keymapDir = path.join(PROFILE_KEYMAPS_RELATIVE_PATH, keymap);
+    return {
+        id: `${PROFILE_KEYBOARD}:${keymap}`,
+        keyboard: PROFILE_KEYBOARD,
+        keymap,
+        keymapDir,
+        keymapPath: path.join(keymapDir, "keymap.c"),
+        configPath: path.join(keymapDir, "config.h"),
+        rgbPath: path.join(keymapDir, "rgb_config.c"),
+        rulesPath: path.join(keymapDir, "rules.mk"),
+        userspaceName: "noah",
+        userspaceDir: path.join("users", "noah"),
+        registered: Boolean(source.registered),
+        discovered: Boolean(source.discovered),
+        complete: Boolean(source.complete),
+        editable: Boolean(source.editable),
+        buildable: Boolean(source.buildable),
+    };
+}
+
+function profileTargetPaths(root, target) {
+    return {
+        keymap: path.join(root, target.keymapPath),
+        config: path.join(root, target.configPath),
+        rgb: path.join(root, target.rgbPath),
+        rules: path.join(root, target.rulesPath),
+    };
+}
+
+function normalizeProfileKeymapName(value) {
+    return String(value || "").trim();
+}
+
+function assertValidProfileKeymapName(keymap) {
+    if (!keymap) {
+        throw new Error("Profile name is required.");
+    }
+    if (!/^[a-z0-9_-]+$/.test(keymap)) {
+        throw new Error("Profile name must use only lowercase letters, numbers, hyphens, and underscores.");
+    }
+    if (keymap === "." || keymap === ".." || keymap.includes("/") || keymap.includes("\\")) {
+        throw new Error("Profile name must not contain path separators.");
+    }
+}
+
+async function findRepoRoot() {
+    const folders = vscode.workspace.workspaceFolders || [];
+    for (const folder of folders) {
+        const root = folder.uri.fsPath;
+        if (await isProfileRepoRoot(root)) {
+            return root;
+        }
+    }
+
+    const activeFile = vscode.window.activeTextEditor?.document?.uri.fsPath;
+    if (activeFile) {
+        let cursor = path.dirname(activeFile);
+        while (cursor !== path.dirname(cursor)) {
+            if (await isProfileRepoRoot(cursor)) {
+                return cursor;
+            }
+            cursor = path.dirname(cursor);
+        }
+    }
+
+    return undefined;
+}
+
+async function isProfileRepoRoot(root) {
+    return await fileExists(path.join(root, "qmk.json")) ||
+        await fileExists(path.join(root, DEFAULT_PROFILE_TARGET.keymapPath)) ||
+        await fileExists(path.join(root, PROFILE_KEYMAPS_RELATIVE_PATH));
+}
+
+async function discoverProfileTargets(root) {
+    const byKeymap = new Map();
+    for (const keymap of await keymapsFromQmkJson(root)) {
+        byKeymap.set(keymap, { registered: true });
+    }
+
+    const keymapsRoot = path.join(root, PROFILE_KEYMAPS_RELATIVE_PATH);
+    try {
+        for (const entry of await fs.readdir(keymapsRoot, { withFileTypes: true })) {
+            if (!entry.isDirectory()) continue;
+            const keymap = entry.name;
+            const state = byKeymap.get(keymap) || {};
+            state.discovered = true;
+            byKeymap.set(keymap, state);
+        }
+    } catch {
+        // A repo with no keymaps yet can still create one from Studio.
+    }
+
+    const targets = [];
+    for (const [keymap, state] of byKeymap.entries()) {
+        const target = profileTargetForKeymap(keymap, state);
+        const paths = profileTargetPaths(root, target);
+        const hasKeymap = await fileExists(paths.keymap);
+        const hasConfig = await fileExists(paths.config);
+        const hasRgb = await fileExists(paths.rgb);
+        const hasRules = await fileExists(paths.rules);
+        target.editable = hasKeymap && hasConfig && hasRgb;
+        target.complete = target.editable && hasRules;
+        target.buildable = target.complete;
+        targets.push(target);
+    }
+
+    return targets.sort(compareProfileTargets);
+}
+
+function compareProfileTargets(left, right) {
+    if (left.keymap === DEFAULT_PROFILE_KEYMAP && right.keymap !== DEFAULT_PROFILE_KEYMAP) return -1;
+    if (right.keymap === DEFAULT_PROFILE_KEYMAP && left.keymap !== DEFAULT_PROFILE_KEYMAP) return 1;
+    if (left.registered !== right.registered) return left.registered ? -1 : 1;
+    return left.keymap.localeCompare(right.keymap, undefined, { numeric: true });
+}
+
+async function keymapsFromQmkJson(root) {
+    const qmkJsonPath = path.join(root, "qmk.json");
+    try {
+        const parsed = JSON.parse(await fs.readFile(qmkJsonPath, "utf8"));
+        return (Array.isArray(parsed.build_targets) ? parsed.build_targets : [])
+            .filter((target) => Array.isArray(target) && target[0] === PROFILE_KEYBOARD && typeof target[1] === "string")
+            .map((target) => target[1]);
+    } catch {
+        return [];
+    }
+}
+
+async function ensureQmkBuildTarget(root, keymap) {
+    const qmkJsonPath = path.join(root, "qmk.json");
+    let parsed = {};
+    try {
+        parsed = JSON.parse(await fs.readFile(qmkJsonPath, "utf8"));
+    } catch {
+        parsed = { userspace_version: "1.0", build_targets: [] };
+    }
+
+    const buildTargets = Array.isArray(parsed.build_targets) ? parsed.build_targets : [];
+    if (!buildTargets.some((target) => Array.isArray(target) && target[0] === PROFILE_KEYBOARD && target[1] === keymap)) {
+        buildTargets.push([PROFILE_KEYBOARD, keymap]);
+    }
+    parsed.build_targets = buildTargets;
+    await writeText(qmkJsonPath, JSON.stringify(parsed, null, 4) + "\n");
+}
+
+async function activeProfileTarget(root, state) {
+    const profiles = await discoverProfileTargets(root);
+    let target = profiles.find((profile) => profile.id === state.activeProfileId);
+    if (!target) {
+        target = profiles.find((profile) => profile.keymap === DEFAULT_PROFILE_KEYMAP && profile.editable) ||
+            profiles.find((profile) => profile.editable);
+    }
+    state.activeProfileId = target?.id || "";
+    return { profiles, target };
+}
+
+function requireActiveProfile(target) {
+    if (!target || !target.editable) {
+        throw new Error("No editable profile is selected.");
+    }
+    return target;
+}
+
+async function createProfile(root, keymapName) {
+    const keymap = normalizeProfileKeymapName(keymapName);
+    assertValidProfileKeymapName(keymap);
+
+    const target = profileTargetForKeymap(keymap);
+    const targetDir = path.join(root, target.keymapDir);
+    if (await fileExists(targetDir)) {
+        throw new Error(`Profile already exists: ${keymap}`);
+    }
+
+    await fs.mkdir(targetDir, { recursive: true });
+    const rendered = await renderProfileTemplates(keymap);
+    const paths = profileTargetPaths(root, target);
+    await Promise.all([
+        writeText(paths.rules, rendered.rules),
+        writeText(paths.config, rendered.config),
+        writeText(paths.keymap, rendered.keymap),
+        writeText(paths.rgb, rendered.rgb),
+    ]);
+    await ensureQmkBuildTarget(root, keymap);
+    return profileTargetForKeymap(keymap, {
+        registered: true,
+        discovered: true,
+        complete: true,
+        editable: true,
+        buildable: true,
+    });
+}
+
+async function renderProfileTemplates(keymap) {
+    const templateRoot = path.join(__dirname, PROFILE_TEMPLATE_RELATIVE_PATH);
+    const replacements = {
+        "{{KEYMAP_NAME}}": keymap,
+        "{{PROFILE_TITLE}}": keymap.replace(/[-_]+/g, " ").replace(/\b[a-z]/g, (char) => char.toUpperCase()),
+    };
+    const render = async (fileName) => {
+        let text = await fs.readFile(path.join(templateRoot, fileName), "utf8");
+        for (const [from, to] of Object.entries(replacements)) {
+            text = text.split(from).join(to);
+        }
+        return text;
+    };
+    return {
+        rules: await render("rules.mk"),
+        config: await render("config.h"),
+        keymap: await render("keymap.c"),
+        rgb: await render("rgb_config.c"),
+    };
+}
+
 function activate(context) {
     context.subscriptions.push(
         vscode.commands.registerCommand("charybdisProfileStudio.open", () => openStudio(context))
@@ -517,7 +719,7 @@ function activate(context) {
 function deactivate() { }
 
 async function setupNativeEntryPoints(context) {
-    const root = await findProfileRoot();
+    const root = await findRepoRoot();
     if (!root) {
         return;
     }
@@ -531,13 +733,14 @@ async function setupNativeEntryPoints(context) {
 }
 
 async function openStudio(context) {
-    const root = await findProfileRoot();
+    const root = await findRepoRoot();
     if (!root) {
         vscode.window.showErrorMessage(
-            `Could not find ${KEYMAP_RELATIVE_PATH} and ${RGB_RELATIVE_PATH} in the open workspace.`
+            "Could not find a Charybdis userspace repo in the open workspace."
         );
         return;
     }
+    const state = { activeProfileId: "" };
 
     const panel = vscode.window.createWebviewPanel(
         "charybdisProfileStudio",
@@ -554,7 +757,7 @@ async function openStudio(context) {
     panel.webview.onDidReceiveMessage(
         async (message) => {
             try {
-                await handleWebviewMessage(panel, root, message);
+                await handleWebviewMessage(panel, root, state, message);
             } catch (error) {
                 const text = error instanceof Error ? error.message : String(error);
                 panel.webview.postMessage({ type: "error", message: text });
@@ -565,33 +768,7 @@ async function openStudio(context) {
         context.subscriptions
     );
 
-    await postModel(panel, root);
-}
-
-async function findProfileRoot() {
-    const folders = vscode.workspace.workspaceFolders || [];
-    for (const folder of folders) {
-        const root = folder.uri.fsPath;
-        if (await fileExists(path.join(root, KEYMAP_RELATIVE_PATH)) && await fileExists(path.join(root, RGB_RELATIVE_PATH))) {
-            return root;
-        }
-    }
-
-    const activeFile = vscode.window.activeTextEditor?.document?.uri.fsPath;
-    if (activeFile) {
-        let cursor = path.dirname(activeFile);
-        while (cursor !== path.dirname(cursor)) {
-            if (
-                await fileExists(path.join(cursor, KEYMAP_RELATIVE_PATH)) &&
-                await fileExists(path.join(cursor, RGB_RELATIVE_PATH))
-            ) {
-                return cursor;
-            }
-            cursor = path.dirname(cursor);
-        }
-    }
-
-    return undefined;
+    await postModel(panel, root, state);
 }
 
 async function fileExists(filePath) {
@@ -603,112 +780,144 @@ async function fileExists(filePath) {
     }
 }
 
-async function handleWebviewMessage(panel, root, message) {
+async function handleWebviewMessage(panel, root, state, message) {
     switch (message?.type) {
         case "ready":
-            await postModel(panel, root);
+            await postModel(panel, root, state);
             return;
         case "refresh":
-            await postModel(panel, root, "Reloaded files and discarded uncommitted Studio edits.");
+            await postModel(panel, root, state, "Reloaded files and discarded uncommitted Studio edits.");
             return;
+        case "selectProfile":
+            state.activeProfileId = String(message.profileId || "");
+            await postModel(panel, root, state, "Switched Profile Studio target.");
+            return;
+        case "createProfile": {
+            const target = await createProfile(root, message.keymap);
+            state.activeProfileId = target.id;
+            await postModel(panel, root, state, `Created ${target.keymap}.`);
+            return;
+        }
         case "openSource":
-            await openSource(root, message.file);
+            await openSource(root, requireActiveProfile((await activeProfileTarget(root, state)).target), message.file);
             return;
         case "applyAllChanges": {
-            await applyAllChanges(root, message);
-            await postModel(panel, root, "Applied all staged Studio changes.", { activeLayer: message.activeLayer, appliedLayerChanges: Boolean(message.adds?.length || message.deletes?.length) });
+            const target = await checkedMessageProfile(root, state, message);
+            await applyAllChanges(root, target, message);
+            await postModel(panel, root, state, "Applied all staged Studio changes.", { activeLayer: message.activeLayer, appliedLayerChanges: Boolean(message.adds?.length || message.deletes?.length) });
             return;
         }
         case "applyLayerChanges": {
-            await applyLayerChanges(root, message.adds, message.deletes);
-            await postModel(panel, root, "Applied staged layer changes.", { activeLayer: message.activeLayer, appliedLayerChanges: true });
+            const target = await checkedMessageProfile(root, state, message);
+            await applyLayerChanges(root, target, message.adds, message.deletes);
+            await postModel(panel, root, state, "Applied staged layer changes.", { activeLayer: message.activeLayer, appliedLayerChanges: true });
             return;
         }
-        case "updateLayoutKeys":
+        case "updateLayoutKeys": {
+            const target = await checkedMessageProfile(root, state, message);
             if (Array.isArray(message.layers)) {
-                await patchLayoutKeyGroups(root, message.layers);
+                await patchLayoutKeyGroups(root, target, message.layers);
             } else {
-                await patchLayoutKeys(root, message.layer, message.changes);
+                await patchLayoutKeys(root, target, message.layer, message.changes);
             }
-            await postModel(panel, root, "Updated keymap.c layout keys.");
+            await postModel(panel, root, state, "Updated keymap.c layout keys.");
             return;
+        }
         case "updateLayerColor":
-            await patchLayerColor(root, message.layer, message.hue, message.sat, message.val, message.mode);
-            await postModel(panel, root, "Updated rgb_config.c layer color.");
+            await patchLayerColor(root, await checkedMessageProfile(root, state, message), message.layer, message.hue, message.sat, message.val, message.mode);
+            await postModel(panel, root, state, "Updated rgb_config.c layer color.");
             return;
         case "updatePdModeColor":
-            await patchPdModeColor(root, message.pointingMode, message.hue, message.sat, message.val, message.locality);
-            await postModel(panel, root, "Updated rgb_config.c pointing-mode color.");
+            await patchPdModeColor(root, await checkedMessageProfile(root, state, message), message.pointingMode, message.hue, message.sat, message.val, message.locality);
+            await postModel(panel, root, state, "Updated rgb_config.c pointing-mode color.");
             return;
         case "updateAutomouseFade":
-            await patchAutomouseFade(root, message.mode, message.hue, message.sat, message.val);
-            await postModel(panel, root, "Updated rgb_config.c auto-mouse fade.");
+            await patchAutomouseFade(root, await checkedMessageProfile(root, state, message), message.mode, message.hue, message.sat, message.val);
+            await postModel(panel, root, state, "Updated rgb_config.c auto-mouse fade.");
             return;
         case "updateComboFeedback":
-            await patchComboFeedback(root, message.hue, message.sat, message.val, message.locality);
-            await postModel(panel, root, "Updated rgb_config.c combo feedback.");
+            await patchComboFeedback(root, await checkedMessageProfile(root, state, message), message.hue, message.sat, message.val, message.locality);
+            await postModel(panel, root, state, "Updated rgb_config.c combo feedback.");
             return;
         case "updateKeyBehaviorFeedback":
-            await patchKeyBehaviorFeedback(root, message.config);
-            await postModel(panel, root, "Updated rgb_config.c key behavior feedback.");
+            await patchKeyBehaviorFeedback(root, await checkedMessageProfile(root, state, message), message.config);
+            await postModel(panel, root, state, "Updated rgb_config.c key behavior feedback.");
             return;
         case "updateConfigDefaults":
-            await patchConfigDefaults(root, message.fields);
-            await postModel(panel, root, "Updated config.h defaults.");
+            await patchConfigDefaults(root, await checkedMessageProfile(root, state, message), message.fields);
+            await postModel(panel, root, state, "Updated config.h defaults.");
             return;
         case "saveRgbReusableLedGroup":
-            await saveRgbReusableLedGroup(root, message.group);
-            await postModel(panel, root, "Saved rgb_config.c reusable LED group.", { clearedRgbReusableGroupDraft: true });
+            await saveRgbReusableLedGroup(root, await checkedMessageProfile(root, state, message), message.group);
+            await postModel(panel, root, state, "Saved rgb_config.c reusable LED group.", { clearedRgbReusableGroupDraft: true });
             return;
         case "deleteRgbReusableLedGroup":
-            await deleteRgbReusableLedGroup(root, message.name);
-            await postModel(panel, root, "Deleted rgb_config.c reusable LED group.", { clearedRgbReusableGroupDraft: true });
+            await deleteRgbReusableLedGroup(root, await checkedMessageProfile(root, state, message), message.name);
+            await postModel(panel, root, state, "Deleted rgb_config.c reusable LED group.", { clearedRgbReusableGroupDraft: true });
             return;
         case "addRgbLedGroup":
-            await appendRgbLedGroup(root, message.group);
-            await postModel(panel, root, "Added rgb_config.c LED group row.");
+            await appendRgbLedGroup(root, await checkedMessageProfile(root, state, message), message.group);
+            await postModel(panel, root, state, "Added rgb_config.c LED group row.");
             return;
         case "updateViaMacro":
-            await patchViaMacro(root, message.keycode, message.payload);
-            await postModel(panel, root, "Updated keymap.c VIA macro payload.");
+            await patchViaMacro(root, await checkedMessageProfile(root, state, message), message.keycode, message.payload);
+            await postModel(panel, root, state, "Updated keymap.c VIA macro payload.");
             return;
         case "addCombo":
-            await appendCombo(root, message.output, message.inputs);
-            await postModel(panel, root, "Added keymap.c combo row.");
+            await appendCombo(root, await checkedMessageProfile(root, state, message), message.output, message.inputs);
+            await postModel(panel, root, state, "Added keymap.c combo row.");
             return;
         case "saveCombo":
-            await saveCombo(root, message.originalOutput, message.originalInputs, message.output, message.inputs);
-            await postModel(panel, root, "Saved keymap.c combo row.");
+            await saveCombo(root, await checkedMessageProfile(root, state, message), message.originalOutput, message.originalInputs, message.output, message.inputs);
+            await postModel(panel, root, state, "Saved keymap.c combo row.");
             return;
         case "addBehavior":
-            await appendKeyBehavior(root, message.behavior);
-            await postModel(panel, root, "Added keymap.c key behavior row.");
+            await appendKeyBehavior(root, await checkedMessageProfile(root, state, message), message.behavior);
+            await postModel(panel, root, state, "Added keymap.c key behavior row.");
             return;
         case "saveBehavior":
-            await saveKeyBehavior(root, message.behavior);
-            await postModel(panel, root, "Saved keymap.c key behavior row.");
+            await saveKeyBehavior(root, await checkedMessageProfile(root, state, message), message.behavior);
+            await postModel(panel, root, state, "Saved keymap.c key behavior row.");
             return;
         default:
             throw new Error(`Unknown studio message: ${message?.type}`);
     }
 }
 
-async function openSource(root, file) {
-    const relative = file === "rgb" ? RGB_RELATIVE_PATH : file === "config" ? KEYMAP_CONFIG_RELATIVE_PATH : KEYMAP_RELATIVE_PATH;
+async function checkedMessageProfile(root, state, message) {
+    const { target } = await activeProfileTarget(root, state);
+    requireActiveProfile(target);
+    if (message?.profileId && message.profileId !== target.id) {
+        throw new Error("Profile changed before this write was applied. Reload and apply the change again.");
+    }
+    return target;
+}
+
+async function openSource(root, target, file) {
+    const relative = file === "rgb" ? target.rgbPath : file === "config" ? target.configPath : target.keymapPath;
     const document = await vscode.workspace.openTextDocument(path.join(root, relative));
     await vscode.window.showTextDocument(document, vscode.ViewColumn.Beside);
 }
 
-async function postModel(panel, root, notice, options = {}) {
-    const model = await buildModel(root);
+async function postModel(panel, root, state, notice, options = {}) {
+    const { profiles, target } = await activeProfileTarget(root, state);
+    const model = await buildModel(root, target, profiles);
     panel.webview.postMessage({ type: "model", model, notice, ...options });
 }
 
-async function buildModel(root) {
-    const keymapPath = path.join(root, KEYMAP_RELATIVE_PATH);
-    const rgbPath = path.join(root, RGB_RELATIVE_PATH);
-    const configPath = path.join(root, KEYMAP_CONFIG_RELATIVE_PATH);
+async function buildModel(root, target = DEFAULT_PROFILE_TARGET, profiles) {
+    const allProfiles = profiles || await discoverProfileTargets(root);
+    const requestedTarget = target || DEFAULT_PROFILE_TARGET;
+    const profileTarget = allProfiles.find((profile) => profile.id === requestedTarget.id) || requestedTarget;
+    const paths = profileTargetPaths(root, profileTarget);
+    const keymapPath = paths.keymap;
+    const rgbPath = paths.rgb;
+    const configPath = paths.config;
     const macroPayloadKeycodesPath = path.join(root, MACRO_PAYLOAD_KEYCODES_RELATIVE_PATH);
+    if (!profileTarget.editable && !(await fileExists(keymapPath) && await fileExists(configPath) && await fileExists(rgbPath))) {
+        const qmkKeycodeCatalog = await loadQmkKeycodeCatalog(root).catch(() => fallbackQmkKeycodeCatalog());
+        return emptyModel(root, allProfiles, profileTarget, qmkKeycodeCatalog, ["Create a profile to start editing keymap.c."]);
+    }
     const [keymapText, rgbText, configText, macroPayloadKeycodesText] = await Promise.all([
         fs.readFile(keymapPath, "utf8"),
         fs.readFile(rgbPath, "utf8"),
@@ -734,12 +943,15 @@ async function buildModel(root) {
 
     return {
         root,
+        profiles: allProfiles,
+        activeProfile: profileTarget,
         files: {
-            keymap: KEYMAP_RELATIVE_PATH,
-            config: KEYMAP_CONFIG_RELATIVE_PATH,
-            rgb: RGB_RELATIVE_PATH,
+            keymap: profileTarget.keymapPath,
+            config: profileTarget.configPath,
+            rgb: profileTarget.rgbPath,
         },
         layers: safe("layers", [], () => parseLayers(keymapText)),
+        customKeycodes: safe("customKeycodes", [], () => parseKeymapCustomKeycodes(keymapText)),
         keyBehaviors: safe("keyBehaviors", [], () => parseKeyBehaviors(keymapText)),
         combos: safe("combos", [], () => parseMacroTable(keymapText, "COMBOS", "COMBO").map(parseComboRow)),
         viaMacros: safe("viaMacros", [], () => parseMacroTable(keymapText, "VIA_MACROS", "MACRO").map((row) => parseMacroSlot(row, "via"))),
@@ -754,6 +966,34 @@ async function buildModel(root) {
         qmkKeycodeAliases: qmkKeycodeCatalog.aliases,
         qmkKeycodeSource: qmkKeycodeCatalog.source,
         macroPayloadKeycodes: safe("macroPayloadKeycodes", [], () => parseMacroPayloadKeycodes(macroPayloadKeycodesText)),
+        diagnostics,
+    };
+}
+
+function emptyModel(root, profiles, target, qmkKeycodeCatalog, diagnostics = []) {
+    return {
+        root,
+        profiles,
+        activeProfile: target || null,
+        files: target ? {
+            keymap: target.keymapPath,
+            config: target.configPath,
+            rgb: target.rgbPath,
+        } : {},
+        layers: [],
+        customKeycodes: [],
+        keyBehaviors: [],
+        combos: [],
+        viaMacros: [],
+        hardcodedMacros: [],
+        behaviorTimingDefaults: {},
+        configDefaults: [],
+        rgb: {},
+        qmkKeycodes: qmkKeycodeCatalog.entries,
+        qmkKeyLabels: qmkKeycodeCatalog.labels,
+        qmkKeycodeAliases: qmkKeycodeCatalog.aliases,
+        qmkKeycodeSource: qmkKeycodeCatalog.source,
+        macroPayloadKeycodes: [],
         diagnostics,
     };
 }
@@ -1065,6 +1305,20 @@ function parseLayers(text) {
     }
 
     return layers;
+}
+
+function parseKeymapCustomKeycodes(text) {
+    let body;
+    try {
+        body = findEnumBody(text, /enum\s+keymap_custom_keycodes\s*\{/).body;
+    } catch {
+        return [];
+    }
+
+    return uniqueStrings(splitTopLevel(stripComments(body))
+        .map((entry) => entry.split("=")[0].trim())
+        .filter((entry) => /^[A-Z_][A-Z0-9_]*$/.test(entry))
+        .filter((entry) => entry !== "KEYMAP_CUSTOM_KEYCODE_SENTINEL"));
 }
 
 function parseKeyBehaviors(text) {
@@ -1473,8 +1727,8 @@ function parseHsv(value) {
     };
 }
 
-async function patchLayoutKeys(root, layer, changes) {
-    const context = await readLayoutSlotContext(root, layer);
+async function patchLayoutKeys(root, target, layer, changes) {
+    const context = await readLayoutSlotContext(root, target, layer);
     const normalizedChanges = normalizeLayoutKeyChanges(changes, knownLayoutKeyTokens(context.text));
     if (!normalizedChanges.length) {
         return;
@@ -1496,13 +1750,13 @@ async function patchLayoutKeys(root, layer, changes) {
     await writeText(context.filePath, next);
 }
 
-async function patchLayoutKeyGroups(root, groups) {
+async function patchLayoutKeyGroups(root, target, groups) {
     const normalizedGroups = normalizeLayoutKeyGroups(groups);
     if (!normalizedGroups.length) {
         return;
     }
 
-    const keymapPath = path.join(root, KEYMAP_RELATIVE_PATH);
+    const keymapPath = profileTargetPaths(root, target).keymap;
     let text = await fs.readFile(keymapPath, "utf8");
     const next = patchLayoutKeyGroupsInText(keymapPath, text, normalizedGroups);
     if (next !== text) {
@@ -1548,7 +1802,7 @@ function patchLayoutKeyGroupsInText(filePath, text, normalizedGroups) {
     return text;
 }
 
-async function applyAllChanges(root, message) {
+async function applyAllChanges(root, target, message) {
     const normalizedAdds = normalizeLayerAdds(message?.adds);
     const normalizedDeletes = normalizeLayerDeletes(message?.deletes);
     const layoutGroups = normalizeLayoutKeyGroups(message?.layoutGroups);
@@ -1556,13 +1810,14 @@ async function applyAllChanges(root, message) {
         return;
     }
     if (!normalizedAdds.length && !normalizedDeletes.length) {
-        await patchLayoutKeyGroups(root, layoutGroups);
+        await patchLayoutKeyGroups(root, target, layoutGroups);
         return;
     }
 
-    const configPath = path.join(root, KEYMAP_CONFIG_RELATIVE_PATH);
-    const keymapPath = path.join(root, KEYMAP_RELATIVE_PATH);
-    const rgbPath = path.join(root, RGB_RELATIVE_PATH);
+    const paths = profileTargetPaths(root, target);
+    const configPath = paths.config;
+    const keymapPath = paths.keymap;
+    const rgbPath = paths.rgb;
     let configText = await fs.readFile(configPath, "utf8");
     let keymapText = await fs.readFile(keymapPath, "utf8");
     let rgbText = await fs.readFile(rgbPath, "utf8");
@@ -1625,16 +1880,17 @@ function validateLayerChangeRequest(normalizedAdds, normalizedDeletes, keymapTex
     }
 }
 
-async function applyLayerChanges(root, adds, deletes) {
+async function applyLayerChanges(root, target, adds, deletes) {
     const normalizedAdds = normalizeLayerAdds(adds);
     const normalizedDeletes = normalizeLayerDeletes(deletes);
     if (!normalizedAdds.length && !normalizedDeletes.length) {
         return;
     }
 
-    const configPath = path.join(root, KEYMAP_CONFIG_RELATIVE_PATH);
-    const keymapPath = path.join(root, KEYMAP_RELATIVE_PATH);
-    const rgbPath = path.join(root, RGB_RELATIVE_PATH);
+    const paths = profileTargetPaths(root, target);
+    const configPath = paths.config;
+    const keymapPath = paths.keymap;
+    const rgbPath = paths.rgb;
     let configText = await fs.readFile(configPath, "utf8");
     let keymapText = await fs.readFile(keymapPath, "utf8");
     let rgbText = await fs.readFile(rgbPath, "utf8");
@@ -1860,8 +2116,8 @@ function removeLayerLedGroupRows(text, layer) {
     return next;
 }
 
-function remainingLayerReferences(layer, texts) {
-    return texts.map((text, index) => ({ text, label: [KEYMAP_CONFIG_RELATIVE_PATH, KEYMAP_RELATIVE_PATH, RGB_RELATIVE_PATH][index] }))
+function remainingLayerReferences(layer, texts, labels = [KEYMAP_CONFIG_RELATIVE_PATH, KEYMAP_RELATIVE_PATH, RGB_RELATIVE_PATH]) {
+    return texts.map((text, index) => ({ text, label: labels[index] }))
         .filter((entry) => new RegExp(`\\b${escapeRegex(layer)}\\b`).test(maskCommentsPreserveLength(entry.text)))
         .map((entry) => entry.label);
 }
@@ -1904,8 +2160,8 @@ function collectLayoutKeyTokens(expression, tokens) {
     }
 }
 
-async function readLayoutSlotContext(root, layer) {
-    const filePath = path.join(root, KEYMAP_RELATIVE_PATH);
+async function readLayoutSlotContext(root, target, layer) {
+    const filePath = profileTargetPaths(root, target).keymap;
     const text = await fs.readFile(filePath, "utf8");
     return layoutSlotContextFromText(filePath, text, layer);
 }
@@ -1939,12 +2195,12 @@ function assertLayoutIndex(layoutIndex) {
     }
 }
 
-async function patchLayerColor(root, layer, hue, sat, val, mode) {
+async function patchLayerColor(root, target, layer, hue, sat, val, mode) {
     assertSafeIdentifier(layer, "layer");
     assertSafeHsv(hue, sat, val);
     assertAllowed(mode, LAYER_COLOR_MODES, "layer color mode");
 
-    const filePath = path.join(root, RGB_RELATIVE_PATH);
+    const filePath = profileTargetPaths(root, target).rgb;
     const text = await fs.readFile(filePath, "utf8");
     const initializer = findInitializerBody(text, /layer_colors\s*\[LAYER_COUNT\]\s*=/);
     const entry = findDesignatedEntry(initializer.body, `[${layer}]`);
@@ -1965,12 +2221,12 @@ async function patchLayerColor(root, layer, hue, sat, val, mode) {
     await writeText(filePath, next);
 }
 
-async function patchPdModeColor(root, pointingMode, hue, sat, val, locality) {
+async function patchPdModeColor(root, target, pointingMode, hue, sat, val, locality) {
     assertSafeIdentifier(pointingMode, "pointing mode");
     assertSafeHsv(hue, sat, val);
     assertAllowed(locality, RGB_LOCALITIES, "RGB locality");
 
-    const filePath = path.join(root, RGB_RELATIVE_PATH);
+    const filePath = profileTargetPaths(root, target).rgb;
     const text = await fs.readFile(filePath, "utf8");
     const initializer = findInitializerBody(text, /pd_mode_colors\s*\[\]\s*=/);
     const entry = findStructEntryByField(initializer.body, ".pointing_mode", pointingMode);
@@ -1991,11 +2247,11 @@ async function patchPdModeColor(root, pointingMode, hue, sat, val, locality) {
     await writeText(filePath, next);
 }
 
-async function patchAutomouseFade(root, mode, hue, sat, val) {
+async function patchAutomouseFade(root, target, mode, hue, sat, val) {
     assertAllowed(mode, AUTOMOUSE_FADE_MODES, "auto-mouse fade mode");
     assertSafeHsv(hue, sat, val);
 
-    const filePath = path.join(root, RGB_RELATIVE_PATH);
+    const filePath = profileTargetPaths(root, target).rgb;
     const text = await fs.readFile(filePath, "utf8");
     const initializer = findInitializerBody(text, /automouse_fade_end_config\s*=/);
     let next = patchFieldExpressionInRange(text, initializer.bodyStart, initializer.bodyEnd, ".mode", mode);
@@ -2003,11 +2259,11 @@ async function patchAutomouseFade(root, mode, hue, sat, val) {
     await writeText(filePath, next);
 }
 
-async function patchComboFeedback(root, hue, sat, val, locality) {
+async function patchComboFeedback(root, target, hue, sat, val, locality) {
     assertSafeHsv(hue, sat, val);
     assertAllowed(locality, RGB_LOCALITIES, "combo feedback locality");
 
-    const filePath = path.join(root, RGB_RELATIVE_PATH);
+    const filePath = profileTargetPaths(root, target).rgb;
     const text = await fs.readFile(filePath, "utf8");
     const initializer = findInitializerBody(text, /combo_feedback_colors\s*=/);
     let next = patchFieldExpressionInRange(text, initializer.bodyStart, initializer.bodyEnd, ".locality", locality);
@@ -2015,7 +2271,7 @@ async function patchComboFeedback(root, hue, sat, val, locality) {
     await writeText(filePath, next);
 }
 
-async function patchKeyBehaviorFeedback(root, config) {
+async function patchKeyBehaviorFeedback(root, target, config) {
     const colors = {
         tapPendingColor: normalizeHsvRequest(config?.tapPendingColor, "tap pending color"),
         tapCommittedColor: normalizeHsvRequest(config?.tapCommittedColor, "tap committed color"),
@@ -2032,7 +2288,7 @@ async function patchKeyBehaviorFeedback(root, config) {
     assertAllowed(tapCommitMode, KEY_FEEDBACK_TAP_COMMIT_MODES, "tap commit mode");
     assertAllowed(locality, RGB_LOCALITIES, "key behavior feedback locality");
 
-    const filePath = path.join(root, RGB_RELATIVE_PATH);
+    const filePath = profileTargetPaths(root, target).rgb;
     let text = await fs.readFile(filePath, "utf8");
     text = patchFieldInInitializer(text, /key_behavior_feedback_colors\s*=/, ".tap_pending_color", colors.tapPendingColor.expression);
     text = patchRgbTapBranchColorsInInitializer(text, /key_behavior_feedback_colors\s*=/, colors.tapBranchColors);
@@ -2045,13 +2301,13 @@ async function patchKeyBehaviorFeedback(root, config) {
     await writeText(filePath, text);
 }
 
-async function patchConfigDefaults(root, fields) {
+async function patchConfigDefaults(root, target, fields) {
     const normalizedFields = normalizeConfigDefaultRequests(fields);
     if (!normalizedFields.length) {
         return;
     }
 
-    const filePath = path.join(root, KEYMAP_CONFIG_RELATIVE_PATH);
+    const filePath = profileTargetPaths(root, target).config;
     let text = await fs.readFile(filePath, "utf8");
     for (const field of normalizedFields) {
         text = field.kind === "toggle"
@@ -2210,7 +2466,7 @@ function hsvExpression(hue, sat, val) {
     return `HSV(${normalizeExpr(hue)}, ${normalizeExpr(sat)}, ${normalizeExpr(val)})`;
 }
 
-async function saveRgbReusableLedGroup(root, group) {
+async function saveRgbReusableLedGroup(root, target, group) {
     const originalName = normalizeExpr(group?.originalName || "");
     const name = normalizeExpr(group?.name || "");
     assertSafeRgbLedGroupName(name);
@@ -2220,7 +2476,7 @@ async function saveRgbReusableLedGroup(root, group) {
         throw new Error("Select at least one LED for the reusable RGB group.");
     }
 
-    const filePath = path.join(root, RGB_RELATIVE_PATH);
+    const filePath = profileTargetPaths(root, target).rgb;
     let text = await fs.readFile(filePath, "utf8");
     const groups = parseRgbReusableLedGroups(text);
     const existingNames = new Set(groups.map((entry) => entry.name));
@@ -2246,11 +2502,11 @@ async function saveRgbReusableLedGroup(root, group) {
     await writeText(filePath, text);
 }
 
-async function deleteRgbReusableLedGroup(root, name) {
+async function deleteRgbReusableLedGroup(root, target, name) {
     name = normalizeExpr(name || "");
     assertSafeRgbLedGroupName(name);
 
-    const filePath = path.join(root, RGB_RELATIVE_PATH);
+    const filePath = profileTargetPaths(root, target).rgb;
     const text = await fs.readFile(filePath, "utf8");
     const rgb = parseRgbConfig(text);
     const group = (rgb.ledGroups || []).find((entry) => entry.name === name);
@@ -2320,16 +2576,16 @@ function insertRgbReusableLedGroupDefine(text, name, ledIndices) {
     return replaceRange(text, insertAt, insertAt, `${rgbReusableLedGroupDefineLine(name, ledIndices)}\n`);
 }
 
-async function appendRgbLedGroup(root, group) {
-    const target = normalizeExpr(group?.target || "");
-    const config = RGB_LED_GROUP_TARGETS[target];
+async function appendRgbLedGroup(root, target, group) {
+    const groupTarget = normalizeExpr(group?.target || "");
+    const config = RGB_LED_GROUP_TARGETS[groupTarget];
     if (!config) {
-        throw new Error(`Invalid RGB LED group target: ${target}`);
+        throw new Error(`Invalid RGB LED group target: ${groupTarget}`);
     }
 
     assertSafeHsv(group?.hue, group?.sat, group?.val);
 
-    const filePath = path.join(root, RGB_RELATIVE_PATH);
+    const filePath = profileTargetPaths(root, target).rgb;
     const text = await fs.readFile(filePath, "utf8");
     const reusableGroupName = normalizeExpr(group?.ledGroupName || "");
     let ledGroupExpression;
@@ -2383,10 +2639,10 @@ function normalizeLedIndices(values) {
     return result;
 }
 
-async function patchViaMacro(root, keycode, payload) {
+async function patchViaMacro(root, target, keycode, payload) {
     assertSafeIdentifier(keycode, "VIA macro keycode");
 
-    const filePath = path.join(root, KEYMAP_RELATIVE_PATH);
+    const filePath = profileTargetPaths(root, target).keymap;
     const text = await fs.readFile(filePath, "utf8");
     const block = findMacroDefinitionBlock(text, "VIA_MACROS");
     const escapedKeycode = escapeRegex(keycode);
@@ -2398,11 +2654,12 @@ async function patchViaMacro(root, keycode, payload) {
     await writeText(filePath, replaceRange(text, block.start, block.end, relative));
 }
 
-async function appendCombo(root, output, inputs) {
-    const filePath = path.join(root, KEYMAP_RELATIVE_PATH);
-    const text = await fs.readFile(filePath, "utf8");
+async function appendCombo(root, target, output, inputs) {
+    const filePath = profileTargetPaths(root, target).keymap;
+    let text = await fs.readFile(filePath, "utf8");
     const {output: normalizedOutput, inputList} = normalizeComboRequest(text, output, inputs);
 
+    text = removeAuthoredEmptyTableFlag(text, "NOAH_KEYMAP_EMPTY_COMBOS");
     const block = findMacroDefinitionBlock(text, "COMBOS");
     const lines = block.text.split(/\r?\n/);
     const insertLine = lines.findIndex((line, index) => index > 0 && line.includes("/* COMBO("));
@@ -2412,8 +2669,8 @@ async function appendCombo(root, output, inputs) {
     await writeText(filePath, replaceRange(text, block.start, block.end, lines.join("\n")));
 }
 
-async function saveCombo(root, originalOutput, originalInputs, output, inputs) {
-    const filePath = path.join(root, KEYMAP_RELATIVE_PATH);
+async function saveCombo(root, target, originalOutput, originalInputs, output, inputs) {
+    const filePath = profileTargetPaths(root, target).keymap;
     const text = await fs.readFile(filePath, "utf8");
     const next = normalizeComboRequest(text, output, inputs);
     const original = normalizeComboIdentity(originalOutput, originalInputs);
@@ -2498,22 +2755,27 @@ function duplicateComboInput(inputs) {
     return "";
 }
 
-async function appendKeyBehavior(root, behavior) {
-    const row = renderBehaviorRowFromRequest(behavior);
-    const filePath = path.join(root, KEYMAP_RELATIVE_PATH);
-    const text = await fs.readFile(filePath, "utf8");
-    const initializer = findInitializerBody(text, /key_behaviors\s*\[\]\s*=/);
-    const insertion = `\n${row}\n`;
-    await writeText(filePath, replaceRange(text, initializer.bodyEnd, initializer.bodyEnd, insertion));
+function removeAuthoredEmptyTableFlag(text, macro) {
+    const pattern = new RegExp(`^[ \\t]*#\\s*define\\s+${escapeRegex(macro)}\\b[^\\r\\n]*(?:\\r?\\n)?`, "m");
+    return text.replace(pattern, "");
 }
 
-async function saveKeyBehavior(root, behavior) {
+async function appendKeyBehavior(root, target, behavior) {
+    const row = renderBehaviorRowFromRequest(behavior);
+    const filePath = profileTargetPaths(root, target).keymap;
+    let text = await fs.readFile(filePath, "utf8");
+    text = removeAuthoredEmptyTableFlag(text, "NOAH_KEYMAP_EMPTY_KEY_BEHAVIORS");
+    await writeText(filePath, appendKeyBehaviorRow(text, row));
+}
+
+async function saveKeyBehavior(root, target, behavior) {
     const normalizedKeycode = normalizeUserKeyExpression(behavior?.keycode || "");
     assertSafeExpression(normalizedKeycode, "behavior keycode");
 
     const row = renderBehaviorRowFromRequest({ ...behavior, keycode: normalizedKeycode });
-    const filePath = path.join(root, KEYMAP_RELATIVE_PATH);
-    const text = await fs.readFile(filePath, "utf8");
+    const filePath = profileTargetPaths(root, target).keymap;
+    let text = await fs.readFile(filePath, "utf8");
+    text = removeAuthoredEmptyTableFlag(text, "NOAH_KEYMAP_EMPTY_KEY_BEHAVIORS");
     const initializer = findInitializerBody(text, /key_behaviors\s*\[\]\s*=/);
     const qmkKeycodeCatalog = await loadQmkKeycodeCatalog(root).catch(() => fallbackQmkKeycodeCatalog());
     const existing = findKeyBehaviorEntry(initializer.body, normalizedKeycode, qmkKeycodeCatalog.aliases || {});
@@ -2523,7 +2785,27 @@ async function saveKeyBehavior(root, behavior) {
         return;
     }
 
-    await writeText(filePath, replaceRange(text, initializer.bodyEnd, initializer.bodyEnd, `\n${row}\n`));
+    await writeText(filePath, appendKeyBehaviorRow(text, row));
+}
+
+function appendKeyBehaviorRow(text, row) {
+    const initializer = findInitializerBody(text, /key_behaviors\s*\[\]\s*=/);
+    const entries = splitTopLevelWithRanges(initializer.body);
+    if (entries.length === 1 && isEmptyKeyBehaviorInitializerEntry(initializer.body.slice(entries[0].start, entries[0].end))) {
+        const absoluteStart = initializer.bodyStart + entries[0].start;
+        const start = text.lastIndexOf("\n", absoluteStart) + 1;
+        let end = initializer.bodyStart + entries[0].end;
+        while (end < text.length && /[ \t]/.test(text[end])) end += 1;
+        if (text[end] === ",") end += 1;
+        if (text[end] === "\r" && text[end + 1] === "\n") end += 2;
+        else if (text[end] === "\n") end += 1;
+        return replaceRange(text, start, end, `${row}\n`);
+    }
+    return replaceRange(text, initializer.bodyEnd, initializer.bodyEnd, `\n${row}\n`);
+}
+
+function isEmptyKeyBehaviorInitializerEntry(value) {
+    return /^\{\s*0\s*\}$/.test(stripComments(value).trim());
 }
 
 function findKeyBehaviorEntry(body, keycode, keyAliases = {}) {
@@ -3642,6 +3924,28 @@ function getStudioHtml() {
             border-bottom: 1px solid var(--line);
             background: #20262a;
         }
+        .header-title {
+            min-width: 0;
+        }
+        .header-actions {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            gap: 10px;
+            align-items: center;
+            min-width: min(720px, 100%);
+        }
+        .profile-picker {
+            display: grid;
+            grid-template-columns: auto minmax(150px, 220px) auto;
+            gap: 8px;
+            align-items: center;
+        }
+        .profile-picker-label {
+            color: var(--muted);
+            font-size: 11px;
+            font-weight: 650;
+        }
         h1, h2, h3 { margin: 0; font-weight: 650; }
         h1 { font-size: 18px; }
         h2 { font-size: 15px; margin-bottom: 10px; }
@@ -3924,6 +4228,19 @@ function getStudioHtml() {
         @media (max-width: 860px) {
             .layer-flow-row,
             .layer-flow-actions {
+                grid-template-columns: 1fr;
+            }
+            header {
+                align-items: stretch;
+                flex-direction: column;
+            }
+            .header-actions,
+            .toolbar,
+            .profile-picker {
+                justify-content: stretch;
+                width: 100%;
+            }
+            .profile-picker {
                 grid-template-columns: 1fr;
             }
         }
@@ -5066,16 +5383,23 @@ function getStudioHtml() {
 </head>
 <body>
     <header>
-        <div>
+        <div class="header-title">
             <h1>Charybdis Profile Studio</h1>
             <div id="subtitle" class="muted">Loading keymap.c, config.h, and rgb_config.c</div>
         </div>
-        <div class="toolbar">
-            <button id="openKeymap">Open keymap.c</button>
-            <button id="openConfig">Open config.h</button>
-            <button id="openRgb">Open rgb_config.c</button>
-            <button id="applyAll" class="primary dirty" hidden disabled>Apply all</button>
-            <button id="reload" class="primary">Reload</button>
+        <div class="header-actions">
+            <div class="profile-picker">
+                <span class="profile-picker-label">Profile</span>
+                <select id="profileSelect" aria-label="Profile"></select>
+                <button id="createProfile">New profile</button>
+            </div>
+            <div class="toolbar">
+                <button id="openKeymap">Open keymap.c</button>
+                <button id="openConfig">Open config.h</button>
+                <button id="openRgb">Open rgb_config.c</button>
+                <button id="applyAll" class="primary dirty" hidden disabled>Apply all</button>
+                <button id="reload" class="primary">Reload</button>
+            </div>
         </div>
     </header>
     <main id="app"></main>
@@ -5152,6 +5476,8 @@ function getClientScript() {
     ];
     // Tooltip copy should say what the control affects, where it writes or stages data, and any non-obvious fallback semantics.
     const headerTooltips = {
+        profileSelect: "Choose which keymap folder Profile Studio edits. Switching profiles discards uncommitted Studio edits.",
+        createProfile: "Create a new keymap folder from the starter Profile Studio template and register it in qmk.json.",
         openKeymap: "Open keymap.c beside the studio so you can inspect or hand-edit the source.",
         openConfig: "Open config.h beside the studio so you can inspect layer enum and timing settings.",
         openRgb: "Open rgb_config.c beside the studio so you can inspect or hand-edit the source.",
@@ -5535,8 +5861,7 @@ function getClientScript() {
             id: "custom",
             label: "Custom",
             rows: [
-                ["_______", "XXXXXXX"],
-                ["LEFT_THUMB", "RIGHT_THUMB", "CLICK_SPAM"]
+                ["_______", "XXXXXXX"]
             ]
         }
     ];
@@ -5588,6 +5913,16 @@ function getClientScript() {
     document.getElementById("reload").addEventListener("click", () => {
         discardLocalDraftState();
         post({ type: "refresh" });
+    });
+    document.getElementById("profileSelect").addEventListener("change", (event) => {
+        discardLocalDraftState();
+        post({ type: "selectProfile", profileId: event.target.value || "" });
+    });
+    document.getElementById("createProfile").addEventListener("click", () => {
+        const keymap = window.prompt("New keymap name");
+        if (!keymap) return;
+        discardLocalDraftState();
+        post({ type: "createProfile", keymap });
     });
     document.getElementById("openKeymap").addEventListener("click", () => vscode.postMessage({ type: "openSource", file: "keymap" }));
     document.getElementById("openConfig").addEventListener("click", () => vscode.postMessage({ type: "openSource", file: "config" }));
@@ -7153,7 +7488,9 @@ function getClientScript() {
         layoutNotice = "";
         render();
         resetLocalHistory();
-        vscode.postMessage(message);
+        const activeProfileId = model?.activeProfile?.id || "";
+        const payload = activeProfileId && !message.profileId ? { ...message, profileId: activeProfileId } : message;
+        vscode.postMessage(payload);
     }
 
     function discardLocalDraftState() {
@@ -7195,11 +7532,49 @@ function getClientScript() {
             return;
         }
 
-        subtitle.textContent = model.root;
+        renderProfileControls();
+        subtitle.textContent = model.activeProfile ? model.root + " / " + model.activeProfile.keymap : model.root;
         app.innerHTML = renderDiagnostics() + renderViewTabs() + renderActiveView();
         initializeDirtyTracking();
         hydrateTooltips();
         scheduleMacroSlotBrowserHeightSync();
+    }
+
+    function renderProfileControls() {
+        const select = document.getElementById("profileSelect");
+        const create = document.getElementById("createProfile");
+        if (!select) return;
+        const profiles = model.profiles || [];
+        if (!profiles.length) {
+            select.innerHTML = "<option value=''>No profiles</option>";
+            select.value = "";
+            select.disabled = true;
+        } else {
+            select.innerHTML = profiles.map(renderProfileOption).join("");
+            select.value = model.activeProfile?.id || "";
+            select.disabled = false;
+        }
+        if (create) {
+            create.disabled = false;
+        }
+        const editable = Boolean(model.activeProfile?.editable);
+        setHeaderButtonDisabled("openKeymap", !editable);
+        setHeaderButtonDisabled("openConfig", !editable);
+        setHeaderButtonDisabled("openRgb", !editable);
+    }
+
+    function renderProfileOption(profile) {
+        const flags = [
+            profile.editable ? "" : "incomplete",
+            profile.registered ? "" : "unregistered",
+        ].filter(Boolean);
+        const label = profile.keymap + (flags.length ? " (" + flags.join(", ") + ")" : "");
+        return "<option value='" + escapeAttr(profile.id) + "'>" + escapeHtml(label) + "</option>";
+    }
+
+    function setHeaderButtonDisabled(id, disabled) {
+        const button = document.getElementById(id);
+        if (button) button.disabled = disabled;
     }
 
     function scheduleMacroSlotBrowserHeightSync() {
@@ -8370,6 +8745,12 @@ function getClientScript() {
                     ...section,
                     rows: chunkKeyPickerItems((model.viaMacros || []).map((slot) => slot.keycode), 8)
                         .concat(chunkKeyPickerItems((model.hardcodedMacros || []).map((slot) => slot.keycode), 8))
+                };
+            }
+            if (section.id === "custom") {
+                return {
+                    ...section,
+                    rows: (section.rows || []).concat(chunkKeyPickerItems(model.customKeycodes || [], 8))
                 };
             }
             return section;

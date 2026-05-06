@@ -126,7 +126,7 @@ const appendedCheck = `
         const targetKeymap = path.join(tempRoot, KEYMAP_RELATIVE_PATH);
         nativeFs.mkdirSync(path.dirname(targetKeymap), {recursive: true});
         nativeFs.copyFileSync(sourceKeymap, targetKeymap);
-        await saveCombo(tempRoot, editableCombo.output, editableCombo.inputs.join(", "), "KC_ESC", editableCombo.inputs.join(", "));
+        await saveCombo(tempRoot, DEFAULT_PROFILE_TARGET, editableCombo.output, editableCombo.inputs.join(", "), "KC_ESC", editableCombo.inputs.join(", "));
         const updated = nativeFs.readFileSync(targetKeymap, "utf8");
         assert(
             updated.includes("COMBO(KC_ESC, (" + editableCombo.inputs.join(", ") + "))"),
@@ -144,7 +144,7 @@ const appendedCheck = `
             const targetConfig = path.join(tempRoot, KEYMAP_CONFIG_RELATIVE_PATH);
             nativeFs.mkdirSync(path.dirname(targetConfig), {recursive: true});
             nativeFs.copyFileSync(sourceConfig, targetConfig);
-            await patchConfigDefaults(tempRoot, [
+            await patchConfigDefaults(tempRoot, DEFAULT_PROFILE_TARGET, [
                 {macro: "TAPPING_TERM", value: "201"},
                 {macro: "RGB_AUTOMOUSE_GRADIENT_ENABLE", enabled: false},
             ]);
@@ -157,6 +157,50 @@ const appendedCheck = `
                 updated.includes("// #        define RGB_AUTOMOUSE_GRADIENT_ENABLE"),
                 "Profile Studio did not disable config.h toggle defaults"
             );
+        } finally {
+            nativeFs.rmSync(tempRoot, {recursive: true, force: true});
+        }
+    }
+
+    {
+        const nativeFs = require("fs");
+        const tempRoot = nativeFs.mkdtempSync(path.join(require("os").tmpdir(), "profile-studio-new-profile-"));
+        try {
+            nativeFs.writeFileSync(
+                path.join(tempRoot, "qmk.json"),
+                JSON.stringify({userspace_version: "1.0", build_targets: []}, null, 4) + "\\n"
+            );
+            const created = await createProfile(tempRoot, "fresh_profile");
+            assert(created.keymap === "fresh_profile", "Profile Studio created the wrong keymap target");
+            const targetPaths = profileTargetPaths(tempRoot, created);
+            for (const filePath of [targetPaths.keymap, targetPaths.config, targetPaths.rgb, targetPaths.rules]) {
+                assert(nativeFs.existsSync(filePath), "Profile Studio did not create " + path.relative(tempRoot, filePath));
+            }
+            const freshModel = await buildModel(tempRoot, created, [created]);
+            assert((freshModel.layers || []).length === 5, "Profile Studio starter profile should expose five default layers");
+            assert((freshModel.combos || []).length === 0, "Profile Studio starter profile should begin with no active combos");
+            assert((freshModel.keyBehaviors || []).length === 0, "Profile Studio starter profile should begin with no active key behaviors");
+
+            await appendCombo(tempRoot, created, "KC_ESC", "KC_Q, KC_W");
+            let updatedKeymap = nativeFs.readFileSync(targetPaths.keymap, "utf8");
+            assert(!updatedKeymap.includes("NOAH_KEYMAP_EMPTY_COMBOS"), "Profile Studio did not remove the empty combo flag");
+            assert(updatedKeymap.includes("COMBO(KC_ESC, (KC_Q, KC_W))"), "Profile Studio did not append a combo to the starter profile");
+
+            await saveKeyBehavior(tempRoot, created, {
+                keycode: "KC_Q",
+                steps: [
+                    {
+                        tapCount: 0,
+                        tap: {helper: "TAP_SENDS", action: "KC_ESC"},
+                    },
+                ],
+            });
+            updatedKeymap = nativeFs.readFileSync(targetPaths.keymap, "utf8");
+            assert(!updatedKeymap.includes("NOAH_KEYMAP_EMPTY_KEY_BEHAVIORS"), "Profile Studio did not remove the empty behavior flag");
+            assert(!updatedKeymap.includes("{0},"), "Profile Studio did not replace the starter behavior placeholder");
+            const editedModel = await buildModel(tempRoot, created, [created]);
+            assert((editedModel.combos || []).length === 1, "Profile Studio did not parse the starter combo after append");
+            assert((editedModel.keyBehaviors || []).length === 1, "Profile Studio did not parse the starter behavior after save");
         } finally {
             nativeFs.rmSync(tempRoot, {recursive: true, force: true});
         }

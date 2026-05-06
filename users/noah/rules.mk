@@ -5,10 +5,10 @@
 # reusable runtime sources.
 
 NOAH_USERSPACE_ROOT := $(if $(QMK_USERSPACE),$(QMK_USERSPACE),$(abspath $(USER_PATH)/../..))
-NOAH_PROFILE_VALIDATION_RESULT := $(shell log="$$(mktemp "$${TMPDIR:-/tmp}/noah-profile-validation.XXXXXX")"; cd "$(NOAH_USERSPACE_ROOT)" && sh tests/host/run_real_profile_validation_tests.sh >"$$log" 2>&1; status=$$?; if [ $$status -ne 0 ]; then cat "$$log" >&2; echo failed; fi; rm -f "$$log")
+NOAH_PROFILE_VALIDATION_RESULT := $(shell log="$$(mktemp "$${TMPDIR:-/tmp}/noah-profile-validation.XXXXXX")"; cd "$(NOAH_USERSPACE_ROOT)" && sh tests/host/run_real_profile_validation_tests.sh "$(KEYMAP_PATH)" >"$$log" 2>&1; status=$$?; if [ $$status -ne 0 ]; then cat "$$log" >&2; echo failed; fi; rm -f "$$log")
 
 ifeq ($(strip $(NOAH_PROFILE_VALIDATION_RESULT)),failed)
-    $(error Noah authored profile validation failed; run `sh tests/host/run_real_profile_validation_tests.sh`)
+    $(error Noah authored profile validation failed; run `sh tests/host/run_real_profile_validation_tests.sh "$(KEYMAP_PATH)"`)
 endif
 
 include $(USER_PATH)/source_manifest.mk
