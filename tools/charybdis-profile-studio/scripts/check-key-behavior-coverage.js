@@ -55,6 +55,14 @@ const appendedCheck = `
         canonicalKeyExpression("WRAP(FOO_ALIAS,BAR)", syntheticAliases) === "WRAP(FOO_CANON, BAR)",
         "canonicalKeyExpression should normalize nested aliases and expression spacing"
     );
+    assert(
+        !getClientScript().includes("window.prompt"),
+        "Profile Studio must not use browser prompts inside the VS Code webview"
+    );
+    assert(
+        getClientScript().includes('type: "requestCreateProfile"'),
+        "Profile Studio new-profile button must request extension-side input"
+    );
 
     const model = await buildModel(${JSON.stringify(repoRoot)});
     const aliases = model.qmkKeycodeAliases || {};
@@ -164,6 +172,7 @@ const appendedCheck = `
 
     {
         const nativeFs = require("fs");
+        const originalShowInputBox = vscode.window.showInputBox;
         const tempRoot = nativeFs.mkdtempSync(path.join(require("os").tmpdir(), "profile-studio-new-profile-"));
         try {
             nativeFs.writeFileSync(
@@ -180,6 +189,44 @@ const appendedCheck = `
             assert((freshModel.layers || []).length === 5, "Profile Studio starter profile should expose five default layers");
             assert((freshModel.combos || []).length === 0, "Profile Studio starter profile should begin with no active combos");
             assert((freshModel.keyBehaviors || []).length === 0, "Profile Studio starter profile should begin with no active key behaviors");
+
+            const parsedQmkJson = JSON.parse(nativeFs.readFileSync(path.join(tempRoot, "qmk.json"), "utf8"));
+            parsedQmkJson.build_targets.push(["bastardkb/charybdis/4x6", "deleted_profile"]);
+            nativeFs.writeFileSync(path.join(tempRoot, "qmk.json"), JSON.stringify(parsedQmkJson, null, 4) + "\\n");
+            const staleState = {activeProfileId: "bastardkb/charybdis/4x6:deleted_profile"};
+            const active = await activeProfileTarget(tempRoot, staleState);
+            assert(
+                active.target && active.target.keymap === "fresh_profile",
+                "Profile Studio should fall back to an editable profile when qmk.json references a deleted keymap"
+            );
+            assert(
+                active.profiles.some((profile) => profile.keymap === "deleted_profile" && !profile.editable),
+                "Profile Studio should keep stale registered keymaps visible as incomplete metadata"
+            );
+            const refreshPosts = [];
+            await handleWebviewMessage(
+                {webview: {postMessage(message) { refreshPosts.push(message); }}},
+                tempRoot,
+                staleState,
+                {type: "refresh"}
+            );
+            const cleanedQmkJson = JSON.parse(nativeFs.readFileSync(path.join(tempRoot, "qmk.json"), "utf8"));
+            assert(
+                !(cleanedQmkJson.build_targets || []).some((target) => Array.isArray(target) && target[1] === "deleted_profile"),
+                "Profile Studio reload should remove qmk.json targets whose keymap folder is missing"
+            );
+            assert(
+                (cleanedQmkJson.build_targets || []).some((target) => Array.isArray(target) && target[1] === "fresh_profile"),
+                "Profile Studio reload should keep qmk.json targets whose keymap folder exists"
+            );
+            assert(
+                refreshPosts.some((message) => message.notice && message.notice.includes("deleted_profile")),
+                "Profile Studio reload should report removed stale qmk.json targets"
+            );
+            assert(
+                refreshPosts.some((message) => message.model && !(message.model.profiles || []).some((profile) => profile.keymap === "deleted_profile")),
+                "Profile Studio reload should stop showing removed stale qmk.json targets"
+            );
 
             await appendCombo(tempRoot, created, "KC_ESC", "KC_Q, KC_W");
             let updatedKeymap = nativeFs.readFileSync(targetPaths.keymap, "utf8");
@@ -201,7 +248,40 @@ const appendedCheck = `
             const editedModel = await buildModel(tempRoot, created, [created]);
             assert((editedModel.combos || []).length === 1, "Profile Studio did not parse the starter combo after append");
             assert((editedModel.keyBehaviors || []).length === 1, "Profile Studio did not parse the starter behavior after save");
+
+            const messageRoot = nativeFs.mkdtempSync(path.join(require("os").tmpdir(), "profile-studio-message-profile-"));
+            try {
+                nativeFs.writeFileSync(
+                    path.join(messageRoot, "qmk.json"),
+                    JSON.stringify({userspace_version: "1.0", build_targets: []}, null, 4) + "\\n"
+                );
+                let inputValidated = false;
+                vscode.window.showInputBox = async (options) => {
+                    assert(options && typeof options.validateInput === "function", "Profile name prompt should validate input");
+                    assert(options.validateInput("Bad Name"), "Profile name prompt should reject invalid keymap names");
+                    assert(!options.validateInput("message_profile"), "Profile name prompt should accept valid keymap names");
+                    inputValidated = true;
+                    return " message_profile ";
+                };
+                const posted = [];
+                await handleWebviewMessage(
+                    {webview: {postMessage(message) { posted.push(message); }}},
+                    messageRoot,
+                    {activeProfileId: ""},
+                    {type: "requestCreateProfile"}
+                );
+                assert(inputValidated, "Profile Studio did not prompt for a new profile name");
+                assert(nativeFs.existsSync(path.join(messageRoot, "keyboards/bastardkb/charybdis/4x6/keymaps/message_profile/keymap.c")), "requestCreateProfile did not create keymap.c");
+                assert(
+                    posted.some((message) => message.type === "model" && message.model?.activeProfile?.keymap === "message_profile"),
+                    "requestCreateProfile did not activate and post the created profile model"
+                );
+            } finally {
+                vscode.window.showInputBox = originalShowInputBox;
+                nativeFs.rmSync(messageRoot, {recursive: true, force: true});
+            }
         } finally {
+            vscode.window.showInputBox = originalShowInputBox;
             nativeFs.rmSync(tempRoot, {recursive: true, force: true});
         }
     }

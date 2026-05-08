@@ -641,12 +641,49 @@ async function ensureQmkBuildTarget(root, keymap) {
     await writeText(qmkJsonPath, JSON.stringify(parsed, null, 4) + "\n");
 }
 
+async function pruneMissingProfileBuildTargets(root) {
+    const qmkJsonPath = path.join(root, "qmk.json");
+    let parsed;
+    try {
+        parsed = JSON.parse(await fs.readFile(qmkJsonPath, "utf8"));
+    } catch {
+        return [];
+    }
+
+    if (!Array.isArray(parsed.build_targets)) {
+        return [];
+    }
+
+    const removed = [];
+    const retained = [];
+    for (const target of parsed.build_targets) {
+        if (!Array.isArray(target) || target[0] !== PROFILE_KEYBOARD || typeof target[1] !== "string") {
+            retained.push(target);
+            continue;
+        }
+
+        const keymapDir = path.join(root, PROFILE_KEYMAPS_RELATIVE_PATH, target[1]);
+        if (await directoryExists(keymapDir)) {
+            retained.push(target);
+        } else {
+            removed.push(target[1]);
+        }
+    }
+
+    if (removed.length) {
+        parsed.build_targets = retained;
+        await writeText(qmkJsonPath, JSON.stringify(parsed, null, 4) + "\n");
+    }
+    return removed;
+}
+
 async function activeProfileTarget(root, state) {
     const profiles = await discoverProfileTargets(root);
-    let target = profiles.find((profile) => profile.id === state.activeProfileId);
+    let target = profiles.find((profile) => profile.id === state.activeProfileId && profile.editable);
     if (!target) {
         target = profiles.find((profile) => profile.keymap === DEFAULT_PROFILE_KEYMAP && profile.editable) ||
-            profiles.find((profile) => profile.editable);
+            profiles.find((profile) => profile.editable) ||
+            profiles[0];
     }
     state.activeProfileId = target?.id || "";
     return { profiles, target };
@@ -780,18 +817,42 @@ async function fileExists(filePath) {
     }
 }
 
+async function directoryExists(filePath) {
+    try {
+        return (await fs.stat(filePath)).isDirectory();
+    } catch {
+        return false;
+    }
+}
+
 async function handleWebviewMessage(panel, root, state, message) {
     switch (message?.type) {
         case "ready":
             await postModel(panel, root, state);
             return;
-        case "refresh":
-            await postModel(panel, root, state, "Reloaded files and discarded uncommitted Studio edits.");
+        case "refresh": {
+            const removedProfiles = await pruneMissingProfileBuildTargets(root);
+            const notice = removedProfiles.length
+                ? `Reloaded files, removed stale qmk.json target${removedProfiles.length === 1 ? "" : "s"}: ${removedProfiles.join(", ")}.`
+                : "Reloaded files and discarded uncommitted Studio edits.";
+            await postModel(panel, root, state, notice);
             return;
+        }
         case "selectProfile":
             state.activeProfileId = String(message.profileId || "");
             await postModel(panel, root, state, "Switched Profile Studio target.");
             return;
+        case "requestCreateProfile": {
+            const keymap = await promptForProfileName();
+            if (!keymap) {
+                await postModel(panel, root, state, "Profile creation cancelled.");
+                return;
+            }
+            const target = await createProfile(root, keymap);
+            state.activeProfileId = target.id;
+            await postModel(panel, root, state, `Created ${target.keymap}.`);
+            return;
+        }
         case "createProfile": {
             const target = await createProfile(root, message.keymap);
             state.activeProfileId = target.id;
@@ -882,6 +943,23 @@ async function handleWebviewMessage(panel, root, state, message) {
         default:
             throw new Error(`Unknown studio message: ${message?.type}`);
     }
+}
+
+async function promptForProfileName() {
+    const value = await vscode.window.showInputBox({
+        title: "New Charybdis profile",
+        prompt: "Enter the new keymap folder name.",
+        placeHolder: "fresh_profile",
+        validateInput(input) {
+            try {
+                assertValidProfileKeymapName(normalizeProfileKeymapName(input));
+                return undefined;
+            } catch (error) {
+                return error instanceof Error ? error.message : String(error);
+            }
+        },
+    });
+    return value === undefined ? undefined : normalizeProfileKeymapName(value);
 }
 
 async function checkedMessageProfile(root, state, message) {
@@ -5919,10 +5997,8 @@ function getClientScript() {
         post({ type: "selectProfile", profileId: event.target.value || "" });
     });
     document.getElementById("createProfile").addEventListener("click", () => {
-        const keymap = window.prompt("New keymap name");
-        if (!keymap) return;
         discardLocalDraftState();
-        post({ type: "createProfile", keymap });
+        post({ type: "requestCreateProfile" });
     });
     document.getElementById("openKeymap").addEventListener("click", () => vscode.postMessage({ type: "openSource", file: "keymap" }));
     document.getElementById("openConfig").addEventListener("click", () => vscode.postMessage({ type: "openSource", file: "config" }));
@@ -7569,7 +7645,8 @@ function getClientScript() {
             profile.registered ? "" : "unregistered",
         ].filter(Boolean);
         const label = profile.keymap + (flags.length ? " (" + flags.join(", ") + ")" : "");
-        return "<option value='" + escapeAttr(profile.id) + "'>" + escapeHtml(label) + "</option>";
+        const disabled = profile.editable ? "" : " disabled";
+        return "<option value='" + escapeAttr(profile.id) + "'" + disabled + ">" + escapeHtml(label) + "</option>";
     }
 
     function setHeaderButtonDisabled(id, disabled) {
