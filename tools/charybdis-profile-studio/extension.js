@@ -2861,7 +2861,8 @@ async function saveKeyBehavior(root, target, behavior) {
     const existing = findKeyBehaviorEntry(initializer.body, normalizedKeycode, qmkKeycodeCatalog.aliases || {});
 
     if (existing) {
-        await writeText(filePath, replaceRange(text, initializer.bodyStart + existing.start, initializer.bodyStart + existing.end, row));
+        const range = keyBehaviorEntryReplacementRange(text, initializer, existing);
+        await writeText(filePath, replaceRange(text, range.start, range.end, row));
         return;
     }
 
@@ -2886,6 +2887,17 @@ function appendKeyBehaviorRow(text, row) {
 
 function isEmptyKeyBehaviorInitializerEntry(value) {
     return /^\{\s*0\s*\}$/.test(stripComments(value).trim());
+}
+
+function keyBehaviorEntryReplacementRange(text, initializer, entry) {
+    const absoluteEntryStart = initializer.bodyStart + entry.start;
+    let start = text.lastIndexOf("\n", absoluteEntryStart) + 1;
+    let end = initializer.bodyStart + entry.end;
+
+    while (end < text.length && /[ \t]/.test(text[end])) end += 1;
+    if (text[end] === ",") end += 1;
+
+    return {start, end};
 }
 
 function findKeyBehaviorEntry(body, keycode, keyAliases = {}) {
@@ -9592,6 +9604,9 @@ function getClientScript() {
         }
         for (const combo of layerCombos(layer)) {
             addSource(combo.output, { kind: "combo", combo });
+            for (const input of combo.inputs || []) {
+                addSource(input, { kind: "comboInput", combo, input });
+            }
         }
 
         return Array.from(rowsByKey.values());
@@ -9620,6 +9635,14 @@ function getClientScript() {
         if (source.kind === "key") {
             return renderOverviewKeyButton(source.position);
         }
+        if (source.kind === "comboInput") {
+            const combo = source.combo;
+            const inputIndex = (combo.inputs || []).findIndex((input) => keyExpressionsEquivalent(input, source.input));
+            const inputDisplay = (combo.inputDisplays || [])[inputIndex] || displayAction(source.input);
+            const label = combo.badge + " input " + inputDisplay;
+            const tooltip = "Combo " + combo.badge + " includes this behavior keycode as an input: " + (combo.inputDisplays || combo.inputs).join(" + ") + " -> " + (combo.outputDisplay || combo.output) + ".";
+            return "<span class='source-pill' data-tooltip='" + escapeAttr(tooltip) + "'>" + escapeHtml(label) + "</span>";
+        }
         const combo = source.combo;
         const label = combo.badge + " output " + (combo.outputDisplay || combo.output);
         const tooltip = "Combo " + combo.badge + " output behavior from " + (combo.inputDisplays || combo.inputs).join(" + ") + " -> " + (combo.outputDisplay || combo.output) + ".";
@@ -9632,7 +9655,7 @@ function getClientScript() {
             return "<p class='muted'>No authored behavior rows are active on this layer.</p>";
         }
         return "<table><thead><tr>" +
-            renderTooltipHeader("Reachable via", "Physical keys or combo outputs on the active layer that use this key_behaviors[] row.") +
+            renderTooltipHeader("Reachable via", "Physical keys, combo inputs, or combo outputs on the active layer that use this key_behaviors[] row.") +
             renderTooltipHeader("Behavior", "Authored keycode that owns the key_behaviors[] row.") +
             renderTooltipHeader("Steps", "Tap-count branch actions attached to this behavior row.") +
             "</tr></thead><tbody>" +

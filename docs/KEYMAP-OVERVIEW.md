@@ -161,7 +161,7 @@ No authored combos resolve entirely from keys on this layer.
 - RGB matrix render mode: `KEYS_MAPPED_ON_THIS_LAYER_ONLY`
 - Authored layer color: `HSV(180, 255, 200)`
 - Preview color: <img alt="LAYER_NAV preview color" src="media/profile-introspection/profile-color-swatch-3c00ff.svg" width="96" height="28" />
-- Combo badges on this layer: `C1`
+- Combo badges on this layer: `C1`, `C2`
 
 ![LAYER_NAV](media/profile-introspection/profile-layer-LAYER_NAV.svg)
 
@@ -169,6 +169,7 @@ No authored combos resolve entirely from keys on this layer.
 
 | Key On Layer | Behavior Keycode | Tap Count | Tap | Hold | Long Hold | Timing |
 | --- | --- | --- | --- | --- | --- | --- |
+| `G(C) x2` | `G(C)` (`G(KC_C)`) | `double` | `TAP_SENDS(G(VIA_MACRO_10))` | `-` | `-` | `multi_tap(150), rgb_branch_confirm(150)` |
 | `LSFT` | `LSFT` (`KC_LEFT_SHIFT`) | `single` | `TAP_SENDS(KC_CAPS)` | `-` | `-` | `release before tap_hold(150); otherwise normal hold` |
 | `LEFT` | `LEFT` (`KC_LEFT`) | `single` | `-` | `TAP_ON_RELEASE_AFTER_HOLD(A(KC_LEFT))` | `TAP_AT_HOLD_THRESHOLD(G(KC_LEFT))` | `tap_hold(150), long_hold(400)` |
 | `RIGHT` | `RIGHT` (`KC_RIGHT`) | `single` | `-` | `TAP_ON_RELEASE_AFTER_HOLD(A(KC_RIGHT))` | `TAP_AT_HOLD_THRESHOLD(G(KC_RIGHT))` | `tap_hold(150), long_hold(400)` |
@@ -186,6 +187,7 @@ No authored combos resolve entirely from keys on this layer.
 | Combo | Inputs On This Layer | Output |
 | --- | --- | --- |
 | `C1` | `MS_BTN1` + `MS_BTN2` | `CLICK_SPAM` |
+| `C2` | `G(C) x2` + `G(V) x2` | `VIA10` (`VIA_MACRO_10`) |
 
 ### `LAYER_POINTER`
 
@@ -361,6 +363,7 @@ Authored key-feedback LED groups repaint after the feedback locality render insi
 | `VIA_MACRO_7` | `{KC_LCTL,KC_LALT,KC_LGUI,KC_V}` | `LAYER_NAV @ VIA7` |
 | `VIA_MACRO_8` | `{KC_LSFT,KC_LGUI,KC_V}` | `LAYER_SYM @ VIA8` |
 | `VIA_MACRO_9` | `{KC_LSFT,KC_LGUI,KC_P}` | `LAYER_SYM @ VIA9` |
+| `VIA_MACRO_10` | `{+KC_LGUI}{+KC_A}{120}{-KC_LGUI}{1340}{+KC_LGUI}{+KC_C}{-KC_LGUI}` | `combo 7 output` |
 
 ### Hardcoded Macros
 
@@ -420,11 +423,11 @@ Reusable groups define physical LED sets once near the LED map in `rgb_config.c`
 | --- | --- |
 | `layer_count` | `5` |
 | `layout_key_count` | `56` |
-| `key_behavior_count` | `33` |
-| `key_behavior_step_count` | `44` |
-| `combo_count` | `6` |
+| `key_behavior_count` | `34` |
+| `key_behavior_step_count` | `45` |
+| `combo_count` | `7` |
 | `via_macro_count` | `64` |
-| `via_macro_non_empty_count` | `10` |
+| `via_macro_non_empty_count` | `11` |
 | `hardcoded_macro_count` | `16` |
 | `hardcoded_macro_non_empty_count` | `0` |
 | `keymap_custom_keycode_count` | `3` |

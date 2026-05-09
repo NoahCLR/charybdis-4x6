@@ -76,7 +76,11 @@ const appendedCheck = `
         "Profile Studio layer behavior overview must include behavior rows reached through combo outputs"
     );
     assert(
-        getClientScript().includes('renderTooltipHeader("Reachable via", "Physical keys or combo outputs on the active layer'),
+        getClientScript().includes('addSource(input, { kind: "comboInput", combo, input });'),
+        "Profile Studio layer behavior overview must include behavior rows attached to combo inputs"
+    );
+    assert(
+        getClientScript().includes('renderTooltipHeader("Reachable via", "Physical keys, combo inputs, or combo outputs on the active layer'),
         "Profile Studio layer behavior overview must label combo-output behavior sources as reachable entries"
     );
     assert(
@@ -269,6 +273,22 @@ const appendedCheck = `
             const editedModel = await buildModel(tempRoot, created, [created]);
             assert((editedModel.combos || []).length === 1, "Profile Studio did not parse the starter combo after append");
             assert((editedModel.keyBehaviors || []).length === 1, "Profile Studio did not parse the starter behavior after save");
+
+            await saveKeyBehavior(tempRoot, created, {
+                keycode: "KC_Q",
+                steps: [
+                    {
+                        tapCount: 1,
+                        tap: {helper: "TAP_SENDS", action: "VIA_MACRO_10"},
+                    },
+                ],
+            });
+            updatedKeymap = nativeFs.readFileSync(targetPaths.keymap, "utf8");
+            assert(!updatedKeymap.includes("},,"), "Profile Studio left a duplicate comma after replacing a behavior row");
+            assert(
+                updatedKeymap.includes("                        [1] = {.tap = TAP_SENDS(VIA_MACRO_10)},"),
+                "Profile Studio did not replace the existing behavior row"
+            );
 
             const messageRoot = nativeFs.mkdtempSync(path.join(require("os").tmpdir(), "profile-studio-message-profile-"));
             try {
