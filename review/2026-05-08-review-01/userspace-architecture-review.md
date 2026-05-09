@@ -19,6 +19,8 @@ The requested behavior change is intentionally narrow:
 - Keep combo RGB sync immediate, including idle-to-active combo feedback.
 - Reduce idle key-runtime scan work and normal pointer-report overhead without
   changing authored key behavior or pointing mode semantics.
+- Reduce normal pointer-report overhead in the idle-noise filter and QMK
+  pointing throttle path.
 - Remove inert diagnostic scope calls from continuous scan, pointer, RGB, and
   housekeeping paths while preserving watchdog heartbeat behavior.
 - Reduce idle housekeeping and split-sync helper work that does not affect
@@ -121,6 +123,13 @@ uses the existing idle-noise policy, and looks up a mode handler only when the
 local active mode is nonzero. Idle-noise absolute-motion calculation now avoids
 building a temporary delta array on every report.
 
+Normal movement now exits the idle-noise filter before querying long-idle
+timers. The filter only checks `last_input_activity_elapsed()` and
+`last_matrix_activity_elapsed()` for tiny motion that could actually be
+suppressed. `POINTING_DEVICE_TASK_THROTTLE_MS` is set to `0` so QMK skips its
+1 ms throttle timer gate; the firmware loop remains the practical polling
+limit.
+
 ### Held Repeat
 
 `users/noah/lib/key/ownership/held_repeat.c` tracks an active binding count.
@@ -171,6 +180,11 @@ unbounded backlog.
   skipped.
 - Pointer reports without a local active PD mode must pass through unchanged
   and must ignore remote display-only PD mode state on the slave half.
+- Normal pointer motion above the idle-noise threshold must not query long-idle
+  timers.
+- The pointing-device task should run whenever the main loop reaches it; do
+  not add a throttle gate unless hardware measurements show the loop has
+  exceeded the sensor/report budget.
 - Idle held-repeat housekeeping must avoid timer reads and repeat-table scans.
 - Active held-repeat scheduling must preserve the requested cadence across
   normal scan-loop drift, including 100 Hz click-spam repeats.
@@ -193,8 +207,9 @@ Expected coverage for this thread:
 - `run_runtime_debug_tests.sh` covers idle key-runtime scan gating and pending
   release drains with no active core work.
 - `run_pd_runtime_tests.sh` covers pointer pass-through, remote display-only
-  state, idle-noise suppression, and active PD mode handler dispatch after the
-  pointer hot-path change.
+  state, idle-noise suppression, skipping long-idle checks for ordinary
+  pointer motion, and active PD mode handler dispatch after the pointer
+  hot-path change.
 - `run_held_action_tests.sh` covers idle held-repeat housekeeping avoiding
   timer work, phase-preserving repeat cadence, and bounded catch-up after long
   stalls.

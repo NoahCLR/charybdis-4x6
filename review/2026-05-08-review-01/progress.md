@@ -113,6 +113,12 @@ Re-run after restoring immediate combo feedback:
 - Updated held-action host coverage for 100 Hz drift catch-up, scan-gap
   catch-up, excessive-backlog bounding, and runtime reset isolation through
   the public reset hook.
+- Reordered the pointing idle-noise filter so normal motion above the noise
+  threshold does not query long-idle timers on every report.
+- Removed the QMK 1 ms pointing-device throttle gate by setting
+  `POINTING_DEVICE_TASK_THROTTLE_MS` to `0`; the current firmware loop is
+  slower than 1 kHz, so the throttle was only adding hot-path timer work.
+- Regenerated the profile overview after the userspace config change.
 - Added a combined combo feedback bitmap API and changed split sync to build
   combo underlay and overlay packets with one combo-origin pass.
 - Added a weak combined-combo fallback in split sync so isolated host runners
@@ -187,6 +193,21 @@ Passed for the held-repeat cadence fix:
 - `sh tests/host/run_key_runtime_release_matrix_tests.sh`
 - `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
 - `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `git diff --check`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Passed for the pointer-task optimization pass so far:
+
+- `sh tests/host/run_pd_runtime_tests.sh`
+- `python3 tools/profile_introspect.py --write`
+- `python3 tools/profile_introspect.py --check`
+- `sh tests/host/run_pd_mode_tests.sh`
+- `sh tests/host/run_pd_mode_handlers_tests.sh`
+- `sh tests/host/run_pointer_layer_policy_tests.sh`
+- `sh tests/host/run_split_runtime_sync_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
 - `sh tests/host/run_feature_gate_compile_tests.sh`
 - `git diff --check`
 - `sh tests/host/run_all_host_tests.sh`

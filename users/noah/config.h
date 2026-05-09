@@ -81,10 +81,11 @@
 
 #ifdef POINTING_DEVICE_ENABLE
 
-// Keep split-pointing polling at the 1 ms cadence QMK already defaults to.
-// Higher values ease transport/main-loop pressure, but trade away responsiveness.
+// Poll the sensor whenever the main loop reaches QMK's pointing-device task.
+// The full firmware loop is currently slower than 1 kHz, so the 1 ms QMK
+// throttle does not limit reports; it only adds timer work to the hot path.
 #    undef POINTING_DEVICE_TASK_THROTTLE_MS
-#    define POINTING_DEVICE_TASK_THROTTLE_MS 1
+#    define POINTING_DEVICE_TASK_THROTTLE_MS 0
 
 // Liftoff distance — how high the ball can be lifted before tracking stops.
 // Default is 0x02; higher = tracks further from the surface.

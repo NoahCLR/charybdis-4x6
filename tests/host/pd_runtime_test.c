@@ -18,6 +18,8 @@ static uint16_t sniping_dpi;
 static uint32_t fake_timer_ms;
 static uint32_t fake_last_input_idle_ms;
 static uint32_t fake_last_matrix_idle_ms;
+static uint8_t  last_input_activity_elapsed_count;
+static uint8_t  last_matrix_activity_elapsed_count;
 
 static bool    fake_is_master;
 static bool    sniping_enabled;
@@ -79,6 +81,8 @@ static void test_reset_stubs(void) {
     fake_timer_ms                 = 0;
     fake_last_input_idle_ms       = 0;
     fake_last_matrix_idle_ms      = UINT32_MAX;
+    last_input_activity_elapsed_count  = 0;
+    last_matrix_activity_elapsed_count = 0;
     fake_is_master                = true;
     sniping_enabled               = false;
     auto_mouse_enabled            = false;
@@ -123,10 +127,12 @@ uint32_t timer_elapsed32(uint32_t last) {
 }
 
 uint32_t last_input_activity_elapsed(void) {
+    last_input_activity_elapsed_count++;
     return fake_last_input_idle_ms;
 }
 
 uint32_t last_matrix_activity_elapsed(void) {
+    last_matrix_activity_elapsed_count++;
     return fake_last_matrix_idle_ms;
 }
 
@@ -401,6 +407,8 @@ static void test_pointing_device_task_keeps_larger_motion_after_quiet_window(voi
     report_mouse_t input = {.x = 2, .y = 1, .h = 0, .v = 0, .buttons = 0};
 
     CHECK(report_mouse_equal(noah_pointing_device_task_user(input), input));
+    CHECK(last_input_activity_elapsed_count == 0);
+    CHECK(last_matrix_activity_elapsed_count == 0);
 }
 
 static void test_pointing_device_task_keeps_small_motion_in_active_local_mode(void) {
