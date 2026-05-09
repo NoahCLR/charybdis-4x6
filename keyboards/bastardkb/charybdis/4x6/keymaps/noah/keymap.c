@@ -195,6 +195,7 @@ enum keymap_custom_keycodes {
     COMBO(G(KC_T), (KC_N, KC_M, KC_COMM))            \
     COMBO(G(KC_T), (VOLUME_MODE, MS_BTN1, MS_BTN2))                          \
     COMBO(KC_LGUI, (MS_BTN1, VOLUME_MODE))                          \
+    COMBO(G(KC_A), (G(KC_C), G(KC_V)))                          \
     /* COMBO(MACRO_0, (KC_Q, KC_W)) */               \
     /* COMBO(VIA_MACRO_0, (KC_U, KC_I)) */           \
     /* COMBO(LOCK_LAYER(LAYER_NAV), (KC_J, KC_K)) */ \
@@ -454,6 +455,14 @@ const key_behavior_t
                 .tap_counts =
                     {
                         [0] = {.hold = REPEAT_WHILE_HELD(MS_BTN1, 100)},
+                    },
+            },
+
+            {
+                .keycode = G(KC_C),
+                .tap_counts =
+                    {
+                        [1] = {.tap = TAP_SENDS(G(KC_A))},
                     },
             },
 };
