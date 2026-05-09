@@ -4545,6 +4545,13 @@ function getStudioHtml() {
             opacity: 0.56;
             font-weight: 650;
         }
+        .svg-key .dual-role-separator-line {
+            opacity: 0.42;
+        }
+        .svg-key .dual-role-hold-label {
+            opacity: 0.78;
+            font-weight: 700;
+        }
         .extra-led {
             cursor: pointer;
         }
@@ -9254,7 +9261,7 @@ function getClientScript() {
         const action = layoutComboPicking ? "toggleLayoutComboKey" : "selectKey";
         return "<g class='svg-key " + (selected ? "selected" : "") + (comboSelected ? " combo-input-selected" : "") + (position.pending ? " pending" : "") + "' tabindex='0' role='button' data-action='" + action + "' data-index='" + position.layoutIndex + "' data-keycode='" + escapeAttr(position.keycode) + "' data-tooltip='" + escapeAttr(tooltipText) + "'" + transform + ">" +
             "<rect x='" + visual.x + "' y='" + visual.y + "' width='" + keyboardGeometry.keyWidth + "' height='" + keyboardGeometry.keyHeight + "' rx='" + keyboardGeometry.radius + "' fill='" + style.fill + "' stroke='" + style.stroke + "'></rect>" +
-            renderLayoutSvgLabel(position, label, cx, cy, style.text) +
+            renderLayoutSvgLabel(position, label, cx, cy, style.text, dots.length > 0 || badges.length > 0) +
             renderBehaviorDots(dots, visual, style.text) +
             renderComboBadges(badges, visual) +
             "</g>";
@@ -9264,8 +9271,10 @@ function getClientScript() {
         const base = "Click to edit layout index " + position.layoutIndex + ": " + label + " (" + position.keycode + "). Double-click to pick a keycode, drag onto another key to swap, or copy/paste selected keys.";
         const alternate = alternateOutputTooltip(position.keycode);
         const macroPreview = macroPayloadTooltipForExpression(position.keycode);
+        const comboBadges = comboBadgesForKey(position.keycode);
         const alternatePreview = alternate ? "\\n" + alternate : "";
-        return (macroPreview ? base + alternatePreview + "\\n\\n" + macroPreview : base + alternatePreview);
+        const comboPreview = comboBadges.length ? "\\nCombos: " + comboBadges.join(", ") : "";
+        return (macroPreview ? base + alternatePreview + comboPreview + "\\n\\n" + macroPreview : base + alternatePreview + comboPreview);
     }
 
     function macroPayloadTooltipForExpression(expression) {
@@ -9319,14 +9328,133 @@ function getClientScript() {
         };
     }
 
-    function renderLayoutSvgLabel(position, label, cx, cy, textColor) {
+    function renderLayoutSvgLabel(position, label, cx, cy, textColor, hasTopRows = false) {
+        const dualRole = dualRoleLayoutVisual(position?.keycode, position?.layoutIndex);
+        if (dualRole) return renderDualRoleSvgLabel(dualRole, cx, cy, textColor);
+        const visual = keyVisual(position?.layoutIndex);
+        const rows = keyFaceRows(visual);
         const pair = shiftedOutputPair(position?.keycode);
-        if (!pair) return renderSvgLabel(label, cx, cy, textColor);
+        const baseY = hasTopRows ? rows.baseY : cy;
+        if (!pair) return renderSvgLabel(label, cx, baseY, textColor);
         if (pair.active === "shifted") {
-            return renderSvgLabel(label, cx, cy, textColor);
+            return renderSvgLabel(label, cx, baseY, textColor);
         }
-        return renderSvgLabel(pair.shifted, cx, cy - 8, textColor, { className: "alternate-output-label", maxFontSize: 9.5, minFontSize: 7, maxWidth: keyboardGeometry.keyWidth - 16 }) +
-            renderSvgLabel(pair.base, cx, cy + 7, textColor, { maxFontSize: 12, minFontSize: 7, maxWidth: keyboardGeometry.keyWidth - 12 });
+        return renderSvgLabel(pair.shifted, cx, rows.shiftedY, textColor, shiftedRowOptions()) +
+            renderSvgLabel(pair.base, cx, rows.baseY, textColor, baseRowOptions());
+    }
+
+    function renderDualRoleSvgLabel(dualRole, cx, cy, textColor) {
+        const visual = keyVisual(dualRole.layoutIndex);
+        const rows = keyFaceRows(visual);
+        const pair = shiftedOutputPair(dualRole.tapKeycode);
+        const separator = "<line class='dual-role-separator-line' x1='" + (visual.x + 8) + "' y1='" + rows.separatorY + "' x2='" + (visual.x + keyboardGeometry.keyWidth - 8) + "' y2='" + rows.separatorY + "' stroke='" + escapeAttr(textColor || "#fff") + "' stroke-width='1'></line>";
+        const holdOptions = { className: "dual-role-hold-label", maxFontSize: 6.4, minFontSize: 5.2, maxWidth: keyboardGeometry.keyWidth - 12 };
+        if (pair && pair.active === "base") {
+            return separator +
+                renderSvgLabel(pair.shifted, cx, rows.shiftedY, textColor, shiftedRowOptions()) +
+                renderSvgLabel(pair.base, cx, rows.baseY, textColor, baseRowOptions()) +
+                renderSvgLabel(dualRole.holdLabel, cx, rows.holdY, textColor, holdOptions);
+        }
+        const tapLabel = pair && pair.active === "shifted" ? pair.shifted : dualRole.tapLabel;
+        return separator +
+            renderSvgLabel(tapLabel, cx, rows.baseY, textColor, baseRowOptions()) +
+            renderSvgLabel(dualRole.holdLabel, cx, rows.holdY, textColor, holdOptions);
+    }
+
+    function keyFaceRows(visual) {
+        return {
+            behaviorY: visual.y + 6.3,
+            comboTopY: visual.y + 14.2,
+            comboHeight: 8.2,
+            shiftedY: visual.y + 30.3,
+            baseY: visual.y + 40.4,
+            separatorY: visual.y + 47.8,
+            holdY: visual.y + 54
+        };
+    }
+
+    function shiftedRowOptions() {
+        return { className: "alternate-output-label", maxFontSize: 7.4, minFontSize: 5.6, maxWidth: keyboardGeometry.keyWidth - 18 };
+    }
+
+    function baseRowOptions() {
+        return { maxFontSize: 9.1, minFontSize: 6.4, maxWidth: keyboardGeometry.keyWidth - 12 };
+    }
+
+    function dualRoleLayoutVisual(expression, layoutIndex) {
+        const call = layoutTopLevelCall(expression);
+        if (!call) return undefined;
+        if (call.helper === "LT" && call.args.length >= 2) {
+            return {
+                layoutIndex,
+                tapKeycode: call.args[1],
+                tapLabel: displayKeyExpression(call.args[1]),
+                holdLabel: layerHoldLabel(call.args[0])
+            };
+        }
+        if (call.helper === "MT" && call.args.length >= 2) {
+            return {
+                layoutIndex,
+                tapKeycode: call.args[1],
+                tapLabel: displayKeyExpression(call.args[1]),
+                holdLabel: modifierArgumentLabel(call.args[0])
+            };
+        }
+        if (call.helper.endsWith("_T") && call.args.length >= 1) {
+            const helper = call.helper.slice(0, -2);
+            const modifiers = modWrapperLabels[helper];
+            if (modifiers) {
+                return {
+                    layoutIndex,
+                    tapKeycode: call.args[0],
+                    tapLabel: displayKeyExpression(call.args[0]),
+                    holdLabel: modifiers.join("+")
+                };
+            }
+        }
+        return undefined;
+    }
+
+    function layerHoldLabel(layer) {
+        return String(layer || "").replace(/^LAYER_/, "").replace(/_/g, " ").toUpperCase();
+    }
+
+    function layoutTopLevelCall(expression) {
+        const normalized = normalizeDisplayExpression(expression);
+        const open = normalized.indexOf("(");
+        if (open <= 0 || !normalized.endsWith(")")) return undefined;
+        const close = matchingLayoutParenIndex(normalized, open);
+        if (close !== normalized.length - 1) return undefined;
+        return {
+            helper: normalized.slice(0, open),
+            args: splitLayoutArguments(normalized.slice(open + 1, -1))
+        };
+    }
+
+    function modifierArgumentLabel(expression) {
+        const parts = normalizeDisplayExpression(expression).split(/\\s*\\|\\s*/).map(modifierAtomLabel).filter(Boolean);
+        return parts.length ? parts.join("+") : displayKeyExpression(expression);
+    }
+
+    function modifierAtomLabel(expression) {
+        const normalized = normalizeDisplayExpression(expression).replace(/^MOD_/, "");
+        const direct = {
+            LCTL: "Ctrl",
+            LSFT: "Shift",
+            LALT: "Alt",
+            LGUI: "Cmd",
+            RCTL: "Right Ctrl",
+            RSFT: "Right Shift",
+            RALT: "Right Alt",
+            RGUI: "Right Cmd",
+            MASK_CTRL: "Ctrl",
+            MASK_SHIFT: "Shift",
+            MASK_ALT: "Alt",
+            MASK_GUI: "Cmd",
+        };
+        if (direct[normalized]) return direct[normalized];
+        if (modWrapperLabels[normalized]) return modWrapperLabels[normalized].join("+");
+        return "";
     }
 
     function shiftedOutputPair(keycode) {
@@ -9484,13 +9612,17 @@ function getClientScript() {
 
     function renderBehaviorDots(dots, visual, textColor) {
         if (!dots.length) return "";
-        const startX = visual.x + keyboardGeometry.keyWidth - 10 - ((dots.length - 1) * 12);
+        const rows = keyFaceRows(visual);
+        const radius = 3.8;
+        const gap = 2;
+        const step = radius * 2 + gap;
+        const startX = visual.x + keyboardGeometry.keyWidth / 2 - ((dots.length - 1) * step) / 2;
         return dots.map((dot, index) => {
-            const x = startX + index * 12;
-            const y = visual.y + 10;
+            const x = startX + index * step;
+            const y = rows.behaviorY;
             const label = dot.count > 1 ? String(dot.count) : "";
-            return "<circle cx='" + x + "' cy='" + y + "' r='5.5' fill='" + dot.color + "' stroke='" + escapeAttr(textColor || "#fff") + "' stroke-width='1.4'></circle>" +
-                (label ? "<text x='" + x + "' y='" + (y + 1) + "' fill='" + idealText(dot.color) + "' font-size='7' text-anchor='middle' dominant-baseline='central'>" + label + "</text>" : "");
+            return "<circle cx='" + svgNumber(x) + "' cy='" + svgNumber(y) + "' r='" + radius + "' fill='" + dot.color + "' stroke='" + escapeAttr(textColor || "#fff") + "' stroke-width='1.1'></circle>" +
+                (label ? "<text x='" + svgNumber(x) + "' y='" + svgNumber(y + 0.5) + "' fill='" + idealText(dot.color) + "' font-size='5.8' text-anchor='middle' dominant-baseline='central' font-weight='700'>" + label + "</text>" : "");
         }).join("");
     }
 
@@ -9500,19 +9632,25 @@ function getClientScript() {
 
     function renderComboBadges(badges, visual) {
         if (!badges.length) return "";
-        const badgeHeight = 12;
-        const widths = badges.map((badge) => Math.max(15, 7 + badge.length * 4));
-        const total = widths.reduce((sum, width) => sum + width, 0) + (badges.length - 1) * 3;
-        let x = visual.x + (keyboardGeometry.keyWidth - total) / 2;
-        const y = visual.y + keyboardGeometry.keyHeight - badgeHeight - 5;
+        const rows = keyFaceRows(visual);
+        const gap = 1.5;
+        const naturalWidths = badges.map((badge) => Math.max(11.5, 5 + String(badge).length * 3.2));
+        const available = keyboardGeometry.keyWidth - 8;
+        const naturalTotal = naturalWidths.reduce((total, width) => total + width, 0) + gap * (badges.length - 1);
+        const scale = naturalTotal > available ? Math.max(0.68, (available - gap * (badges.length - 1)) / naturalWidths.reduce((total, width) => total + width, 0)) : 1;
+        const widths = naturalWidths.map((width) => width * scale);
+        const totalWidth = widths.reduce((total, width) => total + width, 0) + gap * (badges.length - 1);
+        let x = visual.x + keyboardGeometry.keyWidth / 2 - totalWidth / 2;
+        const y = rows.comboTopY;
+        const fontSize = Math.max(4.9, 5.8 * scale);
         return badges.map((badge, index) => {
             const width = widths[index];
             const textX = x + width / 2;
-            const textY = y + badgeHeight / 2;
-            const out = "<rect x='" + x + "' y='" + y + "' width='" + width + "' height='" + badgeHeight + "' rx='5' fill='#141714' fill-opacity='0.94' stroke='#f5f5f3'></rect>" +
-                "<text x='" + textX + "' y='" + textY + "' fill='#f5f5f3' font-size='7.5' text-anchor='middle' dominant-baseline='central' font-weight='700'>" + escapeHtml(badge) + "</text>";
-            x += width + 3;
-            return out;
+            const textY = y + rows.comboHeight / 2 + 0.1;
+            const output = "<rect x='" + svgNumber(x) + "' y='" + svgNumber(y) + "' width='" + svgNumber(width) + "' height='" + rows.comboHeight + "' rx='3.5' fill='#141714' fill-opacity='0.9' stroke='#f5f5f3' stroke-opacity='0.86'></rect>" +
+                "<text x='" + svgNumber(textX) + "' y='" + svgNumber(textY) + "' fill='#f5f5f3' font-size='" + svgNumber(fontSize) + "' text-anchor='middle' dominant-baseline='central' font-weight='700'>" + escapeHtml(badge) + "</text>";
+            x += width + gap;
+            return output;
         }).join("");
     }
 

@@ -84,6 +84,20 @@ const appendedCheck = `
         "Profile Studio layer behavior overview must label combo-output behavior sources as reachable entries"
     );
     assert(
+        getClientScript().includes("function dualRoleLayoutVisual") &&
+        getClientScript().includes('call.helper === "LT"') &&
+        getClientScript().includes("dual-role-separator-line") &&
+        getClientScript().includes("dual-role-hold-label"),
+        "Profile Studio layout keys should render LT()/mod-tap hold legends"
+    );
+    assert(
+        getClientScript().includes("function keyFaceRows") &&
+        getClientScript().includes("comboTopY") &&
+        getClientScript().includes("badges.map((badge, index)") &&
+        getClientScript().includes("renderLayoutSvgLabel(position, label, cx, cy, style.text, dots.length > 0 || badges.length > 0)"),
+        "Profile Studio layout keys should reserve separate rows for behavior markers, combo badges, tap labels, and hold legends"
+    );
+    assert(
         displayKeyExpression("DRAGSCROLL") === "Dragscroll" &&
         displayKeyExpression("DRAGSCROLL_LOCK") === "Dragscroll Lock",
         "Profile Studio should render dragscroll keycodes with friendly labels"
