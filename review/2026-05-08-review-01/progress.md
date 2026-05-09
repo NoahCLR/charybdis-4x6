@@ -67,8 +67,10 @@ Passed so far:
   stage reporting, and no stage-color palette.
 - Kept the boot indicator on every runtime init so a watchdog restart still
   shows visible white feedback.
-- Lowered the boot-indicator white from RGB(255,255,255) to RGB(150,150,150)
-  to match the keymap's authored white brightness.
+- Lowered the boot-indicator white from full RGB white to the keymap's authored
+  `HSV(0,0,150)` white brightness.
+- Switched the boot-indicator implementation and RGB render test to express
+  that white as HSV and convert through `hsv_to_rgb()`.
 - Updated runtime diagnostic and RGB render tests for the restored watchdog
   restart contract and capped white indicator.
 

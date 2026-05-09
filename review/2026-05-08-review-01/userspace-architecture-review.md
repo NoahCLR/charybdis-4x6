@@ -11,7 +11,7 @@ The requested behavior change is intentionally narrow:
 
 - Keep the RP2040 watchdog restart path, but remove stage-specific reboot
   diagnostics.
-- Keep only a simple 150-brightness white RGB boot indicator after every
+- Keep only a simple `HSV(0,0,150)` white boot indicator after every
   runtime init.
 - Remove per-scan watchdog scratch writes from diagnostic scopes.
 - Reduce split runtime sync work on idle scans without changing the packets,
@@ -37,9 +37,9 @@ host runners, full host suite, and noah firmware compile listed in
 watchdog and boot-indicator surface. `noah_runtime_diag_post_init()` enables
 the RP2040 hardware watchdog and starts the indicator every time the runtime
 initializes. `noah_runtime_diag_heartbeat()` refreshes the watchdog from
-housekeeping. RGB renders the boot indicator as a full-board RGB(150,150,150)
-override for `NOAH_RUNTIME_DIAG_INDICATOR_MS`, then normal scene rendering
-resumes.
+housekeeping. RGB renders the boot indicator by converting `HSV(0,0,150)` with
+the same `hsv_to_rgb()` path used by authored RGB config, then applying that
+full-board override for `NOAH_RUNTIME_DIAG_INDICATOR_MS`.
 
 The public diagnostic scope and watchdog query functions remain present for
 existing call sites and host tests, but they no longer write RP2040 watchdog
@@ -76,8 +76,8 @@ truth:
 
 - Runtime diagnostics owns only minimal watchdog restart behavior: enable once
   at post-init and update from housekeeping.
-- The supported visible behavior is a 150-brightness white boot indicator after
-  every runtime initialization.
+- The supported visible behavior is an `HSV(0,0,150)` white boot indicator
+  after every runtime initialization.
 - Diagnostic watchdog query APIs are compatibility APIs and must report idle /
   false / zero unless a future implementation deliberately reintroduces real
   reboot diagnostics.

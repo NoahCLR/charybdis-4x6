@@ -17,14 +17,14 @@ static rgb_runtime_frame_t rgb_runtime_frame_primary;
 
 typedef void (*rgb_runtime_stage_fn_t)(void);
 
-#    define RGB_RUNTIME_BOOT_INDICATOR_WHITE 150u
+#    define RGB_RUNTIME_BOOT_INDICATOR_HSV ((hsv_t){.h = 0u, .s = 0u, .v = 150u})
 
 static bool rgb_runtime_render_runtime_diag_stage(uint8_t led_min, uint8_t led_max) {
     if (!noah_runtime_diag_indicator_active()) {
         return false;
     }
 
-    rgb_set_both_halves((rgb_t){.r = RGB_RUNTIME_BOOT_INDICATOR_WHITE, .g = RGB_RUNTIME_BOOT_INDICATOR_WHITE, .b = RGB_RUNTIME_BOOT_INDICATOR_WHITE}, led_min, led_max);
+    rgb_set_both_halves(hsv_to_rgb(RGB_RUNTIME_BOOT_INDICATOR_HSV), led_min, led_max);
     return true;
 }
 

@@ -72,7 +72,7 @@ static pd_mode_mask_t    fake_pd_locked_mode = 0;
 static split_side_mask_t fake_pd_owner_sides = SPLIT_SIDE_MASK_NONE;
 static uint8_t           fake_pd_owner_bitmap[KEY_ORIGIN_BITMAP_SIZE];
 
-static const rgb_t test_runtime_boot_indicator_rgb = {.r = 150u, .g = 150u, .b = 150u};
+static const hsv_t test_runtime_boot_indicator_hsv = {.h = 0u, .s = 0u, .v = 150u};
 
 ws2812_led_t                ws2812_leds[WS2812_LED_COUNT];
 split_runtime_sync_remote_t split_runtime_sync_remote = SPLIT_RUNTIME_SYNC_REMOTE_EMPTY_INIT;
@@ -1354,7 +1354,7 @@ static void test_runtime_boot_indicator_overrides_scene(void) {
     CHECK(render_output());
 
     for (uint8_t led = 0; led < RGB_MATRIX_LED_COUNT; led++) {
-        check_led(led, test_runtime_boot_indicator_rgb);
+        check_led(led, hsv_to_rgb(test_runtime_boot_indicator_hsv));
     }
 }
 
