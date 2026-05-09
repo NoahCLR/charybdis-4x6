@@ -5487,8 +5487,8 @@ function getStudioHtml() {
             </div>
             <div class="toolbar">
                 <button id="openKeymap">Open keymap.c</button>
-                <button id="openConfig">Open config.h</button>
                 <button id="openRgb">Open rgb_config.c</button>
+                <button id="openConfig">Open config.h</button>
                 <button id="applyAll" class="primary dirty" hidden disabled>Apply all</button>
                 <button id="reload" class="primary">Reload</button>
             </div>
@@ -5572,8 +5572,8 @@ function getClientScript() {
         profileSelect: "Choose which keymap folder Profile Studio edits. Switching profiles discards uncommitted Studio edits.",
         createProfile: "Create a new keymap folder from the starter Profile Studio template and register it in qmk.json.",
         openKeymap: "Open keymap.c beside the studio so you can inspect or hand-edit the source.",
-        openConfig: "Open config.h beside the studio so you can inspect layer enum and timing settings.",
         openRgb: "Open rgb_config.c beside the studio so you can inspect or hand-edit the source.",
+        openConfig: "Open config.h beside the studio so you can inspect layer enum and timing settings.",
         applyAll: "Write all staged Studio changes, including layer structure and staged layout edits.",
         reload: "Reload keymap.c, config.h, and rgb_config.c from disk, discarding uncommitted Studio edits."
     };
@@ -6016,8 +6016,8 @@ function getClientScript() {
         post({ type: "requestCreateProfile" });
     });
     document.getElementById("openKeymap").addEventListener("click", () => vscode.postMessage({ type: "openSource", file: "keymap" }));
-    document.getElementById("openConfig").addEventListener("click", () => vscode.postMessage({ type: "openSource", file: "config" }));
     document.getElementById("openRgb").addEventListener("click", () => vscode.postMessage({ type: "openSource", file: "rgb" }));
+    document.getElementById("openConfig").addEventListener("click", () => vscode.postMessage({ type: "openSource", file: "config" }));
     document.addEventListener("pointerover", (event) => {
         const target = tooltipTarget(event.target);
         if (target) showTooltip(target, event);
