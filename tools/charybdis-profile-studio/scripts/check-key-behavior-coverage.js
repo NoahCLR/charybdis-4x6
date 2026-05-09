@@ -79,6 +79,11 @@ const appendedCheck = `
         getClientScript().includes('renderTooltipHeader("Reachable via", "Physical keys or combo outputs on the active layer'),
         "Profile Studio layer behavior overview must label combo-output behavior sources as reachable entries"
     );
+    assert(
+        displayKeyExpression("DRAGSCROLL") === "Dragscroll" &&
+        displayKeyExpression("DRAGSCROLL_LOCK") === "Dragscroll Lock",
+        "Profile Studio should render dragscroll keycodes with friendly labels"
+    );
 
     const model = await buildModel(${JSON.stringify(repoRoot)});
     const aliases = model.qmkKeycodeAliases || {};

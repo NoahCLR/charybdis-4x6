@@ -453,6 +453,8 @@ const QMK_KEY_LABELS = {
     KC_ASTR: "*",
     KC_LPRN: "(",
     KC_RPRN: ")",
+    DRAGSCROLL: "Dragscroll",
+    DRAGSCROLL_LOCK: "Dragscroll Lock",
 };
 const SHIFTED_KEY_OUTPUT_LABELS = {
     KC_GRV: "~",
