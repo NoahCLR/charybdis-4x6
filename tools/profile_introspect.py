@@ -163,6 +163,74 @@ KC_SIDE_MODIFIERS = {
     "GUI": "GUI",
 }
 
+SHIFTED_KEY_OUTPUT_LABELS = {
+    "KC_GRV": "~",
+    "KC_1": "!",
+    "KC_2": "@",
+    "KC_3": "#",
+    "KC_4": "$",
+    "KC_5": "%",
+    "KC_6": "^",
+    "KC_7": "&",
+    "KC_8": "*",
+    "KC_9": "(",
+    "KC_0": ")",
+    "KC_MINS": "_",
+    "KC_EQL": "+",
+    "KC_LBRC": "{",
+    "KC_RBRC": "}",
+    "KC_BSLS": "|",
+    "KC_SCLN": ":",
+    "KC_QUOT": '"',
+    "KC_COMM": "<",
+    "KC_DOT": ">",
+    "KC_SLSH": "?",
+}
+
+SHIFTED_KEY_BASE_LABELS = {
+    "KC_TILD": "`",
+    "KC_EXLM": "1",
+    "KC_AT": "2",
+    "KC_HASH": "3",
+    "KC_DLR": "4",
+    "KC_PERC": "5",
+    "KC_CIRC": "6",
+    "KC_AMPR": "7",
+    "KC_ASTR": "8",
+    "KC_LPRN": "9",
+    "KC_RPRN": "0",
+    "KC_UNDS": "-",
+    "KC_PLUS": "=",
+    "KC_LCBR": "[",
+    "KC_RCBR": "]",
+    "KC_PIPE": "\\",
+    "KC_COLN": ";",
+    "KC_DQUO": "'",
+    "KC_LABK": ",",
+    "KC_RABK": ".",
+    "KC_QUES": "/",
+}
+
+MOD_WRAPPER_LABELS = {
+    "C": ["Ctrl"],
+    "S": ["Shift"],
+    "A": ["Alt"],
+    "G": ["Cmd"],
+    "LCTL": ["Ctrl"],
+    "LSFT": ["Shift"],
+    "LALT": ["Alt"],
+    "LGUI": ["Cmd"],
+    "RCTL": ["Right Ctrl"],
+    "RSFT": ["Right Shift"],
+    "RALT": ["Right Alt"],
+    "RGUI": ["Right Cmd"],
+    "LAG": ["Alt", "Cmd"],
+    "LSG": ["Shift", "Cmd"],
+    "LCAG": ["Ctrl", "Alt", "Cmd"],
+    "MEH": ["Ctrl", "Shift", "Alt"],
+    "HYPR": ["Ctrl", "Shift", "Alt", "Cmd"],
+}
+
 TAP_COUNT_NAMES = {
     0: "single",
     1: "double",
@@ -1645,6 +1713,102 @@ def display_token(token: str) -> str:
     return normalized
 
 
+def layout_top_level_call(expression: str) -> tuple[str, list[str]] | None:
+    normalized = normalize_expr(expression)
+    open_paren = normalized.find("(")
+    if open_paren <= 0 or not normalized.endswith(")"):
+        return None
+    close_paren = find_matching(normalized, open_paren, "(", ")")
+    if close_paren != len(normalized) - 1:
+        return None
+    return normalized[:open_paren], split_top_level(normalized[open_paren + 1 : -1])
+
+
+def layer_hold_label(layer: str) -> str:
+    return short_layer_name(normalize_expr(layer)).replace("_", " ").upper()
+
+
+def modifier_argument_label(expression: str) -> str:
+    parts = [modifier_atom_label(part) for part in re.split(r"\|", normalize_expr(expression))]
+    filtered = [part for part in parts if part]
+    return "+".join(filtered) if filtered else display_token(expression)
+
+
+def modifier_atom_label(expression: str) -> str:
+    normalized = normalize_expr(expression).removeprefix("MOD_")
+    direct = {
+        "LCTL": "Ctrl",
+        "LSFT": "Shift",
+        "LALT": "Alt",
+        "LGUI": "Cmd",
+        "RCTL": "Right Ctrl",
+        "RSFT": "Right Shift",
+        "RALT": "Right Alt",
+        "RGUI": "Right Cmd",
+        "MASK_CTRL": "Ctrl",
+        "MASK_SHIFT": "Shift",
+        "MASK_ALT": "Alt",
+        "MASK_GUI": "Cmd",
+    }
+    if normalized in direct:
+        return direct[normalized]
+    if normalized in MOD_WRAPPER_LABELS:
+        return "+".join(MOD_WRAPPER_LABELS[normalized])
+    return ""
+
+
+def dual_role_layout_visual(expression: str) -> dict[str, str] | None:
+    call = layout_top_level_call(expression)
+    if call is None:
+        return None
+    helper, args = call
+    if helper == "LT" and len(args) >= 2:
+        return {
+            "tap_keycode": args[1],
+            "tap_label": display_token(args[1]),
+            "hold_label": layer_hold_label(args[0]),
+        }
+    if helper == "MT" and len(args) >= 2:
+        return {
+            "tap_keycode": args[1],
+            "tap_label": display_token(args[1]),
+            "hold_label": modifier_argument_label(args[0]),
+        }
+    if helper.endswith("_T") and len(args) >= 1:
+        modifiers = MOD_WRAPPER_LABELS.get(helper[:-2])
+        if modifiers:
+            return {
+                "tap_keycode": args[0],
+                "tap_label": display_token(args[0]),
+                "hold_label": "+".join(modifiers),
+            }
+    return None
+
+
+def shifted_output_pair(expression: str) -> dict[str, str] | None:
+    keycode = shifted_output_pair_keycode(expression)
+    if not keycode:
+        return None
+    if keycode in SHIFTED_KEY_OUTPUT_LABELS:
+        return {"base": display_token(keycode), "shifted": SHIFTED_KEY_OUTPUT_LABELS[keycode], "active": "base"}
+    if keycode in SHIFTED_KEY_BASE_LABELS:
+        return {"base": SHIFTED_KEY_BASE_LABELS[keycode], "shifted": display_token(keycode), "active": "shifted"}
+    return None
+
+
+def shifted_output_pair_keycode(expression: str) -> str:
+    normalized = normalize_expr(expression)
+    if normalized in SHIFTED_KEY_OUTPUT_LABELS or normalized in SHIFTED_KEY_BASE_LABELS:
+        return normalized
+    call = layout_top_level_call(normalized)
+    if call is None:
+        return ""
+    helper, args = call
+    if helper in {"LT", "MT"} and len(args) >= 2:
+        return shifted_output_pair_keycode(args[1])
+    return ""
+
+
 def behavior_lookup_key(token: str) -> str:
     return display_token(token)
 
@@ -2170,7 +2334,7 @@ def render_layer_maps_section(profile: dict[str, object]) -> str:
         f"| `KEYS_MAPPED_ON_THIS_LAYER_ONLY` | {layer_color_mode_description('KEYS_MAPPED_ON_THIS_LAYER_ONLY')} |",
         "",
         f"- `LAYER_BASE` falls back to the default RGB color from {config_link} when its authored layer color is `HSV(0, 0, 0)`",
-        "- Keys that participate in combos on that layer show bottom-edge combo badges such as `C1` and `C2`; those ids match the combo table for the same layer",
+        "- Keys that participate in combos on that layer show combo badges such as `C1` and `C2` in their own key-face row; those ids match the combo table for the same layer",
         "- Active layer LED groups repaint their configured LED ids on top of the normal layer color in the same generated layer preview",
         "- Each layer section below also pulls in the authored key behaviors, pd modes that are directly placed or reachable through those behaviors, and combos that are actually present on that layer",
         "",
@@ -2796,7 +2960,7 @@ def render_layer_svg(
         label = visual_label_for_position(position, style["variant"])
         behavior_dots = behavior_indicator_map.get(behavior_lookup_key(position["keycode"])) if position["has_key_behavior"] else None
         combo_badges = combo_badge_map.get(position["keycode"])
-        parts.extend(render_svg_key(geometry, label, style, behavior_dots, combo_badges))
+        parts.extend(render_svg_key(geometry, position["keycode"], label, style, behavior_dots, combo_badges))
 
     for led_index, color in sorted(extra_led_group_colors.items()):
         parts.extend(render_extra_led_marker(led_index, color))
@@ -2882,6 +3046,7 @@ def visual_label_for_position(position: dict[str, object], variant: str) -> str:
 
 def render_svg_key(
     geometry: dict[str, float],
+    keycode: str,
     label: str,
     style: dict[str, object],
     behavior_dots: list[dict[str, object]] | None = None,
@@ -2896,45 +3061,242 @@ def render_svg_key(
     parts.append(
         f'    <rect x="{x:.1f}" y="{y:.1f}" width="{KEY_WIDTH}" height="{KEY_HEIGHT}" rx="{KEY_RADIUS}" fill="{style["fill"]}" stroke="{style["stroke"]}" stroke-width="1.5" filter="url(#shadow)"/>'
     )
-    if label:
-        font_size = font_size_for_key_label(label)
-        text_attributes = render_svg_text_fit_attributes(label, font_size)
-        text_suffix = f" {text_attributes}" if text_attributes else ""
-        parts.append(
-            f'    <text x="{cx:.1f}" y="{cy + 4:.1f}" fill="{style["text"]}" fill-opacity="{style["label_opacity"]}" font-size="{font_size}" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600"{text_suffix}>{escape_xml(label)}</text>'
-        )
+    has_top_rows = bool(behavior_dots) or bool(combo_badges)
+    parts.extend(render_svg_key_labels(x, y, cx, cy, keycode, label, style, has_top_rows))
     if behavior_dots:
-        dot_count = len(behavior_dots)
-        start_x = x + KEY_WIDTH - 10 - ((dot_count - 1) * 12)
-        for index, behavior_dot in enumerate(behavior_dots):
-            dot_x = start_x + (index * 12)
-            dot_y = y + 10
-            dot_color = behavior_dot["color"]
-            dot_label = str(behavior_dot["count"]) if int(behavior_dot["count"]) > 1 else ""
-            parts.append(
-                f'    <circle cx="{dot_x:.1f}" cy="{dot_y:.1f}" r="5.5" fill="{dot_color}" stroke="{style["text"]}" stroke-width="1.5"/>'
-            )
-            if dot_label:
-                parts.append(
-                    f'    <text x="{dot_x:.1f}" y="{dot_y + 0.5:.1f}" fill="{ideal_text_color(dot_color)}" font-size="7" text-anchor="middle" dominant-baseline="central" font-family="Helvetica, Arial, sans-serif" font-weight="700">{escape_xml(dot_label)}</text>'
-                )
+        parts.extend(render_svg_behavior_dots(x, y, style, behavior_dots))
     if combo_badges:
-        badge_height = 12
-        badge_spacing = 3
-        badge_widths = [max(15, 7 + (len(badge) * 4)) for badge in combo_badges]
-        total_width = sum(badge_widths) + (badge_spacing * (len(badge_widths) - 1))
-        badge_x = x + ((KEY_WIDTH - total_width) / 2)
-        badge_y = y + KEY_HEIGHT - badge_height - 5
-        for badge, badge_width in zip(combo_badges, badge_widths):
-            parts.append(
-                f'    <rect x="{badge_x:.1f}" y="{badge_y:.1f}" width="{badge_width}" height="{badge_height}" rx="5" fill="#141714" fill-opacity="0.94" stroke="#f5f5f3" stroke-width="1"/>'
-            )
-            parts.append(
-                f'    <text x="{badge_x + (badge_width / 2):.1f}" y="{badge_y + 8.4:.1f}" fill="#f5f5f3" font-size="7.5" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-weight="700">{escape_xml(badge)}</text>'
-            )
-            badge_x += badge_width + badge_spacing
+        parts.extend(render_svg_combo_badges(x, y, combo_badges))
     parts.append("  </g>")
     return parts
+
+
+def render_svg_key_labels(
+    x: float,
+    y: float,
+    cx: float,
+    cy: float,
+    keycode: str,
+    label: str,
+    style: dict[str, object],
+    has_top_rows: bool,
+) -> list[str]:
+    dual_role = dual_role_layout_visual(keycode)
+    if dual_role is not None:
+        return render_svg_dual_role_labels(x, y, cx, dual_role, style, has_top_rows)
+
+    pair = shifted_output_pair(keycode)
+    if pair is None:
+        if not label:
+            return []
+        label_y = key_face_rows(y)["base_y"] if has_top_rows else cy + 4
+        return [
+            render_svg_label(
+                label,
+                cx,
+                label_y,
+                style["text"],
+                float(style["label_opacity"]),
+                font_size_for_key_label(label),
+                KEY_WIDTH - 10,
+            )
+        ]
+
+    if pair["active"] == "shifted":
+        label_y = key_face_rows(y)["base_y"] if has_top_rows else cy + 4
+        return [
+            render_svg_label(
+                label,
+                cx,
+                label_y,
+                style["text"],
+                float(style["label_opacity"]),
+                font_size_for_key_label(label),
+                KEY_WIDTH - 10,
+            )
+        ]
+
+    rows = key_face_rows(y) if has_top_rows else shifted_pair_rows(y)
+    shifted_options = shifted_row_options() if has_top_rows else relaxed_shifted_row_options()
+    base_options = base_row_options() if has_top_rows else relaxed_base_row_options()
+    return [
+        render_svg_label(pair["shifted"], cx, rows["shifted_y"], style["text"], float(style["label_opacity"]) * shifted_options["opacity"], shifted_options["font_size"], shifted_options["max_width"], font_weight="650"),
+        render_svg_label(pair["base"], cx, rows["base_y"], style["text"], float(style["label_opacity"]), base_options["font_size"], base_options["max_width"]),
+    ]
+
+
+def render_svg_dual_role_labels(
+    x: float,
+    y: float,
+    cx: float,
+    dual_role: dict[str, str],
+    style: dict[str, object],
+    has_top_rows: bool,
+) -> list[str]:
+    pair = shifted_output_pair(dual_role["tap_keycode"])
+    has_shifted_row = pair is not None and pair["active"] == "base"
+    rows = dual_role_rows(y, has_top_rows, has_shifted_row)
+    dense = has_top_rows or has_shifted_row
+    hold_options = dense_hold_row_options() if dense else relaxed_hold_row_options()
+    parts = [
+        f'    <line x1="{x + 8:.1f}" y1="{rows["separator_y"]:.1f}" x2="{x + KEY_WIDTH - 8:.1f}" y2="{rows["separator_y"]:.1f}" stroke="{style["text"]}" stroke-opacity="0.42" stroke-width="1"/>'
+    ]
+
+    if has_shifted_row and pair is not None:
+        shifted_options = shifted_row_options() if has_top_rows else relaxed_shifted_row_options()
+        base_options = base_row_options() if has_top_rows else relaxed_base_row_options()
+        parts.append(
+            render_svg_label(pair["shifted"], cx, rows["shifted_y"], style["text"], float(style["label_opacity"]) * shifted_options["opacity"], shifted_options["font_size"], shifted_options["max_width"], font_weight="650")
+        )
+        parts.append(
+            render_svg_label(pair["base"], cx, rows["base_y"], style["text"], float(style["label_opacity"]), base_options["font_size"], base_options["max_width"])
+        )
+    else:
+        tap_label = pair["shifted"] if pair is not None and pair["active"] == "shifted" else dual_role["tap_label"]
+        tap_options = base_row_options() if has_top_rows else relaxed_tap_row_options()
+        parts.append(
+            render_svg_label(tap_label, cx, rows["base_y"], style["text"], float(style["label_opacity"]), tap_options["font_size"], tap_options["max_width"])
+        )
+
+    parts.append(
+        render_svg_label(dual_role["hold_label"], cx, rows["hold_y"], style["text"], float(style["label_opacity"]) * hold_options["opacity"], hold_options["font_size"], hold_options["max_width"], font_weight="700")
+    )
+    return parts
+
+
+def render_svg_behavior_dots(
+    x: float,
+    y: float,
+    style: dict[str, object],
+    behavior_dots: list[dict[str, object]],
+) -> list[str]:
+    rows = key_face_rows(y)
+    radius = 3.8
+    gap = 2
+    step = (radius * 2) + gap
+    start_x = x + (KEY_WIDTH / 2) - (((len(behavior_dots) - 1) * step) / 2)
+    parts: list[str] = []
+    for index, behavior_dot in enumerate(behavior_dots):
+        dot_x = start_x + (index * step)
+        dot_y = rows["behavior_y"]
+        dot_color = behavior_dot["color"]
+        dot_label = str(behavior_dot["count"]) if int(behavior_dot["count"]) > 1 else ""
+        parts.append(
+            f'    <circle cx="{dot_x:.1f}" cy="{dot_y:.1f}" r="{radius:.1f}" fill="{dot_color}" stroke="{style["text"]}" stroke-width="1.1"/>'
+        )
+        if dot_label:
+            parts.append(
+                f'    <text x="{dot_x:.1f}" y="{dot_y + 0.5:.1f}" fill="{ideal_text_color(dot_color)}" font-size="5.8" text-anchor="middle" dominant-baseline="central" font-family="Helvetica, Arial, sans-serif" font-weight="700">{escape_xml(dot_label)}</text>'
+            )
+    return parts
+
+
+def render_svg_combo_badges(x: float, y: float, combo_badges: list[str]) -> list[str]:
+    rows = key_face_rows(y)
+    badge_gap = 1.5
+    natural_widths = [max(11.5, 5 + (len(badge) * 3.2)) for badge in combo_badges]
+    available = KEY_WIDTH - 8
+    natural_total = sum(natural_widths) + (badge_gap * (len(combo_badges) - 1))
+    width_total = sum(natural_widths)
+    scale = max(0.68, (available - (badge_gap * (len(combo_badges) - 1))) / width_total) if natural_total > available else 1
+    badge_widths = [width * scale for width in natural_widths]
+    total_width = sum(badge_widths) + (badge_gap * (len(combo_badges) - 1))
+    badge_x = x + (KEY_WIDTH / 2) - (total_width / 2)
+    badge_y = rows["combo_top_y"]
+    font_size = max(4.9, 5.8 * scale)
+    parts: list[str] = []
+    for badge, badge_width in zip(combo_badges, badge_widths):
+        parts.append(
+            f'    <rect x="{badge_x:.1f}" y="{badge_y:.1f}" width="{badge_width:.1f}" height="{rows["combo_height"]:.1f}" rx="3.5" fill="#141714" fill-opacity="0.9" stroke="#f5f5f3" stroke-opacity="0.86" stroke-width="1"/>'
+        )
+        parts.append(
+            f'    <text x="{badge_x + (badge_width / 2):.1f}" y="{badge_y + (rows["combo_height"] / 2) + 0.1:.1f}" fill="#f5f5f3" font-size="{font_size:.1f}" text-anchor="middle" dominant-baseline="central" font-family="Helvetica, Arial, sans-serif" font-weight="700">{escape_xml(badge)}</text>'
+        )
+        badge_x += badge_width + badge_gap
+    return parts
+
+
+def key_face_rows(y: float) -> dict[str, float]:
+    return {
+        "behavior_y": y + 6.3,
+        "combo_top_y": y + 14.2,
+        "combo_height": 8.2,
+        "shifted_y": y + 30.3,
+        "base_y": y + 40.4,
+        "separator_y": y + 47.8,
+        "hold_y": y + 54,
+    }
+
+
+def shifted_pair_rows(y: float) -> dict[str, float]:
+    return {
+        "shifted_y": y + 23,
+        "base_y": y + 36,
+    }
+
+
+def dual_role_rows(y: float, has_top_rows: bool, has_shifted_row: bool) -> dict[str, float]:
+    if has_top_rows:
+        return key_face_rows(y)
+    if has_shifted_row:
+        return {
+            "shifted_y": y + 19.8,
+            "base_y": y + 31.2,
+            "separator_y": y + 41.5,
+            "hold_y": y + 51.5,
+        }
+    return {
+        "base_y": y + 24.5,
+        "separator_y": y + 37.4,
+        "hold_y": y + 48.8,
+    }
+
+
+def shifted_row_options() -> dict[str, float]:
+    return {"font_size": 7.4, "max_width": KEY_WIDTH - 18, "opacity": 0.56}
+
+
+def base_row_options() -> dict[str, float]:
+    return {"font_size": 9.1, "max_width": KEY_WIDTH - 12, "opacity": 1.0}
+
+
+def relaxed_shifted_row_options() -> dict[str, float]:
+    return {"font_size": 8.4, "max_width": KEY_WIDTH - 16, "opacity": 0.56}
+
+
+def relaxed_base_row_options() -> dict[str, float]:
+    return {"font_size": 10.5, "max_width": KEY_WIDTH - 12, "opacity": 1.0}
+
+
+def relaxed_tap_row_options() -> dict[str, float]:
+    return {"font_size": 12, "max_width": KEY_WIDTH - 12, "opacity": 1.0}
+
+
+def dense_hold_row_options() -> dict[str, float]:
+    return {"font_size": 6.4, "max_width": KEY_WIDTH - 12, "opacity": 0.78}
+
+
+def relaxed_hold_row_options() -> dict[str, float]:
+    return {"font_size": 8, "max_width": KEY_WIDTH - 12, "opacity": 0.78}
+
+
+def render_svg_label(
+    label: str,
+    x: float,
+    y: float,
+    fill: str,
+    opacity: float,
+    font_size: float,
+    max_width: float,
+    font_weight: str = "600",
+) -> str:
+    text_attributes = render_svg_text_fit_attributes(label, font_size, max_width)
+    text_suffix = f" {text_attributes}" if text_attributes else ""
+    return (
+        f'    <text x="{x:.1f}" y="{y:.1f}" fill="{fill}" fill-opacity="{opacity:.2f}" '
+        f'font-size="{font_size:.1f}" text-anchor="middle" dominant-baseline="middle" '
+        f'font-family="Helvetica, Arial, sans-serif" font-weight="{font_weight}"{text_suffix}>{escape_xml(label)}</text>'
+    )
 
 
 def render_extra_led_marker(led_index: int, color: dict[str, object]) -> list[str]:
@@ -2960,15 +3322,15 @@ def font_size_for_key_label(label: str) -> int:
     return 7
 
 
-def render_svg_text_fit_attributes(label: str, font_size: int) -> str:
+def render_svg_text_fit_attributes(label: str, font_size: float, max_width: float | None = None) -> str:
     text_length = estimated_svg_text_length(label, font_size)
-    max_width = KEY_WIDTH - (2 * KEY_TEXT_HORIZONTAL_PADDING)
-    if text_length <= max_width:
+    available_width = max_width if max_width is not None else KEY_WIDTH - (2 * KEY_TEXT_HORIZONTAL_PADDING)
+    if text_length <= available_width:
         return ""
-    return f'textLength="{max_width}" lengthAdjust="spacingAndGlyphs"'
+    return f'textLength="{available_width:.1f}" lengthAdjust="spacingAndGlyphs"'
 
 
-def estimated_svg_text_length(label: str, font_size: int) -> float:
+def estimated_svg_text_length(label: str, font_size: float) -> float:
     width = 0.0
     for char in label:
         if char in "MW@#%&":

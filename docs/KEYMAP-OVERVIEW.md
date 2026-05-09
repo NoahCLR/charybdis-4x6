@@ -25,7 +25,7 @@ These previews are generated as SVG image assets under [docs/media/profile-intro
 
 - `LAYER_BASE` falls back to the default RGB color from [config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) when its authored layer color is `HSV(0, 0, 0)`
 - Keys with authored `key_behaviors[]` rows in [keymap.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c) show numbered activity dots derived from the authored key-behavior feedback colors in [rgb_config.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c): tap-commit color for authored tap actions, hold color for authored hold tiers, and long-hold color for authored long-hold tiers
-- Keys that participate in combos on that layer show bottom-edge combo badges such as `C1` and `C2`; those ids match the combo table for the same layer
+- Keys that participate in combos on that layer show combo badges such as `C1` and `C2` in their own key-face row; those ids match the combo table for the same layer
 - Active layer LED groups repaint their configured LED ids on top of the normal layer color in the same generated layer preview
 - Each layer section below also pulls in the authored key behaviors, pd modes that are directly placed or reachable through those behaviors, and combos that are actually present on that layer
 
