@@ -388,7 +388,7 @@ The current profile uses VIA defaults more than hardcoded firmware macros:
 
 - all `MACRO_0` through `MACRO_15` hardcoded slots are currently empty
 - VIA exposes `VIA_MACRO_0` through `VIA_MACRO_63`
-- `VIA_MACRO_0` through `VIA_MACRO_9` currently have defaults
+- `VIA_MACRO_0` through `VIA_MACRO_10` currently have defaults
 
 But a lot of the current shortcut surface is not implemented through macro
 slots at all. Many standard macOS commands are bound directly as modded
@@ -426,10 +426,16 @@ while others are just my current app-launcher or utility bindings:
 | `VIA_MACRO_7` | `{KC_LCTL,KC_LALT,KC_LGUI,KC_V}` | current shortcut for [Maccy](https://maccy.app/), my clipboard manager |
 | `VIA_MACRO_8` | `{KC_LSFT,KC_LGUI,KC_V}` | current shortcut for VS Code preview |
 | `VIA_MACRO_9` | `{KC_LSFT,KC_LGUI,KC_P}` | current shortcut for the VS Code command palette |
+| `VIA_MACRO_10` | `{KC_LGUI,KC_A}{1340}{KC_LGUI,KC_C}` | select all, wait, then copy |
 
-`VIA_MACRO_10` through `VIA_MACRO_63` are empty by default. The RP2040
+`VIA_MACRO_11` through `VIA_MACRO_63` are empty by default. The RP2040
 wear-leveling region is enlarged for this profile, leaving roughly 15 KB of
 shared VIA macro buffer space after dynamic layer storage.
+
+Prefer chord payloads such as `{KC_LGUI,KC_C}` for self-contained shortcuts.
+Explicit key-down/key-up payloads such as `{+KC_LSFT}` and `{-KC_LSFT}` must
+leave no keys held at the end of the macro; unbalanced key-down payloads are
+rejected so a macro cannot leave a key registered after playback.
 
 So the current profile uses both:
 

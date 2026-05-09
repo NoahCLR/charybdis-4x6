@@ -276,18 +276,22 @@ static void test_delay_command_matches_upstream_parsing(void) {
 
     noah_action_tap(QK_MACRO_0);
 
-    CHECK(test_call_count == 5);
+    CHECK(test_call_count == 7);
     CHECK(test_calls[0].kind == TEST_CALL_WAIT);
-    CHECK(test_calls[0].value == 100);
+    CHECK(test_calls[0].value == 50);
     CHECK(test_calls[1].kind == TEST_CALL_WAIT);
-    CHECK(test_calls[1].value == 100);
+    CHECK(test_calls[1].value == 50);
     CHECK(test_calls[2].kind == TEST_CALL_WAIT);
     CHECK(test_calls[2].value == 50);
     CHECK(test_calls[3].kind == TEST_CALL_WAIT);
-    CHECK(test_calls[3].value == TAP_CODE_DELAY);
-    CHECK(test_calls[4].kind == TEST_CALL_SEND_CHAR);
-    CHECK(test_calls[4].value == 'X');
-    CHECK(test_calls[4].interval == TAP_CODE_DELAY);
+    CHECK(test_calls[3].value == 50);
+    CHECK(test_calls[4].kind == TEST_CALL_WAIT);
+    CHECK(test_calls[4].value == 50);
+    CHECK(test_calls[5].kind == TEST_CALL_WAIT);
+    CHECK(test_calls[5].value == TAP_CODE_DELAY);
+    CHECK(test_calls[6].kind == TEST_CALL_SEND_CHAR);
+    CHECK(test_calls[6].value == 'X');
+    CHECK(test_calls[6].interval == TAP_CODE_DELAY);
 }
 
 static void test_plain_text_uses_send_char_with_delay(void) {

@@ -11,6 +11,7 @@
 enum {
     TEST_DELAYED_ACTION_A = 0x0004,
     TEST_DELAYED_ACTION_B = 0x0005,
+    TEST_DELAYED_MACRO_ACTION = QK_MACRO_10,
 };
 
 typedef struct {
@@ -304,6 +305,39 @@ static void test_delayed_action_settles_fallback_holds_inside_replay_window(void
     CHECK(fake_oneshot_locked_mods == 0x08);
 }
 
+static void test_delayed_macro_runs_with_clean_mod_state(void) {
+    delayed_action_mods_t mods = {
+        .real           = 0x10,
+        .weak           = 0x20,
+        .oneshot        = 0x40,
+        .oneshot_locked = 0x80,
+    };
+
+    test_reset_stubs();
+    fake_mods                                = 0x01;
+    fake_weak_mods                           = 0x02;
+    fake_oneshot_mods                        = 0x04;
+    fake_oneshot_locked_mods                 = 0x08;
+    fallback_hold_settle_real_mods           = 0x03;
+    fallback_hold_settle_weak_mods           = 0x05;
+    fallback_hold_settle_oneshot_mods        = 0x06;
+    fallback_hold_settle_oneshot_locked_mods = 0x07;
+
+    dispatch_delayed_action(TEST_DELAYED_MACRO_ACTION, mods);
+
+    CHECK(fallback_hold_activation_count == 1);
+    CHECK(tap_call_count == 1);
+    CHECK(tap_call.keycode == TEST_DELAYED_MACRO_ACTION);
+    CHECK(tap_call.real == 0);
+    CHECK(tap_call.weak == 0);
+    CHECK(tap_call.oneshot == 0);
+    CHECK(tap_call.oneshot_locked == 0);
+    CHECK(fake_mods == 0x01);
+    CHECK(fake_weak_mods == 0x02);
+    CHECK(fake_oneshot_mods == 0x04);
+    CHECK(fake_oneshot_locked_mods == 0x08);
+}
+
 static void test_delayed_action_at_preserves_origin_key_pos(void) {
     delayed_action_mods_t mods = {
         .real           = 0x10,
@@ -326,6 +360,7 @@ static void test_delayed_action_at_preserves_origin_key_pos(void) {
 int main(void) {
     test_delayed_action_restores_saved_mod_state_after_emit();
     test_delayed_action_settles_fallback_holds_inside_replay_window();
+    test_delayed_macro_runs_with_clean_mod_state();
     test_delayed_action_at_preserves_origin_key_pos();
     puts("delayed_action host tests passed");
     return 0;

@@ -183,14 +183,16 @@ bool macro_payload_parse_command(const char *start, const char *end, macro_paylo
 }
 
 bool macro_payload_compile(const char *payload, macro_payload_ir_t *ir) {
-    const char *cursor     = payload;
-    const char *text_start = payload;
+    const char                   *cursor     = payload;
+    const char                   *text_start = payload;
+    macro_payload_hold_balance_t  balance    = {0};
 
     if (!payload || !ir) {
         return false;
     }
 
     macro_payload_ir_reset(ir);
+    macro_payload_hold_balance_reset(&balance);
 
     while (*cursor) {
         if (*cursor == '{') {
@@ -210,6 +212,14 @@ bool macro_payload_compile(const char *payload, macro_payload_ir_t *ir) {
                 macro_payload_ir_reset(ir);
                 return false;
             }
+            if (command.kind == MACRO_PAYLOAD_COMMAND_KEY_DOWN && !macro_payload_hold_balance_note_down(&balance, command.keycode)) {
+                macro_payload_ir_reset(ir);
+                return false;
+            }
+            if (command.kind == MACRO_PAYLOAD_COMMAND_KEY_UP && !macro_payload_hold_balance_note_up(&balance, command.keycode)) {
+                macro_payload_ir_reset(ir);
+                return false;
+            }
 
             cursor     = command_end + 1;
             text_start = cursor;
@@ -225,6 +235,11 @@ bool macro_payload_compile(const char *payload, macro_payload_ir_t *ir) {
     }
 
     if (!macro_payload_ir_write_text(ir, text_start, (size_t)(cursor - text_start))) {
+        macro_payload_ir_reset(ir);
+        return false;
+    }
+
+    if (!macro_payload_hold_balance_is_clear(&balance)) {
         macro_payload_ir_reset(ir);
         return false;
     }

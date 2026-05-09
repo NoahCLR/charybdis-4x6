@@ -100,6 +100,8 @@ static void test_validate_rejects_invalid_payloads(void) {
     CHECK(!macro_payload_validate("{ }"));
     CHECK(!macro_payload_validate("{KC_NOT_A_KEY}"));
     CHECK(!macro_payload_validate("{+KC_LCTL,KC_C}"));
+    CHECK(!macro_payload_validate("{+KC_LSFT}"));
+    CHECK(!macro_payload_validate("{+KC_LSFT}{+KC_LSFT}{-KC_LSFT}"));
     CHECK(!macro_payload_validate("{KC_A"));
     CHECK(!macro_payload_validate(non_ascii_payload));
 }
@@ -192,6 +194,8 @@ static void test_compile_rejects_invalid_payloads(void) {
 
     CHECK(!macro_payload_compile("{KC_A", &ir));
     CHECK(ir.length == 0);
+    CHECK(!macro_payload_compile("{+KC_LGUI}{+KC_A}{120}{-KC_LGUI}{1340}{+KC_LGUI}{+KC_C}{-KC_LGUI}", &ir));
+    CHECK(ir.length == 0);
     CHECK(!macro_payload_compile(non_ascii_payload, &ir));
     CHECK(ir.length == 0);
 }
@@ -241,6 +245,25 @@ static void test_encode_and_decode_qmk_round_trip_through_ir(void) {
     CHECK(memcmp(decoded.bytes, expected.bytes, expected.length) == 0);
 }
 
+static void test_decode_qmk_stream_rejects_unbalanced_key_downs(void) {
+    static const uint8_t unbalanced[] = {
+        SS_QMK_PREFIX, SS_DOWN_CODE, TEST_SEND_STRING_U8(X_LEFT_GUI),
+        SS_QMK_PREFIX, SS_DOWN_CODE, TEST_SEND_STRING_U8(X_A),
+        SS_QMK_PREFIX, SS_DELAY_CODE, '1', '2', '0', '|',
+        SS_QMK_PREFIX, SS_UP_CODE, TEST_SEND_STRING_U8(X_LEFT_GUI),
+        SS_QMK_PREFIX, SS_DELAY_CODE, '1', '3', '4', '0', '|',
+        SS_QMK_PREFIX, SS_DOWN_CODE, TEST_SEND_STRING_U8(X_LEFT_GUI),
+        SS_QMK_PREFIX, SS_DOWN_CODE, TEST_SEND_STRING_U8(X_C),
+        SS_QMK_PREFIX, SS_UP_CODE, TEST_SEND_STRING_U8(X_LEFT_GUI),
+        0,
+    };
+    macro_payload_ir_t ir     = {0};
+    test_qmk_reader_t  reader = {.buffer = unbalanced};
+
+    CHECK(!macro_payload_decode_qmk_stream(&ir, (uint16_t)sizeof(unbalanced), test_qmk_reader_read_byte, &reader));
+    CHECK(ir.length == 0);
+}
+
 static void test_play_ir_with_delayed_text_uses_send_char_with_delay(void) {
     macro_payload_ir_t ir = {0};
 
@@ -258,12 +281,31 @@ static void test_play_ir_with_delayed_text_uses_send_char_with_delay(void) {
     CHECK((uint8_t)(test_ops[1].value >> 8) == TAP_CODE_DELAY);
 }
 
+static void test_play_ir_releases_unbalanced_downs_and_fails(void) {
+    macro_payload_ir_t ir = {
+        .length = 2,
+        .bytes  = {MACRO_PAYLOAD_IR_OP_KEY_DOWN, TEST_SEND_STRING_U8(X_LEFT_CTRL)},
+    };
+
+    test_reset_stubs();
+
+    CHECK(!macro_payload_play_ir(&ir));
+    CHECK(test_op_count == 3);
+    CHECK(test_ops[0].kind == TEST_OP_REGISTER);
+    CHECK(test_ops[0].value == TEST_SEND_STRING_U8(X_LEFT_CTRL));
+    CHECK(test_ops[1].kind == TEST_OP_WAIT);
+    CHECK(test_ops[1].value == TAP_CODE_DELAY);
+    CHECK(test_ops[2].kind == TEST_OP_UNREGISTER);
+    CHECK(test_ops[2].value == TEST_SEND_STRING_U8(X_LEFT_CTRL));
+}
+
 static void test_play_long_delay_heavy_payload_keeps_runtime_heartbeat_alive(void) {
     macro_payload_ir_t ir            = {0};
     uint32_t           total_wait_ms = 0;
     uint16_t           delayed_chars = 0;
     uint16_t           shift_downs   = 0;
     uint16_t           shift_ups     = 0;
+    uint16_t           max_wait_ms   = 0;
 
     CHECK(macro_payload_compile(test_long_delay_heavy_payload, &ir));
 
@@ -274,6 +316,9 @@ static void test_play_long_delay_heavy_payload_keeps_runtime_heartbeat_alive(voi
     for (uint16_t index = 0; index < test_op_count; index++) {
         if (test_ops[index].kind == TEST_OP_WAIT) {
             total_wait_ms += test_ops[index].value;
+            if (test_ops[index].value > max_wait_ms) {
+                max_wait_ms = test_ops[index].value;
+            }
         } else if (test_ops[index].kind == TEST_OP_SEND_CHAR_DELAYED) {
             delayed_chars++;
         } else if (test_ops[index].kind == TEST_OP_REGISTER && test_ops[index].value == TEST_SEND_STRING_U8(X_LEFT_SHIFT)) {
@@ -287,6 +332,7 @@ static void test_play_long_delay_heavy_payload_keeps_runtime_heartbeat_alive(voi
     CHECK(shift_downs == 1u);
     CHECK(shift_ups == 1u);
     CHECK(total_wait_ms == 13579u);
+    CHECK(max_wait_ms <= 50u);
     CHECK(test_runtime_diag_heartbeat_count > 0u);
 }
 
@@ -300,7 +346,9 @@ int main(void) {
     test_encode_emits_expected_qmk_sequence();
     test_encode_fails_when_buffer_is_too_small();
     test_encode_and_decode_qmk_round_trip_through_ir();
+    test_decode_qmk_stream_rejects_unbalanced_key_downs();
     test_play_ir_with_delayed_text_uses_send_char_with_delay();
+    test_play_ir_releases_unbalanced_downs_and_fails();
     test_play_long_delay_heavy_payload_keeps_runtime_heartbeat_alive();
 
     puts("macro_payload host tests passed");

@@ -169,7 +169,7 @@ No authored combos resolve entirely from keys on this layer.
 
 | Key On Layer | Behavior Keycode | Tap Count | Tap | Hold | Long Hold | Timing |
 | --- | --- | --- | --- | --- | --- | --- |
-| `G(C) x2` | `G(C)` (`G(KC_C)`) | `double` | `TAP_SENDS(G(VIA_MACRO_10))` | `-` | `-` | `multi_tap(150), rgb_branch_confirm(150)` |
+| `G(C) x2` | `G(C)` (`G(KC_C)`) | `double` | `TAP_SENDS(VIA_MACRO_10)` | `-` | `-` | `multi_tap(150), rgb_branch_confirm=skip` |
 | `LSFT` | `LSFT` (`KC_LEFT_SHIFT`) | `single` | `TAP_SENDS(KC_CAPS)` | `-` | `-` | `release before tap_hold(150); otherwise normal hold` |
 | `LEFT` | `LEFT` (`KC_LEFT`) | `single` | `-` | `TAP_ON_RELEASE_AFTER_HOLD(A(KC_LEFT))` | `TAP_AT_HOLD_THRESHOLD(G(KC_LEFT))` | `tap_hold(150), long_hold(400)` |
 | `RIGHT` | `RIGHT` (`KC_RIGHT`) | `single` | `-` | `TAP_ON_RELEASE_AFTER_HOLD(A(KC_RIGHT))` | `TAP_AT_HOLD_THRESHOLD(G(KC_RIGHT))` | `tap_hold(150), long_hold(400)` |
@@ -187,7 +187,7 @@ No authored combos resolve entirely from keys on this layer.
 | Combo | Inputs On This Layer | Output |
 | --- | --- | --- |
 | `C1` | `MS_BTN1` + `MS_BTN2` | `CLICK_SPAM` |
-| `C2` | `G(C) x2` + `G(V) x2` | `VIA10` (`VIA_MACRO_10`) |
+| `C2` | `G(C) x2` + `G(V) x2` | `G(A)` (`G(KC_A)`) |
 
 ### `LAYER_POINTER`
 
@@ -363,7 +363,7 @@ Authored key-feedback LED groups repaint after the feedback locality render insi
 | `VIA_MACRO_7` | `{KC_LCTL,KC_LALT,KC_LGUI,KC_V}` | `LAYER_NAV @ VIA7` |
 | `VIA_MACRO_8` | `{KC_LSFT,KC_LGUI,KC_V}` | `LAYER_SYM @ VIA8` |
 | `VIA_MACRO_9` | `{KC_LSFT,KC_LGUI,KC_P}` | `LAYER_SYM @ VIA9` |
-| `VIA_MACRO_10` | `{+KC_LGUI}{+KC_A}{120}{-KC_LGUI}{1340}{+KC_LGUI}{+KC_C}{-KC_LGUI}` | `combo 7 output` |
+| `VIA_MACRO_10` | `{KC_LGUI,KC_A}{1340}{KC_LGUI,KC_C}` | `G(KC_C) double tap` |
 
 ### Hardcoded Macros
 
