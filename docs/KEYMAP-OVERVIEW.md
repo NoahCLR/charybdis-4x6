@@ -174,10 +174,6 @@ No authored combos resolve entirely from keys on this layer.
 | `LSFT` | `LSFT` (`KC_LEFT_SHIFT`) | `single` | `TAP_SENDS(KC_CAPS)` | `-` | `-` | `release before tap_hold(150); otherwise normal hold` |
 | `LEFT` | `LEFT` (`KC_LEFT`) | `single` | `-` | `TAP_ON_RELEASE_AFTER_HOLD(A(KC_LEFT))` | `TAP_AT_HOLD_THRESHOLD(G(KC_LEFT))` | `tap_hold(150), long_hold(400)` |
 | `RIGHT` | `RIGHT` (`KC_RIGHT`) | `single` | `-` | `TAP_ON_RELEASE_AFTER_HOLD(A(KC_RIGHT))` | `TAP_AT_HOLD_THRESHOLD(G(KC_RIGHT))` | `tap_hold(150), long_hold(400)` |
-| `MS_BTN1` | `MS_BTN1` | `single` | `TAP_SENDS(KC_ESC)` | `-` | `-` | `multi_tap(150)` |
-| `MS_BTN1` | `MS_BTN1` | `double` | `TAP_SENDS(KC_ESC)` | `-` | `-` | `multi_tap(150), rgb_branch_confirm(150)` |
-| `MS_BTN1` | `MS_BTN1` | `triple` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_ESC)` | `-` | `tap_hold(150), multi_tap(150), rgb_branch_confirm(150)` |
-| `MS_BTN1` | `MS_BTN1` | `quadruple` | `-` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_ESC)` | `tap_hold(150), long_hold(400), multi_tap(150), rgb_branch_confirm(150)` |
 | `DRAGSCROLL` | `DRAGSCROLL` | `single` | `TAP_SENDS(KC_TRNS)` | `-` | `-` | `multi_tap(150)` |
 | `DRAGSCROLL` | `DRAGSCROLL` | `double` | `-` | `TAP_AT_HOLD_THRESHOLD(DRAGSCROLL_LOCK)` | `-` | `tap_hold(150), multi_tap(150), rgb_branch_confirm(150)` |
 
@@ -212,10 +208,6 @@ No authored combos resolve entirely from keys on this layer.
 | `PINCH` | `PINCH` (`PINCH_MODE`) | `double` | `TAP_SENDS(VIA_MACRO_6)` | `PRESS_AND_HOLD_UNTIL_RELEASE(ZOOM_MODE)` | `-` | `tap_hold(150), multi_tap(150), rgb_branch_confirm(150)` |
 | `VOLUME` | `VOLUME` (`VOLUME_MODE`) | `single` | `TAP_SENDS(KC_TRNS)` | `-` | `-` | `multi_tap(150)` |
 | `VOLUME` | `VOLUME` (`VOLUME_MODE`) | `double` | `TAP_SENDS(KC_MUTE)` | `-` | `-` | `multi_tap(150), rgb_branch_confirm(150)` |
-| `MS_BTN1` | `MS_BTN1` | `single` | `TAP_SENDS(KC_ESC)` | `-` | `-` | `multi_tap(150)` |
-| `MS_BTN1` | `MS_BTN1` | `double` | `TAP_SENDS(KC_ESC)` | `-` | `-` | `multi_tap(150), rgb_branch_confirm(150)` |
-| `MS_BTN1` | `MS_BTN1` | `triple` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_ESC)` | `-` | `tap_hold(150), multi_tap(150), rgb_branch_confirm(150)` |
-| `MS_BTN1` | `MS_BTN1` | `quadruple` | `-` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_ESC)` | `tap_hold(150), long_hold(400), multi_tap(150), rgb_branch_confirm(150)` |
 | `DRAGSCROLL` | `DRAGSCROLL` | `single` | `TAP_SENDS(KC_TRNS)` | `-` | `-` | `multi_tap(150)` |
 | `DRAGSCROLL` | `DRAGSCROLL` | `double` | `-` | `TAP_AT_HOLD_THRESHOLD(DRAGSCROLL_LOCK)` | `-` | `tap_hold(150), multi_tap(150), rgb_branch_confirm(150)` |
 
@@ -432,8 +424,8 @@ Reusable groups define physical LED sets once near the LED map in `rgb_config.c`
 | --- | --- |
 | `layer_count` | `5` |
 | `layout_key_count` | `56` |
-| `key_behavior_count` | `36` |
-| `key_behavior_step_count` | `50` |
+| `key_behavior_count` | `35` |
+| `key_behavior_step_count` | `46` |
 | `combo_count` | `7` |
 | `via_macro_count` | `64` |
 | `via_macro_non_empty_count` | `11` |

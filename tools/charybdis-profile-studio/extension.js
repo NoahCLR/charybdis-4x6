@@ -9330,7 +9330,7 @@ function getClientScript() {
 
     function renderLayoutSvgLabel(position, label, cx, cy, textColor, hasTopRows = false) {
         const dualRole = dualRoleLayoutVisual(position?.keycode, position?.layoutIndex);
-        if (dualRole) return renderDualRoleSvgLabel(dualRole, cx, cy, textColor);
+        if (dualRole) return renderDualRoleSvgLabel(dualRole, cx, cy, textColor, hasTopRows);
         const visual = keyVisual(position?.layoutIndex);
         const rows = keyFaceRows(visual);
         const pair = shiftedOutputPair(position?.keycode);
@@ -9339,25 +9339,28 @@ function getClientScript() {
         if (pair.active === "shifted") {
             return renderSvgLabel(label, cx, baseY, textColor);
         }
-        return renderSvgLabel(pair.shifted, cx, rows.shiftedY, textColor, shiftedRowOptions()) +
-            renderSvgLabel(pair.base, cx, rows.baseY, textColor, baseRowOptions());
+        const pairRows = hasTopRows ? rows : shiftedPairRows(visual);
+        return renderSvgLabel(pair.shifted, cx, pairRows.shiftedY, textColor, hasTopRows ? shiftedRowOptions() : relaxedShiftedRowOptions()) +
+            renderSvgLabel(pair.base, cx, pairRows.baseY, textColor, hasTopRows ? baseRowOptions() : relaxedBaseRowOptions());
     }
 
-    function renderDualRoleSvgLabel(dualRole, cx, cy, textColor) {
+    function renderDualRoleSvgLabel(dualRole, cx, cy, textColor, hasTopRows = false) {
         const visual = keyVisual(dualRole.layoutIndex);
-        const rows = keyFaceRows(visual);
         const pair = shiftedOutputPair(dualRole.tapKeycode);
+        const hasShiftedRow = pair && pair.active === "base";
+        const rows = dualRoleRows(visual, hasTopRows, hasShiftedRow);
         const separator = "<line class='dual-role-separator-line' x1='" + (visual.x + 8) + "' y1='" + rows.separatorY + "' x2='" + (visual.x + keyboardGeometry.keyWidth - 8) + "' y2='" + rows.separatorY + "' stroke='" + escapeAttr(textColor || "#fff") + "' stroke-width='1'></line>";
-        const holdOptions = { className: "dual-role-hold-label", maxFontSize: 6.4, minFontSize: 5.2, maxWidth: keyboardGeometry.keyWidth - 12 };
-        if (pair && pair.active === "base") {
+        const dense = hasTopRows || hasShiftedRow;
+        const holdOptions = dense ? denseHoldRowOptions() : relaxedHoldRowOptions();
+        if (hasShiftedRow) {
             return separator +
-                renderSvgLabel(pair.shifted, cx, rows.shiftedY, textColor, shiftedRowOptions()) +
-                renderSvgLabel(pair.base, cx, rows.baseY, textColor, baseRowOptions()) +
+                renderSvgLabel(pair.shifted, cx, rows.shiftedY, textColor, hasTopRows ? shiftedRowOptions() : relaxedShiftedRowOptions()) +
+                renderSvgLabel(pair.base, cx, rows.baseY, textColor, hasTopRows ? baseRowOptions() : relaxedBaseRowOptions()) +
                 renderSvgLabel(dualRole.holdLabel, cx, rows.holdY, textColor, holdOptions);
         }
         const tapLabel = pair && pair.active === "shifted" ? pair.shifted : dualRole.tapLabel;
         return separator +
-            renderSvgLabel(tapLabel, cx, rows.baseY, textColor, baseRowOptions()) +
+            renderSvgLabel(tapLabel, cx, rows.baseY, textColor, hasTopRows ? baseRowOptions() : relaxedTapRowOptions()) +
             renderSvgLabel(dualRole.holdLabel, cx, rows.holdY, textColor, holdOptions);
     }
 
@@ -9379,6 +9382,50 @@ function getClientScript() {
 
     function baseRowOptions() {
         return { maxFontSize: 9.1, minFontSize: 6.4, maxWidth: keyboardGeometry.keyWidth - 12 };
+    }
+
+    function shiftedPairRows(visual) {
+        return {
+            shiftedY: visual.y + 23,
+            baseY: visual.y + 36
+        };
+    }
+
+    function dualRoleRows(visual, hasTopRows, hasShiftedRow) {
+        if (hasTopRows) return keyFaceRows(visual);
+        if (hasShiftedRow) {
+            return {
+                shiftedY: visual.y + 19.8,
+                baseY: visual.y + 31.2,
+                separatorY: visual.y + 41.5,
+                holdY: visual.y + 51.5
+            };
+        }
+        return {
+            baseY: visual.y + 24.5,
+            separatorY: visual.y + 37.4,
+            holdY: visual.y + 48.8
+        };
+    }
+
+    function relaxedShiftedRowOptions() {
+        return { className: "alternate-output-label", maxFontSize: 8.4, minFontSize: 6, maxWidth: keyboardGeometry.keyWidth - 16 };
+    }
+
+    function relaxedBaseRowOptions() {
+        return { maxFontSize: 10.5, minFontSize: 7, maxWidth: keyboardGeometry.keyWidth - 12 };
+    }
+
+    function relaxedTapRowOptions() {
+        return { maxFontSize: 12, minFontSize: 7, maxWidth: keyboardGeometry.keyWidth - 12 };
+    }
+
+    function denseHoldRowOptions() {
+        return { className: "dual-role-hold-label", maxFontSize: 6.4, minFontSize: 5.2, maxWidth: keyboardGeometry.keyWidth - 12 };
+    }
+
+    function relaxedHoldRowOptions() {
+        return { className: "dual-role-hold-label", maxFontSize: 8, minFontSize: 6.2, maxWidth: keyboardGeometry.keyWidth - 12 };
     }
 
     function dualRoleLayoutVisual(expression, layoutIndex) {
