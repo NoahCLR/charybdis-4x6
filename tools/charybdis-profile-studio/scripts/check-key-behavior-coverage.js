@@ -71,6 +71,14 @@ const appendedCheck = `
         getClientScript().includes('activeLayoutComboOriginalSource === "matched"'),
         "Profile Studio layout combo builder must clear stale auto-matched combo identity when inputs diverge"
     );
+    assert(
+        getClientScript().includes('addSource(combo.output, { kind: "combo", combo });'),
+        "Profile Studio layer behavior overview must include behavior rows reached through combo outputs"
+    );
+    assert(
+        getClientScript().includes('renderTooltipHeader("Reachable via", "Physical keys or combo outputs on the active layer'),
+        "Profile Studio layer behavior overview must label combo-output behavior sources as reachable entries"
+    );
 
     const model = await buildModel(${JSON.stringify(repoRoot)});
     const aliases = model.qmkKeycodeAliases || {};

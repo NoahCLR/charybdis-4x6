@@ -9570,20 +9570,29 @@ function getClientScript() {
     }
 
     function layerBehaviorRows(layer) {
-        const seen = new Set();
-        const rows = [];
-        for (const position of layer.positions) {
-            const canonical = canonicalKeyExpression(position.keycode);
-            if (seen.has(canonical)) continue;
-            const behavior = behaviorForKey(position.keycode);
-            if (!behavior) continue;
-            seen.add(canonical);
-            rows.push({
-                behavior,
-                positions: layer.positions.filter((candidate) => keyExpressionsEquivalent(candidate.keycode, position.keycode))
-            });
+        const rowsByKey = new Map();
+
+        function addSource(keycode, source) {
+            const behavior = behaviorForKey(keycode);
+            if (!behavior) return;
+
+            const canonical = canonicalKeyExpression(behavior.keycode);
+            let row = rowsByKey.get(canonical);
+            if (!row) {
+                row = { behavior, sources: [] };
+                rowsByKey.set(canonical, row);
+            }
+            row.sources.push(source);
         }
-        return rows;
+
+        for (const position of layer.positions) {
+            addSource(position.keycode, { kind: "key", position });
+        }
+        for (const combo of layerCombos(layer)) {
+            addSource(combo.output, { kind: "combo", combo });
+        }
+
+        return Array.from(rowsByKey.values());
     }
 
     function renderLayerOverview(layer) {
@@ -9605,18 +9614,28 @@ function getClientScript() {
         return "<button data-action='selectKey' data-index='" + position.layoutIndex + "' data-tooltip='" + escapeAttr(tooltip) + "'>" + escapeHtml(label) + "</button>";
     }
 
+    function renderOverviewBehaviorSource(source) {
+        if (source.kind === "key") {
+            return renderOverviewKeyButton(source.position);
+        }
+        const combo = source.combo;
+        const label = combo.badge + " output " + (combo.outputDisplay || combo.output);
+        const tooltip = "Combo " + combo.badge + " output behavior from " + (combo.inputDisplays || combo.inputs).join(" + ") + " -> " + (combo.outputDisplay || combo.output) + ".";
+        return "<span class='source-pill' data-tooltip='" + escapeAttr(tooltip) + "'>" + escapeHtml(label) + "</span>";
+    }
+
     function renderLayerBehaviorTable(layer) {
         const rows = layerBehaviorRows(layer);
         if (!rows.length) {
             return "<p class='muted'>No authored behavior rows are active on this layer.</p>";
         }
         return "<table><thead><tr>" +
-            renderTooltipHeader("Key on layer", "Physical keys on the active layer that use this key_behaviors[] row.") +
+            renderTooltipHeader("Reachable via", "Physical keys or combo outputs on the active layer that use this key_behaviors[] row.") +
             renderTooltipHeader("Behavior", "Authored keycode that owns the key_behaviors[] row.") +
             renderTooltipHeader("Steps", "Tap-count branch actions attached to this behavior row.") +
             "</tr></thead><tbody>" +
             rows.map((row) =>
-                "<tr><td>" + row.positions.map(renderOverviewKeyButton).join(" ") +
+                "<tr><td>" + row.sources.map(renderOverviewBehaviorSource).join(" ") +
                 "</td><td>" + escapeHtml(displayAction(row.behavior.keycode)) + "<br><code class='muted'>" + escapeHtml(row.behavior.keycode) + "</code></td><td>" +
                 row.behavior.steps.map(renderStep).join("<br>") + "</td></tr>"
             ).join("") +
