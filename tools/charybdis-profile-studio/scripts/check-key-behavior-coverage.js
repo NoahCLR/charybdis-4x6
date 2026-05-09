@@ -210,7 +210,23 @@ const appendedCheck = `
             for (const filePath of [targetPaths.keymap, targetPaths.config, targetPaths.rgb, targetPaths.rules]) {
                 assert(nativeFs.existsSync(filePath), "Profile Studio did not create " + path.relative(tempRoot, filePath));
             }
+            const starterKeymap = nativeFs.readFileSync(targetPaths.keymap, "utf8");
+            assert(
+                starterKeymap.includes("Fresh Profile Charybdis 4x6 keymap data"),
+                "Profile Studio starter keymap did not render the profile title"
+            );
+            assert(
+                starterKeymap.includes("This translation unit owns the authored keymap data"),
+                "Profile Studio starter keymap is missing the authored-data comments"
+            );
+            assert(
+                starterKeymap.includes("// ─── Keymap Layouts") &&
+                    starterKeymap.includes("// clang-format off") &&
+                    starterKeymap.includes("╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮"),
+                "Profile Studio starter keymap is missing the documented physical layout scaffold"
+            );
             const freshModel = await buildModel(tempRoot, created, [created]);
+            assert((freshModel.diagnostics || []).length === 0, "Profile Studio starter profile should parse without diagnostics");
             assert((freshModel.layers || []).length === 5, "Profile Studio starter profile should expose five default layers");
             assert((freshModel.combos || []).length === 0, "Profile Studio starter profile should begin with no active combos");
             assert((freshModel.keyBehaviors || []).length === 0, "Profile Studio starter profile should begin with no active key behaviors");
