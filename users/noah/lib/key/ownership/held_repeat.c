@@ -54,6 +54,9 @@ static void held_repeat_remove_slot(uint16_t slot) {
     noah_held_repeat_state_t *state = held_repeat_state();
 
     pointer_layer_policy_note_action(state->bindings[slot].action, false);
+    if (state->active_count != 0u) {
+        state->active_count--;
+    }
     state->bindings[slot] = (held_repeat_binding_snapshot_t){0};
 }
 
@@ -90,6 +93,7 @@ void held_repeat_start(keypos_t key_pos, uint16_t action, uint16_t repeat_hz) {
     noah_held_repeat_state_t *state                = held_repeat_state();
     uint16_t                  interval_ms          = held_repeat_interval_from_hz(repeat_hz);
     bool                      anchor_needs_refresh = true;
+    bool                      new_binding          = false;
 
     if (interval_ms == 0) {
         held_repeat_log_invalid_rate(key_pos, action);
@@ -105,6 +109,7 @@ void held_repeat_start(keypos_t key_pos, uint16_t action, uint16_t repeat_hz) {
             held_repeat_log_binding_overflow(key_pos, action);
             return;
         }
+        new_binding = true;
     } else if (state->bindings[slot].action == action) {
         anchor_needs_refresh = false;
     } else if (state->bindings[slot].action != action) {
@@ -113,6 +118,10 @@ void held_repeat_start(keypos_t key_pos, uint16_t action, uint16_t repeat_hz) {
 
     if (anchor_needs_refresh) {
         pointer_layer_policy_note_action(action, true);
+    }
+
+    if (new_binding) {
+        state->active_count++;
     }
 
     state->bindings[slot] = (held_repeat_binding_snapshot_t){
@@ -126,14 +135,19 @@ void held_repeat_start(keypos_t key_pos, uint16_t action, uint16_t repeat_hz) {
 
 void held_repeat_tick(void) {
     noah_held_repeat_state_t *state = held_repeat_state();
+    uint16_t                  now;
 
+    if (state->active_count == 0u) {
+        return;
+    }
+
+    now = timer_read();
     for (uint16_t i = 0; i < ARRAY_SIZE(state->bindings); i++) {
         if (!state->bindings[i].active) {
             continue;
         }
 
-        uint16_t now = timer_read();
-        if (timer_elapsed(state->bindings[i].last_fire_time) >= state->bindings[i].interval_ms) {
+        if ((uint16_t)(now - state->bindings[i].last_fire_time) >= state->bindings[i].interval_ms) {
             state->bindings[i].last_fire_time = now;
             noah_emit_action_tap_at(state->bindings[i].key_pos, state->bindings[i].action, NOAH_EMIT_POLICY_SETTLE_FALLBACK_HOLDS);
         }

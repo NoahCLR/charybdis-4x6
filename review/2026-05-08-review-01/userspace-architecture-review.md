@@ -19,6 +19,10 @@ The requested behavior change is intentionally narrow:
 - Keep combo RGB sync immediate, including idle-to-active combo feedback.
 - Reduce idle key-runtime scan work and normal pointer-report overhead without
   changing authored key behavior or pointing mode semantics.
+- Remove inert diagnostic scope calls from continuous scan, pointer, RGB, and
+  housekeeping paths while preserving watchdog heartbeat behavior.
+- Reduce idle housekeeping and split-sync helper work that does not affect
+  rendered state.
 
 Out of scope:
 
@@ -48,7 +52,9 @@ full-board override for `NOAH_RUNTIME_DIAG_INDICATOR_MS`.
 The public diagnostic scope and watchdog query functions remain present for
 existing call sites and host tests, but they no longer write RP2040 watchdog
 scratch registers or report a latched reboot stage. Scope enter/leave are
-inert compatibility hooks.
+inert compatibility hooks. Continuous runtime paths no longer call those inert
+scope hooks; watchdog refresh still runs from `noah_runtime_diag_heartbeat()`
+in housekeeping.
 
 ### Split Runtime Sync
 
@@ -57,6 +63,15 @@ and send cadence. Base runtime state is cheap and continues to be built every
 sync tick. Combo feedback packets are also built every sync tick so combo RGB
 feedback can move from idle to active immediately; the existing packet memcmp
 still prevents unchanged combo packets from being sent before heartbeat.
+Split sync now asks `combo_feedback_bitmaps()` for underlay and overlay maps in
+one call, so the combo-origin cache is walked once per combo packet instead of
+once per layer. `runtime_sync.c` keeps a weak fallback that calls the older
+underlay/overlay hooks so isolated host runners and minimal link surfaces do
+not need to link the full key feedback implementation.
+
+PD owner bitmaps are only snapshotted when local owner sides are non-empty.
+Owner-side snapshots read direct local/remote state instead of building a full
+PD mode snapshot.
 
 The heavier key-feedback semantic and branch packets are built only when one
 of these conditions is true:
@@ -104,6 +119,13 @@ uses the existing idle-noise policy, and looks up a mode handler only when the
 local active mode is nonzero. Idle-noise absolute-motion calculation now avoids
 building a temporary delta array on every report.
 
+### Held Repeat
+
+`users/noah/lib/key/ownership/held_repeat.c` tracks an active binding count.
+Idle housekeeping returns before reading the timer or scanning the board-sized
+repeat table. Active repeat ticks read the timer once per housekeeping pass and
+use unsigned elapsed arithmetic for each binding.
+
 ## Contracts
 
 - Runtime diagnostics owns only minimal watchdog restart behavior: enable once
@@ -119,8 +141,16 @@ building a temporary delta array on every report.
 - Combo feedback maps are rebuilt every sync tick so idle-to-active combo RGB
   feedback is immediate; unchanged combo packets must still avoid transport
   sends before heartbeat.
+- Combo feedback underlay and overlay maps should be generated together for
+  split sync.
+- The combined combo feedback API must retain a weak fallback for isolated
+  split-sync link surfaces.
+- PD owner bitmaps should not be snapshotted on idle ticks with no owner side.
 - Idle clean scans must not rebuild key-feedback semantic/branch maps before
   the heartbeat window.
+- Continuous scan, pointing, RGB, post-init, and housekeeping paths must not
+  call inert diagnostic scope hooks.
+- Housekeeping must still refresh the runtime watchdog.
 - Dirty notifications must be available to key-runtime code even when a host
   test defines `SPLIT_TRANSACTION_IDS_USER` but does not link
   `runtime_sync.c`.
@@ -141,7 +171,8 @@ Expected coverage for this thread:
 - `run_rgb_layer_render_tests.sh` covers the full-white boot indicator render
   override.
 - `run_split_runtime_sync_tests.sh` covers immediate combo feedback, idle
-  key-feedback dirty gating, and heartbeat recovery behavior.
+  key-feedback dirty gating, skipped idle PD owner bitmap snapshots, and
+  heartbeat recovery behavior.
 - Key-runtime integration runners cover dirty notifications from scan,
   transition, and feedback paths.
 - `run_runtime_debug_tests.sh` covers idle key-runtime scan gating and pending
@@ -149,6 +180,12 @@ Expected coverage for this thread:
 - `run_pd_runtime_tests.sh` covers pointer pass-through, remote display-only
   state, idle-noise suppression, and active PD mode handler dispatch after the
   pointer hot-path change.
+- `run_held_action_tests.sh` covers idle held-repeat housekeeping avoiding
+  timer work.
+- `run_runtime_init_order_tests.sh` covers unchanged runtime call order after
+  removing inert diagnostic scope wrappers.
+- `run_rgb_layer_render_tests.sh` covers RGB render behavior after removing
+  inert diagnostic scope wrappers.
 - `run_feature_gate_compile_tests.sh` covers the new split dirty-state source
   in the userspace build surface.
 - Closure requires `run_all_host_tests.sh` and the `qmk compile` firmware gate.

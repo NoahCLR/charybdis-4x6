@@ -596,40 +596,37 @@ void key_feedback_tap_branch_map(uint8_t *out_map) {
     }
 }
 
-void combo_feedback_underlay_bitmap(uint8_t *out_bitmap) {
+void combo_feedback_bitmaps(uint8_t *out_underlay_bitmap, uint8_t *out_overlay_bitmap) {
     keypos_t preview_owner_key_pos = {.row = MATRIX_ROWS, .col = MATRIX_COLS};
     keypos_t pd_owner_key_pos      = {.row = MATRIX_ROWS, .col = MATRIX_COLS};
-    uint8_t  unused_overlay[KEY_ORIGIN_BITMAP_SIZE];
 
-    if (!out_bitmap) {
-        return;
+    if (out_underlay_bitmap) {
+        key_origin_bitmap_clear(out_underlay_bitmap);
     }
 
-    key_origin_bitmap_clear(out_bitmap);
-    key_origin_bitmap_clear(unused_overlay);
+    if (out_overlay_bitmap) {
+        key_origin_bitmap_clear(out_overlay_bitmap);
+    }
+
+    if (!(out_underlay_bitmap && out_overlay_bitmap)) {
+        return;
+    }
 
     (void)key_runtime_core_preview_owner_key_pos(&preview_owner_key_pos);
 #ifdef POINTING_DEVICE_ENABLE
     (void)pd_mode_local_owner_key_pos_snapshot(&pd_owner_key_pos);
 #endif
-    noah_qmk_combo_origin_active_bitmaps_partitioned(preview_owner_key_pos, pd_owner_key_pos, out_bitmap, unused_overlay);
+    noah_qmk_combo_origin_active_bitmaps_partitioned(preview_owner_key_pos, pd_owner_key_pos, out_underlay_bitmap, out_overlay_bitmap);
+}
+
+void combo_feedback_underlay_bitmap(uint8_t *out_bitmap) {
+    uint8_t unused_overlay[KEY_ORIGIN_BITMAP_SIZE];
+
+    combo_feedback_bitmaps(out_bitmap, unused_overlay);
 }
 
 void combo_feedback_overlay_bitmap(uint8_t *out_bitmap) {
-    keypos_t preview_owner_key_pos = {.row = MATRIX_ROWS, .col = MATRIX_COLS};
-    keypos_t pd_owner_key_pos      = {.row = MATRIX_ROWS, .col = MATRIX_COLS};
     uint8_t  unused_underlay[KEY_ORIGIN_BITMAP_SIZE];
 
-    if (!out_bitmap) {
-        return;
-    }
-
-    key_origin_bitmap_clear(out_bitmap);
-    key_origin_bitmap_clear(unused_underlay);
-
-    (void)key_runtime_core_preview_owner_key_pos(&preview_owner_key_pos);
-#ifdef POINTING_DEVICE_ENABLE
-    (void)pd_mode_local_owner_key_pos_snapshot(&pd_owner_key_pos);
-#endif
-    noah_qmk_combo_origin_active_bitmaps_partitioned(preview_owner_key_pos, pd_owner_key_pos, unused_underlay, out_bitmap);
+    combo_feedback_bitmaps(unused_underlay, out_bitmap);
 }

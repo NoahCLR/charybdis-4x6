@@ -57,6 +57,11 @@ static void split_runtime_sync_log_packet_size_mismatch(const char *packet_name,
 #    endif
 }
 
+__attribute__((weak)) void combo_feedback_bitmaps(uint8_t *out_underlay_bitmap, uint8_t *out_overlay_bitmap) {
+    combo_feedback_underlay_bitmap(out_underlay_bitmap);
+    combo_feedback_overlay_bitmap(out_overlay_bitmap);
+}
+
 static void split_runtime_sync_elapsed_internal(uint16_t raw_elapsed, bool force);
 
 static split_runtime_base_sync_packet_t split_runtime_sync_build_base_packet(uint16_t raw_elapsed) {
@@ -83,7 +88,9 @@ static split_runtime_base_sync_packet_t split_runtime_sync_build_base_packet(uin
     };
 
 #    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_PD_MODE_ACTIVE_HALF_ENABLE)
-    (void)pd_mode_local_owner_bitmap_snapshot(packet.pd_mode_owner_bitmap);
+    if (packet.pd_mode_owner_sides != SPLIT_SIDE_MASK_NONE) {
+        (void)pd_mode_local_owner_bitmap_snapshot(packet.pd_mode_owner_bitmap);
+    }
 #    endif
 
     return packet;
@@ -92,8 +99,7 @@ static split_runtime_base_sync_packet_t split_runtime_sync_build_base_packet(uin
 static split_runtime_combo_feedback_packet_t split_runtime_sync_build_combo_packet(void) {
     split_runtime_combo_feedback_packet_t packet = {0};
 
-    combo_feedback_underlay_bitmap(packet.combo_underlay_bitmap);
-    combo_feedback_overlay_bitmap(packet.combo_overlay_bitmap);
+    combo_feedback_bitmaps(packet.combo_underlay_bitmap, packet.combo_overlay_bitmap);
 
     return packet;
 }

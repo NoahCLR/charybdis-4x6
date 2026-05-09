@@ -46,6 +46,7 @@ static uint16_t              mod_unregister_calls[16];
 static uint8_t               mod_register_count;
 static uint8_t               mod_unregister_count;
 static uint16_t              fake_time;
+static uint8_t               timer_read_count;
 layer_state_t                layer_state;
 
 static void test_fail(const char *expr, const char *file, int line) {
@@ -75,6 +76,7 @@ static void test_reset_stubs(void) {
     mod_register_count        = 0;
     mod_unregister_count      = 0;
     fake_time                 = 1000;
+    timer_read_count          = 0;
 }
 
 bool is_pd_mode_lock_action(uint16_t action) {
@@ -104,6 +106,7 @@ void noah_action_release(keypos_t key_pos, uint16_t action) {
 }
 
 uint16_t timer_read(void) {
+    timer_read_count++;
     return fake_time;
 }
 
@@ -262,6 +265,15 @@ static void test_release_owned_by_key_reports_missing_bindings(void) {
     CHECK(!held_repeat_release_owned_by_key(test_keypos(7, 7)));
 }
 
+static void test_repeat_tick_returns_without_timer_work_when_idle(void) {
+    test_reset_stubs();
+
+    held_repeat_tick();
+
+    CHECK(timer_read_count == 0u);
+    CHECK(tap_call_count == 0u);
+}
+
 static void test_repeat_binding_taps_immediately_and_on_tick_until_release(void) {
     keypos_t key_pos = test_keypos(5, 5);
 
@@ -344,6 +356,7 @@ int main(void) {
     test_modifier_ownership_refcounts_without_action_dispatch();
     test_rebinding_same_key_releases_old_action_before_pressing_new();
     test_release_owned_by_key_reports_missing_bindings();
+    test_repeat_tick_returns_without_timer_work_when_idle();
     test_repeat_binding_taps_immediately_and_on_tick_until_release();
     test_repeat_binding_drops_backlog_after_scan_gap();
     test_repeat_binding_rejects_rates_above_supported_range();

@@ -447,11 +447,19 @@ pd_mode_mask_t pd_mode_display_locked_snapshot(void) {
 }
 
 split_side_mask_t pd_mode_local_owner_sides_snapshot(void) {
-    return pd_mode_snapshot().local.owner_sides;
+#ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
+    return PD_MODE_LOCAL_OWNER_SIDES;
+#else
+    return SPLIT_SIDE_MASK_NONE;
+#endif
 }
 
 split_side_mask_t pd_mode_display_owner_sides_snapshot(void) {
-    return pd_mode_snapshot().display.owner_sides;
+#ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
+    return is_keyboard_master() ? PD_MODE_LOCAL_OWNER_SIDES : PD_MODE_REMOTE_DISPLAY_OWNER_SIDES;
+#else
+    return SPLIT_SIDE_MASK_NONE;
+#endif
 }
 
 bool pd_mode_local_owner_key_pos_snapshot(keypos_t *out) {

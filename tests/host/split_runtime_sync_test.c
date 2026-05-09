@@ -30,6 +30,7 @@ static uint8_t           fake_key_feedback_flash_visibility_bitmap[KEY_ORIGIN_BI
 static uint8_t           fake_key_preview_layer;
 static uint8_t           combo_underlay_read_count;
 static uint8_t           combo_overlay_read_count;
+static uint8_t           pd_owner_bitmap_read_count;
 static uint8_t           key_feedback_semantic_read_count;
 static uint8_t           key_feedback_broad_owner_read_count;
 static uint8_t           key_feedback_tap_branch_read_count;
@@ -94,6 +95,7 @@ static void test_reset_stubs(void) {
     fake_key_preview_layer = 3u;
     combo_underlay_read_count                 = 0;
     combo_overlay_read_count                  = 0;
+    pd_owner_bitmap_read_count                = 0;
     key_feedback_semantic_read_count          = 0;
     key_feedback_broad_owner_read_count       = 0;
     key_feedback_tap_branch_read_count        = 0;
@@ -123,6 +125,7 @@ static void test_reset_stubs(void) {
 static void test_reset_builder_counts(void) {
     combo_underlay_read_count                = 0;
     combo_overlay_read_count                 = 0;
+    pd_owner_bitmap_read_count               = 0;
     key_feedback_semantic_read_count         = 0;
     key_feedback_broad_owner_read_count      = 0;
     key_feedback_tap_branch_read_count       = 0;
@@ -156,6 +159,7 @@ split_side_mask_t pd_mode_local_owner_sides_snapshot(void) {
 }
 
 bool pd_mode_local_owner_bitmap_snapshot(uint8_t *out_bitmap) {
+    pd_owner_bitmap_read_count++;
     key_origin_bitmap_copy(out_bitmap, fake_pd_owner_bitmap);
     return key_origin_bitmap_has_any(fake_pd_owner_bitmap);
 }
@@ -207,6 +211,13 @@ void combo_feedback_underlay_bitmap(uint8_t *out_bitmap) {
 void combo_feedback_overlay_bitmap(uint8_t *out_bitmap) {
     combo_overlay_read_count++;
     key_origin_bitmap_copy(out_bitmap, fake_combo_overlay_bitmap);
+}
+
+void combo_feedback_bitmaps(uint8_t *out_underlay_bitmap, uint8_t *out_overlay_bitmap) {
+    combo_underlay_read_count++;
+    combo_overlay_read_count++;
+    key_origin_bitmap_copy(out_underlay_bitmap, fake_combo_underlay_bitmap);
+    key_origin_bitmap_copy(out_overlay_bitmap, fake_combo_overlay_bitmap);
 }
 
 uint8_t key_feedback_preview_layer(void) {
@@ -610,6 +621,7 @@ static void test_idle_tick_keeps_combo_immediate_and_skips_key_feedback_builders
     split_runtime_sync_tick();
 
     CHECK(rpc_send_count == 0u);
+    CHECK(pd_owner_bitmap_read_count == 0u);
     CHECK(combo_underlay_read_count == 1u);
     CHECK(combo_overlay_read_count == 1u);
     CHECK(key_feedback_semantic_read_count == 0u);

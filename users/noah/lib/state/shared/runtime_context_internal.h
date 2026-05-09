@@ -31,6 +31,7 @@ typedef struct {
 
 typedef struct {
     held_repeat_binding_snapshot_t bindings[HELD_REPEAT_BINDING_CAPACITY];
+    uint8_t                        active_count;
 } noah_held_repeat_state_t;
 
 typedef struct {

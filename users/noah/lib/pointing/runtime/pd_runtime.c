@@ -8,7 +8,6 @@
 #include "../policy/pointer_layer_policy.h"
 #include "../../compat/qmk_auto_mouse_contract.h"
 #include "../../compat/qmk_pointing_contract.h"
-#include "../../state/diagnostics/runtime_diag.h"
 
 #if defined(NOAH_POINTING_IDLE_NOISE_SUPPRESSION_ENABLE)
 #    if !defined(NOAH_POINTING_IDLE_NOISE_SUPPRESSION_IDLE_MS)
@@ -85,7 +84,6 @@ bool noah_is_mouse_record_user(uint16_t keycode, keyrecord_t *record) {
 report_mouse_t noah_pointing_device_task_user(report_mouse_t mouse_report) {
     report_mouse_t output = mouse_report;
 
-    noah_runtime_diag_scope_enter(NOAH_RUNTIME_DIAG_STAGE_POINTING_TASK);
 #ifdef POINTING_DEVICE_ENABLE
     pd_mode_mask_t active_mode_id = pd_mode_local_active_snapshot();
 
@@ -118,14 +116,12 @@ report_mouse_t noah_pointing_device_task_user(report_mouse_t mouse_report) {
 #endif
 
 done:
-    noah_runtime_diag_scope_leave();
     return output;
 }
 
 layer_state_t noah_layer_state_set_user(layer_state_t state) {
     layer_state_t result = state;
 
-    noah_runtime_diag_scope_enter(NOAH_RUNTIME_DIAG_STAGE_LAYER_STATE_SET);
 #ifdef POINTING_DEVICE_ENABLE
     bool auto_sniping_active = false;
 #    if defined(CHARYBDIS_AUTO_SNIPING_ENABLE)
@@ -140,6 +136,5 @@ layer_state_t noah_layer_state_set_user(layer_state_t state) {
 #else
     result = state;
 #endif
-    noah_runtime_diag_scope_leave();
     return result;
 }

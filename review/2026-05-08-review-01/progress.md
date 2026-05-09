@@ -100,6 +100,23 @@ Re-run after restoring immediate combo feedback:
   transport sends until heartbeat.
 - Added split-sync coverage for idle-to-active combo feedback without relying
   on a dirty notification.
+- Removed inert runtime diagnostic scope calls from matrix scan, housekeeping,
+  keyboard post-init, pointer task, layer-state handling, and RGB render paths.
+  The watchdog heartbeat remains in housekeeping.
+- Added held-repeat active binding counting so idle housekeeping returns before
+  timer reads or board-sized repeat-table scans.
+- Changed active held-repeat ticks to read the timer once per pass.
+- Added a combined combo feedback bitmap API and changed split sync to build
+  combo underlay and overlay packets with one combo-origin pass.
+- Added a weak combined-combo fallback in split sync so isolated host runners
+  that link `runtime_sync.c` without `feedback.c` keep the same build contract
+  as the older underlay/overlay hooks.
+- Skipped PD owner bitmap snapshots on split-sync ticks with no local owner
+  side.
+- Changed local/display PD owner-side snapshot helpers to read direct state
+  instead of building a full PD mode snapshot.
+- Added held-repeat idle coverage and split-sync coverage for skipped idle PD
+  owner bitmap snapshots.
 
 ### In Flight
 
@@ -133,6 +150,22 @@ Passed for the optimization pass:
 - `sh tests/host/run_pd_mode_handlers_tests.sh`
 - `sh tests/host/run_pointer_layer_policy_tests.sh`
 - `sh tests/host/run_split_runtime_sync_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `git diff --check`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Passed for the follow-up inefficiency pass:
+
+- `sh tests/host/run_held_action_tests.sh`
+- `sh tests/host/run_runtime_init_order_tests.sh`
+- `sh tests/host/run_pd_runtime_tests.sh`
+- `sh tests/host/run_pd_mode_tests.sh`
+- `sh tests/host/run_pd_mode_handlers_tests.sh`
+- `sh tests/host/run_pointer_layer_policy_tests.sh`
+- `sh tests/host/run_split_runtime_sync_tests.sh`
+- `sh tests/host/run_runtime_trace_tests.sh`
+- `sh tests/host/run_rgb_layer_render_tests.sh`
 - `sh tests/host/run_feature_gate_compile_tests.sh`
 - `git diff --check`
 - `sh tests/host/run_all_host_tests.sh`
