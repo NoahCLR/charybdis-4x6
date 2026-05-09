@@ -63,6 +63,14 @@ const appendedCheck = `
         getClientScript().includes('type: "requestCreateProfile"'),
         "Profile Studio new-profile button must request extension-side input"
     );
+    assert(
+        getClientScript().includes("layoutComboShouldSaveOriginal(original, originalSource, payload.inputs)"),
+        "Profile Studio layout combo save path must distinguish auto-matched combos from explicit edits"
+    );
+    assert(
+        getClientScript().includes('activeLayoutComboOriginalSource === "matched"'),
+        "Profile Studio layout combo builder must clear stale auto-matched combo identity when inputs diverge"
+    );
 
     const model = await buildModel(${JSON.stringify(repoRoot)});
     const aliases = model.qmkKeycodeAliases || {};

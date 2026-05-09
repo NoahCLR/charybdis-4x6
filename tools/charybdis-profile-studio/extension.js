@@ -5511,6 +5511,7 @@ function getClientScript() {
     let layoutComboOutput = "";
     let layoutComboInputs = "";
     let activeLayoutComboOriginal = undefined;
+    let activeLayoutComboOriginalSource = "";
     let activeMacroKeycode = "";
     let macroDrafts = {};
     let macroRecording = false;
@@ -6228,7 +6229,7 @@ function getClientScript() {
             layoutComboSelection = [];
             layoutComboOutput = "";
             layoutComboInputs = "";
-            activeLayoutComboOriginal = undefined;
+            clearLayoutComboOriginal();
             syncRgbLayerOwnerToActiveLayer();
             lastLayoutKeyClick = { index: undefined, time: 0 };
             render();
@@ -6302,7 +6303,7 @@ function getClientScript() {
             layoutComboSelection = [];
             layoutComboOutput = "";
             layoutComboInputs = "";
-            activeLayoutComboOriginal = undefined;
+            clearLayoutComboOriginal();
             render();
             commitLocalHistory(before);
         } else if (action === "toggleRgbLed") {
@@ -6473,12 +6474,13 @@ function getClientScript() {
         } else if (action === "addLayoutCombo") {
             const payload = readComboBuilder(target);
             const original = activeLayoutComboOriginal;
+            const originalSource = activeLayoutComboOriginalSource;
             layoutComboPicking = false;
             layoutComboSelection = [];
             layoutComboOutput = "";
             layoutComboInputs = "";
-            activeLayoutComboOriginal = undefined;
-            post(original ? { type: "saveCombo", ...payload, originalOutput: original.output, originalInputs: original.inputs.join(", ") } : { type: "addCombo", ...payload });
+            clearLayoutComboOriginal();
+            post(layoutComboShouldSaveOriginal(original, originalSource, payload.inputs) ? { type: "saveCombo", ...payload, originalOutput: original.output, originalInputs: original.inputs.join(", ") } : { type: "addCombo", ...payload });
         } else if (action === "applyLayoutChanges") {
             const groups = pendingLayoutChangeGroups();
             const stagedEditLayer = groups.find((group) => pendingLayerAdd(group.layer));
@@ -6543,7 +6545,7 @@ function getClientScript() {
                 layoutComboSelection = [];
                 layoutComboOutput = "";
                 layoutComboInputs = "";
-                activeLayoutComboOriginal = undefined;
+                clearLayoutComboOriginal();
                 lastLayoutKeyClick = { index: undefined, time: 0 };
             }
             rgbBuilderColor = undefined;
@@ -6674,7 +6676,7 @@ function getClientScript() {
         const layer = currentLayer();
         if (!layer) {
             layoutComboSelection = [];
-            activeLayoutComboOriginal = undefined;
+            clearLayoutComboOriginal();
             return;
         }
         const valid = new Set(layer.positions.map((position) => position.layoutIndex));
@@ -6685,7 +6687,7 @@ function getClientScript() {
             return true;
         });
         if (activeLayoutComboOriginal && !model.combos.some((combo) => comboIdentityEquals(combo, activeLayoutComboOriginal))) {
-            activeLayoutComboOriginal = undefined;
+            clearLayoutComboOriginal();
         }
     }
 
@@ -6753,9 +6755,12 @@ function getClientScript() {
 
     function syncLayoutComboMatchFromInputs() {
         const combo = exactLayoutComboForInputs(layoutComboInputs);
-        if (combo && (!activeLayoutComboOriginal || comboIdentityEquals(combo, activeLayoutComboOriginal))) {
+        if (activeLayoutComboOriginalSource === "matched" && !comboIdentityEquals(combo, activeLayoutComboOriginal)) {
+            clearLayoutComboOriginal();
+        }
+        if (combo && !activeLayoutComboOriginal) {
             layoutComboOutput = combo.output;
-            activeLayoutComboOriginal = comboIdentity(combo);
+            setLayoutComboOriginal(comboIdentity(combo), "matched");
         }
     }
 
@@ -6779,6 +6784,27 @@ function getClientScript() {
         return output && inputs.length ? {output, inputs} : undefined;
     }
 
+    function normalizeLayoutComboOriginalSource(value, original) {
+        if (!original) return "";
+        return value === "matched" ? "matched" : "explicit";
+    }
+
+    function setLayoutComboOriginal(original, source) {
+        activeLayoutComboOriginal = original;
+        activeLayoutComboOriginalSource = normalizeLayoutComboOriginalSource(source, original);
+    }
+
+    function clearLayoutComboOriginal() {
+        activeLayoutComboOriginal = undefined;
+        activeLayoutComboOriginalSource = "";
+    }
+
+    function layoutComboShouldSaveOriginal(original, source, inputs) {
+        if (!original) return false;
+        if (source !== "matched") return true;
+        return comboInputSignature(splitLayoutArguments(inputs || "")) === comboInputSignature(original.inputs);
+    }
+
     function comboIdentityEquals(combo, identity) {
         return Boolean(combo && identity && keyExpressionsEquivalent(combo.output, identity.output) && comboInputSignature(combo.inputs) === comboInputSignature(identity.inputs));
     }
@@ -6791,7 +6817,7 @@ function getClientScript() {
         if (!combo) return;
         layoutComboOutput = combo.output || "";
         layoutComboInputs = (combo.inputs || []).join(", ");
-        activeLayoutComboOriginal = comboIdentity(combo);
+        setLayoutComboOriginal(comboIdentity(combo), "explicit");
         syncLayoutComboSelectionFromInputs();
         layoutComboPicking = false;
     }
@@ -7265,7 +7291,7 @@ function getClientScript() {
         layoutComboSelection = [];
         layoutComboOutput = "";
         layoutComboInputs = "";
-        activeLayoutComboOriginal = undefined;
+        clearLayoutComboOriginal();
         notice = "Staged " + name + ". Use Apply layer changes to write config.h, keymap.c, and rgb_config.c.";
         render();
         return true;
@@ -7298,7 +7324,7 @@ function getClientScript() {
         layoutComboSelection = [];
         layoutComboOutput = "";
         layoutComboInputs = "";
-        activeLayoutComboOriginal = undefined;
+        clearLayoutComboOriginal();
         render();
         return true;
     }
@@ -7580,7 +7606,7 @@ function getClientScript() {
         layoutComboSelection = [];
         layoutComboOutput = "";
         layoutComboInputs = "";
-        activeLayoutComboOriginal = undefined;
+        clearLayoutComboOriginal();
         activeMacroKeycode = "";
         macroDrafts = {};
         resetMacroRecorderState();
@@ -7738,6 +7764,7 @@ function getClientScript() {
             layoutComboOutput,
             layoutComboInputs,
             activeLayoutComboOriginal,
+            activeLayoutComboOriginalSource: activeLayoutComboOriginal ? activeLayoutComboOriginalSource : "",
             activeMacroKeycode,
             macroDrafts,
             macroRecordDelays,
@@ -7778,6 +7805,7 @@ function getClientScript() {
             layoutComboOutput = state.layoutComboOutput || "";
             layoutComboInputs = state.layoutComboInputs || "";
             activeLayoutComboOriginal = normalizeLayoutComboOriginal(state.activeLayoutComboOriginal);
+            activeLayoutComboOriginalSource = normalizeLayoutComboOriginalSource(state.activeLayoutComboOriginalSource, activeLayoutComboOriginal);
             activeMacroKeycode = state.activeMacroKeycode || "";
             macroDrafts = state.macroDrafts && typeof state.macroDrafts === "object" ? state.macroDrafts : {};
             macroRecordDelays = typeof state.macroRecordDelays === "boolean" ? state.macroRecordDelays : macroRecordDelays;

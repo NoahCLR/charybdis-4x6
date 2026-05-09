@@ -43,7 +43,7 @@ Timing legend for the layer-local behavior tables:
 - RGB matrix render mode: `ALL_KEYS`
 - Authored layer color: `HSV(0, 0, 0)`
 - Preview color: <img alt="LAYER_BASE preview color" src="media/profile-introspection/profile-color-swatch-ff0000.svg" width="96" height="28" />
-- Combo badges on this layer: `C1`, `C2`
+- Combo badges on this layer: `C1`, `C2`, `C3`
 
 ![LAYER_BASE](media/profile-introspection/profile-layer-LAYER_BASE.svg)
 
@@ -96,6 +96,7 @@ Timing legend for the layer-local behavior tables:
 | --- | --- | --- |
 | `C1` | `D` + `LT[NAV]/F` | `TAB` (`KC_TAB`) |
 | `C2` | `N` + `M` | `LGUI` (`KC_LEFT_GUI`) |
+| `C3` | `N` + `M` + `,` | `G(T)` (`G(KC_T)`) |
 
 ### `LAYER_NUM`
 
@@ -191,7 +192,7 @@ No authored combos resolve entirely from keys on this layer.
 - RGB matrix render mode: `KEYS_MAPPED_ON_THIS_LAYER_ONLY`
 - Authored layer color: `HSV(0, 0, 150)`
 - Preview color: <img alt="LAYER_POINTER preview color" src="media/profile-introspection/profile-color-swatch-ffffff.svg" width="96" height="28" />
-- Combo badges on this layer: `C1`, `C2`
+- Combo badges on this layer: `C1`, `C2`, `C3`
 
 ![LAYER_POINTER](media/profile-introspection/profile-layer-LAYER_POINTER.svg)
 
@@ -222,7 +223,8 @@ No authored combos resolve entirely from keys on this layer.
 | Combo | Inputs On This Layer | Output |
 | --- | --- | --- |
 | `C1` | `MS_BTN1` + `MS_BTN2` | `CLICK_SPAM` |
-| `C2` | `VOLUME` + `MS_BTN1` | `LGUI` (`KC_LEFT_GUI`) |
+| `C2` | `VOLUME` + `MS_BTN1` + `MS_BTN2` | `G(T)` (`G(KC_T)`) |
+| `C3` | `MS_BTN1` + `VOLUME` | `LGUI` (`KC_LGUI`) |
 
 ## PD Mode Colors
 
@@ -420,7 +422,7 @@ Reusable groups define physical LED sets once near the LED map in `rgb_config.c`
 | `layout_key_count` | `56` |
 | `key_behavior_count` | `33` |
 | `key_behavior_step_count` | `44` |
-| `combo_count` | `4` |
+| `combo_count` | `6` |
 | `via_macro_count` | `64` |
 | `via_macro_non_empty_count` | `10` |
 | `hardcoded_macro_count` | `16` |
