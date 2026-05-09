@@ -3,8 +3,6 @@
 #define NOAH_KEYMAP_EMPTY_COMBOS
 #define NOAH_KEYMAP_EMPTY_KEY_BEHAVIORS
 
-#include "keycodes.h"
-#include "lib/key/behavior/key_behavior.h"
 #include "noah_keymap.h"
 
 enum keymap_custom_keycodes {

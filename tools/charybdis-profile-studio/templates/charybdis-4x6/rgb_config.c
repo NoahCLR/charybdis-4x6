@@ -1,6 +1,5 @@
 // {{PROFILE_TITLE}} RGB configuration.
 
-#include "lib/rgb/core/rgb_helpers.h"
 #include "noah_keymap.h"
 
 #if defined(RGB_MATRIX_ENABLE)
