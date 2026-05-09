@@ -106,6 +106,13 @@ Re-run after restoring immediate combo feedback:
 - Added held-repeat active binding counting so idle housekeeping returns before
   timer reads or board-sized repeat-table scans.
 - Changed active held-repeat ticks to read the timer once per pass.
+- Restored phase-preserving held-repeat scheduling so 100 Hz click-spam does
+  not lose cadence to normal scan-loop timing drift.
+- Bounded held-repeat catch-up to four taps per housekeeping tick so long
+  stalls do not replay an unbounded backlog.
+- Updated held-action host coverage for 100 Hz drift catch-up, scan-gap
+  catch-up, excessive-backlog bounding, and runtime reset isolation through
+  the public reset hook.
 - Added a combined combo feedback bitmap API and changed split sync to build
   combo underlay and overlay packets with one combo-origin pass.
 - Added a weak combined-combo fallback in split sync so isolated host runners
@@ -171,7 +178,21 @@ Passed for the follow-up inefficiency pass:
 - `sh tests/host/run_all_host_tests.sh`
 - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
 
+Passed for the held-repeat cadence fix:
+
+- `sh tests/host/run_held_action_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_key_runtime_integration_harness_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `git diff --check`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
 ### Next Steps
 
-1. Measure firmware loop/report rates on hardware.
+1. Measure click-spam and firmware loop/report rates on hardware.
 2. If report rate is still low, profile the next hottest scan-loop surfaces.

@@ -8,6 +8,7 @@
 #include "users/noah/lib/key/behavior/key_behavior.h"
 #include "users/noah/lib/key/ownership/held_action.h"
 #include "users/noah/lib/key/ownership/held_repeat.h"
+#include "users/noah/lib/state/shared/runtime_reset.h"
 
 enum {
     TEST_SHARED_ACTION = SAFE_RANGE + 0x40,
@@ -69,6 +70,8 @@ static keypos_t test_keypos(uint8_t row, uint8_t col) {
 }
 
 static void test_reset_stubs(void) {
+    noah_runtime_reset_for_test();
+
     press_call_count          = 0;
     release_call_count        = 0;
     tap_call_count            = 0;
@@ -310,7 +313,28 @@ static void test_repeat_binding_taps_immediately_and_on_tick_until_release(void)
     CHECK(tap_call_count == 2);
 }
 
-static void test_repeat_binding_drops_backlog_after_scan_gap(void) {
+static void test_repeat_binding_preserves_rate_across_small_loop_drift(void) {
+    keypos_t key_pos = test_keypos(5, 6);
+
+    test_reset_stubs();
+
+    held_repeat_start(key_pos, TEST_SHARED_ACTION, 100);
+    CHECK(tap_call_count == 1);
+
+    for (uint8_t i = 0; i < 10u; i++) {
+        fake_time = (uint16_t)(fake_time + 11u);
+        held_repeat_tick();
+    }
+
+    CHECK(tap_call_count == 12);
+    for (uint8_t i = 1; i < tap_call_count; i++) {
+        CHECK(tap_calls[i].action == TEST_SHARED_ACTION);
+        CHECK(tap_calls[i].row == key_pos.row);
+        CHECK(tap_calls[i].col == key_pos.col);
+    }
+}
+
+static void test_repeat_binding_catches_up_after_scan_gap(void) {
     keypos_t key_pos = test_keypos(6, 6);
 
     test_reset_stubs();
@@ -321,21 +345,54 @@ static void test_repeat_binding_drops_backlog_after_scan_gap(void) {
     fake_time = (uint16_t)(fake_time + 120);
     held_repeat_tick();
 
-    CHECK(tap_call_count == 2);
+    CHECK(tap_call_count == 4);
     CHECK(tap_calls[1].action == TEST_SECOND_ACTION);
     CHECK(tap_calls[1].row == key_pos.row);
     CHECK(tap_calls[1].col == key_pos.col);
-
-    fake_time = (uint16_t)(fake_time + 39);
-    held_repeat_tick();
-    CHECK(tap_call_count == 2);
-
-    fake_time = (uint16_t)(fake_time + 1);
-    held_repeat_tick();
-    CHECK(tap_call_count == 3);
     CHECK(tap_calls[2].action == TEST_SECOND_ACTION);
     CHECK(tap_calls[2].row == key_pos.row);
     CHECK(tap_calls[2].col == key_pos.col);
+    CHECK(tap_calls[3].action == TEST_SECOND_ACTION);
+    CHECK(tap_calls[3].row == key_pos.row);
+    CHECK(tap_calls[3].col == key_pos.col);
+
+    fake_time = (uint16_t)(fake_time + 39);
+    held_repeat_tick();
+    CHECK(tap_call_count == 4);
+
+    fake_time = (uint16_t)(fake_time + 1);
+    held_repeat_tick();
+    CHECK(tap_call_count == 5);
+    CHECK(tap_calls[4].action == TEST_SECOND_ACTION);
+    CHECK(tap_calls[4].row == key_pos.row);
+    CHECK(tap_calls[4].col == key_pos.col);
+}
+
+static void test_repeat_binding_bounds_excessive_backlog_after_long_stall(void) {
+    keypos_t key_pos = test_keypos(6, 7);
+
+    test_reset_stubs();
+
+    held_repeat_start(key_pos, TEST_SECOND_ACTION, 25);
+    CHECK(tap_call_count == 1);
+
+    fake_time = (uint16_t)(fake_time + 400);
+    held_repeat_tick();
+
+    CHECK(tap_call_count == 5);
+    for (uint8_t i = 1; i < tap_call_count; i++) {
+        CHECK(tap_calls[i].action == TEST_SECOND_ACTION);
+        CHECK(tap_calls[i].row == key_pos.row);
+        CHECK(tap_calls[i].col == key_pos.col);
+    }
+
+    fake_time = (uint16_t)(fake_time + 39);
+    held_repeat_tick();
+    CHECK(tap_call_count == 5);
+
+    fake_time = (uint16_t)(fake_time + 1);
+    held_repeat_tick();
+    CHECK(tap_call_count == 6);
 }
 
 static void test_repeat_binding_rejects_rates_above_supported_range(void) {
@@ -358,7 +415,9 @@ int main(void) {
     test_release_owned_by_key_reports_missing_bindings();
     test_repeat_tick_returns_without_timer_work_when_idle();
     test_repeat_binding_taps_immediately_and_on_tick_until_release();
-    test_repeat_binding_drops_backlog_after_scan_gap();
+    test_repeat_binding_preserves_rate_across_small_loop_drift();
+    test_repeat_binding_catches_up_after_scan_gap();
+    test_repeat_binding_bounds_excessive_backlog_after_long_stall();
     test_repeat_binding_rejects_rates_above_supported_range();
 
     puts("held_action host tests passed");

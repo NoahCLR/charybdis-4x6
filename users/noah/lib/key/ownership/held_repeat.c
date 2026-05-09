@@ -13,6 +13,10 @@
 #include "../../state/shared/runtime_context_internal.h"
 #include "../behavior/key_behavior.h"
 
+#ifndef HELD_REPEAT_MAX_CATCH_UP_TAPS
+#    define HELD_REPEAT_MAX_CATCH_UP_TAPS 4u
+#endif
+
 static inline bool keypos_equal(keypos_t lhs, keypos_t rhs) {
     return lhs.row == rhs.row && lhs.col == rhs.col;
 }
@@ -76,6 +80,23 @@ static void held_repeat_log_invalid_rate(keypos_t key_pos, uint16_t action) {
     (void)key_pos;
     (void)action;
 #endif
+}
+
+static uint8_t held_repeat_due_tap_count(held_repeat_binding_snapshot_t *binding, uint16_t now) {
+    uint16_t scheduled_fire_time = binding->last_fire_time;
+    uint8_t  due_count           = 0;
+
+    while (due_count < HELD_REPEAT_MAX_CATCH_UP_TAPS && (uint16_t)(now - scheduled_fire_time) >= binding->interval_ms) {
+        scheduled_fire_time = (uint16_t)(scheduled_fire_time + binding->interval_ms);
+        due_count++;
+    }
+
+    if (due_count == 0u) {
+        return 0;
+    }
+
+    binding->last_fire_time = (uint16_t)(now - scheduled_fire_time) >= binding->interval_ms ? now : scheduled_fire_time;
+    return due_count;
 }
 
 bool held_repeat_release_owned_by_key(keypos_t key_pos) {
@@ -143,13 +164,16 @@ void held_repeat_tick(void) {
 
     now = timer_read();
     for (uint16_t i = 0; i < ARRAY_SIZE(state->bindings); i++) {
+        uint8_t due_count;
+
         if (!state->bindings[i].active) {
             continue;
         }
 
-        if ((uint16_t)(now - state->bindings[i].last_fire_time) >= state->bindings[i].interval_ms) {
-            state->bindings[i].last_fire_time = now;
+        due_count = held_repeat_due_tap_count(&state->bindings[i], now);
+        while (due_count > 0u) {
             noah_emit_action_tap_at(state->bindings[i].key_pos, state->bindings[i].action, NOAH_EMIT_POLICY_SETTLE_FALLBACK_HOLDS);
+            due_count--;
         }
     }
 }

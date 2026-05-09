@@ -23,6 +23,8 @@ The requested behavior change is intentionally narrow:
   housekeeping paths while preserving watchdog heartbeat behavior.
 - Reduce idle housekeeping and split-sync helper work that does not affect
   rendered state.
+- Keep held-repeat rates anchored to the requested cadence even when the scan
+  loop has small timing drift.
 
 Out of scope:
 
@@ -126,6 +128,14 @@ Idle housekeeping returns before reading the timer or scanning the board-sized
 repeat table. Active repeat ticks read the timer once per housekeeping pass and
 use unsigned elapsed arithmetic for each binding.
 
+Repeat scheduling is phase-preserving: when a binding is due, the stored fire
+time advances by the configured interval instead of snapping to `now`. This
+restores the old 100 Hz click-spam behavior where small scan-loop drift does
+not lower the average repeat rate. A single tick may emit up to four catch-up
+taps; if the firmware was stalled beyond that cap, the scheduler emits the
+bounded catch-up batch and re-anchors to `now` instead of replaying an
+unbounded backlog.
+
 ## Contracts
 
 - Runtime diagnostics owns only minimal watchdog restart behavior: enable once
@@ -161,6 +171,11 @@ use unsigned elapsed arithmetic for each binding.
   skipped.
 - Pointer reports without a local active PD mode must pass through unchanged
   and must ignore remote display-only PD mode state on the slave half.
+- Idle held-repeat housekeeping must avoid timer reads and repeat-table scans.
+- Active held-repeat scheduling must preserve the requested cadence across
+  normal scan-loop drift, including 100 Hz click-spam repeats.
+- Held-repeat catch-up must be bounded so long stalls do not replay an
+  unbounded backlog in one housekeeping tick.
 
 ## Verification Coverage
 
@@ -181,7 +196,8 @@ Expected coverage for this thread:
   state, idle-noise suppression, and active PD mode handler dispatch after the
   pointer hot-path change.
 - `run_held_action_tests.sh` covers idle held-repeat housekeeping avoiding
-  timer work.
+  timer work, phase-preserving repeat cadence, and bounded catch-up after long
+  stalls.
 - `run_runtime_init_order_tests.sh` covers unchanged runtime call order after
   removing inert diagnostic scope wrappers.
 - `run_rgb_layer_render_tests.sh` covers RGB render behavior after removing
