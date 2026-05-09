@@ -464,6 +464,14 @@ const key_behavior_t
                         [1] = {.tap = TAP_SENDS(VIA_MACRO_10)},
                     },
             },
+
+            {
+                .keycode = G(KC_V),
+                .tap_counts =
+                    {
+                        [1] = {.tap = TAP_SENDS(VIA_MACRO_7)},
+                    },
+            },
 };
 
 // ─── Keymap Layouts ─────────────────────────────────────────────────────────
