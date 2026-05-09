@@ -170,6 +170,7 @@ No authored combos resolve entirely from keys on this layer.
 | Key On Layer | Behavior Keycode | Tap Count | Tap | Hold | Long Hold | Timing |
 | --- | --- | --- | --- | --- | --- | --- |
 | `G(C) x2` | `G(C)` (`G(KC_C)`) | `double` | `TAP_SENDS(VIA_MACRO_10)` | `-` | `-` | `multi_tap(150), rgb_branch_confirm=skip` |
+| `G(V) x2` | `G(V)` (`G(KC_V)`) | `double` | `TAP_SENDS(VIA_MACRO_7)` | `-` | `-` | `multi_tap(150), rgb_branch_confirm(150)` |
 | `LSFT` | `LSFT` (`KC_LEFT_SHIFT`) | `single` | `TAP_SENDS(KC_CAPS)` | `-` | `-` | `release before tap_hold(150); otherwise normal hold` |
 | `LEFT` | `LEFT` (`KC_LEFT`) | `single` | `-` | `TAP_ON_RELEASE_AFTER_HOLD(A(KC_LEFT))` | `TAP_AT_HOLD_THRESHOLD(G(KC_LEFT))` | `tap_hold(150), long_hold(400)` |
 | `RIGHT` | `RIGHT` (`KC_RIGHT`) | `single` | `-` | `TAP_ON_RELEASE_AFTER_HOLD(A(KC_RIGHT))` | `TAP_AT_HOLD_THRESHOLD(G(KC_RIGHT))` | `tap_hold(150), long_hold(400)` |
@@ -360,7 +361,7 @@ Authored key-feedback LED groups repaint after the feedback locality render insi
 | `VIA_MACRO_4` | `{KC_LCTL,KC_LALT,KC_LGUI,KC_X}` | `LAYER_SYM @ VIA4` |
 | `VIA_MACRO_5` | `{KC_LCTL,KC_LGUI,KC_SPC}` | `LAYER_SYM @ VIA5` |
 | `VIA_MACRO_6` | `{KC_LALT,KC_LGUI,KC_8}` | `PINCH_MODE double tap` |
-| `VIA_MACRO_7` | `{KC_LCTL,KC_LALT,KC_LGUI,KC_V}` | `LAYER_NAV @ VIA7` |
+| `VIA_MACRO_7` | `{KC_LCTL,KC_LALT,KC_LGUI,KC_V}` | `LAYER_NAV @ VIA7`, `G(KC_V) double tap` |
 | `VIA_MACRO_8` | `{KC_LSFT,KC_LGUI,KC_V}` | `LAYER_SYM @ VIA8` |
 | `VIA_MACRO_9` | `{KC_LSFT,KC_LGUI,KC_P}` | `LAYER_SYM @ VIA9` |
 | `VIA_MACRO_10` | `{KC_LGUI,KC_A}{50}{KC_LGUI,KC_C}` | `G(KC_C) double tap` |
@@ -423,8 +424,8 @@ Reusable groups define physical LED sets once near the LED map in `rgb_config.c`
 | --- | --- |
 | `layer_count` | `5` |
 | `layout_key_count` | `56` |
-| `key_behavior_count` | `34` |
-| `key_behavior_step_count` | `45` |
+| `key_behavior_count` | `35` |
+| `key_behavior_step_count` | `46` |
 | `combo_count` | `7` |
 | `via_macro_count` | `64` |
 | `via_macro_non_empty_count` | `11` |
