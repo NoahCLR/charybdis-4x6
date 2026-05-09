@@ -258,7 +258,7 @@ static void test_play_ir_with_delayed_text_uses_send_char_with_delay(void) {
     CHECK((uint8_t)(test_ops[1].value >> 8) == TAP_CODE_DELAY);
 }
 
-static void test_play_long_delay_heavy_payload_keeps_watchdog_heartbeat_alive(void) {
+static void test_play_long_delay_heavy_payload_keeps_runtime_heartbeat_alive(void) {
     macro_payload_ir_t ir            = {0};
     uint32_t           total_wait_ms = 0;
     uint16_t           delayed_chars = 0;
@@ -301,7 +301,7 @@ int main(void) {
     test_encode_fails_when_buffer_is_too_small();
     test_encode_and_decode_qmk_round_trip_through_ir();
     test_play_ir_with_delayed_text_uses_send_char_with_delay();
-    test_play_long_delay_heavy_payload_keeps_watchdog_heartbeat_alive();
+    test_play_long_delay_heavy_payload_keeps_runtime_heartbeat_alive();
 
     puts("macro_payload host tests passed");
     return 0;

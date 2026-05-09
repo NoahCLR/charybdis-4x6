@@ -90,6 +90,7 @@ lib/key/runtime/planning/release_planner.c
 lib/key/runtime/planning/scan_planner.c
 lib/key/runtime/planning/tap_series_flush.c
 lib/state/diagnostics/runtime_diag.c
+lib/split/runtime_sync_dirty.c
 lib/state/modifiers/keyboard_mod_state.c
 lib/state/modifiers/keyboard_mod_policy.c
 lib/state/shared/runtime_shared_state.c

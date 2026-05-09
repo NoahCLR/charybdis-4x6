@@ -1,12 +1,10 @@
 // ────────────────────────────────────────────────────────────────────────────
-// Runtime Freeze Diagnostic
+// Runtime Restart Watchdog
 // ────────────────────────────────────────────────────────────────────────────
 //
-// Breadcrumb + watchdog surface for diagnosing master-side firmware stalls on
-// RP2040 builds. The runtime records the outer userspace path currently in
-// flight and pets the watchdog only after a healthy loop iteration completes.
-// If the master stalls hard, the watchdog reboots the MCU and the next boot
-// can surface the last in-flight stage.
+// Lightweight boot indicator and restart watchdog surface. The public scope
+// API remains available so hot-path callers do not need conditional code, but
+// normal builds do not write watchdog scratch state or report reboot stages.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 

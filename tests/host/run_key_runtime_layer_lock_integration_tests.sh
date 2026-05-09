@@ -60,6 +60,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/state/modifiers/keyboard_mod_policy.c" \
     "$ROOT/users/noah/lib/state/diagnostics/runtime_diag.c" \
     "$ROOT/users/noah/lib/state/shared/runtime_shared_state.c" \
+    "$ROOT/users/noah/lib/split/runtime_sync_dirty.c" \
     -o "$BIN"
 
 "$BIN"

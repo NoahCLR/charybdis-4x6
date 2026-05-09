@@ -221,7 +221,7 @@ This pattern applies to:
 | `process_record_user()` | `noah_process_record_user()` | key behavior engine, pointer-mode keys, non-handled release cleanup, direct actions, macros, and process-entry tracing |
 | `post_process_record_user()` | `noah_post_process_record_user()` | process-return finalization, including keyboard-event modifier-mask teardown and process trace result emission |
 | `matrix_scan_user()` | `noah_matrix_scan_user()` | VIA macro default reseeding, key runtime scanning, and split shared-state sync ticks |
-| `housekeeping_task_user()` | `noah_housekeeping_task_user()` | held-repeat ticking and runtime diagnostic heartbeat/watchdog servicing |
+| `housekeeping_task_user()` | `noah_housekeeping_task_user()` | held-repeat ticking, watchdog refresh, and runtime boot-indicator expiry |
 | `keyboard_post_init_user()` | `noah_keyboard_post_init_user()` | VIA macro default seeding, RGB runtime init, and split shared-state init |
 | `layer_state_set_user()` | `noah_layer_state_set_user()` | pointer-layer policy, auto-sniping layer state, and queueing scan-time pd-mode DPI policy after layer-owned sniping changes |
 | `pointing_device_task_user()` | `noah_pointing_device_task_user()` | pointer-mode mouse-report transforms and pointing idle-noise suppression |

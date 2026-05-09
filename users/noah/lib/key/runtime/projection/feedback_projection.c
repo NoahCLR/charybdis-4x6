@@ -1,5 +1,7 @@
 #include "feedback_projection.h"
 
+#include "../../../split/runtime_sync.h"
+
 __attribute__((weak)) void key_feedback_pulse_observe(keypos_t key_pos, key_feedback_pulse_kind_t kind, uint8_t tap_branch) {
     (void)key_pos;
     (void)kind;
@@ -41,4 +43,5 @@ static void key_runtime_core_feedback_projection_queue_pulse(key_runtime_core_st
 void key_runtime_core_feedback_projection_project_pulse(keypos_t key_pos, key_feedback_pulse_kind_t kind, uint8_t tap_branch) {
     key_runtime_core_feedback_projection_queue_pulse(key_runtime_core_state(), key_pos, kind, tap_branch);
     key_feedback_pulse_observe(key_pos, kind, tap_branch);
+    split_runtime_sync_notify_key_feedback_dirty();
 }

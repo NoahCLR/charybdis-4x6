@@ -84,6 +84,7 @@ compile_test() {
     "$ROOT/users/noah/lib/state/modifiers/keyboard_mod_policy.c" \
     "$ROOT/users/noah/lib/state/shared/runtime_shared_state.c" \
     "$ROOT/users/noah/lib/state/diagnostics/runtime_trace.c" \
+    "$ROOT/users/noah/lib/split/runtime_sync_dirty.c" \
     -o "$bin"
 }
 

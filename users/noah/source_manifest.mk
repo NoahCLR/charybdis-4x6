@@ -57,6 +57,7 @@ NOAH_COMMON_SOURCES := \
     lib/key/runtime/debug.c \
     lib/state/diagnostics/runtime_trace.c \
     lib/state/shared/runtime_shared_state.c \
+    lib/split/runtime_sync_dirty.c \
     lib/split/runtime_sync.c \
     lib/key/runtime/reducer/runtime.c \
     lib/key/runtime/planning/effect_plan.c \

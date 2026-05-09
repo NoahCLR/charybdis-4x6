@@ -38,77 +38,66 @@ static void test_reset(void) {
     noah_runtime_diag_reset_for_test();
 }
 
-static void test_post_init_enables_watchdog_on_master(void) {
+static void test_post_init_starts_boot_indicator_and_watchdog(void) {
     test_reset();
 
     noah_runtime_diag_post_init();
 
     CHECK(noah_runtime_diag_current_stage() == NOAH_RUNTIME_DIAG_STAGE_IDLE);
+    CHECK(noah_runtime_diag_indicator_active());
     CHECK(noah_runtime_diag_test_backend_watchdog_enabled());
     CHECK(noah_runtime_diag_test_backend_watchdog_enable_count() == 1u);
-    CHECK(noah_runtime_diag_test_backend_scratch(0u) == 0x4E444947u);
-    CHECK(noah_runtime_diag_test_backend_scratch(1u) == NOAH_RUNTIME_DIAG_STAGE_IDLE);
+    CHECK(noah_runtime_diag_test_backend_scratch(0u) == 0u);
+    CHECK(noah_runtime_diag_test_backend_scratch(1u) == 0u);
     CHECK(noah_runtime_diag_test_backend_scratch(2u) == 0u);
 }
 
-static void test_post_init_skips_watchdog_on_slave(void) {
+static void test_post_init_starts_boot_indicator_and_watchdog_on_slave(void) {
     test_reset();
     fake_is_master = false;
 
     noah_runtime_diag_post_init();
 
-    CHECK(!noah_runtime_diag_test_backend_watchdog_enabled());
-    CHECK(noah_runtime_diag_test_backend_watchdog_enable_count() == 0u);
+    CHECK(noah_runtime_diag_indicator_active());
+    CHECK(noah_runtime_diag_test_backend_watchdog_enabled());
+    CHECK(noah_runtime_diag_test_backend_watchdog_enable_count() == 1u);
 }
 
-static void test_nested_scopes_restore_parent_stage(void) {
+static void test_scopes_are_hot_path_noops(void) {
     test_reset();
     noah_runtime_diag_post_init();
 
     noah_runtime_diag_scope_enter(NOAH_RUNTIME_DIAG_STAGE_MATRIX_SCAN_KEY_RUNTIME);
-    CHECK(noah_runtime_diag_current_stage() == NOAH_RUNTIME_DIAG_STAGE_MATRIX_SCAN_KEY_RUNTIME);
-    CHECK(noah_runtime_diag_test_backend_scratch(1u) == NOAH_RUNTIME_DIAG_STAGE_MATRIX_SCAN_KEY_RUNTIME);
+    CHECK(noah_runtime_diag_current_stage() == NOAH_RUNTIME_DIAG_STAGE_IDLE);
+    CHECK(noah_runtime_diag_test_backend_scratch(1u) == 0u);
 
     noah_runtime_diag_scope_enter(NOAH_RUNTIME_DIAG_STAGE_POINTING_TASK);
-    CHECK(noah_runtime_diag_current_stage() == NOAH_RUNTIME_DIAG_STAGE_POINTING_TASK);
-    CHECK(noah_runtime_diag_test_backend_scratch(1u) == NOAH_RUNTIME_DIAG_STAGE_POINTING_TASK);
-
-    noah_runtime_diag_scope_leave();
-    CHECK(noah_runtime_diag_current_stage() == NOAH_RUNTIME_DIAG_STAGE_MATRIX_SCAN_KEY_RUNTIME);
-    CHECK(noah_runtime_diag_test_backend_scratch(1u) == NOAH_RUNTIME_DIAG_STAGE_MATRIX_SCAN_KEY_RUNTIME);
+    CHECK(noah_runtime_diag_current_stage() == NOAH_RUNTIME_DIAG_STAGE_IDLE);
+    CHECK(noah_runtime_diag_test_backend_scratch(1u) == 0u);
 
     noah_runtime_diag_scope_leave();
     CHECK(noah_runtime_diag_current_stage() == NOAH_RUNTIME_DIAG_STAGE_IDLE);
-    CHECK(noah_runtime_diag_test_backend_scratch(1u) == NOAH_RUNTIME_DIAG_STAGE_IDLE);
+    CHECK(noah_runtime_diag_test_backend_scratch(1u) == 0u);
+
+    noah_runtime_diag_scope_leave();
+    CHECK(noah_runtime_diag_current_stage() == NOAH_RUNTIME_DIAG_STAGE_IDLE);
+    CHECK(noah_runtime_diag_test_backend_scratch(1u) == 0u);
 }
 
-static void test_heartbeat_updates_watchdog(void) {
+static void test_heartbeat_updates_watchdog_without_reboot_stage(void) {
     test_reset();
     noah_runtime_diag_post_init();
 
     CHECK(noah_runtime_diag_test_backend_watchdog_update_count() == 0u);
     noah_runtime_diag_heartbeat();
     CHECK(noah_runtime_diag_test_backend_watchdog_update_count() == 1u);
-}
-
-static void test_watchdog_reboot_latches_previous_stage(void) {
-    test_reset();
-    noah_runtime_diag_test_backend_seed_watchdog_reboot(NOAH_RUNTIME_DIAG_STAGE_MATRIX_SCAN_SPLIT_SYNC, 4u);
-
-    noah_runtime_diag_post_init();
-
-    CHECK(noah_runtime_diag_watchdog_reboot_latched());
-    CHECK(noah_runtime_diag_watchdog_stage() == NOAH_RUNTIME_DIAG_STAGE_MATRIX_SCAN_SPLIT_SYNC);
-    CHECK(noah_runtime_diag_watchdog_reboot_count() == 5u);
-    CHECK(noah_runtime_diag_indicator_active());
-    CHECK(noah_runtime_diag_test_backend_watchdog_enabled());
-    CHECK(noah_runtime_diag_test_backend_scratch(1u) == NOAH_RUNTIME_DIAG_STAGE_IDLE);
-    CHECK(noah_runtime_diag_test_backend_scratch(2u) == 5u);
+    CHECK(!noah_runtime_diag_watchdog_reboot_latched());
+    CHECK(noah_runtime_diag_watchdog_stage() == NOAH_RUNTIME_DIAG_STAGE_IDLE);
+    CHECK(noah_runtime_diag_watchdog_reboot_count() == 0u);
 }
 
 static void test_indicator_expires_after_timeout(void) {
     test_reset();
-    noah_runtime_diag_test_backend_seed_watchdog_reboot(NOAH_RUNTIME_DIAG_STAGE_RGB_RENDER, 0u);
 
     noah_runtime_diag_post_init();
     CHECK(noah_runtime_diag_indicator_active());
@@ -118,11 +107,10 @@ static void test_indicator_expires_after_timeout(void) {
 }
 
 int main(void) {
-    test_post_init_enables_watchdog_on_master();
-    test_post_init_skips_watchdog_on_slave();
-    test_nested_scopes_restore_parent_stage();
-    test_heartbeat_updates_watchdog();
-    test_watchdog_reboot_latches_previous_stage();
+    test_post_init_starts_boot_indicator_and_watchdog();
+    test_post_init_starts_boot_indicator_and_watchdog_on_slave();
+    test_scopes_are_hot_path_noops();
+    test_heartbeat_updates_watchdog_without_reboot_stage();
     test_indicator_expires_after_timeout();
 
     puts("runtime_diag host tests passed");

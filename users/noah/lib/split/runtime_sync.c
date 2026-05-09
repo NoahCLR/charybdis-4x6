@@ -21,6 +21,7 @@
 #    include "../key/runtime/feedback.h"
 #    include "../state/diagnostics/runtime_trace.h"
 #    include "runtime_sync.h"
+#    include "runtime_sync_dirty.h"
 #    include "transactions.h" // QMK
 
 split_runtime_sync_remote_t                         split_runtime_sync_remote                     = SPLIT_RUNTIME_SYNC_REMOTE_EMPTY_INIT;
@@ -159,12 +160,20 @@ static bool split_runtime_sync_heartbeat_due(bool sent_once, uint32_t last_send,
     return !sent_once || timer_elapsed32(last_send) >= heartbeat_ms;
 }
 
-static void split_runtime_sync_broadcast_base(const split_runtime_base_sync_packet_t *pkt, bool force) {
+static bool split_runtime_sync_should_build_packet(bool force, bool dirty, bool sent_once, uint32_t last_send, bool last_sent_active) {
+    if (force || dirty || last_sent_active) {
+        return true;
+    }
+
+    return split_runtime_sync_heartbeat_due(sent_once, last_send, false);
+}
+
+static bool split_runtime_sync_broadcast_base(const split_runtime_base_sync_packet_t *pkt, bool force) {
     bool unchanged = split_runtime_base_sent_once && memcmp(&split_runtime_base_last_sent, pkt, sizeof(*pkt)) == 0;
     bool active    = split_runtime_base_packet_is_active(pkt);
 
     if (!force && unchanged && !split_runtime_sync_heartbeat_due(split_runtime_base_sent_once, split_runtime_base_last_send, active)) {
-        return;
+        return true;
     }
 
     if (transaction_rpc_send(PUT_SPLIT_RUNTIME_BASE_SYNC, sizeof(*pkt), pkt)) {
@@ -172,52 +181,64 @@ static void split_runtime_sync_broadcast_base(const split_runtime_base_sync_pack
         split_runtime_base_sent_once = true;
         split_runtime_base_last_send = timer_read32();
         noah_runtime_trace_emit(NOAH_TRACE_SPLIT_SYNC, NOAH_TRACE_SPLIT_SYNC_EVENT_SEND, pd_mode_mask_from_id(pkt->active_mode_id), pd_mode_mask_from_id(pkt->locked_mode_id));
+        return true;
     }
+
+    return false;
 }
 
-static void split_runtime_sync_broadcast_combo(const split_runtime_combo_feedback_packet_t *pkt, bool force) {
+static bool split_runtime_sync_broadcast_combo(const split_runtime_combo_feedback_packet_t *pkt, bool force) {
     bool unchanged = split_runtime_combo_sent_once && memcmp(&split_runtime_combo_last_sent, pkt, sizeof(*pkt)) == 0;
     bool active    = split_runtime_combo_packet_is_active(pkt);
 
     if (!force && unchanged && !split_runtime_sync_heartbeat_due(split_runtime_combo_sent_once, split_runtime_combo_last_send, active)) {
-        return;
+        return true;
     }
 
     if (transaction_rpc_send(PUT_SPLIT_COMBO_FEEDBACK_SYNC, sizeof(*pkt), pkt)) {
         split_runtime_combo_last_sent = *pkt;
         split_runtime_combo_sent_once = true;
         split_runtime_combo_last_send = timer_read32();
+        return true;
     }
+
+    return false;
 }
 
-static void split_runtime_sync_broadcast_key_feedback_semantic(const split_runtime_key_feedback_semantic_packet_t *pkt, bool force) {
+static bool split_runtime_sync_broadcast_key_feedback_semantic(const split_runtime_key_feedback_semantic_packet_t *pkt, bool force) {
     bool unchanged = split_runtime_key_feedback_semantic_sent_once && memcmp(&split_runtime_key_feedback_semantic_last_sent, pkt, sizeof(*pkt)) == 0;
     bool active    = split_runtime_key_feedback_semantic_packet_is_active(pkt);
 
     if (!force && unchanged && !split_runtime_sync_heartbeat_due(split_runtime_key_feedback_semantic_sent_once, split_runtime_key_feedback_semantic_last_send, active)) {
-        return;
+        return true;
     }
 
     if (transaction_rpc_send(PUT_SPLIT_KEY_FEEDBACK_SEMANTIC_SYNC, sizeof(*pkt), pkt)) {
         split_runtime_key_feedback_semantic_last_sent = *pkt;
         split_runtime_key_feedback_semantic_sent_once = true;
         split_runtime_key_feedback_semantic_last_send = timer_read32();
+        return true;
     }
+
+    return false;
 }
 
-static void split_runtime_sync_broadcast_key_feedback_branch(const split_runtime_key_feedback_branch_packet_t *pkt, bool force) {
+static bool split_runtime_sync_broadcast_key_feedback_branch(const split_runtime_key_feedback_branch_packet_t *pkt, bool force) {
     bool unchanged = split_runtime_key_feedback_branch_sent_once && memcmp(&split_runtime_key_feedback_branch_last_sent, pkt, sizeof(*pkt)) == 0;
     bool active    = split_runtime_key_feedback_branch_packet_is_active(pkt);
 
     if (!force && unchanged && !split_runtime_sync_heartbeat_due(split_runtime_key_feedback_branch_sent_once, split_runtime_key_feedback_branch_last_send, active)) {
-        return;
+        return true;
     }
 
     if (transaction_rpc_send(PUT_SPLIT_KEY_FEEDBACK_BRANCH_SYNC, sizeof(*pkt), pkt)) {
         split_runtime_key_feedback_branch_last_sent = *pkt;
         split_runtime_key_feedback_branch_sent_once = true;
         split_runtime_key_feedback_branch_last_send = timer_read32();
+        return true;
     }
+
+    return false;
 }
 
 static void split_runtime_sync_slave_base_rpc(uint8_t initiator2target_buffer_size, const void *initiator2target_buffer, uint8_t target2initiator_buffer_size, void *target2initiator_buffer) {
@@ -328,6 +349,7 @@ void split_runtime_sync_init(void) {
     split_runtime_key_feedback_semantic_sent_once = false;
     split_runtime_key_feedback_branch_sent_once   = false;
     split_runtime_sync_initialized                = true;
+    split_runtime_sync_dirty_reset();
     split_runtime_base_last_send                  = timer_read32();
     split_runtime_combo_last_send                 = split_runtime_base_last_send;
     split_runtime_key_feedback_semantic_last_send = split_runtime_base_last_send;
@@ -350,24 +372,33 @@ void split_runtime_sync_tick(void) {
 }
 
 static void split_runtime_sync_elapsed_internal(uint16_t raw_elapsed, bool force) {
-    split_runtime_base_sync_packet_t             base_packet;
-    split_runtime_combo_feedback_packet_t        combo_packet;
-    split_runtime_key_feedback_semantic_packet_t key_feedback_semantic_packet;
-    split_runtime_key_feedback_branch_packet_t   key_feedback_branch_packet;
-
     if (!split_runtime_sync_initialized || !is_keyboard_master()) {
         return;
     }
 
-    base_packet                  = split_runtime_sync_build_base_packet(raw_elapsed);
-    combo_packet                 = split_runtime_sync_build_combo_packet();
-    key_feedback_semantic_packet = split_runtime_sync_build_key_feedback_semantic_packet();
-    key_feedback_branch_packet   = split_runtime_sync_build_key_feedback_branch_packet();
+    split_runtime_base_sync_packet_t base_packet = split_runtime_sync_build_base_packet(raw_elapsed);
+    (void)split_runtime_sync_broadcast_base(&base_packet, force);
 
-    split_runtime_sync_broadcast_base(&base_packet, force);
-    split_runtime_sync_broadcast_combo(&combo_packet, force);
-    split_runtime_sync_broadcast_key_feedback_semantic(&key_feedback_semantic_packet, force);
-    split_runtime_sync_broadcast_key_feedback_branch(&key_feedback_branch_packet, force);
+    if (split_runtime_sync_should_build_packet(force, split_runtime_sync_combo_is_dirty(), split_runtime_combo_sent_once, split_runtime_combo_last_send, split_runtime_combo_packet_is_active(&split_runtime_combo_last_sent))) {
+        split_runtime_combo_feedback_packet_t combo_packet = split_runtime_sync_build_combo_packet();
+        if (split_runtime_sync_broadcast_combo(&combo_packet, force)) {
+            split_runtime_sync_clear_combo_dirty();
+        }
+    }
+
+    if (split_runtime_sync_should_build_packet(force, split_runtime_sync_key_feedback_semantic_is_dirty(), split_runtime_key_feedback_semantic_sent_once, split_runtime_key_feedback_semantic_last_send, split_runtime_key_feedback_semantic_packet_is_active(&split_runtime_key_feedback_semantic_last_sent))) {
+        split_runtime_key_feedback_semantic_packet_t key_feedback_semantic_packet = split_runtime_sync_build_key_feedback_semantic_packet();
+        if (split_runtime_sync_broadcast_key_feedback_semantic(&key_feedback_semantic_packet, force)) {
+            split_runtime_sync_clear_key_feedback_semantic_dirty();
+        }
+    }
+
+    if (split_runtime_sync_should_build_packet(force, split_runtime_sync_key_feedback_branch_is_dirty(), split_runtime_key_feedback_branch_sent_once, split_runtime_key_feedback_branch_last_send, split_runtime_key_feedback_branch_packet_is_active(&split_runtime_key_feedback_branch_last_sent))) {
+        split_runtime_key_feedback_branch_packet_t key_feedback_branch_packet = split_runtime_sync_build_key_feedback_branch_packet();
+        if (split_runtime_sync_broadcast_key_feedback_branch(&key_feedback_branch_packet, force)) {
+            split_runtime_sync_clear_key_feedback_branch_dirty();
+        }
+    }
 }
 
 void split_runtime_sync_elapsed(uint16_t raw_elapsed) {

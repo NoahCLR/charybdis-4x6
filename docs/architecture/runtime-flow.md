@@ -95,7 +95,7 @@ flowchart TD
     init --> split["split/runtime_sync_tick"]
     scan --> housekeeping["housekeeping_task_user"]
     housekeeping --> repeat["Held repeat tick"]
-    housekeeping --> diag["Runtime diagnostic heartbeat"]
+    housekeeping --> diag["Watchdog refresh and boot-indicator expiry"]
 ```
 
 Scan owns time-based work: hold threshold promotion, long-hold promotion,
@@ -143,7 +143,7 @@ mode storage.
 
 ```mermaid
 flowchart TD
-    rgb_hook["rgb_matrix_indicators_advanced_user"] --> diag["Runtime diagnostic override"]
+    rgb_hook["rgb_matrix_indicators_advanced_user"] --> diag["Runtime boot indicator (150 white)"]
     diag --> base["Layer base or automouse fade"]
     base --> combo_under["Combo underlay"]
     combo_under --> preview["Key preview layer"]

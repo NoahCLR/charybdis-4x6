@@ -9,7 +9,9 @@
 // - authored key-feedback truth (semantic state + broad owner state + tap branch state)
 //
 // The master periodically re-sends each surface as a heartbeat so a rebooted
-// or rejoined half can recover even if the relevant state did not change.
+// or rejoined half can recover even if the relevant state did not change. Heavy
+// combo/key-feedback surfaces are rebuilt only while active, dirty, forced, or
+// heartbeat-due so idle scans do not spend time deriving unchanged RGB packets.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
@@ -111,6 +113,16 @@ void split_runtime_sync_init(void);
 void split_runtime_sync_tick(void);
 void split_runtime_sync_elapsed(uint16_t raw_elapsed);
 void split_runtime_sync(void);
+void split_runtime_sync_mark_combo_dirty(void);
+void split_runtime_sync_mark_key_feedback_dirty(void);
+
+static inline void split_runtime_sync_notify_combo_dirty(void) {
+    split_runtime_sync_mark_combo_dirty();
+}
+
+static inline void split_runtime_sync_notify_key_feedback_dirty(void) {
+    split_runtime_sync_mark_key_feedback_dirty();
+}
 
 #else
 
@@ -122,5 +134,9 @@ static inline void split_runtime_sync_elapsed(uint16_t raw_elapsed) {
     (void)raw_elapsed;
 }
 static inline void split_runtime_sync(void) {}
+static inline void split_runtime_sync_mark_combo_dirty(void) {}
+static inline void split_runtime_sync_mark_key_feedback_dirty(void) {}
+static inline void split_runtime_sync_notify_combo_dirty(void) {}
+static inline void split_runtime_sync_notify_key_feedback_dirty(void) {}
 
 #endif // defined(SPLIT_TRANSACTION_IDS_USER)

@@ -17,42 +17,14 @@ static rgb_runtime_frame_t rgb_runtime_frame_primary;
 
 typedef void (*rgb_runtime_stage_fn_t)(void);
 
-// Reserved watchdog reboot palette. Keep every diagnostic stage color distinct
-// within this table so a latched crash breadcrumb is unambiguous at boot.
-static rgb_t rgb_runtime_diag_stage_color(noah_runtime_diag_stage_t stage) {
-    switch (stage) {
-        case NOAH_RUNTIME_DIAG_STAGE_PROCESS_RECORD:
-            return (rgb_t){.r = 255u, .g = 24u, .b = 24u};
-        case NOAH_RUNTIME_DIAG_STAGE_PROCESS_RECORD_FINALIZE:
-            return (rgb_t){.r = 255u, .g = 64u, .b = 96u};
-        case NOAH_RUNTIME_DIAG_STAGE_LAYER_STATE_SET:
-            return (rgb_t){.r = 255u, .g = 128u, .b = 0u};
-        case NOAH_RUNTIME_DIAG_STAGE_POINTING_TASK:
-            return (rgb_t){.r = 0u, .g = 120u, .b = 255u};
-        case NOAH_RUNTIME_DIAG_STAGE_MATRIX_SCAN_VIA_DEFAULTS:
-            return (rgb_t){.r = 0u, .g = 255u, .b = 0u};
-        case NOAH_RUNTIME_DIAG_STAGE_MATRIX_SCAN_KEY_RUNTIME:
-            return (rgb_t){.r = 255u, .g = 0u, .b = 196u};
-        case NOAH_RUNTIME_DIAG_STAGE_MATRIX_SCAN_SPLIT_SYNC:
-            return (rgb_t){.r = 0u, .g = 255u, .b = 255u};
-        case NOAH_RUNTIME_DIAG_STAGE_RGB_RENDER:
-            return (rgb_t){.r = 255u, .g = 255u, .b = 0u};
-        case NOAH_RUNTIME_DIAG_STAGE_HOUSEKEEPING:
-            return (rgb_t){.r = 0u, .g = 255u, .b = 96u};
-        case NOAH_RUNTIME_DIAG_STAGE_POST_INIT:
-            return (rgb_t){.r = 160u, .g = 80u, .b = 255u};
-        case NOAH_RUNTIME_DIAG_STAGE_IDLE:
-        default:
-            return (rgb_t){.r = 160u, .g = 160u, .b = 160u};
-    }
-}
+#    define RGB_RUNTIME_BOOT_INDICATOR_WHITE 150u
 
 static bool rgb_runtime_render_runtime_diag_stage(uint8_t led_min, uint8_t led_max) {
     if (!noah_runtime_diag_indicator_active()) {
         return false;
     }
 
-    rgb_set_both_halves(rgb_runtime_diag_stage_color(noah_runtime_diag_watchdog_stage()), led_min, led_max);
+    rgb_set_both_halves((rgb_t){.r = RGB_RUNTIME_BOOT_INDICATOR_WHITE, .g = RGB_RUNTIME_BOOT_INDICATOR_WHITE, .b = RGB_RUNTIME_BOOT_INDICATOR_WHITE}, led_min, led_max);
     return true;
 }
 

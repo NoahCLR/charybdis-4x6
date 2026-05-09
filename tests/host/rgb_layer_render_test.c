@@ -72,33 +72,7 @@ static pd_mode_mask_t    fake_pd_locked_mode = 0;
 static split_side_mask_t fake_pd_owner_sides = SPLIT_SIDE_MASK_NONE;
 static uint8_t           fake_pd_owner_bitmap[KEY_ORIGIN_BITMAP_SIZE];
 
-static rgb_t test_runtime_diag_stage_rgb(noah_runtime_diag_stage_t stage) {
-    switch (stage) {
-        case NOAH_RUNTIME_DIAG_STAGE_PROCESS_RECORD:
-            return (rgb_t){.r = 255u, .g = 24u, .b = 24u};
-        case NOAH_RUNTIME_DIAG_STAGE_PROCESS_RECORD_FINALIZE:
-            return (rgb_t){.r = 255u, .g = 64u, .b = 96u};
-        case NOAH_RUNTIME_DIAG_STAGE_LAYER_STATE_SET:
-            return (rgb_t){.r = 255u, .g = 128u, .b = 0u};
-        case NOAH_RUNTIME_DIAG_STAGE_POINTING_TASK:
-            return (rgb_t){.r = 0u, .g = 120u, .b = 255u};
-        case NOAH_RUNTIME_DIAG_STAGE_MATRIX_SCAN_VIA_DEFAULTS:
-            return (rgb_t){.r = 0u, .g = 255u, .b = 0u};
-        case NOAH_RUNTIME_DIAG_STAGE_MATRIX_SCAN_KEY_RUNTIME:
-            return (rgb_t){.r = 255u, .g = 0u, .b = 196u};
-        case NOAH_RUNTIME_DIAG_STAGE_MATRIX_SCAN_SPLIT_SYNC:
-            return (rgb_t){.r = 0u, .g = 255u, .b = 255u};
-        case NOAH_RUNTIME_DIAG_STAGE_RGB_RENDER:
-            return (rgb_t){.r = 255u, .g = 255u, .b = 0u};
-        case NOAH_RUNTIME_DIAG_STAGE_HOUSEKEEPING:
-            return (rgb_t){.r = 0u, .g = 255u, .b = 96u};
-        case NOAH_RUNTIME_DIAG_STAGE_POST_INIT:
-            return (rgb_t){.r = 160u, .g = 80u, .b = 255u};
-        case NOAH_RUNTIME_DIAG_STAGE_IDLE:
-        default:
-            return (rgb_t){.r = 160u, .g = 160u, .b = 160u};
-    }
-}
+static const rgb_t test_runtime_boot_indicator_rgb = {.r = 150u, .g = 150u, .b = 150u};
 
 ws2812_led_t                ws2812_leds[WS2812_LED_COUNT];
 split_runtime_sync_remote_t split_runtime_sync_remote = SPLIT_RUNTIME_SYNC_REMOTE_EMPTY_INIT;
@@ -558,10 +532,6 @@ static void check_led(uint8_t index, rgb_t expected) {
     CHECK(led_output[index].r == expected.r);
     CHECK(led_output[index].g == expected.g);
     CHECK(led_output[index].b == expected.b);
-}
-
-static bool rgb_equal(rgb_t lhs, rgb_t rhs) {
-    return lhs.r == rhs.r && lhs.g == rhs.g && lhs.b == rhs.b;
 }
 
 static bool render_output(void) {
@@ -1369,7 +1339,7 @@ static void test_render_order_base_then_preview_then_pd_mode_then_feedback(void)
 }
 #endif
 
-static void test_runtime_diag_overlay_overrides_scene(void) {
+static void test_runtime_boot_indicator_overrides_scene(void) {
     test_reset();
 
     test_keymap[LAYER_NUM][0][0] = 0x0020u;
@@ -1379,33 +1349,12 @@ static void test_runtime_diag_overlay_overrides_scene(void) {
     test_local_feedback_semantic_add(0, 0, KEY_FEEDBACK_SEMANTIC_UNRESOLVED_TAP_BRANCH);
     fake_pd_active_mode = PD_MODE_VOLUME;
 
-    noah_runtime_diag_test_backend_seed_watchdog_reboot(NOAH_RUNTIME_DIAG_STAGE_POINTING_TASK, 0u);
     noah_runtime_diag_post_init();
 
     CHECK(render_output());
 
     for (uint8_t led = 0; led < RGB_MATRIX_LED_COUNT; led++) {
-        check_led(led, test_runtime_diag_stage_rgb(NOAH_RUNTIME_DIAG_STAGE_POINTING_TASK));
-    }
-}
-
-static void test_runtime_diag_stage_palette_is_unique(void) {
-    static const noah_runtime_diag_stage_t stages[] = {
-        NOAH_RUNTIME_DIAG_STAGE_IDLE, NOAH_RUNTIME_DIAG_STAGE_PROCESS_RECORD, NOAH_RUNTIME_DIAG_STAGE_PROCESS_RECORD_FINALIZE, NOAH_RUNTIME_DIAG_STAGE_LAYER_STATE_SET, NOAH_RUNTIME_DIAG_STAGE_POINTING_TASK, NOAH_RUNTIME_DIAG_STAGE_MATRIX_SCAN_VIA_DEFAULTS, NOAH_RUNTIME_DIAG_STAGE_MATRIX_SCAN_KEY_RUNTIME, NOAH_RUNTIME_DIAG_STAGE_MATRIX_SCAN_SPLIT_SYNC, NOAH_RUNTIME_DIAG_STAGE_RGB_RENDER, NOAH_RUNTIME_DIAG_STAGE_HOUSEKEEPING, NOAH_RUNTIME_DIAG_STAGE_POST_INIT,
-    };
-    const uint8_t stage_count = (uint8_t)(sizeof(stages) / sizeof(stages[0]));
-
-    for (uint8_t lhs_index = 0; lhs_index < stage_count; lhs_index++) {
-        for (uint8_t rhs_index = (uint8_t)(lhs_index + 1u); rhs_index < stage_count; rhs_index++) {
-            rgb_t lhs = test_runtime_diag_stage_rgb(stages[lhs_index]);
-            rgb_t rhs = test_runtime_diag_stage_rgb(stages[rhs_index]);
-
-            if (rgb_equal(lhs, rhs)) {
-                fprintf(stderr, "duplicate watchdog stage colors for %u and %u: (%u,%u,%u)\n", (unsigned int)stages[lhs_index], (unsigned int)stages[rhs_index], (unsigned int)lhs.r, (unsigned int)lhs.g, (unsigned int)lhs.b);
-            }
-
-            CHECK(!rgb_equal(lhs, rhs));
-        }
+        check_led(led, test_runtime_boot_indicator_rgb);
     }
 }
 
@@ -2018,8 +1967,7 @@ int main(void) {
 #if !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY_HALF && !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY && !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_LEFT_HALF && !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_RIGHT_HALF
     test_render_order_base_then_preview_then_pd_mode_then_feedback();
 #endif
-    test_runtime_diag_overlay_overrides_scene();
-    test_runtime_diag_stage_palette_is_unique();
+    test_runtime_boot_indicator_overrides_scene();
 #if !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY_HALF && !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY && !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_LEFT_HALF && !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_RIGHT_HALF
     test_multi_tap_pending_feedback_overrides_preview_and_pd_mode();
     test_hold_pending_feedback_overrides_preview_and_pd_mode();

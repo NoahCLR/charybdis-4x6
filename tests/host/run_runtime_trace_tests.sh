@@ -42,6 +42,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/state/shared/runtime_shared_state.c" \
     "$ROOT/users/noah/lib/state/diagnostics/runtime_trace.c" \
     "$ROOT/users/noah/lib/key/runtime/trace/core_trace.c" \
+    "$ROOT/users/noah/lib/split/runtime_sync_dirty.c" \
     "$ROOT/users/noah/lib/split/runtime_sync.c" \
     "$ROOT/tests/host/key_runtime_core_state_unit_stub.c" \
     -o "$BIN"

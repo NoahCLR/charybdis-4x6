@@ -10,6 +10,7 @@
 #include "planning/effect_plan.h"
 #include "projection/projection.h"
 #include "reducer/runtime.h"
+#include "../../split/runtime_sync.h"
 #include "../../state/modifiers/keyboard_mod_policy.h"
 
 enum {
@@ -125,6 +126,10 @@ void key_runtime_transition_plan_init(key_runtime_transition_plan_t *plan) {
 }
 
 void key_runtime_transition_execute_plan(const key_runtime_transition_plan_t *plan) {
+    if (plan && plan->count != 0u) {
+        split_runtime_sync_notify_key_feedback_dirty();
+    }
+
     key_runtime_transition_plan_project_items(plan);
 }
 

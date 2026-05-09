@@ -7,6 +7,7 @@
 #if defined(COMBO_ENABLE)
 
 #    include "noah_keymap_ids.h"
+#    include "../split/runtime_sync.h"
 
 #    ifndef COMBO_ONLY_FROM_LAYER
 uint8_t combo_ref_from_layer(uint8_t layer);
@@ -535,6 +536,8 @@ void noah_qmk_combo_origin_observe_physical_key_event(uint16_t keycode, keyrecor
     if (!(record && key_origin_keypos_valid(record->event.key))) {
         return;
     }
+
+    split_runtime_sync_notify_combo_dirty();
 
     entry = &physical_key_states[key_origin_keypos_index(record->event.key)];
     if (record->event.pressed) {

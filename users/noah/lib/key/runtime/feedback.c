@@ -9,6 +9,7 @@
 #include "../behavior/handled_key_policy.h"
 #include "../behavior/key_behavior_lookup.h"
 #include "../../compat/qmk_combo_origin.h"
+#include "../../split/runtime_sync.h"
 #include "reducer/ownership_state.h"
 #include "reducer/state_query.h"
 
@@ -274,6 +275,7 @@ void key_feedback_pulse_arm(key_feedback_pulse_kind_t kind) {
     state->feedback_pulse_tap_branch      = 0u;
     state->feedback_pulse_queued          = false;
     state->feedback_pulse_queued_sequence = 0u;
+    split_runtime_sync_notify_key_feedback_dirty();
 }
 
 static bool key_feedback_pulse_active(void) {
