@@ -58,6 +58,17 @@
 
 #endif // SPLIT_KEYBOARD
 
+// ─── Matrix scan ───────────────────────────────────────────────────────────
+//
+// QMK's default matrix settle delay is 30 us after every selected column. On
+// this ROW2COL 4x6 half that is six waits per scan, so it dominates a fixed
+// part of the main loop. RP2040 GPIO settles much faster than the legacy
+// default; keep a smaller explicit delay for diode/matrix stability.
+#ifdef MATRIX_IO_DELAY
+#    undef MATRIX_IO_DELAY
+#endif
+#define MATRIX_IO_DELAY 10
+
 // ─── RGB hardware geometry ──────────────────────────────────────────────────
 
 #ifdef RGB_MATRIX_ENABLE

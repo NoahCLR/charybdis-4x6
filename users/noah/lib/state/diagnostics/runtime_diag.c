@@ -16,6 +16,14 @@
 #    define NOAH_RUNTIME_DIAG_WATCHDOG_TIMEOUT_MS 750u
 #endif
 
+#ifndef NOAH_RUNTIME_DIAG_WATCHDOG_HEARTBEAT_DIVISOR
+#    define NOAH_RUNTIME_DIAG_WATCHDOG_HEARTBEAT_DIVISOR 8u
+#endif
+
+#if NOAH_RUNTIME_DIAG_WATCHDOG_HEARTBEAT_DIVISOR == 0
+#    error "NOAH_RUNTIME_DIAG_WATCHDOG_HEARTBEAT_DIVISOR must be greater than zero"
+#endif
+
 #ifndef NOAH_RUNTIME_DIAG_INDICATOR_MS
 #    define NOAH_RUNTIME_DIAG_INDICATOR_MS 5000u
 #endif
@@ -23,6 +31,7 @@
 typedef struct {
     bool     watchdog_enabled;
     bool     indicator_active;
+    uint32_t watchdog_heartbeat_count;
     uint32_t indicator_started_at;
 } noah_runtime_diag_state_t;
 
@@ -83,7 +92,19 @@ static void noah_runtime_diag_enable_watchdog_if_needed(void) {
     }
 
     noah_runtime_diag_backend_watchdog_enable();
-    noah_runtime_diag_state.watchdog_enabled = true;
+    noah_runtime_diag_state.watchdog_enabled         = true;
+    noah_runtime_diag_state.watchdog_heartbeat_count = NOAH_RUNTIME_DIAG_WATCHDOG_HEARTBEAT_DIVISOR - 1u;
+}
+
+static bool noah_runtime_diag_watchdog_heartbeat_due(void) {
+    noah_runtime_diag_state.watchdog_heartbeat_count++;
+
+    if (noah_runtime_diag_state.watchdog_heartbeat_count < NOAH_RUNTIME_DIAG_WATCHDOG_HEARTBEAT_DIVISOR) {
+        return false;
+    }
+
+    noah_runtime_diag_state.watchdog_heartbeat_count = 0u;
+    return true;
 }
 
 void noah_runtime_diag_post_init(void) {
@@ -101,7 +122,7 @@ void noah_runtime_diag_scope_leave(void) {
 
 void noah_runtime_diag_heartbeat(void) {
     noah_runtime_diag_refresh_indicator();
-    if (noah_runtime_diag_state.watchdog_enabled) {
+    if (noah_runtime_diag_state.watchdog_enabled && noah_runtime_diag_watchdog_heartbeat_due()) {
         noah_runtime_diag_backend_watchdog_update();
     }
 }

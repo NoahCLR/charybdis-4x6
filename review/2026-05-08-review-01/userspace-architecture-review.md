@@ -21,6 +21,8 @@ The requested behavior change is intentionally narrow:
   changing authored key behavior or pointing mode semantics.
 - Reduce normal pointer-report overhead in the idle-noise filter and QMK
   pointing throttle path.
+- Reduce fixed master main-loop overhead from local matrix scan timing and
+  watchdog refresh cadence.
 - Remove inert diagnostic scope calls from continuous scan, pointer, RGB, and
   housekeeping paths while preserving watchdog heartbeat behavior.
 - Reduce idle housekeeping and split-sync helper work that does not affect
@@ -48,10 +50,14 @@ targeted host runners, full host suite, and noah firmware compile listed in
 `users/noah/lib/state/diagnostics/runtime_diag.c` is now a minimal restart
 watchdog and boot-indicator surface. `noah_runtime_diag_post_init()` enables
 the RP2040 hardware watchdog and starts the indicator every time the runtime
-initializes. `noah_runtime_diag_heartbeat()` refreshes the watchdog from
-housekeeping. RGB renders the boot indicator by converting `HSV(0,0,150)` with
-the same `hsv_to_rgb()` path used by authored RGB config, then applying that
-full-board override for `NOAH_RUNTIME_DIAG_INDICATOR_MS`.
+initializes. `noah_runtime_diag_heartbeat()` still runs from housekeeping, but
+it refreshes the hardware watchdog on a loop-count cadence instead of writing
+the watchdog register on every pass. The first heartbeat after init refreshes
+the watchdog immediately, then subsequent updates run every
+`NOAH_RUNTIME_DIAG_WATCHDOG_HEARTBEAT_DIVISOR` housekeeping passes. RGB renders
+the boot indicator by converting `HSV(0,0,150)` with the same `hsv_to_rgb()`
+path used by authored RGB config, then applying that full-board override for
+`NOAH_RUNTIME_DIAG_INDICATOR_MS`.
 
 The public diagnostic scope and watchdog query functions remain present for
 existing call sites and host tests, but they no longer write RP2040 watchdog
@@ -59,6 +65,14 @@ scratch registers or report a latched reboot stage. Scope enter/leave are
 inert compatibility hooks. Continuous runtime paths no longer call those inert
 scope hooks; watchdog refresh still runs from `noah_runtime_diag_heartbeat()`
 in housekeeping.
+
+### Matrix Scan Timing
+
+`users/noah/config.h` now owns a Charybdis-specific `MATRIX_IO_DELAY` of 10 us.
+The upstream QMK default is 30 us after every selected column; on this ROW2COL
+4x6 half that means six fixed waits per local scan. The override keeps an
+explicit settle delay for diode/matrix stability while trimming roughly 120 us
+of fixed delay from every main-loop pass on the master half.
 
 ### Split Runtime Sync
 
@@ -148,7 +162,10 @@ unbounded backlog.
 ## Contracts
 
 - Runtime diagnostics owns only minimal watchdog restart behavior: enable once
-  at post-init and update from housekeeping.
+  at post-init and update from housekeeping on the configured loop-count
+  cadence.
+- The first watchdog heartbeat after runtime init must refresh the watchdog;
+  later idle heartbeats must skip most per-loop watchdog writes.
 - The supported visible behavior is an `HSV(0,0,150)` white boot indicator
   after every runtime initialization.
 - Diagnostic watchdog query APIs are compatibility APIs and must report idle /
@@ -169,7 +186,10 @@ unbounded backlog.
   the heartbeat window.
 - Continuous scan, pointing, RGB, post-init, and housekeeping paths must not
   call inert diagnostic scope hooks.
-- Housekeeping must still refresh the runtime watchdog.
+- Housekeeping must still refresh the runtime watchdog often enough for hard
+  freezes to reset the RP2040 under the 750 ms watchdog timeout.
+- `MATRIX_IO_DELAY` is a userspace-owned Charybdis hardware tuning knob and is
+  expected to remain visible in the generated keymap overview.
 - Dirty notifications must be available to key-runtime code even when a host
   test defines `SPLIT_TRANSACTION_IDS_USER` but does not link
   `runtime_sync.c`.
@@ -196,7 +216,7 @@ unbounded backlog.
 Expected coverage for this thread:
 
 - `run_runtime_diag_tests.sh` covers watchdog enable/update without reboot-stage
-  diagnostics plus boot-indicator expiry.
+  diagnostics, skipped per-loop watchdog writes, and boot-indicator expiry.
 - `run_rgb_layer_render_tests.sh` covers the full-white boot indicator render
   override.
 - `run_split_runtime_sync_tests.sh` covers immediate combo feedback, idle

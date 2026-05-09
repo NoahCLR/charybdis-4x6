@@ -446,6 +446,7 @@ These values come from the keymap config and the shared userspace config. When t
 | `SPLIT_ACTIVITY_ENABLE` | `defined` | [users/noah/config.h](../users/noah/config.h) |
 | `SPLIT_TRANSACTION_IDS_USER` | `PUT_SPLIT_RUNTIME_BASE_SYNC,PUT_SPLIT_COMBO_FEEDBACK_SYNC,PUT_SPLIT_KEY_FEEDBACK_SEMANTIC_SYNC,PUT_SPLIT_KEY_FEEDBACK_BRANCH_SYNC,PUT_VIA_KEYMAP_SYNC` | [users/noah/config.h](../users/noah/config.h) |
 | `RGB_PD_MODE_ACTIVE_HALF_ENABLE` | `defined` | [users/noah/config.h](../users/noah/config.h) |
+| `MATRIX_IO_DELAY` | `10` | [users/noah/config.h](../users/noah/config.h) |
 | `RGB_MATRIX_LED_COUNT` | `58` | [users/noah/config.h](../users/noah/config.h) |
 | `RGB_MATRIX_SPLIT` | `{29,29}` | [users/noah/config.h](../users/noah/config.h) |
 | `POINTING_DEVICE_TASK_THROTTLE_MS` | `0` | [users/noah/config.h](../users/noah/config.h) |

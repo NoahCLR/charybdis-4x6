@@ -96,6 +96,22 @@ static void test_heartbeat_updates_watchdog_without_reboot_stage(void) {
     CHECK(noah_runtime_diag_watchdog_reboot_count() == 0u);
 }
 
+static void test_watchdog_heartbeat_skips_most_loop_passes(void) {
+    test_reset();
+    noah_runtime_diag_post_init();
+
+    noah_runtime_diag_heartbeat();
+    CHECK(noah_runtime_diag_test_backend_watchdog_update_count() == 1u);
+
+    for (uint8_t i = 0u; i < 7u; i++) {
+        noah_runtime_diag_heartbeat();
+    }
+    CHECK(noah_runtime_diag_test_backend_watchdog_update_count() == 1u);
+
+    noah_runtime_diag_heartbeat();
+    CHECK(noah_runtime_diag_test_backend_watchdog_update_count() == 2u);
+}
+
 static void test_indicator_expires_after_timeout(void) {
     test_reset();
 
@@ -111,6 +127,7 @@ int main(void) {
     test_post_init_starts_boot_indicator_and_watchdog_on_slave();
     test_scopes_are_hot_path_noops();
     test_heartbeat_updates_watchdog_without_reboot_stage();
+    test_watchdog_heartbeat_skips_most_loop_passes();
     test_indicator_expires_after_timeout();
 
     puts("runtime_diag host tests passed");

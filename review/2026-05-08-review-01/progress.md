@@ -130,6 +130,15 @@ Re-run after restoring immediate combo feedback:
   instead of building a full PD mode snapshot.
 - Added held-repeat idle coverage and split-sync coverage for skipped idle PD
   owner bitmap snapshots.
+- Shifted the current investigation away from split-sync special casing and
+  back to fixed master main-loop costs.
+- Lowered `MATRIX_IO_DELAY` from QMK's 30 us default to 10 us for the local
+  ROW2COL 4x6 scan.
+- Changed runtime diagnostics so the RP2040 watchdog still refreshes from
+  housekeeping, but only every 8 housekeeping passes after the immediate first
+  heartbeat refresh.
+- Added runtime diagnostic coverage for skipped per-loop watchdog writes.
+- Regenerated the profile overview after adding the matrix scan timing knob.
 
 ### In Flight
 
@@ -208,6 +217,19 @@ Passed for the pointer-task optimization pass so far:
 - `sh tests/host/run_pointer_layer_policy_tests.sh`
 - `sh tests/host/run_split_runtime_sync_tests.sh`
 - `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `git diff --check`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Passed for the master-loop fixed-overhead pass:
+
+- `sh tests/host/run_runtime_diag_tests.sh`
+- `sh tests/host/run_runtime_init_order_tests.sh`
+- `python3 tools/profile_introspect.py --write`
+- `python3 tools/profile_introspect.py --check`
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_runtime_trace_tests.sh`
 - `sh tests/host/run_feature_gate_compile_tests.sh`
 - `git diff --check`
 - `sh tests/host/run_all_host_tests.sh`
