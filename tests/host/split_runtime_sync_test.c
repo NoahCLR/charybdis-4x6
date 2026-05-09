@@ -474,6 +474,29 @@ static void test_tick_sends_only_combo_packet_when_only_combo_feedback_changes(v
     CHECK(rpc_last_combo_packet.combo_underlay_bitmap[0] == 0x01u);
 }
 
+static void test_idle_combo_feedback_activation_sends_without_dirty_notification(void) {
+    test_reset_stubs();
+    test_set_idle_runtime_state();
+
+    split_runtime_sync_init();
+    test_reset_rpc_send_counts();
+    test_reset_builder_counts();
+
+    fake_combo_underlay_bitmap[0] = 0x02u;
+
+    split_runtime_sync_tick();
+
+    CHECK(combo_underlay_read_count == 1u);
+    CHECK(combo_overlay_read_count == 1u);
+    CHECK(rpc_send_count == 1u);
+    CHECK(rpc_send_count_base == 0u);
+    CHECK(rpc_send_count_combo == 1u);
+    CHECK(rpc_send_count_key_feedback_semantic == 0u);
+    CHECK(rpc_send_count_key_feedback_branch == 0u);
+    CHECK(rpc_last_send_id == PUT_SPLIT_COMBO_FEEDBACK_SYNC);
+    CHECK(rpc_last_combo_packet.combo_underlay_bitmap[0] == 0x02u);
+}
+
 static void test_tick_sends_only_key_feedback_packet_when_only_key_feedback_changes(void) {
     test_reset_stubs();
 
@@ -575,7 +598,7 @@ static void test_idle_packets_use_idle_heartbeat(void) {
     CHECK(rpc_send_count_key_feedback_branch == 1u);
 }
 
-static void test_idle_tick_skips_heavy_packet_builders_until_due_or_dirty(void) {
+static void test_idle_tick_keeps_combo_immediate_and_skips_key_feedback_builders_until_due_or_dirty(void) {
     test_reset_stubs();
     test_set_idle_runtime_state();
 
@@ -587,8 +610,8 @@ static void test_idle_tick_skips_heavy_packet_builders_until_due_or_dirty(void) 
     split_runtime_sync_tick();
 
     CHECK(rpc_send_count == 0u);
-    CHECK(combo_underlay_read_count == 0u);
-    CHECK(combo_overlay_read_count == 0u);
+    CHECK(combo_underlay_read_count == 1u);
+    CHECK(combo_overlay_read_count == 1u);
     CHECK(key_feedback_semantic_read_count == 0u);
     CHECK(key_feedback_flash_visibility_read_count == 0u);
     CHECK(key_feedback_broad_owner_read_count == 0u);
@@ -602,13 +625,15 @@ static void test_idle_tick_skips_heavy_packet_builders_until_due_or_dirty(void) 
     CHECK(key_feedback_flash_visibility_read_count == 1u);
     CHECK(key_feedback_broad_owner_read_count == 1u);
     CHECK(key_feedback_tap_branch_read_count == 1u);
+    CHECK(combo_underlay_read_count == 2u);
+    CHECK(combo_overlay_read_count == 2u);
 
     split_runtime_sync_mark_combo_dirty();
     split_runtime_sync_tick();
 
     CHECK(rpc_send_count == 0u);
-    CHECK(combo_underlay_read_count == 1u);
-    CHECK(combo_overlay_read_count == 1u);
+    CHECK(combo_underlay_read_count == 3u);
+    CHECK(combo_overlay_read_count == 3u);
 }
 
 static void test_slave_rpcs_apply_exact_remote_state(void) {
@@ -700,6 +725,7 @@ int main(void) {
     test_locked_pd_mode_zeroes_automouse_progress();
     test_tick_sends_only_base_packet_when_only_automouse_changes();
     test_tick_sends_only_combo_packet_when_only_combo_feedback_changes();
+    test_idle_combo_feedback_activation_sends_without_dirty_notification();
     test_tick_sends_only_key_feedback_packet_when_only_key_feedback_changes();
     test_tick_sends_only_key_feedback_branch_packet_when_only_tap_branch_changes();
     test_tick_sends_only_key_feedback_branch_packet_when_only_broad_owner_changes();
@@ -707,7 +733,7 @@ int main(void) {
     test_tick_sends_base_packet_when_only_pd_owner_bitmap_changes();
 #endif
     test_idle_packets_use_idle_heartbeat();
-    test_idle_tick_skips_heavy_packet_builders_until_due_or_dirty();
+    test_idle_tick_keeps_combo_immediate_and_skips_key_feedback_builders_until_due_or_dirty();
     test_slave_rpcs_apply_exact_remote_state();
     test_slave_base_rpc_ignores_short_packets();
 

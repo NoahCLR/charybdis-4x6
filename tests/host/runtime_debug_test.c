@@ -754,6 +754,50 @@ static void test_reset_clears_all_runtime_surfaces(void) {
     CHECK(send_keyboard_report_count >= 2);
 }
 
+static void test_key_runtime_scan_skips_core_work_when_idle(void) {
+    key_runtime_core_state_t *state;
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+
+    state = key_runtime_core_state();
+    CHECK(state != NULL);
+    CHECK(state->current_time == 0u);
+
+    fake_time = (uint16_t)(fake_time + 42u);
+    noah_key_runtime_scan();
+
+    CHECK(state->current_time == 0u);
+    CHECK(noah_runtime_debug_active_slot_count() == 0u);
+    CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 0u);
+    CHECK(delayed_action_count == 0u);
+}
+
+static void test_key_runtime_scan_drains_pending_release_without_core_work(void) {
+    key_runtime_core_state_t *state;
+    keypos_t                 key_pos = test_keypos(2, 5);
+    keyboard_mod_state_t     mods    = {
+        .real = MOD_BIT(KC_LEFT_SHIFT),
+    };
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+
+    state = key_runtime_core_state();
+    CHECK(state != NULL);
+    CHECK(key_runtime_core_queue_pending_release_dispatch_for_owner(key_pos, TEST_ACTION, mods, false, 0u));
+    CHECK(key_runtime_core_pending_release_count() == 1u);
+
+    fake_time = (uint16_t)(fake_time + 42u);
+    noah_key_runtime_scan();
+
+    CHECK(state->current_time == 0u);
+    CHECK(key_runtime_core_pending_release_count() == 0u);
+    CHECK(delayed_action_count == 1u);
+    CHECK(last_delayed_action == TEST_ACTION);
+    CHECK(last_delayed_mods.real == mods.real);
+}
+
 static void test_display_preview_bridges_momentary_layer_handoff_briefly(void) {
     keypos_t key_pos     = test_keypos(0, 0);
     keypos_t preview_pos = (keypos_t){0};
@@ -2451,6 +2495,8 @@ int main(void) {
     test_debug_reports_slot_phase_and_momentary_layer_interrupt_state();
     test_snapshot_captures_cross_subsystem_runtime_state();
     test_reset_clears_all_runtime_surfaces();
+    test_key_runtime_scan_skips_core_work_when_idle();
+    test_key_runtime_scan_drains_pending_release_without_core_work();
     test_display_preview_bridges_momentary_layer_handoff_briefly();
     test_display_preview_bridge_clears_immediately_when_layer_releases();
     test_key_runtime_core_release_tracks_press_by_position_despite_keycode_mismatch();

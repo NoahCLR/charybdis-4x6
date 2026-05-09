@@ -379,11 +379,9 @@ static void split_runtime_sync_elapsed_internal(uint16_t raw_elapsed, bool force
     split_runtime_base_sync_packet_t base_packet = split_runtime_sync_build_base_packet(raw_elapsed);
     (void)split_runtime_sync_broadcast_base(&base_packet, force);
 
-    if (split_runtime_sync_should_build_packet(force, split_runtime_sync_combo_is_dirty(), split_runtime_combo_sent_once, split_runtime_combo_last_send, split_runtime_combo_packet_is_active(&split_runtime_combo_last_sent))) {
-        split_runtime_combo_feedback_packet_t combo_packet = split_runtime_sync_build_combo_packet();
-        if (split_runtime_sync_broadcast_combo(&combo_packet, force)) {
-            split_runtime_sync_clear_combo_dirty();
-        }
+    split_runtime_combo_feedback_packet_t combo_packet = split_runtime_sync_build_combo_packet();
+    if (split_runtime_sync_broadcast_combo(&combo_packet, force)) {
+        split_runtime_sync_clear_combo_dirty();
     }
 
     if (split_runtime_sync_should_build_packet(force, split_runtime_sync_key_feedback_semantic_is_dirty(), split_runtime_key_feedback_semantic_sent_once, split_runtime_key_feedback_semantic_last_send, split_runtime_key_feedback_semantic_packet_is_active(&split_runtime_key_feedback_semantic_last_sent))) {

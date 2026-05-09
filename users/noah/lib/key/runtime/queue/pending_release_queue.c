@@ -262,7 +262,11 @@ uint8_t key_runtime_core_take_pending_release_dispatches(pending_release_t *out,
     key_runtime_core_state_t *state = key_runtime_core_state();
     uint8_t                   count = 0;
 
-    if (!(state && out && capacity != 0u) || key_runtime_core_deferred_release_blocker_count() != 0u) {
+    if (!(state && out && capacity != 0u) || state->pending_release_count == 0u) {
+        return 0u;
+    }
+
+    if (state->press_token_count != 0u && key_runtime_core_deferred_release_blocker_count() != 0u) {
         return 0u;
     }
 

@@ -47,9 +47,19 @@ void key_runtime_deferred_release_defer_dispatch_actions_until_release(keypos_t 
     plan->count = write_index;
 }
 
+bool key_runtime_deferred_release_has_pending_dispatches(void) {
+    return key_runtime_core_pending_release_count() != 0u;
+}
+
 void key_runtime_deferred_release_drain_dispatches(void) {
     pending_release_t pending[KEY_RUNTIME_CORE_PENDING_RELEASE_CAPACITY];
-    uint8_t           drained = key_runtime_core_take_pending_release_dispatches(pending, ARRAY_SIZE(pending));
+    uint8_t           drained;
+
+    if (!key_runtime_deferred_release_has_pending_dispatches()) {
+        return;
+    }
+
+    drained = key_runtime_core_take_pending_release_dispatches(pending, ARRAY_SIZE(pending));
 
     for (uint8_t index = 0; index < drained; index++) {
         key_runtime_core_project_pending_release_dispatch(&pending[index]);

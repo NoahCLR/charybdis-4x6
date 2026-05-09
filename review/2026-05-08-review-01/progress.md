@@ -16,8 +16,8 @@ The current work is a post-closure runtime thread.
   instead of per-stage reboot colors.
 - Added split runtime sync dirty state in
   `users/noah/lib/split/runtime_sync_dirty.c`.
-- Gated combo and key-feedback split packet building so idle clean scans skip
-  the heavy bitmap/map derivation until forced, dirty, active, or heartbeat-due.
+- Gated key-feedback split packet building so idle clean scans skip the heavy
+  semantic/branch map derivation until forced, dirty, active, or heartbeat-due.
 - Added dirty notifications from combo origin observation, key-runtime scan
   state, transition plans, and feedback pulse paths.
 - Wired the new dirty-state source into the userspace source manifest and the
@@ -52,6 +52,14 @@ Passed so far:
 - `sh tests/host/run_all_host_tests.sh`
 - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
 
+Re-run after restoring immediate combo feedback:
+
+- `sh tests/host/run_split_runtime_sync_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `git diff --check`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
 ### Next Steps
 
 1. Measure firmware loop/report rates on hardware.
@@ -73,6 +81,25 @@ Passed so far:
   that white as HSV and convert through `hsv_to_rgb()`.
 - Updated runtime diagnostic and RGB render tests for the restored watchdog
   restart contract and capped white indicator.
+- Gated `noah_key_runtime_scan()` so idle scans with no active press tokens and
+  no pending multi-tap series skip transition-plan allocation, timer-driven
+  core refresh, scan tracing, and empty plan execution.
+- Kept pending release dispatches draining when key-runtime core work is idle
+  by adding a pending-dispatch query to the deferred-release adapter.
+- Avoided the deferred-release blocker scan when there are no pending releases,
+  and only checked blockers when active press tokens could block the queue.
+- Optimized normal pointer reports so they read the local active PD mode
+  directly and skip full PD snapshots and registry lookups unless a local mode
+  is active.
+- Removed the temporary delta array from idle-noise absolute-motion
+  calculation.
+- Added runtime-debug coverage for idle key-runtime scan gating and pending
+  release drains without active core work.
+- Restored per-tick combo feedback packet building so idle-to-active combo RGB
+  feedback is immediate again while unchanged combo packets still avoid
+  transport sends until heartbeat.
+- Added split-sync coverage for idle-to-active combo feedback without relying
+  on a dirty notification.
 
 ### In Flight
 
@@ -80,13 +107,32 @@ Passed so far:
 
 ### Verification
 
-Passed:
+Passed for the watchdog / HSV pass:
 
 - `sh tests/host/run_runtime_diag_tests.sh`
 - `sh tests/host/run_rgb_layer_render_tests.sh`
 - `sh tests/host/run_runtime_init_order_tests.sh`
 - `sh tests/host/run_runtime_debug_tests.sh`
 - `sh tests/host/run_runtime_trace_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `git diff --check`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+Passed for the optimization pass:
+
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_pd_runtime_tests.sh`
+- `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_key_runtime_integration_harness_tests.sh`
+- `sh tests/host/run_pd_mode_tests.sh`
+- `sh tests/host/run_pd_mode_handlers_tests.sh`
+- `sh tests/host/run_pointer_layer_policy_tests.sh`
+- `sh tests/host/run_split_runtime_sync_tests.sh`
 - `sh tests/host/run_feature_gate_compile_tests.sh`
 - `git diff --check`
 - `sh tests/host/run_all_host_tests.sh`

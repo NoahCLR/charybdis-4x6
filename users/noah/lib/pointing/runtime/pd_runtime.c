@@ -30,12 +30,12 @@ static inline bool pd_runtime_report_has_motion(report_mouse_t report) {
 }
 
 static inline uint16_t pd_runtime_report_abs_total(report_mouse_t report) {
-    uint16_t total    = 0;
-    int16_t  deltas[] = {report.x, report.y, report.h, report.v};
+    uint16_t total = 0;
 
-    for (uint8_t i = 0; i < ARRAY_SIZE(deltas); ++i) {
-        total += (uint16_t)(deltas[i] < 0 ? -deltas[i] : deltas[i]);
-    }
+    total += (uint16_t)(report.x < 0 ? -report.x : report.x);
+    total += (uint16_t)(report.y < 0 ? -report.y : report.y);
+    total += (uint16_t)(report.h < 0 ? -report.h : report.h);
+    total += (uint16_t)(report.v < 0 ? -report.v : report.v);
 
     return total;
 }
@@ -87,26 +87,29 @@ report_mouse_t noah_pointing_device_task_user(report_mouse_t mouse_report) {
 
     noah_runtime_diag_scope_enter(NOAH_RUNTIME_DIAG_STAGE_POINTING_TASK);
 #ifdef POINTING_DEVICE_ENABLE
-    pd_mode_snapshot_t   snapshot    = pd_mode_snapshot();
-    const pd_mode_def_t *active_mode = pd_mode_lookup(snapshot.local.active_mode);
+    pd_mode_mask_t active_mode_id = pd_mode_local_active_snapshot();
 
 #    if defined(NOAH_POINTING_IDLE_NOISE_SUPPRESSION_ENABLE)
     bool     has_motion = pd_runtime_report_has_motion(mouse_report);
     uint16_t abs_total  = has_motion ? pd_runtime_report_abs_total(mouse_report) : 0;
 
-    if (snapshot.local.active_mode != 0 || mouse_report.buttons != 0 || abs_total > NOAH_POINTING_IDLE_NOISE_SUPPRESSION_ABS_MAX) {
+    if (active_mode_id != 0 || mouse_report.buttons != 0 || abs_total > NOAH_POINTING_IDLE_NOISE_SUPPRESSION_ABS_MAX) {
         pd_runtime_idle_noise_note_pointer_activity();
     }
 
-    if (snapshot.local.active_mode == 0 && mouse_report.buttons == 0 && has_motion && last_input_activity_elapsed() >= NOAH_POINTING_IDLE_NOISE_SUPPRESSION_IDLE_MS && pd_runtime_idle_noise_any_activity_elapsed() >= NOAH_POINTING_IDLE_NOISE_SUPPRESSION_ARM_IDLE_MS && abs_total <= NOAH_POINTING_IDLE_NOISE_SUPPRESSION_ABS_MAX) {
+    if (active_mode_id == 0 && mouse_report.buttons == 0 && has_motion && last_input_activity_elapsed() >= NOAH_POINTING_IDLE_NOISE_SUPPRESSION_IDLE_MS && pd_runtime_idle_noise_any_activity_elapsed() >= NOAH_POINTING_IDLE_NOISE_SUPPRESSION_ARM_IDLE_MS && abs_total <= NOAH_POINTING_IDLE_NOISE_SUPPRESSION_ABS_MAX) {
         output = (report_mouse_t){0};
         goto done;
     }
 #    endif
 
-    if (active_mode && active_mode->handler) {
-        output = active_mode->handler(mouse_report);
-        goto done;
+    if (active_mode_id != 0) {
+        const pd_mode_def_t *active_mode = pd_mode_lookup(active_mode_id);
+
+        if (active_mode && active_mode->handler) {
+            output = active_mode->handler(mouse_report);
+            goto done;
+        }
     }
 
     output = mouse_report;
