@@ -287,9 +287,12 @@ const RGB_LED_GROUP_TARGETS = {
 const USER_KEY_ALIASES = {
     transparent: "_______",
     trans: "_______",
+    kc_transparent: "_______",
+    kc_trns: "_______",
     disabled: "XXXXXXX",
     none: "XXXXXXX",
     no: "XXXXXXX",
+    kc_no: "XXXXXXX",
     esc: "KC_ESC",
     escape: "KC_ESC",
     tab: "KC_TAB",
@@ -1367,7 +1370,8 @@ function parseLayers(text) {
         const argsBody = array.body.slice(open + 1, close);
         const items = splitTopLevelWithRanges(argsBody).map((item, index) => {
             const tokenRange = trimCodeRange(argsBody, item.start, item.end);
-            const keycode = argsBody.slice(tokenRange.start, tokenRange.end).trim();
+            const rawKeycode = argsBody.slice(tokenRange.start, tokenRange.end).trim();
+            const keycode = authoredInternalKeyExpression(rawKeycode) || rawKeycode;
             return {
                 layoutIndex: index,
                 keycode,
@@ -3682,6 +3686,12 @@ function normalizeUserKeyExpression(value) {
     return compact;
 }
 
+function authoredInternalKeyExpression(value) {
+    const normalized = normalizeExpr(value);
+    const alias = USER_KEY_ALIASES[normalized] || USER_KEY_ALIASES[normalized.toLowerCase()];
+    return alias === "_______" || alias === "XXXXXXX" ? alias : "";
+}
+
 function normalizeFriendlyChord(value) {
     const parts = String(value || "")
         .split("+")
@@ -3791,6 +3801,10 @@ function editLabelForKeycode(keycode) {
 
 function displayKeyExpression(expression) {
     const normalized = normalizeExpr(expression);
+    const internal = authoredInternalKeyExpression(normalized);
+    if (internal) {
+        return internal;
+    }
     if (normalized === "_______") {
         return normalized;
     }
@@ -7063,6 +7077,12 @@ function getClientScript() {
         return normalized;
     }
 
+    function authoredInternalKeyExpression(value) {
+        const normalized = normalizeDisplayExpression(value);
+        const alias = userKeyAliases[normalized] || userKeyAliases[normalized.toLowerCase()];
+        return alias === "_______" || alias === "XXXXXXX" ? alias : "";
+    }
+
     function layoutKeyExpressionError(value) {
         const normalized = normalizeDisplayExpression(value);
         if (!normalized) {
@@ -9035,7 +9055,7 @@ function getClientScript() {
     function qmkKeyRows(entries, columns) {
         const rows = [];
         const items = entries.map((entry) => ({
-            value: entry.value,
+            value: keyPickerAuthoredValue(entry.value),
             label: entry.label || entry.value,
             tooltip: (entry.value || "") + (entry.key && entry.key !== entry.value ? " / " + entry.key : "") + ((entry.aliases || []).length ? " / " + entry.aliases.join(", ") : "")
         }));
@@ -9043,6 +9063,11 @@ function getClientScript() {
             rows.push(items.slice(index, index + columns));
         }
         return rows;
+    }
+
+    function keyPickerAuthoredValue(value) {
+        const canonical = canonicalLayoutKeyExpression(value);
+        return canonical === "_______" || canonical === "XXXXXXX" ? canonical : value;
     }
 
     function filterQmkKeycodes(entries, query) {
@@ -12312,6 +12337,8 @@ function getClientScript() {
     function displayKeyExpression(value) {
         const normalized = normalizeDisplayExpression(value);
         if (!normalized) return "";
+        const internal = authoredInternalKeyExpression(normalized);
+        if (internal) return internal;
         if (normalized === "_______") return normalized;
         if (qmkKeyLabels[normalized]) return qmkKeyLabels[normalized];
 

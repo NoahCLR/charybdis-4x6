@@ -56,6 +56,26 @@ const appendedCheck = `
         "canonicalKeyExpression should normalize nested aliases and expression spacing"
     );
     assert(
+        normalizeUserKeyExpression("KC_TRANSPARENT") === "_______" &&
+        normalizeUserKeyExpression("KC_TRNS") === "_______",
+        "Profile Studio should write QMK transparent aliases as the authored _______ token"
+    );
+    assert(
+        displayKeyExpression("KC_TRANSPARENT") === "_______" &&
+        displayKeyExpression("KC_TRNS") === "_______",
+        "Profile Studio should display QMK transparent aliases as the authored _______ token"
+    );
+    assert(
+        normalizeUserKeyExpression("KC_NO") === "XXXXXXX",
+        "Profile Studio should write QMK disabled aliases as the authored XXXXXXX token"
+    );
+    assert(
+        getClientScript().includes("value: keyPickerAuthoredValue(entry.value)") &&
+        getClientScript().includes("function authoredInternalKeyExpression(value)") &&
+        getClientScript().includes('canonical === "_______" || canonical === "XXXXXXX"'),
+        "Profile Studio key picker should choose authored internal key tokens from QMK internal keycode rows"
+    );
+    assert(
         !getClientScript().includes("window.prompt"),
         "Profile Studio must not use browser prompts inside the VS Code webview"
     );
