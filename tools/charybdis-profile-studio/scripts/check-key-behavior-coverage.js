@@ -92,11 +92,11 @@ const appendedCheck = `
     );
     assert(
         getClientScript().includes("function keyFaceRows") &&
-        getClientScript().includes("function shiftedPairRows") &&
-        getClientScript().includes("function dualRoleRows") &&
+        getClientScript().includes("function keyFaceTopRowCount") &&
+        getClientScript().includes("function keyFaceLowerRows") &&
         getClientScript().includes("comboTopY") &&
         getClientScript().includes("badges.map((badge, index)") &&
-        getClientScript().includes("renderLayoutSvgLabel(position, label, cx, cy, style.text, dots.length > 0 || badges.length > 0)"),
+        getClientScript().includes("const keyFaceState = { hasBehavior: dots.length > 0, hasCombo: badges.length > 0 };"),
         "Profile Studio layout keys should reserve dynamic rows for behavior markers, combo badges, tap labels, and hold legends"
     );
     assert(

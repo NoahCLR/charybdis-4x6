@@ -12,160 +12,160 @@
   <text x="32" y="68" fill="#cfcfcb" font-size="14" font-family="Helvetica, Arial, sans-serif">RGB matrix ALL_KEYS • authored HSV(0, 0, 0)</text>
   <g transform="rotate(0 65.0 201.0)">
     <rect x="36.0" y="172.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="65.0" y="212.4" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">ESC</text>
-    <circle cx="60.2" cy="178.3" r="3.8" fill="#00ff00" stroke="#f7f7f4" stroke-width="1.1"/>
-    <circle cx="69.8" cy="178.3" r="3.8" fill="#0084ff" stroke="#f7f7f4" stroke-width="1.1"/>
+    <text x="65.0" y="208.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">ESC</text>
+    <circle cx="60.2" cy="179.5" r="3.8" fill="#00ff00" stroke="#f7f7f4" stroke-width="1.1"/>
+    <circle cx="69.8" cy="179.5" r="3.8" fill="#0084ff" stroke="#f7f7f4" stroke-width="1.1"/>
   </g>
   <g transform="rotate(0 131.0 201.0)">
     <rect x="102.0" y="172.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="131.0" y="202.3" fill="#f7f7f4" fill-opacity="0.56" font-size="7.4" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="650">!</text>
-    <text x="131.0" y="212.4" fill="#f7f7f4" fill-opacity="1.00" font-size="9.1" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">1</text>
-    <circle cx="131.0" cy="178.3" r="3.8" fill="#ff6c00" stroke="#f7f7f4" stroke-width="1.1"/>
+    <text x="131.0" y="198.6" fill="#f7f7f4" fill-opacity="0.56" font-size="7.4" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="650">!</text>
+    <text x="131.0" y="211.0" fill="#f7f7f4" fill-opacity="1.00" font-size="9.1" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">1</text>
+    <circle cx="131.0" cy="179.5" r="3.8" fill="#ff6c00" stroke="#f7f7f4" stroke-width="1.1"/>
   </g>
   <g transform="rotate(0 197.0 161.0)">
     <rect x="168.0" y="132.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="197.0" y="162.3" fill="#f7f7f4" fill-opacity="0.56" font-size="7.4" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="650">@</text>
-    <text x="197.0" y="172.4" fill="#f7f7f4" fill-opacity="1.00" font-size="9.1" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">2</text>
-    <circle cx="197.0" cy="138.3" r="3.8" fill="#ff6c00" stroke="#f7f7f4" stroke-width="1.1"/>
+    <text x="197.0" y="158.6" fill="#f7f7f4" fill-opacity="0.56" font-size="7.4" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="650">@</text>
+    <text x="197.0" y="171.0" fill="#f7f7f4" fill-opacity="1.00" font-size="9.1" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">2</text>
+    <circle cx="197.0" cy="139.5" r="3.8" fill="#ff6c00" stroke="#f7f7f4" stroke-width="1.1"/>
   </g>
   <g transform="rotate(0 263.0 137.0)">
     <rect x="234.0" y="108.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="263.0" y="138.3" fill="#f7f7f4" fill-opacity="0.56" font-size="7.4" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="650">#</text>
-    <text x="263.0" y="148.4" fill="#f7f7f4" fill-opacity="1.00" font-size="9.1" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">3</text>
-    <circle cx="263.0" cy="114.3" r="3.8" fill="#ff6c00" stroke="#f7f7f4" stroke-width="1.1"/>
+    <text x="263.0" y="134.6" fill="#f7f7f4" fill-opacity="0.56" font-size="7.4" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="650">#</text>
+    <text x="263.0" y="147.0" fill="#f7f7f4" fill-opacity="1.00" font-size="9.1" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">3</text>
+    <circle cx="263.0" cy="115.5" r="3.8" fill="#ff6c00" stroke="#f7f7f4" stroke-width="1.1"/>
   </g>
   <g transform="rotate(0 329.0 161.0)">
     <rect x="300.0" y="132.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="329.0" y="162.3" fill="#f7f7f4" fill-opacity="0.56" font-size="7.4" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="650">$</text>
-    <text x="329.0" y="172.4" fill="#f7f7f4" fill-opacity="1.00" font-size="9.1" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">4</text>
-    <circle cx="329.0" cy="138.3" r="3.8" fill="#ff6c00" stroke="#f7f7f4" stroke-width="1.1"/>
+    <text x="329.0" y="158.6" fill="#f7f7f4" fill-opacity="0.56" font-size="7.4" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="650">$</text>
+    <text x="329.0" y="171.0" fill="#f7f7f4" fill-opacity="1.00" font-size="9.1" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">4</text>
+    <circle cx="329.0" cy="139.5" r="3.8" fill="#ff6c00" stroke="#f7f7f4" stroke-width="1.1"/>
   </g>
   <g transform="rotate(0 395.0 161.0)">
     <rect x="366.0" y="132.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="395.0" y="162.3" fill="#f7f7f4" fill-opacity="0.56" font-size="7.4" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="650">%</text>
-    <text x="395.0" y="172.4" fill="#f7f7f4" fill-opacity="1.00" font-size="9.1" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">5</text>
-    <circle cx="395.0" cy="138.3" r="3.8" fill="#ff6c00" stroke="#f7f7f4" stroke-width="1.1"/>
+    <text x="395.0" y="158.6" fill="#f7f7f4" fill-opacity="0.56" font-size="7.4" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="650">%</text>
+    <text x="395.0" y="171.0" fill="#f7f7f4" fill-opacity="1.00" font-size="9.1" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">5</text>
+    <circle cx="395.0" cy="139.5" r="3.8" fill="#ff6c00" stroke="#f7f7f4" stroke-width="1.1"/>
   </g>
   <g transform="rotate(0 727.0 161.0)">
     <rect x="698.0" y="132.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="727.0" y="162.3" fill="#f7f7f4" fill-opacity="0.56" font-size="7.4" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="650">^</text>
-    <text x="727.0" y="172.4" fill="#f7f7f4" fill-opacity="1.00" font-size="9.1" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">6</text>
-    <circle cx="727.0" cy="138.3" r="3.8" fill="#ff6c00" stroke="#f7f7f4" stroke-width="1.1"/>
+    <text x="727.0" y="158.6" fill="#f7f7f4" fill-opacity="0.56" font-size="7.4" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="650">^</text>
+    <text x="727.0" y="171.0" fill="#f7f7f4" fill-opacity="1.00" font-size="9.1" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">6</text>
+    <circle cx="727.0" cy="139.5" r="3.8" fill="#ff6c00" stroke="#f7f7f4" stroke-width="1.1"/>
   </g>
   <g transform="rotate(0 793.0 161.0)">
     <rect x="764.0" y="132.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="793.0" y="162.3" fill="#f7f7f4" fill-opacity="0.56" font-size="7.4" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="650">&amp;</text>
-    <text x="793.0" y="172.4" fill="#f7f7f4" fill-opacity="1.00" font-size="9.1" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">7</text>
-    <circle cx="793.0" cy="138.3" r="3.8" fill="#ff6c00" stroke="#f7f7f4" stroke-width="1.1"/>
+    <text x="793.0" y="158.6" fill="#f7f7f4" fill-opacity="0.56" font-size="7.4" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="650">&amp;</text>
+    <text x="793.0" y="171.0" fill="#f7f7f4" fill-opacity="1.00" font-size="9.1" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">7</text>
+    <circle cx="793.0" cy="139.5" r="3.8" fill="#ff6c00" stroke="#f7f7f4" stroke-width="1.1"/>
   </g>
   <g transform="rotate(0 859.0 137.0)">
     <rect x="830.0" y="108.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="859.0" y="138.3" fill="#f7f7f4" fill-opacity="0.56" font-size="7.4" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="650">*</text>
-    <text x="859.0" y="148.4" fill="#f7f7f4" fill-opacity="1.00" font-size="9.1" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">8</text>
-    <circle cx="859.0" cy="114.3" r="3.8" fill="#ff6c00" stroke="#f7f7f4" stroke-width="1.1"/>
+    <text x="859.0" y="134.6" fill="#f7f7f4" fill-opacity="0.56" font-size="7.4" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="650">*</text>
+    <text x="859.0" y="147.0" fill="#f7f7f4" fill-opacity="1.00" font-size="9.1" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">8</text>
+    <circle cx="859.0" cy="115.5" r="3.8" fill="#ff6c00" stroke="#f7f7f4" stroke-width="1.1"/>
   </g>
   <g transform="rotate(0 925.0 161.0)">
     <rect x="896.0" y="132.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="925.0" y="162.3" fill="#f7f7f4" fill-opacity="0.56" font-size="7.4" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="650">(</text>
-    <text x="925.0" y="172.4" fill="#f7f7f4" fill-opacity="1.00" font-size="9.1" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">9</text>
-    <circle cx="925.0" cy="138.3" r="3.8" fill="#ff6c00" stroke="#f7f7f4" stroke-width="1.1"/>
+    <text x="925.0" y="158.6" fill="#f7f7f4" fill-opacity="0.56" font-size="7.4" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="650">(</text>
+    <text x="925.0" y="171.0" fill="#f7f7f4" fill-opacity="1.00" font-size="9.1" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">9</text>
+    <circle cx="925.0" cy="139.5" r="3.8" fill="#ff6c00" stroke="#f7f7f4" stroke-width="1.1"/>
   </g>
   <g transform="rotate(0 991.0 201.0)">
     <rect x="962.0" y="172.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="991.0" y="202.3" fill="#f7f7f4" fill-opacity="0.56" font-size="7.4" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="650">)</text>
-    <text x="991.0" y="212.4" fill="#f7f7f4" fill-opacity="1.00" font-size="9.1" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">0</text>
-    <circle cx="991.0" cy="178.3" r="3.8" fill="#ff6c00" stroke="#f7f7f4" stroke-width="1.1"/>
+    <text x="991.0" y="198.6" fill="#f7f7f4" fill-opacity="0.56" font-size="7.4" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="650">)</text>
+    <text x="991.0" y="211.0" fill="#f7f7f4" fill-opacity="1.00" font-size="9.1" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">0</text>
+    <circle cx="991.0" cy="179.5" r="3.8" fill="#ff6c00" stroke="#f7f7f4" stroke-width="1.1"/>
   </g>
   <g transform="rotate(0 1057.0 201.0)">
     <rect x="1028.0" y="172.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="1057.0" y="202.3" fill="#f7f7f4" fill-opacity="0.56" font-size="7.4" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="650">_</text>
-    <text x="1057.0" y="212.4" fill="#f7f7f4" fill-opacity="1.00" font-size="9.1" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">-</text>
-    <circle cx="1057.0" cy="178.3" r="3.8" fill="#ff6c00" stroke="#f7f7f4" stroke-width="1.1"/>
+    <text x="1057.0" y="198.6" fill="#f7f7f4" fill-opacity="0.56" font-size="7.4" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="650">_</text>
+    <text x="1057.0" y="211.0" fill="#f7f7f4" fill-opacity="1.00" font-size="9.1" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">-</text>
+    <circle cx="1057.0" cy="179.5" r="3.8" fill="#ff6c00" stroke="#f7f7f4" stroke-width="1.1"/>
   </g>
   <g transform="rotate(0 65.0 265.0)">
     <rect x="36.0" y="236.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="65.0" y="269.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">TAB</text>
+    <text x="65.0" y="265.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">TAB</text>
   </g>
   <g transform="rotate(0 131.0 265.0)">
     <rect x="102.0" y="236.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="131.0" y="269.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">Q</text>
+    <text x="131.0" y="265.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">Q</text>
   </g>
   <g transform="rotate(0 197.0 225.0)">
     <rect x="168.0" y="196.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="197.0" y="229.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">W</text>
+    <text x="197.0" y="225.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">W</text>
   </g>
   <g transform="rotate(0 263.0 201.0)">
     <rect x="234.0" y="172.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="263.0" y="205.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">E</text>
+    <text x="263.0" y="201.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">E</text>
   </g>
   <g transform="rotate(0 329.0 225.0)">
     <rect x="300.0" y="196.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="329.0" y="229.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">R</text>
+    <text x="329.0" y="225.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">R</text>
   </g>
   <g transform="rotate(0 395.0 225.0)">
     <rect x="366.0" y="196.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="395.0" y="229.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">T</text>
+    <text x="395.0" y="225.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">T</text>
   </g>
   <g transform="rotate(0 727.0 225.0)">
     <rect x="698.0" y="196.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="727.0" y="229.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">Y</text>
+    <text x="727.0" y="225.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">Y</text>
   </g>
   <g transform="rotate(0 793.0 225.0)">
     <rect x="764.0" y="196.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="793.0" y="229.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">U</text>
+    <text x="793.0" y="225.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">U</text>
   </g>
   <g transform="rotate(0 859.0 201.0)">
     <rect x="830.0" y="172.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="859.0" y="205.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">I</text>
+    <text x="859.0" y="201.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">I</text>
   </g>
   <g transform="rotate(0 925.0 225.0)">
     <rect x="896.0" y="196.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="925.0" y="229.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">O</text>
+    <text x="925.0" y="225.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">O</text>
   </g>
   <g transform="rotate(0 991.0 265.0)">
     <rect x="962.0" y="236.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="991.0" y="269.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">P</text>
+    <text x="991.0" y="265.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">P</text>
   </g>
   <g transform="rotate(0 1057.0 265.0)">
     <rect x="1028.0" y="236.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="1057.0" y="266.3" fill="#f7f7f4" fill-opacity="0.56" font-size="7.4" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="650">|</text>
-    <text x="1057.0" y="276.4" fill="#f7f7f4" fill-opacity="1.00" font-size="9.1" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">\</text>
-    <circle cx="1057.0" cy="242.3" r="3.8" fill="#ff6c00" stroke="#f7f7f4" stroke-width="1.1"/>
+    <text x="1057.0" y="262.6" fill="#f7f7f4" fill-opacity="0.56" font-size="7.4" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="650">|</text>
+    <text x="1057.0" y="275.0" fill="#f7f7f4" fill-opacity="1.00" font-size="9.1" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">\</text>
+    <circle cx="1057.0" cy="243.5" r="3.8" fill="#ff6c00" stroke="#f7f7f4" stroke-width="1.1"/>
   </g>
   <g transform="rotate(0 65.0 329.0)">
     <rect x="36.0" y="300.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="65.0" y="340.4" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">LSFT</text>
-    <circle cx="65.0" cy="306.3" r="3.8" fill="#00ff00" stroke="#f7f7f4" stroke-width="1.1"/>
+    <text x="65.0" y="336.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">LSFT</text>
+    <circle cx="65.0" cy="307.5" r="3.8" fill="#00ff00" stroke="#f7f7f4" stroke-width="1.1"/>
   </g>
   <g transform="rotate(0 131.0 329.0)">
     <rect x="102.0" y="300.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="131.0" y="333.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">A</text>
+    <text x="131.0" y="329.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">A</text>
   </g>
   <g transform="rotate(0 197.0 289.0)">
     <rect x="168.0" y="260.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="197.0" y="293.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">S</text>
+    <text x="197.0" y="289.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">S</text>
   </g>
   <g transform="rotate(0 263.0 265.0)">
     <rect x="234.0" y="236.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="263.0" y="276.4" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">D</text>
-    <rect x="257.2" y="250.2" width="11.5" height="8.2" rx="3.5" fill="#141714" fill-opacity="0.9" stroke="#f5f5f3" stroke-opacity="0.86" stroke-width="1"/>
-    <text x="263.0" y="254.4" fill="#f5f5f3" font-size="5.8" text-anchor="middle" dominant-baseline="central" font-family="Helvetica, Arial, sans-serif" font-weight="700">C1</text>
+    <text x="263.0" y="272.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">D</text>
+    <rect x="257.2" y="243.2" width="11.5" height="8.2" rx="3.5" fill="#141714" fill-opacity="0.9" stroke="#f5f5f3" stroke-opacity="0.86" stroke-width="1"/>
+    <text x="263.0" y="247.4" fill="#f5f5f3" font-size="5.8" text-anchor="middle" dominant-baseline="central" font-family="Helvetica, Arial, sans-serif" font-weight="700">C1</text>
   </g>
   <g transform="rotate(0 329.0 289.0)">
     <rect x="300.0" y="260.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
-    <line x1="308.0" y1="307.8" x2="350.0" y2="307.8" stroke="#f7f7f4" stroke-opacity="0.42" stroke-width="1"/>
-    <text x="329.0" y="300.4" fill="#f7f7f4" fill-opacity="1.00" font-size="9.1" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">F</text>
-    <text x="329.0" y="314.0" fill="#f7f7f4" fill-opacity="0.78" font-size="6.4" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="700">NAV</text>
-    <rect x="323.2" y="274.2" width="11.5" height="8.2" rx="3.5" fill="#141714" fill-opacity="0.9" stroke="#f5f5f3" stroke-opacity="0.86" stroke-width="1"/>
-    <text x="329.0" y="278.4" fill="#f5f5f3" font-size="5.8" text-anchor="middle" dominant-baseline="central" font-family="Helvetica, Arial, sans-serif" font-weight="700">C1</text>
+    <line x1="308.0" y1="300.8" x2="350.0" y2="300.8" stroke="#f7f7f4" stroke-opacity="0.42" stroke-width="1"/>
+    <text x="329.0" y="289.3" fill="#f7f7f4" fill-opacity="1.00" font-size="9.1" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">F</text>
+    <text x="329.0" y="311.8" fill="#f7f7f4" fill-opacity="0.78" font-size="6.4" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="700">NAV</text>
+    <rect x="323.2" y="267.2" width="11.5" height="8.2" rx="3.5" fill="#141714" fill-opacity="0.9" stroke="#f5f5f3" stroke-opacity="0.86" stroke-width="1"/>
+    <text x="329.0" y="271.4" fill="#f5f5f3" font-size="5.8" text-anchor="middle" dominant-baseline="central" font-family="Helvetica, Arial, sans-serif" font-weight="700">C1</text>
   </g>
   <g transform="rotate(0 395.0 289.0)">
     <rect x="366.0" y="260.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="395.0" y="293.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">G</text>
+    <text x="395.0" y="289.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">G</text>
   </g>
   <g transform="rotate(0 727.0 289.0)">
     <rect x="698.0" y="260.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="727.0" y="293.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">H</text>
+    <text x="727.0" y="289.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">H</text>
   </g>
   <g transform="rotate(0 793.0 289.0)">
     <rect x="764.0" y="260.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
@@ -175,27 +175,27 @@
   </g>
   <g transform="rotate(0 859.0 265.0)">
     <rect x="830.0" y="236.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="859.0" y="269.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">K</text>
+    <text x="859.0" y="265.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">K</text>
   </g>
   <g transform="rotate(0 925.0 289.0)">
     <rect x="896.0" y="260.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="925.0" y="293.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">L</text>
+    <text x="925.0" y="289.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">L</text>
   </g>
   <g transform="rotate(0 991.0 329.0)">
     <rect x="962.0" y="300.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="991.0" y="330.3" fill="#f7f7f4" fill-opacity="0.56" font-size="7.4" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="650">:</text>
-    <text x="991.0" y="340.4" fill="#f7f7f4" fill-opacity="1.00" font-size="9.1" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">;</text>
-    <circle cx="991.0" cy="306.3" r="3.8" fill="#ff6c00" stroke="#f7f7f4" stroke-width="1.1"/>
+    <text x="991.0" y="326.6" fill="#f7f7f4" fill-opacity="0.56" font-size="7.4" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="650">:</text>
+    <text x="991.0" y="339.0" fill="#f7f7f4" fill-opacity="1.00" font-size="9.1" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">;</text>
+    <circle cx="991.0" cy="307.5" r="3.8" fill="#ff6c00" stroke="#f7f7f4" stroke-width="1.1"/>
   </g>
   <g transform="rotate(0 1057.0 329.0)">
     <rect x="1028.0" y="300.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="1057.0" y="330.3" fill="#f7f7f4" fill-opacity="0.56" font-size="7.4" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="650">&quot;</text>
-    <text x="1057.0" y="340.4" fill="#f7f7f4" fill-opacity="1.00" font-size="9.1" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">'</text>
-    <circle cx="1057.0" cy="306.3" r="3.8" fill="#ff6c00" stroke="#f7f7f4" stroke-width="1.1"/>
+    <text x="1057.0" y="326.6" fill="#f7f7f4" fill-opacity="0.56" font-size="7.4" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="650">&quot;</text>
+    <text x="1057.0" y="339.0" fill="#f7f7f4" fill-opacity="1.00" font-size="9.1" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">'</text>
+    <circle cx="1057.0" cy="307.5" r="3.8" fill="#ff6c00" stroke="#f7f7f4" stroke-width="1.1"/>
   </g>
   <g transform="rotate(0 65.0 393.0)">
     <rect x="36.0" y="364.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="65.0" y="397.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">LCTL</text>
+    <text x="65.0" y="393.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">LCTL</text>
   </g>
   <g transform="rotate(0 131.0 393.0)">
     <rect x="102.0" y="364.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
@@ -205,35 +205,35 @@
   </g>
   <g transform="rotate(0 197.0 353.0)">
     <rect x="168.0" y="324.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="197.0" y="357.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">X</text>
+    <text x="197.0" y="353.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">X</text>
   </g>
   <g transform="rotate(0 263.0 329.0)">
     <rect x="234.0" y="300.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="263.0" y="333.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">C</text>
+    <text x="263.0" y="329.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">C</text>
   </g>
   <g transform="rotate(0 329.0 353.0)">
     <rect x="300.0" y="324.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="329.0" y="357.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">V</text>
+    <text x="329.0" y="353.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">V</text>
   </g>
   <g transform="rotate(0 395.0 353.0)">
     <rect x="366.0" y="324.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="395.0" y="357.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">B</text>
+    <text x="395.0" y="353.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">B</text>
   </g>
   <g transform="rotate(0 727.0 353.0)">
     <rect x="698.0" y="324.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="727.0" y="364.4" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">N</text>
-    <rect x="714.8" y="338.2" width="11.5" height="8.2" rx="3.5" fill="#141714" fill-opacity="0.9" stroke="#f5f5f3" stroke-opacity="0.86" stroke-width="1"/>
-    <text x="720.5" y="342.4" fill="#f5f5f3" font-size="5.8" text-anchor="middle" dominant-baseline="central" font-family="Helvetica, Arial, sans-serif" font-weight="700">C2</text>
-    <rect x="727.8" y="338.2" width="11.5" height="8.2" rx="3.5" fill="#141714" fill-opacity="0.9" stroke="#f5f5f3" stroke-opacity="0.86" stroke-width="1"/>
-    <text x="733.5" y="342.4" fill="#f5f5f3" font-size="5.8" text-anchor="middle" dominant-baseline="central" font-family="Helvetica, Arial, sans-serif" font-weight="700">C3</text>
+    <text x="727.0" y="360.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">N</text>
+    <rect x="714.8" y="331.2" width="11.5" height="8.2" rx="3.5" fill="#141714" fill-opacity="0.9" stroke="#f5f5f3" stroke-opacity="0.86" stroke-width="1"/>
+    <text x="720.5" y="335.4" fill="#f5f5f3" font-size="5.8" text-anchor="middle" dominant-baseline="central" font-family="Helvetica, Arial, sans-serif" font-weight="700">C2</text>
+    <rect x="727.8" y="331.2" width="11.5" height="8.2" rx="3.5" fill="#141714" fill-opacity="0.9" stroke="#f5f5f3" stroke-opacity="0.86" stroke-width="1"/>
+    <text x="733.5" y="335.4" fill="#f5f5f3" font-size="5.8" text-anchor="middle" dominant-baseline="central" font-family="Helvetica, Arial, sans-serif" font-weight="700">C3</text>
   </g>
   <g transform="rotate(0 793.0 353.0)">
     <rect x="764.0" y="324.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="793.0" y="364.4" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">M</text>
-    <rect x="780.8" y="338.2" width="11.5" height="8.2" rx="3.5" fill="#141714" fill-opacity="0.9" stroke="#f5f5f3" stroke-opacity="0.86" stroke-width="1"/>
-    <text x="786.5" y="342.4" fill="#f5f5f3" font-size="5.8" text-anchor="middle" dominant-baseline="central" font-family="Helvetica, Arial, sans-serif" font-weight="700">C2</text>
-    <rect x="793.8" y="338.2" width="11.5" height="8.2" rx="3.5" fill="#141714" fill-opacity="0.9" stroke="#f5f5f3" stroke-opacity="0.86" stroke-width="1"/>
-    <text x="799.5" y="342.4" fill="#f5f5f3" font-size="5.8" text-anchor="middle" dominant-baseline="central" font-family="Helvetica, Arial, sans-serif" font-weight="700">C3</text>
+    <text x="793.0" y="360.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">M</text>
+    <rect x="780.8" y="331.2" width="11.5" height="8.2" rx="3.5" fill="#141714" fill-opacity="0.9" stroke="#f5f5f3" stroke-opacity="0.86" stroke-width="1"/>
+    <text x="786.5" y="335.4" fill="#f5f5f3" font-size="5.8" text-anchor="middle" dominant-baseline="central" font-family="Helvetica, Arial, sans-serif" font-weight="700">C2</text>
+    <rect x="793.8" y="331.2" width="11.5" height="8.2" rx="3.5" fill="#141714" fill-opacity="0.9" stroke="#f5f5f3" stroke-opacity="0.86" stroke-width="1"/>
+    <text x="799.5" y="335.4" fill="#f5f5f3" font-size="5.8" text-anchor="middle" dominant-baseline="central" font-family="Helvetica, Arial, sans-serif" font-weight="700">C3</text>
   </g>
   <g transform="rotate(0 859.0 329.0)">
     <rect x="830.0" y="300.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
@@ -245,68 +245,68 @@
   </g>
   <g transform="rotate(0 925.0 353.0)">
     <rect x="896.0" y="324.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="925.0" y="354.3" fill="#f7f7f4" fill-opacity="0.56" font-size="7.4" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="650">&gt;</text>
-    <text x="925.0" y="364.4" fill="#f7f7f4" fill-opacity="1.00" font-size="9.1" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">.</text>
-    <circle cx="925.0" cy="330.3" r="3.8" fill="#ff6c00" stroke="#f7f7f4" stroke-width="1.1"/>
+    <text x="925.0" y="350.6" fill="#f7f7f4" fill-opacity="0.56" font-size="7.4" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="650">&gt;</text>
+    <text x="925.0" y="363.0" fill="#f7f7f4" fill-opacity="1.00" font-size="9.1" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">.</text>
+    <circle cx="925.0" cy="331.5" r="3.8" fill="#ff6c00" stroke="#f7f7f4" stroke-width="1.1"/>
   </g>
   <g transform="rotate(0 991.0 393.0)">
     <rect x="962.0" y="364.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
-    <line x1="970.0" y1="411.8" x2="1012.0" y2="411.8" stroke="#f7f7f4" stroke-opacity="0.42" stroke-width="1"/>
-    <text x="991.0" y="394.3" fill="#f7f7f4" fill-opacity="0.56" font-size="7.4" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="650">?</text>
-    <text x="991.0" y="404.4" fill="#f7f7f4" fill-opacity="1.00" font-size="9.1" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">/</text>
-    <text x="991.0" y="418.0" fill="#f7f7f4" fill-opacity="0.78" font-size="6.4" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="700">NAV</text>
-    <circle cx="991.0" cy="370.3" r="3.8" fill="#ff6c00" stroke="#f7f7f4" stroke-width="1.1"/>
+    <line x1="970.0" y1="408.6" x2="1012.0" y2="408.6" stroke="#f7f7f4" stroke-opacity="0.42" stroke-width="1"/>
+    <text x="991.0" y="388.6" fill="#f7f7f4" fill-opacity="0.56" font-size="7.4" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="650">?</text>
+    <text x="991.0" y="399.0" fill="#f7f7f4" fill-opacity="1.00" font-size="9.1" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">/</text>
+    <text x="991.0" y="417.0" fill="#f7f7f4" fill-opacity="0.78" font-size="6.4" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="700">NAV</text>
+    <circle cx="991.0" cy="371.5" r="3.8" fill="#ff6c00" stroke="#f7f7f4" stroke-width="1.1"/>
   </g>
   <g transform="rotate(0 1057.0 393.0)">
     <rect x="1028.0" y="364.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="1057.0" y="404.4" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">RALT</text>
-    <circle cx="1057.0" cy="370.3" r="3.8" fill="#00ff00" stroke="#f7f7f4" stroke-width="1.1"/>
+    <text x="1057.0" y="400.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">RALT</text>
+    <circle cx="1057.0" cy="371.5" r="3.8" fill="#00ff00" stroke="#f7f7f4" stroke-width="1.1"/>
   </g>
   <g transform="rotate(0 357.0 437.0)">
     <rect x="328.0" y="408.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="357.0" y="448.4" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">LGUI</text>
-    <circle cx="352.2" cy="414.3" r="3.8" fill="#00ff00" stroke="#f7f7f4" stroke-width="1.1"/>
-    <circle cx="361.8" cy="414.3" r="3.8" fill="#ff6c00" stroke="#f7f7f4" stroke-width="1.1"/>
+    <text x="357.0" y="444.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">LGUI</text>
+    <circle cx="352.2" cy="415.5" r="3.8" fill="#00ff00" stroke="#f7f7f4" stroke-width="1.1"/>
+    <circle cx="361.8" cy="415.5" r="3.8" fill="#ff6c00" stroke="#f7f7f4" stroke-width="1.1"/>
   </g>
   <g transform="rotate(10 425.0 433.0)">
     <rect x="396.0" y="404.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="425.0" y="437.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">SPC</text>
+    <text x="425.0" y="433.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">SPC</text>
   </g>
   <g transform="rotate(17 497.0 441.0)">
     <rect x="468.0" y="412.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="497.0" y="452.4" fill="#f7f7f4" fill-opacity="1.00" font-size="11.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">LTHUMB</text>
-    <circle cx="487.4" cy="418.3" r="3.8" fill="#00ff00" stroke="#f7f7f4" stroke-width="1.1"/>
-    <text x="487.4" y="418.8" fill="#f7f7f4" font-size="5.8" text-anchor="middle" dominant-baseline="central" font-family="Helvetica, Arial, sans-serif" font-weight="700">4</text>
-    <circle cx="497.0" cy="418.3" r="3.8" fill="#ff6c00" stroke="#f7f7f4" stroke-width="1.1"/>
-    <text x="497.0" y="418.8" fill="#f7f7f4" font-size="5.8" text-anchor="middle" dominant-baseline="central" font-family="Helvetica, Arial, sans-serif" font-weight="700">2</text>
-    <circle cx="506.6" cy="418.3" r="3.8" fill="#0084ff" stroke="#f7f7f4" stroke-width="1.1"/>
-    <text x="506.6" y="418.8" fill="#f7f7f4" font-size="5.8" text-anchor="middle" dominant-baseline="central" font-family="Helvetica, Arial, sans-serif" font-weight="700">3</text>
+    <text x="497.0" y="448.0" fill="#f7f7f4" fill-opacity="1.00" font-size="11.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">LTHUMB</text>
+    <circle cx="487.4" cy="419.5" r="3.8" fill="#00ff00" stroke="#f7f7f4" stroke-width="1.1"/>
+    <text x="487.4" y="420.0" fill="#f7f7f4" font-size="5.8" text-anchor="middle" dominant-baseline="central" font-family="Helvetica, Arial, sans-serif" font-weight="700">4</text>
+    <circle cx="497.0" cy="419.5" r="3.8" fill="#ff6c00" stroke="#f7f7f4" stroke-width="1.1"/>
+    <text x="497.0" y="420.0" fill="#f7f7f4" font-size="5.8" text-anchor="middle" dominant-baseline="central" font-family="Helvetica, Arial, sans-serif" font-weight="700">2</text>
+    <circle cx="506.6" cy="419.5" r="3.8" fill="#0084ff" stroke="#f7f7f4" stroke-width="1.1"/>
+    <text x="506.6" y="420.0" fill="#f7f7f4" font-size="5.8" text-anchor="middle" dominant-baseline="central" font-family="Helvetica, Arial, sans-serif" font-weight="700">3</text>
   </g>
   <g transform="rotate(-17 605.0 441.0)">
     <rect x="576.0" y="412.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="605.0" y="452.4" fill="#f7f7f4" fill-opacity="1.00" font-size="11.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">RTHUMB</text>
-    <circle cx="595.4" cy="418.3" r="3.8" fill="#00ff00" stroke="#f7f7f4" stroke-width="1.1"/>
-    <text x="595.4" y="418.8" fill="#f7f7f4" font-size="5.8" text-anchor="middle" dominant-baseline="central" font-family="Helvetica, Arial, sans-serif" font-weight="700">4</text>
-    <circle cx="605.0" cy="418.3" r="3.8" fill="#ff6c00" stroke="#f7f7f4" stroke-width="1.1"/>
-    <text x="605.0" y="418.8" fill="#f7f7f4" font-size="5.8" text-anchor="middle" dominant-baseline="central" font-family="Helvetica, Arial, sans-serif" font-weight="700">2</text>
-    <circle cx="614.6" cy="418.3" r="3.8" fill="#0084ff" stroke="#f7f7f4" stroke-width="1.1"/>
-    <text x="614.6" y="418.8" fill="#f7f7f4" font-size="5.8" text-anchor="middle" dominant-baseline="central" font-family="Helvetica, Arial, sans-serif" font-weight="700">3</text>
+    <text x="605.0" y="448.0" fill="#f7f7f4" fill-opacity="1.00" font-size="11.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">RTHUMB</text>
+    <circle cx="595.4" cy="419.5" r="3.8" fill="#00ff00" stroke="#f7f7f4" stroke-width="1.1"/>
+    <text x="595.4" y="420.0" fill="#f7f7f4" font-size="5.8" text-anchor="middle" dominant-baseline="central" font-family="Helvetica, Arial, sans-serif" font-weight="700">4</text>
+    <circle cx="605.0" cy="419.5" r="3.8" fill="#ff6c00" stroke="#f7f7f4" stroke-width="1.1"/>
+    <text x="605.0" y="420.0" fill="#f7f7f4" font-size="5.8" text-anchor="middle" dominant-baseline="central" font-family="Helvetica, Arial, sans-serif" font-weight="700">2</text>
+    <circle cx="614.6" cy="419.5" r="3.8" fill="#0084ff" stroke="#f7f7f4" stroke-width="1.1"/>
+    <text x="614.6" y="420.0" fill="#f7f7f4" font-size="5.8" text-anchor="middle" dominant-baseline="central" font-family="Helvetica, Arial, sans-serif" font-weight="700">3</text>
   </g>
   <g transform="rotate(-10 677.0 433.0)">
     <rect x="648.0" y="404.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="677.0" y="444.4" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">ENT</text>
-    <circle cx="677.0" cy="410.3" r="3.8" fill="#ff6c00" stroke="#f7f7f4" stroke-width="1.1"/>
+    <text x="677.0" y="440.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">ENT</text>
+    <circle cx="677.0" cy="411.5" r="3.8" fill="#ff6c00" stroke="#f7f7f4" stroke-width="1.1"/>
   </g>
   <g transform="rotate(9 427.0 515.0)">
     <rect x="398.0" y="486.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="427.0" y="519.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">DEL</text>
+    <text x="427.0" y="515.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">DEL</text>
   </g>
   <g transform="rotate(15 497.0 529.0)">
     <rect x="468.0" y="500.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="497.0" y="533.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">BSPC</text>
+    <text x="497.0" y="529.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">BSPC</text>
   </g>
   <g transform="rotate(-15 607.0 515.0)">
     <rect x="578.0" y="486.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="607.0" y="519.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">BSPC</text>
+    <text x="607.0" y="515.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">BSPC</text>
   </g>
 </svg>

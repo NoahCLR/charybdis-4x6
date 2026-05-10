@@ -9252,6 +9252,7 @@ function getClientScript() {
         const style = keyStyle(position);
         const dots = behaviorDotsForKey(position.keycode);
         const badges = comboBadgesForKey(position.keycode);
+        const keyFaceState = { hasBehavior: dots.length > 0, hasCombo: badges.length > 0 };
         const cx = visual.x + keyboardGeometry.keyWidth / 2;
         const cy = visual.y + keyboardGeometry.keyHeight / 2;
         const transform = visual.angle ? " transform='rotate(" + visual.angle + " " + cx + " " + cy + ")'" : "";
@@ -9261,9 +9262,9 @@ function getClientScript() {
         const action = layoutComboPicking ? "toggleLayoutComboKey" : "selectKey";
         return "<g class='svg-key " + (selected ? "selected" : "") + (comboSelected ? " combo-input-selected" : "") + (position.pending ? " pending" : "") + "' tabindex='0' role='button' data-action='" + action + "' data-index='" + position.layoutIndex + "' data-keycode='" + escapeAttr(position.keycode) + "' data-tooltip='" + escapeAttr(tooltipText) + "'" + transform + ">" +
             "<rect x='" + visual.x + "' y='" + visual.y + "' width='" + keyboardGeometry.keyWidth + "' height='" + keyboardGeometry.keyHeight + "' rx='" + keyboardGeometry.radius + "' fill='" + style.fill + "' stroke='" + style.stroke + "'></rect>" +
-            renderLayoutSvgLabel(position, label, cx, cy, style.text, dots.length > 0 || badges.length > 0) +
-            renderBehaviorDots(dots, visual, style.text) +
-            renderComboBadges(badges, visual) +
+            renderLayoutSvgLabel(position, label, cx, cy, style.text, keyFaceState) +
+            renderBehaviorDots(dots, visual, style.text, keyFaceState) +
+            renderComboBadges(badges, visual, keyFaceState) +
             "</g>";
     }
 
@@ -9328,52 +9329,92 @@ function getClientScript() {
         };
     }
 
-    function renderLayoutSvgLabel(position, label, cx, cy, textColor, hasTopRows = false) {
+    function renderLayoutSvgLabel(position, label, cx, cy, textColor, keyFaceState = {}) {
         const dualRole = dualRoleLayoutVisual(position?.keycode, position?.layoutIndex);
-        if (dualRole) return renderDualRoleSvgLabel(dualRole, cx, cy, textColor, hasTopRows);
+        if (dualRole) return renderDualRoleSvgLabel(dualRole, cx, cy, textColor, keyFaceState);
         const visual = keyVisual(position?.layoutIndex);
-        const rows = keyFaceRows(visual);
         const pair = shiftedOutputPair(position?.keycode);
-        const baseY = hasTopRows ? rows.baseY : cy;
+        const topRowCount = keyFaceTopRowCount(keyFaceState);
+        const rows = keyFaceRows(visual, keyFaceState);
+        const baseY = topRowCount ? rows.baseY : cy;
         if (!pair) return renderSvgLabel(label, cx, baseY, textColor);
         if (pair.active === "shifted") {
             return renderSvgLabel(label, cx, baseY, textColor);
         }
-        const pairRows = hasTopRows ? rows : shiftedPairRows(visual);
-        return renderSvgLabel(pair.shifted, cx, pairRows.shiftedY, textColor, hasTopRows ? shiftedRowOptions() : relaxedShiftedRowOptions()) +
-            renderSvgLabel(pair.base, cx, pairRows.baseY, textColor, hasTopRows ? baseRowOptions() : relaxedBaseRowOptions());
+        const pairRows = keyFaceRows(visual, { ...keyFaceState, hasShifted: true });
+        return renderSvgLabel(pair.shifted, cx, pairRows.shiftedY, textColor, topRowCount ? shiftedRowOptions() : relaxedShiftedRowOptions()) +
+            renderSvgLabel(pair.base, cx, pairRows.baseY, textColor, topRowCount ? baseRowOptions() : relaxedBaseRowOptions());
     }
 
-    function renderDualRoleSvgLabel(dualRole, cx, cy, textColor, hasTopRows = false) {
+    function renderDualRoleSvgLabel(dualRole, cx, cy, textColor, keyFaceState = {}) {
         const visual = keyVisual(dualRole.layoutIndex);
         const pair = shiftedOutputPair(dualRole.tapKeycode);
         const hasShiftedRow = pair && pair.active === "base";
-        const rows = dualRoleRows(visual, hasTopRows, hasShiftedRow);
+        const topRowCount = keyFaceTopRowCount(keyFaceState);
+        const rows = keyFaceRows(visual, { ...keyFaceState, hasShifted: hasShiftedRow, hasHold: true });
         const separator = "<line class='dual-role-separator-line' x1='" + (visual.x + 8) + "' y1='" + rows.separatorY + "' x2='" + (visual.x + keyboardGeometry.keyWidth - 8) + "' y2='" + rows.separatorY + "' stroke='" + escapeAttr(textColor || "#fff") + "' stroke-width='1'></line>";
-        const dense = hasTopRows || hasShiftedRow;
+        const dense = topRowCount > 0 || hasShiftedRow;
         const holdOptions = dense ? denseHoldRowOptions() : relaxedHoldRowOptions();
         if (hasShiftedRow) {
             return separator +
-                renderSvgLabel(pair.shifted, cx, rows.shiftedY, textColor, hasTopRows ? shiftedRowOptions() : relaxedShiftedRowOptions()) +
-                renderSvgLabel(pair.base, cx, rows.baseY, textColor, hasTopRows ? baseRowOptions() : relaxedBaseRowOptions()) +
+                renderSvgLabel(pair.shifted, cx, rows.shiftedY, textColor, topRowCount ? shiftedRowOptions() : relaxedShiftedRowOptions()) +
+                renderSvgLabel(pair.base, cx, rows.baseY, textColor, topRowCount ? baseRowOptions() : relaxedBaseRowOptions()) +
                 renderSvgLabel(dualRole.holdLabel, cx, rows.holdY, textColor, holdOptions);
         }
         const tapLabel = pair && pair.active === "shifted" ? pair.shifted : dualRole.tapLabel;
         return separator +
-            renderSvgLabel(tapLabel, cx, rows.baseY, textColor, hasTopRows ? baseRowOptions() : relaxedTapRowOptions()) +
+            renderSvgLabel(tapLabel, cx, rows.baseY, textColor, topRowCount ? baseRowOptions() : relaxedTapRowOptions()) +
             renderSvgLabel(dualRole.holdLabel, cx, rows.holdY, textColor, holdOptions);
     }
 
-    function keyFaceRows(visual) {
-        return {
-            behaviorY: visual.y + 6.3,
-            comboTopY: visual.y + 14.2,
-            comboHeight: 8.2,
-            shiftedY: visual.y + 30.3,
-            baseY: visual.y + 40.4,
-            separatorY: visual.y + 47.8,
-            holdY: visual.y + 54
-        };
+    function keyFaceRows(visual, state = {}) {
+        const rows = { comboHeight: 8.2 };
+        const topRowCount = keyFaceTopRowCount(state);
+        const y = visual.y;
+        if (state.hasBehavior && state.hasCombo) {
+            rows.behaviorY = y + 6.3;
+            rows.comboTopY = y + 14.2;
+        } else if (state.hasBehavior) {
+            rows.behaviorY = y + 7.5;
+        } else if (state.hasCombo) {
+            rows.comboTopY = y + 7.2;
+        }
+
+        const lowerRows = keyFaceLowerRows(y, topRowCount, Boolean(state.hasShifted), Boolean(state.hasHold));
+        return { ...rows, ...lowerRows };
+    }
+
+    function keyFaceTopRowCount(state = {}) {
+        return (state.hasBehavior ? 1 : 0) + (state.hasCombo ? 1 : 0);
+    }
+
+    function keyFaceLowerRows(y, topRowCount, hasShifted, hasHold) {
+        if (hasHold && hasShifted) {
+            return [
+                { shiftedY: y + 19.8, baseY: y + 31.2, separatorY: y + 41.5, holdY: y + 51.5 },
+                { shiftedY: y + 24.6, baseY: y + 35, separatorY: y + 44.6, holdY: y + 53 },
+                { shiftedY: y + 30.3, baseY: y + 40.4, separatorY: y + 47.8, holdY: y + 54 },
+            ][topRowCount];
+        }
+        if (hasHold) {
+            return [
+                { baseY: y + 24.5, separatorY: y + 37.4, holdY: y + 48.8 },
+                { baseY: y + 29.3, separatorY: y + 40.8, holdY: y + 51.8 },
+                { baseY: y + 32.2, separatorY: y + 43.4, holdY: y + 53.5 },
+            ][topRowCount];
+        }
+        if (hasShifted) {
+            return [
+                { shiftedY: y + 23, baseY: y + 36 },
+                { shiftedY: y + 26.6, baseY: y + 39 },
+                { shiftedY: y + 30.3, baseY: y + 40.4 },
+            ][topRowCount];
+        }
+        return [
+            { baseY: y + keyboardGeometry.keyHeight / 2 },
+            { baseY: y + 36 },
+            { baseY: y + 40.4 },
+        ][topRowCount];
     }
 
     function shiftedRowOptions() {
@@ -9382,30 +9423,6 @@ function getClientScript() {
 
     function baseRowOptions() {
         return { maxFontSize: 9.1, minFontSize: 6.4, maxWidth: keyboardGeometry.keyWidth - 12 };
-    }
-
-    function shiftedPairRows(visual) {
-        return {
-            shiftedY: visual.y + 23,
-            baseY: visual.y + 36
-        };
-    }
-
-    function dualRoleRows(visual, hasTopRows, hasShiftedRow) {
-        if (hasTopRows) return keyFaceRows(visual);
-        if (hasShiftedRow) {
-            return {
-                shiftedY: visual.y + 19.8,
-                baseY: visual.y + 31.2,
-                separatorY: visual.y + 41.5,
-                holdY: visual.y + 51.5
-            };
-        }
-        return {
-            baseY: visual.y + 24.5,
-            separatorY: visual.y + 37.4,
-            holdY: visual.y + 48.8
-        };
     }
 
     function relaxedShiftedRowOptions() {
@@ -9657,9 +9674,9 @@ function getClientScript() {
         ].filter(Boolean);
     }
 
-    function renderBehaviorDots(dots, visual, textColor) {
+    function renderBehaviorDots(dots, visual, textColor, keyFaceState = {}) {
         if (!dots.length) return "";
-        const rows = keyFaceRows(visual);
+        const rows = keyFaceRows(visual, { ...keyFaceState, hasBehavior: true });
         const radius = 3.8;
         const gap = 2;
         const step = radius * 2 + gap;
@@ -9677,9 +9694,9 @@ function getClientScript() {
         return layerCombos(currentLayer()).filter((combo) => combo.inputs.some((input) => keyExpressionsEquivalent(input, keycode))).map((combo) => combo.badge);
     }
 
-    function renderComboBadges(badges, visual) {
+    function renderComboBadges(badges, visual, keyFaceState = {}) {
         if (!badges.length) return "";
-        const rows = keyFaceRows(visual);
+        const rows = keyFaceRows(visual, { ...keyFaceState, hasCombo: true });
         const gap = 1.5;
         const naturalWidths = badges.map((badge) => Math.max(11.5, 5 + String(badge).length * 3.2));
         const available = keyboardGeometry.keyWidth - 8;

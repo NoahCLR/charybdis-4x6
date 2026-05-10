@@ -3061,12 +3061,12 @@ def render_svg_key(
     parts.append(
         f'    <rect x="{x:.1f}" y="{y:.1f}" width="{KEY_WIDTH}" height="{KEY_HEIGHT}" rx="{KEY_RADIUS}" fill="{style["fill"]}" stroke="{style["stroke"]}" stroke-width="1.5" filter="url(#shadow)"/>'
     )
-    has_top_rows = bool(behavior_dots) or bool(combo_badges)
-    parts.extend(render_svg_key_labels(x, y, cx, cy, keycode, label, style, has_top_rows))
+    key_face_state = {"has_behavior": bool(behavior_dots), "has_combo": bool(combo_badges)}
+    parts.extend(render_svg_key_labels(x, y, cx, cy, keycode, label, style, key_face_state))
     if behavior_dots:
-        parts.extend(render_svg_behavior_dots(x, y, style, behavior_dots))
+        parts.extend(render_svg_behavior_dots(x, y, style, behavior_dots, key_face_state))
     if combo_badges:
-        parts.extend(render_svg_combo_badges(x, y, combo_badges))
+        parts.extend(render_svg_combo_badges(x, y, combo_badges, key_face_state))
     parts.append("  </g>")
     return parts
 
@@ -3079,17 +3079,19 @@ def render_svg_key_labels(
     keycode: str,
     label: str,
     style: dict[str, object],
-    has_top_rows: bool,
+    key_face_state: dict[str, bool],
 ) -> list[str]:
     dual_role = dual_role_layout_visual(keycode)
     if dual_role is not None:
-        return render_svg_dual_role_labels(x, y, cx, dual_role, style, has_top_rows)
+        return render_svg_dual_role_labels(x, y, cx, dual_role, style, key_face_state)
 
     pair = shifted_output_pair(keycode)
+    top_row_count = key_face_top_row_count(key_face_state)
+    rows = key_face_rows(y, key_face_state)
     if pair is None:
         if not label:
             return []
-        label_y = key_face_rows(y)["base_y"] if has_top_rows else cy + 4
+        label_y = rows["base_y"] if top_row_count else cy
         return [
             render_svg_label(
                 label,
@@ -3103,7 +3105,7 @@ def render_svg_key_labels(
         ]
 
     if pair["active"] == "shifted":
-        label_y = key_face_rows(y)["base_y"] if has_top_rows else cy + 4
+        label_y = rows["base_y"] if top_row_count else cy
         return [
             render_svg_label(
                 label,
@@ -3116,12 +3118,12 @@ def render_svg_key_labels(
             )
         ]
 
-    rows = key_face_rows(y) if has_top_rows else shifted_pair_rows(y)
-    shifted_options = shifted_row_options() if has_top_rows else relaxed_shifted_row_options()
-    base_options = base_row_options() if has_top_rows else relaxed_base_row_options()
+    pair_rows = key_face_rows(y, {**key_face_state, "has_shifted": True})
+    shifted_options = shifted_row_options() if top_row_count else relaxed_shifted_row_options()
+    base_options = base_row_options() if top_row_count else relaxed_base_row_options()
     return [
-        render_svg_label(pair["shifted"], cx, rows["shifted_y"], style["text"], float(style["label_opacity"]) * shifted_options["opacity"], shifted_options["font_size"], shifted_options["max_width"], font_weight="650"),
-        render_svg_label(pair["base"], cx, rows["base_y"], style["text"], float(style["label_opacity"]), base_options["font_size"], base_options["max_width"]),
+        render_svg_label(pair["shifted"], cx, pair_rows["shifted_y"], style["text"], float(style["label_opacity"]) * shifted_options["opacity"], shifted_options["font_size"], shifted_options["max_width"], font_weight="650"),
+        render_svg_label(pair["base"], cx, pair_rows["base_y"], style["text"], float(style["label_opacity"]), base_options["font_size"], base_options["max_width"]),
     ]
 
 
@@ -3131,20 +3133,21 @@ def render_svg_dual_role_labels(
     cx: float,
     dual_role: dict[str, str],
     style: dict[str, object],
-    has_top_rows: bool,
+    key_face_state: dict[str, bool],
 ) -> list[str]:
     pair = shifted_output_pair(dual_role["tap_keycode"])
     has_shifted_row = pair is not None and pair["active"] == "base"
-    rows = dual_role_rows(y, has_top_rows, has_shifted_row)
-    dense = has_top_rows or has_shifted_row
+    top_row_count = key_face_top_row_count(key_face_state)
+    rows = key_face_rows(y, {**key_face_state, "has_shifted": has_shifted_row, "has_hold": True})
+    dense = top_row_count > 0 or has_shifted_row
     hold_options = dense_hold_row_options() if dense else relaxed_hold_row_options()
     parts = [
         f'    <line x1="{x + 8:.1f}" y1="{rows["separator_y"]:.1f}" x2="{x + KEY_WIDTH - 8:.1f}" y2="{rows["separator_y"]:.1f}" stroke="{style["text"]}" stroke-opacity="0.42" stroke-width="1"/>'
     ]
 
     if has_shifted_row and pair is not None:
-        shifted_options = shifted_row_options() if has_top_rows else relaxed_shifted_row_options()
-        base_options = base_row_options() if has_top_rows else relaxed_base_row_options()
+        shifted_options = shifted_row_options() if top_row_count else relaxed_shifted_row_options()
+        base_options = base_row_options() if top_row_count else relaxed_base_row_options()
         parts.append(
             render_svg_label(pair["shifted"], cx, rows["shifted_y"], style["text"], float(style["label_opacity"]) * shifted_options["opacity"], shifted_options["font_size"], shifted_options["max_width"], font_weight="650")
         )
@@ -3153,7 +3156,7 @@ def render_svg_dual_role_labels(
         )
     else:
         tap_label = pair["shifted"] if pair is not None and pair["active"] == "shifted" else dual_role["tap_label"]
-        tap_options = base_row_options() if has_top_rows else relaxed_tap_row_options()
+        tap_options = base_row_options() if top_row_count else relaxed_tap_row_options()
         parts.append(
             render_svg_label(tap_label, cx, rows["base_y"], style["text"], float(style["label_opacity"]), tap_options["font_size"], tap_options["max_width"])
         )
@@ -3169,8 +3172,9 @@ def render_svg_behavior_dots(
     y: float,
     style: dict[str, object],
     behavior_dots: list[dict[str, object]],
+    key_face_state: dict[str, bool],
 ) -> list[str]:
-    rows = key_face_rows(y)
+    rows = key_face_rows(y, {**key_face_state, "has_behavior": True})
     radius = 3.8
     gap = 2
     step = (radius * 2) + gap
@@ -3191,8 +3195,8 @@ def render_svg_behavior_dots(
     return parts
 
 
-def render_svg_combo_badges(x: float, y: float, combo_badges: list[str]) -> list[str]:
-    rows = key_face_rows(y)
+def render_svg_combo_badges(x: float, y: float, combo_badges: list[str], key_face_state: dict[str, bool]) -> list[str]:
+    rows = key_face_rows(y, {**key_face_state, "has_combo": True})
     badge_gap = 1.5
     natural_widths = [max(11.5, 5 + (len(badge) * 3.2)) for badge in combo_badges]
     available = KEY_WIDTH - 8
@@ -3216,40 +3220,59 @@ def render_svg_combo_badges(x: float, y: float, combo_badges: list[str]) -> list
     return parts
 
 
-def key_face_rows(y: float) -> dict[str, float]:
-    return {
-        "behavior_y": y + 6.3,
-        "combo_top_y": y + 14.2,
-        "combo_height": 8.2,
-        "shifted_y": y + 30.3,
-        "base_y": y + 40.4,
-        "separator_y": y + 47.8,
-        "hold_y": y + 54,
-    }
+def key_face_rows(y: float, state: dict[str, bool] | None = None) -> dict[str, float]:
+    row_state = state or {}
+    rows = {"combo_height": 8.2}
+    top_row_count = key_face_top_row_count(row_state)
+
+    if row_state.get("has_behavior") and row_state.get("has_combo"):
+        rows["behavior_y"] = y + 6.3
+        rows["combo_top_y"] = y + 14.2
+    elif row_state.get("has_behavior"):
+        rows["behavior_y"] = y + 7.5
+    elif row_state.get("has_combo"):
+        rows["combo_top_y"] = y + 7.2
+
+    rows.update(
+        key_face_lower_rows(
+            y,
+            top_row_count,
+            bool(row_state.get("has_shifted")),
+            bool(row_state.get("has_hold")),
+        )
+    )
+    return rows
 
 
-def shifted_pair_rows(y: float) -> dict[str, float]:
-    return {
-        "shifted_y": y + 23,
-        "base_y": y + 36,
-    }
+def key_face_top_row_count(state: dict[str, bool] | None = None) -> int:
+    row_state = state or {}
+    return int(bool(row_state.get("has_behavior"))) + int(bool(row_state.get("has_combo")))
 
 
-def dual_role_rows(y: float, has_top_rows: bool, has_shifted_row: bool) -> dict[str, float]:
-    if has_top_rows:
-        return key_face_rows(y)
-    if has_shifted_row:
-        return {
-            "shifted_y": y + 19.8,
-            "base_y": y + 31.2,
-            "separator_y": y + 41.5,
-            "hold_y": y + 51.5,
-        }
-    return {
-        "base_y": y + 24.5,
-        "separator_y": y + 37.4,
-        "hold_y": y + 48.8,
-    }
+def key_face_lower_rows(y: float, top_row_count: int, has_shifted: bool, has_hold: bool) -> dict[str, float]:
+    if has_hold and has_shifted:
+        return [
+            {"shifted_y": y + 19.8, "base_y": y + 31.2, "separator_y": y + 41.5, "hold_y": y + 51.5},
+            {"shifted_y": y + 24.6, "base_y": y + 35, "separator_y": y + 44.6, "hold_y": y + 53},
+            {"shifted_y": y + 30.3, "base_y": y + 40.4, "separator_y": y + 47.8, "hold_y": y + 54},
+        ][top_row_count]
+    if has_hold:
+        return [
+            {"base_y": y + 24.5, "separator_y": y + 37.4, "hold_y": y + 48.8},
+            {"base_y": y + 29.3, "separator_y": y + 40.8, "hold_y": y + 51.8},
+            {"base_y": y + 32.2, "separator_y": y + 43.4, "hold_y": y + 53.5},
+        ][top_row_count]
+    if has_shifted:
+        return [
+            {"shifted_y": y + 23, "base_y": y + 36},
+            {"shifted_y": y + 26.6, "base_y": y + 39},
+            {"shifted_y": y + 30.3, "base_y": y + 40.4},
+        ][top_row_count]
+    return [
+        {"base_y": y + (KEY_HEIGHT / 2)},
+        {"base_y": y + 36},
+        {"base_y": y + 40.4},
+    ][top_row_count]
 
 
 def shifted_row_options() -> dict[str, float]:
