@@ -110,6 +110,9 @@ are local drafts until an apply action writes them to source.
   staged or dirty edits. The warning lists staged layout/layer changes that
   `Apply all` can write and local form edits that still need their own
   card-level Apply action.
+- Switching between Layout, Macros, RGB, and Defaults preserves dirty form
+  drafts in the previous view. View tabs turn orange while that view still has
+  unapplied local edits.
 - Local Studio edits support normal undo/redo before they are written:
   `Cmd+Z` / `Ctrl+Z` undo, and `Cmd+Shift+Z`, `Ctrl+Shift+Z`, or `Ctrl+Y` redo.
 - Reload reparses `keymap.c`, `config.h`, and `rgb_config.c` from disk and

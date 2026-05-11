@@ -117,6 +117,14 @@ const appendedCheck = `
         "Profile Studio header rows should be ordered as profile, source, profile overview, firmware"
     );
     assert(
+        getClientScript().includes("let viewDrafts = {}") &&
+            getClientScript().includes("function storeActiveViewDraft()") &&
+            getClientScript().includes("function restoreActiveViewDraft()") &&
+            getClientScript().includes("storeActiveViewDraft();\\n            if (activeView !== target.dataset.view)") &&
+            getClientScript().includes("viewDrafts[viewId]?.dirty"),
+        "Profile Studio view tabs should preserve unsaved form drafts and mark inactive dirty tabs"
+    );
+    assert(
         extensionSource.includes('id="compileFirmware"') &&
             extensionSource.includes("Compile left + right") &&
             getClientScript().includes('type: "compileFirmware"') &&

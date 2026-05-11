@@ -6000,6 +6000,7 @@ function getClientScript() {
     let selectedKey = 0;
     let activeBehaviorKeycode = "";
     let activeView = "layout";
+    let viewDrafts = {};
     let rgbGroupTarget = "layer";
     let rgbGroupOwner = "";
     let rgbSelectedLeds = [];
@@ -6638,6 +6639,7 @@ function getClientScript() {
     window.addEventListener("message", (event) => {
         if (event.data.type === "model") {
             clearFloatingStatus();
+            viewDrafts = {};
             model = event.data.model;
             Object.assign(qmkKeyLabels, model.qmkKeyLabels || {});
             Object.assign(qmkKeyAliases, model.qmkKeycodeAliases || {});
@@ -6767,6 +6769,7 @@ function getClientScript() {
             render();
             resetLocalHistory();
         } else if (action === "selectView") {
+            storeActiveViewDraft();
             if (activeView !== target.dataset.view) {
                 stopMacroRecording(true);
             }
@@ -8320,6 +8323,7 @@ function getClientScript() {
     }
 
     function post(message) {
+        storeActiveViewDraft();
         dismissedStatusSignature = "";
         notice = "Working...";
         layoutNotice = "";
@@ -8344,6 +8348,7 @@ function getClientScript() {
         clearLayoutComboOriginal();
         activeMacroKeycode = "";
         macroDrafts = {};
+        viewDrafts = {};
         resetMacroRecorderState();
         pendingLayoutEdits = {};
         pendingLayerAdds = [];
@@ -8373,6 +8378,7 @@ function getClientScript() {
         subtitle.textContent = model.activeProfile ? model.root + " / " + model.activeProfile.keymap : model.root;
         app.innerHTML = renderDiagnostics() + renderViewTabs() + renderActiveView();
         initializeDirtyTracking();
+        restoreActiveViewDraft();
         hydrateTooltips();
         scheduleMacroSlotBrowserHeightSync();
     }
@@ -8615,6 +8621,29 @@ function getClientScript() {
         return { value: control.value || "" };
     }
 
+    function storeActiveViewDraft() {
+        if (!model || !activeView) return;
+        const dirty = Boolean(app.querySelector("[data-dirty-section].dirty"));
+        if (!dirty) {
+            delete viewDrafts[activeView];
+            return;
+        }
+        viewDrafts = {
+            ...viewDrafts,
+            [activeView]: {
+                dirty: true,
+                controls: localEditableControls().map(controlSnapshot),
+            },
+        };
+    }
+
+    function restoreActiveViewDraft() {
+        const draft = viewDrafts[activeView];
+        if (!draft || !draft.controls) return;
+        restoreLocalControls(draft.controls);
+        refreshRestoredLocalState();
+    }
+
     function initializeDirtyTracking() {
         for (const section of document.querySelectorAll("[data-dirty-section]")) {
             section.dataset.dirtyBaseline = dirtySnapshot(section);
@@ -8628,6 +8657,7 @@ function getClientScript() {
         if (section) {
             updateDirtySection(section);
         }
+        storeActiveViewDraft();
         refreshDirtyTabIndicators();
     }
 
@@ -9183,6 +9213,7 @@ function getClientScript() {
 
     function viewTabDirty(viewId) {
         if (viewHasDirtyDomSection(viewId)) return true;
+        if (viewDrafts[viewId]?.dirty) return true;
         if (viewId === "layout") return layoutViewHasUnsavedChanges();
         if (viewId === "macros") return macroViewHasUnsavedChanges();
         if (viewId === "rgb") return rgbViewHasUnsavedChanges();

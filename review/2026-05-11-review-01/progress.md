@@ -49,6 +49,8 @@ right thread for profile-tooling changes.
 - Changed Profile Studio overview-doc generation to warn about unapplied Studio
   edits and avoid a model reload for docs-only generation so local drafts are
   not silently reset.
+- Changed Profile Studio view switching to preserve dirty form drafts across
+  Layout, Macros, RGB, and Defaults and mark inactive dirty tabs.
 - Added all-profile validation and firmware compile runners that loop over
   Charybdis 4x6 `qmk.json` build targets.
 - Changed the full host suite to use all-profile authored validation.
@@ -111,6 +113,13 @@ Passed:
   handling
 - `qmk compile -kb bastardkb/charybdis/4x6 -km noah` after overview-doc
   unsaved-change handling
+- `npm run check` from `tools/charybdis-profile-studio/` after dirty view-tab
+  draft preservation
+- `npm run screenshots` from `tools/charybdis-profile-studio/` after dirty
+  view-tab draft preservation
+- `sh tests/host/run_all_host_tests.sh` after dirty view-tab draft preservation
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah` after dirty view-tab draft
+  preservation
 
 Notes:
 

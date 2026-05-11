@@ -115,6 +115,9 @@ behavior rows, combo outputs, macros, and pointing modes. Combo outputs can
 enter the same behavior editor as physical keys, so a chord can reuse the same
 branch behavior model.
 
+Dirty form drafts survive switching between the Layout, Macros, RGB, and
+Defaults tabs; inactive tabs turn orange while they still have unapplied edits.
+
 ## Macros Tab
 
 Use the Macros tab for `VIA_MACROS(MACRO)` payloads.
