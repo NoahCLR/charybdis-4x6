@@ -141,7 +141,8 @@ Other profiles can generate their own overview with
 `python3 tools/profile_introspect.py --keymap <name> --write`; those reports
 default to `docs/profiles/<name>/KEYMAP-OVERVIEW.md`.
 Profile Studio also has a Profile overview row with a `Create overview doc`
-action for the active profile.
+action for the active profile. It warns when Studio has unapplied edits because
+the overview is generated from source files on disk.
 The Firmware row's `Compile left + right` action opens the Charybdis Profile
 Studio output pane and streams QMK while it builds left and right UF2 files for
 the active profile.

@@ -1204,10 +1204,20 @@ async function handleWebviewMessage(panel, root, state, message) {
             await postModel(panel, root, state, `Deleted ${target.keymap}.`);
             return;
         }
-        case "generateProfileDocs":
-            await runProfileIntrospection(root, await checkedMessageProfile(root, state, message), "write");
-            await postModel(panel, root, state, "Generated active profile overview docs.");
+        case "generateProfileDocs": {
+            const target = await checkedMessageProfile(root, state, message);
+            try {
+                await runProfileIntrospection(root, target, "write");
+                const notice = `Generated ${target.keymap} profile overview docs.`;
+                panel.webview.postMessage({ type: "docsResult", notice });
+                vscode.window.showInformationMessage(notice);
+            } catch (error) {
+                const text = error instanceof Error ? error.message : String(error);
+                panel.webview.postMessage({ type: "docsResult", error: text });
+                vscode.window.showErrorMessage(`Charybdis Profile Studio: ${text}`);
+            }
             return;
+        }
         case "compileFirmware": {
             const target = await checkedMessageProfile(root, state, message);
             try {
@@ -1236,6 +1246,13 @@ async function handleWebviewMessage(panel, root, state, message) {
             await applyAllChanges(root, target, message);
             const builds = await compileProfileFirmware(root, target);
             await postModel(panel, root, state, `Applied staged changes and ${compiledFirmwareNotice(target, builds)}`, { activeLayer: message.activeLayer, appliedLayerChanges: Boolean(message.adds?.length || message.deletes?.length) });
+            return;
+        }
+        case "applyAllChangesAndGenerateProfileDocs": {
+            const target = await checkedMessageProfile(root, state, message);
+            await applyAllChanges(root, target, message);
+            await runProfileIntrospection(root, target, "write");
+            await postModel(panel, root, state, `Applied staged changes and generated ${target.keymap} profile overview docs.`, { activeLayer: message.activeLayer, appliedLayerChanges: Boolean(message.adds?.length || message.deletes?.length) });
             return;
         }
         case "applyLayerChanges": {
@@ -6047,7 +6064,7 @@ function getClientScript() {
         openKeymap: "Open keymap.c beside the studio so you can inspect or hand-edit the source.",
         openRgb: "Open rgb_config.c beside the studio so you can inspect or hand-edit the source.",
         openConfig: "Open config.h beside the studio so you can inspect layer enum and timing settings.",
-        generateProfileDocs: "Create or refresh the generated profile overview Markdown and assets for the active profile.",
+        generateProfileDocs: "Create or refresh the generated profile overview Markdown and assets from the active profile source files on disk.",
         compileFirmware: "Compile separate left and right UF2 firmware files for the active profile.",
         applyAll: "Write all staged Studio changes, including layer structure and staged layout edits.",
         reload: "Reload keymap.c, config.h, and rgb_config.c from disk, discarding uncommitted Studio edits."
@@ -6505,7 +6522,9 @@ function getClientScript() {
     document.getElementById("openKeymap").addEventListener("click", () => vscode.postMessage({ type: "openSource", file: "keymap" }));
     document.getElementById("openRgb").addEventListener("click", () => vscode.postMessage({ type: "openSource", file: "rgb" }));
     document.getElementById("openConfig").addEventListener("click", () => vscode.postMessage({ type: "openSource", file: "config" }));
-    document.getElementById("generateProfileDocs").addEventListener("click", () => post({ type: "generateProfileDocs" }));
+    document.getElementById("generateProfileDocs").addEventListener("click", () => {
+        requestProfileDocsGeneration();
+    });
     document.getElementById("compileFirmware").addEventListener("click", () => {
         requestFirmwareCompile();
     });
@@ -6660,6 +6679,9 @@ function getClientScript() {
         }
         if (event.data.type === "compileResult") {
             showFloatingStatus(event.data.error || event.data.notice || "Firmware compile finished.", Boolean(event.data.error));
+        }
+        if (event.data.type === "docsResult") {
+            showFloatingStatus(event.data.error || event.data.notice || "Profile overview docs generated.", Boolean(event.data.error), "Profile overview");
         }
     });
 
@@ -7883,11 +7905,44 @@ function getClientScript() {
         });
     }
 
-    function compilePostMessage(message) {
+    function messageWithActiveProfile(message) {
         const activeProfileId = model?.activeProfile?.id || "";
-        const payload = activeProfileId && !message.profileId ? { ...message, profileId: activeProfileId } : message;
+        return activeProfileId && !message.profileId ? { ...message, profileId: activeProfileId } : message;
+    }
+
+    function profileDocsPostMessage(message) {
+        const payload = messageWithActiveProfile(message);
+        showFloatingStatus("Generating profile overview doc...", false, "Profile overview");
+        vscode.postMessage(payload);
+    }
+
+    function compilePostMessage(message) {
+        const payload = messageWithActiveProfile(message);
         showFloatingStatus("Compiling left and right firmware...", false);
         vscode.postMessage(payload);
+    }
+
+    async function requestProfileDocsGeneration() {
+        if (!model?.activeProfile?.editable) return;
+        captureActiveMacroDraft();
+        captureLayoutComboBuilderInputs();
+        const summary = compileUnsavedSummary();
+        if (!summary.hasUnsaved) {
+            profileDocsPostMessage({ type: "generateProfileDocs", activeLayer });
+            return;
+        }
+
+        const choice = await showProfileDocsConfirmDialog(summary);
+        if (choice === "apply") {
+            profileDocsPostMessage({
+                type: "applyAllChangesAndGenerateProfileDocs",
+                ...layerStructurePayload(),
+                layoutGroups: pendingLayoutChangeGroups(),
+                activeLayer,
+            });
+        } else if (choice === "saved") {
+            profileDocsPostMessage({ type: "generateProfileDocs", activeLayer });
+        }
     }
 
     async function requestFirmwareCompile() {
@@ -7979,7 +8034,29 @@ function getClientScript() {
         return button?.dataset.cleanLabel || button?.textContent || "Unsaved form";
     }
 
+    function showProfileDocsConfirmDialog(summary) {
+        return showUnsavedActionDialog(summary, {
+            titleId: "profileDocsConfirmTitle",
+            diskNotice: "Profile overview generation reads the profile source files currently on disk.",
+            applyDescription: "Apply all staged and generate writes staged layer and layout changes before creating the overview doc.",
+            localNote: "Local form edits are not written by the header Apply all action. Use each card's Apply button first if those edits should be included in the overview doc.",
+            applyLabel: "Apply all staged and generate",
+            savedLabel: "Keep as is and generate",
+        });
+    }
+
     function showCompileConfirmDialog(summary) {
+        return showUnsavedActionDialog(summary, {
+            titleId: "compileConfirmTitle",
+            diskNotice: "Firmware compile reads the profile source files currently on disk.",
+            applyDescription: "Apply all staged and compile writes staged layer and layout changes before building both firmware files.",
+            localNote: "Local form edits are not written by the header Apply all action. Use each card's Apply button first if those edits should be compiled.",
+            applyLabel: "Apply all staged and compile",
+            savedLabel: "Keep as is and compile",
+        });
+    }
+
+    function showUnsavedActionDialog(summary, action) {
         return new Promise((resolve) => {
             const backdrop = document.createElement("div");
             backdrop.className = "modal-backdrop";
@@ -7990,19 +8067,19 @@ function getClientScript() {
                 ? "<h3>Local form edits</h3><ul class='confirm-list'>" + summary.local.map((item) => "<li>" + escapeHtml(item) + "</li>").join("") + "</ul>"
                 : "";
             const localNote = summary.local.length
-                ? "<p>Local form edits are not written by the header Apply all action. Use each card's Apply button first if those edits should be compiled.</p>"
+                ? "<p>" + escapeHtml(action.localNote) + "</p>"
                 : "";
             backdrop.innerHTML =
-                "<div class='confirm-dialog' role='dialog' aria-modal='true' aria-labelledby='compileConfirmTitle'>" +
-                "<h2 id='compileConfirmTitle'>Unsaved Studio changes</h2>" +
-                "<p>Firmware compile reads the profile source files currently on disk.</p>" +
-                (summary.canApplyAll ? "<p>Apply all staged and compile writes staged layer and layout changes before building both firmware files.</p>" : "") +
+                "<div class='confirm-dialog' role='dialog' aria-modal='true' aria-labelledby='" + escapeHtml(action.titleId) + "'>" +
+                "<h2 id='" + escapeHtml(action.titleId) + "'>Unsaved Studio changes</h2>" +
+                "<p>" + escapeHtml(action.diskNotice) + "</p>" +
+                (summary.canApplyAll ? "<p>" + escapeHtml(action.applyDescription) + "</p>" : "") +
                 localNote +
                 stagedList +
                 localList +
                 "<div class='confirm-actions'>" +
-                (summary.canApplyAll ? "<button type='button' class='primary' data-choice='apply'>Apply all staged and compile</button>" : "") +
-                "<button type='button' data-choice='saved'>Keep as is and compile</button>" +
+                (summary.canApplyAll ? "<button type='button' class='primary' data-choice='apply'>" + escapeHtml(action.applyLabel) + "</button>" : "") +
+                "<button type='button' data-choice='saved'>" + escapeHtml(action.savedLabel) + "</button>" +
                 "<button type='button' data-choice='cancel'>Cancel</button>" +
                 "</div>" +
                 "</div>";
@@ -9039,7 +9116,7 @@ function getClientScript() {
         if (tooltip) tooltip.hidden = true;
     }
 
-    function showFloatingStatus(message, isError) {
+    function showFloatingStatus(message, isError, title) {
         clearFloatingStatus();
         const popup = document.createElement("div");
         popup.className = "status-popup";
@@ -9048,7 +9125,7 @@ function getClientScript() {
         popup.setAttribute("aria-live", isError ? "assertive" : "polite");
         popup.innerHTML =
             "<div class='status-popup-header'>" +
-            "<div class='status-popup-title'>" + (isError ? "Compile failed" : "Firmware") + "</div>" +
+            "<div class='status-popup-title'>" + escapeHtml(title || (isError ? "Compile failed" : "Firmware")) + "</div>" +
             "<button type='button' class='status-popup-dismiss' aria-label='Dismiss status popup'></button>" +
             "</div>" +
             "<div class='status-popup-body'><div class='" + (isError ? "error" : "notice") + "'>" + escapeHtml(message) + "</div></div>";

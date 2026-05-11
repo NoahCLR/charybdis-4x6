@@ -94,8 +94,9 @@ const appendedCheck = `
     );
     assert(
         getClientScript().includes('type: "generateProfileDocs"') &&
+            getClientScript().includes('type: "applyAllChangesAndGenerateProfileDocs"') &&
             !getClientScript().includes('type: "checkProfileDocs"'),
-        "Profile Studio docs button should expose generation without a separate check-docs action"
+        "Profile Studio docs button should expose generation with unsaved-change handling and without a separate check-docs action"
     );
     assert(
         extensionSource.includes("Profile overview") &&
@@ -134,6 +135,17 @@ const appendedCheck = `
             getClientScript().includes("Keep as is and compile") &&
             getClientScript().includes("Local form edits are not written by the header Apply all action"),
         "Profile Studio compile button should show an unsaved-change decision dialog"
+    );
+    assert(
+        getClientScript().includes("Profile overview generation reads the profile source files currently on disk") &&
+            getClientScript().includes("Apply all staged and generate") &&
+            getClientScript().includes("Keep as is and generate") &&
+            getClientScript().includes("included in the overview doc") &&
+            getClientScript().includes('event.data.type === "docsResult"') &&
+            extensionSource.includes('case "generateProfileDocs"') &&
+            extensionSource.includes('case "applyAllChangesAndGenerateProfileDocs"') &&
+            !extensionSource.includes('await postModel(panel, root, state, "Generated active profile overview docs.")'),
+        "Profile Studio overview-doc generation should warn about unsaved edits and avoid refreshing the model for docs-only generation"
     );
     assert(
         getClientScript().includes("layoutComboShouldSaveOriginal(original, originalSource, payload.inputs)"),

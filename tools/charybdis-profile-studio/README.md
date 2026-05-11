@@ -46,7 +46,8 @@ For a read-only overview of the current `noah` profile, see
 [`docs/KEYMAP.md`](../../docs/KEYMAP.md) explains the same current config in
 prose.
 Use the Profile overview row's `Create overview doc` action to run the
-generated overview workflow for the active profile.
+generated overview workflow for the active profile. It warns when Studio has
+unapplied edits because the overview is generated from source files on disk.
 Use the Firmware row's `Compile left + right` action to build
 `bastardkb_charybdis_4x6_<name>_left.uf2` with `FORCE_MASTER=yes` and
 `bastardkb_charybdis_4x6_<name>_right.uf2` with `FORCE_SLAVE=yes`. The action

@@ -46,6 +46,9 @@ right thread for profile-tooling changes.
   unsaved Studio edits before compiling.
 - Changed the Profile Studio firmware compile path to open the Studio output
   pane immediately and stream QMK stdout/stderr while each side builds.
+- Changed Profile Studio overview-doc generation to warn about unapplied Studio
+  edits and avoid a model reload for docs-only generation so local drafts are
+  not silently reset.
 - Added all-profile validation and firmware compile runners that loop over
   Charybdis 4x6 `qmk.json` build targets.
 - Changed the full host suite to use all-profile authored validation.
@@ -100,6 +103,14 @@ Passed:
   reorder
 - `sh tests/host/run_all_host_tests.sh` after header reorder
 - `qmk compile -kb bastardkb/charybdis/4x6 -km noah` after header reorder
+- `npm run check` from `tools/charybdis-profile-studio/` after overview-doc
+  unsaved-change handling
+- `npm run screenshots` from `tools/charybdis-profile-studio/` after
+  overview-doc unsaved-change handling
+- `sh tests/host/run_all_host_tests.sh` after overview-doc unsaved-change
+  handling
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah` after overview-doc
+  unsaved-change handling
 
 Notes:
 
