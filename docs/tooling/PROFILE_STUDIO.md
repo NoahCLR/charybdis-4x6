@@ -80,8 +80,8 @@ Those profile-specific outputs default to
 `docs/profiles/<name>/KEYMAP-OVERVIEW.md` and
 `docs/media/profiles/<name>/profile-introspection/`.
 
-The header `Generate docs` button runs the same `profile_introspect.py --write`
-action for the active profile.
+The header Profile overview row has a `Create overview doc` button that runs
+the same `profile_introspect.py --write` action for the active profile.
 
 ## Editing Model
 

@@ -34,6 +34,8 @@ right thread for profile-tooling changes.
 - Added a Profile Studio active-profile generated-docs action.
 - Reorganized the Profile Studio header into profile and source/docs action
   groups and removed the separate docs-check button.
+- Refined the Profile Studio header into separate profile, Profile overview,
+  and Source rows, with `Create overview doc` and `Reload source` labels.
 - Added all-profile validation and firmware compile runners that loop over
   Charybdis 4x6 `qmk.json` build targets.
 - Changed the full host suite to use all-profile authored validation.

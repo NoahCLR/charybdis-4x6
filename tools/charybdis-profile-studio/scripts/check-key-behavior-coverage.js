@@ -16,6 +16,7 @@ const context = {
     Buffer,
     setTimeout,
     clearTimeout,
+    extensionSource: source,
     __filename: sourcePath,
     __dirname: extensionRoot,
     module: {exports: {}},
@@ -95,6 +96,13 @@ const appendedCheck = `
         getClientScript().includes('type: "generateProfileDocs"') &&
             !getClientScript().includes('type: "checkProfileDocs"'),
         "Profile Studio docs button should expose generation without a separate check-docs action"
+    );
+    assert(
+        extensionSource.includes("Profile overview") &&
+            extensionSource.includes("Create overview doc") &&
+            extensionSource.includes("Reload source") &&
+            !extensionSource.includes("Check docs"),
+        "Profile Studio header should label the overview-doc action clearly and keep reload with source actions"
     );
     assert(
         getClientScript().includes("layoutComboShouldSaveOriginal(original, originalSource, payload.inputs)"),

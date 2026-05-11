@@ -45,8 +45,8 @@ For a read-only overview of the current `noah` profile, see
 [`docs/KEYMAP-OVERVIEW.md`](../../docs/KEYMAP-OVERVIEW.md). The companion
 [`docs/KEYMAP.md`](../../docs/KEYMAP.md) explains the same current config in
 prose.
-Use `Generate docs` to run the generated overview workflow for the active
-profile.
+Use the Profile overview row's `Create overview doc` action to run the
+generated overview workflow for the active profile.
 
 ## Screenshots
 

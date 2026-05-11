@@ -5738,17 +5738,19 @@ function getStudioHtml() {
                     <button id="deleteProfile">Delete</button>
                 </div>
             </div>
+            <div class="header-action-row">
+                <span class="profile-picker-label">Profile overview</span>
+                <button id="generateProfileDocs">Create overview doc</button>
+            </div>
             <div class="header-action-row toolbar">
                 <span class="profile-picker-label">Source</span>
                 <div class="header-button-group">
                     <button id="openKeymap">keymap.c</button>
                     <button id="openRgb">rgb_config.c</button>
                     <button id="openConfig">config.h</button>
+                    <button id="applyAll" class="primary dirty" hidden disabled>Apply all</button>
+                    <button id="reload" class="primary">Reload source</button>
                 </div>
-                <span class="profile-picker-label">Docs</span>
-                <button id="generateProfileDocs">Generate</button>
-                <button id="applyAll" class="primary dirty" hidden disabled>Apply all</button>
-                <button id="reload" class="primary">Reload</button>
             </div>
         </div>
     </header>
@@ -5835,7 +5837,7 @@ function getClientScript() {
         openKeymap: "Open keymap.c beside the studio so you can inspect or hand-edit the source.",
         openRgb: "Open rgb_config.c beside the studio so you can inspect or hand-edit the source.",
         openConfig: "Open config.h beside the studio so you can inspect layer enum and timing settings.",
-        generateProfileDocs: "Run profile_introspect.py --write for the active profile.",
+        generateProfileDocs: "Create or refresh the generated profile overview Markdown and assets for the active profile.",
         applyAll: "Write all staged Studio changes, including layer structure and staged layout edits.",
         reload: "Reload keymap.c, config.h, and rgb_config.c from disk, discarding uncommitted Studio edits."
     };

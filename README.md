@@ -140,7 +140,8 @@ For a read-only overview of my current config, start with the generated
 Other profiles can generate their own overview with
 `python3 tools/profile_introspect.py --keymap <name> --write`; those reports
 default to `docs/profiles/<name>/KEYMAP-OVERVIEW.md`.
-Profile Studio also has a `Generate docs` action for the active profile.
+Profile Studio also has a Profile overview row with a `Create overview doc`
+action for the active profile.
 
 Use Profile Studio when you want to:
 
