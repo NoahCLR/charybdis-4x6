@@ -22,7 +22,11 @@ rejected so extra payloads are not silently dropped.
 The checked-in VIA export currently covers the populated layer blocks. The
 script reads the selected profile's layer enum from `config.h` before rendering
 layer wrappers such as `MO(3)` or `LT(3, KC_F)`, so generated layer names follow
-the target profile.
+the target profile. If an export has fewer layers than the selected profile,
+missing layers are padded as fully transparent layers. If an export has more
+layers than the selected profile enum, the extra layers are preserved with
+numeric C layer designators and numeric layer references instead of invented
+`LAYER_*` enum names.
 
 In `--write` mode, it can rewrite either or both of those sections in the
 selected profile's `keymap.c`.
@@ -155,6 +159,9 @@ After syncing from VIA, check these things:
 - the right layers were rewritten
 - exported layer names still match the keymap enum, especially after adding or
   deleting layers
+- short exports padded any missing layers as transparent layers, and extra
+  export layers intentionally remain numeric if the profile enum does not name
+  them
 - `VIA_MACROS(MACRO)` matches the export you intended
 - custom keycodes still resolved to the expected symbolic names
 - no profile-specific authored behavior in `key_behaviors[]` now conflicts with
@@ -167,7 +174,7 @@ python3 tools/profile_introspect.py --write
 python3 tools/profile_introspect.py --check
 sh tests/host/run_real_profile_validation_tests.sh
 sh tests/host/run_all_host_tests.sh
-qmk compile -kb bastardkb/charybdis/4x6 -km noah
+sh tests/host/run_all_profile_compile_tests.sh
 ```
 
 For another profile, pass the same profile target to the profile checks and
@@ -178,7 +185,7 @@ python3 tools/profile_introspect.py --keymap <name> --write
 python3 tools/profile_introspect.py --keymap <name> --check
 sh tests/host/run_real_profile_validation_tests.sh keyboards/bastardkb/charybdis/4x6/keymaps/<name>
 sh tests/host/run_all_host_tests.sh
-qmk compile -kb bastardkb/charybdis/4x6 -km <name>
+sh tests/host/run_all_profile_compile_tests.sh
 ```
 
 For this repo's normal maintenance workflow, run those host checks before the

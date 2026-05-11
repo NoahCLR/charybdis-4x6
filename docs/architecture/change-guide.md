@@ -52,7 +52,7 @@ checks before handoff when source/build behavior changed.
 | --- | --- |
 | Key runtime | `run_key_runtime_release_matrix_tests.sh`, `run_key_runtime_modifier_hold_integration_tests.sh`, `run_pd_mode_key_runtime_integration_tests.sh`, `run_key_runtime_layer_lock_integration_tests.sh`, `run_key_runtime_scenario_tests.sh`, `run_key_runtime_integration_harness_tests.sh` |
 | PD runtime or pointing policy | `run_pd_mode_tests.sh`, `run_pd_mode_handlers_tests.sh`, `run_pd_runtime_tests.sh`, `run_pointer_layer_policy_tests.sh`, `run_split_runtime_sync_tests.sh` |
-| Authored profile data | `profile_introspect.py --keymap <name> --write`, `profile_introspect.py --keymap <name> --check`, `run_profile_introspection_checks.sh`, `run_key_behavior_lookup_tests.sh`, `run_key_behavior_validation_tests.sh`, `run_keymap_validation_tests.sh`, `run_real_profile_validation_tests.sh`, `run_real_profile_thumb_layer_lock_integration_tests.sh` |
+| Authored profile data | `profile_introspect.py --keymap <name> --write`, `profile_introspect.py --keymap <name> --check`, `run_profile_introspection_checks.sh`, `run_key_behavior_lookup_tests.sh`, `run_key_behavior_validation_tests.sh`, `run_keymap_validation_tests.sh`, `run_all_profile_validation_tests.sh`, `run_real_profile_thumb_layer_lock_integration_tests.sh` |
 | RGB | `run_rgb_validation_tests.sh`, `run_rgb_layer_render_tests.sh` |
 | Hooks or ownership | `run_hook_chaining_tests.sh`, `run_keyboard_mod_ownership_tests.sh`, `run_owned_keycode_tests.sh`, `run_held_action_tests.sh`, `run_layer_ownership_tests.sh` |
 | Macros, VIA, QMK contracts | `run_qmk_contract_checks.sh`, `run_action_lifecycle_tests.sh`, `run_macro_dispatch_tests.sh`, `run_macro_payload_tests.sh`, `run_via_macro_defaults_tests.sh`, `run_via_macro_action_lifecycle_tests.sh`, `run_qmk_via_split_sync_tests.sh` |
@@ -71,5 +71,5 @@ source manifest, build wiring, or generated firmware input changed.
 - Targeted host tests pass for the area touched.
 - `run_feature_gate_compile_tests.sh` passes when source boundaries, manifests,
   or include rules changed.
-- `run_all_host_tests.sh` and `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
-  pass for runtime, authored profile, build, or firmware-behavior changes.
+- `run_all_host_tests.sh` and `run_all_profile_compile_tests.sh` pass for
+  runtime, authored profile, build, or firmware-behavior changes.

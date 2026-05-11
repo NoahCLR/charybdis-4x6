@@ -27,9 +27,21 @@ right thread for profile-tooling changes.
 - Changed VIA import macro loading to accept short older exports by padding
   missing `macros[]` slots as empty defaults while still rejecting oversized
   exports.
+- Changed VIA import layer loading to pad short `layers[]` exports with
+  transparent layers and preserve extra exported layers with numeric layer ids.
+- Added Profile Studio clone, rename, and delete profile actions with matching
+  `qmk.json` build-target updates.
+- Added a Profile Studio active-profile generated-docs action.
+- Reorganized the Profile Studio header into profile and source/docs action
+  groups and removed the separate docs-check button.
+- Added all-profile validation and firmware compile runners that loop over
+  Charybdis 4x6 `qmk.json` build targets.
+- Changed the full host suite to use all-profile authored validation.
 - Expanded tooling checks to exercise alternate profile introspection output and
   alternate VIA target preview/write simulation against a temp profile.
 - Added tooling coverage for short VIA `macros[]` export padding.
+- Added tooling coverage for short VIA `layers[]` padding, extra layer numeric
+  fallback, and Profile Studio lifecycle helpers.
 - Updated user-facing tooling docs and architecture docs for selected-profile
   introspection and VIA import.
 
@@ -53,12 +65,20 @@ Passed:
 - `sh tests/host/run_tooling_checks.sh`
 - `sh tests/host/run_all_host_tests.sh`
 - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `node --check tools/charybdis-profile-studio/extension.js`
+- `sh tests/host/run_all_profile_validation_tests.sh`
+- `npm run screenshots` from `tools/charybdis-profile-studio/`
+- `sh tests/host/run_all_profile_compile_tests.sh`
+
+Notes:
+
+- `npm run screenshots` needed an escalated rerun because the sandbox blocked
+  the local screenshot server from listening on `127.0.0.1`.
+- The first `sh tests/host/run_all_profile_compile_tests.sh` run hit a sandbox
+  denial writing QMK `.build` artifacts in the sibling firmware checkout; the
+  escalated rerun passed.
 
 ### Next Steps
 
-1. Consider adding Profile Studio UI actions for generating the active profile
-   overview.
-2. Consider profile lifecycle operations in Studio: clone, rename, and delete
-   with matching `qmk.json` updates.
-3. Consider CI coverage that runs host tooling checks before firmware
+1. Consider CI coverage that runs host tooling checks before firmware
    userspace builds.

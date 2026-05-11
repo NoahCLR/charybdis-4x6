@@ -42,6 +42,27 @@ charybdis_profile_keymap_paths() {
         sort
 }
 
+charybdis_qmk_build_target_keymaps() {
+    root="$1"
+    python="${PYTHON:-python3}"
+    qmk_json="$root/qmk.json"
+
+    [ -f "$qmk_json" ] || return 0
+
+    "$python" - "$qmk_json" <<'PY'
+import json
+import sys
+
+keyboard = "bastardkb/charybdis/4x6"
+with open(sys.argv[1], "r", encoding="utf-8") as handle:
+    data = json.load(handle)
+
+for target in data.get("build_targets", []):
+    if isinstance(target, list) and len(target) >= 2 and target[0] == keyboard and isinstance(target[1], str):
+        print(target[1])
+PY
+}
+
 noah_source_manifest_absolute_userspace_paths_selected() {
     root="$1"
     variable_name="$2"

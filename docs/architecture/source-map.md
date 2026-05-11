@@ -201,7 +201,7 @@ Use the runner that matches the behavior touched while iterating, then use
 | Area | Runners |
 | --- | --- |
 | Action lifecycle and dispatch | `run_action_dispatch_tests.sh`, `run_action_lifecycle_tests.sh`, `run_delayed_action_tests.sh`, `run_owned_keycode_tests.sh` |
-| Key behavior, authored profile validation, and generated overview | `run_profile_introspection_checks.sh`, `run_key_behavior_lookup_tests.sh`, `run_key_behavior_validation_tests.sh`, `run_keymap_validation_tests.sh`, `run_real_profile_validation_tests.sh`, `run_real_profile_thumb_layer_lock_integration_tests.sh` |
+| Key behavior, authored profile validation, and generated overview | `run_profile_introspection_checks.sh`, `run_key_behavior_lookup_tests.sh`, `run_key_behavior_validation_tests.sh`, `run_keymap_validation_tests.sh`, `run_all_profile_validation_tests.sh`, `run_real_profile_thumb_layer_lock_integration_tests.sh` |
 | Key runtime | `run_key_runtime_release_matrix_tests.sh`, `run_key_runtime_modifier_hold_integration_tests.sh`, `run_pd_mode_key_runtime_integration_tests.sh`, `run_key_runtime_layer_lock_integration_tests.sh`, `run_key_runtime_scenario_tests.sh`, `run_key_runtime_integration_harness_tests.sh` |
 | Hooks, ownership, and boundaries | `run_hook_chaining_tests.sh`, `run_keyboard_mod_ownership_tests.sh`, `run_held_action_tests.sh`, `run_layer_ownership_tests.sh`, `run_feature_gate_compile_tests.sh` |
 | Macro, VIA, and QMK compatibility | `run_macro_dispatch_tests.sh`, `run_macro_payload_tests.sh`, `run_via_macro_defaults_tests.sh`, `run_via_macro_action_lifecycle_tests.sh`, `run_qmk_combo_origin_tests.sh`, `run_qmk_via_split_sync_tests.sh` |
@@ -209,3 +209,4 @@ Use the runner that matches the behavior touched while iterating, then use
 | RGB and split | `run_rgb_validation_tests.sh`, `run_rgb_layer_render_tests.sh`, `run_split_runtime_sync_tests.sh` |
 | Runtime diagnostics and tracing | `run_runtime_init_order_tests.sh`, `run_runtime_debug_tests.sh`, `run_runtime_diag_tests.sh`, `run_runtime_trace_tests.sh` |
 | Full host suite | `run_all_host_tests.sh` |
+| All-profile firmware compile | `run_all_profile_compile_tests.sh` |

@@ -1,8 +1,12 @@
 "use strict";
 
 const vscode = require("vscode");
+const { execFile } = require("child_process");
 const fs = require("fs/promises");
 const path = require("path");
+const { promisify } = require("util");
+
+const execFileAsync = promisify(execFile);
 
 const PROFILE_KEYBOARD = "bastardkb/charybdis/4x6";
 const PROFILE_KEYMAPS_RELATIVE_PATH = path.join(
@@ -646,6 +650,49 @@ async function ensureQmkBuildTarget(root, keymap) {
     await writeText(qmkJsonPath, JSON.stringify(parsed, null, 4) + "\n");
 }
 
+async function removeQmkBuildTarget(root, keymap) {
+    const qmkJsonPath = path.join(root, "qmk.json");
+    let parsed;
+    try {
+        parsed = JSON.parse(await fs.readFile(qmkJsonPath, "utf8"));
+    } catch {
+        return;
+    }
+
+    const buildTargets = Array.isArray(parsed.build_targets) ? parsed.build_targets : [];
+    parsed.build_targets = buildTargets.filter((target) => !(Array.isArray(target) && target[0] === PROFILE_KEYBOARD && target[1] === keymap));
+    await writeText(qmkJsonPath, JSON.stringify(parsed, null, 4) + "\n");
+}
+
+async function renameQmkBuildTarget(root, oldKeymap, newKeymap) {
+    const qmkJsonPath = path.join(root, "qmk.json");
+    let parsed = {};
+    try {
+        parsed = JSON.parse(await fs.readFile(qmkJsonPath, "utf8"));
+    } catch {
+        parsed = { userspace_version: "1.0", build_targets: [] };
+    }
+
+    const buildTargets = Array.isArray(parsed.build_targets) ? parsed.build_targets : [];
+    let renamed = false;
+    const nextTargets = [];
+    for (const target of buildTargets) {
+        if (!Array.isArray(target) || target[0] !== PROFILE_KEYBOARD || target[1] !== oldKeymap) {
+            nextTargets.push(target);
+            continue;
+        }
+        if (!nextTargets.some((existing) => Array.isArray(existing) && existing[0] === PROFILE_KEYBOARD && existing[1] === newKeymap)) {
+            nextTargets.push([PROFILE_KEYBOARD, newKeymap]);
+        }
+        renamed = true;
+    }
+    if (!renamed && !nextTargets.some((target) => Array.isArray(target) && target[0] === PROFILE_KEYBOARD && target[1] === newKeymap)) {
+        nextTargets.push([PROFILE_KEYBOARD, newKeymap]);
+    }
+    parsed.build_targets = nextTargets;
+    await writeText(qmkJsonPath, JSON.stringify(parsed, null, 4) + "\n");
+}
+
 async function pruneMissingProfileBuildTargets(root) {
     const qmkJsonPath = path.join(root, "qmk.json");
     let parsed;
@@ -728,6 +775,91 @@ async function createProfile(root, keymapName) {
         editable: true,
         buildable: true,
     });
+}
+
+function assertMutableProfile(target, action) {
+    requireActiveProfile(target);
+    if (target.keymap === DEFAULT_PROFILE_KEYMAP) {
+        throw new Error(`The default ${DEFAULT_PROFILE_KEYMAP} profile cannot be ${action}.`);
+    }
+}
+
+async function cloneProfile(root, sourceTarget, keymapName) {
+    requireActiveProfile(sourceTarget);
+    const keymap = normalizeProfileKeymapName(keymapName);
+    assertValidProfileKeymapName(keymap);
+
+    const target = profileTargetForKeymap(keymap);
+    const sourceDir = path.join(root, sourceTarget.keymapDir);
+    const targetDir = path.join(root, target.keymapDir);
+    if (!(await directoryExists(sourceDir))) {
+        throw new Error(`Profile folder not found: ${sourceTarget.keymap}`);
+    }
+    if (await fileExists(targetDir)) {
+        throw new Error(`Profile already exists: ${keymap}`);
+    }
+
+    await fs.cp(sourceDir, targetDir, { recursive: true });
+    await ensureQmkBuildTarget(root, keymap);
+    return profileTargetForKeymap(keymap, {
+        registered: true,
+        discovered: true,
+        complete: true,
+        editable: true,
+        buildable: true,
+    });
+}
+
+async function renameProfile(root, sourceTarget, keymapName) {
+    assertMutableProfile(sourceTarget, "renamed");
+    const keymap = normalizeProfileKeymapName(keymapName);
+    assertValidProfileKeymapName(keymap);
+    if (keymap === sourceTarget.keymap) {
+        return sourceTarget;
+    }
+
+    const target = profileTargetForKeymap(keymap);
+    const sourceDir = path.join(root, sourceTarget.keymapDir);
+    const targetDir = path.join(root, target.keymapDir);
+    if (!(await directoryExists(sourceDir))) {
+        throw new Error(`Profile folder not found: ${sourceTarget.keymap}`);
+    }
+    if (await fileExists(targetDir)) {
+        throw new Error(`Profile already exists: ${keymap}`);
+    }
+
+    await fs.rename(sourceDir, targetDir);
+    await renameQmkBuildTarget(root, sourceTarget.keymap, keymap);
+    return profileTargetForKeymap(keymap, {
+        registered: true,
+        discovered: true,
+        complete: true,
+        editable: true,
+        buildable: true,
+    });
+}
+
+async function deleteProfile(root, target) {
+    assertMutableProfile(target, "deleted");
+    const targetDir = path.join(root, target.keymapDir);
+    if (!(await directoryExists(targetDir))) {
+        throw new Error(`Profile folder not found: ${target.keymap}`);
+    }
+
+    await fs.rm(targetDir, { recursive: true, force: false });
+    await removeQmkBuildTarget(root, target.keymap);
+}
+
+async function runProfileIntrospection(root, target, mode) {
+    requireActiveProfile(target);
+    const python = process.env.PYTHON || "python3";
+    const args = [
+        path.join(root, "tools", "profile_introspect.py"),
+        "--keymap",
+        target.keymap,
+        mode === "check" ? "--check" : "--write",
+    ];
+    await execFileAsync(python, args, { cwd: root, maxBuffer: 10 * 1024 * 1024 });
 }
 
 async function renderProfileTemplates(keymap) {
@@ -848,7 +980,7 @@ async function handleWebviewMessage(panel, root, state, message) {
             await postModel(panel, root, state, "Switched Profile Studio target.");
             return;
         case "requestCreateProfile": {
-            const keymap = await promptForProfileName();
+            const keymap = await promptForProfileName({ title: "New Charybdis profile", placeHolder: "fresh_profile" });
             if (!keymap) {
                 await postModel(panel, root, state, "Profile creation cancelled.");
                 return;
@@ -858,12 +990,82 @@ async function handleWebviewMessage(panel, root, state, message) {
             await postModel(panel, root, state, `Created ${target.keymap}.`);
             return;
         }
+        case "requestCloneProfile": {
+            const source = requireActiveProfile((await activeProfileTarget(root, state)).target);
+            const keymap = await promptForProfileName({
+                title: `Clone ${source.keymap}`,
+                prompt: "Enter the new cloned keymap folder name.",
+                placeHolder: `${source.keymap}_copy`,
+            });
+            if (!keymap) {
+                await postModel(panel, root, state, "Profile clone cancelled.");
+                return;
+            }
+            const target = await cloneProfile(root, source, keymap);
+            state.activeProfileId = target.id;
+            await postModel(panel, root, state, `Cloned ${source.keymap} to ${target.keymap}.`);
+            return;
+        }
+        case "requestRenameProfile": {
+            const source = requireActiveProfile((await activeProfileTarget(root, state)).target);
+            const keymap = await promptForProfileName({
+                title: `Rename ${source.keymap}`,
+                prompt: "Enter the new keymap folder name.",
+                value: source.keymap,
+            });
+            if (!keymap) {
+                await postModel(panel, root, state, "Profile rename cancelled.");
+                return;
+            }
+            const target = await renameProfile(root, source, keymap);
+            state.activeProfileId = target.id;
+            await postModel(panel, root, state, target.keymap === source.keymap ? `Profile remains ${target.keymap}.` : `Renamed ${source.keymap} to ${target.keymap}.`);
+            return;
+        }
+        case "requestDeleteProfile": {
+            const target = requireActiveProfile((await activeProfileTarget(root, state)).target);
+            assertMutableProfile(target, "deleted");
+            const confirmed = await confirmDeleteProfile(target);
+            if (!confirmed) {
+                await postModel(panel, root, state, "Profile deletion cancelled.");
+                return;
+            }
+            await deleteProfile(root, target);
+            state.activeProfileId = "";
+            await postModel(panel, root, state, `Deleted ${target.keymap}.`);
+            return;
+        }
         case "createProfile": {
             const target = await createProfile(root, message.keymap);
             state.activeProfileId = target.id;
             await postModel(panel, root, state, `Created ${target.keymap}.`);
             return;
         }
+        case "cloneProfile": {
+            const source = await checkedMessageProfile(root, state, message);
+            const target = await cloneProfile(root, source, message.keymap);
+            state.activeProfileId = target.id;
+            await postModel(panel, root, state, `Cloned ${source.keymap} to ${target.keymap}.`);
+            return;
+        }
+        case "renameProfile": {
+            const source = await checkedMessageProfile(root, state, message);
+            const target = await renameProfile(root, source, message.keymap);
+            state.activeProfileId = target.id;
+            await postModel(panel, root, state, target.keymap === source.keymap ? `Profile remains ${target.keymap}.` : `Renamed ${source.keymap} to ${target.keymap}.`);
+            return;
+        }
+        case "deleteProfile": {
+            const target = await checkedMessageProfile(root, state, message);
+            await deleteProfile(root, target);
+            state.activeProfileId = "";
+            await postModel(panel, root, state, `Deleted ${target.keymap}.`);
+            return;
+        }
+        case "generateProfileDocs":
+            await runProfileIntrospection(root, await checkedMessageProfile(root, state, message), "write");
+            await postModel(panel, root, state, "Generated active profile overview docs.");
+            return;
         case "openSource":
             await openSource(root, requireActiveProfile((await activeProfileTarget(root, state)).target), message.file);
             return;
@@ -950,11 +1152,12 @@ async function handleWebviewMessage(panel, root, state, message) {
     }
 }
 
-async function promptForProfileName() {
+async function promptForProfileName(options = {}) {
     const value = await vscode.window.showInputBox({
-        title: "New Charybdis profile",
-        prompt: "Enter the new keymap folder name.",
-        placeHolder: "fresh_profile",
+        title: options.title || "Charybdis profile",
+        prompt: options.prompt || "Enter the keymap folder name.",
+        placeHolder: options.placeHolder || "fresh_profile",
+        value: options.value,
         validateInput(input) {
             try {
                 assertValidProfileKeymapName(normalizeProfileKeymapName(input));
@@ -965,6 +1168,15 @@ async function promptForProfileName() {
         },
     });
     return value === undefined ? undefined : normalizeProfileKeymapName(value);
+}
+
+async function confirmDeleteProfile(target) {
+    const choice = await vscode.window.showWarningMessage(
+        `Delete Charybdis profile ${target.keymap}? This removes ${target.keymapDir} and its qmk.json build target.`,
+        { modal: true },
+        "Delete Profile"
+    );
+    return choice === "Delete Profile";
 }
 
 async function checkedMessageProfile(root, state, message) {
@@ -4034,23 +4246,35 @@ function getStudioHtml() {
             min-width: 0;
         }
         .header-actions {
+            display: grid;
+            gap: 7px;
+            justify-items: end;
+            min-width: min(900px, 100%);
+        }
+        .header-action-row {
             display: flex;
             flex-wrap: wrap;
-            justify-content: flex-end;
-            gap: 10px;
-            align-items: center;
-            min-width: min(720px, 100%);
-        }
-        .profile-picker {
-            display: grid;
-            grid-template-columns: auto minmax(150px, 220px) auto;
             gap: 8px;
             align-items: center;
+            justify-content: flex-end;
         }
         .profile-picker-label {
             color: var(--muted);
             font-size: 11px;
             font-weight: 650;
+        }
+        .profile-picker select {
+            flex: 0 1 320px;
+            min-width: 220px;
+            width: 320px;
+            max-width: 42vw;
+        }
+        .header-button-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            align-items: center;
+            justify-content: flex-end;
         }
         h1, h2, h3 { margin: 0; font-weight: 650; }
         h1 { font-size: 18px; }
@@ -4342,12 +4566,15 @@ function getStudioHtml() {
             }
             .header-actions,
             .toolbar,
-            .profile-picker {
+            .profile-picker,
+            .header-action-row {
                 justify-content: stretch;
                 width: 100%;
             }
-            .profile-picker {
-                grid-template-columns: 1fr;
+            .profile-picker select,
+            .header-button-group,
+            .header-action-row button {
+                width: 100%;
             }
         }
         .board {
@@ -5501,15 +5728,25 @@ function getStudioHtml() {
             <div id="subtitle" class="muted">Loading keymap.c, config.h, and rgb_config.c</div>
         </div>
         <div class="header-actions">
-            <div class="profile-picker">
+            <div class="header-action-row profile-picker">
                 <span class="profile-picker-label">Profile</span>
                 <select id="profileSelect" aria-label="Profile"></select>
-                <button id="createProfile">New profile</button>
+                <div class="header-button-group">
+                    <button id="createProfile">New profile</button>
+                    <button id="cloneProfile">Clone</button>
+                    <button id="renameProfile">Rename</button>
+                    <button id="deleteProfile">Delete</button>
+                </div>
             </div>
-            <div class="toolbar">
-                <button id="openKeymap">Open keymap.c</button>
-                <button id="openRgb">Open rgb_config.c</button>
-                <button id="openConfig">Open config.h</button>
+            <div class="header-action-row toolbar">
+                <span class="profile-picker-label">Source</span>
+                <div class="header-button-group">
+                    <button id="openKeymap">keymap.c</button>
+                    <button id="openRgb">rgb_config.c</button>
+                    <button id="openConfig">config.h</button>
+                </div>
+                <span class="profile-picker-label">Docs</span>
+                <button id="generateProfileDocs">Generate</button>
                 <button id="applyAll" class="primary dirty" hidden disabled>Apply all</button>
                 <button id="reload" class="primary">Reload</button>
             </div>
@@ -5592,9 +5829,13 @@ function getClientScript() {
     const headerTooltips = {
         profileSelect: "Choose which keymap folder Profile Studio edits. Switching profiles discards uncommitted Studio edits.",
         createProfile: "Create a new keymap folder from the starter Profile Studio template and register it in qmk.json.",
+        cloneProfile: "Copy the active keymap folder to a new profile and register the clone in qmk.json.",
+        renameProfile: "Move the active non-default profile folder to a new keymap name and update qmk.json.",
+        deleteProfile: "Delete the active non-default profile folder and remove its qmk.json build target.",
         openKeymap: "Open keymap.c beside the studio so you can inspect or hand-edit the source.",
         openRgb: "Open rgb_config.c beside the studio so you can inspect or hand-edit the source.",
         openConfig: "Open config.h beside the studio so you can inspect layer enum and timing settings.",
+        generateProfileDocs: "Run profile_introspect.py --write for the active profile.",
         applyAll: "Write all staged Studio changes, including layer structure and staged layout edits.",
         reload: "Reload keymap.c, config.h, and rgb_config.c from disk, discarding uncommitted Studio edits."
     };
@@ -6036,9 +6277,22 @@ function getClientScript() {
         discardLocalDraftState();
         post({ type: "requestCreateProfile" });
     });
+    document.getElementById("cloneProfile").addEventListener("click", () => {
+        discardLocalDraftState();
+        post({ type: "requestCloneProfile" });
+    });
+    document.getElementById("renameProfile").addEventListener("click", () => {
+        discardLocalDraftState();
+        post({ type: "requestRenameProfile" });
+    });
+    document.getElementById("deleteProfile").addEventListener("click", () => {
+        discardLocalDraftState();
+        post({ type: "requestDeleteProfile" });
+    });
     document.getElementById("openKeymap").addEventListener("click", () => vscode.postMessage({ type: "openSource", file: "keymap" }));
     document.getElementById("openRgb").addEventListener("click", () => vscode.postMessage({ type: "openSource", file: "rgb" }));
     document.getElementById("openConfig").addEventListener("click", () => vscode.postMessage({ type: "openSource", file: "config" }));
+    document.getElementById("generateProfileDocs").addEventListener("click", () => post({ type: "generateProfileDocs" }));
     document.addEventListener("pointerover", (event) => {
         const target = tooltipTarget(event.target);
         if (target) showTooltip(target, event);
@@ -7701,9 +7955,14 @@ function getClientScript() {
             create.disabled = false;
         }
         const editable = Boolean(model.activeProfile?.editable);
+        const mutable = editable && model.activeProfile?.keymap !== "noah";
+        setHeaderButtonDisabled("cloneProfile", !editable);
+        setHeaderButtonDisabled("renameProfile", !mutable);
+        setHeaderButtonDisabled("deleteProfile", !mutable);
         setHeaderButtonDisabled("openKeymap", !editable);
         setHeaderButtonDisabled("openConfig", !editable);
         setHeaderButtonDisabled("openRgb", !editable);
+        setHeaderButtonDisabled("generateProfileDocs", !editable);
     }
 
     function renderProfileOption(profile) {

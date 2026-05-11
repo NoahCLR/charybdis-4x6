@@ -54,6 +54,8 @@ LAYER_NAMES = DEFAULT_LAYER_NAMES[:]
 # custom MACRO_n keycodes.
 VIA_MACRO_COUNT = 64
 HARDCODED_MACRO_COUNT = 16
+VIA_LAYER_WIDTH = 60
+VIA_TRANSPARENT_LAYER = ["KC_TRNS"] * VIA_LAYER_WIDTH
 VIA_CUSTOM_BASE = 64
 
 # Upstream Charybdis keyboard keycodes, defined by the keyboard in the
@@ -455,7 +457,7 @@ refresh_keymap_local_replacements()
 
 
 def layer_name_for_index(idx: int) -> str:
-    return LAYER_NAMES[idx] if idx < len(LAYER_NAMES) else f"LAYER_{idx}"
+    return LAYER_NAMES[idx] if idx < len(LAYER_NAMES) else str(idx)
 
 
 def rewrite_layer_token(token: str) -> str:
@@ -493,8 +495,27 @@ def load_via_data(path: Path) -> dict:
         return json.load(f)
 
 
+def normalize_via_layers(layers: object, via_json_path: Path) -> list[list[str]]:
+    if not isinstance(layers, list):
+        die(f"{via_json_path} is missing a top-level 'layers' list")
+
+    normalized_layers: list[list[str]] = []
+    for index, layer in enumerate(layers):
+        if not isinstance(layer, list):
+            die(f"VIA layer {index} in {via_json_path} is not a list")
+        if len(layer) != VIA_LAYER_WIDTH:
+            die(f"expected {VIA_LAYER_WIDTH} entries in VIA layer {index} from {via_json_path}, found {len(layer)}")
+        normalized_layers.append(list(layer))
+
+    while len(normalized_layers) < len(LAYER_NAMES):
+        normalized_layers.append(VIA_TRANSPARENT_LAYER[:])
+
+    return normalized_layers
+
+
 def load_via_layers(path: Path):
-    return load_via_data(path)["layers"]
+    return normalize_via_layers(load_via_data(path).get("layers"), path)
+
 
 
 def list_via_json_candidates() -> list[Path]:

@@ -24,7 +24,9 @@ const context = {
         if (name === "vscode") {
             return {
                 workspace: {workspaceFolders: []},
-                window: {},
+                window: {
+                    async showWarningMessage() { return undefined; },
+                },
                 commands: {registerCommand() { return {dispose() {}}; }},
                 StatusBarAlignment: {Left: 1},
                 ViewColumn: {Beside: 2},
@@ -82,6 +84,17 @@ const appendedCheck = `
     assert(
         getClientScript().includes('type: "requestCreateProfile"'),
         "Profile Studio new-profile button must request extension-side input"
+    );
+    assert(
+        getClientScript().includes('type: "requestCloneProfile"') &&
+            getClientScript().includes('type: "requestRenameProfile"') &&
+            getClientScript().includes('type: "requestDeleteProfile"'),
+        "Profile Studio profile lifecycle buttons must request extension-side actions"
+    );
+    assert(
+        getClientScript().includes('type: "generateProfileDocs"') &&
+            !getClientScript().includes('type: "checkProfileDocs"'),
+        "Profile Studio docs button should expose generation without a separate check-docs action"
     );
     assert(
         getClientScript().includes("layoutComboShouldSaveOriginal(original, originalSource, payload.inputs)"),
@@ -303,6 +316,30 @@ const appendedCheck = `
             assert(
                 refreshPosts.some((message) => message.model && !(message.model.profiles || []).some((profile) => profile.keymap === "deleted_profile")),
                 "Profile Studio reload should stop showing removed stale qmk.json targets"
+            );
+
+            const cloned = await cloneProfile(tempRoot, created, "fresh_clone");
+            assert(nativeFs.existsSync(path.join(tempRoot, cloned.keymapPath)), "Profile Studio did not clone keymap.c");
+            let lifecycleQmkJson = JSON.parse(nativeFs.readFileSync(path.join(tempRoot, "qmk.json"), "utf8"));
+            assert(
+                (lifecycleQmkJson.build_targets || []).some((target) => Array.isArray(target) && target[1] === "fresh_clone"),
+                "Profile Studio clone did not register qmk.json build target"
+            );
+            const renamed = await renameProfile(tempRoot, cloned, "fresh_renamed");
+            assert(!nativeFs.existsSync(path.join(tempRoot, cloned.keymapPath)), "Profile Studio rename left the old profile folder behind");
+            assert(nativeFs.existsSync(path.join(tempRoot, renamed.keymapPath)), "Profile Studio rename did not move the profile folder");
+            lifecycleQmkJson = JSON.parse(nativeFs.readFileSync(path.join(tempRoot, "qmk.json"), "utf8"));
+            assert(
+                !(lifecycleQmkJson.build_targets || []).some((target) => Array.isArray(target) && target[1] === "fresh_clone") &&
+                    (lifecycleQmkJson.build_targets || []).some((target) => Array.isArray(target) && target[1] === "fresh_renamed"),
+                "Profile Studio rename did not update qmk.json build targets"
+            );
+            await deleteProfile(tempRoot, renamed);
+            assert(!nativeFs.existsSync(path.join(tempRoot, renamed.keymapDir)), "Profile Studio delete did not remove the profile folder");
+            lifecycleQmkJson = JSON.parse(nativeFs.readFileSync(path.join(tempRoot, "qmk.json"), "utf8"));
+            assert(
+                !(lifecycleQmkJson.build_targets || []).some((target) => Array.isArray(target) && target[1] === "fresh_renamed"),
+                "Profile Studio delete did not remove qmk.json build target"
             );
 
             await appendCombo(tempRoot, created, "KC_ESC", "KC_Q, KC_W");

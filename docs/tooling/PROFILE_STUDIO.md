@@ -57,6 +57,15 @@ Generic profile validation can target any generated profile directory:
 sh tests/host/run_real_profile_validation_tests.sh keyboards/bastardkb/charybdis/4x6/keymaps/<name>
 ```
 
+The profile controls also support:
+
+- `Clone`: copies the active profile folder to a new keymap and registers it in
+  `qmk.json`
+- `Rename`: moves the active non-`noah` profile folder and updates its
+  `qmk.json` build target
+- `Delete`: removes the active non-`noah` profile folder and removes its
+  `qmk.json` build target
+
 The default generated overview still describes the current `noah` profile:
 [`docs/KEYMAP-OVERVIEW.md`](../KEYMAP-OVERVIEW.md), with prose context in
 [`docs/KEYMAP.md`](../KEYMAP.md). Other profiles can generate their own overview
@@ -70,6 +79,9 @@ python3 tools/profile_introspect.py --keymap <name> --check
 Those profile-specific outputs default to
 `docs/profiles/<name>/KEYMAP-OVERVIEW.md` and
 `docs/media/profiles/<name>/profile-introspection/`.
+
+The header `Generate docs` button runs the same `profile_introspect.py --write`
+action for the active profile.
 
 ## Editing Model
 
@@ -373,9 +385,9 @@ run the same checks as direct edits to the touched surfaces:
 python3 tools/profile_introspect.py --write
 python3 tools/profile_introspect.py --check
 sh tests/host/run_profile_introspection_checks.sh
-sh tests/host/run_real_profile_validation_tests.sh
+sh tests/host/run_all_profile_validation_tests.sh
 sh tests/host/run_all_host_tests.sh
-qmk compile -kb bastardkb/charybdis/4x6 -km noah
+sh tests/host/run_all_profile_compile_tests.sh
 ```
 
 For RGB-only edits, the focused RGB validation and render tests are the useful

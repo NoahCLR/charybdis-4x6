@@ -26,11 +26,13 @@ profile, those files are:
 There is no sidecar database to keep in sync. If you edit the C files by hand,
 reload the Studio and it will parse the current source again.
 
-The header profile picker can switch profiles or create a new one. `New
+The header profile picker can switch profiles, create a new one, clone the
+active one, rename non-default profiles, or delete non-default profiles. `New
 profile` creates `rules.mk`, `config.h`, `keymap.c`, and `rgb_config.c` from
 the bundled starter templates, registers the keymap in `qmk.json`, and keeps
 the generated `keymap.c` intentionally blank: no active combos, no active key
-behavior rows, and empty macro payloads.
+behavior rows, and empty macro payloads. Clone, rename, and delete keep the
+matching `qmk.json` build target synchronized.
 
 Generated profiles reuse the shared runtime through `USER_NAME := noah` in
 their `rules.mk`, so they build with:
@@ -43,6 +45,8 @@ For a read-only overview of the current `noah` profile, see
 [`docs/KEYMAP-OVERVIEW.md`](../../docs/KEYMAP-OVERVIEW.md). The companion
 [`docs/KEYMAP.md`](../../docs/KEYMAP.md) explains the same current config in
 prose.
+Use `Generate docs` to run the generated overview workflow for the active
+profile.
 
 ## Screenshots
 

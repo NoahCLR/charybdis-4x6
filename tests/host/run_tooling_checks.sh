@@ -83,6 +83,25 @@ if padded_macro_map[0]["via"]["value"] != via_data["macros"][0]:
 if padded_macro_map[16]["via"]["value"] != "":
     raise SystemExit("short VIA macros[] export did not pad missing entries as empty macros")
 
+short_layer_export = {**via_data, "layers": via_data["layers"][:2]}
+padded_layers = via.normalize_via_layers(short_layer_export["layers"], export_path)
+if len(padded_layers) != len(via.LAYER_NAMES):
+    raise SystemExit("short VIA layers[] export was not padded to the selected profile layer count")
+if padded_layers[0] != via_data["layers"][0]:
+    raise SystemExit("short VIA layers[] export did not preserve existing layers")
+if padded_layers[2] != via.VIA_TRANSPARENT_LAYER:
+    raise SystemExit("short VIA layers[] export did not pad missing layers as transparent layers")
+
+extra_layer_export = {**via_data, "layers": via_data["layers"] + [via.VIA_TRANSPARENT_LAYER[:]]}
+extra_layers = via.normalize_via_layers(extra_layer_export["layers"], export_path)
+if len(extra_layers) != len(via_data["layers"]) + 1:
+    raise SystemExit("extra VIA layers[] export was not preserved")
+extra_layer_name = via.layer_name_for_index(len(via.LAYER_NAMES))
+if extra_layer_name != str(len(via.LAYER_NAMES)):
+    raise SystemExit("extra VIA layer did not receive a numeric fallback layer designator")
+if via.rewrite_layer_token(f"MO({len(via.LAYER_NAMES)})") != f"MO({len(via.LAYER_NAMES)})":
+    raise SystemExit("extra VIA layer references should remain numeric")
+
 keymap_start = keymap_text.find(via._KEYMAPS_DECL)
 if keymap_start == -1:
     raise SystemExit("could not find keymaps declaration")

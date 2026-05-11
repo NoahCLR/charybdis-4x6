@@ -123,11 +123,12 @@ There is no sidecar profile database. The C files stay the source of truth.
 The Studio parses those files, shows a VS Code webview, stages edits, and
 patches the same authored blocks when you apply changes.
 
-The profile picker can also create a fresh Charybdis 4x6 keymap under
-`keyboards/bastardkb/charybdis/4x6/keymaps/<name>/`. A generated profile gets
-a blank `keymap.c` authoring surface, compile-ready `config.h` and
-`rgb_config.c`, and a small `rules.mk` that points QMK at the shared
-`users/noah` runtime. It is registered in `qmk.json`, so you can build it with:
+The profile picker can also create, clone, rename, and delete Charybdis 4x6
+keymaps under `keyboards/bastardkb/charybdis/4x6/keymaps/<name>/` while keeping
+`qmk.json` build targets in sync. A generated profile gets a blank `keymap.c`
+authoring surface, compile-ready `config.h` and `rgb_config.c`, and a small
+`rules.mk` that points QMK at the shared `users/noah` runtime. It is registered
+in `qmk.json`, so you can build it with:
 
 ```sh
 qmk compile -kb bastardkb/charybdis/4x6 -km <name>
@@ -139,6 +140,7 @@ For a read-only overview of my current config, start with the generated
 Other profiles can generate their own overview with
 `python3 tools/profile_introspect.py --keymap <name> --write`; those reports
 default to `docs/profiles/<name>/KEYMAP-OVERVIEW.md`.
+Profile Studio also has a `Generate docs` action for the active profile.
 
 Use Profile Studio when you want to:
 
