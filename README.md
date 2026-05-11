@@ -142,6 +142,9 @@ Other profiles can generate their own overview with
 default to `docs/profiles/<name>/KEYMAP-OVERVIEW.md`.
 Profile Studio also has a Profile overview row with a `Create overview doc`
 action for the active profile.
+The Firmware row's `Compile left + right` action opens the Charybdis Profile
+Studio output pane and streams QMK while it builds left and right UF2 files for
+the active profile.
 
 Use Profile Studio when you want to:
 
@@ -154,6 +157,7 @@ Use Profile Studio when you want to:
 - choose layer and pointing-mode colors
 - build reusable LED groups by selecting LEDs on the board
 - edit auto-mouse fade settings, combo feedback, and key-behavior feedback
+- compile left and right firmware outputs for the selected profile
 - configure behavior-specific `config.h` defaults for key timing, normal
   pointer speed, pointing modes, sniping, auto-mouse, base lighting, and
   lighting feedback

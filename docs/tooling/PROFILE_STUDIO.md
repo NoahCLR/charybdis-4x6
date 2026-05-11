@@ -82,6 +82,11 @@ Those profile-specific outputs default to
 
 The header Profile overview row has a `Create overview doc` button that runs
 the same `profile_introspect.py --write` action for the active profile.
+The Firmware row's `Compile left + right` button builds
+`bastardkb_charybdis_4x6_<name>_left.uf2` with `FORCE_MASTER=yes` and
+`bastardkb_charybdis_4x6_<name>_right.uf2` with `FORCE_SLAVE=yes`. It opens the
+Charybdis Profile Studio output pane and streams the QMK output while each side
+builds.
 
 ## Editing Model
 
@@ -98,6 +103,9 @@ are local drafts until an apply action writes them to source.
   changes exist, then writes those staged changes together.
 - New-layer key edits are included in the staged layer payload, so they are
   written with the new layer.
+- Compile warns before building when Studio has staged or dirty edits. The
+  warning lists staged layout/layer changes that `Apply all` can write and
+  local form edits that still need their own card-level Apply action.
 - Local Studio edits support normal undo/redo before they are written:
   `Cmd+Z` / `Ctrl+Z` undo, and `Cmd+Shift+Z`, `Ctrl+Shift+Z`, or `Ctrl+Y` redo.
 - Reload reparses `keymap.c`, `config.h`, and `rgb_config.c` from disk and

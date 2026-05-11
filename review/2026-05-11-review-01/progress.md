@@ -31,11 +31,21 @@ right thread for profile-tooling changes.
   transparent layers and preserve extra exported layers with numeric layer ids.
 - Added Profile Studio clone, rename, and delete profile actions with matching
   `qmk.json` build-target updates.
+- Fixed Profile Studio cloning to backfill a generated `rules.mk` when the
+  source profile does not have a keymap-local rules file, and repaired the
+  generated `test` profile with `USER_NAME := noah`.
 - Added a Profile Studio active-profile generated-docs action.
 - Reorganized the Profile Studio header into profile and source/docs action
   groups and removed the separate docs-check button.
 - Refined the Profile Studio header into separate profile, Profile overview,
   and Source rows, with `Create overview doc` and `Reload source` labels.
+- Reordered the Profile Studio header rows to show Profile, Source, Profile
+  overview, then Firmware.
+- Added a Profile Studio Firmware row with a `Compile left + right` action that
+  builds explicit `FORCE_MASTER` and `FORCE_SLAVE` UF2 targets and warns about
+  unsaved Studio edits before compiling.
+- Changed the Profile Studio firmware compile path to open the Studio output
+  pane immediately and stream QMK stdout/stderr while each side builds.
 - Added all-profile validation and firmware compile runners that loop over
   Charybdis 4x6 `qmk.json` build targets.
 - Changed the full host suite to use all-profile authored validation.
@@ -71,6 +81,25 @@ Passed:
 - `sh tests/host/run_all_profile_validation_tests.sh`
 - `npm run screenshots` from `tools/charybdis-profile-studio/`
 - `sh tests/host/run_all_profile_compile_tests.sh`
+- `npm run check` from `tools/charybdis-profile-studio/`
+- `npm run screenshots` from `tools/charybdis-profile-studio/`
+- `sh tests/host/run_tooling_checks.sh`
+- `git diff --check`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah -e FORCE_MASTER=yes -e TARGET=bastardkb_charybdis_4x6_noah_left`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah -e FORCE_SLAVE=yes -e TARGET=bastardkb_charybdis_4x6_noah_right`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `npm run check` from `tools/charybdis-profile-studio/`
+- `sh tests/host/run_real_profile_validation_tests.sh keyboards/bastardkb/charybdis/4x6/keymaps/test`
+- `git diff --check`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km test`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km test -e FORCE_MASTER=yes -e TARGET=bastardkb_charybdis_4x6_test_left`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km test -e FORCE_SLAVE=yes -e TARGET=bastardkb_charybdis_4x6_test_right`
+- `npm run check` from `tools/charybdis-profile-studio/` after header reorder
+- `npm run screenshots` from `tools/charybdis-profile-studio/` after header
+  reorder
+- `sh tests/host/run_all_host_tests.sh` after header reorder
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah` after header reorder
 
 Notes:
 

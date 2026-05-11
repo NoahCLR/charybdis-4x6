@@ -104,6 +104,37 @@ const appendedCheck = `
             !extensionSource.includes("Check docs"),
         "Profile Studio header should label the overview-doc action clearly and keep reload with source actions"
     );
+    const headerProfileIndex = extensionSource.indexOf('id="profileSelect"');
+    const headerSourceIndex = extensionSource.indexOf('id="openKeymap"');
+    const headerOverviewIndex = extensionSource.indexOf('id="generateProfileDocs"');
+    const headerCompileIndex = extensionSource.indexOf('id="compileFirmware"');
+    assert(
+        headerProfileIndex >= 0 &&
+            headerProfileIndex < headerSourceIndex &&
+            headerSourceIndex < headerOverviewIndex &&
+            headerOverviewIndex < headerCompileIndex,
+        "Profile Studio header rows should be ordered as profile, source, profile overview, firmware"
+    );
+    assert(
+        extensionSource.includes('id="compileFirmware"') &&
+            extensionSource.includes("Compile left + right") &&
+            getClientScript().includes('type: "compileFirmware"') &&
+            getClientScript().includes('type: "applyAllChangesAndCompile"') &&
+            extensionSource.includes('env: "FORCE_MASTER"') &&
+            extensionSource.includes('env: "FORCE_SLAVE"') &&
+            extensionSource.includes('spawn("qmk", args') &&
+            extensionSource.includes("channel.show(true)") &&
+            firmwareTargetName(profileTargetForKeymap("noah"), "left") === "bastardkb_charybdis_4x6_noah_left" &&
+            firmwareTargetName(profileTargetForKeymap("noah"), "right") === "bastardkb_charybdis_4x6_noah_right",
+        "Profile Studio compile button should build explicit left and right firmware targets with visible streamed output"
+    );
+    assert(
+        getClientScript().includes("Unsaved Studio changes") &&
+            getClientScript().includes("Apply all staged and compile") &&
+            getClientScript().includes("Keep as is and compile") &&
+            getClientScript().includes("Local form edits are not written by the header Apply all action"),
+        "Profile Studio compile button should show an unsaved-change decision dialog"
+    );
     assert(
         getClientScript().includes("layoutComboShouldSaveOriginal(original, originalSource, payload.inputs)"),
         "Profile Studio layout combo save path must distinguish auto-matched combos from explicit edits"
@@ -148,6 +179,10 @@ const appendedCheck = `
 
     const model = await buildModel(${JSON.stringify(repoRoot)});
     const aliases = model.qmkKeycodeAliases || {};
+    assert(
+        model.activeProfile && model.activeProfile.keymap === "noah" && model.activeProfile.buildable,
+        "Profile Studio should treat the default noah profile as buildable even without a keymap-local rules.mk"
+    );
     assert(
         model.qmkKeyLabels.KC_BSLS === ${JSON.stringify("\\")},
         "Profile Studio did not decode escaped QMK backslash labels"
@@ -326,8 +361,10 @@ const appendedCheck = `
                 "Profile Studio reload should stop showing removed stale qmk.json targets"
             );
 
+            nativeFs.rmSync(targetPaths.rules);
             const cloned = await cloneProfile(tempRoot, created, "fresh_clone");
             assert(nativeFs.existsSync(path.join(tempRoot, cloned.keymapPath)), "Profile Studio did not clone keymap.c");
+            assert(nativeFs.existsSync(path.join(tempRoot, cloned.rulesPath)), "Profile Studio clone should backfill rules.mk when the source profile has none");
             let lifecycleQmkJson = JSON.parse(nativeFs.readFileSync(path.join(tempRoot, "qmk.json"), "utf8"));
             assert(
                 (lifecycleQmkJson.build_targets || []).some((target) => Array.isArray(target) && target[1] === "fresh_clone"),

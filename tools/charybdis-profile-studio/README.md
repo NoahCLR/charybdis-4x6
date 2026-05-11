@@ -47,6 +47,11 @@ For a read-only overview of the current `noah` profile, see
 prose.
 Use the Profile overview row's `Create overview doc` action to run the
 generated overview workflow for the active profile.
+Use the Firmware row's `Compile left + right` action to build
+`bastardkb_charybdis_4x6_<name>_left.uf2` with `FORCE_MASTER=yes` and
+`bastardkb_charybdis_4x6_<name>_right.uf2` with `FORCE_SLAVE=yes`. The action
+opens the Charybdis Profile Studio output pane and streams QMK output while the
+build runs.
 
 ## Screenshots
 

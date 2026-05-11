@@ -1,12 +1,13 @@
 "use strict";
 
 const vscode = require("vscode");
-const { execFile } = require("child_process");
+const { execFile, spawn } = require("child_process");
 const fs = require("fs/promises");
 const path = require("path");
 const { promisify } = require("util");
 
 const execFileAsync = promisify(execFile);
+let profileStudioOutputChannel = undefined;
 
 const PROFILE_KEYBOARD = "bastardkb/charybdis/4x6";
 const PROFILE_KEYMAPS_RELATIVE_PATH = path.join(
@@ -606,7 +607,7 @@ async function discoverProfileTargets(root) {
         const hasRgb = await fileExists(paths.rgb);
         const hasRules = await fileExists(paths.rules);
         target.editable = hasKeymap && hasConfig && hasRgb;
-        target.complete = target.editable && hasRules;
+        target.complete = target.editable && (hasRules || keymap === DEFAULT_PROFILE_KEYMAP);
         target.buildable = target.complete;
         targets.push(target);
     }
@@ -800,6 +801,11 @@ async function cloneProfile(root, sourceTarget, keymapName) {
     }
 
     await fs.cp(sourceDir, targetDir, { recursive: true });
+    const targetPaths = profileTargetPaths(root, target);
+    if (!(await fileExists(targetPaths.rules))) {
+        const rendered = await renderProfileTemplates(keymap);
+        await writeText(targetPaths.rules, rendered.rules);
+    }
     await ensureQmkBuildTarget(root, keymap);
     return profileTargetForKeymap(keymap, {
         registered: true,
@@ -860,6 +866,142 @@ async function runProfileIntrospection(root, target, mode) {
         mode === "check" ? "--check" : "--write",
     ];
     await execFileAsync(python, args, { cwd: root, maxBuffer: 10 * 1024 * 1024 });
+}
+
+function studioOutputChannel() {
+    if (!profileStudioOutputChannel) {
+        profileStudioOutputChannel = vscode.window.createOutputChannel("Charybdis Profile Studio");
+    }
+    return profileStudioOutputChannel;
+}
+
+function qmkKeyboardFilesafe(keyboard) {
+    return String(keyboard || PROFILE_KEYBOARD).replace(/[^A-Za-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+}
+
+function firmwareTargetName(target, side) {
+    return `${qmkKeyboardFilesafe(target.keyboard || PROFILE_KEYBOARD)}_${target.keymap}_${side}`;
+}
+
+function shellDisplayArg(value) {
+    const text = String(value);
+    return /^[A-Za-z0-9_./:=+-]+$/.test(text) ? text : JSON.stringify(text);
+}
+
+function lastUsefulLogLine(text) {
+    const lines = String(text || "")
+        .replace(/\x1b\[[0-9;]*m/g, "")
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean);
+    return lines.slice(-1)[0] || "";
+}
+
+async function compileProfileFirmware(root, target) {
+    requireActiveProfile(target);
+    if (!target.buildable) {
+        throw new Error(`Profile ${target.keymap} is incomplete and cannot be compiled.`);
+    }
+
+    const channel = studioOutputChannel();
+    channel.show(true);
+    channel.appendLine("");
+    channel.appendLine(`Starting ${target.keymap} firmware compile`);
+    const title = `Compiling ${target.keymap} left and right firmware`;
+    const task = async (progress = { report() {} }) => {
+        const builds = [];
+        progress.report({ message: "left firmware" });
+        builds.push(await runQmkCompile(root, target, {
+            side: "left",
+            label: "left",
+            env: "FORCE_MASTER",
+        }));
+        progress.report({ message: "right firmware" });
+        builds.push(await runQmkCompile(root, target, {
+            side: "right",
+            label: "right",
+            env: "FORCE_SLAVE",
+        }));
+        return builds;
+    };
+
+    if (typeof vscode.window.withProgress === "function" && vscode.ProgressLocation) {
+        return vscode.window.withProgress(
+            { location: vscode.ProgressLocation.Notification, title, cancellable: false },
+            task
+        );
+    }
+    return task();
+}
+
+function runQmkCompile(root, target, build) {
+    const firmwareTarget = firmwareTargetName(target, build.side);
+    const args = [
+        "compile",
+        "-kb",
+        target.keyboard || PROFILE_KEYBOARD,
+        "-km",
+        target.keymap,
+        "-e",
+        `${build.env}=yes`,
+        "-e",
+        `TARGET=${firmwareTarget}`,
+    ];
+    const channel = studioOutputChannel();
+    channel.show(true);
+    channel.appendLine("");
+    channel.appendLine(`$ qmk ${args.map(shellDisplayArg).join(" ")}`);
+
+    return new Promise((resolve, reject) => {
+        let stdout = "";
+        let stderr = "";
+        let settled = false;
+        const child = spawn("qmk", args, { cwd: root });
+        const finish = (callback) => {
+            if (settled) return;
+            settled = true;
+            callback();
+        };
+        child.stdout?.on("data", (chunk) => {
+            const text = String(chunk);
+            stdout += text;
+            channel.append(text);
+        });
+        child.stderr?.on("data", (chunk) => {
+            const text = String(chunk);
+            stderr += text;
+            channel.append(text);
+        });
+        child.on("error", (error) => {
+            finish(() => {
+                channel.show(true);
+                reject(new Error(`Failed to start QMK ${build.label} firmware compile: ${error.message}`));
+            });
+        });
+        child.on("close", (code, signal) => {
+            finish(() => {
+                if (code === 0) {
+                    resolve({
+                        side: build.side,
+                        label: build.label,
+                        role: build.env,
+                        firmware: `${firmwareTarget}.uf2`,
+                        path: path.join(root, `${firmwareTarget}.uf2`),
+                    });
+                    return;
+                }
+                channel.show(true);
+                const exitDetail = signal ? `terminated by signal ${signal}` : `exited with code ${code}`;
+                const detail = lastUsefulLogLine(stderr) || lastUsefulLogLine(stdout) || exitDetail;
+                reject(new Error(`QMK ${build.label} firmware compile failed: ${detail}. See the Charybdis Profile Studio output for the full log.`));
+            });
+        });
+    });
+}
+
+function compiledFirmwareNotice(target, builds) {
+    const firmware = builds.map((build) => build.firmware).join(", ");
+    return `Compiled ${target.keymap} firmware for left and right halves: ${firmware}.`;
 }
 
 async function renderProfileTemplates(keymap) {
@@ -1066,6 +1208,20 @@ async function handleWebviewMessage(panel, root, state, message) {
             await runProfileIntrospection(root, await checkedMessageProfile(root, state, message), "write");
             await postModel(panel, root, state, "Generated active profile overview docs.");
             return;
+        case "compileFirmware": {
+            const target = await checkedMessageProfile(root, state, message);
+            try {
+                const builds = await compileProfileFirmware(root, target);
+                const notice = compiledFirmwareNotice(target, builds);
+                panel.webview.postMessage({ type: "compileResult", notice });
+                vscode.window.showInformationMessage(notice);
+            } catch (error) {
+                const text = error instanceof Error ? error.message : String(error);
+                panel.webview.postMessage({ type: "compileResult", error: text });
+                vscode.window.showErrorMessage(`Charybdis Profile Studio: ${text}`);
+            }
+            return;
+        }
         case "openSource":
             await openSource(root, requireActiveProfile((await activeProfileTarget(root, state)).target), message.file);
             return;
@@ -1073,6 +1229,13 @@ async function handleWebviewMessage(panel, root, state, message) {
             const target = await checkedMessageProfile(root, state, message);
             await applyAllChanges(root, target, message);
             await postModel(panel, root, state, "Applied all staged Studio changes.", { activeLayer: message.activeLayer, appliedLayerChanges: Boolean(message.adds?.length || message.deletes?.length) });
+            return;
+        }
+        case "applyAllChangesAndCompile": {
+            const target = await checkedMessageProfile(root, state, message);
+            await applyAllChanges(root, target, message);
+            const builds = await compileProfileFirmware(root, target);
+            await postModel(panel, root, state, `Applied staged changes and ${compiledFirmwareNotice(target, builds)}`, { activeLayer: message.activeLayer, appliedLayerChanges: Boolean(message.adds?.length || message.deletes?.length) });
             return;
         }
         case "applyLayerChanges": {
@@ -4435,6 +4598,49 @@ function getStudioHtml() {
             display: grid;
             gap: 6px;
         }
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            z-index: 10;
+            display: grid;
+            place-items: center;
+            padding: 18px;
+            background: rgba(9, 12, 14, 0.72);
+        }
+        .confirm-dialog {
+            display: grid;
+            gap: 14px;
+            width: min(560px, 100%);
+            max-height: min(680px, calc(100vh - 36px));
+            overflow: auto;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: var(--panel);
+            box-shadow: 0 18px 48px rgba(0, 0, 0, 0.46);
+            padding: 16px;
+        }
+        .confirm-dialog h2 {
+            margin: 0;
+        }
+        .confirm-dialog p {
+            margin: 0;
+            color: var(--muted);
+        }
+        .confirm-list {
+            display: grid;
+            gap: 8px;
+            margin: 0;
+            padding-left: 18px;
+        }
+        .confirm-list li {
+            padding-left: 2px;
+        }
+        .confirm-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: flex-end;
+        }
         .stack { display: grid; gap: 14px; }
         .view-tabs {
             display: flex;
@@ -5738,10 +5944,6 @@ function getStudioHtml() {
                     <button id="deleteProfile">Delete</button>
                 </div>
             </div>
-            <div class="header-action-row">
-                <span class="profile-picker-label">Profile overview</span>
-                <button id="generateProfileDocs">Create overview doc</button>
-            </div>
             <div class="header-action-row toolbar">
                 <span class="profile-picker-label">Source</span>
                 <div class="header-button-group">
@@ -5751,6 +5953,14 @@ function getStudioHtml() {
                     <button id="applyAll" class="primary dirty" hidden disabled>Apply all</button>
                     <button id="reload" class="primary">Reload source</button>
                 </div>
+            </div>
+            <div class="header-action-row">
+                <span class="profile-picker-label">Profile overview</span>
+                <button id="generateProfileDocs">Create overview doc</button>
+            </div>
+            <div class="header-action-row">
+                <span class="profile-picker-label">Firmware</span>
+                <button id="compileFirmware" class="primary">Compile left + right</button>
             </div>
         </div>
     </header>
@@ -5838,6 +6048,7 @@ function getClientScript() {
         openRgb: "Open rgb_config.c beside the studio so you can inspect or hand-edit the source.",
         openConfig: "Open config.h beside the studio so you can inspect layer enum and timing settings.",
         generateProfileDocs: "Create or refresh the generated profile overview Markdown and assets for the active profile.",
+        compileFirmware: "Compile separate left and right UF2 firmware files for the active profile.",
         applyAll: "Write all staged Studio changes, including layer structure and staged layout edits.",
         reload: "Reload keymap.c, config.h, and rgb_config.c from disk, discarding uncommitted Studio edits."
     };
@@ -6295,6 +6506,9 @@ function getClientScript() {
     document.getElementById("openRgb").addEventListener("click", () => vscode.postMessage({ type: "openSource", file: "rgb" }));
     document.getElementById("openConfig").addEventListener("click", () => vscode.postMessage({ type: "openSource", file: "config" }));
     document.getElementById("generateProfileDocs").addEventListener("click", () => post({ type: "generateProfileDocs" }));
+    document.getElementById("compileFirmware").addEventListener("click", () => {
+        requestFirmwareCompile();
+    });
     document.addEventListener("pointerover", (event) => {
         const target = tooltipTarget(event.target);
         if (target) showTooltip(target, event);
@@ -6404,6 +6618,7 @@ function getClientScript() {
 
     window.addEventListener("message", (event) => {
         if (event.data.type === "model") {
+            clearFloatingStatus();
             model = event.data.model;
             Object.assign(qmkKeyLabels, model.qmkKeyLabels || {});
             Object.assign(qmkKeyAliases, model.qmkKeycodeAliases || {});
@@ -6437,10 +6652,14 @@ function getClientScript() {
             resetLocalHistory();
         }
         if (event.data.type === "error") {
+            clearFloatingStatus();
             notice = event.data.message || "Unknown error";
             layoutNotice = "";
             render();
             resetLocalHistory();
+        }
+        if (event.data.type === "compileResult") {
+            showFloatingStatus(event.data.error || event.data.notice || "Firmware compile finished.", Boolean(event.data.error));
         }
     });
 
@@ -7664,6 +7883,148 @@ function getClientScript() {
         });
     }
 
+    function compilePostMessage(message) {
+        const activeProfileId = model?.activeProfile?.id || "";
+        const payload = activeProfileId && !message.profileId ? { ...message, profileId: activeProfileId } : message;
+        showFloatingStatus("Compiling left and right firmware...", false);
+        vscode.postMessage(payload);
+    }
+
+    async function requestFirmwareCompile() {
+        if (!model?.activeProfile?.buildable) return;
+        captureActiveMacroDraft();
+        captureLayoutComboBuilderInputs();
+        const summary = compileUnsavedSummary();
+        if (!summary.hasUnsaved) {
+            compilePostMessage({ type: "compileFirmware", activeLayer });
+            return;
+        }
+
+        const choice = await showCompileConfirmDialog(summary);
+        if (choice === "apply") {
+            compilePostMessage({
+                type: "applyAllChangesAndCompile",
+                ...layerStructurePayload(),
+                layoutGroups: pendingLayoutChangeGroups(),
+                activeLayer,
+            });
+        } else if (choice === "saved") {
+            compilePostMessage({ type: "compileFirmware", activeLayer });
+        }
+    }
+
+    function compileUnsavedSummary() {
+        const staged = [];
+        if (pendingLayerAdds.length) {
+            staged.push("Add " + pendingLayerAdds.length + " layer " + plural(pendingLayerAdds.length, "draft", "drafts") + ": " + pendingLayerAdds.map((layer) => layer.name).join(", "));
+        }
+        if (pendingLayerDeletes.length) {
+            staged.push("Delete " + pendingLayerDeletes.length + " layer " + plural(pendingLayerDeletes.length, "draft", "drafts") + ": " + pendingLayerDeletes.join(", "));
+        }
+        for (const group of pendingLayoutChangeGroups()) {
+            staged.push(group.layer + ": " + group.changes.length + " staged layout " + plural(group.changes.length, "key", "keys"));
+        }
+        const local = dirtySectionSummaries();
+        return {
+            staged,
+            local,
+            canApplyAll: staged.length > 0,
+            hasUnsaved: staged.length > 0 || local.length > 0,
+        };
+    }
+
+    function dirtySectionSummaries() {
+        const labels = [];
+        const seen = new Set();
+        const add = (label) => {
+            const clean = String(label || "").replace(/\\s+/g, " ").trim();
+            if (!clean || seen.has(clean)) return;
+            seen.add(clean);
+            labels.push(clean);
+        };
+        for (const section of document.querySelectorAll("[data-dirty-section].dirty")) {
+            if (section.closest("[hidden]")) continue;
+            add(dirtySectionLabel(section));
+        }
+        for (const keycode of Object.keys(macroDrafts || {})) {
+            if (macroSlotDirty(keycode)) {
+                add("Macro " + keycode);
+            }
+        }
+        return labels;
+    }
+
+    function plural(count, singular, pluralValue) {
+        return count === 1 ? singular : pluralValue;
+    }
+
+    function dirtySectionLabel(section) {
+        if (section.id === "layoutComboBuilder") return "Layout combo builder";
+        if (section.id === "rgbGroupBuilder") return "RGB LED group builder";
+        if (section.id === "rgbReusableGroups") return "Reusable RGB LED groups";
+        if (section.id === "keyBehaviorFeedbackCard") return "Key behavior feedback";
+        if (section.matches?.("[data-macro-editor]")) return "Macro " + (section.dataset.keycode || "slot");
+        if (section.dataset.configSection) {
+            const heading = section.querySelector("h2, h3, summary")?.textContent;
+            return "Defaults: " + (heading || section.dataset.configSection);
+        }
+        if (section.dataset.layer) return "RGB layer " + section.dataset.layer;
+        if (section.dataset.mode) return "RGB pointing mode " + section.dataset.mode;
+        const action = section.querySelector("[data-dirty-button]")?.dataset.action || "";
+        if (action === "applyKey") return "Selected layout key editor";
+        if (action === "saveSelectedBehavior") return "Selected behavior editor";
+        const heading = section.querySelector("h2, h3, summary")?.textContent;
+        if (heading) return heading;
+        const button = section.querySelector("[data-dirty-button]");
+        return button?.dataset.cleanLabel || button?.textContent || "Unsaved form";
+    }
+
+    function showCompileConfirmDialog(summary) {
+        return new Promise((resolve) => {
+            const backdrop = document.createElement("div");
+            backdrop.className = "modal-backdrop";
+            const stagedList = summary.staged.length
+                ? "<h3>Apply all can write</h3><ul class='confirm-list'>" + summary.staged.map((item) => "<li>" + escapeHtml(item) + "</li>").join("") + "</ul>"
+                : "";
+            const localList = summary.local.length
+                ? "<h3>Local form edits</h3><ul class='confirm-list'>" + summary.local.map((item) => "<li>" + escapeHtml(item) + "</li>").join("") + "</ul>"
+                : "";
+            const localNote = summary.local.length
+                ? "<p>Local form edits are not written by the header Apply all action. Use each card's Apply button first if those edits should be compiled.</p>"
+                : "";
+            backdrop.innerHTML =
+                "<div class='confirm-dialog' role='dialog' aria-modal='true' aria-labelledby='compileConfirmTitle'>" +
+                "<h2 id='compileConfirmTitle'>Unsaved Studio changes</h2>" +
+                "<p>Firmware compile reads the profile source files currently on disk.</p>" +
+                (summary.canApplyAll ? "<p>Apply all staged and compile writes staged layer and layout changes before building both firmware files.</p>" : "") +
+                localNote +
+                stagedList +
+                localList +
+                "<div class='confirm-actions'>" +
+                (summary.canApplyAll ? "<button type='button' class='primary' data-choice='apply'>Apply all staged and compile</button>" : "") +
+                "<button type='button' data-choice='saved'>Keep as is and compile</button>" +
+                "<button type='button' data-choice='cancel'>Cancel</button>" +
+                "</div>" +
+                "</div>";
+            const close = (choice) => {
+                document.removeEventListener("keydown", onKeyDown);
+                backdrop.remove();
+                resolve(choice);
+            };
+            const onKeyDown = (event) => {
+                if (event.key === "Escape") close("cancel");
+            };
+            backdrop.addEventListener("click", (event) => {
+                if (event.target === backdrop) close("cancel");
+                const choice = event.target?.closest?.("[data-choice]")?.dataset.choice;
+                if (choice) close(choice);
+            });
+            document.addEventListener("keydown", onKeyDown);
+            document.body.appendChild(backdrop);
+            backdrop.querySelector("[data-choice]")?.focus();
+        });
+    }
+
     function createTransparentLayerDraft(name) {
         return {
             name,
@@ -7965,6 +8326,7 @@ function getClientScript() {
         setHeaderButtonDisabled("openConfig", !editable);
         setHeaderButtonDisabled("openRgb", !editable);
         setHeaderButtonDisabled("generateProfileDocs", !editable);
+        setHeaderButtonDisabled("compileFirmware", !Boolean(model.activeProfile?.buildable));
     }
 
     function renderProfileOption(profile) {
@@ -8675,6 +9037,29 @@ function getClientScript() {
     function hideTooltip() {
         activeTooltipTarget = undefined;
         if (tooltip) tooltip.hidden = true;
+    }
+
+    function showFloatingStatus(message, isError) {
+        clearFloatingStatus();
+        const popup = document.createElement("div");
+        popup.className = "status-popup";
+        popup.dataset.ephemeralStatus = "1";
+        popup.setAttribute("role", isError ? "alert" : "status");
+        popup.setAttribute("aria-live", isError ? "assertive" : "polite");
+        popup.innerHTML =
+            "<div class='status-popup-header'>" +
+            "<div class='status-popup-title'>" + (isError ? "Compile failed" : "Firmware") + "</div>" +
+            "<button type='button' class='status-popup-dismiss' aria-label='Dismiss status popup'></button>" +
+            "</div>" +
+            "<div class='status-popup-body'><div class='" + (isError ? "error" : "notice") + "'>" + escapeHtml(message) + "</div></div>";
+        popup.querySelector("button")?.addEventListener("click", () => popup.remove());
+        document.body.appendChild(popup);
+    }
+
+    function clearFloatingStatus() {
+        for (const existing of document.querySelectorAll("[data-ephemeral-status]")) {
+            existing.remove();
+        }
     }
 
     function renderDiagnostics() {
