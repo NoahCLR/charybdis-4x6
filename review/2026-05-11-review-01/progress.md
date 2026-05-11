@@ -51,6 +51,8 @@ right thread for profile-tooling changes.
   not silently reset.
 - Changed Profile Studio view switching to preserve dirty form drafts across
   Layout, Macros, RGB, and Defaults and mark inactive dirty tabs.
+- Changed Profile Studio view-tab styling so active selection uses the teal
+  selected state and dirty views use an orange dot instead of a filled tab.
 - Added all-profile validation and firmware compile runners that loop over
   Charybdis 4x6 `qmk.json` build targets.
 - Changed the full host suite to use all-profile authored validation.
@@ -120,6 +122,13 @@ Passed:
 - `sh tests/host/run_all_host_tests.sh` after dirty view-tab draft preservation
 - `qmk compile -kb bastardkb/charybdis/4x6 -km noah` after dirty view-tab draft
   preservation
+- `npm run check` from `tools/charybdis-profile-studio/` after dirty view-tab
+  marker styling
+- `npm run screenshots` from `tools/charybdis-profile-studio/` after dirty
+  view-tab marker styling
+- `sh tests/host/run_all_host_tests.sh` after dirty view-tab marker styling
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah` after dirty view-tab
+  marker styling
 
 Notes:
 

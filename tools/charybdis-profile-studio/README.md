@@ -116,7 +116,7 @@ enter the same behavior editor as physical keys, so a chord can reuse the same
 branch behavior model.
 
 Dirty form drafts survive switching between the Layout, Macros, RGB, and
-Defaults tabs; inactive tabs turn orange while they still have unapplied edits.
+Defaults tabs; tabs show an orange dot while they still have unapplied edits.
 
 ## Macros Tab
 

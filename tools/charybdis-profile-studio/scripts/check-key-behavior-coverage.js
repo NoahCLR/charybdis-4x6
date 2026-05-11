@@ -125,6 +125,13 @@ const appendedCheck = `
         "Profile Studio view tabs should preserve unsaved form drafts and mark inactive dirty tabs"
     );
     assert(
+        extensionSource.includes(".view-tab.dirty::after") &&
+            extensionSource.includes("background: var(--warn);") &&
+            extensionSource.includes(".view-tab.active.dirty::after") &&
+            !extensionSource.includes(".view-tab.dirty:not(.active) {\\n            background: rgba(122, 91, 31, 0.42);"),
+        "Profile Studio view tabs should show dirty state as an orange marker instead of a selected-looking fill"
+    );
+    assert(
         extensionSource.includes('id="compileFirmware"') &&
             extensionSource.includes("Compile left + right") &&
             getClientScript().includes('type: "compileFirmware"') &&

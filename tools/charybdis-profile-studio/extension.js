@@ -4687,23 +4687,39 @@ function getStudioHtml() {
         }
         .view-tab.active {
             border-color: var(--accent);
-            border-bottom-color: var(--panel);
-            background: var(--panel);
+            border-bottom-color: #1f5d52;
+            background: #1f5d52;
             color: var(--text);
-            box-shadow: inset 0 2px 0 var(--accent);
+            box-shadow: inset 0 -3px 0 var(--accent);
+            font-weight: 700;
             margin-bottom: -1px;
+            z-index: 1;
         }
         .view-tab.dirty {
-            border-color: var(--warn);
             color: #fff4d2;
-            box-shadow: inset 0 2px 0 var(--warn);
         }
-        .view-tab.dirty:not(.active) {
-            background: rgba(122, 91, 31, 0.42);
+        .view-tab.dirty::after {
+            content: "";
+            position: absolute;
+            top: 7px;
+            right: 10px;
+            width: 7px;
+            height: 7px;
+            border-radius: 999px;
+            background: var(--warn);
+            box-shadow: 0 0 0 2px var(--bg);
+        }
+        .view-tab.dirty:not(.active):hover {
+            border-color: rgba(242, 184, 75, 0.7);
         }
         .view-tab.active.dirty {
-            border-bottom-color: var(--panel);
-            box-shadow: inset 0 2px 0 var(--warn);
+            border-color: var(--accent);
+            border-bottom-color: #1f5d52;
+            color: var(--text);
+            box-shadow: inset 0 -3px 0 var(--accent);
+        }
+        .view-tab.active.dirty::after {
+            box-shadow: 0 0 0 2px #1f5d52;
         }
         .tabs {
             display: flex;
