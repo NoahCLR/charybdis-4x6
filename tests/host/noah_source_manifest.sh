@@ -31,6 +31,17 @@ noah_source_manifest_raw_paths() {
     noah_source_manifest_value "$root" "$variable_name" "$keymap_path"
 }
 
+charybdis_profile_keymap_paths() {
+    root="$1"
+    keymaps_root="$root/keyboards/bastardkb/charybdis/4x6/keymaps"
+
+    [ -d "$keymaps_root" ] || return 0
+
+    find "$keymaps_root" -mindepth 1 -maxdepth 1 -type d -exec test -f "{}/keymap.c" \; -print |
+        sed "s#^$root/##" |
+        sort
+}
+
 noah_source_manifest_absolute_userspace_paths_selected() {
     root="$1"
     variable_name="$2"

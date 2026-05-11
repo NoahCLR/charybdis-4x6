@@ -136,6 +136,9 @@ qmk compile -kb bastardkb/charybdis/4x6 -km <name>
 For a read-only overview of my current config, start with the generated
 [`KEYMAP-OVERVIEW.md`](./docs/KEYMAP-OVERVIEW.md). The companion
 [`KEYMAP.md`](./docs/KEYMAP.md) explains the current profile choices in prose.
+Other profiles can generate their own overview with
+`python3 tools/profile_introspect.py --keymap <name> --write`; those reports
+default to `docs/profiles/<name>/KEYMAP-OVERVIEW.md`.
 
 Use Profile Studio when you want to:
 

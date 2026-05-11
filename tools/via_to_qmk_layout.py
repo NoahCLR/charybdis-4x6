@@ -25,7 +25,9 @@ from typing import NoReturn
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent
-KEYMAP_FILE = REPO_ROOT / "keyboards" / "bastardkb" / "charybdis" / "4x6" / "keymaps" / "noah" / "keymap.c"
+DEFAULT_KEYMAP_NAME = "noah"
+KEYMAPS_ROOT = REPO_ROOT / "keyboards" / "bastardkb" / "charybdis" / "4x6" / "keymaps"
+KEYMAP_FILE = KEYMAPS_ROOT / DEFAULT_KEYMAP_NAME / "keymap.c"
 PD_MODE_MANIFEST_FILE = REPO_ROOT / "users" / "noah" / "lib" / "pointing" / "defs" / "pd_mode_manifest.h"
 
 # Default mode: "write" makes the selected VIA export authoritative for
@@ -39,13 +41,14 @@ MODE = "write"
 # Must match the layer enum order in the keymap config.h.
 # → Adding or renaming a layer? Update this list to match.
 #   Extra VIA layers beyond this list get named LAYER_0, LAYER_1, etc.
-LAYER_NAMES = [
+DEFAULT_LAYER_NAMES = [
     "LAYER_BASE",
     "LAYER_NUM",
     "LAYER_SYM",
     "LAYER_NAV",
     "LAYER_POINTER",
 ]
+LAYER_NAMES = DEFAULT_LAYER_NAMES[:]
 
 # VIA dynamic MACRO(n) slots are separate from this repo's hardcoded
 # custom MACRO_n keycodes.
@@ -111,7 +114,6 @@ PD_MODE_KEYCODES = load_pd_mode_keycodes()
 #   - layer lock actions (one derived action per layer)
 #
 # Keymap-local custom keycodes begin immediately after this range.
-NOAH_USERSPACE_CUSTOM_KEYCODE_COUNT = HARDCODED_MACRO_COUNT + (2 * len(PD_MODE_KEYCODES)) + len(LAYER_NAMES)
 
 # Token normalization: VIA JSON format → QMK keymap style.
 # VIA exports keycodes in its own format (CUSTOM(), MACRO(), S(), etc.)
@@ -167,6 +169,10 @@ _KEYMAP_CUSTOM_KEYCODES_PATTERN = re.compile(
     r"enum\s+keymap_custom_keycodes\s*\{(?P<body>.*?)\};",
     re.DOTALL,
 )
+_KEYMAP_LAYER_ENUM_PATTERN = re.compile(
+    r"enum\s+charybdis_keymap_layers\s*\{(?P<body>.*?)\};",
+    re.DOTALL,
+)
 _LINE_COMMENT_PATTERN = re.compile(r"//.*?$", re.MULTILINE)
 _BLOCK_COMMENT_PATTERN = re.compile(r"/\*.*?\*/", re.DOTALL)
 _ENUM_ENTRY_PATTERN = re.compile(r"^([A-Z_][A-Z0-9_]*)(?:\s*=\s*(.+))?$")
@@ -208,7 +214,7 @@ def load_keymap_local_custom_keycodes() -> list[str]:
     # the later CUSTOM(n) token automatically.
     #
     # If the shared userspace custom-keycode range changes instead, update the
-    # configuration section above so NOAH_USERSPACE_CUSTOM_KEYCODE_COUNT stays
+    # configuration section above so noah_userspace_custom_keycode_count() stays
     # aligned with users/noah/noah_keymap_ids.h.
     if not KEYMAP_FILE.exists():
         die(f"keymap.c not found: {KEYMAP_FILE}")
@@ -370,11 +376,82 @@ def die(message: str) -> NoReturn:
     sys.exit(1)
 
 
+def repo_path(path: str | Path) -> Path:
+    resolved = Path(path).expanduser()
+    if not resolved.is_absolute():
+        resolved = REPO_ROOT / resolved
+    return resolved.resolve()
+
+
+def resolve_keymap_dir(keymap: str | None, keymap_path: str | Path | None) -> Path:
+    if keymap and keymap_path:
+        die("--keymap and --keymap-path are mutually exclusive")
+
+    if keymap_path:
+        keymap_dir = repo_path(keymap_path)
+    else:
+        keymap_dir = KEYMAPS_ROOT / (keymap or DEFAULT_KEYMAP_NAME)
+
+    if keymap_dir.name == "keymap.c":
+        keymap_dir = keymap_dir.parent
+
+    return keymap_dir.resolve()
+
+
+def strip_c_comments(text: str) -> str:
+    return _LINE_COMMENT_PATTERN.sub("", _BLOCK_COMMENT_PATTERN.sub("", text))
+
+
+def load_layer_names_from_config() -> list[str]:
+    config_file = KEYMAP_FILE.with_name("config.h")
+    if not config_file.exists():
+        die(f"config.h not found: {config_file}")
+
+    match = _KEYMAP_LAYER_ENUM_PATTERN.search(strip_c_comments(config_file.read_text()))
+    if not match:
+        return DEFAULT_LAYER_NAMES[:]
+
+    layer_names: list[str] = []
+    for raw_entry in match.group("body").split(","):
+        entry = raw_entry.strip()
+        if not entry:
+            continue
+        match_entry = _ENUM_ENTRY_PATTERN.fullmatch(entry)
+        if not match_entry:
+            die(f"could not parse charybdis_keymap_layers entry: {entry!r}")
+        name = match_entry.group(1)
+        if name == "LAYER_COUNT":
+            continue
+        layer_names.append(name)
+
+    return layer_names or DEFAULT_LAYER_NAMES[:]
+
+
+def noah_userspace_custom_keycode_count() -> int:
+    return HARDCODED_MACRO_COUNT + (2 * len(PD_MODE_KEYCODES)) + len(LAYER_NAMES)
+
+
+def refresh_keymap_local_replacements() -> None:
+    REPLACEMENTS.clear()
+    REPLACEMENTS.update(BASE_REPLACEMENTS)
+    for i, keycode in enumerate(load_keymap_local_custom_keycodes(), start=noah_userspace_custom_keycode_count()):
+        REPLACEMENTS[f"CUSTOM({VIA_CUSTOM_BASE + i})"] = keycode
+
+
+def configure_keymap_target(keymap: str | None, keymap_path: str | Path | None) -> None:
+    global KEYMAP_FILE, LAYER_NAMES
+
+    keymap_dir = resolve_keymap_dir(keymap, keymap_path)
+    KEYMAP_FILE = keymap_dir / "keymap.c"
+    LAYER_NAMES = load_layer_names_from_config()
+    refresh_keymap_local_replacements()
+
+
 # Keymap-local custom keycodes start immediately after the shared userspace
 # range. This is why RIGHT_THUMB / LEFT_THUMB do not need hardcoded
 # REPLACEMENTS entries: their CUSTOM(n) indices are derived from keymap.c.
-for i, keycode in enumerate(load_keymap_local_custom_keycodes(), start=NOAH_USERSPACE_CUSTOM_KEYCODE_COUNT):
-    REPLACEMENTS[f"CUSTOM({VIA_CUSTOM_BASE + i})"] = keycode
+BASE_REPLACEMENTS = dict(REPLACEMENTS)
+refresh_keymap_local_replacements()
 
 
 def layer_name_for_index(idx: int) -> str:
@@ -467,12 +544,13 @@ def load_all_exported_via_macros(via_data: dict, via_json_path: Path) -> dict[in
         return {}
     if not isinstance(macros, list):
         die(f"{via_json_path} is missing a top-level 'macros' list")
-    if len(macros) != VIA_MACRO_COUNT:
-        die(f"expected {VIA_MACRO_COUNT} macro slots in {via_json_path}, found {len(macros)}")
+    if len(macros) > VIA_MACRO_COUNT:
+        die(f"expected at most {VIA_MACRO_COUNT} macro slots in {via_json_path}, found {len(macros)}")
 
     slot_map: dict[int, dict] = {}
+    normalized_macros = [*macros, *([""] * (VIA_MACRO_COUNT - len(macros)))]
 
-    for slot, raw_value in enumerate(macros):
+    for slot, raw_value in enumerate(normalized_macros):
         if not isinstance(raw_value, str):
             die(f"VIA macro slot {slot} is not a string")
 
@@ -764,6 +842,9 @@ def main() -> None:
         type=Path,
         help="path to the VIA export JSON to read; if omitted, choose one from this directory interactively",
     )
+    target_group = parser.add_mutually_exclusive_group()
+    target_group.add_argument("--keymap", help="target profile keymap name under keyboards/bastardkb/charybdis/4x6/keymaps/")
+    target_group.add_argument("--keymap-path", type=Path, help="target profile keymap directory or keymap.c path")
     args = parser.parse_args()
 
     mode = MODE
@@ -771,6 +852,8 @@ def main() -> None:
         mode = "write"
     elif args.print:
         mode = "print"
+
+    configure_keymap_target(args.keymap, args.keymap_path)
 
     via_json_path = args.via_json.expanduser().resolve() if args.via_json else prompt_via_json_choice().resolve()
 

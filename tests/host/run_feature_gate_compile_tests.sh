@@ -12,10 +12,11 @@ COMMON_SOURCES="$(noah_source_manifest_userspace_paths "$ROOT" NOAH_COMMON_SOURC
 POINTING_SOURCES="$(noah_source_manifest_userspace_paths "$ROOT" NOAH_POINTING_SOURCES)"
 RGB_SOURCES="$(noah_source_manifest_raw_paths "$ROOT" NOAH_RGB_KEYMAP_SOURCES)"
 AUTOMOUSE_SOURCES="$(noah_source_manifest_userspace_paths "$ROOT" NOAH_AUTOMOUSE_SOURCES)"
+PROFILE_KEYMAP_PATHS="$(charybdis_profile_keymap_paths "$ROOT")"
 
 POINTING_TEST_FLAGS="-DPOINTING_DEVICE_ENABLE"
 RGB_TEST_FLAGS="-DRGB_MATRIX_ENABLE -DRGB_MATRIX_WS2812"
-REPO_OWNED_PRODUCTION_PATHS="users/noah keyboards/bastardkb/charybdis/4x6/keymaps/noah"
+REPO_OWNED_PRODUCTION_PATHS="users/noah $PROFILE_KEYMAP_PATHS"
 HOST_TEST_PATHS="tests/host"
 REPO_OWNED_CODE_PATHS="$REPO_OWNED_PRODUCTION_PATHS $HOST_TEST_PATHS"
 
@@ -62,9 +63,19 @@ check_header_boundaries() {
         exit 1
     fi
 
-    if rg -n '#include "(users/noah/)?noah_runtime.h"' "$ROOT/keyboards/bastardkb/charybdis/4x6/keymaps/noah" >/dev/null; then
+    if (
+        cd "$ROOT"
+        # Intentional word splitting for discovered profile path list.
+        # shellcheck disable=SC2086
+        rg -n '#include "(users/noah/)?noah_runtime.h"' $PROFILE_KEYMAP_PATHS
+    ) >/dev/null; then
         echo "keymap-owned translation units must not include noah_runtime.h directly" >&2
-        rg -n '#include "(users/noah/)?noah_runtime.h"' "$ROOT/keyboards/bastardkb/charybdis/4x6/keymaps/noah" >&2
+        (
+            cd "$ROOT"
+            # Intentional word splitting for discovered profile path list.
+            # shellcheck disable=SC2086
+            rg -n '#include "(users/noah/)?noah_runtime.h"' $PROFILE_KEYMAP_PATHS
+        ) >&2
         exit 1
     fi
 
@@ -86,7 +97,9 @@ check_dragscroll_config_surface() {
     legacy_dragscroll_violations="$(
         (
             cd "$ROOT"
-            rg -n 'CHARYBDIS_(DRAGSCROLL_(BUFFER_SIZE|REVERSE_X|REVERSE_Y)|SCROLL_(STEP_DIVISOR|RATE_LIMIT_MS|SNAP_RATIO|BUFFER_EXPIRE_MS))|NOAH_DRAGSCROLL_AXIS_LOCK_TIMEOUT_MS' users/noah keyboards/bastardkb/charybdis/4x6/keymaps/noah || true
+            # Intentional word splitting for discovered profile path list.
+            # shellcheck disable=SC2086
+            rg -n 'CHARYBDIS_(DRAGSCROLL_(BUFFER_SIZE|REVERSE_X|REVERSE_Y)|SCROLL_(STEP_DIVISOR|RATE_LIMIT_MS|SNAP_RATIO|BUFFER_EXPIRE_MS))|NOAH_DRAGSCROLL_AXIS_LOCK_TIMEOUT_MS' users/noah $PROFILE_KEYMAP_PATHS || true
         )
     )"
     if [ -n "$legacy_dragscroll_violations" ]; then

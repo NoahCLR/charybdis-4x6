@@ -4,8 +4,8 @@ This doc explains the VIA bridge script in
 [`tools/via_to_qmk_layout.py`](../../tools/via_to_qmk_layout.py).
 
 Use it when you want to experiment in VIA, export the result, and then sync the
-VIA-owned parts of the layout back into the source-controlled
-[`keymap.c`](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c).
+VIA-owned parts of the layout back into a source-controlled profile `keymap.c`.
+By default it targets the `noah` profile.
 
 ## What The Script Does
 
@@ -14,17 +14,18 @@ The script reads a VIA export JSON and renders:
 - `VIA_MACROS(MACRO)`
 - `keymaps[][]`
 
-This profile expects VIA exports with 64 macro entries. VIA backups made from
-older 16-slot firmware need their `macros[]` array padded before this script
-will accept them.
+The source profile stores 64 VIA macro defaults. VIA backups made from older
+firmware with fewer `macros[]` entries are accepted; the script pads the missing
+slots as empty macro defaults. Exports with more than 64 macro entries are
+rejected so extra payloads are not silently dropped.
 
-The checked-in VIA export currently covers the populated layer blocks. If a
-new layer is added in source or through Profile Studio, update the script's
-`LAYER_NAMES` mapping and inspect the generated layer names before using
-`--write`.
+The checked-in VIA export currently covers the populated layer blocks. The
+script reads the selected profile's layer enum from `config.h` before rendering
+layer wrappers such as `MO(3)` or `LT(3, KC_F)`, so generated layer names follow
+the target profile.
 
-In `--write` mode, it can rewrite either or both of those sections in
-[`keymap.c`](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c).
+In `--write` mode, it can rewrite either or both of those sections in the
+selected profile's `keymap.c`.
 
 It does not rewrite:
 
@@ -83,6 +84,22 @@ Write from a specific export:
 python3 tools/via_to_qmk_layout.py --write --via-json /path/to/export.json
 ```
 
+Target another profile by name:
+
+```sh
+python3 tools/via_to_qmk_layout.py --keymap <name> --print --via-json /path/to/export.json
+python3 tools/via_to_qmk_layout.py --keymap <name> --write --via-json /path/to/export.json
+```
+
+Target a profile directory or `keymap.c` directly:
+
+```sh
+python3 tools/via_to_qmk_layout.py \
+  --keymap-path keyboards/bastardkb/charybdis/4x6/keymaps/<name> \
+  --write \
+  --via-json /path/to/export.json
+```
+
 When you use `--write`, the script asks two separate questions:
 
 - update `VIA_MACROS(MACRO)` from the export `macros[]`
@@ -109,17 +126,19 @@ Important cases:
 - `CUSTOM(64 + n)` maps into this userspace custom-keycode range
 - shared pd-mode keycodes are loaded from
   [`pd_mode_manifest.h`](../../users/noah/lib/pointing/defs/pd_mode_manifest.h)
-- keymap-local custom keycodes are loaded from
-  [`enum keymap_custom_keycodes`](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c)
+- keymap-local custom keycodes are loaded from the selected profile's
+  `enum keymap_custom_keycodes`
 - layer wrappers such as `MO(3)` or `LT(3,KC_F)` are rewritten back to the
-  named layer enum symbols from this keymap
+  selected profile's named layer enum symbols
 
 That means most keymap-local additions do not require manual script edits. If
 you add a new keymap-local custom keycode in `keymap.c`, the script can usually
 pick it up automatically.
 
-Layer enum changes are the exception: keep the script's layer-name mapping in
-sync with any layer that should be round-tripped from VIA.
+If a VIA export has more layer arrays than the selected profile enum defines,
+extra layers are named `LAYER_0`, `LAYER_1`, and onward in the preview. Add the
+layers to the target profile before writing if those layers should round-trip as
+named enum entries.
 
 ## What It Treats As Source Of Truth
 
@@ -127,7 +146,7 @@ If you run the script in `--write` mode and confirm a rewrite, the selected VIA
 export becomes authoritative for the rewritten section.
 
 If you do not run the script, the firmware builds exactly from what is already
-authored in [`keymap.c`](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c).
+authored in the selected profile's `keymap.c`.
 
 ## What To Check After A Rewrite
 
@@ -149,6 +168,17 @@ python3 tools/profile_introspect.py --check
 sh tests/host/run_real_profile_validation_tests.sh
 sh tests/host/run_all_host_tests.sh
 qmk compile -kb bastardkb/charybdis/4x6 -km noah
+```
+
+For another profile, pass the same profile target to the profile checks and
+firmware compile:
+
+```sh
+python3 tools/profile_introspect.py --keymap <name> --write
+python3 tools/profile_introspect.py --keymap <name> --check
+sh tests/host/run_real_profile_validation_tests.sh keyboards/bastardkb/charybdis/4x6/keymaps/<name>
+sh tests/host/run_all_host_tests.sh
+qmk compile -kb bastardkb/charybdis/4x6 -km <name>
 ```
 
 For this repo's normal maintenance workflow, run those host checks before the

@@ -57,11 +57,19 @@ Generic profile validation can target any generated profile directory:
 sh tests/host/run_real_profile_validation_tests.sh keyboards/bastardkb/charybdis/4x6/keymaps/<name>
 ```
 
-The generated overview docs still describe the current `noah` profile unless
-the introspection tooling is parameterized in a later pass.
-For that current-profile overview, see
+The default generated overview still describes the current `noah` profile:
 [`docs/KEYMAP-OVERVIEW.md`](../KEYMAP-OVERVIEW.md), with prose context in
-[`docs/KEYMAP.md`](../KEYMAP.md).
+[`docs/KEYMAP.md`](../KEYMAP.md). Other profiles can generate their own overview
+with:
+
+```sh
+python3 tools/profile_introspect.py --keymap <name> --write
+python3 tools/profile_introspect.py --keymap <name> --check
+```
+
+Those profile-specific outputs default to
+`docs/profiles/<name>/KEYMAP-OVERVIEW.md` and
+`docs/media/profiles/<name>/profile-introspection/`.
 
 ## Editing Model
 

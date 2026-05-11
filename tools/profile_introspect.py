@@ -9,6 +9,7 @@ import difflib
 import html
 import os
 import re
+import shlex
 import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -17,16 +18,20 @@ from typing import NoReturn
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent
 
-KEYMAP_FILE = REPO_ROOT / "keyboards" / "bastardkb" / "charybdis" / "4x6" / "keymaps" / "noah" / "keymap.c"
-CONFIG_FILE = REPO_ROOT / "keyboards" / "bastardkb" / "charybdis" / "4x6" / "keymaps" / "noah" / "config.h"
+DEFAULT_KEYMAP_NAME = "noah"
+KEYMAPS_ROOT = REPO_ROOT / "keyboards" / "bastardkb" / "charybdis" / "4x6" / "keymaps"
+KEYMAP_FILE = KEYMAPS_ROOT / DEFAULT_KEYMAP_NAME / "keymap.c"
+CONFIG_FILE = KEYMAPS_ROOT / DEFAULT_KEYMAP_NAME / "config.h"
 USER_CONFIG_FILE = REPO_ROOT / "users" / "noah" / "config.h"
-RGB_CONFIG_FILE = REPO_ROOT / "keyboards" / "bastardkb" / "charybdis" / "4x6" / "keymaps" / "noah" / "rgb_config.c"
+RGB_CONFIG_FILE = KEYMAPS_ROOT / DEFAULT_KEYMAP_NAME / "rgb_config.c"
 PD_MODE_MANIFEST_FILE = REPO_ROOT / "users" / "noah" / "lib" / "pointing" / "defs" / "pd_mode_manifest.h"
 
 DOCS_DIR = REPO_ROOT / "docs"
 MEDIA_DIR = DOCS_DIR / "media"
 MARKDOWN_OUTPUT = DOCS_DIR / "KEYMAP-OVERVIEW.md"
 ASSET_OUTPUT_DIR = MEDIA_DIR / "profile-introspection"
+ACTIVE_KEYMAP_NAME = DEFAULT_KEYMAP_NAME
+ACTIVE_GENERATION_ARGS = ""
 RETIRED_OUTPUT_DIRS = [
     MEDIA_DIR / "generated",
     DOCS_DIR / "generated",
@@ -41,6 +46,91 @@ RETIRED_JSON_OUTPUTS.extend(asset_dir / "profile-summary.json" for asset_dir in 
 MARKDOWN_HEADER = "<!-- Generated file. Do not edit by hand. -->\n"
 RGB_LAYER_GROUP_ALL = "RGB_LAYER_GROUP_ALL"
 RGB_PD_MODE_GROUP_ALL = "RGB_PD_MODE_GROUP_ALL"
+
+
+def repo_path(path: str | Path) -> Path:
+    resolved = Path(path).expanduser()
+    if not resolved.is_absolute():
+        resolved = REPO_ROOT / resolved
+    return resolved.resolve()
+
+
+def default_markdown_output_for_profile(profile_name: str) -> Path:
+    if profile_name == DEFAULT_KEYMAP_NAME:
+        return DOCS_DIR / "KEYMAP-OVERVIEW.md"
+    return DOCS_DIR / "profiles" / profile_name / "KEYMAP-OVERVIEW.md"
+
+
+def default_asset_output_dir_for_profile(profile_name: str) -> Path:
+    if profile_name == DEFAULT_KEYMAP_NAME:
+        return MEDIA_DIR / "profile-introspection"
+    return MEDIA_DIR / "profiles" / profile_name / "profile-introspection"
+
+
+def shell_args(*args: str | Path) -> str:
+    return "".join(f" {shlex.quote(str(arg))}" for arg in args)
+
+
+def profile_target_generation_args(keymap: str | None, keymap_path: str | Path | None, keymap_dir: Path) -> str:
+    if keymap:
+        if keymap == DEFAULT_KEYMAP_NAME:
+            return ""
+        return shell_args("--keymap", keymap)
+
+    if not keymap_path:
+        return ""
+
+    try:
+        relative_keymap_dir = keymap_dir.relative_to(KEYMAPS_ROOT.resolve())
+    except ValueError:
+        return shell_args("--keymap-path", repo_relative_label(keymap_dir))
+
+    if len(relative_keymap_dir.parts) != 1:
+        return shell_args("--keymap-path", repo_relative_label(keymap_dir))
+
+    profile_name = relative_keymap_dir.name
+    if profile_name == DEFAULT_KEYMAP_NAME:
+        return ""
+    return shell_args("--keymap", profile_name)
+
+
+def resolve_keymap_dir(keymap: str | None, keymap_path: str | Path | None) -> Path:
+    if keymap and keymap_path:
+        die("--keymap and --keymap-path are mutually exclusive")
+
+    if keymap_path:
+        keymap_dir = repo_path(keymap_path)
+    else:
+        keymap_dir = KEYMAPS_ROOT / (keymap or DEFAULT_KEYMAP_NAME)
+
+    if keymap_dir.name == "keymap.c":
+        keymap_dir = keymap_dir.parent
+
+    return keymap_dir.resolve()
+
+
+def configure_profile_paths(
+    keymap: str | None,
+    keymap_path: str | Path | None,
+    output_dir: str | Path | None,
+    asset_dir: str | Path | None,
+) -> None:
+    global ACTIVE_GENERATION_ARGS, ACTIVE_KEYMAP_NAME, ASSET_OUTPUT_DIR, CONFIG_FILE, KEYMAP_FILE, MARKDOWN_OUTPUT, RGB_CONFIG_FILE
+
+    keymap_dir = resolve_keymap_dir(keymap, keymap_path)
+    profile_name = keymap_dir.name
+
+    ACTIVE_KEYMAP_NAME = profile_name
+    KEYMAP_FILE = keymap_dir / "keymap.c"
+    CONFIG_FILE = keymap_dir / "config.h"
+    RGB_CONFIG_FILE = keymap_dir / "rgb_config.c"
+    MARKDOWN_OUTPUT = (repo_path(output_dir) / "KEYMAP-OVERVIEW.md") if output_dir else default_markdown_output_for_profile(profile_name)
+    ASSET_OUTPUT_DIR = repo_path(asset_dir) if asset_dir else default_asset_output_dir_for_profile(profile_name)
+    ACTIVE_GENERATION_ARGS = profile_target_generation_args(keymap, keymap_path, keymap_dir)
+    if output_dir:
+        ACTIVE_GENERATION_ARGS += shell_args("--output-dir", repo_relative_label(repo_path(output_dir)))
+    if asset_dir:
+        ACTIVE_GENERATION_ARGS += shell_args("--asset-dir", repo_relative_label(repo_path(asset_dir)))
 
 DISPLAY_ALIASES = {
     "_______": "TRNS",
@@ -2322,7 +2412,7 @@ def render_layer_maps_section(profile: dict[str, object]) -> str:
     keymap_link = markdown_path_link(KEYMAP_FILE, "keymap.c")
     config_link = markdown_path_link(CONFIG_FILE, "config.h")
     rgb_link = markdown_path_link(RGB_CONFIG_FILE, "rgb_config.c")
-    asset_dir_link = markdown_path_link(ASSET_OUTPUT_DIR, "docs/media/profile-introspection/")
+    asset_dir_link = markdown_path_link(ASSET_OUTPUT_DIR, repo_relative_label(ASSET_OUTPUT_DIR) + "/")
     lines = [
         "## Layer Images",
         "",
@@ -2503,6 +2593,13 @@ def color_swatch_image_name(fill_hex: str) -> str:
 
 def markdown_relative_path(path: Path) -> str:
     return Path(os.path.relpath(path, MARKDOWN_OUTPUT.parent)).as_posix()
+
+
+def repo_relative_label(path: Path) -> str:
+    try:
+        return path.relative_to(REPO_ROOT).as_posix()
+    except ValueError:
+        return path.as_posix()
 
 
 def markdown_color_swatch(color: dict[str, object] | None, alt_text: str) -> str:
@@ -3779,7 +3876,7 @@ def format_layout_position(position: dict[str, object]) -> str:
 
 
 def render_generated_assets_section() -> str:
-    asset_dir_link = markdown_path_link(ASSET_OUTPUT_DIR, "docs/media/profile-introspection/")
+    asset_dir_link = markdown_path_link(ASSET_OUTPUT_DIR, repo_relative_label(ASSET_OUTPUT_DIR) + "/")
     tool_link = markdown_path_link(SCRIPT_DIR / "profile_introspect.py", "tools/profile_introspect.py")
     return "\n".join(
         [
@@ -3787,8 +3884,8 @@ def render_generated_assets_section() -> str:
             "",
             f"- Generated layer images live under {asset_dir_link} as `profile-layer-*.svg`",
             f"- Generated color swatches live under {asset_dir_link} as `profile-color-swatch-*.svg`",
-            f"- Regenerate the report, layer images, and swatches with `python3 tools/profile_introspect.py --write`; script: {tool_link}",
-            f"- Verify they are current with `python3 tools/profile_introspect.py --check`; script: {tool_link}",
+            f"- Regenerate the report, layer images, and swatches with `python3 tools/profile_introspect.py{ACTIVE_GENERATION_ARGS} --write`; script: {tool_link}",
+            f"- Verify they are current with `python3 tools/profile_introspect.py{ACTIVE_GENERATION_ARGS} --check`; script: {tool_link}",
             "",
         ]
     )
@@ -3887,13 +3984,20 @@ def check_outputs(assets: dict[Path, str]) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--write", action="store_true", help="write docs/KEYMAP-OVERVIEW.md and docs/media/profile-introspection/*")
+    profile_group = parser.add_mutually_exclusive_group()
+    profile_group.add_argument("--keymap", help="profile keymap name under keyboards/bastardkb/charybdis/4x6/keymaps/")
+    profile_group.add_argument("--keymap-path", type=Path, help="path to a profile keymap directory or keymap.c")
+    parser.add_argument("--output-dir", type=Path, help="directory for KEYMAP-OVERVIEW.md; defaults to docs/ for noah and docs/profiles/<name>/ for other profiles")
+    parser.add_argument("--asset-dir", type=Path, help="directory for generated SVG assets; defaults to docs/media/profile-introspection/ for noah and docs/media/profiles/<name>/profile-introspection/ for other profiles")
+    parser.add_argument("--write", action="store_true", help="write the generated overview Markdown and SVG assets")
     parser.add_argument("--check", action="store_true", help="fail if the generated artifacts are not current")
     parser.add_argument("--print-markdown", action="store_true", help="print the Markdown report to stdout")
     args = parser.parse_args()
 
     if not any((args.write, args.check, args.print_markdown)):
         args.write = True
+
+    configure_profile_paths(args.keymap, args.keymap_path, args.output_dir, args.asset_dir)
 
     profile = build_profile_model()
     assets = build_generated_assets(profile)

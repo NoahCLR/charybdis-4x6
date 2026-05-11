@@ -34,8 +34,8 @@ source trace because they rewrite or verify human-facing firmware docs.
 
 | Surface | Responsibility | Writes | Primary checks |
 | --- | --- | --- | --- |
-| `tools/profile_introspect.py` | Parse authored profile inputs and render the generated visual profile report | `docs/KEYMAP-OVERVIEW.md`, SVG assets under `docs/media/profile-introspection/` | `python3 tools/profile_introspect.py --check`, `run_profile_introspection_checks.sh`, full host suite |
-| `tools/via_to_qmk_layout.py` | Convert VIA export JSON back into source-owned keymap blocks | optionally `keymap.c` `VIA_MACROS(MACRO)` and `keymaps[][]` | script preview/write review, real-profile validation, full host suite when source changes |
+| `tools/profile_introspect.py` | Parse selected authored profile inputs and render generated visual profile reports | default `docs/KEYMAP-OVERVIEW.md` plus optional `docs/profiles/<name>/KEYMAP-OVERVIEW.md` and matching SVG assets | `python3 tools/profile_introspect.py --check`, `python3 tools/profile_introspect.py --keymap <name> --check`, `run_profile_introspection_checks.sh`, full host suite |
+| `tools/via_to_qmk_layout.py` | Convert VIA export JSON back into selected source-owned keymap blocks | optionally selected profile `keymap.c` `VIA_MACROS(MACRO)` and `keymaps[][]` | script preview/write review, real-profile validation, full host suite when source changes |
 | `tools/charybdis-profile-studio/` | VS Code webview editor for selected Charybdis 4x6 profile surfaces, new-profile templates, and generated Studio screenshots | selected profile `config.h`, `keymap.c`, `rgb_config.c`, generated `rules.mk`; screenshot PNGs under `docs/media/profile-studio/` | `npm run check`, `npm run screenshots` for screenshot refresh, selected real-profile validation, profile introspection when noah authored data changes |
 
 ## Source-To-Doc Matrix

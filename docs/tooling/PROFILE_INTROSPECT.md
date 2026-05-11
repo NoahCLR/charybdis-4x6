@@ -8,7 +8,8 @@ this repo derives from the authored keymap and RGB sources.
 
 ## What The Script Reads
 
-The introspector reads these authored inputs directly:
+The introspector reads these authored inputs directly. By default it targets the
+`noah` profile:
 
 - [`keymap.c`](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c)
 - [`config.h`](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h)
@@ -16,14 +17,18 @@ The introspector reads these authored inputs directly:
 - [`rgb_config.c`](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c)
 - [`pd_mode_manifest.h`](../../users/noah/lib/pointing/defs/pd_mode_manifest.h)
 
-It also uses the current `LAYOUT()` slot order from
-[`keymap.c`](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c),
-so the generated previews stay aligned with the physical key positions defined
-in source.
+For another profile, pass `--keymap <name>` or `--keymap-path <path>`. The
+script then reads that profile's `keymap.c`, `config.h`, and `rgb_config.c`
+while still reading shared userspace config and pointing-mode definitions from
+`users/noah/`.
+
+It also uses the selected profile's current `LAYOUT()` slot order from
+`keymap.c`, so the generated previews stay aligned with the physical key
+positions defined in source.
 
 ## What The Script Writes
 
-In `--write` mode, the script regenerates:
+In default `noah` `--write` mode, the script regenerates:
 
 - [`docs/KEYMAP-OVERVIEW.md`](../KEYMAP-OVERVIEW.md)
 - SVG layer previews under
@@ -31,9 +36,17 @@ In `--write` mode, the script regenerates:
 - SVG color swatches under
   [`docs/media/profile-introspection/`](../media/profile-introspection/)
 
-Those outputs are generated artifacts. If you changed one of the authored
-inputs above, regenerate them in the same pass instead of editing the generated
-Markdown or SVG files by hand.
+For non-`noah` profiles, the default outputs are profile-specific:
+
+- `docs/profiles/<name>/KEYMAP-OVERVIEW.md`
+- SVG layer previews and color swatches under
+  `docs/media/profiles/<name>/profile-introspection/`
+
+Use `--output-dir <dir>` and `--asset-dir <dir>` to override those locations.
+
+Those outputs are generated artifacts. If you changed one of the selected
+profile's authored inputs above, regenerate them in the same pass instead of
+editing the generated Markdown or SVG files by hand.
 
 Current generated profile assets live under `docs/media/profile-introspection/`.
 Older scratch outputs under `docs/media/generated/` or top-level
@@ -85,6 +98,24 @@ Verify the generated outputs are current:
 python3 tools/profile_introspect.py --check
 ```
 
+Preview, write, or check another registered profile:
+
+```sh
+python3 tools/profile_introspect.py --keymap <name> --print-markdown
+python3 tools/profile_introspect.py --keymap <name> --write
+python3 tools/profile_introspect.py --keymap <name> --check
+```
+
+Target a profile directory directly, with explicit output paths:
+
+```sh
+python3 tools/profile_introspect.py \
+  --keymap-path keyboards/bastardkb/charybdis/4x6/keymaps/<name> \
+  --output-dir docs/profiles/<name> \
+  --asset-dir docs/media/profiles/<name>/profile-introspection \
+  --write
+```
+
 Run the same verification through the host-suite wrapper:
 
 ```sh
@@ -96,14 +127,13 @@ sh tests/host/run_profile_introspection_checks.sh
 Run the introspector whenever you change authored inputs that affect the
 documented profile view, especially:
 
-- layer contents or macros in
-  [`keymap.c`](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c)
-- layer enum or keymap-facing timing/config surfaces in
-  [`config.h`](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h)
+- layer contents or macros in the selected profile's `keymap.c`
+- layer enum or keymap-facing timing/config surfaces in the selected profile's
+  `config.h`
 - shared userspace config surfaces that appear in the generated config table in
   [`users/noah/config.h`](../../users/noah/config.h)
-- layer colors, LED groups, mode colors, or feedback colors in
-  [`rgb_config.c`](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c)
+- layer colors, LED groups, mode colors, or feedback colors in the selected
+  profile's `rgb_config.c`
 - shared pd-mode definitions in
   [`pd_mode_manifest.h`](../../users/noah/lib/pointing/defs/pd_mode_manifest.h)
 

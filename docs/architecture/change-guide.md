@@ -8,7 +8,7 @@ directory and the existing domain docs.
 
 | Change | Edit here | Do not edit here | Required checks |
 | --- | --- | --- | --- |
-| Add or change a key behavior row | `keymap.c` `key_behaviors[]` | key-runtime reducer/planners unless semantics change | `profile_introspect.py --write`, `profile_introspect.py --check`, `run_profile_introspection_checks.sh`, key behavior lookup/validation, keymap validation, real profile validation |
+| Add or change a key behavior row | selected profile `keymap.c` `key_behaviors[]` | key-runtime reducer/planners unless semantics change | `profile_introspect.py --keymap <name> --write`, `profile_introspect.py --keymap <name> --check`, `run_profile_introspection_checks.sh`, key behavior lookup/validation, keymap validation, real profile validation |
 | Change key behavior semantics | `users/noah/lib/key/behavior/` plus tests | authored profile rows only | key behavior lookup/validation, keymap validation, real profile validation |
 | Change release, quick-release, fallback, or pending multi-tap behavior | `key/runtime/planning/`, with reducer support if state changes | `release.c` or `deferred_release.c` as decision owners | release matrix, scenario, integration harness, modifier-hold, PD integration, feature gate |
 | Change scan-time hold or multi-tap expiry | `key/runtime/planning/scan_planner.*` or `tap_series*` | RGB or split code | key-runtime scenario, release matrix, runtime debug, integration harness |
@@ -17,8 +17,8 @@ directory and the existing domain docs.
 | Change layer lock or momentary layer ownership | `state/ownership/layer_ownership.*` and key-runtime ownership bridge | direct QMK layer writes from planners | layer ownership, key-runtime layer-lock, feature gate |
 | Add or change a PD mode | `pointing/defs/`, `pointing/modes/`, `pointing/runtime/` | key runtime, unless key-runtime interaction semantics change | PD mode, handlers, PD runtime, pointer layer policy, PD/key-runtime integration, split sync, RGB render |
 | Change combo origin or combo footprint behavior | `compat/qmk_combo_origin.*` and `key/runtime/slot/origin_registry.*` | key runtime reducers as a combo-specific workaround | `run_qmk_combo_origin_tests.sh`, key-runtime scenario if behavior changes, RGB render, split sync, real profile validation |
-| Change RGB colors or LED groups | `rgb_config.c` | RGB runtime stage logic | profile introspection write/check, `run_profile_introspection_checks.sh`, RGB validation, RGB render, real profile validation |
-| Change shared config shown in generated profile docs | `users/noah/config.h` or keymap `config.h` | generated Markdown by hand | profile introspection write/check, `run_profile_introspection_checks.sh`, feature gate if config changes source boundaries |
+| Change RGB colors or LED groups | selected profile `rgb_config.c` | RGB runtime stage logic | profile introspection write/check for the selected profile, `run_profile_introspection_checks.sh`, RGB validation, RGB render, real profile validation |
+| Change shared config shown in generated profile docs | `users/noah/config.h` or selected profile `config.h` | generated Markdown by hand | profile introspection write/check for the selected profile, `run_profile_introspection_checks.sh`, feature gate if config changes source boundaries |
 | Change RGB render order or stage behavior | `users/noah/lib/rgb/core/` or `users/noah/lib/rgb/stages/` | authored RGB config | RGB validation, RGB render, split sync if remote state changes |
 | Change split runtime mirroring | `users/noah/lib/split/runtime_sync.*` | PD/RGB owners unless the source truth changes | split runtime sync, runtime trace, RGB render as relevant |
 | Change hardcoded macros | `keymap.c` `HARDCODED_MACROS` | macro parser unless payload language changes | macro dispatch, macro payload, real profile validation |
@@ -52,7 +52,7 @@ checks before handoff when source/build behavior changed.
 | --- | --- |
 | Key runtime | `run_key_runtime_release_matrix_tests.sh`, `run_key_runtime_modifier_hold_integration_tests.sh`, `run_pd_mode_key_runtime_integration_tests.sh`, `run_key_runtime_layer_lock_integration_tests.sh`, `run_key_runtime_scenario_tests.sh`, `run_key_runtime_integration_harness_tests.sh` |
 | PD runtime or pointing policy | `run_pd_mode_tests.sh`, `run_pd_mode_handlers_tests.sh`, `run_pd_runtime_tests.sh`, `run_pointer_layer_policy_tests.sh`, `run_split_runtime_sync_tests.sh` |
-| Authored profile data | `profile_introspect.py --write`, `profile_introspect.py --check`, `run_profile_introspection_checks.sh`, `run_key_behavior_lookup_tests.sh`, `run_key_behavior_validation_tests.sh`, `run_keymap_validation_tests.sh`, `run_real_profile_validation_tests.sh`, `run_real_profile_thumb_layer_lock_integration_tests.sh` |
+| Authored profile data | `profile_introspect.py --keymap <name> --write`, `profile_introspect.py --keymap <name> --check`, `run_profile_introspection_checks.sh`, `run_key_behavior_lookup_tests.sh`, `run_key_behavior_validation_tests.sh`, `run_keymap_validation_tests.sh`, `run_real_profile_validation_tests.sh`, `run_real_profile_thumb_layer_lock_integration_tests.sh` |
 | RGB | `run_rgb_validation_tests.sh`, `run_rgb_layer_render_tests.sh` |
 | Hooks or ownership | `run_hook_chaining_tests.sh`, `run_keyboard_mod_ownership_tests.sh`, `run_owned_keycode_tests.sh`, `run_held_action_tests.sh`, `run_layer_ownership_tests.sh` |
 | Macros, VIA, QMK contracts | `run_qmk_contract_checks.sh`, `run_action_lifecycle_tests.sh`, `run_macro_dispatch_tests.sh`, `run_macro_payload_tests.sh`, `run_via_macro_defaults_tests.sh`, `run_via_macro_action_lifecycle_tests.sh`, `run_qmk_via_split_sync_tests.sh` |
