@@ -8010,15 +8010,20 @@ function getClientScript() {
     function dirtySectionSummaries() {
         const labels = [];
         const seen = new Set();
-        const add = (label) => {
-            const clean = String(label || "").replace(/\\s+/g, " ").trim();
-            if (!clean || seen.has(clean)) return;
-            seen.add(clean);
-            labels.push(clean);
-        };
-        for (const section of document.querySelectorAll("[data-dirty-section].dirty")) {
-            if (section.closest("[hidden]")) continue;
-            add(dirtySectionLabel(section));
+        const add = (label) => addDirtySummaryLabel(labels, seen, label);
+        for (const label of currentDirtySectionLabels()) {
+            add(label);
+        }
+        for (const [viewId, draft] of Object.entries(viewDrafts || {})) {
+            if (viewId === activeView || !draft?.dirty) continue;
+            const draftLabels = Array.isArray(draft.labels) ? draft.labels : [];
+            if (draftLabels.length) {
+                for (const label of draftLabels) {
+                    add(label);
+                }
+            } else {
+                add(viewLabel(viewId) + " form edits");
+            }
         }
         for (const keycode of Object.keys(macroDrafts || {})) {
             if (macroSlotDirty(keycode)) {
@@ -8026,6 +8031,28 @@ function getClientScript() {
             }
         }
         return labels;
+    }
+
+    function currentDirtySectionLabels() {
+        const labels = [];
+        const seen = new Set();
+        for (const section of document.querySelectorAll("[data-dirty-section].dirty")) {
+            if (section.closest("[hidden]")) continue;
+            addDirtySummaryLabel(labels, seen, dirtySectionLabel(section));
+        }
+        return labels;
+    }
+
+    function addDirtySummaryLabel(labels, seen, label) {
+        const clean = String(label || "").replace(/\\s+/g, " ").trim();
+        if (!clean || seen.has(clean)) return;
+        seen.add(clean);
+        labels.push(clean);
+    }
+
+    function viewLabel(viewId) {
+        const view = views.find(([id]) => id === viewId);
+        return view?.[1] || viewId || "View";
     }
 
     function plural(count, singular, pluralValue) {
@@ -8644,10 +8671,12 @@ function getClientScript() {
             delete viewDrafts[activeView];
             return;
         }
+        const labels = currentDirtySectionLabels();
         viewDrafts = {
             ...viewDrafts,
             [activeView]: {
                 dirty: true,
+                labels: labels.length ? labels : [viewLabel(activeView) + " form edits"],
                 controls: localEditableControls().map(controlSnapshot),
             },
         };

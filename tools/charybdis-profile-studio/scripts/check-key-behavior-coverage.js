@@ -121,8 +121,10 @@ const appendedCheck = `
             getClientScript().includes("function storeActiveViewDraft()") &&
             getClientScript().includes("function restoreActiveViewDraft()") &&
             getClientScript().includes("storeActiveViewDraft();\\n            if (activeView !== target.dataset.view)") &&
-            getClientScript().includes("viewDrafts[viewId]?.dirty"),
-        "Profile Studio view tabs should preserve unsaved form drafts and mark inactive dirty tabs"
+            getClientScript().includes("viewDrafts[viewId]?.dirty") &&
+            getClientScript().includes("labels: labels.length ? labels : [viewLabel(activeView) + \\" form edits\\"]") &&
+            getClientScript().includes("for (const [viewId, draft] of Object.entries(viewDrafts || {}))"),
+        "Profile Studio view tabs should preserve unsaved form drafts, mark inactive dirty tabs, and include inactive drafts in action warnings"
     );
     assert(
         extensionSource.includes(".view-tab.dirty::after") &&
