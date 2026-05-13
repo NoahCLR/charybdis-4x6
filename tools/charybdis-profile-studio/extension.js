@@ -5762,6 +5762,151 @@ function getStudioHtml() {
             white-space: pre-wrap;
             overflow-wrap: break-word;
         }
+        .tooltip.layout-key-tooltip {
+            width: min(440px, calc(100vw - 24px));
+            max-width: min(440px, calc(100vw - 24px));
+            padding: 0;
+            white-space: normal;
+            overflow-wrap: normal;
+        }
+        .layout-key-hover-card {
+            display: grid;
+            gap: 10px;
+            padding: 10px;
+        }
+        .layout-key-hover-head {
+            display: grid;
+            gap: 5px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid rgba(107, 124, 133, 0.58);
+        }
+        .layout-key-hover-title-row,
+        .layout-key-combo-flow {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            align-items: center;
+            min-width: 0;
+        }
+        .layout-key-hover-title {
+            color: #f5f7f4;
+            font-size: 14px;
+            font-weight: 750;
+            min-width: 0;
+        }
+        .layout-key-index-pill,
+        .layout-key-combo-badge {
+            border: 1px solid rgba(49, 198, 164, 0.7);
+            border-radius: 999px;
+            padding: 1px 7px;
+            background: rgba(49, 198, 164, 0.12);
+            color: #a8f0de;
+            font-size: 11px;
+            font-weight: 700;
+        }
+        .layout-key-hover-code,
+        .layout-key-chip {
+            display: inline-block;
+            max-width: 100%;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .layout-key-hover-code {
+            color: #b7c6cc;
+            font-size: 11px;
+        }
+        .layout-key-section {
+            display: grid;
+            gap: 7px;
+        }
+        .layout-key-section-title {
+            color: #cfdadd;
+            font-size: 11px;
+            font-weight: 750;
+        }
+        .layout-key-behavior-title {
+            color: #edf4f1;
+            font-weight: 650;
+        }
+        .layout-key-branches {
+            display: grid;
+            gap: 5px;
+        }
+        .layout-key-branch {
+            display: grid;
+            grid-template-columns: 32px minmax(0, 1fr);
+            gap: 8px;
+            align-items: start;
+        }
+        .layout-key-branch-count {
+            justify-self: start;
+            border: 1px solid rgba(168, 178, 184, 0.5);
+            border-radius: 999px;
+            padding: 1px 6px;
+            color: #dbe6e8;
+            font-size: 11px;
+            font-weight: 750;
+        }
+        .layout-key-actions {
+            display: grid;
+            gap: 3px;
+            min-width: 0;
+        }
+        .layout-key-action {
+            display: grid;
+            grid-template-columns: 68px minmax(0, 1fr);
+            gap: 7px;
+            align-items: baseline;
+            min-width: 0;
+        }
+        .layout-key-action-label {
+            color: #8fb0bb;
+            font-size: 11px;
+            font-weight: 700;
+        }
+        .layout-key-action-text {
+            min-width: 0;
+            overflow-wrap: break-word;
+        }
+        .layout-key-combo-list {
+            display: grid;
+            gap: 8px;
+        }
+        .layout-key-combo {
+            display: grid;
+            gap: 6px;
+            padding-top: 7px;
+            border-top: 1px solid rgba(107, 124, 133, 0.35);
+        }
+        .layout-key-combo:first-child {
+            padding-top: 0;
+            border-top: 0;
+        }
+        .layout-key-combo-badge {
+            border-color: rgba(245, 245, 243, 0.65);
+            background: rgba(245, 245, 243, 0.08);
+            color: #f5f5f3;
+        }
+        .layout-key-chip {
+            border: 1px solid rgba(107, 124, 133, 0.72);
+            border-radius: 999px;
+            padding: 2px 7px;
+            background: #20282d;
+            color: #eef4f1;
+            font-size: 11px;
+            font-weight: 650;
+        }
+        .layout-key-chip.output {
+            border-color: rgba(49, 198, 164, 0.66);
+            background: rgba(49, 198, 164, 0.12);
+        }
+        .layout-key-combo-arrow,
+        .layout-key-combo-plus,
+        .layout-key-empty {
+            color: #9aa9b0;
+        }
         .modal-backdrop {
             position: fixed;
             inset: 0;
@@ -9184,7 +9329,14 @@ function getClientScript() {
         const text = target?.getAttribute("data-tooltip") || "";
         if (!text || !tooltip) return;
         activeTooltipTarget = target;
-        tooltip.textContent = text;
+        tooltip.className = "tooltip";
+        const richHtml = tooltipRichHtml(target);
+        if (richHtml) {
+            tooltip.classList.add("layout-key-tooltip");
+            tooltip.innerHTML = richHtml;
+        } else {
+            tooltip.textContent = text;
+        }
         tooltip.hidden = false;
         if (event) {
             positionTooltip(event.clientX, event.clientY);
@@ -9214,6 +9366,13 @@ function getClientScript() {
     function hideTooltip() {
         activeTooltipTarget = undefined;
         if (tooltip) tooltip.hidden = true;
+    }
+
+    function tooltipRichHtml(target) {
+        if (target?.dataset?.tooltipKind === "layoutKey") {
+            return layoutKeyTooltipCardHtml(target);
+        }
+        return "";
     }
 
     function showFloatingStatus(message, isError, title) {
@@ -10125,7 +10284,8 @@ function getClientScript() {
             ? "Toggle combo input " + label + " (" + position.keycode + ")"
             : layoutKeyBehaviorTooltip(position, label);
         const action = layoutComboPicking ? "toggleLayoutComboKey" : "selectKey";
-        return "<g class='svg-key " + (selected ? "selected" : "") + (comboSelected ? " combo-input-selected" : "") + (position.pending ? " pending" : "") + "' tabindex='0' role='button' data-action='" + action + "' data-index='" + position.layoutIndex + "' data-keycode='" + escapeAttr(position.keycode) + "' data-tooltip='" + escapeAttr(tooltipText) + "'" + transform + ">" +
+        const tooltipKind = layoutComboPicking ? "" : " data-tooltip-kind='layoutKey'";
+        return "<g class='svg-key " + (selected ? "selected" : "") + (comboSelected ? " combo-input-selected" : "") + (position.pending ? " pending" : "") + "' tabindex='0' role='button' data-action='" + action + "' data-index='" + position.layoutIndex + "' data-keycode='" + escapeAttr(position.keycode) + "' data-tooltip='" + escapeAttr(tooltipText) + "'" + tooltipKind + transform + ">" +
             "<rect x='" + visual.x + "' y='" + visual.y + "' width='" + keyboardGeometry.keyWidth + "' height='" + keyboardGeometry.keyHeight + "' rx='" + keyboardGeometry.radius + "' fill='" + style.fill + "' stroke='" + style.stroke + "'></rect>" +
             renderLayoutSvgLabel(position, label, cx, cy, style.text, keyFaceState) +
             renderBehaviorDots(dots, visual, style.text, keyFaceState) +
@@ -10177,6 +10337,114 @@ function getClientScript() {
         return lines;
     }
 
+    function layoutKeyTooltipCardHtml(target) {
+        const position = layoutKeyTooltipPosition(target);
+        if (!position) return "";
+        const label = position.display || position.keycode;
+        const rawCode = label === position.keycode ? "" : position.keycode;
+        const behavior = behaviorForKey(position.keycode);
+        const combos = combosForKey(position.keycode);
+        const sections = [];
+
+        if (behavior) {
+            sections.push(renderLayoutKeyBehaviorSection("Key behavior", behavior, { title: behaviorBranchCountText(behavior) }));
+        }
+        if (combos.length) {
+            sections.push(renderLayoutKeyComboSection(combos));
+        }
+        if (!sections.length) {
+            sections.push("<div class='layout-key-empty'>No key behavior or active combos on this key.</div>");
+        }
+
+        return "<div class='layout-key-hover-card'>" +
+            "<div class='layout-key-hover-head'>" +
+            "<div class='layout-key-hover-title-row'>" +
+            "<span class='layout-key-hover-title'>" + escapeHtml(label) + "</span>" +
+            "<span class='layout-key-index-pill'>index " + escapeHtml(String(position.layoutIndex)) + "</span>" +
+            "</div>" +
+            (rawCode ? "<code class='layout-key-hover-code'>" + escapeHtml(rawCode) + "</code>" : "") +
+            "</div>" +
+            sections.join("") +
+            "</div>";
+    }
+
+    function layoutKeyTooltipPosition(target) {
+        const index = Number(target?.dataset?.index);
+        if (!Number.isInteger(index)) return undefined;
+        return currentLayer()?.positions?.find((position) => position.layoutIndex === index);
+    }
+
+    function renderLayoutKeyBehaviorSection(title, behavior, options = {}) {
+        return "<div class='layout-key-section'>" +
+            "<div class='layout-key-section-title'>" + escapeHtml(title) + "</div>" +
+            renderLayoutKeyBehaviorBlock(behavior, options) +
+            "</div>";
+    }
+
+    function renderLayoutKeyBehaviorBlock(behavior, options = {}) {
+        const title = options.title || behaviorTooltipTitle(behavior);
+        return "<div class='layout-key-behavior-title'>" + escapeHtml(title) + "</div>" +
+            renderLayoutKeyBehaviorRows(behavior);
+    }
+
+    function behaviorTooltipTitle(behavior) {
+        return displayAction(behavior.keycode) + " " + behaviorBranchCountLabel(behavior);
+    }
+
+    function behaviorBranchCountLabel(behavior) {
+        return "(" + behaviorBranchCountText(behavior) + ")";
+    }
+
+    function behaviorBranchCountText(behavior) {
+        const branchCount = behaviorTooltipBranchCount(behavior);
+        return branchCount ? branchCount + " " + (branchCount === 1 ? "branch" : "branches") : "no active branches";
+    }
+
+    function renderLayoutKeyBehaviorRows(behavior) {
+        const rows = [];
+        for (const step of behavior?.steps || []) {
+            const actions = behaviorTooltipActionItems(step);
+            if (!actions.length) continue;
+            rows.push("<div class='layout-key-branch'>" +
+                "<span class='layout-key-branch-count'>" + escapeHtml(String(Number(step.tapCount || 0) + 1)) + "x</span>" +
+                "<div class='layout-key-actions'>" +
+                actions.map((action) => "<div class='layout-key-action'>" +
+                    "<span class='layout-key-action-label'>" + escapeHtml(action.label) + "</span>" +
+                    "<span class='layout-key-action-text'>" + escapeHtml(action.text) + "</span>" +
+                    "</div>").join("") +
+                "</div>" +
+                "</div>");
+        }
+        return rows.length ? "<div class='layout-key-branches'>" + rows.join("") + "</div>" : "<div class='layout-key-empty'>No active tap-count branch actions.</div>";
+    }
+
+    function renderLayoutKeyComboSection(combos) {
+        return "<div class='layout-key-section'>" +
+            "<div class='layout-key-section-title'>Combos</div>" +
+            "<div class='layout-key-combo-list'>" + combos.map(renderLayoutKeyComboCard).join("") + "</div>" +
+            "</div>";
+    }
+
+    function renderLayoutKeyComboCard(combo) {
+        const inputs = combo.inputDisplays || combo.inputs || [];
+        const outputText = combo.outputDisplay || displayAction(combo.output);
+        const outputBehavior = behaviorForKey(combo.output);
+        return "<div class='layout-key-combo'>" +
+            "<div class='layout-key-combo-flow'>" +
+            "<span class='layout-key-combo-badge'>" + escapeHtml(combo.badge || "combo") + "</span>" +
+            inputs.map((input, index) => (index ? "<span class='layout-key-combo-plus'>+</span>" : "") + renderLayoutKeyChip(input)).join("") +
+            "<span class='layout-key-combo-arrow'>-></span>" +
+            renderLayoutKeyChip(outputText, "output") +
+            "</div>" +
+            (outputBehavior ? "<div class='layout-key-section-title'>Output behavior</div>" + renderLayoutKeyBehaviorBlock(outputBehavior) : "") +
+            "</div>";
+    }
+
+    function renderLayoutKeyChip(label, extraClass = "") {
+        const className = "layout-key-chip" + (extraClass ? " " + extraClass : "");
+        return "<span class='" + escapeAttr(className) + "'>" + escapeHtml(label || "") + "</span>";
+    }
+
     function behaviorTooltipBranchCount(behavior) {
         return (behavior?.steps || []).filter((step) => step.tap || step.hold || step.longHold).length;
     }
@@ -10186,11 +10454,7 @@ function getClientScript() {
         const actionIndent = options.actionIndent || "      ";
         const lines = [];
         for (const step of behavior?.steps || []) {
-            const actions = [
-                step.tap ? { label: "tap", text: behaviorTooltipActionText(step.tap) } : undefined,
-                step.hold ? { label: "hold", text: behaviorTooltipActionText(step.hold) } : undefined,
-                step.longHold ? { label: "long hold", text: behaviorTooltipActionText(step.longHold) } : undefined,
-            ].filter(Boolean);
+            const actions = behaviorTooltipActionItems(step);
             if (actions.length) {
                 const branchPrefix = branchIndent + (Number(step.tapCount || 0) + 1) + "x  ";
                 actions.forEach((action, index) => {
@@ -10199,6 +10463,14 @@ function getClientScript() {
             }
         }
         return lines.length ? lines : ["No active tap-count branch actions."];
+    }
+
+    function behaviorTooltipActionItems(step) {
+        return [
+            step.tap ? { label: "tap", text: behaviorTooltipActionText(step.tap) } : undefined,
+            step.hold ? { label: "hold", text: behaviorTooltipActionText(step.hold) } : undefined,
+            step.longHold ? { label: "long hold", text: behaviorTooltipActionText(step.longHold) } : undefined,
+        ].filter(Boolean);
     }
 
     function behaviorTooltipActionText(action) {

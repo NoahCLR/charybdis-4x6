@@ -208,10 +208,17 @@ const appendedCheck = `
     );
     assert(
         getClientScript().includes("function layoutKeyBehaviorTooltip") &&
+        getClientScript().includes("data-tooltip-kind='layoutKey'") &&
+        getClientScript().includes("function tooltipRichHtml") &&
+        getClientScript().includes("function layoutKeyTooltipCardHtml") &&
         getClientScript().includes("function layoutKeyComboTooltipLines") &&
         getClientScript().includes("function combosForKey") &&
+        getClientScript().includes("function renderLayoutKeyComboSection") &&
+        getClientScript().includes("function renderLayoutKeyBehaviorRows") &&
         getClientScript().includes("function behaviorTooltipBranchCount") &&
+        getClientScript().includes("function behaviorBranchCountText") &&
         getClientScript().includes("function behaviorTooltipLines") &&
+        getClientScript().includes("function behaviorTooltipActionItems") &&
         getClientScript().includes("function behaviorTooltipActionText") &&
         getClientScript().includes("output behavior") &&
         getClientScript().includes('label: "long hold"') &&
