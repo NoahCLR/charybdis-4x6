@@ -10140,22 +10140,50 @@ function getClientScript() {
         ];
         const behavior = behaviorForKey(position.keycode);
         if (!behavior) {
-            lines.push("No key_behaviors[] row for this key.");
-            return lines.join("\\n");
+            lines.push("Behavior: none on this key");
+        } else {
+            const branches = behaviorTooltipLines(behavior);
+            const branchCount = behaviorTooltipBranchCount(behavior);
+            const branchSuffix = branchCount ? " (" + branchCount + " " + (branchCount === 1 ? "branch" : "branches") + ")" : "";
+            lines.push("Behavior: " + displayAction(behavior.keycode) + branchSuffix);
+            lines.push(...branches);
         }
-        const branches = behaviorTooltipLines(behavior);
-        const branchCount = behaviorTooltipBranchCount(behavior);
-        const branchSuffix = branchCount ? " (" + branchCount + " " + (branchCount === 1 ? "branch" : "branches") + ")" : "";
-        lines.push("Behavior: " + displayAction(behavior.keycode) + branchSuffix);
-        lines.push(...branches);
+        const comboLines = layoutKeyComboTooltipLines(position.keycode);
+        if (comboLines.length) {
+            lines.push("Combos:");
+            lines.push(...comboLines);
+        }
         return lines.join("\\n");
+    }
+
+    function layoutKeyComboTooltipLines(keycode) {
+        const lines = [];
+        for (const combo of combosForKey(keycode)) {
+            const inputText = (combo.inputDisplays || combo.inputs || []).join(" + ");
+            const outputText = combo.outputDisplay || displayAction(combo.output);
+            lines.push("  " + combo.badge + "  " + inputText + " -> " + outputText);
+
+            const outputBehavior = behaviorForKey(combo.output);
+            if (!outputBehavior) {
+                lines.push("      output behavior: none");
+                continue;
+            }
+
+            const branchCount = behaviorTooltipBranchCount(outputBehavior);
+            const branchSuffix = branchCount ? " (" + branchCount + " " + (branchCount === 1 ? "branch" : "branches") + ")" : "";
+            lines.push("      output behavior: " + displayAction(outputBehavior.keycode) + branchSuffix);
+            lines.push(...behaviorTooltipLines(outputBehavior, { branchIndent: "        ", actionIndent: "            " }));
+        }
+        return lines;
     }
 
     function behaviorTooltipBranchCount(behavior) {
         return (behavior?.steps || []).filter((step) => step.tap || step.hold || step.longHold).length;
     }
 
-    function behaviorTooltipLines(behavior) {
+    function behaviorTooltipLines(behavior, options = {}) {
+        const branchIndent = options.branchIndent || "  ";
+        const actionIndent = options.actionIndent || "      ";
         const lines = [];
         for (const step of behavior?.steps || []) {
             const actions = [
@@ -10164,9 +10192,9 @@ function getClientScript() {
                 step.longHold ? { label: "long hold", text: behaviorTooltipActionText(step.longHold) } : undefined,
             ].filter(Boolean);
             if (actions.length) {
-                const branchPrefix = "  " + (Number(step.tapCount || 0) + 1) + "x  ";
+                const branchPrefix = branchIndent + (Number(step.tapCount || 0) + 1) + "x  ";
                 actions.forEach((action, index) => {
-                    lines.push((index === 0 ? branchPrefix : "      ") + action.label + ": " + action.text);
+                    lines.push((index === 0 ? branchPrefix : actionIndent) + action.label + ": " + action.text);
                 });
             }
         }
@@ -10571,7 +10599,11 @@ function getClientScript() {
     }
 
     function comboBadgesForKey(keycode) {
-        return layerCombos(currentLayer()).filter((combo) => combo.inputs.some((input) => keyExpressionsEquivalent(input, keycode))).map((combo) => combo.badge);
+        return combosForKey(keycode).map((combo) => combo.badge);
+    }
+
+    function combosForKey(keycode) {
+        return layerCombos(currentLayer()).filter((combo) => combo.inputs.some((input) => keyExpressionsEquivalent(input, keycode)));
     }
 
     function renderComboBadges(badges, visual, keyFaceState = {}) {

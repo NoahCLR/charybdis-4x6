@@ -208,12 +208,15 @@ const appendedCheck = `
     );
     assert(
         getClientScript().includes("function layoutKeyBehaviorTooltip") &&
+        getClientScript().includes("function layoutKeyComboTooltipLines") &&
+        getClientScript().includes("function combosForKey") &&
         getClientScript().includes("function behaviorTooltipBranchCount") &&
         getClientScript().includes("function behaviorTooltipLines") &&
         getClientScript().includes("function behaviorTooltipActionText") &&
+        getClientScript().includes("output behavior") &&
         getClientScript().includes('label: "long hold"') &&
-        getClientScript().includes("No key_behaviors[] row for this key."),
-        "Profile Studio layout key hover tooltips should show key-specific behavior rows"
+        getClientScript().includes("Behavior: none on this key"),
+        "Profile Studio layout key hover tooltips should show key-specific behavior rows and combo behavior"
     );
     assert(
         displayKeyExpression("DRAGSCROLL") === "Dragscroll" &&

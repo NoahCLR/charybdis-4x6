@@ -319,7 +319,8 @@ color unless the row uses a nonzero HSV override. This includes
 Most visible controls, tables, collapsed summaries, color previews, and SVG
 keys expose hover tooltips that describe what the field edits or displays. In
 the Layout area, the board-level help icon carries the general edit gestures;
-hovering a physical key focuses on that key's `key_behaviors[]` row.
+hovering a physical key focuses on that key's `key_behaviors[]` row, active
+combos, and combo-output behavior.
 
 ## Native Workspace Use
 
