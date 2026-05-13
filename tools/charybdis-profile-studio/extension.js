@@ -5821,6 +5821,23 @@ function getStudioHtml() {
             display: grid;
             gap: 7px;
         }
+        .layout-key-section-body,
+        .layout-key-nested-block {
+            display: grid;
+            min-width: 0;
+            border-left: 1px solid rgba(107, 124, 133, 0.58);
+        }
+        .layout-key-section-body {
+            gap: 7px;
+            margin-left: 7px;
+            padding-left: 10px;
+        }
+        .layout-key-nested-block {
+            gap: 6px;
+            margin-left: 30px;
+            padding-left: 10px;
+            border-left-color: rgba(49, 198, 164, 0.44);
+        }
         .layout-key-section-title {
             color: #cfdadd;
             font-size: 11px;
@@ -10377,7 +10394,9 @@ function getClientScript() {
     function renderLayoutKeyBehaviorSection(title, behavior, options = {}) {
         return "<div class='layout-key-section'>" +
             "<div class='layout-key-section-title'>" + escapeHtml(title) + "</div>" +
+            "<div class='layout-key-section-body'>" +
             renderLayoutKeyBehaviorBlock(behavior, options) +
+            "</div>" +
             "</div>";
     }
 
@@ -10421,7 +10440,9 @@ function getClientScript() {
     function renderLayoutKeyComboSection(combos) {
         return "<div class='layout-key-section'>" +
             "<div class='layout-key-section-title'>Combos</div>" +
+            "<div class='layout-key-section-body'>" +
             "<div class='layout-key-combo-list'>" + combos.map(renderLayoutKeyComboCard).join("") + "</div>" +
+            "</div>" +
             "</div>";
     }
 
@@ -10436,7 +10457,7 @@ function getClientScript() {
             "<span class='layout-key-combo-arrow'>-></span>" +
             renderLayoutKeyChip(outputText, "output") +
             "</div>" +
-            (outputBehavior ? "<div class='layout-key-section-title'>Output behavior</div>" + renderLayoutKeyBehaviorBlock(outputBehavior) : "") +
+            (outputBehavior ? "<div class='layout-key-nested-block'><div class='layout-key-section-title'>Output behavior</div>" + renderLayoutKeyBehaviorBlock(outputBehavior) + "</div>" : "") +
             "</div>";
     }
 

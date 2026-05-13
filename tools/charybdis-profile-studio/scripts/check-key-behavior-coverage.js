@@ -212,6 +212,8 @@ const appendedCheck = `
         getClientScript().includes("function tooltipRichHtml") &&
         getClientScript().includes("function layoutKeyTooltipCardHtml") &&
         getClientScript().includes("function layoutKeyComboTooltipLines") &&
+        getClientScript().includes("layout-key-section-body") &&
+        getClientScript().includes("layout-key-nested-block") &&
         getClientScript().includes("function combosForKey") &&
         getClientScript().includes("function renderLayoutKeyComboSection") &&
         getClientScript().includes("function renderLayoutKeyBehaviorRows") &&
