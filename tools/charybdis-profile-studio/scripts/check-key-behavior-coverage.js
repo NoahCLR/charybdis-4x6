@@ -201,6 +201,21 @@ const appendedCheck = `
         "Profile Studio layout keys should reserve dynamic rows for behavior markers, combo badges, tap labels, and hold legends"
     );
     assert(
+        getClientScript().includes("function renderLayoutBoardInfoButton") &&
+        getClientScript().includes("function layoutBoardHelpTooltip") &&
+        getClientScript().includes("Dots mark key_behaviors[] tap, hold, and long hold branches"),
+        "Profile Studio layout guidance should live behind the board info button"
+    );
+    assert(
+        getClientScript().includes("function layoutKeyBehaviorTooltip") &&
+        getClientScript().includes("function behaviorTooltipBranchCount") &&
+        getClientScript().includes("function behaviorTooltipLines") &&
+        getClientScript().includes("function behaviorTooltipActionText") &&
+        getClientScript().includes('label: "long hold"') &&
+        getClientScript().includes("No key_behaviors[] row for this key."),
+        "Profile Studio layout key hover tooltips should show key-specific behavior rows"
+    );
+    assert(
         displayKeyExpression("DRAGSCROLL") === "Dragscroll" &&
         displayKeyExpression("DRAGSCROLL_LOCK") === "Dragscroll Lock",
         "Profile Studio should render dragscroll keycodes with friendly labels"

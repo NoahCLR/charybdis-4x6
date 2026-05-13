@@ -4907,7 +4907,7 @@ function getStudioHtml() {
             background: #2f3336;
         }
         .layout-board-header {
-            padding: 22px 32px 0;
+            padding: 22px 64px 0 32px;
         }
         .layout-board-title {
             margin: 0;
@@ -4920,6 +4920,29 @@ function getStudioHtml() {
             margin: 8px 0 0;
             color: #a8b2b8;
             font-size: 13px;
+        }
+        .layout-board-info {
+            position: absolute;
+            top: 18px;
+            right: 22px;
+            display: grid;
+            place-items: center;
+            width: 26px;
+            height: 26px;
+            border: 1px solid rgba(219, 230, 232, 0.62);
+            border-radius: 999px;
+            padding: 0;
+            background: rgba(21, 26, 29, 0.42);
+            color: #dbe6e8;
+            font-size: 13px;
+            font-weight: 750;
+            line-height: 1;
+        }
+        .layout-board-info:hover,
+        .layout-board-info:focus-visible {
+            border-color: var(--accent);
+            color: #ffffff;
+            background: rgba(49, 198, 164, 0.16);
         }
         .layout-board-stage {
             display: grid;
@@ -5726,16 +5749,18 @@ function getStudioHtml() {
         .tooltip {
             position: fixed;
             z-index: 50;
-            max-width: 340px;
+            max-width: min(460px, calc(100vw - 24px));
             padding: 7px 9px;
             border: 1px solid #6b7c85;
             border-radius: 6px;
             background: #151a1d;
             color: var(--text);
+            font-size: 12px;
+            line-height: 1.38;
             box-shadow: 0 8px 24px rgba(0, 0, 0, 0.36);
             pointer-events: none;
             white-space: pre-wrap;
-            overflow-wrap: anywhere;
+            overflow-wrap: break-word;
         }
         .modal-backdrop {
             position: fixed;
@@ -10038,6 +10063,7 @@ function getClientScript() {
         const viewBox = keyboardGeometry.layoutViewBox;
         const subtitle = layerColorSubtitle(layerColor);
         return "<div class='board layout-board-card'>" +
+            renderLayoutBoardInfoButton() +
             "<div class='layout-board-header'>" +
             "<h3 class='layout-board-title'>" + escapeHtml(layer.name) + "</h3>" +
             "<p class='layout-board-subtitle' data-tooltip='Layer RGB summary: render mode, authored HSV color, and whether pass-through exposes the default RGB Matrix color.'>" + escapeHtml(subtitle) + "</p>" +
@@ -10049,6 +10075,21 @@ function getClientScript() {
             "</div>" +
             renderLayoutBoardFooter(layer) +
             "</div>";
+    }
+
+    function renderLayoutBoardInfoButton() {
+        return "<button type='button' class='layout-board-info' aria-label='Layout help' data-tooltip='" + escapeAttr(layoutBoardHelpTooltip()) + "'>i</button>";
+    }
+
+    function layoutBoardHelpTooltip() {
+        return [
+            "Click a physical key to edit its LAYOUT() slot.",
+            "Double-click a key to open the keycode picker.",
+            "Drag one key onto another to swap staged keycodes.",
+            "Copy and paste work between selected keys.",
+            "Dashed outlines are staged edits until Apply layout changes.",
+            "Dots mark key_behaviors[] tap, hold, and long hold branches; combo badges mark active-layer combo inputs."
+        ].join("\\n");
     }
 
     function renderLayoutBoardFooter(layer) {
@@ -10082,7 +10123,7 @@ function getClientScript() {
         const transform = visual.angle ? " transform='rotate(" + visual.angle + " " + cx + " " + cy + ")'" : "";
         const tooltipText = layoutComboPicking
             ? "Toggle combo input " + label + " (" + position.keycode + ")"
-            : layoutKeyTooltip(position, label);
+            : layoutKeyBehaviorTooltip(position, label);
         const action = layoutComboPicking ? "toggleLayoutComboKey" : "selectKey";
         return "<g class='svg-key " + (selected ? "selected" : "") + (comboSelected ? " combo-input-selected" : "") + (position.pending ? " pending" : "") + "' tabindex='0' role='button' data-action='" + action + "' data-index='" + position.layoutIndex + "' data-keycode='" + escapeAttr(position.keycode) + "' data-tooltip='" + escapeAttr(tooltipText) + "'" + transform + ">" +
             "<rect x='" + visual.x + "' y='" + visual.y + "' width='" + keyboardGeometry.keyWidth + "' height='" + keyboardGeometry.keyHeight + "' rx='" + keyboardGeometry.radius + "' fill='" + style.fill + "' stroke='" + style.stroke + "'></rect>" +
@@ -10092,39 +10133,54 @@ function getClientScript() {
             "</g>";
     }
 
-    function layoutKeyTooltip(position, label) {
-        const base = "Click to edit layout index " + position.layoutIndex + ": " + label + " (" + position.keycode + "). Double-click to pick a keycode, drag onto another key to swap, or copy/paste selected keys.";
-        const alternate = alternateOutputTooltip(position.keycode);
-        const macroPreview = macroPayloadTooltipForExpression(position.keycode);
-        const comboBadges = comboBadgesForKey(position.keycode);
-        const alternatePreview = alternate ? "\\n" + alternate : "";
-        const comboPreview = comboBadges.length ? "\\nCombos: " + comboBadges.join(", ") : "";
-        return (macroPreview ? base + alternatePreview + comboPreview + "\\n\\n" + macroPreview : base + alternatePreview + comboPreview);
-    }
-
-    function macroPayloadTooltipForExpression(expression) {
-        const parts = macroKeycodesInExpression(expression)
-            .map((keycode) => {
-                const slot = macroSlotForKeycode(keycode);
-                if (!slot) return "";
-                const payload = slot.kind === "via" ? macroPayloadForSlot(slot) : String(slot.payload || "");
-                const label = (slot.kind === "via" ? "VIA " : "Macro ") + macroSlotNumber(slot.keycode);
-                const state = payload ? payload.length + " chars" : "empty";
-                return label + " payload (" + state + "): " + truncateTooltipText(payload || "empty", 420);
-            })
-            .filter(Boolean);
-        return parts.join("\\n");
-    }
-
-    function macroKeycodesInExpression(expression) {
-        const seen = new Set();
-        const keys = [];
-        for (const match of String(expression || "").matchAll(/\\b(?:VIA_MACRO|MACRO)_\\d+\\b/g)) {
-            if (seen.has(match[0])) continue;
-            seen.add(match[0]);
-            keys.push(match[0]);
+    function layoutKeyBehaviorTooltip(position, label) {
+        const lines = [
+            "Index " + position.layoutIndex + " - " + label,
+            "Keycode: " + position.keycode
+        ];
+        const behavior = behaviorForKey(position.keycode);
+        if (!behavior) {
+            lines.push("No key_behaviors[] row for this key.");
+            return lines.join("\\n");
         }
-        return keys;
+        const branches = behaviorTooltipLines(behavior);
+        const branchCount = behaviorTooltipBranchCount(behavior);
+        const branchSuffix = branchCount ? " (" + branchCount + " " + (branchCount === 1 ? "branch" : "branches") + ")" : "";
+        lines.push("Behavior: " + displayAction(behavior.keycode) + branchSuffix);
+        lines.push(...branches);
+        return lines.join("\\n");
+    }
+
+    function behaviorTooltipBranchCount(behavior) {
+        return (behavior?.steps || []).filter((step) => step.tap || step.hold || step.longHold).length;
+    }
+
+    function behaviorTooltipLines(behavior) {
+        const lines = [];
+        for (const step of behavior?.steps || []) {
+            const actions = [
+                step.tap ? { label: "tap", text: behaviorTooltipActionText(step.tap) } : undefined,
+                step.hold ? { label: "hold", text: behaviorTooltipActionText(step.hold) } : undefined,
+                step.longHold ? { label: "long hold", text: behaviorTooltipActionText(step.longHold) } : undefined,
+            ].filter(Boolean);
+            if (actions.length) {
+                const branchPrefix = "  " + (Number(step.tapCount || 0) + 1) + "x  ";
+                actions.forEach((action, index) => {
+                    lines.push((index === 0 ? branchPrefix : "      ") + action.label + ": " + action.text);
+                });
+            }
+        }
+        return lines.length ? lines : ["No active tap-count branch actions."];
+    }
+
+    function behaviorTooltipActionText(action) {
+        const target = action?.actionDisplay || displayAction(action?.action || "");
+        if (action?.helper === "TAP_SENDS") return target || "tap";
+        if (action?.helper === "PRESS_AND_HOLD_UNTIL_RELEASE") return target ? target + " while held" : "while held";
+        if (action?.helper === "TAP_AT_HOLD_THRESHOLD") return target ? target + " at threshold" : "at threshold";
+        if (action?.helper === "TAP_ON_RELEASE_AFTER_HOLD") return target ? target + " on release" : "on release";
+        if (action?.helper === "REPEAT_WHILE_HELD") return (target || "repeat") + (action.repeatHz ? " @" + action.repeatHz + " Hz" : " repeating");
+        return action?.helper ? action.helper + (target ? " " + target : "") : target;
     }
 
     function keyVisual(layoutIndex) {

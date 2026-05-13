@@ -317,7 +317,9 @@ color unless the row uses a nonzero HSV override. This includes
 `KEY_FEEDBACK_GROUP_ALL`.
 
 Most visible controls, tables, collapsed summaries, color previews, and SVG
-keys expose hover tooltips that describe what the field edits or displays.
+keys expose hover tooltips that describe what the field edits or displays. In
+the Layout area, the board-level help icon carries the general edit gestures;
+hovering a physical key focuses on that key's `key_behaviors[]` row.
 
 ## Native Workspace Use
 
