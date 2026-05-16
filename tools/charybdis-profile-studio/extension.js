@@ -5868,24 +5868,149 @@ function getStudioHtml() {
         }
         .layout-key-actions {
             display: grid;
-            gap: 3px;
+            gap: 5px;
             min-width: 0;
         }
         .layout-key-action {
             display: grid;
-            grid-template-columns: 68px minmax(0, 1fr);
-            gap: 7px;
-            align-items: baseline;
+            grid-template-columns: 126px minmax(0, 1fr);
+            gap: 8px;
+            align-items: start;
+            min-width: 0;
+            padding: 5px 0 5px 8px;
+            border-left: 3px solid var(--behavior-color, rgba(143, 176, 187, 0.84));
+            border-radius: 0 5px 5px 0;
+            background: linear-gradient(90deg, var(--behavior-color-wash, rgba(143, 176, 187, 0.1)), rgba(21, 26, 29, 0));
+        }
+        .layout-key-action.action-tap {
+            --behavior-color: var(--layout-key-tap-color, #00d084);
+            --behavior-text-color: var(--layout-key-tap-text, #f7f7f4);
+            --behavior-color-wash: var(--layout-key-tap-wash, rgba(0, 208, 132, 0.13));
+        }
+        .layout-key-action.action-hold {
+            --behavior-color: var(--layout-key-hold-color, #ff8a00);
+            --behavior-text-color: var(--layout-key-hold-text, #18201d);
+            --behavior-color-wash: var(--layout-key-hold-wash, rgba(255, 138, 0, 0.13));
+        }
+        .layout-key-action.action-long-hold {
+            --behavior-color: var(--layout-key-long-hold-color, #3094ff);
+            --behavior-text-color: var(--layout-key-long-hold-text, #f7f7f4);
+            --behavior-color-wash: var(--layout-key-long-hold-wash, rgba(48, 148, 255, 0.13));
+        }
+        .layout-key-action-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            align-items: center;
             min-width: 0;
         }
-        .layout-key-action-label {
-            color: #8fb0bb;
+        .layout-key-stage-chip,
+        .layout-key-helper-chip {
+            display: inline-flex;
+            align-items: center;
+            min-width: 0;
+            max-width: 100%;
+            border-radius: 999px;
+            padding: 1px 6px;
             font-size: 11px;
             font-weight: 700;
+            line-height: 1.35;
+            white-space: nowrap;
         }
-        .layout-key-action-text {
+        .layout-key-stage-chip {
+            border: 1px solid var(--behavior-color, rgba(143, 176, 187, 0.84));
+            background: var(--behavior-color, rgba(143, 176, 187, 0.84));
+            color: var(--behavior-text-color, #101719);
+        }
+        .layout-key-helper-chip {
+            border: 1px solid rgba(143, 176, 187, 0.55);
+            background: rgba(143, 176, 187, 0.1);
+            color: #d9e5e7;
+        }
+        .layout-key-helper-chip.helper-send {
+            border-color: rgba(49, 198, 164, 0.62);
+        }
+        .layout-key-helper-chip.helper-hold {
+            border-color: rgba(244, 169, 84, 0.68);
+        }
+        .layout-key-helper-chip.helper-threshold {
+            border-color: rgba(112, 167, 255, 0.68);
+        }
+        .layout-key-helper-chip.helper-release {
+            border-color: rgba(211, 157, 255, 0.68);
+        }
+        .layout-key-helper-chip.helper-repeat {
+            border-color: rgba(255, 112, 112, 0.7);
+        }
+        .layout-key-action-main {
+            display: grid;
+            gap: 4px;
+            min-width: 0;
+        }
+        .layout-key-action-target {
             min-width: 0;
             overflow-wrap: break-word;
+            color: #f0f6f2;
+            font-weight: 650;
+        }
+        .layout-key-action-detail {
+            color: #a9b9bd;
+            font-size: 11px;
+        }
+        .layout-key-macro-preview {
+            display: grid;
+            gap: 5px;
+            min-width: 0;
+            margin-top: 1px;
+            padding: 6px 7px;
+            border: 1px solid rgba(107, 124, 133, 0.35);
+            border-left: 2px solid var(--behavior-color, rgba(143, 176, 187, 0.84));
+            border-radius: 5px;
+            background: rgba(11, 15, 17, 0.42);
+        }
+        .layout-key-macro-head {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            align-items: center;
+            min-width: 0;
+            color: #dce7e8;
+            font-size: 11px;
+            font-weight: 750;
+        }
+        .layout-key-macro-code {
+            color: #93a8ae;
+            font-size: 10px;
+            font-weight: 650;
+        }
+        .layout-key-macro-steps {
+            display: grid;
+            gap: 3px;
+            min-width: 0;
+        }
+        .layout-key-macro-step {
+            display: grid;
+            grid-template-columns: 56px minmax(0, 1fr);
+            gap: 5px;
+            min-width: 0;
+            align-items: baseline;
+        }
+        .layout-key-macro-kind {
+            color: #9fb0b6;
+            font-size: 10px;
+            font-weight: 750;
+            text-transform: uppercase;
+        }
+        .layout-key-macro-detail {
+            min-width: 0;
+            overflow-wrap: break-word;
+            color: #d8e3e4;
+            font-size: 11px;
+        }
+        .layout-key-macro-more,
+        .layout-key-macro-empty {
+            color: #9caeb4;
+            font-size: 11px;
         }
         .layout-key-combo-list {
             display: grid;
@@ -6146,6 +6271,7 @@ function getStudioHtml() {
             }
         }
     </style>
+    <style id="behaviorColorStyle" nonce="${nonce}"></style>
 </head>
 <body>
     <header>
@@ -6694,6 +6820,7 @@ function getClientScript() {
     const subtitle = document.getElementById("subtitle");
     const tooltip = document.getElementById("tooltip");
     const keyPickerHost = document.getElementById("keyPickerHost");
+    const behaviorColorStyle = document.getElementById("behaviorColorStyle");
     let activeTooltipTarget = undefined;
 
     document.getElementById("applyAll").addEventListener("click", () => {
@@ -8606,6 +8733,7 @@ function getClientScript() {
 
         renderProfileControls();
         subtitle.textContent = model.activeProfile ? model.root + " / " + model.activeProfile.keymap : model.root;
+        updateLayoutKeyBehaviorColorStyle();
         app.innerHTML = renderDiagnostics() + renderViewTabs() + renderActiveView();
         initializeDirtyTracking();
         restoreActiveViewDraft();
@@ -10330,7 +10458,37 @@ function getClientScript() {
             lines.push("Combos:");
             lines.push(...comboLines);
         }
+        const macroLines = layoutKeyMacroTooltipLines(position.keycode);
+        if (macroLines.length) {
+            lines.push("Macro payload:");
+            lines.push(...macroLines);
+        }
         return lines.join("\\n");
+    }
+
+    function layoutKeyMacroTooltipLines(keycode) {
+        const lines = [];
+        for (const macroKeycode of macroKeycodesInExpression(keycode)) {
+            const slot = macroSlotForKeycode(macroKeycode);
+            const payload = macroPayloadForSlot(slot);
+            const parsed = payload ? parseMacroPayloadPreview(payload) : { steps: [], error: "" };
+            const title = (slot?.kind === "via" || /^VIA_MACRO_/.test(macroKeycode || "") ? "VIA macro " : "Hardcoded macro ") + macroSlotNumber(macroKeycode);
+            lines.push("  " + title + " (" + macroKeycode + ")");
+            if (!slot) {
+                lines.push("      No parsed payload for this keycode.");
+            } else if (parsed.error) {
+                lines.push("      Invalid payload: " + parsed.error);
+            } else if (!parsed.steps.length) {
+                lines.push("      Empty payload.");
+            } else {
+                for (const step of parsed.steps.slice(0, 4)) {
+                    lines.push("      " + step.kindLabel + ": " + step.detail);
+                }
+                const moreCount = parsed.steps.length - 4;
+                if (moreCount > 0) lines.push("      +" + moreCount + " more " + (moreCount === 1 ? "step" : "steps"));
+            }
+        }
+        return lines;
     }
 
     function layoutKeyComboTooltipLines(keycode) {
@@ -10361,10 +10519,14 @@ function getClientScript() {
         const rawCode = label === position.keycode ? "" : position.keycode;
         const behavior = behaviorForKey(position.keycode);
         const combos = combosForKey(position.keycode);
+        const macroKeycodes = macroKeycodesInExpression(position.keycode);
         const sections = [];
 
         if (behavior) {
             sections.push(renderLayoutKeyBehaviorSection("Key behavior", behavior, { title: behaviorBranchCountText(behavior) }));
+        }
+        if (macroKeycodes.length) {
+            sections.push(renderLayoutKeyMacroSection(macroKeycodes));
         }
         if (combos.length) {
             sections.push(renderLayoutKeyComboSection(combos));
@@ -10427,14 +10589,35 @@ function getClientScript() {
             rows.push("<div class='layout-key-branch'>" +
                 "<span class='layout-key-branch-count'>" + escapeHtml(String(Number(step.tapCount || 0) + 1)) + "x</span>" +
                 "<div class='layout-key-actions'>" +
-                actions.map((action) => "<div class='layout-key-action'>" +
-                    "<span class='layout-key-action-label'>" + escapeHtml(action.label) + "</span>" +
-                    "<span class='layout-key-action-text'>" + escapeHtml(action.text) + "</span>" +
-                    "</div>").join("") +
+                actions.map(renderLayoutKeyAction).join("") +
                 "</div>" +
                 "</div>");
         }
         return rows.length ? "<div class='layout-key-branches'>" + rows.join("") + "</div>" : "<div class='layout-key-empty'>No active tap-count branch actions.</div>";
+    }
+
+    function renderLayoutKeyAction(action) {
+        const detail = action.detail ? "<span class='layout-key-action-detail'>" + escapeHtml(action.detail) + "</span>" : "";
+        const className = "layout-key-action " + behaviorActionStageClass(action.label);
+        return "<div class='" + escapeAttr(className) + "'>" +
+            "<div class='layout-key-action-meta'>" +
+            "<span class='layout-key-stage-chip'>" + escapeHtml(action.label) + "</span>" +
+            "<span class='layout-key-helper-chip helper-" + escapeAttr(action.helperClass) + "'>" + escapeHtml(action.helperLabel) + "</span>" +
+            "</div>" +
+            "<div class='layout-key-action-main'>" +
+            "<div><span class='layout-key-action-target'>" + escapeHtml(action.target) + "</span>" + (detail ? " " + detail : "") + "</div>" +
+            renderLayoutKeyMacroPreview(action.sourceAction) +
+            "</div>" +
+            "</div>";
+    }
+
+    function renderLayoutKeyMacroSection(keycodes) {
+        return "<div class='layout-key-section'>" +
+            "<div class='layout-key-section-title'>Macro payload</div>" +
+            "<div class='layout-key-section-body'>" +
+            keycodes.map(renderLayoutKeyMacroCard).join("") +
+            "</div>" +
+            "</div>";
     }
 
     function renderLayoutKeyComboSection(combos) {
@@ -10488,20 +10671,145 @@ function getClientScript() {
 
     function behaviorTooltipActionItems(step) {
         return [
-            step.tap ? { label: "tap", text: behaviorTooltipActionText(step.tap) } : undefined,
-            step.hold ? { label: "hold", text: behaviorTooltipActionText(step.hold) } : undefined,
-            step.longHold ? { label: "long hold", text: behaviorTooltipActionText(step.longHold) } : undefined,
+            step.tap ? behaviorTooltipActionItem({ label: "tap", sourceAction: step.tap }) : undefined,
+            step.hold ? behaviorTooltipActionItem({ label: "hold", sourceAction: step.hold }) : undefined,
+            step.longHold ? behaviorTooltipActionItem({ label: "long hold", sourceAction: step.longHold }) : undefined,
         ].filter(Boolean);
     }
 
+    function behaviorTooltipActionItem(item) {
+        const helper = behaviorTooltipHelperVisual(item.sourceAction);
+        const target = behaviorTooltipActionTarget(item.sourceAction) || helper.fallbackTarget;
+        return {
+            label: item.label,
+            text: behaviorTooltipActionText(item.sourceAction),
+            target,
+            detail: helper.detail,
+            helperLabel: helper.label,
+            helperClass: helper.className,
+            sourceAction: item.sourceAction,
+        };
+    }
+
     function behaviorTooltipActionText(action) {
-        const target = action?.actionDisplay || displayAction(action?.action || "");
-        if (action?.helper === "TAP_SENDS") return target || "tap";
-        if (action?.helper === "PRESS_AND_HOLD_UNTIL_RELEASE") return target ? target + " while held" : "while held";
-        if (action?.helper === "TAP_AT_HOLD_THRESHOLD") return target ? target + " at threshold" : "at threshold";
-        if (action?.helper === "TAP_ON_RELEASE_AFTER_HOLD") return target ? target + " on release" : "on release";
-        if (action?.helper === "REPEAT_WHILE_HELD") return (target || "repeat") + (action.repeatHz ? " @" + action.repeatHz + " Hz" : " repeating");
-        return action?.helper ? action.helper + (target ? " " + target : "") : target;
+        const target = behaviorTooltipActionTarget(action);
+        const helper = behaviorTooltipHelperVisual(action);
+        if (!helper.detail) return target || helper.fallbackTarget;
+        return (target || helper.fallbackTarget) + " " + helper.detail;
+    }
+
+    function behaviorTooltipActionTarget(action) {
+        return action?.actionDisplay || displayAction(action?.action || "");
+    }
+
+    function behaviorTooltipHelperVisual(action) {
+        if (action?.helper === "TAP_SENDS") {
+            return { label: "send", className: "send", detail: "", fallbackTarget: "tap" };
+        }
+        if (action?.helper === "PRESS_AND_HOLD_UNTIL_RELEASE") {
+            return { label: "held", className: "hold", detail: "while held", fallbackTarget: "hold" };
+        }
+        if (action?.helper === "TAP_AT_HOLD_THRESHOLD") {
+            return { label: "threshold", className: "threshold", detail: "at hold threshold", fallbackTarget: "threshold" };
+        }
+        if (action?.helper === "TAP_ON_RELEASE_AFTER_HOLD") {
+            return { label: "release", className: "release", detail: "on release after hold", fallbackTarget: "release" };
+        }
+        if (action?.helper === "REPEAT_WHILE_HELD") {
+            return { label: "repeat", className: "repeat", detail: action.repeatHz ? "at " + action.repeatHz + " Hz" : "while held", fallbackTarget: "repeat" };
+        }
+        if (action?.helper) {
+            return { label: action.helper, className: "custom", detail: "", fallbackTarget: action.helper };
+        }
+        return { label: "action", className: "custom", detail: "", fallbackTarget: "action" };
+    }
+
+    function behaviorActionColor(label) {
+        const feedback = model.rgb?.keyBehaviorFeedback || {};
+        if (label === "tap") return hsvToHex(feedback.tapCommittedColor) || "#00d084";
+        if (label === "hold") return hsvToHex(feedback.holdActiveColor) || "#ff8a00";
+        if (label === "long hold") return hsvToHex(feedback.longHoldActiveColor) || "#3094ff";
+        return "#8fb0bb";
+    }
+
+    function behaviorActionStageClass(label) {
+        if (label === "tap") return "action-tap";
+        if (label === "hold") return "action-hold";
+        if (label === "long hold") return "action-long-hold";
+        return "action-custom";
+    }
+
+    function updateLayoutKeyBehaviorColorStyle() {
+        if (!behaviorColorStyle) return;
+        const tapColor = behaviorActionColor("tap");
+        const holdColor = behaviorActionColor("hold");
+        const longHoldColor = behaviorActionColor("long hold");
+        behaviorColorStyle.textContent = [
+            layoutKeyBehaviorColorRule("tap", tapColor),
+            layoutKeyBehaviorColorRule("hold", holdColor),
+            layoutKeyBehaviorColorRule("long-hold", longHoldColor),
+        ].join("\\n");
+    }
+
+    function layoutKeyBehaviorColorRule(name, color) {
+        return ":root {" +
+            "--layout-key-" + name + "-color: " + color + ";" +
+            "--layout-key-" + name + "-text: " + idealText(color) + ";" +
+            "--layout-key-" + name + "-wash: " + hexToRgba(color, 0.13) + ";" +
+            "}";
+    }
+
+    function renderLayoutKeyMacroPreview(action) {
+        const keycodes = macroKeycodesInExpression(action?.action);
+        if (!keycodes.length) return "";
+        return keycodes.map(renderLayoutKeyMacroCard).join("");
+    }
+
+    function renderLayoutKeyMacroCard(keycode) {
+        const slot = macroSlotForKeycode(keycode);
+        const payload = macroPayloadForSlot(slot);
+        const parsed = payload ? parseMacroPayloadPreview(payload) : { steps: [], error: "" };
+        const slotKind = slot?.kind === "via" || /^VIA_MACRO_/.test(keycode || "") ? "VIA macro" : "Hardcoded macro";
+        const title = slotKind + " " + macroSlotNumber(keycode);
+        const previewLimit = 4;
+        const previewSteps = parsed.steps.slice(0, previewLimit);
+        const moreCount = parsed.steps.length - previewSteps.length;
+        return "<div class='layout-key-macro-preview'>" +
+            "<div class='layout-key-macro-head'><span>" + escapeHtml(title) + "</span><code class='layout-key-macro-code'>" + escapeHtml(keycode) + "</code></div>" +
+            (!slot ? "<div class='layout-key-macro-empty'>No parsed payload for this keycode.</div>" : "") +
+            (parsed.error ? "<div class='layout-key-macro-empty'>Invalid payload: " + escapeHtml(parsed.error) + "</div>" : "") +
+            (slot && !parsed.error && !previewSteps.length ? "<div class='layout-key-macro-empty'>Empty payload.</div>" : "") +
+            (previewSteps.length ? "<div class='layout-key-macro-steps'>" + previewSteps.map(renderLayoutKeyMacroStep).join("") + "</div>" : "") +
+            (moreCount > 0 ? "<div class='layout-key-macro-more'>+" + escapeHtml(String(moreCount)) + " more " + (moreCount === 1 ? "step" : "steps") + "</div>" : "") +
+            "</div>";
+    }
+
+    function renderLayoutKeyMacroStep(step) {
+        return "<div class='layout-key-macro-step'>" +
+            "<span class='layout-key-macro-kind'>" + escapeHtml(step.kindLabel) + "</span>" +
+            "<span class='layout-key-macro-detail'>" + escapeHtml(step.detail) + "</span>" +
+            "</div>";
+    }
+
+    function macroKeycodesInExpression(expression) {
+        const found = [];
+        const seen = new Set();
+        for (const match of String(expression || "").matchAll(/\\b(?:VIA_MACRO|MACRO)_\\d+\\b/g)) {
+            if (seen.has(match[0])) continue;
+            seen.add(match[0]);
+            found.push(match[0]);
+        }
+        return found;
+    }
+
+    function hexToRgba(hex, alpha) {
+        const match = String(hex || "").trim().match(/^#?([0-9a-f]{6})$/i);
+        if (!match) return "rgba(143, 176, 187, " + alpha + ")";
+        const value = match[1];
+        const red = parseInt(value.slice(0, 2), 16);
+        const green = parseInt(value.slice(2, 4), 16);
+        const blue = parseInt(value.slice(4, 6), 16);
+        return "rgba(" + red + ", " + green + ", " + blue + ", " + alpha + ")";
     }
 
     function keyVisual(layoutIndex) {

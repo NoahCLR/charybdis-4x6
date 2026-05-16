@@ -212,20 +212,36 @@ const appendedCheck = `
         getClientScript().includes("function tooltipRichHtml") &&
         getClientScript().includes("function layoutKeyTooltipCardHtml") &&
         getClientScript().includes("function layoutKeyComboTooltipLines") &&
+        getClientScript().includes("function layoutKeyMacroTooltipLines") &&
         getClientScript().includes("layout-key-section-body") &&
         getClientScript().includes("layout-key-nested-block") &&
         getClientScript().includes("function combosForKey") &&
         getClientScript().includes("function renderLayoutKeyComboSection") &&
+        getClientScript().includes("function renderLayoutKeyMacroSection") &&
         getClientScript().includes("function renderLayoutKeyBehaviorRows") &&
+        getClientScript().includes("function renderLayoutKeyAction") &&
+        getClientScript().includes("function renderLayoutKeyMacroPreview") &&
+        getClientScript().includes("function macroKeycodesInExpression") &&
         getClientScript().includes("function behaviorTooltipBranchCount") &&
         getClientScript().includes("function behaviorBranchCountText") &&
         getClientScript().includes("function behaviorTooltipLines") &&
         getClientScript().includes("function behaviorTooltipActionItems") &&
         getClientScript().includes("function behaviorTooltipActionText") &&
+        getClientScript().includes("function behaviorTooltipHelperVisual") &&
+        getClientScript().includes("function behaviorActionColor") &&
+        getClientScript().includes("function updateLayoutKeyBehaviorColorStyle") &&
+        getClientScript().includes("function behaviorActionStageClass") &&
+        getClientScript().includes("layout-key-helper-chip") &&
+        getClientScript().includes("layout-key-macro-preview") &&
+        extensionSource.includes('id="behaviorColorStyle"') &&
+        extensionSource.includes(".layout-key-action.action-tap") &&
+        extensionSource.includes("--layout-key-tap-color") &&
         getClientScript().includes("output behavior") &&
+        getClientScript().includes("Macro payload") &&
         getClientScript().includes('label: "long hold"') &&
+        getClientScript().includes("VIA macro") &&
         getClientScript().includes("Behavior: none on this key"),
-        "Profile Studio layout key hover tooltips should show key-specific behavior rows and combo behavior"
+        "Profile Studio layout key hover tooltips should show key-specific behavior rows, direct macros, combo behavior, helper types, RGB action colors, and macro previews"
     );
     assert(
         displayKeyExpression("DRAGSCROLL") === "Dragscroll" &&

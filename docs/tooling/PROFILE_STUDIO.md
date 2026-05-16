@@ -320,7 +320,10 @@ Most visible controls, tables, collapsed summaries, color previews, and SVG
 keys expose hover tooltips that describe what the field edits or displays. In
 the Layout area, the board-level help icon carries the general edit gestures;
 hovering a physical key opens a structured card for that key's
-`key_behaviors[]` row, active combos, and combo-output behavior.
+`key_behaviors[]` row, direct macro payload, active combos, and combo-output
+behavior. Behavior action rows use the configured key-behavior RGB colors, show
+the helper type as a chip, and expand referenced VIA or hardcoded macro payloads
+into a short parsed preview.
 
 ## Native Workspace Use
 
