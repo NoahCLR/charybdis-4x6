@@ -10432,12 +10432,12 @@ function getClientScript() {
         ];
         const behavior = behaviorForKey(position.keycode);
         if (!behavior) {
-            lines.push("Behavior: none on this key");
+            lines.push("Custom key behavior: none on this key");
         } else {
             const branches = behaviorTooltipLines(behavior);
             const branchCount = behaviorTooltipBranchCount(behavior);
             const branchSuffix = branchCount ? " (" + branchCount + " " + (branchCount === 1 ? "branch" : "branches") + ")" : "";
-            lines.push("Behavior: " + displayAction(behavior.keycode) + branchSuffix);
+            lines.push("Custom key behavior: " + displayAction(behavior.keycode) + branchSuffix);
             lines.push(...branches);
         }
         const comboLines = layoutKeyComboTooltipLines(position.keycode);
@@ -10510,7 +10510,7 @@ function getClientScript() {
         const sections = [];
 
         if (behavior) {
-            sections.push(renderLayoutKeyBehaviorSection("Key behavior", behavior, { title: behaviorBranchCountText(behavior) }));
+            sections.push(renderLayoutKeyBehaviorSection("Custom key behavior", behavior, { title: behaviorBranchCountText(behavior) }));
         }
         if (macroKeycodes.length) {
             sections.push(renderLayoutKeyMacroSection(macroKeycodes));
@@ -10519,7 +10519,7 @@ function getClientScript() {
             sections.push(renderLayoutKeyComboSection(combos));
         }
         if (!sections.length) {
-            sections.push("<div class='layout-key-empty'>No key behavior or active combos on this key.</div>");
+            sections.push("<div class='layout-key-empty'>No custom key behavior or active combos on this key.</div>");
         }
 
         return "<div class='layout-key-hover-card'>" +

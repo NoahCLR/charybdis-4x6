@@ -236,6 +236,7 @@ const appendedCheck = `
         extensionSource.includes('id="behaviorColorStyle"') &&
         extensionSource.includes(".layout-key-action.action-tap") &&
         extensionSource.includes("--layout-key-tap-color") &&
+        getClientScript().includes("Custom key behavior") &&
         getClientScript().includes("Custom output behavior") &&
         getClientScript().includes("Macro payload") &&
         getClientScript().includes('label: "long hold"') &&
@@ -244,7 +245,7 @@ const appendedCheck = `
         getClientScript().includes("stops on release") &&
         getClientScript().includes("fires on release unless long hold starts") &&
         getClientScript().includes("VIA macro") &&
-        getClientScript().includes("Behavior: none on this key"),
+        getClientScript().includes("Custom key behavior: none on this key"),
         "Profile Studio layout key hover tooltips should show key-specific behavior rows, direct macros, combo behavior, lifecycle text, RGB action colors, and macro previews"
     );
     assert(
