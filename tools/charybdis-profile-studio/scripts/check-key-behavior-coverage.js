@@ -236,7 +236,7 @@ const appendedCheck = `
         extensionSource.includes('id="behaviorColorStyle"') &&
         extensionSource.includes(".layout-key-action.action-tap") &&
         extensionSource.includes("--layout-key-tap-color") &&
-        getClientScript().includes("output behavior") &&
+        getClientScript().includes("Custom output behavior") &&
         getClientScript().includes("Macro payload") &&
         getClientScript().includes('label: "long hold"') &&
         getClientScript().includes("fires once when ") &&

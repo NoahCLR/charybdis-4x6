@@ -10487,13 +10487,13 @@ function getClientScript() {
 
             const outputBehavior = behaviorForKey(combo.output);
             if (!outputBehavior) {
-                lines.push("      output behavior: none");
+                lines.push("      custom output behavior: none");
                 continue;
             }
 
             const branchCount = behaviorTooltipBranchCount(outputBehavior);
             const branchSuffix = branchCount ? " (" + branchCount + " " + (branchCount === 1 ? "branch" : "branches") + ")" : "";
-            lines.push("      output behavior: " + displayAction(outputBehavior.keycode) + branchSuffix);
+            lines.push("      custom output behavior: " + displayAction(outputBehavior.keycode) + branchSuffix);
             lines.push(...behaviorTooltipLines(outputBehavior, { branchIndent: "        ", actionIndent: "            " }));
         }
         return lines;
@@ -10626,7 +10626,7 @@ function getClientScript() {
             "<span class='layout-key-combo-arrow'>-></span>" +
             renderLayoutKeyChip(outputText, "output") +
             "</div>" +
-            (outputBehavior ? "<div class='layout-key-nested-block'><div class='layout-key-section-title'>Output behavior</div>" + renderLayoutKeyBehaviorBlock(outputBehavior) + "</div>" : "") +
+            (outputBehavior ? "<div class='layout-key-nested-block'><div class='layout-key-section-title'>Custom output behavior</div>" + renderLayoutKeyBehaviorBlock(outputBehavior) + "</div>" : "") +
             "</div>";
     }
 
