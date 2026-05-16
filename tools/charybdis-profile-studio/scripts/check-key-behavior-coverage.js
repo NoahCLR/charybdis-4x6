@@ -227,11 +227,11 @@ const appendedCheck = `
         getClientScript().includes("function behaviorTooltipLines") &&
         getClientScript().includes("function behaviorTooltipActionItems") &&
         getClientScript().includes("function behaviorTooltipActionText") &&
-        getClientScript().includes("function behaviorTooltipHelperVisual") &&
+        getClientScript().includes("function behaviorTooltipActionLifecycle") &&
         getClientScript().includes("function behaviorActionColor") &&
         getClientScript().includes("function updateLayoutKeyBehaviorColorStyle") &&
         getClientScript().includes("function behaviorActionStageClass") &&
-        getClientScript().includes("layout-key-helper-chip") &&
+        getClientScript().includes("layout-key-action-lifecycle") &&
         getClientScript().includes("layout-key-macro-preview") &&
         extensionSource.includes('id="behaviorColorStyle"') &&
         extensionSource.includes(".layout-key-action.action-tap") &&
@@ -239,9 +239,13 @@ const appendedCheck = `
         getClientScript().includes("output behavior") &&
         getClientScript().includes("Macro payload") &&
         getClientScript().includes('label: "long hold"') &&
+        getClientScript().includes("fires once when ") &&
+        getClientScript().includes("starts at ") &&
+        getClientScript().includes("stops on release") &&
+        getClientScript().includes("fires on release unless long hold starts") &&
         getClientScript().includes("VIA macro") &&
         getClientScript().includes("Behavior: none on this key"),
-        "Profile Studio layout key hover tooltips should show key-specific behavior rows, direct macros, combo behavior, helper types, RGB action colors, and macro previews"
+        "Profile Studio layout key hover tooltips should show key-specific behavior rows, direct macros, combo behavior, lifecycle text, RGB action colors, and macro previews"
     );
     assert(
         displayKeyExpression("DRAGSCROLL") === "Dragscroll" &&

@@ -5873,7 +5873,7 @@ function getStudioHtml() {
         }
         .layout-key-action {
             display: grid;
-            grid-template-columns: 126px minmax(0, 1fr);
+            grid-template-columns: 96px minmax(0, 1fr);
             gap: 8px;
             align-items: start;
             min-width: 0;
@@ -5904,8 +5904,7 @@ function getStudioHtml() {
             align-items: center;
             min-width: 0;
         }
-        .layout-key-stage-chip,
-        .layout-key-helper-chip {
+        .layout-key-stage-chip {
             display: inline-flex;
             align-items: center;
             min-width: 0;
@@ -5922,29 +5921,16 @@ function getStudioHtml() {
             background: var(--behavior-color, rgba(143, 176, 187, 0.84));
             color: var(--behavior-text-color, #101719);
         }
-        .layout-key-helper-chip {
-            border: 1px solid rgba(143, 176, 187, 0.55);
-            background: rgba(143, 176, 187, 0.1);
-            color: #d9e5e7;
-        }
-        .layout-key-helper-chip.helper-send {
-            border-color: rgba(49, 198, 164, 0.62);
-        }
-        .layout-key-helper-chip.helper-hold {
-            border-color: rgba(244, 169, 84, 0.68);
-        }
-        .layout-key-helper-chip.helper-threshold {
-            border-color: rgba(112, 167, 255, 0.68);
-        }
-        .layout-key-helper-chip.helper-release {
-            border-color: rgba(211, 157, 255, 0.68);
-        }
-        .layout-key-helper-chip.helper-repeat {
-            border-color: rgba(255, 112, 112, 0.7);
-        }
         .layout-key-action-main {
             display: grid;
-            gap: 4px;
+            gap: 2px;
+            min-width: 0;
+        }
+        .layout-key-action-output {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            align-items: baseline;
             min-width: 0;
         }
         .layout-key-action-target {
@@ -5953,9 +5939,10 @@ function getStudioHtml() {
             color: #f0f6f2;
             font-weight: 650;
         }
-        .layout-key-action-detail {
-            color: #a9b9bd;
+        .layout-key-action-lifecycle {
+            color: #b4c4c9;
             font-size: 11px;
+            overflow-wrap: break-word;
         }
         .layout-key-macro-preview {
             display: grid;
@@ -10597,15 +10584,14 @@ function getClientScript() {
     }
 
     function renderLayoutKeyAction(action) {
-        const detail = action.detail ? "<span class='layout-key-action-detail'>" + escapeHtml(action.detail) + "</span>" : "";
         const className = "layout-key-action " + behaviorActionStageClass(action.label);
         return "<div class='" + escapeAttr(className) + "'>" +
             "<div class='layout-key-action-meta'>" +
             "<span class='layout-key-stage-chip'>" + escapeHtml(action.label) + "</span>" +
-            "<span class='layout-key-helper-chip helper-" + escapeAttr(action.helperClass) + "'>" + escapeHtml(action.helperLabel) + "</span>" +
             "</div>" +
             "<div class='layout-key-action-main'>" +
-            "<div><span class='layout-key-action-target'>" + escapeHtml(action.target) + "</span>" + (detail ? " " + detail : "") + "</div>" +
+            "<div class='layout-key-action-output'><span class='layout-key-action-target'>" + escapeHtml(action.target) + "</span></div>" +
+            "<div class='layout-key-action-lifecycle'>" + escapeHtml(action.lifecycle) + "</div>" +
             renderLayoutKeyMacroPreview(action.sourceAction) +
             "</div>" +
             "</div>";
@@ -10671,57 +10657,67 @@ function getClientScript() {
 
     function behaviorTooltipActionItems(step) {
         return [
-            step.tap ? behaviorTooltipActionItem({ label: "tap", sourceAction: step.tap }) : undefined,
-            step.hold ? behaviorTooltipActionItem({ label: "hold", sourceAction: step.hold }) : undefined,
-            step.longHold ? behaviorTooltipActionItem({ label: "long hold", sourceAction: step.longHold }) : undefined,
+            step.tap ? behaviorTooltipActionItem({ label: "tap", sourceAction: step.tap, step }) : undefined,
+            step.hold ? behaviorTooltipActionItem({ label: "hold", sourceAction: step.hold, step }) : undefined,
+            step.longHold ? behaviorTooltipActionItem({ label: "long hold", sourceAction: step.longHold, step }) : undefined,
         ].filter(Boolean);
     }
 
     function behaviorTooltipActionItem(item) {
-        const helper = behaviorTooltipHelperVisual(item.sourceAction);
-        const target = behaviorTooltipActionTarget(item.sourceAction) || helper.fallbackTarget;
+        const lifecycle = behaviorTooltipActionLifecycle(item.sourceAction, item);
+        const target = behaviorTooltipActionTarget(item.sourceAction) || lifecycle.fallbackTarget;
         return {
             label: item.label,
             text: behaviorTooltipActionText(item.sourceAction),
             target,
-            detail: helper.detail,
-            helperLabel: helper.label,
-            helperClass: helper.className,
+            lifecycle: lifecycle.text,
             sourceAction: item.sourceAction,
         };
     }
 
     function behaviorTooltipActionText(action) {
         const target = behaviorTooltipActionTarget(action);
-        const helper = behaviorTooltipHelperVisual(action);
-        if (!helper.detail) return target || helper.fallbackTarget;
-        return (target || helper.fallbackTarget) + " " + helper.detail;
+        const lifecycle = behaviorTooltipActionLifecycle(action);
+        return (target || lifecycle.fallbackTarget) + " - " + lifecycle.text;
     }
 
     function behaviorTooltipActionTarget(action) {
         return action?.actionDisplay || displayAction(action?.action || "");
     }
 
-    function behaviorTooltipHelperVisual(action) {
+    function behaviorTooltipActionLifecycle(action, context = {}) {
+        const stage = context.label || "";
+        const stageStart = stage === "long hold" ? "long hold" : "hold";
+        const hasLongHoldAlternative = stage === "hold" && Boolean(context.step?.longHold);
+        const macroTarget = macroKeycodesInExpression(action?.action).length > 0;
         if (action?.helper === "TAP_SENDS") {
-            return { label: "send", className: "send", detail: "", fallbackTarget: "tap" };
+            return { text: "fires once on tap release", fallbackTarget: "tap" };
         }
         if (action?.helper === "PRESS_AND_HOLD_UNTIL_RELEASE") {
-            return { label: "held", className: "hold", detail: "while held", fallbackTarget: "hold" };
+            if (macroTarget) {
+                return { text: "fires once when " + stageStart + " starts", fallbackTarget: "hold" };
+            }
+            return { text: "starts at " + stageStart + ", stops on release", fallbackTarget: "hold" };
         }
         if (action?.helper === "TAP_AT_HOLD_THRESHOLD") {
-            return { label: "threshold", className: "threshold", detail: "at hold threshold", fallbackTarget: "threshold" };
+            return { text: "fires once when " + stageStart + " starts", fallbackTarget: "threshold" };
         }
         if (action?.helper === "TAP_ON_RELEASE_AFTER_HOLD") {
-            return { label: "release", className: "release", detail: "on release after hold", fallbackTarget: "release" };
+            return {
+                text: hasLongHoldAlternative ? "fires on release unless long hold starts" : "fires on release after hold",
+                fallbackTarget: "release"
+            };
         }
         if (action?.helper === "REPEAT_WHILE_HELD") {
-            return { label: "repeat", className: "repeat", detail: action.repeatHz ? "at " + action.repeatHz + " Hz" : "while held", fallbackTarget: "repeat" };
+            return {
+                text: "starts at " + stageStart + ", repeats" + (action.repeatHz ? " at " + action.repeatHz + " Hz" : "") + " until release",
+                fallbackTarget: "repeat"
+            };
         }
         if (action?.helper) {
-            return { label: action.helper, className: "custom", detail: "", fallbackTarget: action.helper };
+            return { text: action.helper, fallbackTarget: action.helper };
         }
-        return { label: "action", className: "custom", detail: "", fallbackTarget: "action" };
+        return { text: "runs this action", fallbackTarget: "action" };
     }
 
     function behaviorActionColor(label) {
