@@ -58,6 +58,10 @@
           "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "noah_process_record_user", "key_runtime_core_observe_process_record_event", "key_runtime_core_observe_process_record_press", "handled_key_materialize_hold", "handled_key_transparent_source_at_position", "handled_key_lookup_tap_count_into"]
         },
         {
+          "name": "press observation token allocation",
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "noah_process_record_user", "key_runtime_core_observe_process_record_event", "key_runtime_core_observe_process_record_press", "key_runtime_core_allocate_token_id"]
+        },
+        {
           "name": "handled press planning",
           "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "noah_process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_process_plan_handled_key_press", "key_runtime_transition_plan_append_core_plan", "key_runtime_transition_plan_push"]
         },

@@ -2876,7 +2876,202 @@ static void test_key_runtime_core_projector_executes_effects_and_pending_dispatc
     CHECK(last_delayed_mods.real == mods.real);
 }
 
+#if KEY_RUNTIME_CORE_TOKEN_ID_MAX == UINT16_MAX
+static void test_key_runtime_core_token_ids_wrap_without_issuing_zero(void) {
+    key_runtime_core_state_t *state = key_runtime_core_state();
+    const press_token_t      *token;
+    keypos_t                  first_key  = test_keypos(0, 0);
+    keypos_t                  second_key = test_keypos(0, 1);
+    keypos_t                  third_key  = test_keypos(0, 2);
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+    state->next_token_id = UINT16_MAX - 1u;
+
+    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, KC_C, first_key, fake_time);
+    token = key_runtime_core_press_token_at(first_key);
+    CHECK(token && token->token_id == UINT16_MAX - 1u);
+    CHECK(state->next_token_id == UINT16_MAX);
+    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, KC_C, first_key, ++fake_time);
+
+    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, KC_V, second_key, ++fake_time);
+    token = key_runtime_core_press_token_at(second_key);
+    CHECK(token && token->token_id == UINT16_MAX);
+    CHECK(state->next_token_id == 1u);
+    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, KC_V, second_key, ++fake_time);
+
+    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, KC_B, third_key, ++fake_time);
+    token = key_runtime_core_press_token_at(third_key);
+    CHECK(token && token->token_id == 1u);
+    CHECK(state->next_token_id == 2u);
+    CHECK(state->token_allocation_failure_count == 0u);
+}
+
+static void test_key_runtime_core_token_allocator_skips_every_live_owner_store(void) {
+    key_runtime_core_state_t *state = key_runtime_core_state();
+    const press_token_t      *allocated;
+    keypos_t                  allocated_key = test_keypos(0, 2);
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+
+    state->press_tokens[0] = (press_token_t){
+        .active   = true,
+        .token_id = 1u,
+        .phase    = PRESS_TOKEN_PHASE_PRESSED,
+    };
+    state->press_tokens[1] = (press_token_t){
+        .token_id                 = 2u,
+        .phase                    = PRESS_TOKEN_PHASE_RELEASE_PENDING,
+        .pending_release_emission = true,
+    };
+    state->press_token_count = 1u;
+    state->leases[0] = (lease_t){
+        .active         = true,
+        .kind           = LEASE_KIND_HELD_ACTION,
+        .owner_token_id = 3u,
+    };
+    state->leases[1] = (lease_t){
+        .active         = true,
+        .kind           = LEASE_KIND_REPEAT,
+        .owner_token_id = 4u,
+    };
+    state->lease_count = 2u;
+    state->pending_releases[0] = (pending_release_slot_t){
+        .owner_token_id = 5u,
+        .flags          = KEY_RUNTIME_PENDING_RELEASE_FLAG_ACTIVE,
+    };
+    state->pending_release_count = 1u;
+    state->next_token_id         = 1u;
+
+    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, KC_C, allocated_key, fake_time);
+    allocated = key_runtime_core_press_token_at(allocated_key);
+    CHECK(allocated && allocated->active);
+    CHECK(allocated->token_id == 6u);
+    CHECK(state->next_token_id == 7u);
+    CHECK(state->token_allocation_failure_count == 0u);
+}
+
+static void test_key_runtime_core_token_allocator_skips_live_low_id_after_wrap(void) {
+    key_runtime_core_state_t *state = key_runtime_core_state();
+    const press_token_t      *wrapped;
+    keypos_t                  live_key    = test_keypos(0, 0);
+    keypos_t                  max_key     = test_keypos(0, 1);
+    keypos_t                  wrapped_key = test_keypos(0, 2);
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+    state->press_tokens[0] = (press_token_t){
+        .active   = true,
+        .token_id = 1u,
+        .phase    = PRESS_TOKEN_PHASE_PRESSED,
+    };
+    state->press_token_count = 1u;
+    state->next_token_id     = UINT16_MAX;
+
+    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, KC_C, max_key, fake_time);
+    CHECK(key_runtime_core_press_token_at(max_key)->token_id == UINT16_MAX);
+    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, KC_V, wrapped_key, ++fake_time);
+    wrapped = key_runtime_core_press_token_at(wrapped_key);
+    CHECK(wrapped && wrapped->token_id == 2u);
+    CHECK(wrapped->token_id != key_runtime_core_press_token_at(live_key)->token_id);
+    CHECK(state->next_token_id == 3u);
+}
+
+static void test_key_runtime_core_wrapped_owner_releases_held_and_repeat_leases(void) {
+    key_runtime_core_state_t *state = key_runtime_core_state();
+    const press_token_t      *token;
+    keypos_t                  key_pos = test_keypos(1, 0);
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+    state->next_token_id = UINT16_MAX;
+
+    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, TEST_HELD_ACTION_KEY, key_pos, fake_time);
+    token = key_runtime_core_press_token_at(key_pos);
+    CHECK(token && token->token_id == UINT16_MAX);
+    key_runtime_core_observe_held_action_register(key_pos, TEST_ACTION);
+    key_runtime_core_observe_repeat_start(key_pos, TEST_SECOND_ACTION, 20u);
+    CHECK(key_runtime_core_owner_has_lease_kind(state, UINT16_MAX, LEASE_KIND_HELD_ACTION));
+    CHECK(key_runtime_core_owner_has_lease_kind(state, UINT16_MAX, LEASE_KIND_REPEAT));
+
+    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, TEST_HELD_ACTION_KEY, key_pos, ++fake_time);
+    CHECK(key_runtime_core_release_owned_state_by_key(key_pos));
+    CHECK(!key_runtime_core_owner_has_lease_kind(state, UINT16_MAX, LEASE_KIND_HELD_ACTION));
+    CHECK(!key_runtime_core_owner_has_lease_kind(state, UINT16_MAX, LEASE_KIND_REPEAT));
+    CHECK(state->lease_count == 0u);
+}
+
+static void test_key_runtime_core_pending_owner_survives_token_wrap_and_reuse(void) {
+    key_runtime_core_state_t *state = key_runtime_core_state();
+    pending_release_t         drained;
+    const press_token_t      *old_token;
+    const press_token_t      *new_token;
+    keypos_t                  old_key = test_keypos(1, 0);
+    keypos_t                  new_key = test_keypos(1, 1);
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+    state->next_token_id = UINT16_MAX;
+
+    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, KC_C, old_key, fake_time);
+    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, KC_C, old_key, ++fake_time);
+    old_token = key_runtime_core_press_token_at(old_key);
+    CHECK(old_token && old_token->token_id == UINT16_MAX);
+    CHECK(key_runtime_core_queue_pending_release_dispatch_for_owner(old_key, TEST_ACTION, (keyboard_mod_state_t){0}, false, UINT16_MAX));
+    CHECK(key_runtime_core_press_token_at(old_key)->pending_release_emission);
+
+    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, KC_V, new_key, ++fake_time);
+    new_token = key_runtime_core_press_token_at(new_key);
+    CHECK(new_token && new_token->token_id == 1u);
+    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, KC_V, new_key, ++fake_time);
+
+    CHECK(key_runtime_core_take_pending_release_dispatches(&drained, 1u) == 1u);
+    CHECK(drained.owner_token_id == UINT16_MAX);
+    CHECK(!key_runtime_core_press_token_at(old_key)->pending_release_emission);
+    CHECK(key_runtime_core_press_token_at(old_key)->phase == PRESS_TOKEN_PHASE_RELEASED);
+    CHECK(key_runtime_core_press_token_at(new_key)->token_id == 1u);
+}
+#endif
+
+#if KEY_RUNTIME_CORE_TOKEN_ID_MAX == 3u
+static void test_key_runtime_core_token_allocator_exhaustion_fails_closed(void) {
+    key_runtime_core_state_t      *state = key_runtime_core_state();
+    key_runtime_core_effect_plan_t plan;
+    projection_snapshot_t          snapshot;
+    handled_key_resolution_t       resolution = test_handled_key_resolution(TEST_HELD_ACTION_KEY, 1u);
+    keypos_t                       key_pos    = test_keypos(0, 0);
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+    for (uint16_t index = 0u; index < KEY_RUNTIME_CORE_TOKEN_ID_MAX; index++) {
+        state->leases[index] = (lease_t){
+            .active         = true,
+            .kind           = LEASE_KIND_HELD_ACTION,
+            .owner_token_id = (uint16_t)(index + 1u),
+        };
+    }
+    state->lease_count   = KEY_RUNTIME_CORE_TOKEN_ID_MAX;
+    state->next_token_id = 3u;
+
+    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, TEST_HELD_ACTION_KEY, key_pos, fake_time);
+    CHECK(state->press_token_count == 0u);
+    CHECK(state->lease_count == KEY_RUNTIME_CORE_TOKEN_ID_MAX);
+    CHECK(state->next_token_id == 3u);
+    CHECK(state->token_allocation_failure_count == 1u);
+    CHECK(key_runtime_core_press_token_at(key_pos)->token_id == 0u);
+
+    key_runtime_core_effect_plan_init(&plan);
+    CHECK(key_runtime_core_handle_handled_key_press(TEST_HELD_ACTION_KEY, key_pos, resolution, &plan));
+    CHECK(plan.count == 0u);
+    CHECK(state->token_allocation_failed_packed_key_pos == KEY_RUNTIME_PACKED_KEYPOS_NONE);
+    snapshot = key_runtime_core_projection_snapshot_capture();
+    CHECK(snapshot.core_token_allocation_failure_count == 1u);
+}
+#endif
+
 int main(void) {
+#if KEY_RUNTIME_CORE_TOKEN_ID_MAX == UINT16_MAX
     test_debug_reports_slot_phase_and_momentary_layer_interrupt_state();
     test_snapshot_captures_cross_subsystem_runtime_state();
     test_reset_clears_all_runtime_surfaces();
@@ -2937,6 +3132,16 @@ int main(void) {
     test_key_runtime_core_runtime_owned_state_leases_track_and_clear();
     test_key_runtime_core_transition_execute_plan_updates_owned_state_leases();
     test_key_runtime_core_projector_executes_effects_and_pending_dispatches();
+    test_key_runtime_core_token_ids_wrap_without_issuing_zero();
+    test_key_runtime_core_token_allocator_skips_every_live_owner_store();
+    test_key_runtime_core_token_allocator_skips_live_low_id_after_wrap();
+    test_key_runtime_core_wrapped_owner_releases_held_and_repeat_leases();
+    test_key_runtime_core_pending_owner_survives_token_wrap_and_reuse();
+#elif KEY_RUNTIME_CORE_TOKEN_ID_MAX == 3u
+    test_key_runtime_core_token_allocator_exhaustion_fails_closed();
+#else
+#    error "runtime_debug_test requires the production or exhaustion token-ID domain"
+#endif
 
     puts("runtime_debug host tests passed");
     return 0;

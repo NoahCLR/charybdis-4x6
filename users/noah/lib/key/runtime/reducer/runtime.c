@@ -178,6 +178,80 @@ static bool key_runtime_core_tap_series_can_accept_press(const key_runtime_core_
     return series && series->active && !series->branch_confirmed && !series->branch_confirming && series->keycode == keycode && key_behavior_has_more_taps(series->keycode, series->tap_count) && (key_runtime_core_elapsed(series->last_tap_at, now) <= series->tap_term_ms || key_runtime_core_tap_series_pending_combo_output(state, series));
 }
 
+static bool key_runtime_core_token_id_is_reserved(const key_runtime_core_state_t *state, uint16_t token_id) {
+    if (!(state && token_id != 0u)) {
+        return true;
+    }
+
+    if (state->press_token_count != 0u || state->pending_release_count != 0u) {
+        for (uint16_t index = 0; index < KEY_RUNTIME_CORE_PRESS_TOKEN_CAPACITY; index++) {
+            const press_token_t *token = &state->press_tokens[index];
+
+            if (token->token_id == token_id && (token->active || token->pending_release_emission || token->phase == PRESS_TOKEN_PHASE_RELEASE_PENDING)) {
+                return true;
+            }
+        }
+    }
+
+    if (state->lease_count != 0u) {
+        for (uint16_t index = 0; index < KEY_RUNTIME_CORE_LEASE_CAPACITY; index++) {
+            const lease_t *lease = &state->leases[index];
+
+            if (lease->active && lease->owner_token_id == token_id) {
+                return true;
+            }
+        }
+    }
+
+    if (state->pending_release_count != 0u) {
+        for (uint16_t index = 0; index < KEY_RUNTIME_CORE_PENDING_RELEASE_CAPACITY; index++) {
+            const pending_release_slot_t *pending = &state->pending_releases[index];
+
+            if ((pending->flags & KEY_RUNTIME_PENDING_RELEASE_FLAG_ACTIVE) != 0u && pending->owner_token_id == token_id) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+static uint16_t key_runtime_core_next_token_id_candidate(uint16_t token_id) {
+    return token_id >= KEY_RUNTIME_CORE_TOKEN_ID_MAX ? 1u : (uint16_t)(token_id + 1u);
+}
+
+static __attribute__((noinline)) bool key_runtime_core_allocate_token_id(key_runtime_core_state_t *state, uint16_t *out) {
+    uint16_t candidate;
+    uint16_t first_candidate;
+
+    if (out) {
+        *out = 0u;
+    }
+    if (!(state && out)) {
+        return false;
+    }
+
+    candidate = state->next_token_id;
+    if (candidate == 0u || candidate > KEY_RUNTIME_CORE_TOKEN_ID_MAX) {
+        candidate = 1u;
+    }
+    first_candidate = candidate;
+
+    do {
+        uint16_t next_candidate = key_runtime_core_next_token_id_candidate(candidate);
+
+        if (!key_runtime_core_token_id_is_reserved(state, candidate)) {
+            *out                 = candidate;
+            state->next_token_id = next_candidate;
+            return true;
+        }
+        candidate = next_candidate;
+    } while (candidate != first_candidate);
+
+    state->next_token_id = first_candidate;
+    return false;
+}
+
 static layer_state_t key_runtime_core_resolution_layers(const key_runtime_core_state_t *state) {
     return (layer_state | (state ? state->shadow_projection.layer_state : 0u) | ((layer_state_t)1u << 0));
 }
@@ -278,19 +352,33 @@ static void key_runtime_core_press_token_begin(key_runtime_core_state_t *state, 
     handled_key_resolution_ctx_t   ctx;
     uint16_t                       hold_term_ms;
     uint16_t                       longer_hold_term_ms;
+    uint16_t                       token_id;
     uint8_t                        tap_count                   = 1u;
     bool                           handled                     = false;
     bool                           tap_outcome_available       = false;
     bool                           pd_mode_was_locked_on_press = false;
     key_runtime_slot_phase_t       slot_phase                  = KEY_RUNTIME_SLOT_PHASE_IDLE;
 
-    if (!(state && event)) {
+    if (!state) {
+        return;
+    }
+
+    state->token_allocation_failed_packed_key_pos = KEY_RUNTIME_PACKED_KEYPOS_NONE;
+    if (!event) {
         return;
     }
 
     token  = key_runtime_core_press_token_state(state, event->key_pos);
     series = key_runtime_core_tap_series_state(state, event->key_pos);
     if (!token) {
+        return;
+    }
+
+    if (!key_runtime_core_allocate_token_id(state, &token_id)) {
+        if (state->token_allocation_failure_count != UINT8_MAX) {
+            state->token_allocation_failure_count++;
+        }
+        state->token_allocation_failed_packed_key_pos = key_runtime_keypos_pack(event->key_pos);
         return;
     }
 
@@ -337,7 +425,7 @@ static void key_runtime_core_press_token_begin(key_runtime_core_state_t *state, 
 
     *token = (press_token_t){
         .active                      = true,
-        .token_id                    = state->next_token_id++,
+        .token_id                    = token_id,
         .physical_keycode            = event->keycode,
         .resolved_keycode            = event->keycode,
         .observed_release_keycode    = KC_NO,
@@ -818,6 +906,11 @@ bool key_runtime_core_handle_handled_key_press(uint16_t keycode, keypos_t key_po
 
     if (!(state && plan && handled_key_resolution_is_handled(resolution) && key_runtime_core_keypos_valid(key_pos))) {
         return false;
+    }
+
+    if (state->token_allocation_failed_packed_key_pos == key_runtime_keypos_pack(key_pos)) {
+        state->token_allocation_failed_packed_key_pos = KEY_RUNTIME_PACKED_KEYPOS_NONE;
+        return true;
     }
 
     token  = key_runtime_core_press_token_state(state, key_pos);

@@ -3,7 +3,7 @@
 ## Plan metadata
 
 - **Severity:** Must fix — long-uptime stuck-action risk
-- **Status:** Planned; no remediation has landed
+- **Status:** Verified on 2026-08-15
 - **Affected surfaces:** key-runtime reducer token allocation, lease ownership queries, pending-release ownership, release planning, runtime diagnostics/tests
 - **Primary files:** [`runtime.c`](../users/noah/lib/key/runtime/reducer/runtime.c), [`runtime.h`](../users/noah/lib/key/runtime/reducer/runtime.h), [`ownership_state.c`](../users/noah/lib/key/runtime/reducer/ownership_state.c), [`release_planner.c`](../users/noah/lib/key/runtime/planning/release_planner.c), pending-release queue
 - **Prerequisites:** none for the correctness fix; coordinate target-stack verification with Finding 01 if reducer helpers change call depth
@@ -151,18 +151,19 @@ qmk compile -kb bastardkb/charybdis/4x6 -km noah
 
 ## Acceptance checklist
 
-- [ ] No press-token construction uses unchecked increment for identity.
-- [ ] Zero is skipped both during allocation and when normalizing stored next state.
-- [ ] All retained owner-bearing stores participate in collision detection.
-- [ ] Near-wrap tests cover `0xFFFE`, `0xFFFF`, wrap, and a live low-ID collision.
-- [ ] Held-action and repeat releases remain balanced for the wrapped token.
-- [ ] Pending-release ownership is not stolen or orphaned across wrap.
-- [ ] Exhaustion fails before partial token/lease creation and is diagnosable.
-- [ ] All targeted host runners pass.
-- [ ] `sh tests/host/run_all_host_tests.sh` passes.
-- [ ] `qmk compile -kb bastardkb/charybdis/4x6 -km noah` passes.
-- [ ] Review notes describe the landed allocator and enforcement.
+- [x] No press-token construction uses unchecked increment for identity.
+- [x] Zero is skipped both during allocation and when normalizing stored next state.
+- [x] All retained owner-bearing stores participate in collision detection.
+- [x] Near-wrap tests cover `0xFFFE`, `0xFFFF`, wrap, and a live low-ID collision.
+- [x] Held-action and repeat releases remain balanced for the wrapped token.
+- [x] Pending-release ownership is not stolen or orphaned across wrap.
+- [x] Exhaustion fails before partial token/lease creation and is diagnosable.
+- [x] All targeted host runners pass.
+- [x] `sh tests/host/run_all_host_tests.sh` passes.
+- [x] `qmk compile -kb bastardkb/charybdis/4x6 -km noah` passes.
+- [x] Review notes describe the landed allocator and enforcement.
 
 ## Next action
 
-Write the owner-ID liveness table from the current reducer structs, then add failing near-wrap tests to `runtime_debug_test.c` before replacing the post-increment assignment.
+Finding 02 is closed. Continue with Finding 09's pending-release sequence
+rollover plan; do not reuse press-token identity ordering for queue age.

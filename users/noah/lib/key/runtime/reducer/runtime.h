@@ -31,6 +31,14 @@
 #define KEY_RUNTIME_CORE_PERSISTENT_INTENT_CAPACITY 16u
 #define KEY_RUNTIME_CORE_EFFECT_PLAN_CAPACITY 14u
 
+#ifndef KEY_RUNTIME_CORE_TOKEN_ID_MAX
+#    define KEY_RUNTIME_CORE_TOKEN_ID_MAX UINT16_MAX
+#elif !defined(NOAH_HOST_TEST_ENV)
+#    error "KEY_RUNTIME_CORE_TOKEN_ID_MAX may only be overridden by host tests"
+#endif
+
+_Static_assert(KEY_RUNTIME_CORE_TOKEN_ID_MAX > 0u && KEY_RUNTIME_CORE_TOKEN_ID_MAX <= UINT16_MAX, "press-token ID domain must contain nonzero uint16_t values");
+
 typedef enum {
     RUNTIME_EVENT_KIND_KEY_DOWN = 0,
     RUNTIME_EVENT_KIND_KEY_UP,
@@ -296,9 +304,13 @@ typedef struct {
     uint8_t              core_release_keycode_mismatch_count;
     uint8_t              core_orphan_release_count;
     uint8_t              core_cancelled_press_count;
+    uint8_t              core_token_allocation_failure_count;
 } projection_snapshot_t;
 
 typedef struct {
+    // Owner-ID stores are part of the allocator's liveness contract. Any new
+    // owner-bearing store added here must also be scanned by
+    // key_runtime_core_token_id_is_reserved() and covered by its host test.
     press_token_t                        press_tokens[KEY_RUNTIME_CORE_PRESS_TOKEN_CAPACITY];
     tap_series_t                         tap_series[KEY_RUNTIME_CORE_TAP_SERIES_CAPACITY];
     lease_t                              leases[KEY_RUNTIME_CORE_LEASE_CAPACITY];
@@ -317,6 +329,8 @@ typedef struct {
     uint8_t                              release_keycode_mismatch_count;
     uint8_t                              orphan_release_count;
     uint8_t                              cancelled_press_count;
+    uint8_t                              token_allocation_failure_count;
+    key_runtime_packed_keypos_t          token_allocation_failed_packed_key_pos;
     uint16_t                             feedback_pulse_timer;
     uint32_t                             feedback_pulse_sequence;
     bool                                 feedback_pulse_active;
@@ -375,9 +389,10 @@ static inline void key_runtime_core_state_reset(key_runtime_core_state_t *state)
     }
 
     *state                                     = (key_runtime_core_state_t){0};
-    state->next_token_id                       = 1u;
-    state->next_pending_release_sequence       = 1u;
-    state->next_feedback_sequence              = 1u;
-    state->preview_display_last_semantic_layer = UINT8_MAX;
-    state->preview_display_bridge_layer        = UINT8_MAX;
+    state->next_token_id                         = 1u;
+    state->next_pending_release_sequence         = 1u;
+    state->next_feedback_sequence                = 1u;
+    state->token_allocation_failed_packed_key_pos = KEY_RUNTIME_PACKED_KEYPOS_NONE;
+    state->preview_display_last_semantic_layer   = UINT8_MAX;
+    state->preview_display_bridge_layer          = UINT8_MAX;
 }

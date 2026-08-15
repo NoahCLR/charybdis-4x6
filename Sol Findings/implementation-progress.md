@@ -5,9 +5,9 @@
 - **Branch:** `sol`
 - **Starting commit:** `5b20ed01` (`sol findings`)
 - **Started:** 2026-07-13
-- **Current focus:** [Finding 02 — press-token rollover](02-press-token-rollover.md)
+- **Current focus:** [Finding 09 — pending-release sequence rollover](09-pending-release-sequence-rollover.md)
 - **Overall status:** In progress
-- **Latest closed review:** [`review/2026-08-15-review-02`](../review/2026-08-15-review-02/)
+- **Latest closed review:** [`review/2026-08-15-review-03`](../review/2026-08-15-review-03/)
 
 This file is the implementation record for the plans in this directory. It records what actually changed, why choices were made, what verification really ran, and what remains open. A plan is not marked verified until its targeted checks, the full host suite, the target firmware build, target-specific evidence, and required documentation all pass.
 
@@ -24,7 +24,7 @@ This file is the implementation record for the plans in this directory. It recor
 | ID | Finding | Priority | Status | Verification summary |
 | --- | --- | --- | --- | --- |
 | 01 | [Target stack safety](01-target-stack-safety.md) | Must fix | Verified | Fresh post-LTO target gate: 1,808 B worst main path in a 1,920 B budget; full host suite and firmware build pass |
-| 02 | [Press-token rollover](02-press-token-rollover.md) | Must fix | Planned | Not run |
+| 02 | [Press-token rollover](02-press-token-rollover.md) | Must fix | Verified | Wrap/collision/owner-store/tiny-domain exhaustion coverage, full host, firmware, and explicit target stack path pass |
 | 03 | [VIA split buffer validation](03-via-split-buffer-validation.md) | Must fix | Verified | Exhaustive normal/ASan/UBSan boundary matrix, full host suite, firmware build, and target stack regression gate pass |
 | 04 | [VIA macro byte validation](04-via-macro-byte-validation.md) | Must fix | Verified | Exhaustive text-domain, whole-IR preflight, cache lifecycle, full host, firmware, and explicit target-stack paths pass |
 | 05 | [VIA split persistence](05-via-split-persistence.md) | Must fix | Planned | Not run |
@@ -311,6 +311,69 @@ hardcoded preflight route at 760 B and the handled VIA preflight route at
 path remains 1,808 B. The final linked image reports `.text` 102,104 B,
 `.rodata` 15,460 B, `.data` 23,760 B, and `.bss` 65,204 B.
 
+## Finding 02 — Press-token rollover
+
+### Objective
+
+Guarantee that press identity never uses zero or collides with an owner still
+referenced by reducer state, including after `uint16_t` wrap.
+
+### 2026-08-15 — Total allocator and owner-liveness enforcement
+
+**Implemented**
+
+- Replaced the unchecked `next_token_id++` assignment with a total allocator
+  that explicitly advances `0xFFFF -> 1`, normalizes invalid candidates, and
+  stops after one complete finite-domain cycle.
+- Defined the reservation set as active press tokens, inactive tokens retained
+  for deferred settlement, active leases of every kind, and active pending
+  releases. A maintenance comment on the core owner stores requires future
+  owner-bearing state to join the predicate and its test.
+- Kept the common path inexpensive: owner arrays are skipped entirely when
+  their authoritative counts are zero. Live-state scans are bounded by the
+  fixed press-token, lease, and pending-release capacities.
+- Moved allocation before cancellation, tap-series updates, interruption
+  flags, token/count mutation, feedback sequencing, or lease attachment.
+- Added a saturating allocation-failure diagnostic to projection snapshots.
+  Exhausted handled presses are consumed with an empty effect plan; unhandled
+  QMK presses remain unowned. No zero identity is substituted.
+- Added an explicit target stack-manifest path through the no-inline allocator.
+  The fresh linked frame is 40 B and the complete reviewed allocation path is
+  1,104 B against the 1,920 B main-process budget.
+
+**Boundary coverage**
+
+- Allocations at `0xFFFE`, `0xFFFF`, and post-wrap `1`.
+- A live low ID at wrap, proving selection skips to `2`.
+- Independent reservation through active press, retained press, held-action
+  lease, repeat lease, and pending-release storage.
+- Balanced cleanup for wrapped held-action and repeat owners.
+- Deferred owner settlement at `0xFFFF` alongside a new post-wrap owner.
+- A second host build with `KEY_RUNTIME_CORE_TOKEN_ID_MAX=3` that reserves all
+  identities, proves no partial press/lease mutation, consumes the handled
+  press without effects, and exposes the diagnostic count.
+
+**Focused verification**
+
+- `sh tests/host/run_runtime_debug_tests.sh` — passed production and tiny-domain builds.
+- `sh tests/host/run_key_runtime_release_matrix_tests.sh` — passed.
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh` — passed.
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh` — passed both variants.
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh` — passed.
+- `sh tests/host/run_key_runtime_scenario_tests.sh` — passed.
+- `sh tests/host/run_key_runtime_integration_harness_tests.sh` — passed.
+- `sh tests/host/run_held_action_tests.sh` — passed.
+- `sh tests/host/run_action_lifecycle_tests.sh` — passed.
+- `sh tests/host/run_feature_gate_compile_tests.sh` — passed.
+
+### Current finding status
+
+Finding 02 is **Verified**. Focused ownership/release checks, the complete host
+suite, ordinary firmware compile, explicit fresh target stack path, developer
+documentation, Sol plan, and closed review agree on the landed identity
+contract. The final linked image reports `.text` 102,464 B, `.rodata` 15,460 B,
+`.data` 23,760 B, and `.bss` 65,204 B.
+
 ## Verification ledger
 
 | Date | Finding | Command | Result | Notes |
@@ -364,6 +427,21 @@ path remains 1,808 B. The final linked image reports `.text` 102,104 B,
 | 2026-08-15 | 04 | `sh tests/host/run_firmware_stack_budget_checks.sh` | Passed | Fresh build; hardcoded macro preflight 760 B, VIA macro preflight 1,152 B, worst reviewed path unchanged at 1,808 B |
 | 2026-08-15 | 04 | `PYTHONPYCACHEPREFIX=/tmp/noah-host-pycache sh tests/host/run_all_host_tests.sh` | Passed | Final same-tree complete host suite, including normal and sanitizer macro payload variants |
 | 2026-08-15 | 04 | `git diff --check` | Passed | Source, tests, stack manifest, macro docs, Sol ledger, and closed Finding 04 review |
+| 2026-08-15 | 02 | `sh tests/host/run_runtime_debug_tests.sh` | Passed | Production wrap/collision/store coverage and three-ID exhaustion build |
+| 2026-08-15 | 02 | `sh tests/host/run_key_runtime_release_matrix_tests.sh` | Passed | Release ownership remains coherent |
+| 2026-08-15 | 02 | `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh` | Passed | Modifier hold ownership remains balanced |
+| 2026-08-15 | 02 | `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh` | Passed | Both PD integration variants pass |
+| 2026-08-15 | 02 | `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh` | Passed | Layer lock ownership remains coherent |
+| 2026-08-15 | 02 | `sh tests/host/run_key_runtime_scenario_tests.sh` | Passed | Scenario matrix remains coherent |
+| 2026-08-15 | 02 | `sh tests/host/run_key_runtime_integration_harness_tests.sh` | Passed | Production integration harness passes |
+| 2026-08-15 | 02 | `sh tests/host/run_held_action_tests.sh` | Passed | Held/repeat registry behavior remains balanced |
+| 2026-08-15 | 02 | `sh tests/host/run_action_lifecycle_tests.sh` | Passed | General action lifecycle remains intact |
+| 2026-08-15 | 02 | `sh tests/host/run_feature_gate_compile_tests.sh` | Passed | Header and build variants compile |
+| 2026-08-15 | 02 | `PYTHONPYCACHEPREFIX=/tmp/noah-stack-pycache PYTHON=/usr/bin/python3 sh tests/host/run_firmware_stack_budget_tool_tests.sh` | Passed | All 15 stack-tool fixtures pass with allocation path manifest |
+| 2026-08-15 | 02 | `PYTHONPYCACHEPREFIX=/tmp/noah-host-pycache sh tests/host/run_all_host_tests.sh` | Passed | Final complete host suite, including both allocator-domain builds |
+| 2026-08-15 | 02 | `qmk compile -kb bastardkb/charybdis/4x6 -km noah` | Passed | Required ordinary target firmware build |
+| 2026-08-15 | 02 | `sh tests/host/run_firmware_stack_budget_checks.sh` | Passed | Fresh build; allocator path 1,104 B, overall reviewed worst 1,808 B |
+| 2026-08-15 | 02 | `git diff --check` | Passed | Source, tests, stack manifest, runtime docs, Sol ledger, and closed Finding 02 review |
 
 ## Cross-cutting decisions and deferred work
 
@@ -374,7 +452,6 @@ path remains 1,808 B. The final linked image reports `.text` 102,104 B,
 
 ## Next program action
 
-Begin Finding 02 with an injectable near-wrap press-token reproducer and a
-complete audit of every place that treats token zero as invalid. Do not change
-the counter representation until pre-wrap and post-wrap live-token coexistence
-is mechanically demonstrated.
+Begin Finding 09 with an injectable near-wrap pending-release sequence
+reproducer. Keep queue age/order semantics separate from press-token identity,
+and retain Finding 01's bounded FIFO drain contract.

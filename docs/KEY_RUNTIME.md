@@ -126,6 +126,15 @@ layer," not "old runtime plus new runtime running side by side."
 - `key_runtime_core_shadow_projection_t`: reducer-owned projected view used by
   blocking queries, debug snapshots, and overlap reasoning.
 
+Press-token ID zero is reserved as “no owner.” Allocation wraps explicitly
+from `0xFFFF` to `1` and rejects any candidate still referenced by an active
+press, a retained deferred-release token, an active lease, or an active
+pending-release slot. Allocation happens before the press mutates token,
+series, interruption, count, or lease state. The theoretically exhausted path
+increments `core_token_allocation_failure_count`; a handled press is consumed
+without effects, while non-handled QMK processing remains unowned. Any new
+owner-bearing reducer store must join this liveness scan and its host test.
+
 If a future change needs new runtime state, it belongs in `key_runtime_core` unless
 it is purely an external ownership registry or a stateless authored-behavior
 helper.
@@ -149,7 +158,7 @@ QMK-facing applied registries. Use these labels when changing runtime behavior:
 
 | Runtime fact | Authoritative owner | Projected or compatibility surface | Write direction and guardrail |
 | --- | --- | --- | --- |
-| Physical press identity and active key phase | `press_token_t` in `key_runtime_core` | debug and trace snapshots | Physical events are observed into core first; other registries must not create or mutate press tokens. Covered by key runtime scenario, release matrix, and integration harness tests. |
+| Physical press identity and active key phase | `press_token_t` in `key_runtime_core` | debug and trace snapshots | Physical events are observed into core first; other registries must not create or mutate press tokens. Nonzero IDs are allocated against every live owner store before press mutation, with exhaustion exposed in the projection snapshot. Covered by runtime debug's production and tiny-domain builds, key runtime scenario, release matrix, and integration harness tests. |
 | Pending multi-tap chain state | `tap_series_t` in `key_runtime_core` | `planning/tap_series_flush.c` plans explicit flushes; `planning/scan_planner.c` owns scan-time thresholds; release planner reads the state | Core stores the chain; `planning/tap_series_flush.c` flushes expired or foreign chains, `planning/scan_planner.c` resolves scan-time hold/flush outcomes, and `planning/release_planner.c` resolves release decisions over it. Covered by release matrix, scenario, runtime debug, and integration harness tests. |
 | Release semantics | `planning/release_planner.c` | `deferred_release.c` adapts blocked dispatches into the core pending-release queue | Planner owns quick release, fallback suppression, buffered base tap, active releases, and pending multi-tap releases; adapters must not re-decide those semantics. |
 | Pending release dispatch queue | `pending_release_t` slots in `key_runtime_core`, with mechanics in `queue/pending_release_queue.c` | `deferred_release.c`, `release.c`, and `scan.c` drain through the adapter | Queue storage stays core-owned because blockers are press-token facts; `queue/pending_release_queue.c` owns allocation, ordering, drain snapshots, and pending-emission token cleanup. Covered by release matrix and runtime debug tests. |
