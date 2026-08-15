@@ -7,6 +7,7 @@
 #include "users/noah/lib/macro/macro_slot_provider.h"
 #include "users/noah/lib/macro/macro_payload.h"
 #include "users/noah/lib/macro/via_macro_defaults.h"
+#include "users/noah/lib/compat/qmk_via_storage_contract.h"
 #include "users/noah/noah_keymap_ids.h"
 #include "via.h"
 
@@ -17,16 +18,16 @@ enum {
     TEST_MACRO_BUFFER_CAPACITY = 128,
 };
 
-static uint8_t macro_buffer[TEST_MACRO_BUFFER_CAPACITY];
-static bool    fake_via_eeprom_valid;
-static uint8_t rgb_invalidate_count;
-static uint8_t split_sync_call_count;
-static uint8_t split_sync_last_command_id;
-static uint8_t split_sync_last_length;
-static uint8_t dynamic_keymap_set_buffer_calls;
-static uint8_t macro_payload_compile_calls;
-static uint8_t macro_payload_encode_ir_write_calls;
-static uint8_t macro_payload_encode_write_calls;
+static uint8_t  macro_buffer[TEST_MACRO_BUFFER_CAPACITY];
+static uint16_t fake_macro_buffer_capacity;
+static bool     fake_via_eeprom_valid;
+static uint8_t  rgb_invalidate_count;
+static uint8_t  split_sync_pending_count;
+static uint8_t  split_sync_pending_effects;
+static uint8_t  dynamic_keymap_set_buffer_calls;
+static uint8_t  macro_payload_compile_calls;
+static uint8_t  macro_payload_encode_ir_write_calls;
+static uint8_t  macro_payload_encode_write_calls;
 
 const char *const via_macro_payloads[VIA_MACRO_SLOT_COUNT] = {
     [0] = "AB",
@@ -47,11 +48,11 @@ static void test_fail(const char *expr, const char *file, int line) {
 
 static void test_reset_state(void) {
     memset(macro_buffer, 0, sizeof(macro_buffer));
+    fake_macro_buffer_capacity          = TEST_MACRO_BUFFER_CAPACITY;
     fake_via_eeprom_valid               = true;
     rgb_invalidate_count                = 0;
-    split_sync_call_count               = 0;
-    split_sync_last_command_id          = 0;
-    split_sync_last_length              = 0;
+    split_sync_pending_count            = 0;
+    split_sync_pending_effects          = 0;
     dynamic_keymap_set_buffer_calls     = 0;
     macro_payload_compile_calls         = 0;
     macro_payload_encode_ir_write_calls = 0;
@@ -59,7 +60,7 @@ static void test_reset_state(void) {
 }
 
 uint16_t dynamic_keymap_macro_get_buffer_size(void) {
-    return TEST_MACRO_BUFFER_CAPACITY;
+    return fake_macro_buffer_capacity;
 }
 
 uint8_t noah_qmk_via_macro_count(void) {
@@ -192,11 +193,9 @@ void noah_rgb_runtime_invalidate_layer_maps(void) {
     rgb_invalidate_count++;
 }
 
-void noah_qmk_via_split_sync_command(const uint8_t *data, uint8_t length) {
-    CHECK(data != NULL);
-    split_sync_call_count++;
-    split_sync_last_command_id = data[0];
-    split_sync_last_length     = length;
+void noah_qmk_via_split_sync_note_mutation(uint8_t effects) {
+    split_sync_pending_count++;
+    split_sync_pending_effects |= effects;
 }
 
 static void test_post_init_seeds_defaults_when_via_eeprom_is_invalid(void) {
@@ -226,6 +225,31 @@ static void test_eeprom_init_seeds_defaults_immediately(void) {
     CHECK(macro_buffer[1] == 'B');
     CHECK(macro_buffer[2] == 0);
     CHECK(macro_payload_compile_calls == 2u);
+    CHECK(noah_via_macro_defaults_last_seed_succeeded());
+}
+
+static void test_eeprom_init_reports_seed_failure(void) {
+    test_reset_state();
+    fake_macro_buffer_capacity = 0u;
+
+    noah_via_macro_defaults_eeconfig_init();
+
+    CHECK(dynamic_keymap_set_buffer_calls == 0u);
+    CHECK(!noah_via_macro_defaults_last_seed_succeeded());
+}
+
+static void test_recovery_reseed_reports_completion_without_rgb_side_effect(void) {
+    test_reset_state();
+
+    CHECK(noah_via_macro_defaults_reseed_for_recovery());
+    CHECK(dynamic_keymap_set_buffer_calls > 0u);
+    CHECK(noah_via_macro_defaults_last_seed_succeeded());
+    CHECK(rgb_invalidate_count == 0u);
+
+    test_reset_state();
+    fake_macro_buffer_capacity = 0u;
+    CHECK(!noah_via_macro_defaults_reseed_for_recovery());
+    CHECK(!noah_via_macro_defaults_last_seed_succeeded());
 }
 
 static void test_macro_reset_command_defers_reseed_to_matrix_scan(void) {
@@ -235,11 +259,14 @@ static void test_macro_reset_command_defers_reseed_to_matrix_scan(void) {
 
     CHECK(!via_command_kb(cmd, (uint8_t)sizeof(cmd)));
     CHECK(dynamic_keymap_set_buffer_calls == 0);
-    CHECK(split_sync_call_count == 0);
+    CHECK(split_sync_pending_count == 1u);
+    CHECK((split_sync_pending_effects & NOAH_QMK_VIA_COMMAND_EFFECT_RESEED_MACROS) != 0u);
+    CHECK(!noah_via_macro_defaults_last_seed_succeeded());
 
     noah_via_macro_defaults_matrix_scan();
 
     CHECK(dynamic_keymap_set_buffer_calls > 0);
+    CHECK(noah_via_macro_defaults_last_seed_succeeded());
     CHECK(rgb_invalidate_count == 0);
 }
 
@@ -251,11 +278,12 @@ static void test_keymap_reset_commands_invalidate_rgb_and_request_split_sync(voi
 
     CHECK(!via_command_kb(set_keycode_cmd, (uint8_t)sizeof(set_keycode_cmd)));
     CHECK(!via_command_kb(reset_cmd, (uint8_t)sizeof(reset_cmd)));
-    CHECK(rgb_invalidate_count == 2);
-    CHECK(split_sync_call_count == 2);
-    CHECK(split_sync_last_command_id == id_dynamic_keymap_reset);
-    CHECK(split_sync_last_length == sizeof(reset_cmd));
+    CHECK(rgb_invalidate_count == 0u);
+    CHECK(split_sync_pending_count == 2u);
     CHECK(dynamic_keymap_set_buffer_calls == 0);
+
+    noah_via_macro_defaults_matrix_scan();
+    CHECK(rgb_invalidate_count == 1u);
 }
 
 static void test_eeprom_reset_invalidates_rgb_and_reseeds_on_scan(void) {
@@ -264,15 +292,14 @@ static void test_eeprom_reset_invalidates_rgb_and_reseeds_on_scan(void) {
     test_reset_state();
 
     CHECK(!via_command_kb(cmd, (uint8_t)sizeof(cmd)));
-    CHECK(rgb_invalidate_count == 1);
-    CHECK(split_sync_call_count == 1);
-    CHECK(split_sync_last_command_id == id_eeprom_reset);
-    CHECK(split_sync_last_length == sizeof(cmd));
+    CHECK(rgb_invalidate_count == 0u);
+    CHECK(split_sync_pending_count == 1u);
     CHECK(dynamic_keymap_set_buffer_calls == 0);
 
     noah_via_macro_defaults_matrix_scan();
 
     CHECK(dynamic_keymap_set_buffer_calls > 0);
+    CHECK(rgb_invalidate_count == 1u);
 }
 
 static void test_provider_encode_write_uses_cached_load_state(void) {
@@ -334,6 +361,8 @@ static void test_provider_encode_write_reloads_after_invalidate(void) {
 int main(void) {
     test_post_init_seeds_defaults_when_via_eeprom_is_invalid();
     test_eeprom_init_seeds_defaults_immediately();
+    test_eeprom_init_reports_seed_failure();
+    test_recovery_reseed_reports_completion_without_rgb_side_effect();
     test_macro_reset_command_defers_reseed_to_matrix_scan();
     test_keymap_reset_commands_invalidate_rgb_and_request_split_sync();
     test_eeprom_reset_invalidates_rgb_and_reseeds_on_scan();

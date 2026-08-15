@@ -225,13 +225,20 @@ flowchart TD
     engine --> finish["Completion or bounded cleanup"]
     finish --> provider
     via_defaults --> storage["QMK dynamic macro EEPROM"]
-    via_command["VIA command"] --> via_split["qmk_via_split_sync compatibility"]
-    via_split --> slave["Slave dynamic keymap/macro storage"]
-    via_split --> rgb_invalidate["RGB layer map invalidation"]
+    via_command["VIA command"] --> dirty["Persist dirty before QMK apply"]
+    dirty --> committed["Post-apply canonical readback and digest"]
+    committed --> via_split["Versioned snapshot reconciliation"]
+    via_split --> slave["Peer keymap/encoder/macro/config storage"]
+    slave --> verify["Full digest and generation acknowledgement"]
+    verify --> rgb_invalidate["Post-commit RGB and macro cache invalidation"]
 ```
 
 Hardcoded macros are source-owned. VIA macros are QMK dynamic macro slots with
-source-authored defaults and split mirroring.
+source-authored defaults and durable split reconciliation. Macro reset does not
+publish until the authored defaults have seeded successfully. A transfer is
+limited to one storage/digest chunk or one RPC per scan, and a clean generation
+is replicated only after the receiving half verifies and acknowledges the full
+snapshot.
 
 Macro text is QMK ASCII, not arbitrary bytes: text positions accept
 `0x01..0x7F`, while zero terminates a VIA slot. Bytes above `0x7F` remain valid

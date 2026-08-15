@@ -13,10 +13,11 @@
 #include <stdint.h>
 
 enum {
-    NOAH_QMK_VIA_COMMAND_EFFECT_NONE           = 0,
-    NOAH_QMK_VIA_COMMAND_EFFECT_INVALIDATE_RGB = 1u << 0,
-    NOAH_QMK_VIA_COMMAND_EFFECT_RESEED_MACROS  = 1u << 1,
-    NOAH_QMK_VIA_COMMAND_EFFECT_SPLIT_MIRROR   = 1u << 2,
+    NOAH_QMK_VIA_COMMAND_EFFECT_NONE              = 0,
+    NOAH_QMK_VIA_COMMAND_EFFECT_INVALIDATE_RGB    = 1u << 0,
+    NOAH_QMK_VIA_COMMAND_EFFECT_RESEED_MACROS     = 1u << 1,
+    NOAH_QMK_VIA_COMMAND_EFFECT_SPLIT_MIRROR      = 1u << 2,
+    NOAH_QMK_VIA_COMMAND_EFFECT_INVALIDATE_MACROS = 1u << 3,
 };
 
 #ifdef VIA_ENABLE
@@ -25,6 +26,7 @@ uint16_t noah_qmk_via_macro_seed_capacity(void);
 void     noah_qmk_via_macro_set_buffer(uint16_t offset, uint16_t size, uint8_t *data);
 bool     noah_qmk_via_should_seed_defaults_post_init(void);
 uint8_t  noah_qmk_via_command_effects(uint8_t command_id);
+bool     noah_qmk_via_classify_mutation(const uint8_t *data, uint8_t length, uint8_t *out_effects);
 #else
 static inline uint16_t noah_qmk_via_keymap_buffer_capacity(void) {
     return 0;
@@ -47,5 +49,14 @@ static inline bool noah_qmk_via_should_seed_defaults_post_init(void) {
 static inline uint8_t noah_qmk_via_command_effects(uint8_t command_id) {
     (void)command_id;
     return NOAH_QMK_VIA_COMMAND_EFFECT_NONE;
+}
+
+static inline bool noah_qmk_via_classify_mutation(const uint8_t *data, uint8_t length, uint8_t *out_effects) {
+    (void)data;
+    (void)length;
+    if (out_effects) {
+        *out_effects = NOAH_QMK_VIA_COMMAND_EFFECT_NONE;
+    }
+    return false;
 }
 #endif

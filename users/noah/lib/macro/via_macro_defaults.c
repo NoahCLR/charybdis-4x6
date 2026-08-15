@@ -28,8 +28,10 @@ typedef struct {
     uint8_t  chunk[VIA_MACRO_SEED_CHUNK_SIZE];
 } via_macro_seed_writer_t;
 
-static bool via_macro_seed_post_init_pending = false;
-static bool via_macro_seed_scan_pending      = false;
+static bool    via_macro_seed_post_init_pending = false;
+static bool    via_macro_seed_scan_pending      = false;
+static bool    via_macro_seed_last_succeeded    = true;
+static uint8_t via_local_commit_pending_effects;
 
 static bool via_macro_defaults_lookup_payload(uint8_t slot, const char **payload, void *context) {
     (void)context;
@@ -148,40 +150,63 @@ static bool seed_via_default_macros(uint16_t capacity, uint16_t *written) {
     return true;
 }
 
-static void apply_via_default_macros(void) {
+static bool apply_via_default_macros(void) {
     uint16_t capacity = noah_qmk_via_macro_seed_capacity();
     uint16_t written  = 0;
 
     if (capacity == 0) {
-        return;
+        return false;
     }
 
     // Every call site runs after QMK has already reset the macro region to
     // zero, so we only need to write the authored macro prefix here.
     if (!seed_via_default_macros(capacity, &written) || written == 0) {
-        return;
+        return false;
     }
+
+    return true;
 }
 
 void noah_via_macro_defaults_eeconfig_init(void) {
-    apply_via_default_macros();
+    via_macro_seed_last_succeeded = apply_via_default_macros();
     via_macro_provider_invalidate_all();
     via_macro_seed_post_init_pending = false;
 }
 
 void noah_via_macro_defaults_matrix_scan(void) {
     if (via_macro_seed_scan_pending) {
-        apply_via_default_macros();
-        via_macro_seed_scan_pending = false;
+        via_macro_seed_last_succeeded = apply_via_default_macros();
+        via_macro_seed_scan_pending   = false;
+    }
+
+    if (!via_macro_seed_scan_pending && (!(via_local_commit_pending_effects & NOAH_QMK_VIA_COMMAND_EFFECT_RESEED_MACROS) || via_macro_seed_last_succeeded)) {
+        if (via_local_commit_pending_effects & NOAH_QMK_VIA_COMMAND_EFFECT_INVALIDATE_MACROS) {
+            via_macro_provider_invalidate_all();
+        }
+        if (via_local_commit_pending_effects & NOAH_QMK_VIA_COMMAND_EFFECT_INVALIDATE_RGB) {
+            noah_rgb_runtime_invalidate_layer_maps();
+        }
+        via_local_commit_pending_effects = NOAH_QMK_VIA_COMMAND_EFFECT_NONE;
     }
 }
 
 void noah_via_macro_defaults_keyboard_post_init(void) {
     validate_via_default_macro_payloads();
     if (via_macro_seed_post_init_pending) {
-        apply_via_default_macros();
+        via_macro_seed_last_succeeded    = apply_via_default_macros();
         via_macro_seed_post_init_pending = false;
     }
+}
+
+bool noah_via_macro_defaults_last_seed_succeeded(void) {
+    return via_macro_seed_last_succeeded;
+}
+
+bool noah_via_macro_defaults_reseed_for_recovery(void) {
+    via_macro_seed_last_succeeded    = apply_via_default_macros();
+    via_macro_seed_scan_pending      = false;
+    via_macro_seed_post_init_pending = false;
+    return via_macro_seed_last_succeeded;
 }
 
 void via_init_kb(void) {
@@ -191,18 +216,17 @@ void via_init_kb(void) {
 bool via_command_kb(uint8_t *data, uint8_t length) {
     uint8_t effects;
 
-    (void)length;
-
-    via_macro_provider_invalidate_all();
-    effects = noah_qmk_via_command_effects(data[0]);
-    if (effects & NOAH_QMK_VIA_COMMAND_EFFECT_RESEED_MACROS) {
-        via_macro_seed_scan_pending = true;
+    if (!noah_qmk_via_classify_mutation(data, length, &effects)) {
+        return false;
     }
-    if (effects & NOAH_QMK_VIA_COMMAND_EFFECT_INVALIDATE_RGB) {
-        noah_rgb_runtime_invalidate_layer_maps();
+
+    via_local_commit_pending_effects |= effects;
+    if (effects & NOAH_QMK_VIA_COMMAND_EFFECT_RESEED_MACROS) {
+        via_macro_seed_scan_pending   = true;
+        via_macro_seed_last_succeeded = false;
     }
     if (effects & NOAH_QMK_VIA_COMMAND_EFFECT_SPLIT_MIRROR) {
-        noah_qmk_via_split_sync_command(data, length);
+        noah_qmk_via_split_sync_note_mutation(effects);
     }
 
     return false;

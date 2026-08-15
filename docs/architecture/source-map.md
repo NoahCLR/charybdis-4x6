@@ -81,11 +81,12 @@ source trace because they rewrite or verify human-facing firmware docs.
 ### `compat/`
 
 - Combo and split adapters: `qmk_combo_origin.c/h`,
-  `qmk_via_split_sync.c/h`
+  `qmk_via_split_sync.c/h`, `qmk_via_sync_metadata.c/h`,
+  `qmk_via_sync_protocol.c/h`, and `qmk_via_sync_state.c/h`
 - QMK contract wrappers: `qmk_contract.c`, `qmk_mod_contract.c/h`,
   `qmk_auto_mouse_contract.h`, `qmk_pointing_contract.h`,
   `qmk_via_contract.c`, `qmk_via_playback_contract.h`,
-  `qmk_via_storage_contract.h`
+  `qmk_via_storage_contract.h`, `qmk_via_storage_regions.c/h`
 - Split helpers: `split_half.h`, `split_role.c`
 
 Combo-origin pending entries are bounded compatibility candidates, not runtime
@@ -94,15 +95,17 @@ generation, reconciled against the pinned QMK active/disabled layout at the
 scan boundary, and either promoted exactly once, suppressed, expired after the
 legal buffered-output window, refused conservatively at capacity, or reset.
 
-VIA packets replayed by the slave are untrusted input. `qmk_via_split_sync.c`
-must decode and validate a complete typed command before it calls QMK storage
-or applies RGB effects. Fixed-size commands may carry trailing raw-HID padding.
-For set-buffer, padding does not enlarge the declared payload: the declared
-size must fit both the received RPC bytes and the 28-byte transport payload.
-The destination must fit the dynamic-keymap capacity exposed by
-`qmk_via_storage_contract.h`. A zero-byte write is valid through the exact end
-of that region, skips the QMK storage call, and still represents a successfully
-applied command.
+Inbound VIA commands are classified and marked dirty before QMK applies them,
+but are never replayed on the slave. `qmk_via_split_sync.c` exchanges only
+committed canonical storage snapshots. Its fixed 32-byte frames carry a
+version, generation, region/range, digest, status, and CRC; the receiver
+validates all of them before storage effects. `qmk_via_storage_regions.c`
+centralizes bounded access to VIA validity/layout options, dynamic keymap,
+optional encoder, and macro storage. Clean generation publication happens only
+after complete digest verification, and the sender retains replication-pending
+state until the peer's generation/digest acknowledgement. The current USB
+master initiates metadata exchange after boot, reconnect, and role changes,
+with one storage chunk or RPC per scan and 50–1,000 ms retry backoff.
 
 Auto-mouse elapsed time is also fork-specific. Split runtime passes its one
 sampled tick timestamp through `qmk_auto_mouse_contract.h`; the compatibility

@@ -19,22 +19,21 @@
 #include "lib/macro/via_macro_defaults.h"
 #include "lib/compat/qmk_combo_origin.h"
 #include "lib/compat/qmk_via_split_sync.h"
+#include "lib/compat/qmk_via_sync_state.h"
 #include "lib/rgb/core/rgb_runtime.h"
 #include "lib/state/diagnostics/runtime_diag.h"
 #include "lib/split/runtime_sync.h"
 
 typedef void (*noah_runtime_init_stage_fn_t)(void);
 
-static void noah_runtime_init_seed_eeconfig_defaults(void) {
-#if (EECONFIG_USER_DATA_SIZE) == 0
-    eeconfig_update_user(0);
-#endif
+static void noah_runtime_init_finalize_via_sync_defaults(void) {
+    noah_qmk_via_sync_state_reset_after_defaults(noah_via_macro_defaults_last_seed_succeeded());
 }
 
 void noah_eeconfig_init_user(void) {
     static const noah_runtime_init_stage_fn_t stages[] = {
-        noah_runtime_init_seed_eeconfig_defaults,
         noah_via_macro_defaults_eeconfig_init,
+        noah_runtime_init_finalize_via_sync_defaults,
     };
 
     (void)macro_payload_engine_cancel();
@@ -45,6 +44,7 @@ void noah_eeconfig_init_user(void) {
 
 void noah_matrix_scan_user(void) {
     noah_via_macro_defaults_matrix_scan();
+    noah_qmk_via_split_sync_matrix_scan();
 
     noah_qmk_combo_origin_scan();
 

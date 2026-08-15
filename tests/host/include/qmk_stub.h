@@ -202,6 +202,7 @@ uint32_t         timer_elapsed32(uint32_t last);
 uint32_t         last_input_activity_elapsed(void);
 uint32_t         last_matrix_activity_elapsed(void);
 bool             is_keyboard_master(void);
+uint32_t         eeconfig_read_user(void);
 void             eeconfig_update_user(uint32_t value);
 bool             process_record_user(uint16_t keycode, keyrecord_t *record);
 bool             process_record(keyrecord_t *record);

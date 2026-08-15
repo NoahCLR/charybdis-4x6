@@ -73,7 +73,7 @@ uint8_t noah_qmk_via_command_effects(uint8_t command_id) {
     switch (command_id) {
 #    ifdef VIA_EEPROM_ALLOW_RESET
         case id_eeprom_reset:
-            return NOAH_QMK_VIA_COMMAND_EFFECT_INVALIDATE_RGB | NOAH_QMK_VIA_COMMAND_EFFECT_RESEED_MACROS | NOAH_QMK_VIA_COMMAND_EFFECT_SPLIT_MIRROR;
+            return NOAH_QMK_VIA_COMMAND_EFFECT_INVALIDATE_RGB | NOAH_QMK_VIA_COMMAND_EFFECT_RESEED_MACROS | NOAH_QMK_VIA_COMMAND_EFFECT_SPLIT_MIRROR | NOAH_QMK_VIA_COMMAND_EFFECT_INVALIDATE_MACROS;
 #    endif
         case id_dynamic_keymap_set_keycode:
         case id_dynamic_keymap_set_buffer:
@@ -82,10 +82,69 @@ uint8_t noah_qmk_via_command_effects(uint8_t command_id) {
         case id_dynamic_keymap_set_encoder:
             return NOAH_QMK_VIA_COMMAND_EFFECT_SPLIT_MIRROR;
         case id_dynamic_keymap_macro_reset:
-            return NOAH_QMK_VIA_COMMAND_EFFECT_RESEED_MACROS;
+            return NOAH_QMK_VIA_COMMAND_EFFECT_RESEED_MACROS | NOAH_QMK_VIA_COMMAND_EFFECT_SPLIT_MIRROR | NOAH_QMK_VIA_COMMAND_EFFECT_INVALIDATE_MACROS;
+        case id_dynamic_keymap_macro_set_buffer:
+            return NOAH_QMK_VIA_COMMAND_EFFECT_SPLIT_MIRROR | NOAH_QMK_VIA_COMMAND_EFFECT_INVALIDATE_MACROS;
         default:
             return NOAH_QMK_VIA_COMMAND_EFFECT_NONE;
     }
+}
+
+bool noah_qmk_via_classify_mutation(const uint8_t *data, uint8_t length, uint8_t *out_effects) {
+    size_t capacity;
+    size_t offset;
+    size_t payload_size;
+
+    if (out_effects) {
+        *out_effects = NOAH_QMK_VIA_COMMAND_EFFECT_NONE;
+    }
+    if (!data || !out_effects || length == 0u) {
+        return false;
+    }
+
+    switch (data[0]) {
+        case id_dynamic_keymap_set_keycode:
+            if (length < 6u || data[1] >= DYNAMIC_KEYMAP_LAYER_COUNT || data[2] >= MATRIX_ROWS || data[3] >= MATRIX_COLS) {
+                return false;
+            }
+            break;
+        case id_dynamic_keymap_set_buffer:
+        case id_dynamic_keymap_macro_set_buffer:
+            if (length < 4u) {
+                return false;
+            }
+            offset       = ((size_t)data[1] << 8u) | data[2];
+            payload_size = data[3];
+            capacity     = data[0] == id_dynamic_keymap_set_buffer ? noah_qmk_via_keymap_buffer_capacity() : noah_qmk_via_macro_seed_capacity();
+            if (payload_size > (size_t)length - 4u || offset > capacity || payload_size > capacity - offset) {
+                return false;
+            }
+            break;
+        case id_dynamic_keymap_reset:
+        case id_dynamic_keymap_macro_reset:
+#    ifdef VIA_EEPROM_ALLOW_RESET
+        case id_eeprom_reset:
+#    endif
+            break;
+#    ifdef ENCODER_MAP_ENABLE
+        case id_dynamic_keymap_set_encoder:
+            if (length < 6u || data[1] >= DYNAMIC_KEYMAP_LAYER_COUNT || data[2] >= NUM_ENCODERS) {
+                return false;
+            }
+            break;
+#    endif
+        case id_set_keyboard_value:
+            if (length < 6u || data[1] != id_layout_options) {
+                return false;
+            }
+            *out_effects = NOAH_QMK_VIA_COMMAND_EFFECT_INVALIDATE_RGB | NOAH_QMK_VIA_COMMAND_EFFECT_SPLIT_MIRROR;
+            return true;
+        default:
+            return false;
+    }
+
+    *out_effects = noah_qmk_via_command_effects(data[0]);
+    return *out_effects != NOAH_QMK_VIA_COMMAND_EFFECT_NONE;
 }
 
 #endif

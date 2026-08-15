@@ -17,11 +17,6 @@ cleanup() {
 
 trap cleanup EXIT INT TERM
 
-if grep -F '(uint8_t)(4u +' "$ROOT/users/noah/lib/compat/qmk_via_split_sync.c" >/dev/null; then
-    echo "VIA split set-buffer length arithmetic must not narrow to uint8_t" >&2
-    exit 1
-fi
-
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DVIA_ENABLE \
     -DVIA_EEPROM_ALLOW_RESET \
@@ -31,7 +26,9 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/qmk_via_split_sync_test.c" \
-    "$ROOT/users/noah/lib/compat/qmk_via_contract.c" \
+    "$ROOT/users/noah/lib/compat/qmk_via_sync_metadata.c" \
+    "$ROOT/users/noah/lib/compat/qmk_via_sync_protocol.c" \
+    "$ROOT/users/noah/lib/compat/qmk_via_sync_state.c" \
     "$ROOT/users/noah/lib/compat/qmk_via_split_sync.c" \
     -o "$BIN"
 
@@ -48,7 +45,9 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/qmk_via_split_sync_test.c" \
-    "$ROOT/users/noah/lib/compat/qmk_via_contract.c" \
+    "$ROOT/users/noah/lib/compat/qmk_via_sync_metadata.c" \
+    "$ROOT/users/noah/lib/compat/qmk_via_sync_protocol.c" \
+    "$ROOT/users/noah/lib/compat/qmk_via_sync_state.c" \
     "$ROOT/users/noah/lib/compat/qmk_via_split_sync.c" \
     -o "$SANITIZED_BIN"
 
@@ -65,7 +64,9 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/qmk_via_split_sync_test.c" \
-    "$ROOT/users/noah/lib/compat/qmk_via_contract.c" \
+    "$ROOT/users/noah/lib/compat/qmk_via_sync_metadata.c" \
+    "$ROOT/users/noah/lib/compat/qmk_via_sync_protocol.c" \
+    "$ROOT/users/noah/lib/compat/qmk_via_sync_state.c" \
     "$ROOT/users/noah/lib/compat/qmk_via_split_sync.c" \
     -o "$ENCODER_BIN"
 

@@ -165,6 +165,26 @@
         {
           "name": "matrix scan VIA default macro seed",
           "functions": ["main", "matrix_scan", "apply_via_default_macros", "seed_via_default_macros", "via_macro_defaults_load_ir", "macro_payload_compile", "macro_payload_lookup_keycode", "strlen"]
+        },
+        {
+          "name": "matrix scan VIA canonical digest read",
+          "functions": ["main", "matrix_scan", "noah_qmk_via_storage_digest_step", "noah_qmk_via_storage_region_read", "nvm_dynamic_keymap_macro_read_buffer", "eeprom_read_byte", "wear_leveling_read"]
+        },
+        {
+          "name": "matrix scan VIA metadata and snapshot RPC",
+          "functions": ["main", "matrix_scan", "noah_qmk_via_rpc_exchange", "transaction_rpc_exec", "transport_execute_transaction"]
+        },
+        {
+          "name": "matrix scan VIA pulled macro fragment write",
+          "functions": ["main", "matrix_scan", "noah_qmk_via_storage_region_write", "nvm_dynamic_keymap_macro_update_buffer", "eeprom_update_byte", "wear_leveling_write"]
+        },
+        {
+          "name": "matrix scan VIA verified generation commit",
+          "functions": ["main", "matrix_scan", "noah_qmk_via_sync_state_persist", "eeprom_update_dword", "wear_leveling_write"]
+        },
+        {
+          "name": "matrix scan VIA two-dirty default recovery",
+          "functions": ["main", "matrix_scan", "eeconfig_init_via", "dynamic_keymap_reset", "eeprom_update_byte", "wear_leveling_write"]
         }
       ]
     },
@@ -186,7 +206,7 @@
         {"caller": "slave_rpc_exec_callback", "callee": "split_runtime_sync_slave_combo_rpc", "reason": "local split RPC registry combo-state callback"},
         {"caller": "slave_rpc_exec_callback", "callee": "split_runtime_sync_slave_key_feedback_semantic_rpc", "reason": "local split RPC registry semantic-feedback callback"},
         {"caller": "slave_rpc_exec_callback", "callee": "split_runtime_sync_slave_key_feedback_branch_rpc", "reason": "local split RPC registry branch-feedback callback"},
-        {"caller": "slave_rpc_exec_callback", "callee": "noah_qmk_via_split_sync_slave_rpc", "reason": "local split RPC registry VIA callback"}
+        {"caller": "slave_rpc_exec_callback", "callee": "noah_qmk_via_split_sync_rpc", "reason": "local split RPC registry dispatches the durable VIA reconciliation callback"}
       ],
       "cycle_bounds": [],
       "paths": [
@@ -194,7 +214,10 @@
         {"name": "combo-state RPC", "functions": ["SlaveThread", "slave_rpc_exec_callback", "split_runtime_sync_slave_combo_rpc"]},
         {"name": "semantic-feedback RPC", "functions": ["SlaveThread", "slave_rpc_exec_callback", "split_runtime_sync_slave_key_feedback_semantic_rpc"]},
         {"name": "branch-feedback RPC", "functions": ["SlaveThread", "slave_rpc_exec_callback", "split_runtime_sync_slave_key_feedback_branch_rpc"]},
-        {"name": "VIA synchronization RPC", "functions": ["SlaveThread", "slave_rpc_exec_callback", "noah_qmk_via_split_sync_slave_rpc", "dynamic_keymap_reset"]}
+        {"name": "VIA snapshot begin metadata persistence", "functions": ["SlaveThread", "slave_rpc_exec_callback", "noah_qmk_via_split_sync_rpc", "noah_qmk_via_sync_state_persist", "eeprom_update_dword", "wear_leveling_write"]},
+        {"name": "VIA pushed macro fragment write", "functions": ["SlaveThread", "slave_rpc_exec_callback", "noah_qmk_via_split_sync_rpc", "noah_qmk_via_storage_region_write", "nvm_dynamic_keymap_macro_update_buffer", "eeprom_update_byte", "wear_leveling_write"]},
+        {"name": "VIA pulled macro fragment read", "functions": ["SlaveThread", "slave_rpc_exec_callback", "noah_qmk_via_split_sync_rpc", "noah_qmk_via_storage_region_read", "nvm_dynamic_keymap_macro_read_buffer", "eeprom_read_byte", "wear_leveling_read"]},
+        {"name": "VIA structured acknowledgement encode", "functions": ["SlaveThread", "slave_rpc_exec_callback", "noah_qmk_via_split_sync_rpc", "noah_qmk_via_respond_status", "noah_qmk_via_encode_response", "noah_qmk_via_sync_frame_encode", "noah_qmk_via_sync_crc8"]}
       ]
     }
   ]

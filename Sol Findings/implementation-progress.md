@@ -8,7 +8,7 @@
 - **Current focus:** [Finding 05 — VIA split persistence](05-via-split-persistence.md)
 - **Overall status:** In progress
 - **Latest closed review:** [`review/2026-08-15-review-09`](../review/2026-08-15-review-09/)
-- **Active review:** None; the next implementation pass must open the next sortable review folder.
+- **Active review:** [`review/2026-08-15-review-10`](../review/2026-08-15-review-10/)
 
 This file is the implementation record for the plans in this directory. It records what actually changed, why choices were made, what verification really ran, and what remains open. A plan is not marked verified until its targeted checks, the full host suite, the target firmware build, target-specific evidence, and required documentation all pass.
 
@@ -28,7 +28,7 @@ This file is the implementation record for the plans in this directory. It recor
 | 02 | [Press-token rollover](02-press-token-rollover.md) | Must fix | Verified | Wrap/collision/owner-store/tiny-domain exhaustion coverage, full host, firmware, and explicit target stack path pass |
 | 03 | [VIA split buffer validation](03-via-split-buffer-validation.md) | Must fix | Verified | Exhaustive normal/ASan/UBSan boundary matrix, full host suite, firmware build, and target stack regression gate pass |
 | 04 | [VIA macro byte validation](04-via-macro-byte-validation.md) | Must fix | Verified | Exhaustive text-domain, whole-IR preflight, cache lifecycle, full host, firmware, and explicit target-stack paths pass |
-| 05 | [VIA split persistence](05-via-split-persistence.md) | Must fix | Planned | Not run |
+| 05 | [VIA split persistence](05-via-split-persistence.md) | Must fix | In progress | Durable snapshot/ack reconciliation implemented; all software gates pass, including fresh main/split stack paths; physical two-half matrix pending |
 | 06 | [Combo-origin cache lifecycle](06-combo-origin-cache-lifecycle.md) | Should fix | Verified | Exact generations, suppression/deadline/capacity lifecycle, normal/compact QMK contracts, full host, firmware, and explicit 280 B target stack path pass |
 | 07 | [Nonblocking macro playback](07-nonblocking-macro-playback.md) | Should fix | Verified | Fake-timer/wrap, busy, pinning, cancellation, ownership, full host, firmware, and fresh target-stack gates pass |
 | 08 | [Synthetic-key ownership](08-synthetic-key-ownership.md) | Should fix | Verified | Aggregate physical/managed report ownership, scoped persistent leases, strict macro balance, source guards, full host, firmware, and target stack gates pass |
@@ -730,6 +730,51 @@ bounded trace coverage pass. The complete host suite, ordinary firmware build,
 fresh target stack gate, generated-doc check, and diff hygiene pass. Review 09
 records the closure.
 
+## Finding 05 — VIA split persistence
+
+### Objective
+
+Replace best-effort pre-apply command replay with durable committed-state
+reconciliation that survives loss, reboot, reconnect, and role changes.
+
+### 2026-08-15 — Command, metadata, and framing foundation
+
+**Implemented**
+
+- Added validated full-packet mutation classification for keymap, encoder,
+  macro, reset, EEPROM-reset, and layout-option writes.
+- Removed outbound raw replay from the pre-QMK hook. The hook now retains only
+  owned effect flags and never stores a borrowed HID packet pointer.
+- Reserved the existing atomic 32-bit user-eeconfig word for schema, dirty
+  state, and a nonzero 27-bit serial generation. This does not move VIA data
+  or require an EEPROM migration.
+- Persist dirty state before returning to upstream QMK; coalesce repeated edits
+  without extra EEPROM writes; refuse to publish dirty/unknown boot state.
+- Made macro-default seeding success explicit. Reset publishes clean
+  generation 1 only after successful seeding and remains dirty on failure.
+- Added a fixed 32-byte, endian-stable, CRC-8 protected frame envelope for
+  metadata, snapshot begin, chunk push/pull, commit, ack, and error messages.
+  Strict shape/range validation precedes all future storage effects.
+
+**Current boundary reconciliation**
+
+That foundation checkpoint has now advanced to a live durable implementation.
+Canonical region readback/digest, post-QMK clean completion, acknowledged
+one-fragment snapshot push/pull, bounded retry and periodic rejoin, role and
+generation conflict policy, receiver digest commit, and post-commit RGB/macro
+cache invalidation have landed. Shared callback/scan state uses short atomic
+snapshots and epoch cancellation so a replacement transfer cannot publish an
+older verification result.
+
+Focused normal, sanitizer, encoder, state, and feature-gate checks pass. Full
+host and ordinary firmware also pass on the final source state. The ordinary
+target is 150,748 B text and 245,584 B BSS (+5,544 B text and -8 B BSS versus
+the Finding 12 baseline). A fresh instrumented target build passes every
+reviewed path: 1,904/1,920 B for the worst main-process path and 336/768 B for
+the worst split-worker path. Physical two-half power-cycle and USB-role-swap
+verification remains intentionally pending and is the only remaining Finding
+05 closure gate.
+
 ## Verification ledger
 
 | Date | Finding | Command | Result | Notes |
@@ -878,6 +923,25 @@ records the closure.
 | 2026-08-15 | 12 | `PYTHONPYCACHEPREFIX=/tmp/noah-host-pycache sh tests/host/run_all_host_tests.sh` | Passed | Complete host suite passes after generated documentation reconciliation |
 | 2026-08-15 | 12 | `qmk compile -kb bastardkb/charybdis/4x6 -km noah` | Passed | Required ordinary target firmware build |
 | 2026-08-15 | 12 | `PYTHONPYCACHEPREFIX=/tmp/noah-stack-pycache PYTHON=/usr/bin/python3 sh tests/host/run_firmware_stack_budget_checks.sh` | Passed | Fresh outbound path 480 B; worst main 1,816/1,920 B and split 328/768 B |
+| 2026-08-15 | 05 | `sh tests/host/run_qmk_via_command_classifier_tests.sh` | Passed | Complete validated mutation table and malformed/read-only rejection |
+| 2026-08-15 | 05 | `sh tests/host/run_qmk_via_sync_metadata_tests.sh` | Passed | Schema, dirty, nonzero generation, wrap, and half-range ordering |
+| 2026-08-15 | 05 | `sh tests/host/run_qmk_via_sync_state_tests.sh` | Passed | Dirty-before-complete, coalescing, recovery, reset outcome, and rollover |
+| 2026-08-15 | 05 | `sh tests/host/run_qmk_via_sync_protocol_tests.sh` | Passed | All frame kinds plus corruption, truncation, schema, range, and shape rejection |
+| 2026-08-15 | 05 | `sh tests/host/run_qmk_via_split_sync_tests.sh` | Passed | Normal, sanitizer, and encoder transitional split-sync variants |
+| 2026-08-15 | 05 | `sh tests/host/run_via_macro_defaults_tests.sh` | Passed | Explicit seed success/failure and deferred reseed lifecycle |
+| 2026-08-15 | 05 | `sh tests/host/run_runtime_init_order_tests.sh` | Passed | Reset metadata finalization occurs after macro default seeding |
+| 2026-08-15 | 05 | `sh tests/host/run_qmk_contract_checks.sh` and `sh tests/host/run_hook_chaining_tests.sh` | Passed | QMK and weak-hook contracts remain coherent |
+| 2026-08-15 | 05 | `sh tests/host/run_feature_gate_compile_tests.sh` | Passed | New manifest sources and feature variants compile |
+| 2026-08-15 | 05 | `PYTHONPYCACHEPREFIX=/tmp/noah-host-pycache sh tests/host/run_all_host_tests.sh` | Passed | Complete host suite at the durable-state/frame-codec checkpoint |
+| 2026-08-15 | 05 | `qmk compile -kb bastardkb/charybdis/4x6 -km noah` | Passed | Ordinary target build at the checkpoint; protocol remains intentionally inactive |
+| 2026-08-15 | 05 | `git diff --check` | Passed | Current uncommitted Finding 05 checkpoint |
+| 2026-08-15 | 05 | `sh tests/host/run_qmk_via_split_sync_tests.sh` | Passed | Final live reconciliation tests in normal, ASan/UBSan, and encoder variants, including dirty-recovery reseed failure |
+| 2026-08-15 | 05 | `PYTHONPYCACHEPREFIX=/tmp/noah-host-pycache sh tests/host/run_all_host_tests.sh` | Passed | Final complete host suite after live snapshot transport and recovery correction |
+| 2026-08-15 | 05 | `qmk compile -kb bastardkb/charybdis/4x6 -km noah` | Passed | Final ordinary target: 150,748 B text, 245,584 B BSS |
+| 2026-08-15 | 05 | `python3 tools/profile_introspect.py --write` and `--check` | Passed | Authored config input regenerated and verified; generated content remained coherent |
+| 2026-08-15 | 05 | `sh tests/host/run_firmware_stack_budget_checks.sh` | Blocked | Sandbox could not recreate sibling QMK build artifacts; escalation rejected after app usage limit, with no budget assertion executed |
+| 2026-08-15 | 05 | `PYTHONPYCACHEPREFIX=/tmp/noah-stack-pycache PYTHON=/usr/bin/python3 sh tests/host/run_firmware_stack_budget_tool_tests.sh` | Passed | 15 schema-v2 fixtures after manifest reconciliation to the new main/slave paths |
+| 2026-08-15 | 05 | `PYTHONPYCACHEPREFIX=/tmp/noah-stack-pycache PYTHON=/usr/bin/python3 sh tests/host/run_firmware_stack_budget_checks.sh` | Passed | Fresh post-LTO target: 1,904/1,920 B worst reviewed main path and 336/768 B worst reviewed split path; all Finding 05 digest/RPC/storage/commit/recovery/ack paths pass |
 
 ## Cross-cutting decisions and deferred work
 
@@ -905,6 +969,7 @@ records the closure.
 
 ## Next program action
 
-Open the next sortable review folder for Finding 05. Design and test durable,
-versioned VIA reconciliation across reconnect, reset, and role change without
-conflating it with Finding 12's transient runtime-sync health state.
+Execute Finding 05's physical disconnect, per-half power-cycle, reconnect, and
+USB-role-swap matrix. All software gates are green; the finding remains open
+only for this manual hardware evidence. After that closure, continue with
+Finding 10.

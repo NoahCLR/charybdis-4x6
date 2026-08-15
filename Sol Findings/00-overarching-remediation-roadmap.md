@@ -2,7 +2,7 @@
 
 ## Plan metadata
 
-- **Status:** Implementation in progress; Phases 1 and 2 and Phase 3 Findings 17 and 12 are verified. Phase 3 continues with Finding 05. See [`implementation-progress.md`](implementation-progress.md).
+- **Status:** Implementation in progress; Phases 1 and 2 are verified. Phase 3 software work is complete, with Finding 05 awaiting only its physical two-half verification matrix. See [`implementation-progress.md`](implementation-progress.md).
 - **Prepared:** 2026-07-13.
 - **Scope:** Firmware runtime correctness, split reliability, target resource safety, and measured hot-path efficiency.
 - **Source:** The deep firmware code review performed against the current `charybdis-4x6` tree.
@@ -168,7 +168,9 @@ Recommended order: **17, 12, 05**. Findings 12 and 17 may share a tightly scoped
 
 Findings 17 and 12 are verified: one wrap-safe sampled timestamp drives all
 outbound split-domain timing, and a failed RPC now stops the send pass behind a
-bounded 50–1,000 ms recovery backoff. Finding 05 is the active next step.
+bounded 50–1,000 ms recovery backoff. Finding 05's durable versioned
+reconciliation and all software gates are complete; only its physical
+disconnect, power-cycle, reconnect, and USB-role-swap matrix remains.
 
 1. Sample a single timestamp and pass it through split-domain scheduling.
 2. Introduce shared outage gating and bounded retry/backoff while retaining dirty state.
@@ -378,6 +380,8 @@ The remediation program is complete only when all of the following are true:
 
 ## Recommended next action
 
-Implement [03 — VIA split buffer validation](03-via-split-buffer-validation.md).
-Finding 01 is the verified stack-safety baseline that later runtime changes
-must continue to satisfy.
+Perform [05 — VIA split persistence](05-via-split-persistence.md)'s physical
+two-half verification matrix. Once that evidence closes Finding 05, continue
+with [10 — pointing backlog bounds](10-pointing-backlog-bounds.md). Finding 01
+remains the verified stack-safety baseline that later runtime changes must
+continue to satisfy.

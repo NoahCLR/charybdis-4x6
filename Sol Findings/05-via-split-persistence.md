@@ -3,7 +3,7 @@
 ## Plan metadata
 
 - **Severity:** Must fix — persistent state divergence, role-swap data loss, and stale split rendering/playback
-- **Status:** Planned; no remediation has landed
+- **Status:** Software implementation and gates complete; physical two-half verification pending
 - **Affected surfaces:** VIA hook ordering, storage-command classification, macro default seeding, split RPC protocol, retry/rejoin state, persistent generation metadata, RGB/macro cache invalidation
 - **Primary files:** [`qmk_via_contract.c`](../users/noah/lib/compat/qmk_via_contract.c), [`qmk_via_storage_contract.h`](../users/noah/lib/compat/qmk_via_storage_contract.h), [`qmk_via_split_sync.c`](../users/noah/lib/compat/qmk_via_split_sync.c), [`qmk_via_split_sync.h`](../users/noah/lib/compat/qmk_via_split_sync.h), [`via_macro_defaults.c`](../users/noah/lib/macro/via_macro_defaults.c), runtime scan/init wiring
 - **Prerequisites:** Finding 03 packet validation; coordinate retry cadence with Finding 12; reserve and document persistent sync metadata before implementation
@@ -16,6 +16,10 @@ The current split-VIA integration best-effort replays selected incoming commands
 The replacement must synchronize committed VIA-owned state, not merely forward packets. It needs complete command classification for fast deltas plus a versioned, acknowledged snapshot protocol that can recover after loss, reset, reboot, disconnect, and role change.
 
 ## Current evidence and failure scenarios
+
+> **Audit-time snapshot:** The references in this section describe the legacy
+> implementation that motivated Finding 05. The current landed-state summary
+> near the end of this document supersedes these observations.
 
 - [`noah_qmk_via_command_effects()`](../users/noah/lib/compat/qmk_via_contract.c#L62) mirrors keycode, keymap-buffer, keymap-reset, and encoder writes, but omits `id_dynamic_keymap_macro_set_buffer`.
 - `id_dynamic_keymap_macro_reset` requests only local reseeding at [`qmk_via_contract.c`](../users/noah/lib/compat/qmk_via_contract.c#L74); it is not mirrored.
@@ -233,24 +237,65 @@ Hardware closure also requires changing keymap and macro data while connected, d
 
 ## Acceptance checklist
 
-- [ ] Every VIA-owned mutation is classified from a validated full packet.
-- [ ] Macro set-buffer and the final result of macro reset/default seeding replicate.
-- [ ] Sync publication occurs after QMK/local seeding, never from borrowed pre-apply command data.
-- [ ] Metadata has tested clean/dirty/schema/wrap behavior and explicit migration.
-- [ ] Every committed generation requires a peer generation/digest acknowledgment.
-- [ ] Failed/disconnected delivery remains pending with bounded retry.
-- [ ] Boot, reconnect, reboot, and role swap trigger version/digest reconciliation.
-- [ ] Newer peer state can be pulled to the current master.
-- [ ] Equal-generation divergence and dirty-state recovery follow documented deterministic rules.
-- [ ] Snapshot fragments are bounds-checked, CRC-checked, idempotent, and commit atomically at generation level.
-- [ ] RGB and macro caches invalidate after local commit on both halves.
-- [ ] Targeted protocol, VIA, macro, RGB, init, and compile-gate runners pass.
-- [ ] Profile introspection is regenerated/checked if authored config changes.
-- [ ] `sh tests/host/run_all_host_tests.sh` passes.
-- [ ] `qmk compile -kb bastardkb/charybdis/4x6 -km noah` passes.
+- [x] Every VIA-owned mutation is classified from a validated full packet.
+- [x] Macro set-buffer and the final result of macro reset/default seeding replicate.
+- [x] Sync publication occurs after QMK/local seeding, never from borrowed pre-apply command data.
+- [x] Metadata has tested clean/dirty/schema/wrap behavior and explicit migration.
+- [x] A generation is considered replicated only after peer generation/digest acknowledgment.
+- [x] Failed/disconnected delivery remains pending with bounded retry.
+- [x] Boot, reconnect, reboot, and role swap trigger version/digest reconciliation.
+- [x] Newer peer state can be pulled to the current master.
+- [x] Equal-generation divergence and dirty-state recovery follow documented deterministic rules.
+- [x] Snapshot fragments are bounds-checked, CRC-checked, idempotent, and commit atomically at generation level.
+- [x] RGB and macro caches invalidate after local commit on both halves.
+- [x] Targeted protocol, VIA, macro, RGB, init, and compile-gate runners pass.
+- [x] Profile introspection is regenerated/checked if authored config changes.
+- [x] `sh tests/host/run_all_host_tests.sh` passes.
+- [x] `qmk compile -kb bastardkb/charybdis/4x6 -km noah` passes.
+- [x] Fresh instrumented target stack-budget gate passes (1,904/1,920 B worst reviewed main path; 336/768 B worst reviewed split path).
 - [ ] Physical disconnect/power-cycle/USB-role-swap verification passes.
-- [ ] Architecture and user-facing documentation match the landed protocol.
+- [x] Architecture and user-facing documentation match the landed protocol.
+
+## Current implementation checkpoint
+
+The legacy raw-command replay path has been removed. The live implementation
+now classifies complete VIA packets, persists dirty state before QMK applies a
+mutation, waits for deferred macro seeding, reads canonical storage back, and
+publishes a clean serial generation only after a complete digest succeeds.
+
+The 32-byte framed RPC is the registered transport. It reconciles VIA config,
+dynamic keymap, optional encoder map, and macro storage through acknowledged
+snapshot begin/chunk/commit exchanges. The receiver remains dirty until all
+regions arrive in order and its independent digest matches. Exact last-chunk
+duplicates are idempotent; corrupt, stale, out-of-order, and out-of-range
+frames are rejected. Boot, periodic rejoin, and role changes restart metadata
+exchange. Clean newer state wins; a current-master equal-generation conflict
+advances generation and pushes its snapshot; two dirty halves use explicit
+VIA-default recovery. Transport failures retain work and use 50–1,000 ms
+bounded backoff.
+
+Main-scan digest work and the split slave callback share only short atomic
+state snapshots. Epochs prevent a replacement snapshot from publishing or
+corrupting an older verification, and finalization rejects a new begin until
+the clean metadata commit finishes. A debug snapshot exposes local/peer
+generation and digest, last peer acknowledgement, dirty/recovery/replication
+state, phase, retries, rejected frames, conflicts, and last protocol error.
+
+Focused normal, sanitizer, and encoder variants, the complete host suite, the
+ordinary target build, and the fresh instrumented reviewed-path stack gate are
+green. The worst reviewed main-process path is 1,904 B within its 1,920 B
+budget; the worst reviewed split-worker path is 336 B within its 768 B budget.
+Physical disconnect, independent power-cycle, and USB-role-swap verification
+remains a required manual gate and is not implied by host simulation.
+
+The ordinary linked target is 150,748 B text, 0 B data, and 245,584 B BSS. That
+is +5,544 B text and -8 B BSS against the Finding 12 recorded baseline. The
+canonical target snapshot is 16,345 B: 600 B keymap, no encoder region on this
+profile, 15,743 B macro storage, and 2 B VIA config. At 14 payload bytes per
+frame this is 1,169 data fragments, plus metadata/begin/commit exchanges. The
+transfer remains bounded to one storage/digest chunk or one RPC per scan.
 
 ## Next action
 
-Write a command-completeness table and failing tests for macro set/reset plus failed RPC retention, then decide and document the persistent metadata bit layout before implementing wire frames.
+Perform the physical two-half disconnect, independent power-cycle, reconnect,
+and USB-role-swap matrix before marking the finding fully verified.

@@ -431,11 +431,24 @@ layer set and activity timer; this userspace adds custom split RPCs in
 - `PUT_SPLIT_KEY_FEEDBACK_SEMANTIC_SYNC` and
   `PUT_SPLIT_KEY_FEEDBACK_BRANCH_SYNC`: key-feedback flash visibility, semantic
   state, broad owner groups, and tap-branch colors
-- `PUT_VIA_KEYMAP_SYNC`: mirrored VIA dynamic-keymap writes
+- `PUT_VIA_KEYMAP_SYNC`: durable reconciliation of committed VIA keymap,
+  encoder, macro, validity, and layout-option storage
 
 You can forget those packet names immediately. The point is that both halves
 know the same layers, keys, combos, pointing modes, and feedback state, so the
 board behaves and lights up like one device instead of two disconnected halves.
+
+VIA edits use a stricter path than transient lighting and pointing state. The
+receiving half never trusts or replays an inbound VIA command. Instead, the
+firmware marks local storage dirty before QMK changes it, reads back the
+committed storage afterward, and reconciles a versioned snapshot with the
+other half. Transfers are CRC-checked, range-checked, retried with bounded
+backoff, and considered complete only after the receiver verifies the complete
+digest and acknowledges it. Boot, reconnect, and USB-role changes always
+exchange metadata again. A newer clean generation wins; if equal generations
+have different contents, the current USB master wins deterministically and
+publishes a new generation. RGB and VIA-macro caches refresh only after local
+storage has committed.
 
 ## Main Files
 

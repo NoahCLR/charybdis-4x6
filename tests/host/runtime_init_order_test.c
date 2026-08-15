@@ -49,17 +49,26 @@ static void test_expect_sequence(const char *const *expected, uint8_t count) {
     }
 }
 
-void eeconfig_update_user(uint32_t value) {
-    CHECK(value == 0u);
-    test_log_stage("eeconfig_update_user");
-}
-
 void noah_via_macro_defaults_eeconfig_init(void) {
     test_log_stage("via_macro_defaults_eeconfig_init");
 }
 
+bool noah_via_macro_defaults_last_seed_succeeded(void) {
+    test_log_stage("via_macro_defaults_last_seed_succeeded");
+    return true;
+}
+
+void noah_qmk_via_sync_state_reset_after_defaults(bool defaults_committed) {
+    CHECK(defaults_committed);
+    test_log_stage("qmk_via_sync_state_reset_after_defaults");
+}
+
 void noah_via_macro_defaults_matrix_scan(void) {
     test_log_stage("via_macro_defaults_matrix_scan");
+}
+
+void noah_qmk_via_split_sync_matrix_scan(void) {
+    test_log_stage("qmk_via_split_sync_matrix_scan");
 }
 
 void noah_qmk_combo_origin_scan(void) {
@@ -124,8 +133,9 @@ void noah_runtime_diag_heartbeat(void) {}
 static void test_eeconfig_init_order(void) {
     static const char *const expected[] = {
         "macro_payload_engine_cancel",
-        "eeconfig_update_user",
         "via_macro_defaults_eeconfig_init",
+        "via_macro_defaults_last_seed_succeeded",
+        "qmk_via_sync_state_reset_after_defaults",
     };
 
     test_log_reset();
@@ -135,7 +145,7 @@ static void test_eeconfig_init_order(void) {
 
 static void test_matrix_scan_order(void) {
     static const char *const expected[] = {
-        "via_macro_defaults_matrix_scan", "qmk_combo_origin_scan", "key_runtime_scan", "macro_payload_engine_scan", "split_runtime_sync_tick",
+        "via_macro_defaults_matrix_scan", "qmk_via_split_sync_matrix_scan", "qmk_combo_origin_scan", "key_runtime_scan", "macro_payload_engine_scan", "split_runtime_sync_tick",
     };
 
     test_log_reset();
