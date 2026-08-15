@@ -8,6 +8,7 @@
 - **Current focus:** [Finding 08 — synthetic-key ownership](08-synthetic-key-ownership.md)
 - **Overall status:** In progress
 - **Latest closed review:** [`review/2026-08-15-review-04`](../review/2026-08-15-review-04/)
+- **Active review:** [`review/2026-08-15-review-05`](../review/2026-08-15-review-05/)
 
 This file is the implementation record for the plans in this directory. It records what actually changed, why choices were made, what verification really ran, and what remains open. A plan is not marked verified until its targeted checks, the full host suite, the target firmware build, target-specific evidence, and required documentation all pass.
 
@@ -30,7 +31,7 @@ This file is the implementation record for the plans in this directory. It recor
 | 05 | [VIA split persistence](05-via-split-persistence.md) | Must fix | Planned | Not run |
 | 06 | [Combo-origin cache lifecycle](06-combo-origin-cache-lifecycle.md) | Should fix | Planned | Not run |
 | 07 | [Nonblocking macro playback](07-nonblocking-macro-playback.md) | Should fix | Planned | Not run |
-| 08 | [Synthetic-key ownership](08-synthetic-key-ownership.md) | Should fix | Planned | Not run |
+| 08 | [Synthetic-key ownership](08-synthetic-key-ownership.md) | Should fix | In progress | Strict orphan macro key-up rejection is covered; aggregate physical/managed ownership and lease migration remain open |
 | 09 | [Pending-release sequence rollover](09-pending-release-sequence-rollover.md) | Should fix | Verified | Explicit linked FIFO, 65,537-cycle blocked-head stress, structural corruption checks, full host, firmware, and target stack gate pass |
 | 10 | [Pointing backlog bounds](10-pointing-backlog-bounds.md) | Should fix | Planned | Not run |
 | 11 | [Dragscroll stall recovery](11-dragscroll-stall-recovery.md) | Should fix | Planned | Not run |
@@ -421,6 +422,42 @@ removal follows the same list-maintenance contract, direct and integration
 coverage pass, the target image links, and the fresh reviewed-path stack gate
 retains its required reserve.
 
+## Finding 08 — Synthetic-key ownership
+
+### Objective
+
+Make physical and synthetic producers share aggregate report ownership, migrate
+persistent acquisitions to explicit leases, and prevent one producer from
+releasing another's key.
+
+### 2026-08-15 — Strict macro-local hold checkpoint
+
+**Implemented**
+
+- Changed macro hold balance so key-up without an earlier unmatched key-down is
+  invalid across authored parsing, QMK/VIA decoding, and IR preflight.
+- Reordered playback to consume macro-local balance before unregistering. Even
+  a malformed IR now fails without issuing a key release.
+- Replaced the old encode/round-trip fixture that intentionally blessed an
+  orphan Shift release with a balanced explicit Shift hold.
+- Added direct decoder and malformed-IR tests proving orphan release has zero
+  output side effects.
+- Updated macro syntax documentation.
+
+**Remaining**
+
+- Add aggregate physical/managed ownership for basic, mouse, consumer, and
+  system usages accepted by the literal action boundary.
+- Introduce and migrate owner-scoped leases, including held actions and macro
+  execution.
+- Add saturation/underflow diagnostics, physical overlap hook enforcement,
+  reset reconciliation, BSS measurement, full integration, and target closure.
+
+### Current finding status
+
+Finding 08 is **In progress**. Strict macro-local balance is enforced, but the
+cross-producer aggregate ownership defect is not yet resolved.
+
 ## Verification ledger
 
 | Date | Finding | Command | Result | Notes |
@@ -501,6 +538,16 @@ retains its required reserve.
 | 2026-08-15 | 09 | `qmk compile -kb bastardkb/charybdis/4x6 -km noah` | Passed | Required ordinary target firmware build |
 | 2026-08-15 | 09 | `sh tests/host/run_firmware_stack_budget_checks.sh` | Blocked, then passed | Initial sandboxed clean could not modify sibling QMK artifacts; approved fresh clean/rebuild passed with 1,808 B worst reviewed path |
 | 2026-08-15 | 09 | `git diff --check` | Passed | Source, focused test/runner, runtime docs, Sol records, and closed Finding 09 review |
+| 2026-08-15 | 08 | `sh tests/host/run_macro_payload_tests.sh` | Passed | Normal and sanitizer variants reject authored, decoded, and malformed-IR orphan key-up before side effects |
+| 2026-08-15 | 08 | `sh tests/host/run_via_macro_action_lifecycle_tests.sh` | Passed | Existing valid VIA macro ownership lifecycle remains coherent |
+| 2026-08-15 | 08 | `sh tests/host/run_macro_dispatch_tests.sh` | Passed | Hardcoded macro dispatch remains coherent under strict balance |
+| 2026-08-15 | 08 | `sh tests/host/run_via_macro_defaults_tests.sh` | Passed | Authored default macro payloads remain valid |
+| 2026-08-15 | 08 | `sh tests/host/run_action_lifecycle_tests.sh` | Passed | General action lifecycle remains coherent |
+| 2026-08-15 | 08 | `sh tests/host/run_qmk_contract_checks.sh` | Passed | QMK macro-stream contracts remain coherent |
+| 2026-08-15 | 08 | `sh tests/host/run_feature_gate_compile_tests.sh` | Passed | Macro/runtime feature variants compile |
+| 2026-08-15 | 08 | `PYTHONPYCACHEPREFIX=/tmp/noah-host-pycache sh tests/host/run_all_host_tests.sh` | Passed | Complete post-checkpoint host suite |
+| 2026-08-15 | 08 | `qmk compile -kb bastardkb/charybdis/4x6 -km noah` | Passed | Ordinary target firmware build after strict balance checkpoint |
+| 2026-08-15 | 08 | `git diff --check` | Passed | Strict balance source, tests, keymap docs, Sol checkpoint, and active review |
 
 ## Cross-cutting decisions and deferred work
 

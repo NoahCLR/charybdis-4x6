@@ -101,6 +101,7 @@ static void test_validate_rejects_invalid_payloads(void) {
     CHECK(!macro_payload_validate("{KC_NOT_A_KEY}"));
     CHECK(!macro_payload_validate("{+KC_LCTL,KC_C}"));
     CHECK(!macro_payload_validate("{+KC_LSFT}"));
+    CHECK(!macro_payload_validate("{-KC_LSFT}"));
     CHECK(!macro_payload_validate("{+KC_LSFT}{+KC_LSFT}{-KC_LSFT}"));
     CHECK(!macro_payload_validate("{KC_A"));
     CHECK(!macro_payload_validate(non_ascii_payload));
@@ -212,10 +213,10 @@ static void test_encode_emits_expected_qmk_sequence(void) {
     uint16_t written    = 0;
 
     static const uint8_t expected[] = {
-        'A', SS_QMK_PREFIX, SS_DELAY_CODE, '1', '2', '|', SS_QMK_PREFIX, SS_DOWN_CODE, TEST_SEND_STRING_U8(X_LEFT_CTRL), SS_QMK_PREFIX, SS_TAP_CODE, TEST_SEND_STRING_U8(X_C), SS_QMK_PREFIX, SS_UP_CODE, TEST_SEND_STRING_U8(X_LEFT_CTRL), SS_QMK_PREFIX, SS_UP_CODE, TEST_SEND_STRING_U8(X_LEFT_SHIFT),
+        'A', SS_QMK_PREFIX, SS_DELAY_CODE, '1', '2', '|', SS_QMK_PREFIX, SS_DOWN_CODE, TEST_SEND_STRING_U8(X_LEFT_CTRL), SS_QMK_PREFIX, SS_TAP_CODE, TEST_SEND_STRING_U8(X_C), SS_QMK_PREFIX, SS_UP_CODE, TEST_SEND_STRING_U8(X_LEFT_CTRL), SS_QMK_PREFIX, SS_DOWN_CODE, TEST_SEND_STRING_U8(X_LEFT_SHIFT), SS_QMK_PREFIX, SS_UP_CODE, TEST_SEND_STRING_U8(X_LEFT_SHIFT),
     };
 
-    CHECK(macro_payload_encode("A{12}{KC_LCTL,KC_C}{-KC_LSFT}", buffer, sizeof(buffer), &written));
+    CHECK(macro_payload_encode("A{12}{KC_LCTL,KC_C}{+KC_LSFT}{-KC_LSFT}", buffer, sizeof(buffer), &written));
     CHECK(written == sizeof(expected));
     CHECK(memcmp(buffer, expected, sizeof(expected)) == 0);
 }
@@ -235,7 +236,7 @@ static void test_encode_and_decode_qmk_round_trip_through_ir(void) {
     uint16_t           written    = 0;
     test_qmk_reader_t  reader     = {.buffer = buffer};
 
-    CHECK(macro_payload_compile("A{12}{KC_LCTL,KC_C}{-KC_LSFT}", &expected));
+    CHECK(macro_payload_compile("A{12}{KC_LCTL,KC_C}{+KC_LSFT}{-KC_LSFT}", &expected));
     CHECK(macro_payload_encode_ir(&expected, buffer, sizeof(buffer), &written));
     CHECK(written > 0);
 
@@ -262,6 +263,28 @@ static void test_decode_qmk_stream_rejects_unbalanced_key_downs(void) {
 
     CHECK(!macro_payload_decode_qmk_stream(&ir, (uint16_t)sizeof(unbalanced), test_qmk_reader_read_byte, &reader));
     CHECK(ir.length == 0);
+}
+
+static void test_decode_and_play_reject_orphan_key_up_without_side_effects(void) {
+    static const uint8_t orphan_stream[] = {
+        SS_QMK_PREFIX,
+        SS_UP_CODE,
+        TEST_SEND_STRING_U8(X_LEFT_SHIFT),
+        0,
+    };
+    macro_payload_ir_t decoded   = {0};
+    macro_payload_ir_t orphan_ir = {
+        .length = 2u,
+        .bytes  = {MACRO_PAYLOAD_IR_OP_KEY_UP, KC_LEFT_SHIFT},
+    };
+    test_qmk_reader_t reader = {.buffer = orphan_stream};
+
+    CHECK(!macro_payload_decode_qmk_stream(&decoded, (uint16_t)sizeof(orphan_stream), test_qmk_reader_read_byte, &reader));
+    CHECK(decoded.length == 0u);
+
+    test_reset_stubs();
+    CHECK(!macro_payload_play_ir(&orphan_ir));
+    CHECK(test_op_count == 0u);
 }
 
 static void test_decode_qmk_stream_rejects_every_high_text_byte(void) {
@@ -413,6 +436,7 @@ int main(void) {
     test_encode_fails_when_buffer_is_too_small();
     test_encode_and_decode_qmk_round_trip_through_ir();
     test_decode_qmk_stream_rejects_unbalanced_key_downs();
+    test_decode_and_play_reject_orphan_key_up_without_side_effects();
     test_decode_qmk_stream_rejects_every_high_text_byte();
     test_decode_qmk_stream_keeps_high_command_operands_in_keycode_grammar();
     test_play_ir_with_delayed_text_uses_send_char_with_delay();

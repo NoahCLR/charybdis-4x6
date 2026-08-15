@@ -434,8 +434,10 @@ shared VIA macro buffer space after dynamic layer storage.
 
 Prefer chord payloads such as `{KC_LGUI,KC_C}` for self-contained shortcuts.
 Explicit key-down/key-up payloads such as `{+KC_LSFT}` and `{-KC_LSFT}` must
-leave no keys held at the end of the macro; unbalanced key-down payloads are
-rejected so a macro cannot leave a key registered after playback.
+be locally balanced: each key-up requires an earlier unmatched key-down for the
+same key, duplicate key-downs are invalid, and no key may remain held at the
+end. Invalid balance is rejected before playback, so a macro cannot release
+another producer's key or leave its own key registered.
 
 VIA macro text follows QMK's single-byte ASCII domain. Zero terminates a macro
 slot, bytes `0x01..0x7F` are valid text, and `0x80..0xFF` are rejected in text

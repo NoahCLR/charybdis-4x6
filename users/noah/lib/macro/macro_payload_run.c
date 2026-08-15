@@ -229,10 +229,9 @@ bool macro_payload_play_ir_with_text_output(const macro_payload_ir_t *ir, macro_
                 }
                 break;
             case MACRO_PAYLOAD_IR_OP_KEY_UP:
-                if (!macro_payload_run_key_up((uint8_t)step.value)) {
+                if (!macro_payload_hold_balance_note_up(&balance, (uint8_t)step.value) || !macro_payload_run_key_up((uint8_t)step.value)) {
                     goto finish;
                 }
-                (void)macro_payload_hold_balance_note_up(&balance, (uint8_t)step.value);
                 break;
             case MACRO_PAYLOAD_IR_OP_TAP_LIST:
                 if (!macro_payload_run_tap_list(step.bytes, step.length)) {

@@ -74,7 +74,7 @@ static inline bool macro_payload_hold_balance_note_up(macro_payload_hold_balance
 
     index = macro_payload_hold_balance_find(balance, keycode);
     if (index < 0) {
-        return true;
+        return false;
     }
 
     for (uint8_t i = (uint8_t)index; i + 1u < balance->count; i++) {

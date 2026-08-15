@@ -3,7 +3,7 @@
 ## Plan metadata
 
 - **Severity:** Should-fix (P1 stuck-key and premature-release correctness risk)
-- **Status:** Planned; ordinary synthetic keys are not refcounted
+- **Status:** In progress; strict macro-local hold balance landed first, aggregate ownership remains open
 - **Affected surfaces:** owned keycode dispatch, physical key hooks, held actions, macro holds/taps, pointing-mode shortcuts, keyboard modifiers, mouse/consumer actions
 - **Primary files:** [owned_keycode.c](../users/noah/lib/action/owned_keycode.c), [keyboard_mod_ownership.c](../users/noah/lib/state/ownership/keyboard_mod_ownership.c), [macro_payload_internal.h](../users/noah/lib/macro/macro_payload_internal.h), [macro_payload_run.c](../users/noah/lib/macro/macro_payload_run.c)
 - **Prerequisites:** None, but finish this contract before the scan-driven macro engine in [Finding 07](07-nonblocking-macro-playback.md)
@@ -202,6 +202,25 @@ Measure BSS cost of the ownership tables in the firmware map. Prefer domain-size
 
 When this lands, document the lease/aggregate-report contract in the runtime architecture note, update macro syntax docs to say key-up requires a matching key-down, and record intentional raw QMK report boundaries. Update progress.md with code/tests/BSS impact; if the relevant runtime review is closed, open the next sortable review folder.
 
+## Implementation checkpoints
+
+### 2026-08-15 — Strict macro-local release boundary
+
+- Orphan key-up now fails hold-balance validation instead of being accepted as
+  a no-op balance change.
+- Hardcoded compilation, QMK/VIA stream decoding, and IR preflight all share
+  that strict rule.
+- Playback removes the macro-local balance entry before invoking unregister;
+  a missing acquisition therefore aborts without a release side effect.
+- Tests cover direct payload rejection, encoded-stream rejection, and a
+  deliberately malformed IR with zero report operations.
+- `docs/KEYMAP.md` now defines explicit key-up as requiring an earlier unmatched
+  key-down for the same macro.
+
+Aggregate basic/mouse/consumer ownership, scoped leases, physical overlap, and
+the remaining acceptance checklist are still open. This checkpoint is not
+Finding 08 closure.
+
 ## Acceptance checklist
 
 - [ ] Physical and synthetic ownership can overlap for every supported domain.
@@ -216,4 +235,6 @@ When this lands, document the lease/aggregate-report contract in the runtime arc
 
 ## Next action
 
-Write the failing physical-KC_C plus synthetic-tap integration test first. Then define the normalized component/lease structure and prove the zero-to-one/one-to-zero transition rules before migrating macros or pointing callers.
+Next, write the failing physical-`KC_C` plus synthetic-tap integration test.
+Then define the normalized component/lease structure and prove aggregate
+zero-to-one/one-to-zero transitions before migrating persistent callers.
