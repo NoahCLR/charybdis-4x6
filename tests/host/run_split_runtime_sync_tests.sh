@@ -20,6 +20,7 @@ trap cleanup EXIT INT TERM
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
     -DSPLIT_TRANSACTION_IDS_USER \
+    -DSPLIT_RUNTIME_SYNC_PUBLISH_TEST_BACKEND \
     -DPOINTING_DEVICE_ENABLE \
     -DPOINTING_DEVICE_AUTO_MOUSE_ENABLE \
     -DAUTO_MOUSE_TIME=120u \
@@ -42,6 +43,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
     -DSPLIT_TRANSACTION_IDS_USER \
+    -DSPLIT_RUNTIME_SYNC_PUBLISH_TEST_BACKEND \
     -DPOINTING_DEVICE_ENABLE \
     -DPOINTING_DEVICE_AUTO_MOUSE_ENABLE \
     -DAUTO_MOUSE_TIME=120u \
@@ -63,6 +65,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
     -DSPLIT_TRANSACTION_IDS_USER \
+    -DSPLIT_RUNTIME_SYNC_PUBLISH_TEST_BACKEND \
     -DPOINTING_DEVICE_ENABLE \
     -DPOINTING_DEVICE_AUTO_MOUSE_ENABLE \
     -I"$ROOT" \

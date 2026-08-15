@@ -78,8 +78,9 @@ static void test_layout_and_reset_contract(void) {
     CHECK(sizeof(pending_release_slot_t) == 12u);
     CHECK(sizeof(pending_release_t) == 12u);
     // Two 60-slot active bitmaps add 16 bytes; cached authored branch state
-    // fits existing press-token and tap-series padding.
-    CHECK(sizeof(key_runtime_core_state_t) == 21796u);
+    // fits existing press-token and tap-series padding. The default-report
+    // owner bitmap adds one bit per matrix key, 8 bytes, with no padding.
+    CHECK(sizeof(key_runtime_core_state_t) == 21804u);
     CHECK(test_state.pending_release_count == 0u);
     CHECK(test_state.pending_release_head_index == KEY_RUNTIME_CORE_PENDING_RELEASE_INDEX_NONE);
     CHECK(test_state.pending_release_tail_index == KEY_RUNTIME_CORE_PENDING_RELEASE_INDEX_NONE);

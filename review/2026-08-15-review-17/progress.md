@@ -76,15 +76,122 @@ The review remains **open**. The current branch is buildable and resource-safe
 under its enforced gates, but it is not correct enough to reduce the remaining
 work to hardware testing only.
 
+## 2026-08-16 — Software Remediation Landed
+
+All four software findings from this review are now implemented and enforced.
+The two hardware-verification obligations are unchanged and still open.
+
+### Finding 08 — report ownership settles on the final event result
+
+The audit called this "pre-process records physical owners". Reproducing it
+first showed the user-visible severity was higher than recorded: a host test
+driving the real pre-process/process/finalize seam proved that holding `KC_1`
+registered Shift and never registered `KC_1`, so every authored shifted-symbol
+hold and Shift+Enter emitted a bare modifier. The regression entered with
+`753f73bf`, the original Finding 08 remediation.
+
+Implementing the fix exposed a distinction the audit did not name. The physical
+refcounts answer two different questions, and only one of them was wrong:
+
+- **"a physical modifier key is down"** — what masking policy needs.
+  `pd_mode_pinch.c` deliberately reads it to keep a user-held GUI visible while
+  hiding the mode-owned GUI from concurrent plain keys. This stays in
+  pre-process, unchanged.
+- **"QMK's default handler put this in the report"** — what teardown needs, and
+  only knowable once the event result is final.
+
+`owned_keycode`'s counts only ever gated report decisions, so they moved whole
+to the finalize hook, gated by a per-position committed bitmap in
+`key_runtime_core_state_t` so a press and its release stay balanced even when
+preflight consumes the release. `keyboard_mod_ownership` keeps its physical
+counts and gains separate report counts, used solely by the `del_mods` teardown
+in `unregister_mods()`. `tests/host/key_runtime_physical_ownership_integration_test.c`
+covers the shifted-symbol hold, Shift+Enter, a default-processed physical key
+overlapping a managed owner of the same usage, and a consumed handled modifier
+interleaved with a managed modifier owner.
+
+### Finding 15 — coherent publication across the worker/main boundary
+
+`users/noah/lib/state/shared/runtime_publication.h` adds a single-writer
+publication generation with two shapes: an in-place seqlock for the three split
+feedback domains that are too large to double buffer, and slot publication for
+pd-mode's mirrored identity. Readers re-check the generation around their copy
+and retry a bounded number of times, keeping their previous coherent copy rather
+than blocking, because the `SlaveThread` runs at `HIGHPRIO` and must never be
+delayed by rendering work. A critical section was rejected for that reason, and
+the transport's own `split_shared_memory` mutex is held across blocking serial
+I/O so main-context readers must not take it.
+
+Two seams were closed beyond the audit's description:
+
+1. `rgb_runtime_pd_mode_stage_render()` took mirrored identity and the owner
+   bitmap from two separate accessors. Each was individually coherent, but a
+   publication landing between the two calls still paired identity from one
+   generation with an owner bitmap from the next.
+   `pd_mode_snapshot_with_owner_bitmap()` now serves both from one generation.
+2. `pd_mode_snapshot()` initially copied the whole published slot, pulling the
+   owner bitmap onto a bounded main-loop stack path that does not render owner
+   keys. It now takes identity only, which is exactly as coherent under slot
+   publication.
+
+Interleaving is proven deterministically rather than by timing: a publish seam
+compiled in only under a test backend fires between two field stores of the same
+publication, and the test performs a real reader call from inside it. Each case
+asserts the raw fields at the seam really are half-new, that the reader still
+returns the complete previous packet, and that a later read returns the complete
+new one.
+
+### Findings 10 and 11 — pointing mode bounded state
+
+Arrow mode cancels the inactive axis at an actual dominant-axis transition
+rather than on the next report that carries motion on the old axis, which a
+purely vertical report never does. Because only the dominant axis accumulates,
+the invariant is now "the inactive axis is empty", so the previous cross-axis
+resets were removed rather than kept alongside. Dragscroll and pinch accumulate
+saturating at a documented residual cap, and absolute-value handling is defined
+across the whole `int32_t` domain. This is robustness, not a reachable defect:
+the drain path leaves less than one divisor behind and an 80 ms pause discards
+the buffer, so overflow needs hours of continuous motion that never resolves
+into an axis lock.
+
+### Resource result
+
+The reviewed main-process stack path improved from 1,912 B to **1,872 B**
+against its 1,920 B budget. Making `pd_mode_snapshot_fill_view()` write through
+a pointer instead of returning a view by value more than paid for the coherence
+cost; the reviewed-path function list in `tools/firmware_stack_budget.json` was
+updated for the rename. Added static state is about 40 B, visible as linker heap
+moving from 212,352 B to 212,312 B against its 204,800 B minimum. Static BSS
+span is unchanged at 25,524 B because the runtime singleton and split remote
+struct sit outside the measured `__bss_base__`/`__bss_end__` span.
+
+### Verification
+
+- `sh tests/host/run_all_host_tests.sh` — exit 0, no failures
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `PYTHON=/usr/bin/python3 sh tests/host/run_firmware_memory_budget_checks.sh`
+- `PYTHON=/usr/bin/python3 sh tests/host/run_firmware_stack_budget_checks.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+
+One correction to this review's own Verification section: the full host suite
+could not have passed as recorded on 2026-08-15. `run_owned_keycode_tests.sh`,
+`run_macro_payload_engine_tests.sh`, and `run_feature_gate_compile_tests.sh`
+shell out to `rg`, which was not installed on the machine, so the first aborted
+the suite and the other two would have passed vacuously. Ripgrep was installed
+on 2026-08-16 and all three now genuinely enforce. The first real run of the
+owned-keycode guard immediately caught a new raw-report-caller match, in a code
+comment added during this remediation.
+
 ## Next Steps
 
-1. Implement provisional physical ownership with finalize-time commit or
-   rollback, plus the missing handled-key overlap tests.
-2. Implement coherent split remote-state publication and deterministic
-   interleaving tests.
-3. Define and test arrow dominant-axis transition semantics.
-4. Bound dragscroll/pinch residual accumulation and test the numeric edges.
-5. Re-run focused tests, feature gates, the full host suite, ordinary target
-   compile, memory gate, and fresh linked stack gate.
-6. Only after software closure, perform the Finding 05 and Finding 10 physical
-   matrices.
+1. Flash and run the Finding 05 two-half persistence, power-cycle, reconnect,
+   and USB-role-swap matrix.
+2. Flash and run the Finding 10 arrow timing/feel matrix, now that inactive-axis
+   semantics are settled.
+3. Consider two follow-ups this pass deliberately did not take:
+   - `split_runtime_sync_remote.pd_mode_owner_sides` and `.pd_mode_owner_bitmap`
+     are written by the base RPC and never read in production, since RGB takes
+     ownership from the pd-mode copy. That looks like dead published state.
+   - `NOAH_RUNTIME_TRACE_ENABLE` remains main-context-only by assumption. If
+     trace-enabled hardware diagnostics are ever wanted, the split worker's
+     writer contract for the shared trace ring needs to be made explicit first.

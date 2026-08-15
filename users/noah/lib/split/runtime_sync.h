@@ -14,14 +14,21 @@
 // heartbeat-due so idle scans do not spend time deriving unchanged RGB packets.
 // A shared transport-health gate stops a send pass after its first failure and
 // suppresses packet building until a bounded recovery-probe deadline.
+//
+// Slave RPC callbacks run in the split worker context, not the main loop, so
+// every domain is published as one publication generation and main-context
+// readers copy a domain through the `split_runtime_sync_remote_read_*` helpers
+// below instead of touching the fields directly.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
 #include <stdint.h>
+#include <string.h>
 
 #include "../key/runtime/feedback.h"
 #include "../key/runtime/slot/origin_registry.h"
 #include "../pointing/defs/pd_mode_flags.h"
+#include "../state/shared/runtime_publication.h"
 
 #ifndef RPC_M2S_BUFFER_SIZE
 #    define RPC_M2S_BUFFER_SIZE 32u
@@ -68,7 +75,29 @@ typedef struct {
     uint8_t key_feedback_semantic_map[KEY_FEEDBACK_SEMANTIC_MAP_SIZE];
     uint8_t key_feedback_broad_owner_map[KEY_FEEDBACK_BROAD_OWNER_MAP_SIZE];
     uint8_t key_feedback_tap_branch_map[KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE];
+    // One publication generation per logical domain. The split worker keeps a
+    // generation odd while that domain's fields are in flight.
+    noah_runtime_publication_generation_t base_generation;
+    noah_runtime_publication_generation_t combo_generation;
+    noah_runtime_publication_generation_t key_feedback_semantic_generation;
+    noah_runtime_publication_generation_t key_feedback_branch_generation;
 } split_runtime_sync_remote_t;
+
+typedef enum {
+    SPLIT_RUNTIME_SYNC_DOMAIN_BASE = 0,
+    SPLIT_RUNTIME_SYNC_DOMAIN_COMBO,
+    SPLIT_RUNTIME_SYNC_DOMAIN_KEY_FEEDBACK_SEMANTIC,
+    SPLIT_RUNTIME_SYNC_DOMAIN_KEY_FEEDBACK_BRANCH,
+} split_runtime_sync_domain_t;
+
+#ifdef SPLIT_RUNTIME_SYNC_PUBLISH_TEST_BACKEND
+// Host-test seam. The registered hook runs while a domain's publication is
+// still in flight, so a test can interleave a main-context read between two
+// fields of the same packet deterministically.
+typedef void (*split_runtime_sync_publish_seam_fn_t)(split_runtime_sync_domain_t domain);
+
+void split_runtime_sync_test_set_publish_seam(split_runtime_sync_publish_seam_fn_t seam);
+#endif
 
 #ifdef NOAH_HOST_TEST_ENV
 typedef struct {
@@ -101,6 +130,10 @@ typedef struct {
             .key_feedback_semantic_map            = {0},                                     \
             .key_feedback_broad_owner_map         = KEY_FEEDBACK_BROAD_OWNER_MAP_EMPTY_INIT, \
             .key_feedback_tap_branch_map          = {0},                                     \
+            .base_generation                      = 0,                                       \
+            .combo_generation                     = 0,                                       \
+            .key_feedback_semantic_generation     = 0,                                       \
+            .key_feedback_branch_generation       = 0,                                       \
         }
 #else
 #    define SPLIT_RUNTIME_SYNC_REMOTE_EMPTY_INIT                                             \
@@ -115,6 +148,10 @@ typedef struct {
             .key_feedback_semantic_map            = {0},                                     \
             .key_feedback_broad_owner_map         = KEY_FEEDBACK_BROAD_OWNER_MAP_EMPTY_INIT, \
             .key_feedback_tap_branch_map          = {0},                                     \
+            .base_generation                      = 0,                                       \
+            .combo_generation                     = 0,                                       \
+            .key_feedback_semantic_generation     = 0,                                       \
+            .key_feedback_branch_generation       = 0,                                       \
         }
 #endif
 
@@ -174,3 +211,68 @@ static inline void split_runtime_sync_notify_combo_dirty(void) {}
 static inline void split_runtime_sync_notify_key_feedback_dirty(void) {}
 
 #endif // defined(SPLIT_TRANSACTION_IDS_USER)
+
+// ─── Coherent remote reads ──────────────────────────────────────────────────
+//
+// Main-context readers copy a whole domain through these helpers so a
+// publication that preempts the copy is retried instead of committed as a
+// mixture of two packets. A helper returns false only when it could not
+// capture a settled generation within the retry budget; the caller then keeps
+// the copy it already holds and renders the last coherent snapshot.
+
+static inline bool split_runtime_sync_remote_read_combo(uint8_t *out_underlay_bitmap, uint8_t *out_overlay_bitmap) {
+    for (uint8_t attempt = 0; attempt < NOAH_RUNTIME_PUBLICATION_READ_ATTEMPTS; attempt++) {
+        uint8_t generation = noah_runtime_publication_observe(&split_runtime_sync_remote.combo_generation);
+
+        if (noah_runtime_publication_in_flight(generation)) {
+            continue;
+        }
+
+        key_origin_bitmap_copy(out_underlay_bitmap, split_runtime_sync_remote.combo_underlay_bitmap);
+        key_origin_bitmap_copy(out_overlay_bitmap, split_runtime_sync_remote.combo_overlay_bitmap);
+
+        if (noah_runtime_publication_settled(&split_runtime_sync_remote.combo_generation, generation)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static inline bool split_runtime_sync_remote_read_key_feedback_semantic(uint8_t *out_flash_visibility_bitmap, uint8_t *out_semantic_map) {
+    for (uint8_t attempt = 0; attempt < NOAH_RUNTIME_PUBLICATION_READ_ATTEMPTS; attempt++) {
+        uint8_t generation = noah_runtime_publication_observe(&split_runtime_sync_remote.key_feedback_semantic_generation);
+
+        if (noah_runtime_publication_in_flight(generation)) {
+            continue;
+        }
+
+        key_origin_bitmap_copy(out_flash_visibility_bitmap, split_runtime_sync_remote.key_feedback_flash_visibility_bitmap);
+        memcpy(out_semantic_map, split_runtime_sync_remote.key_feedback_semantic_map, KEY_FEEDBACK_SEMANTIC_MAP_SIZE);
+
+        if (noah_runtime_publication_settled(&split_runtime_sync_remote.key_feedback_semantic_generation, generation)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static inline bool split_runtime_sync_remote_read_key_feedback_branch(uint8_t *out_broad_owner_map, uint8_t *out_tap_branch_map) {
+    for (uint8_t attempt = 0; attempt < NOAH_RUNTIME_PUBLICATION_READ_ATTEMPTS; attempt++) {
+        uint8_t generation = noah_runtime_publication_observe(&split_runtime_sync_remote.key_feedback_branch_generation);
+
+        if (noah_runtime_publication_in_flight(generation)) {
+            continue;
+        }
+
+        memcpy(out_broad_owner_map, split_runtime_sync_remote.key_feedback_broad_owner_map, KEY_FEEDBACK_BROAD_OWNER_MAP_SIZE);
+        memcpy(out_tap_branch_map, split_runtime_sync_remote.key_feedback_tap_branch_map, KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE);
+
+        if (noah_runtime_publication_settled(&split_runtime_sync_remote.key_feedback_branch_generation, generation)) {
+            return true;
+        }
+    }
+
+    return false;
+}

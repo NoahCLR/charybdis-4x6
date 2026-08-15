@@ -480,6 +480,16 @@ bool pd_mode_display_owner_bitmap_snapshot(uint8_t *out_bitmap) {
     return key_origin_bitmap_has_any(out_bitmap);
 }
 
+pd_mode_snapshot_t pd_mode_snapshot_with_owner_bitmap(uint8_t *out_owner_bitmap, bool *out_has_owner_keys) {
+    bool has_owner_keys = pd_mode_display_owner_bitmap_snapshot(out_owner_bitmap);
+
+    if (out_has_owner_keys) {
+        *out_has_owner_keys = has_owner_keys;
+    }
+
+    return pd_mode_snapshot();
+}
+
 int rgb_matrix_led_index(int index) {
     if (index < 0 || index >= RGB_MATRIX_LED_COUNT) {
         return -1;
@@ -1046,6 +1056,36 @@ static void test_slave_combo_underlay_stays_below_remote_pd_mode(void) {
 
     check_led(4, rgb_from_hsv(pd_mode_colors[0].color));
     check_led(5, rgb_from_hsv(pd_mode_colors[0].color));
+}
+
+static void test_slave_frame_keeps_last_coherent_combo_snapshot(void) {
+    test_reset();
+
+    fake_is_master                           = false;
+    layer_state                              = (layer_state_t)1u << LAYER_SYM;
+    split_runtime_sync_remote.active_mode_id = pd_mode_id_from_mask(PD_MODE_ARROW);
+    test_feedback_bitmap_set(split_runtime_sync_remote.combo_overlay_bitmap, 4, 0);
+
+    CHECK(render_output());
+    check_led(4, rgb_from_combo_feedback());
+    check_led(5, rgb_from_hsv(pd_mode_colors[0].color));
+
+    // Stand in for the split worker halfway through publishing the next combo
+    // packet: the overlay bitmap already holds the new key while the domain's
+    // generation is still odd. The frame must render the previous complete
+    // snapshot rather than the half-stored one.
+    test_feedback_bitmap_set(split_runtime_sync_remote.combo_overlay_bitmap, 4, 1);
+    split_runtime_sync_remote.combo_generation = 1u;
+
+    CHECK(render_output());
+    check_led(4, rgb_from_combo_feedback());
+    check_led(5, rgb_from_hsv(pd_mode_colors[0].color));
+
+    split_runtime_sync_remote.combo_generation = 2u;
+
+    CHECK(render_output());
+    check_led(4, rgb_from_hsv(pd_mode_colors[0].color));
+    check_led(5, rgb_from_combo_feedback());
 }
 
 static void test_slave_remote_combo_overlay_suppresses_stale_pending_feedback(void) {
@@ -2353,6 +2393,7 @@ int main(int argc, char **argv) {
     test_slave_combo_underlay_stays_below_remote_preview();
     test_slave_combo_overlay_stays_visible_over_remote_pd_mode();
     test_slave_combo_underlay_stays_below_remote_pd_mode();
+    test_slave_frame_keeps_last_coherent_combo_snapshot();
     test_slave_remote_combo_overlay_suppresses_stale_pending_feedback();
     test_slave_remote_combo_underlay_suppresses_stale_pending_feedback();
     test_slave_tap_commit_feedback_uses_configured_color();

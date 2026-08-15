@@ -102,6 +102,23 @@ void keyboard_mod_ownership_track_physical_keycode_event(uint16_t keycode, keyre
     keyboard_mod_ownership_validate_state("track_physical_keycode_event");
 }
 
+void keyboard_mod_ownership_track_report_keycode_event(uint16_t keycode, keyrecord_t *record) {
+    noah_keyboard_mod_ownership_state_t *state = keyboard_mod_ownership_state();
+    int8_t                               index = keyboard_mod_ownership_index_for_keycode(keycode);
+
+    if (index < 0 || !record || IS_NOEVENT(record->event)) {
+        return;
+    }
+
+    if (record->event.pressed) {
+        if (state->report_refcounts[index] < UINT8_MAX) {
+            state->report_refcounts[index]++;
+        }
+    } else if (state->report_refcounts[index] > 0) {
+        state->report_refcounts[index]--;
+    }
+}
+
 bool keyboard_mod_ownership_should_suppress_default(uint16_t keycode, keyrecord_t *record) {
     noah_keyboard_mod_ownership_state_t *state = keyboard_mod_ownership_state();
     int8_t                               index = keyboard_mod_ownership_index_for_keycode(keycode);
@@ -186,7 +203,10 @@ void keyboard_mod_ownership_unregister_mods(uint8_t mods) {
         }
 
         state->managed_refcounts[i]--;
-        if (state->managed_refcounts[i] == 0 && state->physical_refcounts[i] == 0) {
+        // Only QMK's own default registration can keep this bit alive after the
+        // last managed owner leaves. A physical key that userspace consumed
+        // never reached that path, so it must not veto the teardown.
+        if (state->managed_refcounts[i] == 0 && state->report_refcounts[i] == 0) {
             del_mods(keyboard_mod_ownership_mod_masks[i]);
             report_needed = true;
         }
@@ -261,6 +281,7 @@ void keyboard_mod_ownership_debug_snapshot(keyboard_mod_ownership_debug_snapshot
 
     memcpy(out->physical_refcounts, state->physical_refcounts, sizeof(state->physical_refcounts));
     memcpy(out->managed_refcounts, state->managed_refcounts, sizeof(state->managed_refcounts));
+    memcpy(out->report_refcounts, state->report_refcounts, sizeof(state->report_refcounts));
 }
 
 void keyboard_mod_ownership_reset_for_test(void) {

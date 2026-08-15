@@ -40,6 +40,7 @@ typedef struct {
 typedef struct {
     uint8_t physical_refcounts[KEYBOARD_MOD_OWNERSHIP_MOD_COUNT];
     uint8_t managed_refcounts[KEYBOARD_MOD_OWNERSHIP_MOD_COUNT];
+    uint8_t report_refcounts[KEYBOARD_MOD_OWNERSHIP_MOD_COUNT];
     uint8_t warned_state[KEYBOARD_MOD_OWNERSHIP_MOD_COUNT];
 } noah_keyboard_mod_ownership_state_t;
 

@@ -1,5 +1,23 @@
 # Combined Firmware Closure Verification Review
 
+> **Reconciliation Note (2026-08-16).** Everything below is the audit-time
+> snapshot of the tree at `709d942e`. All four software findings it records have
+> since been remediated and enforced; see this folder's `progress.md` for the
+> landed design, the tests that enforce it, and the verification run. Read the
+> findings below as the state at audit time, not as open work.
+>
+> Two of them changed shape once implemented, and the sections below do not
+> reflect that. Finding 08's user-visible severity was higher than recorded
+> (every authored shifted-symbol hold emitted a bare Shift), and its remediation
+> required separating "a physical key is down" from "QMK's default handler owns
+> this in the report" rather than making one ledger provisional. Finding 15 had
+> two more seams than described: a paired-accessor seam in the RGB pd-mode stage,
+> and an owner bitmap copied onto a bounded main-loop stack path.
+>
+> This review's own Verification section is also inaccurate: the full host suite
+> could not have passed as recorded, because three of its scripts require
+> `ripgrep`, which was not installed at the time.
+
 Review 16 is closed and remains immutable. This post-implementation review
 checks the complete `dev` to `sol` firmware result as one integrated system,
 so it uses the next sortable review folder. The repository's

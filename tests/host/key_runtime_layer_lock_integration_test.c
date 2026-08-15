@@ -356,6 +356,11 @@ void split_runtime_sync(void) {}
 
 void split_runtime_sync_request(void) {}
 
+void keyboard_mod_ownership_track_report_keycode_event(uint16_t keycode, keyrecord_t *record) {
+    (void)keycode;
+    (void)record;
+}
+
 void keyboard_mod_ownership_track_physical_keycode_event(uint16_t keycode, keyrecord_t *record) {
     (void)keycode;
     (void)record;

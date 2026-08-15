@@ -97,7 +97,7 @@
         },
         {
           "name": "handled press projection with fallback settlement",
-          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "noah_process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_emit_run_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_action_press", "pd_mode_apply_command", "pd_mode_snapshot", "pd_mode_snapshot_build_view", "memcpy"]
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "noah_process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_emit_run_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_action_press", "pd_mode_apply_command", "pd_mode_snapshot", "pd_mode_snapshot_fill_view"]
         },
         {
           "name": "handled press literal action projection",
@@ -121,7 +121,7 @@
         },
         {
           "name": "handled release projection with fallback settlement",
-          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "noah_process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_release", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_emit_run_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_action_press", "pd_mode_apply_command", "pd_mode_snapshot", "pd_mode_snapshot_build_view", "memcpy"]
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "noah_process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_release", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_emit_run_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_action_press", "pd_mode_apply_command", "pd_mode_snapshot", "pd_mode_snapshot_fill_view"]
         },
         {
           "name": "handled release literal action projection",
@@ -129,7 +129,7 @@
         },
         {
           "name": "handled release bounded deferred fallback settlement",
-          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "noah_process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_deferred_release_drain_dispatches", "dispatch_delayed_action_at", "noah_emit_run_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_action_press", "pd_mode_apply_command", "pd_mode_snapshot", "pd_mode_snapshot_build_view", "memcpy"]
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "noah_process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_deferred_release_drain_dispatches", "dispatch_delayed_action_at", "noah_emit_run_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_action_press", "pd_mode_apply_command", "pd_mode_snapshot", "pd_mode_snapshot_fill_view"]
         },
         {
           "name": "non-handled release cleanup lookup",
@@ -137,11 +137,11 @@
         },
         {
           "name": "matrix scan projection with fallback settlement",
-          "functions": ["main", "matrix_scan", "noah_key_runtime_scan", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_emit_run_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_action_press", "pd_mode_apply_command", "pd_mode_snapshot", "pd_mode_snapshot_build_view", "memcpy"]
+          "functions": ["main", "matrix_scan", "noah_key_runtime_scan", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_emit_run_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_action_press", "pd_mode_apply_command", "pd_mode_snapshot", "pd_mode_snapshot_fill_view"]
         },
         {
           "name": "matrix scan bounded deferred fallback settlement",
-          "functions": ["main", "matrix_scan", "noah_key_runtime_scan", "key_runtime_deferred_release_drain_dispatches", "dispatch_delayed_action_at", "noah_emit_run_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_action_press", "pd_mode_apply_command", "pd_mode_snapshot", "pd_mode_snapshot_build_view", "memcpy"]
+          "functions": ["main", "matrix_scan", "noah_key_runtime_scan", "key_runtime_deferred_release_drain_dispatches", "dispatch_delayed_action_at", "noah_emit_run_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_action_press", "pd_mode_apply_command", "pd_mode_snapshot", "pd_mode_snapshot_fill_view"]
         },
         {
           "name": "matrix scan combo-origin candidate retirement",
@@ -217,11 +217,11 @@
         },
         {
           "name": "pointing task bounded generic fallback settlement",
-          "functions": ["main", "pointing_device_task", "handle_volume_mode", "pd_mode_axis_emit", "pd_mode_tap_code", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_action_press", "pd_mode_apply_command", "pd_mode_snapshot", "pd_mode_snapshot_build_view", "memcpy"]
+          "functions": ["main", "pointing_device_task", "handle_volume_mode", "pd_mode_axis_emit", "pd_mode_tap_code", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_action_press", "pd_mode_apply_command", "pd_mode_snapshot", "pd_mode_snapshot_fill_view"]
         },
         {
           "name": "pointing task bounded vertical arrow fallback settlement",
-          "functions": ["main", "pointing_device_task", "handle_arrow_mode", "pd_mode_axis_emit", "arrow_vertical_tap_code", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_action_press", "pd_mode_apply_command", "pd_mode_snapshot", "pd_mode_snapshot_build_view", "memcpy"]
+          "functions": ["main", "pointing_device_task", "handle_arrow_mode", "pd_mode_axis_emit", "arrow_vertical_tap_code", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_action_press", "pd_mode_apply_command", "pd_mode_snapshot", "pd_mode_snapshot_fill_view"]
         }
       ]
     },

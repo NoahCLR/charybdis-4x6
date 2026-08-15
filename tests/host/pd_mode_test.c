@@ -205,6 +205,11 @@ void auto_mouse_keyevent(bool pressed) {
     }
 }
 
+void keyboard_mod_ownership_track_report_keycode_event(uint16_t keycode, keyrecord_t *record) {
+    (void)keycode;
+    (void)record;
+}
+
 void keyboard_mod_ownership_track_physical_keycode_event(uint16_t keycode, keyrecord_t *record) {
     (void)keycode;
     (void)record;
@@ -508,6 +513,87 @@ static void test_apply_remote_mode_ids_tracks_display_owner_bitmap(void) {
     CHECK(pd_mode_display_owner_bitmap_snapshot(snapshot_bitmap));
     CHECK(test_bitmap_has_keypos(snapshot_bitmap, 4, 1));
     CHECK(!test_bitmap_has_keypos(snapshot_bitmap, 0, 1));
+}
+
+// ─── Publication interleaving ───────────────────────────────────────────────
+//
+// The mirrored pd-mode identity is published from the split worker context, so
+// this test drives the publish seam to run a main-context display read at the
+// point where the new mode ids are already stored but the new owner side and
+// bitmap are not. The display read must return the complete previous snapshot,
+// never a mixture of the two.
+
+static uint8_t            pd_publish_seam_count;
+static bool               pd_publish_seam_owner_bitmap_present;
+static pd_mode_snapshot_t pd_publish_seam_snapshot;
+static uint8_t            pd_publish_seam_owner_bitmap[KEY_ORIGIN_BITMAP_SIZE];
+
+static bool               pd_publish_seam_combined_has_owner;
+static pd_mode_snapshot_t pd_publish_seam_combined_snapshot;
+static uint8_t            pd_publish_seam_combined_bitmap[KEY_ORIGIN_BITMAP_SIZE];
+
+static void test_pd_publish_seam(void) {
+    pd_publish_seam_count++;
+    pd_publish_seam_snapshot             = pd_mode_snapshot();
+    pd_publish_seam_owner_bitmap_present = pd_mode_display_owner_bitmap_snapshot(pd_publish_seam_owner_bitmap);
+    pd_publish_seam_combined_snapshot    = pd_mode_snapshot_with_owner_bitmap(pd_publish_seam_combined_bitmap, &pd_publish_seam_combined_has_owner);
+}
+
+static void test_remote_display_publication_is_atomic_for_readers(void) {
+    uint8_t            first_bitmap[KEY_ORIGIN_BITMAP_SIZE];
+    uint8_t            second_bitmap[KEY_ORIGIN_BITMAP_SIZE];
+    uint8_t            read_bitmap[KEY_ORIGIN_BITMAP_SIZE];
+    pd_mode_snapshot_t snapshot;
+
+    test_reset_stubs();
+    fake_is_master = false;
+
+    key_origin_bitmap_clear(first_bitmap);
+    key_origin_bitmap_fill_single(first_bitmap, (keypos_t){.row = 4, .col = 1});
+    key_origin_bitmap_clear(second_bitmap);
+    key_origin_bitmap_fill_single(second_bitmap, (keypos_t){.row = 2, .col = 3});
+
+    pd_mode_apply_remote_mode_ids_with_owner_bitmap(pd_mode_id_from_mask(PD_MODE_ZOOM), pd_mode_id_from_mask(PD_MODE_ZOOM), SPLIT_SIDE_MASK_RIGHT, first_bitmap);
+    snapshot = pd_mode_snapshot();
+    CHECK(snapshot.display.active_mode == PD_MODE_ZOOM);
+    CHECK(snapshot.display.owner_sides == SPLIT_SIDE_MASK_RIGHT);
+
+    pd_publish_seam_count = 0;
+    pd_mode_test_set_publish_seam(test_pd_publish_seam);
+    pd_mode_apply_remote_mode_ids_with_owner_bitmap(pd_mode_id_from_mask(PD_MODE_VOLUME), pd_mode_id_from_mask(PD_MODE_VOLUME), SPLIT_SIDE_MASK_LEFT, second_bitmap);
+    pd_mode_test_set_publish_seam(NULL);
+
+    CHECK(pd_publish_seam_count == 1u);
+    CHECK(pd_publish_seam_snapshot.display.active_mode == PD_MODE_ZOOM);
+    CHECK(pd_publish_seam_snapshot.display.locked_mode == PD_MODE_ZOOM);
+    CHECK(pd_publish_seam_snapshot.display.owner_sides == SPLIT_SIDE_MASK_RIGHT);
+    CHECK(pd_publish_seam_owner_bitmap_present);
+    CHECK(test_bitmap_has_keypos(pd_publish_seam_owner_bitmap, 4, 1));
+    CHECK(!test_bitmap_has_keypos(pd_publish_seam_owner_bitmap, 2, 3));
+
+    // Consumers that render identity and owner keys together take both from one
+    // generation, so the combined accessor must pair them from the same
+    // publication rather than straddling one.
+    CHECK(pd_publish_seam_combined_snapshot.display.active_mode == PD_MODE_ZOOM);
+    CHECK(pd_publish_seam_combined_snapshot.display.owner_sides == SPLIT_SIDE_MASK_RIGHT);
+    CHECK(pd_publish_seam_combined_has_owner);
+    CHECK(test_bitmap_has_keypos(pd_publish_seam_combined_bitmap, 4, 1));
+    CHECK(!test_bitmap_has_keypos(pd_publish_seam_combined_bitmap, 2, 3));
+
+    snapshot = pd_mode_snapshot();
+    CHECK(snapshot.display.active_mode == PD_MODE_VOLUME);
+    CHECK(snapshot.display.locked_mode == PD_MODE_VOLUME);
+    CHECK(snapshot.display.owner_sides == SPLIT_SIDE_MASK_LEFT);
+    CHECK(pd_mode_display_owner_bitmap_snapshot(read_bitmap));
+    CHECK(test_bitmap_has_keypos(read_bitmap, 2, 3));
+    CHECK(!test_bitmap_has_keypos(read_bitmap, 4, 1));
+
+    snapshot = pd_mode_snapshot_with_owner_bitmap(read_bitmap, &pd_publish_seam_combined_has_owner);
+    CHECK(snapshot.display.active_mode == PD_MODE_VOLUME);
+    CHECK(snapshot.display.owner_sides == SPLIT_SIDE_MASK_LEFT);
+    CHECK(pd_publish_seam_combined_has_owner);
+    CHECK(test_bitmap_has_keypos(read_bitmap, 2, 3));
+    CHECK(!test_bitmap_has_keypos(read_bitmap, 4, 1));
 }
 
 static void test_same_side_owner_change_requires_split_sync_for_exact_rgb(void) {
@@ -881,6 +967,7 @@ int main(void) {
     test_combo_origin_bitmap_promotes_trigger_half_to_both_sides();
     test_apply_remote_mode_ids_tracks_display_owner_half();
     test_apply_remote_mode_ids_tracks_display_owner_bitmap();
+    test_remote_display_publication_is_atomic_for_readers();
     test_same_side_owner_change_requires_split_sync_for_exact_rgb();
     test_set_lock_state_switches_to_single_locked_mode();
     test_activate_switches_to_single_unlocked_mode();

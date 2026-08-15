@@ -483,6 +483,11 @@ void noah_dispatch_synthetic_qmk_record(uint16_t keycode, bool pressed, uint8_t 
     (void)tap_count;
 }
 
+void keyboard_mod_ownership_track_report_keycode_event(uint16_t keycode, keyrecord_t *record) {
+    (void)keycode;
+    (void)record;
+}
+
 void keyboard_mod_ownership_track_physical_keycode_event(uint16_t keycode, keyrecord_t *record) {
     uint8_t mask = 0;
 

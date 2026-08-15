@@ -17,16 +17,28 @@ static pd_mode_runtime_shared_state_t *pd_mode_shared_state(void) {
 
 #define PD_MODE_LOCAL_ACTIVE_MODE (pd_mode_shared_state()->local_active_mode)
 #define PD_MODE_LOCAL_LOCKED_MODE (pd_mode_shared_state()->local_locked_mode)
-#define PD_MODE_REMOTE_DISPLAY_ACTIVE_MODE (pd_mode_shared_state()->remote_display_active_mode)
-#define PD_MODE_REMOTE_DISPLAY_LOCKED_MODE (pd_mode_shared_state()->remote_display_locked_mode)
 #define PD_MODE_LOCAL_OWNER_KEY_POS_VALID (pd_mode_shared_state()->local_owner_key_pos_valid)
 #define PD_MODE_LOCAL_OWNER_KEY_POS (pd_mode_shared_state()->local_owner_key_pos)
 #ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
 #    define PD_MODE_LOCAL_OWNER_SIDES (pd_mode_shared_state()->local_owner_sides)
-#    define PD_MODE_REMOTE_DISPLAY_OWNER_SIDES (pd_mode_shared_state()->remote_display_owner_sides)
-#    define PD_MODE_REMOTE_DISPLAY_OWNER_BITMAP (pd_mode_shared_state()->remote_display_owner_bitmap)
 #endif
 #define PD_MODE_LOCAL_KEY_OWNERS (pd_mode_shared_state()->local_key_owners)
+
+#ifdef PD_MODE_PUBLISH_TEST_BACKEND
+static pd_mode_publish_seam_fn_t pd_mode_publish_seam = NULL;
+
+void pd_mode_test_set_publish_seam(pd_mode_publish_seam_fn_t seam) {
+    pd_mode_publish_seam = seam;
+}
+
+static void pd_mode_publish_seam_reached(void) {
+    if (pd_mode_publish_seam) {
+        pd_mode_publish_seam();
+    }
+}
+#else
+static void pd_mode_publish_seam_reached(void) {}
+#endif
 
 static bool pd_mode_snapshot_view_changed(pd_mode_snapshot_view_t before, pd_mode_snapshot_view_t after) {
     return before.active_mode != after.active_mode || before.locked_mode != after.locked_mode || before.owner_sides != after.owner_sides;
@@ -365,30 +377,36 @@ static bool pd_mode_apply_remote_display_snapshot(pd_mode_mask_t active_mode, pd
     // Do not replay local side effects such as dragscroll or auto-mouse
     // ownership changes from this path. Keep only one effective mode so the
     // mirrored UI matches the local exclusivity invariant.
-    bool changed = PD_MODE_REMOTE_DISPLAY_ACTIVE_MODE != active_mode || PD_MODE_REMOTE_DISPLAY_LOCKED_MODE != locked_mode;
+    pd_mode_runtime_shared_state_t       *state     = pd_mode_shared_state();
+    const pd_mode_remote_display_state_t *published = pd_mode_remote_display_published(state);
+    pd_mode_remote_display_state_t       *pending   = pd_mode_remote_display_pending(state);
+    bool                                  changed   = published->active_mode != active_mode || published->locked_mode != locked_mode;
 
 #ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
-    changed |= PD_MODE_REMOTE_DISPLAY_OWNER_SIDES != owner_sides;
+    changed |= published->owner_sides != owner_sides;
     if (owner_bitmap) {
-        changed |= !pd_mode_bitmap_equal(PD_MODE_REMOTE_DISPLAY_OWNER_BITMAP, owner_bitmap);
+        changed |= !pd_mode_bitmap_equal(published->owner_bitmap, owner_bitmap);
     } else {
-        changed |= key_origin_bitmap_has_any(PD_MODE_REMOTE_DISPLAY_OWNER_BITMAP);
+        changed |= key_origin_bitmap_has_any(published->owner_bitmap);
     }
 #else
     (void)owner_sides;
     (void)owner_bitmap;
 #endif
 
-    PD_MODE_REMOTE_DISPLAY_LOCKED_MODE = locked_mode;
-    PD_MODE_REMOTE_DISPLAY_ACTIVE_MODE = active_mode;
+    pending->locked_mode = locked_mode;
+    pending->active_mode = active_mode;
+    pd_mode_publish_seam_reached();
 #ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
-    PD_MODE_REMOTE_DISPLAY_OWNER_SIDES = owner_sides;
+    pending->owner_sides = owner_sides;
     if (owner_bitmap) {
-        key_origin_bitmap_copy(PD_MODE_REMOTE_DISPLAY_OWNER_BITMAP, owner_bitmap);
+        key_origin_bitmap_copy(pending->owner_bitmap, owner_bitmap);
     } else {
-        key_origin_bitmap_clear(PD_MODE_REMOTE_DISPLAY_OWNER_BITMAP);
+        key_origin_bitmap_clear(pending->owner_bitmap);
     }
 #endif
+    noah_runtime_publication_publish(&state->remote_display_generation);
+
     noah_runtime_trace_emit(NOAH_TRACE_PD_MODE, NOAH_TRACE_PD_MODE_EVENT_REMOTE_SNAPSHOT, active_mode, locked_mode);
     return changed;
 }
@@ -456,7 +474,11 @@ split_side_mask_t pd_mode_local_owner_sides_snapshot(void) {
 
 split_side_mask_t pd_mode_display_owner_sides_snapshot(void) {
 #ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
-    return is_keyboard_master() ? PD_MODE_LOCAL_OWNER_SIDES : PD_MODE_REMOTE_DISPLAY_OWNER_SIDES;
+    if (is_keyboard_master()) {
+        return PD_MODE_LOCAL_OWNER_SIDES;
+    }
+
+    return pd_mode_remote_display_snapshot(pd_mode_shared_state()).owner_sides;
 #else
     return SPLIT_SIDE_MASK_NONE;
 #endif
@@ -493,6 +515,10 @@ bool pd_mode_local_owner_bitmap_snapshot(uint8_t *out_bitmap) {
 }
 
 bool pd_mode_display_owner_bitmap_snapshot(uint8_t *out_bitmap) {
+#ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
+    pd_mode_remote_display_state_t display;
+#endif
+
     if (!out_bitmap) {
         return false;
     }
@@ -503,7 +529,8 @@ bool pd_mode_display_owner_bitmap_snapshot(uint8_t *out_bitmap) {
     }
 
 #ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
-    key_origin_bitmap_copy(out_bitmap, PD_MODE_REMOTE_DISPLAY_OWNER_BITMAP);
+    display = pd_mode_remote_display_snapshot(pd_mode_shared_state());
+    key_origin_bitmap_copy(out_bitmap, display.owner_bitmap);
     return key_origin_bitmap_has_any(out_bitmap);
 #else
     return false;
@@ -743,13 +770,9 @@ bool pd_mode_handle_keycode_release_at(uint16_t keycode, keypos_t key_pos) {
 
 #undef PD_MODE_LOCAL_ACTIVE_MODE
 #undef PD_MODE_LOCAL_LOCKED_MODE
-#undef PD_MODE_REMOTE_DISPLAY_ACTIVE_MODE
-#undef PD_MODE_REMOTE_DISPLAY_LOCKED_MODE
 #undef PD_MODE_LOCAL_OWNER_KEY_POS_VALID
 #undef PD_MODE_LOCAL_OWNER_KEY_POS
 #undef PD_MODE_LOCAL_KEY_OWNERS
 #ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
 #    undef PD_MODE_LOCAL_OWNER_SIDES
-#    undef PD_MODE_REMOTE_DISPLAY_OWNER_SIDES
-#    undef PD_MODE_REMOTE_DISPLAY_OWNER_BITMAP
 #endif

@@ -55,6 +55,21 @@
 #        define MOUSE_REPORT_HV_MAX INT8_MAX
 #    endif
 
+// Hard cap on stored residual motion, in raw sensor counts.
+//
+// Reachable residuals are tiny: dragscroll_consume() drains whole steps and
+// leaves less than one divisor behind, the cross-axis decay zeroes the idle
+// axis, and NOAH_DRAGSCROLL_BUFFER_EXPIRE_MS discards everything after a pause.
+// The cap only guards the degenerate case where motion never resolves into an
+// axis lock, so nothing ever drains while reports keep arriving. It sits far
+// above any residual real motion can build, so it cannot change scroll feel,
+// and far enough below INT32_MAX that a capped buffer plus one full report
+// delta still cannot overflow.
+#    define NOAH_DRAGSCROLL_BUFFER_LIMIT ((int32_t)1 << 24)
+
+_Static_assert(NOAH_DRAGSCROLL_BUFFER_LIMIT > NOAH_DRAGSCROLL_DIVISOR_H && NOAH_DRAGSCROLL_BUFFER_LIMIT > NOAH_DRAGSCROLL_DIVISOR_V, "dragscroll residual cap must exceed one drained scroll step");
+_Static_assert(NOAH_DRAGSCROLL_BUFFER_LIMIT <= INT32_MAX - ((int32_t)INT16_MAX + 1), "dragscroll residual cap must leave headroom for one full mouse report delta");
+
 typedef enum {
     DRAGSCROLL_AXIS_NONE = 0,
     DRAGSCROLL_AXIS_X,
@@ -72,7 +87,29 @@ typedef struct {
 static dragscroll_state_t dragscroll_state = {0};
 
 static int32_t dragscroll_abs32(int32_t value) {
-    return value >= 0 ? value : -value;
+    if (value >= 0) {
+        return value;
+    }
+
+    // INT32_MIN has no positive counterpart, so report the largest magnitude
+    // instead of negating it. Saturated buffers never reach here, but the helper
+    // stays defined for the whole int32_t domain.
+    return value == INT32_MIN ? INT32_MAX : -value;
+}
+
+// Saturating counterpart to the raw `+=`/`-=` on the residual buffers.
+static void dragscroll_accumulate(int32_t *buffer, int32_t delta) {
+    if (delta > 0 && *buffer > NOAH_DRAGSCROLL_BUFFER_LIMIT - delta) {
+        *buffer = NOAH_DRAGSCROLL_BUFFER_LIMIT;
+        return;
+    }
+
+    if (delta < 0 && *buffer < -NOAH_DRAGSCROLL_BUFFER_LIMIT - delta) {
+        *buffer = -NOAH_DRAGSCROLL_BUFFER_LIMIT;
+        return;
+    }
+
+    *buffer += delta;
 }
 
 static int32_t dragscroll_axis_threshold(dragscroll_axis_t axis) {
@@ -261,15 +298,15 @@ report_mouse_t handle_dragscroll_mode(report_mouse_t mouse_report) {
 
     if (had_motion) {
 #    ifdef NOAH_DRAGSCROLL_REVERSE_X
-        dragscroll_state.buffer_x -= mouse_report.x;
+        dragscroll_accumulate(&dragscroll_state.buffer_x, -(int32_t)mouse_report.x);
 #    else
-        dragscroll_state.buffer_x += mouse_report.x;
+        dragscroll_accumulate(&dragscroll_state.buffer_x, (int32_t)mouse_report.x);
 #    endif
 
 #    ifdef NOAH_DRAGSCROLL_REVERSE_Y
-        dragscroll_state.buffer_y -= mouse_report.y;
+        dragscroll_accumulate(&dragscroll_state.buffer_y, -(int32_t)mouse_report.y);
 #    else
-        dragscroll_state.buffer_y += mouse_report.y;
+        dragscroll_accumulate(&dragscroll_state.buffer_y, (int32_t)mouse_report.y);
 #    endif
 
         dragscroll_state.last_motion_time = now;

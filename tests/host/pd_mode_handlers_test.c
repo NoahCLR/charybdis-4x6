@@ -13,6 +13,12 @@
 
 #define TEST_MAX_CALLS 8
 
+// A 16-bit mouse report can carry 32767 counts, so unsaturated int32_t residual
+// accumulation wraps after roughly 65537 maximum reports. The extreme-input
+// tests push past that boundary; a saturating accumulator has to keep the
+// gesture pointing the same way instead of flipping sign.
+#define TEST_DRAGSCROLL_OVERFLOW_REPORTS 70000u
+
 typedef struct {
     uint16_t keycode;
     uint8_t  real;
@@ -243,6 +249,15 @@ static void test_dragscroll_prime_horizontal_lock_with_residual(uint32_t start_t
     });
     CHECK(report.h == 0);
     CHECK(report.v == 0);
+}
+
+static void test_dragscroll_drive_reports(int16_t dx, int16_t dy, uint32_t count) {
+    for (uint32_t index = 0; index < count; index++) {
+        (void)handle_dragscroll_mode((report_mouse_t){
+            .x = dx,
+            .y = dy,
+        });
+    }
 }
 
 static void test_dragscroll_horizontal_lock_filters_vertical_jitter(void) {
@@ -597,6 +612,125 @@ static void test_dragscroll_cross_axis_decay_prevents_residual_leakage(void) {
     CHECK(report.v == 0);
 }
 
+static void test_dragscroll_extreme_input_saturates_instead_of_wrapping(void) {
+    report_mouse_t report;
+
+    test_reset_stubs();
+
+    fake_time32 = 1020u;
+    report      = handle_dragscroll_mode((report_mouse_t){
+        .x = INT16_MAX,
+    });
+    CHECK(report.h > 0);
+    CHECK(report.v == 0);
+
+    // The rate limit blocks the drain, so these reports only accumulate.
+    test_dragscroll_drive_reports(INT16_MAX, 0, TEST_DRAGSCROLL_OVERFLOW_REPORTS);
+
+    fake_time32 = 1020u + NOAH_DRAGSCROLL_RATE_LIMIT_MS;
+    report      = handle_dragscroll_mode((report_mouse_t){0});
+    CHECK(report.h > 0);
+    CHECK(report.v == 0);
+
+    // A buffer already sitting at the cap still accepts full reports and still
+    // scrolls the same way.
+    test_dragscroll_drive_reports(INT16_MAX, 0, TEST_DRAGSCROLL_OVERFLOW_REPORTS);
+
+    fake_time32 = 1020u + 2u * NOAH_DRAGSCROLL_RATE_LIMIT_MS;
+    report      = handle_dragscroll_mode((report_mouse_t){0});
+    CHECK(report.h > 0);
+    CHECK(report.v == 0);
+}
+
+static void test_dragscroll_reverse_axis_extremes_saturate_in_both_directions(void) {
+    report_mouse_t report;
+
+    test_reset_stubs();
+
+    // NOAH_DRAGSCROLL_REVERSE_Y subtracts the report, so positive vertical input
+    // drives the residual buffer negative.
+    fake_time32 = 1020u;
+    report      = handle_dragscroll_mode((report_mouse_t){
+        .y = INT16_MAX,
+    });
+    CHECK(report.h == 0);
+    CHECK(report.v < 0);
+
+    test_dragscroll_drive_reports(0, INT16_MAX, TEST_DRAGSCROLL_OVERFLOW_REPORTS);
+
+    fake_time32 = 1020u + NOAH_DRAGSCROLL_RATE_LIMIT_MS;
+    report      = handle_dragscroll_mode((report_mouse_t){0});
+    CHECK(report.h == 0);
+    CHECK(report.v < 0);
+
+    // Reversing walks the saturated buffer back through zero to the other cap
+    // instead of sticking or wrapping.
+    test_dragscroll_drive_reports(0, INT16_MIN, TEST_DRAGSCROLL_OVERFLOW_REPORTS);
+
+    fake_time32 = 1020u + 2u * NOAH_DRAGSCROLL_RATE_LIMIT_MS;
+    report      = handle_dragscroll_mode((report_mouse_t){0});
+    CHECK(report.h == 0);
+    CHECK(report.v > 0);
+}
+
+static void test_dragscroll_saturated_buffer_expires_after_pause(void) {
+    report_mouse_t report;
+
+    test_reset_stubs();
+
+    fake_time32 = 1020u;
+    report      = handle_dragscroll_mode((report_mouse_t){
+        .x = INT16_MAX,
+    });
+    CHECK(report.h > 0);
+
+    test_dragscroll_drive_reports(INT16_MAX, 0, TEST_DRAGSCROLL_OVERFLOW_REPORTS);
+
+    fake_time32 = 1020u + NOAH_DRAGSCROLL_BUFFER_EXPIRE_MS + 1u;
+    report      = handle_dragscroll_mode((report_mouse_t){0});
+    CHECK(report.h == 0);
+    CHECK(report.v == 0);
+
+    fake_time32 += NOAH_DRAGSCROLL_RATE_LIMIT_MS;
+    report = handle_dragscroll_mode((report_mouse_t){
+        .y = -24,
+    });
+    CHECK(report.h == 0);
+    CHECK(report.v == 3);
+}
+
+static void test_pinch_reuse_shares_saturating_dragscroll_accumulator(void) {
+    report_mouse_t report;
+
+    // PINCH reuses handle_dragscroll_mode() and reset_dragscroll_mode() through
+    // the pd mode manifest, so the pinch gesture shares this residual cap. The
+    // registry mapping itself is asserted in pd_mode_test.c.
+    test_reset_stubs();
+
+    fake_time32 = 1020u;
+    report      = handle_dragscroll_mode((report_mouse_t){
+        .y = INT16_MIN,
+    });
+    CHECK(report.h == 0);
+    CHECK(report.v > 0);
+
+    test_dragscroll_drive_reports(0, INT16_MIN, TEST_DRAGSCROLL_OVERFLOW_REPORTS);
+
+    fake_time32 = 1020u + NOAH_DRAGSCROLL_RATE_LIMIT_MS;
+    report      = handle_dragscroll_mode((report_mouse_t){0});
+    CHECK(report.h == 0);
+    CHECK(report.v > 0);
+
+    reset_dragscroll_mode();
+
+    fake_time32 += NOAH_DRAGSCROLL_RATE_LIMIT_MS;
+    report = handle_dragscroll_mode((report_mouse_t){
+        .y = -24,
+    });
+    CHECK(report.h == 0);
+    CHECK(report.v == 3);
+}
+
 static void test_dragscroll_reset_clears_buffers_and_lock_state(void) {
     test_reset_stubs();
 
@@ -916,6 +1050,95 @@ static void test_arrow_extreme_magnitudes_select_exact_dominant_axis(void) {
     test_assert_synthetic_calls(NOAH_PD_MODE_MAX_TAPS_PER_TICK, KC_UP);
 }
 
+static void test_arrow_x_to_y_switch_cancels_horizontal_debt(void) {
+    pd_mode_arrow_debug_snapshot_t snapshot;
+
+    test_reset_stubs();
+
+    // Sub-threshold horizontal debt while X is dominant.
+    (void)handle_arrow_mode((report_mouse_t){.x = 39});
+    CHECK(synthetic_tap_call_count == 0u);
+
+    // A purely vertical report carries no horizontal input to notice, so the
+    // transition itself has to clear the horizontal state.
+    test_clear_logs();
+    (void)handle_arrow_mode((report_mouse_t){.y = 50});
+    test_assert_synthetic_calls(1u, KC_DOWN);
+
+    pd_mode_arrow_debug_snapshot(&snapshot);
+    CHECK(!snapshot.selected_axis_is_horizontal);
+    CHECK(snapshot.horizontal.accumulated_motion == 0);
+    CHECK(snapshot.horizontal.pending_tap_count == 0u);
+    CHECK(snapshot.horizontal.direction == 0);
+
+    // Returning to X starts from zero instead of finishing the old debt.
+    test_clear_logs();
+    (void)handle_arrow_mode((report_mouse_t){.x = 1});
+    CHECK(synthetic_tap_call_count == 0u);
+
+    pd_mode_arrow_debug_snapshot(&snapshot);
+    CHECK(snapshot.selected_axis_is_horizontal);
+    CHECK(snapshot.horizontal.accumulated_motion == 1);
+    CHECK(snapshot.vertical.accumulated_motion == 0);
+
+    (void)handle_arrow_mode((report_mouse_t){0});
+    CHECK(synthetic_tap_call_count == 0u);
+}
+
+static void test_arrow_y_to_x_switch_cancels_vertical_debt(void) {
+    pd_mode_arrow_debug_snapshot_t snapshot;
+
+    test_reset_stubs();
+
+    (void)handle_arrow_mode((report_mouse_t){.y = 49});
+    CHECK(synthetic_tap_call_count == 0u);
+
+    test_clear_logs();
+    (void)handle_arrow_mode((report_mouse_t){.x = 40});
+    test_assert_synthetic_calls(1u, KC_RIGHT);
+
+    pd_mode_arrow_debug_snapshot(&snapshot);
+    CHECK(snapshot.selected_axis_is_horizontal);
+    CHECK(snapshot.vertical.accumulated_motion == 0);
+    CHECK(snapshot.vertical.pending_tap_count == 0u);
+    CHECK(snapshot.vertical.direction == 0);
+
+    test_clear_logs();
+    (void)handle_arrow_mode((report_mouse_t){.y = 1});
+    CHECK(synthetic_tap_call_count == 0u);
+
+    pd_mode_arrow_debug_snapshot(&snapshot);
+    CHECK(!snapshot.selected_axis_is_horizontal);
+    CHECK(snapshot.vertical.accumulated_motion == 1);
+    CHECK(snapshot.horizontal.accumulated_motion == 0);
+
+    (void)handle_arrow_mode((report_mouse_t){0});
+    CHECK(synthetic_tap_call_count == 0u);
+}
+
+static void test_arrow_axis_switch_drops_bounded_backlog(void) {
+    pd_mode_arrow_debug_snapshot_t snapshot;
+
+    test_reset_stubs();
+
+    // Fill the horizontal backlog, then leave the axis on a report with no
+    // horizontal input at all.
+    (void)handle_arrow_mode((report_mouse_t){.x = INT16_MAX});
+    test_assert_synthetic_calls(NOAH_PD_MODE_MAX_TAPS_PER_TICK, KC_RIGHT);
+
+    test_clear_logs();
+    (void)handle_arrow_mode((report_mouse_t){.y = 50});
+    test_assert_synthetic_calls(1u, KC_DOWN);
+
+    pd_mode_arrow_debug_snapshot(&snapshot);
+    CHECK(snapshot.horizontal.accumulated_motion == 0);
+    CHECK(snapshot.horizontal.pending_tap_count == 0u);
+
+    test_clear_logs();
+    (void)handle_arrow_mode((report_mouse_t){.x = 1});
+    CHECK(synthetic_tap_call_count == 0u);
+}
+
 static void test_horizontal_arrow_tap_preserves_mod_state(void) {
     test_reset_stubs();
 
@@ -1029,6 +1252,10 @@ int main(void) {
     test_dragscroll_uses_one_timer_sample_per_invocation();
     test_dragscroll_uses_different_horizontal_and_vertical_divisors();
     test_dragscroll_cross_axis_decay_prevents_residual_leakage();
+    test_dragscroll_extreme_input_saturates_instead_of_wrapping();
+    test_dragscroll_reverse_axis_extremes_saturate_in_both_directions();
+    test_dragscroll_saturated_buffer_expires_after_pause();
+    test_pinch_reuse_shares_saturating_dragscroll_accumulator();
     test_dragscroll_reset_clears_buffers_and_lock_state();
     test_volume_mode_emits_discrete_steps_and_resets_on_direction_change();
     test_brightness_mode_emits_discrete_steps_and_resets_on_direction_change();
@@ -1041,6 +1268,9 @@ int main(void) {
     test_direction_reversal_discards_old_debt_before_new_output();
     test_mode_reset_clears_backlog_and_diagnostics();
     test_arrow_extreme_magnitudes_select_exact_dominant_axis();
+    test_arrow_x_to_y_switch_cancels_horizontal_debt();
+    test_arrow_y_to_x_switch_cancels_vertical_debt();
+    test_arrow_axis_switch_drops_bounded_backlog();
     test_horizontal_arrow_tap_preserves_mod_state();
     test_vertical_arrow_tap_masks_alt_and_restores_mod_state();
     test_arrow_mode_selection_button_holds_and_releases_shift();

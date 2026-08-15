@@ -47,9 +47,15 @@ static void arrow_send_shortcut(uint16_t shortcut) {
     noah_emit_literal_tap(shortcut, NOAH_EMIT_POLICY_SETTLE_FALLBACK_HOLDS_AND_PRESERVE_MODS);
 }
 
+// Changing dominant axis cancels the axis being left behind. Only the dominant
+// axis accumulates, so the inactive axis must not keep sub-threshold debt that
+// a later, unrelated gesture would finish into a stale arrow tap. The reset
+// happens on the transition itself, not on the next report that carries motion
+// on the old axis, because a purely vertical report leaves dx == 0.
 static void arrow_update_dominant_axis(int16_t dx, int16_t dy) {
-    int32_t ax = dx;
-    int32_t ay = dy;
+    bool    was_x = arrow_axis_is_x;
+    int32_t ax    = dx;
+    int32_t ay    = dy;
 
     if (ax < 0) {
         ax = -ax;
@@ -63,6 +69,10 @@ static void arrow_update_dominant_axis(int16_t dx, int16_t dy) {
     } else if (ay > ax && ay > 0) {
         arrow_axis_is_x = false;
     }
+
+    if (arrow_axis_is_x != was_x) {
+        pd_mode_axis_reset(arrow_axis_is_x ? &arrow_y_axis : &arrow_x_axis);
+    }
 }
 
 report_mouse_t handle_arrow_mode(report_mouse_t mouse_report) {
@@ -72,18 +82,12 @@ report_mouse_t handle_arrow_mode(report_mouse_t mouse_report) {
 
     arrow_update_dominant_axis(dx, dy);
 
+    // The inactive axis is already empty: arrow_update_dominant_axis() clears it
+    // at the transition and nothing feeds it while the other axis is dominant.
     if (arrow_axis_is_x) {
         (void)pd_mode_axis_emit(&arrow_x_axis, dx, KC_RIGHT, KC_LEFT, ARROW_THRESHOLD_X, &remaining_budget, pd_mode_tap_code);
-
-        if (dy != 0) {
-            pd_mode_axis_reset(&arrow_y_axis);
-        }
     } else {
         (void)pd_mode_axis_emit(&arrow_y_axis, dy, KC_DOWN, KC_UP, ARROW_THRESHOLD_Y, &remaining_budget, arrow_vertical_tap_code);
-
-        if (dx != 0) {
-            pd_mode_axis_reset(&arrow_x_axis);
-        }
     }
 
     return pd_mode_freeze_mouse();

@@ -1069,6 +1069,203 @@ static void test_slave_base_rpc_ignores_short_packets(void) {
     CHECK(remote_snapshot_apply_count == 0u);
 }
 
+// ─── Publication interleaving ───────────────────────────────────────────────
+//
+// Slave RPC callbacks publish from the split worker context, so these tests
+// drive the publish seam to run a main-context read while a packet is only
+// half stored. Every case asserts three things: the seam really sits on a
+// partially stored domain, the reader refuses that in-flight generation, and
+// the reader's destination still holds the complete previous packet.
+
+typedef struct {
+    uint8_t seam_count;
+    bool    saw_generation_in_flight;
+    bool    saw_partial_store;
+    bool    read_coherent;
+} publish_seam_observation_t;
+
+static publish_seam_observation_t                   publish_seam;
+static split_runtime_base_sync_packet_t             seam_first_base_packet;
+static split_runtime_base_sync_packet_t             seam_second_base_packet;
+static split_runtime_combo_feedback_packet_t        seam_first_combo_packet;
+static split_runtime_combo_feedback_packet_t        seam_second_combo_packet;
+static split_runtime_key_feedback_semantic_packet_t seam_first_semantic_packet;
+static split_runtime_key_feedback_semantic_packet_t seam_second_semantic_packet;
+static split_runtime_key_feedback_branch_packet_t   seam_first_branch_packet;
+static split_runtime_key_feedback_branch_packet_t   seam_second_branch_packet;
+static uint8_t                                      seam_read_underlay_bitmap[KEY_ORIGIN_BITMAP_SIZE];
+static uint8_t                                      seam_read_overlay_bitmap[KEY_ORIGIN_BITMAP_SIZE];
+static uint8_t                                      seam_read_flash_visibility_bitmap[KEY_ORIGIN_BITMAP_SIZE];
+static uint8_t                                      seam_read_semantic_map[KEY_FEEDBACK_SEMANTIC_MAP_SIZE];
+static uint8_t                                      seam_read_broad_owner_map[KEY_FEEDBACK_BROAD_OWNER_MAP_SIZE];
+static uint8_t                                      seam_read_tap_branch_map[KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE];
+
+static void test_publish_seam(split_runtime_sync_domain_t domain) {
+    publish_seam.seam_count++;
+
+    switch (domain) {
+        case SPLIT_RUNTIME_SYNC_DOMAIN_BASE:
+            publish_seam.saw_generation_in_flight = noah_runtime_publication_in_flight(split_runtime_sync_remote.base_generation);
+            publish_seam.saw_partial_store        = split_runtime_sync_remote.active_mode_id == seam_second_base_packet.active_mode_id && split_runtime_sync_remote.key_preview_layer == seam_first_base_packet.key_preview_layer;
+            break;
+        case SPLIT_RUNTIME_SYNC_DOMAIN_COMBO:
+            publish_seam.saw_generation_in_flight = noah_runtime_publication_in_flight(split_runtime_sync_remote.combo_generation);
+            publish_seam.saw_partial_store        = memcmp(split_runtime_sync_remote.combo_underlay_bitmap, seam_second_combo_packet.combo_underlay_bitmap, KEY_ORIGIN_BITMAP_SIZE) == 0 && memcmp(split_runtime_sync_remote.combo_overlay_bitmap, seam_first_combo_packet.combo_overlay_bitmap, KEY_ORIGIN_BITMAP_SIZE) == 0;
+            publish_seam.read_coherent            = split_runtime_sync_remote_read_combo(seam_read_underlay_bitmap, seam_read_overlay_bitmap);
+            break;
+        case SPLIT_RUNTIME_SYNC_DOMAIN_KEY_FEEDBACK_SEMANTIC:
+            publish_seam.saw_generation_in_flight = noah_runtime_publication_in_flight(split_runtime_sync_remote.key_feedback_semantic_generation);
+            publish_seam.saw_partial_store        = memcmp(split_runtime_sync_remote.key_feedback_flash_visibility_bitmap, seam_second_semantic_packet.key_feedback_flash_visibility_bitmap, KEY_ORIGIN_BITMAP_SIZE) == 0 && memcmp(split_runtime_sync_remote.key_feedback_semantic_map, seam_first_semantic_packet.key_feedback_semantic_map, KEY_FEEDBACK_SEMANTIC_MAP_SIZE) == 0;
+            publish_seam.read_coherent            = split_runtime_sync_remote_read_key_feedback_semantic(seam_read_flash_visibility_bitmap, seam_read_semantic_map);
+            break;
+        case SPLIT_RUNTIME_SYNC_DOMAIN_KEY_FEEDBACK_BRANCH:
+            publish_seam.saw_generation_in_flight = noah_runtime_publication_in_flight(split_runtime_sync_remote.key_feedback_branch_generation);
+            publish_seam.saw_partial_store        = memcmp(split_runtime_sync_remote.key_feedback_broad_owner_map, seam_second_branch_packet.key_feedback_broad_owner_map, KEY_FEEDBACK_BROAD_OWNER_MAP_SIZE) == 0 && memcmp(split_runtime_sync_remote.key_feedback_tap_branch_map, seam_first_branch_packet.key_feedback_tap_branch_map, KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE) == 0;
+            publish_seam.read_coherent            = split_runtime_sync_remote_read_key_feedback_branch(seam_read_broad_owner_map, seam_read_tap_branch_map);
+            break;
+        default:
+            break;
+    }
+}
+
+static void test_begin_publish_seam_case(void) {
+    test_reset_stubs();
+    fake_is_master = false;
+    split_runtime_sync_init();
+    publish_seam = (publish_seam_observation_t){0};
+}
+
+static void test_arm_publish_seam(void) {
+    publish_seam = (publish_seam_observation_t){0};
+    split_runtime_sync_test_set_publish_seam(test_publish_seam);
+}
+
+static void test_disarm_publish_seam(void) {
+    split_runtime_sync_test_set_publish_seam(NULL);
+}
+
+static void test_combo_publication_is_atomic_for_readers(void) {
+    test_begin_publish_seam_case();
+
+    seam_first_combo_packet                          = (split_runtime_combo_feedback_packet_t){0};
+    seam_first_combo_packet.combo_underlay_bitmap[0] = 0x11u;
+    seam_first_combo_packet.combo_overlay_bitmap[0]  = 0x22u;
+    seam_second_combo_packet                         = (split_runtime_combo_feedback_packet_t){0};
+    seam_second_combo_packet.combo_underlay_bitmap[0] = 0x44u;
+    seam_second_combo_packet.combo_overlay_bitmap[0]  = 0x88u;
+
+    test_registered_callback(PUT_SPLIT_COMBO_FEEDBACK_SYNC)(sizeof(seam_first_combo_packet), &seam_first_combo_packet, 0u, NULL);
+    CHECK(split_runtime_sync_remote_read_combo(seam_read_underlay_bitmap, seam_read_overlay_bitmap));
+    CHECK(memcmp(seam_read_underlay_bitmap, seam_first_combo_packet.combo_underlay_bitmap, KEY_ORIGIN_BITMAP_SIZE) == 0);
+    CHECK(memcmp(seam_read_overlay_bitmap, seam_first_combo_packet.combo_overlay_bitmap, KEY_ORIGIN_BITMAP_SIZE) == 0);
+
+    test_arm_publish_seam();
+    test_registered_callback(PUT_SPLIT_COMBO_FEEDBACK_SYNC)(sizeof(seam_second_combo_packet), &seam_second_combo_packet, 0u, NULL);
+    test_disarm_publish_seam();
+
+    CHECK(publish_seam.seam_count == 1u);
+    CHECK(publish_seam.saw_generation_in_flight);
+    CHECK(publish_seam.saw_partial_store);
+    CHECK(memcmp(seam_read_underlay_bitmap, seam_first_combo_packet.combo_underlay_bitmap, KEY_ORIGIN_BITMAP_SIZE) == 0);
+    CHECK(memcmp(seam_read_overlay_bitmap, seam_first_combo_packet.combo_overlay_bitmap, KEY_ORIGIN_BITMAP_SIZE) == 0);
+    CHECK(!publish_seam.read_coherent);
+
+    CHECK(!noah_runtime_publication_in_flight(split_runtime_sync_remote.combo_generation));
+    CHECK(split_runtime_sync_remote_read_combo(seam_read_underlay_bitmap, seam_read_overlay_bitmap));
+    CHECK(memcmp(seam_read_underlay_bitmap, seam_second_combo_packet.combo_underlay_bitmap, KEY_ORIGIN_BITMAP_SIZE) == 0);
+    CHECK(memcmp(seam_read_overlay_bitmap, seam_second_combo_packet.combo_overlay_bitmap, KEY_ORIGIN_BITMAP_SIZE) == 0);
+}
+
+static void test_key_feedback_semantic_publication_is_atomic_for_readers(void) {
+    test_begin_publish_seam_case();
+
+    seam_first_semantic_packet  = (split_runtime_key_feedback_semantic_packet_t){0};
+    seam_second_semantic_packet = (split_runtime_key_feedback_semantic_packet_t){0};
+    key_origin_bitmap_add_keypos(seam_first_semantic_packet.key_feedback_flash_visibility_bitmap, (keypos_t){.row = 0, .col = 1});
+    key_feedback_semantic_map_set(seam_first_semantic_packet.key_feedback_semantic_map, (keypos_t){.row = 0, .col = 1}, KEY_FEEDBACK_SEMANTIC_HOLD_ACTIVE_FLASHING);
+    key_origin_bitmap_add_keypos(seam_second_semantic_packet.key_feedback_flash_visibility_bitmap, (keypos_t){.row = 1, .col = 2});
+    key_feedback_semantic_map_set(seam_second_semantic_packet.key_feedback_semantic_map, (keypos_t){.row = 1, .col = 2}, KEY_FEEDBACK_SEMANTIC_TAP_COMMITTED);
+
+    test_registered_callback(PUT_SPLIT_KEY_FEEDBACK_SEMANTIC_SYNC)(sizeof(seam_first_semantic_packet), &seam_first_semantic_packet, 0u, NULL);
+    CHECK(split_runtime_sync_remote_read_key_feedback_semantic(seam_read_flash_visibility_bitmap, seam_read_semantic_map));
+
+    test_arm_publish_seam();
+    test_registered_callback(PUT_SPLIT_KEY_FEEDBACK_SEMANTIC_SYNC)(sizeof(seam_second_semantic_packet), &seam_second_semantic_packet, 0u, NULL);
+    test_disarm_publish_seam();
+
+    CHECK(publish_seam.seam_count == 1u);
+    CHECK(publish_seam.saw_generation_in_flight);
+    CHECK(publish_seam.saw_partial_store);
+    CHECK(memcmp(seam_read_flash_visibility_bitmap, seam_first_semantic_packet.key_feedback_flash_visibility_bitmap, KEY_ORIGIN_BITMAP_SIZE) == 0);
+    CHECK(memcmp(seam_read_semantic_map, seam_first_semantic_packet.key_feedback_semantic_map, KEY_FEEDBACK_SEMANTIC_MAP_SIZE) == 0);
+    CHECK(!publish_seam.read_coherent);
+
+    CHECK(split_runtime_sync_remote_read_key_feedback_semantic(seam_read_flash_visibility_bitmap, seam_read_semantic_map));
+    CHECK(memcmp(seam_read_flash_visibility_bitmap, seam_second_semantic_packet.key_feedback_flash_visibility_bitmap, KEY_ORIGIN_BITMAP_SIZE) == 0);
+    CHECK(memcmp(seam_read_semantic_map, seam_second_semantic_packet.key_feedback_semantic_map, KEY_FEEDBACK_SEMANTIC_MAP_SIZE) == 0);
+}
+
+static void test_key_feedback_branch_publication_is_atomic_for_readers(void) {
+    test_begin_publish_seam_case();
+
+    seam_first_branch_packet  = (split_runtime_key_feedback_branch_packet_t){0};
+    seam_second_branch_packet = (split_runtime_key_feedback_branch_packet_t){0};
+    key_feedback_broad_owner_map_clear(seam_first_branch_packet.key_feedback_broad_owner_map);
+    key_feedback_broad_owner_map_set(seam_first_branch_packet.key_feedback_broad_owner_map, KEY_FEEDBACK_BROAD_OWNER_GLOBAL, (keypos_t){.row = 0, .col = 1});
+    key_feedback_tap_branch_map_set(seam_first_branch_packet.key_feedback_tap_branch_map, (keypos_t){.row = 0, .col = 1}, 2u);
+    key_feedback_broad_owner_map_clear(seam_second_branch_packet.key_feedback_broad_owner_map);
+    key_feedback_broad_owner_map_set(seam_second_branch_packet.key_feedback_broad_owner_map, KEY_FEEDBACK_BROAD_OWNER_LEFT_HALF, (keypos_t){.row = 2, .col = 3});
+    key_feedback_tap_branch_map_set(seam_second_branch_packet.key_feedback_tap_branch_map, (keypos_t){.row = 2, .col = 3}, 1u);
+
+    test_registered_callback(PUT_SPLIT_KEY_FEEDBACK_BRANCH_SYNC)(sizeof(seam_first_branch_packet), &seam_first_branch_packet, 0u, NULL);
+    CHECK(split_runtime_sync_remote_read_key_feedback_branch(seam_read_broad_owner_map, seam_read_tap_branch_map));
+
+    test_arm_publish_seam();
+    test_registered_callback(PUT_SPLIT_KEY_FEEDBACK_BRANCH_SYNC)(sizeof(seam_second_branch_packet), &seam_second_branch_packet, 0u, NULL);
+    test_disarm_publish_seam();
+
+    CHECK(publish_seam.seam_count == 1u);
+    CHECK(publish_seam.saw_generation_in_flight);
+    CHECK(publish_seam.saw_partial_store);
+    CHECK(memcmp(seam_read_broad_owner_map, seam_first_branch_packet.key_feedback_broad_owner_map, KEY_FEEDBACK_BROAD_OWNER_MAP_SIZE) == 0);
+    CHECK(memcmp(seam_read_tap_branch_map, seam_first_branch_packet.key_feedback_tap_branch_map, KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE) == 0);
+    CHECK(!publish_seam.read_coherent);
+
+    CHECK(split_runtime_sync_remote_read_key_feedback_branch(seam_read_broad_owner_map, seam_read_tap_branch_map));
+    CHECK(memcmp(seam_read_broad_owner_map, seam_second_branch_packet.key_feedback_broad_owner_map, KEY_FEEDBACK_BROAD_OWNER_MAP_SIZE) == 0);
+    CHECK(memcmp(seam_read_tap_branch_map, seam_second_branch_packet.key_feedback_tap_branch_map, KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE) == 0);
+}
+
+static void test_base_publication_marks_its_generation_in_flight(void) {
+    test_begin_publish_seam_case();
+
+    seam_first_base_packet = (split_runtime_base_sync_packet_t){
+        .automouse_progress = 10u,
+        .active_mode_id     = pd_mode_id_from_mask(PD_MODE_ZOOM),
+        .locked_mode_id     = PD_MODE_ID_NONE,
+        .key_preview_layer  = 3u,
+    };
+    seam_second_base_packet = (split_runtime_base_sync_packet_t){
+        .automouse_progress = 20u,
+        .active_mode_id     = pd_mode_id_from_mask(PD_MODE_VOLUME),
+        .locked_mode_id     = PD_MODE_ID_NONE,
+        .key_preview_layer  = 7u,
+    };
+
+    test_registered_callback(PUT_SPLIT_RUNTIME_BASE_SYNC)(sizeof(seam_first_base_packet), &seam_first_base_packet, 0u, NULL);
+    CHECK(!noah_runtime_publication_in_flight(split_runtime_sync_remote.base_generation));
+
+    test_arm_publish_seam();
+    test_registered_callback(PUT_SPLIT_RUNTIME_BASE_SYNC)(sizeof(seam_second_base_packet), &seam_second_base_packet, 0u, NULL);
+    test_disarm_publish_seam();
+
+    CHECK(publish_seam.seam_count == 1u);
+    CHECK(publish_seam.saw_generation_in_flight);
+    CHECK(publish_seam.saw_partial_store);
+    CHECK(!noah_runtime_publication_in_flight(split_runtime_sync_remote.base_generation));
+    CHECK(split_runtime_sync_remote.key_preview_layer == seam_second_base_packet.key_preview_layer);
+}
+
 int main(void) {
     test_init_registers_rpcs_and_sends_initial_packets_on_master();
     test_init_registers_rpcs_without_sending_on_slave();
@@ -1100,6 +1297,10 @@ int main(void) {
     test_idle_tick_keeps_combo_immediate_and_skips_key_feedback_builders_until_due_or_dirty();
     test_slave_rpcs_apply_exact_remote_state();
     test_slave_base_rpc_ignores_short_packets();
+    test_combo_publication_is_atomic_for_readers();
+    test_key_feedback_semantic_publication_is_atomic_for_readers();
+    test_key_feedback_branch_publication_is_atomic_for_readers();
+    test_base_publication_marks_its_generation_in_flight();
 
     puts("split_runtime_sync host tests passed");
     return 0;

@@ -96,7 +96,7 @@ static split_side_mask_t rgb_runtime_pd_mode_stage_resolve_trigger_sides(pd_mode
     return SPLIT_SIDE_MASK_BOTH;
 }
 
-static bool rgb_runtime_pd_mode_stage_paint_locality(rgb_t color, rgb_locality_t locality, pd_mode_snapshot_t snapshot, uint8_t led_min, uint8_t led_max) {
+static bool rgb_runtime_pd_mode_stage_paint_locality(rgb_t color, rgb_locality_t locality, pd_mode_snapshot_t snapshot, const uint8_t *owner_bitmap, bool has_owner_keys, uint8_t led_min, uint8_t led_max) {
     split_side_mask_t sides = SPLIT_SIDE_MASK_NONE;
 
     switch (locality) {
@@ -112,16 +112,13 @@ static bool rgb_runtime_pd_mode_stage_paint_locality(rgb_t color, rgb_locality_t
         case RGB_KEY_HALF:
             sides = rgb_runtime_pd_mode_stage_resolve_trigger_sides(snapshot);
             break;
-        case RGB_KEYS_ONLY: {
-            uint8_t owner_bitmap[KEY_ORIGIN_BITMAP_SIZE];
-
-            if (pd_mode_display_owner_bitmap_snapshot(owner_bitmap)) {
+        case RGB_KEYS_ONLY:
+            if (has_owner_keys) {
                 return rgb_runtime_pd_mode_stage_paint_owner_keys(color, owner_bitmap, led_min, led_max);
             }
 
             rgb_set_both_halves(color, led_min, led_max);
             return led_min < led_max;
-        }
         case RGB_RIGHT_HALF:
         default:
             sides = SPLIT_SIDE_MASK_RIGHT;
@@ -150,15 +147,19 @@ static bool rgb_runtime_pd_mode_stage_paint_locality(rgb_t color, rgb_locality_t
 }
 
 bool rgb_runtime_pd_mode_stage_render(uint8_t led_min, uint8_t led_max) {
-    pd_mode_snapshot_t snapshot    = pd_mode_snapshot();
-    bool               painted     = false;
-    uint8_t            active_mode = snapshot.display.active_index;
+    // Mirrored identity and owner keys are rendered together, so they come from
+    // one published generation rather than two independent reads.
+    uint8_t            owner_bitmap[KEY_ORIGIN_BITMAP_SIZE];
+    bool               has_owner_keys = false;
+    pd_mode_snapshot_t snapshot       = pd_mode_snapshot_with_owner_bitmap(owner_bitmap, &has_owner_keys);
+    bool               painted        = false;
+    uint8_t            active_mode    = snapshot.display.active_index;
 
     if (active_mode >= PD_MODE_COUNT) {
         return painted;
     }
 
-    painted |= rgb_runtime_pd_mode_stage_paint_locality(pd_mode_rgb[active_mode], pd_mode_render_locality[active_mode], snapshot, led_min, led_max);
+    painted |= rgb_runtime_pd_mode_stage_paint_locality(pd_mode_rgb[active_mode], pd_mode_render_locality[active_mode], snapshot, owner_bitmap, has_owner_keys, led_min, led_max);
 
     for (uint8_t group = 0; group < pd_mode_led_group_count; group++) {
         if (pd_mode_led_groups[group].pointing_mode != RGB_PD_MODE_GROUP_ALL && snapshot.display.active_mode != pd_mode_led_groups[group].pointing_mode) {

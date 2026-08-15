@@ -211,6 +211,11 @@ void auto_mouse_keyevent(bool pressed) {
     auto_mouse_keyevent_calls++;
 }
 
+void keyboard_mod_ownership_track_report_keycode_event(uint16_t keycode, keyrecord_t *record) {
+    (void)keycode;
+    (void)record;
+}
+
 void keyboard_mod_ownership_track_physical_keycode_event(uint16_t keycode, keyrecord_t *record) {
     (void)keycode;
     (void)record;

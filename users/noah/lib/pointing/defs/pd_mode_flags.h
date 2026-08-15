@@ -82,6 +82,11 @@ typedef struct {
 } pd_mode_snapshot_t;
 
 pd_mode_snapshot_t pd_mode_snapshot(void);
+// Identity and owner keys from one published generation, for consumers that
+// render both together. Taking them from two separate accessors is coherent
+// per call but can still pair identity from one publication with an owner
+// bitmap from the next.
+pd_mode_snapshot_t pd_mode_snapshot_with_owner_bitmap(uint8_t *out_owner_bitmap, bool *out_has_owner_keys);
 
 pd_mode_mask_t pd_mode_local_active_snapshot(void);
 pd_mode_mask_t pd_mode_local_locked_snapshot(void);

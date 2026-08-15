@@ -68,6 +68,24 @@ _Static_assert(SPLIT_RUNTIME_SYNC_RETRY_INITIAL_MS > 0u, "split runtime retry de
 _Static_assert(SPLIT_RUNTIME_SYNC_RETRY_MAX_MS >= SPLIT_RUNTIME_SYNC_RETRY_INITIAL_MS, "split runtime retry maximum must cover the initial delay");
 _Static_assert(SPLIT_RUNTIME_SYNC_RETRY_MAX_MS <= UINT32_MAX / 2u, "split runtime retry delay must remain unambiguous across timer wrap");
 
+#    ifdef SPLIT_RUNTIME_SYNC_PUBLISH_TEST_BACKEND
+static split_runtime_sync_publish_seam_fn_t split_runtime_sync_publish_seam = NULL;
+
+void split_runtime_sync_test_set_publish_seam(split_runtime_sync_publish_seam_fn_t seam) {
+    split_runtime_sync_publish_seam = seam;
+}
+
+static void split_runtime_sync_publish_seam_reached(split_runtime_sync_domain_t domain) {
+    if (split_runtime_sync_publish_seam) {
+        split_runtime_sync_publish_seam(domain);
+    }
+}
+#    else
+static void split_runtime_sync_publish_seam_reached(split_runtime_sync_domain_t domain) {
+    (void)domain;
+}
+#    endif
+
 static void split_runtime_sync_log_packet_size_mismatch(const char *packet_name, uint8_t size, uint8_t expected) {
 #    ifdef CONSOLE_ENABLE
     uprintf("Split runtime %s packet size mismatch: received %u bytes, expected %u bytes\n", packet_name, (unsigned int)size, (unsigned int)expected);
@@ -329,14 +347,17 @@ static void split_runtime_sync_slave_base_rpc(uint8_t initiator2target_buffer_si
         split_runtime_sync_log_packet_size_mismatch("base", initiator2target_buffer_size, sizeof(split_runtime_base_sync_packet_t));
     }
 
+    noah_runtime_publication_begin(&split_runtime_sync_remote.base_generation);
     split_runtime_sync_remote.automouse_progress = packet->automouse_progress;
     split_runtime_sync_remote.active_mode_id     = packet->active_mode_id;
     split_runtime_sync_remote.locked_mode_id     = packet->locked_mode_id;
+    split_runtime_sync_publish_seam_reached(SPLIT_RUNTIME_SYNC_DOMAIN_BASE);
 #    ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
     split_runtime_sync_remote.pd_mode_owner_sides = packet->pd_mode_owner_sides;
     key_origin_bitmap_copy(split_runtime_sync_remote.pd_mode_owner_bitmap, packet->pd_mode_owner_bitmap);
 #    endif
     split_runtime_sync_remote.key_preview_layer = packet->key_preview_layer;
+    noah_runtime_publication_end(&split_runtime_sync_remote.base_generation);
 
     noah_runtime_trace_emit(NOAH_TRACE_SPLIT_SYNC, NOAH_TRACE_SPLIT_SYNC_EVENT_RECEIVE, pd_mode_mask_from_id(packet->active_mode_id), pd_mode_mask_from_id(packet->locked_mode_id));
 #    ifdef POINTING_DEVICE_ENABLE
@@ -365,8 +386,11 @@ static void split_runtime_sync_slave_combo_rpc(uint8_t initiator2target_buffer_s
         split_runtime_sync_log_packet_size_mismatch("combo", initiator2target_buffer_size, sizeof(split_runtime_combo_feedback_packet_t));
     }
 
+    noah_runtime_publication_begin(&split_runtime_sync_remote.combo_generation);
     key_origin_bitmap_copy(split_runtime_sync_remote.combo_underlay_bitmap, packet->combo_underlay_bitmap);
+    split_runtime_sync_publish_seam_reached(SPLIT_RUNTIME_SYNC_DOMAIN_COMBO);
     key_origin_bitmap_copy(split_runtime_sync_remote.combo_overlay_bitmap, packet->combo_overlay_bitmap);
+    noah_runtime_publication_end(&split_runtime_sync_remote.combo_generation);
 }
 
 static void split_runtime_sync_slave_key_feedback_semantic_rpc(uint8_t initiator2target_buffer_size, const void *initiator2target_buffer, uint8_t target2initiator_buffer_size, void *target2initiator_buffer) {
@@ -384,8 +408,11 @@ static void split_runtime_sync_slave_key_feedback_semantic_rpc(uint8_t initiator
         split_runtime_sync_log_packet_size_mismatch("key-feedback semantic", initiator2target_buffer_size, sizeof(split_runtime_key_feedback_semantic_packet_t));
     }
 
+    noah_runtime_publication_begin(&split_runtime_sync_remote.key_feedback_semantic_generation);
     key_origin_bitmap_copy(split_runtime_sync_remote.key_feedback_flash_visibility_bitmap, packet->key_feedback_flash_visibility_bitmap);
+    split_runtime_sync_publish_seam_reached(SPLIT_RUNTIME_SYNC_DOMAIN_KEY_FEEDBACK_SEMANTIC);
     memcpy(split_runtime_sync_remote.key_feedback_semantic_map, packet->key_feedback_semantic_map, KEY_FEEDBACK_SEMANTIC_MAP_SIZE);
+    noah_runtime_publication_end(&split_runtime_sync_remote.key_feedback_semantic_generation);
 }
 
 static void split_runtime_sync_slave_key_feedback_branch_rpc(uint8_t initiator2target_buffer_size, const void *initiator2target_buffer, uint8_t target2initiator_buffer_size, void *target2initiator_buffer) {
@@ -403,8 +430,11 @@ static void split_runtime_sync_slave_key_feedback_branch_rpc(uint8_t initiator2t
         split_runtime_sync_log_packet_size_mismatch("key-feedback branch", initiator2target_buffer_size, sizeof(split_runtime_key_feedback_branch_packet_t));
     }
 
+    noah_runtime_publication_begin(&split_runtime_sync_remote.key_feedback_branch_generation);
     memcpy(split_runtime_sync_remote.key_feedback_broad_owner_map, packet->key_feedback_broad_owner_map, KEY_FEEDBACK_BROAD_OWNER_MAP_SIZE);
+    split_runtime_sync_publish_seam_reached(SPLIT_RUNTIME_SYNC_DOMAIN_KEY_FEEDBACK_BRANCH);
     memcpy(split_runtime_sync_remote.key_feedback_tap_branch_map, packet->key_feedback_tap_branch_map, KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE);
+    noah_runtime_publication_end(&split_runtime_sync_remote.key_feedback_branch_generation);
 }
 
 void split_runtime_sync_init(void) {

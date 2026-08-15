@@ -67,6 +67,17 @@ static inline void key_origin_bitmap_add_keypos(uint8_t *bitmap, keypos_t key_po
     bitmap[key_index / 8u] |= (uint8_t)(1u << (key_index % 8u));
 }
 
+static inline void key_origin_bitmap_remove_keypos(uint8_t *bitmap, keypos_t key_pos) {
+    uint16_t key_index;
+
+    if (!(bitmap && key_origin_keypos_valid(key_pos))) {
+        return;
+    }
+
+    key_index = key_origin_keypos_index(key_pos);
+    bitmap[key_index / 8u] &= (uint8_t)~(1u << (key_index % 8u));
+}
+
 static inline bool key_origin_bitmap_has_keypos(const uint8_t *bitmap, keypos_t key_pos) {
     uint16_t key_index;
 

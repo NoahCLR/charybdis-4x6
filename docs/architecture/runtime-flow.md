@@ -35,7 +35,6 @@ matching `noah_*` helper when they still want shared userspace behavior.
 flowchart TD
     physical["Physical key press"] --> pre_user["pre_process_record_user"]
     pre_user --> origin["Compatibility: qmk_combo_origin observes physical member"]
-    pre_user --> key_track["Applied: owned_keycode tracks physical report usage"]
     pre_user --> mod_track["Projected: keyboard modifier ownership tracks physical mods"]
     physical --> process_user["process_record_user"]
     process_user --> normalize["Compatibility: combo origin normalizes event key"]
@@ -51,7 +50,17 @@ flowchart TD
     projection --> layer["Layer ownership"]
     projection --> pd["PD mode state"]
     projection --> feedback["Feedback pulse state"]
+    physical --> finalize["process_record_user finalize"]
+    finalize --> report_track["Applied: owned_keycode and modifier report ownership settle on the final event result"]
 ```
+
+Report ownership is settled in the finalize hook rather than in pre-process,
+because only the final event result says whether QMK's default handler will
+register the usage at all. A press userspace consumes owns nothing in the
+report, so it must not stop a managed owner of the same usage from registering
+it, or stop the last managed modifier release from clearing the report bit.
+Pre-process still tracks which physical modifier keys are down, which is the
+separate question masking policy asks.
 
 The reducer owns active press identity by physical `keypos_t`. Layer changes or
 transparent resolution do not move that identity. If a runtime-handled pd-mode

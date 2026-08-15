@@ -28,3 +28,13 @@ void pd_mode_activate(pd_mode_mask_t mode);
 void pd_mode_deactivate(pd_mode_mask_t mode);
 void pd_mode_lock(pd_mode_mask_t mode);
 void pd_mode_unlock(pd_mode_mask_t mode);
+
+#ifdef PD_MODE_PUBLISH_TEST_BACKEND
+// Host-test seam. The registered hook runs after the mirrored mode identity
+// has been stored into the pending slot but before that slot is published, so
+// a test can interleave a main-context display read into the middle of one
+// remote snapshot deterministically.
+typedef void (*pd_mode_publish_seam_fn_t)(void);
+
+void pd_mode_test_set_publish_seam(pd_mode_publish_seam_fn_t seam);
+#endif

@@ -18,6 +18,7 @@
 
 #include "../../behavior/handled_key.h"
 #include "../slot/keypos_codec.h"
+#include "../slot/origin_registry.h"
 #include "../feedback_kind.h"
 #include "../planning/effect_queue.h"
 #include "../slot/slot_interaction.h"
@@ -361,6 +362,7 @@ typedef struct {
     bool                                 preview_display_bridge_active;
     uint8_t                              keyboard_event_masked_real_mods;
     bool                                 keyboard_event_mask_active;
+    uint8_t                              default_report_owner_bitmap[KEY_ORIGIN_BITMAP_SIZE];
 } key_runtime_core_state_t;
 
 #ifdef KEY_RUNTIME_HOT_PATH_TEST_INSTRUMENTATION

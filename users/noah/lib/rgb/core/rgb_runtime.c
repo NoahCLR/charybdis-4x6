@@ -14,8 +14,6 @@
 #include "rgb_validation.h"
 
 #if defined(RGB_MATRIX_ENABLE) && (defined(RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE) || (defined(COMBO_ENABLE) && defined(RGB_COMBO_FEEDBACK_ENABLE)))
-#    include <string.h>
-
 #    include "../../key/runtime/feedback.h"
 #    include "../../split/runtime_sync.h"
 #endif
@@ -71,8 +69,10 @@ static void rgb_runtime_render_snapshot_ensure_combo(void) {
     if (is_keyboard_master()) {
         combo_feedback_bitmaps(rgb_runtime_render_snapshot.combo_underlay_bitmap, rgb_runtime_render_snapshot.combo_overlay_bitmap);
     } else {
-        key_origin_bitmap_copy(rgb_runtime_render_snapshot.combo_underlay_bitmap, split_runtime_sync_remote.combo_underlay_bitmap);
-        key_origin_bitmap_copy(rgb_runtime_render_snapshot.combo_overlay_bitmap, split_runtime_sync_remote.combo_overlay_bitmap);
+        // A false read means the split worker was still publishing this
+        // domain; the cached bitmaps are untouched, so the frame renders the
+        // last coherent snapshot instead of a mixture of two packets.
+        (void)split_runtime_sync_remote_read_combo(rgb_runtime_render_snapshot.combo_underlay_bitmap, rgb_runtime_render_snapshot.combo_overlay_bitmap);
     }
 
     rgb_runtime_render_snapshot.combo_valid = true;
@@ -105,10 +105,11 @@ static void rgb_runtime_render_snapshot_ensure_key_feedback(void) {
         key_feedback_flash_visibility_bitmap_for_semantic_map(rgb_runtime_render_snapshot.key_feedback_semantic_map, rgb_runtime_render_snapshot.key_feedback_flash_visibility_bitmap);
         key_feedback_broad_owner_map(rgb_runtime_render_snapshot.key_feedback_broad_owner_map);
     } else {
-        memcpy(rgb_runtime_render_snapshot.key_feedback_semantic_map, split_runtime_sync_remote.key_feedback_semantic_map, KEY_FEEDBACK_SEMANTIC_MAP_SIZE);
-        memcpy(rgb_runtime_render_snapshot.key_feedback_tap_branch_map, split_runtime_sync_remote.key_feedback_tap_branch_map, KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE);
-        key_origin_bitmap_copy(rgb_runtime_render_snapshot.key_feedback_flash_visibility_bitmap, split_runtime_sync_remote.key_feedback_flash_visibility_bitmap);
-        memcpy(rgb_runtime_render_snapshot.key_feedback_broad_owner_map, split_runtime_sync_remote.key_feedback_broad_owner_map, KEY_FEEDBACK_BROAD_OWNER_MAP_SIZE);
+        // Semantic and branch state travel as two RPC domains, so each one is
+        // captured as its own coherent generation. A false read leaves that
+        // domain's cached maps untouched and keeps the last coherent snapshot.
+        (void)split_runtime_sync_remote_read_key_feedback_semantic(rgb_runtime_render_snapshot.key_feedback_flash_visibility_bitmap, rgb_runtime_render_snapshot.key_feedback_semantic_map);
+        (void)split_runtime_sync_remote_read_key_feedback_branch(rgb_runtime_render_snapshot.key_feedback_broad_owner_map, rgb_runtime_render_snapshot.key_feedback_tap_branch_map);
     }
 
     rgb_runtime_render_snapshot_suppress_combo_unresolved_semantics();

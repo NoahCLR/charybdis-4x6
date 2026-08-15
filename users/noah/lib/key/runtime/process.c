@@ -216,6 +216,46 @@ static bool key_runtime_process_finish(key_runtime_process_ctx_t *ctx, bool keep
     return keep_processing;
 }
 
+// Report ownership means "QMK's default handler holds this usage in the report".
+// That is only knowable once the event result is final, so it is settled from
+// the finalize hook rather than pre-process. Crediting a press that userspace
+// later consumes would make a managed owner of the same usage skip its own key
+// registration, and would keep the last managed modifier release from clearing
+// the report bit. Pre-process still tracks which physical keys are down, which
+// is a different question and stays where it is.
+static void key_runtime_process_settle_report_ownership(uint16_t keycode, keyrecord_t *record, bool keep_processing) {
+    key_runtime_core_state_t *state = key_runtime_core_state();
+
+    if (!(state && record) || noah_synthetic_record_active()) {
+        return;
+    }
+
+    if (record->event.type != KEY_EVENT || !key_origin_keypos_valid(record->event.key)) {
+        return;
+    }
+
+    if (record->event.pressed) {
+        if (!keep_processing || key_origin_bitmap_has_keypos(state->default_report_owner_bitmap, record->event.key)) {
+            return;
+        }
+
+        key_origin_bitmap_add_keypos(state->default_report_owner_bitmap, record->event.key);
+    } else {
+        // A credited press is always retired on its release, including when
+        // preflight consumes that release to keep a managed owner's usage
+        // down. QMK skips its default teardown there, so the managed owner
+        // becomes the sole owner and must see a zero report count.
+        if (!key_origin_bitmap_has_keypos(state->default_report_owner_bitmap, record->event.key)) {
+            return;
+        }
+
+        key_origin_bitmap_remove_keypos(state->default_report_owner_bitmap, record->event.key);
+    }
+
+    owned_keycode_track_physical_event(keycode, record);
+    keyboard_mod_ownership_track_report_keycode_event(keycode, record);
+}
+
 bool noah_pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
     if (noah_synthetic_record_active()) {
         return true;
@@ -224,7 +264,6 @@ bool noah_pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
     if (record->event.type == KEY_EVENT && key_origin_keypos_valid(record->event.key)) {
         key_origin_registry_set_single(record->event.key);
         noah_qmk_combo_origin_observe_physical_key_event(keycode, record);
-        owned_keycode_track_physical_event(keycode, record);
         keyboard_mod_ownership_track_physical_keycode_event(keycode, record);
     }
 
@@ -283,6 +322,9 @@ bool noah_process_record_user(uint16_t keycode, keyrecord_t *record) {
 
 void noah_process_record_user_finalize(uint16_t keycode, keyrecord_t *record, bool keep_processing) {
     noah_runtime_diag_scope_enter(NOAH_RUNTIME_DIAG_STAGE_PROCESS_RECORD_FINALIZE);
+    // Settle ownership before the mask restore below, which selects managed-only
+    // modifiers from the same ledgers.
+    key_runtime_process_settle_report_ownership(keycode, record, keep_processing);
     key_runtime_process_end_keyboard_event_mod_mask();
     key_runtime_trace_bool_result("process:return", keycode, record, keep_processing);
     noah_runtime_diag_scope_leave();
