@@ -191,6 +191,12 @@ Use `RGB_LAYER_GROUP_ALL` as the layer id when the same LED group should apply
 to every active layer. With `HSV(0, 0, 0)`, that one row inherits the color of
 whichever layer is currently painting it.
 
+Pending layer previews consume these same rules. A preview includes matching
+layer rows and `RGB_LAYER_GROUP_ALL`, resolves `HSV(0, 0, 0)` through the
+previewed layer's base color, and preserves authored row order. A layer with no
+solid base can still preview explicit non-inherit groups; inherit groups on
+that layer remain unpainted.
+
 Use rows like:
 
 ```c
@@ -457,9 +463,10 @@ The tier decides the color:
 - `.hold` surfaces use `hold_active_color`
 - `.long_hold` surfaces use `long_hold_active_color`
 
-Pending momentary-layer previews are a separate overlay path. They reuse the
-previewed layer's authored layer color and any matching layer LED groups
-instead of these feedback colors.
+Pending momentary-layer previews are a separate overlay path. They render one
+selected layer through the normal layer base/group contract—including
+universal groups, inheritance, and later-row overrides—instead of using these
+feedback colors.
 
 The helper decides the RGB behavior shape:
 
@@ -554,7 +561,7 @@ static const key_behavior_feedback_led_group_t key_behavior_feedback_led_groups_
    including any matching combo feedback LED groups
 4. per-layer preview overlay for a pending momentary-layer hold, if
    `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE` is on and that previewed layer has a
-   nonzero solid color
+   paintable solid base or explicit group
 5. if `RGB_PD_MODE_FEEDBACK_ENABLE` is on, the active pointing-device mode
    color using the authored PD locality
 6. if `RGB_PD_MODE_FEEDBACK_ENABLE` is on, per-mode LED groups
@@ -570,6 +577,8 @@ That order matters.
 Examples:
 
 - a per-layer LED group can sit on top of a solid layer color
+- preview and normal activation resolve the selected layer's base and groups
+  identically, including chunked rendering
 - a preview- or PD-owning combo can stay underneath the preview or PD overlay
 - an unrelated active combo can repaint above preview or PD if it uses the
   combo overlay path

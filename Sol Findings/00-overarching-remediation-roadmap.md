@@ -2,7 +2,7 @@
 
 ## Plan metadata
 
-- **Status:** Implementation in progress; Phases 1 and 2 are verified. Phase 3 software work is complete, with Finding 05 awaiting its physical two-half matrix. Phase 4 software work is complete, with Finding 10 awaiting on-device timing. See [`implementation-progress.md`](implementation-progress.md).
+- **Status:** Implementation in progress; Phases 1 and 2 are verified. Phase 3 software work is complete, with Finding 05 awaiting its physical two-half matrix. Phase 4 software work is complete, with Finding 10 awaiting on-device timing. Phase 5 correctness work is verified and Finding 15 optimization remains. See [`implementation-progress.md`](implementation-progress.md).
 - **Prepared:** 2026-07-13.
 - **Scope:** Firmware runtime correctness, split reliability, target resource safety, and measured hot-path efficiency.
 - **Source:** The deep firmware code review performed against the current `charybdis-4x6` tree.
@@ -219,6 +219,11 @@ Exit criteria:
 ### Phase 5 — Correct and streamline RGB rendering
 
 Recommended order: **13, 15**.
+
+Finding 13 is verified: normal activation and pending preview now consume one
+selection-aware base/group renderer, including universal rows, inheritance,
+base-less explicit groups, authored override order, and chunk parity. Finding
+15 is the remaining Phase 5 optimization item.
 
 - Extract or reuse one group/inheritance resolution path for normal and preview rendering.
 - Add parity tests before introducing per-frame or per-chunk caches.

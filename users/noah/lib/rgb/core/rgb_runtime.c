@@ -52,7 +52,7 @@ static bool rgb_runtime_render_base_stage(uint8_t led_min, uint8_t led_max) {
 
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
 static bool rgb_runtime_render_preview_stage(uint8_t led_min, uint8_t led_max) {
-    return rgb_runtime_preview_stage_render(led_min, led_max);
+    return rgb_runtime_preview_stage_render(&rgb_runtime_frame_primary, led_min, led_max);
 }
 #    endif
 

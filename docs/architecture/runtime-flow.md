@@ -151,7 +151,7 @@ flowchart TD
     rgb_hook["rgb_matrix_indicators_advanced_user"] --> diag["Runtime boot indicator (150 white)"]
     diag --> base["Layer base or automouse fade"]
     base --> combo_under["Combo underlay"]
-    combo_under --> preview["Key preview layer"]
+    combo_under --> preview["Selected-layer preview (normal base/group contract)"]
     preview --> pd["PD mode overlay"]
     pd --> combo_overlay["Combo overlay"]
     combo_overlay --> key_feedback["Key-behavior feedback overlay"]

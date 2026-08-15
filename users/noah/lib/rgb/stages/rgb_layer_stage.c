@@ -17,6 +17,9 @@ extern const uint8_t                  layer_led_group_count;
 static rgb_t layer_rgb[LAYER_COUNT];
 static bool  layer_key_led_map_dirty = true;
 static bool  layer_key_led_map[LAYER_COUNT][RGB_MATRIX_LED_COUNT];
+#    ifdef RGB_LAYER_STAGE_TEST_BACKEND
+static uint32_t layer_group_scan_count = 0;
+#    endif
 
 static bool rgb_runtime_layer_stage_paints_only_keys_present_on_this_layer(uint8_t layer) {
     return layer_colors[layer].mode == KEYS_MAPPED_ON_THIS_LAYER_ONLY;
@@ -24,6 +27,14 @@ static bool rgb_runtime_layer_stage_paints_only_keys_present_on_this_layer(uint8
 
 static bool rgb_runtime_layer_stage_layer_is_effectively_active(layer_state_t state, uint8_t layer) {
     return layer == 0u || layer_state_cmp(state, layer);
+}
+
+static bool rgb_runtime_layer_stage_selection_contains(layer_state_t state, uint8_t selected_layer, uint8_t layer) {
+    if (selected_layer < LAYER_COUNT) {
+        return layer == selected_layer;
+    }
+
+    return rgb_runtime_layer_stage_layer_is_effectively_active(state, layer);
 }
 
 static bool rgb_runtime_layer_stage_keycode_is_mapped(uint16_t keycode) {
@@ -113,8 +124,8 @@ void rgb_runtime_layer_stage_invalidate_maps(void) {
     layer_key_led_map_dirty = true;
 }
 
-bool rgb_runtime_layer_stage_has_solid_color(uint8_t layer) {
-    return !(layer_colors[layer].color.s == 0 && layer_colors[layer].color.v == 0);
+static bool rgb_runtime_layer_stage_has_solid_color(uint8_t layer) {
+    return layer < LAYER_COUNT && !(layer_colors[layer].color.s == 0 && layer_colors[layer].color.v == 0);
 }
 
 static bool rgb_runtime_layer_stage_group_color(uint8_t layer, hsv_t group_color, rgb_t *out_color) {
@@ -135,10 +146,10 @@ static bool rgb_runtime_layer_stage_group_color(uint8_t layer, hsv_t group_color
     return true;
 }
 
-static bool rgb_runtime_layer_stage_paint_group_for_layer(rgb_runtime_frame_t *frame, const layer_led_group_t *group, layer_state_t state, uint8_t layer, uint8_t led_min, uint8_t led_max) {
+static bool rgb_runtime_layer_stage_paint_group_for_layer(rgb_runtime_frame_t *frame, const layer_led_group_t *group, uint8_t layer, uint8_t led_min, uint8_t led_max) {
     rgb_t group_rgb;
 
-    if (!(frame && group && rgb_runtime_layer_stage_layer_is_effectively_active(state, layer))) {
+    if (!(frame && group)) {
         return false;
     }
 
@@ -170,13 +181,11 @@ bool rgb_runtime_frame_fill(rgb_runtime_frame_t *frame, rgb_t color, uint8_t led
     return true;
 }
 
-bool rgb_runtime_layer_stage_render_frame(rgb_runtime_frame_t *frame, layer_state_t state, uint8_t led_min, uint8_t led_max) {
-    rgb_runtime_frame_clear(frame, led_min, led_max);
-
+static bool rgb_runtime_layer_stage_render_selection(rgb_runtime_frame_t *frame, layer_state_t state, uint8_t selected_layer, uint8_t led_min, uint8_t led_max) {
     bool painted = false;
 
     for (uint8_t layer = 0; layer < LAYER_COUNT; layer++) {
-        if (!rgb_runtime_layer_stage_layer_is_effectively_active(state, layer)) {
+        if (!rgb_runtime_layer_stage_selection_contains(state, selected_layer, layer)) {
             continue;
         }
         if (!rgb_runtime_layer_stage_has_solid_color(layer)) {
@@ -187,21 +196,44 @@ bool rgb_runtime_layer_stage_render_frame(rgb_runtime_frame_t *frame, layer_stat
     }
 
     for (uint8_t group = 0; group < layer_led_group_count; group++) {
+#    ifdef RGB_LAYER_STAGE_TEST_BACKEND
+        layer_group_scan_count++;
+#    endif
         const layer_led_group_t *group_config = &layer_led_groups[group];
 
         if (group_config->layer == RGB_LAYER_GROUP_ALL) {
             for (uint8_t layer = 0; layer < LAYER_COUNT; layer++) {
-                painted |= rgb_runtime_layer_stage_paint_group_for_layer(frame, group_config, state, layer, led_min, led_max);
+                if (rgb_runtime_layer_stage_selection_contains(state, selected_layer, layer)) {
+                    painted |= rgb_runtime_layer_stage_paint_group_for_layer(frame, group_config, layer, led_min, led_max);
+                }
             }
             continue;
         }
 
-        if (group_config->layer < LAYER_COUNT) {
-            painted |= rgb_runtime_layer_stage_paint_group_for_layer(frame, group_config, state, group_config->layer, led_min, led_max);
+        if (group_config->layer < LAYER_COUNT && rgb_runtime_layer_stage_selection_contains(state, selected_layer, group_config->layer)) {
+            painted |= rgb_runtime_layer_stage_paint_group_for_layer(frame, group_config, group_config->layer, led_min, led_max);
         }
     }
 
     return painted;
+}
+
+bool rgb_runtime_layer_stage_render_frame(rgb_runtime_frame_t *frame, layer_state_t state, uint8_t led_min, uint8_t led_max) {
+    if (!frame) {
+        return false;
+    }
+
+    rgb_runtime_frame_clear(frame, led_min, led_max);
+    return rgb_runtime_layer_stage_render_selection(frame, state, RGB_LAYER_GROUP_ALL, led_min, led_max);
+}
+
+bool rgb_runtime_layer_stage_render_selected_frame(rgb_runtime_frame_t *frame, uint8_t layer, uint8_t led_min, uint8_t led_max) {
+    if (!frame || layer >= LAYER_COUNT) {
+        return false;
+    }
+
+    rgb_runtime_frame_clear(frame, led_min, led_max);
+    return rgb_runtime_layer_stage_render_selection(frame, 0, layer, led_min, led_max);
 }
 
 bool rgb_runtime_layer_stage_apply_frame(const rgb_runtime_frame_t *frame, uint8_t led_min, uint8_t led_max) {
@@ -219,25 +251,14 @@ bool rgb_runtime_layer_stage_apply_frame(const rgb_runtime_frame_t *frame, uint8
     return painted;
 }
 
-bool rgb_runtime_layer_stage_paint_layer(uint8_t layer, uint8_t led_min, uint8_t led_max) {
-    if (!rgb_runtime_layer_stage_paints_only_keys_present_on_this_layer(layer)) {
-        rgb_set_both_halves(layer_rgb[layer], led_min, led_max);
-        return led_min < led_max;
-    }
-
-    rgb_runtime_layer_stage_rebuild_key_led_map();
-
-    bool painted = false;
-    for (uint8_t led = led_min; led < led_max; led++) {
-        if (!layer_key_led_map[layer][led]) {
-            continue;
-        }
-
-        rgb_set_led_color(led, led_min, led_max, layer_rgb[layer]);
-        painted = true;
-    }
-
-    return painted;
+#    ifdef RGB_LAYER_STAGE_TEST_BACKEND
+void rgb_runtime_layer_stage_test_reset_group_scan_count(void) {
+    layer_group_scan_count = 0;
 }
+
+uint32_t rgb_runtime_layer_stage_test_group_scan_count(void) {
+    return layer_group_scan_count;
+}
+#    endif
 
 #endif

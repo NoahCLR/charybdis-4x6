@@ -387,8 +387,9 @@ lets you author the visible language of the board:
 - combo feedback so chords can light near the keys that made them
 - key-behavior feedback for waiting, preview, tap-count, hold, and repeat
   states
-- preview overlays that show a pending momentary-layer hold before the layer
-  becomes active
+- preview overlays that show a pending momentary-layer hold with the same
+  authored base color, inherited accents, universal groups, and override order
+  used after the layer becomes active
 - auto-mouse timeout feedback that fades as the temporary pointer layer is
   about to clear
 

@@ -23,10 +23,13 @@ typedef struct {
 
 void rgb_runtime_layer_stage_post_init(void);
 void rgb_runtime_layer_stage_invalidate_maps(void);
-bool rgb_runtime_layer_stage_has_solid_color(uint8_t layer);
 void rgb_runtime_frame_clear(rgb_runtime_frame_t *frame, uint8_t led_min, uint8_t led_max);
 bool rgb_runtime_frame_fill(rgb_runtime_frame_t *frame, rgb_t color, uint8_t led_min, uint8_t led_max);
 bool rgb_runtime_layer_stage_render_frame(rgb_runtime_frame_t *frame, layer_state_t state, uint8_t led_min, uint8_t led_max);
+bool rgb_runtime_layer_stage_render_selected_frame(rgb_runtime_frame_t *frame, uint8_t layer, uint8_t led_min, uint8_t led_max);
 bool rgb_runtime_layer_stage_apply_frame(const rgb_runtime_frame_t *frame, uint8_t led_min, uint8_t led_max);
-bool rgb_runtime_layer_stage_paint_layer(uint8_t layer, uint8_t led_min, uint8_t led_max);
+#    ifdef RGB_LAYER_STAGE_TEST_BACKEND
+void     rgb_runtime_layer_stage_test_reset_group_scan_count(void);
+uint32_t rgb_runtime_layer_stage_test_group_scan_count(void);
+#    endif
 #endif

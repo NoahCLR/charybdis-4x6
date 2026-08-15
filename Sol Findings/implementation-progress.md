@@ -5,9 +5,9 @@
 - **Branch:** `sol`
 - **Starting commit:** `5b20ed01` (`sol findings`)
 - **Started:** 2026-07-13
-- **Current focus:** Finding 10 awaits on-device timing; Finding 05 awaits manual split-hardware verification. Finding 13 is the next software implementation item.
+- **Current focus:** Findings 05 and 10 await their physical checks. Finding 13 is verified; Finding 15 is the next software implementation item.
 - **Overall status:** In progress
-- **Latest closed review:** [`review/2026-08-15-review-11`](../review/2026-08-15-review-11/)
+- **Latest closed review:** [`review/2026-08-15-review-13`](../review/2026-08-15-review-13/)
 - **Active implementation review:** [`review/2026-08-15-review-12`](../review/2026-08-15-review-12/); Review 10 also remains hardware-verification pending
 
 This file is the implementation record for the plans in this directory. It records what actually changed, why choices were made, what verification really ran, and what remains open. A plan is not marked verified until its targeted checks, the full host suite, the target firmware build, target-specific evidence, and required documentation all pass.
@@ -36,7 +36,7 @@ This file is the implementation record for the plans in this directory. It recor
 | 10 | [Pointing backlog bounds](10-pointing-backlog-bounds.md) | Should fix | Implemented, verification incomplete | 4-tap/32-step bounds, extremes, compile guards, full host, target build, and 1,280 B pointing path pass; flashed timing pending |
 | 11 | [Dragscroll stall recovery](11-dragscroll-stall-recovery.md) | Should fix | Verified | 55/56 and 80/81 ms boundaries, first-report/no-motion/wrap/reset/pinch reuse, one-read timer budget, full host, firmware, and explicit 360 B stack path pass |
 | 12 | [Split RPC failure backoff](12-split-rpc-failure-backoff.md) | Should fix | Verified | Stop-on-first-failure, 50–1,000 ms wrap-safe backoff, current-state recovery, bounded trace, full host, firmware, and target-stack gates pass |
-| 13 | [RGB preview parity](13-rgb-preview-parity.md) | Should fix | Planned | Not run |
+| 13 | [RGB preview parity](13-rgb-preview-parity.md) | Should fix | Verified | Shared selected-layer renderer; universal/inherit/base-less/ordering/chunk parity, full host, firmware, and target-stack gates pass |
 | 14 | [Macro-cache RAM](14-macro-cache-ram.md) | Optimize | Planned | Not run |
 | 15 | [RGB render work](15-rgb-render-work.md) | Optimize | Planned | Not run |
 | 16 | [Runtime lookup hot path](16-runtime-lookup-hot-path.md) | Optimize | Planned | Not run |
@@ -974,6 +974,11 @@ verification remains intentionally pending and is the only remaining Finding
 | 2026-08-15 | 10 | `PYTHONPYCACHEPREFIX=/tmp/noah-host-pycache sh tests/host/run_all_host_tests.sh` | Passed | Complete host suite on the final shared implementation |
 | 2026-08-15 | 10 | `qmk compile -kb bastardkb/charybdis/4x6 -km noah` | Passed | Ordinary target is 150,908 B text and 245,584 B BSS |
 | 2026-08-15 | 10 | `PYTHONPYCACHEPREFIX=/tmp/noah-stack-pycache PYTHON=/usr/bin/python3 sh tests/host/run_firmware_stack_budget_checks.sh` | Passed | Fresh generic path 1,240 B, vertical-arrow path 1,280 B, worst main 1,904/1,920 B, split 336/768 B |
+| 2026-08-15 | 13 | `sh tests/host/run_rgb_layer_render_tests.sh` before implementation | Failed as expected | Five fresh processes independently exposed inherit, universal, base-less explicit, override-order, and chunk-parity mismatches |
+| 2026-08-15 | 13 | `sh tests/host/run_rgb_layer_render_tests.sh`, `run_rgb_validation_tests.sh`, `run_split_runtime_sync_tests.sh`, and `run_feature_gate_compile_tests.sh` | Passed | Shared selection renderer, host scan budget, empty authored groups, split preview source, and feature-disabled header variants pass |
+| 2026-08-15 | 13 | `PYTHONPYCACHEPREFIX=/tmp/noah-host-pycache sh tests/host/run_all_host_tests.sh` | Passed | Complete host suite including all five layer-group parity scenarios |
+| 2026-08-15 | 13 | `qmk compile -kb bastardkb/charybdis/4x6 -km noah` | Passed | Ordinary target is 150,896 B text and 245,592 B BSS; no second preview frame allocation |
+| 2026-08-15 | 13 | `PYTHONPYCACHEPREFIX=/tmp/noah-stack-pycache PYTHON=/usr/bin/python3 sh tests/host/run_firmware_stack_budget_checks.sh` | Passed | Fresh reviewed maxima remain 1,904/1,920 B main and 336/768 B split |
 
 ## Finding 10 — Pointing backlog bounds
 
@@ -1017,6 +1022,42 @@ Finding 10 remains **implemented, verification incomplete** until flashed
 hardware records worst-case handler duration and confirms the 4/32 policy feels
 acceptable in arrow, zoom, volume, and brightness modes. Review 12 stays open.
 
+## Finding 13 — RGB preview parity
+
+### Objective
+
+Make a pending layer preview resolve exactly the same authored base color,
+layer groups, inheritance, row order, painted state, and chunk boundaries as
+normal activation of that selected layer.
+
+### Implemented
+
+- Replaced preview's partial direct-to-driver renderer with the normal layer
+  stage's selection-aware two-phase frame algorithm.
+- Kept normal effective-layer filtering and preview single-layer selection as
+  inputs to one renderer instead of duplicating color rules.
+- Reused the runtime's existing primary frame after base application, avoiding
+  both main-stack growth and a second RGB-sized BSS buffer.
+- Removed the preview-only group intersection and direct HSV conversion paths.
+- Added a synthetic layer-group host variant with independently runnable
+  inheritance, universal, no-base, override-order, and chunk scenarios.
+- Added a host-only scan counter proving preview performs one group-table pass
+  in addition to the normal base pass.
+- Preserved the existing combo-underlay, preview, PD, combo-overlay, and
+  key-feedback stage order.
+
+### Target result
+
+The ordinary target is 150,896 B text, 0 B data, and 245,592 B BSS: 12 B less
+text and an 8 B linked-layout BSS difference from Finding 10, with no new
+production frame or diagnostic allocation. Fresh reviewed stack maxima remain
+1,904/1,920 B main and 336/768 B split.
+
+### Closure
+
+Finding 13 is **verified**. Review 13 records the red evidence, shared contract,
+target evidence, documentation, and all passing closure gates.
+
 ## Cross-cutting decisions and deferred work
 
 - The implementation order follows [`00-overarching-remediation-roadmap.md`](00-overarching-remediation-roadmap.md).
@@ -1048,4 +1089,5 @@ acceptable in arrow, zoom, volume, and brightness modes. Review 12 stays open.
 
 Execute Finding 05's physical disconnect/power-cycle/role-swap matrix and
 Finding 10's flashed timing/feel check when hardware is available. In parallel,
-proceed with Finding 13 preview parity; all current software gates are green.
+proceed with Finding 15 RGB render-work measurement and optimization; Finding
+13 is verified and supplies its color-parity oracle.

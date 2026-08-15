@@ -3,7 +3,7 @@
 ## Plan metadata
 
 - Severity: medium
-- Status: planned
+- Status: verified
 - Recommended phase: Phase 5 RGB correctness, before [Finding 15](15-rgb-render-work.md)
 - Affected surfaces:
   - users/noah/lib/rgb/stages/rgb_preview_stage.c
@@ -146,6 +146,34 @@ Because the implementation changes a runtime header seam, the feature-gate compi
 - Record firmware size before and after; extraction should not create two retained implementations through inlining.
 - If Finding 15 later adds render counters, retain the parity fixture as the color-correctness baseline.
 
+## Implementation result — 2026-08-15
+
+- `rgb_layer_stage.c` now owns one selection-aware two-phase frame renderer:
+  solid bases render in layer order, then eligible group rows render in authored
+  order through the existing inheritance resolver.
+- Normal rendering selects every effectively active layer. Preview rendering
+  selects exactly one valid preview layer and otherwise consumes the same
+  algorithm.
+- Preview reuses `rgb_runtime.c`'s existing primary frame after the base stage
+  has applied it. It clears only the requested chunk and applies only painted
+  entries, adding neither a frame-sized stack object nor a second RGB BSS
+  buffer.
+- The preview-only direct layer painter, group intersection test, and direct
+  `hsv_to_rgb()` group path were removed.
+- A host-only scan counter proves normal rendering scans the group table once
+  and preview adds exactly one selected-layer scan.
+- A dedicated synthetic-group variant preserves independent red/green evidence
+  for inheritance, universal rows, a base-less explicit group, later-row
+  overrides, and full-versus-two-chunk parity. Authored profile data remains
+  unchanged.
+
+Target evidence:
+
+- ordinary linked image: 150,896 B text, 0 B data, 245,592 B BSS;
+- compared with Finding 10: -12 B text and +8 B BSS from linked layout, with no
+  new production frame or diagnostic allocation;
+- reviewed stack maxima remain 1,904/1,920 B main and 336/768 B split.
+
 ## Risks, tradeoffs, and fallbacks
 
 - A helper that clears a full frame can erase prior-stage output when used as an overlay. Painted-mask semantics must be explicit.
@@ -162,17 +190,18 @@ Because the implementation changes a runtime header seam, the feature-gate compi
 
 ## Acceptance checklist
 
-- [ ] Preview applies RGB_LAYER_GROUP_ALL.
-- [ ] Preview resolves inherit colors through the selected layer base.
-- [ ] Explicit groups render when the selected layer has no solid base.
-- [ ] Inherit groups without a base remain unpainted.
-- [ ] Normal and preview output match per LED for full and chunked ranges.
-- [ ] Stage ordering and later-group override behavior remain stable.
-- [ ] Targeted RGB, split, and feature-gate checks pass.
-- [ ] The full host suite passes.
-- [ ] The target QMK compile passes.
-- [ ] RGB docs and the active review note describe the landed contract.
+- [x] Preview applies RGB_LAYER_GROUP_ALL.
+- [x] Preview resolves inherit colors through the selected layer base.
+- [x] Explicit groups render when the selected layer has no solid base.
+- [x] Inherit groups without a base remain unpainted.
+- [x] Normal and preview output match per LED for full and chunked ranges.
+- [x] Stage ordering and later-group override behavior remain stable.
+- [x] Targeted RGB, split, and feature-gate checks pass.
+- [x] The full host suite passes.
+- [x] The target QMK compile passes.
+- [x] RGB docs and the active review note describe the landed contract.
 
 ## Next action
 
-Add the three failing parity cases to rgb_layer_render_test.c, then design the smallest selected-layer helper that makes both normal and preview paths consume one group applicability and color-resolution contract.
+Finding 13 is closed. Retain its parity fixture as the color oracle while
+Finding 15 instruments and streamlines RGB render work.

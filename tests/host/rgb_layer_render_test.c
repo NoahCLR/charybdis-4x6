@@ -14,6 +14,7 @@
 #include "users/noah/lib/state/diagnostics/runtime_diag.h"
 #include "users/noah/lib/rgb/core/rgb_runtime.h"
 #include "users/noah/lib/rgb/core/rgb_helpers.h"
+#include "users/noah/lib/rgb/stages/rgb_layer_stage.h"
 #include "ws2812.h"
 
 #ifndef RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_OVERRIDE
@@ -36,6 +37,9 @@
 #endif
 #ifndef RGB_LAYER_RENDER_TEST_FEEDBACK_GROUPS
 #    define RGB_LAYER_RENDER_TEST_FEEDBACK_GROUPS 0
+#endif
+#ifndef RGB_LAYER_RENDER_TEST_LAYER_GROUPS
+#    define RGB_LAYER_RENDER_TEST_LAYER_GROUPS 0
 #endif
 #if (RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY_HALF + RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY + RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_LEFT_HALF + RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_RIGHT_HALF) > 1
 #    error "Only one key-feedback render test mode variant may be enabled at a time"
@@ -97,8 +101,12 @@ const layer_color_config_t layer_colors[LAYER_COUNT] = {
         },
     [LAYER_NAV] =
         {
+#if RGB_LAYER_RENDER_TEST_LAYER_GROUPS
+            .color = HSV(0, 0, 0),
+#else
             .color = HSV(70, 80, 90),
-            .mode  = KEYS_MAPPED_ON_THIS_LAYER_ONLY,
+#endif
+            .mode = KEYS_MAPPED_ON_THIS_LAYER_ONLY,
         },
     [LAYER_POINTER] =
         {
@@ -106,6 +114,11 @@ const layer_color_config_t layer_colors[LAYER_COUNT] = {
             .mode  = KEYS_MAPPED_ON_THIS_LAYER_ONLY,
         },
 };
+
+#if RGB_LAYER_RENDER_TEST_LAYER_GROUPS
+static const layer_led_group_t layer_led_groups_data[] = RGB_LED_GROUP_TABLE({.layer = LAYER_NUM, .color = HSV(0, 0, 0), .led_group = RGB_LED_GROUP(0)}, {.layer = LAYER_NUM, .color = HSV(121, 122, 123), .led_group = RGB_LED_GROUP(1)}, {.layer = RGB_LAYER_GROUP_ALL, .color = HSV(131, 132, 133), .led_group = RGB_LED_GROUP(2)}, {.layer = LAYER_NUM, .color = HSV(141, 142, 143), .led_group = RGB_LED_GROUP(3)}, {.layer = RGB_LAYER_GROUP_ALL, .color = HSV(151, 152, 153), .led_group = RGB_LED_GROUP(3)}, {.layer = LAYER_NAV, .color = HSV(0, 0, 0), .led_group = RGB_LED_GROUP(4)}, {.layer = LAYER_NAV, .color = HSV(161, 162, 163), .led_group = RGB_LED_GROUP(5)}, );
+EXPORT_LAYER_LED_GROUP_TABLE(layer_led_groups_data);
+#endif
 
 const pd_mode_color_t pd_mode_colors[] = {
     {.pointing_mode = PD_MODE_ARROW, .color = HSV(210, 211, 212), .locality = RGB_RIGHT_HALF}, {.pointing_mode = PD_MODE_VOLUME, .color = HSV(220, 221, 222), .locality = RGB_LEFT_HALF}, {.pointing_mode = PD_MODE_BRIGHTNESS, .color = HSV(223, 224, 225), .locality = RGB_BOTH_HALVES}, {.pointing_mode = PD_MODE_ZOOM, .color = HSV(226, 227, 228), .locality = RGB_KEY_HALF}, {.pointing_mode = PD_MODE_PINCH, .color = HSV(233, 234, 235), .locality = RGB_KEYS_ONLY},
@@ -355,6 +368,10 @@ static void test_reset(void) {
     key_origin_bitmap_clear(fake_pd_owner_bitmap);
     split_runtime_sync_remote = host_runtime_fixture_split_remote_init();
 
+#if RGB_LAYER_RENDER_TEST_LAYER_GROUPS
+    rgb_runtime_layer_stage_test_reset_group_scan_count();
+#endif
+
     for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
         for (uint8_t col = 0; col < MATRIX_COLS; col++) {
             g_led_config.matrix_co[row][col] = NO_LED;
@@ -534,13 +551,145 @@ static void check_led(uint8_t index, rgb_t expected) {
     CHECK(led_output[index].b == expected.b);
 }
 
-static bool render_output(void) {
-    for (uint8_t i = 0; i < RGB_MATRIX_LED_COUNT; i++) {
+static bool render_output_range(uint8_t led_min, uint8_t led_max) {
+    for (uint8_t i = led_min; i < led_max; i++) {
         led_output[i] = rgb_from_ws2812(ws2812_leds[i]);
     }
 
-    return noah_rgb_matrix_indicators_advanced_user(0, RGB_MATRIX_LED_COUNT);
+    return noah_rgb_matrix_indicators_advanced_user(led_min, led_max);
 }
+
+static bool render_output(void) {
+    return render_output_range(0, RGB_MATRIX_LED_COUNT);
+}
+
+#if RGB_LAYER_RENDER_TEST_LAYER_GROUPS
+static void test_map_num_preview_leds(void) {
+    test_keymap[LAYER_NUM][0][0] = 0x0020u;
+    test_keymap[LAYER_NUM][0][1] = 0x0021u;
+    test_keymap[LAYER_NUM][0][2] = 0x0022u;
+    test_keymap[LAYER_NUM][0][3] = 0x0023u;
+}
+
+static bool test_render_normal_num(uint8_t led_min, uint8_t led_max) {
+    test_reset();
+    test_map_num_preview_leds();
+    layer_state  = (layer_state_t)1u << LAYER_NUM;
+    bool painted = render_output_range(led_min, led_max);
+    CHECK(rgb_runtime_layer_stage_test_group_scan_count() == layer_led_group_count);
+    return painted;
+}
+
+static bool test_render_preview_num(uint8_t led_min, uint8_t led_max) {
+    test_reset();
+    test_map_num_preview_leds();
+    fake_preview_layer = LAYER_NUM;
+    bool painted       = render_output_range(led_min, led_max);
+    CHECK(rgb_runtime_layer_stage_test_group_scan_count() == 2u * layer_led_group_count);
+    return painted;
+}
+
+static void test_copy_led_output(rgb_t *out) {
+    memcpy(out, led_output, sizeof(led_output));
+}
+
+static void test_check_led_range_equal(const rgb_t *expected, const rgb_t *actual, uint8_t led_min, uint8_t led_max) {
+    for (uint8_t led = led_min; led < led_max; led++) {
+        CHECK(actual[led].r == expected[led].r);
+        CHECK(actual[led].g == expected[led].g);
+        CHECK(actual[led].b == expected[led].b);
+    }
+}
+
+static void test_preview_inherits_selected_layer_base(void) {
+    rgb_t normal[RGB_MATRIX_LED_COUNT];
+    rgb_t preview[RGB_MATRIX_LED_COUNT];
+
+    CHECK(test_render_normal_num(0, 1));
+    test_copy_led_output(normal);
+    CHECK(test_render_preview_num(0, 1));
+    test_copy_led_output(preview);
+
+    test_check_led_range_equal(normal, preview, 0, 1);
+    check_led(0, rgb_from_hsv(layer_colors[LAYER_NUM].color));
+}
+
+static void test_preview_applies_universal_layer_groups(void) {
+    rgb_t normal[RGB_MATRIX_LED_COUNT];
+    rgb_t preview[RGB_MATRIX_LED_COUNT];
+
+    CHECK(test_render_normal_num(2, 3));
+    test_copy_led_output(normal);
+    CHECK(test_render_preview_num(2, 3));
+    test_copy_led_output(preview);
+
+    test_check_led_range_equal(normal, preview, 2, 3);
+    check_led(2, rgb_from_hsv(layer_led_groups_data[2].color));
+}
+
+static void test_preview_explicit_group_renders_without_solid_base(void) {
+    rgb_t normal[RGB_MATRIX_LED_COUNT];
+    rgb_t preview[RGB_MATRIX_LED_COUNT];
+
+    test_reset();
+    layer_state = (layer_state_t)1u << LAYER_NAV;
+    CHECK(!render_output_range(4, 5));
+
+    test_reset();
+    fake_preview_layer = LAYER_NAV;
+    CHECK(!render_output_range(4, 5));
+
+    test_reset();
+    layer_state = (layer_state_t)1u << LAYER_NAV;
+    CHECK(render_output_range(4, 6));
+    test_copy_led_output(normal);
+
+    test_reset();
+    fake_preview_layer = LAYER_NAV;
+    CHECK(render_output_range(4, 6));
+    test_copy_led_output(preview);
+
+    test_check_led_range_equal(normal, preview, 4, 6);
+    CHECK(preview[4].r == 0 && preview[4].g == 0 && preview[4].b == 0);
+    check_led(5, rgb_from_hsv(layer_led_groups_data[6].color));
+}
+
+static void test_preview_preserves_later_group_override_order(void) {
+    rgb_t normal[RGB_MATRIX_LED_COUNT];
+    rgb_t preview[RGB_MATRIX_LED_COUNT];
+
+    CHECK(test_render_normal_num(3, 4));
+    test_copy_led_output(normal);
+    CHECK(test_render_preview_num(3, 4));
+    test_copy_led_output(preview);
+
+    test_check_led_range_equal(normal, preview, 3, 4);
+    check_led(3, rgb_from_hsv(layer_led_groups_data[4].color));
+}
+
+static void test_preview_full_and_chunked_output_matches_normal(void) {
+    rgb_t normal[RGB_MATRIX_LED_COUNT];
+    rgb_t preview_full[RGB_MATRIX_LED_COUNT];
+    rgb_t preview_chunked[RGB_MATRIX_LED_COUNT];
+
+    CHECK(test_render_normal_num(0, 4));
+    test_copy_led_output(normal);
+
+    CHECK(test_render_preview_num(0, 4));
+    test_copy_led_output(preview_full);
+
+    test_reset();
+    test_map_num_preview_leds();
+    fake_preview_layer   = LAYER_NUM;
+    bool chunked_painted = render_output_range(0, 2);
+    chunked_painted |= render_output_range(2, 4);
+    CHECK(chunked_painted);
+    test_copy_led_output(preview_chunked);
+
+    test_check_led_range_equal(normal, preview_full, 0, 4);
+    test_check_led_range_equal(normal, preview_chunked, 0, 4);
+}
+#endif
 
 static void test_mapped_only_layers_compose_in_layer_order(void) {
     test_reset();
@@ -1901,7 +2050,33 @@ static void test_automouse_end_override_replaces_layer_stack_destination(void) {
 }
 #endif
 
-int main(void) {
+int main(int argc, char **argv) {
+#if RGB_LAYER_RENDER_TEST_LAYER_GROUPS
+    if (argc != 2) {
+        fprintf(stderr, "expected one RGB layer-group scenario\n");
+        return 1;
+    }
+
+    if (strcmp(argv[1], "inherit") == 0) {
+        test_preview_inherits_selected_layer_base();
+    } else if (strcmp(argv[1], "universal") == 0) {
+        test_preview_applies_universal_layer_groups();
+    } else if (strcmp(argv[1], "no-base") == 0) {
+        test_preview_explicit_group_renders_without_solid_base();
+    } else if (strcmp(argv[1], "ordering") == 0) {
+        test_preview_preserves_later_group_override_order();
+    } else if (strcmp(argv[1], "chunks") == 0) {
+        test_preview_full_and_chunked_output_matches_normal();
+    } else {
+        fprintf(stderr, "unknown RGB layer-group scenario: %s\n", argv[1]);
+        return 1;
+    }
+
+    puts("rgb_layer_render layer-group parity scenario passed");
+    return 0;
+#endif
+    (void)argc;
+    (void)argv;
     test_mapped_only_layers_compose_in_layer_order();
     test_full_board_layer_fills_gaps_under_mapped_only_layer();
     test_invalidating_layer_map_refreshes_dynamic_keymap_coverage();
