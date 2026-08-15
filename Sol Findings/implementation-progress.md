@@ -5,10 +5,10 @@
 - **Branch:** `sol`
 - **Starting commit:** `5b20ed01` (`sol findings`)
 - **Started:** 2026-07-13
-- **Current focus:** Findings 05 and 10 await their physical checks. All planned software optimization findings, including Finding 16, are verified.
+- **Current focus:** Review 17 found two must-fix software closure blockers in physical/default ownership and split remote-state publication, plus arrow-axis and dragscroll numeric follow-up work. Findings 05 and 10 still retain physical checks after those software issues close.
 - **Overall status:** In progress
 - **Latest closed review:** [`review/2026-08-15-review-16`](../review/2026-08-15-review-16/)
-- **Active implementation reviews:** [`review/2026-08-15-review-10`](../review/2026-08-15-review-10/) and [`review/2026-08-15-review-12`](../review/2026-08-15-review-12/) remain hardware-verification pending
+- **Active review:** [`review/2026-08-15-review-17`](../review/2026-08-15-review-17/) is the combined closure audit; [`review/2026-08-15-review-10`](../review/2026-08-15-review-10/) and [`review/2026-08-15-review-12`](../review/2026-08-15-review-12/) retain hardware-verification obligations
 
 This file is the implementation record for the plans in this directory. It records what actually changed, why choices were made, what verification really ran, and what remains open. A plan is not marked verified until its targeted checks, the full host suite, the target firmware build, target-specific evidence, and required documentation all pass.
 
@@ -18,6 +18,7 @@ This file is the implementation record for the plans in this directory. It recor
 - **In progress:** code, tests, or target evidence is actively being developed.
 - **Implemented, verification incomplete:** code is present but at least one closure gate is missing or failing.
 - **Verified:** the complete per-finding closure bar passed.
+- **Regressed:** a later integrated pass invalidated a previously verified contract; remediation and enforcement are required again.
 - **Blocked:** a concrete external blocker prevents meaningful progress and is recorded with its exact evidence.
 
 ## Finding dashboard
@@ -31,14 +32,14 @@ This file is the implementation record for the plans in this directory. It recor
 | 05 | [VIA split persistence](05-via-split-persistence.md) | Must fix | In progress | Durable snapshot/ack reconciliation implemented; all software gates pass, including fresh main/split stack paths; physical two-half matrix pending |
 | 06 | [Combo-origin cache lifecycle](06-combo-origin-cache-lifecycle.md) | Should fix | Verified | Exact generations, suppression/deadline/capacity lifecycle, normal/compact QMK contracts, full host, firmware, and explicit 280 B target stack path pass |
 | 07 | [Nonblocking macro playback](07-nonblocking-macro-playback.md) | Should fix | Verified | Fake-timer/wrap, busy, pinning, cancellation, ownership, full host, firmware, and fresh target-stack gates pass |
-| 08 | [Synthetic-key ownership](08-synthetic-key-ownership.md) | Should fix | Verified | Aggregate physical/managed report ownership, scoped persistent leases, strict macro balance, source guards, full host, firmware, and target stack gates pass |
+| 08 | [Synthetic-key ownership](08-synthetic-key-ownership.md) | Should fix | Regressed | Review 17 found that handled events are recorded as physical owners before being consumed, suppressing same-basic hold output and permitting false modifier ownership; missing integration tests are required |
 | 09 | [Pending-release sequence rollover](09-pending-release-sequence-rollover.md) | Should fix | Verified | Explicit linked FIFO, 65,537-cycle blocked-head stress, structural corruption checks, full host, firmware, and target stack gate pass |
-| 10 | [Pointing backlog bounds](10-pointing-backlog-bounds.md) | Should fix | Implemented, verification incomplete | 4-tap/32-step bounds, extremes, compile guards, full host, target build, and 1,280 B pointing path pass; flashed timing pending |
+| 10 | [Pointing backlog bounds](10-pointing-backlog-bounds.md) | Should fix | Implemented, verification incomplete | 4-tap/32-step bounds remain enforced; Review 17 found dormant inactive-axis debt across axis changes, and flashed timing remains pending |
 | 11 | [Dragscroll stall recovery](11-dragscroll-stall-recovery.md) | Should fix | Verified | 55/56 and 80/81 ms boundaries, first-report/no-motion/wrap/reset/pinch reuse, one-read timer budget, full host, firmware, and explicit 360 B stack path pass |
 | 12 | [Split RPC failure backoff](12-split-rpc-failure-backoff.md) | Should fix | Verified | Stop-on-first-failure, 50–1,000 ms wrap-safe backoff, current-state recovery, bounded trace, full host, firmware, and target-stack gates pass |
 | 13 | [RGB preview parity](13-rgb-preview-parity.md) | Should fix | Verified | Shared selected-layer renderer; universal/inherit/base-less/ordering/chunk parity, full host, firmware, and target-stack gates pass |
 | 14 | [Macro-cache RAM](14-macro-cache-ram.md) | Optimize | Verified | 41,440 B per-slot IR storage reduced to 599 B shared storage; full host, firmware, memory, and stack gates pass |
-| 15 | [RGB render work](15-rgb-render-work.md) | Optimize | Verified | Exact frame snapshot; 10→1 semantic and 20→1 combo projection builds, 5→3 local stage pipelines, full host, firmware, and target resource/stack gates pass |
+| 15 | [RGB render work](15-rgb-render-work.md) | Optimize | Implemented, verification incomplete | Frame-local caching/work reductions remain verified, but Review 17 found that split worker publication feeding the first snapshot copy is not coherent across fields |
 | 16 | [Runtime lookup hot path](16-runtime-lookup-hot-path.md) | Optimize | Verified | One authored search per handled press, zero per matched release, 180→2 one-active-press slot visits, zero unchanged dirty marks, full host/firmware/resource/fresh-stack gates pass |
 | 17 | [Split timer sampling](17-split-timer-sampling.md) | Optimize | Verified | One sampled tick timestamp, active auto-mouse elapsed-at compatibility, wrap/timer-budget tests, full host, firmware, and explicit target-stack paths pass |
 
@@ -1225,9 +1226,31 @@ and closure verdict. No sibling QMK source was edited.
   two-file auto-mouse elapsed-at compatibility extension. No other sibling
   source was edited.
 
+## 2026-08-15 — Combined closure audit
+
+Review 17 applied `prompts/closure-verification-review.md` to the integrated
+branch. Focused ownership, split, RGB, and pointing suites passed, as did the
+full host suite, ordinary firmware build, memory budget, and fresh linked stack
+gate. The target remains within its enforced budgets at 25,524 B static BSS,
+212,352 B linker heap, 1,912/1,920 B worst reviewed main path, and 336/768 B
+worst reviewed split path.
+
+The audit nevertheless keeps the program open:
+
+- Finding 08 regressed because physical ownership is committed before the
+  runtime decides whether QMK default handling will occur.
+- Finding 15 is only partially resolved because split worker publication can
+  race the initial RGB/PD snapshot copy.
+- Finding 10 needs an inactive-axis backlog rule before its flashed feel check.
+- Dragscroll/pinch accumulation needs a defined numeric bound.
+
+No firmware or sibling workspace source was changed in this review pass. The
+complete evidence and remediation requirements are in
+[`review/2026-08-15-review-17`](../review/2026-08-15-review-17/).
+
 ## Next program action
 
-Execute Finding 05's physical disconnect/power-cycle/role-swap matrix and
-Finding 10's flashed timing/feel check when hardware is available. All planned
-software findings are verified; these two physical checks are the remaining
-program-level closure work.
+Fix Review 17's physical/default ownership seam first, then coherent split
+remote-state publication. Resolve the two pointing robustness items and rerun
+all closure gates before performing Finding 05's physical persistence matrix
+and Finding 10's flashed timing/feel check.

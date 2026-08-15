@@ -2,7 +2,7 @@
 
 ## Plan metadata
 
-- **Status:** Implementation in progress; Phases 1 and 2 are verified. Phase 3 software work is complete, with Finding 05 awaiting its physical two-half matrix. Phase 4 software work is complete, with Finding 10 awaiting on-device timing. Phases 5 and 6 are verified. See [`implementation-progress.md`](implementation-progress.md).
+- **Status:** Implementation in progress. Review 17 reopened software closure for physical/default ownership, coherent split remote-state publication, arrow-axis residual lifecycle, and dragscroll numeric bounds. Findings 05 and 10 also retain their physical checks. See [`implementation-progress.md`](implementation-progress.md).
 - **Prepared:** 2026-07-13.
 - **Scope:** Firmware runtime correctness, split reliability, target resource safety, and measured hot-path efficiency.
 - **Source:** The deep firmware code review performed against the current `charybdis-4x6` tree.
@@ -149,9 +149,11 @@ Recommended order: **08 first; 06 and 07 may then proceed independently**.
 2. Correct combo-origin lifecycle without assuming physical release means QMK can no longer emit a delayed combo event.
 3. Replace blocking macro delays with a scan-driven state machine that uses the new ownership contract. This can proceed alongside combo-origin work once Finding 08 is stable.
 
-Findings 08, 06, and 07 are verified. Macro playback is scan-driven, uses the
+Findings 06 and 07 remain verified. Macro playback is scan-driven, uses the
 landed lease contract, pins active provider IR, and rejects overlapping starts
-without queueing.
+without queueing. Review 17 regressed Finding 08 because its pre-process
+physical ledger does not distinguish default-processed events from handled
+events that userspace later consumes.
 
 The macro scheduler must specify queueing, overlap, cancellation, reset, layer change, suspend, and aborted-playback cleanup before code is written. A scheduler that is nonblocking but leaks owned keys is not an improvement.
 
@@ -169,8 +171,10 @@ Recommended order: **17, 12, 05**. Findings 12 and 17 may share a tightly scoped
 Findings 17 and 12 are verified: one wrap-safe sampled timestamp drives all
 outbound split-domain timing, and a failed RPC now stops the send pass behind a
 bounded 50–1,000 ms recovery backoff. Finding 05's durable versioned
-reconciliation and all software gates are complete; only its physical
-disconnect, power-cycle, reconnect, and USB-role-swap matrix remains.
+reconciliation-specific software gates are complete and its physical
+disconnect, power-cycle, reconnect, and USB-role-swap matrix remains. Review 17
+also opened the adjacent worker/main publication seam because remote display
+packets are not exposed to RGB/PD readers as coherent logical snapshots.
 
 1. Sample a single timestamp and pass it through split-domain scheduling.
 2. Introduce shared outage gating and bounded retry/backoff while retaining dirty state.
@@ -197,12 +201,13 @@ Exit criteria:
 
 Recommended order: **11, 10**.
 
-Finding 11 is verified: dragscroll and pinch now expire prior lock/residual
-state before accepting post-stall motion, and one sampled timestamp drives all
-handler decisions. Finding 10 now enforces four taps per pointing poll, a
-32-step retained backlog, exact residual preservation, deterministic overload
-diagnostics, and correct `INT16_MIN` dominance. All software and target-build
-gates pass; its flashed worst-case timing/feel check remains pending.
+Finding 11's original stall-expiry contract remains verified: dragscroll and
+pinch expire prior lock/residual state before accepting post-stall motion, and
+one sampled timestamp drives all handler decisions. Finding 10 enforces four
+taps per pointing poll, a 32-step retained backlog, exact residual preservation,
+deterministic overload diagnostics, and correct `INT16_MIN` dominance. Review
+17 additionally found dormant arrow-axis debt and unbounded signed dragscroll
+accumulation; both software items precede the flashed timing/feel check.
 
 - Expire dragscroll state against the previous motion timestamp before accumulating the first post-gap report.
 - Define per-scan output budgets and residual/backlog limits for every pointing-discrete mode.
@@ -220,9 +225,11 @@ Exit criteria:
 
 Recommended order: **13, 15**.
 
-Findings 13 and 15 are verified. Normal activation and pending preview consume
-one selection-aware base/group renderer, and one runtime snapshot now serves a
-whole RGB frame with exact chunk/role parity and bounded stage work.
+Finding 13 remains verified. Finding 15's normal activation, pending preview,
+one selection-aware base/group renderer, per-frame source cache, and bounded
+stage work remain enforced. Review 17 partially reopened Finding 15 because
+the split worker can update the remote source while the main context performs
+the first frame-snapshot copy.
 
 - Extract or reuse one group/inheritance resolution path for normal and preview rendering.
 - Add parity tests before introducing per-frame or per-chunk caches.
@@ -396,10 +403,28 @@ The remediation program is complete only when all of the following are true:
 - [ ] `git diff --check` passes and no sibling workspace source was modified unintentionally.
 - [ ] Remaining risks and deferred optional work are stated plainly in the final handoff.
 
+## Post-implementation closure audit
+
+The combined audit in [`review/2026-08-15-review-17`](../review/2026-08-15-review-17/)
+supersedes the earlier assumption that only hardware verification remained. It
+does not change the historical closure records for Findings 01–17; it tracks
+the integrated-tree state after those passes.
+
+Software closure now additionally requires:
+
+1. physical ownership is committed only for events that QMK default handling
+   actually processes;
+2. split worker packets are published to RGB/PD readers as coherent logical
+   snapshots;
+3. dominant-axis changes cannot later replay stale arrow debt;
+4. dragscroll/pinch accumulation and absolute-value operations are bounded and
+   defined across their complete input domain.
+
 ## Recommended next action
 
-Perform [05 — VIA split persistence](05-via-split-persistence.md)'s physical
-two-half verification matrix when hardware is available. In parallel, proceed
-to [10 — pointing backlog bounds](10-pointing-backlog-bounds.md); Finding 11 is
-verified. Finding 01 remains the stack-safety baseline that later runtime
-changes must continue to satisfy.
+Implement Review 17's ownership correction first, followed by coherent split
+remote-state publication and the two pointing robustness items. After the
+software closure gates pass again, perform [05 — VIA split persistence](05-via-split-persistence.md)'s
+physical two-half matrix and [10 — pointing backlog bounds](10-pointing-backlog-bounds.md)'s
+flashed timing/feel check. Finding 01 remains the stack-safety baseline that
+all later runtime changes must continue to satisfy.
