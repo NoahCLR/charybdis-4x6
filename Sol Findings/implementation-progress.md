@@ -5,9 +5,9 @@
 - **Branch:** `sol`
 - **Starting commit:** `5b20ed01` (`sol findings`)
 - **Started:** 2026-07-13
-- **Current focus:** Findings 05 and 10 await their physical checks. Finding 13 is verified; Finding 15 is the next software implementation item.
+- **Current focus:** Findings 05 and 10 await their physical checks. Findings 13 and 15 are verified; Findings 14 and 16 remain planned software optimization items.
 - **Overall status:** In progress
-- **Latest closed review:** [`review/2026-08-15-review-13`](../review/2026-08-15-review-13/)
+- **Latest closed review:** [`review/2026-08-15-review-14`](../review/2026-08-15-review-14/)
 - **Active implementation review:** [`review/2026-08-15-review-12`](../review/2026-08-15-review-12/); Review 10 also remains hardware-verification pending
 
 This file is the implementation record for the plans in this directory. It records what actually changed, why choices were made, what verification really ran, and what remains open. A plan is not marked verified until its targeted checks, the full host suite, the target firmware build, target-specific evidence, and required documentation all pass.
@@ -38,7 +38,7 @@ This file is the implementation record for the plans in this directory. It recor
 | 12 | [Split RPC failure backoff](12-split-rpc-failure-backoff.md) | Should fix | Verified | Stop-on-first-failure, 50–1,000 ms wrap-safe backoff, current-state recovery, bounded trace, full host, firmware, and target-stack gates pass |
 | 13 | [RGB preview parity](13-rgb-preview-parity.md) | Should fix | Verified | Shared selected-layer renderer; universal/inherit/base-less/ordering/chunk parity, full host, firmware, and target-stack gates pass |
 | 14 | [Macro-cache RAM](14-macro-cache-ram.md) | Optimize | Planned | Not run |
-| 15 | [RGB render work](15-rgb-render-work.md) | Optimize | Planned | Not run |
+| 15 | [RGB render work](15-rgb-render-work.md) | Optimize | Verified | Exact frame snapshot; 10→1 semantic and 20→1 combo projection builds, 5→3 local stage pipelines, full host, firmware, and target resource/stack gates pass |
 | 16 | [Runtime lookup hot path](16-runtime-lookup-hot-path.md) | Optimize | Planned | Not run |
 | 17 | [Split timer sampling](17-split-timer-sampling.md) | Optimize | Verified | One sampled tick timestamp, active auto-mouse elapsed-at compatibility, wrap/timer-budget tests, full host, firmware, and explicit target-stack paths pass |
 
@@ -979,6 +979,11 @@ verification remains intentionally pending and is the only remaining Finding
 | 2026-08-15 | 13 | `PYTHONPYCACHEPREFIX=/tmp/noah-host-pycache sh tests/host/run_all_host_tests.sh` | Passed | Complete host suite including all five layer-group parity scenarios |
 | 2026-08-15 | 13 | `qmk compile -kb bastardkb/charybdis/4x6 -km noah` | Passed | Ordinary target is 150,896 B text and 245,592 B BSS; no second preview frame allocation |
 | 2026-08-15 | 13 | `PYTHONPYCACHEPREFIX=/tmp/noah-stack-pycache PYTHON=/usr/bin/python3 sh tests/host/run_firmware_stack_budget_checks.sh` | Passed | Fresh reviewed maxima remain 1,904/1,920 B main and 336/768 B split |
+| 2026-08-15 | 15 | `sh tests/host/run_rgb_layer_render_tests.sh` before implementation | Failed as expected | New 58-LED work budget first failed on repeated semantic projection; audited baseline was 10 semantic and 20 combo projection invocations per five chunks |
+| 2026-08-15 | 15 | Targeted RGB, validation, split, key-runtime scenario, runtime-trace, and feature-gate runners | Passed | Left/right parity, physical filtering, local/remote frame coherence, flash refresh, source reuse, stage order, and compile variants pass |
+| 2026-08-15 | 15 | `PYTHONPYCACHEPREFIX=/tmp/noah-host-pycache sh tests/host/run_all_host_tests.sh` | Passed | Complete host suite includes the 58-LED workload and Finding 13 parity oracle |
+| 2026-08-15 | 15 | `qmk compile -c -kb bastardkb/charybdis/4x6 -km noah` | Passed | Ordinary target is 151,000 B text, 0 B data, and 245,592 B BSS; linked source snapshot is 80 B with a 96 B compile ceiling |
+| 2026-08-15 | 15 | `PYTHONPYCACHEPREFIX=/tmp/noah-stack-pycache PYTHON=/usr/bin/python3 sh tests/host/run_firmware_stack_budget_checks.sh` | Passed | Fresh reviewed maxima remain 1,904/1,920 B main and 336/768 B split; snapshot adds no automatic array |
 
 ## Finding 10 — Pointing backlog bounds
 
@@ -1058,6 +1063,44 @@ production frame or diagnostic allocation. Fresh reviewed stack maxima remain
 Finding 13 is **verified**. Review 13 records the red evidence, shared contract,
 target evidence, documentation, and all passing closure gates.
 
+## Finding 15 — RGB render work
+
+### Objective
+
+Stop rebuilding identical combo and key-feedback source projections for every
+12-LED callback, and reject chunks that cannot touch the current physical half
+without changing a single authored RGB result.
+
+### Implemented
+
+- Added exact per-frame invalidation from QMK's `rgb_matrix_get_limits(0)`
+  contract, checked before right-half inverted-range rejection.
+- Added top-level physical-half normalization and early exit.
+- Added one bounded, lazy, runtime-owned source snapshot.
+- Reused one semantic map for flash visibility and one combined combo
+  projection for underlay, overlay, and suppression.
+- Changed combo and key-feedback stage seams to consume immutable maps.
+- Added a 58-LED/five-chunk host fixture for both physical roles, full/chunk
+  color parity, work counts, empty/nonlocal ranges, idle probing, and local and
+  remote mid-frame coherence.
+- Preserved Finding 13's color-parity fixture and all existing stage-order
+  coverage.
+
+### Target result
+
+Five-chunk semantic projection falls from 10 builds to 1, combined combo
+projection from 20 invocations to 1, and stage-pipeline entry from 5 chunks to
+the 3 chunks that intersect either physical half. The source snapshot is 80 B
+and compile-time bounded to 96 B. Ordinary target size is 151,000 B text, 0 B
+data, and 245,592 B BSS; linked BSS is unchanged from Finding 13. Fresh reviewed
+stack maxima remain 1,904/1,920 B main and 336/768 B split.
+
+### Closure
+
+Finding 15 is **verified**. Review 14 records the QMK frame contract, red
+evidence, coherent snapshot policy, work budget, target measurements, and all
+passing closure gates.
+
 ## Cross-cutting decisions and deferred work
 
 - The implementation order follows [`00-overarching-remediation-roadmap.md`](00-overarching-remediation-roadmap.md).
@@ -1088,6 +1131,7 @@ target evidence, documentation, and all passing closure gates.
 ## Next program action
 
 Execute Finding 05's physical disconnect/power-cycle/role-swap matrix and
-Finding 10's flashed timing/feel check when hardware is available. In parallel,
-proceed with Finding 15 RGB render-work measurement and optimization; Finding
-13 is verified and supplies its color-parity oracle.
+Finding 10's flashed timing/feel check when hardware is available. The next
+software optimization pass can select Finding 14 macro-cache RAM or Finding 16
+runtime lookup hot-path work; Findings 13 and 15 provide the verified RGB
+correctness and render-work baseline.

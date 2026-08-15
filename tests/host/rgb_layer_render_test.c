@@ -41,6 +41,9 @@
 #ifndef RGB_LAYER_RENDER_TEST_LAYER_GROUPS
 #    define RGB_LAYER_RENDER_TEST_LAYER_GROUPS 0
 #endif
+#ifndef RGB_LAYER_RENDER_TEST_WORKLOAD
+#    define RGB_LAYER_RENDER_TEST_WORKLOAD 0
+#endif
 #if (RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY_HALF + RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY + RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_LEFT_HALF + RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_RIGHT_HALF) > 1
 #    error "Only one key-feedback render test mode variant may be enabled at a time"
 #endif
@@ -71,10 +74,17 @@ static uint16_t               fake_auto_mouse_elapsed = 0;
 static bool                   fake_auto_mouse_active  = true;
 static host_runtime_fixture_t runtime_fixture         = HOST_RUNTIME_FIXTURE_INIT;
 #define fake_is_master runtime_fixture.is_master
+static bool              fake_is_left = true;
 static pd_mode_mask_t    fake_pd_active_mode = 0;
 static pd_mode_mask_t    fake_pd_locked_mode = 0;
 static split_side_mask_t fake_pd_owner_sides = SPLIT_SIDE_MASK_NONE;
 static uint8_t           fake_pd_owner_bitmap[KEY_ORIGIN_BITMAP_SIZE];
+
+static uint16_t fake_semantic_build_count;
+static uint16_t fake_tap_branch_build_count;
+static uint16_t fake_flash_visibility_build_count;
+static uint16_t fake_broad_owner_build_count;
+static uint16_t fake_combo_projection_build_count;
 
 static const hsv_t test_runtime_boot_indicator_hsv = {.h = 0u, .s = 0u, .v = 150u};
 
@@ -362,11 +372,17 @@ static void test_reset(void) {
     fake_auto_mouse_layer   = LAYER_POINTER;
     fake_auto_mouse_elapsed = 0;
     fake_auto_mouse_active  = true;
+    fake_is_left            = true;
     fake_pd_active_mode     = 0;
     fake_pd_locked_mode     = 0;
     fake_pd_owner_sides     = SPLIT_SIDE_MASK_NONE;
     key_origin_bitmap_clear(fake_pd_owner_bitmap);
     split_runtime_sync_remote = host_runtime_fixture_split_remote_init();
+    fake_semantic_build_count         = 0u;
+    fake_tap_branch_build_count       = 0u;
+    fake_flash_visibility_build_count = 0u;
+    fake_broad_owner_build_count      = 0u;
+    fake_combo_projection_build_count = 0u;
 
 #if RGB_LAYER_RENDER_TEST_LAYER_GROUPS
     rgb_runtime_layer_stage_test_reset_group_scan_count();
@@ -385,6 +401,16 @@ static void test_reset(void) {
     g_led_config.matrix_co[0][1] = 1;
     g_led_config.matrix_co[0][2] = 2;
     g_led_config.matrix_co[0][3] = 3;
+#if RGB_LAYER_RENDER_TEST_WORKLOAD
+    g_led_config.matrix_co[1][0] = RGB_LEFT_LED_COUNT;
+    g_led_config.matrix_co[1][1] = RGB_LEFT_LED_COUNT + 1u;
+    g_led_config.matrix_co[1][2] = RGB_LEFT_LED_COUNT + 2u;
+    g_led_config.matrix_co[1][3] = RGB_LEFT_LED_COUNT + 3u;
+    g_led_config.matrix_co[4][0] = RGB_LEFT_LED_COUNT;
+    g_led_config.matrix_co[4][1] = RGB_LEFT_LED_COUNT + 1u;
+    g_led_config.matrix_co[4][2] = RGB_LEFT_LED_COUNT + 2u;
+    g_led_config.matrix_co[4][3] = RGB_MATRIX_LED_COUNT - 9u;
+#else
     g_led_config.matrix_co[1][0] = 4;
     g_led_config.matrix_co[1][1] = 5;
     g_led_config.matrix_co[1][2] = 6;
@@ -393,11 +419,43 @@ static void test_reset(void) {
     g_led_config.matrix_co[4][1] = 5;
     g_led_config.matrix_co[4][2] = 6;
     g_led_config.matrix_co[4][3] = 7;
+#endif
 
     noah_rgb_runtime_post_init();
 }
 
 HOST_RUNTIME_FIXTURE_DEFINE_BASIC_QMK_STUBS(runtime_fixture)
+
+bool is_keyboard_left(void) {
+    return fake_is_left;
+}
+
+struct rgb_matrix_limits_t rgb_matrix_get_limits(uint8_t iter) {
+    struct rgb_matrix_limits_t limits;
+
+#if defined(RGB_MATRIX_LED_PROCESS_LIMIT) && RGB_MATRIX_LED_PROCESS_LIMIT > 0 && RGB_MATRIX_LED_PROCESS_LIMIT < RGB_MATRIX_LED_COUNT
+    limits.led_min_index = (uint8_t)(RGB_MATRIX_LED_PROCESS_LIMIT * iter);
+    limits.led_max_index = (uint8_t)(limits.led_min_index + RGB_MATRIX_LED_PROCESS_LIMIT);
+    if (limits.led_max_index > RGB_MATRIX_LED_COUNT) {
+        limits.led_max_index = RGB_MATRIX_LED_COUNT;
+    }
+#else
+    (void)iter;
+    limits.led_min_index = 0u;
+    limits.led_max_index = RGB_MATRIX_LED_COUNT;
+#endif
+
+#ifdef RGB_MATRIX_SPLIT
+    if (fake_is_left && limits.led_max_index > RGB_LEFT_LED_COUNT) {
+        limits.led_max_index = RGB_LEFT_LED_COUNT;
+    }
+    if (!fake_is_left && limits.led_min_index < RGB_LEFT_LED_COUNT) {
+        limits.led_min_index = RGB_LEFT_LED_COUNT;
+    }
+#endif
+
+    return limits;
+}
 
 pd_mode_snapshot_t pd_mode_snapshot(void) {
     return host_runtime_fixture_pd_mode_snapshot(pd_modes, PD_MODE_COUNT, fake_is_master, fake_pd_active_mode, fake_pd_locked_mode, fake_pd_owner_sides, split_runtime_sync_remote);
@@ -439,27 +497,48 @@ uint16_t keycode_at_keymap_location(uint8_t layer_num, uint8_t row, uint8_t colu
 }
 
 void key_feedback_semantic_map(uint8_t *out_map) {
+    fake_semantic_build_count++;
     memcpy(out_map, fake_feedback_semantic_map, KEY_FEEDBACK_SEMANTIC_MAP_SIZE);
 }
 
 void key_feedback_tap_branch_map(uint8_t *out_map) {
+    fake_tap_branch_build_count++;
     memcpy(out_map, fake_feedback_tap_branch_map, KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE);
 }
 
 void key_feedback_flash_visibility_bitmap(uint8_t *out_bitmap) {
+    // Model the production convenience wrapper: it rebuilds semantic truth
+    // before deriving visibility.
+    fake_semantic_build_count++;
+    fake_flash_visibility_build_count++;
+    key_origin_bitmap_copy(out_bitmap, fake_feedback_flash_visibility_bitmap);
+}
+
+void key_feedback_flash_visibility_bitmap_for_semantic_map(const uint8_t *semantic_map, uint8_t *out_bitmap) {
+    (void)semantic_map;
+    fake_flash_visibility_build_count++;
     key_origin_bitmap_copy(out_bitmap, fake_feedback_flash_visibility_bitmap);
 }
 
 void key_feedback_broad_owner_map(uint8_t *out_map) {
+    fake_broad_owner_build_count++;
     memcpy(out_map, fake_feedback_broad_owner_map, KEY_FEEDBACK_BROAD_OWNER_MAP_SIZE);
 }
 
 void combo_feedback_underlay_bitmap(uint8_t *out_bitmap) {
+    fake_combo_projection_build_count++;
     key_origin_bitmap_copy(out_bitmap, fake_combo_underlay_bitmap);
 }
 
 void combo_feedback_overlay_bitmap(uint8_t *out_bitmap) {
+    fake_combo_projection_build_count++;
     key_origin_bitmap_copy(out_bitmap, fake_combo_overlay_bitmap);
+}
+
+void combo_feedback_bitmaps(uint8_t *out_underlay_bitmap, uint8_t *out_overlay_bitmap) {
+    fake_combo_projection_build_count++;
+    key_origin_bitmap_copy(out_underlay_bitmap, fake_combo_underlay_bitmap);
+    key_origin_bitmap_copy(out_overlay_bitmap, fake_combo_overlay_bitmap);
 }
 
 uint8_t key_feedback_preview_layer(void) {
@@ -2050,7 +2129,184 @@ static void test_automouse_end_override_replaces_layer_stack_destination(void) {
 }
 #endif
 
+#if RGB_LAYER_RENDER_TEST_WORKLOAD
+static void test_workload_setup_scene(bool left, bool master) {
+    test_reset();
+    fake_is_left   = left;
+    fake_is_master = master;
+    layer_state    = (layer_state_t)1u << LAYER_SYM;
+
+    test_keymap[LAYER_NUM][0][1] = 0x0021u;
+    test_keymap[LAYER_NUM][4][1] = 0x0022u;
+    if (master) {
+        fake_preview_layer = LAYER_NUM;
+        test_feedback_bitmap_set(fake_combo_underlay_bitmap, 0, 0);
+        test_feedback_bitmap_add(fake_combo_overlay_bitmap, 4, 0);
+        test_feedback_bitmap_add(fake_combo_overlay_bitmap, 4, 3);
+        test_local_feedback_semantic_add(0, 2, KEY_FEEDBACK_SEMANTIC_TAP_COMMITTED);
+        test_local_feedback_semantic_add(4, 2, KEY_FEEDBACK_SEMANTIC_HOLD_PENDING);
+        test_local_feedback_tap_branch_add(0, 2, 3u);
+    } else {
+        split_runtime_sync_remote.key_preview_layer = LAYER_NUM;
+        test_feedback_bitmap_set(split_runtime_sync_remote.combo_underlay_bitmap, 0, 0);
+        test_feedback_bitmap_add(split_runtime_sync_remote.combo_overlay_bitmap, 4, 0);
+        test_feedback_bitmap_add(split_runtime_sync_remote.combo_overlay_bitmap, 4, 3);
+        test_remote_feedback_semantic_add(0, 2, KEY_FEEDBACK_SEMANTIC_TAP_COMMITTED);
+        test_remote_feedback_semantic_add(4, 2, KEY_FEEDBACK_SEMANTIC_HOLD_PENDING);
+        test_remote_feedback_tap_branch_add(0, 2, 3u);
+    }
+}
+
+static bool test_workload_render_qmk_frame(void) {
+    bool painted = false;
+
+    for (uint8_t iter = 0u; iter < 5u; iter++) {
+        struct rgb_matrix_limits_t limits = rgb_matrix_get_limits(iter);
+        if (limits.led_min_index < limits.led_max_index) {
+            for (uint8_t led = limits.led_min_index; led < limits.led_max_index; led++) {
+                led_output[led] = rgb_from_ws2812(ws2812_leds[led]);
+            }
+        }
+        painted |= noah_rgb_matrix_indicators_advanced_user(limits.led_min_index, limits.led_max_index);
+    }
+
+    return painted;
+}
+
+static void test_workload_check_local_colors_equal(const rgb_t *expected, const rgb_t *actual, bool left) {
+    uint8_t led_min = left ? 0u : RGB_LEFT_LED_COUNT;
+    uint8_t led_max = left ? RGB_LEFT_LED_COUNT : RGB_MATRIX_LED_COUNT;
+
+    for (uint8_t led = led_min; led < led_max; led++) {
+        CHECK(expected[led].r == actual[led].r);
+        CHECK(expected[led].g == actual[led].g);
+        CHECK(expected[led].b == actual[led].b);
+    }
+}
+
+static void test_workload_check_projection_budget(void) {
+    CHECK(fake_semantic_build_count == 1u);
+    CHECK(fake_tap_branch_build_count == 1u);
+    CHECK(fake_flash_visibility_build_count == 1u);
+    CHECK(fake_broad_owner_build_count == 1u);
+    CHECK(fake_combo_projection_build_count == 1u);
+}
+
+static void test_workload_full_and_five_chunk_parity(bool left) {
+    rgb_t full[RGB_MATRIX_LED_COUNT];
+    rgb_t chunked[RGB_MATRIX_LED_COUNT];
+
+    test_workload_setup_scene(left, true);
+    CHECK(render_output());
+    memcpy(full, led_output, sizeof(full));
+    test_workload_check_projection_budget();
+    CHECK(rgb_runtime_test_stage_pipeline_count() == 1u);
+    CHECK(rgb_runtime_test_early_exit_count() == 0u);
+
+    test_workload_setup_scene(left, true);
+    CHECK(test_workload_render_qmk_frame());
+    memcpy(chunked, led_output, sizeof(chunked));
+    test_workload_check_projection_budget();
+    CHECK(rgb_runtime_test_stage_pipeline_count() == 3u);
+    CHECK(rgb_runtime_test_early_exit_count() == 2u);
+    test_workload_check_local_colors_equal(full, chunked, left);
+}
+
+static void test_workload_nonlocal_ranges_skip_projection(void) {
+    test_workload_setup_scene(true, true);
+    CHECK(!noah_rgb_matrix_indicators_advanced_user(RGB_LEFT_LED_COUNT, RGB_MATRIX_LED_COUNT));
+    CHECK(!noah_rgb_matrix_indicators_advanced_user(RGB_LEFT_LED_COUNT, RGB_LEFT_LED_COUNT));
+    CHECK(!noah_rgb_matrix_indicators_advanced_user(RGB_MATRIX_LED_COUNT, RGB_LEFT_LED_COUNT));
+    CHECK(fake_semantic_build_count == 0u);
+    CHECK(fake_combo_projection_build_count == 0u);
+    CHECK(rgb_runtime_test_stage_pipeline_count() == 0u);
+    CHECK(rgb_runtime_test_early_exit_count() == 3u);
+
+    test_workload_setup_scene(false, true);
+    CHECK(!noah_rgb_matrix_indicators_advanced_user(0u, RGB_LEFT_LED_COUNT));
+    CHECK(!noah_rgb_matrix_indicators_advanced_user(0u, 0u));
+    CHECK(!noah_rgb_matrix_indicators_advanced_user(RGB_MATRIX_LED_COUNT, RGB_MATRIX_LED_COUNT));
+    CHECK(fake_semantic_build_count == 0u);
+    CHECK(fake_combo_projection_build_count == 0u);
+    CHECK(rgb_runtime_test_stage_pipeline_count() == 0u);
+    CHECK(rgb_runtime_test_early_exit_count() == 3u);
+}
+
+static void test_workload_idle_frame_has_one_bounded_source_probe(void) {
+    test_reset();
+    fake_is_left = true;
+    (void)test_workload_render_qmk_frame();
+    test_workload_check_projection_budget();
+    CHECK(rgb_runtime_test_stage_pipeline_count() == 3u);
+    CHECK(rgb_runtime_test_early_exit_count() == 2u);
+}
+
+static void test_workload_local_snapshot_is_frame_coherent(void) {
+    struct rgb_matrix_limits_t first;
+    struct rgb_matrix_limits_t second;
+
+    test_workload_setup_scene(true, true);
+    first  = rgb_matrix_get_limits(0u);
+    second = rgb_matrix_get_limits(1u);
+    CHECK(noah_rgb_matrix_indicators_advanced_user(first.led_min_index, first.led_max_index));
+    test_workload_check_projection_budget();
+
+    key_feedback_semantic_map_clear(fake_feedback_semantic_map);
+    key_feedback_broad_owner_map_clear(fake_feedback_broad_owner_map);
+    key_origin_bitmap_clear(fake_combo_underlay_bitmap);
+    key_origin_bitmap_clear(fake_combo_overlay_bitmap);
+    CHECK(noah_rgb_matrix_indicators_advanced_user(second.led_min_index, second.led_max_index));
+    test_workload_check_projection_budget();
+
+    CHECK(noah_rgb_matrix_indicators_advanced_user(first.led_min_index, first.led_max_index));
+    CHECK(fake_semantic_build_count == 2u);
+    CHECK(fake_tap_branch_build_count == 2u);
+    CHECK(fake_flash_visibility_build_count == 2u);
+    CHECK(fake_broad_owner_build_count == 2u);
+    CHECK(fake_combo_projection_build_count == 2u);
+}
+
+static void test_workload_remote_snapshot_is_frame_coherent(void) {
+    struct rgb_matrix_limits_t first_local;
+    struct rgb_matrix_limits_t final_local;
+
+    test_workload_setup_scene(false, false);
+    key_feedback_semantic_map_clear(split_runtime_sync_remote.key_feedback_semantic_map);
+    key_feedback_broad_owner_map_clear(split_runtime_sync_remote.key_feedback_broad_owner_map);
+    first_local = rgb_matrix_get_limits(2u);
+    final_local = rgb_matrix_get_limits(4u);
+    CHECK(noah_rgb_matrix_indicators_advanced_user(rgb_matrix_get_limits(0u).led_min_index, rgb_matrix_get_limits(0u).led_max_index) == false);
+    CHECK(noah_rgb_matrix_indicators_advanced_user(rgb_matrix_get_limits(1u).led_min_index, rgb_matrix_get_limits(1u).led_max_index) == false);
+    CHECK(noah_rgb_matrix_indicators_advanced_user(first_local.led_min_index, first_local.led_max_index));
+
+    key_origin_bitmap_clear(split_runtime_sync_remote.combo_overlay_bitmap);
+    CHECK(noah_rgb_matrix_indicators_advanced_user(final_local.led_min_index, final_local.led_max_index));
+    check_led(RGB_MATRIX_LED_COUNT - 9u, rgb_from_combo_feedback());
+
+    CHECK(!noah_rgb_matrix_indicators_advanced_user(rgb_matrix_get_limits(0u).led_min_index, rgb_matrix_get_limits(0u).led_max_index));
+    CHECK(noah_rgb_matrix_indicators_advanced_user(first_local.led_min_index, first_local.led_max_index));
+    CHECK(noah_rgb_matrix_indicators_advanced_user(final_local.led_min_index, final_local.led_max_index));
+    check_led(RGB_MATRIX_LED_COUNT - 9u, rgb_from_hsv(layer_colors[LAYER_SYM].color));
+}
+
+static void test_workload_render_contract(void) {
+    test_workload_full_and_five_chunk_parity(true);
+    test_workload_full_and_five_chunk_parity(false);
+    test_workload_nonlocal_ranges_skip_projection();
+    test_workload_idle_frame_has_one_bounded_source_probe();
+    test_workload_local_snapshot_is_frame_coherent();
+    test_workload_remote_snapshot_is_frame_coherent();
+}
+#endif
+
 int main(int argc, char **argv) {
+#if RGB_LAYER_RENDER_TEST_WORKLOAD
+    (void)argc;
+    (void)argv;
+    test_workload_render_contract();
+    puts("rgb render workload contract passed");
+    return 0;
+#endif
 #if RGB_LAYER_RENDER_TEST_LAYER_GROUPS
     if (argc != 2) {
         fprintf(stderr, "expected one RGB layer-group scenario\n");

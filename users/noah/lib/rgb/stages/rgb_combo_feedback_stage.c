@@ -8,7 +8,6 @@
 
 #    include "../core/rgb_helpers.h"
 #    include "../../key/runtime/feedback.h"
-#    include "../../split/runtime_sync.h"
 
 extern const combo_feedback_color_config_t     combo_feedback_colors;
 extern const combo_feedback_led_group_t *const combo_feedback_led_groups;
@@ -32,23 +31,6 @@ static bool rgb_runtime_combo_feedback_stage_led_group_intersects(const uint8_t 
     }
 
     return false;
-}
-
-static void rgb_runtime_combo_feedback_stage_current_bitmap(bool underlay, uint8_t *out_bitmap) {
-    if (!out_bitmap) {
-        return;
-    }
-
-    if (is_keyboard_master()) {
-        if (underlay) {
-            combo_feedback_underlay_bitmap(out_bitmap);
-        } else {
-            combo_feedback_overlay_bitmap(out_bitmap);
-        }
-        return;
-    }
-
-    key_origin_bitmap_copy(out_bitmap, underlay ? split_runtime_sync_remote.combo_underlay_bitmap : split_runtime_sync_remote.combo_overlay_bitmap);
 }
 
 static bool rgb_runtime_combo_feedback_stage_paint_key(keypos_t key_pos, uint8_t led_min, uint8_t led_max) {
@@ -148,11 +130,9 @@ static bool rgb_runtime_combo_feedback_stage_render_groups(uint8_t led_min, uint
     return painted;
 }
 
-static bool rgb_runtime_combo_feedback_stage_render(bool underlay, uint8_t led_min, uint8_t led_max) {
-    uint8_t bitmap[KEY_ORIGIN_BITMAP_SIZE];
-    bool    painted = false;
+static bool rgb_runtime_combo_feedback_stage_render(const uint8_t *bitmap, uint8_t led_min, uint8_t led_max) {
+    bool painted = false;
 
-    rgb_runtime_combo_feedback_stage_current_bitmap(underlay, bitmap);
     if (!key_origin_bitmap_has_any(bitmap)) {
         return false;
     }
@@ -163,12 +143,12 @@ static bool rgb_runtime_combo_feedback_stage_render(bool underlay, uint8_t led_m
     return painted;
 }
 
-bool rgb_runtime_combo_feedback_stage_render_underlay(uint8_t led_min, uint8_t led_max) {
-    return rgb_runtime_combo_feedback_stage_render(true, led_min, led_max);
+bool rgb_runtime_combo_feedback_stage_render_underlay(const uint8_t *bitmap, uint8_t led_min, uint8_t led_max) {
+    return rgb_runtime_combo_feedback_stage_render(bitmap, led_min, led_max);
 }
 
-bool rgb_runtime_combo_feedback_stage_render_overlay(uint8_t led_min, uint8_t led_max) {
-    return rgb_runtime_combo_feedback_stage_render(false, led_min, led_max);
+bool rgb_runtime_combo_feedback_stage_render_overlay(const uint8_t *bitmap, uint8_t led_min, uint8_t led_max) {
+    return rgb_runtime_combo_feedback_stage_render(bitmap, led_min, led_max);
 }
 
 #endif

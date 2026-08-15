@@ -15,16 +15,18 @@
 
 #if defined(RGB_MATRIX_ENABLE) && defined(COMBO_ENABLE) && defined(RGB_COMBO_FEEDBACK_ENABLE)
 void rgb_runtime_combo_feedback_stage_post_init(void);
-bool rgb_runtime_combo_feedback_stage_render_underlay(uint8_t led_min, uint8_t led_max);
-bool rgb_runtime_combo_feedback_stage_render_overlay(uint8_t led_min, uint8_t led_max);
+bool rgb_runtime_combo_feedback_stage_render_underlay(const uint8_t *bitmap, uint8_t led_min, uint8_t led_max);
+bool rgb_runtime_combo_feedback_stage_render_overlay(const uint8_t *bitmap, uint8_t led_min, uint8_t led_max);
 #else
 static inline void rgb_runtime_combo_feedback_stage_post_init(void) {}
-static inline bool rgb_runtime_combo_feedback_stage_render_underlay(uint8_t led_min, uint8_t led_max) {
+static inline bool rgb_runtime_combo_feedback_stage_render_underlay(const uint8_t *bitmap, uint8_t led_min, uint8_t led_max) {
+    (void)bitmap;
     (void)led_min;
     (void)led_max;
     return false;
 }
-static inline bool rgb_runtime_combo_feedback_stage_render_overlay(uint8_t led_min, uint8_t led_max) {
+static inline bool rgb_runtime_combo_feedback_stage_render_overlay(const uint8_t *bitmap, uint8_t led_min, uint8_t led_max) {
+    (void)bitmap;
     (void)led_min;
     (void)led_max;
     return false;

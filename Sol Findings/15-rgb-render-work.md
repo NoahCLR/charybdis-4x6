@@ -3,7 +3,7 @@
 ## Plan metadata
 
 - Severity: medium optimization
-- Status: planned
+- Status: verified
 - Recommended phase: Phase 5 RGB performance, after preview parity and coordinated with runtime projection invalidation
 - Affected surfaces:
   - users/noah/lib/rgb/core/rgb_runtime.c
@@ -25,7 +25,7 @@ QMK invokes the advanced RGB indicator callback in LED chunks. The current callb
 
 Several stages also rebuild the same projections within one invocation. Key feedback creates a semantic map, then asks a wrapper to rebuild the semantic map while deriving flash visibility. Combo underlay and overlay each rebuild both partition bitmaps through wrapper APIs. Key-feedback suppression combines those partitions again. This multiplies scans of runtime slots, combo state, and matrix positions without changing the resulting colors.
 
-## Current evidence and quantified workload
+## Pre-implementation evidence and quantified workload
 
 - users/noah/config.h:76-87 defines 58 global LEDs split 29 and 29.
 - The audited build processes 12 LEDs per callback, producing five chunks for 58 LEDs.
@@ -39,6 +39,32 @@ Several stages also rebuild the same projections within one invocation. Key feed
 - users/noah/lib/rgb/stages/rgb_key_feedback_stage.c:104-119 invokes both single-bitmap wrappers again and combines them for suppression.
 - users/noah/lib/split/runtime_sync.c:99-103 already demonstrates the combined combo_feedback_bitmaps API that obtains both partitions in one projection.
 - The audit estimated roughly ten semantic-map builds and twenty combo partitions across five chunks, including idle frames.
+
+## Implemented result
+
+- `rgb_runtime.c` now recognizes the exact first callback of a QMK RGB frame by
+  comparing the incoming range with `rgb_matrix_get_limits(0)` before any
+  physical-half filtering.
+- Empty, inverted, out-of-range, and nonlocal split ranges return before the
+  diagnostics/base/overlay stage pipeline.
+- One runtime-owned source snapshot lazily builds both combo partitions
+  together and reuses them for underlay, overlay, and unresolved-semantic
+  suppression.
+- Key feedback builds semantic, tap-branch, flash-visibility, and broad-owner
+  truth once per frame. Flash visibility derives from the already-built
+  semantic map.
+- Combo and key-feedback painters now accept immutable prebuilt maps and no
+  longer own source projection or per-chunk map arrays.
+- The exact frame boundary invalidates local, remote, and time-dependent truth
+  together. Mid-frame changes intentionally appear coherently on the next RGB
+  frame instead of mixing source generations across chunks.
+- The five-chunk work budget changes semantic builds from 10 to 1, combined
+  combo projection invocations from 20 to 1, and stage-pipeline entries from 5
+  to 3 on either physical half.
+- The linked snapshot symbol is 80 B and has a 96 B compile-time ceiling. The
+  ordinary target remains at 245,592 B BSS; text is 151,000 B, 104 B above the
+  Finding 13 target.
+- Authored colors, locality, preview behavior, and stage order are unchanged.
 
 ## Required invariants
 
@@ -192,19 +218,22 @@ Closure gates:
 
 ## Acceptance checklist
 
-- [ ] Nonintersecting current-half chunks exit before stage work.
-- [ ] Key feedback reuses one semantic map for flash derivation.
-- [ ] Combo partitions are built together and reused.
-- [ ] Expensive projections are at most once per generation/frame contract.
-- [ ] Local, remote, and time-deadline invalidation is complete.
-- [ ] Full-range and chunked output are color-identical.
-- [ ] Left/right role and feature-gate cases are covered.
-- [ ] Snapshot RAM and stack costs are measured and bounded.
-- [ ] Targeted RGB, split, key-runtime, trace, and compile-gate checks pass.
-- [ ] The full host suite passes.
-- [ ] The target QMK compile passes.
-- [ ] Architecture documentation and review notes match the cache lifecycle.
+- [x] Nonintersecting current-half chunks exit before stage work.
+- [x] Key feedback reuses one semantic map for flash derivation.
+- [x] Combo partitions are built together and reused.
+- [x] Expensive projections are at most once per generation/frame contract.
+- [x] Local, remote, and time-deadline invalidation is complete.
+- [x] Full-range and chunked output are color-identical.
+- [x] Left/right role and feature-gate cases are covered.
+- [x] Snapshot RAM and stack costs are measured and bounded.
+- [x] Targeted RGB, split, key-runtime, trace, and compile-gate checks pass.
+- [x] The full host suite passes.
+- [x] The target QMK compile passes.
+- [x] Architecture documentation and review notes match the cache lifecycle.
 
-## Next action
+## Closure result
 
-Add projection counters and full-range-versus-five-chunk color comparisons to rgb_layer_render_test.c. Then land the physical-half guard and within-callback semantic/combo reuse before deciding whether a cross-chunk generation cache is justified.
+Finding 15 is verified. Review 14 records the red work-count evidence, exact
+QMK frame contract, implementation, complete verification, target resources,
+and closure verdict. Retain the 58-LED workload fixture and Finding 13 parity
+scenarios as mandatory regression gates for future RGB work.

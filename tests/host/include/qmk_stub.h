@@ -182,6 +182,11 @@ typedef struct {
     uint8_t b;
 } rgb_t;
 
+struct rgb_matrix_limits_t {
+    uint8_t led_min_index;
+    uint8_t led_max_index;
+};
+
 typedef struct {
     uint8_t h;
     uint8_t s;
@@ -212,6 +217,8 @@ uint32_t         timer_elapsed32(uint32_t last);
 uint32_t         last_input_activity_elapsed(void);
 uint32_t         last_matrix_activity_elapsed(void);
 bool             is_keyboard_master(void);
+bool             is_keyboard_left(void);
+struct rgb_matrix_limits_t rgb_matrix_get_limits(uint8_t iter);
 uint32_t         eeconfig_read_user(void);
 void             eeconfig_update_user(uint32_t value);
 bool             process_record_user(uint16_t keycode, keyrecord_t *record);
