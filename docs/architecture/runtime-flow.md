@@ -20,6 +20,7 @@ flowchart TD
     runtime --> rgb["rgb/core/rgb_runtime.c RGB hook"]
     runtime --> layer["pointing runtime + layer ownership hook"]
     init --> via_defaults["macro/via_macro_defaults.c"]
+    init --> combo_scan["compat/qmk_combo_origin.c lifecycle reconciliation"]
     init --> key_scan["key/runtime/scan.c"]
     init --> split_sync["split/runtime_sync.c"]
     init --> held_repeat["key/ownership/held_repeat.c"]
@@ -87,6 +88,7 @@ or drain effects but must not re-decide release semantics.
 flowchart TD
     scan["matrix_scan_user"] --> init["runtime_init.c"]
     init --> via["VIA macro default scan seeding"]
+    init --> combo["Compatibility: retire suppressed/expired combo origins"]
     init --> key_scan["key/runtime/scan.c"]
     key_scan --> reducer_scan["Authoritative reducer scan state"]
     reducer_scan --> scan_plan["Planned: scan_planner and tap_series helpers"]
@@ -99,9 +101,11 @@ flowchart TD
     housekeeping --> diag["Watchdog refresh and boot-indicator expiry"]
 ```
 
-Scan owns time-based work: hold threshold promotion, long-hold promotion,
-pending multi-tap expiry, pending release draining, split heartbeats, and held
-repeat ticking.
+Combo-origin reconciliation runs before key-runtime scan projection. It removes
+QMK-disabled candidates immediately and expires inactive candidates only after
+the first crossed-deadline scan has been followed by a `combo_task()` cycle.
+Scan also owns hold threshold promotion, long-hold promotion, pending multi-tap
+expiry, pending release draining, split heartbeats, and held repeat ticking.
 
 ## Reducer, Planner, Projection Boundary
 

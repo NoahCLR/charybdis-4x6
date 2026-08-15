@@ -10,6 +10,7 @@
 #    include "action.h"
 #    include "report.h"
 #    include "keycode.h"
+#    include "process_keycode/process_combo.h"
 #endif
 
 _Static_assert(offsetof(keyrecord_t, event) == 0, "keyrecord_t.event must remain the first field");
@@ -17,6 +18,7 @@ _Static_assert(offsetof(keyrecord_t, event) == 0, "keyrecord_t.event must remain
 static void qmk_contract_field_smoke(void) {
     keyrecord_t    record = {0};
     report_mouse_t report = {0};
+    combo_t        combo  = {0};
 
     (void)record.event.key.row;
     (void)record.event.key.col;
@@ -28,6 +30,14 @@ static void qmk_contract_field_smoke(void) {
     (void)report.y;
     (void)report.h;
     (void)report.v;
+
+    (void)combo.keys;
+    (void)combo.keycode;
+    (void)combo.state;
+#ifndef EXTRA_SHORT_COMBOS
+    (void)combo.disabled;
+    (void)combo.active;
+#endif
 }
 
 int main(void) {
@@ -35,6 +45,12 @@ int main(void) {
 
     printf("SAFE_RANGE=0x%04X\n", (unsigned)SAFE_RANGE);
     printf("COMBO_EVENT=%u\n", (unsigned)COMBO_EVENT);
+    printf("COMBO_T_SIZE=%u\n", (unsigned)sizeof(combo_t));
+    printf("COMBO_T_STATE_OFFSET=%u\n", (unsigned)offsetof(combo_t, state));
+#ifndef EXTRA_SHORT_COMBOS
+    printf("COMBO_T_DISABLED_OFFSET=%u\n", (unsigned)offsetof(combo_t, disabled));
+    printf("COMBO_T_ACTIVE_OFFSET=%u\n", (unsigned)offsetof(combo_t, active));
+#endif
     printf("QK_MODS=0x%04X\n", (unsigned)QK_MODS);
     printf("QK_RMODS_MIN=0x%04X\n", (unsigned)QK_RMODS_MIN);
     printf("QK_LAYER_TAP=0x%04X\n", (unsigned)QK_LAYER_TAP);

@@ -5,10 +5,10 @@
 - **Branch:** `sol`
 - **Starting commit:** `5b20ed01` (`sol findings`)
 - **Started:** 2026-07-13
-- **Current focus:** [Finding 06 — combo-origin cache lifecycle](06-combo-origin-cache-lifecycle.md)
+- **Current focus:** [Finding 07 — nonblocking macro playback](07-nonblocking-macro-playback.md)
 - **Overall status:** In progress
-- **Latest closed review:** [`review/2026-08-15-review-05`](../review/2026-08-15-review-05/)
-- **Active review:** None; open the next sortable folder when Finding 06 architecture work begins
+- **Latest closed review:** [`review/2026-08-15-review-06`](../review/2026-08-15-review-06/)
+- **Active review:** None; open the next sortable folder when Finding 07 architecture work begins
 
 This file is the implementation record for the plans in this directory. It records what actually changed, why choices were made, what verification really ran, and what remains open. A plan is not marked verified until its targeted checks, the full host suite, the target firmware build, target-specific evidence, and required documentation all pass.
 
@@ -29,7 +29,7 @@ This file is the implementation record for the plans in this directory. It recor
 | 03 | [VIA split buffer validation](03-via-split-buffer-validation.md) | Must fix | Verified | Exhaustive normal/ASan/UBSan boundary matrix, full host suite, firmware build, and target stack regression gate pass |
 | 04 | [VIA macro byte validation](04-via-macro-byte-validation.md) | Must fix | Verified | Exhaustive text-domain, whole-IR preflight, cache lifecycle, full host, firmware, and explicit target-stack paths pass |
 | 05 | [VIA split persistence](05-via-split-persistence.md) | Must fix | Planned | Not run |
-| 06 | [Combo-origin cache lifecycle](06-combo-origin-cache-lifecycle.md) | Should fix | Planned | Not run |
+| 06 | [Combo-origin cache lifecycle](06-combo-origin-cache-lifecycle.md) | Should fix | Verified | Exact generations, suppression/deadline/capacity lifecycle, normal/compact QMK contracts, full host, firmware, and explicit 280 B target stack path pass |
 | 07 | [Nonblocking macro playback](07-nonblocking-macro-playback.md) | Should fix | Planned | Not run |
 | 08 | [Synthetic-key ownership](08-synthetic-key-ownership.md) | Should fix | Verified | Aggregate physical/managed report ownership, scoped persistent leases, strict macro balance, source guards, full host, firmware, and target stack gates pass |
 | 09 | [Pending-release sequence rollover](09-pending-release-sequence-rollover.md) | Should fix | Verified | Explicit linked FIFO, 65,537-cycle blocked-head stress, structural corruption checks, full host, firmware, and target stack gate pass |
@@ -490,6 +490,72 @@ balance, failure handling, mechanical caller boundaries, complete host
 coverage, target firmware, resource measurements, and review documentation all
 meet the closure bar.
 
+## Finding 06 — Combo-origin cache lifecycle
+
+### Objective
+
+Bound QMK combo-origin candidates without losing attribution for legitimate
+outputs emitted after physical member release, and prevent overlap-suppressed
+origins from poisoning feedback or cache capacity.
+
+### 2026-08-15 — Pinned contract and failing reproduction
+
+- Audited the pinned QMK pre-hook, `process_combo()`, matrix-scan, and
+  `combo_task()` order. The userspace pre-hook runs before combo processing;
+  userspace scan runs before matrix event processing and the following
+  `combo_task()` cycle.
+- Recorded that current profile output is legal strictly after `COMBO_TERM`
+  (50 ms) and that `post_process_record_user()` is not reliable for records
+  consumed by QMK combo processing.
+- Added the suppressed-overlap test first. The old code failed because the
+  disabled short candidate remained in the pressed-combo bitmap.
+
+### Implemented
+
+- Added nonzero physical-completion generations allocated away from every live
+  pending and active entry, making equality safe across counter wrap.
+- Keyed pending/active state by exact combo index and generation. Emitted
+  presses promote one candidate; same-output combos no longer union origins or
+  clear each other. Release matching uses the triggering physical member.
+- Reconciled pending candidates at later physical observations and at the scan
+  boundary. Disabled candidates retire immediately. Inactive candidates keep
+  one crossed-deadline grace scan for the following QMK `combo_task()`, then
+  expire if no output arrived.
+- Derived the deadline from the profile-wide maximum QMK wait contract,
+  including per-combo term and hold/tap feature variants. Timerless builds do
+  not invent an illegal expiry.
+- Refused new candidates when all four pending slots are live instead of
+  overwriting slot zero. Refused origins never enter pending feedback state.
+- Added snapshot diagnostics for current pending/active counts, high-water,
+  suppressed retirement, deadline expiry, cache-full refusal, and unmatched
+  delayed output.
+- Wired reconciliation between VIA default scan work and key-runtime scan.
+
+### Coverage and measurements
+
+- Focused tests cover suppression, delayed output, deadline edges, uint16 timer
+  wrap, full-cache refusal and recovery, feedback bitmap cleanup, exact
+  same-output generations, unmatched output, reset, normal/compact QMK layouts,
+  and the timerless compile branch.
+- Runtime init ordering, pinned QMK source ordering/layout parity, hook chaining,
+  key-runtime scenarios/integration, split sync, real profile, and feature
+  compile gates pass.
+- Final instrumented image: 144,172 B text, 245,592 B total BSS. Exact lifecycle
+  symbols are 96 B pending cache, 96 B active cache, 12 B diagnostics, and 4 B
+  generation state. Text is 648 B above the prior Finding 08 instrumented image;
+  fixed-layout total BSS is unchanged and the explicit `.bss` growth reduces
+  linked heap.
+- The explicit combo-origin retirement stack path is 280 B. The worst reviewed
+  main path is 1,816 B of 1,920 B; the split worst remains 328 B of 768 B.
+- No sibling source was edited; only pinned-QMK inspection and generated target
+  artifacts crossed the repository boundary.
+
+### Current finding status
+
+Finding 06 is **Verified**. Focused and complete host coverage, ordinary target
+firmware, fresh explicit stack evidence, measurements, compatibility docs, Sol
+records, and closed review 06 agree.
+
 ## Verification ledger
 
 | Date | Finding | Command | Result | Notes |
@@ -590,6 +656,20 @@ meet the closure bar.
 | 2026-08-15 | 08 | `qmk compile -kb bastardkb/charybdis/4x6 -km noah` | Passed | Required ordinary target build on final source tree |
 | 2026-08-15 | 08 | `PYTHONPYCACHEPREFIX=/tmp/noah-stack-pycache PYTHON=/usr/bin/python3 sh tests/host/run_firmware_stack_budget_checks.sh` | Passed | Fresh target artifacts; 1,808 B worst reviewed main path and 328 B split path |
 | 2026-08-15 | 08 | `git diff --check` | Passed | Final source, tests, runtime docs, Sol records, and closed review 05 |
+| 2026-08-15 | 06 | `sh tests/host/run_qmk_combo_origin_tests.sh` before implementation | Failed as expected | Overlap-disabled short candidate remained in the pressed-combo feedback bitmap |
+| 2026-08-15 | 06 | `sh tests/host/run_qmk_combo_origin_tests.sh` | Passed | Normal/compact layouts; suppression, deadline/wrap, capacity, identity, diagnostics, release footprint; timerless compile |
+| 2026-08-15 | 06 | `sh tests/host/run_runtime_init_order_tests.sh` | Passed | Combo reconciliation is between VIA default scan and key-runtime scan |
+| 2026-08-15 | 06 | `sh tests/host/run_key_runtime_scenario_tests.sh` | Passed | Key-runtime scenarios remain coherent |
+| 2026-08-15 | 06 | `sh tests/host/run_key_runtime_integration_harness_tests.sh` | Passed | End-to-end runtime integration remains coherent |
+| 2026-08-15 | 06 | `sh tests/host/run_hook_chaining_tests.sh` | Passed | Shared hook delegation remains coherent |
+| 2026-08-15 | 06 | `sh tests/host/run_split_runtime_sync_tests.sh` | Passed | Both split-sync variants preserve combo feedback transport |
+| 2026-08-15 | 06 | `sh tests/host/run_real_profile_validation_tests.sh` | Passed | Both real-profile variants retain authored combo validity |
+| 2026-08-15 | 06 | `sh tests/host/run_feature_gate_compile_tests.sh` | Passed | Compatibility header and runtime feature variants compile |
+| 2026-08-15 | 06 | `sh tests/host/run_qmk_contract_checks.sh` | Passed | Normal/compact combo layout parity and pinned hook/scan/task order |
+| 2026-08-15 | 06 | `python3 tools/profile_introspect.py --write && python3 tools/profile_introspect.py --check` | Passed | Authored keymap comment changed; generated profile outputs remained current |
+| 2026-08-15 | 06 | `PYTHONPYCACHEPREFIX=/tmp/noah-host-pycache sh tests/host/run_all_host_tests.sh` | Passed | Complete host suite with new lifecycle and contract variants |
+| 2026-08-15 | 06 | `qmk compile -kb bastardkb/charybdis/4x6 -km noah` | Passed | Required ordinary target firmware build |
+| 2026-08-15 | 06 | `PYTHONPYCACHEPREFIX=/tmp/noah-stack-pycache PYTHON=/usr/bin/python3 sh tests/host/run_firmware_stack_budget_checks.sh` | Blocked, then passed | Initial sandboxed clean could not modify sibling generated QMK artifacts; approved fresh rebuild passed with explicit 280 B combo path, 1,816 B worst main path, and 328 B split path |
 
 ## Cross-cutting decisions and deferred work
 
@@ -599,12 +679,15 @@ meet the closure bar.
 - Finding 08 establishes the only aggregate literal-report ownership path for
   physical events, held actions, macro playback, and PD persistent shortcuts.
   Finding 07 must reuse its leases during nonblocking playback.
+- Finding 06 keeps QMK combo candidates compatibility-owned and bounded. Its
+  scan reconciliation is sequential with key-runtime scan, not nested runtime
+  ownership, and its target path is explicitly tracked by the stack gate.
 - The stack checker must model vendor split callbacks under `SlaveThread`, not under the main process stack. Stack-context correctness is part of the gate contract.
 - No sibling workspace source was edited; only QMK build artifacts were produced under `../bastardkb-qmk/.build`.
 
 ## Next program action
 
-Begin Finding 06 by opening the next sortable review folder, reproducing the
-combo-origin cache lifecycle defect, and preserving the now-closed ownership
-contract. Finding 07 may proceed after or alongside Finding 06, but must reuse
-the scoped leases landed by Finding 08.
+Begin Finding 07 by opening the next sortable review folder, defining the
+nonblocking playback scheduler's queue, overlap, cancellation, reset, suspend,
+and abort-cleanup contract before code changes. Reuse the scoped leases landed
+by Finding 08; Finding 06 is closed.

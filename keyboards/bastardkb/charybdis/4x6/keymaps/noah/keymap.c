@@ -183,6 +183,9 @@ enum keymap_custom_keycodes {
 // Combo origin tracking follows the live resolved keycodes QMK sees, so VIA /
 // dynamic keymap changes stay authoritative. Keep each combo row's member
 // keycodes unique so that footprint tracking can disambiguate the chord.
+// Overlap-suppressed candidates are retired from feedback at the next compat
+// reconciliation boundary; delayed legitimate outputs retain their exact
+// physical footprint through QMK's final legal buffered-output opportunity.
 //
 // Combo timing is tuned in config.h via COMBO_TERM.
 // Current default: COMBO_TERM = 50 ms.

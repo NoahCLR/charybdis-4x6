@@ -2,7 +2,7 @@
 
 ## Plan metadata
 
-- **Status:** Implementation in progress; Phase 1 Findings 01, 03, 04, 02, and 09 are verified. Phase 2 ownership foundation Finding 08 is verified; Finding 06 is next, and Finding 07 is unblocked by the landed lease contract. See [`implementation-progress.md`](implementation-progress.md).
+- **Status:** Implementation in progress; Phase 1 Findings 01, 03, 04, 02, and 09 are verified. Phase 2 Findings 08 and 06 are verified; Finding 07 is next and must reuse the landed lease contract. See [`implementation-progress.md`](implementation-progress.md).
 - **Prepared:** 2026-07-13.
 - **Scope:** Firmware runtime correctness, split reliability, target resource safety, and measured hot-path efficiency.
 - **Source:** The deep firmware code review performed against the current `charybdis-4x6` tree.
@@ -148,6 +148,8 @@ Recommended order: **08 first; 06 and 07 may then proceed independently**.
 1. Define who owns physical and synthetic basic/modifier registrations and how reference counts are reconciled.
 2. Correct combo-origin lifecycle without assuming physical release means QMK can no longer emit a delayed combo event.
 3. Replace blocking macro delays with a scan-driven state machine that uses the new ownership contract. This can proceed alongside combo-origin work once Finding 08 is stable.
+
+Findings 08 and 06 are now verified. Finding 07 is the remaining Phase 2 item.
 
 The macro scheduler must specify queueing, overlap, cancellation, reset, layer change, suspend, and aborted-playback cleanup before code is written. A scheduler that is nonblocking but leaks owned keys is not an improvement.
 

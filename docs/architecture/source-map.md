@@ -44,7 +44,7 @@ source trace because they rewrite or verify human-facing firmware docs.
 | Source group | Responsibility | Runtime authority | Inputs | Outputs or side effects | Primary tests | Related docs |
 | --- | --- | --- | --- | --- | --- | --- |
 | `action/` | Classify and dispatch action keycodes; aggregate physical and managed literal report ownership | Action metadata, dispatch policy, and owner-scoped literal-key leases | Runtime effects, physical key observations, direct action keys, macro actions | Aggregate-boundary QMK report transitions, synthetic records, PD keycode press/release, macro playback | `run_action_dispatch_tests.sh`, `run_action_lifecycle_tests.sh`, `run_owned_keycode_tests.sh`, `run_delayed_action_tests.sh` | [change-guide](./change-guide.md), [KEY_RUNTIME](../KEY_RUNTIME.md) |
-| `compat/` | Centralize QMK/fork/VIA contracts | Compatibility-only | QMK combo records, VIA commands, QMK APIs | Normalized combo origins, VIA split replication, contract wrappers | `run_qmk_contract_checks.sh`, `run_qmk_combo_origin_tests.sh`, `run_qmk_via_split_sync_tests.sh`, `run_feature_gate_compile_tests.sh` | [runtime-flow](./runtime-flow.md) |
+| `compat/` | Centralize QMK/fork/VIA contracts | Compatibility-only | QMK combo records and state, VIA commands, QMK APIs | Bounded generation-aware combo origins, VIA split replication, contract wrappers | `run_qmk_contract_checks.sh`, `run_qmk_combo_origin_tests.sh`, `run_qmk_via_split_sync_tests.sh`, `run_feature_gate_compile_tests.sh` | [runtime-flow](./runtime-flow.md) |
 | `key/behavior/` | Resolve authored key behavior | Authored behavior interpretation | `key_behaviors[]`, resolved keycodes | `handled_key_resolution_t`, materialized runtime contracts, validation errors | `run_key_behavior_lookup_tests.sh`, `run_key_behavior_validation_tests.sh`, `run_keymap_validation_tests.sh`, `run_real_profile_validation_tests.sh` | [INTERACTION_MODEL](../INTERACTION_MODEL.md), [KEY_RUNTIME](../KEY_RUNTIME.md) |
 | `key/ownership/` | Applied held-action and repeat registries | Projected applied state | Key-runtime effects, housekeeping tick | Registered held actions, repeating actions | `run_held_action_tests.sh`, `run_key_runtime_modifier_hold_integration_tests.sh` | [KEY_RUNTIME](../KEY_RUNTIME.md) |
 | `key/runtime/` top level | QMK-facing key-runtime orchestration | Integration only | QMK key events and scan events | Reducer observations, transition plans, projected effects | key-runtime release/scenario/integration/layer-lock/modifier-hold suites | [KEY_RUNTIME](../KEY_RUNTIME.md), [runtime-flow](./runtime-flow.md) |
@@ -87,6 +87,12 @@ source trace because they rewrite or verify human-facing firmware docs.
   `qmk_via_contract.c`, `qmk_via_playback_contract.h`,
   `qmk_via_storage_contract.h`
 - Split helpers: `split_half.h`, `split_role.c`
+
+Combo-origin pending entries are bounded compatibility candidates, not runtime
+press ownership. Each is keyed by combo index and physical completion
+generation, reconciled against the pinned QMK active/disabled layout at the
+scan boundary, and either promoted exactly once, suppressed, expired after the
+legal buffered-output window, refused conservatively at capacity, or reset.
 
 VIA packets replayed by the slave are untrusted input. `qmk_via_split_sync.c`
 must decode and validate a complete typed command before it calls QMK storage

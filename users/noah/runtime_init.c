@@ -44,6 +44,8 @@ void noah_eeconfig_init_user(void) {
 void noah_matrix_scan_user(void) {
     noah_via_macro_defaults_matrix_scan();
 
+    noah_qmk_combo_origin_scan();
+
     noah_key_runtime_scan();
 
     split_runtime_sync_tick();

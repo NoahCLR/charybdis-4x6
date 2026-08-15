@@ -178,9 +178,13 @@ typedef struct {
 typedef struct {
     const uint16_t *keys;
     uint16_t        keycode;
-    bool            disabled;
-    bool            active;
-    uint8_t         state;
+#ifdef EXTRA_SHORT_COMBOS
+    uint8_t state;
+#else
+    bool    disabled;
+    bool    active;
+    uint8_t state;
+#endif
 } combo_t;
 
 static inline void noah_host_test_fail_runtime_overflow(const char *surface, unsigned int kind, unsigned int capacity) {

@@ -3,7 +3,7 @@
 ## Plan metadata
 
 - **Severity:** Should-fix (P1 correctness and bounded-resource risk)
-- **Status:** Planned; no remediation has landed
+- **Status:** Verified on 2026-08-15
 - **Affected surfaces:** QMK combo compatibility, combo-origin attribution, RGB/key feedback, split combo snapshots, authored overlapping combos
 - **Primary files:** [qmk_combo_origin.c](../users/noah/lib/compat/qmk_combo_origin.c), [feedback.c](../users/noah/lib/key/runtime/feedback.c), [keymap.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c)
 - **Prerequisites:** Confirm the exact combo-buffer timing and state transitions in the pinned QMK fork before choosing the expiry bound
@@ -216,19 +216,49 @@ When the implementation lands:
 
 ## Acceptance checklist
 
-- [ ] Suppressed overlapping combos retire without an emitted combo event.
-- [ ] A legitimate delayed output after physical release still receives the correct origin bitmap.
-- [ ] All four slots can be recovered after repeated suppressed candidates.
-- [ ] Same-keycode combos cannot consume or clear one another's generations.
-- [ ] Stale candidates no longer suppress unresolved-tap feedback.
-- [ ] Cache-full behavior is conservative and observable.
-- [ ] Timer wrap and deadline boundaries are tested.
-- [ ] Hook order and fork-specific combo fields have mechanical coverage.
-- [ ] All targeted runners pass.
-- [ ] The full host suite passes.
-- [ ] The Charybdis firmware compile passes.
-- [ ] Documentation and the active review note match the landed tree.
+- [x] Suppressed overlapping combos retire without an emitted combo event.
+- [x] A legitimate delayed output after physical release still receives the correct origin bitmap.
+- [x] All four slots can be recovered after repeated suppressed candidates.
+- [x] Same-keycode combos cannot consume or clear one another's generations.
+- [x] Stale candidates no longer suppress unresolved-tap feedback.
+- [x] Cache-full behavior is conservative and observable.
+- [x] Timer wrap and deadline boundaries are tested.
+- [x] Hook order and fork-specific combo fields have mechanical coverage.
+- [x] All targeted runners pass.
+- [x] The full host suite passes.
+- [x] The Charybdis firmware compile passes.
+- [x] Documentation and the active review note match the landed tree.
+
+## Implementation checkpoint — 2026-08-15
+
+- Pending and active origins are exact `(combo_index, generation)` entries.
+  Nonzero generations are allocated away from every live entry, including
+  counter wrap.
+- The scan boundary reconciles the pinned QMK state before key-runtime
+  projection. Disabled candidates retire immediately; inactive candidates
+  survive the first scan beyond the profile-wide legal wait so the following
+  `combo_task()` gets its final opportunity, then expire on the next scan.
+- Full pending storage refuses the new candidate instead of overwriting a live
+  origin. Snapshot diagnostics expose current counts, high-water, suppression,
+  expiry, refusal, and unmatched output.
+- Same-keycode output presses promote one exact origin and releases select the
+  matching active footprint from the triggering physical release member.
+- Focused coverage passed for suppression, delayed output, timer boundaries and
+  wrap, capacity refusal/recovery, same-output identity, reset, diagnostics,
+  normal/compact QMK layouts, timerless compilation, runtime scan ordering,
+  hook integration, split sync, and the real profile.
+- Full host, ordinary firmware, and the fresh reviewed-path target gate pass.
+  The new combo retirement path is 280 B. The worst reviewed main path is
+  1,816 B of 1,920 B; split remains 328 B of 768 B.
+- The final instrumented image is 144,172 B text and 245,592 B total BSS. The
+  exact lifecycle symbols occupy 96 B pending cache, 96 B active cache, 12 B
+  diagnostics, and 4 B generation state. Relative to the prior Finding 08
+  instrumented image, text increased 648 B while total BSS stayed constant as
+  the fixed RAM layout reduced heap space.
+- No sibling source was edited. The pinned QMK fork was inspected and its
+  generated build artifacts were refreshed for target evidence only.
 
 ## Next action
 
-Build the failing overlap scenario in qmk_combo_origin_test.c first, including the delayed-after-release control case. Use those two tests to choose and prove the lifecycle seam before changing the cache representation.
+Finding 06 is closed. Continue Phase 2 with Finding 07's nonblocking macro
+playback scheduler, reusing the owner-scoped literal-key leases from Finding 08.

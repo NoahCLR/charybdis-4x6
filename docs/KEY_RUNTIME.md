@@ -171,7 +171,7 @@ QMK-facing applied registries. Use these labels when changing runtime behavior:
 | Physical keyboard modifier observation and replay filtering | QMK live modifier state plus `keyboard_mod_ownership.c` physical refcounts; `keyboard_mod_policy.c` owns shared snapshot/filter/replay helpers and preservation windows | core shadow projection stores physical and managed masks for overlap reasoning | `process.c` observes physical modifier events and preflight may suppress default release; action dispatch, delayed action replay, tap-series capture, deferred release, and PD mode modifier masking use `keyboard_mod_policy.h` instead of local snapshot/filter/preserve logic. QMK remains the live report sink. Covered by keyboard mod ownership, action dispatch, delayed action, modifier-hold, and PD-mode integration tests. |
 | PD runtime local, display, remote, and split state | `pd_mode_state.c` and split sync runtime | key-runtime leases and persistent intents request local pd behavior | Key runtime may request PD transitions through projected effects; PD runtime owns actual mode state and snapshots. Changed local PD lock state is observed into core through `pd_mode_key_runtime_bridge.c`. |
 | Feedback pulse lifecycle | feedback pulse fields in `key_runtime_core` | `projection/feedback_projection.c`, `key_feedback_pulse_observe()`, and RGB/split feedback snapshots | Core state remains authoritative; `projection/feedback_projection.c` queues key-runtime pulse effects and feedback/RGB surfaces render the projection. Covered by runtime debug, split sync, and RGB render tests. |
-| Combo origin recovery | `compat/qmk_combo_origin.c` plus `origin_registry.c` | key runtime, PD mode, RGB, and split feedback consume normalized origins | Compatibility-only. It repairs QMK combo records and origin bitmaps; it must not become an owner of key-runtime press, lease, or release state. Covered by combo origin, PD mode, RGB render, split sync, and real profile integration tests. |
+| Combo origin recovery | `compat/qmk_combo_origin.c` plus `origin_registry.c` | key runtime, PD mode, RGB, and split feedback consume normalized origins | Compatibility-only. It repairs QMK combo records and owns a bounded mirror of pending/active QMK combo origins, keyed by combo index and physical completion generation. Suppressed candidates retire immediately; inactive candidates get one final `combo_task()` opportunity after their legal deadline before expiry. It must not become an owner of key-runtime press, lease, or release state. Covered by combo origin, init order, QMK contract, PD mode, RGB render, split sync, and real profile integration tests. |
 
 When a future change needs to touch both core state and one of the projected
 registries, update the core plan first and project outward through an explicit
@@ -194,7 +194,13 @@ origin:
   representation
 - combo keycode lookup through `COMBO_ONLY_FROM_LAYER` or `combo_ref_from_layer`
 - active and pending combo-output caches needed when QMK emits the combo record
-  after member release
+  after member release; entries are identified by combo index and physical
+  completion generation rather than output keycode alone
+- scan-boundary reconciliation of QMK active/disabled state, with immediate
+  suppression retirement and a two-observation deadline rule that leaves
+  `combo_task()` one final legal emission opportunity
+- conservative capacity refusal and snapshot diagnostics; a full cache never
+  overwrites a still-awaiting origin
 - fallback owner recovery from the latest or last physical combo member, using a
   full-keyboard bitmap when no exact footprint can be proven
 
@@ -205,9 +211,13 @@ origin bitmap stored in `origin_registry.c`.
 
 Coverage for this contract lives in `run_qmk_combo_origin_tests.sh`: reference
 layer lookup, stable combo owner selection, active and pending combo bitmaps,
-pending output after member release, cached release footprints, cross-half
-combos, three-key combos, duplicate-output combo union, reset behavior, and
-preview/PD owner partitioning for RGB underlay/overlay feedback.
+pending output after member release, suppressed overlap, deadline boundaries
+and timer wrap, capacity refusal/recovery, exact same-output generations,
+cached release footprints, cross-half and three-key combos, reset diagnostics,
+and preview/PD owner partitioning for RGB underlay/overlay feedback. The runner
+executes normal and `EXTRA_SHORT_COMBOS` layouts and compile-checks the timerless
+branch. `run_qmk_contract_checks.sh` compares both combo layouts with the pinned
+fork and enforces the upstream pre-hook, matrix-scan, and `combo_task()` order.
 
 ## End-To-End Flow
 

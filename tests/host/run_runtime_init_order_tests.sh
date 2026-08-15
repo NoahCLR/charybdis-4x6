@@ -26,7 +26,6 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/tests/host/runtime_init_order_test.c" \
     "$ROOT/users/noah/runtime_init.c" \
     "$ROOT/users/noah/lib/key/runtime/slot/origin_registry.c" \
-    "$ROOT/users/noah/lib/compat/qmk_combo_origin.c" \
     -o "$BIN"
 
 "$BIN"

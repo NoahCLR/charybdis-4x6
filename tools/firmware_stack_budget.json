@@ -114,6 +114,10 @@
           "functions": ["main", "matrix_scan", "noah_key_runtime_scan", "key_runtime_deferred_release_drain_dispatches", "dispatch_delayed_action_at", "noah_emit_run_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_action_press", "pd_mode_apply_command", "pd_mode_snapshot", "pd_mode_snapshot_build_view", "memcpy"]
         },
         {
+          "name": "matrix scan combo-origin candidate retirement",
+          "functions": ["main", "matrix_scan", "combo_origin_pending_output_reconcile", "combo_origin_pending_output_entry_clear"]
+        },
+        {
           "name": "process macro payload compilation",
           "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "noah_process_record_user", "key_runtime_process_stage_macro_dispatch", "macro_dispatch", "macro_slot_provider_load", "macro_dispatch_load_ir", "macro_payload_compile", "macro_payload_lookup_keycode", "strlen"]
         },

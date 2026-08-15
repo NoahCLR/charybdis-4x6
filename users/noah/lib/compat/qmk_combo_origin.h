@@ -16,8 +16,19 @@
 
 #include "../key/runtime/slot/origin_registry.h"
 
+typedef struct {
+    uint8_t  pending_count;
+    uint8_t  active_count;
+    uint8_t  pending_high_water;
+    uint16_t suppressed_retirement_count;
+    uint16_t deadline_expiry_count;
+    uint16_t cache_full_refusal_count;
+    uint16_t unmatched_delayed_output_count;
+} noah_qmk_combo_origin_debug_snapshot_t;
+
 void              noah_qmk_combo_origin_init(void);
 void              noah_qmk_combo_origin_reset(void);
+void              noah_qmk_combo_origin_scan(void);
 void              noah_qmk_combo_origin_observe_physical_key_event(uint16_t keycode, keyrecord_t *record);
 void              noah_qmk_combo_origin_normalize_record(uint16_t keycode, keyrecord_t *record);
 void              noah_qmk_combo_origin_pressed_combo_bitmap(uint8_t *out_bitmap);
@@ -26,3 +37,4 @@ void              noah_qmk_combo_origin_active_bitmaps_partitioned(keypos_t prev
 bool              noah_qmk_combo_origin_event_owner_keypos(const keyrecord_t *record, keypos_t *out);
 bool              noah_qmk_combo_origin_event_bitmap(const keyrecord_t *record, uint8_t *out_bitmap);
 split_side_mask_t noah_qmk_combo_origin_event_side_mask(const keyrecord_t *record);
+void              noah_qmk_combo_origin_debug_snapshot(noah_qmk_combo_origin_debug_snapshot_t *out);
