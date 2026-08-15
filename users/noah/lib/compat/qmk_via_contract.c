@@ -41,6 +41,16 @@
 #        define DYNAMIC_KEYMAP_MACRO_EEPROM_SIZE (DYNAMIC_KEYMAP_EEPROM_MAX_ADDR - DYNAMIC_KEYMAP_MACRO_EEPROM_ADDR + 1)
 #    endif
 
+#    define NOAH_QMK_VIA_KEYMAP_BUFFER_CAPACITY ((uint32_t)DYNAMIC_KEYMAP_LAYER_COUNT * (uint32_t)MATRIX_ROWS * (uint32_t)MATRIX_COLS * 2u)
+
+_Static_assert(NOAH_QMK_VIA_KEYMAP_BUFFER_CAPACITY <= UINT16_MAX, "VIA dynamic-keymap buffer must fit the 16-bit offset contract");
+
+uint16_t noah_qmk_via_keymap_buffer_capacity(void) {
+    return (uint16_t)NOAH_QMK_VIA_KEYMAP_BUFFER_CAPACITY;
+}
+
+#    undef NOAH_QMK_VIA_KEYMAP_BUFFER_CAPACITY
+
 uint16_t noah_qmk_via_macro_seed_capacity(void) {
     uint16_t capacity = dynamic_keymap_macro_get_buffer_size();
 

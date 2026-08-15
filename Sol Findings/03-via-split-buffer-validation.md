@@ -3,7 +3,7 @@
 ## Plan metadata
 
 - **Severity:** Must fix — out-of-bounds read and unintended NVM-write risk
-- **Status:** Planned; no remediation has landed
+- **Status:** Verified on 2026-08-15
 - **Affected surfaces:** VIA command mirroring, slave RPC decoder, dynamic-keymap storage compatibility, host packet tests
 - **Primary files:** [`qmk_via_split_sync.c`](../users/noah/lib/compat/qmk_via_split_sync.c), [`qmk_via_contract.c`](../users/noah/lib/compat/qmk_via_contract.c), [`qmk_via_split_sync_test.c`](../tests/host/qmk_via_split_sync_test.c)
 - **Prerequisites:** define storage-region capacity helpers shared with Finding 05; the arithmetic fix itself should land immediately and must not wait for the persistence redesign
@@ -151,19 +151,21 @@ qmk compile -kb bastardkb/charybdis/4x6 -km noah
 
 ## Acceptance checklist
 
-- [ ] The set-buffer length calculation contains no narrowing cast.
-- [ ] Encoded sizes 252–255 are rejected for every transport-valid short packet.
-- [ ] All 256 sizes and lengths 0–32 are covered by a deterministic test matrix.
-- [ ] Offset/capacity bounds are checked without overflow.
-- [ ] Malformed packets cause zero NVM, RGB, cache, and acknowledgment side effects.
-- [ ] The valid 28-byte payload boundary remains supported.
-- [ ] The pure decoder passes ASan/UBSan coverage where available.
-- [ ] `sh tests/host/run_qmk_via_split_sync_tests.sh` passes.
-- [ ] `sh tests/host/run_qmk_contract_checks.sh` passes.
-- [ ] `sh tests/host/run_feature_gate_compile_tests.sh` passes.
-- [ ] `sh tests/host/run_all_host_tests.sh` passes.
-- [ ] `qmk compile -kb bastardkb/charybdis/4x6 -km noah` passes.
+- [x] The set-buffer length calculation contains no narrowing cast.
+- [x] Encoded sizes 252–255 are rejected for every transport-valid short packet.
+- [x] All 256 sizes and lengths 0–32 are covered by a deterministic test matrix.
+- [x] Offset/capacity bounds are checked without overflow.
+- [x] Malformed packets cause zero NVM, RGB, cache, and acknowledgment side effects. The slave callback has no cache or acknowledgment surface; tests prove every available storage/reset/RGB effect remains untouched.
+- [x] The valid 28-byte payload boundary remains supported.
+- [x] The pure decoder passes ASan/UBSan coverage where available.
+- [x] `sh tests/host/run_qmk_via_split_sync_tests.sh` passes.
+- [x] `sh tests/host/run_qmk_contract_checks.sh` passes.
+- [x] `sh tests/host/run_feature_gate_compile_tests.sh` passes.
+- [x] `sh tests/host/run_all_host_tests.sh` passes.
+- [x] `qmk compile -kb bastardkb/charybdis/4x6 -km noah` passes.
 
 ## Next action
 
-Add the four 252–255 regression packets to `qmk_via_split_sync_test.c`, then replace the narrowing check with subtraction-based validation before expanding the decoder contract.
+Finding 03 is closed. Continue with Finding 04's non-ASCII VIA macro reproducer;
+carry this decoder forward into Finding 05 rather than creating a second split
+packet parser.

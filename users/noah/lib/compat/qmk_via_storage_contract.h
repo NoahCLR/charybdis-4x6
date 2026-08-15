@@ -20,11 +20,16 @@ enum {
 };
 
 #ifdef VIA_ENABLE
+uint16_t noah_qmk_via_keymap_buffer_capacity(void);
 uint16_t noah_qmk_via_macro_seed_capacity(void);
 void     noah_qmk_via_macro_set_buffer(uint16_t offset, uint16_t size, uint8_t *data);
 bool     noah_qmk_via_should_seed_defaults_post_init(void);
 uint8_t  noah_qmk_via_command_effects(uint8_t command_id);
 #else
+static inline uint16_t noah_qmk_via_keymap_buffer_capacity(void) {
+    return 0;
+}
+
 static inline uint16_t noah_qmk_via_macro_seed_capacity(void) {
     return 0;
 }

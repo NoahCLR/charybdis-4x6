@@ -8,12 +8,19 @@ ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 noah_host_export_qmk_cpath "$ROOT"
 BUILD_DIR="$(mktemp -d)"
 BIN="$BUILD_DIR/qmk_via_split_sync_test"
+SANITIZED_BIN="$BUILD_DIR/qmk_via_split_sync_sanitized_test"
+ENCODER_BIN="$BUILD_DIR/qmk_via_split_sync_encoder_test"
 
 cleanup() {
     rm -rf "$BUILD_DIR"
 }
 
 trap cleanup EXIT INT TERM
+
+if grep -F '(uint8_t)(4u +' "$ROOT/users/noah/lib/compat/qmk_via_split_sync.c" >/dev/null; then
+    echo "VIA split set-buffer length arithmetic must not narrow to uint8_t" >&2
+    exit 1
+fi
 
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DVIA_ENABLE \
@@ -29,3 +36,37 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -o "$BIN"
 
 "$BIN"
+
+cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
+    -fsanitize=address,undefined \
+    -fno-omit-frame-pointer \
+    -DVIA_ENABLE \
+    -DVIA_EEPROM_ALLOW_RESET \
+    -DQMK_KEYBOARD_H='"qmk_stub.h"' \
+    -DSPLIT_TRANSACTION_IDS_USER \
+    -I"$ROOT" \
+    -I"$ROOT/users/noah" \
+    -I"$ROOT/tests/host/include" \
+    "$ROOT/tests/host/qmk_via_split_sync_test.c" \
+    "$ROOT/users/noah/lib/compat/qmk_via_contract.c" \
+    "$ROOT/users/noah/lib/compat/qmk_via_split_sync.c" \
+    -o "$SANITIZED_BIN"
+
+"$SANITIZED_BIN"
+
+cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
+    -DVIA_ENABLE \
+    -DVIA_EEPROM_ALLOW_RESET \
+    -DENCODER_MAP_ENABLE \
+    -DNUM_ENCODERS=2 \
+    -DQMK_KEYBOARD_H='"qmk_stub.h"' \
+    -DSPLIT_TRANSACTION_IDS_USER \
+    -I"$ROOT" \
+    -I"$ROOT/users/noah" \
+    -I"$ROOT/tests/host/include" \
+    "$ROOT/tests/host/qmk_via_split_sync_test.c" \
+    "$ROOT/users/noah/lib/compat/qmk_via_contract.c" \
+    "$ROOT/users/noah/lib/compat/qmk_via_split_sync.c" \
+    -o "$ENCODER_BIN"
+
+"$ENCODER_BIN"

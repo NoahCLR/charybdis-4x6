@@ -2,7 +2,7 @@
 
 ## Plan metadata
 
-- **Status:** Implementation in progress; Finding 01 is verified and the next must-fix item is Finding 03. See [`implementation-progress.md`](implementation-progress.md).
+- **Status:** Implementation in progress; Findings 01 and 03 are verified and the next must-fix item is Finding 04. See [`implementation-progress.md`](implementation-progress.md).
 - **Prepared:** 2026-07-13.
 - **Scope:** Firmware runtime correctness, split reliability, target resource safety, and measured hot-path efficiency.
 - **Source:** The deep firmware code review performed against the current `charybdis-4x6` tree.

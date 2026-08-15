@@ -5,9 +5,9 @@
 - **Branch:** `sol`
 - **Starting commit:** `5b20ed01` (`sol findings`)
 - **Started:** 2026-07-13
-- **Current focus:** [Finding 03 — VIA split buffer validation](03-via-split-buffer-validation.md)
+- **Current focus:** [Finding 04 — VIA macro byte validation](04-via-macro-byte-validation.md)
 - **Overall status:** In progress
-- **Runtime review thread:** [`review/2026-05-08-review-01`](../review/2026-05-08-review-01/)
+- **Latest closed review:** [`review/2026-08-15-review-01`](../review/2026-08-15-review-01/)
 
 This file is the implementation record for the plans in this directory. It records what actually changed, why choices were made, what verification really ran, and what remains open. A plan is not marked verified until its targeted checks, the full host suite, the target firmware build, target-specific evidence, and required documentation all pass.
 
@@ -25,7 +25,7 @@ This file is the implementation record for the plans in this directory. It recor
 | --- | --- | --- | --- | --- |
 | 01 | [Target stack safety](01-target-stack-safety.md) | Must fix | Verified | Fresh post-LTO target gate: 1,808 B worst main path in a 1,920 B budget; full host suite and firmware build pass |
 | 02 | [Press-token rollover](02-press-token-rollover.md) | Must fix | Planned | Not run |
-| 03 | [VIA split buffer validation](03-via-split-buffer-validation.md) | Must fix | Planned | Not run |
+| 03 | [VIA split buffer validation](03-via-split-buffer-validation.md) | Must fix | Verified | Exhaustive normal/ASan/UBSan boundary matrix, full host suite, firmware build, and target stack regression gate pass |
 | 04 | [VIA macro byte validation](04-via-macro-byte-validation.md) | Must fix | Planned | Not run |
 | 05 | [VIA split persistence](05-via-split-persistence.md) | Must fix | Planned | Not run |
 | 06 | [Combo-origin cache lifecycle](06-combo-origin-cache-lifecycle.md) | Should fix | Planned | Not run |
@@ -208,6 +208,56 @@ Finding 01 is **Verified**. The fresh instrumented target gate, full host suite,
 ordinary firmware compile, documentation, and active review reconciliation all
 pass on the same source tree.
 
+## Finding 03 — VIA split buffer validation
+
+### Objective
+
+Treat the slave VIA replay callback as an untrusted binary boundary and prove
+packet shape, payload availability, and destination range before any QMK
+storage or rendering side effect.
+
+### 2026-08-15 — Decoder and boundary coverage
+
+**Implemented**
+
+- Replaced parsing inside the side-effect switch with a pure typed decoder.
+- Removed the narrowing `uint8_t` required-length calculation. Set-buffer now
+  proves the four-byte header, uses `size_t` subtraction for available payload,
+  enforces the 28-byte RPC payload maximum, and validates `size <= capacity -
+  offset` after proving `offset <= capacity`.
+- Added `noah_qmk_via_keymap_buffer_capacity()` in the QMK compatibility layer
+  and a compile-time assertion that the configured keymap byte region fits
+  VIA's 16-bit offset contract.
+- Defined the padded-report contract: supported commands may carry trailing
+  bytes because QMK raw-HID reports are commonly 32 bytes, but padding never
+  expands a declared payload.
+- Defined zero-length set-buffer as a valid no-op at offsets through the exact
+  region end. It skips the storage call and payload pointer while preserving
+  the command's RGB invalidation effect.
+- Added layer/row/column validation for keycode writes and layer/encoder
+  validation for encoder writes before QMK is called.
+- Added all 256 encoded sizes across transport lengths 0 through 32, canaries,
+  destination edges, valid 28-byte payload, reset padding, oversized transport,
+  invalid coordinates, and an encoder-enabled variant.
+- The concrete runner now executes normal, ASan/UBSan, and encoder-enabled
+  builds and rejects reintroduction of the original narrowing expression.
+
+**Focused verification**
+
+- `sh tests/host/run_qmk_via_split_sync_tests.sh` — passed all three variants.
+- `sh tests/host/run_qmk_contract_checks.sh` — passed.
+- `sh tests/host/run_via_macro_defaults_tests.sh` — passed.
+- `sh tests/host/run_action_lifecycle_tests.sh` — passed.
+- `sh tests/host/run_feature_gate_compile_tests.sh` — passed.
+
+### Current finding status
+
+Finding 03 is **Verified**. The focused normal/sanitizer/encoder builds, full
+host suite, ordinary firmware compile, compatibility documentation, and fresh
+Finding 01 target stack regression gate pass on the same source tree. The
+target gate retains a 1,808 B worst reviewed main path against a 1,920 B budget;
+the reviewed VIA slave path is 88 B against a 768 B split-thread budget.
+
 ## Verification ledger
 
 | Date | Finding | Command | Result | Notes |
@@ -239,6 +289,15 @@ pass on the same source tree.
 | 2026-08-15 | 01 | `sh tests/host/run_firmware_stack_budget_checks.sh` | Passed | Fresh clean target build; 2,560 B main stack, 640 B reserve, 1,808 B worst reviewed main path; split path 328 B of 768 B budget |
 | 2026-08-15 | 01 | `PYTHONPYCACHEPREFIX=/tmp/noah-host-pycache sh tests/host/run_all_host_tests.sh` | Passed | Final complete host suite, including 15 stack-tool fixtures |
 | 2026-08-15 | 01 | `qmk compile -kb bastardkb/charybdis/4x6 -km noah` | Passed | Required ordinary firmware build on final source tree |
+| 2026-08-15 | 03 | `sh tests/host/run_qmk_via_split_sync_tests.sh` | Passed | Normal, ASan/UBSan exhaustive matrix, and encoder-enabled variants |
+| 2026-08-15 | 03 | `sh tests/host/run_qmk_contract_checks.sh` | Passed | Compatibility contract remains coherent |
+| 2026-08-15 | 03 | `sh tests/host/run_via_macro_defaults_tests.sh` | Passed | VIA defaults behavior remains intact |
+| 2026-08-15 | 03 | `sh tests/host/run_action_lifecycle_tests.sh` | Passed | Action lifecycle remains intact |
+| 2026-08-15 | 03 | `sh tests/host/run_feature_gate_compile_tests.sh` | Passed | Compatibility header/build variants compile |
+| 2026-08-15 | 03 | `PYTHONPYCACHEPREFIX=/tmp/noah-host-pycache sh tests/host/run_all_host_tests.sh` | Passed | Final complete host suite with normal, sanitizer, and encoder VIA replay variants |
+| 2026-08-15 | 03 | `qmk compile -kb bastardkb/charybdis/4x6 -km noah` | Passed | Required ordinary target firmware build |
+| 2026-08-15 | 03 | `sh tests/host/run_firmware_stack_budget_checks.sh` | Passed | Fresh clean target build; 1,808 B worst reviewed main path and 88 B reviewed VIA split path |
+| 2026-08-15 | 03 | `git diff --check` | Passed | Source, tests, compatibility docs, Sol ledger, and closed Finding 03 review |
 
 ## Cross-cutting decisions and deferred work
 
@@ -249,5 +308,6 @@ pass on the same source tree.
 
 ## Next program action
 
-Start Finding 03 with its malformed-packet baseline and preserve Finding 01's
-target gate as a regression check for later runtime changes.
+Begin Finding 04 with a complete pre-edit review of its plan, the macro decoder,
+IR playback validator, and invalid-slot cache lifecycle. Add the high-byte
+reproducer before changing playback behavior.

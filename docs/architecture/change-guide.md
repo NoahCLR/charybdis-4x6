@@ -23,6 +23,7 @@ directory and the existing domain docs.
 | Change split runtime mirroring | `users/noah/lib/split/runtime_sync.*` | PD/RGB owners unless the source truth changes | split runtime sync, runtime trace, RGB render as relevant |
 | Change hardcoded macros | `keymap.c` `HARDCODED_MACROS` | macro parser unless payload language changes | macro dispatch, macro payload, real profile validation |
 | Change VIA macro defaults or seeding | `keymap.c` `VIA_MACROS`, `macro/via_macro_defaults.*`, VIA contracts | hardcoded macro dispatch | VIA macro defaults, VIA macro action lifecycle, qmk_via_split_sync |
+| Change VIA split command replay or dynamic-keymap writes | `compat/qmk_via_split_sync.*`, with capacities in `compat/qmk_via_storage_contract.h` | direct QMK storage calls before packet validation | qmk_via_split_sync (normal and sanitizer variants), QMK contracts, feature gate, target stack gate |
 | Change hook wiring | `users/noah/hooks.c`, `users/noah/runtime_init.c` | keymap-local hooks without chaining | hook chaining, runtime init order, feature gate |
 | Change source/build wiring | `users/noah/source_manifest.mk` and mirrored host support as needed | one-off test runner source lists | feature gate compile, targeted host tests, full host suite, firmware compile |
 | Change stack-sensitive runtime phases or target stack configuration | runtime owner plus `tools/firmware_stack_budget.json` when call topology changes | per-function frame guesses or host-only `sizeof` checks | matching runtime tests, `run_firmware_stack_budget_tool_tests.sh`, full host suite, fresh instrumented firmware compile, `run_firmware_stack_budget_checks.sh` |
@@ -37,6 +38,9 @@ directory and the existing domain docs.
   them through the projection layer.
 - Do not scatter QMK or fork assumptions through unrelated modules. Put them in
   `compat/` and cover them with contract tests.
+- Do not treat a slave VIA RPC as trusted because the normal sender is local
+  firmware. Prove command shape, declared payload, coordinates, and destination
+  capacity before any storage or rendering side effect.
 - Do not include `noah_keymap.h` from runtime modules or `noah_runtime.h` from
   keymap-owned translation units.
 - Do not add raw QMK layer-action outputs to authored data when they bypass the

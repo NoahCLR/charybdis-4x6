@@ -88,6 +88,16 @@ source trace because they rewrite or verify human-facing firmware docs.
   `qmk_via_storage_contract.h`
 - Split helpers: `split_half.h`, `split_role.c`
 
+VIA packets replayed by the slave are untrusted input. `qmk_via_split_sync.c`
+must decode and validate a complete typed command before it calls QMK storage
+or applies RGB effects. Fixed-size commands may carry trailing raw-HID padding.
+For set-buffer, padding does not enlarge the declared payload: the declared
+size must fit both the received RPC bytes and the 28-byte transport payload.
+The destination must fit the dynamic-keymap capacity exposed by
+`qmk_via_storage_contract.h`. A zero-byte write is valid through the exact end
+of that region, skips the QMK storage call, and still represents a successfully
+applied command.
+
 ### `key/behavior/`
 
 - Public authored behavior API: `key_behavior.h`, `handled_key.h`,
