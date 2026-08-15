@@ -5,9 +5,9 @@
 - **Branch:** `sol`
 - **Starting commit:** `5b20ed01` (`sol findings`)
 - **Started:** 2026-07-13
-- **Current focus:** [Finding 12 — split RPC failure backoff](12-split-rpc-failure-backoff.md)
+- **Current focus:** [Finding 05 — VIA split persistence](05-via-split-persistence.md)
 - **Overall status:** In progress
-- **Latest closed review:** [`review/2026-08-15-review-08`](../review/2026-08-15-review-08/)
+- **Latest closed review:** [`review/2026-08-15-review-09`](../review/2026-08-15-review-09/)
 - **Active review:** None; the next implementation pass must open the next sortable review folder.
 
 This file is the implementation record for the plans in this directory. It records what actually changed, why choices were made, what verification really ran, and what remains open. A plan is not marked verified until its targeted checks, the full host suite, the target firmware build, target-specific evidence, and required documentation all pass.
@@ -35,7 +35,7 @@ This file is the implementation record for the plans in this directory. It recor
 | 09 | [Pending-release sequence rollover](09-pending-release-sequence-rollover.md) | Should fix | Verified | Explicit linked FIFO, 65,537-cycle blocked-head stress, structural corruption checks, full host, firmware, and target stack gate pass |
 | 10 | [Pointing backlog bounds](10-pointing-backlog-bounds.md) | Should fix | Planned | Not run |
 | 11 | [Dragscroll stall recovery](11-dragscroll-stall-recovery.md) | Should fix | Planned | Not run |
-| 12 | [Split RPC failure backoff](12-split-rpc-failure-backoff.md) | Should fix | Planned | Not run |
+| 12 | [Split RPC failure backoff](12-split-rpc-failure-backoff.md) | Should fix | Verified | Stop-on-first-failure, 50–1,000 ms wrap-safe backoff, current-state recovery, bounded trace, full host, firmware, and target-stack gates pass |
 | 13 | [RGB preview parity](13-rgb-preview-parity.md) | Should fix | Planned | Not run |
 | 14 | [Macro-cache RAM](14-macro-cache-ram.md) | Optimize | Planned | Not run |
 | 15 | [RGB render work](15-rgb-render-work.md) | Optimize | Planned | Not run |
@@ -683,6 +683,53 @@ fresh stack-budget build, and diff hygiene. Review 08 records the closure. The
 change crossed into the authorized sibling QMK fork only for the two-file
 auto-mouse compatibility extension.
 
+## Finding 12 — Split RPC failure backoff
+
+### Objective
+
+Prevent a disconnected secondary half from turning every matrix scan into up
+to four consecutive 5 ms serial timeouts, while preserving current state for
+automatic recovery.
+
+### Implemented
+
+- Added explicit shared transport-health state rather than overloading
+  per-domain successful-send timestamps.
+- Stop the base/combo/semantic/branch send pass immediately after its first
+  failed RPC.
+- Suppress packet builders, auto-mouse elapsed lookup, and all runtime RPCs
+  until a wrap-safe retry deadline becomes due.
+- Use a configurable exponential schedule of 50, 100, 200, 400, 800, then
+  1,000 ms capped.
+- Force-send the current base packet as the recovery probe. On success, clear
+  outage state and drain currently eligible later domains in deterministic
+  order; stop again on any new failure.
+- Preserve dirty flags and last-success packets/timestamps until the matching
+  domain succeeds. Reinitialization clears inherited outage state.
+- Emit bounded failure and recovery trace events without emitting one event per
+  suppressed scan.
+- Regenerated `docs/KEYMAP-OVERVIEW.md` because the retry constants are
+  introspected authored configuration.
+
+### Measurements
+
+- Fully due failed tick: four RPC attempts before, one after.
+- Suppressed tick: zero RPC attempts and zero packet/auto-mouse builders.
+- Retry window: 50 ms initial, 1,000 ms maximum.
+- Outbound split base-broadcast target path: 480 B, up from 464 B.
+- Overall reviewed main-process worst path: unchanged at 1,816/1,920 B.
+- Split-slave reviewed worst path: unchanged at 328/768 B.
+- Linked firmware: 145,204 B text and 245,592 B BSS, +144 B text and no BSS
+  change from Finding 17.
+
+### Closure status
+
+Finding 12 is **verified**. Scripted failure, schedule/cap/wrap, no-build
+suppression, current-state recovery, active-to-idle clearing, role reset, and
+bounded trace coverage pass. The complete host suite, ordinary firmware build,
+fresh target stack gate, generated-doc check, and diff hygiene pass. Review 09
+records the closure.
+
 ## Verification ledger
 
 | Date | Finding | Command | Result | Notes |
@@ -822,6 +869,15 @@ auto-mouse compatibility extension.
 | 2026-08-15 | 17 | `PYTHONPYCACHEPREFIX=/tmp/noah-host-pycache sh tests/host/run_all_host_tests.sh` | Passed | Complete host suite passes with the shared-clock contract |
 | 2026-08-15 | 17 | `qmk compile -kb bastardkb/charybdis/4x6 -km noah` | Passed | Required ordinary build against the authorized sibling QMK extension |
 | 2026-08-15 | 17 | `PYTHONPYCACHEPREFIX=/tmp/noah-stack-pycache PYTHON=/usr/bin/python3 sh tests/host/run_firmware_stack_budget_checks.sh` | Passed | Fresh clock path 280 B, base-broadcast path 464 B, worst main 1,816/1,920 B, split 328/768 B |
+| 2026-08-15 | 12 | `sh tests/host/run_split_runtime_sync_tests.sh` before implementation | Failed as expected | A fully forced pass continued after the first failed base RPC instead of stopping at one attempt |
+| 2026-08-15 | 12 | `sh tests/host/run_split_runtime_sync_tests.sh` | Passed | Both feature variants cover failure stop, force suppression, no-build backoff, schedule/cap/wrap, current-state recovery, active-to-idle clear, and role reset |
+| 2026-08-15 | 12 | `sh tests/host/run_runtime_trace_tests.sh` | Passed | Failure/recovery events are emitted and twenty suppressed scans add no trace entries |
+| 2026-08-15 | 12 | `sh tests/host/run_runtime_debug_tests.sh` | Passed | Runtime diagnostics remain coherent in both variants |
+| 2026-08-15 | 12 | `sh tests/host/run_feature_gate_compile_tests.sh` | Passed | Split, trace, and header feature variants compile with the health-state API |
+| 2026-08-15 | 12 | `python3 tools/profile_introspect.py --write && python3 tools/profile_introspect.py --check` | Passed | Regenerated the retry constants in the authored configuration overview |
+| 2026-08-15 | 12 | `PYTHONPYCACHEPREFIX=/tmp/noah-host-pycache sh tests/host/run_all_host_tests.sh` | Passed | Complete host suite passes after generated documentation reconciliation |
+| 2026-08-15 | 12 | `qmk compile -kb bastardkb/charybdis/4x6 -km noah` | Passed | Required ordinary target firmware build |
+| 2026-08-15 | 12 | `PYTHONPYCACHEPREFIX=/tmp/noah-stack-pycache PYTHON=/usr/bin/python3 sh tests/host/run_firmware_stack_budget_checks.sh` | Passed | Fresh outbound path 480 B; worst main 1,816/1,920 B and split 328/768 B |
 
 ## Cross-cutting decisions and deferred work
 
@@ -838,7 +894,10 @@ auto-mouse compatibility extension.
   supports one active execution with no queue, pins provider IR across
   invalidation, and leaves macro-cache footprint reduction to Finding 14.
 - Finding 17 establishes one sampled, wrap-safe clock for every outbound split
-  domain. Finding 12 must reuse that seam for shared outage/backoff scheduling.
+  domain. Finding 12 reuses that seam for shared outage/backoff scheduling.
+- Finding 12 bounds runtime-sync outages independently of the durable VIA
+  convergence protocol. Finding 05 may reuse timing concepts but must keep its
+  version, authority, acknowledgement, and persistence state explicit.
 - The stack checker must model vendor split callbacks under `SlaveThread`, not under the main process stack. Stack-context correctness is part of the gate contract.
 - Finding 17 explicitly crossed into `../bastardkb-qmk` for the authorized
   two-file auto-mouse elapsed-at compatibility extension. No other sibling
@@ -846,6 +905,6 @@ auto-mouse compatibility extension.
 
 ## Next program action
 
-Open the next sortable review folder for Finding 12. Reuse Finding 17's sampled
-`now` to add shared outage gating and bounded, wrap-safe retry/backoff without
-clearing dirty state on failure. Then continue with Finding 05.
+Open the next sortable review folder for Finding 05. Design and test durable,
+versioned VIA reconciliation across reconnect, reset, and role change without
+conflating it with Finding 12's transient runtime-sync health state.

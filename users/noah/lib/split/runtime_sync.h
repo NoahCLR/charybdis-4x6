@@ -12,6 +12,8 @@
 // or rejoined half can recover even if the relevant state did not change. Heavy
 // combo/key-feedback surfaces are rebuilt only while active, dirty, forced, or
 // heartbeat-due so idle scans do not spend time deriving unchanged RGB packets.
+// A shared transport-health gate stops a send pass after its first failure and
+// suppresses packet building until a bounded recovery-probe deadline.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
@@ -75,6 +77,13 @@ typedef struct {
     uint32_t semantic_last_send;
     uint32_t branch_last_send;
 } split_runtime_sync_debug_clock_t;
+
+typedef struct {
+    uint32_t last_failure;
+    uint32_t retry_delay_ms;
+    uint8_t  consecutive_failures;
+    bool     backoff_active;
+} split_runtime_sync_debug_transport_t;
 #endif
 
 #ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
@@ -126,6 +135,7 @@ void split_runtime_sync_mark_combo_dirty(void);
 void split_runtime_sync_mark_key_feedback_dirty(void);
 #    ifdef NOAH_HOST_TEST_ENV
 void split_runtime_sync_debug_clock_snapshot(split_runtime_sync_debug_clock_t *out);
+void split_runtime_sync_debug_transport_snapshot(split_runtime_sync_debug_transport_t *out);
 #    endif
 
 static inline void split_runtime_sync_notify_combo_dirty(void) {
@@ -152,6 +162,11 @@ static inline void split_runtime_sync_mark_key_feedback_dirty(void) {}
 static inline void split_runtime_sync_debug_clock_snapshot(split_runtime_sync_debug_clock_t *out) {
     if (out) {
         *out = (split_runtime_sync_debug_clock_t){0};
+    }
+}
+static inline void split_runtime_sync_debug_transport_snapshot(split_runtime_sync_debug_transport_t *out) {
+    if (out) {
+        *out = (split_runtime_sync_debug_transport_t){0};
     }
 }
 #    endif

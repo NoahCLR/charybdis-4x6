@@ -29,6 +29,7 @@ static int8_t                           rpc_registered_ids[4];
 static slave_callback_t                 rpc_registered_callbacks[4];
 static uint8_t                          rpc_send_count;
 static split_runtime_base_sync_packet_t rpc_last_base_packet;
+static bool                             fake_rpc_send_result;
 
 layer_state_t layer_state;
 
@@ -84,6 +85,7 @@ static void test_reset_stubs(void) {
     memset(rpc_registered_callbacks, 0, sizeof(rpc_registered_callbacks));
     rpc_send_count       = 0u;
     rpc_last_base_packet = (split_runtime_base_sync_packet_t){0};
+    fake_rpc_send_result = true;
     layer_state          = 0;
 
     host_runtime_fixture_reset_userspace_runtime();
@@ -235,22 +237,22 @@ bool transaction_rpc_send(int8_t transaction_id, uint8_t initiator2target_buffer
     if (transaction_id == PUT_SPLIT_RUNTIME_BASE_SYNC) {
         CHECK(initiator2target_buffer_size == sizeof(split_runtime_base_sync_packet_t));
         memcpy(&rpc_last_base_packet, initiator2target_buffer, sizeof(rpc_last_base_packet));
-        return true;
+        return fake_rpc_send_result;
     }
 
     if (transaction_id == PUT_SPLIT_COMBO_FEEDBACK_SYNC) {
         CHECK(initiator2target_buffer_size == sizeof(split_runtime_combo_feedback_packet_t));
-        return true;
+        return fake_rpc_send_result;
     }
 
     if (transaction_id == PUT_SPLIT_KEY_FEEDBACK_SEMANTIC_SYNC) {
         CHECK(initiator2target_buffer_size == sizeof(split_runtime_key_feedback_semantic_packet_t));
-        return true;
+        return fake_rpc_send_result;
     }
 
     if (transaction_id == PUT_SPLIT_KEY_FEEDBACK_BRANCH_SYNC) {
         CHECK(initiator2target_buffer_size == sizeof(split_runtime_key_feedback_branch_packet_t));
-        return true;
+        return fake_rpc_send_result;
     }
 
     CHECK(false);
@@ -409,6 +411,40 @@ static void test_pd_mode_and_split_sync_events_share_one_trace_buffer(void) {
     CHECK(snapshot.entries[9].b == PD_MODE_ZOOM);
 }
 
+static void test_split_failure_and_recovery_trace_is_bounded(void) {
+    noah_runtime_trace_snapshot_t snapshot;
+
+    test_reset_stubs();
+    split_runtime_sync_init();
+    noah_runtime_trace_reset();
+    rpc_send_count       = 0u;
+    fake_rpc_send_result = false;
+
+    split_runtime_sync();
+    CHECK(rpc_send_count == 1u);
+
+    for (uint8_t index = 0u; index < 20u; index++) {
+        split_runtime_sync_tick();
+    }
+
+    snapshot = test_trace_snapshot();
+    CHECK(snapshot.count == 1u);
+    CHECK(snapshot.entries[0].kind == NOAH_TRACE_SPLIT_SYNC);
+    CHECK(snapshot.entries[0].event == NOAH_TRACE_SPLIT_SYNC_EVENT_FAILURE);
+    CHECK(snapshot.entries[0].a == PUT_SPLIT_RUNTIME_BASE_SYNC);
+    CHECK(snapshot.entries[0].b == 50u);
+
+    fake_time32 += 50u;
+    fake_rpc_send_result = true;
+    split_runtime_sync_tick();
+
+    snapshot = test_trace_snapshot();
+    CHECK(snapshot.count == 3u);
+    CHECK(snapshot.entries[1].event == NOAH_TRACE_SPLIT_SYNC_EVENT_SEND);
+    CHECK(snapshot.entries[2].event == NOAH_TRACE_SPLIT_SYNC_EVENT_RECOVERY);
+    CHECK(snapshot.entries[2].a == 1u);
+}
+
 static void test_key_runtime_decision_events_capture_release_hold_and_multi_tap_details(void) {
     noah_runtime_trace_snapshot_t snapshot;
 
@@ -535,6 +571,7 @@ int main(void) {
     test_ring_buffer_retains_recent_tail_when_full();
     test_key_runtime_and_layer_ownership_share_one_trace_buffer();
     test_pd_mode_and_split_sync_events_share_one_trace_buffer();
+    test_split_failure_and_recovery_trace_is_bounded();
     test_key_runtime_decision_events_capture_release_hold_and_multi_tap_details();
     test_key_runtime_core_input_events_round_trip_through_shared_trace_buffer();
 

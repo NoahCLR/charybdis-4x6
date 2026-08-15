@@ -59,6 +59,13 @@ static split_runtime_key_feedback_semantic_packet_t rpc_last_key_feedback_semant
 static split_runtime_key_feedback_branch_packet_t   rpc_last_key_feedback_branch_packet;
 static bool                                         fake_rpc_send_result = true;
 
+#define RPC_SEND_SCRIPT_CAPACITY 32u
+static bool     rpc_send_script[RPC_SEND_SCRIPT_CAPACITY];
+static uint8_t  rpc_send_script_count;
+static uint8_t  rpc_send_script_index;
+static uint32_t rpc_send_times[RPC_SEND_SCRIPT_CAPACITY];
+static int8_t   rpc_send_ids[RPC_SEND_SCRIPT_CAPACITY];
+
 static uint8_t           remote_snapshot_apply_count;
 static pd_mode_mask_t    remote_snapshot_active;
 static pd_mode_mask_t    remote_snapshot_locked;
@@ -129,10 +136,15 @@ static void test_reset_stubs(void) {
     rpc_last_key_feedback_semantic_packet = (split_runtime_key_feedback_semantic_packet_t){0};
     rpc_last_key_feedback_branch_packet   = (split_runtime_key_feedback_branch_packet_t){0};
     fake_rpc_send_result                  = true;
-    remote_snapshot_apply_count           = 0;
-    remote_snapshot_active                = 0;
-    remote_snapshot_locked                = 0;
-    remote_snapshot_owner_sides           = SPLIT_SIDE_MASK_NONE;
+    rpc_send_script_count                 = 0u;
+    rpc_send_script_index                 = 0u;
+    memset(rpc_send_script, 0, sizeof(rpc_send_script));
+    memset(rpc_send_times, 0, sizeof(rpc_send_times));
+    memset(rpc_send_ids, -1, sizeof(rpc_send_ids));
+    remote_snapshot_apply_count = 0;
+    remote_snapshot_active      = 0;
+    remote_snapshot_locked      = 0;
+    remote_snapshot_owner_sides = SPLIT_SIDE_MASK_NONE;
     key_origin_bitmap_clear(remote_snapshot_owner_bitmap);
 }
 
@@ -293,6 +305,11 @@ void transaction_register_rpc(int8_t transaction_id, slave_callback_t callback) 
 }
 
 bool transaction_rpc_send(int8_t transaction_id, uint8_t initiator2target_buffer_size, const void *initiator2target_buffer) {
+    bool result = fake_rpc_send_result;
+
+    CHECK(rpc_send_count < RPC_SEND_SCRIPT_CAPACITY);
+    rpc_send_times[rpc_send_count] = fake_time32;
+    rpc_send_ids[rpc_send_count]   = transaction_id;
     rpc_send_count++;
     rpc_last_send_id   = transaction_id;
     rpc_last_send_size = initiator2target_buffer_size;
@@ -317,7 +334,11 @@ bool transaction_rpc_send(int8_t transaction_id, uint8_t initiator2target_buffer
         CHECK(false);
     }
 
-    return fake_rpc_send_result;
+    if (rpc_send_script_index < rpc_send_script_count) {
+        result = rpc_send_script[rpc_send_script_index++];
+    }
+
+    return result;
 }
 
 static slave_callback_t test_registered_callback(int8_t id) {
@@ -336,6 +357,18 @@ static void test_reset_rpc_send_counts(void) {
     rpc_send_count_combo                 = 0;
     rpc_send_count_key_feedback_semantic = 0;
     rpc_send_count_key_feedback_branch   = 0;
+    memset(rpc_send_times, 0, sizeof(rpc_send_times));
+    memset(rpc_send_ids, -1, sizeof(rpc_send_ids));
+}
+
+static void test_set_rpc_send_script(const bool *results, uint8_t count) {
+    CHECK(count <= RPC_SEND_SCRIPT_CAPACITY);
+    if (count > 0u) {
+        CHECK(results != NULL);
+        memcpy(rpc_send_script, results, count * sizeof(results[0]));
+    }
+    rpc_send_script_count = count;
+    rpc_send_script_index = 0u;
 }
 
 static void test_reset_timer_counts(void) {
@@ -527,6 +560,172 @@ static void test_active_heartbeat_is_wrap_safe(void) {
     CHECK(rpc_send_count == 4u);
     CHECK(timer_read32_count == 1u);
     CHECK(timer_elapsed32_count == 0u);
+}
+
+static void test_first_failure_stops_tick_and_force_respects_backoff(void) {
+    test_reset_stubs();
+    split_runtime_sync_init();
+    test_reset_rpc_send_counts();
+    test_reset_builder_counts();
+    fake_rpc_send_result = false;
+
+    split_runtime_sync();
+
+    CHECK(rpc_send_count == 1u);
+    CHECK(rpc_send_count_base == 1u);
+    CHECK(rpc_send_count_combo == 0u);
+    CHECK(rpc_send_count_key_feedback_semantic == 0u);
+    CHECK(rpc_send_count_key_feedback_branch == 0u);
+
+    test_reset_rpc_send_counts();
+    test_reset_builder_counts();
+    test_reset_timer_counts();
+    split_runtime_sync();
+
+    CHECK(rpc_send_count == 0u);
+    CHECK(timer_read32_count == 1u);
+    CHECK(auto_mouse_elapsed_at_read_count == 0u);
+    CHECK(pd_owner_bitmap_read_count == 0u);
+    CHECK(combo_underlay_read_count == 0u);
+    CHECK(combo_overlay_read_count == 0u);
+    CHECK(key_feedback_semantic_read_count == 0u);
+    CHECK(key_feedback_broad_owner_read_count == 0u);
+    CHECK(key_feedback_tap_branch_read_count == 0u);
+}
+
+static void test_retry_schedule_caps_and_is_wrap_safe(void) {
+    static const uint32_t                expected_delays[] = {50u, 100u, 200u, 400u, 800u, 1000u, 1000u};
+    split_runtime_sync_debug_transport_t transport;
+
+    test_reset_stubs();
+    fake_time32 = UINT32_MAX - 20u;
+    split_runtime_sync_init();
+    test_reset_rpc_send_counts();
+    fake_rpc_send_result = false;
+
+    split_runtime_sync();
+    CHECK(rpc_send_count == 1u);
+    split_runtime_sync_debug_transport_snapshot(&transport);
+    CHECK(transport.backoff_active);
+    CHECK(transport.consecutive_failures == 1u);
+    CHECK(transport.retry_delay_ms == expected_delays[0]);
+
+    for (uint8_t index = 0u; index < (uint8_t)(sizeof(expected_delays) / sizeof(expected_delays[0])); index++) {
+        uint8_t  next_index = index + 1u < (uint8_t)(sizeof(expected_delays) / sizeof(expected_delays[0])) ? (uint8_t)(index + 1u) : index;
+        uint32_t delay      = expected_delays[index];
+
+        test_reset_rpc_send_counts();
+        fake_time32 += delay - 1u;
+        split_runtime_sync_tick();
+        CHECK(rpc_send_count == 0u);
+
+        fake_time32 += 1u;
+        split_runtime_sync_tick();
+        CHECK(rpc_send_count == 1u);
+        CHECK(rpc_send_count_base == 1u);
+        CHECK(rpc_send_times[0] == fake_time32);
+        split_runtime_sync_debug_transport_snapshot(&transport);
+        CHECK(transport.backoff_active);
+        CHECK(transport.retry_delay_ms == expected_delays[next_index]);
+    }
+}
+
+static void test_recovery_sends_latest_state_and_preserves_later_dirty_domains(void) {
+    static const bool                    fail_combo[] = {true, false};
+    split_runtime_sync_debug_transport_t transport;
+
+    test_reset_stubs();
+    split_runtime_sync_init();
+    test_reset_rpc_send_counts();
+    fake_combo_underlay_bitmap[0] = 0x31u;
+    split_runtime_sync_mark_combo_dirty();
+    test_set_rpc_send_script(fail_combo, (uint8_t)(sizeof(fail_combo) / sizeof(fail_combo[0])));
+
+    split_runtime_sync();
+
+    CHECK(rpc_send_count == 2u);
+    CHECK(rpc_send_ids[0] == PUT_SPLIT_RUNTIME_BASE_SYNC);
+    CHECK(rpc_send_ids[1] == PUT_SPLIT_COMBO_FEEDBACK_SYNC);
+
+    fake_combo_underlay_bitmap[0] = 0x72u;
+    key_feedback_semantic_map_set(fake_key_feedback_semantic_map, (keypos_t){.row = 1, .col = 1}, KEY_FEEDBACK_SEMANTIC_UNRESOLVED_TAP_BRANCH);
+    key_feedback_tap_branch_map_set(fake_key_feedback_tap_branch_map, (keypos_t){.row = 1, .col = 1}, 3u);
+    split_runtime_sync_mark_key_feedback_dirty();
+    test_reset_rpc_send_counts();
+    test_set_rpc_send_script(NULL, 0u);
+    fake_rpc_send_result = true;
+
+    fake_time32 += 49u;
+    split_runtime_sync_tick();
+    CHECK(rpc_send_count == 0u);
+
+    fake_time32 += 1u;
+    split_runtime_sync_tick();
+
+    CHECK(rpc_send_count == 4u);
+    CHECK(rpc_send_ids[0] == PUT_SPLIT_RUNTIME_BASE_SYNC);
+    CHECK(rpc_last_combo_packet.combo_underlay_bitmap[0] == 0x72u);
+    CHECK(key_feedback_semantic_map_get(rpc_last_key_feedback_semantic_packet.key_feedback_semantic_map, (keypos_t){.row = 1, .col = 1}) == KEY_FEEDBACK_SEMANTIC_UNRESOLVED_TAP_BRANCH);
+    CHECK(key_feedback_tap_branch_map_get(rpc_last_key_feedback_branch_packet.key_feedback_tap_branch_map, (keypos_t){.row = 1, .col = 1}) == 3u);
+    split_runtime_sync_debug_transport_snapshot(&transport);
+    CHECK(!transport.backoff_active);
+    CHECK(transport.consecutive_failures == 0u);
+    CHECK(transport.retry_delay_ms == 0u);
+
+    test_reset_rpc_send_counts();
+    split_runtime_sync_tick();
+    CHECK(rpc_send_count == 0u);
+}
+
+static void test_active_to_idle_clear_survives_outage(void) {
+    test_reset_stubs();
+    split_runtime_sync_init();
+    test_reset_rpc_send_counts();
+    test_set_idle_runtime_state();
+    fake_rpc_send_result = false;
+
+    split_runtime_sync_tick();
+
+    CHECK(rpc_send_count == 1u);
+    CHECK(rpc_send_count_base == 1u);
+
+    test_reset_rpc_send_counts();
+    fake_rpc_send_result = true;
+    fake_time32 += 50u;
+    split_runtime_sync_tick();
+
+    CHECK(rpc_send_count == 4u);
+    CHECK(rpc_last_base_packet.automouse_progress == 0u);
+    CHECK(rpc_last_base_packet.active_mode_id == PD_MODE_ID_NONE);
+    CHECK(rpc_last_base_packet.locked_mode_id == PD_MODE_ID_NONE);
+    CHECK(rpc_last_base_packet.key_preview_layer == UINT8_MAX);
+}
+
+static void test_role_reinitialization_clears_transport_backoff(void) {
+    split_runtime_sync_debug_transport_t transport;
+
+    test_reset_stubs();
+    split_runtime_sync_init();
+    test_reset_rpc_send_counts();
+    fake_rpc_send_result = false;
+    split_runtime_sync();
+    split_runtime_sync_debug_transport_snapshot(&transport);
+    CHECK(transport.backoff_active);
+
+    rpc_register_count = 0u;
+    fake_is_master     = false;
+    split_runtime_sync_init();
+    split_runtime_sync_debug_transport_snapshot(&transport);
+    CHECK(!transport.backoff_active);
+    CHECK(transport.consecutive_failures == 0u);
+    CHECK(rpc_send_count == 1u);
+
+    rpc_register_count   = 0u;
+    fake_is_master       = true;
+    fake_rpc_send_result = true;
+    test_reset_rpc_send_counts();
+    split_runtime_sync_init();
+    CHECK(rpc_send_count == 4u);
 }
 
 static void test_force_sync_sends_all_packets_even_when_unchanged(void) {
@@ -879,6 +1078,11 @@ int main(void) {
     test_inactive_auto_mouse_skips_elapsed_lookup();
     test_active_heartbeat_is_wrap_safe();
     test_active_auto_mouse_uses_shared_low16_after_wrap();
+    test_first_failure_stops_tick_and_force_respects_backoff();
+    test_retry_schedule_caps_and_is_wrap_safe();
+    test_recovery_sends_latest_state_and_preserves_later_dirty_domains();
+    test_active_to_idle_clear_survives_outage();
+    test_role_reinitialization_clears_transport_backoff();
     test_force_sync_sends_all_packets_even_when_unchanged();
     test_key_feedback_visibility_is_ignored_without_flashing_semantics();
     test_key_feedback_visibility_changes_when_flashing_semantics_are_present();

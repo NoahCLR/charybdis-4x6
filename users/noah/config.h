@@ -25,6 +25,12 @@
 #    undef SERIAL_USART_TIMEOUT
 #    define SERIAL_USART_TIMEOUT 5
 
+// A failed userspace runtime RPC stops the current send pass. Retry probes use
+// a short exponential backoff so an unplugged half cannot spend every scan in
+// repeated serial timeouts, while reconnect recovery remains prompt.
+#    define SPLIT_RUNTIME_SYNC_RETRY_INITIAL_MS 50u
+#    define SPLIT_RUNTIME_SYNC_RETRY_MAX_MS 1000u
+
 // Sync the active layer set to the slave half so it can show the correct
 // RGB layer indicator colors.
 #    ifdef SPLIT_LAYER_STATE_ENABLE

@@ -200,6 +200,14 @@ Auto-mouse progress is read only when its RGB field is active and uses the
 sampled timestamp through `compat/qmk_auto_mouse_contract.h`; the fork-specific
 16-bit subtraction and wrap behavior do not leak into split policy.
 
+The first failed runtime RPC stops later domain attempts. Suppressed ticks do
+not build packets or call the transport; retry probes use the current base
+state after 50 ms and double on repeated failure to a 1,000 ms cap. Probe
+success clears the shared outage state and drains current eligible domains in
+base, combo, semantic, then branch order. Dirty state and per-domain
+last-success snapshots change only after that domain succeeds. Failure and
+recovery are traced, but suppressed scans are intentionally silent.
+
 ## Macro And VIA Flow
 
 ```mermaid

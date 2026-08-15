@@ -39,6 +39,15 @@ static uint32_t                                     split_runtime_combo_last_sen
 static uint32_t                                     split_runtime_key_feedback_semantic_last_send = 0;
 static uint32_t                                     split_runtime_key_feedback_branch_last_send   = 0;
 
+typedef struct {
+    uint32_t last_failure;
+    uint32_t retry_delay_ms;
+    uint8_t  consecutive_failures;
+    bool     backoff_active;
+} split_runtime_sync_transport_t;
+
+static split_runtime_sync_transport_t split_runtime_sync_transport = {0};
+
 #    ifndef SPLIT_RUNTIME_SYNC_ACTIVE_HEARTBEAT_MS
 #        define SPLIT_RUNTIME_SYNC_ACTIVE_HEARTBEAT_MS 250
 #    endif
@@ -46,6 +55,18 @@ static uint32_t                                     split_runtime_key_feedback_b
 #    ifndef SPLIT_RUNTIME_SYNC_IDLE_HEARTBEAT_MS
 #        define SPLIT_RUNTIME_SYNC_IDLE_HEARTBEAT_MS 1000
 #    endif
+
+#    ifndef SPLIT_RUNTIME_SYNC_RETRY_INITIAL_MS
+#        define SPLIT_RUNTIME_SYNC_RETRY_INITIAL_MS 50u
+#    endif
+
+#    ifndef SPLIT_RUNTIME_SYNC_RETRY_MAX_MS
+#        define SPLIT_RUNTIME_SYNC_RETRY_MAX_MS 1000u
+#    endif
+
+_Static_assert(SPLIT_RUNTIME_SYNC_RETRY_INITIAL_MS > 0u, "split runtime retry delay must be nonzero");
+_Static_assert(SPLIT_RUNTIME_SYNC_RETRY_MAX_MS >= SPLIT_RUNTIME_SYNC_RETRY_INITIAL_MS, "split runtime retry maximum must cover the initial delay");
+_Static_assert(SPLIT_RUNTIME_SYNC_RETRY_MAX_MS <= UINT32_MAX / 2u, "split runtime retry delay must remain unambiguous across timer wrap");
 
 static void split_runtime_sync_log_packet_size_mismatch(const char *packet_name, uint8_t size, uint8_t expected) {
 #    ifdef CONSOLE_ENABLE
@@ -171,6 +192,39 @@ static bool split_runtime_key_feedback_branch_packet_is_active(const split_runti
 
 static uint32_t split_runtime_sync_elapsed_since(uint32_t now, uint32_t then) {
     return now - then;
+}
+
+static bool split_runtime_sync_retry_due(uint32_t now) {
+    return !split_runtime_sync_transport.backoff_active || split_runtime_sync_elapsed_since(now, split_runtime_sync_transport.last_failure) >= split_runtime_sync_transport.retry_delay_ms;
+}
+
+static uint32_t split_runtime_sync_next_retry_delay(void) {
+    uint32_t current = split_runtime_sync_transport.retry_delay_ms;
+
+    if (current < SPLIT_RUNTIME_SYNC_RETRY_INITIAL_MS) {
+        return SPLIT_RUNTIME_SYNC_RETRY_INITIAL_MS;
+    }
+    if (current >= SPLIT_RUNTIME_SYNC_RETRY_MAX_MS || current > SPLIT_RUNTIME_SYNC_RETRY_MAX_MS / 2u) {
+        return SPLIT_RUNTIME_SYNC_RETRY_MAX_MS;
+    }
+    return current * 2u;
+}
+
+static void split_runtime_sync_note_failure(int8_t transaction_id, uint32_t now) {
+    if (split_runtime_sync_transport.consecutive_failures < UINT8_MAX) {
+        split_runtime_sync_transport.consecutive_failures++;
+    }
+    split_runtime_sync_transport.last_failure   = now;
+    split_runtime_sync_transport.retry_delay_ms = split_runtime_sync_next_retry_delay();
+    split_runtime_sync_transport.backoff_active = true;
+    noah_runtime_trace_emit(NOAH_TRACE_SPLIT_SYNC, NOAH_TRACE_SPLIT_SYNC_EVENT_FAILURE, (uint8_t)transaction_id, (uint16_t)split_runtime_sync_transport.retry_delay_ms);
+}
+
+static void split_runtime_sync_note_recovery(void) {
+    uint8_t previous_failures = split_runtime_sync_transport.consecutive_failures;
+
+    split_runtime_sync_transport = (split_runtime_sync_transport_t){0};
+    noah_runtime_trace_emit(NOAH_TRACE_SPLIT_SYNC, NOAH_TRACE_SPLIT_SYNC_EVENT_RECOVERY, previous_failures, 0u);
 }
 
 static bool split_runtime_sync_heartbeat_due(bool sent_once, uint32_t last_send, bool active, uint32_t now) {
@@ -369,6 +423,7 @@ void split_runtime_sync_init(void) {
     split_runtime_combo_sent_once                 = false;
     split_runtime_key_feedback_semantic_sent_once = false;
     split_runtime_key_feedback_branch_sent_once   = false;
+    split_runtime_sync_transport                  = (split_runtime_sync_transport_t){0};
     split_runtime_sync_initialized                = true;
     split_runtime_sync_dirty_reset();
     now                                           = timer_read32();
@@ -391,32 +446,54 @@ void split_runtime_sync_tick(void) {
         return;
     }
 
-    now         = timer_read32();
+    now = timer_read32();
+    if (!split_runtime_sync_retry_due(now)) {
+        return;
+    }
+
     raw_elapsed = split_runtime_sync_auto_mouse_elapsed(now);
     split_runtime_sync_elapsed_internal(raw_elapsed, false, now);
 }
 
 static void split_runtime_sync_elapsed_internal(uint16_t raw_elapsed, bool force, uint32_t now) {
+    bool recovery_probe = split_runtime_sync_transport.backoff_active;
+
+    if (!split_runtime_sync_retry_due(now)) {
+        return;
+    }
+
     split_runtime_base_sync_packet_t base_packet = split_runtime_sync_build_base_packet(raw_elapsed);
-    (void)split_runtime_sync_broadcast_base(&base_packet, force, now);
+    if (!split_runtime_sync_broadcast_base(&base_packet, force || recovery_probe, now)) {
+        split_runtime_sync_note_failure(PUT_SPLIT_RUNTIME_BASE_SYNC, now);
+        return;
+    }
+    if (recovery_probe) {
+        split_runtime_sync_note_recovery();
+    }
 
     split_runtime_combo_feedback_packet_t combo_packet = split_runtime_sync_build_combo_packet();
-    if (split_runtime_sync_broadcast_combo(&combo_packet, force, now)) {
-        split_runtime_sync_clear_combo_dirty();
+    if (!split_runtime_sync_broadcast_combo(&combo_packet, force, now)) {
+        split_runtime_sync_note_failure(PUT_SPLIT_COMBO_FEEDBACK_SYNC, now);
+        return;
     }
+    split_runtime_sync_clear_combo_dirty();
 
     if (split_runtime_sync_should_build_packet(force, split_runtime_sync_key_feedback_semantic_is_dirty(), split_runtime_key_feedback_semantic_sent_once, split_runtime_key_feedback_semantic_last_send, split_runtime_key_feedback_semantic_packet_is_active(&split_runtime_key_feedback_semantic_last_sent), now)) {
         split_runtime_key_feedback_semantic_packet_t key_feedback_semantic_packet = split_runtime_sync_build_key_feedback_semantic_packet();
-        if (split_runtime_sync_broadcast_key_feedback_semantic(&key_feedback_semantic_packet, force, now)) {
-            split_runtime_sync_clear_key_feedback_semantic_dirty();
+        if (!split_runtime_sync_broadcast_key_feedback_semantic(&key_feedback_semantic_packet, force, now)) {
+            split_runtime_sync_note_failure(PUT_SPLIT_KEY_FEEDBACK_SEMANTIC_SYNC, now);
+            return;
         }
+        split_runtime_sync_clear_key_feedback_semantic_dirty();
     }
 
     if (split_runtime_sync_should_build_packet(force, split_runtime_sync_key_feedback_branch_is_dirty(), split_runtime_key_feedback_branch_sent_once, split_runtime_key_feedback_branch_last_send, split_runtime_key_feedback_branch_packet_is_active(&split_runtime_key_feedback_branch_last_sent), now)) {
         split_runtime_key_feedback_branch_packet_t key_feedback_branch_packet = split_runtime_sync_build_key_feedback_branch_packet();
-        if (split_runtime_sync_broadcast_key_feedback_branch(&key_feedback_branch_packet, force, now)) {
-            split_runtime_sync_clear_key_feedback_branch_dirty();
+        if (!split_runtime_sync_broadcast_key_feedback_branch(&key_feedback_branch_packet, force, now)) {
+            split_runtime_sync_note_failure(PUT_SPLIT_KEY_FEEDBACK_BRANCH_SYNC, now);
+            return;
         }
+        split_runtime_sync_clear_key_feedback_branch_dirty();
     }
 }
 
@@ -436,7 +513,11 @@ void split_runtime_sync(void) {
         return;
     }
 
-    now         = timer_read32();
+    now = timer_read32();
+    if (!split_runtime_sync_retry_due(now)) {
+        return;
+    }
+
     raw_elapsed = split_runtime_sync_auto_mouse_elapsed(now);
     split_runtime_sync_elapsed_internal(raw_elapsed, true, now);
 }
@@ -452,6 +533,19 @@ void split_runtime_sync_debug_clock_snapshot(split_runtime_sync_debug_clock_t *o
         .combo_last_send    = split_runtime_combo_last_send,
         .semantic_last_send = split_runtime_key_feedback_semantic_last_send,
         .branch_last_send   = split_runtime_key_feedback_branch_last_send,
+    };
+}
+
+void split_runtime_sync_debug_transport_snapshot(split_runtime_sync_debug_transport_t *out) {
+    if (!out) {
+        return;
+    }
+
+    *out = (split_runtime_sync_debug_transport_t){
+        .last_failure         = split_runtime_sync_transport.last_failure,
+        .retry_delay_ms       = split_runtime_sync_transport.retry_delay_ms,
+        .consecutive_failures = split_runtime_sync_transport.consecutive_failures,
+        .backoff_active       = split_runtime_sync_transport.backoff_active,
     };
 }
 #    endif

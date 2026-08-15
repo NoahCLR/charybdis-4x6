@@ -3,7 +3,7 @@
 ## Plan metadata
 
 - Severity: high
-- Status: planned
+- Status: verified on 2026-08-15
 - Recommended phase: Phase 3 split resilience, after or alongside [Finding 17](17-split-timer-sampling.md)
 - Affected surfaces:
   - users/noah/lib/split/runtime_sync.c
@@ -23,6 +23,30 @@
 The master has no outage-level retry gate. A failed transaction remains immediately eligible because its successful-send fields are not updated, and the same tick continues attempting later packet domains. A disconnected or unhealthy split can therefore turn every keyboard scan into several blocking serial timeouts.
 
 This is more than wasted work. With the configured five-millisecond serial timeout, four attempted runtime RPC domains can consume roughly twenty milliseconds in one scan before the next scan immediately retries. That delays matrix handling, pointing reports, RGB work, and watchdog service precisely while the transport is degraded.
+
+## Implementation outcome — 2026-08-15
+
+Finding 12 is implemented and verified. The first failed runtime RPC now ends
+the current send pass. Shared transport-health state suppresses packet
+construction and further RPCs for 50 ms, then doubles failed probe delays to
+100, 200, 400, 800, and a 1,000 ms cap. All comparisons reuse Finding 17's
+sampled `now` with unsigned wrap-safe subtraction.
+
+The current base packet is the recovery probe. A successful probe clears the
+outage state and the same tick drains currently eligible combo, semantic, and
+branch state in deterministic order; any later failure stops the drain. No
+stale packet queue exists, dirty state and last-success snapshots survive
+failure, and force never bypasses active backoff. Failure and recovery trace
+events are emitted once per attempt transition, while suppressed scans remain
+silent.
+
+Host tests reduce a fully due outage tick from four blocking attempts to one,
+enforce zero RPCs/builders/auto-mouse lookup during backoff, cover the complete
+retry schedule across `UINT32_MAX`, and prove current-state and active-to-idle
+recovery. The full host suite, ordinary firmware build, and fresh target stack
+gate pass. The final image is 145,204 B text and 245,592 B BSS; this is +144 B
+text and no BSS change from Finding 17. The outbound base-broadcast reviewed
+path is 480 B, and the overall worst main path remains 1,816/1,920 B.
 
 ## Current evidence and failure scenario
 
@@ -184,17 +208,19 @@ Do not mark this finding resolved if the firmware compile is blocked or skipped.
 
 ## Acceptance checklist
 
-- [ ] First failed RPC ends the current tick's send attempts.
-- [ ] Backoff ticks perform no RPC calls and do not build avoidable packets.
-- [ ] Dirty and active-to-idle state survives the outage.
-- [ ] Recovery sends current state and clears only successfully transmitted domains.
-- [ ] Retry cadence, cap, fairness, role change, and timer wrap are host-tested.
-- [ ] Failure/recovery telemetry is bounded and documented.
-- [ ] Targeted split, trace, debug, and feature-gate checks pass.
-- [ ] The full host suite passes.
-- [ ] The target QMK compile passes.
-- [ ] Runtime docs and the active review note match the landed behavior.
+- [x] First failed RPC ends the current tick's send attempts.
+- [x] Backoff ticks perform no RPC calls and do not build avoidable packets.
+- [x] Dirty and active-to-idle state survives the outage.
+- [x] Recovery sends current state and clears only successfully transmitted domains.
+- [x] Retry cadence, cap, deterministic later-domain service, role reset, and timer wrap are host-tested.
+- [x] Failure/recovery telemetry is bounded and documented.
+- [x] Targeted split, trace, debug, and feature-gate checks pass.
+- [x] The full host suite passes.
+- [x] The target QMK compile passes.
+- [x] Runtime docs and Review 09 match the landed behavior.
 
 ## Next action
 
-Add scripted per-domain RPC failures and a timer-read counter to the split runtime host fixture. Use those tests to lock the desired stop-on-first-failure and retry cadence before changing runtime_sync.c.
+Proceed to Finding 05 and build durable VIA split reconciliation on top of the
+bounded transport behavior. Keep runtime-sync outage state separate from VIA
+versioning and persistence state.
