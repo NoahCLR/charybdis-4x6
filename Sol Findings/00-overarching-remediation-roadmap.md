@@ -2,7 +2,7 @@
 
 ## Plan metadata
 
-- **Status:** Implementation in progress; Findings 01 through 04 are verified and the next Phase 1 item is Finding 09. See [`implementation-progress.md`](implementation-progress.md).
+- **Status:** Implementation in progress; Phase 1 Findings 01, 03, 04, 02, and 09 are verified. Finding 08 is next. See [`implementation-progress.md`](implementation-progress.md).
 - **Prepared:** 2026-07-13.
 - **Scope:** Firmware runtime correctness, split reliability, target resource safety, and measured hot-path efficiency.
 - **Source:** The deep firmware code review performed against the current `charybdis-4x6` tree.
@@ -137,7 +137,8 @@ Exit criteria:
 
 - target stack measurements show a documented safety margin;
 - malformed VIA payloads have zero memory/EEPROM/playback side effects;
-- token and sequence tests cross `0xFFFF → 0x0000` deterministically;
+- token tests cross `0xFFFF → 0x0001` deterministically and pending-release
+  FIFO tests exceed 65,536 operations without a sequence clock;
 - all finding-specific tests, full host suite, and firmware compile are green.
 
 ### Phase 2 — Establish ownership and lifecycle foundations
@@ -340,7 +341,9 @@ Do not use “resolved” as a synonym for “code looks cleaner.” For seam, b
 Before closing the full remediation program, add or retain scenarios that cross subsystem boundaries:
 
 1. A physical key remains held while a VIA macro taps or holds the same basic key, including cancellation during a macro delay.
-2. A press token and pending-release sequence cross wrap while held actions and deferred releases are live.
+2. A press token crosses wrap while held actions and deferred releases are live,
+   and the explicit pending-release FIFO survives more than 65,536 operations
+   behind a long-lived blocked entry.
 3. A malformed VIA macro/buffer command is received during split outage and recovery; neither half mutates partial state.
 4. A split half disconnects during a macro/keymap persistence update, rejoins, changes role, and converges without retry storm.
 5. Maximum pointing input drains under budget while keyboard releases, split sync, and RGB tasks continue to progress.

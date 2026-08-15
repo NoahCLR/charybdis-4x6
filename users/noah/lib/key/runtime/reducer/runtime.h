@@ -38,6 +38,11 @@
 #endif
 
 _Static_assert(KEY_RUNTIME_CORE_TOKEN_ID_MAX > 0u && KEY_RUNTIME_CORE_TOKEN_ID_MAX <= UINT16_MAX, "press-token ID domain must contain nonzero uint16_t values");
+_Static_assert(KEY_RUNTIME_CORE_PENDING_RELEASE_CAPACITY < UINT8_MAX, "pending-release FIFO indices require an unused uint8_t sentinel");
+
+enum {
+    KEY_RUNTIME_CORE_PENDING_RELEASE_INDEX_NONE = UINT8_MAX,
+};
 
 typedef enum {
     RUNTIME_EVENT_KIND_KEY_DOWN = 0,
@@ -169,9 +174,9 @@ typedef enum {
 
 typedef struct {
     uint16_t                    owner_token_id;
-    uint16_t                    sequence;
     uint16_t                    action;
     keyboard_mod_state_t        mods;
+    uint8_t                     next_queue_index;
     key_runtime_packed_keypos_t packed_key_pos;
     uint8_t                     flags;
 } pending_release_slot_t;
@@ -182,7 +187,6 @@ typedef struct {
     bool                 active;
     bool                 tap_commit_feedback;
     uint16_t             owner_token_id;
-    uint16_t             sequence;
     keypos_t             key_pos;
     uint16_t             action;
     keyboard_mod_state_t mods;
@@ -298,6 +302,8 @@ typedef struct {
     uint8_t              core_tap_series_count;
     uint8_t              core_lease_count;
     uint8_t              core_pending_release_count;
+    uint8_t              core_pending_release_high_water_mark;
+    uint8_t              core_pending_release_validation_failure_count;
     uint8_t              core_deferred_release_blocker_count;
     uint8_t              core_deferred_release_timed_blocker_count;
     uint8_t              core_persistent_intent_count;
@@ -319,12 +325,15 @@ typedef struct {
     key_runtime_core_shadow_projection_t shadow_projection;
     uint16_t                             current_time;
     uint16_t                             next_token_id;
-    uint16_t                             next_pending_release_sequence;
     uint32_t                             next_feedback_sequence;
     uint8_t                              press_token_count;
     uint8_t                              tap_series_count;
     uint8_t                              lease_count;
     uint8_t                              pending_release_count;
+    uint8_t                              pending_release_head_index;
+    uint8_t                              pending_release_tail_index;
+    uint8_t                              pending_release_high_water_mark;
+    uint8_t                              pending_release_validation_failure_count;
     uint8_t                              persistent_intent_count;
     uint8_t                              release_keycode_mismatch_count;
     uint8_t                              orphan_release_count;
@@ -388,11 +397,12 @@ static inline void key_runtime_core_state_reset(key_runtime_core_state_t *state)
         return;
     }
 
-    *state                                     = (key_runtime_core_state_t){0};
-    state->next_token_id                         = 1u;
-    state->next_pending_release_sequence         = 1u;
-    state->next_feedback_sequence                = 1u;
+    *state                                        = (key_runtime_core_state_t){0};
+    state->next_token_id                          = 1u;
+    state->next_feedback_sequence                 = 1u;
+    state->pending_release_head_index             = KEY_RUNTIME_CORE_PENDING_RELEASE_INDEX_NONE;
+    state->pending_release_tail_index             = KEY_RUNTIME_CORE_PENDING_RELEASE_INDEX_NONE;
     state->token_allocation_failed_packed_key_pos = KEY_RUNTIME_PACKED_KEYPOS_NONE;
-    state->preview_display_last_semantic_layer   = UINT8_MAX;
-    state->preview_display_bridge_layer          = UINT8_MAX;
+    state->preview_display_last_semantic_layer    = UINT8_MAX;
+    state->preview_display_bridge_layer           = UINT8_MAX;
 }

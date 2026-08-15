@@ -12,9 +12,10 @@ static noah_runtime_context_t noah_runtime_singleton = {
         {
             .core =
                 {
-                    .next_token_id                 = 1u,
-                    .next_pending_release_sequence = 1u,
-                    .next_feedback_sequence        = 1u,
+                    .next_token_id              = 1u,
+                    .next_feedback_sequence     = 1u,
+                    .pending_release_head_index = KEY_RUNTIME_CORE_PENDING_RELEASE_INDEX_NONE,
+                    .pending_release_tail_index = KEY_RUNTIME_CORE_PENDING_RELEASE_INDEX_NONE,
                 },
         },
 };

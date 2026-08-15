@@ -165,5 +165,6 @@ qmk compile -kb bastardkb/charybdis/4x6 -km noah
 
 ## Next action
 
-Finding 02 is closed. Continue with Finding 09's pending-release sequence
-rollover plan; do not reuse press-token identity ordering for queue age.
+Finding 02 is closed. Finding 09 subsequently removed pending-release sequence
+age in favor of explicit FIFO linkage. Continue with Finding 08's synthetic-key
+ownership foundation.

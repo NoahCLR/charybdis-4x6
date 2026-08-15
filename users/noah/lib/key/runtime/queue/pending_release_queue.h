@@ -10,3 +10,7 @@ uint8_t key_runtime_core_take_pending_release_dispatches(pending_release_t *out,
 uint8_t key_runtime_core_pending_release_count_for_keypos(keypos_t key_pos);
 void    key_runtime_core_observe_release_dispatch_deferred(keypos_t key_pos, uint16_t action, keyboard_mod_state_t mods);
 void    key_runtime_core_observe_release_dispatch_drained(keypos_t key_pos, uint16_t action, keyboard_mod_state_t mods);
+
+#ifdef NOAH_HOST_TEST_ENV
+bool key_runtime_core_pending_release_validate(void);
+#endif

@@ -3,7 +3,7 @@
 ## Plan metadata
 
 - **Severity:** Should-fix (P1 long-uptime release-order correctness risk)
-- **Status:** Planned; uint16_t sequence ordering still wraps
+- **Status:** Verified on 2026-08-15; explicit bounded FIFO replaces sequence ordering
 - **Affected surfaces:** key-runtime pending-release queue, deferred release draining, debug projections, core-state layout
 - **Primary files:** [pending_release_queue.c](../users/noah/lib/key/runtime/queue/pending_release_queue.c), [runtime.h](../users/noah/lib/key/runtime/reducer/runtime.h), [deferred_release.c](../users/noah/lib/key/runtime/deferred_release.c)
 - **Prerequisites:** Coordinate state-layout work with Finding 01's stack remediation and Finding 02's press-token rollover tests
@@ -185,17 +185,54 @@ The new implementation must not introduce a capacity-sized automatic array, espe
 
 Update the runtime architecture/review note with the explicit FIFO invariant, measured state sizes, and the new focused runner. If the relevant runtime review is closed, open the next sortable review folder rather than amending closure history.
 
+## Implementation result
+
+The queue now stores `next_queue_index` in each compact slot and explicit head
+and tail indices in core state. `UINT8_MAX` is the invalid sentinel, guarded by
+a compile-time assertion that configured capacity leaves it unused. Tail
+append is constant-time; ordered lookup, oldest matching removal, and
+first-eligible drain walk the linked order with a capacity bound.
+
+All removal paths use one unlink helper. It reconnects the predecessor or
+moves the head, updates the tail, clears the slot, decrements the count once,
+and reevaluates the owner token only after the record is gone. An active-owner
+head may remain linked while a later eligible record drains, without changing
+the relative order of either record.
+
+Host-only validation proves empty/nonempty sentinel rules, active/reachable
+equivalence, count equality, tail termination, and bounded traversal. The
+projection snapshot exposes a queue high-water mark and a saturating validation
+failure count. Production hot paths do not run the structural scan.
+
+Measured host layout before/after:
+
+| Shape | Before | After |
+| --- | ---: | ---: |
+| `pending_release_slot_t` | 12 B | 12 B |
+| `pending_release_t` | 14 B | 12 B |
+| `key_runtime_core_state_t` | 21,780 B | 21,780 B |
+
+The final target image retains `.bss` at 65,204 B. The linked deferred-drain
+frame is 120 B (previous closure evidence recorded 136 B), and the overall
+reviewed process-stack maximum remains 1,808 B against a 1,920 B budget.
+
+Focused coverage lives in `tests/host/pending_release_queue_test.c` and runs
+from `run_pending_release_queue_tests.sh`, including 65,537 enqueue/drain
+cycles behind one long-lived blocked head, full-capacity reuse, every unlink
+position, duplicate matching, owner cleanup, and deliberate corruption.
+
 ## Acceptance checklist
 
-- [ ] No wrapping sequence participates in pending-release order.
-- [ ] Every removal path uses one unlink helper.
-- [ ] Active-owner skipping preserves FIFO order.
-- [ ] More than 65,536 operations pass with a long-lived entry.
-- [ ] Structural invariants and memory sizes are tested.
-- [ ] No capacity-sized stack scratch is added.
-- [ ] Targeted tests, full host suite, and firmware compile pass.
-- [ ] Review notes match the explicit FIFO design.
+- [x] No wrapping sequence participates in pending-release order.
+- [x] Every removal path uses one unlink helper.
+- [x] Active-owner skipping preserves FIFO order.
+- [x] More than 65,536 operations pass with a long-lived entry.
+- [x] Structural invariants and memory sizes are tested.
+- [x] No capacity-sized stack scratch is added.
+- [x] Targeted tests, full host suite, and firmware compile pass.
+- [x] Review notes match the explicit FIFO design.
 
 ## Next action
 
-Write the focused queue test and reproduce the current 65,535/0 failure through direct core-state setup. Then replace sequence fields with head/tail/next indices in one local patch while keeping release policy unchanged.
+Finding 09 is closed. Continue Phase 2 with Finding 08's synthetic-key
+ownership contract before changing combo or macro playback lifecycles.

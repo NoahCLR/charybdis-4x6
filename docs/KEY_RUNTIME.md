@@ -121,8 +121,10 @@ layer," not "old runtime plus new runtime running side by side."
   such as layer locks, pd-mode locks, and pointer toggles. Slots are stored in
   `key_runtime_core_state_t` and managed by `reducer/ownership_state.c`.
 - `pending_release_t`: deferred release dispatches that must drain in authored
-  order after blockers clear. Slots are stored in `key_runtime_core_state_t`
-  and managed by `queue/pending_release_queue.c`.
+  order after blockers clear. Compact slots are linked by bounded array index,
+  with explicit head and tail indices in `key_runtime_core_state_t`; no
+  wrapping clock participates in queue order. The mechanics live in
+  `queue/pending_release_queue.c`.
 - `key_runtime_core_shadow_projection_t`: reducer-owned projected view used by
   blocking queries, debug snapshots, and overlap reasoning.
 
@@ -161,7 +163,7 @@ QMK-facing applied registries. Use these labels when changing runtime behavior:
 | Physical press identity and active key phase | `press_token_t` in `key_runtime_core` | debug and trace snapshots | Physical events are observed into core first; other registries must not create or mutate press tokens. Nonzero IDs are allocated against every live owner store before press mutation, with exhaustion exposed in the projection snapshot. Covered by runtime debug's production and tiny-domain builds, key runtime scenario, release matrix, and integration harness tests. |
 | Pending multi-tap chain state | `tap_series_t` in `key_runtime_core` | `planning/tap_series_flush.c` plans explicit flushes; `planning/scan_planner.c` owns scan-time thresholds; release planner reads the state | Core stores the chain; `planning/tap_series_flush.c` flushes expired or foreign chains, `planning/scan_planner.c` resolves scan-time hold/flush outcomes, and `planning/release_planner.c` resolves release decisions over it. Covered by release matrix, scenario, runtime debug, and integration harness tests. |
 | Release semantics | `planning/release_planner.c` | `deferred_release.c` adapts blocked dispatches into the core pending-release queue | Planner owns quick release, fallback suppression, buffered base tap, active releases, and pending multi-tap releases; adapters must not re-decide those semantics. |
-| Pending release dispatch queue | `pending_release_t` slots in `key_runtime_core`, with mechanics in `queue/pending_release_queue.c` | `deferred_release.c`, `release.c`, and `scan.c` drain through the adapter | Queue storage stays core-owned because blockers are press-token facts; `queue/pending_release_queue.c` owns allocation, ordering, drain snapshots, and pending-emission token cleanup. Covered by release matrix and runtime debug tests. |
+| Pending release dispatch queue | Index-linked `pending_release_t` slots in `key_runtime_core`, with mechanics in `queue/pending_release_queue.c` | `deferred_release.c`, `release.c`, and `scan.c` drain through the adapter | Queue storage stays core-owned because blockers are press-token facts. Head/tail linkage defines FIFO order independently of uptime; one unlink path owns reconnection, count changes, and pending-emission token cleanup. Covered directly by the pending-release queue runner and by release matrix/runtime debug integration tests. |
 | Runtime inspection and blocker queries | `key_runtime_core_state_t` read through `reducer/state_query.c` | `debug.c`, `feedback.c`, projection snapshots, preflight, and deferred release transport | Query code reads reducer-owned state and reports derived facts; it must not mutate press, tap, lease, or pending-release storage. Covered by runtime debug, release matrix, scenario, trace, and integration harness tests. |
 | Temporary held ownership intent for held actions, repeats, momentary layers, managed modifiers, pd holds, and pointer anchors | `lease_t` in `key_runtime_core`, with mechanics in `reducer/ownership_state.c` | `held_action.c`, `held_repeat.c`, `layer_ownership.c`, `keyboard_mod_ownership.c`, `pd_mode_state.c`, and pointer layer policy | `projection/projection.c` writes outward from planned effects; applied registries perform QMK, action, repeat, layer, modifier, or pd-mode side effects. Those registries must not mint independent key-runtime leases. |
 | Lock-like runtime intent | `persistent_intent_t` in `key_runtime_core`, with mechanics in `reducer/ownership_state.c` | `layer_ownership.c` and `pd_mode_state.c` apply the actual layer or pd-mode lock | Current accepted bridge points are `layer_ownership_set_lock_state()` and `pd_mode_key_runtime_bridge_observe_local_lock_state()`, which update external state and then refresh core shadow state. `run_feature_gate_compile_tests.sh` enforces those bridge directions. Treat new two-way lock writes as architecture work, not local fixes. |
@@ -285,10 +287,15 @@ keys from leaving stale core leases behind.
 dispatches.
 
 Each explicit drain transports at most four records from the queue's entry-time
-snapshot. Records remain FIFO ordered. Synchronous drain re-entry is ignored,
-and records enqueued during projection remain pending for a later release or
-scan boundary. The queue itself keeps its full configured capacity; only the
-automatic transport batch is bounded.
+snapshot. Records remain FIFO ordered by an explicit index-linked list. A
+release whose owner is still active stays linked in place while the drain may
+take the first eligible later record; when that owner becomes eligible, its
+original relative order is unchanged. Matching completion removes the oldest
+matching record, and owner pending state clears only after that owner's final
+record is unlinked. Synchronous drain re-entry is ignored, and records enqueued
+during projection remain pending for a later release or scan boundary. The
+queue itself keeps its full configured capacity; only the automatic transport
+batch is bounded.
 
 The reducer scan path owns:
 

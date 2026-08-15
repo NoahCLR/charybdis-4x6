@@ -5,9 +5,9 @@
 - **Branch:** `sol`
 - **Starting commit:** `5b20ed01` (`sol findings`)
 - **Started:** 2026-07-13
-- **Current focus:** [Finding 09 — pending-release sequence rollover](09-pending-release-sequence-rollover.md)
+- **Current focus:** [Finding 08 — synthetic-key ownership](08-synthetic-key-ownership.md)
 - **Overall status:** In progress
-- **Latest closed review:** [`review/2026-08-15-review-03`](../review/2026-08-15-review-03/)
+- **Latest closed review:** [`review/2026-08-15-review-04`](../review/2026-08-15-review-04/)
 
 This file is the implementation record for the plans in this directory. It records what actually changed, why choices were made, what verification really ran, and what remains open. A plan is not marked verified until its targeted checks, the full host suite, the target firmware build, target-specific evidence, and required documentation all pass.
 
@@ -31,7 +31,7 @@ This file is the implementation record for the plans in this directory. It recor
 | 06 | [Combo-origin cache lifecycle](06-combo-origin-cache-lifecycle.md) | Should fix | Planned | Not run |
 | 07 | [Nonblocking macro playback](07-nonblocking-macro-playback.md) | Should fix | Planned | Not run |
 | 08 | [Synthetic-key ownership](08-synthetic-key-ownership.md) | Should fix | Planned | Not run |
-| 09 | [Pending-release sequence rollover](09-pending-release-sequence-rollover.md) | Should fix | Planned | Not run |
+| 09 | [Pending-release sequence rollover](09-pending-release-sequence-rollover.md) | Should fix | Verified | Explicit linked FIFO, 65,537-cycle blocked-head stress, structural corruption checks, full host, firmware, and target stack gate pass |
 | 10 | [Pointing backlog bounds](10-pointing-backlog-bounds.md) | Should fix | Planned | Not run |
 | 11 | [Dragscroll stall recovery](11-dragscroll-stall-recovery.md) | Should fix | Planned | Not run |
 | 12 | [Split RPC failure backoff](12-split-rpc-failure-backoff.md) | Should fix | Planned | Not run |
@@ -374,6 +374,53 @@ documentation, Sol plan, and closed review agree on the landed identity
 contract. The final linked image reports `.text` 102,464 B, `.rodata` 15,460 B,
 `.data` 23,760 B, and `.bss` 65,204 B.
 
+## Finding 09 — Pending-release FIFO rollover
+
+### Objective
+
+Remove the wrapping 16-bit age counter from deferred-release ordering while
+preserving bounded drain batches, blocker policy, oldest-match behavior, and
+owner-token settlement.
+
+### 2026-08-15 — Explicit linked FIFO and long-uptime proof
+
+**Implemented**
+
+- Replaced stored sequence numbers with one-byte next indices plus explicit
+  core-state head and tail indices. `UINT8_MAX` is the invalid sentinel, and a
+  static assertion keeps configured capacity below it.
+- Added constant-time tail append and capacity-bounded traversals for ordinal
+  snapshots, first eligible drain selection, and oldest matching completion.
+- Centralized every removal through one unlink helper responsible for list
+  repair, head/tail state, slot clearing, count changes, and owner-token cleanup.
+- Kept active-owner entries linked in their original positions while allowing
+  the first eligible later entry to drain.
+- Added queue high-water and saturating structural-validation-failure fields to
+  projection diagnostics. Full structural scanning is host-only.
+- Added a focused queue runner to the full host suite. It covers slot reuse;
+  head/middle/tail/only unlink; blocked-owner skipping and later eligibility;
+  oldest duplicate matching; partial/final owner cleanup; full capacity,
+  overflow, drain, and complete reuse; cycles/orphans; and 65,537 cycles with a
+  long-lived blocked head.
+
+**Measurements**
+
+- `pending_release_slot_t`: 12 B before and after.
+- `pending_release_t`: 14 B to 12 B.
+- Host `key_runtime_core_state_t`: 21,780 B before and after.
+- Target `.bss`: unchanged at 65,204 B.
+- Linked bounded deferred-drain frame: 120 B, down from the prior 136 B record.
+- Reviewed target maximum: unchanged at 1,808 B against a 1,920 B budget.
+- Final linked sections: `.text` 102,704 B, `.rodata` 15,460 B, `.data`
+  23,760 B, `.bss` 65,204 B, and `.ram4` 288 B.
+
+### Current finding status
+
+Finding 09 is **Verified**. No sequence counter remains in queue order, every
+removal follows the same list-maintenance contract, direct and integration
+coverage pass, the target image links, and the fresh reviewed-path stack gate
+retains its required reserve.
+
 ## Verification ledger
 
 | Date | Finding | Command | Result | Notes |
@@ -442,16 +489,30 @@ contract. The final linked image reports `.text` 102,464 B, `.rodata` 15,460 B,
 | 2026-08-15 | 02 | `qmk compile -kb bastardkb/charybdis/4x6 -km noah` | Passed | Required ordinary target firmware build |
 | 2026-08-15 | 02 | `sh tests/host/run_firmware_stack_budget_checks.sh` | Passed | Fresh build; allocator path 1,104 B, overall reviewed worst 1,808 B |
 | 2026-08-15 | 02 | `git diff --check` | Passed | Source, tests, stack manifest, runtime docs, Sol ledger, and closed Finding 02 review |
+| 2026-08-15 | 09 | `sh tests/host/run_pending_release_queue_tests.sh` | Passed | Layout, FIFO/reuse, all unlink positions, blocked owners, oldest duplicate, owner cleanup, capacity, corruption, and 65,537-cycle stress |
+| 2026-08-15 | 09 | `sh tests/host/run_key_runtime_release_matrix_tests.sh` | Passed | Release ownership matrix remains coherent |
+| 2026-08-15 | 09 | `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh` | Passed | Layer-lock deferred releases remain balanced |
+| 2026-08-15 | 09 | `sh tests/host/run_key_runtime_scenario_tests.sh` | Passed | Scenario matrix retains release order |
+| 2026-08-15 | 09 | `sh tests/host/run_key_runtime_integration_harness_tests.sh` | Passed | End-to-end runtime integration remains coherent |
+| 2026-08-15 | 09 | `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh` | Passed | Both PD-mode integration variants pass |
+| 2026-08-15 | 09 | `sh tests/host/run_runtime_debug_tests.sh` | Passed | Both token-domain variants retain deferred queue behavior |
+| 2026-08-15 | 09 | `sh tests/host/run_feature_gate_compile_tests.sh` | Passed | Header/state/build variants compile with linked FIFO state |
+| 2026-08-15 | 09 | `PYTHONPYCACHEPREFIX=/tmp/noah-host-pycache sh tests/host/run_all_host_tests.sh` | Passed | Final complete host suite includes the new focused runner |
+| 2026-08-15 | 09 | `qmk compile -kb bastardkb/charybdis/4x6 -km noah` | Passed | Required ordinary target firmware build |
+| 2026-08-15 | 09 | `sh tests/host/run_firmware_stack_budget_checks.sh` | Blocked, then passed | Initial sandboxed clean could not modify sibling QMK artifacts; approved fresh clean/rebuild passed with 1,808 B worst reviewed path |
+| 2026-08-15 | 09 | `git diff --check` | Passed | Source, focused test/runner, runtime docs, Sol records, and closed Finding 09 review |
 
 ## Cross-cutting decisions and deferred work
 
 - The implementation order follows [`00-overarching-remediation-roadmap.md`](00-overarching-remediation-roadmap.md).
-- Finding 09 may later replace pending-release sequence ordering. Finding 01 must not pre-empt that design except where a narrow queue API is required for constant-stack draining.
+- Finding 09 replaced pending-release sequence ordering without changing Finding
+  01's four-record transport batch or re-entry policy.
 - The stack checker must model vendor split callbacks under `SlaveThread`, not under the main process stack. Stack-context correctness is part of the gate contract.
 - No sibling workspace source was edited; only QMK build artifacts were produced under `../bastardkb-qmk/.build`.
 
 ## Next program action
 
-Begin Finding 09 with an injectable near-wrap pending-release sequence
-reproducer. Keep queue age/order semantics separate from press-token identity,
-and retain Finding 01's bounded FIFO drain contract.
+Begin Finding 08 by specifying one reference-counted ownership contract for
+physical and synthetic basic/modifier registrations. Preserve current macro and
+combo behavior until that foundation has direct overlap and orphan-release
+coverage.

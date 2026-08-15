@@ -32,7 +32,10 @@ Representative failure: a handled key is released while one or more foreign defe
 ## Required invariants
 
 1. No normal or error release path allocates storage proportional to the 120-entry pending-release capacity on the process stack.
-2. Deferred dispatches retain their current FIFO/sequence ordering, owner cleanup, modifier snapshot, tap-feedback pairing, and exactly-once projection semantics.
+2. Deferred dispatches retain FIFO order, owner cleanup, modifier snapshot,
+   tap-feedback pairing, and exactly-once projection semantics. Finding 09 now
+   enforces order through explicit head/tail/next linkage, without a sequence
+   clock.
 3. Dispatches queued while a drain is in progress have an explicit policy; they cannot create an unbounded re-entrant drain loop.
 4. The measured worst credible process-stack call chain, including QMK frames, fits within 75% of the configured stack and leaves at least 512 bytes of headroom. If these two limits differ, satisfy the larger reserve.
 5. The stack limit is checked from target compiler/link artifacts in CI or the standard verification workflow. A host-only `sizeof` assertion is insufficient.
@@ -116,7 +119,8 @@ Representative failure: a handled key is released while one or more foreign defe
 ### New focused coverage to add
 
 - Empty, one-entry, small-batch, and full-120-entry drain cases.
-- FIFO ordering across multiple owners and wrapped pending-release sequences once Finding 09 lands.
+- FIFO ordering across multiple owners and more than 65,536 queue operations,
+  including one long-lived blocked owner (landed with Finding 09).
 - Entry enqueued during projection: it remains pending and is projected exactly once on the next permitted drain.
 - Owner-token/pending markers clear only after the last dispatch for that owner.
 - Tap-commit feedback remains adjacent to its dispatch and is neither duplicated nor dropped.
