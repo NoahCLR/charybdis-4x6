@@ -174,10 +174,11 @@ truth; it consumes snapshots and authored color tables.
 
 ```mermaid
 flowchart TD
-    master["Master half"] --> build_base["Build base packet: automouse, PD, preview"]
-    master --> build_combo["Build combo feedback packet"]
-    master --> build_semantic["Build key-feedback semantic packet"]
-    master --> build_branch["Build broad-owner/tap-branch packet"]
+    master["Master half"] --> now["Sample one 32-bit now"]
+    now --> build_base["Build base packet: automouse, PD, preview"]
+    now --> build_combo["Build combo feedback packet"]
+    now --> build_semantic["Build key-feedback semantic packet"]
+    now --> build_branch["Build broad-owner/tap-branch packet"]
     build_base --> rpc["QMK split transaction RPC"]
     build_combo --> rpc
     build_semantic --> rpc
@@ -192,7 +193,12 @@ flowchart TD
 ```
 
 Split sync is transport. It mirrors already-owned state to the other half and
-does not make ownership decisions.
+does not make ownership decisions. Each initialized master tick samples the
+system clock once. Heartbeat and later retry scheduling use unsigned
+`now - then` arithmetic, and every successful domain stores the same `now`.
+Auto-mouse progress is read only when its RGB field is active and uses the
+sampled timestamp through `compat/qmk_auto_mouse_contract.h`; the fork-specific
+16-bit subtraction and wrap behavior do not leak into split policy.
 
 ## Macro And VIA Flow
 

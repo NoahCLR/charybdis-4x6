@@ -123,6 +123,14 @@
           "functions": ["main", "matrix_scan", "combo_origin_pending_output_reconcile", "combo_origin_pending_output_entry_clear"]
         },
         {
+          "name": "matrix scan split shared clock sample",
+          "functions": ["main", "matrix_scan", "timer_read32"]
+        },
+        {
+          "name": "matrix scan split base broadcast",
+          "functions": ["main", "matrix_scan", "split_runtime_sync_elapsed_internal", "transaction_rpc_exec", "transport_execute_transaction"]
+        },
+        {
           "name": "matrix scan macro text press",
           "functions": ["main", "matrix_scan", "macro_payload_start_text_char", "macro_payload_start_transient", "owned_keycode_acquire", "owned_keycode_acquire_basic", "register_code", "send_6kro_report"]
         },

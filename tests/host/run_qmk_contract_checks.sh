@@ -61,11 +61,14 @@ run_variant extra_short -DEXTRA_SHORT_COMBOS
 
 PYTHONDONTWRITEBYTECODE=1 python3 - "$QMK_ROOT" <<'PY'
 from pathlib import Path
+import re
 import sys
 
 qmk = Path(sys.argv[1])
 quantum = (qmk / "quantum/quantum.c").read_text(encoding="utf-8")
 keyboard = (qmk / "quantum/keyboard.c").read_text(encoding="utf-8")
+auto_mouse = (qmk / "quantum/pointing_device/pointing_device_auto_mouse.c").read_text(encoding="utf-8")
+auto_mouse_header = (qmk / "quantum/pointing_device/pointing_device_auto_mouse.h").read_text(encoding="utf-8")
 
 def body(source: str, signature: str) -> str:
     start = source.index(signature)
@@ -95,6 +98,18 @@ if task.index("matrix_task()") > task.index("quantum_task();"):
 quantum_task = body(keyboard, "void quantum_task(void)")
 if "combo_task();" not in quantum_task:
     raise SystemExit("QMK quantum_task no longer runs combo_task")
+
+elapsed_at_signature = "uint16_t auto_mouse_get_time_elapsed_at(uint16_t now)"
+if not re.search(r"uint16_t\s+auto_mouse_get_time_elapsed_at\(uint16_t now\);", auto_mouse_header):
+    raise SystemExit("QMK auto-mouse elapsed-at declaration is missing")
+
+elapsed_at = body(auto_mouse, elapsed_at_signature)
+if "(uint16_t)(now - auto_mouse_context.timer.active)" not in elapsed_at:
+    raise SystemExit("QMK auto-mouse elapsed-at no longer uses wrap-safe caller time")
+
+elapsed = body(auto_mouse, "uint16_t auto_mouse_get_time_elapsed(void)")
+if "auto_mouse_get_time_elapsed_at(timer_read())" not in elapsed:
+    raise SystemExit("QMK auto-mouse elapsed wrapper no longer delegates through elapsed-at")
 PY
 
 echo "qmk contract checks passed"

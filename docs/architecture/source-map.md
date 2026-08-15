@@ -44,7 +44,7 @@ source trace because they rewrite or verify human-facing firmware docs.
 | Source group | Responsibility | Runtime authority | Inputs | Outputs or side effects | Primary tests | Related docs |
 | --- | --- | --- | --- | --- | --- | --- |
 | `action/` | Classify and dispatch action keycodes; aggregate physical and managed literal report ownership | Action metadata, dispatch policy, and owner-scoped literal-key leases | Runtime effects, physical key observations, direct action keys, macro actions | Aggregate-boundary QMK report transitions, synthetic records, PD keycode press/release, macro playback | `run_action_dispatch_tests.sh`, `run_action_lifecycle_tests.sh`, `run_owned_keycode_tests.sh`, `run_delayed_action_tests.sh` | [change-guide](./change-guide.md), [KEY_RUNTIME](../KEY_RUNTIME.md) |
-| `compat/` | Centralize QMK/fork/VIA contracts | Compatibility-only | QMK combo records and state, VIA commands, QMK APIs | Bounded generation-aware combo origins, VIA split replication, contract wrappers | `run_qmk_contract_checks.sh`, `run_qmk_combo_origin_tests.sh`, `run_qmk_via_split_sync_tests.sh`, `run_feature_gate_compile_tests.sh` | [runtime-flow](./runtime-flow.md) |
+| `compat/` | Centralize QMK/fork/VIA contracts | Compatibility-only | QMK combo records and state, VIA commands, QMK APIs | Bounded generation-aware combo origins, VIA split replication, sampled auto-mouse elapsed access, contract wrappers | `run_qmk_contract_checks.sh`, `run_qmk_combo_origin_tests.sh`, `run_qmk_via_split_sync_tests.sh`, `run_feature_gate_compile_tests.sh` | [runtime-flow](./runtime-flow.md) |
 | `key/behavior/` | Resolve authored key behavior | Authored behavior interpretation | `key_behaviors[]`, resolved keycodes | `handled_key_resolution_t`, materialized runtime contracts, validation errors | `run_key_behavior_lookup_tests.sh`, `run_key_behavior_validation_tests.sh`, `run_keymap_validation_tests.sh`, `run_real_profile_validation_tests.sh` | [INTERACTION_MODEL](../INTERACTION_MODEL.md), [KEY_RUNTIME](../KEY_RUNTIME.md) |
 | `key/ownership/` | Applied held-action and repeat registries | Projected applied state | Key-runtime effects, housekeeping tick | Registered held actions, repeating actions | `run_held_action_tests.sh`, `run_key_runtime_modifier_hold_integration_tests.sh` | [KEY_RUNTIME](../KEY_RUNTIME.md) |
 | `key/runtime/` top level | QMK-facing key-runtime orchestration | Integration only | QMK key events and scan events | Reducer observations, transition plans, projected effects | key-runtime release/scenario/integration/layer-lock/modifier-hold suites | [KEY_RUNTIME](../KEY_RUNTIME.md), [runtime-flow](./runtime-flow.md) |
@@ -62,7 +62,7 @@ source trace because they rewrite or verify human-facing firmware docs.
 | `rgb/automouse/` | Auto-mouse RGB fade support | Projected UI | Auto-mouse timing and layer state | Fade frame and progress quantization | RGB layer render tests | [RGB_CONFIG](../RGB_CONFIG.md) |
 | `rgb/core/` | RGB orchestration, helpers, validation | Render pipeline owner | Authored RGB config, runtime snapshots | LED frame application, config validation, map invalidation | `run_rgb_validation_tests.sh`, `run_rgb_layer_render_tests.sh` | [RGB_CONFIG](../RGB_CONFIG.md) |
 | `rgb/stages/` | Individual RGB overlays | Projected UI | Layer state, combo bitmaps, key feedback, PD snapshots | Stage-specific LED painting | RGB render tests | [RGB_CONFIG](../RGB_CONFIG.md) |
-| `split/` | Runtime split sync transport | Transport only | PD, automouse, preview, combo, key-feedback snapshots | Master-to-slave runtime packets | `run_split_runtime_sync_tests.sh` | [runtime-flow](./runtime-flow.md) |
+| `split/` | Runtime split sync transport and outbound timing | Transport only | One sampled tick timestamp plus PD, automouse, preview, combo, and key-feedback snapshots | Master-to-slave runtime packets and per-domain send timestamps | `run_split_runtime_sync_tests.sh` | [runtime-flow](./runtime-flow.md) |
 | `state/shared/` | Internal runtime storage and test reset | Storage owner | Runtime owners | Shared singleton context and reset | runtime init/debug/trace/diag and feature gate tests | [KEY_RUNTIME](../KEY_RUNTIME.md) |
 | `state/diagnostics/` | Runtime debug, diagnostics, trace | Diagnostic owner | Runtime stage scopes and state snapshots | Debug APIs, restart watchdog, boot indicator state, trace snapshots | `run_runtime_debug_tests.sh`, `run_runtime_diag_tests.sh`, `run_runtime_trace_tests.sh` | [runtime-flow](./runtime-flow.md) |
 | `state/modifiers/` | Keyboard modifier snapshots and replay policy | Modifier policy helper | QMK mod state, action replay, delayed actions, PD masks | Saved/restored/filtered modifier state | keyboard mod ownership, action, delayed action, modifier-hold, PD integration tests | [KEY_RUNTIME](../KEY_RUNTIME.md) |
@@ -103,6 +103,11 @@ The destination must fit the dynamic-keymap capacity exposed by
 `qmk_via_storage_contract.h`. A zero-byte write is valid through the exact end
 of that region, skips the QMK storage call, and still represents a successfully
 applied command.
+
+Auto-mouse elapsed time is also fork-specific. Split runtime passes its one
+sampled tick timestamp through `qmk_auto_mouse_contract.h`; the compatibility
+wrapper converts it to the fork's 16-bit clock and preserves unsigned wrap
+semantics without taking another platform timer sample.
 
 ### `key/behavior/`
 

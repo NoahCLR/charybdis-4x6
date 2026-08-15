@@ -5,10 +5,10 @@
 - **Branch:** `sol`
 - **Starting commit:** `5b20ed01` (`sol findings`)
 - **Started:** 2026-07-13
-- **Current focus:** [Finding 17 — split timer sampling](17-split-timer-sampling.md)
+- **Current focus:** [Finding 12 — split RPC failure backoff](12-split-rpc-failure-backoff.md)
 - **Overall status:** In progress
-- **Latest closed review:** [`review/2026-08-15-review-07`](../review/2026-08-15-review-07/)
-- **Active review:** None; open the next sortable folder when Finding 17 architecture work begins
+- **Latest closed review:** [`review/2026-08-15-review-08`](../review/2026-08-15-review-08/)
+- **Active review:** None; the next implementation pass must open the next sortable review folder.
 
 This file is the implementation record for the plans in this directory. It records what actually changed, why choices were made, what verification really ran, and what remains open. A plan is not marked verified until its targeted checks, the full host suite, the target firmware build, target-specific evidence, and required documentation all pass.
 
@@ -40,7 +40,7 @@ This file is the implementation record for the plans in this directory. It recor
 | 14 | [Macro-cache RAM](14-macro-cache-ram.md) | Optimize | Planned | Not run |
 | 15 | [RGB render work](15-rgb-render-work.md) | Optimize | Planned | Not run |
 | 16 | [Runtime lookup hot path](16-runtime-lookup-hot-path.md) | Optimize | Planned | Not run |
-| 17 | [Split timer sampling](17-split-timer-sampling.md) | Optimize | Planned | Not run |
+| 17 | [Split timer sampling](17-split-timer-sampling.md) | Optimize | Verified | One sampled tick timestamp, active auto-mouse elapsed-at compatibility, wrap/timer-budget tests, full host, firmware, and explicit target-stack paths pass |
 
 ## Finding 01 — Target stack safety
 
@@ -634,6 +634,55 @@ pass. User, architecture, review, and Sol documentation describe the landed
 one-active scan-driven lifecycle. No sibling source was edited; target commands
 only refreshed generated artifacts under `../bastardkb-qmk/.build`.
 
+## Finding 17 — Split timer sampling
+
+### Objective
+
+Use one system-time sample for each initialized master split-runtime tick so
+heartbeat, packet construction, successful-send timestamps, and active
+auto-mouse progress describe one coherent scan without repeated ChibiOS timer
+locks.
+
+### Implemented
+
+- Sample `timer_read32()` once at each initialized master tick, force, init, or
+  explicit-elapsed entry and pass `now` through heartbeat, eligibility, packet
+  construction, and every broadcast helper.
+- Replace `timer_elapsed32()` calls with unsigned `now - last_send` arithmetic;
+  all successful domains store the same sampled `now`.
+- Skip auto-mouse elapsed lookup when its gradient field is absent, auto mouse
+  is inactive, or PD lock suppresses its packet value.
+- Centralize active elapsed lookup in
+  `noah_qmk_contract_auto_mouse_elapsed_at(now)`, using the sampled timestamp's
+  low 16 bits with wrap-safe subtraction.
+- With explicit user authorization, extend the sibling QMK fork with
+  `auto_mouse_get_time_elapsed_at(uint16_t now)`. Its original no-argument API
+  remains compatible by sampling once and delegating.
+- Add timer-read and elapsed-helper budgets, same-timestamp assertions,
+  heartbeat and 16-bit auto-mouse wrap cases, disabled/inactive feature checks,
+  and a no-gradient linked-symbol guard.
+- Add reviewed target paths for the matrix-scan clock sample and outbound base
+  broadcast.
+
+### Measurements
+
+- Normal and forced initialized master ticks: one `timer_read32()` call and no
+  `timer_elapsed32()` calls.
+- Shared-clock target path: 280 B.
+- Outbound split base-broadcast target path: 464 B.
+- Overall reviewed main-process worst path: 1,816/1,920 B.
+- Split-slave reviewed worst path: 328/768 B.
+- Linked firmware: 145,060 B text and 245,592 B BSS. This is +40 B text and no
+  linked BSS change from the Finding 07 checkpoint.
+
+### Closure status
+
+Finding 17 is **verified**. Focused split, compatibility, pointing, RGB, and
+feature checks pass, as do the complete host suite, ordinary firmware build,
+fresh stack-budget build, and diff hygiene. Review 08 records the closure. The
+change crossed into the authorized sibling QMK fork only for the two-file
+auto-mouse compatibility extension.
+
 ## Verification ledger
 
 | Date | Finding | Command | Result | Notes |
@@ -763,6 +812,16 @@ only refreshed generated artifacts under `../bastardkb-qmk/.build`.
 | 2026-08-15 | 07 | `PYTHONPYCACHEPREFIX=/tmp/noah-host-pycache sh tests/host/run_all_host_tests.sh` | Passed | Complete host suite includes the two new focused runners |
 | 2026-08-15 | 07 | `qmk compile -kb bastardkb/charybdis/4x6 -km noah` | Passed | Required ordinary target build on final firmware source |
 | 2026-08-15 | 07 | `PYTHONPYCACHEPREFIX=/tmp/noah-stack-pycache PYTHON=/usr/bin/python3 sh tests/host/run_firmware_stack_budget_checks.sh` | Passed | Fresh linked macro paths pass; 1,816 B worst reviewed main path and 328 B split path |
+| 2026-08-15 | 17 | `sh tests/host/run_split_runtime_sync_tests.sh` before implementation | Failed as expected | The existing tick exceeded the new one-read `timer_read32()` budget |
+| 2026-08-15 | 17 | `sh tests/host/run_split_runtime_sync_tests.sh` | Passed | Normal/no-gradient variants enforce one sampled clock, no elapsed helpers, coherent success timestamps, inactive gates, and 32/16-bit wrap behavior |
+| 2026-08-15 | 17 | `sh tests/host/run_qmk_contract_checks.sh` | Passed | Authorized QMK elapsed-at declaration, wrap-safe implementation, and backward-compatible delegating wrapper are pinned |
+| 2026-08-15 | 17 | `sh tests/host/run_pd_runtime_tests.sh` | Passed | PD state behavior remains coherent |
+| 2026-08-15 | 17 | `sh tests/host/run_rgb_layer_render_tests.sh` | Passed | Auto-mouse RGB progress behavior remains coherent |
+| 2026-08-15 | 17 | `sh tests/host/run_feature_gate_compile_tests.sh` | Passed | Split and compatibility feature variants compile |
+| 2026-08-15 | 17 | `PYTHONPYCACHEPREFIX=/tmp/noah-stack-pycache PYTHON=/usr/bin/python3 sh tests/host/run_firmware_stack_budget_tool_tests.sh` | Passed | All 15 schema-v2 path and edge fixtures pass after manifest expansion |
+| 2026-08-15 | 17 | `PYTHONPYCACHEPREFIX=/tmp/noah-host-pycache sh tests/host/run_all_host_tests.sh` | Passed | Complete host suite passes with the shared-clock contract |
+| 2026-08-15 | 17 | `qmk compile -kb bastardkb/charybdis/4x6 -km noah` | Passed | Required ordinary build against the authorized sibling QMK extension |
+| 2026-08-15 | 17 | `PYTHONPYCACHEPREFIX=/tmp/noah-stack-pycache PYTHON=/usr/bin/python3 sh tests/host/run_firmware_stack_budget_checks.sh` | Passed | Fresh clock path 280 B, base-broadcast path 464 B, worst main 1,816/1,920 B, split 328/768 B |
 
 ## Cross-cutting decisions and deferred work
 
@@ -778,12 +837,15 @@ only refreshed generated artifacts under `../bastardkb-qmk/.build`.
 - Finding 07 makes hardcoded and VIA macro output scan-driven. It deliberately
   supports one active execution with no queue, pins provider IR across
   invalidation, and leaves macro-cache footprint reduction to Finding 14.
+- Finding 17 establishes one sampled, wrap-safe clock for every outbound split
+  domain. Finding 12 must reuse that seam for shared outage/backoff scheduling.
 - The stack checker must model vendor split callbacks under `SlaveThread`, not under the main process stack. Stack-context correctness is part of the gate contract.
-- No sibling workspace source was edited; only QMK build artifacts were produced under `../bastardkb-qmk/.build`.
+- Finding 17 explicitly crossed into `../bastardkb-qmk` for the authorized
+  two-file auto-mouse elapsed-at compatibility extension. No other sibling
+  source was edited.
 
 ## Next program action
 
-Begin Phase 3 with Finding 17. Open the next sortable review folder, measure the
-current split tick's timer reads, and define the single-sampled-time contract
-before changing retry scheduling. Then continue with Finding 12 and Finding 05
-as ordered by the roadmap.
+Open the next sortable review folder for Finding 12. Reuse Finding 17's sampled
+`now` to add shared outage gating and bounded, wrap-safe retry/backoff without
+clearing dirty state on failure. Then continue with Finding 05.

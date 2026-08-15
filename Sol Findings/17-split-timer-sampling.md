@@ -3,7 +3,7 @@
 ## Plan metadata
 
 - Severity: low-to-medium optimization
-- Status: planned
+- Status: verified on 2026-08-15
 - Recommended phase: Phase 3 split runtime cleanup, immediately before or with [Finding 12](12-split-rpc-failure-backoff.md)
 - Affected surfaces:
   - users/noah/lib/split/runtime_sync.c
@@ -11,11 +11,37 @@
   - users/noah/lib/compat/qmk_auto_mouse_contract.h
   - tests/host/split_runtime_sync_test.c
   - tests/host/run_split_runtime_sync_tests.sh
-  - potentially ../bastardkb-qmk/quantum/pointing_device/pointing_device_auto_mouse.c and .h, only with explicit user authorization for sibling-repo changes
+  - ../bastardkb-qmk/quantum/pointing_device/pointing_device_auto_mouse.c and .h (explicitly authorized compatibility extension)
 - Prerequisites:
   - Define one unsigned wrap-safe elapsed helper for 32-bit timestamps.
   - Decide whether strict one-sample behavior includes active auto-mouse elapsed. The plan below treats it as required for closure.
-  - Obtain user authorization before editing the sibling QMK fork if its compatibility API must be extended.
+  - Obtain user authorization before editing the sibling QMK fork if its compatibility API must be extended. Authorization was granted for this implementation.
+
+## Implementation outcome — 2026-08-15
+
+Finding 17 is implemented and verified:
+
+- initialized master tick/force entry points sample `timer_read32()` once;
+- heartbeat/build/broadcast helpers use the passed `now` and do not read time;
+- all successful domains in one forced tick store exactly the same timestamp;
+- active-heartbeat boundaries pass across `UINT32_MAX` wrap;
+- inactive, PD-suppressed, and RGB-gradient-disabled auto-mouse paths do not fetch elapsed time;
+- active auto-mouse progress uses the shared tick sample through the centralized
+  compatibility wrapper, including correct 16-bit wrap behavior;
+- host tests enforce the read budget and expose a host-only clock snapshot.
+
+With explicit user authorization, the sibling QMK fork now exposes
+`auto_mouse_get_time_elapsed_at(uint16_t now)`. The original no-argument API
+keeps its behavior by sampling once and delegating. The charybdis runtime calls
+only the compatibility wrapper and passes the low 16 bits of the shared
+32-bit tick sample.
+
+The full host suite, ordinary firmware build, and fresh reviewed-path stack
+gate pass. The new enforced target paths use 280 bytes for the shared clock
+sample and 464 bytes for the outbound base broadcast. The overall worst main
+path remains 1,816/1,920 bytes; the split-slave worst path remains 328/768
+bytes. Linked firmware text is 145,060 bytes and BSS is 245,592 bytes, a
+40-byte text increase from the Finding 07 checkpoint and no linked BSS change.
 
 ## Problem statement
 
@@ -23,7 +49,7 @@ One split runtime tick repeatedly asks the platform timer for elapsed time per p
 
 The domains are making decisions for one logical tick but can observe slightly different timestamps. Besides wasted locking, this complicates deterministic heartbeat, retry, and test behavior. Auto-mouse progress adds another timer sample through the fork contract even when the value is not needed by the compiled base packet.
 
-## Current evidence
+## Pre-change evidence
 
 - users/noah/lib/split/runtime_sync.c:163-166 calls timer_elapsed32 inside the shared heartbeat helper.
 - users/noah/lib/split/runtime_sync.c:177-248 invokes that heartbeat helper separately for base, combo, semantic, and branch paths.
@@ -105,7 +131,7 @@ Idle scenario:
 
 The local compatibility API currently exposes only elapsed-now, which samples the timer internally. It does not expose the active start timestamp, so strict one-sample active behavior cannot be implemented locally without a new fork contract or fragile duplicated state.
 
-1. Request explicit user authorization for a narrowly scoped sibling change.
+1. Request explicit user authorization for a narrowly scoped sibling change. Completed.
 2. In the QMK fork, add an API such as auto_mouse_get_time_elapsed_at(uint16_t now) that subtracts the internal active timestamp from the caller's sampled low 16 bits.
 3. Keep the existing no-argument API for upstream callers and implement it by sampling then delegating, if appropriate.
 4. Add a compat wrapper in qmk_auto_mouse_contract.h; runtime_sync.c calls only that wrapper.
@@ -173,18 +199,19 @@ If the fork contract changes, run the same target compile against that exact sib
 
 ## Acceptance checklist
 
-- [ ] One now value drives all heartbeat, build, send, and retry decisions in a tick.
-- [ ] Broadcast success stores the shared timestamp without resampling.
-- [ ] UINT32 and auto-mouse UINT16 wrap cases pass.
-- [ ] Disabled or inactive auto-mouse paths perform no elapsed read.
-- [ ] Active auto-mouse progress uses the shared tick sample through a centralized compat contract.
-- [ ] Timer-call budgets are enforced in host tests.
-- [ ] Targeted split, contract, pointing, RGB, and feature-gate checks pass.
-- [ ] The full host suite passes.
-- [ ] The target QMK compile passes.
-- [ ] Any sibling QMK change was explicitly authorized and reported.
-- [ ] Architecture notes describe the shared-clock contract.
+- [x] One now value drives all heartbeat, build, and send decisions in a tick; Finding 12 will reuse it for retry decisions.
+- [x] Broadcast success stores the shared timestamp without resampling.
+- [x] UINT32 and auto-mouse UINT16 wrap cases pass.
+- [x] Disabled or inactive auto-mouse paths perform no elapsed read.
+- [x] Active auto-mouse progress uses the shared tick sample through a centralized compat contract.
+- [x] Timer-call budgets are enforced in host tests.
+- [x] Targeted split, contract, pointing, RGB, and feature-gate checks pass.
+- [x] The full host suite passes.
+- [x] The target QMK compile passes.
+- [x] The sibling QMK change was explicitly authorized and is reported in the implementation record.
+- [x] Architecture notes describe the shared-clock contract.
 
 ## Next action
 
-Add fake timer counters and mixed-timestamp detection to split_runtime_sync_test.c. Then thread one uint32_t now through runtime_sync.c. Before strict auto-mouse consolidation, request authorization for the narrow elapsed-at API in ../bastardkb-qmk.
+Proceed to Finding 12 and reuse the sampled `now` for a shared, wrap-safe split
+RPC failure/backoff gate. Do not introduce a second timing convention.

@@ -2,7 +2,7 @@
 
 ## Plan metadata
 
-- **Status:** Implementation in progress; Phases 1 and 2 are verified. Phase 3 begins with Finding 17, followed by Findings 12 and 05. See [`implementation-progress.md`](implementation-progress.md).
+- **Status:** Implementation in progress; Phases 1 and 2 and Phase 3's shared-clock prerequisite (Finding 17) are verified. Phase 3 continues with Findings 12 and 05. See [`implementation-progress.md`](implementation-progress.md).
 - **Prepared:** 2026-07-13.
 - **Scope:** Firmware runtime correctness, split reliability, target resource safety, and measured hot-path efficiency.
 - **Source:** The deep firmware code review performed against the current `charybdis-4x6` tree.
@@ -165,6 +165,11 @@ Exit criteria:
 ### Phase 3 — Make split transport bounded and convergent
 
 Recommended order: **17, 12, 05**. Findings 12 and 17 may share a tightly scoped preparatory change if that is the cleanest way to pass one sampled `now` through the sync tick.
+
+Finding 17 is verified: one wrap-safe sampled timestamp now drives all outbound
+split-domain timing, including active auto-mouse progress through the authorized
+QMK compatibility extension. Finding 12 is the active next step and must reuse
+that timestamp seam.
 
 1. Sample a single timestamp and pass it through split-domain scheduling.
 2. Introduce shared outage gating and bounded retry/backoff while retaining dirty state.

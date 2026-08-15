@@ -31,6 +31,10 @@ static inline uint16_t noah_qmk_contract_auto_mouse_elapsed(void) {
     return auto_mouse_get_time_elapsed();
 }
 
+static inline uint16_t noah_qmk_contract_auto_mouse_elapsed_at(uint32_t now) {
+    return auto_mouse_get_time_elapsed_at((uint16_t)now);
+}
+
 static inline bool noah_qmk_contract_auto_mouse_active(void) {
     return is_auto_mouse_active();
 }
@@ -68,6 +72,11 @@ static inline uint8_t noah_qmk_contract_auto_mouse_layer(void) {
 }
 
 static inline uint16_t noah_qmk_contract_auto_mouse_elapsed(void) {
+    return 0;
+}
+
+static inline uint16_t noah_qmk_contract_auto_mouse_elapsed_at(uint32_t now) {
+    (void)now;
     return 0;
 }
 

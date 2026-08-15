@@ -68,6 +68,15 @@ typedef struct {
     uint8_t key_feedback_tap_branch_map[KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE];
 } split_runtime_sync_remote_t;
 
+#ifdef NOAH_HOST_TEST_ENV
+typedef struct {
+    uint32_t base_last_send;
+    uint32_t combo_last_send;
+    uint32_t semantic_last_send;
+    uint32_t branch_last_send;
+} split_runtime_sync_debug_clock_t;
+#endif
+
 #ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
 #    define SPLIT_RUNTIME_SYNC_REMOTE_EMPTY_INIT                                             \
         {                                                                                    \
@@ -115,6 +124,9 @@ void split_runtime_sync_elapsed(uint16_t raw_elapsed);
 void split_runtime_sync(void);
 void split_runtime_sync_mark_combo_dirty(void);
 void split_runtime_sync_mark_key_feedback_dirty(void);
+#    ifdef NOAH_HOST_TEST_ENV
+void split_runtime_sync_debug_clock_snapshot(split_runtime_sync_debug_clock_t *out);
+#    endif
 
 static inline void split_runtime_sync_notify_combo_dirty(void) {
     split_runtime_sync_mark_combo_dirty();
@@ -136,6 +148,13 @@ static inline void split_runtime_sync_elapsed(uint16_t raw_elapsed) {
 static inline void split_runtime_sync(void) {}
 static inline void split_runtime_sync_mark_combo_dirty(void) {}
 static inline void split_runtime_sync_mark_key_feedback_dirty(void) {}
+#    ifdef NOAH_HOST_TEST_ENV
+static inline void split_runtime_sync_debug_clock_snapshot(split_runtime_sync_debug_clock_t *out) {
+    if (out) {
+        *out = (split_runtime_sync_debug_clock_t){0};
+    }
+}
+#    endif
 static inline void split_runtime_sync_notify_combo_dirty(void) {}
 static inline void split_runtime_sync_notify_key_feedback_dirty(void) {}
 

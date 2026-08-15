@@ -35,6 +35,13 @@ static uint8_t           key_feedback_semantic_read_count;
 static uint8_t           key_feedback_broad_owner_read_count;
 static uint8_t           key_feedback_tap_branch_read_count;
 static uint8_t           key_feedback_flash_visibility_read_count;
+static uint16_t          timer_read_count;
+static uint16_t          timer_elapsed_count;
+static uint16_t          timer_read32_count;
+static uint16_t          timer_elapsed32_count;
+static uint16_t          auto_mouse_elapsed_read_count;
+static uint16_t          auto_mouse_elapsed_at_read_count;
+static uint16_t          auto_mouse_elapsed_at_last_now;
 
 static uint8_t                                      rpc_register_count;
 static int8_t                                       rpc_registered_ids[4];
@@ -92,15 +99,22 @@ static void test_reset_stubs(void) {
     key_feedback_tap_branch_map_clear(fake_key_feedback_tap_branch_map);
     key_origin_bitmap_clear(fake_key_feedback_flash_visibility_bitmap);
     key_origin_bitmap_add_keypos(fake_key_feedback_flash_visibility_bitmap, (keypos_t){.row = 0, .col = 0});
-    fake_key_preview_layer = 3u;
-    combo_underlay_read_count                 = 0;
-    combo_overlay_read_count                  = 0;
-    pd_owner_bitmap_read_count                = 0;
-    key_feedback_semantic_read_count          = 0;
-    key_feedback_broad_owner_read_count       = 0;
-    key_feedback_tap_branch_read_count        = 0;
-    key_feedback_flash_visibility_read_count  = 0;
-    rpc_register_count     = 0;
+    fake_key_preview_layer                   = 3u;
+    combo_underlay_read_count                = 0;
+    combo_overlay_read_count                 = 0;
+    pd_owner_bitmap_read_count               = 0;
+    key_feedback_semantic_read_count         = 0;
+    key_feedback_broad_owner_read_count      = 0;
+    key_feedback_tap_branch_read_count       = 0;
+    key_feedback_flash_visibility_read_count = 0;
+    timer_read_count                         = 0;
+    timer_elapsed_count                      = 0;
+    timer_read32_count                       = 0;
+    timer_elapsed32_count                    = 0;
+    auto_mouse_elapsed_read_count            = 0;
+    auto_mouse_elapsed_at_read_count         = 0;
+    auto_mouse_elapsed_at_last_now           = 0;
+    rpc_register_count                       = 0;
     memset(rpc_registered_ids, -1, sizeof(rpc_registered_ids));
     memset(rpc_registered_callbacks, 0, sizeof(rpc_registered_callbacks));
     rpc_send_count                        = 0;
@@ -132,9 +146,40 @@ static void test_reset_builder_counts(void) {
     key_feedback_flash_visibility_read_count = 0;
 }
 
-HOST_RUNTIME_FIXTURE_DEFINE_BASIC_QMK_STUBS(runtime_fixture)
+HOST_RUNTIME_FIXTURE_DEFINE_MOD_REPORT_STUBS(runtime_fixture)
+
+uint16_t timer_read(void) {
+    timer_read_count++;
+    return (uint16_t)fake_time32;
+}
+
+uint16_t timer_elapsed(uint16_t last) {
+    timer_elapsed_count++;
+    return (uint16_t)(timer_read() - last);
+}
+
+uint32_t timer_read32(void) {
+    timer_read32_count++;
+    return fake_time32;
+}
+
+uint32_t timer_elapsed32(uint32_t last) {
+    timer_elapsed32_count++;
+    return fake_time32 - last;
+}
+
+bool is_keyboard_master(void) {
+    return fake_is_master;
+}
 
 uint16_t auto_mouse_get_time_elapsed(void) {
+    auto_mouse_elapsed_read_count++;
+    return fake_auto_mouse_elapsed;
+}
+
+uint16_t auto_mouse_get_time_elapsed_at(uint16_t now) {
+    auto_mouse_elapsed_at_read_count++;
+    auto_mouse_elapsed_at_last_now = now;
     return fake_auto_mouse_elapsed;
 }
 
@@ -293,6 +338,16 @@ static void test_reset_rpc_send_counts(void) {
     rpc_send_count_key_feedback_branch   = 0;
 }
 
+static void test_reset_timer_counts(void) {
+    timer_read_count                 = 0u;
+    timer_elapsed_count              = 0u;
+    timer_read32_count               = 0u;
+    timer_elapsed32_count            = 0u;
+    auto_mouse_elapsed_read_count    = 0u;
+    auto_mouse_elapsed_at_read_count = 0u;
+    auto_mouse_elapsed_at_last_now   = 0u;
+}
+
 static void test_set_idle_runtime_state(void) {
     fake_auto_mouse_elapsed = 0u;
     fake_pd_active_flags    = 0;
@@ -384,6 +439,94 @@ static void test_elapsed_skips_unchanged_packets_until_heartbeat(void) {
     CHECK(rpc_send_count_combo == 1u);
     CHECK(rpc_send_count_key_feedback_semantic == 1u);
     CHECK(rpc_send_count_key_feedback_branch == 1u);
+}
+
+static void test_tick_samples_one_shared_timestamp(void) {
+    test_reset_stubs();
+    split_runtime_sync_init();
+    test_reset_timer_counts();
+
+    split_runtime_sync_tick();
+
+    CHECK(timer_read32_count == 1u);
+    CHECK(timer_elapsed32_count == 0u);
+    CHECK(timer_read_count == 0u);
+    CHECK(timer_elapsed_count == 0u);
+    CHECK(auto_mouse_elapsed_read_count == 0u);
+    CHECK(auto_mouse_elapsed_at_read_count == 1u);
+    CHECK(auto_mouse_elapsed_at_last_now == (uint16_t)fake_time32);
+}
+
+static void test_force_sync_samples_one_shared_timestamp(void) {
+    split_runtime_sync_debug_clock_t clock;
+
+    test_reset_stubs();
+    split_runtime_sync_init();
+    test_reset_timer_counts();
+
+    split_runtime_sync();
+
+    CHECK(timer_read32_count == 1u);
+    CHECK(timer_elapsed32_count == 0u);
+    CHECK(timer_read_count == 0u);
+    CHECK(timer_elapsed_count == 0u);
+    CHECK(auto_mouse_elapsed_read_count == 0u);
+    CHECK(auto_mouse_elapsed_at_read_count == 1u);
+    CHECK(rpc_send_count >= 4u);
+    split_runtime_sync_debug_clock_snapshot(&clock);
+    CHECK(clock.base_last_send == fake_time32);
+    CHECK(clock.combo_last_send == fake_time32);
+    CHECK(clock.semantic_last_send == fake_time32);
+    CHECK(clock.branch_last_send == fake_time32);
+}
+
+static void test_inactive_auto_mouse_skips_elapsed_lookup(void) {
+    test_reset_stubs();
+    fake_auto_mouse_active = false;
+
+    split_runtime_sync_init();
+
+    CHECK(auto_mouse_elapsed_read_count == 0u);
+    CHECK(auto_mouse_elapsed_at_read_count == 0u);
+    CHECK(rpc_last_base_packet.automouse_progress == 0u);
+}
+
+static void test_active_auto_mouse_uses_shared_low16_after_wrap(void) {
+    test_reset_stubs();
+    fake_time32 = UINT32_MAX - 2u;
+    split_runtime_sync_init();
+    test_reset_timer_counts();
+
+    fake_time32 += 5u;
+    split_runtime_sync_tick();
+
+    CHECK(timer_read32_count == 1u);
+    CHECK(timer_read_count == 0u);
+    CHECK(timer_elapsed_count == 0u);
+    CHECK(auto_mouse_elapsed_read_count == 0u);
+    CHECK(auto_mouse_elapsed_at_read_count == 1u);
+    CHECK(auto_mouse_elapsed_at_last_now == 2u);
+}
+
+static void test_active_heartbeat_is_wrap_safe(void) {
+    test_reset_stubs();
+    fake_time32 = UINT32_MAX - 100u;
+    split_runtime_sync_init();
+    test_reset_rpc_send_counts();
+    test_reset_timer_counts();
+
+    fake_time32 += 249u;
+    split_runtime_sync_tick();
+    CHECK(rpc_send_count == 0u);
+    CHECK(timer_read32_count == 1u);
+    CHECK(timer_elapsed32_count == 0u);
+
+    test_reset_timer_counts();
+    fake_time32 += 1u;
+    split_runtime_sync_tick();
+    CHECK(rpc_send_count == 4u);
+    CHECK(timer_read32_count == 1u);
+    CHECK(timer_elapsed32_count == 0u);
 }
 
 static void test_force_sync_sends_all_packets_even_when_unchanged(void) {
@@ -731,6 +874,11 @@ int main(void) {
     test_init_registers_rpcs_and_sends_initial_packets_on_master();
     test_init_registers_rpcs_without_sending_on_slave();
     test_elapsed_skips_unchanged_packets_until_heartbeat();
+    test_tick_samples_one_shared_timestamp();
+    test_force_sync_samples_one_shared_timestamp();
+    test_inactive_auto_mouse_skips_elapsed_lookup();
+    test_active_heartbeat_is_wrap_safe();
+    test_active_auto_mouse_uses_shared_low16_after_wrap();
     test_force_sync_sends_all_packets_even_when_unchanged();
     test_key_feedback_visibility_is_ignored_without_flashing_semantics();
     test_key_feedback_visibility_changes_when_flashing_semantics_are_present();
