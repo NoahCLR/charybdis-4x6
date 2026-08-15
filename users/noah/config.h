@@ -112,6 +112,17 @@
 #    define MOUSE_EXTENDED_REPORT
 #    define WHEEL_EXTENDED_REPORT
 
+// Discrete pointing modes may emit only this many synthetic taps per sensor
+// report and retain at most this many whole-tap steps for later zero-motion
+// polls. Excess same-direction intent is dropped with diagnostics instead of
+// monopolizing the firmware loop.
+#    ifndef NOAH_PD_MODE_MAX_TAPS_PER_TICK
+#        define NOAH_PD_MODE_MAX_TAPS_PER_TICK 4
+#    endif
+#    ifndef NOAH_PD_MODE_MAX_BACKLOG_TAPS
+#        define NOAH_PD_MODE_MAX_BACKLOG_TAPS 32
+#    endif
+
 // Hi-res scroll: each scroll unit = 1/120th of a notch.
 #    define POINTING_DEVICE_HIRES_SCROLL_ENABLE
 #    define POINTING_DEVICE_HIRES_SCROLL_MULTIPLIER 120

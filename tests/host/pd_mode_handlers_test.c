@@ -7,6 +7,7 @@
 #include "host_runtime_reset_fixture.h"
 #include "users/noah/lib/action/action_dispatch.h"
 #include "users/noah/lib/action/owned_keycode.h"
+#include "users/noah/lib/pointing/modes/pd_mode_handler_common.h"
 #include "users/noah/lib/pointing/modes/pd_mode_handlers.h"
 #include "users/noah/lib/state/modifiers/keyboard_mod_state.h"
 
@@ -86,6 +87,9 @@ static void test_reset_stubs(void) {
     test_clear_logs();
     reset_dragscroll_mode();
     reset_arrow_mode();
+    reset_volume_mode();
+    reset_brightness_mode();
+    reset_zoom_mode();
     test_clear_logs();
 }
 
@@ -209,6 +213,16 @@ static keyrecord_t test_record(bool pressed) {
                 .pressed = pressed,
             },
     };
+}
+
+static void test_assert_synthetic_calls(uint8_t expected_count, uint16_t expected_keycode) {
+    CHECK(synthetic_tap_call_count == expected_count);
+    CHECK(fallback_hold_activation_count == expected_count);
+
+    for (uint8_t i = 0; i < synthetic_tap_call_count; i++) {
+        CHECK(synthetic_tap_calls[i].keycode == expected_keycode);
+        CHECK(synthetic_tap_calls[i].fallback_hold_active);
+    }
 }
 
 static void test_dragscroll_prime_horizontal_lock_with_residual(uint32_t start_time) {
@@ -703,6 +717,205 @@ static void test_zoom_mode_emits_discrete_steps_and_resets_on_direction_change(v
     CHECK(synthetic_tap_calls[1].fallback_hold_active);
 }
 
+static void test_maximum_volume_report_respects_per_tick_budget(void) {
+    pd_mode_axis_debug_snapshot_t snapshot;
+
+    test_reset_stubs();
+
+    (void)handle_volume_mode((report_mouse_t){
+        .y = INT16_MAX,
+    });
+
+    test_assert_synthetic_calls(NOAH_PD_MODE_MAX_TAPS_PER_TICK, KC_AUDIO_VOL_DOWN);
+    pd_mode_volume_debug_snapshot(&snapshot);
+    CHECK(snapshot.accumulated_motion == (int32_t)((NOAH_PD_MODE_MAX_BACKLOG_TAPS - NOAH_PD_MODE_MAX_TAPS_PER_TICK) * 60u + (INT16_MAX % 60)));
+    CHECK(snapshot.pending_tap_count == NOAH_PD_MODE_MAX_BACKLOG_TAPS - NOAH_PD_MODE_MAX_TAPS_PER_TICK);
+    CHECK(snapshot.maximum_backlog_taps == NOAH_PD_MODE_MAX_BACKLOG_TAPS);
+    CHECK(snapshot.maximum_taps_emitted == NOAH_PD_MODE_MAX_TAPS_PER_TICK);
+    CHECK(snapshot.saturated_report_count == 1u);
+    CHECK(snapshot.discarded_tap_count == (uint32_t)(INT16_MAX / 60) - NOAH_PD_MODE_MAX_BACKLOG_TAPS);
+    CHECK(snapshot.direction == 1);
+
+    test_clear_logs();
+
+    (void)handle_volume_mode((report_mouse_t){
+        .y = INT16_MIN,
+    });
+
+    test_assert_synthetic_calls(NOAH_PD_MODE_MAX_TAPS_PER_TICK, KC_AUDIO_VOL_UP);
+    pd_mode_volume_debug_snapshot(&snapshot);
+    CHECK(snapshot.accumulated_motion == -(int32_t)((NOAH_PD_MODE_MAX_BACKLOG_TAPS - NOAH_PD_MODE_MAX_TAPS_PER_TICK) * 60u + ((uint32_t)INT16_MAX + 1u) % 60u));
+    CHECK(snapshot.pending_tap_count == NOAH_PD_MODE_MAX_BACKLOG_TAPS - NOAH_PD_MODE_MAX_TAPS_PER_TICK);
+    CHECK(snapshot.saturated_report_count == 2u);
+    CHECK(snapshot.discarded_tap_count == 2u * (((uint32_t)INT16_MAX + 1u) / 60u - NOAH_PD_MODE_MAX_BACKLOG_TAPS));
+    CHECK(snapshot.direction == -1);
+}
+
+static void test_maximum_reports_are_bounded_in_every_discrete_mode(void) {
+    test_reset_stubs();
+    (void)handle_brightness_mode((report_mouse_t){.y = INT16_MAX});
+    test_assert_synthetic_calls(NOAH_PD_MODE_MAX_TAPS_PER_TICK, KC_BRID);
+
+    test_reset_stubs();
+    (void)handle_brightness_mode((report_mouse_t){.y = INT16_MIN});
+    test_assert_synthetic_calls(NOAH_PD_MODE_MAX_TAPS_PER_TICK, KC_BRIU);
+
+    test_reset_stubs();
+    (void)handle_zoom_mode((report_mouse_t){.y = INT16_MAX});
+    test_assert_synthetic_calls(NOAH_PD_MODE_MAX_TAPS_PER_TICK, G(KC_MINS));
+
+    test_reset_stubs();
+    (void)handle_zoom_mode((report_mouse_t){.y = INT16_MIN});
+    test_assert_synthetic_calls(NOAH_PD_MODE_MAX_TAPS_PER_TICK, G(KC_EQL));
+
+    test_reset_stubs();
+    (void)handle_arrow_mode((report_mouse_t){.x = INT16_MAX});
+    test_assert_synthetic_calls(NOAH_PD_MODE_MAX_TAPS_PER_TICK, KC_RIGHT);
+
+    test_reset_stubs();
+    (void)handle_arrow_mode((report_mouse_t){.x = INT16_MIN});
+    test_assert_synthetic_calls(NOAH_PD_MODE_MAX_TAPS_PER_TICK, KC_LEFT);
+
+    test_reset_stubs();
+    (void)handle_arrow_mode((report_mouse_t){.y = INT16_MAX});
+    test_assert_synthetic_calls(NOAH_PD_MODE_MAX_TAPS_PER_TICK, KC_DOWN);
+
+    test_reset_stubs();
+    (void)handle_arrow_mode((report_mouse_t){.y = INT16_MIN});
+    test_assert_synthetic_calls(NOAH_PD_MODE_MAX_TAPS_PER_TICK, KC_UP);
+}
+
+static void test_zero_motion_drains_bounded_backlog_and_preserves_residual(void) {
+    pd_mode_axis_debug_snapshot_t snapshot;
+
+    test_reset_stubs();
+    (void)handle_volume_mode((report_mouse_t){.y = INT16_MAX});
+
+    for (uint8_t tick = 0; tick < (NOAH_PD_MODE_MAX_BACKLOG_TAPS / NOAH_PD_MODE_MAX_TAPS_PER_TICK) - 1u; tick++) {
+        test_clear_logs();
+        (void)handle_volume_mode((report_mouse_t){0});
+        test_assert_synthetic_calls(NOAH_PD_MODE_MAX_TAPS_PER_TICK, KC_AUDIO_VOL_DOWN);
+    }
+
+    test_clear_logs();
+    (void)handle_volume_mode((report_mouse_t){0});
+    CHECK(synthetic_tap_call_count == 0u);
+
+    pd_mode_volume_debug_snapshot(&snapshot);
+    CHECK(snapshot.accumulated_motion == INT16_MAX % 60);
+    CHECK(snapshot.pending_tap_count == 0u);
+    CHECK(snapshot.saturated_report_count == 1u);
+    CHECK(snapshot.maximum_backlog_taps == NOAH_PD_MODE_MAX_BACKLOG_TAPS);
+    CHECK(snapshot.maximum_taps_emitted == NOAH_PD_MODE_MAX_TAPS_PER_TICK);
+}
+
+static void test_sustained_maximum_input_stays_bounded_and_observable(void) {
+    pd_mode_axis_debug_snapshot_t snapshot;
+
+    test_reset_stubs();
+
+    for (uint8_t report_index = 0; report_index < 64u; report_index++) {
+        test_clear_logs();
+        (void)handle_volume_mode((report_mouse_t){.y = INT16_MAX});
+        test_assert_synthetic_calls(NOAH_PD_MODE_MAX_TAPS_PER_TICK, KC_AUDIO_VOL_DOWN);
+
+        pd_mode_volume_debug_snapshot(&snapshot);
+        CHECK(snapshot.pending_tap_count <= NOAH_PD_MODE_MAX_BACKLOG_TAPS);
+        CHECK(snapshot.maximum_backlog_taps == NOAH_PD_MODE_MAX_BACKLOG_TAPS);
+        CHECK(snapshot.maximum_taps_emitted == NOAH_PD_MODE_MAX_TAPS_PER_TICK);
+    }
+
+    CHECK(snapshot.saturated_report_count == 64u);
+    CHECK(snapshot.discarded_tap_count > 0u);
+    CHECK(snapshot.direction == 1);
+}
+
+static void test_saturation_diagnostic_counters_do_not_wrap(void) {
+    pd_mode_axis_state_t state = {
+        .saturated_report_count = UINT32_MAX,
+        .discarded_tap_count    = UINT32_MAX - 1u,
+    };
+    uint8_t remaining_budget = NOAH_PD_MODE_MAX_TAPS_PER_TICK;
+
+    test_reset_stubs();
+    (void)pd_mode_axis_emit(&state, INT16_MAX, KC_AUDIO_VOL_DOWN, KC_AUDIO_VOL_UP, 60u, &remaining_budget, pd_mode_tap_code);
+
+    CHECK(state.saturated_report_count == UINT32_MAX);
+    CHECK(state.discarded_tap_count == UINT32_MAX);
+    test_assert_synthetic_calls(NOAH_PD_MODE_MAX_TAPS_PER_TICK, KC_AUDIO_VOL_DOWN);
+}
+
+static void test_direction_reversal_discards_old_debt_before_new_output(void) {
+    pd_mode_axis_debug_snapshot_t snapshot;
+
+    test_reset_stubs();
+    (void)handle_volume_mode((report_mouse_t){.y = INT16_MAX});
+
+    test_clear_logs();
+    (void)handle_volume_mode((report_mouse_t){.y = -60});
+    test_assert_synthetic_calls(1u, KC_AUDIO_VOL_UP);
+
+    pd_mode_volume_debug_snapshot(&snapshot);
+    CHECK(snapshot.accumulated_motion == 0);
+    CHECK(snapshot.pending_tap_count == 0u);
+    CHECK(snapshot.direction == -1);
+
+    test_clear_logs();
+    (void)handle_volume_mode((report_mouse_t){0});
+    CHECK(synthetic_tap_call_count == 0u);
+}
+
+static void test_mode_reset_clears_backlog_and_diagnostics(void) {
+    pd_mode_axis_debug_snapshot_t snapshot;
+
+    test_reset_stubs();
+    (void)handle_volume_mode((report_mouse_t){.y = INT16_MAX});
+    reset_volume_mode();
+
+    pd_mode_volume_debug_snapshot(&snapshot);
+    CHECK(snapshot.accumulated_motion == 0);
+    CHECK(snapshot.pending_tap_count == 0u);
+    CHECK(snapshot.saturated_report_count == 0u);
+    CHECK(snapshot.discarded_tap_count == 0u);
+    CHECK(snapshot.maximum_backlog_taps == 0u);
+    CHECK(snapshot.maximum_taps_emitted == 0u);
+    CHECK(snapshot.direction == 0);
+
+    test_clear_logs();
+    (void)handle_volume_mode((report_mouse_t){0});
+    CHECK(synthetic_tap_call_count == 0u);
+}
+
+static void test_arrow_extreme_magnitudes_select_exact_dominant_axis(void) {
+    test_reset_stubs();
+
+    (void)handle_arrow_mode((report_mouse_t){
+        .x = INT16_MIN,
+        .y = INT16_MAX,
+    });
+
+    test_assert_synthetic_calls(NOAH_PD_MODE_MAX_TAPS_PER_TICK, KC_LEFT);
+
+    test_reset_stubs();
+
+    (void)handle_arrow_mode((report_mouse_t){
+        .x = INT16_MAX,
+        .y = INT16_MIN,
+    });
+
+    test_assert_synthetic_calls(NOAH_PD_MODE_MAX_TAPS_PER_TICK, KC_UP);
+
+    test_reset_stubs();
+    (void)handle_arrow_mode((report_mouse_t){.x = INT16_MIN, .y = INT16_MIN});
+    test_assert_synthetic_calls(NOAH_PD_MODE_MAX_TAPS_PER_TICK, KC_LEFT);
+
+    test_reset_stubs();
+    (void)handle_arrow_mode((report_mouse_t){.y = 50});
+    test_clear_logs();
+    (void)handle_arrow_mode((report_mouse_t){.x = INT16_MIN, .y = INT16_MIN});
+    test_assert_synthetic_calls(NOAH_PD_MODE_MAX_TAPS_PER_TICK, KC_UP);
+}
+
 static void test_horizontal_arrow_tap_preserves_mod_state(void) {
     test_reset_stubs();
 
@@ -820,6 +1033,14 @@ int main(void) {
     test_volume_mode_emits_discrete_steps_and_resets_on_direction_change();
     test_brightness_mode_emits_discrete_steps_and_resets_on_direction_change();
     test_zoom_mode_emits_discrete_steps_and_resets_on_direction_change();
+    test_maximum_volume_report_respects_per_tick_budget();
+    test_maximum_reports_are_bounded_in_every_discrete_mode();
+    test_zero_motion_drains_bounded_backlog_and_preserves_residual();
+    test_sustained_maximum_input_stays_bounded_and_observable();
+    test_saturation_diagnostic_counters_do_not_wrap();
+    test_direction_reversal_discards_old_debt_before_new_output();
+    test_mode_reset_clears_backlog_and_diagnostics();
+    test_arrow_extreme_magnitudes_select_exact_dominant_axis();
     test_horizontal_arrow_tap_preserves_mod_state();
     test_vertical_arrow_tap_masks_alt_and_restores_mod_state();
     test_arrow_mode_selection_button_holds_and_releases_shift();

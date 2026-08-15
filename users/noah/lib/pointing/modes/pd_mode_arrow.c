@@ -20,11 +20,14 @@
 #        define ARROW_THRESHOLD_Y 50
 #    endif
 
-static pd_mode_axis_state_t arrow_x_axis        = {0};
-static pd_mode_axis_state_t arrow_y_axis        = {0};
-static bool                 arrow_axis_is_x     = true;
-static uint8_t              arrow_shift_buttons = 0;
-static owned_keycode_lease_t arrow_shift_lease  = {0};
+PD_MODE_VALIDATE_AXIS_THRESHOLD(ARROW_THRESHOLD_X);
+PD_MODE_VALIDATE_AXIS_THRESHOLD(ARROW_THRESHOLD_Y);
+
+static pd_mode_axis_state_t  arrow_x_axis        = {0};
+static pd_mode_axis_state_t  arrow_y_axis        = {0};
+static bool                  arrow_axis_is_x     = true;
+static uint8_t               arrow_shift_buttons = 0;
+static owned_keycode_lease_t arrow_shift_lease   = {0};
 
 static void arrow_vertical_tap_code(uint16_t keycode) {
     noah_emit_synthetic_qmk_tap_with_masked_keyboard_mods(keycode, ARROW_VERTICAL_MASKED_MODS, true);
@@ -45,8 +48,15 @@ static void arrow_send_shortcut(uint16_t shortcut) {
 }
 
 static void arrow_update_dominant_axis(int16_t dx, int16_t dy) {
-    int16_t ax = dx >= 0 ? dx : -dx;
-    int16_t ay = dy >= 0 ? dy : -dy;
+    int32_t ax = dx;
+    int32_t ay = dy;
+
+    if (ax < 0) {
+        ax = -ax;
+    }
+    if (ay < 0) {
+        ay = -ay;
+    }
 
     if (ax > ay && ax > 0) {
         arrow_axis_is_x = true;
@@ -56,19 +66,20 @@ static void arrow_update_dominant_axis(int16_t dx, int16_t dy) {
 }
 
 report_mouse_t handle_arrow_mode(report_mouse_t mouse_report) {
-    int16_t dx = mouse_report.x;
-    int16_t dy = mouse_report.y;
+    int16_t dx               = mouse_report.x;
+    int16_t dy               = mouse_report.y;
+    uint8_t remaining_budget = NOAH_PD_MODE_MAX_TAPS_PER_TICK;
 
     arrow_update_dominant_axis(dx, dy);
 
     if (arrow_axis_is_x) {
-        pd_mode_axis_emit(&arrow_x_axis, dx, KC_RIGHT, KC_LEFT, ARROW_THRESHOLD_X, pd_mode_tap_code);
+        (void)pd_mode_axis_emit(&arrow_x_axis, dx, KC_RIGHT, KC_LEFT, ARROW_THRESHOLD_X, &remaining_budget, pd_mode_tap_code);
 
         if (dy != 0) {
             pd_mode_axis_reset(&arrow_y_axis);
         }
     } else {
-        pd_mode_axis_emit(&arrow_y_axis, dy, KC_DOWN, KC_UP, ARROW_THRESHOLD_Y, arrow_vertical_tap_code);
+        (void)pd_mode_axis_emit(&arrow_y_axis, dy, KC_DOWN, KC_UP, ARROW_THRESHOLD_Y, &remaining_budget, arrow_vertical_tap_code);
 
         if (dx != 0) {
             pd_mode_axis_reset(&arrow_x_axis);
@@ -117,6 +128,16 @@ void reset_arrow_mode(void) {
     arrow_shift_sync();
 }
 
+void pd_mode_arrow_debug_snapshot(pd_mode_arrow_debug_snapshot_t *out) {
+    if (out == NULL) {
+        return;
+    }
+
+    pd_mode_axis_debug_snapshot(&arrow_x_axis, ARROW_THRESHOLD_X, &out->horizontal);
+    pd_mode_axis_debug_snapshot(&arrow_y_axis, ARROW_THRESHOLD_Y, &out->vertical);
+    out->selected_axis_is_horizontal = arrow_axis_is_x;
+}
+
 #else
 
 report_mouse_t handle_arrow_mode(report_mouse_t mouse_report) {
@@ -130,5 +151,11 @@ bool handle_arrow_mode_key(uint16_t keycode, keyrecord_t *record) {
 }
 
 void reset_arrow_mode(void) {}
+
+void pd_mode_arrow_debug_snapshot(pd_mode_arrow_debug_snapshot_t *out) {
+    if (out != NULL) {
+        *out = (pd_mode_arrow_debug_snapshot_t){0};
+    }
+}
 
 #endif // POINTING_DEVICE_ENABLE

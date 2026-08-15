@@ -27,6 +27,23 @@ One important non-rule:
 - auto-sniping is not a pd mode; it is layer state whose CPI change is applied
   by the shared scan-time DPI policy
 
+### Bounded discrete output
+
+`ARROW_MODE`, `ZOOM_MODE`, `VOLUME_MODE`, and `BRIGHTNESS_MODE` convert motion
+to synthetic key taps. They share one overload policy:
+
+- one successful pointing poll emits at most four taps
+- at most 32 whole steps plus the exact sub-step residual are retained
+- zero-motion polls continue draining retained steps, so no separate scheduler
+  competes with the pointing task
+- motion beyond the retained bound is intentionally discarded and counted in
+  per-mode diagnostics instead of blocking matrix, split, or RGB work
+- reversing direction or leaving the mode clears obsolete retained work
+
+At the configured limits, a saturated backlog drains in no more than eight
+successful polls. `DRAGSCROLL` and `PINCH_MODE` produce wheel reports through a
+different gesture handler and do not use this tap backlog.
+
 ## Pointer-Layer Policy
 
 The shared pointer-layer policy is separate from the raw mode handlers, but it
@@ -100,6 +117,7 @@ While active:
 - the cursor stays frozen
 - one vertical direction sends `Cmd+=`
 - the other sends `Cmd+-`
+- large motion follows the shared bounded discrete-output policy
 
 This mode does not depend on BetterMouse. It is direct key-based zoom, not
 scroll-based pinch emulation.
@@ -113,6 +131,9 @@ While active:
 - the cursor stays frozen
 - dominant horizontal motion emits left / right arrow taps
 - dominant vertical motion emits up / down arrow taps
+- dominant-axis magnitude handles the complete signed 16-bit report range,
+  including `-32768`
+- large motion follows the shared bounded discrete-output policy
 - horizontal arrow taps keep held modifiers such as `Alt` intact
 - vertical arrow taps temporarily mask held `Alt` modifiers so up / down stay
   plain
@@ -136,6 +157,7 @@ While active:
 - one vertical direction raises volume
 - the other lowers volume
 - motion is accumulated and emitted in discrete steps
+- large motion follows the shared bounded discrete-output policy
 
 ## BRIGHTNESS_MODE
 
@@ -147,3 +169,4 @@ While active:
 - one vertical direction brightens
 - the other dims
 - motion is accumulated and emitted in discrete steps
+- large motion follows the shared bounded discrete-output policy

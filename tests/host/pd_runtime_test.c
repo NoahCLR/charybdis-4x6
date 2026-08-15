@@ -363,6 +363,16 @@ static void test_pointing_device_task_dispatches_active_local_mode_and_tracks_la
     CHECK(reset_volume_count == 1);
 }
 
+static void test_pointing_device_task_dispatches_zero_report_to_active_mode(void) {
+    test_reset_stubs();
+
+    CHECK(pd_mode_handle_keycode_press(VOLUME_MODE));
+    report_mouse_t output = noah_pointing_device_task_user((report_mouse_t){0});
+
+    CHECK(report_mouse_equal(output, (report_mouse_t){.x = 3, .buttons = 1}));
+    CHECK(volume_handler_calls == 1);
+}
+
 static void test_pointing_device_task_suppresses_idle_noise_after_quiet_window(void) {
     test_reset_stubs();
     noah_pointing_device_init_user();
@@ -547,6 +557,7 @@ int main(void) {
     test_pointing_device_task_returns_original_report_without_local_mode();
     test_pointing_device_task_ignores_remote_display_only_mode_on_slave();
     test_pointing_device_task_dispatches_active_local_mode_and_tracks_latest_selection();
+    test_pointing_device_task_dispatches_zero_report_to_active_mode();
     test_pointing_device_task_suppresses_idle_noise_after_quiet_window();
     test_pointing_device_task_keeps_small_motion_while_recently_active();
     test_pointing_device_task_keeps_small_motion_with_buttons_after_quiet_window();

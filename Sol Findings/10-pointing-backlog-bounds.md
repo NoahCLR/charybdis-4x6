@@ -3,7 +3,8 @@
 ## Plan metadata
 
 - **Severity:** Should-fix (P1 main-loop starvation and extreme-input correctness risk)
-- **Status:** Planned; axis conversion still emits unbounded loops
+- **Status:** Implemented with all software and target-build gates passing;
+  on-device elapsed-time measurement remains pending
 - **Affected surfaces:** arrow, volume, brightness, and zoom pointing modes; synthetic action dispatch; extended mouse reports; mode reset/transition
 - **Primary files:** [pd_mode_handler_common.h](../users/noah/lib/pointing/modes/pd_mode_handler_common.h), [pd_mode_arrow.c](../users/noah/lib/pointing/modes/pd_mode_arrow.c), [pd_mode_volume.c](../users/noah/lib/pointing/modes/pd_mode_volume.c), [pd_mode_brightness.c](../users/noah/lib/pointing/modes/pd_mode_brightness.c), [pd_mode_zoom.c](../users/noah/lib/pointing/modes/pd_mode_zoom.c)
 - **Prerequisites:** Reuse the ownership-safe synthetic tap contract from [Finding 08](08-synthetic-key-ownership.md) if it has landed; do not block on [Finding 07](07-nonblocking-macro-playback.md)'s macro-specific scheduler
@@ -170,6 +171,46 @@ Expose per-mode or aggregate counters for saturated reports, discarded whole tap
 
 Record target worst-case handler duration and confirm the configured budget keeps the loop within the runtime/watchdog expectation.
 
+## Implementation result — 2026-08-15
+
+- `NOAH_PD_MODE_MAX_TAPS_PER_TICK` is 4 and
+  `NOAH_PD_MODE_MAX_BACKLOG_TAPS` is 32.
+- The common helper retains at most 32 whole taps plus the exact residual,
+  emits at most four taps, and drains remaining debt on later zero reports.
+- Direction reversal clears prior debt before accepting the new sign. Mode
+  reset clears debt, direction, and per-activation diagnostics.
+- Per-axis snapshots expose accumulated motion, pending taps, saturating report
+  count, discarded whole taps, maximum backlog, and maximum taps emitted.
+- Compile-time guards reject zero/oversized budgets, zero/oversized backlogs,
+  budget greater than backlog, zero thresholds, and threshold/backlog products
+  that leave insufficient `int32_t` room for a full signed 16-bit delta.
+- Arrow magnitude widens before negation and preserves strict dominance and
+  existing tie behavior for the full signed 16-bit domain.
+- The host QMK fixture now mirrors `MOUSE_EXTENDED_REPORT` and
+  `WHEEL_EXTENDED_REPORT`, allowing the actual extreme report values to reach
+  these tests.
+- The pinned QMK task and `pd_runtime` test confirm active handlers receive
+  successful zero-motion polls; no second drain scheduler was added.
+
+Target evidence:
+
+- ordinary linked image: 150,908 B text, 0 B data, 245,584 B BSS;
+- compared with Finding 11: +160 B text and unchanged BSS;
+- the linked shared emitter uses one combined quotient/remainder helper per
+  report and has a four-iteration maximum dispatch loop;
+- reviewed generic discrete path: 1,240/1,920 B;
+- reviewed vertical-arrow path: 1,280/1,920 B;
+- overall reviewed maxima remain 1,904/1,920 B main and 336/768 B split.
+
+An attempted force-inline variant was rejected: it added another 312 B of text,
+inflated the arrow handler, and did not remove the target's software division.
+The smaller shared implementation is retained.
+
+No physical on-device elapsed-time trace was available in this pass. The hard
+tap/backlog bounds, linked instruction shape, and target stack paths are proven,
+but the review remains open until the configured 4/32 feel and worst-case tick
+duration are measured on flashed hardware.
+
 ## Risks, tradeoffs, and fallback
 
 - **Perceived lag:** retained backlog can continue after motion stops. The 32-tap cap bounds tail latency; tune with measurement.
@@ -185,15 +226,19 @@ Document the bounded/coalescing behavior and configured limits in users/noah/con
 
 ## Acceptance checklist
 
-- [ ] One tick cannot emit more than the configured tap budget.
-- [ ] Backlog and arithmetic are bounded under sustained max reports.
-- [ ] Zero reports drain pending work deterministically.
-- [ ] Reversal and reset discard obsolete debt.
-- [ ] INT16_MIN dominant-axis cases are correct.
-- [ ] Threshold and multiplication guards compile-fail invalid configs.
-- [ ] Target timing and backlog policy are recorded.
-- [ ] Targeted tests, full host suite, and firmware compile pass.
+- [x] One tick cannot emit more than the configured tap budget.
+- [x] Backlog and arithmetic are bounded under sustained max reports.
+- [x] Zero reports drain pending work deterministically.
+- [x] Reversal and reset discard obsolete debt.
+- [x] INT16_MIN dominant-axis cases are correct.
+- [x] Threshold and multiplication guards compile-fail invalid configs.
+- [x] Backlog policy and linked target evidence are recorded.
+- [ ] On-device worst-case handler duration and feel are recorded.
+- [x] Targeted tests, full host suite, and firmware compile pass.
 
 ## Next action
 
-Add the INT16_MIN regression and max-report dispatch-count tests first. Then change the common helper to accept a budget and saturating bound, initially using one tap per tick until target measurements justify the final configured value.
+Flash the 4/32 build and record worst-case handler duration plus subjective
+arrow/volume/brightness/zoom backlog feel. If the measurement is acceptable,
+close Review 12 without changing the policy; otherwise tune only the two
+documented limits and rerun the same gates.

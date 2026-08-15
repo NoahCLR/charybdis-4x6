@@ -48,6 +48,26 @@
           "caller": "pointing_device_task",
           "callee": "handle_dragscroll_mode",
           "reason": "the active pd-mode registry row dispatches DRAGSCROLL and PINCH reports through def->handler"
+        },
+        {
+          "caller": "pointing_device_task",
+          "callee": "handle_volume_mode",
+          "reason": "the active pd-mode registry row dispatches the representative generic discrete-mode handler through def->handler"
+        },
+        {
+          "caller": "pointing_device_task",
+          "callee": "handle_arrow_mode",
+          "reason": "the active pd-mode registry row dispatches the dominant-axis discrete-mode handler through def->handler"
+        },
+        {
+          "caller": "pd_mode_axis_emit",
+          "callee": "pd_mode_tap_code",
+          "reason": "the bounded generic axis emitter invokes its mode-selected synthetic tap callback through dispatch"
+        },
+        {
+          "caller": "pd_mode_axis_emit",
+          "callee": "arrow_vertical_tap_code",
+          "reason": "the bounded arrow Y-axis emitter invokes the Alt-masking vertical callback through dispatch"
         }
       ],
       "cycle_bounds": [
@@ -194,6 +214,14 @@
         {
           "name": "pointing task dragscroll single-sample handler",
           "functions": ["main", "pointing_device_task", "handle_dragscroll_mode", "timer_read32"]
+        },
+        {
+          "name": "pointing task bounded generic fallback settlement",
+          "functions": ["main", "pointing_device_task", "handle_volume_mode", "pd_mode_axis_emit", "pd_mode_tap_code", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_action_press", "pd_mode_apply_command", "pd_mode_snapshot", "pd_mode_snapshot_build_view", "memcpy"]
+        },
+        {
+          "name": "pointing task bounded vertical arrow fallback settlement",
+          "functions": ["main", "pointing_device_task", "handle_arrow_mode", "pd_mode_axis_emit", "arrow_vertical_tap_code", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_action_press", "pd_mode_apply_command", "pd_mode_snapshot", "pd_mode_snapshot_build_view", "memcpy"]
         }
       ]
     },

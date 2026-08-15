@@ -462,6 +462,8 @@ These values come from the keymap config and the shared userspace config. When t
 | `PMW33XX_LIFTOFF_DISTANCE` | `0x03` | [users/noah/config.h](../users/noah/config.h) |
 | `MOUSE_EXTENDED_REPORT` | `defined` | [users/noah/config.h](../users/noah/config.h) |
 | `WHEEL_EXTENDED_REPORT` | `defined` | [users/noah/config.h](../users/noah/config.h) |
+| `NOAH_PD_MODE_MAX_TAPS_PER_TICK` | `4` | [users/noah/config.h](../users/noah/config.h) |
+| `NOAH_PD_MODE_MAX_BACKLOG_TAPS` | `32` | [users/noah/config.h](../users/noah/config.h) |
 | `POINTING_DEVICE_HIRES_SCROLL_ENABLE` | `defined` | [users/noah/config.h](../users/noah/config.h) |
 | `POINTING_DEVICE_HIRES_SCROLL_MULTIPLIER` | `120` | [users/noah/config.h](../users/noah/config.h) |
 | `NOAH_POINTING_IDLE_NOISE_SUPPRESSION_ENABLE` | `defined` | [users/noah/config.h](../users/noah/config.h) |

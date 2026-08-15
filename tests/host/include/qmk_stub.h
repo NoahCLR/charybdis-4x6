@@ -157,10 +157,20 @@ typedef struct {
 #define IS_NOEVENT(event_) ((event_).type == TICK_EVENT)
 
 typedef struct {
-    int8_t  x;
-    int8_t  y;
-    int8_t  h;
-    int8_t  v;
+#ifdef MOUSE_EXTENDED_REPORT
+    int16_t x;
+    int16_t y;
+#else
+    int8_t x;
+    int8_t y;
+#endif
+#ifdef WHEEL_EXTENDED_REPORT
+    int16_t h;
+    int16_t v;
+#else
+    int8_t h;
+    int8_t v;
+#endif
     uint8_t buttons;
 } report_mouse_t;
 

@@ -2,7 +2,7 @@
 
 ## Plan metadata
 
-- **Status:** Implementation in progress; Phases 1 and 2 are verified. Phase 3 software work is complete, with Finding 05 awaiting only its physical two-half verification matrix. See [`implementation-progress.md`](implementation-progress.md).
+- **Status:** Implementation in progress; Phases 1 and 2 are verified. Phase 3 software work is complete, with Finding 05 awaiting its physical two-half matrix. Phase 4 software work is complete, with Finding 10 awaiting on-device timing. See [`implementation-progress.md`](implementation-progress.md).
 - **Prepared:** 2026-07-13.
 - **Scope:** Firmware runtime correctness, split reliability, target resource safety, and measured hot-path efficiency.
 - **Source:** The deep firmware code review performed against the current `charybdis-4x6` tree.
@@ -199,7 +199,10 @@ Recommended order: **11, 10**.
 
 Finding 11 is verified: dragscroll and pinch now expire prior lock/residual
 state before accepting post-stall motion, and one sampled timestamp drives all
-handler decisions. Finding 10 is the next implementation item.
+handler decisions. Finding 10 now enforces four taps per pointing poll, a
+32-step retained backlog, exact residual preservation, deterministic overload
+diagnostics, and correct `INT16_MIN` dominance. All software and target-build
+gates pass; its flashed worst-case timing/feel check remains pending.
 
 - Expire dragscroll state against the previous motion timestamp before accumulating the first post-gap report.
 - Define per-scan output budgets and residual/backlog limits for every pointing-discrete mode.

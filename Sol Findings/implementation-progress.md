@@ -5,10 +5,10 @@
 - **Branch:** `sol`
 - **Starting commit:** `5b20ed01` (`sol findings`)
 - **Started:** 2026-07-13
-- **Current focus:** [Finding 10 — pointing backlog bounds](10-pointing-backlog-bounds.md); Finding 05 awaits manual hardware verification
+- **Current focus:** Finding 10 awaits on-device timing; Finding 05 awaits manual split-hardware verification. Finding 13 is the next software implementation item.
 - **Overall status:** In progress
 - **Latest closed review:** [`review/2026-08-15-review-11`](../review/2026-08-15-review-11/)
-- **Active implementation review:** None; Review 10 remains hardware-verification pending
+- **Active implementation review:** [`review/2026-08-15-review-12`](../review/2026-08-15-review-12/); Review 10 also remains hardware-verification pending
 
 This file is the implementation record for the plans in this directory. It records what actually changed, why choices were made, what verification really ran, and what remains open. A plan is not marked verified until its targeted checks, the full host suite, the target firmware build, target-specific evidence, and required documentation all pass.
 
@@ -33,7 +33,7 @@ This file is the implementation record for the plans in this directory. It recor
 | 07 | [Nonblocking macro playback](07-nonblocking-macro-playback.md) | Should fix | Verified | Fake-timer/wrap, busy, pinning, cancellation, ownership, full host, firmware, and fresh target-stack gates pass |
 | 08 | [Synthetic-key ownership](08-synthetic-key-ownership.md) | Should fix | Verified | Aggregate physical/managed report ownership, scoped persistent leases, strict macro balance, source guards, full host, firmware, and target stack gates pass |
 | 09 | [Pending-release sequence rollover](09-pending-release-sequence-rollover.md) | Should fix | Verified | Explicit linked FIFO, 65,537-cycle blocked-head stress, structural corruption checks, full host, firmware, and target stack gate pass |
-| 10 | [Pointing backlog bounds](10-pointing-backlog-bounds.md) | Should fix | Planned | Not run |
+| 10 | [Pointing backlog bounds](10-pointing-backlog-bounds.md) | Should fix | Implemented, verification incomplete | 4-tap/32-step bounds, extremes, compile guards, full host, target build, and 1,280 B pointing path pass; flashed timing pending |
 | 11 | [Dragscroll stall recovery](11-dragscroll-stall-recovery.md) | Should fix | Verified | 55/56 and 80/81 ms boundaries, first-report/no-motion/wrap/reset/pinch reuse, one-read timer budget, full host, firmware, and explicit 360 B stack path pass |
 | 12 | [Split RPC failure backoff](12-split-rpc-failure-backoff.md) | Should fix | Verified | Stop-on-first-failure, 50–1,000 ms wrap-safe backoff, current-state recovery, bounded trace, full host, firmware, and target-stack gates pass |
 | 13 | [RGB preview parity](13-rgb-preview-parity.md) | Should fix | Planned | Not run |
@@ -966,6 +966,56 @@ verification remains intentionally pending and is the only remaining Finding
 | 2026-08-15 | 11 | `qmk compile -kb bastardkb/charybdis/4x6 -km noah` | Passed | Ordinary target remains 150,748 B text and 245,584 B BSS |
 | 2026-08-15 | 11 | `PYTHONPYCACHEPREFIX=/tmp/noah-stack-pycache PYTHON=/usr/bin/python3 sh tests/host/run_firmware_stack_budget_tool_tests.sh` | Passed | All 15 manifest/schema fixtures pass |
 | 2026-08-15 | 11 | `PYTHONPYCACHEPREFIX=/tmp/noah-stack-pycache PYTHON=/usr/bin/python3 sh tests/host/run_firmware_stack_budget_checks.sh` | Passed | Explicit dragscroll path 360/1,920 B; overall main 1,904/1,920 B and split 336/768 B |
+| 2026-08-15 | 10 | `sh tests/host/run_pd_mode_handlers_tests.sh` before implementation | Failed as expected | After correcting the host's stale 8-bit report model, one maximum report overflowed the eight-entry tap log in the old unbounded loop |
+| 2026-08-15 | 10 | `sh tests/host/run_pd_mode_handlers_tests.sh` | Passed | All signs/modes, 4-tap ceiling, 32-step cap, exact residual, zero draining, sustained overload, reversal/reset, saturating diagnostics, extreme dominance, and compile-fail guards |
+| 2026-08-15 | 10 | `sh tests/host/run_pd_mode_tests.sh`, `run_pd_runtime_tests.sh`, `run_pd_mode_key_runtime_integration_tests.sh`, `run_pointer_layer_policy_tests.sh`, and `run_owned_keycode_tests.sh` | Passed | Registry/reset, zero-report dispatch, surrounding key runtime/layer policy, and ownership contracts remain coherent |
+| 2026-08-15 | 10 | `sh tests/host/run_feature_gate_compile_tests.sh` | Passed | Standalone and feature-gated pointing variants compile with guarded shared defaults |
+| 2026-08-15 | 10 | `python3 tools/profile_introspect.py --write && python3 tools/profile_introspect.py --check` | Passed | Generated profile overview includes the 4/32 authored limits |
+| 2026-08-15 | 10 | `PYTHONPYCACHEPREFIX=/tmp/noah-host-pycache sh tests/host/run_all_host_tests.sh` | Passed | Complete host suite on the final shared implementation |
+| 2026-08-15 | 10 | `qmk compile -kb bastardkb/charybdis/4x6 -km noah` | Passed | Ordinary target is 150,908 B text and 245,584 B BSS |
+| 2026-08-15 | 10 | `PYTHONPYCACHEPREFIX=/tmp/noah-stack-pycache PYTHON=/usr/bin/python3 sh tests/host/run_firmware_stack_budget_checks.sh` | Passed | Fresh generic path 1,240 B, vertical-arrow path 1,280 B, worst main 1,904/1,920 B, split 336/768 B |
+
+## Finding 10 — Pointing backlog bounds
+
+### Objective
+
+Prevent extreme signed 16-bit pointing reports from monopolizing the main loop
+or overflowing accumulated motion, and make `INT16_MIN` dominant-axis behavior
+exact without changing normal thresholds or mappings.
+
+### Implemented
+
+- Added a global four-tap per-poll budget and 32-whole-tap retained-debt cap.
+- Preserved exact sub-threshold residual while deterministically discarding
+  only excess whole taps.
+- Kept a single active-mode budget; arrow still services only its selected
+  dominant axis.
+- Preserved direction-reversal clearing and made mode reset clear accumulator,
+  direction, backlog, and per-activation diagnostics.
+- Added per-axis saturation, dropped-tap, current/past backlog, and maximum
+  emitted-tap snapshots with saturating counters.
+- Added compile-time rejection for every invalid budget, cap, threshold, and
+  accumulator-headroom configuration covered by the plan.
+- Widened arrow magnitude to `int32_t` before negation.
+- Corrected the host QMK report fixture to honor extended X/Y and H/V widths.
+- Proved active modes receive zero-motion reports through the existing userspace
+  path, so no duplicate scan scheduler was introduced.
+
+### Target decision
+
+The initial 4/32 policy is retained. It replaces up to roughly 820 synchronous
+taps with a four-tap hard bound and an eight-successful-poll maximum tail. A
+measured force-inline experiment was rejected because it added 312 B of text
+and did not remove software division. The final shared version adds 160 B over
+Finding 11, leaves BSS unchanged, and uses one combined quotient/remainder
+operation per handler call.
+
+### Remaining work
+
+Software, host, ordinary target-build, and reviewed stack gates all pass.
+Finding 10 remains **implemented, verification incomplete** until flashed
+hardware records worst-case handler duration and confirms the 4/32 policy feels
+acceptable in arrow, zoom, volume, and brightness modes. Review 12 stays open.
 
 ## Cross-cutting decisions and deferred work
 
@@ -987,8 +1037,8 @@ verification remains intentionally pending and is the only remaining Finding
   convergence protocol. Finding 05 may reuse timing concepts but must keep its
   version, authority, acknowledgement, and persistence state explicit.
 - Finding 11 establishes expiry-before-accumulation and one sampled timestamp
-  for the shared DRAGSCROLL/PINCH handler. Finding 10 builds bounded discrete
-  tap backlogs separately and must not change this gesture lifecycle.
+  for the shared DRAGSCROLL/PINCH handler. Finding 10 now bounds discrete tap
+  backlogs separately without changing that gesture lifecycle.
 - The stack checker must model vendor split callbacks under `SlaveThread`, not under the main process stack. Stack-context correctness is part of the gate contract.
 - Finding 17 explicitly crossed into `../bastardkb-qmk` for the authorized
   two-file auto-mouse elapsed-at compatibility extension. No other sibling
@@ -996,7 +1046,6 @@ verification remains intentionally pending and is the only remaining Finding
 
 ## Next program action
 
-Execute Finding 05's physical disconnect, per-half power-cycle, reconnect, and
-USB-role-swap matrix when hardware is available. All Finding 05 software gates
-are green. In parallel, proceed with Finding 10; Finding 11 is verified and
-Review 11 is closed.
+Execute Finding 05's physical disconnect/power-cycle/role-swap matrix and
+Finding 10's flashed timing/feel check when hardware is available. In parallel,
+proceed with Finding 13 preview parity; all current software gates are green.
