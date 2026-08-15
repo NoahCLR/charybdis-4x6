@@ -6,6 +6,7 @@
 
 #include "transactions.h"
 #include "users/noah/lib/action/action_dispatch.h"
+#include "users/noah/lib/action/owned_keycode.h"
 #include "users/noah/lib/key/runtime/trace.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
 #include "users/noah/lib/key/runtime/trace/core_trace.h"
@@ -30,6 +31,22 @@ static uint8_t                          rpc_send_count;
 static split_runtime_base_sync_packet_t rpc_last_base_packet;
 
 layer_state_t layer_state;
+
+bool owned_keycode_acquire(uint16_t keycode, owned_keycode_lease_t *lease) {
+    if (!lease || lease->active) {
+        return false;
+    }
+    *lease = (owned_keycode_lease_t){.active = true, .has_basic = true, .basic = (uint8_t)keycode};
+    return true;
+}
+
+bool owned_keycode_release(owned_keycode_lease_t *lease) {
+    if (!lease || !lease->active) {
+        return false;
+    }
+    *lease = (owned_keycode_lease_t){0};
+    return true;
+}
 
 static void test_fail(const char *expr, const char *file, int line) {
     fprintf(stderr, "test failed: %s (%s:%d)\n", expr, file, line);

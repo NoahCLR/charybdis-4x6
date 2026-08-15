@@ -54,6 +54,8 @@ static key_feedback_tap_commit_mode_t        key_runtime_scenario_tap_commit_mod
 static key_runtime_scenario_effect_t         key_runtime_scenario_effects[KEY_RUNTIME_SCENARIO_MAX_EFFECTS];
 static uint8_t                               key_runtime_scenario_effect_count_value;
 static uint8_t                               key_runtime_scenario_split_sync_count_value;
+static uint16_t                              key_runtime_scenario_register_code_count_value;
+static uint16_t                              key_runtime_scenario_unregister_code_count_value;
 
 layer_state_t layer_state;
 
@@ -100,6 +102,13 @@ static bool key_runtime_scenario_process_record(uint16_t keycode, keyrecord_t *r
         return false;
     }
 
+    if (keycode <= UINT8_MAX && !IS_MODIFIER_KEYCODE(keycode)) {
+        if (record->event.pressed) {
+            register_code((uint8_t)keycode);
+        } else {
+            unregister_code((uint8_t)keycode);
+        }
+    }
     noah_post_process_record_user(keycode, record);
     return true;
 }
@@ -136,6 +145,8 @@ void key_runtime_scenario_reset(void) {
     key_runtime_scenario_tap_commit_mode        = KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS;
     key_runtime_scenario_effect_count_value     = 0;
     key_runtime_scenario_split_sync_count_value = 0;
+    key_runtime_scenario_register_code_count_value = 0;
+    key_runtime_scenario_unregister_code_count_value = 0;
 
     memset(key_runtime_scenario_behaviors, 0, sizeof(key_runtime_scenario_behaviors));
     memset(key_runtime_scenario_steps, 0, sizeof(key_runtime_scenario_steps));
@@ -368,6 +379,20 @@ void del_mods(uint8_t mods) {
 }
 void send_keyboard_report(void) {}
 
+void register_code(uint8_t keycode) {
+    (void)keycode;
+    key_runtime_scenario_register_code_count_value++;
+}
+
+void unregister_code(uint8_t keycode) {
+    (void)keycode;
+    key_runtime_scenario_unregister_code_count_value++;
+}
+
+void wait_ms(uint16_t ms) {
+    (void)ms;
+}
+
 bool noah_synthetic_record_active(void) {
     return false;
 }
@@ -388,9 +413,32 @@ bool keyboard_mod_ownership_should_suppress_default(uint16_t keycode, keyrecord_
     return false;
 }
 
+bool keyboard_mod_ownership_can_register_mods(uint8_t mods) {
+    (void)mods;
+    return true;
+}
+
+bool keyboard_mod_ownership_can_unregister_mods(uint8_t mods) {
+    (void)mods;
+    return true;
+}
+
+void keyboard_mod_ownership_register_mods(uint8_t mods) {
+    (void)mods;
+}
+
+void keyboard_mod_ownership_unregister_mods(uint8_t mods) {
+    (void)mods;
+}
+
 uint8_t keyboard_mod_ownership_managed_only_mask(uint8_t mods) {
     (void)mods;
     return 0;
+}
+
+void pointer_layer_policy_note_action(uint16_t action, bool pressed) {
+    (void)action;
+    (void)pressed;
 }
 
 static void action_dispatch_at(keypos_t key_pos, uint16_t action) {
@@ -711,4 +759,12 @@ void split_runtime_sync(void) {
 
 void split_runtime_sync_request(void) {
     split_runtime_sync();
+}
+
+uint16_t key_runtime_scenario_register_code_count(void) {
+    return key_runtime_scenario_register_code_count_value;
+}
+
+uint16_t key_runtime_scenario_unregister_code_count(void) {
+    return key_runtime_scenario_unregister_code_count_value;
 }

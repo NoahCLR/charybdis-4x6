@@ -354,6 +354,29 @@ static void test_keyboard_mod_policy_real_mod_mask_window_restores_managed_only_
     CHECK(fake_mods == gui_mask);
 }
 
+static void test_modifier_capacity_preflight_is_all_or_nothing(void) {
+    keyboard_mod_ownership_debug_snapshot_t snapshot;
+    uint8_t                                  mods = MOD_BIT(KC_LEFT_GUI) | MOD_BIT(KC_LEFT_SHIFT);
+
+    test_reset_state();
+
+    for (uint16_t i = 0; i < UINT8_MAX; i++) {
+        keyboard_mod_ownership_register(KC_LEFT_GUI);
+    }
+    CHECK(!keyboard_mod_ownership_can_register_mods(mods));
+
+    keyboard_mod_ownership_debug_snapshot(&snapshot);
+    CHECK(snapshot.managed_refcounts[3] == UINT8_MAX);
+    CHECK(snapshot.managed_refcounts[1] == 0);
+
+    keyboard_mod_ownership_unregister(KC_LEFT_GUI);
+    CHECK(keyboard_mod_ownership_can_register_mods(mods));
+    CHECK(!keyboard_mod_ownership_can_unregister_mods(mods));
+
+    keyboard_mod_ownership_register(KC_LEFT_SHIFT);
+    CHECK(keyboard_mod_ownership_can_unregister_mods(mods));
+}
+
 int main(void) {
     test_suspend_allows_nested_same_mod_registration();
     test_managed_only_mask_reports_managed_gui_without_physical_owner();
@@ -365,6 +388,7 @@ int main(void) {
     test_keyboard_mod_policy_masked_emit_window_restores_saved_state();
     test_keyboard_mod_policy_action_replay_window_preserves_replayed_oneshot_output();
     test_keyboard_mod_policy_real_mod_mask_window_restores_managed_only_mods();
+    test_modifier_capacity_preflight_is_all_or_nothing();
     puts("keyboard_mod_ownership host tests passed");
     return 0;
 }

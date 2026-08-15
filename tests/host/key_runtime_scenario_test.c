@@ -3,6 +3,7 @@
 #include <stdlib.h>
 
 #include "key_runtime_scenario_harness.h"
+#include "users/noah/lib/action/owned_keycode.h"
 #include "users/noah/lib/key/runtime/reducer/runtime.h"
 #include "users/noah/lib/state/diagnostics/runtime_debug.h"
 #include "users/noah/noah_keymap_ids.h"
@@ -757,6 +758,45 @@ static void test_same_locked_pd_mode_hold_becomes_momentary_until_release(void) 
     CHECK(key_runtime_scenario_slot_owner_keycode(test_keypos(6, 2)) == KC_NO);
 }
 
+static void test_physical_basic_key_survives_synthetic_tap_at_real_hook_order(void) {
+    static const key_runtime_scenario_step_t press[] = {
+        KEY_RUNTIME_SCENARIO_PRESS(KC_C, 7, 0),
+    };
+    static const key_runtime_scenario_step_t release[] = {
+        KEY_RUNTIME_SCENARIO_RELEASE(KC_C, 7, 0),
+    };
+
+    key_runtime_scenario_reset();
+    key_runtime_scenario_run(press, ARRAY_SIZE(press));
+    CHECK(key_runtime_scenario_register_code_count() == 1u);
+
+    CHECK(owned_keycode_tap(KC_C));
+    CHECK(key_runtime_scenario_register_code_count() == 1u);
+    CHECK(key_runtime_scenario_unregister_code_count() == 0u);
+
+    key_runtime_scenario_run(release, ARRAY_SIZE(release));
+    CHECK(key_runtime_scenario_unregister_code_count() == 1u);
+}
+
+static void test_managed_basic_key_suppresses_overlapping_physical_defaults(void) {
+    static const key_runtime_scenario_step_t physical[] = {
+        KEY_RUNTIME_SCENARIO_PRESS(KC_C, 7, 1),
+        KEY_RUNTIME_SCENARIO_RELEASE(KC_C, 7, 1),
+    };
+    owned_keycode_lease_t lease = {0};
+
+    key_runtime_scenario_reset();
+    CHECK(owned_keycode_acquire(KC_C, &lease));
+    CHECK(key_runtime_scenario_register_code_count() == 1u);
+
+    key_runtime_scenario_run(physical, ARRAY_SIZE(physical));
+    CHECK(key_runtime_scenario_register_code_count() == 1u);
+    CHECK(key_runtime_scenario_unregister_code_count() == 0u);
+
+    CHECK(owned_keycode_release(&lease));
+    CHECK(key_runtime_scenario_unregister_code_count() == 1u);
+}
+
 int main(void) {
     test_single_tap_waits_for_multi_tap_timeout_before_dispatching();
     test_base_tap_commit_feedback_can_be_suppressed();
@@ -779,6 +819,8 @@ int main(void) {
     test_repeat_hold_with_intermediate_scans_starts_once_and_releases_once();
     test_same_locked_pd_mode_quick_tap_unlocks_on_press_without_tap_release();
     test_same_locked_pd_mode_hold_becomes_momentary_until_release();
+    test_physical_basic_key_survives_synthetic_tap_at_real_hook_order();
+    test_managed_basic_key_suppresses_overlapping_physical_defaults();
 
     puts("key_runtime_scenario host tests passed");
     return 0;

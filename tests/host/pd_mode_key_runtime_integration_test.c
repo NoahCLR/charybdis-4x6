@@ -6,6 +6,7 @@
 #include "key_runtime_integration_harness.h"
 #include "users/noah/lib/action/action_dispatch.h"
 #include "users/noah/lib/action/action_lifecycle.h"
+#include "users/noah/lib/action/owned_keycode.h"
 #include "users/noah/lib/action/synthetic_record.h"
 #include "users/noah/lib/key/behavior/key_behavior.h"
 #include "users/noah/lib/key/behavior/key_behavior_lookup.h"
@@ -432,6 +433,33 @@ bool owned_keycode_register(uint16_t keycode) {
 
 bool owned_keycode_unregister(uint16_t keycode) {
     (void)keycode;
+    return false;
+}
+
+bool owned_keycode_is_supported(uint16_t keycode) {
+    (void)keycode;
+    return false;
+}
+
+bool owned_keycode_acquire(uint16_t keycode, owned_keycode_lease_t *lease) {
+    (void)keycode;
+    (void)lease;
+    return false;
+}
+
+bool owned_keycode_release(owned_keycode_lease_t *lease) {
+    (void)lease;
+    return false;
+}
+
+void owned_keycode_track_physical_event(uint16_t keycode, keyrecord_t *record) {
+    (void)keycode;
+    (void)record;
+}
+
+bool owned_keycode_should_suppress_default(uint16_t keycode, keyrecord_t *record) {
+    (void)keycode;
+    (void)record;
     return false;
 }
 

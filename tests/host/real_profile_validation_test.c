@@ -7,6 +7,7 @@
 
 #include "print.h"
 #include "users/noah/lib/action/synthetic_record.h"
+#include "users/noah/lib/action/owned_keycode.h"
 #include "users/noah/lib/macro/macro_dispatch.h"
 #include "users/noah/noah_keymap.h"
 #include "users/noah/noah_runtime.h"
@@ -114,6 +115,17 @@ void noah_dispatch_synthetic_qmk_record(uint16_t keycode, bool pressed, uint8_t 
 
 bool owned_keycode_register(uint16_t keycode) {
     (void)keycode;
+    return false;
+}
+
+bool owned_keycode_acquire(uint16_t keycode, owned_keycode_lease_t *lease) {
+    (void)keycode;
+    (void)lease;
+    return false;
+}
+
+bool owned_keycode_release(owned_keycode_lease_t *lease) {
+    (void)lease;
     return false;
 }
 

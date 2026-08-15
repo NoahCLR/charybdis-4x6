@@ -172,6 +172,7 @@ noah_host_key_runtime_scenario_support_paths() {
     root="$1"
     base_sources="$(noah_host_public_key_runtime_base_sources)"
     common_additions='
+lib/action/owned_keycode.c
 lib/key/behavior/handled_key_lookup.c
 lib/key/runtime/api.c
 lib/state/diagnostics/runtime_trace.c'

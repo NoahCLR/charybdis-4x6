@@ -7,7 +7,7 @@
 #if defined(POINTING_DEVICE_ENABLE)
 
 #    include "../../action/action_dispatch.h"
-#    include "../../state/ownership/keyboard_mod_ownership.h"
+#    include "../../action/owned_keycode.h"
 #    include "pd_mode_handler_common.h"
 
 #    define ARROW_VERTICAL_MASKED_MODS (MOD_BIT(KC_LEFT_ALT) | MOD_BIT(KC_RIGHT_ALT))
@@ -24,7 +24,7 @@ static pd_mode_axis_state_t arrow_x_axis        = {0};
 static pd_mode_axis_state_t arrow_y_axis        = {0};
 static bool                 arrow_axis_is_x     = true;
 static uint8_t              arrow_shift_buttons = 0;
-static bool                 arrow_shift_held    = false;
+static owned_keycode_lease_t arrow_shift_lease  = {0};
 
 static void arrow_vertical_tap_code(uint16_t keycode) {
     noah_emit_synthetic_qmk_tap_with_masked_keyboard_mods(keycode, ARROW_VERTICAL_MASKED_MODS, true);
@@ -33,12 +33,10 @@ static void arrow_vertical_tap_code(uint16_t keycode) {
 static void arrow_shift_sync(void) {
     bool should_hold_shift = arrow_shift_buttons != 0;
 
-    if (should_hold_shift && !arrow_shift_held) {
-        keyboard_mod_ownership_register(ARROW_SELECTION_SHIFT_KEYCODE);
-        arrow_shift_held = true;
-    } else if (!should_hold_shift && arrow_shift_held) {
-        keyboard_mod_ownership_unregister(ARROW_SELECTION_SHIFT_KEYCODE);
-        arrow_shift_held = false;
+    if (should_hold_shift && !arrow_shift_lease.active) {
+        (void)owned_keycode_acquire(ARROW_SELECTION_SHIFT_KEYCODE, &arrow_shift_lease);
+    } else if (!should_hold_shift && arrow_shift_lease.active) {
+        (void)owned_keycode_release(&arrow_shift_lease);
     }
 }
 

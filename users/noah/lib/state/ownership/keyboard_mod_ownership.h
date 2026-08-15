@@ -23,6 +23,8 @@ typedef struct {
 
 void    keyboard_mod_ownership_track_physical_keycode_event(uint16_t keycode, keyrecord_t *record);
 bool    keyboard_mod_ownership_should_suppress_default(uint16_t keycode, keyrecord_t *record);
+bool    keyboard_mod_ownership_can_register_mods(uint8_t mods);
+bool    keyboard_mod_ownership_can_unregister_mods(uint8_t mods);
 void    keyboard_mod_ownership_register_mods(uint8_t mods);
 void    keyboard_mod_ownership_unregister_mods(uint8_t mods);
 void    keyboard_mod_ownership_register(uint16_t keycode);

@@ -7,6 +7,7 @@
 #include "trace.h"
 #include "transition.h"
 #include "../../action/action_dispatch.h"
+#include "../../action/owned_keycode.h"
 #include "reducer/state_query.h"
 #include "../../state/ownership/keyboard_mod_ownership.h"
 
@@ -14,8 +15,8 @@ bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record) {
     handled_key_resolution_t handled_key = handled_key_lookup(keycode);
     const press_token_t     *token       = key_runtime_core_press_token_at(record->event.key);
 
-    if (keyboard_mod_ownership_should_suppress_default(keycode, record)) {
-        if (!record->event.pressed && ((token && token->resolved_keycode != KC_NO) || handled_key_resolution_is_handled(handled_key))) {
+    if (owned_keycode_should_suppress_default(keycode, record) || keyboard_mod_ownership_should_suppress_default(keycode, record)) {
+        if (!record->event.pressed && token && token->handled_key) {
             // Let the handled-key release path run.
         } else {
             key_runtime_trace_message("preflight:suppress_default", "default QMK path suppressed before handled-key runtime");

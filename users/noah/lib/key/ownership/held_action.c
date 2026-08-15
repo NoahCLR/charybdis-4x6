@@ -10,6 +10,7 @@
 
 #include "../../action/action_dispatch.h"
 #include "../../action/action_lifecycle.h"
+#include "../../action/owned_keycode.h"
 #include "../../state/ownership/keyboard_mod_ownership.h"
 #include "../../state/shared/runtime_context_internal.h"
 #include "held_action.h"
@@ -129,6 +130,45 @@ static uint16_t held_action_refcount(uint16_t action) {
     return count;
 }
 
+static bool held_action_slot_uses_lease(const noah_held_action_state_t *state, uint16_t slot) {
+    return state && (state->action_lease_managed[slot / 8u] & (uint8_t)(1u << (slot % 8u))) != 0u;
+}
+
+static void held_action_slot_set_uses_lease(noah_held_action_state_t *state, uint16_t slot, bool uses_lease) {
+    uint8_t mask = (uint8_t)(1u << (slot % 8u));
+
+    if (!state) {
+        return;
+    }
+    if (uses_lease) {
+        state->action_lease_managed[slot / 8u] |= mask;
+    } else {
+        state->action_lease_managed[slot / 8u] &= (uint8_t)~mask;
+    }
+}
+
+static void held_action_remove_slot(uint16_t slot) {
+    noah_held_action_state_t *state         = held_action_state();
+    uint16_t                  action        = state->actions[slot].action;
+    keypos_t                  key_pos       = state->actions[slot].key_pos;
+    bool                      lease_managed = held_action_slot_uses_lease(state, slot);
+
+    state->actions[slot].active = false;
+    state->actions[slot].action = KC_NO;
+    held_action_slot_set_uses_lease(state, slot, false);
+
+    if (lease_managed) {
+        if (state->action_leases[slot].active) {
+            (void)owned_keycode_release(&state->action_leases[slot]);
+        }
+        return;
+    }
+
+    if (held_action_refcount(action) == 0 || held_action_requires_per_key_dispatch(action)) {
+        noah_action_release(key_pos, action);
+    }
+}
+
 static void held_modifier_remove_slot(uint16_t slot) {
     noah_held_action_state_t *state  = held_action_state();
     uint16_t                  action = state->modifiers[slot].action;
@@ -188,13 +228,7 @@ static bool held_action_register_owned(keypos_t key_pos, uint16_t action) {
         if (state->actions[slot].action == action) {
             return true;
         }
-
-        uint16_t old_action         = state->actions[slot].action;
-        state->actions[slot].active = false;
-        state->actions[slot].action = KC_NO;
-        if (held_action_refcount(old_action) == 0 || held_action_requires_per_key_dispatch(old_action)) {
-            noah_action_release(key_pos, old_action);
-        }
+        held_action_remove_slot((uint16_t)slot);
     } else {
         slot = held_action_find_free_slot();
         if (slot < 0) {
@@ -203,12 +237,19 @@ static bool held_action_register_owned(keypos_t key_pos, uint16_t action) {
         }
     }
 
-    bool first_binding   = held_action_refcount(action) == 0;
+    bool first_binding = held_action_refcount(action) == 0;
+
     state->actions[slot] = (held_action_binding_snapshot_t){
         .active  = true,
         .key_pos = key_pos,
         .action  = action,
     };
+
+    if (owned_keycode_is_supported(action)) {
+        held_action_slot_set_uses_lease(state, (uint16_t)slot, true);
+        (void)owned_keycode_acquire(action, &state->action_leases[slot]);
+        return true;
+    }
 
     if (first_binding || held_action_requires_per_key_dispatch(action)) {
         noah_action_press(key_pos, action);
@@ -229,17 +270,10 @@ bool held_modifier_release_owned_by_key(keypos_t key_pos) {
 }
 
 static bool held_action_or_modifier_release_owned_by_key(keypos_t key_pos) {
-    noah_held_action_state_t *state = held_action_state();
-    int16_t                   slot  = held_action_find_slot_for_key(key_pos);
+    int16_t slot = held_action_find_slot_for_key(key_pos);
 
     if (slot >= 0) {
-        uint16_t action             = state->actions[slot].action;
-        state->actions[slot].active = false;
-        state->actions[slot].action = KC_NO;
-
-        if (held_action_refcount(action) == 0 || held_action_requires_per_key_dispatch(action)) {
-            noah_action_release(key_pos, action);
-        }
+        held_action_remove_slot((uint16_t)slot);
         return true;
     }
 
@@ -266,6 +300,10 @@ void held_action_register(keypos_t key_pos, uint16_t action) {
         return;
     }
 
+    if (owned_keycode_is_supported(action)) {
+        return;
+    }
+
     noah_action_press(key_pos, action);
 }
 
@@ -276,6 +314,10 @@ void held_action_unregister(keypos_t key_pos, uint16_t action) {
     }
 
     if (held_action_or_modifier_release_owned_by_key(key_pos)) {
+        return;
+    }
+
+    if (owned_keycode_is_supported(action)) {
         return;
     }
 

@@ -7,6 +7,8 @@
 #include "runtime_context_internal.h"
 #include "../diagnostics/runtime_diag.h"
 
+__attribute__((weak)) void noah_owned_keycode_reset_for_test(void) {}
+
 static noah_runtime_context_t noah_runtime_singleton = {
     .shared =
         {
@@ -57,6 +59,7 @@ void noah_runtime_context_reset_for_test(noah_runtime_context_t *ctx) {
 void noah_runtime_reset_for_test(void) {
     noah_runtime_context_reset_for_test(noah_runtime_context());
     noah_runtime_diag_reset_for_test();
+    noah_owned_keycode_reset_for_test();
 
     layer_state = 0;
     clear_mods();

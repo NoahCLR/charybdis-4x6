@@ -6,6 +6,7 @@
 
 #include "qmk_stub.h"
 #include "send_string.h"
+#include "users/noah/lib/action/owned_keycode.h"
 #include "users/noah/lib/macro/macro_payload.h"
 
 typedef enum {
@@ -29,6 +30,7 @@ static const char *const test_long_delay_heavy_payload = "h{829}e{627}y{665} {24
 static test_op_t test_ops[TEST_MAX_OPS];
 static uint16_t  test_op_count;
 static uint16_t  test_runtime_diag_heartbeat_count;
+static int16_t   test_failed_acquire_keycode;
 
 static void test_fail(const char *expr, const char *file, int line) {
     fprintf(stderr, "test failed: %s (%s:%d)\n", expr, file, line);
@@ -57,6 +59,7 @@ static void test_reset_stubs(void) {
     memset(test_ops, 0, sizeof(test_ops));
     test_op_count                     = 0;
     test_runtime_diag_heartbeat_count = 0;
+    test_failed_acquire_keycode        = -1;
 }
 
 void send_char(char ascii_code) {
@@ -71,13 +74,21 @@ void wait_ms(uint16_t ms) {
     test_log_op(TEST_OP_WAIT, ms);
 }
 
-bool owned_keycode_register(uint16_t keycode) {
+bool owned_keycode_acquire(uint16_t keycode, owned_keycode_lease_t *lease) {
+    CHECK(lease != NULL);
+    if (test_failed_acquire_keycode == (int16_t)keycode) {
+        return false;
+    }
     test_log_op(TEST_OP_REGISTER, keycode);
+    *lease = (owned_keycode_lease_t){.active = true, .has_basic = true, .basic = (uint8_t)keycode};
     return true;
 }
 
-bool owned_keycode_unregister(uint16_t keycode) {
-    test_log_op(TEST_OP_UNREGISTER, keycode);
+bool owned_keycode_release(owned_keycode_lease_t *lease) {
+    CHECK(lease != NULL);
+    CHECK(lease->active);
+    test_log_op(TEST_OP_UNREGISTER, lease->basic);
+    *lease = (owned_keycode_lease_t){0};
     return true;
 }
 
@@ -388,6 +399,22 @@ static void test_play_ir_preflight_rejects_malformed_ir_without_side_effects(voi
     CHECK(test_op_count == 0u);
 }
 
+static void test_playback_failure_releases_only_successfully_acquired_holds(void) {
+    macro_payload_ir_t ir = {0};
+
+    CHECK(macro_payload_compile("{+KC_LCTL}{+KC_LSFT}{-KC_LSFT}{-KC_LCTL}", &ir));
+    test_reset_stubs();
+    test_failed_acquire_keycode = TEST_SEND_STRING_U8(X_LEFT_SHIFT);
+
+    CHECK(!macro_payload_play_ir(&ir));
+    CHECK(test_op_count == 3u);
+    CHECK(test_ops[0].kind == TEST_OP_REGISTER);
+    CHECK(test_ops[0].value == TEST_SEND_STRING_U8(X_LEFT_CTRL));
+    CHECK(test_ops[1].kind == TEST_OP_WAIT);
+    CHECK(test_ops[2].kind == TEST_OP_UNREGISTER);
+    CHECK(test_ops[2].value == TEST_SEND_STRING_U8(X_LEFT_CTRL));
+}
+
 static void test_play_long_delay_heavy_payload_keeps_runtime_heartbeat_alive(void) {
     macro_payload_ir_t ir            = {0};
     uint32_t           total_wait_ms = 0;
@@ -441,6 +468,7 @@ int main(void) {
     test_decode_qmk_stream_keeps_high_command_operands_in_keycode_grammar();
     test_play_ir_with_delayed_text_uses_send_char_with_delay();
     test_play_ir_preflight_rejects_malformed_ir_without_side_effects();
+    test_playback_failure_releases_only_successfully_acquired_holds();
     test_play_long_delay_heavy_payload_keeps_runtime_heartbeat_alive();
 
     puts("macro_payload host tests passed");

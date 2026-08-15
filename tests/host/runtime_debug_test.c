@@ -5,6 +5,7 @@
 
 #include "users/noah/lib/action/action_dispatch.h"
 #include "users/noah/lib/action/action_lifecycle.h"
+#include "users/noah/lib/action/owned_keycode.h"
 #include "users/noah/lib/key/behavior/handled_key.h"
 #include "users/noah/lib/key/ownership/held_action.h"
 #include "users/noah/lib/key/ownership/held_repeat.h"
@@ -74,6 +75,33 @@ static key_feedback_branch_confirm_mode_t fake_branch_confirm_mode;
 static uint16_t                           test_keymap[LAYER_COUNT][MATRIX_ROWS][MATRIX_COLS];
 
 layer_state_t layer_state;
+
+bool owned_keycode_is_supported(uint16_t keycode) {
+    (void)keycode;
+    return false;
+}
+
+bool owned_keycode_acquire(uint16_t keycode, owned_keycode_lease_t *lease) {
+    (void)keycode;
+    (void)lease;
+    return false;
+}
+
+bool owned_keycode_release(owned_keycode_lease_t *lease) {
+    (void)lease;
+    return false;
+}
+
+void owned_keycode_track_physical_event(uint16_t keycode, keyrecord_t *record) {
+    (void)keycode;
+    (void)record;
+}
+
+bool owned_keycode_should_suppress_default(uint16_t keycode, keyrecord_t *record) {
+    (void)keycode;
+    (void)record;
+    return false;
+}
 
 static bool test_keypos_equal(keypos_t lhs, keypos_t rhs) {
     return lhs.row == rhs.row && lhs.col == rhs.col;

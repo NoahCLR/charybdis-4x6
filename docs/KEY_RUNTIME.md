@@ -166,6 +166,7 @@ QMK-facing applied registries. Use these labels when changing runtime behavior:
 | Pending release dispatch queue | Index-linked `pending_release_t` slots in `key_runtime_core`, with mechanics in `queue/pending_release_queue.c` | `deferred_release.c`, `release.c`, and `scan.c` drain through the adapter | Queue storage stays core-owned because blockers are press-token facts. Head/tail linkage defines FIFO order independently of uptime; one unlink path owns reconnection, count changes, and pending-emission token cleanup. Covered directly by the pending-release queue runner and by release matrix/runtime debug integration tests. |
 | Runtime inspection and blocker queries | `key_runtime_core_state_t` read through `reducer/state_query.c` | `debug.c`, `feedback.c`, projection snapshots, preflight, and deferred release transport | Query code reads reducer-owned state and reports derived facts; it must not mutate press, tap, lease, or pending-release storage. Covered by runtime debug, release matrix, scenario, trace, and integration harness tests. |
 | Temporary held ownership intent for held actions, repeats, momentary layers, managed modifiers, pd holds, and pointer anchors | `lease_t` in `key_runtime_core`, with mechanics in `reducer/ownership_state.c` | `held_action.c`, `held_repeat.c`, `layer_ownership.c`, `keyboard_mod_ownership.c`, `pd_mode_state.c`, and pointer layer policy | `projection/projection.c` writes outward from planned effects; applied registries perform QMK, action, repeat, layer, modifier, or pd-mode side effects. Those registries must not mint independent key-runtime leases. |
+| Physical and managed literal report ownership | `owned_keycode.c` physical/managed usage counts plus `keyboard_mod_ownership.c` modifier counts | `process.c` observes physical events before QMK default handling; `preflight.c` suppresses a default transition while a managed owner keeps the same report component live | Managed basic, system, consumer, and mouse usages use owner-scoped `owned_keycode_lease_t` values. QMK register/unregister calls occur only on aggregate zero-to-one and one-to-zero transitions. Modded actions preflight every component before mutation and delegate modifier counts to `keyboard_mod_ownership.c`. Persistent held actions, macro holds/chords, and PD arrow selection retain their exact leases. `run_owned_keycode_tests.sh` also rejects new raw or unscoped mutation callers outside the action-dispatch compatibility boundary. |
 | Lock-like runtime intent | `persistent_intent_t` in `key_runtime_core`, with mechanics in `reducer/ownership_state.c` | `layer_ownership.c` and `pd_mode_state.c` apply the actual layer or pd-mode lock | Current accepted bridge points are `layer_ownership_set_lock_state()` and `pd_mode_key_runtime_bridge_observe_local_lock_state()`, which update external state and then refresh core shadow state. `run_feature_gate_compile_tests.sh` enforces those bridge directions. Treat new two-way lock writes as architecture work, not local fixes. |
 | Physical keyboard modifier observation and replay filtering | QMK live modifier state plus `keyboard_mod_ownership.c` physical refcounts; `keyboard_mod_policy.c` owns shared snapshot/filter/replay helpers and preservation windows | core shadow projection stores physical and managed masks for overlap reasoning | `process.c` observes physical modifier events and preflight may suppress default release; action dispatch, delayed action replay, tap-series capture, deferred release, and PD mode modifier masking use `keyboard_mod_policy.h` instead of local snapshot/filter/preserve logic. QMK remains the live report sink. Covered by keyboard mod ownership, action dispatch, delayed action, modifier-hold, and PD-mode integration tests. |
 | PD runtime local, display, remote, and split state | `pd_mode_state.c` and split sync runtime | key-runtime leases and persistent intents request local pd behavior | Key runtime may request PD transitions through projected effects; PD runtime owns actual mode state and snapshots. Changed local PD lock state is observed into core through `pd_mode_key_runtime_bridge.c`. |
@@ -217,13 +218,17 @@ observes every physical event into `key_runtime_core` first.
 
 That observation step gives the reducer position-stable press/release identity
 before any QMK path, macro path, or pd-mode path narrows the event.
+The pre-process hook also updates physical literal-key and modifier ownership
+before QMK can mutate its report, which lets preflight suppress a duplicate
+press or premature release when a managed lease already owns that component.
 
 ### 2. Preflight
 
 [`preflight.c`](../users/noah/lib/key/runtime/preflight.c)
 does the cross-key work that must happen before the current press resolves:
 
-- suppress default modifier handling when ownership requires it
+- suppress default literal-key or modifier handling when aggregate ownership
+  requires it
 - interrupt other active handled keys on foreign press
 - leave unrelated pending multi-tap chains live until their own timeout or
   same-key continuation resolves them

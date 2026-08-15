@@ -5,10 +5,10 @@
 - **Branch:** `sol`
 - **Starting commit:** `5b20ed01` (`sol findings`)
 - **Started:** 2026-07-13
-- **Current focus:** [Finding 08 — synthetic-key ownership](08-synthetic-key-ownership.md)
+- **Current focus:** [Finding 06 — combo-origin cache lifecycle](06-combo-origin-cache-lifecycle.md)
 - **Overall status:** In progress
-- **Latest closed review:** [`review/2026-08-15-review-04`](../review/2026-08-15-review-04/)
-- **Active review:** [`review/2026-08-15-review-05`](../review/2026-08-15-review-05/)
+- **Latest closed review:** [`review/2026-08-15-review-05`](../review/2026-08-15-review-05/)
+- **Active review:** None; open the next sortable folder when Finding 06 architecture work begins
 
 This file is the implementation record for the plans in this directory. It records what actually changed, why choices were made, what verification really ran, and what remains open. A plan is not marked verified until its targeted checks, the full host suite, the target firmware build, target-specific evidence, and required documentation all pass.
 
@@ -31,7 +31,7 @@ This file is the implementation record for the plans in this directory. It recor
 | 05 | [VIA split persistence](05-via-split-persistence.md) | Must fix | Planned | Not run |
 | 06 | [Combo-origin cache lifecycle](06-combo-origin-cache-lifecycle.md) | Should fix | Planned | Not run |
 | 07 | [Nonblocking macro playback](07-nonblocking-macro-playback.md) | Should fix | Planned | Not run |
-| 08 | [Synthetic-key ownership](08-synthetic-key-ownership.md) | Should fix | In progress | Strict orphan macro key-up rejection is covered; aggregate physical/managed ownership and lease migration remain open |
+| 08 | [Synthetic-key ownership](08-synthetic-key-ownership.md) | Should fix | Verified | Aggregate physical/managed report ownership, scoped persistent leases, strict macro balance, source guards, full host, firmware, and target stack gates pass |
 | 09 | [Pending-release sequence rollover](09-pending-release-sequence-rollover.md) | Should fix | Verified | Explicit linked FIFO, 65,537-cycle blocked-head stress, structural corruption checks, full host, firmware, and target stack gate pass |
 | 10 | [Pointing backlog bounds](10-pointing-backlog-bounds.md) | Should fix | Planned | Not run |
 | 11 | [Dragscroll stall recovery](11-dragscroll-stall-recovery.md) | Should fix | Planned | Not run |
@@ -444,19 +444,51 @@ releasing another's key.
   output side effects.
 - Updated macro syntax documentation.
 
-**Remaining**
+### 2026-08-15 — Aggregate ownership and lease closure
 
-- Add aggregate physical/managed ownership for basic, mouse, consumer, and
-  system usages accepted by the literal action boundary.
-- Introduce and migrate owner-scoped leases, including held actions and macro
-  execution.
-- Add saturation/underflow diagnostics, physical overlap hook enforcement,
-  reset reconciliation, BSS measurement, full integration, and target closure.
+**Implemented**
+
+- Added compact physical and managed counts for basic, system, consumer, and
+  mouse usages at the literal action boundary.
+- Added explicit owner-scoped leases. Modded actions prevalidate all components,
+  share the same basic usage counts, and delegate modifier counts to the
+  existing modifier ledger.
+- Observed physical usages before QMK default handling and suppressed defaults
+  while a managed owner keeps the usage live. Tightened the handled-release
+  bypass to actual handled press tokens.
+- Migrated held literal actions, macro holds/chords/taps/abort cleanup, and PD
+  arrow-selection Shift to retained leases.
+- Added saturation, underflow, unsupported-action, and idempotent-release
+  diagnostics plus a test-only aggregate reset seam.
+- Added mechanical guards for raw QMK and legacy unscoped ownership callers.
+
+**Coverage**
+
+- Direct ownership tests cover transition edges, physical-first and
+  managed-first overlap, two managed owners, shared modded basics, mouse,
+  consumer, system, saturation, underflow, idempotence, and atomic failure.
+- The real runtime scenario harness proves physical `KC_C` survives a
+  synthetic tap in both arrival orders.
+- Held-action, macro, VIA, PD, runtime debug/trace, layer-lock, hook, profile,
+  QMK-contract, and feature variants cover the migrated seams.
+
+**Measurements**
+
+- Baseline commit `5100f2a5`: text 142,364 B, BSS 245,840 B, runtime singleton
+  19,752 B, arrow hold flag 1 B.
+- Final instrumented image: text 143,524 B, BSS 245,592 B,
+  `owned_keycode_state` 456 B, runtime singleton 20,000 B, arrow lease 4 B.
+- Explicit ownership storage cost is 707 B. The whole-image BSS difference is
+  recorded separately because LTO can reshape unrelated linked storage.
+- Stack closure remains 1,808 B of a 1,920 B main-process budget and 328 B of a
+  768 B split-thread budget.
 
 ### Current finding status
 
-Finding 08 is **In progress**. Strict macro-local balance is enforced, but the
-cross-producer aggregate ownership defect is not yet resolved.
+Finding 08 is **Verified**. Aggregate ownership, scoped leases, strict macro
+balance, failure handling, mechanical caller boundaries, complete host
+coverage, target firmware, resource measurements, and review documentation all
+meet the closure bar.
 
 ## Verification ledger
 
@@ -548,18 +580,31 @@ cross-producer aggregate ownership defect is not yet resolved.
 | 2026-08-15 | 08 | `PYTHONPYCACHEPREFIX=/tmp/noah-host-pycache sh tests/host/run_all_host_tests.sh` | Passed | Complete post-checkpoint host suite |
 | 2026-08-15 | 08 | `qmk compile -kb bastardkb/charybdis/4x6 -km noah` | Passed | Ordinary target firmware build after strict balance checkpoint |
 | 2026-08-15 | 08 | `git diff --check` | Passed | Strict balance source, tests, keymap docs, Sol checkpoint, and active review |
+| 2026-08-15 | 08 | `sh tests/host/run_owned_keycode_tests.sh` | Passed | Aggregate edges, overlap orders, shared basics, report domains, diagnostics, and raw-caller guards |
+| 2026-08-15 | 08 | `sh tests/host/run_keyboard_mod_ownership_tests.sh` | Passed | Modifier capacity and unregister preflight remain atomic |
+| 2026-08-15 | 08 | `sh tests/host/run_held_action_tests.sh` | Passed | Per-owner literal leases and failed-acquisition teardown are fail-closed |
+| 2026-08-15 | 08 | `sh tests/host/run_macro_payload_tests.sh` | Passed | Macro persistent holds, chords, and abort cleanup release exact leases |
+| 2026-08-15 | 08 | `sh tests/host/run_key_runtime_scenario_tests.sh` | Passed | Real hook ordering preserves physical-first and managed-first `KC_C` ownership |
+| 2026-08-15 | 08 | `sh tests/host/run_feature_gate_compile_tests.sh` | Passed | Runtime, ownership, and feature variants compile with final interfaces |
+| 2026-08-15 | 08 | `PYTHONPYCACHEPREFIX=/tmp/noah-host-pycache sh tests/host/run_all_host_tests.sh` | Passed | Final same-tree complete host suite |
+| 2026-08-15 | 08 | `qmk compile -kb bastardkb/charybdis/4x6 -km noah` | Passed | Required ordinary target build on final source tree |
+| 2026-08-15 | 08 | `PYTHONPYCACHEPREFIX=/tmp/noah-stack-pycache PYTHON=/usr/bin/python3 sh tests/host/run_firmware_stack_budget_checks.sh` | Passed | Fresh target artifacts; 1,808 B worst reviewed main path and 328 B split path |
+| 2026-08-15 | 08 | `git diff --check` | Passed | Final source, tests, runtime docs, Sol records, and closed review 05 |
 
 ## Cross-cutting decisions and deferred work
 
 - The implementation order follows [`00-overarching-remediation-roadmap.md`](00-overarching-remediation-roadmap.md).
 - Finding 09 replaced pending-release sequence ordering without changing Finding
   01's four-record transport batch or re-entry policy.
+- Finding 08 establishes the only aggregate literal-report ownership path for
+  physical events, held actions, macro playback, and PD persistent shortcuts.
+  Finding 07 must reuse its leases during nonblocking playback.
 - The stack checker must model vendor split callbacks under `SlaveThread`, not under the main process stack. Stack-context correctness is part of the gate contract.
 - No sibling workspace source was edited; only QMK build artifacts were produced under `../bastardkb-qmk/.build`.
 
 ## Next program action
 
-Begin Finding 08 by specifying one reference-counted ownership contract for
-physical and synthetic basic/modifier registrations. Preserve current macro and
-combo behavior until that foundation has direct overlap and orphan-release
-coverage.
+Begin Finding 06 by opening the next sortable review folder, reproducing the
+combo-origin cache lifecycle defect, and preserving the now-closed ownership
+contract. Finding 07 may proceed after or alongside Finding 06, but must reuse
+the scoped leases landed by Finding 08.

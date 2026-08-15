@@ -10,6 +10,7 @@
 
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
+#include "../../action/owned_keycode.h"
 #include "../../key/ownership/held_action.h"
 #include "../../key/ownership/held_repeat.h"
 #include "../ownership/keyboard_mod_ownership.h"
@@ -27,6 +28,8 @@ typedef struct {
     held_action_binding_snapshot_t modifiers[HELD_ACTION_BINDING_CAPACITY];
     uint8_t                        modifier_refcounts[8];
     held_action_binding_snapshot_t actions[HELD_ACTION_BINDING_CAPACITY];
+    owned_keycode_lease_t          action_leases[HELD_ACTION_BINDING_CAPACITY];
+    uint8_t                        action_lease_managed[(HELD_ACTION_BINDING_CAPACITY + 7u) / 8u];
 } noah_held_action_state_t;
 
 typedef struct {

@@ -2,7 +2,7 @@
 
 ## Plan metadata
 
-- **Status:** Implementation in progress; Phase 1 Findings 01, 03, 04, 02, and 09 are verified. Finding 08 is active, with strict macro balance landed and aggregate ownership still open. See [`implementation-progress.md`](implementation-progress.md).
+- **Status:** Implementation in progress; Phase 1 Findings 01, 03, 04, 02, and 09 are verified. Phase 2 ownership foundation Finding 08 is verified; Finding 06 is next, and Finding 07 is unblocked by the landed lease contract. See [`implementation-progress.md`](implementation-progress.md).
 - **Prepared:** 2026-07-13.
 - **Scope:** Firmware runtime correctness, split reliability, target resource safety, and measured hot-path efficiency.
 - **Source:** The deep firmware code review performed against the current `charybdis-4x6` tree.

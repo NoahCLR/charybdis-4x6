@@ -3,7 +3,7 @@
 ## Plan metadata
 
 - **Severity:** Should-fix (P1 stuck-key and premature-release correctness risk)
-- **Status:** In progress; strict macro-local hold balance landed first, aggregate ownership remains open
+- **Status:** Verified; strict macro balance, aggregate ownership, scoped leases, target resource evidence, and closure gates pass
 - **Affected surfaces:** owned keycode dispatch, physical key hooks, held actions, macro holds/taps, pointing-mode shortcuts, keyboard modifiers, mouse/consumer actions
 - **Primary files:** [owned_keycode.c](../users/noah/lib/action/owned_keycode.c), [keyboard_mod_ownership.c](../users/noah/lib/state/ownership/keyboard_mod_ownership.c), [macro_payload_internal.h](../users/noah/lib/macro/macro_payload_internal.h), [macro_payload_run.c](../users/noah/lib/macro/macro_payload_run.c)
 - **Prerequisites:** None, but finish this contract before the scan-driven macro engine in [Finding 07](07-nonblocking-macro-playback.md)
@@ -217,24 +217,73 @@ When this lands, document the lease/aggregate-report contract in the runtime arc
 - `docs/KEYMAP.md` now defines explicit key-up as requiring an earlier unmatched
   key-down for the same macro.
 
-Aggregate basic/mouse/consumer ownership, scoped leases, physical overlap, and
-the remaining acceptance checklist are still open. This checkpoint is not
-Finding 08 closure.
+At that checkpoint, aggregate basic/mouse/consumer ownership, scoped leases,
+physical overlap, and the remaining acceptance checklist were still open. It
+was not Finding 08 closure; the reconciliation and closure pass below supersede
+that intermediate status.
+
+### 2026-08-15 — Aggregate ownership and scoped lease closure
+
+#### Reconciliation note
+
+The problem statement, evidence, and first checkpoint above describe the
+audit-time baseline. The direct unowned register/unregister paths and orphan
+macro teardown they identify no longer describe the current tree.
+
+#### Landed implementation
+
+- `owned_keycode.c` now keeps compact physical and managed refcounts for every
+  basic, system, consumer, and mouse usage accepted by the literal action
+  boundary. QMK transitions happen only when aggregate visibility changes.
+- Physical usages are observed in `noah_pre_process_record_user()` before QMK
+  default handling. Preflight suppresses a duplicate press or premature
+  release while managed ownership is live.
+- `owned_keycode_lease_t` records the exact normalized basic usage and modifier
+  mask acquired by one producer. Acquisition and release prevalidate all
+  components; release is idempotent and cannot tear down another action.
+- Held literal actions, macro persistent holds, macro chords, taps, abort
+  cleanup, and PD arrow-selection Shift now retain scoped leases.
+- Saturation, underflow, unsupported-action, and idempotent-release diagnostics
+  fail closed. The test reset clears aggregate state without adding a production
+  path that blindly unregisters physical keys.
+- The owned-key runner mechanically rejects new raw QMK or unscoped ownership
+  callers outside `owned_keycode.c` and the established action-kind fallback.
+
+#### Target measurements
+
+- Exact checkpoint baseline (`5100f2a5`): text 142,364 B; BSS 245,840 B;
+  runtime singleton 19,752 B; arrow hold flag 1 B.
+- Final instrumented image: text 143,524 B; BSS 245,592 B;
+  `owned_keycode_state` 456 B; runtime singleton 20,000 B; arrow lease 4 B.
+- The explicit ownership storage increase is 707 B. The linked total BSS is
+  reported independently because LTO affects the whole image.
+- Worst reviewed main-process path remains 1,808 B in a 1,920 B budget; worst
+  split path is 328 B in a 768 B budget.
+
+#### Verification
+
+- Focused ownership, modifier, held-action, macro, VIA, PD-mode, hook, scenario,
+  QMK-contract, and feature-gate runners passed.
+- `PYTHONPYCACHEPREFIX=/tmp/noah-host-pycache sh tests/host/run_all_host_tests.sh`
+  passed.
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah` passed.
+- `PYTHONPYCACHEPREFIX=/tmp/noah-stack-pycache PYTHON=/usr/bin/python3 sh tests/host/run_firmware_stack_budget_checks.sh`
+  passed from fresh target artifacts.
+- `git diff --check` passed.
 
 ## Acceptance checklist
 
-- [ ] Physical and synthetic ownership can overlap for every supported domain.
-- [ ] Shared basic keys survive release of one modded action.
-- [ ] Persistent callers use scoped leases.
-- [ ] Orphan macro key-up is rejected before side effects.
-- [ ] Refcount overflow/underflow cannot wrap or release another owner.
-- [ ] Hook order and raw-QMK boundary exceptions are mechanically checked.
-- [ ] Ownership BSS cost is measured.
-- [ ] Targeted tests, full host suite, and firmware compile pass.
-- [ ] Docs and the active review match the implementation.
+- [x] Physical and synthetic ownership can overlap for every supported domain.
+- [x] Shared basic keys survive release of one modded action.
+- [x] Persistent callers use scoped leases.
+- [x] Orphan macro key-up is rejected before side effects.
+- [x] Refcount overflow/underflow cannot wrap or release another owner.
+- [x] Hook order and raw-QMK boundary exceptions are mechanically checked.
+- [x] Ownership BSS cost is measured.
+- [x] Targeted tests, full host suite, and firmware compile pass.
+- [x] Docs and the active review match the implementation.
 
 ## Next action
 
-Next, write the failing physical-`KC_C` plus synthetic-tap integration test.
-Then define the normalized component/lease structure and prove aggregate
-zero-to-one/one-to-zero transitions before migrating persistent callers.
+Finding 08 is closed. Begin Finding 06 in a new sortable review folder. Finding
+07 may then use this lease contract without inventing a second ownership path.

@@ -34,11 +34,12 @@ matching `noah_*` helper when they still want shared userspace behavior.
 flowchart TD
     physical["Physical key press"] --> pre_user["pre_process_record_user"]
     pre_user --> origin["Compatibility: qmk_combo_origin observes physical member"]
+    pre_user --> key_track["Applied: owned_keycode tracks physical report usage"]
     pre_user --> mod_track["Projected: keyboard modifier ownership tracks physical mods"]
     physical --> process_user["process_record_user"]
     process_user --> normalize["Compatibility: combo origin normalizes event key"]
     normalize --> observe["Authoritative: reducer observes physical event"]
-    observe --> preflight["Planned: preflight interrupts or suppresses default paths"]
+    observe --> preflight["Planned: preflight interrupts or suppresses aggregate-owned defaults"]
     preflight --> pd_handler["PD key handler intercepts active mode keys"]
     pd_handler --> lookup["key/behavior handled_key_lookup"]
     lookup --> press_plan["Planned: reducer press effect plan"]

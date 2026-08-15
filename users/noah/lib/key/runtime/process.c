@@ -13,6 +13,7 @@
 #include "reducer/runtime.h"
 #include "reducer/state_query.h"
 #include "../../action/synthetic_record.h"
+#include "../../action/owned_keycode.h"
 #include "../../compat/qmk_combo_origin.h"
 #include "../../state/ownership/keyboard_mod_ownership.h"
 #include "../../state/modifiers/keyboard_mod_policy.h"
@@ -193,6 +194,7 @@ bool noah_pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
     if (record->event.type == KEY_EVENT && key_origin_keypos_valid(record->event.key)) {
         key_origin_registry_set_single(record->event.key);
         noah_qmk_combo_origin_observe_physical_key_event(keycode, record);
+        owned_keycode_track_physical_event(keycode, record);
         keyboard_mod_ownership_track_physical_keycode_event(keycode, record);
     }
 

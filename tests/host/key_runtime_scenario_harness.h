@@ -88,3 +88,5 @@ uint8_t                              key_runtime_scenario_effect_count(void);
 const key_runtime_scenario_effect_t *key_runtime_scenario_effect_at(uint8_t index);
 uint16_t                             key_runtime_scenario_now(void);
 uint8_t                              key_runtime_scenario_split_sync_count(void);
+uint16_t                             key_runtime_scenario_register_code_count(void);
+uint16_t                             key_runtime_scenario_unregister_code_count(void);

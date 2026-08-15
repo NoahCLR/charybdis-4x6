@@ -114,6 +114,30 @@ bool keyboard_mod_ownership_should_suppress_default(uint16_t keycode, keyrecord_
     return state->managed_refcounts[index] > 0;
 }
 
+bool keyboard_mod_ownership_can_register_mods(uint8_t mods) {
+    noah_keyboard_mod_ownership_state_t *state = keyboard_mod_ownership_state();
+
+    for (uint8_t i = 0; i < ARRAY_SIZE(keyboard_mod_ownership_mod_masks); i++) {
+        if ((mods & keyboard_mod_ownership_mod_masks[i]) != 0u && state->managed_refcounts[i] == UINT8_MAX) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool keyboard_mod_ownership_can_unregister_mods(uint8_t mods) {
+    noah_keyboard_mod_ownership_state_t *state = keyboard_mod_ownership_state();
+
+    for (uint8_t i = 0; i < ARRAY_SIZE(keyboard_mod_ownership_mod_masks); i++) {
+        if ((mods & keyboard_mod_ownership_mod_masks[i]) != 0u && state->managed_refcounts[i] == 0u) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 void keyboard_mod_ownership_register_mods(uint8_t mods) {
     noah_keyboard_mod_ownership_state_t *state         = keyboard_mod_ownership_state();
     bool                                 report_needed = false;

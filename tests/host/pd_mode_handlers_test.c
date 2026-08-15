@@ -6,6 +6,7 @@
 
 #include "host_runtime_reset_fixture.h"
 #include "users/noah/lib/action/action_dispatch.h"
+#include "users/noah/lib/action/owned_keycode.h"
 #include "users/noah/lib/pointing/modes/pd_mode_handlers.h"
 #include "users/noah/lib/state/modifiers/keyboard_mod_state.h"
 
@@ -174,16 +175,23 @@ void noah_emit_literal_tap(uint16_t keycode, noah_emit_policy_t policy) {
     tap_code16(keycode);
 }
 
-void keyboard_mod_ownership_register(uint16_t keycode) {
+bool owned_keycode_acquire(uint16_t keycode, owned_keycode_lease_t *lease) {
+    CHECK(lease != NULL);
     keyboard_mod_register_count++;
     last_registered_keycode = keycode;
     add_mods(MOD_BIT(keycode));
+    *lease = (owned_keycode_lease_t){.active = true, .has_basic = true, .basic = (uint8_t)keycode};
+    return true;
 }
 
-void keyboard_mod_ownership_unregister(uint16_t keycode) {
+bool owned_keycode_release(owned_keycode_lease_t *lease) {
+    CHECK(lease != NULL);
+    CHECK(lease->active);
     keyboard_mod_unregister_count++;
-    last_unregistered_keycode = keycode;
-    del_mods(MOD_BIT(keycode));
+    last_unregistered_keycode = lease->basic;
+    del_mods(MOD_BIT(lease->basic));
+    *lease = (owned_keycode_lease_t){0};
+    return true;
 }
 
 static keyrecord_t test_record(bool pressed) {

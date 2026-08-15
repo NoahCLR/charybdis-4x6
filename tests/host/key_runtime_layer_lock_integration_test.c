@@ -244,6 +244,17 @@ bool owned_keycode_unregister(uint16_t keycode) {
     return false;
 }
 
+void owned_keycode_track_physical_event(uint16_t keycode, keyrecord_t *record) {
+    (void)keycode;
+    (void)record;
+}
+
+bool owned_keycode_should_suppress_default(uint16_t keycode, keyrecord_t *record) {
+    (void)keycode;
+    (void)record;
+    return false;
+}
+
 void noah_dispatch_synthetic_tap(uint16_t keycode) {
     (void)keycode;
 }
