@@ -2,7 +2,7 @@
 
 ## Plan metadata
 
-- **Status:** Implementation in progress; Phases 1 and 2 are verified. Phase 3 software work is complete, with Finding 05 awaiting its physical two-half matrix. Phase 4 software work is complete, with Finding 10 awaiting on-device timing. Phase 5 RGB correctness and render-work optimization are verified. Findings 14 and 16 remain planned. See [`implementation-progress.md`](implementation-progress.md).
+- **Status:** Implementation in progress; Phases 1 and 2 are verified. Phase 3 software work is complete, with Finding 05 awaiting its physical two-half matrix. Phase 4 software work is complete, with Finding 10 awaiting on-device timing. Phase 5 is verified. In Phase 6, Finding 14 macro RAM is verified and Finding 16 remains planned. See [`implementation-progress.md`](implementation-progress.md).
 - **Prepared:** 2026-07-13.
 - **Scope:** Firmware runtime correctness, split reliability, target resource safety, and measured hot-path efficiency.
 - **Source:** The deep firmware code review performed against the current `charybdis-4x6` tree.
@@ -240,6 +240,10 @@ Exit criteria:
 ### Phase 6 — Recover RAM and reduce runtime lookup cost
 
 Recommended order: **14, 16**.
+
+Finding 14 is verified: 80 logical slots now use one-byte metadata plus one
+shared pinned IR, reclaiming 40,841 target bytes under a fresh-ELF memory gate.
+Finding 16 remains the next software optimization.
 
 - Measure current `.bss`, cache hit rate, parse latency, behavior comparisons, active-slot scans, and feedback dirty events.
 - Select the smallest design that meets an explicit latency and memory budget; do not begin with a generic runtime rewrite.

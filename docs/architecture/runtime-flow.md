@@ -216,7 +216,7 @@ flowchart TD
     keymap --> via_defaults["via_macro_defaults seeding"]
     action["Action lifecycle"] --> via_play["VIA macro provider"]
     action --> hardcoded
-    hardcoded --> provider["Pinned macro slot provider"]
+    hardcoded --> provider["Compact slot metadata and shared IR"]
     via_play --> provider
     provider --> payload["Validated macro IR"]
     payload --> engine["One-active scan engine"]
@@ -247,12 +247,15 @@ authored and VIA decoders use the same predicate, and playback validates the
 entire IR before its first text, wait, or key-ownership side effect. Invalid VIA
 slots stay negatively cached until a VIA mutation invalidates the macro cache.
 
-Playback is scan-driven and single-active. Busy triggers are consumed without
-queueing or replacing the active execution. Provider IR remains pinned across
-VIA invalidation, and completion or cancellation applies deferred invalidation.
-Text, chord, and persistent-key output use exact owner-scoped leases; reset and
-runtime failure release retained leases through bounded cleanup. One engine
-transition runs per scan, and delay deadlines use wrap-safe 32-bit elapsed time.
+Playback is scan-driven and single-active. Each logical slot stores one byte of
+unchecked/valid/invalid metadata. A valid slot is decoded into one shared IR
+when invoked; invalid slots do not reparse until invalidated. Busy triggers are
+consumed before that shared IR can be changed. The active IR remains pinned
+across VIA invalidation, and completion or cancellation applies deferred
+invalidation. Text, chord, and persistent-key output use exact owner-scoped
+leases; reset and runtime failure release retained leases through bounded
+cleanup. One engine transition runs per scan, and delay deadlines use wrap-safe
+32-bit elapsed time.
 
 ## Test Coverage Map
 

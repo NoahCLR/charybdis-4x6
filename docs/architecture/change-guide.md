@@ -22,6 +22,7 @@ directory and the existing domain docs.
 | Change RGB render order or stage behavior | `users/noah/lib/rgb/core/` or `users/noah/lib/rgb/stages/` | authored RGB config | RGB validation, RGB render, split sync if remote state changes |
 | Change split runtime mirroring | `users/noah/lib/split/runtime_sync.*` | PD/RGB owners unless the source truth changes | split runtime sync, runtime trace, RGB render as relevant |
 | Change hardcoded macros | `keymap.c` `HARDCODED_MACROS` | macro parser unless payload language changes | macro dispatch, macro payload, real profile validation |
+| Change macro slot storage or active IR ownership | `users/noah/lib/macro/macro_slot_provider.*` | per-slot compiled IR or heap allocation | macro provider/dispatch/payload/VIA lifecycle tests, feature gate, fresh firmware compile, firmware memory and stack budget checks |
 | Change VIA macro defaults or seeding | `keymap.c` `VIA_MACROS`, `macro/via_macro_defaults.*`, VIA contracts | hardcoded macro dispatch | VIA macro defaults, VIA macro action lifecycle, qmk_via_split_sync |
 | Change VIA split persistence or canonical storage regions | `compat/qmk_via_split_sync.*`, `compat/qmk_via_sync_*.*`, and `compat/qmk_via_storage_regions.*`, with QMK capacities in `compat/qmk_via_storage_contract.h` | raw command replay or direct QMK storage calls before frame/range validation | qmk_via_split_sync (normal, sanitizer, and encoder variants), storage-region/state/protocol tests, QMK contracts, feature gate, target stack gate |
 | Change hook wiring | `users/noah/hooks.c`, `users/noah/runtime_init.c` | keymap-local hooks without chaining | hook chaining, runtime init order, feature gate |
@@ -64,6 +65,7 @@ checks before handoff when source/build behavior changed.
 | Shared runtime or tracing | `run_runtime_init_order_tests.sh`, `run_runtime_debug_tests.sh`, `run_runtime_diag_tests.sh`, `run_runtime_trace_tests.sh` |
 | Source manifests or boundaries | `run_feature_gate_compile_tests.sh` |
 | Target stack topology or budget | `run_firmware_stack_budget_tool_tests.sh`; after a fresh instrumented target build, `run_firmware_stack_budget_checks.sh` |
+| Target macro/static RAM budget | `run_firmware_memory_budget_tool_tests.sh`; after a fresh ordinary target build, `run_firmware_memory_budget_checks.sh` |
 
 For docs-only changes, run `git diff --check` and a stale-path audit. Host tests
 and firmware compile can be skipped when no runtime source, authored input,

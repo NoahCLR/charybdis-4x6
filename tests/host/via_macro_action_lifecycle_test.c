@@ -552,6 +552,24 @@ static void test_invalid_high_text_is_cached_until_explicit_invalidation(void) {
     CHECK(test_calls[1].kind == TEST_CALL_OWNED_UNREGISTER && test_calls[1].value == KC_A);
 }
 
+static void test_valid_slot_redecodes_once_per_playback(void) {
+    uint16_t first_play_reads;
+
+    test_reset_state();
+    macro_buffer[0] = 'A';
+
+    noah_action_tap(QK_MACRO_0);
+    first_play_reads = macro_buffer_read_count;
+    CHECK(first_play_reads > 0u);
+    CHECK(first_play_reads <= fake_macro_buffer_size);
+    test_run_macro_to_idle();
+
+    noah_action_tap(QK_MACRO_0);
+    CHECK(macro_buffer_read_count - first_play_reads == first_play_reads);
+    test_run_macro_to_idle();
+    CHECK(test_call_count == 4u);
+}
+
 static void test_invalidation_keeps_active_ir_immutable_then_reloads(void) {
     macro_payload_debug_snapshot_t snapshot;
 
@@ -626,6 +644,7 @@ int main(void) {
     test_non_terminated_macro_buffer_is_ignored();
     test_unterminated_delay_command_matches_current_via_behavior();
     test_invalid_high_text_is_cached_until_explicit_invalidation();
+    test_valid_slot_redecodes_once_per_playback();
     test_invalidation_keeps_active_ir_immutable_then_reloads();
     test_busy_via_trigger_is_consumed_without_restarting();
 

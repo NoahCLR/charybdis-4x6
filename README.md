@@ -167,8 +167,10 @@ Macro playback is scan-driven: long delays no longer pause normal keyboard,
 pointing, RGB, VIA, or split work. One macro runs at a time; a trigger received
 while one is active is consumed but not queued. Editing an active VIA slot takes
 effect on its next run, and reset cancels playback while releasing any keys the
-macro owns. See [KEYMAP.md](./docs/KEYMAP.md#macro-and-shortcut-surfaces) for the
-runtime details.
+macro owns. Logical slots keep only validation metadata; one shared decoded
+program remains pinned for the active run, so the configured 80-slot capacity
+does not reserve a 512-byte program for every slot. See
+[KEYMAP.md](./docs/KEYMAP.md#macro-and-shortcut-surfaces) for the runtime details.
 
 Screenshots:
 [`Layout`](./docs/media/profile-studio/studio-layout-tab.png),

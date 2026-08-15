@@ -3,7 +3,7 @@
 ## Plan metadata
 
 - Severity: medium optimization with high memory impact
-- Status: planned
+- Status: verified
 - Recommended phase: Phase 6 memory optimization, after [Finding 04](04-via-macro-byte-validation.md) and [Finding 07](07-nonblocking-macro-playback.md)
 - Affected surfaces:
   - users/noah/lib/macro/macro_payload.h
@@ -35,10 +35,10 @@ The cache buys zero-decode repeat playback, but its memory cost scales with the 
 - users/noah/noah_keymap_ids.h:27 defines 64 VIA macro slots.
 - users/noah/lib/macro/macro_dispatch.c:13 reserves one cache entry for every hardcoded macro.
 - users/noah/noah_keymap_ids.h:154 defines 16 hardcoded slots.
-- The audit measured macro_slot_cache_t at 516 bytes in the target build:
-  - VIA cache: 64 × 516 = 33,024 bytes
-  - hardcoded cache: 16 × 516 = 8,256 bytes
-  - combined: 41,280 bytes
+- The fresh pre-change target symbols measured 518 bytes per slot:
+  - VIA cache: 64 × 518 = 33,152 bytes
+  - hardcoded cache: 16 × 518 = 8,288 bytes
+  - combined: 41,440 bytes
 - The same linked image measured total BSS at 65,196 bytes, making these arrays approximately 63.3 percent of BSS.
 - The audited authored profile populated 12 VIA defaults and zero hardcoded slots, so most reserved IR storage cannot produce a cache hit.
 
@@ -214,18 +214,20 @@ Closure gates:
 
 ## Acceptance checklist
 
-- [ ] Per-slot metadata no longer embeds a 512-byte IR.
-- [ ] Active asynchronous playback owns stable decoded data.
-- [ ] Valid, invalid, empty, mutation, reset, collision, and eviction cases are tested.
-- [ ] At least 32 KiB is reclaimed from the audited cache baseline, or a documented measurement justifies a revised target.
-- [ ] Combined static macro-cache storage is at or below the agreed map gate.
-- [ ] Total BSS falls accordingly.
-- [ ] Cold playback remains within the agreed latency/work budget.
-- [ ] Targeted macro, lifecycle, and feature-gate checks pass.
-- [ ] The full host suite passes.
-- [ ] The target QMK compile and ELF/map memory gate pass.
-- [ ] Documentation and review notes match the selected architecture.
+- [x] Per-slot metadata no longer embeds a 512-byte IR.
+- [x] Active asynchronous playback owns stable decoded data.
+- [x] Valid, invalid, empty, mutation, reset, provider independence, and busy cases are tested; Candidate A has no eviction.
+- [x] 40,841 bytes are reclaimed from the 41,440-byte linked baseline.
+- [x] Combined named macro storage is 599 B and below the 8 KiB gate.
+- [x] Static BSS falls to 25,524 B and recovered RAM expands linker heap to 212,608 B; GNU `size` BSS stays constant because it includes that heap.
+- [x] Cold and warm valid playback each perform one bounded decode; invalid warm playback performs none.
+- [x] Targeted macro, lifecycle, and feature-gate checks pass.
+- [x] The full host suite passes.
+- [x] The target QMK compile and ELF/map memory gate pass.
+- [x] Documentation and Review 15 match the selected architecture.
 
 ## Next action
 
-Prototype host-only size and compile-call measurements for Candidate A and a two-entry LRU. Decide the cache architecture only after the nonblocking macro player specifies whether the active IR can share the decode buffer.
+Preserve the 8 KiB named-storage, 26,000 B static-BSS, 200 KiB linker-heap,
+one-byte metadata, active-immutability, and exact-capacity gates. Reconsider an
+LRU only if measured real-world macro-trigger latency becomes noticeable.

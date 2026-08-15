@@ -74,6 +74,28 @@ static void test_compile_accepts_long_delay_heavy_payload(void) {
     CHECK(ir.length > 128u);
 }
 
+static void test_decode_qmk_stream_accepts_exact_maximum_ir(void) {
+    uint8_t            buffer[509];
+    macro_payload_ir_t ir = {0};
+    test_qmk_reader_t  reader = {.buffer = buffer};
+
+    memset(buffer, 'A', sizeof(buffer));
+    buffer[sizeof(buffer) - 1u] = 0u;
+    CHECK(macro_payload_decode_qmk_stream(&ir, (uint16_t)sizeof(buffer), test_qmk_reader_read_byte, &reader));
+    CHECK(ir.length == MACRO_PAYLOAD_IR_MAX_BYTES);
+}
+
+static void test_decode_qmk_stream_rejects_ir_over_capacity(void) {
+    uint8_t            buffer[511];
+    macro_payload_ir_t ir = {0};
+    test_qmk_reader_t  reader = {.buffer = buffer};
+
+    memset(buffer, 'A', sizeof(buffer));
+    buffer[sizeof(buffer) - 1u] = 0u;
+    CHECK(!macro_payload_decode_qmk_stream(&ir, (uint16_t)sizeof(buffer), test_qmk_reader_read_byte, &reader));
+    CHECK(ir.length == 0u);
+}
+
 static void test_encode_emits_expected_qmk_sequence(void) {
     uint8_t              buffer[32] = {0};
     uint16_t             written    = 0;
@@ -185,6 +207,8 @@ int main(void) {
     test_validate_rejects_invalid_payloads();
     test_compile_rejects_invalid_payloads();
     test_compile_accepts_long_delay_heavy_payload();
+    test_decode_qmk_stream_accepts_exact_maximum_ir();
+    test_decode_qmk_stream_rejects_ir_over_capacity();
     test_encode_emits_expected_qmk_sequence();
     test_encode_fails_when_buffer_is_too_small();
     test_encode_and_decode_qmk_round_trip_through_ir();

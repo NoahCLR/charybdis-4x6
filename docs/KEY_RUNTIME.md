@@ -344,12 +344,15 @@ Use the current runners that match the current core-owned runtime:
 - `sh tests/host/run_runtime_trace_tests.sh`
 - `sh tests/host/run_feature_gate_compile_tests.sh`
 - `sh tests/host/run_firmware_stack_budget_tool_tests.sh`
+- `sh tests/host/run_firmware_memory_budget_tool_tests.sh`
 - `sh tests/host/run_all_host_tests.sh`
 - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `sh tests/host/run_firmware_memory_budget_checks.sh`
 - `sh tests/host/run_firmware_stack_budget_checks.sh`
 
-The last command is a target-only gate and must consume artifacts from the
-fresh instrumented firmware build. Host checker fixtures do not prove target
+The final two commands are target-only gates. The memory gate consumes the
+fresh ordinary ELF; the stack gate consumes artifacts from its fresh
+instrumented build. Host checker fixtures prove neither target RAM nor target
 stack safety by themselves.
 
 ## Non-Goals

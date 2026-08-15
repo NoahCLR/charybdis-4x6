@@ -303,7 +303,7 @@ static void test_eeprom_reset_invalidates_rgb_and_reseeds_on_scan(void) {
 }
 
 static void test_provider_encode_write_uses_cached_load_state(void) {
-    macro_slot_cache_t    cache[1] = {0};
+    macro_slot_metadata_t cache[1] = {0};
     macro_slot_provider_t provider = {
         .slot_count     = 1,
         .load_ir        = test_provider_load_ir,
@@ -328,14 +328,14 @@ static void test_provider_encode_write_uses_cached_load_state(void) {
     CHECK(sink.bytes[1] == 'Y');
 
     CHECK(macro_slot_provider_encode_write(&provider, cache, 0, test_provider_sink_write_byte, &sink, NULL));
-    CHECK(test_provider_load_ir_calls == 1);
+    CHECK(test_provider_load_ir_calls == 2);
     CHECK(test_provider_lookup_calls == 0);
     CHECK(macro_payload_encode_ir_write_calls == 2);
     CHECK(macro_payload_encode_write_calls == 0);
 }
 
 static void test_provider_encode_write_reloads_after_invalidate(void) {
-    macro_slot_cache_t    cache[1] = {0};
+    macro_slot_metadata_t cache[1] = {0};
     macro_slot_provider_t provider = {
         .slot_count     = 1,
         .load_ir        = test_provider_load_ir,

@@ -10,7 +10,7 @@
 #include "macro_slot_provider.h"
 #include "noah_keymap_ids.h"
 
-static macro_slot_cache_t hardcoded_macro_slots[HARDCODED_MACRO_SLOT_COUNT];
+static macro_slot_metadata_t hardcoded_macro_slots[HARDCODED_MACRO_SLOT_COUNT];
 
 static bool macro_dispatch_lookup_payload(uint8_t slot, const char **payload, void *context) {
     (void)context;
@@ -59,7 +59,7 @@ static bool macro_dispatch_validate_slot(uint8_t slot) {
     const char              *payload = hardcoded_macro_payloads[slot];
     macro_slot_cache_state_t before  = hardcoded_macro_slots[slot].state;
 
-    if (macro_slot_provider_load(&macro_dispatch_provider, hardcoded_macro_slots, slot)) {
+    if (macro_slot_provider_validate(&macro_dispatch_provider, hardcoded_macro_slots, slot)) {
         return true;
     }
 
@@ -84,19 +84,17 @@ uint8_t macro_dispatch_validate_all(void) {
 
 bool macro_dispatch(uint16_t keycode) {
     uint8_t                      slot = 0;
+    macro_slot_cache_state_t     before;
     macro_payload_start_result_t result;
     if (keycode < MACRO_0 || keycode > MACRO_15) {
         return false;
     }
 
     slot = (uint8_t)(keycode - MACRO_0);
-
-    if (!macro_dispatch_validate_slot(slot)) {
-        return true;
-    }
+    before = hardcoded_macro_slots[slot].state;
 
     result = macro_slot_provider_start(&macro_dispatch_provider, hardcoded_macro_slots, slot, MACRO_PAYLOAD_TEXT_OUTPUT_PLAIN, 0u, MACRO_PAYLOAD_SOURCE_HARDCODED);
-    if (result == MACRO_PAYLOAD_START_INVALID) {
+    if (result == MACRO_PAYLOAD_START_INVALID && before != MACRO_SLOT_CACHE_INVALID) {
         macro_dispatch_log_invalid_payload(slot, hardcoded_macro_payloads[slot]);
     }
 

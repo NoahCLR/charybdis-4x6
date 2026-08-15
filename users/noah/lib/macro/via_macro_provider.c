@@ -18,7 +18,7 @@ typedef struct {
     uint16_t base_offset;
 } via_macro_provider_reader_t;
 
-static macro_slot_cache_t via_macro_slots[VIA_MACRO_SLOT_COUNT];
+static macro_slot_metadata_t via_macro_slots[VIA_MACRO_SLOT_COUNT];
 
 static const macro_slot_provider_t via_macro_provider = {
     .slot_count = VIA_MACRO_SLOT_COUNT,

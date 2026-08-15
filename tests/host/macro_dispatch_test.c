@@ -13,6 +13,9 @@ static uint8_t                      play_call_count;
 static uint8_t                      last_play_program_id;
 static bool                         fail_compile_for_slot_1;
 static macro_payload_start_result_t next_start_result;
+static macro_payload_finish_fn      active_finish;
+static void                        *active_finish_context;
+static bool                         engine_active;
 
 const char *const hardcoded_macro_payloads[HARDCODED_MACRO_SLOT_COUNT] = {
     [0] = "A{KC_C}", [1] = "{KC_NOT_A_KEY}", [2] = "", [3] = "Z", [4] = "B", [5] = "{KC_BAD}", [6] = "C",
@@ -36,6 +39,9 @@ static void test_reset_state(void) {
     last_play_program_id    = 0;
     fail_compile_for_slot_1 = true;
     next_start_result       = MACRO_PAYLOAD_START_STARTED;
+    active_finish           = NULL;
+    active_finish_context   = NULL;
+    CHECK(!engine_active);
 }
 
 static int test_payload_slot(const char *payload) {
@@ -66,6 +72,9 @@ bool macro_payload_compile(const char *payload, macro_payload_ir_t *ir) {
 }
 
 macro_payload_start_result_t macro_payload_start_ir(const macro_payload_ir_t *ir, macro_payload_text_output_t text_output, uint8_t interval, macro_payload_source_t source, uint8_t slot, macro_payload_finish_fn finish, void *context) {
+    if (engine_active) {
+        return MACRO_PAYLOAD_START_BUSY;
+    }
     CHECK(ir != NULL);
     CHECK(text_output == MACRO_PAYLOAD_TEXT_OUTPUT_PLAIN);
     CHECK(interval == 0u);
@@ -76,21 +85,40 @@ macro_payload_start_result_t macro_payload_start_ir(const macro_payload_ir_t *ir
 
     play_call_count++;
     last_play_program_id = ir->length ? ir->bytes[0] : 0;
+    if (next_start_result == MACRO_PAYLOAD_START_STARTED) {
+        engine_active         = true;
+        active_finish         = finish;
+        active_finish_context = context;
+    }
     return next_start_result;
 }
 
-static void test_dispatch_compiles_valid_slot_once_and_reuses_ir(void) {
+static void test_finish_playback(void) {
+    macro_payload_finish_fn finish  = active_finish;
+    void                   *context = active_finish_context;
+
+    CHECK(engine_active);
+    CHECK(finish != NULL);
+    engine_active         = false;
+    active_finish         = NULL;
+    active_finish_context = NULL;
+    finish(MACRO_PAYLOAD_FINISH_SUCCESS, context);
+}
+
+static void test_dispatch_recompiles_valid_slot_for_each_playback(void) {
     test_reset_state();
 
     CHECK(macro_dispatch(MACRO_4));
     CHECK(compile_call_count[4] == 1);
     CHECK(play_call_count == 1);
     CHECK(last_play_program_id == 5);
+    test_finish_playback();
 
     CHECK(macro_dispatch(MACRO_4));
-    CHECK(compile_call_count[4] == 1);
+    CHECK(compile_call_count[4] == 2);
     CHECK(play_call_count == 2);
     CHECK(last_play_program_id == 5);
+    test_finish_playback();
 }
 
 static void test_dispatch_caches_invalid_compile_result(void) {
@@ -154,7 +182,7 @@ static void test_non_macro_keycodes_are_not_handled(void) {
 }
 
 int main(void) {
-    test_dispatch_compiles_valid_slot_once_and_reuses_ir();
+    test_dispatch_recompiles_valid_slot_for_each_playback();
     test_dispatch_caches_invalid_compile_result();
     test_dispatch_skips_empty_payload_slots();
     test_playback_failure_invalidates_cached_ir();

@@ -30,7 +30,7 @@
           "reason": "process stage table dispatches the macro stage through stage->handler"
         },
         {
-          "caller": "macro_slot_provider_load",
+          "caller": "macro_slot_provider_start",
           "callee": "macro_dispatch_load_ir",
           "reason": "hardcoded macro provider invokes its registered load_ir callback"
         },
@@ -177,15 +177,15 @@
         },
         {
           "name": "process macro payload compilation",
-          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "noah_process_record_user", "key_runtime_process_stage_macro_dispatch", "macro_dispatch", "macro_slot_provider_load", "macro_dispatch_load_ir", "macro_payload_compile", "macro_payload_lookup_keycode", "strlen"]
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "noah_process_record_user", "key_runtime_process_stage_macro_dispatch", "macro_dispatch", "macro_slot_provider_start", "macro_dispatch_load_ir", "macro_payload_compile", "macro_payload_lookup_keycode", "strlen"]
         },
         {
           "name": "process hardcoded macro IR preflight",
-          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "noah_process_record_user", "key_runtime_process_stage_macro_dispatch", "macro_dispatch", "macro_slot_provider_start", "macro_payload_ir_next"]
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "noah_process_record_user", "key_runtime_process_stage_macro_dispatch", "macro_dispatch", "macro_slot_provider_start", "macro_payload_start_ir", "macro_payload_ir_next"]
         },
         {
           "name": "handled VIA macro IR preflight",
-          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "noah_process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_emit_run_at", "noah_action_tap_at", "noah_action_handle_macro_preflight", "macro_slot_provider_start", "macro_payload_ir_next"]
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "noah_process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_emit_run_at", "noah_action_tap_at", "noah_action_handle_macro_preflight", "macro_slot_provider_start", "macro_payload_start_ir", "macro_payload_ir_next"]
         },
         {
           "name": "matrix scan VIA default macro seed",

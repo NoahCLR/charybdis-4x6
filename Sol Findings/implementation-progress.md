@@ -1063,6 +1063,43 @@ production frame or diagnostic allocation. Fresh reviewed stack maxima remain
 Finding 13 is **verified**. Review 13 records the red evidence, shared contract,
 target evidence, documentation, and all passing closure gates.
 
+## Finding 14 — Macro cache RAM
+
+### Objective
+
+Keep 64 VIA and 16 hardcoded logical slots without reserving a full 512-byte
+decoded program for every slot, while preserving negative caching and stable
+scan-driven playback ownership.
+
+### Implemented
+
+- Replaced each per-slot IR/cache object with one byte of validation metadata.
+- Added one shared 514-byte decoded IR, pinned until the single active macro
+  finishes or cancels.
+- Preserved negative caching, explicit VIA invalidation, active mutation
+  deferral, engine busy diagnostics, and provider independence.
+- Made valid playback re-decode once per invocation and added deterministic
+  compile/read-count tests.
+- Added exact 512-byte capacity and over-capacity tests.
+- Added a target memory checker for named macro storage, static BSS, and linker
+  heap, plus host fixtures and developer documentation.
+- Reconciled the target stack manifest with the linked provider → engine
+  preflight edge.
+
+### Target result
+
+Named macro storage falls from 41,440 B to 599 B, reclaiming 40,841 B. Static
+BSS is 25,524 B and the recovered RAM appears as 212,608 B linker heap. GNU
+`size` remains 245,592 B BSS because that figure includes the linker-reserved
+heap. Ordinary text is 151,024 B, a 24 B increase. Fresh reviewed stack maxima
+remain 1,904/1,920 B main and 336/768 B split.
+
+### Closure
+
+Finding 14 is **verified**. Review 15 records the ownership contract, red
+evidence, resource-policy reconciliation, target measurements, documentation,
+and all passing closure gates.
+
 ## Finding 15 — RGB render work
 
 ### Objective
@@ -1132,6 +1169,6 @@ passing closure gates.
 
 Execute Finding 05's physical disconnect/power-cycle/role-swap matrix and
 Finding 10's flashed timing/feel check when hardware is available. The next
-software optimization pass can select Finding 14 macro-cache RAM or Finding 16
-runtime lookup hot-path work; Findings 13 and 15 provide the verified RGB
-correctness and render-work baseline.
+software optimization pass should select Finding 16 runtime lookup hot-path
+work. Finding 14 now provides the verified RAM baseline, while Findings 13 and
+15 provide the verified RGB correctness and render-work baseline.
