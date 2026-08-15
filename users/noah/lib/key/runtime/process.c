@@ -3,6 +3,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "../behavior/handled_key.h"
+#include "deferred_release.h"
 #include "process_internal.h"
 #include "trace.h"
 #include "../../macro/macro_dispatch.h"
@@ -74,13 +75,13 @@ static void key_runtime_process_begin_keyboard_event_mod_mask(void) {
     state->keyboard_event_mask_active      = true;
 }
 
-static handled_key_resolution_t key_runtime_process_resolution(key_runtime_process_ctx_t *ctx) {
+static const handled_key_resolution_t *key_runtime_process_resolution(key_runtime_process_ctx_t *ctx) {
     if (!ctx->resolution_loaded) {
-        ctx->resolution        = handled_key_lookup(ctx->runtime_keycode);
+        handled_key_lookup_into(ctx->runtime_keycode, &ctx->resolution);
         ctx->resolution_loaded = true;
     }
 
-    return ctx->resolution;
+    return &ctx->resolution;
 }
 
 static key_runtime_process_stage_outcome_t key_runtime_process_stage_synthetic_passthrough(key_runtime_process_ctx_t *ctx) {
@@ -125,14 +126,21 @@ static key_runtime_process_stage_outcome_t key_runtime_process_stage_pd_mode(key
 }
 
 static key_runtime_process_stage_outcome_t key_runtime_process_stage_handled_key(key_runtime_process_ctx_t *ctx) {
-    handled_key_resolution_t resolution = key_runtime_process_resolution(ctx);
-    bool                     handled;
+    const handled_key_resolution_t *resolution = key_runtime_process_resolution(ctx);
+    bool                            handled;
 
-    if (!handled_key_resolution_is_handled(resolution)) {
+    if (!handled_key_resolution_is_handled(*resolution)) {
         return KEY_RUNTIME_PROCESS_NEXT;
     }
 
-    handled = ctx->record->event.pressed ? key_runtime_process_handled_key_press(ctx->runtime_keycode, ctx->record, resolution) : key_runtime_process_handled_key_release(ctx->runtime_keycode, ctx->record, resolution);
+    if (ctx->record->event.pressed) {
+        handled = key_runtime_process_handled_key_press(ctx->runtime_keycode, ctx->record, resolution);
+    } else {
+        handled = key_runtime_process_handled_key_release(ctx->runtime_keycode, ctx->record, resolution);
+        if (handled) {
+            key_runtime_deferred_release_drain_dispatches();
+        }
+    }
     key_runtime_trace_bool_result("process:handled_key", ctx->runtime_keycode, ctx->record, handled);
     return handled ? KEY_RUNTIME_PROCESS_RETURN_FALSE : KEY_RUNTIME_PROCESS_NEXT;
 }
@@ -142,7 +150,7 @@ static key_runtime_process_stage_outcome_t key_runtime_process_stage_non_handled
         return KEY_RUNTIME_PROCESS_NEXT;
     }
 
-    if (handled_key_resolution_is_handled(key_runtime_process_resolution(ctx))) {
+    if (handled_key_resolution_is_handled(*key_runtime_process_resolution(ctx))) {
         return KEY_RUNTIME_PROCESS_NEXT;
     }
 

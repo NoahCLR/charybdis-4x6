@@ -22,6 +22,18 @@ COMBO_ENABLE = yes
 # Link-time optimization: reduces binary size.
 LTO_ENABLE = yes
 
+# The reviewed target paths need more than the ChibiOS platform default while
+# retaining a 25% (and at least 512-byte) process-stack reserve.
+USE_PROCESS_STACKSIZE = 0xA00
+
+# The reviewed-path stack gate uses final linked disassembly. Disabling GCC
+# shrink wrapping keeps each analyzed frame allocation in the entry prologue.
+ifeq ($(strip $(NOAH_STACK_BUDGET_ENABLE)), yes)
+    CFLAGS += -fno-shrink-wrap
+    CXXFLAGS += -fno-shrink-wrap
+    EXTRALDFLAGS += -Wl,-Map=$(BUILD_DIR)/$(TARGET).map,--cref
+endif
+
 SRC += $(NOAH_COMMON_SOURCES)
 
 ifeq ($(strip $(POINTING_DEVICE_ENABLE)), yes)

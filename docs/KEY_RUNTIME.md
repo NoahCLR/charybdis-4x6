@@ -257,6 +257,13 @@ The release path now owns:
 - pending release dispatch queueing
 - token retirement and pending-series seeding
 
+Press and release planning return before tracing/projection begins, so their
+planner-local storage is not live beneath action emission. Release planning,
+tracing/projection, and deferred draining are deliberately sequential stack
+phases. `process.c` starts the deferred drain only after the handled-release
+helper has returned, so the release plan is no longer live under deferred
+projection.
+
 Non-handled releases still pass through the shared process flow, but
 `process.c` now finalizes any reducer-owned observed state for
 those keys too. That keeps raw ownership keys such as `MO()`/modifier/pd-mode
@@ -267,6 +274,12 @@ keys from leaving stale core leases behind.
 [`scan.c`](../users/noah/lib/key/runtime/scan.c) asks
 `key_runtime_core` for the current scan plan and then drains pending release
 dispatches.
+
+Each explicit drain transports at most four records from the queue's entry-time
+snapshot. Records remain FIFO ordered. Synchronous drain re-entry is ignored,
+and records enqueued during projection remain pending for a later release or
+scan boundary. The queue itself keeps its full configured capacity; only the
+automatic transport batch is bounded.
 
 The reducer scan path owns:
 
@@ -299,8 +312,14 @@ Use the current runners that match the current core-owned runtime:
 - `sh tests/host/run_runtime_debug_tests.sh`
 - `sh tests/host/run_runtime_trace_tests.sh`
 - `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_firmware_stack_budget_tool_tests.sh`
 - `sh tests/host/run_all_host_tests.sh`
 - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `sh tests/host/run_firmware_stack_budget_checks.sh`
+
+The last command is a target-only gate and must consume artifacts from the
+fresh instrumented firmware build. Host checker fixtures do not prove target
+stack safety by themselves.
 
 ## Non-Goals
 

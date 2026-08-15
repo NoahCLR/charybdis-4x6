@@ -86,16 +86,49 @@ static inline key_runtime_slot_interaction_t key_runtime_slot_interaction_defaul
     };
 }
 
-static inline key_runtime_slot_interaction_t key_runtime_slot_interaction_from_materialized(handled_key_materialized_t materialized) {
-    return (key_runtime_slot_interaction_t){
-        .selection     = key_runtime_slot_selection_from_resolution(materialized.authored),
-        .binding       = key_runtime_slot_binding_from_materialized(materialized),
-        .hold_strategy = materialized.hold_strategy,
-        .layer         = materialized.layer,
-        .pd_mode       = materialized.pd_mode,
-        .flags         = materialized.flags,
-        .contract      = materialized.contract,
+static inline void key_runtime_slot_interaction_from_materialized_into(const handled_key_materialized_t *materialized, key_runtime_slot_interaction_t *out) {
+    if (!out) {
+        return;
+    }
+
+    if (!materialized) {
+        *out = key_runtime_slot_interaction_default();
+        return;
+    }
+
+    *out = (key_runtime_slot_interaction_t){
+        .selection =
+            {
+                .keycode   = materialized->authored.keycode,
+                .tap_count = materialized->authored.tap_count,
+                .step      = materialized->authored.step,
+            },
+        .binding =
+            {
+                .tap_action            = materialized->tap_action,
+                .tap_repeat_count      = materialized->tap_repeat_count,
+                .hold                  = materialized->hold,
+                .long_hold             = materialized->long_hold,
+                .tap_hold_term         = materialized->authored.tap_hold_term,
+                .longer_hold_term      = materialized->authored.longer_hold_term,
+                .multi_tap_term        = materialized->authored.multi_tap_term,
+                .branch_confirm_term   = materialized->authored.branch_confirm_term,
+                .has_more_taps         = materialized->tap_has_more_taps,
+                .tap_resolves_on_press = materialized->tap_resolves_on_press,
+            },
+        .hold_strategy = materialized->hold_strategy,
+        .layer         = materialized->layer,
+        .pd_mode       = materialized->pd_mode,
+        .flags         = materialized->flags,
+        .contract      = materialized->contract,
     };
+}
+
+static inline key_runtime_slot_interaction_t key_runtime_slot_interaction_from_materialized(handled_key_materialized_t materialized) {
+    key_runtime_slot_interaction_t interaction;
+
+    key_runtime_slot_interaction_from_materialized_into(&materialized, &interaction);
+    return interaction;
 }
 
 static inline bool key_runtime_slot_interaction_uses_implicit_hold(key_runtime_slot_interaction_t interaction) {

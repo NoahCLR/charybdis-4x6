@@ -37,6 +37,7 @@ source trace because they rewrite or verify human-facing firmware docs.
 | `tools/profile_introspect.py` | Parse selected authored profile inputs and render generated visual profile reports | default `docs/KEYMAP-OVERVIEW.md` plus optional `docs/profiles/<name>/KEYMAP-OVERVIEW.md` and matching SVG assets | `python3 tools/profile_introspect.py --check`, `python3 tools/profile_introspect.py --keymap <name> --check`, `run_profile_introspection_checks.sh`, full host suite |
 | `tools/via_to_qmk_layout.py` | Convert VIA export JSON back into selected source-owned keymap blocks | optionally selected profile `keymap.c` `VIA_MACROS(MACRO)` and `keymaps[][]` | script preview/write review, real-profile validation, full host suite when source changes |
 | `tools/charybdis-profile-studio/` | VS Code webview editor for selected Charybdis 4x6 profile surfaces, new-profile templates, and generated Studio screenshots | selected profile `config.h`, `keymap.c`, `rgb_config.c`, generated `rules.mk`; screenshot PNGs under `docs/media/profile-studio/` | `npm run check`, `npm run screenshots` for screenshot refresh, selected real-profile validation, profile introspection when noah authored data changes |
+| `tools/check_firmware_stack_budget.py` and `tools/firmware_stack_budget.json` | Reconcile target stack symbols/artifacts and enforce reviewed stack contexts, call edges, indirect edges, and reserves | read-only report; no source output | `run_firmware_stack_budget_tool_tests.sh`; fresh instrumented target build plus `run_firmware_stack_budget_checks.sh` |
 
 ## Source-To-Doc Matrix
 
@@ -208,5 +209,6 @@ Use the runner that matches the behavior touched while iterating, then use
 | Pointing and PD mode | `run_pd_mode_tests.sh`, `run_pd_mode_handlers_tests.sh`, `run_pd_runtime_tests.sh`, `run_pointer_layer_policy_tests.sh` |
 | RGB and split | `run_rgb_validation_tests.sh`, `run_rgb_layer_render_tests.sh`, `run_split_runtime_sync_tests.sh` |
 | Runtime diagnostics and tracing | `run_runtime_init_order_tests.sh`, `run_runtime_debug_tests.sh`, `run_runtime_diag_tests.sh`, `run_runtime_trace_tests.sh` |
+| Firmware stack budget tooling | `run_firmware_stack_budget_tool_tests.sh` (host fixtures), `run_firmware_stack_budget_checks.sh` (fresh target artifacts) |
 | Full host suite | `run_all_host_tests.sh` |
 | All-profile firmware compile | `run_all_profile_compile_tests.sh` |

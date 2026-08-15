@@ -77,6 +77,13 @@ static handled_key_materialized_t test_materialize(handled_key_resolution_t reso
     return handled_key_materialize(resolution, handled_key_resolution_ctx_live(key_pos));
 }
 
+static void test_check_momentary_helper_matches_materialization(handled_key_resolution_t resolution, handled_key_resolution_ctx_t ctx, bool expected) {
+    handled_key_materialized_t materialized = handled_key_materialize(resolution, ctx);
+
+    CHECK(handled_key_resolution_materializes_momentary_layer(&resolution, &ctx) == expected);
+    CHECK(((materialized.flags & HANDLED_KEY_FLAG_MOMENTARY_LAYER) != 0u) == expected);
+}
+
 const key_behavior_t key_behaviors[] = {
     {
         .keycode = TEST_AUTHORED_LAYER_TAP,
@@ -628,6 +635,66 @@ static void test_transparent_long_hold_uses_lower_explicit_long_hold_action(void
     CHECK(materialized.long_hold.mode == HOLD_BEHAVIOR_TAP_AT_HOLD_THRESHOLD);
 }
 
+static void test_momentary_layer_query_matches_hold_materialization(void) {
+    keypos_t                     direct_key_pos       = test_keypos(2, 0);
+    keypos_t                     inherited_key_pos    = test_keypos(2, 1);
+    keypos_t                     chained_key_pos      = test_keypos(2, 2);
+    keypos_t                     plain_key_pos        = test_keypos(2, 3);
+    keypos_t                     tap_only_key_pos     = test_keypos(2, 4);
+    keypos_t                     long_only_key_pos    = test_keypos(2, 5);
+    handled_key_resolution_t     resolution;
+    handled_key_resolution_ctx_t ctx;
+
+    test_reset_keymap();
+    resolution = handled_key_lookup(MO(4));
+    ctx        = handled_key_resolution_ctx_live(direct_key_pos);
+    test_check_momentary_helper_matches_materialization(resolution, ctx, true);
+
+    test_reset_keymap();
+    test_set_keymap_key(1, inherited_key_pos, TEST_BARE_LAYER_TAP);
+    test_set_keymap_key(2, inherited_key_pos, TEST_TRANSPARENT_HOLD_KEY);
+    resolution = handled_key_lookup(TEST_TRANSPARENT_HOLD_KEY);
+    ctx        = handled_key_resolution_ctx_make(inherited_key_pos, (layer_state_t)1u << 2);
+    test_check_momentary_helper_matches_materialization(resolution, ctx, false);
+    ctx.active_layers |= (layer_state_t)1u << 1;
+    test_check_momentary_helper_matches_materialization(resolution, ctx, true);
+
+    test_reset_keymap();
+    test_set_keymap_key(0, chained_key_pos, MO(3));
+    test_set_keymap_key(1, chained_key_pos, TEST_TRANSPARENT_HOLD_KEY);
+    test_set_keymap_key(2, chained_key_pos, TEST_TRANSPARENT_HOLD_KEY);
+    resolution = handled_key_lookup(TEST_TRANSPARENT_HOLD_KEY);
+    ctx        = handled_key_resolution_ctx_make(chained_key_pos, ((layer_state_t)1u << 0) | ((layer_state_t)1u << 1) | ((layer_state_t)1u << 2));
+    test_check_momentary_helper_matches_materialization(resolution, ctx, true);
+
+    test_reset_keymap();
+    test_set_keymap_key(1, plain_key_pos, KC_V);
+    test_set_keymap_key(2, plain_key_pos, TEST_TRANSPARENT_HOLD_KEY);
+    resolution = handled_key_lookup(TEST_TRANSPARENT_HOLD_KEY);
+    ctx        = handled_key_resolution_ctx_make(plain_key_pos, ((layer_state_t)1u << 1) | ((layer_state_t)1u << 2));
+    test_check_momentary_helper_matches_materialization(resolution, ctx, false);
+
+    test_reset_keymap();
+    test_set_keymap_key(2, inherited_key_pos, TEST_TRANSPARENT_HOLD_KEY);
+    resolution = handled_key_lookup(TEST_TRANSPARENT_HOLD_KEY);
+    ctx        = handled_key_resolution_ctx_make(inherited_key_pos, (layer_state_t)1u << 2);
+    test_check_momentary_helper_matches_materialization(resolution, ctx, false);
+
+    test_reset_keymap();
+    test_set_keymap_key(1, tap_only_key_pos, TEST_BARE_LAYER_TAP);
+    test_set_keymap_key(2, tap_only_key_pos, TEST_TRANSPARENT_KEY);
+    resolution = handled_key_lookup(TEST_TRANSPARENT_KEY);
+    ctx        = handled_key_resolution_ctx_make(tap_only_key_pos, ((layer_state_t)1u << 1) | ((layer_state_t)1u << 2));
+    test_check_momentary_helper_matches_materialization(resolution, ctx, false);
+
+    test_reset_keymap();
+    test_set_keymap_key(1, long_only_key_pos, TEST_BARE_LAYER_TAP);
+    test_set_keymap_key(2, long_only_key_pos, TEST_TRANSPARENT_LONG_HOLD_KEY);
+    resolution = handled_key_lookup(TEST_TRANSPARENT_LONG_HOLD_KEY);
+    ctx        = handled_key_resolution_ctx_make(long_only_key_pos, ((layer_state_t)1u << 1) | ((layer_state_t)1u << 2));
+    test_check_momentary_helper_matches_materialization(resolution, ctx, false);
+}
+
 int main(void) {
     test_bare_lt_falls_back_to_qmk();
     test_authored_lt_uses_custom_runtime();
@@ -652,6 +719,7 @@ int main(void) {
     test_transparent_hold_chains_through_lower_authored_transparency();
     test_transparent_hold_uses_current_tap_count_for_lower_handled_key();
     test_transparent_long_hold_uses_lower_explicit_long_hold_action();
+    test_momentary_layer_query_matches_hold_materialization();
 
     puts("key_behavior_lookup host tests passed");
     return 0;

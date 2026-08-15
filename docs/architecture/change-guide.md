@@ -25,6 +25,7 @@ directory and the existing domain docs.
 | Change VIA macro defaults or seeding | `keymap.c` `VIA_MACROS`, `macro/via_macro_defaults.*`, VIA contracts | hardcoded macro dispatch | VIA macro defaults, VIA macro action lifecycle, qmk_via_split_sync |
 | Change hook wiring | `users/noah/hooks.c`, `users/noah/runtime_init.c` | keymap-local hooks without chaining | hook chaining, runtime init order, feature gate |
 | Change source/build wiring | `users/noah/source_manifest.mk` and mirrored host support as needed | one-off test runner source lists | feature gate compile, targeted host tests, full host suite, firmware compile |
+| Change stack-sensitive runtime phases or target stack configuration | runtime owner plus `tools/firmware_stack_budget.json` when call topology changes | per-function frame guesses or host-only `sizeof` checks | matching runtime tests, `run_firmware_stack_budget_tool_tests.sh`, full host suite, fresh instrumented firmware compile, `run_firmware_stack_budget_checks.sh` |
 
 ## Anti-Patterns
 
@@ -58,6 +59,7 @@ checks before handoff when source/build behavior changed.
 | Macros, VIA, QMK contracts | `run_qmk_contract_checks.sh`, `run_action_lifecycle_tests.sh`, `run_macro_dispatch_tests.sh`, `run_macro_payload_tests.sh`, `run_via_macro_defaults_tests.sh`, `run_via_macro_action_lifecycle_tests.sh`, `run_qmk_via_split_sync_tests.sh` |
 | Shared runtime or tracing | `run_runtime_init_order_tests.sh`, `run_runtime_debug_tests.sh`, `run_runtime_diag_tests.sh`, `run_runtime_trace_tests.sh` |
 | Source manifests or boundaries | `run_feature_gate_compile_tests.sh` |
+| Target stack topology or budget | `run_firmware_stack_budget_tool_tests.sh`; after a fresh instrumented target build, `run_firmware_stack_budget_checks.sh` |
 
 For docs-only changes, run `git diff --check` and a stale-path audit. Host tests
 and firmware compile can be skipped when no runtime source, authored input,

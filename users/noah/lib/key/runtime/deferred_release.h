@@ -9,6 +9,8 @@
 
 #include "transition.h"
 
+#define KEY_RUNTIME_DEFERRED_RELEASE_DRAIN_BATCH_CAPACITY 4u
+
 void key_runtime_deferred_release_defer_dispatch_actions_until_release(keypos_t key_pos, key_runtime_transition_plan_t *plan);
 bool key_runtime_deferred_release_has_pending_dispatches(void);
 void key_runtime_deferred_release_drain_dispatches(void);

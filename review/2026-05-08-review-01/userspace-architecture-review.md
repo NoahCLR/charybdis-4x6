@@ -23,6 +23,8 @@ The requested behavior change is intentionally narrow:
   pointing throttle path.
 - Reduce fixed master main-loop overhead from local matrix scan timing and
   watchdog refresh cadence.
+- Bound key-runtime release/materialization stack depth and make deferred
+  release draining constant-stack without reducing queue capacity.
 - Remove inert diagnostic scope calls from continuous scan, pointer, RGB, and
   housekeeping paths while preserving watchdog heartbeat behavior.
 - Reduce idle housekeeping and split-sync helper work that does not affect
@@ -43,7 +45,8 @@ Out of scope:
 Implementation status: landed and verified across the 2026-05-08 watchdog /
 split-sync pass and the 2026-05-09 idle-scan / pointer hot-path pass with the
 targeted host runners, full host suite, and noah firmware compile listed in
-`progress.md`.
+`progress.md`. The stack-safety extension is verified by the 2026-08-15 fresh
+post-LTO target report, full host suite, and firmware compile.
 
 ### Runtime Diagnostics
 
@@ -128,6 +131,44 @@ deferred-release blocker scan when the pending-release queue is empty, and only
 checks blocker state when there are active press tokens that could actually
 block a drain.
 
+### Stack-Bounded Release And Materialization
+
+The pending-release queue remains reducer-owned and retains its 120-record
+capacity. `deferred_release.c` transports at most four records per explicit
+drain, with compile-time caps on both record count and transport bytes. A drain
+takes only its entry-time batch in FIFO order. A synchronous recursive drain
+returns immediately, and any release enqueued while projection runs remains
+pending for the next release or scan boundary.
+
+Handled press and release planning now return before projection begins.
+Mutually exclusive pending-multi-tap, active-token, and unmatched-recovery
+release branches are isolated into target-visible phases, as are tap, hold,
+and long-hold behavior materialization. This keeps unrelated automatic
+storage from accumulating in one target frame while preserving the rule that
+planning completes before projection mutates runtime state.
+
+Unmatched release recovery asks a narrow question—whether the HOLD source
+materializes to a momentary layer—instead of constructing a complete handled
+interaction. The reducer query intentionally sees `live | core shadow | base`
+layers; transition recovery intentionally sees only `live | base`. Active
+release behavior still comes from the press token, never from a newly resolved
+fallback interaction.
+
+Release plans may borrow a pointer to a resolved interaction only during the
+synchronous planning call. Settlement or any reducer state mutation ends that
+lifetime. Callers must not store the pointer in deferred state.
+
+VIA default seeding similarly owns one macro IR at a time. Seeding no longer
+validates by compiling into one IR and then recompiles into another nested IR;
+standalone post-init validation remains independent.
+
+The final linked reviewed paths still require more than the platform-default
+2,048-byte process stack once QMK callers and synchronous fallback settlement
+are included. `users/noah/rules.mk` therefore configures 2,560 bytes. The
+target gate reserves 640 bytes and permits 1,920 bytes of reviewed call depth;
+the worst reviewed main path is 1,808 bytes. The vendor split callback thread
+is evaluated separately and uses 328 bytes of its 768-byte reviewed budget.
+
 ### Pointing Runtime
 
 `users/noah/lib/pointing/runtime/pd_runtime.c` no longer snapshots the full PD
@@ -198,6 +239,17 @@ unbounded backlog.
   release dispatches.
 - Pending release dispatches must drain even when key-runtime core scan work is
   skipped.
+- A deferred-release drain may transport at most four entry-time records; it
+  must preserve FIFO/exactly-once projection and defer projection-time enqueues
+  to a later explicit boundary.
+- Deferred-release projection must not synchronously re-enter another drain.
+- Release planning, release projection, and deferred draining must remain
+  sequential phases so their largest automatic objects do not overlap.
+- An active press token is authoritative for active release behavior;
+  unmatched fallback lookup may only recover an otherwise orphaned momentary
+  layer binding.
+- Borrowed handled-key interactions must not outlive synchronous release
+  planning or cross reducer settlement/state mutation.
 - Pointer reports without a local active PD mode must pass through unchanged
   and must ignore remote display-only PD mode state on the slave half.
 - Normal pointer motion above the idle-noise threshold must not query long-idle
@@ -239,6 +291,11 @@ Expected coverage for this thread:
   inert diagnostic scope wrappers.
 - `run_feature_gate_compile_tests.sh` covers the new split dirty-state source
   in the userspace build surface.
+- `run_firmware_stack_budget_tool_tests.sh` covers stack-checker parsing,
+  budget, context, and failure fixtures without requiring a target build.
+- `run_firmware_stack_budget_checks.sh` is the target-only closure gate over a
+  freshly instrumented ELF, map, post-LTO disassembly, and recorded
+  compile/link flags.
 - Closure requires `run_all_host_tests.sh` and the `qmk compile` firmware gate.
 
 ## Next Steps

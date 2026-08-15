@@ -239,3 +239,130 @@ Passed for the master-loop fixed-overhead pass:
 
 1. Measure click-spam and firmware loop/report rates on hardware.
 2. If report rate is still low, profile the next hottest scan-loop surfaces.
+
+## 2026-07-13
+
+### Completed
+
+- Reproduced the target stack-risk finding against a 2,048-byte process stack
+  and recorded the complete QMK-to-userspace handled-release chain rather than
+  treating individual function frames as independent budgets.
+- Replaced the pending-release-capacity automatic drain array with a fixed
+  four-record transport batch. Queue capacity remains 120 records.
+- Defined bounded drain semantics: one drain snapshots and removes only its
+  entry-time batch, preserves FIFO order, rejects synchronous re-entry, and
+  leaves records enqueued during projection for the next release or scan
+  boundary.
+- Moved release-triggered draining out of the release planner/executor frame so
+  release planning and projection storage unwind before deferred projection.
+- Split mutually exclusive release and handled-key materialization phases into
+  no-inline helpers, and replaced avoidable by-value resolution copies with
+  borrowed or output-parameter seams.
+- Replaced unmatched-release full materialization with a narrow HOLD-source
+  momentary-layer query while preserving the reducer's shadow-inclusive lookup
+  context and transition recovery's live/base-only context as separate
+  policies.
+- Documented the release planner's borrowed-interaction lifetime: the pointer
+  is valid only during synchronous planning before settlement or reducer state
+  mutation.
+- Removed a redundant 512-byte macro-IR compile from VIA default seeding. Each
+  non-empty default is compiled once during seed; post-init validation remains
+  a separate sequential pass.
+- Added host coverage for full-capacity drain batching, overflow, FIFO order,
+  enqueue-during-projection, re-entry suppression, exact modifier snapshots,
+  feedback adjacency, multi-owner cleanup, repeated production scans,
+  momentary fallback context, active-token authority, materialization parity,
+  and the VIA seed compile-call budget.
+- Added opt-in final-linked stack artifacts, a reviewed-path target budget
+  checker, fixture tests, and separate host-only and target runners. The
+  checker parses direct calls/tails, requires documented indirect edges,
+  separates main and split-thread contexts, and states explicitly that it is
+  not a proof of the global call-graph maximum.
+
+### In Flight
+
+- Reconcile the source-reviewed target path manifest against a fresh
+  post-refactor linked image. The gate intentionally fails closed on symbol or
+  edge drift after LTO.
+- Run the stack budget report for both the main process stack and vendor split
+  callback thread.
+
+### Verification
+
+Passed on the final host/documentation tree for this pass:
+
+- `sh tests/host/run_key_behavior_lookup_tests.sh`
+- `sh tests/host/run_runtime_debug_tests.sh`
+- `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+- `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`
+- `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`
+- `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_key_runtime_integration_harness_tests.sh`
+- `sh tests/host/run_runtime_trace_tests.sh`
+- `sh tests/host/run_via_macro_defaults_tests.sh`
+- `sh tests/host/run_via_macro_action_lifecycle_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `PYTHONPYCACHEPREFIX=/tmp/noah-stack-pycache PYTHON=/usr/bin/python3 sh tests/host/run_firmware_stack_budget_tool_tests.sh` (15 tests)
+- `env PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin PYTHONPYCACHEPREFIX=/tmp/noah-host-pycache sh tests/host/run_all_host_tests.sh`
+- `git diff --check`
+
+Intermediate exact `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+builds passed during the frame-isolation work, but they predate the final
+source state and are not closure evidence. The final target rebuild is blocked
+because QMK must write into `../bastardkb-qmk/.build` and the sandbox approval
+service rejected that external write due an account usage-limit condition. No
+sibling source files were edited.
+
+Reconciliation note: this paragraph records the 2026-07-13 checkpoint only.
+The 2026-08-15 continuation below resolves the external blocker and supplies
+the final target evidence.
+
+### Next Steps
+
+1. When sibling build writes are available, run a fresh instrumented firmware
+   compile and `sh tests/host/run_firmware_stack_budget_checks.sh`.
+2. Reconcile any fail-closed LTO symbol/edge drift, then close the finding only
+   when the final ELF satisfies the configured reserve for each context.
+
+## 2026-08-15
+
+### Completed
+
+- Produced a fresh post-LTO target image and reconciled the reviewed-path
+  manifest to its actual linked symbols, direct calls/tails, and documented
+  register-indirect stage/provider/action-kind callbacks.
+- The initial linked report found a real handled-press projection overrun, not
+  only LTO name drift. Split press planning from projection; the linked press
+  wrapper dropped from 488 bytes to 176 bytes and planning owns an independent
+  336-byte frame.
+- The reconciled report proved five reviewed paths exceeded the 1,536-byte
+  budget under the platform-default 2,048-byte process stack. The worst path,
+  including QMK callers and nested fallback settlement, measured 1,808 bytes.
+- Configured a 2,560-byte process stack after measuring linked RAM. The target
+  gate now reserves 640 bytes, leaving a 1,920-byte reviewed-path budget. The
+  worst main path passes at 1,808 bytes; the independent split callback context
+  passes at 328 bytes in a 768-byte budget.
+- Final linked sections are `.text` 101,712 B, `.rodata` 15,460 B, `.data`
+  23,760 B, `.bss` 65,204 B, `.ram4` 288 B, and heap 173,176 B.
+- No sibling source was edited. The target commands only refreshed artifacts
+  under `../bastardkb-qmk/.build`.
+
+### Verification
+
+- `sh tests/host/run_key_runtime_release_matrix_tests.sh`
+- `sh tests/host/run_key_runtime_scenario_tests.sh`
+- `sh tests/host/run_key_runtime_integration_harness_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_firmware_stack_budget_checks.sh`
+- `PYTHONPYCACHEPREFIX=/tmp/noah-host-pycache sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+
+All commands passed. The stack checker remains a reviewed-path regression gate,
+not a claim of global call-graph maximum proof.
+
+### Next Steps
+
+1. Preserve the target stack gate for later runtime changes.
+2. Continue the Sol remediation roadmap with Finding 03.
+3. Measure firmware loop/report rates on hardware when available.

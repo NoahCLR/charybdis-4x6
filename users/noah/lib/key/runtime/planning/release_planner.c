@@ -148,7 +148,7 @@ static bool key_runtime_core_release_hold_action_feedback_kind(const press_token
         return false;
     }
 
-    contract = key_runtime_release_contract_for_interaction(token->interaction);
+    contract = key_runtime_release_contract_for_interaction(&token->interaction);
     if (!key_runtime_release_hold_contract_has_any_action(contract.hold)) {
         return false;
     }
@@ -215,7 +215,7 @@ bool key_runtime_core_resolve_active_release(keypos_t key_pos, key_runtime_core_
     held_action_active = key_runtime_core_owner_has_lease_kind(state, token->token_id, LEASE_KIND_HELD_ACTION);
     repeat_active      = key_runtime_core_owner_has_lease_kind(state, token->token_id, LEASE_KIND_REPEAT);
     query              = (key_runtime_release_query_t){
-        .interaction                     = token->interaction,
+        .interaction                     = &token->interaction,
         .semantics                       = semantics,
         .elapsed                         = elapsed,
         .held_action_active              = held_action_active,
@@ -227,7 +227,7 @@ bool key_runtime_core_resolve_active_release(keypos_t key_pos, key_runtime_core_
     };
 
     *out = (key_runtime_core_active_release_resolution_t){
-        .interaction                     = token->interaction,
+        .interaction                     = &token->interaction,
         .phase                           = token->slot_phase,
         .elapsed                         = elapsed,
         .held_action_active              = query.held_action_active,
@@ -251,13 +251,13 @@ bool key_runtime_core_plan_active_release_effects(keypos_t key_pos, uint16_t key
         };
     }
 
-    if (!(resolution && out && key_runtime_core_keypos_valid(key_pos))) {
+    if (!(resolution && resolution->interaction && out && key_runtime_core_keypos_valid(key_pos))) {
         return false;
     }
 
     contract = key_runtime_release_contract_for_interaction(resolution->interaction);
 
-    if (key_runtime_slot_interaction_is_momentary_layer(resolution->interaction)) {
+    if (key_runtime_slot_interaction_is_momentary_layer(*resolution->interaction)) {
         key_runtime_core_release_effect_plan_push_layer_release(out, key_pos);
     }
     if (resolution->decision.release_owned_state) {
@@ -272,20 +272,20 @@ bool key_runtime_core_plan_active_release_effects(keypos_t key_pos, uint16_t key
                         .active              = true,
                         .keycode             = keycode,
                         .key_pos             = key_pos,
-                        .tap_count           = resolution->interaction.selection.tap_count,
+                        .tap_count           = resolution->interaction->selection.tap_count,
                         .tap_action          = contract.tap.action,
                         .tap_repeat_count    = contract.tap.repeat_count,
-                        .tap_branch_has_authored_step = key_behavior_step_present(resolution->interaction.selection.step),
-                        .tap_branch_has_authored_tap = resolution->interaction.selection.step.tap.present,
-                        .tap_hold_term       = resolution->interaction.binding.tap_hold_term,
-                        .multi_tap_term      = resolution->interaction.binding.multi_tap_term,
-                        .branch_confirm_term = resolution->interaction.binding.branch_confirm_term,
-                        .has_more_taps       = resolution->interaction.binding.has_more_taps,
+                        .tap_branch_has_authored_step = key_behavior_step_present(resolution->interaction->selection.step),
+                        .tap_branch_has_authored_tap = resolution->interaction->selection.step.tap.present,
+                        .tap_hold_term       = resolution->interaction->binding.tap_hold_term,
+                        .multi_tap_term      = resolution->interaction->binding.multi_tap_term,
+                        .branch_confirm_term = resolution->interaction->binding.branch_confirm_term,
+                        .has_more_taps       = resolution->interaction->binding.has_more_taps,
                     };
                     return true;
                 case KEY_RUNTIME_RELEASE_TAP_OUTCOME_DISPATCH_ACTION:
                     key_runtime_core_release_effect_plan_push_action_or_pd_mode_lock_tap(out, key_pos, contract.tap.action);
-                    key_runtime_core_release_effect_plan_push_tap_commit_feedback_pulse(out, key_pos, contract.tap.action, resolution->interaction.selection.tap_count);
+                    key_runtime_core_release_effect_plan_push_tap_commit_feedback_pulse(out, key_pos, contract.tap.action, resolution->interaction->selection.tap_count);
                     return true;
                 case KEY_RUNTIME_RELEASE_TAP_OUTCOME_NONE:
                 default:
@@ -344,7 +344,7 @@ bool key_runtime_core_resolve_pending_multi_tap_release(keypos_t key_pos, uint16
 
         semantics.hold_action_mode = KEY_RUNTIME_RELEASE_HOLD_ACTION_MODE_SELECT_HOLD_ACTION;
         decision                   = key_runtime_release_decide(&(key_runtime_release_query_t){
-            .interaction = token->interaction,
+            .interaction = &token->interaction,
             .semantics   = semantics,
             .elapsed     = elapsed,
         });
@@ -376,7 +376,7 @@ bool key_runtime_core_resolve_pending_multi_tap_release(keypos_t key_pos, uint16
     }
 
     decision = key_runtime_release_decide(&(key_runtime_release_query_t){
-        .interaction = token->interaction,
+        .interaction = &token->interaction,
         .semantics   = semantics,
         .elapsed     = elapsed,
     });

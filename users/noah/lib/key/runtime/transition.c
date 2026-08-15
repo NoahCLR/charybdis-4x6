@@ -97,14 +97,15 @@ static void key_runtime_transition_core_plan_init_streaming(key_runtime_core_eff
     key_runtime_core_effect_plan_init_with_sink(core_plan, key_runtime_transition_core_effect_sink, plan);
 }
 
-static void key_runtime_transition_append_unmatched_release_effects(keypos_t key_pos, handled_key_resolution_t resolution, key_runtime_transition_plan_t *plan) {
-    handled_key_materialized_t materialized = handled_key_materialize(resolution, handled_key_resolution_ctx_live(key_pos));
+static __attribute__((noinline)) void key_runtime_transition_append_unmatched_release_effects(keypos_t key_pos, const handled_key_resolution_t *resolution, key_runtime_transition_plan_t *plan) {
+    handled_key_resolution_ctx_t ctx;
 
     if (!plan) {
         return;
     }
 
-    if ((materialized.flags & HANDLED_KEY_FLAG_MOMENTARY_LAYER) != 0) {
+    ctx = handled_key_resolution_ctx_live(key_pos);
+    if (handled_key_resolution_materializes_momentary_layer(resolution, &ctx)) {
         key_runtime_transition_plan_push(plan, (key_runtime_effect_t){
                                                    .kind         = KEY_RUNTIME_EFFECT_LAYER_RELEASE,
                                                    .data.key_pos = key_pos,
@@ -185,10 +186,10 @@ bool key_runtime_transition_handled_key_press(uint16_t keycode, keypos_t key_pos
     return true;
 }
 
-bool key_runtime_transition_handled_key_release(uint16_t keycode, keyrecord_t *record, handled_key_resolution_t resolution, key_runtime_transition_plan_t *plan) {
+bool key_runtime_transition_handled_key_release(uint16_t keycode, keyrecord_t *record, const handled_key_resolution_t *resolution, key_runtime_transition_plan_t *plan) {
     key_runtime_core_effect_plan_t core_plan;
 
-    if (!(record && plan)) {
+    if (!(record && resolution && plan)) {
         return false;
     }
 

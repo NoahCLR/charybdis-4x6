@@ -9,6 +9,7 @@
 #include "users/noah/lib/key/ownership/held_action.h"
 #include "users/noah/lib/key/ownership/held_repeat.h"
 #include "users/noah/lib/key/runtime/delayed_action.h"
+#include "users/noah/lib/key/runtime/deferred_release.h"
 #include "users/noah/lib/key/runtime/feedback.h"
 #include "users/noah/lib/key/runtime/api.h"
 #include "users/noah/lib/key/runtime/transition.h"
@@ -39,7 +40,11 @@ enum {
     TEST_PENDING_RELEASE_KEY   = NOAH_KEYMAP_SAFE_RANGE + 0x16,
     TEST_FINAL_TAP_ONLY_KEY    = NOAH_KEYMAP_SAFE_RANGE + 0x17,
     TEST_HELD_ACTION_KEY       = NOAH_KEYMAP_SAFE_RANGE + 0x18,
+    TEST_THIRD_ACTION          = NOAH_KEYMAP_SAFE_RANGE + 0x19,
+    TEST_TRANSPARENT_HOLD_KEY  = NOAH_KEYMAP_SAFE_RANGE + 0x1A,
 };
+
+#define TEST_PROJECTION_FEEDBACK_MARKER UINT16_MAX
 
 static uint16_t                           fake_time;
 static uint8_t                            fake_mods;
@@ -50,9 +55,23 @@ static uint8_t                            send_keyboard_report_count;
 static uint16_t                           last_emitted_action;
 static uint16_t                           last_delayed_action;
 static delayed_action_mods_t              last_delayed_mods;
-static uint8_t                            delayed_action_count;
+static uint16_t                           delayed_action_count;
+static uint16_t                           delayed_action_log[KEY_RUNTIME_CORE_PENDING_RELEASE_CAPACITY + KEY_RUNTIME_DEFERRED_RELEASE_DRAIN_BATCH_CAPACITY];
+static delayed_action_mods_t              delayed_action_mods_log[KEY_RUNTIME_CORE_PENDING_RELEASE_CAPACITY + KEY_RUNTIME_DEFERRED_RELEASE_DRAIN_BATCH_CAPACITY];
+static uint16_t                           projection_order_count;
+static uint16_t                           projection_order_log[KEY_RUNTIME_CORE_PENDING_RELEASE_CAPACITY * 2u];
+static uint16_t                           feedback_pulse_count;
+static keypos_t                           feedback_pulse_key_pos_log[KEY_RUNTIME_CORE_PENDING_RELEASE_CAPACITY];
+static key_feedback_pulse_kind_t          feedback_pulse_kind_log[KEY_RUNTIME_CORE_PENDING_RELEASE_CAPACITY];
+static uint8_t                            feedback_pulse_tap_branch_log[KEY_RUNTIME_CORE_PENDING_RELEASE_CAPACITY];
+static bool                               delayed_action_enqueue_hook_armed;
+static bool                               delayed_action_reenter_drain;
+static keypos_t                           delayed_action_enqueue_key_pos;
+static uint16_t                           delayed_action_enqueue_action;
+static delayed_action_mods_t              delayed_action_enqueue_mods;
 static uint8_t                            split_runtime_sync_count;
 static key_feedback_branch_confirm_mode_t fake_branch_confirm_mode;
+static uint16_t                           test_keymap[LAYER_COUNT][MATRIX_ROWS][MATRIX_COLS];
 
 layer_state_t layer_state;
 
@@ -225,6 +244,10 @@ static handled_key_resolution_t test_handled_key_resolution(uint16_t keycode, ui
         step = (key_behavior_step_t){
             .hold = PRESS_AND_HOLD_UNTIL_RELEASE(TEST_ACTION),
         };
+    } else if (keycode == TEST_TRANSPARENT_HOLD_KEY) {
+        step = (key_behavior_step_t){
+            .hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_TRNS),
+        };
     }
 
     return (handled_key_resolution_t){
@@ -253,13 +276,43 @@ static void test_reset_stubs(void) {
     last_delayed_action        = KC_NO;
     last_delayed_mods          = (delayed_action_mods_t){0};
     delayed_action_count       = 0;
+    projection_order_count     = 0;
+    feedback_pulse_count       = 0;
+    delayed_action_enqueue_hook_armed = false;
+    delayed_action_reenter_drain      = false;
+    delayed_action_enqueue_key_pos    = (keypos_t){0};
+    delayed_action_enqueue_action     = KC_NO;
+    delayed_action_enqueue_mods       = (delayed_action_mods_t){0};
     split_runtime_sync_count   = 0;
     fake_branch_confirm_mode   = KEY_FEEDBACK_BRANCH_CONFIRM_NON_BASE_TAPS;
     layer_state                = 0;
+
+    for (uint8_t layer = 0u; layer < LAYER_COUNT; layer++) {
+        for (uint8_t row = 0u; row < MATRIX_ROWS; row++) {
+            for (uint8_t col = 0u; col < MATRIX_COLS; col++) {
+                test_keymap[layer][row][col] = KC_TRNS;
+            }
+        }
+    }
+}
+
+static void test_set_keymap_key(uint8_t layer, keypos_t key_pos, uint16_t keycode) {
+    test_keymap[layer][key_pos.row][key_pos.col] = keycode;
 }
 
 key_feedback_branch_confirm_mode_t key_feedback_branch_confirm_mode(void) {
     return fake_branch_confirm_mode;
+}
+
+void key_feedback_pulse_observe(keypos_t key_pos, key_feedback_pulse_kind_t kind, uint8_t tap_branch) {
+    CHECK(feedback_pulse_count < ARRAY_SIZE(feedback_pulse_key_pos_log));
+    CHECK(projection_order_count < ARRAY_SIZE(projection_order_log));
+
+    feedback_pulse_key_pos_log[feedback_pulse_count]    = key_pos;
+    feedback_pulse_kind_log[feedback_pulse_count]       = kind;
+    feedback_pulse_tap_branch_log[feedback_pulse_count] = tap_branch;
+    feedback_pulse_count++;
+    projection_order_log[projection_order_count++] = TEST_PROJECTION_FEEDBACK_MARKER;
 }
 
 uint16_t timer_read(void) {
@@ -283,10 +336,7 @@ bool layer_state_cmp(layer_state_t state, uint8_t layer) {
 }
 
 uint16_t keycode_at_keymap_location(uint8_t layer_num, uint8_t row, uint8_t column) {
-    (void)layer_num;
-    (void)row;
-    (void)column;
-    return KC_TRNS;
+    return test_keymap[layer_num][row][column];
 }
 
 void layer_on(uint8_t layer) {
@@ -351,6 +401,18 @@ handled_key_resolution_t handled_key_lookup(uint16_t keycode) {
 
 handled_key_resolution_t handled_key_lookup_tap_count(uint16_t keycode, uint8_t tap_count) {
     return test_handled_key_resolution(keycode, tap_count);
+}
+
+void handled_key_lookup_into(uint16_t keycode, handled_key_resolution_t *out) {
+    if (out) {
+        *out = test_handled_key_resolution(keycode, 1u);
+    }
+}
+
+void handled_key_lookup_tap_count_into(uint16_t keycode, uint8_t tap_count, handled_key_resolution_t *out) {
+    if (out) {
+        *out = test_handled_key_resolution(keycode, tap_count);
+    }
 }
 
 bool key_behavior_has_more_taps(uint16_t keycode, uint8_t count) {
@@ -519,7 +581,21 @@ void noah_emit_action_tap_at(keypos_t key_pos, uint16_t action, noah_emit_policy
 void dispatch_delayed_action(uint16_t action, delayed_action_mods_t mods) {
     last_delayed_action = action;
     last_delayed_mods   = mods;
+    if (delayed_action_count < ARRAY_SIZE(delayed_action_log)) {
+        delayed_action_log[delayed_action_count]      = action;
+        delayed_action_mods_log[delayed_action_count] = mods;
+    }
+    CHECK(projection_order_count < ARRAY_SIZE(projection_order_log));
+    projection_order_log[projection_order_count++] = action;
     delayed_action_count++;
+
+    if (delayed_action_enqueue_hook_armed) {
+        delayed_action_enqueue_hook_armed = false;
+        CHECK(key_runtime_core_queue_pending_release_dispatch_for_owner(delayed_action_enqueue_key_pos, delayed_action_enqueue_action, delayed_action_enqueue_mods, false, 0u));
+        if (delayed_action_reenter_drain) {
+            key_runtime_deferred_release_drain_dispatches();
+        }
+    }
 }
 
 void dispatch_delayed_action_at(keypos_t key_pos, uint16_t action, delayed_action_mods_t mods) {
@@ -798,6 +874,272 @@ static void test_key_runtime_scan_drains_pending_release_without_core_work(void)
     CHECK(last_delayed_mods.real == mods.real);
 }
 
+static void test_key_runtime_deferred_release_drain_is_bounded_and_fifo_at_full_capacity(void) {
+    keypos_t             key_pos = test_keypos(2, 6);
+    delayed_action_mods_t mods   = {0};
+    uint16_t             expected_projected_count = 0u;
+    uint16_t             drain_count              = 0u;
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+
+    for (uint16_t index = 0u; index < KEY_RUNTIME_CORE_PENDING_RELEASE_CAPACITY; index++) {
+        CHECK(key_runtime_core_queue_pending_release_dispatch_for_owner(key_pos, (uint16_t)(TEST_ACTION + index), mods, false, 0u));
+    }
+    CHECK(key_runtime_core_pending_release_count() == KEY_RUNTIME_CORE_PENDING_RELEASE_CAPACITY);
+    CHECK(!key_runtime_core_queue_pending_release_dispatch_for_owner(key_pos, TEST_THIRD_ACTION, mods, false, 0u));
+
+    while (key_runtime_core_pending_release_count() != 0u) {
+        uint8_t pending_before = key_runtime_core_pending_release_count();
+        uint8_t expected_batch = pending_before < KEY_RUNTIME_DEFERRED_RELEASE_DRAIN_BATCH_CAPACITY ? pending_before : KEY_RUNTIME_DEFERRED_RELEASE_DRAIN_BATCH_CAPACITY;
+
+        key_runtime_deferred_release_drain_dispatches();
+        expected_projected_count = (uint16_t)(expected_projected_count + expected_batch);
+        drain_count++;
+
+        CHECK(delayed_action_count == expected_projected_count);
+        CHECK(key_runtime_core_pending_release_count() == (uint8_t)(pending_before - expected_batch));
+        CHECK(drain_count <= KEY_RUNTIME_CORE_PENDING_RELEASE_CAPACITY);
+    }
+
+    CHECK(drain_count == (KEY_RUNTIME_CORE_PENDING_RELEASE_CAPACITY + KEY_RUNTIME_DEFERRED_RELEASE_DRAIN_BATCH_CAPACITY - 1u) / KEY_RUNTIME_DEFERRED_RELEASE_DRAIN_BATCH_CAPACITY);
+    CHECK(delayed_action_count == KEY_RUNTIME_CORE_PENDING_RELEASE_CAPACITY);
+    for (uint16_t index = 0u; index < KEY_RUNTIME_CORE_PENDING_RELEASE_CAPACITY; index++) {
+        CHECK(delayed_action_log[index] == (uint16_t)(TEST_ACTION + index));
+    }
+
+    key_runtime_deferred_release_drain_dispatches();
+    CHECK(delayed_action_count == KEY_RUNTIME_CORE_PENDING_RELEASE_CAPACITY);
+}
+
+static void test_key_runtime_deferred_release_drain_defers_projection_enqueues_and_reentry(void) {
+    keypos_t              key_pos = test_keypos(2, 7);
+    delayed_action_mods_t mods    = {.real = MOD_LALT};
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+
+    CHECK(key_runtime_core_queue_pending_release_dispatch_for_owner(key_pos, TEST_ACTION, mods, false, 0u));
+    CHECK(key_runtime_core_queue_pending_release_dispatch_for_owner(key_pos, TEST_SECOND_ACTION, mods, false, 0u));
+
+    delayed_action_enqueue_hook_armed = true;
+    delayed_action_reenter_drain      = true;
+    delayed_action_enqueue_key_pos    = key_pos;
+    delayed_action_enqueue_action     = TEST_THIRD_ACTION;
+    delayed_action_enqueue_mods       = mods;
+
+    key_runtime_deferred_release_drain_dispatches();
+
+    CHECK(delayed_action_count == 2u);
+    CHECK(delayed_action_log[0] == TEST_ACTION);
+    CHECK(delayed_action_log[1] == TEST_SECOND_ACTION);
+    CHECK(key_runtime_core_pending_release_count() == 1u);
+
+    key_runtime_deferred_release_drain_dispatches();
+    CHECK(delayed_action_count == 3u);
+    CHECK(delayed_action_log[2] == TEST_THIRD_ACTION);
+    CHECK(key_runtime_core_pending_release_count() == 0u);
+
+    key_runtime_deferred_release_drain_dispatches();
+    CHECK(delayed_action_count == 3u);
+}
+
+static void test_key_runtime_scan_drains_bounded_batches_with_owner_mod_and_feedback_integrity(void) {
+    enum {
+        TEST_PENDING_COUNT = KEY_RUNTIME_DEFERRED_RELEASE_DRAIN_BATCH_CAPACITY + 2u,
+    };
+    key_runtime_core_state_t *state;
+    const press_token_t      *first_token;
+    const press_token_t      *second_token;
+    keypos_t                  first_key  = test_keypos(3, 6);
+    keypos_t                  second_key = test_keypos(3, 7);
+    keyboard_mod_state_t      expected_mods[TEST_PENDING_COUNT];
+    uint16_t                  first_owner;
+    uint16_t                  second_owner;
+    uint16_t                  state_time_before;
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+
+    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, KC_C, first_key, fake_time);
+    fake_time = (uint16_t)(fake_time + 5u);
+    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, KC_C, first_key, fake_time);
+    fake_time = (uint16_t)(fake_time + 5u);
+    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, KC_V, second_key, fake_time);
+    fake_time = (uint16_t)(fake_time + 5u);
+    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, KC_V, second_key, fake_time);
+
+    state        = key_runtime_core_state();
+    first_token  = key_runtime_core_press_token_at(first_key);
+    second_token = key_runtime_core_press_token_at(second_key);
+    CHECK(state != NULL);
+    CHECK(first_token != NULL);
+    CHECK(second_token != NULL);
+    CHECK(!first_token->active);
+    CHECK(!second_token->active);
+    CHECK(key_runtime_core_active_press_token_count() == 0u);
+    CHECK(key_runtime_core_pending_multi_tap_count() == 0u);
+    first_owner      = first_token->token_id;
+    second_owner     = second_token->token_id;
+    state_time_before = state->current_time;
+
+    for (uint8_t index = 0u; index < TEST_PENDING_COUNT; index++) {
+        keypos_t key_pos = (index & 1u) == 0u ? first_key : second_key;
+        uint16_t owner   = (index & 1u) == 0u ? first_owner : second_owner;
+
+        expected_mods[index] = (keyboard_mod_state_t){
+            .real           = (uint8_t)(1u << index),
+            .weak           = (uint8_t)(0x80u >> index),
+            .oneshot        = (uint8_t)(0x10u + index),
+            .oneshot_locked = (uint8_t)(0xA0u + index),
+        };
+        CHECK(key_runtime_core_queue_pending_release_dispatch_for_owner(key_pos, (uint16_t)(TEST_ACTION + index), expected_mods[index], index == (KEY_RUNTIME_DEFERRED_RELEASE_DRAIN_BATCH_CAPACITY - 1u) || index == KEY_RUNTIME_DEFERRED_RELEASE_DRAIN_BATCH_CAPACITY, owner));
+    }
+
+    first_token  = key_runtime_core_press_token_at(first_key);
+    second_token = key_runtime_core_press_token_at(second_key);
+    CHECK(first_token->pending_release_emission);
+    CHECK(second_token->pending_release_emission);
+    CHECK(first_token->phase == PRESS_TOKEN_PHASE_RELEASE_PENDING);
+    CHECK(second_token->phase == PRESS_TOKEN_PHASE_RELEASE_PENDING);
+
+    noah_key_runtime_scan();
+
+    CHECK(state->current_time == state_time_before);
+    CHECK(delayed_action_count == KEY_RUNTIME_DEFERRED_RELEASE_DRAIN_BATCH_CAPACITY);
+    CHECK(feedback_pulse_count == 1u);
+    CHECK(key_runtime_core_pending_release_count() == 2u);
+    first_token  = key_runtime_core_press_token_at(first_key);
+    second_token = key_runtime_core_press_token_at(second_key);
+    CHECK(first_token->pending_release_emission);
+    CHECK(second_token->pending_release_emission);
+    CHECK(first_token->phase == PRESS_TOKEN_PHASE_RELEASE_PENDING);
+    CHECK(second_token->phase == PRESS_TOKEN_PHASE_RELEASE_PENDING);
+
+    noah_key_runtime_scan();
+
+    CHECK(state->current_time == state_time_before);
+    CHECK(delayed_action_count == TEST_PENDING_COUNT);
+    CHECK(feedback_pulse_count == 2u);
+    CHECK(key_runtime_core_pending_release_count() == 0u);
+    first_token  = key_runtime_core_press_token_at(first_key);
+    second_token = key_runtime_core_press_token_at(second_key);
+    CHECK(!first_token->pending_release_emission);
+    CHECK(!second_token->pending_release_emission);
+    CHECK(first_token->phase == PRESS_TOKEN_PHASE_RELEASED);
+    CHECK(second_token->phase == PRESS_TOKEN_PHASE_RELEASED);
+
+    for (uint8_t index = 0u; index < TEST_PENDING_COUNT; index++) {
+        CHECK(delayed_action_log[index] == (uint16_t)(TEST_ACTION + index));
+        CHECK(delayed_action_mods_log[index].real == expected_mods[index].real);
+        CHECK(delayed_action_mods_log[index].weak == expected_mods[index].weak);
+        CHECK(delayed_action_mods_log[index].oneshot == expected_mods[index].oneshot);
+        CHECK(delayed_action_mods_log[index].oneshot_locked == expected_mods[index].oneshot_locked);
+    }
+
+    CHECK(feedback_pulse_kind_log[0] == KEY_FEEDBACK_PULSE_TAP_COMMITTED);
+    CHECK(feedback_pulse_kind_log[1] == KEY_FEEDBACK_PULSE_TAP_COMMITTED);
+    CHECK(test_keypos_equal(feedback_pulse_key_pos_log[0], second_key));
+    CHECK(test_keypos_equal(feedback_pulse_key_pos_log[1], first_key));
+    CHECK(feedback_pulse_tap_branch_log[0] == 0u);
+    CHECK(feedback_pulse_tap_branch_log[1] == 0u);
+    CHECK(projection_order_count == TEST_PENDING_COUNT + 2u);
+    CHECK(projection_order_log[0] == TEST_ACTION);
+    CHECK(projection_order_log[1] == TEST_ACTION + 1u);
+    CHECK(projection_order_log[2] == TEST_ACTION + 2u);
+    CHECK(projection_order_log[3] == TEST_ACTION + 3u);
+    CHECK(projection_order_log[4] == TEST_PROJECTION_FEEDBACK_MARKER);
+    CHECK(projection_order_log[5] == TEST_ACTION + 4u);
+    CHECK(projection_order_log[6] == TEST_PROJECTION_FEEDBACK_MARKER);
+    CHECK(projection_order_log[7] == TEST_ACTION + 5u);
+
+    noah_key_runtime_scan();
+    CHECK(delayed_action_count == TEST_PENDING_COUNT);
+    CHECK(feedback_pulse_count == 2u);
+    CHECK(projection_order_count == TEST_PENDING_COUNT + 2u);
+}
+
+static bool test_effect_plan_contains(const key_runtime_core_effect_plan_t *plan, key_runtime_effect_kind_t kind) {
+    if (!plan) {
+        return false;
+    }
+
+    for (uint8_t index = 0u; index < plan->count; index++) {
+        if (plan->items[index].kind == kind) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static void test_key_runtime_core_unmatched_release_uses_shadow_inclusive_hold_context(void) {
+    key_runtime_core_state_t  *state;
+    key_runtime_core_effect_plan_t plan;
+    handled_key_resolution_t   resolution = test_handled_key_resolution(TEST_TRANSPARENT_HOLD_KEY, 1u);
+    keypos_t                   key_pos    = test_keypos(2, 4);
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+
+    state = key_runtime_core_state();
+    CHECK(state != NULL);
+    layer_state = (layer_state_t)1u << 2;
+    state->shadow_projection.layer_state = (layer_state_t)1u << 1;
+    test_set_keymap_key(2u, key_pos, TEST_TRANSPARENT_HOLD_KEY);
+    test_set_keymap_key(1u, key_pos, MO(3));
+
+    key_runtime_core_effect_plan_init(&plan);
+    CHECK(key_runtime_core_handle_handled_key_release(TEST_TRANSPARENT_HOLD_KEY, key_pos, &resolution, (keyboard_mod_state_t){0}, &plan));
+    CHECK(plan.count == 2u);
+    CHECK(plan.items[0].kind == KEY_RUNTIME_EFFECT_LAYER_RELEASE);
+    CHECK(plan.items[1].kind == KEY_RUNTIME_EFFECT_RELEASE_OWNED_STATE_BY_KEY);
+
+    state->shadow_projection.layer_state = 0u;
+    key_runtime_core_effect_plan_init(&plan);
+    CHECK(key_runtime_core_handle_handled_key_release(TEST_TRANSPARENT_HOLD_KEY, key_pos, &resolution, (keyboard_mod_state_t){0}, &plan));
+    CHECK(plan.count == 1u);
+    CHECK(plan.items[0].kind == KEY_RUNTIME_EFFECT_RELEASE_OWNED_STATE_BY_KEY);
+}
+
+static void test_key_runtime_core_active_release_uses_token_layer_contract_not_fallback_resolution(void) {
+    key_runtime_core_effect_plan_t plan;
+    handled_key_resolution_t      layer_resolution = test_handled_key_resolution(TEST_INTERRUPTED_LAYER_KEY, 1u);
+    handled_key_resolution_t      plain_resolution = test_handled_key_resolution(KC_C, 1u);
+    keypos_t                      key_pos           = test_keypos(2, 4);
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, KC_C, key_pos, fake_time);
+    fake_time = (uint16_t)(fake_time + 5u);
+    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, KC_C, key_pos, fake_time);
+    key_runtime_core_effect_plan_init(&plan);
+    CHECK(key_runtime_core_handle_handled_key_release(KC_C, key_pos, &layer_resolution, (keyboard_mod_state_t){0}, &plan));
+    CHECK(!test_effect_plan_contains(&plan, KEY_RUNTIME_EFFECT_LAYER_RELEASE));
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, TEST_INTERRUPTED_LAYER_KEY, key_pos, fake_time);
+    fake_time = (uint16_t)(fake_time + 5u);
+    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, TEST_INTERRUPTED_LAYER_KEY, key_pos, fake_time);
+    key_runtime_core_effect_plan_init(&plan);
+    CHECK(key_runtime_core_handle_handled_key_release(TEST_INTERRUPTED_LAYER_KEY, key_pos, &plain_resolution, (keyboard_mod_state_t){0}, &plan));
+    CHECK(test_effect_plan_contains(&plan, KEY_RUNTIME_EFFECT_LAYER_RELEASE));
+}
+
+static void test_release_only_momentary_key_recovers_orphaned_layer_binding(void) {
+    keypos_t key_pos = test_keypos(2, 4);
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+
+    layer_ownership_momentary_press(key_pos, 2u);
+    CHECK(layer_state_cmp(layer_state, 2u));
+    CHECK(!test_process_record(TEST_INTERRUPTED_LAYER_KEY, key_pos, false));
+    CHECK(!layer_state_cmp(layer_state, 2u));
+    CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == KC_NO);
+}
+
 static void test_display_preview_bridges_momentary_layer_handoff_briefly(void) {
     keypos_t key_pos     = test_keypos(0, 0);
     keypos_t preview_pos = (keypos_t){0};
@@ -1040,7 +1382,8 @@ static void test_key_runtime_core_direct_active_release_helper_seeds_pending_mul
     fake_time = (uint16_t)(fake_time + 20u);
     test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, TEST_PENDING_MULTI_TAP_KEY, key_pos, fake_time);
     key_runtime_core_effect_plan_init(&plan);
-    CHECK(key_runtime_core_handle_handled_key_release(TEST_PENDING_MULTI_TAP_KEY, key_pos, test_handled_key_resolution(TEST_PENDING_MULTI_TAP_KEY, 1u), (keyboard_mod_state_t){0}, &plan));
+    handled_key_resolution_t resolution = test_handled_key_resolution(TEST_PENDING_MULTI_TAP_KEY, 1u);
+    CHECK(key_runtime_core_handle_handled_key_release(TEST_PENDING_MULTI_TAP_KEY, key_pos, &resolution, (keyboard_mod_state_t){0}, &plan));
     CHECK(plan.count == 0u);
     series = key_runtime_core_tap_series_at(key_pos);
     CHECK(series != NULL);
@@ -2338,6 +2681,48 @@ static void test_key_runtime_core_take_pending_releases_preserves_order_and_clea
     CHECK(snapshot.core_pending_release_count == 0u);
 }
 
+static void test_key_runtime_core_take_pending_releases_clears_owner_after_last_dispatch(void) {
+    pending_release_t    drained;
+    const press_token_t *token;
+    keypos_t             key_pos = test_keypos(4, 5);
+    keyboard_mod_state_t mods    = {.real = MOD_LALT};
+    uint16_t             owner_token_id;
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+
+    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, KC_C, key_pos, fake_time);
+    fake_time = (uint16_t)(fake_time + 5u);
+    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, KC_C, key_pos, fake_time);
+
+    token = key_runtime_core_press_token_at(key_pos);
+    CHECK(token != NULL);
+    CHECK(!token->active);
+    owner_token_id = token->token_id;
+    CHECK(owner_token_id != 0u);
+
+    CHECK(key_runtime_core_queue_pending_release_dispatch_for_owner(key_pos, TEST_ACTION, mods, false, owner_token_id));
+    CHECK(key_runtime_core_queue_pending_release_dispatch_for_owner(key_pos, TEST_SECOND_ACTION, mods, false, owner_token_id));
+
+    token = key_runtime_core_press_token_at(key_pos);
+    CHECK(token->pending_release_emission);
+    CHECK(token->phase == PRESS_TOKEN_PHASE_RELEASE_PENDING);
+
+    CHECK(key_runtime_core_take_pending_release_dispatches(&drained, 1u) == 1u);
+    CHECK(drained.action == TEST_ACTION);
+    CHECK(key_runtime_core_pending_release_count() == 1u);
+    token = key_runtime_core_press_token_at(key_pos);
+    CHECK(token->pending_release_emission);
+    CHECK(token->phase == PRESS_TOKEN_PHASE_RELEASE_PENDING);
+
+    CHECK(key_runtime_core_take_pending_release_dispatches(&drained, 1u) == 1u);
+    CHECK(drained.action == TEST_SECOND_ACTION);
+    CHECK(key_runtime_core_pending_release_count() == 0u);
+    token = key_runtime_core_press_token_at(key_pos);
+    CHECK(!token->pending_release_emission);
+    CHECK(token->phase == PRESS_TOKEN_PHASE_RELEASED);
+}
+
 static void test_runtime_debug_deferred_release_view_follows_key_runtime_core_queue(void) {
     pending_release_t    pending;
     keypos_t             first_key  = test_keypos(5, 2);
@@ -2497,6 +2882,12 @@ int main(void) {
     test_reset_clears_all_runtime_surfaces();
     test_key_runtime_scan_skips_core_work_when_idle();
     test_key_runtime_scan_drains_pending_release_without_core_work();
+    test_key_runtime_deferred_release_drain_is_bounded_and_fifo_at_full_capacity();
+    test_key_runtime_deferred_release_drain_defers_projection_enqueues_and_reentry();
+    test_key_runtime_scan_drains_bounded_batches_with_owner_mod_and_feedback_integrity();
+    test_key_runtime_core_unmatched_release_uses_shadow_inclusive_hold_context();
+    test_key_runtime_core_active_release_uses_token_layer_contract_not_fallback_resolution();
+    test_release_only_momentary_key_recovers_orphaned_layer_binding();
     test_display_preview_bridges_momentary_layer_handoff_briefly();
     test_display_preview_bridge_clears_immediately_when_layer_releases();
     test_key_runtime_core_release_tracks_press_by_position_despite_keycode_mismatch();
@@ -2541,6 +2932,7 @@ int main(void) {
     test_key_runtime_core_other_press_interrupt_clears_momentary_layer_quick_tap_blocker();
     test_key_runtime_core_pending_release_state_survives_same_key_reuse();
     test_key_runtime_core_take_pending_releases_preserves_order_and_clears_tokens();
+    test_key_runtime_core_take_pending_releases_clears_owner_after_last_dispatch();
     test_runtime_debug_deferred_release_view_follows_key_runtime_core_queue();
     test_key_runtime_core_runtime_owned_state_leases_track_and_clear();
     test_key_runtime_core_transition_execute_plan_updates_owned_state_leases();

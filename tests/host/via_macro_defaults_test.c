@@ -221,6 +221,7 @@ static void test_eeprom_init_seeds_defaults_immediately(void) {
     CHECK(macro_buffer[0] == 'A');
     CHECK(macro_buffer[1] == 'B');
     CHECK(macro_buffer[2] == 0);
+    CHECK(macro_payload_compile_calls == 2u);
 }
 
 static void test_macro_reset_command_defers_reseed_to_matrix_scan(void) {

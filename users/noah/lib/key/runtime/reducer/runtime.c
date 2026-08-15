@@ -303,16 +303,16 @@ static void key_runtime_core_press_token_begin(key_runtime_core_state_t *state, 
         tap_count = (uint8_t)(series->tap_count + 1u);
     }
 
-    resolution          = handled_key_lookup_tap_count(event->keycode, tap_count);
+    handled_key_lookup_tap_count_into(event->keycode, tap_count, &resolution);
     handled             = handled_key_resolution_is_handled(resolution);
-    materialized        = handled_key_materialized_default(resolution);
+    handled_key_materialized_default_into(&resolution, &materialized);
     hold_term_ms        = key_runtime_core_default_hold_term(event->keycode);
     longer_hold_term_ms = key_runtime_core_default_longer_hold_term();
 
     if (handled) {
         ctx                         = handled_key_resolution_ctx_make(event->key_pos, key_runtime_core_resolution_layers(state));
-        materialized                = handled_key_materialize(resolution, ctx);
-        interaction                 = key_runtime_slot_interaction_from_materialized(materialized);
+        handled_key_materialize_into(&resolution, &ctx, &materialized);
+        key_runtime_slot_interaction_from_materialized_into(&materialized, &interaction);
         hold_term_ms                = handled_key_resolution_tap_hold_term(resolution);
         longer_hold_term_ms         = handled_key_resolution_longer_hold_term(resolution);
         tap_outcome_available       = handled_key_resolution_has_multi_tap(resolution) || materialized.tap_action != KC_NO;
@@ -564,22 +564,51 @@ void key_runtime_core_apply_event(const runtime_event_t *event, uint16_t event_t
     }
 }
 
+static __attribute__((noinline)) void key_runtime_core_observe_process_record_press(uint16_t keycode, const keyrecord_t *record, uint16_t now) {
+    key_runtime_core_state_t *state = key_runtime_core_state();
+    runtime_key_event_t       event;
+
+    if (!(state && record)) {
+        return;
+    }
+
+    event = (runtime_key_event_t){
+        .keycode = keycode,
+        .key_pos = record->event.key,
+    };
+    key_runtime_core_refresh_for_time(state, now);
+    key_runtime_core_press_token_begin(state, &event, now);
+}
+
+static __attribute__((noinline)) void key_runtime_core_observe_process_record_release(uint16_t keycode, const keyrecord_t *record, uint16_t now) {
+    key_runtime_core_state_t *state = key_runtime_core_state();
+    runtime_key_event_t       event;
+
+    if (!(state && record)) {
+        return;
+    }
+
+    event = (runtime_key_event_t){
+        .keycode = keycode,
+        .key_pos = record->event.key,
+    };
+    key_runtime_core_refresh_for_time(state, now);
+    key_runtime_core_press_token_end(state, &event, now);
+}
+
 void key_runtime_core_observe_process_record_event(uint16_t keycode, keyrecord_t *record) {
-    runtime_event_t event;
+    uint16_t now;
 
     if (!record) {
         return;
     }
 
-    event = (runtime_event_t){
-        .kind = record->event.pressed ? RUNTIME_EVENT_KIND_KEY_DOWN : RUNTIME_EVENT_KIND_KEY_UP,
-        .data.key_event =
-            {
-                .keycode = keycode,
-                .key_pos = record->event.key,
-            },
-    };
-    key_runtime_core_apply_event(&event, timer_read());
+    now = timer_read();
+    if (record->event.pressed) {
+        key_runtime_core_observe_process_record_press(keycode, record, now);
+    } else {
+        key_runtime_core_observe_process_record_release(keycode, record, now);
+    }
 }
 
 void key_runtime_core_observe_scan_cycle(uint16_t now) {
@@ -846,42 +875,66 @@ bool key_runtime_core_handle_handled_key_press(uint16_t keycode, keypos_t key_po
     return true;
 }
 
-bool key_runtime_core_handle_handled_key_release(uint16_t keycode, keypos_t key_pos, handled_key_resolution_t resolution, keyboard_mod_state_t keyboard_mod_state, key_runtime_core_effect_plan_t *plan) {
-    key_runtime_core_state_t                               *state = key_runtime_core_state();
+static __attribute__((noinline)) bool key_runtime_core_try_pending_multi_tap_release(key_runtime_core_state_t *state, keypos_t key_pos, key_runtime_core_effect_plan_t *plan) {
     press_token_t                                          *token;
     tap_series_t                                           *series;
     key_runtime_core_release_effect_plan_t                  release_plan;
-    key_runtime_core_active_release_resolution_t            active_resolution;
     key_runtime_core_pending_multi_tap_release_resolution_t pending_resolution;
     delayed_action_mods_t                                   series_mods;
-
-    if (!(state && plan && handled_key_resolution_is_handled(resolution) && key_runtime_core_keypos_valid(key_pos))) {
-        return false;
-    }
 
     token       = key_runtime_core_press_token_state(state, key_pos);
     series      = key_runtime_core_tap_series_state(state, key_pos);
     series_mods = series ? series->saved_mod_state : (delayed_action_mods_t){0};
-    if (series && series->active && token && token->handled_key && token->interaction.selection.tap_count > 1u && !token->active && token->observed_release_keycode != KC_NO && series->keycode == token->resolved_keycode && key_runtime_core_resolve_pending_multi_tap_release(key_pos, series->tap_action, series->tap_repeat_count, true, &pending_resolution) && key_runtime_core_plan_pending_multi_tap_release_effects(key_pos, key_runtime_slot_interaction_is_momentary_layer(token->interaction), &pending_resolution, series_mods, &release_plan)) {
-        key_runtime_core_apply_release_settlement(state, key_pos, &release_plan);
-        key_runtime_core_effect_plan_append_release_plan(plan, &release_plan);
-        return true;
+    if (!(series && series->active && token && token->handled_key && token->interaction.selection.tap_count > 1u && !token->active && token->observed_release_keycode != KC_NO && series->keycode == token->resolved_keycode && key_runtime_core_resolve_pending_multi_tap_release(key_pos, series->tap_action, series->tap_repeat_count, true, &pending_resolution) && key_runtime_core_plan_pending_multi_tap_release_effects(key_pos, key_runtime_slot_interaction_is_momentary_layer(token->interaction), &pending_resolution, series_mods, &release_plan))) {
+        return false;
     }
 
-    if (key_runtime_core_resolve_active_release(key_pos, &active_resolution) && key_runtime_core_plan_active_release_effects(key_pos, keycode, &active_resolution, &release_plan)) {
-        key_runtime_core_apply_release_settlement(state, key_pos, &release_plan);
-        key_runtime_core_effect_plan_append_release_plan(plan, &release_plan);
-        if (release_plan.pending_multi_tap_seed.active) {
-            key_runtime_core_tap_series_seed(state, &release_plan.pending_multi_tap_seed, keyboard_mod_state);
-        }
-        return true;
+    key_runtime_core_apply_release_settlement(state, key_pos, &release_plan);
+    key_runtime_core_effect_plan_append_release_plan(plan, &release_plan);
+    return true;
+}
+
+static __attribute__((noinline)) bool key_runtime_core_try_active_release(key_runtime_core_state_t *state, uint16_t keycode, keypos_t key_pos, keyboard_mod_state_t keyboard_mod_state, key_runtime_core_effect_plan_t *plan) {
+    key_runtime_core_release_effect_plan_t       release_plan;
+    key_runtime_core_active_release_resolution_t active_resolution;
+
+    if (!(key_runtime_core_resolve_active_release(key_pos, &active_resolution) && key_runtime_core_plan_active_release_effects(key_pos, keycode, &active_resolution, &release_plan))) {
+        return false;
     }
 
-    handled_key_materialized_t materialized = handled_key_materialize(resolution, handled_key_resolution_ctx_make(key_pos, key_runtime_core_resolution_layers(state)));
-    if ((materialized.flags & HANDLED_KEY_FLAG_MOMENTARY_LAYER) != 0) {
+    key_runtime_core_apply_release_settlement(state, key_pos, &release_plan);
+    key_runtime_core_effect_plan_append_release_plan(plan, &release_plan);
+    if (release_plan.pending_multi_tap_seed.active) {
+        key_runtime_core_tap_series_seed(state, &release_plan.pending_multi_tap_seed, keyboard_mod_state);
+    }
+    return true;
+}
+
+static __attribute__((noinline)) void key_runtime_core_plan_unmatched_release(key_runtime_core_state_t *state, keypos_t key_pos, const handled_key_resolution_t *resolution, key_runtime_core_effect_plan_t *plan) {
+    handled_key_resolution_ctx_t ctx = handled_key_resolution_ctx_make(key_pos, key_runtime_core_resolution_layers(state));
+
+    if (handled_key_resolution_materializes_momentary_layer(resolution, &ctx)) {
         key_runtime_core_effect_plan_push_layer_release(plan, key_pos);
     }
     key_runtime_core_effect_plan_push_release_owned_state(plan, key_pos);
+}
+
+bool key_runtime_core_handle_handled_key_release(uint16_t keycode, keypos_t key_pos, const handled_key_resolution_t *resolution, keyboard_mod_state_t keyboard_mod_state, key_runtime_core_effect_plan_t *plan) {
+    key_runtime_core_state_t *state = key_runtime_core_state();
+
+    if (!(state && plan && resolution && handled_key_resolution_is_handled(*resolution) && key_runtime_core_keypos_valid(key_pos))) {
+        return false;
+    }
+
+    if (key_runtime_core_try_pending_multi_tap_release(state, key_pos, plan)) {
+        return true;
+    }
+
+    if (key_runtime_core_try_active_release(state, keycode, key_pos, keyboard_mod_state, plan)) {
+        return true;
+    }
+
+    key_runtime_core_plan_unmatched_release(state, key_pos, resolution, plan);
     return true;
 }
 

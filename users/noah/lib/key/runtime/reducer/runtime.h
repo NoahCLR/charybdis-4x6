@@ -358,14 +358,14 @@ static inline uint32_t key_runtime_core_state_next_feedback_sequence(key_runtime
 
 key_runtime_core_state_t *key_runtime_core_state(void);
 void                      key_runtime_core_apply_event(const runtime_event_t *event, uint16_t event_time);
-void                      key_runtime_core_observe_process_record_event(uint16_t keycode, keyrecord_t *record);
+__attribute__((noinline)) void key_runtime_core_observe_process_record_event(uint16_t keycode, keyrecord_t *record);
 void                      key_runtime_core_observe_scan_cycle(uint16_t now);
 void                      key_runtime_core_interrupt_active_keys_on_other_press(keypos_t key_pos, key_runtime_core_effect_plan_t *plan);
 void                      key_runtime_core_flush_foreign_multi_tap(uint16_t keycode, keypos_t key_pos, key_runtime_core_effect_plan_t *plan);
 void                      key_runtime_core_flush_multi_tap(key_runtime_core_effect_plan_t *plan);
 void                      key_runtime_core_flush_active_keys_except(keypos_t key_pos, key_runtime_core_effect_plan_t *plan);
 bool                      key_runtime_core_handle_handled_key_press(uint16_t keycode, keypos_t key_pos, handled_key_resolution_t resolution, key_runtime_core_effect_plan_t *plan);
-bool                      key_runtime_core_handle_handled_key_release(uint16_t keycode, keypos_t key_pos, handled_key_resolution_t resolution, keyboard_mod_state_t keyboard_mod_state, key_runtime_core_effect_plan_t *plan);
+bool                      key_runtime_core_handle_handled_key_release(uint16_t keycode, keypos_t key_pos, const handled_key_resolution_t *resolution, keyboard_mod_state_t keyboard_mod_state, key_runtime_core_effect_plan_t *plan);
 void                      key_runtime_core_scan(key_runtime_core_effect_plan_t *plan, uint16_t now);
 bool                      key_runtime_core_settle_pending_fallback_hold(key_runtime_core_effect_plan_t *plan);
 

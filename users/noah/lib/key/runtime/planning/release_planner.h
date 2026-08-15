@@ -63,15 +63,17 @@ typedef struct {
 } key_runtime_release_semantics_t;
 
 typedef struct {
-    key_runtime_slot_interaction_t  interaction;
-    key_runtime_release_semantics_t semantics;
-    uint16_t                        elapsed;
-    bool                            held_action_active;
-    bool                            repeat_active;
-    bool                            other_press_interrupted;
-    bool                            momentary_layer_tap_interrupted;
-    bool                            pd_mode_was_locked_on_press;
-    bool                            pd_mode_lock_consumed_on_press;
+    // Borrowed for the duration of one synchronous decision. Callers must not
+    // retain it across slot settlement or any mutation of press-token state.
+    const key_runtime_slot_interaction_t *interaction;
+    key_runtime_release_semantics_t       semantics;
+    uint16_t                              elapsed;
+    bool                                  held_action_active;
+    bool                                  repeat_active;
+    bool                                  other_press_interrupted;
+    bool                                  momentary_layer_tap_interrupted;
+    bool                                  pd_mode_was_locked_on_press;
+    bool                                  pd_mode_lock_consumed_on_press;
 } key_runtime_release_query_t;
 
 typedef struct {
@@ -81,43 +83,55 @@ typedef struct {
     pd_mode_mask_t                         pd_mode_lock_tap;
 } key_runtime_release_decision_t;
 
-static inline key_runtime_release_tap_contract_t key_runtime_release_tap_contract_for_interaction(key_runtime_slot_interaction_t interaction) {
-    if ((interaction.flags & HANDLED_KEY_FLAG_MULTI_TAP) != 0) {
+static inline key_runtime_release_tap_contract_t key_runtime_release_tap_contract_for_interaction(const key_runtime_slot_interaction_t *interaction) {
+    if (!interaction) {
+        return (key_runtime_release_tap_contract_t){0};
+    }
+
+    if ((interaction->flags & HANDLED_KEY_FLAG_MULTI_TAP) != 0) {
         return (key_runtime_release_tap_contract_t){
             .outcome      = KEY_RUNTIME_RELEASE_TAP_OUTCOME_BUFFER_MULTI_TAP,
-            .action       = interaction.binding.tap_action,
-            .repeat_count = interaction.binding.tap_repeat_count,
+            .action       = interaction->binding.tap_action,
+            .repeat_count = interaction->binding.tap_repeat_count,
         };
     }
 
-    if (interaction.binding.tap_action != KC_NO) {
+    if (interaction->binding.tap_action != KC_NO) {
         return (key_runtime_release_tap_contract_t){
             .outcome      = KEY_RUNTIME_RELEASE_TAP_OUTCOME_DISPATCH_ACTION,
-            .action       = interaction.binding.tap_action,
-            .repeat_count = interaction.binding.tap_repeat_count,
+            .action       = interaction->binding.tap_action,
+            .repeat_count = interaction->binding.tap_repeat_count,
         };
     }
 
     return (key_runtime_release_tap_contract_t){0};
 }
 
-static inline key_runtime_release_hold_contract_t key_runtime_release_hold_contract_for_interaction(key_runtime_slot_interaction_t interaction) {
+static inline key_runtime_release_hold_contract_t key_runtime_release_hold_contract_for_interaction(const key_runtime_slot_interaction_t *interaction) {
+    if (!interaction) {
+        return (key_runtime_release_hold_contract_t){0};
+    }
+
     return (key_runtime_release_hold_contract_t){
-        .primary_action = interaction.contract.hold.release_action,
-        .long_action    = interaction.contract.long_hold.release_action,
+        .primary_action = interaction->contract.hold.release_action,
+        .long_action    = interaction->contract.long_hold.release_action,
     };
 }
 
-static inline key_runtime_release_contract_t key_runtime_release_contract_for_interaction(key_runtime_slot_interaction_t interaction) {
+static inline key_runtime_release_contract_t key_runtime_release_contract_for_interaction(const key_runtime_slot_interaction_t *interaction) {
+    if (!interaction) {
+        return (key_runtime_release_contract_t){0};
+    }
+
     return (key_runtime_release_contract_t){
         .tap                                            = key_runtime_release_tap_contract_for_interaction(interaction),
         .hold                                           = key_runtime_release_hold_contract_for_interaction(interaction),
-        .quick_tap_pd_mode_lock                         = interaction.contract.quick_tap_pd_mode_lock,
-        .suppress_tap_on_layer_interrupt                = interaction.contract.suppress_tap_on_layer_interrupt,
-        .buffered_base_tap_dispatches_tap               = interaction.contract.buffered_base_tap_dispatches_tap,
-        .quick_release_of_immediate_hold_dispatches_tap = interaction.contract.quick_release_of_immediate_hold_dispatches_tap,
-        .fallback_hold_suppresses_nonquick_release      = interaction.contract.fallback_hold_suppresses_nonquick_release,
-        .nonquick_release_dispatches_tap                = interaction.contract.nonquick_release_dispatches_tap,
+        .quick_tap_pd_mode_lock                         = interaction->contract.quick_tap_pd_mode_lock,
+        .suppress_tap_on_layer_interrupt                = interaction->contract.suppress_tap_on_layer_interrupt,
+        .buffered_base_tap_dispatches_tap               = interaction->contract.buffered_base_tap_dispatches_tap,
+        .quick_release_of_immediate_hold_dispatches_tap = interaction->contract.quick_release_of_immediate_hold_dispatches_tap,
+        .fallback_hold_suppresses_nonquick_release      = interaction->contract.fallback_hold_suppresses_nonquick_release,
+        .nonquick_release_dispatches_tap                = interaction->contract.nonquick_release_dispatches_tap,
     };
 }
 
@@ -179,28 +193,28 @@ static inline key_runtime_release_semantics_t key_runtime_release_semantics_for_
 }
 
 static inline bool key_runtime_release_query_momentary_layer_tap_suppresses_quick_tap(const key_runtime_release_query_t *query) {
-    key_runtime_release_contract_t contract = query ? key_runtime_release_contract_for_interaction(query->interaction) : (key_runtime_release_contract_t){0};
-    return query && contract.suppress_tap_on_layer_interrupt && query->momentary_layer_tap_interrupted;
+    key_runtime_release_contract_t contract = key_runtime_release_contract_for_interaction(query ? query->interaction : NULL);
+    return query && query->interaction && contract.suppress_tap_on_layer_interrupt && query->momentary_layer_tap_interrupted;
 }
 
 static inline bool key_runtime_release_query_quick_tap(const key_runtime_release_query_t *query) {
-    return query && query->elapsed < query->interaction.binding.tap_hold_term && !key_runtime_release_query_momentary_layer_tap_suppresses_quick_tap(query);
+    return query && query->interaction && query->elapsed < query->interaction->binding.tap_hold_term && !key_runtime_release_query_momentary_layer_tap_suppresses_quick_tap(query);
 }
 
 static inline bool key_runtime_release_query_buffered_base_tap(const key_runtime_release_query_t *query) {
-    key_runtime_release_contract_t contract = query ? key_runtime_release_contract_for_interaction(query->interaction) : (key_runtime_release_contract_t){0};
-    return query && contract.buffered_base_tap_dispatches_tap && !query->held_action_active;
+    key_runtime_release_contract_t contract = key_runtime_release_contract_for_interaction(query ? query->interaction : NULL);
+    return query && query->interaction && contract.buffered_base_tap_dispatches_tap && !query->held_action_active;
 }
 
 static inline bool key_runtime_release_query_quick_immediate_hold(const key_runtime_release_query_t *query) {
-    key_runtime_release_contract_t contract = query ? key_runtime_release_contract_for_interaction(query->interaction) : (key_runtime_release_contract_t){0};
-    return query && contract.quick_release_of_immediate_hold_dispatches_tap && !query->other_press_interrupted && key_runtime_release_query_quick_tap(query);
+    key_runtime_release_contract_t contract = key_runtime_release_contract_for_interaction(query ? query->interaction : NULL);
+    return query && query->interaction && contract.quick_release_of_immediate_hold_dispatches_tap && !query->other_press_interrupted && key_runtime_release_query_quick_tap(query);
 }
 
 static inline pd_mode_mask_t key_runtime_release_query_lock_tap_mode(const key_runtime_release_query_t *query) {
-    key_runtime_release_contract_t contract = query ? key_runtime_release_contract_for_interaction(query->interaction) : (key_runtime_release_contract_t){0};
+    key_runtime_release_contract_t contract = key_runtime_release_contract_for_interaction(query ? query->interaction : NULL);
 
-    if (!query) {
+    if (!(query && query->interaction)) {
         return 0;
     }
 
@@ -208,7 +222,7 @@ static inline pd_mode_mask_t key_runtime_release_query_lock_tap_mode(const key_r
         return 0;
     }
 
-    if (query->pd_mode_lock_consumed_on_press || !query->pd_mode_was_locked_on_press || query->elapsed >= query->interaction.binding.tap_hold_term) {
+    if (query->pd_mode_lock_consumed_on_press || !query->pd_mode_was_locked_on_press || query->elapsed >= query->interaction->binding.tap_hold_term) {
         return 0;
     }
 
@@ -220,8 +234,8 @@ static inline pd_mode_mask_t key_runtime_release_query_lock_tap_mode(const key_r
 }
 
 static inline bool key_runtime_release_query_long_hold_ready(const key_runtime_release_query_t *query) {
-    key_runtime_release_contract_t contract = query ? key_runtime_release_contract_for_interaction(query->interaction) : (key_runtime_release_contract_t){0};
-    return query && key_runtime_release_hold_contract_long_ready(contract.hold, query->elapsed, query->interaction.binding.longer_hold_term);
+    key_runtime_release_contract_t contract = key_runtime_release_contract_for_interaction(query ? query->interaction : NULL);
+    return query && query->interaction && key_runtime_release_hold_contract_long_ready(contract.hold, query->elapsed, query->interaction->binding.longer_hold_term);
 }
 
 static inline key_runtime_release_decision_t key_runtime_release_decision_base(const key_runtime_release_query_t *query) {
@@ -257,7 +271,7 @@ static inline key_runtime_release_decision_t key_runtime_release_decide(const ke
     bool                           quick_immediate_hold;
     pd_mode_mask_t                 lock_tap_mode;
 
-    if (!query) {
+    if (!(query && query->interaction)) {
         return (key_runtime_release_decision_t){0};
     }
 
@@ -298,12 +312,12 @@ static inline key_runtime_release_decision_t key_runtime_release_decide(const ke
     switch (query->semantics.hold_action_mode) {
         case KEY_RUNTIME_RELEASE_HOLD_ACTION_MODE_PRIMARY_ONLY:
             if (key_runtime_release_hold_contract_has_primary_action(contract.hold)) {
-                return key_runtime_release_decision_action(query, key_runtime_release_contract_select_hold_action(contract, query->elapsed, query->interaction.binding.longer_hold_term));
+                return key_runtime_release_decision_action(query, key_runtime_release_contract_select_hold_action(contract, query->elapsed, query->interaction->binding.longer_hold_term));
             }
             break;
         case KEY_RUNTIME_RELEASE_HOLD_ACTION_MODE_SELECT_HOLD_ACTION:
             if (key_runtime_release_hold_contract_has_any_action(contract.hold)) {
-                return key_runtime_release_decision_action(query, key_runtime_release_contract_select_hold_action(contract, query->elapsed, query->interaction.binding.longer_hold_term));
+                return key_runtime_release_decision_action(query, key_runtime_release_contract_select_hold_action(contract, query->elapsed, query->interaction->binding.longer_hold_term));
             }
             break;
         case KEY_RUNTIME_RELEASE_HOLD_ACTION_MODE_NONE:

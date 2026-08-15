@@ -322,6 +322,9 @@ static void test_same_key_terminal_tap_interruption_defers_previous_branch_actio
     static const key_runtime_scenario_step_t third_release[] = {
         KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 2, 1),
     };
+    static const key_runtime_scenario_step_t follow_up_scan[] = {
+        KEY_RUNTIME_SCENARIO_SCAN(),
+    };
     const keypos_t key_pos = test_keypos(2, 1);
 
     key_runtime_scenario_reset();
@@ -351,6 +354,11 @@ static void test_same_key_terminal_tap_interruption_defers_previous_branch_actio
     CHECK(noah_runtime_debug_deferred_release_count() == 0u);
     CHECK(key_runtime_scenario_slot_has_pending_multi_tap(key_pos));
     CHECK(noah_runtime_debug_slot_pending_multi_tap_count(key_pos) == 1u);
+
+    key_runtime_scenario_clear_effects();
+    key_runtime_scenario_run(follow_up_scan, ARRAY_SIZE(follow_up_scan));
+    CHECK(key_runtime_scenario_effect_count() == 0u);
+    CHECK(noah_runtime_debug_deferred_release_count() == 0u);
 }
 
 static void test_momentary_layer_key_tracks_press_and_release_events(void) {

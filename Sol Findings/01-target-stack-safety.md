@@ -3,15 +3,15 @@
 ## Plan metadata
 
 - **Severity:** Must fix — memory-safety and reset risk on ordinary handled-key release paths
-- **Status:** Planned; no remediation has landed
+- **Status:** Verified on 2026-08-15; see [`implementation-progress.md`](implementation-progress.md) for the implementation and verification record
 - **Affected surfaces:** key-runtime release planning, deferred-release draining, QMK process-record call chain, target linker/build reporting
 - **Primary files:** [`release.c`](../users/noah/lib/key/runtime/release.c), [`deferred_release.c`](../users/noah/lib/key/runtime/deferred_release.c), [`process.c`](../users/noah/lib/key/runtime/process.c), transition/effect-plan types, userspace build wiring
-- **Prerequisites:** a reproducible firmware build with stack-usage artifacts; preserve a known-good release-behavior baseline
+- **Prerequisites:** a reproducible firmware build with final linked disassembly/map artifacts; preserve a known-good release-behavior baseline
 - **Recommended phase:** Phase 1, before functional remediation that adds state or call depth
 
 ## Problem statement
 
-The linked firmware reserves a 2,048-byte process stack, while the current handled-key release chain contains nested frames whose measured userspace contribution already exceeds that reservation. The largest avoidable allocation is a full-capacity deferred-release array on the stack. A release that reaches that drain path can overwrite adjacent memory before any C-level capacity check can help.
+The audited firmware reserved a 2,048-byte process stack, while handled-key and scan paths contained nested frames that could not retain the required reserve. The largest avoidable allocation was a full-capacity deferred-release array on the stack. A release that reached that drain path could overwrite adjacent memory before any C-level capacity check could help.
 
 This is not a theoretical “large frame” cleanup. The closure condition is a measured upper bound for a complete target call chain, including QMK callers and relevant interrupt/runtime reserve, with a mechanically enforced margin.
 
@@ -61,7 +61,10 @@ Representative failure: a handled key is released while one or more foreign defe
 
 1. Restore a working ARM/QMK toolchain and produce a clean `noah` firmware ELF, map file, and disassembly from the current tree.
 2. Record the configured process-stack symbol, `.bss`/`.data` totals, and the frame sizes for the complete process-record-to-deferred-projection chain.
-3. Enable target compiler stack reports (`-fstack-usage` or the equivalent supported by the QMK toolchain) for userspace translation units without changing optimization settings.
+3. Enable deterministic target stack analysis without changing normal release
+   optimization. The implemented gate uses `-fno-shrink-wrap` plus final linked
+   post-LTO disassembly; this is more directly auditable than pre-LTO `.su`
+   records for the linked call paths.
 4. Add a focused release scenario that reaches `key_runtime_deferred_release_drain_dispatches()` with multiple pending entries. Preserve its trace/order output as the behavioral baseline.
 5. Document any indirect-call edges that static call-graph tooling cannot resolve; these must be supplied explicitly to the budget checker.
 
@@ -91,7 +94,7 @@ Representative failure: a handled key is released while one or more foreign defe
 
 ### Step 3 — Add a target stack-budget gate
 
-1. Add a deterministic checker, for example `tests/host/run_firmware_stack_budget_checks.sh`, that parses target `.su`, ELF/map, and a maintained call-edge allowlist.
+1. Add a deterministic checker, for example `tests/host/run_firmware_stack_budget_checks.sh`, that parses the target ELF/map/disassembly and a maintained reviewed-path/indirect-edge manifest.
 2. Make the checker fail when:
    - the configured process-stack symbol is missing or unexpectedly smaller;
    - any enumerated process-record path exceeds the agreed budget;
@@ -173,18 +176,40 @@ Also run the new target stack-budget checker against the just-built ELF. A compi
 
 ## Acceptance checklist
 
-- [ ] The 120-entry automatic array is gone from every process-stack path.
-- [ ] Deferred release ordering, ownership cleanup, and feedback pairing are covered at capacity.
-- [ ] Entries queued during drain follow a tested, bounded policy.
-- [ ] A fresh target build reports the configured process-stack size.
-- [ ] The worst complete chain satisfies both the 25% and 512-byte reserve rules.
-- [ ] The target stack-budget gate fails on an injected over-budget fixture.
-- [ ] All targeted host runners pass.
-- [ ] `sh tests/host/run_feature_gate_compile_tests.sh` passes.
-- [ ] `sh tests/host/run_all_host_tests.sh` passes.
-- [ ] `qmk compile -kb bastardkb/charybdis/4x6 -km noah` passes.
-- [ ] Active review notes and build documentation match the landed tree.
+- [x] The 120-entry automatic array is gone from every process-stack path.
+- [x] Deferred release ordering, ownership cleanup, and feedback pairing are covered at capacity.
+- [x] Entries queued during drain follow a tested, bounded policy.
+- [x] A fresh target build reports the configured process-stack size.
+- [x] The worst complete chain satisfies both the 25% and 512-byte reserve rules.
+- [x] The target stack-budget gate fails on an injected over-budget fixture.
+- [x] All targeted host runners pass.
+- [x] `sh tests/host/run_feature_gate_compile_tests.sh` passes.
+- [x] `sh tests/host/run_all_host_tests.sh` passes.
+- [x] `qmk compile -kb bastardkb/charybdis/4x6 -km noah` passes.
+- [x] Active review notes and build documentation match the landed tree.
+
+## Closure measurements
+
+| Measurement | Before | Verified tree |
+| --- | ---: | ---: |
+| Configured process stack | 2,048 B | 2,560 B |
+| Required reserve | 512 B | 640 B |
+| Reviewed-path budget | 1,536 B | 1,920 B |
+| Worst reviewed main path | over budget | 1,808 B |
+| Worst reviewed split path | not separated | 328 B of 768 B budget |
+| `.text` | 103,304 B | 101,712 B |
+| `.rodata` | 15,460 B | 15,460 B |
+| `.data` | 23,760 B | 23,760 B |
+| `.bss` | 65,196 B | 65,204 B |
+| Linked heap | 173,184 B | 173,176 B |
+
+The process stack increased by 512 bytes only after constant-stack draining,
+press/release phase isolation, behavior materialization isolation, and VIA
+seed de-duplication. The fresh post-LTO report found a remaining credible
+1,808-byte nested fallback-settlement path, so 2,560 bytes is the smallest
+reviewed configuration that meets the 25% reserve policy in 256-byte steps.
 
 ## Next action
 
-Repair the local QMK/ARM toolchain, capture a fresh ELF/map/stack-usage baseline, and prototype a single-item pending-release take API behind tests before changing transition-plan ownership.
+Keep `sh tests/host/run_firmware_stack_budget_checks.sh` as the target closure
+gate for later runtime work. Continue with Finding 03.

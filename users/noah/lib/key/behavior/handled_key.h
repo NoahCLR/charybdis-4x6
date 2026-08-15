@@ -96,13 +96,27 @@ static inline handled_key_resolution_ctx_t handled_key_resolution_ctx_make(keypo
     };
 }
 
+static inline void handled_key_materialized_default_into(const handled_key_resolution_t *resolution, handled_key_materialized_t *out) {
+    if (!out) {
+        return;
+    }
+
+    *out = (handled_key_materialized_t){0};
+    if (!resolution) {
+        return;
+    }
+
+    out->authored = *resolution;
+    out->layer    = resolution->layer;
+    out->pd_mode  = resolution->pd_mode;
+    out->flags    = resolution->flags;
+}
+
 static inline handled_key_materialized_t handled_key_materialized_default(handled_key_resolution_t resolution) {
-    return (handled_key_materialized_t){
-        .authored = resolution,
-        .layer    = resolution.layer,
-        .pd_mode  = resolution.pd_mode,
-        .flags    = resolution.flags,
-    };
+    handled_key_materialized_t materialized;
+
+    handled_key_materialized_default_into(&resolution, &materialized);
+    return materialized;
 }
 
 static inline bool handled_key_hold_semantics_fires_at_threshold(handled_key_hold_semantics_t semantics) {
@@ -129,9 +143,13 @@ static inline bool handled_key_hold_contract_repeats_while_held(handled_key_hold
     return handled_key_hold_semantics_repeats_while_held(contract);
 }
 
+void                         handled_key_lookup_into(uint16_t keycode, handled_key_resolution_t *out);
+void                         handled_key_lookup_tap_count_into(uint16_t keycode, uint8_t tap_count, handled_key_resolution_t *out);
 handled_key_resolution_t     handled_key_lookup(uint16_t keycode);
 handled_key_resolution_t     handled_key_lookup_tap_count(uint16_t keycode, uint8_t tap_count);
 handled_key_resolution_ctx_t handled_key_resolution_ctx_live(keypos_t key_pos);
+__attribute__((noinline)) bool handled_key_resolution_materializes_momentary_layer(const handled_key_resolution_t *resolution, const handled_key_resolution_ctx_t *ctx);
+void                         handled_key_materialize_into(const handled_key_resolution_t *resolution, const handled_key_resolution_ctx_t *ctx, handled_key_materialized_t *out);
 handled_key_materialized_t   handled_key_materialize(handled_key_resolution_t resolution, handled_key_resolution_ctx_t ctx);
 bool                         handled_key_resolution_is_handled(handled_key_resolution_t resolution);
 bool                         handled_key_resolution_uses_implicit_hold(handled_key_resolution_t resolution);

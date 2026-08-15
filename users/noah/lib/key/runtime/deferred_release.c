@@ -9,6 +9,11 @@
 #include "reducer/state_query.h"
 #include "../../state/modifiers/keyboard_mod_policy.h"
 
+_Static_assert(KEY_RUNTIME_DEFERRED_RELEASE_DRAIN_BATCH_CAPACITY <= 4u, "deferred release drain batch exceeds stack budget");
+_Static_assert(sizeof(pending_release_t) * KEY_RUNTIME_DEFERRED_RELEASE_DRAIN_BATCH_CAPACITY <= 64u, "deferred release drain transport exceeds stack budget");
+
+static bool key_runtime_deferred_release_drain_in_progress;
+
 static bool key_runtime_deferred_release_keypos_equal(keypos_t lhs, keypos_t rhs) {
     return lhs.row == rhs.row && lhs.col == rhs.col;
 }
@@ -52,16 +57,18 @@ bool key_runtime_deferred_release_has_pending_dispatches(void) {
 }
 
 void key_runtime_deferred_release_drain_dispatches(void) {
-    pending_release_t pending[KEY_RUNTIME_CORE_PENDING_RELEASE_CAPACITY];
+    pending_release_t pending[KEY_RUNTIME_DEFERRED_RELEASE_DRAIN_BATCH_CAPACITY];
     uint8_t           drained;
 
-    if (!key_runtime_deferred_release_has_pending_dispatches()) {
+    if (key_runtime_deferred_release_drain_in_progress || !key_runtime_deferred_release_has_pending_dispatches()) {
         return;
     }
 
+    key_runtime_deferred_release_drain_in_progress = true;
     drained = key_runtime_core_take_pending_release_dispatches(pending, ARRAY_SIZE(pending));
 
     for (uint8_t index = 0; index < drained; index++) {
         key_runtime_core_project_pending_release_dispatch(&pending[index]);
     }
+    key_runtime_deferred_release_drain_in_progress = false;
 }

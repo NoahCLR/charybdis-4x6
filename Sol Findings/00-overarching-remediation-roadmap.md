@@ -2,7 +2,7 @@
 
 ## Plan metadata
 
-- **Status:** Planned; no firmware changes have landed from this plan.
+- **Status:** Implementation in progress; Finding 01 is verified and the next must-fix item is Finding 03. See [`implementation-progress.md`](implementation-progress.md).
 - **Prepared:** 2026-07-13.
 - **Scope:** Firmware runtime correctness, split reliability, target resource safety, and measured hot-path efficiency.
 - **Source:** The deep firmware code review performed against the current `charybdis-4x6` tree.
@@ -367,6 +367,6 @@ The remediation program is complete only when all of the following are true:
 
 ## Recommended next action
 
-Begin with [01 — Target stack safety](01-target-stack-safety.md).
-
-Before changing firmware, restore a working target compile environment, regenerate a fresh map/disassembly/stack-usage baseline, and add a mechanically checked stack budget. This is the first dependency because a process-stack overrun can corrupt state in ways that make every later lifecycle or split failure appear nondeterministic.
+Implement [03 — VIA split buffer validation](03-via-split-buffer-validation.md).
+Finding 01 is the verified stack-safety baseline that later runtime changes
+must continue to satisfy.
