@@ -4,11 +4,31 @@
 
 #include "handled_key_internal.h"
 
+__attribute__((weak)) key_behavior_step_t key_behavior_step_lookup(uint16_t keycode, uint8_t tap_count) {
+    (void)keycode;
+    (void)tap_count;
+    return key_behavior_step_none();
+}
+
+__attribute__((weak)) bool key_behavior_has_more_taps(uint16_t keycode, uint8_t count) {
+    (void)keycode;
+    (void)count;
+    return false;
+}
+
 __attribute__((weak)) bool key_behavior_future_tap_path_has_foreign_pd_mode(uint16_t keycode, uint8_t count, pd_mode_mask_t base_mode) {
     (void)keycode;
     (void)count;
     (void)base_mode;
     return false;
+}
+
+__attribute__((weak)) key_behavior_step_t key_behavior_view_step(const key_behavior_view_t *behavior, uint8_t tap_count) {
+    return behavior ? key_behavior_step_lookup(behavior->keycode, tap_count) : key_behavior_step_none();
+}
+
+__attribute__((weak)) bool key_behavior_view_has_more_taps(const key_behavior_view_t *behavior, uint8_t count) {
+    return behavior && key_behavior_has_more_taps(behavior->keycode, count);
 }
 
 uint8_t behavior_get_layer(uint16_t keycode) {

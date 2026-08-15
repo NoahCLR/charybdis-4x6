@@ -174,11 +174,11 @@ void key_runtime_transition_interrupt_active_keys_on_other_press(keypos_t key_po
     key_runtime_transition_end_auto_drain(plan, previous_flags, &core_plan);
 }
 
-bool key_runtime_transition_handled_key_press(uint16_t keycode, keypos_t key_pos, handled_key_resolution_t resolution, key_runtime_transition_plan_t *plan) {
+bool key_runtime_transition_handled_key_press(uint16_t keycode, keypos_t key_pos, key_runtime_transition_plan_t *plan) {
     key_runtime_core_effect_plan_t core_plan;
 
     key_runtime_core_effect_plan_init(&core_plan);
-    if (!key_runtime_core_handle_handled_key_press(keycode, key_pos, resolution, &core_plan)) {
+    if (!key_runtime_core_handle_handled_key_press(keycode, key_pos, &core_plan)) {
         return false;
     }
 
@@ -189,7 +189,7 @@ bool key_runtime_transition_handled_key_press(uint16_t keycode, keypos_t key_pos
 bool key_runtime_transition_handled_key_release(uint16_t keycode, keyrecord_t *record, const handled_key_resolution_t *resolution, key_runtime_transition_plan_t *plan) {
     key_runtime_core_effect_plan_t core_plan;
 
-    if (!(record && resolution && plan)) {
+    if (!(record && plan)) {
         return false;
     }
 
@@ -199,8 +199,12 @@ bool key_runtime_transition_handled_key_release(uint16_t keycode, keyrecord_t *r
         return true;
     }
 
-    key_runtime_transition_append_unmatched_release_effects(record->event.key, resolution, plan);
-    return true;
+    if (resolution && handled_key_resolution_is_handled(*resolution)) {
+        key_runtime_transition_append_unmatched_release_effects(record->event.key, resolution, plan);
+        return true;
+    }
+
+    return false;
 }
 
 void key_runtime_transition_scan(key_runtime_transition_plan_t *plan) {

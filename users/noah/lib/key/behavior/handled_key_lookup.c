@@ -5,13 +5,13 @@
 #include "handled_key_internal.h"
 
 void handled_key_lookup_tap_count_into(uint16_t keycode, uint8_t tap_count, handled_key_resolution_t *out) {
-    key_behavior_view_t behavior = key_behavior_lookup(keycode);
-    key_behavior_step_t step     = tap_count <= 1 ? behavior.single : key_behavior_step_lookup(keycode, tap_count);
-    bool                more     = key_behavior_has_more_taps(keycode, tap_count);
-
     if (!out) {
         return;
     }
+
+    key_behavior_view_t behavior = key_behavior_lookup(keycode);
+    key_behavior_step_t step     = tap_count <= 1 ? behavior.single : key_behavior_view_step(&behavior, tap_count);
+    bool                more     = key_behavior_view_has_more_taps(&behavior, tap_count);
 
     *out = (handled_key_resolution_t){
         .keycode             = keycode,

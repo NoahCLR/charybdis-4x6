@@ -11,9 +11,8 @@
 #include "reducer/state_query.h"
 #include "../../state/ownership/keyboard_mod_ownership.h"
 
-bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record) {
-    handled_key_resolution_t handled_key = handled_key_lookup(keycode);
-    const press_token_t     *token       = key_runtime_core_press_token_at(record->event.key);
+bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record, bool press_is_handled) {
+    const press_token_t *token = key_runtime_core_press_token_at(record->event.key);
 
     if (owned_keycode_should_suppress_default(keycode, record) || keyboard_mod_ownership_should_suppress_default(keycode, record)) {
         if (!record->event.pressed && token && token->handled_key) {
@@ -33,7 +32,7 @@ bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record) {
         key_runtime_transition_execute_plan(&plan);
     }
 
-    if (record->event.pressed && !handled_key_resolution_is_handled(handled_key)) {
+    if (record->event.pressed && !press_is_handled) {
         key_runtime_transition_plan_t plan;
 
         key_runtime_transition_plan_init(&plan);

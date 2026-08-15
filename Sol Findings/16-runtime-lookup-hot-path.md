@@ -3,7 +3,7 @@
 ## Plan metadata
 
 - Severity: medium optimization
-- Status: planned
+- Status: verified
 - Recommended phase: Phase 6 profile-guided optimization, after correctness-critical identity and ownership fixes
 - Affected surfaces:
   - users/noah/lib/key/behavior/key_behavior_lookup.c
@@ -27,7 +27,10 @@ Authored behavior lookup is a linear scan, and a single resolution can invoke th
 
 The runtime then repeatedly traverses matrix-sized press-token and tap-series arrays. Feedback projection traverses them again, and an active runtime marks split key feedback dirty on every scan even when no visible semantic changed. These costs are bounded today, but they occur in latency-sensitive firmware paths and scale with authored data and matrix capacity rather than actual active keys.
 
-## Current evidence and workload
+## Audit baseline evidence and workload
+
+This section records the pre-implementation workload. The closure summary and
+acceptance checklist below describe the current tree.
 
 - users/noah/lib/key/behavior/key_behavior_lookup.c:16-20 linearly scans key_behaviors for one keycode.
 - users/noah/lib/key/behavior/key_behavior_lookup.c:159-168 calls that lookup independently for step, more-taps, and future-path queries.
@@ -187,6 +190,28 @@ Closure gates:
 - Deadline-driven dirtiness can miss an animation transition if one mutation path is overlooked.
 - If active-set bookkeeping produces too much churn, retain fixed arrays and land only one-lookup resolution plus semantic dirty generations.
 
+## Final implementation decision
+
+- One located authored config pointer now supplies the selected step and
+  remaining-tap state. A normal handled press performs one authored search and
+  a matched release performs none.
+- The observed position-owned token is authoritative through preflight,
+  handled routing, and matched release. Unmatched release and allocation
+  failure retain explicit fallback resolution.
+- Authored continuation is cached separately from transparent materialized
+  tap-source continuation, preserving PINCH and other transparent branches.
+- Two 60-slot bitmaps accelerate active press-token and tap-series traversal.
+  Arrays remain authoritative and host tests recompute bitmap/count
+  consistency.
+- An unchanged active scan now marks split feedback dirty zero times. A
+  no-effect-plan release-hold threshold crossing changes the feedback sequence
+  and marks exactly once. Projected effects keep their existing explicit dirty
+  notification, while split sync's active-packet policy preserves flashing and
+  expiry updates.
+- A sorted or hashed authored lookup index was rejected: after duplicate
+  searches were removed, the normal event budget was already one search and no
+  measurement justified the extra initialization and invariant surface.
+
 ## Documentation and review-note updates
 
 - Document the lookup index, active-set invariants, and feedback-generation ownership in the active runtime architecture note.
@@ -196,18 +221,24 @@ Closure gates:
 
 ## Acceptance checklist
 
-- [ ] Normal press resolution searches authored rows at most once.
-- [ ] Matched release performs no authored lookup.
-- [ ] Lookup results match the linear reference for all tested profiles/keycodes.
-- [ ] Active-index/count invariants survive all lifecycle paths.
-- [ ] Idle or unchanged active scans avoid unnecessary slot/projection work.
-- [ ] Visible deadlines still invalidate feedback exactly when required.
-- [ ] Operation-count budgets are enforced in host tests.
-- [ ] Targeted lookup, runtime, split, RGB, and feature-gate checks pass.
-- [ ] The full host suite passes.
-- [ ] The target QMK compile passes.
-- [ ] Target stack/BSS/text measurements and architecture notes are current.
+- [x] Normal press resolution searches authored rows at most once.
+- [x] Matched release performs no authored lookup.
+- [x] Lookup results match the linear reference for all tested profiles/keycodes.
+- [x] Active-index/count invariants survive covered lifecycle paths.
+- [x] Idle scans visit no slots and active scans visit only active press/tap-series entries.
+- [x] Visible deadlines still invalidate feedback exactly when required.
+- [x] Authored lookup operation-count budgets are enforced in host tests.
+- [x] Targeted lookup, runtime, split, RGB, and feature-gate checks pass.
+- [x] The full host suite passes.
+- [x] The target QMK compile passes.
+- [x] Target stack/BSS/text measurements and architecture notes are current.
 
-## Next action
+## Closure result
 
-Add test-only comparison, slot-visit, and dirty-notification counters. First remove repeated config lookup inside handled_key_lookup_tap_count; only then decide whether the remaining real-profile search merits a sorted index.
+Finding 16 is verified. A one-active-press scan fell from 180 matrix-slot
+visits to one refresh plus one press visit; a pending series costs one refresh
+plus one series visit; idle costs zero. The final target is 152,232 B text,
+25,524 B static BSS, and 212,352 B linker heap. Fresh reviewed stack maxima are
+1,912/1,920 B on the main process stack and 336/768 B on the split worker.
+Focused checks, the full host suite, normal firmware build, memory gate, and
+fresh post-LTO stack gate all pass. No sibling QMK source was edited.

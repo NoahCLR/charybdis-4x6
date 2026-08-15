@@ -281,6 +281,7 @@ bool key_runtime_core_plan_active_release_effects(keypos_t key_pos, uint16_t key
                         .multi_tap_term      = resolution->interaction->binding.multi_tap_term,
                         .branch_confirm_term = resolution->interaction->binding.branch_confirm_term,
                         .has_more_taps       = resolution->interaction->binding.has_more_taps,
+                        .authored_has_more_taps = resolution->interaction->binding.authored_has_more_taps,
                     };
                     return true;
                 case KEY_RUNTIME_RELEASE_TAP_OUTCOME_DISPATCH_ACTION:

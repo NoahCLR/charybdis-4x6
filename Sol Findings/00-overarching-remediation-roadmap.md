@@ -2,7 +2,7 @@
 
 ## Plan metadata
 
-- **Status:** Implementation in progress; Phases 1 and 2 are verified. Phase 3 software work is complete, with Finding 05 awaiting its physical two-half matrix. Phase 4 software work is complete, with Finding 10 awaiting on-device timing. Phase 5 is verified. In Phase 6, Finding 14 macro RAM is verified and Finding 16 remains planned. See [`implementation-progress.md`](implementation-progress.md).
+- **Status:** Implementation in progress; Phases 1 and 2 are verified. Phase 3 software work is complete, with Finding 05 awaiting its physical two-half matrix. Phase 4 software work is complete, with Finding 10 awaiting on-device timing. Phases 5 and 6 are verified. See [`implementation-progress.md`](implementation-progress.md).
 - **Prepared:** 2026-07-13.
 - **Scope:** Firmware runtime correctness, split reliability, target resource safety, and measured hot-path efficiency.
 - **Source:** The deep firmware code review performed against the current `charybdis-4x6` tree.
@@ -220,10 +220,9 @@ Exit criteria:
 
 Recommended order: **13, 15**.
 
-Finding 13 is verified: normal activation and pending preview now consume one
-selection-aware base/group renderer, including universal rows, inheritance,
-base-less explicit groups, authored override order, and chunk parity. Finding
-15 is the remaining Phase 5 optimization item.
+Findings 13 and 15 are verified. Normal activation and pending preview consume
+one selection-aware base/group renderer, and one runtime snapshot now serves a
+whole RGB frame with exact chunk/role parity and bounded stage work.
 
 - Extract or reuse one group/inheritance resolution path for normal and preview rendering.
 - Add parity tests before introducing per-frame or per-chunk caches.
@@ -243,7 +242,10 @@ Recommended order: **14, 16**.
 
 Finding 14 is verified: 80 logical slots now use one-byte metadata plus one
 shared pinned IR, reclaiming 40,841 target bytes under a fresh-ELF memory gate.
-Finding 16 remains the next software optimization.
+Finding 16 is verified: authored resolution is bounded to one search per normal
+handled press and zero per matched release; active scan traversal is
+proportional to active entries; unchanged active scans issue zero feedback
+dirty marks while tested visible deadlines issue exactly one.
 
 - Measure current `.bss`, cache hit rate, parse latency, behavior comparisons, active-slot scans, and feedback dirty events.
 - Select the smallest design that meets an explicit latency and memory budget; do not begin with a generic runtime rewrite.

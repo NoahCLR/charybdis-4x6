@@ -368,6 +368,28 @@ static void test_plain_pd_mode_key_is_handled_without_authored_behavior(void) {
     CHECK(!behavior.single.long_hold.present);
 }
 
+static void test_handled_resolution_searches_authored_rows_once(void) {
+    key_behavior_lookup_test_counters_t counters;
+
+    key_behavior_lookup_test_counters_reset();
+    (void)handled_key_lookup(TEST_MULTI_TAP_KEY);
+    key_behavior_lookup_test_counters_snapshot(&counters);
+    CHECK(counters.search_count == 1u);
+    CHECK(counters.row_comparison_count > 0u);
+
+    key_behavior_lookup_test_counters_reset();
+    (void)handled_key_lookup_tap_count(TEST_MULTI_TAP_KEY, 2u);
+    key_behavior_lookup_test_counters_snapshot(&counters);
+    CHECK(counters.search_count == 1u);
+    CHECK(counters.row_comparison_count > 0u);
+
+    key_behavior_lookup_test_counters_reset();
+    (void)handled_key_lookup(KC_A);
+    key_behavior_lookup_test_counters_snapshot(&counters);
+    CHECK(counters.search_count == 1u);
+    CHECK(counters.row_comparison_count == key_behavior_count);
+}
+
 static void test_pd_mode_lock_stays_out_of_handled_key_runtime(void) {
     key_behavior_view_t behavior = key_behavior_lookup(TEST_PD_MODE_LOCK_KEY);
 
@@ -701,6 +723,7 @@ int main(void) {
     test_branch_confirm_term_resolution();
     test_momentary_layer_stays_handled();
     test_plain_pd_mode_key_is_handled_without_authored_behavior();
+    test_handled_resolution_searches_authored_rows_once();
     test_pd_mode_lock_stays_out_of_handled_key_runtime();
     test_repeat_rate_validation_helper_enforces_supported_range();
     test_transparent_tap_uses_lower_active_layer_tap_action();

@@ -26,6 +26,7 @@
 
 #define KEY_RUNTIME_CORE_PRESS_TOKEN_CAPACITY ((uint16_t)(MATRIX_ROWS * MATRIX_COLS))
 #define KEY_RUNTIME_CORE_TAP_SERIES_CAPACITY ((uint16_t)(MATRIX_ROWS * MATRIX_COLS))
+#define KEY_RUNTIME_CORE_ACTIVE_BITMAP_WORD_COUNT ((KEY_RUNTIME_CORE_PRESS_TOKEN_CAPACITY + 31u) / 32u)
 #define KEY_RUNTIME_CORE_LEASE_CAPACITY ((uint16_t)(KEY_RUNTIME_CORE_PRESS_TOKEN_CAPACITY * 4u))
 #define KEY_RUNTIME_CORE_PENDING_RELEASE_CAPACITY ((uint16_t)(KEY_RUNTIME_CORE_PRESS_TOKEN_CAPACITY * 2u))
 #define KEY_RUNTIME_CORE_PERSISTENT_INTENT_CAPACITY 16u
@@ -148,6 +149,7 @@ typedef struct {
     bool                  tap_branch_has_authored_step;
     bool                  tap_branch_has_authored_tap;
     bool                  has_more_taps;
+    bool                  authored_has_more_taps;
     hold_behavior_t       hold;
     hold_behavior_t       long_hold;
     uint16_t              tap_hold_term_ms;
@@ -319,6 +321,8 @@ typedef struct {
     // key_runtime_core_token_id_is_reserved() and covered by its host test.
     press_token_t                        press_tokens[KEY_RUNTIME_CORE_PRESS_TOKEN_CAPACITY];
     tap_series_t                         tap_series[KEY_RUNTIME_CORE_TAP_SERIES_CAPACITY];
+    uint32_t                             press_token_active_bitmap[KEY_RUNTIME_CORE_ACTIVE_BITMAP_WORD_COUNT];
+    uint32_t                             tap_series_active_bitmap[KEY_RUNTIME_CORE_ACTIVE_BITMAP_WORD_COUNT];
     lease_t                              leases[KEY_RUNTIME_CORE_LEASE_CAPACITY];
     pending_release_slot_t               pending_releases[KEY_RUNTIME_CORE_PENDING_RELEASE_CAPACITY];
     persistent_intent_t                  persistent_intents[KEY_RUNTIME_CORE_PERSISTENT_INTENT_CAPACITY];
@@ -359,6 +363,18 @@ typedef struct {
     bool                                 keyboard_event_mask_active;
 } key_runtime_core_state_t;
 
+#ifdef KEY_RUNTIME_HOT_PATH_TEST_INSTRUMENTATION
+typedef struct {
+    uint16_t refresh_slot_visit_count;
+    uint16_t scan_press_slot_visit_count;
+    uint16_t scan_tap_series_slot_visit_count;
+} key_runtime_hot_path_test_counters_t;
+
+void key_runtime_hot_path_test_counters_reset(void);
+void key_runtime_hot_path_test_counters_snapshot(key_runtime_hot_path_test_counters_t *out);
+bool key_runtime_hot_path_test_active_indexes_consistent(void);
+#endif
+
 static inline uint32_t key_runtime_core_state_next_feedback_sequence(key_runtime_core_state_t *state) {
     uint32_t sequence;
 
@@ -387,7 +403,7 @@ void                      key_runtime_core_interrupt_active_keys_on_other_press(
 void                      key_runtime_core_flush_foreign_multi_tap(uint16_t keycode, keypos_t key_pos, key_runtime_core_effect_plan_t *plan);
 void                      key_runtime_core_flush_multi_tap(key_runtime_core_effect_plan_t *plan);
 void                      key_runtime_core_flush_active_keys_except(keypos_t key_pos, key_runtime_core_effect_plan_t *plan);
-bool                      key_runtime_core_handle_handled_key_press(uint16_t keycode, keypos_t key_pos, handled_key_resolution_t resolution, key_runtime_core_effect_plan_t *plan);
+bool                      key_runtime_core_handle_handled_key_press(uint16_t keycode, keypos_t key_pos, key_runtime_core_effect_plan_t *plan);
 bool                      key_runtime_core_handle_handled_key_release(uint16_t keycode, keypos_t key_pos, const handled_key_resolution_t *resolution, keyboard_mod_state_t keyboard_mod_state, key_runtime_core_effect_plan_t *plan);
 void                      key_runtime_core_scan(key_runtime_core_effect_plan_t *plan, uint16_t now);
 bool                      key_runtime_core_settle_pending_fallback_hold(key_runtime_core_effect_plan_t *plan);

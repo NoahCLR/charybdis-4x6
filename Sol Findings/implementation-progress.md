@@ -5,10 +5,10 @@
 - **Branch:** `sol`
 - **Starting commit:** `5b20ed01` (`sol findings`)
 - **Started:** 2026-07-13
-- **Current focus:** Findings 05 and 10 await their physical checks. Findings 13 and 15 are verified; Findings 14 and 16 remain planned software optimization items.
+- **Current focus:** Findings 05 and 10 await their physical checks. All planned software optimization findings, including Finding 16, are verified.
 - **Overall status:** In progress
-- **Latest closed review:** [`review/2026-08-15-review-14`](../review/2026-08-15-review-14/)
-- **Active implementation review:** [`review/2026-08-15-review-12`](../review/2026-08-15-review-12/); Review 10 also remains hardware-verification pending
+- **Latest closed review:** [`review/2026-08-15-review-16`](../review/2026-08-15-review-16/)
+- **Active implementation reviews:** [`review/2026-08-15-review-10`](../review/2026-08-15-review-10/) and [`review/2026-08-15-review-12`](../review/2026-08-15-review-12/) remain hardware-verification pending
 
 This file is the implementation record for the plans in this directory. It records what actually changed, why choices were made, what verification really ran, and what remains open. A plan is not marked verified until its targeted checks, the full host suite, the target firmware build, target-specific evidence, and required documentation all pass.
 
@@ -37,9 +37,9 @@ This file is the implementation record for the plans in this directory. It recor
 | 11 | [Dragscroll stall recovery](11-dragscroll-stall-recovery.md) | Should fix | Verified | 55/56 and 80/81 ms boundaries, first-report/no-motion/wrap/reset/pinch reuse, one-read timer budget, full host, firmware, and explicit 360 B stack path pass |
 | 12 | [Split RPC failure backoff](12-split-rpc-failure-backoff.md) | Should fix | Verified | Stop-on-first-failure, 50–1,000 ms wrap-safe backoff, current-state recovery, bounded trace, full host, firmware, and target-stack gates pass |
 | 13 | [RGB preview parity](13-rgb-preview-parity.md) | Should fix | Verified | Shared selected-layer renderer; universal/inherit/base-less/ordering/chunk parity, full host, firmware, and target-stack gates pass |
-| 14 | [Macro-cache RAM](14-macro-cache-ram.md) | Optimize | Planned | Not run |
+| 14 | [Macro-cache RAM](14-macro-cache-ram.md) | Optimize | Verified | 41,440 B per-slot IR storage reduced to 599 B shared storage; full host, firmware, memory, and stack gates pass |
 | 15 | [RGB render work](15-rgb-render-work.md) | Optimize | Verified | Exact frame snapshot; 10→1 semantic and 20→1 combo projection builds, 5→3 local stage pipelines, full host, firmware, and target resource/stack gates pass |
-| 16 | [Runtime lookup hot path](16-runtime-lookup-hot-path.md) | Optimize | Planned | Not run |
+| 16 | [Runtime lookup hot path](16-runtime-lookup-hot-path.md) | Optimize | Verified | One authored search per handled press, zero per matched release, 180→2 one-active-press slot visits, zero unchanged dirty marks, full host/firmware/resource/fresh-stack gates pass |
 | 17 | [Split timer sampling](17-split-timer-sampling.md) | Optimize | Verified | One sampled tick timestamp, active auto-mouse elapsed-at compatibility, wrap/timer-budget tests, full host, firmware, and explicit target-stack paths pass |
 
 ## Finding 01 — Target stack safety
@@ -1138,6 +1138,66 @@ Finding 15 is **verified**. Review 14 records the QMK frame contract, red
 evidence, coherent snapshot policy, work budget, target measurements, and all
 passing closure gates.
 
+## Finding 16 — Runtime lookup hot path
+
+### Objective
+
+Bound authored behavior resolution and runtime scan work to the actual event
+and active entries, then stop invalidating split feedback on unchanged active
+scans without losing deadline-driven visual updates.
+
+### Implemented
+
+- Added host-only authored-search, row-comparison, active-slot-visit,
+  bitmap-consistency, and feedback-dirty counters.
+- Derived a complete handled resolution from one located authored config row.
+- Made the observed position-owned press token authoritative for normal
+  preflight, handled press routing, and matched release settlement.
+- Preserved explicit fallback lookup for unmatched releases and token-capacity
+  failure.
+- Cached authored continuation independently from transparent materialized
+  tap-source continuation.
+- Added two compact 60-slot active bitmaps while keeping the position-indexed
+  arrays authoritative and mechanically checking their lifecycle consistency.
+- Replaced scan-wide feedback invalidation with transition-plan invalidation
+  plus feedback-sequence detection for visible no-plan deadline changes.
+- Reconciled release and non-handled-cleanup stack paths against a fresh linked
+  image; no false or undocumented adjacency was accepted.
+
+### Measured result
+
+- A direct handled resolution performs one authored search instead of two on
+  the first tap and three on later taps.
+- A normal handled press performs one authored search across the whole event
+  pipeline; its matched release performs zero.
+- One active press falls from 180 matrix-slot visits to one refresh plus one
+  press visit. A pending tap series costs one refresh plus one series visit;
+  idle costs zero.
+- An unchanged active scan emits zero feedback dirty marks. A tested
+  release-hold deadline crossing emits exactly one, and the next unchanged scan
+  returns to zero.
+- The final target is 152,232 B text, 25,524 B static BSS, 212,352 B linker
+  heap, and 245,336 B ELF BSS including linker-reserved heap. The bitmaps add
+  exactly 16 B to the key-runtime state.
+- Fresh reviewed stack maxima are 1,912/1,920 B main and 336/768 B split.
+
+### Verification and closure
+
+- Focused lookup, real-profile, release, scenario, split-sync, runtime trace,
+  RGB, feature-gate, and 15-fixture stack-tool checks passed.
+- `PYTHONPYCACHEPREFIX=/tmp/noah-host-pycache sh tests/host/run_all_host_tests.sh`
+  passed.
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah` passed.
+- `PYTHON=/usr/bin/python3 sh tests/host/run_firmware_memory_budget_checks.sh`
+  passed.
+- `PYTHON=/usr/bin/python3 sh tests/host/run_firmware_stack_budget_checks.sh`
+  passed from a clean instrumented target build.
+- `git diff --check` passed.
+
+Finding 16 is **verified**. Review 16 records the selected architecture,
+rejected lookup-index tradeoff, red evidence, enforcement, target measurements,
+and closure verdict. No sibling QMK source was edited.
+
 ## Cross-cutting decisions and deferred work
 
 - The implementation order follows [`00-overarching-remediation-roadmap.md`](00-overarching-remediation-roadmap.md).
@@ -1168,7 +1228,6 @@ passing closure gates.
 ## Next program action
 
 Execute Finding 05's physical disconnect/power-cycle/role-swap matrix and
-Finding 10's flashed timing/feel check when hardware is available. The next
-software optimization pass should select Finding 16 runtime lookup hot-path
-work. Finding 14 now provides the verified RAM baseline, while Findings 13 and
-15 provide the verified RGB correctness and render-work baseline.
+Finding 10's flashed timing/feel check when hardware is available. All planned
+software findings are verified; these two physical checks are the remaining
+program-level closure work.

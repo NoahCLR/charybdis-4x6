@@ -26,6 +26,7 @@ typedef struct {
     uint16_t        multi_tap_term;
     uint16_t        branch_confirm_term;
     bool            has_more_taps;
+    bool            authored_has_more_taps;
     bool            tap_resolves_on_press;
 } key_runtime_slot_binding_t;
 
@@ -58,6 +59,7 @@ static inline key_runtime_slot_binding_t key_runtime_slot_binding_from_materiali
         .multi_tap_term        = materialized.authored.multi_tap_term,
         .branch_confirm_term   = materialized.authored.branch_confirm_term,
         .has_more_taps         = materialized.tap_has_more_taps,
+        .authored_has_more_taps = materialized.authored.has_more_taps,
         .tap_resolves_on_press = materialized.tap_resolves_on_press,
     };
 }
@@ -114,6 +116,7 @@ static inline void key_runtime_slot_interaction_from_materialized_into(const han
                 .multi_tap_term        = materialized->authored.multi_tap_term,
                 .branch_confirm_term   = materialized->authored.branch_confirm_term,
                 .has_more_taps         = materialized->tap_has_more_taps,
+                .authored_has_more_taps = materialized->authored.has_more_taps,
                 .tap_resolves_on_press = materialized->tap_resolves_on_press,
             },
         .hold_strategy = materialized->hold_strategy,

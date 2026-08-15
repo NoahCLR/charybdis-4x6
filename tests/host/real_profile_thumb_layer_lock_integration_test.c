@@ -11,6 +11,7 @@
 #include "users/noah/lib/action/action_dispatch.h"
 #include "users/noah/lib/action/synthetic_record.h"
 #include "users/noah/lib/compat/qmk_combo_origin.h"
+#include "users/noah/lib/key/behavior/key_behavior_lookup.h"
 #include "users/noah/lib/key/runtime/delayed_action.h"
 #include "users/noah/lib/key/runtime/feedback.h"
 #include "users/noah/lib/key/runtime/slot/origin_registry.h"
@@ -23,6 +24,7 @@
 #include "users/noah/lib/state/diagnostics/runtime_debug.h"
 #include "users/noah/lib/state/shared/runtime_reset.h"
 #include "users/noah/lib/state/diagnostics/runtime_trace.h"
+#include "users/noah/lib/split/runtime_sync_dirty.h"
 #include "users/noah/noah_keymap.h"
 #include "users/noah/noah_runtime.h"
 
@@ -428,6 +430,7 @@ static void test_shadow_replay_scenario(void (*scenario)(void)) {
     CHECK(scenario != NULL);
 
     test_reset_state();
+    CHECK(key_runtime_hot_path_test_active_indexes_consistent());
     noah_runtime_trace_reset();
     scenario();
     noah_runtime_trace_snapshot(&original_trace);
@@ -2021,7 +2024,9 @@ static void test_activate_gui_double_tap_alt_hold(keypos_t gui_pos) {
     CHECK(test_resolve_keycode(gui_pos) == KC_LEFT_GUI);
 
     test_press_resolved(gui_pos);
+    CHECK(key_runtime_hot_path_test_active_indexes_consistent());
     test_release_resolved(gui_pos);
+    CHECK(key_runtime_hot_path_test_active_indexes_consistent());
 
     key_runtime_integration_advance(&fake_time, 40);
     test_press_resolved(gui_pos);
@@ -2909,7 +2914,99 @@ static void test_key_runtime_core_shadow_replays_gui_alt_repeated_nav_overlap(vo
     test_shadow_replay_scenario(test_key_runtime_core_gui_alt_repeated_nav_shadow_scenario);
 }
 
+static void test_normal_press_and_matched_release_use_bounded_authored_lookups(void) {
+    key_behavior_lookup_test_counters_t counters;
+    keypos_t                            gui_pos = test_find_keypos_on_layer(LAYER_BASE, KC_LEFT_GUI);
+
+    test_reset_state();
+    CHECK(test_keypos_valid(gui_pos));
+
+    key_behavior_lookup_test_counters_reset();
+    test_press_resolved(gui_pos);
+    key_behavior_lookup_test_counters_snapshot(&counters);
+    CHECK(counters.search_count == 1u);
+    CHECK(counters.row_comparison_count > 0u);
+
+    key_behavior_lookup_test_counters_reset();
+    test_release_resolved(gui_pos);
+    key_behavior_lookup_test_counters_snapshot(&counters);
+    CHECK(counters.search_count == 0u);
+    CHECK(counters.row_comparison_count == 0u);
+
+    key_runtime_integration_advance(&fake_time, 20u);
+    key_behavior_lookup_test_counters_reset();
+    test_press_resolved(gui_pos);
+    key_behavior_lookup_test_counters_snapshot(&counters);
+    CHECK(counters.search_count == 1u);
+    CHECK(counters.row_comparison_count > 0u);
+
+    key_behavior_lookup_test_counters_reset();
+    test_release_resolved(gui_pos);
+    key_behavior_lookup_test_counters_snapshot(&counters);
+    CHECK(counters.search_count == 0u);
+    CHECK(counters.row_comparison_count == 0u);
+}
+
+static void test_active_scan_visit_baseline_is_measured(void) {
+    key_runtime_hot_path_test_counters_t counters;
+    keypos_t                             gui_pos = test_find_keypos_on_layer(LAYER_BASE, KC_LEFT_GUI);
+
+    test_reset_state();
+    key_runtime_hot_path_test_counters_reset();
+    key_runtime_integration_scan();
+    key_runtime_hot_path_test_counters_snapshot(&counters);
+    CHECK(counters.refresh_slot_visit_count == 0u);
+    CHECK(counters.scan_press_slot_visit_count == 0u);
+    CHECK(counters.scan_tap_series_slot_visit_count == 0u);
+
+    test_press_resolved(gui_pos);
+    key_runtime_hot_path_test_counters_reset();
+    split_runtime_sync_dirty_test_mark_count_reset();
+    key_runtime_integration_scan();
+    key_runtime_hot_path_test_counters_snapshot(&counters);
+    CHECK(counters.refresh_slot_visit_count == 1u);
+    CHECK(counters.scan_press_slot_visit_count == 1u);
+    CHECK(counters.scan_tap_series_slot_visit_count == 0u);
+    CHECK(split_runtime_sync_dirty_test_mark_count() == 0u);
+
+    test_release_resolved(gui_pos);
+
+    key_runtime_hot_path_test_counters_reset();
+    key_runtime_integration_scan();
+    key_runtime_hot_path_test_counters_snapshot(&counters);
+    CHECK(counters.refresh_slot_visit_count == 1u);
+    CHECK(counters.scan_press_slot_visit_count == 0u);
+    CHECK(counters.scan_tap_series_slot_visit_count == 1u);
+    CHECK(key_runtime_hot_path_test_active_indexes_consistent());
+}
+
+static void test_feedback_dirty_tracks_visible_deadline_change_once(void) {
+    keypos_t nav_left_pos = test_find_keypos_on_layer(LAYER_NAV, KC_LEFT);
+
+    test_reset_state();
+    layer_state = noah_layer_state_set_user(test_layer_mask(LAYER_BASE) | test_layer_mask(LAYER_NAV));
+    CHECK(test_keypos_valid(nav_left_pos));
+    CHECK(test_resolve_keycode(nav_left_pos) == KC_LEFT);
+
+    test_press_resolved(nav_left_pos);
+    key_runtime_integration_advance(&fake_time, CUSTOM_TAP_HOLD_TERM + 1u);
+
+    split_runtime_sync_dirty_test_mark_count_reset();
+    key_runtime_integration_scan();
+    CHECK(split_runtime_sync_dirty_test_mark_count() == 1u);
+    CHECK(noah_runtime_debug_slot_phase(nav_left_pos) == KEY_RUNTIME_SLOT_PHASE_RELEASE_HOLD_PENDING);
+
+    split_runtime_sync_dirty_test_mark_count_reset();
+    key_runtime_integration_scan();
+    CHECK(split_runtime_sync_dirty_test_mark_count() == 0u);
+
+    test_release_resolved(nav_left_pos);
+}
+
 int main(void) {
+    test_normal_press_and_matched_release_use_bounded_authored_lookups();
+    test_active_scan_visit_baseline_is_measured();
+    test_feedback_dirty_tracks_visible_deadline_change_once();
     test_left_thumb_double_tap_hold_toggles_num_layer();
     test_right_thumb_double_tap_hold_toggles_num_layer();
     test_thumb_double_tap_hold_with_intermediate_scan_toggles_num_layer_once_per_cycle();

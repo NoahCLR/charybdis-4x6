@@ -105,19 +105,19 @@
         },
         {
           "name": "handled active release decision",
-          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "noah_process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_release", "key_runtime_process_plan_handled_key_release", "key_runtime_core_try_active_release", "key_runtime_release_decide", "key_runtime_release_query_quick_immediate_hold", "key_runtime_release_query_quick_tap", "key_runtime_release_query_momentary_layer_tap_suppresses_quick_tap", "key_runtime_release_contract_for_interaction"]
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "noah_process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_release", "key_runtime_process_plan_handled_key_release", "key_runtime_transition_handled_key_release", "key_runtime_core_try_active_release", "key_runtime_release_decide", "key_runtime_release_query_quick_immediate_hold", "key_runtime_release_query_quick_tap", "key_runtime_release_query_momentary_layer_tap_suppresses_quick_tap", "key_runtime_release_contract_for_interaction"]
         },
         {
           "name": "handled pending multi-tap release decision",
-          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "noah_process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_release", "key_runtime_process_plan_handled_key_release", "key_runtime_core_try_pending_multi_tap_release", "key_runtime_release_decide", "key_runtime_release_query_quick_immediate_hold", "key_runtime_release_query_quick_tap", "key_runtime_release_query_momentary_layer_tap_suppresses_quick_tap", "key_runtime_release_contract_for_interaction"]
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "noah_process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_release", "key_runtime_process_plan_handled_key_release", "key_runtime_transition_handled_key_release", "key_runtime_core_try_pending_multi_tap_release", "key_runtime_release_decide", "key_runtime_release_query_quick_immediate_hold", "key_runtime_release_query_quick_tap", "key_runtime_release_query_momentary_layer_tap_suppresses_quick_tap", "key_runtime_release_contract_for_interaction"]
         },
         {
           "name": "handled unmatched release core fallback",
-          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "noah_process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_release", "key_runtime_process_plan_handled_key_release", "key_runtime_core_plan_unmatched_release", "handled_key_resolution_materializes_momentary_layer", "handled_key_transparent_source_at_position", "handled_key_lookup_tap_count_into"]
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "noah_process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_release", "key_runtime_process_plan_handled_key_release", "key_runtime_transition_handled_key_release", "key_runtime_core_plan_unmatched_release", "handled_key_resolution_materializes_momentary_layer", "handled_key_transparent_source_at_position", "handled_key_lookup_tap_count_into"]
         },
         {
           "name": "handled unmatched release transition fallback",
-          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "noah_process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_release", "key_runtime_process_plan_handled_key_release", "key_runtime_transition_append_unmatched_release_effects", "handled_key_resolution_materializes_momentary_layer", "handled_key_transparent_source_at_position", "handled_key_lookup_tap_count_into"]
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "noah_process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_release", "key_runtime_process_plan_handled_key_release", "key_runtime_transition_handled_key_release", "key_runtime_transition_append_unmatched_release_effects", "handled_key_resolution_materializes_momentary_layer", "handled_key_transparent_source_at_position", "handled_key_lookup_tap_count_into"]
         },
         {
           "name": "handled release projection with fallback settlement",
@@ -133,7 +133,7 @@
         },
         {
           "name": "non-handled release cleanup lookup",
-          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "noah_process_record_user", "key_runtime_process_stage_non_handled_release_cleanup", "handled_key_lookup_tap_count_into"]
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "noah_process_record_user", "key_runtime_process_stage_non_handled_release_cleanup", "key_runtime_process_resolution", "handled_key_lookup_tap_count_into"]
         },
         {
           "name": "matrix scan projection with fallback settlement",

@@ -24,8 +24,20 @@ typedef struct {
     key_behavior_step_t   single;
 } key_behavior_view_t;
 
+#ifdef KEY_BEHAVIOR_LOOKUP_TEST_INSTRUMENTATION
+typedef struct {
+    uint16_t search_count;
+    uint16_t row_comparison_count;
+} key_behavior_lookup_test_counters_t;
+
+void key_behavior_lookup_test_counters_reset(void);
+void key_behavior_lookup_test_counters_snapshot(key_behavior_lookup_test_counters_t *out);
+#endif
+
 key_behavior_step_t key_behavior_step_lookup(uint16_t keycode, uint8_t tap_count);
 bool                key_behavior_has_more_taps(uint16_t keycode, uint8_t count);
 bool                key_behavior_future_tap_path_has_foreign_pd_mode(uint16_t keycode, uint8_t count, pd_mode_mask_t base_mode);
 key_behavior_view_t key_behavior_lookup(uint16_t keycode);
+key_behavior_step_t key_behavior_view_step(const key_behavior_view_t *behavior, uint8_t tap_count);
+bool                key_behavior_view_has_more_taps(const key_behavior_view_t *behavior, uint8_t count);
 uint8_t             key_behavior_validate_all(void);

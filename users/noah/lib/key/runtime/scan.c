@@ -25,10 +25,14 @@ void noah_key_runtime_scan(void) {
 
     if (core_work) {
         key_runtime_transition_plan_t plan;
+        key_runtime_core_state_t     *state                    = key_runtime_core_state();
+        uint32_t                      feedback_sequence_before = state ? state->next_feedback_sequence : 0u;
 
         key_runtime_transition_plan_init(&plan);
         key_runtime_transition_scan(&plan);
-        split_runtime_sync_notify_key_feedback_dirty();
+        if (plan.count == 0u && state && state->next_feedback_sequence != feedback_sequence_before) {
+            split_runtime_sync_notify_key_feedback_dirty();
+        }
         key_runtime_trace_plan("scan", &plan);
         key_runtime_transition_execute_plan(&plan);
     }

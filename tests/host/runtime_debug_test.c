@@ -3067,8 +3067,7 @@ static void test_key_runtime_core_token_allocator_exhaustion_fails_closed(void) 
     key_runtime_core_state_t      *state = key_runtime_core_state();
     key_runtime_core_effect_plan_t plan;
     projection_snapshot_t          snapshot;
-    handled_key_resolution_t       resolution = test_handled_key_resolution(TEST_HELD_ACTION_KEY, 1u);
-    keypos_t                       key_pos    = test_keypos(0, 0);
+    keypos_t                       key_pos = test_keypos(0, 0);
 
     test_reset_stubs();
     noah_runtime_reset_for_test();
@@ -3090,7 +3089,7 @@ static void test_key_runtime_core_token_allocator_exhaustion_fails_closed(void) 
     CHECK(key_runtime_core_press_token_at(key_pos)->token_id == 0u);
 
     key_runtime_core_effect_plan_init(&plan);
-    CHECK(key_runtime_core_handle_handled_key_press(TEST_HELD_ACTION_KEY, key_pos, resolution, &plan));
+    CHECK(key_runtime_core_handle_handled_key_press(TEST_HELD_ACTION_KEY, key_pos, &plan));
     CHECK(plan.count == 0u);
     CHECK(state->token_allocation_failed_packed_key_pos == KEY_RUNTIME_PACKED_KEYPOS_NONE);
     snapshot = key_runtime_core_projection_snapshot_capture();

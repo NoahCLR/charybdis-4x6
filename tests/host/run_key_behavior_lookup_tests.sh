@@ -17,6 +17,7 @@ trap cleanup EXIT INT TERM
 
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
+    -DKEY_BEHAVIOR_LOOKUP_TEST_INSTRUMENTATION \
     -I"$ROOT" \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \

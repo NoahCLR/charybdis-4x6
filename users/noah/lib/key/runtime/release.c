@@ -24,7 +24,7 @@ bool key_runtime_process_handled_key_release(uint16_t keycode, keyrecord_t *reco
     key_runtime_transition_plan_t plan;
     bool                          handled;
 
-    if (!(record && resolution)) {
+    if (!record) {
         return false;
     }
 

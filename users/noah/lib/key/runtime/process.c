@@ -85,6 +85,21 @@ static const handled_key_resolution_t *key_runtime_process_resolution(key_runtim
     return &ctx->resolution;
 }
 
+static bool key_runtime_process_observed_press_is_handled(key_runtime_process_ctx_t *ctx) {
+    const press_token_t *token;
+
+    if (!(ctx && ctx->record && ctx->record->event.pressed)) {
+        return false;
+    }
+
+    token = key_runtime_core_press_token_at(ctx->record->event.key);
+    if (token && token->active) {
+        return token->handled_key;
+    }
+
+    return handled_key_resolution_is_handled(*key_runtime_process_resolution(ctx));
+}
+
 static key_runtime_process_stage_outcome_t key_runtime_process_stage_synthetic_passthrough(key_runtime_process_ctx_t *ctx) {
     if (!noah_synthetic_record_active()) {
         return KEY_RUNTIME_PROCESS_NEXT;
@@ -96,7 +111,7 @@ static key_runtime_process_stage_outcome_t key_runtime_process_stage_synthetic_p
 }
 
 static key_runtime_process_stage_outcome_t key_runtime_process_stage_preflight(key_runtime_process_ctx_t *ctx) {
-    bool keep_processing = key_runtime_preflight_record(ctx->keycode, ctx->record);
+    bool keep_processing = key_runtime_preflight_record(ctx->keycode, ctx->record, key_runtime_process_observed_press_is_handled(ctx));
 
     key_runtime_trace_bool_result("process:preflight", ctx->keycode, ctx->record, keep_processing);
     return keep_processing ? KEY_RUNTIME_PROCESS_NEXT : KEY_RUNTIME_PROCESS_RETURN_FALSE;
@@ -127,17 +142,32 @@ static key_runtime_process_stage_outcome_t key_runtime_process_stage_pd_mode(key
 }
 
 static key_runtime_process_stage_outcome_t key_runtime_process_stage_handled_key(key_runtime_process_ctx_t *ctx) {
-    const handled_key_resolution_t *resolution = key_runtime_process_resolution(ctx);
+    const handled_key_resolution_t *resolution;
+    const press_token_t             *token;
     bool                            handled;
 
-    if (!handled_key_resolution_is_handled(*resolution)) {
-        return KEY_RUNTIME_PROCESS_NEXT;
-    }
-
     if (ctx->record->event.pressed) {
-        handled = key_runtime_process_handled_key_press(ctx->runtime_keycode, ctx->record, resolution);
+        token = key_runtime_core_press_token_at(ctx->record->event.key);
+        if (token && token->active) {
+            if (!token->handled_key) {
+                return KEY_RUNTIME_PROCESS_NEXT;
+            }
+        } else {
+            resolution = key_runtime_process_resolution(ctx);
+            if (!handled_key_resolution_is_handled(*resolution)) {
+                return KEY_RUNTIME_PROCESS_NEXT;
+            }
+        }
+        handled = key_runtime_process_handled_key_press(ctx->runtime_keycode, ctx->record);
     } else {
-        handled = key_runtime_process_handled_key_release(ctx->runtime_keycode, ctx->record, resolution);
+        handled = key_runtime_process_handled_key_release(ctx->runtime_keycode, ctx->record, NULL);
+        if (!handled) {
+            resolution = key_runtime_process_resolution(ctx);
+            if (!handled_key_resolution_is_handled(*resolution)) {
+                return KEY_RUNTIME_PROCESS_NEXT;
+            }
+            handled = key_runtime_process_handled_key_release(ctx->runtime_keycode, ctx->record, resolution);
+        }
         if (handled) {
             key_runtime_deferred_release_drain_dispatches();
         }

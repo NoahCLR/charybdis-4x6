@@ -13,8 +13,29 @@
 #include "../../pointing/defs/pd_modes.h"
 #include "key_behavior_lookup.h"
 
+#ifdef KEY_BEHAVIOR_LOOKUP_TEST_INSTRUMENTATION
+static key_behavior_lookup_test_counters_t key_behavior_lookup_test_counters;
+
+void key_behavior_lookup_test_counters_reset(void) {
+    key_behavior_lookup_test_counters = (key_behavior_lookup_test_counters_t){0};
+}
+
+void key_behavior_lookup_test_counters_snapshot(key_behavior_lookup_test_counters_t *out) {
+    if (out) {
+        *out = key_behavior_lookup_test_counters;
+    }
+}
+#endif
+
 static const key_behavior_t *key_behavior_config_lookup(uint16_t keycode) {
+#ifdef KEY_BEHAVIOR_LOOKUP_TEST_INSTRUMENTATION
+    key_behavior_lookup_test_counters.search_count++;
+#endif
+
     for (uint8_t i = 0; i < key_behavior_count; i++) {
+#ifdef KEY_BEHAVIOR_LOOKUP_TEST_INSTRUMENTATION
+        key_behavior_lookup_test_counters.row_comparison_count++;
+#endif
         if (key_behaviors[i].keycode == keycode) return &key_behaviors[i];
     }
 
@@ -202,6 +223,14 @@ key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
         .branch_confirm_term = branch_term,
         .single              = config ? config->tap_counts[0] : key_behavior_step_none(),
     };
+}
+
+key_behavior_step_t key_behavior_view_step(const key_behavior_view_t *behavior, uint8_t tap_count) {
+    return key_behavior_step_lookup_in_config(behavior ? behavior->config : NULL, tap_count);
+}
+
+bool key_behavior_view_has_more_taps(const key_behavior_view_t *behavior, uint8_t count) {
+    return key_behavior_has_more_taps_in_config(behavior ? behavior->config : NULL, count);
 }
 
 uint8_t key_behavior_validate_all(void) {
