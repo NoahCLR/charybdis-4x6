@@ -40,6 +40,22 @@ static test_call_t test_calls[TEST_MAX_CALLS];
 static uint16_t    test_call_count;
 static uint16_t    runtime_diag_heartbeat_count;
 static uint16_t    macro_buffer_read_count;
+static uint32_t    fake_time;
+
+const uint8_t ascii_to_shift_lut[16];
+const uint8_t ascii_to_altgr_lut[16];
+const uint8_t ascii_to_dead_lut[16];
+const uint8_t ascii_to_keycode_lut[128] = {
+    ['A'] = KC_A, ['B'] = KC_B, ['C'] = KC_C, ['D'] = KC_D, ['E'] = KC_E, ['F'] = KC_F, ['H'] = KC_H, ['X'] = KC_X, ['i'] = KC_I,
+};
+
+uint32_t timer_read32(void) {
+    return fake_time;
+}
+
+uint32_t timer_elapsed32(uint32_t last) {
+    return fake_time - last;
+}
 
 static void test_fail(const char *expr, const char *file, int line) {
     fprintf(stderr, "test failed: %s (%s:%d)\n", expr, file, line);
@@ -63,6 +79,22 @@ static void test_log_call(test_call_kind_t kind, uint16_t value, uint8_t interva
 }
 
 static void test_reset_state(void) {
+    macro_payload_debug_snapshot_t snapshot;
+
+    macro_payload_debug_snapshot(&snapshot);
+    if (snapshot.state != MACRO_PAYLOAD_ENGINE_IDLE) {
+        (void)macro_payload_engine_cancel();
+        for (uint8_t scan = 0u; scan < 64u; scan++) {
+            macro_payload_engine_scan();
+            fake_time += 100000u;
+            macro_payload_debug_snapshot(&snapshot);
+            if (snapshot.state == MACRO_PAYLOAD_ENGINE_IDLE) {
+                break;
+            }
+        }
+        CHECK(snapshot.state == MACRO_PAYLOAD_ENGINE_IDLE);
+    }
+    macro_payload_engine_init();
     memset(macro_buffer, 0, sizeof(macro_buffer));
     memset(test_calls, 0, sizeof(test_calls));
     fake_macro_buffer_size       = sizeof(macro_buffer);
@@ -70,7 +102,22 @@ static void test_reset_state(void) {
     test_call_count              = 0;
     runtime_diag_heartbeat_count = 0;
     macro_buffer_read_count      = 0;
+    fake_time                    = 1000u;
     via_macro_provider_invalidate_all();
+}
+
+static void test_run_macro_to_idle(void) {
+    macro_payload_debug_snapshot_t snapshot;
+
+    for (uint16_t scan = 0u; scan < 4096u; scan++) {
+        macro_payload_engine_scan();
+        fake_time += 100000u;
+        macro_payload_debug_snapshot(&snapshot);
+        if (snapshot.state == MACRO_PAYLOAD_ENGINE_IDLE) {
+            return;
+        }
+    }
+    CHECK(false);
 }
 
 uint8_t dynamic_keymap_macro_get_count(void) {
@@ -247,7 +294,7 @@ void pointer_layer_policy_note_action(uint16_t action, bool pressed) {
     (void)pressed;
 }
 
-static void test_qmk_tap_command_uses_owned_tap(void) {
+static void test_qmk_tap_command_uses_scan_driven_owned_lease(void) {
     test_reset_state();
     macro_buffer[0] = SS_QMK_PREFIX;
     macro_buffer[1] = SS_TAP_CODE;
@@ -255,11 +302,13 @@ static void test_qmk_tap_command_uses_owned_tap(void) {
 
     noah_action_tap(QK_MACRO_0);
 
+    CHECK(test_call_count == 0u);
+    test_run_macro_to_idle();
     CHECK(test_call_count == 2);
-    CHECK(test_calls[0].kind == TEST_CALL_OWNED_TAP);
+    CHECK(test_calls[0].kind == TEST_CALL_OWNED_REGISTER);
     CHECK(test_calls[0].value == KC_C);
-    CHECK(test_calls[1].kind == TEST_CALL_WAIT);
-    CHECK(test_calls[1].value == TAP_CODE_DELAY);
+    CHECK(test_calls[1].kind == TEST_CALL_OWNED_UNREGISTER);
+    CHECK(test_calls[1].value == KC_C);
 }
 
 static void test_qmk_down_and_up_commands_use_owned_register_and_unregister(void) {
@@ -273,15 +322,13 @@ static void test_qmk_down_and_up_commands_use_owned_register_and_unregister(void
 
     noah_action_tap(QK_MACRO_0);
 
-    CHECK(test_call_count == 4);
+    CHECK(test_call_count == 0u);
+    test_run_macro_to_idle();
+    CHECK(test_call_count == 2);
     CHECK(test_calls[0].kind == TEST_CALL_OWNED_REGISTER);
     CHECK(test_calls[0].value == KC_LEFT_SHIFT);
-    CHECK(test_calls[1].kind == TEST_CALL_WAIT);
-    CHECK(test_calls[1].value == TAP_CODE_DELAY);
-    CHECK(test_calls[2].kind == TEST_CALL_OWNED_UNREGISTER);
-    CHECK(test_calls[2].value == KC_LEFT_SHIFT);
-    CHECK(test_calls[3].kind == TEST_CALL_WAIT);
-    CHECK(test_calls[3].value == TAP_CODE_DELAY);
+    CHECK(test_calls[1].kind == TEST_CALL_OWNED_UNREGISTER);
+    CHECK(test_calls[1].value == KC_LEFT_SHIFT);
 }
 
 static void test_delay_command_matches_upstream_parsing(void) {
@@ -296,38 +343,29 @@ static void test_delay_command_matches_upstream_parsing(void) {
 
     noah_action_tap(QK_MACRO_0);
 
-    CHECK(test_call_count == 7);
-    CHECK(test_calls[0].kind == TEST_CALL_WAIT);
-    CHECK(test_calls[0].value == 50);
-    CHECK(test_calls[1].kind == TEST_CALL_WAIT);
-    CHECK(test_calls[1].value == 50);
-    CHECK(test_calls[2].kind == TEST_CALL_WAIT);
-    CHECK(test_calls[2].value == 50);
-    CHECK(test_calls[3].kind == TEST_CALL_WAIT);
-    CHECK(test_calls[3].value == 50);
-    CHECK(test_calls[4].kind == TEST_CALL_WAIT);
-    CHECK(test_calls[4].value == 50);
-    CHECK(test_calls[5].kind == TEST_CALL_WAIT);
-    CHECK(test_calls[5].value == TAP_CODE_DELAY);
-    CHECK(test_calls[6].kind == TEST_CALL_SEND_CHAR);
-    CHECK(test_calls[6].value == 'X');
-    CHECK(test_calls[6].interval == TAP_CODE_DELAY);
+    CHECK(test_call_count == 0u);
+    test_run_macro_to_idle();
+    CHECK(test_call_count == 2u);
+    CHECK(test_calls[0].kind == TEST_CALL_OWNED_REGISTER);
+    CHECK(test_calls[0].value == KC_X);
+    CHECK(test_calls[1].kind == TEST_CALL_OWNED_UNREGISTER);
+    CHECK(test_calls[1].value == KC_X);
 }
 
-static void test_plain_text_uses_send_char_with_delay(void) {
+static void test_plain_text_uses_scan_driven_ascii_leases(void) {
     test_reset_state();
     macro_buffer[0] = 'H';
     macro_buffer[1] = 'i';
 
     noah_action_tap(QK_MACRO_0);
 
-    CHECK(test_call_count == 2);
-    CHECK(test_calls[0].kind == TEST_CALL_SEND_CHAR);
-    CHECK(test_calls[0].value == 'H');
-    CHECK(test_calls[0].interval == TAP_CODE_DELAY);
-    CHECK(test_calls[1].kind == TEST_CALL_SEND_CHAR);
-    CHECK(test_calls[1].value == 'i');
-    CHECK(test_calls[1].interval == TAP_CODE_DELAY);
+    CHECK(test_call_count == 0u);
+    test_run_macro_to_idle();
+    CHECK(test_call_count == 4u);
+    CHECK(test_calls[0].kind == TEST_CALL_OWNED_REGISTER && test_calls[0].value == KC_H);
+    CHECK(test_calls[1].kind == TEST_CALL_OWNED_UNREGISTER && test_calls[1].value == KC_H);
+    CHECK(test_calls[2].kind == TEST_CALL_OWNED_REGISTER && test_calls[2].value == KC_I);
+    CHECK(test_calls[3].kind == TEST_CALL_OWNED_UNREGISTER && test_calls[3].value == KC_I);
 }
 
 static void test_macro_slot_lookup_skips_null_terminated_entries(void) {
@@ -340,11 +378,13 @@ static void test_macro_slot_lookup_skips_null_terminated_entries(void) {
 
     noah_action_tap(QK_MACRO_0 + 1);
 
+    CHECK(test_call_count == 0u);
+    test_run_macro_to_idle();
     CHECK(test_call_count == 2);
-    CHECK(test_calls[0].kind == TEST_CALL_OWNED_TAP);
+    CHECK(test_calls[0].kind == TEST_CALL_OWNED_REGISTER);
     CHECK(test_calls[0].value == KC_V);
-    CHECK(test_calls[1].kind == TEST_CALL_WAIT);
-    CHECK(test_calls[1].value == TAP_CODE_DELAY);
+    CHECK(test_calls[1].kind == TEST_CALL_OWNED_UNREGISTER);
+    CHECK(test_calls[1].value == KC_V);
 }
 
 static void test_slot_six_authored_alt_gui_8_chord_uses_owned_keycode_lifecycle(void) {
@@ -379,25 +419,24 @@ static void test_slot_six_authored_alt_gui_8_chord_uses_owned_keycode_lifecycle(
 
     noah_action_tap(QK_MACRO_0 + 6);
 
+    CHECK(test_call_count == 0u);
+    test_run_macro_to_idle();
     CHECK(test_call_count == 6);
     CHECK(test_calls[0].kind == TEST_CALL_OWNED_REGISTER);
     CHECK(test_calls[0].value == KC_LEFT_ALT);
     CHECK(test_calls[1].kind == TEST_CALL_OWNED_REGISTER);
     CHECK(test_calls[1].value == KC_LEFT_GUI);
-    CHECK(test_calls[2].kind == TEST_CALL_OWNED_TAP);
+    CHECK(test_calls[2].kind == TEST_CALL_OWNED_REGISTER);
     CHECK(test_calls[2].value == TEST_KC_8);
-    CHECK(test_calls[3].kind == TEST_CALL_OWNED_UNREGISTER);
-    CHECK(test_calls[3].value == KC_LEFT_GUI);
-    CHECK(test_calls[4].kind == TEST_CALL_OWNED_UNREGISTER);
-    CHECK(test_calls[4].value == KC_LEFT_ALT);
-    CHECK(test_calls[5].kind == TEST_CALL_WAIT);
-    CHECK(test_calls[5].value == TAP_CODE_DELAY);
+    CHECK(test_calls[3].kind == TEST_CALL_OWNED_UNREGISTER && test_calls[3].value == TEST_KC_8);
+    CHECK(test_calls[4].kind == TEST_CALL_OWNED_UNREGISTER && test_calls[4].value == KC_LEFT_GUI);
+    CHECK(test_calls[5].kind == TEST_CALL_OWNED_UNREGISTER && test_calls[5].value == KC_LEFT_ALT);
 }
 
 static void test_slot_six_long_delay_heavy_payload_replays_from_via_buffer(void) {
     uint16_t written       = 0;
-    uint32_t total_wait_ms = 0;
-    uint16_t delayed_chars = 0;
+    uint16_t registrations = 0;
+    uint16_t releases      = 0;
     uint16_t shift_downs   = 0;
     uint16_t shift_ups     = 0;
     uint16_t slot_offset   = 6;
@@ -409,24 +448,28 @@ static void test_slot_six_long_delay_heavy_payload_replays_from_via_buffer(void)
     macro_buffer[slot_offset + written] = 0;
 
     noah_action_tap(QK_MACRO_0 + 6);
+    CHECK(test_call_count == 0u);
+    test_run_macro_to_idle();
 
     for (uint16_t index = 0; index < test_call_count; index++) {
-        if (test_calls[index].kind == TEST_CALL_WAIT) {
-            total_wait_ms += test_calls[index].value;
-        } else if (test_calls[index].kind == TEST_CALL_SEND_CHAR) {
-            delayed_chars++;
-        } else if (test_calls[index].kind == TEST_CALL_OWNED_REGISTER && test_calls[index].value == KC_LEFT_SHIFT) {
-            shift_downs++;
-        } else if (test_calls[index].kind == TEST_CALL_OWNED_UNREGISTER && test_calls[index].value == KC_LEFT_SHIFT) {
-            shift_ups++;
+        CHECK(test_calls[index].kind != TEST_CALL_WAIT);
+        if (test_calls[index].kind == TEST_CALL_OWNED_REGISTER) {
+            registrations++;
+            if (test_calls[index].value == KC_LEFT_SHIFT) {
+                shift_downs++;
+            }
+        } else if (test_calls[index].kind == TEST_CALL_OWNED_UNREGISTER) {
+            releases++;
+            if (test_calls[index].value == KC_LEFT_SHIFT) {
+                shift_ups++;
+            }
         }
     }
 
-    CHECK(delayed_chars == 57u);
+    CHECK(registrations == 58u);
+    CHECK(releases == 58u);
     CHECK(shift_downs == 1u);
     CHECK(shift_ups == 1u);
-    CHECK(total_wait_ms == 13579u);
-    CHECK(runtime_diag_heartbeat_count > 0u);
 }
 
 static void test_out_of_range_macro_slot_is_ignored(void) {
@@ -470,11 +513,9 @@ static void test_unterminated_delay_command_matches_current_via_behavior(void) {
 
     noah_action_tap(QK_MACRO_0);
 
-    CHECK(test_call_count == 2);
-    CHECK(test_calls[0].kind == TEST_CALL_WAIT);
-    CHECK(test_calls[0].value == 25);
-    CHECK(test_calls[1].kind == TEST_CALL_WAIT);
-    CHECK(test_calls[1].value == TAP_CODE_DELAY);
+    CHECK(test_call_count == 0u);
+    test_run_macro_to_idle();
+    CHECK(test_call_count == 0u);
 }
 
 static void test_invalid_high_text_is_cached_until_explicit_invalidation(void) {
@@ -504,16 +545,79 @@ static void test_invalid_high_text_is_cached_until_explicit_invalidation(void) {
     noah_action_tap(QK_MACRO_0);
 
     CHECK(macro_buffer_read_count > reads_after_rejection);
-    CHECK(test_call_count == 1u);
-    CHECK(test_calls[0].kind == TEST_CALL_SEND_CHAR);
-    CHECK(test_calls[0].value == 'A');
+    CHECK(test_call_count == 0u);
+    test_run_macro_to_idle();
+    CHECK(test_call_count == 2u);
+    CHECK(test_calls[0].kind == TEST_CALL_OWNED_REGISTER && test_calls[0].value == KC_A);
+    CHECK(test_calls[1].kind == TEST_CALL_OWNED_UNREGISTER && test_calls[1].value == KC_A);
+}
+
+static void test_invalidation_keeps_active_ir_immutable_then_reloads(void) {
+    macro_payload_debug_snapshot_t snapshot;
+
+    test_reset_state();
+    macro_buffer[0] = SS_QMK_PREFIX;
+    macro_buffer[1] = SS_DELAY_CODE;
+    macro_buffer[2] = '1';
+    macro_buffer[3] = '0';
+    macro_buffer[4] = '0';
+    macro_buffer[5] = '0';
+    macro_buffer[6] = '|';
+    macro_buffer[7] = 'A';
+
+    noah_action_tap(QK_MACRO_0);
+    macro_payload_engine_scan();
+    macro_payload_debug_snapshot(&snapshot);
+    CHECK(snapshot.state == MACRO_PAYLOAD_ENGINE_WAITING);
+
+    memset(macro_buffer, 0, sizeof(macro_buffer));
+    macro_buffer[0] = 'B';
+    via_macro_provider_invalidate_all();
+    test_run_macro_to_idle();
+    CHECK(test_call_count == 2u);
+    CHECK(test_calls[0].value == KC_A);
+    CHECK(test_calls[1].value == KC_A);
+
+    test_call_count = 0u;
+    noah_action_tap(QK_MACRO_0);
+    test_run_macro_to_idle();
+    CHECK(test_call_count == 2u);
+    CHECK(test_calls[0].value == KC_B);
+    CHECK(test_calls[1].value == KC_B);
+}
+
+static void test_busy_via_trigger_is_consumed_without_restarting(void) {
+    macro_payload_debug_snapshot_t snapshot;
+
+    test_reset_state();
+    macro_buffer[0] = SS_QMK_PREFIX;
+    macro_buffer[1] = SS_DELAY_CODE;
+    macro_buffer[2] = '1';
+    macro_buffer[3] = '0';
+    macro_buffer[4] = '0';
+    macro_buffer[5] = '0';
+    macro_buffer[6] = '|';
+    macro_buffer[7] = 'A';
+    macro_buffer[8] = 0u;
+    macro_buffer[9] = 'B';
+
+    noah_action_tap(QK_MACRO_0);
+    noah_action_tap(QK_MACRO_0 + 1u);
+    macro_payload_debug_snapshot(&snapshot);
+    CHECK(snapshot.busy_rejection_count == 1u);
+    CHECK(snapshot.active_slot == 0u);
+
+    test_run_macro_to_idle();
+    CHECK(test_call_count == 2u);
+    CHECK(test_calls[0].value == KC_A);
+    CHECK(test_calls[1].value == KC_A);
 }
 
 int main(void) {
-    test_qmk_tap_command_uses_owned_tap();
+    test_qmk_tap_command_uses_scan_driven_owned_lease();
     test_qmk_down_and_up_commands_use_owned_register_and_unregister();
     test_delay_command_matches_upstream_parsing();
-    test_plain_text_uses_send_char_with_delay();
+    test_plain_text_uses_scan_driven_ascii_leases();
     test_macro_slot_lookup_skips_null_terminated_entries();
     test_slot_six_authored_alt_gui_8_chord_uses_owned_keycode_lifecycle();
     test_slot_six_long_delay_heavy_payload_replays_from_via_buffer();
@@ -522,6 +626,8 @@ int main(void) {
     test_non_terminated_macro_buffer_is_ignored();
     test_unterminated_delay_command_matches_current_via_behavior();
     test_invalid_high_text_is_cached_until_explicit_invalidation();
+    test_invalidation_keeps_active_ir_immutable_then_reloads();
+    test_busy_via_trigger_is_consumed_without_restarting();
 
     puts("via macro action_lifecycle host tests passed");
     return 0;

@@ -169,6 +169,15 @@ void send_char_with_delay(char ascii_code, uint8_t interval) {
     (void)interval;
 }
 
+const uint8_t ascii_to_shift_lut[16];
+const uint8_t ascii_to_altgr_lut[16];
+const uint8_t ascii_to_dead_lut[16];
+const uint8_t ascii_to_keycode_lut[128];
+
+uint32_t timer_read32(void) {
+    return 0u;
+}
+
 void noah_runtime_diag_heartbeat(void) {}
 
 uint16_t keycode_at_keymap_location(uint8_t layer_num, uint8_t row, uint8_t column) {

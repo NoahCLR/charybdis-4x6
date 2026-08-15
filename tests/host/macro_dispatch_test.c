@@ -8,11 +8,11 @@
 #include "users/noah/lib/macro/macro_payload.h"
 #include "users/noah/noah_keymap_ids.h"
 
-static uint8_t compile_call_count[HARDCODED_MACRO_SLOT_COUNT];
-static uint8_t play_call_count;
-static uint8_t last_play_program_id;
-static bool    fail_compile_for_slot_1;
-static bool    fail_playback;
+static uint8_t                      compile_call_count[HARDCODED_MACRO_SLOT_COUNT];
+static uint8_t                      play_call_count;
+static uint8_t                      last_play_program_id;
+static bool                         fail_compile_for_slot_1;
+static macro_payload_start_result_t next_start_result;
 
 const char *const hardcoded_macro_payloads[HARDCODED_MACRO_SLOT_COUNT] = {
     [0] = "A{KC_C}", [1] = "{KC_NOT_A_KEY}", [2] = "", [3] = "Z", [4] = "B", [5] = "{KC_BAD}", [6] = "C",
@@ -35,7 +35,7 @@ static void test_reset_state(void) {
     play_call_count         = 0;
     last_play_program_id    = 0;
     fail_compile_for_slot_1 = true;
-    fail_playback           = false;
+    next_start_result       = MACRO_PAYLOAD_START_STARTED;
 }
 
 static int test_payload_slot(const char *payload) {
@@ -65,18 +65,18 @@ bool macro_payload_compile(const char *payload, macro_payload_ir_t *ir) {
     return true;
 }
 
-bool macro_payload_play_ir(const macro_payload_ir_t *ir) {
+macro_payload_start_result_t macro_payload_start_ir(const macro_payload_ir_t *ir, macro_payload_text_output_t text_output, uint8_t interval, macro_payload_source_t source, uint8_t slot, macro_payload_finish_fn finish, void *context) {
     CHECK(ir != NULL);
+    CHECK(text_output == MACRO_PAYLOAD_TEXT_OUTPUT_PLAIN);
+    CHECK(interval == 0u);
+    CHECK(source == MACRO_PAYLOAD_SOURCE_HARDCODED);
+    CHECK(slot < HARDCODED_MACRO_SLOT_COUNT);
+    CHECK(finish != NULL);
+    CHECK(context != NULL);
 
     play_call_count++;
     last_play_program_id = ir->length ? ir->bytes[0] : 0;
-    return !fail_playback;
-}
-
-bool macro_payload_play_ir_with_text_output(const macro_payload_ir_t *ir, macro_payload_text_output_t text_output, uint8_t interval) {
-    CHECK(text_output == MACRO_PAYLOAD_TEXT_OUTPUT_PLAIN);
-    CHECK(interval == 0);
-    return macro_payload_play_ir(ir);
+    return next_start_result;
 }
 
 static void test_dispatch_compiles_valid_slot_once_and_reuses_ir(void) {
@@ -134,13 +134,13 @@ static void test_validate_all_compiles_each_non_empty_slot_once(void) {
 
 static void test_playback_failure_invalidates_cached_ir(void) {
     test_reset_state();
-    fail_playback = true;
+    next_start_result = MACRO_PAYLOAD_START_INVALID;
 
     CHECK(macro_dispatch(MACRO_6));
     CHECK(compile_call_count[6] == 1);
     CHECK(play_call_count == 1);
 
-    fail_playback = false;
+    next_start_result = MACRO_PAYLOAD_START_STARTED;
     CHECK(macro_dispatch(MACRO_6));
     CHECK(compile_call_count[6] == 1);
     CHECK(play_call_count == 1);

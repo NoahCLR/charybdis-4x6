@@ -2,7 +2,7 @@
 
 ## Plan metadata
 
-- **Status:** Implementation in progress; Phase 1 Findings 01, 03, 04, 02, and 09 are verified. Phase 2 Findings 08 and 06 are verified; Finding 07 is next and must reuse the landed lease contract. See [`implementation-progress.md`](implementation-progress.md).
+- **Status:** Implementation in progress; Phases 1 and 2 are verified. Phase 3 begins with Finding 17, followed by Findings 12 and 05. See [`implementation-progress.md`](implementation-progress.md).
 - **Prepared:** 2026-07-13.
 - **Scope:** Firmware runtime correctness, split reliability, target resource safety, and measured hot-path efficiency.
 - **Source:** The deep firmware code review performed against the current `charybdis-4x6` tree.
@@ -149,7 +149,9 @@ Recommended order: **08 first; 06 and 07 may then proceed independently**.
 2. Correct combo-origin lifecycle without assuming physical release means QMK can no longer emit a delayed combo event.
 3. Replace blocking macro delays with a scan-driven state machine that uses the new ownership contract. This can proceed alongside combo-origin work once Finding 08 is stable.
 
-Findings 08 and 06 are now verified. Finding 07 is the remaining Phase 2 item.
+Findings 08, 06, and 07 are verified. Macro playback is scan-driven, uses the
+landed lease contract, pins active provider IR, and rejects overlapping starts
+without queueing.
 
 The macro scheduler must specify queueing, overlap, cancellation, reset, layer change, suspend, and aborted-playback cleanup before code is written. A scheduler that is nonblocking but leaks owned keys is not an improvement.
 
@@ -361,7 +363,7 @@ The remediation program is complete only when all of the following are true:
 - [ ] Every numbered finding is either verified or explicitly rejected with a documented reason and equivalent risk mitigation.
 - [ ] All must-fix findings have deterministic regression tests.
 - [ ] Stack and RAM claims are supported by a freshly linked target image, not an old artifact.
-- [ ] Work per scan is bounded for deferred release, macro playback, pointing emission, split retry, timer sampling, and RGB rendering.
+- [ ] Work per scan is bounded for deferred release, macro playback, pointing emission, split retry, timer sampling, and RGB rendering. Deferred release and macro playback are verified; the remaining domains belong to later phases.
 - [ ] Counter wrap behavior is specified and tested for every affected identity/order field.
 - [ ] Split state converges after failure, reconnect, and role change.
 - [ ] `README.md`, relevant `docs/`, and the active review folder agree with the landed architecture and behavior.

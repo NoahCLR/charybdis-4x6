@@ -70,12 +70,6 @@ static bool macro_dispatch_validate_slot(uint8_t slot) {
     return false;
 }
 
-static void macro_dispatch_log_playback_failure(uint8_t slot) {
-    const char *payload = hardcoded_macro_payloads[slot];
-
-    macro_dispatch_log_invalid_payload(slot, payload);
-}
-
 uint8_t macro_dispatch_validate_all(void) {
     uint8_t error_count = 0u;
 
@@ -89,7 +83,8 @@ uint8_t macro_dispatch_validate_all(void) {
 }
 
 bool macro_dispatch(uint16_t keycode) {
-    uint8_t slot = 0;
+    uint8_t                      slot = 0;
+    macro_payload_start_result_t result;
     if (keycode < MACRO_0 || keycode > MACRO_15) {
         return false;
     }
@@ -100,8 +95,9 @@ bool macro_dispatch(uint16_t keycode) {
         return true;
     }
 
-    if (!macro_slot_provider_play(&macro_dispatch_provider, hardcoded_macro_slots, slot, MACRO_PAYLOAD_TEXT_OUTPUT_PLAIN, 0)) {
-        macro_dispatch_log_playback_failure(slot);
+    result = macro_slot_provider_start(&macro_dispatch_provider, hardcoded_macro_slots, slot, MACRO_PAYLOAD_TEXT_OUTPUT_PLAIN, 0u, MACRO_PAYLOAD_SOURCE_HARDCODED);
+    if (result == MACRO_PAYLOAD_START_INVALID) {
+        macro_dispatch_log_invalid_payload(slot, hardcoded_macro_payloads[slot]);
     }
 
     return true;

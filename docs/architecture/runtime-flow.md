@@ -200,9 +200,16 @@ does not make ownership decisions.
 flowchart TD
     keymap["keymap.c VIA_MACROS and HARDCODED_MACROS"] --> hardcoded["macro_dispatch hardcoded slots"]
     keymap --> via_defaults["via_macro_defaults seeding"]
-    action["Action lifecycle"] --> via_play["QMK VIA macro playback contract"]
+    action["Action lifecycle"] --> via_play["VIA macro provider"]
     action --> hardcoded
-    hardcoded --> payload["macro_payload parse/IR/playback"]
+    hardcoded --> provider["Pinned macro slot provider"]
+    via_play --> provider
+    provider --> payload["Validated macro IR"]
+    payload --> engine["One-active scan engine"]
+    scan["Matrix scan after key runtime"] --> engine
+    engine --> leases["Owner-scoped key leases"]
+    engine --> finish["Completion or bounded cleanup"]
+    finish --> provider
     via_defaults --> storage["QMK dynamic macro EEPROM"]
     via_command["VIA command"] --> via_split["qmk_via_split_sync compatibility"]
     via_split --> slave["Slave dynamic keymap/macro storage"]
@@ -218,6 +225,13 @@ only where a complete QMK prefix command defines them as keycode operands. Both
 authored and VIA decoders use the same predicate, and playback validates the
 entire IR before its first text, wait, or key-ownership side effect. Invalid VIA
 slots stay negatively cached until a VIA mutation invalidates the macro cache.
+
+Playback is scan-driven and single-active. Busy triggers are consumed without
+queueing or replacing the active execution. Provider IR remains pinned across
+VIA invalidation, and completion or cancellation applies deferred invalidation.
+Text, chord, and persistent-key output use exact owner-scoped leases; reset and
+runtime failure release retained leases through bounded cleanup. One engine
+transition runs per scan, and delay deadlines use wrap-safe 32-bit elapsed time.
 
 ## Test Coverage Map
 

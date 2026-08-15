@@ -60,7 +60,7 @@ checks before handoff when source/build behavior changed.
 | Authored profile data | `profile_introspect.py --keymap <name> --write`, `profile_introspect.py --keymap <name> --check`, `run_profile_introspection_checks.sh`, `run_key_behavior_lookup_tests.sh`, `run_key_behavior_validation_tests.sh`, `run_keymap_validation_tests.sh`, `run_all_profile_validation_tests.sh`, `run_real_profile_thumb_layer_lock_integration_tests.sh` |
 | RGB | `run_rgb_validation_tests.sh`, `run_rgb_layer_render_tests.sh` |
 | Hooks or ownership | `run_hook_chaining_tests.sh`, `run_keyboard_mod_ownership_tests.sh`, `run_owned_keycode_tests.sh`, `run_held_action_tests.sh`, `run_layer_ownership_tests.sh` |
-| Macros, VIA, QMK contracts | `run_qmk_contract_checks.sh`, `run_action_lifecycle_tests.sh`, `run_macro_dispatch_tests.sh`, `run_macro_payload_tests.sh`, `run_via_macro_defaults_tests.sh`, `run_via_macro_action_lifecycle_tests.sh`, `run_qmk_via_split_sync_tests.sh` |
+| Macros, VIA, QMK contracts | `run_qmk_contract_checks.sh`, `run_action_lifecycle_tests.sh`, `run_macro_dispatch_tests.sh`, `run_macro_payload_tests.sh`, `run_macro_payload_engine_tests.sh`, `run_macro_slot_provider_tests.sh`, `run_via_macro_defaults_tests.sh`, `run_via_macro_action_lifecycle_tests.sh`, `run_qmk_via_split_sync_tests.sh` |
 | Shared runtime or tracing | `run_runtime_init_order_tests.sh`, `run_runtime_debug_tests.sh`, `run_runtime_diag_tests.sh`, `run_runtime_trace_tests.sh` |
 | Source manifests or boundaries | `run_feature_gate_compile_tests.sh` |
 | Target stack topology or budget | `run_firmware_stack_budget_tool_tests.sh`; after a fresh instrumented target build, `run_firmware_stack_budget_checks.sh` |

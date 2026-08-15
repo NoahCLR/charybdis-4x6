@@ -35,6 +35,11 @@
           "reason": "hardcoded macro provider invokes its registered load_ir callback"
         },
         {
+          "caller": "macro_payload_finish",
+          "callee": "macro_slot_provider_finish",
+          "reason": "the active macro engine invokes the finish callback registered by its pinned slot provider"
+        },
+        {
           "caller": "noah_action_tap_at",
           "callee": "noah_action_tap_literal",
           "reason": "action-kind dispatch table selects the literal tap implementation for the reviewed emission branch"
@@ -118,16 +123,36 @@
           "functions": ["main", "matrix_scan", "combo_origin_pending_output_reconcile", "combo_origin_pending_output_entry_clear"]
         },
         {
+          "name": "matrix scan macro text press",
+          "functions": ["main", "matrix_scan", "macro_payload_start_text_char", "macro_payload_start_transient", "owned_keycode_acquire", "owned_keycode_acquire_basic", "register_code", "send_6kro_report"]
+        },
+        {
+          "name": "matrix scan macro transient chord press",
+          "functions": ["main", "matrix_scan", "macro_payload_start_transient", "owned_keycode_acquire", "owned_keycode_acquire_basic", "register_code", "send_6kro_report"]
+        },
+        {
+          "name": "matrix scan macro persistent hold press",
+          "functions": ["main", "matrix_scan", "macro_payload_hold_balance_note_down"]
+        },
+        {
+          "name": "matrix scan macro owned release",
+          "functions": ["main", "matrix_scan", "owned_keycode_release", "owned_keycode_release_basic", "unregister_code", "send_6kro_report"]
+        },
+        {
+          "name": "matrix scan macro provider completion",
+          "functions": ["main", "matrix_scan", "macro_payload_finish", "macro_slot_provider_finish"]
+        },
+        {
           "name": "process macro payload compilation",
           "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "noah_process_record_user", "key_runtime_process_stage_macro_dispatch", "macro_dispatch", "macro_slot_provider_load", "macro_dispatch_load_ir", "macro_payload_compile", "macro_payload_lookup_keycode", "strlen"]
         },
         {
           "name": "process hardcoded macro IR preflight",
-          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "noah_process_record_user", "key_runtime_process_stage_macro_dispatch", "macro_dispatch", "macro_slot_provider_play", "macro_payload_ir_next"]
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "noah_process_record_user", "key_runtime_process_stage_macro_dispatch", "macro_dispatch", "macro_slot_provider_start", "macro_payload_ir_next"]
         },
         {
           "name": "handled VIA macro IR preflight",
-          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "noah_process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_emit_run_at", "noah_action_tap_at", "noah_action_handle_macro_preflight", "macro_slot_provider_play", "macro_payload_ir_next"]
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "noah_process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_emit_run_at", "noah_action_tap_at", "noah_action_handle_macro_preflight", "macro_slot_provider_start", "macro_payload_ir_next"]
         },
         {
           "name": "matrix scan VIA default macro seed",

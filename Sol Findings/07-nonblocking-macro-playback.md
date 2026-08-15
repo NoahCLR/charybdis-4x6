@@ -3,11 +3,43 @@
 ## Plan metadata
 
 - **Severity:** Should-fix (P1 responsiveness, input-loss, and watchdog risk)
-- **Status:** Planned; playback is still synchronous
+- **Status:** Verified on 2026-08-15
 - **Affected surfaces:** Hardcoded macros, VIA macros, macro IR execution, matrix scan ordering, synthetic-key ownership, diagnostics/watchdog
 - **Primary files:** [macro_payload_run.c](../users/noah/lib/macro/macro_payload_run.c), [macro_payload.h](../users/noah/lib/macro/macro_payload.h), [macro_dispatch.c](../users/noah/lib/macro/macro_dispatch.c), [via_macro_provider.c](../users/noah/lib/macro/via_macro_provider.c), [runtime_init.c](../users/noah/runtime_init.c)
 - **Prerequisites:** Complete or lock the API design in [Finding 08](08-synthetic-key-ownership.md); retain the byte-validation guarantees from [Finding 04](04-via-macro-byte-validation.md)
 - **Recommended phase:** Phase 2, after synthetic ownership; combo-origin work may proceed independently
+
+## Reconciliation note
+
+Finding 07 is now implemented and verified. The problem statement, baseline
+evidence, and proposed plan below preserve the pre-implementation audit that
+guided the work; they no longer describe the current runtime. The landed
+engine is summarized under **Implementation outcome**, and the acceptance
+checklist records the final closure evidence.
+
+## Implementation outcome
+
+- Hardcoded and VIA macros now start one shared scan-driven engine and return
+  immediately to QMK. One execution may be active; later triggers are consumed,
+  counted as busy, and not queued.
+- The engine performs one bounded state transition per matrix scan. Delays use
+  a wrap-safe 32-bit start timestamp plus duration, and text/chord output uses
+  lease-backed press, wait, and release phases.
+- Provider cache entries are pinned while active. VIA invalidation marks a
+  pinned entry stale, preserves its IR bytes through completion or cleanup, and
+  reloads the slot on the next use.
+- Reset requests cancellation. Successful, cancelled, and runtime-error exits
+  release only execution-owned leases; cleanup releases at most one retained
+  lease per scan.
+- Firmware playback has no call to `wait_ms()`, `send_char()`,
+  `send_char_with_delay()`, or `owned_keycode_tap()`. A host source gate enforces
+  that boundary.
+- The fresh linked target contains a 188-byte engine context and 24-byte
+  diagnostics block. Firmware text is 145,020 bytes, an 848-byte increase over
+  the Finding 06 checkpoint; total BSS remains 245,592 bytes.
+- The fresh reviewed stack gate passes. The new macro paths are 276–440 bytes
+  from `main`; the overall main-process worst case remains 1,816/1,920 bytes,
+  and the split-thread worst case remains 328/768 bytes.
 
 ## Problem statement
 
@@ -17,7 +49,7 @@ The heartbeat calls inside the wait loop can keep one diagnostic alive, but they
 
 Playback must become a bounded amount of work performed from normal scan ticks. The resulting engine also needs explicit concurrency, cancellation, ownership, and cache-invalidation rules; merely replacing wait_ms with a timer check inside the existing loop would leave those lifecycle questions unresolved.
 
-## Current evidence and failure scenario
+## Baseline evidence and failure scenario
 
 - users/noah/lib/macro/macro_payload_run.c:9-22 slices a delay into repeated blocking wait_ms calls.
 - users/noah/lib/macro/macro_payload_run.c:24-31 adds TAP_CODE_DELAY after every explicit delay.
@@ -272,20 +304,22 @@ When implementation lands:
 
 ## Acceptance checklist
 
-- [ ] Firmware macro playback contains no blocking wait_ms or send_char_with_delay path.
-- [ ] One scan performs a bounded amount of macro work.
-- [ ] Long delays and timer wrap are correct.
-- [ ] Physical, pointing, RGB, split, and diagnostics work can run between macro operations.
-- [ ] The one-active/busy-reject policy is enforced and documented.
-- [ ] IR bytes remain immutable for the active execution.
-- [ ] Success, failure, reset, cancellation, and invalidation leave no owned holds.
-- [ ] Hardcoded and VIA macros share the same lifecycle engine.
-- [ ] Source manifest and feature-gate mirrors include any new module.
-- [ ] All targeted runners pass.
-- [ ] The full host suite passes.
-- [ ] The firmware compile passes.
-- [ ] User docs and the active review describe the landed behavior.
+- [x] Firmware macro playback contains no blocking wait_ms or send_char_with_delay path.
+- [x] One scan performs a bounded amount of macro work.
+- [x] Long delays and timer wrap are correct.
+- [x] Physical, pointing, RGB, split, and diagnostics work can run between macro operations.
+- [x] The one-active/busy-reject policy is enforced and documented.
+- [x] IR bytes remain immutable for the active execution.
+- [x] Success, failure, reset, cancellation, and invalidation leave no owned holds.
+- [x] Hardcoded and VIA macros share the same lifecycle engine.
+- [x] Source manifest and feature-gate mirrors include any new module. No new firmware source file was added, so the existing manifest entry remains authoritative.
+- [x] All targeted runners pass.
+- [x] The full host suite passes.
+- [x] The firmware compile passes.
+- [x] User docs and the active review describe the landed behavior.
 
 ## Next action
 
-First land a host-only fake-timer test that proves a long-delay start returns without calling wait_ms. Then introduce the smallest idle/waiting/ready engine skeleton and wire one text character per scan before migrating key holds and both providers.
+Proceed to Phase 3 with [Finding 17](17-split-timer-sampling.md), then Finding
+12 and Finding 05. Finding 14 remains the dedicated follow-up for reducing the
+existing hardcoded/VIA macro cache footprint.

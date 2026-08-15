@@ -96,7 +96,7 @@ bool via_macro_provider_try_play(uint16_t action) {
     }
 
     provider.load_ir = via_macro_provider_load_ir;
-    (void)macro_slot_provider_play(&provider, via_macro_slots, (uint8_t)(action - QK_MACRO), MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED, DYNAMIC_KEYMAP_MACRO_DELAY);
+    (void)macro_slot_provider_start(&provider, via_macro_slots, (uint8_t)(action - QK_MACRO), MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED, DYNAMIC_KEYMAP_MACRO_DELAY, MACRO_PAYLOAD_SOURCE_VIA);
     return true;
 }
 

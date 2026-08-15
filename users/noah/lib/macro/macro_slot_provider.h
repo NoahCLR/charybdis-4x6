@@ -28,10 +28,12 @@ typedef enum {
 typedef struct {
     macro_slot_cache_state_t state;
     macro_payload_ir_t       ir;
+    bool                     pinned;
+    bool                     stale;
 } macro_slot_cache_t;
 
-bool macro_slot_provider_load(const macro_slot_provider_t *provider, macro_slot_cache_t *cache, uint8_t slot);
-bool macro_slot_provider_encode_write(const macro_slot_provider_t *provider, macro_slot_cache_t *cache, uint8_t slot, macro_payload_write_byte_fn write_byte, void *context, uint16_t *written);
-bool macro_slot_provider_play(const macro_slot_provider_t *provider, macro_slot_cache_t *cache, uint8_t slot, macro_payload_text_output_t text_output, uint8_t interval);
-void macro_slot_provider_invalidate(const macro_slot_provider_t *provider, macro_slot_cache_t *cache, uint8_t slot);
-void macro_slot_provider_invalidate_all(const macro_slot_provider_t *provider, macro_slot_cache_t *cache);
+bool                         macro_slot_provider_load(const macro_slot_provider_t *provider, macro_slot_cache_t *cache, uint8_t slot);
+bool                         macro_slot_provider_encode_write(const macro_slot_provider_t *provider, macro_slot_cache_t *cache, uint8_t slot, macro_payload_write_byte_fn write_byte, void *context, uint16_t *written);
+macro_payload_start_result_t macro_slot_provider_start(const macro_slot_provider_t *provider, macro_slot_cache_t *cache, uint8_t slot, macro_payload_text_output_t text_output, uint8_t interval, macro_payload_source_t source);
+void                         macro_slot_provider_invalidate(const macro_slot_provider_t *provider, macro_slot_cache_t *cache, uint8_t slot);
+void                         macro_slot_provider_invalidate_all(const macro_slot_provider_t *provider, macro_slot_cache_t *cache);

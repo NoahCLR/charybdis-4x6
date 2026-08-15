@@ -43,22 +43,42 @@ bool macro_slot_provider_encode_write(const macro_slot_provider_t *provider, mac
     return macro_payload_encode_ir_write(&cache[slot].ir, write_byte, context, written);
 }
 
-bool macro_slot_provider_play(const macro_slot_provider_t *provider, macro_slot_cache_t *cache, uint8_t slot, macro_payload_text_output_t text_output, uint8_t interval) {
+static void macro_slot_provider_finish(macro_payload_finish_result_t result, void *context) {
+    macro_slot_cache_t *slot = (macro_slot_cache_t *)context;
+
+    (void)result;
+    if (!slot) {
+        return;
+    }
+    slot->pinned = false;
+    if (slot->stale) {
+        slot->state     = MACRO_SLOT_CACHE_UNCHECKED;
+        slot->ir.length = 0u;
+        slot->stale     = false;
+    }
+}
+
+macro_payload_start_result_t macro_slot_provider_start(const macro_slot_provider_t *provider, macro_slot_cache_t *cache, uint8_t slot, macro_payload_text_output_t text_output, uint8_t interval, macro_payload_source_t source) {
+    macro_payload_start_result_t result;
+
     if (!macro_slot_provider_load(provider, cache, slot)) {
-        return false;
+        return MACRO_PAYLOAD_START_INVALID;
     }
 
     if (cache[slot].ir.length == 0) {
-        return true;
+        return MACRO_PAYLOAD_START_EMPTY;
     }
 
-    if (macro_payload_play_ir_with_text_output(&cache[slot].ir, text_output, interval)) {
-        return true;
+    result = macro_payload_start_ir(&cache[slot].ir, text_output, interval, source, slot, macro_slot_provider_finish, &cache[slot]);
+    if (result == MACRO_PAYLOAD_START_STARTED) {
+        cache[slot].pinned = true;
+        return result;
     }
-
-    macro_slot_provider_invalidate(provider, cache, slot);
-    cache[slot].state = MACRO_SLOT_CACHE_INVALID;
-    return false;
+    if (result == MACRO_PAYLOAD_START_INVALID) {
+        macro_slot_provider_invalidate(provider, cache, slot);
+        cache[slot].state = MACRO_SLOT_CACHE_INVALID;
+    }
+    return result;
 }
 
 void macro_slot_provider_invalidate(const macro_slot_provider_t *provider, macro_slot_cache_t *cache, uint8_t slot) {
@@ -66,8 +86,14 @@ void macro_slot_provider_invalidate(const macro_slot_provider_t *provider, macro
         return;
     }
 
+    if (cache[slot].pinned) {
+        cache[slot].stale = true;
+        return;
+    }
+
     cache[slot].state     = MACRO_SLOT_CACHE_UNCHECKED;
     cache[slot].ir.length = 0;
+    cache[slot].stale     = false;
 }
 
 void macro_slot_provider_invalidate_all(const macro_slot_provider_t *provider, macro_slot_cache_t *cache) {

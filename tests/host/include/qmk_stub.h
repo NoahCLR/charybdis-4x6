@@ -12,6 +12,9 @@
 #define NOAH_HOST_TEST_ENV 1
 
 #define PROGMEM
+static inline uint8_t pgm_read_byte(const void *addr_) {
+    return *(const uint8_t *)addr_;
+}
 static inline uint16_t pgm_read_word(const void *addr_) {
     return *(const uint16_t *)addr_;
 }

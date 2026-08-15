@@ -99,11 +99,15 @@ bool macro_payload_compile(const char *payload, macro_payload_ir_t *ir) {
     return true;
 }
 
-bool macro_payload_play_ir_with_text_output(const macro_payload_ir_t *ir, macro_payload_text_output_t text_output, uint8_t interval) {
+macro_payload_start_result_t macro_payload_start_ir(const macro_payload_ir_t *ir, macro_payload_text_output_t text_output, uint8_t interval, macro_payload_source_t source, uint8_t slot, macro_payload_finish_fn finish, void *context) {
     (void)ir;
     (void)text_output;
     (void)interval;
-    return true;
+    (void)source;
+    (void)slot;
+    (void)finish;
+    (void)context;
+    return MACRO_PAYLOAD_START_STARTED;
 }
 
 bool macro_payload_encode_ir_write(const macro_payload_ir_t *ir, macro_payload_write_byte_fn write_byte, void *context, uint16_t *written) {

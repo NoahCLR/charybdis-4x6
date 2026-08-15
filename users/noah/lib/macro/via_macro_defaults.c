@@ -123,7 +123,7 @@ static bool seed_via_default_macros(uint16_t capacity, uint16_t *written) {
 
     for (uint8_t slot = 0; slot < VIA_MACRO_SLOT_COUNT; slot++) {
         const char        *payload = via_macro_payloads[slot];
-        macro_payload_ir_t ir = {0};
+        macro_payload_ir_t ir      = {0};
 
         if (!via_macro_defaults_load_ir(slot, &ir, NULL)) {
             log_invalid_via_macro_payload(slot, payload);
@@ -165,6 +165,7 @@ static void apply_via_default_macros(void) {
 
 void noah_via_macro_defaults_eeconfig_init(void) {
     apply_via_default_macros();
+    via_macro_provider_invalidate_all();
     via_macro_seed_post_init_pending = false;
 }
 

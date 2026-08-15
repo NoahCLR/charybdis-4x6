@@ -390,6 +390,21 @@ The current profile uses VIA defaults more than hardcoded firmware macros:
 - VIA exposes `VIA_MACRO_0` through `VIA_MACRO_63`
 - `VIA_MACRO_0` through `VIA_MACRO_10` currently have defaults
 
+Hardcoded and VIA macros share one scan-driven playback engine. Starting a
+macro does not wait inside the triggering key event: delays, text, chords, and
+key holds advance through later matrix scans, so pointing, RGB, VIA, split, and
+normal key processing continue between macro operations. Playback has a
+deliberate one-active/no-queue policy. A second macro trigger is consumed while
+the first keeps running, and it must be triggered again later if desired.
+
+The engine validates the complete payload before output, owns exact leases for
+every synthetic key it retains, and releases those leases on completion,
+cancellation, or runtime failure. VIA edits invalidate the cache immediately,
+but the bytes of an already running slot remain pinned until it finishes; the
+edited payload is loaded on the next trigger. EEPROM reset requests cancellation
+and cleanup before the active cache entry can be reused. Timing is scan-granular:
+each operation runs on the first scan at or after its configured interval.
+
 But a lot of the current shortcut surface is not implemented through macro
 slots at all. Many standard macOS commands are bound directly as modded
 keycodes on the layers, especially on `LAYER_NAV`.

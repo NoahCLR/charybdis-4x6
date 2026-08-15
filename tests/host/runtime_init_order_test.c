@@ -70,6 +70,19 @@ void noah_key_runtime_scan(void) {
     test_log_stage("key_runtime_scan");
 }
 
+void macro_payload_engine_scan(void) {
+    test_log_stage("macro_payload_engine_scan");
+}
+
+bool macro_payload_engine_cancel(void) {
+    test_log_stage("macro_payload_engine_cancel");
+    return false;
+}
+
+void macro_payload_engine_init(void) {
+    test_log_stage("macro_payload_engine_init");
+}
+
 void split_runtime_sync_tick(void) {
     test_log_stage("split_runtime_sync_tick");
 }
@@ -110,6 +123,7 @@ void noah_runtime_diag_heartbeat(void) {}
 
 static void test_eeconfig_init_order(void) {
     static const char *const expected[] = {
+        "macro_payload_engine_cancel",
         "eeconfig_update_user",
         "via_macro_defaults_eeconfig_init",
     };
@@ -121,10 +135,7 @@ static void test_eeconfig_init_order(void) {
 
 static void test_matrix_scan_order(void) {
     static const char *const expected[] = {
-        "via_macro_defaults_matrix_scan",
-        "qmk_combo_origin_scan",
-        "key_runtime_scan",
-        "split_runtime_sync_tick",
+        "via_macro_defaults_matrix_scan", "qmk_combo_origin_scan", "key_runtime_scan", "macro_payload_engine_scan", "split_runtime_sync_tick",
     };
 
     test_log_reset();
@@ -134,7 +145,7 @@ static void test_matrix_scan_order(void) {
 
 static void test_keyboard_post_init_order(void) {
     static const char *const expected[] = {
-        "qmk_combo_origin_init", "via_macro_defaults_keyboard_post_init", "rgb_runtime_post_init", "split_runtime_sync_init", "qmk_via_split_sync_init",
+        "qmk_combo_origin_init", "macro_payload_engine_init", "via_macro_defaults_keyboard_post_init", "rgb_runtime_post_init", "split_runtime_sync_init", "qmk_via_split_sync_init",
     };
 
     test_log_reset();

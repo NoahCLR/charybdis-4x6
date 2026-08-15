@@ -5,10 +5,10 @@
 - **Branch:** `sol`
 - **Starting commit:** `5b20ed01` (`sol findings`)
 - **Started:** 2026-07-13
-- **Current focus:** [Finding 07 — nonblocking macro playback](07-nonblocking-macro-playback.md)
+- **Current focus:** [Finding 17 — split timer sampling](17-split-timer-sampling.md)
 - **Overall status:** In progress
-- **Latest closed review:** [`review/2026-08-15-review-06`](../review/2026-08-15-review-06/)
-- **Active review:** None; open the next sortable folder when Finding 07 architecture work begins
+- **Latest closed review:** [`review/2026-08-15-review-07`](../review/2026-08-15-review-07/)
+- **Active review:** None; open the next sortable folder when Finding 17 architecture work begins
 
 This file is the implementation record for the plans in this directory. It records what actually changed, why choices were made, what verification really ran, and what remains open. A plan is not marked verified until its targeted checks, the full host suite, the target firmware build, target-specific evidence, and required documentation all pass.
 
@@ -30,7 +30,7 @@ This file is the implementation record for the plans in this directory. It recor
 | 04 | [VIA macro byte validation](04-via-macro-byte-validation.md) | Must fix | Verified | Exhaustive text-domain, whole-IR preflight, cache lifecycle, full host, firmware, and explicit target-stack paths pass |
 | 05 | [VIA split persistence](05-via-split-persistence.md) | Must fix | Planned | Not run |
 | 06 | [Combo-origin cache lifecycle](06-combo-origin-cache-lifecycle.md) | Should fix | Verified | Exact generations, suppression/deadline/capacity lifecycle, normal/compact QMK contracts, full host, firmware, and explicit 280 B target stack path pass |
-| 07 | [Nonblocking macro playback](07-nonblocking-macro-playback.md) | Should fix | Planned | Not run |
+| 07 | [Nonblocking macro playback](07-nonblocking-macro-playback.md) | Should fix | Verified | Fake-timer/wrap, busy, pinning, cancellation, ownership, full host, firmware, and fresh target-stack gates pass |
 | 08 | [Synthetic-key ownership](08-synthetic-key-ownership.md) | Should fix | Verified | Aggregate physical/managed report ownership, scoped persistent leases, strict macro balance, source guards, full host, firmware, and target stack gates pass |
 | 09 | [Pending-release sequence rollover](09-pending-release-sequence-rollover.md) | Should fix | Verified | Explicit linked FIFO, 65,537-cycle blocked-head stress, structural corruption checks, full host, firmware, and target stack gate pass |
 | 10 | [Pointing backlog bounds](10-pointing-backlog-bounds.md) | Should fix | Planned | Not run |
@@ -556,6 +556,84 @@ Finding 06 is **Verified**. Focused and complete host coverage, ordinary target
 firmware, fresh explicit stack evidence, measurements, compatibility docs, Sol
 records, and closed review 06 agree.
 
+## Finding 07 — Nonblocking macro playback
+
+### Objective
+
+Move macro timing and output out of the triggering key event, preserve complete
+IR validation and QMK text translation, and make execution lifetime, overlap,
+invalidation, cancellation, and synthetic ownership explicit and bounded.
+
+### Baseline and design
+
+- The pre-change interpreter walked the complete IR synchronously. Explicit
+  delay, text, and tap paths all reached helpers that called `wait_ms()`.
+- A first fake-timer test intentionally failed to link before the engine API
+  existed. It established that a 65,535 ms delay started before timer wrap must
+  return immediately with no output or wait call.
+- Review 07 fixed the lifecycle contract before implementation: one active
+  execution, no queue, deterministic busy rejection, one bounded transition
+  per scan, pinned provider IR, and lease-scoped cleanup.
+
+### Landed implementation
+
+- Replaced the synchronous player with a shared idle/ready/waiting/output/
+  cleanup engine advanced after key-runtime scan and before split sync.
+- Preserved complete IR preflight before the first side effect. Delays use
+  unsigned timestamp-plus-duration comparisons across 32-bit wrap.
+- Reimplemented QMK ASCII output through the exported keycode, shift, AltGr,
+  and dead-key lookup tables. Text and tap-list output acquire exact
+  `owned_keycode_lease_t` values, hold them across scan deadlines, and release
+  them in reverse acquisition order.
+- Persistent key-down operations retain exact leases. Runtime failure and
+  cancellation release one retained lease per scan; success requires an empty
+  persistent hold set.
+- Replaced provider playback with a typed start API. Hardcoded and VIA macros
+  use the same engine; busy, invalid, empty, cancellation, and runtime-error
+  results remain distinct.
+- Added provider pin/stale state. Invalidation cannot overwrite active IR;
+  completion applies deferred invalidation before a later load.
+- Reset requests cancellation before EEPROM/default stages. VIA default
+  reseeding invalidates cached IR after the EEPROM image is updated.
+- Added diagnostics for public engine state, active source/slot, current and
+  high-water holds, operation/completion/busy/cancellation/error counts, and
+  maximum deadline lateness.
+- Added explicit fresh-linked stack paths for macro text, chord, persistent
+  hold, owned release, provider completion, hardcoded/VIA preflight, and VIA
+  default seeding.
+
+### Test and enforcement additions
+
+- `run_macro_payload_engine_tests.sh` runs normal plus ASan/UBSan fake-timer
+  tests and mechanically rejects blocking playback helpers in firmware source.
+- `run_macro_slot_provider_tests.sh` proves pinned invalidation preserves bytes,
+  reloads after completion, and does not pin a busy candidate.
+- VIA lifecycle coverage now advances time through explicit scans and proves
+  start is side-effect free, long delay/text/chord playback has no wait call,
+  active IR survives mid-delay invalidation, and a busy trigger does not restart
+  the active slot.
+- Runtime order tests pin engine init, reset cancellation, and the scan position
+  between key-runtime and split work. The full host runner includes both new
+  focused suites.
+
+### Target measurements
+
+- Fresh linked firmware: 145,020 B text and 245,592 B BSS.
+- Engine context: 188 B BSS; engine diagnostics: 24 B BSS.
+- Text increased by 848 B from the Finding 06 checkpoint. Total BSS did not
+  increase at the linked-image level.
+- New reviewed main-process macro paths are 276–440 B. The overall reviewed
+  worst path remains 1,816/1,920 B; split remains 328/768 B.
+
+### Closure status
+
+Finding 07 is **verified**. Focused normal/sanitizer tests, ownership and action
+integration, runtime order and contract gates, feature variants, the full host
+suite, ordinary firmware build, and fresh instrumented target stack gate all
+pass. User, architecture, review, and Sol documentation describe the landed
+one-active scan-driven lifecycle. No sibling source was edited; target commands
+only refreshed generated artifacts under `../bastardkb-qmk/.build`.
+
 ## Verification ledger
 
 | Date | Finding | Command | Result | Notes |
@@ -670,6 +748,21 @@ records, and closed review 06 agree.
 | 2026-08-15 | 06 | `PYTHONPYCACHEPREFIX=/tmp/noah-host-pycache sh tests/host/run_all_host_tests.sh` | Passed | Complete host suite with new lifecycle and contract variants |
 | 2026-08-15 | 06 | `qmk compile -kb bastardkb/charybdis/4x6 -km noah` | Passed | Required ordinary target firmware build |
 | 2026-08-15 | 06 | `PYTHONPYCACHEPREFIX=/tmp/noah-stack-pycache PYTHON=/usr/bin/python3 sh tests/host/run_firmware_stack_budget_checks.sh` | Blocked, then passed | Initial sandboxed clean could not modify sibling generated QMK artifacts; approved fresh rebuild passed with explicit 280 B combo path, 1,816 B worst main path, and 328 B split path |
+| 2026-08-15 | 07 | `sh tests/host/run_macro_payload_engine_tests.sh` before implementation | Failed as expected | Fake-timer wrap/nonblocking contract could not link before the engine API existed |
+| 2026-08-15 | 07 | `sh tests/host/run_macro_payload_tests.sh` | Passed | Parser/compiler/encoder/decoder validation passes in normal and sanitizer variants |
+| 2026-08-15 | 07 | `sh tests/host/run_macro_payload_engine_tests.sh` | Passed | Normal and sanitizer variants cover immediate start, 65,535 ms wrap, lease-backed text, busy rejection, bounded cancellation, runtime failure, malformed IR, and blocking-helper source guards |
+| 2026-08-15 | 07 | `sh tests/host/run_macro_slot_provider_tests.sh` | Passed | Pinned invalidation and busy no-pin contracts pass |
+| 2026-08-15 | 07 | `sh tests/host/run_macro_dispatch_tests.sh` | Passed | Hardcoded macro dispatch uses the typed shared-engine start contract |
+| 2026-08-15 | 07 | `sh tests/host/run_via_macro_action_lifecycle_tests.sh` | Passed | Scan-driven VIA tap/down/up/text/delay/chord, cache invalidation, and busy behavior pass |
+| 2026-08-15 | 07 | `sh tests/host/run_via_macro_defaults_tests.sh` | Passed | VIA defaults remain valid and reseeding invalidates provider state |
+| 2026-08-15 | 07 | `sh tests/host/run_runtime_init_order_tests.sh` | Passed | Init, reset cancellation, and matrix-scan engine ordering are pinned |
+| 2026-08-15 | 07 | `sh tests/host/run_owned_keycode_tests.sh`, `run_keyboard_mod_ownership_tests.sh`, `run_held_action_tests.sh`, and `run_action_lifecycle_tests.sh` | Passed | Aggregate owner isolation and surrounding action lifecycles remain coherent |
+| 2026-08-15 | 07 | `sh tests/host/run_feature_gate_compile_tests.sh` | Passed | Macro/runtime feature and header variants compile |
+| 2026-08-15 | 07 | `sh tests/host/run_qmk_contract_checks.sh` | Passed | Pinned QMK/VIA action and scan contracts remain coherent |
+| 2026-08-15 | 07 | `PYTHONPYCACHEPREFIX=/tmp/noah-stack-pycache PYTHON=/usr/bin/python3 sh tests/host/run_firmware_stack_budget_tool_tests.sh` | Passed | All 15 stack-manifest fixtures pass with new macro edge/path coverage |
+| 2026-08-15 | 07 | `PYTHONPYCACHEPREFIX=/tmp/noah-host-pycache sh tests/host/run_all_host_tests.sh` | Passed | Complete host suite includes the two new focused runners |
+| 2026-08-15 | 07 | `qmk compile -kb bastardkb/charybdis/4x6 -km noah` | Passed | Required ordinary target build on final firmware source |
+| 2026-08-15 | 07 | `PYTHONPYCACHEPREFIX=/tmp/noah-stack-pycache PYTHON=/usr/bin/python3 sh tests/host/run_firmware_stack_budget_checks.sh` | Passed | Fresh linked macro paths pass; 1,816 B worst reviewed main path and 328 B split path |
 
 ## Cross-cutting decisions and deferred work
 
@@ -678,16 +771,19 @@ records, and closed review 06 agree.
   01's four-record transport batch or re-entry policy.
 - Finding 08 establishes the only aggregate literal-report ownership path for
   physical events, held actions, macro playback, and PD persistent shortcuts.
-  Finding 07 must reuse its leases during nonblocking playback.
+  Finding 07 reuses those leases during nonblocking playback.
 - Finding 06 keeps QMK combo candidates compatibility-owned and bounded. Its
   scan reconciliation is sequential with key-runtime scan, not nested runtime
   ownership, and its target path is explicitly tracked by the stack gate.
+- Finding 07 makes hardcoded and VIA macro output scan-driven. It deliberately
+  supports one active execution with no queue, pins provider IR across
+  invalidation, and leaves macro-cache footprint reduction to Finding 14.
 - The stack checker must model vendor split callbacks under `SlaveThread`, not under the main process stack. Stack-context correctness is part of the gate contract.
 - No sibling workspace source was edited; only QMK build artifacts were produced under `../bastardkb-qmk/.build`.
 
 ## Next program action
 
-Begin Finding 07 by opening the next sortable review folder, defining the
-nonblocking playback scheduler's queue, overlap, cancellation, reset, suspend,
-and abort-cleanup contract before code changes. Reuse the scoped leases landed
-by Finding 08; Finding 06 is closed.
+Begin Phase 3 with Finding 17. Open the next sortable review folder, measure the
+current split tick's timer reads, and define the single-sampled-time contract
+before changing retry scheduling. Then continue with Finding 12 and Finding 05
+as ordered by the roadmap.

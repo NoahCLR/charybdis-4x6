@@ -163,6 +163,13 @@ Use Profile Studio when you want to:
   pointer speed, pointing modes, sniping, auto-mouse, base lighting, and
   lighting feedback
 
+Macro playback is scan-driven: long delays no longer pause normal keyboard,
+pointing, RGB, VIA, or split work. One macro runs at a time; a trigger received
+while one is active is consumed but not queued. Editing an active VIA slot takes
+effect on its next run, and reset cancels playback while releasing any keys the
+macro owns. See [KEYMAP.md](./docs/KEYMAP.md#macro-and-shortcut-surfaces) for the
+runtime details.
+
 Screenshots:
 [`Layout`](./docs/media/profile-studio/studio-layout-tab.png),
 [`Macros`](./docs/media/profile-studio/studio-macros-tab.png),
