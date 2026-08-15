@@ -207,6 +207,13 @@ flowchart TD
 Hardcoded macros are source-owned. VIA macros are QMK dynamic macro slots with
 source-authored defaults and split mirroring.
 
+Macro text is QMK ASCII, not arbitrary bytes: text positions accept
+`0x01..0x7F`, while zero terminates a VIA slot. Bytes above `0x7F` remain valid
+only where a complete QMK prefix command defines them as keycode operands. Both
+authored and VIA decoders use the same predicate, and playback validates the
+entire IR before its first text, wait, or key-ownership side effect. Invalid VIA
+slots stay negatively cached until a VIA mutation invalidates the macro cache.
+
 ## Test Coverage Map
 
 ```mermaid

@@ -3,7 +3,7 @@
 ## Plan metadata
 
 - **Severity:** Must fix — target out-of-bounds lookup during macro playback
-- **Status:** Planned; no remediation has landed
+- **Status:** Verified on 2026-08-15
 - **Affected surfaces:** QMK-stream macro decoder, macro-slot cache state, VIA macro provider, IR playback defense, macro payload tests
 - **Primary files:** [`macro_payload_decode_qmk.c`](../users/noah/lib/macro/macro_payload_decode_qmk.c), [`macro_payload_run.c`](../users/noah/lib/macro/macro_payload_run.c), [`macro_payload_parse.c`](../users/noah/lib/macro/macro_payload_parse.c), [`macro_slot_provider.c`](../users/noah/lib/macro/macro_slot_provider.c), [`via_macro_provider.c`](../users/noah/lib/macro/via_macro_provider.c)
 - **Prerequisites:** none; coordinate any playback API changes with Finding 07 but do not delay decoder hardening
@@ -142,19 +142,21 @@ qmk compile -kb bastardkb/charybdis/4x6 -km noah
 
 ## Acceptance checklist
 
-- [ ] Every direct text byte `0x80..0xFF` is rejected by the QMK-stream decoder.
-- [ ] Valid high-valued command operands follow explicit keycode rules and have tests.
-- [ ] Decoder failure resets the IR and performs no output/wait/key side effects.
-- [ ] Playback preflights the entire IR before its first side effect.
-- [ ] Invalid slots are negatively cached until an explicit mutation invalidates them.
-- [ ] A repaired slot plays after invalidation.
-- [ ] Authored and VIA providers share one documented text-byte predicate.
-- [ ] Targeted macro/VIA runners pass.
-- [ ] `sh tests/host/run_qmk_contract_checks.sh` passes.
-- [ ] `sh tests/host/run_all_host_tests.sh` passes.
-- [ ] `qmk compile -kb bastardkb/charybdis/4x6 -km noah` passes.
-- [ ] Review and macro documentation match the landed contract.
+- [x] Every direct text byte `0x80..0xFF` is rejected by the QMK-stream decoder.
+- [x] Valid high-valued command operands follow explicit keycode rules and have tests.
+- [x] Decoder failure resets the IR and performs no output/wait/key side effects.
+- [x] Playback preflights the entire IR before its first side effect.
+- [x] Invalid slots are negatively cached until an explicit mutation invalidates them.
+- [x] A repaired slot plays after invalidation.
+- [x] Authored and VIA providers share one documented text-byte predicate.
+- [x] Targeted macro/VIA runners pass.
+- [x] `sh tests/host/run_qmk_contract_checks.sh` passes.
+- [x] `sh tests/host/run_all_host_tests.sh` passes.
+- [x] `qmk compile -kb bastardkb/charybdis/4x6 -km noah` passes.
+- [x] Review and macro documentation match the landed contract.
 
 ## Next action
 
-Add an exhaustive `0x80..0xFF` decoder test with output-call counters, then introduce the shared ASCII predicate at the append-text boundary.
+Finding 04 is closed. Continue Phase 1 with Finding 02's injectable near-wrap
+press-token reproducer; preserve the expanded target stack paths as regression
+coverage for both hardcoded and VIA macro preflight.

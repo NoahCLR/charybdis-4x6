@@ -264,6 +264,64 @@ static void test_decode_qmk_stream_rejects_unbalanced_key_downs(void) {
     CHECK(ir.length == 0);
 }
 
+static void test_decode_qmk_stream_rejects_every_high_text_byte(void) {
+    for (uint16_t value = 0x80u; value <= UINT8_MAX; value++) {
+        uint8_t direct[] = {(uint8_t)value, 0};
+        uint8_t surrounded[] = {'A', (uint8_t)value, 'B', 0};
+        uint8_t after_command[] = {SS_QMK_PREFIX, SS_TAP_CODE, (uint8_t)value, (uint8_t)value, 0};
+        const struct {
+            const uint8_t *bytes;
+            uint16_t       length;
+        } cases[] = {
+            {.bytes = direct, .length = sizeof(direct)},
+            {.bytes = surrounded, .length = sizeof(surrounded)},
+            {.bytes = after_command, .length = sizeof(after_command)},
+        };
+
+        for (size_t index = 0; index < sizeof(cases) / sizeof(cases[0]); index++) {
+            macro_payload_ir_t ir     = {.length = 1u, .bytes = {0xA5}};
+            test_qmk_reader_t  reader = {.buffer = cases[index].bytes};
+
+            CHECK(!macro_payload_decode_qmk_stream(&ir, cases[index].length, test_qmk_reader_read_byte, &reader));
+            CHECK(ir.length == 0u);
+        }
+    }
+}
+
+static void test_decode_qmk_stream_keeps_high_command_operands_in_keycode_grammar(void) {
+    static const uint8_t keycodes[] = {0x80u, 0xFEu, 0xFFu};
+
+    for (size_t index = 0; index < sizeof(keycodes) / sizeof(keycodes[0]); index++) {
+        uint8_t tap[] = {SS_QMK_PREFIX, SS_TAP_CODE, keycodes[index], 0};
+        uint8_t held[] = {
+            SS_QMK_PREFIX, SS_DOWN_CODE, keycodes[index],
+            SS_QMK_PREFIX, SS_UP_CODE, keycodes[index],
+            0,
+        };
+        macro_payload_ir_t tap_ir     = {0};
+        macro_payload_ir_t held_ir    = {0};
+        test_qmk_reader_t  tap_reader = {.buffer = tap};
+        test_qmk_reader_t  held_reader = {.buffer = held};
+
+        CHECK(macro_payload_decode_qmk_stream(&tap_ir, sizeof(tap), test_qmk_reader_read_byte, &tap_reader));
+        CHECK(macro_payload_decode_qmk_stream(&held_ir, sizeof(held), test_qmk_reader_read_byte, &held_reader));
+
+        test_reset_stubs();
+        CHECK(macro_payload_play_ir(&tap_ir));
+        CHECK(test_op_count == 2u);
+        CHECK(test_ops[0].kind == TEST_OP_TAP);
+        CHECK(test_ops[0].value == keycodes[index]);
+
+        test_reset_stubs();
+        CHECK(macro_payload_play_ir(&held_ir));
+        CHECK(test_op_count == 4u);
+        CHECK(test_ops[0].kind == TEST_OP_REGISTER);
+        CHECK(test_ops[0].value == keycodes[index]);
+        CHECK(test_ops[2].kind == TEST_OP_UNREGISTER);
+        CHECK(test_ops[2].value == keycodes[index]);
+    }
+}
+
 static void test_play_ir_with_delayed_text_uses_send_char_with_delay(void) {
     macro_payload_ir_t ir = {0};
 
@@ -281,22 +339,30 @@ static void test_play_ir_with_delayed_text_uses_send_char_with_delay(void) {
     CHECK((uint8_t)(test_ops[1].value >> 8) == TAP_CODE_DELAY);
 }
 
-static void test_play_ir_releases_unbalanced_downs_and_fails(void) {
+static void test_play_ir_preflight_rejects_malformed_ir_without_side_effects(void) {
     macro_payload_ir_t ir = {
         .length = 2,
         .bytes  = {MACRO_PAYLOAD_IR_OP_KEY_DOWN, TEST_SEND_STRING_U8(X_LEFT_CTRL)},
+    };
+    macro_payload_ir_t high_text = {
+        .length = 3,
+        .bytes  = {MACRO_PAYLOAD_IR_OP_TEXT, 1, 0x80},
+    };
+    macro_payload_ir_t valid_then_truncated = {
+        .length = 5,
+        .bytes  = {MACRO_PAYLOAD_IR_OP_TEXT, 1, 'A', MACRO_PAYLOAD_IR_OP_DELAY, 1},
     };
 
     test_reset_stubs();
 
     CHECK(!macro_payload_play_ir(&ir));
-    CHECK(test_op_count == 3);
-    CHECK(test_ops[0].kind == TEST_OP_REGISTER);
-    CHECK(test_ops[0].value == TEST_SEND_STRING_U8(X_LEFT_CTRL));
-    CHECK(test_ops[1].kind == TEST_OP_WAIT);
-    CHECK(test_ops[1].value == TAP_CODE_DELAY);
-    CHECK(test_ops[2].kind == TEST_OP_UNREGISTER);
-    CHECK(test_ops[2].value == TEST_SEND_STRING_U8(X_LEFT_CTRL));
+    CHECK(test_op_count == 0u);
+
+    CHECK(!macro_payload_play_ir(&high_text));
+    CHECK(test_op_count == 0u);
+
+    CHECK(!macro_payload_play_ir(&valid_then_truncated));
+    CHECK(test_op_count == 0u);
 }
 
 static void test_play_long_delay_heavy_payload_keeps_runtime_heartbeat_alive(void) {
@@ -347,8 +413,10 @@ int main(void) {
     test_encode_fails_when_buffer_is_too_small();
     test_encode_and_decode_qmk_round_trip_through_ir();
     test_decode_qmk_stream_rejects_unbalanced_key_downs();
+    test_decode_qmk_stream_rejects_every_high_text_byte();
+    test_decode_qmk_stream_keeps_high_command_operands_in_keycode_grammar();
     test_play_ir_with_delayed_text_uses_send_char_with_delay();
-    test_play_ir_releases_unbalanced_downs_and_fails();
+    test_play_ir_preflight_rejects_malformed_ir_without_side_effects();
     test_play_long_delay_heavy_payload_keeps_runtime_heartbeat_alive();
 
     puts("macro_payload host tests passed");

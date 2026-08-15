@@ -85,13 +85,85 @@ static void macro_payload_release_balanced_holds(macro_payload_hold_balance_t *b
     }
 }
 
-bool macro_payload_play_ir_with_text_output(const macro_payload_ir_t *ir, macro_payload_text_output_t text_output, uint8_t interval) {
+typedef struct {
+    macro_payload_ir_opcode_t opcode;
+    const uint8_t            *bytes;
+    uint16_t                  value;
+    uint8_t                   length;
+} macro_payload_ir_step_t;
+
+static bool macro_payload_ir_next(const uint8_t **cursor, const uint8_t *end, macro_payload_ir_step_t *step) {
+    const uint8_t *current;
+
+    if (!cursor || !*cursor || !end || !step || *cursor >= end) {
+        return false;
+    }
+
+    current = *cursor;
+    *step   = (macro_payload_ir_step_t){.opcode = (macro_payload_ir_opcode_t)(*current++)};
+
+    switch (step->opcode) {
+        case MACRO_PAYLOAD_IR_OP_TEXT:
+            if (current >= end) {
+                return false;
+            }
+
+            step->length = *current++;
+            if (step->length == 0u || (size_t)(end - current) < step->length) {
+                return false;
+            }
+            for (uint8_t index = 0; index < step->length; index++) {
+                if (!macro_payload_text_byte_is_supported(current[index])) {
+                    return false;
+                }
+            }
+
+            step->bytes = current;
+            current += step->length;
+            break;
+        case MACRO_PAYLOAD_IR_OP_DELAY:
+            if ((size_t)(end - current) < 2u) {
+                return false;
+            }
+
+            step->value = (uint16_t)current[0] | ((uint16_t)current[1] << 8);
+            current += 2;
+            break;
+        case MACRO_PAYLOAD_IR_OP_KEY_DOWN:
+        case MACRO_PAYLOAD_IR_OP_KEY_UP:
+            if (current >= end) {
+                return false;
+            }
+
+            step->value = *current++;
+            break;
+        case MACRO_PAYLOAD_IR_OP_TAP_LIST:
+            if (current >= end) {
+                return false;
+            }
+
+            step->length = *current++;
+            if (step->length == 0u || step->length > MACRO_PAYLOAD_MAX_TAP_KEYS || (size_t)(end - current) < step->length) {
+                return false;
+            }
+
+            step->bytes = current;
+            current += step->length;
+            break;
+        default:
+            return false;
+    }
+
+    *cursor = current;
+    return true;
+}
+
+static bool macro_payload_ir_preflight(const macro_payload_ir_t *ir) {
     const uint8_t                *cursor;
     const uint8_t                *end;
     macro_payload_hold_balance_t  balance = {0};
-    bool                          ok      = false;
 
-    if (!ir) {
+    if (!ir || ir->length > sizeof(ir->bytes)) {
         return false;
     }
 
@@ -100,67 +172,73 @@ bool macro_payload_play_ir_with_text_output(const macro_payload_ir_t *ir, macro_
     macro_payload_hold_balance_reset(&balance);
 
     while (cursor < end) {
-        macro_payload_ir_opcode_t opcode = (macro_payload_ir_opcode_t)(*cursor++);
+        macro_payload_ir_step_t step;
 
-        switch (opcode) {
-            case MACRO_PAYLOAD_IR_OP_TEXT: {
-                uint8_t text_length = 0;
+        if (!macro_payload_ir_next(&cursor, end, &step)) {
+            return false;
+        }
 
-                if (cursor >= end) {
-                    goto finish;
-                }
+        if (step.opcode == MACRO_PAYLOAD_IR_OP_KEY_DOWN && !macro_payload_hold_balance_note_down(&balance, (uint8_t)step.value)) {
+            return false;
+        }
+        if (step.opcode == MACRO_PAYLOAD_IR_OP_KEY_UP && !macro_payload_hold_balance_note_up(&balance, (uint8_t)step.value)) {
+            return false;
+        }
+    }
 
-                text_length = *cursor++;
-                if ((size_t)(end - cursor) < text_length) {
-                    goto finish;
-                }
+    return cursor == end && macro_payload_hold_balance_is_clear(&balance);
+}
 
-                for (uint8_t i = 0; i < text_length; i++) {
-                    if (!macro_payload_send_text_char((char)cursor[i], text_output, interval)) {
+bool macro_payload_play_ir_with_text_output(const macro_payload_ir_t *ir, macro_payload_text_output_t text_output, uint8_t interval) {
+    const uint8_t                *cursor;
+    const uint8_t                *end;
+    macro_payload_hold_balance_t  balance = {0};
+    bool                          ok      = false;
+
+    if (!macro_payload_ir_preflight(ir)) {
+        return false;
+    }
+
+    cursor = ir->bytes;
+    end    = ir->bytes + ir->length;
+    macro_payload_hold_balance_reset(&balance);
+
+    while (cursor < end) {
+        macro_payload_ir_step_t step;
+
+        if (!macro_payload_ir_next(&cursor, end, &step)) {
+            goto finish;
+        }
+
+        switch (step.opcode) {
+            case MACRO_PAYLOAD_IR_OP_TEXT:
+                for (uint8_t i = 0; i < step.length; i++) {
+                    if (!macro_payload_send_text_char((char)step.bytes[i], text_output, interval)) {
                         goto finish;
                     }
                 }
-
-                cursor += text_length;
                 break;
-            }
             case MACRO_PAYLOAD_IR_OP_DELAY:
-                if ((size_t)(end - cursor) < 2u) {
+                if (!macro_payload_run_delay(step.value)) {
                     goto finish;
                 }
-                if (!macro_payload_run_delay((uint16_t)cursor[0] | ((uint16_t)cursor[1] << 8))) {
-                    goto finish;
-                }
-                cursor += 2;
                 break;
             case MACRO_PAYLOAD_IR_OP_KEY_DOWN:
-                if (cursor >= end || !macro_payload_hold_balance_note_down(&balance, *cursor) || !macro_payload_run_key_down(*cursor)) {
+                if (!macro_payload_hold_balance_note_down(&balance, (uint8_t)step.value) || !macro_payload_run_key_down((uint8_t)step.value)) {
                     goto finish;
                 }
-                cursor++;
                 break;
             case MACRO_PAYLOAD_IR_OP_KEY_UP:
-                if (cursor >= end || !macro_payload_run_key_up(*cursor)) {
+                if (!macro_payload_run_key_up((uint8_t)step.value)) {
                     goto finish;
                 }
-                (void)macro_payload_hold_balance_note_up(&balance, *cursor);
-                cursor++;
+                (void)macro_payload_hold_balance_note_up(&balance, (uint8_t)step.value);
                 break;
-            case MACRO_PAYLOAD_IR_OP_TAP_LIST: {
-                uint8_t count = 0;
-
-                if (cursor >= end) {
+            case MACRO_PAYLOAD_IR_OP_TAP_LIST:
+                if (!macro_payload_run_tap_list(step.bytes, step.length)) {
                     goto finish;
                 }
-
-                count = *cursor++;
-                if ((size_t)(end - cursor) < count || !macro_payload_run_tap_list(cursor, count)) {
-                    goto finish;
-                }
-
-                cursor += count;
                 break;
-            }
             default:
                 goto finish;
         }

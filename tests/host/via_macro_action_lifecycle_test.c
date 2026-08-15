@@ -38,6 +38,7 @@ static uint8_t     fake_macro_count;
 static test_call_t test_calls[TEST_MAX_CALLS];
 static uint16_t    test_call_count;
 static uint16_t    runtime_diag_heartbeat_count;
+static uint16_t    macro_buffer_read_count;
 
 static void test_fail(const char *expr, const char *file, int line) {
     fprintf(stderr, "test failed: %s (%s:%d)\n", expr, file, line);
@@ -67,6 +68,7 @@ static void test_reset_state(void) {
     fake_macro_count             = DYNAMIC_KEYMAP_MACRO_COUNT;
     test_call_count              = 0;
     runtime_diag_heartbeat_count = 0;
+    macro_buffer_read_count      = 0;
     via_macro_provider_invalidate_all();
 }
 
@@ -79,6 +81,7 @@ uint16_t dynamic_keymap_macro_get_buffer_size(void) {
 }
 
 void dynamic_keymap_macro_get_buffer(uint16_t offset, uint16_t size, uint8_t *data) {
+    macro_buffer_read_count++;
     memcpy(data, &macro_buffer[offset], size);
 }
 
@@ -457,6 +460,38 @@ static void test_unterminated_delay_command_matches_current_via_behavior(void) {
     CHECK(test_calls[1].value == TAP_CODE_DELAY);
 }
 
+static void test_invalid_high_text_is_cached_until_explicit_invalidation(void) {
+    uint16_t reads_after_rejection;
+
+    test_reset_state();
+    macro_buffer[0] = 0x80u;
+
+    noah_action_tap(QK_MACRO_0);
+
+    CHECK(test_call_count == 0u);
+    CHECK(macro_buffer_read_count > 0u);
+    reads_after_rejection = macro_buffer_read_count;
+
+    noah_action_tap(QK_MACRO_0);
+
+    CHECK(test_call_count == 0u);
+    CHECK(macro_buffer_read_count == reads_after_rejection);
+
+    macro_buffer[0] = 'A';
+    noah_action_tap(QK_MACRO_0);
+
+    CHECK(test_call_count == 0u);
+    CHECK(macro_buffer_read_count == reads_after_rejection);
+
+    via_macro_provider_invalidate_all();
+    noah_action_tap(QK_MACRO_0);
+
+    CHECK(macro_buffer_read_count > reads_after_rejection);
+    CHECK(test_call_count == 1u);
+    CHECK(test_calls[0].kind == TEST_CALL_SEND_CHAR);
+    CHECK(test_calls[0].value == 'A');
+}
+
 int main(void) {
     test_qmk_tap_command_uses_owned_tap();
     test_qmk_down_and_up_commands_use_owned_register_and_unregister();
@@ -469,6 +504,7 @@ int main(void) {
     test_zero_sized_macro_buffer_is_ignored();
     test_non_terminated_macro_buffer_is_ignored();
     test_unterminated_delay_command_matches_current_via_behavior();
+    test_invalid_high_text_is_cached_until_explicit_invalidation();
 
     puts("via macro action_lifecycle host tests passed");
     return 0;

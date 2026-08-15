@@ -437,6 +437,12 @@ Explicit key-down/key-up payloads such as `{+KC_LSFT}` and `{-KC_LSFT}` must
 leave no keys held at the end of the macro; unbalanced key-down payloads are
 rejected so a macro cannot leave a key registered after playback.
 
+VIA macro text follows QMK's single-byte ASCII domain. Zero terminates a macro
+slot, bytes `0x01..0x7F` are valid text, and `0x80..0xFF` are rejected in text
+positions. QMK prefix command operands keep their separate 8-bit keycode
+grammar. A malformed slot produces no partial typing, wait, or key action and
+stays rejected until the next VIA macro mutation invalidates the cache.
+
 So the current profile uses both:
 
 - direct modded keycodes for many standard macOS editing and app shortcuts

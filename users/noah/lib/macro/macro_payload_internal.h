@@ -8,6 +8,10 @@
 
 #define MACRO_PAYLOAD_MAX_TAP_KEYS 16
 
+static inline bool macro_payload_text_byte_is_supported(uint8_t byte) {
+    return byte != 0u && byte <= 0x7Fu;
+}
+
 typedef enum {
     MACRO_PAYLOAD_COMMAND_DELAY,
     MACRO_PAYLOAD_COMMAND_KEY_DOWN,

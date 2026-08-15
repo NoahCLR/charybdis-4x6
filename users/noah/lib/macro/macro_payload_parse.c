@@ -226,7 +226,7 @@ bool macro_payload_compile(const char *payload, macro_payload_ir_t *ir) {
             continue;
         }
 
-        if (*cursor == '}' || (uint8_t)*cursor > 0x7F) {
+        if (*cursor == '}' || !macro_payload_text_byte_is_supported((uint8_t)*cursor)) {
             macro_payload_ir_reset(ir);
             return false;
         }

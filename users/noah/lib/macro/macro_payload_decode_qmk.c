@@ -132,6 +132,11 @@ bool macro_payload_decode_qmk_stream(macro_payload_ir_t *ir, uint16_t length, ma
         }
 
         if (byte != SS_QMK_PREFIX) {
+            if (!macro_payload_text_byte_is_supported(byte)) {
+                ir->length = 0;
+                return false;
+            }
+
             if (!macro_payload_flush_pending_qmk_sequence(ir, &balance, pending_downs, pending_down_count, pending_tap, pending_tap_key, matched_up_count)) {
                 ir->length = 0;
                 return false;

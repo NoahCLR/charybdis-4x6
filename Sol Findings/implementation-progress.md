@@ -5,9 +5,9 @@
 - **Branch:** `sol`
 - **Starting commit:** `5b20ed01` (`sol findings`)
 - **Started:** 2026-07-13
-- **Current focus:** [Finding 04 — VIA macro byte validation](04-via-macro-byte-validation.md)
+- **Current focus:** [Finding 02 — press-token rollover](02-press-token-rollover.md)
 - **Overall status:** In progress
-- **Latest closed review:** [`review/2026-08-15-review-01`](../review/2026-08-15-review-01/)
+- **Latest closed review:** [`review/2026-08-15-review-02`](../review/2026-08-15-review-02/)
 
 This file is the implementation record for the plans in this directory. It records what actually changed, why choices were made, what verification really ran, and what remains open. A plan is not marked verified until its targeted checks, the full host suite, the target firmware build, target-specific evidence, and required documentation all pass.
 
@@ -26,7 +26,7 @@ This file is the implementation record for the plans in this directory. It recor
 | 01 | [Target stack safety](01-target-stack-safety.md) | Must fix | Verified | Fresh post-LTO target gate: 1,808 B worst main path in a 1,920 B budget; full host suite and firmware build pass |
 | 02 | [Press-token rollover](02-press-token-rollover.md) | Must fix | Planned | Not run |
 | 03 | [VIA split buffer validation](03-via-split-buffer-validation.md) | Must fix | Verified | Exhaustive normal/ASan/UBSan boundary matrix, full host suite, firmware build, and target stack regression gate pass |
-| 04 | [VIA macro byte validation](04-via-macro-byte-validation.md) | Must fix | Planned | Not run |
+| 04 | [VIA macro byte validation](04-via-macro-byte-validation.md) | Must fix | Verified | Exhaustive text-domain, whole-IR preflight, cache lifecycle, full host, firmware, and explicit target-stack paths pass |
 | 05 | [VIA split persistence](05-via-split-persistence.md) | Must fix | Planned | Not run |
 | 06 | [Combo-origin cache lifecycle](06-combo-origin-cache-lifecycle.md) | Should fix | Planned | Not run |
 | 07 | [Nonblocking macro playback](07-nonblocking-macro-playback.md) | Should fix | Planned | Not run |
@@ -258,6 +258,59 @@ Finding 01 target stack regression gate pass on the same source tree. The
 target gate retains a 1,808 B worst reviewed main path against a 1,920 B budget;
 the reviewed VIA slave path is 88 B against a 768 B split-thread budget.
 
+## Finding 04 — VIA macro byte validation
+
+### Objective
+
+Keep arbitrary high bytes out of QMK's 128-entry text lookup tables while
+preserving the full byte grammar for VIA keycode operands, and reject every
+malformed IR before its first output, wait, or key-ownership side effect.
+
+### 2026-08-15 — Text-domain and whole-IR preflight
+
+**Baseline reproduced**
+
+- Added the exhaustive high-text decoder test first. The unmodified decoder
+  failed on the first `0x80` case because it accepted the byte as text.
+
+**Implemented**
+
+- Added one shared `macro_payload_text_byte_is_supported()` predicate. Authored
+  parsing, VIA/QMK-stream decoding, and playback structure validation now agree
+  that text bytes are `0x01..0x7F`; zero remains the VIA stream terminator.
+- Kept high-valued bytes legal in complete QMK tap/down/up command operand
+  positions. Tests cover `0x80`, `0xFE`, and `0xFF` through decode and playback.
+- Added a shared IR step decoder used by both a complete preflight pass and the
+  execution pass. It validates opcode shape, text lengths/bytes, delays,
+  key-action operands, tap-list counts, bounds, and final hold balance.
+- Playback now completes preflight before sending text, waiting, or changing
+  owned-key state. A valid prefix followed by a later malformed operation can
+  no longer produce partial output.
+- Proved invalid VIA slots are negatively cached: a second play performs no NVM
+  reads; repairing storage has no effect until explicit invalidation; after
+  invalidation, the repaired ASCII payload loads and plays.
+- The concrete macro payload runner now repeats its coverage under ASan/UBSan.
+
+**Focused verification**
+
+- `sh tests/host/run_macro_payload_tests.sh` — passed normal and ASan/UBSan variants.
+- `sh tests/host/run_macro_dispatch_tests.sh` — passed.
+- `sh tests/host/run_via_macro_defaults_tests.sh` — passed.
+- `sh tests/host/run_via_macro_action_lifecycle_tests.sh` — passed.
+- `sh tests/host/run_action_lifecycle_tests.sh` — passed.
+- `sh tests/host/run_qmk_contract_checks.sh` — passed.
+- `sh tests/host/run_feature_gate_compile_tests.sh` — passed.
+
+### Current finding status
+
+Finding 04 is **Verified**. Focused macro/VIA checks, ASan/UBSan, the final full
+host suite, ordinary target firmware build, documentation, and the fresh stack
+gate pass on one coherent tree. The expanded target manifest measures the new
+hardcoded preflight route at 760 B and the handled VIA preflight route at
+1,152 B against the 1,920 B main-process budget. The overall worst reviewed
+path remains 1,808 B. The final linked image reports `.text` 102,104 B,
+`.rodata` 15,460 B, `.data` 23,760 B, and `.bss` 65,204 B.
+
 ## Verification ledger
 
 | Date | Finding | Command | Result | Notes |
@@ -298,6 +351,19 @@ the reviewed VIA slave path is 88 B against a 768 B split-thread budget.
 | 2026-08-15 | 03 | `qmk compile -kb bastardkb/charybdis/4x6 -km noah` | Passed | Required ordinary target firmware build |
 | 2026-08-15 | 03 | `sh tests/host/run_firmware_stack_budget_checks.sh` | Passed | Fresh clean target build; 1,808 B worst reviewed main path and 88 B reviewed VIA split path |
 | 2026-08-15 | 03 | `git diff --check` | Passed | Source, tests, compatibility docs, Sol ledger, and closed Finding 03 review |
+| 2026-08-15 | 04 | `sh tests/host/run_macro_payload_tests.sh` before implementation | Failed as expected | First `0x80` text case reproduced the unsafe decoder acceptance |
+| 2026-08-15 | 04 | `sh tests/host/run_macro_payload_tests.sh` | Passed | Normal and ASan/UBSan exhaustive text-domain and whole-IR preflight coverage |
+| 2026-08-15 | 04 | `sh tests/host/run_macro_dispatch_tests.sh` | Passed | Hardcoded macro dispatch remains coherent |
+| 2026-08-15 | 04 | `sh tests/host/run_via_macro_defaults_tests.sh` | Passed | Authored VIA defaults remain valid |
+| 2026-08-15 | 04 | `sh tests/host/run_via_macro_action_lifecycle_tests.sh` | Passed | Negative cache, repair/invalidation, and owned action lifecycle pass |
+| 2026-08-15 | 04 | `sh tests/host/run_action_lifecycle_tests.sh` | Passed | General action lifecycle remains intact |
+| 2026-08-15 | 04 | `sh tests/host/run_qmk_contract_checks.sh` | Passed | QMK compatibility contracts remain coherent |
+| 2026-08-15 | 04 | `sh tests/host/run_feature_gate_compile_tests.sh` | Passed | Macro interface and feature variants compile |
+| 2026-08-15 | 04 | `PYTHONPYCACHEPREFIX=/tmp/noah-stack-pycache PYTHON=/usr/bin/python3 sh tests/host/run_firmware_stack_budget_tool_tests.sh` | Passed | All 15 stack-tool schema/edge fixtures pass after adding macro preflight paths |
+| 2026-08-15 | 04 | `qmk compile -kb bastardkb/charybdis/4x6 -km noah` | Passed | Required ordinary target firmware build |
+| 2026-08-15 | 04 | `sh tests/host/run_firmware_stack_budget_checks.sh` | Passed | Fresh build; hardcoded macro preflight 760 B, VIA macro preflight 1,152 B, worst reviewed path unchanged at 1,808 B |
+| 2026-08-15 | 04 | `PYTHONPYCACHEPREFIX=/tmp/noah-host-pycache sh tests/host/run_all_host_tests.sh` | Passed | Final same-tree complete host suite, including normal and sanitizer macro payload variants |
+| 2026-08-15 | 04 | `git diff --check` | Passed | Source, tests, stack manifest, macro docs, Sol ledger, and closed Finding 04 review |
 
 ## Cross-cutting decisions and deferred work
 
@@ -308,6 +374,7 @@ the reviewed VIA slave path is 88 B against a 768 B split-thread budget.
 
 ## Next program action
 
-Begin Finding 04 with a complete pre-edit review of its plan, the macro decoder,
-IR playback validator, and invalid-slot cache lifecycle. Add the high-byte
-reproducer before changing playback behavior.
+Begin Finding 02 with an injectable near-wrap press-token reproducer and a
+complete audit of every place that treats token zero as invalid. Do not change
+the counter representation until pre-wrap and post-wrap live-token coexistence
+is mechanically demonstrated.

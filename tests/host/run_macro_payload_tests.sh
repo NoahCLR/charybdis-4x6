@@ -8,6 +8,7 @@ ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 noah_host_export_qmk_cpath "$ROOT"
 BUILD_DIR="$(mktemp -d)"
 BIN="$BUILD_DIR/macro_payload_test"
+SANITIZED_BIN="$BUILD_DIR/macro_payload_sanitized_test"
 
 cleanup() {
     rm -rf "$BUILD_DIR"
@@ -32,3 +33,23 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -o "$BIN"
 
 "$BIN"
+
+cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
+    -fsanitize=address,undefined \
+    -fno-omit-frame-pointer \
+    -DQMK_KEYBOARD_H='"qmk_stub.h"' \
+    -I"$QMK_ROOT/platforms" \
+    -I"$QMK_ROOT/quantum/send_string" \
+    -I"$ROOT" \
+    -I"$ROOT/users/noah" \
+    -I"$ROOT/tests/host/include" \
+    "$ROOT/tests/host/macro_payload_test.c" \
+    "$ROOT/users/noah/lib/macro/macro_payload.c" \
+    "$ROOT/users/noah/lib/macro/macro_payload_decode_qmk.c" \
+    "$ROOT/users/noah/lib/macro/macro_payload_keycodes.c" \
+    "$ROOT/users/noah/lib/macro/macro_payload_parse.c" \
+    "$ROOT/users/noah/lib/macro/macro_payload_run.c" \
+    "$ROOT/users/noah/lib/macro/macro_payload_encode.c" \
+    -o "$SANITIZED_BIN"
+
+"$SANITIZED_BIN"
