@@ -70,6 +70,8 @@ static void test_clear_logs(void) {
     fallback_hold_activation_count             = 0;
     fallback_hold_active                       = false;
     fake_time32                                = 1000u;
+    runtime_fixture.timer_read32_count         = 0u;
+    runtime_fixture.timer_elapsed32_count      = 0u;
     keyboard_mod_register_count                = 0;
     keyboard_mod_unregister_count              = 0;
     last_registered_keycode                    = KC_NO;
@@ -207,6 +209,26 @@ static keyrecord_t test_record(bool pressed) {
                 .pressed = pressed,
             },
     };
+}
+
+static void test_dragscroll_prime_horizontal_lock_with_residual(uint32_t start_time) {
+    report_mouse_t report;
+
+    fake_time32 = start_time;
+    report      = handle_dragscroll_mode((report_mouse_t){
+        .x = 18,
+        .y = 0,
+    });
+    CHECK(report.h == 3);
+    CHECK(report.v == 0);
+
+    fake_time32 = start_time + 1u;
+    report      = handle_dragscroll_mode((report_mouse_t){
+        .x = 6,
+        .y = 0,
+    });
+    CHECK(report.h == 0);
+    CHECK(report.v == 0);
 }
 
 static void test_dragscroll_horizontal_lock_filters_vertical_jitter(void) {
@@ -349,6 +371,162 @@ static void test_dragscroll_lock_releases_after_pause_and_switches_axes_cleanly(
     });
     CHECK(report.h == 0);
     CHECK(report.v == 3);
+}
+
+static void test_dragscroll_lock_timeout_boundary_uses_prior_motion_age(void) {
+    report_mouse_t report;
+
+    test_reset_stubs();
+    test_dragscroll_prime_horizontal_lock_with_residual(1020u);
+
+    fake_time32 = 1021u + NOAH_DRAGSCROLL_LOCK_TIMEOUT_MS;
+    report      = handle_dragscroll_mode((report_mouse_t){
+        .x = 0,
+        .y = -4,
+    });
+    CHECK(report.h == 1);
+    CHECK(report.v == 0);
+
+    test_reset_stubs();
+    test_dragscroll_prime_horizontal_lock_with_residual(1020u);
+
+    fake_time32 = 1021u + NOAH_DRAGSCROLL_LOCK_TIMEOUT_MS + 1u;
+    report      = handle_dragscroll_mode((report_mouse_t){
+        .x = 0,
+        .y = -4,
+    });
+    CHECK(report.h == 0);
+    CHECK(report.v == 0);
+}
+
+static void test_dragscroll_buffer_timeout_boundary_preserves_then_expires_residual(void) {
+    report_mouse_t report;
+
+    test_reset_stubs();
+    test_dragscroll_prime_horizontal_lock_with_residual(1020u);
+
+    fake_time32 = 1021u + NOAH_DRAGSCROLL_BUFFER_EXPIRE_MS;
+    report      = handle_dragscroll_mode((report_mouse_t){
+        .x = 0,
+        .y = -4,
+    });
+    CHECK(report.h == 0);
+    CHECK(report.v == 0);
+
+    fake_time32 += NOAH_DRAGSCROLL_RATE_LIMIT_MS;
+    report = handle_dragscroll_mode((report_mouse_t){
+        .x = 6,
+        .y = 0,
+    });
+    CHECK(report.h == 2);
+    CHECK(report.v == 0);
+
+    test_reset_stubs();
+    test_dragscroll_prime_horizontal_lock_with_residual(1020u);
+
+    fake_time32 = 1021u + NOAH_DRAGSCROLL_BUFFER_EXPIRE_MS + 1u;
+    report      = handle_dragscroll_mode((report_mouse_t){
+        .x = 0,
+        .y = -4,
+    });
+    CHECK(report.h == 0);
+    CHECK(report.v == 0);
+
+    fake_time32 += NOAH_DRAGSCROLL_RATE_LIMIT_MS;
+    report = handle_dragscroll_mode((report_mouse_t){
+        .x = 0,
+        .y = -4,
+    });
+    CHECK(report.h == 0);
+    CHECK(report.v == 1);
+}
+
+static void test_dragscroll_no_motion_expires_stale_state(void) {
+    report_mouse_t report;
+
+    test_reset_stubs();
+    test_dragscroll_prime_horizontal_lock_with_residual(1020u);
+
+    fake_time32 = 1021u + NOAH_DRAGSCROLL_BUFFER_EXPIRE_MS + 1u;
+    report      = handle_dragscroll_mode((report_mouse_t){0});
+    CHECK(report.h == 0);
+    CHECK(report.v == 0);
+
+    fake_time32 += NOAH_DRAGSCROLL_RATE_LIMIT_MS;
+    report = handle_dragscroll_mode((report_mouse_t){
+        .x = 0,
+        .y = -8,
+    });
+    CHECK(report.h == 0);
+    CHECK(report.v == 1);
+}
+
+static void test_dragscroll_first_post_expiry_report_can_emit_new_axis(void) {
+    report_mouse_t report;
+
+    test_reset_stubs();
+    test_dragscroll_prime_horizontal_lock_with_residual(1020u);
+
+    fake_time32 = 1021u + NOAH_DRAGSCROLL_BUFFER_EXPIRE_MS + 1u;
+    report      = handle_dragscroll_mode((report_mouse_t){
+        .x = 0,
+        .y = -16,
+    });
+    CHECK(report.h == 0);
+    CHECK(report.v == 2);
+}
+
+static void test_dragscroll_rate_limit_boundary_is_inclusive(void) {
+    report_mouse_t report;
+
+    test_reset_stubs();
+
+    fake_time32 = 1020u;
+    report      = handle_dragscroll_mode((report_mouse_t){
+        .x = 18,
+        .y = 0,
+    });
+    CHECK(report.h == 3);
+
+    fake_time32 = 1020u + NOAH_DRAGSCROLL_RATE_LIMIT_MS - 1u;
+    report      = handle_dragscroll_mode((report_mouse_t){
+        .x = 6,
+        .y = 0,
+    });
+    CHECK(report.h == 0);
+
+    fake_time32 = 1020u + NOAH_DRAGSCROLL_RATE_LIMIT_MS;
+    report      = handle_dragscroll_mode((report_mouse_t){0});
+    CHECK(report.h == 1);
+    CHECK(report.v == 0);
+}
+
+static void test_dragscroll_prior_motion_age_is_wrap_safe(void) {
+    report_mouse_t report;
+    uint32_t       start_time = UINT32_MAX - 32u;
+
+    test_reset_stubs();
+    test_dragscroll_prime_horizontal_lock_with_residual(start_time);
+
+    fake_time32 = start_time + 1u + NOAH_DRAGSCROLL_LOCK_TIMEOUT_MS + 1u;
+    report      = handle_dragscroll_mode((report_mouse_t){
+        .x = 0,
+        .y = -4,
+    });
+    CHECK(report.h == 0);
+    CHECK(report.v == 0);
+}
+
+static void test_dragscroll_uses_one_timer_sample_per_invocation(void) {
+    test_reset_stubs();
+
+    (void)handle_dragscroll_mode((report_mouse_t){
+        .x = 18,
+        .y = 0,
+    });
+
+    CHECK(runtime_fixture.timer_read32_count == 1u);
+    CHECK(runtime_fixture.timer_elapsed32_count == 0u);
 }
 
 static void test_dragscroll_uses_different_horizontal_and_vertical_divisors(void) {
@@ -629,6 +807,13 @@ int main(void) {
     test_dragscroll_opposite_axis_does_not_steal_active_lock();
     test_dragscroll_ambiguous_wobble_keeps_existing_lock();
     test_dragscroll_lock_releases_after_pause_and_switches_axes_cleanly();
+    test_dragscroll_lock_timeout_boundary_uses_prior_motion_age();
+    test_dragscroll_buffer_timeout_boundary_preserves_then_expires_residual();
+    test_dragscroll_no_motion_expires_stale_state();
+    test_dragscroll_first_post_expiry_report_can_emit_new_axis();
+    test_dragscroll_rate_limit_boundary_is_inclusive();
+    test_dragscroll_prior_motion_age_is_wrap_safe();
+    test_dragscroll_uses_one_timer_sample_per_invocation();
     test_dragscroll_uses_different_horizontal_and_vertical_divisors();
     test_dragscroll_cross_axis_decay_prevents_residual_leakage();
     test_dragscroll_reset_clears_buffers_and_lock_state();

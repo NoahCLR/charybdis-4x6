@@ -5,10 +5,10 @@
 - **Branch:** `sol`
 - **Starting commit:** `5b20ed01` (`sol findings`)
 - **Started:** 2026-07-13
-- **Current focus:** [Finding 05 — VIA split persistence](05-via-split-persistence.md)
+- **Current focus:** [Finding 10 — pointing backlog bounds](10-pointing-backlog-bounds.md); Finding 05 awaits manual hardware verification
 - **Overall status:** In progress
-- **Latest closed review:** [`review/2026-08-15-review-09`](../review/2026-08-15-review-09/)
-- **Active review:** [`review/2026-08-15-review-10`](../review/2026-08-15-review-10/)
+- **Latest closed review:** [`review/2026-08-15-review-11`](../review/2026-08-15-review-11/)
+- **Active implementation review:** None; Review 10 remains hardware-verification pending
 
 This file is the implementation record for the plans in this directory. It records what actually changed, why choices were made, what verification really ran, and what remains open. A plan is not marked verified until its targeted checks, the full host suite, the target firmware build, target-specific evidence, and required documentation all pass.
 
@@ -34,7 +34,7 @@ This file is the implementation record for the plans in this directory. It recor
 | 08 | [Synthetic-key ownership](08-synthetic-key-ownership.md) | Should fix | Verified | Aggregate physical/managed report ownership, scoped persistent leases, strict macro balance, source guards, full host, firmware, and target stack gates pass |
 | 09 | [Pending-release sequence rollover](09-pending-release-sequence-rollover.md) | Should fix | Verified | Explicit linked FIFO, 65,537-cycle blocked-head stress, structural corruption checks, full host, firmware, and target stack gate pass |
 | 10 | [Pointing backlog bounds](10-pointing-backlog-bounds.md) | Should fix | Planned | Not run |
-| 11 | [Dragscroll stall recovery](11-dragscroll-stall-recovery.md) | Should fix | Planned | Not run |
+| 11 | [Dragscroll stall recovery](11-dragscroll-stall-recovery.md) | Should fix | Verified | 55/56 and 80/81 ms boundaries, first-report/no-motion/wrap/reset/pinch reuse, one-read timer budget, full host, firmware, and explicit 360 B stack path pass |
 | 12 | [Split RPC failure backoff](12-split-rpc-failure-backoff.md) | Should fix | Verified | Stop-on-first-failure, 50–1,000 ms wrap-safe backoff, current-state recovery, bounded trace, full host, firmware, and target-stack gates pass |
 | 13 | [RGB preview parity](13-rgb-preview-parity.md) | Should fix | Planned | Not run |
 | 14 | [Macro-cache RAM](14-macro-cache-ram.md) | Optimize | Planned | Not run |
@@ -775,6 +775,21 @@ the worst split-worker path. Physical two-half power-cycle and USB-role-swap
 verification remains intentionally pending and is the only remaining Finding
 05 closure gate.
 
+## Finding 11 — Dragscroll stall recovery
+
+### 2026-08-15 — Verified
+
+- Moved prior lock/residual expiry before current motion accumulation, with
+  inclusive 55/56 ms lock and 80/81 ms buffer boundaries.
+- Derived buffer, rate, and lock ages from one wrap-safe `timer_read32()`
+  sample; the host fixture proves zero `timer_elapsed32()` calls.
+- Preserved immediate new-axis output, exact rate behavior, no-motion expiry,
+  reset, and the manifest-owned DRAGSCROLL/PINCH handler/reset pairing.
+- Left all gesture tuning and Finding 10 backlog policy unchanged.
+- Added an explicit post-LTO pointing-task path: 360/1,920 B. Ordinary target
+  size remains 150,748 B text and 245,584 B BSS; overall reviewed maxima remain
+  1,904/1,920 B main and 336/768 B split.
+
 ## Verification ledger
 
 | Date | Finding | Command | Result | Notes |
@@ -942,6 +957,15 @@ verification remains intentionally pending and is the only remaining Finding
 | 2026-08-15 | 05 | `sh tests/host/run_firmware_stack_budget_checks.sh` | Blocked | Sandbox could not recreate sibling QMK build artifacts; escalation rejected after app usage limit, with no budget assertion executed |
 | 2026-08-15 | 05 | `PYTHONPYCACHEPREFIX=/tmp/noah-stack-pycache PYTHON=/usr/bin/python3 sh tests/host/run_firmware_stack_budget_tool_tests.sh` | Passed | 15 schema-v2 fixtures after manifest reconciliation to the new main/slave paths |
 | 2026-08-15 | 05 | `PYTHONPYCACHEPREFIX=/tmp/noah-stack-pycache PYTHON=/usr/bin/python3 sh tests/host/run_firmware_stack_budget_checks.sh` | Passed | Fresh post-LTO target: 1,904/1,920 B worst reviewed main path and 336/768 B worst reviewed split path; all Finding 05 digest/RPC/storage/commit/recovery/ack paths pass |
+| 2026-08-15 | 11 | `sh tests/host/run_pd_mode_handlers_tests.sh` before implementation | Failed as expected | The first report after a 56 ms gap emitted the retained horizontal step because current motion refreshed stale state before expiry |
+| 2026-08-15 | 11 | `sh tests/host/run_pd_mode_handlers_tests.sh` | Passed | 55/56 and 80/81 ms boundaries, immediate fresh-axis output, no-motion expiry, rate boundary, wrap, reset, and one-read timer budget |
+| 2026-08-15 | 11 | `sh tests/host/run_pd_mode_tests.sh` | Passed | DRAGSCROLL and PINCH remain pinned to the shared handler and reset callback |
+| 2026-08-15 | 11 | `sh tests/host/run_pd_runtime_tests.sh`, `run_pd_mode_key_runtime_integration_tests.sh`, and `run_pointer_layer_policy_tests.sh` | Passed | Surrounding pointing runtime, key-runtime integration variants, and layer policy remain coherent |
+| 2026-08-15 | 11 | `sh tests/host/run_feature_gate_compile_tests.sh` | Passed | Pointing/config feature variants compile |
+| 2026-08-15 | 11 | `PYTHONPYCACHEPREFIX=/tmp/noah-host-pycache sh tests/host/run_all_host_tests.sh` | Passed | Complete host suite on the final formatted source |
+| 2026-08-15 | 11 | `qmk compile -kb bastardkb/charybdis/4x6 -km noah` | Passed | Ordinary target remains 150,748 B text and 245,584 B BSS |
+| 2026-08-15 | 11 | `PYTHONPYCACHEPREFIX=/tmp/noah-stack-pycache PYTHON=/usr/bin/python3 sh tests/host/run_firmware_stack_budget_tool_tests.sh` | Passed | All 15 manifest/schema fixtures pass |
+| 2026-08-15 | 11 | `PYTHONPYCACHEPREFIX=/tmp/noah-stack-pycache PYTHON=/usr/bin/python3 sh tests/host/run_firmware_stack_budget_checks.sh` | Passed | Explicit dragscroll path 360/1,920 B; overall main 1,904/1,920 B and split 336/768 B |
 
 ## Cross-cutting decisions and deferred work
 
@@ -962,6 +986,9 @@ verification remains intentionally pending and is the only remaining Finding
 - Finding 12 bounds runtime-sync outages independently of the durable VIA
   convergence protocol. Finding 05 may reuse timing concepts but must keep its
   version, authority, acknowledgement, and persistence state explicit.
+- Finding 11 establishes expiry-before-accumulation and one sampled timestamp
+  for the shared DRAGSCROLL/PINCH handler. Finding 10 builds bounded discrete
+  tap backlogs separately and must not change this gesture lifecycle.
 - The stack checker must model vendor split callbacks under `SlaveThread`, not under the main process stack. Stack-context correctness is part of the gate contract.
 - Finding 17 explicitly crossed into `../bastardkb-qmk` for the authorized
   two-file auto-mouse elapsed-at compatibility extension. No other sibling
@@ -970,6 +997,6 @@ verification remains intentionally pending and is the only remaining Finding
 ## Next program action
 
 Execute Finding 05's physical disconnect, per-half power-cycle, reconnect, and
-USB-role-swap matrix. All software gates are green; the finding remains open
-only for this manual hardware evidence. After that closure, continue with
-Finding 10.
+USB-role-swap matrix when hardware is available. All Finding 05 software gates
+are green. In parallel, proceed with Finding 10; Finding 11 is verified and
+Review 11 is closed.

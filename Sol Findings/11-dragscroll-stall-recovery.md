@@ -3,7 +3,7 @@
 ## Plan metadata
 
 - **Severity:** Should-fix (P1 gesture-state correctness; low implementation risk)
-- **Status:** Planned; new motion still refreshes timestamps before expiry checks
+- **Status:** Verified; prior-state expiry, single-sample timing, host coverage, firmware, and target stack gates pass
 - **Affected surfaces:** dragscroll and pinch modes, axis lock, residual motion buffers, timer sampling, rate limiting
 - **Primary files:** [pd_mode_dragscroll.c](../users/noah/lib/pointing/modes/pd_mode_dragscroll.c), [pd_mode_handlers_test.c](../tests/host/pd_mode_handlers_test.c), [config.h](../users/noah/config.h)
 - **Prerequisites:** None; coordinate timer-helper style with [Finding 17](17-split-timer-sampling.md) if it lands first
@@ -18,6 +18,10 @@ With current configuration, a gap greater than the 55 ms lock timeout should rel
 The function also calls timer_read32 once and timer_elapsed32 multiple times. The repeated reads can disagree around boundaries and add avoidable timer work. All decisions in one handler invocation should use one sampled now value.
 
 ## Current evidence and failure scenario
+
+> **Audit-time snapshot:** This section describes the pre-remediation ordering
+> that motivated Finding 11. The landed-state summary added during closure
+> supersedes it.
 
 - users/noah/lib/pointing/modes/pd_mode_dragscroll.c:64-70 stores buffers, last motion/scroll timestamps, and locked axis together.
 - users/noah/lib/pointing/modes/pd_mode_dragscroll.c:153-181 considers a gesture active while motion age is at most NOAH_DRAGSCROLL_LOCK_TIMEOUT_MS.
@@ -164,15 +168,34 @@ Update code comments to explain the two-stage expiry and single-sample timing. U
 
 ## Acceptance checklist
 
-- [ ] Old lock expires before the first post-timeout report is classified.
-- [ ] Old residual expires before the first post-buffer-timeout report is accumulated.
-- [ ] Exact timeout boundaries preserve current semantics.
-- [ ] A fresh report can establish a new axis immediately.
-- [ ] One timer sample drives all decisions in a handler call.
-- [ ] Wrap, no-motion, reset, and pinch reuse are tested.
-- [ ] Targeted tests, full host suite, and firmware compile pass.
-- [ ] Review notes describe the landed two-stage expiry.
+- [x] Old lock expires before the first post-timeout report is classified.
+- [x] Old residual expires before the first post-buffer-timeout report is accumulated.
+- [x] Exact timeout boundaries preserve current semantics.
+- [x] A fresh report can establish a new axis immediately.
+- [x] One timer sample drives all decisions in a handler call.
+- [x] Wrap, no-motion, reset, and pinch reuse are tested.
+- [x] Targeted tests, full host suite, and firmware compile pass.
+- [x] Review notes describe the landed two-stage expiry.
+
+## Landed implementation and evidence
+
+`handle_dragscroll_mode()` now samples `timer_read32()` once, computes the
+prior gesture age with unsigned subtraction, and expires stale state before
+current motion can refresh `last_motion_time`. A gap through 55 ms preserves
+the lock; 56 ms releases it. A gap through 80 ms preserves residual motion;
+81 ms clears both buffers and the lock. A strong first report after expiry can
+still establish and emit on its new axis in the same call.
+
+The handler no longer calls `timer_elapsed32()`. Host timer counters enforce
+one `timer_read32()` and zero elapsed-helper calls per invocation. Boundary,
+first-report, no-motion, rate-limit, wrap, complete reset, and shared
+DRAGSCROLL/PINCH manifest wiring are covered. No threshold, ratio, divisor,
+direction, rate-limit, or DPI value changed.
+
+The ordinary target remains 150,748 B text, 0 B data, and 245,584 B BSS. The
+fresh post-LTO reviewed dragscroll path is 360/1,920 B; the overall reviewed
+main and split maxima remain 1,904/1,920 B and 336/768 B.
 
 ## Next action
 
-Add the 56 ms stale-lock and 81 ms stale-buffer regression tests first. Then reorder handle_dragscroll_mode around a single now sample without changing ratios, thresholds, or timeout values.
+Proceed to [Finding 10 — pointing backlog bounds](10-pointing-backlog-bounds.md).

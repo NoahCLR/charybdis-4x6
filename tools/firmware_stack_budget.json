@@ -43,6 +43,11 @@
           "caller": "noah_action_tap_at",
           "callee": "noah_action_tap_literal",
           "reason": "action-kind dispatch table selects the literal tap implementation for the reviewed emission branch"
+        },
+        {
+          "caller": "pointing_device_task",
+          "callee": "handle_dragscroll_mode",
+          "reason": "the active pd-mode registry row dispatches DRAGSCROLL and PINCH reports through def->handler"
         }
       ],
       "cycle_bounds": [
@@ -185,6 +190,10 @@
         {
           "name": "matrix scan VIA two-dirty default recovery",
           "functions": ["main", "matrix_scan", "eeconfig_init_via", "dynamic_keymap_reset", "eeprom_update_byte", "wear_leveling_write"]
+        },
+        {
+          "name": "pointing task dragscroll single-sample handler",
+          "functions": ["main", "pointing_device_task", "handle_dragscroll_mode", "timer_read32"]
         }
       ]
     },

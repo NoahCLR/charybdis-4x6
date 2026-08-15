@@ -197,6 +197,10 @@ Exit criteria:
 
 Recommended order: **11, 10**.
 
+Finding 11 is verified: dragscroll and pinch now expire prior lock/residual
+state before accepting post-stall motion, and one sampled timestamp drives all
+handler decisions. Finding 10 is the next implementation item.
+
 - Expire dragscroll state against the previous motion timestamp before accumulating the first post-gap report.
 - Define per-scan output budgets and residual/backlog limits for every pointing-discrete mode.
 - Promote absolute-value and accumulation math so `INT16_MIN` is representable.
@@ -381,7 +385,7 @@ The remediation program is complete only when all of the following are true:
 ## Recommended next action
 
 Perform [05 — VIA split persistence](05-via-split-persistence.md)'s physical
-two-half verification matrix. Once that evidence closes Finding 05, continue
-with [10 — pointing backlog bounds](10-pointing-backlog-bounds.md). Finding 01
-remains the verified stack-safety baseline that later runtime changes must
-continue to satisfy.
+two-half verification matrix when hardware is available. In parallel, proceed
+to [10 — pointing backlog bounds](10-pointing-backlog-bounds.md); Finding 11 is
+verified. Finding 01 remains the stack-safety baseline that later runtime
+changes must continue to satisfy.

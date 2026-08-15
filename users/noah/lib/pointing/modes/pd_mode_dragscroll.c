@@ -231,9 +231,33 @@ static bool dragscroll_emit_locked_axis(report_mouse_t *mouse_report) {
     return true;
 }
 
+static void dragscroll_expire_prior_state(uint32_t prior_motion_age) {
+    bool has_prior_state = dragscroll_state.buffer_x != 0 || dragscroll_state.buffer_y != 0 || dragscroll_state.locked_axis != DRAGSCROLL_AXIS_NONE;
+
+    if (!has_prior_state) {
+        return;
+    }
+
+    if (prior_motion_age > NOAH_DRAGSCROLL_BUFFER_EXPIRE_MS) {
+        dragscroll_state.buffer_x    = 0;
+        dragscroll_state.buffer_y    = 0;
+        dragscroll_state.locked_axis = DRAGSCROLL_AXIS_NONE;
+        return;
+    }
+
+    if (prior_motion_age > NOAH_DRAGSCROLL_LOCK_TIMEOUT_MS) {
+        dragscroll_state.locked_axis = DRAGSCROLL_AXIS_NONE;
+    }
+}
+
 report_mouse_t handle_dragscroll_mode(report_mouse_t mouse_report) {
-    bool     had_motion = mouse_report.x != 0 || mouse_report.y != 0;
-    uint32_t now        = timer_read32();
+    bool     had_motion       = mouse_report.x != 0 || mouse_report.y != 0;
+    uint32_t now              = timer_read32();
+    uint32_t prior_motion_age = now - dragscroll_state.last_motion_time;
+
+    // Expire the previous gesture before current motion can refresh its age.
+    // Lock and residual deadlines are intentionally independent.
+    dragscroll_expire_prior_state(prior_motion_age);
 
     if (had_motion) {
 #    ifdef NOAH_DRAGSCROLL_REVERSE_X
@@ -254,20 +278,11 @@ report_mouse_t handle_dragscroll_mode(report_mouse_t mouse_report) {
     mouse_report.x = 0;
     mouse_report.y = 0;
 
-    if (dragscroll_state.buffer_x != 0 || dragscroll_state.buffer_y != 0) {
-        if (timer_elapsed32(dragscroll_state.last_motion_time) > NOAH_DRAGSCROLL_BUFFER_EXPIRE_MS) {
-            dragscroll_state.locked_axis = DRAGSCROLL_AXIS_NONE;
-            dragscroll_state.buffer_x    = 0;
-            dragscroll_state.buffer_y    = 0;
-            return mouse_report;
-        }
-    }
-
-    if (timer_elapsed32(dragscroll_state.last_scroll_time) < NOAH_DRAGSCROLL_RATE_LIMIT_MS) {
+    if (now - dragscroll_state.last_scroll_time < NOAH_DRAGSCROLL_RATE_LIMIT_MS) {
         return mouse_report;
     }
 
-    uint32_t motion_age = timer_elapsed32(dragscroll_state.last_motion_time);
+    uint32_t motion_age = had_motion ? 0u : prior_motion_age;
     if (!dragscroll_refresh_axis_lock(had_motion, motion_age)) {
         return mouse_report;
     }

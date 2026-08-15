@@ -288,11 +288,15 @@ void reset_arrow_mode(void) {
 static void test_registry_metadata_matches_manifest(void) {
     const pd_mode_def_t *volume_mode;
     const pd_mode_def_t *arrow_mode;
+    const pd_mode_def_t *dragscroll_mode;
+    const pd_mode_def_t *pinch_mode;
 
     test_reset_stubs();
 
-    volume_mode = pd_mode_lookup(PD_MODE_VOLUME);
-    arrow_mode  = pd_mode_lookup(PD_MODE_ARROW);
+    volume_mode     = pd_mode_lookup(PD_MODE_VOLUME);
+    arrow_mode      = pd_mode_lookup(PD_MODE_ARROW);
+    dragscroll_mode = pd_mode_lookup(PD_MODE_DRAGSCROLL);
+    pinch_mode      = pd_mode_lookup(PD_MODE_PINCH);
 
     CHECK(volume_mode != NULL);
     CHECK(volume_mode->mode_flag == PD_MODE_VOLUME);
@@ -309,8 +313,15 @@ static void test_registry_metadata_matches_manifest(void) {
     CHECK(arrow_mode->lock_action == ARROW_MODE_LOCK);
     CHECK(arrow_mode->key_handler == handle_arrow_mode_key);
     CHECK(arrow_mode->lifecycle == NULL);
-    CHECK(pd_mode_lookup(PD_MODE_DRAGSCROLL)->lifecycle != NULL);
-    CHECK(pd_mode_lookup(PD_MODE_PINCH)->lifecycle != NULL);
+
+    CHECK(dragscroll_mode != NULL);
+    CHECK(dragscroll_mode->handler == handle_dragscroll_mode);
+    CHECK(dragscroll_mode->reset == reset_dragscroll_mode);
+    CHECK(dragscroll_mode->lifecycle != NULL);
+    CHECK(pinch_mode != NULL);
+    CHECK(pinch_mode->handler == handle_dragscroll_mode);
+    CHECK(pinch_mode->reset == reset_dragscroll_mode);
+    CHECK(pinch_mode->lifecycle != NULL);
 }
 
 static void test_trait_queries_match_manifest_policy(void) {

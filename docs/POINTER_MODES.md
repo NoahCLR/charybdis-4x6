@@ -66,6 +66,9 @@ While active:
 - forward / backward motion becomes vertical scrolling
 - the handler uses a sticky single-axis gesture model, so near-diagonal motion
   waits for one axis to win instead of emitting both axes together
+- a pause longer than 55 ms releases the prior axis lock before the next
+  report is classified; a pause longer than 80 ms also discards residual
+  motion, so a new gesture cannot inherit stale scroll state
 - horizontal motion can still contribute to horizontal scroll when the host
   surface accepts horizontal wheel input
 

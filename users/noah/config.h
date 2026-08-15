@@ -144,6 +144,7 @@
 //   Start ratio    = dominance needed to begin a one-axis gesture
 //   Sustain ratio  = looser dominance needed to keep the gesture on one axis
 //   Lock timeout   = pause window that ends the current gesture
+//   Buffer expiry  = longer pause that also discards residual motion
 #    define NOAH_DRAGSCROLL_REVERSE_Y
 #    define NOAH_DRAGSCROLL_THRESHOLD_H 2
 #    define NOAH_DRAGSCROLL_THRESHOLD_V 3

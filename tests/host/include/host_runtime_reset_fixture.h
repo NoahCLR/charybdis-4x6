@@ -10,6 +10,8 @@
 
 typedef struct {
     uint32_t time32;
+    uint16_t timer_read32_count;
+    uint16_t timer_elapsed32_count;
     uint8_t  mods;
     uint8_t  weak_mods;
     uint8_t  oneshot_mods;
@@ -91,9 +93,11 @@ static inline void host_runtime_fixture_reset_userspace_runtime(void) {
         return (uint16_t)(timer_read() - last);                     \
     }                                                               \
     uint32_t timer_read32(void) {                                   \
+        (fixture_expr).timer_read32_count++;                        \
         return (fixture_expr).time32;                               \
     }                                                               \
     uint32_t timer_elapsed32(uint32_t last) {                       \
+        (fixture_expr).timer_elapsed32_count++;                     \
         return (fixture_expr).time32 - last;                        \
     }                                                               \
     bool is_keyboard_master(void) {                                 \
