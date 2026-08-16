@@ -35,3 +35,8 @@ bool key_runtime_transition_handled_key_press(uint16_t keycode, keypos_t key_pos
 bool key_runtime_transition_handled_key_release(uint16_t keycode, keyrecord_t *record, const handled_key_resolution_t *resolution, key_runtime_transition_plan_t *plan);
 void key_runtime_transition_scan(key_runtime_transition_plan_t *plan);
 bool key_runtime_transition_settle_pending_fallback_hold(key_runtime_transition_plan_t *plan);
+
+// Announce a feedback change that produced no transition plan, so split
+// consumers still learn about it. See the definition for why key events need
+// this as well as scans.
+void key_runtime_process_notify_planless_feedback_change(const key_runtime_transition_plan_t *plan, uint32_t feedback_sequence_before);

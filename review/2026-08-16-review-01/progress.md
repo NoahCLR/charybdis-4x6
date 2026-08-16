@@ -547,12 +547,65 @@ Finding 05 matrix rather than trusting the original wording.
 - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
 - stack gate PASS; static RAM 49,824 B of 51,000 B
 
-### Still open
+### Superseded hypothesis
 
-Tap-window white flash missing on the slave. Hypothesis unchanged and still
-unproven: `6a9285f3` changed per-domain sends from continue-on-failure to
-return-on-first-failure with a tick-wide backoff. Not yet investigated with the
-rigor applied to the other two.
+The tap-window regression was earlier attributed to `6a9285f3`'s
+return-on-first-failure backoff. That was wrong and is withdrawn; see the pass
+below for the actual cause.
+
+## 2026-08-16 — Hardware regression 3: slave tap-window feedback
+
+Reported from hardware: the tap-window white — shown while a multi-tap count can
+still advance — renders on the master but not on the slave.
+
+**Cause.** The rendered state is a *pending tap series*
+(`key_feedback_tap_series_shows_pending_feedback()`, tap_count > 1), not a
+projected effect and not the flashing feedback. It is established while
+processing a key event, at the tap-series assignments in
+`users/noah/lib/key/runtime/reducer/runtime.c`, each of which bumps
+`next_feedback_sequence`.
+
+Neither dirty-marking site covered that:
+
+- `key_runtime_transition_execute_plan()` announces only non-empty plans, and
+  the press that opens the window defers its tap, so the plan is empty.
+- `noah_key_runtime_scan()` compares the feedback sequence against its value at
+  the start of *that scan*, but the bump already happened during the earlier key
+  event.
+
+`dev` marked key feedback dirty unconditionally whenever a scan had core work,
+and an open tap window is core work, so the next scan pushed the semantic map.
+The narrowing in `5a56146d` removed that blanket marking without replacing it on
+the key-event path.
+
+**Fix.** `key_runtime_process_notify_planless_feedback_change()` applies the
+scan's existing before/after check to the press and release paths, so a key event
+that changes rendered feedback without producing a plan announces it. The
+optimization is kept: nothing is marked when neither the plan nor the sequence
+changed.
+
+**Two wrong turns, recorded because both looked plausible.** First I pursued the
+flash-visibility blink, which is a different feature — corrected by Noah. Then I
+tracked the last-marked sequence in the dirty module and compared against it per
+scan, which broke two existing contracts: a scan after an already-announced press
+began marking a second time, and suppressing that in turn silenced the
+visible-deadline case. The existing tests encode "mark when *this* step changed
+feedback state", and the fix had to match that shape rather than replace it.
+
+**Test.** `test_feedback_dirty_tracks_pending_tap_window()` in
+`tests/host/real_profile_thumb_layer_lock_integration_test.c` taps a real-profile
+multi-tap key, then presses again to enter the higher tier, and requires the
+press itself to mark key feedback dirty. Load-bearing: removing the press-path
+announcement fails it.
+
+### Verification
+
+- `sh tests/host/run_all_host_tests.sh` — exit 0
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- stack gate PASS, worst main path 1,872 B unchanged; static RAM 49,824 B
+
+All three reported hardware regressions now have an identified cause and a fix.
+None has been confirmed on hardware yet.
 
 ## Current Verdict
 

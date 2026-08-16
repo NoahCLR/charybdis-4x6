@@ -2985,6 +2985,33 @@ static void test_active_scan_visit_baseline_is_measured(void) {
     CHECK(key_runtime_hot_path_test_active_indexes_consistent());
 }
 
+// The tap-window white shows while a multi-tap series can still advance, which
+// is a pending tap series rather than a projected effect. That state is
+// established during key event processing, so a scan that produces no plan must
+// still tell the split worker the rendered feedback changed -- otherwise the
+// slave never learns the window opened and only the master lights up.
+static void test_feedback_dirty_tracks_pending_tap_window(void) {
+    keypos_t esc_pos = test_find_keypos_on_layer(LAYER_BASE, KC_ESC);
+
+    test_reset_state();
+    CHECK(test_keypos_valid(esc_pos));
+
+    // First tap opens the series; the second press puts it in the higher tier
+    // that renders the unresolved tap-branch colour.
+    test_press_resolved(esc_pos);
+    test_release_resolved(esc_pos);
+    key_runtime_integration_advance(&fake_time, 10u);
+
+    // The second press makes the pending tap series visible. It defers the tap,
+    // so it produces no transition plan -- the announcement has to come from the
+    // key event itself, not from a later scan.
+    split_runtime_sync_dirty_test_mark_count_reset();
+    test_press_resolved(esc_pos);
+    CHECK(split_runtime_sync_dirty_test_mark_count() >= 1u);
+
+    test_release_resolved(esc_pos);
+}
+
 static void test_feedback_dirty_tracks_visible_deadline_change_once(void) {
     keypos_t nav_left_pos = test_find_keypos_on_layer(LAYER_NAV, KC_LEFT);
 
@@ -3012,6 +3039,7 @@ int main(void) {
     test_normal_press_and_matched_release_use_bounded_authored_lookups();
     test_active_scan_visit_baseline_is_measured();
     test_feedback_dirty_tracks_visible_deadline_change_once();
+    test_feedback_dirty_tracks_pending_tap_window();
     test_left_thumb_double_tap_hold_toggles_num_layer();
     test_right_thumb_double_tap_hold_toggles_num_layer();
     test_thumb_double_tap_hold_with_intermediate_scan_toggles_num_layer_once_per_cycle();
