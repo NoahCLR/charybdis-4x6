@@ -89,22 +89,53 @@ The gates that certify the audited tree are recorded against `aae9c445` in
 `review/2026-08-15-review-17/progress.md`: full host suite, target compile,
 memory budget, and fresh linked stack budget, all green.
 
+## 2026-08-16 — Full Pass Completed
+
+The earlier partial pass was completed. Five auditors covered key runtime and
+ownership, split/RGB/pointing, macro and VIA/compat, architecture boundaries and
+documentation, and test and gate coverage. An initial four-way fan-out died on an
+API session usage limit and was relaunched.
+
+Every finding was re-verified by hand before recording. Two auditor
+characterizations were corrected rather than repeated: the memory-gate blind spot
+is bounded by the heap minimum rather than open-ended, and a suspected
+feature-flag coverage gap turned out to be covered by individual test runners.
+
+**Two must-fix defects found**, both in older code and both requiring an
+interleaving the tests do not construct:
+
+1. Token replacement orphans held-action and repeat leases, leaving an action
+   registered. Reachable in this profile through combo-origin keypos rewriting.
+2. The VIA split master cannot renegotiate after the peer loses its snapshot
+   session, retrying one chunk at 1 Hz forever. This blocks Finding 05's pending
+   hardware matrix, which exercises exactly that condition.
+
+Ten should-fix and nine optional items are recorded in the review note, along
+with a substantial Verified Solid section covering boundaries, build integrity,
+VIA frame validation, macro lifecycle, chunked rendering, and the two mechanisms
+introduced by `aae9c445`.
+
+One documentation miss was self-inflicted: `aae9c445` updated
+`Sol Findings/implementation-progress.md` but left the roadmap saying Review 17
+regressed Finding 08.
+
 ## Current Verdict
 
-The audit is **open and incomplete**. What was examined holds up. Three of four
-planned areas were never examined, so this folder closes nothing and must not be
-read as a clean bill of health.
+The audit is **complete and open**. Coverage is now full across the userspace.
+It closes nothing, because two must-fix defects and ten should-fix items are
+outstanding.
 
 ## Next Steps
 
-1. Decide the coherent-read contract: stage reads into a local and commit only
-   on a settled generation, or correct the comments to state what is actually
-   guaranteed and why exhaustion is unreachable.
-2. Decide the dead base-domain state and `base_generation` together.
-3. Give `synthetic_record.c` behavioral coverage and add the `rg` preflight.
-   Both are small and both close gaps where a gate currently proves less than
-   its name suggests.
-4. Run the still-unaudited areas: architecture and boundaries, API and interface
-   cleanliness, macro and VIA correctness, documentation accuracy.
+1. Fix must-fix 1: sweep held-action and repeat leases by key position on the
+   token cancel path, and extend the existing token-replacement test to the
+   held-action case.
+2. Fix must-fix 2: reset the transmit phase and re-issue `SNAPSHOT_BEGIN` on a
+   peer-reported lost session, with a stateful fake peer that can drop its
+   session mid-transfer.
+3. Work the should-fix list, starting with the ones where a gate proves less
+   than its name suggests: the `rg` preflight, the pd-to-core include gate,
+   `synthetic_record.c` coverage, and the memory gate's `.data` blind spot.
+4. Reconcile the roadmap and the documentation gaps.
 5. Only after software closure, run the Finding 05 and Finding 10 physical
-   matrices.
+   matrices. Finding 05's matrix is blocked on must-fix 2.
