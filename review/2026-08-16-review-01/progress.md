@@ -119,20 +119,82 @@ One documentation miss was self-inflicted: `aae9c445` updated
 `Sol Findings/implementation-progress.md` but left the roadmap saying Review 17
 regressed Finding 08.
 
+## 2026-08-16 — Implementation Pass 1: the two must-fixes
+
+Landed in `474651bc`. Both were driven by a failing test first.
+
+### Must-fix 1 — held actions survive token replacement
+
+`key_runtime_core_adopt_runtime_owned_state_leases()` in
+`users/noah/lib/key/runtime/reducer/ownership_state.c` hands held-action and
+repeat leases from a cancelled press token to the token replacing it, called from
+`key_runtime_core_press_token_begin()`.
+
+Adoption rather than clearing, deliberately. The by-token sweep excludes these
+kinds because their applied bindings are retired by a planned release effect, and
+the observe path has no effect plan. Clearing the lease there would leave the
+action registered with nothing able to release it — worse than the original bug.
+The physical key never went up, so the action should stay held; the replacing
+token's own release now retires it by key position on the normal path.
+
+Test: `test_replaced_press_token_still_releases_owned_state()` in
+`tests/host/key_runtime_scenario_test.c`. Proven load-bearing — with the adoption
+call neutered, the replace-then-release sequence emits **zero** effects.
+
+Note on test placement: this was first written against `runtime_debug_test.c`
+asserting `core_lease_count`, which was the wrong observable. That harness does
+not run the applied registry, so lease teardown there depends on a simulated
+callback and the test would only have been checking the simulation. The scenario
+harness runs the real projection while capturing applied effects, so the
+assertion is on the emitted `RELEASE_OWNED_STATE_BY_KEY`.
+
+### Must-fix 2 — the split master renegotiates after peer session loss
+
+`noah_qmk_via_response_requires_new_session()` and
+`noah_qmk_via_abandon_session()` in `users/noah/lib/compat/qmk_via_split_sync.c`.
+All three tick paths — push chunk, push commit, pull chunk — now distinguish a
+peer that reports `SNAPSHOT_REQUIRED` from a generic failure, and restart from
+metadata instead of retrying a frame that can never be accepted. Transport
+failures still take the plain retry, and the backoff is kept so a peer that
+cannot accept a session does not spin.
+
+Harness: the fake peer in `tests/host/qmk_via_split_sync_test.c` now owns a
+snapshot session, opened by `SNAPSHOT_BEGIN` and losable once mid-transfer, and
+replies with the same `ERROR`/`SNAPSHOT_REQUIRED` the real receiver gives. The
+previous peer was stateless and unconditionally acknowledged, so peer-side
+session loss could not be expressed at all.
+
+**The first version of this test passed against the broken code.** It compared
+the mirrored regions, which already matched because an earlier push had completed
+before the session loss. Tracing the transmit phase showed the real behavior:
+from t=1600 ms onward the master sat in `PUSH_CHUNK` indefinitely, retry count
+climbing 5 → 17, `SNAPSHOT_BEGIN` count frozen, peer session dead. The assertion
+was rewritten around the one thing only a fresh `SNAPSHOT_BEGIN` can restore —
+the peer's session becoming active again. Recorded because it is the same failure
+mode this review is about: a green test proving less than it appears to.
+
+### Verification
+
+- `sh tests/host/run_all_host_tests.sh` — exit 0, no failures
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `PYTHON=/usr/bin/python3 sh tests/host/run_firmware_memory_budget_checks.sh` —
+  BSS 25,524 B unchanged, heap 212,312 B
+- `PYTHON=/usr/bin/python3 sh tests/host/run_firmware_stack_budget_checks.sh` —
+  worst main path 1,872 B of 1,920 B, unchanged
+- Focused regression sweeps across the key-runtime and VIA/split suites
+
+Finding 05's hardware matrix is no longer blocked by must-fix 2.
+
 ## Current Verdict
 
-The audit is **complete and open**. Coverage is now full across the userspace.
-It closes nothing, because two must-fix defects and ten should-fix items are
+The audit is **complete and open**. Coverage is full across the userspace. Both
+must-fix defects are now closed; ten should-fix items and the cleanup list are
 outstanding.
 
 ## Next Steps
 
-1. Fix must-fix 1: sweep held-action and repeat leases by key position on the
-   token cancel path, and extend the existing token-replacement test to the
-   held-action case.
-2. Fix must-fix 2: reset the transmit phase and re-issue `SNAPSHOT_BEGIN` on a
-   peer-reported lost session, with a stateful fake peer that can drop its
-   session mid-transfer.
+1. ~~Must-fix 1~~ — landed in `474651bc`.
+2. ~~Must-fix 2~~ — landed in `474651bc`.
 3. Work the should-fix list, starting with the ones where a gate proves less
    than its name suggests: the `rg` preflight, the pd-to-core include gate,
    `synthetic_record.c` coverage, and the memory gate's `.data` blind spot.

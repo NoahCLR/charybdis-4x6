@@ -25,6 +25,10 @@ rather than repeated; two were.
 
 ## Must Fix
 
+> Both must-fix findings were remediated in `474651bc`. They are kept here as the
+> audit-time record; see this folder's `progress.md` for what landed and how it
+> was proven.
+
 ### 1. Token replacement orphans held-action leases, leaving a key stuck down
 
 `key_runtime_core_release_leases_for_token()`
@@ -326,7 +330,7 @@ probed.
 | 15 — RGB render work | resolved | Each domain publishes as one generation; readers retry bounded and never block the worker. Enforced by seam-driven interleaving tests. The contract-comment gap in finding 4 does not affect the reachable path. |
 | 10 — Pointing backlog bounds | partially resolved | Inactive-axis debt cancels at the dominant-axis transition, verified independently this pass. Flashed timing and feel matrix still hardware-pending. |
 | 11 — Dragscroll stall recovery | resolved | Saturating accumulation and total `abs32` verified this pass, including the `INT32_MIN` case. |
-| 05 — VIA split persistence | regressed in effect | Software paths pass their tests, but finding 2 shows the master cannot renegotiate after peer session loss — the exact condition the pending physical matrix exercises. Treat the hardware matrix as blocked until it is fixed. |
+| 05 — VIA split persistence | partially resolved | Finding 2's renegotiation gap is fixed in `474651bc` and covered by a peer that can lose its session mid-transfer, so the hardware matrix is unblocked. The physical two-half, power-cycle, reconnect, and role-swap matrix is still required. |
 | 03, 04, 07, 14 — VIA/macro validation and RAM | resolved | Re-verified this pass: frame validation, text-byte validation at decode and replay, tap-list bounds, shared-IR guarding, and static-asserted slot indexing all hold. |
 
 ## Current Conclusion
@@ -348,14 +352,11 @@ than any single bug on this list.
 
 ## Remaining Open Findings
 
-1. **Must fix:** sweep held-action and repeat leases by key position on the token
-   cancel path, and cover the held-action case in the existing token-replacement
-   test.
-2. **Must fix:** reset the transmit phase and re-issue `SNAPSHOT_BEGIN` when a
-   peer reports a lost session; add a stateful fake peer that can drop its
-   session mid-transfer.
+1. ~~Must fix: held-action leases across token replacement~~ — landed in
+   `474651bc`.
+2. ~~Must fix: split snapshot renegotiation~~ — landed in `474651bc`.
 3. **Should fix:** items 3 through 12 above.
 4. **Optional:** the cleanup list above.
 5. **Hardware verification:** Finding 05's persistence and role-swap matrix,
-   blocked on must-fix 2.
+   unblocked by `474651bc`.
 6. **Hardware verification:** Finding 10's arrow timing and feel matrix.
