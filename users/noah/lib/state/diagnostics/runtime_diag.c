@@ -166,11 +166,6 @@ void noah_runtime_diag_test_backend_reset(void) {
     noah_runtime_diag_test_backend_watchdog_update_calls = 0u;
 }
 
-void noah_runtime_diag_test_backend_seed_watchdog_reboot(noah_runtime_diag_stage_t stage, uint8_t reboot_count) {
-    (void)stage;
-    (void)reboot_count;
-}
-
 uint32_t noah_runtime_diag_test_backend_scratch(uint8_t index) {
     return index < 8u ? noah_runtime_diag_test_backend_scratch_regs[index] : 0u;
 }

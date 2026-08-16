@@ -112,13 +112,6 @@ static inline void handled_key_materialized_default_into(const handled_key_resol
     out->flags    = resolution->flags;
 }
 
-static inline handled_key_materialized_t handled_key_materialized_default(handled_key_resolution_t resolution) {
-    handled_key_materialized_t materialized;
-
-    handled_key_materialized_default_into(&resolution, &materialized);
-    return materialized;
-}
-
 static inline bool handled_key_hold_semantics_fires_at_threshold(handled_key_hold_semantics_t semantics) {
     return semantics.threshold != HANDLED_KEY_HOLD_THRESHOLD_NONE;
 }
@@ -135,14 +128,6 @@ static inline bool handled_key_hold_contract_fires_at_threshold(handled_key_hold
     return handled_key_hold_semantics_fires_at_threshold(contract);
 }
 
-static inline bool handled_key_hold_contract_registers_held(handled_key_hold_contract_t contract) {
-    return handled_key_hold_semantics_registers_held(contract);
-}
-
-static inline bool handled_key_hold_contract_repeats_while_held(handled_key_hold_contract_t contract) {
-    return handled_key_hold_semantics_repeats_while_held(contract);
-}
-
 void                         handled_key_lookup_into(uint16_t keycode, handled_key_resolution_t *out);
 void                         handled_key_lookup_tap_count_into(uint16_t keycode, uint8_t tap_count, handled_key_resolution_t *out);
 handled_key_resolution_t     handled_key_lookup(uint16_t keycode);
@@ -152,8 +137,6 @@ __attribute__((noinline)) bool handled_key_resolution_materializes_momentary_lay
 void                         handled_key_materialize_into(const handled_key_resolution_t *resolution, const handled_key_resolution_ctx_t *ctx, handled_key_materialized_t *out);
 handled_key_materialized_t   handled_key_materialize(handled_key_resolution_t resolution, handled_key_resolution_ctx_t ctx);
 bool                         handled_key_resolution_is_handled(handled_key_resolution_t resolution);
-bool                         handled_key_resolution_uses_implicit_hold(handled_key_resolution_t resolution);
-bool                         handled_key_resolution_uses_fallback_hold(handled_key_resolution_t resolution);
 bool                         handled_key_resolution_has_multi_tap(handled_key_resolution_t resolution);
 bool                         handled_key_resolution_is_momentary_layer(handled_key_resolution_t resolution);
 bool                         handled_key_resolution_is_layer_tap(handled_key_resolution_t resolution);

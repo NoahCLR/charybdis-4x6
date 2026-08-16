@@ -147,28 +147,12 @@ static inline hold_behavior_t hold_behavior_none(void) {
     return (hold_behavior_t){0};
 }
 
-static inline bool hold_fires_at_threshold(hold_behavior_t hold) {
-    return hold.present && (hold.mode == HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE || hold.mode == HOLD_BEHAVIOR_TAP_AT_HOLD_THRESHOLD || hold.mode == HOLD_BEHAVIOR_REPEAT_WHILE_HELD);
-}
-
 static inline bool hold_registers_on_press(hold_behavior_t hold) {
     return hold.present && hold.mode == HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE;
 }
 
-static inline bool hold_registers_while_held(hold_behavior_t hold) {
-    return hold.present && (hold.mode == HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE || hold.mode == HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE);
-}
-
-static inline bool hold_repeats_while_held(hold_behavior_t hold) {
-    return hold.present && hold.mode == HOLD_BEHAVIOR_REPEAT_WHILE_HELD;
-}
-
 static inline bool hold_repeat_rate_valid(uint16_t repeat_hz) {
     return repeat_hz > 0 && repeat_hz <= KEY_BEHAVIOR_REPEAT_MAX_HZ;
-}
-
-static inline bool hold_sends_on_release(hold_behavior_t hold) {
-    return hold.present && hold.mode == HOLD_BEHAVIOR_TAP_ON_RELEASE_AFTER_HOLD;
 }
 
 static inline tap_behavior_t tap_behavior_none(void) {

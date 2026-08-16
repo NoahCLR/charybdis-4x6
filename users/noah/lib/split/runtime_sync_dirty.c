@@ -43,10 +43,6 @@ void split_runtime_sync_mark_key_feedback_dirty(void) {
     split_runtime_key_feedback_branch_dirty   = true;
 }
 
-bool split_runtime_sync_combo_is_dirty(void) {
-    return split_runtime_combo_dirty;
-}
-
 bool split_runtime_sync_key_feedback_semantic_is_dirty(void) {
     return split_runtime_key_feedback_semantic_dirty;
 }

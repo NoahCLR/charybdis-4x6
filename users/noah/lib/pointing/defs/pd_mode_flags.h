@@ -99,7 +99,6 @@ bool              pd_mode_display_active(pd_mode_mask_t mode);
 bool              pd_mode_display_locked(pd_mode_mask_t mode);
 bool              pd_any_local_mode_active(void);
 bool              pd_any_local_mode_locked(void);
-bool              pd_any_display_mode_active(void);
 bool              pd_any_display_mode_locked(void);
 split_side_mask_t pd_mode_local_owner_sides_snapshot(void);
 split_side_mask_t pd_mode_display_owner_sides_snapshot(void);

@@ -561,10 +561,6 @@ bool pd_any_local_mode_locked(void) {
     return PD_MODE_LOCAL_LOCKED_MODE != 0;
 }
 
-bool pd_any_display_mode_active(void) {
-    return pd_mode_snapshot().display.active_mode != 0;
-}
-
 bool pd_any_display_mode_locked(void) {
     return pd_mode_snapshot().display.locked_mode != 0;
 }

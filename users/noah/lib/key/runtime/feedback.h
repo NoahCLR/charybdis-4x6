@@ -270,22 +270,6 @@ static inline bool key_feedback_semantic_map_has_any(const uint8_t *map) {
     return false;
 }
 
-static inline bool key_feedback_semantic_map_has_flashing(const uint8_t *map) {
-    if (!key_feedback_semantic_map_has_any(map)) {
-        return false;
-    }
-
-    for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
-        for (uint8_t col = 0; col < MATRIX_COLS; col++) {
-            if (key_feedback_semantic_is_flashing(key_feedback_semantic_map_get(map, (keypos_t){.row = row, .col = col}))) {
-                return true;
-            }
-        }
-    }
-
-    return false;
-}
-
 void    key_feedback_semantic_map(uint8_t *out_map);
 void    key_feedback_tap_branch_map(uint8_t *out_map);
 void    key_feedback_broad_owner_map(uint8_t *out_map);

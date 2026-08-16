@@ -20,7 +20,6 @@ bool                                        key_runtime_core_finalize_non_handle
 uint16_t                                    key_runtime_core_held_action_keycode_at(keypos_t key_pos);
 bool                                        key_runtime_core_repeat_active_at(keypos_t key_pos);
 bool                                        key_runtime_core_flashing_feedback_visible_at(keypos_t key_pos);
-bool                                        key_runtime_core_flashing_feedback_started_at(keypos_t key_pos, uint16_t *out_started_at);
 bool                                        key_runtime_core_flashing_feedback_sequence_at(keypos_t key_pos, uint32_t *out_sequence);
 const key_runtime_core_shadow_projection_t *key_runtime_core_shadow_projection(void);
 void                                        key_runtime_core_layer_lock_set(uint8_t layer, bool active);

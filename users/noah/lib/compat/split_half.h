@@ -46,10 +46,6 @@ static inline split_side_mask_t split_side_mask_from_half(split_half_t half) {
     }
 }
 
-static inline split_side_mask_t split_side_mask_from_keypos(keypos_t key_pos) {
-    return split_side_mask_from_half(split_half_from_keypos(key_pos));
-}
-
 static inline split_side_mask_t split_side_mask_add_half(split_side_mask_t sides, split_half_t half) {
     return (split_side_mask_t)(sides | split_side_mask_from_half(half));
 }
@@ -58,10 +54,3 @@ static inline split_side_mask_t split_side_mask_add_keypos(split_side_mask_t sid
     return split_side_mask_add_half(sides, split_half_from_keypos(key_pos));
 }
 
-static inline bool split_side_mask_has_left(split_side_mask_t sides) {
-    return (sides & SPLIT_SIDE_MASK_LEFT) != 0u;
-}
-
-static inline bool split_side_mask_has_right(split_side_mask_t sides) {
-    return (sides & SPLIT_SIDE_MASK_RIGHT) != 0u;
-}

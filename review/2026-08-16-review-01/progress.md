@@ -369,6 +369,45 @@ that mirrors the production path including the key position.
 - `python3 tools/profile_introspect.py --check`
 - memory gate: static RAM 49,824 B of 51,000 B; stack gate PASS, unchanged
 
+## 2026-08-16 — Implementation Pass 6: dead surface removal
+
+Finding 9 plus the 17 unused `static inline` helpers found in the direct sweep.
+167 lines removed across 17 files, no behavior change.
+
+Six public functions, each with a declaration and a definition and nothing else
+in the tree: `handled_key_resolution_uses_implicit_hold` and
+`handled_key_resolution_uses_fallback_hold`,
+`key_runtime_core_flashing_feedback_started_at`,
+`noah_runtime_diag_test_backend_seed_watchdog_reboot` (a test-backend-guarded
+no-op with no test), `pd_any_display_mode_active`, and
+`split_runtime_sync_combo_is_dirty`.
+
+The first two were the reason this ranked above ordinary cleanup: they sat one
+suffix away from the live internal predicate
+`handled_key_resolution_uses_fallback_hold_behavior`, so calling the dead public
+wrapper and believing it was the one the reducer consults was an easy mistake.
+
+The 17 inline helpers included a complete hold-contract predicate vocabulary —
+`hold_fires_at_threshold`, `hold_registers_while_held`, `hold_repeats_while_held`,
+`hold_sends_on_release`, and the `handled_key_hold_contract_*` family — that
+nothing ever called. That is a designed abstraction which was bypassed, and
+removing it makes the surface match how holds are actually resolved.
+
+Removing them exposed one cascade: `automouse_rgb_timeout_window_open` had a
+single remaining reference from a helper deleted in the same pass. A repeat
+sweep after the removals found it, and a third sweep is clean.
+
+### Verification
+
+- `sh tests/host/run_all_host_tests.sh` — exit 0
+- `sh tests/host/run_feature_gate_compile_tests.sh` — PASS
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- memory gate: static RAM 49,824 B of 51,000 B; stack gate PASS, unchanged
+- repeat dead-symbol sweep over `users/noah` reports nothing remaining
+
+Compilation and linking of the current source lists is the enforcement here, per
+the audit template: no negative gate was added to assert these names stay absent.
+
 ## Current Verdict
 
 The audit is **complete and open**. Coverage is full across the userspace. Both
@@ -384,7 +423,8 @@ outstanding.
 4. Remaining should-fix items: ~~the VIA out-of-range classification
    (finding 3)~~ and ~~the coherent-read contract (finding 4)~~ landed; the
    ~~pulse key position (finding 10)~~ and ~~`RGB_LEFT_LED_COUNT` derivation
-   (finding 11)~~ landed; the dead public functions (finding 9) remain.
+   (finding 11)~~ landed, and ~~the dead public functions (finding 9)~~ landed. Only the
+   documentation reconciliation (finding 12) remains.
 5. Reconcile the roadmap and the documentation gaps (finding 12).
 6. Only after software closure, run the Finding 05 and Finding 10 physical
    matrices. Finding 05's matrix is blocked on must-fix 2.

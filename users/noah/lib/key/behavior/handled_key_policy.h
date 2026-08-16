@@ -71,10 +71,6 @@ static inline handled_key_hold_semantics_t handled_key_hold_semantics_for_behavi
     }
 }
 
-static inline handled_key_hold_contract_t handled_key_hold_contract_for_behavior(key_runtime_slot_hold_strategy_t hold_strategy, uint16_t flags, hold_behavior_t hold) {
-    return handled_key_hold_semantics_for_behavior(hold_strategy, flags, hold);
-}
-
 static inline handled_key_behavior_contract_t handled_key_behavior_contract(key_runtime_slot_hold_strategy_t hold_strategy, uint16_t flags, uint16_t tap_action, pd_mode_mask_t pd_mode, hold_behavior_t hold, hold_behavior_t long_hold) {
     return (handled_key_behavior_contract_t){
         .hold                                           = handled_key_hold_semantics_for_behavior(hold_strategy, flags, hold),

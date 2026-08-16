@@ -125,16 +125,8 @@ static inline bool noah_action_desc_is_macro(noah_action_desc_t desc) {
     return desc.kind == NOAH_ACTION_KIND_MACRO;
 }
 
-static inline bool noah_action_desc_is_qmk_behavior_keycode(noah_action_desc_t desc) {
-    return desc.kind == NOAH_ACTION_KIND_QMK_BEHAVIOR;
-}
-
 static inline bool noah_action_desc_is_keymap_custom(noah_action_desc_t desc) {
     return desc.kind == NOAH_ACTION_KIND_KEYMAP_CUSTOM;
-}
-
-static inline bool noah_action_desc_is_pd_mode_lock(noah_action_desc_t desc) {
-    return desc.kind == NOAH_ACTION_KIND_PD_MODE_LOCK;
 }
 
 static inline bool noah_action_desc_is_layer_action(noah_action_desc_t desc) {
