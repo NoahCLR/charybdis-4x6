@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Report and enforce the target macro-slot storage and total-BSS budgets."""
+"""Report and enforce the target macro-slot storage and static RAM budgets."""
 
 import argparse
 import pathlib
@@ -16,7 +16,7 @@ BOOKKEEPING_SYMBOLS = (
     "macro_slot_active_metadata",
     "macro_slot_active_stale",
 )
-LAYOUT_SYMBOLS = ("__bss_base__", "__bss_end__", "__heap_base__", "__heap_end__")
+LAYOUT_SYMBOLS = ("__bss_base__", "__bss_end__", "__data_base__", "__data_end__", "__heap_base__", "__heap_end__")
 
 
 def canonical_symbol(name):
@@ -77,6 +77,7 @@ def main(argv=None):
     parser.add_argument("--min-reclaimed", type=int, default=32768)
     parser.add_argument("--max-macro-storage", type=int, default=8192)
     parser.add_argument("--max-static-bss", type=int, default=26000)
+    parser.add_argument("--max-static-ram", type=int, default=51000)
     parser.add_argument("--min-heap", type=int, default=204800)
     args = parser.parse_args(argv)
 
@@ -95,6 +96,12 @@ def main(argv=None):
     macro_storage = sum(symbols.values())
     reclaimed = args.baseline_macro_storage - macro_storage
     static_bss = layout["__bss_end__"] - layout["__bss_base__"]
+    # Zero-initialized state lands in .bss, but anything with a non-zero
+    # initializer lands in .data -- including noah_runtime_singleton, the single
+    # largest static object. Bounding .bss alone left roughly half of static RAM
+    # unmeasured, so growth there only ever showed up indirectly as heap loss.
+    static_data = layout["__data_end__"] - layout["__data_base__"]
+    static_ram = static_data + static_bss
     heap = layout["__heap_end__"] - layout["__heap_base__"]
     failures = []
     if macro_storage > args.max_macro_storage:
@@ -103,6 +110,8 @@ def main(argv=None):
         failures.append("reclaimed {} is below {} B".format(reclaimed, args.min_reclaimed))
     if static_bss > args.max_static_bss:
         failures.append("static BSS {} exceeds {} B".format(static_bss, args.max_static_bss))
+    if static_ram > args.max_static_ram:
+        failures.append("static RAM {} exceeds {} B".format(static_ram, args.max_static_ram))
     if heap < args.min_heap:
         failures.append("linker heap {} is below {} B".format(heap, args.min_heap))
 
@@ -115,6 +124,8 @@ def main(argv=None):
     print("named macro storage: {} B (limit {} B)".format(macro_storage, args.max_macro_storage))
     print("reclaimed from {} B baseline: {} B (minimum {} B)".format(args.baseline_macro_storage, reclaimed, args.min_reclaimed))
     print("static BSS span: {} B (limit {} B)".format(static_bss, args.max_static_bss))
+    print("static data span: {} B".format(static_data))
+    print("static RAM (.data + .bss): {} B (limit {} B)".format(static_ram, args.max_static_ram))
     print("linker heap: {} B (minimum {} B)".format(heap, args.min_heap))
     print("ELF BSS including linker-reserved heap: {} B (informational)".format(bss))
     for failure in failures:

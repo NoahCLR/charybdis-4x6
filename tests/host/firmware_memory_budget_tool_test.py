@@ -11,6 +11,18 @@ MEMORY_BUDGET = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MEMORY_BUDGET)
 
 
+LAYOUT_OUTPUT = "\n".join(
+    (
+        "20000000 T __data_base__",
+        "20005eec T __data_end__",
+        "20005dc8 B __bss_base__",
+        "2000c17c B __bss_end__",
+        "2000c180 B __heap_base__",
+        "20040000 B __heap_end__",
+    )
+)
+
+
 class FirmwareMemoryBudgetToolTest(unittest.TestCase):
     def test_parses_lto_and_plain_data_symbols(self):
         symbols = MEMORY_BUDGET.parse_nm_symbols(
@@ -50,17 +62,23 @@ class FirmwareMemoryBudgetToolTest(unittest.TestCase):
         self.assertEqual(MEMORY_BUDGET.parse_size_bss(output), 204744)
 
     def test_parses_static_bss_and_heap_boundaries(self):
-        output = "\n".join(
-            (
-                "20005dc8 B __bss_base__",
-                "2000c17c B __bss_end__",
-                "2000c180 B __heap_base__",
-                "20040000 B __heap_end__",
-            )
-        )
-        symbols = MEMORY_BUDGET.parse_layout_symbols(output)
+        symbols = MEMORY_BUDGET.parse_layout_symbols(LAYOUT_OUTPUT)
         self.assertEqual(symbols["__bss_end__"] - symbols["__bss_base__"], 25524)
         self.assertEqual(symbols["__heap_end__"] - symbols["__heap_base__"], 212608)
+
+    def test_parses_static_data_span(self):
+        # noah_runtime_singleton carries non-zero initializers and therefore
+        # lands in .data, so a gate that measured only .bss missed the single
+        # largest static object.
+        symbols = MEMORY_BUDGET.parse_layout_symbols(LAYOUT_OUTPUT)
+        self.assertEqual(symbols["__data_end__"] - symbols["__data_base__"], 24300)
+
+    def test_rejects_missing_data_boundary(self):
+        partial = "\n".join(
+            line for line in LAYOUT_OUTPUT.splitlines() if "__data_end__" not in line
+        )
+        with self.assertRaisesRegex(ValueError, "__data_end__"):
+            MEMORY_BUDGET.parse_layout_symbols(partial)
 
     def test_rejects_missing_layout_boundary(self):
         with self.assertRaisesRegex(ValueError, "__heap_end__"):

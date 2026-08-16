@@ -5,6 +5,7 @@ set -eu
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 
 . "$ROOT/tests/host/noah_host_qmk_env.sh"
+noah_host_require_tool rg
 noah_host_export_qmk_cpath "$ROOT"
 
 . "$ROOT/tests/host/noah_source_manifest.sh"
@@ -166,7 +167,11 @@ check_runtime_sealing_boundaries() {
     pd_runtime_key_core_include_violations="$(
         (
             cd "$ROOT"
-            rg -n '#include ".*key/runtime/reducer/runtime\.h"' users/noah/lib/pointing/runtime | grep -Ev "$pd_runtime_key_core_bridge_allowlist" || true
+            # Any reducer header re-exports key_runtime_core_state_t and its
+            # accessors, so gating runtime.h alone let a module reach core
+            # through ownership_state.h instead. The bridge itself does exactly
+            # that, which is why the narrow pattern matched nothing.
+            rg -n '#include ".*key/runtime/reducer/[a-z_]+\.h"' users/noah/lib/pointing/runtime | grep -Ev "$pd_runtime_key_core_bridge_allowlist" || true
         )
     )"
     if [ -n "$pd_runtime_key_core_include_violations" ]; then

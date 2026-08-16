@@ -185,6 +185,63 @@ mode this review is about: a green test proving less than it appears to.
 
 Finding 05's hardware matrix is no longer blocked by must-fix 2.
 
+## 2026-08-16 — Implementation Pass 2: gate integrity
+
+Findings 5, 6, 7 and 8. These were grouped deliberately: each is a gate that was
+green while proving less than its name suggested, so closing them first protects
+every later change.
+
+### Finding 6 — guards can no longer pass vacuously
+
+`noah_host_require_tool()` in `tests/host/noah_host_qmk_env.sh`, called for `rg`
+by `run_owned_keycode_tests.sh`, `run_macro_payload_engine_tests.sh` and
+`run_feature_gate_compile_tests.sh`. The `if rg <forbidden>; then fail; fi` shape
+treats any non-zero exit as "nothing found", and `set -e` is suppressed inside an
+`if`, so a missing tool or a stale path read as success. Verified by running with
+`PATH=/usr/bin:/bin`: both scripts now exit 1 with an explicit message instead of
+reporting clean.
+
+### Finding 8 — the pd-to-core include gate now matches something
+
+`run_feature_gate_compile_tests.sh` gated `key/runtime/reducer/runtime.h` only,
+while the sanctioned bridge reaches core through `ownership_state.h`. The pattern
+matched nothing, so any pd module could take the same route and obtain
+`key_runtime_core_state_t` untouched. It now gates any `reducer/*.h`, which
+catches exactly one file today — the allowlisted bridge. Verified by planting an
+`ownership_state`-adjacent include in `pd_mode_snapshot.c`: the gate fails, and
+passes again once reverted.
+
+### Finding 5 — `synthetic_record.c` has behavioral coverage
+
+New `tests/host/synthetic_record_test.c` and runner link the real module, which
+no host binary previously did. Covers the depth counter across nesting, the
+non-matrix key position, press/release ordering for both the userspace and QMK
+dispatch paths, and the tap-count carry.
+
+Both mutations named in the review are caught: removing the depth increment pair
+fails the active-flag assertion, and changing the synthetic keypos to `(0, 0)`
+fails the non-matrix assertion.
+
+### Finding 7 — the memory gate measures all of static RAM
+
+`tools/check_firmware_memory_budget.py` now reads `__data_base__`/`__data_end__`
+alongside the BSS bounds and enforces `.data + .bss` against a new
+`--max-static-ram` limit, currently 49,824 B against 51,000 B. `.bss` alone
+excluded `noah_runtime_singleton`, the largest static object, because non-zero
+initializers put it in `.data`; growth there previously showed up only as
+indirect heap loss with roughly 7.5 KB of silent headroom. The tool's own tests
+gained a shared layout fixture plus cases for the data span and for rejecting a
+missing data boundary.
+
+### Verification
+
+- `sh tests/host/run_all_host_tests.sh` — exit 0, no failures
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- memory gate: BSS 25,524 B, data 24,300 B, static RAM 49,824 B of 51,000 B,
+  heap 212,312 B
+- stack gate: worst main path 1,872 B of 1,920 B, unchanged
+- guard preflight and include gate both verified to fail when they should
+
 ## Current Verdict
 
 The audit is **complete and open**. Coverage is full across the userspace. Both
@@ -195,9 +252,12 @@ outstanding.
 
 1. ~~Must-fix 1~~ — landed in `474651bc`.
 2. ~~Must-fix 2~~ — landed in `474651bc`.
-3. Work the should-fix list, starting with the ones where a gate proves less
-   than its name suggests: the `rg` preflight, the pd-to-core include gate,
-   `synthetic_record.c` coverage, and the memory gate's `.data` blind spot.
-4. Reconcile the roadmap and the documentation gaps.
-5. Only after software closure, run the Finding 05 and Finding 10 physical
+3. ~~Gate integrity: `rg` preflight, pd-to-core include gate, `synthetic_record.c`
+   coverage, memory gate `.data` blind spot~~ — landed.
+4. Remaining should-fix items: the VIA out-of-range classification (finding 3),
+   the coherent-read contract (finding 4), the pulse key position (finding 10),
+   `RGB_LEFT_LED_COUNT` derivation (finding 11), and the dead public functions
+   (finding 9).
+5. Reconcile the roadmap and the documentation gaps (finding 12).
+6. Only after software closure, run the Finding 05 and Finding 10 physical
    matrices. Finding 05's matrix is blocked on must-fix 2.

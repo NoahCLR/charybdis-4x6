@@ -77,3 +77,17 @@ noah_host_export_qmk_cpath() {
 
     export CPATH
 }
+
+# Guard scripts express violations as `if rg <forbidden>; then fail; fi`. A
+# non-zero rg exit makes that condition false, and `set -e` is suppressed inside
+# an `if`, so a missing tool or a stale path reads as "no violations found"
+# rather than as a failure. Every script relying on that shape must assert the
+# tool exists first.
+noah_host_require_tool() {
+    tool="$1"
+
+    if ! command -v "$tool" >/dev/null 2>&1; then
+        echo "required tool '$tool' is not on PATH; guard checks in this script would pass vacuously without it" >&2
+        exit 1
+    fi
+}
