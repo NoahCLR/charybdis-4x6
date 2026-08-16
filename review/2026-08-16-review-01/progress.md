@@ -439,6 +439,69 @@ Finding 12, the last should-fix item.
 - `git diff --check` clean
 - anchor targets confirmed by reading the cited lines
 
+## 2026-08-16 — Hardware regression 1: slave auto-mouse fade
+
+Reported from hardware: the auto-mouse timeout fade renders on the master but is
+a solid color on the slave. Working on `dev`.
+
+**Cause.** `split_runtime_sync_auto_mouse_elapsed()` in
+`users/noah/lib/split/runtime_sync.c` gated the elapsed read on
+`noah_qmk_contract_auto_mouse_active()`. `dev` read it unconditionally. The gate
+arrived with `df6df3f4` ("Sample split runtime time once per tick"), which is not
+an ancestor of `dev`.
+
+The predicate is semantically inverted for this use.
+`is_auto_mouse_active()` is `is_activated || mouse_key_tracker || layer_hold_check()`,
+and `../bastardkb-qmk/quantum/pointing_device/pointing_device_auto_mouse.c:267`
+recomputes `is_activated` from **each mouse report** via `auto_mouse_activation()`,
+which is true only while movement exceeds the threshold or a button is held. It
+goes false the moment the pointer stops, while `timer.active` keeps counting
+toward the timeout — and that countdown is exactly what the fade renders. So the
+gate zeroed the published progress for precisely the fade window.
+
+Master-only symptom follows directly: `automouse_rgb_current_progress()` reads
+the clock directly on the master and mirrors the synced value on the slave.
+
+An initial reading of this was wrong and worth recording: `is_activated` looks
+like it should stay true for the whole timeout, which would have made the gate
+harmless. Reading the upstream task rather than assuming its meaning is what
+settled it.
+
+**Fix.** The read is unconditional again. The locked-mode suppression stays in
+the packet builder, where the sent value is decided.
+
+**Tests.** `test_inactive_auto_mouse_skips_elapsed_lookup()` asserted the
+regression as the expected behavior and was replaced by
+`test_idle_auto_mouse_still_publishes_fade_progress()`, which requires progress to
+be published while the pointer is idle, plus
+`test_locked_mode_suppresses_fade_progress()` to keep the lock path pinned.
+Load-bearing: reinstating the gate fails the new test.
+
+**Throughput.** Restoring this costs roughly `ACTIVE_SPAN / AUTOMOUSE_RGB_SYNC_STEP`
+extra base sends per timeout window — about 8 to 9 RPCs spread across one fade,
+not per scan, because progress is quantized and the base packet only sends when
+the quantized value changes. The reported 380 to 470 fps gain came from the
+runtime lookup hot path, one-timer-sample, and key-feedback dirty gating, which
+are untouched.
+
+### Still open, not yet root-caused
+
+Two further hardware regressions were reported and are **not** explained by this
+fix. They have hypotheses only, and rollback to `dev` was considered and
+rejected: the optimizations are worth keeping, so each needs the same treatment
+as above — find the precise defect, fix it, keep the speed.
+
+1. Tap-window white flash missing on the slave. Hypothesis: `6a9285f3` changed
+   per-domain sends from continue-on-failure to return-on-first-failure with a
+   backoff that gates the whole tick, so one transient RPC failure can starve
+   key-feedback packets. Unproven.
+2. VIA edits no longer reach the slave, so slave RGB layer colors do not pick up
+   newly mapped keys. Separate channel from the runtime sync tick. Slave-side
+   cache invalidation was checked and ruled out: the receiver does invalidate RGB
+   layer maps on commit. Hypothesis: the `SNAPSHOT_REQUIRED` handling added in
+   `474651bc` restarts the session on a status that also occurs benignly.
+   Unproven, and it is this session's own change.
+
 ## Current Verdict
 
 The audit is **complete**, and every software finding it raised is closed: both

@@ -105,11 +105,21 @@ static void split_runtime_sync_elapsed_internal(uint16_t raw_elapsed, bool force
 
 static uint16_t split_runtime_sync_auto_mouse_elapsed(uint32_t now) {
 #    if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_AUTOMOUSE_GRADIENT_ENABLE)
-    if (!pd_any_local_mode_locked() && noah_qmk_contract_auto_mouse_active()) {
-        return noah_qmk_contract_auto_mouse_elapsed_at(now);
-    }
-#    endif
+    // Deliberately ungated. is_auto_mouse_active() reports "the pointer is in
+    // use right now", not "the auto-mouse layer is on": QMK recomputes it from
+    // each mouse report, so it goes false the moment movement stops while the
+    // activity timer keeps counting toward the timeout. The fade renders that
+    // timeout, so gating on it zeroed the progress the slave mirrors for
+    // exactly the fade window, leaving the slave a solid color while the master
+    // -- which reads the clock directly -- still faded.
+    //
+    // The lock check stays in the packet builder, where the sent value is
+    // decided, rather than being duplicated here.
+    return noah_qmk_contract_auto_mouse_elapsed_at(now);
+#    else
+    (void)now;
     return 0u;
+#    endif
 }
 
 static split_runtime_base_sync_packet_t split_runtime_sync_build_base_packet(uint16_t raw_elapsed) {

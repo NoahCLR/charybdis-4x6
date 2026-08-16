@@ -7,6 +7,7 @@
 #include "host_runtime_reset_fixture.h"
 #include "transactions.h"
 #include "users/noah/lib/key/runtime/feedback.h"
+#include "users/noah/lib/rgb/automouse/rgb_automouse.h"
 #include "users/noah/lib/split/runtime_sync.h"
 
 static host_runtime_fixture_t runtime_fixture = HOST_RUNTIME_FIXTURE_INIT;
@@ -513,14 +514,34 @@ static void test_force_sync_samples_one_shared_timestamp(void) {
     CHECK(clock.branch_last_send == fake_time32);
 }
 
-static void test_inactive_auto_mouse_skips_elapsed_lookup(void) {
+// The timeout fade is exactly the window where the pointer is idle: QMK
+// recomputes is_auto_mouse_active() from each mouse report, so it goes false as
+// soon as movement stops while the activity timer keeps counting toward the
+// timeout. The slave mirrors this progress, so gating the read on "active"
+// blanked the slave's fade while the master, which reads the clock directly,
+// kept fading. Progress must be published for an idle pointer.
+static void test_idle_auto_mouse_still_publishes_fade_progress(void) {
     test_reset_stubs();
     fake_auto_mouse_active = false;
+    fake_auto_mouse_elapsed = (uint16_t)(AUTOMOUSE_RGB_DEAD_TIME + AUTOMOUSE_RGB_SYNC_STEP * 2u);
 
     split_runtime_sync_init();
 
-    CHECK(auto_mouse_elapsed_read_count == 0u);
-    CHECK(auto_mouse_elapsed_at_read_count == 0u);
+    CHECK(auto_mouse_elapsed_at_read_count >= 1u);
+    CHECK(rpc_last_base_packet.automouse_progress != 0u);
+    CHECK(rpc_last_base_packet.automouse_progress == automouse_rgb_quantize_progress(fake_auto_mouse_elapsed));
+}
+
+// A locked pd mode still suppresses the fade, and that decision stays in the
+// packet builder rather than in the elapsed read.
+static void test_locked_mode_suppresses_fade_progress(void) {
+    test_reset_stubs();
+    fake_auto_mouse_active  = false;
+    fake_any_mode_locked    = true;
+    fake_auto_mouse_elapsed = (uint16_t)(AUTOMOUSE_RGB_DEAD_TIME + AUTOMOUSE_RGB_SYNC_STEP * 2u);
+
+    split_runtime_sync_init();
+
     CHECK(rpc_last_base_packet.automouse_progress == 0u);
 }
 
@@ -1332,7 +1353,8 @@ int main(void) {
     test_elapsed_skips_unchanged_packets_until_heartbeat();
     test_tick_samples_one_shared_timestamp();
     test_force_sync_samples_one_shared_timestamp();
-    test_inactive_auto_mouse_skips_elapsed_lookup();
+    test_idle_auto_mouse_still_publishes_fade_progress();
+    test_locked_mode_suppresses_fade_progress();
     test_active_heartbeat_is_wrap_safe();
     test_active_auto_mouse_uses_shared_low16_after_wrap();
     test_first_failure_stops_tick_and_force_respects_backoff();
