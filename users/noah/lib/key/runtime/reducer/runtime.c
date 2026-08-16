@@ -480,8 +480,11 @@ static void key_runtime_core_press_token_begin(key_runtime_core_state_t *state, 
     }
 
     if (token->active) {
+        uint16_t cancelled_token_id = token->token_id;
+
         state->cancelled_press_count++;
         key_runtime_core_press_token_cancel(state, token, now);
+        key_runtime_core_adopt_runtime_owned_state_leases(state, cancelled_token_id, token_id);
     }
 
     if (key_runtime_core_tap_series_can_accept_press(state, series, event->keycode, now)) {

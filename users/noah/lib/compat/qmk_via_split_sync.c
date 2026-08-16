@@ -153,6 +153,20 @@ static void noah_qmk_via_schedule_progress(uint32_t now) {
     noah_qmk_via_next_attempt_at = now;
 }
 
+// A peer that reset mid-transfer has forgotten the snapshot session and answers
+// SNAPSHOT_REQUIRED to every further chunk or commit. Retrying the same frame
+// can never clear that, because only a new SNAPSHOT_BEGIN reopens a session, so
+// the transfer restarts from metadata. The backoff is kept so a peer that is
+// persistently unable to accept a session does not spin.
+static bool noah_qmk_via_response_requires_new_session(const noah_qmk_via_sync_frame_t *response) {
+    return response && response->status == NOAH_QMK_VIA_SYNC_STATUS_SNAPSHOT_REQUIRED;
+}
+
+static void noah_qmk_via_abandon_session(uint32_t now) {
+    noah_qmk_via_tx_phase = NOAH_QMK_VIA_TX_METADATA;
+    noah_qmk_via_schedule_retry(now);
+}
+
 static void noah_qmk_via_schedule_session_refresh(uint32_t now) {
     noah_qmk_via_retry_ms        = VIA_SPLIT_SYNC_RETRY_INITIAL_MS;
     noah_qmk_via_next_attempt_at = now + VIA_SPLIT_SYNC_SESSION_REFRESH_MS;
@@ -608,7 +622,15 @@ static void noah_qmk_via_master_push_chunk_tick(uint32_t now) {
         .digest         = noah_qmk_via_tx_digest,
         .payload_length = remaining < NOAH_QMK_VIA_SYNC_FRAME_PAYLOAD_MAX ? (uint8_t)remaining : NOAH_QMK_VIA_SYNC_FRAME_PAYLOAD_MAX,
     };
-    if (!noah_qmk_via_storage_region_read(request.region, request.offset, request.payload, request.payload_length) || !noah_qmk_via_rpc_exchange(&request, &response) || response.kind != NOAH_QMK_VIA_SYNC_MESSAGE_ACK || response.status != NOAH_QMK_VIA_SYNC_STATUS_OK || response.generation != request.generation || response.digest != request.digest) {
+    if (!noah_qmk_via_storage_region_read(request.region, request.offset, request.payload, request.payload_length) || !noah_qmk_via_rpc_exchange(&request, &response)) {
+        noah_qmk_via_schedule_retry(now);
+        return;
+    }
+    if (response.kind != NOAH_QMK_VIA_SYNC_MESSAGE_ACK || response.status != NOAH_QMK_VIA_SYNC_STATUS_OK || response.generation != request.generation || response.digest != request.digest) {
+        if (noah_qmk_via_response_requires_new_session(&response)) {
+            noah_qmk_via_abandon_session(now);
+            return;
+        }
         noah_qmk_via_schedule_retry(now);
         return;
     }
@@ -629,6 +651,10 @@ static void noah_qmk_via_master_push_commit_tick(uint32_t now) {
         return;
     }
     if (response.kind != NOAH_QMK_VIA_SYNC_MESSAGE_ACK || response.status != NOAH_QMK_VIA_SYNC_STATUS_OK || response.generation != request.generation || response.digest != request.digest) {
+        if (noah_qmk_via_response_requires_new_session(&response)) {
+            noah_qmk_via_abandon_session(now);
+            return;
+        }
         noah_qmk_via_schedule_retry(now);
         return;
     }
@@ -658,7 +684,15 @@ static void noah_qmk_via_master_pull_chunk_tick(uint32_t now) {
         .region_length = capacity,
         .digest        = noah_qmk_via_tx_digest,
     };
-    if (!noah_qmk_via_rpc_exchange(&request, &response) || response.kind != NOAH_QMK_VIA_SYNC_MESSAGE_PUSH_CHUNK || response.status != NOAH_QMK_VIA_SYNC_STATUS_OK || response.region != request.region || response.generation != request.generation || response.offset != request.offset || response.region_length != capacity || response.digest != request.digest || !noah_qmk_via_storage_region_write(response.region, response.offset, response.payload, response.payload_length)) {
+    if (!noah_qmk_via_rpc_exchange(&request, &response)) {
+        noah_qmk_via_schedule_retry(now);
+        return;
+    }
+    if (response.kind != NOAH_QMK_VIA_SYNC_MESSAGE_PUSH_CHUNK || response.status != NOAH_QMK_VIA_SYNC_STATUS_OK || response.region != request.region || response.generation != request.generation || response.offset != request.offset || response.region_length != capacity || response.digest != request.digest || !noah_qmk_via_storage_region_write(response.region, response.offset, response.payload, response.payload_length)) {
+        if (noah_qmk_via_response_requires_new_session(&response)) {
+            noah_qmk_via_abandon_session(now);
+            return;
+        }
         noah_qmk_via_schedule_retry(now);
         return;
     }

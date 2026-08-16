@@ -412,6 +412,48 @@ static void test_threshold_hold_registers_and_releases_owned_state(void) {
     CHECK(key_runtime_scenario_effect_at(1)->data.key_pos.col == 3);
 }
 
+// A second press at a position that already holds a registered action replaces
+// the press token without any physical release. Held-action and repeat leases
+// survive the token sweep by design, because their applied bindings are retired
+// by a planned release effect. The replacing token must therefore adopt them, or
+// the eventual release plans nothing and the action stays registered forever.
+static void test_replaced_press_token_still_releases_owned_state(void) {
+    static const key_runtime_scenario_step_t hold[] = {
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_HOLD_KEY, 0, 3),
+        KEY_RUNTIME_SCENARIO_ADVANCE(151),
+        KEY_RUNTIME_SCENARIO_SCAN(),
+    };
+    static const key_runtime_scenario_step_t replace_and_release[] = {
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_HOLD_KEY, 0, 3),
+        KEY_RUNTIME_SCENARIO_RELEASE(TEST_HOLD_KEY, 0, 3),
+    };
+
+    key_runtime_scenario_reset();
+    key_runtime_scenario_add_behavior_view((key_behavior_view_t){
+        .keycode          = TEST_HOLD_KEY,
+        .handled          = true,
+        .tap_hold_term    = 150,
+        .longer_hold_term = 350,
+        .multi_tap_term   = 120,
+        .single =
+            {
+                .hold = PRESS_AND_HOLD_UNTIL_RELEASE(TEST_HOLD_ACTION),
+            },
+    });
+
+    key_runtime_scenario_run(hold, ARRAY_SIZE(hold));
+    CHECK(key_runtime_scenario_effect_count() == 1);
+    CHECK(key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER);
+
+    key_runtime_scenario_clear_effects();
+    key_runtime_scenario_run(replace_and_release, ARRAY_SIZE(replace_and_release));
+
+    CHECK(key_runtime_scenario_effect_count() >= 1);
+    CHECK(key_runtime_scenario_effect_at(key_runtime_scenario_effect_count() - 1)->kind == KEY_RUNTIME_EFFECT_RELEASE_OWNED_STATE_BY_KEY);
+    CHECK(key_runtime_scenario_effect_at(key_runtime_scenario_effect_count() - 1)->data.key_pos.row == 0);
+    CHECK(key_runtime_scenario_effect_at(key_runtime_scenario_effect_count() - 1)->data.key_pos.col == 3);
+}
+
 static void test_press_on_other_handled_position_keeps_foreign_pending_multi_tap_until_timeout(void) {
     static const key_runtime_scenario_step_t setup[] = {
         KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 1, 1),
@@ -806,6 +848,7 @@ int main(void) {
     test_same_key_terminal_tap_interruption_defers_previous_branch_action();
     test_momentary_layer_key_tracks_press_and_release_events();
     test_threshold_hold_registers_and_releases_owned_state();
+    test_replaced_press_token_still_releases_owned_state();
     test_press_on_other_handled_position_keeps_foreign_pending_multi_tap_until_timeout();
     test_other_press_does_not_flush_active_same_key_multi_tap_chain();
     test_independent_pending_multi_tap_chains_can_coexist_and_flush_independently();

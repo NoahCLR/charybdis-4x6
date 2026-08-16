@@ -664,6 +664,32 @@ void key_runtime_core_release_leases_for_token(key_runtime_core_state_t *state, 
     }
 }
 
+// Held-action and repeat leases outlive key_runtime_core_release_leases_for_token()
+// on purpose: their applied bindings are retired by a planned release effect, not
+// by clearing the lease. Token replacement happens on the observe path, which has
+// no effect plan and no matching physical release, so the replacing token adopts
+// them. Its own release then plans the retire by key position, exactly as the
+// original token's would have.
+void key_runtime_core_adopt_runtime_owned_state_leases(key_runtime_core_state_t *state, uint16_t from_owner_token_id, uint16_t to_owner_token_id) {
+    if (!state || from_owner_token_id == 0u || to_owner_token_id == 0u || from_owner_token_id == to_owner_token_id) {
+        return;
+    }
+
+    for (uint16_t index = 0; index < KEY_RUNTIME_CORE_LEASE_CAPACITY; index++) {
+        lease_t     *lease = &state->leases[index];
+        lease_kind_t kind;
+
+        if (!(lease->active && lease->owner_token_id == from_owner_token_id)) {
+            continue;
+        }
+
+        kind = key_runtime_core_lease_kind(lease);
+        if (kind == LEASE_KIND_HELD_ACTION || kind == LEASE_KIND_REPEAT) {
+            lease->owner_token_id = to_owner_token_id;
+        }
+    }
+}
+
 bool key_runtime_core_owner_has_lease_kind(const key_runtime_core_state_t *state, uint16_t owner_token_id, lease_kind_t kind) {
     if (!(state && owner_token_id != 0u)) {
         return false;

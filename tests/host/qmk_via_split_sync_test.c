@@ -44,6 +44,11 @@ static uint16_t         rpc_count;
 static uint8_t          rpc_commit_count;
 static uint16_t         drop_rpc_at;
 static bool             drop_after_apply;
+// Models a peer that resets mid-transfer: it forgets its snapshot session and
+// rejects further chunks until the master opens a new one with SNAPSHOT_BEGIN.
+static uint16_t         peer_session_lost_at;
+static bool             peer_session_active;
+static uint16_t         peer_begin_count;
 static test_rpc_mode_t  rpc_mode;
 static slave_callback_t registered_callback;
 
@@ -105,6 +110,9 @@ static void test_reset(void) {
     rpc_commit_count          = 0u;
     drop_rpc_at               = 0u;
     drop_after_apply          = false;
+    peer_session_lost_at      = 0u;
+    peer_session_active       = false;
+    peer_begin_count          = 0u;
     rpc_mode                  = TEST_RPC_EQUAL;
     registered_callback       = NULL;
 }
@@ -261,9 +269,23 @@ bool transaction_rpc_exec(int8_t transaction_id, uint8_t request_size, const voi
             .digest     = (rpc_mode == TEST_RPC_PEER_NEWER || rpc_mode == TEST_RPC_PEER_DIVERGED) ? peer_digest() : request.digest,
         };
     } else if (request.kind == NOAH_QMK_VIA_SYNC_MESSAGE_SNAPSHOT_BEGIN) {
+        peer_session_active = true;
+        peer_begin_count++;
         response = (noah_qmk_via_sync_frame_t){.kind = NOAH_QMK_VIA_SYNC_MESSAGE_ACK, .generation = request.generation, .digest = request.digest};
     } else if (request.kind == NOAH_QMK_VIA_SYNC_MESSAGE_PUSH_CHUNK) {
-        uint8_t *destination = test_region_data(request.region, true);
+        uint8_t *destination;
+
+        if (peer_session_lost_at != 0u && rpc_count >= peer_session_lost_at) {
+            peer_session_active  = false;
+            peer_session_lost_at = 0u;
+        }
+        if (!peer_session_active) {
+            // Same reply the real receiver gives for an inactive session.
+            response = (noah_qmk_via_sync_frame_t){.kind = NOAH_QMK_VIA_SYNC_MESSAGE_ERROR, .status = NOAH_QMK_VIA_SYNC_STATUS_SNAPSHOT_REQUIRED, .generation = request.generation, .digest = request.digest};
+            encode_response(&response, response_size, response_data);
+            return true;
+        }
+        destination = test_region_data(request.region, true);
         CHECK(destination != NULL);
         memcpy(&destination[request.offset], request.payload, request.payload_length);
         response = (noah_qmk_via_sync_frame_t){.kind = NOAH_QMK_VIA_SYNC_MESSAGE_ACK, .region = request.region, .generation = request.generation, .offset = request.offset + request.payload_length, .region_length = request.region_length, .digest = request.digest};
@@ -413,6 +435,30 @@ static void test_each_outbound_boundary_recovers_from_loss(void) {
         CHECK(memcmp(peer_macro, local_macro, sizeof(local_macro)) == 0);
         CHECK(!noah_qmk_via_sync_state_snapshot().metadata.dirty);
     }
+}
+
+// A peer that resets mid-push forgets its snapshot session and rejects every
+// further chunk with SNAPSHOT_REQUIRED. The master must abandon that session and
+// open a new one, rather than re-sending the same chunk until something else
+// happens to reset it.
+static void test_peer_losing_snapshot_session_mid_push_renegotiates(void) {
+    test_reset();
+    rpc_mode = TEST_RPC_PEER_DIRTY;
+    noah_qmk_via_split_sync_init();
+    local_keymap[1] = 0x5Au;
+    noah_qmk_via_split_sync_note_mutation(NOAH_QMK_VIA_COMMAND_EFFECT_SPLIT_MIRROR);
+
+    // Let a push get under way, then take the peer's session away mid-transfer.
+    scan_many(0u, 600u);
+    peer_session_lost_at = (uint16_t)(rpc_count + 1u);
+
+    scan_many(600u, 8000u);
+
+    // The loss is one-shot, so only a fresh SNAPSHOT_BEGIN can make the peer's
+    // session active again. If the master merely retried the rejected chunk,
+    // this stays false however long it runs.
+    CHECK(peer_session_active);
+    CHECK(memcmp(peer_keymap, local_keymap, sizeof(local_keymap)) == 0);
 }
 
 static void test_newer_peer_is_pulled_and_accepted(void) {
@@ -667,6 +713,7 @@ int main(void) {
     test_disconnect_uses_bounded_exponential_retry();
     test_local_mutation_commits_then_pushes_complete_snapshot();
     test_each_outbound_boundary_recovers_from_loss();
+    test_peer_losing_snapshot_session_mid_push_renegotiates();
     test_newer_peer_is_pulled_and_accepted();
     test_equal_generation_digest_conflict_makes_master_advance_and_push();
     test_role_change_forces_new_metadata_session();

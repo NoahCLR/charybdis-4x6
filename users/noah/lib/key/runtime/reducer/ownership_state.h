@@ -6,6 +6,7 @@ bool                                        key_runtime_core_keypos_valid(keypos
 bool                                        key_runtime_core_owner_has_lease_kind(const key_runtime_core_state_t *state, uint16_t owner_token_id, lease_kind_t kind);
 bool                                        key_runtime_core_owner_has_runtime_owned_state_lease(const key_runtime_core_state_t *state, uint16_t owner_token_id);
 void                                        key_runtime_core_release_leases_for_token(key_runtime_core_state_t *state, uint16_t owner_token_id);
+void                                        key_runtime_core_adopt_runtime_owned_state_leases(key_runtime_core_state_t *state, uint16_t from_owner_token_id, uint16_t to_owner_token_id);
 void                                        key_runtime_core_shadow_projection_recompute(key_runtime_core_state_t *state);
 void                                        key_runtime_core_press_token_attach_press_leases(key_runtime_core_state_t *state, const press_token_t *token);
 void                                        key_runtime_core_press_token_attach_hold_leases(key_runtime_core_state_t *state, const press_token_t *token);
