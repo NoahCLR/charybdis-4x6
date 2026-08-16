@@ -116,7 +116,14 @@ bool noah_qmk_via_classify_mutation(const uint8_t *data, uint8_t length, uint8_t
             offset       = ((size_t)data[1] << 8u) | data[2];
             payload_size = data[3];
             capacity     = data[0] == id_dynamic_keymap_set_buffer ? noah_qmk_via_keymap_buffer_capacity() : noah_qmk_via_macro_seed_capacity();
-            if (payload_size > (size_t)length - 4u || offset > capacity || payload_size > capacity - offset) {
+            // Upstream applies these buffer writes byte by byte, keeping every
+            // byte whose offset lands inside the region and silently dropping
+            // the rest. An over-long or partly out-of-range write therefore
+            // still mutates storage, and classifying it as a non-mutation left
+            // the digest advertising pre-write content while the halves
+            // diverged. Only a write starting past the region touches nothing.
+            (void)payload_size;
+            if (offset >= capacity) {
                 return false;
             }
             break;

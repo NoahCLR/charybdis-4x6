@@ -97,6 +97,10 @@ loss is never modelled.
 
 ### 3. Out-of-range VIA buffer writes mutate storage but classify as non-mutations
 
+> Fixed in the commit that follows this review; see `progress.md`. A new
+> upstream out-of-bounds read was noticed while fixing it and is recorded there
+> as a separate decision.
+
 `noah_qmk_via_classify_mutation()` (`users/noah/lib/compat/qmk_via_contract.c:119`)
 returns false when `payload_size > capacity - offset`, so `via_command_kb()`
 (`users/noah/lib/macro/via_macro_defaults.c:219`) records no effects: no

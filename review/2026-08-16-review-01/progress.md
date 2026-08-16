@@ -242,6 +242,58 @@ missing data boundary.
 - stack gate: worst main path 1,872 B of 1,920 B, unchanged
 - guard preflight and include gate both verified to fail when they should
 
+## 2026-08-16 — Implementation Pass 3: VIA mutation classification
+
+Finding 3, the last remaining correctness defect.
+
+`noah_qmk_via_classify_mutation()` in `users/noah/lib/compat/qmk_via_contract.c`
+now treats a buffer write as a mutation whenever any byte can land inside the
+region, rather than only when the whole write fits.
+
+The distinction was checked against upstream rather than assumed, and it is not
+uniform across commands:
+
+- `nvm_dynamic_keymap_update_keycode()`
+  (`../bastardkb-qmk/quantum/nvm/eeprom/nvm_dynamic_keymap.c:95`) rejects an
+  out-of-range write outright, so classifying it as a non-mutation is correct
+  and was left alone.
+- `nvm_dynamic_keymap_update_buffer()` (`:140-151`) and
+  `nvm_dynamic_keymap_macro_update_buffer()` (`:171-181`) apply byte by byte,
+  keeping every byte whose offset lands inside the region and dropping the rest.
+
+So only the two buffer commands were misclassified. An over-long or straddling
+write changed storage while userspace recorded no mutation, leaving the digest
+advertising pre-write content and the halves silently divergent. Only a write
+starting past the region touches nothing and remains a non-mutation, which keeps
+the conservative reclassification from costing spurious digest recomputes.
+
+Two existing assertions in `tests/host/qmk_via_command_classifier_test.c`
+asserted the old, wrong expectation and were changed deliberately: they claimed
+the over-long keymap write and the straddling macro write were rejected, which
+is exactly the misclassification. Replaced with cases proving both are
+mutations, plus new cases proving writes past the region are not, and an
+out-of-range keycode write still is not.
+
+Proven load-bearing: restoring the old range check fails the over-long keymap
+assertion.
+
+### Out of scope, recorded for a decision
+
+`payload_size` is a byte and the raw HID buffer is 32 bytes, so a frame claiming
+a payload larger than it carries makes upstream read past `command_data` while
+copying into storage. That is an upstream out-of-bounds read that userspace
+cannot prevent by classifying, since returning false is what lets the command
+through. Consuming such frames in `via_command_kb()` would stop it but changes
+host-visible VIA behavior, so it is left as a separate decision rather than
+folded into this fix.
+
+### Verification
+
+- `sh tests/host/run_all_host_tests.sh` — exit 0, no failures
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- memory gate: static RAM 49,824 B of 51,000 B, heap 212,312 B
+- stack gate: PASS, unchanged
+
 ## Current Verdict
 
 The audit is **complete and open**. Coverage is full across the userspace. Both
@@ -254,8 +306,9 @@ outstanding.
 2. ~~Must-fix 2~~ — landed in `474651bc`.
 3. ~~Gate integrity: `rg` preflight, pd-to-core include gate, `synthetic_record.c`
    coverage, memory gate `.data` blind spot~~ — landed.
-4. Remaining should-fix items: the VIA out-of-range classification (finding 3),
-   the coherent-read contract (finding 4), the pulse key position (finding 10),
+4. Remaining should-fix items: ~~the VIA out-of-range classification
+   (finding 3)~~ landed; the coherent-read contract (finding 4), the pulse key
+   position (finding 10),
    `RGB_LEFT_LED_COUNT` derivation (finding 11), and the dead public functions
    (finding 9).
 5. Reconcile the roadmap and the documentation gaps (finding 12).
