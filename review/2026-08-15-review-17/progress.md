@@ -182,6 +182,13 @@ on 2026-08-16 and all three now genuinely enforce. The first real run of the
 owned-keycode guard immediately caught a new raw-report-caller match, in a code
 comment added during this remediation.
 
+## Successor Review
+
+`review/2026-08-16-review-01/` audits the code this remediation produced. It
+records one should-fix contract gap in the coherent-read helpers, two cleanup
+items about published state nothing reads, and the areas it did not manage to
+cover. This thread's remaining obligations are the two hardware matrices below.
+
 ## Next Steps
 
 1. Flash and run the Finding 05 two-half persistence, power-cycle, reconnect,
