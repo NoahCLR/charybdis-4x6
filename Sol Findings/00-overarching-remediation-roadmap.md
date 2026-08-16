@@ -152,8 +152,11 @@ Recommended order: **08 first; 06 and 07 may then proceed independently**.
 Findings 06 and 07 remain verified. Macro playback is scan-driven, uses the
 landed lease contract, pins active provider IR, and rejects overlapping starts
 without queueing. Review 17 regressed Finding 08 because its pre-process
-physical ledger does not distinguish default-processed events from handled
-events that userspace later consumes.
+physical ledger did not distinguish default-processed events from handled
+events that userspace later consumes. Closed in `aae9c445`: report ownership
+now settles in the finalize hook on the final event result, and modifier
+ownership keeps physical counts (a key is down) separate from report counts
+(QMK registered it). See `review/2026-08-16-review-01/`.
 
 The macro scheduler must specify queueing, overlap, cancellation, reset, layer change, suspend, and aborted-playback cleanup before code is written. A scheduler that is nonblocking but leaks owned keys is not an improvement.
 
@@ -228,8 +231,11 @@ Recommended order: **13, 15**.
 Finding 13 remains verified. Finding 15's normal activation, pending preview,
 one selection-aware base/group renderer, per-frame source cache, and bounded
 stage work remain enforced. Review 17 partially reopened Finding 15 because
-the split worker can update the remote source while the main context performs
-the first frame-snapshot copy.
+the split worker could update the remote source while the main context
+performed the first frame-snapshot copy. Closed in `aae9c445`: each domain
+publishes as one generation through `users/noah/lib/state/shared/runtime_publication.h`,
+and readers stage their copy before committing it. See
+`review/2026-08-16-review-01/`.
 
 - Extract or reuse one group/inheritance resolution path for normal and preview rendering.
 - Add parity tests before introducing per-frame or per-chunk caches.

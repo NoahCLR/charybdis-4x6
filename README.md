@@ -233,7 +233,7 @@ Combos can enter that same table too. If a combo emits a keycode that has a
 multi-tap behavior as a physical key.
 
 Here is the shape of one authored row, based on the `RIGHT_THUMB` row in
-[`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c#L435).
+[`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c#L442).
 The timing lines are optional row-local overrides, and branch confirm is the
 short RGB-visible pause after a double-tap or higher branch wins, before the
 action fires. The snippet shows one useful helper mix, not the full helper
@@ -423,7 +423,7 @@ left before the board returns to normal.
 A Charybdis has one controller per half, so runtime state cannot just live on
 whichever half saw the key first. QMK's normal split settings cover the active
 layer set and activity timer; this userspace adds custom split RPCs in
-[`users/noah/config.h`](./users/noah/config.h#L42) and
+[`users/noah/config.h`](./users/noah/config.h#L54) and
 [`runtime_sync.h`](./users/noah/lib/split/runtime_sync.h):
 
 - `PUT_SPLIT_RUNTIME_BASE_SYNC`: auto-mouse RGB progress, active or locked

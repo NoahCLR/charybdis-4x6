@@ -408,11 +408,48 @@ sweep after the removals found it, and a third sweep is clean.
 Compilation and linking of the current source lists is the enforcement here, per
 the audit template: no negative gate was added to assert these names stay absent.
 
+## 2026-08-16 — Implementation Pass 7: documentation reconciliation
+
+Finding 12, the last should-fix item.
+
+- `docs/architecture/source-map.md` gained `split/runtime_sync_dirty.c/h`, which
+  existed in the manifest but not in the inventory the doc bills as the way to
+  check a package against the tree, and a `shared/runtime_publication.h` entry
+  describing it as the single-writer generation contract to read before changing
+  split remote or pd-mode snapshot storage. It had appeared in no doc at all.
+- `docs/HOOK_OVERRIDES.md` gained a section for the three QMK hooks defined
+  outside `hooks.c`: `via_init_kb()`, `via_command_kb()` and
+  `is_keyboard_master_impl()`. These are not weak `*_user` hooks, so a
+  keyboard-level definition replaces them outright with no chaining helper and no
+  compile gate. The entry for `via_command_kb()` spells out that replacing it
+  drops VIA mutation classification, macro reseeding and split-mirror marking, so
+  storage would change without the digest or the peer learning about it.
+- `Sol Findings/00-overarching-remediation-roadmap.md` no longer says Review 17
+  regressed Finding 08 or partially reopened Finding 15. Both closed in
+  `aae9c445`; the roadmap now says so and points here. This was the
+  self-inflicted miss: that commit updated `implementation-progress.md` and left
+  the roadmap stale.
+- `README.md` anchors corrected: the `RIGHT_THUMB` row link pointed into the
+  `LEFT_THUMB` row, and the custom split RPC link pointed at a comment line
+  rather than `SPLIT_TRANSACTION_IDS_USER`.
+
+### Verification
+
+- `sh tests/host/run_all_host_tests.sh` — exit 0
+- `git diff --check` clean
+- anchor targets confirmed by reading the cited lines
+
 ## Current Verdict
 
-The audit is **complete and open**. Coverage is full across the userspace. Both
-must-fix defects are now closed; ten should-fix items and the cleanup list are
-outstanding.
+The audit is **complete**, and every software finding it raised is closed: both
+must-fix defects, all ten should-fix items, and the dead-surface cleanup. What
+remains is hardware-only.
+
+Two items were deliberately left as decisions rather than silently absorbed, and
+are recorded above: the upstream VIA out-of-bounds read reachable from a
+malformed frame, which cannot be closed without changing host-visible protocol
+behavior, and the write-only split base-domain state plus its generation, which
+is uniformity that currently has no consumer.
 
 ## Next Steps
 
@@ -423,8 +460,8 @@ outstanding.
 4. Remaining should-fix items: ~~the VIA out-of-range classification
    (finding 3)~~ and ~~the coherent-read contract (finding 4)~~ landed; the
    ~~pulse key position (finding 10)~~ and ~~`RGB_LEFT_LED_COUNT` derivation
-   (finding 11)~~ landed, and ~~the dead public functions (finding 9)~~ landed. Only the
-   documentation reconciliation (finding 12) remains.
-5. Reconcile the roadmap and the documentation gaps (finding 12).
-6. Only after software closure, run the Finding 05 and Finding 10 physical
+   (finding 11)~~ landed, and ~~the dead public functions (finding 9)~~ landed. and ~~the
+   documentation reconciliation (finding 12)~~ landed. All should-fix items are
+   closed.
+5. Only after software closure, run the Finding 05 and Finding 10 physical
    matrices. Finding 05's matrix is blocked on must-fix 2.

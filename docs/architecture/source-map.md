@@ -191,12 +191,17 @@ semantics without taking another platform timer sample.
 ### `split/`
 
 - Runtime transport: `runtime_sync.c/h`
+- Outbound dirty tracking: `runtime_sync_dirty.c/h`
 
 ### `state/`
 
 - Shared storage: `shared/runtime_context_internal.h`,
   `shared/runtime_reset.h`, `shared/runtime_shared_state.c`,
   `shared/runtime_shared_state_internal.h`
+- Cross-context publication: `shared/runtime_publication.h` — the
+  single-writer generation contract the split worker publishes through and the
+  main loop reads through. Read it before changing split remote or pd-mode
+  snapshot storage.
 - Diagnostics: `diagnostics/runtime_debug.h`,
   `diagnostics/runtime_diag.c/h`, `diagnostics/runtime_trace.c/h`
 - Modifiers: `modifiers/keyboard_mod_policy.c/h`,

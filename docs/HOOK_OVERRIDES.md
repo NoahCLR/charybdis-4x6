@@ -229,6 +229,17 @@ This pattern applies to:
 | `is_mouse_record_user()` | `noah_is_mouse_record_user()` | pointer-layer mouse-key classification |
 | `rgb_matrix_indicators_advanced_user()` | `noah_rgb_matrix_indicators_advanced_user()` | shared layer, auto-mouse, LED-group, key-feedback, and pointer-mode RGB rendering |
 
+### Keyboard-level hooks defined outside `hooks.c`
+
+These are not weak `*_user` hooks, so a keyboard-level definition replaces them
+outright with no chaining helper and no compile gate to notice.
+
+| QMK hook | Defined in | What it owns |
+| --- | --- | --- |
+| `via_init_kb()` | `users/noah/lib/macro/via_macro_defaults.c` | arms VIA macro default seeding for the first post-init scan |
+| `via_command_kb()` | `users/noah/lib/macro/via_macro_defaults.c` | VIA mutation classification, macro reseeding, and split-mirror marking; replacing it silently drops all three, so storage changes without the digest or the peer learning about it |
+| `is_keyboard_master_impl()` | `users/noah/lib/compat/split_role.c` | forced split role under `FORCE_MASTER`/`FORCE_SLAVE`; empty otherwise |
+
 Authored-profile validation is also wired into `users/noah/rules.mk`, so
 invalid key behavior, keymap, hardcoded macro, or RGB authored data hard-fails
 the firmware build before flashing.
