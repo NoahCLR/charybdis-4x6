@@ -266,10 +266,6 @@ bool pd_mode_set_lock_state_at(pd_mode_mask_t mode, bool locked, keypos_t key_po
     return pd_mode_set_lock_state(mode, locked);
 }
 
-void key_feedback_pulse_arm(key_feedback_pulse_kind_t kind) {
-    (void)kind;
-}
-
 void split_runtime_sync(void) {}
 
 void split_runtime_sync_request(void) {}

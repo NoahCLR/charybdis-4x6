@@ -457,7 +457,8 @@ These values come from the keymap config and the shared userspace config. When t
 | `RGB_PD_MODE_ACTIVE_HALF_ENABLE` | `defined` | [users/noah/config.h](../users/noah/config.h) |
 | `MATRIX_IO_DELAY` | `10` | [users/noah/config.h](../users/noah/config.h) |
 | `RGB_MATRIX_LED_COUNT` | `58` | [users/noah/config.h](../users/noah/config.h) |
-| `RGB_MATRIX_SPLIT` | `{29,29}` | [users/noah/config.h](../users/noah/config.h) |
+| `RGB_LEFT_LED_COUNT` | `29` | [users/noah/config.h](../users/noah/config.h) |
+| `RGB_MATRIX_SPLIT` | `{RGB_LEFT_LED_COUNT,RGB_MATRIX_LED_COUNT-RGB_LEFT_LED_COUNT}` | [users/noah/config.h](../users/noah/config.h) |
 | `POINTING_DEVICE_TASK_THROTTLE_MS` | `0` | [users/noah/config.h](../users/noah/config.h) |
 | `PMW33XX_LIFTOFF_DISTANCE` | `0x03` | [users/noah/config.h](../users/noah/config.h) |
 | `MOUSE_EXTENDED_REPORT` | `defined` | [users/noah/config.h](../users/noah/config.h) |

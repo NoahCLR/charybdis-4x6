@@ -736,16 +736,6 @@ void pointer_layer_policy_debug_snapshot(layer_state_t state, pointer_layer_poli
     memset(out, 0, sizeof(*out));
 }
 
-void key_feedback_pulse_arm(key_feedback_pulse_kind_t kind) {
-    key_runtime_scenario_log_effect((key_runtime_scenario_effect_t){
-        .kind = KEY_RUNTIME_EFFECT_FEEDBACK_PULSE,
-        .data.feedback_pulse =
-            {
-                .kind = kind,
-            },
-    });
-}
-
 void key_feedback_pulse_observe(keypos_t key_pos, key_feedback_pulse_kind_t kind, uint8_t tap_branch) {
     key_runtime_scenario_log_effect((key_runtime_scenario_effect_t){
         .kind = KEY_RUNTIME_EFFECT_FEEDBACK_PULSE,

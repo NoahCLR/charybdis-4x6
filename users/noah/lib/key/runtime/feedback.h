@@ -295,4 +295,3 @@ uint8_t key_feedback_preview_layer(void);
 void    combo_feedback_bitmaps(uint8_t *out_underlay_bitmap, uint8_t *out_overlay_bitmap);
 void    combo_feedback_underlay_bitmap(uint8_t *out_bitmap);
 void    combo_feedback_overlay_bitmap(uint8_t *out_bitmap);
-void    key_feedback_pulse_arm(key_feedback_pulse_kind_t kind);

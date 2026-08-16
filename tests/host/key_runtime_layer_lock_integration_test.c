@@ -426,10 +426,6 @@ bool held_action_survives_flush(keypos_t key_pos, uint16_t action) {
     return false;
 }
 
-void key_feedback_pulse_arm(key_feedback_pulse_kind_t kind) {
-    (void)kind;
-}
-
 static void test_double_tap_hold_toggles_num_layer_lock_off_on_second_cycle(void) {
     keypos_t key_pos = test_keypos(4, 2);
 

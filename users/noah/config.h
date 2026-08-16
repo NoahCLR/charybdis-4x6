@@ -86,11 +86,20 @@
 #    endif
 #    define RGB_MATRIX_LED_COUNT 58
 
-// How the LEDs are split between halves: 29 left, 29 right.
+// How the LEDs are split between halves. The left count is the single source of
+// truth: userspace half-painting helpers clamp against it while upstream clamps
+// against RGB_MATRIX_SPLIT, so the two must agree or LEDs at the boundary fall
+// outside every userspace chunk while the base effect keeps driving them.
+// Deriving the split here makes disagreement impossible rather than merely
+// discouraged.
+#    ifdef RGB_LEFT_LED_COUNT
+#        undef RGB_LEFT_LED_COUNT
+#    endif
+#    define RGB_LEFT_LED_COUNT 29
 #    ifdef RGB_MATRIX_SPLIT
 #        undef RGB_MATRIX_SPLIT
 #    endif
-#    define RGB_MATRIX_SPLIT {29, 29}
+#    define RGB_MATRIX_SPLIT {RGB_LEFT_LED_COUNT, RGB_MATRIX_LED_COUNT - RGB_LEFT_LED_COUNT}
 
 #endif // RGB_MATRIX_ENABLE
 

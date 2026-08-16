@@ -261,22 +261,6 @@ static key_feedback_semantic_t key_feedback_semantic_for_pulse(key_feedback_puls
     }
 }
 
-void key_feedback_pulse_arm(key_feedback_pulse_kind_t kind) {
-    key_runtime_core_state_t *state = key_runtime_core_state();
-
-    if (!state) {
-        return;
-    }
-
-    state->feedback_pulse_timer           = timer_read();
-    state->feedback_pulse_sequence        = key_runtime_core_state_next_feedback_sequence(state);
-    state->feedback_pulse_active          = true;
-    state->feedback_pulse_kind            = kind;
-    state->feedback_pulse_tap_branch      = 0u;
-    state->feedback_pulse_queued          = false;
-    state->feedback_pulse_queued_sequence = 0u;
-    split_runtime_sync_notify_key_feedback_dirty();
-}
 
 static bool key_feedback_pulse_active(void) {
     key_runtime_core_state_t *state = key_runtime_core_state();

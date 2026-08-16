@@ -627,10 +627,6 @@ void dispatch_delayed_action_at(keypos_t key_pos, uint16_t action, delayed_actio
     dispatch_delayed_action(action, mods);
 }
 
-void key_feedback_pulse_arm(key_feedback_pulse_kind_t kind) {
-    (void)kind;
-}
-
 void split_runtime_sync(void) {
     split_sync_count++;
 }

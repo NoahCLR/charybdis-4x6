@@ -173,12 +173,15 @@ static inline void rgb_fill_led_range(uint8_t from, uint8_t to, uint8_t led_min,
 
 // ─── Convenience: target physical halves ────────────────────────────────────
 //
-// The split boundary is fixed at LED index 29 (matching RGB_MATRIX_SPLIT).
-// These helpers let you paint an entire half with one call.
+// The split boundary comes from RGB_LEFT_LED_COUNT in users/noah/config.h, which
+// also derives RGB_MATRIX_SPLIT, so the two cannot drift apart. The fallback
+// below only applies to builds that do not include that config, such as focused
+// host tests.
 
 #    ifndef RGB_LEFT_LED_COUNT
-#        define RGB_LEFT_LED_COUNT 29 // must match first element of RGB_MATRIX_SPLIT
+#        define RGB_LEFT_LED_COUNT 29
 #    endif
+
 
 // Color only the left half (LEDs 0–28).
 static inline void rgb_set_left_half(rgb_t color, uint8_t led_min, uint8_t led_max) {

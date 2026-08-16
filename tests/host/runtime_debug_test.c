@@ -137,6 +137,23 @@ static runtime_event_t test_key_runtime_core_key_event(runtime_event_kind_t kind
     };
 }
 
+// The production runtime arms pulses through the projection path, which always
+// records the owning key position. This local helper mirrors that, rather than
+// leaving a keypos-less arming function on the production surface with no
+// production caller.
+static void test_arm_feedback_pulse(keypos_t key_pos, key_feedback_pulse_kind_t kind) {
+    key_runtime_core_state_t *state = key_runtime_core_state();
+
+    state->feedback_pulse_timer           = timer_read();
+    state->feedback_pulse_sequence        = key_runtime_core_state_next_feedback_sequence(state);
+    state->feedback_pulse_active          = true;
+    state->feedback_pulse_kind            = kind;
+    state->feedback_pulse_key_pos         = key_pos;
+    state->feedback_pulse_tap_branch      = 0u;
+    state->feedback_pulse_queued          = false;
+    state->feedback_pulse_queued_sequence = 0u;
+}
+
 static void test_key_runtime_core_apply_key_event(runtime_event_kind_t kind, uint16_t keycode, keypos_t key_pos, uint16_t event_time) {
     runtime_event_t event = test_key_runtime_core_key_event(kind, keycode, key_pos);
 
@@ -715,7 +732,7 @@ static void test_snapshot_captures_cross_subsystem_runtime_state(void) {
     test_reset_stubs();
     noah_runtime_reset_for_test();
 
-    key_feedback_pulse_arm(KEY_FEEDBACK_PULSE_HOLD);
+    test_arm_feedback_pulse(test_keypos(0, 0), KEY_FEEDBACK_PULSE_HOLD);
     (void)pd_mode_apply_command((pd_mode_command_t){
         .kind = PD_MODE_COMMAND_ACTIVATE,
         .mode = PD_MODE_VOLUME,
@@ -802,7 +819,7 @@ static void test_reset_clears_all_runtime_surfaces(void) {
     test_reset_stubs();
     noah_runtime_reset_for_test();
 
-    key_feedback_pulse_arm(KEY_FEEDBACK_PULSE_LONG_HOLD);
+    test_arm_feedback_pulse(test_keypos(0, 0), KEY_FEEDBACK_PULSE_LONG_HOLD);
     (void)pd_mode_apply_command((pd_mode_command_t){
         .kind = PD_MODE_COMMAND_LOCK,
         .mode = PD_MODE_ARROW,

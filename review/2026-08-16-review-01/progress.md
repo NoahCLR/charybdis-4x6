@@ -325,6 +325,50 @@ so a later reader does not draw the wrong conclusion from its passing.
 - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
 - stack gate PASS, worst main path 1,872 B unchanged
 
+## 2026-08-16 — Implementation Pass 5: findings 11 and 10
+
+### Finding 11 — the split boundary has one source of truth
+
+`users/noah/config.h` now defines `RGB_LEFT_LED_COUNT` and derives
+`RGB_MATRIX_SPLIT` from it as `{RGB_LEFT_LED_COUNT, RGB_MATRIX_LED_COUNT - RGB_LEFT_LED_COUNT}`.
+Userspace half-painting helpers clamp against the count while upstream clamps
+against the split, so a disagreement left LEDs at the boundary outside every
+userspace chunk while the base effect kept driving them. Derivation makes that
+impossible rather than merely discouraged, which is stronger than the assert the
+finding suggested.
+
+An added `_Static_assert` in `rgb_helpers.h` was reverted: focused host tests
+build with small `RGB_MATRIX_LED_COUNT` values against the header's fallback of
+29, so the assert fired on configurations that are not the firmware. The
+derivation is the enforcement; the assert would only have restated it where it
+does not apply.
+
+`docs/KEYMAP-OVERVIEW.md` was regenerated with `tools/profile_introspect.py
+--write`, since `users/noah/config.h` is an authored introspection input. The
+introspection gate caught this in the full suite rather than it being noticed by
+hand.
+
+### Finding 10 — the keypos-less pulse API is gone
+
+`key_feedback_pulse_arm()` is removed from `feedback.c` and `feedback.h`. It set
+every pulse field except `feedback_pulse_key_pos`, so the semantic and
+broad-owner maps attributed the pulse to a stale key, or to `{0,0}` on fresh
+state, which is a valid position.
+
+Deleted rather than fixed, because it had **no production caller**: the runtime
+arms pulses through `key_runtime_core_feedback_projection_set_pulse()`, which
+does set the position. Five test files carried stubs for it, four of them in
+binaries that do not even link `feedback.c`, so those stubs satisfied nothing.
+The two real uses in `tests/host/runtime_debug_test.c` moved to a local helper
+that mirrors the production path including the key position.
+
+### Verification
+
+- `sh tests/host/run_all_host_tests.sh` — exit 0
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `python3 tools/profile_introspect.py --check`
+- memory gate: static RAM 49,824 B of 51,000 B; stack gate PASS, unchanged
+
 ## Current Verdict
 
 The audit is **complete and open**. Coverage is full across the userspace. Both
@@ -339,9 +383,8 @@ outstanding.
    coverage, memory gate `.data` blind spot~~ — landed.
 4. Remaining should-fix items: ~~the VIA out-of-range classification
    (finding 3)~~ and ~~the coherent-read contract (finding 4)~~ landed; the
-   pulse key position (finding 10),
-   `RGB_LEFT_LED_COUNT` derivation (finding 11), and the dead public functions
-   (finding 9).
+   ~~pulse key position (finding 10)~~ and ~~`RGB_LEFT_LED_COUNT` derivation
+   (finding 11)~~ landed; the dead public functions (finding 9) remain.
 5. Reconcile the roadmap and the documentation gaps (finding 12).
 6. Only after software closure, run the Finding 05 and Finding 10 physical
    matrices. Finding 05's matrix is blocked on must-fix 2.
