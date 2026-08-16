@@ -294,6 +294,37 @@ folded into this fix.
 - memory gate: static RAM 49,824 B of 51,000 B, heap 212,312 B
 - stack gate: PASS, unchanged
 
+## 2026-08-16 — Implementation Pass 4: coherent-read contract
+
+Finding 4. The three helpers in `users/noah/lib/split/runtime_sync.h` now copy
+into a local staging buffer and commit to the caller's destination only after
+confirming the generation is unchanged, so a helper that returns false has
+written nothing. Cost is a few dozen bytes of stack on the render path, which is
+not one of the 43 reviewed stack paths; the reviewed worst case is unchanged at
+1,872 B.
+
+Test: `test_failed_coherent_read_leaves_the_destination_untouched()` in
+`tests/host/split_runtime_sync_test.c`.
+
+**What the test does and does not pin, stated plainly.** It covers the reachable
+failure — an in-flight publication, where the pre-check skips the copy — and is
+load-bearing for it: removing the `in_flight` pre-check fails it. It does not
+cover retry exhaustion, because that needs a full publication inside each of four
+sub-microsecond copies, which the transport cannot produce and which cannot be
+forced without adding a hook to production code. That half is closed by
+construction rather than by test.
+
+An earlier version of this test was written believing it proved the staging
+change; neutering the staging left it green, because the in-flight path never
+wrote the destination even before. The test comment now says which half it pins
+so a later reader does not draw the wrong conclusion from its passing.
+
+### Verification
+
+- `sh tests/host/run_all_host_tests.sh` — exit 0, no failures
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- stack gate PASS, worst main path 1,872 B unchanged
+
 ## Current Verdict
 
 The audit is **complete and open**. Coverage is full across the userspace. Both
@@ -307,8 +338,8 @@ outstanding.
 3. ~~Gate integrity: `rg` preflight, pd-to-core include gate, `synthetic_record.c`
    coverage, memory gate `.data` blind spot~~ — landed.
 4. Remaining should-fix items: ~~the VIA out-of-range classification
-   (finding 3)~~ landed; the coherent-read contract (finding 4), the pulse key
-   position (finding 10),
+   (finding 3)~~ and ~~the coherent-read contract (finding 4)~~ landed; the
+   pulse key position (finding 10),
    `RGB_LEFT_LED_COUNT` derivation (finding 11), and the dead public functions
    (finding 9).
 5. Reconcile the roadmap and the documentation gaps (finding 12).

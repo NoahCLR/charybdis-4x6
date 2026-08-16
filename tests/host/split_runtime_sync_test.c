@@ -1266,7 +1266,67 @@ static void test_base_publication_marks_its_generation_in_flight(void) {
     CHECK(split_runtime_sync_remote.key_preview_layer == seam_second_base_packet.key_preview_layer);
 }
 
+// The helpers advertise that a failed read leaves the caller's destination
+// untouched, so the frame renders its previous coherent snapshot.
+//
+// This pins the reachable half of that contract: an in-flight publication, where
+// the pre-check skips the copy entirely. The other half -- exhausting the retry
+// budget with a publication landing inside every attempt -- is not reachable at
+// transport timing and cannot be forced without a hook in production code, so it
+// is covered by construction (each attempt stages into a local and commits only
+// after confirming the generation) rather than by this test.
+static void test_failed_coherent_read_leaves_the_destination_untouched(void) {
+    uint8_t underlay[KEY_ORIGIN_BITMAP_SIZE];
+    uint8_t overlay[KEY_ORIGIN_BITMAP_SIZE];
+    uint8_t semantic[KEY_FEEDBACK_SEMANTIC_MAP_SIZE];
+    uint8_t visibility[KEY_ORIGIN_BITMAP_SIZE];
+    uint8_t broad_owner[KEY_FEEDBACK_BROAD_OWNER_MAP_SIZE];
+    uint8_t tap_branch[KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE];
+
+    test_reset_stubs();
+
+    memset(underlay, 0xA5, sizeof(underlay));
+    memset(overlay, 0x5A, sizeof(overlay));
+    memset(visibility, 0xA5, sizeof(visibility));
+    memset(semantic, 0x5A, sizeof(semantic));
+    memset(broad_owner, 0xA5, sizeof(broad_owner));
+    memset(tap_branch, 0x5A, sizeof(tap_branch));
+
+    // Fill the shared maps with a different pattern, so any write shows up.
+    memset(split_runtime_sync_remote.combo_underlay_bitmap, 0x11, KEY_ORIGIN_BITMAP_SIZE);
+    memset(split_runtime_sync_remote.combo_overlay_bitmap, 0x22, KEY_ORIGIN_BITMAP_SIZE);
+    memset(split_runtime_sync_remote.key_feedback_flash_visibility_bitmap, 0x33, KEY_ORIGIN_BITMAP_SIZE);
+    memset(split_runtime_sync_remote.key_feedback_semantic_map, 0x44, KEY_FEEDBACK_SEMANTIC_MAP_SIZE);
+    memset(split_runtime_sync_remote.key_feedback_broad_owner_map, 0x55, KEY_FEEDBACK_BROAD_OWNER_MAP_SIZE);
+    memset(split_runtime_sync_remote.key_feedback_tap_branch_map, 0x66, KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE);
+
+    // Odd generation means a publication is in flight for every attempt.
+    split_runtime_sync_remote.combo_generation                 = 1u;
+    split_runtime_sync_remote.key_feedback_semantic_generation = 1u;
+    split_runtime_sync_remote.key_feedback_branch_generation   = 1u;
+
+    CHECK(!split_runtime_sync_remote_read_combo(underlay, overlay));
+    CHECK(!split_runtime_sync_remote_read_key_feedback_semantic(visibility, semantic));
+    CHECK(!split_runtime_sync_remote_read_key_feedback_branch(broad_owner, tap_branch));
+
+    for (uint8_t index = 0; index < KEY_ORIGIN_BITMAP_SIZE; index++) {
+        CHECK(underlay[index] == 0xA5);
+        CHECK(overlay[index] == 0x5A);
+        CHECK(visibility[index] == 0xA5);
+    }
+    for (uint8_t index = 0; index < KEY_FEEDBACK_SEMANTIC_MAP_SIZE; index++) {
+        CHECK(semantic[index] == 0x5A);
+    }
+    for (uint8_t index = 0; index < KEY_FEEDBACK_BROAD_OWNER_MAP_SIZE; index++) {
+        CHECK(broad_owner[index] == 0xA5);
+    }
+    for (uint8_t index = 0; index < KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE; index++) {
+        CHECK(tap_branch[index] == 0x5A);
+    }
+}
+
 int main(void) {
+    test_failed_coherent_read_leaves_the_destination_untouched();
     test_init_registers_rpcs_and_sends_initial_packets_on_master();
     test_init_registers_rpcs_without_sending_on_slave();
     test_elapsed_skips_unchanged_packets_until_heartbeat();

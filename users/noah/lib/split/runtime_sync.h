@@ -216,11 +216,17 @@ static inline void split_runtime_sync_notify_key_feedback_dirty(void) {}
 //
 // Main-context readers copy a whole domain through these helpers so a
 // publication that preempts the copy is retried instead of committed as a
-// mixture of two packets. A helper returns false only when it could not
-// capture a settled generation within the retry budget; the caller then keeps
-// the copy it already holds and renders the last coherent snapshot.
+// mixture of two packets. Each attempt copies into a local staging buffer and
+// only commits to the caller's destination once the generation is confirmed
+// unchanged, so a helper that returns false has written nothing at all and the
+// caller keeps the copy it already holds. Staging costs a few dozen bytes of
+// stack on the render path, which is what makes "a failed read leaves your
+// buffer alone" true rather than merely intended.
 
 static inline bool split_runtime_sync_remote_read_combo(uint8_t *out_underlay_bitmap, uint8_t *out_overlay_bitmap) {
+    uint8_t staged_underlay[KEY_ORIGIN_BITMAP_SIZE];
+    uint8_t staged_overlay[KEY_ORIGIN_BITMAP_SIZE];
+
     for (uint8_t attempt = 0; attempt < NOAH_RUNTIME_PUBLICATION_READ_ATTEMPTS; attempt++) {
         uint8_t generation = noah_runtime_publication_observe(&split_runtime_sync_remote.combo_generation);
 
@@ -228,10 +234,12 @@ static inline bool split_runtime_sync_remote_read_combo(uint8_t *out_underlay_bi
             continue;
         }
 
-        key_origin_bitmap_copy(out_underlay_bitmap, split_runtime_sync_remote.combo_underlay_bitmap);
-        key_origin_bitmap_copy(out_overlay_bitmap, split_runtime_sync_remote.combo_overlay_bitmap);
+        key_origin_bitmap_copy(staged_underlay, split_runtime_sync_remote.combo_underlay_bitmap);
+        key_origin_bitmap_copy(staged_overlay, split_runtime_sync_remote.combo_overlay_bitmap);
 
         if (noah_runtime_publication_settled(&split_runtime_sync_remote.combo_generation, generation)) {
+            key_origin_bitmap_copy(out_underlay_bitmap, staged_underlay);
+            key_origin_bitmap_copy(out_overlay_bitmap, staged_overlay);
             return true;
         }
     }
@@ -240,6 +248,9 @@ static inline bool split_runtime_sync_remote_read_combo(uint8_t *out_underlay_bi
 }
 
 static inline bool split_runtime_sync_remote_read_key_feedback_semantic(uint8_t *out_flash_visibility_bitmap, uint8_t *out_semantic_map) {
+    uint8_t staged_visibility[KEY_ORIGIN_BITMAP_SIZE];
+    uint8_t staged_semantic[KEY_FEEDBACK_SEMANTIC_MAP_SIZE];
+
     for (uint8_t attempt = 0; attempt < NOAH_RUNTIME_PUBLICATION_READ_ATTEMPTS; attempt++) {
         uint8_t generation = noah_runtime_publication_observe(&split_runtime_sync_remote.key_feedback_semantic_generation);
 
@@ -247,10 +258,12 @@ static inline bool split_runtime_sync_remote_read_key_feedback_semantic(uint8_t 
             continue;
         }
 
-        key_origin_bitmap_copy(out_flash_visibility_bitmap, split_runtime_sync_remote.key_feedback_flash_visibility_bitmap);
-        memcpy(out_semantic_map, split_runtime_sync_remote.key_feedback_semantic_map, KEY_FEEDBACK_SEMANTIC_MAP_SIZE);
+        key_origin_bitmap_copy(staged_visibility, split_runtime_sync_remote.key_feedback_flash_visibility_bitmap);
+        memcpy(staged_semantic, split_runtime_sync_remote.key_feedback_semantic_map, KEY_FEEDBACK_SEMANTIC_MAP_SIZE);
 
         if (noah_runtime_publication_settled(&split_runtime_sync_remote.key_feedback_semantic_generation, generation)) {
+            key_origin_bitmap_copy(out_flash_visibility_bitmap, staged_visibility);
+            memcpy(out_semantic_map, staged_semantic, KEY_FEEDBACK_SEMANTIC_MAP_SIZE);
             return true;
         }
     }
@@ -259,6 +272,9 @@ static inline bool split_runtime_sync_remote_read_key_feedback_semantic(uint8_t 
 }
 
 static inline bool split_runtime_sync_remote_read_key_feedback_branch(uint8_t *out_broad_owner_map, uint8_t *out_tap_branch_map) {
+    uint8_t staged_broad_owner[KEY_FEEDBACK_BROAD_OWNER_MAP_SIZE];
+    uint8_t staged_tap_branch[KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE];
+
     for (uint8_t attempt = 0; attempt < NOAH_RUNTIME_PUBLICATION_READ_ATTEMPTS; attempt++) {
         uint8_t generation = noah_runtime_publication_observe(&split_runtime_sync_remote.key_feedback_branch_generation);
 
@@ -266,10 +282,12 @@ static inline bool split_runtime_sync_remote_read_key_feedback_branch(uint8_t *o
             continue;
         }
 
-        memcpy(out_broad_owner_map, split_runtime_sync_remote.key_feedback_broad_owner_map, KEY_FEEDBACK_BROAD_OWNER_MAP_SIZE);
-        memcpy(out_tap_branch_map, split_runtime_sync_remote.key_feedback_tap_branch_map, KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE);
+        memcpy(staged_broad_owner, split_runtime_sync_remote.key_feedback_broad_owner_map, KEY_FEEDBACK_BROAD_OWNER_MAP_SIZE);
+        memcpy(staged_tap_branch, split_runtime_sync_remote.key_feedback_tap_branch_map, KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE);
 
         if (noah_runtime_publication_settled(&split_runtime_sync_remote.key_feedback_branch_generation, generation)) {
+            memcpy(out_broad_owner_map, staged_broad_owner, KEY_FEEDBACK_BROAD_OWNER_MAP_SIZE);
+            memcpy(out_tap_branch_map, staged_tap_branch, KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE);
             return true;
         }
     }
