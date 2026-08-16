@@ -87,6 +87,7 @@ static uint16_t                   noah_qmk_via_retry_ms;
 static bool                       noah_qmk_via_role_known;
 static bool                       noah_qmk_via_was_master;
 static uint16_t                   noah_qmk_via_retry_count;
+static uint8_t                    noah_qmk_via_session_reject_count;
 static uint16_t                   noah_qmk_via_rejected_frame_count;
 static uint16_t                   noah_qmk_via_conflict_count;
 static noah_qmk_via_sync_status_t noah_qmk_via_last_error;
@@ -149,21 +150,47 @@ static void noah_qmk_via_schedule_retry(uint32_t now) {
 }
 
 static void noah_qmk_via_schedule_progress(uint32_t now) {
-    noah_qmk_via_retry_ms        = VIA_SPLIT_SYNC_RETRY_INITIAL_MS;
-    noah_qmk_via_next_attempt_at = now;
+    noah_qmk_via_retry_ms             = VIA_SPLIT_SYNC_RETRY_INITIAL_MS;
+    noah_qmk_via_next_attempt_at      = now;
+    noah_qmk_via_session_reject_count = 0u;
 }
 
-// A peer that reset mid-transfer has forgotten the snapshot session and answers
-// SNAPSHOT_REQUIRED to every further chunk or commit. Retrying the same frame
-// can never clear that, because only a new SNAPSHOT_BEGIN reopens a session, so
-// the transfer restarts from metadata. The backoff is kept so a peer that is
-// persistently unable to accept a session does not spin.
+// SNAPSHOT_REQUIRED covers two very different situations, and treating them
+// alike breaks one of them.
+//
+// Transient: the peer is briefly unable to serve this frame -- its digest is
+// still being computed (noah_qmk_via_local_state_is_clean), a commit arrived
+// before the last chunk registered, or its own state is momentarily dirty.
+// Retrying the same frame clears these, and restarting the session instead
+// re-enters metadata, gets rejected again for the same reason, and livelocks.
+//
+// Terminal: the peer reset and forgot the session entirely. No amount of
+// retrying the same frame can clear that, because only a new SNAPSHOT_BEGIN
+// reopens a session.
+//
+// The two are indistinguishable in a single response, so retry first and only
+// renegotiate once a peer has rejected repeatedly. That keeps the self-healing
+// behavior for transient rejections and still escapes a genuinely lost session.
+#    ifndef VIA_SPLIT_SYNC_SESSION_REJECT_LIMIT
+#        define VIA_SPLIT_SYNC_SESSION_REJECT_LIMIT 3u
+#    endif
+
+_Static_assert(VIA_SPLIT_SYNC_SESSION_REJECT_LIMIT > 0u, "VIA sync session reject limit must allow at least one retry before renegotiating");
+
 static bool noah_qmk_via_response_requires_new_session(const noah_qmk_via_sync_frame_t *response) {
     return response && response->status == NOAH_QMK_VIA_SYNC_STATUS_SNAPSHOT_REQUIRED;
 }
 
-static void noah_qmk_via_abandon_session(uint32_t now) {
-    noah_qmk_via_tx_phase = NOAH_QMK_VIA_TX_METADATA;
+static void noah_qmk_via_note_session_reject(uint32_t now) {
+    if (noah_qmk_via_session_reject_count < UINT8_MAX) {
+        noah_qmk_via_session_reject_count++;
+    }
+
+    if (noah_qmk_via_session_reject_count >= VIA_SPLIT_SYNC_SESSION_REJECT_LIMIT) {
+        noah_qmk_via_session_reject_count = 0u;
+        noah_qmk_via_tx_phase             = NOAH_QMK_VIA_TX_METADATA;
+    }
+
     noah_qmk_via_schedule_retry(now);
 }
 
@@ -628,7 +655,7 @@ static void noah_qmk_via_master_push_chunk_tick(uint32_t now) {
     }
     if (response.kind != NOAH_QMK_VIA_SYNC_MESSAGE_ACK || response.status != NOAH_QMK_VIA_SYNC_STATUS_OK || response.generation != request.generation || response.digest != request.digest) {
         if (noah_qmk_via_response_requires_new_session(&response)) {
-            noah_qmk_via_abandon_session(now);
+            noah_qmk_via_note_session_reject(now);
             return;
         }
         noah_qmk_via_schedule_retry(now);
@@ -652,7 +679,7 @@ static void noah_qmk_via_master_push_commit_tick(uint32_t now) {
     }
     if (response.kind != NOAH_QMK_VIA_SYNC_MESSAGE_ACK || response.status != NOAH_QMK_VIA_SYNC_STATUS_OK || response.generation != request.generation || response.digest != request.digest) {
         if (noah_qmk_via_response_requires_new_session(&response)) {
-            noah_qmk_via_abandon_session(now);
+            noah_qmk_via_note_session_reject(now);
             return;
         }
         noah_qmk_via_schedule_retry(now);
@@ -690,7 +717,7 @@ static void noah_qmk_via_master_pull_chunk_tick(uint32_t now) {
     }
     if (response.kind != NOAH_QMK_VIA_SYNC_MESSAGE_PUSH_CHUNK || response.status != NOAH_QMK_VIA_SYNC_STATUS_OK || response.region != request.region || response.generation != request.generation || response.offset != request.offset || response.region_length != capacity || response.digest != request.digest || !noah_qmk_via_storage_region_write(response.region, response.offset, response.payload, response.payload_length)) {
         if (noah_qmk_via_response_requires_new_session(&response)) {
-            noah_qmk_via_abandon_session(now);
+            noah_qmk_via_note_session_reject(now);
             return;
         }
         noah_qmk_via_schedule_retry(now);
@@ -867,6 +894,7 @@ void noah_qmk_via_split_sync_init(void) {
     noah_qmk_via_retry_ms                 = VIA_SPLIT_SYNC_RETRY_INITIAL_MS;
     noah_qmk_via_role_known               = false;
     noah_qmk_via_retry_count              = 0u;
+    noah_qmk_via_session_reject_count     = 0u;
     noah_qmk_via_rejected_frame_count     = 0u;
     noah_qmk_via_conflict_count           = 0u;
     noah_qmk_via_last_error               = NOAH_QMK_VIA_SYNC_STATUS_OK;

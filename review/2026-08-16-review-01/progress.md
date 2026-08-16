@@ -502,6 +502,58 @@ as above — find the precise defect, fix it, keep the speed.
    `474651bc` restarts the session on a status that also occurs benignly.
    Unproven, and it is this session's own change.
 
+## 2026-08-16 — Hardware regression 2: VIA edits stop reaching the slave
+
+Reported from hardware: VIA changes no longer replicate, so slave RGB layer
+colors do not pick up newly mapped keys. Working on `dev`.
+
+**Cause, and it was this session's own change.** `474651bc` made any
+`SNAPSHOT_REQUIRED` response abandon the session and restart from metadata. That
+status is not only "session lost". `noah_qmk_via_handle_pull_chunk()` returns it
+whenever `noah_qmk_via_local_state_is_clean()` is false, which includes
+`!shared.digest_valid` — the peer merely still computing its digest — and
+`noah_qmk_via_handle_snapshot_commit()` returns it for `!all_received`. Those are
+transient and clear on a retry.
+
+Restarting instead re-enters metadata, is rejected again for the same reason, and
+the transfer never completes. A self-healing retry became a livelock.
+
+**Fix.** Retry first; renegotiate only after
+`VIA_SPLIT_SYNC_SESSION_REJECT_LIMIT` (3) consecutive rejections, with the
+counter cleared on any progress and at init. Transient rejections keep their
+pre-existing self-healing behavior, and a genuinely lost session still escapes in
+bounded time.
+
+**Tests.** `test_transient_peer_rejection_is_retried_without_renegotiating()`
+compares the same push with and without transient rejections and requires the
+session count to be identical. The fixture peer is permanently dirty and opens
+sessions on its own, so a raw begin count is not a stable invariant — the same
+trap that made the first version of the session-loss test pass against broken
+code. Load-bearing: setting the reject limit to 1, which is exactly the shipped
+regression, fails it.
+
+**Correction to an earlier claim.** Removing renegotiation entirely now fails no
+test. `noah_qmk_via_local_digest_tick()` also resets the phase to metadata, so it
+provides a second recovery path. The "retries one chunk at 1 Hz forever, escape
+requires a reboot" characterization in this review's must-fix 2 is therefore
+stronger than the evidence supports: renegotiation bounds the recovery time
+rather than being the only way out. The session-loss test passes either way and
+is not load-bearing for that logic. Worth re-deriving on hardware before the
+Finding 05 matrix rather than trusting the original wording.
+
+### Verification
+
+- `sh tests/host/run_all_host_tests.sh` — exit 0
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- stack gate PASS; static RAM 49,824 B of 51,000 B
+
+### Still open
+
+Tap-window white flash missing on the slave. Hypothesis unchanged and still
+unproven: `6a9285f3` changed per-domain sends from continue-on-failure to
+return-on-first-failure with a tick-wide backoff. Not yet investigated with the
+rigor applied to the other two.
+
 ## Current Verdict
 
 The audit is **complete**, and every software finding it raised is closed: both

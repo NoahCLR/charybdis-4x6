@@ -49,6 +49,10 @@ static bool             drop_after_apply;
 static uint16_t         peer_session_lost_at;
 static bool             peer_session_active;
 static uint16_t         peer_begin_count;
+// A peer that is briefly unable to serve a chunk -- digest still computing, own
+// state momentarily dirty -- answers SNAPSHOT_REQUIRED without having lost its
+// session. Retrying clears it; renegotiating does not.
+static uint8_t          peer_transient_rejects;
 static test_rpc_mode_t  rpc_mode;
 static slave_callback_t registered_callback;
 
@@ -113,6 +117,7 @@ static void test_reset(void) {
     peer_session_lost_at      = 0u;
     peer_session_active       = false;
     peer_begin_count          = 0u;
+    peer_transient_rejects    = 0u;
     rpc_mode                  = TEST_RPC_EQUAL;
     registered_callback       = NULL;
 }
@@ -275,6 +280,12 @@ bool transaction_rpc_exec(int8_t transaction_id, uint8_t request_size, const voi
     } else if (request.kind == NOAH_QMK_VIA_SYNC_MESSAGE_PUSH_CHUNK) {
         uint8_t *destination;
 
+        if (peer_transient_rejects > 0u) {
+            peer_transient_rejects--;
+            response = (noah_qmk_via_sync_frame_t){.kind = NOAH_QMK_VIA_SYNC_MESSAGE_ERROR, .status = NOAH_QMK_VIA_SYNC_STATUS_SNAPSHOT_REQUIRED, .generation = request.generation, .digest = request.digest};
+            encode_response(&response, response_size, response_data);
+            return true;
+        }
         if (peer_session_lost_at != 0u && rpc_count >= peer_session_lost_at) {
             peer_session_active  = false;
             peer_session_lost_at = 0u;
@@ -459,6 +470,36 @@ static void test_peer_losing_snapshot_session_mid_push_renegotiates(void) {
     // this stays false however long it runs.
     CHECK(peer_session_active);
     CHECK(memcmp(peer_keymap, local_keymap, sizeof(local_keymap)) == 0);
+}
+
+// A transient rejection must be retried, not answered with a whole new session.
+// Restarting re-enters metadata, is rejected again for the same reason, and the
+// transfer never completes -- which is how VIA edits stopped reaching the slave.
+//
+// The peer in this fixture is permanently dirty, so it opens fresh sessions on
+// its own and a raw begin count is not a stable invariant. Compare the same run
+// with and without transient rejections instead: retrying costs no extra
+// sessions, renegotiating costs one per rejection.
+static uint16_t run_push_with_transient_rejects(uint8_t rejects) {
+    test_reset();
+    rpc_mode = TEST_RPC_PEER_DIRTY;
+    noah_qmk_via_split_sync_init();
+    local_keymap[1] = 0x77u;
+    noah_qmk_via_split_sync_note_mutation(NOAH_QMK_VIA_COMMAND_EFFECT_SPLIT_MIRROR);
+
+    scan_many(0u, 400u);
+    peer_transient_rejects = rejects;
+    scan_many(400u, 4000u);
+
+    CHECK(memcmp(peer_keymap, local_keymap, sizeof(local_keymap)) == 0);
+    return peer_begin_count;
+}
+
+static void test_transient_peer_rejection_is_retried_without_renegotiating(void) {
+    uint16_t baseline_begins = run_push_with_transient_rejects(0u);
+    uint16_t rejected_begins = run_push_with_transient_rejects(2u);
+
+    CHECK(rejected_begins == baseline_begins);
 }
 
 static void test_newer_peer_is_pulled_and_accepted(void) {
@@ -714,6 +755,7 @@ int main(void) {
     test_local_mutation_commits_then_pushes_complete_snapshot();
     test_each_outbound_boundary_recovers_from_loss();
     test_peer_losing_snapshot_session_mid_push_renegotiates();
+    test_transient_peer_rejection_is_retried_without_renegotiating();
     test_newer_peer_is_pulled_and_accepted();
     test_equal_generation_digest_conflict_makes_master_advance_and_push();
     test_role_change_forces_new_metadata_session();
