@@ -365,7 +365,7 @@ Authored key-feedback LED groups repaint after the feedback locality render insi
 | `VIA_MACRO_8` | `{KC_LSFT,KC_LGUI,KC_V}` | `LAYER_SYM @ VIA8` |
 | `VIA_MACRO_9` | `{KC_LSFT,KC_LGUI,KC_P}` | `LAYER_SYM @ VIA9` |
 | `VIA_MACRO_10` | `{KC_LGUI,KC_A}{50}{KC_LGUI,KC_C}` | `G(KC_C) double tap` |
-| `VIA_MACRO_11` | `{KC_LEFT_GUI,KC_LEFT_SHIFT,KC_DOT}` | `LAYER_SYM @ VIA11` |
+| `VIA_MACRO_11` | `{KC_LGUI,KC_LSFT,KC_DOT}` | `LAYER_SYM @ VIA11` |
 
 ### Hardcoded Macros
 

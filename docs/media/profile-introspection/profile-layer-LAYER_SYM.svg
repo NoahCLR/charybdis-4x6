@@ -192,8 +192,8 @@
     <text x="395.0" y="353.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">VIA9</text>
   </g>
   <g transform="rotate(0 727.0 353.0)">
-    <rect x="698.0" y="324.0" width="58" height="58" rx="7" fill="#777777" stroke="#b8bab5" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="727.0" y="353.0" fill="#ffffff" fill-opacity="0.72" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">TRNS</text>
+    <rect x="698.0" y="324.0" width="58" height="58" rx="7" fill="#0006ff" stroke="#0000e3" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="727.0" y="353.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">P-</text>
   </g>
   <g transform="rotate(0 793.0 353.0)">
     <rect x="764.0" y="324.0" width="58" height="58" rx="7" fill="#777777" stroke="#b8bab5" stroke-width="1.5" filter="url(#shadow)"/>
@@ -228,8 +228,8 @@
     <text x="497.0" y="441.0" fill="#ffffff" fill-opacity="0.72" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">TRNS</text>
   </g>
   <g transform="rotate(-17 605.0 441.0)">
-    <rect x="576.0" y="412.0" width="58" height="58" rx="7" fill="#777777" stroke="#b8bab5" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="605.0" y="441.0" fill="#ffffff" fill-opacity="0.72" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">TRNS</text>
+    <rect x="576.0" y="412.0" width="58" height="58" rx="7" fill="#0006ff" stroke="#0000e3" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="605.0" y="441.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">P.</text>
   </g>
   <g transform="rotate(-10 677.0 433.0)">
     <rect x="648.0" y="404.0" width="58" height="58" rx="7" fill="#777777" stroke="#b8bab5" stroke-width="1.5" filter="url(#shadow)"/>

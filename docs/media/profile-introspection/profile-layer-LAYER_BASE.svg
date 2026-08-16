@@ -270,7 +270,9 @@
   </g>
   <g transform="rotate(10 425.0 433.0)">
     <rect x="396.0" y="404.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="425.0" y="433.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">SPC</text>
+    <line x1="404.0" y1="441.4" x2="446.0" y2="441.4" stroke="#f7f7f4" stroke-opacity="0.42" stroke-width="1"/>
+    <text x="425.0" y="428.5" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">SPC</text>
+    <text x="425.0" y="452.8" fill="#f7f7f4" fill-opacity="0.78" font-size="8.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="700">NUM</text>
   </g>
   <g transform="rotate(17 497.0 441.0)">
     <rect x="468.0" y="412.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
