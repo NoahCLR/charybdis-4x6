@@ -9,6 +9,7 @@
 #    include "noah_keymap_ids.h"
 #    include "macro_payload.h"
 #    include "via_macro_provider.h"
+#    include "../compat/qmk_via_split_mirror.h"
 #    include "../compat/qmk_via_split_sync.h"
 #    include "../compat/qmk_via_storage_contract.h"
 #    include "../rgb/core/rgb_runtime.h"
@@ -226,6 +227,9 @@ bool via_command_kb(uint8_t *data, uint8_t length) {
         via_macro_seed_last_succeeded = false;
     }
     if (effects & NOAH_QMK_VIA_COMMAND_EFFECT_SPLIT_MIRROR) {
+        // Write-through first so the other half is in step immediately, then
+        // note the mutation so the durable layer still owns recovery.
+        noah_qmk_via_split_mirror_command(data, length);
         noah_qmk_via_split_sync_note_mutation(effects);
     }
 

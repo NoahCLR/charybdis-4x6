@@ -607,6 +607,61 @@ announcement fails it.
 All three reported hardware regressions now have an identified cause and a fix.
 None has been confirmed on hardware yet.
 
+## 2026-08-16 — Hardware regression 2, second attempt: restore write-through mirroring
+
+The first attempt was wrong. Confirmed on hardware: the fade and tap-window
+fixes worked, the VIA one changed nothing.
+
+**What the earlier attempts got wrong.** `474651bc` blamed `SNAPSHOT_REQUIRED`
+handling; hardware disproved it. Then a `recovery_required` latch looked like the
+cause, but the fix for it broke
+`test_two_dirty_halves_reseed_current_master_before_authority`, which showed the
+design does have recovery paths — pull from a newer peer, and reseed defaults
+when both halves are dirty. That attempt was reverted rather than shipped.
+
+**The actual difference from `dev`.** `dev` mirrored every VIA storage command to
+the other half as it happened: `via_command_kb()` called
+`noah_qmk_via_split_sync_command()`, which forwarded the raw command over RPC for
+the peer to apply. 99 lines, no state machine. `f881e8a3` replaced that with the
+durable snapshot/digest/generation reconciliation and removed the immediate path.
+
+Reconciliation is the right mechanism for surviving disconnects and power cycles
+and the wrong one for a single live keymap edit: until a session completes, the
+slave keeps rendering the old keycodes.
+
+**Fix.** `users/noah/lib/compat/qmk_via_split_mirror.c` restores write-through on
+its own transaction, `PUT_VIA_KEYMAP_MIRROR`, deliberately independent of the
+reconciliation protocol so neither can block or corrupt the other. The receiver
+applies the command, invalidates the RGB layer maps and macro provider, and
+restarts its local digest so the durable layer does not advertise a stale one.
+`via_command_kb()` mirrors first, then notes the mutation, so reconciliation
+still owns durability and recovery.
+
+Sending is best effort by design: a dropped mirror leaves the halves briefly out
+of step and reconciliation repairs it, whereas retrying would put storage writes
+on the scan path.
+
+**Tests.** `test_keymap_write_mirrors_immediately_and_still_reconciles()` requires
+both paths to run for one edit, and `test_non_mutating_command_is_not_mirrored()`
+keeps the mirror from becoming a second, looser classification path.
+Load-bearing: removing the mirror call reproduces the regressed state and fails.
+
+**Cost.** Static RAM 49,824 to 49,836 B. The worst reviewed main path moved 1,872
+to 1,880 B because a second caller of `dynamic_keymap_reset` stopped LTO inlining
+`nvm_dynamic_keymap_update_keycode` into it, so the reviewed path in
+`tools/firmware_stack_budget.json` gained that frame. Still inside the 1,920 B
+budget.
+
+### Verification
+
+- `sh tests/host/run_all_host_tests.sh` — exit 0
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `python3 tools/profile_introspect.py --check`
+- memory gate: static RAM 49,836 B of 51,000 B, heap 212,304 B
+- stack gate PASS, worst main path 1,880 B of 1,920 B
+
+Not yet confirmed on hardware.
+
 ## Current Verdict
 
 The audit is **complete**, and every software finding it raised is closed: both

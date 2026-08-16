@@ -209,7 +209,7 @@
         },
         {
           "name": "matrix scan VIA two-dirty default recovery",
-          "functions": ["main", "matrix_scan", "eeconfig_init_via", "dynamic_keymap_reset", "eeprom_update_byte", "wear_leveling_write"]
+          "functions": ["main", "matrix_scan", "eeconfig_init_via", "dynamic_keymap_reset", "nvm_dynamic_keymap_update_keycode", "eeprom_update_byte", "wear_leveling_write"]
         },
         {
           "name": "pointing task dragscroll single-sample handler",

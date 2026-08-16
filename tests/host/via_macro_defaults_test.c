@@ -24,6 +24,9 @@ static bool     fake_via_eeprom_valid;
 static uint8_t  rgb_invalidate_count;
 static uint8_t  split_sync_pending_count;
 static uint8_t  split_sync_pending_effects;
+static uint8_t  split_mirror_count;
+static uint8_t  split_mirror_last_command;
+static uint8_t  split_mirror_last_length;
 static uint8_t  dynamic_keymap_set_buffer_calls;
 static uint8_t  macro_payload_compile_calls;
 static uint8_t  macro_payload_encode_ir_write_calls;
@@ -53,6 +56,9 @@ static void test_reset_state(void) {
     rgb_invalidate_count                = 0;
     split_sync_pending_count            = 0;
     split_sync_pending_effects          = 0;
+    split_mirror_count                  = 0;
+    split_mirror_last_command           = 0;
+    split_mirror_last_length            = 0;
     dynamic_keymap_set_buffer_calls     = 0;
     macro_payload_compile_calls         = 0;
     macro_payload_encode_ir_write_calls = 0;
@@ -198,6 +204,19 @@ void noah_qmk_via_split_sync_note_mutation(uint8_t effects) {
     split_sync_pending_effects |= effects;
 }
 
+// The write-through mirror runs alongside the durable layer, so a mirrored
+// command must reach the other half immediately and still be noted for
+// reconciliation.
+void noah_qmk_via_split_mirror_command(const uint8_t *data, uint8_t length) {
+    if (!data || length == 0u) {
+        return;
+    }
+
+    split_mirror_count++;
+    split_mirror_last_command = data[0];
+    split_mirror_last_length  = length;
+}
+
 static void test_post_init_seeds_defaults_when_via_eeprom_is_invalid(void) {
     test_reset_state();
     fake_via_eeprom_valid = false;
@@ -286,6 +305,36 @@ static void test_keymap_reset_commands_invalidate_rgb_and_request_split_sync(voi
     CHECK(rgb_invalidate_count == 1u);
 }
 
+// A VIA edit has to reach the other half straight away. The durable
+// reconciliation exists to survive disconnects and power cycles, and a session
+// that is deferred or stalled leaves the slave rendering the old keycodes --
+// which is exactly what happened when the mirror was removed. Both must run.
+static void test_keymap_write_mirrors_immediately_and_still_reconciles(void) {
+    uint8_t set_keycode_cmd[] = {id_dynamic_keymap_set_keycode, 1, 2, 3, 0, 4};
+
+    test_reset_state();
+
+    CHECK(!via_command_kb(set_keycode_cmd, (uint8_t)sizeof(set_keycode_cmd)));
+
+    CHECK(split_mirror_count == 1u);
+    CHECK(split_mirror_last_command == id_dynamic_keymap_set_keycode);
+    CHECK(split_mirror_last_length == (uint8_t)sizeof(set_keycode_cmd));
+    CHECK(split_sync_pending_count == 1u);
+}
+
+// A command that mutates nothing must not be mirrored either, so the mirror
+// cannot become a second, looser classification path.
+static void test_non_mutating_command_is_not_mirrored(void) {
+    uint8_t read_only_cmd[] = {0x01};
+
+    test_reset_state();
+
+    CHECK(!via_command_kb(read_only_cmd, (uint8_t)sizeof(read_only_cmd)));
+
+    CHECK(split_mirror_count == 0u);
+    CHECK(split_sync_pending_count == 0u);
+}
+
 static void test_eeprom_reset_invalidates_rgb_and_reseeds_on_scan(void) {
     uint8_t cmd[] = {id_eeprom_reset};
 
@@ -365,6 +414,8 @@ int main(void) {
     test_recovery_reseed_reports_completion_without_rgb_side_effect();
     test_macro_reset_command_defers_reseed_to_matrix_scan();
     test_keymap_reset_commands_invalidate_rgb_and_request_split_sync();
+    test_keymap_write_mirrors_immediately_and_still_reconciles();
+    test_non_mutating_command_is_not_mirrored();
     test_eeprom_reset_invalidates_rgb_and_reseeds_on_scan();
     test_provider_encode_write_uses_cached_load_state();
     test_provider_encode_write_reloads_after_invalidate();

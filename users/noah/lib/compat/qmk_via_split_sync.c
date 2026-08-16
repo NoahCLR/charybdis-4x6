@@ -907,6 +907,10 @@ void noah_qmk_via_split_sync_init(void) {
     transaction_register_rpc(PUT_VIA_KEYMAP_SYNC, noah_qmk_via_split_sync_rpc);
 }
 
+void noah_qmk_via_split_sync_note_local_storage_changed(void) {
+    noah_qmk_via_local_digest_start();
+}
+
 void noah_qmk_via_split_sync_note_mutation(uint8_t effects) {
     if (effects == NOAH_QMK_VIA_COMMAND_EFFECT_NONE || !noah_qmk_via_sync_state_begin_mutation()) {
         return;
