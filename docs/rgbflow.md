@@ -8,64 +8,67 @@ Timing names are the authored fields on a `key_behaviors[]` row. All four are
 row-level, shared by every `tap_counts[]` entry on that key. Defaults live in
 the keymap [`config.h`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h).
 
-## Part one: reaching a tier
+## Part one: two clocks from the same press
 
-Which tap count wins, and then which tier of that count the key is sitting in.
+Every press starts two independent clocks, both measured from that press. One
+decides whether the tap count is final. The other decides which tier of that
+count you are in. They are not sequential, and on a key where the two terms
+differ they interleave in either order.
 
 ```mermaid
 flowchart TD
-    ONE["one tap<br>dark"]
-    MANY["two or more taps<br>white"]
-    PLAIN["single tap confirmed<br>dark"]
-    CONF["tap count confirmed<br>colour for that count<br>held for rgb_branch_confirm_term"]
-    STILL{"still holding<br>the key?"}
-    WAIT["holding<br>not past tap_hold_term yet<br>dark"]
-    HOLD["hold tier reached<br>see part two"]
-    LONG["long hold tier reached<br>see part two"]
-    TSENT["tap tier<br>see part two"]
+    TAP["a tap lands<br>this press starts both clocks below"]
+    TAP -->|"you tap again within multi_tap_term"| TAP
 
-    ONE -->|"tap again within multi_tap_term"| MANY
-    MANY -->|"tap again within multi_tap_term"| MANY
+    TAP --> COUNTING
+    TAP --> BELOW
 
-    ONE -->|"multi_tap_term runs out"| PLAIN
-    MANY -->|"multi_tap_term runs out"| CONF
+    subgraph COUNT["count clock, from this press"]
+        COUNTING["multi_tap_term running<br>one tap so far: dark<br>two or more so far: white"]
+        COUNTING -->|"multi_tap_term runs out"| CONF["count is final<br>colour for that count<br>for rgb_branch_confirm_term"]
+    end
 
-    PLAIN --> STILL
-    CONF --> STILL
+    subgraph TIER["tier clock, from this press"]
+        BELOW["below tap_hold_term<br>nothing of its own to say"]
+        BELOW -->|"you let go"| TT["tap tier<br>see part two"]
+        BELOW ==>|"past tap_hold_term"| HT["hold tier live<br>see part two"]
+        HT ==>|"past longer_hold_term"| LT["long hold tier live<br>see part two"]
+    end
 
-    STILL -->|"no, already let go"| TSENT
-    STILL -->|"yes"| WAIT
-
-    WAIT -->|"let go"| TSENT
-    WAIT ==>|"keep holding past tap_hold_term"| HOLD
-
-    HOLD ==>|"keep holding past longer_hold_term"| LONG
-
-    style ONE fill:#DDE3EA,stroke:#5A6673,color:#1A1F26
-    style MANY fill:#FFFFFF,stroke:#5A6673,color:#1A1F26
-    style PLAIN fill:#DDE3EA,stroke:#5A6673,color:#1A1F26
+    style TAP fill:#EDF0F4,stroke:#5A6673,color:#1A1F26
+    style COUNTING fill:#FFFFFF,stroke:#5A6673,color:#1A1F26
     style CONF fill:#B400FF,stroke:#6E0099,color:#FFFFFF
-    style STILL fill:#EDF0F4,stroke:#5A6673,color:#1A1F26
-    style WAIT fill:#DDE3EA,stroke:#5A6673,color:#1A1F26
-    style HOLD fill:#FF6C00,stroke:#A34500,color:#1A1F26
-    style LONG fill:#0084FF,stroke:#00539E,color:#FFFFFF
-    style TSENT fill:#00FF00,stroke:#009E00,color:#1A1F26
+    style BELOW fill:#DDE3EA,stroke:#5A6673,color:#1A1F26
+    style TT fill:#00FF00,stroke:#009E00,color:#1A1F26
+    style HT fill:#FF6C00,stroke:#A34500,color:#1A1F26
+    style LT fill:#0084FF,stroke:#00539E,color:#FFFFFF
 ```
 
 Thick arrows are the board advancing on its own when a term runs out. Thin
 arrows are you releasing the key.
 
-The confirmed-count node is filled violet, which is the two-tap color. Three
-taps is blue, four is azure, and deeper counts clamp to the last color in
-`RGB_TAP_BRANCH_COLORS(...)`. A single tap confirms without any color, because
+When both clocks have something to say at once, precedence decides what you
+actually see: the count colour outranks the tier colour, which outranks white.
+So on a key whose `tap_hold_term` is shorter than its `multi_tap_term`, holding
+the second tap reads white, then orange when the tier clock crosses, then the
+count colour when the count clock runs out. Each transition is honest about
+what just became true.
+
+The tier clock says which action is selected. The count clock says when it is
+allowed to fire: the action waits out `rgb_branch_confirm_term` after the count
+becomes final. So a quick double tap selects its action at the release and sends
+it after the count colour has been shown.
+
+The confirmed-count node is filled violet, which is the two-tap colour. Three
+taps is blue, four is azure, and deeper counts clamp to the last colour in
+`RGB_TAP_BRANCH_COLORS(...)`. A single tap confirms without any colour, because
 `branch_confirm_mode` and `tap_commit_mode` are both restricted to non-base
 taps.
 
-The hold spine only exists when the key is still down as the count confirms.
-Tap twice and let go and the gesture ends in the tap tier; there is no hold
-tier to reach. A deeper authored branch being available does not change that.
-It keeps the question open while the window is open, and never forces a deeper
-answer.
+The tier clock only reaches a hold tier if you keep holding. Tap twice and let
+go and it ends at the tap tier. A deeper authored branch being available does
+not change that: it keeps the count question open while the window is open, and
+never forces a deeper answer.
 
 ## Part two: what the tier actually does
 

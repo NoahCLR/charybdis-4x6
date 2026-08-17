@@ -241,14 +241,27 @@ static bool key_feedback_branch_confirm_mode_allows(uint8_t tap_count) {
     }
 }
 
-// White pending feedback marks a multi-tap gesture that is still undecided.
+// The count clock is the single source of truth for which of the two tap-phase
+// colors is showing. It runs from the last tap in the series and expires one
+// multi_tap_term later; that expiry is the moment the tap count settles.
 //
-// Two conditions gate it. The tap count must be past the base single tap: one
-// tap does not show the user meant to enter a tap branch at all, so base
-// candidates stay quiet. Beyond that, something must actually still be open —
-// either a deeper authored tap branch is reachable, or this branch's hold tier
-// has not resolved yet. Once both are closed the branch is settled and the
-// white gives way to branch-confirm feedback.
+// Returned as a signed offset from the settle moment so one value distinguishes
+// all three positions: negative means the count is still open, zero or positive
+// means it has settled, and callers compare against the branch-confirm term for
+// the far edge. Signed wrap is not a concern because both terms are far below
+// INT16_MAX milliseconds.
+//
+// Deliberately independent of branch_confirming, pending_hold and release state.
+// Those describe when the *action* resolves, which happens on its own clocks and
+// through several different paths; letting them drive the display is what made
+// the count color land on the wrong instant for hold-authoring branches. See
+// docs/rgbflow.md.
+static int16_t key_feedback_tap_series_settle_offset(const tap_series_t *series) {
+    return (int16_t)(timer_read() - (uint16_t)(series->last_counted_tap_at + series->tap_term_ms));
+}
+
+// White: past the base single tap, count clock still running. The base single tap
+// stays quiet because one tap does not show the user meant to enter a tap branch.
 static bool key_feedback_tap_series_shows_pending_feedback(const tap_series_t *series) {
     if (!(series && series->active && !series->branch_confirmed && !series->branch_confirming)) {
         return false;
@@ -258,11 +271,48 @@ static bool key_feedback_tap_series_shows_pending_feedback(const tap_series_t *s
         return false;
     }
 
-    return series->authored_has_more_taps || series->pending_hold;
+    return key_feedback_tap_series_settle_offset(series) < 0;
 }
 
+// The count color answers two separate questions, and both are load bearing.
+//
+// First, as a phase indicator: the count clock has expired, so name the winner.
+// This is the one the count clock drives, and it is what makes the color land on
+// the same instant regardless of which path resolves the action.
+//
+// Second, as a pre-action indicator: an action is being held back in its
+// branch-confirm window, so name the branch before it fires. For a threshold tier
+// this is the only thing shown during that delay, so dropping it would leave the
+// board dark right before a hold or long-hold action lands.
+//
+// The two windows coincide on most keys and overlap harmlessly when they do not.
 static bool key_feedback_tap_series_shows_branch_confirmation(const tap_series_t *series) {
-    return series && series->active && series->branch_confirming && key_feedback_branch_confirm_mode_allows(series->branch_confirm_tap_count);
+    int16_t offset;
+
+    if (!(series && series->active)) {
+        return false;
+    }
+
+    if (series->branch_confirming && key_feedback_branch_confirm_mode_allows(series->branch_confirm_tap_count)) {
+        return true;
+    }
+
+    if (!key_feedback_branch_confirm_mode_allows(series->tap_count)) {
+        return false;
+    }
+
+    offset = key_feedback_tap_series_settle_offset(series);
+    return offset >= 0 && offset < (int16_t)series->branch_confirm_term_ms;
+}
+
+// Which count the color names: the action-delay window carries its own, and the
+// count-settled window uses the series count.
+static uint8_t key_feedback_tap_series_branch_confirm_count(const tap_series_t *series) {
+    if (!series) {
+        return 0u;
+    }
+
+    return series->branch_confirming ? series->branch_confirm_tap_count : series->tap_count;
 }
 
 static key_feedback_semantic_t key_feedback_semantic_for_pulse(key_feedback_pulse_kind_t kind) {
@@ -590,7 +640,7 @@ void key_feedback_tap_branch_map(uint8_t *out_map) {
         keypos_t key_pos;
 
         if (key_feedback_tap_series_shows_branch_confirmation(&state->tap_series[index]) && key_runtime_core_tap_series_key_pos(&state->tap_series[index], &key_pos)) {
-            key_feedback_apply_tap_branch_for_owner(out_map, key_pos, state->tap_series[index].branch_confirm_tap_count);
+            key_feedback_apply_tap_branch_for_owner(out_map, key_pos, key_feedback_tap_series_branch_confirm_count(&state->tap_series[index]));
         }
     }
 }
