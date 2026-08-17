@@ -185,6 +185,12 @@ bool key_behavior_has_more_taps(uint16_t keycode, uint8_t count) {
     return key_behavior_has_more_taps_in_config(key_behavior_config_lookup(keycode), count);
 }
 
+bool key_behavior_keeps_auto_mouse_anchored(uint16_t keycode) {
+    const key_behavior_t *config = key_behavior_config_lookup(keycode);
+
+    return config && config->keeps_auto_mouse_anchored;
+}
+
 bool key_behavior_future_tap_path_has_foreign_pd_mode(uint16_t keycode, uint8_t count, pd_mode_mask_t base_mode) {
     return key_behavior_future_tap_path_has_foreign_pd_mode_in_config(key_behavior_config_lookup(keycode), count, base_mode);
 }

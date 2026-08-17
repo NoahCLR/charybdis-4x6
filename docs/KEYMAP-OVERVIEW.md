@@ -207,7 +207,7 @@ No authored combos resolve entirely from keys on this layer.
 | `PINCH` | `PINCH` (`PINCH_MODE`) | `single` | `TAP_SENDS(KC_TRNS)` | `-` | `-` | `multi_tap(150)` |
 | `PINCH` | `PINCH` (`PINCH_MODE`) | `double` | `TAP_SENDS(VIA_MACRO_6)` | `PRESS_AND_HOLD_UNTIL_RELEASE(ZOOM_MODE)` | `-` | `tap_hold(150), multi_tap(150), rgb_branch_confirm(150)` |
 | `MS_BTN3` | `MS_BTN3` | `double` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(A(MS_BTN2))` | `-` | `tap_hold(150), multi_tap=100, rgb_branch_confirm(150)` |
-| `MS_BTN3` | `MS_BTN3` | `triple` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(A(MS_BTN1))` | `-` | `tap_hold(150), multi_tap=100, rgb_branch_confirm(150)` |
+| `DRAG_WINDOW` | `DRAG_WINDOW` | `single` | `TAP_SENDS(KC_TRNS)` | `PRESS_AND_HOLD_UNTIL_RELEASE(A(MS_BTN1))` | `-` | `tap_hold(150)` |
 | `VOLUME` | `VOLUME` (`VOLUME_MODE`) | `single` | `TAP_SENDS(KC_TRNS)` | `-` | `-` | `multi_tap(150)` |
 | `VOLUME` | `VOLUME` (`VOLUME_MODE`) | `double` | `TAP_SENDS(KC_MUTE)` | `-` | `-` | `multi_tap(150), rgb_branch_confirm(150)` |
 | `DRAGSCROLL` | `DRAGSCROLL` | `single` | `TAP_SENDS(KC_TRNS)` | `-` | `-` | `multi_tap(150)` |
@@ -388,7 +388,7 @@ No filled hardcoded macro slots.
 ### Shared Keycode Surfaces
 
 - Layers: `LAYER_BASE`, `LAYER_NUM`, `LAYER_SYM`, `LAYER_NAV`, `LAYER_POINTER`
-- Keymap-local custom keycodes: `RIGHT_THUMB`, `LEFT_THUMB`, `CLICK_SPAM`
+- Keymap-local custom keycodes: `RIGHT_THUMB`, `LEFT_THUMB`, `CLICK_SPAM`, `DRAG_WINDOW`
 - PD color overlays: `PD_MODE_DRAGSCROLL`, `PD_MODE_VOLUME`, `PD_MODE_BRIGHTNESS`, `PD_MODE_ARROW`, `PD_MODE_PINCH`, `PD_MODE_ZOOM`
 - Auto-mouse fade destination mode: `FOLLOW_REAL_DESTINATION`
 - Key-behavior feedback locality: `RGB_KEY_HALF`
@@ -427,14 +427,14 @@ Reusable groups define physical LED sets once near the LED map in `rgb_config.c`
 | --- | --- |
 | `layer_count` | `5` |
 | `layout_key_count` | `56` |
-| `key_behavior_count` | `36` |
+| `key_behavior_count` | `37` |
 | `key_behavior_step_count` | `48` |
 | `combo_count` | `7` |
 | `via_macro_count` | `64` |
 | `via_macro_non_empty_count` | `12` |
 | `hardcoded_macro_count` | `16` |
 | `hardcoded_macro_non_empty_count` | `0` |
-| `keymap_custom_keycode_count` | `3` |
+| `keymap_custom_keycode_count` | `4` |
 | `pd_mode_count` | `6` |
 | `pd_mode_color_count` | `6` |
 | `reusable_led_group_count` | `4` |

@@ -34,6 +34,7 @@ enum keymap_custom_keycodes {
     RIGHT_THUMB,
     LEFT_THUMB,
     CLICK_SPAM,
+    DRAG_WINDOW,
     // MY_CUSTOM_KEY,
     // MY_OTHER_KEY,
 };
@@ -451,8 +452,9 @@ const key_behavior_t
             },
 
             {
-                .keycode       = CLICK_SPAM,
-                .tap_hold_term = 1,
+                .keycode                   = CLICK_SPAM,
+                .tap_hold_term             = 1,
+                .keeps_auto_mouse_anchored = true,
                 .tap_counts =
                     {
                         [0] = {.hold = REPEAT_WHILE_HELD(MS_BTN1, 100)},
@@ -481,10 +483,23 @@ const key_behavior_t
                 .multi_tap_term = 100,
                 .tap_counts =
                     {
-                        [1] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(A(MS_BTN2))},
-                        [2] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(A(MS_BTN1))},
+                        [1] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(MS_BTN7)},
                     },
             },
+
+            // Not a mouse keycode, so it must claim the auto-mouse anchor
+            // itself: the pointer layer has to survive the press for the
+            // transparent tap tier to fall through to the base-layer key.
+            {
+                .keycode                   = DRAG_WINDOW,
+                .multi_tap_term            = 100,
+                .keeps_auto_mouse_anchored = true,
+                .tap_counts =
+                    {
+                        [0] = {.tap = TAP_SENDS(KC_TRNS), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(MS_BTN6)},
+                    },
+            },
+
 };
 
 // ─── Keymap Layouts ─────────────────────────────────────────────────────────
@@ -570,7 +585,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
                   _______,           _______,           _______,           _______,           _______,           _______,              _______,           _______,           _______,           _______,           _______,           _______,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                  _______,           _______,           _______,           _______,           _______,           _______,      BRIGHTNESS_MODE,        PINCH_MODE,           MS_BTN3,           _______,           _______,           _______,
+                  _______,           _______,           _______,           _______,           _______,           _______,      BRIGHTNESS_MODE,        PINCH_MODE,           MS_BTN3,       DRAG_WINDOW,           _______,           _______,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
                   _______,           _______,           _______,           _______,           _______,           _______,          VOLUME_MODE,           MS_BTN1,           MS_BTN2,        DRAGSCROLL,           _______,           _______,
   // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯

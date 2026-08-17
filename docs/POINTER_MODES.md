@@ -61,6 +61,16 @@ changes how the modes feel in practice.
   mode was entered by a plain mode key, an authored `key_behaviors[]` row, or
   a lock action
 
+The same policy answers QMK's mouse-record question, which decides whether a
+key press keeps the pointer layer up or resets auto mouse. Mouse keycodes and
+pointer-mode keys are classified automatically. A key that drives the mouse
+without being either — `DRAG_WINDOW`'s modified drag, `CLICK_SPAM`'s repeated
+clicks — claims the same anchor from its authored row with
+`.keeps_auto_mouse_anchored = true`. That is not cosmetic: auto mouse tears the
+pointer layer down on the press otherwise, and a `TAP_SENDS(KC_TRNS)` tier on
+such a key then has no layer left to fall through from, so its tap sends
+nothing at all.
+
 ## Mode Reference
 
 | Mode | Raw behavior | Notable side effects |

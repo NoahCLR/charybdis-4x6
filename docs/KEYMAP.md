@@ -268,25 +268,31 @@ second.
 
 ### Window Drags
 
-`MS_BTN3` on `LAYER_POINTER` stays a plain middle click on a single tap and
-puts the two window drags on its deeper hold branches:
+`LAYER_POINTER` carries two window drags, split across two keys:
 
 - `MS_BTN3` tap -> middle click
 - `MS_BTN3` double-tap hold -> `PRESS_AND_HOLD_UNTIL_RELEASE(A(MS_BTN2))`,
   resizing the window under the pointer
-- `MS_BTN3` triple-tap hold -> `PRESS_AND_HOLD_UNTIL_RELEASE(A(MS_BTN1))`,
-  moving it
+- `DRAG_WINDOW` tap -> transparent, so it falls through to the base-layer key
+  under it
+- `DRAG_WINDOW` hold -> `PRESS_AND_HOLD_UNTIL_RELEASE(A(MS_BTN1))`, moving the
+  window under the pointer
 
 The point is to put a whole window drag under one finger. While the key is held
 the trackball is still live, so the ball drives the drag and releasing the key
 ends it.
 
-This row also tightens `.multi_tap_term` to `100`, since both branches are
-entered from a deliberate tap burst rather than typing rhythm.
+The resize drag sits behind a double-tap because it shares a key with an
+ordinary middle click, and an accidental `Alt` + drag rearranges whatever is
+under the pointer. The move drag has its own key, so it can afford a plain hold;
+both rows tighten `.multi_tap_term` to `100`, since these branches are entered
+from a deliberate burst rather than typing rhythm.
 
-Both drags sit behind multi-tap rather than a plain hold on purpose. An
-accidental `Alt` + drag rearranges whatever is under the pointer, which is a
-worse outcome than a gesture that takes an extra tap to ask for.
+`DRAG_WINDOW` is not a mouse keycode, so its row also sets
+`.keeps_auto_mouse_anchored = true`. Without that, auto mouse resets on the
+press and takes `LAYER_POINTER` with it, which both interrupts the drag surface
+and leaves the transparent tap tier with no layer to fall through from. See
+[POINTER_MODES.md](./POINTER_MODES.md) for the classification rule.
 
 For the current macOS setup this expects
 [AnyDrag](https://github.com/XueshiQiao/AnyDrag) to be running:
@@ -374,7 +380,8 @@ side becomes a focused cluster for:
 - `DRAGSCROLL`
 - `MS_BTN1`
 - `MS_BTN2`
-- `MS_BTN3`, which also carries the window drags described above
+- `MS_BTN3`, which also carries the resize drag described above
+- `DRAG_WINDOW`, the move drag described above
 
 The pointer layer also changes the thumb cluster slightly by putting
 `LT(LAYER_NUM, KC_SPC)` on space, so the pointer surface can still chain into

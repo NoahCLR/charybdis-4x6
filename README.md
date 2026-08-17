@@ -92,11 +92,10 @@ The current profile includes:
   volume or display brightness
 - `CLICK_SPAM`: not a pointing mode, but a mouse-button combo output that uses
   the behavior table to repeat left-click while held
-- window drags: also not a pointing mode, but deeper hold branches on `MS_BTN3`
-  that hold `Alt` plus a mouse button so the ball resizes the window under the
-  pointer (double-tap hold) or moves it (triple-tap hold); in my setup this
-  expects [AnyDrag](https://github.com/XueshiQiao/AnyDrag) to translate those
-  gestures
+- window drags: also not a pointing mode, but hold branches that hold `Alt` plus
+  a mouse button so the ball resizes the window under the pointer (`MS_BTN3`
+  double-tap hold) or moves it (`DRAG_WINDOW` hold); in my setup this expects
+  [AnyDrag](https://github.com/XueshiQiao/AnyDrag) to translate those gestures
 - auto-mouse and auto-sniping layers that keep pointer work available
   automatically while you move between typing and trackball use
 
@@ -295,6 +294,10 @@ The vocabulary is:
   for one row
 - `.skip_rgb_branch_confirm = true` skips that RGB branch-confirm window for one
   row
+- `.keeps_auto_mouse_anchored = true` marks the row as a mouse gesture, so
+  pressing it keeps the pointer layer up instead of letting auto mouse reset on
+  it. Needed for keys that drive the mouse without being mouse keycodes or
+  pointer-mode keys, such as `DRAG_WINDOW` and `CLICK_SPAM`
 
 The helper vocabulary is:
 

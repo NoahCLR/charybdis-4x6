@@ -211,6 +211,11 @@ void auto_mouse_keyevent(bool pressed) {
     auto_mouse_keyevent_calls++;
 }
 
+bool key_behavior_keeps_auto_mouse_anchored(uint16_t keycode) {
+    (void)keycode;
+    return false;
+}
+
 void keyboard_mod_ownership_track_report_keycode_event(uint16_t keycode, keyrecord_t *record) {
     (void)keycode;
     (void)record;

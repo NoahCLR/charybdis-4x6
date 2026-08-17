@@ -8,6 +8,7 @@
 #include "../defs/pd_modes.h"
 #include "pointer_layer_policy.h"
 #include "../../compat/qmk_auto_mouse_contract.h"
+#include "../../key/behavior/key_behavior_lookup.h"
 
 #ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
 static inline bool pointer_layer_policy_is_layer_hold_key(uint16_t keycode) {
@@ -34,6 +35,14 @@ bool pointer_layer_policy_is_mouse_record(uint16_t keycode) {
     }
 
     if (pointer_layer_policy_pd_mode_key_keeps_auto_mouse_anchored(keycode)) {
+        return true;
+    }
+
+    // Keycodes that are not mouse keycodes themselves but whose authored
+    // behavior is a mouse gesture. Without this, QMK tears the pointer layer
+    // down on the press, which also strips the layer a KC_TRNS tap tier needs
+    // to resolve its fallback against.
+    if (key_behavior_keeps_auto_mouse_anchored(keycode)) {
         return true;
     }
 

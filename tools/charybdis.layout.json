@@ -361,7 +361,7 @@
       "KC_TRNS",
       "KC_TRNS",
       "KC_TRNS",
-      "KC_TRNS",
+      "CUSTOM(100)",
       "KC_MS_BTN3",
       "CUSTOM(85)",
       "CUSTOM(82)",

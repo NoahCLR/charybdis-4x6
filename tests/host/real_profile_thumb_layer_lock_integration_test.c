@@ -1606,6 +1606,59 @@ static void test_pointer_volume_exact_third_tap_defers_mute_until_release(void) 
     test_pointer_terminal_double_tap_action_defers_on_exact_third_press(VOLUME_MODE, KC_MUTE);
 }
 
+// DRAG_WINDOW is a keymap-local keycode, so find it the way its own tap tier
+// does: the pointer-layer key sitting on top of the base-layer 'l'. It is not a
+// mouse keycode, so only its authored anchor keeps QMK from resetting auto
+// mouse on the press -- and without the pointer layer the transparent tap tier
+// has no layer to fall through from, which sends nothing at all.
+static void test_pointer_drag_window_tap_falls_through_to_the_base_layer_key(void) {
+    keypos_t key_pos = test_find_keypos_on_layer(LAYER_BASE, KC_L);
+    uint16_t drag_window;
+
+    CHECK(test_keypos_valid(key_pos));
+
+    test_reset_state();
+    layer_state = noah_layer_state_set_user(test_layer_mask(LAYER_BASE) | test_layer_mask(LAYER_POINTER));
+
+    drag_window = test_keycode_at(LAYER_POINTER, key_pos);
+    CHECK(drag_window >= NOAH_KEYMAP_SAFE_RANGE);
+    CHECK(test_resolve_keycode(key_pos) == drag_window);
+
+    test_press_resolved(key_pos);
+    key_runtime_integration_advance(&fake_time, 50u);
+    test_release_resolved(key_pos);
+    key_runtime_integration_advance(&fake_time, CUSTOM_MULTI_TAP_TERM + 1u);
+    key_runtime_integration_scan();
+
+    CHECK(layer_state_cmp(layer_state, LAYER_POINTER));
+    CHECK(auto_mouse_key_tracker == 0);
+    CHECK(test_tap_code16_count == 1u);
+    CHECK(test_last_tap_code16 == KC_L);
+    test_assert_thumb_runtime_quiescent(key_pos);
+}
+
+// The combo output keycode is what auto-mouse classifies, not the mouse buttons
+// that produced it -- those never reach QMK's auto-mouse stage.
+static void test_click_spam_combo_output_keeps_the_pointer_layer_anchored(void) {
+    static const uint16_t click_spam_combo_keys[] = {
+        MS_BTN1,
+        MS_BTN2,
+    };
+
+    keyrecord_t record      = {.event = MAKE_COMBOEVENT(true)};
+    int16_t     combo_index = test_find_combo_index_for_exact_keys(click_spam_combo_keys, ARRAY_SIZE(click_spam_combo_keys));
+
+    CHECK(combo_index >= 0);
+
+    test_reset_state();
+    layer_state = noah_layer_state_set_user(test_layer_mask(LAYER_BASE) | test_layer_mask(LAYER_POINTER));
+
+    CHECK(noah_is_mouse_record_user(key_combos[combo_index].keycode, &record));
+    CHECK(key_runtime_integration_pre_userspace_record(key_combos[combo_index].keycode, &record));
+    CHECK(layer_state_cmp(layer_state, LAYER_POINTER));
+    CHECK(auto_mouse_key_tracker == 1);
+}
+
 static void test_click_spam_combo_uses_authored_combo_owner(void) {
     static const uint16_t click_spam_combo_keys[] = {
         MS_BTN1,
@@ -3060,6 +3113,8 @@ int main(void) {
     test_pointer_pinch_double_tap_salvos_queue_zoom_chord_cleanly();
     test_pointer_pinch_exact_third_tap_defers_zoom_chord_until_release();
     test_pointer_volume_exact_third_tap_defers_mute_until_release();
+    test_pointer_drag_window_tap_falls_through_to_the_base_layer_key();
+    test_click_spam_combo_output_keeps_the_pointer_layer_anchored();
     test_click_spam_combo_uses_authored_combo_owner();
     test_cmd_combo_double_tap_hold_uses_stable_owner_across_press_order();
     test_right_nav_layer_hold_dispatches_nav_taps_immediately();

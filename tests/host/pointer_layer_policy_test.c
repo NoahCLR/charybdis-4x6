@@ -12,6 +12,7 @@ static uint8_t        fake_auto_mouse_layer;
 static pd_mode_mask_t fake_active_modes;
 static uint8_t        auto_mouse_keyevent_calls;
 static bool           auto_mouse_keyevent_pressed[8];
+static uint16_t       fake_anchored_behavior_keycode;
 
 layer_state_t layer_state = 0;
 
@@ -28,12 +29,13 @@ static void test_fail(const char *expr, const char *file, int line) {
     } while (0)
 
 static void test_reset_stubs(void) {
-    fake_auto_mouse_toggle      = false;
-    fake_auto_mouse_key_tracker = 0;
-    fake_auto_mouse_layer       = 4;
-    fake_active_modes           = 0;
-    auto_mouse_keyevent_calls   = 0;
-    layer_state                 = 0;
+    fake_auto_mouse_toggle         = false;
+    fake_auto_mouse_key_tracker    = 0;
+    fake_auto_mouse_layer          = 4;
+    fake_active_modes              = 0;
+    auto_mouse_keyevent_calls      = 0;
+    layer_state                    = 0;
+    fake_anchored_behavior_keycode = KC_NO;
 }
 
 bool layer_state_cmp(layer_state_t state, uint8_t layer) {
@@ -71,6 +73,10 @@ pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
 bool is_pd_mode_lock_action(uint16_t action) {
     (void)action;
     return false;
+}
+
+bool key_behavior_keeps_auto_mouse_anchored(uint16_t keycode) {
+    return fake_anchored_behavior_keycode != KC_NO && keycode == fake_anchored_behavior_keycode;
 }
 
 bool pd_mode_has_trait(pd_mode_mask_t mode, pd_mode_traits_t trait) {
@@ -147,6 +153,20 @@ static void test_non_arrow_pd_mode_keys_and_dpi_keys_count_as_mouse_records(void
     CHECK(pointer_layer_policy_is_mouse_record(DPI_RMOD));
     CHECK(pointer_layer_policy_is_mouse_record(S_D_MOD));
     CHECK(pointer_layer_policy_is_mouse_record(S_D_RMOD));
+}
+
+// A keycode that is neither a mouse keycode nor a pd-mode key can still claim
+// the anchor through its authored behavior row, so QMK keeps the pointer layer
+// up across the press instead of resetting auto mouse on it.
+static void test_authored_anchor_row_counts_as_a_mouse_record(void) {
+    test_reset_stubs();
+
+    CHECK(!pointer_layer_policy_is_mouse_record(KC_C));
+
+    fake_anchored_behavior_keycode = KC_C;
+
+    CHECK(pointer_layer_policy_is_mouse_record(KC_C));
+    CHECK(!pointer_layer_policy_is_mouse_record(KC_D));
 }
 
 static void test_mouse_button_actions_notify_auto_mouse(void) {
@@ -277,6 +297,7 @@ int main(void) {
     test_non_arrow_pd_mode_marks_layer_holds_as_mouse_records();
     test_arrow_mode_does_not_anchor_layer_hold_keys();
     test_non_arrow_pd_mode_keys_and_dpi_keys_count_as_mouse_records();
+    test_authored_anchor_row_counts_as_a_mouse_record();
     test_mouse_button_actions_notify_auto_mouse();
     test_arrow_mode_prefers_typing_layer_over_auto_mouse_layer();
     test_anchored_pd_mode_restores_auto_mouse_layer_when_dropped();

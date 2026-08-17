@@ -112,11 +112,12 @@ typedef struct {
 
 typedef struct {
     uint16_t            keycode;
-    uint16_t            tap_hold_term;           // 0 = TAPPING_TERM for LT(), CUSTOM_TAP_HOLD_TERM otherwise
-    uint16_t            longer_hold_term;        // 0 = CUSTOM_LONGER_HOLD_TERM
-    uint16_t            multi_tap_term;          // 0 = CUSTOM_MULTI_TAP_TERM
-    uint16_t            rgb_branch_confirm_term; // 0 = CUSTOM_RGB_BRANCH_CONFIRM_TERM
-    bool                skip_rgb_branch_confirm; // true = skip RGB branch-confirm feedback for this row
+    uint16_t            tap_hold_term;             // 0 = TAPPING_TERM for LT(), CUSTOM_TAP_HOLD_TERM otherwise
+    uint16_t            longer_hold_term;          // 0 = CUSTOM_LONGER_HOLD_TERM
+    uint16_t            multi_tap_term;            // 0 = CUSTOM_MULTI_TAP_TERM
+    uint16_t            rgb_branch_confirm_term;   // 0 = CUSTOM_RGB_BRANCH_CONFIRM_TERM
+    bool                skip_rgb_branch_confirm;   // true = skip RGB branch-confirm feedback for this row
+    bool                keeps_auto_mouse_anchored; // true = counts as a mouse record so the pointer layer survives this key
     key_behavior_step_t tap_counts[KEY_BEHAVIOR_MAX_TAP_COUNT];
 } key_behavior_t;
 
