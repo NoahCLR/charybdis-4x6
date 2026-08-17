@@ -115,6 +115,15 @@ tap-series expiry, then emitted after any enabled branch-confirm feedback
 window. For terminal tap-only multi-tap branches, this means the final press can
 identify the branch before the action has actually been sent.
 
+A branch that is settled resolves on release rather than waiting out the rest of
+its multi-tap term. Settled means no deeper authored tap branch can be reached
+and no hold tier on the current branch is still pending, so no further input can
+change the outcome. Base single taps on a multi-tap key are not settled, because
+a further tap can still deepen them, and they keep waiting the full term. The
+branch-confirm window is anchored at the moment the branch actually resolved, so
+resolving early shortens the wait before the action without shortening that
+feedback window.
+
 Those pending multi-tap windows are tracked per physical key. Pressing a
 different key does not flush an unrelated pending tap series by itself, so
 independent keys can keep separate tap counts and timing windows alive at the
@@ -287,7 +296,10 @@ also project its state into the RGB overlay.
 Shared semantics:
 
 - multi-tap pending shows the neutral unresolved color only for double-tap and
-  higher branches; the base single-tap candidate stays quiet while it waits
+  higher gestures, and only while something is still open: either a deeper
+  authored tap branch is reachable, or the current branch's hold tier has not
+  resolved. The base single-tap candidate stays quiet while it waits, and a
+  branch settled on both counts goes straight to branch-confirm
 - committed double-tap and higher authored branches can open a branch-confirm
   feedback window that delays the selected action long enough to show the
   branch color; the authored RGB config can also skip that window

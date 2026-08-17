@@ -391,10 +391,12 @@ Those rows populate the shared
 - `long_hold_active_color`
 - `locality`
 
-The `tap_pending_color` field is the neutral unresolved multi-tap color for
-double-tap and higher branches while the runtime is still waiting to know
-which tap index wins. The base single-tap candidate stays quiet during that
-same pending window.
+The `tap_pending_color` field is the neutral undecided multi-tap color. It needs
+two things at once: at least two taps, because a single tap does not show the
+user meant to enter a tap branch, so base candidates stay quiet; and something
+genuinely still open, meaning either a deeper authored tap branch is reachable or
+the current branch's hold tier has not resolved. A branch that is settled on both
+counts goes straight to branch-confirm without a pending window.
 
 The `RGB_TAP_BRANCH_COLORS(...)` macro declares the confirmation colors used
 while a committed authored double-tap or higher branch is being held in the
@@ -443,8 +445,9 @@ the live runtime footprint, not a static guess from authored combo comments.
 
 In the shared runtime, those colors are used for these categories:
 
-- multi-tap pending: the engine has not resolved the winning double-tap or
-  higher branch yet; the base single-tap candidate stays quiet
+- multi-tap pending: a double-tap-or-higher gesture is still undecided, because
+  a deeper authored tap branch is reachable or the current branch's hold tier has
+  not resolved; base single-tap candidates stay quiet
 - tap-count branch committed: the winning double-tap or higher branch is known and
   the model is in the branch-confirm feedback window before firing that branch's
   action; `branch_confirm_mode` decides whether that window is used
@@ -515,8 +518,9 @@ locality while still remaining within the key-behavior feedback stage.
 
 Each row chooses a semantic category:
 
-- `KEY_FEEDBACK_GROUP_UNRESOLVED_TAP_BRANCH`: visible while double-tap or
-  higher multi-tap resolution is pending
+- `KEY_FEEDBACK_GROUP_UNRESOLVED_TAP_BRANCH`: visible while a double-tap or
+  higher gesture is still undecided, because a deeper authored tap branch is
+  reachable or the current branch's hold tier has not resolved
 - `KEY_FEEDBACK_GROUP_TAP_BRANCH_COMMITTED`: visible while a committed
   double-tap or higher branch confirmation pulse is active
 - `KEY_FEEDBACK_GROUP_TAP_COMMITTED`: visible while the tap-commit pulse is

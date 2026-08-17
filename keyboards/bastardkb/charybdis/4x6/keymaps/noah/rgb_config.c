@@ -260,9 +260,12 @@ static const combo_feedback_led_group_t combo_feedback_led_groups_data[] = RGB_L
 //   - long-hold tier = .long_hold on the winning tap index
 //
 // Tap feedback:
-//   - tap_pending_color = unresolved multi-tap state for second-tap and higher
-//     branches while the runtime is still waiting to know which tap index wins;
-//     the base single-tap candidate stays quiet
+//   - tap_pending_color = a multi-tap gesture that is still undecided. It needs
+//     two things at once: at least two taps, because one tap does not show the
+//     user meant to enter a tap branch, so base candidates stay quiet; and
+//     something genuinely still open, meaning either a deeper authored tap
+//     branch is reachable or this branch's hold tier has not resolved. A branch
+//     that is settled on both counts goes straight to branch-confirm instead
 //   - RGB_TAP_BRANCH_COLORS(...) = visible branch-confirmation window after an
 //     authored double-tap or higher branch commits; the table starts at tap
 //     count 2 and higher tap counts clamp to the last configured color
@@ -357,8 +360,9 @@ const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
 // nonzero HSV value only when the group should override that stage color.
 //
 // .semantic chooses which visible key-behavior state can drive the group:
-//   - KEY_FEEDBACK_GROUP_UNRESOLVED_TAP_BRANCH = pending double-tap-or-higher
-//     tap branch while the runtime is still waiting for the winning tap count
+//   - KEY_FEEDBACK_GROUP_UNRESOLVED_TAP_BRANCH = double-tap-or-higher gesture
+//     that is still undecided, because a deeper authored tap branch is
+//     reachable or this branch's hold tier has not resolved yet
 //   - KEY_FEEDBACK_GROUP_TAP_BRANCH_COMMITTED = branch-confirmation window after
 //     an authored non-base tap branch commits and before its selected
 //     effect/action fires

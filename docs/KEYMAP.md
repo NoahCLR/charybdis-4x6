@@ -255,9 +255,12 @@ combo footprint rather than the fake QMK combo position `(0,0)`. In
 really spans both sides.
 
 Pending multi-tap feedback uses a neutral unresolved color only once the user
-has entered a double-tap or higher branch. The base single-tap candidate stays
-quiet while it waits to see whether another tap arrives, then dispatches
-without the branch-confirmation window. After a non-base authored branch
+has entered a double-tap or higher branch, and only while that gesture is still
+undecided: either a deeper authored branch is reachable, or the current branch's
+hold tier has not resolved. A branch settled on both counts goes quiet and moves
+straight to branch confirmation. The base single-tap candidate stays quiet while
+it waits to see whether another tap arrives, then dispatches without the
+branch-confirmation window. After a non-base authored branch
 commits, the current RGB config's branch-confirm mode can open a feedback window
 that shows the committed branch color before that branch fires. Inherited quick
 taps from branches that omit `.tap` do not show tap-commit feedback; hold and

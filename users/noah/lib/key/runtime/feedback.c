@@ -241,8 +241,24 @@ static bool key_feedback_branch_confirm_mode_allows(uint8_t tap_count) {
     }
 }
 
+// White pending feedback marks a multi-tap gesture that is still undecided.
+//
+// Two conditions gate it. The tap count must be past the base single tap: one
+// tap does not show the user meant to enter a tap branch at all, so base
+// candidates stay quiet. Beyond that, something must actually still be open —
+// either a deeper authored tap branch is reachable, or this branch's hold tier
+// has not resolved yet. Once both are closed the branch is settled and the
+// white gives way to branch-confirm feedback.
 static bool key_feedback_tap_series_shows_pending_feedback(const tap_series_t *series) {
-    return series && series->active && !series->branch_confirmed && !series->branch_confirming && key_feedback_tap_branch_is_higher_tier(series->tap_count);
+    if (!(series && series->active && !series->branch_confirmed && !series->branch_confirming)) {
+        return false;
+    }
+
+    if (!key_feedback_tap_branch_is_higher_tier(series->tap_count)) {
+        return false;
+    }
+
+    return series->authored_has_more_taps || series->pending_hold;
 }
 
 static bool key_feedback_tap_series_shows_branch_confirmation(const tap_series_t *series) {

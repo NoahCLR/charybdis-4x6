@@ -1112,7 +1112,7 @@ def parse_key_behavior_feedback_colors(
             )
 
     default_meanings = {
-        "tap_pending_color": "Neutral unresolved multi-tap state for double-tap and higher branches while the runtime is still waiting to know which tap index wins; the base single-tap candidate stays quiet.",
+        "tap_pending_color": "Neutral undecided multi-tap state for double-tap and higher gestures, shown while a deeper authored tap branch is still reachable or the current branch's hold tier has not resolved. The base single-tap candidate stays quiet, and a fully settled branch goes straight to branch-confirm.",
         "tap_committed_color": "Action feedback after committed tap-count branches that do not already have state feedback.",
         "hold_active_color": "Authored hold-tier pending / active states and hold-tier commit pulses.",
         "long_hold_active_color": "Authored long-hold-tier active states and long-hold-tier commit pulses.",

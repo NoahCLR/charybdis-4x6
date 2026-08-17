@@ -251,7 +251,12 @@ bool key_runtime_core_resolve_pending_multi_tap_scan(keypos_t key_pos, key_runti
             return true;
         }
 
-        if (key_runtime_core_scan_elapsed(series->last_tap_at, state->current_time) > series->tap_term_ms && key_runtime_core_pending_multi_tap_flush_resolution(series, &flush_action, &flush_repeat_count)) {
+        // A settled branch has nothing left to wait for: no deeper authored tap
+        // branch can be reached, and the key is already released with no hold
+        // tier pending. Resolving it now instead of burning the rest of the
+        // multi-tap term keeps feedback continuous into the branch-confirm
+        // window and drops that term of latency from terminal tap branches.
+        if ((!series->authored_has_more_taps || key_runtime_core_scan_elapsed(series->last_tap_at, state->current_time) > series->tap_term_ms) && key_runtime_core_pending_multi_tap_flush_resolution(series, &flush_action, &flush_repeat_count)) {
             uint8_t flush_tap_count = series->tap_count;
 
             *out = (key_runtime_core_pending_multi_tap_scan_resolution_t){
@@ -475,8 +480,14 @@ void key_runtime_core_plan_pending_multi_tap_scan_for_key(key_runtime_core_state
         case KEY_RUNTIME_CORE_PENDING_MULTI_TAP_SCAN_OUTCOME_FLUSH: {
             bool authored_branch     = key_runtime_core_tap_series_has_authored_branch(series);
             bool authored_tap_branch = key_runtime_core_tap_series_has_authored_tap_branch(series);
+            // Anchor the branch-confirm window at the moment the branch actually
+            // resolved. A settled branch resolves before its multi-tap term
+            // expires, and anchoring at that future expiry would wrap the
+            // unsigned elapsed comparison and skip the window entirely.
+            bool     term_expired               = key_runtime_core_scan_elapsed(series->last_tap_at, state->current_time) > series->tap_term_ms;
+            uint16_t branch_confirm_started_at  = term_expired ? (uint16_t)(series->last_tap_at + series->tap_term_ms) : state->current_time;
 
-            if (authored_branch && key_runtime_core_tap_series_start_delayed_action_branch_confirm(state, series, resolution.tap_count, (uint16_t)(series->last_tap_at + series->tap_term_ms), series->branch_confirm_term_ms, resolution.action, resolution.repeat_count, mods, authored_tap_branch, false, KEY_FEEDBACK_PULSE_HOLD)) {
+            if (authored_branch && key_runtime_core_tap_series_start_delayed_action_branch_confirm(state, series, resolution.tap_count, branch_confirm_started_at, series->branch_confirm_term_ms, resolution.action, resolution.repeat_count, mods, authored_tap_branch, false, KEY_FEEDBACK_PULSE_HOLD)) {
                 return;
             }
             key_runtime_core_effect_plan_push_delayed_action(plan, key_pos, resolution.action, mods, resolution.repeat_count);
