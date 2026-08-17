@@ -9771,7 +9771,7 @@ function getClientScript() {
             renderTimingInput("selectedMultiTapTerm", "multi_tap_term", row.multiTapTerm || "", row.keycode) +
             renderTimingInput("selectedRgbBranchConfirmTerm", "rgb_branch_confirm_term", row.rgbBranchConfirmTerm || "", row.keycode) +
             renderSkipRgbBranchConfirmToggle(row.skipRgbBranchConfirm) +
-            renderKeepsAutoMouseAnchoredToggle(row.keepsAutoMouseAnchored) +
+            (isKeymapCustomKeycode(row.keycode) ? renderKeepsAutoMouseAnchoredToggle(row.keepsAutoMouseAnchored) : "") +
             "</div>" +
             "<div class='behavior-branch-grid'>" +
             steps.map(renderBehaviorStepEditor).join("") +
@@ -9789,6 +9789,15 @@ function getClientScript() {
     function renderSkipRgbBranchConfirmToggle(checked) {
         const tooltip = fieldTooltips.skip_rgb_branch_confirm || "";
         return "<label class='toggle-inline' data-tooltip='" + escapeAttr(tooltip) + "'><input type='checkbox' id='selectedSkipRgbBranchConfirm'" + (checked ? " checked" : "") + " data-tooltip='" + escapeAttr(tooltip) + "'><span class='toggle-switch' aria-hidden='true'></span><span class='toggle-label'>skip RGB branch confirm</span></label>";
+    }
+
+    // Mouse keycodes and pointer-mode keys are already classified as mouse
+    // records by the firmware, so the anchor flag can only change the answer
+    // for a keycode whose behavior is authored here. Offering it elsewhere
+    // would show "off" for keys that are in fact anchored.
+    function isKeymapCustomKeycode(keycode) {
+        const candidate = canonicalKeyExpression(keycode || "");
+        return (model.customKeycodes || []).some((entry) => canonicalKeyExpression(entry) === candidate);
     }
 
     function renderKeepsAutoMouseAnchoredToggle(checked) {
@@ -11649,6 +11658,17 @@ function getClientScript() {
         };
     }
 
+    // The anchor toggle is only rendered for keymap-local custom keycodes. When
+    // it is absent the row keeps whatever it already authored: reading the
+    // missing control would write false back over a hand-authored flag.
+    function readSelectedKeepsAutoMouseAnchored() {
+        const control = document.getElementById("selectedKeepsAutoMouseAnchored");
+        if (control) {
+            return Boolean(control.checked);
+        }
+        return Boolean(behaviorForKey(document.getElementById("selectedBehaviorKeycode")?.value || "")?.keepsAutoMouseAnchored);
+    }
+
     function readSelectedBehaviorForm() {
         const steps = [];
         for (let index = 0; index < 5; index += 1) {
@@ -11666,7 +11686,7 @@ function getClientScript() {
             multiTapTerm: document.getElementById("selectedMultiTapTerm").value,
             rgbBranchConfirmTerm: document.getElementById("selectedRgbBranchConfirmTerm").value,
             skipRgbBranchConfirm: Boolean(document.getElementById("selectedSkipRgbBranchConfirm")?.checked),
-            keepsAutoMouseAnchored: Boolean(document.getElementById("selectedKeepsAutoMouseAnchored")?.checked),
+            keepsAutoMouseAnchored: readSelectedKeepsAutoMouseAnchored(),
             steps
         };
     }

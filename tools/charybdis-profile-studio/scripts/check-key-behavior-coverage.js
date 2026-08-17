@@ -83,6 +83,15 @@ const appendedCheck = `
         "Profile Studio must not use browser prompts inside the VS Code webview"
     );
     assert(
+        getClientScript().includes("isKeymapCustomKeycode(row.keycode) ? renderKeepsAutoMouseAnchoredToggle"),
+        "Profile Studio should only offer the auto-mouse anchor toggle for keymap-local custom keycodes"
+    );
+    assert(
+        getClientScript().includes("keepsAutoMouseAnchored: readSelectedKeepsAutoMouseAnchored()") &&
+            !getClientScript().includes('keepsAutoMouseAnchored: Boolean(document.getElementById("selectedKeepsAutoMouseAnchored")?.checked)'),
+        "Profile Studio must preserve an authored anchor flag when its toggle is not rendered, not read the missing control"
+    );
+    assert(
         getClientScript().includes('type: "requestCreateProfile"'),
         "Profile Studio new-profile button must request extension-side input"
     );
