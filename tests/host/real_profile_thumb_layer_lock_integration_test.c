@@ -3053,8 +3053,8 @@ static void test_feedback_dirty_tracks_pending_tap_window(void) {
     test_reset_state();
     CHECK(test_keypos_valid(esc_pos));
 
-    // First tap opens the series; the second press puts it in the higher tier
-    // that renders the unresolved tap-branch colour.
+    // First tap opens the series; the second press selects a non-base branch and
+    // renders that branch's color.
     test_press_resolved(esc_pos);
     test_release_resolved(esc_pos);
     key_runtime_integration_advance(&fake_time, 10u);

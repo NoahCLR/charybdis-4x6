@@ -81,7 +81,7 @@ static void rgb_runtime_render_snapshot_ensure_combo(void) {
 #        ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
 // Split staleness only. The mirrored key-feedback packet can lag the combo
 // packet, so a key the slave now paints as part of a combo footprint may still
-// carry a tap-branch semantic from before. Dropping it here keeps a stale colour
+// carry a tap-branch semantic from before. Dropping it here keeps a stale color
 // from stomping the live footprint; this is not a judgement about whether a combo
 // member should ever show its branch, which the engine map decides.
 static void rgb_runtime_render_snapshot_suppress_combo_tap_branch_semantics(void) {

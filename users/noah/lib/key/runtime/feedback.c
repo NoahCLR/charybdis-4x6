@@ -205,7 +205,10 @@ static void key_feedback_apply_tap_branch_for_owner(uint8_t *tap_branch_map, key
     key_feedback_apply_tap_branch_to_bitmap(tap_branch_map, bitmap, tap_branch);
 }
 
-static bool key_feedback_tap_branch_is_higher_tier(uint8_t tap_count) {
+// Non-base, not "higher tier": tier means a hold tier throughout this codebase,
+// and this is about which tap_counts[] entry is selected. Matches the wording of
+// KEY_FEEDBACK_BRANCH_CONFIRM_NON_BASE_TAPS.
+static bool key_feedback_tap_branch_is_non_base(uint8_t tap_count) {
     return tap_count > 1u;
 }
 
@@ -232,7 +235,7 @@ static bool key_feedback_tap_series_branch_entered(const tap_series_t *series) {
 // The base tap stays quiet because branch 0 needs no color of its own; one tap
 // does not show the user meant to enter a tap branch at all.
 static bool key_feedback_tap_series_shows_tap_branch(const tap_series_t *series) {
-    return series && series->active && !key_feedback_tap_series_branch_entered(series) && key_feedback_tap_branch_is_higher_tier(series->tap_count);
+    return series && series->active && !key_feedback_tap_series_branch_entered(series) && key_feedback_tap_branch_is_non_base(series->tap_count);
 }
 
 static key_feedback_semantic_t key_feedback_semantic_for_pulse(key_feedback_pulse_kind_t kind) {

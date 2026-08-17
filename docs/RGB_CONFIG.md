@@ -445,12 +445,10 @@ the live runtime footprint, not a static guess from authored combo comments.
 
 In the shared runtime, those colors are used for these categories:
 
-- multi-tap pending: a double-tap-or-higher gesture whose winning tap index is
-  still open, because a deeper authored tap branch is still reachable; base
+- tap branch pending: a double-tap-or-higher branch is selected and has not been
+  entered yet, from the tap that reaches it until its action fires. That spans any
+  branch-confirm window, which `branch_confirm_mode` decides whether to use; base
   single-tap candidates stay quiet
-- tap-count branch committed: the winning double-tap or higher branch is known and
-  the model is in the branch-confirm feedback window before firing that branch's
-  action; `branch_confirm_mode` decides whether that window is used
 - tap committed: an authored tap-count branch has resolved and emitted output
 - hold pending: a hold path exists, but the final action is not resolved yet
 - hold trigger: a hold-tier action has just fired

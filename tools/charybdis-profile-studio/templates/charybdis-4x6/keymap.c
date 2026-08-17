@@ -262,12 +262,10 @@ enum keymap_custom_keycodes {
 // both together for a two-stage hold
 //
 // RGB feedback follows authored tiers on the current tap index:
-//   - double-tap-or-higher gestures show a neutral pending color while the
-//     winning tap index is still open, meaning a deeper tap_counts[] entry is
-//     still reachable; single taps and settled indexes stay quiet, including
-//     when the settled entry still has a hold tier pending
-//   - when a tap index commits, it can briefly show the authored branch color
-//     before action feedback takes over
+//   - every tap past the base one shows that branch's authored color and keeps it
+//     until the branch is entered; another tap just renames it. Single taps stay
+//     quiet, and a hold tier pending on the selected entry does not end the color
+//     because nothing has fired yet
 //   - an authored .hold tier can show hold-tier feedback while pending/active
 //   - an authored .long_hold tier can show longer-hold-tier feedback when it
 //     commits or stays active

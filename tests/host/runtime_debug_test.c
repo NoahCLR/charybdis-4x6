@@ -1878,7 +1878,7 @@ static void test_key_feedback_maps_rename_the_branch_on_every_tap(void) {
 
 // Regression: the branch name must not change between taps just because a clock
 // expired. A tap held briefly and then released used to move the display and the
-// engine onto different anchors, so the key changed colour mid-gesture while the
+// engine onto different anchors, so the key changed color mid-gesture while the
 // runtime would still accept another tap. There is no such clock now: only a new
 // tap renames the branch, and only entering it ends the phase.
 static void test_key_feedback_maps_hold_one_branch_name_across_a_slow_multi_tap(void) {
@@ -1942,7 +1942,7 @@ static void test_key_feedback_maps_hold_one_branch_name_across_a_slow_multi_tap(
     CHECK(key_feedback_tap_branch_map_get(tap_branch_map, key_pos) == 3u);
 }
 
-static void test_key_feedback_branch_confirm_mode_can_skip_branch_commit_window(void) {
+static void test_key_feedback_branch_confirm_mode_can_skip_branch_confirm_window(void) {
     uint8_t  semantic_map[KEY_FEEDBACK_SEMANTIC_MAP_SIZE];
     uint8_t  tap_branch_map[KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE];
     keypos_t key_pos = test_keypos(6, 3);
@@ -3282,7 +3282,7 @@ int main(void) {
     test_key_feedback_maps_name_final_tap_only_branch_until_the_action_fires();
     test_key_feedback_maps_rename_the_branch_on_every_tap();
     test_key_feedback_maps_hold_one_branch_name_across_a_slow_multi_tap();
-    test_key_feedback_branch_confirm_mode_can_skip_branch_commit_window();
+    test_key_feedback_branch_confirm_mode_can_skip_branch_confirm_window();
     test_key_feedback_flashing_visibility_tracks_each_owner_activation();
     test_key_feedback_broad_owner_follows_newest_activation_without_release_restart();
     test_key_feedback_broad_owner_uses_activation_sequence_across_timer_wrap();

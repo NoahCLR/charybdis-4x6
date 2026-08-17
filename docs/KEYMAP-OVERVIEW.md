@@ -307,7 +307,7 @@ Authored combo feedback LED groups repaint after the combo locality render insid
 
 These colors come from `key_behavior_feedback_colors` in [rgb_config.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c) and render last on top of the current layer, combo feedback, preview, and any pd-mode overlay. Internally the runtime keeps truthful per-key semantics, per-key flash visibility, and a broad-surface owner map. `RGB_KEYS_ONLY` stays per-key; broader authored localities follow the newest active owner for that surface and use that owner's real flash phase, so offset held keys do not fill each other's off windows.
 
-Tap feedback is staged as neutral unresolved pending first, then an optional model-level branch confirmation from `RGB_TAP_BRANCH_COLORS(...)`, then tap/hold/long-hold action feedback when that action has its own visible state.
+Tap feedback has one tap-phase state: every tap past the base one shows its branch color from `RGB_TAP_BRANCH_COLORS(...)` and holds it until that branch is entered, including through any branch-confirm delay. Tap/hold/long-hold action feedback takes over from there when that action has its own visible state.
 
 Current authored feedback locality: `RGB_KEY_HALF`.
 
