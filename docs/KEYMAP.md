@@ -254,16 +254,14 @@ combo footprint rather than the fake QMK combo position `(0,0)`. In
 `RGB_KEY_HALF`, that means it can light both halves when a combo
 really spans both sides.
 
-Pending multi-tap feedback uses a neutral unresolved color only once the user
-has entered a double-tap or higher branch, and only while the winning tap index
-is still open, meaning a deeper authored branch is still reachable. Reaching the
-deepest authored branch settles the index, so the key goes quiet and moves
-straight to branch confirmation; a still-pending hold tier on that branch does
-not keep the color alive. The base single-tap candidate stays quiet while it
-waits to see whether another tap arrives, then dispatches without the
-branch-confirmation window. After a non-base authored branch
-commits, the current RGB config's branch-confirm mode can open a feedback window
-that shows the committed branch color before that branch fires. Inherited quick
+Pending multi-tap feedback lights only once the user
+has entered a double-tap or higher branch, and it keeps that branch's color until
+the branch is entered. Reaching the deepest authored branch does not end it, and
+neither does a still-pending hold tier on that branch: nothing has fired yet. The
+base single-tap candidate stays quiet while it waits to see whether another tap
+arrives, then dispatches without the branch-confirmation window. The current RGB
+config's branch-confirm mode can delay a non-base branch's action long enough for
+its color to be seen before it fires. Inherited quick
 taps from branches that omit `.tap` do not show tap-commit feedback; hold and
 long-hold branches still use their hold-tier feedback when those tiers win.
 

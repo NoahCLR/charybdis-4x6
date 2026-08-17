@@ -61,11 +61,8 @@ static bool key_feedback_broad_owner_group_slot(key_feedback_semantic_t semantic
     }
 
     switch (semantic) {
-        case KEY_FEEDBACK_SEMANTIC_UNRESOLVED_TAP_BRANCH:
-            *out_slot = KEY_FEEDBACK_BROAD_OWNER_GROUP_UNRESOLVED_TAP_BRANCH;
-            return true;
-        case KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED:
-            *out_slot = KEY_FEEDBACK_BROAD_OWNER_GROUP_TAP_BRANCH_COMMITTED;
+        case KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING:
+            *out_slot = KEY_FEEDBACK_BROAD_OWNER_GROUP_TAP_BRANCH_PENDING;
             return true;
         case KEY_FEEDBACK_SEMANTIC_TAP_COMMITTED:
             *out_slot = KEY_FEEDBACK_BROAD_OWNER_GROUP_TAP_COMMITTED;
@@ -116,7 +113,11 @@ static void key_feedback_broad_owner_builder_consider(key_feedback_broad_owner_b
 
 static uint8_t key_feedback_semantic_priority(key_feedback_semantic_t semantic) {
     switch (semantic) {
-        case KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED:
+        // Outranks the pending action states on purpose. A branch that is selected
+        // but not entered coexists with a pending hold tier whenever the action is
+        // deferred, and until something actually fires the branch is the honest
+        // answer to what letting go would send.
+        case KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING:
             return 70u;
         case KEY_FEEDBACK_SEMANTIC_TAP_COMMITTED:
             return 60u;
@@ -126,8 +127,6 @@ static uint8_t key_feedback_semantic_priority(key_feedback_semantic_t semantic) 
         case KEY_FEEDBACK_SEMANTIC_HOLD_ACTIVE_FLASHING:
         case KEY_FEEDBACK_SEMANTIC_HOLD_PENDING:
             return 40u;
-        case KEY_FEEDBACK_SEMANTIC_UNRESOLVED_TAP_BRANCH:
-            return 10u;
         case KEY_FEEDBACK_SEMANTIC_NONE:
         default:
             return 0u;
@@ -154,26 +153,6 @@ static void key_feedback_apply_semantic_to_bitmap(uint8_t *semantic_map, const u
 
             existing = key_feedback_semantic_map_get(semantic_map, key_pos);
             key_feedback_semantic_map_set(semantic_map, key_pos, key_feedback_semantic_max(existing, semantic));
-        }
-    }
-}
-
-static void key_feedback_clear_semantic_from_bitmap(uint8_t *semantic_map, const uint8_t *bitmap, key_feedback_semantic_t semantic) {
-    if (!(semantic_map && bitmap && semantic != KEY_FEEDBACK_SEMANTIC_NONE)) {
-        return;
-    }
-
-    for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
-        for (uint8_t col = 0; col < MATRIX_COLS; col++) {
-            keypos_t key_pos = {.row = row, .col = col};
-
-            if (!key_origin_bitmap_has_keypos(bitmap, key_pos)) {
-                continue;
-            }
-
-            if (key_feedback_semantic_map_get(semantic_map, key_pos) == semantic) {
-                key_feedback_semantic_map_set(semantic_map, key_pos, KEY_FEEDBACK_SEMANTIC_NONE);
-            }
         }
     }
 }
@@ -230,89 +209,30 @@ static bool key_feedback_tap_branch_is_higher_tier(uint8_t tap_count) {
     return tap_count > 1u;
 }
 
-static bool key_feedback_branch_confirm_mode_allows(uint8_t tap_count) {
-    switch (key_feedback_branch_confirm_mode()) {
-        case KEY_FEEDBACK_BRANCH_CONFIRM_OFF:
-            return false;
-        case KEY_FEEDBACK_BRANCH_CONFIRM_NON_BASE_TAPS:
-            return key_feedback_tap_branch_is_higher_tier(tap_count);
-        default:
-            return false;
-    }
+// A tap branch is entered once it has been confirmed and is no longer being held
+// back, which is the instant the action path takes the series over. Before that
+// the branch is merely selected, however many clocks are running.
+static bool key_feedback_tap_series_branch_entered(const tap_series_t *series) {
+    return series->branch_confirmed && !series->branch_confirming;
 }
 
-// The count clock is the single source of truth for which of the two tap-phase
-// colors is showing. It runs from the last tap in the series and expires one
-// multi_tap_term later; that expiry is the moment the tap count settles.
+// One state, one color: a tap branch is selected and has not been entered yet.
 //
-// Returned as a signed offset from the settle moment so one value distinguishes
-// all three positions: negative means the count is still open, zero or positive
-// means it has settled, and callers compare against the branch-confirm term for
-// the far edge. Signed wrap is not a concern because both terms are far below
-// INT16_MAX milliseconds.
+// It opens on the tap that counts into the branch and closes when that branch is
+// entered. Both edges are events the runtime observes directly, so there is no
+// derived settle moment to get wrong and no way for the color to claim an outcome
+// the engine has not reached. A further tap simply renames the branch.
 //
-// Deliberately independent of branch_confirming, pending_hold and release state.
-// Those describe when the *action* resolves, which happens on its own clocks and
-// through several different paths; letting them drive the display is what made
-// the count color land on the wrong instant for hold-authoring branches. See
+// Deliberately still true through the branch-confirm window. That window exists
+// to hold the action back so the branch is visible before it fires, so the branch
+// color is exactly what belongs on the key while it runs; gating it off here is
+// what would leave the board dark right before a hold or long-hold lands. See
 // docs/rgbflow.md.
-static int16_t key_feedback_tap_series_settle_offset(const tap_series_t *series) {
-    return (int16_t)(timer_read() - (uint16_t)(series->last_counted_tap_at + series->tap_term_ms));
-}
-
-// White: past the base single tap, count clock still running. The base single tap
-// stays quiet because one tap does not show the user meant to enter a tap branch.
-static bool key_feedback_tap_series_shows_pending_feedback(const tap_series_t *series) {
-    if (!(series && series->active && !series->branch_confirmed && !series->branch_confirming)) {
-        return false;
-    }
-
-    if (!key_feedback_tap_branch_is_higher_tier(series->tap_count)) {
-        return false;
-    }
-
-    return key_feedback_tap_series_settle_offset(series) < 0;
-}
-
-// The count color answers two separate questions, and both are load bearing.
 //
-// First, as a phase indicator: the count clock has expired, so name the winner.
-// This is the one the count clock drives, and it is what makes the color land on
-// the same instant regardless of which path resolves the action.
-//
-// Second, as a pre-action indicator: an action is being held back in its
-// branch-confirm window, so name the branch before it fires. For a threshold tier
-// this is the only thing shown during that delay, so dropping it would leave the
-// board dark right before a hold or long-hold action lands.
-//
-// The two windows coincide on most keys and overlap harmlessly when they do not.
-static bool key_feedback_tap_series_shows_branch_confirmation(const tap_series_t *series) {
-    int16_t offset;
-
-    if (!(series && series->active)) {
-        return false;
-    }
-
-    if (series->branch_confirming && key_feedback_branch_confirm_mode_allows(series->branch_confirm_tap_count)) {
-        return true;
-    }
-
-    if (!key_feedback_branch_confirm_mode_allows(series->tap_count)) {
-        return false;
-    }
-
-    offset = key_feedback_tap_series_settle_offset(series);
-    return offset >= 0 && offset < (int16_t)series->branch_confirm_term_ms;
-}
-
-// Which count the color names: the action-delay window carries its own, and the
-// count-settled window uses the series count.
-static uint8_t key_feedback_tap_series_branch_confirm_count(const tap_series_t *series) {
-    if (!series) {
-        return 0u;
-    }
-
-    return series->branch_confirming ? series->branch_confirm_tap_count : series->tap_count;
+// The base tap stays quiet because branch 0 needs no color of its own; one tap
+// does not show the user meant to enter a tap branch at all.
+static bool key_feedback_tap_series_shows_tap_branch(const tap_series_t *series) {
+    return series && series->active && !key_feedback_tap_series_branch_entered(series) && key_feedback_tap_branch_is_higher_tier(series->tap_count);
 }
 
 static key_feedback_semantic_t key_feedback_semantic_for_pulse(key_feedback_pulse_kind_t kind) {
@@ -559,12 +479,8 @@ void key_feedback_broad_owner_map(uint8_t *out_map) {
     for (uint16_t index = 0; state && index < KEY_RUNTIME_CORE_TAP_SERIES_CAPACITY; index++) {
         keypos_t key_pos;
 
-        if (key_feedback_tap_series_shows_pending_feedback(&state->tap_series[index]) && key_runtime_core_tap_series_key_pos(&state->tap_series[index], &key_pos)) {
-            key_feedback_broad_owner_builder_consider(&builder, key_pos, KEY_FEEDBACK_SEMANTIC_UNRESOLVED_TAP_BRANCH, state->tap_series[index].feedback_sequence);
-        }
-
-        if (key_feedback_tap_series_shows_branch_confirmation(&state->tap_series[index]) && key_runtime_core_tap_series_key_pos(&state->tap_series[index], &key_pos)) {
-            key_feedback_broad_owner_builder_consider(&builder, key_pos, KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED, state->tap_series[index].feedback_sequence);
+        if (key_feedback_tap_series_shows_tap_branch(&state->tap_series[index]) && key_runtime_core_tap_series_key_pos(&state->tap_series[index], &key_pos)) {
+            key_feedback_broad_owner_builder_consider(&builder, key_pos, KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING, state->tap_series[index].feedback_sequence);
         }
     }
 
@@ -599,12 +515,8 @@ void key_feedback_semantic_map(uint8_t *out_map) {
     for (uint16_t index = 0; state && index < KEY_RUNTIME_CORE_TAP_SERIES_CAPACITY; index++) {
         keypos_t key_pos;
 
-        if (key_feedback_tap_series_shows_pending_feedback(&state->tap_series[index]) && key_runtime_core_tap_series_key_pos(&state->tap_series[index], &key_pos)) {
-            key_feedback_apply_semantic_for_owner(out_map, key_pos, KEY_FEEDBACK_SEMANTIC_UNRESOLVED_TAP_BRANCH);
-        }
-
-        if (key_feedback_tap_series_shows_branch_confirmation(&state->tap_series[index]) && key_runtime_core_tap_series_key_pos(&state->tap_series[index], &key_pos)) {
-            key_feedback_apply_semantic_for_owner(out_map, key_pos, KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED);
+        if (key_feedback_tap_series_shows_tap_branch(&state->tap_series[index]) && key_runtime_core_tap_series_key_pos(&state->tap_series[index], &key_pos)) {
+            key_feedback_apply_semantic_for_owner(out_map, key_pos, KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING);
         }
     }
 
@@ -617,13 +529,6 @@ void key_feedback_semantic_map(uint8_t *out_map) {
         }
 
         key_feedback_apply_semantic_for_owner(out_map, key_pos, semantic);
-    }
-
-    if (state) {
-        uint8_t pressed_combo_bitmap[KEY_ORIGIN_BITMAP_SIZE];
-
-        noah_qmk_combo_origin_pressed_combo_bitmap(pressed_combo_bitmap);
-        key_feedback_clear_semantic_from_bitmap(out_map, pressed_combo_bitmap, KEY_FEEDBACK_SEMANTIC_UNRESOLVED_TAP_BRANCH);
     }
 }
 
@@ -639,8 +544,8 @@ void key_feedback_tap_branch_map(uint8_t *out_map) {
     for (uint16_t index = 0; state && index < KEY_RUNTIME_CORE_TAP_SERIES_CAPACITY; index++) {
         keypos_t key_pos;
 
-        if (key_feedback_tap_series_shows_branch_confirmation(&state->tap_series[index]) && key_runtime_core_tap_series_key_pos(&state->tap_series[index], &key_pos)) {
-            key_feedback_apply_tap_branch_for_owner(out_map, key_pos, key_feedback_tap_series_branch_confirm_count(&state->tap_series[index]));
+        if (key_feedback_tap_series_shows_tap_branch(&state->tap_series[index]) && key_runtime_core_tap_series_key_pos(&state->tap_series[index], &key_pos)) {
+            key_feedback_apply_tap_branch_for_owner(out_map, key_pos, state->tap_series[index].tap_count);
         }
     }
 }

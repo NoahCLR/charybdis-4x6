@@ -669,7 +669,7 @@ static void test_recovery_sends_latest_state_and_preserves_later_dirty_domains(v
     CHECK(rpc_send_ids[1] == PUT_SPLIT_COMBO_FEEDBACK_SYNC);
 
     fake_combo_underlay_bitmap[0] = 0x72u;
-    key_feedback_semantic_map_set(fake_key_feedback_semantic_map, (keypos_t){.row = 1, .col = 1}, KEY_FEEDBACK_SEMANTIC_UNRESOLVED_TAP_BRANCH);
+    key_feedback_semantic_map_set(fake_key_feedback_semantic_map, (keypos_t){.row = 1, .col = 1}, KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING);
     key_feedback_tap_branch_map_set(fake_key_feedback_tap_branch_map, (keypos_t){.row = 1, .col = 1}, 3u);
     split_runtime_sync_mark_key_feedback_dirty();
     test_reset_rpc_send_counts();
@@ -686,7 +686,7 @@ static void test_recovery_sends_latest_state_and_preserves_later_dirty_domains(v
     CHECK(rpc_send_count == 4u);
     CHECK(rpc_send_ids[0] == PUT_SPLIT_RUNTIME_BASE_SYNC);
     CHECK(rpc_last_combo_packet.combo_underlay_bitmap[0] == 0x72u);
-    CHECK(key_feedback_semantic_map_get(rpc_last_key_feedback_semantic_packet.key_feedback_semantic_map, (keypos_t){.row = 1, .col = 1}) == KEY_FEEDBACK_SEMANTIC_UNRESOLVED_TAP_BRANCH);
+    CHECK(key_feedback_semantic_map_get(rpc_last_key_feedback_semantic_packet.key_feedback_semantic_map, (keypos_t){.row = 1, .col = 1}) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING);
     CHECK(key_feedback_tap_branch_map_get(rpc_last_key_feedback_branch_packet.key_feedback_tap_branch_map, (keypos_t){.row = 1, .col = 1}) == 3u);
     split_runtime_sync_debug_transport_snapshot(&transport);
     CHECK(!transport.backoff_active);
@@ -767,7 +767,7 @@ static void test_force_sync_sends_all_packets_even_when_unchanged(void) {
 static void test_key_feedback_visibility_is_ignored_without_flashing_semantics(void) {
     test_reset_stubs();
     key_feedback_semantic_map_clear(fake_key_feedback_semantic_map);
-    key_feedback_semantic_map_set(fake_key_feedback_semantic_map, (keypos_t){.row = 1, .col = 1}, KEY_FEEDBACK_SEMANTIC_UNRESOLVED_TAP_BRANCH);
+    key_feedback_semantic_map_set(fake_key_feedback_semantic_map, (keypos_t){.row = 1, .col = 1}, KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING);
     key_origin_bitmap_clear(fake_key_feedback_flash_visibility_bitmap);
     key_origin_bitmap_add_keypos(fake_key_feedback_flash_visibility_bitmap, (keypos_t){.row = 1, .col = 1});
 
@@ -877,7 +877,7 @@ static void test_tick_sends_only_key_feedback_packet_when_only_key_feedback_chan
     split_runtime_sync_init();
     test_reset_rpc_send_counts();
 
-    key_feedback_semantic_map_set(fake_key_feedback_semantic_map, (keypos_t){.row = 1, .col = 1}, KEY_FEEDBACK_SEMANTIC_UNRESOLVED_TAP_BRANCH);
+    key_feedback_semantic_map_set(fake_key_feedback_semantic_map, (keypos_t){.row = 1, .col = 1}, KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING);
 
     split_runtime_sync_tick();
 
@@ -887,7 +887,7 @@ static void test_tick_sends_only_key_feedback_packet_when_only_key_feedback_chan
     CHECK(rpc_send_count_key_feedback_semantic == 1u);
     CHECK(rpc_send_count_key_feedback_branch == 0u);
     CHECK(rpc_last_send_id == PUT_SPLIT_KEY_FEEDBACK_SEMANTIC_SYNC);
-    CHECK(key_feedback_semantic_map_get(rpc_last_key_feedback_semantic_packet.key_feedback_semantic_map, (keypos_t){.row = 1, .col = 1}) == KEY_FEEDBACK_SEMANTIC_UNRESOLVED_TAP_BRANCH);
+    CHECK(key_feedback_semantic_map_get(rpc_last_key_feedback_semantic_packet.key_feedback_semantic_map, (keypos_t){.row = 1, .col = 1}) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING);
 }
 
 static void test_tick_sends_only_key_feedback_branch_packet_when_only_tap_branch_changes(void) {

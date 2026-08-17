@@ -2172,7 +2172,6 @@ function parseKeyBehaviorFeedback(text) {
         branchColors = [];
     }
     return {
-        tapPendingColor: parseHsv(fields[".tap_pending_color"]),
         tapBranchColors: branchColors,
         branchConfirmMode: normalizeExpr(fields[".branch_confirm_mode"] || ""),
         tapCommittedColor: parseHsv(fields[".tap_committed_color"]),
@@ -2750,7 +2749,6 @@ async function patchComboFeedback(root, target, hue, sat, val, locality) {
 
 async function patchKeyBehaviorFeedback(root, target, config) {
     const colors = {
-        tapPendingColor: normalizeHsvRequest(config?.tapPendingColor, "tap pending color"),
         tapCommittedColor: normalizeHsvRequest(config?.tapCommittedColor, "tap committed color"),
         holdActiveColor: normalizeHsvRequest(config?.holdActiveColor, "hold active color"),
         longHoldActiveColor: normalizeHsvRequest(config?.longHoldActiveColor, "long-hold active color"),
@@ -2767,7 +2765,6 @@ async function patchKeyBehaviorFeedback(root, target, config) {
 
     const filePath = profileTargetPaths(root, target).rgb;
     let text = await fs.readFile(filePath, "utf8");
-    text = patchFieldInInitializer(text, /key_behavior_feedback_colors\s*=/, ".tap_pending_color", colors.tapPendingColor.expression);
     text = patchRgbTapBranchColorsInInitializer(text, /key_behavior_feedback_colors\s*=/, colors.tapBranchColors);
     text = patchFieldInInitializer(text, /key_behavior_feedback_colors\s*=/, ".branch_confirm_mode", branchConfirmMode);
     text = patchFieldInInitializer(text, /key_behavior_feedback_colors\s*=/, ".tap_committed_color", colors.tapCommittedColor.expression);
@@ -6554,15 +6551,13 @@ function getClientScript() {
     const keyFeedbackBranchConfirmModes = ${JSON.stringify(KEY_FEEDBACK_BRANCH_CONFIRM_MODES)};
     const keyBehaviorRgbSemantics = [
         keyBehaviorAllGroups,
-        "KEY_FEEDBACK_GROUP_UNRESOLVED_TAP_BRANCH",
-        "KEY_FEEDBACK_GROUP_TAP_BRANCH_COMMITTED",
+        "KEY_FEEDBACK_GROUP_TAP_BRANCH_PENDING",
         "KEY_FEEDBACK_GROUP_TAP_COMMITTED",
         "KEY_FEEDBACK_GROUP_HOLD_ACTIVE",
         "KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE"
     ];
     const keyBehaviorRgbSemanticLabels = {
-        KEY_FEEDBACK_GROUP_UNRESOLVED_TAP_BRANCH: "Tap pending",
-        KEY_FEEDBACK_GROUP_TAP_BRANCH_COMMITTED: "Committed tap-count branch",
+        KEY_FEEDBACK_GROUP_TAP_BRANCH_PENDING: "Tap branch pending",
         KEY_FEEDBACK_GROUP_TAP_COMMITTED: "Tap committed",
         KEY_FEEDBACK_GROUP_HOLD_ACTIVE: "Hold active",
         KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE: "Long hold active"
@@ -7292,7 +7287,6 @@ function getClientScript() {
             post({
                 type: "updateKeyBehaviorFeedback",
                 config: {
-                    tapPendingColor: readColorControl(card, "tapPendingColor"),
                     tapBranchColors: Array.from(card.querySelectorAll("[data-tap-branch-color]")).map(readColorControlFromNode),
                     branchConfirmMode: value(card, "branchConfirmMode"),
                     tapCommittedColor: readColorControl(card, "tapCommittedColor"),
@@ -12165,26 +12159,20 @@ function getClientScript() {
     function keyBehaviorRgbSemanticColorRows() {
         const feedback = model.rgb?.keyBehaviorFeedback || {};
         const fallback = { h: "0", s: "255", v: "RGB_MATRIX_MAXIMUM_BRIGHTNESS" };
-        const rows = [
-            {
-                semantic: "KEY_FEEDBACK_GROUP_UNRESOLVED_TAP_BRANCH",
-                label: keyBehaviorRgbSemanticLabel("KEY_FEEDBACK_GROUP_UNRESOLVED_TAP_BRANCH"),
-                color: feedback.tapPendingColor || fallback
-            }
-        ];
+        const rows = [];
         const branchColors = feedback.tapBranchColors || [];
         if (branchColors.length) {
             for (let index = 0; index < branchColors.length; index += 1) {
                 rows.push({
-                    semantic: "KEY_FEEDBACK_GROUP_TAP_BRANCH_COMMITTED",
-                    label: "Tap count " + (index + 2) + " branch committed",
+                    semantic: "KEY_FEEDBACK_GROUP_TAP_BRANCH_PENDING",
+                    label: "Tap count " + (index + 2) + " branch pending",
                     color: branchColors[index] || fallback
                 });
             }
         } else {
             rows.push({
-                semantic: "KEY_FEEDBACK_GROUP_TAP_BRANCH_COMMITTED",
-                label: keyBehaviorRgbSemanticLabel("KEY_FEEDBACK_GROUP_TAP_BRANCH_COMMITTED"),
+                semantic: "KEY_FEEDBACK_GROUP_TAP_BRANCH_PENDING",
+                label: keyBehaviorRgbSemanticLabel("KEY_FEEDBACK_GROUP_TAP_BRANCH_PENDING"),
                 color: fallback
             });
         }
@@ -12211,8 +12199,7 @@ function getClientScript() {
     function keyBehaviorSemanticColor(semantic) {
         const feedback = model.rgb?.keyBehaviorFeedback || {};
         return {
-            KEY_FEEDBACK_GROUP_UNRESOLVED_TAP_BRANCH: feedback.tapPendingColor,
-            KEY_FEEDBACK_GROUP_TAP_BRANCH_COMMITTED: (feedback.tapBranchColors || [])[0],
+            KEY_FEEDBACK_GROUP_TAP_BRANCH_PENDING: (feedback.tapBranchColors || [])[0],
             KEY_FEEDBACK_GROUP_TAP_COMMITTED: feedback.tapCommittedColor,
             KEY_FEEDBACK_GROUP_HOLD_ACTIVE: feedback.holdActiveColor,
             KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE: feedback.longHoldActiveColor
@@ -12450,7 +12437,6 @@ function getClientScript() {
             return "<p class='muted'>No active key behavior feedback config parsed.</p>";
         }
         const colorRows = [
-            ["Tap pending", "tapPendingColor", config.tapPendingColor],
             ["Tap committed", "tapCommittedColor", config.tapCommittedColor],
             ["Hold active", "holdActiveColor", config.holdActiveColor],
             ["Long hold active", "longHoldActiveColor", config.longHoldActiveColor],

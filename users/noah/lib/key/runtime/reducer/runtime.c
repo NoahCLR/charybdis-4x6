@@ -646,7 +646,6 @@ static void key_runtime_core_tap_series_note_tap(key_runtime_core_state_t *state
         .branch_confirm_term_ms       = branch_confirm_term_ms,
         .last_action                  = tap_action,
         .last_tap_at                  = now,
-        .last_counted_tap_at          = now,
         .tap_term_ms                  = tap_term_ms,
         .feedback_sequence            = key_runtime_core_state_next_feedback_sequence(state),
         .saved_mod_state              = saved_mod_state,
@@ -907,7 +906,6 @@ static void key_runtime_core_tap_series_seed(key_runtime_core_state_t *state, co
         .branch_confirm_term_ms       = seed->branch_confirm_term,
         .last_action                  = seed->tap_action,
         .last_tap_at                  = state->current_time,
-        .last_counted_tap_at          = state->current_time,
         .tap_term_ms                  = seed->multi_tap_term,
         .feedback_sequence            = key_runtime_core_state_next_feedback_sequence(state),
         .saved_mod_state              = mods,
@@ -945,7 +943,6 @@ static void key_runtime_core_tap_series_update_for_press(key_runtime_core_state_
     series->branch_confirm_term_ms       = token->interaction.binding.branch_confirm_term;
     series->last_action                  = token->interaction.binding.tap_action;
     series->last_tap_at                  = state->current_time;
-    series->last_counted_tap_at          = state->current_time;
     series->tap_term_ms                  = token->interaction.binding.multi_tap_term;
     series->feedback_sequence            = key_runtime_core_state_next_feedback_sequence(state);
     key_runtime_core_tap_series_active_set(state, series, true);

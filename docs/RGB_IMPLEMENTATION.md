@@ -75,28 +75,35 @@ plan was empty but `next_feedback_sequence` moved, checked on the press, release
 and scan entry points. `should_build_packet` also rebuilds unconditionally while
 the last sent packet was active, so an active-to-inactive edge is never missed.
 
-## The tap phase runs on one clock
+## The tap phase runs on no clock
 
-Both tap-phase colors derive from `last_counted_tap_at + tap_term_ms`. That field
-is stamped only where a tap is counted into the series, and deliberately not in
-`note_hold_release`, which restamps `last_tap_at` when a held tier releases.
+Both tap-phase questions collapse into one predicate,
+`key_feedback_tap_series_shows_tap_branch`: the series is active, the tap count is
+past the base one, and the branch is not entered yet. "Entered" is
+`branch_confirmed && !branch_confirming`, the instant the action path takes the
+series over.
 
 ```mermaid
 flowchart TD
-    OFF["settle offset =<br>now minus last_counted_tap_at plus tap_term_ms"]
-    OFF -->|"offset below zero"| W["count still open<br>white, if tap_count above one"]
-    OFF -->|"offset zero to branch_confirm_term_ms"| C["count settled<br>colour for that count"]
-    OFF -->|"offset beyond that"| Q["tap phase over<br>nothing from this clock"]
+    T["tap counted into the series<br>tap_count above one"]
+    T --> P["branch selected<br>colour for tap_count"]
+    P -->|"another tap"| T
+    P ==>|"branch_confirmed and<br>not branch_confirming"| Q["branch entered<br>action semantics own the key"]
 
-    style OFF fill:#EDF0F4,stroke:#5A6673,color:#1A1F26
-    style W fill:#FFFFFF,stroke:#5A6673,color:#1A1F26
-    style C fill:#B400FF,stroke:#6E0099,color:#FFFFFF
+    style T fill:#EDF0F4,stroke:#5A6673,color:#1A1F26
+    style P fill:#B400FF,stroke:#6E0099,color:#FFFFFF
     style Q fill:#DDE3EA,stroke:#5A6673,color:#1A1F26
 ```
 
-White additionally requires `!branch_confirmed && !branch_confirming`. The count
-color additionally fires whenever an action-delay window is open, which is the
-overload described at the end of this document.
+There is no derived settle moment, so there is nothing to anchor and nothing to
+disagree with the engine about. `tap_branch_map` carries
+`series->tap_count`, which the reducer sets from
+`token->interaction.selection.tap_count` — the resolved branch index, not the raw
+press count, so the colour names the branch that would actually win.
+
+The predicate stays true through the branch-confirm window on purpose: that window
+holds the action back so the branch is visible before it fires, so the branch
+colour is what belongs on the key while it runs.
 
 ## The action phase runs on five paths
 
@@ -181,11 +188,10 @@ When one key has more than one live semantic, the highest wins.
 
 | Priority | Semantic |
 | --- | --- |
-| 70 | tap branch committed |
+| 70 | tap branch pending |
 | 60 | tap committed |
 | 50 | long hold active, steady or flashing |
 | 40 | hold active or hold pending |
-| 10 | unresolved tap branch |
 
 ## Deliberate silences
 
@@ -193,28 +199,25 @@ When one key has more than one live semantic, the highest wins.
 - any tier a row does not author
 - layer and pointer-mode actions, whose own overlays are the persistent feedback
 - any hold tier carrying a layer preview, which routes to the preview stage
-- keys inside a currently pressed combo, cleared from the semantic map
 - implicit-hold and fallback-hold tokens
 
 ## Where this does not match rgbflow.md
 
-1. **The count colour is overloaded.** It fires both when the count clock settles
-   and whenever an action-delay window is open. The second meaning is load
-   bearing: for a threshold tier it is the only thing shown while the action is
-   held back, so removing it leaves the board dark right before a hold or
-   long-hold lands. But one colour now answers two questions.
+1. **The palette has homonyms.** The three-tap colour is the same `#3C00FF` as
+   `LAYER_NAV`; the four-tap `#00A2FF` is a near miss for `long_hold_active`
+   `#0084FF`. Both are reachable on keys that use both meanings, and the branch
+   colours are now on screen for longer than they used to be, so these collisions
+   are more visible than before rather than less.
 
-2. **Display and action can describe different moments.** The display moved to the
-   count clock; action resolution still runs on the five paths above. On a
-   hold-authoring branch released early, the count colour appears when the count
-   settles while the action resolved at the release and fires on its own schedule.
-
-3. **The palette has homonyms.** `tap_pending` is the same `#FFFFFF` as
-   `LAYER_POINTER`; the three-tap colour is the same `#3C00FF` as `LAYER_NAV`;
-   `tap_committed` is the same `#00FF00` as `LAYER_NUM`; the four-tap `#00A2FF`
-   is a near miss for `long_hold_active` `#0084FF`. Every collision is reachable
-   on keys that use both meanings.
-
-4. **Scale is out of proportion to scope.** `RGB_KEY_HALF` repaints half the board
+2. **Scale is out of proportion to scope.** `RGB_KEY_HALF` repaints half the board
    for a single key's state, and this stage renders last, so it overrides the
    layer and pointer-mode colours underneath while it is active.
+
+### Closed by the single-state tap phase
+
+- The count colour is no longer overloaded: one predicate, one meaning, and the
+  branch-confirm window is covered by the same fact rather than a second trigger.
+- Display and action can no longer describe different moments, because the display
+  reads the action state instead of a parallel clock.
+- The `tap_pending` white that collided with `LAYER_POINTER` `#FFFFFF` is gone,
+  and `tap_committed` green still collides with `LAYER_NUM` `#00FF00`.

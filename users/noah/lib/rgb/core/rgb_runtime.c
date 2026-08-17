@@ -79,14 +79,19 @@ static void rgb_runtime_render_snapshot_ensure_combo(void) {
 }
 
 #        ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
-static void rgb_runtime_render_snapshot_suppress_combo_unresolved_semantics(void) {
+// Split staleness only. The mirrored key-feedback packet can lag the combo
+// packet, so a key the slave now paints as part of a combo footprint may still
+// carry a tap-branch semantic from before. Dropping it here keeps a stale colour
+// from stomping the live footprint; this is not a judgement about whether a combo
+// member should ever show its branch, which the engine map decides.
+static void rgb_runtime_render_snapshot_suppress_combo_tap_branch_semantics(void) {
     for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
         for (uint8_t col = 0; col < MATRIX_COLS; col++) {
             keypos_t key_pos = {.row = row, .col = col};
             bool     combo_key;
 
             combo_key = key_origin_bitmap_has_keypos(rgb_runtime_render_snapshot.combo_underlay_bitmap, key_pos) || key_origin_bitmap_has_keypos(rgb_runtime_render_snapshot.combo_overlay_bitmap, key_pos);
-            if (combo_key && key_feedback_semantic_map_get(rgb_runtime_render_snapshot.key_feedback_semantic_map, key_pos) == KEY_FEEDBACK_SEMANTIC_UNRESOLVED_TAP_BRANCH) {
+            if (combo_key && key_feedback_semantic_map_get(rgb_runtime_render_snapshot.key_feedback_semantic_map, key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING) {
                 key_feedback_semantic_map_set(rgb_runtime_render_snapshot.key_feedback_semantic_map, key_pos, KEY_FEEDBACK_SEMANTIC_NONE);
             }
         }
@@ -112,7 +117,7 @@ static void rgb_runtime_render_snapshot_ensure_key_feedback(void) {
         (void)split_runtime_sync_remote_read_key_feedback_branch(rgb_runtime_render_snapshot.key_feedback_broad_owner_map, rgb_runtime_render_snapshot.key_feedback_tap_branch_map);
     }
 
-    rgb_runtime_render_snapshot_suppress_combo_unresolved_semantics();
+    rgb_runtime_render_snapshot_suppress_combo_tap_branch_semantics();
     rgb_runtime_render_snapshot.key_feedback_valid = true;
 }
 #        endif

@@ -295,16 +295,14 @@ also project its state into the RGB overlay.
 
 Shared semantics:
 
-- multi-tap pending shows the neutral unresolved color only for double-tap and
-  higher gestures, and only while the winning tap index is still open, meaning a
-  deeper authored tap branch is still reachable. The base single-tap candidate
-  stays quiet while it waits, and reaching the deepest authored branch settles
-  the index and goes straight to branch-confirm. A pending hold tier does not
-  show this color: the index is already settled, and the tap-vs-hold decision
-  window is silent everywhere on the board
-- committed double-tap and higher authored branches can open a branch-confirm
-  feedback window that delays the selected action long enough to show the
-  branch color; the authored RGB config can also skip that window
+- every tap past the base one shows the color of the branch it reaches, and holds
+  it until that branch is entered. Another tap simply renames the branch. The base
+  tap stays dark: branch 0 needs no color of its own, and one tap does not show
+  intent to enter a tap branch. A pending hold tier does not end the color, since
+  the branch has not been entered while its action is still deferred
+- double-tap and higher authored branches can open a branch-confirm window that
+  delays the selected action long enough for the branch color to be seen; the
+  branch color covers that whole window, and the authored RGB config can skip it
 - committed authored tap-count branches can pulse once after the tap output
   resolves; the authored RGB config can disable those pulses or limit them to
   double-tap and higher branches

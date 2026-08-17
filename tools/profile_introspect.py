@@ -1104,7 +1104,7 @@ def parse_key_behavior_feedback_colors(
                     {
                         "field": f"tap_count_{tap_count}_branch_color",
                         "label": f"Tap Count {tap_count}",
-                        "meaning": "Configured branch-confirmation color for this committed authored branch. The table starts at double-tap because the base single-tap branch never emits branch-confirm feedback; higher committed authored branches clamp to the last configured branch color.",
+                        "meaning": "Color of this tap branch while it is selected and not yet entered, from the tap that reaches it until its action fires, including through any branch-confirm window. The table starts at double-tap because the base tap stays dark; deeper branches clamp to the last configured branch color.",
                         "color": authored_color,
                         "preview_color": dict(authored_color),
                     },
@@ -1112,7 +1112,6 @@ def parse_key_behavior_feedback_colors(
             )
 
     default_meanings = {
-        "tap_pending_color": "Neutral unresolved state for double-tap and higher gestures, shown only while the winning tap index is still open because a deeper authored tap branch is still reachable. The base single-tap candidate stays quiet, and reaching the deepest authored branch settles the index and goes straight to branch-confirm.",
         "tap_committed_color": "Action feedback after committed tap-count branches that do not already have state feedback.",
         "hold_active_color": "Authored hold-tier pending / active states and hold-tier commit pulses.",
         "long_hold_active_color": "Authored long-hold-tier active states and long-hold-tier commit pulses.",
@@ -1436,8 +1435,7 @@ def finalize_rgb_led_group_previews(
     layer_color_map = {row["layer"]: row for row in layer_colors}
     pd_mode_color_map = {row["pointing_mode"]: row for row in pd_mode_colors}
     key_feedback_color_map = {
-        "KEY_FEEDBACK_GROUP_UNRESOLVED_TAP_BRANCH": first_feedback_color_by_field(key_behavior_feedback_colors, "tap_pending_color"),
-        "KEY_FEEDBACK_GROUP_TAP_BRANCH_COMMITTED": first_feedback_color_by_field(key_behavior_feedback_colors, "tap_count_2_branch_color"),
+        "KEY_FEEDBACK_GROUP_TAP_BRANCH_PENDING": first_feedback_color_by_field(key_behavior_feedback_colors, "tap_count_2_branch_color"),
         "KEY_FEEDBACK_GROUP_TAP_COMMITTED": first_feedback_color_by_field(key_behavior_feedback_colors, "tap_committed_color"),
         "KEY_FEEDBACK_GROUP_HOLD_ACTIVE": first_feedback_color_by_field(key_behavior_feedback_colors, "hold_active_color"),
         "KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE": first_feedback_color_by_field(key_behavior_feedback_colors, "long_hold_active_color"),

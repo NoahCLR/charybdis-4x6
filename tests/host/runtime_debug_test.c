@@ -1639,7 +1639,7 @@ static void test_inherited_non_base_modifier_tap_flush_keeps_branch_confirm_with
 
     key_feedback_semantic_map(semantic_map);
     key_feedback_tap_branch_map(tap_branch_map);
-    CHECK(key_feedback_semantic_map_get(semantic_map, key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED);
+    CHECK(key_feedback_semantic_map_get(semantic_map, key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING);
     CHECK(key_feedback_tap_branch_map_get(tap_branch_map, key_pos) == 2u);
 
     fake_time = (uint16_t)(fake_time + CUSTOM_RGB_BRANCH_CONFIRM_TERM + 1u);
@@ -1686,7 +1686,7 @@ static void test_inherited_terminal_modifier_tap_release_keeps_branch_confirm_wi
 
     key_feedback_semantic_map(semantic_map);
     key_feedback_tap_branch_map(tap_branch_map);
-    CHECK(key_feedback_semantic_map_get(semantic_map, key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED);
+    CHECK(key_feedback_semantic_map_get(semantic_map, key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING);
     CHECK(key_feedback_tap_branch_map_get(tap_branch_map, key_pos) == 2u);
 
     fake_time = (uint16_t)(fake_time + CUSTOM_RGB_BRANCH_CONFIRM_TERM + 1u);
@@ -1702,9 +1702,9 @@ static void test_inherited_terminal_modifier_tap_release_keeps_branch_confirm_wi
     CHECK(key_feedback_tap_branch_map_get(tap_branch_map, key_pos) == 0u);
 }
 
-// White reports position, not ambiguity: past the base tap and not yet
-// committed. A pending hold tier on the deepest authored branch does not end it.
-static void test_key_feedback_maps_keep_pending_hold_neutral_until_branch_commits(void) {
+// A pending hold tier does not change the tap phase: the second tap has already
+// named its branch, and that branch stays named until it is entered.
+static void test_key_feedback_maps_name_the_branch_through_a_pending_hold(void) {
     uint8_t             semantic_map[KEY_FEEDBACK_SEMANTIC_MAP_SIZE];
     uint8_t             tap_branch_map[KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE];
     const tap_series_t *series;
@@ -1729,14 +1729,13 @@ static void test_key_feedback_maps_keep_pending_hold_neutral_until_branch_commit
     key_feedback_semantic_map(semantic_map);
     key_feedback_tap_branch_map(tap_branch_map);
 
-    CHECK(key_feedback_semantic_map_get(semantic_map, key_pos) == KEY_FEEDBACK_SEMANTIC_UNRESOLVED_TAP_BRANCH);
-    CHECK(key_feedback_tap_branch_map_get(tap_branch_map, key_pos) == 0u);
+    CHECK(key_feedback_semantic_map_get(semantic_map, key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING);
+    CHECK(key_feedback_tap_branch_map_get(tap_branch_map, key_pos) == 2u);
 }
 
-// A tap-only terminal branch still shows white from the second tap until the
-// count confirms. Reaching the deepest authored branch does not end the white;
-// only committing does.
-static void test_key_feedback_maps_show_final_tap_only_neutral_pending_then_branch_commit(void) {
+// A tap-only terminal branch names itself on the second tap and holds that name
+// through every clock in between, until its action fires.
+static void test_key_feedback_maps_name_final_tap_only_branch_until_the_action_fires(void) {
     uint8_t             semantic_map[KEY_FEEDBACK_SEMANTIC_MAP_SIZE];
     uint8_t             tap_branch_map[KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE];
     const tap_series_t *series;
@@ -1763,8 +1762,8 @@ static void test_key_feedback_maps_show_final_tap_only_neutral_pending_then_bran
     key_feedback_semantic_map(semantic_map);
     key_feedback_tap_branch_map(tap_branch_map);
 
-    CHECK(key_feedback_semantic_map_get(semantic_map, key_pos) == KEY_FEEDBACK_SEMANTIC_UNRESOLVED_TAP_BRANCH);
-    CHECK(key_feedback_tap_branch_map_get(tap_branch_map, key_pos) == 0u);
+    CHECK(key_feedback_semantic_map_get(semantic_map, key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING);
+    CHECK(key_feedback_tap_branch_map_get(tap_branch_map, key_pos) == 2u);
 
     fake_time = (uint16_t)(fake_time + CUSTOM_MULTI_TAP_TERM + 1u);
     noah_key_runtime_scan();
@@ -1784,12 +1783,12 @@ static void test_key_feedback_maps_show_final_tap_only_neutral_pending_then_bran
     CHECK(series->tap_count == 2u);
     CHECK(last_delayed_action == KC_NO);
 
-    // The count clock expired one scan ago, so white has already given way to the
-    // count colour even though the action path has not resolved this series yet.
+    // Still the same branch. Neither the multi-tap term expiring nor the release
+    // is a transition here: only entering the branch ends this phase.
     key_feedback_semantic_map(semantic_map);
     key_feedback_tap_branch_map(tap_branch_map);
 
-    CHECK(key_feedback_semantic_map_get(semantic_map, key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED);
+    CHECK(key_feedback_semantic_map_get(semantic_map, key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING);
     CHECK(key_feedback_tap_branch_map_get(tap_branch_map, key_pos) == 2u);
 
     fake_time = (uint16_t)(fake_time + CUSTOM_MULTI_TAP_TERM + 1u);
@@ -1801,7 +1800,7 @@ static void test_key_feedback_maps_show_final_tap_only_neutral_pending_then_bran
 
     key_feedback_semantic_map(semantic_map);
     key_feedback_tap_branch_map(tap_branch_map);
-    CHECK(key_feedback_semantic_map_get(semantic_map, key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED);
+    CHECK(key_feedback_semantic_map_get(semantic_map, key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING);
     CHECK(key_feedback_tap_branch_map_get(tap_branch_map, key_pos) == 2u);
 
     fake_time = (uint16_t)(fake_time + CUSTOM_RGB_BRANCH_CONFIRM_TERM + 1u);
@@ -1817,10 +1816,11 @@ static void test_key_feedback_maps_show_final_tap_only_neutral_pending_then_bran
     CHECK(key_feedback_tap_branch_map_get(tap_branch_map, key_pos) == 0u);
 }
 
-// KC_LEFT_GUI authors branches at tap counts 2 and 3. White holds across every
-// tap past the base one, whatever depth remains, and only the base tap is quiet.
-static void test_key_feedback_maps_hold_pending_white_across_the_whole_tap_loop(void) {
+// KC_LEFT_GUI authors branches at tap counts 2 and 3. Each tap past the base one
+// renames the key to its own branch; only the base tap is quiet.
+static void test_key_feedback_maps_rename_the_branch_on_every_tap(void) {
     uint8_t             semantic_map[KEY_FEEDBACK_SEMANTIC_MAP_SIZE];
+    uint8_t             tap_branch_map[KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE];
     const tap_series_t *series;
     keypos_t            key_pos = test_keypos(6, 3);
 
@@ -1852,9 +1852,11 @@ static void test_key_feedback_maps_hold_pending_white_across_the_whole_tap_loop(
     CHECK(series->tap_count == 2u);
     CHECK(series->authored_has_more_taps);
 
-    // Second tap: white, with a deeper branch still reachable.
+    // Second tap names branch 2, with a deeper branch still reachable.
     key_feedback_semantic_map(semantic_map);
-    CHECK(key_feedback_semantic_map_get(semantic_map, key_pos) == KEY_FEEDBACK_SEMANTIC_UNRESOLVED_TAP_BRANCH);
+    key_feedback_tap_branch_map(tap_branch_map);
+    CHECK(key_feedback_semantic_map_get(semantic_map, key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING);
+    CHECK(key_feedback_tap_branch_map_get(tap_branch_map, key_pos) == 2u);
 
     fake_time = (uint16_t)(fake_time + 20u);
     CHECK(!test_process_record(KC_LEFT_GUI, key_pos, true));
@@ -1866,10 +1868,78 @@ static void test_key_feedback_maps_hold_pending_white_across_the_whole_tap_loop(
     CHECK(!series->authored_has_more_taps);
     CHECK(!series->pending_hold);
 
-    // Third tap is the deepest authored branch, but the count has still not
-    // committed, so the white holds rather than going dark here.
+    // Third tap renames to branch 3. Being the deepest authored branch does not
+    // end the phase; only entering it does.
     key_feedback_semantic_map(semantic_map);
-    CHECK(key_feedback_semantic_map_get(semantic_map, key_pos) == KEY_FEEDBACK_SEMANTIC_UNRESOLVED_TAP_BRANCH);
+    key_feedback_tap_branch_map(tap_branch_map);
+    CHECK(key_feedback_semantic_map_get(semantic_map, key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING);
+    CHECK(key_feedback_tap_branch_map_get(tap_branch_map, key_pos) == 3u);
+}
+
+// Regression: the branch name must not change between taps just because a clock
+// expired. A tap held briefly and then released used to move the display and the
+// engine onto different anchors, so the key changed colour mid-gesture while the
+// runtime would still accept another tap. There is no such clock now: only a new
+// tap renames the branch, and only entering it ends the phase.
+static void test_key_feedback_maps_hold_one_branch_name_across_a_slow_multi_tap(void) {
+    uint8_t             semantic_map[KEY_FEEDBACK_SEMANTIC_MAP_SIZE];
+    uint8_t             tap_branch_map[KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE];
+    const tap_series_t *series;
+    keypos_t            key_pos = test_keypos(6, 3);
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+
+    CHECK(!test_process_record(KC_LEFT_GUI, key_pos, true));
+    fake_time = (uint16_t)(fake_time + 10u);
+    CHECK(!test_process_record(KC_LEFT_GUI, key_pos, false));
+
+    // Second tap, deliberately held most of the tap-vs-hold window before release.
+    // That release restamps the accept window, so the engine keeps taking taps
+    // well past the point a press-anchored clock would have called this settled.
+    fake_time = (uint16_t)(fake_time + 20u);
+    CHECK(!test_process_record(KC_LEFT_GUI, key_pos, true));
+    fake_time = (uint16_t)(fake_time + CUSTOM_TAP_HOLD_TERM - 50u);
+    CHECK(!test_process_record(KC_LEFT_GUI, key_pos, false));
+
+    series = key_runtime_core_tap_series_at(key_pos);
+    CHECK(series != NULL);
+    CHECK(series->active);
+    CHECK(series->tap_count == 2u);
+
+    key_feedback_semantic_map(semantic_map);
+    key_feedback_tap_branch_map(tap_branch_map);
+    CHECK(key_feedback_semantic_map_get(semantic_map, key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING);
+    CHECK(key_feedback_tap_branch_map_get(tap_branch_map, key_pos) == 2u);
+
+    // Past where a clock anchored on the second press would have expired, and
+    // still inside the accept window the release restarted. Same branch, and the
+    // engine has resolved nothing.
+    fake_time = (uint16_t)(fake_time + 60u);
+    noah_key_runtime_scan();
+
+    series = key_runtime_core_tap_series_at(key_pos);
+    CHECK(series != NULL);
+    CHECK(series->active);
+    CHECK(!series->branch_confirmed);
+    CHECK(last_delayed_action == KC_NO);
+
+    key_feedback_semantic_map(semantic_map);
+    key_feedback_tap_branch_map(tap_branch_map);
+    CHECK(key_feedback_semantic_map_get(semantic_map, key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING);
+    CHECK(key_feedback_tap_branch_map_get(tap_branch_map, key_pos) == 2u);
+
+    // The third tap is the only thing that renames it.
+    CHECK(!test_process_record(KC_LEFT_GUI, key_pos, true));
+
+    series = key_runtime_core_tap_series_at(key_pos);
+    CHECK(series != NULL);
+    CHECK(series->tap_count == 3u);
+
+    key_feedback_semantic_map(semantic_map);
+    key_feedback_tap_branch_map(tap_branch_map);
+    CHECK(key_feedback_semantic_map_get(semantic_map, key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING);
+    CHECK(key_feedback_tap_branch_map_get(tap_branch_map, key_pos) == 3u);
 }
 
 static void test_key_feedback_branch_confirm_mode_can_skip_branch_commit_window(void) {
@@ -3208,9 +3278,10 @@ int main(void) {
     test_base_tap_multi_tap_flush_skips_branch_confirm();
     test_inherited_non_base_modifier_tap_flush_keeps_branch_confirm_without_commit_feedback();
     test_inherited_terminal_modifier_tap_release_keeps_branch_confirm_without_commit_feedback();
-    test_key_feedback_maps_keep_pending_hold_neutral_until_branch_commits();
-    test_key_feedback_maps_show_final_tap_only_neutral_pending_then_branch_commit();
-    test_key_feedback_maps_hold_pending_white_across_the_whole_tap_loop();
+    test_key_feedback_maps_name_the_branch_through_a_pending_hold();
+    test_key_feedback_maps_name_final_tap_only_branch_until_the_action_fires();
+    test_key_feedback_maps_rename_the_branch_on_every_tap();
+    test_key_feedback_maps_hold_one_branch_name_across_a_slow_multi_tap();
     test_key_feedback_branch_confirm_mode_can_skip_branch_commit_window();
     test_key_feedback_flashing_visibility_tracks_each_owner_activation();
     test_key_feedback_broad_owner_follows_newest_activation_without_release_restart();

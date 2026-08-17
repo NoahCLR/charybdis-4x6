@@ -8,67 +8,73 @@ Timing names are the authored fields on a `key_behaviors[]` row. All four are
 row-level, shared by every `tap_counts[]` entry on that key. Defaults live in
 the keymap [`config.h`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h).
 
-## Part one: two clocks from the same press
+## Part one: taps name the branch
 
-Every press starts two independent clocks, both measured from that press. One
-decides whether the tap count is final. The other decides which tier of that
-count you are in. They are not sequential, and on a key where the two terms
-differ they interleave in either order.
+The tap phase has one state and it is driven by your taps, not by a timer. Each
+tap past the base one names the branch it reaches, and the key holds that colour
+until the branch is entered. Tap again and it simply renames.
+
+Nothing about the tap phase is derived from a clock, so there is no moment where
+the colour can get ahead of the runtime or fall behind it. The only two things
+that change it are a further tap and the branch being entered.
 
 ```mermaid
 flowchart TD
-    TAP["a tap lands<br>this press starts both clocks below"]
-    TAP -->|"you tap again within multi_tap_term"| TAP
+    BASE["one tap so far<br>branch 0 needs no colour<br>dark"]
+    BASE -->|"tap again"| B2["branch 2 selected<br>violet"]
+    B2 -->|"tap again"| B3["branch 3 selected<br>blue"]
+    B3 -->|"tap again"| BN["deeper branches<br>clamp to the last<br>configured colour"]
 
-    TAP --> COUNTING
-    TAP --> BELOW
+    B2 ==>|"branch entered"| ACT["the tier decides<br>what fires<br>see part two"]
+    B3 ==>|"branch entered"| ACT
+    BN ==>|"branch entered"| ACT
 
-    subgraph COUNT["count clock, from this press"]
-        COUNTING["multi_tap_term running<br>one tap so far: dark<br>two or more so far: white"]
-        COUNTING -->|"multi_tap_term runs out"| CONF["count is final<br>colour for that count<br>for rgb_branch_confirm_term"]
-    end
+    style BASE fill:#DDE3EA,stroke:#5A6673,color:#1A1F26
+    style B2 fill:#B400FF,stroke:#6E0099,color:#FFFFFF
+    style B3 fill:#3C00FF,stroke:#28006E,color:#FFFFFF
+    style BN fill:#00A2FF,stroke:#0069A6,color:#1A1F26
+    style ACT fill:#EDF0F4,stroke:#5A6673,color:#1A1F26
+```
 
-    subgraph TIER["tier clock, from this press"]
-        BELOW["below tap_hold_term<br>nothing of its own to say"]
-        BELOW -->|"you let go"| TT["tap tier<br>see part two"]
-        BELOW ==>|"past tap_hold_term"| HT["hold tier live<br>see part two"]
-        HT ==>|"past longer_hold_term"| LT["long hold tier live<br>see part two"]
-    end
+Thick arrows are the board advancing on its own. Thin arrows are you tapping.
 
-    style TAP fill:#EDF0F4,stroke:#5A6673,color:#1A1F26
-    style COUNTING fill:#FFFFFF,stroke:#5A6673,color:#1A1F26
-    style CONF fill:#B400FF,stroke:#6E0099,color:#FFFFFF
+A branch is entered when its action is no longer being held back, which is the
+instant the action path takes the key over. Until then the branch colour owns the
+key, and it deliberately outranks the pending tier colours: while an action is
+still being deferred, the branch is the honest answer to what letting go would
+send. `rgb_branch_confirm_term` exists to hold that action back so you get to see
+the branch before it fires, so the branch colour is exactly what belongs on the
+key for the whole of that window.
+
+The base tap stays dark on purpose. One tap does not show that you meant to enter
+a tap branch at all, and a colour on every keystroke would be noise.
+
+## Part one and a half: which tier you enter
+
+Separately from the count, one clock from the current press decides which tier of
+the selected branch you reach.
+
+```mermaid
+flowchart TD
+    BELOW["below tap_hold_term"]
+    BELOW -->|"you let go"| TT["tap tier<br>see part two"]
+    BELOW ==>|"past tap_hold_term"| HT["hold tier<br>see part two"]
+    HT ==>|"past longer_hold_term"| LT["long hold tier<br>see part two"]
+
     style BELOW fill:#DDE3EA,stroke:#5A6673,color:#1A1F26
     style TT fill:#00FF00,stroke:#009E00,color:#1A1F26
     style HT fill:#FF6C00,stroke:#A34500,color:#1A1F26
     style LT fill:#0084FF,stroke:#00539E,color:#FFFFFF
 ```
 
-Thick arrows are the board advancing on its own when a term runs out. Thin
-arrows are you releasing the key.
+This clock says *which* action is selected within the branch. It does not change
+the tap phase: crossing `tap_hold_term` on a second tap does not end the branch
+colour, because the branch has not been entered yet. Once it is, these tier
+colours take over.
 
-When both clocks have something to say at once, precedence decides what you
-actually see: the count colour outranks the tier colour, which outranks white.
-So on a key whose `tap_hold_term` is shorter than its `multi_tap_term`, holding
-the second tap reads white, then orange when the tier clock crosses, then the
-count colour when the count clock runs out. Each transition is honest about
-what just became true.
-
-The tier clock says which action is selected. The count clock says when it is
-allowed to fire: the action waits out `rgb_branch_confirm_term` after the count
-becomes final. So a quick double tap selects its action at the release and sends
-it after the count colour has been shown.
-
-The confirmed-count node is filled violet, which is the two-tap colour. Three
-taps is blue, four is azure, and deeper counts clamp to the last colour in
-`RGB_TAP_BRANCH_COLORS(...)`. A single tap confirms without any colour, because
-`branch_confirm_mode` and `tap_commit_mode` are both restricted to non-base
-taps.
-
-The tier clock only reaches a hold tier if you keep holding. Tap twice and let
-go and it ends at the tap tier. A deeper authored branch being available does
-not change that: it keeps the count question open while the window is open, and
-never forces a deeper answer.
+The tier clock only reaches a hold tier if you keep holding. Tap twice and let go
+and it ends at the tap tier. A deeper authored branch being available never forces
+a deeper answer.
 
 ## Part two: what the tier actually does
 
@@ -133,7 +139,7 @@ that tier.
 
 Dark is a word in this language, not an absence. These conditions choose it:
 
-- a single tap for the whole of its multi-tap window, because one tap does not
+- the base tap for the whole of its multi-tap window, because one tap does not
   show intent to enter a tap branch
 - any tier a row does not author, so a `.long_hold`-only key shows nothing at
   the hold threshold
@@ -148,9 +154,9 @@ Dark is a word in this language, not an absence. These conditions choose it:
 
 ## When two states coincide
 
-Higher wins: tap-count confirmed, then tap sent, then long-hold, then hold,
-then the uncommitted white. White ranks lowest by design, so the moment
-anything is actually known the answer outranks the question.
+Higher wins: selected tap branch, then tap sent, then long-hold, then hold. The
+branch outranks the pending tier states by design, because a branch that has not
+been entered is a more truthful answer than a tier that has not fired.
 
 For the color table, locality, LED groups and render order, see
 [RGB_CONFIG.md](./RGB_CONFIG.md). For the engine contract behind these

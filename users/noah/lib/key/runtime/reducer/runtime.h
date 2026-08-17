@@ -157,11 +157,6 @@ typedef struct {
     uint16_t              branch_confirm_term_ms;
     uint16_t              last_action;
     uint16_t              last_tap_at;
-    // Stamped only when a tap is counted into this series, never on a hold
-    // release. last_tap_at tracks the last activity of any kind and is restamped
-    // when a held tier releases, which restarts the accept window; this one is
-    // the clock the RGB count phase reads, so it must mean the last actual tap.
-    uint16_t              last_counted_tap_at;
     uint16_t              tap_term_ms;
     uint32_t              feedback_sequence;
     keyboard_mod_state_t  saved_mod_state;

@@ -330,7 +330,6 @@ example shows the vocabulary.
 
 ```c
 const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
-    .tap_pending_color = HSV(0, 0, 150),
     RGB_TAP_BRANCH_COLORS(
         HSV(200, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), // double tap
         HSV(180, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), // triple tap
@@ -355,10 +354,10 @@ static const key_behavior_feedback_led_group_t
     );
 ```
 
-- `tap_pending_color`: the firmware is waiting to see whether a second tap or
-  higher branch will arrive
-- `RGB_TAP_BRANCH_COLORS(...)`: the colors shown while the branch is committed
-  and the RGB branch-confirm window is active
+- `RGB_TAP_BRANCH_COLORS(...)`: the color of the tap branch currently selected
+  and not yet entered. Every tap past the base one switches the key to that
+  branch's color and holds it until the branch is entered, including through the
+  RGB branch-confirm window. The base tap stays dark
 - `tap_committed_color`: a tap action just fired and does not already have a
   layer or pointing-mode state to show; inherited normal-tap repeats from a
   branch that omits `.tap` stay quiet
@@ -375,8 +374,7 @@ static const key_behavior_feedback_led_group_t
 - `locality`: chooses where the feedback paints with `RGB_BOTH_HALVES`,
   `RGB_LEFT_HALF`, `RGB_RIGHT_HALF`, `RGB_KEY_HALF`, or `RGB_KEYS_ONLY`
 - key-behavior LED group semantics let named LED groups follow
-  `KEY_FEEDBACK_GROUP_UNRESOLVED_TAP_BRANCH`,
-  `KEY_FEEDBACK_GROUP_TAP_BRANCH_COMMITTED`,
+  `KEY_FEEDBACK_GROUP_TAP_BRANCH_PENDING`,
   `KEY_FEEDBACK_GROUP_TAP_COMMITTED`, `KEY_FEEDBACK_GROUP_HOLD_ACTIVE`,
   `KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE`, or `KEY_FEEDBACK_GROUP_ALL`
 

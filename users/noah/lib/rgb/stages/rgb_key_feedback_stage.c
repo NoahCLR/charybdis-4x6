@@ -13,7 +13,6 @@ extern const key_behavior_feedback_color_config_t     key_behavior_feedback_colo
 extern const key_behavior_feedback_led_group_t *const key_behavior_feedback_led_groups;
 extern const uint8_t                                  key_behavior_feedback_led_group_count;
 
-static rgb_t   key_behavior_feedback_tap_pending_rgb;
 static rgb_t   key_behavior_feedback_tap_branch_rgb[KEY_BEHAVIOR_MAX_TAP_COUNT];
 static uint8_t key_behavior_feedback_tap_branch_rgb_count;
 static rgb_t   key_behavior_feedback_tap_committed_rgb;
@@ -30,7 +29,6 @@ typedef struct {
 #    endif
 
 void rgb_runtime_key_feedback_stage_post_init(void) {
-    key_behavior_feedback_tap_pending_rgb      = hsv_to_rgb(key_behavior_feedback_colors.tap_pending_color);
     key_behavior_feedback_tap_branch_rgb_count = key_behavior_feedback_colors.tap_branch_colors ? key_behavior_feedback_colors.tap_branch_color_count : 0u;
     if (key_behavior_feedback_tap_branch_rgb_count > KEY_BEHAVIOR_MAX_TAP_COUNT) {
         key_behavior_feedback_tap_branch_rgb_count = KEY_BEHAVIOR_MAX_TAP_COUNT;
@@ -84,10 +82,7 @@ static bool rgb_runtime_key_feedback_stage_semantic_color(key_feedback_semantic_
     }
 
     switch (semantic) {
-        case KEY_FEEDBACK_SEMANTIC_UNRESOLVED_TAP_BRANCH:
-            *out_color = key_behavior_feedback_tap_pending_rgb;
-            return true;
-        case KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED:
+        case KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING:
             if (key_behavior_feedback_tap_branch_rgb_count == 0u) {
                 *out_color = (rgb_t){0};
                 return false;
@@ -117,7 +112,7 @@ static uint8_t rgb_runtime_key_feedback_stage_branch_for_key(const uint8_t *sema
         return 0u;
     }
 
-    if (key_feedback_semantic_map_get(semantic_map, key_pos) != KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED) {
+    if (key_feedback_semantic_map_get(semantic_map, key_pos) != KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING) {
         return 0u;
     }
 
@@ -130,10 +125,8 @@ static bool rgb_runtime_key_feedback_stage_semantic_visible(key_feedback_semanti
 
 static bool rgb_runtime_key_feedback_stage_group_semantic_matches(key_behavior_feedback_group_semantic_t group_semantic, key_feedback_semantic_t semantic) {
     switch (group_semantic) {
-        case KEY_FEEDBACK_GROUP_UNRESOLVED_TAP_BRANCH:
-            return semantic == KEY_FEEDBACK_SEMANTIC_UNRESOLVED_TAP_BRANCH;
-        case KEY_FEEDBACK_GROUP_TAP_BRANCH_COMMITTED:
-            return semantic == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED;
+        case KEY_FEEDBACK_GROUP_TAP_BRANCH_PENDING:
+            return semantic == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING;
         case KEY_FEEDBACK_GROUP_TAP_COMMITTED:
             return semantic == KEY_FEEDBACK_SEMANTIC_TAP_COMMITTED;
         case KEY_FEEDBACK_GROUP_HOLD_ACTIVE:
@@ -151,11 +144,8 @@ static bool rgb_runtime_key_feedback_stage_group_owner_slot(key_behavior_feedbac
     }
 
     switch (group_semantic) {
-        case KEY_FEEDBACK_GROUP_UNRESOLVED_TAP_BRANCH:
-            *out_slot = KEY_FEEDBACK_BROAD_OWNER_GROUP_UNRESOLVED_TAP_BRANCH;
-            return true;
-        case KEY_FEEDBACK_GROUP_TAP_BRANCH_COMMITTED:
-            *out_slot = KEY_FEEDBACK_BROAD_OWNER_GROUP_TAP_BRANCH_COMMITTED;
+        case KEY_FEEDBACK_GROUP_TAP_BRANCH_PENDING:
+            *out_slot = KEY_FEEDBACK_BROAD_OWNER_GROUP_TAP_BRANCH_PENDING;
             return true;
         case KEY_FEEDBACK_GROUP_TAP_COMMITTED:
             *out_slot = KEY_FEEDBACK_BROAD_OWNER_GROUP_TAP_COMMITTED;
@@ -300,7 +290,10 @@ static bool rgb_runtime_key_feedback_stage_render_locality(const uint8_t *semant
 static bool rgb_runtime_key_feedback_stage_render_group(const key_behavior_feedback_led_group_t *group, const uint8_t *semantic_map, const uint8_t *tap_branch_map, const uint8_t *flash_visibility_bitmap, const uint8_t *broad_owner_map, uint8_t led_min, uint8_t led_max) {
     bool                                         painted         = false;
     const key_behavior_feedback_group_semantic_t all_semantics[] = {
-        KEY_FEEDBACK_GROUP_UNRESOLVED_TAP_BRANCH, KEY_FEEDBACK_GROUP_TAP_BRANCH_COMMITTED, KEY_FEEDBACK_GROUP_TAP_COMMITTED, KEY_FEEDBACK_GROUP_HOLD_ACTIVE, KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE,
+        KEY_FEEDBACK_GROUP_TAP_BRANCH_PENDING,
+        KEY_FEEDBACK_GROUP_TAP_COMMITTED,
+        KEY_FEEDBACK_GROUP_HOLD_ACTIVE,
+        KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE,
     };
     uint8_t semantic_count = 1u;
 

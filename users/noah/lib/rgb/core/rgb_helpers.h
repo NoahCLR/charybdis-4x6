@@ -94,7 +94,6 @@ typedef struct {
 } combo_feedback_led_group_t;
 
 typedef struct {
-    hsv_t                              tap_pending_color;
     const hsv_t                       *tap_branch_colors;
     uint8_t                            tap_branch_color_count;
     key_feedback_branch_confirm_mode_t branch_confirm_mode;
@@ -106,8 +105,7 @@ typedef struct {
 } key_behavior_feedback_color_config_t;
 
 typedef enum {
-    KEY_FEEDBACK_GROUP_UNRESOLVED_TAP_BRANCH = 0,
-    KEY_FEEDBACK_GROUP_TAP_BRANCH_COMMITTED,
+    KEY_FEEDBACK_GROUP_TAP_BRANCH_PENDING = 0,
     KEY_FEEDBACK_GROUP_TAP_COMMITTED,
     KEY_FEEDBACK_GROUP_HOLD_ACTIVE,
     KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE,

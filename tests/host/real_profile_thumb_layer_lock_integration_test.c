@@ -353,8 +353,7 @@ static uint8_t test_feedback_tap_branch_for_key(keypos_t key_pos) {
 static void test_assert_no_tap_branch_feedback(keypos_t key_pos) {
     key_feedback_semantic_t semantic = test_feedback_semantic_for_key(key_pos);
 
-    CHECK(semantic != KEY_FEEDBACK_SEMANTIC_UNRESOLVED_TAP_BRANCH);
-    CHECK(semantic != KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED);
+    CHECK(semantic != KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING);
     CHECK(test_feedback_tap_branch_for_key(key_pos) == 0u);
 }
 
@@ -1195,13 +1194,15 @@ static void test_left_thumb_double_tap_hold_escape_feedback_sequence(void) {
 
     CHECK(noah_runtime_debug_slot_pending_multi_tap_count(key_pos) == 2);
     CHECK(noah_runtime_debug_slot_pending_multi_tap_holding(key_pos));
-    CHECK(test_feedback_semantic_for_key(key_pos) == KEY_FEEDBACK_SEMANTIC_UNRESOLVED_TAP_BRANCH);
-    CHECK(test_feedback_tap_branch_for_key(key_pos) == 0u);
+    // The second tap names its branch straight away; there is no neutral phase
+    // ahead of it, and the branch stays named until the branch is entered.
+    CHECK(test_feedback_semantic_for_key(key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING);
+    CHECK(test_feedback_tap_branch_for_key(key_pos) == 2u);
 
     key_runtime_integration_advance(&fake_time, CUSTOM_TAP_HOLD_TERM + 1);
     key_runtime_integration_scan();
 
-    CHECK(test_feedback_semantic_for_key(key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED);
+    CHECK(test_feedback_semantic_for_key(key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING);
     CHECK(test_feedback_tap_branch_for_key(key_pos) == 2u);
 
     key_runtime_integration_advance(&fake_time, CUSTOM_RGB_BRANCH_CONFIRM_TERM + 1);
@@ -1235,7 +1236,7 @@ static void test_left_thumb_double_tap_hold_escape_release_crossing_threshold_pu
     test_release_resolved(key_pos);
 
     CHECK(test_delayed_action_count == 0u);
-    CHECK(test_feedback_semantic_for_key(key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED);
+    CHECK(test_feedback_semantic_for_key(key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING);
     CHECK(test_feedback_tap_branch_for_key(key_pos) == 2u);
 
     key_runtime_integration_advance(&fake_time, CUSTOM_RGB_BRANCH_CONFIRM_TERM + 1);
@@ -1267,13 +1268,13 @@ static void test_left_thumb_double_tap_hold_escape_release_during_branch_keeps_h
     key_runtime_integration_advance(&fake_time, CUSTOM_TAP_HOLD_TERM + 1);
     key_runtime_integration_scan();
 
-    CHECK(test_feedback_semantic_for_key(key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED);
+    CHECK(test_feedback_semantic_for_key(key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING);
     CHECK(test_feedback_tap_branch_for_key(key_pos) == 2u);
 
     test_release_resolved(key_pos);
 
     CHECK(test_delayed_action_count == 0u);
-    CHECK(test_feedback_semantic_for_key(key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED);
+    CHECK(test_feedback_semantic_for_key(key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING);
     CHECK(test_feedback_tap_branch_for_key(key_pos) == 2u);
 
     key_runtime_integration_advance(&fake_time, CUSTOM_RGB_BRANCH_CONFIRM_TERM + 1);
@@ -1305,7 +1306,7 @@ static void test_left_thumb_double_tap_long_hold_num_feedback_replaces_branch(vo
 
     key_runtime_integration_advance(&fake_time, branch_scan_elapsed);
     key_runtime_integration_scan();
-    CHECK(test_feedback_semantic_for_key(key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED);
+    CHECK(test_feedback_semantic_for_key(key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING);
     CHECK(test_feedback_tap_branch_for_key(key_pos) == 2u);
 
     key_runtime_integration_advance(&fake_time, (uint16_t)(CUSTOM_LONGER_HOLD_TERM - branch_scan_elapsed + 1u));
@@ -1427,7 +1428,7 @@ static void test_right_thumb_triple_tap_flushes_next_track_after_timeout(void) {
 
     CHECK(test_tap_code16_count == 0);
     CHECK(test_delayed_action_count == 0);
-    CHECK(test_feedback_semantic_for_key(key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED);
+    CHECK(test_feedback_semantic_for_key(key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING);
 
     test_finish_tap_branch_confirmation();
 
@@ -1457,7 +1458,7 @@ static void test_right_thumb_triple_tap_long_hold_registers_next_track_hold(void
     key_runtime_integration_scan();
 
     CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == KC_NO);
-    CHECK(test_feedback_semantic_for_key(key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED);
+    CHECK(test_feedback_semantic_for_key(key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING);
     CHECK(test_feedback_tap_branch_for_key(key_pos) == 3u);
 
     test_finish_tap_branch_confirmation();
@@ -1780,7 +1781,7 @@ static void test_cmd_combo_double_tap_hold_uses_stable_owner_across_press_order(
 
     CHECK(noah_runtime_debug_slot_owner_keycode(m_pos) == KC_LEFT_GUI);
     CHECK(!noah_runtime_debug_slot_pending_multi_tap_holding(m_pos));
-    CHECK(test_feedback_semantic_for_key(m_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED);
+    CHECK(test_feedback_semantic_for_key(m_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING);
 
     test_finish_tap_branch_confirmation();
 
@@ -2097,7 +2098,7 @@ static void test_activate_gui_double_tap_alt_hold(keypos_t gui_pos) {
 
     CHECK(noah_runtime_debug_slot_owner_keycode(gui_pos) == KC_LEFT_GUI);
     CHECK(noah_runtime_debug_slot_held_action_keycode(gui_pos) == KC_NO);
-    CHECK(test_feedback_semantic_for_key(gui_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED);
+    CHECK(test_feedback_semantic_for_key(gui_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING);
 
     test_finish_tap_branch_confirmation();
 
@@ -2130,7 +2131,7 @@ static void test_commit_pending_gui_double_tap_alt_hold(keypos_t gui_pos) {
     CHECK(!noah_runtime_debug_slot_pending_multi_tap_holding(gui_pos));
 
     if (noah_runtime_debug_slot_held_action_keycode(gui_pos) == KC_NO) {
-        CHECK(test_feedback_semantic_for_key(gui_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_COMMITTED);
+        CHECK(test_feedback_semantic_for_key(gui_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING);
         test_finish_tap_branch_confirmation();
     }
 

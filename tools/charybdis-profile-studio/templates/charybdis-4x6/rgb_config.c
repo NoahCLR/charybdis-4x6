@@ -100,8 +100,6 @@ static const combo_feedback_led_group_t combo_feedback_led_groups_data[] = RGB_L
 
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
 const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
-    .tap_pending_color = HSV(0, 0, 150),
-
     RGB_TAP_BRANCH_COLORS(HSV(200, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), HSV(180, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), HSV(143, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS)),
 
     .branch_confirm_mode    = KEY_FEEDBACK_BRANCH_CONFIRM_NON_BASE_TAPS,
