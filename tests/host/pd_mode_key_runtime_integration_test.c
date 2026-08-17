@@ -527,9 +527,12 @@ bool keyboard_mod_ownership_should_suppress_default(uint16_t keycode, keyrecord_
     return false;
 }
 
-void keyboard_mod_ownership_register_mods(uint8_t mods) {
+bool keyboard_mod_ownership_register_mods(uint8_t mods) {
+    uint8_t added = (uint8_t)(mods & ~fake_mods);
+
     fake_managed_mods |= mods;
     fake_mods |= mods;
+    return added != 0u;
 }
 
 void keyboard_mod_ownership_unregister_mods(uint8_t mods) {

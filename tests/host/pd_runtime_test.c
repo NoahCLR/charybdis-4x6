@@ -227,8 +227,8 @@ bool keyboard_mod_ownership_should_suppress_default(uint16_t keycode, keyrecord_
     return false;
 }
 
-void keyboard_mod_ownership_register_mods(uint8_t mods) {
-    (void)mods;
+bool keyboard_mod_ownership_register_mods(uint8_t mods) {
+    return mods != 0u;
 }
 
 void keyboard_mod_ownership_unregister_mods(uint8_t mods) {

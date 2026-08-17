@@ -12,6 +12,10 @@
 // report count says QMK's default handler put that modifier in the report and
 // has not taken it out, which is what teardown needs: a handled key whose press
 // userspace consumed is physically down but owns nothing in the report.
+//
+// keyboard_mod_ownership_register_mods() returns whether it actually put a new
+// modifier bit into the host report, so a caller can tell a fresh modifier from
+// one an earlier owner already has down.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
@@ -33,7 +37,7 @@ void    keyboard_mod_ownership_track_report_keycode_event(uint16_t keycode, keyr
 bool    keyboard_mod_ownership_should_suppress_default(uint16_t keycode, keyrecord_t *record);
 bool    keyboard_mod_ownership_can_register_mods(uint8_t mods);
 bool    keyboard_mod_ownership_can_unregister_mods(uint8_t mods);
-void    keyboard_mod_ownership_register_mods(uint8_t mods);
+bool    keyboard_mod_ownership_register_mods(uint8_t mods);
 void    keyboard_mod_ownership_unregister_mods(uint8_t mods);
 void    keyboard_mod_ownership_register(uint16_t keycode);
 void    keyboard_mod_ownership_unregister(uint16_t keycode);

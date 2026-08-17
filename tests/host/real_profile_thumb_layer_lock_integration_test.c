@@ -624,7 +624,7 @@ void noah_dispatch_synthetic_qmk_record(uint16_t keycode, bool pressed, uint8_t 
 
 void keyboard_mod_ownership_register(uint16_t keycode);
 void keyboard_mod_ownership_unregister(uint16_t keycode);
-void keyboard_mod_ownership_register_mods(uint8_t mods);
+bool keyboard_mod_ownership_register_mods(uint8_t mods);
 void keyboard_mod_ownership_unregister_mods(uint8_t mods);
 
 bool owned_keycode_register(uint16_t keycode) {
@@ -734,9 +734,12 @@ void keyboard_mod_ownership_unregister(uint16_t keycode) {
     }
 }
 
-void keyboard_mod_ownership_register_mods(uint8_t mods) {
+bool keyboard_mod_ownership_register_mods(uint8_t mods) {
+    uint8_t added = (uint8_t)(mods & ~fake_mods);
+
     fake_managed_mods |= mods;
     fake_mods |= mods;
+    return added != 0u;
 }
 
 void keyboard_mod_ownership_unregister_mods(uint8_t mods) {

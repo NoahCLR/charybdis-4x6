@@ -124,7 +124,19 @@ static bool owned_keycode_release_basic(uint8_t basic) {
 // with the bare usage down, which the host has already committed as an
 // unshifted character by the time the modifier arrives: holding a
 // PRESS_AND_HOLD_UNTIL_RELEASE(KC_ASTR) key types "8" and then repeats "*".
+//
+// Mouse buttons need more than report order. They leave on their own USB
+// interface and endpoint, whose output queue drains independently of the
+// keyboard endpoint's, so a modifier queued microseconds earlier still lands in
+// the same USB frame and the host is free to poll the mouse endpoint first. A
+// host that samples modifier state at button-down then sees a bare click, which
+// is how PRESS_AND_HOLD_UNTIL_RELEASE(A(MS_BTN2)) reaches a window manager as a
+// plain right-drag some of the time. Let a fresh modifier settle across a few
+// frames before the button goes down. A modifier that was already down needs no
+// head start: no report was sent for it, so there is nothing to outrun.
 static bool owned_keycode_acquire_components(const owned_keycode_lease_t *components) {
+    bool modifier_report_sent = false;
+
     if (components->mods != 0u && !keyboard_mod_ownership_can_register_mods(components->mods)) {
         if (owned_keycode_state.saturation_count != UINT16_MAX) {
             owned_keycode_state.saturation_count++;
@@ -133,14 +145,19 @@ static bool owned_keycode_acquire_components(const owned_keycode_lease_t *compon
     }
 
     if (components->mods != 0u) {
-        keyboard_mod_ownership_register_mods(components->mods);
+        modifier_report_sent = keyboard_mod_ownership_register_mods(components->mods);
     }
 
-    if (components->has_basic && !owned_keycode_acquire_basic(components->basic)) {
-        if (components->mods != 0u) {
-            keyboard_mod_ownership_unregister_mods(components->mods);
+    if (components->has_basic) {
+        if (modifier_report_sent && IS_MOUSEKEY_BUTTON(components->basic)) {
+            wait_ms(OWNED_KEYCODE_MOD_TO_MOUSE_SETTLE_MS);
         }
-        return false;
+        if (!owned_keycode_acquire_basic(components->basic)) {
+            if (components->mods != 0u) {
+                keyboard_mod_ownership_unregister_mods(components->mods);
+            }
+            return false;
+        }
     }
 
     return true;

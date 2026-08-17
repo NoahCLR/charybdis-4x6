@@ -32,6 +32,7 @@ static uint8_t  register_code_seq[16];
 static uint8_t  unregister_code_seq[16];
 static uint8_t  register_mods_seq[16];
 static uint8_t  unregister_mods_seq[16];
+static uint8_t  fake_report_mods;
 
 static void test_fail(const char *expr, const char *file, int line) {
     fprintf(stderr, "test failed: %s (%s:%d)\n", expr, file, line);
@@ -58,6 +59,7 @@ static void test_reset_stubs(void) {
     can_register_mods         = true;
     can_unregister_mods       = true;
     call_sequence             = 0;
+    fake_report_mods          = 0;
 }
 
 static keyrecord_t test_record(bool pressed) {
@@ -91,10 +93,14 @@ bool keyboard_mod_ownership_can_unregister_mods(uint8_t mods) {
     return can_unregister_mods;
 }
 
-void keyboard_mod_ownership_register_mods(uint8_t mods) {
+bool keyboard_mod_ownership_register_mods(uint8_t mods) {
+    uint8_t added = (uint8_t)(mods & ~fake_report_mods);
+
     CHECK(register_mods_count < ARRAY_SIZE(register_mods_calls));
     register_mods_seq[register_mods_count]     = call_sequence++;
     register_mods_calls[register_mods_count++] = mods;
+    fake_report_mods |= mods;
+    return added != 0u;
 }
 
 void keyboard_mod_ownership_unregister_mods(uint8_t mods) {
@@ -471,6 +477,54 @@ static void test_modded_hold_registers_mods_before_the_usage(void) {
     CHECK(unregister_code_seq[0] < unregister_mods_seq[0]);
 }
 
+// The mouse button leaves on a different USB endpoint than the modifier, so
+// report order alone does not survive the trip to the host. A fresh modifier
+// gets a settle window; one already in the report does not, because no
+// keyboard report was sent for it and there is nothing to outrun.
+static void test_fresh_modifier_settles_before_a_mouse_button(void) {
+    owned_keycode_lease_t lease = {0};
+
+    test_reset_stubs();
+
+    CHECK(owned_keycode_acquire(A(MS_BTN2), &lease));
+    CHECK(register_mods_seq[0] < register_code_seq[0]);
+    CHECK(wait_call_count == 1);
+    CHECK(wait_calls[0] == OWNED_KEYCODE_MOD_TO_MOUSE_SETTLE_MS);
+}
+
+static void test_modifier_already_in_the_report_skips_the_settle(void) {
+    owned_keycode_lease_t held  = {0};
+    owned_keycode_lease_t lease = {0};
+
+    test_reset_stubs();
+
+    CHECK(owned_keycode_acquire(KC_LEFT_ALT, &held));
+    CHECK(owned_keycode_acquire(A(MS_BTN2), &lease));
+    CHECK(register_code_count == 1);
+    CHECK(register_code_calls[0] == MS_BTN2);
+    CHECK(wait_call_count == 0);
+}
+
+static void test_modded_non_mouse_usage_never_settles(void) {
+    owned_keycode_lease_t lease = {0};
+
+    test_reset_stubs();
+
+    CHECK(owned_keycode_acquire(A(KC_8), &lease));
+    CHECK(register_code_count == 1);
+    CHECK(wait_call_count == 0);
+}
+
+static void test_bare_mouse_button_never_settles(void) {
+    owned_keycode_lease_t lease = {0};
+
+    test_reset_stubs();
+
+    CHECK(owned_keycode_acquire(MS_BTN2, &lease));
+    CHECK(register_code_count == 1);
+    CHECK(wait_call_count == 0);
+}
+
 static void test_legacy_modded_register_matches_lease_report_order(void) {
     test_reset_stubs();
 
@@ -539,6 +593,10 @@ int main(void) {
     test_overlapping_mouse_leases_notify_only_aggregate_edges();
     test_consumer_usage_shares_physical_and_managed_ownership();
     test_modded_hold_registers_mods_before_the_usage();
+    test_fresh_modifier_settles_before_a_mouse_button();
+    test_modifier_already_in_the_report_skips_the_settle();
+    test_modded_non_mouse_usage_never_settles();
+    test_bare_mouse_button_never_settles();
     test_legacy_modded_register_matches_lease_report_order();
     test_basic_saturation_unwinds_the_mods_it_already_registered();
     test_system_usage_shares_two_managed_owners();

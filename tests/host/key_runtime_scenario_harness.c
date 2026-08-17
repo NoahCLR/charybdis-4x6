@@ -428,8 +428,8 @@ bool keyboard_mod_ownership_can_unregister_mods(uint8_t mods) {
     return true;
 }
 
-void keyboard_mod_ownership_register_mods(uint8_t mods) {
-    (void)mods;
+bool keyboard_mod_ownership_register_mods(uint8_t mods) {
+    return mods != 0u;
 }
 
 void keyboard_mod_ownership_unregister_mods(uint8_t mods) {

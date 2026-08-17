@@ -14,6 +14,13 @@
 
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
+// Head start given to a freshly registered modifier before a mouse button it
+// qualifies goes down. Spans several 1ms USB frames so the two reports cannot
+// share one. See owned_keycode_acquire_components().
+#ifndef OWNED_KEYCODE_MOD_TO_MOUSE_SETTLE_MS
+#    define OWNED_KEYCODE_MOD_TO_MOUSE_SETTLE_MS 8u
+#endif
+
 typedef struct {
     bool    active;
     bool    has_basic;

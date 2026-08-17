@@ -155,12 +155,12 @@ bool keyboard_mod_ownership_can_unregister_mods(uint8_t mods) {
     return true;
 }
 
-void keyboard_mod_ownership_register_mods(uint8_t mods) {
+bool keyboard_mod_ownership_register_mods(uint8_t mods) {
     noah_keyboard_mod_ownership_state_t *state         = keyboard_mod_ownership_state();
     bool                                 report_needed = false;
 
     if (mods == 0) {
-        return;
+        return false;
     }
 
     for (uint8_t i = 0; i < ARRAY_SIZE(keyboard_mod_ownership_mod_masks); i++) {
@@ -187,6 +187,7 @@ void keyboard_mod_ownership_register_mods(uint8_t mods) {
     }
 
     keyboard_mod_ownership_validate_state("register_mods");
+    return report_needed;
 }
 
 void keyboard_mod_ownership_unregister_mods(uint8_t mods) {
