@@ -24,6 +24,14 @@ static bool     pointer_action_pressed[16];
 static uint8_t  pointer_action_call_count;
 static bool     can_register_mods;
 static bool     can_unregister_mods;
+// Ordering between the usage stubs and the modifier stubs is what distinguishes
+// a correct shifted hold from one the host reads as unshifted, so every report
+// mutation takes a ticket from one shared counter.
+static uint8_t  call_sequence;
+static uint8_t  register_code_seq[16];
+static uint8_t  unregister_code_seq[16];
+static uint8_t  register_mods_seq[16];
+static uint8_t  unregister_mods_seq[16];
 
 static void test_fail(const char *expr, const char *file, int line) {
     fprintf(stderr, "test failed: %s (%s:%d)\n", expr, file, line);
@@ -49,6 +57,7 @@ static void test_reset_stubs(void) {
     pointer_action_call_count = 0;
     can_register_mods         = true;
     can_unregister_mods       = true;
+    call_sequence             = 0;
 }
 
 static keyrecord_t test_record(bool pressed) {
@@ -84,21 +93,25 @@ bool keyboard_mod_ownership_can_unregister_mods(uint8_t mods) {
 
 void keyboard_mod_ownership_register_mods(uint8_t mods) {
     CHECK(register_mods_count < ARRAY_SIZE(register_mods_calls));
+    register_mods_seq[register_mods_count]     = call_sequence++;
     register_mods_calls[register_mods_count++] = mods;
 }
 
 void keyboard_mod_ownership_unregister_mods(uint8_t mods) {
     CHECK(unregister_mods_count < ARRAY_SIZE(unregister_mods_calls));
+    unregister_mods_seq[unregister_mods_count]     = call_sequence++;
     unregister_mods_calls[unregister_mods_count++] = mods;
 }
 
 void register_code(uint8_t keycode) {
     CHECK(register_code_count < ARRAY_SIZE(register_code_calls));
+    register_code_seq[register_code_count]     = call_sequence++;
     register_code_calls[register_code_count++] = keycode;
 }
 
 void unregister_code(uint8_t keycode) {
     CHECK(unregister_code_count < ARRAY_SIZE(unregister_code_calls));
+    unregister_code_seq[unregister_code_count]     = call_sequence++;
     unregister_code_calls[unregister_code_count++] = keycode;
 }
 
@@ -436,6 +449,57 @@ static void test_consumer_usage_shares_physical_and_managed_ownership(void) {
     owned_keycode_track_physical_event(KC_AUDIO_MUTE, &release);
 }
 
+// PRESS_AND_HOLD_UNTIL_RELEASE(KC_ASTR) on KC_8. Shipping KC_8 to the report
+// before LSFT gives the host one report holding a bare 8, which it commits as
+// an unshifted character before the modifier lands; every typematic repeat
+// after that arrives shifted, so the key types "8**" instead of "***".
+static void test_modded_hold_registers_mods_before_the_usage(void) {
+    owned_keycode_lease_t lease = {0};
+
+    test_reset_stubs();
+
+    CHECK(owned_keycode_acquire(S(KC_8), &lease));
+    CHECK(register_mods_count == 1);
+    CHECK(register_mods_calls[0] == MOD_BIT(KC_LEFT_SHIFT));
+    CHECK(register_code_count == 1);
+    CHECK(register_code_calls[0] == KC_8);
+    CHECK(register_mods_seq[0] < register_code_seq[0]);
+
+    CHECK(owned_keycode_release(&lease));
+    CHECK(unregister_code_count == 1);
+    CHECK(unregister_mods_count == 1);
+    CHECK(unregister_code_seq[0] < unregister_mods_seq[0]);
+}
+
+static void test_legacy_modded_register_matches_lease_report_order(void) {
+    test_reset_stubs();
+
+    CHECK(owned_keycode_register(S(KC_8)));
+    CHECK(register_mods_seq[0] < register_code_seq[0]);
+
+    CHECK(owned_keycode_unregister(S(KC_8)));
+    CHECK(unregister_code_seq[0] < unregister_mods_seq[0]);
+}
+
+static void test_basic_saturation_unwinds_the_mods_it_already_registered(void) {
+    owned_keycode_lease_t          lease = {0};
+    owned_keycode_debug_snapshot_t snapshot;
+
+    test_reset_stubs();
+
+    for (uint16_t i = 0; i < UINT8_MAX; i++) {
+        CHECK(owned_keycode_register(KC_C));
+    }
+
+    CHECK(!owned_keycode_acquire(S(KC_C), &lease));
+    CHECK(!lease.active);
+    CHECK(register_mods_count == 1);
+    CHECK(unregister_mods_count == 1);
+    CHECK(unregister_mods_calls[0] == MOD_BIT(KC_LEFT_SHIFT));
+    owned_keycode_debug_snapshot(KC_C, &snapshot);
+    CHECK(snapshot.managed_count == UINT8_MAX);
+}
+
 static void test_system_usage_shares_two_managed_owners(void) {
     owned_keycode_lease_t lease_a = {0};
     owned_keycode_lease_t lease_b = {0};
@@ -474,6 +538,9 @@ int main(void) {
     test_modifier_release_underflow_is_atomic_with_basic_component();
     test_overlapping_mouse_leases_notify_only_aggregate_edges();
     test_consumer_usage_shares_physical_and_managed_ownership();
+    test_modded_hold_registers_mods_before_the_usage();
+    test_legacy_modded_register_matches_lease_report_order();
+    test_basic_saturation_unwinds_the_mods_it_already_registered();
     test_system_usage_shares_two_managed_owners();
 
     puts("owned_keycode host tests passed");

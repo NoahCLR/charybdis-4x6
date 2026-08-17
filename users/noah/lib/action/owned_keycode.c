@@ -119,6 +119,53 @@ static bool owned_keycode_release_basic(uint8_t basic) {
     return true;
 }
 
+// Modifiers reach the host report before the usage they qualify, matching
+// QMK's own register_code16(). Registering the usage first ships one report
+// with the bare usage down, which the host has already committed as an
+// unshifted character by the time the modifier arrives: holding a
+// PRESS_AND_HOLD_UNTIL_RELEASE(KC_ASTR) key types "8" and then repeats "*".
+static bool owned_keycode_acquire_components(const owned_keycode_lease_t *components) {
+    if (components->mods != 0u && !keyboard_mod_ownership_can_register_mods(components->mods)) {
+        if (owned_keycode_state.saturation_count != UINT16_MAX) {
+            owned_keycode_state.saturation_count++;
+        }
+        return false;
+    }
+
+    if (components->mods != 0u) {
+        keyboard_mod_ownership_register_mods(components->mods);
+    }
+
+    if (components->has_basic && !owned_keycode_acquire_basic(components->basic)) {
+        if (components->mods != 0u) {
+            keyboard_mod_ownership_unregister_mods(components->mods);
+        }
+        return false;
+    }
+
+    return true;
+}
+
+// Teardown mirrors the acquire order: the usage leaves the report first, so a
+// modifier never outlives the usage it was qualifying.
+static bool owned_keycode_release_components(const owned_keycode_lease_t *components) {
+    if ((components->has_basic && owned_keycode_state.managed_refcounts[components->basic] == 0u) || (components->mods != 0u && !keyboard_mod_ownership_can_unregister_mods(components->mods))) {
+        if (owned_keycode_state.underflow_count != UINT16_MAX) {
+            owned_keycode_state.underflow_count++;
+        }
+        return false;
+    }
+
+    if (components->has_basic) {
+        (void)owned_keycode_release_basic(components->basic);
+    }
+    if (components->mods != 0u) {
+        keyboard_mod_ownership_unregister_mods(components->mods);
+    }
+
+    return true;
+}
+
 bool owned_keycode_acquire(uint16_t keycode, owned_keycode_lease_t *lease) {
     owned_keycode_lease_t candidate;
 
@@ -130,17 +177,8 @@ bool owned_keycode_acquire(uint16_t keycode, owned_keycode_lease_t *lease) {
         owned_keycode_note_unsupported();
         return false;
     }
-    if (candidate.mods != 0u && !keyboard_mod_ownership_can_register_mods(candidate.mods)) {
-        if (owned_keycode_state.saturation_count != UINT16_MAX) {
-            owned_keycode_state.saturation_count++;
-        }
+    if (!owned_keycode_acquire_components(&candidate)) {
         return false;
-    }
-    if (candidate.has_basic && !owned_keycode_acquire_basic(candidate.basic)) {
-        return false;
-    }
-    if (candidate.mods != 0u) {
-        keyboard_mod_ownership_register_mods(candidate.mods);
     }
     candidate.active = true;
     *lease           = candidate;
@@ -148,6 +186,8 @@ bool owned_keycode_acquire(uint16_t keycode, owned_keycode_lease_t *lease) {
 }
 
 bool owned_keycode_release(owned_keycode_lease_t *lease) {
+    bool released;
+
     if (!lease) {
         return false;
     }
@@ -158,22 +198,9 @@ bool owned_keycode_release(owned_keycode_lease_t *lease) {
         return true;
     }
 
-    if ((lease->has_basic && owned_keycode_state.managed_refcounts[lease->basic] == 0u) || (lease->mods != 0u && !keyboard_mod_ownership_can_unregister_mods(lease->mods))) {
-        if (owned_keycode_state.underflow_count != UINT16_MAX) {
-            owned_keycode_state.underflow_count++;
-        }
-        *lease = (owned_keycode_lease_t){0};
-        return false;
-    }
-
-    if (lease->has_basic) {
-        (void)owned_keycode_release_basic(lease->basic);
-    }
-    if (lease->mods != 0u) {
-        keyboard_mod_ownership_unregister_mods(lease->mods);
-    }
-    *lease = (owned_keycode_lease_t){0};
-    return true;
+    released = owned_keycode_release_components(lease);
+    *lease   = (owned_keycode_lease_t){0};
+    return released;
 }
 
 bool owned_keycode_register(uint16_t keycode) {
@@ -183,19 +210,7 @@ bool owned_keycode_register(uint16_t keycode) {
         owned_keycode_note_unsupported();
         return false;
     }
-    if (components.mods != 0u && !keyboard_mod_ownership_can_register_mods(components.mods)) {
-        if (owned_keycode_state.saturation_count != UINT16_MAX) {
-            owned_keycode_state.saturation_count++;
-        }
-        return false;
-    }
-    if (components.has_basic && !owned_keycode_acquire_basic(components.basic)) {
-        return false;
-    }
-    if (components.mods != 0u) {
-        keyboard_mod_ownership_register_mods(components.mods);
-    }
-    return true;
+    return owned_keycode_acquire_components(&components);
 }
 
 bool owned_keycode_unregister(uint16_t keycode) {
@@ -205,19 +220,7 @@ bool owned_keycode_unregister(uint16_t keycode) {
         owned_keycode_note_unsupported();
         return false;
     }
-    if ((components.has_basic && owned_keycode_state.managed_refcounts[components.basic] == 0u) || (components.mods != 0u && !keyboard_mod_ownership_can_unregister_mods(components.mods))) {
-        if (owned_keycode_state.underflow_count != UINT16_MAX) {
-            owned_keycode_state.underflow_count++;
-        }
-        return false;
-    }
-    if (components.has_basic) {
-        (void)owned_keycode_release_basic(components.basic);
-    }
-    if (components.mods != 0u) {
-        keyboard_mod_ownership_unregister_mods(components.mods);
-    }
-    return true;
+    return owned_keycode_release_components(&components);
 }
 
 bool owned_keycode_tap(uint16_t keycode) {
