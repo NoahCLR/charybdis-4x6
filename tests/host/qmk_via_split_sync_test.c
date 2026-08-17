@@ -26,29 +26,29 @@ typedef enum {
     TEST_RPC_DISCONNECTED,
 } test_rpc_mode_t;
 
-static bool             fake_master;
-static uint32_t         fake_now;
-static uint32_t         user_eeconfig_word;
-static bool             fake_seed_succeeded;
-static uint8_t          local_config[TEST_CONFIG_SIZE];
-static uint8_t          local_keymap[TEST_KEYMAP_SIZE];
-static uint8_t          local_macro[TEST_MACRO_SIZE];
-static uint8_t          peer_config[TEST_CONFIG_SIZE];
-static uint8_t          peer_keymap[TEST_KEYMAP_SIZE];
-static uint8_t          peer_macro[TEST_MACRO_SIZE];
-static uint8_t          rgb_invalidate_count;
-static uint8_t          macro_invalidate_count;
-static uint8_t          eeconfig_init_via_count;
-static uint8_t          macro_defaults_init_count;
-static uint16_t         rpc_count;
-static uint8_t          rpc_commit_count;
-static uint16_t         drop_rpc_at;
-static bool             drop_after_apply;
+static bool     fake_master;
+static uint32_t fake_now;
+static uint32_t user_eeconfig_word;
+static bool     fake_seed_succeeded;
+static uint8_t  local_config[TEST_CONFIG_SIZE];
+static uint8_t  local_keymap[TEST_KEYMAP_SIZE];
+static uint8_t  local_macro[TEST_MACRO_SIZE];
+static uint8_t  peer_config[TEST_CONFIG_SIZE];
+static uint8_t  peer_keymap[TEST_KEYMAP_SIZE];
+static uint8_t  peer_macro[TEST_MACRO_SIZE];
+static uint8_t  rgb_invalidate_count;
+static uint8_t  macro_invalidate_count;
+static uint8_t  eeconfig_init_via_count;
+static uint8_t  macro_defaults_init_count;
+static uint16_t rpc_count;
+static uint8_t  rpc_commit_count;
+static uint16_t drop_rpc_at;
+static bool     drop_after_apply;
 // Models a peer that resets mid-transfer: it forgets its snapshot session and
 // rejects further chunks until the master opens a new one with SNAPSHOT_BEGIN.
-static uint16_t         peer_session_lost_at;
-static bool             peer_session_active;
-static uint16_t         peer_begin_count;
+static uint16_t peer_session_lost_at;
+static bool     peer_session_active;
+static uint16_t peer_begin_count;
 // A peer that is briefly unable to serve a chunk -- digest still computing, own
 // state momentarily dirty -- answers SNAPSHOT_REQUIRED without having lost its
 // session. Retrying clears it; renegotiating does not.

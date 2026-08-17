@@ -78,17 +78,17 @@ static keypos_t test_keypos(uint8_t row, uint8_t col) {
 static void test_reset_stubs(void) {
     noah_runtime_reset_for_test();
 
-    press_call_count          = 0;
-    release_call_count        = 0;
-    tap_call_count            = 0;
-    pointer_action_call_count = 0;
-    mod_register_count        = 0;
-    mod_unregister_count      = 0;
-    owned_acquire_count       = 0;
-    owned_release_count       = 0;
+    press_call_count             = 0;
+    release_call_count           = 0;
+    tap_call_count               = 0;
+    pointer_action_call_count    = 0;
+    mod_register_count           = 0;
+    mod_unregister_count         = 0;
+    owned_acquire_count          = 0;
+    owned_release_count          = 0;
     owned_failed_acquire_keycode = -1;
-    fake_time                 = 1000;
-    timer_read_count          = 0;
+    fake_time                    = 1000;
+    timer_read_count             = 0;
 }
 
 bool is_pd_mode_lock_action(uint16_t action) {
@@ -190,7 +190,7 @@ bool owned_keycode_acquire(uint16_t keycode, owned_keycode_lease_t *lease) {
     }
     CHECK(owned_acquire_count < ARRAY_SIZE(owned_acquire_calls));
     owned_acquire_calls[owned_acquire_count++] = keycode;
-    *lease = (owned_keycode_lease_t){.active = true, .has_basic = true, .basic = (uint8_t)keycode};
+    *lease                                     = (owned_keycode_lease_t){.active = true, .has_basic = true, .basic = (uint8_t)keycode};
     return true;
 }
 
@@ -199,7 +199,7 @@ bool owned_keycode_release(owned_keycode_lease_t *lease) {
     CHECK(lease->active);
     CHECK(owned_release_count < ARRAY_SIZE(owned_release_calls));
     owned_release_calls[owned_release_count++] = lease->basic;
-    *lease = (owned_keycode_lease_t){0};
+    *lease                                     = (owned_keycode_lease_t){0};
     return true;
 }
 

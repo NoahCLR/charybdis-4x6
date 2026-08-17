@@ -261,7 +261,6 @@ static key_feedback_semantic_t key_feedback_semantic_for_pulse(key_feedback_puls
     }
 }
 
-
 static bool key_feedback_pulse_active(void) {
     key_runtime_core_state_t *state = key_runtime_core_state();
 
@@ -610,7 +609,7 @@ void combo_feedback_underlay_bitmap(uint8_t *out_bitmap) {
 }
 
 void combo_feedback_overlay_bitmap(uint8_t *out_bitmap) {
-    uint8_t  unused_underlay[KEY_ORIGIN_BITMAP_SIZE];
+    uint8_t unused_underlay[KEY_ORIGIN_BITMAP_SIZE];
 
     combo_feedback_bitmaps(unused_underlay, out_bitmap);
 }

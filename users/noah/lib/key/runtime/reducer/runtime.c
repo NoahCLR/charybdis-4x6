@@ -32,11 +32,11 @@ void key_runtime_hot_path_test_counters_snapshot(key_runtime_hot_path_test_count
 }
 
 bool key_runtime_hot_path_test_active_indexes_consistent(void) {
-    key_runtime_core_state_t *state = key_runtime_core_state();
-    uint32_t                  expected_press[KEY_RUNTIME_CORE_ACTIVE_BITMAP_WORD_COUNT] = {0};
+    key_runtime_core_state_t *state                                                      = key_runtime_core_state();
+    uint32_t                  expected_press[KEY_RUNTIME_CORE_ACTIVE_BITMAP_WORD_COUNT]  = {0};
     uint32_t                  expected_series[KEY_RUNTIME_CORE_ACTIVE_BITMAP_WORD_COUNT] = {0};
-    uint8_t                   press_count = 0u;
-    uint8_t                   series_count = 0u;
+    uint8_t                   press_count                                                = 0u;
+    uint8_t                   series_count                                               = 0u;
 
     if (!state) {
         return false;
@@ -492,13 +492,13 @@ static void key_runtime_core_press_token_begin(key_runtime_core_state_t *state, 
     }
 
     handled_key_lookup_tap_count_into(event->keycode, tap_count, &resolution);
-    handled             = handled_key_resolution_is_handled(resolution);
+    handled = handled_key_resolution_is_handled(resolution);
     handled_key_materialized_default_into(&resolution, &materialized);
     hold_term_ms        = key_runtime_core_default_hold_term(event->keycode);
     longer_hold_term_ms = key_runtime_core_default_longer_hold_term();
 
     if (handled) {
-        ctx                         = handled_key_resolution_ctx_make(event->key_pos, key_runtime_core_resolution_layers(state));
+        ctx = handled_key_resolution_ctx_make(event->key_pos, key_runtime_core_resolution_layers(state));
         handled_key_materialize_into(&resolution, &ctx, &materialized);
         key_runtime_slot_interaction_from_materialized_into(&materialized, &interaction);
         hold_term_ms                = handled_key_resolution_tap_hold_term(resolution);
@@ -566,9 +566,9 @@ static void key_runtime_core_tap_series_note_tap(key_runtime_core_state_t *state
     uint16_t             branch_confirm_term_ms;
     uint16_t             tap_term_ms;
     uint8_t              tap_count;
-    bool                 pending_hold = false;
+    bool                 pending_hold                 = false;
     bool                 tap_branch_has_authored_step = false;
-    bool                 tap_branch_has_authored_tap = false;
+    bool                 tap_branch_has_authored_tap  = false;
     keyboard_mod_state_t saved_mod_state;
 
     if (!(state && token && token->active)) {
@@ -601,19 +601,19 @@ static void key_runtime_core_tap_series_note_tap(key_runtime_core_state_t *state
     if (token->handled_key) {
         uint16_t handled_tap_action = token->interaction.binding.tap_action;
 
-        single_action          = reuse_existing ? series->single_action : handled_tap_action;
-        tap_action             = handled_tap_action;
-        tap_repeat_count       = token->interaction.binding.tap_repeat_count;
-        has_more_taps          = token->interaction.binding.has_more_taps;
-        authored_has_more_taps = token->interaction.binding.authored_has_more_taps;
-        hold                   = token->interaction.binding.hold;
-        long_hold              = token->interaction.binding.long_hold;
-        pending_hold           = reuse_existing && (hold.present || long_hold.present);
+        single_action                = reuse_existing ? series->single_action : handled_tap_action;
+        tap_action                   = handled_tap_action;
+        tap_repeat_count             = token->interaction.binding.tap_repeat_count;
+        has_more_taps                = token->interaction.binding.has_more_taps;
+        authored_has_more_taps       = token->interaction.binding.authored_has_more_taps;
+        hold                         = token->interaction.binding.hold;
+        long_hold                    = token->interaction.binding.long_hold;
+        pending_hold                 = reuse_existing && (hold.present || long_hold.present);
         tap_branch_has_authored_step = key_behavior_step_present(token->interaction.selection.step);
-        tap_branch_has_authored_tap = token->interaction.selection.step.tap.present;
-        tap_hold_term_ms       = token->interaction.binding.tap_hold_term;
-        branch_confirm_term_ms = token->interaction.binding.branch_confirm_term;
-        tap_term_ms            = token->interaction.binding.multi_tap_term;
+        tap_branch_has_authored_tap  = token->interaction.selection.step.tap.present;
+        tap_hold_term_ms             = token->interaction.binding.tap_hold_term;
+        branch_confirm_term_ms       = token->interaction.binding.branch_confirm_term;
+        tap_term_ms                  = token->interaction.binding.multi_tap_term;
         if (token->interaction.selection.tap_count != 0u) {
             tap_count = token->interaction.selection.tap_count;
         }
@@ -629,26 +629,26 @@ static void key_runtime_core_tap_series_note_tap(key_runtime_core_state_t *state
     }
 
     *series = (tap_series_t){
-        .active                 = true,
-        .keycode                = token->resolved_keycode,
-        .tap_count              = tap_count,
-        .pending_hold           = pending_hold,
-        .single_action          = single_action,
-        .tap_action             = tap_action,
-        .tap_repeat_count       = tap_repeat_count,
+        .active                       = true,
+        .keycode                      = token->resolved_keycode,
+        .tap_count                    = tap_count,
+        .pending_hold                 = pending_hold,
+        .single_action                = single_action,
+        .tap_action                   = tap_action,
+        .tap_repeat_count             = tap_repeat_count,
         .tap_branch_has_authored_step = tap_branch_has_authored_step,
-        .tap_branch_has_authored_tap = tap_branch_has_authored_tap,
-        .has_more_taps          = has_more_taps,
-        .authored_has_more_taps = authored_has_more_taps,
-        .hold                   = hold,
-        .long_hold              = long_hold,
-        .tap_hold_term_ms       = tap_hold_term_ms,
-        .branch_confirm_term_ms = branch_confirm_term_ms,
-        .last_action            = tap_action,
-        .last_tap_at            = now,
-        .tap_term_ms            = tap_term_ms,
-        .feedback_sequence      = key_runtime_core_state_next_feedback_sequence(state),
-        .saved_mod_state        = saved_mod_state,
+        .tap_branch_has_authored_tap  = tap_branch_has_authored_tap,
+        .has_more_taps                = has_more_taps,
+        .authored_has_more_taps       = authored_has_more_taps,
+        .hold                         = hold,
+        .long_hold                    = long_hold,
+        .tap_hold_term_ms             = tap_hold_term_ms,
+        .branch_confirm_term_ms       = branch_confirm_term_ms,
+        .last_action                  = tap_action,
+        .last_tap_at                  = now,
+        .tap_term_ms                  = tap_term_ms,
+        .feedback_sequence            = key_runtime_core_state_next_feedback_sequence(state),
+        .saved_mod_state              = saved_mod_state,
     };
     key_runtime_core_tap_series_active_set(state, series, true);
 }
@@ -720,7 +720,7 @@ static void key_runtime_core_press_token_end(key_runtime_core_state_t *state, co
         key_runtime_core_tap_series_note_hold_release(state, token);
     }
 
-    *token        = released_token;
+    *token = released_token;
     key_runtime_core_press_token_active_set(state, token, false);
     token->active = false;
     token->phase  = PRESS_TOKEN_PHASE_RELEASED;
@@ -889,26 +889,26 @@ static void key_runtime_core_tap_series_seed(key_runtime_core_state_t *state, co
     }
 
     *series = (tap_series_t){
-        .active                 = true,
-        .keycode                = seed->keycode,
-        .tap_count              = seed->tap_count == 0u ? 1u : seed->tap_count,
-        .pending_hold           = false,
-        .single_action          = seed->tap_action,
-        .tap_action             = seed->tap_action,
-        .tap_repeat_count       = seed->tap_repeat_count,
+        .active                       = true,
+        .keycode                      = seed->keycode,
+        .tap_count                    = seed->tap_count == 0u ? 1u : seed->tap_count,
+        .pending_hold                 = false,
+        .single_action                = seed->tap_action,
+        .tap_action                   = seed->tap_action,
+        .tap_repeat_count             = seed->tap_repeat_count,
         .tap_branch_has_authored_step = seed->tap_branch_has_authored_step,
-        .tap_branch_has_authored_tap = seed->tap_branch_has_authored_tap,
-        .has_more_taps          = seed->has_more_taps,
-        .authored_has_more_taps = seed->authored_has_more_taps,
-        .hold                   = hold_behavior_none(),
-        .long_hold              = hold_behavior_none(),
-        .tap_hold_term_ms       = seed->tap_hold_term,
-        .branch_confirm_term_ms = seed->branch_confirm_term,
-        .last_action            = seed->tap_action,
-        .last_tap_at            = state->current_time,
-        .tap_term_ms            = seed->multi_tap_term,
-        .feedback_sequence      = key_runtime_core_state_next_feedback_sequence(state),
-        .saved_mod_state        = mods,
+        .tap_branch_has_authored_tap  = seed->tap_branch_has_authored_tap,
+        .has_more_taps                = seed->has_more_taps,
+        .authored_has_more_taps       = seed->authored_has_more_taps,
+        .hold                         = hold_behavior_none(),
+        .long_hold                    = hold_behavior_none(),
+        .tap_hold_term_ms             = seed->tap_hold_term,
+        .branch_confirm_term_ms       = seed->branch_confirm_term,
+        .last_action                  = seed->tap_action,
+        .last_tap_at                  = state->current_time,
+        .tap_term_ms                  = seed->multi_tap_term,
+        .feedback_sequence            = key_runtime_core_state_next_feedback_sequence(state),
+        .saved_mod_state              = mods,
     };
     key_runtime_core_tap_series_active_set(state, series, true);
 }
@@ -926,25 +926,25 @@ static void key_runtime_core_tap_series_update_for_press(key_runtime_core_state_
         state->tap_series_count++;
     }
 
-    series->active                 = true;
-    series->keycode                = token->resolved_keycode;
-    series->tap_count              = token->interaction.selection.tap_count ? token->interaction.selection.tap_count : (uint8_t)(series->tap_count + 1u);
-    series->pending_hold           = token->interaction.binding.hold.present || token->interaction.binding.long_hold.present;
-    series->single_action          = series->single_action == KC_NO ? token->interaction.binding.tap_action : series->single_action;
-    series->tap_action             = token->interaction.binding.tap_action;
-    series->tap_repeat_count       = token->interaction.binding.tap_repeat_count;
+    series->active                       = true;
+    series->keycode                      = token->resolved_keycode;
+    series->tap_count                    = token->interaction.selection.tap_count ? token->interaction.selection.tap_count : (uint8_t)(series->tap_count + 1u);
+    series->pending_hold                 = token->interaction.binding.hold.present || token->interaction.binding.long_hold.present;
+    series->single_action                = series->single_action == KC_NO ? token->interaction.binding.tap_action : series->single_action;
+    series->tap_action                   = token->interaction.binding.tap_action;
+    series->tap_repeat_count             = token->interaction.binding.tap_repeat_count;
     series->tap_branch_has_authored_step = key_behavior_step_present(token->interaction.selection.step);
-    series->tap_branch_has_authored_tap = token->interaction.selection.step.tap.present;
-    series->has_more_taps          = token->interaction.binding.has_more_taps;
-    series->authored_has_more_taps = token->interaction.binding.authored_has_more_taps;
-    series->hold                   = token->interaction.binding.hold;
-    series->long_hold              = token->interaction.binding.long_hold;
-    series->tap_hold_term_ms       = token->interaction.binding.tap_hold_term;
-    series->branch_confirm_term_ms = token->interaction.binding.branch_confirm_term;
-    series->last_action            = token->interaction.binding.tap_action;
-    series->last_tap_at            = state->current_time;
-    series->tap_term_ms            = token->interaction.binding.multi_tap_term;
-    series->feedback_sequence      = key_runtime_core_state_next_feedback_sequence(state);
+    series->tap_branch_has_authored_tap  = token->interaction.selection.step.tap.present;
+    series->has_more_taps                = token->interaction.binding.has_more_taps;
+    series->authored_has_more_taps       = token->interaction.binding.authored_has_more_taps;
+    series->hold                         = token->interaction.binding.hold;
+    series->long_hold                    = token->interaction.binding.long_hold;
+    series->tap_hold_term_ms             = token->interaction.binding.tap_hold_term;
+    series->branch_confirm_term_ms       = token->interaction.binding.branch_confirm_term;
+    series->last_action                  = token->interaction.binding.tap_action;
+    series->last_tap_at                  = state->current_time;
+    series->tap_term_ms                  = token->interaction.binding.multi_tap_term;
+    series->feedback_sequence            = key_runtime_core_state_next_feedback_sequence(state);
     key_runtime_core_tap_series_active_set(state, series, true);
     (void)token_key_pos;
 }

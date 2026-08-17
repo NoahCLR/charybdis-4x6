@@ -50,11 +50,11 @@ static void test_complete_mutation_table(void) {
 }
 
 static void test_invalid_or_read_only_shapes_are_rejected(void) {
-    uint8_t truncated_keycode[]  = {id_dynamic_keymap_set_keycode, 0, 0, 0, 0};
+    uint8_t truncated_keycode[]    = {id_dynamic_keymap_set_keycode, 0, 0, 0, 0};
     uint8_t out_of_range_keycode[] = {id_dynamic_keymap_set_keycode, 0, MATRIX_ROWS, 0, 0, 4};
-    uint8_t wrong_nested[]       = {id_set_keyboard_value, 0x7Fu, 0, 0, 0, 1};
-    uint8_t read_only[]          = {0x01};
-    uint8_t effects              = 0xFFu;
+    uint8_t wrong_nested[]         = {id_set_keyboard_value, 0x7Fu, 0, 0, 0, 1};
+    uint8_t read_only[]            = {0x01};
+    uint8_t effects                = 0xFFu;
 
     CHECK(!noah_qmk_via_classify_mutation(truncated_keycode, sizeof(truncated_keycode), &effects));
     // Upstream rejects an out-of-range keycode write outright, so it really is
@@ -71,7 +71,7 @@ static void test_invalid_or_read_only_shapes_are_rejected(void) {
 // while the advertised digest kept its pre-write value and the split halves
 // diverged with no way to notice.
 static void test_partially_applied_buffer_writes_are_mutations(void) {
-    uint8_t overlong_keymap[] = {id_dynamic_keymap_set_buffer, 0, 0, 2, 0xA5};
+    uint8_t overlong_keymap[]  = {id_dynamic_keymap_set_buffer, 0, 0, 2, 0xA5};
     uint8_t straddling_macro[] = {id_dynamic_keymap_macro_set_buffer, 0, 127, 2, 0xA5, 0x5A};
     uint8_t effects            = 0u;
 

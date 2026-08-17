@@ -76,7 +76,7 @@ static void test_compile_accepts_long_delay_heavy_payload(void) {
 
 static void test_decode_qmk_stream_accepts_exact_maximum_ir(void) {
     uint8_t            buffer[509];
-    macro_payload_ir_t ir = {0};
+    macro_payload_ir_t ir     = {0};
     test_qmk_reader_t  reader = {.buffer = buffer};
 
     memset(buffer, 'A', sizeof(buffer));
@@ -87,7 +87,7 @@ static void test_decode_qmk_stream_accepts_exact_maximum_ir(void) {
 
 static void test_decode_qmk_stream_rejects_ir_over_capacity(void) {
     uint8_t            buffer[511];
-    macro_payload_ir_t ir = {0};
+    macro_payload_ir_t ir     = {0};
     test_qmk_reader_t  reader = {.buffer = buffer};
 
     memset(buffer, 'A', sizeof(buffer));

@@ -65,7 +65,7 @@ void key_runtime_deferred_release_drain_dispatches(void) {
     }
 
     key_runtime_deferred_release_drain_in_progress = true;
-    drained = key_runtime_core_take_pending_release_dispatches(pending, ARRAY_SIZE(pending));
+    drained                                        = key_runtime_core_take_pending_release_dispatches(pending, ARRAY_SIZE(pending));
 
     for (uint8_t index = 0; index < drained; index++) {
         key_runtime_core_project_pending_release_dispatch(&pending[index]);

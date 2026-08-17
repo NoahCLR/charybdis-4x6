@@ -30,9 +30,9 @@ uint8_t                          handled_key_tap_repeat_count_behavior(const han
 hold_behavior_t                  handled_key_hold_behavior(const handled_key_resolution_t *resolution);
 key_runtime_slot_hold_strategy_t handled_key_hold_strategy_behavior(const handled_key_resolution_t *resolution);
 bool                             handled_key_tap_resolves_on_press_behavior(const handled_key_resolution_t *resolution);
-bool    handled_key_resolution_uses_transparent_source(const handled_key_resolution_t *resolution, handled_key_transparent_field_t field);
-bool    handled_key_resolution_source_is_layer_tap(const handled_key_resolution_t *resolution);
-bool    handled_key_resolution_source_is_momentary_layer(const handled_key_resolution_t *resolution);
-uint8_t handled_key_resolution_source_layer(const handled_key_resolution_t *resolution);
-bool    handled_key_transparent_source_at_position(const handled_key_resolution_t *resolution, const handled_key_resolution_ctx_t *ctx, handled_key_transparent_field_t field, handled_key_resolution_t *out);
-void    handled_key_materialized_refresh_contract(handled_key_materialized_t *materialized);
+bool                             handled_key_resolution_uses_transparent_source(const handled_key_resolution_t *resolution, handled_key_transparent_field_t field);
+bool                             handled_key_resolution_source_is_layer_tap(const handled_key_resolution_t *resolution);
+bool                             handled_key_resolution_source_is_momentary_layer(const handled_key_resolution_t *resolution);
+uint8_t                          handled_key_resolution_source_layer(const handled_key_resolution_t *resolution);
+bool                             handled_key_transparent_source_at_position(const handled_key_resolution_t *resolution, const handled_key_resolution_ctx_t *ctx, handled_key_transparent_field_t field, handled_key_resolution_t *out);
+void                             handled_key_materialized_refresh_contract(handled_key_materialized_t *materialized);

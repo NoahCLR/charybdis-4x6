@@ -9,8 +9,8 @@
 #include "users/noah/lib/key/runtime/delayed_action.h"
 
 enum {
-    TEST_DELAYED_ACTION_A = 0x0004,
-    TEST_DELAYED_ACTION_B = 0x0005,
+    TEST_DELAYED_ACTION_A     = 0x0004,
+    TEST_DELAYED_ACTION_B     = 0x0005,
     TEST_DELAYED_MACRO_ACTION = QK_MACRO_10,
 };
 

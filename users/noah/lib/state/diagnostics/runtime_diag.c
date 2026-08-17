@@ -117,8 +117,7 @@ void noah_runtime_diag_scope_enter(noah_runtime_diag_stage_t stage) {
     (void)stage;
 }
 
-void noah_runtime_diag_scope_leave(void) {
-}
+void noah_runtime_diag_scope_leave(void) {}
 
 void noah_runtime_diag_heartbeat(void) {
     noah_runtime_diag_refresh_indicator();

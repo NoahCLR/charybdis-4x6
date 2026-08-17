@@ -183,9 +183,9 @@ bool macro_payload_parse_command(const char *start, const char *end, macro_paylo
 }
 
 bool macro_payload_compile(const char *payload, macro_payload_ir_t *ir) {
-    const char                   *cursor     = payload;
-    const char                   *text_start = payload;
-    macro_payload_hold_balance_t  balance    = {0};
+    const char                  *cursor     = payload;
+    const char                  *text_start = payload;
+    macro_payload_hold_balance_t balance    = {0};
 
     if (!payload || !ir) {
         return false;

@@ -210,22 +210,22 @@ static inline void noah_host_test_fail_runtime_overflow(const char *surface, uns
     exit(1);
 }
 
-uint16_t         timer_read(void);
-uint16_t         timer_elapsed(uint16_t last);
-uint32_t         timer_read32(void);
-uint32_t         timer_elapsed32(uint32_t last);
-uint32_t         last_input_activity_elapsed(void);
-uint32_t         last_matrix_activity_elapsed(void);
-bool             is_keyboard_master(void);
-bool             is_keyboard_left(void);
+uint16_t                   timer_read(void);
+uint16_t                   timer_elapsed(uint16_t last);
+uint32_t                   timer_read32(void);
+uint32_t                   timer_elapsed32(uint32_t last);
+uint32_t                   last_input_activity_elapsed(void);
+uint32_t                   last_matrix_activity_elapsed(void);
+bool                       is_keyboard_master(void);
+bool                       is_keyboard_left(void);
 struct rgb_matrix_limits_t rgb_matrix_get_limits(uint8_t iter);
-uint32_t         eeconfig_read_user(void);
-void             eeconfig_update_user(uint32_t value);
-bool             process_record_user(uint16_t keycode, keyrecord_t *record);
-bool             process_record(keyrecord_t *record);
-typedef uint16_t action_t;
-action_t         action_for_keycode(uint16_t keycode);
-void             process_action(keyrecord_t *record, action_t action);
+uint32_t                   eeconfig_read_user(void);
+void                       eeconfig_update_user(uint32_t value);
+bool                       process_record_user(uint16_t keycode, keyrecord_t *record);
+bool                       process_record(keyrecord_t *record);
+typedef uint16_t           action_t;
+action_t                   action_for_keycode(uint16_t keycode);
+void                       process_action(keyrecord_t *record, action_t action);
 
 extern layer_state_t layer_state;
 extern layer_state_t default_layer_state;

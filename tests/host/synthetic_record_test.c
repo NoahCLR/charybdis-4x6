@@ -11,14 +11,14 @@
 // credited as default-handler report ownership, so the depth counter and the
 // non-matrix key position are both load-bearing contracts rather than details.
 
-static uint8_t     observed_calls;
-static bool        observed_active_during;
-static bool        observed_pressed[4];
-static keypos_t    observed_key;
-static uint16_t    observed_keycode;
-static uint8_t     observed_tap_count;
-static bool        observed_nested_active;
-static bool        nest_once;
+static uint8_t  observed_calls;
+static bool     observed_active_during;
+static bool     observed_pressed[4];
+static keypos_t observed_key;
+static uint16_t observed_keycode;
+static uint8_t  observed_tap_count;
+static bool     observed_nested_active;
+static bool     nest_once;
 
 static void test_fail(const char *expr, const char *file, int line) {
     fprintf(stderr, "test failed: %s (%s:%d)\n", expr, file, line);

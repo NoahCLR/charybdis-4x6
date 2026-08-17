@@ -37,11 +37,7 @@ typedef struct {
 } test_behavior_row_t;
 
 static const test_behavior_row_t test_behavior_rows[] = {
-    {.keycode = TEST_SHIFTED_SYMBOL_KEY, .single = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(S(KC_1))}},
-    {.keycode = TEST_SHIFT_ENTER_KEY, .single = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(S(KC_ENT))}},
-    {.keycode = TEST_HANDLED_SHIFT_KEY, .single = {.tap = TAP_SENDS(KC_CAPS)}},
-    {.keycode = TEST_MANAGED_SHIFT_KEY, .single = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_LEFT_SHIFT)}},
-    {.keycode = TEST_SHIFTED_PLAIN_KEY, .single = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(S(KC_A))}},
+    {.keycode = TEST_SHIFTED_SYMBOL_KEY, .single = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(S(KC_1))}}, {.keycode = TEST_SHIFT_ENTER_KEY, .single = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(S(KC_ENT))}}, {.keycode = TEST_HANDLED_SHIFT_KEY, .single = {.tap = TAP_SENDS(KC_CAPS)}}, {.keycode = TEST_MANAGED_SHIFT_KEY, .single = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_LEFT_SHIFT)}}, {.keycode = TEST_SHIFTED_PLAIN_KEY, .single = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(S(KC_A))}},
 };
 
 static uint16_t fake_time;

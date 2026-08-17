@@ -143,7 +143,7 @@ static key_runtime_process_stage_outcome_t key_runtime_process_stage_pd_mode(key
 
 static key_runtime_process_stage_outcome_t key_runtime_process_stage_handled_key(key_runtime_process_ctx_t *ctx) {
     const handled_key_resolution_t *resolution;
-    const press_token_t             *token;
+    const press_token_t            *token;
     bool                            handled;
 
     if (ctx->record->event.pressed) {

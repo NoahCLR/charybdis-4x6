@@ -658,12 +658,12 @@ static void test_transparent_long_hold_uses_lower_explicit_long_hold_action(void
 }
 
 static void test_momentary_layer_query_matches_hold_materialization(void) {
-    keypos_t                     direct_key_pos       = test_keypos(2, 0);
-    keypos_t                     inherited_key_pos    = test_keypos(2, 1);
-    keypos_t                     chained_key_pos      = test_keypos(2, 2);
-    keypos_t                     plain_key_pos        = test_keypos(2, 3);
-    keypos_t                     tap_only_key_pos     = test_keypos(2, 4);
-    keypos_t                     long_only_key_pos    = test_keypos(2, 5);
+    keypos_t                     direct_key_pos    = test_keypos(2, 0);
+    keypos_t                     inherited_key_pos = test_keypos(2, 1);
+    keypos_t                     chained_key_pos   = test_keypos(2, 2);
+    keypos_t                     plain_key_pos     = test_keypos(2, 3);
+    keypos_t                     tap_only_key_pos  = test_keypos(2, 4);
+    keypos_t                     long_only_key_pos = test_keypos(2, 5);
     handled_key_resolution_t     resolution;
     handled_key_resolution_ctx_t ctx;
 

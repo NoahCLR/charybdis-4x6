@@ -53,4 +53,3 @@ static inline split_side_mask_t split_side_mask_add_half(split_side_mask_t sides
 static inline split_side_mask_t split_side_mask_add_keypos(split_side_mask_t sides, keypos_t key_pos) {
     return split_side_mask_add_half(sides, split_half_from_keypos(key_pos));
 }
-

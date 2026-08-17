@@ -522,7 +522,7 @@ static void test_force_sync_samples_one_shared_timestamp(void) {
 // kept fading. Progress must be published for an idle pointer.
 static void test_idle_auto_mouse_still_publishes_fade_progress(void) {
     test_reset_stubs();
-    fake_auto_mouse_active = false;
+    fake_auto_mouse_active  = false;
     fake_auto_mouse_elapsed = (uint16_t)(AUTOMOUSE_RGB_DEAD_TIME + AUTOMOUSE_RGB_SYNC_STEP * 2u);
 
     split_runtime_sync_init();
@@ -1168,10 +1168,10 @@ static void test_disarm_publish_seam(void) {
 static void test_combo_publication_is_atomic_for_readers(void) {
     test_begin_publish_seam_case();
 
-    seam_first_combo_packet                          = (split_runtime_combo_feedback_packet_t){0};
-    seam_first_combo_packet.combo_underlay_bitmap[0] = 0x11u;
-    seam_first_combo_packet.combo_overlay_bitmap[0]  = 0x22u;
-    seam_second_combo_packet                         = (split_runtime_combo_feedback_packet_t){0};
+    seam_first_combo_packet                           = (split_runtime_combo_feedback_packet_t){0};
+    seam_first_combo_packet.combo_underlay_bitmap[0]  = 0x11u;
+    seam_first_combo_packet.combo_overlay_bitmap[0]   = 0x22u;
+    seam_second_combo_packet                          = (split_runtime_combo_feedback_packet_t){0};
     seam_second_combo_packet.combo_underlay_bitmap[0] = 0x44u;
     seam_second_combo_packet.combo_overlay_bitmap[0]  = 0x88u;
 

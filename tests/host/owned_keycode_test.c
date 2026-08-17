@@ -27,12 +27,12 @@ static bool     can_unregister_mods;
 // Ordering between the usage stubs and the modifier stubs is what distinguishes
 // a correct shifted hold from one the host reads as unshifted, so every report
 // mutation takes a ticket from one shared counter.
-static uint8_t  call_sequence;
-static uint8_t  register_code_seq[16];
-static uint8_t  unregister_code_seq[16];
-static uint8_t  register_mods_seq[16];
-static uint8_t  unregister_mods_seq[16];
-static uint8_t  fake_report_mods;
+static uint8_t call_sequence;
+static uint8_t register_code_seq[16];
+static uint8_t unregister_code_seq[16];
+static uint8_t register_mods_seq[16];
+static uint8_t unregister_mods_seq[16];
+static uint8_t fake_report_mods;
 
 static void test_fail(const char *expr, const char *file, int line) {
     fprintf(stderr, "test failed: %s (%s:%d)\n", expr, file, line);
@@ -249,8 +249,8 @@ static void test_mouse_buttons_notify_pointer_policy(void) {
 }
 
 static void test_two_leases_share_one_basic_report_transition(void) {
-    owned_keycode_lease_t lease_a = {0};
-    owned_keycode_lease_t lease_b = {0};
+    owned_keycode_lease_t          lease_a = {0};
+    owned_keycode_lease_t          lease_b = {0};
     owned_keycode_debug_snapshot_t snapshot;
 
     test_reset_stubs();

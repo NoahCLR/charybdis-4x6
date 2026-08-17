@@ -90,7 +90,7 @@ bool macro_dispatch(uint16_t keycode) {
         return false;
     }
 
-    slot = (uint8_t)(keycode - MACRO_0);
+    slot   = (uint8_t)(keycode - MACRO_0);
     before = hardcoded_macro_slots[slot].state;
 
     result = macro_slot_provider_start(&macro_dispatch_provider, hardcoded_macro_slots, slot, MACRO_PAYLOAD_TEXT_OUTPUT_PLAIN, 0u, MACRO_PAYLOAD_SOURCE_HARDCODED);

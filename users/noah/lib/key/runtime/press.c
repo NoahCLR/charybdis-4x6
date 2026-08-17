@@ -14,7 +14,6 @@ static __attribute__((noinline)) bool key_runtime_process_plan_handled_key_press
     return key_runtime_transition_handled_key_press(keycode, record->event.key, plan);
 }
 
-
 // A key event can change what the feedback maps render without producing any
 // transition plan: opening a multi-tap window makes a pending tap series
 // visible while the tap itself is still deferred. execute_plan only announces

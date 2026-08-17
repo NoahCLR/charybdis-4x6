@@ -1,6 +1,6 @@
 #include "macro_slot_provider.h"
 
-static macro_payload_ir_t    macro_slot_active_ir;
+static macro_payload_ir_t     macro_slot_active_ir;
 static macro_slot_metadata_t *macro_slot_active_metadata;
 static bool                   macro_slot_active_stale;
 

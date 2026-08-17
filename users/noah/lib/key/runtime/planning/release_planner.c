@@ -269,19 +269,19 @@ bool key_runtime_core_plan_active_release_effects(keypos_t key_pos, uint16_t key
             switch (contract.tap.outcome) {
                 case KEY_RUNTIME_RELEASE_TAP_OUTCOME_BUFFER_MULTI_TAP:
                     out->pending_multi_tap_seed = (key_runtime_core_pending_multi_tap_seed_t){
-                        .active              = true,
-                        .keycode             = keycode,
-                        .key_pos             = key_pos,
-                        .tap_count           = resolution->interaction->selection.tap_count,
-                        .tap_action          = contract.tap.action,
-                        .tap_repeat_count    = contract.tap.repeat_count,
+                        .active                       = true,
+                        .keycode                      = keycode,
+                        .key_pos                      = key_pos,
+                        .tap_count                    = resolution->interaction->selection.tap_count,
+                        .tap_action                   = contract.tap.action,
+                        .tap_repeat_count             = contract.tap.repeat_count,
                         .tap_branch_has_authored_step = key_behavior_step_present(resolution->interaction->selection.step),
-                        .tap_branch_has_authored_tap = resolution->interaction->selection.step.tap.present,
-                        .tap_hold_term       = resolution->interaction->binding.tap_hold_term,
-                        .multi_tap_term      = resolution->interaction->binding.multi_tap_term,
-                        .branch_confirm_term = resolution->interaction->binding.branch_confirm_term,
-                        .has_more_taps       = resolution->interaction->binding.has_more_taps,
-                        .authored_has_more_taps = resolution->interaction->binding.authored_has_more_taps,
+                        .tap_branch_has_authored_tap  = resolution->interaction->selection.step.tap.present,
+                        .tap_hold_term                = resolution->interaction->binding.tap_hold_term,
+                        .multi_tap_term               = resolution->interaction->binding.multi_tap_term,
+                        .branch_confirm_term          = resolution->interaction->binding.branch_confirm_term,
+                        .has_more_taps                = resolution->interaction->binding.has_more_taps,
+                        .authored_has_more_taps       = resolution->interaction->binding.authored_has_more_taps,
                     };
                     return true;
                 case KEY_RUNTIME_RELEASE_TAP_OUTCOME_DISPATCH_ACTION:
@@ -335,9 +335,9 @@ bool key_runtime_core_resolve_pending_multi_tap_release(keypos_t key_pos, uint16
         return false;
     }
 
-    elapsed          = key_runtime_core_release_elapsed(token->pressed_at, token->released_at);
-    series_tap_count = series ? series->tap_count : 0u;
-    authored_branch = key_runtime_core_tap_series_has_authored_branch(series);
+    elapsed             = key_runtime_core_release_elapsed(token->pressed_at, token->released_at);
+    series_tap_count    = series ? series->tap_count : 0u;
+    authored_branch     = key_runtime_core_tap_series_has_authored_branch(series);
     authored_tap_branch = key_runtime_core_tap_series_has_authored_tap_branch(series);
 
     if (series && series->active && series->branch_confirming && series->branch_confirm_kind != KEY_RUNTIME_TAP_SERIES_BRANCH_CONFIRM_DELAYED_ACTION) {

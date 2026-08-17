@@ -74,7 +74,7 @@ static uint16_t               fake_auto_mouse_elapsed = 0;
 static bool                   fake_auto_mouse_active  = true;
 static host_runtime_fixture_t runtime_fixture         = HOST_RUNTIME_FIXTURE_INIT;
 #define fake_is_master runtime_fixture.is_master
-static bool              fake_is_left = true;
+static bool              fake_is_left        = true;
 static pd_mode_mask_t    fake_pd_active_mode = 0;
 static pd_mode_mask_t    fake_pd_locked_mode = 0;
 static split_side_mask_t fake_pd_owner_sides = SPLIT_SIDE_MASK_NONE;
@@ -377,7 +377,7 @@ static void test_reset(void) {
     fake_pd_locked_mode     = 0;
     fake_pd_owner_sides     = SPLIT_SIDE_MASK_NONE;
     key_origin_bitmap_clear(fake_pd_owner_bitmap);
-    split_runtime_sync_remote = host_runtime_fixture_split_remote_init();
+    split_runtime_sync_remote         = host_runtime_fixture_split_remote_init();
     fake_semantic_build_count         = 0u;
     fake_tap_branch_build_count       = 0u;
     fake_flash_visibility_build_count = 0u;

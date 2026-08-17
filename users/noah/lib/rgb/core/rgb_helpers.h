@@ -182,7 +182,6 @@ static inline void rgb_fill_led_range(uint8_t from, uint8_t to, uint8_t led_min,
 #        define RGB_LEFT_LED_COUNT 29
 #    endif
 
-
 // Color only the left half (LEDs 0–28).
 static inline void rgb_set_left_half(rgb_t color, uint8_t led_min, uint8_t led_max) {
     rgb_fill_led_range(0, RGB_LEFT_LED_COUNT, led_min, led_max, color);

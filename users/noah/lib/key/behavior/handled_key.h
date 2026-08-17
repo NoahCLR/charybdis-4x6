@@ -128,17 +128,17 @@ static inline bool handled_key_hold_contract_fires_at_threshold(handled_key_hold
     return handled_key_hold_semantics_fires_at_threshold(contract);
 }
 
-void                         handled_key_lookup_into(uint16_t keycode, handled_key_resolution_t *out);
-void                         handled_key_lookup_tap_count_into(uint16_t keycode, uint8_t tap_count, handled_key_resolution_t *out);
-handled_key_resolution_t     handled_key_lookup(uint16_t keycode);
-handled_key_resolution_t     handled_key_lookup_tap_count(uint16_t keycode, uint8_t tap_count);
-handled_key_resolution_ctx_t handled_key_resolution_ctx_live(keypos_t key_pos);
+void                           handled_key_lookup_into(uint16_t keycode, handled_key_resolution_t *out);
+void                           handled_key_lookup_tap_count_into(uint16_t keycode, uint8_t tap_count, handled_key_resolution_t *out);
+handled_key_resolution_t       handled_key_lookup(uint16_t keycode);
+handled_key_resolution_t       handled_key_lookup_tap_count(uint16_t keycode, uint8_t tap_count);
+handled_key_resolution_ctx_t   handled_key_resolution_ctx_live(keypos_t key_pos);
 __attribute__((noinline)) bool handled_key_resolution_materializes_momentary_layer(const handled_key_resolution_t *resolution, const handled_key_resolution_ctx_t *ctx);
-void                         handled_key_materialize_into(const handled_key_resolution_t *resolution, const handled_key_resolution_ctx_t *ctx, handled_key_materialized_t *out);
-handled_key_materialized_t   handled_key_materialize(handled_key_resolution_t resolution, handled_key_resolution_ctx_t ctx);
-bool                         handled_key_resolution_is_handled(handled_key_resolution_t resolution);
-bool                         handled_key_resolution_has_multi_tap(handled_key_resolution_t resolution);
-bool                         handled_key_resolution_is_momentary_layer(handled_key_resolution_t resolution);
-bool                         handled_key_resolution_is_layer_tap(handled_key_resolution_t resolution);
-uint16_t                     handled_key_resolution_tap_hold_term(handled_key_resolution_t resolution);
-uint16_t                     handled_key_resolution_longer_hold_term(handled_key_resolution_t resolution);
+void                           handled_key_materialize_into(const handled_key_resolution_t *resolution, const handled_key_resolution_ctx_t *ctx, handled_key_materialized_t *out);
+handled_key_materialized_t     handled_key_materialize(handled_key_resolution_t resolution, handled_key_resolution_ctx_t ctx);
+bool                           handled_key_resolution_is_handled(handled_key_resolution_t resolution);
+bool                           handled_key_resolution_has_multi_tap(handled_key_resolution_t resolution);
+bool                           handled_key_resolution_is_momentary_layer(handled_key_resolution_t resolution);
+bool                           handled_key_resolution_is_layer_tap(handled_key_resolution_t resolution);
+uint16_t                       handled_key_resolution_tap_hold_term(handled_key_resolution_t resolution);
+uint16_t                       handled_key_resolution_longer_hold_term(handled_key_resolution_t resolution);

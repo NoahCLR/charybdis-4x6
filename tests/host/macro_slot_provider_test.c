@@ -14,7 +14,7 @@ static macro_payload_start_result_t start_result;
 static bool                         engine_active;
 static macro_payload_finish_fn      captured_finish;
 static void                        *captured_context;
-static const macro_payload_ir_t     *captured_ir;
+static const macro_payload_ir_t    *captured_ir;
 
 bool macro_payload_encode_ir_write(const macro_payload_ir_t *ir, macro_payload_write_byte_fn write_byte, void *context, uint16_t *written) {
     (void)ir;
@@ -84,8 +84,8 @@ static void test_finish_active(void) {
 }
 
 static void test_active_invalidation_and_busy_start_preserve_shared_ir(void) {
-    const macro_slot_provider_t provider = {.slot_count = 1u, .load_ir = test_load_ir};
-    macro_slot_metadata_t       first[1] = {0};
+    const macro_slot_provider_t provider  = {.slot_count = 1u, .load_ir = test_load_ir};
+    macro_slot_metadata_t       first[1]  = {0};
     macro_slot_metadata_t       second[1] = {0};
 
     source_byte      = 'A';
@@ -121,7 +121,7 @@ static void test_active_invalidation_and_busy_start_preserve_shared_ir(void) {
 }
 
 static void test_engine_busy_start_keeps_valid_metadata_without_pinning(void) {
-    const macro_slot_provider_t provider = {.slot_count = 1u, .load_ir = test_load_ir};
+    const macro_slot_provider_t provider    = {.slot_count = 1u, .load_ir = test_load_ir};
     macro_slot_metadata_t       metadata[1] = {0};
 
     source_byte     = 'A';
@@ -135,7 +135,7 @@ static void test_engine_busy_start_keeps_valid_metadata_without_pinning(void) {
 }
 
 static void test_invalid_result_is_cached_until_invalidation(void) {
-    const macro_slot_provider_t provider = {.slot_count = 1u, .load_ir = test_load_ir};
+    const macro_slot_provider_t provider    = {.slot_count = 1u, .load_ir = test_load_ir};
     macro_slot_metadata_t       metadata[1] = {0};
 
     load_call_count = 0u;

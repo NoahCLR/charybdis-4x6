@@ -33,9 +33,9 @@ typedef struct {
 } noah_qmk_via_split_sync_debug_snapshot_t;
 
 #if defined(VIA_ENABLE) && defined(SPLIT_TRANSACTION_IDS_USER)
-void                                     noah_qmk_via_split_sync_init(void);
-void                                     noah_qmk_via_split_sync_matrix_scan(void);
-void                                     noah_qmk_via_split_sync_note_mutation(uint8_t effects);
+void noah_qmk_via_split_sync_init(void);
+void noah_qmk_via_split_sync_matrix_scan(void);
+void noah_qmk_via_split_sync_note_mutation(uint8_t effects);
 // Storage changed outside this layer, via the write-through mirror. Recompute
 // the local digest so nothing advertises a stale one.
 void                                     noah_qmk_via_split_sync_note_local_storage_changed(void);
@@ -47,7 +47,7 @@ static inline void noah_qmk_via_split_sync_matrix_scan(void) {}
 static inline void noah_qmk_via_split_sync_note_mutation(uint8_t effects) {
     (void)effects;
 }
-static inline void noah_qmk_via_split_sync_note_local_storage_changed(void) {}
+static inline void                                     noah_qmk_via_split_sync_note_local_storage_changed(void) {}
 static inline noah_qmk_via_split_sync_debug_snapshot_t noah_qmk_via_split_sync_debug_snapshot(void) {
     return (noah_qmk_via_split_sync_debug_snapshot_t){0};
 }

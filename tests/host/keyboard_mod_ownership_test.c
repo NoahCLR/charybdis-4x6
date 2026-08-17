@@ -356,7 +356,7 @@ static void test_keyboard_mod_policy_real_mod_mask_window_restores_managed_only_
 
 static void test_modifier_capacity_preflight_is_all_or_nothing(void) {
     keyboard_mod_ownership_debug_snapshot_t snapshot;
-    uint8_t                                  mods = MOD_BIT(KC_LEFT_GUI) | MOD_BIT(KC_LEFT_SHIFT);
+    uint8_t                                 mods = MOD_BIT(KC_LEFT_GUI) | MOD_BIT(KC_LEFT_SHIFT);
 
     test_reset_state();
 

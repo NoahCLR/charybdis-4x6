@@ -162,15 +162,15 @@ projection_snapshot_t key_runtime_core_projection_snapshot_capture(void) {
     snapshot.deferred_release_timed_blocker_count = noah_runtime_debug_deferred_release_timed_blocker_count();
 
     if (state) {
-        snapshot.core_shadow_layer_state                   = state->shadow_projection.layer_state;
-        snapshot.core_shadow_locked_layer_mask             = state->shadow_projection.locked_layer_mask;
-        snapshot.core_shadow_keyboard_mod_state            = state->shadow_projection.keyboard_mod_state;
-        snapshot.core_shadow_keyboard_managed_mod_mask     = state->shadow_projection.keyboard_managed_mod_mask;
-        snapshot.core_shadow_keyboard_physical_mod_mask    = state->shadow_projection.keyboard_physical_mod_mask;
-        snapshot.core_shadow_pd_mode_local_active          = state->shadow_projection.pd_mode_local_active;
-        snapshot.core_shadow_pd_mode_local_locked          = state->shadow_projection.pd_mode_local_locked;
-        snapshot.core_shadow_pointer_anchor_active         = state->shadow_projection.pointer_anchor_active;
-        snapshot.core_shadow_pointer_pd_mode_anchor_active = state->shadow_projection.pointer_pd_mode_anchor_active;
+        snapshot.core_shadow_layer_state                       = state->shadow_projection.layer_state;
+        snapshot.core_shadow_locked_layer_mask                 = state->shadow_projection.locked_layer_mask;
+        snapshot.core_shadow_keyboard_mod_state                = state->shadow_projection.keyboard_mod_state;
+        snapshot.core_shadow_keyboard_managed_mod_mask         = state->shadow_projection.keyboard_managed_mod_mask;
+        snapshot.core_shadow_keyboard_physical_mod_mask        = state->shadow_projection.keyboard_physical_mod_mask;
+        snapshot.core_shadow_pd_mode_local_active              = state->shadow_projection.pd_mode_local_active;
+        snapshot.core_shadow_pd_mode_local_locked              = state->shadow_projection.pd_mode_local_locked;
+        snapshot.core_shadow_pointer_anchor_active             = state->shadow_projection.pointer_anchor_active;
+        snapshot.core_shadow_pointer_pd_mode_anchor_active     = state->shadow_projection.pointer_pd_mode_anchor_active;
         snapshot.core_shadow_pointer_prefers_typing_layer      = state->shadow_projection.pointer_prefers_typing_layer;
         snapshot.core_shadow_pointer_toggle_enabled            = state->shadow_projection.pointer_toggle_enabled;
         snapshot.core_press_token_count                        = state->press_token_count;
@@ -182,10 +182,10 @@ projection_snapshot_t key_runtime_core_projection_snapshot_capture(void) {
         snapshot.core_deferred_release_blocker_count           = key_runtime_core_deferred_release_blocker_count();
         snapshot.core_deferred_release_timed_blocker_count     = key_runtime_core_deferred_release_timed_blocker_count();
         snapshot.core_persistent_intent_count                  = state->persistent_intent_count;
-        snapshot.core_release_keycode_mismatch_count       = state->release_keycode_mismatch_count;
-        snapshot.core_orphan_release_count                 = state->orphan_release_count;
-        snapshot.core_cancelled_press_count                = state->cancelled_press_count;
-        snapshot.core_token_allocation_failure_count       = state->token_allocation_failure_count;
+        snapshot.core_release_keycode_mismatch_count           = state->release_keycode_mismatch_count;
+        snapshot.core_orphan_release_count                     = state->orphan_release_count;
+        snapshot.core_cancelled_press_count                    = state->cancelled_press_count;
+        snapshot.core_token_allocation_failure_count           = state->token_allocation_failure_count;
     }
 
     return snapshot;

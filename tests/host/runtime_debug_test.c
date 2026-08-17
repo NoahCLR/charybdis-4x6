@@ -311,26 +311,26 @@ static handled_key_resolution_t test_handled_key_resolution(uint16_t keycode, ui
 }
 
 static void test_reset_stubs(void) {
-    fake_time                  = 1000;
-    fake_mods                  = 0;
-    fake_weak_mods             = 0;
-    fake_oneshot_mods          = 0;
-    fake_oneshot_locked_mods   = 0;
-    send_keyboard_report_count = 0;
-    last_emitted_action        = KC_NO;
-    last_delayed_action        = KC_NO;
-    last_delayed_mods          = (delayed_action_mods_t){0};
-    delayed_action_count       = 0;
-    projection_order_count     = 0;
-    feedback_pulse_count       = 0;
+    fake_time                         = 1000;
+    fake_mods                         = 0;
+    fake_weak_mods                    = 0;
+    fake_oneshot_mods                 = 0;
+    fake_oneshot_locked_mods          = 0;
+    send_keyboard_report_count        = 0;
+    last_emitted_action               = KC_NO;
+    last_delayed_action               = KC_NO;
+    last_delayed_mods                 = (delayed_action_mods_t){0};
+    delayed_action_count              = 0;
+    projection_order_count            = 0;
+    feedback_pulse_count              = 0;
     delayed_action_enqueue_hook_armed = false;
     delayed_action_reenter_drain      = false;
     delayed_action_enqueue_key_pos    = (keypos_t){0};
     delayed_action_enqueue_action     = KC_NO;
     delayed_action_enqueue_mods       = (delayed_action_mods_t){0};
-    split_runtime_sync_count   = 0;
-    fake_branch_confirm_mode   = KEY_FEEDBACK_BRANCH_CONFIRM_NON_BASE_TAPS;
-    layer_state                = 0;
+    split_runtime_sync_count          = 0;
+    fake_branch_confirm_mode          = KEY_FEEDBACK_BRANCH_CONFIRM_NON_BASE_TAPS;
+    layer_state                       = 0;
 
     for (uint8_t layer = 0u; layer < LAYER_COUNT; layer++) {
         for (uint8_t row = 0u; row < MATRIX_ROWS; row++) {
@@ -896,8 +896,8 @@ static void test_key_runtime_scan_skips_core_work_when_idle(void) {
 
 static void test_key_runtime_scan_drains_pending_release_without_core_work(void) {
     key_runtime_core_state_t *state;
-    keypos_t                 key_pos = test_keypos(2, 5);
-    keyboard_mod_state_t     mods    = {
+    keypos_t                  key_pos = test_keypos(2, 5);
+    keyboard_mod_state_t      mods    = {
         .real = MOD_BIT(KC_LEFT_SHIFT),
     };
 
@@ -920,10 +920,10 @@ static void test_key_runtime_scan_drains_pending_release_without_core_work(void)
 }
 
 static void test_key_runtime_deferred_release_drain_is_bounded_and_fifo_at_full_capacity(void) {
-    keypos_t             key_pos = test_keypos(2, 6);
-    delayed_action_mods_t mods   = {0};
-    uint16_t             expected_projected_count = 0u;
-    uint16_t             drain_count              = 0u;
+    keypos_t              key_pos                  = test_keypos(2, 6);
+    delayed_action_mods_t mods                     = {0};
+    uint16_t              expected_projected_count = 0u;
+    uint16_t              drain_count              = 0u;
 
     test_reset_stubs();
     noah_runtime_reset_for_test();
@@ -1024,8 +1024,8 @@ static void test_key_runtime_scan_drains_bounded_batches_with_owner_mod_and_feed
     CHECK(!second_token->active);
     CHECK(key_runtime_core_active_press_token_count() == 0u);
     CHECK(key_runtime_core_pending_multi_tap_count() == 0u);
-    first_owner      = first_token->token_id;
-    second_owner     = second_token->token_id;
+    first_owner       = first_token->token_id;
+    second_owner      = second_token->token_id;
     state_time_before = state->current_time;
 
     for (uint8_t index = 0u; index < TEST_PENDING_COUNT; index++) {
@@ -1119,17 +1119,17 @@ static bool test_effect_plan_contains(const key_runtime_core_effect_plan_t *plan
 }
 
 static void test_key_runtime_core_unmatched_release_uses_shadow_inclusive_hold_context(void) {
-    key_runtime_core_state_t  *state;
+    key_runtime_core_state_t      *state;
     key_runtime_core_effect_plan_t plan;
-    handled_key_resolution_t   resolution = test_handled_key_resolution(TEST_TRANSPARENT_HOLD_KEY, 1u);
-    keypos_t                   key_pos    = test_keypos(2, 4);
+    handled_key_resolution_t       resolution = test_handled_key_resolution(TEST_TRANSPARENT_HOLD_KEY, 1u);
+    keypos_t                       key_pos    = test_keypos(2, 4);
 
     test_reset_stubs();
     noah_runtime_reset_for_test();
 
     state = key_runtime_core_state();
     CHECK(state != NULL);
-    layer_state = (layer_state_t)1u << 2;
+    layer_state                          = (layer_state_t)1u << 2;
     state->shadow_projection.layer_state = (layer_state_t)1u << 1;
     test_set_keymap_key(2u, key_pos, TEST_TRANSPARENT_HOLD_KEY);
     test_set_keymap_key(1u, key_pos, MO(3));
@@ -1149,9 +1149,9 @@ static void test_key_runtime_core_unmatched_release_uses_shadow_inclusive_hold_c
 
 static void test_key_runtime_core_active_release_uses_token_layer_contract_not_fallback_resolution(void) {
     key_runtime_core_effect_plan_t plan;
-    handled_key_resolution_t      layer_resolution = test_handled_key_resolution(TEST_INTERRUPTED_LAYER_KEY, 1u);
-    handled_key_resolution_t      plain_resolution = test_handled_key_resolution(KC_C, 1u);
-    keypos_t                      key_pos           = test_keypos(2, 4);
+    handled_key_resolution_t       layer_resolution = test_handled_key_resolution(TEST_INTERRUPTED_LAYER_KEY, 1u);
+    handled_key_resolution_t       plain_resolution = test_handled_key_resolution(KC_C, 1u);
+    keypos_t                       key_pos          = test_keypos(2, 4);
 
     test_reset_stubs();
     noah_runtime_reset_for_test();
@@ -2971,7 +2971,7 @@ static void test_key_runtime_core_token_allocator_skips_every_live_owner_store(v
         .pending_release_emission = true,
     };
     state->press_token_count = 1u;
-    state->leases[0] = (lease_t){
+    state->leases[0]         = (lease_t){
         .active         = true,
         .kind           = LEASE_KIND_HELD_ACTION,
         .owner_token_id = 3u,
@@ -2981,7 +2981,7 @@ static void test_key_runtime_core_token_allocator_skips_every_live_owner_store(v
         .kind           = LEASE_KIND_REPEAT,
         .owner_token_id = 4u,
     };
-    state->lease_count = 2u;
+    state->lease_count         = 2u;
     state->pending_releases[0] = (pending_release_slot_t){
         .owner_token_id = 5u,
         .flags          = KEY_RUNTIME_PENDING_RELEASE_FLAG_ACTIVE,

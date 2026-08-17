@@ -257,7 +257,7 @@ bool owned_keycode_tap(uint16_t keycode) {
 
 void owned_keycode_track_physical_event(uint16_t keycode, keyrecord_t *record) {
     owned_keycode_lease_t components;
-    uint8_t               *physical;
+    uint8_t              *physical;
 
     if (!record || IS_NOEVENT(record->event) || !owned_keycode_decompose(keycode, &components) || !components.has_basic) {
         return;

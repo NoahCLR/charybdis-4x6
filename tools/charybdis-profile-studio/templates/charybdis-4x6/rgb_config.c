@@ -102,15 +102,12 @@ static const combo_feedback_led_group_t combo_feedback_led_groups_data[] = RGB_L
 const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
     .tap_pending_color = HSV(0, 0, 150),
 
-    RGB_TAP_BRANCH_COLORS(HSV(200, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
-                          HSV(180, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
-                          HSV(143, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
-                          HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS)),
+    RGB_TAP_BRANCH_COLORS(HSV(200, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), HSV(180, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), HSV(143, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS)),
 
-    .branch_confirm_mode = KEY_FEEDBACK_BRANCH_CONFIRM_NON_BASE_TAPS,
-    .tap_committed_color = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
-    .tap_commit_mode     = KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS,
-    .hold_active_color   = HSV(18, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+    .branch_confirm_mode    = KEY_FEEDBACK_BRANCH_CONFIRM_NON_BASE_TAPS,
+    .tap_committed_color    = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+    .tap_commit_mode        = KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS,
+    .hold_active_color      = HSV(18, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
     .long_hold_active_color = HSV(148, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
     .locality               = RGB_KEY_HALF,
 };
