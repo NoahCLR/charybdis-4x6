@@ -238,11 +238,13 @@ Combos can enter that same table too. If a combo emits a keycode that has a
 multi-tap behavior as a physical key.
 
 Here is the shape of one authored row, based on the `RIGHT_THUMB` row in
-[`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c#L442).
-The timing lines are optional row-local overrides, and branch confirm is the
-short RGB-visible pause after a double-tap or higher branch wins, before the
-action fires. The snippet shows one useful helper mix, not the full helper
-vocabulary; the list below shows the other helpers you can use.
+[`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c#L456).
+The lines between the keycode and `.tap_counts` are optional row-local
+settings, shown here at their default values: four timing overrides, and two
+policy flags. Branch confirm is the short RGB-visible pause after a double-tap
+or higher branch wins, before the action fires. The snippet shows one useful
+helper mix, not the full helper vocabulary; the list below shows the other
+helpers you can use.
 
 ```c
 {
@@ -252,6 +254,7 @@ vocabulary; the list below shows the other helpers you can use.
     .multi_tap_term = 150,
     .rgb_branch_confirm_term = 150,
     .skip_rgb_branch_confirm = false,
+    .keeps_auto_mouse_anchored = false,
     .tap_counts = {
         [0] = {
             .tap = TAP_SENDS(LOCK_LAYER(LAYER_NAV)),

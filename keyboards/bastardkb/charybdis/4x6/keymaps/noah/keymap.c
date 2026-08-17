@@ -226,6 +226,8 @@ enum keymap_custom_keycodes {
 //     default longer-hold threshold
 //   - CUSTOM_MULTI_TAP_TERM = 150 ms
 //     max gap allowed between taps in a multi-tap sequence
+//   - CUSTOM_RGB_BRANCH_CONFIRM_TERM = 150 ms
+//     RGB-visible window after a committed non-base tap branch
 //   - KEY_BEHAVIOR_MAX_TAP_COUNT = 5
 //     current runtime limit for tap_counts[] entries
 //
@@ -233,9 +235,20 @@ enum keymap_custom_keycodes {
 //   - .tap_hold_term overrides the first hold threshold for that row
 //   - .longer_hold_term overrides the longer-hold threshold
 //   - .multi_tap_term overrides the max gap between taps
+//   - .rgb_branch_confirm_term overrides the committed-branch RGB window
 //   - omit them (or leave them 0) to use the defaults above
 //   - for LT() rows, omitted .tap_hold_term falls back to TAPPING_TERM;
 //     all other rows fall back to CUSTOM_TAP_HOLD_TERM
+//
+// per-key policy flags, omit them (or leave them false) for ordinary keys:
+//   - .skip_rgb_branch_confirm drops the branch-confirm RGB window for that
+//     row; the key output still runs, only the visual pause goes away
+//   - .keeps_auto_mouse_anchored counts the row's keycode as a mouse record, so
+//     pressing it keeps the pointer layer up instead of letting auto mouse
+//     reset on it. Only keys that drive the mouse through authored actions need
+//     it: mouse keycodes and pointer-mode keys already anchor on their own.
+//     Without it, a TAP_SENDS(KC_TRNS) tier on the pointer layer finds no lower
+//     layer to fall through to, because the press already took that layer down
 //
 // multi-tap behavior:
 //   - if a key has higher tap_counts[] entries, lower tap counts wait one
