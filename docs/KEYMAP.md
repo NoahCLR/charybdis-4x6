@@ -271,11 +271,11 @@ second.
 `LAYER_POINTER` carries two window drags, split across two keys:
 
 - `MS_BTN3` tap -> middle click
-- `MS_BTN3` double-tap hold -> `PRESS_AND_HOLD_UNTIL_RELEASE(A(MS_BTN2))`,
-  resizing the window under the pointer
+- `MS_BTN3` double-tap hold -> `PRESS_AND_HOLD_UNTIL_RELEASE(MS_BTN7)`, resizing
+  the window under the pointer
 - `DRAG_WINDOW` tap -> transparent, so it falls through to the base-layer key
   under it
-- `DRAG_WINDOW` hold -> `PRESS_AND_HOLD_UNTIL_RELEASE(A(MS_BTN1))`, moving the
+- `DRAG_WINDOW` hold -> `PRESS_AND_HOLD_UNTIL_RELEASE(MS_BTN6)`, moving the
   window under the pointer
 
 The point is to put a whole window drag under one finger. While the key is held
@@ -283,7 +283,7 @@ the trackball is still live, so the ball drives the drag and releasing the key
 ends it.
 
 The resize drag sits behind a double-tap because it shares a key with an
-ordinary middle click, and an accidental `Alt` + drag rearranges whatever is
+ordinary middle click, and an accidental window drag rearranges whatever is
 under the pointer. The move drag has its own key, so it can afford a plain hold;
 both rows tighten `.multi_tap_term` to `100`, since these branches are entered
 from a deliberate burst rather than typing rhythm.
@@ -294,23 +294,12 @@ press and takes `LAYER_POINTER` with it, which both interrupts the drag surface
 and leaves the transparent tap tier with no layer to fall through from. See
 [POINTER_MODES.md](./POINTER_MODES.md) for the classification rule.
 
-For the current macOS setup this expects
-[AnyDrag](https://github.com/XueshiQiao/AnyDrag) to be running:
-
-```
-brew install --cask XueshiQiao/tap/anydrag
-```
-
-AnyDrag is what turns those `Alt` + drag gestures into window management.
-Without it the key still sends a real `Alt` + mouse button, which most apps
-treat as an ordinary modified click.
-
-The runtime settles a freshly registered modifier before pressing a mouse
-button it qualifies, because the two leave on separate USB endpoints and a host
-sampling modifier state at button-down can otherwise see a bare click. That is
-shared-runtime behavior, not a profile choice; see
-`owned_keycode_acquire_components()` in
-[owned_keycode.c](../users/noah/lib/action/owned_keycode.c).
+Neither gesture means anything to macOS on its own: both are ordinary extra
+mouse buttons on the wire. For the current macOS setup, window move and resize
+are bound to buttons 6 and 7 in
+[Rectangle Pro](https://rectangleapp.com/pro), which is what turns them into
+window management. Without that binding the keys still send real button 6 and
+button 7 presses, which most apps ignore.
 
 ## Layer Walkthrough
 

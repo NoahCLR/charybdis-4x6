@@ -64,7 +64,7 @@ changes how the modes feel in practice.
 The same policy answers QMK's mouse-record question, which decides whether a
 key press keeps the pointer layer up or resets auto mouse. Mouse keycodes and
 pointer-mode keys are classified automatically. A key that drives the mouse
-without being either — `DRAG_WINDOW`'s modified drag, `CLICK_SPAM`'s repeated
+without being either — `DRAG_WINDOW`'s held window-drag button, `CLICK_SPAM`'s repeated
 clicks — claims the same anchor from its authored row with
 `.keeps_auto_mouse_anchored = true`. That is not cosmetic: auto mouse tears the
 pointer layer down on the press otherwise, and a `TAP_SENDS(KC_TRNS)` tier on

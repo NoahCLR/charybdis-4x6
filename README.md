@@ -92,10 +92,11 @@ The current profile includes:
   volume or display brightness
 - `CLICK_SPAM`: not a pointing mode, but a mouse-button combo output that uses
   the behavior table to repeat left-click while held
-- window drags: also not a pointing mode, but hold branches that hold `Alt` plus
-  a mouse button so the ball resizes the window under the pointer (`MS_BTN3`
-  double-tap hold) or moves it (`DRAG_WINDOW` hold); in my setup this expects
-  [AnyDrag](https://github.com/XueshiQiao/AnyDrag) to translate those gestures
+- window drags: also not a pointing mode, but hold branches that hold an extra
+  mouse button so the ball resizes the window under the pointer (`MS_BTN3`
+  double-tap hold, button 7) or moves it (`DRAG_WINDOW` hold, button 6); in my
+  setup [Rectangle Pro](https://rectangleapp.com/pro) is what binds those
+  buttons to window management
 - auto-mouse and auto-sniping layers that keep pointer work available
   automatically while you move between typing and trackball use
 
