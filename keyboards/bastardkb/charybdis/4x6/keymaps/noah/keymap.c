@@ -475,6 +475,15 @@ const key_behavior_t
                         [1] = {.tap = TAP_SENDS(VIA_MACRO_7)},
                     },
             },
+
+            {
+                .keycode        = MS_BTN3,
+                .multi_tap_term = 100,
+                .tap_counts =
+                    {
+                        [1] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(A(MS_BTN2))},
+                    },
+            },
 };
 
 // ─── Keymap Layouts ─────────────────────────────────────────────────────────
