@@ -187,8 +187,21 @@ enum keymap_custom_keycodes {
 //
 // Combo timing is tuned in config.h via COMBO_TERM.
 // Current default: COMBO_TERM = 50 ms.
-#define COMBOS(COMBO)
-/* COMBO(KC_TAB, (KC_D, KC_F)) */ /* COMBO(MACRO_0, (KC_Q, KC_W)) */ /* COMBO(VIA_MACRO_0, (KC_U, KC_I)) */ /* COMBO(LOCK_LAYER(LAYER_NAV), (KC_J, KC_K)) */ /* COMBO(ARROW_MODE_LOCK, (KC_M, KC_COMM)) */ /* COMBO(..., (...)) */ /* ... */
+// clang-format off
+// The body is comments until the first authored row, and clang-format would
+// collapse a comment-only macro body onto one line and drop the continuations.
+// Profile Studio appends rows under the #define line, so the trailing
+// backslashes have to survive formatting or the appended row lands outside the
+// macro.
+#define COMBOS(COMBO)                                \
+    /* COMBO(KC_TAB, (KC_D, KC_F)) */                \
+    /* COMBO(MACRO_0, (KC_Q, KC_W)) */               \
+    /* COMBO(VIA_MACRO_0, (KC_U, KC_I)) */           \
+    /* COMBO(LOCK_LAYER(LAYER_NAV), (KC_J, KC_K)) */ \
+    /* COMBO(ARROW_MODE_LOCK, (KC_M, KC_COMM)) */    \
+    /* COMBO(..., (...)) */                          \
+    /* ... */
+// clang-format on
 
 // ─── Key Behavior Tables ────────────────────────────────────────────────────
 //

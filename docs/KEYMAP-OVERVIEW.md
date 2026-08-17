@@ -169,7 +169,7 @@ No authored combos resolve entirely from keys on this layer.
 
 | Key On Layer | Behavior Keycode | Tap Count | Tap | Hold | Long Hold | Timing |
 | --- | --- | --- | --- | --- | --- | --- |
-| `G(C) x2` | `G(C)` (`G(KC_C)`) | `double` | `TAP_SENDS(VIA_MACRO_10)` | `-` | `-` | `multi_tap(150), rgb_branch_confirm=skip` |
+| `G(C) x2` | `G(C)` (`G(KC_C)`) | `double` | `TAP_SENDS(VIA_MACRO_10)` | `-` | `-` | `multi_tap(150), rgb_branch_confirm(150)` |
 | `G(V) x2` | `G(V)` (`G(KC_V)`) | `double` | `TAP_SENDS(VIA_MACRO_7)` | `-` | `-` | `multi_tap(150), rgb_branch_confirm(150)` |
 | `LSFT` | `LSFT` (`KC_LEFT_SHIFT`) | `single` | `TAP_SENDS(KC_CAPS)` | `-` | `-` | `release before tap_hold(150); otherwise normal hold` |
 | `LEFT` | `LEFT` (`KC_LEFT`) | `single` | `-` | `TAP_ON_RELEASE_AFTER_HOLD(A(KC_LEFT))` | `TAP_AT_HOLD_THRESHOLD(G(KC_LEFT))` | `tap_hold(150), long_hold(400)` |
@@ -207,7 +207,7 @@ No authored combos resolve entirely from keys on this layer.
 | `PINCH` | `PINCH` (`PINCH_MODE`) | `single` | `TAP_SENDS(KC_TRNS)` | `-` | `-` | `multi_tap(150)` |
 | `PINCH` | `PINCH` (`PINCH_MODE`) | `double` | `TAP_SENDS(VIA_MACRO_6)` | `PRESS_AND_HOLD_UNTIL_RELEASE(ZOOM_MODE)` | `-` | `tap_hold(150), multi_tap(150), rgb_branch_confirm(150)` |
 | `MS_BTN3` | `MS_BTN3` | `double` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(MS_BTN7)` | `-` | `tap_hold(150), multi_tap=100, rgb_branch_confirm(150)` |
-| `DRAG_WINDOW` | `DRAG_WINDOW` | `single` | `TAP_SENDS(KC_TRNS)` | `PRESS_AND_HOLD_UNTIL_RELEASE(MS_BTN6)` | `-` | `tap_hold(150)` |
+| `DRAG_WINDOW` | `DRAG_WINDOW` | `single` | `TAP_SENDS(KC_TRNS)` | `PRESS_AND_HOLD_UNTIL_RELEASE(MS_BTN6)` | `-` | `tap_hold=100` |
 | `VOLUME` | `VOLUME` (`VOLUME_MODE`) | `single` | `TAP_SENDS(KC_TRNS)` | `-` | `-` | `multi_tap(150)` |
 | `VOLUME` | `VOLUME` (`VOLUME_MODE`) | `double` | `TAP_SENDS(KC_MUTE)` | `-` | `-` | `multi_tap(150), rgb_branch_confirm(150)` |
 | `DRAGSCROLL` | `DRAGSCROLL` | `single` | `TAP_SENDS(KC_TRNS)` | `-` | `-` | `multi_tap(150)` |

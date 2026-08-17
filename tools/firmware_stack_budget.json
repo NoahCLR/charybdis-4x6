@@ -157,11 +157,11 @@
         },
         {
           "name": "matrix scan macro text press",
-          "functions": ["main", "matrix_scan", "macro_payload_start_text_char", "macro_payload_start_transient", "owned_keycode_acquire", "owned_keycode_acquire_basic", "register_code", "send_6kro_report"]
+          "functions": ["main", "matrix_scan", "macro_payload_start_text_char", "macro_payload_start_transient", "owned_keycode_acquire", "owned_keycode_acquire_components", "register_code", "send_6kro_report"]
         },
         {
           "name": "matrix scan macro transient chord press",
-          "functions": ["main", "matrix_scan", "macro_payload_start_transient", "owned_keycode_acquire", "owned_keycode_acquire_basic", "register_code", "send_6kro_report"]
+          "functions": ["main", "matrix_scan", "macro_payload_start_transient", "owned_keycode_acquire", "owned_keycode_acquire_components", "register_code", "send_6kro_report"]
         },
         {
           "name": "matrix scan macro persistent hold press",
@@ -169,7 +169,7 @@
         },
         {
           "name": "matrix scan macro owned release",
-          "functions": ["main", "matrix_scan", "owned_keycode_release", "owned_keycode_release_basic", "unregister_code", "send_6kro_report"]
+          "functions": ["main", "matrix_scan", "owned_keycode_release", "owned_keycode_release_components", "unregister_code", "send_6kro_report"]
         },
         {
           "name": "matrix scan macro provider completion",
