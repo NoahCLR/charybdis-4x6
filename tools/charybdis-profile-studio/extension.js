@@ -1813,6 +1813,7 @@ function parseKeyBehaviors(text) {
                 multiTapTerm: normalizeExpr(fields[".multi_tap_term"] || ""),
                 rgbBranchConfirmTerm: normalizeExpr(fields[".rgb_branch_confirm_term"] || ""),
                 skipRgbBranchConfirm: ["true", "1"].includes(normalizeExpr(fields[".skip_rgb_branch_confirm"] || "")),
+                keepsAutoMouseAnchored: ["true", "1"].includes(normalizeExpr(fields[".keeps_auto_mouse_anchored"] || "")),
                 steps,
             };
         })
@@ -3320,6 +3321,7 @@ function renderBehaviorRowFromRequest(behavior) {
     const longerHoldTerm = normalizeOptionalTerm(behavior?.longerHoldTerm, "longer_hold_term");
     const multiTapTerm = normalizeOptionalTerm(behavior?.multiTapTerm, "multi_tap_term");
     const skipRgbBranchConfirm = normalizeOptionalBool(behavior?.skipRgbBranchConfirm);
+    const keepsAutoMouseAnchored = normalizeOptionalBool(behavior?.keepsAutoMouseAnchored);
     const rgbBranchConfirmTerm = skipRgbBranchConfirm ? "" : normalizeOptionalTerm(behavior?.rgbBranchConfirmTerm, "rgb_branch_confirm_term");
 
     let stepRequests = Array.isArray(behavior?.steps) ? behavior.steps : [];
@@ -3350,7 +3352,7 @@ function renderBehaviorRowFromRequest(behavior) {
         throw new Error("Add at least one tap, hold, or long-hold action.");
     }
 
-    return renderKeyBehaviorRow(normalizedKeycode, { tapHoldTerm, longerHoldTerm, multiTapTerm, rgbBranchConfirmTerm, skipRgbBranchConfirm }, steps);
+    return renderKeyBehaviorRow(normalizedKeycode, { tapHoldTerm, longerHoldTerm, multiTapTerm, rgbBranchConfirmTerm, skipRgbBranchConfirm, keepsAutoMouseAnchored }, steps);
 }
 
 function normalizeOptionalTerm(value, label) {
@@ -3430,6 +3432,7 @@ function renderKeyBehaviorRow(keycode, timings, steps) {
     if (timings.multiTapTerm) timingFields.push(`                .multi_tap_term = ${timings.multiTapTerm},`);
     if (timings.rgbBranchConfirmTerm) timingFields.push(`                .rgb_branch_confirm_term = ${timings.rgbBranchConfirmTerm},`);
     if (timings.skipRgbBranchConfirm) timingFields.push("                .skip_rgb_branch_confirm = true,");
+    if (timings.keepsAutoMouseAnchored) timingFields.push("                .keeps_auto_mouse_anchored = true,");
     const timing = timingFields.length ? `\n${timingFields.join("\n")}` : "";
     return `            {
                 .keycode = ${keycode},${timing}
@@ -6487,6 +6490,7 @@ function getClientScript() {
         multi_tap_term: "Optional repeated-tap window for this key behavior row. Valid range: 1-65535 ms; empty uses the displayed default.",
         rgb_branch_confirm_term: "Optional RGB-visible confirmation window for committed non-base tap-count branches. Valid range: 1-65535 ms; empty uses the displayed default.",
         skip_rgb_branch_confirm: "Skip the RGB branch-confirm window for this behavior row. The key output still runs; only the visual pause is removed.",
+        keeps_auto_mouse_anchored: "Treat this row as a mouse gesture, so pressing the key keeps the pointer layer up instead of letting auto mouse reset on it. Needed for keys that drive the mouse without being mouse keycodes or pointer-mode keys, and required for a transparent tap tier on the pointer layer to reach the layer below.",
         tap: "Enable the tap-tier action for this tap-count branch. When enabled, choose a helper and action below.",
         hold: "Enable the hold-tier action that can run after the tap-hold term for this branch.",
         "long hold": "Enable the long-hold-tier action that can run after the longer-hold term for this branch.",
@@ -9746,6 +9750,7 @@ function getClientScript() {
             multiTapTerm: "",
             rgbBranchConfirmTerm: "",
             skipRgbBranchConfirm: false,
+            keepsAutoMouseAnchored: false,
             steps: []
         };
         const steps = [];
@@ -9766,6 +9771,7 @@ function getClientScript() {
             renderTimingInput("selectedMultiTapTerm", "multi_tap_term", row.multiTapTerm || "", row.keycode) +
             renderTimingInput("selectedRgbBranchConfirmTerm", "rgb_branch_confirm_term", row.rgbBranchConfirmTerm || "", row.keycode) +
             renderSkipRgbBranchConfirmToggle(row.skipRgbBranchConfirm) +
+            renderKeepsAutoMouseAnchoredToggle(row.keepsAutoMouseAnchored) +
             "</div>" +
             "<div class='behavior-branch-grid'>" +
             steps.map(renderBehaviorStepEditor).join("") +
@@ -9783,6 +9789,11 @@ function getClientScript() {
     function renderSkipRgbBranchConfirmToggle(checked) {
         const tooltip = fieldTooltips.skip_rgb_branch_confirm || "";
         return "<label class='toggle-inline' data-tooltip='" + escapeAttr(tooltip) + "'><input type='checkbox' id='selectedSkipRgbBranchConfirm'" + (checked ? " checked" : "") + " data-tooltip='" + escapeAttr(tooltip) + "'><span class='toggle-switch' aria-hidden='true'></span><span class='toggle-label'>skip RGB branch confirm</span></label>";
+    }
+
+    function renderKeepsAutoMouseAnchoredToggle(checked) {
+        const tooltip = fieldTooltips.keeps_auto_mouse_anchored || "";
+        return "<label class='toggle-inline' data-tooltip='" + escapeAttr(tooltip) + "'><input type='checkbox' id='selectedKeepsAutoMouseAnchored'" + (checked ? " checked" : "") + " data-tooltip='" + escapeAttr(tooltip) + "'><span class='toggle-switch' aria-hidden='true'></span><span class='toggle-label'>keeps auto mouse anchored</span></label>";
     }
 
     function behaviorTimingDefault(field, keycode) {
@@ -11655,6 +11666,7 @@ function getClientScript() {
             multiTapTerm: document.getElementById("selectedMultiTapTerm").value,
             rgbBranchConfirmTerm: document.getElementById("selectedRgbBranchConfirmTerm").value,
             skipRgbBranchConfirm: Boolean(document.getElementById("selectedSkipRgbBranchConfirm")?.checked),
+            keepsAutoMouseAnchored: Boolean(document.getElementById("selectedKeepsAutoMouseAnchored")?.checked),
             steps
         };
     }

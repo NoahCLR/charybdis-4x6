@@ -102,7 +102,26 @@ bool get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record) {
 There is no `noah_get_hold_on_other_key_press()` helper. The shared userspace
 does not own hold-preference behavior.
 
-For mouse-record classification, let the shared helper claim its keys first:
+For mouse-record classification, a keymap in this repo does not need this hook
+at all, and cannot use the chaining pattern anyway: chaining requires
+`noah_is_mouse_record_user()` from `noah_runtime.h`, and keymap-owned
+translation units are gated away from that header. Claim the key from its
+authored `key_behaviors[]` row instead:
+
+```c
+{
+    .keycode                   = MY_MOUSE_RELATED_KEY,
+    .keeps_auto_mouse_anchored = true,
+    .tap_counts = {...},
+}
+```
+
+`pointer_layer_policy_is_mouse_record()` reads that flag alongside its own
+rules, so the shared classification stays intact. See
+[POINTER_MODES.md](./POINTER_MODES.md) for what the flag buys.
+
+If a translation unit outside the keymap directory does need to override the
+hook, let the shared helper claim its keys first:
 
 ```c
 bool is_mouse_record_user(uint16_t keycode, keyrecord_t *record) {

@@ -64,6 +64,15 @@ value of `0` means "use the default timing for this row." That includes
 `CUSTOM_RGB_BRANCH_CONFIRM_TERM`. To turn that RGB feedback window off for one
 row, set `.skip_rgb_branch_confirm = true`.
 
+Rows carry one policy flag that is not about timing at all:
+
+- `.keeps_auto_mouse_anchored` marks the row as a mouse gesture, so pressing the
+  key keeps the pointer layer up instead of letting auto mouse reset on it. It
+  is only needed for keys that drive the mouse through authored actions rather
+  than being mouse keycodes or pointer-mode keys, and it is what lets a
+  `TAP_SENDS(KC_TRNS)` tier on such a key still find a layer to fall through to.
+  See [POINTER_MODES.md](./POINTER_MODES.md).
+
 In plain terms:
 
 - a quick release before the tap-hold term is treated as a tap

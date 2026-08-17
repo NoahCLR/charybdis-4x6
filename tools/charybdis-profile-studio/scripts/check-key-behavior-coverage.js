@@ -501,6 +501,42 @@ const appendedCheck = `
                 "Profile Studio did not replace the existing behavior row"
             );
 
+            // A row can claim the auto-mouse anchor, and re-saving it must not
+            // drop that claim: the flag is what keeps the pointer layer alive
+            // for keys that are not mouse keycodes.
+            await saveKeyBehavior(tempRoot, created, {
+                keycode: "KC_W",
+                keepsAutoMouseAnchored: true,
+                steps: [
+                    {
+                        tapCount: 0,
+                        tap: {helper: "TAP_SENDS", action: "_______"},
+                    },
+                ],
+            });
+            updatedKeymap = nativeFs.readFileSync(targetPaths.keymap, "utf8");
+            assert(
+                updatedKeymap.includes("                .keeps_auto_mouse_anchored = true,"),
+                "Profile Studio did not write .keeps_auto_mouse_anchored"
+            );
+
+            const anchoredModel = await buildModel(tempRoot, created, [created]);
+            const anchoredRow = (anchoredModel.keyBehaviors || []).find((row) => row.keycode === "KC_W");
+            assert(anchoredRow, "Profile Studio did not parse the anchored behavior row");
+            assert(anchoredRow.keepsAutoMouseAnchored === true, "Profile Studio did not parse .keeps_auto_mouse_anchored");
+
+            await saveKeyBehavior(tempRoot, created, {
+                keycode: anchoredRow.keycode,
+                multiTapTerm: "100",
+                keepsAutoMouseAnchored: anchoredRow.keepsAutoMouseAnchored,
+                steps: anchoredRow.steps,
+            });
+            updatedKeymap = nativeFs.readFileSync(targetPaths.keymap, "utf8");
+            assert(
+                updatedKeymap.includes("                .keeps_auto_mouse_anchored = true,"),
+                "Profile Studio dropped .keeps_auto_mouse_anchored when re-saving the row"
+            );
+
             const messageRoot = nativeFs.mkdtempSync(path.join(require("os").tmpdir(), "profile-studio-message-profile-"));
             try {
                 nativeFs.writeFileSync(
