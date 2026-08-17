@@ -416,6 +416,11 @@ const key_behavior_t
             // ─── Navigation-Layer Overrides ─────────────────────────────────────────────────
             {.keycode = KC_LEFT, .tap_counts = {[0] = {.hold = TAP_ON_RELEASE_AFTER_HOLD(A(KC_LEFT)), .long_hold = TAP_AT_HOLD_THRESHOLD(G(KC_LEFT))}}},
             {.keycode = KC_RIGHT, .tap_counts = {[0] = {.hold = TAP_ON_RELEASE_AFTER_HOLD(A(KC_RIGHT)), .long_hold = TAP_AT_HOLD_THRESHOLD(G(KC_RIGHT))}}},
+            {.keycode = G(KC_C), .tap_counts = {[1] = {.tap = TAP_SENDS(VIA_MACRO_10)}}},
+            {.keycode = G(KC_V), .tap_counts = {[1] = {.tap = TAP_SENDS(VIA_MACRO_7)}}},
+
+            // ─── Mouse-Button Keys ──────────────────────────────────────────────────────────
+            {.keycode = MS_BTN3, .multi_tap_term = 100, .tap_counts = {[1] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(MS_BTN7)}}},
 
             // ─── Pointer-Mode Keys ──────────────────────────────────────────────────────────
             {.keycode = BRIGHTNESS_MODE, .tap_counts = {[0] = {.tap = TAP_SENDS(KC_TRNS)}}},
@@ -465,51 +470,22 @@ const key_behavior_t
             },
 
             {
+                .keycode                   = DRAG_WINDOW,
+                .tap_hold_term             = 100,
+                .keeps_auto_mouse_anchored = true,
+                .tap_counts =
+                    {
+                        [0] = {.tap = TAP_SENDS(KC_TRNS), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(MS_BTN6)},
+                    },
+            },
+
+            {
                 .keycode                   = CLICK_SPAM,
                 .tap_hold_term             = 1,
                 .keeps_auto_mouse_anchored = true,
                 .tap_counts =
                     {
                         [0] = {.hold = REPEAT_WHILE_HELD(MS_BTN1, 100)},
-                    },
-            },
-
-            {
-                .keycode                 = G(KC_C),
-                .skip_rgb_branch_confirm = true,
-                .tap_counts =
-                    {
-                        [1] = {.tap = TAP_SENDS(VIA_MACRO_10)},
-                    },
-            },
-
-            {
-                .keycode = G(KC_V),
-                .tap_counts =
-                    {
-                        [1] = {.tap = TAP_SENDS(VIA_MACRO_7)},
-                    },
-            },
-
-            {
-                .keycode        = MS_BTN3,
-                .multi_tap_term = 100,
-                .tap_counts =
-                    {
-                        [1] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(MS_BTN7)},
-                    },
-            },
-
-            // Not a mouse keycode, so it must claim the auto-mouse anchor
-            // itself: the pointer layer has to survive the press for the
-            // transparent tap tier to fall through to the base-layer key.
-            {
-                .keycode                   = DRAG_WINDOW,
-                .multi_tap_term            = 100,
-                .keeps_auto_mouse_anchored = true,
-                .tap_counts =
-                    {
-                        [0] = {.tap = TAP_SENDS(KC_TRNS), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(MS_BTN6)},
                     },
             },
 
