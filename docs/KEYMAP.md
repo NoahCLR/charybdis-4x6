@@ -266,6 +266,46 @@ long-hold branches still use their hold-tier feedback when those tiers win.
 That `100 Hz` setting is also the current authored maximum: `100` repeats per
 second.
 
+### Window Drags
+
+`MS_BTN3` on `LAYER_POINTER` stays a plain middle click on a single tap and
+puts the two window drags on its deeper hold branches:
+
+- `MS_BTN3` tap -> middle click
+- `MS_BTN3` double-tap hold -> `PRESS_AND_HOLD_UNTIL_RELEASE(A(MS_BTN2))`,
+  resizing the window under the pointer
+- `MS_BTN3` triple-tap hold -> `PRESS_AND_HOLD_UNTIL_RELEASE(A(MS_BTN1))`,
+  moving it
+
+The point is to put a whole window drag under one finger. While the key is held
+the trackball is still live, so the ball drives the drag and releasing the key
+ends it.
+
+This row also tightens `.multi_tap_term` to `100`, since both branches are
+entered from a deliberate tap burst rather than typing rhythm.
+
+Both drags sit behind multi-tap rather than a plain hold on purpose. An
+accidental `Alt` + drag rearranges whatever is under the pointer, which is a
+worse outcome than a gesture that takes an extra tap to ask for.
+
+For the current macOS setup this expects
+[AnyDrag](https://github.com/XueshiQiao/AnyDrag) to be running:
+
+```
+brew install --cask XueshiQiao/tap/anydrag
+```
+
+AnyDrag is what turns those `Alt` + drag gestures into window management.
+Without it the key still sends a real `Alt` + mouse button, which most apps
+treat as an ordinary modified click.
+
+The runtime settles a freshly registered modifier before pressing a mouse
+button it qualifies, because the two leave on separate USB endpoints and a host
+sampling modifier state at button-down can otherwise see a bare click. That is
+shared-runtime behavior, not a profile choice; see
+`owned_keycode_acquire_components()` in
+[owned_keycode.c](../users/noah/lib/action/owned_keycode.c).
+
 ## Layer Walkthrough
 
 ### `LAYER_BASE`
@@ -334,7 +374,7 @@ side becomes a focused cluster for:
 - `DRAGSCROLL`
 - `MS_BTN1`
 - `MS_BTN2`
-- `MS_BTN3`
+- `MS_BTN3`, which also carries the window drags described above
 
 The pointer layer also changes the thumb cluster slightly by putting
 `LT(LAYER_NUM, KC_SPC)` on space, so the pointer surface can still chain into

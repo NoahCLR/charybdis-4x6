@@ -482,6 +482,7 @@ const key_behavior_t
                 .tap_counts =
                     {
                         [1] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(A(MS_BTN2))},
+                        [2] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(A(MS_BTN1))},
                     },
             },
 };

@@ -207,6 +207,7 @@ No authored combos resolve entirely from keys on this layer.
 | `PINCH` | `PINCH` (`PINCH_MODE`) | `single` | `TAP_SENDS(KC_TRNS)` | `-` | `-` | `multi_tap(150)` |
 | `PINCH` | `PINCH` (`PINCH_MODE`) | `double` | `TAP_SENDS(VIA_MACRO_6)` | `PRESS_AND_HOLD_UNTIL_RELEASE(ZOOM_MODE)` | `-` | `tap_hold(150), multi_tap(150), rgb_branch_confirm(150)` |
 | `MS_BTN3` | `MS_BTN3` | `double` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(A(MS_BTN2))` | `-` | `tap_hold(150), multi_tap=100, rgb_branch_confirm(150)` |
+| `MS_BTN3` | `MS_BTN3` | `triple` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(A(MS_BTN1))` | `-` | `tap_hold(150), multi_tap=100, rgb_branch_confirm(150)` |
 | `VOLUME` | `VOLUME` (`VOLUME_MODE`) | `single` | `TAP_SENDS(KC_TRNS)` | `-` | `-` | `multi_tap(150)` |
 | `VOLUME` | `VOLUME` (`VOLUME_MODE`) | `double` | `TAP_SENDS(KC_MUTE)` | `-` | `-` | `multi_tap(150), rgb_branch_confirm(150)` |
 | `DRAGSCROLL` | `DRAGSCROLL` | `single` | `TAP_SENDS(KC_TRNS)` | `-` | `-` | `multi_tap(150)` |
@@ -427,7 +428,7 @@ Reusable groups define physical LED sets once near the LED map in `rgb_config.c`
 | `layer_count` | `5` |
 | `layout_key_count` | `56` |
 | `key_behavior_count` | `36` |
-| `key_behavior_step_count` | `47` |
+| `key_behavior_step_count` | `48` |
 | `combo_count` | `7` |
 | `via_macro_count` | `64` |
 | `via_macro_non_empty_count` | `12` |

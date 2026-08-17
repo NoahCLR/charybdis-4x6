@@ -92,6 +92,11 @@ The current profile includes:
   volume or display brightness
 - `CLICK_SPAM`: not a pointing mode, but a mouse-button combo output that uses
   the behavior table to repeat left-click while held
+- window drags: also not a pointing mode, but deeper hold branches on `MS_BTN3`
+  that hold `Alt` plus a mouse button so the ball resizes the window under the
+  pointer (double-tap hold) or moves it (triple-tap hold); in my setup this
+  expects [AnyDrag](https://github.com/XueshiQiao/AnyDrag) to translate those
+  gestures
 - auto-mouse and auto-sniping layers that keep pointer work available
   automatically while you move between typing and trackball use
 
