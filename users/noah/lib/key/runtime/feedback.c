@@ -234,8 +234,13 @@ static bool key_feedback_tap_series_branch_entered(const tap_series_t *series) {
 //
 // The base tap stays quiet because branch 0 needs no color of its own; one tap
 // does not show the user meant to enter a tap branch at all.
+//
+// tap_branch_has_authored_step keeps the color to branches the row actually
+// authors. A gapped tap_counts[] can select a count with no step behind it, and a
+// color there would name a branch that cannot fire; the table's clamping would
+// happily supply one.
 static bool key_feedback_tap_series_shows_tap_branch(const tap_series_t *series) {
-    return series && series->active && !key_feedback_tap_series_branch_entered(series) && key_feedback_tap_branch_is_non_base(series->tap_count);
+    return series && series->active && series->tap_branch_has_authored_step && !key_feedback_tap_series_branch_entered(series) && key_feedback_tap_branch_is_non_base(series->tap_count);
 }
 
 static key_feedback_semantic_t key_feedback_semantic_for_pulse(key_feedback_pulse_kind_t kind) {
