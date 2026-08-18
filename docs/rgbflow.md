@@ -44,16 +44,16 @@ it the moment there is something more specific to say: a pending hold tier, the 
 a release would send, an active hold. Nothing here reads a clock — ordering does the
 work.
 
-That removes what used to be a dead stretch. On a branch that authors `.long_hold`
-but no `.hold` — the triple and quadruple taps on both thumbs — holding past
-`tap_hold_term` used to change nothing on screen even though a release would send
-that branch's tap. Now the tap colour takes over at the threshold, and the long-hold
-colour replaces it at 400 ms.
+That removes what used to be a dead stretch. Any branch that authors a `.tap` and
+no `.hold` turns the tap colour at `tap_hold_term`, because a release really would
+send that tap: the `.long_hold`-carrying triple and quadruple taps on both thumbs,
+and equally the many `.tap`-only branches like `G(KC_C)`. The long-hold colour
+replaces it at its own threshold where one is authored.
 
-Where a branch authors none of those — only `.long_hold`, with no `.tap` and no
-`.hold` — nothing outranks the branch, so the branch colour simply stays until the
-long-hold threshold. Being on that branch is the last true thing about the key, so
-it is what the light keeps saying.
+Where a branch authors no `.tap` at all — only `.hold` or `.long_hold`, not yet
+reached — nothing outranks the branch, so the branch colour simply stays until that
+threshold arrives. Being on that branch is the last true thing about the key, so it
+is what the light keeps saying.
 
 Every authored depth waits the same `multi_tap_term` before its tap fires, the
 deepest one included, so the colour is on screen for the same length of time

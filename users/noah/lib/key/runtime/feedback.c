@@ -415,10 +415,18 @@ static key_feedback_semantic_t key_feedback_semantic_for_token(const press_token
     }
 
     // Past the tap-vs-hold threshold on a branch that authors no hold tier there,
-    // a release still sends this branch's tap. Naming it keeps the stretch before a
-    // long-hold threshold from reading as a dead window, and matches what the same
-    // color means once the tap actually fires.
-    if (!token->interaction.binding.hold.present && token->interaction.selection.step.tap.present && key_feedback_token_allows_tap_release(token) && timer_elapsed(token->pressed_at) >= token->interaction.binding.tap_hold_term) {
+    // a release still sends this branch's tap, so name it. That keeps the stretch
+    // before a long-hold threshold from reading as a dead window, and matches what
+    // the same color means once the tap actually fires.
+    //
+    // Deliberately not gated on allows_tap_release. That predicate admits only
+    // TAP_WINDOW and PRESS_HELD_WINDOW, and a branch with nothing after its tap has
+    // no hold path to traverse, so its slot reaches HOLD_COMPLETE at the press --
+    // which made the green depend on whether a deeper tier happened to exist, a
+    // phase side effect rather than anything about the outcome. The three
+    // conditions below establish the fact on their own, and !hold.present is what
+    // keeps a hold tier that fired at its threshold from being named a tap.
+    if (!token->interaction.binding.hold.present && token->interaction.selection.step.tap.present && timer_elapsed(token->pressed_at) >= token->interaction.binding.tap_hold_term) {
         return KEY_FEEDBACK_SEMANTIC_TAP_COMMITTED;
     }
 
