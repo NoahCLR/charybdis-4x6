@@ -183,20 +183,35 @@ When one key has more than one live semantic, the highest wins.
 
 | Priority | Semantic |
 | --- | --- |
-| 70 | tap branch pending |
 | 60 | tap committed |
 | 50 | long hold active, steady or flashing |
 | 40 | hold active or hold pending |
+| 10 | tap branch pending |
+
+The branch sits at the bottom deliberately: it names which branch is selected,
+which every action state may replace with what that branch is about to do. A branch
+that authors nothing nameable keeps the key because nothing outranks it.
 
 ## Deliberate silences
 
-- the base single tap through its whole window
-- any tier a row does not author
+This stage declining to paint leaves the stage beneath it showing, so these are
+silences of the override, not of the LED.
+
+- branch 0, always: the non-tapping surface
+- a tap count with no authored step, which would otherwise take a clamped colour
 - layer and pointer-mode actions, whose own overlays are the persistent feedback
 - any hold tier carrying a layer preview, which routes to the preview stage
-- implicit-hold and fallback-hold tokens
+- base-tap commits, limited by `tap_commit_mode`
+- implicit-hold and fallback-hold tokens, which are holds the engine synthesised
+  rather than behaviour anyone authored
 
 ## Where this does not match rgbflow.md
+
+0. **Colours are read against a lit board, and one of them barely is.**
+   `hold_active_color` `HSV(18)` `#FF6C00` sits 25 degrees from the base layer's
+   resting red `HSV(0)` `#FF0000` at equal saturation and brightness. The base layer
+   carries most of the board's hold feedback, so the most common hold colour is the
+   one least separable from what it paints over.
 
 1. **The palette has homonyms.** The three-tap colour is the same `#3C00FF` as
    `LAYER_NAV`; the four-tap `#00A2FF` is a near miss for `long_hold_active`
