@@ -269,16 +269,16 @@ static const combo_feedback_led_group_t combo_feedback_led_groups_data[] = RGB_L
 //     does not show the user meant to enter a tap branch at all
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
 const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
-    RGB_TAP_BRANCH_COLORS(HSV(200, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), // tap count 2
-                          HSV(180, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), // tap count 3
-                          HSV(143, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), // tap count 4
-                          HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS)   // tap count 5
+    RGB_TAP_BRANCH_COLORS(HSV(169, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), // tap count 2
+                          HSV(222, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), // tap count 3
+                          HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), // tap count 4
+                          HSV(25, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS)   // tap count 5
                           ),
 
     // Used for committed authored non-base tap branches that do not already
     // have state feedback. Base single-tap commits stay quiet under the pulse
     // mode below.
-    .tap_committed_color = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+    .tap_committed_color = HSV(0, 0, 150),
 
     // Only authored double-tap and higher tap branches can pulse tap-commit feedback.
     .tap_commit_mode = KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS,

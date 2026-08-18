@@ -421,7 +421,7 @@ const key_behavior_t
             {.keycode = G(KC_V), .tap_counts = {[1] = {.tap = TAP_SENDS(VIA_MACRO_7)}}},
 
             // ─── Mouse-Button Keys ──────────────────────────────────────────────────────────
-            {.keycode = MS_BTN3, .multi_tap_term = 100, .tap_counts = {[1] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(MS_BTN7)}}},
+            {.keycode = MS_BTN3, .multi_tap_term = 100, .tap_hold_term = 100, .tap_counts = {[1] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(MS_BTN7)}}},
 
             // ─── Pointer-Mode Keys ──────────────────────────────────────────────────────────
             {.keycode = BRIGHTNESS_MODE, .tap_counts = {[0] = {.tap = TAP_SENDS(KC_TRNS)}}},
@@ -472,6 +472,7 @@ const key_behavior_t
 
             {
                 .keycode                   = DRAG_WINDOW,
+                .multi_tap_term            = 100,
                 .tap_hold_term             = 100,
                 .keeps_auto_mouse_anchored = true,
                 .tap_counts =
