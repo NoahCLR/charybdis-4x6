@@ -226,8 +226,23 @@ static bool key_feedback_tap_branch_is_non_base(uint8_t tap_count) {
 // authors. A gapped tap_counts[] can select a count with no step behind it, and a
 // color there would name a branch that cannot fire; the table's clamping would
 // happily supply one.
+//
+// It also ends when the multi-tap window closes, not merely when the branch is
+// entered. Past that point the count cannot change, so the honest thing to name is
+// the action rather than the branch; a held key sits there until a hold threshold,
+// and a released one has already flushed. The window is the engine's own
+// last_tap_at + tap_term_ms, the same expression can_accept_press and the scan
+// flush use, so this reads the engine's clock rather than keeping a second one.
 static bool key_feedback_tap_series_shows_tap_branch(const tap_series_t *series) {
-    return series && series->active && series->tap_branch_has_authored_step && !series->resolved && key_feedback_tap_branch_is_non_base(series->tap_count);
+    if (!(series && series->active && series->tap_branch_has_authored_step && !series->resolved)) {
+        return false;
+    }
+
+    if (timer_elapsed(series->last_tap_at) > series->tap_term_ms) {
+        return false;
+    }
+
+    return key_feedback_tap_branch_is_non_base(series->tap_count);
 }
 
 static key_feedback_semantic_t key_feedback_semantic_for_pulse(key_feedback_pulse_kind_t kind) {
@@ -405,6 +420,14 @@ static key_feedback_semantic_t key_feedback_semantic_for_token(const press_token
 
     if (!key_feedback_hold_contract_uses_preview_layer(token->interaction.contract.hold) && key_feedback_token_allows_tap_release(token) && timer_elapsed(token->pressed_at) >= token->interaction.binding.tap_hold_term && (handled_key_hold_contract_fires_at_threshold(token->interaction.contract.hold) || token->interaction.contract.hold.keeps_pending_feedback)) {
         return KEY_FEEDBACK_SEMANTIC_HOLD_PENDING;
+    }
+
+    // Past the tap-vs-hold threshold on a branch that authors no hold tier there,
+    // a release still sends this branch's tap. Naming it keeps the stretch before a
+    // long-hold threshold from reading as a dead window, and matches what the same
+    // color means once the tap actually fires.
+    if (!token->interaction.binding.hold.present && token->interaction.selection.step.tap.present && key_feedback_token_allows_tap_release(token) && timer_elapsed(token->pressed_at) >= token->interaction.binding.tap_hold_term) {
+        return KEY_FEEDBACK_SEMANTIC_TAP_COMMITTED;
     }
 
     return KEY_FEEDBACK_SEMANTIC_NONE;

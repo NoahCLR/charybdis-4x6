@@ -287,8 +287,11 @@ also project its state into the RGB overlay.
 
 Shared semantics:
 
-- every tap past the base one shows the color of the branch it reaches, and holds
-  it until that branch is entered. Another tap simply renames the branch. The base
+- every tap past the base one shows the color of the branch it reaches, for as
+  long as the multi-tap window stays open. After it closes the count is fixed and
+  the light names the action instead: the one that fired, or the one a release
+  would send. A branch with no `.hold` tier therefore shows its tap color while
+  held past `tap_hold_term`, instead of nothing changing. Another tap simply renames the branch. The base
   tap stays dark: branch 0 needs no color of its own, and one tap does not show
   intent to enter a tap branch. A pending hold tier does not end the color, since
   the branch has not been entered while its action is still deferred

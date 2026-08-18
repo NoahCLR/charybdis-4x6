@@ -38,10 +38,18 @@ flowchart TD
 
 Thick arrows are the board advancing on its own. Thin arrows are you tapping.
 
-A branch is entered the instant the action path takes the key over: its tap fires
-at the flush, or a hold tier claims it at a threshold. Until then the branch colour
-owns the key, and it deliberately outranks the pending tier colours — while
-nothing has fired, the branch is the honest answer to what letting go would send.
+The branch colour owns the tapping term, and only the tapping term. While the count
+can still change, the branch is the honest answer to what letting go would send, and
+it deliberately outranks the pending tier colours. Once the window closes the count
+is fixed, so the light stops naming the branch and starts naming the action: the one
+that just fired, or the one a release would send now. Each authored threshold you
+cross replaces it.
+
+That removes what used to be a dead stretch. On a branch that authors `.long_hold`
+but no `.hold` — the triple and quadruple taps on both thumbs — holding past
+`tap_hold_term` changes nothing about the outcome, so the old rule showed nothing
+changing. Now the window closes and the key turns the tap colour, because a release
+really would send that branch's tap, and the long-hold colour replaces it at 400 ms.
 
 Every authored depth waits the same `multi_tap_term` before its tap fires, the
 deepest one included, so the colour is on screen for the same length of time
