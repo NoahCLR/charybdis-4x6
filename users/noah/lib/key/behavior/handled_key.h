@@ -20,7 +20,6 @@ typedef struct {
     uint16_t            tap_hold_term;
     uint16_t            longer_hold_term;
     uint16_t            multi_tap_term;
-    uint16_t            branch_confirm_term;
     uint8_t             layer;
     pd_mode_mask_t      pd_mode;
     bool                has_more_taps;

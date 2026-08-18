@@ -369,7 +369,6 @@ const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
         HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),  // tap count 5
     ),
 
-    .branch_confirm_mode    = KEY_FEEDBACK_BRANCH_CONFIRM_NON_BASE_TAPS,
     .tap_committed_color     = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
     .tap_commit_mode         = KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS,
     .hold_active_color       = HSV(18, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
@@ -382,7 +381,6 @@ Those rows populate the shared
 `key_behavior_feedback_colors` config object:
 
 - `RGB_TAP_BRANCH_COLORS(...)`
-- `branch_confirm_mode`
 - `tap_committed_color`
 - `tap_commit_mode`
 - `hold_active_color`
@@ -392,9 +390,8 @@ Those rows populate the shared
 The `RGB_TAP_BRANCH_COLORS(...)` macro declares the color of each tap branch
 while that branch is selected and has not been entered yet. Every tap past the
 base one switches the key to its branch's color and holds it there until the
-branch is entered, which is the instant the action path takes the key over. That
-includes the whole of the model-level branch-confirm window, because a branch held
-back by that window is selected and still not entered.
+branch is entered, which is the instant the action path takes the key over: the
+tap firing at the flush, or a hold tier claiming the key at a threshold.
 
 The color table starts at tap count 2 because the base tap stays dark: branch 0
 needs no color of its own, and one tap does not show the user meant to enter a tap
@@ -406,20 +403,6 @@ its action is still deferred, so the branch color deliberately outranks the pend
 tier states; hold feedback owns the key only once something has actually fired.
 Inline C comments next to those `HSV(...)` arguments are allowed and are
 ignored by the profile introspector.
-
-The `branch_confirm_mode` field controls whether selected tap-count branches
-enter the model-level branch-confirm feedback window before their action fires:
-
-- `KEY_FEEDBACK_BRANCH_CONFIRM_OFF`: skip branch-confirm feedback windows and
-  emit the selected action or hold path as soon as normal tap/hold resolution
-  allows
-- `KEY_FEEDBACK_BRANCH_CONFIRM_NON_BASE_TAPS`: open a branch-confirm feedback
-  window only for double-tap and higher authored branches; the base single-tap
-  branch stays quiet
-
-Individual `key_behaviors[]` rows can tune that RGB-visible window with
-`.rgb_branch_confirm_term = ms`, or skip it for that row with
-`.skip_rgb_branch_confirm = true`.
 
 The `tap_commit_mode` field controls which committed tap-count branches pulse with
 `tap_committed_color`:
@@ -446,8 +429,7 @@ the live runtime footprint, not a static guess from authored combo comments.
 In the shared runtime, those colors are used for these categories:
 
 - tap branch pending: a double-tap-or-higher branch is selected and has not been
-  entered yet, from the tap that reaches it until its action fires. That spans any
-  branch-confirm window, which `branch_confirm_mode` decides whether to use; base
+  entered yet, from the tap that reaches it until its action fires; base
   single-tap candidates stay quiet
 - tap committed: an authored tap-count branch has resolved and emitted output
 - hold pending: a hold path exists, but the final action is not resolved yet
@@ -517,8 +499,7 @@ locality while still remaining within the key-behavior feedback stage.
 Each row chooses a semantic category:
 
 - `KEY_FEEDBACK_GROUP_TAP_BRANCH_PENDING`: visible while a double-tap or higher
-  branch is selected and has not been entered yet, including while the
-  branch-confirm window holds its action back
+  branch is selected and has not been entered yet
 - `KEY_FEEDBACK_GROUP_TAP_COMMITTED`: visible while the tap-commit pulse is
   active
 - `KEY_FEEDBACK_GROUP_HOLD_ACTIVE`: visible for hold pending, hold commit

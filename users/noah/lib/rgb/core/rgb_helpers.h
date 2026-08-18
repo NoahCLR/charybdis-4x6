@@ -94,14 +94,13 @@ typedef struct {
 } combo_feedback_led_group_t;
 
 typedef struct {
-    const hsv_t                       *tap_branch_colors;
-    uint8_t                            tap_branch_color_count;
-    key_feedback_branch_confirm_mode_t branch_confirm_mode;
-    hsv_t                              tap_committed_color;
-    hsv_t                              hold_active_color;
-    hsv_t                              long_hold_active_color;
-    key_feedback_tap_commit_mode_t     tap_commit_mode;
-    rgb_locality_t                     locality;
+    const hsv_t                   *tap_branch_colors;
+    uint8_t                        tap_branch_color_count;
+    hsv_t                          tap_committed_color;
+    hsv_t                          hold_active_color;
+    hsv_t                          long_hold_active_color;
+    key_feedback_tap_commit_mode_t tap_commit_mode;
+    rgb_locality_t                 locality;
 } key_behavior_feedback_color_config_t;
 
 typedef enum {

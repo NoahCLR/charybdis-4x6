@@ -210,8 +210,10 @@ static keypos_t test_keypos(uint8_t row, uint8_t col) {
     };
 }
 
-static void test_finish_tap_branch_confirmation(void) {
-    key_runtime_integration_advance(&fake_time, CUSTOM_RGB_BRANCH_CONFIRM_TERM + 1);
+// Run the multi-tap window out so the pending series flushes and its branch is
+// entered. There is no separate confirm window after it any more.
+static void test_flush_pending_tap_branch(void) {
+    key_runtime_integration_advance(&fake_time, CUSTOM_MULTI_TAP_TERM + 1);
     key_runtime_integration_scan();
 }
 
@@ -763,7 +765,7 @@ static void test_activate_gui_double_tap_alt_hold(keypos_t gui_pos) {
     CHECK(key_behavior_lookup(KC_LEFT_GUI).config != NULL);
 
     key_runtime_integration_run(&fake_time, initial_tap_steps, ARRAY_SIZE(initial_tap_steps));
-    test_finish_tap_branch_confirmation();
+    test_flush_pending_tap_branch();
     CHECK(noah_runtime_debug_slot_owner_keycode(gui_pos) == KC_LEFT_GUI);
     CHECK(noah_runtime_debug_slot_held_action_keycode(gui_pos) == KC_LEFT_ALT);
     CHECK((fake_mods & MOD_BIT(KC_LEFT_ALT)) != 0);
@@ -1180,7 +1182,7 @@ static void test_authored_double_tap_lock_locks_pd_mode(void) {
 
     key_runtime_integration_run(&fake_time, setup, ARRAY_SIZE(setup));
     key_runtime_integration_run(&fake_time, release, ARRAY_SIZE(release));
-    test_finish_tap_branch_confirmation();
+    test_flush_pending_tap_branch();
     CHECK(pd_mode_local_active_snapshot() == PD_MODE_VOLUME);
     CHECK(pd_mode_local_locked_snapshot() == PD_MODE_VOLUME);
     CHECK(pd_mode_local_active(PD_MODE_VOLUME));
@@ -1198,7 +1200,7 @@ static void test_authored_second_press_hold_branches_into_other_pd_mode(void) {
     test_reset_state();
 
     key_runtime_integration_run(&fake_time, scenario, 6);
-    test_finish_tap_branch_confirmation();
+    test_flush_pending_tap_branch();
     CHECK(pd_mode_local_active_snapshot() == PD_MODE_BRIGHTNESS);
     CHECK(pd_mode_local_active(PD_MODE_BRIGHTNESS));
     CHECK(pd_mode_local_locked_snapshot() == 0);
@@ -1493,7 +1495,7 @@ static void test_pinch_masks_mode_owned_gui_during_concurrent_plain_key_processi
     CHECK(!key_runtime_integration_process_record(PINCH_MODE, pinch_key_pos, true));
     key_runtime_integration_advance(&fake_time, TEST_PD_TAP_HOLD_TERM + 1);
     key_runtime_integration_scan();
-    test_finish_tap_branch_confirmation();
+    test_flush_pending_tap_branch();
     CHECK(pd_mode_local_active(PD_MODE_PINCH));
     CHECK(fake_mods == (MOD_BIT(KC_LEFT_SHIFT) | MOD_BIT(KC_LEFT_GUI)));
 
@@ -1556,7 +1558,7 @@ static void test_pinch_double_tap_hold_zoom_branch_keeps_projection_coherent(voi
     CHECK(!key_runtime_integration_process_record(PINCH_MODE, key_pos, true));
     key_runtime_integration_advance(&fake_time, TEST_PD_TAP_HOLD_TERM + 1);
     key_runtime_integration_scan();
-    test_finish_tap_branch_confirmation();
+    test_flush_pending_tap_branch();
 
     CHECK(pd_mode_local_active_snapshot() == PD_MODE_ZOOM);
     CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == PINCH_MODE);
@@ -1615,7 +1617,7 @@ static void test_volume_pinch_zoom_volume_alternation_keeps_projection_coherent(
     CHECK(!key_runtime_integration_process_record(PINCH_MODE, pinch_pos, true));
     key_runtime_integration_advance(&fake_time, TEST_PD_TAP_HOLD_TERM + 1);
     key_runtime_integration_scan();
-    test_finish_tap_branch_confirmation();
+    test_flush_pending_tap_branch();
     CHECK(pd_mode_local_active_snapshot() == PD_MODE_ZOOM);
     CHECK(noah_runtime_debug_slot_owner_keycode(pinch_pos) == PINCH_MODE);
     CHECK(noah_runtime_debug_slot_held_action_keycode(pinch_pos) == ZOOM_MODE);
@@ -1678,7 +1680,7 @@ static void test_pinch_double_tap_salvos_stay_quiescent(void) {
         CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 1);
         CHECK(delayed_action_count == salvo);
 
-        test_finish_tap_branch_confirmation();
+        test_flush_pending_tap_branch();
 
         CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 0);
         CHECK(noah_runtime_debug_deferred_release_count() == 0);
@@ -1782,7 +1784,7 @@ static void test_legacy_pinch_double_tap_salvos_leave_no_pd_owner(void) {
         CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 1);
         CHECK(delayed_action_count == salvo);
 
-        test_finish_tap_branch_confirmation();
+        test_flush_pending_tap_branch();
 
         CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 0);
         CHECK(noah_runtime_debug_slot_owner_keycode(pinch_pos) == KC_NO);
@@ -1812,7 +1814,7 @@ static void test_legacy_pinch_double_tap_hold_zoom_branch_keeps_single_owner(voi
 
     key_runtime_integration_advance(&fake_time, TEST_PD_TAP_HOLD_TERM + 1);
     key_runtime_integration_scan();
-    test_finish_tap_branch_confirmation();
+    test_flush_pending_tap_branch();
     test_assert_active_pd_owner_invariant(pinch_pos, PINCH_MODE, ZOOM_MODE, PD_MODE_ZOOM, false);
 
     CHECK(!key_runtime_integration_process_record(PINCH_MODE, pinch_pos, false));
@@ -1843,7 +1845,7 @@ static void test_legacy_stacked_pinch_duplicate_press_keeps_owner_token_coherent
     CHECK(!key_runtime_integration_process_record(PINCH_MODE, pinch_pos, true));
     key_runtime_integration_advance(&fake_time, TEST_PD_TAP_HOLD_TERM + 1);
     key_runtime_integration_scan();
-    test_finish_tap_branch_confirmation();
+    test_flush_pending_tap_branch();
     test_assert_active_pd_owner_invariant(pinch_pos, PINCH_MODE, ZOOM_MODE, PD_MODE_ZOOM, false);
 
     CHECK(!key_runtime_integration_process_record(PINCH_MODE, pinch_pos, false));

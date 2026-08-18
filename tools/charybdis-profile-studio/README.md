@@ -133,7 +133,7 @@ Use the RGB tab for the visible language in `rgb_config.c`.
 It covers layer colors, pointing-mode colors, reusable LED groups, stage-specific
 LED group rows, auto-mouse fade, combo feedback, and key-behavior feedback.
 The RGB page keeps the firmware vocabulary visible: HSV values, render modes,
-locality, inherited LED group color, branch-confirm colors, and tap/hold/long
+locality, inherited LED group color, tap-branch colors, and tap/hold/long
 hold feedback.
 
 The LED group builder lets you select physical LED indices on the board and

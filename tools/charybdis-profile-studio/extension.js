@@ -44,10 +44,6 @@ const KEY_FEEDBACK_TAP_COMMIT_MODES = [
     "KEY_FEEDBACK_TAP_COMMIT_OFF",
     "KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS",
 ];
-const KEY_FEEDBACK_BRANCH_CONFIRM_MODES = [
-    "KEY_FEEDBACK_BRANCH_CONFIRM_OFF",
-    "KEY_FEEDBACK_BRANCH_CONFIRM_NON_BASE_TAPS",
-];
 const CONFIG_DEFAULT_SECTIONS = [
     {
         id: "keyTiming",
@@ -117,7 +113,6 @@ const CONFIG_DEFAULT_SECTIONS = [
             { macro: "RGB_PD_MODE_FEEDBACK_ENABLE", label: "Pointing-mode feedback", kind: "toggle", tooltip: "Enables the RGB overlay for active pointing modes such as volume, brightness, zoom, and arrows. Disable this to remove pointing-mode color feedback entirely." },
             { macro: "RGB_COMBO_FEEDBACK_ENABLE", label: "Combo feedback", kind: "toggle", tooltip: "Enables the RGB overlay shown while combo member keys are active. Disable this to remove combo footprint feedback without changing combo behavior." },
             { macro: "RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE", label: "Key-behavior feedback", kind: "toggle", tooltip: "Enables RGB feedback for custom key behavior taps, holds, long holds, and tap-count branches. Disable this to remove the visual stage without changing key output." },
-            { macro: "CUSTOM_RGB_BRANCH_CONFIRM_TERM", label: "RGB branch-confirm term", kind: "number", validate: "timing-ms", tooltip: "Default visible confirmation window for committed non-base tap-count branches. Row-level branch_confirm_term values override this; rows can also skip the confirm window." },
             { macro: "RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS", label: "Key feedback flash half-period", kind: "number", validate: "positive-int", tooltip: "Blink half-period for held or repeating key-behavior feedback. One full blink cycle is twice this value; lower values flash faster." },
             { macro: "RGB_AUTOMOUSE_GRADIENT_ENABLE", label: "Auto-mouse gradient", kind: "toggle", tooltip: "Enables the RGB fade that shows auto-mouse approaching its timeout. Disable this to remove the timeout fade while leaving auto-mouse layer activation unchanged." },
             { macro: "AUTOMOUSE_RGB_DEAD_TIME", label: "Auto-mouse RGB dead time", kind: "expression", validate: "safe-expression", tooltip: "Initial part of AUTO_MOUSE_TIME before the auto-mouse RGB fade starts. Must stay below AUTO_MOUSE_TIME; higher values delay the visible timeout warning." },
@@ -1811,8 +1806,6 @@ function parseKeyBehaviors(text) {
                 tapHoldTerm: normalizeExpr(fields[".tap_hold_term"] || ""),
                 longerHoldTerm: normalizeExpr(fields[".longer_hold_term"] || ""),
                 multiTapTerm: normalizeExpr(fields[".multi_tap_term"] || ""),
-                rgbBranchConfirmTerm: normalizeExpr(fields[".rgb_branch_confirm_term"] || ""),
-                skipRgbBranchConfirm: ["true", "1"].includes(normalizeExpr(fields[".skip_rgb_branch_confirm"] || "")),
                 keepsAutoMouseAnchored: ["true", "1"].includes(normalizeExpr(fields[".keeps_auto_mouse_anchored"] || "")),
                 steps,
             };
@@ -1962,7 +1955,6 @@ function resolveBehaviorTimingDefaults(macros) {
         tapHoldTerm: normalizeExpr(macros.CUSTOM_TAP_HOLD_TERM || ""),
         longerHoldTerm: normalizeExpr(macros.CUSTOM_LONGER_HOLD_TERM || ""),
         multiTapTerm: normalizeExpr(macros.CUSTOM_MULTI_TAP_TERM || ""),
-        rgbBranchConfirmTerm: normalizeExpr(macros.CUSTOM_RGB_BRANCH_CONFIRM_TERM || ""),
     };
 }
 
@@ -2173,7 +2165,6 @@ function parseKeyBehaviorFeedback(text) {
     }
     return {
         tapBranchColors: branchColors,
-        branchConfirmMode: normalizeExpr(fields[".branch_confirm_mode"] || ""),
         tapCommittedColor: parseHsv(fields[".tap_committed_color"]),
         holdActiveColor: parseHsv(fields[".hold_active_color"]),
         longHoldActiveColor: parseHsv(fields[".long_hold_active_color"]),
@@ -2756,17 +2747,14 @@ async function patchKeyBehaviorFeedback(root, target, config) {
             ? config.tapBranchColors.map((color, index) => normalizeHsvRequest(color, `tap count ${index + 2} branch color`))
             : [],
     };
-    const branchConfirmMode = normalizeExpr(config?.branchConfirmMode || "");
     const tapCommitMode = normalizeExpr(config?.tapCommitMode || "");
     const locality = normalizeExpr(config?.locality || "");
-    assertAllowed(branchConfirmMode, KEY_FEEDBACK_BRANCH_CONFIRM_MODES, "branch confirm mode");
     assertAllowed(tapCommitMode, KEY_FEEDBACK_TAP_COMMIT_MODES, "tap commit mode");
     assertAllowed(locality, RGB_LOCALITIES, "key behavior feedback locality");
 
     const filePath = profileTargetPaths(root, target).rgb;
     let text = await fs.readFile(filePath, "utf8");
     text = patchRgbTapBranchColorsInInitializer(text, /key_behavior_feedback_colors\s*=/, colors.tapBranchColors);
-    text = patchFieldInInitializer(text, /key_behavior_feedback_colors\s*=/, ".branch_confirm_mode", branchConfirmMode);
     text = patchFieldInInitializer(text, /key_behavior_feedback_colors\s*=/, ".tap_committed_color", colors.tapCommittedColor.expression);
     text = patchFieldInInitializer(text, /key_behavior_feedback_colors\s*=/, ".tap_commit_mode", tapCommitMode);
     text = patchFieldInInitializer(text, /key_behavior_feedback_colors\s*=/, ".hold_active_color", colors.holdActiveColor.expression);
@@ -3317,9 +3305,7 @@ function renderBehaviorRowFromRequest(behavior) {
     const tapHoldTerm = normalizeOptionalTerm(behavior?.tapHoldTerm, "tap_hold_term");
     const longerHoldTerm = normalizeOptionalTerm(behavior?.longerHoldTerm, "longer_hold_term");
     const multiTapTerm = normalizeOptionalTerm(behavior?.multiTapTerm, "multi_tap_term");
-    const skipRgbBranchConfirm = normalizeOptionalBool(behavior?.skipRgbBranchConfirm);
     const keepsAutoMouseAnchored = normalizeOptionalBool(behavior?.keepsAutoMouseAnchored);
-    const rgbBranchConfirmTerm = skipRgbBranchConfirm ? "" : normalizeOptionalTerm(behavior?.rgbBranchConfirmTerm, "rgb_branch_confirm_term");
 
     let stepRequests = Array.isArray(behavior?.steps) ? behavior.steps : [];
     if (stepRequests.length === 0) {
@@ -3349,7 +3335,7 @@ function renderBehaviorRowFromRequest(behavior) {
         throw new Error("Add at least one tap, hold, or long-hold action.");
     }
 
-    return renderKeyBehaviorRow(normalizedKeycode, { tapHoldTerm, longerHoldTerm, multiTapTerm, rgbBranchConfirmTerm, skipRgbBranchConfirm, keepsAutoMouseAnchored }, steps);
+    return renderKeyBehaviorRow(normalizedKeycode, { tapHoldTerm, longerHoldTerm, multiTapTerm, keepsAutoMouseAnchored }, steps);
 }
 
 function normalizeOptionalTerm(value, label) {
@@ -3427,8 +3413,6 @@ function renderKeyBehaviorRow(keycode, timings, steps) {
     if (timings.tapHoldTerm) timingFields.push(`                .tap_hold_term = ${timings.tapHoldTerm},`);
     if (timings.longerHoldTerm) timingFields.push(`                .longer_hold_term = ${timings.longerHoldTerm},`);
     if (timings.multiTapTerm) timingFields.push(`                .multi_tap_term = ${timings.multiTapTerm},`);
-    if (timings.rgbBranchConfirmTerm) timingFields.push(`                .rgb_branch_confirm_term = ${timings.rgbBranchConfirmTerm},`);
-    if (timings.skipRgbBranchConfirm) timingFields.push("                .skip_rgb_branch_confirm = true,");
     if (timings.keepsAutoMouseAnchored) timingFields.push("                .keeps_auto_mouse_anchored = true,");
     const timing = timingFields.length ? `\n${timingFields.join("\n")}` : "";
     return `            {
@@ -6485,8 +6469,6 @@ function getClientScript() {
         tap_hold_term: "Optional tap-vs-hold boundary for this key behavior row. Valid range: 1-65535 ms; empty uses the displayed default.",
         longer_hold_term: "Optional hold-vs-long-hold boundary for this key behavior row. Valid range: 1-65535 ms; empty uses the displayed default.",
         multi_tap_term: "Optional repeated-tap window for this key behavior row. Valid range: 1-65535 ms; empty uses the displayed default.",
-        rgb_branch_confirm_term: "Optional RGB-visible confirmation window for committed non-base tap-count branches. Valid range: 1-65535 ms; empty uses the displayed default.",
-        skip_rgb_branch_confirm: "Skip the RGB branch-confirm window for this behavior row. The key output still runs; only the visual pause is removed.",
         keeps_auto_mouse_anchored: "Treat this row as a mouse gesture, so pressing the key keeps the pointer layer up instead of letting auto mouse reset on it. Needed for keys that drive the mouse without being mouse keycodes or pointer-mode keys, and required for a transparent tap tier on the pointer layer to reach the layer below.",
         tap: "Enable the tap-tier action for this tap-count branch. When enabled, choose a helper and action below.",
         hold: "Enable the hold-tier action that can run after the tap-hold term for this branch.",
@@ -6499,7 +6481,6 @@ function getClientScript() {
         "LED group": "Choose a reusable RGB_LED_GROUP_* LED set, or use the current inline LED selection from the board.",
         mode: "Select how this RGB row behaves. For layers it controls which keys are painted; for auto-mouse it controls how the fade destination is reached.",
         locality: "Choose where this feedback paints: both halves, one half, the triggering key half, or only the triggering keys.",
-        "branch confirm mode": "Choose which tap-count branches show a branch-confirm feedback window before their action finishes.",
         "tap commit mode": "Choose which key-behavior taps show tap-commit feedback after the tap action commits.",
         picker: "Pick an approximate RGB color. The studio converts the browser color into QMK HSV channels.",
         h: "QMK HSV hue channel, 0-255. Hue chooses the color family.",
@@ -6548,7 +6529,6 @@ function getClientScript() {
     const rgbLocalities = ${JSON.stringify(RGB_LOCALITIES)};
     const automouseFadeModes = ${JSON.stringify(AUTOMOUSE_FADE_MODES)};
     const keyFeedbackTapCommitModes = ${JSON.stringify(KEY_FEEDBACK_TAP_COMMIT_MODES)};
-    const keyFeedbackBranchConfirmModes = ${JSON.stringify(KEY_FEEDBACK_BRANCH_CONFIRM_MODES)};
     const keyBehaviorRgbSemantics = [
         keyBehaviorAllGroups,
         "KEY_FEEDBACK_GROUP_TAP_BRANCH_PENDING",
@@ -7288,7 +7268,6 @@ function getClientScript() {
                 type: "updateKeyBehaviorFeedback",
                 config: {
                     tapBranchColors: Array.from(card.querySelectorAll("[data-tap-branch-color]")).map(readColorControlFromNode),
-                    branchConfirmMode: value(card, "branchConfirmMode"),
                     tapCommittedColor: readColorControl(card, "tapCommittedColor"),
                     holdActiveColor: readColorControl(card, "holdActiveColor"),
                     longHoldActiveColor: readColorControl(card, "longHoldActiveColor"),
@@ -9742,8 +9721,6 @@ function getClientScript() {
             tapHoldTerm: "",
             longerHoldTerm: "",
             multiTapTerm: "",
-            rgbBranchConfirmTerm: "",
-            skipRgbBranchConfirm: false,
             keepsAutoMouseAnchored: false,
             steps: []
         };
@@ -9763,8 +9740,6 @@ function getClientScript() {
             renderTimingInput("selectedTapHoldTerm", "tap_hold_term", row.tapHoldTerm || "", row.keycode) +
             renderTimingInput("selectedLongerHoldTerm", "longer_hold_term", row.longerHoldTerm || "", row.keycode) +
             renderTimingInput("selectedMultiTapTerm", "multi_tap_term", row.multiTapTerm || "", row.keycode) +
-            renderTimingInput("selectedRgbBranchConfirmTerm", "rgb_branch_confirm_term", row.rgbBranchConfirmTerm || "", row.keycode) +
-            renderSkipRgbBranchConfirmToggle(row.skipRgbBranchConfirm) +
             (isKeymapCustomKeycode(row.keycode) ? renderKeepsAutoMouseAnchoredToggle(row.keepsAutoMouseAnchored) : "") +
             "</div>" +
             "<div class='behavior-branch-grid'>" +
@@ -9778,11 +9753,6 @@ function getClientScript() {
         const placeholder = "default: " + fallback.label;
         const tooltip = timingTooltip(field, fallback);
         return "<label data-tooltip='" + escapeAttr(tooltip) + "'><span>" + field + "</span><input id='" + id + "' data-validate='optional-term' inputmode='numeric' value='" + escapeAttr(value || "") + "' placeholder='" + escapeAttr(placeholder) + "' data-tooltip='" + escapeAttr(tooltip) + "'></label>";
-    }
-
-    function renderSkipRgbBranchConfirmToggle(checked) {
-        const tooltip = fieldTooltips.skip_rgb_branch_confirm || "";
-        return "<label class='toggle-inline' data-tooltip='" + escapeAttr(tooltip) + "'><input type='checkbox' id='selectedSkipRgbBranchConfirm'" + (checked ? " checked" : "") + " data-tooltip='" + escapeAttr(tooltip) + "'><span class='toggle-switch' aria-hidden='true'></span><span class='toggle-label'>skip RGB branch confirm</span></label>";
     }
 
     // Mouse keycodes and pointer-mode keys are already classified as mouse
@@ -9805,8 +9775,7 @@ function getClientScript() {
         const expression = {
             tap_hold_term: useLtTapTerm ? defaults.tappingTerm : defaults.tapHoldTerm,
             longer_hold_term: defaults.longerHoldTerm,
-            multi_tap_term: defaults.multiTapTerm,
-            rgb_branch_confirm_term: defaults.rgbBranchConfirmTerm
+            multi_tap_term: defaults.multiTapTerm
         }[field] || "";
         return {
             expression,
@@ -11678,8 +11647,6 @@ function getClientScript() {
             tapHoldTerm: document.getElementById("selectedTapHoldTerm").value,
             longerHoldTerm: document.getElementById("selectedLongerHoldTerm").value,
             multiTapTerm: document.getElementById("selectedMultiTapTerm").value,
-            rgbBranchConfirmTerm: document.getElementById("selectedRgbBranchConfirmTerm").value,
-            skipRgbBranchConfirm: Boolean(document.getElementById("selectedSkipRgbBranchConfirm")?.checked),
             keepsAutoMouseAnchored: readSelectedKeepsAutoMouseAnchored(),
             steps
         };
@@ -12447,7 +12414,6 @@ function getClientScript() {
             "<summary data-tooltip='Key behavior feedback policy. Click to edit which tap branches show confirmation, when tap-commit feedback appears, and where feedback paints.'><h3>Policy</h3></summary>" +
             "<div class='rgb-subsection-body'>" +
             "<div class='form-grid four'>" +
-            "<label><span>branch confirm mode</span><select name='branchConfirmMode'>" + options(keyFeedbackBranchConfirmModes, config.branchConfirmMode) + "</select></label>" +
             "<label><span>tap commit mode</span><select name='tapCommitMode'>" + options(keyFeedbackTapCommitModes, config.tapCommitMode) + "</select></label>" +
             "<label data-tooltip='Where key-behavior feedback paints for tap, hold, long-hold, and tap-count states.'><span>locality</span><select name='locality' data-tooltip='Where key-behavior feedback paints for tap, hold, long-hold, and tap-count states.'>" + options(rgbLocalities, config.locality) + "</select></label>" +
             "</div>" +
@@ -12475,7 +12441,7 @@ function getClientScript() {
         if (key === "tap committed") return "Color shown after a base tap commits when tap-commit feedback is enabled. Click to edit HSV channels.";
         if (key === "hold active") return "Color shown while a key behavior hold action is active. Click to edit HSV channels.";
         if (key === "long hold active") return "Color shown while a key behavior long-hold action is active. Click to edit HSV channels.";
-        if (key.startsWith("tap count ")) return "Color shown during the branch-confirm window for this committed tap-count branch. Click to edit HSV channels.";
+        if (key.startsWith("tap count ")) return "Color shown while this tap branch is selected and has not been entered yet. Click to edit HSV channels.";
         return "RGB feedback color row for " + label + ". Click to edit HSV channels.";
     }
 

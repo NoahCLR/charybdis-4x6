@@ -77,10 +77,6 @@ __attribute__((weak)) uint8_t pd_mode_buffered_tap_masked_real_mods(uint16_t key
     return 0;
 }
 
-__attribute__((weak)) key_feedback_branch_confirm_mode_t key_feedback_branch_confirm_mode(void) {
-    return KEY_FEEDBACK_BRANCH_CONFIRM_NON_BASE_TAPS;
-}
-
 __attribute__((weak)) key_feedback_tap_commit_mode_t key_feedback_tap_commit_mode(void) {
     return KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS;
 }
@@ -261,7 +257,7 @@ static uint16_t key_runtime_core_elapsed(uint16_t start, uint16_t end) {
 }
 
 static bool key_runtime_core_tap_series_can_accept_press(const key_runtime_core_state_t *state, const tap_series_t *series, uint16_t keycode, uint16_t now) {
-    return series && series->active && !series->branch_confirmed && !series->branch_confirming && series->keycode == keycode && series->authored_has_more_taps && (key_runtime_core_elapsed(series->last_tap_at, now) <= series->tap_term_ms || key_runtime_core_tap_series_pending_combo_output(state, series));
+    return series && series->active && !series->resolved && series->keycode == keycode && series->authored_has_more_taps && (key_runtime_core_elapsed(series->last_tap_at, now) <= series->tap_term_ms || key_runtime_core_tap_series_pending_combo_output(state, series));
 }
 
 static bool key_runtime_core_token_id_is_reserved(const key_runtime_core_state_t *state, uint16_t token_id) {
@@ -390,7 +386,7 @@ static void key_runtime_core_tap_series_release_if_expired(tap_series_t *series,
         return;
     }
 
-    if (series->pending_hold || series->branch_confirmed || series->branch_confirming) {
+    if (series->pending_hold || series->resolved) {
         return;
     }
 
@@ -563,7 +559,6 @@ static void key_runtime_core_tap_series_note_tap(key_runtime_core_state_t *state
     hold_behavior_t      hold;
     hold_behavior_t      long_hold;
     uint16_t             tap_hold_term_ms;
-    uint16_t             branch_confirm_term_ms;
     uint16_t             tap_term_ms;
     uint8_t              tap_count;
     bool                 pending_hold                 = false;
@@ -590,7 +585,6 @@ static void key_runtime_core_tap_series_note_tap(key_runtime_core_state_t *state
     hold                   = hold_behavior_none();
     long_hold              = hold_behavior_none();
     tap_hold_term_ms       = key_runtime_core_default_hold_term(token->resolved_keycode);
-    branch_confirm_term_ms = CUSTOM_RGB_BRANCH_CONFIRM_TERM;
     tap_term_ms            = key_runtime_core_default_multi_tap_term();
     tap_count              = (uint8_t)(reuse_existing ? (uint8_t)(series->tap_count + 1u) : 1u);
     saved_mod_state        = reuse_existing ? series->saved_mod_state : keyboard_mod_policy_current_state();
@@ -612,7 +606,6 @@ static void key_runtime_core_tap_series_note_tap(key_runtime_core_state_t *state
         tap_branch_has_authored_step = key_behavior_step_present(token->interaction.selection.step);
         tap_branch_has_authored_tap  = token->interaction.selection.step.tap.present;
         tap_hold_term_ms             = token->interaction.binding.tap_hold_term;
-        branch_confirm_term_ms       = token->interaction.binding.branch_confirm_term;
         tap_term_ms                  = token->interaction.binding.multi_tap_term;
         if (token->interaction.selection.tap_count != 0u) {
             tap_count = token->interaction.selection.tap_count;
@@ -643,7 +636,6 @@ static void key_runtime_core_tap_series_note_tap(key_runtime_core_state_t *state
         .hold                         = hold,
         .long_hold                    = long_hold,
         .tap_hold_term_ms             = tap_hold_term_ms,
-        .branch_confirm_term_ms       = branch_confirm_term_ms,
         .last_action                  = tap_action,
         .last_tap_at                  = now,
         .tap_term_ms                  = tap_term_ms,
@@ -903,7 +895,6 @@ static void key_runtime_core_tap_series_seed(key_runtime_core_state_t *state, co
         .hold                         = hold_behavior_none(),
         .long_hold                    = hold_behavior_none(),
         .tap_hold_term_ms             = seed->tap_hold_term,
-        .branch_confirm_term_ms       = seed->branch_confirm_term,
         .last_action                  = seed->tap_action,
         .last_tap_at                  = state->current_time,
         .tap_term_ms                  = seed->multi_tap_term,
@@ -940,7 +931,6 @@ static void key_runtime_core_tap_series_update_for_press(key_runtime_core_state_
     series->hold                         = token->interaction.binding.hold;
     series->long_hold                    = token->interaction.binding.long_hold;
     series->tap_hold_term_ms             = token->interaction.binding.tap_hold_term;
-    series->branch_confirm_term_ms       = token->interaction.binding.branch_confirm_term;
     series->last_action                  = token->interaction.binding.tap_action;
     series->last_tap_at                  = state->current_time;
     series->tap_term_ms                  = token->interaction.binding.multi_tap_term;
@@ -1034,9 +1024,7 @@ bool key_runtime_core_handle_handled_key_press(uint16_t keycode, keypos_t key_po
     series_key_pos = key_runtime_core_tap_series_resolve_key_pos(state, series);
 
     if (series && series->active && !key_runtime_core_tap_series_can_accept_press(state, series, keycode, state->current_time)) {
-        if (series->branch_confirming && series->branch_confirm_kind == KEY_RUNTIME_TAP_SERIES_BRANCH_CONFIRM_DELAYED_ACTION) {
-            key_runtime_core_plan_same_key_branch_confirm_interruption(state, series, series_key_pos, plan);
-        } else if (key_runtime_core_tap_series_take_flush(series, &action, &repeat_count, &mods)) {
+        if (key_runtime_core_tap_series_take_flush(series, &action, &repeat_count, &mods)) {
             bool tap_commit_feedback = key_runtime_core_tap_series_has_authored_tap_branch(series) && key_runtime_core_tap_commit_feedback_allowed(action, series->tap_count);
 
             key_runtime_core_effect_plan_push_deferred_delayed_action(plan, series_key_pos, action, mods, repeat_count, tap_commit_feedback);

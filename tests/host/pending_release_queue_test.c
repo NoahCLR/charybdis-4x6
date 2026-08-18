@@ -80,7 +80,9 @@ static void test_layout_and_reset_contract(void) {
     // Two 60-slot active bitmaps add 16 bytes; cached authored branch state
     // fits existing press-token and tap-series padding. The default-report
     // owner bitmap adds one bit per matrix key, 8 bytes, with no padding.
-    CHECK(sizeof(key_runtime_core_state_t) == 21804u);
+    // Retiring the branch-confirm window took tap_series_t from 81 to 60 bytes,
+    // which is 1280 bytes across the 60 slots.
+    CHECK(sizeof(key_runtime_core_state_t) == 20524u);
     CHECK(test_state.pending_release_count == 0u);
     CHECK(test_state.pending_release_head_index == KEY_RUNTIME_CORE_PENDING_RELEASE_INDEX_NONE);
     CHECK(test_state.pending_release_tail_index == KEY_RUNTIME_CORE_PENDING_RELEASE_INDEX_NONE);

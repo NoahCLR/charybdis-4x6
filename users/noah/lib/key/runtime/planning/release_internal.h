@@ -66,7 +66,6 @@ typedef struct {
     bool     tap_branch_has_authored_tap;
     uint16_t tap_hold_term;
     uint16_t multi_tap_term;
-    uint16_t branch_confirm_term;
     bool     has_more_taps;
     bool     authored_has_more_taps;
 } key_runtime_core_pending_multi_tap_seed_t;

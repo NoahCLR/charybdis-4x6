@@ -10,27 +10,25 @@
 #include "users/noah/lib/pointing/defs/pd_modes.h"
 
 enum {
-    TEST_LAYER_TAP_KEY               = 0x04,
-    TEST_AUTHORED_LAYER_TAP          = LT(2, TEST_LAYER_TAP_KEY),
-    TEST_BARE_LAYER_TAP              = LT(3, TEST_LAYER_TAP_KEY),
-    TEST_PD_MODE_KEY                 = SAFE_RANGE + 0x0Fu,
-    TEST_TAP_ACTION                  = SAFE_RANGE + 0x10u,
-    TEST_PD_MODE_LOCK_KEY            = SAFE_RANGE + 0x11u,
-    TEST_TRANSPARENT_PD_KEY          = SAFE_RANGE + 0x12u,
-    TEST_TRANSPARENT_KEY             = SAFE_RANGE + 0x13u,
-    TEST_MULTI_TAP_KEY               = SAFE_RANGE + 0x14u,
-    TEST_TRANSPARENT_HOLD_KEY        = SAFE_RANGE + 0x15u,
-    TEST_TRANSPARENT_HOLD_OTHER_KEY  = SAFE_RANGE + 0x16u,
-    TEST_TRANSPARENT_LONG_HOLD_KEY   = SAFE_RANGE + 0x17u,
-    TEST_HOLD_ACTION                 = SAFE_RANGE + 0x18u,
-    TEST_LONG_HOLD_ACTION            = SAFE_RANGE + 0x19u,
-    TEST_HOLD_BEHAVIOR_KEY           = SAFE_RANGE + 0x1Au,
-    TEST_LONG_HOLD_BEHAVIOR_KEY      = SAFE_RANGE + 0x1Bu,
-    TEST_CHAIN_MULTI_TAP_KEY         = SAFE_RANGE + 0x1Cu,
-    TEST_STACKED_PD_KEY              = SAFE_RANGE + 0x1Du,
-    TEST_OTHER_PD_MODE_KEY           = SAFE_RANGE + 0x1Eu,
-    TEST_BRANCH_CONFIRM_DISABLED_KEY = SAFE_RANGE + 0x1Fu,
-    TEST_BRANCH_CONFIRM_OVERRIDE_KEY = SAFE_RANGE + 0x20u,
+    TEST_LAYER_TAP_KEY              = 0x04,
+    TEST_AUTHORED_LAYER_TAP         = LT(2, TEST_LAYER_TAP_KEY),
+    TEST_BARE_LAYER_TAP             = LT(3, TEST_LAYER_TAP_KEY),
+    TEST_PD_MODE_KEY                = SAFE_RANGE + 0x0Fu,
+    TEST_TAP_ACTION                 = SAFE_RANGE + 0x10u,
+    TEST_PD_MODE_LOCK_KEY           = SAFE_RANGE + 0x11u,
+    TEST_TRANSPARENT_PD_KEY         = SAFE_RANGE + 0x12u,
+    TEST_TRANSPARENT_KEY            = SAFE_RANGE + 0x13u,
+    TEST_MULTI_TAP_KEY              = SAFE_RANGE + 0x14u,
+    TEST_TRANSPARENT_HOLD_KEY       = SAFE_RANGE + 0x15u,
+    TEST_TRANSPARENT_HOLD_OTHER_KEY = SAFE_RANGE + 0x16u,
+    TEST_TRANSPARENT_LONG_HOLD_KEY  = SAFE_RANGE + 0x17u,
+    TEST_HOLD_ACTION                = SAFE_RANGE + 0x18u,
+    TEST_LONG_HOLD_ACTION           = SAFE_RANGE + 0x19u,
+    TEST_HOLD_BEHAVIOR_KEY          = SAFE_RANGE + 0x1Au,
+    TEST_LONG_HOLD_BEHAVIOR_KEY     = SAFE_RANGE + 0x1Bu,
+    TEST_CHAIN_MULTI_TAP_KEY        = SAFE_RANGE + 0x1Cu,
+    TEST_STACKED_PD_KEY             = SAFE_RANGE + 0x1Du,
+    TEST_OTHER_PD_MODE_KEY          = SAFE_RANGE + 0x1Eu,
 };
 
 layer_state_t   layer_state;
@@ -167,24 +165,6 @@ const key_behavior_t key_behaviors[] = {
             {
                 [0] = {.tap = TAP_SENDS(KC_TRNS)},
                 [1] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(TEST_OTHER_PD_MODE_KEY)},
-            },
-    },
-    {
-        .keycode                 = TEST_BRANCH_CONFIRM_DISABLED_KEY,
-        .skip_rgb_branch_confirm = true,
-        .tap_counts =
-            {
-                [0] = {.tap = TAP_SENDS(KC_C)},
-                [1] = {.tap = TAP_SENDS(KC_V)},
-            },
-    },
-    {
-        .keycode                 = TEST_BRANCH_CONFIRM_OVERRIDE_KEY,
-        .rgb_branch_confirm_term = 42,
-        .tap_counts =
-            {
-                [0] = {.tap = TAP_SENDS(KC_C)},
-                [1] = {.tap = TAP_SENDS(KC_V)},
             },
     },
 };
@@ -333,18 +313,6 @@ static void test_authored_lt_uses_custom_runtime(void) {
     CHECK(behavior.is_layer_tap);
     CHECK(behavior.tap_hold_term == TAPPING_TERM);
     CHECK(behavior.has_multi_tap);
-}
-
-static void test_branch_confirm_term_resolution(void) {
-    key_behavior_view_t behavior = key_behavior_lookup(TEST_MULTI_TAP_KEY);
-
-    CHECK(behavior.branch_confirm_term == CUSTOM_RGB_BRANCH_CONFIRM_TERM);
-
-    behavior = key_behavior_lookup(TEST_BRANCH_CONFIRM_DISABLED_KEY);
-    CHECK(behavior.branch_confirm_term == 0u);
-
-    behavior = key_behavior_lookup(TEST_BRANCH_CONFIRM_OVERRIDE_KEY);
-    CHECK(behavior.branch_confirm_term == 42u);
 }
 
 static void test_momentary_layer_stays_handled(void) {
@@ -720,7 +688,6 @@ static void test_momentary_layer_query_matches_hold_materialization(void) {
 int main(void) {
     test_bare_lt_falls_back_to_qmk();
     test_authored_lt_uses_custom_runtime();
-    test_branch_confirm_term_resolution();
     test_momentary_layer_stays_handled();
     test_plain_pd_mode_key_is_handled_without_authored_behavior();
     test_handled_resolution_searches_authored_rows_once();

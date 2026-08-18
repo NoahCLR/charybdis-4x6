@@ -159,7 +159,6 @@ const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
     .tap_committed_color    = HSV(4, 5, 6),
     .hold_active_color      = HSV(7, 8, 9),
     .long_hold_active_color = HSV(10, 11, 12),
-    .branch_confirm_mode    = KEY_FEEDBACK_BRANCH_CONFIRM_NON_BASE_TAPS,
     .tap_commit_mode        = KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS,
 #if RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY
     .locality = RGB_KEYS_ONLY,

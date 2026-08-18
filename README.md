@@ -252,8 +252,6 @@ helpers you can use.
     .tap_hold_term = 150,
     .longer_hold_term = 400,
     .multi_tap_term = 150,
-    .rgb_branch_confirm_term = 150,
-    .skip_rgb_branch_confirm = false,
     .keeps_auto_mouse_anchored = false,
     .tap_counts = {
         [0] = {
@@ -294,10 +292,6 @@ The vocabulary is:
 - `.long_hold` is the later hold tier for that branch
 - `.tap_hold_term`, `.longer_hold_term`, and `.multi_tap_term` override timing
   for one row
-- `.rgb_branch_confirm_term = ms` sets the RGB-visible committed-branch window
-  for one row
-- `.skip_rgb_branch_confirm = true` skips that RGB branch-confirm window for one
-  row
 - `.keeps_auto_mouse_anchored = true` marks the row as a mouse gesture, so
   pressing it keeps the pointer layer up instead of letting auto mouse reset on
   it. Needed for keys that drive the mouse without being mouse keycodes or
@@ -336,7 +330,6 @@ const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
         HSV(143, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), // quadruple tap
         HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS)   // quintuple tap
     ),
-    .branch_confirm_mode = KEY_FEEDBACK_BRANCH_CONFIRM_NON_BASE_TAPS,
     .tap_committed_color = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
     .tap_commit_mode = KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS,
     .hold_active_color = HSV(18, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
@@ -356,17 +349,13 @@ static const key_behavior_feedback_led_group_t
 
 - `RGB_TAP_BRANCH_COLORS(...)`: the color of the tap branch currently selected
   and not yet entered. Every tap past the base one switches the key to that
-  branch's color and holds it until the branch is entered, including through the
-  RGB branch-confirm window. The base tap stays dark
+  branch's color and holds it until the branch is entered. The base tap stays
+  dark
 - `tap_committed_color`: a tap action just fired and does not already have a
   layer or pointing-mode state to show; inherited normal-tap repeats from a
   branch that omits `.tap` stay quiet
 - `hold_active_color`: the `.hold` tier is pending, active, or committing
 - `long_hold_active_color`: the `.long_hold` tier is active or committing
-- `branch_confirm_mode`: chooses whether committed branches get the
-  branch-color window; `KEY_FEEDBACK_BRANCH_CONFIRM_OFF` disables it and
-  `KEY_FEEDBACK_BRANCH_CONFIRM_NON_BASE_TAPS` enables it for double-tap and
-  higher authored branches
 - `tap_commit_mode`: chooses whether tap commits pulse;
   `KEY_FEEDBACK_TAP_COMMIT_OFF` disables pulses and
   `KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS` enables them for double-tap and

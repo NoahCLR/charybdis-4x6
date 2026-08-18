@@ -117,7 +117,7 @@ static bool key_runtime_core_query_press_token_has_pending_hold_series(const key
 
     key_pos = key_runtime_core_query_press_token_resolve_key_pos(state, token);
     series  = key_runtime_core_query_tap_series_state((key_runtime_core_state_t *)state, key_pos);
-    return series && series->active && (series->pending_hold || series->branch_confirming) && series->keycode == token->physical_keycode;
+    return series && series->active && series->pending_hold && series->keycode == token->physical_keycode;
 }
 
 static bool key_runtime_core_query_hold_semantics_owns_state_at_threshold(handled_key_hold_semantics_t semantics) {

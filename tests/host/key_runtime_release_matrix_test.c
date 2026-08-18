@@ -119,10 +119,9 @@ static keypos_t test_keypos(uint8_t row, uint8_t col) {
 static key_behavior_view_t test_pressable_handled_key(uint16_t keycode) {
     key_behavior_view_t behavior = key_runtime_scenario_pressable_handled_key(keycode);
 
-    behavior.tap_hold_term       = TEST_TAP_HOLD_TERM_MS;
-    behavior.longer_hold_term    = TEST_LONGER_HOLD_TERM_MS;
-    behavior.multi_tap_term      = TEST_MULTI_TAP_TERM_MS;
-    behavior.branch_confirm_term = 0;
+    behavior.tap_hold_term    = TEST_TAP_HOLD_TERM_MS;
+    behavior.longer_hold_term = TEST_LONGER_HOLD_TERM_MS;
+    behavior.multi_tap_term   = TEST_MULTI_TAP_TERM_MS;
     return behavior;
 }
 
@@ -514,14 +513,16 @@ static void test_pending_release_edge_cases(void) {
             .expected          = TEST_EXPECT_PRESERVE_CHAIN(),
         },
         {
-            .name              = "quick release falls back to second tap action when chain ends",
+            // A terminal branch preserves the chain too, so every authored depth
+            // waits the same multi-tap window and its action fires at the flush.
+            .name              = "quick release preserves pending chain when the chain ends",
             .second_tap_action = TEST_SECOND_TAP_ACTION,
             .hold              = HOLD_LIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_PRIMARY)),
             .long_hold         = HOLD_NONE_LIT,
             .has_more_taps     = false,
             .pending_setup     = TEST_PENDING_SETUP_NONE,
             .release_elapsed   = 60,
-            .expected          = TEST_EXPECT_ACTION(TEST_SECOND_TAP_ACTION, false),
+            .expected          = TEST_EXPECT_PRESERVE_CHAIN(),
         },
         {
             .name              = "pending release synthesizes held lifecycle without scan",

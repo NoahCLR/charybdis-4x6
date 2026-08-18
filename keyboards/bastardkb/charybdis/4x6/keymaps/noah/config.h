@@ -43,11 +43,10 @@ enum charybdis_keymap_layers {
 //   > CUSTOM_LONGER_HOLD_TERM                      = longer hold (third-tier action)
 //
 // Multi-tap: each tap must arrive within CUSTOM_MULTI_TAP_TERM of the previous.
-#define KEY_BEHAVIOR_MAX_TAP_COUNT 5       // max tap-count entries per key (single through quintuple)
-#define CUSTOM_TAP_HOLD_TERM 150           // tap vs hold boundary (ms)
-#define CUSTOM_LONGER_HOLD_TERM 400        // hold vs longer-hold boundary (ms)
-#define CUSTOM_MULTI_TAP_TERM 150          // max gap between consecutive taps (ms)
-#define CUSTOM_RGB_BRANCH_CONFIRM_TERM 150 // default RGB-visible branch-confirm window for committed tap-count branches
+#define KEY_BEHAVIOR_MAX_TAP_COUNT 5 // max tap-count entries per key (single through quintuple)
+#define CUSTOM_TAP_HOLD_TERM 150     // tap vs hold boundary (ms)
+#define CUSTOM_LONGER_HOLD_TERM 400  // hold vs longer-hold boundary (ms)
+#define CUSTOM_MULTI_TAP_TERM 150    // max gap between consecutive taps (ms)
 
 // ─── Pointing device ────────────────────────────────────────────────────────
 

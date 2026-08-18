@@ -267,57 +267,6 @@ static const combo_feedback_led_group_t combo_feedback_led_groups_data[] = RGB_L
 //     clamp to the last configured color
 //   - the base tap stays dark: branch 0 needs no color of its own, and one tap
 //     does not show the user meant to enter a tap branch at all
-//   - the branch color also covers the branch-confirm window below, because a
-//     branch held back by that window is selected and still not entered
-//
-// Branch-confirm policy:
-//   - branch_confirm_mode chooses which committed tap-count branches enter the
-//     branch-confirmation window before their selected effect/action fires
-//   - KEY_FEEDBACK_BRANCH_CONFIRM_OFF skips that window and lets the resolved
-//     branch continue through the normal dispatch path
-//   - KEY_FEEDBACK_BRANCH_CONFIRM_NON_BASE_TAPS allows the window only for
-//     double-tap and higher authored branches
-//   - the per-key branch-confirm term controls the window duration; a zero or
-//     already-expired term also falls through to the normal dispatch path
-//
-// Tap-commit pulse policy:
-//   - tap_committed_color = action feedback after committed tap-count branches
-//     that author .tap and do not already have state feedback; layer and
-//     PD-mode state actions stay quiet because their state overlays own that
-//     feedback
-//   - tap_commit_mode chooses which committed tap-count branches can pulse
-//   - KEY_FEEDBACK_TAP_COMMIT_OFF disables tap-commit pulses
-//   - KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS allows pulses only for double-tap
-//     and higher branches that author .tap
-//
-// Hold feedback:
-//   - hold_active_color = authored hold-tier pending / active states and
-//     hold-tier commit pulses
-//   - long_hold_active_color = authored long-hold-tier active states and
-//     long-hold-tier commit pulses
-//   - missing tiers stay quiet; e.g. a long-hold-only surface does not show
-//     hold feedback before the long-hold tier commits
-//   - the active tier picks the color: .hold always uses hold_active_color,
-//     .long_hold always uses long_hold_active_color, regardless of which
-//     helper authored that tier
-//   - TAP_AT_HOLD_THRESHOLD(...) pulses once when that tier commits
-//   - TAP_ON_RELEASE_AFTER_HOLD(...) stays steady while that tier is pending
-//     release
-//   - PRESS_AND_HOLD_UNTIL_RELEASE(...) and REPEAT_WHILE_HELD(...) flash while
-//     that tier stays active; the first visible flash window starts when that
-//     key's held/repeat feedback activates
-//
-// Locality decides where the overlay paints:
-//   - RGB_BOTH_HALVES = mirror the newest active feedback owner across both halves
-//   - RGB_LEFT_HALF = always paint the left half from the newest active owner
-//   - RGB_RIGHT_HALF = always paint the right half from the newest active owner
-//   - RGB_KEY_HALF = paint only the half that owns the key or tap series
-//     currently driving the feedback state; combo-driven feedback can broaden
-//     this to both halves
-//   - RGB_KEYS_ONLY = paint only the key footprint currently driving the
-//     feedback state; combo-driven feedback paints every combo key
-// Broadened modes follow the selected owner's real flash phase; offset held
-// keys do not fill each other's off windows.
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
 const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
     RGB_TAP_BRANCH_COLORS(HSV(200, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), // tap count 2
@@ -325,11 +274,6 @@ const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
                           HSV(143, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), // tap count 4
                           HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS)   // tap count 5
                           ),
-
-    // Let authored double-tap and higher branches enter the branch-confirm
-    // window before their selected effect/action fires. OFF skips that state
-    // and its delay.
-    .branch_confirm_mode = KEY_FEEDBACK_BRANCH_CONFIRM_NON_BASE_TAPS,
 
     // Used for committed authored non-base tap branches that do not already
     // have state feedback. Base single-tap commits stay quiet under the pulse
@@ -359,8 +303,7 @@ const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
 //
 // .semantic chooses which visible key-behavior state can drive the group:
 //   - KEY_FEEDBACK_GROUP_TAP_BRANCH_PENDING = a double-tap-or-higher branch is
-//     selected and has not been entered yet, including while the branch-confirm
-//     window holds its action back
+//     selected and has not been entered yet
 //   - KEY_FEEDBACK_GROUP_TAP_COMMITTED = tap action commit pulse for authored
 //     non-base tap branches that do not already have state feedback
 //   - KEY_FEEDBACK_GROUP_HOLD_ACTIVE = hold-tier pending / active / commit

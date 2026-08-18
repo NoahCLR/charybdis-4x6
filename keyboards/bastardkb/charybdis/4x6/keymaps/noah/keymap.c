@@ -226,8 +226,6 @@ enum keymap_custom_keycodes {
 //     default longer-hold threshold
 //   - CUSTOM_MULTI_TAP_TERM = 150 ms
 //     max gap allowed between taps in a multi-tap sequence
-//   - CUSTOM_RGB_BRANCH_CONFIRM_TERM = 150 ms
-//     RGB-visible window after a committed non-base tap branch
 //   - KEY_BEHAVIOR_MAX_TAP_COUNT = 5
 //     current runtime limit for tap_counts[] entries
 //
@@ -235,14 +233,11 @@ enum keymap_custom_keycodes {
 //   - .tap_hold_term overrides the first hold threshold for that row
 //   - .longer_hold_term overrides the longer-hold threshold
 //   - .multi_tap_term overrides the max gap between taps
-//   - .rgb_branch_confirm_term overrides the committed-branch RGB window
 //   - omit them (or leave them 0) to use the defaults above
 //   - for LT() rows, omitted .tap_hold_term falls back to TAPPING_TERM;
 //     all other rows fall back to CUSTOM_TAP_HOLD_TERM
 //
 // per-key policy flags, omit them (or leave them false) for ordinary keys:
-//   - .skip_rgb_branch_confirm drops the branch-confirm RGB window for that
-//     row; the key output still runs, only the visual pause goes away
 //   - .keeps_auto_mouse_anchored counts the row's keycode as a mouse record, so
 //     pressing it keeps the pointer layer up instead of letting auto mouse
 //     reset on it. Only keys that drive the mouse through authored actions need
@@ -255,13 +250,13 @@ enum keymap_custom_keycodes {
 //     multi-tap window before firing so the engine can see whether more taps
 //     follow
 //   - this means base single taps on multi-tap keys are delayed by
-//     .multi_tap_term, but skip the branch-confirm window
-//   - double-tap and higher terminal tap branches that author .tap use the
-//     same pending window, then the branch-confirm window, so RGB can show the
-//     selected branch before the tap-commit pulse
+//     .multi_tap_term
+//   - terminal tap branches wait that same window rather than firing on the
+//     release, so every authored depth shows its branch color for the same
+//     length of time before its action lands
 //   - if a non-base branch omits .tap, a quick tap keeps the key's normal tap
-//     behavior; branch-confirm still shows when that branch authors a hold or
-//     long-hold tier, but tap-commit feedback is skipped
+//     behavior; the branch color still shows, but tap-commit feedback is
+//     skipped because no .tap was authored on that branch
 //
 // within one tap index:
 //   - .tap is the tap tier

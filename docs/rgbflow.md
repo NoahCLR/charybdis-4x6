@@ -38,13 +38,16 @@ flowchart TD
 
 Thick arrows are the board advancing on its own. Thin arrows are you tapping.
 
-A branch is entered when its action is no longer being held back, which is the
-instant the action path takes the key over. Until then the branch colour owns the
-key, and it deliberately outranks the pending tier colours: while an action is
-still being deferred, the branch is the honest answer to what letting go would
-send. `rgb_branch_confirm_term` exists to hold that action back so you get to see
-the branch before it fires, so the branch colour is exactly what belongs on the
-key for the whole of that window.
+A branch is entered the instant the action path takes the key over: its tap fires
+at the flush, or a hold tier claims it at a threshold. Until then the branch colour
+owns the key, and it deliberately outranks the pending tier colours — while
+nothing has fired, the branch is the honest answer to what letting go would send.
+
+Every authored depth waits the same `multi_tap_term` before its tap fires, the
+deepest one included, so the colour is on screen for the same length of time
+wherever you are in the gesture. Holding is the one thing that cuts it short, and
+it should: crossing `tap_hold_term` enters the branch, so the hold tier takes over
+there and then.
 
 The base tap stays dark on purpose. One tap does not show that you meant to enter
 a tap branch at all, and a colour on every keystroke would be noise.
@@ -149,8 +152,8 @@ Dark is a word in this language, not an absence. These conditions choose it:
   instead of this stage
 - keys inside a currently pressed combo, where the combo footprint speaks
   instead
-- the base tap of a multi-tap key on commit, since both branch-confirm and
-  tap-commit feedback are limited to non-base taps
+- the base tap of a multi-tap key on commit, since tap-commit feedback is
+  limited to non-base taps
 
 ## When two states coincide
 

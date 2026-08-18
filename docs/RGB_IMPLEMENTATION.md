@@ -78,17 +78,15 @@ the last sent packet was active, so an active-to-inactive edge is never missed.
 ## The tap phase runs on no clock
 
 Both tap-phase questions collapse into one predicate,
-`key_feedback_tap_series_shows_tap_branch`: the series is active, the tap count is
-past the base one, and the branch is not entered yet. "Entered" is
-`branch_confirmed && !branch_confirming`, the instant the action path takes the
-series over.
+`key_feedback_tap_series_shows_tap_branch`: the series is active, its count is past
+the base one, the row authors a step at that count, and the series has not resolved.
 
 ```mermaid
 flowchart TD
-    T["tap counted into the series<br>tap_count above one"]
+    T["tap counted into the series<br>tap_count above one<br>authored step at that count"]
     T --> P["branch selected<br>colour for tap_count"]
     P -->|"another tap"| T
-    P ==>|"branch_confirmed and<br>not branch_confirming"| Q["branch entered<br>action semantics own the key"]
+    P ==>|"series resolved"| Q["branch entered<br>action semantics own the key"]
 
     style T fill:#EDF0F4,stroke:#5A6673,color:#1A1F26
     style P fill:#B400FF,stroke:#6E0099,color:#FFFFFF
@@ -96,43 +94,40 @@ flowchart TD
 ```
 
 There is no derived settle moment, so there is nothing to anchor and nothing to
-disagree with the engine about. `tap_branch_map` carries
-`series->tap_count`, which the reducer sets from
-`token->interaction.selection.tap_count` — the resolved branch index, not the raw
-press count, so the colour names the branch that would actually win.
+disagree with the engine about. `tap_branch_map` carries `series->tap_count`, which
+the reducer sets from `token->interaction.selection.tap_count` — the resolved
+branch index, not the raw press count, so the colour names the branch that would
+actually win. `tap_branch_has_authored_step` keeps it to branches the row really
+authors, since the colour table would otherwise clamp a colour onto a count with
+no step behind it.
 
-The predicate stays true through the branch-confirm window on purpose: that window
-holds the action back so the branch is visible before it fires, so the branch
-colour is what belongs on the key while it runs.
+## The action phase resolves where it is decided
 
-## The action phase runs on five paths
-
-`branch_confirming` is set from five call sites, each anchoring its window on a
-different clock. This is what the display used to inherit, and what the count
-clock above now replaces for display purposes.
+There is no window between deciding a branch and doing it. Each resolution point
+acts immediately:
 
 ```mermaid
 flowchart TD
-    S1["scan flush<br>scan_planner 479"] -->|"anchored at<br>last_tap_at plus tap_term_ms"| BC["branch_confirming<br>action held back for<br>branch_confirm_term_ms"]
-    S2["hold threshold<br>scan_planner 490"] -->|"anchored at<br>pressed_at plus tap_hold_term"| BC
-    S3["long hold threshold<br>scan_planner 497"] -->|"anchored at<br>pressed_at plus longer_hold_term"| BC
-    S4["release hold pending<br>scan_planner 504"] -->|"anchored at<br>pressed_at plus tap_hold_term"| BC
-    S5["release path<br>release_planner 502"] -->|"anchored at<br>the release instant"| BC
-    BC --> FIRE["window ends<br>action dispatches"]
+    F["scan flush<br>last_tap_at plus tap_term_ms"] --> FA["tap dispatched<br>series cleared"]
+    H["hold threshold"] --> HA["hold tier effects<br>series cleared"]
+    L["long-hold threshold"] --> LA["long-hold tier effects<br>series cleared"]
+    R["release past the hold threshold"] --> RA["release-hold-pending<br>series resolved"]
 
-    style S1 fill:#EDF0F4,stroke:#5A6673,color:#1A1F26
-    style S2 fill:#EDF0F4,stroke:#5A6673,color:#1A1F26
-    style S3 fill:#EDF0F4,stroke:#5A6673,color:#1A1F26
-    style S4 fill:#EDF0F4,stroke:#5A6673,color:#1A1F26
-    style S5 fill:#EDF0F4,stroke:#5A6673,color:#1A1F26
-    style BC fill:#B400FF,stroke:#6E0099,color:#FFFFFF
-    style FIRE fill:#00FF00,stroke:#009E00,color:#1A1F26
+    style F fill:#EDF0F4,stroke:#5A6673,color:#1A1F26
+    style H fill:#EDF0F4,stroke:#5A6673,color:#1A1F26
+    style L fill:#EDF0F4,stroke:#5A6673,color:#1A1F26
+    style R fill:#EDF0F4,stroke:#5A6673,color:#1A1F26
+    style FA fill:#00FF00,stroke:#009E00,color:#1A1F26
+    style HA fill:#FF6C00,stroke:#A34500,color:#1A1F26
+    style LA fill:#0084FF,stroke:#00539E,color:#FFFFFF
+    style RA fill:#DDE3EA,stroke:#5A6673,color:#1A1F26
 ```
 
-Which site runs depends on whether the selected branch authors a hold tier and on
-whether the key was released. There is no predicate anywhere that answers "has
-the count settled" for the action side; that concept exists only in the display
-clock above.
+A release before the hold threshold does not resolve anything on a multi-tap row:
+it preserves the chain so the multi-tap window can run out, which is what gives
+every authored depth — the deepest included — the same visible window before its
+action lands. `terminal_tap_only_feedback_window` in the release planner is the
+condition that extends that to terminal branches.
 
 ## Tier semantics are decided in order
 
@@ -215,9 +210,10 @@ When one key has more than one live semantic, the highest wins.
 
 ### Closed by the single-state tap phase
 
-- The count colour is no longer overloaded: one predicate, one meaning, and the
-  branch-confirm window is covered by the same fact rather than a second trigger.
+- The count colour is no longer overloaded: one predicate, one meaning.
 - Display and action can no longer describe different moments, because the display
   reads the action state instead of a parallel clock.
+- The action-delay window is gone entirely, so there is no longer a term whose only
+  job was to make the colour visible.
 - The `tap_pending` white that collided with `LAYER_POINTER` `#FFFFFF` is gone,
   and `tap_committed` green still collides with `LAYER_NUM` `#00FF00`.

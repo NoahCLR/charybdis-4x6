@@ -324,8 +324,10 @@ static void test_advance_thumb_multi_tap_gap(void) {
     key_runtime_integration_advance(&fake_time, 40);
 }
 
-static void test_finish_tap_branch_confirmation(void) {
-    key_runtime_integration_advance(&fake_time, CUSTOM_RGB_BRANCH_CONFIRM_TERM + 1);
+// Run the multi-tap window out so the pending series flushes and its branch is
+// entered. There is no separate confirm window after it any more.
+static void test_flush_pending_tap_branch(void) {
+    key_runtime_integration_advance(&fake_time, CUSTOM_MULTI_TAP_TERM + 1);
     key_runtime_integration_scan();
 }
 
@@ -1199,13 +1201,9 @@ static void test_left_thumb_double_tap_hold_escape_feedback_sequence(void) {
     CHECK(test_feedback_semantic_for_key(key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING);
     CHECK(test_feedback_tap_branch_for_key(key_pos) == 2u);
 
+    // Crossing the hold threshold enters the branch, so the hold tier takes the
+    // key over there and then; nothing holds the handover back any more.
     key_runtime_integration_advance(&fake_time, CUSTOM_TAP_HOLD_TERM + 1);
-    key_runtime_integration_scan();
-
-    CHECK(test_feedback_semantic_for_key(key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING);
-    CHECK(test_feedback_tap_branch_for_key(key_pos) == 2u);
-
-    key_runtime_integration_advance(&fake_time, CUSTOM_RGB_BRANCH_CONFIRM_TERM + 1);
     key_runtime_integration_scan();
 
     CHECK(noah_runtime_debug_slot_phase(key_pos) == KEY_RUNTIME_SLOT_PHASE_RELEASE_HOLD_PENDING);
@@ -1232,15 +1230,10 @@ static void test_left_thumb_double_tap_hold_escape_release_crossing_threshold_pu
     key_runtime_integration_advance(&fake_time, 40);
     test_press_resolved(key_pos);
 
+    // Released past the hold threshold: TAP_ON_RELEASE_AFTER_HOLD fires on that
+    // release, so the branch is entered there and hold feedback takes over.
     key_runtime_integration_advance(&fake_time, CUSTOM_TAP_HOLD_TERM + 1);
     test_release_resolved(key_pos);
-
-    CHECK(test_delayed_action_count == 0u);
-    CHECK(test_feedback_semantic_for_key(key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING);
-    CHECK(test_feedback_tap_branch_for_key(key_pos) == 2u);
-
-    key_runtime_integration_advance(&fake_time, CUSTOM_RGB_BRANCH_CONFIRM_TERM + 1);
-    key_runtime_integration_scan();
 
     CHECK(test_delayed_action_count == 1u);
     CHECK(test_last_delayed_action == KC_ESC);
@@ -1252,7 +1245,9 @@ static void test_left_thumb_double_tap_hold_escape_release_crossing_threshold_pu
     test_assert_thumb_runtime_quiescent(key_pos);
 }
 
-static void test_left_thumb_double_tap_hold_escape_release_during_branch_keeps_hold_feedback_pulse(void) {
+// Held past the hold threshold, the branch is entered and hold feedback owns the
+// key; the later release only fires the action it was already showing.
+static void test_left_thumb_double_tap_hold_escape_release_after_handover_keeps_hold_feedback_pulse(void) {
     keypos_t key_pos      = test_left_thumb_pos();
     uint16_t base_keycode = test_keycode_at(LAYER_BASE, key_pos);
 
@@ -1268,17 +1263,10 @@ static void test_left_thumb_double_tap_hold_escape_release_during_branch_keeps_h
     key_runtime_integration_advance(&fake_time, CUSTOM_TAP_HOLD_TERM + 1);
     key_runtime_integration_scan();
 
-    CHECK(test_feedback_semantic_for_key(key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING);
-    CHECK(test_feedback_tap_branch_for_key(key_pos) == 2u);
+    CHECK(test_feedback_semantic_for_key(key_pos) == KEY_FEEDBACK_SEMANTIC_HOLD_PENDING);
+    CHECK(test_feedback_tap_branch_for_key(key_pos) == 0u);
 
     test_release_resolved(key_pos);
-
-    CHECK(test_delayed_action_count == 0u);
-    CHECK(test_feedback_semantic_for_key(key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING);
-    CHECK(test_feedback_tap_branch_for_key(key_pos) == 2u);
-
-    key_runtime_integration_advance(&fake_time, CUSTOM_RGB_BRANCH_CONFIRM_TERM + 1);
-    key_runtime_integration_scan();
 
     CHECK(test_delayed_action_count == 1u);
     CHECK(test_last_delayed_action == KC_ESC);
@@ -1304,10 +1292,12 @@ static void test_left_thumb_double_tap_long_hold_num_feedback_replaces_branch(vo
     key_runtime_integration_advance(&fake_time, 40);
     test_press_resolved(key_pos);
 
+    // Past the hold threshold the hold tier already owns the key, so this leg
+    // shows hold feedback rather than the branch it came from.
     key_runtime_integration_advance(&fake_time, branch_scan_elapsed);
     key_runtime_integration_scan();
-    CHECK(test_feedback_semantic_for_key(key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING);
-    CHECK(test_feedback_tap_branch_for_key(key_pos) == 2u);
+    CHECK(test_feedback_semantic_for_key(key_pos) == KEY_FEEDBACK_SEMANTIC_HOLD_PENDING);
+    CHECK(test_feedback_tap_branch_for_key(key_pos) == 0u);
 
     key_runtime_integration_advance(&fake_time, (uint16_t)(CUSTOM_LONGER_HOLD_TERM - branch_scan_elapsed + 1u));
     key_runtime_integration_scan();
@@ -1426,12 +1416,6 @@ static void test_right_thumb_triple_tap_flushes_next_track_after_timeout(void) {
     key_runtime_integration_advance(&fake_time, CUSTOM_MULTI_TAP_TERM + 1);
     key_runtime_integration_scan();
 
-    CHECK(test_tap_code16_count == 0);
-    CHECK(test_delayed_action_count == 0);
-    CHECK(test_feedback_semantic_for_key(key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING);
-
-    test_finish_tap_branch_confirmation();
-
     CHECK(test_delayed_action_count == 1);
     CHECK(test_last_delayed_action == KC_MNXT);
     test_assert_thumb_runtime_quiescent(key_pos);
@@ -1457,13 +1441,10 @@ static void test_right_thumb_triple_tap_long_hold_registers_next_track_hold(void
     key_runtime_integration_advance(&fake_time, CUSTOM_LONGER_HOLD_TERM + 1);
     key_runtime_integration_scan();
 
-    CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == KC_NO);
-    CHECK(test_feedback_semantic_for_key(key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING);
-    CHECK(test_feedback_tap_branch_for_key(key_pos) == 3u);
-
-    test_finish_tap_branch_confirmation();
-
+    // The long-hold threshold enters branch 3 immediately, so the held action is
+    // registered by this scan and the branch color is already gone.
     CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == KC_MNXT);
+    CHECK(test_feedback_tap_branch_for_key(key_pos) == 0u);
     CHECK(test_tap_code16_count == 0);
 
     test_release_resolved(key_pos);
@@ -1491,8 +1472,6 @@ static void test_right_thumb_quadruple_tap_dispatches_previous_track(void) {
     key_runtime_integration_advance(&fake_time, CUSTOM_MULTI_TAP_TERM + 1);
     key_runtime_integration_scan();
 
-    test_finish_tap_branch_confirmation();
-
     CHECK(test_delayed_action_count == 1);
     CHECK(test_last_delayed_action == KC_MPRV);
     test_assert_thumb_runtime_quiescent(key_pos);
@@ -1516,7 +1495,7 @@ static void test_pointer_pinch_double_tap_queues_zoom_chord(void) {
         key_runtime_integration_scan();
     }
     if (test_delayed_action_count == 0) {
-        test_finish_tap_branch_confirmation();
+        test_flush_pending_tap_branch();
     }
 
     CHECK(test_tap_code16_count == 0);
@@ -1544,7 +1523,7 @@ static void test_pointer_pinch_double_tap_salvos_queue_zoom_chord_cleanly(void) 
             key_runtime_integration_scan();
         }
         if (test_delayed_action_count == salvo) {
-            test_finish_tap_branch_confirmation();
+            test_flush_pending_tap_branch();
         }
 
         CHECK(test_tap_code16_count == 0);
@@ -1779,12 +1758,10 @@ static void test_cmd_combo_double_tap_hold_uses_stable_owner_across_press_order(
     key_runtime_integration_advance(&fake_time, CUSTOM_TAP_HOLD_TERM + 1u);
     key_runtime_integration_scan();
 
+    // The hold threshold enters the branch, so the held modifier is registered by
+    // this scan rather than after a further window.
     CHECK(noah_runtime_debug_slot_owner_keycode(m_pos) == KC_LEFT_GUI);
     CHECK(!noah_runtime_debug_slot_pending_multi_tap_holding(m_pos));
-    CHECK(test_feedback_semantic_for_key(m_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING);
-
-    test_finish_tap_branch_confirmation();
-
     CHECK(noah_runtime_debug_slot_held_action_keycode(m_pos) == KC_LEFT_ALT);
     CHECK((fake_mods & MOD_BIT(KC_LEFT_ALT)) != 0u);
     CHECK((fake_mods & MOD_BIT(KC_LEFT_GUI)) == 0u);
@@ -2096,12 +2073,9 @@ static void test_activate_gui_double_tap_alt_hold(keypos_t gui_pos) {
     key_runtime_integration_advance(&fake_time, CUSTOM_TAP_HOLD_TERM + 1);
     key_runtime_integration_scan();
 
+    // The hold threshold enters the branch and registers the modifier in the same
+    // scan; there is no window between deciding and doing.
     CHECK(noah_runtime_debug_slot_owner_keycode(gui_pos) == KC_LEFT_GUI);
-    CHECK(noah_runtime_debug_slot_held_action_keycode(gui_pos) == KC_NO);
-    CHECK(test_feedback_semantic_for_key(gui_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING);
-
-    test_finish_tap_branch_confirmation();
-
     CHECK(noah_runtime_debug_slot_held_action_keycode(gui_pos) == KC_LEFT_ALT);
     CHECK((fake_mods & MOD_BIT(KC_LEFT_ALT)) != 0);
 }
@@ -2132,7 +2106,7 @@ static void test_commit_pending_gui_double_tap_alt_hold(keypos_t gui_pos) {
 
     if (noah_runtime_debug_slot_held_action_keycode(gui_pos) == KC_NO) {
         CHECK(test_feedback_semantic_for_key(gui_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING);
-        test_finish_tap_branch_confirmation();
+        test_flush_pending_tap_branch();
     }
 
     CHECK(noah_runtime_debug_slot_held_action_keycode(gui_pos) == KC_LEFT_ALT);
@@ -3102,7 +3076,7 @@ int main(void) {
     test_thumb_double_tap_hold_with_intermediate_scan_toggles_num_layer_once_per_cycle();
     test_left_thumb_double_tap_hold_escape_feedback_sequence();
     test_left_thumb_double_tap_hold_escape_release_crossing_threshold_pulses_branch();
-    test_left_thumb_double_tap_hold_escape_release_during_branch_keeps_hold_feedback_pulse();
+    test_left_thumb_double_tap_hold_escape_release_after_handover_keeps_hold_feedback_pulse();
     test_left_thumb_double_tap_long_hold_num_feedback_replaces_branch();
     test_left_and_right_thumb_single_taps_keep_independent_pending_chains();
     test_number_key_hold_only_tap_feedback_stays_quiet();

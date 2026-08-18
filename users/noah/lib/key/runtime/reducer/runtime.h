@@ -119,47 +119,30 @@ typedef struct {
     key_runtime_slot_phase_t       slot_phase;
 } press_token_t;
 
-typedef enum {
-    KEY_RUNTIME_TAP_SERIES_BRANCH_CONFIRM_NONE = 0,
-    KEY_RUNTIME_TAP_SERIES_BRANCH_CONFIRM_DELAYED_ACTION,
-    KEY_RUNTIME_TAP_SERIES_BRANCH_CONFIRM_RELEASE_HOLD_PENDING,
-    KEY_RUNTIME_TAP_SERIES_BRANCH_CONFIRM_THRESHOLD_HOLD,
-} key_runtime_tap_series_branch_confirm_kind_t;
-
 typedef struct {
-    bool                  active;
-    uint16_t              keycode;
-    uint8_t               tap_count;
-    bool                  pending_hold;
-    bool                  branch_confirmed;
-    bool                  branch_confirming;
-    uint8_t               branch_confirm_kind;
-    uint8_t               branch_confirm_tap_count;
-    uint16_t              branch_confirm_started_at;
-    uint16_t              branch_confirm_duration_ms;
-    uint16_t              branch_confirm_action;
-    uint8_t               branch_confirm_repeat_count;
-    delayed_action_mods_t branch_confirm_mods;
-    bool                  branch_confirm_tap_commit_feedback;
-    bool                  branch_confirm_action_feedback;
-    uint8_t               branch_confirm_action_feedback_kind;
-    bool                  branch_confirm_long_hold_level;
-    uint16_t              single_action;
-    uint16_t              tap_action;
-    uint8_t               tap_repeat_count;
-    bool                  tap_branch_has_authored_step;
-    bool                  tap_branch_has_authored_tap;
-    bool                  has_more_taps;
-    bool                  authored_has_more_taps;
-    hold_behavior_t       hold;
-    hold_behavior_t       long_hold;
-    uint16_t              tap_hold_term_ms;
-    uint16_t              branch_confirm_term_ms;
-    uint16_t              last_action;
-    uint16_t              last_tap_at;
-    uint16_t              tap_term_ms;
-    uint32_t              feedback_sequence;
-    keyboard_mod_state_t  saved_mod_state;
+    bool     active;
+    uint16_t keycode;
+    uint8_t  tap_count;
+    bool     pending_hold;
+    // The selected branch has been entered: its action was dispatched or its hold
+    // path took the key over. A resolved series accepts no further taps and shows
+    // no branch color.
+    bool                 resolved;
+    uint16_t             single_action;
+    uint16_t             tap_action;
+    uint8_t              tap_repeat_count;
+    bool                 tap_branch_has_authored_step;
+    bool                 tap_branch_has_authored_tap;
+    bool                 has_more_taps;
+    bool                 authored_has_more_taps;
+    hold_behavior_t      hold;
+    hold_behavior_t      long_hold;
+    uint16_t             tap_hold_term_ms;
+    uint16_t             last_action;
+    uint16_t             last_tap_at;
+    uint16_t             tap_term_ms;
+    uint32_t             feedback_sequence;
+    keyboard_mod_state_t saved_mod_state;
 } tap_series_t;
 
 typedef struct {

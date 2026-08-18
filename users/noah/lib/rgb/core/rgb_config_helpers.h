@@ -61,12 +61,9 @@
 #endif
 
 #ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
-#    define _RGB_KEY_BEHAVIOR_FEEDBACK_POLICY_DATA()                                \
-        key_feedback_branch_confirm_mode_t key_feedback_branch_confirm_mode(void) { \
-            return key_behavior_feedback_colors.branch_confirm_mode;                \
-        }                                                                           \
-        key_feedback_tap_commit_mode_t key_feedback_tap_commit_mode(void) {         \
-            return key_behavior_feedback_colors.tap_commit_mode;                    \
+#    define _RGB_KEY_BEHAVIOR_FEEDBACK_POLICY_DATA()                        \
+        key_feedback_tap_commit_mode_t key_feedback_tap_commit_mode(void) { \
+            return key_behavior_feedback_colors.tap_commit_mode;            \
         }
 #    define _RGB_KEY_BEHAVIOR_FEEDBACK_LED_GROUP_DATA() EXPORT_KEY_BEHAVIOR_FEEDBACK_LED_GROUP_TABLE(key_behavior_feedback_led_groups_data);
 #else

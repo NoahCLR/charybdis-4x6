@@ -269,8 +269,8 @@ It covers:
 - layer, pointing-mode, combo, and key-behavior LED group tables
 - auto-mouse fade destination color and fade mode
 - combo feedback color and locality
-- key-behavior feedback colors, tap-count branch-confirm colors,
-  branch-confirm mode, tap commit mode, and locality
+- key-behavior feedback colors, tap-count branch colors, tap commit mode, and
+  locality
 
 All major panels are collapsible. The RGB page keeps a panel for every
 authored section in `rgb_config.c`, even when a table currently has no active

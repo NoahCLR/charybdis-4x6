@@ -209,25 +209,17 @@ key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
 
     uint16_t longer_term = config && config->longer_hold_term ? config->longer_hold_term : CUSTOM_LONGER_HOLD_TERM;
     uint16_t multi_term  = config && config->multi_tap_term ? config->multi_tap_term : CUSTOM_MULTI_TAP_TERM;
-    uint16_t branch_term = CUSTOM_RGB_BRANCH_CONFIRM_TERM;
-    if (config && config->skip_rgb_branch_confirm) {
-        branch_term = 0;
-    } else if (config && config->rgb_branch_confirm_term) {
-        branch_term = config->rgb_branch_confirm_term;
-    }
-
     return (key_behavior_view_t){
-        .config              = config,
-        .keycode             = keycode,
-        .handled             = config || noah_action_desc_is_runtime_handled_keycode(desc),
-        .is_momentary_layer  = noah_action_desc_is_momentary_layer_keycode(desc) || custom_lt,
-        .is_layer_tap        = custom_lt,
-        .has_multi_tap       = key_behavior_has_multi_tap_in_config(config),
-        .tap_hold_term       = tap_term,
-        .longer_hold_term    = longer_term,
-        .multi_tap_term      = multi_term,
-        .branch_confirm_term = branch_term,
-        .single              = config ? config->tap_counts[0] : key_behavior_step_none(),
+        .config             = config,
+        .keycode            = keycode,
+        .handled            = config || noah_action_desc_is_runtime_handled_keycode(desc),
+        .is_momentary_layer = noah_action_desc_is_momentary_layer_keycode(desc) || custom_lt,
+        .is_layer_tap       = custom_lt,
+        .has_multi_tap      = key_behavior_has_multi_tap_in_config(config),
+        .tap_hold_term      = tap_term,
+        .longer_hold_term   = longer_term,
+        .multi_tap_term     = multi_term,
+        .single             = config ? config->tap_counts[0] : key_behavior_step_none(),
     };
 }
 

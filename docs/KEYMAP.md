@@ -56,7 +56,6 @@ The keymap currently sets these defaults in
 - `CUSTOM_TAP_HOLD_TERM = 150`
 - `CUSTOM_LONGER_HOLD_TERM = 400`
 - `CUSTOM_MULTI_TAP_TERM = 150`
-- `CUSTOM_RGB_BRANCH_CONFIRM_TERM = 150`
 - `COMBO_TERM = 50`
 
 There are also current per-key exceptions:
@@ -205,7 +204,7 @@ These are small profile-specific quality-of-life keys:
 
 A quick double tap on `KC_LEFT_GUI` has no authored `.tap` branch, so it emits
 two normal `Cmd` taps without tap-commit feedback. The double-tap branch itself
-is still authored because it has a hold tier, so branch-confirm can still show
+is still authored because it has a hold tier, so the branch color can still show
 that the double-tap branch won.
 
 `KC_RIGHT_ALT` is a good example of the profile using a plain key's default held
@@ -259,9 +258,9 @@ has entered a double-tap or higher branch, and it keeps that branch's color unti
 the branch is entered. Reaching the deepest authored branch does not end it, and
 neither does a still-pending hold tier on that branch: nothing has fired yet. The
 base single-tap candidate stays quiet while it waits to see whether another tap
-arrives, then dispatches without the branch-confirmation window. The current RGB
-config's branch-confirm mode can delay a non-base branch's action long enough for
-its color to be seen before it fires. Inherited quick
+arrives. Every authored depth waits that same window before its action fires, so
+the branch color is visible for the same length of time wherever you are in the
+gesture. Inherited quick
 taps from branches that omit `.tap` do not show tap-commit feedback; hold and
 long-hold branches still use their hold-tier feedback when those tiers win.
 

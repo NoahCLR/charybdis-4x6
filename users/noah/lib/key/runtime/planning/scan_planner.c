@@ -137,7 +137,7 @@ static bool key_runtime_core_scan_press_token_has_pending_hold_series(const key_
 
     key_pos = key_runtime_core_scan_press_token_key_pos(state, token);
     series  = key_runtime_core_tap_series_state((key_runtime_core_state_t *)state, key_pos);
-    return series && series->active && (series->pending_hold || series->branch_confirming) && series->keycode == token->physical_keycode;
+    return series && series->active && series->pending_hold && series->keycode == token->physical_keycode;
 }
 
 static bool key_runtime_core_scan_press_token_uses_implicit_hold(const press_token_t *token) {
@@ -321,7 +321,7 @@ void key_runtime_core_plan_fallback_hold_activation(key_runtime_core_state_t *st
 static void key_runtime_core_scan_clear_confirmed_tap_series_at(key_runtime_core_state_t *state, keypos_t key_pos) {
     tap_series_t *series = key_runtime_core_tap_series_state(state, key_pos);
 
-    if (series && series->active && series->branch_confirmed) {
+    if (series && series->active && series->resolved) {
         key_runtime_core_tap_series_clear(state, series);
     }
 }
@@ -365,90 +365,6 @@ static void key_runtime_core_plan_threshold_hold_effects(key_runtime_core_state_
     }
 }
 
-static uint16_t key_runtime_core_scan_token_branch_confirm_started_at(const press_token_t *token, bool long_hold_level) {
-    uint16_t boundary;
-
-    if (!token) {
-        return 0u;
-    }
-
-    boundary = long_hold_level ? token->interaction.binding.longer_hold_term : token->interaction.binding.tap_hold_term;
-    return (uint16_t)(token->pressed_at + boundary);
-}
-
-static bool key_runtime_core_tap_series_start_threshold_branch_confirm(key_runtime_core_state_t *state, tap_series_t *series, const press_token_t *token, key_runtime_tap_series_branch_confirm_kind_t kind, bool long_hold_level) {
-    bool started;
-
-    if (!(state && series && token && (token->interaction.flags & HANDLED_KEY_FLAG_MULTI_TAP) != 0u)) {
-        return false;
-    }
-
-    started = key_runtime_core_tap_series_start_branch_confirm(state, series, kind, token->interaction.selection.tap_count, key_runtime_core_scan_token_branch_confirm_started_at(token, long_hold_level), token->interaction.binding.branch_confirm_term);
-    if (started) {
-        series->branch_confirm_long_hold_level = long_hold_level;
-    }
-    return started;
-}
-
-static void key_runtime_core_plan_branch_confirm_complete(key_runtime_core_state_t *state, tap_series_t *series, keypos_t key_pos, key_runtime_core_effect_plan_t *plan) {
-    press_token_t *token;
-    uint16_t       elapsed;
-
-    if (!(state && series && series->active && series->branch_confirming && plan)) {
-        return;
-    }
-
-    if (key_runtime_core_tap_series_branch_confirm_window_active(series->branch_confirm_started_at, series->branch_confirm_duration_ms, state->current_time)) {
-        return;
-    }
-
-    switch ((key_runtime_tap_series_branch_confirm_kind_t)series->branch_confirm_kind) {
-        case KEY_RUNTIME_TAP_SERIES_BRANCH_CONFIRM_DELAYED_ACTION:
-            key_runtime_core_plan_branch_confirm_delayed_action(state, series, key_pos, plan);
-            return;
-        case KEY_RUNTIME_TAP_SERIES_BRANCH_CONFIRM_RELEASE_HOLD_PENDING:
-            token = key_runtime_core_scan_press_token_state(state, key_pos);
-            if (!(token && token->active && token->handled_key)) {
-                key_runtime_core_tap_series_clear(state, series);
-                return;
-            }
-
-            key_runtime_core_press_token_mark_release_hold_pending(state, token);
-            series->branch_confirming = false;
-            series->branch_confirmed  = true;
-            series->pending_hold      = false;
-            series->hold              = hold_behavior_none();
-            series->long_hold         = hold_behavior_none();
-
-            elapsed = key_runtime_core_scan_elapsed(token->pressed_at, state->current_time);
-            if (handled_key_hold_contract_fires_at_threshold(token->interaction.contract.long_hold) && elapsed >= token->interaction.binding.longer_hold_term) {
-                key_runtime_core_tap_series_clear(state, series);
-                key_runtime_core_plan_threshold_hold_effects(state, token, token->interaction.binding.long_hold, token->interaction.contract.long_hold, true, true, plan);
-            }
-            return;
-        case KEY_RUNTIME_TAP_SERIES_BRANCH_CONFIRM_THRESHOLD_HOLD:
-            token = key_runtime_core_scan_press_token_state(state, key_pos);
-            if (!(token && token->active && token->handled_key)) {
-                key_runtime_core_tap_series_clear(state, series);
-                return;
-            }
-
-            if (series->branch_confirm_long_hold_level) {
-                key_runtime_core_tap_series_clear(state, series);
-                key_runtime_core_plan_threshold_hold_effects(state, token, token->interaction.binding.long_hold, token->interaction.contract.long_hold, true, true, plan);
-                return;
-            }
-
-            key_runtime_core_tap_series_clear(state, series);
-            key_runtime_core_plan_threshold_hold_effects(state, token, token->interaction.binding.hold, token->interaction.contract.hold, !token->interaction.binding.long_hold.present, false, plan);
-            return;
-        case KEY_RUNTIME_TAP_SERIES_BRANCH_CONFIRM_NONE:
-        default:
-            key_runtime_core_tap_series_clear(state, series);
-            return;
-    }
-}
-
 void key_runtime_core_plan_pending_multi_tap_scan_for_key(key_runtime_core_state_t *state, keypos_t key_pos, key_runtime_core_effect_plan_t *plan) {
     key_runtime_core_pending_multi_tap_scan_resolution_t resolution;
     press_token_t                                       *token;
@@ -461,11 +377,6 @@ void key_runtime_core_plan_pending_multi_tap_scan_for_key(key_runtime_core_state
 
     series = key_runtime_core_tap_series_state(state, key_pos);
     mods   = series ? series->saved_mod_state : (delayed_action_mods_t){0};
-    if (series && series->active && series->branch_confirming) {
-        key_runtime_core_plan_branch_confirm_complete(state, series, key_pos, plan);
-        return;
-    }
-
     if (!key_runtime_core_resolve_pending_multi_tap_scan(key_pos, &resolution)) {
         return;
     }
@@ -476,9 +387,7 @@ void key_runtime_core_plan_pending_multi_tap_scan_for_key(key_runtime_core_state
             bool authored_branch     = key_runtime_core_tap_series_has_authored_branch(series);
             bool authored_tap_branch = key_runtime_core_tap_series_has_authored_tap_branch(series);
 
-            if (authored_branch && key_runtime_core_tap_series_start_delayed_action_branch_confirm(state, series, resolution.tap_count, (uint16_t)(series->last_tap_at + series->tap_term_ms), series->branch_confirm_term_ms, resolution.action, resolution.repeat_count, mods, authored_tap_branch, false, KEY_FEEDBACK_PULSE_HOLD)) {
-                return;
-            }
+            (void)authored_branch;
             key_runtime_core_effect_plan_push_delayed_action(plan, key_pos, resolution.action, mods, resolution.repeat_count);
             if (authored_tap_branch) {
                 key_runtime_core_effect_plan_push_tap_commit_feedback_pulse(plan, key_pos, resolution.action, resolution.tap_count);
@@ -487,23 +396,14 @@ void key_runtime_core_plan_pending_multi_tap_scan_for_key(key_runtime_core_state
             return;
         }
         case KEY_RUNTIME_CORE_PENDING_MULTI_TAP_SCAN_OUTCOME_HOLD_THRESHOLD:
-            if (key_runtime_core_tap_series_start_threshold_branch_confirm(state, series, token, KEY_RUNTIME_TAP_SERIES_BRANCH_CONFIRM_THRESHOLD_HOLD, false)) {
-                return;
-            }
             key_runtime_core_tap_series_clear(state, series);
             key_runtime_core_plan_threshold_hold_effects(state, token, resolution.hold, resolution.semantics, resolution.completes_hold, false, plan);
             return;
         case KEY_RUNTIME_CORE_PENDING_MULTI_TAP_SCAN_OUTCOME_LONG_HOLD:
-            if (key_runtime_core_tap_series_start_threshold_branch_confirm(state, series, token, KEY_RUNTIME_TAP_SERIES_BRANCH_CONFIRM_THRESHOLD_HOLD, true)) {
-                return;
-            }
             key_runtime_core_tap_series_clear(state, series);
             key_runtime_core_plan_threshold_hold_effects(state, token, resolution.hold, resolution.semantics, resolution.completes_hold, true, plan);
             return;
         case KEY_RUNTIME_CORE_PENDING_MULTI_TAP_SCAN_OUTCOME_RELEASE_HOLD_PENDING:
-            if (key_runtime_core_tap_series_start_threshold_branch_confirm(state, series, token, KEY_RUNTIME_TAP_SERIES_BRANCH_CONFIRM_RELEASE_HOLD_PENDING, false)) {
-                return;
-            }
             if (token) {
                 key_runtime_core_press_token_mark_release_hold_pending(state, token);
                 if (handled_key_hold_contract_fires_at_threshold(token->interaction.contract.long_hold) && key_runtime_core_scan_elapsed(token->pressed_at, state->current_time) >= token->interaction.binding.longer_hold_term) {
@@ -513,10 +413,10 @@ void key_runtime_core_plan_pending_multi_tap_scan_for_key(key_runtime_core_state
                 }
             }
             if (series) {
-                series->branch_confirmed = true;
-                series->pending_hold     = false;
-                series->hold             = hold_behavior_none();
-                series->long_hold        = hold_behavior_none();
+                series->resolved     = true;
+                series->pending_hold = false;
+                series->hold         = hold_behavior_none();
+                series->long_hold    = hold_behavior_none();
             }
             return;
         case KEY_RUNTIME_CORE_PENDING_MULTI_TAP_SCAN_OUTCOME_NONE:

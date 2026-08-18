@@ -24,7 +24,6 @@ typedef struct {
     uint16_t        tap_hold_term;
     uint16_t        longer_hold_term;
     uint16_t        multi_tap_term;
-    uint16_t        branch_confirm_term;
     bool            has_more_taps;
     bool            authored_has_more_taps;
     bool            tap_resolves_on_press;
@@ -44,10 +43,9 @@ static inline key_runtime_slot_interaction_t key_runtime_slot_interaction_defaul
     return (key_runtime_slot_interaction_t){
         .binding =
             {
-                .tap_hold_term       = CUSTOM_TAP_HOLD_TERM,
-                .longer_hold_term    = CUSTOM_LONGER_HOLD_TERM,
-                .multi_tap_term      = CUSTOM_MULTI_TAP_TERM,
-                .branch_confirm_term = CUSTOM_RGB_BRANCH_CONFIRM_TERM,
+                .tap_hold_term    = CUSTOM_TAP_HOLD_TERM,
+                .longer_hold_term = CUSTOM_LONGER_HOLD_TERM,
+                .multi_tap_term   = CUSTOM_MULTI_TAP_TERM,
             },
         .layer = UINT8_MAX,
         .contract =
@@ -90,7 +88,6 @@ static inline void key_runtime_slot_interaction_from_materialized_into(const han
                 .tap_hold_term          = materialized->authored.tap_hold_term,
                 .longer_hold_term       = materialized->authored.longer_hold_term,
                 .multi_tap_term         = materialized->authored.multi_tap_term,
-                .branch_confirm_term    = materialized->authored.branch_confirm_term,
                 .has_more_taps          = materialized->tap_has_more_taps,
                 .authored_has_more_taps = materialized->authored.has_more_taps,
                 .tap_resolves_on_press  = materialized->tap_resolves_on_press,

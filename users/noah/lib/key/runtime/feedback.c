@@ -206,31 +206,18 @@ static void key_feedback_apply_tap_branch_for_owner(uint8_t *tap_branch_map, key
 }
 
 // Non-base, not "higher tier": tier means a hold tier throughout this codebase,
-// and this is about which tap_counts[] entry is selected. Matches the wording of
-// KEY_FEEDBACK_BRANCH_CONFIRM_NON_BASE_TAPS.
+// and this is about which tap_counts[] entry is selected.
 static bool key_feedback_tap_branch_is_non_base(uint8_t tap_count) {
     return tap_count > 1u;
 }
 
-// A tap branch is entered once it has been confirmed and is no longer being held
-// back, which is the instant the action path takes the series over. Before that
-// the branch is merely selected, however many clocks are running.
-static bool key_feedback_tap_series_branch_entered(const tap_series_t *series) {
-    return series->branch_confirmed && !series->branch_confirming;
-}
-
 // One state, one color: a tap branch is selected and has not been entered yet.
 //
-// It opens on the tap that counts into the branch and closes when that branch is
-// entered. Both edges are events the runtime observes directly, so there is no
-// derived settle moment to get wrong and no way for the color to claim an outcome
-// the engine has not reached. A further tap simply renames the branch.
-//
-// Deliberately still true through the branch-confirm window. That window exists
-// to hold the action back so the branch is visible before it fires, so the branch
-// color is exactly what belongs on the key while it runs; gating it off here is
-// what would leave the board dark right before a hold or long-hold lands. See
-// docs/rgbflow.md.
+// It opens on the tap that counts into the branch and closes when the series
+// resolves, which is the instant the action path takes the key over. Both edges
+// are events the runtime observes directly, so there is no derived settle moment
+// to get wrong and no way for the color to claim an outcome the engine has not
+// reached. A further tap simply renames the branch. See docs/rgbflow.md.
 //
 // The base tap stays quiet because branch 0 needs no color of its own; one tap
 // does not show the user meant to enter a tap branch at all.
@@ -240,7 +227,7 @@ static bool key_feedback_tap_series_branch_entered(const tap_series_t *series) {
 // color there would name a branch that cannot fire; the table's clamping would
 // happily supply one.
 static bool key_feedback_tap_series_shows_tap_branch(const tap_series_t *series) {
-    return series && series->active && series->tap_branch_has_authored_step && !key_feedback_tap_series_branch_entered(series) && key_feedback_tap_branch_is_non_base(series->tap_count);
+    return series && series->active && series->tap_branch_has_authored_step && !series->resolved && key_feedback_tap_branch_is_non_base(series->tap_count);
 }
 
 static key_feedback_semantic_t key_feedback_semantic_for_pulse(key_feedback_pulse_kind_t kind) {

@@ -129,14 +129,6 @@ static void rgb_validation_log_invalid_key_behavior_feedback_tap_commit_mode(uin
 #        endif
 }
 
-static void rgb_validation_log_invalid_key_behavior_feedback_branch_confirm_mode(uint8_t mode) {
-#        ifdef CONSOLE_ENABLE
-    uprintf("Invalid key_behavior_feedback_colors.branch_confirm_mode %u; expected KEY_FEEDBACK_BRANCH_CONFIRM_OFF (0) or KEY_FEEDBACK_BRANCH_CONFIRM_NON_BASE_TAPS (1)\n", (unsigned int)mode);
-#        else
-    (void)mode;
-#        endif
-}
-
 static void rgb_validation_log_invalid_key_behavior_feedback_tap_branch_colors(void) {
 #        ifdef CONSOLE_ENABLE
     uprintf("Invalid key_behavior_feedback_colors tap-count branch colors; RGB_TAP_BRANCH_COLORS(...) must provide at least one color\n");
@@ -268,9 +260,6 @@ static void rgb_validation_validate_combo_feedback_led_groups(void) {
 static void rgb_validation_validate_key_behavior_feedback_config(void) {
     if (key_behavior_feedback_colors.locality > RGB_KEYS_ONLY) {
         rgb_validation_log_invalid_key_behavior_feedback_locality((uint8_t)key_behavior_feedback_colors.locality);
-    }
-    if (key_behavior_feedback_colors.branch_confirm_mode > KEY_FEEDBACK_BRANCH_CONFIRM_NON_BASE_TAPS) {
-        rgb_validation_log_invalid_key_behavior_feedback_branch_confirm_mode((uint8_t)key_behavior_feedback_colors.branch_confirm_mode);
     }
     if (key_behavior_feedback_colors.tap_commit_mode > KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS) {
         rgb_validation_log_invalid_key_behavior_feedback_tap_commit_mode((uint8_t)key_behavior_feedback_colors.tap_commit_mode);

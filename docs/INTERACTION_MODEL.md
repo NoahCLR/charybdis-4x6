@@ -48,21 +48,15 @@ That keymap chooses:
 - `CUSTOM_TAP_HOLD_TERM`
 - `CUSTOM_LONGER_HOLD_TERM`
 - `CUSTOM_MULTI_TAP_TERM`
-- `CUSTOM_RGB_BRANCH_CONFIRM_TERM`
 
 Individual `key_behaviors[]` rows can override those defaults with:
 
 - `.tap_hold_term`
 - `.longer_hold_term`
 - `.multi_tap_term`
-- `.rgb_branch_confirm_term`
-- `.skip_rgb_branch_confirm`
 
 For the scalar timing fields, omission means C zero-initializes the field and a
-value of `0` means "use the default timing for this row." That includes
-`rgb_branch_confirm_term`: omitting it or setting it to `0` uses
-`CUSTOM_RGB_BRANCH_CONFIRM_TERM`. To turn that RGB feedback window off for one
-row, set `.skip_rgb_branch_confirm = true`.
+value of `0` means "use the default timing for this row."
 
 Rows carry one policy flag that is not about timing at all:
 
@@ -80,9 +74,6 @@ In plain terms:
 - crossing the longer-hold term can promote to the longer-hold tier
 - repeated taps must stay within the multi-tap term to remain part of the same
   sequence
-- once a double-tap or higher branch is committed, the RGB branch-confirm term
-  can hold the model in that committed branch before the tap, hold, or long-hold
-  action fires
 
 Foreign-key interruption only cancels the quick tap for true momentary-layer
 taps. Other authored hold families, such as press-registering modifier holds
@@ -101,28 +92,22 @@ but that overlap fact is separate from momentary-layer cancellation. Its job is
 narrower: once an immediate-hold key was actually used in an overlap, release
 must not reopen the key's quick-release tap or first-tap multi-tap path.
 
-One practical consequence is that a single tap on a multi-tap key is delayed by
-one multi-tap window so the firmware can tell whether you meant one tap or
-more. The base single-tap branch skips the branch-confirm feedback window; that
-extra window is only for double-tap and higher committed authored branches when
-the authored RGB config enables it. Inherited normal-tap repeats from branches
-that omit `.tap` can still show branch-confirm when that branch authors another
-tier, but they skip tap-commit feedback.
+One practical consequence is that a tap on a multi-tap key is delayed by one
+multi-tap window so the firmware can tell whether you meant one tap or more. That
+applies at every authored depth, the deepest included: a terminal branch preserves
+the chain on release rather than firing immediately, so every depth waits the same
+window and shows its branch color for the same length of time. Inherited
+normal-tap repeats from branches that omit `.tap` still show the branch color, but
+they skip tap-commit feedback.
 
-Tap actions are release-settled. Reaching a tap-count branch on press selects
-the candidate branch, but `TAP_SENDS(...)` is selected by release or pending
-tap-series expiry, then emitted after any enabled branch-confirm feedback
-window. For terminal tap-only multi-tap branches, this means the final press can
-identify the branch before the action has actually been sent.
+Tap actions are release-settled. Reaching a tap-count branch on press selects the
+candidate branch, but `TAP_SENDS(...)` is selected by release and emitted when the
+pending tap series flushes. For terminal tap-only multi-tap branches, this means
+the final press can identify the branch before the action has actually been sent.
 
-A branch that is settled resolves on release rather than waiting out the rest of
-its multi-tap term. Settled means no deeper authored tap branch can be reached
-and no hold tier on the current branch is still pending, so no further input can
-change the outcome. Base single taps on a multi-tap key are not settled, because
-a further tap can still deepen them, and they keep waiting the full term. The
-branch-confirm window is anchored at the moment the branch actually resolved, so
-resolving early shortens the wait before the action without shortening that
-feedback window.
+Holding is the one thing that resolves early. Crossing a hold threshold enters the
+branch there and then, so the hold tier claims the key without waiting out the
+multi-tap window.
 
 Those pending multi-tap windows are tracked per physical key. Pressing a
 different key does not flush an unrelated pending tap series by itself, so
@@ -146,7 +131,7 @@ custom rows.
 An authored row does not automatically replace everything about a key.
 
 - if `.tap` is omitted for a tap-count branch, that branch keeps the key's
-  normal tap behavior; a quick tap on that branch can still show branch-confirm
+  normal tap behavior; a quick tap on that branch can still show its branch color
   if the branch authors a hold or long-hold tier, but it does not show
   tap-commit feedback
 - `KC_TRNS` inside any authored action helper is transparent for that field:
@@ -300,9 +285,6 @@ Shared semantics:
   tap stays dark: branch 0 needs no color of its own, and one tap does not show
   intent to enter a tap branch. A pending hold tier does not end the color, since
   the branch has not been entered while its action is still deferred
-- double-tap and higher authored branches can open a branch-confirm window that
-  delays the selected action long enough for the branch color to be seen; the
-  branch color covers that whole window, and the authored RGB config can skip it
 - committed authored tap-count branches can pulse once after the tap output
   resolves; the authored RGB config can disable those pulses or limit them to
   double-tap and higher branches
