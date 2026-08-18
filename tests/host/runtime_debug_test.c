@@ -43,6 +43,7 @@ enum {
     TEST_HELD_ACTION_KEY       = NOAH_KEYMAP_SAFE_RANGE + 0x18,
     TEST_THIRD_ACTION          = NOAH_KEYMAP_SAFE_RANGE + 0x19,
     TEST_TRANSPARENT_HOLD_KEY  = NOAH_KEYMAP_SAFE_RANGE + 0x1A,
+    TEST_LONG_HOLD_ONLY_KEY    = NOAH_KEYMAP_SAFE_RANGE + 0x1B,
 };
 
 #define TEST_PROJECTION_FEEDBACK_MARKER UINT16_MAX
@@ -267,6 +268,19 @@ static handled_key_resolution_t test_handled_key_resolution(uint16_t keycode, ui
         } else {
             step = (key_behavior_step_t){
                 .hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_RIGHT_ALT),
+            };
+        }
+    } else if (keycode == TEST_LONG_HOLD_ONLY_KEY) {
+        flags |= HANDLED_KEY_FLAG_MULTI_TAP;
+        authored_tap_depth = 2u;
+        if (tap_count == 1u) {
+            step = (key_behavior_step_t){
+                .tap = TAP_SENDS(TEST_ACTION),
+            };
+            has_more_taps = true;
+        } else {
+            step = (key_behavior_step_t){
+                .long_hold = TAP_AT_HOLD_THRESHOLD(TEST_SECOND_ACTION),
             };
         }
     } else if (keycode == TEST_INTERRUPTED_LAYER_KEY) {
@@ -1688,6 +1702,60 @@ static void test_inherited_terminal_modifier_tap_waits_the_window_without_commit
 
 // A pending hold tier does not change the tap phase: the second tap has already
 // named its branch, and that branch stays named until it is entered.
+
+// A branch that authors only .long_hold has no tap and no hold tier to name, so
+// once the multi-tap window closes there is no action to show. The branch colour
+// has to stay: it is the last true thing about the key until the long-hold
+// threshold replaces it.
+static void test_long_hold_only_branch_keeps_branch_color_until_long_hold(void) {
+    uint8_t             semantic_map[KEY_FEEDBACK_SEMANTIC_MAP_SIZE];
+    uint8_t             tap_branch_map[KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE];
+    const tap_series_t *series;
+    keypos_t            key_pos = test_keypos(6, 4);
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+
+    CHECK(!test_process_record(TEST_LONG_HOLD_ONLY_KEY, key_pos, true));
+    fake_time = (uint16_t)(fake_time + 10u);
+    CHECK(!test_process_record(TEST_LONG_HOLD_ONLY_KEY, key_pos, false));
+    fake_time = (uint16_t)(fake_time + 20u);
+    CHECK(!test_process_record(TEST_LONG_HOLD_ONLY_KEY, key_pos, true));
+
+    series = key_runtime_core_tap_series_at(key_pos);
+    CHECK(series != NULL);
+    CHECK(series->tap_count == 2u);
+
+    key_feedback_semantic_map(semantic_map);
+    key_feedback_tap_branch_map(tap_branch_map);
+    CHECK(key_feedback_semantic_map_get(semantic_map, key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING);
+    CHECK(key_feedback_tap_branch_map_get(tap_branch_map, key_pos) == 2u);
+
+    // Past the multi-tap window and past the tap-vs-hold threshold, still held and
+    // still short of the long-hold term. Nothing has fired and nothing can be
+    // named, so the branch keeps the key.
+    _Static_assert(CUSTOM_TAP_HOLD_TERM < CUSTOM_LONGER_HOLD_TERM, "the gap under test needs a hold threshold below the long-hold one");
+    _Static_assert(CUSTOM_MULTI_TAP_TERM < CUSTOM_LONGER_HOLD_TERM, "the multi-tap window has to close before the long-hold term");
+    fake_time = (uint16_t)(fake_time + CUSTOM_LONGER_HOLD_TERM - 1u);
+    noah_key_runtime_scan();
+
+    CHECK(last_emitted_action == KC_NO);
+    CHECK(delayed_action_count == 0u);
+
+    key_feedback_semantic_map(semantic_map);
+    key_feedback_tap_branch_map(tap_branch_map);
+    CHECK(key_feedback_semantic_map_get(semantic_map, key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING);
+    CHECK(key_feedback_tap_branch_map_get(tap_branch_map, key_pos) == 2u);
+
+    // The long-hold threshold finally gives the light something to replace it with.
+    fake_time = (uint16_t)(fake_time + 2u);
+    noah_key_runtime_scan();
+
+    key_feedback_semantic_map(semantic_map);
+    CHECK(key_feedback_semantic_map_get(semantic_map, key_pos) != KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING);
+    CHECK(key_feedback_semantic_map_get(semantic_map, key_pos) != KEY_FEEDBACK_SEMANTIC_NONE);
+}
+
 static void test_key_feedback_maps_name_the_branch_through_a_pending_hold(void) {
     uint8_t             semantic_map[KEY_FEEDBACK_SEMANTIC_MAP_SIZE];
     uint8_t             tap_branch_map[KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE];
@@ -3246,6 +3314,7 @@ int main(void) {
     test_base_tap_multi_tap_flush_stays_quiet();
     test_inherited_non_base_modifier_tap_flush_has_no_commit_feedback();
     test_inherited_terminal_modifier_tap_waits_the_window_without_commit_feedback();
+    test_long_hold_only_branch_keeps_branch_color_until_long_hold();
     test_key_feedback_maps_name_the_branch_through_a_pending_hold();
     test_key_feedback_maps_name_final_tap_only_branch_until_the_action_fires();
     test_key_feedback_maps_rename_the_branch_on_every_tap();

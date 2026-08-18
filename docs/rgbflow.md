@@ -38,18 +38,22 @@ flowchart TD
 
 Thick arrows are the board advancing on its own. Thin arrows are you tapping.
 
-The branch colour owns the tapping term, and only the tapping term. While the count
-can still change, the branch is the honest answer to what letting go would send, and
-it deliberately outranks the pending tier colours. Once the window closes the count
-is fixed, so the light stops naming the branch and starts naming the action: the one
-that just fired, or the one a release would send now. Each authored threshold you
-cross replaces it.
+The branch colour is the floor of the tap phase. It holds from the tap that selects
+the branch until the series resolves, and anything more specific takes the key from
+it the moment there is something more specific to say: a pending hold tier, the tap
+a release would send, an active hold. Nothing here reads a clock — ordering does the
+work.
 
 That removes what used to be a dead stretch. On a branch that authors `.long_hold`
 but no `.hold` — the triple and quadruple taps on both thumbs — holding past
-`tap_hold_term` changes nothing about the outcome, so the old rule showed nothing
-changing. Now the window closes and the key turns the tap colour, because a release
-really would send that branch's tap, and the long-hold colour replaces it at 400 ms.
+`tap_hold_term` used to change nothing on screen even though a release would send
+that branch's tap. Now the tap colour takes over at the threshold, and the long-hold
+colour replaces it at 400 ms.
+
+Where a branch authors none of those — only `.long_hold`, with no `.tap` and no
+`.hold` — nothing outranks the branch, so the branch colour simply stays until the
+long-hold threshold. Being on that branch is the last true thing about the key, so
+it is what the light keeps saying.
 
 Every authored depth waits the same `multi_tap_term` before its tap fires, the
 deepest one included, so the colour is on screen for the same length of time
