@@ -44,6 +44,7 @@ enum {
     TEST_THIRD_ACTION          = NOAH_KEYMAP_SAFE_RANGE + 0x19,
     TEST_TRANSPARENT_HOLD_KEY  = NOAH_KEYMAP_SAFE_RANGE + 0x1A,
     TEST_LONG_HOLD_ONLY_KEY    = NOAH_KEYMAP_SAFE_RANGE + 0x1B,
+    TEST_SPLIT_TERM_TAP_KEY    = NOAH_KEYMAP_SAFE_RANGE + 0x1C,
 };
 
 #define TEST_PROJECTION_FEEDBACK_MARKER UINT16_MAX
@@ -283,6 +284,24 @@ static handled_key_resolution_t test_handled_key_resolution(uint16_t keycode, ui
                 .long_hold = TAP_AT_HOLD_THRESHOLD(TEST_SECOND_ACTION),
             };
         }
+    } else if (keycode == TEST_SPLIT_TERM_TAP_KEY) {
+        flags |= HANDLED_KEY_FLAG_MULTI_TAP;
+        authored_tap_depth = 3u;
+        if (tap_count == 1u) {
+            step = (key_behavior_step_t){
+                .tap = TAP_SENDS(TEST_ACTION),
+            };
+            has_more_taps = true;
+        } else if (tap_count == 2u) {
+            step = (key_behavior_step_t){
+                .tap = TAP_SENDS(TEST_SECOND_ACTION),
+            };
+            has_more_taps = true;
+        } else {
+            step = (key_behavior_step_t){
+                .tap = TAP_SENDS(TEST_THIRD_ACTION),
+            };
+        }
     } else if (keycode == TEST_INTERRUPTED_LAYER_KEY) {
         flags |= HANDLED_KEY_FLAG_MOMENTARY_LAYER | HANDLED_KEY_FLAG_LAYER_TAP;
         step = (key_behavior_step_t){
@@ -319,9 +338,9 @@ static handled_key_resolution_t test_handled_key_resolution(uint16_t keycode, ui
         .keycode            = keycode,
         .tap_count          = tap_count,
         .step               = step,
-        .tap_hold_term      = keycode == TEST_PENDING_MULTI_TAP_KEY ? 120 : CUSTOM_TAP_HOLD_TERM,
+        .tap_hold_term      = (keycode == TEST_PENDING_MULTI_TAP_KEY || keycode == TEST_SPLIT_TERM_TAP_KEY) ? 120 : CUSTOM_TAP_HOLD_TERM,
         .longer_hold_term   = CUSTOM_LONGER_HOLD_TERM,
-        .multi_tap_term     = keycode == TEST_PENDING_MULTI_TAP_KEY ? 180 : CUSTOM_MULTI_TAP_TERM,
+        .multi_tap_term     = (keycode == TEST_PENDING_MULTI_TAP_KEY || keycode == TEST_SPLIT_TERM_TAP_KEY) ? 180 : CUSTOM_MULTI_TAP_TERM,
         .layer              = layer,
         .pd_mode            = pd_mode_for_keycode(keycode),
         .has_more_taps      = has_more_taps,
@@ -1707,6 +1726,48 @@ static void test_inherited_terminal_modifier_tap_waits_the_window_without_commit
 // once the multi-tap window closes there is no action to show. The branch colour
 // has to stay: it is the last true thing about the key until the long-hold
 // threshold replaces it.
+
+// A .tap-only branch on a row whose accept window (180) outlasts its hold threshold
+// (120). The tap cannot be named at the hold threshold: a further tap can still
+// arrive until the accept window closes and would select a different branch, so
+// naming this branch's tap at 120 would claim an outcome that is not settled.
+static void test_split_term_branch_names_its_tap_at_the_accept_window(void) {
+    uint8_t             semantic_map[KEY_FEEDBACK_SEMANTIC_MAP_SIZE];
+    const tap_series_t *series;
+    keypos_t            key_pos = test_keypos(6, 6);
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+
+    CHECK(!test_process_record(TEST_SPLIT_TERM_TAP_KEY, key_pos, true));
+    fake_time = (uint16_t)(fake_time + 10u);
+    CHECK(!test_process_record(TEST_SPLIT_TERM_TAP_KEY, key_pos, false));
+    fake_time = (uint16_t)(fake_time + 20u);
+    CHECK(!test_process_record(TEST_SPLIT_TERM_TAP_KEY, key_pos, true));
+
+    series = key_runtime_core_tap_series_at(key_pos);
+    CHECK(series != NULL);
+    CHECK(series->tap_count == 2u);
+    CHECK(series->tap_hold_term_ms == 120u);
+    CHECK(series->tap_term_ms == 180u);
+
+    // Held past the hold threshold but inside the accept window: still the branch,
+    // because a third tap could still land and rename it.
+    fake_time = (uint16_t)(fake_time + 130u);
+    noah_key_runtime_scan();
+
+    key_feedback_semantic_map(semantic_map);
+    CHECK(key_feedback_semantic_map_get(semantic_map, key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING);
+
+    // Past the accept window: the count is fixed, so the tap is what a release
+    // sends and the light says so.
+    fake_time = (uint16_t)(fake_time + 60u);
+    noah_key_runtime_scan();
+
+    key_feedback_semantic_map(semantic_map);
+    CHECK(key_feedback_semantic_map_get(semantic_map, key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_COMMITTED);
+}
+
 static void test_long_hold_only_branch_keeps_branch_color_until_long_hold(void) {
     uint8_t             semantic_map[KEY_FEEDBACK_SEMANTIC_MAP_SIZE];
     uint8_t             tap_branch_map[KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE];
@@ -3314,6 +3375,7 @@ int main(void) {
     test_base_tap_multi_tap_flush_stays_quiet();
     test_inherited_non_base_modifier_tap_flush_has_no_commit_feedback();
     test_inherited_terminal_modifier_tap_waits_the_window_without_commit_feedback();
+    test_split_term_branch_names_its_tap_at_the_accept_window();
     test_long_hold_only_branch_keeps_branch_color_until_long_hold();
     test_key_feedback_maps_name_the_branch_through_a_pending_hold();
     test_key_feedback_maps_name_final_tap_only_branch_until_the_action_fires();

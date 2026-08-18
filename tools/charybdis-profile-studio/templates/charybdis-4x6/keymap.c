@@ -270,8 +270,8 @@ enum keymap_custom_keycodes {
 //     as nothing more specific applies; another tap just renames it. Single taps
 //     stay quiet. Any action state replaces it: a pending hold tier, the tap a
 //     release would send, an active hold. So a branch with no .hold shows its tap
-//     color past .tap_hold_term, and a branch authoring only .long_hold keeps the
-//     branch color until .longer_hold_term because it has nothing else to name
+//     color once .multi_tap_term has run out, and a branch authoring no .tap keeps
+//     the branch color until its hold threshold because it has nothing else to name
 //   - an authored .hold tier can show hold-tier feedback while pending/active
 //   - an authored .long_hold tier can show longer-hold-tier feedback when it
 //     commits or stays active

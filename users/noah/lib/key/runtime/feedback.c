@@ -414,19 +414,27 @@ static key_feedback_semantic_t key_feedback_semantic_for_token(const press_token
         return KEY_FEEDBACK_SEMANTIC_HOLD_PENDING;
     }
 
-    // Past the tap-vs-hold threshold on a branch that authors no hold tier there,
-    // a release still sends this branch's tap, so name it. That keeps the stretch
+    // Once the count can no longer change, a release on a branch that authors no
+    // hold tier still sends this branch's tap, so name it. That keeps the stretch
     // before a long-hold threshold from reading as a dead window, and matches what
     // the same color means once the tap actually fires.
+    //
+    // The boundary is multi_tap_term, not tap_hold_term. A branch with no hold tier
+    // has no tap-vs-hold decision for tap_hold_term to describe, and on a row whose
+    // multi_tap_term is the longer of the two, naming the tap at the hold threshold
+    // would claim this branch's outcome while a further tap could still change which
+    // branch is selected. pressed_at is the anchor because last_tap_at is stamped at
+    // this press and is not restamped while the key is held, so this is the engine's
+    // own accept window rather than a second one.
     //
     // Deliberately not gated on allows_tap_release. That predicate admits only
     // TAP_WINDOW and PRESS_HELD_WINDOW, and a branch with nothing after its tap has
     // no hold path to traverse, so its slot reaches HOLD_COMPLETE at the press --
     // which made the green depend on whether a deeper tier happened to exist, a
-    // phase side effect rather than anything about the outcome. The three
-    // conditions below establish the fact on their own, and !hold.present is what
-    // keeps a hold tier that fired at its threshold from being named a tap.
-    if (!token->interaction.binding.hold.present && token->interaction.selection.step.tap.present && timer_elapsed(token->pressed_at) >= token->interaction.binding.tap_hold_term) {
+    // phase side effect rather than anything about the outcome. The conditions below
+    // establish the fact on their own, and !hold.present is what keeps a hold tier
+    // that fired at its threshold from being named a tap.
+    if (!token->interaction.binding.hold.present && token->interaction.selection.step.tap.present && timer_elapsed(token->pressed_at) >= token->interaction.binding.multi_tap_term) {
         return KEY_FEEDBACK_SEMANTIC_TAP_COMMITTED;
     }
 

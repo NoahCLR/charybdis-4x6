@@ -290,9 +290,9 @@ Shared semantics:
 - every tap past the base one shows the color of the branch it reaches, for as
   as long as nothing more specific applies. Any action state replaces it: a pending
   hold tier, the tap a release would send, an active hold. A branch that authors a
-  `.tap` and no `.hold` therefore shows its tap color while held past
-  `tap_hold_term`, whether or not it also authors a `.long_hold`; a branch with no
-  `.tap` at all keeps the branch color until its hold threshold arrives. Another tap simply renames the branch. The base
+  `.tap` and no `.hold` therefore shows its tap color once its multi-tap window has
+  closed, whether or not it also authors a `.long_hold`; a branch with no `.tap` at
+  all keeps the branch color until its hold threshold arrives. Another tap simply renames the branch. The base
   tap stays dark: branch 0 needs no color of its own, and one tap does not show
   intent to enter a tap branch. A pending hold tier does not end the color, since
   the branch has not been entered while its action is still deferred

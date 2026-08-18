@@ -45,8 +45,9 @@ a release would send, an active hold. Nothing here reads a clock — ordering do
 work.
 
 That removes what used to be a dead stretch. Any branch that authors a `.tap` and
-no `.hold` turns the tap colour at `tap_hold_term`, because a release really would
-send that tap: the `.long_hold`-carrying triple and quadruple taps on both thumbs,
+no `.hold` turns the tap colour once its multi-tap window closes, because from that
+point a release really would send that tap and no further tap can change which branch
+is selected: the `.long_hold`-carrying triple and quadruple taps on both thumbs,
 and equally the many `.tap`-only branches like `G(KC_C)`. The long-hold colour
 replaces it at its own threshold where one is authored.
 
