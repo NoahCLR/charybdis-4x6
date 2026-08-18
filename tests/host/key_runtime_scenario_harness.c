@@ -204,8 +204,9 @@ void key_runtime_scenario_add_pending_multi_tap_behavior(key_behavior_view_t beh
 void key_runtime_scenario_add_pending_multi_tap_chain(uint16_t keycode, key_behavior_step_t single, const key_runtime_scenario_multi_tap_entry_t *entries, uint8_t entry_count) {
     key_behavior_view_t behavior = key_runtime_scenario_pressable_handled_key(keycode);
 
-    behavior.has_multi_tap = true;
-    behavior.single        = single;
+    behavior.has_multi_tap      = true;
+    behavior.authored_tap_depth = entry_count > 0u ? (uint8_t)entries[entry_count - 1u].tap_count : 2u;
+    behavior.single             = single;
     key_runtime_scenario_add_pending_multi_tap_behavior(behavior, entries, entry_count);
 }
 

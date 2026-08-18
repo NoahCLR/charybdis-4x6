@@ -176,12 +176,13 @@ void pointer_layer_policy_note_action(uint16_t action, bool pressed) {
 
 key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
     return (key_behavior_view_t){
-        .keycode          = keycode,
-        .handled          = true,
-        .has_multi_tap    = keycode == TEST_MULTI_TAP_KEY,
-        .tap_hold_term    = keycode == TEST_MULTI_TAP_KEY ? 120 : 0,
-        .longer_hold_term = keycode == TEST_MULTI_TAP_KEY ? 240 : 0,
-        .multi_tap_term   = keycode == TEST_MULTI_TAP_KEY ? 150 : 0,
+        .keycode            = keycode,
+        .handled            = true,
+        .has_multi_tap      = keycode == TEST_MULTI_TAP_KEY,
+        .authored_tap_depth = keycode == TEST_MULTI_TAP_KEY ? 3u : 1u,
+        .tap_hold_term      = keycode == TEST_MULTI_TAP_KEY ? 120 : 0,
+        .longer_hold_term   = keycode == TEST_MULTI_TAP_KEY ? 240 : 0,
+        .multi_tap_term     = keycode == TEST_MULTI_TAP_KEY ? 150 : 0,
     };
 }
 

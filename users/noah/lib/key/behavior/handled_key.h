@@ -23,6 +23,7 @@ typedef struct {
     uint8_t             layer;
     pd_mode_mask_t      pd_mode;
     bool                has_more_taps;
+    uint8_t             authored_tap_depth;
     uint16_t            flags;
 } handled_key_resolution_t;
 

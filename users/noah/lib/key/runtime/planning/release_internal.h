@@ -67,7 +67,7 @@ typedef struct {
     uint16_t tap_hold_term;
     uint16_t multi_tap_term;
     bool     has_more_taps;
-    bool     authored_has_more_taps;
+    uint8_t  authored_tap_depth;
 } key_runtime_core_pending_multi_tap_seed_t;
 
 typedef struct {

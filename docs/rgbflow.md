@@ -50,7 +50,10 @@ it should: crossing `tap_hold_term` enters the branch, so the hold tier takes ov
 there and then.
 
 The base tap stays dark on purpose. One tap does not show that you meant to enter
-a tap branch at all, and a colour on every keystroke would be noise.
+a tap branch at all, and a colour on every keystroke would be noise. The tap index
+cycles, so a fifth tap on a four-branch row lands back on the base branch and the
+key goes dark again mid-gesture — that is the same statement as the first tap: the
+branch now selected has no colour of its own.
 
 ## Part one and a half: which tier you enter
 

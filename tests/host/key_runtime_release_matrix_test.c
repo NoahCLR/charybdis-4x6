@@ -144,8 +144,9 @@ static void test_configure_tap_release_key(uint16_t keycode, uint16_t tap_action
 static void test_configure_multi_tap_tap_key(uint16_t keycode, uint16_t tap_action) {
     key_behavior_view_t behavior = test_pressable_handled_key(keycode);
 
-    behavior.has_multi_tap = true;
-    behavior.single.tap    = (tap_behavior_t)TAP_SENDS(tap_action);
+    behavior.has_multi_tap      = true;
+    behavior.authored_tap_depth = 2u;
+    behavior.single.tap         = (tap_behavior_t)TAP_SENDS(tap_action);
     key_runtime_scenario_add_behavior_view(behavior);
 }
 
@@ -195,8 +196,9 @@ static void test_configure_pending_multi_tap_release_key(uint16_t second_tap_act
 
     key_behavior_view_t behavior = test_pressable_handled_key(TEST_MULTI_TAP_KEY);
 
-    behavior.has_multi_tap = true;
-    behavior.single.tap    = tap_behavior_none();
+    behavior.has_multi_tap      = true;
+    behavior.authored_tap_depth = entry_count > 0u ? (uint8_t)entries[entry_count - 1u].tap_count : 2u;
+    behavior.single.tap         = tap_behavior_none();
     key_runtime_scenario_add_pending_multi_tap_behavior(behavior, entries, entry_count);
 }
 

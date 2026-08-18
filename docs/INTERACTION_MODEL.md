@@ -109,6 +109,13 @@ Holding is the one thing that resolves early. Crossing a hold threshold enters t
 branch there and then, so the hold tier claims the key without waiting out the
 multi-tap window.
 
+The tap index cycles through the authored branches rather than ending the gesture
+at the deepest one. A row with four branches answers a fifth tap with branch one
+again and a sixth with branch two, so a run of taps of any length resolves to
+exactly one action. The consequence is that tapping cannot repeat an action inside
+one multi-tap window: to send the same branch twice you have to let the window
+close between them.
+
 Those pending multi-tap windows are tracked per physical key. Pressing a
 different key does not flush an unrelated pending tap series by itself, so
 independent keys can keep separate tap counts and timing windows alive at the

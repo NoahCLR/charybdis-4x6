@@ -80,8 +80,9 @@ static void test_configure_multi_tap_key(void) {
 
     key_behavior_view_t behavior = test_pressable_handled_key(TEST_MULTI_TAP_KEY);
 
-    behavior.has_multi_tap = true;
-    behavior.single.tap    = (tap_behavior_t)TAP_SENDS(TEST_TAP_ACTION);
+    behavior.has_multi_tap      = true;
+    behavior.authored_tap_depth = (uint8_t)entries[ARRAY_SIZE(entries) - 1u].tap_count;
+    behavior.single.tap         = (tap_behavior_t)TAP_SENDS(TEST_TAP_ACTION);
     key_runtime_scenario_add_pending_multi_tap_behavior(behavior, entries, ARRAY_SIZE(entries));
 }
 
@@ -98,8 +99,9 @@ static void test_configure_multi_tap_key_two(void) {
 
     key_behavior_view_t behavior = test_pressable_handled_key(TEST_MULTI_TAP_KEY_TWO);
 
-    behavior.has_multi_tap = true;
-    behavior.single.tap    = (tap_behavior_t)TAP_SENDS(TEST_TAP_ACTION_TWO);
+    behavior.has_multi_tap      = true;
+    behavior.authored_tap_depth = (uint8_t)entries[ARRAY_SIZE(entries) - 1u].tap_count;
+    behavior.single.tap         = (tap_behavior_t)TAP_SENDS(TEST_TAP_ACTION_TWO);
     key_runtime_scenario_add_pending_multi_tap_behavior(behavior, entries, ARRAY_SIZE(entries));
 }
 
@@ -117,9 +119,10 @@ static void test_configure_multi_tap_lock_key(uint16_t layer_lock_action) {
 
     key_behavior_view_t behavior = test_pressable_handled_key(TEST_MULTI_TAP_KEY);
 
-    behavior.has_multi_tap = true;
-    behavior.single.tap    = (tap_behavior_t)TAP_SENDS(LOCK_LAYER(TEST_OTHER_LAYER));
-    behavior.single.hold   = (hold_behavior_t)PRESS_AND_HOLD_UNTIL_RELEASE(MO(TEST_OTHER_LAYER));
+    behavior.has_multi_tap      = true;
+    behavior.authored_tap_depth = (uint8_t)entries[ARRAY_SIZE(entries) - 1u].tap_count;
+    behavior.single.tap         = (tap_behavior_t)TAP_SENDS(LOCK_LAYER(TEST_OTHER_LAYER));
+    behavior.single.hold        = (hold_behavior_t)PRESS_AND_HOLD_UNTIL_RELEASE(MO(TEST_OTHER_LAYER));
     key_runtime_scenario_add_pending_multi_tap_behavior(behavior, entries, ARRAY_SIZE(entries));
 }
 
@@ -138,8 +141,9 @@ static void test_configure_multi_tap_hold_key(hold_behavior_t hold, hold_behavio
 
     key_behavior_view_t behavior = test_pressable_handled_key(TEST_MULTI_TAP_KEY);
 
-    behavior.has_multi_tap = true;
-    behavior.single.tap    = (tap_behavior_t)TAP_SENDS(TEST_TAP_ACTION);
+    behavior.has_multi_tap      = true;
+    behavior.authored_tap_depth = (uint8_t)entries[ARRAY_SIZE(entries) - 1u].tap_count;
+    behavior.single.tap         = (tap_behavior_t)TAP_SENDS(TEST_TAP_ACTION);
     key_runtime_scenario_add_pending_multi_tap_behavior(behavior, entries, ARRAY_SIZE(entries));
 }
 
@@ -262,13 +266,18 @@ static void test_non_base_release_resolved_tap_commit_feedback_still_pulses(void
     test_check_feedback_pulse(1, KEY_FEEDBACK_PULSE_TAP_COMMITTED, 2, 3, 0);
 }
 
-static void test_terminal_tap_branch_does_not_accept_undefined_higher_branch(void) {
+// A third tap on a two-branch row wraps back to the base branch instead of firing
+// the second branch and starting a partial gesture, so one run of taps resolves to
+// exactly one action.
+static void test_tap_index_wraps_past_the_deepest_authored_branch(void) {
     static const key_runtime_scenario_step_t first_two_taps[] = {
         KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 2, 2), KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 2, 2), KEY_RUNTIME_SCENARIO_ADVANCE(40), KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 2, 2), KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 2, 2),
     };
-    static const key_runtime_scenario_step_t third_tap[] = {
+    static const key_runtime_scenario_step_t third_press_only[] = {
         KEY_RUNTIME_SCENARIO_ADVANCE(40),
         KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 2, 2),
+    };
+    static const key_runtime_scenario_step_t third_release_only[] = {
         KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 2, 2),
     };
     const keypos_t key_pos = test_keypos(2, 2);
@@ -282,19 +291,19 @@ static void test_terminal_tap_branch_does_not_accept_undefined_higher_branch(voi
     CHECK(noah_runtime_debug_slot_pending_multi_tap_count(key_pos) == 2u);
 
     key_runtime_scenario_clear_effects();
-    key_runtime_scenario_run(third_tap, ARRAY_SIZE(third_tap));
+    key_runtime_scenario_run(third_press_only, ARRAY_SIZE(third_press_only));
+    key_runtime_scenario_run(third_release_only, ARRAY_SIZE(third_release_only));
 
-    CHECK(key_runtime_scenario_effect_count() == 2);
-    CHECK(key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
-    CHECK(key_runtime_scenario_effect_at(0)->data.delayed_action.action == TEST_ALT_ACTION);
-    CHECK(key_runtime_effect_delayed_action_key_pos(key_runtime_scenario_effect_at(0)).row == 2);
-    CHECK(key_runtime_effect_delayed_action_key_pos(key_runtime_scenario_effect_at(0)).col == 2);
-    test_check_feedback_pulse(1, KEY_FEEDBACK_PULSE_TAP_COMMITTED, 2, 2, 0);
+    // Nothing fires on the third tap: the series stays alive on the wrapped base
+    // branch and resolves once, at the flush.
+    CHECK(key_runtime_scenario_effect_count() == 0);
     CHECK(key_runtime_scenario_slot_has_pending_multi_tap(key_pos));
     CHECK(noah_runtime_debug_slot_pending_multi_tap_count(key_pos) == 1u);
 }
 
-static void test_same_key_terminal_tap_interruption_defers_previous_branch_action(void) {
+// There is no interruption to defer any more: a third press on a two-branch row
+// wraps the index rather than ending the gesture, so nothing is held over.
+static void test_same_key_wrapped_tap_does_not_defer_a_previous_branch_action(void) {
     static const key_runtime_scenario_step_t first_two_taps[] = {
         KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 2, 1), KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 2, 1), KEY_RUNTIME_SCENARIO_ADVANCE(40), KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 2, 1), KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 2, 1),
     };
@@ -322,18 +331,12 @@ static void test_same_key_terminal_tap_interruption_defers_previous_branch_actio
     key_runtime_scenario_run(third_press, ARRAY_SIZE(third_press));
 
     CHECK(key_runtime_scenario_effect_count() == 0);
-    CHECK(noah_runtime_debug_deferred_release_count() == 1u);
-    CHECK(noah_runtime_debug_deferred_release_action(0) == TEST_ALT_ACTION);
+    CHECK(noah_runtime_debug_deferred_release_count() == 0u);
     CHECK(key_runtime_scenario_slot_owner_keycode(key_pos) == TEST_MULTI_TAP_KEY);
 
     key_runtime_scenario_run(third_release, ARRAY_SIZE(third_release));
 
-    CHECK(key_runtime_scenario_effect_count() == 2);
-    CHECK(key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
-    CHECK(key_runtime_scenario_effect_at(0)->data.delayed_action.action == TEST_ALT_ACTION);
-    CHECK(key_runtime_effect_delayed_action_key_pos(key_runtime_scenario_effect_at(0)).row == 2);
-    CHECK(key_runtime_effect_delayed_action_key_pos(key_runtime_scenario_effect_at(0)).col == 1);
-    test_check_feedback_pulse(1, KEY_FEEDBACK_PULSE_TAP_COMMITTED, 2, 1, 0);
+    CHECK(key_runtime_scenario_effect_count() == 0);
     CHECK(noah_runtime_debug_deferred_release_count() == 0u);
     CHECK(key_runtime_scenario_slot_has_pending_multi_tap(key_pos));
     CHECK(noah_runtime_debug_slot_pending_multi_tap_count(key_pos) == 1u);
@@ -826,8 +829,8 @@ int main(void) {
     test_base_tap_commit_feedback_can_be_suppressed();
     test_non_base_tap_commit_feedback_still_pulses();
     test_non_base_release_resolved_tap_commit_feedback_still_pulses();
-    test_terminal_tap_branch_does_not_accept_undefined_higher_branch();
-    test_same_key_terminal_tap_interruption_defers_previous_branch_action();
+    test_tap_index_wraps_past_the_deepest_authored_branch();
+    test_same_key_wrapped_tap_does_not_defer_a_previous_branch_action();
     test_momentary_layer_key_tracks_press_and_release_events();
     test_threshold_hold_registers_and_releases_owned_state();
     test_replaced_press_token_still_releases_owned_state();

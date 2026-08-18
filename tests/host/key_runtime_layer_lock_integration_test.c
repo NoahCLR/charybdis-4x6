@@ -180,12 +180,13 @@ void layer_off(uint8_t layer) {
 key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
     if (keycode == TEST_MULTI_TAP_KEY) {
         return (key_behavior_view_t){
-            .keycode          = keycode,
-            .handled          = true,
-            .has_multi_tap    = true,
-            .tap_hold_term    = 150,
-            .longer_hold_term = 350,
-            .multi_tap_term   = 120,
+            .keycode            = keycode,
+            .handled            = true,
+            .has_multi_tap      = true,
+            .authored_tap_depth = 2u,
+            .tap_hold_term      = 150,
+            .longer_hold_term   = 350,
+            .multi_tap_term     = 120,
             .single =
                 {
                     .tap  = TAP_SENDS(LOCK_LAYER(TEST_OTHER_LAYER)),

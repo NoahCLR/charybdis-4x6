@@ -280,7 +280,7 @@ bool key_runtime_core_plan_active_release_effects(keypos_t key_pos, uint16_t key
                         .tap_hold_term                = resolution->interaction->binding.tap_hold_term,
                         .multi_tap_term               = resolution->interaction->binding.multi_tap_term,
                         .has_more_taps                = resolution->interaction->binding.has_more_taps,
-                        .authored_has_more_taps       = resolution->interaction->binding.authored_has_more_taps,
+                        .authored_tap_depth           = resolution->interaction->binding.authored_tap_depth,
                     };
                     return true;
                 case KEY_RUNTIME_RELEASE_TAP_OUTCOME_DISPATCH_ACTION:

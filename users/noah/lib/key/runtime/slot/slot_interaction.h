@@ -25,7 +25,7 @@ typedef struct {
     uint16_t        longer_hold_term;
     uint16_t        multi_tap_term;
     bool            has_more_taps;
-    bool            authored_has_more_taps;
+    uint8_t         authored_tap_depth;
     bool            tap_resolves_on_press;
 } key_runtime_slot_binding_t;
 
@@ -81,16 +81,16 @@ static inline void key_runtime_slot_interaction_from_materialized_into(const han
             },
         .binding =
             {
-                .tap_action             = materialized->tap_action,
-                .tap_repeat_count       = materialized->tap_repeat_count,
-                .hold                   = materialized->hold,
-                .long_hold              = materialized->long_hold,
-                .tap_hold_term          = materialized->authored.tap_hold_term,
-                .longer_hold_term       = materialized->authored.longer_hold_term,
-                .multi_tap_term         = materialized->authored.multi_tap_term,
-                .has_more_taps          = materialized->tap_has_more_taps,
-                .authored_has_more_taps = materialized->authored.has_more_taps,
-                .tap_resolves_on_press  = materialized->tap_resolves_on_press,
+                .tap_action            = materialized->tap_action,
+                .tap_repeat_count      = materialized->tap_repeat_count,
+                .hold                  = materialized->hold,
+                .long_hold             = materialized->long_hold,
+                .tap_hold_term         = materialized->authored.tap_hold_term,
+                .longer_hold_term      = materialized->authored.longer_hold_term,
+                .multi_tap_term        = materialized->authored.multi_tap_term,
+                .has_more_taps         = materialized->tap_has_more_taps,
+                .authored_tap_depth    = materialized->authored.authored_tap_depth,
+                .tap_resolves_on_press = materialized->tap_resolves_on_press,
             },
         .hold_strategy = materialized->hold_strategy,
         .layer         = materialized->layer,

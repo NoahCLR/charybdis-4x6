@@ -127,14 +127,18 @@ typedef struct {
     // The selected branch has been entered: its action was dispatched or its hold
     // path took the key over. A resolved series accepts no further taps and shows
     // no branch color.
-    bool                 resolved;
-    uint16_t             single_action;
-    uint16_t             tap_action;
-    uint8_t              tap_repeat_count;
-    bool                 tap_branch_has_authored_step;
-    bool                 tap_branch_has_authored_tap;
-    bool                 has_more_taps;
-    bool                 authored_has_more_taps;
+    bool     resolved;
+    uint16_t single_action;
+    uint16_t tap_action;
+    uint8_t  tap_repeat_count;
+    bool     tap_branch_has_authored_step;
+    bool     tap_branch_has_authored_tap;
+    bool     has_more_taps;
+    uint8_t  authored_tap_depth;
+    // Set once the tap index has cycled past the deepest authored branch. A
+    // wrapped series sits on branch one again, so tap_count alone can no longer
+    // tell an ongoing gesture from a first tap.
+    bool                 wrapped;
     hold_behavior_t      hold;
     hold_behavior_t      long_hold;
     uint16_t             tap_hold_term_ms;

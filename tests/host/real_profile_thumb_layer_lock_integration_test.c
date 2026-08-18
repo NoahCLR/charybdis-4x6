@@ -1537,9 +1537,11 @@ static void test_pointer_pinch_double_tap_salvos_queue_zoom_chord_cleanly(void) 
     }
 }
 
-static void test_pointer_terminal_double_tap_action_defers_on_exact_third_press(uint16_t keycode, uint16_t expected_action) {
+// A third press on a two-branch pointer key wraps the tap index back to the base
+// branch instead of ending the gesture, so nothing is deferred and nothing is sent
+// twice. The series simply carries on at count one.
+static void test_pointer_terminal_double_tap_wraps_on_exact_third_press(uint16_t keycode) {
     keypos_t key_pos;
-    keypos_t deferred_key_pos;
 
     key_pos = test_find_keypos_on_layer(LAYER_POINTER, keycode);
     CHECK(test_keypos_valid(key_pos));
@@ -1557,33 +1559,33 @@ static void test_pointer_terminal_double_tap_action_defers_on_exact_third_press(
 
     CHECK(test_tap_code16_count == 0);
     CHECK(test_delayed_action_count == 0);
-    CHECK(noah_runtime_debug_deferred_release_count() == 1u);
-    CHECK(noah_runtime_debug_deferred_release_action(0u) == expected_action);
-    CHECK(noah_runtime_debug_deferred_release_key_pos(0u, &deferred_key_pos));
-    CHECK(test_keypos_equal(deferred_key_pos, key_pos));
+    CHECK(noah_runtime_debug_deferred_release_count() == 0u);
+    CHECK(noah_runtime_debug_slot_pending_multi_tap_count(key_pos) == 1u);
     CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == keycode);
 
     key_runtime_integration_scan();
 
     CHECK(test_delayed_action_count == 0);
-    CHECK(noah_runtime_debug_deferred_release_count() == 1u);
+    CHECK(noah_runtime_debug_deferred_release_count() == 0u);
 
     test_release_resolved(key_pos);
 
-    CHECK(test_delayed_action_count == 1);
-    CHECK(test_last_delayed_action == expected_action);
-    CHECK(noah_runtime_debug_deferred_release_count() == 0);
+    CHECK(noah_runtime_debug_deferred_release_count() == 0u);
+    CHECK(noah_runtime_debug_slot_has_pending_multi_tap(key_pos));
+
+    test_flush_pending_tap_branch();
+
     CHECK(pd_mode_local_active_snapshot() == 0);
     CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == KC_NO);
     CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == KC_NO);
 }
 
 static void test_pointer_pinch_exact_third_tap_defers_zoom_chord_until_release(void) {
-    test_pointer_terminal_double_tap_action_defers_on_exact_third_press(PINCH_MODE, VIA_MACRO_6);
+    test_pointer_terminal_double_tap_wraps_on_exact_third_press(PINCH_MODE);
 }
 
 static void test_pointer_volume_exact_third_tap_defers_mute_until_release(void) {
-    test_pointer_terminal_double_tap_action_defers_on_exact_third_press(VOLUME_MODE, KC_MUTE);
+    test_pointer_terminal_double_tap_wraps_on_exact_third_press(VOLUME_MODE);
 }
 
 // DRAG_WINDOW is a keymap-local keycode, so find it the way its own tap tier

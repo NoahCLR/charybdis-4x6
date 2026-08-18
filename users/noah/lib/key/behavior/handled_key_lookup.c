@@ -14,16 +14,17 @@ void handled_key_lookup_tap_count_into(uint16_t keycode, uint8_t tap_count, hand
     bool                more     = key_behavior_view_has_more_taps(&behavior, tap_count);
 
     *out = (handled_key_resolution_t){
-        .keycode          = keycode,
-        .tap_count        = tap_count,
-        .step             = step,
-        .tap_hold_term    = behavior.tap_hold_term,
-        .longer_hold_term = behavior.longer_hold_term,
-        .multi_tap_term   = behavior.multi_tap_term,
-        .layer            = behavior.is_momentary_layer ? behavior_get_layer(behavior.keycode) : UINT8_MAX,
-        .pd_mode          = handled_key_pd_mode_for_behavior(behavior),
-        .has_more_taps    = more,
-        .flags            = handled_key_flags_from_behavior(behavior),
+        .keycode            = keycode,
+        .tap_count          = tap_count,
+        .step               = step,
+        .tap_hold_term      = behavior.tap_hold_term,
+        .longer_hold_term   = behavior.longer_hold_term,
+        .multi_tap_term     = behavior.multi_tap_term,
+        .layer              = behavior.is_momentary_layer ? behavior_get_layer(behavior.keycode) : UINT8_MAX,
+        .pd_mode            = handled_key_pd_mode_for_behavior(behavior),
+        .has_more_taps      = more,
+        .authored_tap_depth = behavior.authored_tap_depth,
+        .flags              = handled_key_flags_from_behavior(behavior),
     };
 }
 

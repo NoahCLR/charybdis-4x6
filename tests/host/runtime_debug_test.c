@@ -211,9 +211,12 @@ static handled_key_resolution_t test_handled_key_resolution(uint16_t keycode, ui
     };
     uint8_t layer         = UINT8_MAX;
     bool    has_more_taps = false;
+    // Branch count for this fake row; the runtime wraps the tap index through it.
+    uint8_t authored_tap_depth = 1u;
 
     if (keycode == TEST_PENDING_MULTI_TAP_KEY) {
         flags |= HANDLED_KEY_FLAG_MULTI_TAP;
+        authored_tap_depth = 2u;
         if (tap_count == 1u) {
             step = (key_behavior_step_t){
                 .tap = TAP_SENDS(TEST_ACTION),
@@ -228,6 +231,7 @@ static handled_key_resolution_t test_handled_key_resolution(uint16_t keycode, ui
         }
     } else if (keycode == TEST_FINAL_TAP_ONLY_KEY) {
         flags |= HANDLED_KEY_FLAG_MULTI_TAP;
+        authored_tap_depth = 2u;
         if (tap_count == 1u) {
             step = (key_behavior_step_t){
                 .tap = TAP_SENDS(TEST_ACTION),
@@ -240,6 +244,7 @@ static handled_key_resolution_t test_handled_key_resolution(uint16_t keycode, ui
         }
     } else if (keycode == KC_LEFT_GUI) {
         flags |= HANDLED_KEY_FLAG_MULTI_TAP;
+        authored_tap_depth = 3u;
         if (tap_count == 1u) {
             step          = key_behavior_step_none();
             has_more_taps = true;
@@ -255,6 +260,7 @@ static handled_key_resolution_t test_handled_key_resolution(uint16_t keycode, ui
         }
     } else if (keycode == KC_RIGHT_GUI) {
         flags |= HANDLED_KEY_FLAG_MULTI_TAP;
+        authored_tap_depth = 2u;
         if (tap_count == 1u) {
             step          = key_behavior_step_none();
             has_more_taps = true;
@@ -281,7 +287,8 @@ static handled_key_resolution_t test_handled_key_resolution(uint16_t keycode, ui
         };
     } else if (keycode == TEST_PENDING_RELEASE_KEY) {
         flags |= HANDLED_KEY_FLAG_MULTI_TAP;
-        step = (key_behavior_step_t){
+        authored_tap_depth = 2u;
+        step               = (key_behavior_step_t){
             .hold = TAP_ON_RELEASE_AFTER_HOLD(TEST_ACTION),
         };
     } else if (keycode == TEST_HELD_ACTION_KEY) {
@@ -295,16 +302,17 @@ static handled_key_resolution_t test_handled_key_resolution(uint16_t keycode, ui
     }
 
     return (handled_key_resolution_t){
-        .keycode          = keycode,
-        .tap_count        = tap_count,
-        .step             = step,
-        .tap_hold_term    = keycode == TEST_PENDING_MULTI_TAP_KEY ? 120 : CUSTOM_TAP_HOLD_TERM,
-        .longer_hold_term = CUSTOM_LONGER_HOLD_TERM,
-        .multi_tap_term   = keycode == TEST_PENDING_MULTI_TAP_KEY ? 180 : CUSTOM_MULTI_TAP_TERM,
-        .layer            = layer,
-        .pd_mode          = pd_mode_for_keycode(keycode),
-        .has_more_taps    = has_more_taps,
-        .flags            = flags,
+        .keycode            = keycode,
+        .tap_count          = tap_count,
+        .step               = step,
+        .tap_hold_term      = keycode == TEST_PENDING_MULTI_TAP_KEY ? 120 : CUSTOM_TAP_HOLD_TERM,
+        .longer_hold_term   = CUSTOM_LONGER_HOLD_TERM,
+        .multi_tap_term     = keycode == TEST_PENDING_MULTI_TAP_KEY ? 180 : CUSTOM_MULTI_TAP_TERM,
+        .layer              = layer,
+        .pd_mode            = pd_mode_for_keycode(keycode),
+        .has_more_taps      = has_more_taps,
+        .authored_tap_depth = authored_tap_depth,
+        .flags              = flags,
     };
 }
 
@@ -1700,7 +1708,7 @@ static void test_key_feedback_maps_name_the_branch_through_a_pending_hold(void) 
     CHECK(series->active);
     CHECK(series->pending_hold);
     CHECK(series->tap_count == 2u);
-    CHECK(!series->authored_has_more_taps);
+    CHECK(series->authored_tap_depth == series->tap_count);
 
     key_feedback_semantic_map(semantic_map);
     key_feedback_tap_branch_map(tap_branch_map);
@@ -1731,7 +1739,7 @@ static void test_key_feedback_maps_name_final_tap_only_branch_until_the_action_f
     CHECK(series->active);
     CHECK(!series->pending_hold);
     CHECK(series->tap_count == 2u);
-    CHECK(!series->authored_has_more_taps);
+    CHECK(series->authored_tap_depth == series->tap_count);
     CHECK(last_emitted_action == KC_NO);
     CHECK(last_delayed_action == KC_NO);
 
@@ -1800,7 +1808,7 @@ static void test_key_feedback_maps_rename_the_branch_on_every_tap(void) {
     CHECK(series != NULL);
     CHECK(series->active);
     CHECK(series->tap_count == 1u);
-    CHECK(series->authored_has_more_taps);
+    CHECK(series->authored_tap_depth > series->tap_count);
 
     // Base tap: intent to enter a tap branch is not established yet.
     key_feedback_semantic_map(semantic_map);
@@ -1815,7 +1823,7 @@ static void test_key_feedback_maps_rename_the_branch_on_every_tap(void) {
     CHECK(series != NULL);
     CHECK(series->active);
     CHECK(series->tap_count == 2u);
-    CHECK(series->authored_has_more_taps);
+    CHECK(series->authored_tap_depth > series->tap_count);
 
     // Second tap names branch 2, with a deeper branch still reachable.
     key_feedback_semantic_map(semantic_map);
@@ -1830,7 +1838,7 @@ static void test_key_feedback_maps_rename_the_branch_on_every_tap(void) {
     CHECK(series != NULL);
     CHECK(series->active);
     CHECK(series->tap_count == 3u);
-    CHECK(!series->authored_has_more_taps);
+    CHECK(series->authored_tap_depth == series->tap_count);
     CHECK(!series->pending_hold);
 
     // Third tap renames to branch 3. Being the deepest authored branch does not

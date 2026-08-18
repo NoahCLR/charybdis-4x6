@@ -17,9 +17,10 @@ typedef struct {
     bool                  is_momentary_layer; // MO() or authored LT() row
     bool                  is_layer_tap;       // specifically authored LT() row
     bool                  has_multi_tap;
-    uint16_t              tap_hold_term;    // resolved: per-key → TAPPING_TERM for authored LT() → CUSTOM_TAP_HOLD_TERM
-    uint16_t              longer_hold_term; // resolved: per-key → CUSTOM_LONGER_HOLD_TERM
-    uint16_t              multi_tap_term;   // resolved: per-key → CUSTOM_MULTI_TAP_TERM
+    uint8_t               authored_tap_depth; // branch count, and the wrap modulus
+    uint16_t              tap_hold_term;      // resolved: per-key → TAPPING_TERM for authored LT() → CUSTOM_TAP_HOLD_TERM
+    uint16_t              longer_hold_term;   // resolved: per-key → CUSTOM_LONGER_HOLD_TERM
+    uint16_t              multi_tap_term;     // resolved: per-key → CUSTOM_MULTI_TAP_TERM
     key_behavior_step_t   single;
 } key_behavior_view_t;
 

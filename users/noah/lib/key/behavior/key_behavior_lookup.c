@@ -50,6 +50,24 @@ static key_behavior_step_t key_behavior_step_lookup_in_config(const key_behavior
     return config->tap_counts[tap_count - 1];
 }
 
+// Highest authored tap_counts[] index plus one: how many branches the row offers,
+// and therefore the modulus a tap count wraps through.
+static uint8_t key_behavior_authored_tap_depth_in_config(const key_behavior_t *config) {
+    uint8_t depth = 0u;
+
+    if (!config) {
+        return 0u;
+    }
+
+    for (uint8_t i = 0; i < KEY_BEHAVIOR_MAX_TAP_COUNT; i++) {
+        if (key_behavior_step_present(config->tap_counts[i])) {
+            depth = (uint8_t)(i + 1u);
+        }
+    }
+
+    return depth;
+}
+
 static bool key_behavior_has_more_taps_in_config(const key_behavior_t *config, uint8_t count) {
     if (!config || count >= KEY_BEHAVIOR_MAX_TAP_COUNT) return false;
 
@@ -216,6 +234,7 @@ key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
         .is_momentary_layer = noah_action_desc_is_momentary_layer_keycode(desc) || custom_lt,
         .is_layer_tap       = custom_lt,
         .has_multi_tap      = key_behavior_has_multi_tap_in_config(config),
+        .authored_tap_depth = key_behavior_authored_tap_depth_in_config(config),
         .tap_hold_term      = tap_term,
         .longer_hold_term   = longer_term,
         .multi_tap_term     = multi_term,
