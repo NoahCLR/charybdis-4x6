@@ -288,14 +288,14 @@ also project its state into the RGB overlay.
 Shared semantics:
 
 - every tap past the base one shows the color of the branch it reaches, for as
-  as long as nothing more specific applies. Any action state replaces it: a pending
+  long as nothing more specific applies. Any action state replaces it: a pending
   hold tier, the tap a release would send, an active hold. A branch that authors a
   `.tap` and no `.hold` therefore shows its tap color once its multi-tap window has
   closed, whether or not it also authors a `.long_hold`; a branch with no `.tap` at
-  all keeps the branch color until its hold threshold arrives. Another tap simply renames the branch. The base
-  tap stays dark: branch 0 needs no color of its own, and one tap does not show
-  intent to enter a tap branch. A pending hold tier does not end the color, since
-  the branch has not been entered while its action is still deferred
+  all keeps the branch color until its hold threshold arrives. Another tap simply
+  renames the branch. Branch 0 paints nothing: it is the non-tapping surface, so
+  whatever the layer or effect underneath is showing simply stays, and one tap
+  does not show intent to enter a tap branch
 - committed authored tap-count branches can pulse once after the tap output
   resolves; the authored RGB config can disable those pulses or limit them to
   double-tap and higher branches

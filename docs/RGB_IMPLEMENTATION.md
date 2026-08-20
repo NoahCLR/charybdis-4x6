@@ -25,7 +25,7 @@ flowchart LR
     style PV fill:#EDF0F4,stroke:#5A6673,color:#1A1F26
     style PD fill:#EDF0F4,stroke:#5A6673,color:#1A1F26
     style CO fill:#EDF0F4,stroke:#5A6673,color:#1A1F26
-    style KF fill:#B400FF,stroke:#6E0099,color:#FFFFFF
+    style KF fill:#0006FF,stroke:#00049E,color:#FFFFFF
 ```
 
 `locality` decides how much it paints. The authored profile uses `RGB_KEY_HALF`,
@@ -63,7 +63,7 @@ flowchart TD
     style BR fill:#DDE3EA,stroke:#5A6673,color:#1A1F26
     style OWN fill:#DDE3EA,stroke:#5A6673,color:#1A1F26
     style FV fill:#DDE3EA,stroke:#5A6673,color:#1A1F26
-    style RENDER fill:#B400FF,stroke:#6E0099,color:#FFFFFF
+    style RENDER fill:#0006FF,stroke:#00049E,color:#FFFFFF
     style P1 fill:#FFE8D6,stroke:#A34500,color:#5C2800
     style P2 fill:#FFE8D6,stroke:#A34500,color:#5C2800
     style SLAVE fill:#D6EAFF,stroke:#00539E,color:#00305C
@@ -89,7 +89,7 @@ flowchart TD
     P ==>|"series resolved"| Q["branch entered<br>action semantics own the key"]
 
     style T fill:#EDF0F4,stroke:#5A6673,color:#1A1F26
-    style P fill:#B400FF,stroke:#6E0099,color:#FFFFFF
+    style P fill:#0006FF,stroke:#00049E,color:#FFFFFF
     style Q fill:#DDE3EA,stroke:#5A6673,color:#1A1F26
 ```
 
@@ -117,7 +117,7 @@ flowchart TD
     style H fill:#EDF0F4,stroke:#5A6673,color:#1A1F26
     style L fill:#EDF0F4,stroke:#5A6673,color:#1A1F26
     style R fill:#EDF0F4,stroke:#5A6673,color:#1A1F26
-    style FA fill:#00FF00,stroke:#009E00,color:#1A1F26
+    style FA fill:#FFFFFF,stroke:#5A6673,color:#1A1F26
     style HA fill:#FF6C00,stroke:#A34500,color:#1A1F26
     style LA fill:#0084FF,stroke:#00539E,color:#FFFFFF
     style RA fill:#DDE3EA,stroke:#5A6673,color:#1A1F26
@@ -213,11 +213,13 @@ silences of the override, not of the LED.
    carries most of the board's hold feedback, so the most common hold colour is the
    one least separable from what it paints over.
 
-1. **The palette has homonyms.** The three-tap colour is the same `#3C00FF` as
-   `LAYER_NAV`; the four-tap `#00A2FF` is a near miss for `long_hold_active`
-   `#0084FF`. Both are reachable on keys that use both meanings, and the branch
-   colours are now on screen for longer than they used to be, so these collisions
-   are more visible than before rather than less.
+1. **The palette has homonyms.** Three feedback colours are byte-for-byte identical
+   to a layer colour: branch 2 `#0006FF` is `LAYER_SYM`, branch 4 `#00FF00` is
+   `LAYER_NUM`, and the tap colour `#FFFFFF` is `LAYER_POINTER`. Because the layers
+   paint mapped keys only and this stage repaints the whole half, the signal is
+   degraded rather than lost — the pressed key holds still while its neighbours
+   move. The branch colours are also on screen for longer than they used to be,
+   so these collisions are more visible than before rather than less.
 
 2. **Scale is out of proportion to scope.** `RGB_KEY_HALF` repaints half the board
    for a single key's state, and this stage renders last, so it overrides the
@@ -230,5 +232,7 @@ silences of the override, not of the LED.
   reads the action state instead of a parallel clock.
 - The action-delay window is gone entirely, so there is no longer a term whose only
   job was to make the colour visible.
-- The `tap_pending` white that collided with `LAYER_POINTER` `#FFFFFF` is gone,
-  and `tap_committed` green still collides with `LAYER_NUM` `#00FF00`.
+- The second tap-phase colour is gone, so the phase can no longer show two
+  different things about one moment. The collisions it had did not close: they moved
+  with the palette, and `tap_committed` is now itself exactly `LAYER_POINTER`
+  `#FFFFFF`. That is a palette choice, not a consequence of the collapse.

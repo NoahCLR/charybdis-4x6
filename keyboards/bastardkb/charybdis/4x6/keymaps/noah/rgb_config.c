@@ -265,13 +265,14 @@ static const combo_feedback_led_group_t combo_feedback_led_groups_data[] = RGB_L
 //     and holds it until the branch is entered, at which point the action colors
 //     below take over. The table starts at tap count 2 and higher tap counts
 //     clamp to the last configured color
-//   - the base tap stays dark: branch 0 needs no color of its own, and one tap
-//     does not show the user meant to enter a tap branch at all
+//   - branch 0 paints nothing: it is the non-tapping surface, so the layer color
+//     or effect underneath simply stays, and one tap does not show the user meant
+//     to enter a tap branch at all
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
 const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
     RGB_TAP_BRANCH_COLORS(HSV(169, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), // tap count 2
                           HSV(222, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), // tap count 3
-                          HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), // tap count 4
+                          HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),  // tap count 4
                           HSV(25, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS)   // tap count 5
                           ),
 

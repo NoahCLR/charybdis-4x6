@@ -1102,7 +1102,7 @@ def parse_key_behavior_feedback_colors(
                     {
                         "field": f"tap_count_{tap_count}_branch_color",
                         "label": f"Tap Count {tap_count}",
-                        "meaning": "Color of this tap branch while it is selected and not yet entered, from the tap that reaches it until its action fires, The table starts at double-tap because the base tap stays dark; deeper branches clamp to the last configured branch color.",
+                        "meaning": "Color of this tap branch while it is selected and not yet entered, from the tap that reaches it until its action fires. The table starts at double-tap because branch 0 paints nothing and leaves the surface underneath showing; deeper branches clamp to the last configured branch color.",
                         "color": authored_color,
                         "preview_color": dict(authored_color),
                     },

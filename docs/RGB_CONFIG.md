@@ -363,13 +363,13 @@ In `rgb_config.c`, declare `key_behavior_feedback_colors` directly:
 const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
 
     RGB_TAP_BRANCH_COLORS(
-        HSV(200, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), // tap count 2
-        HSV(180, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), // tap count 3
-        HSV(143, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), // tap count 4
-        HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),  // tap count 5
+        HSV(169, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), // tap count 2
+        HSV(222, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), // tap count 3
+        HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),  // tap count 4
+        HSV(25, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),  // tap count 5
     ),
 
-    .tap_committed_color     = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+    .tap_committed_color     = HSV(0, 0, 150),
     .tap_commit_mode         = KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS,
     .hold_active_color       = HSV(18, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
     .long_hold_active_color  = HSV(148, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
@@ -393,15 +393,17 @@ base one switches the key to its branch's color and holds it there until the
 branch is entered, which is the instant the action path takes the key over: the
 tap firing at the flush, or a hold tier claiming the key at a threshold.
 
-The color table starts at tap count 2 because the base tap stays dark: branch 0
-needs no color of its own, and one tap does not show the user meant to enter a tap
-branch. Double-tap and higher branches use their matching entry and clamp to the
-last configured branch color if they exceed the table.
+The color table starts at tap count 2 because branch 0 paints nothing: it is the
+non-tapping surface, so the layer color or effect underneath simply stays, and one
+tap does not show the user meant to enter a tap branch. Double-tap and higher
+branches use their matching entry and clamp to the last configured branch color if
+they exceed the table.
 
-A pending hold tier does not end this color. The branch has not been entered while
-its action is still deferred, so the branch color deliberately outranks the pending
-tier states; hold feedback owns the key only once something has actually fired.
-Inline C comments next to those `HSV(...)` arguments are allowed and are
+The branch color is the floor of the tap phase, not a priority. Any concrete
+action state outranks it: a pending hold tier at `tap_hold_term`, the tap a
+release would send once the multi-tap window closes, an active hold. The branch
+color is what shows while the branch has named nothing more specific than
+itself. Inline C comments next to those `HSV(...)` arguments are allowed and are
 ignored by the profile introspector.
 
 The `tap_commit_mode` field controls which committed tap-count branches pulse with
@@ -455,9 +457,8 @@ The helper decides the RGB behavior shape:
 
 - `TAP_AT_HOLD_THRESHOLD(...)`: pulse once when that tier commits
 - `TAP_ON_RELEASE_AFTER_HOLD(...)`: stay steadily lit while that tier is
-  pending release; if release happens during branch confirmation, the hold-tier
-  action feedback follows after confirmation completes so both states get a
-  visible window
+  pending release, then keep the action's own feedback window after the release
+  that sends it
 - `PRESS_AND_HOLD_UNTIL_RELEASE(...)` and `REPEAT_WHILE_HELD(...)`: flash while
   that tier remains active; each key starts with a visible flash window when
   its held/repeat feedback activates, then alternates on its own cadence

@@ -240,11 +240,9 @@ multi-tap behavior as a physical key.
 Here is the shape of one authored row, based on the `RIGHT_THUMB` row in
 [`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c#L456).
 The lines between the keycode and `.tap_counts` are optional row-local
-settings, shown here at their default values: four timing overrides, and two
-policy flags. Branch confirm is the short RGB-visible pause after a double-tap
-or higher branch wins, before the action fires. The snippet shows one useful
-helper mix, not the full helper vocabulary; the list below shows the other
-helpers you can use.
+settings, shown here at their default values: three timing overrides and one
+policy flag. The snippet shows one useful helper mix, not the full helper
+vocabulary; the list below shows the other helpers you can use.
 
 ```c
 {
@@ -325,12 +323,12 @@ example shows the vocabulary.
 ```c
 const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
     RGB_TAP_BRANCH_COLORS(
-        HSV(200, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), // double tap
-        HSV(180, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), // triple tap
-        HSV(143, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), // quadruple tap
-        HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS)   // quintuple tap
+        HSV(169, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), // double tap
+        HSV(222, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), // triple tap
+        HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),  // quadruple tap
+        HSV(25, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS)   // quintuple tap
     ),
-    .tap_committed_color = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+    .tap_committed_color = HSV(0, 0, 150),
     .tap_commit_mode = KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS,
     .hold_active_color = HSV(18, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
     .long_hold_active_color = HSV(148, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),

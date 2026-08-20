@@ -341,10 +341,9 @@ bool key_runtime_core_resolve_pending_multi_tap_release(keypos_t key_pos, uint16
 
     // A terminal branch has nothing deeper to wait for, so without this it would
     // dispatch on the release and its color would last only as long as the press.
-    // Preserving the chain gives every authored depth the same multi-tap window.
-    // Hold tiers were excluded here while the branch-confirm window supplied their
-    // window instead; that window is gone, so they need this one. The preserving
-    // release clears the hold bindings, so nothing stays armed.
+    // Preserving the chain gives every authored depth the same multi-tap window,
+    // hold tiers included. The preserving release clears the hold bindings, so
+    // nothing stays armed.
     terminal_tap_only_feedback_window = !token->interaction.binding.has_more_taps && tap_action != KC_NO;
     preserve_chain                    = preserve_chain_available && elapsed < token->interaction.binding.tap_hold_term && (token->interaction.binding.has_more_taps || terminal_tap_only_feedback_window);
     tap_branch_feedback_on_release    = series_tap_count > 1u && token->slot_phase != KEY_RUNTIME_SLOT_PHASE_RELEASE_HOLD_PENDING;

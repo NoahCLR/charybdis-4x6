@@ -38,7 +38,7 @@ flowchart TD
     style PV fill:#DDE3EA,stroke:#5A6673,color:#1A1F26
     style PD fill:#DDE3EA,stroke:#5A6673,color:#1A1F26
     style CO fill:#DDE3EA,stroke:#5A6673,color:#1A1F26
-    style KF fill:#B400FF,stroke:#6E0099,color:#FFFFFF
+    style KF fill:#0006FF,stroke:#00049E,color:#FFFFFF
 ```
 
 Later stages paint over earlier ones. So a key-behavior colour hides the layer
@@ -82,9 +82,9 @@ one action.
 ```mermaid
 flowchart TD
     B0["branch 0<br>resting surface, no override"]
-    B0 -->|"tap"| B2["branch 2<br>violet #B400FF"]
-    B2 -->|"tap"| B3["branch 3<br>blue #3C00FF"]
-    B3 -->|"tap"| B4["branch 4<br>azure #00A2FF"]
+    B0 -->|"tap"| B2["branch 2<br>blue #0006FF"]
+    B2 -->|"tap"| B3["branch 3<br>magenta #FF00C6"]
+    B3 -->|"tap"| B4["branch 4<br>green #00FF00"]
     B4 -->|"tap"| B0
 
     B2 ==> H["something more specific<br>takes the key<br>see section 4"]
@@ -92,9 +92,9 @@ flowchart TD
     B4 ==> H
 
     style B0 fill:#FF0000,stroke:#A30000,color:#FFFFFF
-    style B2 fill:#B400FF,stroke:#6E0099,color:#FFFFFF
-    style B3 fill:#3C00FF,stroke:#28006E,color:#FFFFFF
-    style B4 fill:#00A2FF,stroke:#0069A6,color:#1A1F26
+    style B2 fill:#0006FF,stroke:#00049E,color:#FFFFFF
+    style B3 fill:#FF00C6,stroke:#9E007A,color:#FFFFFF
+    style B4 fill:#00FF00,stroke:#009E00,color:#1A1F26
     style H fill:#EDF0F4,stroke:#5A6673,color:#1A1F26
 ```
 
@@ -126,15 +126,15 @@ flowchart TD
     BR["branch colour<br>this branch is selected"]
 
     BR ==>|"hold threshold crossed<br>AND a .hold is authored here"| OR["hold colour<br>orange #FF6C00"]
-    BR ==>|"multi-tap window closed<br>AND a .tap is authored here<br>AND no .hold is authored here"| GR["tap colour<br>green #00FF00"]
+    BR ==>|"multi-tap window closed<br>AND a .tap is authored here<br>AND no .hold is authored here"| GR["tap colour<br>white #FFFFFF"]
     BR ==>|"long-hold threshold crossed"| TL["long-hold colour<br>#0084FF"]
     BR -->|"nothing authored to name yet"| BR
 
     GR ==>|"long-hold threshold crossed"| TL
 
-    style BR fill:#B400FF,stroke:#6E0099,color:#FFFFFF
+    style BR fill:#0006FF,stroke:#00049E,color:#FFFFFF
     style OR fill:#FF6C00,stroke:#A34500,color:#1A1F26
-    style GR fill:#00FF00,stroke:#009E00,color:#1A1F26
+    style GR fill:#FFFFFF,stroke:#5A6673,color:#1A1F26
     style TL fill:#0084FF,stroke:#00539E,color:#FFFFFF
 ```
 
@@ -171,7 +171,7 @@ flowchart TD
     HT ==>|"past longer_hold_term"| LT["long-hold tier"]
 
     style BELOW fill:#DDE3EA,stroke:#5A6673,color:#1A1F26
-    style TT fill:#00FF00,stroke:#009E00,color:#1A1F26
+    style TT fill:#FFFFFF,stroke:#5A6673,color:#1A1F26
     style HT fill:#FF6C00,stroke:#A34500,color:#1A1F26
     style LT fill:#0084FF,stroke:#00539E,color:#FFFFFF
 ```
@@ -198,7 +198,7 @@ the long-hold blue. The tap tier has one helper.
 flowchart TD
     T{"which helper authored<br>this tier?"}
 
-    T -->|"TAP_SENDS<br>tap tier only"| S1["action sent on release<br>green pulse"]
+    T -->|"TAP_SENDS<br>tap tier only"| S1["action sent on release<br>white pulse"]
 
     T -->|"TAP_AT_HOLD_THRESHOLD"| A1["action sent once, immediately<br>pulse, then steady tier colour<br>for as long as you hold"]
     A1 -->|"let go"| A2["nothing further sent"]
@@ -216,7 +216,7 @@ flowchart TD
     C1 -->|"let go"| C2["layer or mode ends"]
 
     style T fill:#EDF0F4,stroke:#5A6673,color:#1A1F26
-    style S1 fill:#00FF00,stroke:#009E00,color:#1A1F26
+    style S1 fill:#FFFFFF,stroke:#5A6673,color:#1A1F26
     style A1 fill:#FF6C00,stroke:#A34500,color:#1A1F26
     style B1 fill:#FF6C00,stroke:#A34500,color:#1A1F26
     style D1 fill:#FF6C00,stroke:#A34500,color:#1A1F26
@@ -343,11 +343,16 @@ brightness. The base layer is where hold feedback is most used — all ten
 number-row shifted symbols, `KC_ESC`, `KC_ENT`, `KC_LEFT_SHIFT` — so the most
 common hold feedback on the board is painted against the surface it most resembles.
 
-**Palette collisions.** Three are reachable on `RIGHT_THUMB` alone: branch 3
-`#3C00FF` is exactly `LAYER_NAV`, whose lock is that key's single tap; the tap
-colour `#00FF00` is exactly `LAYER_NUM`, whose lock is that key's double-tap long
-hold; branch 4 `#00A2FF` sits 7° from `long_hold_active_color` `#0084FF`, and they
-are consecutive states in the same gesture.
+**Palette collisions.** Three feedback colours are byte-for-byte identical to a
+layer colour: branch 2 `#0006FF` is `LAYER_SYM`, branch 4 `#00FF00` is `LAYER_NUM`,
+and the tap colour `#FFFFFF` is `LAYER_POINTER`. Because every layer here paints
+`KEYS_MAPPED_ON_THIS_LAYER_ONLY` and this stage repaints the whole half, the signal
+is degraded rather than lost: the key you pressed does not change colour, while the
+unmapped keys around it do. The sharpest instance is on `RIGHT_THUMB`, where the
+quadruple-tap branch is exactly the colour that same key's double-tap long hold
+turns the board. Branch 2 also sits only 11° from `LAYER_NAV` `#3C00FF`. Latent:
+branch 5 `#FF9600` is 7° from `hold_active_color` `#FF6C00` and they would be
+consecutive states in one gesture — no row authors five branches today.
 
 **Scale.** `RGB_KEY_HALF` repaints half a lit board for one key's state, and this
 stage renders last, so the layer context under it is lost while it shows.

@@ -112,7 +112,6 @@ typedef struct {
     bool                           pd_mode_lock_consumed_on_press;
     bool                           other_press_interrupted;
     bool                           momentary_layer_tap_interrupted;
-    bool                           resolved_from_transparent;
     bool                           pending_release_emission;
     bool                           release_keycode_mismatched;
     key_runtime_slot_interaction_t interaction;
