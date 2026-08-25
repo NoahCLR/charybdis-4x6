@@ -27,6 +27,16 @@ static bool noah_qmk_profile_eeprom_read(void *context, uint16_t address, uint8_
     return true;
 }
 
+static bool noah_qmk_profile_eeprom_write(void *context, uint16_t address, const uint8_t *source, uint16_t length) {
+    (void)context;
+
+    if (!source || !noah_qmk_profile_eeprom_range_valid(address, length)) {
+        return false;
+    }
+    eeprom_update_block(source, (void *)(uintptr_t)address, length);
+    return true;
+}
+
 #endif
 
 noah_profile_store_io_t noah_qmk_profile_eeprom_read_only_io(void) {
@@ -34,6 +44,18 @@ noah_profile_store_io_t noah_qmk_profile_eeprom_read_only_io(void) {
     return (noah_profile_store_io_t){
         .read    = noah_qmk_profile_eeprom_read,
         .write   = NULL,
+        .context = NULL,
+    };
+#else
+    return (noah_profile_store_io_t){0};
+#endif
+}
+
+noah_profile_store_io_t noah_qmk_profile_eeprom_io(void) {
+#ifdef VIA_ENABLE
+    return (noah_profile_store_io_t){
+        .read    = noah_qmk_profile_eeprom_read,
+        .write   = noah_qmk_profile_eeprom_write,
         .context = NULL,
     };
 #else

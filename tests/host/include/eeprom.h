@@ -7,3 +7,4 @@
 #endif
 
 void eeprom_read_block(void *target, const void *source, size_t length);
+void eeprom_update_block(const void *source, void *target, size_t length);

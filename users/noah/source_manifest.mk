@@ -11,11 +11,13 @@ NOAH_COMMON_SOURCES := \
     lib/profile/schema/profile_reader.c \
     lib/profile/schema/key_behavior_domain_v1.c \
     lib/profile/schema/profile_rgb_v1.c \
+    lib/profile/schema/profile_validator_v1.c \
     lib/profile/storage/profile_storage_layout.c \
     lib/profile/storage/profile_checksum.c \
     lib/profile/storage/profile_store.c \
     lib/profile/storage/profile_store_runtime.c \
     lib/profile/storage/profile_candidate_transaction.c \
+    lib/profile/storage/profile_candidate_store_backend.c \
     lib/profile/protocol/profile_wire_v1.c \
     lib/compat/qmk_profile_eeprom.c \
     lib/compat/qmk_via_profile_channel.c \

@@ -5,19 +5,22 @@ Status: blocked on Stage 01
 Implementation note: two isolated foundations landed early. The storage
 package freezes the 32-byte header, checksum helpers, read-only boot discovery,
 bounded inactive-slot writes, readback validation, and final-marker commit. A
-read-only, slot-bounded QMK adapter and one-shot matrix-scan boot owner now make
-discovery reachable on firmware and expose committed metadata through status;
-they do not activate the discovered payload or expose a write callback.
+slot-bounded QMK adapter and one-shot matrix-scan boot owner now make discovery
+reachable on firmware and expose committed metadata through status. Boot
+ownership still receives only the read-only adapter; the write-capable form is
+available solely for the disconnected candidate backend.
 The generic schema package implements the canonical `NLP1` blob/domain
 envelopes and four-byte semantic actions in firmware and Studio against one
 shared exact-byte fixture. The key-behavior and RGB packages now implement
 matching desktop and reader-backed firmware payload codecs against shared
-exact-byte fixtures. A standalone exact candidate-frame codec and scan-owned transaction
-coordinator now cover begin/chunk/validate/abort and operation status, but are
-intentionally not routed through QMK or advertised. These packages still do
-not provide the full cross-reference/action-ABI validator, commit, runtime
-activation, reset, or split reconciliation, so this
-stage remains blocked/incomplete.
+exact-byte fixtures. The reader-backed whole-profile validator now composes
+those layers, streams both checksums, enforces schema/domain/action-ABI and
+compiled-reference compatibility, and returns bounded borrowed views. Exact
+candidate codecs and upload coordinators now exist on firmware and desktop, and
+the firmware coordinator can stage and validate an inactive EEPROM slot through
+an injected backend. These paths remain intentionally unrouted and
+unadvertised. Durable commit ownership, runtime activation, reset, and split
+reconciliation are still absent, so this stage remains blocked/incomplete.
 
 ## Objective
 
@@ -143,18 +146,19 @@ Volatile preview must not outrank durable committed state after reconnect.
 
 - [ ] Firmware and desktop Profile Wire v1 codecs (generic blob, domain
   envelope, semantic-action, key-behavior, and RGB domain layers landed;
-  compiled-default materialization and whole-profile composition remain)
+  compiled-default materialization remains)
 - [ ] Shared golden fixtures (generic blob/action vector is executable in C and
   JavaScript; representative behavior and RGB vectors are also shared;
   compiled-profile fixtures remain)
-- [ ] Layered validator (generic structural, canonical-order, reserved-field,
-  action-capacity, behavior, and RGB wire-semantic validation landed;
-  action-ABI and cross-domain reference layers remain)
-- [ ] Recoverable persistent store (storage foundation plus read-only QMK boot
-  ownership/status landed; candidate mutation ownership, reset, activation,
-  and split integration remain)
-- [ ] Candidate protocol (exact standalone frame/status codecs and bounded
-  scan coordinator landed; QMK routing and commit remain)
+- [x] Layered validator (generic structure, canonical order, reserved fields,
+  action capacity, behavior/RGB semantics, whole-profile checksums,
+  action-ABI identity, domain masks, and compiled action references)
+- [ ] Recoverable persistent store (storage foundation, read-only QMK boot
+  ownership/status, and disconnected inactive-slot staging landed; QMK
+  mutation ownership, reset, activation, and split integration remain)
+- [ ] Candidate protocol (exact firmware/desktop frame/status codecs, bounded
+  scan coordinator, and desktop upload coordinator landed; QMK routing and
+  commit remain)
 - [ ] Safe activation owner and predicate
 - [ ] Effective profile generation publication
 - [ ] Domain invalidation contract
@@ -267,6 +271,45 @@ Landed standalone candidate-coordinator evidence:
 - the coordinator has a compile-time 256-byte ceiling and exposes no commit or
   activation operation. Production QMK routing and candidate capability bits
   remain unchanged and disabled.
+
+Landed whole-profile validation and staging-backend evidence:
+
+- `tests/fixtures/profile_validator_v1.fixture` drives the whole-profile
+  validator through an injected reader at a nonzero base offset;
+- checksum work reads at most the supplied budget and 20 bytes, while domain
+  composition retains the established maximum individual RGB and behavior
+  reads of 16 and 12 bytes;
+- schema, declared/required/allowed domain masks, action ABI, canonical domain
+  ordering, duplicate/unknown/trailing data, domain semantic failures, and
+  layer/PD/VIA/hardcoded action references produce stable structured errors;
+- the candidate-store backend writes only the inactive slot, validates through
+  a borrowed reader, and requires an explicit separate call before the store's
+  marker-last commit can run;
+- copied validated domain views retain an absolute committed-slot base, so
+  beginning a later candidate cannot silently retarget an active view to the
+  new inactive slot; and
+- the production boot owner still receives a null write callback, Profile Wire
+  mutation/domain capability bits remain disabled, and no QMK callback can
+  reach candidate staging yet.
+
+Landed desktop candidate evidence:
+
+- exact JavaScript begin/chunk/validate/abort/status bytes consume the shared
+  firmware candidate fixture;
+- upload tests cover sequential 20-byte chunks, wrapping nonzero request and
+  transaction ids, queued-operation polling, byte-identical safe busy retries,
+  unsafe overlap refusal, cooperative abort, bounded polling, and structured
+  validation failures;
+- preflight refuses all non-idle firmware candidates without sending a
+  mutation, caller-owned blob bytes are snapshotted before asynchronous work,
+  and deterministic failures clean up with an idempotent abort; and
+- timeout or disconnect after a mutation is classified as ambiguous and is
+  never retried on the same connection; the package has no commit operation and
+  is not connected to the extension UI or device service.
+
+Before QMK routing is enabled, the schema-bounded `DOMAIN_DECODE` phase still
+needs a worst-case 4,064-byte profile timing/work gate. Its individual reads are
+bounded, but the current domain decoder call is not a 20-total-byte scan step.
 
 ## Exit Criteria
 

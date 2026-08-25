@@ -26,6 +26,16 @@ void eeprom_read_block(void *target, const void *source, size_t length) {
     memcpy(target, &eeprom_bytes[address], length);
 }
 
+void eeprom_update_block(const void *source, void *target, size_t length) {
+    uintptr_t address = (uintptr_t)target;
+
+    assert(source != NULL);
+    assert(address >= NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR);
+    assert(address + length <= sizeof(eeprom_bytes));
+    qmk_write_calls++;
+    memcpy(&eeprom_bytes[address], source, length);
+}
+
 static bool memory_read(void *context, uint16_t address, uint8_t *target, uint16_t length) {
     uint8_t *bytes = context;
 
@@ -106,6 +116,28 @@ static void test_qmk_adapter_is_slot_bounded_and_read_only(void) {
     assert(qmk_read_calls == 2u);
 }
 
+static void test_qmk_write_adapter_is_slot_bounded(void) {
+    noah_profile_store_io_t io = noah_qmk_profile_eeprom_io();
+    const uint8_t           bytes[] = {0x12u, 0x34u};
+    uint8_t                 result[sizeof(bytes)] = {0u};
+
+    reset_eeprom(eeprom_bytes);
+    qmk_read_calls  = 0u;
+    qmk_write_calls = 0u;
+    assert(io.read != NULL);
+    assert(io.write != NULL);
+    assert(!io.write(io.context, NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR - 1u, bytes, 1u));
+    assert(!io.write(io.context, NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR, NULL, 1u));
+    assert(!io.write(io.context, NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR, bytes, 0u));
+    assert(io.write(io.context, NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR, bytes, sizeof(bytes)));
+    assert(io.read(io.context, NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR, result, sizeof(result)));
+    assert(memcmp(result, bytes, sizeof(bytes)) == 0);
+    assert(io.write(io.context, NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE - sizeof(bytes), bytes, sizeof(bytes)));
+    assert(!io.write(io.context, NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE - 1u, bytes, sizeof(bytes)));
+    assert(qmk_write_calls == 2u);
+    assert(qmk_read_calls == 1u);
+}
+
 static void test_boot_discovery_runs_once_from_scan(void) {
     uint32_t reads_after_discovery;
 
@@ -168,6 +200,7 @@ static void test_equal_generation_divergence_is_reported(void) {
 
 int main(void) {
     test_qmk_adapter_is_slot_bounded_and_read_only();
+    test_qmk_write_adapter_is_slot_bounded();
     test_boot_discovery_runs_once_from_scan();
     test_committed_metadata_is_discovered_without_activation();
     test_equal_generation_divergence_is_reported();

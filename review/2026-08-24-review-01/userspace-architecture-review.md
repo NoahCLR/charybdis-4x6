@@ -353,6 +353,16 @@ owner contains no profile-sized RAM buffer. It remains independently compiled
 and unrouted until both domain validators and the commit/activation owners can
 support the capabilities they would advertise.
 
+The landed store backend now supplies that coordinator with a bounded inactive-
+slot reader/writer and composes the whole-profile validator over the staged
+bytes. Validation streams CRC32/FNV-1a, checks the canonical envelope and both
+domain codecs, and resolves behavior references against exact compiled
+layer/PD/macro identities. A separate backend commit call is intentionally not
+part of the candidate coordinator interface. QMK routing, capability
+advertising, durable commit ownership, activation, and split convergence must
+therefore land together in a later integration slice rather than becoming
+reachable merely because the adapter exists.
+
 ### Split Reconciliation
 
 The split owner publishes or reconciles committed persistent generations. A
