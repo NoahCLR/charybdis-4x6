@@ -37,6 +37,8 @@ class CandidateFirmwareHarness {
         this.pendingStatusReads = 0;
         this.busied = new Set();
         this.validationReads = 0;
+        this.commitReads = 0;
+        this.activationReads = 0;
         this.status = noErrorStatus();
     }
 
@@ -44,6 +46,14 @@ class CandidateFirmwareHarness {
         const report = Buffer.from(value);
         this.writes.push(report);
         this.requestOptions.push(requestOptions);
+        if (this.options.processThenThrowOnOperation !== undefined
+            && this.options.processThenThrowOnOperation === operationForValue(report[2])) {
+            this.options.processThenThrowOnOperation = undefined;
+            this.process(report);
+            const error = new Error("simulated lost admitted response");
+            error.code = "TIMEOUT";
+            throw error;
+        }
         if (this.options.throwOnOperation !== undefined
             && this.options.throwOnOperation === operationForValue(report[2])) {
             this.options.throwOnOperation = undefined;
@@ -60,7 +70,12 @@ class CandidateFirmwareHarness {
             assert.equal(requestOptions.matchResponse(response, report), true);
             return response;
         }
-        assert.equal(report[0], PROFILE_CANDIDATE_V1.COMMAND_SET);
+        assert.equal(
+            report[0],
+            report[2] === PROFILE_CANDIDATE_V1.VALUE_COMMIT
+                ? PROFILE_CANDIDATE_V1.COMMAND_SAVE
+                : PROFILE_CANDIDATE_V1.COMMAND_SET
+        );
         const operation = operationForValue(report[2]);
         if (this.options.busyOnce?.has(operation) && !this.busied.has(operation)) {
             this.busied.add(operation);
@@ -118,6 +133,22 @@ class CandidateFirmwareHarness {
                     };
                 }
             }
+        } else if (this.status.state === CANDIDATE_STATE.COMMITTING && this.status.lastOperation === CANDIDATE_OPERATION.COMMIT) {
+            this.commitReads += 1;
+            if (this.commitReads >= (this.options.commitReads || 1)) {
+                this.status.state = CANDIDATE_STATE.ACTIVATING;
+            }
+        } else if (this.status.state === CANDIDATE_STATE.ACTIVATING && this.status.lastOperation === CANDIDATE_OPERATION.COMMIT) {
+            this.activationReads += 1;
+            if (this.activationReads >= (this.options.activationReads || 1)) {
+                this.status.state = this.options.activationError
+                    ? CANDIDATE_STATE.REJECTED
+                    : CANDIDATE_STATE.IDLE;
+                if (this.options.activationError) {
+                    this.status.flags = 2;
+                    this.status.error = {...noError(), id: this.options.activationErrorId || CANDIDATE_ERROR.ACTIVATION_FAILED};
+                }
+            }
         }
         return encodeStatus(request, this.status);
     }
@@ -157,6 +188,12 @@ class CandidateFirmwareHarness {
                 transactionId,
                 operationSequence: this.status.operationSequence,
             };
+        } else if (operation === CANDIDATE_OPERATION.COMMIT) {
+            this.status.transactionId = transactionId;
+            this.status.state = CANDIDATE_STATE.COMMITTING;
+            this.status.error = noError();
+            this.commitReads = 0;
+            this.activationReads = 0;
         }
     }
 }
@@ -226,12 +263,13 @@ function operationForValue(valueId) {
         [PROFILE_CANDIDATE_V1.VALUE_BEGIN]: CANDIDATE_OPERATION.BEGIN,
         [PROFILE_CANDIDATE_V1.VALUE_CHUNK]: CANDIDATE_OPERATION.CHUNK,
         [PROFILE_CANDIDATE_V1.VALUE_VALIDATE]: CANDIDATE_OPERATION.VALIDATE,
+        [PROFILE_CANDIDATE_V1.VALUE_COMMIT]: CANDIDATE_OPERATION.COMMIT,
         [PROFILE_CANDIDATE_V1.VALUE_ABORT]: CANDIDATE_OPERATION.ABORT,
     }[valueId];
 }
 
 function operationWrites(harness, valueId) {
-    return harness.writes.filter((report) => report[0] === 0x07 && report[2] === valueId);
+    return harness.writes.filter((report) => (report[0] === PROFILE_CANDIDATE_V1.COMMAND_SET || report[0] === PROFILE_CANDIDATE_V1.COMMAND_SAVE) && report[2] === valueId);
 }
 
 function coordinator(harness, options = {}) {
@@ -269,6 +307,79 @@ test("upload stages strictly sequential 20-byte chunks and validates only after 
     assert.equal(requestIds.includes(0), false);
 });
 
+test("a prepared candidate commits through custom-save and waits for activation", async () => {
+    const harness = new CandidateFirmwareHarness({commitReads: 2, activationReads: 2});
+    const client = coordinator(harness);
+    const prepared = await client.upload(representativeBlob(1), {actionAbiDigest: 1, transactionId: 0x1234});
+    const result = await client.commit(prepared.transactionId, {digest: prepared.metadata.digest});
+
+    assert.equal(result.status.state, CANDIDATE_STATE.IDLE);
+    assert.equal(result.status.lastOperation, CANDIDATE_OPERATION.COMMIT);
+    assert.equal(result.digest, prepared.metadata.digest);
+    const commits = operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_COMMIT);
+    assert.equal(commits.length, 1);
+    assert.equal(commits[0][0], PROFILE_CANDIDATE_V1.COMMAND_SAVE);
+});
+
+test("lost commit acknowledgement is safely resolved from progressing status", async () => {
+    const harness = new CandidateFirmwareHarness({
+        processThenThrowOnOperation: CANDIDATE_OPERATION.COMMIT,
+        commitReads: 2,
+        activationReads: 2,
+    });
+    const client = coordinator(harness);
+    const prepared = await client.upload(representativeBlob(1), {actionAbiDigest: 1, transactionId: 0x1234});
+
+    await assert.rejects(
+        client.commit(prepared.transactionId, {digest: prepared.metadata.digest}),
+        (error) => error.code === "TRANSPORT_OUTCOME_AMBIGUOUS"
+            && error.ambiguous === true
+            && error.safeToRetry === true
+    );
+    const recovered = await client.commit(prepared.transactionId, {digest: prepared.metadata.digest});
+    assert.equal(recovered.status.state, CANDIDATE_STATE.IDLE);
+    assert.equal(operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_COMMIT).length, 1);
+});
+
+test("commit preflight refuses a mismatched digest before custom-save", async () => {
+    const harness = new CandidateFirmwareHarness();
+    const client = coordinator(harness);
+    const prepared = await client.upload(representativeBlob(1), {actionAbiDigest: 1, transactionId: 0x1234});
+    await assert.rejects(
+        client.commit(prepared.transactionId, {digest: (prepared.metadata.digest ^ 1) >>> 0}),
+        (error) => error.code === "CANDIDATE_IDENTITY_MISMATCH" && error.safeToRetry === false
+    );
+    assert.equal(operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_COMMIT).length, 0);
+});
+
+test("activation failure remains visible after durable commit", async () => {
+    const harness = new CandidateFirmwareHarness({activationError: true});
+    const client = coordinator(harness);
+    const prepared = await client.upload(representativeBlob(1), {actionAbiDigest: 1, transactionId: 0x1234});
+    await assert.rejects(
+        client.commit(prepared.transactionId, {digest: prepared.metadata.digest}),
+        (error) => error.code === "DEVICE_REJECTED"
+            && error.phase === "committing"
+            && error.deviceError.id === CANDIDATE_ERROR.ACTIVATION_FAILED
+    );
+    assert.equal(operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_ABORT).length, 0);
+});
+
+test("unknown marker durability is an ambiguous outcome that requires reconciliation", async () => {
+    const harness = new CandidateFirmwareHarness({
+        activationError: true,
+        activationErrorId: CANDIDATE_ERROR.DURABILITY_UNKNOWN,
+    });
+    const client = coordinator(harness);
+    const prepared = await client.upload(representativeBlob(1), {actionAbiDigest: 1, transactionId: 0x1234});
+    await assert.rejects(
+        client.commit(prepared.transactionId, {digest: prepared.metadata.digest}),
+        (error) => error.code === "DURABILITY_UNKNOWN"
+            && error.ambiguous === true
+            && error.safeToRetry === false
+    );
+});
+
 test("preflight refuses every non-idle firmware candidate without sending a mutation", async () => {
     for (const state of [
         CANDIDATE_STATE.RECEIVING,
@@ -276,6 +387,8 @@ test("preflight refuses every non-idle firmware candidate without sending a muta
         CANDIDATE_STATE.VALIDATING,
         CANDIDATE_STATE.VALIDATED,
         CANDIDATE_STATE.REJECTED,
+        CANDIDATE_STATE.COMMITTING,
+        CANDIDATE_STATE.ACTIVATING,
     ]) {
         const harness = new CandidateFirmwareHarness();
         harness.status.state = state;

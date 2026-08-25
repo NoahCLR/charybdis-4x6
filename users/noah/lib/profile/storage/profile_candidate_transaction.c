@@ -107,6 +107,10 @@ static void process_begin(noah_profile_candidate_transaction_t *transaction, con
         }
         return;
     }
+    if (transaction->status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE) {
+        set_simple_error(transaction, NOAH_PROFILE_CANDIDATE_V1_ERROR_INVALID_STATE, NOAH_PROFILE_CANDIDATE_V1_LOCATION_NONE_U16);
+        return;
+    }
 
     transaction->status.transaction_id = command->transaction_id;
     transaction->status.payload_length = metadata->payload_length;
@@ -267,11 +271,17 @@ static void process_abort(noah_profile_candidate_transaction_t *transaction, con
         transaction->status.next_offset          = 0u;
         transaction->status.payload_length       = 0u;
         transaction->status.digest               = 0u;
+        transaction->poisoned                    = false;
+        memset(&transaction->metadata, 0, sizeof(transaction->metadata));
         clear_error(transaction);
         return;
     }
     if (command->transaction_id != transaction->status.transaction_id) {
         set_simple_error(transaction, NOAH_PROFILE_CANDIDATE_V1_ERROR_WRONG_TRANSACTION, NOAH_PROFILE_CANDIDATE_V1_LOCATION_NONE_U16);
+        return;
+    }
+    if (transaction->status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_ACTIVATING) {
+        set_simple_error(transaction, NOAH_PROFILE_CANDIDATE_V1_ERROR_INVALID_STATE, NOAH_PROFILE_CANDIDATE_V1_LOCATION_NONE_U16);
         return;
     }
     if (!transaction->backend.abort) {
@@ -296,6 +306,81 @@ static void process_abort(noah_profile_candidate_transaction_t *transaction, con
     clear_error(transaction);
 }
 
+static void activation_failed(noah_profile_candidate_transaction_t *transaction) {
+    transaction->has_candidate = false;
+    transaction->poisoned      = true;
+    transaction->status.state  = NOAH_PROFILE_CANDIDATE_V1_STATE_REJECTED;
+    set_simple_error(transaction, NOAH_PROFILE_CANDIDATE_V1_ERROR_ACTIVATION_FAILED, NOAH_PROFILE_CANDIDATE_V1_LOCATION_NONE_U16);
+}
+
+static void durability_unknown(noah_profile_candidate_transaction_t *transaction) {
+    transaction->has_candidate = false;
+    transaction->poisoned      = true;
+    transaction->status.state  = NOAH_PROFILE_CANDIDATE_V1_STATE_REJECTED;
+    set_simple_error(transaction, NOAH_PROFILE_CANDIDATE_V1_ERROR_DURABILITY_UNKNOWN, NOAH_PROFILE_CANDIDATE_V1_LOCATION_NONE_U16);
+}
+
+static void begin_activation(noah_profile_candidate_transaction_t *transaction) {
+    noah_profile_candidate_backend_result_t result;
+
+    if (!transaction->backend.activation_begin || !transaction->backend.activation_step) {
+        activation_failed(transaction);
+        return;
+    }
+    result = transaction->backend.activation_begin(transaction->backend.context);
+    if (result == NOAH_PROFILE_CANDIDATE_BACKEND_OK || result == NOAH_PROFILE_CANDIDATE_BACKEND_IN_PROGRESS) {
+        transaction->status.state = NOAH_PROFILE_CANDIDATE_V1_STATE_ACTIVATING;
+        clear_error(transaction);
+    } else {
+        activation_failed(transaction);
+    }
+}
+
+static void process_commit(noah_profile_candidate_transaction_t *transaction, const noah_profile_candidate_v1_command_t *command) {
+    noah_profile_candidate_backend_result_t result;
+
+    if (!transaction->has_candidate) {
+        if (transaction->status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE && command->transaction_id == transaction->last_committed_transaction_id && transaction->last_committed_transaction_id != 0u) {
+            transaction->status.transaction_id = command->transaction_id;
+            transaction->status.state          = NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE;
+            clear_error(transaction);
+        } else {
+            set_simple_error(transaction, NOAH_PROFILE_CANDIDATE_V1_ERROR_INVALID_STATE, NOAH_PROFILE_CANDIDATE_V1_LOCATION_NONE_U16);
+        }
+        return;
+    }
+    if (command->transaction_id != transaction->status.transaction_id) {
+        set_simple_error(transaction, NOAH_PROFILE_CANDIDATE_V1_ERROR_WRONG_TRANSACTION, NOAH_PROFILE_CANDIDATE_V1_LOCATION_NONE_U16);
+        return;
+    }
+    if (transaction->poisoned) {
+        set_simple_error(transaction, NOAH_PROFILE_CANDIDATE_V1_ERROR_POISONED, NOAH_PROFILE_CANDIDATE_V1_LOCATION_NONE_U16);
+        return;
+    }
+    if (transaction->status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_COMMITTING || transaction->status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_ACTIVATING) {
+        clear_error(transaction);
+        return;
+    }
+    if (transaction->status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATED) {
+        set_simple_error(transaction, NOAH_PROFILE_CANDIDATE_V1_ERROR_INVALID_STATE, NOAH_PROFILE_CANDIDATE_V1_LOCATION_NONE_U16);
+        return;
+    }
+    if (!transaction->backend.commit_begin || !transaction->backend.commit_step) {
+        poison(transaction, NOAH_PROFILE_CANDIDATE_V1_ERROR_STORAGE_FAILURE, NOAH_PROFILE_CANDIDATE_V1_LOCATION_NONE_U16);
+        return;
+    }
+    result = transaction->backend.commit_begin(transaction->backend.context);
+    if (result == NOAH_PROFILE_CANDIDATE_BACKEND_IN_PROGRESS) {
+        transaction->status.state = NOAH_PROFILE_CANDIDATE_V1_STATE_COMMITTING;
+        clear_error(transaction);
+    } else if (result == NOAH_PROFILE_CANDIDATE_BACKEND_OK) {
+        transaction->last_committed_transaction_id = transaction->status.transaction_id;
+        begin_activation(transaction);
+    } else {
+        poison(transaction, NOAH_PROFILE_CANDIDATE_V1_ERROR_STORAGE_FAILURE, NOAH_PROFILE_CANDIDATE_V1_LOCATION_NONE_U16);
+    }
+}
+
 static void process_mailbox(noah_profile_candidate_transaction_t *transaction, const noah_profile_candidate_v1_command_t *command) {
     transaction->status.last_operation = command->operation;
     transaction->status.operation_sequence++;
@@ -312,6 +397,9 @@ static void process_mailbox(noah_profile_candidate_transaction_t *transaction, c
             break;
         case NOAH_PROFILE_CANDIDATE_V1_OPERATION_ABORT:
             process_abort(transaction, command);
+            break;
+        case NOAH_PROFILE_CANDIDATE_V1_OPERATION_COMMIT:
+            process_commit(transaction, command);
             break;
         default:
             set_simple_error(transaction, NOAH_PROFILE_CANDIDATE_V1_ERROR_UNSUPPORTED_OPERATION, NOAH_PROFILE_CANDIDATE_V1_LOCATION_NONE_U16);
@@ -336,6 +424,39 @@ static void process_validation_step(noah_profile_candidate_transaction_t *transa
     }
 }
 
+static void process_commit_step(noah_profile_candidate_transaction_t *transaction) {
+    noah_profile_candidate_backend_result_t result = transaction->backend.commit_step(transaction->backend.context, NOAH_PROFILE_CANDIDATE_SCAN_BYTE_BUDGET);
+
+    if (result == NOAH_PROFILE_CANDIDATE_BACKEND_IN_PROGRESS) {
+        return;
+    }
+    if (result == NOAH_PROFILE_CANDIDATE_BACKEND_OK) {
+        transaction->last_committed_transaction_id = transaction->status.transaction_id;
+        begin_activation(transaction);
+    } else if (result == NOAH_PROFILE_CANDIDATE_BACKEND_DURABILITY_UNKNOWN) {
+        durability_unknown(transaction);
+    } else {
+        poison(transaction, NOAH_PROFILE_CANDIDATE_V1_ERROR_STORAGE_FAILURE, NOAH_PROFILE_CANDIDATE_V1_LOCATION_NONE_U16);
+    }
+}
+
+static void process_activation_step(noah_profile_candidate_transaction_t *transaction) {
+    noah_profile_candidate_backend_result_t result = transaction->backend.activation_step(transaction->backend.context);
+
+    if (result == NOAH_PROFILE_CANDIDATE_BACKEND_IN_PROGRESS) {
+        return;
+    }
+    if (result != NOAH_PROFILE_CANDIDATE_BACKEND_OK) {
+        activation_failed(transaction);
+        return;
+    }
+    transaction->has_candidate                 = false;
+    transaction->poisoned                      = false;
+    memset(&transaction->metadata, 0, sizeof(transaction->metadata));
+    transaction->status.state = NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE;
+    clear_error(transaction);
+}
+
 bool noah_profile_candidate_transaction_scan(noah_profile_candidate_transaction_t *transaction) {
     if (!transaction) {
         return false;
@@ -348,6 +469,14 @@ bool noah_profile_candidate_transaction_scan(noah_profile_candidate_transaction_
     }
     if (transaction->status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATING && transaction->backend.validation_step) {
         process_validation_step(transaction);
+        return true;
+    }
+    if (transaction->status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_COMMITTING && transaction->backend.commit_step) {
+        process_commit_step(transaction);
+        return true;
+    }
+    if (transaction->status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_ACTIVATING && transaction->backend.activation_step) {
+        process_activation_step(transaction);
         return true;
     }
     return false;

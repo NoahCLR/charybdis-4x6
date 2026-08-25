@@ -244,15 +244,15 @@ interpretation everywhere in this active review.
 
 Each keyboard half has its own RP2040 and its own 270,336 bytes of physical
 SRAM: 262,144 bytes in the `ram0` SRAM0–3 region plus separate 4,096-byte SRAM4
-and SRAM5 banks. The current fresh ELF records 22,980 bytes of `.data`, 25,660
-bytes of `.bss`, and therefore a 48,640-byte SRAM0–3 `.data + .bss` regression
-metric. Its 51,000-byte ceiling has 2,360 bytes of policy slack; that number is
+and SRAM5 banks. The current fresh ELF records 22,980 bytes of `.data`, 25,684
+bytes of `.bss`, and therefore a 48,664-byte SRAM0–3 `.data + .bss` regression
+metric. Its 51,000-byte ceiling has 2,336 bytes of policy slack; that number is
 not total RAM headroom.
 
-The current `__heap_base__` to `__heap_end__` span is 213,496 bytes. It is the
+The current `__heap_base__` to `__heap_end__` span is 213,472 bytes. It is the
 SRAM0–3 linker/core-memory span at boot and backs ChibiOS core allocation plus
 the linked newlib allocation path. Actual runtime high-water is not yet
-measured. Fixed linked occupancy across all banks is 56,104 bytes, including
+measured. Fixed linked occupancy across all banks is 56,128 bytes, including
 alignment and reserved stacks but excluding runtime allocation.
 
 SRAM4 remains the tight bank. Its 1,024-byte interrupt stack, 2,560-byte process
@@ -363,8 +363,10 @@ once, and behavior action-reference events remove the former row/step rescans.
 The schema-maximal 3,216-byte behavior profile completes in 1,061 whole-profile
 steps, with 897 behavior-domain steps capped at one 12-byte read each. Maximal
 RGB completes in 58 domain steps capped at one 16-byte read each. The owner
-contains no profile-sized RAM buffer. It remains independently compiled and
-unrouted until the store/provider commit and activation owners can support the
+contains no profile-sized RAM buffer. Its custom-save commit path now advances
+persistence through one EEPROM operation of at most 20 bytes per scan, then
+requests and polls provider activation. It remains independently compiled and
+unrouted until production safe-boundary and invalidation owners can support the
 capabilities they would advertise; real-device scan timing remains part of the
 hardware acceptance pass rather than an unbounded-code blocker.
 
@@ -380,10 +382,13 @@ release failure stays fail-closed. The provider pins active and pending ranges,
 discards an overlapping rollback only as part of a successful reservation, and
 therefore prevents store bookkeeping from overwriting a runtime-rolled-back
 generation. After durable commit, the backend can build the exact committed
-snapshot and request safe-boundary publication. These APIs remain disconnected
-from QMK routing: the candidate coordinator still has no commit operation, and
-no production safe predicate, invalidator set, capability, or split owner is
-installed merely because the storage/provider seam exists.
+snapshot and request safe-boundary publication. The candidate coordinator now
+composes those operations behind custom-save `0x13`, retains idempotent
+transaction/digest correlation through commit and activation, and distinguishes
+an unconfirmed final marker from a safely failed commit. These APIs remain
+disconnected from QMK routing: no production safe predicate, invalidator set,
+capability, or split owner is installed merely because the isolated owner
+exists.
 
 ### Split Reconciliation
 

@@ -162,8 +162,8 @@ Volatile preview must not outrank durable committed state after reconnect.
   activation handoff landed; QMK mutation ownership, reset, and split
   integration remain)
 - [ ] Candidate protocol (exact firmware/desktop frame/status codecs, bounded
-  scan coordinator, and desktop upload coordinator landed; QMK routing and
-  commit remain)
+  scan coordinator, durable commit/activation coordinator, and desktop prepare
+  plus commit coordinator landed; QMK routing and capabilities remain)
 - [ ] Safe activation owner and predicate
 - [ ] Effective profile generation publication
 - [ ] Domain invalidation contract
@@ -253,20 +253,21 @@ Landed read-only store-integration evidence:
 - the normal and sanitized store suite covers metadata-divergent equal
   generations plus power loss at every write and partial-byte boundary through
   the final commit marker;
-- target gates pass at a 48,640-byte SRAM0–3 `.data + .bss` regression metric
-  against the 51,000-byte policy, with a 213,496-byte linker/core-memory span
+- target gates pass at a 48,664-byte SRAM0–3 `.data + .bss` regression metric
+  against the 51,000-byte policy, with a 213,472-byte linker/core-memory span
   at boot and a 480-byte reviewed boot path; the existing worst reviewed
   main/split paths remain 1,880 B and 336 B.
 
 Landed standalone candidate-coordinator evidence:
 
-- exact 32-byte begin, chunk, validate, abort, immediate-admission, and
-  operation-status layouts are frozen in `profile-wire-v1.md` and executable
-  through `tests/fixtures/profile_candidate_v1.fixture`;
+- exact 32-byte begin, chunk, validate, abort, custom-save `0x13` commit,
+  immediate-admission, and operation-status layouts are frozen in
+  `profile-wire-v1.md` and executable through
+  `tests/fixtures/profile_candidate_v1.fixture`;
 - the callback-side API only decodes and copies one bounded mailbox item, while
-  scan context owns backend begin/write/read/abort and validation; checksum
-  and domain validation now advance through a common one-read / 20-byte maximum
-  per scan-step contract;
+  scan context owns backend begin/write/read/abort, validation, marker-last
+  persistence, and activation polling; validation and commit each advance
+  through a common one-read-or-write / 20-byte maximum per scan-step contract;
 - retries compare staged bytes: identical duplicates are accepted, conflicting
   duplicates poison the candidate, and wrong transaction ids preserve the
   active candidate identity;
@@ -274,9 +275,11 @@ Landed standalone candidate-coordinator evidence:
   every reserved/padding byte, gaps, partial overlaps, overflow, reset with a
   pending or staged candidate, idempotent abort, backend failures, structured
   validation locations, and the explicit v1 no-timeout behavior;
-- the coordinator has a compile-time 256-byte ceiling and exposes no commit or
-  activation operation. Production QMK routing and candidate capability bits
-  remain unchanged and disabled.
+- the coordinator has a compile-time 256-byte ceiling; commit is idempotently
+  correlated by transaction id and digest across COMMITTING, ACTIVATING, and
+  final IDLE status, and an unconfirmed final-marker write is reported as
+  durability-unknown rather than as a safe failure. Production QMK routing and
+  candidate capability bits remain unchanged and disabled.
 
 Landed whole-profile validation and staging-backend evidence:
 
@@ -342,8 +345,8 @@ or invalidator is installed, and no key/RGB consumer reads through it.
 
 Landed desktop candidate evidence:
 
-- exact JavaScript begin/chunk/validate/abort/status bytes consume the shared
-  firmware candidate fixture;
+- exact JavaScript begin/chunk/validate/abort/commit/status bytes consume the
+  shared firmware candidate fixture;
 - upload tests cover sequential 20-byte chunks, wrapping nonzero request and
   transaction ids, queued-operation polling, byte-identical safe busy retries,
   unsafe overlap refusal, cooperative abort, bounded polling, and structured
@@ -351,9 +354,12 @@ Landed desktop candidate evidence:
 - preflight refuses all non-idle firmware candidates without sending a
   mutation, caller-owned blob bytes are snapshotted before asynchronous work,
   and deterministic failures clean up with an idempotent abort; and
-- timeout or disconnect after a mutation is classified as ambiguous and is
-  never retried on the same connection; the package has no commit operation and
-  is not connected to the extension UI or device service.
+- timeout or disconnect after a staging mutation is classified as ambiguous
+  and is never retried on the same connection. The separate commit coordinator
+  can resume an exact admitted commit from status because firmware retains its
+  transaction/digest identity; durability-unknown remains explicitly unsafe to
+  retry until status is reconciled. Neither coordinator is connected to the
+  extension UI or device service.
 
 The former whole-domain work blocker is resolved by incremental domain state
 machines. `tests/host/run_profile_validator_work_budget_tests.sh` constructs
@@ -366,8 +372,8 @@ maximum 16-byte read. RGB, behavior, and whole-profile runners also compile the
 state machines for Cortex-M0+. The whole validator is exactly 348 bytes on the
 32-bit target under an explicit 352-byte regression policy; that policy is not
 a hardware SRAM-capacity claim. Production routing and mutation capability
-bits remain disabled for store/provider commit and activation integration, and
-real-device scan timing remains unconfirmed until the hardware pass.
+bits remain disabled pending the production safe predicate, invalidators, and
+QMK owner; real-device scan timing remains unconfirmed until the hardware pass.
 
 ## Exit Criteria
 

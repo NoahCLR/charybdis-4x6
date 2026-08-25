@@ -25,6 +25,7 @@ typedef struct {
     uint8_t                                    origin_half;
     bool                                       validation_complete;
     bool                                       committed_available;
+    bool                                       activation_requested;
     bool                                       reuse_guard_installed;
 } noah_profile_candidate_store_backend_t;
 
@@ -36,8 +37,9 @@ void noah_profile_candidate_store_backend_init(noah_profile_candidate_store_back
 // interface borrows backend for its entire lifetime.
 noah_profile_candidate_backend_t noah_profile_candidate_store_backend_interface(noah_profile_candidate_store_backend_t *backend);
 
-// Commit remains a separate scan-owner operation. Merely wiring the candidate
-// backend cannot make a validated payload durable or active.
+// Cold/test convenience wrapper around the interface's bounded commit steps.
+// Staging and validation never call it; production durability still requires
+// an explicit commit operation owned by scan context.
 noah_profile_candidate_backend_result_t noah_profile_candidate_store_backend_commit(noah_profile_candidate_store_backend_t *backend, noah_profile_store_record_t *committed);
 
 // After durable commit, request publication through the effective provider.

@@ -34,13 +34,16 @@ No project risks are closed yet.
 
 - R-01's inherited Review 19 malformed mirror-frame defect is resolved with
   widened receiver guards, exact boundary cases, a real receiver harness, and
-  ASan/UBSan coverage. R-01 remains open for the new candidate-write frames,
-  which do not exist yet and must receive equivalent validation in Stage 02.
+  ASan/UBSan coverage. The isolated candidate-write and custom-save commit
+  frames now have exact-length, padding, bounds, correlation, malformed-corpus,
+  and sanitizer coverage in C and JavaScript. R-01 remains open until that
+  standalone codec is connected through and reverified at the production QMK
+  callback boundary.
 - R-07's original resource wording was corrected by D-016. On the current
-  tree, the SRAM0–3 `.data + .bss` regression metric is 48,640 bytes against a
-  51,000-byte policy, while the linker/core-memory span is 213,496 bytes at
+  tree, the SRAM0–3 `.data + .bss` regression metric is 48,664 bytes against a
+  51,000-byte policy, while the linker/core-memory span is 213,472 bytes at
   boot. Fixed linked occupancy across the RP2040's 270,336 bytes of physical
-  SRAM is 56,104 bytes. These figures are not interchangeable,
+  SRAM is 56,128 bytes. These figures are not interchangeable,
   and runtime allocator high-water remains unmeasured.
 - The accepted design repartitions the existing 16 KiB logical EEPROM, so it
   does not enlarge the 16 KiB wear-level cache. Candidate payloads remain in

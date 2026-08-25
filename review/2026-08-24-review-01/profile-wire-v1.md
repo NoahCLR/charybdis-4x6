@@ -299,28 +299,29 @@ real digest.
 
 ### Candidate Mutation Envelope
 
-Candidate mutations use VIA custom set command `0x07`, custom channel `0x00`,
-and an exact 32-byte report. The only v1 candidate operations admitted before
-commit is implemented are:
+Candidate staging mutations use VIA custom set command `0x07`; durable commit
+uses VIA custom save command `0x09`. Both use custom channel `0x00` and an exact
+32-byte report:
 
 | Value id | Operation |
 | ---: | --- |
 | `0x10` | begin candidate |
 | `0x11` | write candidate chunk |
 | `0x12` | validate candidate |
+| `0x13` | durably commit and request safe activation |
 | `0x14` | abort candidate |
 
-Value `0x13` remains reserved for the later durable commit owner. The preview,
-rollback, and committed-blob read values remain reserved as `0x15`, `0x16`,
-and `0x17`. A firmware build must not route these mutation frames or advertise
-candidate-write capability merely because the standalone codec and coordinator
-are compiled.
+The preview, rollback, and committed-blob read values remain reserved as
+`0x15`, `0x16`, and `0x17`. A firmware build must not route these mutation
+frames or advertise candidate-write capability merely because the standalone
+codec and coordinator are compiled.
 
-All mutation requests start with:
+All mutation requests use this correlation header (byte 0 is `0x07` except
+for commit, which uses `0x09`):
 
 | Offset | Size | Field |
 | ---: | ---: | --- |
-| 0 | 1 | VIA command `0x07`, custom set |
+| 0 | 1 | VIA command: custom set `0x07` or commit custom save `0x09` |
 | 1 | 1 | custom channel `0x00` |
 | 2 | 1 | operation value id |
 | 3 | 2 | nonzero transaction id |
@@ -360,19 +361,35 @@ Partial overlaps, gaps, writes beyond the declared length or 4,064-byte bound,
 and nonzero padding are rejected.
 
 Validate and abort contain only the five-byte common header; bytes 5 through
-31 are reserved and zero. Validate can start only after every declared byte is
-staged. It performs digest and semantic validation incrementally from scan
-context. Abort is idempotent; retrying a successful or no-op abort never
-repeats storage work.
+31 are reserved and zero. Commit uses the same body-free shape but byte 0 is
+custom save `0x09` rather than custom set `0x07`. Validate can start only after
+every declared byte is staged. It performs digest and semantic validation
+incrementally from scan context.
+
+Commit is admitted only for the matching validated transaction. The scan owner
+writes and reads back the non-marker header, streams one payload readback,
+checks canonical top-level shape, writes the two-byte commit marker last, reads
+that marker back, and only then requests provider activation. Each scan step
+performs exactly one EEPROM operation of at most 20 bytes. Behavior activation
+may remain in the activating state until the safe-boundary predicate clears;
+the prior generation remains active meanwhile. A duplicate commit for the same
+transaction is a no-op while commit/activation is progressing and after final
+success. Once durable commit has entered activation, abort cannot undo it.
+Failure while completing or confirming the final marker is reported as
+durability unknown, not as a safe failure: Studio must reconcile committed
+generation and digest before retrying.
+
+Abort is idempotent before durable commit; retrying a successful or no-op abort
+never repeats storage work.
 There is no autonomous candidate timeout in v1. A host transport timeout does
 not implicitly abort a transaction. Reset or power loss discards the volatile
 mailbox/transaction owner, and the storage marker-last rule keeps an incomplete
 candidate ineligible for boot.
 
-The custom-set callback performs only exact frame validation and one bounded
-mailbox copy. It never reads or writes EEPROM and never computes a payload
-digest. Its immediate response preserves bytes 0 through 4 and replaces bytes
-5 through 31 with:
+The candidate mutation receive callback performs only exact custom-set or
+custom-save frame validation and one bounded mailbox copy. It never reads or
+writes EEPROM and never computes a payload digest. Its immediate response
+preserves bytes 0 through 4 and replaces bytes 5 through 31 with:
 
 | Offset | Size | Field |
 | ---: | ---: | --- |
@@ -410,8 +427,9 @@ route and advertise candidate writes. Its successful 25-byte payload is:
 | 23 | 2 | operation sequence, incremented after each processed mailbox item |
 
 Candidate states are `0` idle, `1` receiving, `2` complete, `3` validating,
-`4` validated, and `5` rejected. Last-operation ids are `0` none, `1` begin,
-`2` chunk, `3` validate, and `4` abort. Error ids are stable:
+`4` validated, `5` rejected, `6` committing, and `7` activating.
+Last-operation ids are `0` none, `1` begin, `2` chunk, `3` validate, `4`
+abort, and `5` commit. Error ids are stable:
 
 | Id | Error |
 | ---: | --- |
@@ -432,6 +450,8 @@ Candidate states are `0` idle, `1` receiving, `2` complete, `3` validating,
 | 14 | semantic validation rejected |
 | 15 | unsupported operation |
 | 16 | candidate poisoned |
+| 17 | durable commit succeeded but activation failed |
+| 18 | final marker durability is unknown; reconcile status |
 
 Errors which have no domain/table/row/tap/field location use the sentinels
 above. The operation sequence lets a host distinguish a newly processed
@@ -440,9 +460,9 @@ result from an older polled status without inventing another transaction id.
 The executable cross-language golden reads live in
 `tests/fixtures/profile_wire_v1_reads.fixture` and are consumed by both the C
 host codec suite and the Profile Studio JavaScript suite. Exact candidate
-begin, chunk, validate, abort, acknowledgement, and operation-status reports
-live in `tests/fixtures/profile_candidate_v1.fixture` and are consumed by the
-standalone firmware C codec/coordinator suite.
+begin, chunk, validate, commit, abort, acknowledgement, and operation-status
+reports live in `tests/fixtures/profile_candidate_v1.fixture` and are consumed
+by the standalone firmware C codec/coordinator suite.
 
 Initial value ids:
 
@@ -466,12 +486,12 @@ payload. Firmware validates every frame length before reading any field.
 
 Retries are idempotent when transaction id, offset, length, and bytes match.
 Conflicting retransmission rejects the transaction. Commit acknowledgement loss
-is resolved by reading status and comparing transaction, generation, and
-digest.
+is resolved by reading status and comparing transaction, digest, commit state,
+last operation, and operation sequence.
 
-USB receive context performs framing and bounded copying only. Decode,
-semantic validation, EEPROM work, safe activation, and split convergence run
-from scan context.
+USB receive context performs exact frame decoding and one bounded mailbox copy
+only. Semantic validation, EEPROM work, safe activation, and split convergence
+run from scan context.
 
 ## Error Model
 
@@ -488,6 +508,8 @@ Responses use stable error ids and include the transaction id when present:
 - validation rejected;
 - waiting for safe boundary;
 - storage failure;
+- final-marker durability unknown;
+- post-commit activation failure;
 - peer pending or divergent;
 - busy or transport contention.
 

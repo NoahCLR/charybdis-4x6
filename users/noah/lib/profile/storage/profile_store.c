@@ -252,6 +252,8 @@ static noah_profile_store_result_t finish_prepare(noah_profile_store_t *store, n
     noah_profile_store_result_t release_result;
 
     store->prepare_active = false;
+    store->commit_phase   = NOAH_PROFILE_STORE_COMMIT_IDLE;
+    store->commit_offset  = 0u;
     release_result        = end_reuse(store);
     return release_result == NOAH_PROFILE_STORE_OK ? result : release_result;
 }
@@ -365,6 +367,8 @@ noah_profile_store_result_t noah_profile_store_prepare_begin(noah_profile_store_
     store->candidate_written      = 0u;
     store->candidate_crc32_state  = NOAH_PROFILE_CRC32_INITIAL;
     store->candidate_digest_state = NOAH_PROFILE_FNV1A_INITIAL;
+    store->commit_phase           = NOAH_PROFILE_STORE_COMMIT_IDLE;
+    store->commit_offset          = 0u;
     store->prepare_active         = true;
     return NOAH_PROFILE_STORE_OK;
 }
@@ -374,6 +378,9 @@ noah_profile_store_result_t noah_profile_store_prepare_write(noah_profile_store_
 
     if (!store || !store->prepare_active) {
         return NOAH_PROFILE_STORE_NO_PREPARE;
+    }
+    if (store->commit_phase != NOAH_PROFILE_STORE_COMMIT_IDLE) {
+        return NOAH_PROFILE_STORE_PREPARE_IN_PROGRESS;
     }
     if (!bytes || length == 0u) {
         return NOAH_PROFILE_STORE_INVALID_ARGUMENT;
@@ -393,13 +400,12 @@ noah_profile_store_result_t noah_profile_store_prepare_write(noah_profile_store_
     return NOAH_PROFILE_STORE_OK;
 }
 
-noah_profile_store_result_t noah_profile_store_prepare_commit(noah_profile_store_t *store, noah_profile_store_record_t *committed) {
-    noah_profile_store_record_t verified;
-    noah_profile_store_result_t result;
-    uint16_t                    start;
-
+noah_profile_store_result_t noah_profile_store_prepare_commit_begin(noah_profile_store_t *store) {
     if (!store || !store->prepare_active) {
         return NOAH_PROFILE_STORE_NO_PREPARE;
+    }
+    if (store->commit_phase != NOAH_PROFILE_STORE_COMMIT_IDLE) {
+        return NOAH_PROFILE_STORE_IN_PROGRESS;
     }
     if (store->candidate_written != store->candidate.payload_length) {
         return NOAH_PROFILE_STORE_PAYLOAD_INCOMPLETE;
@@ -407,30 +413,205 @@ noah_profile_store_result_t noah_profile_store_prepare_commit(noah_profile_store
     if (noah_profile_crc32_finish(store->candidate_crc32_state) != store->candidate.payload_crc32 || store->candidate_digest_state != store->candidate.payload_digest) {
         return finish_prepare(store, NOAH_PROFILE_STORE_CHECKSUM_MISMATCH);
     }
-    if (!slot_start(store->candidate_slot, &start)) {
-        return finish_prepare(store, NOAH_PROFILE_STORE_INVALID_ARGUMENT);
+    store->commit_phase         = NOAH_PROFILE_STORE_COMMIT_HEADER_WRITE;
+    store->commit_offset        = 0u;
+    store->commit_crc32_state   = NOAH_PROFILE_CRC32_INITIAL;
+    store->commit_digest_state  = NOAH_PROFILE_FNV1A_INITIAL;
+    store->commit_domain_count  = 0u;
+    store->commit_domain_index  = 0u;
+    store->commit_prior_domain  = 0u;
+    store->commit_record_offset = 0u;
+    return NOAH_PROFILE_STORE_IN_PROGRESS;
+}
+
+static uint16_t bounded_step_length(uint16_t remaining, uint8_t byte_budget) {
+    return remaining < byte_budget ? remaining : byte_budget;
+}
+
+static void record_from_candidate(const noah_profile_store_t *store, noah_profile_store_record_t *record) {
+    *record = (noah_profile_store_record_t){
+        .slot                    = store->candidate_slot,
+        .schema_major            = store->candidate.schema_major,
+        .schema_minor            = store->candidate.schema_minor,
+        .flags                   = store->candidate.flags,
+        .payload_length          = store->candidate.payload_length,
+        .generation              = store->candidate.generation,
+        .origin_half             = store->candidate.origin_half,
+        .payload_crc32           = store->candidate.payload_crc32,
+        .payload_digest          = store->candidate.payload_digest,
+        .compiled_default_digest = store->candidate.compiled_default_digest,
+        .action_abi_digest       = store->candidate.action_abi_digest,
+    };
+}
+
+noah_profile_store_result_t noah_profile_store_prepare_commit_step(noah_profile_store_t *store, uint8_t byte_budget, noah_profile_store_record_t *committed) {
+    uint8_t                     expected_header[NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE];
+    noah_profile_store_record_t record;
+    uint16_t                    start;
+    uint16_t                    length;
+
+    if (!store || !store->prepare_active || store->commit_phase == NOAH_PROFILE_STORE_COMMIT_IDLE) {
+        return NOAH_PROFILE_STORE_NO_PREPARE;
+    }
+    if (byte_budget == 0u || byte_budget > 20u || !slot_start(store->candidate_slot, &start)) {
+        return NOAH_PROFILE_STORE_INVALID_ARGUMENT;
     }
 
-    encode_header(store->scratch, &store->candidate);
-    if (!io_write(store, start, store->scratch, HEADER_COMMIT_MARKER)) {
-        return finish_prepare(store, NOAH_PROFILE_STORE_IO_ERROR);
+    switch (store->commit_phase) {
+        case NOAH_PROFILE_STORE_COMMIT_HEADER_WRITE:
+            encode_header(expected_header, &store->candidate);
+            length = bounded_step_length((uint16_t)(HEADER_COMMIT_MARKER - store->commit_offset), byte_budget);
+            if (!io_write(store, (uint16_t)(start + store->commit_offset), &expected_header[store->commit_offset], length)) {
+                return finish_prepare(store, NOAH_PROFILE_STORE_IO_ERROR);
+            }
+            store->commit_offset = (uint16_t)(store->commit_offset + length);
+            if (store->commit_offset == HEADER_COMMIT_MARKER) {
+                store->commit_phase  = NOAH_PROFILE_STORE_COMMIT_HEADER_READBACK;
+                store->commit_offset = 0u;
+            }
+            return NOAH_PROFILE_STORE_IN_PROGRESS;
+
+        case NOAH_PROFILE_STORE_COMMIT_HEADER_READBACK:
+            encode_header(expected_header, &store->candidate);
+            length = bounded_step_length((uint16_t)(HEADER_COMMIT_MARKER - store->commit_offset), byte_budget);
+            if (!io_read(store, (uint16_t)(start + store->commit_offset), store->scratch, length)) {
+                return finish_prepare(store, NOAH_PROFILE_STORE_IO_ERROR);
+            }
+            if (memcmp(store->scratch, &expected_header[store->commit_offset], length) != 0) {
+                return finish_prepare(store, NOAH_PROFILE_STORE_CHECKSUM_MISMATCH);
+            }
+            store->commit_offset = (uint16_t)(store->commit_offset + length);
+            if (store->commit_offset == HEADER_COMMIT_MARKER) {
+                store->commit_phase        = NOAH_PROFILE_STORE_COMMIT_PAYLOAD_READBACK;
+                store->commit_offset       = 0u;
+                store->commit_crc32_state  = NOAH_PROFILE_CRC32_INITIAL;
+                store->commit_digest_state = NOAH_PROFILE_FNV1A_INITIAL;
+            }
+            return NOAH_PROFILE_STORE_IN_PROGRESS;
+
+        case NOAH_PROFILE_STORE_COMMIT_PAYLOAD_READBACK:
+            length = bounded_step_length((uint16_t)(store->candidate.payload_length - store->commit_offset), byte_budget);
+            if (!io_read(store, (uint16_t)(start + NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE + store->commit_offset), store->scratch, length)) {
+                return finish_prepare(store, NOAH_PROFILE_STORE_IO_ERROR);
+            }
+            store->commit_crc32_state  = noah_profile_crc32_update(store->commit_crc32_state, store->scratch, length);
+            store->commit_digest_state = noah_profile_fnv1a_update(store->commit_digest_state, store->scratch, length);
+            store->commit_offset       = (uint16_t)(store->commit_offset + length);
+            if (store->commit_offset == store->candidate.payload_length) {
+                if (noah_profile_crc32_finish(store->commit_crc32_state) != store->candidate.payload_crc32 || store->commit_digest_state != store->candidate.payload_digest) {
+                    return finish_prepare(store, NOAH_PROFILE_STORE_CHECKSUM_MISMATCH);
+                }
+                store->commit_phase  = NOAH_PROFILE_STORE_COMMIT_SHAPE_HEADER;
+                store->commit_offset = 0u;
+            }
+            return NOAH_PROFILE_STORE_IN_PROGRESS;
+
+        case NOAH_PROFILE_STORE_COMMIT_SHAPE_HEADER:
+            length = bounded_step_length((uint16_t)(PROFILE_BLOB_HEADER_SIZE - store->commit_record_offset), byte_budget);
+            if (!io_read(store, (uint16_t)(start + NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE + store->commit_record_offset), &store->scratch[store->commit_record_offset], length)) {
+                return finish_prepare(store, NOAH_PROFILE_STORE_IO_ERROR);
+            }
+            store->commit_record_offset = (uint8_t)(store->commit_record_offset + length);
+            if (store->commit_record_offset != PROFILE_BLOB_HEADER_SIZE) {
+                return NOAH_PROFILE_STORE_IN_PROGRESS;
+            }
+            if (memcmp(store->scratch, profile_magic, sizeof(profile_magic)) != 0 || store->scratch[4] != store->candidate.schema_major || store->scratch[5] != store->candidate.schema_minor || store->scratch[7] != PROFILE_BLOB_CANONICAL_BIT) {
+                return finish_prepare(store, NOAH_PROFILE_STORE_INVALID_PAYLOAD);
+            }
+            store->commit_domain_count = store->scratch[6];
+            store->commit_domain_index = 0u;
+            store->commit_prior_domain = 0u;
+            store->commit_offset       = PROFILE_BLOB_HEADER_SIZE;
+            store->commit_record_offset = 0u;
+            if (store->commit_domain_count == 0u) {
+                if (store->commit_offset != store->candidate.payload_length) {
+                    return finish_prepare(store, NOAH_PROFILE_STORE_INVALID_PAYLOAD);
+                }
+                store->commit_phase = NOAH_PROFILE_STORE_COMMIT_MARKER_WRITE;
+            } else {
+                store->commit_phase = NOAH_PROFILE_STORE_COMMIT_SHAPE_DOMAIN;
+            }
+            return NOAH_PROFILE_STORE_IN_PROGRESS;
+
+        case NOAH_PROFILE_STORE_COMMIT_SHAPE_DOMAIN: {
+            uint8_t  domain_id;
+            uint8_t  domain_version;
+            uint16_t domain_length;
+
+            if ((uint32_t)store->commit_offset + DOMAIN_ENVELOPE_SIZE > store->candidate.payload_length) {
+                return finish_prepare(store, NOAH_PROFILE_STORE_INVALID_PAYLOAD);
+            }
+            length = bounded_step_length((uint16_t)(DOMAIN_ENVELOPE_SIZE - store->commit_record_offset), byte_budget);
+            if (!io_read(store, (uint16_t)(start + NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE + store->commit_offset + store->commit_record_offset), &store->scratch[store->commit_record_offset], length)) {
+                return finish_prepare(store, NOAH_PROFILE_STORE_IO_ERROR);
+            }
+            store->commit_record_offset = (uint8_t)(store->commit_record_offset + length);
+            if (store->commit_record_offset != DOMAIN_ENVELOPE_SIZE) {
+                return NOAH_PROFILE_STORE_IN_PROGRESS;
+            }
+            domain_id      = store->scratch[0];
+            domain_version = store->scratch[1];
+            domain_length  = read_u16(&store->scratch[2]);
+            if (domain_id <= store->commit_prior_domain || (domain_id != 0x10u && domain_id != 0x20u) || domain_version != 1u || (uint32_t)store->commit_offset + DOMAIN_ENVELOPE_SIZE + domain_length > store->candidate.payload_length) {
+                return finish_prepare(store, NOAH_PROFILE_STORE_INVALID_PAYLOAD);
+            }
+            store->commit_prior_domain = domain_id;
+            store->commit_offset       = (uint16_t)(store->commit_offset + DOMAIN_ENVELOPE_SIZE + domain_length);
+            store->commit_domain_index++;
+            store->commit_record_offset = 0u;
+            if (store->commit_domain_index == store->commit_domain_count) {
+                if (store->commit_offset != store->candidate.payload_length) {
+                    return finish_prepare(store, NOAH_PROFILE_STORE_INVALID_PAYLOAD);
+                }
+                store->commit_phase = NOAH_PROFILE_STORE_COMMIT_MARKER_WRITE;
+            }
+            return NOAH_PROFILE_STORE_IN_PROGRESS;
+        }
+
+        case NOAH_PROFILE_STORE_COMMIT_MARKER_WRITE:
+            length = bounded_step_length((uint16_t)(sizeof(commit_marker) - store->commit_record_offset), byte_budget);
+            if (!io_write(store, (uint16_t)(start + HEADER_COMMIT_MARKER + store->commit_record_offset), &commit_marker[store->commit_record_offset], length)) {
+                return finish_prepare(store, store->commit_record_offset + length == sizeof(commit_marker) ? NOAH_PROFILE_STORE_DURABILITY_UNKNOWN : NOAH_PROFILE_STORE_IO_ERROR);
+            }
+            store->commit_record_offset = (uint8_t)(store->commit_record_offset + length);
+            if (store->commit_record_offset == sizeof(commit_marker)) {
+                store->commit_phase         = NOAH_PROFILE_STORE_COMMIT_MARKER_READBACK;
+                store->commit_record_offset = 0u;
+            }
+            return NOAH_PROFILE_STORE_IN_PROGRESS;
+
+        case NOAH_PROFILE_STORE_COMMIT_MARKER_READBACK:
+            length = bounded_step_length((uint16_t)(sizeof(commit_marker) - store->commit_record_offset), byte_budget);
+            if (!io_read(store, (uint16_t)(start + HEADER_COMMIT_MARKER + store->commit_record_offset), &store->scratch[store->commit_record_offset], length)) {
+                return finish_prepare(store, NOAH_PROFILE_STORE_DURABILITY_UNKNOWN);
+            }
+            store->commit_record_offset = (uint8_t)(store->commit_record_offset + length);
+            if (store->commit_record_offset != sizeof(commit_marker)) {
+                return NOAH_PROFILE_STORE_IN_PROGRESS;
+            }
+            if (memcmp(store->scratch, commit_marker, sizeof(commit_marker)) != 0) {
+                return finish_prepare(store, NOAH_PROFILE_STORE_DURABILITY_UNKNOWN);
+            }
+            record_from_candidate(store, &record);
+            store->committed = record;
+            if (committed) {
+                *committed = record;
+            }
+            return finish_prepare(store, NOAH_PROFILE_STORE_OK);
+
+        case NOAH_PROFILE_STORE_COMMIT_IDLE:
+        default:
+            return finish_prepare(store, NOAH_PROFILE_STORE_INVALID_ARGUMENT);
     }
-    result = noah_profile_store_validate_slot(store, store->candidate_slot, false, &verified);
-    if (result != NOAH_PROFILE_STORE_OK) {
-        return finish_prepare(store, result);
+}
+
+noah_profile_store_result_t noah_profile_store_prepare_commit(noah_profile_store_t *store, noah_profile_store_record_t *committed) {
+    noah_profile_store_result_t result = noah_profile_store_prepare_commit_begin(store);
+
+    while (result == NOAH_PROFILE_STORE_IN_PROGRESS) {
+        result = noah_profile_store_prepare_commit_step(store, 20u, committed);
     }
-    if (!io_write(store, (uint16_t)(start + HEADER_COMMIT_MARKER), commit_marker, sizeof(commit_marker))) {
-        return finish_prepare(store, NOAH_PROFILE_STORE_IO_ERROR);
-    }
-    result = noah_profile_store_validate_slot(store, store->candidate_slot, true, &verified);
-    if (result != NOAH_PROFILE_STORE_OK) {
-        return finish_prepare(store, result);
-    }
-    store->committed = verified;
-    if (committed) {
-        *committed = verified;
-    }
-    return finish_prepare(store, NOAH_PROFILE_STORE_OK);
+    return result;
 }
 
 noah_profile_store_result_t noah_profile_store_prepare_abort(noah_profile_store_t *store) {

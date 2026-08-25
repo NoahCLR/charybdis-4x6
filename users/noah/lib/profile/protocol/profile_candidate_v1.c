@@ -51,8 +51,11 @@ static noah_profile_candidate_v1_decode_result_t fail(noah_profile_candidate_v1_
     return result;
 }
 
-static bool operation_is_supported(uint8_t value) {
-    return value == NOAH_PROFILE_CANDIDATE_V1_VALUE_BEGIN || value == NOAH_PROFILE_CANDIDATE_V1_VALUE_CHUNK || value == NOAH_PROFILE_CANDIDATE_V1_VALUE_VALIDATE || value == NOAH_PROFILE_CANDIDATE_V1_VALUE_ABORT;
+static bool operation_is_supported(uint8_t command, uint8_t value) {
+    if (command == NOAH_PROFILE_CANDIDATE_V1_COMMAND_SAVE) {
+        return value == NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT;
+    }
+    return command == NOAH_PROFILE_CANDIDATE_V1_COMMAND_SET && (value == NOAH_PROFILE_CANDIDATE_V1_VALUE_BEGIN || value == NOAH_PROFILE_CANDIDATE_V1_VALUE_CHUNK || value == NOAH_PROFILE_CANDIDATE_V1_VALUE_VALIDATE || value == NOAH_PROFILE_CANDIDATE_V1_VALUE_ABORT);
 }
 
 static noah_profile_candidate_v1_operation_t decode_operation(uint8_t value) {
@@ -63,6 +66,8 @@ static noah_profile_candidate_v1_operation_t decode_operation(uint8_t value) {
             return NOAH_PROFILE_CANDIDATE_V1_OPERATION_CHUNK;
         case NOAH_PROFILE_CANDIDATE_V1_VALUE_VALIDATE:
             return NOAH_PROFILE_CANDIDATE_V1_OPERATION_VALIDATE;
+        case NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT:
+            return NOAH_PROFILE_CANDIDATE_V1_OPERATION_COMMIT;
         case NOAH_PROFILE_CANDIDATE_V1_VALUE_ABORT:
             return NOAH_PROFILE_CANDIDATE_V1_OPERATION_ABORT;
         default:
@@ -95,12 +100,12 @@ noah_profile_candidate_v1_decode_result_t noah_profile_candidate_v1_decode(const
         uint8_t offset = length < NOAH_PROFILE_WIRE_V1_REPORT_SIZE ? (uint8_t)length : NOAH_PROFILE_WIRE_V1_REPORT_SIZE;
         return fail(error, NOAH_PROFILE_CANDIDATE_V1_DECODE_INVALID_LENGTH, offset);
     }
-    if (frame[FRAME_COMMAND] != NOAH_PROFILE_CANDIDATE_V1_COMMAND_SET || frame[FRAME_CHANNEL] != NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL) {
+    if ((frame[FRAME_COMMAND] != NOAH_PROFILE_CANDIDATE_V1_COMMAND_SET && frame[FRAME_COMMAND] != NOAH_PROFILE_CANDIDATE_V1_COMMAND_SAVE) || frame[FRAME_CHANNEL] != NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL) {
         return NOAH_PROFILE_CANDIDATE_V1_DECODE_NOT_HANDLED;
     }
 
     value = frame[FRAME_VALUE];
-    if (!operation_is_supported(value)) {
+    if (!operation_is_supported(frame[FRAME_COMMAND], value)) {
         return NOAH_PROFILE_CANDIDATE_V1_DECODE_NOT_HANDLED;
     }
 

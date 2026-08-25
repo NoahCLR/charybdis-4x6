@@ -12,6 +12,7 @@ const {
     buildCandidateAbortRequest,
     buildCandidateBeginRequest,
     buildCandidateChunkRequest,
+    buildCandidateCommitRequest,
     buildCandidateValidateRequest,
     candidateMetadataForBlob,
     candidateMutationResponseMatcher,
@@ -30,6 +31,9 @@ const UPLOAD_PHASE = Object.freeze({
     WRITING: "writing",
     VALIDATE: "validate",
     VALIDATING: "validating",
+    COMMIT_PREFLIGHT: "commit-preflight",
+    COMMIT: "commit",
+    COMMITTING: "committing",
     ABORTING: "aborting",
     COMPLETE: "complete",
 });
@@ -221,6 +225,71 @@ class CandidateUploadCoordinator {
         }
     }
 
+    async commit(transactionId, options = {}) {
+        if (this.uploading) {
+            throw new CandidateUploadError("UPLOAD_BUSY", "A candidate operation is already active.", {
+                phase: UPLOAD_PHASE.COMMIT_PREFLIGHT,
+                safeToRetry: true,
+            });
+        }
+        const context = createUploadContext(options.signal);
+        context.transactionId = normalizeTransactionId(transactionId);
+        context.onProgress = typeof options.onProgress === "function" ? options.onProgress : undefined;
+        context.expectedDigest = options.digest === undefined ? undefined : normalizeInteger(options.digest, "Candidate digest", 0, 0xffffffff);
+        this.uploading = true;
+        try {
+            throwIfCancelled(context);
+            context.phase = UPLOAD_PHASE.COMMIT_PREFLIGHT;
+            context.status = await this.readStatus(context, {ambiguous: false});
+            assertCandidateIdentity(context.status, context);
+            if (context.expectedDigest !== undefined && context.status.digest !== context.expectedDigest) {
+                throw uploadError("CANDIDATE_IDENTITY_MISMATCH", "Prepared candidate digest does not match the requested commit.", context, {safeToRetry: false});
+            }
+            context.expectedDigest = context.status.digest;
+            if (commitIsComplete(context.status, context)) {
+                assertNoDeviceError(context.status, context);
+                context.phase = UPLOAD_PHASE.COMPLETE;
+                this.emitProgress(context);
+                return commitResult(context);
+            }
+            if ([CANDIDATE_STATE.COMMITTING, CANDIDATE_STATE.ACTIVATING].includes(context.status.state)) {
+                context.phase = UPLOAD_PHASE.COMMITTING;
+                context.operation = CANDIDATE_OPERATION.COMMIT;
+                context.status = await this.waitForCommit(context);
+                context.phase = UPLOAD_PHASE.COMPLETE;
+                context.operation = CANDIDATE_OPERATION.NONE;
+                this.emitProgress(context);
+                return commitResult(context);
+            }
+            if (context.status.state !== CANDIDATE_STATE.VALIDATED || context.status.error.id !== CANDIDATE_ERROR.NONE) {
+                throw uploadError("CANDIDATE_NOT_VALIDATED", "Only the matching validated candidate can be committed.", context, {safeToRetry: false});
+            }
+
+            throwIfCancelled(context);
+            context.phase = UPLOAD_PHASE.COMMIT;
+            context.operation = CANDIDATE_OPERATION.COMMIT;
+            context.status = await this.performMutation(
+                buildCandidateCommitRequest(context.transactionId),
+                context
+            );
+            context.phase = UPLOAD_PHASE.COMMITTING;
+            context.status = await this.waitForCommit(context);
+            context.phase = UPLOAD_PHASE.COMPLETE;
+            context.operation = CANDIDATE_OPERATION.NONE;
+            this.emitProgress(context);
+            return commitResult(context);
+        } catch (cause) {
+            if (cause instanceof CandidateUploadError) throw cause;
+            throw uploadError("COMMIT_FAILED", cause?.message || "Candidate commit failed.", context, {
+                ambiguous: context.phase !== UPLOAD_PHASE.COMMIT_PREFLIGHT,
+                cause,
+                safeToRetry: context.operation === CANDIDATE_OPERATION.COMMIT,
+            });
+        } finally {
+            this.uploading = false;
+        }
+    }
+
     async performMutation(frame, context, operationDetails = {}) {
         let baseline = context.status;
         let busyResubmissions = 0;
@@ -238,7 +307,7 @@ class CandidateUploadCoordinator {
                     "TRANSPORT_OUTCOME_AMBIGUOUS",
                     "The candidate mutation response was lost; the keyboard may or may not have admitted it.",
                     context,
-                    {ambiguous: true, cause, safeToRetry: false}
+                    {ambiguous: true, cause, safeToRetry: context.operation === CANDIDATE_OPERATION.COMMIT}
                 );
             }
             let acknowledgment;
@@ -382,6 +451,36 @@ class CandidateUploadCoordinator {
         });
     }
 
+    async waitForCommit(context) {
+        for (let poll = 0; poll < this.maxStatusPolls; poll += 1) {
+            throwIfCancelled(context);
+            const status = poll === 0
+                ? context.status
+                : await this.readStatus(context, {ambiguous: true});
+            context.status = status;
+            this.emitProgress(context);
+            assertCandidateIdentity(status, context);
+            if (status.digest !== context.expectedDigest) {
+                throw uploadError("CANDIDATE_IDENTITY_MISMATCH", "Commit status digest changed during persistence.", context, {status, safeToRetry: false});
+            }
+            if (commitIsComplete(status, context)) {
+                assertNoDeviceError(status, context);
+                return status;
+            }
+            if (status.state === CANDIDATE_STATE.REJECTED || status.error.id !== CANDIDATE_ERROR.NONE) {
+                throw deviceRejection(status, context);
+            }
+            if (![CANDIDATE_STATE.COMMITTING, CANDIDATE_STATE.ACTIVATING].includes(status.state)) {
+                throw uploadError("INVALID_COMMIT_STATE", `Firmware entered candidate state ${status.state} during commit.`, context, {status, safeToRetry: false});
+            }
+            await this.waitBeforePoll(context);
+        }
+        throw uploadError("COMMIT_OUTCOME_AMBIGUOUS", "Candidate commit did not finish within the bounded status-poll limit.", context, {
+            ambiguous: true,
+            safeToRetry: true,
+        });
+    }
+
     async readStatus(context, options) {
         try {
             return await readCandidateStatus(this.connection, {
@@ -475,6 +574,11 @@ function assertSuccessfulOperationStatus(status, context, operationDetails) {
                 throw operationStatusMismatch(status, context, `validation entered state ${status.state}`);
             }
             break;
+        case CANDIDATE_OPERATION.COMMIT:
+            if (![CANDIDATE_STATE.COMMITTING, CANDIDATE_STATE.ACTIVATING, CANDIDATE_STATE.IDLE].includes(status.state)) {
+                throw operationStatusMismatch(status, context, `commit entered state ${status.state}`);
+            }
+            break;
         case CANDIDATE_OPERATION.ABORT:
             if (status.state !== CANDIDATE_STATE.IDLE) {
                 throw operationStatusMismatch(status, context, `abort entered state ${status.state}`);
@@ -496,6 +600,8 @@ function operationStatusCouldBeOurs(status, context, operationDetails) {
             return status.nextOffset === operationDetails.offset + operationDetails.length;
         case CANDIDATE_OPERATION.VALIDATE:
             return [CANDIDATE_STATE.VALIDATING, CANDIDATE_STATE.VALIDATED, CANDIDATE_STATE.REJECTED].includes(status.state);
+        case CANDIDATE_OPERATION.COMMIT:
+            return [CANDIDATE_STATE.COMMITTING, CANDIDATE_STATE.ACTIVATING, CANDIDATE_STATE.IDLE, CANDIDATE_STATE.REJECTED].includes(status.state);
         case CANDIDATE_OPERATION.ABORT:
             return status.state === CANDIDATE_STATE.IDLE;
         default:
@@ -522,6 +628,10 @@ function canSafelyResubmit(status, context, operationDetails) {
         }
         case CANDIDATE_OPERATION.VALIDATE:
             return status.transactionId === context.transactionId && status.state === CANDIDATE_STATE.COMPLETE;
+        case CANDIDATE_OPERATION.COMMIT:
+            return status.transactionId === context.transactionId
+                && ([CANDIDATE_STATE.VALIDATED, CANDIDATE_STATE.COMMITTING, CANDIDATE_STATE.ACTIVATING].includes(status.state)
+                    || (status.state === CANDIDATE_STATE.IDLE && status.lastOperation === CANDIDATE_OPERATION.COMMIT));
         default:
             return false;
     }
@@ -538,6 +648,22 @@ function assertCandidateIdentity(status, context) {
     }
 }
 
+function commitIsComplete(status, context) {
+    return status.state === CANDIDATE_STATE.IDLE
+        && status.lastOperation === CANDIDATE_OPERATION.COMMIT
+        && status.transactionId === context.transactionId
+        && status.digest === context.expectedDigest;
+}
+
+function commitResult(context) {
+    return {
+        transactionId: context.transactionId,
+        digest: context.expectedDigest,
+        status: cloneStatus(context.status),
+        progress: progressFor(context),
+    };
+}
+
 function assertNoDeviceError(status, context) {
     if (status.error.id !== CANDIDATE_ERROR.NONE) {
         throw deviceRejection(status, context);
@@ -545,6 +671,14 @@ function assertNoDeviceError(status, context) {
 }
 
 function deviceRejection(status, context) {
+    if (status.error.id === CANDIDATE_ERROR.DURABILITY_UNKNOWN) {
+        return uploadError(
+            "DURABILITY_UNKNOWN",
+            "Firmware could not confirm whether the final commit marker became durable; reconcile device status before retrying.",
+            context,
+            {ambiguous: true, deviceError: status.error, status, safeToRetry: false}
+        );
+    }
     return uploadError(
         "DEVICE_REJECTED",
         `Firmware rejected the candidate with ${CANDIDATE_ERROR_NAMES[status.error.id] || `error ${status.error.id}`}.`,
@@ -698,6 +832,11 @@ async function uploadProfileCandidate(connection, blob, options = {}) {
     return coordinator.upload(blob, options);
 }
 
+async function commitPreparedCandidate(connection, transactionId, options = {}) {
+    const coordinator = new CandidateUploadCoordinator(connection, options);
+    return coordinator.commit(transactionId, options);
+}
+
 module.exports = {
     DEFAULT_MAX_BUSY_RESUBMISSIONS,
     DEFAULT_MAX_STATUS_POLLS,
@@ -705,5 +844,6 @@ module.exports = {
     CandidateUploadCoordinator,
     CandidateUploadError,
     UPLOAD_PHASE,
+    commitPreparedCandidate,
     uploadProfileCandidate,
 };

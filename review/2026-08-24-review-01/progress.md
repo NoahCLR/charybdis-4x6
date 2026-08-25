@@ -462,8 +462,11 @@ Focused verification passed:
   split-slave worst reviewed paths)
 - `git diff --check`
 
-Production QMK routing, candidate/domain capability advertising, commit
-ownership, activation, and split convergence remain deliberately absent. The
+Production QMK routing, candidate/domain capability advertising, the production
+safe predicate/invalidators, and split convergence remain deliberately absent.
+The isolated candidate scan owner now composes bounded marker-last commit and
+provider activation behind custom-save `0x13`; it is not yet reachable from
+QMK. The
 compiled-default materializer and the isolated effective-profile provider
 foundation have now landed. The provider uses the established publication
 primitive, fails closed during invalidation, guards safe-boundary reentrancy,
@@ -481,9 +484,8 @@ in 58 steps with at most one 16-byte read each. Every step is mechanically
 capped at one reader operation and 20 newly observed bytes. Cortex-M0+ compile
 coverage enforces the 348-byte whole-validator state under its explicit
 352-byte regression policy. This closes the unbounded domain-work blocker;
-production routing still awaits the commit wire operation, production safe
-predicate/invalidators, and runtime owner; real hardware timing remains
-unconfirmed.
+production routing still awaits the safe predicate/invalidators and runtime
+QMK owner; real hardware timing remains unconfirmed.
 
 Stage 00 baseline commands passed on 2026-08-25:
 
@@ -494,7 +496,7 @@ Stage 00 baseline commands passed on 2026-08-25:
 
 The initial Stage 00 target evidence was a 48,396 B SRAM0–3 `.data + .bss`
 metric against a 51,000 B policy and a 213,744 B linker/core-memory span at
-boot. The current reconciled tree measures 48,640 B and 213,496 B respectively.
+boot. The current reconciled tree measures 48,664 B and 213,472 B respectively.
 The 1,880 B worst reviewed main path has 40 B to the 1,920 B reviewed-path
 policy and 680 B to its 2,560 B physical process-stack boundary; the 336 B
 worst reviewed split-slave path is measured against its 768 B reviewed-path
@@ -524,14 +526,14 @@ These are expected opening conditions, not project failure.
 
 ## Next Steps
 
-1. Freeze and implement the durable commit operation/status envelope, then wire
-   the scan owner to durable commit plus provider activation request.
-2. Install the production safe-boundary predicate and first invalidators before
+1. Install the production safe-boundary predicate and first invalidators before
    connecting the validated staging path to QMK routing, then measure scan
    timing on the real RP2040 before advertising mutation capabilities.
-3. Add split reconciliation before advertising durable mutation capabilities.
-4. Build the effective RGB accessors, then migrate the eight renderer families
+2. Add split reconciliation before advertising durable mutation capabilities.
+3. Build the effective RGB accessors, then migrate the eight renderer families
    without allowing direct compiled-table bypasses.
+4. Build the effective key-behavior accessor and migrate lookup after the safe
+   interaction boundary is mechanically enforced.
 5. Run the real-board transport and persistence matrix when hardware is
    available.
 
@@ -642,3 +644,47 @@ Append new entries here in chronological order. Each entry must name:
   so screenshots were intentionally not regenerated. The QMK build/resource
   gates wrote generated sibling build artifacts only; no sibling source file
   was edited.
+
+### 2026-08-25 — Stage 02 bounded durable commit and activation checkpoint
+
+- Replaced the cold marker-last store commit with explicit begin/step phases.
+  Begin performs no EEPROM I/O; every step performs exactly one read or write
+  of at most 20 bytes through header write/readback, payload checksum readback,
+  canonical top-level shape verification, and final-marker write/readback.
+- Distinguished an unconfirmed completing marker write or marker readback from
+  a safely failed write as `durability unknown`. Power-loss tests still select
+  the old generation, new generation, or no committed profile according to the
+  exact byte boundary; the prior committed slot is never destroyed first.
+- Added custom-save `0x09` value `0x13` as the exact durable-commit request,
+  plus COMMITTING/ACTIVATING states, commit operation status, activation-failed
+  and durability-unknown errors, and shared C/JavaScript golden frames.
+- The isolated scan owner now advances bounded persistence, preserves
+  transaction/digest identity for idempotent retries, requests provider
+  activation only after confirmed durability, waits for the safe boundary, and
+  retries a transiently blocked activation request before polling it.
+- Profile Studio now has a separate prepared-candidate commit coordinator. It
+  waits across commit and activation, recovers a lost commit acknowledgement
+  from exact status, refuses digest mismatch before mutation, and treats
+  unknown marker durability as an unsafe-to-retry reconciliation case. Source
+  Apply remains unchanged, preserving the prepare/source/commit ordering in
+  D-013 for later UI integration.
+- Verification passed: `sh tests/host/run_profile_store_tests.sh`,
+  `sh tests/host/run_profile_candidate_transaction_tests.sh`,
+  `sh tests/host/run_profile_candidate_store_backend_tests.sh`,
+  `sh tests/host/run_feature_gate_compile_tests.sh`, focused Node candidate
+  tests (24 tests), Profile Studio `npm run check` (88 tests),
+  `sh tests/host/run_all_host_tests.sh`,
+  `qmk compile -kb bastardkb/charybdis/4x6 -km noah`,
+  `sh tests/host/run_firmware_memory_budget_checks.sh`,
+  `sh tests/host/run_firmware_stack_budget_checks.sh`, and `git diff --check`.
+- Fresh RP2040 accounting reports 270,336 B physical SRAM per MCU, 25,684 B
+  SRAM0–3 `.bss`, 48,664 B for the `.data + .bss` regression metric,
+  213,472 B for the boot core-memory span, and 56,128 B fixed linked occupancy.
+  Reviewed stack paths remain 1,880 B main and 336 B split-slave.
+- Production QMK mutation routing and capability advertising remain disabled.
+  The next package is the production safe-boundary predicate and first domain
+  invalidators, followed by QMK owner wiring and real-board scan timing. Split
+  convergence and runtime key/RGB consumer migration remain open. No Profile
+  Studio UI changed, so screenshots were intentionally not regenerated. The
+  QMK build/resource gates wrote generated sibling build artifacts only; no
+  sibling source file was edited.

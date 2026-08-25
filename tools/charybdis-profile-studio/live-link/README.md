@@ -35,15 +35,17 @@ trailing bytes. This codec is not connected to any candidate, preview, commit,
 or device-write operation yet.
 
 `profile-candidate-v1.js` is the exact desktop codec for the Stage 02 candidate
-mailbox: begin, sequential chunks, validate, abort, immediate admission, and
-operation status. `candidate-upload-coordinator.js` derives metadata from a
-canonical blob and drives those operations conservatively. It never retries an
-ambiguous transport outcome, only resubmits a busy operation after status proves
-that doing so is safe, and attempts an idempotent abort when a cooperative
-cancellation or deterministic failure happens after staging begins. Preflight
-refuses every non-idle firmware candidate instead of disturbing an existing
-transaction. These modules are not connected to the extension UI or device
-service, and they do not expose commit or activation.
+mailbox: begin, sequential chunks, validate, custom-save commit, abort,
+immediate admission, and operation status. `candidate-upload-coordinator.js`
+derives metadata from a canonical blob, prepares it without activation, and
+offers a separate commit call for D-013's source-then-device ordering. Staging
+never retries an ambiguous transport outcome and performs an idempotent abort
+after deterministic failure. Commit is transaction/digest-correlated,
+idempotent across a lost acknowledgement, waits through bounded committing and
+safe-activation states, and reports final-marker uncertainty as an ambiguous
+outcome requiring status reconciliation. These modules remain disconnected
+from the extension UI and device service; production firmware routing and
+capability advertising are also still disabled.
 
 `rgb-domain-v1.js` is the desktop half of the domain `0x10` v1 codec. It covers the
 complete Milestone A RGB surface, canonicalizes Profile Studio's parsed model,

@@ -27,10 +27,10 @@ foundations:
 | Measurement | Bytes | Meaning |
 | --- | ---: | --- |
 | SRAM0–3 `.data` | 22,980 | nonzero-initialized fixed data |
-| SRAM0–3 `.bss` | 25,660 | zero-initialized fixed data |
-| SRAM0–3 `.data + .bss` | 48,640 | regression metric, not total SRAM use |
-| SRAM0–3 linker/core-memory span at boot | 213,496 | maximum allocator span before runtime allocations |
-| Fixed linked section bytes across all SRAM banks | 56,104 | includes alignment, `.data`, `.bss`, RAM-resident sections, and reserved stacks; excludes runtime allocation |
+| SRAM0–3 `.bss` | 25,684 | zero-initialized fixed data |
+| SRAM0–3 `.data + .bss` | 48,664 | regression metric, not total SRAM use |
+| SRAM0–3 linker/core-memory span at boot | 213,472 | maximum allocator span before runtime allocations |
+| Fixed linked section bytes across all SRAM banks | 56,128 | includes alignment, `.data`, `.bss`, RAM-resident sections, and reserved stacks; excludes runtime allocation |
 
 The linker/core-memory span is `__heap_end__ - __heap_base__`. ChibiOS
 initializes its core allocator from that range and the target's linked newlib
@@ -48,9 +48,9 @@ The current automated thresholds are deliberately conservative policies:
 
 | Policy | Limit | Current margin |
 | --- | ---: | ---: |
-| SRAM0–3 `.bss` maximum | 26,000 B | 340 B |
-| SRAM0–3 `.data + .bss` maximum | 51,000 B | 2,360 B |
-| SRAM0–3 linker/core-memory span minimum at boot | 204,800 B | 8,696 B |
+| SRAM0–3 `.bss` maximum | 26,000 B | 316 B |
+| SRAM0–3 `.data + .bss` maximum | 51,000 B | 2,336 B |
+| SRAM0–3 linker/core-memory span minimum at boot | 204,800 B | 8,672 B |
 
 These thresholds were introduced to detect regressions around earlier linked
 images. They are not RP2040 capacity boundaries. A change may revise them only
@@ -58,9 +58,9 @@ with explicit rationale, bank-aware accounting, failure-path tests, a fresh
 target build, and hardware allocator/stack evidence proportional to the risk.
 
 For example, one nominal 4 KiB static profile buffer would raise the current
-`.data + .bss` metric to about 52,736 bytes and leave about 209,400 bytes in the
-boot core-memory span. Two would raise the metric to about 56,832 bytes and
-leave about 205,304 bytes. Both designs violate current regression policies;
+`.data + .bss` metric to about 52,760 bytes and leave about 209,376 bytes in the
+boot core-memory span. Two would raise the metric to about 56,856 bytes and
+leave about 205,280 bytes. Both designs violate current regression policies;
 neither exhausts physical SRAM. The live-profile project keeps candidate bytes
 in inactive EEPROM for power-loss-safe staging and deterministic memory use,
 not because a 4 KiB buffer is physically impossible.

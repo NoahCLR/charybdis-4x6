@@ -22,6 +22,7 @@ typedef enum {
     NOAH_PROFILE_CANDIDATE_BACKEND_VALID,
     NOAH_PROFILE_CANDIDATE_BACKEND_REJECTED,
     NOAH_PROFILE_CANDIDATE_BACKEND_IO_ERROR,
+    NOAH_PROFILE_CANDIDATE_BACKEND_DURABILITY_UNKNOWN,
 } noah_profile_candidate_backend_result_t;
 
 typedef struct {
@@ -35,6 +36,12 @@ typedef struct {
     // terminal validation result and is treated as an invalid backend
     // response/storage failure by the owner.
     noah_profile_candidate_backend_result_t (*validation_step)(void *context, uint8_t byte_budget, noah_profile_candidate_v1_error_t *error);
+    // Durable commit and activation advance only from scan context. Each
+    // commit_step obeys the same one-operation / <=20-byte work ceiling.
+    noah_profile_candidate_backend_result_t (*commit_begin)(void *context);
+    noah_profile_candidate_backend_result_t (*commit_step)(void *context, uint8_t byte_budget);
+    noah_profile_candidate_backend_result_t (*activation_begin)(void *context);
+    noah_profile_candidate_backend_result_t (*activation_step)(void *context);
     noah_profile_candidate_backend_result_t (*abort)(void *context);
 } noah_profile_candidate_backend_t;
 
@@ -60,6 +67,7 @@ typedef struct {
     bool                                   has_candidate;
     bool                                   poisoned;
     uint16_t                               last_aborted_transaction_id;
+    uint16_t                               last_committed_transaction_id;
 } noah_profile_candidate_transaction_t;
 
 void noah_profile_candidate_transaction_init(noah_profile_candidate_transaction_t *transaction, const noah_profile_candidate_backend_t *backend, const noah_profile_candidate_compatibility_t *compatibility);
@@ -68,8 +76,9 @@ void noah_profile_candidate_transaction_init(noah_profile_candidate_transaction_
 // frame is replaced in place with its immediate admission acknowledgement.
 bool noah_profile_candidate_transaction_receive(noah_profile_candidate_transaction_t *transaction, uint8_t *frame, size_t length);
 
-// Scan side: processes at most one mailbox item or one validator step. Each
-// validation step is independently reader-work-bounded by the contract above.
+// Scan side: processes at most one mailbox item, validation step, commit step,
+// or activation step. Validation and commit obey the bounded-work contracts
+// above; provider activation remains a separate safe-boundary poll.
 bool noah_profile_candidate_transaction_scan(noah_profile_candidate_transaction_t *transaction);
 
 void noah_profile_candidate_transaction_status(const noah_profile_candidate_transaction_t *transaction, noah_profile_candidate_v1_status_t *status);

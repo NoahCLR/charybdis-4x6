@@ -214,7 +214,8 @@ turn the complete parsed RGB model into deterministic Profile Wire bytes.
 
 The RGB codec validates compiled-stage inclusion, complete layer/PD/tap-color
 surfaces, brightness and geometry ceilings, and every selector/group
-reference. It is schema groundwork only: the extension has no RGB preview,
+reference. The transport package also has isolated candidate prepare and
+custom-save commit coordinators, but the extension has no RGB preview,
 candidate upload, commit, or other device-write path yet. See
 [`live-link/rgb-domain-v1.md`](live-link/rgb-domain-v1.md) for the exact
 payload contract and intentional deferrals.

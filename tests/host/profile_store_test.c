@@ -22,12 +22,14 @@ enum {
 
 typedef struct {
     uint8_t  bytes[NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE];
+    uint32_t read_calls;
     uint32_t write_calls;
     uint32_t fail_write_call;
     uint16_t fail_partial_bytes;
     bool     fail_reads;
     uint16_t last_write_address;
     uint16_t last_write_length;
+    uint16_t last_read_length;
 } fake_eeprom_t;
 
 static fake_eeprom_t eeprom;
@@ -51,11 +53,27 @@ static const uint8_t behavior_profile[] = {'N', 'L', 'P', '1', 1u, 0u, 1u, 1u, 0
 static bool fake_read(void *context, uint16_t address, uint8_t *target, uint16_t length) {
     fake_eeprom_t *memory = context;
 
+    memory->read_calls++;
+    memory->last_read_length = length;
     if (memory->fail_reads || (uint32_t)address + length > sizeof(memory->bytes)) {
         return false;
     }
     memcpy(target, &memory->bytes[address], length);
     return true;
+}
+
+static uint16_t partial_limit_for_commit_write(uint32_t write_call, uint16_t payload_length) {
+    uint32_t payload_calls = (payload_length + 4u) / 5u;
+
+    if (write_call == 1u || write_call == payload_calls + 4u) {
+        return 2u;
+    }
+    if (write_call <= payload_calls + 1u) {
+        uint32_t payload_call = write_call - 2u;
+        uint16_t remaining    = (uint16_t)(payload_length - payload_call * 5u);
+        return remaining < 5u ? remaining : 5u;
+    }
+    return write_call == payload_calls + 2u ? 20u : 10u;
 }
 
 static bool fake_write(void *context, uint16_t address, const uint8_t *source, uint16_t length) {
@@ -172,6 +190,21 @@ static noah_profile_store_result_t commit_payload(noah_profile_store_t *store, c
     return noah_profile_store_prepare_commit(store, record);
 }
 
+static void stage_commit_to_phase(noah_profile_store_t *store, const uint8_t *payload, uint16_t length, noah_profile_store_commit_phase_t phase) {
+    noah_profile_store_candidate_t candidate = candidate_for(payload, length, 1u, 0u);
+    noah_profile_store_result_t    result;
+    uint16_t                       steps = 0u;
+
+    CHECK(noah_profile_store_prepare_begin(store, &candidate) == NOAH_PROFILE_STORE_OK);
+    CHECK(noah_profile_store_prepare_write(store, 0u, payload, length) == NOAH_PROFILE_STORE_OK);
+    CHECK(noah_profile_store_prepare_commit_begin(store) == NOAH_PROFILE_STORE_IN_PROGRESS);
+    while (store->commit_phase != phase) {
+        result = noah_profile_store_prepare_commit_step(store, 20u, NULL);
+        CHECK(result == NOAH_PROFILE_STORE_IN_PROGRESS);
+        CHECK(++steps < 64u);
+    }
+}
+
 static void test_checksums(void) {
     static const uint8_t canonical[] = "123456789";
     uint32_t             crc         = noah_profile_crc32_update(NOAH_PROFILE_CRC32_INITIAL, canonical, sizeof(canonical) - 1u);
@@ -241,6 +274,47 @@ static void test_chunk_and_candidate_guards(void) {
     candidate.schema_major      = 1u;
     candidate.action_abi_digest = 0u;
     CHECK(noah_profile_store_prepare_begin(&store, &candidate) == NOAH_PROFILE_STORE_INCOMPATIBLE_ACTION_ABI);
+}
+
+static void test_commit_state_machine_is_scan_bounded(void) {
+    noah_profile_store_t            store;
+    noah_profile_store_candidate_t candidate;
+    noah_profile_store_record_t    record;
+    noah_profile_store_result_t    result;
+    uint32_t                       prior_reads;
+    uint32_t                       prior_writes;
+    uint16_t                       steps = 0u;
+
+    reset_eeprom(&eeprom);
+    initialize_store(&store, &eeprom, NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE);
+    candidate = candidate_for(rgb_profile, sizeof(rgb_profile), 1u, 0u);
+    CHECK(noah_profile_store_prepare_begin(&store, &candidate) == NOAH_PROFILE_STORE_OK);
+    CHECK(noah_profile_store_prepare_write(&store, 0u, rgb_profile, sizeof(rgb_profile)) == NOAH_PROFILE_STORE_OK);
+    prior_reads  = eeprom.read_calls;
+    prior_writes = eeprom.write_calls;
+    CHECK(noah_profile_store_prepare_commit_begin(&store) == NOAH_PROFILE_STORE_IN_PROGRESS);
+    CHECK(eeprom.read_calls == prior_reads && eeprom.write_calls == prior_writes);
+    CHECK(noah_profile_store_prepare_write(&store, 0u, rgb_profile, 1u) == NOAH_PROFILE_STORE_PREPARE_IN_PROGRESS);
+    CHECK(noah_profile_store_prepare_commit_step(&store, 0u, NULL) == NOAH_PROFILE_STORE_INVALID_ARGUMENT);
+    CHECK(noah_profile_store_prepare_commit_step(&store, 21u, NULL) == NOAH_PROFILE_STORE_INVALID_ARGUMENT);
+    CHECK(eeprom.read_calls == prior_reads && eeprom.write_calls == prior_writes);
+
+    do {
+        prior_reads  = eeprom.read_calls;
+        prior_writes = eeprom.write_calls;
+        result       = noah_profile_store_prepare_commit_step(&store, 1u, &record);
+        CHECK(eeprom.read_calls + eeprom.write_calls == prior_reads + prior_writes + 1u);
+        if (eeprom.read_calls != prior_reads) {
+            CHECK(eeprom.last_read_length <= 1u);
+        } else {
+            CHECK(eeprom.last_write_length <= 1u);
+        }
+        CHECK(++steps < 160u);
+    } while (result == NOAH_PROFILE_STORE_IN_PROGRESS);
+
+    CHECK(result == NOAH_PROFILE_STORE_OK);
+    CHECK(record.slot == NOAH_PROFILE_SLOT_A && record.generation == 1u);
+    CHECK(!store.prepare_active && store.commit_phase == NOAH_PROFILE_STORE_COMMIT_IDLE);
 }
 
 static void test_destructive_reuse_guard_brackets_every_prepare(void) {
@@ -348,6 +422,33 @@ static void test_checksum_mismatch_never_commits(void) {
     initialize_store(&rebooted, &eeprom, NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE);
 }
 
+static void test_final_marker_io_failure_is_durability_unknown(void) {
+    noah_profile_store_t        store;
+    noah_profile_store_t        rebooted;
+    noah_profile_store_record_t selected;
+
+    reset_eeprom(&eeprom);
+    initialize_store(&store, &eeprom, NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE);
+    stage_commit_to_phase(&store, empty_profile, sizeof(empty_profile), NOAH_PROFILE_STORE_COMMIT_MARKER_WRITE);
+    eeprom.fail_write_call    = eeprom.write_calls + 1u;
+    eeprom.fail_partial_bytes = NOAH_PROFILE_STORAGE_COMMIT_MARKER_SIZE;
+    CHECK(noah_profile_store_prepare_commit_step(&store, 20u, NULL) == NOAH_PROFILE_STORE_DURABILITY_UNKNOWN);
+    CHECK(!store.prepare_active);
+    eeprom.fail_write_call = 0u;
+    initialize_store(&rebooted, &eeprom, NOAH_PROFILE_STORE_OK);
+    CHECK(rebooted.committed.generation == 1u);
+
+    reset_eeprom(&eeprom);
+    initialize_store(&store, &eeprom, NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE);
+    stage_commit_to_phase(&store, empty_profile, sizeof(empty_profile), NOAH_PROFILE_STORE_COMMIT_MARKER_READBACK);
+    eeprom.fail_reads = true;
+    CHECK(noah_profile_store_prepare_commit_step(&store, 20u, NULL) == NOAH_PROFILE_STORE_DURABILITY_UNKNOWN);
+    eeprom.fail_reads = false;
+    noah_profile_store_init(&rebooted, io_for(&eeprom), compatibility());
+    CHECK(noah_profile_store_boot_select(&rebooted, &selected) == NOAH_PROFILE_STORE_OK);
+    CHECK(selected.generation == 1u);
+}
+
 static void test_power_loss_preserves_last_known_good(void) {
     noah_profile_store_t store;
     uint32_t             fail_call;
@@ -357,8 +458,8 @@ static void test_power_loss_preserves_last_known_good(void) {
     CHECK(commit_payload(&store, empty_profile, sizeof(empty_profile), 1u, 0u, NULL) == NOAH_PROFILE_STORE_OK);
     memcpy(eeprom_snapshot, eeprom.bytes, sizeof(eeprom_snapshot));
 
-    for (fail_call = 1u; fail_call <= 6u; fail_call++) {
-        uint16_t partial_limit = fail_call == 1u || fail_call == 6u ? 2u : (fail_call == 5u ? 30u : 5u);
+    for (fail_call = 1u; fail_call <= 7u; fail_call++) {
+        uint16_t partial_limit = partial_limit_for_commit_write(fail_call, sizeof(rgb_profile));
         uint16_t partial;
 
         for (partial = 0u; partial < partial_limit; partial++) {
@@ -383,8 +484,8 @@ static void test_first_commit_power_loss_falls_back_to_compiled_defaults(void) {
     noah_profile_store_t store;
     uint32_t             fail_call;
 
-    for (fail_call = 1u; fail_call <= 5u; fail_call++) {
-        uint16_t partial_limit = fail_call == 1u || fail_call == 5u ? 2u : (fail_call == 4u ? 30u : 5u);
+    for (fail_call = 1u; fail_call <= 6u; fail_call++) {
+        uint16_t partial_limit = partial_limit_for_commit_write(fail_call, sizeof(empty_profile));
         uint16_t partial;
 
         for (partial = 0u; partial < partial_limit; partial++) {
@@ -487,9 +588,11 @@ int main(void) {
     test_checksums();
     test_commit_and_boot_selection();
     test_chunk_and_candidate_guards();
+    test_commit_state_machine_is_scan_bounded();
     test_destructive_reuse_guard_brackets_every_prepare();
     test_payload_and_header_validation();
     test_checksum_mismatch_never_commits();
+    test_final_marker_io_failure_is_durability_unknown();
     test_power_loss_preserves_last_known_good();
     test_first_commit_power_loss_falls_back_to_compiled_defaults();
     test_generation_conflict_and_rollover();

@@ -12,10 +12,12 @@ const {
 
 const PROFILE_CANDIDATE_V1 = Object.freeze({
     COMMAND_SET: 0x07,
+    COMMAND_SAVE: 0x09,
     CHANNEL: PROFILE_WIRE_V1.CHANNEL,
     VALUE_BEGIN: 0x10,
     VALUE_CHUNK: 0x11,
     VALUE_VALIDATE: 0x12,
+    VALUE_COMMIT: 0x13,
     VALUE_ABORT: 0x14,
     VALUE_STATUS: 0x18,
     CHUNK_MAX: 20,
@@ -40,6 +42,8 @@ const CANDIDATE_STATE = Object.freeze({
     VALIDATING: 3,
     VALIDATED: 4,
     REJECTED: 5,
+    COMMITTING: 6,
+    ACTIVATING: 7,
 });
 
 const CANDIDATE_OPERATION = Object.freeze({
@@ -48,6 +52,7 @@ const CANDIDATE_OPERATION = Object.freeze({
     CHUNK: 2,
     VALIDATE: 3,
     ABORT: 4,
+    COMMIT: 5,
 });
 
 const CANDIDATE_STATUS_FLAGS = Object.freeze({
@@ -74,6 +79,8 @@ const CANDIDATE_ERROR = Object.freeze({
     VALIDATION_REJECTED: 14,
     UNSUPPORTED_OPERATION: 15,
     POISONED: 16,
+    ACTIVATION_FAILED: 17,
+    DURABILITY_UNKNOWN: 18,
 });
 
 const CANDIDATE_ERROR_NAMES = Object.freeze(Object.fromEntries(
@@ -153,6 +160,14 @@ function buildCandidateValidateRequest(transactionId) {
     return buildMutationHeader(
         PROFILE_CANDIDATE_V1.VALUE_VALIDATE,
         assertU16(transactionId, "Candidate transaction id", {nonzero: true})
+    );
+}
+
+function buildCandidateCommitRequest(transactionId) {
+    return buildMutationHeader(
+        PROFILE_CANDIDATE_V1.VALUE_COMMIT,
+        assertU16(transactionId, "Candidate transaction id", {nonzero: true}),
+        PROFILE_CANDIDATE_V1.COMMAND_SAVE
     );
 }
 
@@ -353,9 +368,9 @@ function normalizeCandidateMetadata(metadata) {
     };
 }
 
-function buildMutationHeader(valueId, transactionId) {
+function buildMutationHeader(valueId, transactionId, command = PROFILE_CANDIDATE_V1.COMMAND_SET) {
     const report = Buffer.alloc(RAW_HID_REPORT_SIZE);
-    report[0] = PROFILE_CANDIDATE_V1.COMMAND_SET;
+    report[0] = command;
     report[1] = PROFILE_CANDIDATE_V1.CHANNEL;
     report[2] = valueId;
     report.writeUInt16LE(transactionId, 3);
@@ -441,6 +456,7 @@ module.exports = {
     buildCandidateAbortRequest,
     buildCandidateBeginRequest,
     buildCandidateChunkRequest,
+    buildCandidateCommitRequest,
     buildCandidateStatusRequest,
     buildCandidateValidateRequest,
     candidateMetadataForBlob,

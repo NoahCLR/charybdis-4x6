@@ -12,6 +12,11 @@ enum {
 };
 
 static uint8_t eeprom_bytes[NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE];
+static uint32_t eeprom_read_calls;
+static uint32_t eeprom_write_calls;
+static uint16_t eeprom_last_read_length;
+static uint16_t eeprom_last_write_length;
+static uint32_t safe_boundary_reasons;
 static const uint8_t empty_profile[] = {'N', 'L', 'P', '1', 1u, 0u, 0u, 1u};
 static const uint8_t behavior_profile[] =
     "\x4e\x4c\x50\x31\x01\x00\x01\x01\x20\x01\x3a\x00\x02\x03\x00\x00"
@@ -22,7 +27,7 @@ static const uint8_t behavior_profile[] =
 
 static uint32_t always_safe(void *context) {
     (void)context;
-    return 0u;
+    return safe_boundary_reasons;
 }
 
 static bool memory_read(void *context, uint16_t address, uint8_t *target, uint16_t length) {
@@ -31,6 +36,8 @@ static bool memory_read(void *context, uint16_t address, uint8_t *target, uint16
     if (!target || length == 0u || (uint32_t)address + length > NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE) {
         return false;
     }
+    eeprom_read_calls++;
+    eeprom_last_read_length = length;
     memcpy(target, &bytes[address], length);
     return true;
 }
@@ -41,6 +48,8 @@ static bool memory_write(void *context, uint16_t address, const uint8_t *source,
     if (!source || length == 0u || (uint32_t)address + length > NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE) {
         return false;
     }
+    eeprom_write_calls++;
+    eeprom_last_write_length = length;
     memcpy(&bytes[address], source, length);
     return true;
 }
@@ -58,6 +67,52 @@ static noah_profile_candidate_v1_metadata_t metadata_for(const uint8_t *payload,
         .digest            = noah_profile_fnv1a_update(NOAH_PROFILE_FNV1A_INITIAL, payload, length),
         .action_abi_digest = ACTION_ABI_DIGEST,
     };
+}
+
+static void store_u16(uint8_t *target, uint16_t value) {
+    target[0] = (uint8_t)value;
+    target[1] = (uint8_t)(value >> 8u);
+}
+
+static void store_u32(uint8_t *target, uint32_t value) {
+    target[0] = (uint8_t)value;
+    target[1] = (uint8_t)(value >> 8u);
+    target[2] = (uint8_t)(value >> 16u);
+    target[3] = (uint8_t)(value >> 24u);
+}
+
+static void transaction_frame(uint8_t frame[NOAH_PROFILE_WIRE_V1_REPORT_SIZE], uint8_t value, uint16_t transaction_id, const noah_profile_candidate_v1_metadata_t *metadata) {
+    memset(frame, 0, NOAH_PROFILE_WIRE_V1_REPORT_SIZE);
+    frame[0] = value == NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT ? NOAH_PROFILE_CANDIDATE_V1_COMMAND_SAVE : NOAH_PROFILE_CANDIDATE_V1_COMMAND_SET;
+    frame[1] = NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL;
+    frame[2] = value;
+    store_u16(&frame[3], transaction_id);
+    if (value == NOAH_PROFILE_CANDIDATE_V1_VALUE_BEGIN) {
+        frame[5] = metadata->schema_major;
+        frame[6] = metadata->schema_minor;
+        frame[7] = metadata->requested_domains;
+        frame[8] = metadata->flags;
+        store_u16(&frame[9], metadata->payload_length);
+        store_u32(&frame[11], metadata->crc32);
+        store_u32(&frame[15], metadata->digest);
+        store_u32(&frame[19], metadata->action_abi_digest);
+    } else if (value == NOAH_PROFILE_CANDIDATE_V1_VALUE_CHUNK) {
+        store_u16(&frame[5], 0u);
+        frame[7] = metadata->payload_length;
+        memcpy(&frame[8], empty_profile, metadata->payload_length);
+    }
+}
+
+static void queue_and_scan_transaction(noah_profile_candidate_transaction_t *transaction, uint8_t frame[NOAH_PROFILE_WIRE_V1_REPORT_SIZE]) {
+    assert(noah_profile_candidate_transaction_receive(transaction, frame, NOAH_PROFILE_WIRE_V1_REPORT_SIZE));
+    assert(frame[5] == NOAH_PROFILE_CANDIDATE_V1_ADMISSION_QUEUED);
+    assert(noah_profile_candidate_transaction_scan(transaction));
+}
+
+static noah_profile_candidate_v1_status_t transaction_status(const noah_profile_candidate_transaction_t *transaction) {
+    noah_profile_candidate_v1_status_t status;
+    noah_profile_candidate_transaction_status(transaction, &status);
+    return status;
 }
 
 static void init_store(noah_profile_store_t *store) {
@@ -171,6 +226,45 @@ static void test_stage_validate_and_commit(void) {
     assert(selected.payload_digest == committed.payload_digest);
 }
 
+static void test_activation_request_retries_after_transient_provider_reuse(void) {
+    noah_profile_store_t                   store;
+    noah_profile_candidate_store_backend_t backend;
+    noah_effective_profile_provider_t      provider;
+    noah_profile_candidate_backend_t       interface;
+    noah_profile_candidate_v1_metadata_t   metadata = metadata_for(empty_profile, sizeof(empty_profile));
+    noah_profile_candidate_v1_error_t      error    = noah_profile_candidate_v1_no_error();
+    noah_effective_profile_status_t        status;
+    uint8_t                                unrelated_bytes[1] = {0u};
+    noah_profile_reader_t                  unrelated_reader   = noah_profile_reader_from_memory(unrelated_bytes, sizeof(unrelated_bytes));
+    noah_effective_profile_backing_t       unrelated_backing  = {
+              .reader      = unrelated_reader,
+              .base_offset = 0u,
+              .byte_length = sizeof(unrelated_bytes),
+    };
+
+    memset(eeprom_bytes, 0xff, sizeof(eeprom_bytes));
+    safe_boundary_reasons = 0u;
+    init_store(&store);
+    init_backend(&backend, &store, &provider, init_provider(&provider));
+    interface = noah_profile_candidate_store_backend_interface(&backend);
+
+    assert(interface.begin(interface.context, &metadata) == NOAH_PROFILE_CANDIDATE_BACKEND_OK);
+    assert(interface.write(interface.context, 0u, empty_profile, sizeof(empty_profile)) == NOAH_PROFILE_CANDIDATE_BACKEND_OK);
+    assert(validate_to_completion(&interface, &metadata, &error) == NOAH_PROFILE_CANDIDATE_BACKEND_VALID);
+    assert(noah_profile_candidate_store_backend_commit(&backend, NULL) == NOAH_PROFILE_CANDIDATE_BACKEND_OK);
+
+    assert(noah_effective_profile_provider_begin_backing_reuse(&provider, &unrelated_backing) == NOAH_EFFECTIVE_PROFILE_OK);
+    assert(interface.activation_begin(interface.context) == NOAH_PROFILE_CANDIDATE_BACKEND_IN_PROGRESS);
+    assert(!backend.activation_requested);
+    assert(noah_effective_profile_provider_end_backing_reuse(&provider) == NOAH_EFFECTIVE_PROFILE_OK);
+
+    assert(interface.activation_step(interface.context) == NOAH_PROFILE_CANDIDATE_BACKEND_IN_PROGRESS);
+    assert(backend.activation_requested);
+    assert(interface.activation_step(interface.context) == NOAH_PROFILE_CANDIDATE_BACKEND_OK);
+    assert(noah_effective_profile_provider_status(&provider, &status) == NOAH_EFFECTIVE_PROFILE_OK);
+    assert(status.active.generation == 1u && status.active.payload_digest == metadata.digest);
+}
+
 static void test_checksum_rejection_and_abort_preserve_last_known_good(void) {
     noah_profile_store_t                   store;
     noah_profile_candidate_store_backend_t backend;
@@ -282,11 +376,87 @@ static void test_runtime_rollback_pins_store_target_until_active_backing_moves(v
     assert(interface.abort(interface.context) == NOAH_PROFILE_CANDIDATE_BACKEND_OK);
 }
 
+static void test_scan_owner_composes_bounded_commit_and_safe_activation(void) {
+    noah_profile_store_t                   store;
+    noah_profile_candidate_store_backend_t backend;
+    noah_profile_candidate_backend_t       interface;
+    noah_effective_profile_provider_t      provider;
+    noah_profile_candidate_transaction_t   transaction;
+    noah_profile_candidate_compatibility_t compatibility;
+    noah_profile_candidate_v1_metadata_t   metadata = metadata_for(empty_profile, sizeof(empty_profile));
+    noah_profile_candidate_v1_status_t     status;
+    noah_profile_store_t                   rebooted;
+    noah_profile_store_record_t            selected;
+    uint8_t                                frame[NOAH_PROFILE_WIRE_V1_REPORT_SIZE];
+    uint16_t                               scans = 0u;
+
+    memset(eeprom_bytes, 0xff, sizeof(eeprom_bytes));
+    eeprom_read_calls = eeprom_write_calls = 0u;
+    safe_boundary_reasons = 0u;
+    init_store(&store);
+    init_backend(&backend, &store, &provider, init_provider(&provider));
+    interface = noah_profile_candidate_store_backend_interface(&backend);
+    compatibility = (noah_profile_candidate_compatibility_t){
+        .schema_major          = 1u,
+        .schema_minor          = 0u,
+        .supported_domain_mask = 0u,
+        .max_payload_length    = NOAH_PROFILE_CANDIDATE_V1_MAX_BLOB_SIZE,
+        .action_abi_digest     = ACTION_ABI_DIGEST,
+    };
+    noah_profile_candidate_transaction_init(&transaction, &interface, &compatibility);
+
+    transaction_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_BEGIN, 77u, &metadata);
+    queue_and_scan_transaction(&transaction, frame);
+    transaction_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_CHUNK, 77u, &metadata);
+    queue_and_scan_transaction(&transaction, frame);
+    transaction_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_VALIDATE, 77u, &metadata);
+    queue_and_scan_transaction(&transaction, frame);
+    while (transaction_status(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATING) {
+        assert(noah_profile_candidate_transaction_scan(&transaction));
+        assert(++scans < 64u);
+    }
+    assert(transaction_status(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATED);
+
+    transaction_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT, 77u, &metadata);
+    queue_and_scan_transaction(&transaction, frame);
+    assert(transaction_status(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_COMMITTING);
+    scans = 0u;
+    while (transaction_status(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_COMMITTING) {
+        uint32_t prior_reads  = eeprom_read_calls;
+        uint32_t prior_writes = eeprom_write_calls;
+
+        assert(noah_profile_candidate_transaction_scan(&transaction));
+        assert(eeprom_read_calls + eeprom_write_calls == prior_reads + prior_writes + 1u);
+        if (eeprom_read_calls != prior_reads) {
+            assert(eeprom_last_read_length <= NOAH_PROFILE_CANDIDATE_SCAN_BYTE_BUDGET);
+        } else {
+            assert(eeprom_last_write_length <= NOAH_PROFILE_CANDIDATE_SCAN_BYTE_BUDGET);
+        }
+        assert(++scans < 32u);
+    }
+    assert(transaction_status(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_ACTIVATING);
+
+    safe_boundary_reasons = 1u;
+    assert(noah_profile_candidate_transaction_scan(&transaction));
+    assert(transaction_status(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_ACTIVATING);
+    safe_boundary_reasons = 0u;
+    assert(noah_profile_candidate_transaction_scan(&transaction));
+    status = transaction_status(&transaction);
+    assert(status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE && status.transaction_id == 77u);
+    assert(transaction.last_committed_transaction_id == 77u);
+
+    noah_profile_store_init(&rebooted, store.io, store.compatibility);
+    assert(noah_profile_store_boot_select(&rebooted, &selected) == NOAH_PROFILE_STORE_OK);
+    assert(selected.generation == 1u && selected.payload_digest == metadata.digest);
+}
+
 int main(void) {
     test_stage_validate_and_commit();
+    test_activation_request_retries_after_transient_provider_reuse();
     test_checksum_rejection_and_abort_preserve_last_known_good();
     test_committed_view_keeps_its_slot_when_next_candidate_starts();
     test_runtime_rollback_pins_store_target_until_active_backing_moves();
+    test_scan_owner_composes_bounded_commit_and_safe_activation();
     puts("profile candidate store backend tests passed");
     return 0;
 }

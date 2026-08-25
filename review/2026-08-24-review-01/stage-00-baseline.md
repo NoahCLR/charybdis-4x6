@@ -40,10 +40,10 @@ Fresh ordinary ELF on 2026-08-25 after the landed Stage 02 foundations:
 | Resource | Measured | Policy or physical boundary | Remaining margin |
 | --- | ---: | ---: | ---: |
 | SRAM0–3 `.data` | 22,980 B | accounting input | — |
-| SRAM0–3 `.bss` | 25,660 B | 26,000 B regression policy | 340 B policy margin |
-| SRAM0–3 `.data + .bss` metric | 48,640 B | 51,000 B regression policy | 2,360 B policy margin |
-| SRAM0–3 linker/core-memory span at boot | 213,496 B | 204,800 B conservative minimum policy | 8,696 B policy margin |
-| Fixed linked occupancy across all SRAM banks | 56,104 B | 270,336 B physical SRAM | informational; includes alignment and reserved stacks, excludes runtime allocation |
+| SRAM0–3 `.bss` | 25,684 B | 26,000 B regression policy | 316 B policy margin |
+| SRAM0–3 `.data + .bss` metric | 48,664 B | 51,000 B regression policy | 2,336 B policy margin |
+| SRAM0–3 linker/core-memory span at boot | 213,472 B | 204,800 B conservative minimum policy | 8,672 B policy margin |
+| Fixed linked occupancy across all SRAM banks | 56,128 B | 270,336 B physical SRAM | informational; includes alignment and reserved stacks, excludes runtime allocation |
 | Main-process worst reviewed path | 1,880 B | 1,920 B reviewed-path policy | 40 B policy margin |
 | Main process stack allocation | 2,560 B | physical stack boundary | 680 B beyond the worst reviewed path |
 | Split-slave worst reviewed path | 336 B | 768 B reviewed-path policy within its 1,024 B usable stack | 432 B policy margin |
@@ -56,7 +56,7 @@ historical measurements, not current capacity limits.
 The SRAM0–3 linker/core-memory span is the range from `__heap_base__` to
 `__heap_end__`. ChibiOS initializes its monotonic core allocator from this
 range, and the linked newlib `_sbrk_r` obtains allocation pages from that
-allocator. Therefore 213,496 bytes is the maximum span at boot, not a measured
+allocator. Therefore 213,472 bytes is the maximum span at boot, not a measured
 runtime-free or runtime-high-water value. Hardware telemetry is still required
 to record runtime allocator use.
 

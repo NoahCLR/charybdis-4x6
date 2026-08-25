@@ -129,9 +129,10 @@ static noah_profile_candidate_backend_result_t begin_candidate(void *context, co
     if (noah_profile_store_prepare_begin(backend->store, &candidate) != NOAH_PROFILE_STORE_OK) {
         return NOAH_PROFILE_CANDIDATE_BACKEND_IO_ERROR;
     }
-    backend->metadata            = *metadata;
-    backend->validation_complete = false;
-    backend->committed_available = false;
+    backend->metadata             = *metadata;
+    backend->validation_complete  = false;
+    backend->committed_available  = false;
+    backend->activation_requested = false;
     memset(&backend->validator, 0, sizeof(backend->validator));
     memset(&backend->validated_profile, 0, sizeof(backend->validated_profile));
     memset(&backend->activation_snapshot, 0, sizeof(backend->activation_snapshot));
@@ -215,10 +216,94 @@ static noah_profile_candidate_backend_result_t abort_candidate(void *context) {
         return NOAH_PROFILE_CANDIDATE_BACKEND_IO_ERROR;
     }
     result = backend->store->prepare_active ? noah_profile_store_prepare_abort(backend->store) : NOAH_PROFILE_STORE_OK;
-    backend->validation_complete = false;
+    backend->validation_complete  = false;
+    backend->activation_requested = false;
     memset(&backend->metadata, 0, sizeof(backend->metadata));
     memset(&backend->validated_profile, 0, sizeof(backend->validated_profile));
     return map_store_result(result);
+}
+
+static noah_profile_candidate_backend_result_t commit_begin_candidate(void *context) {
+    noah_profile_candidate_store_backend_t *backend = context;
+    noah_profile_store_result_t             result;
+
+    if (!backend || !backend->store || !backend->validation_complete) {
+        return NOAH_PROFILE_CANDIDATE_BACKEND_REJECTED;
+    }
+    if (backend->committed_available && !backend->store->prepare_active && committed_record_equal(&backend->store->committed, &backend->committed_record)) {
+        return NOAH_PROFILE_CANDIDATE_BACKEND_OK;
+    }
+    result = noah_profile_store_prepare_commit_begin(backend->store);
+    if (result == NOAH_PROFILE_STORE_IN_PROGRESS) {
+        return NOAH_PROFILE_CANDIDATE_BACKEND_IN_PROGRESS;
+    }
+    backend->validation_complete = false;
+    return result == NOAH_PROFILE_STORE_OK ? NOAH_PROFILE_CANDIDATE_BACKEND_OK : NOAH_PROFILE_CANDIDATE_BACKEND_IO_ERROR;
+}
+
+static noah_profile_candidate_backend_result_t commit_step_candidate(void *context, uint8_t byte_budget) {
+    noah_profile_candidate_store_backend_t *backend = context;
+    noah_profile_store_record_t             record;
+    noah_profile_store_result_t             result;
+
+    if (!backend || !backend->store || !backend->validation_complete) {
+        return NOAH_PROFILE_CANDIDATE_BACKEND_REJECTED;
+    }
+    result = noah_profile_store_prepare_commit_step(backend->store, byte_budget, &record);
+    if (result == NOAH_PROFILE_STORE_IN_PROGRESS) {
+        return NOAH_PROFILE_CANDIDATE_BACKEND_IN_PROGRESS;
+    }
+    if (result != NOAH_PROFILE_STORE_OK) {
+        backend->validation_complete = false;
+        return result == NOAH_PROFILE_STORE_DURABILITY_UNKNOWN ? NOAH_PROFILE_CANDIDATE_BACKEND_DURABILITY_UNKNOWN : NOAH_PROFILE_CANDIDATE_BACKEND_IO_ERROR;
+    }
+    backend->committed_record    = record;
+    backend->committed_available = true;
+    return NOAH_PROFILE_CANDIDATE_BACKEND_OK;
+}
+
+static noah_profile_candidate_backend_result_t activation_begin_candidate(void *context) {
+    noah_profile_candidate_store_backend_t *backend = context;
+    noah_profile_candidate_backend_result_t  result  = noah_profile_candidate_store_backend_request_activation(backend);
+
+    if (backend) {
+        backend->activation_requested = result == NOAH_PROFILE_CANDIDATE_BACKEND_OK;
+    }
+    return result;
+}
+
+static bool active_identity_matches_commit(const noah_effective_profile_identity_t *active, const noah_profile_store_record_t *record) {
+    return active && record && active->kind == NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE && active->generation == record->generation && active->origin == record->origin_half && active->payload_crc32 == record->payload_crc32 && active->payload_digest == record->payload_digest && active->compiled_default_digest == record->compiled_default_digest && active->action_abi_digest == record->action_abi_digest;
+}
+
+static noah_profile_candidate_backend_result_t activation_step_candidate(void *context) {
+    noah_profile_candidate_store_backend_t *backend = context;
+    noah_effective_profile_status_t         status;
+    noah_effective_profile_result_t         result;
+
+    if (!backend || !backend->provider || !backend->committed_available) {
+        return NOAH_PROFILE_CANDIDATE_BACKEND_REJECTED;
+    }
+    if (!backend->activation_requested) {
+        noah_profile_candidate_backend_result_t request_result = noah_profile_candidate_store_backend_request_activation(backend);
+
+        if (request_result != NOAH_PROFILE_CANDIDATE_BACKEND_OK) {
+            return request_result;
+        }
+        backend->activation_requested = true;
+        return NOAH_PROFILE_CANDIDATE_BACKEND_IN_PROGRESS;
+    }
+    result = noah_effective_profile_provider_poll(backend->provider);
+    if (result == NOAH_EFFECTIVE_PROFILE_PUBLISHED) {
+        return NOAH_PROFILE_CANDIDATE_BACKEND_OK;
+    }
+    if (result == NOAH_EFFECTIVE_PROFILE_WAITING || result == NOAH_EFFECTIVE_PROFILE_BUSY || result == NOAH_EFFECTIVE_PROFILE_BACKING_REUSE_IN_PROGRESS) {
+        return NOAH_PROFILE_CANDIDATE_BACKEND_IN_PROGRESS;
+    }
+    if (result == NOAH_EFFECTIVE_PROFILE_NO_PENDING && noah_effective_profile_provider_status(backend->provider, &status) == NOAH_EFFECTIVE_PROFILE_OK && active_identity_matches_commit(&status.active, &backend->committed_record)) {
+        return NOAH_PROFILE_CANDIDATE_BACKEND_OK;
+    }
+    return NOAH_PROFILE_CANDIDATE_BACKEND_REJECTED;
 }
 
 void noah_profile_candidate_store_backend_init(noah_profile_candidate_store_backend_t *backend, noah_profile_store_t *store, noah_effective_profile_provider_t *provider, const noah_profile_validator_v1_compatibility_t *compatibility, uint32_t compiled_default_digest, uint8_t origin_half) {
@@ -256,26 +341,24 @@ noah_profile_candidate_backend_t noah_profile_candidate_store_backend_interface(
         .read             = read_candidate,
         .validation_begin = validation_begin,
         .validation_step  = validation_step,
+        .commit_begin     = commit_begin_candidate,
+        .commit_step      = commit_step_candidate,
+        .activation_begin = activation_begin_candidate,
+        .activation_step  = activation_step_candidate,
         .abort            = abort_candidate,
     };
 }
 
 noah_profile_candidate_backend_result_t noah_profile_candidate_store_backend_commit(noah_profile_candidate_store_backend_t *backend, noah_profile_store_record_t *committed) {
-    noah_profile_store_record_t record;
+    noah_profile_candidate_backend_result_t result = commit_begin_candidate(backend);
 
-    if (!backend || !backend->store || !backend->validation_complete) {
-        return NOAH_PROFILE_CANDIDATE_BACKEND_REJECTED;
+    while (result == NOAH_PROFILE_CANDIDATE_BACKEND_IN_PROGRESS) {
+        result = commit_step_candidate(backend, NOAH_PROFILE_CANDIDATE_SCAN_BYTE_BUDGET);
     }
-    if (noah_profile_store_prepare_commit(backend->store, &record) != NOAH_PROFILE_STORE_OK) {
-        backend->validation_complete = false;
-        return NOAH_PROFILE_CANDIDATE_BACKEND_IO_ERROR;
+    if (result == NOAH_PROFILE_CANDIDATE_BACKEND_OK && committed) {
+        *committed = backend->committed_record;
     }
-    backend->committed_record    = record;
-    backend->committed_available = true;
-    if (committed) {
-        *committed = record;
-    }
-    return NOAH_PROFILE_CANDIDATE_BACKEND_OK;
+    return result;
 }
 
 noah_profile_candidate_backend_result_t noah_profile_candidate_store_backend_request_activation(noah_profile_candidate_store_backend_t *backend) {

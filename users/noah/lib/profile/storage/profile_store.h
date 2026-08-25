@@ -42,7 +42,22 @@ typedef enum {
     NOAH_PROFILE_STORE_PAYLOAD_INCOMPLETE,
     NOAH_PROFILE_STORE_BACKING_REUSE_DENIED,
     NOAH_PROFILE_STORE_BACKING_REUSE_RELEASE_FAILED,
+    NOAH_PROFILE_STORE_IN_PROGRESS,
+    // The final marker write may have become durable but could not be
+    // confirmed. The caller must reconcile persistent status before retrying.
+    NOAH_PROFILE_STORE_DURABILITY_UNKNOWN,
 } noah_profile_store_result_t;
+
+typedef enum {
+    NOAH_PROFILE_STORE_COMMIT_IDLE = 0u,
+    NOAH_PROFILE_STORE_COMMIT_HEADER_WRITE,
+    NOAH_PROFILE_STORE_COMMIT_HEADER_READBACK,
+    NOAH_PROFILE_STORE_COMMIT_PAYLOAD_READBACK,
+    NOAH_PROFILE_STORE_COMMIT_SHAPE_HEADER,
+    NOAH_PROFILE_STORE_COMMIT_SHAPE_DOMAIN,
+    NOAH_PROFILE_STORE_COMMIT_MARKER_WRITE,
+    NOAH_PROFILE_STORE_COMMIT_MARKER_READBACK,
+} noah_profile_store_commit_phase_t;
 
 typedef bool (*noah_profile_store_read_fn)(void *context, uint16_t address, uint8_t *target, uint16_t length);
 typedef bool (*noah_profile_store_write_fn)(void *context, uint16_t address, const uint8_t *source, uint16_t length);
@@ -109,6 +124,14 @@ typedef struct {
     uint16_t                           candidate_written;
     uint32_t                           candidate_crc32_state;
     uint32_t                           candidate_digest_state;
+    noah_profile_store_commit_phase_t  commit_phase;
+    uint16_t                           commit_offset;
+    uint32_t                           commit_crc32_state;
+    uint32_t                           commit_digest_state;
+    uint8_t                            commit_domain_count;
+    uint8_t                            commit_domain_index;
+    uint8_t                            commit_prior_domain;
+    uint8_t                            commit_record_offset;
     bool                               boot_scanned;
     bool                               conflict;
     bool                               prepare_active;
@@ -122,6 +145,13 @@ noah_profile_store_result_t noah_profile_store_boot_select(noah_profile_store_t 
 noah_profile_store_result_t noah_profile_store_validate_slot(noah_profile_store_t *store, noah_profile_slot_t slot, bool require_commit, noah_profile_store_record_t *record);
 noah_profile_store_result_t noah_profile_store_prepare_begin(noah_profile_store_t *store, const noah_profile_store_candidate_t *candidate);
 noah_profile_store_result_t noah_profile_store_prepare_write(noah_profile_store_t *store, uint16_t offset, const uint8_t *bytes, uint16_t length);
+// Starts and advances a marker-last commit without unbounded scan work. Begin
+// performs no EEPROM I/O. Each step performs exactly one read or write of at
+// most byte_budget bytes; byte_budget must be 1..20. The final OK step returns
+// the durable record and releases the destructive-backing reservation.
+noah_profile_store_result_t noah_profile_store_prepare_commit_begin(noah_profile_store_t *store);
+noah_profile_store_result_t noah_profile_store_prepare_commit_step(noah_profile_store_t *store, uint8_t byte_budget, noah_profile_store_record_t *committed);
+// Cold/test convenience wrapper around begin + bounded steps.
 noah_profile_store_result_t noah_profile_store_prepare_commit(noah_profile_store_t *store, noah_profile_store_record_t *committed);
 noah_profile_store_result_t noah_profile_store_prepare_abort(noah_profile_store_t *store);
 bool noah_profile_store_next_generation(const noah_profile_store_t *store, uint32_t *generation);

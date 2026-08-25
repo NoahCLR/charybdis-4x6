@@ -23,12 +23,22 @@ typedef struct {
     unsigned read_calls;
     unsigned validation_begin_calls;
     unsigned validation_step_calls;
+    unsigned commit_begin_calls;
+    unsigned commit_step_calls;
+    unsigned activation_begin_calls;
+    unsigned activation_step_calls;
     unsigned abort_calls;
     noah_profile_candidate_backend_result_t begin_result;
     noah_profile_candidate_backend_result_t write_result;
     noah_profile_candidate_backend_result_t read_result;
     noah_profile_candidate_backend_result_t validation_begin_result;
+    noah_profile_candidate_backend_result_t commit_begin_result;
+    noah_profile_candidate_backend_result_t commit_terminal_result;
+    noah_profile_candidate_backend_result_t activation_begin_result;
+    noah_profile_candidate_backend_result_t activation_terminal_result;
     noah_profile_candidate_backend_result_t abort_result;
+    unsigned commit_steps_remaining;
+    unsigned activation_steps_remaining;
     bool semantic_reject;
     bool validation_step_returns_ok;
     noah_profile_candidate_v1_metadata_t metadata;
@@ -134,7 +144,7 @@ static void chunk_frame(uint8_t frame[NOAH_PROFILE_WIRE_V1_REPORT_SIZE], uint16_
 
 static void simple_frame(uint8_t frame[NOAH_PROFILE_WIRE_V1_REPORT_SIZE], uint8_t value, uint16_t transaction_id) {
     memset(frame, 0, NOAH_PROFILE_WIRE_V1_REPORT_SIZE);
-    frame[0] = NOAH_PROFILE_CANDIDATE_V1_COMMAND_SET;
+    frame[0] = value == NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT ? NOAH_PROFILE_CANDIDATE_V1_COMMAND_SAVE : NOAH_PROFILE_CANDIDATE_V1_COMMAND_SET;
     frame[1] = NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL;
     frame[2] = value;
     write_u16(&frame[3], transaction_id);
@@ -226,12 +236,49 @@ static noah_profile_candidate_backend_result_t fake_abort(void *context) {
     return fake->abort_result;
 }
 
+static noah_profile_candidate_backend_result_t fake_commit_begin(void *context) {
+    fake_backend_t *fake = context;
+    fake->commit_begin_calls++;
+    return fake->commit_begin_result;
+}
+
+static noah_profile_candidate_backend_result_t fake_commit_step(void *context, uint8_t byte_budget) {
+    fake_backend_t *fake = context;
+    fake->commit_step_calls++;
+    assert(byte_budget <= NOAH_PROFILE_CANDIDATE_SCAN_BYTE_BUDGET);
+    if (fake->commit_steps_remaining != 0u) {
+        fake->commit_steps_remaining--;
+        return NOAH_PROFILE_CANDIDATE_BACKEND_IN_PROGRESS;
+    }
+    return fake->commit_terminal_result;
+}
+
+static noah_profile_candidate_backend_result_t fake_activation_begin(void *context) {
+    fake_backend_t *fake = context;
+    fake->activation_begin_calls++;
+    return fake->activation_begin_result;
+}
+
+static noah_profile_candidate_backend_result_t fake_activation_step(void *context) {
+    fake_backend_t *fake = context;
+    fake->activation_step_calls++;
+    if (fake->activation_steps_remaining != 0u) {
+        fake->activation_steps_remaining--;
+        return NOAH_PROFILE_CANDIDATE_BACKEND_IN_PROGRESS;
+    }
+    return fake->activation_terminal_result;
+}
+
 static void fake_init(fake_backend_t *fake) {
     memset(fake, 0, sizeof(*fake));
     fake->begin_result            = NOAH_PROFILE_CANDIDATE_BACKEND_OK;
     fake->write_result            = NOAH_PROFILE_CANDIDATE_BACKEND_OK;
     fake->read_result             = NOAH_PROFILE_CANDIDATE_BACKEND_OK;
     fake->validation_begin_result = NOAH_PROFILE_CANDIDATE_BACKEND_OK;
+    fake->commit_begin_result     = NOAH_PROFILE_CANDIDATE_BACKEND_IN_PROGRESS;
+    fake->commit_terminal_result  = NOAH_PROFILE_CANDIDATE_BACKEND_OK;
+    fake->activation_begin_result = NOAH_PROFILE_CANDIDATE_BACKEND_OK;
+    fake->activation_terminal_result = NOAH_PROFILE_CANDIDATE_BACKEND_OK;
     fake->abort_result            = NOAH_PROFILE_CANDIDATE_BACKEND_OK;
 }
 
@@ -243,6 +290,10 @@ static noah_profile_candidate_backend_t backend_for(fake_backend_t *fake) {
         .read             = fake_read,
         .validation_begin = fake_validation_begin,
         .validation_step  = fake_validation_step,
+        .commit_begin     = fake_commit_begin,
+        .commit_step      = fake_commit_step,
+        .activation_begin = fake_activation_begin,
+        .activation_step  = fake_activation_step,
         .abort            = fake_abort,
     };
     return backend;
@@ -260,7 +311,7 @@ static noah_profile_candidate_compatibility_t compatibility(void) {
 }
 
 static unsigned backend_call_count(const fake_backend_t *fake) {
-    return fake->begin_calls + fake->write_calls + fake->read_calls + fake->validation_begin_calls + fake->validation_step_calls + fake->abort_calls;
+    return fake->begin_calls + fake->write_calls + fake->read_calls + fake->validation_begin_calls + fake->validation_step_calls + fake->commit_begin_calls + fake->commit_step_calls + fake->activation_begin_calls + fake->activation_step_calls + fake->abort_calls;
 }
 
 static void queue(noah_profile_candidate_transaction_t *transaction, fake_backend_t *fake, uint8_t frame[NOAH_PROFILE_WIRE_V1_REPORT_SIZE]) {
@@ -308,6 +359,11 @@ static void test_exact_frame_codecs(void) {
     load_fixture("validate-request", frame);
     assert(noah_profile_candidate_v1_decode(frame, sizeof(frame), &command, &error) == NOAH_PROFILE_CANDIDATE_V1_DECODE_OK);
     assert(command.operation == NOAH_PROFILE_CANDIDATE_V1_OPERATION_VALIDATE);
+    load_fixture("commit-request", frame);
+    assert(noah_profile_candidate_v1_decode(frame, sizeof(frame), &command, &error) == NOAH_PROFILE_CANDIDATE_V1_DECODE_OK);
+    assert(command.operation == NOAH_PROFILE_CANDIDATE_V1_OPERATION_COMMIT);
+    noah_profile_candidate_v1_encode_ack(frame, NOAH_PROFILE_CANDIDATE_V1_ADMISSION_QUEUED, NOAH_PROFILE_CANDIDATE_V1_ERROR_NONE, NOAH_PROFILE_CANDIDATE_V1_LOCATION_NONE_U8);
+    assert_golden("commit-queued-ack", frame);
     load_fixture("abort-request", frame);
     assert(noah_profile_candidate_v1_decode(frame, sizeof(frame), &command, &error) == NOAH_PROFILE_CANDIDATE_V1_DECODE_OK);
     assert(command.operation == NOAH_PROFILE_CANDIDATE_V1_OPERATION_ABORT);
@@ -322,6 +378,7 @@ static void test_malformed_frame_matrix(void) {
         NOAH_PROFILE_CANDIDATE_V1_VALUE_BEGIN,
         NOAH_PROFILE_CANDIDATE_V1_VALUE_CHUNK,
         NOAH_PROFILE_CANDIDATE_V1_VALUE_VALIDATE,
+        NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT,
         NOAH_PROFILE_CANDIDATE_V1_VALUE_ABORT,
     };
     const uint8_t bytes[20] = {0u};
@@ -384,7 +441,8 @@ static void test_malformed_frame_matrix(void) {
         }
     }
 
-    simple_frame(frame, 0x13u, 1u);
+    simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT, 1u);
+    frame[0] = NOAH_PROFILE_CANDIDATE_V1_COMMAND_SET;
     assert(noah_profile_candidate_v1_decode(frame, 32u, &command, &error) == NOAH_PROFILE_CANDIDATE_V1_DECODE_NOT_HANDLED);
     simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_BEGIN, 1u);
     frame[0] = NOAH_PROFILE_WIRE_V1_COMMAND_GET;
@@ -418,6 +476,15 @@ static void test_operation_status_codec(void) {
     load_fixture("operation-status-request", frame);
     assert(noah_profile_candidate_v1_handle_status_get(&status, frame, sizeof(frame)));
     assert_golden("operation-status-response", frame);
+
+    status.state              = NOAH_PROFILE_CANDIDATE_V1_STATE_ACTIVATING;
+    status.last_operation     = NOAH_PROFILE_CANDIDATE_V1_OPERATION_COMMIT;
+    status.flags              = 0u;
+    status.error              = noah_profile_candidate_v1_no_error();
+    status.operation_sequence = UINT16_C(0x3345);
+    load_fixture("operation-status-request", frame);
+    assert(noah_profile_candidate_v1_handle_status_get(&status, frame, sizeof(frame)));
+    assert_golden("commit-status-response", frame);
 
     load_fixture("operation-status-request", frame);
     frame[3] = 0u;
@@ -654,6 +721,131 @@ static void test_bounded_validation_and_error_locations(void) {
     assert(status.error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_STORAGE_FAILURE);
 }
 
+static void test_commit_activation_and_idempotent_retry(void) {
+    static const uint8_t profile[8] = {'N', 'L', 'P', '1', 1u, 0u, 0u, 1u};
+    fake_backend_t fake;
+    noah_profile_candidate_backend_t backend;
+    noah_profile_candidate_compatibility_t compatible = compatibility();
+    noah_profile_candidate_transaction_t transaction;
+    noah_profile_candidate_v1_metadata_t metadata = metadata_for(profile, sizeof(profile));
+    noah_profile_candidate_v1_status_t status;
+    uint8_t frame[32];
+
+    fake_init(&fake);
+    fake.commit_steps_remaining     = 1u;
+    fake.activation_steps_remaining = 1u;
+    backend = backend_for(&fake);
+    noah_profile_candidate_transaction_init(&transaction, &backend, &compatible);
+    stage_complete(&transaction, &fake, 50u, profile, sizeof(profile), &metadata);
+
+    simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT, 50u);
+    queue_and_scan(&transaction, &fake, frame);
+    assert(status_of(&transaction).error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_INVALID_STATE);
+    assert(fake.commit_begin_calls == 0u);
+
+    request_validation(&transaction, &fake, 50u);
+    finish_validation(&transaction);
+    assert(status_of(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATED);
+
+    simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT, 50u);
+    queue_and_scan(&transaction, &fake, frame);
+    status = status_of(&transaction);
+    assert(status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_COMMITTING);
+    assert(status.last_operation == NOAH_PROFILE_CANDIDATE_V1_OPERATION_COMMIT);
+    assert(fake.commit_begin_calls == 1u && fake.commit_step_calls == 0u);
+
+    // A lost acknowledgment can be retried without restarting persistence.
+    simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT, 50u);
+    queue_and_scan(&transaction, &fake, frame);
+    assert(status_of(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_COMMITTING);
+    assert(fake.commit_begin_calls == 1u && fake.commit_step_calls == 0u);
+
+    assert(noah_profile_candidate_transaction_scan(&transaction));
+    assert(status_of(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_COMMITTING);
+    assert(noah_profile_candidate_transaction_scan(&transaction));
+    assert(status_of(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_ACTIVATING);
+    assert(fake.commit_step_calls == 2u && fake.activation_begin_calls == 1u);
+    assert(noah_profile_candidate_transaction_scan(&transaction));
+    assert(status_of(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_ACTIVATING);
+    assert(noah_profile_candidate_transaction_scan(&transaction));
+    status = status_of(&transaction);
+    assert(status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE);
+    assert(status.transaction_id == 50u && status.digest == metadata.digest);
+    assert(transaction.last_committed_transaction_id == 50u);
+
+    // Retrying after success is also a no-op and preserves correlation.
+    simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT, 50u);
+    queue_and_scan(&transaction, &fake, frame);
+    assert(status_of(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE);
+    assert(fake.commit_begin_calls == 1u && fake.commit_step_calls == 2u && fake.activation_begin_calls == 1u && fake.activation_step_calls == 2u);
+}
+
+static void test_activation_failure_is_durable_and_requires_status_clear(void) {
+    static const uint8_t profile[8] = {'N', 'L', 'P', '1', 1u, 0u, 0u, 1u};
+    fake_backend_t fake;
+    noah_profile_candidate_backend_t backend;
+    noah_profile_candidate_compatibility_t compatible = compatibility();
+    noah_profile_candidate_transaction_t transaction;
+    noah_profile_candidate_v1_metadata_t metadata = metadata_for(profile, sizeof(profile));
+    uint8_t frame[32];
+
+    fake_init(&fake);
+    fake.activation_terminal_result = NOAH_PROFILE_CANDIDATE_BACKEND_REJECTED;
+    backend = backend_for(&fake);
+    noah_profile_candidate_transaction_init(&transaction, &backend, &compatible);
+    stage_complete(&transaction, &fake, 51u, profile, sizeof(profile), &metadata);
+    request_validation(&transaction, &fake, 51u);
+    finish_validation(&transaction);
+    simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT, 51u);
+    queue_and_scan(&transaction, &fake, frame);
+    assert(noah_profile_candidate_transaction_scan(&transaction));
+    assert(status_of(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_ACTIVATING);
+
+    simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_ABORT, 51u);
+    queue_and_scan(&transaction, &fake, frame);
+    assert(status_of(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_ACTIVATING);
+    assert(status_of(&transaction).error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_INVALID_STATE);
+    assert(fake.abort_calls == 0u);
+
+    assert(noah_profile_candidate_transaction_scan(&transaction));
+    assert(status_of(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_REJECTED);
+    assert(status_of(&transaction).error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_ACTIVATION_FAILED);
+    assert(!transaction.has_candidate && transaction.poisoned);
+    assert(transaction.last_committed_transaction_id == 51u);
+
+    // The durable record cannot be aborted, but an idempotent abort clears the
+    // operation error so a later transaction can reconcile or redeploy.
+    simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_ABORT, 51u);
+    queue_and_scan(&transaction, &fake, frame);
+    assert(status_of(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE);
+    assert(!transaction.poisoned && fake.abort_calls == 0u);
+}
+
+static void test_unknown_marker_durability_is_not_reported_as_safe_failure(void) {
+    static const uint8_t profile[8] = {'N', 'L', 'P', '1', 1u, 0u, 0u, 1u};
+    fake_backend_t fake;
+    noah_profile_candidate_backend_t backend;
+    noah_profile_candidate_compatibility_t compatible = compatibility();
+    noah_profile_candidate_transaction_t transaction;
+    noah_profile_candidate_v1_metadata_t metadata = metadata_for(profile, sizeof(profile));
+    uint8_t frame[32];
+
+    fake_init(&fake);
+    fake.commit_terminal_result = NOAH_PROFILE_CANDIDATE_BACKEND_DURABILITY_UNKNOWN;
+    backend = backend_for(&fake);
+    noah_profile_candidate_transaction_init(&transaction, &backend, &compatible);
+    stage_complete(&transaction, &fake, 52u, profile, sizeof(profile), &metadata);
+    request_validation(&transaction, &fake, 52u);
+    finish_validation(&transaction);
+    simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT, 52u);
+    queue_and_scan(&transaction, &fake, frame);
+    assert(noah_profile_candidate_transaction_scan(&transaction));
+    assert(status_of(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_REJECTED);
+    assert(status_of(&transaction).error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_DURABILITY_UNKNOWN);
+    assert(!transaction.has_candidate && transaction.poisoned);
+    assert(fake.activation_begin_calls == 0u);
+}
+
 static void test_abort_reset_and_no_timeout(void) {
     static const uint8_t profile[8] = {'N', 'L', 'P', '1', 1u, 0u, 0u, 1u};
     fake_backend_t fake;
@@ -766,6 +958,9 @@ int main(int argc, char **argv) {
     test_mailbox_and_begin_retries();
     test_sequential_chunks_and_duplicate_rules();
     test_bounded_validation_and_error_locations();
+    test_commit_activation_and_idempotent_retry();
+    test_activation_failure_is_durable_and_requires_status_clear();
+    test_unknown_marker_durability_is_not_reported_as_safe_failure();
     test_abort_reset_and_no_timeout();
     test_begin_compatibility_rejections();
     puts("profile candidate transaction host tests passed");

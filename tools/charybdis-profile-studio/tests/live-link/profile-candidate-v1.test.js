@@ -16,6 +16,7 @@ const {
     buildCandidateAbortRequest,
     buildCandidateBeginRequest,
     buildCandidateChunkRequest,
+    buildCandidateCommitRequest,
     buildCandidateStatusRequest,
     buildCandidateValidateRequest,
     candidateMetadataForBlob,
@@ -54,17 +55,36 @@ test("JavaScript emits the exact candidate frames consumed by the firmware fixtu
         fixtures["chunk-request"]
     );
     assert.deepEqual(buildCandidateValidateRequest(0x1234), fixtures["validate-request"]);
+    assert.deepEqual(buildCandidateCommitRequest(0x1234), fixtures["commit-request"]);
     assert.deepEqual(buildCandidateAbortRequest(0x1234), fixtures["abort-request"]);
     assert.deepEqual(buildCandidateStatusRequest(0x41), fixtures["operation-status-request"]);
     for (const report of [
         buildCandidateBeginRequest(0x1234, metadata),
         buildCandidateChunkRequest(0x1234, 0, Buffer.alloc(20)),
         buildCandidateValidateRequest(0x1234),
+        buildCandidateCommitRequest(0x1234),
         buildCandidateAbortRequest(0x1234),
         buildCandidateStatusRequest(0x41),
     ]) {
         assert.equal(report.length, 32);
     }
+});
+
+test("commit uses custom-save framing and the shared acknowledgement contract", () => {
+    const fixtures = goldenFixtures();
+    const request = buildCandidateCommitRequest(0x1234);
+    assert.equal(request[0], 0x09);
+    assert.equal(request[2], 0x13);
+    assert.deepEqual(request, fixtures["commit-request"]);
+    assert.deepEqual(decodeCandidateAcknowledgement(fixtures["commit-queued-ack"], request), {
+        admission: CANDIDATE_ADMISSION.QUEUED,
+        admissionName: "QUEUED",
+        errorId: CANDIDATE_ERROR.NONE,
+        errorName: "NONE",
+        frameOffset: 0xff,
+        transactionId: 0x1234,
+        valueId: 0x13,
+    });
 });
 
 test("mutation acknowledgment correlation includes operation and both transaction bytes", () => {
@@ -131,6 +151,14 @@ test("candidate status uses normal request correlation and decodes structured lo
         },
     };
     assert.equal((await readCandidateStatus(connection, {requestId: 0x41})).transactionId, 0x1234);
+
+    const commit = decodeCandidateStatusResponse(fixtures["commit-status-response"], request);
+    assert.equal(commit.state, CANDIDATE_STATE.ACTIVATING);
+    assert.equal(commit.lastOperation, CANDIDATE_OPERATION.COMMIT);
+    assert.equal(commit.transactionId, 0x1234);
+    assert.equal(commit.digest, 0x88776655);
+    assert.equal(commit.error.id, CANDIDATE_ERROR.NONE);
+    assert.equal(commit.operationSequence, 0x3345);
 });
 
 test("candidate codecs reject noncanonical padding, invalid bounds, and unknown status values", () => {
