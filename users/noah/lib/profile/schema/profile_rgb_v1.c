@@ -8,7 +8,8 @@
 #include <string.h>
 
 #if UINTPTR_MAX == UINT32_MAX
-_Static_assert(sizeof(noah_profile_rgb_v1_view_t) <= NOAH_PROFILE_RGB_V1_EMBEDDED_VIEW_BUDGET, "RGB reader-backed view exceeded its 32-bit firmware RAM budget");
+_Static_assert(sizeof(noah_profile_rgb_v1_view_t) <= NOAH_PROFILE_RGB_V1_EMBEDDED_VIEW_BUDGET, "RGB reader-backed view exceeded its 32-bit representation policy");
+_Static_assert(sizeof(noah_profile_rgb_v1_validation_t) <= NOAH_PROFILE_RGB_V1_EMBEDDED_VALIDATION_BUDGET, "RGB incremental validation state exceeded its 32-bit representation policy");
 #endif
 
 enum {
@@ -23,6 +24,9 @@ enum {
     RGB_KEY_FEEDBACK_SIZE       = 11u,
     RGB_FIXED_PAYLOAD_SIZE      = 35u,
 };
+
+_Static_assert((unsigned)NOAH_PROFILE_RGB_V1_HEADER_SIZE <= (unsigned)NOAH_PROFILE_RGB_V1_VALIDATION_READ_MAX, "RGB header exceeded the incremental validation read budget");
+_Static_assert((unsigned)RGB_KEY_FEEDBACK_SIZE <= (unsigned)NOAH_PROFILE_RGB_V1_VALIDATION_READ_MAX, "RGB record exceeded the incremental validation read budget");
 
 typedef enum {
     RGB_SECTION_GROUPS = 0u,
@@ -85,7 +89,7 @@ static noah_profile_rgb_v1_result_t resolve_limits(const noah_profile_rgb_v1_lim
 }
 
 static noah_profile_rgb_v1_result_t read_bytes(const noah_profile_rgb_v1_view_t *view, size_t offset, uint8_t *target, size_t length, uint8_t table, uint8_t row, uint8_t field, noah_profile_rgb_v1_error_t *error) {
-    if (!view || !view->reader.read || offset > view->byte_length || length > (size_t)view->byte_length - offset) {
+    if (!view || !view->reader.read || length > NOAH_PROFILE_RGB_V1_VALIDATION_READ_MAX || offset > view->byte_length || length > (size_t)view->byte_length - offset) {
         return fail(error, NOAH_PROFILE_RGB_V1_INVALID_ARGUMENT, offset, table, row, field);
     }
     if (!noah_profile_reader_read(&view->reader, view->base_offset + offset, target, length)) {
@@ -164,210 +168,309 @@ static noah_profile_rgb_v1_result_t validate_group_row(const noah_profile_rgb_v1
     return NOAH_PROFILE_RGB_V1_OK;
 }
 
-noah_profile_rgb_v1_result_t noah_profile_rgb_v1_decode_reader(const noah_profile_reader_t *reader, size_t base_offset, size_t length, const noah_profile_rgb_v1_limits_t *supplied_limits, noah_profile_rgb_v1_view_t *view, noah_profile_rgb_v1_error_t *error) {
-    noah_profile_rgb_v1_view_t candidate;
-    uint8_t                    header[NOAH_PROFILE_RGB_V1_HEADER_SIZE];
-    size_t                     expected_length;
-    size_t                     offset;
-    uint8_t                    bytes[RGB_KEY_FEEDBACK_SIZE];
-    uint8_t                    previous_bitmap[NOAH_PROFILE_RGB_V1_LED_BITMAP_SIZE];
-    bool                       have_previous_bitmap = false;
-    uint8_t                    observed_pd_mask = 0u;
-    int16_t                    previous_pd_id = -1;
+static void copy_error(noah_profile_rgb_v1_error_t *target, const noah_profile_rgb_v1_error_t *source) {
+    if (target && source) *target = *source;
+}
+
+static noah_profile_rgb_v1_validation_result_t validation_reject(noah_profile_rgb_v1_validation_t *validation, noah_profile_rgb_v1_error_t *error, noah_profile_rgb_v1_result_t code, size_t offset, uint8_t table, uint8_t row, uint8_t field) {
+    noah_profile_rgb_v1_error_t local;
+    noah_profile_rgb_v1_error_t *stored = validation ? &validation->rejection : &local;
+
+    clear_error(stored);
+    fail(stored, code, offset, table, row, field);
+    if (validation) {
+        validation->phase  = NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_REJECTED;
+        validation->result = NOAH_PROFILE_RGB_V1_VALIDATION_REJECTED;
+    }
+    copy_error(error, stored);
+    return NOAH_PROFILE_RGB_V1_VALIDATION_REJECTED;
+}
+
+static noah_profile_rgb_v1_validation_result_t validation_reject_captured(noah_profile_rgb_v1_validation_t *validation, noah_profile_rgb_v1_error_t *error, const noah_profile_rgb_v1_error_t *captured) {
+    return validation_reject(validation, error, captured->code, captured->offset, captured->table, captured->row, captured->field);
+}
+
+static noah_profile_rgb_v1_validation_result_t validation_progress(noah_profile_rgb_v1_validation_t *validation, noah_profile_rgb_v1_validation_phase_t next_phase) {
+    validation->phase = (uint8_t)next_phase;
+    validation->row   = 0u;
+    return NOAH_PROFILE_RGB_V1_VALIDATION_IN_PROGRESS;
+}
+
+static noah_profile_rgb_v1_validation_result_t validation_result(const noah_profile_rgb_v1_validation_t *validation, noah_profile_rgb_v1_error_t *error) {
+    noah_profile_rgb_v1_validation_result_t result = (noah_profile_rgb_v1_validation_result_t)validation->result;
+    if (result == NOAH_PROFILE_RGB_V1_VALIDATION_REJECTED) copy_error(error, &validation->rejection);
+    return result;
+}
+
+noah_profile_rgb_v1_validation_result_t noah_profile_rgb_v1_validation_begin(noah_profile_rgb_v1_validation_t *validation, const noah_profile_reader_t *reader, size_t base_offset, size_t length, const noah_profile_rgb_v1_limits_t *supplied_limits, noah_profile_rgb_v1_error_t *error) {
+    noah_profile_rgb_v1_error_t captured;
     noah_profile_rgb_v1_result_t result;
 
     clear_error(error);
-    if (!reader || !reader->read || !view || base_offset > reader->length || length > reader->length - base_offset) {
-        return fail(error, NOAH_PROFILE_RGB_V1_INVALID_ARGUMENT, 0u, NOAH_PROFILE_RGB_V1_TABLE_HEADER, UINT8_MAX, NOAH_PROFILE_RGB_V1_FIELD_HEADER);
+    if (!validation) {
+        return validation_reject(NULL, error, NOAH_PROFILE_RGB_V1_INVALID_ARGUMENT, 0u, NOAH_PROFILE_RGB_V1_TABLE_HEADER, UINT8_MAX, NOAH_PROFILE_RGB_V1_FIELD_HEADER);
     }
-    memset(&candidate, 0, sizeof(candidate));
-    memset(view, 0, sizeof(*view));
-    result = resolve_limits(supplied_limits, &candidate.limits, error);
-    if (result != NOAH_PROFILE_RGB_V1_OK) return result;
+    memset(validation, 0, sizeof(*validation));
+    clear_error(&validation->rejection);
+    validation->previous_pd_id = -1;
+    if (!reader || !reader->read || base_offset > reader->length || length > reader->length - base_offset) {
+        return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_INVALID_ARGUMENT, 0u, NOAH_PROFILE_RGB_V1_TABLE_HEADER, UINT8_MAX, NOAH_PROFILE_RGB_V1_FIELD_HEADER);
+    }
+    clear_error(&captured);
+    result = resolve_limits(supplied_limits, &validation->candidate.limits, &captured);
+    if (result != NOAH_PROFILE_RGB_V1_OK) return validation_reject_captured(validation, error, &captured);
     if (length < NOAH_PROFILE_RGB_V1_HEADER_SIZE) {
-        return fail(error, NOAH_PROFILE_RGB_V1_TRUNCATED, length, NOAH_PROFILE_RGB_V1_TABLE_HEADER, UINT8_MAX, NOAH_PROFILE_RGB_V1_FIELD_HEADER);
+        return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_TRUNCATED, length, NOAH_PROFILE_RGB_V1_TABLE_HEADER, UINT8_MAX, NOAH_PROFILE_RGB_V1_FIELD_HEADER);
     }
-    if (length > candidate.limits.max_payload_size || length > UINT16_MAX) {
-        return fail(error, NOAH_PROFILE_RGB_V1_CAPACITY_EXCEEDED, length, NOAH_PROFILE_RGB_V1_TABLE_HEADER, UINT8_MAX, NOAH_PROFILE_RGB_V1_FIELD_HEADER);
+    if (length > validation->candidate.limits.max_payload_size || length > UINT16_MAX) {
+        return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_CAPACITY_EXCEEDED, length, NOAH_PROFILE_RGB_V1_TABLE_HEADER, UINT8_MAX, NOAH_PROFILE_RGB_V1_FIELD_HEADER);
     }
-    candidate.reader      = *reader;
-    candidate.base_offset = base_offset;
-    candidate.byte_length = (uint16_t)length;
-    result = read_bytes(&candidate, 0u, header, sizeof(header), NOAH_PROFILE_RGB_V1_TABLE_HEADER, UINT8_MAX, NOAH_PROFILE_RGB_V1_FIELD_HEADER, error);
-    if (result != NOAH_PROFILE_RGB_V1_OK) return result;
+    validation->candidate.reader      = *reader;
+    validation->candidate.base_offset = base_offset;
+    validation->candidate.byte_length = (uint16_t)length;
+    validation->phase                 = NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_HEADER;
+    validation->result                = NOAH_PROFILE_RGB_V1_VALIDATION_IN_PROGRESS;
+    return NOAH_PROFILE_RGB_V1_VALIDATION_IN_PROGRESS;
+}
 
-    if (header[0] != NOAH_PROFILE_RGB_V1_FORMAT_VERSION) {
-        return fail(error, NOAH_PROFILE_RGB_V1_INVALID_VERSION, 0u, NOAH_PROFILE_RGB_V1_TABLE_HEADER, UINT8_MAX, NOAH_PROFILE_RGB_V1_FIELD_FORMAT_VERSION);
-    }
-    if (header[1] != 0u || header[14] != 0u || header[15] != 0u) {
-        size_t bad_offset = header[1] != 0u ? 1u : (header[14] != 0u ? 14u : 15u);
-        return fail(error, NOAH_PROFILE_RGB_V1_RESERVED_BITS, bad_offset, NOAH_PROFILE_RGB_V1_TABLE_HEADER, UINT8_MAX, NOAH_PROFILE_RGB_V1_FIELD_RESERVED);
-    }
-    candidate.stage_enable_mask = read_u16(&header[2]);
-    if ((candidate.stage_enable_mask & (uint16_t)~NOAH_PROFILE_RGB_V1_STAGE_MASK_ALL) != 0u) {
-        return fail(error, NOAH_PROFILE_RGB_V1_RESERVED_BITS, 2u, NOAH_PROFILE_RGB_V1_TABLE_HEADER, UINT8_MAX, NOAH_PROFILE_RGB_V1_FIELD_STAGE_MASK);
-    }
-    if ((candidate.stage_enable_mask & (uint16_t)~candidate.limits.compiled_stage_mask) != 0u) {
-        return fail(error, NOAH_PROFILE_RGB_V1_UNSUPPORTED_STAGE, 2u, NOAH_PROFILE_RGB_V1_TABLE_HEADER, UINT8_MAX, NOAH_PROFILE_RGB_V1_FIELD_STAGE_MASK);
-    }
-    if (header[12] != NOAH_PROFILE_RGB_V1_PHYSICAL_LED_COUNT || header[13] != NOAH_PROFILE_RGB_V1_LED_BITMAP_SIZE) {
-        return fail(error, NOAH_PROFILE_RGB_V1_INCOMPATIBLE_GEOMETRY, header[12] != NOAH_PROFILE_RGB_V1_PHYSICAL_LED_COUNT ? 12u : 13u, NOAH_PROFILE_RGB_V1_TABLE_HEADER, UINT8_MAX, NOAH_PROFILE_RGB_V1_FIELD_GEOMETRY);
-    }
+noah_profile_rgb_v1_validation_result_t noah_profile_rgb_v1_validation_step(noah_profile_rgb_v1_validation_t *validation, noah_profile_rgb_v1_error_t *error) {
+    noah_profile_rgb_v1_view_t *candidate;
+    noah_profile_rgb_v1_error_t captured;
+    noah_profile_rgb_v1_result_t result;
+    uint8_t bytes[NOAH_PROFILE_RGB_V1_HEADER_SIZE];
+    size_t offset;
 
-    candidate.group_count            = header[4];
-    candidate.layer_color_count      = header[5];
-    candidate.layer_group_count      = header[6];
-    candidate.pd_color_count         = header[7];
-    candidate.pd_group_count         = header[8];
-    candidate.combo_group_count      = header[9];
-    candidate.tap_branch_color_count = header[10];
-    candidate.key_group_count        = header[11];
-    if (candidate.group_count > NOAH_PROFILE_RGB_V1_MAX_GROUPS || candidate.layer_color_count > candidate.limits.max_logical_layers || candidate.pd_color_count > NOAH_PROFILE_RGB_V1_MAX_PD_MODES || candidate.tap_branch_color_count > NOAH_PROFILE_RGB_V1_MAX_TAP_BRANCH_COLORS || (uint16_t)candidate.layer_group_count + candidate.pd_group_count + candidate.combo_group_count + candidate.key_group_count > NOAH_PROFILE_RGB_V1_MAX_STAGE_GROUP_ROWS) {
-        return fail(error, NOAH_PROFILE_RGB_V1_CAPACITY_EXCEEDED, 4u, NOAH_PROFILE_RGB_V1_TABLE_HEADER, UINT8_MAX, NOAH_PROFILE_RGB_V1_FIELD_COUNT);
+    clear_error(error);
+    if (!validation) {
+        return validation_reject(NULL, error, NOAH_PROFILE_RGB_V1_INVALID_ARGUMENT, 0u, NOAH_PROFILE_RGB_V1_TABLE_HEADER, UINT8_MAX, NOAH_PROFILE_RGB_V1_FIELD_HEADER);
     }
-    expected_length = RGB_FIXED_PAYLOAD_SIZE + (size_t)candidate.group_count * RGB_GROUP_RECORD_SIZE + (size_t)candidate.layer_color_count * RGB_LAYER_COLOR_RECORD_SIZE + (size_t)candidate.layer_group_count * RGB_GROUP_ROW_RECORD_SIZE + (size_t)candidate.pd_color_count * RGB_PD_COLOR_RECORD_SIZE + (size_t)candidate.pd_group_count * RGB_GROUP_ROW_RECORD_SIZE + (size_t)candidate.combo_group_count * RGB_COMBO_GROUP_RECORD_SIZE + (size_t)candidate.tap_branch_color_count * RGB_COLOR_RECORD_SIZE + (size_t)candidate.key_group_count * RGB_GROUP_ROW_RECORD_SIZE;
-    if (length < expected_length) {
-        return fail(error, NOAH_PROFILE_RGB_V1_TRUNCATED, length, NOAH_PROFILE_RGB_V1_TABLE_HEADER, UINT8_MAX, NOAH_PROFILE_RGB_V1_FIELD_COUNT);
-    }
-    if (length > expected_length) {
-        return fail(error, NOAH_PROFILE_RGB_V1_TRAILING_BYTES, expected_length, NOAH_PROFILE_RGB_V1_TABLE_HEADER, UINT8_MAX, NOAH_PROFILE_RGB_V1_FIELD_COUNT);
-    }
+    if (validation->result != NOAH_PROFILE_RGB_V1_VALIDATION_IN_PROGRESS) return validation_result(validation, error);
+    candidate = &validation->candidate;
+    clear_error(&captured);
 
-    offset = section_offset(&candidate, RGB_SECTION_GROUPS);
-    for (uint8_t index = 0u; index < candidate.group_count; index++, offset += RGB_GROUP_RECORD_SIZE) {
-        int order;
-        result = read_bytes(&candidate, offset, bytes, RGB_GROUP_RECORD_SIZE, NOAH_PROFILE_RGB_V1_TABLE_GROUPS, index, NOAH_PROFILE_RGB_V1_FIELD_ID, error);
-        if (result != NOAH_PROFILE_RGB_V1_OK) return result;
-        if (bytes[0] != index) {
-            return fail(error, NOAH_PROFILE_RGB_V1_NONCANONICAL_ORDER, offset, NOAH_PROFILE_RGB_V1_TABLE_GROUPS, index, NOAH_PROFILE_RGB_V1_FIELD_ID);
-        }
-        if ((bytes[8] & 0xfcu) != 0u) {
-            return fail(error, NOAH_PROFILE_RGB_V1_RESERVED_BITS, offset + 8u, NOAH_PROFILE_RGB_V1_TABLE_GROUPS, index, NOAH_PROFILE_RGB_V1_FIELD_BITMAP);
-        }
-        if (have_previous_bitmap) {
-            order = memcmp(previous_bitmap, &bytes[1], NOAH_PROFILE_RGB_V1_LED_BITMAP_SIZE);
-            if (order == 0) {
-                return fail(error, NOAH_PROFILE_RGB_V1_DUPLICATE_BITMAP, offset + 1u, NOAH_PROFILE_RGB_V1_TABLE_GROUPS, index, NOAH_PROFILE_RGB_V1_FIELD_BITMAP);
+    switch ((noah_profile_rgb_v1_validation_phase_t)validation->phase) {
+        case NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_HEADER: {
+            size_t expected_length;
+            result = read_bytes(candidate, 0u, bytes, NOAH_PROFILE_RGB_V1_HEADER_SIZE, NOAH_PROFILE_RGB_V1_TABLE_HEADER, UINT8_MAX, NOAH_PROFILE_RGB_V1_FIELD_HEADER, &captured);
+            if (result != NOAH_PROFILE_RGB_V1_OK) return validation_reject_captured(validation, error, &captured);
+            if (bytes[0] != NOAH_PROFILE_RGB_V1_FORMAT_VERSION) return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_INVALID_VERSION, 0u, NOAH_PROFILE_RGB_V1_TABLE_HEADER, UINT8_MAX, NOAH_PROFILE_RGB_V1_FIELD_FORMAT_VERSION);
+            if (bytes[1] != 0u || bytes[14] != 0u || bytes[15] != 0u) {
+                size_t bad_offset = bytes[1] != 0u ? 1u : (bytes[14] != 0u ? 14u : 15u);
+                return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_RESERVED_BITS, bad_offset, NOAH_PROFILE_RGB_V1_TABLE_HEADER, UINT8_MAX, NOAH_PROFILE_RGB_V1_FIELD_RESERVED);
             }
-            if (order > 0) {
-                return fail(error, NOAH_PROFILE_RGB_V1_NONCANONICAL_ORDER, offset + 1u, NOAH_PROFILE_RGB_V1_TABLE_GROUPS, index, NOAH_PROFILE_RGB_V1_FIELD_BITMAP);
+            candidate->stage_enable_mask = read_u16(&bytes[2]);
+            if ((candidate->stage_enable_mask & (uint16_t)~NOAH_PROFILE_RGB_V1_STAGE_MASK_ALL) != 0u) return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_RESERVED_BITS, 2u, NOAH_PROFILE_RGB_V1_TABLE_HEADER, UINT8_MAX, NOAH_PROFILE_RGB_V1_FIELD_STAGE_MASK);
+            if ((candidate->stage_enable_mask & (uint16_t)~candidate->limits.compiled_stage_mask) != 0u) return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_UNSUPPORTED_STAGE, 2u, NOAH_PROFILE_RGB_V1_TABLE_HEADER, UINT8_MAX, NOAH_PROFILE_RGB_V1_FIELD_STAGE_MASK);
+            if (bytes[12] != NOAH_PROFILE_RGB_V1_PHYSICAL_LED_COUNT || bytes[13] != NOAH_PROFILE_RGB_V1_LED_BITMAP_SIZE) return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_INCOMPATIBLE_GEOMETRY, bytes[12] != NOAH_PROFILE_RGB_V1_PHYSICAL_LED_COUNT ? 12u : 13u, NOAH_PROFILE_RGB_V1_TABLE_HEADER, UINT8_MAX, NOAH_PROFILE_RGB_V1_FIELD_GEOMETRY);
+            candidate->group_count            = bytes[4];
+            candidate->layer_color_count      = bytes[5];
+            candidate->layer_group_count      = bytes[6];
+            candidate->pd_color_count         = bytes[7];
+            candidate->pd_group_count         = bytes[8];
+            candidate->combo_group_count      = bytes[9];
+            candidate->tap_branch_color_count = bytes[10];
+            candidate->key_group_count        = bytes[11];
+            if (candidate->group_count > NOAH_PROFILE_RGB_V1_MAX_GROUPS || candidate->layer_color_count > candidate->limits.max_logical_layers || candidate->pd_color_count > NOAH_PROFILE_RGB_V1_MAX_PD_MODES || candidate->tap_branch_color_count > NOAH_PROFILE_RGB_V1_MAX_TAP_BRANCH_COLORS || (uint16_t)candidate->layer_group_count + candidate->pd_group_count + candidate->combo_group_count + candidate->key_group_count > NOAH_PROFILE_RGB_V1_MAX_STAGE_GROUP_ROWS) return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_CAPACITY_EXCEEDED, 4u, NOAH_PROFILE_RGB_V1_TABLE_HEADER, UINT8_MAX, NOAH_PROFILE_RGB_V1_FIELD_COUNT);
+            expected_length = RGB_FIXED_PAYLOAD_SIZE + (size_t)candidate->group_count * RGB_GROUP_RECORD_SIZE + (size_t)candidate->layer_color_count * RGB_LAYER_COLOR_RECORD_SIZE + (size_t)candidate->layer_group_count * RGB_GROUP_ROW_RECORD_SIZE + (size_t)candidate->pd_color_count * RGB_PD_COLOR_RECORD_SIZE + (size_t)candidate->pd_group_count * RGB_GROUP_ROW_RECORD_SIZE + (size_t)candidate->combo_group_count * RGB_COMBO_GROUP_RECORD_SIZE + (size_t)candidate->tap_branch_color_count * RGB_COLOR_RECORD_SIZE + (size_t)candidate->key_group_count * RGB_GROUP_ROW_RECORD_SIZE;
+            if (candidate->byte_length < expected_length) return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_TRUNCATED, candidate->byte_length, NOAH_PROFILE_RGB_V1_TABLE_HEADER, UINT8_MAX, NOAH_PROFILE_RGB_V1_FIELD_COUNT);
+            if (candidate->byte_length > expected_length) return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_TRAILING_BYTES, expected_length, NOAH_PROFILE_RGB_V1_TABLE_HEADER, UINT8_MAX, NOAH_PROFILE_RGB_V1_FIELD_COUNT);
+            return validation_progress(validation, NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_GROUPS);
+        }
+
+        case NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_GROUPS:
+            if (validation->row >= candidate->group_count) return validation_progress(validation, NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_LAYER_COLORS);
+            offset = section_offset(candidate, RGB_SECTION_GROUPS) + (size_t)validation->row * RGB_GROUP_RECORD_SIZE;
+            result = read_bytes(candidate, offset, bytes, RGB_GROUP_RECORD_SIZE, NOAH_PROFILE_RGB_V1_TABLE_GROUPS, validation->row, NOAH_PROFILE_RGB_V1_FIELD_ID, &captured);
+            if (result != NOAH_PROFILE_RGB_V1_OK) return validation_reject_captured(validation, error, &captured);
+            if (bytes[0] != validation->row) return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_NONCANONICAL_ORDER, offset, NOAH_PROFILE_RGB_V1_TABLE_GROUPS, validation->row, NOAH_PROFILE_RGB_V1_FIELD_ID);
+            if ((bytes[8] & 0xfcu) != 0u) return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_RESERVED_BITS, offset + 8u, NOAH_PROFILE_RGB_V1_TABLE_GROUPS, validation->row, NOAH_PROFILE_RGB_V1_FIELD_BITMAP);
+            if (validation->have_previous_bitmap != 0u) {
+                int order = memcmp(validation->previous_bitmap, &bytes[1], NOAH_PROFILE_RGB_V1_LED_BITMAP_SIZE);
+                if (order == 0) return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_DUPLICATE_BITMAP, offset + 1u, NOAH_PROFILE_RGB_V1_TABLE_GROUPS, validation->row, NOAH_PROFILE_RGB_V1_FIELD_BITMAP);
+                if (order > 0) return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_NONCANONICAL_ORDER, offset + 1u, NOAH_PROFILE_RGB_V1_TABLE_GROUPS, validation->row, NOAH_PROFILE_RGB_V1_FIELD_BITMAP);
             }
-        }
-        memcpy(previous_bitmap, &bytes[1], sizeof(previous_bitmap));
-        have_previous_bitmap = true;
-    }
+            memcpy(validation->previous_bitmap, &bytes[1], sizeof(validation->previous_bitmap));
+            validation->have_previous_bitmap = 1u;
+            validation->row++;
+            if (validation->row == candidate->group_count) return validation_progress(validation, NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_LAYER_COLORS);
+            return NOAH_PROFILE_RGB_V1_VALIDATION_IN_PROGRESS;
 
-    offset = section_offset(&candidate, RGB_SECTION_LAYER_COLORS);
-    for (uint8_t index = 0u; index < candidate.layer_color_count; index++, offset += RGB_LAYER_COLOR_RECORD_SIZE) {
-        result = read_bytes(&candidate, offset, bytes, RGB_LAYER_COLOR_RECORD_SIZE, NOAH_PROFILE_RGB_V1_TABLE_LAYER_COLORS, index, NOAH_PROFILE_RGB_V1_FIELD_ID, error);
-        if (result != NOAH_PROFILE_RGB_V1_OK) return result;
-        if (bytes[0] != index) return fail(error, NOAH_PROFILE_RGB_V1_NONCANONICAL_ORDER, offset, NOAH_PROFILE_RGB_V1_TABLE_LAYER_COLORS, index, NOAH_PROFILE_RGB_V1_FIELD_ID);
-        result = validate_hsv(&candidate, &bytes[1], offset + 1u, NOAH_PROFILE_RGB_V1_TABLE_LAYER_COLORS, index, error);
-        if (result != NOAH_PROFILE_RGB_V1_OK) return result;
-        if (bytes[4] > 1u) return fail(error, NOAH_PROFILE_RGB_V1_INVALID_ENUM, offset + 4u, NOAH_PROFILE_RGB_V1_TABLE_LAYER_COLORS, index, NOAH_PROFILE_RGB_V1_FIELD_MODE);
-    }
-    if ((candidate.limits.compiled_stage_mask & NOAH_PROFILE_RGB_V1_STAGE_LAYER) != 0u) {
-        if (candidate.layer_color_count == 0u || (candidate.limits.logical_layer_count != 0u && candidate.layer_color_count != candidate.limits.logical_layer_count)) {
-            return fail(error, NOAH_PROFILE_RGB_V1_INCOMPLETE_SURFACE, 5u, NOAH_PROFILE_RGB_V1_TABLE_LAYER_COLORS, UINT8_MAX, NOAH_PROFILE_RGB_V1_FIELD_COUNT);
-        }
-    } else if (candidate.layer_color_count != 0u || candidate.layer_group_count != 0u) {
-        return fail(error, NOAH_PROFILE_RGB_V1_UNSUPPORTED_STAGE_DATA, 5u, NOAH_PROFILE_RGB_V1_TABLE_LAYER_COLORS, UINT8_MAX, NOAH_PROFILE_RGB_V1_FIELD_COUNT);
-    }
+        case NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_LAYER_COLORS:
+            if (validation->row < candidate->layer_color_count) {
+                offset = section_offset(candidate, RGB_SECTION_LAYER_COLORS) + (size_t)validation->row * RGB_LAYER_COLOR_RECORD_SIZE;
+                result = read_bytes(candidate, offset, bytes, RGB_LAYER_COLOR_RECORD_SIZE, NOAH_PROFILE_RGB_V1_TABLE_LAYER_COLORS, validation->row, NOAH_PROFILE_RGB_V1_FIELD_ID, &captured);
+                if (result != NOAH_PROFILE_RGB_V1_OK) return validation_reject_captured(validation, error, &captured);
+                if (bytes[0] != validation->row) return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_NONCANONICAL_ORDER, offset, NOAH_PROFILE_RGB_V1_TABLE_LAYER_COLORS, validation->row, NOAH_PROFILE_RGB_V1_FIELD_ID);
+                result = validate_hsv(candidate, &bytes[1], offset + 1u, NOAH_PROFILE_RGB_V1_TABLE_LAYER_COLORS, validation->row, &captured);
+                if (result != NOAH_PROFILE_RGB_V1_OK) return validation_reject_captured(validation, error, &captured);
+                if (bytes[4] > 1u) return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_INVALID_ENUM, offset + 4u, NOAH_PROFILE_RGB_V1_TABLE_LAYER_COLORS, validation->row, NOAH_PROFILE_RGB_V1_FIELD_MODE);
+                validation->row++;
+                if (validation->row < candidate->layer_color_count) return NOAH_PROFILE_RGB_V1_VALIDATION_IN_PROGRESS;
+            }
+            if ((candidate->limits.compiled_stage_mask & NOAH_PROFILE_RGB_V1_STAGE_LAYER) != 0u) {
+                if (candidate->layer_color_count == 0u || (candidate->limits.logical_layer_count != 0u && candidate->layer_color_count != candidate->limits.logical_layer_count)) return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_INCOMPLETE_SURFACE, 5u, NOAH_PROFILE_RGB_V1_TABLE_LAYER_COLORS, UINT8_MAX, NOAH_PROFILE_RGB_V1_FIELD_COUNT);
+            } else if (candidate->layer_color_count != 0u || candidate->layer_group_count != 0u) {
+                return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_UNSUPPORTED_STAGE_DATA, 5u, NOAH_PROFILE_RGB_V1_TABLE_LAYER_COLORS, UINT8_MAX, NOAH_PROFILE_RGB_V1_FIELD_COUNT);
+            }
+            return validation_progress(validation, NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_LAYER_GROUPS);
 
-    offset = section_offset(&candidate, RGB_SECTION_LAYER_GROUPS);
-    for (uint8_t index = 0u; index < candidate.layer_group_count; index++, offset += RGB_GROUP_ROW_RECORD_SIZE) {
-        result = validate_group_row(&candidate, offset, NOAH_PROFILE_RGB_V1_TABLE_LAYER_GROUPS, index, NOAH_PROFILE_RGB_V1_TABLE_LAYER_GROUPS, error);
-        if (result != NOAH_PROFILE_RGB_V1_OK) return result;
-    }
+        case NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_LAYER_GROUPS:
+            if (validation->row >= candidate->layer_group_count) return validation_progress(validation, NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_AUTOMOUSE);
+            offset = section_offset(candidate, RGB_SECTION_LAYER_GROUPS) + (size_t)validation->row * RGB_GROUP_ROW_RECORD_SIZE;
+            result = validate_group_row(candidate, offset, NOAH_PROFILE_RGB_V1_TABLE_LAYER_GROUPS, validation->row, NOAH_PROFILE_RGB_V1_TABLE_LAYER_GROUPS, &captured);
+            if (result != NOAH_PROFILE_RGB_V1_OK) return validation_reject_captured(validation, error, &captured);
+            validation->row++;
+            if (validation->row == candidate->layer_group_count) return validation_progress(validation, NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_AUTOMOUSE);
+            return NOAH_PROFILE_RGB_V1_VALIDATION_IN_PROGRESS;
 
-    offset = section_offset(&candidate, RGB_SECTION_AUTOMOUSE);
-    result = read_bytes(&candidate, offset, bytes, RGB_AUTOMOUSE_RECORD_SIZE, NOAH_PROFILE_RGB_V1_TABLE_AUTOMOUSE, 0u, NOAH_PROFILE_RGB_V1_FIELD_MODE, error);
-    if (result != NOAH_PROFILE_RGB_V1_OK) return result;
-    if (bytes[0] > 2u) return fail(error, NOAH_PROFILE_RGB_V1_INVALID_ENUM, offset, NOAH_PROFILE_RGB_V1_TABLE_AUTOMOUSE, 0u, NOAH_PROFILE_RGB_V1_FIELD_MODE);
-    result = validate_hsv(&candidate, &bytes[1], offset + 1u, NOAH_PROFILE_RGB_V1_TABLE_AUTOMOUSE, 0u, error);
-    if (result != NOAH_PROFILE_RGB_V1_OK) return result;
-    if ((candidate.limits.compiled_stage_mask & NOAH_PROFILE_RGB_V1_STAGE_AUTOMOUSE) == 0u && (bytes[0] != 0u || !hsv_is_black(&bytes[1]))) {
-        return fail(error, NOAH_PROFILE_RGB_V1_UNSUPPORTED_STAGE_DATA, offset, NOAH_PROFILE_RGB_V1_TABLE_AUTOMOUSE, 0u, NOAH_PROFILE_RGB_V1_FIELD_MODE);
-    }
+        case NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_AUTOMOUSE:
+            offset = section_offset(candidate, RGB_SECTION_AUTOMOUSE);
+            result = read_bytes(candidate, offset, bytes, RGB_AUTOMOUSE_RECORD_SIZE, NOAH_PROFILE_RGB_V1_TABLE_AUTOMOUSE, 0u, NOAH_PROFILE_RGB_V1_FIELD_MODE, &captured);
+            if (result != NOAH_PROFILE_RGB_V1_OK) return validation_reject_captured(validation, error, &captured);
+            if (bytes[0] > 2u) return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_INVALID_ENUM, offset, NOAH_PROFILE_RGB_V1_TABLE_AUTOMOUSE, 0u, NOAH_PROFILE_RGB_V1_FIELD_MODE);
+            result = validate_hsv(candidate, &bytes[1], offset + 1u, NOAH_PROFILE_RGB_V1_TABLE_AUTOMOUSE, 0u, &captured);
+            if (result != NOAH_PROFILE_RGB_V1_OK) return validation_reject_captured(validation, error, &captured);
+            if ((candidate->limits.compiled_stage_mask & NOAH_PROFILE_RGB_V1_STAGE_AUTOMOUSE) == 0u && (bytes[0] != 0u || !hsv_is_black(&bytes[1]))) return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_UNSUPPORTED_STAGE_DATA, offset, NOAH_PROFILE_RGB_V1_TABLE_AUTOMOUSE, 0u, NOAH_PROFILE_RGB_V1_FIELD_MODE);
+            return validation_progress(validation, NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_PD_COLORS);
 
-    offset = section_offset(&candidate, RGB_SECTION_PD_COLORS);
-    for (uint8_t index = 0u; index < candidate.pd_color_count; index++, offset += RGB_PD_COLOR_RECORD_SIZE) {
-        uint8_t pd_id;
-        result = read_bytes(&candidate, offset, bytes, RGB_PD_COLOR_RECORD_SIZE, NOAH_PROFILE_RGB_V1_TABLE_PD_COLORS, index, NOAH_PROFILE_RGB_V1_FIELD_ID, error);
-        if (result != NOAH_PROFILE_RGB_V1_OK) return result;
-        pd_id = bytes[0];
-        if (pd_id >= NOAH_PROFILE_RGB_V1_MAX_PD_MODES || (candidate.limits.supported_pd_mode_mask & (1u << pd_id)) == 0u) {
-            return fail(error, NOAH_PROFILE_RGB_V1_INVALID_ID, offset, NOAH_PROFILE_RGB_V1_TABLE_PD_COLORS, index, NOAH_PROFILE_RGB_V1_FIELD_ID);
-        }
-        if ((int16_t)pd_id <= previous_pd_id) return fail(error, NOAH_PROFILE_RGB_V1_NONCANONICAL_ORDER, offset, NOAH_PROFILE_RGB_V1_TABLE_PD_COLORS, index, NOAH_PROFILE_RGB_V1_FIELD_ID);
-        observed_pd_mask = (uint8_t)(observed_pd_mask | (1u << pd_id));
-        previous_pd_id = pd_id;
-        result = validate_hsv(&candidate, &bytes[1], offset + 1u, NOAH_PROFILE_RGB_V1_TABLE_PD_COLORS, index, error);
-        if (result != NOAH_PROFILE_RGB_V1_OK) return result;
-        if (bytes[4] > 4u) return fail(error, NOAH_PROFILE_RGB_V1_INVALID_ENUM, offset + 4u, NOAH_PROFILE_RGB_V1_TABLE_PD_COLORS, index, NOAH_PROFILE_RGB_V1_FIELD_LOCALITY);
-    }
-    if ((candidate.limits.compiled_stage_mask & NOAH_PROFILE_RGB_V1_STAGE_PD_MODE) != 0u) {
-        if (observed_pd_mask != candidate.limits.supported_pd_mode_mask) return fail(error, NOAH_PROFILE_RGB_V1_INCOMPLETE_SURFACE, 7u, NOAH_PROFILE_RGB_V1_TABLE_PD_COLORS, UINT8_MAX, NOAH_PROFILE_RGB_V1_FIELD_COUNT);
-    } else if (candidate.pd_color_count != 0u || candidate.pd_group_count != 0u) {
-        return fail(error, NOAH_PROFILE_RGB_V1_UNSUPPORTED_STAGE_DATA, 7u, NOAH_PROFILE_RGB_V1_TABLE_PD_COLORS, UINT8_MAX, NOAH_PROFILE_RGB_V1_FIELD_COUNT);
-    }
+        case NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_PD_COLORS:
+            if (validation->row < candidate->pd_color_count) {
+                uint8_t pd_id;
+                offset = section_offset(candidate, RGB_SECTION_PD_COLORS) + (size_t)validation->row * RGB_PD_COLOR_RECORD_SIZE;
+                result = read_bytes(candidate, offset, bytes, RGB_PD_COLOR_RECORD_SIZE, NOAH_PROFILE_RGB_V1_TABLE_PD_COLORS, validation->row, NOAH_PROFILE_RGB_V1_FIELD_ID, &captured);
+                if (result != NOAH_PROFILE_RGB_V1_OK) return validation_reject_captured(validation, error, &captured);
+                pd_id = bytes[0];
+                if (pd_id >= NOAH_PROFILE_RGB_V1_MAX_PD_MODES || (candidate->limits.supported_pd_mode_mask & (1u << pd_id)) == 0u) return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_INVALID_ID, offset, NOAH_PROFILE_RGB_V1_TABLE_PD_COLORS, validation->row, NOAH_PROFILE_RGB_V1_FIELD_ID);
+                if ((int16_t)pd_id <= validation->previous_pd_id) return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_NONCANONICAL_ORDER, offset, NOAH_PROFILE_RGB_V1_TABLE_PD_COLORS, validation->row, NOAH_PROFILE_RGB_V1_FIELD_ID);
+                validation->observed_pd_mask = (uint8_t)(validation->observed_pd_mask | (1u << pd_id));
+                validation->previous_pd_id   = (int8_t)pd_id;
+                result = validate_hsv(candidate, &bytes[1], offset + 1u, NOAH_PROFILE_RGB_V1_TABLE_PD_COLORS, validation->row, &captured);
+                if (result != NOAH_PROFILE_RGB_V1_OK) return validation_reject_captured(validation, error, &captured);
+                if (bytes[4] > 4u) return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_INVALID_ENUM, offset + 4u, NOAH_PROFILE_RGB_V1_TABLE_PD_COLORS, validation->row, NOAH_PROFILE_RGB_V1_FIELD_LOCALITY);
+                validation->row++;
+                if (validation->row < candidate->pd_color_count) return NOAH_PROFILE_RGB_V1_VALIDATION_IN_PROGRESS;
+            }
+            if ((candidate->limits.compiled_stage_mask & NOAH_PROFILE_RGB_V1_STAGE_PD_MODE) != 0u) {
+                if (validation->observed_pd_mask != candidate->limits.supported_pd_mode_mask) return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_INCOMPLETE_SURFACE, 7u, NOAH_PROFILE_RGB_V1_TABLE_PD_COLORS, UINT8_MAX, NOAH_PROFILE_RGB_V1_FIELD_COUNT);
+            } else if (candidate->pd_color_count != 0u || candidate->pd_group_count != 0u) {
+                return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_UNSUPPORTED_STAGE_DATA, 7u, NOAH_PROFILE_RGB_V1_TABLE_PD_COLORS, UINT8_MAX, NOAH_PROFILE_RGB_V1_FIELD_COUNT);
+            }
+            return validation_progress(validation, NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_PD_GROUPS);
 
-    offset = section_offset(&candidate, RGB_SECTION_PD_GROUPS);
-    for (uint8_t index = 0u; index < candidate.pd_group_count; index++, offset += RGB_GROUP_ROW_RECORD_SIZE) {
-        result = validate_group_row(&candidate, offset, NOAH_PROFILE_RGB_V1_TABLE_PD_GROUPS, index, NOAH_PROFILE_RGB_V1_TABLE_PD_GROUPS, error);
-        if (result != NOAH_PROFILE_RGB_V1_OK) return result;
-    }
+        case NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_PD_GROUPS:
+            if (validation->row >= candidate->pd_group_count) return validation_progress(validation, NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_COMBO);
+            offset = section_offset(candidate, RGB_SECTION_PD_GROUPS) + (size_t)validation->row * RGB_GROUP_ROW_RECORD_SIZE;
+            result = validate_group_row(candidate, offset, NOAH_PROFILE_RGB_V1_TABLE_PD_GROUPS, validation->row, NOAH_PROFILE_RGB_V1_TABLE_PD_GROUPS, &captured);
+            if (result != NOAH_PROFILE_RGB_V1_OK) return validation_reject_captured(validation, error, &captured);
+            validation->row++;
+            if (validation->row == candidate->pd_group_count) return validation_progress(validation, NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_COMBO);
+            return NOAH_PROFILE_RGB_V1_VALIDATION_IN_PROGRESS;
 
-    offset = section_offset(&candidate, RGB_SECTION_COMBO);
-    result = read_bytes(&candidate, offset, bytes, RGB_COMBO_RECORD_SIZE, NOAH_PROFILE_RGB_V1_TABLE_COMBO, 0u, NOAH_PROFILE_RGB_V1_FIELD_COLOR, error);
-    if (result != NOAH_PROFILE_RGB_V1_OK) return result;
-    result = validate_hsv(&candidate, bytes, offset, NOAH_PROFILE_RGB_V1_TABLE_COMBO, 0u, error);
-    if (result != NOAH_PROFILE_RGB_V1_OK) return result;
-    if (bytes[3] > 4u) return fail(error, NOAH_PROFILE_RGB_V1_INVALID_ENUM, offset + 3u, NOAH_PROFILE_RGB_V1_TABLE_COMBO, 0u, NOAH_PROFILE_RGB_V1_FIELD_LOCALITY);
-    if ((candidate.limits.compiled_stage_mask & NOAH_PROFILE_RGB_V1_STAGE_COMBO) == 0u && (candidate.combo_group_count != 0u || bytes[3] != 0u || !hsv_is_black(bytes))) {
-        return fail(error, NOAH_PROFILE_RGB_V1_UNSUPPORTED_STAGE_DATA, offset, NOAH_PROFILE_RGB_V1_TABLE_COMBO, 0u, NOAH_PROFILE_RGB_V1_FIELD_COLOR);
-    }
+        case NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_COMBO:
+            offset = section_offset(candidate, RGB_SECTION_COMBO);
+            result = read_bytes(candidate, offset, bytes, RGB_COMBO_RECORD_SIZE, NOAH_PROFILE_RGB_V1_TABLE_COMBO, 0u, NOAH_PROFILE_RGB_V1_FIELD_COLOR, &captured);
+            if (result != NOAH_PROFILE_RGB_V1_OK) return validation_reject_captured(validation, error, &captured);
+            result = validate_hsv(candidate, bytes, offset, NOAH_PROFILE_RGB_V1_TABLE_COMBO, 0u, &captured);
+            if (result != NOAH_PROFILE_RGB_V1_OK) return validation_reject_captured(validation, error, &captured);
+            if (bytes[3] > 4u) return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_INVALID_ENUM, offset + 3u, NOAH_PROFILE_RGB_V1_TABLE_COMBO, 0u, NOAH_PROFILE_RGB_V1_FIELD_LOCALITY);
+            if ((candidate->limits.compiled_stage_mask & NOAH_PROFILE_RGB_V1_STAGE_COMBO) == 0u && (candidate->combo_group_count != 0u || bytes[3] != 0u || !hsv_is_black(bytes))) return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_UNSUPPORTED_STAGE_DATA, offset, NOAH_PROFILE_RGB_V1_TABLE_COMBO, 0u, NOAH_PROFILE_RGB_V1_FIELD_COLOR);
+            return validation_progress(validation, NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_COMBO_GROUPS);
 
-    offset = section_offset(&candidate, RGB_SECTION_COMBO_GROUPS);
-    for (uint8_t index = 0u; index < candidate.combo_group_count; index++, offset += RGB_COMBO_GROUP_RECORD_SIZE) {
-        result = read_bytes(&candidate, offset, bytes, RGB_COMBO_GROUP_RECORD_SIZE, NOAH_PROFILE_RGB_V1_TABLE_COMBO_GROUPS, index, NOAH_PROFILE_RGB_V1_FIELD_COLOR, error);
-        if (result != NOAH_PROFILE_RGB_V1_OK) return result;
-        result = validate_hsv(&candidate, bytes, offset, NOAH_PROFILE_RGB_V1_TABLE_COMBO_GROUPS, index, error);
-        if (result != NOAH_PROFILE_RGB_V1_OK) return result;
-        if (bytes[3] >= candidate.group_count) return fail(error, NOAH_PROFILE_RGB_V1_INVALID_REFERENCE, offset + 3u, NOAH_PROFILE_RGB_V1_TABLE_COMBO_GROUPS, index, NOAH_PROFILE_RGB_V1_FIELD_GROUP_ID);
-    }
+        case NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_COMBO_GROUPS:
+            if (validation->row >= candidate->combo_group_count) return validation_progress(validation, NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_TAP_BRANCH_COLORS);
+            offset = section_offset(candidate, RGB_SECTION_COMBO_GROUPS) + (size_t)validation->row * RGB_COMBO_GROUP_RECORD_SIZE;
+            result = read_bytes(candidate, offset, bytes, RGB_COMBO_GROUP_RECORD_SIZE, NOAH_PROFILE_RGB_V1_TABLE_COMBO_GROUPS, validation->row, NOAH_PROFILE_RGB_V1_FIELD_COLOR, &captured);
+            if (result != NOAH_PROFILE_RGB_V1_OK) return validation_reject_captured(validation, error, &captured);
+            result = validate_hsv(candidate, bytes, offset, NOAH_PROFILE_RGB_V1_TABLE_COMBO_GROUPS, validation->row, &captured);
+            if (result != NOAH_PROFILE_RGB_V1_OK) return validation_reject_captured(validation, error, &captured);
+            if (bytes[3] >= candidate->group_count) return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_INVALID_REFERENCE, offset + 3u, NOAH_PROFILE_RGB_V1_TABLE_COMBO_GROUPS, validation->row, NOAH_PROFILE_RGB_V1_FIELD_GROUP_ID);
+            validation->row++;
+            if (validation->row == candidate->combo_group_count) return validation_progress(validation, NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_TAP_BRANCH_COLORS);
+            return NOAH_PROFILE_RGB_V1_VALIDATION_IN_PROGRESS;
 
-    offset = section_offset(&candidate, RGB_SECTION_TAP_BRANCH_COLORS);
-    for (uint8_t index = 0u; index < candidate.tap_branch_color_count; index++, offset += RGB_COLOR_RECORD_SIZE) {
-        result = read_bytes(&candidate, offset, bytes, RGB_COLOR_RECORD_SIZE, NOAH_PROFILE_RGB_V1_TABLE_TAP_BRANCH_COLORS, index, NOAH_PROFILE_RGB_V1_FIELD_COLOR, error);
-        if (result != NOAH_PROFILE_RGB_V1_OK) return result;
-        result = validate_hsv(&candidate, bytes, offset, NOAH_PROFILE_RGB_V1_TABLE_TAP_BRANCH_COLORS, index, error);
-        if (result != NOAH_PROFILE_RGB_V1_OK) return result;
-    }
+        case NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_TAP_BRANCH_COLORS:
+            if (validation->row >= candidate->tap_branch_color_count) return validation_progress(validation, NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_KEY_FEEDBACK);
+            offset = section_offset(candidate, RGB_SECTION_TAP_BRANCH_COLORS) + (size_t)validation->row * RGB_COLOR_RECORD_SIZE;
+            result = read_bytes(candidate, offset, bytes, RGB_COLOR_RECORD_SIZE, NOAH_PROFILE_RGB_V1_TABLE_TAP_BRANCH_COLORS, validation->row, NOAH_PROFILE_RGB_V1_FIELD_COLOR, &captured);
+            if (result != NOAH_PROFILE_RGB_V1_OK) return validation_reject_captured(validation, error, &captured);
+            result = validate_hsv(candidate, bytes, offset, NOAH_PROFILE_RGB_V1_TABLE_TAP_BRANCH_COLORS, validation->row, &captured);
+            if (result != NOAH_PROFILE_RGB_V1_OK) return validation_reject_captured(validation, error, &captured);
+            validation->row++;
+            if (validation->row == candidate->tap_branch_color_count) return validation_progress(validation, NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_KEY_FEEDBACK);
+            return NOAH_PROFILE_RGB_V1_VALIDATION_IN_PROGRESS;
 
-    offset = section_offset(&candidate, RGB_SECTION_KEY_FEEDBACK);
-    result = read_bytes(&candidate, offset, bytes, RGB_KEY_FEEDBACK_SIZE, NOAH_PROFILE_RGB_V1_TABLE_KEY_FEEDBACK, 0u, NOAH_PROFILE_RGB_V1_FIELD_COLOR, error);
-    if (result != NOAH_PROFILE_RGB_V1_OK) return result;
-    for (uint8_t color_index = 0u; color_index < 3u; color_index++) {
-        result = validate_hsv(&candidate, &bytes[color_index * 3u], offset + color_index * 3u, NOAH_PROFILE_RGB_V1_TABLE_KEY_FEEDBACK, 0u, error);
-        if (result != NOAH_PROFILE_RGB_V1_OK) return result;
-    }
-    if (bytes[9] > 1u) return fail(error, NOAH_PROFILE_RGB_V1_INVALID_ENUM, offset + 9u, NOAH_PROFILE_RGB_V1_TABLE_KEY_FEEDBACK, 0u, NOAH_PROFILE_RGB_V1_FIELD_MODE);
-    if (bytes[10] > 4u) return fail(error, NOAH_PROFILE_RGB_V1_INVALID_ENUM, offset + 10u, NOAH_PROFILE_RGB_V1_TABLE_KEY_FEEDBACK, 0u, NOAH_PROFILE_RGB_V1_FIELD_LOCALITY);
-    if ((candidate.limits.compiled_stage_mask & NOAH_PROFILE_RGB_V1_STAGE_KEY_BEHAVIOR) != 0u) {
-        if (candidate.tap_branch_color_count != candidate.limits.tap_branch_color_count) return fail(error, NOAH_PROFILE_RGB_V1_INCOMPLETE_SURFACE, 10u, NOAH_PROFILE_RGB_V1_TABLE_TAP_BRANCH_COLORS, UINT8_MAX, NOAH_PROFILE_RGB_V1_FIELD_COUNT);
-    } else if (candidate.tap_branch_color_count != 0u || candidate.key_group_count != 0u || bytes[9] != 0u || bytes[10] != 0u || !hsv_is_black(&bytes[0]) || !hsv_is_black(&bytes[3]) || !hsv_is_black(&bytes[6])) {
-        return fail(error, NOAH_PROFILE_RGB_V1_UNSUPPORTED_STAGE_DATA, offset, NOAH_PROFILE_RGB_V1_TABLE_KEY_FEEDBACK, 0u, NOAH_PROFILE_RGB_V1_FIELD_COLOR);
-    }
+        case NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_KEY_FEEDBACK:
+            offset = section_offset(candidate, RGB_SECTION_KEY_FEEDBACK);
+            result = read_bytes(candidate, offset, bytes, RGB_KEY_FEEDBACK_SIZE, NOAH_PROFILE_RGB_V1_TABLE_KEY_FEEDBACK, 0u, NOAH_PROFILE_RGB_V1_FIELD_COLOR, &captured);
+            if (result != NOAH_PROFILE_RGB_V1_OK) return validation_reject_captured(validation, error, &captured);
+            for (uint8_t color_index = 0u; color_index < 3u; color_index++) {
+                result = validate_hsv(candidate, &bytes[color_index * 3u], offset + color_index * 3u, NOAH_PROFILE_RGB_V1_TABLE_KEY_FEEDBACK, 0u, &captured);
+                if (result != NOAH_PROFILE_RGB_V1_OK) return validation_reject_captured(validation, error, &captured);
+            }
+            if (bytes[9] > 1u) return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_INVALID_ENUM, offset + 9u, NOAH_PROFILE_RGB_V1_TABLE_KEY_FEEDBACK, 0u, NOAH_PROFILE_RGB_V1_FIELD_MODE);
+            if (bytes[10] > 4u) return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_INVALID_ENUM, offset + 10u, NOAH_PROFILE_RGB_V1_TABLE_KEY_FEEDBACK, 0u, NOAH_PROFILE_RGB_V1_FIELD_LOCALITY);
+            if ((candidate->limits.compiled_stage_mask & NOAH_PROFILE_RGB_V1_STAGE_KEY_BEHAVIOR) != 0u) {
+                if (candidate->tap_branch_color_count != candidate->limits.tap_branch_color_count) return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_INCOMPLETE_SURFACE, 10u, NOAH_PROFILE_RGB_V1_TABLE_TAP_BRANCH_COLORS, UINT8_MAX, NOAH_PROFILE_RGB_V1_FIELD_COUNT);
+            } else if (candidate->tap_branch_color_count != 0u || candidate->key_group_count != 0u || bytes[9] != 0u || bytes[10] != 0u || !hsv_is_black(&bytes[0]) || !hsv_is_black(&bytes[3]) || !hsv_is_black(&bytes[6])) {
+                return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_UNSUPPORTED_STAGE_DATA, offset, NOAH_PROFILE_RGB_V1_TABLE_KEY_FEEDBACK, 0u, NOAH_PROFILE_RGB_V1_FIELD_COLOR);
+            }
+            return validation_progress(validation, NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_KEY_GROUPS);
 
-    offset = section_offset(&candidate, RGB_SECTION_KEY_GROUPS);
-    for (uint8_t index = 0u; index < candidate.key_group_count; index++, offset += RGB_GROUP_ROW_RECORD_SIZE) {
-        result = validate_group_row(&candidate, offset, NOAH_PROFILE_RGB_V1_TABLE_KEY_GROUPS, index, NOAH_PROFILE_RGB_V1_TABLE_KEY_GROUPS, error);
-        if (result != NOAH_PROFILE_RGB_V1_OK) return result;
-    }
+        case NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_KEY_GROUPS:
+            if (validation->row < candidate->key_group_count) {
+                offset = section_offset(candidate, RGB_SECTION_KEY_GROUPS) + (size_t)validation->row * RGB_GROUP_ROW_RECORD_SIZE;
+                result = validate_group_row(candidate, offset, NOAH_PROFILE_RGB_V1_TABLE_KEY_GROUPS, validation->row, NOAH_PROFILE_RGB_V1_TABLE_KEY_GROUPS, &captured);
+                if (result != NOAH_PROFILE_RGB_V1_OK) return validation_reject_captured(validation, error, &captured);
+                validation->row++;
+                if (validation->row < candidate->key_group_count) return NOAH_PROFILE_RGB_V1_VALIDATION_IN_PROGRESS;
+            }
+            validation->phase  = NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_COMPLETE;
+            validation->result = NOAH_PROFILE_RGB_V1_VALIDATION_VALID;
+            return NOAH_PROFILE_RGB_V1_VALIDATION_VALID;
 
-    *view = candidate;
-    return NOAH_PROFILE_RGB_V1_OK;
+        case NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_COMPLETE:
+            validation->result = NOAH_PROFILE_RGB_V1_VALIDATION_VALID;
+            return NOAH_PROFILE_RGB_V1_VALIDATION_VALID;
+
+        case NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_REJECTED:
+            validation->result = NOAH_PROFILE_RGB_V1_VALIDATION_REJECTED;
+            copy_error(error, &validation->rejection);
+            return NOAH_PROFILE_RGB_V1_VALIDATION_REJECTED;
+
+        case NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_UNINITIALIZED:
+        default:
+            return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_INVALID_ARGUMENT, 0u, NOAH_PROFILE_RGB_V1_TABLE_HEADER, UINT8_MAX, NOAH_PROFILE_RGB_V1_FIELD_HEADER);
+    }
+}
+
+noah_profile_rgb_v1_validation_result_t noah_profile_rgb_v1_validation_view(const noah_profile_rgb_v1_validation_t *validation, noah_profile_rgb_v1_view_t *view, noah_profile_rgb_v1_error_t *error) {
+    clear_error(error);
+    if (view) memset(view, 0, sizeof(*view));
+    if (!validation || !view) {
+        fail(error, NOAH_PROFILE_RGB_V1_INVALID_ARGUMENT, 0u, NOAH_PROFILE_RGB_V1_TABLE_HEADER, UINT8_MAX, NOAH_PROFILE_RGB_V1_FIELD_HEADER);
+        return NOAH_PROFILE_RGB_V1_VALIDATION_REJECTED;
+    }
+    if (validation->result == NOAH_PROFILE_RGB_V1_VALIDATION_REJECTED) {
+        copy_error(error, &validation->rejection);
+        return NOAH_PROFILE_RGB_V1_VALIDATION_REJECTED;
+    }
+    if (validation->result != NOAH_PROFILE_RGB_V1_VALIDATION_VALID) return NOAH_PROFILE_RGB_V1_VALIDATION_IN_PROGRESS;
+    *view = validation->candidate;
+    return NOAH_PROFILE_RGB_V1_VALIDATION_VALID;
+}
+
+noah_profile_rgb_v1_result_t noah_profile_rgb_v1_decode_reader(const noah_profile_reader_t *reader, size_t base_offset, size_t length, const noah_profile_rgb_v1_limits_t *limits, noah_profile_rgb_v1_view_t *view, noah_profile_rgb_v1_error_t *error) {
+    noah_profile_rgb_v1_validation_t validation;
+    noah_profile_rgb_v1_validation_result_t progress;
+
+    clear_error(error);
+    if (!view) return fail(error, NOAH_PROFILE_RGB_V1_INVALID_ARGUMENT, 0u, NOAH_PROFILE_RGB_V1_TABLE_HEADER, UINT8_MAX, NOAH_PROFILE_RGB_V1_FIELD_HEADER);
+    memset(view, 0, sizeof(*view));
+    progress = noah_profile_rgb_v1_validation_begin(&validation, reader, base_offset, length, limits, error);
+    while (progress == NOAH_PROFILE_RGB_V1_VALIDATION_IN_PROGRESS) progress = noah_profile_rgb_v1_validation_step(&validation, error);
+    if (progress == NOAH_PROFILE_RGB_V1_VALIDATION_REJECTED) return validation.rejection.code;
+    progress = noah_profile_rgb_v1_validation_view(&validation, view, error);
+    return progress == NOAH_PROFILE_RGB_V1_VALIDATION_VALID ? NOAH_PROFILE_RGB_V1_OK : NOAH_PROFILE_RGB_V1_INVALID_ARGUMENT;
 }
 
 noah_profile_rgb_v1_result_t noah_profile_rgb_v1_decode(const uint8_t *bytes, size_t length, const noah_profile_rgb_v1_limits_t *limits, noah_profile_rgb_v1_view_t *view, noah_profile_rgb_v1_error_t *error) {

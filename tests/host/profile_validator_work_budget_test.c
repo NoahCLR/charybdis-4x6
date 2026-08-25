@@ -12,16 +12,12 @@ enum {
     TEST_STEPS_PER_ROW            = 2u,
     TEST_STEP_COUNT                = TEST_ROW_COUNT * TEST_STEPS_PER_ROW,
     TEST_ACTION_ABI                = 0x12345678u,
-    // Regression ceilings for the current disconnected validator, not an
-    // acceptance budget for matrix-scan routing. The measured work remains a
-    // tracked blocker until domain validation is made incrementally bounded.
-    DOMAIN_DECODE_READ_CALL_LIMIT  = 900u,
-    DOMAIN_DECODE_BYTE_LIMIT       = 3216u,
-    CROSS_REFERENCE_CALL_LIMIT     = 912u,
-    CROSS_REFERENCE_BYTE_LIMIT     = 3240u,
+    STEP_READ_CALL_LIMIT           = 1u,
+    STEP_BYTE_LIMIT                = NOAH_PROFILE_VALIDATOR_V1_STEP_READ_MAX,
+    MAX_VALIDATION_STEPS           = 1200u,
+    MAX_BEHAVIOR_DOMAIN_STEPS      = 897u,
+    MAX_RGB_DOMAIN_STEPS           = 58u,
     TEST_MAXIMUM_RGB_PAYLOAD_SIZE  = 344u,
-    RGB_DECODE_READ_CALL_LIMIT     = 54u,
-    RGB_DECODE_BYTE_LIMIT          = TEST_MAXIMUM_RGB_PAYLOAD_SIZE,
 };
 
 typedef struct {
@@ -195,17 +191,20 @@ static void run_maximum_rgb_profile(void) {
         reader_state.step_bytes    = 0u;
         reader_state.step_max_read = 0u;
         result = noah_profile_validator_v1_step(&validator, NOAH_PROFILE_VALIDATOR_V1_CHECKSUM_CHUNK_MAX, &error);
+        assert(reader_state.step_calls <= STEP_READ_CALL_LIMIT);
+        assert(reader_state.step_bytes <= STEP_BYTE_LIMIT);
+        assert(reader_state.step_max_read <= STEP_BYTE_LIMIT);
         record_phase_budget(&budgets[phase], &reader_state);
-        assert(++total_steps < 1000u);
+        assert(++total_steps < MAX_VALIDATION_STEPS);
     }
     assert(result == NOAH_PROFILE_VALIDATOR_V1_VALID);
     assert(validator.profile.rgb.group_count == NOAH_PROFILE_RGB_V1_MAX_GROUPS);
     assert(validator.profile.rgb.layer_group_count == NOAH_PROFILE_RGB_V1_MAX_STAGE_GROUP_ROWS);
 
     const phase_budget_t decode = budgets[NOAH_PROFILE_VALIDATOR_V1_PHASE_DOMAIN_DECODE];
-    assert(decode.steps == 1u && decode.max_read <= NOAH_PROFILE_RGB_V1_HEADER_SIZE);
-    assert(decode.calls <= RGB_DECODE_READ_CALL_LIMIT && decode.bytes <= RGB_DECODE_BYTE_LIMIT);
-    printf("RGB domain decode max/step: %zu reads, %zu bytes for %zu-byte maximal RGB payload\n", decode.calls, decode.bytes, sizeof(rgb_payload));
+    assert(decode.steps == MAX_RGB_DOMAIN_STEPS);
+    assert(decode.calls == 1u && decode.bytes <= STEP_BYTE_LIMIT && decode.max_read <= STEP_BYTE_LIMIT);
+    printf("RGB domain validation: %zu bounded steps, max %zu read / %zu bytes per step for %zu-byte payload\n", decode.steps, decode.calls, decode.bytes, sizeof(rgb_payload));
 }
 
 int main(void) {
@@ -247,8 +246,11 @@ int main(void) {
         reader_state.step_max_read = 0u;
         result = noah_profile_validator_v1_step(&validator, NOAH_PROFILE_VALIDATOR_V1_CHECKSUM_CHUNK_MAX, &error);
         assert(phase <= NOAH_PROFILE_VALIDATOR_V1_PHASE_REJECTED);
+        assert(reader_state.step_calls <= STEP_READ_CALL_LIMIT);
+        assert(reader_state.step_bytes <= STEP_BYTE_LIMIT);
+        assert(reader_state.step_max_read <= STEP_BYTE_LIMIT);
         record_phase_budget(&budgets[phase], &reader_state);
-        assert(++total_steps < 1000u);
+        assert(++total_steps < MAX_VALIDATION_STEPS);
     }
     assert(result == NOAH_PROFILE_VALIDATOR_V1_VALID);
     assert(profile_length * 4u >= NOAH_PROFILE_BLOB_V1_MAX_SIZE * 3u);
@@ -259,21 +261,15 @@ int main(void) {
     const phase_budget_t header   = budgets[NOAH_PROFILE_VALIDATOR_V1_PHASE_BLOB_HEADER];
     const phase_budget_t envelope = budgets[NOAH_PROFILE_VALIDATOR_V1_PHASE_DOMAIN_HEADER];
     const phase_budget_t decode   = budgets[NOAH_PROFILE_VALIDATOR_V1_PHASE_DOMAIN_DECODE];
-    const phase_budget_t row      = budgets[NOAH_PROFILE_VALIDATOR_V1_PHASE_CROSS_REFERENCE_ROW];
-    const phase_budget_t step     = budgets[NOAH_PROFILE_VALIDATOR_V1_PHASE_CROSS_REFERENCE_STEP];
 
     assert(checksum.calls == 1u && checksum.bytes <= NOAH_PROFILE_VALIDATOR_V1_CHECKSUM_CHUNK_MAX && checksum.max_read <= NOAH_PROFILE_VALIDATOR_V1_CHECKSUM_CHUNK_MAX);
     assert(header.calls == 1u && header.bytes == NOAH_PROFILE_BLOB_V1_HEADER_SIZE);
     assert(envelope.calls == 1u && envelope.bytes == NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE);
-    assert(decode.steps == 1u && decode.max_read <= NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_FIXED_SIZE);
-    assert(row.steps == TEST_ROW_COUNT + 1u && row.max_read <= NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_FIXED_SIZE);
-    assert(step.steps == TEST_STEP_COUNT && step.max_read <= NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_FIXED_SIZE);
-    assert(decode.calls <= DOMAIN_DECODE_READ_CALL_LIMIT && decode.bytes <= DOMAIN_DECODE_BYTE_LIMIT);
-    assert(row.calls <= CROSS_REFERENCE_CALL_LIMIT && row.bytes <= CROSS_REFERENCE_BYTE_LIMIT);
-    assert(step.calls <= CROSS_REFERENCE_CALL_LIMIT && step.bytes <= CROSS_REFERENCE_BYTE_LIMIT);
+    assert(decode.steps == MAX_BEHAVIOR_DOMAIN_STEPS);
+    assert(decode.calls == 1u && decode.bytes <= STEP_BYTE_LIMIT && decode.max_read <= STEP_BYTE_LIMIT);
 
     printf("profile validator work budget: %zu-byte valid profile, %zu steps, %.3f ms host CPU\n", profile_length, total_steps, 1000.0 * (double)(clock() - started) / CLOCKS_PER_SEC);
-    printf("domain decode max/step: %zu reads, %zu bytes; cross-row: %zu reads, %zu bytes; cross-step: %zu reads, %zu bytes\n", decode.calls, decode.bytes, row.calls, row.bytes, step.calls, step.bytes);
+    printf("behavior domain validation: %zu bounded steps, max %zu read / %zu bytes per step; reference rescans: 0\n", decode.steps, decode.calls, decode.bytes);
     run_maximum_rgb_profile();
     return 0;
 }

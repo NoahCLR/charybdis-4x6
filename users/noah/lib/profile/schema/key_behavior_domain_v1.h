@@ -3,6 +3,7 @@
 // ──────────────────────────────────────────────────────────────────────────
 #pragma once
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -27,6 +28,13 @@ enum {
     NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_TAP_STEPS_PER_ROW    = 5u,
     NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_REPEAT_HZ            = 100u,
     NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_PAYLOAD_SIZE         = NOAH_PROFILE_BLOB_V1_MAX_SIZE - NOAH_PROFILE_BLOB_V1_HEADER_SIZE - NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE,
+    // An incremental validation step performs at most one reader call. The
+    // current wire records need no more than the 12-byte fixed row read, but
+    // the public budget remains 20 bytes to match the scan owner contract.
+    NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_READ_MAX       = 20u,
+    // Payload-independent 32-bit representation regression policy. This is
+    // not a statement of RP2040 hardware capacity.
+    NOAH_KEY_BEHAVIOR_DOMAIN_V1_EMBEDDED_VALIDATION_BUDGET = 120u,
 };
 
 typedef enum {
@@ -115,7 +123,80 @@ typedef struct {
     size_t                   row_end;
 } noah_key_behavior_row_v1_view_t;
 
+typedef enum {
+    NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_IN_PROGRESS = 0u,
+    NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_VALID,
+    NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_REJECTED,
+} noah_key_behavior_domain_v1_validation_result_t;
+
+// Public for deterministic scan-owner tests and diagnostics. Callers should
+// otherwise treat phases as an implementation detail.
+typedef enum {
+    NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_PHASE_UNINITIALIZED = 0u,
+    NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_PHASE_HEADER,
+    NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_PHASE_ROW_LENGTH,
+    NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_PHASE_ROW_FIXED,
+    NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_PHASE_STEP_HEADER,
+    NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_PHASE_STEP_TAP,
+    NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_PHASE_STEP_HOLD_FIELDS,
+    NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_PHASE_STEP_HOLD_ACTION,
+    NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_PHASE_STEP_LONG_HOLD_FIELDS,
+    NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_PHASE_STEP_LONG_HOLD_ACTION,
+    NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_PHASE_VALID,
+    NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_PHASE_REJECTED,
+} noah_key_behavior_domain_v1_validation_phase_t;
+
+// Published for the single action decoded by the most recent validation
+// step. Offsets are relative to the start of the behavior payload. A whole-
+// profile caller can record the first invalid reference from these events and
+// defer reporting it until structural validation completes, preserving the
+// existing domain-error-before-reference-error precedence without rereading.
+typedef struct {
+    noah_profile_action_v1_t action;
+    size_t                   offset;
+    uint8_t                  row_index;
+    uint8_t                  step_index;
+    uint8_t                  field_id;
+} noah_key_behavior_domain_v1_action_event_t;
+
+// Caller-owned, payload-independent incremental validation state. Fields are
+// public only so firmware can allocate the object statically.
+typedef struct {
+    noah_key_behavior_domain_v1_validation_phase_t phase;
+    noah_profile_codec_v1_result_t                  terminal_result;
+    noah_profile_codec_v1_error_t                   terminal_error;
+    noah_key_behavior_domain_v1_t                   candidate;
+    noah_key_behavior_domain_v1_action_event_t      action_event;
+    noah_profile_action_v1_t                        current_target;
+    size_t                                          row_offset;
+    size_t                                          row_end;
+    size_t                                          step_offset;
+    size_t                                          branch_offset;
+    size_t                                          actual_steps;
+    int16_t                                         previous_tap_index;
+    uint8_t                                         previous_target[NOAH_PROFILE_BLOB_V1_ACTION_SIZE];
+    uint8_t                                         current_target_bytes[NOAH_PROFILE_BLOB_V1_ACTION_SIZE];
+    uint8_t                                         row_index;
+    uint8_t                                         step_index;
+    uint8_t                                         current_step_count;
+    uint8_t                                         current_tap_index;
+    uint8_t                                         current_presence_mask;
+    bool                                            have_previous_target;
+    bool                                            action_event_available;
+} noah_key_behavior_domain_v1_validation_t;
+
 noah_key_behavior_limits_v1_t noah_key_behavior_domain_v1_default_limits(void);
+
+// begin validates arguments and capacities but performs no reader I/O. Each
+// successful step performs at most one reader call and reads no more than
+// NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_READ_MAX newly observed bytes.
+noah_key_behavior_domain_v1_validation_result_t noah_key_behavior_domain_v1_validation_begin(noah_key_behavior_domain_v1_validation_t *validation, const noah_profile_reader_t *reader, size_t base_offset, size_t length, const noah_key_behavior_limits_v1_t *limits, const noah_profile_action_v1_limits_t *action_limits, noah_profile_codec_v1_error_t *error);
+noah_key_behavior_domain_v1_validation_result_t noah_key_behavior_domain_v1_validation_step(noah_key_behavior_domain_v1_validation_t *validation, noah_profile_codec_v1_error_t *error);
+noah_key_behavior_domain_v1_validation_result_t noah_key_behavior_domain_v1_validation_view(const noah_key_behavior_domain_v1_validation_t *validation, noah_key_behavior_domain_v1_t *domain, noah_profile_codec_v1_error_t *error);
+
+// Returns true and copies the action decoded by the most recent step. The
+// event remains available until the next call to validation_step.
+bool noah_key_behavior_domain_v1_validation_action_event(const noah_key_behavior_domain_v1_validation_t *validation, noah_key_behavior_domain_v1_action_event_t *event);
 
 noah_profile_codec_v1_result_t noah_key_behavior_domain_v1_encode(const noah_key_behavior_row_v1_t *rows, size_t row_count, const noah_key_behavior_limits_v1_t *limits, const noah_profile_action_v1_limits_t *action_limits, uint8_t *output, size_t output_capacity, size_t *written, noah_profile_codec_v1_error_t *error);
 

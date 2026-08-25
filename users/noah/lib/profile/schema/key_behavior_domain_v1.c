@@ -287,87 +287,390 @@ static noah_profile_codec_v1_result_t decode_row(const decode_context_t *context
     return NOAH_PROFILE_CODEC_V1_OK;
 }
 
-noah_profile_codec_v1_result_t noah_key_behavior_domain_v1_decode_reader(const noah_profile_reader_t *reader, size_t base_offset, size_t length, const noah_key_behavior_limits_v1_t *supplied_limits, const noah_profile_action_v1_limits_t *supplied_action_limits, noah_key_behavior_domain_v1_t *domain, noah_profile_codec_v1_error_t *error) {
-    noah_key_behavior_domain_v1_t candidate;
-    decode_context_t              context;
-    uint8_t                       header[NOAH_KEY_BEHAVIOR_DOMAIN_V1_HEADER_SIZE];
-    size_t                        offset;
-    size_t                        actual_steps = 0u;
-    uint8_t                       previous_target[NOAH_PROFILE_BLOB_V1_ACTION_SIZE];
-    bool                          have_previous = false;
+static void copy_codec_error(noah_profile_codec_v1_error_t *target, const noah_profile_codec_v1_error_t *source) {
+    if (target) {
+        *target = *source;
+    }
+}
+
+static noah_key_behavior_domain_v1_validation_result_t validation_reject(noah_key_behavior_domain_v1_validation_t *validation, noah_profile_codec_v1_result_t code, size_t offset, uint8_t row_index, uint8_t step_index, uint8_t field_id, noah_profile_codec_v1_error_t *error) {
+    noah_profile_codec_v1_error_t rejected;
+
+    clear_error(&rejected);
+    fail(&rejected, code, offset, row_index, step_index, field_id);
+    if (validation) {
+        validation->phase           = NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_PHASE_REJECTED;
+        validation->terminal_result = code;
+        validation->terminal_error  = rejected;
+        validation->action_event_available = false;
+    }
+    copy_codec_error(error, &rejected);
+    return NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_REJECTED;
+}
+
+static noah_key_behavior_domain_v1_validation_result_t validation_reject_error(noah_key_behavior_domain_v1_validation_t *validation, const noah_profile_codec_v1_error_t *rejected, noah_profile_codec_v1_error_t *error) {
+    validation->phase           = NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_PHASE_REJECTED;
+    validation->terminal_result = rejected->code;
+    validation->terminal_error  = *rejected;
+    validation->action_event_available = false;
+    copy_codec_error(error, rejected);
+    return NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_REJECTED;
+}
+
+static noah_key_behavior_domain_v1_validation_result_t validation_read(noah_key_behavior_domain_v1_validation_t *validation, size_t offset, uint8_t *target, size_t length, uint8_t row_index, uint8_t step_index, uint8_t field_id, noah_profile_codec_v1_error_t *error) {
+    if (length > NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_READ_MAX) {
+        return validation_reject(validation, NOAH_PROFILE_CODEC_V1_INVALID_ARGUMENT, offset, row_index, step_index, field_id, error);
+    }
+    if (!noah_profile_reader_read(&validation->candidate.reader, validation->candidate.base_offset + offset, target, length)) {
+        return validation_reject(validation, NOAH_PROFILE_CODEC_V1_READ_ERROR, offset, row_index, step_index, field_id, error);
+    }
+    return NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_IN_PROGRESS;
+}
+
+static void publish_action_event(noah_key_behavior_domain_v1_validation_t *validation, const noah_profile_action_v1_t *action, size_t offset, uint8_t row_index, uint8_t step_index, uint8_t field_id) {
+    validation->action_event.action     = *action;
+    validation->action_event.offset     = offset;
+    validation->action_event.row_index = row_index;
+    validation->action_event.step_index = step_index;
+    validation->action_event.field_id   = field_id;
+    validation->action_event_available  = true;
+}
+
+static noah_key_behavior_domain_v1_validation_result_t validation_finish_domain(noah_key_behavior_domain_v1_validation_t *validation, noah_profile_codec_v1_error_t *error) {
+    if (validation->row_offset != validation->candidate.byte_length) {
+        return validation_reject(validation, NOAH_PROFILE_CODEC_V1_TRAILING_BYTES, validation->row_offset, UINT8_MAX, UINT8_MAX, NOAH_KEY_BEHAVIOR_FIELD_V1_HEADER, error);
+    }
+    if (validation->actual_steps != validation->candidate.populated_step_count) {
+        return validation_reject(validation, NOAH_PROFILE_CODEC_V1_COUNT_MISMATCH, 1u, UINT8_MAX, UINT8_MAX, NOAH_KEY_BEHAVIOR_FIELD_V1_HEADER, error);
+    }
+    validation->phase           = NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_PHASE_VALID;
+    validation->terminal_result = NOAH_PROFILE_CODEC_V1_OK;
+    clear_error(&validation->terminal_error);
+    return NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_VALID;
+}
+
+static noah_key_behavior_domain_v1_validation_result_t validation_finish_row(noah_key_behavior_domain_v1_validation_t *validation, noah_profile_codec_v1_error_t *error) {
+    if (validation->branch_offset != validation->row_end) {
+        return validation_reject(validation, NOAH_PROFILE_CODEC_V1_ROW_LENGTH, validation->branch_offset, validation->row_index, UINT8_MAX, NOAH_KEY_BEHAVIOR_FIELD_V1_ROW_LENGTH, error);
+    }
+    if (validation->have_previous_target) {
+        int order = memcmp(validation->previous_target, validation->current_target_bytes, sizeof(validation->previous_target));
+
+        if (order == 0) {
+            return validation_reject(validation, NOAH_PROFILE_CODEC_V1_DUPLICATE_TARGET, validation->row_offset + NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_LENGTH_SIZE, validation->row_index, UINT8_MAX, NOAH_KEY_BEHAVIOR_FIELD_V1_TARGET, error);
+        }
+        if (order > 0) {
+            return validation_reject(validation, NOAH_PROFILE_CODEC_V1_ROW_ORDER, validation->row_offset + NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_LENGTH_SIZE, validation->row_index, UINT8_MAX, NOAH_KEY_BEHAVIOR_FIELD_V1_TARGET, error);
+        }
+    }
+    memcpy(validation->previous_target, validation->current_target_bytes, sizeof(validation->previous_target));
+    validation->have_previous_target = true;
+    validation->actual_steps += validation->current_step_count;
+    if (validation->actual_steps > validation->candidate.limits.max_populated_steps) {
+        return validation_reject(validation, NOAH_PROFILE_CODEC_V1_CAPACITY_EXCEEDED, validation->row_offset, validation->row_index, UINT8_MAX, NOAH_KEY_BEHAVIOR_FIELD_V1_ROW_STEP_COUNT, error);
+    }
+
+    validation->row_offset = validation->row_end;
+    validation->row_index++;
+    if (validation->row_index == validation->candidate.row_count) {
+        return validation_finish_domain(validation, error);
+    }
+    validation->phase = NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_PHASE_ROW_LENGTH;
+    return NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_IN_PROGRESS;
+}
+
+static noah_key_behavior_domain_v1_validation_result_t validation_finish_step(noah_key_behavior_domain_v1_validation_t *validation, noah_profile_codec_v1_error_t *error) {
+    if ((int16_t)validation->current_tap_index == validation->previous_tap_index) {
+        return validation_reject(validation, NOAH_PROFILE_CODEC_V1_DUPLICATE_STEP, validation->step_offset, validation->row_index, validation->step_index, NOAH_KEY_BEHAVIOR_FIELD_V1_TAP_INDEX, error);
+    }
+    if ((int16_t)validation->current_tap_index < validation->previous_tap_index) {
+        return validation_reject(validation, NOAH_PROFILE_CODEC_V1_STEP_ORDER, validation->step_offset, validation->row_index, validation->step_index, NOAH_KEY_BEHAVIOR_FIELD_V1_TAP_INDEX, error);
+    }
+    validation->previous_tap_index = validation->current_tap_index;
+    validation->step_index++;
+    if (validation->step_index == validation->current_step_count) {
+        return validation_finish_row(validation, error);
+    }
+    validation->phase = NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_PHASE_STEP_HEADER;
+    return NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_IN_PROGRESS;
+}
+
+static noah_key_behavior_domain_v1_validation_result_t validation_advance_after_tap(noah_key_behavior_domain_v1_validation_t *validation, noah_profile_codec_v1_error_t *error) {
+    if ((validation->current_presence_mask & NOAH_KEY_BEHAVIOR_DOMAIN_V1_STEP_HAS_HOLD) != 0u) {
+        validation->phase = NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_PHASE_STEP_HOLD_FIELDS;
+        return NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_IN_PROGRESS;
+    }
+    if ((validation->current_presence_mask & NOAH_KEY_BEHAVIOR_DOMAIN_V1_STEP_HAS_LONG_HOLD) != 0u) {
+        validation->phase = NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_PHASE_STEP_LONG_HOLD_FIELDS;
+        return NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_IN_PROGRESS;
+    }
+    return validation_finish_step(validation, error);
+}
+
+static noah_key_behavior_domain_v1_validation_result_t validation_advance_after_hold(noah_key_behavior_domain_v1_validation_t *validation, noah_profile_codec_v1_error_t *error) {
+    if ((validation->current_presence_mask & NOAH_KEY_BEHAVIOR_DOMAIN_V1_STEP_HAS_LONG_HOLD) != 0u) {
+        validation->phase = NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_PHASE_STEP_LONG_HOLD_FIELDS;
+        return NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_IN_PROGRESS;
+    }
+    return validation_finish_step(validation, error);
+}
+
+noah_key_behavior_domain_v1_validation_result_t noah_key_behavior_domain_v1_validation_begin(noah_key_behavior_domain_v1_validation_t *validation, const noah_profile_reader_t *reader, size_t base_offset, size_t length, const noah_key_behavior_limits_v1_t *supplied_limits, const noah_profile_action_v1_limits_t *supplied_action_limits, noah_profile_codec_v1_error_t *error) {
+    noah_profile_codec_v1_error_t resolved_error;
     noah_profile_codec_v1_result_t result;
 
     clear_error(error);
-    if (!reader || !reader->read || !domain || base_offset > reader->length || length > reader->length - base_offset) {
-        return fail(error, NOAH_PROFILE_CODEC_V1_INVALID_ARGUMENT, 0u, UINT8_MAX, UINT8_MAX, NOAH_KEY_BEHAVIOR_FIELD_V1_HEADER);
+    if (!validation) {
+        noah_profile_codec_v1_error_t rejected;
+
+        clear_error(&rejected);
+        fail(&rejected, NOAH_PROFILE_CODEC_V1_INVALID_ARGUMENT, 0u, UINT8_MAX, UINT8_MAX, NOAH_KEY_BEHAVIOR_FIELD_V1_HEADER);
+        copy_codec_error(error, &rejected);
+        return NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_REJECTED;
     }
-    memset(&candidate, 0, sizeof(candidate));
-    memset(domain, 0, sizeof(*domain));
-    result = resolve_limits(supplied_limits, supplied_action_limits, &candidate.limits, &candidate.action_limits, error);
+    memset(validation, 0, sizeof(*validation));
+    clear_error(&validation->terminal_error);
+    if (!reader || !reader->read || base_offset > reader->length || length > reader->length - base_offset) {
+        return validation_reject(validation, NOAH_PROFILE_CODEC_V1_INVALID_ARGUMENT, 0u, UINT8_MAX, UINT8_MAX, NOAH_KEY_BEHAVIOR_FIELD_V1_HEADER, error);
+    }
+    clear_error(&resolved_error);
+    result = resolve_limits(supplied_limits, supplied_action_limits, &validation->candidate.limits, &validation->candidate.action_limits, &resolved_error);
     if (result != NOAH_PROFILE_CODEC_V1_OK) {
-        return result;
+        return validation_reject_error(validation, &resolved_error, error);
     }
     if (length < NOAH_KEY_BEHAVIOR_DOMAIN_V1_HEADER_SIZE) {
-        return fail(error, NOAH_PROFILE_CODEC_V1_TRUNCATED, length, UINT8_MAX, UINT8_MAX, NOAH_KEY_BEHAVIOR_FIELD_V1_HEADER);
+        return validation_reject(validation, NOAH_PROFILE_CODEC_V1_TRUNCATED, length, UINT8_MAX, UINT8_MAX, NOAH_KEY_BEHAVIOR_FIELD_V1_HEADER, error);
     }
-    if (length > candidate.limits.max_payload_size) {
-        return fail(error, NOAH_PROFILE_CODEC_V1_CAPACITY_EXCEEDED, length, UINT8_MAX, UINT8_MAX, NOAH_KEY_BEHAVIOR_FIELD_V1_HEADER);
+    if (length > validation->candidate.limits.max_payload_size) {
+        return validation_reject(validation, NOAH_PROFILE_CODEC_V1_CAPACITY_EXCEEDED, length, UINT8_MAX, UINT8_MAX, NOAH_KEY_BEHAVIOR_FIELD_V1_HEADER, error);
+    }
+    validation->candidate.reader      = *reader;
+    validation->candidate.base_offset = base_offset;
+    validation->candidate.byte_length = length;
+    validation->row_offset            = NOAH_KEY_BEHAVIOR_DOMAIN_V1_HEADER_SIZE;
+    validation->previous_tap_index    = -1;
+    validation->phase                 = NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_PHASE_HEADER;
+    return NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_IN_PROGRESS;
+}
+
+noah_key_behavior_domain_v1_validation_result_t noah_key_behavior_domain_v1_validation_step(noah_key_behavior_domain_v1_validation_t *validation, noah_profile_codec_v1_error_t *error) {
+    uint8_t bytes[NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_FIXED_SIZE];
+
+    clear_error(error);
+    if (!validation) {
+        noah_profile_codec_v1_error_t rejected;
+
+        clear_error(&rejected);
+        fail(&rejected, NOAH_PROFILE_CODEC_V1_INVALID_ARGUMENT, 0u, UINT8_MAX, UINT8_MAX, NOAH_KEY_BEHAVIOR_FIELD_V1_HEADER);
+        copy_codec_error(error, &rejected);
+        return NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_REJECTED;
+    }
+    validation->action_event_available = false;
+    if (validation->phase == NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_PHASE_REJECTED) {
+        copy_codec_error(error, &validation->terminal_error);
+        return NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_REJECTED;
+    }
+    if (validation->phase == NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_PHASE_VALID) {
+        return NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_VALID;
     }
 
-    candidate.reader      = *reader;
-    candidate.base_offset = base_offset;
-    candidate.byte_length = length;
-    context.reader        = *reader;
-    context.base_offset   = base_offset;
-    context.length        = length;
-    context.limits        = candidate.limits;
-    context.action_limits = candidate.action_limits;
-    result                = read_bytes(&context, 0u, header, sizeof(header), UINT8_MAX, UINT8_MAX, NOAH_KEY_BEHAVIOR_FIELD_V1_HEADER, error);
-    if (result != NOAH_PROFILE_CODEC_V1_OK) {
-        return result;
-    }
-    candidate.row_count            = header[0];
-    candidate.populated_step_count = header[1];
-    if (header[2] != 0u || header[3] != 0u) {
-        return fail(error, NOAH_PROFILE_CODEC_V1_RESERVED_FIELDS, header[2] != 0u ? 2u : 3u, UINT8_MAX, UINT8_MAX, NOAH_KEY_BEHAVIOR_FIELD_V1_HEADER);
-    }
-    if (candidate.row_count > candidate.limits.max_rows || candidate.populated_step_count > candidate.limits.max_populated_steps) {
-        return fail(error, NOAH_PROFILE_CODEC_V1_CAPACITY_EXCEEDED, 0u, UINT8_MAX, UINT8_MAX, NOAH_KEY_BEHAVIOR_FIELD_V1_HEADER);
-    }
-
-    offset = NOAH_KEY_BEHAVIOR_DOMAIN_V1_HEADER_SIZE;
-    for (uint8_t row_index = 0u; row_index < candidate.row_count; row_index++) {
-        noah_key_behavior_row_v1_view_t row;
-        size_t                          next_row;
-
-        result = decode_row(&context, offset, row_index, &row, &next_row, error);
-        if (result != NOAH_PROFILE_CODEC_V1_OK) {
-            return result;
-        }
-        if (have_previous) {
-            int order = memcmp(previous_target, row.target_bytes, sizeof(previous_target));
-            if (order == 0) {
-                return fail(error, NOAH_PROFILE_CODEC_V1_DUPLICATE_TARGET, offset + NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_LENGTH_SIZE, row_index, UINT8_MAX, NOAH_KEY_BEHAVIOR_FIELD_V1_TARGET);
+    switch (validation->phase) {
+        case NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_PHASE_HEADER:
+            if (validation_read(validation, 0u, bytes, NOAH_KEY_BEHAVIOR_DOMAIN_V1_HEADER_SIZE, UINT8_MAX, UINT8_MAX, NOAH_KEY_BEHAVIOR_FIELD_V1_HEADER, error) == NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_REJECTED) return NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_REJECTED;
+            validation->candidate.row_count            = bytes[0];
+            validation->candidate.populated_step_count = bytes[1];
+            if (bytes[2] != 0u || bytes[3] != 0u) {
+                return validation_reject(validation, NOAH_PROFILE_CODEC_V1_RESERVED_FIELDS, bytes[2] != 0u ? 2u : 3u, UINT8_MAX, UINT8_MAX, NOAH_KEY_BEHAVIOR_FIELD_V1_HEADER, error);
             }
-            if (order > 0) {
-                return fail(error, NOAH_PROFILE_CODEC_V1_ROW_ORDER, offset + NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_LENGTH_SIZE, row_index, UINT8_MAX, NOAH_KEY_BEHAVIOR_FIELD_V1_TARGET);
+            if (validation->candidate.row_count > validation->candidate.limits.max_rows || validation->candidate.populated_step_count > validation->candidate.limits.max_populated_steps) {
+                return validation_reject(validation, NOAH_PROFILE_CODEC_V1_CAPACITY_EXCEEDED, 0u, UINT8_MAX, UINT8_MAX, NOAH_KEY_BEHAVIOR_FIELD_V1_HEADER, error);
             }
+            if (validation->candidate.row_count == 0u) {
+                return validation_finish_domain(validation, error);
+            }
+            validation->phase = NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_PHASE_ROW_LENGTH;
+            return NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_IN_PROGRESS;
+
+        case NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_PHASE_ROW_LENGTH: {
+            uint16_t body_length;
+            size_t   body_start;
+
+            if (validation->row_offset > validation->candidate.byte_length || NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_LENGTH_SIZE > validation->candidate.byte_length - validation->row_offset) {
+                return validation_reject(validation, NOAH_PROFILE_CODEC_V1_TRUNCATED, validation->row_offset, validation->row_index, UINT8_MAX, NOAH_KEY_BEHAVIOR_FIELD_V1_ROW_LENGTH, error);
+            }
+            if (validation_read(validation, validation->row_offset, bytes, NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_LENGTH_SIZE, validation->row_index, UINT8_MAX, NOAH_KEY_BEHAVIOR_FIELD_V1_ROW_LENGTH, error) == NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_REJECTED) return NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_REJECTED;
+            body_length = read_u16(bytes);
+            body_start  = validation->row_offset + NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_LENGTH_SIZE;
+            if (body_length < NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_FIXED_SIZE || body_length > validation->candidate.byte_length - body_start) {
+                return validation_reject(validation, NOAH_PROFILE_CODEC_V1_TRUNCATED, validation->row_offset, validation->row_index, UINT8_MAX, NOAH_KEY_BEHAVIOR_FIELD_V1_ROW_LENGTH, error);
+            }
+            validation->row_end = body_start + body_length;
+            validation->phase = NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_PHASE_ROW_FIXED;
+            return NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_IN_PROGRESS;
         }
-        memcpy(previous_target, row.target_bytes, sizeof(previous_target));
-        have_previous = true;
-        actual_steps += row.step_count;
-        if (actual_steps > candidate.limits.max_populated_steps) {
-            return fail(error, NOAH_PROFILE_CODEC_V1_CAPACITY_EXCEEDED, offset, row_index, UINT8_MAX, NOAH_KEY_BEHAVIOR_FIELD_V1_ROW_STEP_COUNT);
+
+        case NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_PHASE_ROW_FIXED: {
+            size_t body_start = validation->row_offset + NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_LENGTH_SIZE;
+            noah_profile_codec_v1_error_t action_error;
+            noah_profile_codec_v1_result_t result;
+
+            if (validation_read(validation, body_start, bytes, NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_FIXED_SIZE, validation->row_index, UINT8_MAX, NOAH_KEY_BEHAVIOR_FIELD_V1_TARGET, error) == NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_REJECTED) return NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_REJECTED;
+            clear_error(&action_error);
+            result = decode_action_bytes(bytes, body_start, &validation->candidate.action_limits, true, validation->row_index, UINT8_MAX, NOAH_KEY_BEHAVIOR_FIELD_V1_TARGET, &validation->current_target, &action_error);
+            if (result != NOAH_PROFILE_CODEC_V1_OK) return validation_reject_error(validation, &action_error, error);
+            memcpy(validation->current_target_bytes, bytes, sizeof(validation->current_target_bytes));
+            validation->current_step_count = bytes[11];
+            if ((bytes[10] & (uint8_t)~NOAH_KEY_BEHAVIOR_DOMAIN_V1_KNOWN_ROW_FLAGS) != 0u) {
+                return validation_reject(validation, NOAH_PROFILE_CODEC_V1_RESERVED_FLAGS, body_start + 10u, validation->row_index, UINT8_MAX, NOAH_KEY_BEHAVIOR_FIELD_V1_ROW_FLAGS, error);
+            }
+            if (validation->current_step_count > validation->candidate.limits.max_tap_steps_per_row) {
+                return validation_reject(validation, NOAH_PROFILE_CODEC_V1_CAPACITY_EXCEEDED, body_start + 11u, validation->row_index, UINT8_MAX, NOAH_KEY_BEHAVIOR_FIELD_V1_ROW_STEP_COUNT, error);
+            }
+            publish_action_event(validation, &validation->current_target, body_start, validation->row_index, UINT8_MAX, NOAH_KEY_BEHAVIOR_FIELD_V1_TARGET);
+            validation->branch_offset      = body_start + NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_FIXED_SIZE;
+            validation->step_index         = 0u;
+            validation->previous_tap_index = -1;
+            if (validation->current_step_count == 0u) {
+                return validation_finish_row(validation, error);
+            }
+            validation->phase = NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_PHASE_STEP_HEADER;
+            return NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_IN_PROGRESS;
         }
-        offset = next_row;
+
+        case NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_PHASE_STEP_HEADER:
+            validation->step_offset = validation->branch_offset;
+            if (validation->branch_offset > validation->row_end || NOAH_KEY_BEHAVIOR_DOMAIN_V1_STEP_HEADER_SIZE > validation->row_end - validation->branch_offset) {
+                return validation_reject(validation, NOAH_PROFILE_CODEC_V1_TRUNCATED, validation->branch_offset, validation->row_index, validation->step_index, NOAH_KEY_BEHAVIOR_FIELD_V1_TAP_INDEX, error);
+            }
+            if (validation_read(validation, validation->branch_offset, bytes, NOAH_KEY_BEHAVIOR_DOMAIN_V1_STEP_HEADER_SIZE, validation->row_index, validation->step_index, NOAH_KEY_BEHAVIOR_FIELD_V1_TAP_INDEX, error) == NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_REJECTED) return NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_REJECTED;
+            validation->current_tap_index     = bytes[0];
+            validation->current_presence_mask = bytes[1];
+            if (validation->current_tap_index >= validation->candidate.limits.max_tap_steps_per_row) {
+                return validation_reject(validation, NOAH_PROFILE_CODEC_V1_INVALID_TAP_INDEX, validation->branch_offset, validation->row_index, validation->step_index, NOAH_KEY_BEHAVIOR_FIELD_V1_TAP_INDEX, error);
+            }
+            if (validation->current_presence_mask == 0u) {
+                return validation_reject(validation, NOAH_PROFILE_CODEC_V1_EMPTY_STEP, validation->branch_offset + 1u, validation->row_index, validation->step_index, NOAH_KEY_BEHAVIOR_FIELD_V1_PRESENCE_MASK, error);
+            }
+            if ((validation->current_presence_mask & (uint8_t)~NOAH_KEY_BEHAVIOR_DOMAIN_V1_KNOWN_STEP_MASK) != 0u) {
+                return validation_reject(validation, NOAH_PROFILE_CODEC_V1_RESERVED_FLAGS, validation->branch_offset + 1u, validation->row_index, validation->step_index, NOAH_KEY_BEHAVIOR_FIELD_V1_PRESENCE_MASK, error);
+            }
+            validation->branch_offset += NOAH_KEY_BEHAVIOR_DOMAIN_V1_STEP_HEADER_SIZE;
+            if ((validation->current_presence_mask & NOAH_KEY_BEHAVIOR_DOMAIN_V1_STEP_HAS_TAP) != 0u) validation->phase = NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_PHASE_STEP_TAP;
+            else if ((validation->current_presence_mask & NOAH_KEY_BEHAVIOR_DOMAIN_V1_STEP_HAS_HOLD) != 0u) validation->phase = NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_PHASE_STEP_HOLD_FIELDS;
+            else validation->phase = NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_PHASE_STEP_LONG_HOLD_FIELDS;
+            return NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_IN_PROGRESS;
+
+        case NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_PHASE_STEP_TAP: {
+            noah_profile_action_v1_t action;
+            noah_profile_codec_v1_error_t action_error;
+            noah_profile_codec_v1_result_t result;
+            size_t action_offset = validation->branch_offset;
+
+            if (action_offset > validation->row_end || NOAH_PROFILE_BLOB_V1_ACTION_SIZE > validation->row_end - action_offset) {
+                return validation_reject(validation, NOAH_PROFILE_CODEC_V1_TRUNCATED, action_offset, validation->row_index, validation->step_index, NOAH_KEY_BEHAVIOR_FIELD_V1_TAP_ACTION, error);
+            }
+            if (validation_read(validation, action_offset, bytes, NOAH_PROFILE_BLOB_V1_ACTION_SIZE, validation->row_index, validation->step_index, NOAH_KEY_BEHAVIOR_FIELD_V1_TAP_ACTION, error) == NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_REJECTED) return NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_REJECTED;
+            clear_error(&action_error);
+            result = decode_action_bytes(bytes, action_offset, &validation->candidate.action_limits, false, validation->row_index, validation->step_index, NOAH_KEY_BEHAVIOR_FIELD_V1_TAP_ACTION, &action, &action_error);
+            if (result != NOAH_PROFILE_CODEC_V1_OK) return validation_reject_error(validation, &action_error, error);
+            publish_action_event(validation, &action, action_offset, validation->row_index, validation->step_index, NOAH_KEY_BEHAVIOR_FIELD_V1_TAP_ACTION);
+            validation->branch_offset += NOAH_PROFILE_BLOB_V1_ACTION_SIZE;
+            return validation_advance_after_tap(validation, error);
+        }
+
+        case NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_PHASE_STEP_HOLD_FIELDS:
+        case NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_PHASE_STEP_LONG_HOLD_FIELDS: {
+            bool long_hold = validation->phase == NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_PHASE_STEP_LONG_HOLD_FIELDS;
+            uint8_t mode_field   = long_hold ? NOAH_KEY_BEHAVIOR_FIELD_V1_LONG_HOLD_MODE : NOAH_KEY_BEHAVIOR_FIELD_V1_HOLD_MODE;
+            uint8_t repeat_field = long_hold ? NOAH_KEY_BEHAVIOR_FIELD_V1_LONG_HOLD_REPEAT : NOAH_KEY_BEHAVIOR_FIELD_V1_HOLD_REPEAT;
+            size_t fields_offset = validation->branch_offset;
+
+            if (fields_offset > validation->row_end || NOAH_KEY_BEHAVIOR_DOMAIN_V1_HOLD_SIZE > validation->row_end - fields_offset) {
+                return validation_reject(validation, NOAH_PROFILE_CODEC_V1_TRUNCATED, fields_offset, validation->row_index, validation->step_index, mode_field, error);
+            }
+            if (validation_read(validation, fields_offset, bytes, 2u, validation->row_index, validation->step_index, mode_field, error) == NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_REJECTED) return NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_REJECTED;
+            if (bytes[0] < NOAH_KEY_BEHAVIOR_HOLD_V1_PRESS_AND_HOLD_UNTIL_RELEASE || bytes[0] > NOAH_KEY_BEHAVIOR_HOLD_V1_TAP_ON_RELEASE_AFTER_HOLD) {
+                return validation_reject(validation, NOAH_PROFILE_CODEC_V1_INVALID_HOLD_MODE, fields_offset, validation->row_index, validation->step_index, mode_field, error);
+            }
+            if ((bytes[0] == NOAH_KEY_BEHAVIOR_HOLD_V1_REPEAT_WHILE_HELD && (bytes[1] == 0u || bytes[1] > validation->candidate.limits.max_repeat_hz)) || (bytes[0] != NOAH_KEY_BEHAVIOR_HOLD_V1_REPEAT_WHILE_HELD && bytes[1] != 0u)) {
+                return validation_reject(validation, NOAH_PROFILE_CODEC_V1_INVALID_REPEAT_RATE, fields_offset + 1u, validation->row_index, validation->step_index, repeat_field, error);
+            }
+            validation->branch_offset += 2u;
+            validation->phase = long_hold ? NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_PHASE_STEP_LONG_HOLD_ACTION : NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_PHASE_STEP_HOLD_ACTION;
+            return NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_IN_PROGRESS;
+        }
+
+        case NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_PHASE_STEP_HOLD_ACTION:
+        case NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_PHASE_STEP_LONG_HOLD_ACTION: {
+            bool long_hold = validation->phase == NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_PHASE_STEP_LONG_HOLD_ACTION;
+            uint8_t field = long_hold ? NOAH_KEY_BEHAVIOR_FIELD_V1_LONG_HOLD_ACTION : NOAH_KEY_BEHAVIOR_FIELD_V1_HOLD_ACTION;
+            noah_profile_action_v1_t action;
+            noah_profile_codec_v1_error_t action_error;
+            noah_profile_codec_v1_result_t result;
+            size_t action_offset = validation->branch_offset;
+
+            if (action_offset > validation->row_end || NOAH_PROFILE_BLOB_V1_ACTION_SIZE > validation->row_end - action_offset) {
+                return validation_reject(validation, NOAH_PROFILE_CODEC_V1_TRUNCATED, action_offset, validation->row_index, validation->step_index, field, error);
+            }
+            if (validation_read(validation, action_offset, bytes, NOAH_PROFILE_BLOB_V1_ACTION_SIZE, validation->row_index, validation->step_index, field, error) == NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_REJECTED) return NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_REJECTED;
+            clear_error(&action_error);
+            result = decode_action_bytes(bytes, action_offset, &validation->candidate.action_limits, false, validation->row_index, validation->step_index, field, &action, &action_error);
+            if (result != NOAH_PROFILE_CODEC_V1_OK) return validation_reject_error(validation, &action_error, error);
+            publish_action_event(validation, &action, action_offset, validation->row_index, validation->step_index, field);
+            validation->branch_offset += NOAH_PROFILE_BLOB_V1_ACTION_SIZE;
+            if (long_hold) return validation_finish_step(validation, error);
+            return validation_advance_after_hold(validation, error);
+        }
+
+        default:
+            return validation_reject(validation, NOAH_PROFILE_CODEC_V1_INVALID_ARGUMENT, 0u, UINT8_MAX, UINT8_MAX, NOAH_KEY_BEHAVIOR_FIELD_V1_HEADER, error);
     }
-    if (offset != length) {
-        return fail(error, NOAH_PROFILE_CODEC_V1_TRAILING_BYTES, offset, UINT8_MAX, UINT8_MAX, NOAH_KEY_BEHAVIOR_FIELD_V1_HEADER);
+}
+
+noah_key_behavior_domain_v1_validation_result_t noah_key_behavior_domain_v1_validation_view(const noah_key_behavior_domain_v1_validation_t *validation, noah_key_behavior_domain_v1_t *domain, noah_profile_codec_v1_error_t *error) {
+    clear_error(error);
+    if (!validation || !domain) {
+        if (error) fail(error, NOAH_PROFILE_CODEC_V1_INVALID_ARGUMENT, 0u, UINT8_MAX, UINT8_MAX, NOAH_KEY_BEHAVIOR_FIELD_V1_HEADER);
+        return NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_REJECTED;
     }
-    if (actual_steps != candidate.populated_step_count) {
-        return fail(error, NOAH_PROFILE_CODEC_V1_COUNT_MISMATCH, 1u, UINT8_MAX, UINT8_MAX, NOAH_KEY_BEHAVIOR_FIELD_V1_HEADER);
+    if (validation->phase == NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_PHASE_REJECTED) {
+        copy_codec_error(error, &validation->terminal_error);
+        return NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_REJECTED;
     }
-    *domain = candidate;
+    if (validation->phase != NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_PHASE_VALID) {
+        return NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_IN_PROGRESS;
+    }
+    *domain = validation->candidate;
+    return NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_VALID;
+}
+
+bool noah_key_behavior_domain_v1_validation_action_event(const noah_key_behavior_domain_v1_validation_t *validation, noah_key_behavior_domain_v1_action_event_t *event) {
+    if (!validation || !event || !validation->action_event_available) {
+        return false;
+    }
+    *event = validation->action_event;
+    return true;
+}
+
+noah_profile_codec_v1_result_t noah_key_behavior_domain_v1_decode_reader(const noah_profile_reader_t *reader, size_t base_offset, size_t length, const noah_key_behavior_limits_v1_t *supplied_limits, const noah_profile_action_v1_limits_t *supplied_action_limits, noah_key_behavior_domain_v1_t *domain, noah_profile_codec_v1_error_t *error) {
+    noah_key_behavior_domain_v1_validation_t validation;
+    noah_key_behavior_domain_v1_validation_result_t result;
+
+    clear_error(error);
+    if (!domain) {
+        return fail(error, NOAH_PROFILE_CODEC_V1_INVALID_ARGUMENT, 0u, UINT8_MAX, UINT8_MAX, NOAH_KEY_BEHAVIOR_FIELD_V1_HEADER);
+    }
+    memset(domain, 0, sizeof(*domain));
+    result = noah_key_behavior_domain_v1_validation_begin(&validation, reader, base_offset, length, supplied_limits, supplied_action_limits, error);
+    while (result == NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_IN_PROGRESS) {
+        result = noah_key_behavior_domain_v1_validation_step(&validation, error);
+    }
+    if (result == NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_REJECTED) {
+        return validation.terminal_result;
+    }
+    if (noah_key_behavior_domain_v1_validation_view(&validation, domain, error) != NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_VALID) {
+        return error ? error->code : NOAH_PROFILE_CODEC_V1_INVALID_ARGUMENT;
+    }
     return NOAH_PROFILE_CODEC_V1_OK;
 }
 
@@ -658,4 +961,8 @@ _Static_assert(NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_ROWS == NOAH_PROFILE_WIRE_V1_MAX_
 _Static_assert(NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_POPULATED_STEPS == NOAH_PROFILE_WIRE_V1_MAX_POPULATED_BEHAVIOR_STEPS, "behavior aggregate step ceilings drifted");
 _Static_assert(NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_TAP_STEPS_PER_ROW == NOAH_PROFILE_WIRE_V1_MAX_TAP_STEPS_PER_BEHAVIOR, "behavior tap-depth ceilings drifted");
 _Static_assert(NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_PAYLOAD_SIZE + NOAH_PROFILE_BLOB_V1_HEADER_SIZE + NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE == NOAH_PROFILE_BLOB_V1_MAX_SIZE, "behavior payload and blob ceilings drifted");
-_Static_assert(sizeof(noah_key_behavior_domain_v1_t) <= 128u, "validated behavior domain handle must remain bounded and payload-independent");
+_Static_assert(NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_FIXED_SIZE <= NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_READ_MAX, "incremental behavior validation read exceeds its scan budget");
+_Static_assert(sizeof(noah_key_behavior_domain_v1_t) <= 128u, "validated behavior domain handle exceeded its payload-independent representation policy");
+#if UINTPTR_MAX == UINT32_MAX
+_Static_assert(sizeof(noah_key_behavior_domain_v1_validation_t) <= NOAH_KEY_BEHAVIOR_DOMAIN_V1_EMBEDDED_VALIDATION_BUDGET, "incremental behavior validation state exceeded its payload-independent representation policy");
+#endif

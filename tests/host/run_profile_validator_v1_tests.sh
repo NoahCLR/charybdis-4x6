@@ -30,3 +30,11 @@ build_and_run() {
 
 build_and_run normal
 build_and_run sanitized -fsanitize=address,undefined -fno-omit-frame-pointer
+
+ARM_CC="${ARM_CC:-arm-none-eabi-gcc}"
+"$ARM_CC" -std=c11 -Wall -Wextra -Werror -pedantic \
+    -mcpu=cortex-m0plus -mthumb \
+    -I"$ROOT" \
+    -I"$ROOT/users/noah" \
+    -c "$ROOT/users/noah/lib/profile/schema/profile_validator_v1.c" \
+    -o "$BUILD_DIR/profile_validator_v1_cortex_m0plus.o"

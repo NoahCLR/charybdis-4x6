@@ -181,6 +181,9 @@ static void test_golden_incremental_phases(const char *fixture_path) {
 
         reset_step_counts(&state);
         result = noah_profile_validator_v1_step(&validator, 7u, &error);
+        assert(state.step_calls <= 1u);
+        assert(state.step_bytes <= NOAH_PROFILE_VALIDATOR_V1_STEP_READ_MAX);
+        assert(state.step_max_read <= NOAH_PROFILE_VALIDATOR_V1_STEP_READ_MAX);
         if (prior_phase == NOAH_PROFILE_VALIDATOR_V1_PHASE_CHECKSUM) {
             assert(state.step_calls == 1u && state.step_bytes <= 7u && state.step_max_read <= 7u);
             assert(validator.checksum_offset > prior_checksum_offset);
@@ -188,11 +191,6 @@ static void test_golden_incremental_phases(const char *fixture_path) {
             assert(state.step_calls == 1u && state.step_max_read == NOAH_PROFILE_BLOB_V1_HEADER_SIZE);
         } else if (prior_phase == NOAH_PROFILE_VALIDATOR_V1_PHASE_DOMAIN_HEADER && validator.domain_index < validator.declared_domain_count) {
             assert(state.step_calls == 1u && state.step_max_read == NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE);
-        } else if (prior_phase == NOAH_PROFILE_VALIDATOR_V1_PHASE_DOMAIN_DECODE) {
-            assert(state.step_calls > 0u);
-            assert(state.step_max_read <= (validator.previous_domain_id == NOAH_PROFILE_DOMAIN_V1_RGB ? 16u : 12u));
-        } else if (prior_phase == NOAH_PROFILE_VALIDATOR_V1_PHASE_CROSS_REFERENCE_ROW || prior_phase == NOAH_PROFILE_VALIDATOR_V1_PHASE_CROSS_REFERENCE_STEP) {
-            assert(state.step_max_read <= 12u);
         }
     }
     expect_result(result, NOAH_PROFILE_VALIDATOR_V1_VALID);

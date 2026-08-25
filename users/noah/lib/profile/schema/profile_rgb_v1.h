@@ -30,7 +30,13 @@ enum {
     NOAH_PROFILE_RGB_V1_STAGE_KEY_BEHAVIOR      = 1u << 4,
     NOAH_PROFILE_RGB_V1_STAGE_MASK_ALL          = 0x1fu,
     NOAH_PROFILE_RGB_V1_PD_MODE_MASK_ALL        = 0x3fu,
+    // Validation performs at most one reader call per step. The v1 header is
+    // the largest record; the remaining records are at most 11 bytes.
+    NOAH_PROFILE_RGB_V1_VALIDATION_READ_MAX     = 20u,
+    // Payload-independent 32-bit representation regression policies. These
+    // are not statements of RP2040 hardware capacity.
     NOAH_PROFILE_RGB_V1_EMBEDDED_VIEW_BUDGET    = 40u,
+    NOAH_PROFILE_RGB_V1_EMBEDDED_VALIDATION_BUDGET = 72u,
 };
 
 typedef enum {
@@ -177,8 +183,54 @@ typedef struct {
     noah_profile_rgb_v1_limits_t  limits;
 } noah_profile_rgb_v1_view_t;
 
+typedef enum {
+    NOAH_PROFILE_RGB_V1_VALIDATION_IN_PROGRESS = 0u,
+    NOAH_PROFILE_RGB_V1_VALIDATION_VALID,
+    NOAH_PROFILE_RGB_V1_VALIDATION_REJECTED,
+} noah_profile_rgb_v1_validation_result_t;
+
+typedef enum {
+    NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_UNINITIALIZED = 0u,
+    NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_HEADER,
+    NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_GROUPS,
+    NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_LAYER_COLORS,
+    NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_LAYER_GROUPS,
+    NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_AUTOMOUSE,
+    NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_PD_COLORS,
+    NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_PD_GROUPS,
+    NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_COMBO,
+    NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_COMBO_GROUPS,
+    NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_TAP_BRANCH_COLORS,
+    NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_KEY_FEEDBACK,
+    NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_KEY_GROUPS,
+    NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_COMPLETE,
+    NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_REJECTED,
+} noah_profile_rgb_v1_validation_phase_t;
+
+// Caller-owned, payload-independent validation state. Treat fields as opaque;
+// they are public only so firmware owners can allocate the state without a
+// heap. begin() performs no reader I/O. Each step() performs at most one read
+// of at most NOAH_PROFILE_RGB_V1_VALIDATION_READ_MAX bytes.
+typedef struct {
+    noah_profile_rgb_v1_view_t  candidate;
+    noah_profile_rgb_v1_error_t rejection;
+    uint8_t                     previous_bitmap[NOAH_PROFILE_RGB_V1_LED_BITMAP_SIZE];
+    uint8_t                     phase;
+    uint8_t                     row;
+    uint8_t                     have_previous_bitmap;
+    uint8_t                     observed_pd_mask;
+    int8_t                      previous_pd_id;
+    uint8_t                     result;
+} noah_profile_rgb_v1_validation_t;
+
 noah_profile_rgb_v1_limits_t noah_profile_rgb_v1_default_limits(void);
 
+noah_profile_rgb_v1_validation_result_t noah_profile_rgb_v1_validation_begin(noah_profile_rgb_v1_validation_t *validation, const noah_profile_reader_t *reader, size_t base_offset, size_t length, const noah_profile_rgb_v1_limits_t *limits, noah_profile_rgb_v1_error_t *error);
+noah_profile_rgb_v1_validation_result_t noah_profile_rgb_v1_validation_step(noah_profile_rgb_v1_validation_t *validation, noah_profile_rgb_v1_error_t *error);
+noah_profile_rgb_v1_validation_result_t noah_profile_rgb_v1_validation_view(const noah_profile_rgb_v1_validation_t *validation, noah_profile_rgb_v1_view_t *view, noah_profile_rgb_v1_error_t *error);
+
+// Compatibility wrappers. decode_reader() drives the incremental validator to
+// completion; scan-context owners should call begin()/step()/view() directly.
 noah_profile_rgb_v1_result_t noah_profile_rgb_v1_decode_reader(const noah_profile_reader_t *reader, size_t base_offset, size_t length, const noah_profile_rgb_v1_limits_t *limits, noah_profile_rgb_v1_view_t *view, noah_profile_rgb_v1_error_t *error);
 noah_profile_rgb_v1_result_t noah_profile_rgb_v1_decode(const uint8_t *bytes, size_t length, const noah_profile_rgb_v1_limits_t *limits, noah_profile_rgb_v1_view_t *view, noah_profile_rgb_v1_error_t *error);
 

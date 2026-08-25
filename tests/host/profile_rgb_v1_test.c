@@ -15,6 +15,7 @@ typedef struct {
     const uint8_t *bytes;
     size_t         length;
     size_t         calls;
+    size_t         bytes_read;
     size_t         max_read;
     size_t         fail_call;
 } instrumented_reader_t;
@@ -89,11 +90,27 @@ static noah_profile_rgb_v1_limits_t fixture_limits(const char *path) {
 static bool instrumented_read(void *context_value, size_t offset, uint8_t *target, size_t length) {
     instrumented_reader_t *context = (instrumented_reader_t *)context_value;
     context->calls++;
+    context->bytes_read += length;
     if (length > context->max_read) context->max_read = length;
     if (context->fail_call != 0u && context->calls == context->fail_call) return false;
     assert(offset <= context->length && length <= context->length - offset);
     if (length != 0u) memcpy(target, &context->bytes[offset], length);
     return true;
+}
+
+static noah_profile_rgb_v1_validation_result_t drive_incremental(noah_profile_rgb_v1_validation_t *validation, instrumented_reader_t *context, noah_profile_rgb_v1_error_t *error, size_t *steps) {
+    noah_profile_rgb_v1_validation_result_t progress = NOAH_PROFILE_RGB_V1_VALIDATION_IN_PROGRESS;
+
+    while (progress == NOAH_PROFILE_RGB_V1_VALIDATION_IN_PROGRESS) {
+        size_t calls_before = context->calls;
+        size_t bytes_before = context->bytes_read;
+        progress = noah_profile_rgb_v1_validation_step(validation, error);
+        assert(context->calls - calls_before <= 1u);
+        assert(context->bytes_read - bytes_before <= NOAH_PROFILE_RGB_V1_VALIDATION_READ_MAX);
+        (*steps)++;
+        assert(*steps < 128u);
+    }
+    return progress;
 }
 
 static void expect_decode(const uint8_t *bytes, size_t length, const noah_profile_rgb_v1_limits_t *limits, noah_profile_rgb_v1_result_t expected) {
@@ -181,6 +198,98 @@ static void test_reader_is_bounded(const char *fixture_path) {
     expect_result(noah_profile_rgb_v1_decode_reader(&reader, 7u, length, &limits, &view, &error), NOAH_PROFILE_RGB_V1_READ_ERROR);
     context.fail_call = 0u;
     expect_result(noah_profile_rgb_v1_decode_reader(&reader, context.length, 1u, &limits, &view, &error), NOAH_PROFILE_RGB_V1_INVALID_ARGUMENT);
+}
+
+static void test_incremental_reader_budget_and_failures(const char *fixture_path) {
+    uint8_t                                  padded[TEST_BUFFER_SIZE + 14u];
+    size_t                                   length = fixture_hex(fixture_path, "payload.hex", &padded[7], TEST_BUFFER_SIZE);
+    noah_profile_rgb_v1_limits_t             limits = fixture_limits(fixture_path);
+    instrumented_reader_t                    context = {.bytes = padded, .length = length + 14u};
+    noah_profile_reader_t                    reader = {.read = instrumented_read, .context = &context, .length = length + 14u};
+    noah_profile_rgb_v1_validation_t         validation;
+    noah_profile_rgb_v1_validation_result_t  progress;
+    noah_profile_rgb_v1_view_t               view;
+    noah_profile_rgb_v1_error_t              error;
+    size_t                                   steps = 0u;
+    size_t                                   successful_calls;
+
+    assert(sizeof(validation) <= 128u);
+    progress = noah_profile_rgb_v1_validation_begin(&validation, &reader, 7u, length, &limits, &error);
+    assert(progress == NOAH_PROFILE_RGB_V1_VALIDATION_IN_PROGRESS);
+    assert(context.calls == 0u && context.bytes_read == 0u);
+    memset(&view, 0xa5, sizeof(view));
+    assert(noah_profile_rgb_v1_validation_view(&validation, &view, &error) == NOAH_PROFILE_RGB_V1_VALIDATION_IN_PROGRESS);
+    assert(view.reader.read == NULL && view.byte_length == 0u);
+
+    progress = drive_incremental(&validation, &context, &error, &steps);
+    assert(progress == NOAH_PROFILE_RGB_V1_VALIDATION_VALID);
+    assert(context.max_read == NOAH_PROFILE_RGB_V1_HEADER_SIZE);
+    assert(context.bytes_read == length);
+    assert(context.calls == 27u && steps == 27u);
+    assert(noah_profile_rgb_v1_validation_step(&validation, &error) == NOAH_PROFILE_RGB_V1_VALIDATION_VALID);
+    assert(context.calls == 27u && context.bytes_read == length);
+    assert(noah_profile_rgb_v1_validation_view(&validation, &view, &error) == NOAH_PROFILE_RGB_V1_VALIDATION_VALID);
+    assert(view.byte_length == length && view.base_offset == 7u);
+    successful_calls = context.calls;
+
+    for (size_t fail_call = 1u; fail_call <= successful_calls; fail_call++) {
+        noah_profile_rgb_v1_error_t retained;
+
+        context.calls = 0u;
+        context.bytes_read = 0u;
+        context.max_read = 0u;
+        context.fail_call = fail_call;
+        steps = 0u;
+        assert(noah_profile_rgb_v1_validation_begin(&validation, &reader, 7u, length, &limits, &error) == NOAH_PROFILE_RGB_V1_VALIDATION_IN_PROGRESS);
+        progress = drive_incremental(&validation, &context, &error, &steps);
+        assert(progress == NOAH_PROFILE_RGB_V1_VALIDATION_REJECTED);
+        assert(error.code == NOAH_PROFILE_RGB_V1_READ_ERROR);
+        retained = error;
+        assert(context.calls == fail_call);
+        assert(context.max_read <= NOAH_PROFILE_RGB_V1_VALIDATION_READ_MAX);
+        assert(noah_profile_rgb_v1_validation_step(&validation, &error) == NOAH_PROFILE_RGB_V1_VALIDATION_REJECTED);
+        assert(memcmp(&error, &retained, sizeof(error)) == 0);
+        assert(noah_profile_rgb_v1_validation_view(&validation, &view, &error) == NOAH_PROFILE_RGB_V1_VALIDATION_REJECTED);
+        assert(memcmp(&error, &retained, sizeof(error)) == 0);
+        assert(context.calls == fail_call);
+    }
+    context.fail_call = 0u;
+
+    memset(&validation, 0, sizeof(validation));
+    assert(noah_profile_rgb_v1_validation_step(&validation, &error) == NOAH_PROFILE_RGB_V1_VALIDATION_REJECTED);
+    assert(error.code == NOAH_PROFILE_RGB_V1_INVALID_ARGUMENT);
+    context.calls = 0u;
+    assert(noah_profile_rgb_v1_validation_begin(&validation, &reader, reader.length, 1u, &limits, &error) == NOAH_PROFILE_RGB_V1_VALIDATION_REJECTED);
+    assert(error.code == NOAH_PROFILE_RGB_V1_INVALID_ARGUMENT && context.calls == 0u);
+}
+
+static void test_incremental_error_locations(const char *fixture_path) {
+    uint8_t                      valid[TEST_BUFFER_SIZE];
+    uint8_t                      mutated[TEST_BUFFER_SIZE];
+    size_t                       length = fixture_hex(fixture_path, "payload.hex", valid, sizeof(valid));
+    noah_profile_rgb_v1_limits_t limits = fixture_limits(fixture_path);
+    noah_profile_rgb_v1_view_t   view;
+    noah_profile_rgb_v1_error_t  error;
+
+    memcpy(mutated, valid, length); mutated[0] = 2u;
+    expect_result(noah_profile_rgb_v1_decode(mutated, length, &limits, &view, &error), NOAH_PROFILE_RGB_V1_INVALID_VERSION);
+    assert(error.offset == 0u && error.table == NOAH_PROFILE_RGB_V1_TABLE_HEADER && error.row == UINT8_MAX && error.field == NOAH_PROFILE_RGB_V1_FIELD_FORMAT_VERSION);
+
+    memcpy(mutated, valid, length); memcpy(&mutated[26], &valid[17], 8u);
+    expect_result(noah_profile_rgb_v1_decode(mutated, length, &limits, &view, &error), NOAH_PROFILE_RGB_V1_DUPLICATE_BITMAP);
+    assert(error.offset == 26u && error.table == NOAH_PROFILE_RGB_V1_TABLE_GROUPS && error.row == 1u && error.field == NOAH_PROFILE_RGB_V1_FIELD_BITMAP);
+
+    memcpy(mutated, valid, length); mutated[46] = 201u;
+    expect_result(noah_profile_rgb_v1_decode(mutated, length, &limits, &view, &error), NOAH_PROFILE_RGB_V1_BRIGHTNESS_EXCEEDED);
+    assert(error.offset == 46u && error.table == NOAH_PROFILE_RGB_V1_TABLE_LAYER_COLORS && error.row == 0u && error.field == NOAH_PROFILE_RGB_V1_FIELD_COLOR);
+
+    memcpy(mutated, valid, length); mutated[62] = 3u;
+    expect_result(noah_profile_rgb_v1_decode(mutated, length, &limits, &view, &error), NOAH_PROFILE_RGB_V1_INVALID_REFERENCE);
+    assert(error.offset == 62u && error.table == NOAH_PROFILE_RGB_V1_TABLE_LAYER_GROUPS && error.row == 0u && error.field == NOAH_PROFILE_RGB_V1_FIELD_GROUP_ID);
+
+    memcpy(mutated, valid, length); mutated[72] = 6u;
+    expect_result(noah_profile_rgb_v1_decode(mutated, length, &limits, &view, &error), NOAH_PROFILE_RGB_V1_INVALID_ID);
+    assert(error.offset == 72u && error.table == NOAH_PROFILE_RGB_V1_TABLE_PD_COLORS && error.row == 0u && error.field == NOAH_PROFILE_RGB_V1_FIELD_ID);
 }
 
 static void test_headers_lengths_and_dictionary(const char *fixture_path) {
@@ -313,6 +422,11 @@ static void test_maximum_dictionary_and_rows(void) {
     noah_profile_rgb_v1_limits_t limits = noah_profile_rgb_v1_default_limits();
     noah_profile_rgb_v1_view_t view;
     noah_profile_rgb_v1_error_t error;
+    instrumented_reader_t context;
+    noah_profile_reader_t reader;
+    noah_profile_rgb_v1_validation_t validation;
+    noah_profile_rgb_v1_validation_result_t progress;
+    size_t steps = 0u;
 
     payload[0]  = NOAH_PROFILE_RGB_V1_FORMAT_VERSION;
     payload[2]  = NOAH_PROFILE_RGB_V1_STAGE_LAYER;
@@ -340,12 +454,23 @@ static void test_maximum_dictionary_and_rows(void) {
     expect_result(noah_profile_rgb_v1_decode(payload, sizeof(payload), &limits, &view, &error), NOAH_PROFILE_RGB_V1_OK);
     assert(view.group_count == NOAH_PROFILE_RGB_V1_MAX_GROUPS);
     assert(view.layer_group_count == NOAH_PROFILE_RGB_V1_MAX_STAGE_GROUP_ROWS);
+
+    context = (instrumented_reader_t){.bytes = payload, .length = sizeof(payload)};
+    reader = (noah_profile_reader_t){.read = instrumented_read, .context = &context, .length = sizeof(payload)};
+    assert(noah_profile_rgb_v1_validation_begin(&validation, &reader, 0u, sizeof(payload), &limits, &error) == NOAH_PROFILE_RGB_V1_VALIDATION_IN_PROGRESS);
+    progress = drive_incremental(&validation, &context, &error, &steps);
+    assert(progress == NOAH_PROFILE_RGB_V1_VALIDATION_VALID);
+    assert(context.calls == 53u && context.bytes_read == sizeof(payload));
+    assert(context.max_read == NOAH_PROFILE_RGB_V1_HEADER_SIZE);
+    assert(steps == 58u);
 }
 
 int main(int argc, char **argv) {
     assert(argc == 2);
     test_shared_golden_and_accessors(argv[1]);
     test_reader_is_bounded(argv[1]);
+    test_incremental_reader_budget_and_failures(argv[1]);
+    test_incremental_error_locations(argv[1]);
     test_headers_lengths_and_dictionary(argv[1]);
     test_fields_features_and_surfaces(argv[1]);
     test_canonical_empty_forms();

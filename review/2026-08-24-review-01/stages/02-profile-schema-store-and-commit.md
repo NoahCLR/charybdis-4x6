@@ -264,8 +264,8 @@ Landed standalone candidate-coordinator evidence:
   through `tests/fixtures/profile_candidate_v1.fixture`;
 - the callback-side API only decodes and copies one bounded mailbox item, while
   scan context owns backend begin/write/read/abort and validation; checksum
-  reads are 20-byte-budgeted while domain total-work remains the explicit
-  before-routing blocker below;
+  and domain validation now advance through a common one-read / 20-byte maximum
+  per scan-step contract;
 - retries compare staged bytes: identical duplicates are accepted, conflicting
   duplicates poison the candidate, and wrong transaction ids preserve the
   active candidate identity;
@@ -347,21 +347,19 @@ Landed desktop candidate evidence:
   never retried on the same connection; the package has no commit operation and
   is not connected to the extension UI or device service.
 
-Before QMK routing is enabled, the schema-bounded `DOMAIN_DECODE` phase still
-needs to be made incrementally bounded. The executable work-budget gate now
-constructs the schema-maximal behavior payload (64 rows, 128 fully populated
-steps; 3,216-byte complete profile) and records the real reader work per
-validator step. The current single `DOMAIN_DECODE` call performs 897 reads and
-reads 3,204 bytes; the worst cross-reference step performs 908 reads and reads
-3,236 bytes because the row/step accessors rescan prior records. Individual
-reads remain at most 12 bytes. The maximal valid RGB payload is smaller but
-still takes 53 reads / 344 bytes in one domain-decode step. Neither result is a
-safe total-work guarantee for matrix-scan routing.
-`tests/host/run_profile_validator_work_budget_tests.sh` locks these
-measurements as regression ceilings while explicitly withholding scan-context
-acceptance. Production routing and mutation capability bits must remain
-disabled until validation is sliced into a documented per-scan total-work
-budget and exercised on the RP2040 target.
+The former whole-domain work blocker is resolved by incremental domain state
+machines. `tests/host/run_profile_validator_work_budget_tests.sh` constructs
+the schema-maximal behavior payload (64 rows, 128 fully populated steps;
+3,216-byte complete profile) and mechanically limits every whole-profile step
+to one reader call and 20 bytes. It completes in 1,061 steps: 897 behavior
+domain steps with an actual maximum 12-byte read and zero reference rescans.
+The maximal valid RGB payload completes in 58 domain steps with an actual
+maximum 16-byte read. RGB, behavior, and whole-profile runners also compile the
+state machines for Cortex-M0+. The whole validator is exactly 348 bytes on the
+32-bit target under an explicit 352-byte regression policy; that policy is not
+a hardware SRAM-capacity claim. Production routing and mutation capability
+bits remain disabled for store/provider commit and activation integration, and
+real-device scan timing remains unconfirmed until the hardware pass.
 
 ## Exit Criteria
 

@@ -3,6 +3,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -13,7 +14,12 @@ enum {
     NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB          = 1u << 0,
     NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS = 1u << 1,
     NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS       = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS,
-    NOAH_PROFILE_VALIDATOR_V1_CHECKSUM_CHUNK_MAX  = 20u,
+    NOAH_PROFILE_VALIDATOR_V1_STEP_READ_MAX       = 20u,
+    NOAH_PROFILE_VALIDATOR_V1_CHECKSUM_CHUNK_MAX  = NOAH_PROFILE_VALIDATOR_V1_STEP_READ_MAX,
+    // Regression policy for the payload-independent 32-bit scan state. This
+    // is not a hardware SRAM-capacity claim; target resource gates account
+    // for the linked instance separately.
+    NOAH_PROFILE_VALIDATOR_V1_EMBEDDED_STATE_BUDGET = 352u,
     NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8    = 0xffu,
     NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U16   = 0xffffu,
 };
@@ -50,8 +56,6 @@ typedef enum {
     NOAH_PROFILE_VALIDATOR_V1_PHASE_BLOB_HEADER,
     NOAH_PROFILE_VALIDATOR_V1_PHASE_DOMAIN_HEADER,
     NOAH_PROFILE_VALIDATOR_V1_PHASE_DOMAIN_DECODE,
-    NOAH_PROFILE_VALIDATOR_V1_PHASE_CROSS_REFERENCE_ROW,
-    NOAH_PROFILE_VALIDATOR_V1_PHASE_CROSS_REFERENCE_STEP,
     NOAH_PROFILE_VALIDATOR_V1_PHASE_VALID,
     NOAH_PROFILE_VALIDATOR_V1_PHASE_REJECTED,
 } noah_profile_validator_v1_phase_t;
@@ -109,6 +113,11 @@ typedef struct {
     noah_key_behavior_domain_v1_t  key_behaviors;
 } noah_profile_validator_v1_profile_t;
 
+typedef union {
+    noah_profile_rgb_v1_validation_t                rgb;
+    noah_key_behavior_domain_v1_validation_t        key_behaviors;
+} noah_profile_validator_v1_domain_validation_t;
+
 // Caller-owned, payload-independent state. Treat fields after phase as
 // private; they are public only so firmware can allocate the object statically.
 typedef struct {
@@ -131,10 +140,12 @@ typedef struct {
     uint8_t                                   current_domain_id;
     uint8_t                                   previous_domain_id;
     uint8_t                                   seen_domain_mask;
-    uint8_t                                   cross_row_index;
-    uint8_t                                   cross_step_index;
-    size_t                                    cross_step_offset;
-    noah_key_behavior_row_v1_view_t           cross_row;
+    noah_profile_validator_v1_domain_validation_t domain_validation;
+    size_t                                    reference_error_offset;
+    uint16_t                                  reference_error_row;
+    uint8_t                                   reference_error_step;
+    uint8_t                                   reference_error_field;
+    bool                                      has_reference_error;
 } noah_profile_validator_v1_t;
 
 noah_profile_validator_v1_compatibility_t noah_profile_validator_v1_default_compatibility(uint32_t action_abi_digest);
@@ -144,12 +155,12 @@ noah_profile_validator_v1_error_t noah_profile_validator_v1_no_error(void);
 // begin returns IN_PROGRESS. base_offset allows validating a slot-bounded view.
 noah_profile_validator_v1_result_t noah_profile_validator_v1_begin(noah_profile_validator_v1_t *validator, const noah_profile_reader_t *reader, size_t base_offset, const noah_profile_validator_v1_declaration_t *declaration, const noah_profile_validator_v1_compatibility_t *compatibility, noah_profile_validator_v1_error_t *error);
 
-// During CHECKSUM, at most min(checksum_byte_budget, 20, remaining) bytes are
-// read. Later calls deliberately ignore the byte budget and execute one phase:
-// one 8-byte blob header, one 4-byte domain envelope, one existing reader-
-// backed domain decoder call, or one behavior row/step accessor. Existing
-// domain decoders may issue multiple reads, but no individual read exceeds
-// their frozen 16-byte RGB / 12-byte behavior bound.
+// Every call performs at most one reader operation and reads at most
+// NOAH_PROFILE_VALIDATOR_V1_STEP_READ_MAX newly observed bytes. CHECKSUM also
+// honors a smaller nonzero checksum_byte_budget; later record phases have
+// fixed schema bounds no larger than the overall step ceiling. Zero-read phase
+// transitions are allowed. Behavior action-reference checks consume the
+// incremental decoder's event and never rescan prior rows or steps.
 noah_profile_validator_v1_result_t noah_profile_validator_v1_step(noah_profile_validator_v1_t *validator, uint8_t checksum_byte_budget, noah_profile_validator_v1_error_t *error);
 
 // Available only after step returns VALID. The copied views continue to borrow

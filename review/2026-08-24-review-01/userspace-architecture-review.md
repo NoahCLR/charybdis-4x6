@@ -355,13 +355,18 @@ validation or persistence for scan context where necessary.
 The v1 candidate coordinator realizes that boundary as one decoded-command
 mailbox. The callback performs exact 32-byte validation and copies at most one
 20-byte chunk; the scan owner alone calls the injected staging backend, reads
-staged bytes for retry comparison, and advances one validation phase. Checksum
-reads are incrementally byte-bounded, but current domain phases are only
-schema-bounded; the executable Stage 02 work gate therefore keeps this path
-unrouted until those phases have a true per-scan total-work bound. The owner
+staged bytes for retry comparison, and advances one validation step. Every
+whole-profile validation call now performs at most one reader operation and
+observes at most 20 new bytes; checksum calls also honor a smaller supplied
+budget. Incremental RGB and behavior state machines read each structural byte
+once, and behavior action-reference events remove the former row/step rescans.
+The schema-maximal 3,216-byte behavior profile completes in 1,061 whole-profile
+steps, with 897 behavior-domain steps capped at one 12-byte read each. Maximal
+RGB completes in 58 domain steps capped at one 16-byte read each. The owner
 contains no profile-sized RAM buffer. It remains independently compiled and
-unrouted until both domain validators and the commit/activation owners can
-support the capabilities they would advertise.
+unrouted until the store/provider commit and activation owners can support the
+capabilities they would advertise; real-device scan timing remains part of the
+hardware acceptance pass rather than an unbounded-code blocker.
 
 The landed store backend now supplies that coordinator with a bounded inactive-
 slot reader/writer and composes the whole-profile validator over the staged

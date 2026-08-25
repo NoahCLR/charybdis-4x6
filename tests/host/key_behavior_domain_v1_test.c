@@ -15,6 +15,7 @@ typedef struct {
     const uint8_t *bytes;
     size_t         length;
     size_t         read_count;
+    size_t         total_bytes;
     size_t         max_read;
     size_t         fail_at;
 } instrumented_reader_t;
@@ -24,6 +25,13 @@ static void expect_result(noah_profile_codec_v1_result_t actual, noah_profile_co
         fprintf(stderr, "behavior codec result mismatch: got %u expected %u\n", (unsigned)actual, (unsigned)expected);
         abort();
     }
+}
+
+static void expect_error_location(const noah_profile_codec_v1_error_t *error, size_t offset, uint8_t row_index, uint8_t step_index, uint8_t field_id) {
+    assert(error->offset == offset);
+    assert(error->row_index == row_index);
+    assert(error->step_index == step_index);
+    assert(error->field_id == field_id);
 }
 
 static bool fixture_value(const char *path, const char *key, char *value, size_t capacity) {
@@ -82,6 +90,7 @@ static bool instrumented_read(void *context, size_t offset, uint8_t *target, siz
     if ((reader->fail_at != 0u && reader->read_count == reader->fail_at) || length > NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_FIXED_SIZE || offset > reader->length || length > reader->length - offset) {
         return false;
     }
+    reader->total_bytes += length;
     memcpy(target, &reader->bytes[offset], length);
     return true;
 }
@@ -135,6 +144,142 @@ static size_t encode_representative(uint8_t *output, size_t capacity, noah_profi
     return written;
 }
 
+static bool errors_equal(const noah_profile_codec_v1_error_t *lhs, const noah_profile_codec_v1_error_t *rhs) {
+    return lhs->code == rhs->code && lhs->offset == rhs->offset && lhs->domain_index == rhs->domain_index && lhs->domain_id == rhs->domain_id && lhs->table_id == rhs->table_id && lhs->row_index == rhs->row_index && lhs->step_index == rhs->step_index && lhs->field_id == rhs->field_id;
+}
+
+static size_t run_incremental_budget(instrumented_reader_t *state, size_t base_offset, size_t length, noah_key_behavior_domain_v1_t *domain) {
+    noah_profile_reader_t reader = {.read = instrumented_read, .context = state, .length = state->length};
+    noah_key_behavior_domain_v1_validation_t validation;
+    noah_profile_codec_v1_error_t error;
+    noah_key_behavior_domain_v1_validation_result_t result;
+    size_t event_count = 0u;
+    size_t iterations  = 0u;
+    size_t reads_before = state->read_count;
+    size_t bytes_before = state->total_bytes;
+
+    result = noah_key_behavior_domain_v1_validation_begin(&validation, &reader, base_offset, length, NULL, NULL, &error);
+    assert(result == NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_IN_PROGRESS);
+    assert(state->read_count == reads_before && state->total_bytes == bytes_before);
+    assert(noah_key_behavior_domain_v1_validation_view(&validation, domain, &error) == NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_IN_PROGRESS);
+    assert(!noah_key_behavior_domain_v1_validation_action_event(&validation, &(noah_key_behavior_domain_v1_action_event_t){0}));
+
+    while (result == NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_IN_PROGRESS) {
+        noah_key_behavior_domain_v1_action_event_t event;
+        size_t prior_reads = state->read_count;
+        size_t prior_bytes = state->total_bytes;
+
+        result = noah_key_behavior_domain_v1_validation_step(&validation, &error);
+        assert(state->read_count - prior_reads <= 1u);
+        assert(state->total_bytes - prior_bytes <= NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_READ_MAX);
+        if (noah_key_behavior_domain_v1_validation_action_event(&validation, &event)) {
+            assert(state->read_count - prior_reads == 1u);
+            event_count++;
+        }
+        assert(++iterations < 2048u);
+    }
+    assert(result == NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_VALID);
+    reads_before = state->read_count;
+    bytes_before = state->total_bytes;
+    assert(noah_key_behavior_domain_v1_validation_view(&validation, domain, &error) == NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_VALID);
+    assert(state->read_count == reads_before && state->total_bytes == bytes_before);
+    assert(noah_key_behavior_domain_v1_validation_step(&validation, &error) == NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_VALID);
+    assert(!noah_key_behavior_domain_v1_validation_action_event(&validation, &(noah_key_behavior_domain_v1_action_event_t){0}));
+    assert(state->read_count == reads_before && state->total_bytes == bytes_before);
+    return event_count;
+}
+
+static void test_incremental_validation(const char *fixture_path) {
+    static const size_t expected_offsets[] = {6u, 22u, 28u, 34u, 40u, 54u};
+    static const uint8_t expected_rows[] = {0u, 0u, 0u, 0u, 1u, 1u};
+    static const uint8_t expected_steps[] = {UINT8_MAX, 0u, 1u, 1u, UINT8_MAX, 0u};
+    static const uint8_t expected_fields[] = {
+        NOAH_KEY_BEHAVIOR_FIELD_V1_TARGET,
+        NOAH_KEY_BEHAVIOR_FIELD_V1_HOLD_ACTION,
+        NOAH_KEY_BEHAVIOR_FIELD_V1_TAP_ACTION,
+        NOAH_KEY_BEHAVIOR_FIELD_V1_LONG_HOLD_ACTION,
+        NOAH_KEY_BEHAVIOR_FIELD_V1_TARGET,
+        NOAH_KEY_BEHAVIOR_FIELD_V1_TAP_ACTION,
+    };
+    static const uint8_t expected_kinds[] = {
+        NOAH_PROFILE_ACTION_V1_QMK_KEYCODE,
+        NOAH_PROFILE_ACTION_V1_QMK_KEYCODE,
+        NOAH_PROFILE_ACTION_V1_VIA_MACRO,
+        NOAH_PROFILE_ACTION_V1_LAYER_LOCK,
+        NOAH_PROFILE_ACTION_V1_PD_MODE_MOMENTARY,
+        NOAH_PROFILE_ACTION_V1_HARDCODED_MACRO,
+    };
+    static const uint16_t expected_operands[] = {0x1234u, 0x28u, 10u, 3u, 2u, 2u};
+    uint8_t payload[TEST_BUFFER_SIZE];
+    size_t length = fixture_hex(fixture_path, "payload.representative.hex", payload, sizeof(payload));
+    instrumented_reader_t state = {.bytes = payload, .length = length};
+    noah_profile_reader_t reader = {.read = instrumented_read, .context = &state, .length = length};
+    noah_key_behavior_domain_v1_validation_t validation;
+    noah_key_behavior_domain_v1_action_event_t event;
+    noah_key_behavior_domain_v1_t domain;
+    noah_profile_codec_v1_error_t error;
+    noah_key_behavior_domain_v1_validation_result_t result;
+    size_t event_index = 0u;
+
+    result = noah_key_behavior_domain_v1_validation_begin(&validation, &reader, 0u, length, NULL, NULL, &error);
+    assert(result == NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_IN_PROGRESS && state.read_count == 0u);
+    while (result == NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_IN_PROGRESS) {
+        size_t prior_reads = state.read_count;
+        size_t prior_bytes = state.total_bytes;
+
+        result = noah_key_behavior_domain_v1_validation_step(&validation, &error);
+        assert(state.read_count - prior_reads <= 1u);
+        assert(state.total_bytes - prior_bytes <= NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_READ_MAX);
+        if (noah_key_behavior_domain_v1_validation_action_event(&validation, &event)) {
+            assert(event_index < sizeof(expected_offsets) / sizeof(expected_offsets[0]));
+            assert(event.offset == expected_offsets[event_index]);
+            assert(event.row_index == expected_rows[event_index]);
+            assert(event.step_index == expected_steps[event_index]);
+            assert(event.field_id == expected_fields[event_index]);
+            assert(event.action.kind == expected_kinds[event_index]);
+            assert(event.action.flags == 0u && event.action.operand == expected_operands[event_index]);
+            event_index++;
+        }
+    }
+    assert(result == NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_VALID);
+    assert(event_index == sizeof(expected_offsets) / sizeof(expected_offsets[0]));
+    assert(state.max_read == NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_FIXED_SIZE);
+    assert(state.read_count == 14u && state.total_bytes == length);
+    assert(noah_key_behavior_domain_v1_validation_view(&validation, &domain, &error) == NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_VALID);
+    assert(domain.row_count == 2u && domain.populated_step_count == 3u);
+
+    size_t successful_reads = state.read_count;
+    for (size_t fail_at = 1u; fail_at <= successful_reads; fail_at++) {
+        noah_profile_codec_v1_error_t first_error;
+
+        state.read_count = 0u;
+        state.total_bytes = 0u;
+        state.max_read = 0u;
+        state.fail_at = fail_at;
+        result = noah_key_behavior_domain_v1_validation_begin(&validation, &reader, 0u, length, NULL, NULL, &error);
+        while (result == NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_IN_PROGRESS) {
+            size_t prior_reads = state.read_count;
+            size_t prior_bytes = state.total_bytes;
+
+            result = noah_key_behavior_domain_v1_validation_step(&validation, &error);
+            assert(state.read_count - prior_reads <= 1u);
+            assert(state.total_bytes - prior_bytes <= NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_READ_MAX);
+        }
+        assert(result == NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_REJECTED);
+        assert(error.code == NOAH_PROFILE_CODEC_V1_READ_ERROR);
+        first_error = error;
+        assert(noah_key_behavior_domain_v1_validation_step(&validation, &error) == NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_REJECTED);
+        assert(errors_equal(&first_error, &error));
+        assert(noah_key_behavior_domain_v1_validation_view(&validation, &domain, &error) == NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_REJECTED);
+        assert(errors_equal(&first_error, &error));
+    }
+    state.fail_at = 0u;
+    assert(noah_key_behavior_domain_v1_validation_begin(NULL, &reader, 0u, length, NULL, NULL, &error) == NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_REJECTED);
+    assert(error.code == NOAH_PROFILE_CODEC_V1_INVALID_ARGUMENT);
+    assert(noah_key_behavior_domain_v1_validation_step(NULL, &error) == NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_REJECTED);
+    assert(noah_key_behavior_domain_v1_validation_view(NULL, &domain, &error) == NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_REJECTED);
+}
+
 static void test_shared_vectors_and_reader(const char *fixture_path) {
     uint8_t                         expected[TEST_BUFFER_SIZE];
     uint8_t                         encoded[TEST_BUFFER_SIZE];
@@ -180,6 +325,9 @@ static void test_shared_vectors_and_reader(const char *fixture_path) {
     expect_result(noah_key_behavior_domain_v1_row_at(&domain, 2u, &row, &error), NOAH_PROFILE_CODEC_V1_INVALID_ARGUMENT);
     expect_result(noah_key_behavior_domain_v1_step_at(&domain, 0u, 2u, &step, &error), NOAH_PROFILE_CODEC_V1_INVALID_ARGUMENT);
     assert(state.max_read <= 12u);
+    instrumented_reader_t incremental_state = {.bytes = prefixed, .length = written + 14u};
+    assert(run_incremental_budget(&incremental_state, 7u, written, &domain) == 6u);
+    assert(incremental_state.total_bytes == written);
 
     noah_profile_domain_v1_t envelope_domain = {.id = NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIORS, .version = 1u, .payload = encoded, .payload_length = written};
     size_t envelope_length;
@@ -229,9 +377,11 @@ static void test_decode_rejections(const char *fixture_path) {
     memcpy(bytes, valid, length);
     bytes[2] = 1u;
     expect_result(noah_key_behavior_domain_v1_decode(bytes, length, NULL, NULL, &domain, &error), NOAH_PROFILE_CODEC_V1_RESERVED_FIELDS);
+    expect_error_location(&error, 2u, UINT8_MAX, UINT8_MAX, NOAH_KEY_BEHAVIOR_FIELD_V1_HEADER);
     memcpy(bytes, valid, length);
     bytes[1]--;
     expect_result(noah_key_behavior_domain_v1_decode(bytes, length, NULL, NULL, &domain, &error), NOAH_PROFILE_CODEC_V1_COUNT_MISMATCH);
+    expect_error_location(&error, 1u, UINT8_MAX, UINT8_MAX, NOAH_KEY_BEHAVIOR_FIELD_V1_HEADER);
     memcpy(bytes, valid, length);
     bytes[16] = 0x80u;
     expect_result(noah_key_behavior_domain_v1_decode(bytes, length, NULL, NULL, &domain, &error), NOAH_PROFILE_CODEC_V1_RESERVED_FLAGS);
@@ -244,9 +394,11 @@ static void test_decode_rejections(const char *fixture_path) {
     memcpy(bytes, valid, length);
     bytes[26] = 0u;
     expect_result(noah_key_behavior_domain_v1_decode(bytes, length, NULL, NULL, &domain, &error), NOAH_PROFILE_CODEC_V1_DUPLICATE_STEP);
+    expect_error_location(&error, 26u, 0u, 1u, NOAH_KEY_BEHAVIOR_FIELD_V1_TAP_INDEX);
     memcpy(bytes, valid, length);
     bytes[18] = 3u;
     expect_result(noah_key_behavior_domain_v1_decode(bytes, length, NULL, NULL, &domain, &error), NOAH_PROFILE_CODEC_V1_STEP_ORDER);
+    expect_error_location(&error, 26u, 0u, 1u, NOAH_KEY_BEHAVIOR_FIELD_V1_TAP_INDEX);
     memcpy(bytes, valid, length);
     bytes[18] = 5u;
     expect_result(noah_key_behavior_domain_v1_decode(bytes, length, NULL, NULL, &domain, &error), NOAH_PROFILE_CODEC_V1_INVALID_TAP_INDEX);
@@ -259,6 +411,7 @@ static void test_decode_rejections(const char *fixture_path) {
     memcpy(bytes, valid, length);
     bytes[21] = 0u;
     expect_result(noah_key_behavior_domain_v1_decode(bytes, length, NULL, NULL, &domain, &error), NOAH_PROFILE_CODEC_V1_INVALID_REPEAT_RATE);
+    expect_error_location(&error, 21u, 0u, 0u, NOAH_KEY_BEHAVIOR_FIELD_V1_HOLD_REPEAT);
     memcpy(bytes, valid, length);
     bytes[21] = 101u;
     expect_result(noah_key_behavior_domain_v1_decode(bytes, length, NULL, NULL, &domain, &error), NOAH_PROFILE_CODEC_V1_INVALID_REPEAT_RATE);
@@ -279,6 +432,7 @@ static void test_decode_rejections(const char *fixture_path) {
     memcpy(bytes, valid, length);
     memset(&bytes[34], 0, 4u);
     expect_result(noah_key_behavior_domain_v1_decode(bytes, length, NULL, NULL, &domain, &error), NOAH_PROFILE_CODEC_V1_INVALID_ACTION);
+    expect_error_location(&error, 34u, 0u, 1u, NOAH_KEY_BEHAVIOR_FIELD_V1_LONG_HOLD_ACTION);
 
     uint16_t first_size = (uint16_t)(read_u16(&valid[4]) + 2u);
     memcpy(bytes, valid, 4u);
@@ -288,10 +442,12 @@ static void test_decode_rejections(const char *fixture_path) {
     memcpy(bytes, valid, length);
     memcpy(&bytes[4u + first_size + 2u], &valid[6], 4u);
     expect_result(noah_key_behavior_domain_v1_decode(bytes, length, NULL, NULL, &domain, &error), NOAH_PROFILE_CODEC_V1_DUPLICATE_TARGET);
+    expect_error_location(&error, 40u, 1u, UINT8_MAX, NOAH_KEY_BEHAVIOR_FIELD_V1_TARGET);
 
     memcpy(bytes, valid, length);
     bytes[length] = 0u;
     expect_result(noah_key_behavior_domain_v1_decode(bytes, length + 1u, NULL, NULL, &domain, &error), NOAH_PROFILE_CODEC_V1_TRAILING_BYTES);
+    expect_error_location(&error, length, UINT8_MAX, UINT8_MAX, NOAH_KEY_BEHAVIOR_FIELD_V1_HEADER);
     memcpy(bytes, valid, length);
     write_u16(&bytes[4], (uint16_t)(read_u16(&bytes[4]) - 1u));
     assert(noah_key_behavior_domain_v1_decode(bytes, length, NULL, NULL, &domain, &error) == NOAH_PROFILE_CODEC_V1_TRUNCATED || error.code == NOAH_PROFILE_CODEC_V1_ROW_LENGTH);
@@ -418,6 +574,11 @@ static void test_maximum_counts(void) {
     expect_result(noah_key_behavior_domain_v1_encode(rows, NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_ROWS, NULL, NULL, output, sizeof(output), &written, &error), NOAH_PROFILE_CODEC_V1_OK);
     expect_result(noah_key_behavior_domain_v1_decode(output, written, NULL, NULL, &domain, &error), NOAH_PROFILE_CODEC_V1_OK);
     assert(domain.row_count == 64u && domain.populated_step_count == 128u);
+    instrumented_reader_t state = {.bytes = output, .length = written};
+    assert(run_incremental_budget(&state, 0u, written, &domain) == 192u);
+    assert(domain.row_count == 64u && domain.populated_step_count == 128u);
+    assert(state.max_read == NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_FIXED_SIZE);
+    assert(state.total_bytes == written);
     rows[0].step_count = 3u;
     expect_result(noah_key_behavior_domain_v1_encode(rows, NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_ROWS, NULL, NULL, output, sizeof(output), &written, &error), NOAH_PROFILE_CODEC_V1_CAPACITY_EXCEEDED);
     rows[0].step_count = 2u;
@@ -453,6 +614,7 @@ static void test_malformed_corpus(void) {
 int main(int argc, char **argv) {
     assert(argc == 2);
     test_shared_vectors_and_reader(argv[1]);
+    test_incremental_validation(argv[1]);
     test_reader_failures(argv[1]);
     test_decode_rejections(argv[1]);
     test_encode_rejections();
