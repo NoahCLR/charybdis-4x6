@@ -13,14 +13,19 @@ The generic schema package implements the canonical `NLP1` blob/domain
 envelopes and four-byte semantic actions in firmware and Studio against one
 shared exact-byte fixture. The key-behavior and RGB packages now implement
 matching desktop and reader-backed firmware payload codecs against shared
-exact-byte fixtures. The reader-backed whole-profile validator now composes
-those layers, streams both checksums, enforces schema/domain/action-ABI and
-compiled-reference compatibility, and returns bounded borrowed views. Exact
-candidate codecs and upload coordinators now exist on firmware and desktop, and
-the firmware coordinator can stage and validate an inactive EEPROM slot through
-an injected backend. These paths remain intentionally unrouted and
-unadvertised. Durable commit ownership, runtime activation, reset, and split
-reconciliation are still absent, so this stage remains blocked/incomplete.
+exact-byte fixtures. A cold-path compiled-default materializer now translates
+the real authored C tables into the same canonical profile and publishes exact
+compiled-profile and action-ABI identities without retaining a profile-sized
+buffer. The reader-backed whole-profile validator composes those layers,
+streams both checksums, enforces schema/domain/action-ABI and compiled-reference
+compatibility, and returns bounded borrowed views. Exact candidate codecs and
+upload coordinators now exist on firmware and desktop, and the firmware
+coordinator can stage and validate an inactive EEPROM slot through an injected
+backend. These paths remain intentionally unrouted and unadvertised. The
+isolated effective-provider foundation is now hardened and tested after
+lifecycle review. Durable commit ownership, runtime activation, reset, and
+split reconciliation are still absent, so this stage remains
+blocked/incomplete.
 
 ## Objective
 
@@ -144,12 +149,11 @@ Volatile preview must not outrank durable committed state after reconnect.
 
 ## Deliverables
 
-- [ ] Firmware and desktop Profile Wire v1 codecs (generic blob, domain
-  envelope, semantic-action, key-behavior, and RGB domain layers landed;
-  compiled-default materialization remains)
-- [ ] Shared golden fixtures (generic blob/action vector is executable in C and
-  JavaScript; representative behavior and RGB vectors are also shared;
-  compiled-profile fixtures remain)
+- [x] Firmware and desktop Profile Wire v1 codecs, including generic blob,
+  domain envelope, semantic actions, key behaviors, RGB, and compiled-default
+  materialization
+- [x] Shared golden fixtures for generic blob/action, representative behavior,
+  representative RGB, and the complete real compiled profile
 - [x] Layered validator (generic structure, canonical order, reserved fields,
   action capacity, behavior/RGB semantics, whole-profile checksums,
   action-ABI identity, domain masks, and compiled action references)
@@ -259,8 +263,9 @@ Landed standalone candidate-coordinator evidence:
   operation-status layouts are frozen in `profile-wire-v1.md` and executable
   through `tests/fixtures/profile_candidate_v1.fixture`;
 - the callback-side API only decodes and copies one bounded mailbox item, while
-  scan context owns backend begin/write/read/abort and 20-byte-budgeted
-  validation steps;
+  scan context owns backend begin/write/read/abort and validation; checksum
+  reads are 20-byte-budgeted while domain total-work remains the explicit
+  before-routing blocker below;
 - retries compare staged bytes: identical duplicates are accepted, conflicting
   duplicates poison the candidate, and wrong transaction ids preserve the
   active candidate identity;
@@ -292,6 +297,41 @@ Landed whole-profile validation and staging-backend evidence:
   mutation/domain capability bits remain disabled, and no QMK callback can
   reach candidate staging yet.
 
+Landed compiled-default materialization evidence:
+
+- the real authored RGB and key-behavior tables materialize into one canonical
+  1,089-byte profile with CRC32 `fd3c39ef`, FNV-1a `aee2da1b`, and action-ABI
+  identity `dcb00959`;
+- `tests/fixtures/compiled_profile_v1.fixture` is decoded and re-encoded
+  byte-identically by both the firmware C tests and Profile Studio JavaScript;
+- the materializer retains only a metadata handle capped at 20 bytes and the
+  action-ABI walk is bounded by authored row counts (185 visits for the real
+  profile, with a frozen 4,160-visit schema ceiling); and
+- its virtual reader is explicitly cold-path only for identity, validation,
+  export, and reset persistence. Hot key-event and RGB-frame consumers must use
+  direct compiled semantic tables when the effective kind is compiled rather
+  than replaying the virtual blob.
+
+Landed isolated effective-provider evidence:
+
+- copied active snapshots use the existing bounded `runtime_publication`
+  protocol and fail closed for the entire invalidation interval;
+- invalidators run in declared order with a callback-only view of the new
+  generation, so ordinary readers cannot observe a new identity with stale
+  derived state;
+- safe-boundary evaluation is reentrancy-guarded, and behavior-bearing pending
+  profiles cannot publish without an injected safe predicate;
+- nested reader-backed domain views must remain inside the checksummed
+  top-level blob; and
+- destructive storage reuse requires an explicit complete-backing reservation.
+  Active, compiled, and pending ranges remain pinned, while an overlapping
+  rollback copy is discarded atomically. Discarding rollback alone is not
+  storage authorization.
+
+This provider remains disconnected. The persistent store has not yet adopted
+the backing-reservation protocol, no production invalidator or safe predicate
+is installed, and no key/RGB consumer reads through it.
+
 Landed desktop candidate evidence:
 
 - exact JavaScript begin/chunk/validate/abort/status bytes consume the shared
@@ -308,8 +348,20 @@ Landed desktop candidate evidence:
   is not connected to the extension UI or device service.
 
 Before QMK routing is enabled, the schema-bounded `DOMAIN_DECODE` phase still
-needs a worst-case 4,064-byte profile timing/work gate. Its individual reads are
-bounded, but the current domain decoder call is not a 20-total-byte scan step.
+needs to be made incrementally bounded. The executable work-budget gate now
+constructs the schema-maximal behavior payload (64 rows, 128 fully populated
+steps; 3,216-byte complete profile) and records the real reader work per
+validator step. The current single `DOMAIN_DECODE` call performs 897 reads and
+reads 3,204 bytes; the worst cross-reference step performs 908 reads and reads
+3,236 bytes because the row/step accessors rescan prior records. Individual
+reads remain at most 12 bytes. The maximal valid RGB payload is smaller but
+still takes 53 reads / 344 bytes in one domain-decode step. Neither result is a
+safe total-work guarantee for matrix-scan routing.
+`tests/host/run_profile_validator_work_budget_tests.sh` locks these
+measurements as regression ceilings while explicitly withholding scan-context
+acceptance. Production routing and mutation capability bits must remain
+disabled until validation is sliced into a documented per-scan total-work
+budget and exercised on the RP2040 target.
 
 ## Exit Criteria
 

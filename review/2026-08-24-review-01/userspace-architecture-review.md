@@ -50,6 +50,13 @@ Required design: introduce narrow effective-profile providers or immutable
 snapshots. Compiled defaults and persisted live data both implement the same
 logical schema. Consumers stop knowing which source is active.
 
+The compiled-default materializer now supplies the canonical identity/export/
+validation/reset representation without a profile-sized buffer. Its virtual
+reader may replay canonical records from byte zero and is therefore a cold-path
+surface only. The future effective behavior and RGB providers must branch the
+compiled-default kind to the existing direct authored semantic tables; hot key
+events and RGB frames must never replay the virtual compiled blob.
+
 Enforcement must prevent new direct reads outside default materialization,
 validation fixtures, and the provider implementation.
 
@@ -216,8 +223,8 @@ The opening findings above are the audit-time snapshot. Current status:
 | Finding | Status | Reconciliation evidence |
 | --- | --- | --- |
 | 1 — malformed VIA mirror prerequisite | open, remediation in progress | owned by Review 19; targeted guard and sanitizer package opened |
-| 2 — no effective-profile seam | open | runtime audit selected a generation-stable provider and copied lookup result, but code has not migrated |
-| 3 — no canonical schema | partially resolved | `profile-wire-v1.md`, D-010, and D-015 freeze the v1 byte and identity contract; `profile_blob_v1.c` and the shared generic C/JavaScript fixture enforce canonical blob, envelope, digest, and semantic-action bytes, while complete domain and cross-reference codecs remain open |
+| 2 — no effective-profile seam | partially resolved | a hardened isolated generation-owned provider now enforces coherent publication, invalidation visibility, safe-predicate reentrancy, nested-view containment, and active-backing-aware reuse; production store ownership and all consumer migration remain open |
+| 3 — no canonical schema | partially resolved | `profile-wire-v1.md`, D-010, and D-015 freeze the v1 contract; blob, RGB, behavior, validator, and real compiled-default materializer now share exact C/JavaScript fixtures, while production runtime and split integration remain open |
 | 4 — no safe activation boundary | partially resolved | `authority-state-table.md` freezes the quiescence contract; production reason-mask and activation owner remain open |
 | 5 — source/device authority | resolved at contract level | D-013, D-014, and `authority-state-table.md` define operations, ordering, partial results, and conflicts |
 | 6 — storage/capacity evidence | resolved at Stage 00 design level; runtime high-water remains open | D-016 and `stage-00-baseline.md` record the corrected per-half bank model, policy-versus-capacity distinction, exact EEPROM map, dual-slot partition, and ceilings |
@@ -348,9 +355,12 @@ validation or persistence for scan context where necessary.
 The v1 candidate coordinator realizes that boundary as one decoded-command
 mailbox. The callback performs exact 32-byte validation and copies at most one
 20-byte chunk; the scan owner alone calls the injected staging backend, reads
-staged bytes for retry comparison, and advances incremental validation. The
-owner contains no profile-sized RAM buffer. It remains independently compiled
-and unrouted until both domain validators and the commit/activation owners can
+staged bytes for retry comparison, and advances one validation phase. Checksum
+reads are incrementally byte-bounded, but current domain phases are only
+schema-bounded; the executable Stage 02 work gate therefore keeps this path
+unrouted until those phases have a true per-scan total-work bound. The owner
+contains no profile-sized RAM buffer. It remains independently compiled and
+unrouted until both domain validators and the commit/activation owners can
 support the capabilities they would advertise.
 
 The landed store backend now supplies that coordinator with a bounded inactive-

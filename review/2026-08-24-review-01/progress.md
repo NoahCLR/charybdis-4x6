@@ -321,7 +321,8 @@ writes:
   reserved-byte rejection coverage;
 - added one bounded mailbox whose receive side only validates/copies and whose
   scan owner alone performs injected backend begin/write/read/abort and
-  incremental 20-byte-budget validation;
+  validation; checksum reads advance in 20-byte-budgeted chunks, while the
+  later-discovered whole-domain work limitation is recorded below;
 - enforced nonzero transaction ids, schema/domain/action-ABI/capacity checks,
   sequential chunks, staged-byte comparison for idempotent duplicates,
   poisoning on conflicting retries, stable status sequencing, and idempotent
@@ -463,12 +464,22 @@ Focused verification passed:
 
 Production QMK routing, candidate/domain capability advertising, commit
 ownership, activation, and split convergence remain deliberately absent. The
-next package is compiled-default materialization plus the effective-profile
-provider, followed by one integrated candidate/commit/activation path with
-truthful capabilities. Before scan routing, the domain-decode phase also needs
-a worst-case 4,064-byte profile timing/work gate because its reads are
-individually bounded but its total per-step work is schema-bounded rather than
-20-byte-budgeted. Real hardware remains unconfirmed.
+compiled-default materializer and the isolated effective-profile provider
+foundation have now landed. The provider uses the established publication
+primitive, fails closed during invalidation, guards safe-boundary reentrancy,
+requires a safe predicate for behavior activation, bounds nested views to the
+checksummed blob, and exposes an explicit active-backing-aware storage-reuse
+reservation. It is not connected to storage, QMK routing, or runtime consumers.
+A new executable work-budget gate also proves why scan routing is still
+blocked: the schema-maximal behavior profile is 3,216 bytes,
+and the current single domain-decode step performs 897 reads / 3,204 bytes;
+the worst cross-reference step performs 908 reads / 3,236 bytes because
+accessors rescan prior records. The maximal RGB payload separately takes 53
+reads / 344 bytes in one domain-decode step. Individual reads are bounded, but
+total per-step work is not. These measurements are regression ceilings, not a
+scan-loop acceptance budget. Validation must be sliced into a documented
+per-scan total-work bound and exercised on the RP2040 before mutation
+capabilities are advertised. Real hardware remains unconfirmed.
 
 Stage 00 baseline commands passed on 2026-08-25:
 
@@ -497,8 +508,10 @@ the packaged helper without changing the injected adapter contract.
 ## Current Blockers
 
 - The real-board HID/VS Code-host spike has not run.
-- RGB and key-behavior domain codecs now match across firmware and Studio;
-  compiled-default materialization, safe publication, and consumer migration
+- RGB and key-behavior domain codecs plus the real compiled-default
+  materializer now match across firmware and Studio. The isolated provider
+  lifecycle contract is hardened and tested; storage ownership, production
+  safe-boundary wiring, invalidator implementations, and consumer migration
   remain open. Whole-profile action-ABI and compiled-reference validation has
   landed.
 - The baseline persistence and role-swap hardware matrix remains open.
@@ -507,12 +520,13 @@ These are expected opening conditions, not project failure.
 
 ## Next Steps
 
-1. Materialize the compiled profile through the canonical blob/domain codecs
-   and add the generation-owned effective-profile provider.
-2. Connect the existing validated inactive-slot staging path to QMK routing,
-   commit, safe activation, and effective generation publication.
-3. Add split reconciliation before advertising mutation capabilities.
-4. Build the effective RGB provider, then migrate the eight renderer families
+1. Replace whole-domain validation calls with a documented total-work-bounded
+   scan state machine and prove it on the RP2040.
+2. Integrate the provider's backing-reuse reservation with inactive-slot
+   selection, commit, rollback, and safe activation ownership.
+3. Connect the validated staging path to QMK routing only after those two gates
+   pass, then add split reconciliation before advertising mutation capabilities.
+4. Build the effective RGB accessors, then migrate the eight renderer families
    without allowing direct compiled-table bypasses.
 5. Run the real-board transport and persistence matrix when hardware is
    available.
@@ -527,3 +541,27 @@ Append new entries here in chronological order. Each entry must name:
 - skipped or unconfirmed checks
 - risks and decisions changed
 - next work package
+
+### 2026-08-25 — Stage 02 compiled defaults and provider checkpoint
+
+- Added a payload-independent compiled-default materializer and a shared exact
+  C/JavaScript fixture for the real 1,089-byte RGB-plus-behavior profile.
+- Added an executable validator work-budget gate. It records the current
+  schema-maximal 3,216-byte behavior profile at 897 reads / 3,204 bytes in one
+  domain-decode step and 908 reads / 3,236 bytes in the worst cross-reference
+  step; these are regression ceilings, not scan acceptance.
+- Added a disconnected generation-owned provider with coherent bounded reads,
+  safe-boundary and invalidation guards, copied reader-backed snapshots,
+  rollback/fallback, and explicit active-backing-aware reuse reservations.
+- Kept QMK mutation routing, commit/activation ownership, capabilities, split
+  convergence, and runtime consumer migration disabled.
+- Focused normal and ASan/UBSan materializer, work-budget, and provider tests
+  passed; the provider and materializer also passed Cortex-M0+ / feature-matrix
+  compile coverage, and the compiled fixture passed its JavaScript test.
+- Final combined verification passed: `run_feature_gate_compile_tests.sh`,
+  `run_all_host_tests.sh`, Profile Studio `npm run check` (82 tests), a clean
+  QMK firmware compile, the RP2040 memory policy gate (48,640 B `.data + .bss`,
+  213,496 B boot core-memory span, 56,104 B fixed bank occupancy), the reviewed
+  stack gate (1,880 B main / 336 B split-slave), and `git diff --check`.
+- The next work package is incremental total-work-bounded validation, followed
+  by storage/provider integration.
