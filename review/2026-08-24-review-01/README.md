@@ -1,6 +1,6 @@
 # Live Profile Editing Project
 
-Status: architecture and implementation plan
+Status: Stage 02 implementation in progress; Stage 00/01 real-board evidence pending
 
 Primary milestone: live RGB and live key-behavior editing
 
@@ -124,6 +124,10 @@ deferred.
 | [agent-workflow.md](agent-workflow.md) | Required entry, execution, testing, and handoff workflow for every agent |
 | [decisions.md](decisions.md) | Accepted and open architecture decisions |
 | [risks.md](risks.md) | Cross-stage risks, mitigations, owners, and closure evidence |
+| [stage-00-baseline.md](stage-00-baseline.md) | Fresh firmware resources, EEPROM map, accepted partition, ceilings, and commands |
+| [field-classification.md](field-classification.md) | Classification of every Profile Studio field and source surface |
+| [profile-wire-v1.md](profile-wire-v1.md) | Canonical blob, action, domain, transport, error, and fixture contract |
+| [authority-state-table.md](authority-state-table.md) | Source/device operations, generation authority, preview, and safe activation |
 | [stages/](stages/) | Bounded stage briefs with scope, deliverables, tests, and exit criteria |
 
 ## Agent Entry Point

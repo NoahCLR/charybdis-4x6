@@ -67,6 +67,10 @@ void noah_via_macro_defaults_matrix_scan(void) {
     test_log_stage("via_macro_defaults_matrix_scan");
 }
 
+void noah_profile_store_runtime_matrix_scan(void) {
+    test_log_stage("profile_store_runtime_matrix_scan");
+}
+
 void noah_qmk_via_split_sync_matrix_scan(void) {
     test_log_stage("qmk_via_split_sync_matrix_scan");
 }
@@ -102,6 +106,10 @@ void held_repeat_tick(void) {
 
 void noah_via_macro_defaults_keyboard_post_init(void) {
     test_log_stage("via_macro_defaults_keyboard_post_init");
+}
+
+void noah_profile_store_runtime_init(void) {
+    test_log_stage("profile_store_runtime_init");
 }
 
 void noah_qmk_combo_origin_init(void) {
@@ -149,7 +157,7 @@ static void test_eeconfig_init_order(void) {
 
 static void test_matrix_scan_order(void) {
     static const char *const expected[] = {
-        "via_macro_defaults_matrix_scan", "qmk_via_split_sync_matrix_scan", "qmk_combo_origin_scan", "key_runtime_scan", "macro_payload_engine_scan", "split_runtime_sync_tick",
+        "via_macro_defaults_matrix_scan", "profile_store_runtime_matrix_scan", "qmk_via_split_sync_matrix_scan", "qmk_combo_origin_scan", "key_runtime_scan", "macro_payload_engine_scan", "split_runtime_sync_tick",
     };
 
     test_log_reset();
@@ -159,7 +167,7 @@ static void test_matrix_scan_order(void) {
 
 static void test_keyboard_post_init_order(void) {
     static const char *const expected[] = {
-        "qmk_combo_origin_init", "macro_payload_engine_init", "via_macro_defaults_keyboard_post_init", "rgb_runtime_post_init", "split_runtime_sync_init", "qmk_via_split_sync_init", "qmk_via_split_mirror_init",
+        "qmk_combo_origin_init", "macro_payload_engine_init", "via_macro_defaults_keyboard_post_init", "profile_store_runtime_init", "rgb_runtime_post_init", "split_runtime_sync_init", "qmk_via_split_sync_init", "qmk_via_split_mirror_init",
     };
 
     test_log_reset();

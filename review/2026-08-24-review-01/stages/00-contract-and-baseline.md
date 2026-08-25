@@ -1,13 +1,13 @@
 # Stage 00 — Contract And Baseline
 
-Status: planned
+Status: in progress
 
 ## Objective
 
 Turn the architecture direction into measured, testable contracts before
 production storage or protocol code lands.
 
-This stage closes open decisions D-009 through D-014 and produces the budgets
+This stage closes open decisions D-009 through D-016 and produces the budgets
 and fixtures every later stage depends on.
 
 ## Entry Criteria
@@ -23,7 +23,14 @@ and fixtures every later stage depends on.
 
 Measure from fresh ordinary and instrumented target builds:
 
-- firmware text, data, BSS, true static RAM, linker heap, and stack reserves;
+- firmware text and read-only data;
+- per-half RP2040 physical banks, fixed linked sections, the SRAM0–3
+  `.data + .bss` regression metric, and the SRAM0–3 linker/core-memory span at
+  boot;
+- regression-policy thresholds separately from physical capacity and runtime
+  high-water evidence;
+- interrupt, process, core-1, and split-thread stack allocations plus reviewed
+  path budgets;
 - named large runtime symbols;
 - total logical EEPROM and backing flash;
 - exact EECONFIG, VIA config, dynamic keymap, encoder, macro, and free address
@@ -32,8 +39,9 @@ Measure from fresh ordinary and instrumented target builds:
 - the cost of increasing logical EEPROM, if considered.
 
 Create a checked address-map document or compile-time report. Do not rely on a
-stale ELF or GNU size's informational BSS number without separating the
-linker-reserved heap.
+stale ELF or GNU size's informational BSS number: that number includes the
+linker-reserved core-memory span and stack sections and must not be added to
+the separately reported linked regions.
 
 ### 00B — Canonical Model Inventory
 
@@ -149,20 +157,42 @@ Do not edit sibling QMK in this stage.
 
 ## Deliverables
 
-- [ ] Fresh resource report
-- [ ] Exact EEPROM address map
-- [ ] Field classification matrix
-- [ ] Profile Wire v1 specification
-- [ ] Golden fixture plan
-- [ ] Storage and power-loss decision
-- [ ] Fixed capacity decision
-- [ ] Safe activation contract
-- [ ] HID adapter decision and spike result
-- [ ] Split integration decision
-- [ ] Source/device authority state table
-- [ ] Updated decisions.md, risks.md, architecture review, and progress.md
+- [x] Fresh resource report — `../stage-00-baseline.md`
+- [x] Corrected bank and policy model — D-016 and
+  `../stage-00-baseline.md`
+- [x] Exact EEPROM address map — `../stage-00-baseline.md`
+- [x] Compile-time storage partition contract —
+  `users/noah/lib/profile/storage/profile_storage_layout.h` with focused host
+  compile guards
+- [x] Field classification matrix — `../field-classification.md`
+- [x] Profile Wire v1 specification — `../profile-wire-v1.md`
+- [x] Golden fixture plan — required fixture list in `../profile-wire-v1.md`
+  plus executable capability/status reads in
+  `tests/fixtures/profile_wire_v1_reads.fixture`
+- [x] Storage and power-loss decision — D-009
+- [x] Fixed capacity decision — D-010
+- [x] Safe activation contract — `../authority-state-table.md`
+- [ ] HID adapter spike result — the fake/coordinator and lazy `node-hid`
+  adapter are implemented and packaged; native read-only enumeration succeeds,
+  but no matching attached interface was present and the real-board VS Code
+  host probe is still required
+- [x] Split integration decision — D-011
+- [x] Source/device authority state table — `../authority-state-table.md`
+- [ ] Updated decisions.md, risks.md, architecture review, and progress.md —
+  decision/progress updates in progress with first implementation packages
 
 ## Verification
+
+Baseline evidence captured on 2026-08-25:
+
+- `sh tests/host/run_all_host_tests.sh` — pass
+- `sh tests/host/run_profile_storage_layout_tests.sh` — pass
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah` — pass
+- `sh tests/host/run_firmware_memory_budget_checks.sh` — pass
+- `sh tests/host/run_firmware_stack_budget_checks.sh` — pass
+
+Measured values and the exact sibling fork commit are recorded in
+`../stage-00-baseline.md`.
 
 At minimum:
 
@@ -182,7 +212,7 @@ unchanged.
 
 Stage 00 is complete only when:
 
-- D-009 through D-014 are accepted or explicitly deferred with a blocker that
+- D-009 through D-016 are accepted or explicitly deferred with a blocker that
   prevents dependent implementation;
 - storage regions and capacities fit measured resource budgets;
 - Profile Wire v1 can encode the Milestone A model without native C layout;

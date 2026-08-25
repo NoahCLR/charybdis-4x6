@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Report and enforce the target macro-slot storage and static RAM budgets."""
+"""Report and enforce firmware storage policies with RP2040 SRAM accounting."""
 
 import argparse
 import pathlib
@@ -16,7 +16,30 @@ BOOKKEEPING_SYMBOLS = (
     "macro_slot_active_metadata",
     "macro_slot_active_stale",
 )
-LAYOUT_SYMBOLS = ("__bss_base__", "__bss_end__", "__data_base__", "__data_end__", "__heap_base__", "__heap_end__")
+LAYOUT_SYMBOLS = (
+    "__bss_base__",
+    "__bss_end__",
+    "__data_base__",
+    "__data_end__",
+    "__heap_base__",
+    "__heap_end__",
+    "__ram0_base__",
+    "__ram0_end__",
+    "__ram4_base__",
+    "__ram4_end__",
+    "__ram4_free__",
+    "__ram5_base__",
+    "__ram5_end__",
+    "__ram5_free__",
+    "__ram7_base__",
+    "__ram7_end__",
+    "__ram7_free__",
+)
+
+RP2040_SRAM0_BYTES = 256 * 1024
+RP2040_SRAM4_BYTES = 4 * 1024
+RP2040_SRAM5_BYTES = 4 * 1024
+RP2040_PHYSICAL_SRAM_BYTES = RP2040_SRAM0_BYTES + RP2040_SRAM4_BYTES + RP2040_SRAM5_BYTES
 
 
 def canonical_symbol(name):
@@ -64,6 +87,115 @@ def parse_layout_symbols(output):
     return symbols
 
 
+def checked_span(name, start, end):
+    if end < start:
+        raise ValueError("{} end precedes its start".format(name))
+    return end - start
+
+
+def calculate_memory_accounting(layout):
+    """Return non-overlapping RP2040 SRAM accounting from linker symbols.
+
+    ram7 is the 256-byte boot window at the end of physical SRAM5, not an
+    additional bank. Keeping it separate prevents the overlapping linker
+    region from being counted as extra physical RAM.
+    """
+
+    ram0_capacity = checked_span("SRAM0-3", layout["__ram0_base__"], layout["__ram0_end__"])
+    ram4_capacity = checked_span("SRAM4", layout["__ram4_base__"], layout["__ram4_end__"])
+    ram5_capacity = checked_span("SRAM5", layout["__ram5_base__"], layout["__ram5_end__"])
+    physical_sram = ram0_capacity + ram4_capacity + ram5_capacity
+    if (ram0_capacity, ram4_capacity, ram5_capacity) != (
+        RP2040_SRAM0_BYTES,
+        RP2040_SRAM4_BYTES,
+        RP2040_SRAM5_BYTES,
+    ):
+        raise ValueError(
+            "unexpected RP2040 SRAM bank layout: {}, {}, {} B".format(
+                ram0_capacity, ram4_capacity, ram5_capacity
+            )
+        )
+    if physical_sram != RP2040_PHYSICAL_SRAM_BYTES:
+        raise ValueError("unexpected RP2040 physical SRAM capacity: {} B".format(physical_sram))
+    if layout["__heap_end__"] != layout["__ram0_end__"]:
+        raise ValueError("SRAM0-3 linker-managed free span does not end at the bank boundary")
+    if layout["__ram7_end__"] != layout["__ram5_end__"]:
+        raise ValueError("ram7 boot window does not end at the SRAM5 boundary")
+    if not (
+        layout["__ram0_base__"]
+        <= layout["__data_base__"]
+        <= layout["__data_end__"]
+        <= layout["__heap_base__"]
+        <= layout["__heap_end__"]
+    ):
+        raise ValueError("data or linker-managed free span falls outside SRAM0-3")
+    if not (
+        layout["__ram0_base__"]
+        <= layout["__bss_base__"]
+        <= layout["__bss_end__"]
+        <= layout["__heap_base__"]
+    ):
+        raise ValueError("BSS span falls outside the fixed SRAM0-3 prefix")
+    if not layout["__ram4_base__"] <= layout["__ram4_free__"] <= layout["__ram4_end__"]:
+        raise ValueError("SRAM4 free marker falls outside the bank")
+    if not (
+        layout["__ram5_base__"]
+        <= layout["__ram5_free__"]
+        <= layout["__ram7_base__"]
+        <= layout["__ram7_free__"]
+        <= layout["__ram7_end__"]
+    ):
+        raise ValueError("SRAM5 or ram7 boot-window markers overlap unexpectedly")
+
+    static_data = checked_span("static data", layout["__data_base__"], layout["__data_end__"])
+    static_bss = checked_span("static BSS", layout["__bss_base__"], layout["__bss_end__"])
+    data_bss = static_data + static_bss
+    ram0_fixed_prefix = checked_span(
+        "SRAM0-3 fixed prefix", layout["__ram0_base__"], layout["__heap_base__"]
+    )
+    ram0_free = checked_span(
+        "SRAM0-3 linker-managed free span", layout["__heap_base__"], layout["__heap_end__"]
+    )
+    ram4_fixed_prefix = checked_span(
+        "SRAM4 fixed prefix", layout["__ram4_base__"], layout["__ram4_free__"]
+    )
+    ram4_unassigned_tail = checked_span(
+        "SRAM4 unassigned tail", layout["__ram4_free__"], layout["__ram4_end__"]
+    )
+    ram5_fixed_prefix = checked_span(
+        "SRAM5 fixed prefix", layout["__ram5_base__"], layout["__ram5_free__"]
+    )
+    ram5_unassigned_pre_boot = checked_span(
+        "SRAM5 unassigned pre-boot tail", layout["__ram5_free__"], layout["__ram7_base__"]
+    )
+    ram7_linked = checked_span(
+        "ram7 linked boot-window prefix", layout["__ram7_base__"], layout["__ram7_free__"]
+    )
+    ram7_reserved = checked_span(
+        "ram7 reserved boot-window remainder", layout["__ram7_free__"], layout["__ram7_end__"]
+    )
+    fixed_linked = ram0_fixed_prefix + ram4_fixed_prefix + ram5_fixed_prefix + ram7_linked
+    unassigned_or_allocator = ram0_free + ram4_unassigned_tail + ram5_unassigned_pre_boot
+    if fixed_linked + unassigned_or_allocator + ram7_reserved != physical_sram:
+        raise ValueError("RP2040 SRAM bank accounting does not sum to physical capacity")
+
+    return {
+        "physical_sram": physical_sram,
+        "static_data": static_data,
+        "static_bss": static_bss,
+        "data_bss": data_bss,
+        "ram0_fixed_prefix": ram0_fixed_prefix,
+        "ram0_free": ram0_free,
+        "ram4_fixed_prefix": ram4_fixed_prefix,
+        "ram4_unassigned_tail": ram4_unassigned_tail,
+        "ram5_fixed_prefix": ram5_fixed_prefix,
+        "ram5_unassigned_pre_boot": ram5_unassigned_pre_boot,
+        "ram7_linked": ram7_linked,
+        "ram7_reserved": ram7_reserved,
+        "fixed_linked": fixed_linked,
+    }
+
+
 def run(command):
     return subprocess.run(command, check=True, text=True, capture_output=True).stdout
 
@@ -77,8 +209,22 @@ def main(argv=None):
     parser.add_argument("--min-reclaimed", type=int, default=32768)
     parser.add_argument("--max-macro-storage", type=int, default=8192)
     parser.add_argument("--max-static-bss", type=int, default=26000)
-    parser.add_argument("--max-static-ram", type=int, default=51000)
-    parser.add_argument("--min-heap", type=int, default=204800)
+    parser.add_argument(
+        "--max-data-bss",
+        "--max-static-ram",
+        dest="max_data_bss",
+        type=int,
+        default=51000,
+        help="policy ceiling for .data + .bss; --max-static-ram is a compatibility alias",
+    )
+    parser.add_argument(
+        "--min-sram0-free",
+        "--min-heap",
+        dest="min_sram0_free",
+        type=int,
+        default=204800,
+        help="minimum SRAM0-3 linker-managed free/core-memory span at boot; --min-heap is a compatibility alias",
+    )
     args = parser.parse_args(argv)
 
     if not args.elf.is_file():
@@ -87,47 +233,77 @@ def main(argv=None):
     try:
         symbols = parse_nm_symbols(run([args.nm, "-S", "--size-sort", str(args.elf)]))
         layout = parse_layout_symbols(run([args.nm, "-S", str(args.elf)]))
-        bss = parse_size_bss(run([args.size, str(args.elf)]))
+        gnu_size_bss = parse_size_bss(run([args.size, str(args.elf)]))
+        memory = calculate_memory_accounting(layout)
         toolchain = run([args.nm, "--version"]).splitlines()[0]
     except (OSError, subprocess.CalledProcessError, ValueError) as error:
-        print("macro storage budget: FAIL ({})".format(error), file=sys.stderr)
+        print("firmware memory policy: FAIL ({})".format(error), file=sys.stderr)
         return 1
 
     macro_storage = sum(symbols.values())
     reclaimed = args.baseline_macro_storage - macro_storage
-    static_bss = layout["__bss_end__"] - layout["__bss_base__"]
-    # Zero-initialized state lands in .bss, but anything with a non-zero
-    # initializer lands in .data -- including noah_runtime_singleton, the single
-    # largest static object. Bounding .bss alone left roughly half of static RAM
-    # unmeasured, so growth there only ever showed up indirectly as heap loss.
-    static_data = layout["__data_end__"] - layout["__data_base__"]
-    static_ram = static_data + static_bss
-    heap = layout["__heap_end__"] - layout["__heap_base__"]
     failures = []
     if macro_storage > args.max_macro_storage:
         failures.append("named macro storage {} exceeds {} B".format(macro_storage, args.max_macro_storage))
     if reclaimed < args.min_reclaimed:
         failures.append("reclaimed {} is below {} B".format(reclaimed, args.min_reclaimed))
-    if static_bss > args.max_static_bss:
-        failures.append("static BSS {} exceeds {} B".format(static_bss, args.max_static_bss))
-    if static_ram > args.max_static_ram:
-        failures.append("static RAM {} exceeds {} B".format(static_ram, args.max_static_ram))
-    if heap < args.min_heap:
-        failures.append("linker heap {} is below {} B".format(heap, args.min_heap))
+    if memory["static_bss"] > args.max_static_bss:
+        failures.append("static BSS {} exceeds {} B".format(memory["static_bss"], args.max_static_bss))
+    if memory["data_bss"] > args.max_data_bss:
+        failures.append(
+            ".data + .bss policy span {} exceeds {} B".format(memory["data_bss"], args.max_data_bss)
+        )
+    if memory["ram0_free"] < args.min_sram0_free:
+        failures.append(
+            "SRAM0-3 linker-managed free/core-memory span {} is below {} B".format(
+                memory["ram0_free"], args.min_sram0_free
+            )
+        )
 
-    print("macro storage budget: {}".format("FAIL" if failures else "PASS"))
+    print("firmware memory policy: {}".format("FAIL" if failures else "PASS"))
     print("ELF: {}".format(args.elf))
     print("toolchain: {}".format(toolchain))
+    print(
+        "RP2040 physical SRAM per MCU: {} B (256 KiB SRAM0-3 + 4 KiB SRAM4 + 4 KiB SRAM5)".format(
+            memory["physical_sram"]
+        )
+    )
     for name in REQUIRED_SYMBOLS + BOOKKEEPING_SYMBOLS:
         if name in symbols:
             print("{}: {} B".format(name, symbols[name]))
     print("named macro storage: {} B (limit {} B)".format(macro_storage, args.max_macro_storage))
     print("reclaimed from {} B baseline: {} B (minimum {} B)".format(args.baseline_macro_storage, reclaimed, args.min_reclaimed))
-    print("static BSS span: {} B (limit {} B)".format(static_bss, args.max_static_bss))
-    print("static data span: {} B".format(static_data))
-    print("static RAM (.data + .bss): {} B (limit {} B)".format(static_ram, args.max_static_ram))
-    print("linker heap: {} B (minimum {} B)".format(heap, args.min_heap))
-    print("ELF BSS including linker-reserved heap: {} B (informational)".format(bss))
+    print("SRAM0-3 .bss span: {} B (policy limit {} B)".format(memory["static_bss"], args.max_static_bss))
+    print("SRAM0-3 .data span: {} B".format(memory["static_data"]))
+    print(
+        "SRAM0-3 .data + .bss policy span: {} B (policy limit {} B)".format(
+            memory["data_bss"], args.max_data_bss
+        )
+    )
+    print(
+        "SRAM0-3 fixed linked prefix: {} B; linker-managed free/core-memory span at boot: {} B (policy minimum {} B)".format(
+            memory["ram0_fixed_prefix"], memory["ram0_free"], args.min_sram0_free
+        )
+    )
+    print(
+        "SRAM4 fixed linked prefix: {} B; linker-unassigned tail: {} B".format(
+            memory["ram4_fixed_prefix"], memory["ram4_unassigned_tail"]
+        )
+    )
+    print(
+        "SRAM5 fixed linked prefix: {} B; linker-unassigned pre-boot tail: {} B; boot window: {} B linked + {} B reserved".format(
+            memory["ram5_fixed_prefix"],
+            memory["ram5_unassigned_pre_boot"],
+            memory["ram7_linked"],
+            memory["ram7_reserved"],
+        )
+    )
+    print("fixed linked occupancy across unique SRAM banks: {} B".format(memory["fixed_linked"]))
+    print(
+        "GNU size BSS column: {} B (informational; includes NOLOAD reservations)".format(
+            gnu_size_bss
+        )
+    )
     for failure in failures:
         print("error: {}".format(failure), file=sys.stderr)
     return 1 if failures else 0

@@ -1,6 +1,13 @@
 # Stage 01 — Transport Prerequisites And Live Link
 
-Status: blocked on Stage 00 and Review 19 transport prerequisites
+Status: software implementation complete; real-board/VS Code-host exit evidence pending
+
+Implementation note: Review 19 Findings 1 and 4 are resolved in their owning
+review. The injected fake, serialized request coordinator, lazy `node-hid`
+adapter, read-only firmware channel, shared C/JavaScript golden reports, and
+Studio compatibility UI have landed. Native enumeration ran successfully but
+found no attached matching interface, so the hardware matrix remains open and
+the project does not claim a proven board connection yet.
 
 ## Objective
 
@@ -14,7 +21,7 @@ profile operations are compatible. It does not yet write bulk profile state.
 ## Entry Criteria
 
 - Stage 00 exit criteria are recorded.
-- D-009 through D-014 have accepted outcomes.
+- D-009 through D-016 have accepted outcomes.
 - Profile Wire capability and status bytes have golden fixtures.
 - Review 19 Finding 1 is resolved in review/2026-08-16-review-02 with its
   required tests and compile evidence.
@@ -92,15 +99,16 @@ transaction ids, timeout, disconnect, and contention are visible states.
 
 ## Deliverables
 
-- [ ] Concrete HID adapter
-- [ ] Fake device adapter
-- [ ] Serialized request coordinator
-- [ ] Capability/status firmware handler
-- [ ] Golden cross-language fixtures
-- [ ] Connection and compatibility UI
-- [ ] Disconnect, timeout, and contention behavior
-- [ ] Diagnostics and error mapping
-- [ ] Updated source manifest, docs, stage evidence, and progress
+- [x] Concrete HID adapter
+- [x] Fake device adapter
+- [x] Serialized request coordinator
+- [x] Capability/status firmware handler
+- [x] Golden cross-language fixtures
+- [x] Connection and compatibility UI
+- [x] Disconnect, timeout, and contention behavior
+- [x] Diagnostics and error mapping
+- [x] Updated source manifest and user-facing tooling docs
+- [ ] Real-board enumerate/connect/unplug/replug/contention evidence
 
 ## Verification
 
@@ -131,6 +139,10 @@ Required targeted coverage:
 - Repeated reads are deterministic and recover after disconnect.
 - No candidate, EEPROM, RGB, or behavior write exists yet.
 - Tests and real-board evidence are recorded in progress.md.
+
+All software-only criteria are implemented. The first, fifth, and final
+criteria remain unclosed until a matching physical board is available for the
+recorded hardware matrix.
 
 ## Handoff
 

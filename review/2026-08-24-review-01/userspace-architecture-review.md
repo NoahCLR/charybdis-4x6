@@ -4,7 +4,9 @@ This review uses prompts/initial-architecture-review.md. It plans a new
 architecture thread for live profile editing from Charybdis Profile Studio,
 with Milestone A defined as complete live RGB and key-behavior editing.
 
-The baseline tree is 87f356cd. This pass changes planning documentation only.
+The project opened against tree `87f356cd`. Stage 00 implementation and
+evidence are tracked in `progress.md`; the opening findings below remain the
+architectural rationale rather than a claim that no later work has landed.
 
 ## Must Fix Before The Milestone
 
@@ -125,6 +127,9 @@ target RAM. Repartitioning the existing logical space may reduce macro capacity.
 Required evidence:
 
 - fresh target ELF memory report;
+- per-half RP2040 physical-bank and linker-region accounting;
+- explicit separation of hardware capacity, linked-section occupancy,
+  regression policies, and runtime allocator/stack high-water evidence;
 - exact current EEPROM address map;
 - representative and maximum encoded RGB and behavior profiles;
 - selected persistent strategy and power-loss overhead;
@@ -203,6 +208,57 @@ coverage.
   for this project.
 - Consider a generated schema description for Studio controls after Profile
   Wire v1 stabilizes. Firmware-driven arbitrary UI generation is not required.
+
+## Stage 00 Reconciliation Note — 2026-08-25
+
+The opening findings above are the audit-time snapshot. Current status:
+
+| Finding | Status | Reconciliation evidence |
+| --- | --- | --- |
+| 1 — malformed VIA mirror prerequisite | open, remediation in progress | owned by Review 19; targeted guard and sanitizer package opened |
+| 2 — no effective-profile seam | open | runtime audit selected a generation-stable provider and copied lookup result, but code has not migrated |
+| 3 — no canonical schema | partially resolved | `profile-wire-v1.md`, D-010, and D-015 freeze the v1 byte and identity contract; `profile_blob_v1.c` and the shared generic C/JavaScript fixture enforce canonical blob, envelope, digest, and semantic-action bytes, while complete domain and cross-reference codecs remain open |
+| 4 — no safe activation boundary | partially resolved | `authority-state-table.md` freezes the quiescence contract; production reason-mask and activation owner remain open |
+| 5 — source/device authority | resolved at contract level | D-013, D-014, and `authority-state-table.md` define operations, ordering, partial results, and conflicts |
+| 6 — storage/capacity evidence | resolved at Stage 00 design level; runtime high-water remains open | D-016 and `stage-00-baseline.md` record the corrected per-half bank model, policy-versus-capacity distinction, exact EEPROM map, dual-slot partition, and ceilings |
+| 7 — Studio transport boundary | partially resolved | D-012 accepts an injected serialized adapter and fake; concrete packaged board probe remains open |
+| 8 — split integration shape | resolved at contract level | D-011 selects a sibling profile reconciler with mechanically aligned descriptors |
+| 9 — config classification | resolved at inventory level | `field-classification.md` classifies every currently parsed Studio surface |
+
+Contract-level resolution is not milestone closure. Runtime, protocol, storage,
+split, and UI findings remain open until their stage gates and hardware evidence
+pass.
+
+## Resource-Truth Reconciliation — 2026-08-25
+
+The earlier Stage 00 wording conflated an SRAM0–3 `.data + .bss` regression
+threshold with the RP2040's physical RAM capacity. D-016 supersedes that
+interpretation everywhere in this active review.
+
+Each keyboard half has its own RP2040 and its own 270,336 bytes of physical
+SRAM: 262,144 bytes in the `ram0` SRAM0–3 region plus separate 4,096-byte SRAM4
+and SRAM5 banks. The current fresh ELF records 22,980 bytes of `.data`, 25,660
+bytes of `.bss`, and therefore a 48,640-byte SRAM0–3 `.data + .bss` regression
+metric. Its 51,000-byte ceiling has 2,360 bytes of policy slack; that number is
+not total RAM headroom.
+
+The current `__heap_base__` to `__heap_end__` span is 213,496 bytes. It is the
+SRAM0–3 linker/core-memory span at boot and backs ChibiOS core allocation plus
+the linked newlib allocation path. Actual runtime high-water is not yet
+measured. Fixed linked occupancy across all banks is 56,104 bytes, including
+alignment and reserved stacks but excluding runtime allocation.
+
+SRAM4 remains the tight bank. Its 1,024-byte interrupt stack, 2,560-byte process
+stack, and 288 bytes of RTOS state leave 224 bytes outside those reservations.
+The 1,880-byte worst reviewed process path has 40 bytes to the stricter
+1,920-byte reviewed-path policy and 680 bytes to its physical stack boundary.
+The gate covers named paths only.
+
+Consequently, reader-backed decoding and EEPROM candidate staging remain sound
+choices for deterministic memory use and power-loss recovery, but they are not
+required by a false claim that only 2–3 KiB of physical RAM remains. Future
+resource decisions must cite the bank, linked metric, policy, and hardware
+evidence they rely on.
 
 ## Verified Solid Foundations
 
@@ -289,6 +345,14 @@ The protocol owns:
 The USB receive callback should do bounded framing work and schedule heavier
 validation or persistence for scan context where necessary.
 
+The v1 candidate coordinator realizes that boundary as one decoded-command
+mailbox. The callback performs exact 32-byte validation and copies at most one
+20-byte chunk; the scan owner alone calls the injected staging backend, reads
+staged bytes for retry comparison, and advances incremental validation. The
+owner contains no profile-sized RAM buffer. It remains independently compiled
+and unrouted until both domain validators and the commit/activation owners can
+support the capabilities they would advertise.
+
 ### Split Reconciliation
 
 The split owner publishes or reconciles committed persistent generations. A
@@ -358,14 +422,14 @@ finding lifecycle:
 
 | Review 19 item | Dependency status at project opening |
 | --- | --- |
-| Finding 1: split mirror length guard | open; blocks Stage 01 transport readiness |
+| Finding 1: split mirror length guard | remediation in progress in Review 19; blocks Stage 01 until gates pass |
 | Finding 4: advertised mirror effects without handlers | open; must be decided before profile-region effect wiring |
 | Finding 3: base sync publication contract | open; relevant if profile previews reuse the base publication domain |
 | Hardware persistence and role-swap matrix | open; baseline evidence needed before Milestone A closure |
 
 ## Current Architecture Assessment
 
-The project is realistic and does not require replacing the current runtime.
+The project remains realistic and does not require replacing the current runtime.
 The repository already owns the difficult domain logic, structured source
 editor, Raw HID endpoint, EEPROM layer, split reconciliation, validators, and
 test infrastructure.
@@ -380,8 +444,9 @@ feature rather than a demo in which one color or behavior changes until reboot.
 
 ## Recommended Next Refactor Sequence
 
-1. Complete Stage 00 decisions with fresh EEPROM, RAM, flash, stack, and encoded
-   profile measurements.
+1. Finish Stage 00 by landing executable golden fixtures, storage contracts,
+   and the real-board packaged HID probe; the resource and architecture
+   decisions are accepted.
 2. Resolve the Review 19 transport prerequisites in their owning review thread.
 3. Land the Stage 01 transport interface, fake device, discovery, capability
    query, and read-only digest/status path.

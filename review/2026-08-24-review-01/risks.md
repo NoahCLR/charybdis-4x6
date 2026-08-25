@@ -8,7 +8,7 @@
 | R-04 | The halves run different behavior generations after disconnect or role swap | critical | 02 and 05 | Include profile state in durable digest reconciliation and pass disconnect, reconnect, forced-role, and dual-USB matrices |
 | R-05 | Source and device silently diverge | high | 01 and 05 | Show independent digests and operation outcomes; implement explicit push, pull, retry, and reset flows |
 | R-06 | Raw C struct persistence breaks across compiler, alignment, or schema changes | high | 00 and 02 | Canonical fixed-width schema, golden fixtures, migration rules, and hard rejection of unknown incompatible versions |
-| R-07 | Enlarging logical EEPROM consumes too much RP2040 RAM through the wear-leveling cache | high | 00 | Measure fresh ELF layout; prefer repartitioning the existing logical region; pass fresh memory and stack budget gates |
+| R-07 | Logical EEPROM growth or live-profile buffers consume an RP2040 SRAM bank without bank-aware accounting, or policy slack is mistaken for hardware headroom | high | 00 | Keep physical banks, linked sections, regression policies, and runtime high-water evidence separate; prefer repartitioning existing EEPROM; pass fresh memory and stack gates and measure hardware high-water before closure |
 | R-08 | Reserving profile storage removes too much VIA macro capacity | medium | 00 and 02 | Measure real and worst-case usage, publish capacity, add compile gates for non-overlap, and document the selected tradeoff |
 | R-09 | Profile Studio and VIA issue interleaved requests on the same Raw HID endpoint | high | 01 | Serialize requests, use transaction ids where available, detect timeouts or unexpected replies, and clearly surface contention |
 | R-10 | A native HID dependency fails under the VS Code extension runtime or on another architecture | high | 01 | Isolate the adapter, test the packaged extension, keep a helper-process fallback, and record supported platforms |
@@ -29,3 +29,30 @@ and userspace-architecture-review.md in the same pass.
 ## Closure Evidence
 
 No project risks are closed yet.
+
+### 2026-08-25 Stage 00 and early implementation evidence update
+
+- R-01's inherited Review 19 malformed mirror-frame defect is resolved with
+  widened receiver guards, exact boundary cases, a real receiver harness, and
+  ASan/UBSan coverage. R-01 remains open for the new candidate-write frames,
+  which do not exist yet and must receive equivalent validation in Stage 02.
+- R-07's original resource wording was corrected by D-016. On the current
+  tree, the SRAM0–3 `.data + .bss` regression metric is 48,640 bytes against a
+  51,000-byte policy, while the linker/core-memory span is 213,496 bytes at
+  boot. Fixed linked occupancy across the RP2040's 270,336 bytes of physical
+  SRAM is 56,104 bytes. These figures are not interchangeable,
+  and runtime allocator high-water remains unmeasured.
+- The accepted design repartitions the existing 16 KiB logical EEPROM, so it
+  does not enlarge the 16 KiB wear-level cache. Candidate payloads remain in
+  inactive EEPROM for power-loss-safe staging and to avoid duplication. A
+  nominal 4 KiB RAM buffer would violate current regression policies but is
+  not physically impossible; runtime representation costs remain open.
+- R-08 is bounded by retaining 7,551 VIA macro bytes; current authored defaults
+  use approximately 258 bytes.
+- R-10 selects a lazy `node-hid` N-API adapter behind an injected interface,
+  with a helper-process escape hatch. Mock packaging/transport checks and
+  read-only native enumeration pass; real VS Code-host packaging and board
+  evidence remain open because enumeration found no matching attached device.
+- R-15 now has a frozen v1 compatibility and action-ABI contract in
+  `profile-wire-v1.md`; migration implementation and persisted-profile fixtures
+  remain open.

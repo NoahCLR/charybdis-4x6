@@ -46,7 +46,7 @@ static void noah_qmk_via_split_mirror_apply_command(const uint8_t *data, uint8_t
             }
 
             size = data[3];
-            if (length < (uint8_t)(4u + size)) {
+            if ((uint16_t)length < 4u + (uint16_t)size) {
                 return;
             }
 
@@ -61,7 +61,7 @@ static void noah_qmk_via_split_mirror_apply_command(const uint8_t *data, uint8_t
             }
 
             size = data[3];
-            if (length < (uint8_t)(4u + size)) {
+            if ((uint16_t)length < 4u + (uint16_t)size) {
                 return;
             }
 

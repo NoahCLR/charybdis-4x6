@@ -27,6 +27,30 @@ profile, the editable files are:
 For complex behavior rows, direct source editing is still expected after using
 the Studio as a starter.
 
+## Read-only Live Keyboard Status
+
+The header's `Live keyboard` row is the first Profile Wire integration. It is
+deliberately read-only:
+
+- `Find keyboards` enumerates the matching QMK Raw HID interface without
+  opening it.
+- `Connect` opens the selected interface and sends only standard VIA identity
+  reads plus Profile Wire custom-get requests for capabilities and status.
+- `Refresh` repeats those capability and status reads.
+- `Disconnect` closes the host connection.
+
+The native HID path and connected handle stay in the extension host. The
+webview receives an opaque device id, a display label, decoded capabilities and
+status, and sanitized errors/diagnostics.
+
+The live panel compares protocol and schema majors, report framing, Milestone A
+domain support, the standard VIA firmware version, and the active source
+profile's layer, behavior, combo, RGB group, and LED requirements with the
+capacities reported by firmware. An
+incompatible result is diagnostic only; no live write is available in this
+stage. Source Apply actions keep their existing meaning and never write to the
+connected keyboard.
+
 ## Profiles And New Keymaps
 
 The header profile picker chooses the active keymap folder. Write actions carry

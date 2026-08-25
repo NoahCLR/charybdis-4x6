@@ -4,11 +4,13 @@
 const fs = require("fs");
 const path = require("path");
 const vm = require("vm");
+const {createRequire} = require("module");
 
 const extensionRoot = path.resolve(__dirname, "..");
 const repoRoot = path.resolve(extensionRoot, "..", "..");
 const sourcePath = path.join(extensionRoot, "extension.js");
 const source = fs.readFileSync(sourcePath, "utf8");
+const requireFromExtension = createRequire(sourcePath);
 
 const context = {
     console,
@@ -34,7 +36,7 @@ const context = {
                 Uri: {file: (fsPath) => ({fsPath})},
             };
         }
-        return require(name);
+        return requireFromExtension(name);
     },
 };
 

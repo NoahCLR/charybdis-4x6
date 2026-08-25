@@ -8,10 +8,12 @@ const net = require("net");
 const os = require("os");
 const path = require("path");
 const vm = require("vm");
+const {createRequire} = require("module");
 
 const extensionRoot = path.resolve(__dirname, "..");
 const repoRoot = path.resolve(extensionRoot, "..", "..");
 const extensionPath = path.join(extensionRoot, "extension.js");
+const requireFromExtension = createRequire(extensionPath);
 
 const defaultViews = [
     {id: "layout", label: "Layout", fileName: "studio-layout-tab.png"},
@@ -315,7 +317,7 @@ function loadStudioInternals() {
             if (name === "vscode") {
                 return fakeVscode;
             }
-            return require(name);
+            return requireFromExtension(name);
         },
     };
 

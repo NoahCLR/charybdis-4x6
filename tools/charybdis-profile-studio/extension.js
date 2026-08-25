@@ -5,6 +5,7 @@ const { execFile, spawn } = require("child_process");
 const fs = require("fs/promises");
 const path = require("path");
 const { promisify } = require("util");
+const {ProfileDeviceService} = require("./live-link/profile-device-service");
 
 const execFileAsync = promisify(execFile);
 let profileStudioOutputChannel = undefined;
@@ -1051,7 +1052,7 @@ async function openStudio(context) {
         );
         return;
     }
-    const state = { activeProfileId: "" };
+    const state = { activeProfileId: "", liveLink: undefined };
 
     const panel = vscode.window.createWebviewPanel(
         "charybdisProfileStudio",
@@ -1064,6 +1065,15 @@ async function openStudio(context) {
     );
 
     panel.webview.html = getStudioHtml(panel.webview);
+
+    state.liveLink = new ProfileDeviceService({
+        onChange(snapshot) {
+            panel.webview.postMessage({type: "liveLinkState", liveLink: snapshot});
+        },
+    });
+    panel.onDidDispose(() => {
+        void state.liveLink?.close();
+    }, undefined, context.subscriptions);
 
     panel.webview.onDidReceiveMessage(
         async (message) => {
@@ -1103,6 +1113,18 @@ async function handleWebviewMessage(panel, root, state, message) {
     switch (message?.type) {
         case "ready":
             await postModel(panel, root, state);
+            return;
+        case "enumerateLiveDevices":
+            await state.liveLink.enumerate();
+            return;
+        case "connectLiveDevice":
+            await state.liveLink.connect(message.deviceId);
+            return;
+        case "refreshLiveDevice":
+            await state.liveLink.refresh();
+            return;
+        case "disconnectLiveDevice":
+            await state.liveLink.disconnect();
             return;
         case "refresh": {
             const removedProfiles = await pruneMissingProfileBuildTargets(root);
@@ -1372,7 +1394,46 @@ async function openSource(root, target, file) {
 async function postModel(panel, root, state, notice, options = {}) {
     const { profiles, target } = await activeProfileTarget(root, state);
     const model = await buildModel(root, target, profiles);
-    panel.webview.postMessage({ type: "model", model, notice, ...options });
+    state.liveLink?.setProfileSummary(profileSummaryFromModel(model));
+    panel.webview.postMessage({ type: "model", model, liveLink: state.liveLink?.snapshot(), notice, ...options });
+}
+
+function profileSummaryFromModel(model) {
+    const behaviors = Array.isArray(model?.keyBehaviors) ? model.keyBehaviors : [];
+    const combos = Array.isArray(model?.combos) ? model.combos : [];
+    const rgb = model?.rgb || {};
+    const stageGroupRows = [
+        rgb.layerLedGroups,
+        rgb.pdModeLedGroups,
+        rgb.comboFeedbackLedGroups,
+        rgb.keyBehaviorFeedbackLedGroups,
+    ].flatMap((rows) => Array.isArray(rows) ? rows : []);
+    const allLedGroups = (Array.isArray(rgb.ledGroups) ? rgb.ledGroups : []).concat(stageGroupRows);
+    const ledGroupSignatures = new Set();
+    let highestLedIndex = 0;
+    for (const group of allLedGroups) {
+        const ledIndices = Array.isArray(group?.ledIndices)
+            ? group.ledIndices.filter((value) => Number.isInteger(Number(value))).map(Number).sort((a, b) => a - b)
+            : [];
+        if (ledIndices.length) {
+            ledGroupSignatures.add(ledIndices.join(","));
+            highestLedIndex = Math.max(highestLedIndex, ...ledIndices);
+        }
+    }
+    return {
+        layerCount: Array.isArray(model?.layers) ? model.layers.length : 0,
+        behaviorRows: behaviors.length,
+        maxTapStepsPerBehavior: behaviors.reduce((maximum, row) => Math.max(
+            maximum,
+            ...(Array.isArray(row?.steps) ? row.steps.map((step) => Number(step?.tapCount || 0) + 1) : [0])
+        ), 0),
+        populatedBehaviorSteps: behaviors.reduce((total, row) => total + (Array.isArray(row?.steps) ? row.steps.length : 0), 0),
+        comboCount: combos.length,
+        maxKeysPerCombo: combos.reduce((maximum, combo) => Math.max(maximum, Array.isArray(combo?.inputs) ? combo.inputs.length : 0), 0),
+        reusableRgbGroups: ledGroupSignatures.size,
+        rgbStageGroupRows: stageGroupRows.length,
+        highestLedIndex,
+    };
 }
 
 async function buildModel(root, target = DEFAULT_PROFILE_TARGET, profiles) {
@@ -4422,6 +4483,33 @@ function getStudioHtml() {
             align-items: center;
             justify-content: flex-end;
         }
+        .live-device-select {
+            flex: 0 1 280px;
+            min-width: 210px;
+            max-width: 34vw;
+        }
+        .live-status-chip {
+            display: inline-flex;
+            align-items: center;
+            min-height: 28px;
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            padding: 4px 9px;
+            color: var(--muted);
+            background: rgba(32, 38, 42, 0.64);
+            font-size: 11px;
+            font-weight: 650;
+        }
+        .live-status-chip.connected,
+        .live-status-chip.compatible {
+            border-color: #2aa88e;
+            color: #7ee3ce;
+        }
+        .live-status-chip.incompatible,
+        .live-status-chip.error {
+            border-color: var(--danger);
+            color: #ff9b9b;
+        }
         .profile-picker-label {
             color: var(--muted);
             font-size: 11px;
@@ -4509,6 +4597,52 @@ function getStudioHtml() {
         main {
             display: block;
             padding: 14px;
+        }
+        #liveLinkPanelHost:not(:empty) {
+            display: block;
+            padding: 14px 14px 0;
+        }
+        .live-link-summary {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 12px;
+            align-items: start;
+        }
+        .live-link-heading {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+        }
+        .live-link-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 10px;
+            margin-top: 12px;
+        }
+        .live-link-card {
+            min-width: 0;
+            border: 1px solid var(--line);
+            border-radius: 7px;
+            padding: 10px;
+            background: rgba(32, 38, 42, 0.54);
+        }
+        .live-link-card dl {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 5px 10px;
+            margin: 0;
+        }
+        .live-link-card dt { color: var(--muted); }
+        .live-link-card dd {
+            margin: 0;
+            text-align: right;
+            font-family: var(--vscode-editor-font-family, ui-monospace, monospace);
+        }
+        .live-link-diagnostics {
+            margin: 10px 0 0;
+            padding-left: 20px;
+            color: var(--muted);
         }
         section, details.panel {
             border: 1px solid var(--line);
@@ -6240,6 +6374,9 @@ function getStudioHtml() {
             .layout-selected-key-column {
                 padding: 8px 0 0;
             }
+            .live-link-grid {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
     <style id="behaviorColorStyle" nonce="${nonce}"></style>
@@ -6271,6 +6408,17 @@ function getStudioHtml() {
                     <button id="reload" class="primary">Reload source</button>
                 </div>
             </div>
+            <div class="header-action-row toolbar">
+                <span class="profile-picker-label">Live keyboard</span>
+                <select id="liveDeviceSelect" class="live-device-select" aria-label="Live keyboard"></select>
+                <span id="liveLinkStatus" class="live-status-chip">Not scanned</span>
+                <div class="header-button-group">
+                    <button id="enumerateLiveDevices">Find keyboards</button>
+                    <button id="connectLiveDevice" disabled>Connect</button>
+                    <button id="refreshLiveDevice" disabled>Refresh</button>
+                    <button id="disconnectLiveDevice" disabled>Disconnect</button>
+                </div>
+            </div>
             <div class="header-action-row">
                 <span class="profile-picker-label">Profile overview</span>
                 <button id="generateProfileDocs">Create overview doc</button>
@@ -6281,6 +6429,7 @@ function getStudioHtml() {
             </div>
         </div>
     </header>
+    <div id="liveLinkPanelHost"></div>
     <main id="app"></main>
     <div id="tooltip" class="tooltip" hidden></div>
     <div id="keyPickerHost"></div>
@@ -6296,6 +6445,20 @@ function getClientScript() {
 (function () {
     const vscode = acquireVsCodeApi();
     let model = undefined;
+    let liveLink = {
+        phase: "idle",
+        scanned: false,
+        busy: false,
+        connected: false,
+        devices: [],
+        selectedDeviceId: "",
+        capabilities: null,
+        status: null,
+        compatibility: null,
+        error: null,
+        diagnostics: []
+    };
+    let liveDeviceSelection = "";
     let activeLayer = undefined;
     let selectedKey = 0;
     let activeBehaviorKeycode = "";
@@ -6368,7 +6531,12 @@ function getClientScript() {
         generateProfileDocs: "Create or refresh the generated profile overview Markdown and assets from the active profile source files on disk.",
         compileFirmware: "Compile separate left and right UF2 firmware files for the active profile.",
         applyAll: "Write all staged Studio changes, including layer structure and staged layout edits.",
-        reload: "Reload keymap.c, config.h, and rgb_config.c from disk, discarding uncommitted Studio edits."
+        reload: "Reload keymap.c, config.h, and rgb_config.c from disk, discarding uncommitted Studio edits.",
+        liveDeviceSelect: "Choose a compatible Charybdis QMK Raw HID interface found by the latest scan.",
+        enumerateLiveDevices: "Scan for the Charybdis Raw HID interface without opening it or sending a report.",
+        connectLiveDevice: "Open the selected Raw HID interface and read Profile Wire capabilities and status. This does not modify the keyboard.",
+        refreshLiveDevice: "Read Profile Wire capabilities and status again. Only read requests are sent.",
+        disconnectLiveDevice: "Close Profile Studio's Raw HID connection to the keyboard."
     };
     const viewTooltips = {
         layout: "Edit layer keys and behavior rows using the physical keyboard layout as the filter.",
@@ -6825,6 +6993,24 @@ function getClientScript() {
     document.getElementById("compileFirmware").addEventListener("click", () => {
         requestFirmwareCompile();
     });
+    document.getElementById("liveDeviceSelect").addEventListener("change", (event) => {
+        liveDeviceSelection = event.target.value || "";
+        renderLiveLinkControls();
+    });
+    document.getElementById("enumerateLiveDevices").addEventListener("click", () => {
+        vscode.postMessage({type: "enumerateLiveDevices"});
+    });
+    document.getElementById("connectLiveDevice").addEventListener("click", () => {
+        if (liveDeviceSelection) {
+            vscode.postMessage({type: "connectLiveDevice", deviceId: liveDeviceSelection});
+        }
+    });
+    document.getElementById("refreshLiveDevice").addEventListener("click", () => {
+        vscode.postMessage({type: "refreshLiveDevice"});
+    });
+    document.getElementById("disconnectLiveDevice").addEventListener("click", () => {
+        vscode.postMessage({type: "disconnectLiveDevice"});
+    });
     document.addEventListener("pointerover", (event) => {
         const target = tooltipTarget(event.target);
         if (target) showTooltip(target, event);
@@ -6937,6 +7123,7 @@ function getClientScript() {
             clearFloatingStatus();
             viewDrafts = {};
             model = event.data.model;
+            updateLiveLinkState(event.data.liveLink);
             Object.assign(qmkKeyLabels, model.qmkKeyLabels || {});
             Object.assign(qmkKeyAliases, model.qmkKeycodeAliases || {});
             macroPayloadKeycodes = new Set(model.macroPayloadKeycodes || []);
@@ -6967,6 +7154,9 @@ function getClientScript() {
             normalizeRgbGroupState();
             render();
             resetLocalHistory();
+        }
+        if (event.data.type === "liveLinkState") {
+            updateLiveLinkState(event.data.liveLink);
         }
         if (event.data.type === "error") {
             clearFloatingStatus();
@@ -8689,6 +8879,7 @@ function getClientScript() {
     }
 
     function render() {
+        renderLiveLinkControls();
         if (!model) {
             app.innerHTML = "<section>Loading...</section>";
             hydrateTooltips();
@@ -8703,6 +8894,158 @@ function getClientScript() {
         restoreActiveViewDraft();
         hydrateTooltips();
         scheduleMacroSlotBrowserHeightSync();
+    }
+
+    function updateLiveLinkState(next) {
+        if (next && typeof next === "object") {
+            liveLink = next;
+        }
+        const devices = Array.isArray(liveLink.devices) ? liveLink.devices : [];
+        const knownIds = devices.map((device) => device.id);
+        if (liveLink.selectedDeviceId && knownIds.includes(liveLink.selectedDeviceId)) {
+            liveDeviceSelection = liveLink.selectedDeviceId;
+        } else if (!knownIds.includes(liveDeviceSelection)) {
+            liveDeviceSelection = knownIds[0] || "";
+        }
+        renderLiveLinkControls();
+    }
+
+    function renderLiveLinkControls() {
+        const select = document.getElementById("liveDeviceSelect");
+        const statusChip = document.getElementById("liveLinkStatus");
+        const host = document.getElementById("liveLinkPanelHost");
+        if (!select || !statusChip || !host) return;
+        const devices = Array.isArray(liveLink.devices) ? liveLink.devices : [];
+        if (!liveLink.scanned) {
+            select.innerHTML = "<option value=''>Scan to find a keyboard</option>";
+        } else if (!devices.length) {
+            select.innerHTML = "<option value=''>No compatible keyboard found</option>";
+        } else {
+            select.innerHTML = devices.map((device) =>
+                "<option value='" + escapeAttr(device.id) + "'>" + escapeHtml(device.label || "Charybdis keyboard") + "</option>"
+            ).join("");
+        }
+        if (devices.some((device) => device.id === liveDeviceSelection)) {
+            select.value = liveDeviceSelection;
+        }
+        select.disabled = Boolean(liveLink.busy || liveLink.connected || !devices.length);
+        setHeaderButtonDisabled("enumerateLiveDevices", Boolean(liveLink.busy || liveLink.connected));
+        setHeaderButtonDisabled("connectLiveDevice", Boolean(liveLink.busy || liveLink.connected || !liveDeviceSelection));
+        setHeaderButtonDisabled("refreshLiveDevice", Boolean(liveLink.busy || !liveLink.connected));
+        setHeaderButtonDisabled("disconnectLiveDevice", Boolean(liveLink.busy || !liveLink.connected));
+        const chip = liveLinkStatus();
+        statusChip.textContent = chip.label;
+        statusChip.className = "live-status-chip" + (chip.kind ? " " + chip.kind : "");
+        host.innerHTML = renderLiveLinkPanel();
+        hydrateTooltips();
+    }
+
+    function liveLinkStatus() {
+        if (liveLink.busy) {
+            const labels = {enumerating: "Scanning...", connecting: "Connecting...", refreshing: "Reading...", disconnecting: "Disconnecting..."};
+            return {label: labels[liveLink.phase] || "Working...", kind: ""};
+        }
+        if (liveLink.error) return {label: "Live error", kind: "error"};
+        if (liveLink.connected && liveLink.compatibility) {
+            return liveLink.compatibility.compatible
+                ? {label: "Connected · compatible", kind: "compatible"}
+                : {label: "Connected · incompatible", kind: "incompatible"};
+        }
+        if (liveLink.connected) return {label: "Connected", kind: "connected"};
+        if (!liveLink.scanned) return {label: "Not scanned", kind: ""};
+        return Array.isArray(liveLink.devices) && liveLink.devices.length
+            ? {label: "Keyboard available", kind: ""}
+            : {label: "No keyboard found", kind: ""};
+    }
+
+    function renderLiveLinkPanel() {
+        const diagnostics = Array.isArray(liveLink.diagnostics) ? liveLink.diagnostics : [];
+        if (!liveLink.scanned && !liveLink.connected && !liveLink.error && !diagnostics.length) return "";
+        const device = (liveLink.devices || []).find((candidate) => candidate.id === liveLink.selectedDeviceId);
+        const compatibility = liveLink.compatibility;
+        const summaryKind = liveLink.error ? "error" : compatibility?.compatible === false ? "incompatible" : compatibility?.compatible ? "compatible" : "";
+        const summaryText = liveLink.error
+            ? liveLink.error.code + ": " + liveLink.error.message
+            : compatibility
+                ? (compatibility.compatible
+                    ? "This firmware supports the Profile Wire schema and the current profile fits the advertised capacities."
+                    : "Do not attempt a future live deploy until every compatibility blocker below is resolved.")
+                : liveLink.connected
+                    ? "Connected; waiting for Profile Wire capability and status reads."
+                    : (liveLink.devices || []).length
+                        ? "A compatible Raw HID interface is available. Connect to read firmware capabilities and profile status."
+                        : "No matching Charybdis Raw HID interface was found. The source editor remains fully available.";
+        return "<section class='panel live-link-panel' aria-label='Live keyboard status'>" +
+            "<div class='live-link-summary'>" +
+            "<div><div class='live-link-heading'><h2>Live keyboard</h2><span class='live-status-chip " + summaryKind + "'>" + escapeHtml(liveLinkStatus().label) + "</span></div>" +
+            "<p class='" + (liveLink.error ? "error" : compatibility?.compatible === false ? "warning" : "muted") + "'>" + escapeHtml(summaryText) + "</p></div>" +
+            (device ? "<div class='source-pill'>" + escapeHtml(device.label) + "</div>" : "") +
+            "</div>" +
+            renderLiveLinkDetails() +
+            (diagnostics.length ? "<h3>Diagnostics</h3><ul class='live-link-diagnostics'>" + diagnostics.map((entry) => "<li>" + escapeHtml(entry) + "</li>").join("") + "</ul>" : "") +
+            "</section>";
+    }
+
+    function renderLiveLinkDetails() {
+        const capabilities = liveLink.capabilities;
+        const status = liveLink.status;
+        const viaIdentity = liveLink.viaIdentity;
+        const compatibility = liveLink.compatibility;
+        if (!capabilities && !status && !compatibility) return "";
+        return "<div class='live-link-grid'>" +
+            (capabilities ? liveDefinitionCard("Firmware capabilities", [
+                ["Protocol", capabilityVersion(capabilities.protocol)],
+                ["Schema", capabilityVersion(capabilities.schema)],
+                ["VIA protocol", formatHex(viaIdentity?.protocolVersion, 4)],
+                ["VIA firmware", formatHex(viaIdentity?.firmwareVersion, 8)],
+                ["Report size", capabilities.reportSize + " bytes"],
+                ["Profile payload", capabilities.maxProfilePayload + " bytes"],
+                ["Domains", formatHex(capabilities.supportedDomainMask, 2)],
+                ["Action ABI", formatHex(capabilities.actionAbiDigest, 8)]
+            ]) : "") +
+            (status ? liveDefinitionCard("Device profile state", [
+                ["State flags", formatHex(status.stateFlags, 4)],
+                ["Active kind", String(status.activeKind)],
+                ["Active digest", formatHex(status.activeDigest, 8)],
+                ["Committed digest", formatHex(status.committedDigest, 8)],
+                ["Active generation", generationLabel(status.activeGeneration, status.activeOriginHalf)],
+                ["Committed generation", generationLabel(status.committedGeneration, status.committedOriginHalf)],
+                ["Last error", String(status.lastError)]
+            ]) : "") +
+            (compatibility ? liveCompatibilityCard(compatibility) : "") +
+            "</div>";
+    }
+
+    function liveDefinitionCard(title, entries) {
+        return "<div class='live-link-card'><h3>" + escapeHtml(title) + "</h3><dl>" + entries.map(([label, value]) =>
+            "<dt>" + escapeHtml(label) + "</dt><dd>" + escapeHtml(value) + "</dd>"
+        ).join("") + "</dl></div>";
+    }
+
+    function liveCompatibilityCard(compatibility) {
+        const failed = (compatibility.checks || []).filter((check) => !check.ok);
+        const capacityChecks = (compatibility.checks || []).filter((check) => [
+            "Logical layers", "Key behavior rows", "Populated behavior steps", "Reusable RGB groups", "RGB stage-group rows"
+        ].includes(check.label));
+        return "<div class='live-link-card'><h3>Source compatibility</h3>" +
+            (failed.length
+                ? "<ul class='live-link-diagnostics'>" + failed.map((check) => "<li class='error'>" + escapeHtml(check.message) + "</li>").join("") + "</ul>"
+                : "<p class='notice'>Compatible</p>") +
+            "<dl>" + capacityChecks.map((check) =>
+                "<dt>" + escapeHtml(check.label) + "</dt><dd>" + escapeHtml(String(check.actual) + " / " + String(check.limit)) + "</dd>"
+            ).join("") + "</dl></div>";
+    }
+
+    function capabilityVersion(version) {
+        return String(version?.major ?? "?") + "." + String(version?.minor ?? "?");
+    }
+
+    function generationLabel(counter, originHalf) {
+        return String(counter || 0) + " · half " + String(originHalf || 0);
+    }
+
+    function formatHex(value, width) {
+        return "0x" + (Number(value) >>> 0).toString(16).toUpperCase().padStart(width, "0");
     }
 
     function renderProfileControls() {

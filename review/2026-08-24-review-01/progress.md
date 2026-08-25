@@ -25,7 +25,7 @@ dependency status without duplicating or prematurely resolving its findings.
 
 | Stage | Status | Exit evidence |
 | --- | --- | --- |
-| 00 — Contract and baseline | planned | open |
+| 00 — Contract and baseline | in progress | measured baseline and D-009 through D-016 accepted; HID board spike and executable golden fixtures open |
 | 01 — Live Link transport | blocked on Stage 00 and Review 19 prerequisite | open |
 | 02 — Schema, store, and commit | blocked on Stage 01 | open |
 | 03 — Live RGB | blocked on Stage 02 | open |
@@ -59,6 +59,348 @@ Created:
 No firmware, Profile Studio, authored profile, generated docs, or sibling QMK
 files were changed.
 
+### 2026-08-25 — Stage 00 measured contract baseline
+
+Completed:
+
+- fresh full-host, firmware, memory, and reviewed-stack baseline against sibling
+  QMK `sol` at `aac9f637ee`
+- exact existing and accepted EEPROM maps
+- fixed Profile Wire and storage ceilings
+- full Profile Studio field classification
+- Profile Wire v1 blob, action, RGB, behavior, transport, error, and fixture
+  contracts
+- source/device/split authority and safe-activation state tables
+- accepted D-009 through D-016, including the corrected bank-aware resource
+  model
+
+Implementation packages opened without overlapping ownership:
+
+- Review 19 malformed mirror-frame prerequisite and its sanitizer test
+- Profile Studio injected adapter, fake device, and serialized request
+  coordinator
+
+No sibling QMK source file was edited. The sibling checkout was used for fresh
+build artifacts only.
+
+### 2026-08-25 — Stage 02 dual-slot storage foundation
+
+Landed the bounded storage-only work package without advancing the overall
+stage status:
+
+- canonical 32-byte slot-header encoder/decoder with packed 4-bit schema
+  components, CRC16 header protection, payload CRC32, and payload FNV-1a;
+- injectable storage IO with read-only boot discovery;
+- strict committed-slot compatibility, checksum, and top-level canonical blob
+  validation;
+- newest-valid-slot boot selection, last-known-good fallback, and explicit
+  equal-generation conflict detection;
+- sequential 32-byte-bounded inactive-slot staging, readback verification, and
+  the two-byte commit marker as the final write;
+- strict generation exhaustion at `UINT32_MAX`; storage format v1 does not
+  wrap generation counters;
+- focused normal and ASan/UBSan host coverage for interruption, corruption,
+  conflict, ordering, compatibility, and rollover/exhaustion behavior.
+
+The package intentionally does not add Raw HID mutation commands, runtime
+activation, RGB/key-behavior decoding, reset, split reconciliation, or Profile
+Studio changes. QMK scan-context ownership and its concrete EEPROM adapter
+remain part of the later Stage 02 integration pass.
+
+Verification passed for this package:
+
+- `sh tests/host/run_profile_store_tests.sh` (normal and ASan/UBSan)
+- `sh tests/host/run_profile_storage_layout_tests.sh`
+- `sh tests/host/run_profile_wire_v1_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `sh tests/host/run_firmware_memory_budget_checks.sh`
+- `sh tests/host/run_firmware_stack_budget_checks.sh`
+- `git diff --check`
+
+The initial target checkpoint recorded a 48,396 B SRAM0–3 `.data + .bss`
+regression metric, a 213,744 B linker/core-memory span at boot, a 1,880 B worst
+reviewed main-process path, and a 336 B worst reviewed split-slave path. D-016
+later corrected the resource terminology; these are policy/accounting values,
+not total physical-RAM or runtime-free-memory claims.
+At this storage-only checkpoint the functions were not yet reachable from a
+runtime owner. The read-only runtime integration below supersedes these target
+numbers. No sibling QMK source file was edited.
+
+### 2026-08-25 — Stage 02 read-only QMK store discovery
+
+Made the persistent-store foundation reachable on firmware without opening a
+mutation path:
+
+- added a slot-bounded QMK EEPROM adapter whose store IO deliberately has no
+  write callback;
+- added a two-phase boot owner that initializes after VIA defaults and performs
+  exactly one dual-slot discovery from matrix-scan context;
+- surfaced a discovered committed digest, generation, origin, and
+  equal-generation conflict count through the existing Profile Wire status
+  pages while continuing to report compiled defaults as the active runtime;
+- retained truthful capabilities: candidate chunk size and supported-domain
+  mask remain zero, and no candidate-write, commit, RGB-schema, or
+  behavior-schema feature bit is advertised;
+- strengthened equal-generation identity to include schema, flags, length,
+  CRC32, FNV digest, compiled-default digest, and action-ABI digest in addition
+  to generation and origin;
+- extended the last-known-good power-loss matrix across the real six-write
+  15-byte transaction, including every partial final-marker write;
+- wired runtime init order, the common source manifest, VIA on/off plus
+  RGB/split compile variants, and an explicit reviewed stack path for boot
+  discovery.
+
+Verification passed for the combined tree:
+
+- `sh tests/host/run_profile_store_tests.sh` (normal and ASan/UBSan)
+- `sh tests/host/run_profile_store_runtime_tests.sh`
+- `sh tests/host/run_profile_wire_v1_tests.sh`
+- `sh tests/host/run_runtime_init_order_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `sh tests/host/run_firmware_memory_budget_checks.sh`
+- `sh tests/host/run_firmware_stack_budget_checks.sh`
+
+Fresh linked resources are 25,660 B SRAM0–3 BSS, 22,980 B SRAM0–3 data, a
+48,640 B `.data + .bss` regression metric against the 51,000 B policy, and a
+213,496 B linker/core-memory span at boot. The new boot-discovery reviewed path
+is 480 B; the existing worst reviewed paths remain 1,880/1,920 B for the main
+process and 336/768 B for the split slave. The ratios describe policy margins,
+not physical stack or total-RAM headroom.
+
+This package discovers and reports persistent metadata only. It does not read
+a committed profile into an effective provider, activate it, expose candidate
+writes or commits, reset slots, or reconcile the peer half. Hardware EEPROM
+discovery is not confirmed. No sibling QMK source file was edited; the sibling
+checkout was used only for build artifacts.
+
+### 2026-08-25 — Stage 02 generic blob and semantic-action codecs
+
+Landed the reusable schema-only work package without advancing the overall
+stage status:
+
+- firmware encoding and strict zero-copy decoding for the canonical eight-byte
+  `NLP1` header and ordered four-byte domain envelopes;
+- firmware field-by-field encoding and decoding for every Profile Wire v1
+  semantic action kind, with caller-supplied layer, PD-mode, VIA-macro, and
+  hardcoded-macro capacity counts;
+- stable generic rejection categories and offsets for truncated, overlong,
+  unknown, duplicate, out-of-order, reserved, noncanonical, trailing, and
+  invalid-action input;
+- a single exact-byte blob/action fixture consumed directly by both firmware C
+  tests and the Profile Studio JavaScript tests;
+- normal and ASan/UBSan coverage, including every truncated golden prefix, all
+  unknown action tags and reserved action flags, boundary capacities, and a
+  deterministic malformed-input corpus;
+- userspace source-manifest and full-host runner wiring plus compile-time
+  alignment with the accepted 4,064-byte slot, eight-layer, and 16-slot
+  hardcoded-macro ceilings.
+
+This generic layer deliberately does not interpret RGB or key-behavior payload
+records. It also does not validate the negotiated action-ABI digest or logical
+cross-references, mutate the store, activate a candidate, or synchronize the
+peer half. Those are separate Stage 02 validator/runtime packages.
+
+Focused verification passed:
+
+- `sh tests/host/run_profile_blob_v1_tests.sh` (normal and ASan/UBSan)
+- `npm run check` from `tools/charybdis-profile-studio/` (53 tests)
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+
+Combined-tree closure gates also passed after source-manifest wiring:
+
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `sh tests/host/run_firmware_memory_budget_checks.sh` — 48,640 B SRAM0–3
+  `.data + .bss` regression metric, 213,496 B linker/core-memory span at boot
+- `sh tests/host/run_firmware_stack_budget_checks.sh` — 1,880 B main and
+  336 B split worst reviewed paths
+- `git diff --check`
+
+### 2026-08-25 — Stage 02/04 reader-backed key-behavior domain codec
+
+Landed the cross-language behavior payload package without advancing Stage 02
+or the Stage 04 vertical slice:
+
+- exact firmware encoding and reader-backed decoding for the frozen row,
+  sparse-step, branch, timing, flags, hold-mode, repeat-rate, and semantic-action
+  byte contract;
+- canonical encoder sorting plus strict decoder rejection for duplicate or
+  out-of-order targets and tap indexes;
+- fail-closed negotiated behavior ceilings that may lower but never raise the
+  frozen v1 maxima of 64 rows, 128 populated steps, five steps per row, 100 Hz,
+  and 4,052 behavior-payload bytes;
+- one shared payload/envelope/blob/digest fixture executed by firmware C and
+  Profile Studio JavaScript;
+- a bounded reader abstraction with arbitrary base offsets, injected read
+  failures, at-most-12-byte reads, and a payload-independent validated handle
+  statically capped at 128 bytes;
+- row and step accessors that re-resolve row indexes from the validated domain,
+  avoiding caller-controlled stored offsets.
+
+The package does not allocate or retain a contiguous 4 KiB candidate, and it
+does not materialize maximum native row/step arrays. The remaining behavior
+seam is whole-profile action-ABI/cross-reference validation followed by a
+generation-owned runtime action/handled-key view and quiescent publication.
+
+Focused verification passed:
+
+- `sh tests/host/run_key_behavior_domain_v1_tests.sh` (normal and ASan/UBSan)
+- `npm run check` from `tools/charybdis-profile-studio/` (63 tests)
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh` (combined tree, including the generic,
+  behavior, RGB, store, wire, and candidate profile packages)
+- `git diff --check`
+
+The QMK compile and firmware memory/stack gates were intentionally not rerun by
+this slice because the candidate-coordinator agent owns the sequential
+combined-tree firmware/resource build. This avoids concurrent `.build`
+artifact races; its result belongs in the coordinator's verification entry.
+
+### 2026-08-25 — Stage 02/03 matching RGB domain codec foundation
+
+Landed matching desktop and reader-backed firmware schema packages early
+without advancing Stage 03's blocked status:
+
+- froze domain `0x10` version 1 as a 16-byte header plus fixed-order records for
+  all Milestone A RGB surfaces;
+- encoded the five-stage enable mask, complete layer and stable PD color
+  identities, auto-mouse fade, combo feedback, complete ordered tap-branch and
+  key-feedback colors, tap policy, locality, and every renderer group table;
+- canonicalized named and inline groups into at most 16 unique 58-bit bitmaps,
+  with zero reserved LED bits, lexicographic profile-local ids, validated
+  references, and authored repaint order retained;
+- enforced eight layers, six registered PD ids, four compiled tap colors, 32
+  aggregate group rows, compiled feature inclusion, maximum brightness, exact
+  geometry, canonical ordering, and strict reserved/truncation/trailing rules;
+- kept the normalized domain and parsed Studio model in a semantic JSON fixture
+  while moving codec limits, exact payload and whole-blob bytes, FNV-1a, and
+  CRC32 into one shared C/JavaScript fixture;
+- composed the RGB domain through the generic desktop profile-blob codec and
+  added focused canonicalization, corruption, completeness, enum/reference,
+  feature, and maximum-capacity tests;
+- added a firmware decoder whose retained view contains only the injected
+  bounded reader, header counts, and negotiated limits, with a 40-byte 32-bit
+  static ceiling and no payload/dictionary/table materialization;
+- exposed record-at-a-time accessors for every RGB section, with one 16-byte
+  header read during decode and all later validation/materialization reads
+  bounded to at most 11 bytes;
+- wired the firmware decoder into the canonical userspace source manifest,
+  feature-gate compile matrix, and full host suite.
+
+Verification passed:
+
+- `sh tests/host/run_profile_rgb_v1_tests.sh` — normal and ASan/UBSan
+- `npm run check` from `tools/charybdis-profile-studio/` — all 63 live-link
+  tests passed
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `git diff --check`
+
+This slice deliberately does not add an extension command, webview or UI
+change, device write, effective RGB provider, preview/rollback, runtime
+activation, persistence, or split reconciliation. QMK/resource gates remain
+for the final combined firmware pass because other firmware packages were
+still active. The next RGB package is compiled-default
+materialization and a generation-owned effective provider before consumer
+migration.
+
+### 2026-08-25 — Stage 02 standalone candidate transaction coordinator
+
+Landed the bounded candidate mutation foundation without enabling device
+writes:
+
+- froze exact 32-byte begin, chunk, validate, abort, immediate admission, and
+  operation-status layouts, including transaction width, canonical padding,
+  stable errors, structured validation locations, and an explicit no-timeout
+  rule;
+- added a strict frame/status codec and exact-byte fixture with all-length and
+  reserved-byte rejection coverage;
+- added one bounded mailbox whose receive side only validates/copies and whose
+  scan owner alone performs injected backend begin/write/read/abort and
+  incremental 20-byte-budget validation;
+- enforced nonzero transaction ids, schema/domain/action-ABI/capacity checks,
+  sequential chunks, staged-byte comparison for idempotent duplicates,
+  poisoning on conflicting retries, stable status sequencing, and idempotent
+  successful/no-op abort;
+- added reset/power-loss ownership tests that prove pending/staged volatile
+  state is not resumed after owner initialization and an explicit long-idle
+  test for the v1 no-autonomous-timeout contract;
+- wired both firmware sources into the common source manifest, the VIA on/off
+  feature compile matrix, and the full host runner.
+
+Focused verification passed:
+
+- `sh tests/host/run_profile_candidate_transaction_tests.sh` (normal and
+  ASan/UBSan)
+- `sh tests/host/run_profile_wire_v1_tests.sh`
+- `sh tests/host/run_feature_gate_compile_tests.sh`
+
+The coordinator is deliberately disconnected from the QMK hook and no
+candidate, commit, activation, preview, or domain capability was enabled by
+this package. It has no commit API and no profile-sized RAM buffer. The next
+integration seam is an EEPROM/store staging backend plus QMK callback/scan
+routing, but that must wait for both domain validators and must land together
+with truthful candidate capability/status advertising. The combined QMK build
+passed; resource gates remain at a 48,640/51,000 B SRAM0–3 `.data + .bss`
+policy metric, a 213,496 B linker/core-memory span at boot, and 1,880 B
+main-stack and 336 B split-stack worst reviewed paths. Final
+`git diff --check` passed. The shared combined-tree full-host run also passed
+after all candidate, RGB, and behavior source wiring settled.
+
+### 2026-08-25 — RP2040 resource-truth reconciliation
+
+Accepted D-016 is now the durable resource-accounting contract for this
+project. The repository no longer presents the 51,000 B `.data + .bss` limit
+or the 204,800 B minimum linker-managed SRAM0 span as RP2040 hardware
+capacities. They remain conservative regression policies and are reported as
+such.
+
+This pass:
+
+- added the canonical human-facing memory model in
+  `docs/architecture/memory-budgets.md` and linked it from the architecture
+  guide, change guide, and source map;
+- added the same mandatory resource-truth rules to `AGENTS.md`, so future
+  agents begin from the physical bank model and do not infer runtime
+  high-water from linker output;
+- upgraded `tools/check_firmware_memory_budget.py` from threshold-only parsing
+  to exact RP2040 bank, boundary, overlap, and conservation checks while
+  retaining the previous CLI names only as documented compatibility aliases;
+- expanded the memory-tool test suite to cover exact accounting, both policy
+  failures, compatibility aliases, and invalid bank layouts;
+- reconciled the active review's baseline, architecture, risks, stages, and
+  decision log with that contract; and
+- corrected the pointing-runtime stack comment so the 40 B value cannot be
+  confused with physical stack headroom.
+
+The current linked checkpoint per half is 270,336 B of physical RP2040 SRAM,
+48,640 B for the `.data + .bss` regression metric, 48,648 B for the fixed
+SRAM0 prefix, 213,496 B for the linker-managed SRAM0 free/core-memory span at
+boot, and 56,104 B of exact fixed linked occupancy across all banks. SRAM4 has
+224 B unassigned after its fixed reservations. The worst reviewed main path is
+1,880 B: 40 B below its 1,920 B policy threshold and 680 B below the 2,560 B
+physical process-stack boundary. These are link-time and reviewed-path facts;
+runtime allocator and global/interrupt stack high-water remain unmeasured.
+
+Verification passed:
+
+- `python3 -m py_compile tools/check_firmware_memory_budget.py`
+- `sh tests/host/run_firmware_memory_budget_tool_tests.sh` (14 tests)
+- `sh tests/host/run_firmware_memory_budget_checks.sh`
+- `sh tests/host/run_firmware_stack_budget_checks.sh`
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `git diff --check`
+
+No sibling QMK source was changed; the sibling tree was used only for the
+required build and linker evidence. A real-board runtime high-water probe is a
+future measurement, not a prerequisite for using the now-correct static
+accounting.
+
 ## Verification
 
 Passed on 2026-08-24:
@@ -76,40 +418,51 @@ only.
 
 Hardware is not confirmed.
 
+Stage 00 baseline commands passed on 2026-08-25:
+
+- `sh tests/host/run_all_host_tests.sh`
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `sh tests/host/run_firmware_memory_budget_checks.sh`
+- `sh tests/host/run_firmware_stack_budget_checks.sh`
+
+The initial Stage 00 target evidence was a 48,396 B SRAM0–3 `.data + .bss`
+metric against a 51,000 B policy and a 213,744 B linker/core-memory span at
+boot. The current reconciled tree measures 48,640 B and 213,496 B respectively.
+The 1,880 B worst reviewed main path has 40 B to the 1,920 B reviewed-path
+policy and 680 B to its 2,560 B physical process-stack boundary; the 336 B
+worst reviewed split-slave path is measured against its 768 B reviewed-path
+policy. These gates cover named paths, not global or interrupt high-water.
+
 ## Open Decisions
 
-Stage 00 owns D-009 through D-014 in decisions.md:
+D-009 through D-016 are accepted. The decisions no longer block schema,
+storage-contract, or transport-boundary implementation.
 
-- storage layout
-- fixed capacities
-- split integration shape
-- Profile Studio HID adapter
-- preview and apply semantics
-- generation authority and drift resolution
-
-No implementation should freeze a wire or storage format before these decisions
-have measured evidence.
+The `node-hid` choice remains subject to its recorded escape hatch: if the
+actual VS Code-host packaging/board spike fails, D-012 must be amended to select
+the packaged helper without changing the injected adapter contract.
 
 ## Current Blockers
 
-- Stage 00 measurements and decisions have not started.
-- Review 19 Finding 1 remains a transport-safety prerequisite.
-- Review 19 Finding 4 remains relevant to effect/handler alignment.
+- The real-board HID/VS Code-host spike has not run.
+- RGB and key-behavior domain codecs now match across firmware and Studio;
+  compiled-default materialization, whole-profile action-ABI/cross-reference
+  validation, safe publication, and consumer migration remain open.
 - The baseline persistence and role-swap hardware matrix remains open.
 
 These are expected opening conditions, not project failure.
 
 ## Next Steps
 
-1. Execute Stage 00 exactly as scoped in stages/00-contract-and-baseline.md.
-2. Record measured EEPROM, static RAM, linker heap, stack, flash, and encoded
-   profile budgets.
-3. Prototype the desktop HID boundary without landing production protocol
-   commitments.
-4. Resolve D-009 through D-014 and update this architecture review if the
-   intended structure changes.
-5. Confirm the Review 19 transport prerequisite is resolved in its owning
-   folder before Stage 01 declares transport readiness.
+1. Materialize the compiled profile through the canonical blob/domain codecs
+   and add whole-profile action-ABI and cross-domain validation.
+2. Connect the candidate coordinator to validated inactive-slot staging,
+   commit, safe activation, and effective generation publication.
+3. Add split reconciliation before advertising mutation capabilities.
+4. Build the effective RGB provider, then migrate the eight renderer families
+   without allowing direct compiled-table bypasses.
+5. Run the real-board transport and persistence matrix when hardware is
+   available.
 
 ## Handoff History
 

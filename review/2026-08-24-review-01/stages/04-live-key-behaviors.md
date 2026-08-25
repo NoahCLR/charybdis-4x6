@@ -2,6 +2,16 @@
 
 Status: blocked on Stage 02
 
+Implementation note: the isolated cross-language payload package has landed
+early. It defines exact canonical row and sparse-step bytes, semantic actions,
+stable wire hold-mode ids, timing overrides, auto-mouse anchoring, capacity
+checks, and malformed-input rejection in Studio and firmware. Firmware
+validation is reader-backed and retains no payload-sized buffer or max-sized
+native row/step arrays. It does not yet translate source expressions into the
+wire model, materialize semantic wire actions for the key runtime, publish an
+effective provider, validate whole-profile references/action-ABI identity, or
+perform any device write.
+
 ## Objective
 
 Make supported key_behaviors rows live-editable, persistent, split-safe, and
@@ -97,6 +107,8 @@ state merely to make a profile apply appear fast.
 
 ## Deliverables
 
+- [x] Desktop canonical key-behavior payload codec and golden vector
+- [x] Matching reader-backed firmware codec and cross-language fixture
 - [ ] Effective behavior provider
 - [ ] Compact bounded index
 - [ ] Complete Milestone A row validation
@@ -107,6 +119,25 @@ state merely to make a profile apply appear fast.
 - [ ] Semantic diff, push, pull, and reset
 - [ ] Regression gate against direct array reads
 - [ ] Updated docs, Studio UI, stage, risks, and progress
+
+Early codec evidence:
+
+- `users/noah/lib/profile/schema/key_behavior_domain_v1.c` encodes canonical
+  row/step order and validates from a bounded reader at arbitrary base offsets;
+- the validated domain handle is statically bounded to 128 bytes and individual
+  reads to 12 bytes, with accessors that re-resolve row identity instead of
+  trusting caller-supplied offsets;
+- `tests/fixtures/key_behavior_domain_v1.fixture` is consumed directly by C
+  and JavaScript;
+- `tests/host/run_key_behavior_domain_v1_tests.sh` runs normal and ASan/UBSan
+  coverage for the exact vector, every frozen capacity, malformed records, and
+  reader failure at every read boundary.
+
+The remaining materialization seam is deliberate: wire actions are validated
+as stable `{kind, operand}` values, but no code yet converts them into a
+generation-owned runtime action/handled-key view. That conversion must first
+validate the connected action-ABI digest and whole-profile layer, PD-mode, and
+macro references, then publish only at the Stage 02 safe activation boundary.
 
 ## Verification
 

@@ -342,6 +342,7 @@ static void test_eeprom_reset_invalidates_rgb_and_reseeds_on_scan(void) {
 
     CHECK(!via_command_kb(cmd, (uint8_t)sizeof(cmd)));
     CHECK(rgb_invalidate_count == 0u);
+    CHECK(split_mirror_count == 0u);
     CHECK(split_sync_pending_count == 1u);
     CHECK(dynamic_keymap_set_buffer_calls == 0);
 
@@ -349,6 +350,17 @@ static void test_eeprom_reset_invalidates_rgb_and_reseeds_on_scan(void) {
 
     CHECK(dynamic_keymap_set_buffer_calls > 0);
     CHECK(rgb_invalidate_count == 1u);
+}
+
+static void test_layout_options_reconciles_without_claiming_write_through(void) {
+    uint8_t cmd[] = {id_set_keyboard_value, id_layout_options, 0, 0, 0, 1};
+
+    test_reset_state();
+
+    CHECK(!via_command_kb(cmd, (uint8_t)sizeof(cmd)));
+    CHECK(split_mirror_count == 0u);
+    CHECK(split_sync_pending_count == 1u);
+    CHECK(split_sync_pending_effects == NOAH_QMK_VIA_COMMAND_EFFECT_INVALIDATE_RGB);
 }
 
 static void test_provider_encode_write_uses_cached_load_state(void) {
@@ -417,6 +429,7 @@ int main(void) {
     test_keymap_write_mirrors_immediately_and_still_reconciles();
     test_non_mutating_command_is_not_mirrored();
     test_eeprom_reset_invalidates_rgb_and_reseeds_on_scan();
+    test_layout_options_reconciles_without_claiming_write_through();
     test_provider_encode_write_uses_cached_load_state();
     test_provider_encode_write_reloads_after_invalidate();
 

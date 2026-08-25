@@ -104,6 +104,32 @@ Repo-specific guardrails:
 - Always include next steps.
 - If the intended structure or tradeoffs changed, update `userspace-architecture-review.md` in the same pass.
 
+## RP2040 Resource Truth
+
+- Read `docs/architecture/memory-budgets.md` before interpreting or reporting
+  firmware RAM, allocator, EEPROM-cache, or stack values.
+- Report resources per keyboard half. Each half has its own RP2040 and its own
+  270,336 bytes of physical SRAM: 262,144 bytes in SRAM0–3 plus 4,096 bytes
+  each in SRAM4 and SRAM5. The overlapping `ram7` boot window is part of SRAM5,
+  not extra memory.
+- Treat the `.data + .bss` threshold and the BSS threshold as regression
+  policies, not physical-RAM limits. Never describe their remaining policy
+  margin as total RAM headroom.
+- Describe `__heap_end__ - __heap_base__` as the SRAM0–3 linker/core-memory
+  span at boot. It backs the ChibiOS core allocator and linked newlib
+  allocation path; it is not guaranteed unused memory or a runtime high-water
+  measurement.
+- Keep reviewed-path stack policy margin separate from the physical stack
+  boundary. A stack-gate PASS covers the named manifest paths only and does not
+  prove a global or interrupt-stack maximum.
+- Do not add GNU `size`'s aggregate BSS number to separately reported `.data`,
+  `.bss`, core-memory-span, or stack figures; the aggregate includes NOLOAD
+  reservations.
+- Any claim that a RAM representation is required or impossible must name the
+  physical/linker bank, fresh linked accounting, the applicable policy, and
+  runtime high-water evidence. Preserve conservative designs when useful, but
+  do not justify them with policy values presented as hardware capacity.
+
 ## Active Review Thread
 
 - For one architecture/refactor thread, keep one active review folder until the thread is closed.

@@ -26,6 +26,14 @@ least-reviewed code in the tree and three of them touch seams the previous
 review had just finished hardening: the split base packet, the VIA
 reconciliation state machine, and VIA write-through.
 
+## Reconciliation Note — 2026-08-25
+
+The finding descriptions below record the tree at the original `bcd9b187`
+audit. Findings 1 and 4 have since been remediated and mechanically covered;
+their resolution records are appended to those findings so the audit-time
+evidence and the current tree remain distinguishable. Review 19 remains open
+for findings 2, 3, and 5–7 and its optional items.
+
 ## Must Fix
 
 ### 1. The split mirror's payload-length guard wraps and lets an over-long VIA buffer write read off the end of the RPC buffer
@@ -71,6 +79,27 @@ it is our code, it has an explicit guard, and the guard does not work.
 
 Fix: compare in a type that cannot wrap, e.g.
 `if ((uint16_t)length < (uint16_t)4u + (uint16_t)size) return;`, in both cases.
+
+#### Resolution — 2026-08-25
+
+**Status: resolved.** Both guards now compare the received length and declared
+payload size in `uint16_t` before either write sink is called
+(`users/noah/lib/compat/qmk_via_split_mirror.c`). The dedicated
+`qmk_via_split_mirror_test.c` reaches the production file's actual static RPC
+receiver through its registered transaction callback. It proves the exact
+28-byte payload boundary is accepted, the next size is rejected, and declared
+sizes 252–255 are rejected for both dynamic-keymap and macro-buffer commands
+without invoking either sink or changing storage state. The same test is built
+and run under AddressSanitizer and UndefinedBehaviorSanitizer by
+`run_qmk_via_split_mirror_tests.sh`, and that runner is part of
+`run_all_host_tests.sh`.
+
+Verification passed: `sh tests/host/run_qmk_via_split_mirror_tests.sh`,
+`sh tests/host/run_qmk_via_split_sync_tests.sh`,
+`sh tests/host/run_qmk_contract_checks.sh`,
+`sh tests/host/run_feature_gate_compile_tests.sh`,
+`sh tests/host/run_all_host_tests.sh`, and
+`qmk compile -kb bastardkb/charybdis/4x6 -km noah`.
 
 ## Should Fix
 
@@ -184,6 +213,33 @@ Two switches over the same command-id domain with no mechanical link is exactly
 the coupling this codebase keeps getting bitten by. Either handle both commands
 in the mirror, or stop setting `SPLIT_MIRROR` for commands the mirror does not
 implement, and add a gate that keeps the two lists in agreement.
+
+#### Resolution — 2026-08-25
+
+**Status: resolved.** Layout-options writes and `id_eeprom_reset` remain real
+classified mutations, but no longer advertise `SPLIT_MIRROR`; their propagation
+is owned by durable reconciliation. `via_command_kb()` now notes every
+classified mutation for reconciliation independently of whether the optional
+write-through bit is present, while only commands carrying that bit enter the
+mirror transport.
+
+The production classifier and production receiver are now compiled into the
+same `qmk_via_split_mirror_test.c` binary. Its contract case enumerates all 256
+command IDs with encoder support enabled, supplies the classifier's valid
+layout-options shape, and requires every classified command carrying
+`SPLIT_MIRROR` to be accepted by the actual registered receiver and restart its
+storage digest. Dedicated assertions prove layout options and EEPROM reset are
+durable-only. The runner executes this gate normally and under ASan/UBSan
+alongside Finding 1's sizes-252–255 regression.
+
+Verification passed: `sh tests/host/run_qmk_via_split_mirror_tests.sh`,
+`sh tests/host/run_qmk_via_command_classifier_tests.sh`,
+`sh tests/host/run_via_macro_defaults_tests.sh`,
+`sh tests/host/run_qmk_via_split_sync_tests.sh`,
+`sh tests/host/run_qmk_contract_checks.sh`,
+`sh tests/host/run_feature_gate_compile_tests.sh`,
+`sh tests/host/run_all_host_tests.sh`, and
+`qmk compile -kb bastardkb/charybdis/4x6 -km noah`.
 
 ### 5. `key_runtime_core_resolve_pending_multi_tap_release()` copies an indeterminate value into its resolution
 
@@ -312,8 +368,9 @@ checked this pass and are correct.
 - **`bcd9b187`'s mirror does not weaken the reconciliation layer.** It runs on
   its own transaction ID, its receiver restarts the local digest so the durable
   layer cannot advertise stale content (`qmk_via_split_mirror.c:93`), and
-  `via_command_kb()` still notes the mutation afterwards. Finding 1 is a bug
-  inside the mirror, not an objection to the design.
+  `via_command_kb()` still notes the mutation afterwards. Finding 1 was a bug
+  inside the mirror, not an objection to the design, and is now resolved by the
+  widened guards and production-receiver sanitizer test recorded above.
 - **Held-action lease adoption across token replacement is correct.**
   `key_runtime_core_press_token_begin()` allocates the new token id *before*
   cancelling the old one (`reducer/runtime.c:474` then `:486`), so the old id is
@@ -358,13 +415,13 @@ left open.
 | --- | --- | --- |
 | 18-1 — Held-action leases orphaned by token replacement | resolved | Allocation-before-cancel ordering plus `key_runtime_core_adopt_runtime_owned_state_leases()` re-owns exactly the skipped kinds; re-traced this pass. |
 | 18-2 — No renegotiation on peer session loss | resolved, refined | `474651bc` added the escape, `3172e22f` bounded it at three rejections. Both directions verified against the receiver's `SNAPSHOT_REQUIRED` sources. |
-| 18-3 — Out-of-range VIA buffer writes classified as non-mutations | resolved, but see finding 1 | The classifier change is correct. It also makes finding 1's frame reach the mirror, which is why that guard now matters. |
+| 18-3 — Out-of-range VIA buffer writes classified as non-mutations | resolved | The classifier change is correct. The newly reachable mirror edge is now bounded by widened guards and exercised through the real receiver for sizes 252–255 under ASan/UBSan. |
 | 18-4 — Coherent-read helpers did not stage | resolved | Staging buffers in all three helpers; contract and code agree. |
 | 18-9 / 18-10 / 18-11 — dead public surface, pulse keypos, RGB split derivation | resolved | Confirmed absent / derived in this tree. |
 | 18-optional — unguarded dragscroll divisor | open | Now finding 7. |
 | 18-optional — write-only split base-domain state and `base_generation` | open | Now finding 3, with the contract angle added. |
 | 18-optional — display state in the key-runtime core | open | Now the fourth optional item, with the caller-side ordering concern added. |
-| 18-hardware — Finding 05 persistence/role-swap matrix, Finding 10 arrow feel matrix | open | Still hardware-only. Finding 1 should land before the persistence matrix is run, since that matrix exercises the mirror path. |
+| 18-hardware — Finding 05 persistence/role-swap matrix, Finding 10 arrow feel matrix | open | Still hardware-only. The Finding 1 software prerequisite for the persistence matrix is resolved; the matrix itself has not been run. |
 
 ## Current Architecture Assessment
 
@@ -387,12 +444,14 @@ The pattern in this review's findings is narrower than Review 18's "gates that
 prove less than their name". It is **guards and contracts that are one type,
 one call site, or one switch case short of what they claim**:
 
-- a length guard that wraps in `uint8_t` (finding 1)
+- an audit-time length guard that wrapped in `uint8_t` (finding 1, resolved
+  2026-08-25)
 - a clock read that is correct for the case it was written for and unbounded
   outside it (finding 2)
 - a documented reader contract with no reader for one of its four domains
   (finding 3)
-- an effect flag whose consumer has no case for two of its commands (finding 4)
+- an audit-time effect flag whose consumer had no case for two of its commands
+  (finding 4, resolved 2026-08-25)
 - an initializer present at one call site and missing at its twin (finding 5)
 
 None of these is an architectural problem. All five are the kind of defect that
@@ -408,18 +467,19 @@ decision, not a patch.
 
 ## Recommended Next Refactor Sequence
 
-1. **Finding 1** — widen both mirror length guards. One line each, and it should
-   land before the Review 18 Finding 05 hardware matrix, which exercises this
-   path.
+1. **Finding 1 — resolved 2026-08-25.** Both mirror length guards are widened,
+   and the actual receiver is covered at the malformed-size boundary under
+   ASan/UBSan. This software prerequisite now lands before the Review 18
+   Finding 05 hardware matrix as required.
 2. **Finding 5** — initialize `action_feedback_kind` to match its twin. One line.
 3. **Finding 2** — regate the published auto-mouse elapsed on the auto-mouse
    layer rather than on `is_auto_mouse_active()`, and extend the existing
    `split_runtime_sync_test` case to require that an idle board with the layer
    off publishes zero progress across a timer wrap.
-4. **Finding 4** — decide whether the mirror handles `id_set_keyboard_value` and
-   `id_eeprom_reset` or stops advertising `SPLIT_MIRROR` for them, then add a
-   gate that keeps `noah_qmk_via_command_effects()` and the mirror's switch in
-   agreement.
+4. **Finding 4 — resolved 2026-08-25.** Layout options and EEPROM reset are
+   durable-sync-only, reconciliation is notified independently of write-through,
+   and an exhaustive production classifier/receiver gate prevents an
+   unsupported command from advertising `SPLIT_MIRROR`.
 5. **Finding 3 together with Review 18's write-only base-domain cleanup** — one
    decision: either add `split_runtime_sync_remote_read_base()` and route
    `rgb_automouse.c` and `rgb_preview_stage.c` through it, or drop

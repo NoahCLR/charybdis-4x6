@@ -65,7 +65,7 @@ checks before handoff when source/build behavior changed.
 | Shared runtime or tracing | `run_runtime_init_order_tests.sh`, `run_runtime_debug_tests.sh`, `run_runtime_diag_tests.sh`, `run_runtime_trace_tests.sh` |
 | Source manifests or boundaries | `run_feature_gate_compile_tests.sh` |
 | Target stack topology or budget | `run_firmware_stack_budget_tool_tests.sh`; after a fresh instrumented target build, `run_firmware_stack_budget_checks.sh` |
-| Target macro/static RAM budget | `run_firmware_memory_budget_tool_tests.sh`; after a fresh ordinary target build, `run_firmware_memory_budget_checks.sh` |
+| Target macro or RP2040 SRAM-bank policy | Read [memory-budgets.md](./memory-budgets.md); run `run_firmware_memory_budget_tool_tests.sh`; after a fresh ordinary target build, run `run_firmware_memory_budget_checks.sh`; keep physical capacity, linked occupancy, policy margin, and runtime high-water distinct |
 
 For docs-only changes, run `git diff --check` and a stale-path audit. Host tests
 and firmware compile can be skipped when no runtime source, authored input,

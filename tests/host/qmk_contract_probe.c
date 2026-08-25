@@ -13,6 +13,8 @@
 #    include "process_keycode/process_combo.h"
 #endif
 
+#include "via.h"
+
 _Static_assert(offsetof(keyrecord_t, event) == 0, "keyrecord_t.event must remain the first field");
 
 static void qmk_contract_field_smoke(void) {
@@ -76,6 +78,8 @@ int main(void) {
     printf("SS_DOWN_CODE=%u\n", (unsigned)SS_DOWN_CODE);
     printf("SS_UP_CODE=%u\n", (unsigned)SS_UP_CODE);
     printf("SS_DELAY_CODE=%u\n", (unsigned)SS_DELAY_CODE);
+    printf("VIA_ID_CUSTOM_GET_VALUE=0x%02X\n", (unsigned)id_custom_get_value);
+    printf("VIA_ID_CUSTOM_CHANNEL=0x%02X\n", (unsigned)id_custom_channel);
 
     return 0;
 }

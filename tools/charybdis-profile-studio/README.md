@@ -9,6 +9,16 @@ The Studio does not create a separate profile format. The C files stay the
 source of truth, and every apply action patches those authored source blocks
 directly.
 
+The header also has a read-only `Live keyboard` row. `Find keyboards` scans
+for the Charybdis Raw HID interface, `Connect` opens the selected interface and
+reads Profile Wire capabilities and status, and `Refresh` repeats those reads.
+The live panel reports protocol/schema compatibility, whether the current
+source profile fits the keyboard's advertised capacities, device generations
+and digests, and transport diagnostics. This Stage 01 connection does not
+preview, deploy, save, or otherwise mutate a live profile. Existing Apply
+buttons still mean source-only edits followed by the normal firmware build and
+flash workflow.
+
 ## What It Edits
 
 Profile Studio reads and writes the selected Charybdis 4x6 profile under
@@ -191,6 +201,48 @@ code --extensionDevelopmentPath="$PWD/tools/charybdis-profile-studio" "$PWD"
 
 Then run `Charybdis: Open Profile Studio` from the command palette in the
 Extension Development Host window.
+
+## Live Link Transport Development
+
+The hardware-independent transport boundary for future live profile editing
+lives under [`live-link/`](live-link/). It defines an injected device adapter,
+a serialized request coordinator, a fake adapter, a lazy-loaded `node-hid`
+3.x desktop adapter, the Profile Wire V1 read codec, and the host-side service
+used by the Studio's read-only live connection controls. It also contains the
+canonical whole-profile codec and a desktop-only RGB domain v1 codec that can
+turn the complete parsed RGB model into deterministic Profile Wire bytes.
+
+The RGB codec validates compiled-stage inclusion, complete layer/PD/tap-color
+surfaces, brightness and geometry ceilings, and every selector/group
+reference. It is schema groundwork only: the extension has no RGB preview,
+candidate upload, commit, or other device-write path yet. See
+[`live-link/rgb-domain-v1.md`](live-link/rgb-domain-v1.md) for the exact
+payload contract and intentional deferrals.
+
+The desktop adapter enumerates only the Charybdis QMK Raw HID interface (VID
+`0xA8F8`, PID `0x1833`, usage page `0xFF60`, usage `0x61`). It adds the native
+report-id byte on writes and removes it when present on reads, while keeping the
+transport contract at exact 32-byte protocol frames.
+
+To check whether a matching interface is visible without opening or writing to
+the keyboard, run:
+
+```sh
+npm run probe:live-link
+npm run probe:live-link -- --json
+```
+
+Run its Node built-in test suite with:
+
+```sh
+npm run test:live-link
+```
+
+The coordinator accepts only exact 32-byte reports. It permits one outstanding
+request per connected device and invalidates a session after an in-flight
+timeout or cancellation so a late response cannot be mistaken for a later
+request. See [`live-link/README.md`](live-link/README.md) for the adapter and
+error-code and native-adapter contracts.
 
 ## Checks
 

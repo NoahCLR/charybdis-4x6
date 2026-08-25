@@ -6,6 +6,19 @@
 NOAH_COMMON_SOURCES := \
     runtime_init.c \
     hooks.c \
+    lib/profile/protocol/profile_candidate_v1.c \
+    lib/profile/schema/profile_blob_v1.c \
+    lib/profile/schema/profile_reader.c \
+    lib/profile/schema/key_behavior_domain_v1.c \
+    lib/profile/schema/profile_rgb_v1.c \
+    lib/profile/storage/profile_storage_layout.c \
+    lib/profile/storage/profile_checksum.c \
+    lib/profile/storage/profile_store.c \
+    lib/profile/storage/profile_store_runtime.c \
+    lib/profile/storage/profile_candidate_transaction.c \
+    lib/profile/protocol/profile_wire_v1.c \
+    lib/compat/qmk_profile_eeprom.c \
+    lib/compat/qmk_via_profile_channel.c \
     lib/compat/qmk_contract.c \
     lib/compat/qmk_mod_contract.c \
     lib/compat/qmk_via_contract.c \

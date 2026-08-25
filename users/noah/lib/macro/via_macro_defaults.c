@@ -227,11 +227,13 @@ bool via_command_kb(uint8_t *data, uint8_t length) {
         via_macro_seed_last_succeeded = false;
     }
     if (effects & NOAH_QMK_VIA_COMMAND_EFFECT_SPLIT_MIRROR) {
-        // Write-through first so the other half is in step immediately, then
-        // note the mutation so the durable layer still owns recovery.
+        // Write-through first so the other half is in step immediately.
         noah_qmk_via_split_mirror_command(data, length);
-        noah_qmk_via_split_sync_note_mutation(effects);
     }
+    // Durable reconciliation owns every classified storage mutation, including
+    // commands such as layout-options and EEPROM reset that are intentionally
+    // outside the write-through transport's command set.
+    noah_qmk_via_split_sync_note_mutation(effects);
 
     return false;
 }

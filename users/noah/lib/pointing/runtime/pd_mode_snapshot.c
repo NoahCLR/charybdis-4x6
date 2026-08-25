@@ -29,7 +29,8 @@ static uint8_t pd_mode_snapshot_mode_index(pd_mode_mask_t mode) {
 
 // Filled through a pointer rather than returned by value: this runs on the
 // bounded main-loop scan path, where a returned view costs an extra struct
-// temporary and its copy on a reviewed stack path with little headroom.
+// temporary and its copy from the deliberately retained reviewed-path policy
+// reserve. That policy margin is distinct from the physical stack boundary.
 static void pd_mode_snapshot_fill_view(pd_mode_snapshot_view_t *view, pd_mode_mask_t active_mode, pd_mode_mask_t locked_mode, split_side_mask_t owner_sides) {
     view->active_mode   = active_mode;
     view->locked_mode   = locked_mode;

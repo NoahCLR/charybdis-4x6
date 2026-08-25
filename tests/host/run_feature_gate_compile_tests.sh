@@ -14,6 +14,7 @@ POINTING_SOURCES="$(noah_source_manifest_userspace_paths "$ROOT" NOAH_POINTING_S
 RGB_SOURCES="$(noah_source_manifest_raw_paths "$ROOT" NOAH_RGB_KEYMAP_SOURCES)"
 AUTOMOUSE_SOURCES="$(noah_source_manifest_userspace_paths "$ROOT" NOAH_AUTOMOUSE_SOURCES)"
 PROFILE_KEYMAP_PATHS="$(charybdis_profile_keymap_paths "$ROOT")"
+PROFILE_WIRE_COMPILE_SOURCES="users/noah/lib/profile/storage/profile_store_runtime.c users/noah/lib/profile/storage/profile_candidate_transaction.c users/noah/lib/profile/protocol/profile_wire_v1.c users/noah/lib/profile/protocol/profile_candidate_v1.c users/noah/lib/compat/qmk_profile_eeprom.c users/noah/lib/compat/qmk_via_profile_channel.c"
 
 POINTING_TEST_FLAGS="-DPOINTING_DEVICE_ENABLE"
 RGB_TEST_FLAGS="-DRGB_MATRIX_ENABLE -DRGB_MATRIX_WS2812"
@@ -313,6 +314,14 @@ compile_variant "tests/host/include/noah_compile_config_no_automouse.h" "$POINTI
 compile_variant "tests/host/include/noah_compile_config_no_automouse.h" "$POINTING_TEST_FLAGS $RGB_TEST_FLAGS" "$COMMON_SOURCES $POINTING_SOURCES $RGB_SOURCES"
 compile_variant "tests/host/include/noah_compile_config_no_automouse.h" "-DSPLIT_KEYBOARD $POINTING_TEST_FLAGS $RGB_TEST_FLAGS" "$COMMON_SOURCES $POINTING_SOURCES $RGB_SOURCES"
 compile_variant "tests/host/include/noah_compile_config.h" "-DSPLIT_KEYBOARD $POINTING_TEST_FLAGS $RGB_TEST_FLAGS" "$COMMON_SOURCES $POINTING_SOURCES $RGB_SOURCES $AUTOMOUSE_SOURCES"
+
+# The normal matrix above proves the VIA-off source-manifest path. These named
+# variants make the live-profile VIA hook's real preprocessor body part of the
+# compile gate across RGB and split feature combinations.
+compile_variant "tests/host/include/noah_compile_config.h" "-DVIA_ENABLE" "$PROFILE_WIRE_COMPILE_SOURCES"
+compile_variant "tests/host/include/noah_compile_config.h" "-DVIA_ENABLE $RGB_TEST_FLAGS" "$PROFILE_WIRE_COMPILE_SOURCES"
+compile_variant "tests/host/include/noah_compile_config.h" "-DVIA_ENABLE -DSPLIT_KEYBOARD" "$PROFILE_WIRE_COMPILE_SOURCES"
+compile_variant "tests/host/include/noah_compile_config.h" "-DVIA_ENABLE -DSPLIT_KEYBOARD $RGB_TEST_FLAGS" "$PROFILE_WIRE_COMPILE_SOURCES"
 
 check_header_boundaries
 check_profile_build_validation_gate

@@ -18,6 +18,8 @@ This directory explains how the runtime is shaped and where changes belong.
   to change and need the edit point plus checks.
 - Use [runtime-flow.md](./runtime-flow.md) when a bug crosses press/release,
   scan, RGB, pointing-device, split, or macro boundaries.
+- Use [memory-budgets.md](./memory-budgets.md) before interpreting target RAM,
+  allocator, EEPROM-cache, or stack numbers.
 
 The source trace covers:
 
@@ -95,6 +97,7 @@ flowchart TD
 | Change split mirroring | `users/noah/lib/split/runtime_sync.*` | [runtime-flow.md](./runtime-flow.md) |
 | Change hardcoded or VIA macro behavior | `keymap.c` macro tables or `users/noah/lib/macro/` | [change-guide.md](./change-guide.md) |
 | Change hook wiring | `users/noah/hooks.c`, `users/noah/runtime_init.c` | [Hook Overrides](../HOOK_OVERRIDES.md) |
+| Change target memory, EEPROM size, or stack policy | resource owner plus the matching budget tool | [memory-budgets.md](./memory-budgets.md), [change-guide.md](./change-guide.md) |
 
 ## Documents In This Pack
 
@@ -105,6 +108,8 @@ flowchart TD
   responsibilities, mutation ownership, side effects, tests, and existing docs.
 - [change-guide.md](./change-guide.md) tells future maintainers and agents where
   to make common changes and which checks to run.
+- [memory-budgets.md](./memory-budgets.md) separates RP2040 physical banks,
+  linked occupancy, regression policies, and runtime high-water evidence.
 
 ## Architecture Rules
 

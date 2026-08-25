@@ -4,6 +4,12 @@ Thread: full-tree architecture and correctness review of `users/noah/` and the
 authored profile at `bcd9b187`. Findings live in
 `userspace-architecture-review.md` in this folder.
 
+## Reconciliation Note — 2026-08-25
+
+The original sections through `Next Steps` are the audit-time snapshot at
+`bcd9b187`. Remediation history is appended below rather than rewriting that
+baseline. Findings 1 and 4 are now resolved; Review 19 as a whole remains open.
+
 ## Why This Folder Instead of Review 18
 
 `review/2026-08-16-review-01` records a closure verdict ("The audit is
@@ -111,3 +117,130 @@ is run, because that matrix exercises the mirror path the defect lives on.
    the three unguarded diagnostic counters in `reducer/runtime.c`.
 8. Only after the above, run the two outstanding hardware matrices carried over
    from Review 18 (Finding 05 persistence/role-swap, Finding 10 arrow feel).
+
+## 2026-08-25 — Finding 1 Remediation
+
+### Completed Work
+
+- Widened both payload-length comparisons in
+  `users/noah/lib/compat/qmk_via_split_mirror.c` so `4 + size` cannot wrap at
+  declared sizes 252–255.
+- Added `tests/host/qmk_via_split_mirror_test.c`, which registers the production
+  receiver and invokes the captured RPC callback rather than duplicating its
+  switch or guard. It covers both dynamic-keymap and macro-buffer commands,
+  accepts the exact 28-byte payload boundary, rejects the next size, and rejects
+  every declared size from 252 through 255 without a sink call, storage-state
+  change, or touched sink buffer.
+- Added `tests/host/run_qmk_via_split_mirror_tests.sh`, with both a normal build
+  and an AddressSanitizer/UndefinedBehaviorSanitizer build, and wired it into
+  `tests/host/run_all_host_tests.sh`.
+- Added the mirror transaction identifier to the host transaction stub so the
+  production compatibility module is compiled unchanged by the test.
+
+### Finding Status
+
+| Finding | Status | Evidence |
+| --- | --- | --- |
+| 19-1 — split-mirror payload-length wrap | resolved | Widened production guards; actual registered receiver exercised for both commands and sizes 252–255 under ASan/UBSan; targeted, contract, compile-gate, full-host, and firmware-build checks pass. |
+| 19-2, 19-3, and 19-5 through 19-7 and optional items | open | Not changed by this bounded remediation. |
+| 19-4 — unsupported commands advertised as mirrored | resolved later | See the subsequent 2026-08-25 Finding 4 remediation record. |
+| Review 18 Finding 05 hardware matrix | open | Its Finding 1 software prerequisite is resolved, but the hardware persistence/role-swap matrix was not run. |
+
+### Verification
+
+- `sh tests/host/run_qmk_via_split_mirror_tests.sh` — exit 0; normal and
+  ASan/UBSan variants each reported `qmk via split mirror tests passed`
+- `sh tests/host/run_qmk_via_split_sync_tests.sh` — exit 0; all three variants
+  passed
+- `sh tests/host/run_qmk_contract_checks.sh` — exit 0
+- `sh tests/host/run_feature_gate_compile_tests.sh` — exit 0
+- `sh tests/host/run_all_host_tests.sh` — exit 0, including the new normal and
+  sanitized receiver tests
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah` — exit 0; linked and UF2
+  emitted
+- `git diff --check` — exit 0
+
+Not confirmed on hardware. No sibling QMK source was changed.
+
+### Current Verdict
+
+Finding 1 meets the closure bar: current code matches the intended guard,
+mechanical coverage exercises the actual receiver under sanitizers, the full
+host suite passes, the firmware builds, and this review record matches the
+tree. This does **not** close Review 19; Finding 4 was resolved in the later
+record below, while the other findings and optional items retain their prior
+status.
+
+### Next Steps
+
+Finding 4 was handled in the next bounded remediation below. The Review 18
+Finding 05 hardware persistence/role-swap matrix can now be run without the
+split-mirror guard defect as an outstanding software prerequisite.
+
+## 2026-08-25 — Finding 4 Remediation
+
+### Ownership Decision
+
+Layout-options writes and EEPROM reset are durable-reconciliation commands, not
+write-through commands. Layout options already live in the reconciled
+`VIA_CONFIG` region, while EEPROM reset spans storage beyond the mirror's narrow
+command transport. Both remain classified mutations with their local cache and
+reseed effects, but neither carries `SPLIT_MIRROR`.
+
+### Completed Work
+
+- Removed `SPLIT_MIRROR` from the layout-options and EEPROM-reset classifications
+  in `users/noah/lib/compat/qmk_via_contract.c`.
+- Separated durable mutation notification from optional immediate mirroring in
+  `users/noah/lib/macro/via_macro_defaults.c`. Every classified mutation now
+  reaches `noah_qmk_via_split_sync_note_mutation()`; only supported commands
+  enter `noah_qmk_via_split_mirror_command()`.
+- Extended `tests/host/qmk_via_split_mirror_test.c` and its runner to compile the
+  production classifier and production receiver together. The gate enumerates
+  all 256 command IDs with encoder support enabled and requires every classified
+  `SPLIT_MIRROR` command to be accepted by the registered receiver and restart
+  its digest.
+- Added classifier and VIA-hook assertions that layout options and EEPROM reset
+  are not mirrored but still schedule durable reconciliation.
+- Preserved Finding 1's exact-boundary and sizes-252–255 checks in both the
+  normal and ASan/UBSan variants.
+
+### Finding Status
+
+| Finding | Status | Evidence |
+| --- | --- | --- |
+| 19-1 — split-mirror payload-length wrap | resolved | Existing widened guards and sanitizer-backed production receiver regression remain green. |
+| 19-4 — unsupported commands advertised as mirrored | resolved | Unsupported commands are durable-only; exhaustive production classifier/receiver gate enforces the mirror capability claim. |
+| 19-2, 19-3, and 19-5 through 19-7 and optional items | open | Not changed by this bounded remediation. |
+| Review 18 hardware matrices | open | Not run in this pass. |
+
+### Verification
+
+- `sh tests/host/run_qmk_via_split_mirror_tests.sh` — exit 0; production
+  classifier/receiver contract plus Finding 1 regression passed normally and
+  under ASan/UBSan
+- `sh tests/host/run_qmk_via_command_classifier_tests.sh` — exit 0
+- `sh tests/host/run_via_macro_defaults_tests.sh` — exit 0
+- `sh tests/host/run_qmk_via_split_sync_tests.sh` — exit 0; all three variants
+  passed
+- `sh tests/host/run_qmk_contract_checks.sh` — exit 0
+- `sh tests/host/run_feature_gate_compile_tests.sh` — exit 0
+- `sh tests/host/run_all_host_tests.sh` — exit 0
+- `qmk compile -kb bastardkb/charybdis/4x6 -km noah` — exit 0; linked and UF2
+  emitted
+- `git diff --check` — exit 0
+
+Not confirmed on hardware. No sibling QMK source was changed.
+
+### Current Verdict
+
+Finding 4 meets the closure bar: the ownership decision is explicit, the
+production classifier/receiver relationship is mechanically enforced, the
+durable-only path is covered through `via_command_kb()`, the full host suite
+passes, and the firmware builds. Review 19 remains open for Findings 2, 3, and
+5–7 and its optional items.
+
+### Next Steps
+
+Continue with Finding 5, then Findings 2 and 3 in the recorded sequence before
+the remaining optional cleanup and hardware matrices.

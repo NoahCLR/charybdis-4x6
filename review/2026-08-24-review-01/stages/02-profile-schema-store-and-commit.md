@@ -2,6 +2,23 @@
 
 Status: blocked on Stage 01
 
+Implementation note: two isolated foundations landed early. The storage
+package freezes the 32-byte header, checksum helpers, read-only boot discovery,
+bounded inactive-slot writes, readback validation, and final-marker commit. A
+read-only, slot-bounded QMK adapter and one-shot matrix-scan boot owner now make
+discovery reachable on firmware and expose committed metadata through status;
+they do not activate the discovered payload or expose a write callback.
+The generic schema package implements the canonical `NLP1` blob/domain
+envelopes and four-byte semantic actions in firmware and Studio against one
+shared exact-byte fixture. The key-behavior and RGB packages now implement
+matching desktop and reader-backed firmware payload codecs against shared
+exact-byte fixtures. A standalone exact candidate-frame codec and scan-owned transaction
+coordinator now cover begin/chunk/validate/abort and operation status, but are
+intentionally not routed through QMK or advertised. These packages still do
+not provide the full cross-reference/action-ABI validator, commit, runtime
+activation, reset, or split reconciliation, so this
+stage remains blocked/incomplete.
+
 ## Objective
 
 Implement the generic firmware and desktop foundation that can transfer,
@@ -124,11 +141,20 @@ Volatile preview must not outrank durable committed state after reconnect.
 
 ## Deliverables
 
-- [ ] Firmware and desktop Profile Wire v1 codecs
-- [ ] Shared golden fixtures
-- [ ] Layered validator
-- [ ] Recoverable persistent store
-- [ ] Candidate protocol
+- [ ] Firmware and desktop Profile Wire v1 codecs (generic blob, domain
+  envelope, semantic-action, key-behavior, and RGB domain layers landed;
+  compiled-default materialization and whole-profile composition remain)
+- [ ] Shared golden fixtures (generic blob/action vector is executable in C and
+  JavaScript; representative behavior and RGB vectors are also shared;
+  compiled-profile fixtures remain)
+- [ ] Layered validator (generic structural, canonical-order, reserved-field,
+  action-capacity, behavior, and RGB wire-semantic validation landed;
+  action-ABI and cross-domain reference layers remain)
+- [ ] Recoverable persistent store (storage foundation plus read-only QMK boot
+  ownership/status landed; candidate mutation ownership, reset, activation,
+  and split integration remain)
+- [ ] Candidate protocol (exact standalone frame/status codecs and bounded
+  scan coordinator landed; QMK routing and commit remain)
 - [ ] Safe activation owner and predicate
 - [ ] Effective profile generation publication
 - [ ] Domain invalidation contract
@@ -159,6 +185,88 @@ Required targeted tests:
 - fresh memory and stack gates
 - hardware protocol, reboot, interruption, reconnect, and role-swap matrix
 - git diff --check
+
+Landed generic-codec evidence:
+
+- `tests/fixtures/profile_blob_v1.fixture` is consumed directly by the C host
+  test and the Profile Studio JavaScript test;
+- normal and ASan/UBSan tests cover every truncated prefix, unknown and
+  out-of-order domains, duplicates, trailing input, reserved flags, aggregate
+  and action capacities, all unknown action tags and nonzero action flags, and
+  a deterministic malformed corpus;
+- the userspace source manifest and feature-gate matrix compile the firmware
+  codec with VIA disabled and enabled, including split/RGB variants through the
+  existing common-source matrix.
+
+Landed behavior-codec evidence:
+
+- `tests/fixtures/key_behavior_domain_v1.fixture` is the single payload,
+  envelope, blob, and digest golden consumed by both languages;
+- the firmware decoder operates through an injected bounded reader plus
+  base/length and never requires a contiguous candidate buffer;
+- the retained validated handle is at most 128 bytes and payload-independent,
+  individual reads are at most 12 bytes, and row/step accessors resolve one
+  record at a time;
+- normal and ASan/UBSan coverage enforces ordering, uniqueness, fixed counts,
+  sparse masks, stable hold ids, repeat rules, timing widths, non-none targets
+  and branches, negotiated-lower ceilings, every truncated prefix, injected
+  read failure, and deterministic malformed input.
+
+Landed RGB-codec evidence:
+
+- `tests/fixtures/rgb_domain_v1.fixture` is the single limits, payload,
+  envelope/blob, and digest golden consumed by the firmware C and Profile
+  Studio JavaScript tests;
+- the firmware decoder retains a bounded reader-backed view rather than a
+  payload, dictionary, or renderer-table copy; a 32-bit static assertion caps
+  the view at 40 bytes;
+- decode uses one 16-byte header read and fixed record reads of at most 11
+  bytes, while record-at-a-time accessors expose every RGB table for a future
+  provider;
+- normal and ASan/UBSan coverage enforces exact lengths, capacities,
+  dictionary identity/order/uniqueness, LED geometry, selectors, references,
+  enums, brightness, stable PD ids, complete compiled surfaces, canonical
+  absent-stage data, negotiated-lower limits, every truncated prefix, and
+  injected reader failure.
+
+Landed read-only store-integration evidence:
+
+- QMK EEPROM access is restricted to `0x2000–0x3FFF` and the boot owner receives
+  a null write callback;
+- post-init only arms discovery; the first matrix scan selects the newest valid
+  committed slot once, with compiled-default fallback or explicit
+  equal-generation conflict state;
+- status can report committed identity while active state remains truthfully
+  compiled-only and every mutation/domain capability remains disabled;
+- `tests/host/run_profile_store_runtime_tests.sh` covers adapter bounds,
+  read-only ownership, one-shot scan behavior, committed discovery, and
+  conflict discovery;
+- the normal and sanitized store suite covers metadata-divergent equal
+  generations plus power loss at every write and partial-byte boundary through
+  the final commit marker;
+- target gates pass at a 48,640-byte SRAM0–3 `.data + .bss` regression metric
+  against the 51,000-byte policy, with a 213,496-byte linker/core-memory span
+  at boot and a 480-byte reviewed boot path; the existing worst reviewed
+  main/split paths remain 1,880 B and 336 B.
+
+Landed standalone candidate-coordinator evidence:
+
+- exact 32-byte begin, chunk, validate, abort, immediate-admission, and
+  operation-status layouts are frozen in `profile-wire-v1.md` and executable
+  through `tests/fixtures/profile_candidate_v1.fixture`;
+- the callback-side API only decodes and copies one bounded mailbox item, while
+  scan context owns backend begin/write/read/abort and 20-byte-budgeted
+  validation steps;
+- retries compare staged bytes: identical duplicates are accepted, conflicting
+  duplicates poison the candidate, and wrong transaction ids preserve the
+  active candidate identity;
+- normal and ASan/UBSan tests cover every short frame length, overlong frames,
+  every reserved/padding byte, gaps, partial overlaps, overflow, reset with a
+  pending or staged candidate, idempotent abort, backend failures, structured
+  validation locations, and the explicit v1 no-timeout behavior;
+- the coordinator has a compile-time 256-byte ceiling and exposes no commit or
+  activation operation. Production QMK routing and candidate capability bits
+  remain unchanged and disabled.
 
 ## Exit Criteria
 

@@ -184,12 +184,23 @@
 // ─── VIA ────────────────────────────────────────────────────────────────────
 
 #ifdef VIA_ENABLE
+// Profile Wire v1-capable firmware. Standard VIA reports this numeric value in
+// big-endian byte order while the custom Profile Wire capability page encodes
+// the same uint32 value little-endian; Studio compares the decoded values.
+#    define VIA_FIRMWARE_VERSION 0x00010000u
 #    define DYNAMIC_KEYMAP_LAYER_COUNT LAYER_COUNT
 #    define DYNAMIC_KEYMAP_MACRO_COUNT 64
 // RP2040 wear-leveling exposes half of this backing region as logical EEPROM.
-// 32768 bytes backing gives this keymap roughly 15 KB of VIA macro payload
-// space after VIA's dynamic layer storage.
+// Keep the logical EEPROM at 16 KiB. VIA owns the lower 8 KiB; the upper
+// 8 KiB is reserved as two last-known-good live-profile slots. The storage
+// layout contract validates these exact inclusive address ranges without
+// reading or writing them.
 #    if defined(MCU_RP)
 #        define WEAR_LEVELING_BACKING_SIZE 32768
 #    endif
+#    define DYNAMIC_KEYMAP_EEPROM_MAX_ADDR 0x1FFFu
+#    define NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR 0x2000u
+#    define NOAH_PROFILE_STORAGE_SLOT_A_END_ADDR 0x2FFFu
+#    define NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR 0x3000u
+#    define NOAH_PROFILE_STORAGE_SLOT_B_END_ADDR 0x3FFFu
 #endif

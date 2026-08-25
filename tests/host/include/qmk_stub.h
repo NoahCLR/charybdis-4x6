@@ -21,8 +21,12 @@ static inline uint16_t pgm_read_word(const void *addr_) {
 
 #define ARRAY_SIZE(arr_) (sizeof(arr_) / sizeof((arr_)[0]))
 
-#define MATRIX_ROWS 8
-#define MATRIX_COLS 8
+#ifndef MATRIX_ROWS
+#    define MATRIX_ROWS 8
+#endif
+#ifndef MATRIX_COLS
+#    define MATRIX_COLS 8
+#endif
 
 #ifndef QMK_STUB_SUPPRESS_LAYER_COUNT
 #    define LAYER_COUNT 8

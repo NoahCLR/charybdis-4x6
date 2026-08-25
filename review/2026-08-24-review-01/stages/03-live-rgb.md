@@ -18,6 +18,23 @@ This is the first visible end-to-end win.
 - Volatile RGB preview and rollback semantics are accepted.
 - Profile Studio fake device supports RGB candidates and status transitions.
 
+## Schema Codec Foundation
+
+Matching desktop and reader-backed firmware domain `0x10` v1 codecs landed
+early on 2026-08-25 without advancing this stage's blocked status. They freeze
+the exact Milestone A RGB payload, adapt the complete parsed Profile Studio
+RGB model, canonicalize 58-bit group bitmaps independently of C macro names,
+preserve renderer row order, and compose through the generic canonical profile
+blob. The firmware validates and exposes rows through bounded reads without a
+payload-sized RAM buffer. Exact fields, enum ids, capacities, canonical rules,
+and deferrals are documented in
+`tools/charybdis-profile-studio/live-link/rgb-domain-v1.md`.
+
+This is schema evidence, not the vertical slice: an effective RGB provider,
+preview/rollback, candidate writes, persistence, split convergence, source
+pull, and UI actions remain open. No deliverable below is checked by this
+foundation alone.
+
 ## Migration Order
 
 Migrate one table family at a time:

@@ -475,9 +475,15 @@ These values come from the keymap config and the shared userspace config. When t
 | `NOAH_DRAGSCROLL_LOCK_SUSTAIN_RATIO_DEN` | `4` | [users/noah/config.h](../users/noah/config.h) |
 | `NOAH_DRAGSCROLL_LOCK_TIMEOUT_MS` | `55` | [users/noah/config.h](../users/noah/config.h) |
 | `NOAH_DRAGSCROLL_CROSS_AXIS_DECAY_DIVISOR` | `4` | [users/noah/config.h](../users/noah/config.h) |
+| `VIA_FIRMWARE_VERSION` | `0x00010000u` | [users/noah/config.h](../users/noah/config.h) |
 | `DYNAMIC_KEYMAP_LAYER_COUNT` | `LAYER_COUNT` | [users/noah/config.h](../users/noah/config.h) |
 | `DYNAMIC_KEYMAP_MACRO_COUNT` | `64` | [users/noah/config.h](../users/noah/config.h) |
 | `WEAR_LEVELING_BACKING_SIZE` | `32768` | [users/noah/config.h](../users/noah/config.h) |
+| `DYNAMIC_KEYMAP_EEPROM_MAX_ADDR` | `0x1FFFu` | [users/noah/config.h](../users/noah/config.h) |
+| `NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR` | `0x2000u` | [users/noah/config.h](../users/noah/config.h) |
+| `NOAH_PROFILE_STORAGE_SLOT_A_END_ADDR` | `0x2FFFu` | [users/noah/config.h](../users/noah/config.h) |
+| `NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR` | `0x3000u` | [users/noah/config.h](../users/noah/config.h) |
+| `NOAH_PROFILE_STORAGE_SLOT_B_END_ADDR` | `0x3FFFu` | [users/noah/config.h](../users/noah/config.h) |
 | `TAPPING_TERM` | `200` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
 | `COMBO_TERM` | `50` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
 | `KEY_BEHAVIOR_MAX_TAP_COUNT` | `5` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |

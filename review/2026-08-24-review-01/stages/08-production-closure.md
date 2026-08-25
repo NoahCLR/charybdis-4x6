@@ -40,8 +40,11 @@ Test and document:
 Measure:
 
 - final firmware flash;
-- static RAM and linker heap;
-- main and split stack paths;
+- per-half RP2040 bank occupancy, fixed linked sections, and policy margins;
+- SRAM0–3 linker/core-memory span at boot plus allocator high-water on real
+  hardware;
+- physical interrupt/process/split stack allocations, reviewed-path policy
+  margins, and hardware stack high-water;
 - EEPROM region utilization;
 - worst-case candidate and profile sizes;
 - behavior lookup cost;

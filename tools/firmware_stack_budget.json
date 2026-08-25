@@ -68,6 +68,11 @@
           "caller": "pd_mode_axis_emit",
           "callee": "arrow_vertical_tap_code",
           "reason": "the bounded arrow Y-axis emitter invokes the Alt-masking vertical callback through dispatch"
+        },
+        {
+          "caller": "io_read",
+          "callee": "noah_qmk_profile_eeprom_read",
+          "reason": "the read-only profile store invokes the QMK EEPROM adapter through its injected storage IO callback"
         }
       ],
       "cycle_bounds": [
@@ -194,6 +199,10 @@
         {
           "name": "matrix scan VIA canonical digest read",
           "functions": ["main", "matrix_scan", "noah_qmk_via_storage_digest_step", "noah_qmk_via_storage_region_read", "nvm_dynamic_keymap_macro_read_buffer", "eeprom_read_byte", "wear_leveling_read"]
+        },
+        {
+          "name": "matrix scan live-profile boot discovery",
+          "functions": ["main", "matrix_scan", "noah_profile_store_validate_slot", "io_read", "noah_qmk_profile_eeprom_read", "wear_leveling_read"]
         },
         {
           "name": "matrix scan VIA metadata and snapshot RPC",

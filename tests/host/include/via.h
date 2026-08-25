@@ -8,6 +8,11 @@
 #endif
 
 enum {
+    id_custom_set_value                = 0x07,
+    id_custom_get_value                = 0x08,
+    id_custom_save                     = 0x09,
+    id_custom_channel                  = 0x00,
+    id_unhandled                       = 0xFF,
     id_set_keyboard_value              = 0x03,
     id_eeprom_reset                    = 0x0A,
     id_dynamic_keymap_set_keycode      = 0x05,

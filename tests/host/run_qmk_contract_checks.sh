@@ -69,6 +69,7 @@ quantum = (qmk / "quantum/quantum.c").read_text(encoding="utf-8")
 keyboard = (qmk / "quantum/keyboard.c").read_text(encoding="utf-8")
 auto_mouse = (qmk / "quantum/pointing_device/pointing_device_auto_mouse.c").read_text(encoding="utf-8")
 auto_mouse_header = (qmk / "quantum/pointing_device/pointing_device_auto_mouse.h").read_text(encoding="utf-8")
+usb_descriptor_header = (qmk / "tmk_core/protocol/usb_descriptor.h").read_text(encoding="utf-8")
 
 def body(source: str, signature: str) -> str:
     start = source.index(signature)
@@ -110,6 +111,9 @@ if "(uint16_t)(now - auto_mouse_context.timer.active)" not in elapsed_at:
 elapsed = body(auto_mouse, "uint16_t auto_mouse_get_time_elapsed(void)")
 if "auto_mouse_get_time_elapsed_at(timer_read())" not in elapsed:
     raise SystemExit("QMK auto-mouse elapsed wrapper no longer delegates through elapsed-at")
+
+if not re.search(r"^\s*#\s*define\s+RAW_EPSIZE\s+32\s*$", usb_descriptor_header, re.MULTILINE):
+    raise SystemExit("QMK Raw HID endpoint size no longer matches Profile Wire's 32-byte report contract")
 PY
 
 echo "qmk contract checks passed"

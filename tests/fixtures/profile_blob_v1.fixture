@@ -1,0 +1,24 @@
+# Shared Profile Wire v1.0 blob/action golden vectors.
+# Consumed by both the firmware C host suite and Profile Studio JavaScript.
+blob.empty.hex=4e4c503101000001
+blob.empty.fnv1a32=2051f0aa
+blob.empty.crc32=85eade89
+blob.ordered.hex=4e4c50310100020110010400deadbeef20010300000102
+blob.ordered.fnv1a32=cf2dcd54
+blob.ordered.crc32=4e023ea1
+action.NONE.operand=0
+action.NONE.hex=00000000
+action.QMK_KEYCODE.operand=4660
+action.QMK_KEYCODE.hex=01003412
+action.LAYER_MOMENTARY.operand=7
+action.LAYER_MOMENTARY.hex=02000700
+action.LAYER_LOCK.operand=3
+action.LAYER_LOCK.hex=03000300
+action.PD_MODE_MOMENTARY.operand=5
+action.PD_MODE_MOMENTARY.hex=04000500
+action.PD_MODE_LOCK.operand=1
+action.PD_MODE_LOCK.hex=05000100
+action.VIA_MACRO.operand=63
+action.VIA_MACRO.hex=06003f00
+action.HARDCODED_MACRO.operand=15
+action.HARDCODED_MACRO.hex=07000f00

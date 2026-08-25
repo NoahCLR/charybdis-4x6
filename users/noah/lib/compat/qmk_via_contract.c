@@ -73,7 +73,9 @@ uint8_t noah_qmk_via_command_effects(uint8_t command_id) {
     switch (command_id) {
 #    ifdef VIA_EEPROM_ALLOW_RESET
         case id_eeprom_reset:
-            return NOAH_QMK_VIA_COMMAND_EFFECT_INVALIDATE_RGB | NOAH_QMK_VIA_COMMAND_EFFECT_RESEED_MACROS | NOAH_QMK_VIA_COMMAND_EFFECT_SPLIT_MIRROR | NOAH_QMK_VIA_COMMAND_EFFECT_INVALIDATE_MACROS;
+            // Reset spans more storage than the write-through transport can
+            // replay. The durable reconciliation layer owns propagation.
+            return NOAH_QMK_VIA_COMMAND_EFFECT_INVALIDATE_RGB | NOAH_QMK_VIA_COMMAND_EFFECT_RESEED_MACROS | NOAH_QMK_VIA_COMMAND_EFFECT_INVALIDATE_MACROS;
 #    endif
         case id_dynamic_keymap_set_keycode:
         case id_dynamic_keymap_set_buffer:
@@ -144,7 +146,9 @@ bool noah_qmk_via_classify_mutation(const uint8_t *data, uint8_t length, uint8_t
             if (length < 6u || data[1] != id_layout_options) {
                 return false;
             }
-            *out_effects = NOAH_QMK_VIA_COMMAND_EFFECT_INVALIDATE_RGB | NOAH_QMK_VIA_COMMAND_EFFECT_SPLIT_MIRROR;
+            // Layout options are part of the reconciled VIA_CONFIG region,
+            // but the write-through receiver does not implement this command.
+            *out_effects = NOAH_QMK_VIA_COMMAND_EFFECT_INVALIDATE_RGB;
             return true;
         default:
             return false;

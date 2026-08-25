@@ -37,8 +37,8 @@ static void test_complete_mutation_table(void) {
         uint8_t length;
         uint8_t required_effects;
     } cases[] = {
-        {{id_dynamic_keymap_set_keycode, 0, 0, 0, 0, 4}, 6u, NOAH_QMK_VIA_COMMAND_EFFECT_INVALIDATE_RGB | NOAH_QMK_VIA_COMMAND_EFFECT_SPLIT_MIRROR},         {{id_dynamic_keymap_set_buffer, 0, 0, 1, 0xA5}, 5u, NOAH_QMK_VIA_COMMAND_EFFECT_INVALIDATE_RGB | NOAH_QMK_VIA_COMMAND_EFFECT_SPLIT_MIRROR}, {{id_dynamic_keymap_reset}, 1u, NOAH_QMK_VIA_COMMAND_EFFECT_INVALIDATE_RGB | NOAH_QMK_VIA_COMMAND_EFFECT_SPLIT_MIRROR}, {{id_dynamic_keymap_macro_set_buffer, 0, 0, 1, 0xA5}, 5u, NOAH_QMK_VIA_COMMAND_EFFECT_SPLIT_MIRROR | NOAH_QMK_VIA_COMMAND_EFFECT_INVALIDATE_MACROS}, {{id_dynamic_keymap_macro_reset}, 1u, NOAH_QMK_VIA_COMMAND_EFFECT_RESEED_MACROS | NOAH_QMK_VIA_COMMAND_EFFECT_SPLIT_MIRROR | NOAH_QMK_VIA_COMMAND_EFFECT_INVALIDATE_MACROS}, {{id_eeprom_reset}, 1u, NOAH_QMK_VIA_COMMAND_EFFECT_INVALIDATE_RGB | NOAH_QMK_VIA_COMMAND_EFFECT_RESEED_MACROS | NOAH_QMK_VIA_COMMAND_EFFECT_SPLIT_MIRROR | NOAH_QMK_VIA_COMMAND_EFFECT_INVALIDATE_MACROS},
-        {{id_set_keyboard_value, id_layout_options, 0, 0, 0, 1}, 6u, NOAH_QMK_VIA_COMMAND_EFFECT_INVALIDATE_RGB | NOAH_QMK_VIA_COMMAND_EFFECT_SPLIT_MIRROR},
+        {{id_dynamic_keymap_set_keycode, 0, 0, 0, 0, 4}, 6u, NOAH_QMK_VIA_COMMAND_EFFECT_INVALIDATE_RGB | NOAH_QMK_VIA_COMMAND_EFFECT_SPLIT_MIRROR},         {{id_dynamic_keymap_set_buffer, 0, 0, 1, 0xA5}, 5u, NOAH_QMK_VIA_COMMAND_EFFECT_INVALIDATE_RGB | NOAH_QMK_VIA_COMMAND_EFFECT_SPLIT_MIRROR}, {{id_dynamic_keymap_reset}, 1u, NOAH_QMK_VIA_COMMAND_EFFECT_INVALIDATE_RGB | NOAH_QMK_VIA_COMMAND_EFFECT_SPLIT_MIRROR}, {{id_dynamic_keymap_macro_set_buffer, 0, 0, 1, 0xA5}, 5u, NOAH_QMK_VIA_COMMAND_EFFECT_SPLIT_MIRROR | NOAH_QMK_VIA_COMMAND_EFFECT_INVALIDATE_MACROS}, {{id_dynamic_keymap_macro_reset}, 1u, NOAH_QMK_VIA_COMMAND_EFFECT_RESEED_MACROS | NOAH_QMK_VIA_COMMAND_EFFECT_SPLIT_MIRROR | NOAH_QMK_VIA_COMMAND_EFFECT_INVALIDATE_MACROS}, {{id_eeprom_reset}, 1u, NOAH_QMK_VIA_COMMAND_EFFECT_INVALIDATE_RGB | NOAH_QMK_VIA_COMMAND_EFFECT_RESEED_MACROS | NOAH_QMK_VIA_COMMAND_EFFECT_INVALIDATE_MACROS},
+        {{id_set_keyboard_value, id_layout_options, 0, 0, 0, 1}, 6u, NOAH_QMK_VIA_COMMAND_EFFECT_INVALIDATE_RGB},
     };
 
     for (size_t index = 0u; index < sizeof(cases) / sizeof(cases[0]); index++) {
@@ -47,6 +47,19 @@ static void test_complete_mutation_table(void) {
         CHECK(noah_qmk_via_classify_mutation(cases[index].bytes, cases[index].length, &effects));
         CHECK((effects & cases[index].required_effects) == cases[index].required_effects);
     }
+}
+
+static void test_durable_only_mutations_are_not_mirrored(void) {
+    uint8_t eeprom_reset[]  = {id_eeprom_reset};
+    uint8_t layout_option[] = {id_set_keyboard_value, id_layout_options, 0, 0, 0, 1};
+    uint8_t effects         = 0u;
+
+    CHECK(noah_qmk_via_classify_mutation(eeprom_reset, sizeof(eeprom_reset), &effects));
+    CHECK((effects & NOAH_QMK_VIA_COMMAND_EFFECT_SPLIT_MIRROR) == 0u);
+
+    effects = 0u;
+    CHECK(noah_qmk_via_classify_mutation(layout_option, sizeof(layout_option), &effects));
+    CHECK((effects & NOAH_QMK_VIA_COMMAND_EFFECT_SPLIT_MIRROR) == 0u);
 }
 
 static void test_invalid_or_read_only_shapes_are_rejected(void) {
@@ -101,6 +114,7 @@ static void test_buffer_writes_past_the_region_are_not_mutations(void) {
 
 int main(void) {
     test_complete_mutation_table();
+    test_durable_only_mutations_are_not_mirrored();
     test_invalid_or_read_only_shapes_are_rejected();
     test_partially_applied_buffer_writes_are_mutations();
     test_buffer_writes_past_the_region_are_not_mutations();

@@ -79,73 +79,145 @@ The first user-significant completion point is not layout-only live editing.
 It is the complete Milestone A definition in README.md: live, persistent,
 split-safe, source-aware RGB and key behaviors.
 
-## Open Decisions For Stage 00
+## Stage 00 Decisions
 
 ### D-009 — Persistent Storage Layout
 
-Status: open
+Status: accepted on 2026-08-25
 
-Decide:
+Reserve the upper 8 KiB of the existing 16 KiB logical EEPROM as two 4 KiB
+live-profile slots. Slot A is `0x2000–0x2FFF`; slot B is
+`0x3000–0x3FFF`. Cap standard VIA storage at `0x1FFF`, leaving 7,551 bytes for
+VIA macros after existing config and keymap regions.
 
-- custom VIA config region versus a separately reserved EEPROM region;
-- single record log versus two validatable slots;
-- exact macro-region tradeoff;
-- maximum encoded profile size;
-- power-loss commit marker and checksum layout.
+Each profile slot has a 32-byte canonical header and at most 4,064 bytes of
+payload. An inactive slot is invalidated, written, read back, checksummed, and
+committed by a final two-byte marker. The previous valid slot remains the
+last-known-good record until that marker succeeds.
 
-The decision must use measured current EEPROM and target RAM budgets.
+Do not grow logical EEPROM and do not use `VIA_EEPROM_CUSTOM_CONFIG_SIZE`.
+Exact addresses, measured budgets, and the header contract are in
+`stage-00-baseline.md`.
 
 ### D-010 — Fixed Capacity Ceilings
 
-Status: open
+Status: accepted on 2026-08-25
 
-Measure and select at least:
+Profile Wire v1 supports at most 8 logical layers, 64 behavior rows, 5 tap
+steps per behavior, 128 populated behavior steps, 32 combos with 4 keys each,
+16 reusable RGB groups, 32 aggregate RGB stage-group rows, 58 LEDs per group,
+16 hardcoded macro slots, 1,024 hardcoded macro bytes, and a 4,064-byte
+canonical payload.
 
-- maximum logical layers
-- maximum key-behavior rows
-- maximum combo rows and keys per combo
-- maximum RGB groups and LEDs per group
-- maximum persisted hardcoded macro bytes
-- maximum full candidate size
-
-The firmware reports these values through capability negotiation.
+The first firmware advertises its compiled 5 layers and 58 LEDs. The aggregate
+payload ceiling still applies when individual domain maxima would sum past one
+slot. `stage-00-baseline.md` is the canonical capacity table.
 
 ### D-011 — Split Integration Shape
 
-Status: open
+Status: accepted on 2026-08-25
 
-Choose whether the live profile becomes one new canonical region in the
-existing VIA split snapshot protocol or uses a sibling profile-specific
-reconciliation package sharing its primitives.
+Use a sibling live-profile reconciler with its own split transaction and
+generation metadata. Share or extract the existing bounded-frame, checksum,
+chunk, retry, backoff, dirty, and recovery primitives; do not add the blob to
+the current contiguous VIA region enum.
 
-The choice must keep region lists, mutation effects, digest coverage, and
-receiver handlers mechanically aligned.
+Ordinary VIA mutations must not trigger a 4 KiB profile transfer. The new
+reconciler still requires a mechanically defined descriptor table tying every
+advertised operation to size, read, write, digest, commit, invalidate, reset,
+and recovery behavior.
 
 ### D-012 — Profile Studio HID Adapter
 
-Status: open
+Status: accepted on 2026-08-25; real-board packaging evidence remains open
 
-Prototype and choose between:
+Start with `node-hid` 3.x async/N-API, lazy-loaded by a concrete adapter inside
+the local VS Code extension host. Keep an injected, mockable device-adapter
+contract and a helper-process escape hatch if the VS Code-host or packaging
+spike fails.
 
-- a maintained N-API HID dependency loaded by the VS Code extension host;
-- a small packaged native helper with a stable JSON or binary IPC boundary.
+One extension-scoped coordinator serializes requests per device, supports
+cancellation and timeouts, rejects queued work on disconnect, and treats VIA
+and Studio as contending protocol clients even when macOS permits a
+nonexclusive open. No webview module imports HID.
 
-The adapter must be mockable, cancellable, serial per device, and explicit
-about VIA/Profile Studio contention.
+This architectural choice is frozen; Stage 00 remains open until the concrete
+adapter enumerates and repeats a protocol request from the actual extension
+host on a real board.
 
 ### D-013 — Preview And Apply Semantics
 
-Status: open
+Status: accepted on 2026-08-25
 
-Decide which RGB edits may be volatile previews, how preview rollback works,
-and whether ordinary Apply performs device-first or source-first work. Partial
-outcomes must remain visible either way.
+Keep existing Apply actions source-only. Add explicit Preview Live, Deploy
+Live, Apply Source + Device, Pull Device, Push Source, Roll Back Preview, and
+Reset Device operations.
+
+Compound Apply prepares and validates the device candidate first, writes
+source second, and commits the prepared device candidate third. This avoids a
+source write the connected firmware cannot represent while ensuring a source
+failure can still abort before device activation. Every partial outcome stays
+visible and retryable.
+
+Only behavior-independent RGB fields use volatile frame-boundary preview. The
+preview rolls back on cancel, reload, profile switch, panel disposal, timeout,
+disconnect, reboot, or explicit rollback. Full rules are in
+`authority-state-table.md`.
 
 ### D-014 — Generation Authority And Drift Resolution
 
-Status: open
+Status: accepted on 2026-08-25
 
-Define how source digest, compiled-default digest, active-device generation,
-USB-half generation, and peer-half generation are compared. Define the exact
-rules for push, pull, reconnect, role swap, and same-generation digest
-disagreement.
+Committed device authority is `{counter, origin_half}` plus canonical payload
+digest. Only a durable device commit advances the counter. Source, draft, and
+compiled-default digests are comparison identities, not deployment
+generations.
+
+Higher valid counters win after reconnect. Equal tuple and digest means
+converged. Equal tuple with different digest is corruption. Equal counter with
+different origins is a disconnected concurrent commit and requires explicit
+Studio resolution. Reset commits an override-disabled generation; unchanged
+push is a no-op. See `authority-state-table.md`.
+
+### D-015 — Semantic Actions And ABI Compatibility
+
+Status: accepted on 2026-08-25
+
+Profile Wire v1 uses tagged semantic actions. Standard QMK keycodes may use a
+16-bit operand under an exact action-ABI digest. Layer, PD-mode, VIA-macro,
+hardcoded-macro, and userspace-owned actions use stable kinds plus bounded
+operands rather than raw custom-keycode enum values.
+
+Unknown kinds, incompatible action ABI, and invalid cross-references reject the
+whole candidate. `profile-wire-v1.md` owns the byte contract.
+
+### D-016 — Resource Truth Separates Hardware, Linker Accounting, Policy, And Runtime Evidence
+
+Status: accepted on 2026-08-25
+
+Report RP2040 resources per half and by physical/linker bank. The target has
+270,336 bytes of physical SRAM: 262,144 bytes in the word-striped SRAM0–3
+`ram0` region and 4,096 bytes each in SRAM4 and SRAM5. The overlapping
+256-byte `ram7` boot region is part of SRAM5 and is never added to that total.
+
+The `.data + .bss` value is an SRAM0–3 regression metric, not total static RAM
+or physical capacity. The `__heap_base__` to `__heap_end__` value is the
+SRAM0–3 linker/core-memory span at boot. It backs the ChibiOS core allocator
+and linked newlib allocation path, so it is neither a second pool nor proof of
+runtime-free memory. Runtime allocator high-water remains hardware evidence.
+
+The existing 26,000-byte BSS maximum, 51,000-byte `.data + .bss` maximum, and
+204,800-byte minimum core-memory span remain conservative regression policies
+until deliberately replaced. A design may revise them with bank-aware linked
+accounting, explicit rationale, regression tests, fresh target evidence, and
+hardware high-water measurements; it must not present policy slack as hardware
+headroom.
+
+Stack reporting also separates the reviewed-path policy from physical stack
+allocation. The current 1,880-byte worst reviewed main path has 40 bytes to the
+1,920-byte policy budget and 680 bytes to the 2,560-byte process-stack boundary.
+The reviewed-path gate is not proof of a global or interrupt-stack maximum.
+
+Keeping candidate payloads in inactive EEPROM remains the accepted
+power-loss-safe and memory-efficient design. It is not justified by a claim
+that a nominal 4 KiB RAM buffer is physically impossible.
