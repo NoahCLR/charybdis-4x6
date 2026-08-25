@@ -372,11 +372,18 @@ The landed store backend now supplies that coordinator with a bounded inactive-
 slot reader/writer and composes the whole-profile validator over the staged
 bytes. Validation streams CRC32/FNV-1a, checks the canonical envelope and both
 domain codecs, and resolves behavior references against exact compiled
-layer/PD/macro identities. A separate backend commit call is intentionally not
-part of the candidate coordinator interface. QMK routing, capability
-advertising, durable commit ownership, activation, and split convergence must
-therefore land together in a later integration slice rather than becoming
-reachable merely because the adapter exists.
+layer/PD/macro identities. The store now has an injected destructive-reuse
+guard: after candidate checks pass and before the target commit marker is
+invalidated, the provider reserves that slot's complete payload range. Abort,
+successful commit, and every terminal failure release the reservation; a
+release failure stays fail-closed. The provider pins active and pending ranges,
+discards an overlapping rollback only as part of a successful reservation, and
+therefore prevents store bookkeeping from overwriting a runtime-rolled-back
+generation. After durable commit, the backend can build the exact committed
+snapshot and request safe-boundary publication. These APIs remain disconnected
+from QMK routing: the candidate coordinator still has no commit operation, and
+no production safe predicate, invalidator set, capability, or split owner is
+installed merely because the storage/provider seam exists.
 
 ### Split Reconciliation
 

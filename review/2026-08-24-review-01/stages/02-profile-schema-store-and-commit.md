@@ -158,8 +158,9 @@ Volatile preview must not outrank durable committed state after reconnect.
   action capacity, behavior/RGB semantics, whole-profile checksums,
   action-ABI identity, domain masks, and compiled action references)
 - [ ] Recoverable persistent store (storage foundation, read-only QMK boot
-  ownership/status, and disconnected inactive-slot staging landed; QMK
-  mutation ownership, reset, activation, and split integration remain)
+  ownership/status, provider-guarded inactive-slot staging, durable commit, and
+  activation handoff landed; QMK mutation ownership, reset, and split
+  integration remain)
 - [ ] Candidate protocol (exact firmware/desktop frame/status codecs, bounded
   scan coordinator, and desktop upload coordinator landed; QMK routing and
   commit remain)
@@ -328,9 +329,16 @@ Landed isolated effective-provider evidence:
   rollback copy is discarded atomically. Discarding rollback alone is not
   storage authorization.
 
-This provider remains disconnected. The persistent store has not yet adopted
-the backing-reservation protocol, no production invalidator or safe predicate
-is installed, and no key/RGB consumer reads through it.
+The persistent store and candidate backend now adopt this reservation protocol.
+Every admitted prepare reserves the complete target-slot payload range before
+the marker is invalidated and releases it on abort, commit, or terminal failure.
+The backend can turn its exact durable record plus validated borrowed view into
+a pending provider snapshot; provider polling still owns safe publication. A
+runtime rollback that makes the store's nominal inactive slot active is
+mechanically refused before EEPROM mutation, and moving active authority away
+allows the next reservation to discard only the overlapping rollback copy.
+This seam is still disconnected from QMK routing. No production safe predicate
+or invalidator is installed, and no key/RGB consumer reads through it.
 
 Landed desktop candidate evidence:
 

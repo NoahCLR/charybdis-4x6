@@ -212,6 +212,50 @@ void noah_profile_store_init(noah_profile_store_t *store, noah_profile_store_io_
     store->compatibility = compatibility;
 }
 
+bool noah_profile_store_set_reuse_guard(noah_profile_store_t *store, const noah_profile_store_reuse_guard_t *guard) {
+    if (!store || store->prepare_active || store->reuse_active || (guard && (!guard->begin || !guard->end))) {
+        return false;
+    }
+    memset(&store->reuse_guard, 0, sizeof(store->reuse_guard));
+    if (guard) {
+        store->reuse_guard = *guard;
+    }
+    return true;
+}
+
+static noah_profile_store_result_t begin_reuse(noah_profile_store_t *store, noah_profile_slot_t slot) {
+    if (!store->reuse_guard.begin) {
+        return NOAH_PROFILE_STORE_OK;
+    }
+    if (!store->reuse_guard.begin(store->reuse_guard.context, slot)) {
+        return NOAH_PROFILE_STORE_BACKING_REUSE_DENIED;
+    }
+    store->reuse_active = true;
+    return NOAH_PROFILE_STORE_OK;
+}
+
+static noah_profile_store_result_t end_reuse(noah_profile_store_t *store) {
+    noah_profile_slot_t slot;
+
+    if (!store->reuse_active) {
+        return NOAH_PROFILE_STORE_OK;
+    }
+    slot = store->candidate_slot;
+    if (!store->reuse_guard.end(store->reuse_guard.context, slot)) {
+        return NOAH_PROFILE_STORE_BACKING_REUSE_RELEASE_FAILED;
+    }
+    store->reuse_active = false;
+    return NOAH_PROFILE_STORE_OK;
+}
+
+static noah_profile_store_result_t finish_prepare(noah_profile_store_t *store, noah_profile_store_result_t result) {
+    noah_profile_store_result_t release_result;
+
+    store->prepare_active = false;
+    release_result        = end_reuse(store);
+    return release_result == NOAH_PROFILE_STORE_OK ? result : release_result;
+}
+
 noah_profile_store_result_t noah_profile_store_validate_slot(noah_profile_store_t *store, noah_profile_slot_t slot, bool require_commit, noah_profile_store_record_t *record) {
     noah_profile_store_result_t result;
     uint16_t                    start;
@@ -235,7 +279,7 @@ noah_profile_store_result_t noah_profile_store_boot_select(noah_profile_store_t 
     noah_profile_store_result_t a_result;
     noah_profile_store_result_t b_result;
 
-    if (!store || !selected || !store->io.read) {
+    if (!store || !selected || !store->io.read || store->prepare_active || store->reuse_active) {
         return NOAH_PROFILE_STORE_INVALID_ARGUMENT;
     }
 
@@ -301,14 +345,21 @@ noah_profile_store_result_t noah_profile_store_prepare_begin(noah_profile_store_
     if (store->prepare_active) {
         return NOAH_PROFILE_STORE_PREPARE_IN_PROGRESS;
     }
+    if (store->reuse_active) {
+        return NOAH_PROFILE_STORE_BACKING_REUSE_RELEASE_FAILED;
+    }
     result = validate_candidate(store, candidate);
     if (result != NOAH_PROFILE_STORE_OK) {
         return result;
     }
 
     store->candidate_slot = store->committed.slot == NOAH_PROFILE_SLOT_A ? NOAH_PROFILE_SLOT_B : NOAH_PROFILE_SLOT_A;
+    result                = begin_reuse(store, store->candidate_slot);
+    if (result != NOAH_PROFILE_STORE_OK) {
+        return result;
+    }
     if (!slot_start(store->candidate_slot, &start) || !io_write(store, (uint16_t)(start + HEADER_COMMIT_MARKER), invalid_marker, sizeof(invalid_marker))) {
-        return NOAH_PROFILE_STORE_IO_ERROR;
+        return finish_prepare(store, NOAH_PROFILE_STORE_IO_ERROR);
     }
     store->candidate              = *candidate;
     store->candidate_written      = 0u;
@@ -334,8 +385,7 @@ noah_profile_store_result_t noah_profile_store_prepare_write(noah_profile_store_
         return NOAH_PROFILE_STORE_CHUNK_OUT_OF_ORDER;
     }
     if (!slot_start(store->candidate_slot, &start) || !io_write(store, (uint16_t)(start + NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE + offset), bytes, length)) {
-        store->prepare_active = false;
-        return NOAH_PROFILE_STORE_IO_ERROR;
+        return finish_prepare(store, NOAH_PROFILE_STORE_IO_ERROR);
     }
     store->candidate_crc32_state  = noah_profile_crc32_update(store->candidate_crc32_state, bytes, length);
     store->candidate_digest_state = noah_profile_fnv1a_update(store->candidate_digest_state, bytes, length);
@@ -355,38 +405,32 @@ noah_profile_store_result_t noah_profile_store_prepare_commit(noah_profile_store
         return NOAH_PROFILE_STORE_PAYLOAD_INCOMPLETE;
     }
     if (noah_profile_crc32_finish(store->candidate_crc32_state) != store->candidate.payload_crc32 || store->candidate_digest_state != store->candidate.payload_digest) {
-        store->prepare_active = false;
-        return NOAH_PROFILE_STORE_CHECKSUM_MISMATCH;
+        return finish_prepare(store, NOAH_PROFILE_STORE_CHECKSUM_MISMATCH);
     }
     if (!slot_start(store->candidate_slot, &start)) {
-        store->prepare_active = false;
-        return NOAH_PROFILE_STORE_INVALID_ARGUMENT;
+        return finish_prepare(store, NOAH_PROFILE_STORE_INVALID_ARGUMENT);
     }
 
     encode_header(store->scratch, &store->candidate);
     if (!io_write(store, start, store->scratch, HEADER_COMMIT_MARKER)) {
-        store->prepare_active = false;
-        return NOAH_PROFILE_STORE_IO_ERROR;
+        return finish_prepare(store, NOAH_PROFILE_STORE_IO_ERROR);
     }
     result = noah_profile_store_validate_slot(store, store->candidate_slot, false, &verified);
     if (result != NOAH_PROFILE_STORE_OK) {
-        store->prepare_active = false;
-        return result;
+        return finish_prepare(store, result);
     }
     if (!io_write(store, (uint16_t)(start + HEADER_COMMIT_MARKER), commit_marker, sizeof(commit_marker))) {
-        store->prepare_active = false;
-        return NOAH_PROFILE_STORE_IO_ERROR;
+        return finish_prepare(store, NOAH_PROFILE_STORE_IO_ERROR);
     }
     result = noah_profile_store_validate_slot(store, store->candidate_slot, true, &verified);
-    store->prepare_active = false;
     if (result != NOAH_PROFILE_STORE_OK) {
-        return result;
+        return finish_prepare(store, result);
     }
     store->committed = verified;
     if (committed) {
         *committed = verified;
     }
-    return NOAH_PROFILE_STORE_OK;
+    return finish_prepare(store, NOAH_PROFILE_STORE_OK);
 }
 
 noah_profile_store_result_t noah_profile_store_prepare_abort(noah_profile_store_t *store) {
@@ -396,11 +440,9 @@ noah_profile_store_result_t noah_profile_store_prepare_abort(noah_profile_store_
         return NOAH_PROFILE_STORE_NO_PREPARE;
     }
     if (!slot_start(store->candidate_slot, &start) || !io_write(store, (uint16_t)(start + HEADER_COMMIT_MARKER), invalid_marker, sizeof(invalid_marker))) {
-        store->prepare_active = false;
-        return NOAH_PROFILE_STORE_IO_ERROR;
+        return finish_prepare(store, NOAH_PROFILE_STORE_IO_ERROR);
     }
-    store->prepare_active = false;
-    return NOAH_PROFILE_STORE_OK;
+    return finish_prepare(store, NOAH_PROFILE_STORE_OK);
 }
 
 bool noah_profile_store_next_generation(const noah_profile_store_t *store, uint32_t *generation) {

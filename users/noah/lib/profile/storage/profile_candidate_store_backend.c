@@ -16,6 +16,10 @@ static bool metadata_equal(const noah_profile_candidate_v1_metadata_t *left, con
     return left && right && left->schema_major == right->schema_major && left->schema_minor == right->schema_minor && left->requested_domains == right->requested_domains && left->flags == right->flags && left->payload_length == right->payload_length && left->crc32 == right->crc32 && left->digest == right->digest && left->action_abi_digest == right->action_abi_digest;
 }
 
+static bool committed_record_equal(const noah_profile_store_record_t *left, const noah_profile_store_record_t *right) {
+    return left && right && left->slot == right->slot && left->schema_major == right->schema_major && left->schema_minor == right->schema_minor && left->flags == right->flags && left->payload_length == right->payload_length && left->generation == right->generation && left->origin_half == right->origin_half && left->payload_crc32 == right->payload_crc32 && left->payload_digest == right->payload_digest && left->compiled_default_digest == right->compiled_default_digest && left->action_abi_digest == right->action_abi_digest;
+}
+
 static bool candidate_payload_start(const noah_profile_candidate_store_backend_t *backend, uint16_t *address) {
     uint16_t slot_start;
 
@@ -33,6 +37,21 @@ static bool candidate_payload_start(const noah_profile_candidate_store_backend_t
     return true;
 }
 
+static bool slot_payload_start(noah_profile_slot_t slot, uint16_t *address) {
+    if (!address) {
+        return false;
+    }
+    if (slot == NOAH_PROFILE_SLOT_A) {
+        *address = (uint16_t)(NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR + NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE);
+        return true;
+    }
+    if (slot == NOAH_PROFILE_SLOT_B) {
+        *address = (uint16_t)(NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR + NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE);
+        return true;
+    }
+    return false;
+}
+
 static bool staged_reader_read(void *context, size_t offset, uint8_t *target, size_t length) {
     noah_profile_store_t *store = context;
 
@@ -40,6 +59,29 @@ static bool staged_reader_read(void *context, size_t offset, uint8_t *target, si
         return false;
     }
     return store->io.read(store->io.context, (uint16_t)offset, target, (uint16_t)length);
+}
+
+static bool begin_slot_reuse(void *context, noah_profile_slot_t slot) {
+    noah_profile_candidate_store_backend_t *backend = context;
+    noah_effective_profile_backing_t         backing;
+    uint16_t                                 payload_start;
+
+    if (!backend || !backend->provider || !slot_payload_start(slot, &payload_start)) {
+        return false;
+    }
+    backing = (noah_effective_profile_backing_t){
+        .reader      = backend->staged_reader,
+        .base_offset = payload_start,
+        .byte_length = NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX,
+    };
+    return noah_effective_profile_provider_begin_backing_reuse(backend->provider, &backing) == NOAH_EFFECTIVE_PROFILE_OK;
+}
+
+static bool end_slot_reuse(void *context, noah_profile_slot_t slot) {
+    noah_profile_candidate_store_backend_t *backend = context;
+
+    (void)slot;
+    return backend && backend->provider && noah_effective_profile_provider_end_backing_reuse(backend->provider) == NOAH_EFFECTIVE_PROFILE_OK;
 }
 
 static noah_profile_candidate_backend_result_t map_store_result(noah_profile_store_result_t result) {
@@ -69,7 +111,7 @@ static noah_profile_candidate_backend_result_t begin_candidate(void *context, co
     noah_profile_store_candidate_t          candidate;
     uint32_t                                generation;
 
-    if (!backend || !backend->store || !metadata || backend->origin_half > 1u || !noah_profile_store_next_generation(backend->store, &generation)) {
+    if (!backend || !backend->store || !backend->provider || !backend->reuse_guard_installed || !metadata || backend->origin_half > 1u || !noah_profile_store_next_generation(backend->store, &generation)) {
         return NOAH_PROFILE_CANDIDATE_BACKEND_IO_ERROR;
     }
     candidate = (noah_profile_store_candidate_t){
@@ -89,13 +131,11 @@ static noah_profile_candidate_backend_result_t begin_candidate(void *context, co
     }
     backend->metadata            = *metadata;
     backend->validation_complete = false;
+    backend->committed_available = false;
     memset(&backend->validator, 0, sizeof(backend->validator));
     memset(&backend->validated_profile, 0, sizeof(backend->validated_profile));
-    backend->staged_reader = (noah_profile_reader_t){
-        .read    = staged_reader_read,
-        .context = backend->store,
-        .length  = NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE,
-    };
+    memset(&backend->activation_snapshot, 0, sizeof(backend->activation_snapshot));
+    memset(&backend->committed_record, 0, sizeof(backend->committed_record));
     return NOAH_PROFILE_CANDIDATE_BACKEND_OK;
 }
 
@@ -181,17 +221,31 @@ static noah_profile_candidate_backend_result_t abort_candidate(void *context) {
     return map_store_result(result);
 }
 
-void noah_profile_candidate_store_backend_init(noah_profile_candidate_store_backend_t *backend, noah_profile_store_t *store, const noah_profile_validator_v1_compatibility_t *compatibility, uint32_t compiled_default_digest, uint8_t origin_half) {
+void noah_profile_candidate_store_backend_init(noah_profile_candidate_store_backend_t *backend, noah_profile_store_t *store, noah_effective_profile_provider_t *provider, const noah_profile_validator_v1_compatibility_t *compatibility, uint32_t compiled_default_digest, uint8_t origin_half) {
+    noah_profile_store_reuse_guard_t guard;
+
     if (!backend) {
         return;
     }
     memset(backend, 0, sizeof(*backend));
     backend->store                   = store;
+    backend->provider                = provider;
     backend->compiled_default_digest = compiled_default_digest;
     backend->origin_half             = origin_half;
+    backend->staged_reader = (noah_profile_reader_t){
+        .read    = staged_reader_read,
+        .context = store,
+        .length  = NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE,
+    };
     if (compatibility) {
         backend->compatibility = *compatibility;
     }
+    guard = (noah_profile_store_reuse_guard_t){
+        .begin   = begin_slot_reuse,
+        .end     = end_slot_reuse,
+        .context = backend,
+    };
+    backend->reuse_guard_installed = store && provider && noah_profile_store_set_reuse_guard(store, &guard);
 }
 
 noah_profile_candidate_backend_t noah_profile_candidate_store_backend_interface(noah_profile_candidate_store_backend_t *backend) {
@@ -207,14 +261,39 @@ noah_profile_candidate_backend_t noah_profile_candidate_store_backend_interface(
 }
 
 noah_profile_candidate_backend_result_t noah_profile_candidate_store_backend_commit(noah_profile_candidate_store_backend_t *backend, noah_profile_store_record_t *committed) {
+    noah_profile_store_record_t record;
+
     if (!backend || !backend->store || !backend->validation_complete) {
         return NOAH_PROFILE_CANDIDATE_BACKEND_REJECTED;
     }
-    if (noah_profile_store_prepare_commit(backend->store, committed) != NOAH_PROFILE_STORE_OK) {
+    if (noah_profile_store_prepare_commit(backend->store, &record) != NOAH_PROFILE_STORE_OK) {
         backend->validation_complete = false;
         return NOAH_PROFILE_CANDIDATE_BACKEND_IO_ERROR;
     }
+    backend->committed_record    = record;
+    backend->committed_available = true;
+    if (committed) {
+        *committed = record;
+    }
     return NOAH_PROFILE_CANDIDATE_BACKEND_OK;
+}
+
+noah_profile_candidate_backend_result_t noah_profile_candidate_store_backend_request_activation(noah_profile_candidate_store_backend_t *backend) {
+    noah_effective_profile_result_t result;
+    uint16_t                        payload_start;
+
+    if (!backend || !backend->store || !backend->provider || !backend->validation_complete || !backend->committed_available || backend->store->prepare_active || backend->store->reuse_active || !committed_record_equal(&backend->store->committed, &backend->committed_record) || backend->validated_profile.byte_length != backend->committed_record.payload_length || backend->validated_profile.crc32 != backend->committed_record.payload_crc32 || backend->validated_profile.digest != backend->committed_record.payload_digest || backend->validated_profile.action_abi_digest != backend->committed_record.action_abi_digest || !slot_payload_start(backend->committed_record.slot, &payload_start)) {
+        return NOAH_PROFILE_CANDIDATE_BACKEND_REJECTED;
+    }
+    result = noah_effective_profile_snapshot_make_validated(&backend->validated_profile, &backend->staged_reader, payload_start, backend->committed_record.generation, backend->committed_record.origin_half, backend->committed_record.compiled_default_digest, &backend->activation_snapshot);
+    if (result != NOAH_EFFECTIVE_PROFILE_OK) {
+        return NOAH_PROFILE_CANDIDATE_BACKEND_REJECTED;
+    }
+    result = noah_effective_profile_provider_request_validated(backend->provider, &backend->activation_snapshot);
+    if (result == NOAH_EFFECTIVE_PROFILE_OK || result == NOAH_EFFECTIVE_PROFILE_NO_CHANGE) {
+        return NOAH_PROFILE_CANDIDATE_BACKEND_OK;
+    }
+    return result == NOAH_EFFECTIVE_PROFILE_BUSY || result == NOAH_EFFECTIVE_PROFILE_BACKING_REUSE_IN_PROGRESS ? NOAH_PROFILE_CANDIDATE_BACKEND_IN_PROGRESS : NOAH_PROFILE_CANDIDATE_BACKEND_REJECTED;
 }
 
 const noah_profile_validator_v1_profile_t *noah_profile_candidate_store_backend_validated_profile(const noah_profile_candidate_store_backend_t *backend) {

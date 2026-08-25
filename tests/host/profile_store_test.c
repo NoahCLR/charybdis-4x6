@@ -34,6 +34,16 @@ static fake_eeprom_t eeprom;
 static fake_eeprom_t alternate_eeprom;
 static uint8_t       eeprom_snapshot[NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE];
 
+typedef struct {
+    fake_eeprom_t      *memory;
+    noah_profile_slot_t slot;
+    uint32_t            begin_calls;
+    uint32_t            end_calls;
+    bool                deny_begin;
+    bool                fail_end;
+    bool                saw_pristine_marker;
+} reuse_guard_state_t;
+
 static const uint8_t empty_profile[] = {'N', 'L', 'P', '1', 1u, 0u, 0u, 1u};
 static const uint8_t rgb_profile[]   = {'N', 'L', 'P', '1', 1u, 0u, 1u, 1u, 0x10u, 1u, 3u, 0u, 1u, 2u, 3u};
 static const uint8_t behavior_profile[] = {'N', 'L', 'P', '1', 1u, 0u, 1u, 1u, 0x20u, 1u, 2u, 0u, 4u, 5u};
@@ -73,6 +83,24 @@ static noah_profile_store_io_t io_for(fake_eeprom_t *memory) {
 
 static noah_profile_store_compatibility_t compatibility(void) {
     return (noah_profile_store_compatibility_t){.schema_major = 1u, .schema_minor = 0u, .action_abi_digest = ACTION_ABI_DIGEST};
+}
+
+static bool reuse_begin(void *context, noah_profile_slot_t slot) {
+    reuse_guard_state_t *state = context;
+    uint16_t             start = slot == NOAH_PROFILE_SLOT_A ? NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR : NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR;
+
+    state->begin_calls++;
+    state->slot                = slot;
+    state->saw_pristine_marker = state->memory->bytes[start + 30u] == 0xffu && state->memory->bytes[start + 31u] == 0xffu;
+    return !state->deny_begin;
+}
+
+static bool reuse_end(void *context, noah_profile_slot_t slot) {
+    reuse_guard_state_t *state = context;
+
+    state->end_calls++;
+    CHECK(slot == state->slot);
+    return !state->fail_end;
 }
 
 static uint16_t load_u16(const uint8_t *bytes) {
@@ -213,6 +241,67 @@ static void test_chunk_and_candidate_guards(void) {
     candidate.schema_major      = 1u;
     candidate.action_abi_digest = 0u;
     CHECK(noah_profile_store_prepare_begin(&store, &candidate) == NOAH_PROFILE_STORE_INCOMPATIBLE_ACTION_ABI);
+}
+
+static void test_destructive_reuse_guard_brackets_every_prepare(void) {
+    noah_profile_store_t            store;
+    noah_profile_store_candidate_t candidate;
+    reuse_guard_state_t             state;
+    noah_profile_store_reuse_guard_t guard;
+    uint32_t                        writes_before;
+
+    reset_eeprom(&eeprom);
+    initialize_store(&store, &eeprom, NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE);
+    memset(&state, 0, sizeof(state));
+    state.memory = &eeprom;
+    guard = (noah_profile_store_reuse_guard_t){.begin = reuse_begin, .end = reuse_end, .context = &state};
+    CHECK(!noah_profile_store_set_reuse_guard(&store, &(noah_profile_store_reuse_guard_t){.begin = reuse_begin}));
+    CHECK(noah_profile_store_set_reuse_guard(&store, &guard));
+    candidate = candidate_for(empty_profile, sizeof(empty_profile), 1u, 0u);
+
+    state.deny_begin = true;
+    writes_before    = eeprom.write_calls;
+    CHECK(noah_profile_store_prepare_begin(&store, &candidate) == NOAH_PROFILE_STORE_BACKING_REUSE_DENIED);
+    CHECK(state.begin_calls == 1u && state.end_calls == 0u);
+    CHECK(eeprom.write_calls == writes_before && state.saw_pristine_marker);
+    CHECK(!store.prepare_active && !store.reuse_active);
+
+    state.deny_begin = false;
+    CHECK(noah_profile_store_prepare_begin(&store, &candidate) == NOAH_PROFILE_STORE_OK);
+    CHECK(state.begin_calls == 2u && state.end_calls == 0u && state.slot == NOAH_PROFILE_SLOT_A);
+    CHECK(store.prepare_active && store.reuse_active);
+    CHECK(!noah_profile_store_set_reuse_guard(&store, NULL));
+    CHECK(noah_profile_store_prepare_abort(&store) == NOAH_PROFILE_STORE_OK);
+    CHECK(state.end_calls == 1u && !store.prepare_active && !store.reuse_active);
+
+    eeprom.fail_write_call = eeprom.write_calls + 1u;
+    CHECK(noah_profile_store_prepare_begin(&store, &candidate) == NOAH_PROFILE_STORE_IO_ERROR);
+    CHECK(state.begin_calls == 3u && state.end_calls == 2u);
+    CHECK(!store.prepare_active && !store.reuse_active);
+    eeprom.fail_write_call = 0u;
+
+    CHECK(noah_profile_store_prepare_begin(&store, &candidate) == NOAH_PROFILE_STORE_OK);
+    eeprom.fail_write_call = eeprom.write_calls + 1u;
+    CHECK(noah_profile_store_prepare_write(&store, 0u, empty_profile, sizeof(empty_profile)) == NOAH_PROFILE_STORE_IO_ERROR);
+    CHECK(state.begin_calls == 4u && state.end_calls == 3u && !store.reuse_active);
+    eeprom.fail_write_call = 0u;
+
+    candidate.payload_crc32 ^= 1u;
+    CHECK(noah_profile_store_prepare_begin(&store, &candidate) == NOAH_PROFILE_STORE_OK);
+    CHECK(noah_profile_store_prepare_write(&store, 0u, empty_profile, sizeof(empty_profile)) == NOAH_PROFILE_STORE_OK);
+    CHECK(noah_profile_store_prepare_commit(&store, NULL) == NOAH_PROFILE_STORE_CHECKSUM_MISMATCH);
+    CHECK(state.begin_calls == 5u && state.end_calls == 4u && !store.reuse_active);
+    candidate.payload_crc32 ^= 1u;
+
+    CHECK(commit_payload(&store, empty_profile, sizeof(empty_profile), 1u, 0u, NULL) == NOAH_PROFILE_STORE_OK);
+    CHECK(state.begin_calls == 6u && state.end_calls == 5u && !store.reuse_active);
+
+    candidate.generation = 2u;
+    CHECK(noah_profile_store_prepare_begin(&store, &candidate) == NOAH_PROFILE_STORE_OK);
+    state.fail_end = true;
+    CHECK(noah_profile_store_prepare_abort(&store) == NOAH_PROFILE_STORE_BACKING_REUSE_RELEASE_FAILED);
+    CHECK(state.begin_calls == 7u && state.end_calls == 6u && !store.prepare_active && store.reuse_active);
+    CHECK(noah_profile_store_prepare_begin(&store, &candidate) == NOAH_PROFILE_STORE_BACKING_REUSE_RELEASE_FAILED);
 }
 
 static void test_payload_and_header_validation(void) {
@@ -398,6 +487,7 @@ int main(void) {
     test_checksums();
     test_commit_and_boot_selection();
     test_chunk_and_candidate_guards();
+    test_destructive_reuse_guard_brackets_every_prepare();
     test_payload_and_header_validation();
     test_checksum_mismatch_never_commits();
     test_power_loss_preserves_last_known_good();

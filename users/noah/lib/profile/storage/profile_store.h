@@ -40,6 +40,8 @@ typedef enum {
     NOAH_PROFILE_STORE_CHUNK_OUT_OF_ORDER,
     NOAH_PROFILE_STORE_CHUNK_TOO_LARGE,
     NOAH_PROFILE_STORE_PAYLOAD_INCOMPLETE,
+    NOAH_PROFILE_STORE_BACKING_REUSE_DENIED,
+    NOAH_PROFILE_STORE_BACKING_REUSE_RELEASE_FAILED,
 } noah_profile_store_result_t;
 
 typedef bool (*noah_profile_store_read_fn)(void *context, uint16_t address, uint8_t *target, uint16_t length);
@@ -50,6 +52,19 @@ typedef struct {
     noah_profile_store_write_fn write;
     void                       *context;
 } noah_profile_store_io_t;
+
+// Optional destructive-write guard. A configured store calls begin after all
+// candidate checks pass but before it invalidates the target slot. Exactly one
+// matching end follows every admitted prepare, including abort and all
+// terminal I/O/validation failures. Callbacks must not perform store I/O.
+typedef bool (*noah_profile_store_reuse_begin_fn)(void *context, noah_profile_slot_t slot);
+typedef bool (*noah_profile_store_reuse_end_fn)(void *context, noah_profile_slot_t slot);
+
+typedef struct {
+    noah_profile_store_reuse_begin_fn begin;
+    noah_profile_store_reuse_end_fn   end;
+    void                             *context;
+} noah_profile_store_reuse_guard_t;
 
 typedef struct {
     uint8_t  schema_major;
@@ -86,6 +101,7 @@ typedef struct {
 
 typedef struct {
     noah_profile_store_io_t            io;
+    noah_profile_store_reuse_guard_t   reuse_guard;
     noah_profile_store_compatibility_t compatibility;
     noah_profile_store_record_t        committed;
     noah_profile_store_candidate_t     candidate;
@@ -96,10 +112,12 @@ typedef struct {
     bool                               boot_scanned;
     bool                               conflict;
     bool                               prepare_active;
+    bool                               reuse_active;
     uint8_t                            scratch[NOAH_PROFILE_STORE_IO_CHUNK_MAX];
 } noah_profile_store_t;
 
 void noah_profile_store_init(noah_profile_store_t *store, noah_profile_store_io_t io, noah_profile_store_compatibility_t compatibility);
+bool noah_profile_store_set_reuse_guard(noah_profile_store_t *store, const noah_profile_store_reuse_guard_t *guard);
 noah_profile_store_result_t noah_profile_store_boot_select(noah_profile_store_t *store, noah_profile_store_record_t *selected);
 noah_profile_store_result_t noah_profile_store_validate_slot(noah_profile_store_t *store, noah_profile_slot_t slot, bool require_commit, noah_profile_store_record_t *record);
 noah_profile_store_result_t noah_profile_store_prepare_begin(noah_profile_store_t *store, const noah_profile_store_candidate_t *candidate);

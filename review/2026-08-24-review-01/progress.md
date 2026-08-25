@@ -469,7 +469,10 @@ foundation have now landed. The provider uses the established publication
 primitive, fails closed during invalidation, guards safe-boundary reentrancy,
 requires a safe predicate for behavior activation, bounds nested views to the
 checksummed blob, and exposes an explicit active-backing-aware storage-reuse
-reservation. It is not connected to storage, QMK routing, or runtime consumers.
+reservation. The store/backend seam now uses that reservation before every
+target-slot mutation, releases it on all terminal paths, and can hand a durable
+validated record to provider-owned pending activation. It remains disconnected
+from QMK routing and runtime consumers.
 The executable work-budget gate now accepts the incremental whole-profile
 validator: the schema-maximal 3,216-byte behavior profile completes in 1,061
 whole-profile steps, including 897 behavior-domain steps with at most one
@@ -478,8 +481,9 @@ in 58 steps with at most one 16-byte read each. Every step is mechanically
 capped at one reader operation and 20 newly observed bytes. Cortex-M0+ compile
 coverage enforces the 348-byte whole-validator state under its explicit
 352-byte regression policy. This closes the unbounded domain-work blocker;
-production routing still awaits store/provider commit and activation ownership,
-and real hardware timing remains unconfirmed.
+production routing still awaits the commit wire operation, production safe
+predicate/invalidators, and runtime owner; real hardware timing remains
+unconfirmed.
 
 Stage 00 baseline commands passed on 2026-08-25:
 
@@ -509,22 +513,22 @@ the packaged helper without changing the injected adapter contract.
 
 - The real-board HID/VS Code-host spike has not run.
 - RGB and key-behavior domain codecs plus the real compiled-default
-  materializer now match across firmware and Studio. The isolated provider
-  lifecycle contract is hardened and tested; storage ownership, production
-  safe-boundary wiring, invalidator implementations, and consumer migration
-  remain open. Whole-profile action-ABI and compiled-reference validation has
-  landed.
+  materializer now match across firmware and Studio. The provider lifecycle and
+  its destructive-store reservation are hardened and tested; production
+  safe-boundary wiring, invalidator implementations, QMK commit routing, and
+  consumer migration remain open. Whole-profile action-ABI and compiled-
+  reference validation has landed.
 - The baseline persistence and role-swap hardware matrix remains open.
 
 These are expected opening conditions, not project failure.
 
 ## Next Steps
 
-1. Integrate the provider's backing-reuse reservation with inactive-slot
-   selection, commit, rollback, and safe activation ownership.
-2. Connect the validated staging path to QMK routing after that ownership gate,
-   then measure scan timing on the real RP2040 before advertising mutation
-   capabilities.
+1. Freeze and implement the durable commit operation/status envelope, then wire
+   the scan owner to durable commit plus provider activation request.
+2. Install the production safe-boundary predicate and first invalidators before
+   connecting the validated staging path to QMK routing, then measure scan
+   timing on the real RP2040 before advertising mutation capabilities.
 3. Add split reconciliation before advertising durable mutation capabilities.
 4. Build the effective RGB accessors, then migrate the eight renderer families
    without allowing direct compiled-table bypasses.
@@ -594,8 +598,47 @@ Append new entries here in chronological order. Each entry must name:
   213,496 B for the boot core-memory span, and 56,104 B fixed linked occupancy;
   reviewed paths remain 1,880 B main and 336 B split-slave.
 - Production QMK mutation routing and capability advertising remain disabled.
-  The next package is storage/provider commit and activation ownership, with
-  real-board scan timing retained as a hardware acceptance check. No Profile
+  At that checkpoint the next package was storage/provider commit and activation
+  ownership; the store/provider seam has since landed. Real-board scan timing
+  remains a hardware acceptance check. No Profile
   Studio UI changed, so screenshots were intentionally not regenerated. The
   QMK build/resource gates wrote generated sibling build artifacts only; no
   sibling source file was edited.
+
+### 2026-08-25 — Stage 02 active-backing store integration checkpoint
+
+- Added an injected store reuse guard that runs after candidate compatibility
+  checks but before the target marker is invalidated. Every admitted prepare is
+  paired with release on abort, durable commit, checksum rejection, and I/O or
+  readback failure; release failure leaves the store fail-closed.
+- The candidate backend installs a provider-backed guard for the target slot's
+  complete 4,064-byte payload range. Active and pending backing cannot be
+  overwritten, while an overlapping rollback is discarded only during an
+  admitted reservation.
+- Durable commit records are cross-checked against the validated view before
+  the backend requests provider activation. Publication remains a separate
+  safe-boundary poll and is not silently performed by storage code.
+- Focused normal and ASan/UBSan store/backend tests cover reservation ordering,
+  denied writes before marker mutation, all major release paths, exact durable
+  identity checks, activation handoff, and runtime rollback diverging from the
+  store's nominal inactive slot.
+- Verification passed: `sh tests/host/run_profile_store_tests.sh`,
+  `sh tests/host/run_profile_candidate_store_backend_tests.sh`,
+  `sh tests/host/run_effective_profile_provider_tests.sh`,
+  `sh tests/host/run_profile_candidate_transaction_tests.sh`,
+  `sh tests/host/run_profile_store_runtime_tests.sh`,
+  `sh tests/host/run_feature_gate_compile_tests.sh`,
+  `sh tests/host/run_all_host_tests.sh`,
+  `qmk compile -kb bastardkb/charybdis/4x6 -km noah`,
+  `sh tests/host/run_firmware_memory_budget_checks.sh`, and
+  `sh tests/host/run_firmware_stack_budget_checks.sh`.
+- Fresh RP2040 accounting reports 270,336 B physical SRAM per MCU, 48,648 B
+  for the SRAM0-3 `.data + .bss` policy metric, 213,488 B for the boot
+  core-memory span, and 56,112 B fixed linked occupancy. Reviewed stack paths
+  remain 1,880 B main and 336 B split-slave.
+- QMK routing, the `0x13` commit frame, production safe predicate/invalidators,
+  capabilities, split convergence, and runtime consumers remain disabled. The
+  next package is the commit/activation scan owner. No Profile Studio UI changed,
+  so screenshots were intentionally not regenerated. The QMK build/resource
+  gates wrote generated sibling build artifacts only; no sibling source file
+  was edited.
