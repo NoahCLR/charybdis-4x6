@@ -54,9 +54,11 @@ The compiled-default materializer now supplies the canonical identity/export/
 validation/reset representation without a profile-sized buffer. Its virtual
 reader may replay canonical records from byte zero and is therefore a cold-path
 surface only. The effective behavior seam now branches compiled and RGB-only
-generations to the existing direct authored semantic tables. The future RGB
-provider must do the same; hot key events and RGB frames must never replay the
-virtual compiled blob.
+generations to the existing direct authored semantic tables. The effective RGB
+seam similarly branches compiled and behavior-only generations to the authored
+RGB configuration and rejects frame tokens after a later publication. It is
+not installed and renderer-family migration remains open; hot key events and
+RGB frames must never replay the virtual compiled blob.
 
 Enforcement must prevent new direct reads outside default materialization,
 validation fixtures, and the provider implementation.
@@ -224,9 +226,9 @@ The opening findings above are the audit-time snapshot. Current status:
 | Finding | Status | Reconciliation evidence |
 | --- | --- | --- |
 | 1 — malformed VIA mirror prerequisite | open, remediation in progress | owned by Review 19; targeted guard and sanitizer package opened |
-| 2 — no effective-profile seam | partially resolved | a hardened generation-owned provider now enforces coherent publication, invalidation visibility, safe-predicate reentrancy, nested-view containment, and active-backing-aware reuse; the behavior consumer can atomically switch to a validated reader-backed generation without replaying compiled virtual bytes, while production owner installation, a measured compact index decision, RGB migration, and split convergence remain open |
+| 2 — no effective-profile seam | partially resolved | a hardened generation-owned provider now enforces coherent publication, invalidation visibility, safe-predicate reentrancy, nested-view containment, and active-backing-aware reuse; behavior and RGB consumers can atomically capture validated reader-backed generations without replaying compiled virtual bytes, while production owner installation, renderer migration, a measured behavior-index decision, and split convergence remain open |
 | 3 — no canonical schema | partially resolved | `profile-wire-v1.md`, D-010, and D-015 freeze the v1 contract; blob, RGB, behavior, validator, and real compiled-default materializer now share exact C/JavaScript fixtures, while production runtime and split integration remain open |
-| 4 — no safe activation boundary | partially resolved | `authority-state-table.md` freezes the quiescence contract and `profile_activation_policy.c` now produces coherent production reason/count snapshots from authoritative runtime owners; a callback-only behavior invalidator and stale-epoch refusal have landed, while provider-owner installation, split convergence, RGB invalidation, and hardware evidence remain open |
+| 4 — no safe activation boundary | partially resolved | `authority-state-table.md` freezes the quiescence contract and `profile_activation_policy.c` now produces coherent production reason/count snapshots from authoritative runtime owners; callback-only behavior/RGB invalidators plus stale token refusal have landed, while provider-owner installation, split convergence, renderer migration, and hardware evidence remain open |
 | 5 — source/device authority | resolved at contract level | D-013, D-014, and `authority-state-table.md` define operations, ordering, partial results, and conflicts |
 | 6 — storage/capacity evidence | resolved at Stage 00 design level; runtime high-water remains open | D-016 and `stage-00-baseline.md` record the corrected per-half bank model, policy-versus-capacity distinction, exact EEPROM map, dual-slot partition, and ceilings |
 | 7 — Studio transport boundary | partially resolved | D-012 accepts an injected serialized adapter and fake; concrete packaged board probe remains open |

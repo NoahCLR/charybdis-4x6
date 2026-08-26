@@ -787,3 +787,47 @@ Next steps:
    fail-closed peer status until profile-generation split convergence exists.
 3. Measure worst-case behavior lookup and scan activation timing on the real
    split keyboard before choosing an index or advertising mutation capability.
+
+### 2026-08-26 — Effective RGB view and frame-token checkpoint
+
+- Added a caller-owned, double-banked effective RGB view. Its provider
+  invalidator copies only the validated reader-backed RGB metadata and active
+  identity; instrumentation confirms it performs no payload reads or derived
+  cache construction during provider publication.
+- Added a captured frame token and explicit status check. The token is a copied
+  view rather than a pointer into a runtime bank, and any later publication
+  changes its local epoch so access fails stale instead of mixing generations.
+- Compiled identities and validated behavior-only profiles explicitly retain
+  the direct authored RGB fallback. The runtime remains uninstalled, no RGB
+  stage reads it yet, and production rendering is therefore unchanged.
+- Focused verification passed: `sh tests/host/run_effective_rgb_runtime_tests.sh`
+  (normal, ASan/UBSan, and Cortex-M0+ source compile),
+  `sh tests/host/run_profile_rgb_v1_tests.sh`,
+  `sh tests/host/run_effective_profile_provider_tests.sh`,
+  `sh tests/host/run_rgb_validation_tests.sh`,
+  `sh tests/host/run_rgb_layer_render_tests.sh`,
+  `sh tests/host/run_feature_gate_compile_tests.sh`,
+  `sh tests/host/run_all_host_tests.sh`,
+  `qmk compile -kb bastardkb/charybdis/4x6 -km noah`, both firmware resource
+  gates, and `git diff --check`.
+- Because the runtime remains uninstalled, the fresh ordinary image is
+  unchanged at 25,684 B SRAM0–3 `.bss`, 22,980 B `.data`, 48,664/51,000 B
+  `.data + .bss` policy span, 213,472 B SRAM0–3 linker/core-memory span at
+  boot, and 56,128 B fixed linked occupancy across the unique banks. Those are
+  per-half linked facts and policy metrics, not total-RAM or runtime high-water
+  claims. Reviewed paths remain 1,880/1,920 B on the main process stack and
+  336/768 B on the split-slave stack; that gate covers only its named paths.
+- Profile Studio UI and authored profile data did not change, so screenshots
+  and introspection regeneration were intentionally skipped. No sibling source
+  was edited; QMK/resource checks wrote generated sibling build artifacts only.
+
+Next steps:
+
+1. Capture one effective RGB token at the renderer's frame boundary and migrate
+   layer colors/render modes as the first table family, retaining exact compiled
+   fallback behavior.
+2. Migrate the remaining seven families one at a time with parity tests and a
+   direct-array source gate, then install RGB and behavior consumers through
+   the single production owner.
+3. Add split profile-generation convergence and real-hardware render/lookup
+   timing before enabling mutation capabilities.

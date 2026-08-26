@@ -2,6 +2,12 @@
 
 Status: blocked on Stage 02
 
+Implementation note: the reader-backed codec and a callback-only effective RGB
+view have landed early. The view copies no payload during provider publication,
+and its captured frame token refuses access after any later publication. It is
+not installed in production and no renderer family has migrated yet, so the
+compiled RGB configuration remains the exact runtime behavior.
+
 ## Objective
 
 Make every Milestone A RGB surface read from one generation-consistent effective
@@ -30,10 +36,10 @@ payload-sized RAM buffer. Exact fields, enum ids, capacities, canonical rules,
 and deferrals are documented in
 `tools/charybdis-profile-studio/live-link/rgb-domain-v1.md`.
 
-This is schema evidence, not the vertical slice: an effective RGB provider,
-preview/rollback, candidate writes, persistence, split convergence, source
-pull, and UI actions remain open. No deliverable below is checked by this
-foundation alone.
+This is foundation evidence, not the vertical slice: production owner
+installation, all eight renderer migrations, preview/rollback, candidate
+writes, persistence, split convergence, source pull, and UI actions remain
+open. No deliverable below is complete from this foundation alone.
 
 ## Migration Order
 
@@ -94,7 +100,8 @@ adds a source or compile gate against regression.
 
 ## Deliverables
 
-- [ ] Effective RGB profile API
+- [ ] Effective RGB profile API (callback view and stale-frame contract landed;
+      installed renderer consumer remains)
 - [ ] All eight RGB families migrated
 - [ ] Generation-consistent cache invalidation
 - [ ] Volatile preview and rollback
@@ -103,6 +110,19 @@ adds a source or compile gate against regression.
 - [ ] Push, pull, and reset for RGB
 - [ ] Source gate against direct production array reads
 - [ ] Updated Studio UI, docs, screenshots, stage, risks, and progress
+
+Early effective-view evidence landed on 2026-08-26:
+
+- the provider callback copies only the validated RGB view and identity into a
+  double bank; it performs no reader calls or derived color/map work;
+- compiled and validated behavior-only generations explicitly retain the
+  direct authored RGB fallback instead of replaying the compiled virtual blob;
+- a captured live frame contains no pointer into the runtime bank and becomes
+  stale after any later publication, including another compiled-fallback
+  publication; and
+- focused tests cover normal, ASan/UBSan, and Cortex-M0+ builds, zero-I/O
+  invalidation, installed/fallback selection, reader-backed access after
+  capture, fail-closed identity mismatch, and frame staleness.
 
 ## Verification
 

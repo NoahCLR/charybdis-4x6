@@ -58,6 +58,12 @@ No project risks are closed yet.
   risks remain open until the owner is installed, direct-bypass gates land,
   worst-case lookup timing is measured on the keyboard, and any index choice is
   rechecked against bank-aware linked accounting.
+- R-12 now has a callback-only double-banked RGB view and a captured-frame
+  epoch contract. Provider invalidation performs no payload reads, and any
+  later publication makes an old frame token stale before another record is
+  requested. R-12 remains open until every renderer family consumes that view,
+  cache invalidation is ordered at the frame boundary, split generations
+  converge, and the real keyboard passes the render matrix.
 - The accepted design repartitions the existing 16 KiB logical EEPROM, so it
   does not enlarge the 16 KiB wear-level cache. Candidate payloads remain in
   inactive EEPROM for power-loss-safe staging and to avoid duplication. A

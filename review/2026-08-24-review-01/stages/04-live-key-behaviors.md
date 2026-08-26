@@ -155,11 +155,11 @@ measure its worst-case first lookup before choosing a compact index; that
 decision must use the RP2040 bank accounting in `docs/architecture/memory-budgets.md`,
 not the `.data + .bss` regression margin presented as physical capacity.
 
-The remaining materialization seam is deliberate: wire actions are validated
-as stable `{kind, operand}` values, but no code yet converts them into a
-generation-owned runtime action/handled-key view. That conversion must first
-validate the connected action-ABI digest and whole-profile layer, PD-mode, and
-macro references, then publish only at the Stage 02 safe activation boundary.
+The remaining owner seam is deliberate: action translation and the
+generation-owned behavior view now exist, but production does not install them
+until the RGB consumer and one scan owner can register all invalidators in a
+fixed order. Provider validation still owns the connected action-ABI digest and
+whole-profile layer, PD-mode, and macro references before that safe activation.
 
 ## Verification
 
