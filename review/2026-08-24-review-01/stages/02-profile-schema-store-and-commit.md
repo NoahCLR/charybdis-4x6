@@ -164,7 +164,8 @@ Volatile preview must not outrank durable committed state after reconnect.
 - [ ] Candidate protocol (exact firmware/desktop frame/status codecs, bounded
   scan coordinator, durable commit/activation coordinator, and desktop prepare
   plus commit coordinator landed; QMK routing and capabilities remain)
-- [ ] Safe activation owner and predicate
+- [ ] Safe activation owner and predicate (production predicate and coherent
+  reason/count snapshot landed; provider-owner installation remains)
 - [ ] Effective profile generation publication
 - [ ] Domain invalidation contract
 - [ ] Split convergence
@@ -340,8 +341,9 @@ a pending provider snapshot; provider polling still owns safe publication. A
 runtime rollback that makes the store's nominal inactive slot active is
 mechanically refused before EEPROM mutation, and moving active authority away
 allows the next reservation to discard only the overlapping rollback copy.
-This seam is still disconnected from QMK routing. No production safe predicate
-or invalidator is installed, and no key/RGB consumer reads through it.
+This seam is still disconnected from QMK routing. A production safe predicate
+now exists, but it is not installed into a production provider owner; no
+invalidator is installed, and no key/RGB consumer reads through it.
 
 Landed desktop candidate evidence:
 
@@ -372,8 +374,23 @@ maximum 16-byte read. RGB, behavior, and whole-profile runners also compile the
 state machines for Cortex-M0+. The whole validator is exactly 348 bytes on the
 32-bit target under an explicit 352-byte regression policy; that policy is not
 a hardware SRAM-capacity claim. Production routing and mutation capability
-bits remain disabled pending the production safe predicate, invalidators, and
-QMK owner; real-device scan timing remains unconfirmed until the hardware pass.
+bits remain disabled pending installation of the landed safe predicate,
+invalidators, and the QMK owner; real-device scan timing remains unconfirmed
+until the hardware pass.
+
+Landed safe-predicate evidence:
+
+- `profile_activation_policy.c` maps authoritative key-runtime counts, managed
+  HID outputs, live modifier/one-shot state, macro lifecycle, combo-origin
+  state, and an injected peer observer into the frozen reason mask above;
+- owned HID usage maintains an aggregate active-usage count, so a pending
+  activation does not scan the full usage table on every matrix cycle;
+- missing or failed peer observation and invalid policy state fail closed;
+- reason/count status is copied through the established bounded publication
+  protocol; and
+- focused normal, ASan/UBSan, no-one-shot, and Cortex-M0+ tests cover every
+  reason, peer failure, saturation, and in-flight status refusal. Runtime-debug
+  and owned-keycode tests enforce the two new authoritative observation seams.
 
 ## Exit Criteria
 

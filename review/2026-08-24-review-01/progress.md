@@ -462,8 +462,9 @@ Focused verification passed:
   split-slave worst reviewed paths)
 - `git diff --check`
 
-Production QMK routing, candidate/domain capability advertising, the production
-safe predicate/invalidators, and split convergence remain deliberately absent.
+Production QMK routing, candidate/domain capability advertising, installed
+invalidators, and split convergence remain deliberately absent. The production
+safe predicate has since landed but is not installed into a provider owner.
 The isolated candidate scan owner now composes bounded marker-last commit and
 provider activation behind custom-save `0x13`; it is not yet reachable from
 QMK. The
@@ -484,8 +485,9 @@ in 58 steps with at most one 16-byte read each. Every step is mechanically
 capped at one reader operation and 20 newly observed bytes. Cortex-M0+ compile
 coverage enforces the 348-byte whole-validator state under its explicit
 352-byte regression policy. This closes the unbounded domain-work blocker;
-production routing still awaits the safe predicate/invalidators and runtime
-QMK owner; real hardware timing remains unconfirmed.
+production routing still awaits installation of the landed safe predicate,
+invalidators, and the runtime QMK owner; real hardware timing remains
+unconfirmed.
 
 Stage 00 baseline commands passed on 2026-08-25:
 
@@ -516,9 +518,10 @@ the packaged helper without changing the injected adapter contract.
 - The real-board HID/VS Code-host spike has not run.
 - RGB and key-behavior domain codecs plus the real compiled-default
   materializer now match across firmware and Studio. The provider lifecycle and
-  its destructive-store reservation are hardened and tested; production
-  safe-boundary wiring, invalidator implementations, QMK commit routing, and
-  consumer migration remain open. Whole-profile action-ABI and compiled-
+  its destructive-store reservation are hardened and tested; the production
+  safe predicate is implemented, while provider-owner installation,
+  invalidators, QMK commit routing, and consumer migration remain open.
+  Whole-profile action-ABI and compiled-
   reference validation has landed.
 - The baseline persistence and role-swap hardware matrix remains open.
 
@@ -526,9 +529,10 @@ These are expected opening conditions, not project failure.
 
 ## Next Steps
 
-1. Install the production safe-boundary predicate and first invalidators before
-   connecting the validated staging path to QMK routing, then measure scan
-   timing on the real RP2040 before advertising mutation capabilities.
+1. Install the landed production safe-boundary predicate with the first
+   invalidators before connecting the validated staging path to QMK routing,
+   then measure scan timing on the real RP2040 before advertising mutation
+   capabilities.
 2. Add split reconciliation before advertising durable mutation capabilities.
 3. Build the effective RGB accessors, then migrate the eight renderer families
    without allowing direct compiled-table bypasses.
@@ -688,3 +692,44 @@ Append new entries here in chronological order. Each entry must name:
   Studio UI changed, so screenshots were intentionally not regenerated. The
   QMK build/resource gates wrote generated sibling build artifacts only; no
   sibling source file was edited.
+
+### 2026-08-25 — Stage 02 production activation-predicate checkpoint
+
+- Added the production safe-boundary predicate with frozen reason bits and an
+  exact count snapshot for physical presses, tap series, runtime leases,
+  deferred releases, persistent intents, managed HID outputs, modifiers and
+  one-shots, macro work, combo-origin work, and peer convergence.
+- The key runtime exposes its five authoritative aggregate counts through a
+  narrow public snapshot. Owned keycodes now maintain an O(1) aggregate active
+  usage count, including managed mouse buttons, instead of requiring an HID
+  usage-table scan while activation waits.
+- Peer observation fails closed when absent or unreadable. Predicate status is
+  published through the existing bounded generation primitive, so USB/status
+  readers either receive one complete observation or retain their prior copy.
+- Focused verification passed through the activation-policy runner (normal,
+  ASan/UBSan, QMK one-shot-disabled, and Cortex-M0+), owned-keycode tests,
+  runtime-debug tests, the feature-gate compile matrix, the full host suite,
+  the production QMK build, and both firmware resource gates.
+- Fresh RP2040 accounting reports 270,336 B physical SRAM per MCU, 25,684 B
+  SRAM0–3 `.bss`, 48,664 B for the `.data + .bss` regression metric,
+  213,472 B for the boot core-memory span, and 56,128 B fixed linked
+  occupancy. Reviewed stack paths remain 1,880 B main and 336 B split-slave.
+- The predicate is compiled into production firmware but is not installed into
+  a production provider owner. QMK mutation routing and capability advertising
+  remain disabled. Domain invalidators, split convergence, key/RGB consumer
+  migration, and real-board timing remain next. No Profile Studio UI changed,
+  so screenshots were intentionally not regenerated. The QMK build/resource
+  gates wrote generated sibling build artifacts only; no sibling source file
+  was edited.
+
+Next steps:
+
+1. Add effective RGB/behavior invalidator owners that can consume the
+   provider's callback-only generation view without replaying the compiled
+   virtual blob on hot paths.
+2. Install the provider and predicate through the scan owner only after those
+   invalidators exist; retain fail-closed peer status until split convergence
+   is implemented.
+3. Repeat full host, firmware, and fresh resource gates after owner/consumer
+   integration, then run the hardware timing gate before enabling any mutation
+   capability.

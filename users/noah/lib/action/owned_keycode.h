@@ -45,5 +45,6 @@ bool owned_keycode_unregister(uint16_t keycode);
 bool owned_keycode_tap(uint16_t keycode);
 void owned_keycode_track_physical_event(uint16_t keycode, keyrecord_t *record);
 bool owned_keycode_should_suppress_default(uint16_t keycode, keyrecord_t *record);
+uint16_t owned_keycode_managed_usage_count(void);
 void owned_keycode_debug_snapshot(uint8_t keycode, owned_keycode_debug_snapshot_t *out);
 void owned_keycode_reset_for_test(void);

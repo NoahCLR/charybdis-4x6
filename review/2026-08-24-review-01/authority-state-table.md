@@ -82,6 +82,29 @@ The activation owner reports a reason mask and counts. It never forces releases
 just to make a commit progress. Until the predicate is satisfied, the prior
 generation remains active and the prepared candidate remains observable.
 
+The landed predicate freezes the following firmware reason bits:
+
+| Bit | Reason | Authoritative evidence |
+| --- | --- | --- |
+| `0` | physical press | key-runtime press-token count |
+| `1` | pending tap series | key-runtime tap-series count |
+| `2` | runtime-owned lease | key-runtime lease count, including held/repeat and momentary ownership |
+| `3` | deferred release | key-runtime pending-release count |
+| `4` | persistent intent | key-runtime persistent layer/PD/pointer intent count |
+| `5` | owned output | aggregate managed HID usage count, including mouse buttons |
+| `6` | modifier or one-shot modifier | live real, weak, one-shot, or locked one-shot modifier state |
+| `7` | one-shot layer | QMK one-shot-layer state |
+| `8` | macro | non-idle macro engine or macro-owned hold count |
+| `9` | combo | pending or active combo-origin count |
+| `10` | peer | unresolved or unreadable peer-convergence state |
+| `30` | internal | missing or invalid local policy state |
+
+The predicate snapshot uses bounded generation publication so an extension-host
+status read cannot observe counts from two evaluations. A missing peer observer
+is intentionally unsafe. The predicate exists in production firmware code but
+is not yet installed into a production provider owner; mutation routing remains
+disabled until that owner, invalidators, and split convergence are connected.
+
 ## Connection Status Shown By Studio
 
 At minimum:

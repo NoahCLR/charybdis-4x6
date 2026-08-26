@@ -12,6 +12,7 @@
 typedef struct {
     uint8_t  physical_refcounts[OWNED_KEYCODE_USAGE_CAPACITY];
     uint8_t  managed_refcounts[OWNED_KEYCODE_USAGE_CAPACITY];
+    uint16_t managed_usage_count;
     uint16_t saturation_count;
     uint16_t underflow_count;
     uint16_t unsupported_count;
@@ -95,9 +96,12 @@ static bool owned_keycode_acquire_basic(uint8_t basic) {
         }
         return false;
     }
-    if ((*managed)++ == 0u && owned_keycode_state.physical_refcounts[basic] == 0u) {
-        pointer_layer_policy_note_action(basic, true);
-        register_code(basic);
+    if ((*managed)++ == 0u) {
+        owned_keycode_state.managed_usage_count++;
+        if (owned_keycode_state.physical_refcounts[basic] == 0u) {
+            pointer_layer_policy_note_action(basic, true);
+            register_code(basic);
+        }
     }
     return true;
 }
@@ -112,9 +116,14 @@ static bool owned_keycode_release_basic(uint8_t basic) {
         return false;
     }
     (*managed)--;
-    if (*managed == 0u && owned_keycode_state.physical_refcounts[basic] == 0u) {
-        unregister_code(basic);
-        pointer_layer_policy_note_action(basic, false);
+    if (*managed == 0u) {
+        if (owned_keycode_state.managed_usage_count != 0u) {
+            owned_keycode_state.managed_usage_count--;
+        }
+        if (owned_keycode_state.physical_refcounts[basic] == 0u) {
+            unregister_code(basic);
+            pointer_layer_policy_note_action(basic, false);
+        }
     }
     return true;
 }
@@ -282,6 +291,10 @@ bool owned_keycode_should_suppress_default(uint16_t keycode, keyrecord_t *record
     owned_keycode_lease_t components;
 
     return record && owned_keycode_decompose(keycode, &components) && components.has_basic && owned_keycode_state.managed_refcounts[components.basic] != 0u;
+}
+
+uint16_t owned_keycode_managed_usage_count(void) {
+    return owned_keycode_state.managed_usage_count;
 }
 
 void owned_keycode_debug_snapshot(uint8_t keycode, owned_keycode_debug_snapshot_t *out) {

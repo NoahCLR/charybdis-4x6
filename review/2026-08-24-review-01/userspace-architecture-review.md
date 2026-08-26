@@ -225,7 +225,7 @@ The opening findings above are the audit-time snapshot. Current status:
 | 1 — malformed VIA mirror prerequisite | open, remediation in progress | owned by Review 19; targeted guard and sanitizer package opened |
 | 2 — no effective-profile seam | partially resolved | a hardened isolated generation-owned provider now enforces coherent publication, invalidation visibility, safe-predicate reentrancy, nested-view containment, and active-backing-aware reuse; production store ownership and all consumer migration remain open |
 | 3 — no canonical schema | partially resolved | `profile-wire-v1.md`, D-010, and D-015 freeze the v1 contract; blob, RGB, behavior, validator, and real compiled-default materializer now share exact C/JavaScript fixtures, while production runtime and split integration remain open |
-| 4 — no safe activation boundary | partially resolved | `authority-state-table.md` freezes the quiescence contract; production reason-mask and activation owner remain open |
+| 4 — no safe activation boundary | partially resolved | `authority-state-table.md` freezes the quiescence contract and `profile_activation_policy.c` now produces coherent production reason/count snapshots from authoritative runtime owners; provider-owner installation, split convergence, invalidators, consumer migration, and hardware evidence remain open |
 | 5 — source/device authority | resolved at contract level | D-013, D-014, and `authority-state-table.md` define operations, ordering, partial results, and conflicts |
 | 6 — storage/capacity evidence | resolved at Stage 00 design level; runtime high-water remains open | D-016 and `stage-00-baseline.md` record the corrected per-half bank model, policy-versus-capacity distinction, exact EEPROM map, dual-slot partition, and ceilings |
 | 7 — Studio transport boundary | partially resolved | D-012 accepts an injected serialized adapter and fake; concrete packaged board probe remains open |
@@ -386,9 +386,9 @@ snapshot and request safe-boundary publication. The candidate coordinator now
 composes those operations behind custom-save `0x13`, retains idempotent
 transaction/digest correlation through commit and activation, and distinguishes
 an unconfirmed final marker from a safely failed commit. These APIs remain
-disconnected from QMK routing: no production safe predicate, invalidator set,
-capability, or split owner is installed merely because the isolated owner
-exists.
+disconnected from QMK routing. The production safe predicate has landed but is
+not yet installed; no invalidator set, capability, or split owner is installed
+merely because the isolated owner exists.
 
 ### Split Reconciliation
 

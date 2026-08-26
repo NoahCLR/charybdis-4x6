@@ -135,6 +135,7 @@ noah_host_runtime_debug_support_paths() {
     common_additions='
 lib/key/ownership/held_action.c
 lib/key/ownership/held_repeat.c
+lib/key/runtime/api.c
 lib/key/runtime/feedback.c
 lib/key/runtime/trace/core_trace.c
 lib/state/ownership/keyboard_mod_ownership.c

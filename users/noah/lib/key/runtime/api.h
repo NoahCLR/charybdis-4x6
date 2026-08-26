@@ -10,5 +10,14 @@
 
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
+typedef struct {
+    uint8_t press_token_count;
+    uint8_t tap_series_count;
+    uint8_t lease_count;
+    uint8_t pending_release_count;
+    uint8_t persistent_intent_count;
+} noah_key_runtime_activity_snapshot_t;
+
 void noah_key_runtime_scan(void);
 bool noah_key_runtime_settle_pending_fallback_hold(void);
+void noah_key_runtime_activity_snapshot(noah_key_runtime_activity_snapshot_t *out);

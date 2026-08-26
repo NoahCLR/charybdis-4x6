@@ -3345,6 +3345,30 @@ static void test_key_runtime_core_token_allocator_exhaustion_fails_closed(void) 
 }
 #endif
 
+static void test_key_runtime_activity_snapshot_uses_authoritative_counts(void) {
+    key_runtime_core_state_t             *state = key_runtime_core_state();
+    noah_key_runtime_activity_snapshot_t  snapshot;
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+    state->press_token_count       = 1u;
+    state->tap_series_count        = 2u;
+    state->lease_count             = 3u;
+    state->pending_release_count   = 4u;
+    state->persistent_intent_count = 5u;
+
+    snapshot = (noah_key_runtime_activity_snapshot_t){0};
+    noah_key_runtime_activity_snapshot(&snapshot);
+    CHECK(snapshot.press_token_count == 1u);
+    CHECK(snapshot.tap_series_count == 2u);
+    CHECK(snapshot.lease_count == 3u);
+    CHECK(snapshot.pending_release_count == 4u);
+    CHECK(snapshot.persistent_intent_count == 5u);
+
+    noah_key_runtime_activity_snapshot(NULL);
+    noah_runtime_reset_for_test();
+}
+
 int main(void) {
 #if KEY_RUNTIME_CORE_TOKEN_ID_MAX == UINT16_MAX
     test_debug_reports_slot_phase_and_momentary_layer_interrupt_state();
@@ -3421,6 +3445,8 @@ int main(void) {
 #else
 #    error "runtime_debug_test requires the production or exhaustion token-ID domain"
 #endif
+
+    test_key_runtime_activity_snapshot_uses_authoritative_counts();
 
     puts("runtime_debug host tests passed");
     return 0;

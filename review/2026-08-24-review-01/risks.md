@@ -45,6 +45,12 @@ No project risks are closed yet.
   boot. Fixed linked occupancy across the RP2040's 270,336 bytes of physical
   SRAM is 56,128 bytes. These figures are not interchangeable,
   and runtime allocator high-water remains unmeasured.
+- R-02 now has a production reason/count predicate backed by key-runtime
+  press/tap/lease/release/persistent counts, aggregate managed HID outputs,
+  QMK modifier and one-shot state, macro and combo lifecycles, and a fail-closed
+  injected peer observer. Its status snapshot is generation-coherent. R-02
+  remains open until the predicate is installed with provider invalidators,
+  split convergence, migrated consumers, and the held-state hardware matrix.
 - The accepted design repartitions the existing 16 KiB logical EEPROM, so it
   does not enlarge the 16 KiB wear-level cache. Candidate payloads remain in
   inactive EEPROM for power-loss-safe staging and to avoid duplication. A

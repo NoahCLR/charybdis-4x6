@@ -257,14 +257,17 @@ static void test_two_leases_share_one_basic_report_transition(void) {
 
     CHECK(owned_keycode_acquire(KC_C, &lease_a));
     CHECK(owned_keycode_acquire(KC_C, &lease_b));
+    CHECK(owned_keycode_managed_usage_count() == 1u);
     CHECK(register_code_count == 1);
 
     CHECK(owned_keycode_release(&lease_a));
+    CHECK(owned_keycode_managed_usage_count() == 1u);
     CHECK(unregister_code_count == 0);
     owned_keycode_debug_snapshot(KC_C, &snapshot);
     CHECK(snapshot.managed_count == 1);
 
     CHECK(owned_keycode_release(&lease_b));
+    CHECK(owned_keycode_managed_usage_count() == 0u);
     CHECK(unregister_code_count == 1);
     CHECK(unregister_code_calls[0] == KC_C);
     owned_keycode_debug_snapshot(KC_C, &snapshot);
@@ -279,6 +282,7 @@ static void test_modded_leases_share_the_basic_component(void) {
 
     CHECK(owned_keycode_acquire(G(KC_C), &gui_c));
     CHECK(owned_keycode_acquire(S(KC_C), &shift_c));
+    CHECK(owned_keycode_managed_usage_count() == 1u);
     CHECK(register_code_count == 1);
     CHECK(register_mods_count == 2);
 
@@ -287,6 +291,7 @@ static void test_modded_leases_share_the_basic_component(void) {
     CHECK(unregister_mods_count == 1);
 
     CHECK(owned_keycode_release(&shift_c));
+    CHECK(owned_keycode_managed_usage_count() == 0u);
     CHECK(unregister_code_count == 1);
     CHECK(unregister_mods_count == 2);
 }
@@ -380,11 +385,13 @@ static void test_basic_refcount_saturation_is_rejected(void) {
     CHECK(register_code_count == 1);
     owned_keycode_debug_snapshot(KC_C, &snapshot);
     CHECK(snapshot.managed_count == UINT8_MAX);
+    CHECK(owned_keycode_managed_usage_count() == 1u);
     CHECK(snapshot.saturation_count == 1);
 
     for (uint16_t i = 0; i < UINT8_MAX; i++) {
         CHECK(owned_keycode_unregister(KC_C));
     }
+    CHECK(owned_keycode_managed_usage_count() == 0u);
     CHECK(unregister_code_count == 1);
 }
 
