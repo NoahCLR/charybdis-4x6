@@ -2,15 +2,14 @@
 
 Status: blocked on Stage 02
 
-Implementation note: the isolated cross-language payload package has landed
-early. It defines exact canonical row and sparse-step bytes, semantic actions,
-stable wire hold-mode ids, timing overrides, auto-mouse anchoring, capacity
-checks, and malformed-input rejection in Studio and firmware. Firmware
-validation is reader-backed and retains no payload-sized buffer or max-sized
-native row/step arrays. It does not yet translate source expressions into the
-wire model, materialize semantic wire actions for the key runtime, publish an
-effective provider, validate whole-profile references/action-ABI identity, or
-perform any device write.
+Implementation note: the cross-language payload, incremental whole-profile
+validation, semantic native-action materializer, and callback-only effective
+consumer seam have landed early. Firmware retains no payload-sized buffer or
+max-sized native row/step arrays. The consumer remains uninstalled, has no
+production scan/split owner, uses an ordered reader-backed lookup pending
+hardware timing, and performs no device write. Source-expression translation,
+Studio operation integration, compact-index decision, and device capability
+advertising remain open.
 
 ## Objective
 
@@ -109,8 +108,10 @@ state merely to make a profile apply appear fast.
 
 - [x] Desktop canonical key-behavior payload codec and golden vector
 - [x] Matching reader-backed firmware codec and cross-language fixture
-- [ ] Effective behavior provider
-- [ ] Compact bounded index
+- [ ] Effective behavior provider (reader-backed consumer/invalidation seam
+      landed; production owner installation remains)
+- [ ] Compact bounded index (retain the current ordered reader lookup until
+      real-board timing justifies the RAM/complexity tradeoff)
 - [ ] Complete Milestone A row validation
 - [ ] Direct compiled-array consumers removed from production lookup
 - [ ] Safe waiting activation with reason diagnostics
@@ -132,6 +133,27 @@ Early codec evidence:
 - `tests/host/run_key_behavior_domain_v1_tests.sh` runs normal and ASan/UBSan
   coverage for the exact vector, every frozen capacity, malformed records, and
   reader failure at every read boundary.
+
+Effective consumer evidence landed on 2026-08-26:
+
+- semantic action translation is centralized and round-trips QMK, layer,
+  pointing-mode, VIA-macro, and hardcoded-macro actions against the current
+  action ABI;
+- the provider invalidator performs only an infallible double-bank copy of the
+  already-validated reader-backed domain view; it performs no profile traversal
+  during publication;
+- live lookup uses a single ordered target pass and exact-row step access, while
+  compiled and RGB-only generations use direct authored tables rather than the
+  cold compiled virtual reader;
+- a live behavior domain is a complete replacement, so omitted rows are
+  removals rather than compiled-data leaks; and
+- lookup tokens carry a local epoch, and step materialization refuses tokens
+  from a prior published generation.
+
+The current lookup is schema-bounded but not yet indexed. Hardware timing must
+measure its worst-case first lookup before choosing a compact index; that
+decision must use the RP2040 bank accounting in `docs/architecture/memory-budgets.md`,
+not the `.data + .bss` regression margin presented as physical capacity.
 
 The remaining materialization seam is deliberate: wire actions are validated
 as stable `{kind, operand}` values, but no code yet converts them into a

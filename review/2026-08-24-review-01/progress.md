@@ -519,8 +519,9 @@ the packaged helper without changing the injected adapter contract.
 - RGB and key-behavior domain codecs plus the real compiled-default
   materializer now match across firmware and Studio. The provider lifecycle and
   its destructive-store reservation are hardened and tested; the production
-  safe predicate is implemented, while provider-owner installation,
-  invalidators, QMK commit routing, and consumer migration remain open.
+  safe predicate and first callback-only behavior consumer/invalidator are
+  implemented, while provider-owner installation, RGB invalidation, QMK commit
+  routing, split convergence, and remaining consumer migration remain open.
   Whole-profile action-ABI and compiled-
   reference validation has landed.
 - The baseline persistence and role-swap hardware matrix remains open.
@@ -733,3 +734,56 @@ Next steps:
 3. Repeat full host, firmware, and fresh resource gates after owner/consumer
    integration, then run the hardware timing gate before enabling any mutation
    capability.
+
+### 2026-08-26 — Stage 04 effective behavior-consumer checkpoint
+
+- Centralized Profile Wire v1 semantic-action translation in a bidirectional
+  runtime adapter. The compiled-default materializer now uses the same native
+  mapping as live behavior materialization, while its canonical 1,089-byte
+  fixture and action-ABI digest remain unchanged.
+- Added ordered target lookup and exact-row step access to the validated
+  behavior-domain view. Exact-row access re-resolves and compares caller row
+  metadata before reading steps, preserving the reader as the bounds authority.
+- Added a caller-owned, double-banked effective behavior view. Its provider
+  invalidator copies only validated domain metadata and swaps one local epoch;
+  it performs no payload traversal during provider publication.
+- Migrated production key-behavior lookup behind the optional effective seam.
+  An installed live domain fully replaces compiled rows, supports add/change/
+  remove semantics, converts every Milestone A action and hold mode, and rejects
+  step tokens from an older epoch. With no installed owner, or for RGB-only and
+  compiled generations, the existing direct authored tables remain exact.
+- Focused verification passed: `sh tests/host/run_key_behavior_domain_v1_tests.sh`,
+  `sh tests/host/run_key_behavior_lookup_tests.sh` (normal, ASan/UBSan, and
+  Cortex-M0+ source compiles), `sh tests/host/run_profile_compiled_defaults_v1_tests.sh`,
+  behavior/keymap/real-profile validation, all required key-runtime scenario,
+  release, modifier, PD-mode, layer-lock and integration runners, action/
+  ownership/macro runners, and `sh tests/host/run_feature_gate_compile_tests.sh`.
+- The state is compiled but no production instance is allocated or installed;
+  QMK mutation routing and capability advertising remain disabled. The current
+  schema-bounded ordered lookup intentionally precedes a real-board timing
+  decision about a compact index.
+- Final checkpoint verification passed: `sh tests/host/run_all_host_tests.sh`,
+  `qmk compile -kb bastardkb/charybdis/4x6 -km noah`,
+  `sh tests/host/run_firmware_memory_budget_checks.sh`,
+  `sh tests/host/run_firmware_stack_budget_checks.sh`, and
+  `git diff --check`. The fresh ordinary image remains at 25,684 B SRAM0–3
+  `.bss`, 22,980 B `.data`, 48,664/51,000 B `.data + .bss` policy span,
+  213,472 B SRAM0–3 linker/core-memory span at boot, and 56,128 B fixed linked
+  occupancy across the unique banks. Those are per-half linked facts and policy
+  metrics, not total-RAM or runtime high-water claims. Reviewed paths remain
+  1,880/1,920 B on the main process stack and 336/768 B on the split-slave
+  stack; that gate covers only its named paths.
+- Profile Studio UI behavior did not change, so screenshots were intentionally
+  not regenerated. The QMK build and resource gates wrote generated artifacts
+  in the sibling firmware build tree only; no sibling source was edited.
+- The remaining gates for this stage are the RGB invalidator, production owner,
+  split convergence, and real-hardware timing before capability advertising.
+
+Next steps:
+
+1. Add the callback-only effective RGB view and frame-generation capture before
+   installing either consumer into the production scan owner.
+2. Install provider, predicate, and both consumer states as one owner, retaining
+   fail-closed peer status until profile-generation split convergence exists.
+3. Measure worst-case behavior lookup and scan activation timing on the real
+   split keyboard before choosing an index or advertising mutation capability.

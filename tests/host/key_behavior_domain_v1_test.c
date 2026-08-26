@@ -289,7 +289,9 @@ static void test_shared_vectors_and_reader(const char *fixture_path) {
     noah_profile_codec_v1_error_t   error;
     noah_key_behavior_domain_v1_t   domain;
     noah_key_behavior_row_v1_view_t row;
+    noah_key_behavior_row_v1_view_t found_row;
     noah_key_behavior_step_v1_t     step;
+    bool                            found;
 
     expected_length = fixture_hex(fixture_path, "payload.empty.hex", expected, sizeof(expected));
     expect_result(noah_key_behavior_domain_v1_encode(NULL, 0u, NULL, NULL, encoded, sizeof(encoded), &written, &error), NOAH_PROFILE_CODEC_V1_OK);
@@ -312,6 +314,17 @@ static void test_shared_vectors_and_reader(const char *fixture_path) {
     assert(row.target.kind == NOAH_PROFILE_ACTION_V1_QMK_KEYCODE && row.target.operand == 0x1234u);
     assert(row.tap_hold_term == 150u && row.longer_hold_term == 400u && row.multi_tap_term == 175u);
     assert(row.flags == NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_FLAG_AUTO_MOUSE && row.step_count == 2u);
+    noah_profile_action_v1_t target = {.kind = NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, .operand = 0x1234u};
+    expect_result(noah_key_behavior_domain_v1_find_target(&domain, &target, &found_row, &found, &error), NOAH_PROFILE_CODEC_V1_OK);
+    assert(found && found_row.row_index == 0u && found_row.row_offset == row.row_offset);
+    expect_result(noah_key_behavior_domain_v1_step_in_row(&domain, &found_row, 0u, &step, &error), NOAH_PROFILE_CODEC_V1_OK);
+    assert(step.tap_index == 0u && step.hold.action.operand == 0x28u);
+    state.fail_at = state.read_count + 1u;
+    expect_result(noah_key_behavior_domain_v1_step_in_row(&domain, &found_row, 0u, &step, &error), NOAH_PROFILE_CODEC_V1_READ_ERROR);
+    state.fail_at = 0u;
+    noah_key_behavior_row_v1_view_t forged_row = found_row;
+    forged_row.row_offset++;
+    expect_result(noah_key_behavior_domain_v1_step_in_row(&domain, &forged_row, 0u, &step, &error), NOAH_PROFILE_CODEC_V1_INVALID_ARGUMENT);
     expect_result(noah_key_behavior_domain_v1_step_at(&domain, 0u, 0u, &step, &error), NOAH_PROFILE_CODEC_V1_OK);
     assert(step.tap_index == 0u && step.presence_mask == NOAH_KEY_BEHAVIOR_DOMAIN_V1_STEP_HAS_HOLD);
     assert(step.hold.mode == NOAH_KEY_BEHAVIOR_HOLD_V1_REPEAT_WHILE_HELD && step.hold.repeat_hz == 25u && step.hold.action.operand == 0x28u);
@@ -320,6 +333,14 @@ static void test_shared_vectors_and_reader(const char *fixture_path) {
     assert(step.long_hold.mode == NOAH_KEY_BEHAVIOR_HOLD_V1_TAP_AT_THRESHOLD && step.long_hold.action.kind == NOAH_PROFILE_ACTION_V1_LAYER_LOCK);
     expect_result(noah_key_behavior_domain_v1_row_at(&domain, 1u, &row, &error), NOAH_PROFILE_CODEC_V1_OK);
     assert(row.target.kind == NOAH_PROFILE_ACTION_V1_PD_MODE_MOMENTARY && row.target.operand == 2u && row.step_count == 1u);
+    target = (noah_profile_action_v1_t){.kind = NOAH_PROFILE_ACTION_V1_PD_MODE_MOMENTARY, .operand = 2u};
+    expect_result(noah_key_behavior_domain_v1_find_target(&domain, &target, &found_row, &found, &error), NOAH_PROFILE_CODEC_V1_OK);
+    assert(found && found_row.row_index == 1u);
+    target = (noah_profile_action_v1_t){.kind = NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, .operand = 0x4321u};
+    expect_result(noah_key_behavior_domain_v1_find_target(&domain, &target, &found_row, &found, &error), NOAH_PROFILE_CODEC_V1_OK);
+    assert(!found);
+    target = (noah_profile_action_v1_t){.kind = NOAH_PROFILE_ACTION_V1_NONE};
+    expect_result(noah_key_behavior_domain_v1_find_target(&domain, &target, &found_row, &found, &error), NOAH_PROFILE_CODEC_V1_INVALID_ARGUMENT);
     expect_result(noah_key_behavior_domain_v1_step_at(&domain, 1u, 0u, &step, &error), NOAH_PROFILE_CODEC_V1_OK);
     assert(step.tap.kind == NOAH_PROFILE_ACTION_V1_HARDCODED_MACRO && step.tap.operand == 2u);
     expect_result(noah_key_behavior_domain_v1_row_at(&domain, 2u, &row, &error), NOAH_PROFILE_CODEC_V1_INVALID_ARGUMENT);

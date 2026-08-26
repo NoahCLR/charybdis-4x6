@@ -12,7 +12,10 @@
 
 typedef struct {
     const key_behavior_t *config;
+    uint32_t              source_epoch; // live-profile epoch; zero for compiled defaults
     uint16_t              keycode;
+    uint8_t               source_row;
+    bool                  source_is_live;
     bool                  handled;
     bool                  is_momentary_layer; // MO() or authored LT() row
     bool                  is_layer_tap;       // specifically authored LT() row

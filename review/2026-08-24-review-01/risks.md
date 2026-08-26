@@ -51,6 +51,13 @@ No project risks are closed yet.
   injected peer observer. Its status snapshot is generation-coherent. R-02
   remains open until the predicate is installed with provider invalidators,
   split convergence, migrated consumers, and the held-state hardware matrix.
+- R-11 and R-13 now have a first production behavior seam: an installed live
+  generation fully replaces compiled rows, the callback copies no payload, and
+  old lookup epochs are refused after publication. The current ordered
+  reader-backed lookup deliberately has no persistent max-sized index. Both
+  risks remain open until the owner is installed, direct-bypass gates land,
+  worst-case lookup timing is measured on the keyboard, and any index choice is
+  rechecked against bank-aware linked accounting.
 - The accepted design repartitions the existing 16 KiB logical EEPROM, so it
   does not enlarge the 16 KiB wear-level cache. Candidate payloads remain in
   inactive EEPROM for power-loss-safe staging and to avoid duplication. A

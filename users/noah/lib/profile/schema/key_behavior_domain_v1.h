@@ -204,6 +204,14 @@ noah_profile_codec_v1_result_t noah_key_behavior_domain_v1_decode_reader(const n
 noah_profile_codec_v1_result_t noah_key_behavior_domain_v1_decode(const uint8_t *bytes, size_t length, const noah_key_behavior_limits_v1_t *limits, const noah_profile_action_v1_limits_t *action_limits, noah_key_behavior_domain_v1_t *domain, noah_profile_codec_v1_error_t *error);
 
 noah_profile_codec_v1_result_t noah_key_behavior_domain_v1_row_at(const noah_key_behavior_domain_v1_t *domain, uint8_t row_index, noah_key_behavior_row_v1_view_t *row, noah_profile_codec_v1_error_t *error);
+// Finds one canonical semantic target in a single ordered row pass. A missing
+// target is a successful query with *found == false; reader/shape failures are
+// still reported as codec errors.
+noah_profile_codec_v1_result_t noah_key_behavior_domain_v1_find_target(const noah_key_behavior_domain_v1_t *domain, const noah_profile_action_v1_t *target, noah_key_behavior_row_v1_view_t *row, bool *found, noah_profile_codec_v1_error_t *error);
+// Reads one step from a row view returned by row_at/find_target without
+// rescanning preceding rows. The row metadata is re-resolved at its exact
+// offset before use, so a forged caller view cannot escape domain bounds.
+noah_profile_codec_v1_result_t noah_key_behavior_domain_v1_step_in_row(const noah_key_behavior_domain_v1_t *domain, const noah_key_behavior_row_v1_view_t *row, uint8_t step_index, noah_key_behavior_step_v1_t *step, noah_profile_codec_v1_error_t *error);
 // Re-resolves row_index from the validated domain rather than trusting caller-
 // supplied row offsets. This keeps the reader bounds authoritative.
 noah_profile_codec_v1_result_t noah_key_behavior_domain_v1_step_at(const noah_key_behavior_domain_v1_t *domain, uint8_t row_index, uint8_t step_index, noah_key_behavior_step_v1_t *step, noah_profile_codec_v1_error_t *error);

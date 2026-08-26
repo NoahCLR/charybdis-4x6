@@ -11,7 +11,25 @@
 
 #include "../../action/action_dispatch.h"
 #include "../../pointing/defs/pd_modes.h"
+#include "../../profile/runtime/effective_key_behavior_runtime.h"
 #include "key_behavior_lookup.h"
+
+// Narrow host/feature variants may compile the authored lookup without the
+// live-profile runtime. Production's manifest supplies strong implementations;
+// the weak seam keeps those variants on exact compiled-default semantics.
+__attribute__((weak)) noah_effective_key_behavior_result_t noah_effective_key_behavior_lookup(uint16_t keycode, noah_effective_key_behavior_row_t *row) {
+    (void)keycode;
+    (void)row;
+    return NOAH_EFFECTIVE_KEY_BEHAVIOR_COMPILED_FALLBACK;
+}
+
+__attribute__((weak)) noah_effective_key_behavior_result_t noah_effective_key_behavior_step(uint32_t epoch, uint8_t row_index, uint8_t tap_count, key_behavior_step_t *step) {
+    (void)epoch;
+    (void)row_index;
+    (void)tap_count;
+    (void)step;
+    return NOAH_EFFECTIVE_KEY_BEHAVIOR_COMPILED_FALLBACK;
+}
 
 #ifdef KEY_BEHAVIOR_LOOKUP_TEST_INSTRUMENTATION
 static key_behavior_lookup_test_counters_t key_behavior_lookup_test_counters;
@@ -68,20 +86,6 @@ static uint8_t key_behavior_authored_tap_depth_in_config(const key_behavior_t *c
     return depth;
 }
 
-static bool key_behavior_has_more_taps_in_config(const key_behavior_t *config, uint8_t count) {
-    if (!config || count >= KEY_BEHAVIOR_MAX_TAP_COUNT) return false;
-
-    for (uint8_t i = count; i < KEY_BEHAVIOR_MAX_TAP_COUNT; i++) {
-        if (key_behavior_step_present(config->tap_counts[i])) return true;
-    }
-
-    return false;
-}
-
-static bool key_behavior_has_multi_tap_in_config(const key_behavior_t *config) {
-    return key_behavior_has_more_taps_in_config(config, 1);
-}
-
 static bool key_behavior_step_references_foreign_pd_mode(key_behavior_step_t step, pd_mode_mask_t base_mode) {
     pd_mode_mask_t mode;
 
@@ -99,20 +103,6 @@ static bool key_behavior_step_references_foreign_pd_mode(key_behavior_step_t ste
     if (step.long_hold.present) {
         mode = pd_mode_for_keycode(step.long_hold.action);
         if (mode != 0 && mode != base_mode) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
-static bool key_behavior_future_tap_path_has_foreign_pd_mode_in_config(const key_behavior_t *config, uint8_t count, pd_mode_mask_t base_mode) {
-    if (!config || base_mode == 0 || count >= KEY_BEHAVIOR_MAX_TAP_COUNT) {
-        return false;
-    }
-
-    for (uint8_t index = count; index < KEY_BEHAVIOR_MAX_TAP_COUNT; index++) {
-        if (key_behavior_step_references_foreign_pd_mode(config->tap_counts[index], base_mode)) {
             return true;
         }
     }
@@ -196,58 +186,98 @@ static uint8_t key_behavior_validate_unique_keycodes(void) {
 }
 
 key_behavior_step_t key_behavior_step_lookup(uint16_t keycode, uint8_t tap_count) {
-    return key_behavior_step_lookup_in_config(key_behavior_config_lookup(keycode), tap_count);
+    key_behavior_view_t behavior = key_behavior_lookup(keycode);
+
+    return key_behavior_view_step(&behavior, tap_count);
 }
 
 bool key_behavior_has_more_taps(uint16_t keycode, uint8_t count) {
-    return key_behavior_has_more_taps_in_config(key_behavior_config_lookup(keycode), count);
+    key_behavior_view_t behavior = key_behavior_lookup(keycode);
+
+    return key_behavior_view_has_more_taps(&behavior, count);
 }
 
 bool key_behavior_keeps_auto_mouse_anchored(uint16_t keycode) {
-    const key_behavior_t *config = key_behavior_config_lookup(keycode);
+    noah_effective_key_behavior_row_t live;
+    noah_effective_key_behavior_result_t result = noah_effective_key_behavior_lookup(keycode, &live);
 
+    if (result == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK) {
+        return (live.flags & NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_FLAG_AUTO_MOUSE) != 0u;
+    }
+    if (result != NOAH_EFFECTIVE_KEY_BEHAVIOR_COMPILED_FALLBACK) {
+        return false;
+    }
+
+    const key_behavior_t *config = key_behavior_config_lookup(keycode);
     return config && config->keeps_auto_mouse_anchored;
 }
 
 bool key_behavior_future_tap_path_has_foreign_pd_mode(uint16_t keycode, uint8_t count, pd_mode_mask_t base_mode) {
-    return key_behavior_future_tap_path_has_foreign_pd_mode_in_config(key_behavior_config_lookup(keycode), count, base_mode);
+    key_behavior_view_t behavior = key_behavior_lookup(keycode);
+
+    if (base_mode == 0u || count >= behavior.authored_tap_depth) {
+        return false;
+    }
+    for (uint8_t tap_count = (uint8_t)(count + 1u); tap_count <= behavior.authored_tap_depth; tap_count++) {
+        if (key_behavior_step_references_foreign_pd_mode(key_behavior_view_step(&behavior, tap_count), base_mode)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
-    const key_behavior_t *config    = key_behavior_config_lookup(keycode);
-    noah_action_desc_t    desc      = noah_action_describe(keycode);
-    bool                  custom_lt = config && noah_action_desc_uses_authored_layer_tap_contract(desc);
+    noah_effective_key_behavior_row_t    live = {0};
+    noah_effective_key_behavior_result_t live_result = noah_effective_key_behavior_lookup(keycode, &live);
+    const key_behavior_t                 *config = live_result == NOAH_EFFECTIVE_KEY_BEHAVIOR_COMPILED_FALLBACK ? key_behavior_config_lookup(keycode) : NULL;
+    bool                                  has_authored = live_result == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK || config;
+    noah_action_desc_t                    desc = noah_action_describe(keycode);
+    bool                                  custom_lt = has_authored && noah_action_desc_uses_authored_layer_tap_contract(desc);
 
     uint16_t tap_term = CUSTOM_TAP_HOLD_TERM;
-    if (config && config->tap_hold_term) {
+    if (live_result == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK && live.tap_hold_term) {
+        tap_term = live.tap_hold_term;
+    } else if (config && config->tap_hold_term) {
         tap_term = config->tap_hold_term;
     } else if (custom_lt) {
         tap_term = TAPPING_TERM;
     }
 
-    uint16_t longer_term = config && config->longer_hold_term ? config->longer_hold_term : CUSTOM_LONGER_HOLD_TERM;
-    uint16_t multi_term  = config && config->multi_tap_term ? config->multi_tap_term : CUSTOM_MULTI_TAP_TERM;
+    uint16_t longer_term = live_result == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK && live.longer_hold_term ? live.longer_hold_term : (config && config->longer_hold_term ? config->longer_hold_term : CUSTOM_LONGER_HOLD_TERM);
+    uint16_t multi_term  = live_result == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK && live.multi_tap_term ? live.multi_tap_term : (config && config->multi_tap_term ? config->multi_tap_term : CUSTOM_MULTI_TAP_TERM);
+    uint8_t  tap_depth   = live_result == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK ? live.authored_tap_depth : key_behavior_authored_tap_depth_in_config(config);
     return (key_behavior_view_t){
         .config             = config,
+        .source_epoch       = live.epoch,
         .keycode            = keycode,
-        .handled            = config || noah_action_desc_is_runtime_handled_keycode(desc),
+        .source_row         = live.row_index,
+        .source_is_live     = live_result == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK,
+        .handled            = has_authored || noah_action_desc_is_runtime_handled_keycode(desc),
         .is_momentary_layer = noah_action_desc_is_momentary_layer_keycode(desc) || custom_lt,
         .is_layer_tap       = custom_lt,
-        .has_multi_tap      = key_behavior_has_multi_tap_in_config(config),
-        .authored_tap_depth = key_behavior_authored_tap_depth_in_config(config),
+        .has_multi_tap      = tap_depth > 1u,
+        .authored_tap_depth = tap_depth,
         .tap_hold_term      = tap_term,
         .longer_hold_term   = longer_term,
         .multi_tap_term     = multi_term,
-        .single             = config ? config->tap_counts[0] : key_behavior_step_none(),
+        .single             = live_result == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK ? live.single : (config ? config->tap_counts[0] : key_behavior_step_none()),
     };
 }
 
 key_behavior_step_t key_behavior_view_step(const key_behavior_view_t *behavior, uint8_t tap_count) {
-    return key_behavior_step_lookup_in_config(behavior ? behavior->config : NULL, tap_count);
+    key_behavior_step_t step;
+
+    if (!behavior) {
+        return key_behavior_step_none();
+    }
+    if (behavior->source_is_live) {
+        return noah_effective_key_behavior_step(behavior->source_epoch, behavior->source_row, tap_count, &step) == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK ? step : key_behavior_step_none();
+    }
+    return key_behavior_step_lookup_in_config(behavior->config, tap_count);
 }
 
 bool key_behavior_view_has_more_taps(const key_behavior_view_t *behavior, uint8_t count) {
-    return key_behavior_has_more_taps_in_config(behavior ? behavior->config : NULL, count);
+    return behavior && count < behavior->authored_tap_depth;
 }
 
 uint8_t key_behavior_validate_all(void) {

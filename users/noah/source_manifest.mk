@@ -13,7 +13,9 @@ NOAH_COMMON_SOURCES := \
     lib/profile/schema/profile_rgb_v1.c \
     lib/profile/schema/profile_validator_v1.c \
     lib/profile/schema/profile_compiled_defaults_v1.c \
+    lib/profile/runtime/profile_action_runtime_v1.c \
     lib/profile/runtime/effective_profile_provider.c \
+    lib/profile/runtime/effective_key_behavior_runtime.c \
     lib/profile/runtime/profile_activation_policy.c \
     lib/profile/storage/profile_storage_layout.c \
     lib/profile/storage/profile_checksum.c \

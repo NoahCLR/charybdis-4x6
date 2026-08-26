@@ -7,6 +7,7 @@
 
 #include "users/noah/lib/profile/schema/profile_compiled_defaults_v1.h"
 #include "users/noah/lib/profile/schema/profile_validator_v1.h"
+#include "users/noah/lib/profile/runtime/profile_action_runtime_v1.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
 #include "users/noah/noah_keymap.h"
 
@@ -206,6 +207,7 @@ static void test_real_authored_profile(void) {
 
 static void test_semantic_action_translation(void) {
     noah_profile_action_v1_t action;
+    uint16_t                 native;
 
     assert(noah_profile_compiled_v1_action(KC_A, NULL) == NOAH_PROFILE_COMPILED_V1_INVALID_ARGUMENT);
     assert(noah_profile_compiled_v1_action(KC_NO, &action) == NOAH_PROFILE_COMPILED_V1_OK && action.kind == NOAH_PROFILE_ACTION_V1_NONE);
@@ -216,6 +218,26 @@ static void test_semantic_action_translation(void) {
     assert(noah_profile_compiled_v1_action(MACRO_7, &action) == NOAH_PROFILE_COMPILED_V1_OK && action.kind == NOAH_PROFILE_ACTION_V1_HARDCODED_MACRO && action.operand == 7u);
     assert(noah_profile_compiled_v1_action(pd_modes[PD_MODE_INDEX_ZOOM].keycode, &action) == NOAH_PROFILE_COMPILED_V1_OK && action.kind == NOAH_PROFILE_ACTION_V1_PD_MODE_MOMENTARY && action.operand == PD_MODE_INDEX_ZOOM);
     assert(noah_profile_compiled_v1_action(pd_modes[PD_MODE_INDEX_ARROW].lock_action, &action) == NOAH_PROFILE_COMPILED_V1_OK && action.kind == NOAH_PROFILE_ACTION_V1_PD_MODE_LOCK && action.operand == PD_MODE_INDEX_ARROW);
+
+    const uint16_t round_trip_actions[] = {
+        KC_NO,
+        KC_A,
+        MO(LAYER_NAV),
+        LOCK_LAYER(LAYER_SYM),
+        VIA_MACRO_10,
+        MACRO_7,
+        pd_modes[PD_MODE_INDEX_ZOOM].keycode,
+        pd_modes[PD_MODE_INDEX_ARROW].lock_action,
+    };
+    for (size_t index = 0u; index < ARRAY_SIZE(round_trip_actions); index++) {
+        assert(noah_profile_action_runtime_v1_from_native(round_trip_actions[index], &action) == NOAH_PROFILE_ACTION_RUNTIME_V1_OK);
+        assert(noah_profile_action_runtime_v1_to_native(&action, &native) == NOAH_PROFILE_ACTION_RUNTIME_V1_OK);
+        assert(native == round_trip_actions[index]);
+    }
+    action = (noah_profile_action_v1_t){.kind = NOAH_PROFILE_ACTION_V1_LAYER_LOCK, .operand = LAYER_COUNT};
+    assert(noah_profile_action_runtime_v1_to_native(&action, &native) == NOAH_PROFILE_ACTION_RUNTIME_V1_UNSUPPORTED && native == KC_NO);
+    action = (noah_profile_action_v1_t){.kind = NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, .flags = 1u, .operand = KC_A};
+    assert(noah_profile_action_runtime_v1_to_native(&action, &native) == NOAH_PROFILE_ACTION_RUNTIME_V1_INVALID_ARGUMENT);
 }
 
 int main(int argc, char **argv) {

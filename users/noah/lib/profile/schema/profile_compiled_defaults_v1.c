@@ -8,6 +8,7 @@
 
 #include "key_behavior_domain_v1.h"
 #include "profile_rgb_v1.h"
+#include "../runtime/profile_action_runtime_v1.h"
 #include "../storage/profile_checksum.h"
 #include "noah_keymap_ids.h"
 #include "lib/key/behavior/key_behavior.h"
@@ -152,53 +153,13 @@ static bool range_write(void *context, const uint8_t *bytes, size_t length) {
     return chunk_end < sink->end;
 }
 
-static noah_profile_action_v1_t action_none(void) {
-    return (noah_profile_action_v1_t){.kind = NOAH_PROFILE_ACTION_V1_NONE};
-}
-
 noah_profile_compiled_v1_result_t noah_profile_compiled_v1_action(uint16_t native_action, noah_profile_action_v1_t *action) {
-    if (!action) {
-        return NOAH_PROFILE_COMPILED_V1_INVALID_ARGUMENT;
-    }
-    *action = action_none();
-    if (native_action == KC_NO) {
+    noah_profile_action_runtime_v1_result_t result = noah_profile_action_runtime_v1_from_native(native_action, action);
+
+    if (result == NOAH_PROFILE_ACTION_RUNTIME_V1_OK) {
         return NOAH_PROFILE_COMPILED_V1_OK;
     }
-    if (native_action >= MACRO_0 && native_action <= MACRO_15) {
-        action->kind    = NOAH_PROFILE_ACTION_V1_HARDCODED_MACRO;
-        action->operand = (uint16_t)(native_action - MACRO_0);
-        return NOAH_PROFILE_COMPILED_V1_OK;
-    }
-    if (IS_QK_MACRO(native_action)) {
-        action->kind    = NOAH_PROFILE_ACTION_V1_VIA_MACRO;
-        action->operand = (uint16_t)(native_action - QK_MACRO_0);
-        return action->operand < VIA_MACRO_SLOT_COUNT ? NOAH_PROFILE_COMPILED_V1_OK : NOAH_PROFILE_COMPILED_V1_INVALID_ACTION;
-    }
-    if (native_action >= LAYER_LOCK_BASE && native_action < LAYER_LOCK_BASE + LAYER_COUNT) {
-        action->kind    = NOAH_PROFILE_ACTION_V1_LAYER_LOCK;
-        action->operand = (uint16_t)(native_action - LAYER_LOCK_BASE);
-        return NOAH_PROFILE_COMPILED_V1_OK;
-    }
-    if (IS_QK_MOMENTARY(native_action)) {
-        action->kind    = NOAH_PROFILE_ACTION_V1_LAYER_MOMENTARY;
-        action->operand = QK_MOMENTARY_GET_LAYER(native_action);
-        return action->operand < LAYER_COUNT ? NOAH_PROFILE_COMPILED_V1_OK : NOAH_PROFILE_COMPILED_V1_INVALID_ACTION;
-    }
-    for (uint8_t index = 0u; index < PD_MODE_COUNT; index++) {
-        if (native_action == pd_modes[index].keycode) {
-            action->kind    = NOAH_PROFILE_ACTION_V1_PD_MODE_MOMENTARY;
-            action->operand = index;
-            return NOAH_PROFILE_COMPILED_V1_OK;
-        }
-        if (native_action == pd_modes[index].lock_action) {
-            action->kind    = NOAH_PROFILE_ACTION_V1_PD_MODE_LOCK;
-            action->operand = index;
-            return NOAH_PROFILE_COMPILED_V1_OK;
-        }
-    }
-    action->kind    = NOAH_PROFILE_ACTION_V1_QMK_KEYCODE;
-    action->operand = native_action;
-    return NOAH_PROFILE_COMPILED_V1_OK;
+    return result == NOAH_PROFILE_ACTION_RUNTIME_V1_INVALID_ARGUMENT ? NOAH_PROFILE_COMPILED_V1_INVALID_ARGUMENT : NOAH_PROFILE_COMPILED_V1_INVALID_ACTION;
 }
 
 static int action_compare(noah_profile_action_v1_t left, noah_profile_action_v1_t right) {

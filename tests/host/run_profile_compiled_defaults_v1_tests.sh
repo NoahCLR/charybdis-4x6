@@ -44,6 +44,7 @@ build_and_run() {
         "$KEYMAP_PATH/keymap.c" \
         "$KEYMAP_PATH/rgb_config.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_compiled_defaults_v1.c" \
+        "$ROOT/users/noah/lib/profile/runtime/profile_action_runtime_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_blob_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
         "$ROOT/users/noah/lib/profile/schema/key_behavior_domain_v1.c" \
@@ -70,4 +71,5 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/tests/host/include" \
     -include "$CONFIG" \
     -fsyntax-only \
-    "$ROOT/users/noah/lib/profile/schema/profile_compiled_defaults_v1.c"
+    "$ROOT/users/noah/lib/profile/schema/profile_compiled_defaults_v1.c" \
+    "$ROOT/users/noah/lib/profile/runtime/profile_action_runtime_v1.c"

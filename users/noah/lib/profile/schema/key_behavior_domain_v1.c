@@ -711,25 +711,71 @@ noah_profile_codec_v1_result_t noah_key_behavior_domain_v1_row_at(const noah_key
     return NOAH_PROFILE_CODEC_V1_OK;
 }
 
-noah_profile_codec_v1_result_t noah_key_behavior_domain_v1_step_at(const noah_key_behavior_domain_v1_t *domain, uint8_t row_index, uint8_t step_index, noah_key_behavior_step_v1_t *step, noah_profile_codec_v1_error_t *error) {
+noah_profile_codec_v1_result_t noah_key_behavior_domain_v1_find_target(const noah_key_behavior_domain_v1_t *domain, const noah_profile_action_v1_t *target, noah_key_behavior_row_v1_view_t *row, bool *found, noah_profile_codec_v1_error_t *error) {
     decode_context_t context;
-    noah_key_behavior_row_v1_view_t row;
-    size_t           offset;
+    uint8_t          target_bytes[NOAH_PROFILE_BLOB_V1_ACTION_SIZE];
+    size_t           offset = NOAH_KEY_BEHAVIOR_DOMAIN_V1_HEADER_SIZE;
 
     clear_error(error);
-    if (!step || context_from_domain(domain, &context, error) != NOAH_PROFILE_CODEC_V1_OK || row_index >= domain->row_count) {
-        return fail(error, NOAH_PROFILE_CODEC_V1_INVALID_ARGUMENT, 0u, row_index, step_index, NOAH_KEY_BEHAVIOR_FIELD_V1_TAP_INDEX);
+    if (!target || !row || !found || context_from_domain(domain, &context, error) != NOAH_PROFILE_CODEC_V1_OK || noah_profile_action_v1_encode(target, &domain->action_limits, target_bytes, error) != NOAH_PROFILE_CODEC_V1_OK || target->kind == NOAH_PROFILE_ACTION_V1_NONE) {
+        return fail(error, NOAH_PROFILE_CODEC_V1_INVALID_ARGUMENT, 0u, UINT8_MAX, UINT8_MAX, NOAH_KEY_BEHAVIOR_FIELD_V1_TARGET);
     }
-    if (noah_key_behavior_domain_v1_row_at(domain, row_index, &row, error) != NOAH_PROFILE_CODEC_V1_OK) {
-        return error ? error->code : NOAH_PROFILE_CODEC_V1_INVALID_ARGUMENT;
+    *found = false;
+    for (uint8_t index = 0u; index < domain->row_count; index++) {
+        noah_key_behavior_row_v1_view_t decoded;
+        size_t                          next_offset;
+        noah_profile_codec_v1_result_t  result = decode_row(&context, offset, index, &decoded, &next_offset, error);
+        int                             comparison;
+
+        if (result != NOAH_PROFILE_CODEC_V1_OK) {
+            return result;
+        }
+        comparison = memcmp(decoded.target_bytes, target_bytes, sizeof(target_bytes));
+        if (comparison == 0) {
+            *row   = decoded;
+            *found = true;
+            return NOAH_PROFILE_CODEC_V1_OK;
+        }
+        if (comparison > 0) {
+            return NOAH_PROFILE_CODEC_V1_OK;
+        }
+        offset = next_offset;
     }
-    if (step_index >= row.step_count) {
-        return fail(error, NOAH_PROFILE_CODEC_V1_INVALID_ARGUMENT, row.steps_offset, row_index, step_index, NOAH_KEY_BEHAVIOR_FIELD_V1_TAP_INDEX);
+    return NOAH_PROFILE_CODEC_V1_OK;
+}
+
+static bool row_view_equal(const noah_key_behavior_row_v1_view_t *left, const noah_key_behavior_row_v1_view_t *right) {
+    return left && right && left->row_index == right->row_index && memcmp(left->target_bytes, right->target_bytes, sizeof(left->target_bytes)) == 0 && left->target.kind == right->target.kind && left->target.flags == right->target.flags && left->target.operand == right->target.operand && left->tap_hold_term == right->tap_hold_term && left->longer_hold_term == right->longer_hold_term && left->multi_tap_term == right->multi_tap_term && left->flags == right->flags && left->step_count == right->step_count && left->row_offset == right->row_offset && left->steps_offset == right->steps_offset && left->row_end == right->row_end;
+}
+
+noah_profile_codec_v1_result_t noah_key_behavior_domain_v1_step_in_row(const noah_key_behavior_domain_v1_t *domain, const noah_key_behavior_row_v1_view_t *row, uint8_t step_index, noah_key_behavior_step_v1_t *step, noah_profile_codec_v1_error_t *error) {
+    decode_context_t                 context;
+    noah_key_behavior_row_v1_view_t resolved;
+    size_t                           ignored_next;
+    size_t                           offset;
+    noah_profile_codec_v1_result_t  result;
+
+    clear_error(error);
+    if (!row || !step || context_from_domain(domain, &context, error) != NOAH_PROFILE_CODEC_V1_OK || row->row_index >= domain->row_count || row->row_offset < NOAH_KEY_BEHAVIOR_DOMAIN_V1_HEADER_SIZE) {
+        return fail(error, NOAH_PROFILE_CODEC_V1_INVALID_ARGUMENT, row ? row->row_offset : 0u, row ? row->row_index : UINT8_MAX, step_index, NOAH_KEY_BEHAVIOR_FIELD_V1_TAP_INDEX);
     }
-    offset = row.steps_offset;
+    result = decode_row(&context, row->row_offset, row->row_index, &resolved, &ignored_next, error);
+    if (result == NOAH_PROFILE_CODEC_V1_READ_ERROR) {
+        return result;
+    }
+    if (result != NOAH_PROFILE_CODEC_V1_OK) {
+        return fail(error, NOAH_PROFILE_CODEC_V1_INVALID_ARGUMENT, row->row_offset, row->row_index, step_index, NOAH_KEY_BEHAVIOR_FIELD_V1_TAP_INDEX);
+    }
+    if (!row_view_equal(row, &resolved)) {
+        return fail(error, NOAH_PROFILE_CODEC_V1_INVALID_ARGUMENT, row->row_offset, row->row_index, step_index, NOAH_KEY_BEHAVIOR_FIELD_V1_TAP_INDEX);
+    }
+    if (step_index >= resolved.step_count) {
+        return fail(error, NOAH_PROFILE_CODEC_V1_INVALID_ARGUMENT, resolved.steps_offset, resolved.row_index, step_index, NOAH_KEY_BEHAVIOR_FIELD_V1_TAP_INDEX);
+    }
+    offset = resolved.steps_offset;
     for (uint8_t index = 0u; index <= step_index; index++) {
         size_t next_offset;
-        noah_profile_codec_v1_result_t result = decode_step(&context, offset, row.row_end, row.row_index, index, step, &next_offset, error);
+        result = decode_step(&context, offset, resolved.row_end, resolved.row_index, index, step, &next_offset, error);
 
         if (result != NOAH_PROFILE_CODEC_V1_OK) {
             return result;
@@ -737,6 +783,19 @@ noah_profile_codec_v1_result_t noah_key_behavior_domain_v1_step_at(const noah_ke
         offset = next_offset;
     }
     return NOAH_PROFILE_CODEC_V1_OK;
+}
+
+noah_profile_codec_v1_result_t noah_key_behavior_domain_v1_step_at(const noah_key_behavior_domain_v1_t *domain, uint8_t row_index, uint8_t step_index, noah_key_behavior_step_v1_t *step, noah_profile_codec_v1_error_t *error) {
+    noah_key_behavior_row_v1_view_t row;
+
+    clear_error(error);
+    if (!step || !domain || row_index >= domain->row_count) {
+        return fail(error, NOAH_PROFILE_CODEC_V1_INVALID_ARGUMENT, 0u, row_index, step_index, NOAH_KEY_BEHAVIOR_FIELD_V1_TAP_INDEX);
+    }
+    if (noah_key_behavior_domain_v1_row_at(domain, row_index, &row, error) != NOAH_PROFILE_CODEC_V1_OK) {
+        return error ? error->code : NOAH_PROFILE_CODEC_V1_INVALID_ARGUMENT;
+    }
+    return noah_key_behavior_domain_v1_step_in_row(domain, &row, step_index, step, error);
 }
 
 static size_t step_encoded_size(const noah_key_behavior_step_v1_t *step) {

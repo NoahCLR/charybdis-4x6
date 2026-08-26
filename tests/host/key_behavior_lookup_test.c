@@ -8,6 +8,8 @@
 #include "users/noah/lib/key/behavior/key_behavior_lookup.h"
 #include "users/noah/lib/pointing/defs/pd_mode_flags.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
+#include "users/noah/lib/profile/runtime/effective_key_behavior_runtime.h"
+#include "users/noah/lib/profile/runtime/profile_action_runtime_v1.h"
 
 enum {
     TEST_LAYER_TAP_KEY              = 0x04,
@@ -170,6 +172,11 @@ const key_behavior_t key_behaviors[] = {
 };
 
 const uint8_t key_behavior_count = ARRAY_SIZE(key_behaviors);
+
+const pd_mode_def_t pd_modes[PD_MODE_COUNT] = {
+    [0] = {.mode_flag = 1u, .keycode = TEST_PD_MODE_KEY, .lock_action = TEST_PD_MODE_LOCK_KEY},
+    [1] = {.mode_flag = 2u, .keycode = TEST_OTHER_PD_MODE_KEY, .lock_action = TEST_OTHER_PD_MODE_KEY + 1u},
+};
 
 pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
     if (keycode == TEST_PD_MODE_KEY || keycode == TEST_TRANSPARENT_PD_KEY || keycode == TEST_STACKED_PD_KEY) {
@@ -685,6 +692,94 @@ static void test_momentary_layer_query_matches_hold_materialization(void) {
     test_check_momentary_helper_matches_materialization(resolution, ctx, false);
 }
 
+static void test_live_profile_behavior_replaces_compiled_rows_atomically(void) {
+    uint8_t                                payload[256];
+    size_t                                 written;
+    noah_profile_codec_v1_error_t          codec_error;
+    noah_key_behavior_domain_v1_t          domain;
+    noah_profile_action_v1_t               target;
+    noah_profile_action_v1_t               tap_zero;
+    noah_profile_action_v1_t               tap_one;
+    noah_key_behavior_step_v1_t            steps[2];
+    noah_key_behavior_row_v1_t             rows[1];
+    noah_effective_key_behavior_runtime_t  runtime;
+    noah_effective_profile_snapshot_t      callback_view = {0};
+    noah_effective_profile_identity_t      active = {.generation = 7u, .payload_digest = 0x1111u, .kind = NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE};
+    noah_effective_key_behavior_row_t      token;
+    key_behavior_view_t                    behavior;
+    key_behavior_step_t                    step;
+
+    CHECK(noah_profile_action_runtime_v1_from_native(TEST_MULTI_TAP_KEY, &target) == NOAH_PROFILE_ACTION_RUNTIME_V1_OK);
+    CHECK(noah_profile_action_runtime_v1_from_native(KC_Z, &tap_zero) == NOAH_PROFILE_ACTION_RUNTIME_V1_OK);
+    CHECK(noah_profile_action_runtime_v1_from_native(MACRO_7, &tap_one) == NOAH_PROFILE_ACTION_RUNTIME_V1_OK);
+    steps[0] = (noah_key_behavior_step_v1_t){
+        .tap_index     = 0u,
+        .presence_mask = NOAH_KEY_BEHAVIOR_DOMAIN_V1_STEP_HAS_TAP | NOAH_KEY_BEHAVIOR_DOMAIN_V1_STEP_HAS_HOLD,
+        .tap           = tap_zero,
+        .hold          = {
+            .mode   = NOAH_KEY_BEHAVIOR_HOLD_V1_PRESS_AND_HOLD_UNTIL_RELEASE,
+            .action = {.kind = NOAH_PROFILE_ACTION_V1_LAYER_MOMENTARY, .operand = 2u},
+        },
+    };
+    steps[1] = (noah_key_behavior_step_v1_t){
+        .tap_index     = 1u,
+        .presence_mask = NOAH_KEY_BEHAVIOR_DOMAIN_V1_STEP_HAS_TAP,
+        .tap           = tap_one,
+    };
+    rows[0] = (noah_key_behavior_row_v1_t){
+        .target           = target,
+        .tap_hold_term    = 123u,
+        .longer_hold_term = 456u,
+        .multi_tap_term   = 78u,
+        .flags            = NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_FLAG_AUTO_MOUSE,
+        .steps            = steps,
+        .step_count       = ARRAY_SIZE(steps),
+    };
+    CHECK(noah_key_behavior_domain_v1_encode(rows, ARRAY_SIZE(rows), NULL, NULL, payload, sizeof(payload), &written, &codec_error) == NOAH_PROFILE_CODEC_V1_OK);
+    CHECK(noah_key_behavior_domain_v1_decode(payload, written, NULL, NULL, &domain, &codec_error) == NOAH_PROFILE_CODEC_V1_OK);
+
+    noah_effective_key_behavior_runtime_init(&runtime);
+    CHECK(noah_effective_key_behavior_runtime_install(&runtime));
+    callback_view.identity            = active;
+    callback_view.profile.domain_mask = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS;
+    callback_view.profile.key_behaviors = domain;
+    noah_effective_key_behavior_runtime_invalidate(&runtime, 1u, (noah_effective_profile_identity_t){0}, active, &callback_view);
+
+    behavior = key_behavior_lookup(TEST_MULTI_TAP_KEY);
+    CHECK(behavior.source_is_live && behavior.config == NULL && behavior.handled);
+    CHECK(behavior.tap_hold_term == 123u && behavior.longer_hold_term == 456u && behavior.multi_tap_term == 78u);
+    CHECK(behavior.has_multi_tap && behavior.authored_tap_depth == 2u);
+    CHECK(behavior.single.tap.present && behavior.single.tap.action == KC_Z);
+    CHECK(behavior.single.hold.present && behavior.single.hold.action == MO(2));
+    CHECK(key_behavior_keeps_auto_mouse_anchored(TEST_MULTI_TAP_KEY));
+    step = key_behavior_view_step(&behavior, 2u);
+    CHECK(step.tap.present && step.tap.action == MACRO_7);
+
+    // A live behavior domain is a complete replacement: an omitted compiled
+    // row is removed rather than silently leaking through from source data.
+    behavior = key_behavior_lookup(TEST_AUTHORED_LAYER_TAP);
+    CHECK(!behavior.source_is_live && behavior.config == NULL && !behavior.handled);
+
+    CHECK(noah_effective_key_behavior_lookup(TEST_MULTI_TAP_KEY, &token) == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK);
+    active.generation = 8u;
+    active.payload_digest++;
+    callback_view.identity = active;
+    noah_effective_key_behavior_runtime_invalidate(&runtime, 2u, (noah_effective_profile_identity_t){0}, active, &callback_view);
+    CHECK(noah_effective_key_behavior_runtime_step(&runtime, token.epoch, token.row_index, 1u, &step) == NOAH_EFFECTIVE_KEY_BEHAVIOR_STALE);
+
+    // A validated RGB-only profile deliberately returns to direct compiled
+    // behavior tables; it never replays the compiled virtual blob on this path.
+    active.generation = 9u;
+    active.payload_digest++;
+    callback_view.identity            = active;
+    callback_view.profile.domain_mask = 0u;
+    noah_effective_key_behavior_runtime_invalidate(&runtime, 3u, (noah_effective_profile_identity_t){0}, active, &callback_view);
+    behavior = key_behavior_lookup(TEST_AUTHORED_LAYER_TAP);
+    CHECK(!behavior.source_is_live && behavior.config != NULL && behavior.handled);
+
+    noah_effective_key_behavior_runtime_uninstall(&runtime);
+}
+
 int main(void) {
     test_bare_lt_falls_back_to_qmk();
     test_authored_lt_uses_custom_runtime();
@@ -710,6 +805,7 @@ int main(void) {
     test_transparent_hold_uses_current_tap_count_for_lower_handled_key();
     test_transparent_long_hold_uses_lower_explicit_long_hold_action();
     test_momentary_layer_query_matches_hold_materialization();
+    test_live_profile_behavior_replaces_compiled_rows_atomically();
 
     puts("key_behavior_lookup host tests passed");
     return 0;

@@ -342,8 +342,10 @@ runtime rollback that makes the store's nominal inactive slot active is
 mechanically refused before EEPROM mutation, and moving active authority away
 allows the next reservation to discard only the overlapping rollback copy.
 This seam is still disconnected from QMK routing. A production safe predicate
-now exists, but it is not installed into a production provider owner; no
-invalidator is installed, and no key/RGB consumer reads through it.
+now exists, but it is not installed into a production provider owner. The
+first callback-only behavior invalidator and consumer lookup seam have landed;
+they remain dormant until that owner installs their caller-owned state. RGB
+invalidation and all capability advertising remain disabled.
 
 Landed desktop candidate evidence:
 
