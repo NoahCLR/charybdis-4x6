@@ -3,15 +3,16 @@
 Status: blocked on Stage 02
 
 Implementation note: the reader-backed codec, callback-only effective RGB view,
-and first four renderer-family migrations have landed early. The RGB orchestrator
+and all current renderer-family migrations have landed early. The RGB orchestrator
 now captures one token at the frame boundary. Layer colors/render modes and
 pointing-mode colors/locality read through the effective adapter, as do reusable
 group bitmaps, their layer/pointing/combo stage rows, the auto-mouse fade
-mode/end color, and combo-feedback color/locality. The view copies no payload
-during provider publication, and its captured frame token refuses access after
-any later publication. The effective runtime owner is not installed in
-production yet, so the compiled RGB configuration remains the exact runtime
-behavior.
+mode/end color, combo-feedback color/locality, and key-feedback colors,
+tap-branch ordering, locality, group rows, and tap-commit policy. The view
+copies no payload during provider publication, and its captured frame token
+refuses access after any later publication. The effective runtime owner is not
+installed in production yet, so the compiled RGB configuration remains the
+exact runtime behavior.
 
 ## Objective
 
@@ -42,10 +43,10 @@ and deferrals are documented in
 `tools/charybdis-profile-studio/live-link/rgb-domain-v1.md`.
 
 This is foundation and early-consumer evidence, not the vertical slice:
-production owner installation, the remaining renderer migrations,
-preview/rollback, candidate writes, persistence, split convergence, source
-pull, and UI actions remain open. No deliverable below is complete from this
-foundation alone.
+production owner installation, preview/rollback, candidate writes,
+persistence, split convergence, source pull, and UI actions remain open. The
+renderer-migration deliverables below can be complete without making the
+end-to-end stage complete.
 
 ## Migration Order
 
@@ -55,13 +56,14 @@ Migrate one table family at a time:
 2. pointing-mode colors and locality — migrated;
 3. auto-mouse fade mode and end color — migrated;
 4. combo feedback color and locality — migrated;
-5. key-behavior feedback colors, branch colors, tap-commit mode, and locality;
+5. key-behavior feedback colors, branch colors, tap-commit mode, and locality —
+   migrated;
 6. reusable LED groups as canonical bitmaps or the Stage 00-selected format —
-   migrated for layer, pointing-mode, and combo consumers;
+   migrated for layer, pointing-mode, combo, and key-feedback consumers;
 7. layer, pointing-mode, combo, and key-behavior stage-specific group rows —
-   migrated for layer, pointing mode, and combo;
+   migrated;
 8. runtime enable flags for authored feedback stages — migrated for layer,
-   pointing mode, auto-mouse, and combo; key feedback remains.
+   pointing mode, auto-mouse, combo, and key feedback.
 
 Each pass removes direct production reads of the matching compiled symbol and
 adds a source or compile gate against regression.
@@ -110,20 +112,15 @@ adds a source or compile gate against regression.
 ## Deliverables
 
 - [ ] Effective RGB profile API (callback view, stale-frame contract, frame
-      capture, and layer/pointing/auto-mouse/combo consumers landed; production
-      owner installation remains)
-- [ ] All eight RGB families migrated (layer colors/render modes,
-      pointing-mode colors/locality, auto-mouse fade mode/end color,
-      combo-feedback color/locality, and reusable groups used by the migrated
-      stage rows have migrated)
+      capture, and every current renderer consumer landed; production owner
+      installation remains)
+- [x] All eight RGB families migrated
 - [ ] Generation-consistent cache invalidation
 - [ ] Volatile preview and rollback
 - [ ] Persistent apply and split status
 - [ ] Semantic source/device diff
 - [ ] Push, pull, and reset for RGB
-- [ ] Source gate against direct production array reads (the migrated layer,
-      pointing-mode, auto-mouse, and combo families are gated; key feedback
-      still needs its matching gate)
+- [x] Source gate against direct production renderer-array reads
 - [ ] Updated Studio UI, docs, screenshots, stage, risks, and progress
 
 Early effective-view evidence landed on 2026-08-26:
@@ -193,6 +190,23 @@ Fourth-consumer evidence landed on 2026-08-27:
 - disabling the live combo stage clears the composed chunk, while publication
   during the final group lookup fails stale and leaves no partial frame. The
   source gate rejects direct combo-table reads outside the effective adapter.
+
+Fifth-consumer evidence landed on 2026-08-27:
+
+- the key-feedback stage resolves its stage-enable flag, ordered tap-branch
+  colors, committed/hold/long-hold colors, locality, canonical group bitmaps,
+  semantic group selectors, and group colors from the captured effective
+  frame;
+- the key runtime's tap-commit decision uses the same adapter and fails closed
+  to `KEY_FEEDBACK_TAP_COMMIT_OFF` if publication invalidates the read;
+- the stage no longer caches converted colors and composes into a caller-owned
+  frame before the runtime applies LEDs;
+- a dedicated live-vs-compiled fixture covers all six visible semantics,
+  branch-index selection, keys-only versus key-half locality, all-semantic and
+  inherited-color groups, and stage disablement; and
+- publication on the final group lookup clears the incomplete frame. The
+  source gate now rejects direct key-feedback table reads outside the effective
+  adapter, completing migration coverage for all current renderer families.
 
 ## Verification
 

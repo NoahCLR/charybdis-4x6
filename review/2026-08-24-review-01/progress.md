@@ -1065,3 +1065,72 @@ Next steps:
 3. Install RGB and behavior consumers through one production owner only after
    split profile-generation convergence is fail-closed, then measure real-board
    render and lookup timing before advertising mutation capabilities.
+
+### 2026-08-27 — Effective key-feedback RGB consumer checkpoint
+
+- Extended `rgb_effective_config.c` with compiled/live accessors for the
+  key-feedback stage-enable flag, ordered tap-branch colors, committed/hold/
+  long-hold colors, locality, canonical reusable-group bitmaps, semantic group
+  selectors, and group colors. Direct compiled key-feedback table access is
+  centralized in the adapter.
+- Moved `key_feedback_tap_commit_mode()` into the effective adapter because it
+  controls whether the key engine emits a tap-commit pulse, not only how RGB is
+  painted. A publication that invalidates this reader-backed decision returns
+  `KEY_FEEDBACK_TAP_COMMIT_OFF` fail-closed.
+- Reworked the final RGB stage to resolve colors as render-local state and
+  compose into the runtime's caller-owned frame from the same effective token
+  captured at the RGB frame boundary. The old persistent converted-color cache
+  is gone, and the runtime applies LEDs only after composition succeeds.
+- Preserved the six visible semantic states, tap-branch selection and clamp,
+  flash visibility, keys-only/key-half/left/right/both locality, all-semantic
+  group ordering, semantic-specific groups, canonical group bitmaps, and
+  inherited group colors.
+- Added a dedicated live-vs-compiled fixture. It distinguishes compiled
+  keys-only locality and explicit group color from live key-half locality and
+  inherited group placement, covers all six visible semantics, verifies branch
+  three selects the second live branch color, and proves stage-disablement.
+  Publication during the final group lookup clears the incomplete frame;
+  publication during the tap-policy read returns the fail-closed policy. The
+  renderer source gate now rejects direct key-feedback table reads outside the
+  effective adapter, completing migration coverage for all current RGB
+  renderer families.
+- Focused verification passed:
+  `sh tests/host/run_rgb_layer_render_tests.sh`,
+  `sh tests/host/run_effective_rgb_runtime_tests.sh`,
+  `sh tests/host/run_profile_rgb_v1_tests.sh`,
+  `sh tests/host/run_rgb_validation_tests.sh`,
+  `sh tests/host/run_real_profile_validation_tests.sh`,
+  `sh tests/host/run_key_runtime_scenario_tests.sh`, and
+  `sh tests/host/run_feature_gate_compile_tests.sh`.
+- Final checkpoint verification passed:
+  `sh tests/host/run_all_host_tests.sh`,
+  `qmk compile -kb bastardkb/charybdis/4x6 -km noah`,
+  `sh tests/host/run_firmware_memory_budget_checks.sh`,
+  `sh tests/host/run_firmware_stack_budget_checks.sh`, a restored ordinary QMK
+  compile plus memory check after stack instrumentation, and `git diff --check`.
+- Fresh linked resource facts are per RP2040 half: 270,336 B physical SRAM;
+  SRAM0–3 `.bss` is 25,684/26,000 B under the regression policy, `.data` is
+  22,984 B, and `.data + .bss` is 48,668/51,000 B. The SRAM0–3 linker/core-
+  memory span at boot is 213,472 B against the 204,800 B minimum, and fixed
+  linked occupancy across unique SRAM banks is 56,128 B. Removing the
+  persistent key-feedback color cache reduced linked `.bss` and fixed
+  occupancy by 24 B from the combo checkpoint. These are link-time facts and
+  policy metrics, not total-RAM headroom or runtime high-water measurements.
+- The stack gate remains 1,880/1,920 B for its worst named main-process path
+  and 336/768 B for its worst named split-slave path. It covers only the paths
+  in the stack manifest and is not a global or interrupt-stack maximum.
+- The effective runtime owner is still not installed, so production retains
+  exact compiled RGB behavior. Profile Studio UI and authored profile inputs
+  did not change; screenshots and introspection regeneration were intentionally
+  skipped. QMK/resource checks wrote generated sibling build artifacts only;
+  no sibling source was edited.
+
+Next steps:
+
+1. Install the RGB and behavior consumers through one production profile owner
+   after split generation convergence is fail-closed.
+2. Exercise preview/rollback, commit, reboot, disconnect/reconnect, both USB
+   orientations, and role swap on the real keyboard before exposing mutation
+   controls as ready.
+3. Measure real-board render time, behavior lookup time, allocator high-water,
+   and stack evidence for the newly reachable owner/activation paths.

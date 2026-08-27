@@ -231,7 +231,8 @@ static bool rgb_runtime_render_combo_overlay_stage(uint8_t led_min, uint8_t led_
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
 static bool rgb_runtime_render_key_feedback_stage(uint8_t led_min, uint8_t led_max) {
     rgb_runtime_render_snapshot_ensure_key_feedback();
-    return rgb_runtime_key_feedback_stage_render(rgb_runtime_render_snapshot.key_feedback_semantic_map, rgb_runtime_render_snapshot.key_feedback_tap_branch_map, rgb_runtime_render_snapshot.key_feedback_flash_visibility_bitmap, rgb_runtime_render_snapshot.key_feedback_broad_owner_map, led_min, led_max);
+    rgb_runtime_key_feedback_stage_render_effective_frame(&rgb_runtime_frame_primary, &rgb_runtime_profile_frame, rgb_runtime_render_snapshot.key_feedback_semantic_map, rgb_runtime_render_snapshot.key_feedback_tap_branch_map, rgb_runtime_render_snapshot.key_feedback_flash_visibility_bitmap, rgb_runtime_render_snapshot.key_feedback_broad_owner_map, led_min, led_max);
+    return rgb_runtime_layer_stage_apply_frame(&rgb_runtime_frame_primary, led_min, led_max);
 }
 #    endif
 #endif
