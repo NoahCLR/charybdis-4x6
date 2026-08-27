@@ -15,12 +15,16 @@ static uint8_t rgb_runtime_preview_stage_current_layer(void) {
 }
 
 bool rgb_runtime_preview_stage_render(rgb_runtime_frame_t *frame, uint8_t led_min, uint8_t led_max) {
+    return rgb_runtime_preview_stage_render_effective(frame, NULL, led_min, led_max);
+}
+
+bool rgb_runtime_preview_stage_render_effective(rgb_runtime_frame_t *frame, const noah_effective_rgb_frame_t *profile_frame, uint8_t led_min, uint8_t led_max) {
     uint8_t preview_layer = rgb_runtime_preview_stage_current_layer();
     if (!frame || preview_layer >= LAYER_COUNT) {
         return false;
     }
 
-    rgb_runtime_layer_stage_render_selected_frame(frame, preview_layer, led_min, led_max);
+    rgb_runtime_layer_stage_render_effective_selected_frame(frame, preview_layer, profile_frame, led_min, led_max);
     return rgb_runtime_layer_stage_apply_frame(frame, led_min, led_max);
 }
 

@@ -6,6 +6,7 @@ ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 
 . "$ROOT/tests/host/noah_host_qmk_env.sh"
 noah_host_export_qmk_cpath "$ROOT"
+noah_host_require_tool rg
 BUILD_DIR="$(mktemp -d)"
 BIN="$BUILD_DIR/rgb_layer_render_test"
 BIN_WORKLOAD="$BUILD_DIR/rgb_render_workload_test"
@@ -36,9 +37,13 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/rgb_base_underlay_test.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_layer_stage.c" \
+    "$ROOT/users/noah/lib/rgb/core/rgb_effective_config.c" \
+    "$ROOT/users/noah/lib/profile/runtime/effective_rgb_runtime.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_rgb_v1.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
     -o "$BIN_BASE_UNDERLAY"
 
-"$BIN_BASE_UNDERLAY"
+"$BIN_BASE_UNDERLAY" "$ROOT/tests/fixtures/rgb_domain_v1.fixture"
 
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
@@ -76,6 +81,10 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/rgb/stages/rgb_pd_mode_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_preview_stage.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_config_defaults.c" \
+    "$ROOT/users/noah/lib/rgb/core/rgb_effective_config.c" \
+    "$ROOT/users/noah/lib/profile/runtime/effective_rgb_runtime.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_rgb_v1.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_validation.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_runtime.c" \
     "$ROOT/users/noah/lib/state/diagnostics/runtime_diag.c" \
@@ -123,6 +132,10 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/rgb/stages/rgb_pd_mode_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_preview_stage.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_config_defaults.c" \
+    "$ROOT/users/noah/lib/rgb/core/rgb_effective_config.c" \
+    "$ROOT/users/noah/lib/profile/runtime/effective_rgb_runtime.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_rgb_v1.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_validation.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_runtime.c" \
     "$ROOT/users/noah/lib/state/diagnostics/runtime_diag.c" \
@@ -167,6 +180,10 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/rgb/stages/rgb_pd_mode_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_preview_stage.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_config_defaults.c" \
+    "$ROOT/users/noah/lib/rgb/core/rgb_effective_config.c" \
+    "$ROOT/users/noah/lib/profile/runtime/effective_rgb_runtime.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_rgb_v1.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_validation.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_runtime.c" \
     "$ROOT/users/noah/lib/state/diagnostics/runtime_diag.c" \
@@ -212,6 +229,10 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/rgb/stages/rgb_pd_mode_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_preview_stage.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_config_defaults.c" \
+    "$ROOT/users/noah/lib/rgb/core/rgb_effective_config.c" \
+    "$ROOT/users/noah/lib/profile/runtime/effective_rgb_runtime.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_rgb_v1.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_validation.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_runtime.c" \
     "$ROOT/users/noah/lib/state/diagnostics/runtime_diag.c" \
@@ -264,6 +285,10 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/rgb/stages/rgb_pd_mode_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_preview_stage.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_config_defaults.c" \
+    "$ROOT/users/noah/lib/rgb/core/rgb_effective_config.c" \
+    "$ROOT/users/noah/lib/profile/runtime/effective_rgb_runtime.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_rgb_v1.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_validation.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_runtime.c" \
     "$ROOT/users/noah/lib/state/diagnostics/runtime_diag.c" \
@@ -308,6 +333,10 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/rgb/stages/rgb_pd_mode_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_preview_stage.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_config_defaults.c" \
+    "$ROOT/users/noah/lib/rgb/core/rgb_effective_config.c" \
+    "$ROOT/users/noah/lib/profile/runtime/effective_rgb_runtime.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_rgb_v1.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_validation.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_runtime.c" \
     "$ROOT/users/noah/lib/state/diagnostics/runtime_diag.c" \
@@ -352,6 +381,10 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/rgb/stages/rgb_pd_mode_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_preview_stage.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_config_defaults.c" \
+    "$ROOT/users/noah/lib/rgb/core/rgb_effective_config.c" \
+    "$ROOT/users/noah/lib/profile/runtime/effective_rgb_runtime.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_rgb_v1.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_validation.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_runtime.c" \
     "$ROOT/users/noah/lib/state/diagnostics/runtime_diag.c" \
@@ -396,6 +429,10 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/rgb/stages/rgb_pd_mode_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_preview_stage.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_config_defaults.c" \
+    "$ROOT/users/noah/lib/rgb/core/rgb_effective_config.c" \
+    "$ROOT/users/noah/lib/profile/runtime/effective_rgb_runtime.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_rgb_v1.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_validation.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_runtime.c" \
     "$ROOT/users/noah/lib/state/diagnostics/runtime_diag.c" \
@@ -440,6 +477,10 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/rgb/stages/rgb_pd_mode_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_preview_stage.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_config_defaults.c" \
+    "$ROOT/users/noah/lib/rgb/core/rgb_effective_config.c" \
+    "$ROOT/users/noah/lib/profile/runtime/effective_rgb_runtime.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_rgb_v1.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_validation.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_runtime.c" \
     "$ROOT/users/noah/lib/state/diagnostics/runtime_diag.c" \
@@ -484,9 +525,23 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/rgb/stages/rgb_pd_mode_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_preview_stage.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_config_defaults.c" \
+    "$ROOT/users/noah/lib/rgb/core/rgb_effective_config.c" \
+    "$ROOT/users/noah/lib/profile/runtime/effective_rgb_runtime.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_rgb_v1.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_validation.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_runtime.c" \
     "$ROOT/users/noah/lib/state/diagnostics/runtime_diag.c" \
     -o "$BIN_KEY_RIGHT"
 
 "$BIN_KEY_RIGHT"
+
+if rg -n '\b(layer_colors|layer_led_groups|layer_led_group_count)\b' \
+    "$ROOT/users/noah/lib/rgb/stages/rgb_layer_stage.c" \
+    "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse_stage.c" \
+    "$ROOT/users/noah/lib/rgb/stages/rgb_preview_stage.c" \
+    "$ROOT/users/noah/lib/rgb/core/rgb_runtime.c"
+then
+    echo "direct authored layer RGB reads escaped the effective config adapter" >&2
+    exit 1
+fi

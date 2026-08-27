@@ -254,10 +254,11 @@ Landed read-only store-integration evidence:
 - the normal and sanitized store suite covers metadata-divergent equal
   generations plus power loss at every write and partial-byte boundary through
   the final commit marker;
-- target gates pass at a 48,664-byte SRAM0–3 `.data + .bss` regression metric
-  against the 51,000-byte policy, with a 213,472-byte linker/core-memory span
-  at boot and a 480-byte reviewed boot path; the existing worst reviewed
-  main/split paths remain 1,880 B and 336 B.
+- at this checkpoint, target gates passed at a 48,664-byte SRAM0–3
+  `.data + .bss` regression metric against the 51,000-byte policy, with a
+  213,472-byte linker/core-memory span at boot and a 480-byte reviewed boot
+  path; the existing worst reviewed main/split paths remained 1,880 B and
+  336 B.
 
 Landed standalone candidate-coordinator evidence:
 

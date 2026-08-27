@@ -13,6 +13,10 @@ enum test_layers {
     LAYER_SYM,
 };
 
+enum {
+    TEST_RGB_PAYLOAD_SIZE = NOAH_PROFILE_RGB_V1_MAX_PAYLOAD_SIZE,
+};
+
 static uint16_t test_keymap[LAYER_COUNT][MATRIX_ROWS][MATRIX_COLS];
 
 layer_state_t layer_state  = 0;
@@ -21,18 +25,18 @@ led_config_t  g_led_config = {0};
 const layer_color_config_t layer_colors[LAYER_COUNT] = {
     [LAYER_BASE] =
         {
-            .color = {.h = 1, .s = 2, .v = 3},
+            .color = {.h = 101, .s = 102, .v = 103},
             .mode  = ALL_KEYS,
         },
     [LAYER_NAV] =
         {
-            .color = {.h = 10, .s = 20, .v = 30},
-            .mode  = KEYS_MAPPED_ON_THIS_LAYER_ONLY,
+            .color = {.h = 110, .s = 120, .v = 130},
+            .mode  = ALL_KEYS,
         },
     [LAYER_SYM] =
         {
-            .color = {.h = 40, .s = 50, .v = 60},
-            .mode  = ALL_KEYS,
+            .color = {.h = 140, .s = 150, .v = 160},
+            .mode  = KEYS_MAPPED_ON_THIS_LAYER_ONLY,
         },
 };
 
@@ -66,6 +70,68 @@ static void test_fail(const char *expr, const char *file, int line) {
 
 static rgb_t rgb_from_hsv(hsv_t hsv) {
     return (rgb_t){.r = hsv.h, .g = hsv.s, .b = hsv.v};
+}
+
+typedef struct {
+    const uint8_t                    *bytes;
+    noah_effective_rgb_runtime_t     *runtime;
+    noah_effective_profile_identity_t previous;
+    noah_effective_profile_identity_t active;
+    noah_effective_profile_snapshot_t *snapshot;
+    size_t                            calls;
+    size_t                            invalidate_on_call;
+} invalidating_reader_t;
+
+static bool invalidating_reader_read(void *context_value, size_t offset, uint8_t *target, size_t length) {
+    invalidating_reader_t *context = context_value;
+
+    memcpy(target, &context->bytes[offset], length);
+    context->calls++;
+    if (context->calls == context->invalidate_on_call) {
+        noah_effective_rgb_runtime_invalidate(context->runtime, 2u, context->previous, context->active, context->snapshot);
+    }
+    return true;
+}
+
+static bool fixture_value(const char *path, const char *key, char *value, size_t capacity) {
+    FILE  *file = fopen(path, "r");
+    char   line[TEST_RGB_PAYLOAD_SIZE * 2u + 64u];
+    size_t key_length = strlen(key);
+
+    CHECK(file != NULL);
+    while (fgets(line, sizeof(line), file)) {
+        size_t length;
+        if (strncmp(line, key, key_length) != 0 || line[key_length] != '=') continue;
+        length = strcspn(&line[key_length + 1u], "\r\n");
+        CHECK(length + 1u <= capacity);
+        memcpy(value, &line[key_length + 1u], length);
+        value[length] = '\0';
+        fclose(file);
+        return true;
+    }
+    fclose(file);
+    return false;
+}
+
+static uint8_t hex_nibble(char value) {
+    if (value >= '0' && value <= '9') return (uint8_t)(value - '0');
+    if (value >= 'a' && value <= 'f') return (uint8_t)(value - 'a' + 10);
+    if (value >= 'A' && value <= 'F') return (uint8_t)(value - 'A' + 10);
+    test_fail("hex nibble", __FILE__, __LINE__);
+    return 0u;
+}
+
+static size_t fixture_payload(const char *path, uint8_t *payload, size_t capacity) {
+    char   encoded[TEST_RGB_PAYLOAD_SIZE * 2u + 1u];
+    size_t length;
+
+    CHECK(fixture_value(path, "payload.hex", encoded, sizeof(encoded)));
+    length = strlen(encoded);
+    CHECK((length % 2u) == 0u && length / 2u <= capacity);
+    for (size_t index = 0u; index < length; index += 2u) {
+        payload[index / 2u] = (uint8_t)((hex_nibble(encoded[index]) << 4u) | hex_nibble(encoded[index + 1u]));
+    }
+    return length / 2u;
 }
 
 static void check_frame_led(const rgb_runtime_frame_t *frame, uint8_t index, rgb_t expected) {
@@ -145,22 +211,100 @@ static void test_base_layer_is_visible_when_no_overlay_layer_is_active(void) {
 static void test_base_layer_remains_under_mapped_only_overlay_layers(void) {
     test_reset();
 
-    test_keymap[LAYER_NAV][0][1] = 0x004Fu;
-    layer_state                  = (layer_state_t)1u << LAYER_NAV;
+    test_keymap[LAYER_SYM][0][1] = 0x004Fu;
+    layer_state                  = (layer_state_t)1u << LAYER_SYM;
 
     rgb_runtime_frame_t frame;
 
     CHECK(rgb_runtime_layer_stage_render_frame(&frame, layer_state, 0, RGB_MATRIX_LED_COUNT));
 
     check_frame_led(&frame, 0, rgb_from_hsv(layer_colors[LAYER_BASE].color));
-    check_frame_led(&frame, 1, rgb_from_hsv(layer_colors[LAYER_NAV].color));
-    check_frame_led(&frame, 2, rgb_from_hsv(layer_colors[LAYER_NAV].color));
+    check_frame_led(&frame, 1, rgb_from_hsv(layer_colors[LAYER_SYM].color));
+    check_frame_led(&frame, 2, rgb_from_hsv(layer_colors[LAYER_SYM].color));
     check_frame_led(&frame, 3, rgb_from_hsv(layer_led_groups[0].color));
 }
 
-int main(void) {
+static noah_effective_profile_identity_t test_identity(uint32_t generation) {
+    return (noah_effective_profile_identity_t){
+        .generation              = generation,
+        .payload_crc32           = 0x1000u + generation,
+        .payload_digest          = 0x2000u + generation,
+        .compiled_default_digest = 0x3000u,
+        .action_abi_digest       = 0x4000u,
+        .origin                  = 0u,
+        .kind                    = NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE,
+    };
+}
+
+static void test_live_layer_profile_and_stale_frame(const char *fixture_path) {
+    uint8_t                           payload[TEST_RGB_PAYLOAD_SIZE];
+    size_t                            length = fixture_payload(fixture_path, payload, sizeof(payload));
+    noah_profile_rgb_v1_limits_t      limits = noah_profile_rgb_v1_default_limits();
+    noah_profile_rgb_v1_view_t        view;
+    noah_profile_rgb_v1_error_t       error;
+    noah_effective_rgb_runtime_t      runtime;
+    noah_effective_rgb_frame_t        profile_frame;
+    noah_effective_profile_identity_t active = test_identity(1u);
+    noah_effective_profile_snapshot_t snapshot = {0};
+    rgb_runtime_frame_t               frame;
+
+    limits.logical_layer_count    = LAYER_COUNT;
+    limits.maximum_brightness     = 200u;
+    limits.tap_branch_color_count = 4u;
+    CHECK(noah_profile_rgb_v1_decode(payload, length, &limits, &view, &error) == NOAH_PROFILE_RGB_V1_OK);
+    snapshot.identity            = active;
+    snapshot.profile.domain_mask = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB;
+    snapshot.profile.rgb         = view;
+
+    noah_effective_rgb_runtime_init(&runtime);
+    CHECK(noah_effective_rgb_runtime_install(&runtime));
+    noah_effective_rgb_runtime_invalidate(&runtime, 1u, (noah_effective_profile_identity_t){0}, active, &snapshot);
+    CHECK(rgb_effective_config_capture_frame(&profile_frame) == NOAH_EFFECTIVE_RGB_OK);
+
+    test_reset();
+    CHECK(rgb_runtime_layer_stage_render_effective_frame(&frame, 0u, &profile_frame, 0u, RGB_MATRIX_LED_COUNT));
+    check_frame_led(&frame, 0u, rgb_from_hsv((hsv_t){.h = 1u, .s = 2u, .v = 3u}));
+    check_frame_led(&frame, 1u, rgb_from_hsv((hsv_t){.h = 1u, .s = 2u, .v = 3u}));
+    check_frame_led(&frame, 2u, rgb_from_hsv((hsv_t){.h = 1u, .s = 2u, .v = 3u}));
+    check_frame_led(&frame, 3u, rgb_from_hsv((hsv_t){.h = 1u, .s = 2u, .v = 3u}));
+
+    test_keymap[LAYER_NAV][0][1] = 0x004fu;
+    layer_state                  = (layer_state_t)1u << LAYER_NAV;
+    CHECK(rgb_runtime_layer_stage_render_effective_frame(&frame, layer_state, &profile_frame, 0u, RGB_MATRIX_LED_COUNT));
+    check_frame_led(&frame, 0u, rgb_from_hsv((hsv_t){.h = 10u, .s = 20u, .v = 30u}));
+    check_frame_led(&frame, 1u, rgb_from_hsv((hsv_t){.h = 10u, .s = 20u, .v = 30u}));
+    check_frame_led(&frame, 2u, rgb_from_hsv((hsv_t){.h = 1u, .s = 2u, .v = 3u}));
+    check_frame_led(&frame, 3u, rgb_from_hsv((hsv_t){.h = 1u, .s = 2u, .v = 3u}));
+
+    noah_effective_profile_identity_t next = test_identity(2u);
+    noah_effective_profile_snapshot_t behavior_only = {.identity = next};
+    invalidating_reader_t             reader = {
+        .bytes              = payload,
+        .runtime            = &runtime,
+        .previous           = active,
+        .active             = next,
+        .snapshot           = &behavior_only,
+        .invalidate_on_call = 4u,
+    };
+    profile_frame.view.reader = (noah_profile_reader_t){
+        .read    = invalidating_reader_read,
+        .context = &reader,
+        .length  = length,
+    };
+
+    CHECK(!rgb_runtime_layer_stage_render_effective_frame(&frame, layer_state, &profile_frame, 0u, RGB_MATRIX_LED_COUNT));
+    CHECK(reader.calls > reader.invalidate_on_call);
+    for (uint8_t led = 0u; led < RGB_MATRIX_LED_COUNT; led++) {
+        CHECK(!frame.painted[led]);
+    }
+    noah_effective_rgb_runtime_uninstall(&runtime);
+}
+
+int main(int argc, char **argv) {
+    CHECK(argc == 2);
     test_base_layer_is_visible_when_no_overlay_layer_is_active();
     test_base_layer_remains_under_mapped_only_overlay_layers();
+    test_live_layer_profile_and_stale_frame(argv[1]);
 
     puts("rgb_base_underlay host tests passed");
     return 0;

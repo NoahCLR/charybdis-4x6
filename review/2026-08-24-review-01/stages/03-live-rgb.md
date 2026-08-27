@@ -2,11 +2,14 @@
 
 Status: blocked on Stage 02
 
-Implementation note: the reader-backed codec and a callback-only effective RGB
-view have landed early. The view copies no payload during provider publication,
-and its captured frame token refuses access after any later publication. It is
-not installed in production and no renderer family has migrated yet, so the
-compiled RGB configuration remains the exact runtime behavior.
+Implementation note: the reader-backed codec, callback-only effective RGB view,
+and first renderer-family migration have landed early. The RGB orchestrator now
+captures one token at the frame boundary, and layer colors, render modes,
+reusable group bitmaps, and layer-group rows read through the effective adapter.
+The view copies no payload during provider publication, and its captured frame
+token refuses access after any later publication. The effective runtime owner is
+not installed in production yet, so the compiled RGB configuration remains the
+exact runtime behavior.
 
 ## Objective
 
@@ -36,10 +39,11 @@ payload-sized RAM buffer. Exact fields, enum ids, capacities, canonical rules,
 and deferrals are documented in
 `tools/charybdis-profile-studio/live-link/rgb-domain-v1.md`.
 
-This is foundation evidence, not the vertical slice: production owner
-installation, all eight renderer migrations, preview/rollback, candidate
-writes, persistence, split convergence, source pull, and UI actions remain
-open. No deliverable below is complete from this foundation alone.
+This is foundation and first-consumer evidence, not the vertical slice:
+production owner installation, the remaining renderer migrations,
+preview/rollback, candidate writes, persistence, split convergence, source
+pull, and UI actions remain open. No deliverable below is complete from this
+foundation alone.
 
 ## Migration Order
 
@@ -100,15 +104,17 @@ adds a source or compile gate against regression.
 
 ## Deliverables
 
-- [ ] Effective RGB profile API (callback view and stale-frame contract landed;
-      installed renderer consumer remains)
-- [ ] All eight RGB families migrated
+- [ ] Effective RGB profile API (callback view, stale-frame contract, frame
+      capture, and layer consumer landed; production owner installation remains)
+- [ ] All eight RGB families migrated (layer colors/render modes plus reusable
+      groups used by layer-group rows have migrated)
 - [ ] Generation-consistent cache invalidation
 - [ ] Volatile preview and rollback
 - [ ] Persistent apply and split status
 - [ ] Semantic source/device diff
 - [ ] Push, pull, and reset for RGB
-- [ ] Source gate against direct production array reads
+- [ ] Source gate against direct production array reads (the migrated layer
+      family is gated; remaining families still need matching gates)
 - [ ] Updated Studio UI, docs, screenshots, stage, risks, and progress
 
 Early effective-view evidence landed on 2026-08-26:
@@ -123,6 +129,19 @@ Early effective-view evidence landed on 2026-08-26:
 - focused tests cover normal, ASan/UBSan, and Cortex-M0+ builds, zero-I/O
   invalidation, installed/fallback selection, reader-backed access after
   capture, fail-closed identity mismatch, and frame staleness.
+
+First-consumer evidence landed on 2026-08-27:
+
+- `rgb_runtime.c` captures one effective token when the first QMK LED chunk
+  starts a frame and passes that same token through normal layer rendering,
+  auto-mouse destination rendering, and layer preview;
+- `rgb_effective_config.c` is the only production seam that reads the compiled
+  `layer_colors`, `layer_led_groups`, and `layer_led_group_count` fallbacks;
+- live layer rows and canonical reusable-group bitmaps render through the same
+  layer compositor, while a token made stale by later publication fails closed;
+  and
+- the layer render runner enforces the direct-read boundary and distinguishes
+  live colors, render mode, and group placement from the compiled fixture.
 
 ## Verification
 

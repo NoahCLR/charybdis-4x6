@@ -498,7 +498,8 @@ Stage 00 baseline commands passed on 2026-08-25:
 
 The initial Stage 00 target evidence was a 48,396 B SRAM0–3 `.data + .bss`
 metric against a 51,000 B policy and a 213,744 B linker/core-memory span at
-boot. The current reconciled tree measures 48,664 B and 213,472 B respectively.
+boot. The then-current reconciled tree measured 48,664 B and 213,472 B
+respectively.
 The 1,880 B worst reviewed main path has 40 B to the 1,920 B reviewed-path
 policy and 680 B to its 2,560 B physical process-stack boundary; the 336 B
 worst reviewed split-slave path is measured against its 768 B reviewed-path
@@ -831,3 +832,59 @@ Next steps:
    the single production owner.
 3. Add split profile-generation convergence and real-hardware render/lookup
    timing before enabling mutation capabilities.
+
+### 2026-08-27 — Effective layer-RGB consumer checkpoint
+
+- Added `rgb_effective_config.c` as the single compiled/live adapter for layer
+  colors, render modes, reusable group bitmaps, and layer-group rows. Direct
+  compiled table access for this family is now centralized there.
+- The RGB orchestrator captures one effective frame token at the first QMK LED
+  chunk and threads it through normal layer rendering, auto-mouse destination
+  rendering, and layer preview. A later profile publication makes the token
+  stale; the layer compositor clears its local frame and fails closed rather
+  than reading across generations.
+- Removed the cached converted layer-color array. Colors, modes, and solid-color
+  flags are now render-local, while the mapped-key LED map is independent of
+  profile generation and therefore remains safe across live render-mode changes.
+- Extended the RGB render fixture so compiled and live colors and modes differ.
+  It proves reader-backed colors, mapped-only rendering, canonical reusable
+  group bitmaps, exact compiled fallback parity, and stale-frame refusal. The
+  runner also rejects direct authored layer-table reads outside the adapter.
+- Focused verification passed:
+  `sh tests/host/run_rgb_layer_render_tests.sh`,
+  `sh tests/host/run_effective_rgb_runtime_tests.sh`,
+  `sh tests/host/run_profile_rgb_v1_tests.sh`,
+  `sh tests/host/run_rgb_validation_tests.sh`,
+  `sh tests/host/run_real_profile_validation_tests.sh`, and
+  `sh tests/host/run_feature_gate_compile_tests.sh`.
+- Final checkpoint verification passed:
+  `sh tests/host/run_all_host_tests.sh`,
+  `qmk compile -kb bastardkb/charybdis/4x6 -km noah`,
+  `sh tests/host/run_firmware_memory_budget_checks.sh`,
+  `sh tests/host/run_firmware_stack_budget_checks.sh`, a restored ordinary QMK
+  compile plus memory check after stack instrumentation, and `git diff --check`.
+- Fresh linked resource facts are per RP2040 half: 270,336 B physical SRAM;
+  SRAM0–3 `.bss` is 25,756/26,000 B under the regression policy, `.data` is
+  22,984 B, and `.data + .bss` is 48,740/51,000 B. The SRAM0–3 linker/core-
+  memory span at boot is 213,400 B against the 204,800 B minimum, and fixed
+  linked occupancy across unique SRAM banks is 56,200 B. These are link-time
+  facts and policy metrics, not total-RAM headroom or runtime high-water
+  measurements.
+- The stack gate remains 1,880/1,920 B for its worst named main-process path
+  and 336/768 B for its worst named split-slave path. It covers only the paths
+  in the stack manifest and is not a global or interrupt-stack maximum.
+- The effective RGB runtime owner is still not installed, so the shipped image
+  retains exact compiled RGB behavior. Profile Studio UI and authored profile
+  inputs did not change; screenshots and introspection regeneration were
+  intentionally skipped. QMK/resource checks wrote generated artifacts in the
+  sibling firmware build tree only; no sibling source was edited.
+
+Next steps:
+
+1. Migrate pointing-mode colors, locality, and pointing-mode group rows through
+   the same captured effective frame and add the matching direct-read gate.
+2. Migrate auto-mouse fade, combo feedback, and key-feedback families one at a
+   time with live-vs-compiled parity and stale-generation tests.
+3. Install RGB and behavior consumers through one production owner only after
+   split profile-generation convergence is fail-closed, then measure real-board
+   render and lookup timing before advertising mutation capabilities.

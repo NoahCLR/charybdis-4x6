@@ -39,11 +39,11 @@ No project risks are closed yet.
   and sanitizer coverage in C and JavaScript. R-01 remains open until that
   standalone codec is connected through and reverified at the production QMK
   callback boundary.
-- R-07's original resource wording was corrected by D-016. On the current
-  tree, the SRAM0–3 `.data + .bss` regression metric is 48,664 bytes against a
-  51,000-byte policy, while the linker/core-memory span is 213,472 bytes at
+- R-07's original resource wording was corrected by D-016. On the 2026-08-25
+  tree, the SRAM0–3 `.data + .bss` regression metric was 48,664 bytes against a
+  51,000-byte policy, while the linker/core-memory span was 213,472 bytes at
   boot. Fixed linked occupancy across the RP2040's 270,336 bytes of physical
-  SRAM is 56,128 bytes. These figures are not interchangeable,
+  SRAM was 56,128 bytes. These figures are not interchangeable,
   and runtime allocator high-water remains unmeasured.
 - R-02 now has a production reason/count predicate backed by key-runtime
   press/tap/lease/release/persistent counts, aggregate managed HID outputs,
@@ -78,3 +78,18 @@ No project risks are closed yet.
 - R-15 now has a frozen v1 compatibility and action-ABI contract in
   `profile-wire-v1.md`; migration implementation and persisted-profile fixtures
   remain open.
+
+### 2026-08-27 first RGB consumer evidence update
+
+- R-11 is partially mitigated for the layer RGB family. Layer colors, render
+  modes, reusable group bitmaps, and layer-group rows now pass through
+  `rgb_effective_config.c`; a source gate rejects direct reads of their compiled
+  symbols from the layer, preview, auto-mouse destination, or orchestrator
+  paths. The risk remains open for the other renderer families and until the
+  effective owner is installed.
+- R-12 is partially mitigated at the actual render boundary. One effective
+  token is captured at frame start and shared by normal layers, auto-mouse
+  destination layers, and layer preview. Live-vs-compiled render tests cover
+  colors, mapped-only mode, canonical group bitmaps, and stale-token fail-closed
+  behavior. The risk remains open for remaining families, split convergence,
+  real-board timing, and the hardware render matrix.

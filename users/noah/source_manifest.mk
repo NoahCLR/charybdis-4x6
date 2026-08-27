@@ -98,6 +98,7 @@ NOAH_COMMON_SOURCES := \
     lib/key/runtime/planning/tap_series_flush.c \
     lib/key/runtime/trace/core_trace.c \
     lib/rgb/core/rgb_runtime.c \
+    lib/rgb/core/rgb_effective_config.c \
     lib/rgb/stages/rgb_combo_feedback_stage.c \
     lib/rgb/stages/rgb_key_feedback_stage.c \
     lib/rgb/stages/rgb_layer_stage.c \

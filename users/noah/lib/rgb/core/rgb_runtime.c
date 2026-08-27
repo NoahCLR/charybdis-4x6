@@ -3,6 +3,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "rgb_runtime.h"
+#include "rgb_effective_config.h"
 #include "rgb_helpers.h"
 #include "../automouse/rgb_automouse_stage.h"
 #include "../stages/rgb_combo_feedback_stage.h"
@@ -20,6 +21,7 @@
 
 #ifdef RGB_MATRIX_ENABLE
 static rgb_runtime_frame_t rgb_runtime_frame_primary;
+static noah_effective_rgb_frame_t rgb_runtime_profile_frame;
 
 #    ifdef RGB_RUNTIME_RENDER_TEST_BACKEND
 static uint16_t rgb_runtime_stage_pipeline_count;
@@ -178,7 +180,7 @@ static bool rgb_runtime_render_runtime_diag_stage(uint8_t led_min, uint8_t led_m
 }
 
 static bool rgb_runtime_render_layer_base_stage(uint8_t led_min, uint8_t led_max) {
-    rgb_runtime_layer_stage_render_frame(&rgb_runtime_frame_primary, layer_state, led_min, led_max);
+    rgb_runtime_layer_stage_render_effective_frame(&rgb_runtime_frame_primary, layer_state, &rgb_runtime_profile_frame, led_min, led_max);
     return rgb_runtime_layer_stage_apply_frame(&rgb_runtime_frame_primary, led_min, led_max);
 }
 
@@ -188,7 +190,7 @@ static bool rgb_runtime_render_base_stage(uint8_t led_min, uint8_t led_max) {
     // Once this branch stops running, the next frame falls back to ordinary
     // layer rendering below.
     if (rgb_runtime_automouse_stage_should_render(layer_state)) {
-        return rgb_runtime_automouse_stage_render(layer_state, led_min, led_max);
+        return rgb_runtime_automouse_stage_render_effective(layer_state, &rgb_runtime_profile_frame, led_min, led_max);
     }
 
     return rgb_runtime_render_layer_base_stage(led_min, led_max);
@@ -201,7 +203,7 @@ static bool rgb_runtime_render_base_stage(uint8_t led_min, uint8_t led_max) {
 
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
 static bool rgb_runtime_render_preview_stage(uint8_t led_min, uint8_t led_max) {
-    return rgb_runtime_preview_stage_render(&rgb_runtime_frame_primary, led_min, led_max);
+    return rgb_runtime_preview_stage_render_effective(&rgb_runtime_frame_primary, &rgb_runtime_profile_frame, led_min, led_max);
 }
 #    endif
 
@@ -257,6 +259,7 @@ void noah_rgb_runtime_post_init(void) {
     };
 
     rgb_runtime_render_snapshot_invalidate();
+    (void)rgb_effective_config_capture_frame(&rgb_runtime_profile_frame);
 #    ifdef RGB_RUNTIME_RENDER_TEST_BACKEND
     rgb_runtime_stage_pipeline_count = 0u;
     rgb_runtime_early_exit_count     = 0u;
@@ -273,6 +276,7 @@ bool noah_rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) 
 
     if (rgb_runtime_range_starts_frame(led_min, led_max)) {
         rgb_runtime_render_snapshot_invalidate();
+        (void)rgb_effective_config_capture_frame(&rgb_runtime_profile_frame);
     }
 
     if (!rgb_runtime_normalize_local_range(&led_min, &led_max)) {
