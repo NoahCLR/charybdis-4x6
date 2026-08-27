@@ -189,7 +189,7 @@ static bool rgb_runtime_render_base_stage(uint8_t led_min, uint8_t led_max) {
     // The synthetic automouse destination is not a persistent board state.
     // Once this branch stops running, the next frame falls back to ordinary
     // layer rendering below.
-    if (rgb_runtime_automouse_stage_should_render(layer_state)) {
+    if (rgb_runtime_automouse_stage_should_render_effective(layer_state, &rgb_runtime_profile_frame)) {
         return rgb_runtime_automouse_stage_render_effective(layer_state, &rgb_runtime_profile_frame, led_min, led_max);
     }
 

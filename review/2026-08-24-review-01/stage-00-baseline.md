@@ -34,7 +34,7 @@ regression policies. None is the RP2040's physical capacity.
 
 ### Current Reconciled Measurement
 
-Fresh ordinary ELF on 2026-08-27 after the effective pointing-mode RGB
+Fresh ordinary ELF on 2026-08-27 after the effective auto-mouse RGB
 consumer:
 `bastardkb_charybdis_4x6_noah.elf`.
 

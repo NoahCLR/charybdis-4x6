@@ -10,6 +10,10 @@ extern const layer_color_config_t     layer_colors[];
 extern const layer_led_group_t *const layer_led_groups;
 extern const uint8_t                  layer_led_group_count;
 
+#if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_AUTOMOUSE_GRADIENT_ENABLE)
+extern const automouse_fade_end_config_t automouse_fade_end_config;
+#endif
+
 #if defined(POINTING_DEVICE_ENABLE) && defined(RGB_PD_MODE_FEEDBACK_ENABLE)
 extern const pd_mode_color_t            pd_mode_colors[];
 extern const uint8_t                    pd_mode_color_count;
@@ -137,6 +141,48 @@ bool rgb_effective_config_layer_group_at(const noah_effective_rgb_frame_t *frame
         return true;
     }
     return false;
+}
+
+bool rgb_effective_config_automouse_stage_enabled(const noah_effective_rgb_frame_t *frame) {
+#if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_AUTOMOUSE_GRADIENT_ENABLE)
+    noah_effective_rgb_result_t status = frame_status(frame);
+
+    if (status == NOAH_EFFECTIVE_RGB_COMPILED_FALLBACK) {
+        return true;
+    }
+    return status == NOAH_EFFECTIVE_RGB_OK && (frame->view.stage_enable_mask & NOAH_PROFILE_RGB_V1_STAGE_AUTOMOUSE) != 0u;
+#else
+    (void)frame;
+    return false;
+#endif
+}
+
+bool rgb_effective_config_automouse(const noah_effective_rgb_frame_t *frame, automouse_fade_end_config_t *config) {
+#if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_AUTOMOUSE_GRADIENT_ENABLE)
+    noah_effective_rgb_result_t status = frame_status(frame);
+
+    if (!config) {
+        return false;
+    }
+    if (status == NOAH_EFFECTIVE_RGB_COMPILED_FALLBACK) {
+        *config = automouse_fade_end_config;
+        return true;
+    }
+    if (status == NOAH_EFFECTIVE_RGB_OK && (frame->view.stage_enable_mask & NOAH_PROFILE_RGB_V1_STAGE_AUTOMOUSE) != 0u) {
+        noah_profile_rgb_v1_automouse_t row;
+        noah_profile_rgb_v1_error_t     error;
+
+        if (noah_profile_rgb_v1_automouse(&frame->view, &row, &error) == NOAH_PROFILE_RGB_V1_OK) {
+            *config = (automouse_fade_end_config_t){.mode = (automouse_fade_end_mode_t)row.mode, .end_color = native_hsv(row.end_color)};
+            return true;
+        }
+    }
+    return false;
+#else
+    (void)frame;
+    (void)config;
+    return false;
+#endif
 }
 
 bool rgb_effective_config_pd_stage_enabled(const noah_effective_rgb_frame_t *frame) {

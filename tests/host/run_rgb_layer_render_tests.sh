@@ -32,11 +32,16 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DQMK_STUB_SUPPRESS_LAYER_COUNT \
     -DLAYER_COUNT=3 \
     -DRGB_MATRIX_ENABLE \
+    -DPOINTING_DEVICE_AUTO_MOUSE_ENABLE \
+    -DRGB_AUTOMOUSE_GRADIENT_ENABLE \
+    -DRGB_MATRIX_WS2812 \
+    -DAUTO_MOUSE_TIME=900 \
     -DRGB_MATRIX_LED_COUNT=4 \
     -I"$ROOT" \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/rgb_base_underlay_test.c" \
+    "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_layer_stage.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_effective_config.c" \
     "$ROOT/users/noah/lib/profile/runtime/effective_rgb_runtime.c" \
@@ -566,7 +571,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
 
 "$BIN_KEY_RIGHT"
 
-if rg -n '\b(layer_colors|layer_led_groups|layer_led_group_count|pd_mode_colors|pd_mode_color_count|pd_mode_led_groups|pd_mode_led_group_count)\b' \
+if rg -n '\b(layer_colors|layer_led_groups|layer_led_group_count|automouse_fade_end_config|pd_mode_colors|pd_mode_color_count|pd_mode_led_groups|pd_mode_led_group_count)\b' \
     "$ROOT/users/noah/lib/rgb/stages/rgb_layer_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_pd_mode_stage.c" \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse_stage.c" \

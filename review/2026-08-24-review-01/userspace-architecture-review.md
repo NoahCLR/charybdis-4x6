@@ -34,15 +34,13 @@ Examples:
   key_behaviors[] directly.
 - users/noah/lib/rgb/core/rgb_effective_config.c is now the sole compiled/live
   adapter for layer_colors[]/layer_led_groups and
-  pd_mode_colors[]/pd_mode_led_groups; the layer, preview, auto-mouse
-  destination, and pointing-mode render paths consume one captured effective
-  frame.
+  pd_mode_colors[]/pd_mode_led_groups plus the auto-mouse fade destination; the
+  layer, preview, auto-mouse, and pointing-mode render paths consume one
+  captured effective frame.
 - users/noah/lib/rgb/stages/rgb_combo_feedback_stage.c:12 reads the compiled
   combo feedback tables directly.
 - users/noah/lib/rgb/stages/rgb_key_feedback_stage.c:12 reads compiled
   feedback colors and LED groups directly.
-- users/noah/lib/rgb/automouse/rgb_automouse_stage.c:18 reads the compiled fade
-  config directly.
 
 The compiled tables are appropriate defaults, but live state cannot safely
 replace them through scattered special cases.
@@ -58,11 +56,11 @@ surface only. The effective behavior seam now branches compiled and RGB-only
 generations to the existing direct authored semantic tables. The effective RGB
 seam similarly branches compiled and behavior-only generations to the authored
 RGB configuration and rejects frame tokens after a later publication. Layer
-colors/render modes, pointing-mode colors/locality, reusable group bitmaps, and
-their layer/pointing stage rows now consume that seam from one renderer frame
-token. The runtime owner is not installed and the remaining RGB families still
-read compiled data; hot key events and RGB frames must never replay the virtual
-compiled blob.
+colors/render modes, pointing-mode colors/locality, auto-mouse fade mode/end
+color, reusable group bitmaps, and their layer/pointing stage rows now consume
+that seam from one renderer frame token. The runtime owner is not installed and
+the remaining RGB families still read compiled data; hot key events and RGB
+frames must never replay the virtual compiled blob.
 
 Enforcement must prevent new direct reads outside default materialization,
 validation fixtures, and the provider implementation.
@@ -230,9 +228,9 @@ The opening findings above are the audit-time snapshot. Current status:
 | Finding | Status | Reconciliation evidence |
 | --- | --- | --- |
 | 1 — malformed VIA mirror prerequisite | open, remediation in progress | owned by Review 19; targeted guard and sanitizer package opened |
-| 2 — no effective-profile seam | partially resolved | a hardened generation-owned provider now enforces coherent publication, invalidation visibility, safe-predicate reentrancy, nested-view containment, and active-backing-aware reuse; behavior and RGB consumers can atomically capture validated reader-backed generations without replaying compiled virtual bytes, and the layer and pointing-mode RGB families consume the seam, while production owner installation, remaining renderer migration, a measured behavior-index decision, and split convergence remain open |
+| 2 — no effective-profile seam | partially resolved | a hardened generation-owned provider now enforces coherent publication, invalidation visibility, safe-predicate reentrancy, nested-view containment, and active-backing-aware reuse; behavior and RGB consumers can atomically capture validated reader-backed generations without replaying compiled virtual bytes, and the layer, pointing-mode, and auto-mouse RGB families consume the seam, while production owner installation, remaining renderer migration, a measured behavior-index decision, and split convergence remain open |
 | 3 — no canonical schema | partially resolved | `profile-wire-v1.md`, D-010, and D-015 freeze the v1 contract; blob, RGB, behavior, validator, and real compiled-default materializer now share exact C/JavaScript fixtures, while production runtime and split integration remain open |
-| 4 — no safe activation boundary | partially resolved | `authority-state-table.md` freezes the quiescence contract and `profile_activation_policy.c` now produces coherent production reason/count snapshots from authoritative runtime owners; callback-only behavior/RGB invalidators, stale token refusal, and the first two frame-boundary RGB consumers have landed, while provider-owner installation, split convergence, remaining renderer migration, and hardware evidence remain open |
+| 4 — no safe activation boundary | partially resolved | `authority-state-table.md` freezes the quiescence contract and `profile_activation_policy.c` now produces coherent production reason/count snapshots from authoritative runtime owners; callback-only behavior/RGB invalidators, stale token refusal, and the first three frame-boundary RGB consumers have landed, while provider-owner installation, split convergence, remaining renderer migration, and hardware evidence remain open |
 | 5 — source/device authority | resolved at contract level | D-013, D-014, and `authority-state-table.md` define operations, ordering, partial results, and conflicts |
 | 6 — storage/capacity evidence | resolved at Stage 00 design level; runtime high-water remains open | D-016 and `stage-00-baseline.md` record the corrected per-half bank model, policy-versus-capacity distinction, exact EEPROM map, dual-slot partition, and ceilings |
 | 7 — Studio transport boundary | partially resolved | D-012 accepts an injected serialized adapter and fake; concrete packaged board probe remains open |

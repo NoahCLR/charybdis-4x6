@@ -21,7 +21,7 @@ linker map is
 
 ## Current Linked Checkpoint
 
-Freshly measured on 2026-08-27 after the effective pointing-mode RGB consumer:
+Freshly measured on 2026-08-27 after the effective auto-mouse RGB consumer:
 
 | Measurement | Bytes | Meaning |
 | --- | ---: | --- |

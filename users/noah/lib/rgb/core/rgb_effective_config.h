@@ -27,6 +27,8 @@ bool rgb_effective_config_layer_stage_enabled(const noah_effective_rgb_frame_t *
 bool rgb_effective_config_layer_color(const noah_effective_rgb_frame_t *frame, uint8_t layer, layer_color_config_t *color);
 uint8_t rgb_effective_config_layer_group_count(const noah_effective_rgb_frame_t *frame);
 bool rgb_effective_config_layer_group_at(const noah_effective_rgb_frame_t *frame, uint8_t index, rgb_effective_layer_group_t *group);
+bool rgb_effective_config_automouse_stage_enabled(const noah_effective_rgb_frame_t *frame);
+bool rgb_effective_config_automouse(const noah_effective_rgb_frame_t *frame, automouse_fade_end_config_t *config);
 bool rgb_effective_config_pd_stage_enabled(const noah_effective_rgb_frame_t *frame);
 bool rgb_effective_config_pd_color(const noah_effective_rgb_frame_t *frame, pd_mode_id_t mode_id, pd_mode_color_t *color);
 uint8_t rgb_effective_config_pd_group_count(const noah_effective_rgb_frame_t *frame);
