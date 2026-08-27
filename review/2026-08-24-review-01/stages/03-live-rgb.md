@@ -3,13 +3,14 @@
 Status: blocked on Stage 02
 
 Implementation note: the reader-backed codec, callback-only effective RGB view,
-and first renderer-family migration have landed early. The RGB orchestrator now
-captures one token at the frame boundary, and layer colors, render modes,
-reusable group bitmaps, and layer-group rows read through the effective adapter.
-The view copies no payload during provider publication, and its captured frame
-token refuses access after any later publication. The effective runtime owner is
-not installed in production yet, so the compiled RGB configuration remains the
-exact runtime behavior.
+and first two renderer-family migrations have landed early. The RGB orchestrator
+now captures one token at the frame boundary. Layer colors/render modes and
+pointing-mode colors/locality read through the effective adapter, as do reusable
+group bitmaps and their layer/pointing stage rows. The view copies no payload
+during provider publication, and its captured frame token refuses access after
+any later publication. The effective runtime owner is not installed in
+production yet, so the compiled RGB configuration remains the exact runtime
+behavior.
 
 ## Objective
 
@@ -39,7 +40,7 @@ payload-sized RAM buffer. Exact fields, enum ids, capacities, canonical rules,
 and deferrals are documented in
 `tools/charybdis-profile-studio/live-link/rgb-domain-v1.md`.
 
-This is foundation and first-consumer evidence, not the vertical slice:
+This is foundation and early-consumer evidence, not the vertical slice:
 production owner installation, the remaining renderer migrations,
 preview/rollback, candidate writes, persistence, split convergence, source
 pull, and UI actions remain open. No deliverable below is complete from this
@@ -49,13 +50,15 @@ foundation alone.
 
 Migrate one table family at a time:
 
-1. layer colors and render modes;
-2. pointing-mode colors and locality;
+1. layer colors and render modes — migrated;
+2. pointing-mode colors and locality — migrated;
 3. auto-mouse fade mode and end color;
 4. combo feedback color and locality;
 5. key-behavior feedback colors, branch colors, tap-commit mode, and locality;
-6. reusable LED groups as canonical bitmaps or the Stage 00-selected format;
-7. layer, pointing-mode, combo, and key-behavior stage-specific group rows;
+6. reusable LED groups as canonical bitmaps or the Stage 00-selected format —
+   migrated for layer and pointing-mode consumers;
+7. layer, pointing-mode, combo, and key-behavior stage-specific group rows —
+   migrated for layer and pointing mode;
 8. runtime enable flags for authored feedback stages.
 
 Each pass removes direct production reads of the matching compiled symbol and
@@ -105,16 +108,19 @@ adds a source or compile gate against regression.
 ## Deliverables
 
 - [ ] Effective RGB profile API (callback view, stale-frame contract, frame
-      capture, and layer consumer landed; production owner installation remains)
-- [ ] All eight RGB families migrated (layer colors/render modes plus reusable
-      groups used by layer-group rows have migrated)
+      capture, and layer/pointing consumers landed; production owner
+      installation remains)
+- [ ] All eight RGB families migrated (layer colors/render modes,
+      pointing-mode colors/locality, and reusable groups used by their stage
+      rows have migrated)
 - [ ] Generation-consistent cache invalidation
 - [ ] Volatile preview and rollback
 - [ ] Persistent apply and split status
 - [ ] Semantic source/device diff
 - [ ] Push, pull, and reset for RGB
-- [ ] Source gate against direct production array reads (the migrated layer
-      family is gated; remaining families still need matching gates)
+- [ ] Source gate against direct production array reads (the migrated layer and
+      pointing-mode families are gated; remaining families still need matching
+      gates)
 - [ ] Updated Studio UI, docs, screenshots, stage, risks, and progress
 
 Early effective-view evidence landed on 2026-08-26:
@@ -142,6 +148,21 @@ First-consumer evidence landed on 2026-08-27:
   and
 - the layer render runner enforces the direct-read boundary and distinguishes
   live colors, render mode, and group placement from the compiled fixture.
+
+Second-consumer evidence landed on 2026-08-27:
+
+- `rgb_pd_mode_stage.c` no longer caches or directly reads the compiled
+  pointing-mode colors, locality, or LED-group tables; those fallbacks are
+  centralized in `rgb_effective_config.c`;
+- the pointing-mode stage composes into a caller-owned frame from the same
+  captured profile token used by the other migrated paths, and only applies
+  that frame after effective reads complete;
+- a dedicated live-vs-compiled renderer fixture distinguishes color, locality,
+  mode-specific groups, all-mode groups, inherited colors, and canonical group
+  bitmaps; and
+- publication during the final reader-backed group lookup makes the token stale
+  and clears the incomplete overlay before it reaches the LEDs. The source gate
+  rejects new direct pointing-table reads outside the adapter.
 
 ## Verification
 

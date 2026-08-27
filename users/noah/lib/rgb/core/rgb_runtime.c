@@ -209,7 +209,8 @@ static bool rgb_runtime_render_preview_stage(uint8_t led_min, uint8_t led_max) {
 
 #    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_PD_MODE_FEEDBACK_ENABLE)
 static bool rgb_runtime_render_pd_mode_stage(uint8_t led_min, uint8_t led_max) {
-    return rgb_runtime_pd_mode_stage_render(led_min, led_max);
+    rgb_runtime_pd_mode_stage_render_effective_frame(&rgb_runtime_frame_primary, &rgb_runtime_profile_frame, led_min, led_max);
+    return rgb_runtime_layer_stage_apply_frame(&rgb_runtime_frame_primary, led_min, led_max);
 }
 #    endif
 

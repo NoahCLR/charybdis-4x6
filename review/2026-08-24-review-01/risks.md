@@ -79,17 +79,19 @@ No project risks are closed yet.
   `profile-wire-v1.md`; migration implementation and persisted-profile fixtures
   remain open.
 
-### 2026-08-27 first RGB consumer evidence update
+### 2026-08-27 first two RGB consumer families evidence update
 
-- R-11 is partially mitigated for the layer RGB family. Layer colors, render
-  modes, reusable group bitmaps, and layer-group rows now pass through
-  `rgb_effective_config.c`; a source gate rejects direct reads of their compiled
-  symbols from the layer, preview, auto-mouse destination, or orchestrator
-  paths. The risk remains open for the other renderer families and until the
-  effective owner is installed.
+- R-11 is partially mitigated for the layer and pointing-mode RGB families.
+  Their colors, render modes/locality, reusable group bitmaps, and stage-group
+  rows now pass through `rgb_effective_config.c`; a source gate rejects direct
+  reads of their compiled symbols from the migrated render paths and
+  orchestrator. The risk remains open for the other renderer families and until
+  the effective owner is installed.
 - R-12 is partially mitigated at the actual render boundary. One effective
   token is captured at frame start and shared by normal layers, auto-mouse
-  destination layers, and layer preview. Live-vs-compiled render tests cover
-  colors, mapped-only mode, canonical group bitmaps, and stale-token fail-closed
-  behavior. The risk remains open for remaining families, split convergence,
-  real-board timing, and the hardware render matrix.
+  destination layers, layer preview, and the pointing-mode overlay.
+  Live-vs-compiled render tests cover colors, mapped-only mode, pointing
+  locality, canonical group bitmaps, mode-specific/all-mode groups, inherited
+  colors, and stale-token fail-closed behavior. The risk remains open for
+  remaining families, split convergence, real-board timing, and the hardware
+  render matrix.

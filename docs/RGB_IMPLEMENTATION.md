@@ -32,24 +32,28 @@ flowchart LR
 so one key's feedback state repaints that entire half, over the layer colors and
 pointer-mode overlay underneath.
 
-## Where layer RGB configuration comes from
+## Where live-capable RGB configuration comes from
 
 The renderer captures one effective RGB frame token when QMK starts the first
 LED chunk of a frame. Normal layer rendering, the auto-mouse destination scene,
-and layer preview all receive that same token. Their layer colors, mapped-only
-render modes, reusable group bitmaps, and layer-group rows are read through
+layer preview, and the pointing-mode overlay all receive that same token. Layer
+colors, mapped-only render modes, pointing-mode colors and locality, reusable
+group bitmaps, and the layer and pointing-mode group rows are read through
 [`rgb_effective_config.c`](../users/noah/lib/rgb/core/rgb_effective_config.c),
 which selects either a validated live view or the compiled tables in
 `rgb_config.c`.
 
 A token becomes stale as soon as a later profile generation is published. The
-layer compositor then refuses it instead of reading part of each generation.
-The mapped-key LED map is generation-independent; colors and modes are rebuilt
-as render-local state, so they cannot remain cached after a profile switch.
+layer compositor and pointing-mode overlay then refuse it instead of reading
+part of each generation. Both compose into caller-owned render frames before
+touching the LEDs, so an invalid or stale access can clear the incomplete
+overlay. The mapped-key LED map is generation-independent; layer and
+pointing-mode colors, modes, locality, and groups are resolved as render-local
+state, so they cannot remain cached after a profile switch.
 
 The production effective-profile owner is not installed yet, so current
-firmware still selects the compiled tables. Pointing-mode, auto-mouse fade,
-combo, and key-feedback configuration migrations are later live-edit stages.
+firmware still selects the compiled tables. Auto-mouse fade, combo, and
+key-feedback configuration migrations are later live-edit stages.
 
 ## How truth reaches the LEDs
 

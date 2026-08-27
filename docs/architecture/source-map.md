@@ -62,8 +62,8 @@ source trace because they rewrite or verify human-facing firmware docs.
 | `pointing/runtime/` | PD mode state, snapshots, lifecycle, key bridge | Authoritative PD state | PD key events, key-runtime effects, pointer reports, split snapshots | Local/display/remote PD state, active handler routing, DPI sync | PD runtime/mode/bridge integration tests | [ADDING_PD_MODE](../ADDING_PD_MODE.md), [runtime-flow](./runtime-flow.md) |
 | `profile/runtime/` | Effective-profile publication, semantic-action translation, generation-owned behavior/RGB views, and activation safety policy | Pending/active profile generation plus activation wait evidence | Validated profile snapshots, canonical actions, authoritative runtime activity, injected peer convergence | Coherent generation publication, callback-only behavior/RGB view swaps, stale-token refusal, native behavior materialization, reason/count status | `run_effective_profile_provider_tests.sh`, `run_effective_rgb_runtime_tests.sh`, `run_profile_activation_policy_tests.sh`, `run_key_behavior_lookup_tests.sh` | active live-edit architecture review |
 | `rgb/automouse/` | Auto-mouse RGB fade support | Projected UI | Auto-mouse timing and layer state | Fade frame and progress quantization | RGB layer render tests | [RGB_CONFIG](../RGB_CONFIG.md) |
-| `rgb/core/` | RGB orchestration, effective-config adapters, helpers, validation | Render pipeline owner | One captured effective RGB frame, compiled fallbacks, runtime snapshots | LED frame application, bounded config reads, validation, map invalidation | `run_effective_rgb_runtime_tests.sh`, `run_rgb_validation_tests.sh`, `run_rgb_layer_render_tests.sh` | [RGB_CONFIG](../RGB_CONFIG.md) |
-| `rgb/stages/` | Individual RGB overlays | Projected UI | Effective layer profile, layer state, combo bitmaps, key feedback, PD snapshots | Stage-specific LED painting | RGB render tests | [RGB_CONFIG](../RGB_CONFIG.md) |
+| `rgb/core/` | RGB orchestration, effective-config adapters, helpers, validation | Render pipeline owner | One captured effective RGB frame, compiled fallbacks, runtime snapshots | LED frame application, bounded layer/pointing config reads, validation, map invalidation | `run_effective_rgb_runtime_tests.sh`, `run_rgb_validation_tests.sh`, `run_rgb_layer_render_tests.sh` | [RGB_CONFIG](../RGB_CONFIG.md) |
+| `rgb/stages/` | Individual RGB overlays | Projected UI | Effective layer and pointing profile, layer state, combo bitmaps, key feedback, PD snapshots | Stage-specific frame composition and LED painting | RGB render tests | [RGB_CONFIG](../RGB_CONFIG.md) |
 | `split/` | Runtime split sync transport, outbound timing, and outage backoff | Transport only | One sampled tick timestamp plus PD, automouse, preview, combo, and key-feedback snapshots | Bounded master-to-slave runtime attempts, per-domain success state, and current-state recovery | `run_split_runtime_sync_tests.sh`, `run_runtime_trace_tests.sh` | [runtime-flow](./runtime-flow.md) |
 | `state/shared/` | Internal runtime storage and test reset | Storage owner | Runtime owners | Shared singleton context and reset | runtime init/debug/trace/diag and feature gate tests | [KEY_RUNTIME](../KEY_RUNTIME.md) |
 | `state/diagnostics/` | Runtime debug, diagnostics, trace | Diagnostic owner | Runtime stage scopes and state snapshots | Debug APIs, restart watchdog, boot indicator state, trace snapshots | `run_runtime_debug_tests.sh`, `run_runtime_diag_tests.sh`, `run_runtime_trace_tests.sh` | [runtime-flow](./runtime-flow.md) |
@@ -181,8 +181,9 @@ semantics without taking another platform timer sample.
 - Automouse fade: `automouse/rgb_automouse.c/h`,
   `automouse/rgb_automouse_stage.c/h`
 - Core rendering and authored config helpers: `core/rgb_runtime.c/h`,
-  `core/rgb_config_defaults.c`, `core/rgb_config_helpers.h`,
-  `core/rgb_helpers.h`, `core/rgb_validation.c/h`
+  `core/rgb_effective_config.c/h`, `core/rgb_config_defaults.c`,
+  `core/rgb_config_helpers.h`, `core/rgb_helpers.h`,
+  `core/rgb_validation.c/h`
 - Stages: `stages/rgb_layer_stage.c/h`,
   `stages/rgb_combo_feedback_stage.c/h`,
   `stages/rgb_key_feedback_stage.c/h`,

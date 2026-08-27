@@ -34,16 +34,17 @@ regression policies. None is the RP2040's physical capacity.
 
 ### Current Reconciled Measurement
 
-Fresh ordinary ELF on 2026-08-27 after the first effective layer-RGB consumer:
+Fresh ordinary ELF on 2026-08-27 after the effective pointing-mode RGB
+consumer:
 `bastardkb_charybdis_4x6_noah.elf`.
 
 | Resource | Measured | Policy or physical boundary | Remaining margin |
 | --- | ---: | ---: | ---: |
 | SRAM0–3 `.data` | 22,984 B | accounting input | — |
-| SRAM0–3 `.bss` | 25,756 B | 26,000 B regression policy | 244 B policy margin |
-| SRAM0–3 `.data + .bss` metric | 48,740 B | 51,000 B regression policy | 2,260 B policy margin |
-| SRAM0–3 linker/core-memory span at boot | 213,400 B | 204,800 B conservative minimum policy | 8,600 B policy margin |
-| Fixed linked occupancy across all SRAM banks | 56,200 B | 270,336 B physical SRAM | informational; includes alignment and reserved stacks, excludes runtime allocation |
+| SRAM0–3 `.bss` | 25,716 B | 26,000 B regression policy | 284 B policy margin |
+| SRAM0–3 `.data + .bss` metric | 48,700 B | 51,000 B regression policy | 2,300 B policy margin |
+| SRAM0–3 linker/core-memory span at boot | 213,440 B | 204,800 B conservative minimum policy | 8,640 B policy margin |
+| Fixed linked occupancy across all SRAM banks | 56,160 B | 270,336 B physical SRAM | informational; includes alignment and reserved stacks, excludes runtime allocation |
 | Main-process worst reviewed path | 1,880 B | 1,920 B reviewed-path policy | 40 B policy margin |
 | Main process stack allocation | 2,560 B | physical stack boundary | 680 B beyond the worst reviewed path |
 | Split-slave worst reviewed path | 336 B | 768 B reviewed-path policy within its 1,024 B usable stack | 432 B policy margin |
@@ -56,7 +57,7 @@ historical measurements, not current capacity limits.
 The SRAM0–3 linker/core-memory span is the range from `__heap_base__` to
 `__heap_end__`. ChibiOS initializes its monotonic core allocator from this
 range, and the linked newlib `_sbrk_r` obtains allocation pages from that
-allocator. Therefore 213,400 bytes is the maximum span at boot, not a measured
+allocator. Therefore 213,440 bytes is the maximum span at boot, not a measured
 runtime-free or runtime-high-water value. Hardware telemetry is still required
 to record runtime allocator use.
 
@@ -71,8 +72,8 @@ become reachable.
 A nominal 4 KiB active buffer, or an active plus candidate pair, would violate
 the current `.data + .bss` regression policy. A zero-initialized buffer placed
 in `.bss` would also violate the BSS policy. Neither would exhaust the RP2040:
-one nominal buffer would leave about 209,400 bytes in the SRAM0–3
-linker/core-memory span, and two would leave about 205,304 bytes before runtime
+one nominal buffer would leave about 209,344 bytes in the SRAM0–3
+linker/core-memory span, and two would leave about 205,248 bytes before runtime
 allocation. Candidate bytes remain in the inactive EEPROM slot because this
 supports power-loss-safe staging and avoids unnecessary duplication, not
 because the hardware has only 2–3 KiB RAM available. Firmware should still
