@@ -3,14 +3,15 @@
 Status: blocked on Stage 02
 
 Implementation note: the reader-backed codec, callback-only effective RGB view,
-and first three renderer-family migrations have landed early. The RGB orchestrator
+and first four renderer-family migrations have landed early. The RGB orchestrator
 now captures one token at the frame boundary. Layer colors/render modes and
 pointing-mode colors/locality read through the effective adapter, as do reusable
-group bitmaps, their layer/pointing stage rows, and the auto-mouse fade mode/end
-color. The view copies no payload during provider publication, and its captured
-frame token refuses access after any later publication. The effective runtime
-owner is not installed in production yet, so the compiled RGB configuration
-remains the exact runtime behavior.
+group bitmaps, their layer/pointing/combo stage rows, the auto-mouse fade
+mode/end color, and combo-feedback color/locality. The view copies no payload
+during provider publication, and its captured frame token refuses access after
+any later publication. The effective runtime owner is not installed in
+production yet, so the compiled RGB configuration remains the exact runtime
+behavior.
 
 ## Objective
 
@@ -53,13 +54,14 @@ Migrate one table family at a time:
 1. layer colors and render modes — migrated;
 2. pointing-mode colors and locality — migrated;
 3. auto-mouse fade mode and end color — migrated;
-4. combo feedback color and locality;
+4. combo feedback color and locality — migrated;
 5. key-behavior feedback colors, branch colors, tap-commit mode, and locality;
 6. reusable LED groups as canonical bitmaps or the Stage 00-selected format —
-   migrated for layer and pointing-mode consumers;
+   migrated for layer, pointing-mode, and combo consumers;
 7. layer, pointing-mode, combo, and key-behavior stage-specific group rows —
-   migrated for layer and pointing mode;
-8. runtime enable flags for authored feedback stages.
+   migrated for layer, pointing mode, and combo;
+8. runtime enable flags for authored feedback stages — migrated for layer,
+   pointing mode, auto-mouse, and combo; key feedback remains.
 
 Each pass removes direct production reads of the matching compiled symbol and
 adds a source or compile gate against regression.
@@ -108,19 +110,20 @@ adds a source or compile gate against regression.
 ## Deliverables
 
 - [ ] Effective RGB profile API (callback view, stale-frame contract, frame
-      capture, and layer/pointing/auto-mouse consumers landed; production owner
-      installation remains)
+      capture, and layer/pointing/auto-mouse/combo consumers landed; production
+      owner installation remains)
 - [ ] All eight RGB families migrated (layer colors/render modes,
-      pointing-mode colors/locality, auto-mouse fade mode/end color, and
-      reusable groups used by the migrated stage rows have migrated)
+      pointing-mode colors/locality, auto-mouse fade mode/end color,
+      combo-feedback color/locality, and reusable groups used by the migrated
+      stage rows have migrated)
 - [ ] Generation-consistent cache invalidation
 - [ ] Volatile preview and rollback
 - [ ] Persistent apply and split status
 - [ ] Semantic source/device diff
 - [ ] Push, pull, and reset for RGB
 - [ ] Source gate against direct production array reads (the migrated layer,
-      pointing-mode, and auto-mouse families are gated; remaining families still
-      need matching gates)
+      pointing-mode, auto-mouse, and combo families are gated; key feedback
+      still needs its matching gate)
 - [ ] Updated Studio UI, docs, screenshots, stage, risks, and progress
 
 Early effective-view evidence landed on 2026-08-26:
@@ -176,6 +179,20 @@ Third-consumer evidence landed on 2026-08-27:
 - a publication triggered by the final reader call is detected before LED
   application, leaving the existing LED output untouched. The source gate now
   rejects direct auto-mouse configuration reads from renderer paths.
+
+Fourth-consumer evidence landed on 2026-08-27:
+
+- both combo underlay and overlay passes resolve the stage-enable flag,
+  color/locality, canonical group bitmaps, group colors, and inheritance from
+  the captured effective frame;
+- the combo stage no longer caches its converted active color and composes into
+  a caller-owned frame before the runtime applies any LEDs;
+- a dedicated live-vs-compiled fixture distinguishes keys-only compiled
+  locality from live key-half locality and distinguishes compiled group
+  placement from the live canonical bitmap; and
+- disabling the live combo stage clears the composed chunk, while publication
+  during the final group lookup fails stale and leaves no partial frame. The
+  source gate rejects direct combo-table reads outside the effective adapter.
 
 ## Verification
 

@@ -34,11 +34,10 @@ Examples:
   key_behaviors[] directly.
 - users/noah/lib/rgb/core/rgb_effective_config.c is now the sole compiled/live
   adapter for layer_colors[]/layer_led_groups and
-  pd_mode_colors[]/pd_mode_led_groups plus the auto-mouse fade destination; the
-  layer, preview, auto-mouse, and pointing-mode render paths consume one
-  captured effective frame.
-- users/noah/lib/rgb/stages/rgb_combo_feedback_stage.c:12 reads the compiled
-  combo feedback tables directly.
+  pd_mode_colors[]/pd_mode_led_groups, the auto-mouse fade destination, and
+  combo_feedback_colors/combo_feedback_led_groups; the layer, preview,
+  auto-mouse, pointing-mode, and combo render paths consume one captured
+  effective frame.
 - users/noah/lib/rgb/stages/rgb_key_feedback_stage.c:12 reads compiled
   feedback colors and LED groups directly.
 
@@ -57,10 +56,11 @@ generations to the existing direct authored semantic tables. The effective RGB
 seam similarly branches compiled and behavior-only generations to the authored
 RGB configuration and rejects frame tokens after a later publication. Layer
 colors/render modes, pointing-mode colors/locality, auto-mouse fade mode/end
-color, reusable group bitmaps, and their layer/pointing stage rows now consume
-that seam from one renderer frame token. The runtime owner is not installed and
-the remaining RGB families still read compiled data; hot key events and RGB
-frames must never replay the virtual compiled blob.
+color, combo-feedback color/locality, reusable group bitmaps, and their
+layer/pointing/combo stage rows now consume that seam from one renderer frame
+token. The runtime owner is not installed and the key-feedback family still
+reads compiled data; hot key events and RGB frames must never replay the virtual
+compiled blob.
 
 Enforcement must prevent new direct reads outside default materialization,
 validation fixtures, and the provider implementation.
@@ -228,9 +228,9 @@ The opening findings above are the audit-time snapshot. Current status:
 | Finding | Status | Reconciliation evidence |
 | --- | --- | --- |
 | 1 — malformed VIA mirror prerequisite | open, remediation in progress | owned by Review 19; targeted guard and sanitizer package opened |
-| 2 — no effective-profile seam | partially resolved | a hardened generation-owned provider now enforces coherent publication, invalidation visibility, safe-predicate reentrancy, nested-view containment, and active-backing-aware reuse; behavior and RGB consumers can atomically capture validated reader-backed generations without replaying compiled virtual bytes, and the layer, pointing-mode, and auto-mouse RGB families consume the seam, while production owner installation, remaining renderer migration, a measured behavior-index decision, and split convergence remain open |
+| 2 — no effective-profile seam | partially resolved | a hardened generation-owned provider now enforces coherent publication, invalidation visibility, safe-predicate reentrancy, nested-view containment, and active-backing-aware reuse; behavior and RGB consumers can atomically capture validated reader-backed generations without replaying compiled virtual bytes, and the layer, pointing-mode, auto-mouse, and combo RGB families consume the seam, while production owner installation, remaining renderer migration, a measured behavior-index decision, and split convergence remain open |
 | 3 — no canonical schema | partially resolved | `profile-wire-v1.md`, D-010, and D-015 freeze the v1 contract; blob, RGB, behavior, validator, and real compiled-default materializer now share exact C/JavaScript fixtures, while production runtime and split integration remain open |
-| 4 — no safe activation boundary | partially resolved | `authority-state-table.md` freezes the quiescence contract and `profile_activation_policy.c` now produces coherent production reason/count snapshots from authoritative runtime owners; callback-only behavior/RGB invalidators, stale token refusal, and the first three frame-boundary RGB consumers have landed, while provider-owner installation, split convergence, remaining renderer migration, and hardware evidence remain open |
+| 4 — no safe activation boundary | partially resolved | `authority-state-table.md` freezes the quiescence contract and `profile_activation_policy.c` now produces coherent production reason/count snapshots from authoritative runtime owners; callback-only behavior/RGB invalidators, stale token refusal, and the first four frame-boundary RGB consumers have landed, while provider-owner installation, split convergence, remaining renderer migration, and hardware evidence remain open |
 | 5 — source/device authority | resolved at contract level | D-013, D-014, and `authority-state-table.md` define operations, ordering, partial results, and conflicts |
 | 6 — storage/capacity evidence | resolved at Stage 00 design level; runtime high-water remains open | D-016 and `stage-00-baseline.md` record the corrected per-half bank model, policy-versus-capacity distinction, exact EEPROM map, dual-slot partition, and ceilings |
 | 7 — Studio transport boundary | partially resolved | D-012 accepts an injected serialized adapter and fake; concrete packaged board probe remains open |
@@ -249,15 +249,15 @@ interpretation everywhere in this active review.
 
 Each keyboard half has its own RP2040 and its own 270,336 bytes of physical
 SRAM: 262,144 bytes in the `ram0` SRAM0–3 region plus separate 4,096-byte SRAM4
-and SRAM5 banks. The current fresh ELF records 22,984 bytes of `.data`, 25,716
-bytes of `.bss`, and therefore a 48,700-byte SRAM0–3 `.data + .bss` regression
-metric. Its 51,000-byte ceiling has 2,300 bytes of policy slack; that number is
+and SRAM5 banks. The current fresh ELF records 22,984 bytes of `.data`, 25,708
+bytes of `.bss`, and therefore a 48,692-byte SRAM0–3 `.data + .bss` regression
+metric. Its 51,000-byte ceiling has 2,308 bytes of policy slack; that number is
 not total RAM headroom.
 
-The current `__heap_base__` to `__heap_end__` span is 213,440 bytes. It is the
+The current `__heap_base__` to `__heap_end__` span is 213,448 bytes. It is the
 SRAM0–3 linker/core-memory span at boot and backs ChibiOS core allocation plus
 the linked newlib allocation path. Actual runtime high-water is not yet
-measured. Fixed linked occupancy across all banks is 56,160 bytes, including
+measured. Fixed linked occupancy across all banks is 56,152 bytes, including
 alignment and reserved stacks but excluding runtime allocation.
 
 SRAM4 remains the tight bank. Its 1,024-byte interrupt stack, 2,560-byte process

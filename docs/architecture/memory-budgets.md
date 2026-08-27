@@ -21,15 +21,15 @@ linker map is
 
 ## Current Linked Checkpoint
 
-Freshly measured on 2026-08-27 after the effective auto-mouse RGB consumer:
+Freshly measured on 2026-08-27 after the effective combo-feedback RGB consumer:
 
 | Measurement | Bytes | Meaning |
 | --- | ---: | --- |
 | SRAM0–3 `.data` | 22,984 | nonzero-initialized fixed data |
-| SRAM0–3 `.bss` | 25,716 | zero-initialized fixed data |
-| SRAM0–3 `.data + .bss` | 48,700 | regression metric, not total SRAM use |
-| SRAM0–3 linker/core-memory span at boot | 213,440 | maximum allocator span before runtime allocations |
-| Fixed linked section bytes across all SRAM banks | 56,160 | includes alignment, `.data`, `.bss`, RAM-resident sections, and reserved stacks; excludes runtime allocation |
+| SRAM0–3 `.bss` | 25,708 | zero-initialized fixed data |
+| SRAM0–3 `.data + .bss` | 48,692 | regression metric, not total SRAM use |
+| SRAM0–3 linker/core-memory span at boot | 213,448 | maximum allocator span before runtime allocations |
+| Fixed linked section bytes across all SRAM banks | 56,152 | includes alignment, `.data`, `.bss`, RAM-resident sections, and reserved stacks; excludes runtime allocation |
 
 The linker/core-memory span is `__heap_end__ - __heap_base__`. ChibiOS
 initializes its core allocator from that range and the target's linked newlib
@@ -47,9 +47,9 @@ The current automated thresholds are deliberately conservative policies:
 
 | Policy | Limit | Current margin |
 | --- | ---: | ---: |
-| SRAM0–3 `.bss` maximum | 26,000 B | 284 B |
-| SRAM0–3 `.data + .bss` maximum | 51,000 B | 2,300 B |
-| SRAM0–3 linker/core-memory span minimum at boot | 204,800 B | 8,640 B |
+| SRAM0–3 `.bss` maximum | 26,000 B | 292 B |
+| SRAM0–3 `.data + .bss` maximum | 51,000 B | 2,308 B |
+| SRAM0–3 linker/core-memory span minimum at boot | 204,800 B | 8,648 B |
 
 These thresholds were introduced to detect regressions around earlier linked
 images. They are not RP2040 capacity boundaries. A change may revise them only

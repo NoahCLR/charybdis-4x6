@@ -1004,3 +1004,64 @@ Next steps:
 3. Install RGB and behavior consumers through one production owner only after
    split profile-generation convergence is fail-closed, then measure real-board
    render and lookup timing before advertising mutation capabilities.
+
+### 2026-08-27 — Effective combo-feedback RGB consumer checkpoint
+
+- Extended `rgb_effective_config.c` with compiled/live accessors for the combo
+  stage-enable flag, color/locality, canonical reusable-group bitmaps, group
+  colors, and inherited-color semantics. Direct compiled combo-table access is
+  now centralized in the adapter.
+- Reworked the combo underlay and overlay passes to compose into the runtime's
+  caller-owned frame from the same effective token captured at the RGB frame
+  boundary. The stage no longer retains a converted combo color across profile
+  generations, and the runtime applies LEDs only after composition succeeds.
+- Invalid group reads clear the incomplete chunk. A profile generation
+  published during the final group lookup makes the captured token stale and
+  also clears the chunk before LED application. Disabling the live combo stage
+  similarly produces no combo frame.
+- Added a dedicated live-vs-compiled fixture. Its compiled fallback uses
+  keys-only locality and an explicit-color group, while the live golden profile
+  uses key-half locality plus a differently placed inherited-color canonical
+  group. The renderer source gate now rejects direct combo-table reads outside
+  the effective adapter.
+- Focused verification passed:
+  `sh tests/host/run_rgb_layer_render_tests.sh`,
+  `sh tests/host/run_effective_rgb_runtime_tests.sh`,
+  `sh tests/host/run_profile_rgb_v1_tests.sh`,
+  `sh tests/host/run_rgb_validation_tests.sh`,
+  `sh tests/host/run_real_profile_validation_tests.sh`, and
+  `sh tests/host/run_feature_gate_compile_tests.sh`.
+- Final checkpoint verification passed:
+  `sh tests/host/run_all_host_tests.sh`,
+  `qmk compile -kb bastardkb/charybdis/4x6 -km noah`,
+  `sh tests/host/run_firmware_memory_budget_checks.sh`,
+  `sh tests/host/run_firmware_stack_budget_checks.sh`, a restored ordinary QMK
+  compile plus memory check after stack instrumentation, and `git diff --check`.
+- Fresh linked resource facts are per RP2040 half: 270,336 B physical SRAM;
+  SRAM0–3 `.bss` is 25,708/26,000 B under the regression policy, `.data` is
+  22,984 B, and `.data + .bss` is 48,692/51,000 B. The SRAM0–3 linker/core-
+  memory span at boot is 213,448 B against the 204,800 B minimum, and fixed
+  linked occupancy across unique SRAM banks is 56,152 B. Removing the
+  persistent converted combo color reduced linked `.bss` and fixed occupancy
+  by 8 B from the auto-mouse checkpoint. These are link-time facts and policy
+  metrics, not total-RAM headroom or runtime high-water measurements.
+- The stack gate remains 1,880/1,920 B for its worst named main-process path
+  and 336/768 B for its worst named split-slave path. It covers only the paths
+  in the stack manifest and is not a global or interrupt-stack maximum.
+- The effective runtime owner is still not installed, so production retains
+  exact compiled RGB behavior. Profile Studio UI and authored profile inputs
+  did not change; screenshots and introspection regeneration were intentionally
+  skipped. QMK/resource checks wrote generated sibling build artifacts only;
+  no sibling source was edited.
+
+Next steps:
+
+1. Migrate key-feedback colors, ordered tap-branch colors, tap-commit mode,
+   locality, semantic group rows, and reusable-group bitmaps through the same
+   captured effective frame.
+2. Extend the direct-read gate to the final renderer family and prove
+   live-vs-compiled parity, every feedback semantic, stage disablement, and
+   stale-final-read refusal.
+3. Install RGB and behavior consumers through one production owner only after
+   split profile-generation convergence is fail-closed, then measure real-board
+   render and lookup timing before advertising mutation capabilities.

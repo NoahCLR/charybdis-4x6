@@ -20,7 +20,7 @@
 #endif
 
 #ifdef RGB_MATRIX_ENABLE
-static rgb_runtime_frame_t rgb_runtime_frame_primary;
+static rgb_runtime_frame_t        rgb_runtime_frame_primary;
 static noah_effective_rgb_frame_t rgb_runtime_profile_frame;
 
 #    ifdef RGB_RUNTIME_RENDER_TEST_BACKEND
@@ -217,12 +217,14 @@ static bool rgb_runtime_render_pd_mode_stage(uint8_t led_min, uint8_t led_max) {
 #    if defined(COMBO_ENABLE) && defined(RGB_COMBO_FEEDBACK_ENABLE)
 static bool rgb_runtime_render_combo_underlay_stage(uint8_t led_min, uint8_t led_max) {
     rgb_runtime_render_snapshot_ensure_combo();
-    return rgb_runtime_combo_feedback_stage_render_underlay(rgb_runtime_render_snapshot.combo_underlay_bitmap, led_min, led_max);
+    rgb_runtime_combo_feedback_stage_render_effective_frame(&rgb_runtime_frame_primary, &rgb_runtime_profile_frame, rgb_runtime_render_snapshot.combo_underlay_bitmap, led_min, led_max);
+    return rgb_runtime_layer_stage_apply_frame(&rgb_runtime_frame_primary, led_min, led_max);
 }
 
 static bool rgb_runtime_render_combo_overlay_stage(uint8_t led_min, uint8_t led_max) {
     rgb_runtime_render_snapshot_ensure_combo();
-    return rgb_runtime_combo_feedback_stage_render_overlay(rgb_runtime_render_snapshot.combo_overlay_bitmap, led_min, led_max);
+    rgb_runtime_combo_feedback_stage_render_effective_frame(&rgb_runtime_frame_primary, &rgb_runtime_profile_frame, rgb_runtime_render_snapshot.combo_overlay_bitmap, led_min, led_max);
+    return rgb_runtime_layer_stage_apply_frame(&rgb_runtime_frame_primary, led_min, led_max);
 }
 #    endif
 

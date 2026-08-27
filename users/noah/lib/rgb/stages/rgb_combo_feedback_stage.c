@@ -6,149 +6,143 @@
 
 #if defined(RGB_MATRIX_ENABLE) && defined(COMBO_ENABLE) && defined(RGB_COMBO_FEEDBACK_ENABLE)
 
-#    include "../core/rgb_helpers.h"
 #    include "../../key/runtime/feedback.h"
 
-extern const combo_feedback_color_config_t     combo_feedback_colors;
-extern const combo_feedback_led_group_t *const combo_feedback_led_groups;
-extern const uint8_t                           combo_feedback_led_group_count;
-
-static rgb_t combo_feedback_active_rgb;
-
 void rgb_runtime_combo_feedback_stage_post_init(void) {
-    combo_feedback_active_rgb = hsv_to_rgb(combo_feedback_colors.color);
+    // Retained as a pipeline hook; effective colors are resolved per frame.
 }
 
-static bool rgb_runtime_combo_feedback_stage_led_range_intersects(uint8_t from, uint8_t to, uint8_t led_min, uint8_t led_max) {
-    return from < led_max && to > led_min;
-}
+static bool rgb_runtime_combo_feedback_stage_paint_range(rgb_runtime_frame_t *frame, rgb_t color, uint8_t from, uint8_t to, uint8_t led_min, uint8_t led_max) {
+    bool painted = false;
 
-static bool rgb_runtime_combo_feedback_stage_led_group_intersects(const uint8_t *leds, uint8_t count, uint8_t led_min, uint8_t led_max) {
-    for (uint8_t i = 0; i < count; i++) {
-        if (leds[i] >= led_min && leds[i] < led_max) {
-            return true;
-        }
+    if (!frame || from >= led_max || to <= led_min) {
+        return false;
     }
-
-    return false;
+    if (from < led_min) {
+        from = led_min;
+    }
+    if (to > led_max) {
+        to = led_max;
+    }
+    for (uint8_t led = from; led < to; led++) {
+        frame->colors[led]  = color;
+        frame->painted[led] = true;
+        painted             = true;
+    }
+    return painted;
 }
 
-static bool rgb_runtime_combo_feedback_stage_paint_key(keypos_t key_pos, uint8_t led_min, uint8_t led_max) {
+static bool rgb_runtime_combo_feedback_stage_paint_key(rgb_runtime_frame_t *frame, rgb_t color, keypos_t key_pos, uint8_t led_min, uint8_t led_max) {
     uint8_t leds[RGB_MATRIX_LED_COUNT];
     uint8_t led_count = rgb_matrix_map_row_column_to_led(key_pos.row, key_pos.col, leds);
     bool    painted   = false;
 
-    for (uint8_t index = 0; index < led_count; index++) {
+    for (uint8_t index = 0u; index < led_count; index++) {
         uint8_t led = leds[index];
 
-        if (led >= led_min && led < led_max) {
-            rgb_set_led_color(led, led_min, led_max, combo_feedback_active_rgb);
-            painted = true;
+        if (frame && led >= led_min && led < led_max) {
+            frame->colors[led]  = color;
+            frame->painted[led] = true;
+            painted             = true;
         }
     }
-
     return painted;
 }
 
-static bool rgb_runtime_combo_feedback_stage_paint_bitmap_keys(const uint8_t *bitmap, uint8_t led_min, uint8_t led_max) {
+static bool rgb_runtime_combo_feedback_stage_paint_bitmap_keys(rgb_runtime_frame_t *frame, rgb_t color, const uint8_t *bitmap, uint8_t led_min, uint8_t led_max) {
     bool painted = false;
 
     if (!bitmap) {
         return false;
     }
-
-    for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
-        for (uint8_t col = 0; col < MATRIX_COLS; col++) {
+    for (uint8_t row = 0u; row < MATRIX_ROWS; row++) {
+        for (uint8_t col = 0u; col < MATRIX_COLS; col++) {
             keypos_t key_pos = {.row = row, .col = col};
 
-            if (!key_origin_bitmap_has_keypos(bitmap, key_pos)) {
-                continue;
+            if (key_origin_bitmap_has_keypos(bitmap, key_pos)) {
+                painted |= rgb_runtime_combo_feedback_stage_paint_key(frame, color, key_pos, led_min, led_max);
             }
-
-            painted |= rgb_runtime_combo_feedback_stage_paint_key(key_pos, led_min, led_max);
         }
     }
-
     return painted;
 }
 
-static bool rgb_runtime_combo_feedback_stage_render_locality(const uint8_t *bitmap, uint8_t led_min, uint8_t led_max) {
+static bool rgb_runtime_combo_feedback_stage_paint_locality(rgb_runtime_frame_t *frame, rgb_t color, rgb_locality_t locality, const uint8_t *bitmap, uint8_t led_min, uint8_t led_max) {
     split_side_mask_t sides;
 
-    switch (combo_feedback_colors.locality) {
+    switch (locality) {
         case RGB_KEYS_ONLY:
-            return rgb_runtime_combo_feedback_stage_paint_bitmap_keys(bitmap, led_min, led_max);
+            return rgb_runtime_combo_feedback_stage_paint_bitmap_keys(frame, color, bitmap, led_min, led_max);
         case RGB_LEFT_HALF:
-            if (!rgb_runtime_combo_feedback_stage_led_range_intersects(0, RGB_LEFT_LED_COUNT, led_min, led_max)) {
-                return false;
-            }
-            rgb_set_left_half(combo_feedback_active_rgb, led_min, led_max);
-            return true;
+            return rgb_runtime_combo_feedback_stage_paint_range(frame, color, 0u, RGB_LEFT_LED_COUNT, led_min, led_max);
         case RGB_RIGHT_HALF:
-            if (!rgb_runtime_combo_feedback_stage_led_range_intersects(RGB_LEFT_LED_COUNT, RGB_MATRIX_LED_COUNT, led_min, led_max)) {
-                return false;
-            }
-            rgb_set_right_half(combo_feedback_active_rgb, led_min, led_max);
-            return true;
+            return rgb_runtime_combo_feedback_stage_paint_range(frame, color, RGB_LEFT_LED_COUNT, RGB_MATRIX_LED_COUNT, led_min, led_max);
         case RGB_KEY_HALF:
             sides = key_origin_bitmap_side_mask(bitmap);
             if (sides == SPLIT_SIDE_MASK_LEFT) {
-                if (!rgb_runtime_combo_feedback_stage_led_range_intersects(0, RGB_LEFT_LED_COUNT, led_min, led_max)) {
-                    return false;
-                }
-                rgb_set_left_half(combo_feedback_active_rgb, led_min, led_max);
-                return true;
+                return rgb_runtime_combo_feedback_stage_paint_range(frame, color, 0u, RGB_LEFT_LED_COUNT, led_min, led_max);
             }
-
             if (sides == SPLIT_SIDE_MASK_RIGHT) {
-                if (!rgb_runtime_combo_feedback_stage_led_range_intersects(RGB_LEFT_LED_COUNT, RGB_MATRIX_LED_COUNT, led_min, led_max)) {
-                    return false;
-                }
-                rgb_set_right_half(combo_feedback_active_rgb, led_min, led_max);
-                return true;
+                return rgb_runtime_combo_feedback_stage_paint_range(frame, color, RGB_LEFT_LED_COUNT, RGB_MATRIX_LED_COUNT, led_min, led_max);
             }
             break;
         case RGB_BOTH_HALVES:
         default:
             break;
     }
-
-    rgb_set_both_halves(combo_feedback_active_rgb, led_min, led_max);
-    return led_min < led_max;
+    return rgb_runtime_combo_feedback_stage_paint_range(frame, color, 0u, RGB_MATRIX_LED_COUNT, led_min, led_max);
 }
 
-static bool rgb_runtime_combo_feedback_stage_render_groups(uint8_t led_min, uint8_t led_max) {
+static bool rgb_runtime_combo_feedback_stage_paint_group(rgb_runtime_frame_t *frame, const rgb_effective_combo_group_t *group, rgb_t color, uint8_t led_min, uint8_t led_max) {
     bool painted = false;
 
-    for (uint8_t group = 0; group < combo_feedback_led_group_count; group++) {
-        const rgb_led_group_t *led_group = &combo_feedback_led_groups[group].led_group;
-        rgb_t                  group_rgb = rgb_hsv_is_inherit_color(combo_feedback_led_groups[group].color) ? combo_feedback_active_rgb : hsv_to_rgb(combo_feedback_led_groups[group].color);
-        rgb_set_led_group(led_group->leds, led_group->count, led_min, led_max, group_rgb);
-        painted |= rgb_runtime_combo_feedback_stage_led_group_intersects(led_group->leds, led_group->count, led_min, led_max);
-    }
-
-    return painted;
-}
-
-static bool rgb_runtime_combo_feedback_stage_render(const uint8_t *bitmap, uint8_t led_min, uint8_t led_max) {
-    bool painted = false;
-
-    if (!key_origin_bitmap_has_any(bitmap)) {
+    if (!(frame && group)) {
         return false;
     }
-
-    painted |= rgb_runtime_combo_feedback_stage_render_locality(bitmap, led_min, led_max);
-    painted |= rgb_runtime_combo_feedback_stage_render_groups(led_min, led_max);
-
+    for (uint8_t led = led_min; led < led_max; led++) {
+        if (led >= NOAH_PROFILE_RGB_V1_PHYSICAL_LED_COUNT || (group->bitmap[led / 8u] & (uint8_t)(1u << (led % 8u))) == 0u) {
+            continue;
+        }
+        frame->colors[led]  = color;
+        frame->painted[led] = true;
+        painted             = true;
+    }
     return painted;
 }
 
-bool rgb_runtime_combo_feedback_stage_render_underlay(const uint8_t *bitmap, uint8_t led_min, uint8_t led_max) {
-    return rgb_runtime_combo_feedback_stage_render(bitmap, led_min, led_max);
-}
+bool rgb_runtime_combo_feedback_stage_render_effective_frame(rgb_runtime_frame_t *frame, const noah_effective_rgb_frame_t *profile_frame, const uint8_t *bitmap, uint8_t led_min, uint8_t led_max) {
+    combo_feedback_color_config_t feedback_config;
+    rgb_effective_combo_group_t   group_config;
+    rgb_t                         active_rgb;
+    bool                          painted = false;
+    uint8_t                       group_count;
 
-bool rgb_runtime_combo_feedback_stage_render_overlay(const uint8_t *bitmap, uint8_t led_min, uint8_t led_max) {
-    return rgb_runtime_combo_feedback_stage_render(bitmap, led_min, led_max);
+    if (!frame) {
+        return false;
+    }
+    rgb_runtime_frame_clear(frame, led_min, led_max);
+    if (!bitmap || !key_origin_bitmap_has_any(bitmap) || !rgb_effective_config_combo_stage_enabled(profile_frame) || !rgb_effective_config_combo_feedback(profile_frame, &feedback_config)) {
+        return false;
+    }
+    active_rgb = hsv_to_rgb(feedback_config.color);
+    painted |= rgb_runtime_combo_feedback_stage_paint_locality(frame, active_rgb, feedback_config.locality, bitmap, led_min, led_max);
+
+    group_count = rgb_effective_config_combo_group_count(profile_frame);
+    for (uint8_t group = 0u; group < group_count; group++) {
+        if (!rgb_effective_config_combo_group_at(profile_frame, group, &group_config)) {
+            rgb_runtime_frame_clear(frame, led_min, led_max);
+            return false;
+        }
+
+        rgb_t group_rgb = rgb_hsv_is_inherit_color(group_config.color) ? active_rgb : hsv_to_rgb(group_config.color);
+        painted |= rgb_runtime_combo_feedback_stage_paint_group(frame, &group_config, group_rgb, led_min, led_max);
+    }
+
+    if (!rgb_effective_config_frame_current(profile_frame)) {
+        rgb_runtime_frame_clear(frame, led_min, led_max);
+        return false;
+    }
+    return painted;
 }
 
 #endif

@@ -13,19 +13,16 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "rgb_layer_stage.h"
+
 #if defined(RGB_MATRIX_ENABLE) && defined(COMBO_ENABLE) && defined(RGB_COMBO_FEEDBACK_ENABLE)
 void rgb_runtime_combo_feedback_stage_post_init(void);
-bool rgb_runtime_combo_feedback_stage_render_underlay(const uint8_t *bitmap, uint8_t led_min, uint8_t led_max);
-bool rgb_runtime_combo_feedback_stage_render_overlay(const uint8_t *bitmap, uint8_t led_min, uint8_t led_max);
+bool rgb_runtime_combo_feedback_stage_render_effective_frame(rgb_runtime_frame_t *frame, const noah_effective_rgb_frame_t *profile_frame, const uint8_t *bitmap, uint8_t led_min, uint8_t led_max);
 #else
 static inline void rgb_runtime_combo_feedback_stage_post_init(void) {}
-static inline bool rgb_runtime_combo_feedback_stage_render_underlay(const uint8_t *bitmap, uint8_t led_min, uint8_t led_max) {
-    (void)bitmap;
-    (void)led_min;
-    (void)led_max;
-    return false;
-}
-static inline bool rgb_runtime_combo_feedback_stage_render_overlay(const uint8_t *bitmap, uint8_t led_min, uint8_t led_max) {
+static inline bool rgb_runtime_combo_feedback_stage_render_effective_frame(void *frame, const noah_effective_rgb_frame_t *profile_frame, const uint8_t *bitmap, uint8_t led_min, uint8_t led_max) {
+    (void)frame;
+    (void)profile_frame;
     (void)bitmap;
     (void)led_min;
     (void)led_max;

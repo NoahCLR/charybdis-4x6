@@ -36,26 +36,28 @@ pointer-mode overlay underneath.
 
 The renderer captures one effective RGB frame token when QMK starts the first
 LED chunk of a frame. Normal layer rendering, the auto-mouse destination scene,
-layer preview, and the pointing-mode overlay all receive that same token. Layer
-colors, mapped-only render modes, pointing-mode colors and locality, reusable
-group bitmaps, layer and pointing-mode group rows, and the auto-mouse fade mode
-and end color are read through
+layer preview, the pointing-mode overlay, and both combo-feedback passes all
+receive that same token. Layer colors, mapped-only render modes, pointing-mode
+colors and locality, reusable group bitmaps, layer/pointing/combo group rows,
+the auto-mouse fade mode and end color, and combo-feedback color/locality are
+read through
 [`rgb_effective_config.c`](../users/noah/lib/rgb/core/rgb_effective_config.c),
 which selects either a validated live view or the compiled tables in
 `rgb_config.c`.
 
 A token becomes stale as soon as a later profile generation is published. The
-layer compositor, pointing-mode overlay, and auto-mouse fade then refuse it
-instead of reading part of each generation. They compose into caller-owned
-render frames before touching the LEDs, so an invalid or stale access can clear
-or discard the incomplete result. The mapped-key LED map is
-generation-independent; layer and pointing-mode colors, modes, locality,
-groups, and the auto-mouse destination configuration are resolved as
-render-local state, so they cannot remain cached after a profile switch.
+layer compositor, pointing-mode overlay, auto-mouse fade, and combo-feedback
+passes then refuse it instead of reading part of each generation. They compose
+into caller-owned render frames before touching the LEDs, so an invalid or
+stale access can clear or discard the incomplete result. The mapped-key LED map
+is generation-independent; layer and pointing-mode colors, modes, locality,
+groups, the auto-mouse destination configuration, and combo-feedback config
+are resolved as render-local state, so they cannot remain cached after a
+profile switch.
 
 The production effective-profile owner is not installed yet, so current
-firmware still selects the compiled tables. Combo and key-feedback
-configuration migrations are later live-edit stages.
+firmware still selects the compiled tables. Key-feedback configuration is the
+remaining renderer migration.
 
 ## How truth reaches the LEDs
 

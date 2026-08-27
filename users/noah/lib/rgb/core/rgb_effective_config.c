@@ -21,6 +21,12 @@ extern const pd_mode_led_group_t *const pd_mode_led_groups;
 extern const uint8_t                    pd_mode_led_group_count;
 #endif
 
+#if defined(COMBO_ENABLE) && defined(RGB_COMBO_FEEDBACK_ENABLE)
+extern const combo_feedback_color_config_t     combo_feedback_colors;
+extern const combo_feedback_led_group_t *const combo_feedback_led_groups;
+extern const uint8_t                           combo_feedback_led_group_count;
+#endif
+
 // Narrow host/feature variants can compile RGB stages without the profile
 // runtime. Production's source manifest supplies strong implementations.
 __attribute__((weak)) noah_effective_rgb_result_t noah_effective_rgb_capture_frame(noah_effective_rgb_frame_t *frame) {
@@ -274,7 +280,7 @@ static bool compiled_pd_group_at(uint8_t index, rgb_effective_pd_group_t *group)
             return false;
         }
     }
-    group->color    = source->color;
+    group->color = source->color;
     for (uint8_t led_index = 0u; led_index < source->led_group.count; led_index++) {
         uint8_t led = source->led_group.leds[led_index];
 
@@ -307,6 +313,116 @@ bool rgb_effective_config_pd_group_at(const noah_effective_rgb_frame_t *frame, u
         }
         group->selector = row.selector;
         group->color    = native_hsv(row.color);
+        memcpy(group->bitmap, dictionary_group.bitmap, sizeof(group->bitmap));
+        return true;
+    }
+#else
+    (void)frame;
+    (void)index;
+    (void)group;
+#endif
+    return false;
+}
+
+bool rgb_effective_config_combo_stage_enabled(const noah_effective_rgb_frame_t *frame) {
+#if defined(COMBO_ENABLE) && defined(RGB_COMBO_FEEDBACK_ENABLE)
+    noah_effective_rgb_result_t status = frame_status(frame);
+
+    if (status == NOAH_EFFECTIVE_RGB_COMPILED_FALLBACK) {
+        return true;
+    }
+    return status == NOAH_EFFECTIVE_RGB_OK && (frame->view.stage_enable_mask & NOAH_PROFILE_RGB_V1_STAGE_COMBO) != 0u;
+#else
+    (void)frame;
+    return false;
+#endif
+}
+
+bool rgb_effective_config_combo_feedback(const noah_effective_rgb_frame_t *frame, combo_feedback_color_config_t *config) {
+#if defined(COMBO_ENABLE) && defined(RGB_COMBO_FEEDBACK_ENABLE)
+    noah_effective_rgb_result_t status = frame_status(frame);
+
+    if (!config) {
+        return false;
+    }
+    if (status == NOAH_EFFECTIVE_RGB_COMPILED_FALLBACK) {
+        *config = combo_feedback_colors;
+        return true;
+    }
+    if (status == NOAH_EFFECTIVE_RGB_OK && (frame->view.stage_enable_mask & NOAH_PROFILE_RGB_V1_STAGE_COMBO) != 0u) {
+        noah_profile_rgb_v1_feedback_t row;
+        noah_profile_rgb_v1_error_t    error;
+
+        if (noah_profile_rgb_v1_combo_feedback(&frame->view, &row, &error) == NOAH_PROFILE_RGB_V1_OK) {
+            *config = (combo_feedback_color_config_t){.color = native_hsv(row.color), .locality = (rgb_locality_t)row.locality};
+            return true;
+        }
+    }
+    return false;
+#else
+    (void)frame;
+    (void)config;
+    return false;
+#endif
+}
+
+uint8_t rgb_effective_config_combo_group_count(const noah_effective_rgb_frame_t *frame) {
+#if defined(COMBO_ENABLE) && defined(RGB_COMBO_FEEDBACK_ENABLE)
+    noah_effective_rgb_result_t status = frame_status(frame);
+
+    if (status == NOAH_EFFECTIVE_RGB_COMPILED_FALLBACK) {
+        return combo_feedback_led_group_count;
+    }
+    if (status == NOAH_EFFECTIVE_RGB_OK && (frame->view.stage_enable_mask & NOAH_PROFILE_RGB_V1_STAGE_COMBO) != 0u) {
+        return frame->view.combo_group_count;
+    }
+#else
+    (void)frame;
+#endif
+    return 0u;
+}
+
+#if defined(COMBO_ENABLE) && defined(RGB_COMBO_FEEDBACK_ENABLE)
+static bool compiled_combo_group_at(uint8_t index, rgb_effective_combo_group_t *group) {
+    const combo_feedback_led_group_t *source;
+
+    if (!group || index >= combo_feedback_led_group_count) {
+        return false;
+    }
+    source = &combo_feedback_led_groups[index];
+    memset(group, 0, sizeof(*group));
+    group->color = source->color;
+    for (uint8_t led_index = 0u; led_index < source->led_group.count; led_index++) {
+        uint8_t led = source->led_group.leds[led_index];
+
+        if (led >= NOAH_PROFILE_RGB_V1_PHYSICAL_LED_COUNT) {
+            return false;
+        }
+        group->bitmap[led / 8u] |= (uint8_t)(1u << (led % 8u));
+    }
+    return true;
+}
+#endif
+
+bool rgb_effective_config_combo_group_at(const noah_effective_rgb_frame_t *frame, uint8_t index, rgb_effective_combo_group_t *group) {
+#if defined(COMBO_ENABLE) && defined(RGB_COMBO_FEEDBACK_ENABLE)
+    noah_effective_rgb_result_t status = frame_status(frame);
+
+    if (!group) {
+        return false;
+    }
+    if (status == NOAH_EFFECTIVE_RGB_COMPILED_FALLBACK) {
+        return compiled_combo_group_at(index, group);
+    }
+    if (status == NOAH_EFFECTIVE_RGB_OK && (frame->view.stage_enable_mask & NOAH_PROFILE_RGB_V1_STAGE_COMBO) != 0u && index < frame->view.combo_group_count) {
+        noah_profile_rgb_v1_combo_group_row_t row;
+        noah_profile_rgb_v1_group_t           dictionary_group;
+        noah_profile_rgb_v1_error_t           error;
+
+        if (noah_profile_rgb_v1_combo_group_at(&frame->view, index, &row, &error) != NOAH_PROFILE_RGB_V1_OK || row.group_id >= frame->view.group_count || noah_profile_rgb_v1_group_at(&frame->view, row.group_id, &dictionary_group, &error) != NOAH_PROFILE_RGB_V1_OK || dictionary_group.id != row.group_id) {
+            return false;
+        }
+        group->color = native_hsv(row.color);
         memcpy(group->bitmap, dictionary_group.bitmap, sizeof(group->bitmap));
         return true;
     }

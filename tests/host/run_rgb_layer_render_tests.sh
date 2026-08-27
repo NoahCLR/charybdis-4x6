@@ -12,6 +12,7 @@ BIN="$BUILD_DIR/rgb_layer_render_test"
 BIN_WORKLOAD="$BUILD_DIR/rgb_render_workload_test"
 BIN_BASE_UNDERLAY="$BUILD_DIR/rgb_base_underlay_test"
 BIN_PD_EFFECTIVE="$BUILD_DIR/rgb_pd_effective_test"
+BIN_COMBO_EFFECTIVE="$BUILD_DIR/rgb_combo_effective_test"
 BIN_END_FILL_UNPAINTED="$BUILD_DIR/rgb_layer_render_test_end_fill_unpainted"
 BIN_END_OVERRIDE="$BUILD_DIR/rgb_layer_render_test_end_override"
 BIN_KEY_HALF="$BUILD_DIR/rgb_layer_render_test_key_half"
@@ -79,6 +80,30 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -o "$BIN_PD_EFFECTIVE"
 
 "$BIN_PD_EFFECTIVE" "$ROOT/tests/fixtures/rgb_domain_v1.fixture"
+
+cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
+    -DQMK_KEYBOARD_H='"qmk_stub.h"' \
+    -DQMK_STUB_SUPPRESS_LAYER_COUNT \
+    -DLAYER_COUNT=3 \
+    -DMATRIX_ROWS=2 \
+    -DMATRIX_COLS=1 \
+    -DRGB_MATRIX_ENABLE \
+    -DCOMBO_ENABLE \
+    -DRGB_COMBO_FEEDBACK_ENABLE \
+    -DRGB_MATRIX_LED_COUNT=8 \
+    -DRGB_LEFT_LED_COUNT=4 \
+    -I"$ROOT" \
+    -I"$ROOT/users/noah" \
+    -I"$ROOT/tests/host/include" \
+    "$ROOT/tests/host/rgb_combo_effective_test.c" \
+    "$ROOT/users/noah/lib/rgb/stages/rgb_combo_feedback_stage.c" \
+    "$ROOT/users/noah/lib/rgb/core/rgb_effective_config.c" \
+    "$ROOT/users/noah/lib/profile/runtime/effective_rgb_runtime.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_rgb_v1.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
+    -o "$BIN_COMBO_EFFECTIVE"
+
+"$BIN_COMBO_EFFECTIVE" "$ROOT/tests/fixtures/rgb_domain_v1.fixture"
 
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
@@ -571,9 +596,10 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
 
 "$BIN_KEY_RIGHT"
 
-if rg -n '\b(layer_colors|layer_led_groups|layer_led_group_count|automouse_fade_end_config|pd_mode_colors|pd_mode_color_count|pd_mode_led_groups|pd_mode_led_group_count)\b' \
+if rg -n '\b(layer_colors|layer_led_groups|layer_led_group_count|automouse_fade_end_config|pd_mode_colors|pd_mode_color_count|pd_mode_led_groups|pd_mode_led_group_count|combo_feedback_colors|combo_feedback_led_groups|combo_feedback_led_group_count)\b' \
     "$ROOT/users/noah/lib/rgb/stages/rgb_layer_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_pd_mode_stage.c" \
+    "$ROOT/users/noah/lib/rgb/stages/rgb_combo_feedback_stage.c" \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_preview_stage.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_runtime.c"

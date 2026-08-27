@@ -79,21 +79,21 @@ No project risks are closed yet.
   `profile-wire-v1.md`; migration implementation and persisted-profile fixtures
   remain open.
 
-### 2026-08-27 first three RGB consumer families evidence update
+### 2026-08-27 first four RGB consumer families evidence update
 
-- R-11 is partially mitigated for the layer, pointing-mode, and auto-mouse RGB
-  families. Their colors, render modes/locality, reusable group bitmaps,
-  stage-group rows, and fade destination now pass through
+- R-11 is partially mitigated for the layer, pointing-mode, auto-mouse, and
+  combo-feedback RGB families. Their colors, render modes/locality, reusable
+  group bitmaps, stage-group rows, and fade destination now pass through
   `rgb_effective_config.c`; a source gate rejects direct reads of their compiled
   symbols from the migrated render paths and orchestrator. The risk remains
-  open for the other renderer families and until the effective owner is
-  installed.
+  open for the key-feedback renderer and until the effective owner is installed.
 - R-12 is partially mitigated at the actual render boundary. One effective
   token is captured at frame start and shared by normal layers, auto-mouse
   destination layers, layer preview, the pointing-mode overlay, and the
-  auto-mouse fade configuration.
+  auto-mouse fade and combo-feedback passes.
   Live-vs-compiled render tests cover colors, mapped-only mode, pointing
   locality, canonical group bitmaps, mode-specific/all-mode groups, inherited
-  colors, live fade destinations, and stale-token fail-closed behavior before
-  LED application. The risk remains open for remaining families, split
-  convergence, real-board timing, and the hardware render matrix.
+  colors, live fade destinations, combo locality/group placement, and
+  stale-token fail-closed behavior before LED application. The risk remains
+  open for the remaining family, split convergence, real-board timing, and the
+  hardware render matrix.
