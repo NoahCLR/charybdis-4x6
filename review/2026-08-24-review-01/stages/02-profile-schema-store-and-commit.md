@@ -23,9 +23,12 @@ upload coordinators now exist on firmware and desktop, and the firmware
 coordinator can stage and validate an inactive EEPROM slot through an injected
 backend. These paths remain intentionally unrouted and unadvertised. The
 isolated effective-provider foundation is now hardened and tested after
-lifecycle review. Durable commit ownership, runtime activation, reset, and
-split reconciliation are still absent, so this stage remains
-blocked/incomplete.
+lifecycle review, and every current behavior/RGB consumer family now has an
+effective-profile seam. A dedicated split foundation freezes the exact 32-byte
+internal protocol and D-014 authority decisions, including fail-closed peer
+observation for activation. Production durable-commit ownership, runtime owner
+installation, reset, peer transport/import, and complete split reconciliation
+are still absent, so this stage remains blocked/incomplete.
 
 ## Objective
 
@@ -344,9 +347,10 @@ mechanically refused before EEPROM mutation, and moving active authority away
 allows the next reservation to discard only the overlapping rollback copy.
 This seam is still disconnected from QMK routing. A production safe predicate
 now exists, but it is not installed into a production provider owner. The
-first callback-only behavior invalidator and consumer lookup seam have landed;
-they remain dormant until that owner installs their caller-owned state. RGB
-invalidation and all capability advertising remain disabled.
+callback-only behavior and RGB invalidators, consumer lookup seam, and every
+current RGB renderer-family adapter have landed; they remain dormant until
+that owner installs their caller-owned state. All capability advertising
+remains disabled.
 
 Landed desktop candidate evidence:
 
@@ -394,6 +398,24 @@ Landed safe-predicate evidence:
 - focused normal, ASan/UBSan, no-one-shot, and Cortex-M0+ tests cover every
   reason, peer failure, saturation, and in-flight status refusal. Runtime-debug
   and owned-keycode tests enforce the two new authoritative observation seams.
+
+Landed split-foundation evidence:
+
+- `profile-split-v1.md` and D-017 freeze a dedicated 32-byte profile protocol
+  rather than extending VIA regions; descriptor frames carry the complete
+  durable identity and firmware compatibility, while payload frames transfer
+  at most 14 bytes with canonical padding and CRC8;
+- the D-014 comparator distinguishes compiled/committed convergence, the newer
+  side, disconnected concurrent commits, same-tuple corruption, incompatible
+  firmware, unreadable state, and invalid metadata without using current USB
+  role as authority;
+- its coherent peer observer reports resolved only for an exact durable match
+  with no transfer in progress, so stale, malformed, or in-flight observations
+  cannot leave activation accidentally open; and
+- normal, ASan/UBSan, Cortex-M0+, fixed-golden, truncation, padding, checksum,
+  enum, bounds, publication, and fail-closed observer coverage is in
+  `run_profile_split_foundation_tests.sh`. The files are in the userspace
+  manifest but no QMK RPC, transfer/store owner, or capability uses them yet.
 
 ## Exit Criteria
 

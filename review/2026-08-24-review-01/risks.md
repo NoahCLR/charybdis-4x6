@@ -101,3 +101,20 @@ No project risks are closed yet.
   before LED application. All current renderer families use the frame seam;
   the risk remains open for production owner installation, split convergence,
   real-board timing, and the hardware render matrix.
+
+### 2026-08-27 split authority and protocol foundation update
+
+- R-04 now has executable D-014 ordering and an exact dedicated split frame
+  contract. Host tests cover both newer-side directions, compiled and exact
+  committed convergence, equal-counter/different-origin conflict,
+  same-tuple/different-record corruption, incompatible firmware, unreadable or
+  malformed metadata, in-flight publication, transfer pending, saturation,
+  fixed wire goldens, truncation, CRC, padding, enum, and range rejection.
+- The activation observer is fail-closed and reports the peer resolved only for
+  an exact durable match with no active transfer. This prevents the future
+  production owner from interpreting missing or conflicting peer evidence as
+  safe activation.
+- R-04 remains open because no QMK RPC or scan reconciler transfers payloads,
+  no exact peer record is yet staged and marker-last committed, and reconnect,
+  role swap, dual USB, interruption, and real-keyboard convergence remain
+  untested. Peer and mutation capability bits therefore remain disabled.

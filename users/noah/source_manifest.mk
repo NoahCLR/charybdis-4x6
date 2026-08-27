@@ -18,6 +18,8 @@ NOAH_COMMON_SOURCES := \
     lib/profile/runtime/effective_key_behavior_runtime.c \
     lib/profile/runtime/effective_rgb_runtime.c \
     lib/profile/runtime/profile_activation_policy.c \
+    lib/profile/split/profile_split_authority.c \
+    lib/profile/split/profile_split_protocol_v1.c \
     lib/profile/storage/profile_storage_layout.c \
     lib/profile/storage/profile_checksum.c \
     lib/profile/storage/profile_store.c \

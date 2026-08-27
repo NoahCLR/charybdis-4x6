@@ -221,3 +221,25 @@ The reviewed-path gate is not proof of a global or interrupt-stack maximum.
 Keeping candidate payloads in inactive EEPROM remains the accepted
 power-loss-safe and memory-efficient design. It is not justified by a claim
 that a nominal 4 KiB RAM buffer is physically impossible.
+
+### D-017 — Dedicated Profile Split Protocol And Fail-Closed Authority
+
+Status: accepted on 2026-08-27
+
+The live profile uses its own versioned 32-byte sibling protocol rather than a
+new VIA reconciliation region. Metadata carries the complete durable record
+identity and both firmware compatibility digests. Payload transfer is bounded
+to 14 bytes per frame and correlated by generation plus payload digest. Every
+frame has canonical zero padding and a CRC8.
+
+The authority comparator implements D-014 directly and does not use current
+USB role as a tie-breaker. Unreadable metadata, unsupported schema, firmware
+incompatibility, an active transfer, equal-counter/different-origin commits,
+and equal-tuple record disagreement all block activation. Only two compiled
+defaults with matching firmware identity or two exact committed records are
+converged. The exact byte contract is in `profile-split-v1.md`.
+
+This decision does not make the foundation a production reconciler. QMK RPC
+registration, exact remote-slot import, marker-last peer acknowledgement,
+retry/reconnect/role-change state, and production owner installation remain
+required before peer capability or live mutation is advertised.

@@ -227,12 +227,12 @@ The opening findings above are the audit-time snapshot. Current status:
 | --- | --- | --- |
 | 1 — malformed VIA mirror prerequisite | open, remediation in progress | owned by Review 19; targeted guard and sanitizer package opened |
 | 2 — no effective-profile seam | partially resolved | a hardened generation-owned provider now enforces coherent publication, invalidation visibility, safe-predicate reentrancy, nested-view containment, and active-backing-aware reuse; behavior consumers can resolve validated reader-backed generations, and every current RGB family consumes one captured effective frame without replaying compiled virtual bytes, while production owner installation, a measured behavior-index decision, and split convergence remain open |
-| 3 — no canonical schema | partially resolved | `profile-wire-v1.md`, D-010, and D-015 freeze the v1 contract; blob, RGB, behavior, validator, and real compiled-default materializer now share exact C/JavaScript fixtures, while production runtime and split integration remain open |
+| 3 — no canonical schema | partially resolved | `profile-wire-v1.md`, `profile-split-v1.md`, D-010, D-015, and D-017 freeze the host/profile and sibling envelopes; blob, RGB, behavior, validator, real compiled-default materializer, and profile split frames now have exact executable fixtures, while production runtime and peer persistence integration remain open |
 | 4 — no safe activation boundary | partially resolved | `authority-state-table.md` freezes the quiescence contract and `profile_activation_policy.c` now produces coherent production reason/count snapshots from authoritative runtime owners; callback-only behavior/RGB invalidators, stale token refusal, and all current frame-boundary RGB consumers have landed, while provider-owner installation, split convergence, and hardware evidence remain open |
 | 5 — source/device authority | resolved at contract level | D-013, D-014, and `authority-state-table.md` define operations, ordering, partial results, and conflicts |
 | 6 — storage/capacity evidence | resolved at Stage 00 design level; runtime high-water remains open | D-016 and `stage-00-baseline.md` record the corrected per-half bank model, policy-versus-capacity distinction, exact EEPROM map, dual-slot partition, and ceilings |
 | 7 — Studio transport boundary | partially resolved | D-012 accepts an injected serialized adapter and fake; concrete packaged board probe remains open |
-| 8 — split integration shape | resolved at contract level | D-011 selects a sibling profile reconciler with mechanically aligned descriptors |
+| 8 — split integration shape | partially implemented beyond the resolved contract | D-011 selects a sibling profile reconciler; D-017, the exact frame codec, the D-014 comparator, and the fail-closed peer observer now land the isolated protocol/authority foundation, while QMK transport, exact remote import, marker-last acknowledgement, and reconnect/role-change reconciliation remain open |
 | 9 — config classification | resolved at inventory level | `field-classification.md` classifies every currently parsed Studio surface |
 
 Contract-level resolution is not milestone closure. Runtime, protocol, storage,
@@ -399,6 +399,15 @@ because the isolated pieces exist.
 The split owner publishes or reconciles committed persistent generations. A
 volatile RGB preview may be mirrored separately, but it can never overwrite the
 last committed profile or win durable authority after reconnect.
+
+The isolated `profile/split/` package now freezes the first two pieces of that
+owner: a strict 32-byte v1 codec and a caller-owned authority publication. The
+comparator follows the accepted `{counter, origin_half} + digest` ordering and
+its activation observer fails closed for every non-converged or in-transfer
+state. It deliberately does not register a QMK transaction, import a peer
+record, write EEPROM, retry a transfer, or install the production provider.
+Those responsibilities belong to the next scan-owned reconciler and exact
+remote-store backend; capability advertising remains off until they land.
 
 ### Profile Studio
 

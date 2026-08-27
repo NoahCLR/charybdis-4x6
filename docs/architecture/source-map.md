@@ -61,6 +61,7 @@ source trace because they rewrite or verify human-facing firmware docs.
 | `pointing/policy/` | Pointer layer and PD policy rules | Policy helper | Layer state, keycodes, PD traits | Pointer layer activation, mouse-record classification | `run_pointer_layer_policy_tests.sh`, PD/key-runtime integration tests | [POINTER_MODES](../POINTER_MODES.md) |
 | `pointing/runtime/` | PD mode state, snapshots, lifecycle, key bridge | Authoritative PD state | PD key events, key-runtime effects, pointer reports, split snapshots | Local/display/remote PD state, active handler routing, DPI sync | PD runtime/mode/bridge integration tests | [ADDING_PD_MODE](../ADDING_PD_MODE.md), [runtime-flow](./runtime-flow.md) |
 | `profile/runtime/` | Effective-profile publication, semantic-action translation, generation-owned behavior/RGB views, and activation safety policy | Pending/active profile generation plus activation wait evidence | Validated profile snapshots, canonical actions, authoritative runtime activity, injected peer convergence | Coherent generation publication, callback-only behavior/RGB view swaps, stale-token refusal, native behavior materialization, reason/count status | `run_effective_profile_provider_tests.sh`, `run_effective_rgb_runtime_tests.sh`, `run_profile_activation_policy_tests.sh`, `run_key_behavior_lookup_tests.sh` | active live-edit architecture review |
+| `profile/split/` | Canonical live-profile sibling frames and D-014 authority decisions | Isolated protocol/decision foundation; no production transport owner yet | Durable local/peer descriptors and transfer progress | Strict 32-byte frames, coherent authority snapshots, fail-closed activation peer count | `run_profile_split_foundation_tests.sh`, `run_profile_activation_policy_tests.sh`, feature compile gates | active live-edit architecture review and `profile-split-v1.md` |
 | `rgb/automouse/` | Auto-mouse RGB fade support | Projected UI | Effective fade destination, auto-mouse timing, and layer state | Generation-consistent fade frame and progress quantization | RGB layer render tests | [RGB_CONFIG](../RGB_CONFIG.md) |
 | `rgb/core/` | RGB orchestration, effective-config adapters, helpers, validation | Render pipeline owner | One captured effective RGB frame, compiled fallbacks, runtime snapshots | LED frame application, bounded reads for every RGB family and key-feedback tap policy, validation, map invalidation | `run_effective_rgb_runtime_tests.sh`, `run_rgb_validation_tests.sh`, `run_rgb_layer_render_tests.sh` | [RGB_CONFIG](../RGB_CONFIG.md) |
 | `rgb/stages/` | Individual RGB overlays | Projected UI | Effective layer, pointing, combo, and key-feedback profile data; layer state, combo bitmaps, key feedback, PD snapshots | Generation-consistent stage composition and LED painting | RGB render tests | [RGB_CONFIG](../RGB_CONFIG.md) |
@@ -175,6 +176,17 @@ semantics without taking another platform timer sample.
   `runtime/pd_mode_keyboard_event_internal.h`,
   `runtime/pd_mode_registry_internal.h`,
   `runtime/pd_mode_runtime_shared_state_internal.h`
+
+### `profile/`
+
+- Runtime publication and consumers: `runtime/effective_profile_provider.c/h`,
+  `runtime/effective_key_behavior_runtime.c/h`,
+  `runtime/effective_rgb_runtime.c/h`, and
+  `runtime/profile_activation_policy.c/h`
+- Split protocol foundation: `split/profile_split_authority.c/h` and
+  `split/profile_split_protocol_v1.c/h`. These files define decisions and
+  framing only; they do not own QMK RPC, EEPROM transfer, or production
+  activation.
 
 ### `rgb/`
 

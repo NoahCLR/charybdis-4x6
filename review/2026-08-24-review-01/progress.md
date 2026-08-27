@@ -1134,3 +1134,72 @@ Next steps:
    controls as ready.
 3. Measure real-board render time, behavior lookup time, allocator high-water,
    and stack evidence for the newly reachable owner/activation paths.
+
+### 2026-08-27 — Stage 02 split authority/protocol foundation checkpoint
+
+- Added the dedicated live-profile split protocol foundation selected by
+  D-011/D-017 instead of extending the VIA storage regions. The exact 32-byte
+  v1 codec carries complete durable record metadata, compatibility identities,
+  bounded 14-byte payload chunks, canonical zero padding, and CRC8.
+- Added the caller-owned D-014 authority model. It orders durable generations
+  independently of USB role, detects disconnected concurrent commits and
+  same-tuple corruption, rejects unsupported v1 schema/flags and incompatible
+  firmware identities, and publishes one coherent local/peer/status snapshot.
+- Added the activation-policy peer observer. It reports resolved only for
+  matching compiled defaults or an exact committed record with no transfer in
+  progress. Missing, unreadable, malformed, incompatible, stale, conflicting,
+  corrupt, in-transfer, or incoherent state fails closed.
+- Added fixed metadata/begin/chunk golden frames plus normal, ASan/UBSan, and
+  Cortex-M0+ coverage for the authority decision table, publication races,
+  saturation, transfer pending, round trips, every truncated frame length,
+  checksum, reserved bytes, padding, enum/status, and transfer bounds. The new
+  runner is part of the full host suite and both sources are in the production
+  userspace manifest.
+- Corrected the active Stage 02 and architecture notes so they no longer say
+  RGB invalidation or RGB consumer migration is absent. Every current RGB
+  renderer family and both domain invalidators have landed; the production
+  provider owner and all mutation/activation/peer capability advertising
+  remain intentionally absent.
+- Focused verification passed:
+  `sh tests/host/run_profile_split_foundation_tests.sh`,
+  `sh tests/host/run_profile_activation_policy_tests.sh`,
+  `sh tests/host/run_profile_store_tests.sh`,
+  `sh tests/host/run_qmk_via_split_sync_tests.sh`,
+  `sh tests/host/run_qmk_via_sync_state_tests.sh`,
+  `sh tests/host/run_qmk_via_sync_protocol_tests.sh`, and
+  `sh tests/host/run_feature_gate_compile_tests.sh`.
+- Final checkpoint verification passed:
+  `sh tests/host/run_all_host_tests.sh`,
+  `qmk compile -kb bastardkb/charybdis/4x6 -km noah`,
+  `sh tests/host/run_firmware_memory_budget_checks.sh`,
+  `sh tests/host/run_firmware_stack_budget_checks.sh`, a clean ordinary
+  `qmk compile -c -kb bastardkb/charybdis/4x6 -km noah`, a second memory check,
+  and `git diff --check`.
+- Fresh linked resource facts remain unchanged per RP2040 half because no
+  persistent production authority instance is allocated: physical SRAM is
+  270,336 B; SRAM0–3 `.bss` is 25,684/26,000 B under the regression policy;
+  `.data` is 22,984 B; `.data + .bss` is 48,668/51,000 B; the SRAM0–3
+  linker/core-memory span at boot is 213,472 B against the 204,800 B minimum;
+  and fixed linked occupancy across unique banks is 56,128 B. These are
+  link-time facts and policy metrics, not runtime high-water measurements or
+  total-RAM headroom.
+- Reviewed stack paths remain 1,880/1,920 B for the main process and 336/768 B
+  for the split-slave context. This gate covers only the paths named in its
+  manifest; the new foundation is not reachable from a QMK callback yet.
+- Profile Studio UI and authored profile inputs did not change, so screenshots
+  and introspection regeneration were intentionally skipped. The QMK builds
+  wrote generated artifacts in the sibling firmware tree only; no sibling
+  source file was edited.
+
+Next steps:
+
+1. Add an exact peer-store backend that imports the sender's generation,
+   physical origin, flags, CRC, payload digest, compiled digest, and action ABI
+   into an inactive slot, validates it incrementally, and acknowledges only
+   after marker readback proves durability.
+2. Add the bounded scan-owned reconciler and QMK transaction wiring with retry,
+   disconnect/reconnect, role-change restart, conflict/corruption stop states,
+   and observer invalidation on every peer-status loss.
+3. Integrate boot discovery, provider/predicate/behavior/RGB ownership, and
+   diagnostics while keeping mutation and peer capabilities disabled until the
+   full host and real-keyboard matrices pass.
