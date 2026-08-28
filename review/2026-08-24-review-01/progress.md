@@ -1290,3 +1290,82 @@ Next steps:
 3. Exercise commit/reboot/interruption/reconnect, both USB orientations, role
    swap, reset-to-compiled, and exact durable convergence on the real keyboard
    before advertising mutation or peer support.
+
+### 2026-08-28 — Bidirectional split reconciler checkpoint
+
+- Added a caller-owned, payload-independent profile reconciler. The current
+  QMK master can push a newer local record or explicitly pull a newer sibling
+  record; authority remains the durable generation/origin/digest tuple rather
+  than current USB role. Exact generation and origin are preserved through the
+  existing peer-store backend without a local counter increment.
+- Kept all expensive work in matrix scan. The split callback only performs
+  strict frame decode, one publication-protected mailbox copy, and a cached
+  response copy. Each scan advances at most one RPC, payload read/write, or
+  validator/marker-last commit step. Retry backoff is bounded from 50 to
+  1,000 ms; disconnect, malformed response, role change, and passive-peer
+  expiry invalidate convergence, while conflict, corruption, and
+  incompatibility stop without overwriting either record.
+- Extended Profile Split v1 with the exact `PAYLOAD_REQUEST` frame needed for
+  master-initiated QMK RPC to pull a newer slave. Added the separate
+  `qmk_profile_split_transport` adapter and appended
+  `PUT_PROFILE_SPLIT_SYNC`. The adapter and reconciler are compiled, but the
+  production firmware does not initialize/register them and all live mutation,
+  activation, and peer capability bits remain disabled.
+- Corrected Profile Studio's forced-artifact mapping for this `MASTER_RIGHT`
+  keyboard: left now builds with `FORCE_SLAVE` and right with `FORCE_MASTER`.
+  The source check enforces that exact relationship. This exposed R-17: with no
+  hand pin or `EE_HANDS`, upstream QMK derives left/right from current master,
+  so transport role is not a durable physical origin. Production mutation
+  remains blocked until physical-half identity is explicitly provisioned.
+- Added two-half real-store reconciliation coverage for compiled convergence,
+  newer-master push, newer-slave pull, disconnect/reconnect, passive timeout,
+  malformed and lost responses, role change, concurrent-origin conflict,
+  same-tuple corruption, incompatible firmware, `UINT32_MAX`, exact record
+  identity, and per-scan RPC/storage exclusion. Added separate exact QMK
+  registration, callback, framing, malformed-size, cached-busy, and exchange
+  tests. Both runners execute normal and ASan/UBSan builds and are part of the
+  full host suite.
+- Focused verification passed:
+  `sh tests/host/run_profile_split_foundation_tests.sh`,
+  `sh tests/host/run_profile_peer_store_backend_tests.sh`,
+  `sh tests/host/run_profile_split_reconciler_tests.sh`,
+  `sh tests/host/run_qmk_profile_split_transport_tests.sh`,
+  `sh tests/host/run_profile_activation_policy_tests.sh`,
+  `sh tests/host/run_qmk_via_split_sync_tests.sh`,
+  `sh tests/host/run_qmk_via_split_mirror_tests.sh`, and
+  `sh tests/host/run_feature_gate_compile_tests.sh`.
+- Final verification passed:
+  `sh tests/host/run_all_host_tests.sh`,
+  `npm run check` and `npm run screenshots` from Profile Studio,
+  `python3 tools/profile_introspect.py --write`,
+  `python3 tools/profile_introspect.py --check`,
+  `qmk compile -kb bastardkb/charybdis/4x6 -km noah`,
+  `sh tests/host/run_firmware_memory_budget_checks.sh`,
+  `sh tests/host/run_firmware_stack_budget_checks.sh`, a clean ordinary
+  `qmk compile -c -kb bastardkb/charybdis/4x6 -km noah`, a second memory check,
+  and `git diff --check`.
+- Fresh linked resource facts are per RP2040 half: physical SRAM is 270,336 B;
+  SRAM0–3 `.bss` is unchanged at 25,692/26,000 B under the regression policy;
+  `.data` is 22,996 B; `.data + .bss` is 48,688/51,000 B; the SRAM0–3
+  linker/core-memory span at boot is 213,448 B against the 204,800 B minimum;
+  and fixed linked occupancy across unique banks is 56,152 B. The 12 B
+  initialized-data increase is the appended split transaction-table entry; no
+  production reconciler instance is allocated. These are linked facts and
+  policy metrics, not total-RAM headroom or runtime high-water measurements.
+- Reviewed stack paths remain 1,880/1,920 B for the worst named main path and
+  336/768 B for the worst named split-slave path; the boot discovery path is
+  488 B. This is evidence for the named manifest paths only. The unregistered
+  profile callback is not yet a reachable production stack path. Firmware
+  builds wrote generated sibling QMK artifacts only; no sibling source changed.
+
+Next steps:
+
+1. Provision and expose a stable physical-half identity that cannot change
+   with USB role, with tests for both orientations and role swaps.
+2. Replace the read-only boot shell with one writable profile owner that runs
+   boot whole-profile validation, owns store/candidate/peer/reconciler state,
+   installs provider and domain invalidators, and arbitrates its transaction
+   work with the existing VIA split owner.
+3. Enable an engineering-only capability and run the real-keyboard matrix for
+   behavior and RGB commit, activation, reboot, interruption, reconnect,
+   role swap, reset-to-compiled, and rollback before exposing live mutation.

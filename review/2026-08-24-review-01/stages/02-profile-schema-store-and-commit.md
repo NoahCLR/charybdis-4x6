@@ -28,9 +28,12 @@ effective-profile seam. A dedicated split foundation freezes the exact 32-byte
 internal protocol and D-014 authority decisions, including fail-closed peer
 observation for activation. An isolated exact peer-store backend now imports a
 sender-owned record through the shared validator/store owner and confirms
-marker-last durability without activating it. Production durable-commit
-ownership, runtime owner installation, reset, QMK peer transport/reconciliation,
-and boot whole-profile validation are still absent, so this stage remains
+marker-last durability without activating it. An isolated scan reconciler and
+QMK adapter now implement bidirectional push/pull, cached callback replies,
+bounded scan work, retry/reconnect/role-change behavior, and passive-peer
+expiry. Production durable-commit ownership, runtime owner installation,
+reset, QMK registration, provisioned physical-half identity, and boot
+whole-profile validation are still absent, so this stage remains
 blocked/incomplete.
 
 ## Objective
@@ -174,7 +177,8 @@ Volatile preview must not outrank durable committed state after reconnect.
   reason/count snapshot landed; provider-owner installation remains)
 - [ ] Effective profile generation publication
 - [ ] Domain invalidation contract
-- [ ] Split convergence
+- [ ] Split convergence (isolated bidirectional reconciler and transport adapter
+  landed; production owner, physical origin, and hardware convergence remain)
 - [ ] Reset and migration behavior
 - [ ] Debug/status snapshots
 - [ ] Source manifest, docs, decisions, risks, and progress updates

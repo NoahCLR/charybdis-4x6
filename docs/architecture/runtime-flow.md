@@ -266,6 +266,34 @@ leases; reset and runtime failure release retained leases through bounded
 cleanup. One engine transition runs per scan, and delay deadlines use wrap-safe
 32-bit elapsed time.
 
+## Live-Profile Split Reconciliation
+
+```mermaid
+flowchart LR
+    scan["Current-master scan"] --> metadata["Exchange durable metadata"]
+    metadata --> compare["D-014 authority compare"]
+    compare -->|local newer| push["Read one local chunk, then push"]
+    compare -->|peer newer| pull["Request one peer chunk, then stage locally"]
+    push --> mailbox["Sibling callback mailbox"]
+    pull --> mailbox
+    mailbox --> peer_scan["Sibling scan: one store or validator step"]
+    peer_scan --> durable["Marker-last durable commit"]
+    durable --> verify["Exact metadata verification"]
+    verify --> authority["Fail-closed peer observer"]
+```
+
+The RPC callback only validates/copies one exact 32-byte request and returns a
+cached response. EEPROM access, whole-profile validation, and commit remain in
+matrix scan. Each half performs at most one RPC, payload read/write, or
+validator/commit step per scan. A newer slave is pulled explicitly, so current
+USB role never decides durable authority. Disconnect, malformed response, role
+change, or passive-peer timeout invalidates peer evidence; conflict,
+corruption, and incompatibility stop without overwriting either record.
+
+This path is compiled and host-tested but is not registered by production
+firmware until the writable profile owner, provisioned physical-half identity,
+boot validation, and transport arbitration are installed.
+
 ## Test Coverage Map
 
 ```mermaid
@@ -275,7 +303,7 @@ flowchart TD
     key_runtime["Key runtime reducer/planner/projection"] --> runtime_tests["release matrix, scenario, integration harness, modifier hold, layer lock"]
     pd["Pointing and PD runtime"] --> pd_tests["pd_mode, pd_runtime, handlers, key-runtime integration, pointer layer policy"]
     rgb["RGB rendering"] --> rgb_tests["rgb_validation, rgb_layer_render"]
-    split["Split transport"] --> split_tests["split_runtime_sync, qmk_via_split_sync"]
+    split["Split transport"] --> split_tests["split_runtime_sync, qmk_via_split_sync, profile_split_reconciler"]
     hooks["Hooks and boundaries"] --> boundary_tests["hook_chaining, feature_gate_compile, qmk_contract"]
     all["Whole userspace"] --> full["run_all_host_tests.sh and qmk compile"]
 ```

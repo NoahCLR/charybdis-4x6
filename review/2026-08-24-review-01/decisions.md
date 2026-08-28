@@ -246,7 +246,17 @@ comparison. Store compatibility now includes the compiled-default digest, and
 ambiguous marker durability blocks all later prepares until boot selection
 reconciles the slots.
 
-This still does not make the foundation a production reconciler. QMK RPC
-registration, protocol acknowledgement emission, retry/reconnect/role-change
-state, boot whole-profile validation, and production owner installation remain
+The isolated scan reconciler and QMK adapter now implement acknowledgement,
+newer-local push, newer-peer pull, retry/reconnect/role-change state, passive
+peer expiry, and terminal conflict/corruption handling. They remain caller-
+owned and unregistered in production until the single writable profile owner
+exists.
+
+Durable origin is explicitly independent of USB role. On this board,
+`MASTER_RIGHT` without a hand pin or `EE_HANDS` makes QMK's left/right fallback
+depend on current master, so production must consume an explicitly provisioned
+physical-half identity. Correcting the forced build mapping (left is
+`FORCE_SLAVE`, right is `FORCE_MASTER`) is necessary but does not by itself
+close generic physical-origin provisioning. Boot whole-profile validation,
+owner installation, physical-origin evidence, and hardware convergence remain
 required before peer capability or live mutation is advertised.

@@ -45,7 +45,7 @@ source trace because they rewrite or verify human-facing firmware docs.
 | Source group | Responsibility | Runtime authority | Inputs | Outputs or side effects | Primary tests | Related docs |
 | --- | --- | --- | --- | --- | --- | --- |
 | `action/` | Classify and dispatch action keycodes; aggregate physical and managed literal report ownership | Action metadata, dispatch policy, and owner-scoped literal-key leases | Runtime effects, physical key observations, direct action keys, macro actions | Aggregate-boundary QMK report transitions, synthetic records, PD keycode press/release, macro playback | `run_action_dispatch_tests.sh`, `run_action_lifecycle_tests.sh`, `run_owned_keycode_tests.sh`, `run_delayed_action_tests.sh` | [change-guide](./change-guide.md), [KEY_RUNTIME](../KEY_RUNTIME.md) |
-| `compat/` | Centralize QMK/fork/VIA contracts | Compatibility-only | QMK combo records and state, VIA commands, QMK APIs | Bounded generation-aware combo origins, VIA split replication, sampled auto-mouse elapsed access, contract wrappers | `run_qmk_contract_checks.sh`, `run_qmk_combo_origin_tests.sh`, `run_qmk_via_split_sync_tests.sh`, `run_feature_gate_compile_tests.sh` | [runtime-flow](./runtime-flow.md) |
+| `compat/` | Centralize QMK/fork/VIA contracts | Compatibility-only | QMK combo records and state, VIA commands, QMK APIs | Bounded generation-aware combo origins, VIA split replication, live-profile RPC adapter, sampled auto-mouse elapsed access, contract wrappers | `run_qmk_contract_checks.sh`, `run_qmk_combo_origin_tests.sh`, `run_qmk_via_split_sync_tests.sh`, `run_qmk_profile_split_transport_tests.sh`, `run_feature_gate_compile_tests.sh` | [runtime-flow](./runtime-flow.md) |
 | `key/behavior/` | Resolve compiled or installed effective key behavior | Active behavior interpretation | compiled `key_behaviors[]` fallback, generation-owned live behavior view, resolved keycodes | `handled_key_resolution_t`, materialized runtime contracts, validation errors | `run_key_behavior_lookup_tests.sh`, `run_key_behavior_validation_tests.sh`, `run_keymap_validation_tests.sh`, `run_real_profile_validation_tests.sh` | [INTERACTION_MODEL](../INTERACTION_MODEL.md), [KEY_RUNTIME](../KEY_RUNTIME.md) |
 | `key/ownership/` | Applied held-action and repeat registries | Projected applied state | Key-runtime effects, housekeeping tick | Registered held actions, repeating actions | `run_held_action_tests.sh`, `run_key_runtime_modifier_hold_integration_tests.sh` | [KEY_RUNTIME](../KEY_RUNTIME.md) |
 | `key/runtime/` top level | QMK-facing key-runtime orchestration | Integration only | QMK key events and scan events | Reducer observations, transition plans, projected effects | key-runtime release/scenario/integration/layer-lock/modifier-hold suites | [KEY_RUNTIME](../KEY_RUNTIME.md), [runtime-flow](./runtime-flow.md) |
@@ -61,7 +61,7 @@ source trace because they rewrite or verify human-facing firmware docs.
 | `pointing/policy/` | Pointer layer and PD policy rules | Policy helper | Layer state, keycodes, PD traits | Pointer layer activation, mouse-record classification | `run_pointer_layer_policy_tests.sh`, PD/key-runtime integration tests | [POINTER_MODES](../POINTER_MODES.md) |
 | `pointing/runtime/` | PD mode state, snapshots, lifecycle, key bridge | Authoritative PD state | PD key events, key-runtime effects, pointer reports, split snapshots | Local/display/remote PD state, active handler routing, DPI sync | PD runtime/mode/bridge integration tests | [ADDING_PD_MODE](../ADDING_PD_MODE.md), [runtime-flow](./runtime-flow.md) |
 | `profile/runtime/` | Effective-profile publication, semantic-action translation, generation-owned behavior/RGB views, and activation safety policy | Pending/active profile generation plus activation wait evidence | Validated profile snapshots, canonical actions, authoritative runtime activity, injected peer convergence | Coherent generation publication, callback-only behavior/RGB view swaps, stale-token refusal, native behavior materialization, reason/count status | `run_effective_profile_provider_tests.sh`, `run_effective_rgb_runtime_tests.sh`, `run_profile_activation_policy_tests.sh`, `run_key_behavior_lookup_tests.sh` | active live-edit architecture review |
-| `profile/split/` | Canonical live-profile sibling frames and D-014 authority decisions | Isolated protocol/decision foundation; no production transport owner yet | Durable local/peer descriptors and transfer progress | Strict 32-byte frames, coherent authority snapshots, fail-closed activation peer count | `run_profile_split_foundation_tests.sh`, `run_profile_activation_policy_tests.sh`, feature compile gates | active live-edit architecture review and `profile-split-v1.md` |
+| `profile/split/` | Canonical live-profile sibling frames, D-014 authority, and scan reconciliation | Isolated caller-owned reconciler; no production store/provider owner yet | Durable local/peer descriptors, exact peer store, bounded payload reader, one-frame QMK exchange | Strict 32-byte push/pull frames, one callback mailbox, one transport or storage step per scan, coherent authority snapshots, fail-closed activation peer count | `run_profile_split_foundation_tests.sh`, `run_profile_split_reconciler_tests.sh`, `run_qmk_profile_split_transport_tests.sh`, `run_profile_activation_policy_tests.sh`, feature compile gates | active live-edit architecture review and `profile-split-v1.md` |
 | `rgb/automouse/` | Auto-mouse RGB fade support | Projected UI | Effective fade destination, auto-mouse timing, and layer state | Generation-consistent fade frame and progress quantization | RGB layer render tests | [RGB_CONFIG](../RGB_CONFIG.md) |
 | `rgb/core/` | RGB orchestration, effective-config adapters, helpers, validation | Render pipeline owner | One captured effective RGB frame, compiled fallbacks, runtime snapshots | LED frame application, bounded reads for every RGB family and key-feedback tap policy, validation, map invalidation | `run_effective_rgb_runtime_tests.sh`, `run_rgb_validation_tests.sh`, `run_rgb_layer_render_tests.sh` | [RGB_CONFIG](../RGB_CONFIG.md) |
 | `rgb/stages/` | Individual RGB overlays | Projected UI | Effective layer, pointing, combo, and key-feedback profile data; layer state, combo bitmaps, key feedback, PD snapshots | Generation-consistent stage composition and LED painting | RGB render tests | [RGB_CONFIG](../RGB_CONFIG.md) |
@@ -85,7 +85,8 @@ source trace because they rewrite or verify human-facing firmware docs.
 
 - Combo and split adapters: `qmk_combo_origin.c/h`,
   `qmk_via_split_sync.c/h`, `qmk_via_sync_metadata.c/h`,
-  `qmk_via_sync_protocol.c/h`, and `qmk_via_sync_state.c/h`
+  `qmk_via_sync_protocol.c/h`, `qmk_via_sync_state.c/h`, and
+  `qmk_profile_split_transport.c/h`
 - QMK contract wrappers: `qmk_contract.c`, `qmk_mod_contract.c/h`,
   `qmk_auto_mouse_contract.h`, `qmk_pointing_contract.h`,
   `qmk_via_contract.c`, `qmk_via_playback_contract.h`,
@@ -109,6 +110,14 @@ after complete digest verification, and the sender retains replication-pending
 state until the peer's generation/digest acknowledgement. The current USB
 master initiates metadata exchange after boot, reconnect, and role changes,
 with one storage chunk or RPC per scan and 50–1,000 ms retry backoff.
+
+The live-profile adapter is separate from VIA region reconciliation. Its
+callback only forwards exact 32-byte frames into the caller-owned profile
+reconciler and returns cached replies; scan context owns every profile read,
+write, validation, and marker-last commit step. The transaction id is appended
+after the existing userspace ids. The adapter is compiled but remains
+unregistered until the production writable profile owner and durable physical-
+half identity exist.
 
 Auto-mouse elapsed time is also fork-specific. Split runtime passes its one
 sampled tick timestamp through `qmk_auto_mouse_contract.h`; the compatibility

@@ -20,6 +20,7 @@ NOAH_COMMON_SOURCES := \
     lib/profile/runtime/profile_activation_policy.c \
     lib/profile/split/profile_split_authority.c \
     lib/profile/split/profile_split_protocol_v1.c \
+    lib/profile/split/profile_split_reconciler.c \
     lib/profile/storage/profile_storage_layout.c \
     lib/profile/storage/profile_checksum.c \
     lib/profile/storage/profile_store.c \
@@ -29,6 +30,7 @@ NOAH_COMMON_SOURCES := \
     lib/profile/storage/profile_peer_store_backend.c \
     lib/profile/protocol/profile_wire_v1.c \
     lib/compat/qmk_profile_eeprom.c \
+    lib/compat/qmk_profile_split_transport.c \
     lib/compat/qmk_via_profile_channel.c \
     lib/compat/qmk_contract.c \
     lib/compat/qmk_mod_contract.c \

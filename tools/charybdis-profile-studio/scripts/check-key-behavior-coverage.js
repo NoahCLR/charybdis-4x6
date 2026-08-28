@@ -149,13 +149,13 @@ const appendedCheck = `
             extensionSource.includes("Compile left + right") &&
             getClientScript().includes('type: "compileFirmware"') &&
             getClientScript().includes('type: "applyAllChangesAndCompile"') &&
-            extensionSource.includes('env: "FORCE_MASTER"') &&
-            extensionSource.includes('env: "FORCE_SLAVE"') &&
+            /side: "left",[\\s\\S]{0,220}env: "FORCE_SLAVE"/.test(extensionSource) &&
+            /side: "right",[\\s\\S]{0,160}env: "FORCE_MASTER"/.test(extensionSource) &&
             extensionSource.includes('spawn("qmk", args') &&
             extensionSource.includes("channel.show(true)") &&
             firmwareTargetName(profileTargetForKeymap("noah"), "left") === "bastardkb_charybdis_4x6_noah_left" &&
             firmwareTargetName(profileTargetForKeymap("noah"), "right") === "bastardkb_charybdis_4x6_noah_right",
-        "Profile Studio compile button should build explicit left and right firmware targets with visible streamed output"
+        "Profile Studio compile button should build explicit MASTER_RIGHT-aware left and right firmware targets with visible streamed output"
     );
     assert(
         getClientScript().includes("Unsaved Studio changes") &&

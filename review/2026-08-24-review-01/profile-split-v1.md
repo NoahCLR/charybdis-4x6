@@ -1,7 +1,8 @@
 # Profile Split Protocol V1
 
-Status: accepted internal split foundation and isolated durable peer receiver;
-production transport/reconciliation remains unimplemented
+Status: accepted internal split foundation, durable peer receiver, scan-owned
+reconciler, and QMK transport adapter; production owner registration remains
+unimplemented
 
 This is a dedicated sibling protocol for the durable live profile. It does not
 extend the VIA region reconciler. Every frame is exactly 32 bytes, multi-byte
@@ -20,6 +21,7 @@ bytes.
 | abort | `5` | abandon the correlated prepare |
 | acknowledgement | `6` | report accepted progress or busy state |
 | error | `7` | report a stable terminal or retryable error |
+| payload request | `8` | let the current QMK master pull bytes from a newer sibling |
 
 Status ids are OK `0`, invalid frame `1`, incompatible `2`, stale `3`,
 conflict `4`, corrupt `5`, busy `6`, range error `7`, digest mismatch `8`,
@@ -81,6 +83,11 @@ and error frames carry no chunk bytes. Generation plus digest correlates
 transfer progress inside the one active peer prepare; the prepare descriptor
 retains the complete origin, CRC, flags, schema, and compatibility identity.
 
+A payload request has the same correlation, offset, and total length fields but
+no chunk. Its response is a payload chunk beginning at the exact requested
+offset. QMK custom RPC is initiated only by the current transport master, so
+this explicit pull prevents USB role from becoming durable profile authority.
+
 ## Authority And Activation
 
 The comparator follows D-014:
@@ -120,11 +127,35 @@ prepare can invalidate either slot until a conclusive boot selection clears
 that latch. A boot-discovered exact record is not called idempotently validated
 until a future boot owner has also rerun whole-profile validation.
 
+## Scan-Owned Reconciler And QMK Adapter
+
+`profile_split_reconciler` is caller-owned and payload-independent. Its QMK
+callback validates one exact frame, copies at most one mailbox frame, and
+returns metadata, a correlated busy response, or the cached result of a prior
+scan step. It never reads or writes EEPROM and never runs validation or commit.
+
+Matrix scan performs at most one transport exchange, one bounded payload
+read/write, or one validator/marker-last commit step. It supports newer-local
+push, newer-peer pull, byte-identical retries, 50–1,000 ms backoff,
+disconnect/reconnect, role-change restart, passive-peer expiry, and terminal
+conflict/corruption/incompatibility states. Every peer loss republishes
+fail-closed authority. The QMK adapter appends `PUT_PROFILE_SPLIT_SYNC`, checks
+both 32-byte RPC directions, and can be registered only after a real owner
+initializes the reconciler.
+
+The reconciler preserves `origin_half`; it never derives it from current USB
+role. On this `MASTER_RIGHT` board, upstream QMK falls back to
+`is_keyboard_left() == !is_keyboard_master()` without a hand pin or `EE_HANDS`,
+so that fallback is not a durable physical identity. Profile Studio now builds
+left with `FORCE_SLAVE` and right with `FORCE_MASTER`, but production live
+mutation remains off until the owner consumes an explicitly provisioned
+physical-half identity.
+
 ## Deliberately Missing Production Pieces
 
-- QMK transaction id and RPC callback registration;
-- a scan-owned retry, reconnect, and role-change reconciler;
-- protocol acknowledgement emission after the landed marker-last receiver;
+- the single writable store/provider owner that initializes and registers the
+  landed QMK adapter;
+- a provisioned physical-half origin independent of dynamic USB role;
 - boot discovery publication and reset convergence;
 - production activation-policy installation, diagnostics, and capabilities.
 

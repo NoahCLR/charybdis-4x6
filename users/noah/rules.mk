@@ -46,7 +46,9 @@ ifeq ($(strip $(RGB_MATRIX_ENABLE)), yes)
 endif
 
 # Split role override: build with FORCE_MASTER=yes or FORCE_SLAVE=yes
-# to force a specific half's role when both have USB connected.
+# to force a specific half's role when both have USB connected. On this
+# MASTER_RIGHT board, right is FORCE_MASTER and left is FORCE_SLAVE. These
+# flags describe transport role, not a generic durable physical-origin source.
 ifdef FORCE_MASTER
     OPT_DEFS += -DFORCE_MASTER
 endif

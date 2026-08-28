@@ -99,11 +99,14 @@ static bool transfer_shape_valid(const noah_profile_split_v1_frame_t *frame) {
     if (frame->kind == NOAH_PROFILE_SPLIT_V1_ACK) {
         return frame->status == NOAH_PROFILE_SPLIT_V1_STATUS_OK || frame->status == NOAH_PROFILE_SPLIT_V1_STATUS_BUSY;
     }
+    if (frame->kind == NOAH_PROFILE_SPLIT_V1_PAYLOAD_REQUEST) {
+        return frame->status == NOAH_PROFILE_SPLIT_V1_STATUS_OK && frame->generation != 0u && frame->payload_length >= NOAH_PROFILE_BLOB_V1_HEADER_SIZE && frame->offset < frame->payload_length;
+    }
     return frame->kind == NOAH_PROFILE_SPLIT_V1_ERROR && frame->status != NOAH_PROFILE_SPLIT_V1_STATUS_OK && frame->status != NOAH_PROFILE_SPLIT_V1_STATUS_BUSY;
 }
 
 static bool frame_shape_valid(const noah_profile_split_v1_frame_t *frame) {
-    if (!frame || frame->kind < NOAH_PROFILE_SPLIT_V1_METADATA || frame->kind > NOAH_PROFILE_SPLIT_V1_ERROR || frame->status > NOAH_PROFILE_SPLIT_V1_STATUS_VALIDATION_ERROR) {
+    if (!frame || frame->kind < NOAH_PROFILE_SPLIT_V1_METADATA || frame->kind > NOAH_PROFILE_SPLIT_V1_PAYLOAD_REQUEST || frame->status > NOAH_PROFILE_SPLIT_V1_STATUS_VALIDATION_ERROR) {
         return false;
     }
     if (descriptor_kind(frame->kind)) {

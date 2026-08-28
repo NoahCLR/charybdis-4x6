@@ -910,13 +910,15 @@ async function compileProfileFirmware(root, target) {
         builds.push(await runQmkCompile(root, target, {
             side: "left",
             label: "left",
-            env: "FORCE_MASTER",
+            // This keyboard is MASTER_RIGHT, so the forced slave artifact is
+            // the physical left half.
+            env: "FORCE_SLAVE",
         }));
         progress.report({ message: "right firmware" });
         builds.push(await runQmkCompile(root, target, {
             side: "right",
             label: "right",
-            env: "FORCE_SLAVE",
+            env: "FORCE_MASTER",
         }));
         return builds;
     };

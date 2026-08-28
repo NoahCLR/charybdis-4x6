@@ -22,6 +22,10 @@ typedef enum {
     NOAH_PROFILE_SPLIT_V1_ABORT          = 5u,
     NOAH_PROFILE_SPLIT_V1_ACK            = 6u,
     NOAH_PROFILE_SPLIT_V1_ERROR          = 7u,
+    // The current QMK master is the only RPC initiator. This request lets it
+    // pull a newer durable profile from the sibling without making USB role
+    // part of authority. The response is a correlated PAYLOAD_CHUNK.
+    NOAH_PROFILE_SPLIT_V1_PAYLOAD_REQUEST = 8u,
 } noah_profile_split_v1_kind_t;
 
 typedef enum {

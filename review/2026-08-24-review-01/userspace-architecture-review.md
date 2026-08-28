@@ -232,7 +232,7 @@ The opening findings above are the audit-time snapshot. Current status:
 | 5 — source/device authority | resolved at contract level | D-013, D-014, and `authority-state-table.md` define operations, ordering, partial results, and conflicts |
 | 6 — storage/capacity evidence | resolved at Stage 00 design level; runtime high-water remains open | D-016 and `stage-00-baseline.md` record the corrected per-half bank model, policy-versus-capacity distinction, exact EEPROM map, dual-slot partition, and ceilings |
 | 7 — Studio transport boundary | partially resolved | D-012 accepts an injected serialized adapter and fake; concrete packaged board probe remains open |
-| 8 — split integration shape | partially implemented beyond the resolved contract | D-011 selects a sibling profile reconciler; D-017, the exact frame codec, D-014 comparator, fail-closed peer observer, and isolated exact peer-store backend now cover sender-identity preservation, whole-profile validation, marker-last commit, and durability-unknown recovery. QMK transport/acknowledgement, boot validation, and reconnect/role-change reconciliation remain open |
+| 8 — split integration shape | partially implemented beyond the resolved contract | D-011 selects a sibling profile reconciler; D-017, the exact frame codec, D-014 comparator, fail-closed peer observer, exact peer-store backend, scan reconciler, and QMK adapter now cover bidirectional transfer, sender identity, bounded whole-profile validation, marker-last commit, retry/reconnect/role-change, passive expiry, and durability-unknown recovery. Production owner registration, provisioned physical origin, boot validation, and hardware convergence remain open |
 | 9 — config classification | resolved at inventory level | `field-classification.md` classifies every currently parsed Studio surface |
 
 Contract-level resolution is not milestone closure. Runtime, protocol, storage,
@@ -400,14 +400,24 @@ The split owner publishes or reconciles committed persistent generations. A
 volatile RGB preview may be mirrored separately, but it can never overwrite the
 last committed profile or win durable authority after reconnect.
 
-The isolated `profile/split/` package now freezes the first two pieces of that
-owner: a strict 32-byte v1 codec and a caller-owned authority publication. The
+The `profile/split/` package now supplies a strict 32-byte v1 codec, a
+caller-owned authority publication, and a caller-owned scan reconciler. The
 comparator follows the accepted `{counter, origin_half} + digest` ordering and
 its activation observer fails closed for every non-converged or in-transfer
-state. It deliberately does not register a QMK transaction, import a peer
-record, write EEPROM, retry a transfer, or install the production provider.
-Those responsibilities belong to the next scan-owned reconciler and exact
-remote-store backend; capability advertising remains off until they land.
+state. The reconciler can push or pull the exact durable blob regardless of
+which side currently owns USB, queues callback work into one frame, performs at
+most one transport or storage/validation operation per scan, retries with
+bounded backoff, restarts after reconnect or role change, expires passive peer
+evidence, and stops on conflict, corruption, or incompatibility. The exact
+peer-store backend retains marker-last durability and sender identity.
+
+The appended QMK transaction adapter is independently compiled and tested but
+not registered by production firmware because the single writable profile
+owner does not exist yet. Production installation must also resolve physical
+origin explicitly. With this board's `MASTER_RIGHT` fallback and no hand pin or
+`EE_HANDS`, `is_keyboard_left()` is derived from current master role and cannot
+identify a durable commit origin. Capability advertising remains off until the
+owner, physical identity, boot validation, and hardware matrix land.
 
 ### Profile Studio
 

@@ -187,6 +187,9 @@ static void test_protocol_golden_frames(void) {
     static const uint8_t chunk_golden[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE] = {
         0x01, 0x03, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x40, 0x30, 0x20, 0x10, 0x0E, 0x00, 0x41, 0x04, 0x0E, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x45,
     };
+    static const uint8_t request_golden[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE] = {
+        0x01, 0x08, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x40, 0x30, 0x20, 0x10, 0x0E, 0x00, 0x41, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xBB,
+    };
     noah_profile_split_v1_frame_t metadata = {.kind = NOAH_PROFILE_SPLIT_V1_METADATA, .status = NOAH_PROFILE_SPLIT_V1_STATUS_OK, .descriptor = compiled_descriptor()};
     noah_profile_split_v1_frame_t begin    = {.kind = NOAH_PROFILE_SPLIT_V1_PREPARE_BEGIN, .status = NOAH_PROFILE_SPLIT_V1_STATUS_OK, .descriptor = committed_descriptor(7u, 1u, UINT32_C(0x10203040))};
     noah_profile_split_v1_frame_t chunk    = {
@@ -199,6 +202,14 @@ static void test_protocol_golden_frames(void) {
         .chunk_length   = 14u,
         .chunk          = {0u, 1u, 2u, 3u, 4u, 5u, 6u, 7u, 8u, 9u, 10u, 11u, 12u, 13u},
     };
+    noah_profile_split_v1_frame_t request = {
+        .kind           = NOAH_PROFILE_SPLIT_V1_PAYLOAD_REQUEST,
+        .status         = NOAH_PROFILE_SPLIT_V1_STATUS_OK,
+        .generation     = 7u,
+        .payload_digest = UINT32_C(0x10203040),
+        .offset         = 14u,
+        .payload_length = 1089u,
+    };
     uint8_t wire[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE];
 
     // The fixed begin CRC uses the exact descriptor CRC, not the helper's
@@ -210,10 +221,13 @@ static void test_protocol_golden_frames(void) {
     assert(memcmp(wire, begin_golden, sizeof(wire)) == 0);
     assert(noah_profile_split_v1_frame_encode(&chunk, wire));
     assert(memcmp(wire, chunk_golden, sizeof(wire)) == 0);
+    assert(noah_profile_split_v1_frame_encode(&request, wire));
+    assert(memcmp(wire, request_golden, sizeof(wire)) == 0);
 
     assert_round_trip(&metadata);
     assert_round_trip(&begin);
     assert_round_trip(&chunk);
+    assert_round_trip(&request);
     assert_round_trip(&(noah_profile_split_v1_frame_t){.kind = NOAH_PROFILE_SPLIT_V1_ACK, .status = NOAH_PROFILE_SPLIT_V1_STATUS_BUSY, .generation = 7u, .payload_digest = UINT32_C(0x10203040), .offset = 28u, .payload_length = 1089u});
     assert_round_trip(&(noah_profile_split_v1_frame_t){.kind = NOAH_PROFILE_SPLIT_V1_ERROR, .status = NOAH_PROFILE_SPLIT_V1_STATUS_CONFLICT, .generation = 7u, .payload_digest = UINT32_C(0x10203040)});
 }
@@ -270,6 +284,16 @@ static void test_protocol_rejects_malformed_frames(void) {
     assert(!noah_profile_split_v1_frame_encode(&frame, wire));
     frame.kind   = NOAH_PROFILE_SPLIT_V1_ERROR;
     frame.status = NOAH_PROFILE_SPLIT_V1_STATUS_OK;
+    assert(!noah_profile_split_v1_frame_encode(&frame, wire));
+    frame.kind           = NOAH_PROFILE_SPLIT_V1_PAYLOAD_REQUEST;
+    frame.status         = NOAH_PROFILE_SPLIT_V1_STATUS_OK;
+    frame.generation     = 3u;
+    frame.payload_length = 20u;
+    frame.offset         = 20u;
+    assert(!noah_profile_split_v1_frame_encode(&frame, wire));
+    frame.offset       = 0u;
+    frame.chunk_length = 1u;
+    frame.chunk[0]     = 0xA5u;
     assert(!noah_profile_split_v1_frame_encode(&frame, wire));
 }
 

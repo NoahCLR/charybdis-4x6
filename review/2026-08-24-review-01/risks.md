@@ -18,6 +18,7 @@
 | R-14 | Layer deletion changes numeric references inconsistently across tables | high | 07 | Treat structural layer changes as a whole-profile transaction and validate every cross-reference before commit |
 | R-15 | Protocol changes strand already-persisted profiles | high | 02 and 08 | Define compatibility policy before v1 lands; test upgrade, incompatible version, corrupted header, and factory-reset paths |
 | R-16 | A prototype becomes production without device-level validation | high | 05 and 08 | Keep hardware criteria open until named matrices pass on the real split keyboard |
+| R-17 | Durable commit origin is derived from dynamic USB role, or left/right forced-role artifacts are mapped backwards on this `MASTER_RIGHT` board | critical | 02 and 05 | Use an explicitly provisioned physical-half identity, keep role and origin independent in tests, build left as `FORCE_SLAVE` and right as `FORCE_MASTER`, and prove both USB orientations preserve origin before enabling mutation |
 
 ## Risk Update Rule
 
@@ -135,3 +136,21 @@ No project risks are closed yet.
   matrix. R-04 remains open for QMK transport, retry/reconnect/role-change
   orchestration, boot whole-profile validation, dual USB, and real-keyboard
   convergence. Capability bits remain disabled.
+
+### 2026-08-28 split reconciler and physical-origin update
+
+- R-04 now has an isolated scan-owned reconciler and appended QMK transaction
+  adapter. Two real in-memory store/provider halves cover compiled convergence,
+  exact newer-master push, exact newer-slave pull, bounded busy retries,
+  disconnect/reconnect, malformed response recovery, role-change restart,
+  conflict stop, passive-peer expiry, and per-scan transport/storage exclusion.
+- R-17 records a newly verified blocker: this board defines `MASTER_RIGHT`, and
+  upstream QMK's no-hand-pin/no-`EE_HANDS` fallback implements physical-left as
+  the inverse of current master. It therefore changes with USB role and cannot
+  source durable `origin_half`. Profile Studio's forced artifacts were also
+  reversed; they now build left with `FORCE_SLAVE` and right with
+  `FORCE_MASTER`, with a source check enforcing that mapping.
+- R-04 remains open for production owner registration, boot whole-profile
+  validation, transport arbitration, and the real-keyboard matrix. R-17 remains
+  open until a physical identity is explicitly provisioned and hardware proves
+  role changes never alter it. Mutation and peer capability bits remain off.
