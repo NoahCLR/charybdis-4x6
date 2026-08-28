@@ -248,20 +248,20 @@ interpretation everywhere in this active review.
 Each keyboard half has its own RP2040 and its own 270,336 bytes of physical
 SRAM: 262,144 bytes in the `ram0` SRAM0–3 region plus separate 4,096-byte SRAM4
 and SRAM5 banks. The 2026-08-28 ordinary ELF records 22,996 bytes of `.data`,
-25,692 bytes of `.bss`, and therefore a 48,688-byte SRAM0–3 `.data + .bss`
-regression metric. Its 51,000-byte ceiling has 2,312 bytes of policy slack;
+25,788 bytes of `.bss`, and therefore a 48,784-byte SRAM0–3 `.data + .bss`
+regression metric. Its 51,000-byte ceiling has 2,216 bytes of policy slack;
 that number is not total RAM headroom.
 
-The current `__heap_base__` to `__heap_end__` span is 213,448 bytes. It is the
+The current `__heap_base__` to `__heap_end__` span is 213,352 bytes. It is the
 SRAM0–3 linker/core-memory span at boot and backs ChibiOS core allocation plus
 the linked newlib allocation path. Actual runtime high-water is not yet
-measured. Fixed linked occupancy across all banks is 56,152 bytes, including
+measured. Fixed linked occupancy across all banks is 56,248 bytes, including
 alignment and reserved stacks but excluding runtime allocation.
 
 SRAM4 remains the tight bank. Its 1,024-byte interrupt stack, 2,560-byte process
 stack, and 288 bytes of RTOS state leave 224 bytes outside those reservations.
-The 1,880-byte worst reviewed process path has 40 bytes to the stricter
-1,920-byte reviewed-path policy and 680 bytes to its physical stack boundary.
+The 1,800-byte worst reviewed process path has 120 bytes to the stricter
+1,920-byte reviewed-path policy and 760 bytes to its physical stack boundary.
 The gate covers named paths only.
 
 Consequently, reader-backed decoding and EEPROM candidate staging remain sound
@@ -419,6 +419,15 @@ USB role; generic firmware deliberately exposes no durable origin. Production
 installation must consume that boundary rather than `is_keyboard_master()`.
 Capability advertising remains off until the owner, boot validation,
 transport arbitration, and hardware matrix land.
+
+The production VIA mirror and durable VIA reconciler now use the same callback
+boundary required by that future owner. Split callbacks perform strict decode,
+one bounded mailbox admission, and an immediate BUSY or cached response only;
+dynamic-keymap, macro, metadata, digest, recovery, and verification storage work
+runs from matrix scan. A rotating scheduler grants at most one step among boot
+profile discovery, the best-effort VIA mirror, and durable VIA reconciliation
+per scan. The future writable profile owner must join this scheduler rather
+than opening a second EEPROM path.
 
 ### Profile Studio
 

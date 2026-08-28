@@ -1433,3 +1433,79 @@ Next steps:
    orientations, role swap, commit/reboot/interruption/reconnect,
    reset-to-compiled, RGB, and behavior hardware tests before advertising the
    capability in normal firmware.
+
+### 2026-08-28 — Scan-owned durable-I/O arbitration checkpoint
+
+- Accepted D-019 and removed durable work from both production VIA split
+  callbacks. The write-through mirror now admits one bounded best-effort frame
+  and applies it from scan context. Durable VIA reconciliation now queues one
+  exact request, returns BUSY while scan owns processing, and returns a cached
+  terminal response only for the exact request that produced it. Malformed
+  callbacks retain bounded structured errors without entering storage.
+- Added one rotating scan scheduler across live-profile boot discovery, the
+  queued VIA mirror, and durable VIA reconciliation. It starts at the next
+  owner, visits idle owners once, and stops after the first consumed step, so a
+  continuously busy owner cannot starve the others and those subsystems cannot
+  perform two work steps in one scheduler grant.
+- Preserved best-effort mirror semantics: a full mailbox keeps the first frame
+  and durable reconciliation repairs a dropped later mirror. Receiver
+  verification and local digest work remain finite and take priority inside
+  the VIA reconciliation grant so commit polling cannot skip verification.
+- Added normal and sanitizer callback instrumentation. Every metadata,
+  validity, recovery, dynamic-keymap, macro, and region read/write effect
+  increments a test counter; every callback invocation asserts the counter is
+  unchanged. Scheduler tests cover deterministic idle order, round-robin
+  fairness, idle skipping, and one-consumer-per-scan behavior. Runtime init
+  tests enforce the new scheduler position.
+- Updated the userspace manifest, hook/runtime documentation, Stage 02 record,
+  risk lifecycle, architecture review, canonical memory facts, and reviewed
+  stack paths. The split-thread manifest no longer describes EEPROM calls that
+  are unreachable from callbacks; it now covers sync decode/admission, cached
+  response encoding, and mirror mailbox admission, while the main-process
+  manifest covers the scan-owned mirror writes and all three indirect scheduler
+  entries.
+- Focused verification passed:
+  `sh tests/host/run_qmk_durable_io_tests.sh`,
+  `sh tests/host/run_runtime_init_order_tests.sh`,
+  `sh tests/host/run_profile_store_runtime_tests.sh`,
+  `sh tests/host/run_qmk_via_split_mirror_tests.sh`,
+  `sh tests/host/run_qmk_via_split_sync_tests.sh`,
+  `sh tests/host/run_hook_chaining_tests.sh`, and
+  `sh tests/host/run_feature_gate_compile_tests.sh`.
+- Final verification passed:
+  `sh tests/host/run_all_host_tests.sh`,
+  `sh tests/host/run_firmware_stack_budget_checks.sh`,
+  `qmk compile -c -kb bastardkb/charybdis/4x6 -km noah`,
+  `sh tests/host/run_firmware_memory_budget_checks.sh`, and
+  `git diff --check`. The first instrumented stack pass exposed two stale
+  mirror path names in the new manifest; the paths were corrected to the linked
+  byte-write functions before the required stack command passed.
+- Fresh ordinary linked resource facts are per RP2040 half: physical SRAM is
+  270,336 B; SRAM0–3 `.bss` is 25,788/26,000 B under the regression policy;
+  `.data` is 22,996 B; `.data + .bss` is 48,784/51,000 B; the SRAM0–3
+  linker/core-memory span at boot is 213,352 B against the 204,800 B minimum;
+  and fixed linked occupancy across unique SRAM banks is 56,248 B. The 96 B
+  BSS increase is the bounded mirror/sync mailboxes plus scheduler state. These
+  are link-time facts and policy metrics, not total-RAM headroom or runtime
+  high-water measurements.
+- The worst named reviewed main path is 1,800/1,920 B. The worst named split
+  path remains the 328/768 B base-state RPC; the largest new VIA callback path
+  is 292 B and the queued mirror write path is 424 B in main scan context. The
+  gate covers named manifest paths only.
+- Profile Studio UI and authored profile inputs did not change, so screenshots
+  and introspection regeneration were intentionally skipped. Firmware builds
+  wrote generated artifacts in the sibling QMK tree only; no sibling source
+  file changed. Live profile mutation, activation, and peer capabilities remain
+  disabled.
+
+Next steps:
+
+1. Replace the read-only boot shell with one provisioned writable owner that
+   consumes D-018 and the existing scheduler entry, boot-validates committed
+   blobs, and owns the sole store/provider/candidate/peer/reconciler instances.
+2. Install the behavior and RGB invalidators, safe-activation predicate, and
+   profile split transport through that owner without creating another EEPROM
+   path; add production boot, mutation, rollback, and split integration tests.
+3. Enable capabilities only in an engineering artifact and run both USB
+   orientations, role swap, commit/reboot/interruption/reconnect,
+   reset-to-compiled, RGB, and behavior hardware tests before normal exposure.

@@ -40,6 +40,7 @@ static uint8_t  rgb_invalidate_count;
 static uint8_t  macro_invalidate_count;
 static uint8_t  eeconfig_init_via_count;
 static uint8_t  macro_defaults_init_count;
+static uint32_t durable_effect_count;
 static uint16_t rpc_count;
 static uint8_t  rpc_commit_count;
 static uint16_t drop_rpc_at;
@@ -110,6 +111,7 @@ static void test_reset(void) {
     macro_invalidate_count    = 0u;
     eeconfig_init_via_count   = 0u;
     macro_defaults_init_count = 0u;
+    durable_effect_count      = 0u;
     rpc_count                 = 0u;
     rpc_commit_count          = 0u;
     drop_rpc_at               = 0u;
@@ -135,6 +137,7 @@ uint32_t eeconfig_read_user(void) {
 }
 
 void eeconfig_update_user(uint32_t word) {
+    durable_effect_count++;
     user_eeconfig_word = word;
 }
 
@@ -155,10 +158,12 @@ bool via_eeprom_is_valid(void) {
 }
 
 void via_eeprom_set_valid(bool valid) {
+    durable_effect_count++;
     local_config[0] = valid ? 1u : 0u;
 }
 
 void eeconfig_init_via(void) {
+    durable_effect_count++;
     eeconfig_init_via_count++;
     local_config[0] = 1u;
     local_config[1] = 0u;
@@ -167,6 +172,7 @@ void eeconfig_init_via(void) {
 }
 
 bool noah_via_macro_defaults_reseed_for_recovery(void) {
+    durable_effect_count++;
     macro_defaults_init_count++;
     local_macro[0] = 0xA1u;
     local_macro[1] = 0xA2u;
@@ -208,6 +214,7 @@ bool noah_qmk_via_storage_region_read(noah_qmk_via_sync_region_t region, uint16_
     if (!source || !data || offset > capacity || length > capacity - offset) {
         return false;
     }
+    durable_effect_count++;
     memcpy(data, &source[offset], length);
     return true;
 }
@@ -219,6 +226,7 @@ bool noah_qmk_via_storage_region_write(noah_qmk_via_sync_region_t region, uint16
     if (!destination || !data || offset > capacity || length > capacity - offset) {
         return false;
     }
+    durable_effect_count++;
     memcpy(&destination[offset], data, length);
     return true;
 }
@@ -343,11 +351,22 @@ static noah_qmk_via_sync_frame_t callback_exchange(noah_qmk_via_sync_frame_t req
     uint8_t                   request_wire[NOAH_QMK_VIA_SYNC_FRAME_SIZE];
     uint8_t                   response_wire[NOAH_QMK_VIA_SYNC_FRAME_SIZE] = {0};
     noah_qmk_via_sync_frame_t response;
+    uint32_t                  effects_before_callback;
 
     CHECK(registered_callback != NULL);
     CHECK(noah_qmk_via_sync_frame_encode(&request, request_wire));
+    effects_before_callback = durable_effect_count;
     registered_callback(sizeof(request_wire), request_wire, sizeof(response_wire), response_wire);
+    CHECK(durable_effect_count == effects_before_callback);
     CHECK(noah_qmk_via_sync_frame_decode(response_wire, sizeof(response_wire), &response));
+    if (response.status == NOAH_QMK_VIA_SYNC_STATUS_BUSY) {
+        (void)noah_qmk_via_split_sync_matrix_scan_step();
+        memset(response_wire, 0, sizeof(response_wire));
+        effects_before_callback = durable_effect_count;
+        registered_callback(sizeof(request_wire), request_wire, sizeof(response_wire), response_wire);
+        CHECK(durable_effect_count == effects_before_callback);
+        CHECK(noah_qmk_via_sync_frame_decode(response_wire, sizeof(response_wire), &response));
+    }
     return response;
 }
 
@@ -362,7 +381,9 @@ static void test_receiver_returns_structured_error_for_corrupt_frame(void) {
     noah_qmk_via_split_sync_init();
     CHECK(noah_qmk_via_sync_frame_encode(&request, request_wire));
     request_wire[8] ^= 0x80u;
+    uint32_t effects_before_callback = durable_effect_count;
     registered_callback(sizeof(request_wire), request_wire, sizeof(response_wire), response_wire);
+    CHECK(durable_effect_count == effects_before_callback);
     CHECK(noah_qmk_via_sync_frame_decode(response_wire, sizeof(response_wire), &response));
     CHECK(response.kind == NOAH_QMK_VIA_SYNC_MESSAGE_ERROR);
     CHECK(response.status == NOAH_QMK_VIA_SYNC_STATUS_INVALID_FRAME);
@@ -735,6 +756,12 @@ static void test_replacement_snapshot_restarts_in_progress_verification(void) {
     peer_macro[1]      = 0x42u;
     replacement_digest = peer_digest();
     response           = callback_exchange((noah_qmk_via_sync_frame_t){.kind = NOAH_QMK_VIA_SYNC_MESSAGE_SNAPSHOT_BEGIN, .generation = 8u, .digest = replacement_digest});
+    if (response.status == NOAH_QMK_VIA_SYNC_STATUS_BUSY) {
+        // The scan-owned mailbox serializes the already queued commit before
+        // admitting a replacement session.
+        scan_many(11u, 2u);
+        response = callback_exchange((noah_qmk_via_sync_frame_t){.kind = NOAH_QMK_VIA_SYNC_MESSAGE_SNAPSHOT_BEGIN, .generation = 8u, .digest = replacement_digest});
+    }
     CHECK(response.status == NOAH_QMK_VIA_SYNC_STATUS_OK);
     (void)callback_exchange((noah_qmk_via_sync_frame_t){.kind = NOAH_QMK_VIA_SYNC_MESSAGE_PUSH_CHUNK, .region = NOAH_QMK_VIA_SYNC_REGION_KEYMAP, .generation = 8u, .region_length = TEST_KEYMAP_SIZE, .digest = replacement_digest, .payload_length = TEST_KEYMAP_SIZE, .payload = {peer_keymap[0], peer_keymap[1], peer_keymap[2]}});
     (void)callback_exchange((noah_qmk_via_sync_frame_t){.kind = NOAH_QMK_VIA_SYNC_MESSAGE_PUSH_CHUNK, .region = NOAH_QMK_VIA_SYNC_REGION_MACRO, .generation = 8u, .region_length = TEST_MACRO_SIZE, .digest = replacement_digest, .payload_length = TEST_MACRO_SIZE, .payload = {peer_macro[0], peer_macro[1]}});

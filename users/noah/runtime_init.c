@@ -18,6 +18,7 @@
 #include "lib/macro/macro_payload.h"
 #include "lib/macro/via_macro_defaults.h"
 #include "lib/compat/qmk_combo_origin.h"
+#include "lib/compat/qmk_durable_io.h"
 #include "lib/compat/qmk_via_split_mirror.h"
 #include "lib/compat/qmk_via_split_sync.h"
 #include "lib/compat/qmk_via_sync_state.h"
@@ -46,8 +47,7 @@ void noah_eeconfig_init_user(void) {
 
 void noah_matrix_scan_user(void) {
     noah_via_macro_defaults_matrix_scan();
-    noah_profile_store_runtime_matrix_scan();
-    noah_qmk_via_split_sync_matrix_scan();
+    noah_qmk_durable_io_matrix_scan();
 
     noah_qmk_combo_origin_scan();
 
@@ -65,7 +65,7 @@ void noah_housekeeping_task_user(void) {
 
 void noah_keyboard_post_init_user(void) {
     static const noah_runtime_init_stage_fn_t stages[] = {
-        key_origin_registry_init, noah_qmk_combo_origin_init, macro_payload_engine_init, noah_via_macro_defaults_keyboard_post_init, noah_profile_store_runtime_init, noah_rgb_runtime_post_init, split_runtime_sync_init, noah_qmk_via_split_sync_init, noah_qmk_via_split_mirror_init,
+        key_origin_registry_init, noah_qmk_combo_origin_init, macro_payload_engine_init, noah_via_macro_defaults_keyboard_post_init, noah_profile_store_runtime_init, noah_rgb_runtime_post_init, split_runtime_sync_init, noah_qmk_via_split_sync_init, noah_qmk_via_split_mirror_init, noah_qmk_durable_io_init,
     };
 
     noah_runtime_diag_post_init();

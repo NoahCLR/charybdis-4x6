@@ -5,6 +5,7 @@ set -eu
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 
 sh "$ROOT/run_qmk_contract_checks.sh"
+sh "$ROOT/run_qmk_durable_io_tests.sh"
 sh "$ROOT/run_qmk_physical_half_tests.sh"
 sh "$ROOT/run_qmk_combo_origin_tests.sh"
 sh "$ROOT/run_hook_chaining_tests.sh"

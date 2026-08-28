@@ -50,10 +50,15 @@ static void test_reset(void) {
     CHECK(registered_callback != NULL);
 }
 
-static void mirror_receive_frame(const uint8_t *frame, uint8_t length) {
+static void mirror_enqueue_frame(const uint8_t *frame, uint8_t length) {
     CHECK(frame != NULL);
     CHECK(length <= TEST_RPC_SIZE);
     registered_callback(length, frame, 0u, NULL);
+}
+
+static void mirror_receive_frame(const uint8_t *frame, uint8_t length) {
+    mirror_enqueue_frame(frame, length);
+    CHECK(noah_qmk_via_split_mirror_matrix_scan_step());
 }
 
 static void mirror_receive(uint8_t command, uint8_t payload_size, uint8_t length) {
@@ -166,6 +171,37 @@ static void test_maximum_valid_payload_is_applied_by_real_receiver(void) {
     }
 }
 
+static void test_callback_only_queues_and_scan_owns_storage(void) {
+    uint8_t frame[TEST_RPC_SIZE] = {id_dynamic_keymap_set_buffer, 0u, 0u, 1u, 0xA6u};
+
+    test_reset();
+    mirror_enqueue_frame(frame, sizeof(frame));
+    CHECK(keymap_write_count == 0u);
+    CHECK(rgb_invalidate_count == 0u);
+    CHECK(storage_changed_count == 0u);
+
+    CHECK(noah_qmk_via_split_mirror_matrix_scan_step());
+    CHECK(keymap_write_count == 1u);
+    CHECK(keymap_sink[0] == 0xA6u);
+    CHECK(rgb_invalidate_count == 1u);
+    CHECK(storage_changed_count == 1u);
+    CHECK(!noah_qmk_via_split_mirror_matrix_scan_step());
+}
+
+static void test_full_mailbox_keeps_first_best_effort_frame(void) {
+    uint8_t keymap[TEST_RPC_SIZE] = {id_dynamic_keymap_set_buffer, 0u, 0u, 1u, 0xB1u};
+    uint8_t macro[TEST_RPC_SIZE]  = {id_dynamic_keymap_macro_set_buffer, 0u, 0u, 1u, 0xB2u};
+
+    test_reset();
+    mirror_enqueue_frame(keymap, sizeof(keymap));
+    mirror_enqueue_frame(macro, sizeof(macro));
+    CHECK(noah_qmk_via_split_mirror_matrix_scan_step());
+    CHECK(keymap_write_count == 1u);
+    CHECK(macro_write_count == 0u);
+    CHECK(keymap_sink[0] == 0xB1u);
+    CHECK(!noah_qmk_via_split_mirror_matrix_scan_step());
+}
+
 static void test_one_byte_over_payload_limit_is_rejected(void) {
     test_reset();
 
@@ -236,6 +272,8 @@ static void test_durable_only_commands_are_not_advertised_as_mirrored(void) {
 
 int main(void) {
     test_maximum_valid_payload_is_applied_by_real_receiver();
+    test_callback_only_queues_and_scan_owns_storage();
+    test_full_mailbox_keeps_first_best_effort_frame();
     test_one_byte_over_payload_limit_is_rejected();
     test_wrapping_payload_sizes_are_rejected_without_touching_storage();
     test_every_classified_mirror_command_is_implemented();

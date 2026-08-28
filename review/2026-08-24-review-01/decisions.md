@@ -282,3 +282,25 @@ artifact-owned identity survives ordinary EEPROM reset/recovery flows and does
 not share storage lifecycle with the profile slots. Hardware must still prove
 that both USB orientations and an actual role swap preserve the reported
 origin before mutation is advertised.
+
+### D-019 — Durable Storage Work Is Mailbox-Deferred And Scan-Arbitrated
+
+Status: accepted on 2026-08-28; writable-profile-owner and hardware evidence remain open
+
+No QMK split RPC callback may access EEPROM, the wear-level cache, dynamic
+keymap or macro storage, profile storage, or a validator backed by those
+regions. A callback may validate fixed framing, admit one bounded request into
+a publication-protected mailbox, and return an immediate structured BUSY,
+error, or exact cached response.
+
+Matrix scan is the durable execution context. One rotating scheduler owns the
+current boot profile discovery, best-effort VIA write-through mirror, and VIA
+durable reconciliation steps. It begins each scan at the next owner, skips idle
+owners, and stops after the first owner reports work, preventing starvation
+without allowing two of those subsystems to execute in one scan grant.
+
+The future production profile owner must replace or extend the existing
+profile-discovery scheduler entry; it may not introduce an independent EEPROM
+tick. VIA macro default recovery remains ordered before this scheduler, and
+must be included in a broader arbitration decision if later work makes it
+concurrent or incremental alongside live-profile mutation.

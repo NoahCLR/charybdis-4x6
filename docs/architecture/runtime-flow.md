@@ -97,6 +97,10 @@ or drain effects but must not re-decide release semantics.
 flowchart TD
     scan["matrix_scan_user"] --> init["runtime_init.c"]
     init --> via["VIA macro default scan seeding"]
+    init --> durable["Rotating durable-I/O grant"]
+    durable --> discovery["Live-profile boot discovery"]
+    durable --> mirror["Queued VIA write-through mirror"]
+    durable --> via_sync["VIA digest, storage, or reconciliation step"]
     init --> combo["Compatibility: retire suppressed/expired combo origins"]
     init --> key_scan["key/runtime/scan.c"]
     key_scan --> reducer_scan["Authoritative reducer scan state"]
@@ -109,6 +113,12 @@ flowchart TD
     housekeeping --> repeat["Held repeat tick"]
     housekeeping --> diag["Watchdog refresh and boot-indicator expiry"]
 ```
+
+Split RPC callbacks for the VIA mirror and durable VIA reconciliation only
+validate, queue, and return bounded responses. They never access EEPROM. The
+durable-I/O scheduler starts from a rotating owner and grants at most one
+profile-discovery, mirror, or VIA-reconciliation step per matrix scan; idle
+owners are skipped without losing round-robin fairness.
 
 Combo-origin reconciliation runs before key-runtime scan projection. It removes
 QMK-disabled candidates immediately and expires inactive candidates only after
@@ -237,7 +247,9 @@ flowchart TD
     via_command["VIA command"] --> dirty["Persist dirty before QMK apply"]
     dirty --> committed["Post-apply canonical readback and digest"]
     committed --> via_split["Versioned snapshot reconciliation"]
-    via_split --> slave["Peer keymap/encoder/macro/config storage"]
+    via_split --> callback["Peer callback mailbox + BUSY/cached reply"]
+    callback --> scheduler["Peer durable-I/O scan grant"]
+    scheduler --> slave["Peer keymap/encoder/macro/config storage"]
     slave --> verify["Full digest and generation acknowledgement"]
     verify --> rgb_invalidate["Post-commit RGB and macro cache invalidation"]
 ```
@@ -247,7 +259,10 @@ source-authored defaults and durable split reconciliation. Macro reset does not
 publish until the authored defaults have seeded successfully. A transfer is
 limited to one storage/digest chunk or one RPC per scan, and a clean generation
 is replicated only after the receiving half verifies and acknowledges the full
-snapshot.
+snapshot. The best-effort write-through mirror uses the same callback-mailbox
+boundary: the split thread copies at most one frame, and scan context performs
+the QMK dynamic-keymap or macro storage mutation. A full mailbox may drop a
+mirror frame because durable reconciliation remains the repair path.
 
 Macro text is QMK ASCII, not arbitrary bytes: text positions accept
 `0x01..0x7F`, while zero terminates a VIA slot. Bytes above `0x7F` remain valid

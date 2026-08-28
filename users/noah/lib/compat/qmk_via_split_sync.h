@@ -35,6 +35,10 @@ typedef struct {
 #if defined(VIA_ENABLE) && defined(SPLIT_TRANSACTION_IDS_USER)
 void noah_qmk_via_split_sync_init(void);
 void noah_qmk_via_split_sync_matrix_scan(void);
+// Performs at most one queued slave request, digest/storage step, or master
+// exchange. Returns true when this subsystem consumed the scan's durable-I/O
+// budget.
+bool noah_qmk_via_split_sync_matrix_scan_step(void);
 void noah_qmk_via_split_sync_note_mutation(uint8_t effects);
 // Storage changed outside this layer, via the write-through mirror. Recompute
 // the local digest so nothing advertises a stale one.
@@ -43,6 +47,9 @@ noah_qmk_via_split_sync_debug_snapshot_t noah_qmk_via_split_sync_debug_snapshot(
 #else
 static inline void noah_qmk_via_split_sync_init(void) {}
 static inline void noah_qmk_via_split_sync_matrix_scan(void) {}
+static inline bool noah_qmk_via_split_sync_matrix_scan_step(void) {
+    return false;
+}
 
 static inline void noah_qmk_via_split_sync_note_mutation(uint8_t effects) {
     (void)effects;

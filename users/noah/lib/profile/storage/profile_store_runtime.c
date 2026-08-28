@@ -40,10 +40,10 @@ void noah_profile_store_runtime_init(void) {
 #endif
 }
 
-void noah_profile_store_runtime_matrix_scan(void) {
+bool noah_profile_store_runtime_matrix_scan_step(void) {
 #ifdef VIA_ENABLE
     if (runtime_state != NOAH_PROFILE_STORE_RUNTIME_DISCOVERY_PENDING) {
-        return;
+        return false;
     }
 
     discovery_result = noah_profile_store_boot_select(&runtime_store, &runtime_store.committed);
@@ -61,7 +61,14 @@ void noah_profile_store_runtime_matrix_scan(void) {
             runtime_state = NOAH_PROFILE_STORE_RUNTIME_STORAGE_ERROR;
             break;
     }
+    return true;
+#else
+    return false;
 #endif
+}
+
+void noah_profile_store_runtime_matrix_scan(void) {
+    (void)noah_profile_store_runtime_matrix_scan_step();
 }
 
 noah_profile_store_runtime_state_t noah_profile_store_runtime_state(void) {

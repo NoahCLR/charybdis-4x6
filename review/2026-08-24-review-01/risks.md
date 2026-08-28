@@ -19,6 +19,7 @@
 | R-15 | Protocol changes strand already-persisted profiles | high | 02 and 08 | Define compatibility policy before v1 lands; test upgrade, incompatible version, corrupted header, and factory-reset paths |
 | R-16 | A prototype becomes production without device-level validation | high | 05 and 08 | Keep hardware criteria open until named matrices pass on the real split keyboard |
 | R-17 | Durable commit origin is derived from dynamic USB role, or left/right forced-role artifacts are mapped backwards on this `MASTER_RIGHT` board | critical | 02 and 05 | Provision left/right identity independently in flash, keep role and origin independent in tests, build left as `FORCE_SLAVE` plus `NOAH_PHYSICAL_HALF=left` and right as `FORCE_MASTER` plus `NOAH_PHYSICAL_HALF=right`, and prove both USB orientations preserve origin before enabling mutation |
+| R-18 | A split callback and matrix scan concurrently enter wear-level storage, or multiple durable subsystems perform unarbitrated work | critical | 02 | Keep callbacks mailbox-only, route profile discovery/VIA mirror/VIA reconciliation through one rotating scan scheduler, instrument callback tests against every storage effect, and include the future writable profile owner in the same scheduler |
 
 ## Risk Update Rule
 
@@ -168,3 +169,16 @@ No project risks are closed yet.
 - R-17 remains open for the production owner's use of this boundary and the
   real-keyboard both-orientations/role-swap matrix. Mutation and peer
   capability bits remain off.
+
+### 2026-08-28 split callback and durable-I/O arbitration update
+
+- R-18 is partially resolved for every production durable subsystem currently
+  reachable from the split callbacks. VIA mirror and reconciliation callbacks
+  now perform bounded mailbox/framing work only; host instrumentation fails if
+  a callback reaches metadata, EEPROM, keymap, macro, recovery, or digest
+  storage. A rotating scheduler grants at most one boot-discovery, mirror, or
+  VIA-reconciliation step per scan and skips idle owners fairly.
+- R-18 remains open until the writable profile owner replaces the read-only
+  discovery step in that same scheduler and real hardware proves editing,
+  reconciliation, reconnect, and role changes without storage concurrency or
+  starvation. Mutation and peer-profile capability bits remain off.

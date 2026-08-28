@@ -35,7 +35,10 @@ expiry. Production durable-commit ownership, runtime owner installation,
 reset, QMK registration, and boot whole-profile validation are still absent.
 Side-specific artifacts now provide the D-018 flash-owned physical identity,
 but the future production owner has not consumed it yet, so this stage remains
-blocked/incomplete.
+blocked/incomplete. The existing VIA mirror and reconciliation callbacks now
+queue bounded frames without touching EEPROM, and a rotating matrix-scan
+scheduler serializes their work with live-profile boot discovery. The future
+production owner must replace that discovery step inside the same scheduler.
 
 ## Objective
 

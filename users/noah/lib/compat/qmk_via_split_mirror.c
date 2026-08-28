@@ -6,6 +6,10 @@
 
 #if defined(VIA_ENABLE) && defined(SPLIT_TRANSACTION_IDS_USER)
 
+#    include <stdbool.h>
+#    include <string.h>
+
+#    include "atomic_util.h"
 #    include "dynamic_keymap.h"
 #    include "via.h"
 #    include "../macro/via_macro_provider.h"
@@ -13,6 +17,14 @@
 #    include "qmk_via_split_sync.h"
 #    include "qmk_via_storage_contract.h"
 #    include "transactions.h" // QMK
+
+typedef struct {
+    uint8_t frame[RPC_M2S_BUFFER_SIZE];
+    uint8_t length;
+    bool    pending;
+} noah_qmk_via_split_mirror_mailbox_t;
+
+static noah_qmk_via_split_mirror_mailbox_t noah_qmk_via_split_mirror_mailbox;
 
 static void noah_qmk_via_split_mirror_apply_effects(uint8_t command_id) {
     uint8_t effects = noah_qmk_via_command_effects(command_id);
@@ -97,15 +109,42 @@ static void noah_qmk_via_split_mirror_rpc(uint8_t initiator2target_buffer_size, 
     (void)target2initiator_buffer_size;
     (void)target2initiator_buffer;
 
-    if (!initiator2target_buffer || initiator2target_buffer_size == 0u) {
+    if (!initiator2target_buffer || initiator2target_buffer_size == 0u || initiator2target_buffer_size > sizeof(noah_qmk_via_split_mirror_mailbox.frame)) {
         return;
     }
 
-    noah_qmk_via_split_mirror_apply_command((const uint8_t *)initiator2target_buffer, initiator2target_buffer_size);
+    ATOMIC_BLOCK_RESTORESTATE {
+        if (!noah_qmk_via_split_mirror_mailbox.pending) {
+            memcpy(noah_qmk_via_split_mirror_mailbox.frame, initiator2target_buffer, initiator2target_buffer_size);
+            noah_qmk_via_split_mirror_mailbox.length  = initiator2target_buffer_size;
+            noah_qmk_via_split_mirror_mailbox.pending = true;
+        }
+    }
 }
 
 void noah_qmk_via_split_mirror_init(void) {
+    ATOMIC_BLOCK_RESTORESTATE {
+        noah_qmk_via_split_mirror_mailbox = (noah_qmk_via_split_mirror_mailbox_t){0};
+    }
     transaction_register_rpc(PUT_VIA_KEYMAP_MIRROR, noah_qmk_via_split_mirror_rpc);
+}
+
+bool noah_qmk_via_split_mirror_matrix_scan_step(void) {
+    uint8_t frame[RPC_M2S_BUFFER_SIZE];
+    uint8_t length = 0u;
+
+    ATOMIC_BLOCK_RESTORESTATE {
+        if (noah_qmk_via_split_mirror_mailbox.pending) {
+            length = noah_qmk_via_split_mirror_mailbox.length;
+            memcpy(frame, noah_qmk_via_split_mirror_mailbox.frame, length);
+            noah_qmk_via_split_mirror_mailbox.pending = false;
+        }
+    }
+    if (length == 0u) {
+        return false;
+    }
+    noah_qmk_via_split_mirror_apply_command(frame, length);
+    return true;
 }
 
 void noah_qmk_via_split_mirror_command(const uint8_t *data, uint8_t length) {
@@ -113,9 +152,8 @@ void noah_qmk_via_split_mirror_command(const uint8_t *data, uint8_t length) {
         return;
     }
 
-    // Best effort by design. A dropped mirror leaves the halves briefly out of
-    // step and the reconciliation layer repairs it; blocking or retrying here
-    // would put storage writes on the scan path.
+    // Best effort by design. A dropped or mailbox-busy mirror leaves the
+    // halves briefly out of step and durable reconciliation repairs it.
     (void)transaction_rpc_send(PUT_VIA_KEYMAP_MIRROR, length, data);
 }
 
