@@ -146,16 +146,17 @@ initializes the reconciler.
 The reconciler preserves `origin_half`; it never derives it from current USB
 role. On this `MASTER_RIGHT` board, upstream QMK falls back to
 `is_keyboard_left() == !is_keyboard_master()` without a hand pin or `EE_HANDS`,
-so that fallback is not a durable physical identity. Profile Studio now builds
-left with `FORCE_SLAVE` and right with `FORCE_MASTER`, but production live
-mutation remains off until the owner consumes an explicitly provisioned
-physical-half identity.
+so that fallback is not a durable physical identity. D-018 now builds left
+with `FORCE_SLAVE` plus `NOAH_PHYSICAL_HALF=left` and right with `FORCE_MASTER`
+plus `NOAH_PHYSICAL_HALF=right`. The physical setting overrides handedness in
+flash independently of transport role. Production live mutation remains off
+until the owner consumes that fail-closed identity boundary.
 
 ## Deliberately Missing Production Pieces
 
 - the single writable store/provider owner that initializes and registers the
   landed QMK adapter;
-- a provisioned physical-half origin independent of dynamic USB role;
+- production-owner consumption of the provisioned physical-half origin;
 - boot discovery publication and reset convergence;
 - production activation-policy installation, diagnostics, and capabilities.
 

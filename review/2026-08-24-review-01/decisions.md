@@ -260,3 +260,25 @@ physical-half identity. Correcting the forced build mapping (left is
 close generic physical-origin provisioning. Boot whole-profile validation,
 owner installation, physical-origin evidence, and hardware convergence remain
 required before peer capability or live mutation is advertised.
+
+### D-018 — Physical Identity Is Provisioned In Each Firmware Artifact
+
+Status: accepted on 2026-08-28; real-hardware role-swap evidence remains open
+
+Profile Studio's left artifact builds with `NOAH_PHYSICAL_HALF=left`; its right
+artifact builds with `NOAH_PHYSICAL_HALF=right`. The setting becomes one of two
+mutually exclusive compile definitions and overrides QMK's weak
+`is_keyboard_left_impl()` with flash-owned handedness. The same boundary
+returns Profile Wire origin `0` for physical left and `1` for physical right.
+
+Transport role remains a separate decision. Current dual-USB artifacts also
+use `FORCE_SLAVE` for left and `FORCE_MASTER` for right because this board is
+`MASTER_RIGHT`, but no profile generation or conflict decision may derive
+origin from those flags or from `is_keyboard_master()`.
+
+Generic firmware has neither physical-half definition and fails closed when
+asked for a durable origin. EEPROM handedness is not the profile-origin source:
+artifact-owned identity survives ordinary EEPROM reset/recovery flows and does
+not share storage lifecycle with the profile slots. Hardware must still prove
+that both USB orientations and an actual role swap preserve the reported
+origin before mutation is advertised.

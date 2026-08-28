@@ -18,7 +18,7 @@
 | R-14 | Layer deletion changes numeric references inconsistently across tables | high | 07 | Treat structural layer changes as a whole-profile transaction and validate every cross-reference before commit |
 | R-15 | Protocol changes strand already-persisted profiles | high | 02 and 08 | Define compatibility policy before v1 lands; test upgrade, incompatible version, corrupted header, and factory-reset paths |
 | R-16 | A prototype becomes production without device-level validation | high | 05 and 08 | Keep hardware criteria open until named matrices pass on the real split keyboard |
-| R-17 | Durable commit origin is derived from dynamic USB role, or left/right forced-role artifacts are mapped backwards on this `MASTER_RIGHT` board | critical | 02 and 05 | Use an explicitly provisioned physical-half identity, keep role and origin independent in tests, build left as `FORCE_SLAVE` and right as `FORCE_MASTER`, and prove both USB orientations preserve origin before enabling mutation |
+| R-17 | Durable commit origin is derived from dynamic USB role, or left/right forced-role artifacts are mapped backwards on this `MASTER_RIGHT` board | critical | 02 and 05 | Provision left/right identity independently in flash, keep role and origin independent in tests, build left as `FORCE_SLAVE` plus `NOAH_PHYSICAL_HALF=left` and right as `FORCE_MASTER` plus `NOAH_PHYSICAL_HALF=right`, and prove both USB orientations preserve origin before enabling mutation |
 
 ## Risk Update Rule
 
@@ -154,3 +154,17 @@ No project risks are closed yet.
   validation, transport arbitration, and the real-keyboard matrix. R-17 remains
   open until a physical identity is explicitly provisioned and hardware proves
   role changes never alter it. Mutation and peer capability bits remain off.
+
+### 2026-08-28 flash-provisioned physical-origin update
+
+- R-17 is partially resolved in code. D-018 adds mutually exclusive left/right
+  artifact provisioning, a fail-closed generic-firmware query, and a strong
+  QMK handedness override whose result never reads current USB role or EEPROM.
+  Profile Studio now supplies both the physical-side and independent forced-
+  role settings for each generated artifact.
+- Host coverage proves left origin `0`, right origin `1`, correct handedness,
+  generic refusal, null-output refusal, and conflicting-definition compile
+  failure. The source/feature gates compile both provisioned forms.
+- R-17 remains open for the production owner's use of this boundary and the
+  real-keyboard both-orientations/role-swap matrix. Mutation and peer
+  capability bits remain off.

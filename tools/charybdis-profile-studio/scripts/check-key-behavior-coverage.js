@@ -149,8 +149,8 @@ const appendedCheck = `
             extensionSource.includes("Compile left + right") &&
             getClientScript().includes('type: "compileFirmware"') &&
             getClientScript().includes('type: "applyAllChangesAndCompile"') &&
-            /side: "left",[\\s\\S]{0,220}env: "FORCE_SLAVE"/.test(extensionSource) &&
-            /side: "right",[\\s\\S]{0,160}env: "FORCE_MASTER"/.test(extensionSource) &&
+            /side: "left",[\\s\\S]{0,320}env: \\["FORCE_SLAVE=yes", "NOAH_PHYSICAL_HALF=left"\\]/.test(extensionSource) &&
+            /side: "right",[\\s\\S]{0,220}env: \\["FORCE_MASTER=yes", "NOAH_PHYSICAL_HALF=right"\\]/.test(extensionSource) &&
             extensionSource.includes('spawn("qmk", args') &&
             extensionSource.includes("channel.show(true)") &&
             firmwareTargetName(profileTargetForKeymap("noah"), "left") === "bastardkb_charybdis_4x6_noah_left" &&

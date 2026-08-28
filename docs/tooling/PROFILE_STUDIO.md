@@ -110,13 +110,13 @@ warns before generation when Studio has staged layout/layer edits or dirty local
 forms, because the overview is generated from the source files currently on
 disk.
 The Firmware row's `Compile left + right` button builds
-`bastardkb_charybdis_4x6_<name>_left.uf2` with `FORCE_SLAVE=yes` and
-`bastardkb_charybdis_4x6_<name>_right.uf2` with `FORCE_MASTER=yes`. This is the
-required mapping for the keyboard's `MASTER_RIGHT` configuration. The flags
-force current transport role; live-profile origin still needs an explicitly
-provisioned physical-half identity before mutation is enabled. The action opens
-the Charybdis Profile Studio output pane and streams QMK output while each side
-builds.
+`bastardkb_charybdis_4x6_<name>_left.uf2` with `FORCE_SLAVE=yes` plus
+`NOAH_PHYSICAL_HALF=left`, and the matching right artifact with
+`FORCE_MASTER=yes` plus `NOAH_PHYSICAL_HALF=right`. The role mapping follows
+the keyboard's `MASTER_RIGHT` configuration. Physical identity is embedded in
+each artifact independently, so a USB-role swap or EEPROM reset cannot change
+the durable live-profile origin. The action opens the Charybdis Profile Studio
+output pane and streams QMK output while each side builds.
 
 ## Editing Model
 

@@ -60,11 +60,12 @@ generated overview workflow for the active profile. It warns when Studio has
 unapplied edits because the overview is generated from source files on disk.
 Use the Firmware row's `Compile left + right` action to build
 `bastardkb_charybdis_4x6_<name>_left.uf2` with `FORCE_SLAVE=yes` and
-`bastardkb_charybdis_4x6_<name>_right.uf2` with `FORCE_MASTER=yes`. This follows
-the keyboard's `MASTER_RIGHT` configuration. Forced USB role is not, by
-itself, a general durable physical-half identity. The action
-opens the Charybdis Profile Studio output pane and streams QMK output while the
-build runs.
+`NOAH_PHYSICAL_HALF=left`, and the matching right artifact with
+`FORCE_MASTER=yes` and `NOAH_PHYSICAL_HALF=right`. The first setting selects
+the intended transport role for this `MASTER_RIGHT` keyboard; the second
+embeds a stable physical identity in flash for handedness and future profile
+origin. The action opens the Charybdis Profile Studio output pane and streams
+QMK output while the build runs.
 
 ## Screenshots
 

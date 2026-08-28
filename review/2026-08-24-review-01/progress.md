@@ -1369,3 +1369,67 @@ Next steps:
 3. Enable an engineering-only capability and run the real-keyboard matrix for
    behavior and RGB commit, activation, reboot, interruption, reconnect,
    role swap, reset-to-compiled, and rollback before exposing live mutation.
+
+### 2026-08-28 — Flash-provisioned physical-half identity checkpoint
+
+- Accepted D-018 and added a narrow QMK compatibility boundary for stable
+  physical identity. `NOAH_PHYSICAL_HALF=left` compiles origin `0` and a left
+  `is_keyboard_left_impl()` override; `NOAH_PHYSICAL_HALF=right` compiles
+  origin `1` and a right override. A generic artifact exposes neither and the
+  query fails closed. Supplying both definitions is a compile error.
+- Kept durable identity independent of transport role. `FORCE_MASTER` and
+  `FORCE_SLAVE` still control the dual-USB role only; no profile authority
+  comparison derives origin from those flags or from current master status.
+- Updated Profile Studio's paired build action. The physical-left artifact now
+  receives `FORCE_SLAVE=yes` plus `NOAH_PHYSICAL_HALF=left`; physical right
+  receives `FORCE_MASTER=yes` plus `NOAH_PHYSICAL_HALF=right`. The build helper
+  now accepts multiple explicit QMK environment assignments, and the source
+  check enforces both exact pairs.
+- Added host coverage for unprovisioned refusal, null-output refusal, left and
+  right origins, left/right QMK handedness, and conflicting provisioning.
+  Feature compile gates cover both provisioned production bodies, and both
+  real side-specific QMK builds produced distinct UF2 artifacts successfully.
+- Updated the hook inventory, Profile Studio documentation, split contract,
+  active architecture, Stage 02 status, risk lifecycle, and canonical memory
+  facts. R-17 is partially resolved in code; hardware evidence remains open.
+- Focused verification passed:
+  `sh tests/host/run_qmk_physical_half_tests.sh`,
+  `sh tests/host/run_feature_gate_compile_tests.sh`, and `npm run check` from
+  Profile Studio (88 live-link tests).
+- Final verification passed:
+  `sh tests/host/run_all_host_tests.sh`, `npm run screenshots`, both exact
+  side-specific `qmk compile` commands, the ordinary
+  `qmk compile -kb bastardkb/charybdis/4x6 -km noah`,
+  `sh tests/host/run_firmware_memory_budget_checks.sh`,
+  `sh tests/host/run_firmware_stack_budget_checks.sh`, an ordinary rebuild and
+  second memory check after stack instrumentation, and `git diff --check`.
+- Fresh ordinary linked resource facts are per RP2040 half: physical SRAM is
+  270,336 B; SRAM0–3 `.bss` is 25,692/26,000 B under the regression policy;
+  `.data` is 22,996 B; `.data + .bss` is 48,688/51,000 B; the SRAM0–3
+  linker/core-memory span at boot is 213,448 B against the 204,800 B minimum;
+  and fixed linked occupancy across unique SRAM banks is 56,152 B. These are
+  link-time values and policy metrics, not total-RAM headroom or runtime
+  high-water measurements.
+- Reviewed stack paths remain 1,880/1,920 B for the worst named main path and
+  336/768 B for the worst named split-slave path; boot discovery remains 488 B.
+  The gate covers only manifest paths. No new profile owner or callback became
+  reachable in this checkpoint.
+- Profile Studio screenshots were regenerated and remained byte-identical.
+  Firmware builds wrote generated artifacts in the sibling QMK tree only; no
+  sibling source file changed. Live mutation, activation, and peer capability
+  bits remain disabled.
+
+Next steps:
+
+1. Move VIA split callback EEPROM work behind the same scan-owned durable-I/O
+   scheduler required by the profile owner; a scan-only round robin is not
+   enough because current VIA callbacks can access wear-level storage from the
+   split thread.
+2. Replace the read-only boot shell with one provisioned writable owner that
+   consumes D-018, validates a committed blob incrementally, owns the sole
+   store/provider/candidate/peer/reconciler instances, installs behavior/RGB
+   invalidators, and registers the split transport.
+3. Enable mutation only in an engineering artifact, then run both USB
+   orientations, role swap, commit/reboot/interruption/reconnect,
+   reset-to-compiled, RGB, and behavior hardware tests before advertising the
+   capability in normal firmware.

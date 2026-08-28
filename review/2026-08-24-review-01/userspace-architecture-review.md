@@ -232,7 +232,7 @@ The opening findings above are the audit-time snapshot. Current status:
 | 5 — source/device authority | resolved at contract level | D-013, D-014, and `authority-state-table.md` define operations, ordering, partial results, and conflicts |
 | 6 — storage/capacity evidence | resolved at Stage 00 design level; runtime high-water remains open | D-016 and `stage-00-baseline.md` record the corrected per-half bank model, policy-versus-capacity distinction, exact EEPROM map, dual-slot partition, and ceilings |
 | 7 — Studio transport boundary | partially resolved | D-012 accepts an injected serialized adapter and fake; concrete packaged board probe remains open |
-| 8 — split integration shape | partially implemented beyond the resolved contract | D-011 selects a sibling profile reconciler; D-017, the exact frame codec, D-014 comparator, fail-closed peer observer, exact peer-store backend, scan reconciler, and QMK adapter now cover bidirectional transfer, sender identity, bounded whole-profile validation, marker-last commit, retry/reconnect/role-change, passive expiry, and durability-unknown recovery. Production owner registration, provisioned physical origin, boot validation, and hardware convergence remain open |
+| 8 — split integration shape | partially implemented beyond the resolved contract | D-011 selects a sibling profile reconciler; D-017, the exact frame codec, D-014 comparator, fail-closed peer observer, exact peer-store backend, scan reconciler, and QMK adapter now cover bidirectional transfer, sender identity, bounded whole-profile validation, marker-last commit, retry/reconnect/role-change, passive expiry, and durability-unknown recovery. D-018 provisions physical origin in side-specific flash artifacts. Production owner consumption/registration, boot validation, transport arbitration, and hardware convergence remain open |
 | 9 — config classification | resolved at inventory level | `field-classification.md` classifies every currently parsed Studio surface |
 
 Contract-level resolution is not milestone closure. Runtime, protocol, storage,
@@ -247,15 +247,15 @@ interpretation everywhere in this active review.
 
 Each keyboard half has its own RP2040 and its own 270,336 bytes of physical
 SRAM: 262,144 bytes in the `ram0` SRAM0–3 region plus separate 4,096-byte SRAM4
-and SRAM5 banks. The current fresh ELF records 22,984 bytes of `.data`, 25,684
-bytes of `.bss`, and therefore a 48,668-byte SRAM0–3 `.data + .bss` regression
-metric. Its 51,000-byte ceiling has 2,332 bytes of policy slack; that number is
-not total RAM headroom.
+and SRAM5 banks. The 2026-08-28 ordinary ELF records 22,996 bytes of `.data`,
+25,692 bytes of `.bss`, and therefore a 48,688-byte SRAM0–3 `.data + .bss`
+regression metric. Its 51,000-byte ceiling has 2,312 bytes of policy slack;
+that number is not total RAM headroom.
 
-The current `__heap_base__` to `__heap_end__` span is 213,472 bytes. It is the
+The current `__heap_base__` to `__heap_end__` span is 213,448 bytes. It is the
 SRAM0–3 linker/core-memory span at boot and backs ChibiOS core allocation plus
 the linked newlib allocation path. Actual runtime high-water is not yet
-measured. Fixed linked occupancy across all banks is 56,128 bytes, including
+measured. Fixed linked occupancy across all banks is 56,152 bytes, including
 alignment and reserved stacks but excluding runtime allocation.
 
 SRAM4 remains the tight bank. Its 1,024-byte interrupt stack, 2,560-byte process
@@ -413,11 +413,12 @@ peer-store backend retains marker-last durability and sender identity.
 
 The appended QMK transaction adapter is independently compiled and tested but
 not registered by production firmware because the single writable profile
-owner does not exist yet. Production installation must also resolve physical
-origin explicitly. With this board's `MASTER_RIGHT` fallback and no hand pin or
-`EE_HANDS`, `is_keyboard_left()` is derived from current master role and cannot
-identify a durable commit origin. Capability advertising remains off until the
-owner, physical identity, boot validation, and hardware matrix land.
+owner does not exist yet. D-018 now provisions physical origin in each
+side-specific firmware artifact and overrides QMK handedness independently of
+USB role; generic firmware deliberately exposes no durable origin. Production
+installation must consume that boundary rather than `is_keyboard_master()`.
+Capability advertising remains off until the owner, boot validation,
+transport arbitration, and hardware matrix land.
 
 ### Profile Studio
 

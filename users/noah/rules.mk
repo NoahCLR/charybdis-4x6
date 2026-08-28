@@ -55,3 +55,17 @@ endif
 ifdef FORCE_SLAVE
     OPT_DEFS += -DFORCE_SLAVE
 endif
+
+# Stable physical-half provisioning for side-specific firmware artifacts.
+# This is deliberately independent of FORCE_MASTER/FORCE_SLAVE: those flags
+# select the current transport role, while this value is durable profile
+# origin and QMK handedness embedded in flash.
+ifneq ($(strip $(NOAH_PHYSICAL_HALF)),)
+    ifeq ($(strip $(NOAH_PHYSICAL_HALF)),left)
+        OPT_DEFS += -DNOAH_PHYSICAL_HALF_LEFT
+    else ifeq ($(strip $(NOAH_PHYSICAL_HALF)),right)
+        OPT_DEFS += -DNOAH_PHYSICAL_HALF_RIGHT
+    else
+        $(error NOAH_PHYSICAL_HALF must be `left` or `right`)
+    endif
+endif

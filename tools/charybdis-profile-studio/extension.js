@@ -911,14 +911,17 @@ async function compileProfileFirmware(root, target) {
             side: "left",
             label: "left",
             // This keyboard is MASTER_RIGHT, so the forced slave artifact is
-            // the physical left half.
-            env: "FORCE_SLAVE",
+            // the physical left half. Physical identity is a separate flash-
+            // provisioned contract and remains stable if transport role swaps.
+            env: ["FORCE_SLAVE=yes", "NOAH_PHYSICAL_HALF=left"],
+            role: "FORCE_SLAVE",
         }));
         progress.report({ message: "right firmware" });
         builds.push(await runQmkCompile(root, target, {
             side: "right",
             label: "right",
-            env: "FORCE_MASTER",
+            env: ["FORCE_MASTER=yes", "NOAH_PHYSICAL_HALF=right"],
+            role: "FORCE_MASTER",
         }));
         return builds;
     };
@@ -934,17 +937,20 @@ async function compileProfileFirmware(root, target) {
 
 function runQmkCompile(root, target, build) {
     const firmwareTarget = firmwareTargetName(target, build.side);
+    const buildEnvironment = Array.isArray(build.env) ? build.env : [String(build.env || "")];
     const args = [
         "compile",
         "-kb",
         target.keyboard || PROFILE_KEYBOARD,
         "-km",
         target.keymap,
-        "-e",
-        `${build.env}=yes`,
-        "-e",
-        `TARGET=${firmwareTarget}`,
     ];
+    for (const assignment of buildEnvironment) {
+        if (assignment) {
+            args.push("-e", assignment.includes("=") ? assignment : `${assignment}=yes`);
+        }
+    }
+    args.push("-e", `TARGET=${firmwareTarget}`);
     const channel = studioOutputChannel();
     channel.show(true);
     channel.appendLine("");
@@ -982,7 +988,7 @@ function runQmkCompile(root, target, build) {
                     resolve({
                         side: build.side,
                         label: build.label,
-                        role: build.env,
+                        role: build.role,
                         firmware: `${firmwareTarget}.uf2`,
                         path: path.join(root, `${firmwareTarget}.uf2`),
                     });

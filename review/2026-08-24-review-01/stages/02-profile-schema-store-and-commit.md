@@ -32,8 +32,9 @@ marker-last durability without activating it. An isolated scan reconciler and
 QMK adapter now implement bidirectional push/pull, cached callback replies,
 bounded scan work, retry/reconnect/role-change behavior, and passive-peer
 expiry. Production durable-commit ownership, runtime owner installation,
-reset, QMK registration, provisioned physical-half identity, and boot
-whole-profile validation are still absent, so this stage remains
+reset, QMK registration, and boot whole-profile validation are still absent.
+Side-specific artifacts now provide the D-018 flash-owned physical identity,
+but the future production owner has not consumed it yet, so this stage remains
 blocked/incomplete.
 
 ## Objective
@@ -178,7 +179,8 @@ Volatile preview must not outrank durable committed state after reconnect.
 - [ ] Effective profile generation publication
 - [ ] Domain invalidation contract
 - [ ] Split convergence (isolated bidirectional reconciler and transport adapter
-  landed; production owner, physical origin, and hardware convergence remain)
+  plus flash physical identity landed; production owner consumption,
+  registration, transport arbitration, and hardware convergence remain)
 - [ ] Reset and migration behavior
 - [ ] Debug/status snapshots
 - [ ] Source manifest, docs, decisions, risks, and progress updates

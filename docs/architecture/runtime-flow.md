@@ -291,8 +291,8 @@ change, or passive-peer timeout invalidates peer evidence; conflict,
 corruption, and incompatibility stop without overwriting either record.
 
 This path is compiled and host-tested but is not registered by production
-firmware until the writable profile owner, provisioned physical-half identity,
-boot validation, and transport arbitration are installed.
+firmware until the writable profile owner consumes the side-specific flash
+identity, completes boot validation, and installs transport arbitration.
 
 ## Test Coverage Map
 
