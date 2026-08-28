@@ -1203,3 +1203,90 @@ Next steps:
 3. Integrate boot discovery, provider/predicate/behavior/RGB ownership, and
    diagnostics while keeping mutation and peer capabilities disabled until the
    full host and real-keyboard matrices pass.
+
+### 2026-08-27 — Exact peer-profile durable import checkpoint
+
+- Added `profile_peer_store_backend`, a caller-owned bounded receiver that
+  serializes peer import through the existing candidate backend, validator,
+  store, provider reuse guard, and inactive EEPROM slot. It preserves the
+  sender's generation, stable physical origin, persistent flags, schema,
+  length, CRC/FNV identity, compiled-default digest, action ABI, and payload-
+  derived domain mask unchanged.
+- Added exact host/peer serialization and retry rules. Active duplicate begin
+  reports progress; fully repeated chunks are read back and accepted only when
+  byte-identical; gaps, partial overlaps, correlation errors, and conflicting
+  repeats abort the prepare. Stale generations, equal-generation concurrent
+  origins, same-tuple record disagreement, incompatible firmware, and domain
+  capacity mismatches are rejected before destructive writes.
+- Validation and marker-last commit remain incremental through the shared
+  scan-step interfaces. A peer commit succeeds only after marker readback and
+  field-by-field comparison of every durable identity field except the local
+  slot number. The isolated receiver never requests activation, so a zero-flag
+  reset record leaves compiled behavior active for the later convergence owner.
+- Corrected persistence compatibility and reboot truth. The store now rejects
+  candidates and boot records whose compiled-default digest differs from the
+  current authored profile, derives the domain mask from the checksummed blob
+  during boot/commit shape validation, and retains that derived mask in the
+  selected record. The read-only boot owner now computes the real compiled and
+  action-ABI identities instead of using a zero placeholder.
+- Made final-marker ambiguity sticky. `DURABILITY_UNKNOWN` now blocks every
+  later prepare until a conclusive boot selection rescans both slots, avoiding
+  accidental invalidation of a commit that may already be durable. A reboot-
+  discovered exact record still fails closed as not-yet-idempotently-validated
+  until the future production boot owner reruns whole-profile validation.
+- Added normal and ASan/UBSan peer-backend coverage for exact generation 5
+  import over an empty store, reboot identity, zero-write idempotence, reset
+  flags without activation, stale/conflict/corruption/incompatibility refusal,
+  duplicate/gap/overlap/conflicting chunks, domain-mask mismatch, reservation
+  release, and ambiguous marker reconciliation. Store/runtime tests now cover
+  old compiled-default rejection. The runner is in the full host suite, the
+  source is in the userspace manifest, and real VIA/split bodies are in the
+  explicit feature compile matrix.
+- Focused verification passed:
+  `sh tests/host/run_profile_store_tests.sh`,
+  `sh tests/host/run_profile_store_runtime_tests.sh`,
+  `sh tests/host/run_profile_candidate_store_backend_tests.sh`,
+  `sh tests/host/run_profile_peer_store_backend_tests.sh`,
+  `sh tests/host/run_profile_split_foundation_tests.sh`,
+  `sh tests/host/run_profile_activation_policy_tests.sh`, and
+  `sh tests/host/run_feature_gate_compile_tests.sh`.
+- Final verification passed:
+  `sh tests/host/run_all_host_tests.sh`,
+  `qmk compile -kb bastardkb/charybdis/4x6 -km noah`,
+  `sh tests/host/run_firmware_memory_budget_checks.sh`,
+  `sh tests/host/run_firmware_stack_budget_checks.sh`, a clean ordinary
+  `qmk compile -c -kb bastardkb/charybdis/4x6 -km noah`, a second memory check,
+  a final full host suite, and `git diff --check`. The first target compile
+  exposed one GCC enum-comparison warning in a static assertion; explicit
+  unsigned casts fixed it before the passing builds.
+- Fresh linked resource facts are per RP2040 half: physical SRAM is 270,336 B;
+  SRAM0–3 `.bss` is 25,692/26,000 B under the regression policy; `.data` is
+  22,984 B; `.data + .bss` is 48,676/51,000 B; the SRAM0–3 linker/core-memory
+  span at boot is 213,464 B against the 204,800 B minimum; and fixed linked
+  occupancy across unique banks is 56,136 B. The extra 8 B versus the prior
+  checkpoint comes from the durable store's derived-domain/reconciliation
+  state; no production peer-receiver instance is allocated yet. These remain
+  link-time facts and policy metrics, not runtime high-water measurements or
+  total-RAM headroom.
+- Reviewed stack paths remain 1,880/1,920 B for the worst named main path and
+  336/768 B for the worst named split-slave path. The boot-discovery named path
+  is 488 B. The gate covers only its manifest paths; peer import is not yet
+  reachable from a QMK callback.
+- Profile Studio UI and authored profile inputs did not change, so screenshots
+  and introspection regeneration were intentionally skipped. Firmware builds
+  wrote generated artifacts in the sibling QMK tree only; no sibling source
+  file was edited. Mutation, activation, and peer capability bits remain
+  disabled.
+
+Next steps:
+
+1. Add the scan-owned split reconciler and QMK RPC registration, including
+   metadata exchange, chunk scheduling, acknowledgement/error mapping, retry,
+   reconnect, role-change restart, and authority publication on every loss.
+2. Replace the read-only discovery shell with one production owner that opens
+   compiled defaults once, boot-validates a committed blob, owns the writable
+   store/candidate/peer state, and installs provider, activation predicate,
+   behavior, and RGB invalidators without duplicate backends.
+3. Exercise commit/reboot/interruption/reconnect, both USB orientations, role
+   swap, reset-to-compiled, and exact durable convergence on the real keyboard
+   before advertising mutation or peer support.

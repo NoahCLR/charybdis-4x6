@@ -37,6 +37,12 @@ void noah_profile_candidate_store_backend_init(noah_profile_candidate_store_back
 // interface borrows backend for its entire lifetime.
 noah_profile_candidate_backend_t noah_profile_candidate_store_backend_interface(noah_profile_candidate_store_backend_t *backend);
 
+// Split reconciliation uses the same storage/validator/provider owner as host
+// candidates but supplies the sender's complete durable identity. This path
+// never manufactures a local generation or origin. metadata supplies the
+// derived canonical domain mask used by whole-profile validation.
+noah_profile_store_result_t noah_profile_candidate_store_backend_begin_exact(noah_profile_candidate_store_backend_t *backend, const noah_profile_candidate_v1_metadata_t *metadata, const noah_profile_store_candidate_t *candidate);
+
 // Cold/test convenience wrapper around the interface's bounded commit steps.
 // Staging and validation never call it; production durability still requires
 // an explicit commit operation owned by scan context.

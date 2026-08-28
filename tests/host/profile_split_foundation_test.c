@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "users/noah/lib/profile/schema/profile_validator_v1.h"
 #include "users/noah/lib/profile/split/profile_split_authority.h"
 #include "users/noah/lib/profile/split/profile_split_protocol_v1.h"
 
@@ -24,6 +25,7 @@ static noah_profile_split_descriptor_t committed_descriptor(uint32_t generation,
     descriptor.payload_crc32  = UINT32_C(0xA1B2C3D4) ^ digest;
     descriptor.payload_digest = digest;
     descriptor.payload_length = 1089u;
+    descriptor.domain_mask    = NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS;
     descriptor.profile_flags  = 1u;
     descriptor.origin_half    = origin;
     descriptor.has_profile    = true;
@@ -55,6 +57,7 @@ static void assert_descriptors_equal(const noah_profile_split_descriptor_t *actu
     assert(actual->payload_length == expected->payload_length);
     assert(actual->schema_major == expected->schema_major);
     assert(actual->schema_minor == expected->schema_minor);
+    assert(actual->domain_mask == expected->domain_mask);
     assert(actual->profile_flags == expected->profile_flags);
     assert(actual->origin_half == expected->origin_half);
     assert(actual->readable == expected->readable);
@@ -89,11 +92,19 @@ static void test_authority_decision_table(void) {
     peer.payload_crc32 ^= 1u;
     assert(noah_profile_split_authority_compare(&local, &peer) == NOAH_PROFILE_SPLIT_AUTHORITY_CORRUPT_SAME_TUPLE);
     peer = local;
+    peer.domain_mask ^= NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB;
+    assert(noah_profile_split_authority_compare(&local, &peer) == NOAH_PROFILE_SPLIT_AUTHORITY_CORRUPT_SAME_TUPLE);
+    peer = local;
     peer.compiled_default_digest ^= 1u;
     assert(noah_profile_split_authority_compare(&local, &peer) == NOAH_PROFILE_SPLIT_AUTHORITY_INCOMPATIBLE);
     peer = local;
     peer.action_abi_digest ^= 1u;
     assert(noah_profile_split_authority_compare(&local, &peer) == NOAH_PROFILE_SPLIT_AUTHORITY_INCOMPATIBLE);
+
+    peer             = local;
+    peer.domain_mask = 0x80u;
+    assert(!noah_profile_split_descriptor_valid(&peer));
+    assert(noah_profile_split_authority_compare(&local, &peer) == NOAH_PROFILE_SPLIT_AUTHORITY_INVALID_METADATA);
 
     peer               = local;
     local.schema_major = 2u;
@@ -171,7 +182,7 @@ static void test_protocol_golden_frames(void) {
         0x01, 0x01, 0x00, 0x02, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x44, 0x33, 0x22, 0x11, 0x88, 0x77, 0x66, 0x55, 0x00, 0xFC,
     };
     static const uint8_t begin_golden[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE] = {
-        0x01, 0x02, 0x00, 0x03, 0x01, 0x00, 0x01, 0x01, 0x41, 0x04, 0x07, 0x00, 0x00, 0x00, 0xD4, 0xC3, 0xB2, 0xA1, 0x40, 0x30, 0x20, 0x10, 0x44, 0x33, 0x22, 0x11, 0x88, 0x77, 0x66, 0x55, 0x00, 0xF4,
+        0x01, 0x02, 0x00, 0x03, 0x01, 0x00, 0x01, 0x01, 0x41, 0x04, 0x07, 0x00, 0x00, 0x00, 0xD4, 0xC3, 0xB2, 0xA1, 0x40, 0x30, 0x20, 0x10, 0x44, 0x33, 0x22, 0x11, 0x88, 0x77, 0x66, 0x55, 0x03, 0xFD,
     };
     static const uint8_t chunk_golden[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE] = {
         0x01, 0x03, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x40, 0x30, 0x20, 0x10, 0x0E, 0x00, 0x41, 0x04, 0x0E, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x45,

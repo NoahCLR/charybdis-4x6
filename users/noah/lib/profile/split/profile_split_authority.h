@@ -38,6 +38,7 @@ typedef struct {
     uint16_t payload_length;
     uint8_t  schema_major;
     uint8_t  schema_minor;
+    uint8_t  domain_mask;
     uint8_t  profile_flags;
     uint8_t  origin_half;
     bool     readable;

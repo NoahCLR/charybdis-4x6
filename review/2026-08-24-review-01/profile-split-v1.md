@@ -1,7 +1,7 @@
 # Profile Split Protocol V1
 
-Status: accepted internal split foundation; production reconciliation remains
-unimplemented
+Status: accepted internal split foundation and isolated durable peer receiver;
+production transport/reconciliation remains unimplemented
 
 This is a dedicated sibling protocol for the durable live profile. It does not
 extend the VIA region reconciler. Every frame is exactly 32 bytes, multi-byte
@@ -47,7 +47,7 @@ Metadata, prepare begin, prepare commit, and abort use this layout:
 | 18 | 4 | canonical payload FNV-1a digest |
 | 22 | 4 | compiled-default digest |
 | 26 | 4 | action-ABI digest |
-| 30 | 1 | reserved zero |
+| 30 | 1 | Profile Wire domain mask derived from the canonical payload |
 | 31 | 1 | frame CRC8 |
 
 A readable compiled-default descriptor has no committed profile. Its
@@ -55,7 +55,9 @@ generation, payload length, payload identities, persistent flags, and origin
 are all zero, while schema and firmware compatibility digests remain present.
 An unreadable descriptor is entirely zero apart from the frame header. A
 committed descriptor requires a nonzero generation, a blob-sized payload, a
-valid physical origin, and only known persistent flags.
+valid physical origin, and only known persistent flags. Its domain mask may
+contain only the RGB and key-behavior bits and must match the domains found by
+whole-profile validation before commit.
 
 ## Transfer, Acknowledgement, And Error Frame
 
@@ -95,12 +97,34 @@ convergence with no transfer in progress. An uninitialized or incoherent
 publication is a failed observation, which the activation policy already
 treats as unresolved.
 
+## Durable Peer Receiver
+
+`profile_peer_store_backend` reuses the one candidate-store/validator/provider
+owner used by host candidates. It preserves the sender's generation, physical
+origin, persistent flags, checksums, compatibility identities, and declared
+domain mask instead of manufacturing a local identity. Validator flags remain
+zero because they are a different namespace from persistent store flags.
+
+The receiver admits only a strictly newer compatible record, accepts a fully
+repeated chunk only after its staged bytes compare equal, and rejects gaps,
+partial overlaps, conflicting retries, stale generations, concurrent origins,
+and same-tuple record disagreement before destructive writes. Validation and
+marker-last commit advance through the existing bounded scan-step interfaces.
+Success is reported only after marker readback and an explicit field-by-field
+comparison of the durable record, excluding only the local slot number.
+
+The store now treats compiled-default digest as boot and candidate
+compatibility, derives the domain mask from the checksummed canonical payload,
+and latches an unconfirmed final marker as reconciliation-required. No later
+prepare can invalidate either slot until a conclusive boot selection clears
+that latch. A boot-discovered exact record is not called idempotently validated
+until a future boot owner has also rerun whole-profile validation.
+
 ## Deliberately Missing Production Pieces
 
 - QMK transaction id and RPC callback registration;
 - a scan-owned retry, reconnect, and role-change reconciler;
-- exact remote-record inactive-slot staging and validation;
-- marker-last durability acknowledgement;
+- protocol acknowledgement emission after the landed marker-last receiver;
 - boot discovery publication and reset convergence;
 - production activation-policy installation, diagnostics, and capabilities.
 

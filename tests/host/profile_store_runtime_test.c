@@ -5,16 +5,31 @@
 #include <string.h>
 
 #include "users/noah/lib/compat/qmk_profile_eeprom.h"
+#include "users/noah/lib/profile/schema/profile_compiled_defaults_v1.h"
 #include "users/noah/lib/profile/storage/profile_checksum.h"
 #include "users/noah/lib/profile/storage/profile_store_runtime.h"
+
+enum {
+    TEST_COMPILED_DIGEST = UINT32_C(0x10203040),
+};
 
 static uint8_t  eeprom_bytes[NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE];
 static uint8_t  alternate_bytes[NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE];
 static uint32_t qmk_read_calls;
 static uint32_t qmk_write_calls;
+static uint32_t current_compiled_digest = TEST_COMPILED_DIGEST;
 
 static const uint8_t empty_profile[] = {'N', 'L', 'P', '1', 1u, 0u, 0u, 1u};
 static const uint8_t rgb_profile[]   = {'N', 'L', 'P', '1', 1u, 0u, 1u, 1u, 0x10u, 1u, 1u, 0u, 0xA5u};
+
+noah_profile_compiled_v1_result_t noah_profile_compiled_v1_open(noah_profile_compiled_v1_t *profile, noah_profile_compiled_v1_error_t *error) {
+    (void)error;
+    assert(profile != NULL);
+    memset(profile, 0, sizeof(*profile));
+    profile->metadata.digest            = current_compiled_digest;
+    profile->metadata.action_abi_digest = 0u;
+    return NOAH_PROFILE_COMPILED_V1_OK;
+}
 
 void eeprom_read_block(void *target, const void *source, size_t length) {
     uintptr_t address = (uintptr_t)source;
@@ -63,13 +78,14 @@ static noah_profile_store_candidate_t candidate_for(const uint8_t *payload, uint
     return (noah_profile_store_candidate_t){
         .schema_major            = NOAH_PROFILE_STORE_SCHEMA_MAJOR,
         .schema_minor            = NOAH_PROFILE_STORE_SCHEMA_MINOR,
+        .domain_mask             = payload[6] == 0u ? 0u : 1u,
         .flags                   = NOAH_PROFILE_STORE_FLAG_OVERRIDE,
         .payload_length          = length,
         .generation              = generation,
         .origin_half             = 0u,
         .payload_crc32           = noah_profile_crc32_finish(crc),
         .payload_digest          = noah_profile_fnv1a_update(NOAH_PROFILE_FNV1A_INITIAL, payload, length),
-        .compiled_default_digest = UINT32_C(0x10203040),
+        .compiled_default_digest = current_compiled_digest,
         .action_abi_digest       = 0u,
     };
 }
@@ -84,11 +100,13 @@ static void commit_to(uint8_t *bytes, const uint8_t *payload, uint16_t length, u
         .context = bytes,
     };
 
-    noah_profile_store_init(&store, io, (noah_profile_store_compatibility_t){
-                                           .schema_major      = NOAH_PROFILE_STORE_SCHEMA_MAJOR,
-                                           .schema_minor      = NOAH_PROFILE_STORE_SCHEMA_MINOR,
-                                           .action_abi_digest = 0u,
-                                       });
+    noah_profile_store_init(&store, io,
+                            (noah_profile_store_compatibility_t){
+                                .schema_major            = NOAH_PROFILE_STORE_SCHEMA_MAJOR,
+                                .schema_minor            = NOAH_PROFILE_STORE_SCHEMA_MINOR,
+                                .compiled_default_digest = current_compiled_digest,
+                                .action_abi_digest       = 0u,
+                            });
     assert(noah_profile_store_boot_select(&store, &selected) == NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE);
     assert(noah_profile_store_prepare_begin(&store, &candidate) == NOAH_PROFILE_STORE_OK);
     assert(noah_profile_store_prepare_write(&store, 0u, payload, length) == NOAH_PROFILE_STORE_OK);
@@ -117,8 +135,8 @@ static void test_qmk_adapter_is_slot_bounded_and_read_only(void) {
 }
 
 static void test_qmk_write_adapter_is_slot_bounded(void) {
-    noah_profile_store_io_t io = noah_qmk_profile_eeprom_io();
-    const uint8_t           bytes[] = {0x12u, 0x34u};
+    noah_profile_store_io_t io                    = noah_qmk_profile_eeprom_io();
+    const uint8_t           bytes[]               = {0x12u, 0x34u};
     uint8_t                 result[sizeof(bytes)] = {0u};
 
     reset_eeprom(eeprom_bytes);
@@ -198,12 +216,29 @@ static void test_equal_generation_divergence_is_reported(void) {
     assert(qmk_write_calls == 0u);
 }
 
+static void test_old_compiled_default_record_falls_back(void) {
+    reset_eeprom(eeprom_bytes);
+    current_compiled_digest = TEST_COMPILED_DIGEST ^ 1u;
+    commit_to(eeprom_bytes, empty_profile, sizeof(empty_profile), 1u);
+    current_compiled_digest = TEST_COMPILED_DIGEST;
+    qmk_read_calls          = 0u;
+    qmk_write_calls         = 0u;
+
+    noah_profile_store_runtime_init();
+    noah_profile_store_runtime_matrix_scan();
+    assert(noah_profile_store_runtime_state() == NOAH_PROFILE_STORE_RUNTIME_COMPILED_FALLBACK);
+    assert(noah_profile_store_runtime_discovery_result() == NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE);
+    assert(noah_profile_store_runtime_committed() == NULL);
+    assert(qmk_write_calls == 0u);
+}
+
 int main(void) {
     test_qmk_adapter_is_slot_bounded_and_read_only();
     test_qmk_write_adapter_is_slot_bounded();
     test_boot_discovery_runs_once_from_scan();
     test_committed_metadata_is_discovered_without_activation();
     test_equal_generation_divergence_is_reported();
+    test_old_compiled_default_record_falls_back();
     puts("profile store runtime host tests passed");
     return 0;
 }

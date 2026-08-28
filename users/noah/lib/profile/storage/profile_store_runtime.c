@@ -7,22 +7,31 @@
 #include <stddef.h>
 
 #include "../../compat/qmk_profile_eeprom.h"
+#include "../schema/profile_compiled_defaults_v1.h"
 
 static noah_profile_store_runtime_state_t runtime_state;
 static noah_profile_store_result_t        discovery_result;
 
 #ifdef VIA_ENABLE
 static noah_profile_store_t runtime_store;
-static const noah_profile_store_compatibility_t runtime_compatibility = {
-    .schema_major      = NOAH_PROFILE_STORE_SCHEMA_MAJOR,
-    .schema_minor      = NOAH_PROFILE_STORE_SCHEMA_MINOR,
-    .action_abi_digest = 0u,
-};
 #endif
 
 void noah_profile_store_runtime_init(void) {
 #ifdef VIA_ENABLE
-    noah_profile_store_init(&runtime_store, noah_qmk_profile_eeprom_read_only_io(), runtime_compatibility);
+    noah_profile_compiled_v1_t compiled;
+
+    if (noah_profile_compiled_v1_open(&compiled, NULL) != NOAH_PROFILE_COMPILED_V1_OK) {
+        discovery_result = NOAH_PROFILE_STORE_INVALID_PAYLOAD;
+        runtime_state    = NOAH_PROFILE_STORE_RUNTIME_STORAGE_ERROR;
+        return;
+    }
+    noah_profile_store_init(&runtime_store, noah_qmk_profile_eeprom_read_only_io(),
+                            (noah_profile_store_compatibility_t){
+                                .schema_major            = NOAH_PROFILE_STORE_SCHEMA_MAJOR,
+                                .schema_minor            = NOAH_PROFILE_STORE_SCHEMA_MINOR,
+                                .compiled_default_digest = compiled.metadata.digest,
+                                .action_abi_digest       = compiled.metadata.action_abi_digest,
+                            });
     discovery_result = NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE;
     runtime_state    = NOAH_PROFILE_STORE_RUNTIME_DISCOVERY_PENDING;
 #else

@@ -7,12 +7,12 @@
 #include "users/noah/lib/profile/storage/profile_checksum.h"
 #include "users/noah/lib/profile/storage/profile_store.h"
 
-#define CHECK(condition)                                                                                                                   \
-    do {                                                                                                                                   \
-        if (!(condition)) {                                                                                                                \
-            fprintf(stderr, "CHECK failed at %s:%d: %s\n", __FILE__, __LINE__, #condition);                                              \
-            exit(1);                                                                                                                       \
-        }                                                                                                                                  \
+#define CHECK(condition)                                                                    \
+    do {                                                                                    \
+        if (!(condition)) {                                                                 \
+            fprintf(stderr, "CHECK failed at %s:%d: %s\n", __FILE__, __LINE__, #condition); \
+            exit(1);                                                                        \
+        }                                                                                   \
     } while (0)
 
 enum {
@@ -46,8 +46,8 @@ typedef struct {
     bool                saw_pristine_marker;
 } reuse_guard_state_t;
 
-static const uint8_t empty_profile[] = {'N', 'L', 'P', '1', 1u, 0u, 0u, 1u};
-static const uint8_t rgb_profile[]   = {'N', 'L', 'P', '1', 1u, 0u, 1u, 1u, 0x10u, 1u, 3u, 0u, 1u, 2u, 3u};
+static const uint8_t empty_profile[]    = {'N', 'L', 'P', '1', 1u, 0u, 0u, 1u};
+static const uint8_t rgb_profile[]      = {'N', 'L', 'P', '1', 1u, 0u, 1u, 1u, 0x10u, 1u, 3u, 0u, 1u, 2u, 3u};
 static const uint8_t behavior_profile[] = {'N', 'L', 'P', '1', 1u, 0u, 1u, 1u, 0x20u, 1u, 2u, 0u, 4u, 5u};
 
 static bool fake_read(void *context, uint16_t address, uint8_t *target, uint16_t length) {
@@ -77,7 +77,7 @@ static uint16_t partial_limit_for_commit_write(uint32_t write_call, uint16_t pay
 }
 
 static bool fake_write(void *context, uint16_t address, const uint8_t *source, uint16_t length) {
-    fake_eeprom_t *memory = context;
+    fake_eeprom_t *memory  = context;
     uint16_t       written = length;
 
     memory->write_calls++;
@@ -100,7 +100,7 @@ static noah_profile_store_io_t io_for(fake_eeprom_t *memory) {
 }
 
 static noah_profile_store_compatibility_t compatibility(void) {
-    return (noah_profile_store_compatibility_t){.schema_major = 1u, .schema_minor = 0u, .action_abi_digest = ACTION_ABI_DIGEST};
+    return (noah_profile_store_compatibility_t){.schema_major = 1u, .schema_minor = 0u, .compiled_default_digest = COMPILED_DIGEST, .action_abi_digest = ACTION_ABI_DIGEST};
 }
 
 static bool reuse_begin(void *context, noah_profile_slot_t slot) {
@@ -136,18 +136,24 @@ static void store_u16(uint8_t *bytes, uint16_t value) {
 
 static void reset_eeprom(fake_eeprom_t *memory) {
     memset(memory, 0xFF, sizeof(*memory));
-    memory->write_calls      = 0u;
-    memory->fail_write_call  = 0u;
+    memory->write_calls        = 0u;
+    memory->fail_write_call    = 0u;
     memory->fail_partial_bytes = 0u;
-    memory->fail_reads       = false;
+    memory->fail_reads         = false;
 }
 
 static noah_profile_store_candidate_t candidate_for(const uint8_t *payload, uint16_t length, uint32_t generation, uint8_t origin_half) {
-    uint32_t crc = noah_profile_crc32_update(NOAH_PROFILE_CRC32_INITIAL, payload, length);
+    uint32_t crc         = noah_profile_crc32_update(NOAH_PROFILE_CRC32_INITIAL, payload, length);
+    uint8_t  domain_mask = 0u;
+
+    if (length >= 12u && payload[6] != 0u) {
+        domain_mask = payload[8] == 0x10u ? 1u : payload[8] == 0x20u ? 2u : 0u;
+    }
 
     return (noah_profile_store_candidate_t){
         .schema_major            = 1u,
         .schema_minor            = 0u,
+        .domain_mask             = domain_mask,
         .flags                   = NOAH_PROFILE_STORE_FLAG_OVERRIDE,
         .payload_length          = length,
         .generation              = generation,
@@ -217,12 +223,12 @@ static void test_checksums(void) {
 }
 
 static void test_commit_and_boot_selection(void) {
-    noah_profile_store_t        store;
-    noah_profile_store_t        rebooted;
-    noah_profile_store_record_t record;
+    noah_profile_store_t           store;
+    noah_profile_store_t           rebooted;
+    noah_profile_store_record_t    record;
     noah_profile_store_candidate_t first_candidate;
-    const uint8_t              *header;
-    uint32_t                    next;
+    const uint8_t                 *header;
+    uint32_t                       next;
 
     reset_eeprom(&eeprom);
     initialize_store(&store, &eeprom, NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE);
@@ -230,6 +236,7 @@ static void test_commit_and_boot_selection(void) {
     CHECK(next == 1u);
     CHECK(commit_payload(&store, empty_profile, sizeof(empty_profile), 1u, 0u, &record) == NOAH_PROFILE_STORE_OK);
     CHECK(record.slot == NOAH_PROFILE_SLOT_A && record.generation == 1u);
+    CHECK(record.domain_mask == 0u);
     CHECK(eeprom.last_write_address == NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR + 30u);
     CHECK(eeprom.last_write_length == NOAH_PROFILE_STORAGE_COMMIT_MARKER_SIZE);
     first_candidate = candidate_for(empty_profile, sizeof(empty_profile), 1u, 0u);
@@ -248,6 +255,7 @@ static void test_commit_and_boot_selection(void) {
     CHECK(rebooted.committed.slot == NOAH_PROFILE_SLOT_A && rebooted.committed.payload_length == sizeof(empty_profile));
     CHECK(commit_payload(&rebooted, rgb_profile, sizeof(rgb_profile), 7u, 1u, &record) == NOAH_PROFILE_STORE_OK);
     CHECK(record.slot == NOAH_PROFILE_SLOT_B && record.generation == 7u && record.origin_half == 1u);
+    CHECK(record.domain_mask == 1u);
 
     initialize_store(&store, &eeprom, NOAH_PROFILE_STORE_OK);
     CHECK(store.committed.slot == NOAH_PROFILE_SLOT_B && store.committed.generation == 7u);
@@ -255,9 +263,9 @@ static void test_commit_and_boot_selection(void) {
 }
 
 static void test_chunk_and_candidate_guards(void) {
-    noah_profile_store_t             store;
-    noah_profile_store_candidate_t  candidate;
-    uint8_t                         oversized[NOAH_PROFILE_STORE_IO_CHUNK_MAX + 1u] = {0};
+    noah_profile_store_t           store;
+    noah_profile_store_candidate_t candidate;
+    uint8_t                        oversized[NOAH_PROFILE_STORE_IO_CHUNK_MAX + 1u] = {0};
 
     reset_eeprom(&eeprom);
     initialize_store(&store, &eeprom, NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE);
@@ -274,10 +282,13 @@ static void test_chunk_and_candidate_guards(void) {
     candidate.schema_major      = 1u;
     candidate.action_abi_digest = 0u;
     CHECK(noah_profile_store_prepare_begin(&store, &candidate) == NOAH_PROFILE_STORE_INCOMPATIBLE_ACTION_ABI);
+    candidate.action_abi_digest       = ACTION_ABI_DIGEST;
+    candidate.compiled_default_digest = 0u;
+    CHECK(noah_profile_store_prepare_begin(&store, &candidate) == NOAH_PROFILE_STORE_INCOMPATIBLE_COMPILED_DEFAULT);
 }
 
 static void test_commit_state_machine_is_scan_bounded(void) {
-    noah_profile_store_t            store;
+    noah_profile_store_t           store;
     noah_profile_store_candidate_t candidate;
     noah_profile_store_record_t    record;
     noah_profile_store_result_t    result;
@@ -318,17 +329,17 @@ static void test_commit_state_machine_is_scan_bounded(void) {
 }
 
 static void test_destructive_reuse_guard_brackets_every_prepare(void) {
-    noah_profile_store_t            store;
-    noah_profile_store_candidate_t candidate;
-    reuse_guard_state_t             state;
+    noah_profile_store_t             store;
+    noah_profile_store_candidate_t   candidate;
+    reuse_guard_state_t              state;
     noah_profile_store_reuse_guard_t guard;
-    uint32_t                        writes_before;
+    uint32_t                         writes_before;
 
     reset_eeprom(&eeprom);
     initialize_store(&store, &eeprom, NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE);
     memset(&state, 0, sizeof(state));
     state.memory = &eeprom;
-    guard = (noah_profile_store_reuse_guard_t){.begin = reuse_begin, .end = reuse_end, .context = &state};
+    guard        = (noah_profile_store_reuse_guard_t){.begin = reuse_begin, .end = reuse_end, .context = &state};
     CHECK(!noah_profile_store_set_reuse_guard(&store, &(noah_profile_store_reuse_guard_t){.begin = reuse_begin}));
     CHECK(noah_profile_store_set_reuse_guard(&store, &guard));
     candidate = candidate_for(empty_profile, sizeof(empty_profile), 1u, 0u);
@@ -408,8 +419,8 @@ static void test_payload_and_header_validation(void) {
 }
 
 static void test_checksum_mismatch_never_commits(void) {
-    noah_profile_store_t            store;
-    noah_profile_store_t            rebooted;
+    noah_profile_store_t           store;
+    noah_profile_store_t           rebooted;
     noah_profile_store_candidate_t candidate;
 
     reset_eeprom(&eeprom);
@@ -433,7 +444,8 @@ static void test_final_marker_io_failure_is_durability_unknown(void) {
     eeprom.fail_write_call    = eeprom.write_calls + 1u;
     eeprom.fail_partial_bytes = NOAH_PROFILE_STORAGE_COMMIT_MARKER_SIZE;
     CHECK(noah_profile_store_prepare_commit_step(&store, 20u, NULL) == NOAH_PROFILE_STORE_DURABILITY_UNKNOWN);
-    CHECK(!store.prepare_active);
+    CHECK(!store.prepare_active && store.reconciliation_required);
+    CHECK(noah_profile_store_prepare_begin(&store, &(noah_profile_store_candidate_t){0}) == NOAH_PROFILE_STORE_DURABILITY_UNKNOWN);
     eeprom.fail_write_call = 0u;
     initialize_store(&rebooted, &eeprom, NOAH_PROFILE_STORE_OK);
     CHECK(rebooted.committed.generation == 1u);
@@ -443,7 +455,10 @@ static void test_final_marker_io_failure_is_durability_unknown(void) {
     stage_commit_to_phase(&store, empty_profile, sizeof(empty_profile), NOAH_PROFILE_STORE_COMMIT_MARKER_READBACK);
     eeprom.fail_reads = true;
     CHECK(noah_profile_store_prepare_commit_step(&store, 20u, NULL) == NOAH_PROFILE_STORE_DURABILITY_UNKNOWN);
+    CHECK(store.reconciliation_required);
     eeprom.fail_reads = false;
+    CHECK(noah_profile_store_boot_select(&store, &selected) == NOAH_PROFILE_STORE_OK);
+    CHECK(!store.reconciliation_required);
     noah_profile_store_init(&rebooted, io_for(&eeprom), compatibility());
     CHECK(noah_profile_store_boot_select(&rebooted, &selected) == NOAH_PROFILE_STORE_OK);
     CHECK(selected.generation == 1u);
@@ -466,8 +481,8 @@ static void test_power_loss_preserves_last_known_good(void) {
             noah_profile_store_result_t result;
 
             memcpy(eeprom.bytes, eeprom_snapshot, sizeof(eeprom.bytes));
-            eeprom.write_calls       = 0u;
-            eeprom.fail_write_call   = fail_call;
+            eeprom.write_calls        = 0u;
+            eeprom.fail_write_call    = fail_call;
             eeprom.fail_partial_bytes = partial;
             initialize_store(&store, &eeprom, NOAH_PROFILE_STORE_OK);
             result = commit_payload(&store, rgb_profile, sizeof(rgb_profile), 2u, 1u, NULL);
@@ -545,7 +560,7 @@ static void test_equal_generation_metadata_divergence_conflicts(void) {
     memcpy(&eeprom.bytes[NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR], &alternate_eeprom.bytes[NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR], NOAH_PROFILE_STORAGE_SLOT_A_SIZE);
 
     slot_b_header = &eeprom.bytes[NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR];
-    slot_b_header[20] ^= 0x01u;
+    slot_b_header[11] ^= NOAH_PROFILE_STORE_FLAG_OVERRIDE;
     store_u16(&slot_b_header[28], noah_profile_crc16_ccitt_update(NOAH_PROFILE_CRC16_INITIAL, slot_b_header, 28u));
 
     initialize_store(&store, &eeprom, NOAH_PROFILE_STORE_GENERATION_CONFLICT);
@@ -553,8 +568,8 @@ static void test_equal_generation_metadata_divergence_conflicts(void) {
 }
 
 static void test_io_failures_are_not_treated_as_empty(void) {
-    noah_profile_store_t        store;
-    noah_profile_store_record_t selected;
+    noah_profile_store_t           store;
+    noah_profile_store_record_t    selected;
     noah_profile_store_candidate_t candidate;
 
     reset_eeprom(&eeprom);
@@ -563,6 +578,25 @@ static void test_io_failures_are_not_treated_as_empty(void) {
     CHECK(noah_profile_store_boot_select(&store, &selected) == NOAH_PROFILE_STORE_IO_ERROR);
     candidate = candidate_for(empty_profile, sizeof(empty_profile), 1u, 0u);
     CHECK(noah_profile_store_prepare_begin(&store, &candidate) == NOAH_PROFILE_STORE_INVALID_ARGUMENT);
+}
+
+static void test_boot_rejects_old_compiled_default_identity(void) {
+    noah_profile_store_t               store;
+    noah_profile_store_record_t        selected;
+    noah_profile_store_candidate_t     candidate;
+    noah_profile_store_compatibility_t old_compatibility = compatibility();
+
+    reset_eeprom(&eeprom);
+    old_compatibility.compiled_default_digest ^= 1u;
+    noah_profile_store_init(&store, io_for(&eeprom), old_compatibility);
+    CHECK(noah_profile_store_boot_select(&store, &selected) == NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE);
+    candidate                         = candidate_for(empty_profile, sizeof(empty_profile), 1u, 0u);
+    candidate.compiled_default_digest = old_compatibility.compiled_default_digest;
+    CHECK(noah_profile_store_prepare_begin(&store, &candidate) == NOAH_PROFILE_STORE_OK);
+    CHECK(noah_profile_store_prepare_write(&store, 0u, empty_profile, sizeof(empty_profile)) == NOAH_PROFILE_STORE_OK);
+    CHECK(noah_profile_store_prepare_commit(&store, &selected) == NOAH_PROFILE_STORE_OK);
+
+    initialize_store(&store, &eeprom, NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE);
 }
 
 static void test_boot_selection_supports_read_only_discovery(void) {
@@ -598,6 +632,7 @@ int main(void) {
     test_generation_conflict_and_rollover();
     test_equal_generation_metadata_divergence_conflicts();
     test_io_failures_are_not_treated_as_empty();
+    test_boot_rejects_old_compiled_default_identity();
     test_boot_selection_supports_read_only_discovery();
     puts("profile store host tests passed");
     return 0;

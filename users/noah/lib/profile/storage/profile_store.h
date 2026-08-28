@@ -9,12 +9,12 @@
 #include "profile_storage_layout.h"
 
 enum {
-    NOAH_PROFILE_STORE_FORMAT_VERSION  = 1u,
-    NOAH_PROFILE_STORE_SCHEMA_MAJOR    = 1u,
-    NOAH_PROFILE_STORE_SCHEMA_MINOR    = 0u,
-    NOAH_PROFILE_STORE_IO_CHUNK_MAX    = 32u,
-    NOAH_PROFILE_STORE_FLAG_OVERRIDE   = 1u << 0,
-    NOAH_PROFILE_STORE_ALLOWED_FLAGS   = NOAH_PROFILE_STORE_FLAG_OVERRIDE,
+    NOAH_PROFILE_STORE_FORMAT_VERSION = 1u,
+    NOAH_PROFILE_STORE_SCHEMA_MAJOR   = 1u,
+    NOAH_PROFILE_STORE_SCHEMA_MINOR   = 0u,
+    NOAH_PROFILE_STORE_IO_CHUNK_MAX   = 32u,
+    NOAH_PROFILE_STORE_FLAG_OVERRIDE  = 1u << 0,
+    NOAH_PROFILE_STORE_ALLOWED_FLAGS  = NOAH_PROFILE_STORE_FLAG_OVERRIDE,
 };
 
 typedef enum {
@@ -30,6 +30,7 @@ typedef enum {
     NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE,
     NOAH_PROFILE_STORE_INVALID_HEADER,
     NOAH_PROFILE_STORE_INCOMPATIBLE_SCHEMA,
+    NOAH_PROFILE_STORE_INCOMPATIBLE_COMPILED_DEFAULT,
     NOAH_PROFILE_STORE_INCOMPATIBLE_ACTION_ABI,
     NOAH_PROFILE_STORE_INVALID_PAYLOAD,
     NOAH_PROFILE_STORE_CHECKSUM_MISMATCH,
@@ -82,8 +83,11 @@ typedef struct {
 } noah_profile_store_reuse_guard_t;
 
 typedef struct {
-    uint8_t  schema_major;
-    uint8_t  schema_minor;
+    uint8_t schema_major;
+    uint8_t schema_minor;
+    // Persisted profiles are compatible only with the authored defaults and
+    // semantic action vocabulary that existed when they were encoded.
+    uint32_t compiled_default_digest;
     uint32_t action_abi_digest;
 } noah_profile_store_compatibility_t;
 
@@ -91,19 +95,24 @@ typedef struct {
     noah_profile_slot_t slot;
     uint8_t             schema_major;
     uint8_t             schema_minor;
-    uint8_t             flags;
-    uint16_t            payload_length;
-    uint32_t            generation;
-    uint8_t             origin_half;
-    uint32_t            payload_crc32;
-    uint32_t            payload_digest;
-    uint32_t            compiled_default_digest;
-    uint32_t            action_abi_digest;
+    // Derived from the checksummed canonical payload during slot validation;
+    // it is not an independent field in the fixed 32-byte header.
+    uint8_t  domain_mask;
+    uint8_t  flags;
+    uint16_t payload_length;
+    uint32_t generation;
+    uint8_t  origin_half;
+    uint32_t payload_crc32;
+    uint32_t payload_digest;
+    uint32_t compiled_default_digest;
+    uint32_t action_abi_digest;
 } noah_profile_store_record_t;
 
 typedef struct {
-    uint8_t  schema_major;
-    uint8_t  schema_minor;
+    uint8_t schema_major;
+    uint8_t schema_minor;
+    // The marker-last shape pass must derive this exact mask before commit.
+    uint8_t  domain_mask;
     uint8_t  flags;
     uint16_t payload_length;
     uint32_t generation;
@@ -131,16 +140,18 @@ typedef struct {
     uint8_t                            commit_domain_count;
     uint8_t                            commit_domain_index;
     uint8_t                            commit_prior_domain;
+    uint8_t                            commit_domain_mask;
     uint8_t                            commit_record_offset;
     bool                               boot_scanned;
     bool                               conflict;
+    bool                               reconciliation_required;
     bool                               prepare_active;
     bool                               reuse_active;
     uint8_t                            scratch[NOAH_PROFILE_STORE_IO_CHUNK_MAX];
 } noah_profile_store_t;
 
-void noah_profile_store_init(noah_profile_store_t *store, noah_profile_store_io_t io, noah_profile_store_compatibility_t compatibility);
-bool noah_profile_store_set_reuse_guard(noah_profile_store_t *store, const noah_profile_store_reuse_guard_t *guard);
+void                        noah_profile_store_init(noah_profile_store_t *store, noah_profile_store_io_t io, noah_profile_store_compatibility_t compatibility);
+bool                        noah_profile_store_set_reuse_guard(noah_profile_store_t *store, const noah_profile_store_reuse_guard_t *guard);
 noah_profile_store_result_t noah_profile_store_boot_select(noah_profile_store_t *store, noah_profile_store_record_t *selected);
 noah_profile_store_result_t noah_profile_store_validate_slot(noah_profile_store_t *store, noah_profile_slot_t slot, bool require_commit, noah_profile_store_record_t *record);
 noah_profile_store_result_t noah_profile_store_prepare_begin(noah_profile_store_t *store, const noah_profile_store_candidate_t *candidate);
@@ -154,4 +165,4 @@ noah_profile_store_result_t noah_profile_store_prepare_commit_step(noah_profile_
 // Cold/test convenience wrapper around begin + bounded steps.
 noah_profile_store_result_t noah_profile_store_prepare_commit(noah_profile_store_t *store, noah_profile_store_record_t *committed);
 noah_profile_store_result_t noah_profile_store_prepare_abort(noah_profile_store_t *store);
-bool noah_profile_store_next_generation(const noah_profile_store_t *store, uint32_t *generation);
+bool                        noah_profile_store_next_generation(const noah_profile_store_t *store, uint32_t *generation);

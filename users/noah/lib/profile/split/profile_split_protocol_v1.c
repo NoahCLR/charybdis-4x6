@@ -24,7 +24,7 @@ enum {
     WIRE_PAYLOAD_DIGEST   = 18u,
     WIRE_COMPILED_DIGEST  = 22u,
     WIRE_ACTION_ABI       = 26u,
-    WIRE_DESCRIPTOR_PAD   = 30u,
+    WIRE_DOMAIN_MASK      = 30u,
     WIRE_TRANSFER_GEN     = 4u,
     WIRE_TRANSFER_DIGEST  = 8u,
     WIRE_TRANSFER_OFFSET  = 12u,
@@ -83,7 +83,7 @@ static bool descriptor_kind(noah_profile_split_v1_kind_t kind) {
 }
 
 static bool descriptor_zero(const noah_profile_split_descriptor_t *descriptor) {
-    return descriptor && descriptor->generation == 0u && descriptor->payload_crc32 == 0u && descriptor->payload_digest == 0u && descriptor->compiled_default_digest == 0u && descriptor->action_abi_digest == 0u && descriptor->payload_length == 0u && descriptor->schema_major == 0u && descriptor->schema_minor == 0u && descriptor->profile_flags == 0u && descriptor->origin_half == 0u && !descriptor->readable && !descriptor->has_profile;
+    return descriptor && descriptor->generation == 0u && descriptor->payload_crc32 == 0u && descriptor->payload_digest == 0u && descriptor->compiled_default_digest == 0u && descriptor->action_abi_digest == 0u && descriptor->payload_length == 0u && descriptor->schema_major == 0u && descriptor->schema_minor == 0u && descriptor->domain_mask == 0u && descriptor->profile_flags == 0u && descriptor->origin_half == 0u && !descriptor->readable && !descriptor->has_profile;
 }
 
 static bool transfer_shape_valid(const noah_profile_split_v1_frame_t *frame) {
@@ -138,6 +138,7 @@ bool noah_profile_split_v1_frame_encode(const noah_profile_split_v1_frame_t *fra
         write_u32(&out[WIRE_PAYLOAD_DIGEST], frame->descriptor.payload_digest);
         write_u32(&out[WIRE_COMPILED_DIGEST], frame->descriptor.compiled_default_digest);
         write_u32(&out[WIRE_ACTION_ABI], frame->descriptor.action_abi_digest);
+        out[WIRE_DOMAIN_MASK] = frame->descriptor.domain_mask;
     } else {
         write_u32(&out[WIRE_TRANSFER_GEN], frame->generation);
         write_u32(&out[WIRE_TRANSFER_DIGEST], frame->payload_digest);
@@ -159,7 +160,7 @@ bool noah_profile_split_v1_frame_decode(const uint8_t *wire, uint8_t length, noa
     decoded.kind   = (noah_profile_split_v1_kind_t)wire[WIRE_KIND];
     decoded.status = (noah_profile_split_v1_status_t)wire[WIRE_STATUS];
     if (descriptor_kind(decoded.kind)) {
-        if ((wire[WIRE_FLAGS] & (uint8_t)~WIRE_DESCRIPTOR_FLAGS) != 0u || wire[WIRE_DESCRIPTOR_PAD] != 0u) {
+        if ((wire[WIRE_FLAGS] & (uint8_t)~WIRE_DESCRIPTOR_FLAGS) != 0u) {
             return false;
         }
         decoded.descriptor = (noah_profile_split_descriptor_t){
@@ -171,6 +172,7 @@ bool noah_profile_split_v1_frame_decode(const uint8_t *wire, uint8_t length, noa
             .payload_length          = read_u16(&wire[WIRE_PAYLOAD_LENGTH]),
             .schema_major            = wire[WIRE_SCHEMA_MAJOR],
             .schema_minor            = wire[WIRE_SCHEMA_MINOR],
+            .domain_mask             = wire[WIRE_DOMAIN_MASK],
             .profile_flags           = wire[WIRE_PROFILE_FLAGS],
             .origin_half             = wire[WIRE_ORIGIN_HALF],
             .readable                = (wire[WIRE_FLAGS] & WIRE_FLAG_READABLE) != 0u,

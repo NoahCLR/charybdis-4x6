@@ -118,3 +118,20 @@ No project risks are closed yet.
   no exact peer record is yet staged and marker-last committed, and reconnect,
   role swap, dual USB, interruption, and real-keyboard convergence remain
   untested. Peer and mutation capability bits therefore remain disabled.
+
+### 2026-08-27 exact peer-store durability update
+
+- R-03 and R-04 gain an isolated exact peer import path. It uses the existing
+  inactive-slot reuse guard, whole-profile validator, bounded marker-last
+  commit, and field-by-field durable identity check. Tests cover sender-owned
+  generation/origin/flags, reboot selection, duplicate chunks, stale/conflict/
+  corruption decisions, reset flags, domain-mask mismatch, and ambiguous final
+  marker readback.
+- A durability-unknown marker now latches the store against every later
+  prepare until boot selection conclusively rescans both slots. Boot selection
+  and new candidates also reject a compiled-default digest mismatch, so an old
+  compiled base cannot masquerade as a compatible peer record.
+- R-03 remains open for the production writable owner and hardware interruption
+  matrix. R-04 remains open for QMK transport, retry/reconnect/role-change
+  orchestration, boot whole-profile validation, dual USB, and real-keyboard
+  convergence. Capability bits remain disabled.

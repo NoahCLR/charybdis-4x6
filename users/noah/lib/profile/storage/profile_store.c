@@ -30,6 +30,11 @@ enum {
     PROFILE_BLOB_HEADER_SIZE   = 8u,
     DOMAIN_ENVELOPE_SIZE       = 4u,
     PROFILE_BLOB_CANONICAL_BIT = 1u,
+    DOMAIN_ID_RGB              = 0x10u,
+    DOMAIN_ID_KEY_BEHAVIORS    = 0x20u,
+    DOMAIN_MASK_RGB            = 1u << 0,
+    DOMAIN_MASK_KEY_BEHAVIORS  = 1u << 1,
+    DOMAIN_MASK_ALL            = DOMAIN_MASK_RGB | DOMAIN_MASK_KEY_BEHAVIORS,
 };
 
 static const uint8_t header_magic[2]   = {'N', 'P'};
@@ -85,7 +90,17 @@ static bool generation_is_newer(uint32_t candidate, uint32_t current) {
 }
 
 static bool record_identity_equal(const noah_profile_store_record_t *lhs, const noah_profile_store_record_t *rhs) {
-    return lhs->schema_major == rhs->schema_major && lhs->schema_minor == rhs->schema_minor && lhs->flags == rhs->flags && lhs->payload_length == rhs->payload_length && lhs->generation == rhs->generation && lhs->origin_half == rhs->origin_half && lhs->payload_crc32 == rhs->payload_crc32 && lhs->payload_digest == rhs->payload_digest && lhs->compiled_default_digest == rhs->compiled_default_digest && lhs->action_abi_digest == rhs->action_abi_digest;
+    return lhs->schema_major == rhs->schema_major && lhs->schema_minor == rhs->schema_minor && lhs->domain_mask == rhs->domain_mask && lhs->flags == rhs->flags && lhs->payload_length == rhs->payload_length && lhs->generation == rhs->generation && lhs->origin_half == rhs->origin_half && lhs->payload_crc32 == rhs->payload_crc32 && lhs->payload_digest == rhs->payload_digest && lhs->compiled_default_digest == rhs->compiled_default_digest && lhs->action_abi_digest == rhs->action_abi_digest;
+}
+
+static uint8_t domain_mask_for_id(uint8_t domain_id) {
+    if (domain_id == DOMAIN_ID_RGB) {
+        return DOMAIN_MASK_RGB;
+    }
+    if (domain_id == DOMAIN_ID_KEY_BEHAVIORS) {
+        return DOMAIN_MASK_KEY_BEHAVIORS;
+    }
+    return 0u;
 }
 
 static void encode_header(uint8_t *header, const noah_profile_store_candidate_t *candidate) {
@@ -141,10 +156,13 @@ static noah_profile_store_result_t decode_header(noah_profile_store_t *store, no
     if (record->action_abi_digest != store->compatibility.action_abi_digest) {
         return NOAH_PROFILE_STORE_INCOMPATIBLE_ACTION_ABI;
     }
+    if (record->compiled_default_digest != store->compatibility.compiled_default_digest) {
+        return NOAH_PROFILE_STORE_INCOMPATIBLE_COMPILED_DEFAULT;
+    }
     return NOAH_PROFILE_STORE_OK;
 }
 
-static noah_profile_store_result_t validate_blob_shape(noah_profile_store_t *store, uint16_t payload_start, const noah_profile_store_record_t *record) {
+static noah_profile_store_result_t validate_blob_shape(noah_profile_store_t *store, uint16_t payload_start, noah_profile_store_record_t *record) {
     uint16_t offset;
     uint8_t  domain_count;
     uint8_t  prior_domain = 0u;
@@ -157,8 +175,9 @@ static noah_profile_store_result_t validate_blob_shape(noah_profile_store_t *sto
         return NOAH_PROFILE_STORE_INVALID_PAYLOAD;
     }
 
-    domain_count = store->scratch[6];
-    offset       = PROFILE_BLOB_HEADER_SIZE;
+    domain_count        = store->scratch[6];
+    offset              = PROFILE_BLOB_HEADER_SIZE;
+    record->domain_mask = 0u;
     for (domain_index = 0u; domain_index < domain_count; domain_index++) {
         uint8_t  domain_id;
         uint8_t  domain_version;
@@ -170,16 +189,17 @@ static noah_profile_store_result_t validate_blob_shape(noah_profile_store_t *sto
         domain_id      = store->scratch[0];
         domain_version = store->scratch[1];
         domain_length  = read_u16(&store->scratch[2]);
-        if (domain_id <= prior_domain || (domain_id != 0x10u && domain_id != 0x20u) || domain_version != 1u || (uint32_t)offset + DOMAIN_ENVELOPE_SIZE + domain_length > record->payload_length) {
+        if (domain_id <= prior_domain || domain_mask_for_id(domain_id) == 0u || domain_version != 1u || (uint32_t)offset + DOMAIN_ENVELOPE_SIZE + domain_length > record->payload_length) {
             return NOAH_PROFILE_STORE_INVALID_PAYLOAD;
         }
+        record->domain_mask |= domain_mask_for_id(domain_id);
         prior_domain = domain_id;
         offset       = (uint16_t)(offset + DOMAIN_ENVELOPE_SIZE + domain_length);
     }
     return offset == record->payload_length ? NOAH_PROFILE_STORE_OK : NOAH_PROFILE_STORE_INVALID_PAYLOAD;
 }
 
-static noah_profile_store_result_t validate_payload(noah_profile_store_t *store, uint16_t payload_start, const noah_profile_store_record_t *record) {
+static noah_profile_store_result_t validate_payload(noah_profile_store_t *store, uint16_t payload_start, noah_profile_store_record_t *record) {
     uint16_t offset = 0u;
     uint32_t crc    = NOAH_PROFILE_CRC32_INITIAL;
     uint32_t digest = NOAH_PROFILE_FNV1A_INITIAL;
@@ -251,6 +271,9 @@ static noah_profile_store_result_t end_reuse(noah_profile_store_t *store) {
 static noah_profile_store_result_t finish_prepare(noah_profile_store_t *store, noah_profile_store_result_t result) {
     noah_profile_store_result_t release_result;
 
+    if (result == NOAH_PROFILE_STORE_DURABILITY_UNKNOWN) {
+        store->reconciliation_required = true;
+    }
     store->prepare_active = false;
     store->commit_phase   = NOAH_PROFILE_STORE_COMMIT_IDLE;
     store->commit_offset  = 0u;
@@ -296,7 +319,8 @@ noah_profile_store_result_t noah_profile_store_boot_select(noah_profile_store_t 
     if (a_result == NOAH_PROFILE_STORE_IO_ERROR || b_result == NOAH_PROFILE_STORE_IO_ERROR) {
         return NOAH_PROFILE_STORE_IO_ERROR;
     }
-    store->boot_scanned = true;
+    store->reconciliation_required = false;
+    store->boot_scanned            = true;
     if (a_result != NOAH_PROFILE_STORE_OK && b_result != NOAH_PROFILE_STORE_OK) {
         return NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE;
     }
@@ -328,6 +352,12 @@ static noah_profile_store_result_t validate_candidate(const noah_profile_store_t
     if (candidate->action_abi_digest != store->compatibility.action_abi_digest) {
         return NOAH_PROFILE_STORE_INCOMPATIBLE_ACTION_ABI;
     }
+    if (candidate->compiled_default_digest != store->compatibility.compiled_default_digest) {
+        return NOAH_PROFILE_STORE_INCOMPATIBLE_COMPILED_DEFAULT;
+    }
+    if ((candidate->domain_mask & (uint8_t)~DOMAIN_MASK_ALL) != 0u) {
+        return NOAH_PROFILE_STORE_INVALID_ARGUMENT;
+    }
     if (store->committed.slot != NOAH_PROFILE_SLOT_NONE && !generation_is_newer(candidate->generation, store->committed.generation)) {
         return NOAH_PROFILE_STORE_GENERATION_NOT_NEWER;
     }
@@ -343,6 +373,9 @@ noah_profile_store_result_t noah_profile_store_prepare_begin(noah_profile_store_
     }
     if (store->conflict) {
         return NOAH_PROFILE_STORE_GENERATION_CONFLICT;
+    }
+    if (store->reconciliation_required) {
+        return NOAH_PROFILE_STORE_DURABILITY_UNKNOWN;
     }
     if (store->prepare_active) {
         return NOAH_PROFILE_STORE_PREPARE_IN_PROGRESS;
@@ -420,6 +453,7 @@ noah_profile_store_result_t noah_profile_store_prepare_commit_begin(noah_profile
     store->commit_domain_count  = 0u;
     store->commit_domain_index  = 0u;
     store->commit_prior_domain  = 0u;
+    store->commit_domain_mask   = 0u;
     store->commit_record_offset = 0u;
     return NOAH_PROFILE_STORE_IN_PROGRESS;
 }
@@ -433,6 +467,7 @@ static void record_from_candidate(const noah_profile_store_t *store, noah_profil
         .slot                    = store->candidate_slot,
         .schema_major            = store->candidate.schema_major,
         .schema_minor            = store->candidate.schema_minor,
+        .domain_mask             = store->candidate.domain_mask,
         .flags                   = store->candidate.flags,
         .payload_length          = store->candidate.payload_length,
         .generation              = store->candidate.generation,
@@ -518,13 +553,14 @@ noah_profile_store_result_t noah_profile_store_prepare_commit_step(noah_profile_
             if (memcmp(store->scratch, profile_magic, sizeof(profile_magic)) != 0 || store->scratch[4] != store->candidate.schema_major || store->scratch[5] != store->candidate.schema_minor || store->scratch[7] != PROFILE_BLOB_CANONICAL_BIT) {
                 return finish_prepare(store, NOAH_PROFILE_STORE_INVALID_PAYLOAD);
             }
-            store->commit_domain_count = store->scratch[6];
-            store->commit_domain_index = 0u;
-            store->commit_prior_domain = 0u;
-            store->commit_offset       = PROFILE_BLOB_HEADER_SIZE;
+            store->commit_domain_count  = store->scratch[6];
+            store->commit_domain_index  = 0u;
+            store->commit_prior_domain  = 0u;
+            store->commit_domain_mask   = 0u;
+            store->commit_offset        = PROFILE_BLOB_HEADER_SIZE;
             store->commit_record_offset = 0u;
             if (store->commit_domain_count == 0u) {
-                if (store->commit_offset != store->candidate.payload_length) {
+                if (store->commit_offset != store->candidate.payload_length || store->candidate.domain_mask != 0u) {
                     return finish_prepare(store, NOAH_PROFILE_STORE_INVALID_PAYLOAD);
                 }
                 store->commit_phase = NOAH_PROFILE_STORE_COMMIT_MARKER_WRITE;
@@ -552,15 +588,16 @@ noah_profile_store_result_t noah_profile_store_prepare_commit_step(noah_profile_
             domain_id      = store->scratch[0];
             domain_version = store->scratch[1];
             domain_length  = read_u16(&store->scratch[2]);
-            if (domain_id <= store->commit_prior_domain || (domain_id != 0x10u && domain_id != 0x20u) || domain_version != 1u || (uint32_t)store->commit_offset + DOMAIN_ENVELOPE_SIZE + domain_length > store->candidate.payload_length) {
+            if (domain_id <= store->commit_prior_domain || domain_mask_for_id(domain_id) == 0u || domain_version != 1u || (uint32_t)store->commit_offset + DOMAIN_ENVELOPE_SIZE + domain_length > store->candidate.payload_length) {
                 return finish_prepare(store, NOAH_PROFILE_STORE_INVALID_PAYLOAD);
             }
             store->commit_prior_domain = domain_id;
-            store->commit_offset       = (uint16_t)(store->commit_offset + DOMAIN_ENVELOPE_SIZE + domain_length);
+            store->commit_domain_mask |= domain_mask_for_id(domain_id);
+            store->commit_offset = (uint16_t)(store->commit_offset + DOMAIN_ENVELOPE_SIZE + domain_length);
             store->commit_domain_index++;
             store->commit_record_offset = 0u;
             if (store->commit_domain_index == store->commit_domain_count) {
-                if (store->commit_offset != store->candidate.payload_length) {
+                if (store->commit_offset != store->candidate.payload_length || store->commit_domain_mask != store->candidate.domain_mask) {
                     return finish_prepare(store, NOAH_PROFILE_STORE_INVALID_PAYLOAD);
                 }
                 store->commit_phase = NOAH_PROFILE_STORE_COMMIT_MARKER_WRITE;

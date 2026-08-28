@@ -232,7 +232,7 @@ The opening findings above are the audit-time snapshot. Current status:
 | 5 — source/device authority | resolved at contract level | D-013, D-014, and `authority-state-table.md` define operations, ordering, partial results, and conflicts |
 | 6 — storage/capacity evidence | resolved at Stage 00 design level; runtime high-water remains open | D-016 and `stage-00-baseline.md` record the corrected per-half bank model, policy-versus-capacity distinction, exact EEPROM map, dual-slot partition, and ceilings |
 | 7 — Studio transport boundary | partially resolved | D-012 accepts an injected serialized adapter and fake; concrete packaged board probe remains open |
-| 8 — split integration shape | partially implemented beyond the resolved contract | D-011 selects a sibling profile reconciler; D-017, the exact frame codec, the D-014 comparator, and the fail-closed peer observer now land the isolated protocol/authority foundation, while QMK transport, exact remote import, marker-last acknowledgement, and reconnect/role-change reconciliation remain open |
+| 8 — split integration shape | partially implemented beyond the resolved contract | D-011 selects a sibling profile reconciler; D-017, the exact frame codec, D-014 comparator, fail-closed peer observer, and isolated exact peer-store backend now cover sender-identity preservation, whole-profile validation, marker-last commit, and durability-unknown recovery. QMK transport/acknowledgement, boot validation, and reconnect/role-change reconciliation remain open |
 | 9 — config classification | resolved at inventory level | `field-classification.md` classifies every currently parsed Studio surface |
 
 Contract-level resolution is not milestone closure. Runtime, protocol, storage,

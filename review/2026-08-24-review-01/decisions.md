@@ -239,7 +239,14 @@ and equal-tuple record disagreement all block activation. Only two compiled
 defaults with matching firmware identity or two exact committed records are
 converged. The exact byte contract is in `profile-split-v1.md`.
 
-This decision does not make the foundation a production reconciler. QMK RPC
-registration, exact remote-slot import, marker-last peer acknowledgement,
-retry/reconnect/role-change state, and production owner installation remain
+The isolated exact peer-store backend now preserves the sender's full durable
+identity, validates the declared domain mask against the canonical payload,
+and reports success only after marker readback plus exact committed-record
+comparison. Store compatibility now includes the compiled-default digest, and
+ambiguous marker durability blocks all later prepares until boot selection
+reconciles the slots.
+
+This still does not make the foundation a production reconciler. QMK RPC
+registration, protocol acknowledgement emission, retry/reconnect/role-change
+state, boot whole-profile validation, and production owner installation remain
 required before peer capability or live mutation is advertised.

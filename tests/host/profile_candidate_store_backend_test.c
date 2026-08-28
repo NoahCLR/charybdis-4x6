@@ -124,9 +124,10 @@ static void init_store(noah_profile_store_t *store) {
                                          .context = eeprom_bytes,
                                      },
                             (noah_profile_store_compatibility_t){
-                                .schema_major      = NOAH_PROFILE_STORE_SCHEMA_MAJOR,
-                                .schema_minor      = NOAH_PROFILE_STORE_SCHEMA_MINOR,
-                                .action_abi_digest = ACTION_ABI_DIGEST,
+                                .schema_major            = NOAH_PROFILE_STORE_SCHEMA_MAJOR,
+                                .schema_minor            = NOAH_PROFILE_STORE_SCHEMA_MINOR,
+                                .compiled_default_digest = noah_profile_fnv1a_update(NOAH_PROFILE_FNV1A_INITIAL, empty_profile, sizeof(empty_profile)),
+                                .action_abi_digest       = ACTION_ABI_DIGEST,
                             });
     assert(noah_profile_store_boot_select(store, &selected) == NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE);
 }

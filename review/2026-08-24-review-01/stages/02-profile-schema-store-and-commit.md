@@ -26,9 +26,12 @@ isolated effective-provider foundation is now hardened and tested after
 lifecycle review, and every current behavior/RGB consumer family now has an
 effective-profile seam. A dedicated split foundation freezes the exact 32-byte
 internal protocol and D-014 authority decisions, including fail-closed peer
-observation for activation. Production durable-commit ownership, runtime owner
-installation, reset, peer transport/import, and complete split reconciliation
-are still absent, so this stage remains blocked/incomplete.
+observation for activation. An isolated exact peer-store backend now imports a
+sender-owned record through the shared validator/store owner and confirms
+marker-last durability without activating it. Production durable-commit
+ownership, runtime owner installation, reset, QMK peer transport/reconciliation,
+and boot whole-profile validation are still absent, so this stage remains
+blocked/incomplete.
 
 ## Objective
 
@@ -162,8 +165,8 @@ Volatile preview must not outrank durable committed state after reconnect.
   action-ABI identity, domain masks, and compiled action references)
 - [ ] Recoverable persistent store (storage foundation, read-only QMK boot
   ownership/status, provider-guarded inactive-slot staging, durable commit, and
-  activation handoff landed; QMK mutation ownership, reset, and split
-  integration remain)
+  activation handoff landed; exact isolated peer import also landed; QMK
+  mutation ownership, reset, and split transport integration remain)
 - [ ] Candidate protocol (exact firmware/desktop frame/status codecs, bounded
   scan coordinator, durable commit/activation coordinator, and desktop prepare
   plus commit coordinator landed; QMK routing and capabilities remain)
@@ -415,7 +418,33 @@ Landed split-foundation evidence:
 - normal, ASan/UBSan, Cortex-M0+, fixed-golden, truncation, padding, checksum,
   enum, bounds, publication, and fail-closed observer coverage is in
   `run_profile_split_foundation_tests.sh`. The files are in the userspace
-  manifest but no QMK RPC, transfer/store owner, or capability uses them yet.
+  manifest but no QMK RPC or advertised capability uses them yet.
+
+Landed exact peer-store evidence:
+
+- `profile_peer_store_backend.c` serializes peer import through the same
+  candidate backend, validator, store, provider reuse guard, and inactive slot
+  as host deployment. It retains the sender's generation, stable physical
+  origin, persistent flags, schema, CRC/FNV identity, compiled-default digest,
+  action ABI, payload length, and domain mask unchanged;
+- fully repeated chunks are read back and compared, while gaps, partial
+  overlaps, conflicting retries, stale generations, equal-generation
+  concurrent origins, same-tuple corruption, and incompatible firmware are
+  rejected without starting or continuing unsafe writes;
+- the store derives the domain mask during boot/commit shape validation,
+  rejects records made against different compiled defaults, and latches
+  durability-unknown until a conclusive boot selection. Peer success requires
+  marker readback and exact field comparison excluding only the slot number;
+- override-disabled records remain durable with zero persistent flags and do
+  not request validated-profile activation. Boot-discovered exact records also
+  fail closed until future boot whole-profile validation retains their decoded
+  view; and
+- `run_profile_peer_store_backend_tests.sh` provides normal and ASan/UBSan
+  coverage for exact commit/reboot identity, idempotence without writes,
+  reset flags, chunk retry failures, ordering/compatibility decisions,
+  domain-mask mismatch, provider reservation release, and ambiguous-marker
+  reconciliation. The production source and runner are wired into the common
+  manifest, explicit VIA/split compile matrix, and full host suite.
 
 ## Exit Criteria
 
