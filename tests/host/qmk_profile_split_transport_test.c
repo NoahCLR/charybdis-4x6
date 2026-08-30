@@ -165,6 +165,7 @@ static void init_reconciler(noah_profile_split_reconciler_t *reconciler, noah_pr
 }
 
 static void reset_transport_stubs(void) {
+    noah_qmk_profile_split_transport_reset_for_test();
     registered_callback = NULL;
     registered_id       = -1;
     registration_count  = 0u;
@@ -186,7 +187,9 @@ static bool reconciler_mailbox_pending(const noah_profile_split_reconciler_t *re
 
 static void test_init_registers_exact_profile_transaction(void) {
     noah_profile_split_reconciler_t reconciler = {0};
+    noah_profile_split_reconciler_t other_reconciler = {0};
     noah_profile_peer_store_backend_t peer_store;
+    noah_profile_peer_store_backend_t other_peer_store;
 
     reset_transport_stubs();
     CHECK(!noah_qmk_profile_split_transport_init(NULL));
@@ -198,6 +201,11 @@ static void test_init_registers_exact_profile_transaction(void) {
     CHECK(registration_count == 1u);
     CHECK(registered_id == PUT_PROFILE_SPLIT_SYNC);
     CHECK(registered_callback != NULL);
+    CHECK(noah_qmk_profile_split_transport_init(&reconciler));
+    CHECK(registration_count == 1u);
+    init_reconciler(&other_reconciler, &other_peer_store);
+    CHECK(!noah_qmk_profile_split_transport_init(&other_reconciler));
+    CHECK(registration_count == 1u);
 }
 
 static void test_callback_forwards_and_reuses_cached_busy_response(void) {

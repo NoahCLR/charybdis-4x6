@@ -125,7 +125,8 @@ compatibility, derives the domain mask from the checksummed canonical payload,
 and latches an unconfirmed final marker as reconciliation-required. No later
 prepare can invalidate either slot until a conclusive boot selection clears
 that latch. A boot-discovered exact record is not called idempotently validated
-until a future boot owner has also rerun whole-profile validation.
+until the production owner has also advanced the landed bounded whole-profile
+adoption validator for that exact selected record.
 
 ## Scan-Owned Reconciler And QMK Adapter
 

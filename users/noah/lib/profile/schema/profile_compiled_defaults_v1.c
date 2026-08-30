@@ -755,4 +755,30 @@ noah_profile_reader_t noah_profile_compiled_v1_reader(const noah_profile_compile
     };
 }
 
+bool noah_profile_compiled_v1_compatibility(const noah_profile_compiled_v1_t *profile, noah_profile_validator_v1_compatibility_t *compatibility) {
+    noah_profile_validator_v1_compatibility_t result;
+
+    if (!profile || !compatibility || profile->metadata.domain_mask == 0u || (profile->metadata.domain_mask & (uint8_t)~NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS) != 0u) {
+        return false;
+    }
+    result                              = noah_profile_validator_v1_default_compatibility(profile->metadata.action_abi_digest);
+    result.allowed_domain_mask          = profile->metadata.domain_mask;
+    result.required_domain_mask         = 0u;
+    result.logical_layer_count          = LAYER_COUNT;
+    result.supported_pd_mode_mask       = (uint8_t)((UINT32_C(1) << PD_MODE_COUNT) - 1u);
+    result.via_macro_slot_count         = VIA_MACRO_SLOT_COUNT;
+    result.hardcoded_macro_slot_count   = HARDCODED_MACRO_SLOT_COUNT;
+    result.rgb_limits.logical_layer_count     = LAYER_COUNT;
+    result.rgb_limits.supported_pd_mode_mask  = result.supported_pd_mode_mask;
+    result.rgb_limits.tap_branch_color_count  = KEY_BEHAVIOR_MAX_TAP_COUNT - 1u;
+#if defined(RGB_MATRIX_ENABLE)
+    result.rgb_limits.maximum_brightness = RGB_MATRIX_MAXIMUM_BRIGHTNESS;
+    result.rgb_limits.compiled_stage_mask = rgb_stage_mask();
+#else
+    result.rgb_limits.compiled_stage_mask = 0u;
+#endif
+    *compatibility = result;
+    return true;
+}
+
 _Static_assert(sizeof(noah_profile_compiled_v1_t) <= 20u, "compiled-profile handle must remain metadata-only");

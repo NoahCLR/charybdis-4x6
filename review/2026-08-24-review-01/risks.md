@@ -20,6 +20,7 @@
 | R-16 | A prototype becomes production without device-level validation | high | 05 and 08 | Keep hardware criteria open until named matrices pass on the real split keyboard |
 | R-17 | Durable commit origin is derived from dynamic USB role, or left/right forced-role artifacts are mapped backwards on this `MASTER_RIGHT` board | critical | 02 and 05 | Provision left/right identity independently in flash, keep role and origin independent in tests, build left as `FORCE_SLAVE` plus `NOAH_PHYSICAL_HALF=left` and right as `FORCE_MASTER` plus `NOAH_PHYSICAL_HALF=right`, and prove both USB orientations preserve origin before enabling mutation |
 | R-18 | A split callback and matrix scan concurrently enter wear-level storage, or multiple durable subsystems perform unarbitrated work | critical | 02 | Keep callbacks mailbox-only, route profile discovery/VIA mirror/VIA reconciliation through one rotating scan scheduler, instrument callback tests against every storage effect, and include the future writable profile owner in the same scheduler |
+| R-19 | Host deployment and peer import interleave against the same writable profile store, corrupt admission state, or activate the wrong durable record | critical | 02 and 05 | Use one owner-held candidate backend with explicit host/peer admission, make contention retryable without poisoning transactions, validate the exact committed record before activation, and pass production plus hardware contention/interruption matrices |
 
 ## Risk Update Rule
 
@@ -182,3 +183,23 @@ No project risks are closed yet.
   discovery step in that same scheduler and real hardware proves editing,
   reconciliation, reconnect, and role changes without storage concurrency or
   starvation. Mutation and peer-profile capability bits remain off.
+
+### 2026-08-29 production-owner safety foundation update
+
+- R-03 gains bounded boot selection and reader-backed adoption of the exact
+  selected durable record. The backend activates validated data only for an
+  override record; an override-disabled reset generation requests compiled
+  fallback. Production boot still uses the compatibility wrapper until the
+  writable owner replaces the read-only discovery shell, so R-03 remains open.
+- R-04 and R-19 gain explicit `HOST`/`PEER` admission around the one shared
+  candidate store backend. A competing host begin remains queued as retryable
+  busy instead of poisoning the candidate, abort and successful activation
+  release admission, and split transport registration rejects a second owner.
+  Production owner assembly and real split contention evidence remain open.
+- The compiled materializer now derives the validator's exact layer, PD-mode,
+  VIA-macro, hardcoded-macro, RGB, domain, and action-ABI compatibility rather
+  than allowing the broader schema maxima. This closes a compatibility gap in
+  the isolated path but does not enable any capability.
+- R-18 remains open because the incremental store/adoption APIs are foundations;
+  the current production read-only discovery wrapper has not yet been replaced
+  by the writable owner inside the rotating scheduler.

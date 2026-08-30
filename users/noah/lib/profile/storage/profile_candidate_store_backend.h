@@ -11,6 +11,12 @@
 #include "profile_candidate_transaction.h"
 #include "profile_store.h"
 
+typedef enum {
+    NOAH_PROFILE_STORAGE_ADMISSION_NONE = 0u,
+    NOAH_PROFILE_STORAGE_ADMISSION_HOST,
+    NOAH_PROFILE_STORAGE_ADMISSION_PEER,
+} noah_profile_storage_admission_owner_t;
+
 typedef struct {
     noah_profile_store_t                      *store;
     noah_effective_profile_provider_t         *provider;
@@ -27,6 +33,8 @@ typedef struct {
     bool                                       committed_available;
     bool                                       activation_requested;
     bool                                       reuse_guard_installed;
+    bool                                       validating_committed_record;
+    noah_profile_storage_admission_owner_t     admission_owner;
 } noah_profile_candidate_store_backend_t;
 
 // backend and store must remain at stable addresses for their shared lifetime:
@@ -42,6 +50,20 @@ noah_profile_candidate_backend_t noah_profile_candidate_store_backend_interface(
 // never manufactures a local generation or origin. metadata supplies the
 // derived canonical domain mask used by whole-profile validation.
 noah_profile_store_result_t noah_profile_candidate_store_backend_begin_exact(noah_profile_candidate_store_backend_t *backend, const noah_profile_candidate_v1_metadata_t *metadata, const noah_profile_store_candidate_t *candidate);
+
+// Reboot path for a record already selected by profile_store_boot_select().
+// It performs no write and does not manufacture a new durable identity. Begin
+// and every step are scan-owned and obey the same bounded whole-profile
+// validator contract as an uploaded or peer-supplied candidate.
+noah_profile_candidate_backend_result_t noah_profile_candidate_store_backend_adopt_committed_begin(noah_profile_candidate_store_backend_t *backend, const noah_profile_store_record_t *record, noah_profile_candidate_v1_error_t *error);
+noah_profile_candidate_backend_result_t noah_profile_candidate_store_backend_adopt_committed_step(noah_profile_candidate_store_backend_t *backend, uint8_t byte_budget, noah_profile_candidate_v1_error_t *error);
+
+// Host and peer staging share one backend. Admission remains held across
+// validation, durability, convergence, and activation so neither path can
+// overwrite the other's retained validated view. Abort or a successful
+// activation releases it; durability-unknown deliberately retains it.
+noah_profile_storage_admission_owner_t noah_profile_candidate_store_backend_admission_owner(const noah_profile_candidate_store_backend_t *backend);
+bool noah_profile_candidate_store_backend_release_admission(noah_profile_candidate_store_backend_t *backend, noah_profile_storage_admission_owner_t owner);
 
 // Cold/test convenience wrapper around the interface's bounded commit steps.
 // Staging and validation never call it; production durability still requires

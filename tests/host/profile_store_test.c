@@ -618,6 +618,45 @@ static void test_boot_selection_supports_read_only_discovery(void) {
     CHECK(noah_profile_store_prepare_begin(&read_only_store, &(noah_profile_store_candidate_t){0}) == NOAH_PROFILE_STORE_INVALID_ARGUMENT);
 }
 
+static void test_boot_selection_state_machine_is_scan_bounded(void) {
+    noah_profile_store_t        store;
+    noah_profile_store_record_t selected;
+    noah_profile_store_result_t result;
+    uint32_t                    steps = 0u;
+
+    reset_eeprom(&eeprom);
+    initialize_store(&store, &eeprom, NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE);
+    CHECK(commit_payload(&store, behavior_profile, sizeof(behavior_profile), 4u, 1u, NULL) == NOAH_PROFILE_STORE_OK);
+
+    noah_profile_store_init(&store, io_for(&eeprom), compatibility());
+    eeprom.read_calls = 0u;
+    result            = noah_profile_store_boot_select_begin(&store);
+    CHECK(result == NOAH_PROFILE_STORE_IN_PROGRESS);
+    CHECK(eeprom.read_calls == 0u);
+    while (result == NOAH_PROFILE_STORE_IN_PROGRESS) {
+        uint32_t reads_before = eeprom.read_calls;
+
+        CHECK(steps++ < 64u);
+        result = noah_profile_store_boot_select_step(&store, 5u, &selected);
+        CHECK(eeprom.read_calls == reads_before || eeprom.read_calls == reads_before + 1u);
+        if (eeprom.read_calls != reads_before) {
+            CHECK(eeprom.last_read_length <= NOAH_PROFILE_STORE_IO_CHUNK_MAX);
+        }
+    }
+    CHECK(result == NOAH_PROFILE_STORE_OK);
+    CHECK(selected.slot == NOAH_PROFILE_SLOT_A && selected.generation == 4u && selected.origin_half == 1u);
+    CHECK(store.boot_scanned && !store.conflict);
+
+    {
+        uint32_t reads_before = eeprom.read_calls;
+        noah_profile_store_record_t repeated = {0};
+
+        CHECK(noah_profile_store_boot_select_step(&store, 1u, &repeated) == NOAH_PROFILE_STORE_OK);
+        CHECK(eeprom.read_calls == reads_before);
+        CHECK(repeated.slot == selected.slot && repeated.generation == selected.generation && repeated.payload_digest == selected.payload_digest);
+    }
+}
+
 int main(void) {
     test_checksums();
     test_commit_and_boot_selection();
@@ -634,6 +673,7 @@ int main(void) {
     test_io_failures_are_not_treated_as_empty();
     test_boot_rejects_old_compiled_default_identity();
     test_boot_selection_supports_read_only_discovery();
+    test_boot_selection_state_machine_is_scan_bounded();
     puts("profile store host tests passed");
     return 0;
 }

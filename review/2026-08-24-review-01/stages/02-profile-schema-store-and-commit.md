@@ -31,8 +31,10 @@ sender-owned record through the shared validator/store owner and confirms
 marker-last durability without activating it. An isolated scan reconciler and
 QMK adapter now implement bidirectional push/pull, cached callback replies,
 bounded scan work, retry/reconnect/role-change behavior, and passive-peer
-expiry. Production durable-commit ownership, runtime owner installation,
-reset, QMK registration, and boot whole-profile validation are still absent.
+expiry. Production durable-commit ownership, runtime owner installation, and
+QMK routing are still absent. Bounded boot selection, exact compiled
+compatibility, committed-record adoption, reset-to-compiled activation, and a
+shared host/peer admission lease have landed as disconnected owner foundations.
 Side-specific artifacts now provide the D-018 flash-owned physical identity,
 but the future production owner has not consumed it yet, so this stage remains
 blocked/incomplete. The existing VIA mirror and reconciliation callbacks now
@@ -171,9 +173,10 @@ Volatile preview must not outrank durable committed state after reconnect.
   action capacity, behavior/RGB semantics, whole-profile checksums,
   action-ABI identity, domain masks, and compiled action references)
 - [ ] Recoverable persistent store (storage foundation, read-only QMK boot
-  ownership/status, provider-guarded inactive-slot staging, durable commit, and
-  activation handoff landed; exact isolated peer import also landed; QMK
-  mutation ownership, reset, and split transport integration remain)
+  ownership/status, provider-guarded inactive-slot staging, incremental slot
+  selection, exact committed-record adoption, durable commit, reset activation,
+  and activation handoff landed; exact isolated peer import also landed; QMK
+  mutation ownership and split transport integration remain)
 - [ ] Candidate protocol (exact firmware/desktop frame/status codecs, bounded
   scan coordinator, durable commit/activation coordinator, and desktop prepare
   plus commit coordinator landed; QMK routing and capabilities remain)
@@ -184,7 +187,8 @@ Volatile preview must not outrank durable committed state after reconnect.
 - [ ] Split convergence (isolated bidirectional reconciler and transport adapter
   plus flash physical identity landed; production owner consumption,
   registration, transport arbitration, and hardware convergence remain)
-- [ ] Reset and migration behavior
+- [ ] Reset and migration behavior (override-disabled durable records now
+  activate compiled fallback; production routing and upgrade evidence remain)
 - [ ] Debug/status snapshots
 - [ ] Source manifest, docs, decisions, risks, and progress updates
 
@@ -445,15 +449,35 @@ Landed exact peer-store evidence:
   durability-unknown until a conclusive boot selection. Peer success requires
   marker readback and exact field comparison excluding only the slot number;
 - override-disabled records remain durable with zero persistent flags and do
-  not request validated-profile activation. Boot-discovered exact records also
-  fail closed until future boot whole-profile validation retains their decoded
-  view; and
+  not request validated-profile activation. Boot-discovered exact records fail
+  closed until the production owner advances the landed bounded adoption
+  validator and retains their decoded view; and
 - `run_profile_peer_store_backend_tests.sh` provides normal and ASan/UBSan
   coverage for exact commit/reboot identity, idempotence without writes,
   reset flags, chunk retry failures, ordering/compatibility decisions,
   domain-mask mismatch, provider reservation release, and ambiguous-marker
   reconciliation. The production source and runner are wired into the common
   manifest, explicit VIA/split compile matrix, and full host suite.
+
+Landed production-owner safety-foundation evidence:
+
+- the store boot selector has begin/step APIs whose tests enforce at most one
+  read per step, a 32-byte maximum fixed read, budget-honoring payload reads,
+  exact selection/conflict semantics, and idempotent terminal results;
+- the real compiled-default materializer derives exact validator limits for
+  domains, action ABI, layers, PD modes, macro spaces, RGB brightness/stages,
+  and tap branches instead of exposing schema-wide maxima;
+- the candidate backend can validate and adopt the exact selected committed
+  record after reboot without writes, requests a validated snapshot only when
+  the durable override flag is set, and otherwise requests compiled fallback;
+- one explicit `NONE`/`HOST`/`PEER` admission lease prevents host and peer from
+  interleaving against the shared store. Retryable host contention remains
+  queued without poisoning its transaction, and terminal abort or successful
+  activation releases the lease; and
+- QMK profile split registration is idempotent for the same reconciler and
+  rejects a second owner. All foundations remain disconnected, the current
+  read-only shell still uses the cold boot wrapper, and capability bits remain
+  disabled until the production owner consumes them in D-019's scheduler.
 
 ## Exit Criteria
 

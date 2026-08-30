@@ -15,6 +15,9 @@ enum {
     NOAH_PROFILE_STORE_IO_CHUNK_MAX   = 32u,
     NOAH_PROFILE_STORE_FLAG_OVERRIDE  = 1u << 0,
     NOAH_PROFILE_STORE_ALLOWED_FLAGS  = NOAH_PROFILE_STORE_FLAG_OVERRIDE,
+    // Regression policy for the persistent store's complete writable state
+    // on the 32-bit RP2040 target. This is not a physical SRAM limit.
+    NOAH_PROFILE_STORE_STATE_BUDGET_32BIT = 384u,
 };
 
 typedef enum {
@@ -59,6 +62,19 @@ typedef enum {
     NOAH_PROFILE_STORE_COMMIT_MARKER_WRITE,
     NOAH_PROFILE_STORE_COMMIT_MARKER_READBACK,
 } noah_profile_store_commit_phase_t;
+
+typedef enum {
+    NOAH_PROFILE_STORE_BOOT_IDLE = 0u,
+    NOAH_PROFILE_STORE_BOOT_SLOT_A_HEADER,
+    NOAH_PROFILE_STORE_BOOT_SLOT_A_PAYLOAD,
+    NOAH_PROFILE_STORE_BOOT_SLOT_A_SHAPE_HEADER,
+    NOAH_PROFILE_STORE_BOOT_SLOT_A_SHAPE_DOMAIN,
+    NOAH_PROFILE_STORE_BOOT_SLOT_B_HEADER,
+    NOAH_PROFILE_STORE_BOOT_SLOT_B_PAYLOAD,
+    NOAH_PROFILE_STORE_BOOT_SLOT_B_SHAPE_HEADER,
+    NOAH_PROFILE_STORE_BOOT_SLOT_B_SHAPE_DOMAIN,
+    NOAH_PROFILE_STORE_BOOT_DONE,
+} noah_profile_store_boot_phase_t;
 
 typedef bool (*noah_profile_store_read_fn)(void *context, uint16_t address, uint8_t *target, uint16_t length);
 typedef bool (*noah_profile_store_write_fn)(void *context, uint16_t address, const uint8_t *source, uint16_t length);
@@ -148,11 +164,30 @@ typedef struct {
     bool                               prepare_active;
     bool                               reuse_active;
     uint8_t                            scratch[NOAH_PROFILE_STORE_IO_CHUNK_MAX];
+    noah_profile_store_record_t        boot_slot_a;
+    noah_profile_store_record_t        boot_current;
+    noah_profile_store_result_t        boot_slot_a_result;
+    noah_profile_store_result_t        boot_slot_b_result;
+    noah_profile_store_result_t        boot_result;
+    noah_profile_store_boot_phase_t    boot_phase;
+    uint16_t                           boot_payload_start;
+    uint16_t                           boot_offset;
+    uint32_t                           boot_crc32_state;
+    uint32_t                           boot_digest_state;
+    uint8_t                            boot_domain_count;
+    uint8_t                            boot_domain_index;
+    uint8_t                            boot_prior_domain;
 } noah_profile_store_t;
 
 void                        noah_profile_store_init(noah_profile_store_t *store, noah_profile_store_io_t io, noah_profile_store_compatibility_t compatibility);
 bool                        noah_profile_store_set_reuse_guard(noah_profile_store_t *store, const noah_profile_store_reuse_guard_t *guard);
 noah_profile_store_result_t noah_profile_store_boot_select(noah_profile_store_t *store, noah_profile_store_record_t *selected);
+// Production boot discovery. Begin performs no I/O. Each step performs at
+// most one bounded read. Payload checksum reads honor byte_budget; fixed
+// header/shape reads are at most NOAH_PROFILE_STORE_IO_CHUNK_MAX. The terminal
+// result is idempotent.
+noah_profile_store_result_t noah_profile_store_boot_select_begin(noah_profile_store_t *store);
+noah_profile_store_result_t noah_profile_store_boot_select_step(noah_profile_store_t *store, uint8_t byte_budget, noah_profile_store_record_t *selected);
 noah_profile_store_result_t noah_profile_store_validate_slot(noah_profile_store_t *store, noah_profile_slot_t slot, bool require_commit, noah_profile_store_record_t *record);
 noah_profile_store_result_t noah_profile_store_prepare_begin(noah_profile_store_t *store, const noah_profile_store_candidate_t *candidate);
 noah_profile_store_result_t noah_profile_store_prepare_write(noah_profile_store_t *store, uint16_t offset, const uint8_t *bytes, uint16_t length);

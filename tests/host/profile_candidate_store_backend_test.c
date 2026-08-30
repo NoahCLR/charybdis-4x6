@@ -177,6 +177,7 @@ static void deploy_empty(noah_profile_candidate_store_backend_t *backend, noah_p
     assert(noah_profile_candidate_store_backend_commit(backend, NULL) == NOAH_PROFILE_CANDIDATE_BACKEND_OK);
     assert(noah_profile_candidate_store_backend_request_activation(backend) == NOAH_PROFILE_CANDIDATE_BACKEND_OK);
     assert(noah_effective_profile_provider_poll(provider) == NOAH_EFFECTIVE_PROFILE_PUBLISHED);
+    assert(noah_profile_candidate_store_backend_release_admission(backend, NOAH_PROFILE_STORAGE_ADMISSION_HOST));
 }
 
 static void test_stage_validate_and_commit(void) {
@@ -218,6 +219,7 @@ static void test_stage_validate_and_commit(void) {
     backend.committed_record.payload_crc32 ^= 1u;
     assert(noah_profile_candidate_store_backend_request_activation(&backend) == NOAH_PROFILE_CANDIDATE_BACKEND_OK);
     assert(noah_effective_profile_provider_poll(&provider) == NOAH_EFFECTIVE_PROFILE_PUBLISHED);
+    assert(noah_profile_candidate_store_backend_release_admission(&backend, NOAH_PROFILE_STORAGE_ADMISSION_HOST));
     assert(noah_effective_profile_provider_status(&provider, &provider_status) == NOAH_EFFECTIVE_PROFILE_OK);
     assert(provider_status.active.generation == 1u && provider_status.active.payload_digest == metadata.digest);
 
@@ -324,6 +326,7 @@ static void test_committed_view_keeps_its_slot_when_next_candidate_starts(void) 
     assert(noah_profile_candidate_store_backend_commit(&backend, NULL) == NOAH_PROFILE_CANDIDATE_BACKEND_OK);
     assert(noah_profile_candidate_store_backend_request_activation(&backend) == NOAH_PROFILE_CANDIDATE_BACKEND_OK);
     assert(noah_effective_profile_provider_poll(&provider) == NOAH_EFFECTIVE_PROFILE_PUBLISHED);
+    assert(noah_profile_candidate_store_backend_release_admission(&backend, NOAH_PROFILE_STORAGE_ADMISSION_HOST));
     assert(noah_key_behavior_domain_v1_row_at(&retained.key_behaviors, 0u, &row, &codec_error) == NOAH_PROFILE_CODEC_V1_OK);
     assert(row.target.kind == NOAH_PROFILE_ACTION_V1_QMK_KEYCODE && row.target.operand == 0x1234u);
 
@@ -361,7 +364,7 @@ static void test_runtime_rollback_pins_store_target_until_active_backing_moves(v
     assert(status.active.generation == 1u);
 
     memcpy(marker_before, &eeprom_bytes[NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR + NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE - NOAH_PROFILE_STORAGE_COMMIT_MARKER_SIZE], sizeof(marker_before));
-    assert(interface.begin(interface.context, &metadata) == NOAH_PROFILE_CANDIDATE_BACKEND_IO_ERROR);
+    assert(interface.begin(interface.context, &metadata) == NOAH_PROFILE_CANDIDATE_BACKEND_BUSY);
     assert(memcmp(marker_before, &eeprom_bytes[NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR + NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE - NOAH_PROFILE_STORAGE_COMMIT_MARKER_SIZE], sizeof(marker_before)) == 0);
     assert(!store.prepare_active && !store.reuse_active);
     assert(noah_effective_profile_provider_status(&provider, &status) == NOAH_EFFECTIVE_PROFILE_OK);
@@ -451,6 +454,139 @@ static void test_scan_owner_composes_bounded_commit_and_safe_activation(void) {
     assert(selected.generation == 1u && selected.payload_digest == metadata.digest);
 }
 
+static void test_reboot_adopts_committed_profile_through_bounded_validator(void) {
+    noah_profile_store_t                   store;
+    noah_profile_store_t                   rebooted;
+    noah_profile_candidate_store_backend_t backend;
+    noah_profile_candidate_store_backend_t rebooted_backend;
+    noah_effective_profile_provider_t      provider;
+    noah_effective_profile_provider_t      rebooted_provider;
+    noah_profile_candidate_backend_t       interface;
+    noah_profile_candidate_v1_metadata_t   metadata = metadata_for(empty_profile, sizeof(empty_profile));
+    noah_profile_candidate_v1_error_t      error    = noah_profile_candidate_v1_no_error();
+    noah_profile_candidate_backend_result_t result;
+    noah_profile_store_record_t            selected;
+    noah_effective_profile_status_t        status;
+    uint32_t                               compiled_digest;
+    uint16_t                               steps = 0u;
+
+    memset(eeprom_bytes, 0xff, sizeof(eeprom_bytes));
+    init_store(&store);
+    compiled_digest = init_provider(&provider);
+    init_backend(&backend, &store, &provider, compiled_digest);
+    interface = noah_profile_candidate_store_backend_interface(&backend);
+    deploy_empty(&backend, &interface, &provider, &metadata);
+
+    noah_profile_store_init(&rebooted, store.io, store.compatibility);
+    assert(noah_profile_store_boot_select(&rebooted, &selected) == NOAH_PROFILE_STORE_OK);
+    init_backend(&rebooted_backend, &rebooted, &rebooted_provider, init_provider(&rebooted_provider));
+    eeprom_write_calls = 0u;
+    result = noah_profile_candidate_store_backend_adopt_committed_begin(&rebooted_backend, &selected, &error);
+    assert(result == NOAH_PROFILE_CANDIDATE_BACKEND_IN_PROGRESS);
+    while (result == NOAH_PROFILE_CANDIDATE_BACKEND_IN_PROGRESS) {
+        uint32_t reads_before = eeprom_read_calls;
+
+        result = noah_profile_candidate_store_backend_adopt_committed_step(&rebooted_backend, NOAH_PROFILE_CANDIDATE_SCAN_BYTE_BUDGET, &error);
+        assert(eeprom_read_calls == reads_before || eeprom_read_calls == reads_before + 1u);
+        if (eeprom_read_calls != reads_before) assert(eeprom_last_read_length <= NOAH_PROFILE_CANDIDATE_SCAN_BYTE_BUDGET);
+        assert(++steps < 64u);
+    }
+    assert(result == NOAH_PROFILE_CANDIDATE_BACKEND_VALID);
+    assert(eeprom_write_calls == 0u);
+    assert(rebooted_backend.committed_available && rebooted_backend.validation_complete);
+    assert(noah_profile_candidate_store_backend_request_activation(&rebooted_backend) == NOAH_PROFILE_CANDIDATE_BACKEND_OK);
+    assert(noah_effective_profile_provider_poll(&rebooted_provider) == NOAH_EFFECTIVE_PROFILE_PUBLISHED);
+    assert(noah_effective_profile_provider_status(&rebooted_provider, &status) == NOAH_EFFECTIVE_PROFILE_OK);
+    assert(status.active.kind == NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE && status.active.generation == selected.generation);
+}
+
+static void test_override_disabled_commit_activates_compiled_fallback(void) {
+    noah_profile_store_t                   store;
+    noah_profile_candidate_store_backend_t backend;
+    noah_effective_profile_provider_t      provider;
+    noah_profile_candidate_backend_t       interface;
+    noah_profile_candidate_v1_metadata_t   metadata = metadata_for(empty_profile, sizeof(empty_profile));
+    noah_profile_candidate_v1_error_t      error    = noah_profile_candidate_v1_no_error();
+    noah_profile_store_candidate_t         reset;
+    noah_effective_profile_status_t        status;
+    uint32_t                               compiled_digest;
+
+    memset(eeprom_bytes, 0xff, sizeof(eeprom_bytes));
+    init_store(&store);
+    compiled_digest = init_provider(&provider);
+    init_backend(&backend, &store, &provider, compiled_digest);
+    interface = noah_profile_candidate_store_backend_interface(&backend);
+    deploy_empty(&backend, &interface, &provider, &metadata);
+    assert(noah_effective_profile_provider_status(&provider, &status) == NOAH_EFFECTIVE_PROFILE_OK);
+    assert(status.active.kind == NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE);
+
+    reset = (noah_profile_store_candidate_t){
+        .schema_major            = metadata.schema_major,
+        .schema_minor            = metadata.schema_minor,
+        .domain_mask             = metadata.requested_domains,
+        .flags                   = 0u,
+        .payload_length          = metadata.payload_length,
+        .generation              = 2u,
+        .origin_half             = 1u,
+        .payload_crc32           = metadata.crc32,
+        .payload_digest          = metadata.digest,
+        .compiled_default_digest = compiled_digest,
+        .action_abi_digest       = metadata.action_abi_digest,
+    };
+    assert(noah_profile_candidate_store_backend_begin_exact(&backend, &metadata, &reset) == NOAH_PROFILE_STORE_OK);
+    assert(interface.write(interface.context, 0u, empty_profile, sizeof(empty_profile)) == NOAH_PROFILE_CANDIDATE_BACKEND_OK);
+    assert(validate_to_completion(&interface, &metadata, &error) == NOAH_PROFILE_CANDIDATE_BACKEND_VALID);
+    assert(noah_profile_candidate_store_backend_commit(&backend, NULL) == NOAH_PROFILE_CANDIDATE_BACKEND_OK);
+    assert(noah_profile_candidate_store_backend_request_activation(&backend) == NOAH_PROFILE_CANDIDATE_BACKEND_OK);
+    assert(noah_effective_profile_provider_poll(&provider) == NOAH_EFFECTIVE_PROFILE_PUBLISHED);
+    assert(noah_effective_profile_provider_status(&provider, &status) == NOAH_EFFECTIVE_PROFILE_OK);
+    assert(status.active.kind == NOAH_EFFECTIVE_PROFILE_KIND_COMPILED_DEFAULTS);
+    assert(store.committed.flags == 0u && store.committed.generation == 2u);
+    assert(noah_profile_candidate_store_backend_release_admission(&backend, NOAH_PROFILE_STORAGE_ADMISSION_PEER));
+}
+
+static void test_host_and_peer_share_one_explicit_admission_lease(void) {
+    noah_profile_store_t                   store;
+    noah_profile_candidate_store_backend_t backend;
+    noah_effective_profile_provider_t      provider;
+    noah_profile_candidate_backend_t       interface;
+    noah_profile_candidate_v1_metadata_t   metadata = metadata_for(empty_profile, sizeof(empty_profile));
+    noah_profile_store_candidate_t         exact;
+    uint32_t                               compiled_digest;
+
+    memset(eeprom_bytes, 0xff, sizeof(eeprom_bytes));
+    init_store(&store);
+    compiled_digest = init_provider(&provider);
+    init_backend(&backend, &store, &provider, compiled_digest);
+    interface = noah_profile_candidate_store_backend_interface(&backend);
+    exact = (noah_profile_store_candidate_t){
+        .schema_major            = metadata.schema_major,
+        .schema_minor            = metadata.schema_minor,
+        .domain_mask             = metadata.requested_domains,
+        .flags                   = NOAH_PROFILE_STORE_FLAG_OVERRIDE,
+        .payload_length          = metadata.payload_length,
+        .generation              = 1u,
+        .origin_half             = 0u,
+        .payload_crc32           = metadata.crc32,
+        .payload_digest          = metadata.digest,
+        .compiled_default_digest = compiled_digest,
+        .action_abi_digest       = metadata.action_abi_digest,
+    };
+
+    assert(interface.begin(interface.context, &metadata) == NOAH_PROFILE_CANDIDATE_BACKEND_OK);
+    assert(noah_profile_candidate_store_backend_admission_owner(&backend) == NOAH_PROFILE_STORAGE_ADMISSION_HOST);
+    assert(noah_profile_candidate_store_backend_begin_exact(&backend, &metadata, &exact) == NOAH_PROFILE_STORE_PREPARE_IN_PROGRESS);
+    assert(interface.abort(interface.context) == NOAH_PROFILE_CANDIDATE_BACKEND_OK);
+    assert(noah_profile_candidate_store_backend_admission_owner(&backend) == NOAH_PROFILE_STORAGE_ADMISSION_NONE);
+
+    assert(noah_profile_candidate_store_backend_begin_exact(&backend, &metadata, &exact) == NOAH_PROFILE_STORE_OK);
+    assert(noah_profile_candidate_store_backend_admission_owner(&backend) == NOAH_PROFILE_STORAGE_ADMISSION_PEER);
+    assert(interface.begin(interface.context, &metadata) == NOAH_PROFILE_CANDIDATE_BACKEND_BUSY);
+    assert(noah_profile_candidate_store_backend_admission_owner(&backend) == NOAH_PROFILE_STORAGE_ADMISSION_PEER);
+    assert(interface.abort(interface.context) == NOAH_PROFILE_CANDIDATE_BACKEND_OK);
+    assert(noah_profile_candidate_store_backend_admission_owner(&backend) == NOAH_PROFILE_STORAGE_ADMISSION_NONE);
+}
+
 int main(void) {
     test_stage_validate_and_commit();
     test_activation_request_retries_after_transient_provider_reuse();
@@ -458,6 +594,9 @@ int main(void) {
     test_committed_view_keeps_its_slot_when_next_candidate_starts();
     test_runtime_rollback_pins_store_target_until_active_backing_moves();
     test_scan_owner_composes_bounded_commit_and_safe_activation();
+    test_reboot_adopts_committed_profile_through_bounded_validator();
+    test_override_disabled_commit_activates_compiled_fallback();
+    test_host_and_peer_share_one_explicit_admission_lease();
     puts("profile candidate store backend tests passed");
     return 0;
 }

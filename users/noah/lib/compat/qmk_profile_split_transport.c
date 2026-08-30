@@ -27,10 +27,19 @@ bool noah_qmk_profile_split_transport_init(noah_profile_split_reconciler_t *reco
     if (!reconciler || !noah_profile_split_reconciler_authority(reconciler)) {
         return false;
     }
+    if (noah_qmk_profile_split_reconciler) {
+        return noah_qmk_profile_split_reconciler == reconciler;
+    }
     noah_qmk_profile_split_reconciler = reconciler;
     transaction_register_rpc(PUT_PROFILE_SPLIT_SYNC, noah_qmk_profile_split_rpc);
     return true;
 }
+
+#    ifdef NOAH_PROFILE_SPLIT_TRANSPORT_TEST
+void noah_qmk_profile_split_transport_reset_for_test(void) {
+    noah_qmk_profile_split_reconciler = NULL;
+}
+#    endif
 
 bool noah_qmk_profile_split_transport_exchange(void *context, const uint8_t request[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE], uint8_t response[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE]) {
     (void)context;

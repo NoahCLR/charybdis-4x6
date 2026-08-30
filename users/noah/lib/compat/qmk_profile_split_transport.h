@@ -13,6 +13,10 @@
 // initialized. Merely compiling this adapter does not enable live mutation.
 bool noah_qmk_profile_split_transport_init(noah_profile_split_reconciler_t *reconciler);
 
+#    ifdef NOAH_PROFILE_SPLIT_TRANSPORT_TEST
+void noah_qmk_profile_split_transport_reset_for_test(void);
+#    endif
+
 // noah_profile_split_exchange_fn adapter used by the master scan owner.
 bool noah_qmk_profile_split_transport_exchange(void *context, const uint8_t request[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE], uint8_t response[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE]);
 

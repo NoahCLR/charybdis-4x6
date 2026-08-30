@@ -24,7 +24,8 @@ build_test() {
         "$@" \
         -DVIA_ENABLE \
         -DSPLIT_KEYBOARD \
-        -DQMK_KEYBOARD_H='"qmk_stub.h"' \
+    -DQMK_KEYBOARD_H='"qmk_stub.h"' \
+    -DNOAH_PROFILE_SPLIT_TRANSPORT_TEST \
         -include "$ROOT/tests/host/include/noah_compile_config.h" \
         -I"$ROOT" \
         -I"$ROOT/users/noah" \

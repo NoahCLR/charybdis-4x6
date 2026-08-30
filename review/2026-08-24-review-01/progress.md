@@ -1509,3 +1509,78 @@ Next steps:
 3. Enable capabilities only in an engineering artifact and run both USB
    orientations, role swap, commit/reboot/interruption/reconnect,
    reset-to-compiled, RGB, and behavior hardware tests before normal exposure.
+
+### 2026-08-30 — Production-owner safety foundations checkpoint
+
+- Accepted D-020 and hardened the disconnected components that the single
+  writable owner will compose. The compiled-default materializer now derives
+  the validator's exact domain, action-ABI, layer, PD-mode, macro, and RGB
+  compatibility from the real authored profile instead of schema-wide maxima.
+- Replaced whole-slot boot discovery inside the store with begin/step state.
+  Each step performs at most one read; fixed reads are at most 32 bytes and
+  payload reads honor the supplied budget. Both slot identities and canonical
+  domain shape are checked before the established selection/conflict decision.
+  The current temporary read-only runtime still uses the cold compatibility
+  wrapper; production scheduling remains the next owner checkpoint.
+- Added bounded committed-record adoption through the reader-backed whole-
+  profile validator. Reboot adoption performs no write and retains the exact
+  validated view selected by durable metadata. An override record requests the
+  validated snapshot; an override-disabled reset generation requests compiled
+  fallback while preserving its durable authority identity.
+- Added an explicit `NONE`/`HOST`/`PEER` admission lease to the one shared
+  candidate backend. Host contention remains queued as retryable busy without
+  poisoning its transaction; peer contention cannot retarget host staging;
+  abort and successful activation release admission. Profile split transport
+  registration is now idempotent for the same reconciler and rejects a second
+  owner.
+- Added a 384-byte 32-bit store-state regression policy. The added boot cursor
+  state increased linked SRAM0–3 `.bss` by 88 bytes; this is a link-time policy
+  fact, not physical RAM use or runtime high-water evidence.
+- Focused normal/sanitizer verification passed:
+  `sh tests/host/run_profile_store_tests.sh`,
+  `sh tests/host/run_profile_store_runtime_tests.sh`,
+  `sh tests/host/run_profile_candidate_store_backend_tests.sh`,
+  `sh tests/host/run_profile_candidate_transaction_tests.sh`,
+  `sh tests/host/run_profile_peer_store_backend_tests.sh`,
+  `sh tests/host/run_profile_compiled_defaults_v1_tests.sh`,
+  `sh tests/host/run_qmk_profile_split_transport_tests.sh`,
+  `sh tests/host/run_profile_split_reconciler_tests.sh`,
+  `sh tests/host/run_qmk_durable_io_tests.sh`, and
+  `sh tests/host/run_feature_gate_compile_tests.sh`.
+- Final verification passed:
+  `sh tests/host/run_all_host_tests.sh`,
+  `qmk compile -c -kb bastardkb/charybdis/4x6 -km noah`,
+  `sh tests/host/run_firmware_memory_budget_checks.sh`,
+  `sh tests/host/run_firmware_stack_budget_checks.sh`, the ordinary
+  `qmk compile -kb bastardkb/charybdis/4x6 -km noah`, a second memory check,
+  and `git diff --check`. The first stack pass correctly rejected the stale
+  boot-discovery manifest path; the manifest was updated to the linked
+  incremental state-machine path before the required command passed.
+- Fresh ordinary linked resource facts are per RP2040 half: physical SRAM is
+  270,336 B; SRAM0–3 `.bss` is 25,876/26,000 B under the regression policy;
+  `.data` is 22,996 B; `.data + .bss` is 48,872/51,000 B; the SRAM0–3
+  linker/core-memory span at boot is 213,264 B against the 204,800 B minimum;
+  and fixed linked occupancy across unique SRAM banks is 56,336 B. These are
+  linked facts and policy metrics, not total-RAM headroom or runtime high-water
+  measurements.
+- The worst named main-process path remains 1,800/1,920 B; the boot discovery
+  path is now 384 B. The worst named split-slave path remains 328/768 B. The
+  stack gate covers only the manifest paths. Authored profile inputs and the
+  Profile Studio UI did not change, so introspection regeneration and
+  screenshots were intentionally skipped. Builds wrote generated sibling QMK
+  artifacts only; no sibling source changed. Mutation, activation, and peer
+  capability bits remain disabled.
+
+Next steps:
+
+1. Replace `profile_store_runtime` with the one production owner that consumes
+   flash-provisioned physical identity, advances incremental boot selection and
+   adoption inside the existing durable scheduler entry, and owns the sole
+   store, provider, candidate transaction/backend, peer backend, reconciler,
+   activation policy, behavior runtime, and RGB runtime instances.
+2. Alternate host activation and peer convergence work explicitly, add an
+   abandoned pre-commit host timeout, publish coherent owner status, install
+   behavior/RGB invalidators, and register the split transport exactly once.
+3. Enable mutation only in an engineering artifact, then run the two-half
+   behavior/RGB commit, reboot, interruption, reconnect, role-swap,
+   reset-to-compiled, rollback, and host/peer contention hardware matrix.

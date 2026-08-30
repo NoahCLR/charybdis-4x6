@@ -948,6 +948,42 @@ static void test_begin_compatibility_rejections(void) {
     assert(status_of(&transaction).error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_CAPACITY_EXCEEDED && fake.begin_calls == 0u);
 }
 
+static void test_busy_begin_remains_queued_without_poisoning(void) {
+    static const uint8_t profile[8] = {'N', 'L', 'P', '1', 1u, 0u, 0u, 1u};
+    fake_backend_t fake;
+    noah_profile_candidate_backend_t backend;
+    noah_profile_candidate_compatibility_t compatible = compatibility();
+    noah_profile_candidate_transaction_t transaction;
+    noah_profile_candidate_v1_metadata_t metadata = metadata_for(profile, sizeof(profile));
+    noah_profile_candidate_v1_status_t status;
+    uint8_t frame[32];
+
+    fake_init(&fake);
+    fake.begin_result = NOAH_PROFILE_CANDIDATE_BACKEND_BUSY;
+    backend = backend_for(&fake);
+    noah_profile_candidate_transaction_init(&transaction, &backend, &compatible);
+    begin_frame(frame, 55u, &metadata);
+    queue(&transaction, &fake, frame);
+
+    assert(noah_profile_candidate_transaction_scan(&transaction));
+    status = status_of(&transaction);
+    assert(status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE);
+    assert(status.error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_MAILBOX_BUSY);
+    assert((status.flags & NOAH_PROFILE_CANDIDATE_V1_STATUS_MAILBOX_PENDING) != 0u);
+    assert((status.flags & NOAH_PROFILE_CANDIDATE_V1_STATUS_POISONED) == 0u);
+    assert(fake.begin_calls == 1u);
+
+    assert(noah_profile_candidate_transaction_scan(&transaction));
+    assert(fake.begin_calls == 2u);
+    fake.begin_result = NOAH_PROFILE_CANDIDATE_BACKEND_OK;
+    assert(noah_profile_candidate_transaction_scan(&transaction));
+    status = status_of(&transaction);
+    assert(status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_RECEIVING);
+    assert((status.flags & NOAH_PROFILE_CANDIDATE_V1_STATUS_MAILBOX_PENDING) == 0u);
+    assert((status.flags & NOAH_PROFILE_CANDIDATE_V1_STATUS_POISONED) == 0u);
+    assert(fake.begin_calls == 3u);
+}
+
 int main(int argc, char **argv) {
     assert(argc == 2);
     fixture_path = argv[1];
@@ -963,6 +999,7 @@ int main(int argc, char **argv) {
     test_unknown_marker_durability_is_not_reported_as_safe_failure();
     test_abort_reset_and_no_timeout();
     test_begin_compatibility_rejections();
+    test_busy_begin_remains_queued_without_poisoning();
     puts("profile candidate transaction host tests passed");
     return 0;
 }

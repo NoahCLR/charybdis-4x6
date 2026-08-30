@@ -120,6 +120,13 @@ durable-I/O scheduler starts from a rotating owner and grants at most one
 profile-discovery, mirror, or VIA-reconciliation step per matrix scan; idle
 owners are skipped without losing round-robin fairness.
 
+The profile store now exposes a one-read-per-step boot selector and the
+candidate backend exposes bounded whole-profile adoption of its exact selected
+record. The current read-only discovery shell still calls the cold compatibility
+wrapper, so it may finish the scan in one scheduler grant. Replacing that shell
+with the single writable profile owner, which must advance both state machines
+incrementally in this scheduler entry, is the next production checkpoint.
+
 Combo-origin reconciliation runs before key-runtime scan projection. It removes
 QMK-disabled candidates immediately and expires inactive candidates only after
 the first crossed-deadline scan has been followed by a `combo_task()` cycle.

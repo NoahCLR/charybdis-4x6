@@ -299,47 +299,234 @@ noah_profile_store_result_t noah_profile_store_validate_slot(noah_profile_store_
 }
 
 noah_profile_store_result_t noah_profile_store_boot_select(noah_profile_store_t *store, noah_profile_store_record_t *selected) {
-    noah_profile_store_record_t slot_a;
-    noah_profile_store_record_t slot_b;
-    noah_profile_store_result_t a_result;
-    noah_profile_store_result_t b_result;
+    noah_profile_store_result_t result;
 
-    if (!store || !selected || !store->io.read || store->prepare_active || store->reuse_active) {
+    if (!selected) {
+        return NOAH_PROFILE_STORE_INVALID_ARGUMENT;
+    }
+    result = noah_profile_store_boot_select_begin(store);
+
+    while (result == NOAH_PROFILE_STORE_IN_PROGRESS) {
+        result = noah_profile_store_boot_select_step(store, NOAH_PROFILE_STORE_IO_CHUNK_MAX, selected);
+    }
+    return result;
+}
+
+static bool boot_phase_is_slot_a(noah_profile_store_boot_phase_t phase) {
+    return phase >= NOAH_PROFILE_STORE_BOOT_SLOT_A_HEADER && phase <= NOAH_PROFILE_STORE_BOOT_SLOT_A_SHAPE_DOMAIN;
+}
+
+static bool boot_phase_is_header(noah_profile_store_boot_phase_t phase) {
+    return phase == NOAH_PROFILE_STORE_BOOT_SLOT_A_HEADER || phase == NOAH_PROFILE_STORE_BOOT_SLOT_B_HEADER;
+}
+
+static bool boot_phase_is_payload(noah_profile_store_boot_phase_t phase) {
+    return phase == NOAH_PROFILE_STORE_BOOT_SLOT_A_PAYLOAD || phase == NOAH_PROFILE_STORE_BOOT_SLOT_B_PAYLOAD;
+}
+
+static bool boot_phase_is_shape_header(noah_profile_store_boot_phase_t phase) {
+    return phase == NOAH_PROFILE_STORE_BOOT_SLOT_A_SHAPE_HEADER || phase == NOAH_PROFILE_STORE_BOOT_SLOT_B_SHAPE_HEADER;
+}
+
+static noah_profile_store_boot_phase_t boot_payload_phase(bool slot_a) {
+    return slot_a ? NOAH_PROFILE_STORE_BOOT_SLOT_A_PAYLOAD : NOAH_PROFILE_STORE_BOOT_SLOT_B_PAYLOAD;
+}
+
+static noah_profile_store_boot_phase_t boot_shape_header_phase(bool slot_a) {
+    return slot_a ? NOAH_PROFILE_STORE_BOOT_SLOT_A_SHAPE_HEADER : NOAH_PROFILE_STORE_BOOT_SLOT_B_SHAPE_HEADER;
+}
+
+static noah_profile_store_boot_phase_t boot_shape_domain_phase(bool slot_a) {
+    return slot_a ? NOAH_PROFILE_STORE_BOOT_SLOT_A_SHAPE_DOMAIN : NOAH_PROFILE_STORE_BOOT_SLOT_B_SHAPE_DOMAIN;
+}
+
+static noah_profile_store_result_t boot_finish_selection(noah_profile_store_t *store, noah_profile_store_record_t *selected) {
+    const noah_profile_store_record_t *slot_b = &store->boot_current;
+
+    memset(selected, 0, sizeof(*selected));
+    memset(&store->committed, 0, sizeof(store->committed));
+    store->boot_scanned            = false;
+    store->reconciliation_required = false;
+    store->boot_phase              = NOAH_PROFILE_STORE_BOOT_DONE;
+    if (store->boot_slot_a_result == NOAH_PROFILE_STORE_IO_ERROR || store->boot_slot_b_result == NOAH_PROFILE_STORE_IO_ERROR) {
+        store->boot_result = NOAH_PROFILE_STORE_IO_ERROR;
+    } else if (store->boot_slot_a_result != NOAH_PROFILE_STORE_OK && store->boot_slot_b_result != NOAH_PROFILE_STORE_OK) {
+        store->boot_scanned = true;
+        store->boot_result = NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE;
+    } else if (store->boot_slot_a_result == NOAH_PROFILE_STORE_OK && store->boot_slot_b_result != NOAH_PROFILE_STORE_OK) {
+        store->boot_scanned = true;
+        *selected = store->boot_slot_a;
+        store->boot_result = NOAH_PROFILE_STORE_OK;
+    } else if (store->boot_slot_b_result == NOAH_PROFILE_STORE_OK && store->boot_slot_a_result != NOAH_PROFILE_STORE_OK) {
+        store->boot_scanned = true;
+        *selected = *slot_b;
+        store->boot_result = NOAH_PROFILE_STORE_OK;
+    } else if (store->boot_slot_a.generation > slot_b->generation) {
+        store->boot_scanned = true;
+        *selected = store->boot_slot_a;
+        store->boot_result = NOAH_PROFILE_STORE_OK;
+    } else if (slot_b->generation > store->boot_slot_a.generation || record_identity_equal(&store->boot_slot_a, slot_b)) {
+        store->boot_scanned = true;
+        *selected = *slot_b;
+        store->boot_result = NOAH_PROFILE_STORE_OK;
+    } else {
+        store->boot_scanned = true;
+        store->conflict    = true;
+        store->boot_result = NOAH_PROFILE_STORE_GENERATION_CONFLICT;
+    }
+    if (store->boot_result == NOAH_PROFILE_STORE_OK) {
+        store->committed = *selected;
+    }
+    return store->boot_result;
+}
+
+static noah_profile_store_result_t boot_finish_slot(noah_profile_store_t *store, noah_profile_store_result_t result, noah_profile_store_record_t *selected) {
+    if (boot_phase_is_slot_a(store->boot_phase)) {
+        store->boot_slot_a_result = result;
+        if (result == NOAH_PROFILE_STORE_OK) {
+            store->boot_slot_a = store->boot_current;
+        }
+        memset(&store->boot_current, 0, sizeof(store->boot_current));
+        store->boot_phase = NOAH_PROFILE_STORE_BOOT_SLOT_B_HEADER;
+        return NOAH_PROFILE_STORE_IN_PROGRESS;
+    }
+    store->boot_slot_b_result = result;
+    return boot_finish_selection(store, selected);
+}
+
+noah_profile_store_result_t noah_profile_store_boot_select_begin(noah_profile_store_t *store) {
+    if (!store || !store->io.read || store->prepare_active || store->reuse_active) {
+        return NOAH_PROFILE_STORE_INVALID_ARGUMENT;
+    }
+    memset(&store->committed, 0, sizeof(store->committed));
+    memset(&store->boot_slot_a, 0, sizeof(store->boot_slot_a));
+    memset(&store->boot_current, 0, sizeof(store->boot_current));
+    store->boot_slot_a_result = NOAH_PROFILE_STORE_INVALID_HEADER;
+    store->boot_slot_b_result = NOAH_PROFILE_STORE_INVALID_HEADER;
+    store->boot_result        = NOAH_PROFILE_STORE_IN_PROGRESS;
+    store->boot_phase         = NOAH_PROFILE_STORE_BOOT_SLOT_A_HEADER;
+    store->boot_payload_start = 0u;
+    store->boot_offset        = 0u;
+    store->boot_crc32_state   = NOAH_PROFILE_CRC32_INITIAL;
+    store->boot_digest_state  = NOAH_PROFILE_FNV1A_INITIAL;
+    store->boot_domain_count  = 0u;
+    store->boot_domain_index  = 0u;
+    store->boot_prior_domain  = 0u;
+    store->boot_scanned       = false;
+    store->conflict           = false;
+    store->prepare_active     = false;
+    return NOAH_PROFILE_STORE_IN_PROGRESS;
+}
+
+noah_profile_store_result_t noah_profile_store_boot_select_step(noah_profile_store_t *store, uint8_t byte_budget, noah_profile_store_record_t *selected) {
+    bool                        slot_a;
+    noah_profile_slot_t         slot;
+    uint16_t                    start;
+    noah_profile_store_result_t result;
+
+    if (!store || !selected || !store->io.read || byte_budget == 0u || byte_budget > NOAH_PROFILE_STORE_IO_CHUNK_MAX || store->prepare_active || store->reuse_active) {
+        return NOAH_PROFILE_STORE_INVALID_ARGUMENT;
+    }
+    if (store->boot_phase == NOAH_PROFILE_STORE_BOOT_DONE) {
+        if (store->boot_result == NOAH_PROFILE_STORE_OK) {
+            *selected = store->committed;
+        } else {
+            memset(selected, 0, sizeof(*selected));
+        }
+        return store->boot_result;
+    }
+    if (store->boot_phase == NOAH_PROFILE_STORE_BOOT_IDLE) {
         return NOAH_PROFILE_STORE_INVALID_ARGUMENT;
     }
 
-    a_result = noah_profile_store_validate_slot(store, NOAH_PROFILE_SLOT_A, true, &slot_a);
-    b_result = noah_profile_store_validate_slot(store, NOAH_PROFILE_SLOT_B, true, &slot_b);
-    memset(selected, 0, sizeof(*selected));
-    memset(&store->committed, 0, sizeof(store->committed));
-    store->boot_scanned   = false;
-    store->conflict       = false;
-    store->prepare_active = false;
+    slot_a = boot_phase_is_slot_a(store->boot_phase);
+    slot   = slot_a ? NOAH_PROFILE_SLOT_A : NOAH_PROFILE_SLOT_B;
+    if (!slot_start(slot, &start)) {
+        return boot_finish_slot(store, NOAH_PROFILE_STORE_INVALID_ARGUMENT, selected);
+    }
 
-    if (a_result == NOAH_PROFILE_STORE_IO_ERROR || b_result == NOAH_PROFILE_STORE_IO_ERROR) {
-        return NOAH_PROFILE_STORE_IO_ERROR;
+    if (boot_phase_is_header(store->boot_phase)) {
+        if (!io_read(store, start, store->scratch, NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE)) {
+            return boot_finish_slot(store, NOAH_PROFILE_STORE_IO_ERROR, selected);
+        }
+        result = decode_header(store, slot, store->scratch, true, &store->boot_current);
+        if (result != NOAH_PROFILE_STORE_OK) {
+            return boot_finish_slot(store, result, selected);
+        }
+        store->boot_payload_start = (uint16_t)(start + NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE);
+        store->boot_offset        = 0u;
+        store->boot_crc32_state   = NOAH_PROFILE_CRC32_INITIAL;
+        store->boot_digest_state  = NOAH_PROFILE_FNV1A_INITIAL;
+        store->boot_phase         = boot_payload_phase(slot_a);
+        return NOAH_PROFILE_STORE_IN_PROGRESS;
     }
-    store->reconciliation_required = false;
-    store->boot_scanned            = true;
-    if (a_result != NOAH_PROFILE_STORE_OK && b_result != NOAH_PROFILE_STORE_OK) {
-        return NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE;
+
+    if (boot_phase_is_payload(store->boot_phase)) {
+        uint16_t length = (uint16_t)(store->boot_current.payload_length - store->boot_offset);
+
+        if (length > byte_budget) {
+            length = byte_budget;
+        }
+        if (!io_read(store, (uint16_t)(store->boot_payload_start + store->boot_offset), store->scratch, length)) {
+            return boot_finish_slot(store, NOAH_PROFILE_STORE_IO_ERROR, selected);
+        }
+        store->boot_crc32_state  = noah_profile_crc32_update(store->boot_crc32_state, store->scratch, length);
+        store->boot_digest_state = noah_profile_fnv1a_update(store->boot_digest_state, store->scratch, length);
+        store->boot_offset       = (uint16_t)(store->boot_offset + length);
+        if (store->boot_offset == store->boot_current.payload_length) {
+            if (noah_profile_crc32_finish(store->boot_crc32_state) != store->boot_current.payload_crc32 || store->boot_digest_state != store->boot_current.payload_digest) {
+                return boot_finish_slot(store, NOAH_PROFILE_STORE_CHECKSUM_MISMATCH, selected);
+            }
+            store->boot_phase = boot_shape_header_phase(slot_a);
+        }
+        return NOAH_PROFILE_STORE_IN_PROGRESS;
     }
-    if (a_result == NOAH_PROFILE_STORE_OK && b_result != NOAH_PROFILE_STORE_OK) {
-        *selected = slot_a;
-    } else if (b_result == NOAH_PROFILE_STORE_OK && a_result != NOAH_PROFILE_STORE_OK) {
-        *selected = slot_b;
-    } else if (slot_a.generation > slot_b.generation) {
-        *selected = slot_a;
-    } else if (slot_b.generation > slot_a.generation) {
-        *selected = slot_b;
-    } else if (record_identity_equal(&slot_a, &slot_b)) {
-        *selected = slot_b;
-    } else {
-        store->conflict = true;
-        return NOAH_PROFILE_STORE_GENERATION_CONFLICT;
+
+    if (boot_phase_is_shape_header(store->boot_phase)) {
+        if (!io_read(store, store->boot_payload_start, store->scratch, PROFILE_BLOB_HEADER_SIZE)) {
+            return boot_finish_slot(store, NOAH_PROFILE_STORE_IO_ERROR, selected);
+        }
+        if (memcmp(store->scratch, profile_magic, sizeof(profile_magic)) != 0 || store->scratch[4] != store->boot_current.schema_major || store->scratch[5] != store->boot_current.schema_minor || store->scratch[7] != PROFILE_BLOB_CANONICAL_BIT) {
+            return boot_finish_slot(store, NOAH_PROFILE_STORE_INVALID_PAYLOAD, selected);
+        }
+        store->boot_domain_count       = store->scratch[6];
+        store->boot_domain_index       = 0u;
+        store->boot_prior_domain       = 0u;
+        store->boot_offset             = PROFILE_BLOB_HEADER_SIZE;
+        store->boot_current.domain_mask = 0u;
+        if (store->boot_domain_count == 0u) {
+            return boot_finish_slot(store, store->boot_offset == store->boot_current.payload_length ? NOAH_PROFILE_STORE_OK : NOAH_PROFILE_STORE_INVALID_PAYLOAD, selected);
+        }
+        store->boot_phase = boot_shape_domain_phase(slot_a);
+        return NOAH_PROFILE_STORE_IN_PROGRESS;
     }
-    store->committed = *selected;
-    return NOAH_PROFILE_STORE_OK;
+
+    {
+        uint8_t  domain_id;
+        uint8_t  domain_version;
+        uint16_t domain_length;
+
+        if ((uint32_t)store->boot_offset + DOMAIN_ENVELOPE_SIZE > store->boot_current.payload_length) {
+            return boot_finish_slot(store, NOAH_PROFILE_STORE_INVALID_PAYLOAD, selected);
+        }
+        if (!io_read(store, (uint16_t)(store->boot_payload_start + store->boot_offset), store->scratch, DOMAIN_ENVELOPE_SIZE)) {
+            return boot_finish_slot(store, NOAH_PROFILE_STORE_IO_ERROR, selected);
+        }
+        domain_id      = store->scratch[0];
+        domain_version = store->scratch[1];
+        domain_length  = read_u16(&store->scratch[2]);
+        if (domain_id <= store->boot_prior_domain || domain_mask_for_id(domain_id) == 0u || domain_version != 1u || (uint32_t)store->boot_offset + DOMAIN_ENVELOPE_SIZE + domain_length > store->boot_current.payload_length) {
+            return boot_finish_slot(store, NOAH_PROFILE_STORE_INVALID_PAYLOAD, selected);
+        }
+        store->boot_current.domain_mask |= domain_mask_for_id(domain_id);
+        store->boot_prior_domain = domain_id;
+        store->boot_offset       = (uint16_t)(store->boot_offset + DOMAIN_ENVELOPE_SIZE + domain_length);
+        store->boot_domain_index++;
+        if (store->boot_domain_index == store->boot_domain_count) {
+            return boot_finish_slot(store, store->boot_offset == store->boot_current.payload_length ? NOAH_PROFILE_STORE_OK : NOAH_PROFILE_STORE_INVALID_PAYLOAD, selected);
+        }
+        return NOAH_PROFILE_STORE_IN_PROGRESS;
+    }
 }
 
 static noah_profile_store_result_t validate_candidate(const noah_profile_store_t *store, const noah_profile_store_candidate_t *candidate) {
@@ -674,5 +861,8 @@ bool noah_profile_store_next_generation(const noah_profile_store_t *store, uint3
 _Static_assert(NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE == 32u, "persistent profile header layout requires exactly 32 bytes");
 _Static_assert(HEADER_COMMIT_MARKER + NOAH_PROFILE_STORAGE_COMMIT_MARKER_SIZE == NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE, "commit marker must be the final header field");
 _Static_assert(NOAH_PROFILE_STORE_IO_CHUNK_MAX <= NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX, "bounded write chunk must fit a slot payload");
+#if UINTPTR_MAX == UINT32_MAX
+_Static_assert(sizeof(noah_profile_store_t) <= NOAH_PROFILE_STORE_STATE_BUDGET_32BIT, "persistent profile store exceeded its reviewed 32-bit state budget");
+#endif
 
 #endif

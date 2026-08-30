@@ -10,6 +10,7 @@
 #include "key_behavior_domain_v1.h"
 #include "profile_blob_v1.h"
 #include "profile_reader.h"
+#include "profile_validator_v1.h"
 
 enum {
     NOAH_PROFILE_COMPILED_V1_DOMAIN_MASK_RGB           = 1u << 0,
@@ -81,6 +82,11 @@ noah_profile_compiled_v1_result_t noah_profile_compiled_v1_write(const noah_prof
 // Runtime providers must read compiled defaults directly from authored tables,
 // not call this virtual reader from key-event or RGB-frame hot paths.
 noah_profile_reader_t noah_profile_compiled_v1_reader(const noah_profile_compiled_v1_t *profile);
+
+// Builds the exact validator/runtime ceilings represented by this firmware
+// artifact. Callers may tighten required_domain_mask for a particular
+// operation, but must not widen any returned capability.
+bool noah_profile_compiled_v1_compatibility(const noah_profile_compiled_v1_t *profile, noah_profile_validator_v1_compatibility_t *compatibility);
 
 // Shared native-to-semantic action translation used by compiled defaults and
 // later providers. KC_NO maps to the explicit NONE action; populated behavior

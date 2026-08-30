@@ -217,7 +217,7 @@
         },
         {
           "name": "matrix scan live-profile boot discovery",
-          "functions": ["main", "matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "noah_profile_store_validate_slot", "io_read", "noah_qmk_profile_eeprom_read", "wear_leveling_read"]
+          "functions": ["main", "matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "io_read", "noah_qmk_profile_eeprom_read", "wear_leveling_read"]
         },
         {
           "name": "matrix scan VIA metadata and snapshot RPC",

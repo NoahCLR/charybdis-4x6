@@ -304,3 +304,30 @@ profile-discovery scheduler entry; it may not introduce an independent EEPROM
 tick. VIA macro default recovery remains ordered before this scheduler, and
 must be included in a broader arbitration decision if later work makes it
 concurrent or incremental alongside live-profile mutation.
+
+### D-020 — One Writable Profile Backend Has Explicit Admission And Bounded Boot Adoption
+
+Status: accepted on 2026-08-29; production-owner installation remains open
+
+The production owner will hold one writable store/candidate backend shared by
+host deployment and peer import. That backend exposes an explicit
+`NONE`/`HOST`/`PEER` admission lease. A competing begin reports retryable busy
+without poisoning the queued host transaction or retargeting the staged slot.
+Admission remains held through validation, durable commit, and activation, and
+is released only by a terminal abort, successful activation, or an explicit
+owner-controlled cold-path release.
+
+Boot selection and whole-profile adoption are separate bounded state machines.
+The store scans at most one fixed read per step and checks both payload identity
+and canonical domain shape. A selected committed record is not eligible for
+activation until the reader-backed whole-profile validator has re-established
+the exact compatibility derived from the actual compiled profile. The existing
+one-shot boot wrapper is cold/test compatibility only; the future production
+owner must consume the incremental entry inside D-019's durable scheduler.
+
+A durable override record activates its validated snapshot. A durable record
+with the override flag clear activates compiled defaults while retaining the
+newer durable generation for authority and reset semantics. Split transport
+registration is one-shot: reinstalling the same reconciler is idempotent and a
+different owner is rejected. Mutation, activation, and peer capabilities stay
+disabled until one production owner composes these rules.
