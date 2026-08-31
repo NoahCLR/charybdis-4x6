@@ -1,8 +1,7 @@
 # Profile Split Protocol V1
 
-Status: accepted internal split foundation, durable peer receiver, scan-owned
-reconciler, and QMK transport adapter; production owner registration remains
-unimplemented
+Status: accepted internal split foundation with gated owner registration;
+normal mutation exposure and hardware acceptance remain open
 
 This is a dedicated sibling protocol for the durable live profile. It does not
 extend the VIA region reconciler. Every frame is exactly 32 bytes, multi-byte
@@ -124,9 +123,10 @@ The store now treats compiled-default digest as boot and candidate
 compatibility, derives the domain mask from the checksummed canonical payload,
 and latches an unconfirmed final marker as reconciliation-required. No later
 prepare can invalidate either slot until a conclusive boot selection clears
-that latch. A boot-discovered exact record is not called idempotently validated
-until the production owner has also advanced the landed bounded whole-profile
-adoption validator for that exact selected record.
+that latch. The gated owner does not publish a boot-discovered exact record
+until it has also advanced the bounded whole-profile adoption validator for
+that exact selected record; the ordinary shell remains read-only and never
+activates the record.
 
 ## Scan-Owned Reconciler And QMK Adapter
 
@@ -150,16 +150,18 @@ role. On this `MASTER_RIGHT` board, upstream QMK falls back to
 so that fallback is not a durable physical identity. D-018 now builds left
 with `FORCE_SLAVE` plus `NOAH_PHYSICAL_HALF=left` and right with `FORCE_MASTER`
 plus `NOAH_PHYSICAL_HALF=right`. The physical setting overrides handedness in
-flash independently of transport role. Production live mutation remains off
-until the owner consumes that fail-closed identity boundary.
+flash independently of transport role. Production live mutation remains off.
+The side-specific D-021 engineering owner now consumes that fail-closed
+identity boundary and registers the split transport exactly once.
 
-## Deliberately Missing Production Pieces
+## Remaining Exposure And Acceptance Pieces
 
-- the single writable store/provider owner that initializes and registers the
-  landed QMK adapter;
-- production-owner consumption of the provisioned physical-half origin;
-- boot discovery publication and reset convergence;
-- production activation-policy installation, diagnostics, and capabilities.
+- postcommit concurrent-authority resolution or prevention;
+- allocator/stack high-water evidence on both physical halves;
+- the USB-orientation, reconnect, role-swap, interruption, and contention
+  hardware matrix;
+- normal mutation routing and truthful write/commit/activation/peer capability
+  advertising.
 
-Until those pieces and their hardware matrix pass, mutation, activation, and
-peer-reconciliation capability bits remain disabled.
+Until those pieces pass, mutation, activation, and peer-reconciliation
+capability bits remain disabled.

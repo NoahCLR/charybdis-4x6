@@ -462,10 +462,12 @@ Focused verification passed:
   split-slave worst reviewed paths)
 - `git diff --check`
 
-Production QMK routing, candidate/domain capability advertising, installed
-invalidators, and split convergence remain deliberately absent. The production
-safe predicate has since landed but is not installed into a provider owner.
-The isolated candidate scan owner now composes bounded marker-last commit and
+At this checkpoint, production QMK routing, candidate/domain capability
+advertising, installed invalidators, and split convergence remained
+deliberately absent. The safe predicate landed afterward but was still
+uninstalled at this point in the history; the later D-021 checkpoint supersedes
+that implementation state. The isolated candidate scan owner then composed
+bounded marker-last commit and
 provider activation behind custom-save `0x13`; it is not yet reachable from
 QMK. The
 compiled-default materializer and the isolated effective-profile provider
@@ -1680,3 +1682,93 @@ Next steps:
 3. Make an explicit resource-policy decision from the linked accounting and
    hardware evidence before enabling engineering mutation, and enable normal
    live-edit capability only after the two-half safety matrix passes.
+
+### 2026-08-31 — Coherent owner status and pre-commit supersession checkpoint
+
+- Added one protocol-neutral owner snapshot that coherently reports the
+  effective provider, semantically validated committed record, candidate
+  transaction, split authority, compiled/action identities, safe-boundary
+  state, and convergence state. `profile_store_runtime` exposes copy-out status
+  and candidate adapters while retaining sole ownership of the static owner;
+  no mutable owner pointer crosses the boundary.
+- The engineering-owner VIA read surface now publishes the real behavior/RGB
+  schema support, supported domains, action ABI, compiled digest, active and
+  pending provider identity, validated committed identity, candidate state,
+  peer identity, convergence, and conflict state. General status page 0 latches
+  the snapshot and page 1 serves the same snapshot, preventing torn two-page
+  reads.
+- Preserved the frozen capability contract: candidate-write, commit,
+  activation, peer-operation, and preview bits remain clear,
+  `candidate_chunk_max` remains zero, candidate status `0x18` remains
+  unhandled, and all mutation commands remain unrouted in ordinary and current
+  engineering-owner builds. The future receive adapter is therefore not a
+  hidden write path.
+- Added pre-commit peer supersession. While HOST owns staging, a coherent,
+  compatible peer whose generation is greater than or equal to the host's
+  reserved candidate generation cancels staging before commit begins,
+  including a queued commit. Cancellation aborts only the inactive staged
+  slot, releases admission, preserves the transaction/digest/last-operation
+  correlation, increments the operation sequence, and reports stable error 20
+  (`PEER_SUPERSEDED`). Durable, committing, activating, and durability-unknown
+  phases cannot be cancelled this way.
+- Tests cover peer generation below, equal to, and above the reserved host
+  generation; cancellation of a queued commit before marker-last durability;
+  preservation of the previous durable record and status correlation; refusal
+  to cancel durable phases or discard their queued mailbox; and acceptance of
+  a later begin after supersession.
+- The remaining authority blocker is now explicit: a newer peer observed after
+  host commit begins can still leave HOST activation unable to import that peer
+  while convergence-only split mode is active. Mutation stays unavailable
+  until a post-commit convergence barrier or deterministic distributed commit
+  resolution covers that race and its interruption/reboot cases.
+- Focused verification passed:
+  `sh tests/host/run_profile_candidate_transaction_tests.sh`,
+  `sh tests/host/run_profile_owner_tests.sh`,
+  `sh tests/host/run_profile_store_runtime_tests.sh`,
+  `sh tests/host/run_profile_wire_v1_tests.sh`,
+  `sh tests/host/run_profile_split_reconciler_tests.sh`,
+  `sh tests/host/run_qmk_contract_checks.sh`,
+  `sh tests/host/run_feature_gate_compile_tests.sh`, and
+  `python3 tests/host/firmware_stack_budget_tool_test.py`.
+- Final ordinary verification passed:
+  `sh tests/host/run_all_host_tests.sh` (including the Profile Studio
+  `npm run check` and all 88 live-link tests),
+  `sh tests/host/run_firmware_stack_budget_checks.sh`,
+  `qmk compile -kb bastardkb/charybdis/4x6 -km noah`,
+  `sh tests/host/run_firmware_memory_budget_checks.sh`, and
+  `git diff --check`. Ordinary linked resource facts remain unchanged per
+  RP2040 half: `.bss` 25,876/26,000 B, `.data` 22,996 B, combined policy span
+  48,872/51,000 B, linker/core-memory span 213,264/204,800 B, and fixed linked
+  occupancy 56,336 B. The largest named ordinary main and split paths remain
+  1,800/1,920 B and 328/768 B respectively.
+- The side-specific engineering owner again passed
+  `sh tests/host/run_live_profile_owner_stack_budget_checks.sh`. Its coherent
+  VIA status path is 616/1,920 B, split metadata exchange is the largest named
+  main path at 1,280/1,920 B, and the largest profile split callback remains
+  264/768 B. These are reviewed linked paths only, not global or interrupt
+  stack high-water measurements.
+- The engineering memory-policy audit intentionally remains red:
+  `NOAH_MEMORY_BUDGET_TARGET=bastardkb_charybdis_4x6_noah_live_owner_stack_left sh tests/host/run_firmware_memory_budget_checks.sh`
+  reports `.bss` 28,740/26,000 B and `.data + .bss` 51,740/51,000 B. Its
+  linker/core-memory span passes at 210,400/204,800 B and fixed linked occupancy
+  is 59,200 B. These are conservative policy failures, not physical exhaustion;
+  every half has 270,336 B of RP2040 SRAM and runtime high-water remains to be
+  measured on hardware.
+- Authored profile inputs and the rendered Profile Studio UI did not change, so
+  introspection regeneration and screenshots were intentionally skipped. The
+  JavaScript protocol constant changed and was covered by `npm run check`.
+  Builds wrote artifacts in the sibling QMK tree only; no sibling source file
+  changed.
+
+Next steps:
+
+1. Specify and implement the post-commit split-authority rule: decide which
+   durable identity wins, how both halves converge after interruption or role
+   swap, and when host activation can safely leave its lease.
+2. Add a separate explicit engineering-mutation build gate that enables
+   routing and advertising atomically only after that rule is enforced; then
+   run the real two-half behavior/RGB commit, reboot, reconnect, role-swap,
+   interruption, reset, and contention matrix.
+3. Measure allocator and stack high-water on both halves and make an explicit
+   resource-policy decision before promoting the owner or mutation capability
+   into normal firmware.

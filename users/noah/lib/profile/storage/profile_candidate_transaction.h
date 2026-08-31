@@ -95,4 +95,10 @@ bool noah_profile_candidate_transaction_scan(noah_profile_candidate_transaction_
 // or durability-unknown terminal state can never be expired through this API.
 noah_profile_candidate_expire_result_t noah_profile_candidate_transaction_expire_precommit(noah_profile_candidate_transaction_t *transaction);
 
+// Split-authority cleanup for a host candidate that lost to an already newer
+// peer before marker-last commit began. Unlike inactivity expiry, this scan-
+// owned operation may discard one acknowledged but unprocessed mailbox item so
+// a queued commit cannot cross the newly observed durable-authority boundary.
+noah_profile_candidate_expire_result_t noah_profile_candidate_transaction_supersede_precommit(noah_profile_candidate_transaction_t *transaction);
+
 void noah_profile_candidate_transaction_status(const noah_profile_candidate_transaction_t *transaction, noah_profile_candidate_v1_status_t *status);

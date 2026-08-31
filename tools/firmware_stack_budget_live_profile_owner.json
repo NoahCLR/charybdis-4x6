@@ -96,6 +96,10 @@
         {
           "name": "engineering owner split metadata exchange",
           "functions": ["main", "matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_split_reconciler_scan_mode", "metadata_exchange", "rpc_exchange", "noah_qmk_profile_split_transport_exchange", "transaction_rpc_exec", "transport_execute_transaction"]
+        },
+        {
+          "name": "engineering owner coherent VIA status read",
+          "functions": ["main", "noah_profile_store_runtime_owner_status", "noah_profile_split_authority_status"]
         }
       ]
     },

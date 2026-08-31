@@ -51,6 +51,14 @@ incompatible result is diagnostic only; no live write is available in this
 stage. Source Apply actions keep their existing meaning and never write to the
 connected keyboard.
 
+Ordinary firmware reports its compiled/read-only store view. The side-specific
+engineering-owner artifact can additionally report real compiled/action
+identities plus active, pending, committed, candidate, peer, convergence, and
+conflict state as one coherent two-page observation. It still advertises zero
+candidate chunk capacity and no write, commit, activation, or peer-operation
+capability, so Profile Studio cannot send a hidden mutation through this read
+surface.
+
 ## Profiles And New Keymaps
 
 The header profile picker chooses the active keymap folder. Write actions carry

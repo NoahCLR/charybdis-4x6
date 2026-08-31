@@ -82,6 +82,7 @@ const CANDIDATE_ERROR = Object.freeze({
     ACTIVATION_FAILED: 17,
     DURABILITY_UNKNOWN: 18,
     TIMEOUT: 19,
+    PEER_SUPERSEDED: 20,
 });
 
 const CANDIDATE_ERROR_NAMES = Object.freeze(Object.fromEntries(

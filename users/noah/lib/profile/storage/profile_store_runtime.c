@@ -171,3 +171,37 @@ const noah_profile_store_record_t *noah_profile_store_runtime_committed(void) {
     return NULL;
 #endif
 }
+
+bool noah_profile_store_runtime_owner_status(noah_profile_owner_status_t *status) {
+#if defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)
+    return runtime_owner_initialized && !runtime_integration_error && noah_profile_owner_status(&runtime_owner, status);
+#else
+    (void)status;
+    return false;
+#endif
+}
+
+bool noah_profile_store_runtime_candidate_status(noah_profile_candidate_v1_status_t *status) {
+#if defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)
+    noah_profile_owner_status_t owner_status;
+
+    if (!status || !noah_profile_store_runtime_owner_status(&owner_status)) {
+        return false;
+    }
+    *status = owner_status.candidate;
+    return true;
+#else
+    (void)status;
+    return false;
+#endif
+}
+
+bool noah_profile_store_runtime_candidate_receive(uint8_t *frame, size_t length) {
+#if defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)
+    return runtime_owner_initialized && !runtime_integration_error && noah_profile_owner_receive(&runtime_owner, frame, length);
+#else
+    (void)frame;
+    (void)length;
+    return false;
+#endif
+}

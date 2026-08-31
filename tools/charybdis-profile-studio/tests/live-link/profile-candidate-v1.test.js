@@ -39,6 +39,7 @@ function goldenFixtures() {
 
 test("JavaScript emits the exact candidate frames consumed by the firmware fixture", () => {
     assert.equal(CANDIDATE_ERROR.TIMEOUT, 19);
+    assert.equal(CANDIDATE_ERROR.PEER_SUPERSEDED, 20);
     const fixtures = goldenFixtures();
     const metadata = {
         schemaMajor: 1,

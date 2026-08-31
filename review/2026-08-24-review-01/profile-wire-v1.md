@@ -381,10 +381,22 @@ generation and digest before retrying.
 
 Abort is idempotent before durable commit; retrying a successful or no-op abort
 never repeats storage work.
-There is no autonomous candidate timeout in v1. A host transport timeout does
-not implicitly abort a transaction. Reset or power loss discards the volatile
-mailbox/transaction owner, and the storage marker-last rule keeps an incomplete
-candidate ineligible for boot.
+The device owner expires a host-owned candidate after 15 seconds without
+processed precommit work. It never expires a queued mailbox item, marker-last
+commit, activation, or durability-unknown state. This device-side inactivity
+policy reports error `19`; a desktop transport timeout still does not itself
+command an abort. Reset or power loss discards the volatile mailbox/transaction
+owner, and the storage marker-last rule keeps an incomplete candidate
+ineligible for boot.
+
+When coherent split authority reveals a compatible peer generation greater
+than or equal to the generation reserved by a host candidate, the owner cancels
+that host candidate before commit can begin. One acknowledged queued command
+may be discarded by this scan-owned cancellation so a queued commit cannot
+cross the authority boundary. Transaction id, digest, last operation, and
+operation sequence remain available for correlation, and error `20` identifies
+the peer supersession. Committing, activating, and durability-unknown states
+cannot be canceled by this rule.
 
 The candidate mutation receive callback performs only exact custom-set or
 custom-save frame validation and one bounded mailbox copy. It never reads or
@@ -453,6 +465,7 @@ abort, and `5` commit. Error ids are stable:
 | 17 | durable commit succeeded but activation failed |
 | 18 | final marker durability is unknown; reconcile status |
 | 19 | inactive precommit candidate expired on device |
+| 20 | compatible peer authority superseded the precommit candidate |
 
 Errors which have no domain/table/row/tap/field location use the sentinels
 above. The operation sequence lets a host distinguish a newly processed

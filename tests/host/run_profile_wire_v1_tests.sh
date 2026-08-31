@@ -60,3 +60,4 @@ build_hook_and_run via
 build_hook_and_run via_rgb -DRGB_MATRIX_ENABLE -DRGB_MATRIX_WS2812
 build_hook_and_run via_split -DSPLIT_KEYBOARD
 build_hook_and_run via_split_rgb -DSPLIT_KEYBOARD -DRGB_MATRIX_ENABLE -DRGB_MATRIX_WS2812
+build_hook_and_run via_owner_split_rgb -DNOAH_LIVE_PROFILE_OWNER_ENABLE -DSPLIT_KEYBOARD -DRGB_MATRIX_ENABLE -DRGB_MATRIX_WS2812

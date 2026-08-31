@@ -101,9 +101,11 @@ The landed predicate freezes the following firmware reason bits:
 
 The predicate snapshot uses bounded generation publication so an extension-host
 status read cannot observe counts from two evaluations. A missing peer observer
-is intentionally unsafe. The predicate exists in production firmware code but
-is not yet installed into a production provider owner; mutation routing remains
-disabled until that owner, invalidators, and split convergence are connected.
+is intentionally unsafe. The predicate is installed by the gated D-021 owner
+together with the behavior and RGB invalidators and exact split peer observer.
+Ordinary firmware still allocates only the read-only shell, and mutation
+routing remains disabled until postcommit authority, resource policy, and the
+hardware matrix close.
 
 ## Connection Status Shown By Studio
 

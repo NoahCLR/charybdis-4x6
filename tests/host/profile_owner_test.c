@@ -229,6 +229,32 @@ static void commit_blob(noah_profile_owner_t *owner, uint16_t transaction_id, ui
     assert(owner->state == NOAH_PROFILE_OWNER_READY_VALIDATED);
 }
 
+static noah_profile_split_descriptor_t peer_descriptor(const noah_profile_owner_t *owner, uint32_t generation) {
+    return (noah_profile_split_descriptor_t){
+        .generation              = generation,
+        .payload_crc32           = crc_of(compiled_blob, sizeof(compiled_blob)),
+        .payload_digest          = digest_of(compiled_blob, sizeof(compiled_blob)),
+        .compiled_default_digest = owner->compiled.metadata.digest,
+        .action_abi_digest       = owner->compiled.metadata.action_abi_digest,
+        .payload_length          = sizeof(compiled_blob),
+        .schema_major            = NOAH_PROFILE_STORE_SCHEMA_MAJOR,
+        .schema_minor            = NOAH_PROFILE_STORE_SCHEMA_MINOR,
+        .domain_mask             = owner->compiled.metadata.domain_mask,
+        .profile_flags           = NOAH_PROFILE_STORE_FLAG_OVERRIDE,
+        .origin_half             = 1u,
+        .readable                = true,
+        .has_profile             = true,
+    };
+}
+
+static void publish_peer(noah_profile_owner_t *owner, uint32_t generation) {
+    if (!owner->split_initialized) {
+        noah_profile_split_authority_init(&owner->reconciler.authority);
+        owner->split_initialized = true;
+    }
+    assert(noah_profile_split_authority_publish(&owner->reconciler.authority, owner->committed_descriptor, peer_descriptor(owner, generation), false));
+}
+
 static void test_empty_boot_live_commit_and_timeout(void) {
     noah_profile_owner_t owner;
     noah_profile_owner_t rebooted;
@@ -326,6 +352,71 @@ static void test_boot_reconciles_different_generations_before_activation(void) {
     assert(left_memory.writes > left_writes_before_reconciliation);
 }
 
+static void test_peer_authority_supersedes_only_precommit_host_generation(void) {
+    noah_profile_owner_t        owner;
+    noah_profile_owner_status_t status;
+    memory_t                    memory;
+    uint8_t                     frame[32];
+    uint32_t                    now = 5000u;
+    uint32_t                    writes_before_commit;
+    uint16_t                    operation_sequence;
+
+    memset(&memory, 0, sizeof(memory));
+    memset(memory.bytes, 0xff, sizeof(memory.bytes));
+    boot_empty(&owner, &memory);
+    assert(noah_profile_owner_status(&owner, &status));
+    assert(status.provider_known && status.active.kind == NOAH_EFFECTIVE_PROFILE_KIND_COMPILED_DEFAULTS);
+    assert(status.compiled_default_digest == digest_of(compiled_blob, sizeof(compiled_blob)));
+    assert(status.action_abi_digest == UINT32_C(0x12345678));
+    assert(!status.has_committed && !status.candidate_pending);
+
+    commit_blob(&owner, 70u, &now);
+    assert(owner.committed_descriptor.generation == 1u);
+
+    begin_frame(frame, 71u); send_and_scan(&owner, frame, now++);
+    assert(owner.store.candidate.generation == 2u);
+    publish_peer(&owner, 1u);
+    (void)noah_profile_owner_scan(&owner, true, now++);
+    assert(owner.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_RECEIVING);
+
+    chunk_frame(frame, 71u); send_and_scan(&owner, frame, now++);
+    simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_VALIDATE, 71u); send_and_scan(&owner, frame, now++);
+    while (owner.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATING) assert(noah_profile_owner_scan(&owner, true, now++));
+    assert(owner.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATED);
+    writes_before_commit = memory.writes;
+    simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT, 71u);
+    assert(noah_profile_owner_receive(&owner, frame, sizeof(frame)));
+    publish_peer(&owner, 2u);
+    assert(noah_profile_owner_scan(&owner, true, now++));
+    // Supersession invalidates only the inactive prepared slot's marker; it
+    // never starts marker-last commit or changes the prior durable record.
+    assert(memory.writes == writes_before_commit + 1u);
+    assert(owner.store.committed.generation == 1u);
+    assert(noah_profile_candidate_store_backend_admission_owner(&owner.staging.candidate_backend) == NOAH_PROFILE_STORAGE_ADMISSION_NONE);
+    assert(owner.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE);
+    assert(owner.host_transaction.status.error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_PEER_SUPERSEDED);
+    assert(owner.host_transaction.status.transaction_id == 71u);
+    assert(owner.host_transaction.status.digest == digest_of(compiled_blob, sizeof(compiled_blob)));
+    assert(owner.host_transaction.status.last_operation == NOAH_PROFILE_CANDIDATE_V1_OPERATION_COMMIT);
+
+    assert(noah_profile_owner_status(&owner, &status));
+    assert(status.has_committed && status.committed.generation == 1u);
+    assert(status.peer_known && status.peer.generation == 2u);
+    assert(status.candidate.error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_PEER_SUPERSEDED);
+    assert(!status.candidate_pending);
+
+    begin_frame(frame, 72u);
+    assert(noah_profile_owner_receive(&owner, frame, sizeof(frame)));
+    assert(noah_profile_owner_scan(&owner, true, now++));
+    assert(owner.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_RECEIVING);
+    operation_sequence = owner.host_transaction.status.operation_sequence;
+    publish_peer(&owner, 3u);
+    assert(noah_profile_owner_scan(&owner, true, now++));
+    assert(owner.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE);
+    assert(owner.host_transaction.status.error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_PEER_SUPERSEDED);
+    assert(owner.host_transaction.status.operation_sequence == (uint16_t)(operation_sequence + 1u));
+}
+
 static void test_partial_runtime_install_rolls_back(void) {
     noah_profile_owner_t owner;
     memory_t             memory;
@@ -351,6 +442,7 @@ int main(void) {
     test_partial_runtime_install_rolls_back();
     test_empty_boot_live_commit_and_timeout();
     test_boot_reconciles_different_generations_before_activation();
+    test_peer_authority_supersedes_only_precommit_host_generation();
     puts("profile owner host tests passed");
     return 0;
 }

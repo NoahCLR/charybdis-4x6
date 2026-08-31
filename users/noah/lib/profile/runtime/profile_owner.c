@@ -36,6 +36,33 @@ static bool elapsed_at_least(uint32_t now, uint32_t since, uint32_t interval) {
     return (uint32_t)(now - since) >= interval;
 }
 
+static bool host_state_is_precommit(noah_profile_candidate_v1_state_t state) {
+    return state == NOAH_PROFILE_CANDIDATE_V1_STATE_RECEIVING || state == NOAH_PROFILE_CANDIDATE_V1_STATE_COMPLETE || state == NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATING || state == NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATED || state == NOAH_PROFILE_CANDIDATE_V1_STATE_REJECTED;
+}
+
+static bool peer_can_supersede_host(const noah_profile_owner_t *owner, const noah_profile_split_descriptor_t *peer) {
+    return owner && peer && peer->readable && peer->has_profile && noah_profile_split_descriptor_valid(peer) && peer->schema_major == NOAH_PROFILE_STORE_SCHEMA_MAJOR && peer->schema_minor == NOAH_PROFILE_STORE_SCHEMA_MINOR && (peer->domain_mask & (uint8_t)~owner->compatibility.allowed_domain_mask) == 0u && peer->compiled_default_digest == owner->compiled.metadata.digest && peer->action_abi_digest == owner->compiled.metadata.action_abi_digest && owner->store.prepare_active && peer->generation >= owner->store.candidate.generation;
+}
+
+static bool supersede_host_precommit(noah_profile_owner_t *owner) {
+    noah_profile_split_authority_status_t authority;
+    noah_profile_candidate_expire_result_t result;
+
+    if (!owner || !owner->split_initialized || noah_profile_candidate_store_backend_admission_owner(candidate_backend(owner)) != NOAH_PROFILE_STORAGE_ADMISSION_HOST || !host_state_is_precommit(owner->host_transaction.status.state) || !noah_profile_split_authority_status(&owner->reconciler.authority, &authority) || !peer_can_supersede_host(owner, &authority.peer)) {
+        return false;
+    }
+    result = noah_profile_candidate_transaction_supersede_precommit(&owner->host_transaction);
+    if (result == NOAH_PROFILE_CANDIDATE_EXPIRE_DONE) {
+        owner->host_activity_known = false;
+        return true;
+    }
+    if (result == NOAH_PROFILE_CANDIDATE_EXPIRE_BACKEND_ERROR) {
+        owner->state = NOAH_PROFILE_OWNER_STORAGE_ERROR;
+        return true;
+    }
+    return false;
+}
+
 static bool record_payload_start(noah_profile_slot_t slot, uint16_t *address) {
     if (!address) {
         return false;
@@ -380,6 +407,10 @@ static void refresh_ready_state(noah_profile_owner_t *owner) {
 static bool scan_running(noah_profile_owner_t *owner, bool master, uint32_t now_ms, bool activating_boot) {
     noah_profile_storage_admission_owner_t admission = noah_profile_candidate_store_backend_admission_owner(candidate_backend(owner));
 
+    if (!activating_boot && supersede_host_precommit(owner)) {
+        return true;
+    }
+
     if (!activating_boot && admission == NOAH_PROFILE_STORAGE_ADMISSION_HOST && owner->host_activity_known && !owner->host_transaction.mailbox.pending && elapsed_at_least(now_ms, owner->host_last_activity_at, NOAH_PROFILE_OWNER_HOST_TIMEOUT_MS)) {
         noah_profile_candidate_expire_result_t expired = noah_profile_candidate_transaction_expire_precommit(&owner->host_transaction);
 
@@ -428,6 +459,9 @@ static bool scan_running(noah_profile_owner_t *owner, bool master, uint32_t now_
             worked = owner->split_initialized && noah_profile_split_reconciler_scan_mode(&owner->reconciler, master, now_ms, mode);
             if (worked && noah_profile_peer_store_backend_state(&owner->peer_store) == NOAH_PROFILE_PEER_STORE_COMMITTED) {
                 (void)publish_validated_descriptor(owner);
+            }
+            if (!activating_boot && supersede_host_precommit(owner)) {
+                return true;
             }
         } else if (!activating_boot && admission != NOAH_PROFILE_STORAGE_ADMISSION_HOST) {
             worked = scan_peer_activation(owner);
@@ -494,6 +528,50 @@ noah_profile_candidate_transaction_t *noah_profile_owner_host_transaction(noah_p
 
 noah_profile_split_reconciler_t *noah_profile_owner_split_reconciler(noah_profile_owner_t *owner) {
     return owner && owner->split_initialized ? &owner->reconciler : NULL;
+}
+
+bool noah_profile_owner_status(const noah_profile_owner_t *owner, noah_profile_owner_status_t *status) {
+    noah_effective_profile_status_t      provider;
+    noah_profile_split_authority_status_t authority;
+    const noah_profile_store_record_t    *committed;
+
+    if (!owner || !status || owner->state == NOAH_PROFILE_OWNER_UNINITIALIZED) {
+        return false;
+    }
+    memset(status, 0, sizeof(*status));
+    status->candidate.error          = noah_profile_candidate_v1_no_error();
+    status->owner_state              = owner->state;
+    status->compiled_default_digest  = owner->compiled.metadata.digest;
+    status->action_abi_digest        = owner->compiled.metadata.action_abi_digest;
+    status->supported_domain_mask    = owner->compatibility.allowed_domain_mask;
+
+    if (owner->runtimes_installed && noah_effective_profile_provider_status(&owner->provider, &provider) == NOAH_EFFECTIVE_PROFILE_OK) {
+        status->provider_known            = true;
+        status->active                    = provider.active;
+        status->has_pending               = provider.has_pending;
+        status->safe_boundary_reason_mask = provider.safe_boundary_reason_mask;
+        if (provider.has_pending) {
+            status->pending = provider.pending;
+        }
+    }
+    if (owner->runtimes_installed) {
+        noah_profile_candidate_transaction_status(&owner->host_transaction, &status->candidate);
+        status->candidate_pending              = owner->host_transaction.has_candidate || owner->host_transaction.mailbox.pending;
+        status->last_committed_transaction_id = owner->host_transaction.last_committed_transaction_id;
+    }
+    committed = noah_profile_owner_committed(owner);
+    if (committed) {
+        status->committed     = owner->committed_descriptor;
+        status->has_committed = true;
+    }
+    if (owner->split_initialized && noah_profile_split_authority_status(&owner->reconciler.authority, &authority)) {
+        status->authority_state  = authority.state;
+        status->peer             = authority.peer;
+        status->peer_known       = authority.peer.readable;
+        status->transfer_pending = authority.transfer_pending;
+        status->peer_converged   = !authority.transfer_pending && (authority.state == NOAH_PROFILE_SPLIT_AUTHORITY_COMPILED_CONVERGED || authority.state == NOAH_PROFILE_SPLIT_AUTHORITY_COMMITTED_CONVERGED);
+    }
+    return true;
 }
 
 #if UINTPTR_MAX == UINT32_MAX

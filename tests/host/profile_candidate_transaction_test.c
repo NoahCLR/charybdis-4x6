@@ -991,6 +991,7 @@ static void test_explicit_precommit_expiry_never_crosses_durable_boundary(void) 
     noah_profile_candidate_compatibility_t compatible = compatibility();
     noah_profile_candidate_transaction_t transaction;
     noah_profile_candidate_v1_metadata_t metadata = metadata_for(profile, sizeof(profile));
+    uint16_t operation_sequence;
     uint8_t frame[32];
 
     fake_init(&fake);
@@ -1011,6 +1012,21 @@ static void test_explicit_precommit_expiry_never_crosses_durable_boundary(void) 
     assert(noah_profile_candidate_transaction_expire_precommit(&transaction) == NOAH_PROFILE_CANDIDATE_EXPIRE_DONE);
     assert(fake.abort_calls == 2u);
 
+    begin_transaction(&transaction, &fake, 63u, &metadata);
+    operation_sequence = status_of(&transaction).operation_sequence;
+    chunk_frame(frame, 63u, 0u, profile, sizeof(profile));
+    queue(&transaction, &fake, frame);
+    assert(noah_profile_candidate_transaction_supersede_precommit(&transaction) == NOAH_PROFILE_CANDIDATE_EXPIRE_DONE);
+    assert(fake.abort_calls == 3u);
+    assert(!transaction.mailbox.pending);
+    assert(!noah_profile_candidate_transaction_scan(&transaction));
+    assert(status_of(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE);
+    assert(status_of(&transaction).error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_PEER_SUPERSEDED);
+    assert(status_of(&transaction).transaction_id == 63u);
+    assert(status_of(&transaction).digest == metadata.digest);
+    assert(status_of(&transaction).last_operation == NOAH_PROFILE_CANDIDATE_V1_OPERATION_CHUNK);
+    assert(status_of(&transaction).operation_sequence == (uint16_t)(operation_sequence + 1u));
+
     fake.commit_steps_remaining = 2u;
     noah_profile_candidate_transaction_init(&transaction, &backend, &compatible);
     stage_complete(&transaction, &fake, 62u, profile, sizeof(profile), &metadata);
@@ -1020,7 +1036,11 @@ static void test_explicit_precommit_expiry_never_crosses_durable_boundary(void) 
     queue_and_scan(&transaction, &fake, frame);
     assert(status_of(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_COMMITTING);
     assert(noah_profile_candidate_transaction_expire_precommit(&transaction) == NOAH_PROFILE_CANDIDATE_EXPIRE_DURABLE_PHASE);
-    assert(fake.abort_calls == 2u);
+    simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_ABORT, 62u);
+    queue(&transaction, &fake, frame);
+    assert(noah_profile_candidate_transaction_supersede_precommit(&transaction) == NOAH_PROFILE_CANDIDATE_EXPIRE_DURABLE_PHASE);
+    assert(transaction.mailbox.pending);
+    assert(fake.abort_calls == 3u);
 }
 
 int main(int argc, char **argv) {

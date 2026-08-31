@@ -357,9 +357,11 @@ durability becomes uncertain.
 The complete graph is allocated only when a side-specific build supplies
 `NOAH_LIVE_PROFILE_OWNER=yes` and a flash-owned physical half. Ordinary
 firmware retains the read-only discovery shell. Even the engineering artifact
-does not advertise or route candidate mutation through VIA, because coherent
-host status, superseded-host resolution, hardware acceptance, and resource
-policy closure remain open.
+does not advertise or route candidate mutation through VIA. It now publishes
+coherent read-only owner status and cancels a precommit host candidate when an
+already compatible peer generation is greater than or equal to the reserved
+host generation. Postcommit concurrent-authority resolution, hardware
+acceptance, and resource-policy closure remain open.
 
 The linked engineering owner is 3,084 bytes per RP2040 half. Its SRAM0–3
 linker/core-memory span passes policy, but `.bss` and `.data + .bss` fail their

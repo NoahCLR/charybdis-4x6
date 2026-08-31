@@ -61,10 +61,11 @@ Allocator and stack high-water measurements on the real two-half keyboard are
 still required before revising the policies or enabling the owner normally.
 
 The dedicated engineering reviewed-path stack gate passes: the largest named
-owner main-process path is split metadata exchange at 1,104/1,920 bytes, and
-the largest named profile split callback is 264/768 bytes. This is linked path
-evidence for `tools/firmware_stack_budget_live_profile_owner.json`, not a global
-stack or interrupt-stack maximum.
+owner main-process path is split metadata exchange at 1,280/1,920 bytes, the
+coherent VIA status-read path is 616/1,920 bytes, and the largest named profile
+split callback is 264/768 bytes. This is linked path evidence for
+`tools/firmware_stack_budget_live_profile_owner.json`, not a global stack or
+interrupt-stack maximum.
 
 GNU `size` reports the linker-reserved `.heap` section and stack reservations
 inside its aggregate BSS number. Do not add that aggregate BSS value to the

@@ -200,6 +200,12 @@ npm run install:local
 The full Studio guide is
 [`docs/tooling/PROFILE_STUDIO.md`](./docs/tooling/PROFILE_STUDIO.md).
 
+The Live keyboard connection is currently read-only. Normal firmware reports
+its compiled/store status; the side-specific engineering owner can also report
+coherent active, pending, committed, candidate, and peer state. Live writes are
+still disabled while postcommit split authority, resource policy, and the real
+two-half safety matrix remain open.
+
 The next sections explain the keymap and RGB models that the Studio edits.
 
 ## The Keymap Model

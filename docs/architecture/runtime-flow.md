@@ -127,7 +127,8 @@ engineering artifact replaces that scheduler entry with the single profile
 owner, which incrementally validates compiled defaults, selects and adopts a
 durable record, fully reconciles a boot-selected record before requesting its
 activation, and then rotates at most one host, split, or peer-activation step.
-Its host/split receive surface is still not routed from the VIA channel.
+Its coherent owner status is routed into the read-only VIA channel. Candidate
+status and all mutation receive commands remain deliberately unrouted.
 
 Combo-origin reconciliation runs before key-runtime scan projection. It removes
 QMK-disabled candidates immediately and expires inactive candidates only after

@@ -68,6 +68,97 @@ static noah_profile_wire_v1_read_service_t noah_profile_wire_v1_read_service = {
     },
 };
 
+#    ifdef NOAH_LIVE_PROFILE_OWNER_ENABLE
+static bool noah_profile_authority_is_conflict(noah_profile_split_authority_state_t state) {
+    return state == NOAH_PROFILE_SPLIT_AUTHORITY_CONCURRENT_COMMIT || state == NOAH_PROFILE_SPLIT_AUTHORITY_CORRUPT_SAME_TUPLE;
+}
+
+static void noah_profile_channel_refresh_owner_capabilities(const noah_profile_owner_status_t *owner) {
+    if (!owner) {
+        return;
+    }
+    noah_profile_wire_v1_read_service.capabilities.feature_flags = NOAH_PROFILE_FEATURE_READ_SURFACE | NOAH_PROFILE_FEATURE_STORAGE_LAYOUT | NOAH_PROFILE_SPLIT_CAPABILITY | NOAH_PROFILE_FEATURE_RGB_SCHEMA | NOAH_PROFILE_FEATURE_KEY_BEHAVIOR_SCHEMA | NOAH_PROFILE_FEATURE_ACTION_ABI_DIGEST | NOAH_PROFILE_FEATURE_COMPILED_PROFILE_HASH;
+    noah_profile_wire_v1_read_service.capabilities.action_abi_digest         = owner->action_abi_digest;
+    noah_profile_wire_v1_read_service.capabilities.compiled_default_digest   = owner->compiled_default_digest;
+    noah_profile_wire_v1_read_service.capabilities.supported_domain_mask     = owner->supported_domain_mask;
+    noah_profile_wire_v1_read_service.capabilities.candidate_chunk_max       = 0u;
+}
+
+static void noah_profile_channel_latch_owner_status(const noah_profile_owner_status_t *owner) {
+    noah_profile_wire_v1_device_status_t *status;
+
+    if (!owner) {
+        return;
+    }
+    status = &noah_profile_wire_v1_read_service.status;
+    *status = (noah_profile_wire_v1_device_status_t){
+        .source_digest                 = owner->compiled_default_digest,
+        .compiled_default_digest       = owner->compiled_default_digest,
+        .candidate_transaction_id      = owner->candidate.transaction_id,
+        .last_committed_transaction_id = owner->last_committed_transaction_id,
+        .validation_state              = (uint8_t)owner->candidate.state,
+        .last_error                    = (uint8_t)owner->candidate.error.code,
+    };
+
+    if (owner->provider_known) {
+        status->active_digest     = owner->active.payload_digest;
+        status->active_generation = owner->active.generation;
+        if (owner->active.kind == NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE) {
+            status->active_kind        = NOAH_PROFILE_ACTIVE_COMMITTED;
+            status->active_origin_half = owner->active.origin;
+        } else {
+            status->state_flags |= NOAH_PROFILE_STATE_ACTIVE_IS_COMPILED_DEFAULT;
+            status->active_kind = NOAH_PROFILE_ACTIVE_COMPILED_ONLY;
+        }
+    } else {
+        status->state_flags |= NOAH_PROFILE_STATE_ACTIVE_IS_COMPILED_DEFAULT;
+        status->active_digest = owner->compiled_default_digest;
+        status->active_kind   = NOAH_PROFILE_ACTIVE_COMPILED_ONLY;
+    }
+    if (owner->has_pending) {
+        status->pending_digest = owner->pending.payload_digest;
+    }
+    if (owner->has_committed) {
+        status->state_flags |= NOAH_PROFILE_STATE_COMMITTED_VALID;
+        status->committed_digest      = owner->committed.payload_digest;
+        status->committed_generation  = owner->committed.generation;
+        status->committed_origin_half = owner->committed.origin_half;
+    }
+    if (owner->candidate_pending || owner->has_pending) {
+        status->state_flags |= NOAH_PROFILE_STATE_CANDIDATE_PENDING;
+    }
+    if (owner->has_pending && owner->safe_boundary_reason_mask != 0u) {
+        status->state_flags |= NOAH_PROFILE_STATE_WAITING_SAFE_BOUNDARY;
+    }
+    if (owner->peer_known) {
+        status->state_flags |= NOAH_PROFILE_STATE_PEER_KNOWN;
+        if (owner->peer.has_profile) {
+            status->peer_generation  = owner->peer.generation;
+            status->peer_origin_half = owner->peer.origin_half;
+        }
+    }
+    if (owner->peer_converged) {
+        status->state_flags |= NOAH_PROFILE_STATE_PEER_CONVERGED;
+    }
+    if (owner->owner_state == NOAH_PROFILE_OWNER_GENERATION_CONFLICT || noah_profile_authority_is_conflict(owner->authority_state)) {
+        status->conflict_count = 1u;
+    }
+}
+
+static bool noah_profile_channel_refresh_owner(bool latch_status) {
+    noah_profile_owner_status_t owner;
+
+    if (!noah_profile_store_runtime_owner_status(&owner)) {
+        return false;
+    }
+    noah_profile_channel_refresh_owner_capabilities(&owner);
+    if (latch_status) {
+        noah_profile_channel_latch_owner_status(&owner);
+    }
+    return true;
+}
+#    endif
+
 static void noah_profile_channel_refresh_store_status(void) {
     const noah_profile_store_record_t *committed = noah_profile_store_runtime_committed();
 
@@ -87,9 +178,20 @@ static void noah_profile_channel_refresh_store_status(void) {
 }
 
 void via_custom_value_command_kb(uint8_t *data, uint8_t length) {
-    if (data && length == NOAH_PROFILE_WIRE_V1_REPORT_SIZE && data[0] == NOAH_PROFILE_WIRE_V1_COMMAND_GET && data[1] == NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL && data[2] == NOAH_PROFILE_WIRE_V1_VALUE_STATUS) {
+    if (data && length == NOAH_PROFILE_WIRE_V1_REPORT_SIZE && data[0] == NOAH_PROFILE_WIRE_V1_COMMAND_GET && data[1] == NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL && data[2] == NOAH_PROFILE_WIRE_V1_VALUE_STATUS && data[4] == 0u) {
+#    ifdef NOAH_LIVE_PROFILE_OWNER_ENABLE
+        if (!noah_profile_channel_refresh_owner(true)) {
+            noah_profile_channel_refresh_store_status();
+        }
+#    else
         noah_profile_channel_refresh_store_status();
+#    endif
     }
+#    ifdef NOAH_LIVE_PROFILE_OWNER_ENABLE
+    if (data && length == NOAH_PROFILE_WIRE_V1_REPORT_SIZE && data[0] == NOAH_PROFILE_WIRE_V1_COMMAND_GET && data[1] == NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL && data[2] == NOAH_PROFILE_WIRE_V1_VALUE_CAPABILITY) {
+        (void)noah_profile_channel_refresh_owner(false);
+    }
+#    endif
     if (noah_profile_wire_v1_handle_get(&noah_profile_wire_v1_read_service, data, length)) {
         return;
     }

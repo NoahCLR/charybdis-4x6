@@ -1,14 +1,15 @@
 # Stage 02 — Profile Schema, Store, And Atomic Commit
 
-Status: blocked on Stage 01
+Status: implementation in progress behind an engineering gate
 
-Implementation note: two isolated foundations landed early. The storage
-package freezes the 32-byte header, checksum helpers, read-only boot discovery,
-bounded inactive-slot writes, readback validation, and final-marker commit. A
-slot-bounded QMK adapter and one-shot matrix-scan boot owner now make discovery
-reachable on firmware and expose committed metadata through status. Boot
-ownership still receives only the read-only adapter; the write-capable form is
-available solely for the disconnected candidate backend.
+Implementation note: the storage package freezes the 32-byte header, checksum
+helpers, read-only boot discovery, bounded inactive-slot writes, readback
+validation, and final-marker commit. A slot-bounded QMK adapter and one-shot
+ordinary matrix-scan boot owner make read-only discovery reachable on normal
+firmware. A side-specific engineering artifact now replaces that shell with the
+complete writable owner and exposes one coherent read-only snapshot of
+compiled, active, pending, committed, peer, and candidate state through the
+existing two-page status surface.
 The generic schema package implements the canonical `NLP1` blob/domain
 envelopes and four-byte semantic actions in firmware and Studio against one
 shared exact-byte fixture. The key-behavior and RGB packages now implement
@@ -21,7 +22,7 @@ streams both checksums, enforces schema/domain/action-ABI and compiled-reference
 compatibility, and returns bounded borrowed views. Exact candidate codecs and
 upload coordinators now exist on firmware and desktop, and the firmware
 coordinator can stage and validate an inactive EEPROM slot through an injected
-backend. These paths remain intentionally unrouted and unadvertised. The
+backend. These mutation paths remain intentionally unrouted and unadvertised. The
 isolated effective-provider foundation is now hardened and tested after
 lifecycle review, and every current behavior/RGB consumer family now has an
 effective-profile seam. A dedicated split foundation freezes the exact 32-byte
@@ -31,16 +32,17 @@ sender-owned record through the shared validator/store owner and confirms
 marker-last durability without activating it. An isolated scan reconciler and
 QMK adapter now implement bidirectional push/pull, cached callback replies,
 bounded scan work, retry/reconnect/role-change behavior, and passive-peer
-expiry. Production durable-commit ownership, runtime owner installation, and
-QMK routing are still absent. Bounded boot selection, exact compiled
+expiry. Durable-commit ownership and runtime owner installation now exist only
+in the engineering artifact; QMK mutation routing remains absent. Bounded boot
+selection, exact compiled
 compatibility, committed-record adoption, reset-to-compiled activation, and a
-shared host/peer admission lease have landed as disconnected owner foundations.
-Side-specific artifacts now provide the D-018 flash-owned physical identity,
-but the future production owner has not consumed it yet, so this stage remains
-blocked/incomplete. The existing VIA mirror and reconciliation callbacks now
-queue bounded frames without touching EEPROM, and a rotating matrix-scan
-scheduler serializes their work with live-profile boot discovery. The future
-production owner must replace that discovery step inside the same scheduler.
+shared host/peer admission lease have landed in that gated owner. Side-specific
+artifacts provide the D-018 flash-owned physical identity and the owner consumes
+it for durable origin and split registration. Host and peer work share one
+admission-first scheduler. A newer-or-equal compatible peer cancels host work
+before marker-last commit, but postcommit concurrent authority,
+resource-policy closure, and the real two-half hardware matrix still block
+mutation capability and stage completion.
 
 ## Objective
 
@@ -172,24 +174,24 @@ Volatile preview must not outrank durable committed state after reconnect.
 - [x] Layered validator (generic structure, canonical order, reserved fields,
   action capacity, behavior/RGB semantics, whole-profile checksums,
   action-ABI identity, domain masks, and compiled action references)
-- [ ] Recoverable persistent store (storage foundation, read-only QMK boot
-  ownership/status, provider-guarded inactive-slot staging, incremental slot
-  selection, exact committed-record adoption, durable commit, reset activation,
-  and activation handoff landed; exact isolated peer import also landed; QMK
-  mutation ownership and split transport integration remain)
+- [ ] Recoverable persistent store (read-only normal boot ownership and gated
+  writable owner, provider-guarded staging, incremental selection/adoption,
+  durable commit, reset activation, and exact peer import/reconciliation
+  landed; host routing and hardware interruption evidence remain)
 - [ ] Candidate protocol (exact firmware/desktop frame/status codecs, bounded
   scan coordinator, durable commit/activation coordinator, and desktop prepare
   plus commit coordinator landed; QMK routing and capabilities remain)
-- [ ] Safe activation owner and predicate (production predicate and coherent
-  reason/count snapshot landed; provider-owner installation remains)
-- [ ] Effective profile generation publication
-- [ ] Domain invalidation contract
-- [ ] Split convergence (isolated bidirectional reconciler and transport adapter
-  plus flash physical identity landed; production owner consumption,
-  registration, transport arbitration, and hardware convergence remain)
+- [ ] Safe activation owner and predicate (predicate, coherent reason/count
+  snapshot, and gated provider-owner installation landed; hardware evidence
+  remains)
+- [x] Effective profile generation publication
+- [x] Domain invalidation contract
+- [ ] Split convergence (bidirectional reconciler, transport adapter, flash
+  physical identity, gated owner consumption, registration, and precommit host
+  supersession landed; postcommit contention and hardware convergence remain)
 - [ ] Reset and migration behavior (override-disabled durable records now
   activate compiled fallback; production routing and upgrade evidence remain)
-- [ ] Debug/status snapshots
+- [x] Debug/status snapshots for the gated owner read surface
 - [ ] Source manifest, docs, decisions, risks, and progress updates
 
 ## Verification
@@ -295,7 +297,8 @@ Landed standalone candidate-coordinator evidence:
 - normal and ASan/UBSan tests cover every short frame length, overlong frames,
   every reserved/padding byte, gaps, partial overlaps, overflow, reset with a
   pending or staged candidate, idempotent abort, backend failures, structured
-  validation locations, and the explicit v1 no-timeout behavior;
+  validation locations, device-side precommit timeout, and the rule that a
+  desktop transport timeout does not itself abort firmware state;
 - the coordinator has a compile-time 256-byte ceiling; commit is idempotently
   correlated by transaction id and digest across COMMITTING, ACTIVATING, and
   final IDLE status, and an unconfirmed final-marker write is reported as
@@ -318,9 +321,9 @@ Landed whole-profile validation and staging-backend evidence:
 - copied validated domain views retain an absolute committed-slot base, so
   beginning a later candidate cannot silently retarget an active view to the
   new inactive slot; and
-- the production boot owner still receives a null write callback, Profile Wire
-  mutation/domain capability bits remain disabled, and no QMK callback can
-  reach candidate staging yet.
+- the ordinary boot shell still receives a null write callback, while the gated
+  owner has the write-capable backend. No QMK callback can reach candidate
+  staging yet.
 
 Landed compiled-default materialization evidence:
 
@@ -361,12 +364,12 @@ a pending provider snapshot; provider polling still owns safe publication. A
 runtime rollback that makes the store's nominal inactive slot active is
 mechanically refused before EEPROM mutation, and moving active authority away
 allows the next reservation to discard only the overlapping rollback copy.
-This seam is still disconnected from QMK routing. A production safe predicate
-now exists, but it is not installed into a production provider owner. The
+This seam is still disconnected from QMK mutation routing. The safe predicate,
 callback-only behavior and RGB invalidators, consumer lookup seam, and every
-current RGB renderer-family adapter have landed; they remain dormant until
-that owner installs their caller-owned state. All capability advertising
-remains disabled.
+current RGB renderer-family adapter are installed by the side-specific gated
+owner. Ordinary firmware still uses the compiled path. The engineering read
+surface advertises only schema/digest knowledge; all mutation capability bits
+remain disabled.
 
 Landed desktop candidate evidence:
 
@@ -475,9 +478,8 @@ Landed production-owner safety-foundation evidence:
   queued without poisoning its transaction, and terminal abort or successful
   activation releases the lease; and
 - QMK profile split registration is idempotent for the same reconciler and
-  rejects a second owner. All foundations remain disconnected, the current
-  read-only shell still uses the cold boot wrapper, and capability bits remain
-  disabled until the production owner consumes them in D-019's scheduler.
+  rejects a second owner. At that safety-foundation checkpoint the pieces were
+  still disconnected; the gated composition below supersedes that snapshot.
 
 Landed gated owner-composition evidence:
 
@@ -499,7 +501,16 @@ Landed gated owner-composition evidence:
   QMK's variable-stack update helper;
 - a side-specific engineering build installs this graph and registers one
   profile split transport. Ordinary firmware retains its read-only shell, and
-  both builds leave host mutation unadvertised and unrouted; and
+  both builds leave host mutation unadvertised and unrouted;
+- the gated owner now exports one caller-owned snapshot of compiled, active,
+  pending, committed, peer, and candidate state. VIA latches page zero and
+  serves page one from the same observation, and its engineering capabilities
+  advertise only the landed schemas/digests while all write-operation bits and
+  chunk capacity remain zero;
+- a compatible peer generation greater than or equal to the reserved host
+  generation cancels the candidate before commit, including one queued commit,
+  preserves transaction/digest correlation, releases the host lease, and
+  reports stable error `20` without changing the prior committed record; and
 - exact linked engineering evidence is recorded in the canonical memory doc.
   The owner is 3,084 bytes per half and its reviewed owner stack paths pass,
   but the artifact fails the BSS and combined-data regression policies. It is

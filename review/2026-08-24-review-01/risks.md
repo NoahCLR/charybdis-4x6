@@ -200,9 +200,9 @@ No project risks are closed yet.
   VIA-macro, hardcoded-macro, RGB, domain, and action-ABI compatibility rather
   than allowing the broader schema maxima. This closes a compatibility gap in
   the isolated path but does not enable any capability.
-- R-18 remains open because the incremental store/adoption APIs are foundations;
-  the current production read-only discovery wrapper has not yet been replaced
-  by the writable owner inside the rotating scheduler.
+- At this 2026-08-29 foundation checkpoint, R-18 remained open because the
+  incremental store/adoption APIs were still disconnected. The 2026-08-31
+  gated composition below supersedes that implementation-state snapshot.
 
 ### 2026-08-31 gated owner-composition update
 
@@ -216,9 +216,13 @@ No project risks are closed yet.
   uses one direct block write. It no longer enters QMK's variable-stack update
   helper, which could perform a read plus a write inside one scheduler grant.
   The dedicated owner stack manifest covers both main and split callback paths.
-- These risks remain open because candidate routing and capability advertising
-  are still disabled, superseded-host resolution and coherent external status
-  are incomplete, and the two-half interruption/role-swap hardware matrix has
+- Coherent external read-only status and precommit supersession are now landed.
+  A compatible peer generation greater than or equal to the reserved host
+  generation cancels host staging before commit, including a queued commit,
+  without changing the prior durable record.
+- These risks remain open because candidate routing and write-capability
+  advertising are still disabled, postcommit concurrent-authority resolution
+  is incomplete, and the two-half interruption/role-swap hardware matrix has
   not run.
 - R-07 remains open with explicit evidence: the engineering owner is 3,084
   bytes per half and passes the core-memory-span and reviewed-path stack

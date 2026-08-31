@@ -54,10 +54,11 @@ result. The mapped-key LED map is generation-independent; colors, modes,
 locality, groups, and feedback policy are resolved as render-local state, so
 they cannot remain cached after a profile switch.
 
-The production effective-profile owner is not installed yet, so current
-firmware still selects the compiled tables. All current renderer families are
-now behind the effective adapter; production owner installation, split-profile
-convergence, and real-board timing remain before live RGB activation.
+Ordinary firmware still selects the compiled tables. The side-specific
+engineering artifact installs the complete effective-profile owner and all
+renderer invalidators, but its host mutation route remains off while
+postcommit split authority, resource policy, and hardware validation are open.
+All current renderer families are behind the effective adapter.
 
 ## How truth reaches the LEDs
 

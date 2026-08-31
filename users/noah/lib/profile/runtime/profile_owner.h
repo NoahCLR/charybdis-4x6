@@ -89,6 +89,31 @@ typedef struct {
     bool                                         runtimes_installed;
 } noah_profile_owner_t;
 
+// Protocol-neutral, caller-owned observation of the complete live-profile
+// graph. The VIA adapter maps this snapshot into its frozen two-page status;
+// no mutable owner pointer crosses the runtime boundary.
+typedef struct {
+    noah_profile_owner_state_t             owner_state;
+    noah_effective_profile_identity_t      active;
+    noah_effective_profile_identity_t      pending;
+    noah_profile_split_descriptor_t        committed;
+    noah_profile_split_descriptor_t        peer;
+    noah_profile_candidate_v1_status_t     candidate;
+    noah_profile_split_authority_state_t   authority_state;
+    uint32_t                               compiled_default_digest;
+    uint32_t                               action_abi_digest;
+    uint32_t                               safe_boundary_reason_mask;
+    uint16_t                               last_committed_transaction_id;
+    uint8_t                                supported_domain_mask;
+    bool                                   provider_known;
+    bool                                   has_pending;
+    bool                                   has_committed;
+    bool                                   candidate_pending;
+    bool                                   peer_known;
+    bool                                   peer_converged;
+    bool                                   transfer_pending;
+} noah_profile_owner_status_t;
+
 // Initializes metadata and begins incremental validation of the compiled
 // canonical profile. It performs no EEPROM or split-transport I/O.
 bool noah_profile_owner_init(noah_profile_owner_t *owner, const noah_profile_owner_config_t *config);
@@ -107,3 +132,4 @@ noah_profile_store_result_t            noah_profile_owner_discovery_result(const
 const noah_profile_store_record_t      *noah_profile_owner_committed(const noah_profile_owner_t *owner);
 noah_profile_candidate_transaction_t  *noah_profile_owner_host_transaction(noah_profile_owner_t *owner);
 noah_profile_split_reconciler_t        *noah_profile_owner_split_reconciler(noah_profile_owner_t *owner);
+bool                                    noah_profile_owner_status(const noah_profile_owner_t *owner, noah_profile_owner_status_t *status);
