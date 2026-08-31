@@ -984,6 +984,45 @@ static void test_busy_begin_remains_queued_without_poisoning(void) {
     assert(fake.begin_calls == 3u);
 }
 
+static void test_explicit_precommit_expiry_never_crosses_durable_boundary(void) {
+    static const uint8_t profile[8] = {'N', 'L', 'P', '1', 1u, 0u, 0u, 1u};
+    fake_backend_t fake;
+    noah_profile_candidate_backend_t backend;
+    noah_profile_candidate_compatibility_t compatible = compatibility();
+    noah_profile_candidate_transaction_t transaction;
+    noah_profile_candidate_v1_metadata_t metadata = metadata_for(profile, sizeof(profile));
+    uint8_t frame[32];
+
+    fake_init(&fake);
+    backend = backend_for(&fake);
+    noah_profile_candidate_transaction_init(&transaction, &backend, &compatible);
+    begin_transaction(&transaction, &fake, 60u, &metadata);
+    assert(noah_profile_candidate_transaction_expire_precommit(&transaction) == NOAH_PROFILE_CANDIDATE_EXPIRE_DONE);
+    assert(fake.abort_calls == 1u);
+    assert(status_of(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE);
+    assert(status_of(&transaction).error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_TIMEOUT);
+
+    begin_transaction(&transaction, &fake, 61u, &metadata);
+    chunk_frame(frame, 61u, 0u, profile, sizeof(profile));
+    queue(&transaction, &fake, frame);
+    assert(noah_profile_candidate_transaction_expire_precommit(&transaction) == NOAH_PROFILE_CANDIDATE_EXPIRE_MAILBOX_BUSY);
+    assert(fake.abort_calls == 1u);
+    assert(noah_profile_candidate_transaction_scan(&transaction));
+    assert(noah_profile_candidate_transaction_expire_precommit(&transaction) == NOAH_PROFILE_CANDIDATE_EXPIRE_DONE);
+    assert(fake.abort_calls == 2u);
+
+    fake.commit_steps_remaining = 2u;
+    noah_profile_candidate_transaction_init(&transaction, &backend, &compatible);
+    stage_complete(&transaction, &fake, 62u, profile, sizeof(profile), &metadata);
+    request_validation(&transaction, &fake, 62u);
+    finish_validation(&transaction);
+    simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT, 62u);
+    queue_and_scan(&transaction, &fake, frame);
+    assert(status_of(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_COMMITTING);
+    assert(noah_profile_candidate_transaction_expire_precommit(&transaction) == NOAH_PROFILE_CANDIDATE_EXPIRE_DURABLE_PHASE);
+    assert(fake.abort_calls == 2u);
+}
+
 int main(int argc, char **argv) {
     assert(argc == 2);
     fixture_path = argv[1];
@@ -1000,6 +1039,7 @@ int main(int argc, char **argv) {
     test_abort_reset_and_no_timeout();
     test_begin_compatibility_rejections();
     test_busy_begin_remains_queued_without_poisoning();
+    test_explicit_precommit_expiry_never_crosses_durable_boundary();
     puts("profile candidate transaction host tests passed");
     return 0;
 }

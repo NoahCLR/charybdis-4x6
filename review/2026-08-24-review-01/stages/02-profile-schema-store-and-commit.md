@@ -479,6 +479,33 @@ Landed production-owner safety-foundation evidence:
   read-only shell still uses the cold boot wrapper, and capability bits remain
   disabled until the production owner consumes them in D-019's scheduler.
 
+Landed gated owner-composition evidence:
+
+- one caller-owned graph now composes compiled validation, incremental boot
+  selection/adoption, the store/provider/candidate/peer/reconciler objects,
+  the safe activation policy, and the behavior/RGB runtime invalidators;
+- boot-selected records reconcile in full before activation begins. A newer
+  peer may therefore replace an older validated local record without either
+  half waiting behind the activation convergence predicate;
+- host and peer retain one exact admission lease through activation. While the
+  host owns it, split scheduling is convergence-only: metadata, serving, and
+  pushing the known durable local record continue, but a peer import cannot
+  begin or advance;
+- abandoned host candidates expire after 15 seconds only in precommit states,
+  never across a queued mailbox, marker-last commit, activation, or uncertain
+  durability. Error id `19` is frozen in both firmware and Profile Studio;
+- the QMK EEPROM adapter enforces the 32-byte store I/O contract and uses a
+  direct block write, preserving one wear-level write per scan grant without
+  QMK's variable-stack update helper;
+- a side-specific engineering build installs this graph and registers one
+  profile split transport. Ordinary firmware retains its read-only shell, and
+  both builds leave host mutation unadvertised and unrouted; and
+- exact linked engineering evidence is recorded in the canonical memory doc.
+  The owner is 3,084 bytes per half and its reviewed owner stack paths pass,
+  but the artifact fails the BSS and combined-data regression policies. It is
+  therefore not eligible for normal exposure without hardware high-water and
+  an explicit resource-policy decision.
+
 ## Exit Criteria
 
 - Desktop and firmware produce identical canonical bytes and digests.

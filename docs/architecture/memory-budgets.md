@@ -21,8 +21,8 @@ linker map is
 
 ## Current Linked Checkpoint
 
-Freshly measured on 2026-08-30 after the production-owner safety-foundation
-checkpoint:
+Freshly remeasured on 2026-08-31 after the gated live-profile owner checkpoint.
+The ordinary artifact does not link or allocate that engineering-only owner:
 
 | Measurement | Bytes | Meaning |
 | --- | ---: | --- |
@@ -37,6 +37,34 @@ initializes its core allocator from that range and the target's linked newlib
 `_sbrk_r` obtains memory from it. It is not a second memory pool, guaranteed
 unused RAM, or a runtime-free-memory measurement. Record allocator high-water
 on hardware before making claims about runtime availability.
+
+## Engineering Live-Profile Owner Checkpoint
+
+The side-specific left engineering artifact was freshly linked on 2026-08-31
+with `NOAH_LIVE_PROFILE_OWNER=yes`, `NOAH_PHYSICAL_HALF=left`, and
+`FORCE_SLAVE=yes`. It is deliberately not the ordinary firmware checkpoint:
+
+| Measurement | Bytes | Policy result |
+| --- | ---: | --- |
+| Exact linked `runtime_owner` state | 3,084 | within its 4,096 B engineering state policy |
+| SRAM0–3 `.data` | 23,000 | informational |
+| SRAM0–3 `.bss` | 28,740 | **FAIL**, 2,740 B above the 26,000 B regression policy |
+| SRAM0–3 `.data + .bss` | 51,740 | **FAIL**, 740 B above the 51,000 B regression policy |
+| SRAM0–3 linker/core-memory span at boot | 210,400 | PASS, 5,600 B above the 204,800 B minimum |
+| Fixed linked section bytes across all SRAM banks | 59,200 | informational |
+
+These failures do not mean that the RP2040 is physically out of memory. Each
+half still has 270,336 bytes of physical SRAM, and the linked SRAM0–3 core-
+memory span passes its separate policy. They do mean that this artifact cannot
+be promoted by silently treating old policy margin as hardware headroom.
+Allocator and stack high-water measurements on the real two-half keyboard are
+still required before revising the policies or enabling the owner normally.
+
+The dedicated engineering reviewed-path stack gate passes: the largest named
+owner main-process path is split metadata exchange at 1,104/1,920 bytes, and
+the largest named profile split callback is 264/768 bytes. This is linked path
+evidence for `tools/firmware_stack_budget_live_profile_owner.json`, not a global
+stack or interrupt-stack maximum.
 
 GNU `size` reports the linker-reserved `.heap` section and stack reservations
 inside its aggregate BSS number. Do not add that aggregate BSS value to the

@@ -71,6 +71,14 @@ typedef struct {
     uint16_t                               last_committed_transaction_id;
 } noah_profile_candidate_transaction_t;
 
+typedef enum {
+    NOAH_PROFILE_CANDIDATE_EXPIRE_NOTHING = 0u,
+    NOAH_PROFILE_CANDIDATE_EXPIRE_DONE,
+    NOAH_PROFILE_CANDIDATE_EXPIRE_MAILBOX_BUSY,
+    NOAH_PROFILE_CANDIDATE_EXPIRE_DURABLE_PHASE,
+    NOAH_PROFILE_CANDIDATE_EXPIRE_BACKEND_ERROR,
+} noah_profile_candidate_expire_result_t;
+
 void noah_profile_candidate_transaction_init(noah_profile_candidate_transaction_t *transaction, const noah_profile_candidate_backend_t *backend, const noah_profile_candidate_compatibility_t *compatibility);
 
 // USB/callback side: exact decode plus one bounded mailbox copy only. A handled
@@ -81,5 +89,10 @@ bool noah_profile_candidate_transaction_receive(noah_profile_candidate_transacti
 // or activation step. Validation and commit obey the bounded-work contracts
 // above; provider activation remains a separate safe-boundary poll.
 bool noah_profile_candidate_transaction_scan(noah_profile_candidate_transaction_t *transaction);
+
+// Owner-requested inactivity cleanup. Only precommit states with an admitted
+// candidate may be aborted. A queued mailbox, marker-last commit, activation,
+// or durability-unknown terminal state can never be expired through this API.
+noah_profile_candidate_expire_result_t noah_profile_candidate_transaction_expire_precommit(noah_profile_candidate_transaction_t *transaction);
 
 void noah_profile_candidate_transaction_status(const noah_profile_candidate_transaction_t *transaction, noah_profile_candidate_v1_status_t *status);

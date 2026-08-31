@@ -133,5 +133,10 @@ NOAH_POINTING_SOURCES := \
 NOAH_AUTOMOUSE_SOURCES := \
     lib/rgb/automouse/rgb_automouse.c
 
+# Allocated only by explicit side-specific engineering builds. Keeping this
+# out of NOAH_COMMON_SOURCES preserves the reviewed normal-firmware footprint.
+NOAH_LIVE_PROFILE_OWNER_SOURCES := \
+    lib/profile/runtime/profile_owner.c
+
 NOAH_RGB_KEYMAP_SOURCES := \
     $(KEYMAP_PATH)/rgb_config.c

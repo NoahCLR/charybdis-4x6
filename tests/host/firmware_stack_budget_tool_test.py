@@ -288,6 +288,15 @@ class FirmwareStackBudgetToolTest(unittest.TestCase):
         self.assertEqual(manifest.analysis_kind, "reviewed_path_regression")
         self.assertEqual({context.name for context in manifest.contexts}, {"main_process", "split_slave_thread"})
 
+        live_owner_manifest = stack_budget.load_manifest(
+            ROOT / "tools" / "firmware_stack_budget_live_profile_owner.json"
+        )
+        self.assertEqual(live_owner_manifest.analysis_kind, "reviewed_path_regression")
+        self.assertEqual(
+            {context.name for context in live_owner_manifest.contexts},
+            {"main_process", "split_slave_thread"},
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

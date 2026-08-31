@@ -495,6 +495,39 @@ bool noah_profile_candidate_transaction_scan(noah_profile_candidate_transaction_
     return false;
 }
 
+noah_profile_candidate_expire_result_t noah_profile_candidate_transaction_expire_precommit(noah_profile_candidate_transaction_t *transaction) {
+    noah_profile_candidate_v1_state_t state;
+
+    if (!transaction || !transaction->has_candidate) {
+        return NOAH_PROFILE_CANDIDATE_EXPIRE_NOTHING;
+    }
+    if (transaction->mailbox.pending) {
+        return NOAH_PROFILE_CANDIDATE_EXPIRE_MAILBOX_BUSY;
+    }
+    state = transaction->status.state;
+    if (state == NOAH_PROFILE_CANDIDATE_V1_STATE_COMMITTING || state == NOAH_PROFILE_CANDIDATE_V1_STATE_ACTIVATING) {
+        return NOAH_PROFILE_CANDIDATE_EXPIRE_DURABLE_PHASE;
+    }
+    if (state != NOAH_PROFILE_CANDIDATE_V1_STATE_RECEIVING && state != NOAH_PROFILE_CANDIDATE_V1_STATE_COMPLETE && state != NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATING && state != NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATED && state != NOAH_PROFILE_CANDIDATE_V1_STATE_REJECTED) {
+        return NOAH_PROFILE_CANDIDATE_EXPIRE_NOTHING;
+    }
+    if (!transaction->backend.abort || transaction->backend.abort(transaction->backend.context) != NOAH_PROFILE_CANDIDATE_BACKEND_OK) {
+        poison(transaction, NOAH_PROFILE_CANDIDATE_V1_ERROR_STORAGE_FAILURE, NOAH_PROFILE_CANDIDATE_V1_LOCATION_NONE_U16);
+        return NOAH_PROFILE_CANDIDATE_EXPIRE_BACKEND_ERROR;
+    }
+
+    transaction->last_aborted_transaction_id = transaction->status.transaction_id;
+    transaction->has_candidate                = false;
+    transaction->poisoned                     = false;
+    memset(&transaction->metadata, 0, sizeof(transaction->metadata));
+    transaction->status.state          = NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE;
+    transaction->status.next_offset    = 0u;
+    transaction->status.payload_length = 0u;
+    transaction->status.digest         = 0u;
+    set_simple_error(transaction, NOAH_PROFILE_CANDIDATE_V1_ERROR_TIMEOUT, NOAH_PROFILE_CANDIDATE_V1_LOCATION_NONE_U16);
+    return NOAH_PROFILE_CANDIDATE_EXPIRE_DONE;
+}
+
 void noah_profile_candidate_transaction_status(const noah_profile_candidate_transaction_t *transaction, noah_profile_candidate_v1_status_t *status) {
     if (!status) {
         return;

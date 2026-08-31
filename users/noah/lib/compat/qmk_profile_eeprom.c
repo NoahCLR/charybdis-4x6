@@ -14,7 +14,7 @@
 #    include "eeprom.h"
 
 static bool noah_qmk_profile_eeprom_range_valid(uint16_t address, uint16_t length) {
-    return length != 0u && address >= NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR && (uint32_t)address + length <= NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE;
+    return length != 0u && length <= NOAH_PROFILE_STORE_IO_CHUNK_MAX && address >= NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR && (uint32_t)address + length <= NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE;
 }
 
 static bool noah_qmk_profile_eeprom_read(void *context, uint16_t address, uint8_t *target, uint16_t length) {
@@ -33,7 +33,7 @@ static bool noah_qmk_profile_eeprom_write(void *context, uint16_t address, const
     if (!source || !noah_qmk_profile_eeprom_range_valid(address, length)) {
         return false;
     }
-    eeprom_update_block(source, (void *)(uintptr_t)address, length);
+    eeprom_write_block(source, (void *)(uintptr_t)address, length);
     return true;
 }
 

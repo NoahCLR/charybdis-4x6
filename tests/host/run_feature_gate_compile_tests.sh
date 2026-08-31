@@ -14,7 +14,7 @@ POINTING_SOURCES="$(noah_source_manifest_userspace_paths "$ROOT" NOAH_POINTING_S
 RGB_SOURCES="$(noah_source_manifest_raw_paths "$ROOT" NOAH_RGB_KEYMAP_SOURCES)"
 AUTOMOUSE_SOURCES="$(noah_source_manifest_userspace_paths "$ROOT" NOAH_AUTOMOUSE_SOURCES)"
 PROFILE_KEYMAP_PATHS="$(charybdis_profile_keymap_paths "$ROOT")"
-PROFILE_WIRE_COMPILE_SOURCES="users/noah/lib/profile/storage/profile_store_runtime.c users/noah/lib/profile/storage/profile_candidate_transaction.c users/noah/lib/profile/storage/profile_candidate_store_backend.c users/noah/lib/profile/storage/profile_peer_store_backend.c users/noah/lib/profile/split/profile_split_authority.c users/noah/lib/profile/split/profile_split_protocol_v1.c users/noah/lib/profile/split/profile_split_reconciler.c users/noah/lib/profile/protocol/profile_wire_v1.c users/noah/lib/profile/protocol/profile_candidate_v1.c users/noah/lib/compat/qmk_profile_eeprom.c users/noah/lib/compat/qmk_profile_split_transport.c users/noah/lib/compat/qmk_via_profile_channel.c"
+PROFILE_WIRE_COMPILE_SOURCES="users/noah/lib/profile/runtime/profile_owner.c users/noah/lib/profile/storage/profile_store_runtime.c users/noah/lib/profile/storage/profile_candidate_transaction.c users/noah/lib/profile/storage/profile_candidate_store_backend.c users/noah/lib/profile/storage/profile_peer_store_backend.c users/noah/lib/profile/split/profile_split_authority.c users/noah/lib/profile/split/profile_split_protocol_v1.c users/noah/lib/profile/split/profile_split_reconciler.c users/noah/lib/profile/protocol/profile_wire_v1.c users/noah/lib/profile/protocol/profile_candidate_v1.c users/noah/lib/compat/qmk_profile_eeprom.c users/noah/lib/compat/qmk_profile_split_transport.c users/noah/lib/compat/qmk_via_profile_channel.c"
 
 POINTING_TEST_FLAGS="-DPOINTING_DEVICE_ENABLE"
 RGB_TEST_FLAGS="-DRGB_MATRIX_ENABLE -DRGB_MATRIX_WS2812"
@@ -322,6 +322,7 @@ compile_variant "tests/host/include/noah_compile_config.h" "-DVIA_ENABLE" "$PROF
 compile_variant "tests/host/include/noah_compile_config.h" "-DVIA_ENABLE $RGB_TEST_FLAGS" "$PROFILE_WIRE_COMPILE_SOURCES"
 compile_variant "tests/host/include/noah_compile_config.h" "-DVIA_ENABLE -DSPLIT_KEYBOARD" "$PROFILE_WIRE_COMPILE_SOURCES"
 compile_variant "tests/host/include/noah_compile_config.h" "-DVIA_ENABLE -DSPLIT_KEYBOARD $RGB_TEST_FLAGS" "$PROFILE_WIRE_COMPILE_SOURCES"
+compile_variant "tests/host/include/noah_compile_config.h" "-DVIA_ENABLE -DSPLIT_KEYBOARD -DNOAH_PHYSICAL_HALF_LEFT -DNOAH_LIVE_PROFILE_OWNER_ENABLE $RGB_TEST_FLAGS" "$PROFILE_WIRE_COMPILE_SOURCES"
 compile_variant "tests/host/include/noah_compile_config.h" "-DSPLIT_KEYBOARD -DNOAH_PHYSICAL_HALF_LEFT" "users/noah/lib/compat/qmk_physical_half.c"
 compile_variant "tests/host/include/noah_compile_config.h" "-DSPLIT_KEYBOARD -DNOAH_PHYSICAL_HALF_RIGHT" "users/noah/lib/compat/qmk_physical_half.c"
 

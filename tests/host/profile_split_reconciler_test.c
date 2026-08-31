@@ -487,6 +487,75 @@ static void test_max_generation_transfers_without_local_increment(void) {
     assert(right.store.committed.generation == UINT32_MAX);
 }
 
+static void test_convergence_only_pushes_host_record_without_importing(void) {
+    half_t   left;
+    half_t   right;
+    uint32_t right_writes;
+
+    half_storage_init(&left);
+    half_storage_init(&right);
+    install_profile(&right, 14u, 1u);
+    right_writes = right.memory.writes;
+    pair_init(&left, &right);
+    for (uint32_t scan = 0u; scan < MAX_SCANS && !pair_converged(&left, &right); scan++) {
+        uint32_t now = scan * NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS;
+        (void)noah_profile_split_reconciler_scan_mode(&right.reconciler, true, now, NOAH_PROFILE_SPLIT_RECONCILE_CONVERGENCE_ONLY);
+        (void)noah_profile_split_reconciler_scan(&left.reconciler, false, now);
+    }
+    assert(pair_converged(&left, &right));
+    assert_records_match(&left, &right);
+    assert(right.memory.writes == right_writes);
+}
+
+static void test_convergence_only_refuses_newer_peer_import(void) {
+    half_t   left;
+    half_t   right;
+    uint32_t right_writes;
+
+    half_storage_init(&left);
+    half_storage_init(&right);
+    install_profile(&left, 15u, 0u);
+    right_writes = right.memory.writes;
+    pair_init(&left, &right);
+    for (uint32_t scan = 0u; scan < 64u; scan++) {
+        uint32_t now = scan * NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS;
+        (void)noah_profile_split_reconciler_scan_mode(&right.reconciler, true, now, NOAH_PROFILE_SPLIT_RECONCILE_CONVERGENCE_ONLY);
+        (void)noah_profile_split_reconciler_scan(&left.reconciler, false, now);
+    }
+    assert(right.store.committed.slot == NOAH_PROFILE_SLOT_NONE);
+    assert(right.memory.writes == right_writes);
+    assert(noah_profile_candidate_store_backend_admission_owner(&right.candidate_backend) == NOAH_PROFILE_STORAGE_ADMISSION_NONE);
+}
+
+static void test_convergence_only_answers_inbound_prepare_busy_without_storage(void) {
+    half_t                         left;
+    half_t                         right;
+    noah_profile_split_v1_frame_t request;
+    noah_profile_split_v1_frame_t response;
+    uint8_t                        request_wire[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE];
+    uint8_t                        response_wire[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE];
+    uint32_t                       right_writes;
+
+    half_storage_init(&left);
+    half_storage_init(&right);
+    install_profile(&left, 16u, 0u);
+    pair_init(&left, &right);
+    right_writes = right.memory.writes;
+    request = (noah_profile_split_v1_frame_t){
+        .kind       = NOAH_PROFILE_SPLIT_V1_PREPARE_BEGIN,
+        .status     = NOAH_PROFILE_SPLIT_V1_STATUS_OK,
+        .descriptor = committed_descriptor(&left, 16u, 0u),
+    };
+    assert(noah_profile_split_v1_frame_encode(&request, request_wire));
+    assert(noah_profile_split_reconciler_receive(&right.reconciler, request_wire, sizeof(request_wire), response_wire, sizeof(response_wire)));
+    assert(noah_profile_split_reconciler_scan_mode(&right.reconciler, false, 0u, NOAH_PROFILE_SPLIT_RECONCILE_CONVERGENCE_ONLY));
+    assert(noah_profile_split_reconciler_receive(&right.reconciler, request_wire, sizeof(request_wire), response_wire, sizeof(response_wire)));
+    assert(noah_profile_split_v1_frame_decode(response_wire, sizeof(response_wire), &response));
+    assert(response.kind == NOAH_PROFILE_SPLIT_V1_ACK && response.status == NOAH_PROFILE_SPLIT_V1_STATUS_BUSY);
+    assert(right.memory.writes == right_writes);
+    assert(noah_profile_candidate_store_backend_admission_owner(&right.candidate_backend) == NOAH_PROFILE_STORAGE_ADMISSION_NONE);
+}
+
 int main(void) {
     test_compiled_convergence();
     test_newer_master_pushes_exact_record();
@@ -499,6 +568,9 @@ int main(void) {
     test_same_tuple_corruption_stops_without_overwrite();
     test_incompatible_firmware_stops_without_write();
     test_max_generation_transfers_without_local_increment();
+    test_convergence_only_pushes_host_record_without_importing();
+    test_convergence_only_refuses_newer_peer_import();
+    test_convergence_only_answers_inbound_prepare_busy_without_storage();
     puts("profile split reconciler host tests passed");
     return 0;
 }

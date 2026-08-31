@@ -452,6 +452,7 @@ abort, and `5` commit. Error ids are stable:
 | 16 | candidate poisoned |
 | 17 | durable commit succeeded but activation failed |
 | 18 | final marker durability is unknown; reconcile status |
+| 19 | inactive precommit candidate expired on device |
 
 Errors which have no domain/table/row/tap/field location use the sentinels
 above. The operation sequence lets a host distinguish a newly processed

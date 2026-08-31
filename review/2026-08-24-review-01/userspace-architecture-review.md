@@ -226,13 +226,13 @@ The opening findings above are the audit-time snapshot. Current status:
 | Finding | Status | Reconciliation evidence |
 | --- | --- | --- |
 | 1 — malformed VIA mirror prerequisite | open, remediation in progress | owned by Review 19; targeted guard and sanitizer package opened |
-| 2 — no effective-profile seam | partially resolved | a hardened generation-owned provider now enforces coherent publication, invalidation visibility, safe-predicate reentrancy, nested-view containment, and active-backing-aware reuse; behavior consumers can resolve validated reader-backed generations, every current RGB family consumes one captured effective frame, and the candidate backend can adopt an exact boot-selected record or request compiled fallback for reset, while production owner installation, a measured behavior-index decision, and split convergence remain open |
+| 2 — no effective-profile seam | partially resolved | a hardened generation-owned provider now enforces coherent publication, invalidation visibility, safe-predicate reentrancy, nested-view containment, and active-backing-aware reuse; one gated engineering owner composes incremental boot/adoption, provider, behavior/RGB consumers, host/peer admission, and split convergence. Normal exposure, coherent external status, resource-policy closure, and hardware evidence remain open |
 | 3 — no canonical schema | partially resolved | `profile-wire-v1.md`, `profile-split-v1.md`, D-010, D-015, D-017, and D-020 freeze the host/profile, sibling, exact-compatibility, and boot-adoption contracts; blob, RGB, behavior, validator, real compiled-default materializer, and profile split frames have exact executable fixtures, while production runtime and peer persistence integration remain open |
-| 4 — no safe activation boundary | partially resolved | `authority-state-table.md` freezes the quiescence contract and `profile_activation_policy.c` now produces coherent production reason/count snapshots from authoritative runtime owners; callback-only behavior/RGB invalidators, stale token refusal, all current frame-boundary RGB consumers, and override-disabled compiled fallback have landed, while provider-owner installation, split convergence, and hardware evidence remain open |
+| 4 — no safe activation boundary | partially resolved | `authority-state-table.md` freezes the quiescence contract and `profile_activation_policy.c` produces coherent reason/count snapshots; the engineering owner installs the behavior/RGB invalidators and holds host/peer admission through activation while restricting concurrent reconciliation to convergence-only work. Superseded-host resolution, normal capability exposure, and hardware evidence remain open |
 | 5 — source/device authority | resolved at contract level | D-013, D-014, and `authority-state-table.md` define operations, ordering, partial results, and conflicts |
 | 6 — storage/capacity evidence | resolved at Stage 00 design level; runtime high-water remains open | D-016 and `stage-00-baseline.md` record the corrected per-half bank model, policy-versus-capacity distinction, exact EEPROM map, dual-slot partition, and ceilings |
 | 7 — Studio transport boundary | partially resolved | D-012 accepts an injected serialized adapter and fake; concrete packaged board probe remains open |
-| 8 — split integration shape | partially implemented beyond the resolved contract | D-011 selects a sibling profile reconciler; D-017, the exact frame codec, D-014 comparator, fail-closed peer observer, exact peer-store backend, scan reconciler, and QMK adapter cover bidirectional transfer, sender identity, bounded whole-profile validation, marker-last commit, retry/reconnect/role-change, passive expiry, and durability-unknown recovery. D-018 provisions physical origin; D-020 gives host and peer one explicit admission lease and makes split registration idempotent for exactly one reconciler. Production owner consumption/registration, incremental boot adoption, scheduler integration, and hardware convergence remain open |
+| 8 — split integration shape | partially implemented beyond the resolved contract | D-011/D-017 define the sibling protocol, authority, exact peer store, bounded reconciliation, retry, and recovery; D-018 provisions physical origin; D-020/D-021 give host and peer one lease and register exactly one reconciler through the engineering owner after incremental boot adoption. Ordinary registration, two-half hardware convergence, role-swap, and superseded-host evidence remain open |
 | 9 — config classification | resolved at inventory level | `field-classification.md` classifies every currently parsed Studio surface |
 
 Contract-level resolution is not milestone closure. Runtime, protocol, storage,
@@ -330,9 +330,12 @@ The store does not understand Raw HID commands or RGB rendering.
 The store's boot selector is now incremental: begin performs no I/O and each
 step performs one bounded read while validating both slots' fixed headers,
 payload identities, and canonical domain envelopes. The one-shot wrapper is
-retained for cold tests and the current temporary read-only shell only. D-020
-requires the production owner to advance the incremental selector and then the
-reader-backed whole-profile adoption validator through D-019's scan grant.
+retained for cold tests and the ordinary read-only shell only. The gated
+engineering owner advances the incremental selector and then the reader-backed
+whole-profile adoption validator through D-019's scan grant. A validated boot
+record enters full sibling reconciliation before activation is requested; this
+prevents the peer-convergence activation predicate from blocking the import
+needed when the halves boot with different durable generations.
 
 ### Runtime Provider And Activation
 
@@ -375,10 +378,10 @@ steps, with 897 behavior-domain steps capped at one 12-byte read each. Maximal
 RGB completes in 58 domain steps capped at one 16-byte read each. The owner
 contains no profile-sized RAM buffer. Its custom-save commit path now advances
 persistence through one EEPROM operation of at most 20 bytes per scan, then
-requests and polls provider activation. It remains independently compiled and
-unrouted until production safe-boundary and invalidation owners can support the
-capabilities they would advertise; real-device scan timing remains part of the
-hardware acceptance pass rather than an unbounded-code blocker.
+requests and polls provider activation. It is now composed by the side-specific
+engineering owner, but remains unrouted from the VIA channel; real-device scan
+timing remains part of the hardware acceptance pass rather than an unbounded-
+code blocker.
 
 The landed store backend now supplies that coordinator with a bounded inactive-
 slot reader/writer and composes the whole-profile validator over the staged
@@ -396,10 +399,10 @@ snapshot and request safe-boundary publication. The candidate coordinator now
 composes those operations behind custom-save `0x13`, retains idempotent
 transaction/digest correlation through commit and activation, and distinguishes
 an unconfirmed final marker from a safely failed commit. These APIs remain
-disconnected from QMK routing. The production safe predicate and first
-callback-only behavior invalidator have landed but are not yet installed by a
-production provider owner; no capability or split owner is installed merely
-because the isolated pieces exist.
+disconnected from host mutation routing. The engineering owner installs the
+production safe predicate and callback-only behavior/RGB invalidators, but
+ordinary firmware allocates none of that graph and no candidate capability is
+enabled merely because the composition exists.
 
 Host deployment and peer import now share an explicit backend admission lease.
 Only `HOST` or `PEER` may own staging at a time; a competing host begin remains
@@ -409,8 +412,9 @@ an exact boot-selected record through the bounded validator without rewriting
 EEPROM. Override-disabled durable records publish compiled fallback rather than
 their canonical reset payload, while their durable generation remains visible
 to authority. Validator compatibility is derived from the actual compiled
-materializer instead of permissive schema maxima. These are production-owner
-foundations, not production routing.
+materializer instead of permissive schema maxima. D-021 composes those
+foundations only in a side-specific engineering artifact, not production host
+routing.
 
 ### Split Reconciliation
 
@@ -429,28 +433,26 @@ bounded backoff, restarts after reconnect or role change, expires passive peer
 evidence, and stops on conflict, corruption, or incompatibility. The exact
 peer-store backend retains marker-last durability and sender identity.
 
-The appended QMK transaction adapter is independently compiled and tested but
-not registered by production firmware because the single writable profile
-owner does not exist yet. D-018 now provisions physical origin in each
-side-specific firmware artifact and overrides QMK handedness independently of
-USB role; generic firmware deliberately exposes no durable origin. Production
-installation must consume that boundary rather than `is_keyboard_master()`.
-Capability advertising remains off until the owner, boot validation,
-transport arbitration, and hardware matrix land.
+The appended QMK transaction adapter is independently compiled and tested.
+Ordinary firmware leaves it unregistered; the D-021 engineering owner registers
+it after consuming D-018's physical origin and completing compiled-profile
+validation. Generic firmware deliberately exposes no durable origin.
+Capability advertising remains off until resource policies, coherent host
+status, superseded-host arbitration, and the hardware matrix close.
 
 Registration now accepts one reconciler exactly once: repeating installation
 with the same pointer is idempotent, while a different pointer is rejected.
 This prevents accidental double registration during owner assembly but does
 not make the isolated adapter reachable by itself.
 
-The production VIA mirror and durable VIA reconciler now use the same callback
-boundary required by that future owner. Split callbacks perform strict decode,
+The production VIA mirror and durable VIA reconciler use the same callback
+boundary as the gated owner. Split callbacks perform strict decode,
 one bounded mailbox admission, and an immediate BUSY or cached response only;
 dynamic-keymap, macro, metadata, digest, recovery, and verification storage work
 runs from matrix scan. A rotating scheduler grants at most one step among boot
 profile discovery, the best-effort VIA mirror, and durable VIA reconciliation
-per scan. The future writable profile owner must join this scheduler rather
-than opening a second EEPROM path.
+per scan. The engineering owner replaces the existing profile-discovery entry
+and opens no second EEPROM tick; ordinary firmware keeps the read-only entry.
 
 ### Profile Studio
 

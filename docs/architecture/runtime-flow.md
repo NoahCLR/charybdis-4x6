@@ -120,12 +120,14 @@ durable-I/O scheduler starts from a rotating owner and grants at most one
 profile-discovery, mirror, or VIA-reconciliation step per matrix scan; idle
 owners are skipped without losing round-robin fairness.
 
-The profile store now exposes a one-read-per-step boot selector and the
-candidate backend exposes bounded whole-profile adoption of its exact selected
-record. The current read-only discovery shell still calls the cold compatibility
-wrapper, so it may finish the scan in one scheduler grant. Replacing that shell
-with the single writable profile owner, which must advance both state machines
-incrementally in this scheduler entry, is the next production checkpoint.
+The profile store exposes a one-read-per-step boot selector and the candidate
+backend exposes bounded whole-profile adoption of its exact selected record.
+Ordinary firmware retains the read-only discovery shell. The side-specific
+engineering artifact replaces that scheduler entry with the single profile
+owner, which incrementally validates compiled defaults, selects and adopts a
+durable record, fully reconciles a boot-selected record before requesting its
+activation, and then rotates at most one host, split, or peer-activation step.
+Its host/split receive surface is still not routed from the VIA channel.
 
 Combo-origin reconciliation runs before key-runtime scan projection. It removes
 QMK-disabled candidates immediately and expires inactive candidates only after
@@ -312,9 +314,11 @@ USB role never decides durable authority. Disconnect, malformed response, role
 change, or passive-peer timeout invalidates peer evidence; conflict,
 corruption, and incompatibility stop without overwriting either record.
 
-This path is compiled and host-tested but is not registered by production
-firmware until the writable profile owner consumes the side-specific flash
-identity, completes boot validation, and installs transport arbitration.
+Ordinary firmware compiles but does not register this path. The side-specific
+engineering owner consumes the flash identity, completes compiled-profile
+validation, installs transport arbitration, and registers it exactly once.
+That artifact remains non-production because its BSS and combined-data policy
+checks fail and its host mutation capability is deliberately unadvertised.
 
 ## Test Coverage Map
 

@@ -203,3 +203,25 @@ No project risks are closed yet.
 - R-18 remains open because the incremental store/adoption APIs are foundations;
   the current production read-only discovery wrapper has not yet been replaced
   by the writable owner inside the rotating scheduler.
+
+### 2026-08-31 gated owner-composition update
+
+- R-03, R-04, R-18, and R-19 now have one complete side-specific engineering
+  composition. The owner replaces the read-only scheduler entry, validates and
+  adopts boot state incrementally, installs the behavior/RGB consumers, and
+  registers one profile reconciler. Host and peer share one lease through
+  activation; host admission permits convergence-only split work and refuses a
+  concurrent peer import. Abandoned host work expires only before commit.
+- The QMK profile EEPROM adapter now enforces the store's 32-byte bound and
+  uses one direct block write. It no longer enters QMK's variable-stack update
+  helper, which could perform a read plus a write inside one scheduler grant.
+  The dedicated owner stack manifest covers both main and split callback paths.
+- These risks remain open because candidate routing and capability advertising
+  are still disabled, superseded-host resolution and coherent external status
+  are incomplete, and the two-half interruption/role-swap hardware matrix has
+  not run.
+- R-07 remains open with explicit evidence: the engineering owner is 3,084
+  bytes per half and passes the core-memory-span and reviewed-path stack
+  policies, but fails the `.bss` policy by 2,740 bytes and the combined-data
+  policy by 740 bytes. This is not physical SRAM exhaustion. No policy will be
+  revised without fresh allocator and stack high-water evidence on hardware.

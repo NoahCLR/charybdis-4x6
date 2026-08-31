@@ -1584,3 +1584,99 @@ Next steps:
 3. Enable mutation only in an engineering artifact, then run the two-half
    behavior/RGB commit, reboot, interruption, reconnect, role-swap,
    reset-to-compiled, rollback, and host/peer contention hardware matrix.
+
+### 2026-08-31 — Gated live-profile owner checkpoint
+
+- Accepted D-021 and composed the previously isolated live-profile pieces into
+  one caller-owned graph. The owner holds the compiled profile and validator,
+  committed reader and compatibility state, store, provider, shared candidate
+  backend, host transaction, peer backend, split reconciler, activation policy,
+  behavior runtime, RGB runtime, and one durable descriptor. It has no
+  profile-sized RAM buffer.
+- Boot now advances incremental slot discovery and semantic committed-record
+  adoption. The durable descriptor is withheld until semantic validation
+  succeeds; an accepted committed record is adopted without rewriting EEPROM,
+  and reset-to-compiled preserves the durable authority identity. The validated
+  boot record then reconciles in full before activation is requested, allowing
+  an older half to import its newer peer without deadlocking on the activation
+  policy's convergence requirement.
+- Added admission-first scheduling across host and peer work. A peer lease
+  blocks host work; a host lease allows only convergence-only peer work; and an
+  idle owner rotates host, split, and peer activation work. Convergence-only
+  split mode may exchange metadata, serve local content, or push the selected
+  local record, but refuses a peer-newer import without storage effects.
+- Added a 15-second pre-commit host timeout and protocol error 19 (`TIMEOUT`).
+  The timeout cannot expire a received candidate while it is committing,
+  activating, in the host command mailbox, or durability-unknown. The owner also
+  surfaces durability-unknown and activation-failed terminal states.
+- Kept the graph engineering-only. `NOAH_LIVE_PROFILE_OWNER=yes` requires an
+  explicit left/right physical half and VIA, and links the owner through a
+  separate source list. The ordinary firmware remains the read-only discovery
+  shell, does not allocate the owner, and still advertises no live mutation,
+  activation, or peer capability.
+- The engineering runtime owns one static owner, writable EEPROM access,
+  physical identity, split exchange, and one transport registration after graph
+  initialization. Exact owner state is 3,084 bytes on the 32-bit target, within
+  its 4,096-byte engineering policy.
+- The first engineering stack analysis exposed an unbounded dynamic stack path
+  in QMK's EEPROM update helper. The adapter now enforces a 32-byte I/O boundary
+  and uses the direct bounded write primitive; the profile store already owns
+  change detection and deliberate writes, so the extra update read was not part
+  of the storage contract. After the boot-reconciliation fix, the gate also
+  rejected a stale optimized metadata-path adjacency; the manifest was expanded
+  to the newly linked reconciler and metadata frames before the dedicated gate
+  passed.
+- A final independent audit exposed the boot-order deadlock above before this
+  checkpoint was committed. A two-owner host regression now boots generation 1
+  opposite generation 2, converges both durable records to generation 2, and
+  verifies that both owners activate successfully. Partial behavior/RGB runtime
+  installation rollback is also covered.
+- Focused verification passed:
+  `sh tests/host/run_profile_store_runtime_tests.sh`,
+  `sh tests/host/run_profile_candidate_store_backend_tests.sh`,
+  `sh tests/host/run_profile_owner_tests.sh`,
+  `sh tests/host/run_feature_gate_compile_tests.sh`,
+  `python3 tests/host/firmware_stack_budget_tool_test.py`, and
+  `npm run check` from `tools/charybdis-profile-studio/`.
+- Final ordinary verification passed:
+  `sh tests/host/run_all_host_tests.sh`,
+  `sh tests/host/run_firmware_stack_budget_checks.sh`,
+  `qmk compile -kb bastardkb/charybdis/4x6 -km noah`,
+  `sh tests/host/run_firmware_memory_budget_checks.sh`, and
+  `git diff --check`. The largest named ordinary main-process path is
+  1,800/1,920 bytes; boot discovery is 384 bytes; and the largest named split
+  path is 328/768 bytes. These are manifest-path estimates, not global or
+  interrupt-stack maxima.
+- The side-specific left engineering artifact linked successfully. Its
+  dedicated `sh tests/host/run_live_profile_owner_stack_budget_checks.sh` gate
+  passed: split metadata exchange is the largest named owner main-process path
+  at 1,104/1,920 bytes, and the largest named profile split callback is
+  264/768 bytes. Host marker-last write is 816 bytes, host validation is 824
+  bytes, and behavior/RGB publication is 1,072 bytes.
+- The engineering memory-policy check intentionally remains red:
+  `NOAH_MEMORY_BUDGET_TARGET=bastardkb_charybdis_4x6_noah_live_owner_stack_left sh tests/host/run_firmware_memory_budget_checks.sh`
+  reports SRAM0–3 `.bss` 28,740/26,000 bytes and `.data + .bss`
+  51,740/51,000 bytes. Its linker/core-memory span is 210,400/204,800 bytes and
+  passes that separate policy. Each half has 270,336 bytes of physical SRAM;
+  the failed regression margins are not physical-RAM limits or runtime
+  high-water evidence.
+- Fresh ordinary linked facts remain per RP2040 half: SRAM0–3 `.bss` is
+  25,876/26,000 bytes, `.data` is 22,996 bytes, `.data + .bss` is
+  48,872/51,000 bytes, the linker/core-memory span is 213,264/204,800 bytes,
+  and fixed linked occupancy across unique SRAM banks is 56,336 bytes.
+- Authored profile inputs and the Profile Studio UI did not change, so
+  introspection regeneration and screenshots were intentionally skipped.
+  Builds wrote generated artifacts in the sibling QMK tree only; no sibling
+  source file changed.
+
+Next steps:
+
+1. Route coherent owner status and candidate-channel commands into the gated
+   runtime, including explicit resolution when peer authority supersedes an
+   in-flight host candidate; keep advertised write capabilities disabled.
+2. Measure allocator and stack high-water on both real halves, then run both USB
+   orientations, role swap, behavior/RGB commit, reboot, interruption,
+   reconnect, reset-to-compiled, rollback, and host/peer contention tests.
+3. Make an explicit resource-policy decision from the linked accounting and
+   hardware evidence before enabling engineering mutation, and enable normal
+   live-edit capability only after the two-half safety matrix passes.

@@ -1,0 +1,138 @@
+{
+  "schema_version": 2,
+  "analysis_kind": "reviewed_path_regression",
+  "indirect_callsite_policy": "reviewed_path_adjacencies",
+  "top_frames": 12,
+  "contexts": [
+    {
+      "name": "main_process",
+      "root": "main",
+      "stack": {
+        "kind": "elf_map_symbol",
+        "symbol": "__process_stack_size__",
+        "minimum_bytes": 2560,
+        "reserve": {"fraction": 0.25, "minimum_bytes": 512}
+      },
+      "indirect_edges": [
+        {
+          "caller": "matrix_scan",
+          "callee": "noah_profile_store_runtime_matrix_scan_step",
+          "reason": "the durable-I/O scheduler dispatches the engineering live-profile owner through its rotating step table"
+        },
+        {
+          "caller": "scan_running",
+          "callee": "write_candidate",
+          "reason": "the host transaction invokes the shared candidate backend write callback"
+        },
+        {
+          "caller": "scan_running",
+          "callee": "validation_step",
+          "reason": "the host transaction invokes the shared candidate backend validation-step callback"
+        },
+        {
+          "caller": "scan_running",
+          "callee": "commit_step_candidate",
+          "reason": "the host transaction invokes the shared candidate backend marker-last commit callback"
+        },
+        {
+          "caller": "io_write",
+          "callee": "noah_qmk_profile_eeprom_write",
+          "reason": "the writable profile store invokes its injected QMK EEPROM write adapter"
+        },
+        {
+          "caller": "noah_profile_candidate_store_backend_activation_step",
+          "callee": "noah_effective_key_behavior_runtime_invalidate",
+          "reason": "provider publication invokes the installed key-behavior invalidator"
+        },
+        {
+          "caller": "noah_profile_candidate_store_backend_activation_step",
+          "callee": "noah_effective_rgb_runtime_invalidate",
+          "reason": "provider publication invokes the installed RGB invalidator"
+        },
+        {
+          "caller": "rpc_exchange",
+          "callee": "noah_qmk_profile_split_transport_exchange",
+          "reason": "the profile reconciler invokes its injected QMK split exchange callback"
+        },
+        {
+          "caller": "io_read",
+          "callee": "noah_qmk_profile_eeprom_read",
+          "reason": "the writable profile store invokes its injected QMK EEPROM read adapter"
+        }
+      ],
+      "paths": [
+        {
+          "name": "engineering owner compiled-profile validation",
+          "functions": ["main", "matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "noah_profile_validator_v1_step"]
+        },
+        {
+          "name": "engineering owner boot discovery read",
+          "functions": ["main", "matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "io_read", "noah_qmk_profile_eeprom_read", "wear_leveling_read"]
+        },
+        {
+          "name": "engineering owner committed-profile adoption",
+          "functions": ["main", "matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "validation_step", "noah_profile_validator_v1_step"]
+        },
+        {
+          "name": "engineering owner host payload write",
+          "functions": ["main", "matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "write_candidate", "io_write", "noah_qmk_profile_eeprom_write", "wear_leveling_write"]
+        },
+        {
+          "name": "engineering owner host validation step",
+          "functions": ["main", "matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "validation_step", "noah_profile_validator_v1_step"]
+        },
+        {
+          "name": "engineering owner host marker-last commit write",
+          "functions": ["main", "matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "commit_step_candidate", "io_write", "noah_qmk_profile_eeprom_write", "wear_leveling_write"]
+        },
+        {
+          "name": "engineering owner key-behavior publication",
+          "functions": ["main", "matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_store_backend_activation_step", "noah_effective_key_behavior_runtime_invalidate"]
+        },
+        {
+          "name": "engineering owner RGB publication",
+          "functions": ["main", "matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_store_backend_activation_step", "noah_effective_rgb_runtime_invalidate"]
+        },
+        {
+          "name": "engineering owner split metadata exchange",
+          "functions": ["main", "matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_split_reconciler_scan_mode", "metadata_exchange", "rpc_exchange", "noah_qmk_profile_split_transport_exchange", "transaction_rpc_exec", "transport_execute_transaction"]
+        }
+      ]
+    },
+    {
+      "name": "split_slave_thread",
+      "root": "SlaveThread",
+      "stack": {
+        "kind": "fixed_usable_stack",
+        "usable_stack_bytes": 1024,
+        "working_area_symbol": "waSlaveThread",
+        "working_area_fixed_overhead_bytes": 172,
+        "working_area_alignment_bytes": 8,
+        "expected_working_area_bytes": 1200,
+        "reserve": {"fraction": 0.25, "minimum_bytes": 256}
+      },
+      "indirect_edges": [
+        {
+          "caller": "SlaveThread",
+          "callee": "slave_rpc_exec_callback",
+          "reason": "vendor serial transaction dispatch selects EXECUTE_RPC through transaction->slave_callback"
+        },
+        {
+          "caller": "slave_rpc_exec_callback",
+          "callee": "noah_qmk_profile_split_rpc",
+          "reason": "the registered local profile transaction dispatches the callback from the split RPC table"
+        }
+      ],
+      "paths": [
+        {
+          "name": "engineering profile split mailbox decode",
+          "functions": ["SlaveThread", "slave_rpc_exec_callback", "noah_qmk_profile_split_rpc", "noah_profile_split_v1_frame_decode"]
+        },
+        {
+          "name": "engineering profile split mailbox publication",
+          "functions": ["SlaveThread", "slave_rpc_exec_callback", "noah_qmk_profile_split_rpc", "publish_mailbox"]
+        }
+      ]
+    }
+  ]
+}

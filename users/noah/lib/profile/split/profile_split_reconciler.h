@@ -72,6 +72,15 @@ typedef enum {
     NOAH_PROFILE_SPLIT_TRANSFER_LOCAL_PULL,
 } noah_profile_split_transfer_owner_t;
 
+typedef enum {
+    // Normal arbitration may import a newer peer profile.
+    NOAH_PROFILE_SPLIT_RECONCILE_FULL = 0u,
+    // Used while HOST owns the shared candidate backend. Metadata exchange,
+    // serving local payload, and pushing the host's durable record continue;
+    // starting or advancing a local peer import is refused with BUSY.
+    NOAH_PROFILE_SPLIT_RECONCILE_CONVERGENCE_ONLY,
+} noah_profile_split_reconcile_mode_t;
+
 // Caller-owned and payload-independent. It contains only protocol frames,
 // descriptors, retry state, and references to the shared store/provider owner.
 typedef struct {
@@ -121,6 +130,7 @@ bool noah_profile_split_reconciler_receive(noah_profile_split_reconciler_t *reco
 // or one validator/commit step. `master` is current transport role only; durable
 // authority continues to use the descriptor's stable physical origin.
 bool noah_profile_split_reconciler_scan(noah_profile_split_reconciler_t *reconciler, bool master, uint32_t now_ms);
+bool noah_profile_split_reconciler_scan_mode(noah_profile_split_reconciler_t *reconciler, bool master, uint32_t now_ms, noah_profile_split_reconcile_mode_t mode);
 
 const noah_profile_split_authority_t *noah_profile_split_reconciler_authority(const noah_profile_split_reconciler_t *reconciler);
 bool noah_profile_split_reconciler_status(const noah_profile_split_reconciler_t *reconciler, noah_profile_split_reconciler_status_t *status);

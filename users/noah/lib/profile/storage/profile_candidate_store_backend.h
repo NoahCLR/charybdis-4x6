@@ -75,4 +75,16 @@ noah_profile_candidate_backend_result_t noah_profile_candidate_store_backend_com
 // provider's safe-boundary predicate remains authoritative.
 noah_profile_candidate_backend_result_t noah_profile_candidate_store_backend_request_activation(noah_profile_candidate_store_backend_t *backend);
 
+// Owner-facing activation lifecycle for boot adoption and exact peer commits.
+// expected_owner prevents a top-level scheduler from polling a lease that
+// changed underneath it. NONE is valid only for boot adoption, which does not
+// acquire a host/peer staging lease.
+noah_profile_candidate_backend_result_t noah_profile_candidate_store_backend_activation_begin(noah_profile_candidate_store_backend_t *backend, noah_profile_storage_admission_owner_t expected_owner);
+noah_profile_candidate_backend_result_t noah_profile_candidate_store_backend_activation_step(noah_profile_candidate_store_backend_t *backend, noah_profile_storage_admission_owner_t expected_owner);
+
+// Returns only the exact semantically validated durable record retained by
+// this backend. Callers must copy it before a later staging admission reuses
+// the backend's validated view.
+bool noah_profile_candidate_store_backend_committed(const noah_profile_candidate_store_backend_t *backend, noah_profile_store_record_t *record);
+
 const noah_profile_validator_v1_profile_t *noah_profile_candidate_store_backend_validated_profile(const noah_profile_candidate_store_backend_t *backend);

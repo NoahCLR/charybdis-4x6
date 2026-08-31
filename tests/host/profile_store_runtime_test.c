@@ -41,7 +41,7 @@ void eeprom_read_block(void *target, const void *source, size_t length) {
     memcpy(target, &eeprom_bytes[address], length);
 }
 
-void eeprom_update_block(const void *source, void *target, size_t length) {
+void eeprom_write_block(const void *source, void *target, size_t length) {
     uintptr_t address = (uintptr_t)target;
 
     assert(source != NULL);
@@ -128,6 +128,7 @@ static void test_qmk_adapter_is_slot_bounded_and_read_only(void) {
     assert(!io.read(io.context, NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR - 1u, &byte, 1u));
     assert(!io.read(io.context, NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR, NULL, 1u));
     assert(!io.read(io.context, NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR, &byte, 0u));
+    assert(!io.read(io.context, NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR, &byte, NOAH_PROFILE_STORE_IO_CHUNK_MAX + 1u));
     assert(io.read(io.context, NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR, &byte, 1u));
     assert(io.read(io.context, NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE - 1u, &byte, 1u));
     assert(!io.read(io.context, NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE - 1u, &byte, 2u));
@@ -147,6 +148,7 @@ static void test_qmk_write_adapter_is_slot_bounded(void) {
     assert(!io.write(io.context, NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR - 1u, bytes, 1u));
     assert(!io.write(io.context, NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR, NULL, 1u));
     assert(!io.write(io.context, NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR, bytes, 0u));
+    assert(!io.write(io.context, NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR, bytes, NOAH_PROFILE_STORE_IO_CHUNK_MAX + 1u));
     assert(io.write(io.context, NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR, bytes, sizeof(bytes)));
     assert(io.read(io.context, NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR, result, sizeof(result)));
     assert(memcmp(result, bytes, sizeof(bytes)) == 0);

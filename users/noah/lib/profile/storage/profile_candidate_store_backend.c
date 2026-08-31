@@ -382,12 +382,7 @@ static noah_profile_candidate_backend_result_t commit_step_candidate(void *conte
 
 static noah_profile_candidate_backend_result_t activation_begin_candidate(void *context) {
     noah_profile_candidate_store_backend_t *backend = context;
-    noah_profile_candidate_backend_result_t result  = noah_profile_candidate_store_backend_request_activation(backend);
-
-    if (backend) {
-        backend->activation_requested = result == NOAH_PROFILE_CANDIDATE_BACKEND_OK;
-    }
-    return result;
+    return noah_profile_candidate_store_backend_activation_begin(backend, NOAH_PROFILE_STORAGE_ADMISSION_HOST);
 }
 
 static bool active_identity_matches_commit(const noah_effective_profile_identity_t *active, const noah_profile_store_record_t *record) {
@@ -402,10 +397,34 @@ static bool active_identity_matches_commit(const noah_effective_profile_identity
 
 static noah_profile_candidate_backend_result_t activation_step_candidate(void *context) {
     noah_profile_candidate_store_backend_t *backend = context;
+    return noah_profile_candidate_store_backend_activation_step(backend, NOAH_PROFILE_STORAGE_ADMISSION_HOST);
+}
+
+static bool activation_owner_matches(const noah_profile_candidate_store_backend_t *backend, noah_profile_storage_admission_owner_t expected_owner) {
+    return backend && backend->admission_owner == expected_owner && (expected_owner != NOAH_PROFILE_STORAGE_ADMISSION_NONE || backend->validating_committed_record || backend->committed_available);
+}
+
+noah_profile_candidate_backend_result_t noah_profile_candidate_store_backend_activation_begin(noah_profile_candidate_store_backend_t *backend, noah_profile_storage_admission_owner_t expected_owner) {
+    noah_profile_candidate_backend_result_t result;
+
+    if (!activation_owner_matches(backend, expected_owner)) {
+        return NOAH_PROFILE_CANDIDATE_BACKEND_BUSY;
+    }
+    result = noah_profile_candidate_store_backend_request_activation(backend);
+    if (result == NOAH_PROFILE_CANDIDATE_BACKEND_OK) {
+        backend->activation_requested = true;
+    }
+    return result;
+}
+
+noah_profile_candidate_backend_result_t noah_profile_candidate_store_backend_activation_step(noah_profile_candidate_store_backend_t *backend, noah_profile_storage_admission_owner_t expected_owner) {
     noah_effective_profile_status_t         status;
     noah_effective_profile_result_t         result;
 
-    if (!backend || !backend->provider || !backend->committed_available) {
+    if (!activation_owner_matches(backend, expected_owner)) {
+        return NOAH_PROFILE_CANDIDATE_BACKEND_BUSY;
+    }
+    if (!backend->provider || !backend->committed_available) {
         return NOAH_PROFILE_CANDIDATE_BACKEND_REJECTED;
     }
     if (!backend->activation_requested) {
@@ -511,6 +530,14 @@ noah_profile_candidate_backend_result_t noah_profile_candidate_store_backend_req
 
 const noah_profile_validator_v1_profile_t *noah_profile_candidate_store_backend_validated_profile(const noah_profile_candidate_store_backend_t *backend) {
     return backend && backend->validation_complete ? &backend->validated_profile : NULL;
+}
+
+bool noah_profile_candidate_store_backend_committed(const noah_profile_candidate_store_backend_t *backend, noah_profile_store_record_t *record) {
+    if (!backend || !record || !backend->store || !backend->validation_complete || !backend->committed_available || !committed_record_equal(&backend->committed_record, &backend->store->committed) || !validated_profile_matches_record(&backend->validated_profile, &backend->committed_record)) {
+        return false;
+    }
+    *record = backend->committed_record;
+    return true;
 }
 
 _Static_assert((unsigned)NOAH_PROFILE_CANDIDATE_V1_CHUNK_MAX <= (unsigned)NOAH_PROFILE_STORE_IO_CHUNK_MAX, "candidate wire chunks must fit the store write bound");

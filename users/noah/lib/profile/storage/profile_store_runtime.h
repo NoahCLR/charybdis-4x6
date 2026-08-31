@@ -13,6 +13,7 @@ typedef enum {
     NOAH_PROFILE_STORE_RUNTIME_COMMITTED_FOUND,
     NOAH_PROFILE_STORE_RUNTIME_GENERATION_CONFLICT,
     NOAH_PROFILE_STORE_RUNTIME_STORAGE_ERROR,
+    NOAH_PROFILE_STORE_RUNTIME_INTEGRATION_ERROR,
 } noah_profile_store_runtime_state_t;
 
 noah_profile_store_runtime_state_t noah_profile_store_runtime_state(void);

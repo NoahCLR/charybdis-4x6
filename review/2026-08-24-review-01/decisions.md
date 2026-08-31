@@ -331,3 +331,40 @@ newer durable generation for authority and reset semantics. Split transport
 registration is one-shot: reinstalling the same reconciler is idempotent and a
 different owner is rejected. Mutation, activation, and peer capabilities stay
 disabled until one production owner composes these rules.
+
+### D-021 — Complete Owner Composition Lands Behind An Engineering Gate
+
+Status: accepted on 2026-08-31; normal exposure and hardware acceptance remain open
+
+One caller-owned `noah_profile_owner_t` composes the compiled reader and
+validator, store, provider, shared candidate backend, host transaction, exact
+peer backend, split reconciler, activation policy, and installed behavior/RGB
+runtimes. The boot path validates compiled defaults before constructing this
+graph, incrementally selects and semantically adopts a durable record, and
+withholds its split descriptor until that validation succeeds.
+
+Runtime scheduling is admission-first. `PEER` blocks host work until exact
+peer commit and activation finish. `HOST` retains its lease through durable
+commit and activation while split work is restricted to metadata, serving or
+pushing the known durable local record; it cannot begin or advance a peer
+import. A validated boot-selected record first runs full reconciliation, so a
+newer peer can replace it before either half requests activation; only after
+authority converges does boot activation begin. With no admission during normal
+operation, host, split, and peer activation rotate. An inactive host transaction
+may expire only before marker-last commit, never with a queued mailbox or after
+durability becomes uncertain.
+
+The complete graph is allocated only when a side-specific build supplies
+`NOAH_LIVE_PROFILE_OWNER=yes` and a flash-owned physical half. Ordinary
+firmware retains the read-only discovery shell. Even the engineering artifact
+does not advertise or route candidate mutation through VIA, because coherent
+host status, superseded-host resolution, hardware acceptance, and resource
+policy closure remain open.
+
+The linked engineering owner is 3,084 bytes per RP2040 half. Its SRAM0–3
+linker/core-memory span passes policy, but `.bss` and `.data + .bss` fail their
+separate regression policies. Those failures are not physical-SRAM exhaustion
+and are not grounds to change policy without allocator/stack high-water data.
+A dedicated engineering stack manifest covers owner boot, host write,
+validation, marker-last commit, publication, split exchange, and profile split
+callback paths.

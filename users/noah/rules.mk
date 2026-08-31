@@ -69,3 +69,21 @@ ifneq ($(strip $(NOAH_PHYSICAL_HALF)),)
         $(error NOAH_PHYSICAL_HALF must be `left` or `right`)
     endif
 endif
+
+# Complete live-profile owner composition is available only as a deliberate
+# side-specific engineering artifact while its linked state and hardware
+# high-water evidence are under review. The VIA write capability remains
+# unadvertised and unrouted even in this build.
+ifneq ($(strip $(NOAH_LIVE_PROFILE_OWNER)),)
+    ifneq ($(strip $(NOAH_LIVE_PROFILE_OWNER)),yes)
+        $(error NOAH_LIVE_PROFILE_OWNER must be `yes` when specified)
+    endif
+    ifeq ($(strip $(NOAH_PHYSICAL_HALF)),)
+        $(error NOAH_LIVE_PROFILE_OWNER=yes requires NOAH_PHYSICAL_HALF=left or right)
+    endif
+    ifneq ($(strip $(VIA_ENABLE)),yes)
+        $(error NOAH_LIVE_PROFILE_OWNER=yes requires VIA_ENABLE=yes)
+    endif
+    OPT_DEFS += -DNOAH_LIVE_PROFILE_OWNER_ENABLE
+    SRC += $(NOAH_LIVE_PROFILE_OWNER_SOURCES)
+endif

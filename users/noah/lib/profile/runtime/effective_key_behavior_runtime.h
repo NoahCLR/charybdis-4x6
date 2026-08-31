@@ -11,8 +11,8 @@
 
 enum {
     // Caller-owned derived state policy on a 32-bit target. This is not an
-    // RP2040 capacity statement and no production instance is allocated by
-    // this module yet.
+    // RP2040 capacity statement. The instance is allocated only by the
+    // explicit engineering profile-owner artifact, not ordinary firmware.
     NOAH_EFFECTIVE_KEY_BEHAVIOR_RUNTIME_STATE_BUDGET_32BIT = 256u,
 };
 
