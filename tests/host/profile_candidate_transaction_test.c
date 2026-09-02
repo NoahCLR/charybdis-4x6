@@ -651,6 +651,13 @@ static void finish_validation(noah_profile_candidate_transaction_t *transaction)
     }
 }
 
+static void stage_validated(noah_profile_candidate_transaction_t *transaction, fake_backend_t *fake, uint16_t transaction_id, const uint8_t *profile, uint16_t length, const noah_profile_candidate_v1_metadata_t *metadata) {
+    stage_complete(transaction, fake, transaction_id, profile, length, metadata);
+    request_validation(transaction, fake, transaction_id);
+    finish_validation(transaction);
+    assert(status_of(transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATED);
+}
+
 static void test_bounded_validation_and_error_locations(void) {
     uint8_t profile[48];
     fake_backend_t fake;
@@ -778,6 +785,214 @@ static void test_commit_activation_and_idempotent_retry(void) {
     queue_and_scan(&transaction, &fake, frame);
     assert(status_of(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE);
     assert(fake.commit_begin_calls == 1u && fake.commit_step_calls == 2u && fake.activation_begin_calls == 1u && fake.activation_step_calls == 2u);
+}
+
+static void test_split_authorization_barriers(void) {
+    static const uint8_t profile[8] = {'N', 'L', 'P', '1', 1u, 0u, 0u, 1u};
+    fake_backend_t fake;
+    noah_profile_candidate_backend_t backend;
+    noah_profile_candidate_compatibility_t compatible = compatibility();
+    noah_profile_candidate_transaction_t transaction;
+    noah_profile_candidate_v1_metadata_t metadata = metadata_for(profile, sizeof(profile));
+    noah_profile_candidate_v1_status_t status;
+    uint8_t frame[32];
+
+    fake_init(&fake);
+    backend = backend_for(&fake);
+    noah_profile_candidate_transaction_init(&transaction, &backend, &compatible);
+    assert(noah_profile_candidate_transaction_require_split_authorization(&transaction, true));
+    stage_validated(&transaction, &fake, 70u, profile, sizeof(profile), &metadata);
+    assert(!noah_profile_candidate_transaction_require_split_authorization(&transaction, false));
+
+    // The callback-owned COMMIT can cross neither split-authority boundary.
+    simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT, 70u);
+    queue_and_scan(&transaction, &fake, frame);
+    status = status_of(&transaction);
+    assert(status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_PREPARING_PEER);
+    assert(status.transaction_id == 70u && status.digest == metadata.digest);
+    assert(fake.commit_begin_calls == 0u && fake.commit_step_calls == 0u);
+    assert(fake.activation_begin_calls == 0u && fake.activation_step_calls == 0u);
+    assert(!noah_profile_candidate_transaction_scan(&transaction));
+
+    // Correlation is preserved and lost acknowledgements remain idempotent
+    // while waiting at the barrier.
+    simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT, 700u);
+    queue_and_scan(&transaction, &fake, frame);
+    status = status_of(&transaction);
+    assert(status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_PREPARING_PEER);
+    assert(status.transaction_id == 70u && status.digest == metadata.digest);
+    assert(status.error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_WRONG_TRANSACTION);
+    assert(fake.commit_begin_calls == 0u);
+    simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT, 70u);
+    queue_and_scan(&transaction, &fake, frame);
+    assert(status_of(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_PREPARING_PEER);
+    assert(status_of(&transaction).error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_NONE);
+    assert(fake.commit_begin_calls == 0u);
+    assert(!noah_profile_candidate_transaction_authorize_activation(&transaction));
+
+    // PREPARING_PEER is still precommit and may be aborted normally.
+    simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_ABORT, 70u);
+    queue_and_scan(&transaction, &fake, frame);
+    assert(status_of(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE);
+    assert(fake.abort_calls == 1u && fake.commit_begin_calls == 0u);
+
+    // Owner-driven supersession has the same safe precommit boundary.
+    stage_validated(&transaction, &fake, 71u, profile, sizeof(profile), &metadata);
+    simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT, 71u);
+    queue_and_scan(&transaction, &fake, frame);
+    assert(noah_profile_candidate_transaction_supersede_precommit(&transaction) == NOAH_PROFILE_CANDIDATE_EXPIRE_DONE);
+    assert(status_of(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE);
+    assert(status_of(&transaction).error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_PEER_SUPERSEDED);
+    assert(fake.abort_calls == 2u && fake.commit_begin_calls == 0u);
+
+    // Simultaneous-host arbitration has a distinct frozen outcome rather than
+    // impersonating a durable-peer supersession.
+    stage_validated(&transaction, &fake, 710u, profile, sizeof(profile), &metadata);
+    simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT, 710u);
+    queue_and_scan(&transaction, &fake, frame);
+    assert(noah_profile_candidate_transaction_yield_precommit(&transaction) == NOAH_PROFILE_CANDIDATE_EXPIRE_DONE);
+    assert(status_of(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE);
+    assert(status_of(&transaction).error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_PEER_PREPARE_YIELDED);
+    assert(fake.abort_calls == 3u && fake.commit_begin_calls == 0u);
+
+    // Once authorized, durability can advance but activation remains fenced.
+    fake.commit_steps_remaining      = 1u;
+    fake.activation_steps_remaining = 1u;
+    stage_validated(&transaction, &fake, 72u, profile, sizeof(profile), &metadata);
+    simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT, 72u);
+    queue_and_scan(&transaction, &fake, frame);
+    assert(noah_profile_candidate_transaction_authorize_commit(&transaction));
+    assert(status_of(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_COMMITTING);
+    assert(fake.commit_begin_calls == 1u && fake.activation_begin_calls == 0u);
+    assert(noah_profile_candidate_transaction_authorize_commit(&transaction));
+    assert(fake.commit_begin_calls == 1u);
+
+    simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_ABORT, 72u);
+    queue_and_scan(&transaction, &fake, frame);
+    assert(status_of(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_COMMITTING);
+    assert(status_of(&transaction).error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_INVALID_STATE);
+    assert(fake.abort_calls == 3u);
+    simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT, 72u);
+    queue_and_scan(&transaction, &fake, frame);
+    assert(status_of(&transaction).error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_NONE);
+
+    assert(noah_profile_candidate_transaction_scan(&transaction));
+    assert(status_of(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_COMMITTING);
+    assert(noah_profile_candidate_transaction_scan(&transaction));
+    status = status_of(&transaction);
+    assert(status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_CONVERGING_PEER);
+    assert(status.transaction_id == 72u && status.digest == metadata.digest);
+    assert(transaction.last_committed_transaction_id == 72u);
+    assert(fake.commit_step_calls == 2u && fake.activation_begin_calls == 0u);
+    assert(!noah_profile_candidate_transaction_scan(&transaction));
+    assert(noah_profile_candidate_transaction_expire_precommit(&transaction) == NOAH_PROFILE_CANDIDATE_EXPIRE_DURABLE_PHASE);
+
+    // Commit and owner retries cannot restart persistence or activation.
+    simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT, 72u);
+    queue_and_scan(&transaction, &fake, frame);
+    assert(status_of(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_CONVERGING_PEER);
+    assert(noah_profile_candidate_transaction_authorize_commit(&transaction));
+    assert(fake.commit_begin_calls == 1u && fake.commit_step_calls == 2u && fake.activation_begin_calls == 0u);
+
+    assert(noah_profile_candidate_transaction_authorize_activation(&transaction));
+    assert(status_of(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_ACTIVATING);
+    assert(fake.activation_begin_calls == 1u);
+    assert(noah_profile_candidate_transaction_authorize_activation(&transaction));
+    simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT, 72u);
+    queue_and_scan(&transaction, &fake, frame);
+    assert(fake.activation_begin_calls == 1u);
+    assert(noah_profile_candidate_transaction_scan(&transaction));
+    assert(status_of(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_ACTIVATING);
+    assert(noah_profile_candidate_transaction_scan(&transaction));
+    assert(status_of(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE);
+    assert(status_of(&transaction).transaction_id == 72u && status_of(&transaction).digest == metadata.digest);
+
+    // The setting can be disabled at idle; ordinary transactions still cross
+    // directly from COMMITTING to ACTIVATING as before.
+    assert(noah_profile_candidate_transaction_require_split_authorization(&transaction, false));
+    stage_validated(&transaction, &fake, 73u, profile, sizeof(profile), &metadata);
+    simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT, 73u);
+    queue_and_scan(&transaction, &fake, frame);
+    assert(status_of(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_COMMITTING);
+    assert(fake.commit_begin_calls == 2u);
+}
+
+static void test_postcommit_authority_failure_is_terminal_and_retains_candidate(void) {
+    static const uint8_t profile[8] = {'N', 'L', 'P', '1', 1u, 0u, 0u, 1u};
+    fake_backend_t fake;
+    noah_profile_candidate_backend_t backend;
+    noah_profile_candidate_compatibility_t compatible = compatibility();
+    noah_profile_candidate_transaction_t transaction;
+    noah_profile_candidate_v1_metadata_t metadata = metadata_for(profile, sizeof(profile));
+    uint8_t frame[32];
+
+    fake_init(&fake);
+    fake.commit_steps_remaining = 0u;
+    backend = backend_for(&fake);
+    noah_profile_candidate_transaction_init(&transaction, &backend, &compatible);
+    assert(noah_profile_candidate_transaction_require_split_authorization(&transaction, true));
+    stage_validated(&transaction, &fake, 74u, profile, sizeof(profile), &metadata);
+    simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT, 74u);
+    queue_and_scan(&transaction, &fake, frame);
+    assert(noah_profile_candidate_transaction_authorize_commit(&transaction));
+    while (status_of(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_COMMITTING) {
+        assert(noah_profile_candidate_transaction_scan(&transaction));
+    }
+    assert(status_of(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_CONVERGING_PEER);
+    assert(!noah_profile_candidate_transaction_fail_postcommit(&transaction, NOAH_PROFILE_CANDIDATE_V1_ERROR_STORAGE_FAILURE));
+    assert(noah_profile_candidate_transaction_fail_postcommit(&transaction, NOAH_PROFILE_CANDIDATE_V1_ERROR_POSTCOMMIT_AUTHORITY_LOST));
+    assert(status_of(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_AUTHORITY_FAILED);
+    assert(status_of(&transaction).error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_POSTCOMMIT_AUTHORITY_LOST);
+    assert(transaction.has_candidate && transaction.poisoned);
+    assert(fake.abort_calls == 0u && fake.activation_begin_calls == 0u);
+    assert(!noah_profile_candidate_transaction_scan(&transaction));
+    assert(!noah_profile_candidate_transaction_authorize_activation(&transaction));
+    assert(noah_profile_candidate_transaction_expire_precommit(&transaction) == NOAH_PROFILE_CANDIDATE_EXPIRE_DURABLE_PHASE);
+}
+
+static void test_split_commit_failure_reports_and_cleans_known_precommit_failure(void) {
+    static const uint8_t profile[8] = {'N', 'L', 'P', '1', 1u, 0u, 0u, 1u};
+    fake_backend_t fake;
+    noah_profile_candidate_backend_t backend;
+    noah_profile_candidate_compatibility_t compatible = compatibility();
+    noah_profile_candidate_transaction_t transaction;
+    noah_profile_candidate_v1_metadata_t metadata = metadata_for(profile, sizeof(profile));
+    uint8_t frame[32];
+
+    fake_init(&fake);
+    fake.commit_begin_result = NOAH_PROFILE_CANDIDATE_BACKEND_IO_ERROR;
+    backend = backend_for(&fake);
+    noah_profile_candidate_transaction_init(&transaction, &backend, &compatible);
+    assert(noah_profile_candidate_transaction_require_split_authorization(&transaction, true));
+    stage_validated(&transaction, &fake, 75u, profile, sizeof(profile), &metadata);
+    simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT, 75u);
+    queue_and_scan(&transaction, &fake, frame);
+    assert(!noah_profile_candidate_transaction_authorize_commit(&transaction));
+    assert(status_of(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_REJECTED);
+    assert(status_of(&transaction).error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_STORAGE_FAILURE);
+    assert(transaction.has_candidate && transaction.poisoned);
+    assert(noah_profile_candidate_transaction_cleanup_failed_precommit(&transaction) == NOAH_PROFILE_CANDIDATE_EXPIRE_DONE);
+    assert(!transaction.has_candidate && transaction.poisoned);
+    assert(status_of(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_REJECTED);
+    assert(status_of(&transaction).error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_STORAGE_FAILURE);
+    assert(fake.abort_calls == 1u);
+    assert(noah_profile_candidate_transaction_cleanup_failed_precommit(&transaction) == NOAH_PROFILE_CANDIDATE_EXPIRE_NOTHING);
+
+    fake_init(&fake);
+    fake.commit_steps_remaining = 0u;
+    fake.commit_terminal_result = NOAH_PROFILE_CANDIDATE_BACKEND_IO_ERROR;
+    backend = backend_for(&fake);
+    noah_profile_candidate_transaction_init(&transaction, &backend, &compatible);
+    assert(noah_profile_candidate_transaction_require_split_authorization(&transaction, true));
+    stage_validated(&transaction, &fake, 76u, profile, sizeof(profile), &metadata);
+    simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT, 76u);
+    queue_and_scan(&transaction, &fake, frame);
+    assert(noah_profile_candidate_transaction_authorize_commit(&transaction));
+    assert(noah_profile_candidate_transaction_scan(&transaction));
+    assert(status_of(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_REJECTED);
+    assert(status_of(&transaction).error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_STORAGE_FAILURE);
+    assert(noah_profile_candidate_transaction_cleanup_failed_precommit(&transaction) == NOAH_PROFILE_CANDIDATE_EXPIRE_DONE);
+    assert(fake.abort_calls == 1u && !transaction.has_candidate);
 }
 
 static void test_activation_failure_is_durable_and_requires_status_clear(void) {
@@ -1054,6 +1269,9 @@ int main(int argc, char **argv) {
     test_sequential_chunks_and_duplicate_rules();
     test_bounded_validation_and_error_locations();
     test_commit_activation_and_idempotent_retry();
+    test_split_authorization_barriers();
+    test_postcommit_authority_failure_is_terminal_and_retains_candidate();
+    test_split_commit_failure_reports_and_cleans_known_precommit_failure();
     test_activation_failure_is_durable_and_requires_status_clear();
     test_unknown_marker_durability_is_not_reported_as_safe_failure();
     test_abort_reset_and_no_timeout();

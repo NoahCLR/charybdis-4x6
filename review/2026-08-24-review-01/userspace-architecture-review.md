@@ -229,11 +229,11 @@ The opening findings above are the audit-time snapshot. Current status:
 | 1 — malformed VIA mirror prerequisite | open, remediation in progress | owned by Review 19; targeted guard and sanitizer package opened |
 | 2 — no effective-profile seam | partially resolved | a hardened generation-owned provider now enforces coherent publication, invalidation visibility, safe-predicate reentrancy, nested-view containment, and active-backing-aware reuse; one gated engineering owner composes incremental boot/adoption, provider, behavior/RGB consumers, host/peer admission, split convergence, and coherent external read-only status. Normal mutation exposure, resource-policy closure, and hardware evidence remain open |
 | 3 — no canonical schema | partially resolved | `profile-wire-v1.md`, `profile-split-v1.md`, D-010, D-015, D-017, and D-020 freeze the host/profile, sibling, exact-compatibility, and boot-adoption contracts; blob, RGB, behavior, validator, real compiled-default materializer, and profile split frames have exact executable fixtures, while production runtime and peer persistence integration remain open |
-| 4 — no safe activation boundary | partially resolved | `authority-state-table.md` freezes the quiescence contract and `profile_activation_policy.c` produces coherent reason/count snapshots; the engineering owner installs the behavior/RGB invalidators and holds host/peer admission through activation while restricting concurrent reconciliation to convergence-only work. Compatible newer-or-equal peer authority now cancels only precommit host work; postcommit concurrent authority, normal capability exposure, and hardware evidence remain open |
+| 4 — no safe activation boundary | partially resolved | `authority-state-table.md` freezes the quiescence contract and `profile_activation_policy.c` produces coherent reason/count snapshots; the engineering owner installs the behavior/RGB invalidators and holds host/peer admission through activation. D-022 prepares the peer before local durability and requires a fresh exact owner-matching authority snapshot before activation; normal capability exposure and hardware evidence remain open |
 | 5 — source/device authority | resolved at contract level | D-013, D-014, and `authority-state-table.md` define operations, ordering, partial results, and conflicts |
 | 6 — storage/capacity evidence | resolved at Stage 00 design level; runtime high-water remains open | D-016 and `stage-00-baseline.md` record the corrected per-half bank model, policy-versus-capacity distinction, exact EEPROM map, dual-slot partition, and ceilings |
 | 7 — Studio transport boundary | partially resolved | D-012 accepts an injected serialized adapter and fake; concrete packaged board probe remains open |
-| 8 — split integration shape | partially implemented beyond the resolved contract | D-011/D-017 define the sibling protocol, authority, exact peer store, bounded reconciliation, retry, and recovery; D-018 provisions physical origin; D-020/D-021 give host and peer one lease and register exactly one reconciler through the engineering owner after incremental boot adoption. Precommit supersession is enforced and status-visible; normal exposure, postcommit contention handling, two-half hardware convergence, and role-swap evidence remain open |
+| 8 — split integration shape | partially implemented beyond the resolved contract | D-011/D-017 define the sibling protocol, authority, exact peer store, bounded reconciliation, retry, and recovery; D-018 provisions physical origin; D-020/D-021 give host and peer one lease and register exactly one reconciler through the engineering owner after incremental boot adoption; D-022 adds provisional peer preparation, simultaneous-writer arbitration, local/peer marker ordering, and exact activation fencing. Normal exposure and the two-half hardware convergence/recovery matrix remain open |
 | 9 — config classification | resolved at inventory level | `field-classification.md` classifies every currently parsed Studio surface |
 
 Contract-level resolution is not milestone closure. Runtime, protocol, storage,
@@ -437,6 +437,16 @@ bounded backoff, restarts after reconnect or role change, expires passive peer
 evidence, and stops on conflict, corruption, or incompatibility. The exact
 peer-store backend retains marker-last durability and sender identity.
 
+D-022 adds a staged-source mode for live deployment. The sender transfers the
+validated inactive-slot candidate and pauses before `PREPARE_COMMIT`;
+provisional intent remains separate from durable peer authority. The owner then
+commits local, commits peer, refreshes both durable descriptors, and authorizes
+provider activation only for a fresh exact match to the just-committed
+identity. Role changes preserve that prepared sender state, simultaneous
+provisional writers are ordered by generation and stable physical origin, and
+any unexpected postcommit authority loss remains inactive with its HOST
+backing retained.
+
 The appended QMK transaction adapter is independently compiled and tested.
 Ordinary firmware leaves it unregistered; the D-021 engineering owner registers
 it after consuming D-018's physical origin and completing compiled-profile
@@ -444,8 +454,8 @@ validation. Generic firmware deliberately exposes no durable origin. The
 engineering read surface truthfully advertises the landed RGB/behavior schemas
 plus compiled-profile and action-ABI identities while keeping candidate chunk
 capacity and write/commit/activation/peer-operation bits zero. Mutation
-advertising and routing remain coupled and off until postcommit authority,
-resource policy, and the hardware matrix close.
+advertising and routing remain coupled and off until resource policy, the
+hardware matrix, and a separate explicit engineering-mutation gate close.
 
 Registration now accepts one reconciler exactly once: repeating installation
 with the same pointer is idempotent, while a different pointer is rejected.

@@ -299,10 +299,14 @@ flowchart LR
     metadata --> compare["D-014 authority compare"]
     compare -->|local newer| push["Read one local chunk, then push"]
     compare -->|peer newer| pull["Request one peer chunk, then stage locally"]
+    compare -->|live candidate| prepare["Stage peer, pause before markers"]
     push --> mailbox["Sibling callback mailbox"]
     pull --> mailbox
+    prepare --> mailbox
     mailbox --> peer_scan["Sibling scan: one store or validator step"]
-    peer_scan --> durable["Marker-last durable commit"]
+    peer_scan --> local_marker["Owner authorizes local marker"]
+    local_marker --> peer_marker["Owner authorizes peer marker"]
+    peer_marker --> durable["Both records durable"]
     durable --> verify["Exact metadata verification"]
     verify --> authority["Fail-closed peer observer"]
 ```
@@ -315,11 +319,19 @@ USB role never decides durable authority. Disconnect, malformed response, role
 change, or passive-peer timeout invalidates peer evidence; conflict,
 corruption, and incompatibility stop without overwriting either record.
 
+For a host live deployment, D-022 treats `PREPARE_BEGIN` as provisional. The
+sender pauses after the peer has every byte, commits local then peer, and
+requires fresh exact durable convergence before provider activation. Prepared
+candidate correlation survives role changes by restarting the provisional
+handshake; simultaneous provisional writers are resolved by generation and
+stable physical origin before either marker.
+
 Ordinary firmware compiles but does not register this path. The side-specific
 engineering owner consumes the flash identity, completes compiled-profile
 validation, installs transport arbitration, and registers it exactly once.
 That artifact remains non-production because its BSS and combined-data policy
-checks fail and its host mutation capability is deliberately unadvertised.
+checks fail, the real two-half safety matrix is open, and its host mutation
+capability is deliberately unadvertised.
 
 ## Test Coverage Map
 

@@ -229,6 +229,42 @@ static void test_stage_validate_and_commit(void) {
     assert(selected.payload_digest == committed.payload_digest);
 }
 
+static void test_validated_host_candidate_is_a_provisional_split_source(void) {
+    noah_profile_store_t                   store;
+    noah_profile_candidate_store_backend_t backend;
+    noah_effective_profile_provider_t      provider;
+    noah_profile_candidate_backend_t       interface;
+    noah_profile_candidate_v1_metadata_t   metadata = metadata_for(empty_profile, sizeof(empty_profile));
+    noah_profile_candidate_v1_error_t      error    = noah_profile_candidate_v1_no_error();
+    noah_profile_store_candidate_t         staged;
+    noah_profile_store_candidate_t         wrong;
+    uint8_t                                bytes[sizeof(empty_profile)];
+
+    memset(eeprom_bytes, 0xff, sizeof(eeprom_bytes));
+    init_store(&store);
+    init_backend(&backend, &store, &provider, init_provider(&provider));
+    interface = noah_profile_candidate_store_backend_interface(&backend);
+
+    assert(!noah_profile_candidate_store_backend_staged_candidate(&backend, &staged));
+    assert(interface.begin(interface.context, &metadata) == NOAH_PROFILE_CANDIDATE_BACKEND_OK);
+    assert(interface.write(interface.context, 0u, empty_profile, sizeof(empty_profile)) == NOAH_PROFILE_CANDIDATE_BACKEND_OK);
+    assert(!noah_profile_candidate_store_backend_staged_candidate(&backend, &staged));
+    assert(validate_to_completion(&interface, &metadata, &error) == NOAH_PROFILE_CANDIDATE_BACKEND_VALID);
+
+    assert(noah_profile_candidate_store_backend_staged_candidate(&backend, &staged));
+    assert(staged.generation == 1u && staged.origin_half == 1u);
+    assert(staged.payload_digest == metadata.digest);
+    assert(noah_profile_candidate_store_backend_staged_read(&backend, &staged, 0u, bytes, sizeof(bytes)));
+    assert(memcmp(bytes, empty_profile, sizeof(bytes)) == 0);
+    wrong = staged;
+    wrong.payload_digest ^= 1u;
+    assert(!noah_profile_candidate_store_backend_staged_read(&backend, &wrong, 0u, bytes, sizeof(bytes)));
+    assert(!noah_profile_candidate_store_backend_staged_read(&backend, &staged, staged.payload_length, bytes, 1u));
+
+    assert(interface.commit_begin(interface.context) == NOAH_PROFILE_CANDIDATE_BACKEND_IN_PROGRESS);
+    assert(!noah_profile_candidate_store_backend_staged_candidate(&backend, &staged));
+}
+
 static void test_activation_request_retries_after_transient_provider_reuse(void) {
     noah_profile_store_t                   store;
     noah_profile_candidate_store_backend_t backend;
@@ -632,6 +668,7 @@ static void test_owner_activation_api_checks_lease_and_exposes_exact_commit(void
 
 int main(void) {
     test_stage_validate_and_commit();
+    test_validated_host_candidate_is_a_provisional_split_source();
     test_activation_request_retries_after_transient_provider_reuse();
     test_checksum_rejection_and_abort_preserve_last_known_good();
     test_committed_view_keeps_its_slot_when_next_candidate_starts();

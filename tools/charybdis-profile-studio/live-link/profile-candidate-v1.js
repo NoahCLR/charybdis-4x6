@@ -44,6 +44,9 @@ const CANDIDATE_STATE = Object.freeze({
     REJECTED: 5,
     COMMITTING: 6,
     ACTIVATING: 7,
+    PREPARING_PEER: 8,
+    CONVERGING_PEER: 9,
+    AUTHORITY_FAILED: 10,
 });
 
 const CANDIDATE_OPERATION = Object.freeze({
@@ -83,6 +86,9 @@ const CANDIDATE_ERROR = Object.freeze({
     DURABILITY_UNKNOWN: 18,
     TIMEOUT: 19,
     PEER_SUPERSEDED: 20,
+    PEER_PREPARE_YIELDED: 21,
+    POSTCOMMIT_AUTHORITY_LOST: 22,
+    PEER_COMMIT_CONFLICT: 23,
 });
 
 const CANDIDATE_ERROR_NAMES = Object.freeze(Object.fromEntries(

@@ -22,8 +22,21 @@ const {
 } = require("./profile-candidate-v1");
 
 const DEFAULT_POLL_INTERVAL_MS = 10;
-const DEFAULT_MAX_STATUS_POLLS = 500;
 const DEFAULT_MAX_BUSY_RESUBMISSIONS = 3;
+const FIRMWARE_HOST_PRECOMMIT_TIMEOUT_MS = 15000;
+const FIRMWARE_PREPARING_PEER_NO_PROGRESS_TIMEOUT_MS = 60000;
+const FIRMWARE_SPLIT_PEER_TIMEOUT_MS = 3000;
+const DEFAULT_PREPARING_PEER_TRANSFER_ALLOWANCE_MS = 20000;
+const DEFAULT_STATUS_SCHEDULING_MARGIN_MS = 1000;
+const DEFAULT_STATUS_SCAN_STEP_ALLOWANCE_MS = 45;
+const DEFAULT_STATUS_TIMEOUT_SAFETY_MS = 1000;
+
+const COMMIT_IN_PROGRESS_STATES = Object.freeze([
+    CANDIDATE_STATE.PREPARING_PEER,
+    CANDIDATE_STATE.COMMITTING,
+    CANDIDATE_STATE.CONVERGING_PEER,
+    CANDIDATE_STATE.ACTIVATING,
+]);
 
 const UPLOAD_PHASE = Object.freeze({
     PREFLIGHT: "preflight",
@@ -75,12 +88,12 @@ class CandidateUploadCoordinator {
             0,
             60000
         );
-        this.maxStatusPolls = normalizeInteger(
-            options.maxStatusPolls === undefined ? DEFAULT_MAX_STATUS_POLLS : options.maxStatusPolls,
-            "Maximum candidate status polls",
-            1,
-            100000
-        );
+        this.maxStatusPolls = options.maxStatusPolls === undefined
+            ? undefined
+            : normalizeInteger(options.maxStatusPolls, "Maximum candidate status polls", 1, 100000);
+        this.statusStallTimeoutMs = options.statusStallTimeoutMs === undefined
+            ? undefined
+            : normalizeInteger(options.statusStallTimeoutMs, "Candidate status stall timeout", 1, 300000);
         this.maxBusyResubmissions = normalizeInteger(
             options.maxBusyResubmissions === undefined ? DEFAULT_MAX_BUSY_RESUBMISSIONS : options.maxBusyResubmissions,
             "Maximum busy resubmissions",
@@ -90,6 +103,7 @@ class CandidateUploadCoordinator {
         this.requestTimeoutMs = options.requestTimeoutMs;
         this.onProgress = typeof options.onProgress === "function" ? options.onProgress : undefined;
         this.sleep = typeof options.sleep === "function" ? options.sleep : defaultSleep;
+        this.now = typeof options.now === "function" ? options.now : Date.now;
         this.transactionIds = options.transactionIds || new CandidateTransactionIdSequence(options.transactionIdStart);
         this.requestIds = options.requestIds || new CandidateRequestIdSequence(options.requestIdStart);
         assertIdSequence(this.transactionIds, "transactionIds");
@@ -252,7 +266,10 @@ class CandidateUploadCoordinator {
                 this.emitProgress(context);
                 return commitResult(context);
             }
-            if ([CANDIDATE_STATE.COMMITTING, CANDIDATE_STATE.ACTIVATING].includes(context.status.state)) {
+            if (context.status.state === CANDIDATE_STATE.AUTHORITY_FAILED) {
+                throw deviceRejection(context.status, context);
+            }
+            if (COMMIT_IN_PROGRESS_STATES.includes(context.status.state)) {
                 context.phase = UPLOAD_PHASE.COMMITTING;
                 context.operation = CANDIDATE_OPERATION.COMMIT;
                 context.status = await this.waitForCommit(context);
@@ -366,7 +383,8 @@ class CandidateUploadCoordinator {
     }
 
     async waitForProcessedOperation(context, baseline, operationDetails) {
-        for (let poll = 0; poll < this.maxStatusPolls; poll += 1) {
+        const budget = this.createStatusBudget(context, baseline);
+        while (true) {
             throwIfCancelled(context);
             const status = await this.readStatus(context, {ambiguous: true});
             context.status = status;
@@ -383,18 +401,20 @@ class CandidateUploadCoordinator {
                 assertSuccessfulOperationStatus(status, context, operationDetails);
                 return status;
             }
+            if (!this.statusBudgetAllowsAnotherPoll(budget, status)) break;
             await this.waitBeforePoll(context);
         }
         throw uploadError(
             "OPERATION_OUTCOME_AMBIGUOUS",
-            `Candidate ${operationLabel(context.operation)} remained queued beyond the bounded status-poll limit.`,
+            `Candidate ${operationLabel(context.operation)} made no observable progress within its firmware-aware wait window.`,
             context,
             {ambiguous: true, safeToRetry: false}
         );
     }
 
     async waitUntilBusyCanResolve(context, baseline, operationDetails) {
-        for (let poll = 0; poll < this.maxStatusPolls; poll += 1) {
+        const budget = this.createStatusBudget(context, baseline);
+        while (true) {
             throwIfCancelled(context);
             const status = await this.readStatus(context, {ambiguous: false});
             context.status = status;
@@ -413,15 +433,17 @@ class CandidateUploadCoordinator {
                     status,
                 };
             }
+            if (!this.statusBudgetAllowsAnotherPoll(budget, status)) break;
             await this.waitBeforePoll(context);
         }
-        throw uploadError("MAILBOX_BUSY", "Firmware mailbox remained busy beyond the bounded status-poll limit.", context, {
+        throw uploadError("MAILBOX_BUSY", "Firmware mailbox made no observable progress within its firmware-aware wait window.", context, {
             safeToRetry: true,
         });
     }
 
     async waitForValidation(context) {
-        for (let poll = 0; poll < this.maxStatusPolls; poll += 1) {
+        const budget = this.createStatusBudget(context, context.status);
+        while (true) {
             throwIfCancelled(context);
             const status = context.status?.state === CANDIDATE_STATE.VALIDATED
                 || context.status?.state === CANDIDATE_STATE.REJECTED
@@ -443,20 +465,24 @@ class CandidateUploadCoordinator {
                     safeToRetry: false,
                 });
             }
+            if (!this.statusBudgetAllowsAnotherPoll(budget, status)) break;
             await this.waitBeforePoll(context);
         }
-        throw uploadError("VALIDATION_OUTCOME_AMBIGUOUS", "Candidate validation did not finish within the bounded status-poll limit.", context, {
+        throw uploadError("VALIDATION_OUTCOME_AMBIGUOUS", "Candidate validation made no observable progress within its firmware-aware wait window.", context, {
             ambiguous: true,
             safeToRetry: false,
         });
     }
 
     async waitForCommit(context) {
-        for (let poll = 0; poll < this.maxStatusPolls; poll += 1) {
+        const budget = this.createStatusBudget(context, context.status);
+        let first = true;
+        while (true) {
             throwIfCancelled(context);
-            const status = poll === 0
+            const status = first
                 ? context.status
                 : await this.readStatus(context, {ambiguous: true});
+            first = false;
             context.status = status;
             this.emitProgress(context);
             assertCandidateIdentity(status, context);
@@ -467,15 +493,16 @@ class CandidateUploadCoordinator {
                 assertNoDeviceError(status, context);
                 return status;
             }
-            if (status.state === CANDIDATE_STATE.REJECTED || status.error.id !== CANDIDATE_ERROR.NONE) {
+            if (status.state === CANDIDATE_STATE.AUTHORITY_FAILED || status.state === CANDIDATE_STATE.REJECTED || status.error.id !== CANDIDATE_ERROR.NONE) {
                 throw deviceRejection(status, context);
             }
-            if (![CANDIDATE_STATE.COMMITTING, CANDIDATE_STATE.ACTIVATING].includes(status.state)) {
+            if (!COMMIT_IN_PROGRESS_STATES.includes(status.state)) {
                 throw uploadError("INVALID_COMMIT_STATE", `Firmware entered candidate state ${status.state} during commit.`, context, {status, safeToRetry: false});
             }
+            if (!this.statusBudgetAllowsAnotherPoll(budget, status)) break;
             await this.waitBeforePoll(context);
         }
-        throw uploadError("COMMIT_OUTCOME_AMBIGUOUS", "Candidate commit did not finish within the bounded status-poll limit.", context, {
+        throw uploadError("COMMIT_OUTCOME_AMBIGUOUS", "Candidate commit made no observable progress within its firmware-aware wait window.", context, {
             ambiguous: true,
             safeToRetry: true,
         });
@@ -498,6 +525,36 @@ class CandidateUploadCoordinator {
                 {ambiguous: options.ambiguous, cause, safeToRetry: !options.ambiguous}
             );
         }
+    }
+
+    createStatusBudget(context, baseline) {
+        const timeoutMs = this.statusStallTimeoutMs === undefined
+            ? candidateStatusStallTimeoutMs(candidatePayloadLength(context), baseline?.state)
+            : this.statusStallTimeoutMs;
+        return {
+            configuredTimeoutMs: this.statusStallTimeoutMs,
+            deadline: this.now() + timeoutMs,
+            fingerprint: statusProgressFingerprint(baseline),
+            maxPolls: this.maxStatusPolls,
+            payloadLength: candidatePayloadLength(context),
+            polls: 0,
+            timeoutMs,
+        };
+    }
+
+    statusBudgetAllowsAnotherPoll(budget, status) {
+        const now = this.now();
+        const fingerprint = statusProgressFingerprint(status);
+        budget.polls += 1;
+        if (fingerprint !== budget.fingerprint) {
+            budget.fingerprint = fingerprint;
+            budget.timeoutMs = budget.configuredTimeoutMs === undefined
+                ? candidateStatusStallTimeoutMs(budget.payloadLength, status?.state)
+                : budget.configuredTimeoutMs;
+            budget.deadline = now + budget.timeoutMs;
+        }
+        if (budget.maxPolls !== undefined && budget.polls >= budget.maxPolls) return false;
+        return now < budget.deadline;
     }
 
     async waitBeforePoll(context) {
@@ -546,7 +603,7 @@ class CandidateUploadCoordinator {
 }
 
 function assertSuccessfulOperationStatus(status, context, operationDetails) {
-    if (status.error.id !== CANDIDATE_ERROR.NONE || status.state === CANDIDATE_STATE.REJECTED) {
+    if (status.error.id !== CANDIDATE_ERROR.NONE || status.state === CANDIDATE_STATE.REJECTED || status.state === CANDIDATE_STATE.AUTHORITY_FAILED) {
         throw deviceRejection(status, context);
     }
     assertCandidateIdentity(status, context);
@@ -575,7 +632,7 @@ function assertSuccessfulOperationStatus(status, context, operationDetails) {
             }
             break;
         case CANDIDATE_OPERATION.COMMIT:
-            if (![CANDIDATE_STATE.COMMITTING, CANDIDATE_STATE.ACTIVATING, CANDIDATE_STATE.IDLE].includes(status.state)) {
+            if (![...COMMIT_IN_PROGRESS_STATES, CANDIDATE_STATE.IDLE].includes(status.state)) {
                 throw operationStatusMismatch(status, context, `commit entered state ${status.state}`);
             }
             break;
@@ -601,7 +658,7 @@ function operationStatusCouldBeOurs(status, context, operationDetails) {
         case CANDIDATE_OPERATION.VALIDATE:
             return [CANDIDATE_STATE.VALIDATING, CANDIDATE_STATE.VALIDATED, CANDIDATE_STATE.REJECTED].includes(status.state);
         case CANDIDATE_OPERATION.COMMIT:
-            return [CANDIDATE_STATE.COMMITTING, CANDIDATE_STATE.ACTIVATING, CANDIDATE_STATE.IDLE, CANDIDATE_STATE.REJECTED].includes(status.state);
+            return [...COMMIT_IN_PROGRESS_STATES, CANDIDATE_STATE.IDLE, CANDIDATE_STATE.REJECTED, CANDIDATE_STATE.AUTHORITY_FAILED].includes(status.state);
         case CANDIDATE_OPERATION.ABORT:
             return status.state === CANDIDATE_STATE.IDLE;
         default:
@@ -630,7 +687,7 @@ function canSafelyResubmit(status, context, operationDetails) {
             return status.transactionId === context.transactionId && status.state === CANDIDATE_STATE.COMPLETE;
         case CANDIDATE_OPERATION.COMMIT:
             return status.transactionId === context.transactionId
-                && ([CANDIDATE_STATE.VALIDATED, CANDIDATE_STATE.COMMITTING, CANDIDATE_STATE.ACTIVATING].includes(status.state)
+                && ([CANDIDATE_STATE.VALIDATED, ...COMMIT_IN_PROGRESS_STATES].includes(status.state)
                     || (status.state === CANDIDATE_STATE.IDLE && status.lastOperation === CANDIDATE_OPERATION.COMMIT));
         default:
             return false;
@@ -679,6 +736,14 @@ function deviceRejection(status, context) {
             {ambiguous: true, deviceError: status.error, status, safeToRetry: false}
         );
     }
+    if (status.state === CANDIDATE_STATE.AUTHORITY_FAILED) {
+        return uploadError(
+            "AUTHORITY_FAILED",
+            `The committed profile could not establish split authority (${CANDIDATE_ERROR_NAMES[status.error.id] || `error ${status.error.id}`}); it was not activated.`,
+            context,
+            {deviceError: status.error, status, safeToRetry: false}
+        );
+    }
     return uploadError(
         "DEVICE_REJECTED",
         `Firmware rejected the candidate with ${CANDIDATE_ERROR_NAMES[status.error.id] || `error ${status.error.id}`}.`,
@@ -716,6 +781,51 @@ function createUploadContext(signal) {
         totalBytes: 0,
         transactionId: undefined,
     };
+}
+
+function candidatePayloadLength(context) {
+    return context.metadata?.payloadLength
+        ?? context.status?.payloadLength
+        ?? PROFILE_CANDIDATE_V1.MAX_BLOB_SIZE;
+}
+
+// Firmware performs at most one <=20-byte candidate/split work item per scan.
+// Ordinary staging therefore scales with the actual candidate, leaves room
+// for the split peer's 3-second liveness window, and expires before the 15-
+// second precommit inactivity cleanup. PREPARING_PEER is different: candidate
+// status cannot expose its internal acknowledged split offset, so the desktop
+// allows the firmware's full 60-second no-progress window plus enough time for
+// the audited maximum transfer and scheduling overhead. Observable status
+// transitions renew the deadline for the newly visible phase.
+function candidateStatusStallTimeoutMs(payloadLength, state) {
+    if (state === CANDIDATE_STATE.PREPARING_PEER) {
+        return FIRMWARE_PREPARING_PEER_NO_PROGRESS_TIMEOUT_MS
+            + DEFAULT_PREPARING_PEER_TRANSFER_ALLOWANCE_MS;
+    }
+    const boundedLength = Math.max(
+        PROFILE_CANDIDATE_V1.MIN_BLOB_SIZE,
+        Math.min(PROFILE_CANDIDATE_V1.MAX_BLOB_SIZE, Number(payloadLength) || PROFILE_CANDIDATE_V1.MAX_BLOB_SIZE)
+    );
+    const scanSteps = Math.ceil(boundedLength / PROFILE_CANDIDATE_V1.CHUNK_MAX);
+    const workAllowance = FIRMWARE_SPLIT_PEER_TIMEOUT_MS
+        + DEFAULT_STATUS_SCHEDULING_MARGIN_MS
+        + scanSteps * DEFAULT_STATUS_SCAN_STEP_ALLOWANCE_MS;
+    return Math.min(
+        FIRMWARE_HOST_PRECOMMIT_TIMEOUT_MS - DEFAULT_STATUS_TIMEOUT_SAFETY_MS,
+        workAllowance
+    );
+}
+
+function statusProgressFingerprint(status) {
+    if (!status) return "none";
+    return [
+        status.state,
+        status.lastOperation,
+        status.flags,
+        status.operationSequence,
+        status.nextOffset,
+        status.error?.id,
+    ].join(":");
 }
 
 function throwIfCancelled(context) {
@@ -839,11 +949,13 @@ async function commitPreparedCandidate(connection, transactionId, options = {}) 
 
 module.exports = {
     DEFAULT_MAX_BUSY_RESUBMISSIONS,
-    DEFAULT_MAX_STATUS_POLLS,
     DEFAULT_POLL_INTERVAL_MS,
+    FIRMWARE_HOST_PRECOMMIT_TIMEOUT_MS,
+    FIRMWARE_PREPARING_PEER_NO_PROGRESS_TIMEOUT_MS,
     CandidateUploadCoordinator,
     CandidateUploadError,
     UPLOAD_PHASE,
+    candidateStatusStallTimeoutMs,
     commitPreparedCandidate,
     uploadProfileCandidate,
 };

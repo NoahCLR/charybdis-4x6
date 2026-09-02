@@ -357,11 +357,12 @@ durability becomes uncertain.
 The complete graph is allocated only when a side-specific build supplies
 `NOAH_LIVE_PROFILE_OWNER=yes` and a flash-owned physical half. Ordinary
 firmware retains the read-only discovery shell. Even the engineering artifact
-does not advertise or route candidate mutation through VIA. It now publishes
+does not advertise or route candidate mutation through VIA. It publishes
 coherent read-only owner status and cancels a precommit host candidate when an
 already compatible peer generation is greater than or equal to the reserved
-host generation. Postcommit concurrent-authority resolution, hardware
-acceptance, and resource-policy closure remain open.
+host generation. D-022 supersedes the original postcommit-race limitation with
+a distributed prepare barrier. Hardware acceptance and resource-policy closure
+remain open.
 
 The linked engineering owner is 3,084 bytes per RP2040 half. Its SRAM0–3
 linker/core-memory span passes policy, but `.bss` and `.data + .bss` fail their
@@ -370,3 +371,48 @@ and are not grounds to change policy without allocator/stack high-water data.
 A dedicated engineering stack manifest covers owner boot, host write,
 validation, marker-last commit, publication, split exchange, and profile split
 callback paths.
+
+### D-022 — Split Commit Uses A Distributed Prepare Barrier
+
+Status: accepted on 2026-09-02; hardware acceptance and mutation exposure remain open
+
+A peer-required host COMMIT does not begin local marker-last durability as soon
+as semantic validation completes. The transaction enters `PREPARING_PEER`, and
+the owner streams the exact validated candidate from the local inactive slot
+into the peer inactive slot. `PREPARE_BEGIN` is provisional intent, not durable
+peer authority. The peer holds `PEER` admission after all bytes arrive, while
+the sender pauses in `PUSH_PREPARED`; neither half has advanced a marker yet.
+
+Only after the peer is prepared does the owner authorize local marker-last
+commit. A successful local marker moves the transaction to
+`CONVERGING_PEER`, immediately republishes the new local durable descriptor,
+and authorizes the already-prepared peer's marker-last commit. Provider
+activation remains fenced until a fresh authority snapshot reports the exact
+just-committed descriptor on both halves, `COMMITTED_CONVERGED`, with no
+transfer pending. This order keeps the previously active slot pinned while
+avoiding the impossible two-slot hot-import handoff that motivated the rule.
+
+Simultaneous provisional host candidates are ordered before either marker.
+Higher generation wins; equal generation uses the lower stable physical-origin
+id as the deterministic winner. The loser first sends an idempotent peer abort,
+then aborts its own inactive candidate and reports `PEER_PREPARE_YIELDED`.
+Dynamic USB role never participates in this decision. A compatible durable
+peer can still supersede any earlier precommit host phase.
+
+Disconnect or timeout before local durability retains both leases until the
+peer abort is confirmed, then discards only provisional data. A link reconnect
+resumes the correlated prepared transfer. If the sender reboots after local
+durability, boot discovery recovers the durable local record and normal split
+reconciliation transfers that identity again; volatile prepare state is not
+claimed to survive reset. An unexpected newer, concurrent, corrupt, or
+incompatible peer observed after local durability never activates the local
+candidate: the transaction enters `AUTHORITY_FAILED`, retains the HOST
+lease/backing, and requires cold-path reconciliation or explicit Studio
+resolution. Role changes restart or preserve the outbound prepared handshake
+without abandoning its candidate correlation.
+
+The reconciler callback remains mailbox-only. Each scan grant still performs
+at most one transport exchange, bounded payload operation, validator step, or
+marker-last commit step. Candidate-write routing and its write/commit/
+activation/peer-operation capability bits remain coupled and disabled until a
+separate engineering-mutation gate is accepted.

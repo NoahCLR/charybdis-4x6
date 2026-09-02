@@ -20,17 +20,17 @@
           "reason": "the durable-I/O scheduler dispatches the engineering live-profile owner through its rotating step table"
         },
         {
-          "caller": "scan_running",
+          "caller": "noah_profile_candidate_transaction_scan",
           "callee": "write_candidate",
           "reason": "the host transaction invokes the shared candidate backend write callback"
         },
         {
-          "caller": "scan_running",
+          "caller": "noah_profile_candidate_transaction_scan",
           "callee": "validation_step",
           "reason": "the host transaction invokes the shared candidate backend validation-step callback"
         },
         {
-          "caller": "scan_running",
+          "caller": "noah_profile_candidate_transaction_scan",
           "callee": "commit_step_candidate",
           "reason": "the host transaction invokes the shared candidate backend marker-last commit callback"
         },
@@ -75,15 +75,15 @@
         },
         {
           "name": "engineering owner host payload write",
-          "functions": ["main", "matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "write_candidate", "io_write", "noah_qmk_profile_eeprom_write", "wear_leveling_write"]
+          "functions": ["main", "matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_transaction_scan", "write_candidate", "io_write", "noah_qmk_profile_eeprom_write", "wear_leveling_write"]
         },
         {
           "name": "engineering owner host validation step",
-          "functions": ["main", "matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "validation_step", "noah_profile_validator_v1_step"]
+          "functions": ["main", "matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_transaction_scan", "validation_step", "noah_profile_validator_v1_step"]
         },
         {
           "name": "engineering owner host marker-last commit write",
-          "functions": ["main", "matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "commit_step_candidate", "io_write", "noah_qmk_profile_eeprom_write", "wear_leveling_write"]
+          "functions": ["main", "matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_transaction_scan", "commit_step_candidate", "io_write", "noah_qmk_profile_eeprom_write", "wear_leveling_write"]
         },
         {
           "name": "engineering owner key-behavior publication",

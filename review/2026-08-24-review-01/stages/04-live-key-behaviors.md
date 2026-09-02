@@ -5,10 +5,12 @@ Status: blocked on Stage 02
 Implementation note: the cross-language payload, incremental whole-profile
 validation, semantic native-action materializer, and callback-only effective
 consumer seam have landed early. Firmware retains no payload-sized buffer or
-max-sized native row/step arrays. The consumer remains uninstalled, has no
-production scan/split owner, uses an ordered reader-backed lookup pending
-hardware timing, and performs no device write. Source-expression translation,
-Studio operation integration, compact-index decision, and device capability
+max-sized native row/step arrays. The consumer and its split-safe activation
+owner are installed only in the side-specific engineering artifact; normal
+firmware still uses compiled behavior data, and candidate mutation remains
+unrouted and unadvertised. The live consumer uses an ordered reader-backed
+lookup pending hardware timing. Source-expression translation, Studio
+operation integration, compact-index decision, and device capability
 advertising remain open.
 
 ## Objective
@@ -109,14 +111,15 @@ state merely to make a profile apply appear fast.
 - [x] Desktop canonical key-behavior payload codec and golden vector
 - [x] Matching reader-backed firmware codec and cross-language fixture
 - [ ] Effective behavior provider (reader-backed consumer/invalidation seam
-      landed; production owner installation remains)
+      and gated owner installation landed; normal-firmware promotion remains)
 - [ ] Compact bounded index (retain the current ordered reader lookup until
       real-board timing justifies the RAM/complexity tradeoff)
 - [ ] Complete Milestone A row validation
 - [ ] Direct compiled-array consumers removed from production lookup
 - [ ] Safe waiting activation with reason diagnostics
 - [ ] Add, edit, and remove live flows
-- [ ] Persistent apply and peer convergence
+- [ ] Persistent apply and peer convergence (firmware path landed behind the
+      gate; mutation routing and UI remain)
 - [ ] Semantic diff, push, pull, and reset
 - [ ] Regression gate against direct array reads
 - [ ] Updated docs, Studio UI, stage, risks, and progress
@@ -155,11 +158,11 @@ measure its worst-case first lookup before choosing a compact index; that
 decision must use the RP2040 bank accounting in `docs/architecture/memory-budgets.md`,
 not the `.data + .bss` regression margin presented as physical capacity.
 
-The remaining owner seam is deliberate: action translation and the
-generation-owned behavior view now exist, but production does not install them
-until the RGB consumer and one scan owner can register all invalidators in a
-fixed order. Provider validation still owns the connected action-ABI digest and
-whole-profile layer, PD-mode, and macro references before that safe activation.
+The side-specific engineering owner now installs the behavior and RGB
+invalidators in a fixed order and owns their split-safe publication. Normal
+firmware intentionally does not install that owner yet. Provider validation
+still owns the connected action-ABI digest and whole-profile layer, PD-mode,
+and macro references before safe activation.
 
 ## Verification
 

@@ -23,7 +23,12 @@ enum {
     // is not an RP2040 physical-SRAM limit; linked target gates remain the
     // authority for the concrete firmware artifact.
     NOAH_PROFILE_OWNER_STATE_BUDGET_32BIT = 4096u,
-    NOAH_PROFILE_OWNER_HOST_TIMEOUT_MS     = 15000u,
+    // Ordinary host staging expires after 15 seconds without host-owned work.
+    // Split preparation has a separate no-progress window: a maximum 4,064-byte
+    // profile needs at least 292 request/retry intervals at the 50 ms split
+    // floor, before scan overhead or a transient retry is included.
+    NOAH_PROFILE_OWNER_HOST_TIMEOUT_MS                = 15000u,
+    NOAH_PROFILE_OWNER_HOST_BARRIER_NO_PROGRESS_MS   = 60000u,
 };
 
 typedef enum {
@@ -40,6 +45,8 @@ typedef enum {
     NOAH_PROFILE_OWNER_COMPILED_ERROR,
     NOAH_PROFILE_OWNER_STORAGE_ERROR,
     NOAH_PROFILE_OWNER_INTEGRATION_ERROR,
+    NOAH_PROFILE_OWNER_POSTCOMMIT_AUTHORITY_LOST,
+    NOAH_PROFILE_OWNER_CONCURRENT_COMMIT,
 } noah_profile_owner_state_t;
 
 typedef struct {
@@ -76,10 +83,13 @@ typedef struct {
     noah_profile_peer_store_backend_t           peer_store;
     noah_profile_split_reconciler_t             reconciler;
     noah_profile_split_descriptor_t             committed_descriptor;
+    noah_profile_split_descriptor_t             host_barrier_descriptor;
     noah_profile_candidate_v1_error_t            adoption_error;
+    noah_profile_candidate_v1_error_id_t         host_cancel_reason;
     noah_profile_store_result_t                  discovery_result;
     noah_profile_owner_state_t                   state;
     uint32_t                                     host_last_activity_at;
+    uint16_t                                     host_barrier_progress_offset;
     uint8_t                                      scheduler_cursor;
     bool                                         boot_activation_started;
     bool                                         peer_activation_started;
@@ -87,6 +97,11 @@ typedef struct {
     bool                                         descriptor_readable;
     bool                                         split_initialized;
     bool                                         runtimes_installed;
+    bool                                         host_barrier_descriptor_known;
+    bool                                         host_barrier_started;
+    bool                                         host_barrier_local_published;
+    bool                                         host_barrier_peer_commit_authorized;
+    bool                                         host_cancel_pending;
 } noah_profile_owner_t;
 
 // Protocol-neutral, caller-owned observation of the complete live-profile

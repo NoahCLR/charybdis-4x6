@@ -21,7 +21,8 @@ linker map is
 
 ## Current Linked Checkpoint
 
-Freshly remeasured on 2026-08-31 after the gated live-profile owner checkpoint.
+Freshly remeasured on 2026-09-02 after the distributed live-profile commit
+barrier checkpoint.
 The ordinary artifact does not link or allocate that engineering-only owner:
 
 | Measurement | Bytes | Meaning |
@@ -40,18 +41,18 @@ on hardware before making claims about runtime availability.
 
 ## Engineering Live-Profile Owner Checkpoint
 
-The side-specific left engineering artifact was freshly linked on 2026-08-31
+The side-specific left engineering artifact was freshly linked on 2026-09-02
 with `NOAH_LIVE_PROFILE_OWNER=yes`, `NOAH_PHYSICAL_HALF=left`, and
 `FORCE_SLAVE=yes`. It is deliberately not the ordinary firmware checkpoint:
 
 | Measurement | Bytes | Policy result |
 | --- | ---: | --- |
-| Exact linked `runtime_owner` state | 3,084 | within its 4,096 B engineering state policy |
+| Exact linked `runtime_owner` state | 3,172 | within its 4,096 B engineering state policy |
 | SRAM0–3 `.data` | 23,000 | informational |
-| SRAM0–3 `.bss` | 28,740 | **FAIL**, 2,740 B above the 26,000 B regression policy |
-| SRAM0–3 `.data + .bss` | 51,740 | **FAIL**, 740 B above the 51,000 B regression policy |
-| SRAM0–3 linker/core-memory span at boot | 210,400 | PASS, 5,600 B above the 204,800 B minimum |
-| Fixed linked section bytes across all SRAM banks | 59,200 | informational |
+| SRAM0–3 `.bss` | 28,828 | **FAIL**, 2,828 B above the 26,000 B regression policy |
+| SRAM0–3 `.data + .bss` | 51,828 | **FAIL**, 828 B above the 51,000 B regression policy |
+| SRAM0–3 linker/core-memory span at boot | 210,312 | PASS, 5,512 B above the 204,800 B minimum |
+| Fixed linked section bytes across all SRAM banks | 59,288 | informational |
 
 These failures do not mean that the RP2040 is physically out of memory. Each
 half still has 270,336 bytes of physical SRAM, and the linked SRAM0–3 core-
@@ -61,8 +62,8 @@ Allocator and stack high-water measurements on the real two-half keyboard are
 still required before revising the policies or enabling the owner normally.
 
 The dedicated engineering reviewed-path stack gate passes: the largest named
-owner main-process path is split metadata exchange at 1,280/1,920 bytes, the
-coherent VIA status-read path is 616/1,920 bytes, and the largest named profile
+owner main-process path is split metadata exchange at 1,504/1,920 bytes, the
+coherent VIA status-read path is 624/1,920 bytes, and the largest named profile
 split callback is 264/768 bytes. This is linked path evidence for
 `tools/firmware_stack_budget_live_profile_owner.json`, not a global stack or
 interrupt-stack maximum.

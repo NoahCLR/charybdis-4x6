@@ -16,6 +16,9 @@ const {
 const {
     CandidateUploadCoordinator,
     CandidateUploadError,
+    FIRMWARE_HOST_PRECOMMIT_TIMEOUT_MS,
+    FIRMWARE_PREPARING_PEER_NO_PROGRESS_TIMEOUT_MS,
+    candidateStatusStallTimeoutMs,
 } = require("../../live-link/candidate-upload-coordinator");
 
 function representativeBlob(payloadSize = 41) {
@@ -39,6 +42,9 @@ class CandidateFirmwareHarness {
         this.validationReads = 0;
         this.commitReads = 0;
         this.activationReads = 0;
+        this.prepareReads = 0;
+        this.convergenceReads = 0;
+        this.reportedStates = [];
         this.status = noErrorStatus();
     }
 
@@ -67,6 +73,7 @@ class CandidateFirmwareHarness {
                 await this.options.beforeFirstStatusResponse();
             }
             const response = this.statusReport(report);
+            this.reportedStates.push(response[8]);
             assert.equal(requestOptions.matchResponse(response, report), true);
             return response;
         }
@@ -133,10 +140,29 @@ class CandidateFirmwareHarness {
                     };
                 }
             }
+        } else if (this.status.state === CANDIDATE_STATE.PREPARING_PEER && this.status.lastOperation === CANDIDATE_OPERATION.COMMIT) {
+            this.prepareReads += 1;
+            if (this.prepareReads >= (this.options.prepareReads || 1)) {
+                this.status.state = CANDIDATE_STATE.COMMITTING;
+            }
         } else if (this.status.state === CANDIDATE_STATE.COMMITTING && this.status.lastOperation === CANDIDATE_OPERATION.COMMIT) {
             this.commitReads += 1;
             if (this.commitReads >= (this.options.commitReads || 1)) {
-                this.status.state = CANDIDATE_STATE.ACTIVATING;
+                this.status.state = this.options.splitBarrier
+                    ? CANDIDATE_STATE.CONVERGING_PEER
+                    : CANDIDATE_STATE.ACTIVATING;
+            }
+        } else if (this.status.state === CANDIDATE_STATE.CONVERGING_PEER && this.status.lastOperation === CANDIDATE_OPERATION.COMMIT) {
+            this.convergenceReads += 1;
+            if (this.convergenceReads >= (this.options.convergenceReads || 1)) {
+                if (this.options.authorityErrorId !== undefined) {
+                    this.status.state = CANDIDATE_STATE.AUTHORITY_FAILED;
+                    this.status.flags = 2;
+                    this.status.error = {...noError(), id: this.options.authorityErrorId};
+                    this.status.operationSequence = (this.status.operationSequence + 1) & 0xffff;
+                } else {
+                    this.status.state = CANDIDATE_STATE.ACTIVATING;
+                }
             }
         } else if (this.status.state === CANDIDATE_STATE.ACTIVATING && this.status.lastOperation === CANDIDATE_OPERATION.COMMIT) {
             this.activationReads += 1;
@@ -190,9 +216,13 @@ class CandidateFirmwareHarness {
             };
         } else if (operation === CANDIDATE_OPERATION.COMMIT) {
             this.status.transactionId = transactionId;
-            this.status.state = CANDIDATE_STATE.COMMITTING;
+            this.status.state = this.options.splitBarrier
+                ? CANDIDATE_STATE.PREPARING_PEER
+                : CANDIDATE_STATE.COMMITTING;
             this.status.error = noError();
+            this.prepareReads = 0;
             this.commitReads = 0;
+            this.convergenceReads = 0;
             this.activationReads = 0;
         }
     }
@@ -321,10 +351,38 @@ test("a prepared candidate commits through custom-save and waits for activation"
     assert.equal(commits[0][0], PROFILE_CANDIDATE_V1.COMMAND_SAVE);
 });
 
+test("a split commit polls through peer preparation and convergence before activation", async () => {
+    const harness = new CandidateFirmwareHarness({
+        splitBarrier: true,
+        prepareReads: 2,
+        commitReads: 2,
+        convergenceReads: 2,
+        activationReads: 2,
+    });
+    const client = coordinator(harness);
+    const prepared = await client.upload(representativeBlob(1), {actionAbiDigest: 1, transactionId: 0x1234});
+    const result = await client.commit(prepared.transactionId, {digest: prepared.metadata.digest});
+
+    assert.equal(result.status.state, CANDIDATE_STATE.IDLE);
+    assert.equal(result.status.lastOperation, CANDIDATE_OPERATION.COMMIT);
+    for (const state of [
+        CANDIDATE_STATE.PREPARING_PEER,
+        CANDIDATE_STATE.COMMITTING,
+        CANDIDATE_STATE.CONVERGING_PEER,
+        CANDIDATE_STATE.ACTIVATING,
+    ]) {
+        assert.equal(harness.reportedStates.includes(state), true, `missing reported candidate state ${state}`);
+    }
+    assert.equal(operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_COMMIT).length, 1);
+});
+
 test("lost commit acknowledgement is safely resolved from progressing status", async () => {
     const harness = new CandidateFirmwareHarness({
         processThenThrowOnOperation: CANDIDATE_OPERATION.COMMIT,
+        splitBarrier: true,
         commitReads: 2,
+        prepareReads: 2,
+        convergenceReads: 2,
         activationReads: 2,
     });
     const client = coordinator(harness);
@@ -339,6 +397,27 @@ test("lost commit acknowledgement is safely resolved from progressing status", a
     const recovered = await client.commit(prepared.transactionId, {digest: prepared.metadata.digest});
     assert.equal(recovered.status.state, CANDIDATE_STATE.IDLE);
     assert.equal(operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_COMMIT).length, 1);
+});
+
+test("terminal postcommit authority failure is surfaced without retrying or aborting", async () => {
+    const harness = new CandidateFirmwareHarness({
+        splitBarrier: true,
+        authorityErrorId: CANDIDATE_ERROR.POSTCOMMIT_AUTHORITY_LOST,
+    });
+    const client = coordinator(harness);
+    const prepared = await client.upload(representativeBlob(1), {actionAbiDigest: 1, transactionId: 0x1234});
+
+    await assert.rejects(
+        client.commit(prepared.transactionId, {digest: prepared.metadata.digest}),
+        (error) => error.code === "AUTHORITY_FAILED"
+            && error.phase === "committing"
+            && error.ambiguous === false
+            && error.safeToRetry === false
+            && error.status.state === CANDIDATE_STATE.AUTHORITY_FAILED
+            && error.deviceError.id === CANDIDATE_ERROR.POSTCOMMIT_AUTHORITY_LOST
+    );
+    assert.equal(operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_COMMIT).length, 1);
+    assert.equal(operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_ABORT).length, 0);
 });
 
 test("commit preflight refuses a mismatched digest before custom-save", async () => {
@@ -389,6 +468,9 @@ test("preflight refuses every non-idle firmware candidate without sending a muta
         CANDIDATE_STATE.REJECTED,
         CANDIDATE_STATE.COMMITTING,
         CANDIDATE_STATE.ACTIVATING,
+        CANDIDATE_STATE.PREPARING_PEER,
+        CANDIDATE_STATE.CONVERGING_PEER,
+        CANDIDATE_STATE.AUTHORITY_FAILED,
     ]) {
         const harness = new CandidateFirmwareHarness();
         harness.status.state = state;
@@ -519,6 +601,43 @@ test("a queued operation that never advances returns bounded structured ambiguit
             && error.safeToRetry === false
     );
     assert.equal(operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_BEGIN).length, 1);
+});
+
+test("default status stall timing scales and gives peer preparation its unobservable-progress window", () => {
+    const minimum = candidateStatusStallTimeoutMs(PROFILE_CANDIDATE_V1.MIN_BLOB_SIZE);
+    const maximum = candidateStatusStallTimeoutMs(PROFILE_CANDIDATE_V1.MAX_BLOB_SIZE);
+    const preparing = candidateStatusStallTimeoutMs(
+        PROFILE_CANDIDATE_V1.MAX_BLOB_SIZE,
+        CANDIDATE_STATE.PREPARING_PEER
+    );
+    assert.equal(maximum > minimum, true);
+    assert.equal(maximum < FIRMWARE_HOST_PRECOMMIT_TIMEOUT_MS, true);
+    assert.equal(maximum, 13180);
+    assert.equal(preparing, 80000);
+    assert.equal(preparing > FIRMWARE_PREPARING_PEER_NO_PROGRESS_TIMEOUT_MS, true);
+});
+
+test("observable split state progress renews the stall deadline", async () => {
+    let now = 0;
+    const harness = new CandidateFirmwareHarness({
+        splitBarrier: true,
+        prepareReads: 2,
+        commitReads: 2,
+        convergenceReads: 2,
+        activationReads: 2,
+    });
+    const client = new CandidateUploadCoordinator(harness, {
+        pollIntervalMs: 1,
+        statusStallTimeoutMs: 2,
+        now: () => now,
+        async sleep(milliseconds) {
+            now += milliseconds;
+        },
+    });
+    const prepared = await client.upload(representativeBlob(1), {actionAbiDigest: 1, transactionId: 0x1234});
+    const result = await client.commit(prepared.transactionId, {digest: prepared.metadata.digest});
+    assert.equal(result.status.state, CANDIDATE_STATE.IDLE);
+    assert.equal(now > 2, true);
 });
 
 test("an unexpected polling failure cleans up the admitted candidate before retry", async () => {

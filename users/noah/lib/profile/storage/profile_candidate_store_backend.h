@@ -65,6 +65,13 @@ noah_profile_candidate_backend_result_t noah_profile_candidate_store_backend_ado
 noah_profile_storage_admission_owner_t noah_profile_candidate_store_backend_admission_owner(const noah_profile_candidate_store_backend_t *backend);
 bool noah_profile_candidate_store_backend_release_admission(noah_profile_candidate_store_backend_t *backend, noah_profile_storage_admission_owner_t owner);
 
+// While a validated HOST candidate is still precommit, the split owner may
+// stream its exact bytes to the sibling's inactive slot. These observations
+// never imply durability: the returned identity is the provisional store
+// candidate, and both calls fail once local marker-last commit begins.
+bool noah_profile_candidate_store_backend_staged_candidate(const noah_profile_candidate_store_backend_t *backend, noah_profile_store_candidate_t *candidate);
+bool noah_profile_candidate_store_backend_staged_read(void *context, const noah_profile_store_candidate_t *candidate, uint16_t offset, uint8_t *bytes, uint8_t length);
+
 // Cold/test convenience wrapper around the interface's bounded commit steps.
 // Staging and validation never call it; production durability still requires
 // an explicit commit operation owned by scan context.

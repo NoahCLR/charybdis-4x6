@@ -18,6 +18,7 @@ enum {
 };
 
 static bool scan_running(noah_profile_owner_t *owner, bool master, uint32_t now_ms, bool activating_boot);
+static bool request_host_precommit_cancel(noah_profile_owner_t *owner, noah_profile_candidate_v1_error_id_t reason);
 
 static noah_profile_candidate_store_backend_t *candidate_backend(noah_profile_owner_t *owner) {
     return owner ? &owner->staging.candidate_backend : NULL;
@@ -37,7 +38,85 @@ static bool elapsed_at_least(uint32_t now, uint32_t since, uint32_t interval) {
 }
 
 static bool host_state_is_precommit(noah_profile_candidate_v1_state_t state) {
-    return state == NOAH_PROFILE_CANDIDATE_V1_STATE_RECEIVING || state == NOAH_PROFILE_CANDIDATE_V1_STATE_COMPLETE || state == NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATING || state == NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATED || state == NOAH_PROFILE_CANDIDATE_V1_STATE_REJECTED;
+    return state == NOAH_PROFILE_CANDIDATE_V1_STATE_RECEIVING || state == NOAH_PROFILE_CANDIDATE_V1_STATE_COMPLETE || state == NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATING || state == NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATED || state == NOAH_PROFILE_CANDIDATE_V1_STATE_REJECTED || state == NOAH_PROFILE_CANDIDATE_V1_STATE_PREPARING_PEER;
+}
+
+static bool host_mailbox_is_matching_abort(const noah_profile_owner_t *owner) {
+    return owner && owner->host_transaction.mailbox.pending && owner->host_transaction.mailbox.command.operation == NOAH_PROFILE_CANDIDATE_V1_OPERATION_ABORT && owner->host_transaction.mailbox.command.transaction_id == owner->host_transaction.status.transaction_id;
+}
+
+static bool descriptor_equal(const noah_profile_split_descriptor_t *left, const noah_profile_split_descriptor_t *right) {
+    return left && right && left->generation == right->generation && left->payload_crc32 == right->payload_crc32 && left->payload_digest == right->payload_digest && left->compiled_default_digest == right->compiled_default_digest && left->action_abi_digest == right->action_abi_digest && left->payload_length == right->payload_length && left->schema_major == right->schema_major && left->schema_minor == right->schema_minor && left->domain_mask == right->domain_mask && left->profile_flags == right->profile_flags && left->origin_half == right->origin_half && left->readable == right->readable && left->has_profile == right->has_profile;
+}
+
+static noah_profile_split_descriptor_t descriptor_from_candidate(const noah_profile_store_candidate_t *candidate) {
+    if (!candidate) {
+        return (noah_profile_split_descriptor_t){0};
+    }
+    return (noah_profile_split_descriptor_t){
+        .generation              = candidate->generation,
+        .payload_crc32           = candidate->payload_crc32,
+        .payload_digest          = candidate->payload_digest,
+        .compiled_default_digest = candidate->compiled_default_digest,
+        .action_abi_digest       = candidate->action_abi_digest,
+        .payload_length          = candidate->payload_length,
+        .schema_major            = candidate->schema_major,
+        .schema_minor            = candidate->schema_minor,
+        .domain_mask             = candidate->domain_mask,
+        .profile_flags           = candidate->flags,
+        .origin_half             = candidate->origin_half,
+        .readable                = true,
+        .has_profile             = true,
+    };
+}
+
+static bool host_staged_read(void *context, const noah_profile_split_descriptor_t *descriptor, uint16_t offset, uint8_t *bytes, uint8_t length) {
+    noah_profile_owner_t           *owner = context;
+    noah_profile_store_candidate_t  candidate;
+
+    if (!owner || !descriptor || !owner->host_barrier_descriptor_known || !descriptor_equal(descriptor, &owner->host_barrier_descriptor) || !noah_profile_candidate_store_backend_staged_candidate(candidate_backend(owner), &candidate) || !descriptor_equal(descriptor, &(noah_profile_split_descriptor_t){
+            .generation              = candidate.generation,
+            .payload_crc32           = candidate.payload_crc32,
+            .payload_digest          = candidate.payload_digest,
+            .compiled_default_digest = candidate.compiled_default_digest,
+            .action_abi_digest       = candidate.action_abi_digest,
+            .payload_length          = candidate.payload_length,
+            .schema_major            = candidate.schema_major,
+            .schema_minor            = candidate.schema_minor,
+            .domain_mask             = candidate.domain_mask,
+            .profile_flags           = candidate.flags,
+            .origin_half             = candidate.origin_half,
+            .readable                = true,
+            .has_profile             = true,
+        })) {
+        return false;
+    }
+    return noah_profile_candidate_store_backend_staged_read(candidate_backend(owner), &candidate, offset, bytes, length);
+}
+
+static bool owner_peer_observer(void *context, uint8_t *unresolved_count) {
+    noah_profile_owner_t                  *owner = context;
+    noah_profile_split_authority_status_t  authority;
+
+    if (!owner || !unresolved_count || !owner->descriptor_readable || !owner->split_initialized || !noah_profile_split_authority_status(&owner->reconciler.authority, &authority)) {
+        return false;
+    }
+    *unresolved_count = !authority.transfer_pending && descriptor_equal(&authority.local, &owner->committed_descriptor) && descriptor_equal(&authority.peer, &owner->committed_descriptor) && (authority.state == NOAH_PROFILE_SPLIT_AUTHORITY_COMPILED_CONVERGED || authority.state == NOAH_PROFILE_SPLIT_AUTHORITY_COMMITTED_CONVERGED) ? 0u : 1u;
+    return true;
+}
+
+static void reset_host_barrier(noah_profile_owner_t *owner) {
+    if (!owner) {
+        return;
+    }
+    memset(&owner->host_barrier_descriptor, 0, sizeof(owner->host_barrier_descriptor));
+    owner->host_barrier_descriptor_known       = false;
+    owner->host_barrier_started                = false;
+    owner->host_barrier_local_published        = false;
+    owner->host_barrier_peer_commit_authorized = false;
+    owner->host_cancel_reason                  = NOAH_PROFILE_CANDIDATE_V1_ERROR_NONE;
+    owner->host_cancel_pending                 = false;
+    owner->host_barrier_progress_offset        = 0u;
 }
 
 static bool peer_can_supersede_host(const noah_profile_owner_t *owner, const noah_profile_split_descriptor_t *peer) {
@@ -50,6 +129,9 @@ static bool supersede_host_precommit(noah_profile_owner_t *owner) {
 
     if (!owner || !owner->split_initialized || noah_profile_candidate_store_backend_admission_owner(candidate_backend(owner)) != NOAH_PROFILE_STORAGE_ADMISSION_HOST || !host_state_is_precommit(owner->host_transaction.status.state) || !noah_profile_split_authority_status(&owner->reconciler.authority, &authority) || !peer_can_supersede_host(owner, &authority.peer)) {
         return false;
+    }
+    if (owner->host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_PREPARING_PEER && owner->host_barrier_started) {
+        return request_host_precommit_cancel(owner, NOAH_PROFILE_CANDIDATE_V1_ERROR_PEER_SUPERSEDED);
     }
     result = noah_profile_candidate_transaction_supersede_precommit(&owner->host_transaction);
     if (result == NOAH_PROFILE_CANDIDATE_EXPIRE_DONE) {
@@ -177,8 +259,8 @@ static bool initialize_runtime_graph(noah_profile_owner_t *owner) {
         .callback = noah_effective_rgb_runtime_invalidate,
         .context  = &owner->rgb,
     };
-    observer         = owner->config.peer_required ? noah_profile_split_authority_peer_observer : no_peer_observer;
-    observer_context = owner->config.peer_required ? (void *)&owner->reconciler.authority : NULL;
+    observer         = owner->config.peer_required ? owner_peer_observer : no_peer_observer;
+    observer_context = owner->config.peer_required ? owner : NULL;
     noah_profile_activation_policy_init(&owner->activation_policy, observer, observer_context);
     if (noah_effective_profile_provider_init(&owner->provider, &owner->compiled_snapshot, noah_profile_activation_policy_safe_boundary, &owner->activation_policy, invalidators, 2u) != NOAH_EFFECTIVE_PROFILE_OK) {
         return false;
@@ -206,6 +288,9 @@ static bool initialize_runtime_graph(noah_profile_owner_t *owner) {
         .action_abi_digest     = owner->compatibility.action_abi_digest,
     };
     noah_profile_candidate_transaction_init(&owner->host_transaction, &host_backend, &host_compatibility);
+    if (!noah_profile_candidate_transaction_require_split_authorization(&owner->host_transaction, owner->config.peer_required)) {
+        return false;
+    }
     noah_profile_peer_store_backend_init(&owner->peer_store, candidate_backend(owner));
 
     if (owner->config.peer_required) {
@@ -320,7 +405,7 @@ static bool scan_adoption(noah_profile_owner_t *owner) {
 static bool boot_peer_converged(const noah_profile_owner_t *owner) {
     uint8_t unresolved_count = 1u;
 
-    return owner && owner->split_initialized && noah_profile_split_authority_peer_observer((void *)&owner->reconciler.authority, &unresolved_count) && unresolved_count == 0u;
+    return owner && owner_peer_observer((void *)owner, &unresolved_count) && unresolved_count == 0u;
 }
 
 static bool scan_boot_reconciliation(noah_profile_owner_t *owner, bool master, uint32_t now_ms) {
@@ -404,14 +489,245 @@ static void refresh_ready_state(noah_profile_owner_t *owner) {
     owner->state = status.active.kind == NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE ? NOAH_PROFILE_OWNER_READY_VALIDATED : NOAH_PROFILE_OWNER_READY_COMPILED;
 }
 
+static noah_profile_candidate_expire_result_t finish_host_precommit_cancel(noah_profile_owner_t *owner) {
+    if (!owner || !owner->host_cancel_pending || owner->reconciler.prepared_push_active) {
+        return NOAH_PROFILE_CANDIDATE_EXPIRE_NOTHING;
+    }
+    switch (owner->host_cancel_reason) {
+        case NOAH_PROFILE_CANDIDATE_V1_ERROR_NONE:
+            if (!host_mailbox_is_matching_abort(owner) || !noah_profile_candidate_transaction_scan(&owner->host_transaction)) {
+                return NOAH_PROFILE_CANDIDATE_EXPIRE_NOTHING;
+            }
+            return owner->host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE && noah_profile_candidate_store_backend_admission_owner(candidate_backend(owner)) != NOAH_PROFILE_STORAGE_ADMISSION_HOST ? NOAH_PROFILE_CANDIDATE_EXPIRE_DONE : NOAH_PROFILE_CANDIDATE_EXPIRE_BACKEND_ERROR;
+        case NOAH_PROFILE_CANDIDATE_V1_ERROR_TIMEOUT:
+            return noah_profile_candidate_transaction_expire_precommit(&owner->host_transaction);
+        case NOAH_PROFILE_CANDIDATE_V1_ERROR_PEER_SUPERSEDED:
+            return noah_profile_candidate_transaction_supersede_precommit(&owner->host_transaction);
+        case NOAH_PROFILE_CANDIDATE_V1_ERROR_PEER_PREPARE_YIELDED:
+            return noah_profile_candidate_transaction_yield_precommit(&owner->host_transaction);
+        case NOAH_PROFILE_CANDIDATE_V1_ERROR_STORAGE_FAILURE:
+            return noah_profile_candidate_transaction_cleanup_failed_precommit(&owner->host_transaction);
+        default:
+            return NOAH_PROFILE_CANDIDATE_EXPIRE_NOTHING;
+    }
+}
+
+static bool advance_host_precommit_cancel(noah_profile_owner_t *owner) {
+    noah_profile_candidate_expire_result_t result;
+    noah_profile_candidate_v1_error_id_t   reason;
+
+    if (!owner || !owner->host_cancel_pending) {
+        return false;
+    }
+    result = finish_host_precommit_cancel(owner);
+    if (result == NOAH_PROFILE_CANDIDATE_EXPIRE_DONE) {
+        reason = owner->host_cancel_reason;
+        reset_host_barrier(owner);
+        owner->host_activity_known = false;
+        if (reason == NOAH_PROFILE_CANDIDATE_V1_ERROR_STORAGE_FAILURE) {
+            owner->state = NOAH_PROFILE_OWNER_STORAGE_ERROR;
+        } else {
+            refresh_ready_state(owner);
+        }
+        return true;
+    }
+    if (result == NOAH_PROFILE_CANDIDATE_EXPIRE_BACKEND_ERROR) {
+        owner->state = NOAH_PROFILE_OWNER_STORAGE_ERROR;
+        return true;
+    }
+    return false;
+}
+
+static bool request_host_precommit_cancel(noah_profile_owner_t *owner, noah_profile_candidate_v1_error_id_t reason) {
+    if (!owner || (reason != NOAH_PROFILE_CANDIDATE_V1_ERROR_NONE && reason != NOAH_PROFILE_CANDIDATE_V1_ERROR_TIMEOUT && reason != NOAH_PROFILE_CANDIDATE_V1_ERROR_PEER_SUPERSEDED && reason != NOAH_PROFILE_CANDIDATE_V1_ERROR_PEER_PREPARE_YIELDED && reason != NOAH_PROFILE_CANDIDATE_V1_ERROR_STORAGE_FAILURE)) {
+        return false;
+    }
+    if (reason == NOAH_PROFILE_CANDIDATE_V1_ERROR_NONE && !host_mailbox_is_matching_abort(owner)) {
+        return false;
+    }
+    if (!owner->host_cancel_pending) {
+        if (owner->host_barrier_started && owner->host_barrier_descriptor_known && !noah_profile_split_reconciler_prepared_push_cancel(&owner->reconciler, &owner->host_barrier_descriptor)) {
+            return false;
+        }
+        owner->host_cancel_reason  = reason;
+        owner->host_cancel_pending = true;
+    } else if (owner->host_cancel_reason != reason) {
+        return false;
+    }
+    if (advance_host_precommit_cancel(owner)) {
+        return true;
+    }
+    // Scheduling or awaiting the bounded peer ABORT is useful work even when
+    // the local backend cannot be released in this grant.
+    return true;
+}
+
+static bool provisional_peer_wins(const noah_profile_owner_t *owner, const noah_profile_split_descriptor_t *local, const noah_profile_split_descriptor_t *peer, bool *conflict) {
+    noah_profile_split_authority_state_t comparison;
+
+    if (conflict) {
+        *conflict = false;
+    }
+    if (!owner || !local || !peer || !noah_profile_split_descriptor_valid(local) || !noah_profile_split_descriptor_valid(peer) || !local->has_profile || !peer->has_profile) {
+        return false;
+    }
+    comparison = noah_profile_split_authority_compare(local, peer);
+    if (comparison == NOAH_PROFILE_SPLIT_AUTHORITY_PEER_NEWER) {
+        return true;
+    }
+    if (comparison == NOAH_PROFILE_SPLIT_AUTHORITY_LOCAL_NEWER) {
+        return false;
+    }
+    if (comparison == NOAH_PROFILE_SPLIT_AUTHORITY_CONCURRENT_COMMIT) {
+        return peer->origin_half < local->origin_half;
+    }
+    if (conflict && (comparison == NOAH_PROFILE_SPLIT_AUTHORITY_CORRUPT_SAME_TUPLE || comparison == NOAH_PROFILE_SPLIT_AUTHORITY_INCOMPATIBLE || (comparison == NOAH_PROFILE_SPLIT_AUTHORITY_COMMITTED_CONVERGED && peer->origin_half == local->origin_half))) {
+        *conflict = true;
+    }
+    return false;
+}
+
+static bool begin_or_advance_host_barrier(noah_profile_owner_t *owner) {
+    noah_profile_store_candidate_t   candidate;
+    noah_profile_split_descriptor_t  descriptor;
+    noah_profile_split_descriptor_t  prepared;
+    noah_profile_split_descriptor_t  provisional_peer;
+    bool                             conflict = false;
+
+    if (!owner || !owner->split_initialized || owner->host_transaction.status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_PREPARING_PEER || !noah_profile_candidate_store_backend_staged_candidate(candidate_backend(owner), &candidate)) {
+        return false;
+    }
+    descriptor = descriptor_from_candidate(&candidate);
+    if (!noah_profile_split_descriptor_valid(&descriptor)) {
+        fail_integration(owner);
+        return true;
+    }
+    if (!owner->host_barrier_descriptor_known) {
+        owner->host_barrier_descriptor       = descriptor;
+        owner->host_barrier_descriptor_known = true;
+    } else if (!descriptor_equal(&owner->host_barrier_descriptor, &descriptor)) {
+        fail_integration(owner);
+        return true;
+    }
+    if (noah_profile_split_reconciler_provisional_peer_descriptor(&owner->reconciler, &provisional_peer)) {
+        if (provisional_peer_wins(owner, &owner->host_barrier_descriptor, &provisional_peer, &conflict)) {
+            return request_host_precommit_cancel(owner, NOAH_PROFILE_CANDIDATE_V1_ERROR_PEER_PREPARE_YIELDED);
+        }
+        if (conflict) {
+            (void)request_host_precommit_cancel(owner, NOAH_PROFILE_CANDIDATE_V1_ERROR_PEER_PREPARE_YIELDED);
+            owner->state = NOAH_PROFILE_OWNER_CONCURRENT_COMMIT;
+            return true;
+        }
+    }
+    if (!owner->host_barrier_started) {
+        if (!noah_profile_split_reconciler_prepared_push_begin(&owner->reconciler, &owner->host_barrier_descriptor, owner, host_staged_read)) {
+            return false;
+        }
+        owner->host_barrier_started = true;
+        return true;
+    }
+    if (!noah_profile_split_reconciler_prepared_push_ready(&owner->reconciler, &prepared)) {
+        return false;
+    }
+    if (!descriptor_equal(&prepared, &owner->host_barrier_descriptor)) {
+        fail_integration(owner);
+    } else if (!noah_profile_candidate_transaction_authorize_commit(&owner->host_transaction)) {
+        if (owner->host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_REJECTED && owner->host_transaction.status.error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_STORAGE_FAILURE) {
+            return request_host_precommit_cancel(owner, NOAH_PROFILE_CANDIDATE_V1_ERROR_STORAGE_FAILURE);
+        }
+        fail_integration(owner);
+    }
+    return true;
+}
+
+static void note_host_barrier_progress(noah_profile_owner_t *owner, uint32_t now_ms) {
+    noah_profile_split_reconciler_status_t status;
+
+    if (!owner || !owner->host_barrier_started || owner->host_transaction.status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_PREPARING_PEER || !noah_profile_split_reconciler_status(&owner->reconciler, &status) || status.transfer_offset == owner->host_barrier_progress_offset) {
+        return;
+    }
+    owner->host_barrier_progress_offset = status.transfer_offset;
+    owner->host_last_activity_at        = now_ms;
+    owner->host_activity_known          = true;
+}
+
+static bool host_barrier_exact_convergence(const noah_profile_owner_t *owner) {
+    noah_profile_split_authority_status_t authority;
+
+    return owner && owner->host_barrier_descriptor_known && owner->descriptor_readable && descriptor_equal(&owner->committed_descriptor, &owner->host_barrier_descriptor) && noah_profile_split_authority_status(&owner->reconciler.authority, &authority) && !authority.transfer_pending && authority.state == NOAH_PROFILE_SPLIT_AUTHORITY_COMMITTED_CONVERGED && descriptor_equal(&authority.local, &owner->host_barrier_descriptor) && descriptor_equal(&authority.peer, &owner->host_barrier_descriptor);
+}
+
+static bool fail_host_postcommit_authority(noah_profile_owner_t *owner, noah_profile_candidate_v1_error_id_t error, noah_profile_owner_state_t state) {
+    if (!owner || !noah_profile_candidate_transaction_fail_postcommit(&owner->host_transaction, error)) {
+        return false;
+    }
+    owner->state = state;
+    return true;
+}
+
+static bool advance_host_postcommit_barrier(noah_profile_owner_t *owner) {
+    if (!owner || owner->host_transaction.status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_CONVERGING_PEER || !owner->host_barrier_descriptor_known) {
+        return false;
+    }
+    if (!owner->host_barrier_local_published) {
+        if (!publish_validated_descriptor(owner) || !descriptor_equal(&owner->committed_descriptor, &owner->host_barrier_descriptor) || !noah_profile_split_reconciler_refresh_authority(&owner->reconciler)) {
+            owner->state = NOAH_PROFILE_OWNER_STORAGE_ERROR;
+        } else {
+            owner->host_barrier_local_published = true;
+        }
+        return true;
+    }
+    if (!owner->host_barrier_peer_commit_authorized) {
+        if (noah_profile_split_reconciler_prepared_push_authorize_commit(&owner->reconciler, &owner->host_barrier_descriptor)) {
+            owner->host_barrier_peer_commit_authorized = true;
+            return true;
+        }
+        return false;
+    }
+    if (!host_barrier_exact_convergence(owner)) {
+        noah_profile_split_authority_status_t  authority;
+        noah_profile_split_reconciler_status_t reconciler;
+
+        if (noah_profile_split_authority_status(&owner->reconciler.authority, &authority) && descriptor_equal(&authority.local, &owner->host_barrier_descriptor)) {
+            if (authority.state == NOAH_PROFILE_SPLIT_AUTHORITY_PEER_NEWER) {
+                return fail_host_postcommit_authority(owner, NOAH_PROFILE_CANDIDATE_V1_ERROR_POSTCOMMIT_AUTHORITY_LOST, NOAH_PROFILE_OWNER_POSTCOMMIT_AUTHORITY_LOST);
+            }
+            if (authority.state == NOAH_PROFILE_SPLIT_AUTHORITY_CONCURRENT_COMMIT || authority.state == NOAH_PROFILE_SPLIT_AUTHORITY_CORRUPT_SAME_TUPLE || authority.state == NOAH_PROFILE_SPLIT_AUTHORITY_INCOMPATIBLE) {
+                return fail_host_postcommit_authority(owner, NOAH_PROFILE_CANDIDATE_V1_ERROR_PEER_COMMIT_CONFLICT, NOAH_PROFILE_OWNER_CONCURRENT_COMMIT);
+            }
+        }
+        if (noah_profile_split_reconciler_status(&owner->reconciler, &reconciler) && reconciler.state == NOAH_PROFILE_SPLIT_RECONCILER_STOPPED) {
+            if (reconciler.last_status == NOAH_PROFILE_SPLIT_V1_STATUS_CONFLICT || reconciler.last_status == NOAH_PROFILE_SPLIT_V1_STATUS_CORRUPT || reconciler.last_status == NOAH_PROFILE_SPLIT_V1_STATUS_INCOMPATIBLE) {
+                return fail_host_postcommit_authority(owner, NOAH_PROFILE_CANDIDATE_V1_ERROR_PEER_COMMIT_CONFLICT, NOAH_PROFILE_OWNER_CONCURRENT_COMMIT);
+            }
+            if (reconciler.last_status == NOAH_PROFILE_SPLIT_V1_STATUS_STORAGE_ERROR || reconciler.last_status == NOAH_PROFILE_SPLIT_V1_STATUS_VALIDATION_ERROR || reconciler.last_status == NOAH_PROFILE_SPLIT_V1_STATUS_DIGEST_MISMATCH) {
+                return fail_host_postcommit_authority(owner, NOAH_PROFILE_CANDIDATE_V1_ERROR_POSTCOMMIT_AUTHORITY_LOST, NOAH_PROFILE_OWNER_POSTCOMMIT_AUTHORITY_LOST);
+            }
+        }
+        return false;
+    }
+    if (!noah_profile_candidate_transaction_authorize_activation(&owner->host_transaction)) {
+        fail_integration(owner);
+    }
+    return true;
+}
+
 static bool scan_running(noah_profile_owner_t *owner, bool master, uint32_t now_ms, bool activating_boot) {
     noah_profile_storage_admission_owner_t admission = noah_profile_candidate_store_backend_admission_owner(candidate_backend(owner));
+    uint32_t                               host_timeout_ms;
 
+    if (!activating_boot && owner->host_cancel_pending && advance_host_precommit_cancel(owner)) {
+        return true;
+    }
     if (!activating_boot && supersede_host_precommit(owner)) {
         return true;
     }
 
-    if (!activating_boot && admission == NOAH_PROFILE_STORAGE_ADMISSION_HOST && owner->host_activity_known && !owner->host_transaction.mailbox.pending && elapsed_at_least(now_ms, owner->host_last_activity_at, NOAH_PROFILE_OWNER_HOST_TIMEOUT_MS)) {
+    host_timeout_ms = owner->host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_PREPARING_PEER && owner->host_barrier_started ? NOAH_PROFILE_OWNER_HOST_BARRIER_NO_PROGRESS_MS : NOAH_PROFILE_OWNER_HOST_TIMEOUT_MS;
+    if (!activating_boot && !owner->host_cancel_pending && admission == NOAH_PROFILE_STORAGE_ADMISSION_HOST && owner->host_activity_known && !owner->host_transaction.mailbox.pending && elapsed_at_least(now_ms, owner->host_last_activity_at, host_timeout_ms)) {
+        if (owner->host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_PREPARING_PEER && owner->host_barrier_started) {
+            return request_host_precommit_cancel(owner, NOAH_PROFILE_CANDIDATE_V1_ERROR_TIMEOUT);
+        }
         noah_profile_candidate_expire_result_t expired = noah_profile_candidate_transaction_expire_precommit(&owner->host_transaction);
 
         if (expired == NOAH_PROFILE_CANDIDATE_EXPIRE_DONE) {
@@ -433,7 +749,19 @@ static bool scan_running(noah_profile_owner_t *owner, bool master, uint32_t now_
             if (activating_boot) {
                 worked = scan_activation(owner);
             } else if (admission != NOAH_PROFILE_STORAGE_ADMISSION_PEER) {
-                worked = noah_profile_candidate_transaction_scan(&owner->host_transaction);
+                if (owner->host_cancel_pending) {
+                    worked = false;
+                } else if (owner->host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_PREPARING_PEER && owner->host_transaction.mailbox.pending) {
+                    worked = host_mailbox_is_matching_abort(owner) ? request_host_precommit_cancel(owner, NOAH_PROFILE_CANDIDATE_V1_ERROR_NONE) : noah_profile_candidate_transaction_scan(&owner->host_transaction);
+                } else if (owner->host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_PREPARING_PEER) {
+                    worked = begin_or_advance_host_barrier(owner);
+                } else if (owner->host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_CONVERGING_PEER && owner->host_transaction.mailbox.pending) {
+                    worked = noah_profile_candidate_transaction_scan(&owner->host_transaction);
+                } else if (owner->host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_CONVERGING_PEER) {
+                    worked = advance_host_postcommit_barrier(owner);
+                } else {
+                    worked = noah_profile_candidate_transaction_scan(&owner->host_transaction);
+                }
                 if (worked) {
                     owner->host_last_activity_at = now_ms;
                     owner->host_activity_known   = true;
@@ -442,23 +770,32 @@ static bool scan_running(noah_profile_owner_t *owner, bool master, uint32_t now_
                     owner->state = NOAH_PROFILE_OWNER_DURABILITY_UNKNOWN;
                     return true;
                 }
+                if (worked && owner->host_barrier_started && owner->host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_REJECTED && owner->host_transaction.status.error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_STORAGE_FAILURE) {
+                    return request_host_precommit_cancel(owner, NOAH_PROFILE_CANDIDATE_V1_ERROR_STORAGE_FAILURE);
+                }
                 if (worked && owner->host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_REJECTED && owner->host_transaction.status.error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_ACTIVATION_FAILED) {
                     owner->state = NOAH_PROFILE_OWNER_STORAGE_ERROR;
                     return true;
                 }
-                if (worked && owner->host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_ACTIVATING) {
+                if (worked && owner->host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_ACTIVATING && !owner->config.peer_required) {
                     (void)publish_validated_descriptor(owner);
                 }
                 if (owner->host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE && noah_profile_candidate_store_backend_admission_owner(candidate_backend(owner)) != NOAH_PROFILE_STORAGE_ADMISSION_HOST) {
                     owner->host_activity_known = false;
+                    reset_host_barrier(owner);
                     refresh_ready_state(owner);
                 }
             }
         } else if (current == OWNER_SCHEDULE_SPLIT) {
             noah_profile_split_reconcile_mode_t mode = activating_boot || admission == NOAH_PROFILE_STORAGE_ADMISSION_HOST ? NOAH_PROFILE_SPLIT_RECONCILE_CONVERGENCE_ONLY : NOAH_PROFILE_SPLIT_RECONCILE_FULL;
             worked = owner->split_initialized && noah_profile_split_reconciler_scan_mode(&owner->reconciler, master, now_ms, mode);
+            if (worked && !activating_boot) {
+                note_host_barrier_progress(owner, now_ms);
+            }
             if (worked && noah_profile_peer_store_backend_state(&owner->peer_store) == NOAH_PROFILE_PEER_STORE_COMMITTED) {
-                (void)publish_validated_descriptor(owner);
+                if (!publish_validated_descriptor(owner) || !noah_profile_split_reconciler_refresh_authority(&owner->reconciler)) {
+                    owner->state = NOAH_PROFILE_OWNER_STORAGE_ERROR;
+                }
             }
             if (!activating_boot && supersede_host_precommit(owner)) {
                 return true;

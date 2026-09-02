@@ -229,3 +229,34 @@ No project risks are closed yet.
   policies, but fails the `.bss` policy by 2,740 bytes and the combined-data
   policy by 740 bytes. This is not physical SRAM exhaustion. No policy will be
   revised without fresh allocator and stack high-water evidence on hardware.
+
+### 2026-09-02 distributed prepare-barrier update
+
+Reconciliation note: the 2026-08-31 statement that postcommit authority was
+incomplete is an audit-time snapshot. D-022 and the current tree supersede that
+specific implementation finding.
+
+- R-04 and R-19 now have host proof for the missing postcommit race. A
+  peer-required commit stages the exact candidate on the sibling before the
+  local marker, pauses at `PUSH_PREPARED`, commits local then peer, and permits
+  activation only after a fresh exact `COMMITTED_CONVERGED` observation. Two
+  consecutive full-owner commits prove the second candidate does not attempt
+  to overwrite the slot backing the previous active runtime.
+- Simultaneous provisional host writers are deterministically arbitrated by
+  generation and stable physical origin before either marker. The loser aborts
+  both provisional preparations and reports a distinct status. Timeout waits
+  for a peer abort before releasing local admission, and role changes restart
+  the handshake without losing the prepared sender correlation.
+- A newer, conflicting, corrupt, or incompatible peer detected after local
+  durability enters terminal `AUTHORITY_FAILED` recovery. The new record is
+  not activated and the HOST lease/backing remains retained; hot import is not
+  attempted against the two pinned slots.
+- Host and sanitizer tests cover prepare/pause/authorize/cancel, provisional
+  versus durable metadata, immediate authority refresh, role swap, first and
+  second complete split commits, simultaneous writers, prepared timeout, and
+  postcommit fence loss. R-04 and R-19 remain project risks until the real
+  two-half interruption, reboot, reconnect, dual-USB, and contention matrix
+  supplies hardware evidence.
+- R-07 remains open. No resource-policy value is described as physical SRAM
+  capacity; fresh linked and reviewed-path stack evidence must be recorded for
+  this larger owner before enabling mutation.

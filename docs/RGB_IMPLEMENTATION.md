@@ -57,8 +57,10 @@ they cannot remain cached after a profile switch.
 Ordinary firmware still selects the compiled tables. The side-specific
 engineering artifact installs the complete effective-profile owner and all
 renderer invalidators, but its host mutation route remains off while
-postcommit split authority, resource policy, and hardware validation are open.
-All current renderer families are behind the effective adapter.
+resource policy, an explicit mutation gate, and hardware validation are open.
+Its distributed split barrier already prepares both halves before local
+durability and requires exact durable convergence before activation. All
+current renderer families are behind the effective adapter.
 
 ## How truth reaches the LEDs
 

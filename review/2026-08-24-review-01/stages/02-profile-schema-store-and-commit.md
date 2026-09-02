@@ -39,10 +39,12 @@ compatibility, committed-record adoption, reset-to-compiled activation, and a
 shared host/peer admission lease have landed in that gated owner. Side-specific
 artifacts provide the D-018 flash-owned physical identity and the owner consumes
 it for durable origin and split registration. Host and peer work share one
-admission-first scheduler. A newer-or-equal compatible peer cancels host work
-before marker-last commit, but postcommit concurrent authority,
-resource-policy closure, and the real two-half hardware matrix still block
-mutation capability and stage completion.
+admission-first scheduler. D-022 now prepares the exact candidate on the peer
+before local marker-last commit, commits local then peer, and permits activation
+only after fresh exact durable convergence. Simultaneous provisional writers,
+prepared timeout, role change, and postcommit authority loss have fail-closed
+host coverage. Resource-policy closure, explicit mutation routing/capabilities,
+and the real two-half hardware matrix still block stage completion.
 
 ## Objective
 
@@ -187,8 +189,9 @@ Volatile preview must not outrank durable committed state after reconnect.
 - [x] Effective profile generation publication
 - [x] Domain invalidation contract
 - [ ] Split convergence (bidirectional reconciler, transport adapter, flash
-  physical identity, gated owner consumption, registration, and precommit host
-  supersession landed; postcommit contention and hardware convergence remain)
+  physical identity, gated owner consumption, registration, precommit host
+  supersession, and distributed prepare/commit/activation fencing landed;
+  hardware convergence and recovery evidence remain)
 - [ ] Reset and migration behavior (override-disabled durable records now
   activate compiled fallback; production routing and upgrade evidence remain)
 - [x] Debug/status snapshots for the gated owner read surface
@@ -493,9 +496,11 @@ Landed gated owner-composition evidence:
   host owns it, split scheduling is convergence-only: metadata, serving, and
   pushing the known durable local record continue, but a peer import cannot
   begin or advance;
-- abandoned host candidates expire after 15 seconds only in precommit states,
-  never across a queued mailbox, marker-last commit, activation, or uncertain
-  durability. Error id `19` is frozen in both firmware and Profile Studio;
+- ordinary abandoned host staging expires after 15 seconds. Distributed peer
+  preparation uses a separate 60-second no-progress window refreshed only by
+  acknowledged payload advance, and confirms peer abort before releasing the
+  local candidate. Neither path expires marker-last commit, activation, or
+  uncertain durability. Error id `19` is frozen in firmware and Profile Studio;
 - the QMK EEPROM adapter enforces the 32-byte store I/O contract and uses a
   direct block write, preserving one wear-level write per scan grant without
   QMK's variable-stack update helper;

@@ -67,6 +67,7 @@ typedef struct {
     noah_profile_candidate_v1_status_t     status;
     bool                                   has_candidate;
     bool                                   poisoned;
+    bool                                   split_commit_authorization_required;
     uint16_t                               last_aborted_transaction_id;
     uint16_t                               last_committed_transaction_id;
 } noah_profile_candidate_transaction_t;
@@ -80,6 +81,23 @@ typedef enum {
 } noah_profile_candidate_expire_result_t;
 
 void noah_profile_candidate_transaction_init(noah_profile_candidate_transaction_t *transaction, const noah_profile_candidate_backend_t *backend, const noah_profile_candidate_compatibility_t *compatibility);
+
+// Selects the split-authority commit barrier while the transaction is idle.
+// Coordinated commits stop before durability and again before activation until
+// the owner explicitly authorizes each boundary. The setting persists across
+// completed candidates. Returns false if a candidate or mailbox is active.
+bool noah_profile_candidate_transaction_require_split_authorization(noah_profile_candidate_transaction_t *transaction, bool required);
+
+// Owner-side split-authority boundary. PREPARING_PEER begins marker-last
+// durability and becomes COMMITTING. A synchronously completed commit becomes
+// CONVERGING_PEER. Calls after that boundary are idempotent and do not restart
+// persistence. Returns false outside coordinated commit states.
+bool noah_profile_candidate_transaction_authorize_commit(noah_profile_candidate_transaction_t *transaction);
+
+// Owner-side split-authority boundary. Only CONVERGING_PEER begins provider
+// activation and becomes ACTIVATING. Repeated calls while ACTIVATING are
+// idempotent and never restart activation.
+bool noah_profile_candidate_transaction_authorize_activation(noah_profile_candidate_transaction_t *transaction);
 
 // USB/callback side: exact decode plus one bounded mailbox copy only. A handled
 // frame is replaced in place with its immediate admission acknowledgement.
@@ -100,5 +118,20 @@ noah_profile_candidate_expire_result_t noah_profile_candidate_transaction_expire
 // owned operation may discard one acknowledged but unprocessed mailbox item so
 // a queued commit cannot cross the newly observed durable-authority boundary.
 noah_profile_candidate_expire_result_t noah_profile_candidate_transaction_supersede_precommit(noah_profile_candidate_transaction_t *transaction);
+// Deterministic simultaneous-host arbitration. The losing physical origin
+// aborts only its still-provisional candidate and reports a distinct status.
+noah_profile_candidate_expire_result_t noah_profile_candidate_transaction_yield_precommit(noah_profile_candidate_transaction_t *transaction);
+
+// Fail closed after local marker-last durability. This retains the candidate
+// and backend lease/backing so a two-slot runtime cannot overwrite the active
+// slot while authority is unresolved. Only the two postcommit split errors
+// are accepted.
+bool noah_profile_candidate_transaction_fail_postcommit(noah_profile_candidate_transaction_t *transaction, noah_profile_candidate_v1_error_id_t reason);
+
+// Releases a candidate whose local commit failed before marker durability was
+// possible while retaining its terminal STORAGE_FAILURE status for the host.
+// The split owner calls this only after confirming that any provisional peer
+// copy has been aborted. Durable/ambiguous states are refused.
+noah_profile_candidate_expire_result_t noah_profile_candidate_transaction_cleanup_failed_precommit(noah_profile_candidate_transaction_t *transaction);
 
 void noah_profile_candidate_transaction_status(const noah_profile_candidate_transaction_t *transaction, noah_profile_candidate_v1_status_t *status);

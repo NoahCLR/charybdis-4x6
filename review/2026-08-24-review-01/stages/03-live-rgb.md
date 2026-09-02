@@ -10,9 +10,10 @@ group bitmaps, their layer/pointing/combo stage rows, the auto-mouse fade
 mode/end color, combo-feedback color/locality, and key-feedback colors,
 tap-branch ordering, locality, group rows, and tap-commit policy. The view
 copies no payload during provider publication, and its captured frame token
-refuses access after any later publication. The effective runtime owner is not
-installed in production yet, so the compiled RGB configuration remains the
-exact runtime behavior.
+refuses access after any later publication. The effective runtime and its
+split-safe activation owner are installed only in the side-specific engineering
+artifact. Normal firmware still uses the compiled RGB configuration, and the
+engineering artifact still does not route or advertise candidate mutation.
 
 ## Objective
 
@@ -43,8 +44,9 @@ and deferrals are documented in
 `tools/charybdis-profile-studio/live-link/rgb-domain-v1.md`.
 
 This is foundation and early-consumer evidence, not the vertical slice:
-production owner installation, preview/rollback, candidate writes,
-persistence, split convergence, source pull, and UI actions remain open. The
+normal-firmware promotion, preview/rollback, routed candidate writes, source
+pull, UI actions, and real-hardware proof remain open. Persistent split
+convergence and provider publication exist behind the engineering gate. The
 renderer-migration deliverables below can be complete without making the
 end-to-end stage complete.
 
@@ -112,12 +114,13 @@ adds a source or compile gate against regression.
 ## Deliverables
 
 - [ ] Effective RGB profile API (callback view, stale-frame contract, frame
-      capture, and every current renderer consumer landed; production owner
-      installation remains)
+      capture, every current renderer consumer, and gated owner installation
+      landed; normal-firmware promotion remains)
 - [x] All eight RGB families migrated
 - [ ] Generation-consistent cache invalidation
 - [ ] Volatile preview and rollback
-- [ ] Persistent apply and split status
+- [ ] Persistent apply and split status (firmware path landed behind the gate;
+      mutation routing and UI remain)
 - [ ] Semantic source/device diff
 - [ ] Push, pull, and reset for RGB
 - [x] Source gate against direct production renderer-array reads

@@ -1,7 +1,8 @@
 # Profile Split Protocol V1
 
-Status: accepted internal split foundation with gated owner registration;
-normal mutation exposure and hardware acceptance remain open
+Status: accepted internal split foundation and distributed commit barrier with
+gated owner registration; normal mutation exposure and hardware acceptance
+remain open
 
 This is a dedicated sibling protocol for the durable live profile. It does not
 extend the VIA region reconciler. Every frame is exactly 32 bytes, multi-byte
@@ -82,6 +83,17 @@ and error frames carry no chunk bytes. Generation plus digest correlates
 transfer progress inside the one active peer prepare; the prepare descriptor
 retains the complete origin, CRC, flags, schema, and compatibility identity.
 
+`PREPARE_BEGIN` may describe either an already durable sender record during
+normal repair or a semantically validated but still provisional host candidate
+during D-022 deployment. Receiving it records provisional intent separately;
+it never overwrites the last durable `peer_descriptor` or publishes the intent
+as peer authority. Once every byte is acknowledged, a provisional sender pauses
+in `PUSH_PREPARED`. Only a later owner authorization may send
+`PREPARE_COMMIT`. `ABORT` is idempotent and releases the correlated peer lease
+before the sender releases its own precommit candidate. An ABORT for an exact
+candidate that was never admitted or was already discarded also succeeds, but
+it cannot cancel a different live transfer or an uncertain durable phase.
+
 A payload request has the same correlation, offset, and total length fields but
 no chunk. Its response is a payload chunk beginning at the exact requested
 offset. QMK custom RPC is initiated only by the current transport master, so
@@ -102,6 +114,24 @@ The peer observer reports zero unresolved peers only for compiled or committed
 convergence with no transfer in progress. An uninitialized or incoherent
 publication is a failed observation, which the activation policy already
 treats as unresolved.
+
+For a peer-required live deployment, exact convergence is a two-phase barrier:
+
+1. transfer the validated local candidate into the peer inactive slot and
+   pause before either marker;
+2. commit the local marker, immediately publish that exact durable descriptor,
+   then authorize the peer marker;
+3. exchange fresh metadata and require both durable descriptors to equal the
+   just-committed candidate with no transfer pending;
+4. only then request provider activation on either half.
+
+The activation observer compares its coherent authority snapshot with the
+owner's current committed descriptor. A stale previously converged publication
+therefore cannot authorize a newly durable generation. Higher-generation
+simultaneous provisional candidates win before durability; equal generations
+use stable physical origin as the deterministic precommit tiebreaker. Durable
+equal-generation/different-origin records remain D-014 conflicts and are never
+silently overwritten.
 
 ## Durable Peer Receiver
 
@@ -137,12 +167,20 @@ scan step. It never reads or writes EEPROM and never runs validation or commit.
 
 Matrix scan performs at most one transport exchange, one bounded payload
 read/write, or one validator/marker-last commit step. It supports newer-local
-push, newer-peer pull, byte-identical retries, 50–1,000 ms backoff,
-disconnect/reconnect, role-change restart, passive-peer expiry, and terminal
+push, newer-peer pull, staged-source prepare/pause/commit/abort,
+byte-identical retries, 50–1,000 ms backoff, disconnect/reconnect, prepared-
+sender preservation across role changes, passive-peer expiry, and terminal
 conflict/corruption/incompatibility states. Every peer loss republishes
 fail-closed authority. The QMK adapter appends `PUT_PROFILE_SPLIT_SYNC`, checks
 both 32-byte RPC directions, and can be registered only after a real owner
 initializes the reconciler.
+
+An abandoned inbound provisional prepare has its own passive lease expiry. The
+receiver aborts that incomplete inactive-slot candidate and releases `PEER`
+admission when its correlated sender activity expires. If both halves change
+transport roles, an outbound prepared source retains its candidate correlation
+but restarts at `PREPARE_BEGIN` before resuming chunks or an authorized commit;
+it never assumes the new receiver retained volatile prepare state.
 
 The reconciler preserves `origin_half`; it never derives it from current USB
 role. On this `MASTER_RIGHT` board, upstream QMK falls back to
@@ -156,10 +194,11 @@ identity boundary and registers the split transport exactly once.
 
 ## Remaining Exposure And Acceptance Pieces
 
-- postcommit concurrent-authority resolution or prevention;
 - allocator/stack high-water evidence on both physical halves;
 - the USB-orientation, reconnect, role-swap, interruption, and contention
   hardware matrix;
+- real-device recovery evidence for `AUTHORITY_FAILED` after an injected
+  postcommit fence loss;
 - normal mutation routing and truthful write/commit/activation/peer capability
   advertising.
 

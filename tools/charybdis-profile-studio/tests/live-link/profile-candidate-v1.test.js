@@ -40,6 +40,11 @@ function goldenFixtures() {
 test("JavaScript emits the exact candidate frames consumed by the firmware fixture", () => {
     assert.equal(CANDIDATE_ERROR.TIMEOUT, 19);
     assert.equal(CANDIDATE_ERROR.PEER_SUPERSEDED, 20);
+    assert.equal(CANDIDATE_ERROR.PEER_PREPARE_YIELDED, 21);
+    assert.equal(CANDIDATE_ERROR.POSTCOMMIT_AUTHORITY_LOST, 22);
+    assert.equal(CANDIDATE_ERROR.PEER_COMMIT_CONFLICT, 23);
+    assert.equal(CANDIDATE_STATE.PREPARING_PEER, 8);
+    assert.equal(CANDIDATE_STATE.CONVERGING_PEER, 9);
     const fixtures = goldenFixtures();
     const metadata = {
         schemaMajor: 1,
@@ -177,8 +182,18 @@ test("candidate codecs reject noncanonical padding, invalid bounds, and unknown 
     assert.throws(() => decodeCandidateAcknowledgement(badQueued, fixtures["begin-request"]), /queued acknowledgment/);
 
     const badStatus = Buffer.from(fixtures["operation-status-response"]);
-    badStatus[8] = 9;
+    badStatus[8] = 11;
     assert.throws(() => decodeCandidateStatusResponse(badStatus, fixtures["operation-status-request"]), /Unknown candidate state/);
+
+    const preparing = Buffer.from(fixtures["commit-status-response"]);
+    preparing[8] = CANDIDATE_STATE.PREPARING_PEER;
+    assert.equal(decodeCandidateStatusResponse(preparing, fixtures["operation-status-request"]).state, CANDIDATE_STATE.PREPARING_PEER);
+    const converging = Buffer.from(preparing);
+    converging[8] = CANDIDATE_STATE.CONVERGING_PEER;
+    assert.equal(decodeCandidateStatusResponse(converging, fixtures["operation-status-request"]).state, CANDIDATE_STATE.CONVERGING_PEER);
+    const failed = Buffer.from(preparing);
+    failed[8] = CANDIDATE_STATE.AUTHORITY_FAILED;
+    assert.equal(decodeCandidateStatusResponse(failed, fixtures["operation-status-request"]).state, CANDIDATE_STATE.AUTHORITY_FAILED);
 });
 
 test("metadata is derived from the canonical blob and its exact domain mask", () => {

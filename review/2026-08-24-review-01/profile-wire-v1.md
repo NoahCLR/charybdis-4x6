@@ -381,13 +381,17 @@ generation and digest before retrying.
 
 Abort is idempotent before durable commit; retrying a successful or no-op abort
 never repeats storage work.
-The device owner expires a host-owned candidate after 15 seconds without
-processed precommit work. It never expires a queued mailbox item, marker-last
-commit, activation, or durability-unknown state. This device-side inactivity
-policy reports error `19`; a desktop transport timeout still does not itself
-command an abort. Reset or power loss discards the volatile mailbox/transaction
-owner, and the storage marker-last rule keeps an incomplete candidate
-ineligible for boot.
+The device owner expires ordinary host staging after 15 seconds without
+processed precommit work. Once a peer-required candidate enters its distributed
+prepare, it uses a separate 60-second no-progress window; only acknowledged
+split payload progress refreshes that window, not BUSY replies or retries. A
+matching host abort or barrier timeout cancels and confirms the peer's
+provisional prepare before releasing the local candidate. Neither policy
+expires marker-last commit, activation, or durability-unknown state. Device-side
+inactivity reports error `19`; a desktop transport timeout still does not
+itself command an abort. Reset or power loss discards the volatile
+mailbox/transaction owner, and the storage marker-last rule keeps an incomplete
+candidate ineligible for boot.
 
 When coherent split authority reveals a compatible peer generation greater
 than or equal to the generation reserved by a host candidate, the owner cancels
@@ -439,7 +443,10 @@ route and advertise candidate writes. Its successful 25-byte payload is:
 | 23 | 2 | operation sequence, incremented after each processed mailbox item |
 
 Candidate states are `0` idle, `1` receiving, `2` complete, `3` validating,
-`4` validated, `5` rejected, `6` committing, and `7` activating.
+`4` validated, `5` rejected, `6` committing, `7` activating, `8` preparing
+the peer before local durability, `9` converging the peer after local
+durability but before provider activation, and `10` authority-failed after a
+durable local commit that was deliberately not activated.
 Last-operation ids are `0` none, `1` begin, `2` chunk, `3` validate, `4`
 abort, and `5` commit. Error ids are stable:
 
@@ -466,6 +473,9 @@ abort, and `5` commit. Error ids are stable:
 | 18 | final marker durability is unknown; reconcile status |
 | 19 | inactive precommit candidate expired on device |
 | 20 | compatible peer authority superseded the precommit candidate |
+| 21 | simultaneous peer prepare won deterministic arbitration |
+| 22 | local durability completed but peer authority was lost before activation |
+| 23 | peer committed a conflicting identity during postcommit convergence |
 
 Errors which have no domain/table/row/tap/field location use the sentinels
 above. The operation sequence lets a host distinguish a newly processed

@@ -27,6 +27,26 @@ draft changes never manufacture device generations.
 
 The origin half is a stable physical-half id, not current USB role.
 
+## Distributed Commit Phases
+
+| Phase | USB/local half | Peer half | Durable authority | Activation |
+| --- | --- | --- | --- | --- |
+| validated | inactive candidate validated | unchanged | prior committed descriptor | prior generation stays active |
+| `PREPARING_PEER` | HOST lease retained; no marker | exact bytes staged under PEER lease; no marker | unchanged | forbidden |
+| peer prepared | pauses in `PUSH_PREPARED` | complete inactive candidate | unchanged | forbidden |
+| local committing | marker-last advances locally | prepared and fenced | prior descriptor until local marker succeeds | forbidden |
+| `CONVERGING_PEER` | new descriptor durable and published | marker-last commit authorized | local newer, transfer pending | forbidden |
+| exact converged | exact new descriptor | exact new descriptor | `COMMITTED_CONVERGED`, no transfer | eligible for normal safe-boundary activation |
+| authority failed | local marker is durable but fresh peer evidence is newer, conflicting, corrupt, incompatible, or terminally failed | do not overwrite | explicit recovery state | forbidden; HOST lease/backing retained |
+
+`PREPARE_BEGIN` intent is provisional and never replaces durable peer metadata.
+If both halves hold provisional host candidates, higher generation wins before
+either marker. Equal generation is ordered by the lower stable physical-origin
+id; the loser aborts peer staging first and then reports
+`PEER_PREPARE_YIELDED`. Once either marker is durable, D-014 ordering applies
+without a tiebreaker: equal-generation/different-origin records are an explicit
+conflict.
+
 ## User Operations
 
 | Operation | Source | USB half | Peer half | Required visible result |
@@ -103,9 +123,11 @@ The predicate snapshot uses bounded generation publication so an extension-host
 status read cannot observe counts from two evaluations. A missing peer observer
 is intentionally unsafe. The predicate is installed by the gated D-021 owner
 together with the behavior and RGB invalidators and exact split peer observer.
-Ordinary firmware still allocates only the read-only shell, and mutation
-routing remains disabled until postcommit authority, resource policy, and the
-hardware matrix close.
+Ordinary firmware still allocates only the read-only shell. The D-022
+distributed barrier now enforces postcommit authority in the gated owner, but
+mutation routing remains disabled until resource policy and the hardware
+matrix close and a separate engineering-mutation gate couples routing with
+truthful capabilities.
 
 ## Connection Status Shown By Studio
 

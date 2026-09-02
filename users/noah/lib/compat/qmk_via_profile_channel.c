@@ -140,7 +140,7 @@ static void noah_profile_channel_latch_owner_status(const noah_profile_owner_sta
     if (owner->peer_converged) {
         status->state_flags |= NOAH_PROFILE_STATE_PEER_CONVERGED;
     }
-    if (owner->owner_state == NOAH_PROFILE_OWNER_GENERATION_CONFLICT || noah_profile_authority_is_conflict(owner->authority_state)) {
+    if (owner->owner_state == NOAH_PROFILE_OWNER_GENERATION_CONFLICT || owner->owner_state == NOAH_PROFILE_OWNER_CONCURRENT_COMMIT || noah_profile_authority_is_conflict(owner->authority_state)) {
         status->conflict_count = 1u;
     }
 }

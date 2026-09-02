@@ -28,6 +28,10 @@ static bool metadata_matches_candidate(const noah_profile_candidate_v1_metadata_
     return metadata && candidate && metadata->schema_major == candidate->schema_major && metadata->schema_minor == candidate->schema_minor && metadata->requested_domains == candidate->domain_mask && metadata->flags == 0u && metadata->payload_length == candidate->payload_length && metadata->crc32 == candidate->payload_crc32 && metadata->digest == candidate->payload_digest && metadata->action_abi_digest == candidate->action_abi_digest;
 }
 
+static bool store_candidate_equal(const noah_profile_store_candidate_t *left, const noah_profile_store_candidate_t *right) {
+    return left && right && left->schema_major == right->schema_major && left->schema_minor == right->schema_minor && left->domain_mask == right->domain_mask && left->flags == right->flags && left->payload_length == right->payload_length && left->generation == right->generation && left->origin_half == right->origin_half && left->payload_crc32 == right->payload_crc32 && left->payload_digest == right->payload_digest && left->compiled_default_digest == right->compiled_default_digest && left->action_abi_digest == right->action_abi_digest;
+}
+
 static bool candidate_payload_start(const noah_profile_candidate_store_backend_t *backend, uint16_t *address) {
     uint16_t slot_start;
 
@@ -281,6 +285,29 @@ bool noah_profile_candidate_store_backend_release_admission(noah_profile_candida
     }
     backend->admission_owner = NOAH_PROFILE_STORAGE_ADMISSION_NONE;
     return true;
+}
+
+static bool validated_profile_matches_candidate(const noah_profile_validator_v1_profile_t *profile, const noah_profile_store_candidate_t *candidate) {
+    return profile && candidate && profile->domain_mask == candidate->domain_mask && profile->byte_length == candidate->payload_length && profile->crc32 == candidate->payload_crc32 && profile->digest == candidate->payload_digest && profile->action_abi_digest == candidate->action_abi_digest;
+}
+
+bool noah_profile_candidate_store_backend_staged_candidate(const noah_profile_candidate_store_backend_t *backend, noah_profile_store_candidate_t *candidate) {
+    if (!backend || !candidate || !backend->store || backend->admission_owner != NOAH_PROFILE_STORAGE_ADMISSION_HOST || !backend->store->prepare_active || backend->store->commit_phase != NOAH_PROFILE_STORE_COMMIT_IDLE || backend->store->candidate_written != backend->store->candidate.payload_length || !backend->validation_complete || backend->committed_available || !validated_profile_matches_candidate(&backend->validated_profile, &backend->store->candidate)) {
+        return false;
+    }
+    *candidate = backend->store->candidate;
+    return true;
+}
+
+bool noah_profile_candidate_store_backend_staged_read(void *context, const noah_profile_store_candidate_t *candidate, uint16_t offset, uint8_t *bytes, uint8_t length) {
+    noah_profile_candidate_store_backend_t *backend = context;
+    noah_profile_store_candidate_t          staged;
+    uint16_t                                payload_start;
+
+    if (!candidate || !bytes || length == 0u || !noah_profile_candidate_store_backend_staged_candidate(backend, &staged) || !store_candidate_equal(&staged, candidate) || !candidate_payload_start(backend, &payload_start) || (uint32_t)offset + length > staged.payload_length) {
+        return false;
+    }
+    return staged_reader_read(backend->store, (size_t)payload_start + offset, bytes, length);
 }
 
 noah_profile_candidate_backend_result_t noah_profile_candidate_store_backend_adopt_committed_begin(noah_profile_candidate_store_backend_t *backend, const noah_profile_store_record_t *record, noah_profile_candidate_v1_error_t *error) {

@@ -25,11 +25,11 @@ dependency status without duplicating or prematurely resolving its findings.
 
 | Stage | Status | Exit evidence |
 | --- | --- | --- |
-| 00 — Contract and baseline | in progress | measured baseline and D-009 through D-016 accepted; HID board spike and executable golden fixtures open |
-| 01 — Live Link transport | blocked on Stage 00 and Review 19 prerequisite | open |
-| 02 — Schema, store, and commit | blocked on Stage 01 | open |
-| 03 — Live RGB | blocked on Stage 02 | open |
-| 04 — Live key behaviors | blocked on Stage 02 | open |
+| 00 — Contract and baseline | in progress | measured baseline, frozen contracts, and executable golden fixtures landed; real-board probe remains |
+| 01 — Live Link transport | software implementation complete; hardware evidence pending | fake/injected transport and read-only device channel landed; real-board/VS Code-host matrix remains |
+| 02 — Schema, store, and commit | engineering implementation hardening | codecs, bounded store, provider, owner, and D-022 split barrier landed behind a gate; resource decision, mutation gate, and hardware evidence remain |
+| 03 — Live RGB | consumer/runtime foundation complete; end-to-end flow blocked on Stage 02 | all renderer families use the effective seam and the gated owner can publish them; routed write/UI/hardware proof remains |
+| 04 — Live key behaviors | consumer/runtime foundation complete; end-to-end flow blocked on Stage 02 | reader-backed lookup and gated publication landed; routed write/UI/hardware proof and timing decision remain |
 | 05 — Milestone A integration | blocked on Stages 03 and 04 | open |
 | 06 — Defaults, layout, and macros | blocked on Milestone A | open |
 | 07 — Combos and layer structure | blocked on Stage 06 | open |
@@ -1772,3 +1772,69 @@ Next steps:
 3. Measure allocator and stack high-water on both halves and make an explicit
    resource-policy decision before promoting the owner or mutation capability
    into normal firmware.
+
+### 2026-09-02 — Distributed commit-barrier checkpoint
+
+- Replaced the unresolved post-commit authority race with the D-022
+  distributed prepare/commit barrier. A host candidate is staged and validated
+  locally, prepared on the peer, committed locally, authorized to commit on the
+  peer, and activated only after both halves report the exact durable identity.
+- Split candidate commit from activation authorization so neither half can
+  publish a candidate before the barrier is satisfied. Unexpected post-commit
+  authority loss now fails closed as `AUTHORITY_FAILED`; conflicting peer
+  commit and prepare-yield outcomes are separately observable protocol errors.
+- Hardened interruption and arbitration behavior: receiver prepares expire,
+  absent aborts are idempotent, aborts cannot be starved by a busy mailbox,
+  local commit failure releases a prepared peer, role changes restart the
+  handshake, crossed simultaneous prepares resolve deterministically, and
+  retry scheduling remains valid across the timer high bit.
+- Reconciled Profile Studio's upload coordinator with the new preparation,
+  convergence, and authority-failure states. Barrier waits use the firmware's
+  60-second no-progress window plus host allowance; acknowledged transfer
+  progress, rather than arbitrary polling, refreshes that window.
+- Added maximum-size candidate evidence: a 4,064-byte payload reaches the
+  prepare barrier within the firmware window. Host tests cover commit/abort
+  idempotence, lease expiry, role swap, simultaneous prepares, storage failure,
+  exact two-half convergence, and fail-closed publication.
+- Focused transaction, owner, reconciler, storage, QMK contract/transport, and
+  Profile Studio live-link verification passed. Final
+  `sh tests/host/run_all_host_tests.sh` passed, including Profile Studio
+  `npm run check` and all 92 live-link tests.
+- Required ordinary firmware checks passed:
+  `sh tests/host/run_firmware_stack_budget_checks.sh`,
+  `qmk compile -kb bastardkb/charybdis/4x6 -km noah`, and
+  `sh tests/host/run_firmware_memory_budget_checks.sh`. The ordinary image is
+  unchanged in policy terms per RP2040 half: SRAM0–3 `.bss` is
+  25,876/26,000 B, `.data` is 22,996 B, combined is 48,872/51,000 B, the
+  linker/core-memory span is 213,264/204,800 B, and fixed linked occupancy is
+  56,336 B.
+- The left-side gated engineering owner passed
+  `sh tests/host/run_live_profile_owner_stack_budget_checks.sh`. Its largest
+  named main-process path is split metadata exchange at 1,504/1,920 B; the
+  coherent status read is 624/1,920 B; and the largest named profile split
+  callback is 264/768 B. These are reviewed linked paths only, not global or
+  interrupt-stack high-water measurements.
+- Fresh engineering linked accounting reports an exact 3,172-byte owner,
+  SRAM0–3 `.data` 23,000 B, `.bss` 28,828/26,000 B, combined
+  51,828/51,000 B, linker/core-memory span 210,312/204,800 B, and fixed linked
+  occupancy 59,288 B. The BSS and combined regression policies remain red;
+  this is not physical exhaustion. Each half has 270,336 B of physical SRAM,
+  and hardware allocator/stack high-water evidence is still absent.
+- Mutation routing and advertised write capabilities remain disabled in both
+  ordinary and current engineering-owner artifacts. This checkpoint is a
+  verified safety foundation, not yet a user-testable live-edit release.
+- Authored profile inputs and rendered Profile Studio layout did not change,
+  so introspection regeneration and screenshots were intentionally skipped.
+  Firmware builds wrote generated artifacts in the sibling QMK tree; no
+  sibling source file changed.
+
+Next steps:
+
+1. Add one explicit side-specific engineering-mutation gate that couples the
+   candidate command route and advertised write capabilities so they cannot
+   drift apart.
+2. Build labeled left/right engineering UF2 artifacts and run the first real
+   two-half RGB and key-behavior upload test through Profile Studio.
+3. Capture allocator and stack high-water during upload, commit, activation,
+   reconnect, reboot, role swap, interruption, reset, and contention before
+   deciding whether to revise policy or promote mutation into normal firmware.

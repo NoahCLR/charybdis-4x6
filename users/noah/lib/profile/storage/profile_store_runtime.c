@@ -109,11 +109,13 @@ bool noah_profile_store_runtime_matrix_scan_step(void) {
             runtime_state = NOAH_PROFILE_STORE_RUNTIME_COMMITTED_FOUND;
             break;
         case NOAH_PROFILE_OWNER_GENERATION_CONFLICT:
+        case NOAH_PROFILE_OWNER_CONCURRENT_COMMIT:
             runtime_state = NOAH_PROFILE_STORE_RUNTIME_GENERATION_CONFLICT;
             break;
         case NOAH_PROFILE_OWNER_COMPILED_ERROR:
         case NOAH_PROFILE_OWNER_STORAGE_ERROR:
         case NOAH_PROFILE_OWNER_DURABILITY_UNKNOWN:
+        case NOAH_PROFILE_OWNER_POSTCOMMIT_AUTHORITY_LOST:
             runtime_state = NOAH_PROFILE_STORE_RUNTIME_STORAGE_ERROR;
             break;
         case NOAH_PROFILE_OWNER_INTEGRATION_ERROR:

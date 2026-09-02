@@ -57,7 +57,9 @@ identities plus active, pending, committed, candidate, peer, convergence, and
 conflict state as one coherent two-page observation. It still advertises zero
 candidate chunk capacity and no write, commit, activation, or peer-operation
 capability, so Profile Studio cannot send a hidden mutation through this read
-surface.
+surface. The underlying owner now contains the D-022 distributed split commit
+barrier; routing and capabilities remain intentionally coupled and off until a
+separate engineering-mutation gate and the real-device acceptance work land.
 
 ## Profiles And New Keymaps
 
