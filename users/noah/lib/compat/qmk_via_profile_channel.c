@@ -4,6 +4,16 @@
 
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
+#if defined(NOAH_LIVE_PROFILE_MUTATION_ENABLE) && (!defined(NOAH_LIVE_PROFILE_OWNER_ENABLE) || !defined(VIA_ENABLE))
+#    error "live-profile mutation requires the complete VIA owner"
+#endif
+
+#ifdef NOAH_STACK_BUDGET_ENABLE
+#    define NOAH_PROFILE_CHANNEL_STACK_BOUNDARY __attribute__((noinline))
+#else
+#    define NOAH_PROFILE_CHANNEL_STACK_BOUNDARY
+#endif
+
 #ifdef VIA_ENABLE
 
 #    include "via.h"
@@ -26,6 +36,14 @@
 #        define NOAH_PROFILE_LED_COUNT RGB_MATRIX_LED_COUNT
 #    else
 #        define NOAH_PROFILE_LED_COUNT 0u
+#    endif
+
+#    ifdef NOAH_LIVE_PROFILE_MUTATION_ENABLE
+#        define NOAH_PROFILE_MUTATION_CAPABILITIES (NOAH_PROFILE_FEATURE_CANDIDATE_WRITE | NOAH_PROFILE_FEATURE_PERSISTENT_COMMIT | NOAH_PROFILE_FEATURE_RUNTIME_ACTIVATION | NOAH_PROFILE_FEATURE_PEER_RECONCILIATION)
+#        define NOAH_PROFILE_MUTATION_CHUNK_MAX NOAH_PROFILE_CANDIDATE_V1_CHUNK_MAX
+#    else
+#        define NOAH_PROFILE_MUTATION_CAPABILITIES 0u
+#        define NOAH_PROFILE_MUTATION_CHUNK_MAX 0u
 #    endif
 
 static noah_profile_wire_v1_read_service_t noah_profile_wire_v1_read_service = {
@@ -77,11 +95,11 @@ static void noah_profile_channel_refresh_owner_capabilities(const noah_profile_o
     if (!owner) {
         return;
     }
-    noah_profile_wire_v1_read_service.capabilities.feature_flags = NOAH_PROFILE_FEATURE_READ_SURFACE | NOAH_PROFILE_FEATURE_STORAGE_LAYOUT | NOAH_PROFILE_SPLIT_CAPABILITY | NOAH_PROFILE_FEATURE_RGB_SCHEMA | NOAH_PROFILE_FEATURE_KEY_BEHAVIOR_SCHEMA | NOAH_PROFILE_FEATURE_ACTION_ABI_DIGEST | NOAH_PROFILE_FEATURE_COMPILED_PROFILE_HASH;
+    noah_profile_wire_v1_read_service.capabilities.feature_flags = NOAH_PROFILE_FEATURE_READ_SURFACE | NOAH_PROFILE_FEATURE_STORAGE_LAYOUT | NOAH_PROFILE_SPLIT_CAPABILITY | NOAH_PROFILE_FEATURE_RGB_SCHEMA | NOAH_PROFILE_FEATURE_KEY_BEHAVIOR_SCHEMA | NOAH_PROFILE_FEATURE_ACTION_ABI_DIGEST | NOAH_PROFILE_FEATURE_COMPILED_PROFILE_HASH | NOAH_PROFILE_MUTATION_CAPABILITIES;
     noah_profile_wire_v1_read_service.capabilities.action_abi_digest         = owner->action_abi_digest;
     noah_profile_wire_v1_read_service.capabilities.compiled_default_digest   = owner->compiled_default_digest;
     noah_profile_wire_v1_read_service.capabilities.supported_domain_mask     = owner->supported_domain_mask;
-    noah_profile_wire_v1_read_service.capabilities.candidate_chunk_max       = 0u;
+    noah_profile_wire_v1_read_service.capabilities.candidate_chunk_max       = NOAH_PROFILE_MUTATION_CHUNK_MAX;
 }
 
 static void noah_profile_channel_latch_owner_status(const noah_profile_owner_status_t *owner) {
@@ -177,7 +195,19 @@ static void noah_profile_channel_refresh_store_status(void) {
     }
 }
 
-void via_custom_value_command_kb(uint8_t *data, uint8_t length) {
+NOAH_PROFILE_CHANNEL_STACK_BOUNDARY void via_custom_value_command_kb(uint8_t *data, uint8_t length) {
+#    ifdef NOAH_LIVE_PROFILE_MUTATION_ENABLE
+    if (data && length == NOAH_PROFILE_WIRE_V1_REPORT_SIZE && data[0] == NOAH_PROFILE_WIRE_V1_COMMAND_GET && data[1] == NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL && data[2] == NOAH_PROFILE_CANDIDATE_V1_VALUE_STATUS) {
+        noah_profile_candidate_v1_status_t candidate;
+
+        if (noah_profile_store_runtime_candidate_status(&candidate) && noah_profile_candidate_v1_handle_status_get(&candidate, data, length)) {
+            return;
+        }
+    }
+    if (noah_profile_store_runtime_candidate_receive(data, length)) {
+        return;
+    }
+#    endif
     if (data && length == NOAH_PROFILE_WIRE_V1_REPORT_SIZE && data[0] == NOAH_PROFILE_WIRE_V1_COMMAND_GET && data[1] == NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL && data[2] == NOAH_PROFILE_WIRE_V1_VALUE_STATUS && data[4] == 0u) {
 #    ifdef NOAH_LIVE_PROFILE_OWNER_ENABLE
         if (!noah_profile_channel_refresh_owner(true)) {
@@ -209,6 +239,8 @@ _Static_assert(NOAH_PROFILE_STORAGE_VIA_MACRO_SIZE <= UINT16_MAX, "VIA macro cap
 _Static_assert(VIA_FIRMWARE_VERSION != 0u, "Profile Wire firmware must advertise a meaningful VIA firmware version");
 _Static_assert((uint8_t)NOAH_PROFILE_WIRE_V1_COMMAND_GET == (uint8_t)id_custom_get_value, "Profile Wire custom-get routing drifted from QMK VIA");
 _Static_assert((uint8_t)NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL == (uint8_t)id_custom_channel, "Profile Wire custom channel drifted from QMK VIA");
+_Static_assert((uint8_t)NOAH_PROFILE_CANDIDATE_V1_COMMAND_SET == (uint8_t)id_custom_set_value, "Profile candidate custom-set routing drifted from QMK VIA");
+_Static_assert((uint8_t)NOAH_PROFILE_CANDIDATE_V1_COMMAND_SAVE == (uint8_t)id_custom_save, "Profile candidate custom-save routing drifted from QMK VIA");
 _Static_assert(NOAH_PROFILE_WIRE_V1_REPORT_SIZE == 32u, "Profile Wire requires the reviewed 32-byte QMK Raw HID report");
 
 #    ifdef RGB_MATRIX_ENABLE
@@ -216,6 +248,10 @@ _Static_assert(NOAH_PROFILE_LED_COUNT == NOAH_PROFILE_WIRE_V1_MAX_PHYSICAL_LEDS,
 #    endif
 
 #    undef NOAH_PROFILE_LED_COUNT
+#    undef NOAH_PROFILE_MUTATION_CHUNK_MAX
+#    undef NOAH_PROFILE_MUTATION_CAPABILITIES
 #    undef NOAH_PROFILE_SPLIT_CAPABILITY
 
 #endif
+
+#undef NOAH_PROFILE_CHANNEL_STACK_BOUNDARY

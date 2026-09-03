@@ -124,10 +124,10 @@ status read cannot observe counts from two evaluations. A missing peer observer
 is intentionally unsafe. The predicate is installed by the gated D-021 owner
 together with the behavior and RGB invalidators and exact split peer observer.
 Ordinary firmware still allocates only the read-only shell. The D-022
-distributed barrier now enforces postcommit authority in the gated owner, but
-mutation routing remains disabled until resource policy and the hardware
-matrix close and a separate engineering-mutation gate couples routing with
-truthful capabilities.
+distributed barrier enforces postcommit authority in the gated owner. The
+separate engineering-mutation gate now couples routing with the complete,
+truthful write/commit/activation/peer capability set for hardware testing;
+resource policy and the hardware matrix still block ordinary exposure.
 
 ## Connection Status Shown By Studio
 

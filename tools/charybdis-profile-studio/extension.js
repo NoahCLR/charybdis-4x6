@@ -5,6 +5,7 @@ const { execFile, spawn } = require("child_process");
 const fs = require("fs/promises");
 const path = require("path");
 const { promisify } = require("util");
+const {buildCanonicalStudioProfileV1} = require("./live-link/compiled-profile-v1");
 const {ProfileDeviceService} = require("./live-link/profile-device-service");
 
 const execFileAsync = promisify(execFile);
@@ -893,7 +894,7 @@ function lastUsefulLogLine(text) {
     return lines.slice(-1)[0] || "";
 }
 
-async function compileProfileFirmware(root, target) {
+async function compileProfileFirmware(root, target, options = {}) {
     requireActiveProfile(target);
     if (!target.buildable) {
         throw new Error(`Profile ${target.keymap} is incomplete and cannot be compiled.`);
@@ -902,25 +903,27 @@ async function compileProfileFirmware(root, target) {
     const channel = studioOutputChannel();
     channel.show(true);
     channel.appendLine("");
-    channel.appendLine(`Starting ${target.keymap} firmware compile`);
-    const title = `Compiling ${target.keymap} left and right firmware`;
+    const liveEdit = options.liveEdit === true;
+    channel.appendLine(`Starting ${target.keymap}${liveEdit ? " live-edit test" : ""} firmware compile`);
+    const title = `Compiling ${target.keymap}${liveEdit ? " live-edit test" : ""} left and right firmware`;
+    const engineeringEnv = liveEdit ? ["NOAH_LIVE_PROFILE_OWNER=yes", "NOAH_LIVE_PROFILE_MUTATION=yes"] : [];
     const task = async (progress = { report() {} }) => {
         const builds = [];
         progress.report({ message: "left firmware" });
         builds.push(await runQmkCompile(root, target, {
-            side: "left",
+            side: liveEdit ? "live_edit_left" : "left",
             label: "left",
             // This keyboard is MASTER_RIGHT, so the forced slave artifact is
             // the physical left half. Physical identity is a separate flash-
             // provisioned contract and remains stable if transport role swaps.
-            env: ["FORCE_SLAVE=yes", "NOAH_PHYSICAL_HALF=left"],
+            env: ["FORCE_SLAVE=yes", "NOAH_PHYSICAL_HALF=left", ...engineeringEnv],
             role: "FORCE_SLAVE",
         }));
         progress.report({ message: "right firmware" });
         builds.push(await runQmkCompile(root, target, {
-            side: "right",
+            side: liveEdit ? "live_edit_right" : "right",
             label: "right",
-            env: ["FORCE_MASTER=yes", "NOAH_PHYSICAL_HALF=right"],
+            env: ["FORCE_MASTER=yes", "NOAH_PHYSICAL_HALF=right", ...engineeringEnv],
             role: "FORCE_MASTER",
         }));
         return builds;
@@ -933,6 +936,10 @@ async function compileProfileFirmware(root, target) {
         );
     }
     return task();
+}
+
+function compileLiveEditProfileFirmware(root, target) {
+    return compileProfileFirmware(root, target, {liveEdit: true});
 }
 
 function runQmkCompile(root, target, build) {
@@ -1006,6 +1013,10 @@ function runQmkCompile(root, target, build) {
 function compiledFirmwareNotice(target, builds) {
     const firmware = builds.map((build) => build.firmware).join(", ");
     return `Compiled ${target.keymap} firmware for left and right halves: ${firmware}.`;
+}
+
+function formatDigest(value) {
+    return `0x${(Number(value) >>> 0).toString(16).toUpperCase().padStart(8, "0")}`;
 }
 
 async function renderProfileTemplates(keymap) {
@@ -1134,6 +1145,29 @@ async function handleWebviewMessage(panel, root, state, message) {
         case "disconnectLiveDevice":
             await state.liveLink.disconnect();
             return;
+        case "applyLiveProfile": {
+            const {profiles, target} = await activeProfileTarget(root, state);
+            const model = await buildModel(root, requireActiveProfile(target), profiles);
+            state.liveLink.setProfileSummary(profileSummaryFromModel(model));
+            const compiled = buildCanonicalStudioProfileV1(model, {capabilities: state.liveLink.snapshot().capabilities || {}});
+            const snapshot = await state.liveLink.applyLiveProfile(compiled.blob);
+            if (!snapshot.error && snapshot.liveApply?.state === "complete") {
+                await postModel(panel, root, state, `Applied ${compiled.byteLength}-byte live profile ${formatDigest(compiled.digest)} and persisted it on both halves.`);
+            }
+            return;
+        }
+        case "applyAllChangesAndApplyLiveProfile": {
+            const target = await checkedMessageProfile(root, state, message);
+            await applyAllChanges(root, target, message);
+            const model = await buildModel(root, target);
+            state.liveLink.setProfileSummary(profileSummaryFromModel(model));
+            const compiled = buildCanonicalStudioProfileV1(model, {capabilities: state.liveLink.snapshot().capabilities || {}});
+            const snapshot = await state.liveLink.applyLiveProfile(compiled.blob);
+            if (!snapshot.error && snapshot.liveApply?.state === "complete") {
+                await postModel(panel, root, state, `Applied staged changes, then persisted ${compiled.byteLength}-byte live profile ${formatDigest(compiled.digest)} on both halves.`, { activeLayer: message.activeLayer, appliedLayerChanges: Boolean(message.adds?.length || message.deletes?.length) });
+            }
+            return;
+        }
         case "refresh": {
             const removedProfiles = await pruneMissingProfileBuildTargets(root);
             const notice = removedProfiles.length
@@ -1257,6 +1291,20 @@ async function handleWebviewMessage(panel, root, state, message) {
             }
             return;
         }
+        case "compileLiveEditFirmware": {
+            const target = await checkedMessageProfile(root, state, message);
+            try {
+                const builds = await compileLiveEditProfileFirmware(root, target);
+                const notice = `Compiled live-edit test firmware: ${builds.map((build) => build.firmware).join(", ")}.`;
+                panel.webview.postMessage({ type: "compileResult", notice });
+                vscode.window.showInformationMessage(notice);
+            } catch (error) {
+                const text = error instanceof Error ? error.message : String(error);
+                panel.webview.postMessage({ type: "compileResult", error: text });
+                vscode.window.showErrorMessage(`Charybdis Profile Studio: ${text}`);
+            }
+            return;
+        }
         case "openSource":
             await openSource(root, requireActiveProfile((await activeProfileTarget(root, state)).target), message.file);
             return;
@@ -1271,6 +1319,13 @@ async function handleWebviewMessage(panel, root, state, message) {
             await applyAllChanges(root, target, message);
             const builds = await compileProfileFirmware(root, target);
             await postModel(panel, root, state, `Applied staged changes and ${compiledFirmwareNotice(target, builds)}`, { activeLayer: message.activeLayer, appliedLayerChanges: Boolean(message.adds?.length || message.deletes?.length) });
+            return;
+        }
+        case "applyAllChangesAndCompileLiveEdit": {
+            const target = await checkedMessageProfile(root, state, message);
+            await applyAllChanges(root, target, message);
+            const builds = await compileLiveEditProfileFirmware(root, target);
+            await postModel(panel, root, state, `Applied staged changes and compiled live-edit test firmware: ${builds.map((build) => build.firmware).join(", ")}.`, { activeLayer: message.activeLayer, appliedLayerChanges: Boolean(message.adds?.length || message.deletes?.length) });
             return;
         }
         case "applyAllChangesAndGenerateProfileDocs": {
@@ -1503,6 +1558,7 @@ async function buildModel(root, target = DEFAULT_PROFILE_TARGET, profiles) {
         qmkKeycodes: qmkKeycodeCatalog.entries,
         qmkKeyLabels: qmkKeycodeCatalog.labels,
         qmkKeycodeAliases: qmkKeycodeCatalog.aliases,
+        qmkKeycodeValues: qmkKeycodeCatalog.values,
         qmkKeycodeSource: qmkKeycodeCatalog.source,
         macroPayloadKeycodes: safe("macroPayloadKeycodes", [], () => parseMacroPayloadKeycodes(macroPayloadKeycodesText)),
         diagnostics,
@@ -1531,6 +1587,7 @@ function emptyModel(root, profiles, target, qmkKeycodeCatalog, diagnostics = [])
         qmkKeycodes: qmkKeycodeCatalog.entries,
         qmkKeyLabels: qmkKeycodeCatalog.labels,
         qmkKeycodeAliases: qmkKeycodeCatalog.aliases,
+        qmkKeycodeValues: qmkKeycodeCatalog.values,
         qmkKeycodeSource: qmkKeycodeCatalog.source,
         macroPayloadKeycodes: [],
         diagnostics,
@@ -1571,11 +1628,13 @@ async function loadQmkKeycodeCatalog(root) {
     }
 
     const entries = Array.from(entriesByValue.values()).sort(compareQmkKeycodes);
+    const values = qmkKeycodeValuesFromEntries(entries);
     return {
         source: `${path.join(keycodeDir, "*.hjson")} + ${path.join(keycodeDir, "extras", "keycodes_us_*.hjson")}`,
         entries,
         labels: qmkKeyLabelsFromEntries(entries),
         aliases: qmkKeyAliasesFromEntries(entries),
+        values,
     };
 }
 
@@ -1637,6 +1696,7 @@ function parseQmkKeycodeHjsonSectionEntries(text, sectionName) {
             continue;
         }
         entries.push({
+            sourceExpression: decodeHjsonString(match[1]),
             key,
             label: extractHjsonStringField(body, "label") || key,
             group: extractHjsonStringField(body, "group") || "other",
@@ -1719,6 +1779,47 @@ function qmkKeyAliasesFromEntries(entries) {
     return aliases;
 }
 
+function qmkKeycodeValuesFromEntries(entries) {
+    const values = {};
+    const unresolved = new Set(entries);
+    for (let pass = 0; pass < entries.length + 1 && unresolved.size; pass += 1) {
+        let changed = false;
+        for (const entry of Array.from(unresolved)) {
+            const numeric = qmkCatalogExpressionValue(entry.sourceExpression, values);
+            if (!Number.isInteger(numeric)) continue;
+            entry.numericValue = numeric;
+            for (const name of [entry.value, entry.key].concat(entry.aliases || [])) {
+                if (name && !name.startsWith("!")) values[name] = numeric;
+            }
+            unresolved.delete(entry);
+            changed = true;
+        }
+        if (!changed) break;
+    }
+    values._______ = values.KC_TRNS ?? values.KC_TRANSPARENT ?? 1;
+    values.XXXXXXX = values.KC_NO ?? 0;
+    return values;
+}
+
+function qmkCatalogExpressionValue(value, values) {
+    const expression = normalizeExpr(value || "");
+    if (/^0x[0-9a-f]+$/i.test(expression)) return Number.parseInt(expression, 16);
+    if (Number.isInteger(values[expression])) return values[expression];
+    const match = expression.match(/^([A-Z][A-Z0-9_]*)\((.+)\)$/);
+    const modifiers = {
+        C: 0x0100, LCTL: 0x0100,
+        S: 0x0200, LSFT: 0x0200,
+        A: 0x0400, LALT: 0x0400,
+        G: 0x0800, LGUI: 0x0800,
+        LCAG: 0x0d00, LCA: 0x0500, LCG: 0x0900, LCS: 0x0300,
+        LAG: 0x0c00, LSG: 0x0a00, LAS: 0x0600,
+        MEH: 0x0700, HYPR: 0x0f00,
+    };
+    if (!match || modifiers[match[1]] === undefined) return undefined;
+    const inner = qmkCatalogExpressionValue(match[2], values);
+    return Number.isInteger(inner) ? (modifiers[match[1]] | inner) & 0xffff : undefined;
+}
+
 function buildQmkKeycodeSearch(entry, value) {
     const terms = uniqueStrings([value, entry.key, entry.label, QMK_KEY_LABELS[value], QMK_KEY_LABELS[entry.key], displayKeyExpression(value)]
         .concat(entry.aliases || [])
@@ -1767,6 +1868,7 @@ function fallbackQmkKeycodeCatalog() {
         entries,
         labels: { ...QMK_KEY_LABELS },
         aliases: qmkKeyAliasesFromEntries(entries),
+        values: qmkKeycodeValuesFromEntries(entries),
     };
 }
 
@@ -6424,6 +6526,7 @@ function getStudioHtml() {
                     <button id="enumerateLiveDevices">Find keyboards</button>
                     <button id="connectLiveDevice" disabled>Connect</button>
                     <button id="refreshLiveDevice" disabled>Refresh</button>
+                    <button id="applyLiveProfile" class="primary" disabled>Apply live</button>
                     <button id="disconnectLiveDevice" disabled>Disconnect</button>
                 </div>
             </div>
@@ -6434,6 +6537,7 @@ function getStudioHtml() {
             <div class="header-action-row">
                 <span class="profile-picker-label">Firmware</span>
                 <button id="compileFirmware" class="primary">Compile left + right</button>
+                <button id="compileLiveEditFirmware">Compile live-edit test</button>
             </div>
         </div>
     </header>
@@ -6463,6 +6567,8 @@ function getClientScript() {
         capabilities: null,
         status: null,
         compatibility: null,
+        mutationCompatibility: null,
+        liveApply: {state: "idle", progress: null, result: null, error: null},
         error: null,
         diagnostics: []
     };
@@ -6538,12 +6644,14 @@ function getClientScript() {
         openConfig: "Open config.h beside the studio so you can inspect layer enum and timing settings.",
         generateProfileDocs: "Create or refresh the generated profile overview Markdown and assets from the active profile source files on disk.",
         compileFirmware: "Compile separate left and right UF2 firmware files for the active profile.",
+        compileLiveEditFirmware: "Compile distinct left and right engineering UF2 files with the live-profile owner and mutation route enabled. Ordinary firmware compilation is unchanged.",
         applyAll: "Write all staged Studio changes, including layer structure and staged layout edits.",
         reload: "Reload keymap.c, config.h, and rgb_config.c from disk, discarding uncommitted Studio edits.",
         liveDeviceSelect: "Choose a compatible Charybdis QMK Raw HID interface found by the latest scan.",
         enumerateLiveDevices: "Scan for the Charybdis Raw HID interface without opening it or sending a report.",
         connectLiveDevice: "Open the selected Raw HID interface and read Profile Wire capabilities and status. This does not modify the keyboard.",
         refreshLiveDevice: "Read Profile Wire capabilities and status again. Only read requests are sent.",
+        applyLiveProfile: "Build RGB and key behaviors from the active source files, upload the canonical profile, commit it to both halves, and activate it without reflashing.",
         disconnectLiveDevice: "Close Profile Studio's Raw HID connection to the keyboard."
     };
     const viewTooltips = {
@@ -7001,6 +7109,9 @@ function getClientScript() {
     document.getElementById("compileFirmware").addEventListener("click", () => {
         requestFirmwareCompile();
     });
+    document.getElementById("compileLiveEditFirmware").addEventListener("click", () => {
+        requestFirmwareCompile(true);
+    });
     document.getElementById("liveDeviceSelect").addEventListener("change", (event) => {
         liveDeviceSelection = event.target.value || "";
         renderLiveLinkControls();
@@ -7015,6 +7126,9 @@ function getClientScript() {
     });
     document.getElementById("refreshLiveDevice").addEventListener("click", () => {
         vscode.postMessage({type: "refreshLiveDevice"});
+    });
+    document.getElementById("applyLiveProfile").addEventListener("click", () => {
+        requestLiveApply();
     });
     document.getElementById("disconnectLiveDevice").addEventListener("click", () => {
         vscode.postMessage({type: "disconnectLiveDevice"});
@@ -8417,6 +8531,12 @@ function getClientScript() {
         vscode.postMessage(payload);
     }
 
+    function liveApplyPostMessage(message) {
+        const payload = messageWithActiveProfile(message);
+        showFloatingStatus("Building and applying live profile...", false, "Live apply");
+        vscode.postMessage(payload);
+    }
+
     async function requestProfileDocsGeneration() {
         if (!model?.activeProfile?.editable) return;
         captureActiveMacroDraft();
@@ -8440,26 +8560,55 @@ function getClientScript() {
         }
     }
 
-    async function requestFirmwareCompile() {
+    async function requestFirmwareCompile(liveEdit = false) {
         if (!model?.activeProfile?.buildable) return;
         captureActiveMacroDraft();
         captureLayoutComboBuilderInputs();
         const summary = compileUnsavedSummary();
         if (!summary.hasUnsaved) {
-            compilePostMessage({ type: "compileFirmware", activeLayer });
+            compilePostMessage({ type: liveEdit ? "compileLiveEditFirmware" : "compileFirmware", activeLayer });
             return;
         }
 
         const choice = await showCompileConfirmDialog(summary);
         if (choice === "apply") {
             compilePostMessage({
-                type: "applyAllChangesAndCompile",
+                type: liveEdit ? "applyAllChangesAndCompileLiveEdit" : "applyAllChangesAndCompile",
                 ...layerStructurePayload(),
                 layoutGroups: pendingLayoutChangeGroups(),
                 activeLayer,
             });
         } else if (choice === "saved") {
-            compilePostMessage({ type: "compileFirmware", activeLayer });
+            compilePostMessage({ type: liveEdit ? "compileLiveEditFirmware" : "compileFirmware", activeLayer });
+        }
+    }
+
+    async function requestLiveApply() {
+        if (!liveLink.mutationCompatibility?.available || liveLink.busy) return;
+        captureActiveMacroDraft();
+        captureLayoutComboBuilderInputs();
+        const summary = compileUnsavedSummary();
+        if (!summary.hasUnsaved) {
+            liveApplyPostMessage({type: "applyLiveProfile", activeLayer});
+            return;
+        }
+        const choice = await showUnsavedActionDialog(summary, {
+            titleId: "liveApplyConfirmTitle",
+            diskNotice: "Live apply builds RGB and key behaviors from the profile source files currently on disk.",
+            applyDescription: "Apply all staged and deploy writes staged layer and layout changes before building and persisting the live profile.",
+            localNote: "Local form edits are not written by the header Apply all action. Use each card's Apply button first if those edits should be deployed.",
+            applyLabel: "Apply all staged and deploy",
+            savedLabel: "Deploy saved source only",
+        });
+        if (choice === "apply") {
+            liveApplyPostMessage({
+                type: "applyAllChangesAndApplyLiveProfile",
+                ...layerStructurePayload(),
+                layoutGroups: pendingLayoutChangeGroups(),
+                activeLayer,
+            });
+        } else if (choice === "saved") {
+            liveApplyPostMessage({type: "applyLiveProfile", activeLayer});
         }
     }
 
@@ -8905,6 +9054,7 @@ function getClientScript() {
     }
 
     function updateLiveLinkState(next) {
+        const wasApplying = Boolean(liveLink.busy && liveLink.phase === "applying-live");
         if (next && typeof next === "object") {
             liveLink = next;
         }
@@ -8916,6 +9066,21 @@ function getClientScript() {
             liveDeviceSelection = knownIds[0] || "";
         }
         renderLiveLinkControls();
+        if (wasApplying && !liveLink.busy) {
+            if (liveLink.liveApply?.state === "complete") {
+                showFloatingStatus(
+                    "Profile " + formatHex(liveLink.liveApply.result?.digest, 8) + " is persisted and active on both halves.",
+                    false,
+                    "Live apply complete"
+                );
+            } else {
+                showFloatingStatus(
+                    liveLink.liveApply?.error?.message || liveLink.error?.message || "Live apply did not complete.",
+                    true,
+                    "Live apply failed"
+                );
+            }
+        }
     }
 
     function renderLiveLinkControls() {
@@ -8940,6 +9105,7 @@ function getClientScript() {
         setHeaderButtonDisabled("enumerateLiveDevices", Boolean(liveLink.busy || liveLink.connected));
         setHeaderButtonDisabled("connectLiveDevice", Boolean(liveLink.busy || liveLink.connected || !liveDeviceSelection));
         setHeaderButtonDisabled("refreshLiveDevice", Boolean(liveLink.busy || !liveLink.connected));
+        setHeaderButtonDisabled("applyLiveProfile", Boolean(liveLink.busy || !liveLink.mutationCompatibility?.available));
         setHeaderButtonDisabled("disconnectLiveDevice", Boolean(liveLink.busy || !liveLink.connected));
         const chip = liveLinkStatus();
         statusChip.textContent = chip.label;
@@ -8950,7 +9116,7 @@ function getClientScript() {
 
     function liveLinkStatus() {
         if (liveLink.busy) {
-            const labels = {enumerating: "Scanning...", connecting: "Connecting...", refreshing: "Reading...", disconnecting: "Disconnecting..."};
+            const labels = {enumerating: "Scanning...", connecting: "Connecting...", refreshing: "Reading...", "applying-live": "Applying live...", disconnecting: "Disconnecting..."};
             return {label: labels[liveLink.phase] || "Working...", kind: ""};
         }
         if (liveLink.error) return {label: "Live error", kind: "error"};
@@ -8976,7 +9142,9 @@ function getClientScript() {
             ? liveLink.error.code + ": " + liveLink.error.message
             : compatibility
                 ? (compatibility.compatible
-                    ? "This firmware supports the Profile Wire schema and the current profile fits the advertised capacities."
+                    ? (liveLink.mutationCompatibility?.available
+                        ? "Ready to build, upload, persist, and activate RGB and key behaviors from the current source files."
+                        : "Read-compatible, but this firmware does not expose the complete persistent live-apply capability set.")
                     : "Do not attempt a future live deploy until every compatibility blocker below is resolved.")
                 : liveLink.connected
                     ? "Connected; waiting for Profile Wire capability and status reads."
@@ -9020,7 +9188,22 @@ function getClientScript() {
                 ["Committed generation", generationLabel(status.committedGeneration, status.committedOriginHalf)],
                 ["Last error", String(status.lastError)]
             ]) : "") +
+            (liveLink.liveApply?.state && liveLink.liveApply.state !== "idle" ? liveApplyCard(liveLink.liveApply) : "") +
             (compatibility ? liveCompatibilityCard(compatibility) : "") +
+            "</div>";
+    }
+
+    function liveApplyCard(application) {
+        const progress = application.progress || {};
+        const sent = Number(progress.bytesSent) || 0;
+        const total = Number(progress.totalBytes) || application.result?.byteLength || 0;
+        const outcome = application.error
+            ? application.error.code + ": " + application.error.message
+            : application.state === "complete"
+                ? "Persisted and active · " + formatHex(application.result?.digest, 8)
+                : "Phase: " + String(application.state || "working");
+        return "<div class='live-link-card'><h3>Live apply</h3><p class='" + (application.error ? "error" : application.state === "complete" ? "notice" : "muted") + "'>" + escapeHtml(outcome) + "</p>" +
+            (total ? "<dl><dt>Transfer</dt><dd>" + escapeHtml(String(sent) + " / " + String(total) + " bytes") + "</dd></dl>" : "") +
             "</div>";
     }
 
@@ -9032,6 +9215,9 @@ function getClientScript() {
 
     function liveCompatibilityCard(compatibility) {
         const failed = (compatibility.checks || []).filter((check) => !check.ok);
+        const mutationReasons = liveLink.mutationCompatibility?.available
+            ? []
+            : (liveLink.mutationCompatibility?.reasons || []).filter((reason) => !(compatibility.reasons || []).includes(reason));
         const capacityChecks = (compatibility.checks || []).filter((check) => [
             "Logical layers", "Key behavior rows", "Populated behavior steps", "Reusable RGB groups", "RGB stage-group rows"
         ].includes(check.label));
@@ -9039,6 +9225,7 @@ function getClientScript() {
             (failed.length
                 ? "<ul class='live-link-diagnostics'>" + failed.map((check) => "<li class='error'>" + escapeHtml(check.message) + "</li>").join("") + "</ul>"
                 : "<p class='notice'>Compatible</p>") +
+            (mutationReasons.length ? "<h3>Live apply unavailable</h3><ul class='live-link-diagnostics'>" + mutationReasons.map((reason) => "<li class='warning'>" + escapeHtml(reason) + "</li>").join("") + "</ul>" : "") +
             "<dl>" + capacityChecks.map((check) =>
                 "<dt>" + escapeHtml(check.label) + "</dt><dd>" + escapeHtml(String(check.actual) + " / " + String(check.limit)) + "</dd>"
             ).join("") + "</dl></div>";
@@ -9083,6 +9270,7 @@ function getClientScript() {
         setHeaderButtonDisabled("openRgb", !editable);
         setHeaderButtonDisabled("generateProfileDocs", !editable);
         setHeaderButtonDisabled("compileFirmware", !Boolean(model.activeProfile?.buildable));
+        setHeaderButtonDisabled("compileLiveEditFirmware", !Boolean(model.activeProfile?.buildable));
     }
 
     function renderProfileOption(profile) {

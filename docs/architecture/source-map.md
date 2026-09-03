@@ -118,9 +118,10 @@ write, validation, and marker-last commit step. The transaction id is appended
 after the existing userspace ids. Ordinary firmware leaves the adapter
 unregistered. A side-specific engineering artifact registers it through the
 single owner after compiled-profile validation and graph initialization. That
-artifact exposes coherent owner capabilities and status through the read-only
-VIA channel; candidate status and host mutation remain unadvertised and
-unrouted.
+artifact exposes coherent owner capabilities and status through the VIA
+channel. Adding the explicit mutation gate couples candidate status and host
+mutation routing to the complete write/commit/activation/peer capability set;
+ordinary and owner-only firmware remain read-only.
 
 Auto-mouse elapsed time is also fork-specific. Split runtime passes its one
 sampled tick timestamp through `qmk_auto_mouse_contract.h`; the compatibility

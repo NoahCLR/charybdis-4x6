@@ -127,8 +127,11 @@ engineering artifact replaces that scheduler entry with the single profile
 owner, which incrementally validates compiled defaults, selects and adopts a
 durable record, fully reconciles a boot-selected record before requesting its
 activation, and then rotates at most one host, split, or peer-activation step.
-Its coherent owner status is routed into the read-only VIA channel. Candidate
-status and all mutation receive commands remain deliberately unrouted.
+Its coherent owner status is routed into the VIA channel. When the separate
+`NOAH_LIVE_PROFILE_MUTATION=yes` engineering gate is also enabled, the channel
+truthfully advertises and routes candidate status, candidate writes, persistent
+commit, runtime activation, and peer reconciliation as one coupled surface.
+Ordinary firmware and owner-only engineering firmware remain read-only.
 
 Combo-origin reconciliation runs before key-runtime scan projection. It removes
 QMK-disabled candidates immediately and expires inactive candidates only after
@@ -330,8 +333,9 @@ Ordinary firmware compiles but does not register this path. The side-specific
 engineering owner consumes the flash identity, completes compiled-profile
 validation, installs transport arbitration, and registers it exactly once.
 That artifact remains non-production because its BSS and combined-data policy
-checks fail, the real two-half safety matrix is open, and its host mutation
-capability is deliberately unadvertised.
+checks fail and the real two-half safety matrix is open. The separate mutation
+engineering artifact now advertises and routes the complete write capability
+set for hardware testing; it does not change the ordinary build.
 
 ## Test Coverage Map
 

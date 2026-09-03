@@ -22,6 +22,25 @@ static bool                               store_runtime_has_committed;
 #ifdef NOAH_LIVE_PROFILE_OWNER_ENABLE
 static noah_profile_owner_status_t live_owner_status;
 
+#    ifdef NOAH_LIVE_PROFILE_MUTATION_ENABLE
+static uint8_t mutation_receive_count;
+
+bool noah_profile_store_runtime_candidate_status(noah_profile_candidate_v1_status_t *status) {
+    if (!status) return false;
+    *status = live_owner_status.candidate;
+    return true;
+}
+
+bool noah_profile_store_runtime_candidate_receive(uint8_t *frame, size_t length) {
+    if (!frame || length != NOAH_PROFILE_WIRE_V1_REPORT_SIZE || frame[0] != NOAH_PROFILE_CANDIDATE_V1_COMMAND_SET || frame[1] != NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL || frame[2] != NOAH_PROFILE_CANDIDATE_V1_VALUE_BEGIN) {
+        return false;
+    }
+    mutation_receive_count++;
+    noah_profile_candidate_v1_encode_ack(frame, NOAH_PROFILE_CANDIDATE_V1_ADMISSION_QUEUED, NOAH_PROFILE_CANDIDATE_V1_ERROR_NONE, NOAH_PROFILE_CANDIDATE_V1_LOCATION_NONE_U8);
+    return true;
+}
+#    endif
+
 bool noah_profile_store_runtime_owner_status(noah_profile_owner_status_t *status) {
     if (!status) return false;
     *status = live_owner_status;
@@ -107,11 +126,19 @@ static uint32_t expected_feature_flags(void) {
 #ifdef NOAH_LIVE_PROFILE_OWNER_ENABLE
     flags |= NOAH_PROFILE_FEATURE_RGB_SCHEMA | NOAH_PROFILE_FEATURE_KEY_BEHAVIOR_SCHEMA | NOAH_PROFILE_FEATURE_ACTION_ABI_DIGEST | NOAH_PROFILE_FEATURE_COMPILED_PROFILE_HASH;
 #endif
+#ifdef NOAH_LIVE_PROFILE_MUTATION_ENABLE
+    flags |= NOAH_PROFILE_FEATURE_CANDIDATE_WRITE | NOAH_PROFILE_FEATURE_PERSISTENT_COMMIT | NOAH_PROFILE_FEATURE_RUNTIME_ACTIVATION | NOAH_PROFILE_FEATURE_PEER_RECONCILIATION;
+#endif
     return flags;
 }
 
 static void test_capability_hook(void) {
     uint8_t frame[NOAH_PROFILE_WIRE_V1_REPORT_SIZE];
+    uint8_t expected_candidate_chunk = 0u;
+
+#ifdef NOAH_LIVE_PROFILE_MUTATION_ENABLE
+    expected_candidate_chunk = NOAH_PROFILE_CANDIDATE_V1_CHUNK_MAX;
+#endif
 
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_CAPABILITY, 0x31u, 0u);
     via_custom_value_command_kb(frame, sizeof(frame));
@@ -123,9 +150,13 @@ static void test_capability_hook(void) {
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK);
     assert(frame[6] == NOAH_PROFILE_WIRE_V1_PAYLOAD_SIZE);
     assert(frame[WIRE_PAYLOAD + 6u] == NOAH_PROFILE_WIRE_V1_REPORT_SIZE);
-    assert(frame[WIRE_PAYLOAD + 7u] == 0u);
+    assert(frame[WIRE_PAYLOAD + 7u] == expected_candidate_chunk);
     assert(read_u32(&frame[WIRE_PAYLOAD + 9u]) == expected_feature_flags());
+#ifndef NOAH_LIVE_PROFILE_MUTATION_ENABLE
     assert((read_u32(&frame[WIRE_PAYLOAD + 9u]) & (NOAH_PROFILE_FEATURE_CANDIDATE_WRITE | NOAH_PROFILE_FEATURE_PERSISTENT_COMMIT | NOAH_PROFILE_FEATURE_RUNTIME_ACTIVATION | NOAH_PROFILE_FEATURE_PEER_RECONCILIATION)) == 0u);
+#else
+    assert((read_u32(&frame[WIRE_PAYLOAD + 9u]) & (NOAH_PROFILE_FEATURE_CANDIDATE_WRITE | NOAH_PROFILE_FEATURE_PERSISTENT_COMMIT | NOAH_PROFILE_FEATURE_RUNTIME_ACTIVATION | NOAH_PROFILE_FEATURE_PEER_RECONCILIATION)) == (NOAH_PROFILE_FEATURE_CANDIDATE_WRITE | NOAH_PROFILE_FEATURE_PERSISTENT_COMMIT | NOAH_PROFILE_FEATURE_RUNTIME_ACTIVATION | NOAH_PROFILE_FEATURE_PEER_RECONCILIATION));
+#endif
 #ifdef NOAH_LIVE_PROFILE_OWNER_ENABLE
     assert((read_u32(&frame[WIRE_PAYLOAD + 9u]) & (NOAH_PROFILE_FEATURE_RGB_SCHEMA | NOAH_PROFILE_FEATURE_KEY_BEHAVIOR_SCHEMA)) == (NOAH_PROFILE_FEATURE_RGB_SCHEMA | NOAH_PROFILE_FEATURE_KEY_BEHAVIOR_SCHEMA));
     assert(read_u32(&frame[WIRE_PAYLOAD + 13u]) == live_owner_status.action_abi_digest);
@@ -250,11 +281,24 @@ static void test_hook_rejects_unsupported_or_malformed_commands(void) {
     frame[1] = id_custom_channel;
     frame[2] = NOAH_PROFILE_CANDIDATE_V1_VALUE_BEGIN;
     via_custom_value_command_kb(frame, sizeof(frame));
+#ifdef NOAH_LIVE_PROFILE_MUTATION_ENABLE
+    assert(frame[0] == id_custom_set_value);
+    assert(frame[5] == NOAH_PROFILE_CANDIDATE_V1_ADMISSION_QUEUED);
+    assert(mutation_receive_count == 1u);
+#else
     assert(frame[0] == id_unhandled);
+#endif
 
     make_request(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_STATUS, 2u, 0u);
     via_custom_value_command_kb(frame, sizeof(frame));
+#ifdef NOAH_LIVE_PROFILE_MUTATION_ENABLE
+    assert(frame[0] == id_custom_get_value);
+    assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK);
+    assert(frame[WIRE_PAYLOAD + 1u] == NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATED);
+    assert(read_u16(&frame[WIRE_PAYLOAD + 4u]) == live_owner_status.candidate.transaction_id);
+#else
     assert(frame[0] == id_unhandled);
+#endif
 
     via_custom_value_command_kb(NULL, 0u);
 }

@@ -1,6 +1,6 @@
 # Stage 03 — Live RGB Vertical Slice
 
-Status: blocked on Stage 02
+Status: engineering vertical slice complete; hardware evidence pending
 
 Implementation note: the reader-backed codec, callback-only effective RGB view,
 and all current renderer-family migrations have landed early. The RGB orchestrator
@@ -12,8 +12,10 @@ tap-branch ordering, locality, group rows, and tap-commit policy. The view
 copies no payload during provider publication, and its captured frame token
 refuses access after any later publication. The effective runtime and its
 split-safe activation owner are installed only in the side-specific engineering
-artifact. Normal firmware still uses the compiled RGB configuration, and the
-engineering artifact still does not route or advertise candidate mutation.
+artifact. Normal firmware still uses the compiled RGB configuration. The
+separately gated mutation artifact now compiles the Studio RGB model, routes a
+canonical candidate, persists it on both halves, and activates only after exact
+durable convergence; real-board proof remains open.
 
 ## Objective
 
@@ -117,14 +119,13 @@ adds a source or compile gate against regression.
       capture, every current renderer consumer, and gated owner installation
       landed; normal-firmware promotion remains)
 - [x] All eight RGB families migrated
-- [ ] Generation-consistent cache invalidation
+- [x] Generation-consistent cache invalidation
 - [ ] Volatile preview and rollback
-- [ ] Persistent apply and split status (firmware path landed behind the gate;
-      mutation routing and UI remain)
+- [x] Persistent apply and split status in the gated engineering path
 - [ ] Semantic source/device diff
 - [ ] Push, pull, and reset for RGB
 - [x] Source gate against direct production renderer-array reads
-- [ ] Updated Studio UI, docs, screenshots, stage, risks, and progress
+- [x] Updated Studio UI, docs, screenshots, stage, risks, and progress
 
 Early effective-view evidence landed on 2026-08-26:
 

@@ -150,7 +150,8 @@ action for the active profile. It warns when Studio has unapplied edits because
 the overview is generated from source files on disk.
 The Firmware row's `Compile left + right` action opens the Charybdis Profile
 Studio output pane and streams QMK while it builds left and right UF2 files for
-the active profile.
+the active profile. `Compile live-edit test` builds a separately named pair
+with the engineering live-profile owner and mutation route enabled.
 
 Use Profile Studio when you want to:
 
@@ -164,6 +165,8 @@ Use Profile Studio when you want to:
 - build reusable LED groups by selecting LEDs on the board
 - edit auto-mouse fade settings, combo feedback, and key-behavior feedback
 - compile left and right firmware outputs for the selected profile
+- apply the complete authored RGB and `key_behaviors[]` surfaces live after the
+  engineering firmware pair is installed
 - configure behavior-specific `config.h` defaults for key timing, normal
   pointer speed, pointing modes, sniping, auto-mouse, base lighting, and
   lighting feedback
@@ -200,12 +203,16 @@ npm run install:local
 The full Studio guide is
 [`docs/tooling/PROFILE_STUDIO.md`](./docs/tooling/PROFILE_STUDIO.md).
 
-The Live keyboard connection is currently read-only. Normal firmware reports
-its compiled/store status; the side-specific engineering owner can also report
-coherent active, pending, committed, candidate, and peer state. Live writes are
-still disabled. The engineering owner now enforces a distributed peer-prepare,
-local-commit, peer-commit, exact-convergence barrier, while resource policy, an
-explicit mutation gate, and the real two-half safety matrix remain open.
+Normal firmware keeps the Live keyboard connection read-only. The separately
+labeled live-edit test firmware now exposes the first end-to-end engineering
+path: Profile Studio compiles RGB and `key_behaviors[]` directly from the
+authored source files, uploads the canonical profile, validates and prepares it
+on both halves, commits it persistently, waits for safe activation, and verifies
+the active and committed digest before reporting success. This is ready for the
+first real two-half test, but it is not production-promoted: the hardware
+acceptance matrix and runtime high-water measurements are still open, and the
+engineering image remains above two conservative static-memory regression
+policies (not the RP2040's physical RAM capacity).
 
 The next sections explain the keymap and RGB models that the Studio edits.
 

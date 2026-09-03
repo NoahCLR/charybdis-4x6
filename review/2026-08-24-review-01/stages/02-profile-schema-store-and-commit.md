@@ -1,15 +1,18 @@
 # Stage 02 — Profile Schema, Store, And Atomic Commit
 
-Status: implementation in progress behind an engineering gate
+Status: engineering software integration complete; hardware and production-policy evidence pending
 
 Implementation note: the storage package freezes the 32-byte header, checksum
 helpers, read-only boot discovery, bounded inactive-slot writes, readback
 validation, and final-marker commit. A slot-bounded QMK adapter and one-shot
 ordinary matrix-scan boot owner make read-only discovery reachable on normal
 firmware. A side-specific engineering artifact now replaces that shell with the
-complete writable owner and exposes one coherent read-only snapshot of
+complete writable owner and exposes one coherent snapshot of
 compiled, active, pending, committed, peer, and candidate state through the
-existing two-page status surface.
+existing two-page status surface. A separate mutation engineering gate now
+couples candidate status, write/commit/activation/peer capabilities, and VIA
+command routing. The Studio service stages the canonical candidate, commits it,
+and verifies the exact active and committed digest before reporting success.
 The generic schema package implements the canonical `NLP1` blob/domain
 envelopes and four-byte semantic actions in firmware and Studio against one
 shared exact-byte fixture. The key-behavior and RGB packages now implement
@@ -22,7 +25,7 @@ streams both checksums, enforces schema/domain/action-ABI and compiled-reference
 compatibility, and returns bounded borrowed views. Exact candidate codecs and
 upload coordinators now exist on firmware and desktop, and the firmware
 coordinator can stage and validate an inactive EEPROM slot through an injected
-backend. These mutation paths remain intentionally unrouted and unadvertised. The
+backend. These paths are routed only in the explicitly gated mutation artifact. The
 isolated effective-provider foundation is now hardened and tested after
 lifecycle review, and every current behavior/RGB consumer family now has an
 effective-profile seam. A dedicated split foundation freezes the exact 32-byte
@@ -32,8 +35,8 @@ sender-owned record through the shared validator/store owner and confirms
 marker-last durability without activating it. An isolated scan reconciler and
 QMK adapter now implement bidirectional push/pull, cached callback replies,
 bounded scan work, retry/reconnect/role-change behavior, and passive-peer
-expiry. Durable-commit ownership and runtime owner installation now exist only
-in the engineering artifact; QMK mutation routing remains absent. Bounded boot
+expiry. Durable-commit ownership, runtime owner installation, and QMK mutation
+routing now exist only in the engineering mutation artifact. Bounded boot
 selection, exact compiled
 compatibility, committed-record adoption, reset-to-compiled activation, and a
 shared host/peer admission lease have landed in that gated owner. Side-specific
@@ -43,8 +46,8 @@ admission-first scheduler. D-022 now prepares the exact candidate on the peer
 before local marker-last commit, commits local then peer, and permits activation
 only after fresh exact durable convergence. Simultaneous provisional writers,
 prepared timeout, role change, and postcommit authority loss have fail-closed
-host coverage. Resource-policy closure, explicit mutation routing/capabilities,
-and the real two-half hardware matrix still block stage completion.
+host coverage. Resource-policy closure and the real two-half hardware matrix
+still block stage completion and production exposure.
 
 ## Objective
 
@@ -367,12 +370,13 @@ a pending provider snapshot; provider polling still owns safe publication. A
 runtime rollback that makes the store's nominal inactive slot active is
 mechanically refused before EEPROM mutation, and moving active authority away
 allows the next reservation to discard only the overlapping rollback copy.
-This seam is still disconnected from QMK mutation routing. The safe predicate,
+This seam is connected to QMK mutation routing only by the separate engineering
+mutation gate. The safe predicate,
 callback-only behavior and RGB invalidators, consumer lookup seam, and every
 current RGB renderer-family adapter are installed by the side-specific gated
-owner. Ordinary firmware still uses the compiled path. The engineering read
-surface advertises only schema/digest knowledge; all mutation capability bits
-remain disabled.
+owner. Ordinary firmware still uses the compiled path. Owner-only firmware
+advertises only schema/digest knowledge; the mutation artifact advertises and
+routes the complete coupled operation set.
 
 Landed desktop candidate evidence:
 
@@ -389,8 +393,9 @@ Landed desktop candidate evidence:
   and is never retried on the same connection. The separate commit coordinator
   can resume an exact admitted commit from status because firmware retains its
   transaction/digest identity; durability-unknown remains explicitly unsafe to
-  retry until status is reconciled. Neither coordinator is connected to the
-  extension UI or device service.
+  retry until status is reconciled. The coordinator is now connected to the
+  extension UI and device service through `Apply live`, with a final exact-
+  digest status check before success.
 
 The former whole-domain work blocker is resolved by incremental domain state
 machines. `tests/host/run_profile_validator_work_budget_tests.sh` constructs
@@ -403,9 +408,9 @@ maximum 16-byte read. RGB, behavior, and whole-profile runners also compile the
 state machines for Cortex-M0+. The whole validator is exactly 348 bytes on the
 32-bit target under an explicit 352-byte regression policy; that policy is not
 a hardware SRAM-capacity claim. Production routing and mutation capability
-bits remain disabled pending installation of the landed safe predicate,
-invalidators, and the QMK owner; real-device scan timing remains unconfirmed
-until the hardware pass.
+bits remain disabled. The explicitly gated engineering artifact installs the
+safe predicate, invalidators, owner, and routed operation set; real-device scan
+timing remains unconfirmed until the hardware pass.
 
 Landed safe-predicate evidence:
 
@@ -505,13 +510,14 @@ Landed gated owner-composition evidence:
   direct block write, preserving one wear-level write per scan grant without
   QMK's variable-stack update helper;
 - a side-specific engineering build installs this graph and registers one
-  profile split transport. Ordinary firmware retains its read-only shell, and
-  both builds leave host mutation unadvertised and unrouted;
+  profile split transport. Ordinary and owner-only firmware retain a read-only
+  shell; the additional mutation build advertises and routes the whole coupled
+  operation set;
 - the gated owner now exports one caller-owned snapshot of compiled, active,
   pending, committed, peer, and candidate state. VIA latches page zero and
-  serves page one from the same observation, and its engineering capabilities
-  advertise only the landed schemas/digests while all write-operation bits and
-  chunk capacity remain zero;
+  serves page one from the same observation. Owner-only capabilities advertise
+  the landed schemas/digests, while the mutation build adds the four operation
+  bits and exact chunk capacity;
 - a compatible peer generation greater than or equal to the reserved host
   generation cancels the candidate before commit, including one queued commit,
   preserves transaction/digest correlation, releases the host lease, and

@@ -5,14 +5,14 @@ connection. The coordinator and protocol layers have no VS Code or webview
 dependency. The concrete desktop adapter keeps `node-hid` lazy-loaded and
 injectable so the same boundary remains usable in tests and harnesses.
 
-`profile-device-service.js` is the read-only Stage 01 host integration. It
-enumerates devices, keeps native paths and connected handles outside the
-webview, reads the two capability pages and two status pages, and publishes a
-sanitized snapshot for the Studio UI. Its compatibility result checks protocol
-and schema majors, 32-byte framing, Milestone A domain support, and the current
-source profile against the advertised layer, behavior, combo, RGB-group, and
-LED capacities. It has no preview, candidate, commit, save, rollback, or other
-mutating operation.
+`profile-device-service.js` owns the Stage 01 read path and the explicitly gated
+engineering live-apply path. It enumerates devices, keeps native paths and
+connected handles outside the webview, reads the capability and status pages,
+and publishes a sanitized snapshot for the Studio UI. Its compatibility result
+checks protocol and schema majors, 32-byte framing, Milestone A domain support,
+the current source profile against advertised capacities, and all four
+candidate/persistence/activation/peer capability bits before enabling writes.
+Ordinary firmware remains read-only.
 
 Each refresh first reads the standard VIA protocol and firmware versions, then
 cross-checks the firmware version reported by Profile Wire. Custom Profile Wire
@@ -31,8 +31,9 @@ The same module owns four-byte semantic action values, including bounded
 logical-layer, PD-mode, VIA-macro, and hardcoded-macro operands, plus canonical
 FNV-1a 32-bit and CRC32 helpers. Its stream readers return exact next offsets
 so later domain decoders can compose them without accepting implicit padding or
-trailing bytes. This codec is not connected to any candidate, preview, commit,
-or device-write operation yet.
+trailing bytes. `compiled-profile-v1.js` converts Profile Studio's parsed model
+into that exact canonical blob for the RGB and key-behavior Milestone A
+domains.
 
 `profile-candidate-v1.js` is the exact desktop codec for the Stage 02 candidate
 mailbox: begin, sequential chunks, validate, custom-save commit, abort,
@@ -43,9 +44,12 @@ never retries an ambiguous transport outcome and performs an idempotent abort
 after deterministic failure. Commit is transaction/digest-correlated,
 idempotent across a lost acknowledgement, waits through bounded committing and
 safe-activation states, and reports final-marker uncertainty as an ambiguous
-outcome requiring status reconciliation. These modules remain disconnected
-from the extension UI and device service; production firmware routing and
-capability advertising are also still disabled.
+outcome requiring status reconciliation. The device service now uses this
+coordinator for the engineering `Apply live` operation and accepts success only
+after a fresh general-status read reports the exact candidate digest as both
+committed and active. Production firmware routing and capability advertising
+remain disabled; only a firmware built with the separate owner and mutation
+gates exposes this path.
 
 `rgb-domain-v1.js` is the desktop half of the domain `0x10` v1 codec. It covers the
 complete Milestone A RGB surface, canonicalizes Profile Studio's parsed model,

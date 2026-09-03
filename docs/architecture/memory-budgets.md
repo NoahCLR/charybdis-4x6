@@ -21,8 +21,8 @@ linker map is
 
 ## Current Linked Checkpoint
 
-Freshly remeasured on 2026-09-02 after the distributed live-profile commit
-barrier checkpoint.
+Freshly remeasured on 2026-09-03 at the first testable engineering live-edit
+checkpoint.
 The ordinary artifact does not link or allocate that engineering-only owner:
 
 | Measurement | Bytes | Meaning |
@@ -41,8 +41,9 @@ on hardware before making claims about runtime availability.
 
 ## Engineering Live-Profile Owner Checkpoint
 
-The side-specific left engineering artifact was freshly linked on 2026-09-02
-with `NOAH_LIVE_PROFILE_OWNER=yes`, `NOAH_PHYSICAL_HALF=left`, and
+The side-specific left engineering mutation artifact was freshly linked on
+2026-09-03 with `NOAH_LIVE_PROFILE_OWNER=yes`,
+`NOAH_LIVE_PROFILE_MUTATION=yes`, `NOAH_PHYSICAL_HALF=left`, and
 `FORCE_SLAVE=yes`. It is deliberately not the ordinary firmware checkpoint:
 
 | Measurement | Bytes | Policy result |
@@ -59,12 +60,14 @@ half still has 270,336 bytes of physical SRAM, and the linked SRAM0–3 core-
 memory span passes its separate policy. They do mean that this artifact cannot
 be promoted by silently treating old policy margin as hardware headroom.
 Allocator and stack high-water measurements on the real two-half keyboard are
-still required before revising the policies or enabling the owner normally.
+still required before revising the policies or enabling live mutation in the
+ordinary build.
 
 The dedicated engineering reviewed-path stack gate passes: the largest named
-owner main-process path is split metadata exchange at 1,504/1,920 bytes, the
-coherent VIA status-read path is 624/1,920 bytes, and the largest named profile
-split callback is 264/768 bytes. This is linked path evidence for
+owner main-process path is split metadata exchange at 1,328/1,920 bytes, the
+coherent VIA status-read path is 680/1,920 bytes, the Raw HID write dispatch is
+392/1,920 bytes, and the largest named profile split callback is 264/768 bytes.
+This is linked path evidence for
 `tools/firmware_stack_budget_live_profile_owner.json`, not a global stack or
 interrupt-stack maximum.
 

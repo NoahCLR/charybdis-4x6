@@ -303,6 +303,27 @@ compile_variant() {
     done
 }
 
+compile_variant_must_fail() {
+    config_header="$1"
+    extra_flags="$2"
+    source="$3"
+
+    # Intentional word splitting for the preprocessor flag list.
+    # shellcheck disable=SC2086
+    if cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic -fsyntax-only \
+        -DQMK_KEYBOARD_H='"qmk_stub.h"' \
+        -DQMK_STUB_SUPPRESS_LAYER_COUNT \
+        $extra_flags \
+        -I"$ROOT" \
+        -I"$ROOT/users/noah" \
+        -I"$ROOT/tests/host/include" \
+        -include "$ROOT/$config_header" \
+        "$ROOT/$source" >/dev/null 2>&1; then
+        echo "expected compile failure for $source with flags: $extra_flags" >&2
+        exit 1
+    fi
+}
+
 compile_variant "tests/host/include/noah_compile_config.h" "" "$COMMON_SOURCES"
 compile_variant "tests/host/include/noah_compile_config.h" "-DCONSOLE_ENABLE -DNOAH_KEY_RUNTIME_TRACE_ENABLE -DNOAH_RUNTIME_TRACE_ENABLE" "$COMMON_SOURCES users/noah/lib/key/runtime/process.c users/noah/lib/key/runtime/preflight.c users/noah/lib/key/runtime/press.c users/noah/lib/key/runtime/release.c users/noah/lib/key/runtime/scan.c users/noah/lib/key/runtime/transition.c"
 compile_variant "tests/host/include/noah_compile_config_no_rgb_feedback.h" "$RGB_TEST_FLAGS" "$COMMON_SOURCES $RGB_SOURCES"
@@ -323,6 +344,8 @@ compile_variant "tests/host/include/noah_compile_config.h" "-DVIA_ENABLE $RGB_TE
 compile_variant "tests/host/include/noah_compile_config.h" "-DVIA_ENABLE -DSPLIT_KEYBOARD" "$PROFILE_WIRE_COMPILE_SOURCES"
 compile_variant "tests/host/include/noah_compile_config.h" "-DVIA_ENABLE -DSPLIT_KEYBOARD $RGB_TEST_FLAGS" "$PROFILE_WIRE_COMPILE_SOURCES"
 compile_variant "tests/host/include/noah_compile_config.h" "-DVIA_ENABLE -DSPLIT_KEYBOARD -DNOAH_PHYSICAL_HALF_LEFT -DNOAH_LIVE_PROFILE_OWNER_ENABLE $RGB_TEST_FLAGS" "$PROFILE_WIRE_COMPILE_SOURCES"
+compile_variant "tests/host/include/noah_compile_config.h" "-DVIA_ENABLE -DSPLIT_KEYBOARD -DNOAH_PHYSICAL_HALF_LEFT -DNOAH_LIVE_PROFILE_OWNER_ENABLE -DNOAH_LIVE_PROFILE_MUTATION_ENABLE $RGB_TEST_FLAGS" "$PROFILE_WIRE_COMPILE_SOURCES"
+compile_variant_must_fail "tests/host/include/noah_compile_config.h" "-DVIA_ENABLE -DNOAH_LIVE_PROFILE_MUTATION_ENABLE" "users/noah/lib/compat/qmk_via_profile_channel.c"
 compile_variant "tests/host/include/noah_compile_config.h" "-DSPLIT_KEYBOARD -DNOAH_PHYSICAL_HALF_LEFT" "users/noah/lib/compat/qmk_physical_half.c"
 compile_variant "tests/host/include/noah_compile_config.h" "-DSPLIT_KEYBOARD -DNOAH_PHYSICAL_HALF_RIGHT" "users/noah/lib/compat/qmk_physical_half.c"
 

@@ -240,6 +240,23 @@ Contract-level resolution is not milestone closure. Runtime, protocol, storage,
 split, and UI findings remain open until their stage gates and hardware evidence
 pass.
 
+## Engineering Live-Apply Reconciliation — 2026-09-03
+
+The Stage 00 table above is an audit-time snapshot. D-023 and the current tree
+advance the implementation findings as follows:
+
+| Finding | Status | Current enforcement and remaining evidence |
+| --- | --- | --- |
+| 2 — no effective-profile seam | partially resolved | both Milestone A domains now compile from the Studio source model and publish through the generation-owned provider; exact active/committed digest verification is enforced in the device service, while real-board and production-policy evidence remain open |
+| 3 — no canonical schema | partially resolved | the Studio compiler produces the exact 1,089-byte canonical real-profile fixture consumed by the firmware codecs; hardware persistence/recovery remains open |
+| 4 — no safe activation boundary | partially resolved | the D-022 distributed barrier and all-or-nothing D-023 mutation capability gate are routed in labeled engineering artifacts; the real held-input, reconnect, interruption, and role-swap matrix remains open |
+| 7 — Studio transport boundary | partially resolved | the native/injected adapter, staged upload, commit, progress reporting, and final digest reconciliation are integrated into `Apply live`; real VS Code-host/device evidence remains open |
+| 8 — split integration shape | partially resolved | the exact peer prepare/local commit/peer commit/convergence path is reachable through the engineering mutation channel; real two-half convergence and recovery evidence remains open |
+
+These findings are not closed by software integration alone. The closure bar
+still requires the complete host suite, ordinary firmware gates, both physical
+halves, resource high-water evidence, and the hardware acceptance matrix.
+
 ## Resource-Truth Reconciliation — 2026-08-25
 
 The earlier Stage 00 wording conflated an SRAM0–3 `.data + .bss` regression
@@ -380,9 +397,9 @@ RGB completes in 58 domain steps capped at one 16-byte read each. The owner
 contains no profile-sized RAM buffer. Its custom-save commit path now advances
 persistence through one EEPROM operation of at most 20 bytes per scan, then
 requests and polls provider activation. It is now composed by the side-specific
-engineering owner, but remains unrouted from the VIA channel; real-device scan
-timing remains part of the hardware acceptance pass rather than an unbounded-
-code blocker.
+engineering owner. D-023 routes it through the VIA channel only when the
+separate mutation gate is enabled; real-device scan timing remains part of the
+hardware acceptance pass rather than an unbounded-code blocker.
 
 The landed store backend now supplies that coordinator with a bounded inactive-
 slot reader/writer and composes the whole-profile validator over the staged
@@ -399,14 +416,16 @@ generation. After durable commit, the backend can build the exact committed
 snapshot and request safe-boundary publication. The candidate coordinator now
 composes those operations behind custom-save `0x13`, retains idempotent
 transaction/digest correlation through commit and activation, and distinguishes
-an unconfirmed final marker from a safely failed commit. These APIs remain
-disconnected from host mutation routing. The engineering owner installs the
+an unconfirmed final marker from a safely failed commit. These APIs are
+connected to host mutation routing only in the D-023 engineering artifact. The
+engineering owner installs the
 production safe predicate and callback-only behavior/RGB invalidators and now
 publishes a narrow caller-owned status snapshot. The VIA adapter latches that
 snapshot on status page zero so page one cannot mix a different active,
 committed, peer, or transaction observation. Ordinary firmware allocates none
-of that graph and no candidate capability is enabled merely because the
-composition exists.
+of that graph, and owner-only firmware remains read-only; the mutation artifact
+advertises the full operation set only because it also installs the complete
+composition.
 
 Host deployment and peer import now share an explicit backend admission lease.
 Only `HOST` or `PEER` may own staging at a time; a competing host begin remains
@@ -541,10 +560,12 @@ finding lifecycle:
 
 ## Current Architecture Assessment
 
-The project remains realistic and does not require replacing the current runtime.
-The repository already owns the difficult domain logic, structured source
-editor, Raw HID endpoint, EEPROM layer, split reconciliation, validators, and
-test infrastructure.
+The project remains realistic and does not require replacing the current
+runtime. Its first complete engineering path now exists: Profile Studio can
+compile the authored RGB and key-behavior model, send one canonical candidate,
+persist it across both halves, wait for safe activation, and verify the exact
+active digest. The remaining uncertainty is hardware and production acceptance,
+not whether the architecture can form an end-to-end implementation.
 
 The central architecture change is to insert one canonical effective-profile
 boundary between compiled defaults and runtime consumers. The largest
@@ -556,19 +577,13 @@ feature rather than a demo in which one color or behavior changes until reboot.
 
 ## Recommended Next Refactor Sequence
 
-1. Finish Stage 00 by landing executable golden fixtures, storage contracts,
-   and the real-board packaged HID probe; the resource and architecture
-   decisions are accepted.
-2. Resolve the Review 19 transport prerequisites in their owning review thread.
-3. Land the Stage 01 transport interface, fake device, discovery, capability
-   query, and read-only digest/status path.
-4. Land Profile Wire v1, storage recovery, candidate protocol, validation,
-   safe activation, and split convergence as Stage 02.
-5. Migrate RGB through the effective provider one table family at a time and
-   finish the live RGB vertical slice.
-6. Migrate key-behavior lookup and validation through a compact indexed
-   effective provider and finish safe behavior activation.
-7. Integrate source/device operations, diagnostics, recovery, resource gates,
-   and the full Milestone A hardware matrix.
-8. Only then extend the same architecture to defaults, standard VIA surfaces,
-   combos, and logical layer structure.
+1. Flash the labeled left/right engineering pair and prove one RGB edit, one
+   key-behavior edit, exact two-half convergence, and reboot persistence through
+   Profile Studio.
+2. Run reconnect, USB-orientation, role-swap, held-input, interruption, reset,
+   contention, and `AUTHORITY_FAILED` recovery scenarios on hardware.
+3. Capture allocator and stack high-water on both halves during those scenarios
+   and make an explicit production resource-policy decision.
+4. Close Milestone A only after docs, full host verification, ordinary firmware
+   gates, and the real-board matrix agree; then extend the architecture to
+   defaults, standard VIA surfaces, macros, combos, and logical-layer structure.

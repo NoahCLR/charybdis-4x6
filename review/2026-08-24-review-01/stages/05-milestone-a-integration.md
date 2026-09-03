@@ -1,6 +1,6 @@
 # Stage 05 — Milestone A Integration And Hardware Closure
 
-Status: blocked on Stages 03 and 04
+Status: in progress; first two-half hardware test ready
 
 ## Objective
 

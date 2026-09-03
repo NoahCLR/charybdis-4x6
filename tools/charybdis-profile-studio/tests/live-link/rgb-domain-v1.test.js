@@ -114,6 +114,17 @@ test("identity tables and LED-group names canonicalize while renderer row order 
     assert.notDeepEqual(encodeRgbDomainV1(reorderedRows, golden.codecOptions), expected);
 });
 
+test("compiled-source adapter omits reusable groups that no renderer row references", () => {
+    const golden = fixture();
+    const expected = encodeStudioRgbDomainV1(golden.studioModel, {includeUnusedGroups: false});
+    const withAnotherUnusedGroup = clone(golden.studioModel);
+    withAnotherUnusedGroup.rgb.ledGroups.push({name: "RGB_LED_GROUP_UNUSED_TOO", ledIndices: [56]});
+    assert.deepEqual(
+        encodeStudioRgbDomainV1(withAnotherUnusedGroup, {includeUnusedGroups: false}),
+        expected
+    );
+});
+
 test("decoder rejects noncanonical headers, geometry, dictionary order, and bitmap bits", () => {
     const golden = fixture();
     const valid = encodeRgbDomainV1(golden.profile, golden.codecOptions);

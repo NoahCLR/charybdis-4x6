@@ -8,8 +8,9 @@ const {
     ProfileRequestIdSequence,
     ProfileDeviceService,
     evaluateProfileCompatibility,
+    evaluateLiveMutationCompatibility,
 } = require("../../live-link/profile-device-service");
-const {PROFILE_WIRE_V1, VIA_READS} = require("../../live-link/profile-wire-v1");
+const {PROFILE_ACTIVE_KIND, PROFILE_WIRE_FEATURES, PROFILE_WIRE_V1, VIA_READS} = require("../../live-link/profile-wire-v1");
 
 function response(request, payload) {
     const report = Buffer.from(request);
@@ -22,13 +23,31 @@ function response(request, payload) {
 
 function readPages(options = {}) {
     const capabilityIdentity = Buffer.alloc(25);
-    capabilityIdentity.set([1, 2, 1, 0, options.schemaMajor || 1, 0, 32, 20, 2, 0x3f], 0);
+    const featureFlags = PROFILE_WIRE_FEATURES.READ_SURFACE
+        | PROFILE_WIRE_FEATURES.STORAGE_LAYOUT
+        | PROFILE_WIRE_FEATURES.RGB_SCHEMA
+        | PROFILE_WIRE_FEATURES.KEY_BEHAVIOR_SCHEMA
+        | PROFILE_WIRE_FEATURES.SPLIT_KEYBOARD
+        | PROFILE_WIRE_FEATURES.ACTION_ABI_DIGEST
+        | PROFILE_WIRE_FEATURES.COMPILED_PROFILE_HASH
+        | (options.mutation
+            ? PROFILE_WIRE_FEATURES.CANDIDATE_WRITE
+                | PROFILE_WIRE_FEATURES.PERSISTENT_COMMIT
+                | PROFILE_WIRE_FEATURES.RUNTIME_ACTIVATION
+                | PROFILE_WIRE_FEATURES.PEER_RECONCILIATION
+            : 0);
+    capabilityIdentity.set([1, 2, 1, 0, options.schemaMajor || 1, 0, 32, options.mutation ? 20 : 0, 2], 0);
+    capabilityIdentity.writeUInt32LE(featureFlags, 9);
+    capabilityIdentity.writeUInt32LE(options.actionAbiDigest ?? 0x12345678, 13);
     const capacity = Buffer.from([
         5, options.maxLayers || 8, 64, 5, 128, 32, 4, 16, 32, 58, 8, 16, 64,
         0xe0, 0x0f, 0xe0, 0x0f, 0x00, 0x10, 0x7f, 0x1d, 3, 0, 0, 0,
     ]);
     const statusIdentity = Buffer.alloc(25);
     statusIdentity.set([1, 2, 0x81, 0], 0);
+    statusIdentity.writeUInt32LE(options.activeDigest ?? 0, 12);
+    statusIdentity.writeUInt32LE(options.committedDigest ?? 0, 20);
+    statusIdentity[24] = options.activeKind ?? PROFILE_ACTIVE_KIND.COMPILED_ONLY;
     return {
         [`${PROFILE_WIRE_V1.VALUE_CAPABILITIES}:0`]: capabilityIdentity,
         [`${PROFILE_WIRE_V1.VALUE_CAPABILITIES}:1`]: capacity,
@@ -82,6 +101,7 @@ function serviceHarness(options = {}) {
             rgbStageGroupRows: 12,
             highestLedIndex: 57,
         },
+        createCandidateUploadCoordinator: options.createCandidateUploadCoordinator,
     });
     return {adapter, changes, service};
 }
@@ -147,6 +167,89 @@ test("compatibility checks Milestone A domains and fixed report framing", () => 
     assert.equal(compatibility.compatible, false);
     assert.match(compatibility.reasons.join("\n"), /Raw HID report size/);
     assert.match(compatibility.reasons.join("\n"), /Milestone A domains/);
+});
+
+test("persistent live apply requires every mutation capability", () => {
+    const compatible = {compatible: true, reasons: []};
+    const completeFlags = PROFILE_WIRE_FEATURES.CANDIDATE_WRITE
+        | PROFILE_WIRE_FEATURES.PERSISTENT_COMMIT
+        | PROFILE_WIRE_FEATURES.RUNTIME_ACTIVATION
+        | PROFILE_WIRE_FEATURES.PEER_RECONCILIATION;
+    assert.equal(evaluateLiveMutationCompatibility({featureFlags: completeFlags, candidateChunkMax: 20}, compatible, true).available, true);
+
+    const blocked = evaluateLiveMutationCompatibility({
+        featureFlags: completeFlags & ~PROFILE_WIRE_FEATURES.PEER_RECONCILIATION,
+        candidateChunkMax: 20,
+    }, compatible, true);
+    assert.equal(blocked.available, false);
+    assert.match(blocked.reasons.join("\n"), /persistent split apply mask/);
+});
+
+test("service uploads, commits, and verifies a live profile before reporting success", async () => {
+    const digest = 0x89abcdef;
+    const calls = [];
+    const {adapter, service} = serviceHarness({
+        mutation: true,
+        activeKind: PROFILE_ACTIVE_KIND.COMMITTED,
+        activeDigest: digest,
+        committedDigest: digest,
+        createCandidateUploadCoordinator(connection, options) {
+            assert.equal(connection.connected, true);
+            return {
+                async upload(blob, metadata) {
+                    calls.push({kind: "upload", blob: Buffer.from(blob), metadata: {...metadata}});
+                    options.onProgress({phase: "writing", bytesSent: blob.length, totalBytes: blob.length});
+                    return {transactionId: 0x1234, metadata: {digest}, progress: {phase: "complete"}};
+                },
+                async commit(transactionId, commitOptions) {
+                    calls.push({kind: "commit", transactionId, options: {...commitOptions}});
+                    options.onProgress({phase: "committing", transactionId});
+                    return {progress: {phase: "complete", transactionId}};
+                },
+            };
+        },
+    });
+    const scanned = await service.enumerate();
+    const connected = await service.connect(scanned.devices[0].id);
+    assert.equal(connected.mutationCompatibility.available, true);
+
+    const blob = Buffer.from([0x4e, 0x4c, 0x50, 0x31, 1, 0, 0, 0]);
+    const applied = await service.applyLiveProfile(blob);
+    assert.equal(applied.error, null);
+    assert.equal(applied.liveApply.state, "complete");
+    assert.deepEqual(applied.liveApply.result, {transactionId: 0x1234, digest, byteLength: blob.length});
+    assert.deepEqual(calls, [
+        {
+            kind: "upload",
+            blob,
+            metadata: {actionAbiDigest: 0x12345678, requestedDomains: 3},
+        },
+        {kind: "commit", transactionId: 0x1234, options: {digest}},
+    ]);
+    assert.equal(adapter.lastConnection().writes.length, 8, "post-commit verification should reread both Profile Wire status pages");
+});
+
+test("service fails closed when post-commit status does not confirm the digest", async () => {
+    const digest = 0x89abcdef;
+    const {service} = serviceHarness({
+        mutation: true,
+        createCandidateUploadCoordinator() {
+            return {
+                async upload() {
+                    return {transactionId: 0x1234, metadata: {digest}, progress: {phase: "complete"}};
+                },
+                async commit() {
+                    return {progress: {phase: "complete"}};
+                },
+            };
+        },
+    });
+    const scanned = await service.enumerate();
+    await service.connect(scanned.devices[0].id);
+    const failed = await service.applyLiveProfile(Buffer.from([0x4e, 0x4c, 0x50, 0x31, 1, 0, 0, 0]));
+    assert.equal(failed.liveApply.state, "failed");
+    assert.equal(failed.liveApply.error.code, "LIVE_APPLY_VERIFICATION_FAILED");
+    assert.equal(failed.error.code, "LIVE_APPLY_VERIFICATION_FAILED");
 });
 
 test("request ids advance across refreshes and reject a delayed duplicate", async () => {

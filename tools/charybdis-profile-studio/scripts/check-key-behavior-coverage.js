@@ -147,15 +147,32 @@ const appendedCheck = `
     assert(
         extensionSource.includes('id="compileFirmware"') &&
             extensionSource.includes("Compile left + right") &&
-            getClientScript().includes('type: "compileFirmware"') &&
-            getClientScript().includes('type: "applyAllChangesAndCompile"') &&
-            /side: "left",[\\s\\S]{0,320}env: \\["FORCE_SLAVE=yes", "NOAH_PHYSICAL_HALF=left"\\]/.test(extensionSource) &&
-            /side: "right",[\\s\\S]{0,220}env: \\["FORCE_MASTER=yes", "NOAH_PHYSICAL_HALF=right"\\]/.test(extensionSource) &&
+            getClientScript().includes('type: liveEdit ? "compileLiveEditFirmware" : "compileFirmware"') &&
+            getClientScript().includes('type: liveEdit ? "applyAllChangesAndCompileLiveEdit" : "applyAllChangesAndCompile"') &&
+            extensionSource.includes('side: liveEdit ? "live_edit_left" : "left"') &&
+            extensionSource.includes('env: ["FORCE_SLAVE=yes", "NOAH_PHYSICAL_HALF=left", ...engineeringEnv]') &&
+            extensionSource.includes('side: liveEdit ? "live_edit_right" : "right"') &&
+            extensionSource.includes('env: ["FORCE_MASTER=yes", "NOAH_PHYSICAL_HALF=right", ...engineeringEnv]') &&
             extensionSource.includes('spawn("qmk", args') &&
             extensionSource.includes("channel.show(true)") &&
             firmwareTargetName(profileTargetForKeymap("noah"), "left") === "bastardkb_charybdis_4x6_noah_left" &&
-            firmwareTargetName(profileTargetForKeymap("noah"), "right") === "bastardkb_charybdis_4x6_noah_right",
+            firmwareTargetName(profileTargetForKeymap("noah"), "right") === "bastardkb_charybdis_4x6_noah_right" &&
+            firmwareTargetName(profileTargetForKeymap("noah"), "live_edit_left") === "bastardkb_charybdis_4x6_noah_live_edit_left" &&
+            firmwareTargetName(profileTargetForKeymap("noah"), "live_edit_right") === "bastardkb_charybdis_4x6_noah_live_edit_right",
         "Profile Studio compile button should build explicit MASTER_RIGHT-aware left and right firmware targets with visible streamed output"
+    );
+    assert(
+        extensionSource.includes('id="compileLiveEditFirmware"') &&
+            extensionSource.includes("Compile live-edit test") &&
+            extensionSource.includes('id="applyLiveProfile"') &&
+            extensionSource.includes("Apply live") &&
+            getClientScript().includes('type: "applyLiveProfile"') &&
+            getClientScript().includes('type: "applyAllChangesAndApplyLiveProfile"') &&
+            getClientScript().includes("liveLink.mutationCompatibility?.available") &&
+            getClientScript().includes("Live apply complete") &&
+            extensionSource.includes("buildCanonicalStudioProfileV1(model") &&
+            extensionSource.includes("state.liveLink.applyLiveProfile(compiled.blob)"),
+        "Profile Studio should expose a capability-gated, source-compiled live apply and a separate engineering firmware build"
     );
     assert(
         getClientScript().includes("Unsaved Studio changes") &&
@@ -267,6 +284,29 @@ const appendedCheck = `
 
     const model = await buildModel(${JSON.stringify(repoRoot)});
     const aliases = model.qmkKeycodeAliases || {};
+    const compiledProfileFixture = new Map(require("fs").readFileSync(path.join(${JSON.stringify(repoRoot)}, "tests", "fixtures", "compiled_profile_v1.fixture"), "utf8")
+        .split(/\\r?\\n/)
+        .filter((line) => line && !line.startsWith("#"))
+        .map((line) => {
+            const separator = line.indexOf("=");
+            return [line.slice(0, separator), line.slice(separator + 1)];
+        }));
+    const liveProfile = buildCanonicalStudioProfileV1(model, {capabilities: {
+        maxLogicalLayers: 8,
+        maxBehaviorRows: 64,
+        maxTapStepsPerBehavior: 5,
+        maxPopulatedBehaviorSteps: 128,
+        hardcodedMacroSlots: 16,
+        viaMacroSlots: 64,
+        maxProfilePayload: 4064,
+        physicalLedCount: 58,
+    }});
+    assert(
+        liveProfile.blob.toString("hex") === compiledProfileFixture.get("profile.full.hex"),
+        "Profile Studio source compilation must reproduce the firmware's exact canonical compiled-default blob; " +
+            "got " + liveProfile.blob.length + " bytes / " + liveProfile.blob.toString("hex").slice(0, 96) +
+            ", expected " + (compiledProfileFixture.get("profile.full.hex").length / 2) + " bytes / " + compiledProfileFixture.get("profile.full.hex").slice(0, 96)
+    );
     assert(
         model.activeProfile && model.activeProfile.keymap === "noah" && model.activeProfile.buildable,
         "Profile Studio should treat the default noah profile as buildable even without a keymap-local rules.mk"

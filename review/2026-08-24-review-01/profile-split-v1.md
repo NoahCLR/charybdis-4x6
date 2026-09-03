@@ -188,9 +188,10 @@ role. On this `MASTER_RIGHT` board, upstream QMK falls back to
 so that fallback is not a durable physical identity. D-018 now builds left
 with `FORCE_SLAVE` plus `NOAH_PHYSICAL_HALF=left` and right with `FORCE_MASTER`
 plus `NOAH_PHYSICAL_HALF=right`. The physical setting overrides handedness in
-flash independently of transport role. Production live mutation remains off.
-The side-specific D-021 engineering owner now consumes that fail-closed
-identity boundary and registers the split transport exactly once.
+  flash independently of transport role. Production live mutation remains off.
+  The side-specific D-021 engineering owner consumes that fail-closed identity
+  boundary and registers the split transport exactly once. The additional
+  mutation gate exposes the path only in labeled hardware-test artifacts.
 
 ## Remaining Exposure And Acceptance Pieces
 
@@ -199,8 +200,9 @@ identity boundary and registers the split transport exactly once.
   hardware matrix;
 - real-device recovery evidence for `AUTHORITY_FAILED` after an injected
   postcommit fence loss;
-- normal mutation routing and truthful write/commit/activation/peer capability
-  advertising.
+- promotion of mutation routing and write/commit/activation/peer capability
+  advertising beyond the explicit engineering gate.
 
 Until those pieces pass, mutation, activation, and peer-reconciliation
-capability bits remain disabled.
+capability bits remain disabled in ordinary firmware. The engineering mutation
+pair advertises them together for the two-half acceptance matrix.

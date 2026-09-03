@@ -9,7 +9,7 @@ set -eu
 HOST_ROOT="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 ROOT="$(CDPATH= cd -- "$HOST_ROOT/../.." && pwd)"
 PYTHON="${PYTHON:-python3}"
-TARGET="bastardkb_charybdis_4x6_noah_live_owner_stack_left"
+TARGET="bastardkb_charybdis_4x6_noah_live_mutation_stack_left"
 
 . "$HOST_ROOT/noah_host_qmk_env.sh"
 QMK_ROOT="$(noah_host_find_qmk_root "$ROOT")"
@@ -23,6 +23,7 @@ QMK_USERSPACE="$ROOT" qmk compile -c \
     -km noah \
     -e NOAH_STACK_BUDGET_ENABLE=yes \
     -e NOAH_LIVE_PROFILE_OWNER=yes \
+    -e NOAH_LIVE_PROFILE_MUTATION=yes \
     -e NOAH_PHYSICAL_HALF=left \
     -e FORCE_SLAVE=yes \
     -e TARGET="$TARGET"

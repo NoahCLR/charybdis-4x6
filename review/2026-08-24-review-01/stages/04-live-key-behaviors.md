@@ -1,17 +1,16 @@
 # Stage 04 — Live Key-Behavior Vertical Slice
 
-Status: blocked on Stage 02
+Status: engineering vertical slice complete; hardware and timing evidence pending
 
 Implementation note: the cross-language payload, incremental whole-profile
 validation, semantic native-action materializer, and callback-only effective
 consumer seam have landed early. Firmware retains no payload-sized buffer or
 max-sized native row/step arrays. The consumer and its split-safe activation
 owner are installed only in the side-specific engineering artifact; normal
-firmware still uses compiled behavior data, and candidate mutation remains
-unrouted and unadvertised. The live consumer uses an ordered reader-backed
-lookup pending hardware timing. Source-expression translation, Studio
-operation integration, compact-index decision, and device capability
-advertising remain open.
+firmware still uses compiled behavior data. The separate mutation gate and
+Studio compiler now route supported source expressions through persistent,
+split-converged activation. The live consumer uses an ordered reader-backed
+lookup pending real-hardware timing evidence and the compact-index decision.
 
 ## Objective
 
@@ -114,15 +113,14 @@ state merely to make a profile apply appear fast.
       and gated owner installation landed; normal-firmware promotion remains)
 - [ ] Compact bounded index (retain the current ordered reader lookup until
       real-board timing justifies the RAM/complexity tradeoff)
-- [ ] Complete Milestone A row validation
-- [ ] Direct compiled-array consumers removed from production lookup
-- [ ] Safe waiting activation with reason diagnostics
-- [ ] Add, edit, and remove live flows
-- [ ] Persistent apply and peer convergence (firmware path landed behind the
-      gate; mutation routing and UI remain)
+- [x] Complete Milestone A row validation
+- [x] Direct compiled-array consumers removed from production lookup
+- [x] Safe waiting activation with reason diagnostics
+- [x] Add, edit, and remove live flows in the gated engineering path
+- [x] Persistent apply and peer convergence in the gated engineering path
 - [ ] Semantic diff, push, pull, and reset
-- [ ] Regression gate against direct array reads
-- [ ] Updated docs, Studio UI, stage, risks, and progress
+- [x] Regression gate against direct array reads
+- [x] Updated docs, Studio UI, stage, risks, and progress
 
 Early codec evidence:
 

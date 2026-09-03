@@ -27,16 +27,20 @@ profile, the editable files are:
 For complex behavior rows, direct source editing is still expected after using
 the Studio as a starter.
 
-## Read-only Live Keyboard Status
+## Live Keyboard And Engineering Apply
 
-The header's `Live keyboard` row is the first Profile Wire integration. It is
-deliberately read-only:
+The header's `Live keyboard` row supports both read-only inspection and the
+first engineering live-apply path:
 
 - `Find keyboards` enumerates the matching QMK Raw HID interface without
   opening it.
 - `Connect` opens the selected interface and sends only standard VIA identity
-  reads plus Profile Wire custom-get requests for capabilities and status.
+  reads plus Profile Wire requests for capabilities and status.
 - `Refresh` repeats those capability and status reads.
+- `Apply live` appears only when the connected firmware advertises the complete
+  candidate-write, persistent-commit, runtime-activation, and peer-reconciliation
+  contract. It compiles RGB and `key_behaviors[]` from source on disk, uploads
+  the canonical profile, persists it on both halves, and activates it.
 - `Disconnect` closes the host connection.
 
 The native HID path and connected handle stay in the extension host. The
@@ -47,19 +51,41 @@ The live panel compares protocol and schema majors, report framing, Milestone A
 domain support, the standard VIA firmware version, and the active source
 profile's layer, behavior, combo, RGB group, and LED requirements with the
 capacities reported by firmware. An
-incompatible result is diagnostic only; no live write is available in this
-stage. Source Apply actions keep their existing meaning and never write to the
-connected keyboard.
+incompatible result disables `Apply live`. Ordinary source Apply actions still
+write only the C files; use `Apply live` as the explicit device operation.
 
-Ordinary firmware reports its compiled/read-only store view. The side-specific
-engineering-owner artifact can additionally report real compiled/action
-identities plus active, pending, committed, candidate, peer, convergence, and
-conflict state as one coherent two-page observation. It still advertises zero
-candidate chunk capacity and no write, commit, activation, or peer-operation
-capability, so Profile Studio cannot send a hidden mutation through this read
-surface. The underlying owner now contains the D-022 distributed split commit
-barrier; routing and capabilities remain intentionally coupled and off until a
-separate engineering-mutation gate and the real-device acceptance work land.
+Ordinary firmware reports its compiled/read-only store view and advertises no
+mutation capability. The side-specific live-edit test artifacts enable the
+complete owner and mutation route together. Their D-022 barrier prepares the
+peer, commits locally, authorizes the peer commit, requires exact convergence,
+then publishes the new runtime generation only at a safe activation boundary.
+Profile Studio performs a final status read and reports success only when the
+same digest is both active and committed.
+
+### First two-half test
+
+1. Install or reload the current Profile Studio extension.
+2. Use `Compile live-edit test` in the Firmware row, or use the labeled UF2
+   files already built at the repository root.
+3. Flash `bastardkb_charybdis_4x6_noah_live_edit_left.uf2` to the physical left
+   half and `bastardkb_charybdis_4x6_noah_live_edit_right.uf2` to the physical
+   right half using the normal UF2 bootloader workflow.
+4. Reconnect the keyboard normally, open Profile Studio, then choose `Find
+   keyboards` and `Connect`.
+5. Confirm the Live panel says live apply is available. Make and apply a small
+   source edit—an obvious RGB color is the easiest first signal—then choose
+   `Apply live`. Local form drafts must be applied to source first; the live
+   compiler intentionally reads the three files on disk.
+6. Confirm the Live apply card says `Persisted and active`, exercise the changed
+   behavior, and reboot once to verify persistence.
+
+This pair is an engineering acceptance build, not the ordinary daily firmware.
+Its reviewed stack paths pass and its linked fixed occupancy is far below the
+270,336 bytes of physical SRAM available on each RP2040, but its `.bss` and
+`.data + .bss` regression policies remain red and runtime high-water has not
+yet been measured. If the first test behaves unexpectedly, stop live writes and
+flash the ordinary left/right firmware pair; ordinary firmware does not activate
+the persisted live profile.
 
 ## Profiles And New Keymaps
 
@@ -127,6 +153,10 @@ the keyboard's `MASTER_RIGHT` configuration. Physical identity is embedded in
 each artifact independently, so a USB-role swap or EEPROM reset cannot change
 the durable live-profile origin. The action opens the Charybdis Profile Studio
 output pane and streams QMK output while each side builds.
+`Compile live-edit test` uses the same physical mapping and produces
+`bastardkb_charybdis_4x6_<name>_live_edit_left.uf2` and
+`bastardkb_charybdis_4x6_<name>_live_edit_right.uf2`, adding the explicit
+engineering owner and mutation gates without changing the ordinary build.
 
 ## Editing Model
 

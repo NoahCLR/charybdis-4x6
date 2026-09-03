@@ -26,11 +26,11 @@ dependency status without duplicating or prematurely resolving its findings.
 | Stage | Status | Exit evidence |
 | --- | --- | --- |
 | 00 — Contract and baseline | in progress | measured baseline, frozen contracts, and executable golden fixtures landed; real-board probe remains |
-| 01 — Live Link transport | software implementation complete; hardware evidence pending | fake/injected transport and read-only device channel landed; real-board/VS Code-host matrix remains |
-| 02 — Schema, store, and commit | engineering implementation hardening | codecs, bounded store, provider, owner, and D-022 split barrier landed behind a gate; resource decision, mutation gate, and hardware evidence remain |
-| 03 — Live RGB | consumer/runtime foundation complete; end-to-end flow blocked on Stage 02 | all renderer families use the effective seam and the gated owner can publish them; routed write/UI/hardware proof remains |
-| 04 — Live key behaviors | consumer/runtime foundation complete; end-to-end flow blocked on Stage 02 | reader-backed lookup and gated publication landed; routed write/UI/hardware proof and timing decision remain |
-| 05 — Milestone A integration | blocked on Stages 03 and 04 | open |
+| 01 — Live Link transport | software implementation complete; hardware evidence pending | injected/native transport, read path, and gated write orchestration landed; real-board/VS Code-host matrix remains |
+| 02 — Schema, store, and commit | engineering software integration complete; hardware and production-policy evidence pending | codecs, bounded store, provider, owner, D-022 split barrier, and coupled engineering mutation gate landed |
+| 03 — Live RGB | engineering vertical slice complete; hardware evidence pending | Studio compiles the authored RGB model and the two-half gated owner can persist and activate it |
+| 04 — Live key behaviors | engineering vertical slice complete; hardware and timing evidence pending | Studio compiles supported authored behaviors and the gated provider publishes them through the runtime lookup seam |
+| 05 — Milestone A integration | in progress; first two-half hardware test ready | labeled UF2 pair and Studio `Apply live` flow are ready; real-board recovery/resource matrix remains |
 | 06 — Defaults, layout, and macros | blocked on Milestone A | open |
 | 07 — Combos and layer structure | blocked on Stage 06 | open |
 | 08 — Production closure | blocked on Stage 07 | open |
@@ -1838,3 +1838,53 @@ Next steps:
 3. Capture allocator and stack high-water during upload, commit, activation,
    reconnect, reboot, role swap, interruption, reset, and contention before
    deciding whether to revise policy or promote mutation into normal firmware.
+
+### 2026-09-03 — First testable engineering live-edit checkpoint
+
+- Added the explicit D-023 `NOAH_LIVE_PROFILE_MUTATION=yes` gate. It requires
+  the side-specific owner and VIA, routes candidate status/write/abort/validate
+  and save/commit commands, and advertises candidate-write, persistence,
+  activation, and peer-reconciliation capabilities only as one complete set.
+  Ordinary and owner-only builds remain read-only.
+- Connected Profile Studio's parsed source model to the canonical Profile Wire
+  encoder for the complete current Milestone A RGB and supported key-behavior
+  surfaces. The real authored profile compiles byte-for-byte to the 1,089-byte
+  firmware fixture; unused source group declarations are intentionally omitted
+  to match the compiled-default materializer.
+- Connected `Apply live` to staged upload and commit. The UI exposes progress
+  and failure states, and the device service reports success only after a fresh
+  status read identifies the candidate digest as both committed and active.
+  Read-only firmware cannot enable the control.
+- Built labeled side-specific hardware-test artifacts:
+  `bastardkb_charybdis_4x6_noah_live_edit_left.uf2` for the physical left half
+  and `bastardkb_charybdis_4x6_noah_live_edit_right.uf2` for the physical right
+  half. Both include the owner and mutation gates; neither is a production
+  firmware recommendation. Their SHA-256 digests are respectively
+  `adc391872f2b7cf7ff0eb3b8a9d4e538a18e16c5d85e8445a4188df248d91d0d`
+  and
+  `9d66bf27939fd1f43ef18e8900481a876282b3206213ac815eaa7c195d6e6c8e`.
+- Focused Profile Wire and feature-gate tests pass. Profile Studio's check
+  passes with 98 live-link tests, including real-source exact compilation,
+  mutation-capability gating, successful staged commit, and fail-closed final
+  digest mismatch. The dedicated mutation-owner stack gate passes with split
+  metadata at 1,328/1,920 B, coherent VIA status at 680/1,920 B, Raw HID write
+  dispatch at 392/1,920 B, and the profile split callback at 264/768 B. These
+  are named linked paths, not global or interrupt-stack high-water evidence.
+- Fresh optimized engineering linked accounting remains `.data` 23,000 B,
+  `.bss` 28,828/26,000 B, combined 51,828/51,000 B, linker/core-memory span
+  210,312/204,800 B, and fixed linked occupancy 59,288 B per half. The first
+  two regression policies fail, but this is not physical exhaustion: each half
+  has its own 270,336 B of physical SRAM. Runtime allocator/stack high-water is
+  still unknown.
+- Hardware has not yet been flashed or exercised. This checkpoint is software-
+  verified and ready for the first real test; it is not Milestone A closure.
+
+Next steps:
+
+1. Flash the labeled image matching each physical half and run one small RGB
+   edit followed by one key-behavior edit through `Apply source` then
+   `Apply live`.
+2. Verify both halves, reboot persistence, reconnect, and both USB orientations;
+   preserve the ordinary firmware artifact as the fallback.
+3. Capture allocator/stack high-water and complete the interruption, role-swap,
+   contention, reset, and recovery matrix before any production promotion.

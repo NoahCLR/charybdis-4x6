@@ -260,3 +260,20 @@ specific implementation finding.
 - R-07 remains open. No resource-policy value is described as physical SRAM
   capacity; fresh linked and reviewed-path stack evidence must be recorded for
   this larger owner before enabling mutation.
+
+### 2026-09-03 engineering mutation and first-test reconciliation
+
+The final 2026-09-02 sentence above meant “before enabling mutation in a
+hardware-test artifact.” D-023 now supplies that explicit gate and fresh linked
+evidence; it does not resolve R-07 or authorize production exposure.
+
+- R-03, R-04, R-18, and R-19 are reachable end-to-end only in the labeled
+  engineering mutation pair. Routing and the complete capability set are
+  mechanically coupled, and Studio verifies the exact committed/active digest.
+- Those risks remain open until the physical two-half persistence, reconnect,
+  USB-orientation, role-swap, interruption, contention, and recovery matrix
+  passes. Software/fake-device proof is not substituted for hardware evidence.
+- R-07 remains open: optimized linked accounting fails the conservative BSS and
+  combined-data policies even though each half has 270,336 B of physical SRAM
+  and the SRAM0–3 linker/core-memory-span policy passes. Reviewed named stack
+  paths pass; runtime allocator and stack high-water evidence is still absent.

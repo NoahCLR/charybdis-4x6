@@ -52,6 +52,7 @@ build_hook_and_run() {
         "$ROOT/tests/host/qmk_via_profile_channel_test.c" \
         "$ROOT/users/noah/lib/compat/qmk_via_profile_channel.c" \
         "$ROOT/users/noah/lib/profile/protocol/profile_wire_v1.c" \
+        "$ROOT/users/noah/lib/profile/protocol/profile_candidate_v1.c" \
         -o "$BUILD_DIR/qmk_via_profile_channel_test_$name"
     "$BUILD_DIR/qmk_via_profile_channel_test_$name"
 }
@@ -61,3 +62,4 @@ build_hook_and_run via_rgb -DRGB_MATRIX_ENABLE -DRGB_MATRIX_WS2812
 build_hook_and_run via_split -DSPLIT_KEYBOARD
 build_hook_and_run via_split_rgb -DSPLIT_KEYBOARD -DRGB_MATRIX_ENABLE -DRGB_MATRIX_WS2812
 build_hook_and_run via_owner_split_rgb -DNOAH_LIVE_PROFILE_OWNER_ENABLE -DSPLIT_KEYBOARD -DRGB_MATRIX_ENABLE -DRGB_MATRIX_WS2812
+build_hook_and_run via_mutation_owner_split_rgb -DNOAH_LIVE_PROFILE_MUTATION_ENABLE -DNOAH_LIVE_PROFILE_OWNER_ENABLE -DSPLIT_KEYBOARD -DRGB_MATRIX_ENABLE -DRGB_MATRIX_WS2812

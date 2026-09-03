@@ -29,6 +29,7 @@ USE_PROCESS_STACKSIZE = 0xA00
 # The reviewed-path stack gate uses final linked disassembly. Disabling GCC
 # shrink wrapping keeps each analyzed frame allocation in the entry prologue.
 ifeq ($(strip $(NOAH_STACK_BUDGET_ENABLE)), yes)
+    OPT_DEFS += -DNOAH_STACK_BUDGET_ENABLE
     CFLAGS += -fno-shrink-wrap
     CXXFLAGS += -fno-shrink-wrap
     EXTRALDFLAGS += -Wl,-Map=$(BUILD_DIR)/$(TARGET).map,--cref
@@ -72,8 +73,7 @@ endif
 
 # Complete live-profile owner composition is available only as a deliberate
 # side-specific engineering artifact while its linked state and hardware
-# high-water evidence are under review. The VIA write capability remains
-# unadvertised and unrouted even in this build.
+# high-water evidence are under review.
 ifneq ($(strip $(NOAH_LIVE_PROFILE_OWNER)),)
     ifneq ($(strip $(NOAH_LIVE_PROFILE_OWNER)),yes)
         $(error NOAH_LIVE_PROFILE_OWNER must be `yes` when specified)
@@ -86,4 +86,19 @@ ifneq ($(strip $(NOAH_LIVE_PROFILE_OWNER)),)
     endif
     OPT_DEFS += -DNOAH_LIVE_PROFILE_OWNER_ENABLE
     SRC += $(NOAH_LIVE_PROFILE_OWNER_SOURCES)
+endif
+
+# Candidate routing and advertised write capabilities are one stricter switch
+# layered on the complete owner. Keeping the define behind this build-time
+# dependency prevents a firmware image from advertising mutation without the
+# owner that receives it, or from accepting hidden writes while advertising a
+# read-only channel.
+ifneq ($(strip $(NOAH_LIVE_PROFILE_MUTATION)),)
+    ifneq ($(strip $(NOAH_LIVE_PROFILE_MUTATION)),yes)
+        $(error NOAH_LIVE_PROFILE_MUTATION must be `yes` when specified)
+    endif
+    ifneq ($(strip $(NOAH_LIVE_PROFILE_OWNER)),yes)
+        $(error NOAH_LIVE_PROFILE_MUTATION=yes requires NOAH_LIVE_PROFILE_OWNER=yes)
+    endif
+    OPT_DEFS += -DNOAH_LIVE_PROFILE_MUTATION_ENABLE
 endif

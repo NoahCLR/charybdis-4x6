@@ -99,7 +99,11 @@
         },
         {
           "name": "engineering owner coherent VIA status read",
-          "functions": ["main", "noah_profile_store_runtime_owner_status", "noah_profile_split_authority_status"]
+          "functions": ["main", "via_custom_value_command_kb", "noah_profile_store_runtime_owner_status", "noah_profile_split_authority_status"]
+        },
+        {
+          "name": "engineering mutation Raw HID dispatch",
+          "functions": ["main", "via_custom_value_command_kb"]
         }
       ]
     },

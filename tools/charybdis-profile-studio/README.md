@@ -9,15 +9,14 @@ The Studio does not create a separate profile format. The C files stay the
 source of truth, and every apply action patches those authored source blocks
 directly.
 
-The header also has a read-only `Live keyboard` row. `Find keyboards` scans
-for the Charybdis Raw HID interface, `Connect` opens the selected interface and
-reads Profile Wire capabilities and status, and `Refresh` repeats those reads.
-The live panel reports protocol/schema compatibility, whether the current
-source profile fits the keyboard's advertised capacities, device generations
-and digests, and transport diagnostics. This Stage 01 connection does not
-preview, deploy, save, or otherwise mutate a live profile. Existing Apply
-buttons still mean source-only edits followed by the normal firmware build and
-flash workflow.
+The header also has a `Live keyboard` row. `Find keyboards` scans for the
+Charybdis Raw HID interface, `Connect` reads Profile Wire capabilities and
+status, and `Refresh` repeats those reads. With ordinary firmware this remains
+read-only. With the separately labeled live-edit test firmware, `Apply live`
+builds the complete RGB and `key_behaviors[]` domains from the source files on
+disk, persists them on both halves, and activates them without reflashing.
+Existing card-level Apply buttons still mean source-only edits; use them before
+`Apply live` so the desired values are present on disk.
 
 ## What It Edits
 
@@ -66,6 +65,11 @@ the intended transport role for this `MASTER_RIGHT` keyboard; the second
 embeds a stable physical identity in flash for handedness and future profile
 origin. The action opens the Charybdis Profile Studio output pane and streams
 QMK output while the build runs.
+Use `Compile live-edit test` for the engineering pair. It produces
+`bastardkb_charybdis_4x6_<name>_live_edit_left.uf2` and
+`bastardkb_charybdis_4x6_<name>_live_edit_right.uf2` with the live-profile owner
+and mutation route enabled together. Flash each file to its matching physical
+half before expecting `Apply live` to become available.
 
 ## Screenshots
 
@@ -207,19 +211,19 @@ Extension Development Host window.
 
 ## Live Link Transport Development
 
-The hardware-independent transport boundary for future live profile editing
+The hardware-independent transport boundary for live profile editing
 lives under [`live-link/`](live-link/). It defines an injected device adapter,
 a serialized request coordinator, a fake adapter, a lazy-loaded `node-hid`
 3.x desktop adapter, the Profile Wire V1 read codec, and the host-side service
-used by the Studio's read-only live connection controls. It also contains the
-canonical whole-profile codec and a desktop-only RGB domain v1 codec that can
-turn the complete parsed RGB model into deterministic Profile Wire bytes.
+used by the Studio's live connection controls. It also contains the canonical
+whole-profile, RGB, key-behavior, and source-to-profile compiler path that turns
+the parsed model into deterministic Profile Wire bytes.
 
 The RGB codec validates compiled-stage inclusion, complete layer/PD/tap-color
 surfaces, brightness and geometry ceilings, and every selector/group
-reference. The transport package also has isolated candidate prepare and
-custom-save commit coordinators, but the extension has no RGB preview,
-candidate upload, commit, or other device-write path yet. See
+reference. The candidate coordinator uploads, validates, commits, waits through
+split preparation/convergence and safe activation, and the device service
+verifies the final active/committed digest. See
 [`live-link/rgb-domain-v1.md`](live-link/rgb-domain-v1.md) for the exact
 payload contract and intentional deferrals.
 

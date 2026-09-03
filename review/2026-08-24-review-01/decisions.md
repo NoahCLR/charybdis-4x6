@@ -416,3 +416,24 @@ at most one transport exchange, bounded payload operation, validator step, or
 marker-last commit step. Candidate-write routing and its write/commit/
 activation/peer-operation capability bits remain coupled and disabled until a
 separate engineering-mutation gate is accepted.
+
+### D-023 — Live Mutation Is An Explicit Engineering-Only Capability Set
+
+Status: accepted on 2026-09-03; production promotion and hardware acceptance remain open
+
+`NOAH_LIVE_PROFILE_MUTATION=yes` is a separate engineering build gate and is
+valid only with `NOAH_LIVE_PROFILE_OWNER=yes` and VIA enabled. It atomically
+routes candidate-status, candidate-write, abort, validation, save/commit,
+activation, and peer-reconciliation operations and advertises the matching
+four capability bits plus the exact candidate chunk capacity. Owner-only and
+ordinary builds remain read-only; the build and host compile gates reject
+partial or contradictory configurations.
+
+Profile Studio enables `Apply live` only after the connected device advertises
+that complete set. It compiles the parsed RGB and key-behavior source model to
+the canonical Profile Wire blob, stages and commits through the existing
+coordinator, and reports success only when a fresh status read identifies that
+exact digest as both durable and active. This is the first hardware-test path,
+not production acceptance: the conservative BSS and combined-data regression
+policies remain red and allocator/stack high-water plus the two-half recovery
+matrix remain open.

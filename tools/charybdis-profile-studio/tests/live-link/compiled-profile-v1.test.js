@@ -8,6 +8,10 @@ const test = require("node:test");
 const {decodeProfileBlob, encodeProfileBlob} = require("../../live-link/profile-blob-v1");
 const {decodeKeyBehaviorDomain, encodeKeyBehaviorDomain} = require("../../live-link/key-behavior-domain-v1");
 const {decodeRgbDomainV1, encodeRgbDomainV1} = require("../../live-link/rgb-domain-v1");
+const {
+    buildCanonicalStudioProfileV1,
+    semanticActionForExpression,
+} = require("../../live-link/compiled-profile-v1");
 
 const fixturePath = path.resolve(__dirname, "../../../../tests/fixtures/compiled_profile_v1.fixture");
 const fixture = new Map(fs.readFileSync(fixturePath, "utf8")
@@ -43,4 +47,66 @@ test("real compiled defaults remain a canonical cross-language Profile Blob v1 f
     assert.deepEqual(encodeRgbDomainV1(rgb, codecOptions), decoded.domains[0].payload);
     assert.deepEqual(encodeKeyBehaviorDomain({rows: behaviors.rows}), decoded.domains[1].payload);
     assert.deepEqual(encodeProfileBlob({domains: decoded.domains}), bytes);
+});
+
+function minimalStudioModel() {
+    return {
+        layers: [{name: "_BASE"}],
+        configDefaults: [],
+        rgb: {
+            ledGroups: [],
+            layerColors: [{layer: "_BASE", color: {h: 0, s: 0, v: 0}, mode: "ALL_KEYS"}],
+            layerLedGroups: [],
+            pdModeColors: [],
+            pdModeLedGroups: [],
+            comboFeedbackLedGroups: [],
+            keyBehaviorFeedbackLedGroups: [],
+        },
+        keyBehaviors: [{
+            keycode: "CUSTOM_ONE",
+            tapHoldTerm: "180",
+            steps: [{
+                tapCount: 0,
+                tap: {helper: "TAP_SENDS", action: "KC_A"},
+                hold: {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "MO(_BASE)"},
+            }],
+        }],
+        qmkKeycodeValues: {KC_A: 4},
+        customKeycodes: ["CUSTOM_ONE"],
+    };
+}
+
+const milestoneCapabilities = {
+    maxLogicalLayers: 8,
+    maxBehaviorRows: 64,
+    maxTapStepsPerBehavior: 5,
+    maxPopulatedBehaviorSteps: 128,
+    hardcodedMacroSlots: 16,
+    viaMacroSlots: 64,
+    maxProfilePayload: 4064,
+    physicalLedCount: 58,
+};
+
+test("Studio source model compiles RGB and behaviors into one canonical milestone blob", () => {
+    const compiled = buildCanonicalStudioProfileV1(minimalStudioModel(), {capabilities: milestoneCapabilities});
+    const decoded = decodeProfileBlob(compiled.blob);
+    const behaviors = decodeKeyBehaviorDomain(decoded.domains[1].payload);
+
+    assert.equal(compiled.domainMask, 3);
+    assert.deepEqual(decoded.domains.map((domain) => domain.id), [0x10, 0x20]);
+    assert.equal(behaviors.rows.length, 1);
+    assert.equal(behaviors.rows[0].tapHoldTerm, 180);
+    assert.deepEqual(behaviors.rows[0].steps[0].tap, {kind: 1, flags: 0, operand: 4});
+    assert.deepEqual(behaviors.rows[0].steps[0].hold.action, {kind: 2, flags: 0, operand: 0});
+    assert.deepEqual(encodeProfileBlob({domains: decoded.domains}), compiled.blob);
+});
+
+test("semantic compiler maps stable actions and rejects source-only helpers", () => {
+    const model = minimalStudioModel();
+    assert.deepEqual(semanticActionForExpression("VIA_MACRO_12", model), {kind: 6, operand: 12});
+    assert.deepEqual(semanticActionForExpression("LOCK_LAYER(_BASE)", model), {kind: 3, operand: 0});
+    assert.throws(
+        () => semanticActionForExpression("SOME_LOCAL_C_FUNCTION(KC_A)", model),
+        (error) => error?.code === "UNSUPPORTED_ACTION"
+    );
 });

@@ -3,9 +3,12 @@
 const {RAW_HID_REPORT_SIZE} = require("./device-adapter");
 const {NodeHidDeviceAdapter} = require("./node-hid-adapter");
 const {DeviceRequestCoordinator} = require("./request-coordinator");
+const {CandidateUploadCoordinator} = require("./candidate-upload-coordinator");
 const {
     PROFILE_WIRE_KNOWN_MASKS,
+    PROFILE_WIRE_FEATURES,
     PROFILE_WIRE_V1,
+    PROFILE_ACTIVE_KIND,
     VIA_READS,
     readProfileCapabilities,
     readProfileStatus,
@@ -16,6 +19,10 @@ const PROFILE_STUDIO_PROTOCOL = Object.freeze({major: 1, minor: 0});
 const PROFILE_STUDIO_SCHEMA = Object.freeze({major: 1, minor: 0});
 const PROFILE_DOMAIN_FLAGS = Object.freeze({RGB: 1 << 0, KEY_BEHAVIORS: 1 << 1});
 const REQUIRED_PROFILE_DOMAIN_MASK = PROFILE_DOMAIN_FLAGS.RGB | PROFILE_DOMAIN_FLAGS.KEY_BEHAVIORS;
+const REQUIRED_LIVE_MUTATION_FEATURES = PROFILE_WIRE_FEATURES.CANDIDATE_WRITE
+    | PROFILE_WIRE_FEATURES.PERSISTENT_COMMIT
+    | PROFILE_WIRE_FEATURES.RUNTIME_ACTIVATION
+    | PROFILE_WIRE_FEATURES.PEER_RECONCILIATION;
 
 class ProfileDeviceService {
     constructor(options = {}) {
@@ -27,6 +34,9 @@ class ProfileDeviceService {
         this.onChange = typeof options.onChange === "function" ? options.onChange : undefined;
         this.profileSummary = normalizeProfileSummary(options.profileSummary);
         this.requestIdStart = normalizeRequestId(options.requestIdStart === undefined ? 1 : options.requestIdStart);
+        this.createCandidateUploadCoordinator = typeof options.createCandidateUploadCoordinator === "function"
+            ? options.createCandidateUploadCoordinator
+            : (connection, coordinatorOptions) => new CandidateUploadCoordinator(connection, coordinatorOptions);
         this.devices = [];
         this.adapterIdsByPublicId = new Map();
         this.connection = undefined;
@@ -43,6 +53,7 @@ class ProfileDeviceService {
         this.error = undefined;
         this.diagnostics = [];
         this.lastRefreshedAt = "";
+        this.liveApply = {state: "idle", progress: null, result: null, error: null};
     }
 
     setProfileSummary(summary) {
@@ -152,6 +163,62 @@ class ProfileDeviceService {
         return this.snapshot();
     }
 
+    async applyLiveProfile(value) {
+        const blob = copyBytes(value, "Live profile blob");
+        const compatibility = this.capabilities
+            ? evaluateProfileCompatibility(this.capabilities, this.profileSummary, this.viaIdentity)
+            : null;
+        const mutation = evaluateLiveMutationCompatibility(this.capabilities, compatibility, Boolean(this.connection?.connected));
+        if (!mutation.available) {
+            this.setError(new Error(mutation.reasons[0] || "This keyboard is not ready for persistent live apply."));
+            this.emitChange();
+            return this.snapshot();
+        }
+        if (blob.length > this.capabilities.maxProfilePayload) {
+            this.setError(new Error(`Compiled live profile is ${blob.length} bytes; firmware accepts at most ${this.capabilities.maxProfilePayload}.`));
+            this.emitChange();
+            return this.snapshot();
+        }
+
+        return this.runOperation("applying-live", async () => {
+            this.liveApply = {state: "uploading", progress: null, result: null, error: null};
+            const coordinator = this.createCandidateUploadCoordinator(this.connection, {
+                chunkSize: this.capabilities.candidateChunkMax,
+                requestIds: this.requestIds,
+                onProgress: (progress) => {
+                    this.liveApply = {...this.liveApply, state: progress.phase, progress: {...progress}};
+                    this.emitChange();
+                },
+            });
+            try {
+                const prepared = await coordinator.upload(blob, {
+                    actionAbiDigest: this.capabilities.actionAbiDigest,
+                    requestedDomains: REQUIRED_PROFILE_DOMAIN_MASK,
+                });
+                this.liveApply = {...this.liveApply, state: "committing", result: {transactionId: prepared.transactionId, digest: prepared.metadata.digest}};
+                this.emitChange();
+                const committed = await coordinator.commit(prepared.transactionId, {digest: prepared.metadata.digest});
+                this.status = await readProfileStatus(this.connection, {nextRequestId: () => this.requestIds.next()});
+                assertAppliedStatus(this.status, prepared.metadata.digest);
+                this.lastRefreshedAt = new Date().toISOString();
+                this.liveApply = {
+                    state: "complete",
+                    progress: {...committed.progress},
+                    result: {
+                        transactionId: prepared.transactionId,
+                        digest: prepared.metadata.digest,
+                        byteLength: blob.length,
+                    },
+                    error: null,
+                };
+                this.addDiagnostic(`Applied and persisted live profile ${hexDigest(prepared.metadata.digest)} (${blob.length} bytes).`);
+            } catch (error) {
+                this.liveApply = {...this.liveApply, state: "failed", error: publicError(error)};
+                throw error;
+            }
+        });
+    }
+
     async close() {
         this.disposeConnectionListener?.();
         this.disposeConnectionListener = undefined;
@@ -178,6 +245,12 @@ class ProfileDeviceService {
             compatibility: this.capabilities
                 ? evaluateProfileCompatibility(this.capabilities, this.profileSummary, this.viaIdentity)
                 : null,
+            mutationCompatibility: evaluateLiveMutationCompatibility(
+                this.capabilities,
+                this.capabilities ? evaluateProfileCompatibility(this.capabilities, this.profileSummary, this.viaIdentity) : null,
+                Boolean(this.connection?.connected)
+            ),
+            liveApply: cloneLiveApply(this.liveApply),
             error: this.error ? {...this.error} : null,
             diagnostics: this.diagnostics.slice(),
             lastRefreshedAt: this.lastRefreshedAt,
@@ -229,6 +302,7 @@ class ProfileDeviceService {
         this.viaIdentity = undefined;
         this.requestIds = undefined;
         this.lastRefreshedAt = "";
+        this.liveApply = {state: "idle", progress: null, result: null, error: null};
     }
 
     setError(error) {
@@ -390,6 +464,49 @@ function ledIndexCheck(highestLedIndex, physicalLedCount) {
     };
 }
 
+function evaluateLiveMutationCompatibility(capabilities, compatibility, connected = true) {
+    const reasons = [];
+    if (!connected) reasons.push("Connect to the keyboard before applying a live profile.");
+    if (!compatibility?.compatible) reasons.push(...(compatibility?.reasons || ["Read compatibility has not been established."]));
+    const flags = Number(capabilities?.featureFlags) || 0;
+    if ((flags & REQUIRED_LIVE_MUTATION_FEATURES) !== REQUIRED_LIVE_MUTATION_FEATURES) {
+        reasons.push(`Firmware mutation flags 0x${flags.toString(16)} do not include required persistent split apply mask 0x${REQUIRED_LIVE_MUTATION_FEATURES.toString(16)}.`);
+    }
+    if (!Number.isInteger(capabilities?.candidateChunkMax) || capabilities.candidateChunkMax < 1) {
+        reasons.push("Firmware does not advertise a candidate upload chunk size.");
+    }
+    return {available: reasons.length === 0, reasons, requiredFeatureMask: REQUIRED_LIVE_MUTATION_FEATURES};
+}
+
+function copyBytes(value, label) {
+    if (!(value instanceof Uint8Array)) throw new TypeError(`${label} must be a Buffer or Uint8Array.`);
+    return Buffer.from(value);
+}
+
+function cloneLiveApply(value) {
+    return {
+        state: value?.state || "idle",
+        progress: value?.progress ? {...value.progress} : null,
+        result: value?.result ? {...value.result} : null,
+        error: value?.error ? {...value.error} : null,
+    };
+}
+
+function hexDigest(value) {
+    return `0x${(Number(value) >>> 0).toString(16).padStart(8, "0")}`;
+}
+
+function assertAppliedStatus(status, digest) {
+    const expected = Number(digest) >>> 0;
+    if (status?.activeKind !== PROFILE_ACTIVE_KIND.COMMITTED
+        || (Number(status?.activeDigest) >>> 0) !== expected
+        || (Number(status?.committedDigest) >>> 0) !== expected) {
+        const error = new Error(`Firmware completed the candidate transaction, but its active and committed status did not confirm ${hexDigest(expected)}.`);
+        error.code = "LIVE_APPLY_VERIFICATION_FAILED";
+        throw error;
+    }
+}
+
 module.exports = {
     PROFILE_DOMAIN_FLAGS,
     PROFILE_STUDIO_PROTOCOL,
@@ -397,6 +514,8 @@ module.exports = {
     ProfileRequestIdSequence,
     ProfileDeviceService,
     REQUIRED_PROFILE_DOMAIN_MASK,
+    REQUIRED_LIVE_MUTATION_FEATURES,
     evaluateProfileCompatibility,
+    evaluateLiveMutationCompatibility,
     normalizeProfileSummary,
 };

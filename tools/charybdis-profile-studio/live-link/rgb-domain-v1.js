@@ -301,7 +301,7 @@ function canonicalizeStudioRgbDomainV1(model, options = {}) {
         tapBranchColorCount: options.tapBranchColorCount,
         supportedPdModeIds: options.supportedPdModeIds,
     };
-    const groupContext = studioGroupContext(rgb);
+    const groupContext = studioGroupContext(rgb, options.includeUnusedGroups !== false);
     const profile = {
         stageEnableMask,
         groups: groupContext.groups,
@@ -592,7 +592,7 @@ class Reader {
     }
 }
 
-function studioGroupContext(rgb) {
+function studioGroupContext(rgb, includeUnusedGroups = true) {
     const reusableByName = new Map();
     const sources = [];
     for (const [index, group] of requiredArray(rgb.ledGroups || [], "rgb.ledGroups").entries()) {
@@ -602,7 +602,7 @@ function studioGroupContext(rgb) {
         }
         const leds = normalizeLeds(group.ledIndices, "rgb.ledGroups", index);
         reusableByName.set(name, leds);
-        sources.push(leds);
+        if (includeUnusedGroups) sources.push(leds);
     }
     const tables = [rgb.layerLedGroups, rgb.pdModeLedGroups, rgb.comboFeedbackLedGroups, rgb.keyBehaviorFeedbackLedGroups];
     for (const rows of tables) {
