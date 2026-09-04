@@ -108,7 +108,7 @@
   </g>
   <g transform="rotate(0 727.0 225.0)">
     <rect x="698.0" y="196.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="727.0" y="225.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">X</text>
+    <text x="727.0" y="225.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">Y</text>
   </g>
   <g transform="rotate(0 793.0 225.0)">
     <rect x="764.0" y="196.0" width="58" height="58" rx="7" fill="#ff0000" stroke="#e30000" stroke-width="1.5" filter="url(#shadow)"/>
