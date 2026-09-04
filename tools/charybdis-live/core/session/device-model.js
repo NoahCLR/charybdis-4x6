@@ -28,14 +28,17 @@ function buildDeviceModel(state = {}) {
         layers: layersFromDevice(state.layout),
         customKeycodes: [],
 
-        // Awaiting the committed-payload read. Empty, not fabricated.
-        keyBehaviors: [],
+        // Read off the keyboard when the committed profile has been read;
+        // empty rather than fabricated before that.
+        keyBehaviors: committedKeyBehaviors(state.committed),
+        rgb: committedRgb(state.committed),
+
+        // Still awaiting their own reads.
         combos: [],
         viaMacros: [],
         hardcodedMacros: [],
         behaviorTimingDefaults: {},
         configDefaults: [],
-        rgb: {},
         macroPayloadKeycodes: [],
 
         qmkKeycodes: catalog.entries,
@@ -95,6 +98,20 @@ function trim(name) {
     return stripped.length <= 5 ? stripped : stripped.slice(0, 5);
 }
 
+// The decoded domains reach the UI only once the whole payload verified, so a
+// half-read profile is never rendered as if it were the keyboard's state.
+function committedRgb(committed) {
+    return committed?.state === "read" && committed.domains?.rgb ? committed.domains.rgb : {};
+}
+
+function committedKeyBehaviors(committed) {
+    const decoded = committed?.state === "read" ? committed.domains?.keyBehaviors : undefined;
+    if (!decoded) {
+        return [];
+    }
+    return Array.isArray(decoded) ? decoded : decoded.rows || [];
+}
+
 function activeProfileFromDevice(state) {
     if (!state.capabilities) {
         return null;
@@ -120,9 +137,16 @@ function deviceHeader(state) {
         ? `generation ${status.committedGeneration} · ${hex(status.committedDigest)} · ${convergence(status)}`
         : "";
     const layers = state.layout?.state === "read" ? state.layout.layers.length : 0;
-    const subtitle = layers
-        ? `${layers} layers read from the keyboard`
-        : "Connected. Use Read from keyboard to load its layout.";
+    const parts = [];
+    if (layers) {
+        parts.push(`${layers} layers`);
+    }
+    if (state.committed?.state === "read") {
+        parts.push(`generation ${state.committed.generation}`);
+    }
+    const subtitle = parts.length
+        ? `${parts.join(" and ")} read from the keyboard`
+        : "Connected. Use Read from keyboard to load its configuration.";
     return {connected: true, label, summary, subtitle};
 }
 
@@ -144,9 +168,17 @@ function diagnosticsFor(state) {
     if (!state.layout || state.layout.state !== "read") {
         notes.push("Layout has not been read from the keyboard yet.");
     }
-    notes.push(
-        "RGB, key behaviours, combos and macros need the committed profile read, which is not implemented yet."
-    );
+    if (state.committed?.state === "read") {
+        notes.push(
+            `Committed profile generation ${state.committed.generation} read from the keyboard (${state.committed.byteLength} bytes).`
+        );
+        for (const failure of state.committed.failures || []) {
+            notes.push(`Domain 0x${failure.domainId.toString(16)} did not decode: ${failure.message}`);
+        }
+    } else {
+        notes.push("RGB and key behaviours need the committed profile read.");
+    }
+    notes.push("Combos, macros and policy defaults are not read yet.");
     return notes;
 }
 

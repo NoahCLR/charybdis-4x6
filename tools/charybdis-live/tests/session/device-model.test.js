@@ -156,3 +156,72 @@ test("the subtitle says what to do next", () => {
     }).device;
     assert.match(read.subtitle, /2 layers read/);
 });
+
+// The committed profile is what the keyboard is actually running. Showing a
+// half-read or failed decode as if it were device state would be the worst
+// failure this app can have, so those paths are pinned here.
+
+function committedRead(overrides = {}) {
+    return {
+        state: "read",
+        generation: 12,
+        digest: 0xdeadbeef,
+        byteLength: 320,
+        domainIds: [0x10, 0x20],
+        domains: {},
+        failures: [],
+        ...overrides,
+    };
+}
+
+test("decoded domains reach the UI only after a verified read", () => {
+    const rgb = {stageEnableMask: 3, layerColors: [{layerId: 0}]};
+    const behaviors = {rows: [{keycode: 4}]};
+
+    const reading = buildDeviceModel({committed: {state: "reading", progress: {done: 10, total: 320}}});
+    assert.deepEqual(reading.rgb, {}, "a partial read must not render as device state");
+    assert.deepEqual(reading.keyBehaviors, []);
+
+    const done = buildDeviceModel({committed: committedRead({domains: {rgb, keyBehaviors: behaviors}})});
+    assert.deepEqual(done.rgb, rgb);
+    assert.deepEqual(done.keyBehaviors, behaviors.rows);
+});
+
+test("key behaviours decode whether the domain is a list or a wrapper", () => {
+    const asRows = buildDeviceModel({committed: committedRead({domains: {keyBehaviors: {rows: [{keycode: 1}]}}})});
+    assert.deepEqual(asRows.keyBehaviors, [{keycode: 1}]);
+
+    const asArray = buildDeviceModel({committed: committedRead({domains: {keyBehaviors: [{keycode: 2}]}})});
+    assert.deepEqual(asArray.keyBehaviors, [{keycode: 2}]);
+});
+
+test("a keyboard with no committed profile says so instead of looking broken", () => {
+    const model = buildDeviceModel({capabilities: {}, committed: {state: "none", reason: "no committed profile"}});
+    assert.deepEqual(model.rgb, {});
+    assert.deepEqual(model.keyBehaviors, []);
+    assert.match(model.diagnostics.join(" "), /need the committed profile read/);
+});
+
+test("a domain that fails to decode is named, and the others still render", () => {
+    const model = buildDeviceModel({
+        committed: committedRead({
+            domains: {rgb: {stageEnableMask: 1}},
+            failures: [{domainId: 0x20, message: "row count exceeds the declared limit"}],
+        }),
+    });
+
+    assert.deepEqual(model.rgb, {stageEnableMask: 1}, "one bad domain must not discard the whole profile");
+    assert.deepEqual(model.keyBehaviors, []);
+    assert.match(model.diagnostics.join(" "), /0x20 did not decode/);
+    assert.match(model.diagnostics.join(" "), /row count exceeds/);
+});
+
+test("the header reports the generation once the profile is read", () => {
+    const model = buildDeviceModel({
+        capabilities: {},
+        layout: {state: "read", layers: [{layer: 0, keys: []}]},
+        committed: committedRead({generation: 12}),
+    });
+    assert.match(model.device.subtitle, /1 layers and generation 12 read/);
+    assert.match(model.diagnostics.join(" "), /generation 12 read from the keyboard \(320 bytes\)/);
+});

@@ -234,12 +234,16 @@ completed slice.
    the specs, delete the process, invert the firmware gate. Proven by
    connecting and displaying device identity, capabilities, schema, and status
    through the Profile Wire reads that already work.
-2. **Device readback.** Bounded, chunked, generation-correlated read of the
-   exact committed payload. This is the critical path: device-first open,
-   generation-bound drafts, stale-write refusal, read-after-write verification,
-   backup, restore, and recovery are all downstream of it. Today's
-   `READ_SURFACE` bit is capability and status reporting only and must not be
-   presented as profile readback.
+2. **Device readback.** *Landed.* Profile Wire value `0x04` serves the
+   committed payload: page 0 metadata, pages 1..N raw bytes. Coherence is the
+   host's, by re-reading metadata after the chunks, since generation only
+   increases. The payload is verified against both the reported CRC and digest
+   before decoding, and a domain that fails to decode is reported without
+   discarding the rest of the profile. RGB and key behaviours now reach the UI
+   as the keyboard holds them.
+
+   `READ_SURFACE` remains capability and status reporting and is still not
+   this.
 3. **Generation-bound drafts and conflict-safe apply**, then read-after-write
    verification and visible two-half convergence.
 4. **Backup, restore, reset, and recovery journeys** over the canonical profile

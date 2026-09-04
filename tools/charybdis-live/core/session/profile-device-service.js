@@ -6,6 +6,10 @@ const {DeviceRequestCoordinator} = require("../transport/request-coordinator");
 const {CandidateUploadCoordinator} = require("./candidate-upload-coordinator");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX, readViaKeycode, readViaLayout, synchronizeViaLayout, writeViaKeycode} = require("../protocol/via-layout-v1");
 const keycodeCatalog = require("../data/keycode-catalog");
+const {readCommittedPayload} = require("../protocol/profile-payload-v1");
+const {PROFILE_DOMAIN_IDS, decodeProfileBlob} = require("../schema/profile-blob-v1");
+const {decodeRgbDomainV1} = require("../schema/rgb-domain-v1");
+const {decodeKeyBehaviorDomain} = require("../schema/key-behavior-domain-v1");
 const {
     CANDIDATE_OPERATION,
     CANDIDATE_STATE,
@@ -71,6 +75,7 @@ class ProfileDeviceService {
         this.lastRefreshedAt = "";
         this.liveApply = {state: "idle", progress: null, result: null, error: null};
         this.layout = undefined;
+        this.committed = undefined;
     }
 
     setProfileSummary(summary) {
@@ -290,6 +295,83 @@ class ProfileDeviceService {
         }
     }
 
+// Reads the committed profile off the keyboard and decodes it.
+    //
+    // This is the read D-026 requires and the first time the app can show RGB
+    // and key behaviours as the device actually holds them, rather than as the
+    // authored source describes them. A domain that fails to decode is
+    // reported as such and leaves the others readable; the alternative is
+    // discarding a whole profile because one section drifted.
+    async readCommittedProfile() {
+        if (!this.connection?.connected) {
+            this.setError(new Error("Connect to a keyboard before reading its profile."));
+            this.emitChange();
+            return this.snapshot();
+        }
+
+        return this.runOperation("reading profile", async () => {
+            const connection = this.connection;
+            this.committed = {state: "reading", progress: {done: 0, total: 0}};
+            this.emitChange();
+
+            let read;
+            try {
+                read = await readCommittedPayload(connection, {
+                    nextRequestId: () => this.requestIds.next(),
+                    onProgress: (progress) => {
+                        this.committed = {...this.committed, progress};
+                        this.emitChange();
+                    },
+                });
+            } catch (error) {
+                if (error?.code === "DEVICE_REJECTED") {
+                    this.committed = {state: "none", progress: null, reason: error.message};
+                    this.addDiagnostic("The keyboard reports no committed profile; it is running compiled defaults.");
+                    return;
+                }
+                throw error;
+            }
+            const {metadata, bytes} = read;
+            if (this.connection !== connection || !connection.connected) {
+                throw new Error("The keyboard disconnected while its profile was being read.");
+            }
+
+            const blob = decodeProfileBlob(bytes);
+            const domains = {};
+            const failures = [];
+            for (const domain of blob.domains) {
+                try {
+                    if (domain.id === PROFILE_DOMAIN_IDS.RGB) {
+                        domains.rgb = decodeRgbDomainV1(domain.payload);
+                    } else if (domain.id === PROFILE_DOMAIN_IDS.KEY_BEHAVIORS) {
+                        domains.keyBehaviors = decodeKeyBehaviorDomain(domain.payload);
+                    }
+                } catch (error) {
+                    failures.push({domainId: domain.id, message: error instanceof Error ? error.message : String(error)});
+                }
+            }
+
+            this.committed = {
+                state: "read",
+                progress: null,
+                readAt: new Date().toISOString(),
+                generation: metadata.generation,
+                digest: metadata.digest,
+                schema: metadata.schema,
+                originHalf: metadata.originHalf,
+                byteLength: bytes.length,
+                domainIds: blob.domains.map((domain) => domain.id),
+                domains,
+                failures,
+            };
+            this.addDiagnostic(
+                failures.length
+                    ? `Read generation ${metadata.generation}; ${failures.length} domain${failures.length === 1 ? "" : "s"} failed to decode.`
+                    : `Read generation ${metadata.generation} from the keyboard (${bytes.length} bytes).`
+            );
+        });
+    }
+
     async disconnect() {
         const connection = this.connection;
         if (!connection) {
@@ -483,6 +565,7 @@ class ProfileDeviceService {
             ),
             liveApply: cloneLiveApply(this.liveApply),
             layout: this.layout ? JSON.parse(JSON.stringify(this.layout)) : null,
+            committed: this.committed ? JSON.parse(JSON.stringify(this.committed)) : null,
             error: this.error ? {...this.error} : null,
             diagnostics: this.diagnostics.slice(),
             lastRefreshedAt: this.lastRefreshedAt,
@@ -526,6 +609,7 @@ class ProfileDeviceService {
 
     clearConnection() {
         this.layout = undefined;
+        this.committed = undefined;
         this.disposeConnectionListener?.();
         this.disposeConnectionListener = undefined;
         this.connection = undefined;

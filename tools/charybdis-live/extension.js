@@ -145,7 +145,19 @@ async function connectAndRead(panel, session) {
         {location: vscode.ProgressLocation.Notification, title: "Reading layout from the keyboard"},
         () => service.readLayout()
     );
-    session.notice = "Read the layout from the connected keyboard.";
+
+    // The committed profile is only present on firmware that has one. A
+    // keyboard running compiled defaults is a normal state, not an error, so a
+    // failure here leaves the layout read standing.
+    await vscode.window.withProgress(
+        {location: vscode.ProgressLocation.Notification, title: "Reading committed profile"},
+        () => service.readCommittedProfile()
+    );
+
+    const state = service.snapshot();
+    session.notice = state.committed?.state === "read"
+        ? `Read the layout and committed profile generation ${state.committed.generation}.`
+        : "Read the layout. The keyboard reports no committed profile, so RGB and key behaviours are running compiled defaults.";
     publish(panel, session);
 }
 

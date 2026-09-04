@@ -109,7 +109,11 @@ function profileResponseMatcher(response, request) {
         && actual[4] === expected[4];
 }
 
-function decodeProfileResponse(response, request) {
+// options.allowShortPayload is for reads whose last page is legitimately
+// partial, such as the tail chunk of a committed payload. It stays opt-in so
+// the fixed-size status and capability pages keep failing on a short read,
+// where a short page really does mean something is wrong.
+function decodeProfileResponse(response, request, options = {}) {
     const report = Buffer.from(normalizeRawHidReport(response, "Profile Wire response"));
     if (!profileResponseMatcher(report, request)) {
         throw new ProfileWireProtocolError(
@@ -130,8 +134,11 @@ function decodeProfileResponse(response, request) {
     if (status !== PROFILE_WIRE_STATUS.OK) {
         throw new ProfileWireProtocolError("DEVICE_REJECTED", `Profile Wire request failed with status ${status}.`, {status});
     }
-    if (payloadLength !== PROFILE_WIRE_V1.PAYLOAD_SIZE) {
+    if (payloadLength !== PROFILE_WIRE_V1.PAYLOAD_SIZE && !options.allowShortPayload) {
         throw new ProfileWireProtocolError("MALFORMED_RESPONSE", "Successful Profile Wire read pages must contain 25 bytes.");
+    }
+    if (payloadLength === 0) {
+        throw new ProfileWireProtocolError("MALFORMED_RESPONSE", "A successful Profile Wire read page cannot be empty.");
     }
     return report.subarray(PROFILE_WIRE_V1.PAYLOAD_OFFSET, PROFILE_WIRE_V1.PAYLOAD_OFFSET + payloadLength);
 }
