@@ -133,16 +133,20 @@ function deviceHeader(state) {
     }
     const label = [state.device?.manufacturer, state.device?.product].filter(Boolean).join(" ") || "Charybdis";
     const status = state.status;
-    const summary = status
-        ? `generation ${status.committedGeneration} · ${hex(status.committedDigest)} · ${convergence(status)}`
-        : "";
+    // Say plainly when nothing is committed. "generation 0" reads like a real
+    // generation and it is not one.
+    const summary = !status
+        ? ""
+        : state.committed?.source === "compiled" || status.committedGeneration === 0
+            ? `no committed profile · running compiled defaults · ${convergence(status)}`
+            : `generation ${status.committedGeneration} · ${hex(status.committedDigest)} · ${convergence(status)}`;
     const layers = state.layout?.state === "read" ? state.layout.layers.length : 0;
     const parts = [];
     if (layers) {
         parts.push(`${layers} layers`);
     }
     if (state.committed?.state === "read") {
-        parts.push(`generation ${state.committed.generation}`);
+        parts.push(state.committed.source === "compiled" ? "compiled defaults" : `generation ${state.committed.generation}`);
     }
     const subtitle = parts.length
         ? `${parts.join(" and ")} read from the keyboard`
@@ -170,7 +174,9 @@ function diagnosticsFor(state) {
     }
     if (state.committed?.state === "read") {
         notes.push(
-            `Committed profile generation ${state.committed.generation} read from the keyboard (${state.committed.byteLength} bytes).`
+            state.committed.source === "compiled"
+                ? `Showing the firmware's compiled defaults (${state.committed.byteLength} bytes). Nothing is committed to the keyboard yet, so this is what it runs.`
+                : `Committed profile generation ${state.committed.generation} read from the keyboard (${state.committed.byteLength} bytes).`
         );
         for (const failure of state.committed.failures || []) {
             notes.push(`Domain 0x${failure.domainId.toString(16)} did not decode: ${failure.message}`);

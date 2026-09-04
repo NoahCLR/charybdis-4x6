@@ -248,14 +248,21 @@ static void noah_profile_channel_write_u32(uint8_t *target, uint32_t value) {
 // This is the read D-026 requires. The READ_SURFACE capability bit describes
 // status reporting and is not this.
 static bool noah_profile_channel_handle_payload_get(uint8_t *data, uint8_t length) {
-    const noah_profile_store_record_t *record;
-    uint16_t                           offset;
-    uint16_t                           remaining;
-    uint8_t                            chunk;
+    const noah_profile_store_record_t   *record = NULL;
+    noah_profile_compiled_v1_metadata_t  compiled_metadata;
+    uint16_t                             payload_length;
+    uint16_t                             offset;
+    uint16_t                             remaining;
+    uint8_t                              chunk;
+    bool                                 compiled;
 
-    if (!data || length != NOAH_PROFILE_WIRE_V1_REPORT_SIZE || data[0] != NOAH_PROFILE_WIRE_V1_COMMAND_GET || data[1] != NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL || data[2] != NOAH_PROFILE_WIRE_V1_VALUE_PAYLOAD) {
+    if (!data || length != NOAH_PROFILE_WIRE_V1_REPORT_SIZE || data[0] != NOAH_PROFILE_WIRE_V1_COMMAND_GET || data[1] != NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL) {
         return false;
     }
+    if (data[2] != NOAH_PROFILE_WIRE_V1_VALUE_PAYLOAD && data[2] != NOAH_PROFILE_WIRE_V1_VALUE_COMPILED) {
+        return false;
+    }
+    compiled = data[2] == NOAH_PROFILE_WIRE_V1_VALUE_COMPILED;
     for (uint8_t index = 5u; index < NOAH_PROFILE_WIRE_V1_REPORT_SIZE; index++) {
         if (data[index] != 0u) {
             memset(&data[5], 0, NOAH_PROFILE_WIRE_V1_REPORT_SIZE - 5u);
@@ -269,11 +276,21 @@ static bool noah_profile_channel_handle_payload_get(uint8_t *data, uint8_t lengt
         return true;
     }
 
-    record = noah_profile_store_runtime_committed();
-    if (!record) {
-        memset(&data[5], 0, NOAH_PROFILE_WIRE_V1_REPORT_SIZE - 5u);
-        data[5] = NOAH_PROFILE_WIRE_V1_STATUS_UNAVAILABLE;
-        return true;
+    if (compiled) {
+        if (!noah_profile_store_runtime_compiled_metadata(&compiled_metadata)) {
+            memset(&data[5], 0, NOAH_PROFILE_WIRE_V1_REPORT_SIZE - 5u);
+            data[5] = NOAH_PROFILE_WIRE_V1_STATUS_UNAVAILABLE;
+            return true;
+        }
+        payload_length = compiled_metadata.byte_length;
+    } else {
+        record = noah_profile_store_runtime_committed();
+        if (!record) {
+            memset(&data[5], 0, NOAH_PROFILE_WIRE_V1_REPORT_SIZE - 5u);
+            data[5] = NOAH_PROFILE_WIRE_V1_STATUS_UNAVAILABLE;
+            return true;
+        }
+        payload_length = record->payload_length;
     }
 
     memset(&data[6], 0, NOAH_PROFILE_WIRE_V1_REPORT_SIZE - 6u);
@@ -282,28 +299,40 @@ static bool noah_profile_channel_handle_payload_get(uint8_t *data, uint8_t lengt
         data[6] = NOAH_PROFILE_WIRE_V1_PAYLOAD_SIZE;
         data[7] = 1u; // layout version
         data[8] = NOAH_PROFILE_WIRE_V1_PAYLOAD_SIZE;
-        noah_profile_channel_write_u16(&data[9], record->payload_length);
-        noah_profile_channel_write_u32(&data[11], record->generation);
-        noah_profile_channel_write_u32(&data[15], record->payload_digest);
-        noah_profile_channel_write_u32(&data[19], record->payload_crc32);
-        data[23] = record->schema_major;
-        data[24] = record->schema_minor;
-        data[25] = record->domain_mask;
-        data[26] = record->origin_half;
-        data[27] = record->flags;
+        noah_profile_channel_write_u16(&data[9], payload_length);
+        if (compiled) {
+            // Compiled defaults have no generation: they are what the firmware
+            // was built with, not something committed.
+            noah_profile_channel_write_u32(&data[11], 0u);
+            noah_profile_channel_write_u32(&data[15], compiled_metadata.digest);
+            noah_profile_channel_write_u32(&data[19], compiled_metadata.crc32);
+            data[23] = NOAH_PROFILE_STORE_SCHEMA_MAJOR;
+            data[24] = NOAH_PROFILE_STORE_SCHEMA_MINOR;
+            data[25] = compiled_metadata.domain_mask;
+        } else {
+            noah_profile_channel_write_u32(&data[11], record->generation);
+            noah_profile_channel_write_u32(&data[15], record->payload_digest);
+            noah_profile_channel_write_u32(&data[19], record->payload_crc32);
+            data[23] = record->schema_major;
+            data[24] = record->schema_minor;
+            data[25] = record->domain_mask;
+            data[26] = record->origin_half;
+            data[27] = record->flags;
+        }
         return true;
     }
 
     offset = (uint16_t)((data[4] - 1u) * NOAH_PROFILE_WIRE_V1_PAYLOAD_SIZE);
-    if (offset >= record->payload_length) {
+    if (offset >= payload_length) {
         memset(&data[5], 0, NOAH_PROFILE_WIRE_V1_REPORT_SIZE - 5u);
         data[5] = NOAH_PROFILE_WIRE_V1_STATUS_UNKNOWN_PAGE;
         return true;
     }
-    remaining = (uint16_t)(record->payload_length - offset);
+    remaining = (uint16_t)(payload_length - offset);
     chunk     = remaining < NOAH_PROFILE_WIRE_V1_PAYLOAD_SIZE ? (uint8_t)remaining : NOAH_PROFILE_WIRE_V1_PAYLOAD_SIZE;
 
-    if (!noah_profile_store_runtime_read_committed(offset, &data[7], chunk)) {
+    if (!(compiled ? noah_profile_store_runtime_read_compiled(offset, &data[7], chunk)
+                   : noah_profile_store_runtime_read_committed(offset, &data[7], chunk))) {
         memset(&data[5], 0, NOAH_PROFILE_WIRE_V1_REPORT_SIZE - 5u);
         data[5] = NOAH_PROFILE_WIRE_V1_STATUS_UNAVAILABLE;
         return true;

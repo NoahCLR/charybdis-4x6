@@ -6,7 +6,7 @@ const {DeviceRequestCoordinator} = require("../transport/request-coordinator");
 const {CandidateUploadCoordinator} = require("./candidate-upload-coordinator");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX, readViaKeycode, readViaLayout, synchronizeViaLayout, writeViaKeycode} = require("../protocol/via-layout-v1");
 const keycodeCatalog = require("../data/keycode-catalog");
-const {readCommittedPayload} = require("../protocol/profile-payload-v1");
+const {readCommittedPayload, readCompiledPayload} = require("../protocol/profile-payload-v1");
 const {PROFILE_DOMAIN_IDS, decodeProfileBlob} = require("../schema/profile-blob-v1");
 const {decodeRgbDomainV1} = require("../schema/rgb-domain-v1");
 const {decodeKeyBehaviorDomain} = require("../schema/key-behavior-domain-v1");
@@ -315,6 +315,7 @@ class ProfileDeviceService {
             this.emitChange();
 
             let read;
+            let source = "committed";
             try {
                 read = await readCommittedPayload(connection, {
                     nextRequestId: () => this.requestIds.next(),
@@ -324,12 +325,20 @@ class ProfileDeviceService {
                     },
                 });
             } catch (error) {
-                if (error?.code === "DEVICE_REJECTED") {
-                    this.committed = {state: "none", progress: null, reason: error.message};
-                    this.addDiagnostic("The keyboard reports no committed profile; it is running compiled defaults.");
-                    return;
+                if (error?.code !== "DEVICE_REJECTED") {
+                    throw error;
                 }
-                throw error;
+                // Nothing committed. The keyboard is still running something —
+                // the defaults it was compiled with — so read those instead of
+                // showing an empty editor and calling it device state.
+                read = await readCompiledPayload(connection, {
+                    nextRequestId: () => this.requestIds.next(),
+                    onProgress: (progress) => {
+                        this.committed = {...this.committed, progress};
+                        this.emitChange();
+                    },
+                });
+                source = "compiled";
             }
             const {metadata, bytes} = read;
             if (this.connection !== connection || !connection.connected) {
@@ -353,6 +362,7 @@ class ProfileDeviceService {
 
             this.committed = {
                 state: "read",
+                source,
                 progress: null,
                 readAt: new Date().toISOString(),
                 generation: metadata.generation,
@@ -364,10 +374,13 @@ class ProfileDeviceService {
                 domains,
                 failures,
             };
+            const described = source === "compiled"
+                ? "the firmware's compiled defaults"
+                : `committed generation ${metadata.generation}`;
             this.addDiagnostic(
                 failures.length
-                    ? `Read generation ${metadata.generation}; ${failures.length} domain${failures.length === 1 ? "" : "s"} failed to decode.`
-                    : `Read generation ${metadata.generation} from the keyboard (${bytes.length} bytes).`
+                    ? `Read ${described}; ${failures.length} domain${failures.length === 1 ? "" : "s"} failed to decode.`
+                    : `Read ${described} from the keyboard (${bytes.length} bytes).`
             );
         });
     }

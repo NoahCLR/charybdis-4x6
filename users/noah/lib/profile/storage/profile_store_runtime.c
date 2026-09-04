@@ -210,6 +210,45 @@ bool noah_profile_store_runtime_read_committed(uint16_t offset, uint8_t *target,
 #endif
 }
 
+// Opened lazily on first host request rather than at boot: computing the
+// compiled digest walks the authored tables, and nothing on the scan path
+// needs it. One open is enough, since the compiled bytes cannot change at
+// runtime.
+static bool                        compiled_opened;
+static bool                        compiled_valid;
+static noah_profile_compiled_v1_t  compiled_profile;
+static noah_profile_reader_t       compiled_reader;
+
+static bool ensure_compiled_open(void) {
+    if (!compiled_opened) {
+        compiled_opened = true;
+        compiled_valid  = noah_profile_compiled_v1_open(&compiled_profile, NULL) == NOAH_PROFILE_COMPILED_V1_OK;
+        if (compiled_valid) {
+            compiled_reader = noah_profile_compiled_v1_reader(&compiled_profile);
+        }
+    }
+    return compiled_valid;
+}
+
+bool noah_profile_store_runtime_compiled_metadata(noah_profile_compiled_v1_metadata_t *metadata) {
+    if (!metadata || !ensure_compiled_open()) {
+        return false;
+    }
+    *metadata = compiled_profile.metadata;
+    return true;
+}
+
+bool noah_profile_store_runtime_read_compiled(uint16_t offset, uint8_t *target, uint16_t length) {
+    if (!target || length == 0u || !ensure_compiled_open() || !compiled_reader.read) {
+        return false;
+    }
+    // Bounds first: offset and length arrive from the host.
+    if ((uint32_t)offset + (uint32_t)length > (uint32_t)compiled_profile.metadata.byte_length) {
+        return false;
+    }
+    return compiled_reader.read(compiled_reader.context, offset, target, length);
+}
+
 bool noah_profile_store_runtime_owner_status(noah_profile_owner_status_t *status) {
 #if defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)
     return runtime_owner_initialized && !runtime_integration_error && noah_profile_owner_status(&runtime_owner, status);

@@ -119,6 +119,36 @@ static uint8_t store_payload_byte(uint16_t offset) {
 }
 
 static bool store_read_committed_fails;
+static bool store_has_compiled = true;
+
+// The compiled defaults are a virtual view over authored const data, so the
+// stub derives them the same way: byte value from offset, distinct from the
+// committed pattern so a source mix-up is visible.
+static uint8_t store_compiled_byte(uint16_t offset) {
+    return (uint8_t)(offset * 11u + 5u);
+}
+
+bool noah_profile_store_runtime_compiled_metadata(noah_profile_compiled_v1_metadata_t *metadata) {
+    if (!store_has_compiled || !metadata) {
+        return false;
+    }
+    memset(metadata, 0, sizeof(*metadata));
+    metadata->byte_length = 40u;
+    metadata->digest      = UINT32_C(0x01020304);
+    metadata->crc32       = UINT32_C(0x05060708);
+    metadata->domain_mask = 0x30u;
+    return true;
+}
+
+bool noah_profile_store_runtime_read_compiled(uint16_t offset, uint8_t *target, uint16_t length) {
+    if (!store_has_compiled || !target || length == 0u || (uint32_t)offset + (uint32_t)length > 40u) {
+        return false;
+    }
+    for (uint16_t index = 0u; index < length; index++) {
+        target[index] = store_compiled_byte((uint16_t)(offset + index));
+    }
+    return true;
+}
 
 bool noah_profile_store_runtime_read_committed(uint16_t offset, uint8_t *target, uint16_t length) {
     if (store_read_committed_fails || !store_runtime_has_committed || !target || length == 0u) {
@@ -459,6 +489,43 @@ static void test_payload_read_surfaces_storage_failure(void) {
     store_read_committed_fails = false;
 }
 
+
+static void test_compiled_read_serves_what_the_firmware_runs(void) {
+    uint8_t frame[NOAH_PROFILE_WIRE_V1_REPORT_SIZE];
+
+    store_has_compiled          = true;
+    store_runtime_has_committed = false; // nothing committed: compiled must still answer
+
+    make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_COMPILED, 1u, 0u);
+    via_custom_value_command_kb(frame, sizeof(frame));
+    assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK);
+    assert(read_u16(&frame[9]) == 40u);
+    // Compiled defaults are not a committed generation.
+    assert(read_u32(&frame[11]) == 0u);
+    assert(read_u32(&frame[15]) == UINT32_C(0x01020304));
+    assert(read_u32(&frame[19]) == UINT32_C(0x05060708));
+    assert(frame[25] == 0x30u);
+
+    make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_COMPILED, 2u, 1u);
+    via_custom_value_command_kb(frame, sizeof(frame));
+    assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK);
+    assert(frame[6] == NOAH_PROFILE_WIRE_V1_PAYLOAD_SIZE);
+    assert(frame[7] == store_compiled_byte(0u));
+
+    // The two sources must not be confused for one another.
+    assert(frame[7] != store_payload_byte(0u));
+}
+
+static void test_compiled_read_reports_unavailable_when_absent(void) {
+    uint8_t frame[NOAH_PROFILE_WIRE_V1_REPORT_SIZE];
+
+    store_has_compiled = false;
+    make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_COMPILED, 1u, 0u);
+    via_custom_value_command_kb(frame, sizeof(frame));
+    assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_UNAVAILABLE);
+    store_has_compiled = true;
+}
+
 int main(void) {
 #ifdef NOAH_LIVE_PROFILE_OWNER_ENABLE
     initialize_live_owner_status();
@@ -478,6 +545,8 @@ int main(void) {
     test_payload_read_reports_unavailable_without_a_commit();
     test_payload_read_rejects_malformed_requests();
     test_payload_read_surfaces_storage_failure();
+    test_compiled_read_serves_what_the_firmware_runs();
+    test_compiled_read_reports_unavailable_when_absent();
     puts("qmk VIA Profile Wire channel tests passed");
     return 0;
 }

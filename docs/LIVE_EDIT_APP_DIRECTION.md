@@ -187,6 +187,35 @@ use.
 Static RAM for the owner build is 51,820 B against the 57,344 B regression
 tripwire, so this needs no memory policy change.
 
+### D-L11 — Current state comes from the keyboard, including compiled defaults
+
+The app has zero reliance on the repository's C files. It parses none of them,
+reads no file at runtime, and `tests/layering.test.js` fails the build if a
+`core/` module so much as names one.
+
+A keyboard with nothing committed is still running something: the defaults its
+firmware was built with. Profile Wire value `0x05` serves those over the same
+page layout as the committed payload, so the app can show what the board
+actually does instead of an empty editor.
+
+That is not a source dependency. The bytes come from the device over HID. If
+the flashed firmware was built from different authored data than the repo
+currently holds, the app shows what is flashed, because that is what the
+keyboard reports. The compiled defaults are labelled as such in the UI and
+never presented as a committed generation; `generation 0` is reported as "no
+committed profile" rather than as a generation.
+
+Two pieces of data are shipped with the app rather than read from the device,
+because no device command exposes them:
+
+- the vendored QMK keycode catalog, since keycodes arrive as bare `uint16`
+  with no names;
+- the Charybdis layout matrix, since standard VIA has no query for which
+  physical position maps to which row and column.
+
+Both are keyboard-definition data of the kind VIA and Vial ship per board. No
+configuration flows from them; they only decode what the device sends.
+
 ### D-L09 — The live app owns a canonical profile format, not `.c`
 
 Backup, restore, sharing, and version control all go through a canonical

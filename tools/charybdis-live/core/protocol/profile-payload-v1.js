@@ -24,6 +24,10 @@ const {crc32, fnv1a32} = require("../schema/profile-blob-v1");
 
 const PROFILE_PAYLOAD_V1 = Object.freeze({
     VALUE: 0x04,
+    // The compiled defaults the firmware was built with, served through the
+    // same page layout. A keyboard with nothing committed is still running
+    // something, and this is it.
+    COMPILED_VALUE: 0x05,
     LAYOUT_VERSION: 1,
     METADATA_PAGE: 0,
     METADATA_SIZE: 21,
@@ -71,19 +75,29 @@ function chunkCount(metadata) {
 }
 
 async function readCommittedPayload(connection, options = {}) {
+    return readProfilePayload(connection, PROFILE_PAYLOAD_V1.VALUE, options);
+}
+
+// The compiled defaults carry no generation, so there is nothing for the
+// coherence check to compare; they cannot change while the firmware runs.
+async function readCompiledPayload(connection, options = {}) {
+    return readProfilePayload(connection, PROFILE_PAYLOAD_V1.COMPILED_VALUE, options);
+}
+
+async function readProfilePayload(connection, value, options = {}) {
     assertConnection(connection);
     const retries = normalizeRetryCount(options.generationRetries);
     const requestIds = createRequestIdSource(options);
     let lastMismatch;
 
     for (let attempt = 0; attempt <= retries; attempt += 1) {
-        const metadata = decodePayloadMetadata(await requestPage(connection, PROFILE_PAYLOAD_V1.METADATA_PAGE, requestIds, options));
+        const metadata = decodePayloadMetadata(await requestPage(connection, value, PROFILE_PAYLOAD_V1.METADATA_PAGE, requestIds, options));
         const total = chunkCount(metadata);
         const bytes = Buffer.alloc(metadata.payloadLength);
         let written = 0;
 
         for (let chunk = 0; chunk < total; chunk += 1) {
-            const page = await requestPage(connection, chunk + 1, requestIds, options);
+            const page = await requestPage(connection, value, chunk + 1, requestIds, options);
             const expected = Math.min(metadata.chunkSize, metadata.payloadLength - written);
             if (page.length < expected) {
                 throw protocolError(
@@ -100,7 +114,7 @@ async function readCommittedPayload(connection, options = {}) {
 
         // Re-read the metadata. A generation that has not moved means no commit
         // landed while the chunks were in flight.
-        const after = decodePayloadMetadata(await requestPage(connection, PROFILE_PAYLOAD_V1.METADATA_PAGE, requestIds, options));
+        const after = decodePayloadMetadata(await requestPage(connection, value, PROFILE_PAYLOAD_V1.METADATA_PAGE, requestIds, options));
         if (after.generation !== metadata.generation || after.digest !== metadata.digest) {
             lastMismatch = {expectedGeneration: metadata.generation, actualGeneration: after.generation};
             continue;
@@ -137,8 +151,8 @@ function verify(bytes, metadata) {
     }
 }
 
-async function requestPage(connection, page, requestIds, options) {
-    const request = buildProfileGetRequest(PROFILE_PAYLOAD_V1.VALUE, page, requestIds.next());
+async function requestPage(connection, value, page, requestIds, options) {
+    const request = buildProfileGetRequest(value, page, requestIds.next());
     const response = await connection.request(request, {
         matchResponse: profileResponseMatcher,
         signal: options.signal,
@@ -216,4 +230,5 @@ module.exports = {
     chunkCount,
     decodePayloadMetadata,
     readCommittedPayload,
+    readCompiledPayload,
 };

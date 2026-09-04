@@ -31,6 +31,14 @@ noah_profile_compiled_v1_result_t noah_profile_compiled_v1_open(noah_profile_com
     return NOAH_PROFILE_COMPILED_V1_OK;
 }
 
+// The store runtime now reads compiled defaults too. Stubbed rather than
+// linked, because the real module is a virtual view over authored keymap
+// tables and this test is about storage.
+noah_profile_reader_t noah_profile_compiled_v1_reader(const noah_profile_compiled_v1_t *profile) {
+    (void)profile;
+    return (noah_profile_reader_t){0};
+}
+
 void eeprom_read_block(void *target, const void *source, size_t length) {
     uintptr_t address = (uintptr_t)source;
 
@@ -233,6 +241,9 @@ static void test_old_compiled_default_record_falls_back(void) {
     assert(noah_profile_store_runtime_committed() == NULL);
     assert(qmk_write_calls == 0u);
 }
+
+
+
 
 int main(void) {
     test_qmk_adapter_is_slot_bounded_and_read_only();

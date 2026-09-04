@@ -225,3 +225,40 @@ test("the header reports the generation once the profile is read", () => {
     assert.match(model.device.subtitle, /1 layers and generation 12 read/);
     assert.match(model.diagnostics.join(" "), /generation 12 read from the keyboard \(320 bytes\)/);
 });
+
+// A keyboard with nothing committed is still running something. Showing its
+// compiled defaults is the honest answer; showing an empty editor is not. But
+// the two must never be confused for each other.
+
+test("compiled defaults are shown, and labelled as compiled", () => {
+    const model = buildDeviceModel({
+        capabilities: {},
+        status: {committedGeneration: 0, committedDigest: 0, activeGeneration: 0, peerGeneration: 0},
+        committed: committedRead({source: "compiled", generation: 0, byteLength: 210, domains: {rgb: {stageEnableMask: 7}}}),
+    });
+
+    assert.deepEqual(model.rgb, {stageEnableMask: 7}, "the tabs must populate from compiled defaults");
+    assert.match(model.diagnostics.join(" "), /compiled defaults/);
+    assert.match(model.diagnostics.join(" "), /Nothing is committed/);
+    assert.match(model.device.subtitle, /compiled defaults/);
+});
+
+test("an uncommitted keyboard does not claim generation 0 as a generation", () => {
+    const model = buildDeviceModel({
+        capabilities: {},
+        status: {committedGeneration: 0, committedDigest: 0, activeGeneration: 0, peerGeneration: 0},
+    });
+    assert.match(model.device.summary, /no committed profile/);
+    assert.doesNotMatch(model.device.summary, /generation 0/);
+});
+
+test("a committed profile is still reported as committed", () => {
+    const model = buildDeviceModel({
+        capabilities: {},
+        status: {committedGeneration: 7, committedDigest: 0xabcd1234, activeGeneration: 7, peerGeneration: 7},
+        committed: committedRead({source: "committed", generation: 7}),
+    });
+    assert.match(model.device.summary, /generation 7/);
+    assert.doesNotMatch(model.device.summary, /compiled defaults/);
+    assert.match(model.diagnostics.join(" "), /Committed profile generation 7/);
+});
