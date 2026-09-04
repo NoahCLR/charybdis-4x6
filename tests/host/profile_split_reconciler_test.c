@@ -1047,6 +1047,51 @@ static void test_refresh_publishes_new_local_authority_during_backoff(void) {
     assert(authority.local.generation == 22u);
 }
 
+// Steady-state cost probe: a converged pair scanned across real elapsed time
+// at a realistic 450 Hz main-loop rate. A converged reconciler should only
+// wake on its NOAH_PROFILE_SPLIT_POLL_MS deadline, so the split RPC and
+// EEPROM budgets must scale with elapsed seconds, not with scan count.
+static void test_converged_steady_state_cost_is_bounded_by_poll_deadline(void) {
+    half_t   left;
+    half_t   right;
+    uint32_t reads;
+    uint32_t writes;
+    uint32_t exchanges;
+    uint32_t start_ms;
+    uint32_t elapsed_ms = 5000u;
+    uint32_t scans      = 2250u; // 5 s at ~450 scans/s
+    uint32_t expected_polls;
+
+    half_storage_init(&left);
+    half_storage_init(&right);
+    pair_init(&left, &right);
+    run_pair_until_converged(&left, &right, false);
+
+    start_ms  = 1000000u;
+    reads     = left.memory.reads + right.memory.reads;
+    writes    = left.memory.writes + right.memory.writes;
+    exchanges = left.link.exchanges + right.link.exchanges;
+
+    for (uint32_t scan = 0u; scan < scans; scan++) {
+        uint32_t now = start_ms + (scan * elapsed_ms) / scans;
+
+        (void)noah_profile_split_reconciler_scan(&right.reconciler, true, now);
+        (void)noah_profile_split_reconciler_scan(&left.reconciler, false, now);
+    }
+
+    exchanges = (left.link.exchanges + right.link.exchanges) - exchanges;
+    reads     = (left.memory.reads + right.memory.reads) - reads;
+    writes    = (left.memory.writes + right.memory.writes) - writes;
+    expected_polls = elapsed_ms / NOAH_PROFILE_SPLIT_POLL_MS;
+
+    printf("steady state: %u scans over %u ms -> %u exchanges, %u reads, %u writes (expected <= %u exchanges)\n",
+           (unsigned)scans, (unsigned)elapsed_ms, (unsigned)exchanges, (unsigned)reads, (unsigned)writes,
+           (unsigned)(expected_polls + 1u));
+
+    assert(writes == 0u);
+    assert(exchanges <= expected_polls + 1u);
+}
+
 static void test_idle_scans_do_not_republish_unchanged_metadata(void) {
     half_t   left;
     half_t   right;
@@ -1119,6 +1164,7 @@ int main(void) {
     test_crossed_prepare_begin_loser_abort_does_not_deadlock();
     test_refresh_publishes_new_local_authority_during_backoff();
     test_idle_scans_do_not_republish_unchanged_metadata();
+    test_converged_steady_state_cost_is_bounded_by_poll_deadline();
     puts("profile split reconciler host tests passed");
     return 0;
 }
