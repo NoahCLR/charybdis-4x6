@@ -174,6 +174,11 @@ by default, and the single generic image does not. If that split is wrong, the
 alternative is to make the generic build an error, which would break the plain
 `qmk compile` documented in the root README.
 
+`tools/build-firmware-pair.sh`, and the `Build Firmware Pair (flashable)` task
+that runs it, exist because of this. A build path that sets only
+`FORCE_MASTER`/`FORCE_SLAVE` silently omits the owner, which is easy to miss:
+the firmware works, it just has no committed profile to read.
+
 The opt-out is kept deliberately. It is the only remaining lever for comparing
 ordinary against live behaviour on identical source, which matters for R-21
 (below), and it is the fallback if the regression proves intolerable in daily

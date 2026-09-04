@@ -32,17 +32,17 @@ scattered runtime rewrites.
 > qmk compile -kb bastardkb/charybdis/4x6 -km noah
 > ```
 >
-> That single command builds a generic image without the live-profile owner,
-> because the owner needs a provisioned physical half. The firmware you flash
-> is the side-specific pair, which carries the owner by default:
+> That single command builds a generic image **without** the live-profile
+> owner, because the owner needs a provisioned physical half. The firmware you
+> flash is the side-specific pair. Build it with the VS Code task
+> `Build Firmware Pair (flashable)`, or from a shell:
 >
 > ```sh
-> FORCE_SLAVE=yes NOAH_PHYSICAL_HALF=left qmk compile -kb bastardkb/charybdis/4x6 -km noah
-> FORCE_MASTER=yes NOAH_PHYSICAL_HALF=right qmk compile -kb bastardkb/charybdis/4x6 -km noah
+> sh tools/build-firmware-pair.sh
 > ```
 >
-> Add `NOAH_LIVE_PROFILE_OWNER=no` to either for an owner-free comparison
-> image.
+> That writes numbered left and right images into `../builds/<branch>/`. Add
+> `--no-owner` for the comparison pair without the live-profile owner.
 
 This repo is built around the open-source Charybdis from
 [BastardKB](https://bastardkb.com/), designed by Quentin. The hardware files

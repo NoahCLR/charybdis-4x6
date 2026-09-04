@@ -2,9 +2,12 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "Build QMK",
-            "type": "shell",
-            "command": "zsh -i -c 'qmk-build'",
+            "label": "Build Firmware Pair (flashable)",
+            "type": "process",
+            "command": "sh",
+            "args": [
+                "${workspaceFolder}/tools/build-firmware-pair.sh"
+            ],
             "group": {
                 "kind": "build",
                 "isDefault": true
@@ -12,13 +15,27 @@
             "problemMatcher": []
         },
         {
+            "label": "Build Firmware Pair (no live owner)",
+            "type": "process",
+            "command": "sh",
+            "args": [
+                "${workspaceFolder}/tools/build-firmware-pair.sh",
+                "--no-owner"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "Build QMK",
+            "type": "shell",
+            "command": "zsh -i -c 'qmk-build'",
+            "group": "build",
+            "problemMatcher": []
+        },
+        {
             "label": "Build QMK with Compilation Database",
             "type": "shell",
             "command": "qmk compile --compiledb -kb bastardkb/charybdis/4x6 -km noah",
-            "group": {
-                "kind": "build",
-                "isDefault": true
-            },
+            "group": "build",
             "problemMatcher": []
         },
         {
