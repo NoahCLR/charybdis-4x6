@@ -419,7 +419,8 @@ separate engineering-mutation gate is accepted.
 
 ### D-023 — Live Mutation Is An Explicit Engineering-Only Capability Set
 
-Status: accepted on 2026-09-03; production promotion and hardware acceptance remain open
+Status: accepted on 2026-09-03; initial RGB mutation hardware-confirmed,
+production promotion and broader acceptance remain open
 
 `NOAH_LIVE_PROFILE_MUTATION=yes` is a separate engineering build gate and is
 valid only with `NOAH_LIVE_PROFILE_OWNER=yes` and VIA enabled. It atomically
@@ -440,7 +441,8 @@ matrix remain open.
 
 ### D-024 — Durable Split Work Runs From Both QMK Scan Hooks
 
-Status: accepted on 2026-09-04; hardware re-test remains open
+Status: accepted on 2026-09-04; initial two-half hardware path confirmed,
+recovery and role-swap matrix remain open
 
 QMK routes the USB/master half through `matrix_scan_user()` and the passive
 half through the distinct `matrix_slave_scan_user()` hook. Noah therefore owns
@@ -462,7 +464,8 @@ can be resumed without silently overwriting firmware state.
 
 ### D-025 — Authored Layer Slots Stay In Standard VIA Storage
 
-Status: accepted on 2026-09-04; hardware acceptance and full Stage 06 controls remain open
+Status: accepted on 2026-09-04; base-key source push hardware-confirmed,
+durability matrix and full Stage 06 controls remain open
 
 Profile Studio does not add `keymaps[][]` to the custom Profile Wire blob.
 Before live mutation it resolves every authored layout expression to the exact

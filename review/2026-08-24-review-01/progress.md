@@ -26,12 +26,12 @@ dependency status without duplicating or prematurely resolving its findings.
 | Stage | Status | Exit evidence |
 | --- | --- | --- |
 | 00 — Contract and baseline | in progress | measured baseline, frozen contracts, and executable golden fixtures landed; real-board probe remains |
-| 01 — Live Link transport | software implementation complete; hardware evidence pending | injected/native transport, read path, and gated write orchestration landed; real-board/VS Code-host matrix remains |
-| 02 — Schema, store, and commit | engineering software integration complete; hardware and production-policy evidence pending | codecs, bounded store, provider, owner, D-022 split barrier, and coupled engineering mutation gate landed |
-| 03 — Live RGB | engineering vertical slice complete; hardware evidence pending | Studio compiles the authored RGB model and the two-half gated owner can persist and activate it |
+| 01 — Live Link transport | initial real-board path confirmed; broader host matrix pending | native connection, reads, and serialized writes worked from Profile Studio |
+| 02 — Schema, store, and commit | initial two-half persistent commit confirmed; recovery and production-policy evidence pending | an RGB profile committed and activated successfully through the D-022 barrier |
+| 03 — Live RGB | engineering vertical slice hardware-confirmed; broader persistence matrix pending | Studio compiles and applies authored RGB successfully on the real two-half board |
 | 04 — Live key behaviors | engineering vertical slice complete; hardware and timing evidence pending | Studio compiles supported authored behaviors and the gated provider publishes them through the runtime lookup seam |
-| 05 — Milestone A integration | in progress; first two-half hardware test ready | labeled UF2 pair and Studio `Apply live` flow are ready; real-board recovery/resource matrix remains |
-| 06 — Defaults, layout, and macros | in progress; bounded standard-VIA layout slice ready for hardware test | source push/diff/readback landed; peer visibility, pull/reset, macros, and defaults remain |
+| 05 — Milestone A integration | in progress; initial two-half live-edit path operational | RGB and standard layout apply are confirmed; custom behavior, recovery, and resource matrix remain |
+| 06 — Defaults, layout, and macros | in progress; standard-VIA layout source push hardware-confirmed | base-key apply works; peer visibility, reboot/role matrix, pull/reset, macros, and defaults remain |
 | 07 — Combos and layer structure | blocked on Stage 06 | open |
 | 08 — Production closure | blocked on Stage 07 | open |
 
@@ -2015,3 +2015,30 @@ Next steps:
 3. Exercise that key from its physical half, reboot both halves, and reverse
    the USB orientation. Record all three results before adding visible VIA peer
    convergence and the remaining Stage 06 pull/reset/macro controls.
+
+### 2026-09-04 — First usable live-edit milestone hardware-confirmed
+
+- Real-board testing now confirms the two highest-priority user paths: an RGB
+  color change applies live, and a normal base-layer keycode change applies and
+  changes the character typed without reflashing.
+- The second half was connected and functional during the test. This confirms
+  the corrected split reachability needed by the profile apply and the standard
+  VIA dynamic-keymap path used for the base key.
+- This evidence accepts the first usable engineering milestone, not production
+  closure. A custom `key_behaviors[]` row, reboot persistence, reconnect,
+  opposite USB orientation, role swap, interrupted apply, and runtime
+  high-water remain unverified on hardware.
+- The implementation is saved in `97692e95` (`Apply authored layer keys live
+  through VIA`); this follow-up checkpoint records the hardware outcome without
+  folding unrelated generated preview/export changes into the milestone.
+
+Next steps:
+
+1. Pause feature expansion and audit the live-edit architecture and file growth
+   before adding macros, defaults, combos, or layer-structure mutation.
+2. Measure pointing report cadence and trace the master scan hot path so the
+   reported mouse polling-frequency regression is explained with data rather
+   than assumed to be acceptable.
+3. Run the remaining reboot, USB-orientation, role-swap, custom-behavior, and
+   recovery tests only after that audit identifies which live-edit work is
+   allowed on steady-state scans and which must be deferred or removed.

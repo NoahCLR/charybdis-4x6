@@ -211,11 +211,12 @@ authored source files and synchronizes every authored `keymaps[][]` slot through
 standard VIA. The custom profile is validated, prepared, persistently committed,
 and activated on both halves; layout writes are read back on the connected half
 and enter the existing immediate-mirror and durable split-reconciliation paths.
-This is ready for a base-key hardware test, but it is not production-promoted:
-the broader hardware acceptance matrix and
-runtime high-water measurements are still open, and the engineering image
-remains above two conservative static-memory regression policies (not the
-RP2040's physical RAM capacity).
+Real-board testing confirms that both an RGB color and a normal base-layer
+keycode can now be changed without reflashing. This is the first usable
+engineering milestone, but it is not production-promoted: the broader hardware
+acceptance matrix and runtime high-water measurements are still open, and the
+engineering image remains above two conservative static-memory regression
+policies (not the RP2040's physical RAM capacity).
 
 Working keys on the slave prove QMK's core split transport, not the separate
 live-profile endpoint. The engineering firmware therefore advances durable

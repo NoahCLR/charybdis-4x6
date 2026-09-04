@@ -1,6 +1,7 @@
 # Stage 06 — Live Defaults, Layout, And Macros
 
-Status: in progress — standard VIA layout push/readback slice landed; hardware evidence pending
+Status: in progress — standard VIA layout source push works on hardware;
+architecture/performance audit next
 
 ## Objective
 
