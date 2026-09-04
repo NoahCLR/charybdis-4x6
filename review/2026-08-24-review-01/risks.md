@@ -277,3 +277,23 @@ evidence; it does not resolve R-07 or authorize production exposure.
   combined-data policies even though each half has 270,336 B of physical SRAM
   and the SRAM0–3 linker/core-memory-span policy passes. Reviewed named stack
   paths pass; runtime allocator and stack high-water evidence is still absent.
+
+### 2026-09-04 first-hardware-test reachability update
+
+- The first real apply did not close R-04, R-18, or R-19. It exposed a
+  production reachability gap: QMK's slave half uses
+  `matrix_slave_scan_user()`, while Noah's durable scheduler was reachable only
+  from the master's `matrix_scan_user()`. Core split keys still worked, but the
+  slave never registered or advanced the profile endpoint, so the host remained
+  in `PREPARING_PEER` with no known profile peer.
+- D-024 now routes the slave scan through the same arbitrated durable scheduler
+  while keeping master-only runtime work out of that path. Hook chaining,
+  runtime ordering, the full host suite, ordinary and engineering compiles, and
+  both reviewed-path stack gates pass. Studio additionally refuses mutation
+  until fresh status reports a known and converged peer and exposes/resumes only
+  a matching recoverable candidate.
+- R-04, R-18, and R-19 remain open until the corrected pair proves real
+  two-half commit, activation, persistence, interruption, reconnect, and role
+  behavior. R-07 remains unchanged: the engineering `.bss` and combined-data
+  policy gates are red, physical SRAM is 270,336 B per half, and runtime
+  high-water has not been measured.

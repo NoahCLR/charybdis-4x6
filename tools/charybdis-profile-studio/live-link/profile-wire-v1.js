@@ -54,6 +54,17 @@ const PROFILE_ACTIVE_KIND = Object.freeze({
     PENDING: 3,
 });
 
+const PROFILE_STATE_FLAGS = Object.freeze({
+    ACTIVE_IS_COMPILED_DEFAULT: 1 << 0,
+    COMMITTED_VALID: 1 << 1,
+    CANDIDATE_PENDING: 1 << 2,
+    PREVIEW_ACTIVE: 1 << 3,
+    PEER_KNOWN: 1 << 4,
+    PEER_CONVERGED: 1 << 5,
+    WAITING_SAFE_BOUNDARY: 1 << 6,
+    DIGESTS_UNAVAILABLE: 1 << 7,
+});
+
 const VIA_READS = Object.freeze({
     COMMAND_GET_PROTOCOL_VERSION: 0x01,
     COMMAND_GET_KEYBOARD_VALUE: 0x02,
@@ -251,6 +262,10 @@ function decodeStatusPages(pages) {
         validationState: generation[21],
         lastError: generation[22],
     };
+    decoded.candidatePending = (decoded.stateFlags & PROFILE_STATE_FLAGS.CANDIDATE_PENDING) !== 0;
+    decoded.peerKnown = (decoded.stateFlags & PROFILE_STATE_FLAGS.PEER_KNOWN) !== 0;
+    decoded.peerConverged = (decoded.stateFlags & PROFILE_STATE_FLAGS.PEER_CONVERGED) !== 0;
+    decoded.waitingSafeBoundary = (decoded.stateFlags & PROFILE_STATE_FLAGS.WAITING_SAFE_BOUNDARY) !== 0;
     assertKnownMask(decoded.stateFlags, PROFILE_WIRE_KNOWN_MASKS.STATE_FLAGS, "status state flags");
     if (!Object.values(PROFILE_ACTIVE_KIND).includes(decoded.activeKind)) {
         throw new ProfileWireProtocolError("INCOMPATIBLE_RESPONSE", `Unknown active profile kind ${decoded.activeKind}.`);
@@ -392,6 +407,7 @@ function assertViaHandled(report, command) {
 module.exports = {
     PROFILE_WIRE_STATUS,
     PROFILE_ACTIVE_KIND,
+    PROFILE_STATE_FLAGS,
     PROFILE_WIRE_KNOWN_MASKS,
     PROFILE_WIRE_FEATURES,
     PROFILE_WIRE_DOMAINS,

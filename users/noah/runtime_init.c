@@ -58,6 +58,13 @@ void noah_matrix_scan_user(void) {
     split_runtime_sync_tick();
 }
 
+void noah_matrix_slave_scan_user(void) {
+    // QMK does not call matrix_scan_user() on the slave half. Keep the
+    // durable receiver scheduler alive there without running master-side key,
+    // macro, or shared-state senders a second time.
+    noah_qmk_durable_io_matrix_scan();
+}
+
 void noah_housekeeping_task_user(void) {
     held_repeat_tick();
     noah_runtime_diag_heartbeat();

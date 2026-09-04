@@ -40,6 +40,7 @@ If you do nothing, the weak hooks in [`users/noah/hooks.c`](../users/noah/hooks.
 - `process_record_user()`
 - `post_process_record_user()`
 - `matrix_scan_user()`
+- `matrix_slave_scan_user()` on split keyboards
 - `housekeeping_task_user()`
 - `keyboard_post_init_user()`
 - `layer_state_set_user()`
@@ -66,10 +67,21 @@ void matrix_scan_user(void) {
 }
 ```
 
+On a split keyboard, QMK does not call `matrix_scan_user()` on the slave. If a
+strong override replaces the slave hook, it must chain independently:
+
+```c
+void matrix_slave_scan_user(void) {
+    noah_matrix_slave_scan_user();
+    // Slave-specific scan work.
+}
+```
+
 This pattern applies to:
 
 - `eeconfig_init_user()` -> `noah_eeconfig_init_user()`
 - `matrix_scan_user()` -> `noah_matrix_scan_user()`
+- `matrix_slave_scan_user()` -> `noah_matrix_slave_scan_user()`
 - `housekeeping_task_user()` -> `noah_housekeeping_task_user()`
 - `keyboard_post_init_user()` -> `noah_keyboard_post_init_user()`
 - `pointing_device_init_user()` -> `noah_pointing_device_init_user()`
@@ -240,6 +252,7 @@ This pattern applies to:
 | `process_record_user()` | `noah_process_record_user()` | key behavior engine, pointer-mode keys, non-handled release cleanup, direct actions, macros, and process-entry tracing |
 | `post_process_record_user()` | `noah_post_process_record_user()` | process-return finalization, including keyboard-event modifier-mask teardown and process trace result emission |
 | `matrix_scan_user()` | `noah_matrix_scan_user()` | VIA macro default reseeding, one rotating scan-owned durable-I/O grant across profile discovery/VIA mirroring/VIA reconciliation, key runtime scanning, and split shared-state sync ticks |
+| `matrix_slave_scan_user()` | `noah_matrix_slave_scan_user()` | the slave half's rotating durable-I/O grant, including live-profile initialization and profile/VIA split receiver mailboxes; QMK never routes the slave through `matrix_scan_user()` |
 | `housekeeping_task_user()` | `noah_housekeeping_task_user()` | held-repeat ticking, watchdog refresh, and runtime boot-indicator expiry |
 | `keyboard_post_init_user()` | `noah_keyboard_post_init_user()` | VIA macro default seeding, profile-store discovery setup, durable-I/O scheduler setup, RGB runtime init, and split shared-state init |
 | `layer_state_set_user()` | `noah_layer_state_set_user()` | pointer-layer policy, auto-sniping layer state, and queueing scan-time pd-mode DPI policy after layer-owned sniping changes |

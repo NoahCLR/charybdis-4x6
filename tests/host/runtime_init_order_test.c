@@ -165,6 +165,16 @@ static void test_matrix_scan_order(void) {
     test_expect_sequence(expected, ARRAY_SIZE(expected));
 }
 
+static void test_matrix_slave_scan_order(void) {
+    static const char *const expected[] = {
+        "qmk_durable_io_matrix_scan",
+    };
+
+    test_log_reset();
+    noah_matrix_slave_scan_user();
+    test_expect_sequence(expected, ARRAY_SIZE(expected));
+}
+
 static void test_keyboard_post_init_order(void) {
     static const char *const expected[] = {
         "qmk_combo_origin_init", "macro_payload_engine_init", "via_macro_defaults_keyboard_post_init", "profile_store_runtime_init", "rgb_runtime_post_init", "split_runtime_sync_init", "qmk_via_split_sync_init", "qmk_via_split_mirror_init", "qmk_durable_io_init",
@@ -188,6 +198,7 @@ static void test_housekeeping_order(void) {
 int main(void) {
     test_eeconfig_init_order();
     test_matrix_scan_order();
+    test_matrix_slave_scan_order();
     test_housekeeping_order();
     test_keyboard_post_init_order();
 

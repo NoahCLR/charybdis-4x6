@@ -6,6 +6,7 @@ const {
     CANDIDATE_ERROR_NAMES,
     CANDIDATE_OPERATION,
     CANDIDATE_STATE,
+    CANDIDATE_STATE_NAMES,
     CandidateRequestIdSequence,
     CandidateTransactionIdSequence,
     PROFILE_CANDIDATE_V1,
@@ -846,7 +847,7 @@ function assertNoActiveCandidate(status) {
     if (status.state !== CANDIDATE_STATE.IDLE) {
         throw new CandidateUploadError(
             "ACTIVE_CANDIDATE",
-            `Candidate transaction ${status.transactionId} is already in firmware state ${status.state}; abort or finish it before starting another upload.`,
+            `Candidate transaction ${status.transactionId} is already in firmware state ${CANDIDATE_STATE_NAMES[status.state] || status.state}; abort or finish it before starting another upload.`,
             {phase: UPLOAD_PHASE.PREFLIGHT, status, transactionId: status.transactionId, safeToRetry: false}
         );
     }

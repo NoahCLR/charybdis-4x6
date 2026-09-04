@@ -18,6 +18,7 @@ trap cleanup EXIT INT TERM
 
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
+    -DSPLIT_KEYBOARD \
     -I"$ROOT" \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
@@ -29,6 +30,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
 
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
+    -DSPLIT_KEYBOARD \
     -DHOOK_CHAINING_TEST_STRONG_OVERRIDE \
     -I"$ROOT" \
     -I"$ROOT/users/noah" \

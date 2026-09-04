@@ -12,6 +12,7 @@ bool           pre_process_record_user(uint16_t keycode, keyrecord_t *record);
 bool           process_record_user(uint16_t keycode, keyrecord_t *record);
 void           post_process_record_user(uint16_t keycode, keyrecord_t *record);
 void           matrix_scan_user(void);
+void           matrix_slave_scan_user(void);
 void           housekeeping_task_user(void);
 void           keyboard_post_init_user(void);
 layer_state_t  layer_state_set_user(layer_state_t state);
@@ -29,6 +30,7 @@ typedef struct {
     unsigned finalize_calls;
     unsigned post_process_calls;
     unsigned scan_calls;
+    unsigned slave_scan_calls;
     unsigned housekeeping_calls;
     unsigned post_init_calls;
     unsigned layer_state_calls;
@@ -75,6 +77,7 @@ typedef struct {
     unsigned                   process_calls;
     unsigned                   post_process_calls;
     unsigned                   scan_calls;
+    unsigned                   slave_scan_calls;
     unsigned                   housekeeping_calls;
     unsigned                   post_init_calls;
     unsigned                   layer_state_calls;
@@ -154,6 +157,10 @@ void noah_process_record_user_finalize(uint16_t keycode, keyrecord_t *record, bo
 
 void noah_matrix_scan_user(void) {
     noah_hook_stub_state.scan_calls++;
+}
+
+void noah_matrix_slave_scan_user(void) {
+    noah_hook_stub_state.slave_scan_calls++;
 }
 
 void noah_housekeeping_task_user(void) {
@@ -249,6 +256,11 @@ void post_process_record_user(uint16_t keycode, keyrecord_t *record) {
 void matrix_scan_user(void) {
     hook_override_state.scan_calls++;
     noah_matrix_scan_user();
+}
+
+void matrix_slave_scan_user(void) {
+    hook_override_state.slave_scan_calls++;
+    noah_matrix_slave_scan_user();
 }
 
 void housekeeping_task_user(void) {
@@ -348,6 +360,9 @@ static void test_weak_defaults_use_expected_shared_behavior(void) {
     matrix_scan_user();
     CHECK(noah_hook_stub_state.scan_calls == 1);
 
+    matrix_slave_scan_user();
+    CHECK(noah_hook_stub_state.slave_scan_calls == 1);
+
     housekeeping_task_user();
     CHECK(noah_hook_stub_state.housekeeping_calls == 1);
 
@@ -437,6 +452,10 @@ static void test_strong_overrides_can_chain_to_noah_helpers(void) {
     matrix_scan_user();
     CHECK(hook_override_state.scan_calls == 1);
     CHECK(noah_hook_stub_state.scan_calls == 1);
+
+    matrix_slave_scan_user();
+    CHECK(hook_override_state.slave_scan_calls == 1);
+    CHECK(noah_hook_stub_state.slave_scan_calls == 1);
 
     housekeeping_task_user();
     CHECK(hook_override_state.housekeeping_calls == 1);

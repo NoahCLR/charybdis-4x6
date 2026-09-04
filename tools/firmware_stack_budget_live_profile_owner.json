@@ -15,9 +15,9 @@
       },
       "indirect_edges": [
         {
-          "caller": "matrix_scan",
+          "caller": "noah_qmk_durable_io_matrix_scan",
           "callee": "noah_profile_store_runtime_matrix_scan_step",
-          "reason": "the durable-I/O scheduler dispatches the engineering live-profile owner through its rotating step table"
+          "reason": "the shared master/slave durable-I/O scheduler dispatches the engineering live-profile owner through its rotating step table"
         },
         {
           "caller": "noah_profile_candidate_transaction_scan",
@@ -63,39 +63,39 @@
       "paths": [
         {
           "name": "engineering owner compiled-profile validation",
-          "functions": ["main", "matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "noah_profile_validator_v1_step"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "noah_profile_validator_v1_step"]
         },
         {
           "name": "engineering owner boot discovery read",
-          "functions": ["main", "matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "io_read", "noah_qmk_profile_eeprom_read", "wear_leveling_read"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "io_read", "noah_qmk_profile_eeprom_read", "wear_leveling_read"]
         },
         {
           "name": "engineering owner committed-profile adoption",
-          "functions": ["main", "matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "validation_step", "noah_profile_validator_v1_step"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "validation_step", "noah_profile_validator_v1_step"]
         },
         {
           "name": "engineering owner host payload write",
-          "functions": ["main", "matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_transaction_scan", "write_candidate", "io_write", "noah_qmk_profile_eeprom_write", "wear_leveling_write"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_transaction_scan", "write_candidate", "io_write", "noah_qmk_profile_eeprom_write", "wear_leveling_write"]
         },
         {
           "name": "engineering owner host validation step",
-          "functions": ["main", "matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_transaction_scan", "validation_step", "noah_profile_validator_v1_step"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_transaction_scan", "validation_step", "noah_profile_validator_v1_step"]
         },
         {
           "name": "engineering owner host marker-last commit write",
-          "functions": ["main", "matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_transaction_scan", "commit_step_candidate", "io_write", "noah_qmk_profile_eeprom_write", "wear_leveling_write"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_transaction_scan", "commit_step_candidate", "io_write", "noah_qmk_profile_eeprom_write", "wear_leveling_write"]
         },
         {
           "name": "engineering owner key-behavior publication",
-          "functions": ["main", "matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_store_backend_activation_step", "noah_effective_key_behavior_runtime_invalidate"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_store_backend_activation_step", "noah_effective_key_behavior_runtime_invalidate"]
         },
         {
           "name": "engineering owner RGB publication",
-          "functions": ["main", "matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_store_backend_activation_step", "noah_effective_rgb_runtime_invalidate"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_store_backend_activation_step", "noah_effective_rgb_runtime_invalidate"]
         },
         {
           "name": "engineering owner split metadata exchange",
-          "functions": ["main", "matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_split_reconciler_scan_mode", "metadata_exchange", "rpc_exchange", "noah_qmk_profile_split_transport_exchange", "transaction_rpc_exec", "transport_execute_transaction"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_split_reconciler_scan_mode", "metadata_exchange", "rpc_exchange", "noah_qmk_profile_split_transport_exchange", "transaction_rpc_exec", "transport_execute_transaction"]
         },
         {
           "name": "engineering owner coherent VIA status read",

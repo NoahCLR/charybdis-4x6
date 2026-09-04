@@ -36,6 +36,12 @@ __attribute__((weak)) void matrix_scan_user(void) {
     noah_matrix_scan_user();
 }
 
+#ifdef SPLIT_KEYBOARD
+__attribute__((weak)) void matrix_slave_scan_user(void) {
+    noah_matrix_slave_scan_user();
+}
+#endif
+
 __attribute__((weak)) void housekeeping_task_user(void) {
     noah_housekeeping_task_user();
 }

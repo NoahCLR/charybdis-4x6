@@ -69,7 +69,12 @@ Use `Compile live-edit test` for the engineering pair. It produces
 `bastardkb_charybdis_4x6_<name>_live_edit_left.uf2` and
 `bastardkb_charybdis_4x6_<name>_live_edit_right.uf2` with the live-profile owner
 and mutation route enabled together. Flash each file to its matching physical
-half before expecting `Apply live` to become available.
+half before expecting `Apply live` to become available. The Live panel must
+report both `Second half detected: Yes` and `Halves converged: Yes`; working
+keys alone prove only QMK's core split transport, not the separate live-profile
+endpoint. If an older test pair leaves a candidate in `PREPARING_PEER`,
+power-cycle both halves together and flash the freshly built pair before
+retrying.
 
 ## Screenshots
 

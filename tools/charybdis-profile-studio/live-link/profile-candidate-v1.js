@@ -49,6 +49,10 @@ const CANDIDATE_STATE = Object.freeze({
     AUTHORITY_FAILED: 10,
 });
 
+const CANDIDATE_STATE_NAMES = Object.freeze(Object.fromEntries(
+    Object.entries(CANDIDATE_STATE).map(([name, value]) => [value, name])
+));
+
 const CANDIDATE_OPERATION = Object.freeze({
     NONE: 0,
     BEGIN: 1,
@@ -456,6 +460,7 @@ module.exports = {
     CANDIDATE_ERROR_NAMES,
     CANDIDATE_OPERATION,
     CANDIDATE_STATE,
+    CANDIDATE_STATE_NAMES,
     CANDIDATE_STATUS_FLAGS,
     CandidateRequestIdSequence,
     CandidateTransactionIdSequence,

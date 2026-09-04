@@ -5,6 +5,13 @@ const {NodeHidDeviceAdapter} = require("./node-hid-adapter");
 const {DeviceRequestCoordinator} = require("./request-coordinator");
 const {CandidateUploadCoordinator} = require("./candidate-upload-coordinator");
 const {
+    CANDIDATE_OPERATION,
+    CANDIDATE_STATE,
+    CANDIDATE_STATE_NAMES,
+    candidateMetadataForBlob,
+    readCandidateStatus,
+} = require("./profile-candidate-v1");
+const {
     PROFILE_WIRE_KNOWN_MASKS,
     PROFILE_WIRE_FEATURES,
     PROFILE_WIRE_V1,
@@ -37,6 +44,9 @@ class ProfileDeviceService {
         this.createCandidateUploadCoordinator = typeof options.createCandidateUploadCoordinator === "function"
             ? options.createCandidateUploadCoordinator
             : (connection, coordinatorOptions) => new CandidateUploadCoordinator(connection, coordinatorOptions);
+        this.readCandidateStatus = typeof options.readCandidateStatus === "function"
+            ? options.readCandidateStatus
+            : readCandidateStatus;
         this.devices = [];
         this.adapterIdsByPublicId = new Map();
         this.connection = undefined;
@@ -48,6 +58,7 @@ class ProfileDeviceService {
         this.phase = "idle";
         this.capabilities = undefined;
         this.status = undefined;
+        this.candidateStatus = undefined;
         this.viaIdentity = undefined;
         this.requestIds = undefined;
         this.error = undefined;
@@ -117,11 +128,15 @@ class ProfileDeviceService {
             const viaIdentity = await readViaIdentity(connection);
             const capabilities = await readProfileCapabilities(connection, {nextRequestId: () => this.requestIds.next()});
             const status = await readProfileStatus(connection, {nextRequestId: () => this.requestIds.next()});
+            const candidateStatus = (capabilities.featureFlags & PROFILE_WIRE_FEATURES.CANDIDATE_WRITE) !== 0
+                ? await this.readCandidateStatus(connection, {nextRequestId: () => this.requestIds.next()})
+                : undefined;
             if (this.connection !== connection || !connection.connected) {
                 throw new Error("The keyboard disconnected while live state was being refreshed.");
             }
             this.capabilities = capabilities;
             this.status = status;
+            this.candidateStatus = candidateStatus;
             this.viaIdentity = viaIdentity;
             this.lastRefreshedAt = new Date().toISOString();
             this.phase = "connected";
@@ -168,7 +183,12 @@ class ProfileDeviceService {
         const compatibility = this.capabilities
             ? evaluateProfileCompatibility(this.capabilities, this.profileSummary, this.viaIdentity)
             : null;
-        const mutation = evaluateLiveMutationCompatibility(this.capabilities, compatibility, Boolean(this.connection?.connected));
+        const mutation = evaluateLiveMutationCompatibility(
+            this.capabilities,
+            compatibility,
+            Boolean(this.connection?.connected),
+            this.status
+        );
         if (!mutation.available) {
             this.setError(new Error(mutation.reasons[0] || "This keyboard is not ready for persistent live apply."));
             this.emitChange();
@@ -176,6 +196,19 @@ class ProfileDeviceService {
         }
         if (blob.length > this.capabilities.maxProfilePayload) {
             this.setError(new Error(`Compiled live profile is ${blob.length} bytes; firmware accepts at most ${this.capabilities.maxProfilePayload}.`));
+            this.emitChange();
+            return this.snapshot();
+        }
+
+        let metadata;
+        try {
+            metadata = candidateMetadataForBlob(blob, {
+                actionAbiDigest: this.capabilities.actionAbiDigest,
+                requestedDomains: REQUIRED_PROFILE_DOMAIN_MASK,
+            });
+        } catch (error) {
+            this.setError(error);
+            this.liveApply = {...this.liveApply, state: "failed", error: publicError(error)};
             this.emitChange();
             return this.snapshot();
         }
@@ -191,14 +224,44 @@ class ProfileDeviceService {
                 },
             });
             try {
-                const prepared = await coordinator.upload(blob, {
-                    actionAbiDigest: this.capabilities.actionAbiDigest,
-                    requestedDomains: REQUIRED_PROFILE_DOMAIN_MASK,
+                this.status = await readProfileStatus(this.connection, {nextRequestId: () => this.requestIds.next()});
+                const currentMutation = evaluateLiveMutationCompatibility(
+                    this.capabilities,
+                    compatibility,
+                    Boolean(this.connection?.connected),
+                    this.status
+                );
+                if (!currentMutation.available) {
+                    throw liveApplyError("LIVE_APPLY_PEER_NOT_READY", currentMutation.reasons[0] || "The split keyboard is not ready for live apply.");
+                }
+
+                this.candidateStatus = await this.readCandidateStatus(this.connection, {
+                    nextRequestId: () => this.requestIds.next(),
                 });
+                let prepared;
+                if (candidateCanResumeCommit(this.candidateStatus, metadata.digest)) {
+                    prepared = {transactionId: this.candidateStatus.transactionId, metadata};
+                    this.liveApply = {
+                        ...this.liveApply,
+                        state: "resuming-commit",
+                        result: {transactionId: prepared.transactionId, digest: metadata.digest},
+                    };
+                    this.addDiagnostic(
+                        `Resuming matching candidate transaction ${prepared.transactionId} from ${candidateStateName(this.candidateStatus.state)}.`
+                    );
+                    this.emitChange();
+                } else if (this.candidateStatus.state === CANDIDATE_STATE.IDLE) {
+                    prepared = await coordinator.upload(blob, {metadata});
+                } else {
+                    throw activeCandidateError(this.candidateStatus, metadata.digest);
+                }
                 this.liveApply = {...this.liveApply, state: "committing", result: {transactionId: prepared.transactionId, digest: prepared.metadata.digest}};
                 this.emitChange();
                 const committed = await coordinator.commit(prepared.transactionId, {digest: prepared.metadata.digest});
                 this.status = await readProfileStatus(this.connection, {nextRequestId: () => this.requestIds.next()});
+                this.candidateStatus = committed.status || await this.readCandidateStatus(this.connection, {
+                    nextRequestId: () => this.requestIds.next(),
+                });
                 assertAppliedStatus(this.status, prepared.metadata.digest);
                 this.lastRefreshedAt = new Date().toISOString();
                 this.liveApply = {
@@ -214,6 +277,7 @@ class ProfileDeviceService {
                 this.addDiagnostic(`Applied and persisted live profile ${hexDigest(prepared.metadata.digest)} (${blob.length} bytes).`);
             } catch (error) {
                 this.liveApply = {...this.liveApply, state: "failed", error: publicError(error)};
+                await this.refreshStatusAfterFailure();
                 throw error;
             }
         });
@@ -241,6 +305,7 @@ class ProfileDeviceService {
             selectedDeviceId: this.connectionPublicId,
             capabilities: this.capabilities ? {...this.capabilities} : null,
             status: this.status ? {...this.status} : null,
+            candidateStatus: this.candidateStatus ? cloneCandidateStatus(this.candidateStatus) : null,
             viaIdentity: this.viaIdentity ? {...this.viaIdentity} : null,
             compatibility: this.capabilities
                 ? evaluateProfileCompatibility(this.capabilities, this.profileSummary, this.viaIdentity)
@@ -248,7 +313,8 @@ class ProfileDeviceService {
             mutationCompatibility: evaluateLiveMutationCompatibility(
                 this.capabilities,
                 this.capabilities ? evaluateProfileCompatibility(this.capabilities, this.profileSummary, this.viaIdentity) : null,
-                Boolean(this.connection?.connected)
+                Boolean(this.connection?.connected),
+                this.status
             ),
             liveApply: cloneLiveApply(this.liveApply),
             error: this.error ? {...this.error} : null,
@@ -299,6 +365,7 @@ class ProfileDeviceService {
         this.connectionPublicId = "";
         this.capabilities = undefined;
         this.status = undefined;
+        this.candidateStatus = undefined;
         this.viaIdentity = undefined;
         this.requestIds = undefined;
         this.lastRefreshedAt = "";
@@ -333,6 +400,19 @@ class ProfileDeviceService {
             this.onChange(this.snapshot());
         } catch {
             // A closed or reloading webview must not break device cleanup.
+        }
+    }
+
+    async refreshStatusAfterFailure() {
+        if (!this.connection?.connected || !this.requestIds) return;
+        try {
+            this.status = await readProfileStatus(this.connection, {nextRequestId: () => this.requestIds.next()});
+            this.candidateStatus = await this.readCandidateStatus(this.connection, {
+                nextRequestId: () => this.requestIds.next(),
+            });
+            this.lastRefreshedAt = new Date().toISOString();
+        } catch {
+            // Preserve the original mutation failure; Refresh remains available for a later explicit retry.
         }
     }
 }
@@ -464,7 +544,7 @@ function ledIndexCheck(highestLedIndex, physicalLedCount) {
     };
 }
 
-function evaluateLiveMutationCompatibility(capabilities, compatibility, connected = true) {
+function evaluateLiveMutationCompatibility(capabilities, compatibility, connected = true, status) {
     const reasons = [];
     if (!connected) reasons.push("Connect to the keyboard before applying a live profile.");
     if (!compatibility?.compatible) reasons.push(...(compatibility?.reasons || ["Read compatibility has not been established."]));
@@ -475,7 +555,20 @@ function evaluateLiveMutationCompatibility(capabilities, compatibility, connecte
     if (!Number.isInteger(capabilities?.candidateChunkMax) || capabilities.candidateChunkMax < 1) {
         reasons.push("Firmware does not advertise a candidate upload chunk size.");
     }
-    return {available: reasons.length === 0, reasons, requiredFeatureMask: REQUIRED_LIVE_MUTATION_FEATURES};
+    if (connected && !status) {
+        reasons.push("Live profile status has not been read yet.");
+    } else if (status && !status.peerKnown) {
+        reasons.push("The second keyboard half has not been detected over the split link.");
+    } else if (status && !status.peerConverged) {
+        reasons.push("The two keyboard halves have not established a converged profile state yet.");
+    }
+    return {
+        available: reasons.length === 0,
+        reasons,
+        requiredFeatureMask: REQUIRED_LIVE_MUTATION_FEATURES,
+        peerReady: Boolean(status?.peerKnown && status?.peerConverged),
+        recoveryPending: Boolean(status?.candidatePending),
+    };
 }
 
 function copyBytes(value, label) {
@@ -490,6 +583,52 @@ function cloneLiveApply(value) {
         result: value?.result ? {...value.result} : null,
         error: value?.error ? {...value.error} : null,
     };
+}
+
+function cloneCandidateStatus(status) {
+    return {
+        ...status,
+        error: status?.error ? {...status.error} : null,
+        stateName: candidateStateName(status?.state),
+    };
+}
+
+function candidateStateName(state) {
+    return CANDIDATE_STATE_NAMES[state] || `UNKNOWN_${state}`;
+}
+
+function candidateCanResumeCommit(status, digest) {
+    if (!status || (Number(status.digest) >>> 0) !== (Number(digest) >>> 0) || !status.transactionId) return false;
+    return [
+        CANDIDATE_STATE.VALIDATED,
+        CANDIDATE_STATE.PREPARING_PEER,
+        CANDIDATE_STATE.COMMITTING,
+        CANDIDATE_STATE.CONVERGING_PEER,
+        CANDIDATE_STATE.ACTIVATING,
+    ].includes(status.state)
+        || (status.state === CANDIDATE_STATE.IDLE && status.lastOperation === CANDIDATE_OPERATION.COMMIT);
+}
+
+function activeCandidateError(status, requestedDigest) {
+    const stateName = candidateStateName(status?.state);
+    const sameDigest = (Number(status?.digest) >>> 0) === (Number(requestedDigest) >>> 0);
+    const reason = sameDigest
+        ? `Its ${stateName} state cannot be resumed safely by Profile Studio.`
+        : `Its digest ${hexDigest(status?.digest)} does not match the current source digest ${hexDigest(requestedDigest)}.`;
+    const error = liveApplyError(
+        "ACTIVE_CANDIDATE",
+        `Firmware already has candidate transaction ${status?.transactionId || 0} in ${stateName}. `
+            + reason + " "
+            + "Power-cycle both halves together to discard this pre-commit candidate, then reconnect and apply again."
+    );
+    error.status = cloneCandidateStatus(status);
+    return error;
+}
+
+function liveApplyError(code, message) {
+    const error = new Error(message);
+    error.code = code;
+    return error;
 }
 
 function hexDigest(value) {

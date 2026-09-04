@@ -1888,3 +1888,76 @@ Next steps:
    preserve the ordinary firmware artifact as the fallback.
 3. Capture allocator/stack high-water and complete the interruption, role-swap,
    contention, reset, and recovery matrix before any production promotion.
+
+### 2026-09-04 — First hardware finding and slave-scan remediation checkpoint
+
+- The first hardware apply found one Raw HID interface and compatible source
+  capacities, but the commit made no observable progress and left candidate
+  transaction 1 in `PREPARING_PEER`. Studio status reported `peerKnown=false`
+  even though normal keys on the second half remained functional.
+- Root cause was firmware reachability, not the physical split link. Upstream
+  QMK calls `matrix_scan_user()` only on the master and
+  `matrix_slave_scan_user()` on the slave. Noah had only the master hook, so
+  the slave never advanced compiled-profile validation, constructed its owner
+  graph, registered `PUT_PROFILE_SPLIT_SYNC`, or processed the profile and VIA
+  durable mailboxes. Core key transport continued independently, exactly
+  matching the hardware observation.
+- Added D-024's dedicated slave entry point. The weak QMK slave hook chains to
+  `noah_matrix_slave_scan_user()`, which runs only the shared durable-I/O
+  scheduler; key runtime, macro playback, combo retirement, and shared-state
+  senders remain master-only. This also restores the scan-owned VIA mirror and
+  reconciliation receiver paths on the slave.
+- Extended hook chaining and runtime-order tests to enforce the slave path and
+  its deliberately narrow workload. Updated both reviewed-path stack manifests
+  to follow the now-shared `noah_qmk_durable_io_matrix_scan()` callsite.
+- Hardened Profile Studio's recovery surface. General status flags now expose
+  second-half detection, convergence, pending-candidate, and safe-boundary
+  state; refresh reads the candidate transaction; live apply requires a known,
+  converged peer; a matching recoverable transaction can resume; and a
+  mismatched or unsafe transaction is refused with a two-half cold-recovery
+  instruction. The UI names candidate states instead of showing only numeric
+  ids.
+- Focused verification passed:
+  `sh tests/host/run_hook_chaining_tests.sh`,
+  `sh tests/host/run_runtime_init_order_tests.sh`,
+  `sh tests/host/run_qmk_durable_io_tests.sh`,
+  `sh tests/host/run_qmk_profile_split_transport_tests.sh`,
+  `sh tests/host/run_profile_owner_tests.sh`,
+  `sh tests/host/run_feature_gate_compile_tests.sh`,
+  `python3 tools/profile_introspect.py --check`, and
+  `sh tests/host/run_tooling_checks.sh`.
+- Final verification passed:
+  `sh tests/host/run_all_host_tests.sh`,
+  `qmk compile -kb bastardkb/charybdis/4x6 -km noah`,
+  `sh tests/host/run_firmware_stack_budget_checks.sh`,
+  `sh tests/host/run_live_profile_owner_stack_budget_checks.sh`,
+  `npm run check`, `npm run screenshots`, and `git diff --check`.
+  Profile Studio reports 101 passing live-link tests. The ordinary memory gate
+  passed at 25,868 B SRAM0–3 `.bss`, 22,996 B `.data`, 48,864/51,000 B policy
+  span, 213,272 B linker/core-memory span, and 56,328 B fixed occupancy per
+  half.
+- The engineering mutation image still intentionally fails the two known
+  conservative policies: 28,828/26,000 B SRAM0–3 `.bss` and
+  51,832/51,000 B `.data + .bss`. Its linker/core-memory span passes at
+  210,304/204,800 B and fixed linked occupancy is 59,296 B. These policy
+  failures are not physical SRAM exhaustion; each RP2040 half has 270,336 B of
+  physical SRAM, and runtime high-water remains unmeasured. Reviewed owner
+  stack paths pass; the largest named main path is split metadata exchange at
+  1,344/1,920 B and the largest named split callback remains 264/768 B.
+- Rebuilt the corrected labeled artifacts. The physical-left UF2 SHA-256 is
+  `524166857cc61ed056927f7797e184f7dae8ac27013fd90f3bec13838cf6f0cc`;
+  the physical-right UF2 SHA-256 is
+  `2b866a05bf3dd2eab1d776ff95602b4ffe46b2757058f5bf2c817544347d70cd`.
+  Builds wrote generated artifacts in the sibling QMK tree only; no sibling
+  source file changed.
+
+Next steps:
+
+1. Power-cycle both halves together to discard the old pre-commit transaction,
+   then flash the corrected left/right UF2 pair to the matching physical halves.
+2. Reconnect and confirm Studio reports both `Second half detected: Yes` and
+   `Halves converged: Yes`; then apply one obvious RGB change and one supported
+   `key_behaviors[]` change live.
+3. Reboot to verify persistence, then continue the reconnect, USB-orientation,
+   role-swap, held-input, interruption, contention, reset, and runtime
+   high-water hardware matrix before production promotion.

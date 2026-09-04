@@ -120,6 +120,10 @@ test("JavaScript consumes the same golden reports as the C firmware codec", () =
         conflictCount: 0xa1a2,
         validationState: 0xb1,
         lastError: 0xc1,
+        candidatePending: true,
+        peerKnown: true,
+        peerConverged: true,
+        waitingSafeBoundary: true,
     });
 });
 
@@ -198,6 +202,10 @@ test("status pages expose explicit compiled-only state", () => {
     assert.equal(decoded.stateFlags, 0x81);
     assert.equal(decoded.activeKind, 0);
     assert.equal(decoded.activeGeneration, 0);
+    assert.equal(decoded.candidatePending, false);
+    assert.equal(decoded.peerKnown, false);
+    assert.equal(decoded.peerConverged, false);
+    assert.equal(decoded.waitingSafeBoundary, false);
 });
 
 test("patterned status vectors decode every semantic field exactly", () => {
@@ -242,6 +250,10 @@ test("patterned status vectors decode every semantic field exactly", () => {
         conflictCount: 0x9abc,
         validationState: 0xde,
         lastError: 0xef,
+        candidatePending: true,
+        peerKnown: true,
+        peerConverged: true,
+        waitingSafeBoundary: true,
     });
 });
 

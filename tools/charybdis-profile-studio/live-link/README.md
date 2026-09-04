@@ -12,7 +12,8 @@ and publishes a sanitized snapshot for the Studio UI. Its compatibility result
 checks protocol and schema majors, 32-byte framing, Milestone A domain support,
 the current source profile against advertised capacities, and all four
 candidate/persistence/activation/peer capability bits before enabling writes.
-Ordinary firmware remains read-only.
+It also requires fresh firmware status proving that the peer is known and both
+halves are converged. Ordinary firmware remains read-only.
 
 Each refresh first reads the standard VIA protocol and firmware versions, then
 cross-checks the firmware version reported by Profile Wire. Custom Profile Wire
@@ -47,9 +48,12 @@ safe-activation states, and reports final-marker uncertainty as an ambiguous
 outcome requiring status reconciliation. The device service now uses this
 coordinator for the engineering `Apply live` operation and accepts success only
 after a fresh general-status read reports the exact candidate digest as both
-committed and active. Production firmware routing and capability advertising
-remain disabled; only a firmware built with the separate owner and mutation
-gates exposes this path.
+committed and active. Refresh also reads candidate status. A matching
+recoverable transaction is resumed instead of uploaded over, while a mismatched
+or unsafe active candidate is refused with an explicit two-half cold-recovery
+instruction. Production firmware routing and capability advertising remain
+disabled; only a firmware built with the separate owner and mutation gates
+exposes this path.
 
 `rgb-domain-v1.js` is the desktop half of the domain `0x10` v1 codec. It covers the
 complete Milestone A RGB surface, canonicalizes Profile Studio's parsed model,

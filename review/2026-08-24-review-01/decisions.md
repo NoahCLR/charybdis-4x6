@@ -437,3 +437,25 @@ exact digest as both durable and active. This is the first hardware-test path,
 not production acceptance: the conservative BSS and combined-data regression
 policies remain red and allocator/stack high-water plus the two-half recovery
 matrix remain open.
+
+### D-024 — Durable Split Work Runs From Both QMK Scan Hooks
+
+Status: accepted on 2026-09-04; hardware re-test remains open
+
+QMK routes the USB/master half through `matrix_scan_user()` and the passive
+half through the distinct `matrix_slave_scan_user()` hook. Noah therefore owns
+two matching runtime entry points. The master entry keeps the complete key,
+macro, profile, and split-sender pipeline; the slave entry advances only the
+shared durable-I/O scheduler.
+
+The slave durable grant is a required production reachability contract, not an
+optimization. It incrementally initializes the live-profile owner, registers
+the local profile RPC endpoint, and drains the profile and VIA receiver
+mailboxes. Core split key traffic is independent and cannot be used as evidence
+that these higher-level endpoints are alive.
+
+Weak defaults chain both QMK hooks to their `noah_*` helpers. Hook and runtime-
+order tests enforce the two paths separately. Profile Studio additionally
+requires fresh `peerKnown` and `peerConverged` status before enabling live
+mutation, and exposes candidate state so an interrupted matching transaction
+can be resumed without silently overwriting firmware state.

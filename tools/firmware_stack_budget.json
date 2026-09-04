@@ -75,19 +75,19 @@
           "reason": "the read-only profile store invokes the QMK EEPROM adapter through its injected storage IO callback"
         },
         {
-          "caller": "matrix_scan",
+          "caller": "noah_qmk_durable_io_matrix_scan",
           "callee": "noah_profile_store_runtime_matrix_scan_step",
-          "reason": "the inlined durable-I/O scheduler dispatches profile discovery through its rotating step table"
+          "reason": "the shared master/slave durable-I/O scheduler dispatches profile discovery through its rotating step table"
         },
         {
-          "caller": "matrix_scan",
+          "caller": "noah_qmk_durable_io_matrix_scan",
           "callee": "noah_qmk_via_split_mirror_matrix_scan_step",
-          "reason": "the inlined durable-I/O scheduler dispatches the VIA mirror mailbox through its rotating step table"
+          "reason": "the shared master/slave durable-I/O scheduler dispatches the VIA mirror mailbox through its rotating step table"
         },
         {
-          "caller": "matrix_scan",
+          "caller": "noah_qmk_durable_io_matrix_scan",
           "callee": "noah_qmk_via_split_sync_matrix_scan_step",
-          "reason": "the inlined durable-I/O scheduler dispatches durable VIA reconciliation through its rotating step table"
+          "reason": "the shared master/slave durable-I/O scheduler dispatches durable VIA reconciliation through its rotating step table"
         }
       ],
       "cycle_bounds": [
@@ -213,35 +213,35 @@
         },
         {
           "name": "matrix scan VIA canonical digest read",
-          "functions": ["main", "matrix_scan", "noah_qmk_via_split_sync_matrix_scan_step", "noah_qmk_via_storage_digest_step", "noah_qmk_via_storage_region_read", "nvm_dynamic_keymap_macro_read_buffer", "eeprom_read_byte", "wear_leveling_read"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_via_split_sync_matrix_scan_step", "noah_qmk_via_storage_digest_step", "noah_qmk_via_storage_region_read", "nvm_dynamic_keymap_macro_read_buffer", "eeprom_read_byte", "wear_leveling_read"]
         },
         {
           "name": "matrix scan live-profile boot discovery",
-          "functions": ["main", "matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "io_read", "noah_qmk_profile_eeprom_read", "wear_leveling_read"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "io_read", "noah_qmk_profile_eeprom_read", "wear_leveling_read"]
         },
         {
           "name": "matrix scan VIA metadata and snapshot RPC",
-          "functions": ["main", "matrix_scan", "noah_qmk_via_split_sync_matrix_scan_step", "noah_qmk_via_rpc_exchange", "transaction_rpc_exec", "transport_execute_transaction"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_via_split_sync_matrix_scan_step", "noah_qmk_via_rpc_exchange", "transaction_rpc_exec", "transport_execute_transaction"]
         },
         {
           "name": "matrix scan VIA pulled macro fragment write",
-          "functions": ["main", "matrix_scan", "noah_qmk_via_split_sync_matrix_scan_step", "noah_qmk_via_storage_region_write", "nvm_dynamic_keymap_macro_update_buffer", "eeprom_update_byte", "wear_leveling_write"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_via_split_sync_matrix_scan_step", "noah_qmk_via_storage_region_write", "nvm_dynamic_keymap_macro_update_buffer", "eeprom_update_byte", "wear_leveling_write"]
         },
         {
           "name": "matrix scan VIA verified generation commit",
-          "functions": ["main", "matrix_scan", "noah_qmk_via_split_sync_matrix_scan_step", "noah_qmk_via_sync_state_persist", "eeprom_update_dword", "wear_leveling_write"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_via_split_sync_matrix_scan_step", "noah_qmk_via_sync_state_persist", "eeprom_update_dword", "wear_leveling_write"]
         },
         {
           "name": "matrix scan VIA two-dirty default recovery",
-          "functions": ["main", "matrix_scan", "noah_qmk_via_split_sync_matrix_scan_step", "eeconfig_init_via", "dynamic_keymap_reset", "nvm_dynamic_keymap_update_keycode", "eeprom_update_byte", "wear_leveling_write"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_via_split_sync_matrix_scan_step", "eeconfig_init_via", "dynamic_keymap_reset", "nvm_dynamic_keymap_update_keycode", "eeprom_update_byte", "wear_leveling_write"]
         },
         {
           "name": "matrix scan queued VIA mirror keymap write",
-          "functions": ["main", "matrix_scan", "noah_qmk_via_split_mirror_matrix_scan_step", "nvm_dynamic_keymap_update_buffer", "eeprom_update_byte", "wear_leveling_write"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_via_split_mirror_matrix_scan_step", "nvm_dynamic_keymap_update_buffer", "eeprom_update_byte", "wear_leveling_write"]
         },
         {
           "name": "matrix scan queued VIA mirror macro write",
-          "functions": ["main", "matrix_scan", "noah_qmk_via_split_mirror_matrix_scan_step", "nvm_dynamic_keymap_macro_update_buffer", "eeprom_update_byte", "wear_leveling_write"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_via_split_mirror_matrix_scan_step", "nvm_dynamic_keymap_macro_update_buffer", "eeprom_update_byte", "wear_leveling_write"]
         },
         {
           "name": "pointing task dragscroll single-sample handler",

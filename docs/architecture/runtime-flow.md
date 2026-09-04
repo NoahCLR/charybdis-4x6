@@ -95,21 +95,22 @@ or drain effects but must not re-decide release semantics.
 
 ```mermaid
 flowchart TD
-    scan["matrix_scan_user"] --> init["runtime_init.c"]
-    init --> via["VIA macro default scan seeding"]
-    init --> durable["Rotating durable-I/O grant"]
+    master_scan["master: matrix_scan_user"] --> init["runtime_init.c"]
+    slave_scan["slave: matrix_slave_scan_user"] --> init
+    init --> via["Master-only VIA macro default scan seeding"]
+    init --> durable["Both halves: rotating durable-I/O grant"]
     durable --> discovery["Live-profile boot discovery"]
     durable --> mirror["Queued VIA write-through mirror"]
     durable --> via_sync["VIA digest, storage, or reconciliation step"]
-    init --> combo["Compatibility: retire suppressed/expired combo origins"]
-    init --> key_scan["key/runtime/scan.c"]
+    init --> combo["Master-only: retire suppressed/expired combo origins"]
+    init --> key_scan["Master-only: key/runtime/scan.c"]
     key_scan --> reducer_scan["Authoritative reducer scan state"]
     reducer_scan --> scan_plan["Planned: scan_planner and tap_series helpers"]
     scan_plan --> transition["Transition plan transport"]
     transition --> projection["Projected effects"]
     projection --> pending["Drain pending release queue"]
-    init --> split["split/runtime_sync_tick"]
-    scan --> housekeeping["housekeeping_task_user"]
+    init --> split["Master-only: split/runtime_sync_tick"]
+    master_scan --> housekeeping["housekeeping_task_user"]
     housekeeping --> repeat["Held repeat tick"]
     housekeeping --> diag["Watchdog refresh and boot-indicator expiry"]
 ```
@@ -119,6 +120,12 @@ validate, queue, and return bounded responses. They never access EEPROM. The
 durable-I/O scheduler starts from a rotating owner and grants at most one
 profile-discovery, mirror, or VIA-reconciliation step per matrix scan; idle
 owners are skipped without losing round-robin fairness.
+
+QMK routes master and slave scans through different user hooks. The master
+uses `matrix_scan_user()` and runs the complete runtime pipeline; the slave
+uses `matrix_slave_scan_user()` and runs only the durable-I/O scheduler. This
+second path is required for incremental profile-owner initialization, profile
+RPC registration, and profile/VIA receiver mailbox processing on the slave.
 
 The profile store exposes a one-read-per-step boot selector and the candidate
 backend exposes bounded whole-profile adoption of its exact selected record.

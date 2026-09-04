@@ -9106,6 +9106,8 @@ function getClientScript() {
         setHeaderButtonDisabled("connectLiveDevice", Boolean(liveLink.busy || liveLink.connected || !liveDeviceSelection));
         setHeaderButtonDisabled("refreshLiveDevice", Boolean(liveLink.busy || !liveLink.connected));
         setHeaderButtonDisabled("applyLiveProfile", Boolean(liveLink.busy || !liveLink.mutationCompatibility?.available));
+        const applyButton = document.getElementById("applyLiveProfile");
+        if (applyButton) applyButton.textContent = liveLink.status?.candidatePending ? "Resume live" : "Apply live";
         setHeaderButtonDisabled("disconnectLiveDevice", Boolean(liveLink.busy || !liveLink.connected));
         const chip = liveLinkStatus();
         statusChip.textContent = chip.label;
@@ -9144,7 +9146,7 @@ function getClientScript() {
                 ? (compatibility.compatible
                     ? (liveLink.mutationCompatibility?.available
                         ? "Ready to build, upload, persist, and activate RGB and key behaviors from the current source files."
-                        : "Read-compatible, but this firmware does not expose the complete persistent live-apply capability set.")
+                        : "Read-compatible, but live apply is unavailable: " + (liveLink.mutationCompatibility?.reasons?.[0] || "the split keyboard is not ready."))
                     : "Do not attempt a future live deploy until every compatibility blocker below is resolved.")
                 : liveLink.connected
                     ? "Connected; waiting for Profile Wire capability and status reads."
@@ -9181,12 +9183,23 @@ function getClientScript() {
             ]) : "") +
             (status ? liveDefinitionCard("Device profile state", [
                 ["State flags", formatHex(status.stateFlags, 4)],
+                ["Second half detected", yesNo(status.peerKnown)],
+                ["Halves converged", yesNo(status.peerConverged)],
+                ["Candidate pending", yesNo(status.candidatePending)],
+                ["Safe-boundary wait", yesNo(status.waitingSafeBoundary)],
                 ["Active kind", String(status.activeKind)],
                 ["Active digest", formatHex(status.activeDigest, 8)],
                 ["Committed digest", formatHex(status.committedDigest, 8)],
                 ["Active generation", generationLabel(status.activeGeneration, status.activeOriginHalf)],
                 ["Committed generation", generationLabel(status.committedGeneration, status.committedOriginHalf)],
                 ["Last error", String(status.lastError)]
+            ]) : "") +
+            (liveLink.candidateStatus ? liveDefinitionCard("Candidate transaction", [
+                ["State", liveLink.candidateStatus.stateName || String(liveLink.candidateStatus.state)],
+                ["Transaction", String(liveLink.candidateStatus.transactionId || 0)],
+                ["Digest", formatHex(liveLink.candidateStatus.digest, 8)],
+                ["Last operation", String(liveLink.candidateStatus.lastOperation)],
+                ["Device error", liveLink.candidateStatus.error?.name || String(liveLink.candidateStatus.error?.id || 0)]
             ]) : "") +
             (liveLink.liveApply?.state && liveLink.liveApply.state !== "idle" ? liveApplyCard(liveLink.liveApply) : "") +
             (compatibility ? liveCompatibilityCard(compatibility) : "") +
@@ -9201,7 +9214,7 @@ function getClientScript() {
             ? application.error.code + ": " + application.error.message
             : application.state === "complete"
                 ? "Persisted and active · " + formatHex(application.result?.digest, 8)
-                : "Phase: " + String(application.state || "working");
+                : "Phase: " + String(application.state || "working").replaceAll("-", " ");
         return "<div class='live-link-card'><h3>Live apply</h3><p class='" + (application.error ? "error" : application.state === "complete" ? "notice" : "muted") + "'>" + escapeHtml(outcome) + "</p>" +
             (total ? "<dl><dt>Transfer</dt><dd>" + escapeHtml(String(sent) + " / " + String(total) + " bytes") + "</dd></dl>" : "") +
             "</div>";
@@ -9233,6 +9246,10 @@ function getClientScript() {
 
     function capabilityVersion(version) {
         return String(version?.major ?? "?") + "." + String(version?.minor ?? "?");
+    }
+
+    function yesNo(value) {
+        return value ? "Yes" : "No";
     }
 
     function generationLabel(counter, originHalf) {

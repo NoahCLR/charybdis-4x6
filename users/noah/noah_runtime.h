@@ -23,6 +23,7 @@ bool           noah_process_record_user(uint16_t keycode, keyrecord_t *record);
 void           noah_process_record_user_finalize(uint16_t keycode, keyrecord_t *record, bool keep_processing);
 void           noah_post_process_record_user(uint16_t keycode, keyrecord_t *record);
 void           noah_matrix_scan_user(void);
+void           noah_matrix_slave_scan_user(void);
 void           noah_housekeeping_task_user(void);
 void           noah_keyboard_post_init_user(void);
 layer_state_t  noah_layer_state_set_user(layer_state_t state);

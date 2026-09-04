@@ -166,7 +166,8 @@ Use Profile Studio when you want to:
 - edit auto-mouse fade settings, combo feedback, and key-behavior feedback
 - compile left and right firmware outputs for the selected profile
 - apply the complete authored RGB and `key_behaviors[]` surfaces live after the
-  engineering firmware pair is installed
+  engineering firmware pair is installed and the Live panel reports that the
+  second half is detected and converged
 - configure behavior-specific `config.h` defaults for key timing, normal
   pointer speed, pointing modes, sniping, auto-mouse, base lighting, and
   lighting feedback
@@ -209,10 +210,17 @@ path: Profile Studio compiles RGB and `key_behaviors[]` directly from the
 authored source files, uploads the canonical profile, validates and prepares it
 on both halves, commits it persistently, waits for safe activation, and verifies
 the active and committed digest before reporting success. This is ready for the
-first real two-half test, but it is not production-promoted: the hardware
-acceptance matrix and runtime high-water measurements are still open, and the
-engineering image remains above two conservative static-memory regression
-policies (not the RP2040's physical RAM capacity).
+two-half hardware re-test after the first attempt exposed a missing slave scan
+path, but it is not production-promoted: the hardware acceptance matrix and
+runtime high-water measurements are still open, and the engineering image
+remains above two conservative static-memory regression policies (not the
+RP2040's physical RAM capacity).
+
+Working keys on the slave prove QMK's core split transport, not the separate
+live-profile endpoint. The engineering firmware therefore advances durable
+profile and VIA receiver work from QMK's dedicated slave scan hook as well as
+the master scan hook, and Studio keeps live apply disabled until profile status
+confirms that both halves are present and converged.
 
 The next sections explain the keymap and RGB models that the Studio edits.
 

@@ -490,6 +490,14 @@ profile discovery, the best-effort VIA mirror, and durable VIA reconciliation
 per scan. The engineering owner replaces the existing profile-discovery entry
 and opens no second EEPROM tick; ordinary firmware keeps the read-only entry.
 
+D-024 makes the QMK role boundary explicit: the master advances that scheduler
+from `matrix_scan_user()`, while the slave advances it from QMK's separate
+`matrix_slave_scan_user()`. The slave path deliberately excludes key-runtime,
+macro, and shared-state sender work, but it is mandatory for profile-owner
+initialization, local profile RPC registration, and profile/VIA receiver
+mailbox progress. Working keys on the passive half prove only QMK's core split
+transport and do not prove this durable endpoint is reachable.
+
 ### Profile Studio
 
 The extension host owns HID and filesystem side effects. The webview owns
@@ -564,8 +572,10 @@ The project remains realistic and does not require replacing the current
 runtime. Its first complete engineering path now exists: Profile Studio can
 compile the authored RGB and key-behavior model, send one canonical candidate,
 persist it across both halves, wait for safe activation, and verify the exact
-active digest. The remaining uncertainty is hardware and production acceptance,
-not whether the architecture can form an end-to-end implementation.
+active digest. The first hardware attempt exposed and corrected the missing
+slave scan reachability described by D-024. The remaining uncertainty is the
+hardware re-test and production acceptance, not whether the architecture can
+form an end-to-end implementation.
 
 The central architecture change is to insert one canonical effective-profile
 boundary between compiled defaults and runtime consumers. The largest

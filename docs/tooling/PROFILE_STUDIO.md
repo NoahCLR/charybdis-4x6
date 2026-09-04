@@ -39,8 +39,9 @@ first engineering live-apply path:
 - `Refresh` repeats those capability and status reads.
 - `Apply live` appears only when the connected firmware advertises the complete
   candidate-write, persistent-commit, runtime-activation, and peer-reconciliation
-  contract. It compiles RGB and `key_behaviors[]` from source on disk, uploads
-  the canonical profile, persists it on both halves, and activates it.
+  contract and reports the second half as detected and converged. It compiles
+  RGB and `key_behaviors[]` from source on disk, uploads the canonical profile,
+  persists it on both halves, and activates it.
 - `Disconnect` closes the host connection.
 
 The native HID path and connected handle stay in the extension host. The
@@ -72,12 +73,23 @@ same digest is both active and committed.
    right half using the normal UF2 bootloader workflow.
 4. Reconnect the keyboard normally, open Profile Studio, then choose `Find
    keyboards` and `Connect`.
-5. Confirm the Live panel says live apply is available. Make and apply a small
+5. Confirm the Live panel says `Second half detected: Yes`, `Halves converged:
+   Yes`, and that live apply is available. Make and apply a small
    source edit—an obvious RGB color is the easiest first signal—then choose
    `Apply live`. Local form drafts must be applied to source first; the live
    compiler intentionally reads the three files on disk.
 6. Confirm the Live apply card says `Persisted and active`, exercise the changed
    behavior, and reboot once to verify persistence.
+
+If Studio reports that the second half was not detected while ordinary keys on
+that half still work, the core QMK split link may be healthy while the profile
+endpoint is not. Both live-edit artifacts must include the slave durable-I/O
+scan hook; rebuild and flash the current pair rather than treating working keys
+as proof that the profile endpoint is running. A candidate left in
+`PREPARING_PEER` by an older pair is still pre-commit. Power-cycle both halves
+together, flash the current matching left/right pair, reconnect, and refresh.
+Studio can resume a matching recoverable candidate after the split is healthy;
+it refuses a mismatched or unsafe candidate instead of overwriting it.
 
 This pair is an engineering acceptance build, not the ordinary daily firmware.
 Its reviewed stack paths pass and its linked fixed occupancy is far below the
