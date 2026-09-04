@@ -1,6 +1,6 @@
 # Stage 06 — Live Defaults, Layout, And Macros
 
-Status: blocked on Milestone A
+Status: in progress — standard VIA layout push/readback slice landed; hardware evidence pending
 
 ## Objective
 
@@ -88,7 +88,8 @@ Changing a policy applies its side effects explicitly:
 
 ## Deliverables
 
-- [ ] Standard VIA layout Live Link integration
+- [x] Standard VIA layout source push with semantic diff and connected-half readback
+- [ ] Visible peer-convergence evidence, layout pull/reset/retry controls
 - [ ] Standard VIA macro Live Link integration
 - [ ] Source/device diff, push, pull, reset, and recovery for both
 - [ ] Every Defaults field classified

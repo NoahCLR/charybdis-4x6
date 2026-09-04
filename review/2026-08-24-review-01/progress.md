@@ -31,7 +31,7 @@ dependency status without duplicating or prematurely resolving its findings.
 | 03 — Live RGB | engineering vertical slice complete; hardware evidence pending | Studio compiles the authored RGB model and the two-half gated owner can persist and activate it |
 | 04 — Live key behaviors | engineering vertical slice complete; hardware and timing evidence pending | Studio compiles supported authored behaviors and the gated provider publishes them through the runtime lookup seam |
 | 05 — Milestone A integration | in progress; first two-half hardware test ready | labeled UF2 pair and Studio `Apply live` flow are ready; real-board recovery/resource matrix remains |
-| 06 — Defaults, layout, and macros | blocked on Milestone A | open |
+| 06 — Defaults, layout, and macros | in progress; bounded standard-VIA layout slice ready for hardware test | source push/diff/readback landed; peer visibility, pull/reset, macros, and defaults remain |
 | 07 — Combos and layer structure | blocked on Stage 06 | open |
 | 08 — Production closure | blocked on Stage 07 | open |
 
@@ -1961,3 +1961,57 @@ Next steps:
 3. Reboot to verify persistence, then continue the reconnect, USB-orientation,
    role-swap, held-input, interruption, contention, reset, and runtime
    high-water hardware matrix before production promotion.
+
+### 2026-09-04 — Standard VIA layer-key live apply checkpoint
+
+- The first corrected two-half hardware run successfully applied RGB, but a
+  base-layer keycode edit did not change typed output. This was a host scope
+  gap: the Milestone A custom blob intentionally contains RGB and
+  `key_behaviors[]`, while `keymaps[][]` remains standard VIA-owned state.
+- Added a dedicated Profile Studio VIA layout codec. It maps all 56 authored
+  `LAYOUT(...)` positions to the keyboard's 10x6 matrix contract, resolves the
+  current profile's complete keycode vocabulary to 16-bit QMK values, and
+  rejects unresolved expressions before any device mutation.
+- `Apply live` now reads all 280 authored positions in the five-layer profile,
+  writes only differing positions with standard VIA set-keycode commands, and
+  immediately verifies every changed position through VIA readback. Unused
+  matrix cells are not overwritten.
+- The standard firmware path remains authoritative: each accepted write is
+  persisted in the dynamic keymap, sent through the immediate split mirror,
+  and marked for durable VIA reconciliation. Studio currently proves readback
+  on the USB-connected half; explicit peer-convergence reporting for VIA-owned
+  storage remains open.
+- Focused Profile Studio verification passes with 106 live-link tests,
+  including matrix drift enforcement against pinned QMK, exact layout/matrix
+  compilation, fail-closed expression handling,
+  standard VIA framing, semantic diff, write-only-on-change behavior, immediate
+  readback, and operation ordering after the custom profile commit.
+- Firmware-contract verification passes:
+  `sh tests/host/run_qmk_contract_checks.sh`,
+  `sh tests/host/run_qmk_via_command_classifier_tests.sh`,
+  `sh tests/host/run_qmk_via_split_mirror_tests.sh`,
+  `sh tests/host/run_qmk_via_split_sync_tests.sh`,
+  `sh tests/host/run_qmk_via_storage_regions_tests.sh`, and
+  `sh tests/host/run_real_profile_validation_tests.sh`.
+  `qmk compile -kb bastardkb/charybdis/4x6 -km noah` also passes. The compile
+  wrote build output in the sibling QMK tree but changed no sibling source.
+- `npm run screenshots -- --out /private/tmp/profile-studio-live-layout-screenshots`
+  passes and the rendered Layout view was inspected. `git diff --check` passes.
+- The full host suite advanced through all runtime, profile, VIA, validation,
+  and real-profile checks, then stopped in the tooling section because an
+  existing dirty generated `profile-layer-LAYER_BASE.svg` still renders `X`
+  while the current authored `keymap.c` is back to `KC_Y`. That pre-existing
+  generated preview (and its related dirty Studio images/export) was preserved
+  rather than overwritten; it is unrelated to the new live-layout code.
+
+Next steps:
+
+1. Install/reload the updated Profile Studio extension; no firmware reflash is
+   needed because the current engineering firmware already implements the
+   standard VIA keymap and split-mirror paths.
+2. Change one base-layer letter, apply the staged source edit, choose `Apply
+   live`, and verify the Live apply card reports 280 checked keys and one
+   changed key.
+3. Exercise that key from its physical half, reboot both halves, and reverse
+   the USB orientation. Record all three results before adding visible VIA peer
+   convergence and the remaining Stage 06 pull/reset/macro controls.

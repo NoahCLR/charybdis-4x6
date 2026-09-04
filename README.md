@@ -207,11 +207,12 @@ The full Studio guide is
 Normal firmware keeps the Live keyboard connection read-only. The separately
 labeled live-edit test firmware now exposes the first end-to-end engineering
 path: Profile Studio compiles RGB and `key_behaviors[]` directly from the
-authored source files, uploads the canonical profile, validates and prepares it
-on both halves, commits it persistently, waits for safe activation, and verifies
-the active and committed digest before reporting success. This is ready for the
-two-half hardware re-test after the first attempt exposed a missing slave scan
-path, but it is not production-promoted: the hardware acceptance matrix and
+authored source files and synchronizes every authored `keymaps[][]` slot through
+standard VIA. The custom profile is validated, prepared, persistently committed,
+and activated on both halves; layout writes are read back on the connected half
+and enter the existing immediate-mirror and durable split-reconciliation paths.
+This is ready for a base-key hardware test, but it is not production-promoted:
+the broader hardware acceptance matrix and
 runtime high-water measurements are still open, and the engineering image
 remains above two conservative static-memory regression policies (not the
 RP2040's physical RAM capacity).

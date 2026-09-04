@@ -136,6 +136,7 @@ function serviceHarness(options = {}) {
         },
         createCandidateUploadCoordinator: options.createCandidateUploadCoordinator,
         readCandidateStatus: options.readCandidateStatus || (async () => candidateStatus(options.candidateStatus)),
+        synchronizeViaLayout: options.synchronizeViaLayout,
     });
     return {adapter, changes, service};
 }
@@ -277,15 +278,28 @@ test("service uploads, commits, and verifies a live profile before reporting suc
                 },
             };
         },
+        async synchronizeViaLayout(connection, entries, options) {
+            assert.equal(connection.connected, true);
+            calls.push({kind: "layout", entries});
+            options.onProgress({phase: "reading-layout", completed: entries.length, total: entries.length, changed: 1});
+            options.onProgress({phase: "writing-layout", completed: 1, total: 1, changed: 1});
+            return {checkedKeys: entries.length, changedKeys: 1, verifiedKeys: 1};
+        },
     });
     const scanned = await service.enumerate();
     const connected = await service.connect(scanned.devices[0].id);
     assert.equal(connected.mutationCompatibility.available, true);
 
-    const applied = await service.applyLiveProfile(blob);
+    const layoutEntries = [{layer: 0, row: 0, column: 0, keycode: 4}];
+    const applied = await service.applyLiveProfile(blob, {layoutEntries});
     assert.equal(applied.error, null);
     assert.equal(applied.liveApply.state, "complete");
-    assert.deepEqual(applied.liveApply.result, {transactionId: 0x1234, digest, byteLength: blob.length});
+    assert.deepEqual(applied.liveApply.result, {
+        transactionId: 0x1234,
+        digest,
+        byteLength: blob.length,
+        layout: {checkedKeys: 1, changedKeys: 1, verifiedKeys: 1},
+    });
     assert.deepEqual(calls, [
         {
             kind: "upload",
@@ -293,6 +307,7 @@ test("service uploads, commits, and verifies a live profile before reporting suc
             options: {metadata},
         },
         {kind: "commit", transactionId: 0x1234, options: {digest}},
+        {kind: "layout", entries: layoutEntries},
     ]);
     assert.equal(adapter.lastConnection().writes.length, 10, "apply should recheck split readiness and verify both status pages after commit");
 });

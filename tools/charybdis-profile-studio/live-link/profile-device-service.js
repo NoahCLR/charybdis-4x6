@@ -4,6 +4,7 @@ const {RAW_HID_REPORT_SIZE} = require("./device-adapter");
 const {NodeHidDeviceAdapter} = require("./node-hid-adapter");
 const {DeviceRequestCoordinator} = require("./request-coordinator");
 const {CandidateUploadCoordinator} = require("./candidate-upload-coordinator");
+const {synchronizeViaLayout} = require("./via-layout-v1");
 const {
     CANDIDATE_OPERATION,
     CANDIDATE_STATE,
@@ -47,6 +48,9 @@ class ProfileDeviceService {
         this.readCandidateStatus = typeof options.readCandidateStatus === "function"
             ? options.readCandidateStatus
             : readCandidateStatus;
+        this.synchronizeViaLayout = typeof options.synchronizeViaLayout === "function"
+            ? options.synchronizeViaLayout
+            : synchronizeViaLayout;
         this.devices = [];
         this.adapterIdsByPublicId = new Map();
         this.connection = undefined;
@@ -178,8 +182,11 @@ class ProfileDeviceService {
         return this.snapshot();
     }
 
-    async applyLiveProfile(value) {
+    async applyLiveProfile(value, options = {}) {
         const blob = copyBytes(value, "Live profile blob");
+        const layoutEntries = options.layoutEntries === undefined
+            ? null
+            : copyLayoutEntries(options.layoutEntries);
         const compatibility = this.capabilities
             ? evaluateProfileCompatibility(this.capabilities, this.profileSummary, this.viaIdentity)
             : null;
@@ -263,6 +270,21 @@ class ProfileDeviceService {
                     nextRequestId: () => this.requestIds.next(),
                 });
                 assertAppliedStatus(this.status, prepared.metadata.digest);
+                let layoutResult = null;
+                if (layoutEntries) {
+                    this.liveApply = {
+                        ...this.liveApply,
+                        state: "reading-layout",
+                        progress: {phase: "reading-layout", completed: 0, total: layoutEntries.length, changed: 0},
+                    };
+                    this.emitChange();
+                    layoutResult = await this.synchronizeViaLayout(this.connection, layoutEntries, {
+                        onProgress: (progress) => {
+                            this.liveApply = {...this.liveApply, state: progress.phase, progress: {...progress}};
+                            this.emitChange();
+                        },
+                    });
+                }
                 this.lastRefreshedAt = new Date().toISOString();
                 this.liveApply = {
                     state: "complete",
@@ -271,10 +293,16 @@ class ProfileDeviceService {
                         transactionId: prepared.transactionId,
                         digest: prepared.metadata.digest,
                         byteLength: blob.length,
+                        ...(layoutResult ? {layout: {...layoutResult}} : {}),
                     },
                     error: null,
                 };
                 this.addDiagnostic(`Applied and persisted live profile ${hexDigest(prepared.metadata.digest)} (${blob.length} bytes).`);
+                if (layoutResult) {
+                    this.addDiagnostic(
+                        `Verified ${layoutResult.checkedKeys} VIA layout keys; changed ${layoutResult.changedKeys} on the connected half and queued split persistence.`
+                    );
+                }
             } catch (error) {
                 this.liveApply = {...this.liveApply, state: "failed", error: publicError(error)};
                 await this.refreshStatusAfterFailure();
@@ -574,6 +602,11 @@ function evaluateLiveMutationCompatibility(capabilities, compatibility, connecte
 function copyBytes(value, label) {
     if (!(value instanceof Uint8Array)) throw new TypeError(`${label} must be a Buffer or Uint8Array.`);
     return Buffer.from(value);
+}
+
+function copyLayoutEntries(entries) {
+    if (!Array.isArray(entries)) throw new TypeError("Live layout entries must be an array.");
+    return entries.map((entry) => ({...entry}));
 }
 
 function cloneLiveApply(value) {

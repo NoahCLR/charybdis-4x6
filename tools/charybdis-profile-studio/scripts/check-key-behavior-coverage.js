@@ -171,8 +171,9 @@ const appendedCheck = `
             getClientScript().includes("liveLink.mutationCompatibility?.available") &&
             getClientScript().includes("Live apply complete") &&
             extensionSource.includes("buildCanonicalStudioProfileV1(model") &&
-            extensionSource.includes("state.liveLink.applyLiveProfile(compiled.blob)"),
-        "Profile Studio should expose a capability-gated, source-compiled live apply and a separate engineering firmware build"
+            extensionSource.includes("compileViaLayout(model)") &&
+            extensionSource.includes("state.liveLink.applyLiveProfile(compiled.blob, {layoutEntries})"),
+        "Profile Studio should expose a capability-gated, source-compiled RGB, behavior, and VIA-layout live apply and a separate engineering firmware build"
     );
     assert(
         getClientScript().includes("Unsaved Studio changes") &&
@@ -283,6 +284,12 @@ const appendedCheck = `
     );
 
     const model = await buildModel(${JSON.stringify(repoRoot)});
+    const liveLayout = compileViaLayout(model);
+    assert(
+        liveLayout.length === model.layers.length * 56 &&
+            liveLayout.every((entry) => Number.isInteger(entry.keycode) && entry.keycode >= 0 && entry.keycode <= 0xffff),
+        "Profile Studio should compile every authored Charybdis layout slot to a standard VIA matrix keycode before live apply"
+    );
     const aliases = model.qmkKeycodeAliases || {};
     const compiledProfileFixture = new Map(require("fs").readFileSync(path.join(${JSON.stringify(repoRoot)}, "tests", "fixtures", "compiled_profile_v1.fixture"), "utf8")
         .split(/\\r?\\n/)

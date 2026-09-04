@@ -17,7 +17,18 @@ const {
 
 const PROFILE_MILESTONE_DOMAIN_MASK = 0x03;
 const QMK_USER_BASE = 0x7e40;
+const QMK_MACRO_BASE = 0x7700;
 const HARDCODED_MACRO_SLOTS = 16;
+const CHARYBDIS_KEYCODE_VALUES = Object.freeze({
+    DPI_MOD: 0x7e00,
+    DPI_RMOD: 0x7e01,
+    S_D_MOD: 0x7e02,
+    S_D_RMOD: 0x7e03,
+    SNIPING: 0x7e04,
+    SNP_TOG: 0x7e05,
+    DRGSCRL: 0x7e06,
+    DRG_TOG: 0x7e07,
+});
 
 const HOLD_MODES = Object.freeze({
     PRESS_AND_HOLD_UNTIL_RELEASE: KEY_BEHAVIOR_HOLD_MODES.PRESS_AND_HOLD_UNTIL_RELEASE,
@@ -193,15 +204,37 @@ function resolveNativeQmkExpression(value, model) {
     }
     const catalog = model?.qmkKeycodeValues || {};
     if (Number.isInteger(catalog[expression])) return catalog[expression];
+    if (Number.isInteger(CHARYBDIS_KEYCODE_VALUES[expression])) return CHARYBDIS_KEYCODE_VALUES[expression];
     if (expression === "_______") return catalog.KC_TRNS ?? catalog.KC_TRANSPARENT ?? 1;
     if (expression === "XXXXXXX") return catalog.KC_NO ?? 0;
-    if (PD_ACTIONS[expression]) return undefined;
+
+    let match = expression.match(/^VIA_MACRO_(\d+)$/);
+    if (match && Number(match[1]) < 64) return QMK_MACRO_BASE + Number(match[1]);
+    match = expression.match(/^MACRO_(\d+)$/);
+    if (match && Number(match[1]) < HARDCODED_MACRO_SLOTS) return QMK_USER_BASE + Number(match[1]);
+
+    const pdModeNames = ["DRAGSCROLL", "VOLUME_MODE", "BRIGHTNESS_MODE", "ZOOM_MODE", "ARROW_MODE", "PINCH_MODE"];
+    const pdModeIndex = pdModeNames.indexOf(expression.replace(/_LOCK$/, ""));
+    if (pdModeIndex >= 0) {
+        return QMK_USER_BASE + HARDCODED_MACRO_SLOTS + pdModeIndex + (expression.endsWith("_LOCK") ? pdModeNames.length : 0);
+    }
 
     const custom = localCustomKeycodeValues(model);
     if (Number.isInteger(custom[expression])) return custom[expression];
 
     const call = parseCall(expression);
     if (!call) return undefined;
+    if (["TO", "MO", "DF", "TG", "OSL"].includes(call.name) && call.args.length === 1) {
+        const layer = layerIdOrUndefined(call.args[0], model);
+        const bases = {TO: 0x5200, MO: 0x5220, DF: 0x5240, TG: 0x5260, OSL: 0x5280};
+        return layer === undefined || layer > 0x1f ? undefined : bases[call.name] | layer;
+    }
+    if (call.name === "LOCK_LAYER" && call.args.length === 1) {
+        const layer = layerIdOrUndefined(call.args[0], model);
+        return layer === undefined
+            ? undefined
+            : QMK_USER_BASE + HARDCODED_MACRO_SLOTS + (pdModeNames.length * 2) + layer;
+    }
     if (MODIFIER_WRAPPERS[call.name] !== undefined && call.args.length === 1) {
         const keycode = resolveNativeQmkExpression(call.args[0], model);
         return keycode === undefined ? undefined : (MODIFIER_WRAPPERS[call.name] | keycode) & 0xffff;

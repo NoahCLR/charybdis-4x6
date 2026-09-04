@@ -7,6 +7,7 @@ const path = require("path");
 const { promisify } = require("util");
 const {buildCanonicalStudioProfileV1} = require("./live-link/compiled-profile-v1");
 const {ProfileDeviceService} = require("./live-link/profile-device-service");
+const {compileViaLayout} = require("./live-link/via-layout-v1");
 
 const execFileAsync = promisify(execFile);
 let profileStudioOutputChannel = undefined;
@@ -1150,9 +1151,10 @@ async function handleWebviewMessage(panel, root, state, message) {
             const model = await buildModel(root, requireActiveProfile(target), profiles);
             state.liveLink.setProfileSummary(profileSummaryFromModel(model));
             const compiled = buildCanonicalStudioProfileV1(model, {capabilities: state.liveLink.snapshot().capabilities || {}});
-            const snapshot = await state.liveLink.applyLiveProfile(compiled.blob);
+            const layoutEntries = compileViaLayout(model);
+            const snapshot = await state.liveLink.applyLiveProfile(compiled.blob, {layoutEntries});
             if (!snapshot.error && snapshot.liveApply?.state === "complete") {
-                await postModel(panel, root, state, `Applied ${compiled.byteLength}-byte live profile ${formatDigest(compiled.digest)} and persisted it on both halves.`);
+                await postModel(panel, root, state, liveApplySuccessNotice(compiled, snapshot));
             }
             return;
         }
@@ -1162,9 +1164,10 @@ async function handleWebviewMessage(panel, root, state, message) {
             const model = await buildModel(root, target);
             state.liveLink.setProfileSummary(profileSummaryFromModel(model));
             const compiled = buildCanonicalStudioProfileV1(model, {capabilities: state.liveLink.snapshot().capabilities || {}});
-            const snapshot = await state.liveLink.applyLiveProfile(compiled.blob);
+            const layoutEntries = compileViaLayout(model);
+            const snapshot = await state.liveLink.applyLiveProfile(compiled.blob, {layoutEntries});
             if (!snapshot.error && snapshot.liveApply?.state === "complete") {
-                await postModel(panel, root, state, `Applied staged changes, then persisted ${compiled.byteLength}-byte live profile ${formatDigest(compiled.digest)} on both halves.`, { activeLayer: message.activeLayer, appliedLayerChanges: Boolean(message.adds?.length || message.deletes?.length) });
+                await postModel(panel, root, state, `Applied staged changes. ${liveApplySuccessNotice(compiled, snapshot)}`, { activeLayer: message.activeLayer, appliedLayerChanges: Boolean(message.adds?.length || message.deletes?.length) });
             }
             return;
         }
@@ -1410,6 +1413,14 @@ async function handleWebviewMessage(panel, root, state, message) {
         default:
             throw new Error(`Unknown studio message: ${message?.type}`);
     }
+}
+
+function liveApplySuccessNotice(compiled, snapshot) {
+    const layout = snapshot.liveApply?.result?.layout;
+    const layoutNotice = layout
+        ? ` Verified ${layout.checkedKeys} layer keys and changed ${layout.changedKeys}.`
+        : "";
+    return `Applied ${compiled.byteLength}-byte RGB/behavior profile ${formatDigest(compiled.digest)} and persisted it on both halves.${layoutNotice}`;
 }
 
 async function promptForProfileName(options = {}) {
@@ -6651,7 +6662,7 @@ function getClientScript() {
         enumerateLiveDevices: "Scan for the Charybdis Raw HID interface without opening it or sending a report.",
         connectLiveDevice: "Open the selected Raw HID interface and read Profile Wire capabilities and status. This does not modify the keyboard.",
         refreshLiveDevice: "Read Profile Wire capabilities and status again. Only read requests are sent.",
-        applyLiveProfile: "Build RGB and key behaviors from the active source files, upload the canonical profile, commit it to both halves, and activate it without reflashing.",
+        applyLiveProfile: "Synchronize layer keys through standard VIA and build RGB and key behaviors from the active source files, persist them on both halves, and activate everything without reflashing.",
         disconnectLiveDevice: "Close Profile Studio's Raw HID connection to the keyboard."
     };
     const viewTooltips = {
@@ -8594,8 +8605,8 @@ function getClientScript() {
         }
         const choice = await showUnsavedActionDialog(summary, {
             titleId: "liveApplyConfirmTitle",
-            diskNotice: "Live apply builds RGB and key behaviors from the profile source files currently on disk.",
-            applyDescription: "Apply all staged and deploy writes staged layer and layout changes before building and persisting the live profile.",
+            diskNotice: "Live apply synchronizes layer keys and builds RGB and key behaviors from the profile source files currently on disk.",
+            applyDescription: "Apply all staged and deploy writes staged layer and layout changes before synchronizing the VIA layout and persisting the live profile.",
             localNote: "Local form edits are not written by the header Apply all action. Use each card's Apply button first if those edits should be deployed.",
             applyLabel: "Apply all staged and deploy",
             savedLabel: "Deploy saved source only",
@@ -9145,7 +9156,7 @@ function getClientScript() {
             : compatibility
                 ? (compatibility.compatible
                     ? (liveLink.mutationCompatibility?.available
-                        ? "Ready to build, upload, persist, and activate RGB and key behaviors from the current source files."
+                        ? "Ready to synchronize layer keys and build, persist, and activate RGB and key behaviors from the current source files."
                         : "Read-compatible, but live apply is unavailable: " + (liveLink.mutationCompatibility?.reasons?.[0] || "the split keyboard is not ready."))
                     : "Do not attempt a future live deploy until every compatibility blocker below is resolved.")
                 : liveLink.connected
@@ -9209,7 +9220,10 @@ function getClientScript() {
     function liveApplyCard(application) {
         const progress = application.progress || {};
         const sent = Number(progress.bytesSent) || 0;
-        const total = Number(progress.totalBytes) || application.result?.byteLength || 0;
+        const total = Number(progress.totalBytes) || 0;
+        const layoutCompleted = Number(progress.completed) || 0;
+        const layoutTotal = Number(progress.total) || 0;
+        const layoutResult = application.result?.layout;
         const outcome = application.error
             ? application.error.code + ": " + application.error.message
             : application.state === "complete"
@@ -9217,6 +9231,8 @@ function getClientScript() {
                 : "Phase: " + String(application.state || "working").replaceAll("-", " ");
         return "<div class='live-link-card'><h3>Live apply</h3><p class='" + (application.error ? "error" : application.state === "complete" ? "notice" : "muted") + "'>" + escapeHtml(outcome) + "</p>" +
             (total ? "<dl><dt>Transfer</dt><dd>" + escapeHtml(String(sent) + " / " + String(total) + " bytes") + "</dd></dl>" : "") +
+            (layoutTotal ? "<dl><dt>Layer keys</dt><dd>" + escapeHtml(String(layoutCompleted) + " / " + String(layoutTotal) + " checked") + "</dd><dt>Changes found</dt><dd>" + escapeHtml(String(Number(progress.changed) || 0)) + "</dd></dl>" : "") +
+            (layoutResult ? "<dl><dt>Layer keys verified</dt><dd>" + escapeHtml(String(layoutResult.checkedKeys)) + "</dd><dt>Layer keys changed</dt><dd>" + escapeHtml(String(layoutResult.changedKeys)) + "</dd></dl>" : "") +
             "</div>";
     }
 

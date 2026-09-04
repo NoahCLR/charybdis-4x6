@@ -459,3 +459,27 @@ order tests enforce the two paths separately. Profile Studio additionally
 requires fresh `peerKnown` and `peerConverged` status before enabling live
 mutation, and exposes candidate state so an interrupted matching transaction
 can be resumed without silently overwriting firmware state.
+
+### D-025 — Authored Layer Slots Stay In Standard VIA Storage
+
+Status: accepted on 2026-09-04; hardware acceptance and full Stage 06 controls remain open
+
+Profile Studio does not add `keymaps[][]` to the custom Profile Wire blob.
+Before live mutation it resolves every authored layout expression to the exact
+16-bit QMK keycode and maps `LAYOUT(...)` order to the Charybdis 4x6 matrix from
+the keyboard's `keyboard.json` contract. Any unresolved expression rejects the
+whole operation before device mutation.
+
+After the RGB/behavior profile commit succeeds, Studio reads all authored
+dynamic-keymap positions through standard VIA, writes only semantic
+differences, and immediately reads every changed position back. Unused matrix
+cells remain device-owned. Accepted VIA writes retain the existing firmware
+path: EEPROM persistence, immediate split mirror, cache invalidation, and
+durable split reconciliation. Connected-half readback is not presented as
+direct peer readback; visible VIA peer-convergence status, pull/reset controls,
+and cross-domain recovery UX remain Stage 06 work.
+
+This bounded Stage 06 slice overlaps the still-open Milestone A hardware matrix
+because the first successful RGB hardware apply exposed base-layer editing as
+the critical missing user path. It is independent of the custom profile storage
+representation and does not relax Stage 05's production or resource exit bars.

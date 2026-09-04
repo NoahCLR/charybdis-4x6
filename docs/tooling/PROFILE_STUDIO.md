@@ -41,7 +41,11 @@ first engineering live-apply path:
   candidate-write, persistent-commit, runtime-activation, and peer-reconciliation
   contract and reports the second half as detected and converged. It compiles
   RGB and `key_behaviors[]` from source on disk, uploads the canonical profile,
-  persists it on both halves, and activates it.
+  persists it on both halves, and activates it. It also compiles every authored
+  layer slot to the keyboard's VIA matrix coordinates, reads the current
+  dynamic keymap, writes only differences, and verifies each changed key by
+  readback. Those standard VIA writes use the firmware's existing immediate
+  split mirror and durable reconciliation rather than a second profile format.
 - `Disconnect` closes the host connection.
 
 The native HID path and connected handle stay in the extension host. The
@@ -75,11 +79,13 @@ same digest is both active and committed.
    keyboards` and `Connect`.
 5. Confirm the Live panel says `Second half detected: Yes`, `Halves converged:
    Yes`, and that live apply is available. Make and apply a small
-   source edit—an obvious RGB color is the easiest first signal—then choose
-   `Apply live`. Local form drafts must be applied to source first; the live
-   compiler intentionally reads the three files on disk.
-6. Confirm the Live apply card says `Persisted and active`, exercise the changed
-   behavior, and reboot once to verify persistence.
+   source edit—first an obvious RGB color, then a base-layer letter such as
+   `KC_Y` to `KC_X`—and choose `Apply live`. Local form drafts must be applied
+   to source first; the live compiler intentionally reads the three files on
+   disk.
+6. Confirm the Live apply card says `Persisted and active` and reports the
+   checked/changed layer-key counts. Exercise the changed key and behavior on
+   both halves, then reboot once to verify persistence.
 
 If Studio reports that the second half was not detected while ordinary keys on
 that half still work, the core QMK split link may be healthy while the profile
@@ -177,6 +183,10 @@ are local drafts until an apply action writes them to source.
 
 - Layout-slot edits are staged and written to `keymap.c` only when a layout
   apply action is pressed.
+- `Apply live` treats that source as authoritative for all authored layer
+  slots. It compares all slots with the connected keyboard, sends standard VIA
+  writes only for differences, and verifies each write. Unused matrix cells are
+  left untouched.
 - The Layout board's apply button appears on every layer whenever any layer has
   staged layout edits, and writes all staged layout edits in one pass.
 - Layer add/delete is a separate staged operation written only by
