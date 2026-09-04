@@ -872,6 +872,10 @@ noah_profile_store_result_t noah_profile_owner_discovery_result(const noah_profi
     return owner ? owner->discovery_result : NOAH_PROFILE_STORE_INVALID_ARGUMENT;
 }
 
+const noah_profile_store_t *noah_profile_owner_store(const noah_profile_owner_t *owner) {
+    return owner ? &owner->store : NULL;
+}
+
 const noah_profile_store_record_t *noah_profile_owner_committed(const noah_profile_owner_t *owner) {
     return owner && owner->descriptor_readable && owner->committed_descriptor.has_profile && record_matches_descriptor(&owner->store.committed, &owner->committed_descriptor) ? &owner->store.committed : NULL;
 }

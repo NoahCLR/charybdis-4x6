@@ -174,6 +174,42 @@ const noah_profile_store_record_t *noah_profile_store_runtime_committed(void) {
 #endif
 }
 
+bool noah_profile_store_runtime_read_committed(uint16_t offset, uint8_t *target, uint16_t length) {
+#if defined(VIA_ENABLE)
+    const noah_profile_store_record_t *record = noah_profile_store_runtime_committed();
+    const noah_profile_store_t        *store;
+    uint16_t                           payload_start;
+
+#    if defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)
+    store = noah_profile_owner_store(&runtime_owner);
+#    else
+    store = &runtime_store;
+#    endif
+
+    if (!record || !store || !target || length == 0u || !store->io.read) {
+        return false;
+    }
+    // Bounds first: offset and length arrive from the host, so a request that
+    // runs past the committed payload is refused rather than clamped.
+    if ((uint32_t)offset + (uint32_t)length > (uint32_t)record->payload_length) {
+        return false;
+    }
+    if (record->slot == NOAH_PROFILE_SLOT_A) {
+        payload_start = (uint16_t)(NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR + NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE);
+    } else if (record->slot == NOAH_PROFILE_SLOT_B) {
+        payload_start = (uint16_t)(NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR + NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE);
+    } else {
+        return false;
+    }
+    return store->io.read(store->io.context, (uint16_t)(payload_start + offset), target, length);
+#else
+    (void)offset;
+    (void)target;
+    (void)length;
+    return false;
+#endif
+}
+
 bool noah_profile_store_runtime_owner_status(noah_profile_owner_status_t *status) {
 #if defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)
     return runtime_owner_initialized && !runtime_integration_error && noah_profile_owner_status(&runtime_owner, status);

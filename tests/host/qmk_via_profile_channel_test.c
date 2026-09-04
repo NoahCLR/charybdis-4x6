@@ -112,6 +112,27 @@ const noah_profile_store_record_t *noah_profile_store_runtime_committed(void) {
     return store_runtime_has_committed ? &store_runtime_record : NULL;
 }
 
+// Stands in for EEPROM. Each byte is derived from its offset so a chunk served
+// from the wrong address is visible in the assertion rather than plausible.
+static uint8_t store_payload_byte(uint16_t offset) {
+    return (uint8_t)(offset * 7u + 3u);
+}
+
+static bool store_read_committed_fails;
+
+bool noah_profile_store_runtime_read_committed(uint16_t offset, uint8_t *target, uint16_t length) {
+    if (store_read_committed_fails || !store_runtime_has_committed || !target || length == 0u) {
+        return false;
+    }
+    if ((uint32_t)offset + (uint32_t)length > (uint32_t)store_runtime_record.payload_length) {
+        return false;
+    }
+    for (uint16_t index = 0u; index < length; index++) {
+        target[index] = store_payload_byte((uint16_t)(offset + index));
+    }
+    return true;
+}
+
 static uint16_t read_u16(const uint8_t *source) {
     return (uint16_t)source[0] | ((uint16_t)source[1] << 8u);
 }
@@ -335,6 +356,109 @@ static void test_cadence_read_route_is_bounded_and_canonical(void) {
 }
 #endif
 
+
+// Committed-payload readback. The wire contract is: page 0 is metadata,
+// pages 1..N are raw payload bytes, and anything past the payload is refused
+// rather than served as zeros.
+static void test_payload_read_reports_metadata_then_chunks(void) {
+    uint8_t frame[NOAH_PROFILE_WIRE_V1_REPORT_SIZE];
+
+    store_runtime_has_committed = true;
+    store_runtime_record.slot            = NOAH_PROFILE_SLOT_A;
+    store_runtime_record.payload_length  = 60u;
+    store_runtime_record.generation      = 9u;
+    store_runtime_record.payload_digest  = UINT32_C(0xAABBCCDD);
+    store_runtime_record.payload_crc32   = UINT32_C(0x11223344);
+    store_runtime_record.schema_major    = 1u;
+    store_runtime_record.schema_minor    = 2u;
+    store_runtime_record.domain_mask     = 0x03u;
+    store_runtime_record.origin_half     = 1u;
+
+    make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_PAYLOAD, 1u, 0u);
+    via_custom_value_command_kb(frame, sizeof(frame));
+    assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK);
+    assert(frame[6] == NOAH_PROFILE_WIRE_V1_PAYLOAD_SIZE);
+    assert(frame[7] == 1u);
+    assert(read_u16(&frame[9]) == 60u);
+    assert(read_u32(&frame[11]) == 9u);
+    assert(read_u32(&frame[15]) == UINT32_C(0xAABBCCDD));
+    assert(read_u32(&frame[19]) == UINT32_C(0x11223344));
+    assert(frame[23] == 1u && frame[24] == 2u);
+    assert(frame[25] == 0x03u && frame[26] == 1u);
+
+    // Page 1 starts at offset 0 and carries a full report of payload.
+    make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_PAYLOAD, 2u, 1u);
+    via_custom_value_command_kb(frame, sizeof(frame));
+    assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK);
+    assert(frame[6] == NOAH_PROFILE_WIRE_V1_PAYLOAD_SIZE);
+    for (uint8_t index = 0u; index < NOAH_PROFILE_WIRE_V1_PAYLOAD_SIZE; index++) {
+        assert(frame[7 + index] == store_payload_byte(index));
+    }
+
+    // The final chunk is short, and reports its real length.
+    make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_PAYLOAD, 3u, 3u);
+    via_custom_value_command_kb(frame, sizeof(frame));
+    assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK);
+    assert(frame[6] == 10u);
+    assert(frame[7] == store_payload_byte(50u));
+}
+
+static void test_payload_read_refuses_pages_past_the_payload(void) {
+    uint8_t frame[NOAH_PROFILE_WIRE_V1_REPORT_SIZE];
+
+    store_runtime_has_committed         = true;
+    store_runtime_record.slot           = NOAH_PROFILE_SLOT_A;
+    store_runtime_record.payload_length = 30u;
+
+    make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_PAYLOAD, 1u, 3u);
+    via_custom_value_command_kb(frame, sizeof(frame));
+    assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_UNKNOWN_PAGE);
+    assert(frame[6] == 0u);
+}
+
+static void test_payload_read_reports_unavailable_without_a_commit(void) {
+    uint8_t frame[NOAH_PROFILE_WIRE_V1_REPORT_SIZE];
+
+    store_runtime_has_committed = false;
+
+    make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_PAYLOAD, 1u, 0u);
+    via_custom_value_command_kb(frame, sizeof(frame));
+    assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_UNAVAILABLE);
+}
+
+static void test_payload_read_rejects_malformed_requests(void) {
+    uint8_t frame[NOAH_PROFILE_WIRE_V1_REPORT_SIZE];
+
+    store_runtime_has_committed         = true;
+    store_runtime_record.slot           = NOAH_PROFILE_SLOT_A;
+    store_runtime_record.payload_length = 60u;
+
+    // A zero request id is not correlatable.
+    make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_PAYLOAD, 0u, 0u);
+    via_custom_value_command_kb(frame, sizeof(frame));
+    assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_MALFORMED);
+
+    // Reserved bytes must be zero, so a host cannot smuggle state in them.
+    make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_PAYLOAD, 1u, 1u);
+    frame[20] = 0x5Au;
+    via_custom_value_command_kb(frame, sizeof(frame));
+    assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_MALFORMED);
+}
+
+static void test_payload_read_surfaces_storage_failure(void) {
+    uint8_t frame[NOAH_PROFILE_WIRE_V1_REPORT_SIZE];
+
+    store_runtime_has_committed         = true;
+    store_runtime_record.slot           = NOAH_PROFILE_SLOT_A;
+    store_runtime_record.payload_length = 60u;
+    store_read_committed_fails          = true;
+
+    make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_PAYLOAD, 1u, 1u);
+    via_custom_value_command_kb(frame, sizeof(frame));
+    assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_UNAVAILABLE);
+    store_read_committed_fails = false;
+}
+
 int main(void) {
 #ifdef NOAH_LIVE_PROFILE_OWNER_ENABLE
     initialize_live_owner_status();
@@ -349,6 +473,11 @@ int main(void) {
 #ifdef NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS_ENABLE
     test_cadence_read_route_is_bounded_and_canonical();
 #endif
+    test_payload_read_reports_metadata_then_chunks();
+    test_payload_read_refuses_pages_past_the_payload();
+    test_payload_read_reports_unavailable_without_a_commit();
+    test_payload_read_rejects_malformed_requests();
+    test_payload_read_surfaces_storage_failure();
     puts("qmk VIA Profile Wire channel tests passed");
     return 0;
 }

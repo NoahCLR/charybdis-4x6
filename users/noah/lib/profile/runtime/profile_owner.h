@@ -145,6 +145,10 @@ bool noah_profile_owner_receive(noah_profile_owner_t *owner, uint8_t *frame, siz
 noah_profile_owner_state_t             noah_profile_owner_state(const noah_profile_owner_t *owner);
 noah_profile_store_result_t            noah_profile_owner_discovery_result(const noah_profile_owner_t *owner);
 const noah_profile_store_record_t      *noah_profile_owner_committed(const noah_profile_owner_t *owner);
+
+// Read-only view of the backing store, for bounded host readback of the
+// committed payload. Callers must not mutate through it.
+const noah_profile_store_t             *noah_profile_owner_store(const noah_profile_owner_t *owner);
 noah_profile_candidate_transaction_t  *noah_profile_owner_host_transaction(noah_profile_owner_t *owner);
 noah_profile_split_reconciler_t        *noah_profile_owner_split_reconciler(noah_profile_owner_t *owner);
 bool                                    noah_profile_owner_status(const noah_profile_owner_t *owner, noah_profile_owner_status_t *status);

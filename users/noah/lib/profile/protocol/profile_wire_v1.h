@@ -13,6 +13,12 @@ enum {
     NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL   = 0x00u,
     NOAH_PROFILE_WIRE_V1_VALUE_CAPABILITY = 0x01u,
     NOAH_PROFILE_WIRE_V1_VALUE_STATUS     = 0x02u,
+    // 0x03 is the performance cadence recorder, present only in diagnostic
+    // builds; see users/noah/lib/state/diagnostics/runtime_diag.h.
+    NOAH_PROFILE_WIRE_V1_VALUE_PAYLOAD    = 0x04u,
+    // Page 0 of a payload read is metadata; pages 1..N carry raw payload
+    // bytes, a full report payload each.
+    NOAH_PROFILE_WIRE_V1_PAYLOAD_METADATA_PAGE = 0u,
     NOAH_PROFILE_WIRE_V1_CAPABILITY_PAGES = 2u,
     NOAH_PROFILE_WIRE_V1_STATUS_PAGES     = 2u,
 };

@@ -225,6 +225,94 @@ static bool noah_profile_channel_handle_cadence_get(uint8_t *data, uint8_t lengt
 }
 #    endif
 
+static void noah_profile_channel_write_u16(uint8_t *target, uint16_t value) {
+    target[0] = (uint8_t)(value & 0xffu);
+    target[1] = (uint8_t)((value >> 8) & 0xffu);
+}
+
+static void noah_profile_channel_write_u32(uint8_t *target, uint32_t value) {
+    target[0] = (uint8_t)(value & 0xffu);
+    target[1] = (uint8_t)((value >> 8) & 0xffu);
+    target[2] = (uint8_t)((value >> 16) & 0xffu);
+    target[3] = (uint8_t)((value >> 24) & 0xffu);
+}
+
+// Committed-payload readback.
+//
+// Page 0 reports the committed generation, digest and length; pages 1..N carry
+// raw payload bytes. Coherence is the host's job and is cheap: generation only
+// ever increases, so re-reading page 0 after the chunks proves nothing was
+// committed in between. That keeps a full report of payload in every chunk
+// instead of spending four bytes per chunk on a sequence number.
+//
+// This is the read D-026 requires. The READ_SURFACE capability bit describes
+// status reporting and is not this.
+static bool noah_profile_channel_handle_payload_get(uint8_t *data, uint8_t length) {
+    const noah_profile_store_record_t *record;
+    uint16_t                           offset;
+    uint16_t                           remaining;
+    uint8_t                            chunk;
+
+    if (!data || length != NOAH_PROFILE_WIRE_V1_REPORT_SIZE || data[0] != NOAH_PROFILE_WIRE_V1_COMMAND_GET || data[1] != NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL || data[2] != NOAH_PROFILE_WIRE_V1_VALUE_PAYLOAD) {
+        return false;
+    }
+    for (uint8_t index = 5u; index < NOAH_PROFILE_WIRE_V1_REPORT_SIZE; index++) {
+        if (data[index] != 0u) {
+            memset(&data[5], 0, NOAH_PROFILE_WIRE_V1_REPORT_SIZE - 5u);
+            data[5] = NOAH_PROFILE_WIRE_V1_STATUS_MALFORMED;
+            return true;
+        }
+    }
+    if (data[3] == 0u) {
+        memset(&data[5], 0, NOAH_PROFILE_WIRE_V1_REPORT_SIZE - 5u);
+        data[5] = NOAH_PROFILE_WIRE_V1_STATUS_MALFORMED;
+        return true;
+    }
+
+    record = noah_profile_store_runtime_committed();
+    if (!record) {
+        memset(&data[5], 0, NOAH_PROFILE_WIRE_V1_REPORT_SIZE - 5u);
+        data[5] = NOAH_PROFILE_WIRE_V1_STATUS_UNAVAILABLE;
+        return true;
+    }
+
+    memset(&data[6], 0, NOAH_PROFILE_WIRE_V1_REPORT_SIZE - 6u);
+    if (data[4] == NOAH_PROFILE_WIRE_V1_PAYLOAD_METADATA_PAGE) {
+        data[5] = NOAH_PROFILE_WIRE_V1_STATUS_OK;
+        data[6] = NOAH_PROFILE_WIRE_V1_PAYLOAD_SIZE;
+        data[7] = 1u; // layout version
+        data[8] = NOAH_PROFILE_WIRE_V1_PAYLOAD_SIZE;
+        noah_profile_channel_write_u16(&data[9], record->payload_length);
+        noah_profile_channel_write_u32(&data[11], record->generation);
+        noah_profile_channel_write_u32(&data[15], record->payload_digest);
+        noah_profile_channel_write_u32(&data[19], record->payload_crc32);
+        data[23] = record->schema_major;
+        data[24] = record->schema_minor;
+        data[25] = record->domain_mask;
+        data[26] = record->origin_half;
+        data[27] = record->flags;
+        return true;
+    }
+
+    offset = (uint16_t)((data[4] - 1u) * NOAH_PROFILE_WIRE_V1_PAYLOAD_SIZE);
+    if (offset >= record->payload_length) {
+        memset(&data[5], 0, NOAH_PROFILE_WIRE_V1_REPORT_SIZE - 5u);
+        data[5] = NOAH_PROFILE_WIRE_V1_STATUS_UNKNOWN_PAGE;
+        return true;
+    }
+    remaining = (uint16_t)(record->payload_length - offset);
+    chunk     = remaining < NOAH_PROFILE_WIRE_V1_PAYLOAD_SIZE ? (uint8_t)remaining : NOAH_PROFILE_WIRE_V1_PAYLOAD_SIZE;
+
+    if (!noah_profile_store_runtime_read_committed(offset, &data[7], chunk)) {
+        memset(&data[5], 0, NOAH_PROFILE_WIRE_V1_REPORT_SIZE - 5u);
+        data[5] = NOAH_PROFILE_WIRE_V1_STATUS_UNAVAILABLE;
+        return true;
+    }
+    data[5] = NOAH_PROFILE_WIRE_V1_STATUS_OK;
+    data[6] = chunk;
+    return true;
+}
+
 NOAH_PROFILE_CHANNEL_STACK_BOUNDARY void via_custom_value_command_kb(uint8_t *data, uint8_t length) {
 #    ifdef NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS_ENABLE
     if (noah_profile_channel_handle_cadence_get(data, length)) {
@@ -257,6 +345,9 @@ NOAH_PROFILE_CHANNEL_STACK_BOUNDARY void via_custom_value_command_kb(uint8_t *da
         (void)noah_profile_channel_refresh_owner(false);
     }
 #    endif
+    if (noah_profile_channel_handle_payload_get(data, length)) {
+        return;
+    }
     if (noah_profile_wire_v1_handle_get(&noah_profile_wire_v1_read_service, data, length)) {
         return;
     }
