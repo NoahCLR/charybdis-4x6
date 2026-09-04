@@ -117,16 +117,30 @@ the repo-local VS Code extension for editing the profile visually, so you can
 click through the layout, macros, RGB, and defaults before digging into the C
 model.
 
-It works directly on the selected profile's authored source files. For my
-current profile, those are:
+The current editor works directly on the selected profile's authored source
+files. For my current profile, those are:
 
 - [`config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h)
 - [`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c)
 - [`rgb_config.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c)
 
-There is no sidecar profile database. The C files stay the source of truth.
-The Studio parses those files, shows a VS Code webview, stages edits, and
-patches the same authored blocks when you apply changes.
+There is no sidecar profile database. Today, Studio parses these files, shows a
+VS Code webview, stages edits, and patches the same authored blocks when you
+apply changes. This source-driven workflow is the current implementation, not
+the final live-edit authority model.
+
+The target is a device-resident logical profile: when connected, Studio reads
+the complete supported configuration from the keyboard, edits a draft based on
+that exact generation, commits it to both halves, and verifies it by reading it
+back. The C files remain compiled defaults plus an explicit import/export and
+version-control representation; they are not required to open an existing
+keyboard configuration. See
+[`device-resident-profile.md`](./docs/architecture/device-resident-profile.md)
+for the technical contract and
+[`PROFILE_STUDIO_PRODUCT_GOAL.md`](./docs/tooling/PROFILE_STUDIO_PRODUCT_GOAL.md)
+for the broader goal: first-grade keyboard control software that can inspect,
+customize, validate, persist, back up, restore, and recover the keyboard without
+requiring a firmware repository for normal use.
 
 The profile picker can also create, clone, rename, and delete Charybdis 4x6
 keymaps under `keyboards/bastardkb/charybdis/4x6/keymaps/<name>/` while keeping
@@ -217,6 +231,12 @@ engineering milestone, but it is not production-promoted: the broader hardware
 acceptance matrix and runtime high-water measurements are still open, and the
 engineering image remains above two conservative static-memory regression
 policies (not the RP2040's physical RAM capacity).
+
+This first milestone is still source-driven. The keyboard exposes status and
+identity but not yet the complete committed custom-profile payload, so Studio
+cannot yet reconstruct RGB and custom behaviors from the keyboard alone. Full
+device readback, device-first editing, explicit source import/export, and
+generation-conflict handling are the next architectural goal.
 
 Working keys on the slave prove QMK's core split transport, not the separate
 live-profile endpoint. The engineering firmware therefore advances durable

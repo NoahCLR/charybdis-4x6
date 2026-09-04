@@ -4,6 +4,18 @@ This review uses prompts/initial-architecture-review.md. It plans a new
 architecture thread for live profile editing from Charybdis Profile Studio,
 with Milestone A defined as complete live RGB and key-behavior editing.
 
+On 2026-09-04, D-026 revised the end-state authority after the first usable
+hardware milestone. The source-driven upload path remains a valid engineering
+checkpoint, but it is no longer the target product model. The target is a
+readable device-resident logical profile with explicit source import/export;
+`docs/architecture/device-resident-profile.md` is the maintained contract.
+
+D-027 promotes that technical target into first-grade keyboard control
+software. The finished normal workflow does not depend on an open firmware
+repository, and one logical manifest must cover every participating VIA and
+custom-store domain. The maintained product contract is
+`docs/tooling/PROFILE_STUDIO_PRODUCT_GOAL.md`.
+
 The project opened against tree `87f356cd`. Stage 00 implementation and
 evidence are tracked in `progress.md`; the opening findings below remain the
 architectural rationale rather than a claim that no later work has landed.
@@ -123,8 +135,9 @@ Required model:
 - active device is the deployed USB-half generation;
 - peer device is the other half's reconciled generation.
 
-Every operation must report partial success. Device-first versus source-first
-apply remains an open Stage 00 decision, but neither outcome may be hidden.
+Every operation must report partial success. D-026 resolves the direction: a
+connected session is device-first, while source import, source export, and
+device apply are explicit operations whose outcomes cannot be hidden.
 
 ### 6. The EEPROM and capacity budget must be measured before the storage format is fixed
 
@@ -230,7 +243,7 @@ The opening findings above are the audit-time snapshot. Current status:
 | 2 — no effective-profile seam | partially resolved | a hardened generation-owned provider now enforces coherent publication, invalidation visibility, safe-predicate reentrancy, nested-view containment, and active-backing-aware reuse; one gated engineering owner composes incremental boot/adoption, provider, behavior/RGB consumers, host/peer admission, split convergence, and coherent external read-only status. Normal mutation exposure, resource-policy closure, and hardware evidence remain open |
 | 3 — no canonical schema | partially resolved | `profile-wire-v1.md`, `profile-split-v1.md`, D-010, D-015, D-017, and D-020 freeze the host/profile, sibling, exact-compatibility, and boot-adoption contracts; blob, RGB, behavior, validator, real compiled-default materializer, and profile split frames have exact executable fixtures, while production runtime and peer persistence integration remain open |
 | 4 — no safe activation boundary | partially resolved | `authority-state-table.md` freezes the quiescence contract and `profile_activation_policy.c` produces coherent reason/count snapshots; the engineering owner installs the behavior/RGB invalidators and holds host/peer admission through activation. D-022 prepares the peer before local durability and requires a fresh exact owner-matching authority snapshot before activation; normal capability exposure and hardware evidence remain open |
-| 5 — source/device authority | resolved at contract level | D-013, D-014, and `authority-state-table.md` define operations, ordering, partial results, and conflicts |
+| 5 — source/device authority | partially resolved after D-026 replan | D-013, D-014, D-026, `authority-state-table.md`, and `docs/architecture/device-resident-profile.md` define device-first authority, directional operations, ordering, partial results, and conflicts; complete payload readback and the Studio lifecycle remain open |
 | 6 — storage/capacity evidence | resolved at Stage 00 design level; runtime high-water remains open | D-016 and `stage-00-baseline.md` record the corrected per-half bank model, policy-versus-capacity distinction, exact EEPROM map, dual-slot partition, and ceilings |
 | 7 — Studio transport boundary | partially resolved | D-012 accepts an injected serialized adapter and fake; concrete packaged board probe remains open |
 | 8 — split integration shape | partially implemented beyond the resolved contract | D-011/D-017 define the sibling protocol, authority, exact peer store, bounded reconciliation, retry, and recovery; D-018 provisions physical origin; D-020/D-021 give host and peer one lease and register exactly one reconciler through the engineering owner after incremental boot adoption; D-022 adds provisional peer preparation, simultaneous-writer arbitration, local/peer marker ordering, and exact activation fencing. Normal exposure and the two-half hardware convergence/recovery matrix remain open |
@@ -256,6 +269,15 @@ advance the implementation findings as follows:
 These findings are not closed by software integration alone. The closure bar
 still requires the complete host suite, ordinary firmware gates, both physical
 halves, resource high-water evidence, and the hardware acceptance matrix.
+
+## D-026 Authority Reconciliation — 2026-09-04
+
+The earlier contract allowed either source-first or device-first product
+direction. D-026 chooses device-first and reopens Finding 5 at implementation
+level. The committed keyboard generation is the target connected-session
+authority; source becomes explicit import/export and compiled-default material.
+The contract is documented, but the current firmware read surface still lacks
+complete committed-payload readback and Studio still starts from source.
 
 ## Resource-Truth Reconciliation — 2026-08-25
 
@@ -505,12 +527,13 @@ draft presentation only.
 
 Recommended layers:
 
-- source model and patcher;
+- device snapshot and generation-conflict model;
+- source importer and canonical source exporter;
 - canonical profile model;
 - wire encoder and golden fixtures;
 - device transport interface;
 - connection and compatibility state;
-- source/device diff and operation coordinator;
+- explicit device/source diff and directional operation coordinator;
 - existing UI views.
 
 ## State And Transaction Model
@@ -569,31 +592,51 @@ finding lifecycle:
 ## Current Architecture Assessment
 
 The project remains realistic and does not require replacing the current
-runtime. Its first complete engineering path now exists: Profile Studio can
+runtime. Its first source-driven engineering path exists: Profile Studio can
 compile the authored RGB and key-behavior model, send one canonical candidate,
 persist it across both halves, wait for safe activation, and verify the exact
-active digest. The first hardware attempt exposed and corrected the missing
-slave scan reachability described by D-024. The remaining uncertainty is the
-hardware re-test and production acceptance, not whether the architecture can
-form an end-to-end implementation.
+active digest. Hardware also confirms standard VIA base-key mutation.
 
-The central architecture change is to insert one canonical effective-profile
-boundary between compiled defaults and runtime consumers. The largest
-correctness challenges are transactional activation, source/device authority,
-power-loss recovery, and split convergence—not RGB conversion or UI controls.
+That milestone does not complete the intended editor architecture. Studio can
+read VIA keycodes plus Profile Wire capabilities, status, generations, and
+digests, but it cannot retrieve the committed custom-profile payload. It
+therefore cannot open an existing keyboard as the configuration authority.
+D-026 makes complete device readback, generation-bound drafts, explicit source
+import/export, and read-after-commit verification part of the target.
+
+The central architecture change is one canonical logical profile spanning the
+device, Studio, compiled defaults, and runtime consumers. Compiled C is the
+factory/export representation; the committed device generation is the target
+live authority. When VIA and custom data remain in separate physical stores,
+one manifest and coordinator must bind them to a truthful logical generation
+and detect external VIA writes. The largest correctness challenges are readable
+round trips, cross-store transactional activation, explicit source/device and
+external-client conflict handling, power-loss recovery, split convergence, and
+protecting the keyboard hot loop.
+
+The broader product is not complete when those firmware mechanisms work. It
+also requires the normal connection/edit/apply journey, backup and restore,
+reset and failure recovery, compatibility guidance, complete field
+classification, actionable UX, and a reusable application core that can run
+without repository parsing. The VS Code extension is the current shell, not a
+reason to keep the product repo-bound.
 
 Milestone A is deliberately substantial. It represents a trustworthy daily-use
 feature rather than a demo in which one color or behavior changes until reboot.
 
 ## Recommended Next Refactor Sequence
 
-1. Flash the labeled left/right engineering pair and prove one RGB edit, one
-   key-behavior edit, exact two-half convergence, and reboot persistence through
-   Profile Studio.
-2. Run reconnect, USB-orientation, role-swap, held-input, interruption, reset,
-   contention, and `AUTHORITY_FAILED` recovery scenarios on hardware.
-3. Capture allocator and stack high-water on both halves during those scenarios
-   and make an explicit production resource-policy decision.
-4. Close Milestone A only after docs, full host verification, ordinary firmware
-   gates, and the real-board matrix agree; then extend the architecture to
-   defaults, standard VIA surfaces, macros, combos, and logical-layer structure.
+1. Instrument pointing cadence and remove unconditional profile metadata work
+   plus repeated live RGB materialization from steady-state paths.
+2. Freeze the complete logical-profile manifest, cross-store transaction, and
+   external-VIA-change semantics.
+3. Add bounded readback for the exact committed custom profile and combine it
+   with readable VIA state in one Studio device snapshot.
+4. Make connected drafts generation-bound and add explicit keyboard refresh,
+   source import, device apply, source export, and compiled-default reset.
+5. Add named desktop backup/restore and the specified recovery journeys, while
+   separating the device/profile core from repository parsing.
+6. Run reboot, reconnect, USB-orientation, role-swap, held-input, interruption,
+   contention, and recovery scenarios with exact readback and convergence.
+7. Capture allocator and stack high-water, enforce polling/resource regressions,
+   and only then decide production promotion and later schema expansion.

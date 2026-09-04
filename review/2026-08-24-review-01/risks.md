@@ -6,7 +6,7 @@
 | R-02 | A profile activates while keys or owned outputs are active and leaves stuck keys, modifiers, layers, modes, or mouse buttons | critical | 02 and 04 | Define a quiescence predicate, stage until safe, test every owned lifecycle, and run the Milestone A held-state hardware matrix |
 | R-03 | Power loss or reset during persistence destroys the last known-good profile | critical | 02 | Use recoverable commit metadata or dual valid slots; interrupted-write fixtures must always select an intact generation or compiled defaults |
 | R-04 | The halves run different behavior generations after disconnect or role swap | critical | 02 and 05 | Include profile state in durable digest reconciliation and pass disconnect, reconnect, forced-role, and dual-USB matrices |
-| R-05 | Source and device silently diverge | high | 01 and 05 | Show independent digests and operation outcomes; implement explicit push, pull, retry, and reset flows |
+| R-05 | Source, Studio draft, and committed device profile silently diverge or overwrite one another | high | 01, 05, and 06 | Open and refresh complete device state, bind drafts to the device generation and digest, reject stale applies, and keep device apply, source import/export, retry, and reset as explicit operations |
 | R-06 | Raw C struct persistence breaks across compiler, alignment, or schema changes | high | 00 and 02 | Canonical fixed-width schema, golden fixtures, migration rules, and hard rejection of unknown incompatible versions |
 | R-07 | Logical EEPROM growth or live-profile buffers consume an RP2040 SRAM bank without bank-aware accounting, or policy slack is mistaken for hardware headroom | high | 00 | Keep physical banks, linked sections, regression policies, and runtime high-water evidence separate; prefer repartitioning existing EEPROM; pass fresh memory and stack gates and measure hardware high-water before closure |
 | R-08 | Reserving profile storage removes too much VIA macro capacity | medium | 00 and 02 | Measure real and worst-case usage, publish capacity, add compile gates for non-overlap, and document the selected tradeoff |
@@ -21,6 +21,10 @@
 | R-17 | Durable commit origin is derived from dynamic USB role, or left/right forced-role artifacts are mapped backwards on this `MASTER_RIGHT` board | critical | 02 and 05 | Provision left/right identity independently in flash, keep role and origin independent in tests, build left as `FORCE_SLAVE` plus `NOAH_PHYSICAL_HALF=left` and right as `FORCE_MASTER` plus `NOAH_PHYSICAL_HALF=right`, and prove both USB orientations preserve origin before enabling mutation |
 | R-18 | A split callback and matrix scan concurrently enter wear-level storage, or multiple durable subsystems perform unarbitrated work | critical | 02 | Keep callbacks mailbox-only, route profile discovery/VIA mirror/VIA reconciliation through one rotating scan scheduler, instrument callback tests against every storage effect, and include the future writable profile owner in the same scheduler |
 | R-19 | Host deployment and peer import interleave against the same writable profile store, corrupt admission state, or activate the wrong durable record | critical | 02 and 05 | Use one owner-held candidate backend with explicit host/peer admission, make contention retryable without poisoning transactions, validate the exact committed record before activation, and pass production plus hardware contention/interruption matrices |
+| R-20 | Capability/status metadata or VIA layout readback is mistaken for complete device-profile readback | high | 06 | Add bounded, correlated payload reads for every live-owned domain, decode them into one logical Studio snapshot, verify generation and digest consistency, and pass read-after-write, reconnect, malformed-frame, and real-device tests |
+| R-21 | Live-profile persistence, reconciliation, status encoding, or rendering work reduces pointing report cadence | high | 06 | Instrument baseline and live-enabled cadence on hardware, keep unchanged metadata and storage work out of the steady-state scan path, materialize bounded runtime views, skip inactive RGB work, and enforce an agreed regression threshold before expanding the live surface |
+| R-22 | VIA and custom stores are presented as one profile without one atomic logical generation | critical | 06 | Define a manifest covering every domain digest, coordinate cross-store prepare/commit/recovery, detect external VIA writes, expose partial outcomes, and pass interruption plus external-client matrices before claiming a complete profile commit |
+| R-23 | The implementation remains coupled to an open firmware repository and never becomes normal keyboard control software | high | 06 and 08 | Separate transport/schema/device-session/profile-model services from source parsing, prove open/edit/apply/backup/restore without a repository, and retain source import/export as optional adapters |
 
 ## Risk Update Rule
 
@@ -297,3 +301,36 @@ evidence; it does not resolve R-07 or authorize production exposure.
   behavior. R-07 remains unchanged: the engineering `.bss` and combined-data
   policy gates are red, physical SRAM is 270,336 B per half, and runtime
   high-water has not been measured.
+
+### 2026-09-04 device-resident authority replan
+
+- D-026 makes the keyboard's committed logical profile the target live
+  authority. The C files remain compiled defaults plus explicit import/export
+  and version-control representations; they are no longer the intended
+  connected-session authority. R-05 is therefore broadened to cover three-way
+  device, draft, and source divergence with generation-bound conflict checks.
+- R-20 records the current readback gap. Profile Wire v1 can report
+  capabilities, status, generations, and digests, and VIA can return layout
+  state, but Studio cannot yet retrieve and reconstruct every custom live
+  profile domain. The existing read surface must not be described as complete
+  profile readback.
+- R-21 turns the observed pointing-rate concern into a release constraint.
+  Device readback and later domain expansion must follow measurement and
+  remediation of steady-state work; protocol correctness alone is not enough
+  to close the milestone.
+- These are planning and documentation updates only. No runtime risk is closed
+  by this entry.
+
+### 2026-09-04 first-grade control-software goal
+
+- D-027 and `docs/tooling/PROFILE_STUDIO_PRODUCT_GOAL.md` define the finished
+  product as repository-independent keyboard control software rather than a
+  repo-backed live-upload feature.
+- R-22 records that separate VIA and custom stores cannot truthfully appear as
+  one committed profile without a logical manifest, coordinated transaction,
+  and explicit handling of external VIA changes.
+- R-23 records the delivery risk that the current VS Code/source parser remains
+  the only usable shell. The reusable device and profile core plus normal
+  backup/restore journeys now form part of production closure.
+- This entry changes project scope and acceptance documentation only. R-22 and
+  R-23 are open and no implementation evidence is claimed.

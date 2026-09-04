@@ -4,8 +4,8 @@
 
 | State | Identity | Authority |
 | --- | --- | --- |
-| Studio draft | source base revision plus canonical digest | none until an explicit operation |
-| Source files | canonical digest plus file revision | human-authored default for next build |
+| Studio draft | device base generation/digest plus optional imported source revision | none until an explicit device apply or source export |
+| Source files | canonical digest plus file revision | compiled-default and explicit import/export representation |
 | Compiled defaults | canonical digest and action-ABI digest | recovery fallback |
 | Device commit | `{counter, origin_half}` plus canonical digest | deployed runtime authority |
 | RGB preview | transaction id, base generation, digest | volatile overlay only |
@@ -23,7 +23,7 @@ draft changes never manufacture device generations.
 - Equal counter with different origins is a disconnected concurrent commit;
   stop and require explicit Studio resolution.
 - Reset commits an override-disabled record with a new generation.
-- Pushing an unchanged canonical payload is a no-op.
+- Applying an unchanged canonical payload is a no-op.
 
 The origin half is a stable physical-half id, not current USB role.
 
@@ -51,18 +51,22 @@ conflict.
 
 | Operation | Source | USB half | Peer half | Required visible result |
 | --- | --- | --- | --- | --- |
-| Apply source | write | unchanged | unchanged | source updated; device drift may remain |
+| Open from keyboard | unchanged | read complete supported profile | prove matching peer or expose drift | generation-bound editable draft |
+| Refresh from keyboard | unchanged | reread complete supported profile | prove matching peer or expose drift | draft refreshed or local-draft conflict shown |
+| Save desktop backup | unchanged | read exact logical profile or use a verified draft | prove matching peer or label backup as unresolved | named portable backup with schema and compatibility identity |
+| Restore desktop backup | unchanged | validate and apply as a new generation | prepare then converge | backup restored and exact result read back |
+| Import source | read | unchanged | unchanged | source-derived draft; device unchanged |
+| Export draft to source | write | unchanged | unchanged | source updated; device unchanged |
 | Preview live RGB | unchanged | volatile preview | mirror preview or show peer pending | preview active; never persisted |
 | Roll back preview | unchanged | committed profile | committed profile | preview cleared |
-| Deploy live | unchanged | validate then commit | prepare then converge | device persisted; source drift may remain |
-| Apply source + device | validate proposed write, then write | prepare before source write, commit after it | prepare/commit with USB half | synchronized or explicit partial outcome |
-| Pull device to source | rewrite supported source fields | unchanged | unchanged | source updated or source-write failure |
-| Push source to device | unchanged | validate then commit | prepare then converge | device persisted or rejected |
+| Apply draft to keyboard | unchanged | compare base generation, validate, then commit | prepare then converge | device persisted and exact payload read back |
+| Explicit source + device sync | validate proposed source export, then write | prepare before source write, commit after it | prepare/commit with USB half | synchronized or explicit partial outcome |
 | Reset device | unchanged | commit override-disabled generation | converge reset generation | compiled defaults active; source unchanged |
+| Reconcile external VIA change | unchanged | detect changed VIA digest and refuse stale logical generation | prove peer VIA state or expose drift | adopted new logical generation or explicit conflict; never silent divergence |
 
 ## Compound Apply Ordering
 
-`Apply source + device` uses:
+An explicit compound source-and-device synchronization uses:
 
 1. parse proposed source and build a canonical candidate;
 2. validate locally against connected capabilities;

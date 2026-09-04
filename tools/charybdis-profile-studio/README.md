@@ -1,13 +1,22 @@
 # Charybdis Profile Studio
 
 Charybdis Profile Studio is a repo-local VS Code extension for editing this
-userspace visually. It is meant for the authored profile parts of the repo:
-layout keys, layers, combos, behavior rows, VIA macros, RGB colors, and LED
-feedback tables, and profile-level defaults from `config.h`.
+userspace visually. It is meant for layout keys, layers, combos, behavior rows,
+VIA macros, RGB colors, LED feedback tables, and profile-level defaults.
 
-The Studio does not create a separate profile format. The C files stay the
-source of truth, and every apply action patches those authored source blocks
-directly.
+The current editor has no sidecar database: it parses the three C authoring
+files and patches their authored blocks. That is the present implementation.
+The target live workflow is device-first: a connected keyboard supplies the
+complete supported logical profile, Studio edits a generation-bound draft, and
+the result is committed and read back from both halves. C remains the compiled
+default and explicit import/export representation rather than the mandatory
+live-session source. See
+[`docs/architecture/device-resident-profile.md`](../../docs/architecture/device-resident-profile.md).
+The finished product is intended to be first-grade keyboard control software,
+including complete readback, conflict-safe apply, backup/restore, recovery,
+compatibility guidance, and a normal workflow that does not require an open
+firmware repository. See
+[`PROFILE_STUDIO_PRODUCT_GOAL.md`](../../docs/tooling/PROFILE_STUDIO_PRODUCT_GOAL.md).
 
 The header also has a `Live keyboard` row. `Find keyboards` scans for the
 Charybdis Raw HID interface, `Connect` reads Profile Wire capabilities and
@@ -17,6 +26,11 @@ builds the complete RGB and `key_behaviors[]` domains from the source files on
 disk, persists them on both halves, and activates them without reflashing.
 Existing card-level Apply buttons still mean source-only edits; use them before
 `Apply live` so the desired values are present on disk.
+
+This milestone cannot yet download the committed custom-profile payload. Its
+read surface returns capabilities, status, generations, and digests; layout
+keycodes are independently readable through VIA. Complete profile readback and
+opening Studio from keyboard state are planned, not current features.
 
 ## What It Edits
 
@@ -110,7 +124,7 @@ inside an Extension Development Host.
 
 ## Mental Model
 
-The Studio has two kinds of edits:
+The current source-driven Studio has two kinds of edits:
 
 - staged local edits, such as changing layout slots or adding a layer
 - direct apply actions, such as saving a macro, combo, behavior row, or RGB
@@ -119,9 +133,10 @@ The Studio has two kinds of edits:
 Staged edits are visible in the UI until you apply them. Reload discards
 uncommitted Studio edits and reparses the source files from disk.
 
-For complex behavior rows, the Studio is a good editor and browser, but direct
-source editing is still expected. The goal is to make the common profile edits
-safer and easier, not to hide the underlying C model.
+For complex behavior rows, direct source editing is still expected in the
+current implementation. That is an interim limitation, not the product goal.
+Normal use of the finished configurator opens from the keyboard and does not
+require understanding or editing the underlying C model.
 
 ## Layout Tab
 

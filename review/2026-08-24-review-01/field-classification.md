@@ -1,8 +1,15 @@
 # Live-Profile Field Classification
 
 This matrix classifies every surface currently parsed by Profile Studio. It is
-the scope boundary between live data, standard VIA state, compiled ceilings,
-and executable firmware.
+the starting scope boundary between live data, standard VIA state, compiled
+ceilings, and executable firmware.
+
+The first-grade product goal requires this to become a complete inventory of
+every user-relevant value represented by the three authoring files, including
+fields that Studio does not parse yet. A missing field is not implicitly out of
+scope: it must be added here and classified as live data, runtime-applicable
+policy, bounded structure, compiled capability/safety, or executable/source-only
+behavior. The UI must explain every intentional non-live boundary.
 
 ## `keymap.c`
 

@@ -1,12 +1,13 @@
 # Stage 06 — Live Defaults, Layout, And Macros
 
-Status: in progress — standard VIA layout source push works on hardware;
-architecture/performance audit next
+Status: replanned — performance remediation and device readback precede further
+surface expansion
 
 ## Objective
 
-Bring the lower-risk remaining Profile Studio surfaces into the same
-source/device experience without replacing standard VIA ownership.
+Establish the device-first editing lifecycle, then bring the lower-risk
+remaining Profile Studio surfaces into one logical profile without replacing
+standard VIA ownership.
 
 This stage integrates existing live layout and VIA macro capabilities and
 converts practical config defaults into runtime policy where feasible.
@@ -24,9 +25,11 @@ Layout keys and VIA macros already have live EEPROM representations. Profile
 Studio should:
 
 - send standard VIA commands through the Live Link adapter;
-- retain the existing source patch behavior;
-- show source/device semantic diff;
-- support push, pull, reset, retry, local commit, and peer convergence states;
+- read device state as the connected editing baseline;
+- retain source parsing as explicit import and canonical source export;
+- show generation-aware source/device semantic diff;
+- support device apply, refresh, source import/export, reset, retry, local
+  commit, and peer convergence states;
 - batch layout changes safely and preserve layer/keycode validation;
 - encode macro payloads using the established QMK/VIA byte grammar;
 - invalidate macro caches after accepted mutation;
@@ -90,9 +93,17 @@ Changing a policy applies its side effects explicitly:
 ## Deliverables
 
 - [x] Standard VIA layout source push with semantic diff and connected-half readback
+- [ ] Steady-state pointing cadence instrumentation and accepted regression threshold
+- [ ] Idle profile scheduler and live RGB materialization remediation
+- [ ] Chunked committed custom-profile readback
+- [ ] Unified device snapshot across Profile Wire and standard VIA
+- [ ] One logical-generation manifest and coordinator across custom and VIA
+      stores, including explicit handling of writes made by another VIA client
+- [ ] Generation-bound drafts and stale-write refusal
+- [ ] Explicit source import and canonical source export
 - [ ] Visible peer-convergence evidence, layout pull/reset/retry controls
 - [ ] Standard VIA macro Live Link integration
-- [ ] Source/device diff, push, pull, reset, and recovery for both
+- [ ] Device/source diff, device refresh/apply, source import/export, reset, and recovery
 - [ ] Every Defaults field classified
 - [ ] Practical live-policy fields implemented
 - [ ] Compiled capacity and safety fields visibly identified in Studio
@@ -122,7 +133,12 @@ Required coverage includes:
 
 - Layout and VIA macros can be edited live from Profile Studio without a
   second persistence system.
-- Source and both halves reconcile visibly.
+- A connected session opens from readable device state without requiring the C
+  files to match or exist.
+- Layout, macros, custom domains, and policy are covered by one truthful logical
+  generation, or a partial/cross-store state is visibly refused rather than
+  reported as an atomic commit.
+- Source and both halves reconcile visibly through explicit directional actions.
 - Every Defaults control is either live with tested side effects or clearly
   labeled as a compiled capability/safety field requiring flash.
 - Milestone A remains green.

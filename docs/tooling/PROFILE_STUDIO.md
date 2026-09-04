@@ -2,17 +2,21 @@
 
 Charybdis Profile Studio is the repo-local VS Code extension under
 [`tools/charybdis-profile-studio/`](../../tools/charybdis-profile-studio/).
-It edits the authored profile visually while keeping the C source files as the
-only source of truth.
+It currently edits the authored C profile visually. The long-term live-edit
+authority is the keyboard's readable committed logical profile, as defined in
+[`device-resident-profile.md`](../architecture/device-resident-profile.md).
+The complete user-facing product goal and quality bar are maintained in
+[`PROFILE_STUDIO_PRODUCT_GOAL.md`](./PROFILE_STUDIO_PRODUCT_GOAL.md).
 
 For the shorter user-facing guide and screenshot links, see
 [`tools/charybdis-profile-studio/README.md`](../../tools/charybdis-profile-studio/README.md).
 
-## Source Ownership
+## Current Source-Driven Ownership
 
 There is no sidecar profile format. The Studio parses existing C authoring
 blocks, renders a VS Code webview, and applies narrow patches back to those
-same blocks.
+same blocks. This describes current behavior, not the intended authority of a
+connected live session.
 
 The extension writes the selected profile under
 `keyboards/bastardkb/charybdis/4x6/keymaps/<name>/`. For the current `noah`
@@ -26,6 +30,22 @@ profile, the editable files are:
 
 For complex behavior rows, direct source editing is still expected after using
 the Studio as a starter.
+
+## Target Device-First Ownership
+
+When a live keyboard is connected, its exact committed generation becomes the
+editing baseline. Studio must be able to download the complete supported
+logical profile, create a generation-bound draft, commit it to both halves, and
+read it back. Source import and source export remain explicit operations; a
+connection never silently overwrites the keyboard or the repository.
+
+The device stores structured configuration values, not literal C text. The C
+files remain compiled defaults, recovery input, and the reviewable
+version-control representation. Initially one logical Studio profile may still
+be backed by standard VIA storage for layout/macros and the custom profile store
+for RGB, behaviors, and policy domains. That physical split must be covered by
+one logical manifest and transaction coordinator before the software can claim
+that a complete profile was committed atomically.
 
 ## Live Keyboard And Engineering Apply
 
@@ -47,6 +67,11 @@ first engineering live-apply path:
   readback. Those standard VIA writes use the firmware's existing immediate
   split mirror and durable reconciliation rather than a second profile format.
 - `Disconnect` closes the host connection.
+
+Despite the current feature name, Profile Wire's `READ_SURFACE` exposes only
+capability and status pages. It does not yet expose the committed custom-profile
+bytes. Standard VIA can read layout keycodes, but Studio cannot currently
+reconstruct the complete profile from the keyboard.
 
 The native HID path and connected handle stay in the extension host. The
 webview receives an opaque device id, a display label, decoded capabilities and
@@ -183,10 +208,11 @@ are local drafts until an apply action writes them to source.
 
 - Layout-slot edits are staged and written to `keymap.c` only when a layout
   apply action is pressed.
-- `Apply live` treats that source as authoritative for all authored layer
-  slots. It compares all slots with the connected keyboard, sends standard VIA
-  writes only for differences, and verifies each write. Unused matrix cells are
-  left untouched.
+- In the current milestone, `Apply live` treats source as authoritative for all
+  authored layer slots. It compares all slots with the connected keyboard,
+  sends standard VIA writes only for differences, and verifies each write.
+  Unused matrix cells are left untouched. Device-first readback will replace
+  this implicit direction with explicit keyboard/source import and export.
 - The Layout board's apply button appears on every layer whenever any layer has
   staged layout edits, and writes all staged layout edits in one pass.
 - Layer add/delete is a separate staged operation written only by

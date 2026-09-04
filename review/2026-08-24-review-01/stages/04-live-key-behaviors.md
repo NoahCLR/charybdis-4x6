@@ -118,7 +118,7 @@ state merely to make a profile apply appear fast.
 - [x] Safe waiting activation with reason diagnostics
 - [x] Add, edit, and remove live flows in the gated engineering path
 - [x] Persistent apply and peer convergence in the gated engineering path
-- [ ] Semantic diff, push, pull, and reset
+- [ ] Device readback, semantic diff, explicit source import/export, and reset
 - [x] Regression gate against direct array reads
 - [x] Updated docs, Studio UI, stage, risks, and progress
 
@@ -195,8 +195,9 @@ Run all matching targeted runners from AGENTS.md, including:
 - Invalid candidates leave the prior generation untouched.
 - Default behavior is unchanged when no live profile is valid.
 - Provider lookup meets measured memory, stack, and runtime bounds.
-- Source/device diff, push, pull, reset, tests, firmware compile, and hardware
-  evidence are recorded.
+- Device/draft/source diff, device readback and apply, explicit source
+  import/export, reset, tests, firmware compile, and hardware evidence are
+  recorded.
 
 ## Handoff
 

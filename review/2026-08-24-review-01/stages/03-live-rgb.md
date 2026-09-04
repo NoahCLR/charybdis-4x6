@@ -20,8 +20,9 @@ durable convergence; real-board proof remains open.
 ## Objective
 
 Make every Milestone A RGB surface read from one generation-consistent effective
-profile and make Profile Studio preview, persist, compare, push, and pull those
-fields without flashing.
+profile and make Profile Studio open, preview, persist, and compare those fields
+from the keyboard without flashing. Source import and export remain explicit
+secondary operations.
 
 This is the first visible end-to-end win.
 
@@ -240,8 +241,9 @@ Required targeted coverage:
 
 - Every current Profile Studio RGB surface changes the real keyboard without a
   flash.
-- The change can be previewed, cancelled, persisted, rebooted, pushed, pulled,
-  and reset according to the documented UX.
+- The change can be opened from the keyboard, previewed, cancelled, persisted,
+  rebooted, refreshed, explicitly imported from or exported to source, and
+  reset according to the documented UX.
 - Both halves display one coherent generation and converge after disruption.
 - No production RGB consumer bypasses the effective profile.
 - Compiled defaults render exactly as before when no live profile is valid.

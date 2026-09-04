@@ -48,7 +48,7 @@ Out of scope:
 - candidate writes;
 - persistent profile storage;
 - RGB or behavior activation;
-- source pull or push;
+- source import or export;
 - dynamic combos or layers.
 
 ## Firmware Contracts

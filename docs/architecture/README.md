@@ -20,6 +20,13 @@ This directory explains how the runtime is shaped and where changes belong.
   scan, RGB, pointing-device, split, or macro boundaries.
 - Use [memory-budgets.md](./memory-budgets.md) before interpreting target RAM,
   allocator, EEPROM-cache, or stack numbers.
+- Use [device-resident-profile.md](./device-resident-profile.md) for the target
+  Profile Studio authority, readback, source import/export, and performance
+  contracts. Current source-driven live apply is an interim implementation.
+- Use
+  [PROFILE_STUDIO_PRODUCT_GOAL.md](../tooling/PROFILE_STUDIO_PRODUCT_GOAL.md)
+  for the complete user experience and first-grade control-software completion
+  bar that the device-profile architecture serves.
 
 The source trace covers:
 
@@ -47,7 +54,8 @@ The main rule is:
 
 | Runtime fact | Owner | Readers or projections |
 | --- | --- | --- |
-| Authored layers, combos, macros, `key_behaviors[]`, RGB tables | keymap-owned files under `keyboards/.../keymaps/noah/` | behavior lookup, validation, RGB runtime, profile introspection |
+| Compiled profile defaults and source export | keymap-owned files under `keyboards/.../keymaps/noah/` | firmware compilation, source import/export, validation, profile introspection |
+| Active committed live profile | target: generation-owned device profile; current milestone: VIA layout plus custom RGB/behavior profile assembled from source | effective behavior/RGB runtime, dynamic keymap, Profile Studio device snapshot |
 | Action classification and dispatch semantics | `users/noah/lib/action/` | key behavior materialization, key runtime, macro dispatch, direct action taps |
 | QMK and fork compatibility assumptions | `users/noah/lib/compat/` | runtime entry flow, combo origin normalization, VIA split sync, QMK contract checks |
 | Authored key-behavior lookup and materialization | `users/noah/lib/key/behavior/` | key-runtime press planning and validation |
@@ -110,6 +118,12 @@ flowchart TD
   to make common changes and which checks to run.
 - [memory-budgets.md](./memory-budgets.md) separates RP2040 physical banks,
   linked occupancy, regression policies, and runtime high-water evidence.
+- [device-resident-profile.md](./device-resident-profile.md) defines the
+  device-first live-profile target and the boundary between device authority and
+  compiled/source representation.
+- [PROFILE_STUDIO_PRODUCT_GOAL.md](../tooling/PROFILE_STUDIO_PRODUCT_GOAL.md)
+  defines the finished configurator experience, complete product scope, and
+  quality bar.
 
 ## Architecture Rules
 

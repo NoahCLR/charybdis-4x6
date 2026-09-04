@@ -486,3 +486,62 @@ This bounded Stage 06 slice overlaps the still-open Milestone A hardware matrix
 because the first successful RGB hardware apply exposed base-layer editing as
 the critical missing user path. It is independent of the custom profile storage
 representation and does not relax Stage 05's production or resource exit bars.
+
+### D-026 — The Committed Device Profile Is The Target Live Authority
+
+Status: accepted on 2026-09-04; readback and device-first Studio lifecycle remain open
+
+The source-driven engineering milestone is an interim bridge, not the final
+authority model. A connected keyboard must eventually expose the complete
+supported structured configuration represented by `config.h`, `keymap.c`, and
+`rgb_config.c`. Studio opens from the exact committed device generation, edits
+a draft bound to that generation and digest, commits it safely to both halves,
+and reads it back for verification.
+
+The keyboard stores canonical structured values, not literal C. The three C
+files remain compiled factory defaults, recovery input, and the explicit
+human-reviewable import/export representation. Connecting, refreshing, source
+import, device apply, and source export are separate directional operations;
+none silently overwrites another authority.
+
+One logical profile may initially retain more than one established physical
+storage owner. Standard VIA remains responsible for dynamic layout and VIA
+macro storage, while the custom profile store owns RGB, behaviors, and future
+policy domains. Studio combines their readable state into one device snapshot
+and reports any inability to prove cross-store or peer convergence. This avoids
+duplicating VIA merely to create the appearance of one store.
+
+The current Profile Wire `READ_SURFACE` bit is capability/status readback only.
+It must not be documented or displayed as full profile readback. The next
+protocol work adds bounded chunked reads of the exact committed payload and
+generation-based compare-and-swap protection. The complete target and
+non-functional performance constraints are maintained in
+`docs/architecture/device-resident-profile.md`.
+
+### D-027 — Profile Studio Is First-Grade Keyboard Control Software
+
+Status: accepted on 2026-09-04; product implementation remains open
+
+The project target is not satisfied by adding live mutation to the current
+repo-backed editor. A normal user must be able to connect the keyboard, open
+its complete supported configuration, edit and validate a generation-bound
+draft, apply and read back one logical generation on both halves, and later
+recover that same configuration without the firmware repository.
+
+The device profile may retain VIA and custom physical stores, but one
+authoritative manifest and coordinator must bind all participating domain
+digests into a truthful logical generation. External VIA changes are adopted
+or exposed as conflicts. A partially updated physical store is never reported
+as a complete profile commit.
+
+The product includes backup/restore, explicit import/export/reset, migration
+and recovery, firmware compatibility guidance, actionable diagnostics, and a
+reusable application core independent of repository parsing. One active device
+profile plus named desktop backups is the preferred initial storage tradeoff;
+multiple named on-device profiles are not required without evidence.
+
+Delivery uses real-keyboard vertical slices and preserves keyboard quality.
+Pointing, matrix, RGB, idle-loop, memory, stack, persistence, and endurance
+thresholds are release requirements. Infrastructure without a usable connected
+workflow is not a completed product milestone. The maintained product contract
+is `docs/tooling/PROFILE_STUDIO_PRODUCT_GOAL.md`.

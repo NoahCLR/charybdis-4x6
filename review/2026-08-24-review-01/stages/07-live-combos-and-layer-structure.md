@@ -59,7 +59,7 @@ profile key ids and map source names to them.
 Any such design must:
 
 - avoid collision with userspace keycodes, macros, layer locks, and QMK ranges;
-- be stable across source pull/push;
+- be stable across explicit source import/export;
 - advertise capacity;
 - remain data-driven;
 - reject identities requiring new process_record code.
@@ -89,10 +89,10 @@ Do not duplicate the existing macro interpreter or cache.
 ## Deliverables
 
 - [ ] Dynamic combo provider and lifecycle safety
-- [ ] Combo source/device operations
+- [ ] Combo device operations plus explicit source import/export
 - [ ] Fixed-capacity logical layer structure
 - [ ] Atomic layer cross-reference rewrite and validation
-- [ ] Layer source/device operations
+- [ ] Layer device operations plus explicit source import/export
 - [ ] Accepted generic identity design or documented compiled-only boundary
 - [ ] Accepted hardcoded macro result
 - [ ] Updated docs, screenshots, decisions, risks, stage, and progress
@@ -122,7 +122,7 @@ Required coverage:
 ## Exit Criteria
 
 - Supported combos can be added, edited, removed, persisted, split-synced,
-  pulled, pushed, reset, and safely activated.
+  read from the keyboard, reset, and safely activated.
 - Logical layers can be added or removed within capacity as one valid
   cross-domain transaction.
 - Active QMK/runtime state never observes a partially changed combo or layer

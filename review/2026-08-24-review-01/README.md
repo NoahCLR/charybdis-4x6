@@ -1,11 +1,14 @@
-# Live Profile Editing Project
+# Charybdis Control Software And Live Profile Project
 
-Status: Stage 02 implementation in progress; Stage 00/01 real-board evidence pending
+Status: first source-driven hardware milestone confirmed; Stage 06 replanned
+around performance remediation and device-first readback
 
-Primary milestone: live RGB and live key-behavior editing
+Initial usable milestone: live RGB and base-key editing
+
+Product goal: first-grade keyboard control software
 
 This folder is the implementation control center for making Charybdis Profile
-Studio apply authored-profile changes to a connected keyboard without a
+Studio read and edit the keyboard's committed logical profile without a
 firmware rebuild and reflash.
 
 It uses [the initial architecture review prompt](../../prompts/initial-architecture-review.md) and opens a new review thread
@@ -21,12 +24,28 @@ defaults while allowing the connected keyboard to run a versioned live profile:
 - `keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h`
 - `keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c`
 
-Profile Studio becomes the bridge between source and device. It can compare,
-preview, apply, persist, pull, push, and reset live profile state.
+The keyboard's committed generation is the target authority for a connected
+session. Profile Studio opens it, edits a generation-bound draft, commits it to
+both halves, and verifies it by readback. Source import and canonical source
+export are explicit operations; the C files remain compiled defaults and the
+reviewable version-control representation. The maintained target contract is
+[`docs/architecture/device-resident-profile.md`](../../docs/architecture/device-resident-profile.md).
+
+The current engineering milestone still starts from source. It can persist RGB
+and custom behaviors, mutate VIA layout keys, and read status/digests, but it
+cannot yet download the committed custom-profile payload.
 
 The project does not attempt to hot-load arbitrary C code. Firmware algorithms,
 new hardware support, USB descriptors, and changes beyond compiled capacity
 ceilings still require a firmware build and flash.
+
+The full product promise is maintained in
+[`PROFILE_STUDIO_PRODUCT_GOAL.md`](../../docs/tooling/PROFILE_STUDIO_PRODUCT_GOAL.md).
+It requires a repository-independent normal workflow, one logical generation
+across all participating stores, complete field classification, backup and
+recovery, compatibility guidance, and measured keyboard-quality preservation.
+The device-resident architecture is a foundation for that product, not the
+complete product by itself.
 
 ## Milestone A: Live RGB And Key Behaviors
 
@@ -52,10 +71,10 @@ Milestone A is complete only when all of the following are true:
    no held key, modifier, macro, combo, layer, or pointer-mode lease is orphaned.
 6. Accepted changes reach both halves, survive reboot, and recover after a
    disconnect, role swap, or interrupted transfer.
-7. Profile Studio shows whether draft, source, USB-half, and peer-half state
-   agree.
-8. The user can push source defaults to the keyboard, pull supported device
-   state into source, and reset the keyboard to compiled defaults.
+7. Profile Studio can open the complete supported profile from the keyboard and
+   shows whether draft, source export, USB-half, and peer-half state agree.
+8. The user can explicitly import source, export a device-derived draft to
+   source, apply a draft to the keyboard, and reset to compiled defaults.
 9. Host tests, target resource gates, firmware compile, and the Milestone A
    hardware matrix pass.
 
@@ -64,14 +83,14 @@ split-consistency, source-reconciliation, or recovery requirements by itself.
 
 ## Architecture In One Page
 
-The intended flow is:
+The intended target flow is:
 
     three C files
-        -> compiled default profile
-        -> effective profile provider
-        -> RGB and key runtime consumers
+        -> compiled default and explicit source import/export
 
-    Profile Studio draft
+    committed keyboard generation
+        -> bounded device readback
+        -> Profile Studio generation-bound draft
         -> desktop validation and canonical encoder
         -> VIA Raw HID custom profile protocol
         -> staged device candidate
@@ -79,6 +98,9 @@ The intended flow is:
         -> safe atomic activation
         -> persistent profile store
         -> split reconciliation
+        -> readback verification
+        -> effective profile provider
+        -> RGB, key, and policy consumers
 
 Core rules:
 
@@ -107,7 +129,7 @@ Core rules:
 | [03](stages/03-live-rgb.md) | Live RGB vertical slice | 02 | All Milestone A RGB surfaces use the effective profile |
 | [04](stages/04-live-key-behaviors.md) | Live key-behavior vertical slice | 02 | Supported behavior rows use the effective profile |
 | [05](stages/05-milestone-a-integration.md) | Milestone A integration and hardware closure | 03 and 04 | Live RGB plus behaviors is a trustworthy end-to-end product |
-| [06](stages/06-live-defaults-layout-and-macros.md) | Existing VIA surfaces and runtime defaults | 05 | Layout, macros, and practical config defaults share the same source/device UX |
+| [06](stages/06-live-defaults-layout-and-macros.md) | Performance remediation, device readback, existing VIA surfaces, and runtime defaults | first hardware milestone plus open Stage 05 acceptance | Studio opens one generation-aware device snapshot before further surface expansion |
 | [07](stages/07-live-combos-and-layer-structure.md) | Dynamic combos and layer structure | 06 | Remaining high-coupling authored data is live within fixed capacities |
 | [08](stages/08-production-closure.md) | Production closure and migration | 07 | Documentation, recovery, upgrades, budgets, and hardware evidence close the project |
 
@@ -128,6 +150,8 @@ deferred.
 | [field-classification.md](field-classification.md) | Classification of every Profile Studio field and source surface |
 | [profile-wire-v1.md](profile-wire-v1.md) | Canonical blob, action, domain, transport, error, and fixture contract |
 | [authority-state-table.md](authority-state-table.md) | Source/device operations, generation authority, preview, and safe activation |
+| [device-resident-profile.md](../../docs/architecture/device-resident-profile.md) | Maintained device-first authority, readback, import/export, performance, and completion contract |
+| [Profile Studio product goal](../../docs/tooling/PROFILE_STUDIO_PRODUCT_GOAL.md) | Finished user experience, product capabilities, delivery strategy, and quality bar |
 | [stages/](stages/) | Bounded stage briefs with scope, deliverables, tests, and exit criteria |
 
 ## Agent Entry Point

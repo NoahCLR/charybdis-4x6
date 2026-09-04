@@ -77,10 +77,30 @@ Update:
 - architecture source map, runtime flow, and change guide
 - key runtime, RGB, interaction, pointer, macro, VIA, and split docs where
   behavior changed
-- setup, first connection, preview, apply, push, pull, reset, recovery, limits,
-  and troubleshooting
+- setup, first connection, open/refresh from keyboard, preview, apply to
+  keyboard, explicit source import/export, reset, recovery, limits, and
+  troubleshooting
 - screenshots and hover states
 - generated profile docs where authored inputs changed
+
+### Product Experience And Packaging
+
+Prove the critical user journeys in
+`docs/tooling/PROFILE_STUDIO_PRODUCT_GOAL.md`:
+
+- first connection and complete open from keyboard;
+- edit, validation, preview, undo/redo, and verified apply;
+- stale draft, external VIA edit, missing peer, disconnect, and partial failure;
+- named backup, restore, import/export, and factory reset;
+- incompatible firmware/schema guidance and recovery;
+- normal configuration without an open firmware repository;
+- accessible, actionable primary UI with development diagnostics kept
+  available but secondary.
+
+The reusable transport, schema, device-session, and profile-model core must not
+depend on VS Code workspace parsing. The VS Code extension may remain a
+supported shell, but it cannot be the only path to the repository-independent
+normal workflow required by the product goal.
 
 ### Hardware Closure
 
@@ -101,6 +121,7 @@ Record firmware hashes or commits and exact board setup.
 - [ ] Final resource and performance report
 - [ ] Mechanical architecture gates
 - [ ] Complete user and developer documentation
+- [ ] Product-journey and repository-independent packaging evidence
 - [ ] Final screenshots and generated docs
 - [ ] Full automated verification
 - [ ] Full hardware verification

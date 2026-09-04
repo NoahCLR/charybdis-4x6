@@ -31,7 +31,8 @@ One candidate may change RGB and behavior fields together. The system must:
 - publish both domains as one generation;
 - invalidate RGB and behavior-derived caches after publication;
 - persist and split-sync one committed identity;
-- pull or push the matching semantic source changes as one user operation.
+- expose matching source import or export as an explicit user operation,
+  separate from applying the candidate to the keyboard.
 
 ### Source And Device Coordinator
 

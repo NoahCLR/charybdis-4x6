@@ -31,7 +31,7 @@ dependency status without duplicating or prematurely resolving its findings.
 | 03 — Live RGB | engineering vertical slice hardware-confirmed; broader persistence matrix pending | Studio compiles and applies authored RGB successfully on the real two-half board |
 | 04 — Live key behaviors | engineering vertical slice complete; hardware and timing evidence pending | Studio compiles supported authored behaviors and the gated provider publishes them through the runtime lookup seam |
 | 05 — Milestone A integration | in progress; initial two-half live-edit path operational | RGB and standard layout apply are confirmed; custom behavior, recovery, and resource matrix remain |
-| 06 — Defaults, layout, and macros | in progress; standard-VIA layout source push hardware-confirmed | base-key apply works; peer visibility, reboot/role matrix, pull/reset, macros, and defaults remain |
+| 06 — Defaults, layout, and macros | replanned around device-first sessions; standard-VIA layout apply hardware-confirmed | base-key apply works; cadence measurement/remediation, complete device readback, generation-bound drafts, peer/reboot/role matrix, macros, and defaults remain |
 | 07 — Combos and layer structure | blocked on Stage 06 | open |
 | 08 — Production closure | blocked on Stage 07 | open |
 
@@ -2042,3 +2042,72 @@ Next steps:
 3. Run the remaining reboot, USB-orientation, role-swap, custom-behavior, and
    recovery tests only after that audit identifies which live-edit work is
    allowed on steady-state scans and which must be deferred or removed.
+
+### 2026-09-04 — Device-resident profile goal and authority replan
+
+- Reassessed the first usable source-driven milestone against the intended
+  product experience. The current firmware can persist and activate RGB and
+  custom behaviors, expose generation/digest status, and read/write VIA layout
+  keys, but Profile Studio cannot download the committed custom-profile payload
+  or reconstruct the complete configuration from the keyboard.
+- Accepted D-026: the exact committed device generation is the target authority
+  for a connected live session. The three C files remain compiled defaults,
+  recovery input, and explicit human-reviewable source import/export; the
+  keyboard stores canonical structured values rather than literal C text.
+- Added `docs/architecture/device-resident-profile.md` as the maintained target
+  contract. It defines complete payload readback, a unified logical snapshot
+  across Profile Wire and standard VIA, generation-bound drafts, stale-write
+  refusal, explicit directional operations, reset semantics, performance
+  requirements, and the end-to-end completion criterion.
+- Updated the root README, both Profile Studio guides, architecture index and
+  source map, active architecture assessment, decisions, and Stages 06–07 so
+  they distinguish current source-driven behavior from the device-first goal.
+  The old statement that C is the only live source of truth is no longer the
+  documented target.
+- Replanned Stage 06 to put polling instrumentation, steady-state performance
+  remediation, chunked committed-profile readback, unified device snapshots,
+  and source import/export before macros/defaults or further surface growth.
+- This checkpoint changes documentation and architecture direction only. It
+  does not claim that complete device readback, conflict-safe device-first
+  editing, or the performance remediation has been implemented.
+
+Next steps:
+
+1. Add hardware-visible pointing/main-loop cadence measurements and regression
+   thresholds, then remove unconditional idle metadata encoding and repeated
+   live RGB materialization.
+2. Design and implement a bounded Profile Wire read command for the exact
+   committed payload, correlated by generation and digest.
+3. Build the Studio device snapshot and generation-bound draft lifecycle before
+   extending live coverage to macros, defaults, combos, or layer structure.
+
+### 2026-09-04 — First-grade control-software product goal
+
+- Promoted the project goal from device-resident live editing to first-grade
+  Charybdis control software. The normal product journey starts from the
+  connected keyboard and does not require an open firmware repository or C
+  knowledge.
+- Added `docs/tooling/PROFILE_STUDIO_PRODUCT_GOAL.md` as the maintained product
+  contract. It specifies the complete connect/open/edit/preview/apply/readback
+  journey, backup and restore, recovery, compatibility guidance, field
+  classification, packaging boundary, performance bar, and completion
+  criterion.
+- Accepted D-027. One logical profile may use VIA and custom physical storage,
+  but it now requires one authoritative manifest and coordinator covering all
+  domain digests. External VIA writes must be adopted or exposed as conflicts;
+  a partial cross-store write cannot be called a complete profile commit.
+- Updated the root and Profile Studio documentation, device-resident technical
+  contract, architecture index and assessment, active project overview, field
+  classification, Stage 06, Stage 08, and risk register to follow that goal.
+- Added R-22 for false cross-store atomicity and R-23 for remaining repo-bound.
+  This checkpoint changes documentation and project acceptance only; it does
+  not claim those risks are implemented or resolved.
+
+Next steps:
+
+1. Measure and remediate the observed pointing-cadence regression before
+   expanding live functionality.
+2. Freeze the logical-profile manifest, cross-store commit/recovery behavior,
+   and external VIA edit semantics.
+3. Implement complete device readback and a repository-independent device
+   snapshot, ending in a real-keyboard open/edit/apply/readback checkpoint.
