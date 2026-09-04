@@ -1,0 +1,6803 @@
+{
+  "format": "charybdis-keycode-catalog-v1",
+  "qmkVersion": "0.32.5-1-gaac9f637ee",
+  "source": "data/constants/keycodes",
+  "generatedFrom": [
+    "keycodes_us_0.0.1.hjson",
+    "keycodes_0.0.1.hjson",
+    "keycodes_0.0.1_audio.hjson",
+    "keycodes_0.0.1_basic.hjson",
+    "keycodes_0.0.1_joystick.hjson",
+    "keycodes_0.0.1_lighting.hjson",
+    "keycodes_0.0.1_macro.hjson",
+    "keycodes_0.0.1_magic.hjson",
+    "keycodes_0.0.1_midi.hjson",
+    "keycodes_0.0.1_programmable_button.hjson",
+    "keycodes_0.0.1_quantum.hjson",
+    "keycodes_0.0.1_sequencer.hjson",
+    "keycodes_0.0.1_steno.hjson",
+    "keycodes_0.0.1_swap_hands.hjson",
+    "keycodes_0.0.2.hjson",
+    "keycodes_0.0.2_basic.hjson",
+    "keycodes_0.0.2_kb.hjson",
+    "keycodes_0.0.2_magic.hjson",
+    "keycodes_0.0.2_midi.hjson",
+    "keycodes_0.0.2_quantum.hjson",
+    "keycodes_0.0.2_sequencer.hjson",
+    "keycodes_0.0.2_swap_hands.hjson",
+    "keycodes_0.0.2_user.hjson",
+    "keycodes_0.0.3.hjson",
+    "keycodes_0.0.3_quantum.hjson",
+    "keycodes_0.0.4.hjson",
+    "keycodes_0.0.4_lighting.hjson",
+    "keycodes_0.0.5.hjson",
+    "keycodes_0.0.5_basic.hjson",
+    "keycodes_0.0.6.hjson",
+    "keycodes_0.0.6_connection.hjson",
+    "keycodes_0.0.6_quantum.hjson",
+    "keycodes_0.0.7.hjson",
+    "keycodes_0.0.8.hjson",
+    "keycodes_0.0.8_lighting.hjson"
+  ],
+  "entries": [
+    {
+      "value": 0,
+      "name": "KC_NO",
+      "label": "N/A",
+      "group": "internal",
+      "aliases": [
+        "XXXXXXX"
+      ]
+    },
+    {
+      "value": 1,
+      "name": "KC_TRANSPARENT",
+      "label": "Transparent",
+      "group": "internal",
+      "aliases": [
+        "_______",
+        "KC_TRNS"
+      ]
+    },
+    {
+      "value": 4,
+      "name": "KC_A",
+      "label": "A",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 5,
+      "name": "KC_B",
+      "label": "B",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 6,
+      "name": "KC_C",
+      "label": "C",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 7,
+      "name": "KC_D",
+      "label": "D",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 8,
+      "name": "KC_E",
+      "label": "E",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 9,
+      "name": "KC_F",
+      "label": "F",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 10,
+      "name": "KC_G",
+      "label": "G",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 11,
+      "name": "KC_H",
+      "label": "H",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 12,
+      "name": "KC_I",
+      "label": "I",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 13,
+      "name": "KC_J",
+      "label": "J",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 14,
+      "name": "KC_K",
+      "label": "K",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 15,
+      "name": "KC_L",
+      "label": "L",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 16,
+      "name": "KC_M",
+      "label": "M",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 17,
+      "name": "KC_N",
+      "label": "N",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 18,
+      "name": "KC_O",
+      "label": "O",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 19,
+      "name": "KC_P",
+      "label": "P",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 20,
+      "name": "KC_Q",
+      "label": "Q",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 21,
+      "name": "KC_R",
+      "label": "R",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 22,
+      "name": "KC_S",
+      "label": "S",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 23,
+      "name": "KC_T",
+      "label": "T",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 24,
+      "name": "KC_U",
+      "label": "U",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 25,
+      "name": "KC_V",
+      "label": "V",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 26,
+      "name": "KC_W",
+      "label": "W",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 27,
+      "name": "KC_X",
+      "label": "X",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 28,
+      "name": "KC_Y",
+      "label": "Y",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 29,
+      "name": "KC_Z",
+      "label": "Z",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 30,
+      "name": "KC_1",
+      "label": "1",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 31,
+      "name": "KC_2",
+      "label": "2",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 32,
+      "name": "KC_3",
+      "label": "3",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 33,
+      "name": "KC_4",
+      "label": "4",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 34,
+      "name": "KC_5",
+      "label": "5",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 35,
+      "name": "KC_6",
+      "label": "6",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 36,
+      "name": "KC_7",
+      "label": "7",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 37,
+      "name": "KC_8",
+      "label": "8",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 38,
+      "name": "KC_9",
+      "label": "9",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 39,
+      "name": "KC_0",
+      "label": "0",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 40,
+      "name": "KC_ENTER",
+      "label": "Enter",
+      "group": "basic",
+      "aliases": [
+        "KC_ENT"
+      ]
+    },
+    {
+      "value": 41,
+      "name": "KC_ESCAPE",
+      "label": "Esc",
+      "group": "basic",
+      "aliases": [
+        "KC_ESC"
+      ]
+    },
+    {
+      "value": 42,
+      "name": "KC_BACKSPACE",
+      "label": "Backspace",
+      "group": "basic",
+      "aliases": [
+        "KC_BSPC"
+      ]
+    },
+    {
+      "value": 43,
+      "name": "KC_TAB",
+      "label": "Tab",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 44,
+      "name": "KC_SPACE",
+      "label": "Spacebar",
+      "group": "basic",
+      "aliases": [
+        "KC_SPC"
+      ]
+    },
+    {
+      "value": 45,
+      "name": "KC_MINUS",
+      "label": "-",
+      "group": "basic",
+      "aliases": [
+        "KC_MINS"
+      ]
+    },
+    {
+      "value": 46,
+      "name": "KC_EQUAL",
+      "label": "=",
+      "group": "basic",
+      "aliases": [
+        "KC_EQL"
+      ]
+    },
+    {
+      "value": 47,
+      "name": "KC_LEFT_BRACKET",
+      "label": "[",
+      "group": "basic",
+      "aliases": [
+        "KC_LBRC"
+      ]
+    },
+    {
+      "value": 48,
+      "name": "KC_RIGHT_BRACKET",
+      "label": "]",
+      "group": "basic",
+      "aliases": [
+        "KC_RBRC"
+      ]
+    },
+    {
+      "value": 49,
+      "name": "KC_BACKSLASH",
+      "label": "\\",
+      "group": "basic",
+      "aliases": [
+        "KC_BSLS"
+      ]
+    },
+    {
+      "value": 50,
+      "name": "KC_NONUS_HASH",
+      "label": "#",
+      "group": "basic",
+      "aliases": [
+        "KC_NUHS"
+      ]
+    },
+    {
+      "value": 51,
+      "name": "KC_SEMICOLON",
+      "label": ";",
+      "group": "basic",
+      "aliases": [
+        "KC_SCLN"
+      ]
+    },
+    {
+      "value": 52,
+      "name": "KC_QUOTE",
+      "label": "'",
+      "group": "basic",
+      "aliases": [
+        "KC_QUOT"
+      ]
+    },
+    {
+      "value": 53,
+      "name": "KC_GRAVE",
+      "label": "`",
+      "group": "basic",
+      "aliases": [
+        "KC_GRV"
+      ]
+    },
+    {
+      "value": 54,
+      "name": "KC_COMMA",
+      "label": ",",
+      "group": "basic",
+      "aliases": [
+        "KC_COMM"
+      ]
+    },
+    {
+      "value": 55,
+      "name": "KC_DOT",
+      "label": ".",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 56,
+      "name": "KC_SLASH",
+      "label": "/",
+      "group": "basic",
+      "aliases": [
+        "KC_SLSH"
+      ]
+    },
+    {
+      "value": 57,
+      "name": "KC_CAPS_LOCK",
+      "label": "Caps Lock",
+      "group": "basic",
+      "aliases": [
+        "KC_CAPS"
+      ]
+    },
+    {
+      "value": 58,
+      "name": "KC_F1",
+      "label": "F1",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 59,
+      "name": "KC_F2",
+      "label": "F2",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 60,
+      "name": "KC_F3",
+      "label": "F3",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 61,
+      "name": "KC_F4",
+      "label": "F4",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 62,
+      "name": "KC_F5",
+      "label": "F5",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 63,
+      "name": "KC_F6",
+      "label": "F6",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 64,
+      "name": "KC_F7",
+      "label": "F7",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 65,
+      "name": "KC_F8",
+      "label": "F8",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 66,
+      "name": "KC_F9",
+      "label": "F9",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 67,
+      "name": "KC_F10",
+      "label": "F10",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 68,
+      "name": "KC_F11",
+      "label": "F11",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 69,
+      "name": "KC_F12",
+      "label": "F12",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 70,
+      "name": "KC_PRINT_SCREEN",
+      "label": "Print Screen",
+      "group": "basic",
+      "aliases": [
+        "KC_PSCR"
+      ]
+    },
+    {
+      "value": 71,
+      "name": "KC_SCROLL_LOCK",
+      "label": "Scroll Lock",
+      "group": "basic",
+      "aliases": [
+        "KC_SCRL",
+        "KC_BRMD"
+      ]
+    },
+    {
+      "value": 72,
+      "name": "KC_PAUSE",
+      "label": "Pause",
+      "group": "basic",
+      "aliases": [
+        "KC_PAUS",
+        "KC_BRK",
+        "KC_BRMU"
+      ]
+    },
+    {
+      "value": 73,
+      "name": "KC_INSERT",
+      "label": "Insert",
+      "group": "basic",
+      "aliases": [
+        "KC_INS"
+      ]
+    },
+    {
+      "value": 74,
+      "name": "KC_HOME",
+      "label": "Home",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 75,
+      "name": "KC_PAGE_UP",
+      "label": "Page Up",
+      "group": "basic",
+      "aliases": [
+        "KC_PGUP"
+      ]
+    },
+    {
+      "value": 76,
+      "name": "KC_DELETE",
+      "label": "Delete",
+      "group": "basic",
+      "aliases": [
+        "KC_DEL"
+      ]
+    },
+    {
+      "value": 77,
+      "name": "KC_END",
+      "label": "End",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 78,
+      "name": "KC_PAGE_DOWN",
+      "label": "Page Down",
+      "group": "basic",
+      "aliases": [
+        "KC_PGDN"
+      ]
+    },
+    {
+      "value": 79,
+      "name": "KC_RIGHT",
+      "label": "Right",
+      "group": "basic",
+      "aliases": [
+        "KC_RGHT"
+      ]
+    },
+    {
+      "value": 80,
+      "name": "KC_LEFT",
+      "label": "Left",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 81,
+      "name": "KC_DOWN",
+      "label": "Down",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 82,
+      "name": "KC_UP",
+      "label": "Up",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 83,
+      "name": "KC_NUM_LOCK",
+      "label": "Num Lock",
+      "group": "basic",
+      "aliases": [
+        "KC_NUM"
+      ]
+    },
+    {
+      "value": 84,
+      "name": "KC_KP_SLASH",
+      "label": "/",
+      "group": "basic",
+      "aliases": [
+        "KC_PSLS"
+      ]
+    },
+    {
+      "value": 85,
+      "name": "KC_KP_ASTERISK",
+      "label": "*",
+      "group": "basic",
+      "aliases": [
+        "KC_PAST"
+      ]
+    },
+    {
+      "value": 86,
+      "name": "KC_KP_MINUS",
+      "label": "-",
+      "group": "basic",
+      "aliases": [
+        "KC_PMNS"
+      ]
+    },
+    {
+      "value": 87,
+      "name": "KC_KP_PLUS",
+      "label": "+",
+      "group": "basic",
+      "aliases": [
+        "KC_PPLS"
+      ]
+    },
+    {
+      "value": 88,
+      "name": "KC_KP_ENTER",
+      "label": "Enter",
+      "group": "basic",
+      "aliases": [
+        "KC_PENT"
+      ]
+    },
+    {
+      "value": 89,
+      "name": "KC_KP_1",
+      "label": "1",
+      "group": "basic",
+      "aliases": [
+        "KC_P1"
+      ]
+    },
+    {
+      "value": 90,
+      "name": "KC_KP_2",
+      "label": "2",
+      "group": "basic",
+      "aliases": [
+        "KC_P2"
+      ]
+    },
+    {
+      "value": 91,
+      "name": "KC_KP_3",
+      "label": "3",
+      "group": "basic",
+      "aliases": [
+        "KC_P3"
+      ]
+    },
+    {
+      "value": 92,
+      "name": "KC_KP_4",
+      "label": "4",
+      "group": "basic",
+      "aliases": [
+        "KC_P4"
+      ]
+    },
+    {
+      "value": 93,
+      "name": "KC_KP_5",
+      "label": "5",
+      "group": "basic",
+      "aliases": [
+        "KC_P5"
+      ]
+    },
+    {
+      "value": 94,
+      "name": "KC_KP_6",
+      "label": "6",
+      "group": "basic",
+      "aliases": [
+        "KC_P6"
+      ]
+    },
+    {
+      "value": 95,
+      "name": "KC_KP_7",
+      "label": "7",
+      "group": "basic",
+      "aliases": [
+        "KC_P7"
+      ]
+    },
+    {
+      "value": 96,
+      "name": "KC_KP_8",
+      "label": "8",
+      "group": "basic",
+      "aliases": [
+        "KC_P8"
+      ]
+    },
+    {
+      "value": 97,
+      "name": "KC_KP_9",
+      "label": "9",
+      "group": "basic",
+      "aliases": [
+        "KC_P9"
+      ]
+    },
+    {
+      "value": 98,
+      "name": "KC_KP_0",
+      "label": "0",
+      "group": "basic",
+      "aliases": [
+        "KC_P0"
+      ]
+    },
+    {
+      "value": 99,
+      "name": "KC_KP_DOT",
+      "label": ".",
+      "group": "basic",
+      "aliases": [
+        "KC_PDOT"
+      ]
+    },
+    {
+      "value": 100,
+      "name": "KC_NONUS_BACKSLASH",
+      "label": "\\",
+      "group": "basic",
+      "aliases": [
+        "KC_NUBS"
+      ]
+    },
+    {
+      "value": 101,
+      "name": "KC_APPLICATION",
+      "label": "App",
+      "group": "basic",
+      "aliases": [
+        "KC_APP"
+      ]
+    },
+    {
+      "value": 102,
+      "name": "KC_KB_POWER",
+      "label": "Power",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 103,
+      "name": "KC_KP_EQUAL",
+      "label": "=",
+      "group": "basic",
+      "aliases": [
+        "KC_PEQL"
+      ]
+    },
+    {
+      "value": 104,
+      "name": "KC_F13",
+      "label": "F13",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 105,
+      "name": "KC_F14",
+      "label": "F14",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 106,
+      "name": "KC_F15",
+      "label": "F15",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 107,
+      "name": "KC_F16",
+      "label": "F16",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 108,
+      "name": "KC_F17",
+      "label": "F17",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 109,
+      "name": "KC_F18",
+      "label": "F18",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 110,
+      "name": "KC_F19",
+      "label": "F19",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 111,
+      "name": "KC_F20",
+      "label": "F20",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 112,
+      "name": "KC_F21",
+      "label": "F21",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 113,
+      "name": "KC_F22",
+      "label": "F22",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 114,
+      "name": "KC_F23",
+      "label": "F23",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 115,
+      "name": "KC_F24",
+      "label": "F24",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 116,
+      "name": "KC_EXECUTE",
+      "label": "Execute",
+      "group": "basic",
+      "aliases": [
+        "KC_EXEC"
+      ]
+    },
+    {
+      "value": 117,
+      "name": "KC_HELP",
+      "label": "Help",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 118,
+      "name": "KC_MENU",
+      "label": "Menu",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 119,
+      "name": "KC_SELECT",
+      "label": "Select",
+      "group": "basic",
+      "aliases": [
+        "KC_SLCT"
+      ]
+    },
+    {
+      "value": 120,
+      "name": "KC_STOP",
+      "label": "Stop",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 121,
+      "name": "KC_AGAIN",
+      "label": "Again",
+      "group": "basic",
+      "aliases": [
+        "KC_AGIN"
+      ]
+    },
+    {
+      "value": 122,
+      "name": "KC_UNDO",
+      "label": "Undo",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 123,
+      "name": "KC_CUT",
+      "label": "Cut",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 124,
+      "name": "KC_COPY",
+      "label": "Copy",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 125,
+      "name": "KC_PASTE",
+      "label": "Paste",
+      "group": "basic",
+      "aliases": [
+        "KC_PSTE"
+      ]
+    },
+    {
+      "value": 126,
+      "name": "KC_FIND",
+      "label": "Find",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 127,
+      "name": "KC_KB_MUTE",
+      "label": "Mute",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 128,
+      "name": "KC_KB_VOLUME_UP",
+      "label": "Volume Up",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 129,
+      "name": "KC_KB_VOLUME_DOWN",
+      "label": "Volume Down",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 130,
+      "name": "KC_LOCKING_CAPS_LOCK",
+      "label": "Caps Lock",
+      "group": "basic",
+      "aliases": [
+        "KC_LCAP"
+      ]
+    },
+    {
+      "value": 131,
+      "name": "KC_LOCKING_NUM_LOCK",
+      "label": "Num Lock",
+      "group": "basic",
+      "aliases": [
+        "KC_LNUM"
+      ]
+    },
+    {
+      "value": 132,
+      "name": "KC_LOCKING_SCROLL_LOCK",
+      "label": "Scroll Lock",
+      "group": "basic",
+      "aliases": [
+        "KC_LSCR"
+      ]
+    },
+    {
+      "value": 133,
+      "name": "KC_KP_COMMA",
+      "label": ",",
+      "group": "basic",
+      "aliases": [
+        "KC_PCMM"
+      ]
+    },
+    {
+      "value": 134,
+      "name": "KC_KP_EQUAL_AS400",
+      "label": "=",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 135,
+      "name": "KC_INTERNATIONAL_1",
+      "label": "INT 1",
+      "group": "basic",
+      "aliases": [
+        "KC_INT1"
+      ]
+    },
+    {
+      "value": 136,
+      "name": "KC_INTERNATIONAL_2",
+      "label": "INT 2",
+      "group": "basic",
+      "aliases": [
+        "KC_INT2"
+      ]
+    },
+    {
+      "value": 137,
+      "name": "KC_INTERNATIONAL_3",
+      "label": "INT 3",
+      "group": "basic",
+      "aliases": [
+        "KC_INT3"
+      ]
+    },
+    {
+      "value": 138,
+      "name": "KC_INTERNATIONAL_4",
+      "label": "INT 4",
+      "group": "basic",
+      "aliases": [
+        "KC_INT4"
+      ]
+    },
+    {
+      "value": 139,
+      "name": "KC_INTERNATIONAL_5",
+      "label": "INT 5",
+      "group": "basic",
+      "aliases": [
+        "KC_INT5"
+      ]
+    },
+    {
+      "value": 140,
+      "name": "KC_INTERNATIONAL_6",
+      "label": "INT 6",
+      "group": "basic",
+      "aliases": [
+        "KC_INT6"
+      ]
+    },
+    {
+      "value": 141,
+      "name": "KC_INTERNATIONAL_7",
+      "label": "INT 7",
+      "group": "basic",
+      "aliases": [
+        "KC_INT7"
+      ]
+    },
+    {
+      "value": 142,
+      "name": "KC_INTERNATIONAL_8",
+      "label": "INT 8",
+      "group": "basic",
+      "aliases": [
+        "KC_INT8"
+      ]
+    },
+    {
+      "value": 143,
+      "name": "KC_INTERNATIONAL_9",
+      "label": "INT 9",
+      "group": "basic",
+      "aliases": [
+        "KC_INT9"
+      ]
+    },
+    {
+      "value": 144,
+      "name": "KC_LANGUAGE_1",
+      "label": "LANG 1",
+      "group": "basic",
+      "aliases": [
+        "KC_LNG1"
+      ]
+    },
+    {
+      "value": 145,
+      "name": "KC_LANGUAGE_2",
+      "label": "LANG 2",
+      "group": "basic",
+      "aliases": [
+        "KC_LNG2"
+      ]
+    },
+    {
+      "value": 146,
+      "name": "KC_LANGUAGE_3",
+      "label": "LANG 3",
+      "group": "basic",
+      "aliases": [
+        "KC_LNG3"
+      ]
+    },
+    {
+      "value": 147,
+      "name": "KC_LANGUAGE_4",
+      "label": "LANG 4",
+      "group": "basic",
+      "aliases": [
+        "KC_LNG4"
+      ]
+    },
+    {
+      "value": 148,
+      "name": "KC_LANGUAGE_5",
+      "label": "LANG 5",
+      "group": "basic",
+      "aliases": [
+        "KC_LNG5"
+      ]
+    },
+    {
+      "value": 149,
+      "name": "KC_LANGUAGE_6",
+      "label": "LANG 6",
+      "group": "basic",
+      "aliases": [
+        "KC_LNG6"
+      ]
+    },
+    {
+      "value": 150,
+      "name": "KC_LANGUAGE_7",
+      "label": "LANG 7",
+      "group": "basic",
+      "aliases": [
+        "KC_LNG7"
+      ]
+    },
+    {
+      "value": 151,
+      "name": "KC_LANGUAGE_8",
+      "label": "LANG 8",
+      "group": "basic",
+      "aliases": [
+        "KC_LNG8"
+      ]
+    },
+    {
+      "value": 152,
+      "name": "KC_LANGUAGE_9",
+      "label": "LANG 9",
+      "group": "basic",
+      "aliases": [
+        "KC_LNG9"
+      ]
+    },
+    {
+      "value": 153,
+      "name": "KC_ALTERNATE_ERASE",
+      "label": "Alternate Erase",
+      "group": "basic",
+      "aliases": [
+        "KC_ERAS"
+      ]
+    },
+    {
+      "value": 154,
+      "name": "KC_SYSTEM_REQUEST",
+      "label": "SysReq/Attention",
+      "group": "basic",
+      "aliases": [
+        "KC_SYRQ"
+      ]
+    },
+    {
+      "value": 155,
+      "name": "KC_CANCEL",
+      "label": "Cancel",
+      "group": "basic",
+      "aliases": [
+        "KC_CNCL"
+      ]
+    },
+    {
+      "value": 156,
+      "name": "KC_CLEAR",
+      "label": "Clear",
+      "group": "basic",
+      "aliases": [
+        "KC_CLR"
+      ]
+    },
+    {
+      "value": 157,
+      "name": "KC_PRIOR",
+      "label": "Prior",
+      "group": "basic",
+      "aliases": [
+        "KC_PRIR"
+      ]
+    },
+    {
+      "value": 158,
+      "name": "KC_RETURN",
+      "label": "Return",
+      "group": "basic",
+      "aliases": [
+        "KC_RETN"
+      ]
+    },
+    {
+      "value": 159,
+      "name": "KC_SEPARATOR",
+      "label": "Separator",
+      "group": "basic",
+      "aliases": [
+        "KC_SEPR"
+      ]
+    },
+    {
+      "value": 160,
+      "name": "KC_OUT",
+      "label": "Out",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 161,
+      "name": "KC_OPER",
+      "label": "Oper",
+      "group": "basic",
+      "aliases": []
+    },
+    {
+      "value": 162,
+      "name": "KC_CLEAR_AGAIN",
+      "label": "Clear/Again",
+      "group": "basic",
+      "aliases": [
+        "KC_CLAG"
+      ]
+    },
+    {
+      "value": 163,
+      "name": "KC_CRSEL",
+      "label": "CrSel/Props",
+      "group": "basic",
+      "aliases": [
+        "KC_CRSL"
+      ]
+    },
+    {
+      "value": 164,
+      "name": "KC_EXSEL",
+      "label": "ExSel",
+      "group": "basic",
+      "aliases": [
+        "KC_EXSL"
+      ]
+    },
+    {
+      "value": 165,
+      "name": "KC_SYSTEM_POWER",
+      "label": "Power",
+      "group": "system",
+      "aliases": [
+        "KC_PWR"
+      ]
+    },
+    {
+      "value": 166,
+      "name": "KC_SYSTEM_SLEEP",
+      "label": "Sleep",
+      "group": "system",
+      "aliases": [
+        "KC_SLEP"
+      ]
+    },
+    {
+      "value": 167,
+      "name": "KC_SYSTEM_WAKE",
+      "label": "Wake",
+      "group": "system",
+      "aliases": [
+        "KC_WAKE"
+      ]
+    },
+    {
+      "value": 168,
+      "name": "KC_AUDIO_MUTE",
+      "label": "Mute",
+      "group": "media",
+      "aliases": [
+        "KC_MUTE"
+      ]
+    },
+    {
+      "value": 169,
+      "name": "KC_AUDIO_VOL_UP",
+      "label": "Volume Up",
+      "group": "media",
+      "aliases": [
+        "KC_VOLU"
+      ]
+    },
+    {
+      "value": 170,
+      "name": "KC_AUDIO_VOL_DOWN",
+      "label": "Volume Down",
+      "group": "media",
+      "aliases": [
+        "KC_VOLD"
+      ]
+    },
+    {
+      "value": 171,
+      "name": "KC_MEDIA_NEXT_TRACK",
+      "label": "Next",
+      "group": "media",
+      "aliases": [
+        "KC_MNXT"
+      ]
+    },
+    {
+      "value": 172,
+      "name": "KC_MEDIA_PREV_TRACK",
+      "label": "Previous",
+      "group": "media",
+      "aliases": [
+        "KC_MPRV"
+      ]
+    },
+    {
+      "value": 173,
+      "name": "KC_MEDIA_STOP",
+      "label": "Stop",
+      "group": "media",
+      "aliases": [
+        "KC_MSTP"
+      ]
+    },
+    {
+      "value": 174,
+      "name": "KC_MEDIA_PLAY_PAUSE",
+      "label": "Play/Pause",
+      "group": "media",
+      "aliases": [
+        "KC_MPLY"
+      ]
+    },
+    {
+      "value": 175,
+      "name": "KC_MEDIA_SELECT",
+      "label": "Media",
+      "group": "media",
+      "aliases": [
+        "KC_MSEL"
+      ]
+    },
+    {
+      "value": 176,
+      "name": "KC_MEDIA_EJECT",
+      "label": "Eject",
+      "group": "media",
+      "aliases": [
+        "KC_EJCT"
+      ]
+    },
+    {
+      "value": 177,
+      "name": "KC_MAIL",
+      "label": "Mail",
+      "group": "media",
+      "aliases": []
+    },
+    {
+      "value": 178,
+      "name": "KC_CALCULATOR",
+      "label": "Calculator",
+      "group": "media",
+      "aliases": [
+        "KC_CALC"
+      ]
+    },
+    {
+      "value": 179,
+      "name": "KC_MY_COMPUTER",
+      "label": "My Computer",
+      "group": "media",
+      "aliases": [
+        "KC_MYCM"
+      ]
+    },
+    {
+      "value": 180,
+      "name": "KC_WWW_SEARCH",
+      "label": "Search",
+      "group": "media",
+      "aliases": [
+        "KC_WSCH"
+      ]
+    },
+    {
+      "value": 181,
+      "name": "KC_WWW_HOME",
+      "label": "Home",
+      "group": "media",
+      "aliases": [
+        "KC_WHOM"
+      ]
+    },
+    {
+      "value": 182,
+      "name": "KC_WWW_BACK",
+      "label": "Back",
+      "group": "media",
+      "aliases": [
+        "KC_WBAK"
+      ]
+    },
+    {
+      "value": 183,
+      "name": "KC_WWW_FORWARD",
+      "label": "Forward",
+      "group": "media",
+      "aliases": [
+        "KC_WFWD"
+      ]
+    },
+    {
+      "value": 184,
+      "name": "KC_WWW_STOP",
+      "label": "Stop",
+      "group": "media",
+      "aliases": [
+        "KC_WSTP"
+      ]
+    },
+    {
+      "value": 185,
+      "name": "KC_WWW_REFRESH",
+      "label": "Refresh",
+      "group": "media",
+      "aliases": [
+        "KC_WREF"
+      ]
+    },
+    {
+      "value": 186,
+      "name": "KC_WWW_FAVORITES",
+      "label": "Favorites",
+      "group": "media",
+      "aliases": [
+        "KC_WFAV"
+      ]
+    },
+    {
+      "value": 187,
+      "name": "KC_MEDIA_FAST_FORWARD",
+      "label": "Fast Forward",
+      "group": "media",
+      "aliases": [
+        "KC_MFFD"
+      ]
+    },
+    {
+      "value": 188,
+      "name": "KC_MEDIA_REWIND",
+      "label": "Rewind",
+      "group": "media",
+      "aliases": [
+        "KC_MRWD"
+      ]
+    },
+    {
+      "value": 189,
+      "name": "KC_BRIGHTNESS_UP",
+      "label": "Brightness Up",
+      "group": "media",
+      "aliases": [
+        "KC_BRIU"
+      ]
+    },
+    {
+      "value": 190,
+      "name": "KC_BRIGHTNESS_DOWN",
+      "label": "Brightness Down",
+      "group": "media",
+      "aliases": [
+        "KC_BRID"
+      ]
+    },
+    {
+      "value": 191,
+      "name": "KC_CONTROL_PANEL",
+      "label": "Control Panel",
+      "group": "media",
+      "aliases": [
+        "KC_CPNL"
+      ]
+    },
+    {
+      "value": 192,
+      "name": "KC_ASSISTANT",
+      "label": "Assistant",
+      "group": "media",
+      "aliases": [
+        "KC_ASST"
+      ]
+    },
+    {
+      "value": 193,
+      "name": "KC_MISSION_CONTROL",
+      "label": "Mission Control",
+      "group": "media",
+      "aliases": [
+        "KC_MCTL"
+      ]
+    },
+    {
+      "value": 194,
+      "name": "KC_LAUNCHPAD",
+      "label": "Launchpad",
+      "group": "media",
+      "aliases": [
+        "KC_LPAD"
+      ]
+    },
+    {
+      "value": 205,
+      "name": "QK_MOUSE_CURSOR_UP",
+      "label": "Mouse Up",
+      "group": "mouse",
+      "aliases": [
+        "MS_UP"
+      ]
+    },
+    {
+      "value": 206,
+      "name": "QK_MOUSE_CURSOR_DOWN",
+      "label": "Mouse Down",
+      "group": "mouse",
+      "aliases": [
+        "MS_DOWN"
+      ]
+    },
+    {
+      "value": 207,
+      "name": "QK_MOUSE_CURSOR_LEFT",
+      "label": "Mouse Left",
+      "group": "mouse",
+      "aliases": [
+        "MS_LEFT"
+      ]
+    },
+    {
+      "value": 208,
+      "name": "QK_MOUSE_CURSOR_RIGHT",
+      "label": "Mouse Right",
+      "group": "mouse",
+      "aliases": [
+        "MS_RGHT"
+      ]
+    },
+    {
+      "value": 209,
+      "name": "QK_MOUSE_BUTTON_1",
+      "label": "Mouse Button 1",
+      "group": "mouse",
+      "aliases": [
+        "MS_BTN1"
+      ]
+    },
+    {
+      "value": 210,
+      "name": "QK_MOUSE_BUTTON_2",
+      "label": "Mouse Button 2",
+      "group": "mouse",
+      "aliases": [
+        "MS_BTN2"
+      ]
+    },
+    {
+      "value": 211,
+      "name": "QK_MOUSE_BUTTON_3",
+      "label": "Mouse Button 3",
+      "group": "mouse",
+      "aliases": [
+        "MS_BTN3"
+      ]
+    },
+    {
+      "value": 212,
+      "name": "QK_MOUSE_BUTTON_4",
+      "label": "Mouse Button 4",
+      "group": "mouse",
+      "aliases": [
+        "MS_BTN4"
+      ]
+    },
+    {
+      "value": 213,
+      "name": "QK_MOUSE_BUTTON_5",
+      "label": "Mouse Button 5",
+      "group": "mouse",
+      "aliases": [
+        "MS_BTN5"
+      ]
+    },
+    {
+      "value": 214,
+      "name": "QK_MOUSE_BUTTON_6",
+      "label": "Mouse Button 6",
+      "group": "mouse",
+      "aliases": [
+        "MS_BTN6"
+      ]
+    },
+    {
+      "value": 215,
+      "name": "QK_MOUSE_BUTTON_7",
+      "label": "Mouse Button 7",
+      "group": "mouse",
+      "aliases": [
+        "MS_BTN7"
+      ]
+    },
+    {
+      "value": 216,
+      "name": "QK_MOUSE_BUTTON_8",
+      "label": "Mouse Button 8",
+      "group": "mouse",
+      "aliases": [
+        "MS_BTN8"
+      ]
+    },
+    {
+      "value": 217,
+      "name": "QK_MOUSE_WHEEL_UP",
+      "label": "Mouse Wheel Up",
+      "group": "mouse",
+      "aliases": [
+        "MS_WHLU"
+      ]
+    },
+    {
+      "value": 218,
+      "name": "QK_MOUSE_WHEEL_DOWN",
+      "label": "Mouse Wheel Down",
+      "group": "mouse",
+      "aliases": [
+        "MS_WHLD"
+      ]
+    },
+    {
+      "value": 219,
+      "name": "QK_MOUSE_WHEEL_LEFT",
+      "label": "Mouse Wheel Left",
+      "group": "mouse",
+      "aliases": [
+        "MS_WHLL"
+      ]
+    },
+    {
+      "value": 220,
+      "name": "QK_MOUSE_WHEEL_RIGHT",
+      "label": "Mouse Wheel Right",
+      "group": "mouse",
+      "aliases": [
+        "MS_WHLR"
+      ]
+    },
+    {
+      "value": 221,
+      "name": "QK_MOUSE_ACCELERATION_0",
+      "label": "Acceleration 0",
+      "group": "mouse",
+      "aliases": [
+        "MS_ACL0"
+      ]
+    },
+    {
+      "value": 222,
+      "name": "QK_MOUSE_ACCELERATION_1",
+      "label": "Acceleration 1",
+      "group": "mouse",
+      "aliases": [
+        "MS_ACL1"
+      ]
+    },
+    {
+      "value": 223,
+      "name": "QK_MOUSE_ACCELERATION_2",
+      "label": "Acceleration 2",
+      "group": "mouse",
+      "aliases": [
+        "MS_ACL2"
+      ]
+    },
+    {
+      "value": 224,
+      "name": "KC_LEFT_CTRL",
+      "label": "Left Control",
+      "group": "modifiers",
+      "aliases": [
+        "KC_LCTL"
+      ]
+    },
+    {
+      "value": 225,
+      "name": "KC_LEFT_SHIFT",
+      "label": "Left Shift",
+      "group": "modifiers",
+      "aliases": [
+        "KC_LSFT"
+      ]
+    },
+    {
+      "value": 226,
+      "name": "KC_LEFT_ALT",
+      "label": "Left Alt",
+      "group": "modifiers",
+      "aliases": [
+        "KC_LALT",
+        "KC_LOPT"
+      ]
+    },
+    {
+      "value": 227,
+      "name": "KC_LEFT_GUI",
+      "label": "Left GUI",
+      "group": "modifiers",
+      "aliases": [
+        "KC_LGUI",
+        "KC_LCMD",
+        "KC_LWIN"
+      ]
+    },
+    {
+      "value": 228,
+      "name": "KC_RIGHT_CTRL",
+      "label": "Right Control",
+      "group": "modifiers",
+      "aliases": [
+        "KC_RCTL"
+      ]
+    },
+    {
+      "value": 229,
+      "name": "KC_RIGHT_SHIFT",
+      "label": "Right Shift",
+      "group": "modifiers",
+      "aliases": [
+        "KC_RSFT"
+      ]
+    },
+    {
+      "value": 230,
+      "name": "KC_RIGHT_ALT",
+      "label": "Right Alt",
+      "group": "modifiers",
+      "aliases": [
+        "KC_RALT",
+        "KC_ROPT",
+        "KC_ALGR"
+      ]
+    },
+    {
+      "value": 231,
+      "name": "KC_RIGHT_GUI",
+      "label": "Right GUI",
+      "group": "modifiers",
+      "aliases": [
+        "KC_RGUI",
+        "KC_RCMD",
+        "KC_RWIN"
+      ]
+    },
+    {
+      "value": 22256,
+      "name": "QK_SWAP_HANDS_TOGGLE",
+      "label": "Toggle Swap Hands",
+      "group": "swap_hands",
+      "aliases": [
+        "SH_TOGG"
+      ]
+    },
+    {
+      "value": 22257,
+      "name": "QK_SWAP_HANDS_TAP_TOGGLE",
+      "label": "Swap Hands Tap Toggle",
+      "group": "swap_hands",
+      "aliases": [
+        "SH_TT"
+      ]
+    },
+    {
+      "value": 22258,
+      "name": "QK_SWAP_HANDS_MOMENTARY_ON",
+      "label": "Swap Hands Momentary On",
+      "group": "swap_hands",
+      "aliases": [
+        "SH_MON"
+      ]
+    },
+    {
+      "value": 22259,
+      "name": "QK_SWAP_HANDS_MOMENTARY_OFF",
+      "label": "Swap Hands Momentary Off",
+      "group": "swap_hands",
+      "aliases": [
+        "SH_MOFF"
+      ]
+    },
+    {
+      "value": 22260,
+      "name": "QK_SWAP_HANDS_OFF",
+      "label": "Unswap Hands",
+      "group": "swap_hands",
+      "aliases": [
+        "SH_OFF"
+      ]
+    },
+    {
+      "value": 22261,
+      "name": "QK_SWAP_HANDS_ON",
+      "label": "Swap Hands",
+      "group": "swap_hands",
+      "aliases": [
+        "SH_ON"
+      ]
+    },
+    {
+      "value": 22262,
+      "name": "QK_SWAP_HANDS_ONE_SHOT",
+      "label": "Swap Hands One Shot",
+      "group": "swap_hands",
+      "aliases": [
+        "SH_OS"
+      ]
+    },
+    {
+      "value": 28672,
+      "name": "QK_MAGIC_SWAP_CONTROL_CAPS_LOCK",
+      "label": "Swap LCtl⇄Caps",
+      "group": "magic",
+      "aliases": [
+        "CL_SWAP"
+      ]
+    },
+    {
+      "value": 28673,
+      "name": "QK_MAGIC_UNSWAP_CONTROL_CAPS_LOCK",
+      "label": "Unswap LCtl⇄Caps",
+      "group": "magic",
+      "aliases": [
+        "CL_NORM"
+      ]
+    },
+    {
+      "value": 28674,
+      "name": "QK_MAGIC_TOGGLE_CONTROL_CAPS_LOCK",
+      "label": "Toggle LCtl⇄Caps",
+      "group": "magic",
+      "aliases": [
+        "CL_TOGG"
+      ]
+    },
+    {
+      "value": 28675,
+      "name": "QK_MAGIC_CAPS_LOCK_AS_CONTROL_OFF",
+      "label": "Caps≠LCtl",
+      "group": "magic",
+      "aliases": [
+        "CL_CAPS"
+      ]
+    },
+    {
+      "value": 28676,
+      "name": "QK_MAGIC_CAPS_LOCK_AS_CONTROL_ON",
+      "label": "Caps=LCtl",
+      "group": "magic",
+      "aliases": [
+        "CL_CTRL"
+      ]
+    },
+    {
+      "value": 28677,
+      "name": "QK_MAGIC_SWAP_LALT_LGUI",
+      "label": "Swap LAlt⇄LGUI",
+      "group": "magic",
+      "aliases": [
+        "AG_LSWP"
+      ]
+    },
+    {
+      "value": 28678,
+      "name": "QK_MAGIC_UNSWAP_LALT_LGUI",
+      "label": "Unswap LAlt⇄LGUI",
+      "group": "magic",
+      "aliases": [
+        "AG_LNRM"
+      ]
+    },
+    {
+      "value": 28679,
+      "name": "QK_MAGIC_SWAP_RALT_RGUI",
+      "label": "Swap RAlt⇄RGUI",
+      "group": "magic",
+      "aliases": [
+        "AG_RSWP"
+      ]
+    },
+    {
+      "value": 28680,
+      "name": "QK_MAGIC_UNSWAP_RALT_RGUI",
+      "label": "Unswap RAlt⇄RGUI",
+      "group": "magic",
+      "aliases": [
+        "AG_RNRM"
+      ]
+    },
+    {
+      "value": 28681,
+      "name": "QK_MAGIC_GUI_ON",
+      "label": "GUI On",
+      "group": "magic",
+      "aliases": [
+        "GU_ON"
+      ]
+    },
+    {
+      "value": 28682,
+      "name": "QK_MAGIC_GUI_OFF",
+      "label": "GUI Off",
+      "group": "magic",
+      "aliases": [
+        "GU_OFF"
+      ]
+    },
+    {
+      "value": 28683,
+      "name": "QK_MAGIC_TOGGLE_GUI",
+      "label": "Toggle GUI",
+      "group": "magic",
+      "aliases": [
+        "GU_TOGG"
+      ]
+    },
+    {
+      "value": 28684,
+      "name": "QK_MAGIC_SWAP_GRAVE_ESC",
+      "label": "Swap `⇄Esc",
+      "group": "magic",
+      "aliases": [
+        "GE_SWAP"
+      ]
+    },
+    {
+      "value": 28685,
+      "name": "QK_MAGIC_UNSWAP_GRAVE_ESC",
+      "label": "Unswap `⇄Esc",
+      "group": "magic",
+      "aliases": [
+        "GE_NORM"
+      ]
+    },
+    {
+      "value": 28686,
+      "name": "QK_MAGIC_SWAP_BACKSLASH_BACKSPACE",
+      "label": "Swap \\⇄Bspc",
+      "group": "magic",
+      "aliases": [
+        "BS_SWAP"
+      ]
+    },
+    {
+      "value": 28687,
+      "name": "QK_MAGIC_UNSWAP_BACKSLASH_BACKSPACE",
+      "label": "Unswap \\⇄Bspc",
+      "group": "magic",
+      "aliases": [
+        "BS_NORM"
+      ]
+    },
+    {
+      "value": 28688,
+      "name": "QK_MAGIC_TOGGLE_BACKSLASH_BACKSPACE",
+      "label": "Toggle \\⇄Bspc",
+      "group": "magic",
+      "aliases": [
+        "BS_TOGG"
+      ]
+    },
+    {
+      "value": 28689,
+      "name": "QK_MAGIC_NKRO_ON",
+      "label": "NKRO On",
+      "group": "magic",
+      "aliases": [
+        "NK_ON"
+      ]
+    },
+    {
+      "value": 28690,
+      "name": "QK_MAGIC_NKRO_OFF",
+      "label": "NKRO Off",
+      "group": "magic",
+      "aliases": [
+        "NK_OFF"
+      ]
+    },
+    {
+      "value": 28691,
+      "name": "QK_MAGIC_TOGGLE_NKRO",
+      "label": "Toggle NKRO",
+      "group": "magic",
+      "aliases": [
+        "NK_TOGG"
+      ]
+    },
+    {
+      "value": 28692,
+      "name": "QK_MAGIC_SWAP_ALT_GUI",
+      "label": "Swap Alt⇄GUI",
+      "group": "magic",
+      "aliases": [
+        "AG_SWAP"
+      ]
+    },
+    {
+      "value": 28693,
+      "name": "QK_MAGIC_UNSWAP_ALT_GUI",
+      "label": "Unswap Alt⇄GUI",
+      "group": "magic",
+      "aliases": [
+        "AG_NORM"
+      ]
+    },
+    {
+      "value": 28694,
+      "name": "QK_MAGIC_TOGGLE_ALT_GUI",
+      "label": "Toggle Alt⇄GUI",
+      "group": "magic",
+      "aliases": [
+        "AG_TOGG"
+      ]
+    },
+    {
+      "value": 28695,
+      "name": "QK_MAGIC_SWAP_LCTL_LGUI",
+      "label": "Swap LCtl⇄LGUI",
+      "group": "magic",
+      "aliases": [
+        "CG_LSWP"
+      ]
+    },
+    {
+      "value": 28696,
+      "name": "QK_MAGIC_UNSWAP_LCTL_LGUI",
+      "label": "Unswap LCtl⇄LGUI",
+      "group": "magic",
+      "aliases": [
+        "CG_LNRM"
+      ]
+    },
+    {
+      "value": 28697,
+      "name": "QK_MAGIC_SWAP_RCTL_RGUI",
+      "label": "Swap RCtl⇄RGUI",
+      "group": "magic",
+      "aliases": [
+        "CG_RSWP"
+      ]
+    },
+    {
+      "value": 28698,
+      "name": "QK_MAGIC_UNSWAP_RCTL_RGUI",
+      "label": "Unswap RCtl⇄RGUI",
+      "group": "magic",
+      "aliases": [
+        "CG_RNRM"
+      ]
+    },
+    {
+      "value": 28699,
+      "name": "QK_MAGIC_SWAP_CTL_GUI",
+      "label": "Swap Ctl⇄GUI",
+      "group": "magic",
+      "aliases": [
+        "CG_SWAP"
+      ]
+    },
+    {
+      "value": 28700,
+      "name": "QK_MAGIC_UNSWAP_CTL_GUI",
+      "label": "Unswap Ctl⇄GUI",
+      "group": "magic",
+      "aliases": [
+        "CG_NORM"
+      ]
+    },
+    {
+      "value": 28701,
+      "name": "QK_MAGIC_TOGGLE_CTL_GUI",
+      "label": "Toggle Ctl⇄GUI",
+      "group": "magic",
+      "aliases": [
+        "CG_TOGG"
+      ]
+    },
+    {
+      "value": 28702,
+      "name": "QK_MAGIC_EE_HANDS_LEFT",
+      "label": "EE Hands Left",
+      "group": "magic",
+      "aliases": [
+        "EH_LEFT"
+      ]
+    },
+    {
+      "value": 28703,
+      "name": "QK_MAGIC_EE_HANDS_RIGHT",
+      "label": "EE Hands Right",
+      "group": "magic",
+      "aliases": [
+        "EH_RGHT"
+      ]
+    },
+    {
+      "value": 28704,
+      "name": "QK_MAGIC_SWAP_ESCAPE_CAPS_LOCK",
+      "label": "Swap Esc⇄Caps",
+      "group": "magic",
+      "aliases": [
+        "EC_SWAP"
+      ]
+    },
+    {
+      "value": 28705,
+      "name": "QK_MAGIC_UNSWAP_ESCAPE_CAPS_LOCK",
+      "label": "Unswap Esc⇄Caps",
+      "group": "magic",
+      "aliases": [
+        "EC_NORM"
+      ]
+    },
+    {
+      "value": 28706,
+      "name": "QK_MAGIC_TOGGLE_ESCAPE_CAPS_LOCK",
+      "label": "Toggle Esc⇄Caps",
+      "group": "magic",
+      "aliases": [
+        "EC_TOGG"
+      ]
+    },
+    {
+      "value": 28928,
+      "name": "QK_MIDI_ON",
+      "label": "MIDI On",
+      "group": "midi",
+      "aliases": [
+        "MI_ON"
+      ]
+    },
+    {
+      "value": 28929,
+      "name": "QK_MIDI_OFF",
+      "label": "MIDI Off",
+      "group": "midi",
+      "aliases": [
+        "MI_OFF"
+      ]
+    },
+    {
+      "value": 28930,
+      "name": "QK_MIDI_TOGGLE",
+      "label": "Toggle MIDI",
+      "group": "midi",
+      "aliases": [
+        "MI_TOGG"
+      ]
+    },
+    {
+      "value": 28931,
+      "name": "QK_MIDI_NOTE_C_0",
+      "label": "C₀",
+      "group": "midi",
+      "aliases": [
+        "MI_C"
+      ]
+    },
+    {
+      "value": 28932,
+      "name": "QK_MIDI_NOTE_C_SHARP_0",
+      "label": "C♯₀",
+      "group": "midi",
+      "aliases": [
+        "MI_Cs",
+        "MI_Db"
+      ]
+    },
+    {
+      "value": 28933,
+      "name": "QK_MIDI_NOTE_D_0",
+      "label": "D₀",
+      "group": "midi",
+      "aliases": [
+        "MI_D"
+      ]
+    },
+    {
+      "value": 28934,
+      "name": "QK_MIDI_NOTE_D_SHARP_0",
+      "label": "D♯₀",
+      "group": "midi",
+      "aliases": [
+        "MI_Ds",
+        "MI_Eb"
+      ]
+    },
+    {
+      "value": 28935,
+      "name": "QK_MIDI_NOTE_E_0",
+      "label": "E₀",
+      "group": "midi",
+      "aliases": [
+        "MI_E"
+      ]
+    },
+    {
+      "value": 28936,
+      "name": "QK_MIDI_NOTE_F_0",
+      "label": "F₀",
+      "group": "midi",
+      "aliases": [
+        "MI_F"
+      ]
+    },
+    {
+      "value": 28937,
+      "name": "QK_MIDI_NOTE_F_SHARP_0",
+      "label": "F♯₀",
+      "group": "midi",
+      "aliases": [
+        "MI_Fs",
+        "MI_Gb"
+      ]
+    },
+    {
+      "value": 28938,
+      "name": "QK_MIDI_NOTE_G_0",
+      "label": "G₀",
+      "group": "midi",
+      "aliases": [
+        "MI_G"
+      ]
+    },
+    {
+      "value": 28939,
+      "name": "QK_MIDI_NOTE_G_SHARP_0",
+      "label": "G♯₀",
+      "group": "midi",
+      "aliases": [
+        "MI_Gs",
+        "MI_Ab"
+      ]
+    },
+    {
+      "value": 28940,
+      "name": "QK_MIDI_NOTE_A_0",
+      "label": "A₀",
+      "group": "midi",
+      "aliases": [
+        "MI_A"
+      ]
+    },
+    {
+      "value": 28941,
+      "name": "QK_MIDI_NOTE_A_SHARP_0",
+      "label": "A♯₀",
+      "group": "midi",
+      "aliases": [
+        "MI_As",
+        "MI_Bb"
+      ]
+    },
+    {
+      "value": 28942,
+      "name": "QK_MIDI_NOTE_B_0",
+      "label": "B₀",
+      "group": "midi",
+      "aliases": [
+        "MI_B"
+      ]
+    },
+    {
+      "value": 28943,
+      "name": "QK_MIDI_NOTE_C_1",
+      "label": "C₁",
+      "group": "midi",
+      "aliases": [
+        "MI_C1"
+      ]
+    },
+    {
+      "value": 28944,
+      "name": "QK_MIDI_NOTE_C_SHARP_1",
+      "label": "C♯₁",
+      "group": "midi",
+      "aliases": [
+        "MI_Cs1",
+        "MI_Db1"
+      ]
+    },
+    {
+      "value": 28945,
+      "name": "QK_MIDI_NOTE_D_1",
+      "label": "D₁",
+      "group": "midi",
+      "aliases": [
+        "MI_D1"
+      ]
+    },
+    {
+      "value": 28946,
+      "name": "QK_MIDI_NOTE_D_SHARP_1",
+      "label": "D♯₁",
+      "group": "midi",
+      "aliases": [
+        "MI_Ds1",
+        "MI_Eb1"
+      ]
+    },
+    {
+      "value": 28947,
+      "name": "QK_MIDI_NOTE_E_1",
+      "label": "E₁",
+      "group": "midi",
+      "aliases": [
+        "MI_E1"
+      ]
+    },
+    {
+      "value": 28948,
+      "name": "QK_MIDI_NOTE_F_1",
+      "label": "F₁",
+      "group": "midi",
+      "aliases": [
+        "MI_F1"
+      ]
+    },
+    {
+      "value": 28949,
+      "name": "QK_MIDI_NOTE_F_SHARP_1",
+      "label": "F♯₁",
+      "group": "midi",
+      "aliases": [
+        "MI_Fs1",
+        "MI_Gb1"
+      ]
+    },
+    {
+      "value": 28950,
+      "name": "QK_MIDI_NOTE_G_1",
+      "label": "G₁",
+      "group": "midi",
+      "aliases": [
+        "MI_G1"
+      ]
+    },
+    {
+      "value": 28951,
+      "name": "QK_MIDI_NOTE_G_SHARP_1",
+      "label": "G♯₁",
+      "group": "midi",
+      "aliases": [
+        "MI_Gs1",
+        "MI_Ab1"
+      ]
+    },
+    {
+      "value": 28952,
+      "name": "QK_MIDI_NOTE_A_1",
+      "label": "A₁",
+      "group": "midi",
+      "aliases": [
+        "MI_A1"
+      ]
+    },
+    {
+      "value": 28953,
+      "name": "QK_MIDI_NOTE_A_SHARP_1",
+      "label": "A♯₁",
+      "group": "midi",
+      "aliases": [
+        "MI_As1",
+        "MI_Bb1"
+      ]
+    },
+    {
+      "value": 28954,
+      "name": "QK_MIDI_NOTE_B_1",
+      "label": "B₁",
+      "group": "midi",
+      "aliases": [
+        "MI_B1"
+      ]
+    },
+    {
+      "value": 28955,
+      "name": "QK_MIDI_NOTE_C_2",
+      "label": "C₂",
+      "group": "midi",
+      "aliases": [
+        "MI_C2"
+      ]
+    },
+    {
+      "value": 28956,
+      "name": "QK_MIDI_NOTE_C_SHARP_2",
+      "label": "C♯₂",
+      "group": "midi",
+      "aliases": [
+        "MI_Cs2",
+        "MI_Db2"
+      ]
+    },
+    {
+      "value": 28957,
+      "name": "QK_MIDI_NOTE_D_2",
+      "label": "D₂",
+      "group": "midi",
+      "aliases": [
+        "MI_D2"
+      ]
+    },
+    {
+      "value": 28958,
+      "name": "QK_MIDI_NOTE_D_SHARP_2",
+      "label": "D♯₂",
+      "group": "midi",
+      "aliases": [
+        "MI_Ds2",
+        "MI_Eb2"
+      ]
+    },
+    {
+      "value": 28959,
+      "name": "QK_MIDI_NOTE_E_2",
+      "label": "E₂",
+      "group": "midi",
+      "aliases": [
+        "MI_E2"
+      ]
+    },
+    {
+      "value": 28960,
+      "name": "QK_MIDI_NOTE_F_2",
+      "label": "F₂",
+      "group": "midi",
+      "aliases": [
+        "MI_F2"
+      ]
+    },
+    {
+      "value": 28961,
+      "name": "QK_MIDI_NOTE_F_SHARP_2",
+      "label": "F♯₂",
+      "group": "midi",
+      "aliases": [
+        "MI_Fs2",
+        "MI_Gb2"
+      ]
+    },
+    {
+      "value": 28962,
+      "name": "QK_MIDI_NOTE_G_2",
+      "label": "G₂",
+      "group": "midi",
+      "aliases": [
+        "MI_G2"
+      ]
+    },
+    {
+      "value": 28963,
+      "name": "QK_MIDI_NOTE_G_SHARP_2",
+      "label": "G♯₂",
+      "group": "midi",
+      "aliases": [
+        "MI_Gs2",
+        "MI_Ab2"
+      ]
+    },
+    {
+      "value": 28964,
+      "name": "QK_MIDI_NOTE_A_2",
+      "label": "A₂",
+      "group": "midi",
+      "aliases": [
+        "MI_A2"
+      ]
+    },
+    {
+      "value": 28965,
+      "name": "QK_MIDI_NOTE_A_SHARP_2",
+      "label": "A♯₂",
+      "group": "midi",
+      "aliases": [
+        "MI_As2",
+        "MI_Bb2"
+      ]
+    },
+    {
+      "value": 28966,
+      "name": "QK_MIDI_NOTE_B_2",
+      "label": "B₂",
+      "group": "midi",
+      "aliases": [
+        "MI_B2"
+      ]
+    },
+    {
+      "value": 28967,
+      "name": "QK_MIDI_NOTE_C_3",
+      "label": "C₃",
+      "group": "midi",
+      "aliases": [
+        "MI_C3"
+      ]
+    },
+    {
+      "value": 28968,
+      "name": "QK_MIDI_NOTE_C_SHARP_3",
+      "label": "C♯₃",
+      "group": "midi",
+      "aliases": [
+        "MI_Cs3",
+        "MI_Db3"
+      ]
+    },
+    {
+      "value": 28969,
+      "name": "QK_MIDI_NOTE_D_3",
+      "label": "D₃",
+      "group": "midi",
+      "aliases": [
+        "MI_D3"
+      ]
+    },
+    {
+      "value": 28970,
+      "name": "QK_MIDI_NOTE_D_SHARP_3",
+      "label": "D♯₃",
+      "group": "midi",
+      "aliases": [
+        "MI_Ds3",
+        "MI_Eb3"
+      ]
+    },
+    {
+      "value": 28971,
+      "name": "QK_MIDI_NOTE_E_3",
+      "label": "E₃",
+      "group": "midi",
+      "aliases": [
+        "MI_E3"
+      ]
+    },
+    {
+      "value": 28972,
+      "name": "QK_MIDI_NOTE_F_3",
+      "label": "F₃",
+      "group": "midi",
+      "aliases": [
+        "MI_F3"
+      ]
+    },
+    {
+      "value": 28973,
+      "name": "QK_MIDI_NOTE_F_SHARP_3",
+      "label": "F♯₃",
+      "group": "midi",
+      "aliases": [
+        "MI_Fs3",
+        "MI_Gb3"
+      ]
+    },
+    {
+      "value": 28974,
+      "name": "QK_MIDI_NOTE_G_3",
+      "label": "G₃",
+      "group": "midi",
+      "aliases": [
+        "MI_G3"
+      ]
+    },
+    {
+      "value": 28975,
+      "name": "QK_MIDI_NOTE_G_SHARP_3",
+      "label": "G♯₃",
+      "group": "midi",
+      "aliases": [
+        "MI_Gs3",
+        "MI_Ab3"
+      ]
+    },
+    {
+      "value": 28976,
+      "name": "QK_MIDI_NOTE_A_3",
+      "label": "A₃",
+      "group": "midi",
+      "aliases": [
+        "MI_A3"
+      ]
+    },
+    {
+      "value": 28977,
+      "name": "QK_MIDI_NOTE_A_SHARP_3",
+      "label": "A♯₃",
+      "group": "midi",
+      "aliases": [
+        "MI_As3",
+        "MI_Bb3"
+      ]
+    },
+    {
+      "value": 28978,
+      "name": "QK_MIDI_NOTE_B_3",
+      "label": "B₃",
+      "group": "midi",
+      "aliases": [
+        "MI_B3"
+      ]
+    },
+    {
+      "value": 28979,
+      "name": "QK_MIDI_NOTE_C_4",
+      "label": "C₄",
+      "group": "midi",
+      "aliases": [
+        "MI_C4"
+      ]
+    },
+    {
+      "value": 28980,
+      "name": "QK_MIDI_NOTE_C_SHARP_4",
+      "label": "C♯₄",
+      "group": "midi",
+      "aliases": [
+        "MI_Cs4",
+        "MI_Db4"
+      ]
+    },
+    {
+      "value": 28981,
+      "name": "QK_MIDI_NOTE_D_4",
+      "label": "D₄",
+      "group": "midi",
+      "aliases": [
+        "MI_D4"
+      ]
+    },
+    {
+      "value": 28982,
+      "name": "QK_MIDI_NOTE_D_SHARP_4",
+      "label": "D♯₄",
+      "group": "midi",
+      "aliases": [
+        "MI_Ds4",
+        "MI_Eb4"
+      ]
+    },
+    {
+      "value": 28983,
+      "name": "QK_MIDI_NOTE_E_4",
+      "label": "E₄",
+      "group": "midi",
+      "aliases": [
+        "MI_E4"
+      ]
+    },
+    {
+      "value": 28984,
+      "name": "QK_MIDI_NOTE_F_4",
+      "label": "F₄",
+      "group": "midi",
+      "aliases": [
+        "MI_F4"
+      ]
+    },
+    {
+      "value": 28985,
+      "name": "QK_MIDI_NOTE_F_SHARP_4",
+      "label": "F♯₄",
+      "group": "midi",
+      "aliases": [
+        "MI_Fs4",
+        "MI_Gb4"
+      ]
+    },
+    {
+      "value": 28986,
+      "name": "QK_MIDI_NOTE_G_4",
+      "label": "G₄",
+      "group": "midi",
+      "aliases": [
+        "MI_G4"
+      ]
+    },
+    {
+      "value": 28987,
+      "name": "QK_MIDI_NOTE_G_SHARP_4",
+      "label": "G♯₄",
+      "group": "midi",
+      "aliases": [
+        "MI_Gs4",
+        "MI_Ab4"
+      ]
+    },
+    {
+      "value": 28988,
+      "name": "QK_MIDI_NOTE_A_4",
+      "label": "A₄",
+      "group": "midi",
+      "aliases": [
+        "MI_A4"
+      ]
+    },
+    {
+      "value": 28989,
+      "name": "QK_MIDI_NOTE_A_SHARP_4",
+      "label": "A♯₄",
+      "group": "midi",
+      "aliases": [
+        "MI_As4",
+        "MI_Bb4"
+      ]
+    },
+    {
+      "value": 28990,
+      "name": "QK_MIDI_NOTE_B_4",
+      "label": "B₄",
+      "group": "midi",
+      "aliases": [
+        "MI_B4"
+      ]
+    },
+    {
+      "value": 28991,
+      "name": "QK_MIDI_NOTE_C_5",
+      "label": "C₅",
+      "group": "midi",
+      "aliases": [
+        "MI_C5"
+      ]
+    },
+    {
+      "value": 28992,
+      "name": "QK_MIDI_NOTE_C_SHARP_5",
+      "label": "C♯₅",
+      "group": "midi",
+      "aliases": [
+        "MI_Cs5",
+        "MI_Db5"
+      ]
+    },
+    {
+      "value": 28993,
+      "name": "QK_MIDI_NOTE_D_5",
+      "label": "D₅",
+      "group": "midi",
+      "aliases": [
+        "MI_D5"
+      ]
+    },
+    {
+      "value": 28994,
+      "name": "QK_MIDI_NOTE_D_SHARP_5",
+      "label": "D♯₅",
+      "group": "midi",
+      "aliases": [
+        "MI_Ds5",
+        "MI_Eb5"
+      ]
+    },
+    {
+      "value": 28995,
+      "name": "QK_MIDI_NOTE_E_5",
+      "label": "E₅",
+      "group": "midi",
+      "aliases": [
+        "MI_E5"
+      ]
+    },
+    {
+      "value": 28996,
+      "name": "QK_MIDI_NOTE_F_5",
+      "label": "F₅",
+      "group": "midi",
+      "aliases": [
+        "MI_F5"
+      ]
+    },
+    {
+      "value": 28997,
+      "name": "QK_MIDI_NOTE_F_SHARP_5",
+      "label": "F♯₅",
+      "group": "midi",
+      "aliases": [
+        "MI_Fs5",
+        "MI_Gb5"
+      ]
+    },
+    {
+      "value": 28998,
+      "name": "QK_MIDI_NOTE_G_5",
+      "label": "G₅",
+      "group": "midi",
+      "aliases": [
+        "MI_G5"
+      ]
+    },
+    {
+      "value": 28999,
+      "name": "QK_MIDI_NOTE_G_SHARP_5",
+      "label": "G♯₅",
+      "group": "midi",
+      "aliases": [
+        "MI_Gs5",
+        "MI_Ab5"
+      ]
+    },
+    {
+      "value": 29000,
+      "name": "QK_MIDI_NOTE_A_5",
+      "label": "A₅",
+      "group": "midi",
+      "aliases": [
+        "MI_A5"
+      ]
+    },
+    {
+      "value": 29001,
+      "name": "QK_MIDI_NOTE_A_SHARP_5",
+      "label": "A♯₅",
+      "group": "midi",
+      "aliases": [
+        "MI_As5",
+        "MI_Bb5"
+      ]
+    },
+    {
+      "value": 29002,
+      "name": "QK_MIDI_NOTE_B_5",
+      "label": "B₅",
+      "group": "midi",
+      "aliases": [
+        "MI_B5"
+      ]
+    },
+    {
+      "value": 29003,
+      "name": "QK_MIDI_OCTAVE_N2",
+      "label": "Octave -2",
+      "group": "midi",
+      "aliases": [
+        "MI_OCN2"
+      ]
+    },
+    {
+      "value": 29004,
+      "name": "QK_MIDI_OCTAVE_N1",
+      "label": "Octave -1",
+      "group": "midi",
+      "aliases": [
+        "MI_OCN1"
+      ]
+    },
+    {
+      "value": 29005,
+      "name": "QK_MIDI_OCTAVE_0",
+      "label": "Octave 0",
+      "group": "midi",
+      "aliases": [
+        "MI_OC0"
+      ]
+    },
+    {
+      "value": 29006,
+      "name": "QK_MIDI_OCTAVE_1",
+      "label": "Octave 1",
+      "group": "midi",
+      "aliases": [
+        "MI_OC1"
+      ]
+    },
+    {
+      "value": 29007,
+      "name": "QK_MIDI_OCTAVE_2",
+      "label": "Octave 2",
+      "group": "midi",
+      "aliases": [
+        "MI_OC2"
+      ]
+    },
+    {
+      "value": 29008,
+      "name": "QK_MIDI_OCTAVE_3",
+      "label": "Octave 3",
+      "group": "midi",
+      "aliases": [
+        "MI_OC3"
+      ]
+    },
+    {
+      "value": 29009,
+      "name": "QK_MIDI_OCTAVE_4",
+      "label": "Octave 4",
+      "group": "midi",
+      "aliases": [
+        "MI_OC4"
+      ]
+    },
+    {
+      "value": 29010,
+      "name": "QK_MIDI_OCTAVE_5",
+      "label": "Octave 5",
+      "group": "midi",
+      "aliases": [
+        "MI_OC5"
+      ]
+    },
+    {
+      "value": 29011,
+      "name": "QK_MIDI_OCTAVE_6",
+      "label": "Octave 6",
+      "group": "midi",
+      "aliases": [
+        "MI_OC6"
+      ]
+    },
+    {
+      "value": 29012,
+      "name": "QK_MIDI_OCTAVE_7",
+      "label": "Octave 7",
+      "group": "midi",
+      "aliases": [
+        "MI_OC7"
+      ]
+    },
+    {
+      "value": 29013,
+      "name": "QK_MIDI_OCTAVE_DOWN",
+      "label": "Octave Down",
+      "group": "midi",
+      "aliases": [
+        "MI_OCTD"
+      ]
+    },
+    {
+      "value": 29014,
+      "name": "QK_MIDI_OCTAVE_UP",
+      "label": "Octave Up",
+      "group": "midi",
+      "aliases": [
+        "MI_OCTU"
+      ]
+    },
+    {
+      "value": 29015,
+      "name": "QK_MIDI_TRANSPOSE_N6",
+      "label": "Transpose -6",
+      "group": "midi",
+      "aliases": [
+        "MI_TRN6"
+      ]
+    },
+    {
+      "value": 29016,
+      "name": "QK_MIDI_TRANSPOSE_N5",
+      "label": "Transpose -5",
+      "group": "midi",
+      "aliases": [
+        "MI_TRN5"
+      ]
+    },
+    {
+      "value": 29017,
+      "name": "QK_MIDI_TRANSPOSE_N4",
+      "label": "Transpose -4",
+      "group": "midi",
+      "aliases": [
+        "MI_TRN4"
+      ]
+    },
+    {
+      "value": 29018,
+      "name": "QK_MIDI_TRANSPOSE_N3",
+      "label": "Transpose -3",
+      "group": "midi",
+      "aliases": [
+        "MI_TRN3"
+      ]
+    },
+    {
+      "value": 29019,
+      "name": "QK_MIDI_TRANSPOSE_N2",
+      "label": "Transpose -2",
+      "group": "midi",
+      "aliases": [
+        "MI_TRN2"
+      ]
+    },
+    {
+      "value": 29020,
+      "name": "QK_MIDI_TRANSPOSE_N1",
+      "label": "Transpose -1",
+      "group": "midi",
+      "aliases": [
+        "MI_TRN1"
+      ]
+    },
+    {
+      "value": 29021,
+      "name": "QK_MIDI_TRANSPOSE_0",
+      "label": "Transpose 0",
+      "group": "midi",
+      "aliases": [
+        "MI_TR0"
+      ]
+    },
+    {
+      "value": 29022,
+      "name": "QK_MIDI_TRANSPOSE_1",
+      "label": "Transpose +1",
+      "group": "midi",
+      "aliases": [
+        "MI_TR1"
+      ]
+    },
+    {
+      "value": 29023,
+      "name": "QK_MIDI_TRANSPOSE_2",
+      "label": "Transpose +2",
+      "group": "midi",
+      "aliases": [
+        "MI_TR2"
+      ]
+    },
+    {
+      "value": 29024,
+      "name": "QK_MIDI_TRANSPOSE_3",
+      "label": "Transpose +3",
+      "group": "midi",
+      "aliases": [
+        "MI_TR3"
+      ]
+    },
+    {
+      "value": 29025,
+      "name": "QK_MIDI_TRANSPOSE_4",
+      "label": "Transpose +4",
+      "group": "midi",
+      "aliases": [
+        "MI_TR4"
+      ]
+    },
+    {
+      "value": 29026,
+      "name": "QK_MIDI_TRANSPOSE_5",
+      "label": "Transpose +5",
+      "group": "midi",
+      "aliases": [
+        "MI_TR5"
+      ]
+    },
+    {
+      "value": 29027,
+      "name": "QK_MIDI_TRANSPOSE_6",
+      "label": "Transpose +6",
+      "group": "midi",
+      "aliases": [
+        "MI_TR6"
+      ]
+    },
+    {
+      "value": 29028,
+      "name": "QK_MIDI_TRANSPOSE_DOWN",
+      "label": "Transpose Down",
+      "group": "midi",
+      "aliases": [
+        "MI_TRSD"
+      ]
+    },
+    {
+      "value": 29029,
+      "name": "QK_MIDI_TRANSPOSE_UP",
+      "label": "Transpose Up",
+      "group": "midi",
+      "aliases": [
+        "MI_TRSU"
+      ]
+    },
+    {
+      "value": 29030,
+      "name": "QK_MIDI_VELOCITY_0",
+      "label": "Velocity 0",
+      "group": "midi",
+      "aliases": [
+        "MI_VL0"
+      ]
+    },
+    {
+      "value": 29031,
+      "name": "QK_MIDI_VELOCITY_1",
+      "label": "Velocity 1",
+      "group": "midi",
+      "aliases": [
+        "MI_VL1"
+      ]
+    },
+    {
+      "value": 29032,
+      "name": "QK_MIDI_VELOCITY_2",
+      "label": "Velocity 2",
+      "group": "midi",
+      "aliases": [
+        "MI_VL2"
+      ]
+    },
+    {
+      "value": 29033,
+      "name": "QK_MIDI_VELOCITY_3",
+      "label": "Velocity 3",
+      "group": "midi",
+      "aliases": [
+        "MI_VL3"
+      ]
+    },
+    {
+      "value": 29034,
+      "name": "QK_MIDI_VELOCITY_4",
+      "label": "Velocity 4",
+      "group": "midi",
+      "aliases": [
+        "MI_VL4"
+      ]
+    },
+    {
+      "value": 29035,
+      "name": "QK_MIDI_VELOCITY_5",
+      "label": "Velocity 5",
+      "group": "midi",
+      "aliases": [
+        "MI_VL5"
+      ]
+    },
+    {
+      "value": 29036,
+      "name": "QK_MIDI_VELOCITY_6",
+      "label": "Velocity 6",
+      "group": "midi",
+      "aliases": [
+        "MI_VL6"
+      ]
+    },
+    {
+      "value": 29037,
+      "name": "QK_MIDI_VELOCITY_7",
+      "label": "Velocity 7",
+      "group": "midi",
+      "aliases": [
+        "MI_VL7"
+      ]
+    },
+    {
+      "value": 29038,
+      "name": "QK_MIDI_VELOCITY_8",
+      "label": "Velocity 8",
+      "group": "midi",
+      "aliases": [
+        "MI_VL8"
+      ]
+    },
+    {
+      "value": 29039,
+      "name": "QK_MIDI_VELOCITY_9",
+      "label": "Velocity 9",
+      "group": "midi",
+      "aliases": [
+        "MI_VL9"
+      ]
+    },
+    {
+      "value": 29040,
+      "name": "QK_MIDI_VELOCITY_10",
+      "label": "Velocity 10",
+      "group": "midi",
+      "aliases": [
+        "MI_VL10"
+      ]
+    },
+    {
+      "value": 29041,
+      "name": "QK_MIDI_VELOCITY_DOWN",
+      "label": "Velocity Down",
+      "group": "midi",
+      "aliases": [
+        "MI_VELD"
+      ]
+    },
+    {
+      "value": 29042,
+      "name": "QK_MIDI_VELOCITY_UP",
+      "label": "Velocity Up",
+      "group": "midi",
+      "aliases": [
+        "MI_VELU"
+      ]
+    },
+    {
+      "value": 29043,
+      "name": "QK_MIDI_CHANNEL_1",
+      "label": "Channel 1",
+      "group": "midi",
+      "aliases": [
+        "MI_CH1"
+      ]
+    },
+    {
+      "value": 29044,
+      "name": "QK_MIDI_CHANNEL_2",
+      "label": "Channel 2",
+      "group": "midi",
+      "aliases": [
+        "MI_CH2"
+      ]
+    },
+    {
+      "value": 29045,
+      "name": "QK_MIDI_CHANNEL_3",
+      "label": "Channel 3",
+      "group": "midi",
+      "aliases": [
+        "MI_CH3"
+      ]
+    },
+    {
+      "value": 29046,
+      "name": "QK_MIDI_CHANNEL_4",
+      "label": "Channel 4",
+      "group": "midi",
+      "aliases": [
+        "MI_CH4"
+      ]
+    },
+    {
+      "value": 29047,
+      "name": "QK_MIDI_CHANNEL_5",
+      "label": "Channel 5",
+      "group": "midi",
+      "aliases": [
+        "MI_CH5"
+      ]
+    },
+    {
+      "value": 29048,
+      "name": "QK_MIDI_CHANNEL_6",
+      "label": "Channel 6",
+      "group": "midi",
+      "aliases": [
+        "MI_CH6"
+      ]
+    },
+    {
+      "value": 29049,
+      "name": "QK_MIDI_CHANNEL_7",
+      "label": "Channel 7",
+      "group": "midi",
+      "aliases": [
+        "MI_CH7"
+      ]
+    },
+    {
+      "value": 29050,
+      "name": "QK_MIDI_CHANNEL_8",
+      "label": "Channel 8",
+      "group": "midi",
+      "aliases": [
+        "MI_CH8"
+      ]
+    },
+    {
+      "value": 29051,
+      "name": "QK_MIDI_CHANNEL_9",
+      "label": "Channel 9",
+      "group": "midi",
+      "aliases": [
+        "MI_CH9"
+      ]
+    },
+    {
+      "value": 29052,
+      "name": "QK_MIDI_CHANNEL_10",
+      "label": "Channel 10",
+      "group": "midi",
+      "aliases": [
+        "MI_CH10"
+      ]
+    },
+    {
+      "value": 29053,
+      "name": "QK_MIDI_CHANNEL_11",
+      "label": "Channel 11",
+      "group": "midi",
+      "aliases": [
+        "MI_CH11"
+      ]
+    },
+    {
+      "value": 29054,
+      "name": "QK_MIDI_CHANNEL_12",
+      "label": "Channel 12",
+      "group": "midi",
+      "aliases": [
+        "MI_CH12"
+      ]
+    },
+    {
+      "value": 29055,
+      "name": "QK_MIDI_CHANNEL_13",
+      "label": "Channel 13",
+      "group": "midi",
+      "aliases": [
+        "MI_CH13"
+      ]
+    },
+    {
+      "value": 29056,
+      "name": "QK_MIDI_CHANNEL_14",
+      "label": "Channel 14",
+      "group": "midi",
+      "aliases": [
+        "MI_CH14"
+      ]
+    },
+    {
+      "value": 29057,
+      "name": "QK_MIDI_CHANNEL_15",
+      "label": "Channel 15",
+      "group": "midi",
+      "aliases": [
+        "MI_CH15"
+      ]
+    },
+    {
+      "value": 29058,
+      "name": "QK_MIDI_CHANNEL_16",
+      "label": "Channel 16",
+      "group": "midi",
+      "aliases": [
+        "MI_CH16"
+      ]
+    },
+    {
+      "value": 29059,
+      "name": "QK_MIDI_CHANNEL_DOWN",
+      "label": "Channel Down",
+      "group": "midi",
+      "aliases": [
+        "MI_CHND"
+      ]
+    },
+    {
+      "value": 29060,
+      "name": "QK_MIDI_CHANNEL_UP",
+      "label": "Channel Up",
+      "group": "midi",
+      "aliases": [
+        "MI_CHNU"
+      ]
+    },
+    {
+      "value": 29061,
+      "name": "QK_MIDI_ALL_NOTES_OFF",
+      "label": "All Notes Off",
+      "group": "midi",
+      "aliases": [
+        "MI_AOFF"
+      ]
+    },
+    {
+      "value": 29062,
+      "name": "QK_MIDI_SUSTAIN",
+      "label": "Sustain",
+      "group": "midi",
+      "aliases": [
+        "MI_SUST"
+      ]
+    },
+    {
+      "value": 29063,
+      "name": "QK_MIDI_PORTAMENTO",
+      "label": "Portamento",
+      "group": "midi",
+      "aliases": [
+        "MI_PORT"
+      ]
+    },
+    {
+      "value": 29064,
+      "name": "QK_MIDI_SOSTENUTO",
+      "label": "Sostenuto",
+      "group": "midi",
+      "aliases": [
+        "MI_SOST"
+      ]
+    },
+    {
+      "value": 29065,
+      "name": "QK_MIDI_SOFT",
+      "label": "Soft Pedal",
+      "group": "midi",
+      "aliases": [
+        "MI_SOFT"
+      ]
+    },
+    {
+      "value": 29066,
+      "name": "QK_MIDI_LEGATO",
+      "label": "Legato",
+      "group": "midi",
+      "aliases": [
+        "MI_LEG"
+      ]
+    },
+    {
+      "value": 29067,
+      "name": "QK_MIDI_MODULATION",
+      "label": "Modulation",
+      "group": "midi",
+      "aliases": [
+        "MI_MOD"
+      ]
+    },
+    {
+      "value": 29068,
+      "name": "QK_MIDI_MODULATION_SPEED_DOWN",
+      "label": "Modulation Speed Down",
+      "group": "midi",
+      "aliases": [
+        "MI_MODD"
+      ]
+    },
+    {
+      "value": 29069,
+      "name": "QK_MIDI_MODULATION_SPEED_UP",
+      "label": "Modulation Speed Up",
+      "group": "midi",
+      "aliases": [
+        "MI_MODU"
+      ]
+    },
+    {
+      "value": 29070,
+      "name": "QK_MIDI_PITCH_BEND_DOWN",
+      "label": "Pitch Bend Down",
+      "group": "midi",
+      "aliases": [
+        "MI_BNDD"
+      ]
+    },
+    {
+      "value": 29071,
+      "name": "QK_MIDI_PITCH_BEND_UP",
+      "label": "Pitch Bend Up",
+      "group": "midi",
+      "aliases": [
+        "MI_BNDU"
+      ]
+    },
+    {
+      "value": 29072,
+      "name": "QK_MIDI_VELOCITY_0",
+      "label": "QK_MIDI_VELOCITY_0",
+      "group": "midi",
+      "aliases": [
+        "MI_VL0"
+      ]
+    },
+    {
+      "value": 29073,
+      "name": "QK_MIDI_VELOCITY_1",
+      "label": "QK_MIDI_VELOCITY_1",
+      "group": "midi",
+      "aliases": [
+        "MI_VL1"
+      ]
+    },
+    {
+      "value": 29074,
+      "name": "QK_MIDI_VELOCITY_2",
+      "label": "QK_MIDI_VELOCITY_2",
+      "group": "midi",
+      "aliases": [
+        "MI_VL2"
+      ]
+    },
+    {
+      "value": 29075,
+      "name": "QK_MIDI_VELOCITY_3",
+      "label": "QK_MIDI_VELOCITY_3",
+      "group": "midi",
+      "aliases": [
+        "MI_VL3"
+      ]
+    },
+    {
+      "value": 29076,
+      "name": "QK_MIDI_VELOCITY_4",
+      "label": "QK_MIDI_VELOCITY_4",
+      "group": "midi",
+      "aliases": [
+        "MI_VL4"
+      ]
+    },
+    {
+      "value": 29077,
+      "name": "QK_MIDI_VELOCITY_5",
+      "label": "QK_MIDI_VELOCITY_5",
+      "group": "midi",
+      "aliases": [
+        "MI_VL5"
+      ]
+    },
+    {
+      "value": 29078,
+      "name": "QK_MIDI_VELOCITY_6",
+      "label": "QK_MIDI_VELOCITY_6",
+      "group": "midi",
+      "aliases": [
+        "MI_VL6"
+      ]
+    },
+    {
+      "value": 29079,
+      "name": "QK_MIDI_VELOCITY_7",
+      "label": "QK_MIDI_VELOCITY_7",
+      "group": "midi",
+      "aliases": [
+        "MI_VL7"
+      ]
+    },
+    {
+      "value": 29080,
+      "name": "QK_MIDI_VELOCITY_8",
+      "label": "QK_MIDI_VELOCITY_8",
+      "group": "midi",
+      "aliases": [
+        "MI_VL8"
+      ]
+    },
+    {
+      "value": 29081,
+      "name": "QK_MIDI_VELOCITY_9",
+      "label": "QK_MIDI_VELOCITY_9",
+      "group": "midi",
+      "aliases": [
+        "MI_VL9"
+      ]
+    },
+    {
+      "value": 29082,
+      "name": "QK_MIDI_VELOCITY_10",
+      "label": "QK_MIDI_VELOCITY_10",
+      "group": "midi",
+      "aliases": [
+        "MI_VL10"
+      ]
+    },
+    {
+      "value": 29083,
+      "name": "QK_MIDI_VELOCITY_DOWN",
+      "label": "QK_MIDI_VELOCITY_DOWN",
+      "group": "midi",
+      "aliases": [
+        "MI_VELD"
+      ]
+    },
+    {
+      "value": 29084,
+      "name": "QK_MIDI_VELOCITY_UP",
+      "label": "QK_MIDI_VELOCITY_UP",
+      "group": "midi",
+      "aliases": [
+        "MI_VELU"
+      ]
+    },
+    {
+      "value": 29088,
+      "name": "QK_MIDI_CHANNEL_1",
+      "label": "QK_MIDI_CHANNEL_1",
+      "group": "midi",
+      "aliases": [
+        "MI_CH1"
+      ]
+    },
+    {
+      "value": 29089,
+      "name": "QK_MIDI_CHANNEL_2",
+      "label": "QK_MIDI_CHANNEL_2",
+      "group": "midi",
+      "aliases": [
+        "MI_CH2"
+      ]
+    },
+    {
+      "value": 29090,
+      "name": "QK_MIDI_CHANNEL_3",
+      "label": "QK_MIDI_CHANNEL_3",
+      "group": "midi",
+      "aliases": [
+        "MI_CH3"
+      ]
+    },
+    {
+      "value": 29091,
+      "name": "QK_MIDI_CHANNEL_4",
+      "label": "QK_MIDI_CHANNEL_4",
+      "group": "midi",
+      "aliases": [
+        "MI_CH4"
+      ]
+    },
+    {
+      "value": 29092,
+      "name": "QK_MIDI_CHANNEL_5",
+      "label": "QK_MIDI_CHANNEL_5",
+      "group": "midi",
+      "aliases": [
+        "MI_CH5"
+      ]
+    },
+    {
+      "value": 29093,
+      "name": "QK_MIDI_CHANNEL_6",
+      "label": "QK_MIDI_CHANNEL_6",
+      "group": "midi",
+      "aliases": [
+        "MI_CH6"
+      ]
+    },
+    {
+      "value": 29094,
+      "name": "QK_MIDI_CHANNEL_7",
+      "label": "QK_MIDI_CHANNEL_7",
+      "group": "midi",
+      "aliases": [
+        "MI_CH7"
+      ]
+    },
+    {
+      "value": 29095,
+      "name": "QK_MIDI_CHANNEL_8",
+      "label": "QK_MIDI_CHANNEL_8",
+      "group": "midi",
+      "aliases": [
+        "MI_CH8"
+      ]
+    },
+    {
+      "value": 29096,
+      "name": "QK_MIDI_CHANNEL_9",
+      "label": "QK_MIDI_CHANNEL_9",
+      "group": "midi",
+      "aliases": [
+        "MI_CH9"
+      ]
+    },
+    {
+      "value": 29097,
+      "name": "QK_MIDI_CHANNEL_10",
+      "label": "QK_MIDI_CHANNEL_10",
+      "group": "midi",
+      "aliases": [
+        "MI_CH10"
+      ]
+    },
+    {
+      "value": 29098,
+      "name": "QK_MIDI_CHANNEL_11",
+      "label": "QK_MIDI_CHANNEL_11",
+      "group": "midi",
+      "aliases": [
+        "MI_CH11"
+      ]
+    },
+    {
+      "value": 29099,
+      "name": "QK_MIDI_CHANNEL_12",
+      "label": "QK_MIDI_CHANNEL_12",
+      "group": "midi",
+      "aliases": [
+        "MI_CH12"
+      ]
+    },
+    {
+      "value": 29100,
+      "name": "QK_MIDI_CHANNEL_13",
+      "label": "QK_MIDI_CHANNEL_13",
+      "group": "midi",
+      "aliases": [
+        "MI_CH13"
+      ]
+    },
+    {
+      "value": 29101,
+      "name": "QK_MIDI_CHANNEL_14",
+      "label": "QK_MIDI_CHANNEL_14",
+      "group": "midi",
+      "aliases": [
+        "MI_CH14"
+      ]
+    },
+    {
+      "value": 29102,
+      "name": "QK_MIDI_CHANNEL_15",
+      "label": "QK_MIDI_CHANNEL_15",
+      "group": "midi",
+      "aliases": [
+        "MI_CH15"
+      ]
+    },
+    {
+      "value": 29103,
+      "name": "QK_MIDI_CHANNEL_16",
+      "label": "QK_MIDI_CHANNEL_16",
+      "group": "midi",
+      "aliases": [
+        "MI_CH16"
+      ]
+    },
+    {
+      "value": 29104,
+      "name": "QK_MIDI_CHANNEL_DOWN",
+      "label": "QK_MIDI_CHANNEL_DOWN",
+      "group": "midi",
+      "aliases": [
+        "MI_CHND"
+      ]
+    },
+    {
+      "value": 29105,
+      "name": "QK_MIDI_CHANNEL_UP",
+      "label": "QK_MIDI_CHANNEL_UP",
+      "group": "midi",
+      "aliases": [
+        "MI_CHNU"
+      ]
+    },
+    {
+      "value": 29120,
+      "name": "QK_MIDI_ALL_NOTES_OFF",
+      "label": "QK_MIDI_ALL_NOTES_OFF",
+      "group": "midi",
+      "aliases": [
+        "MI_AOFF"
+      ]
+    },
+    {
+      "value": 29121,
+      "name": "QK_MIDI_SUSTAIN",
+      "label": "QK_MIDI_SUSTAIN",
+      "group": "midi",
+      "aliases": [
+        "MI_SUST"
+      ]
+    },
+    {
+      "value": 29122,
+      "name": "QK_MIDI_PORTAMENTO",
+      "label": "QK_MIDI_PORTAMENTO",
+      "group": "midi",
+      "aliases": [
+        "MI_PORT"
+      ]
+    },
+    {
+      "value": 29123,
+      "name": "QK_MIDI_SOSTENUTO",
+      "label": "QK_MIDI_SOSTENUTO",
+      "group": "midi",
+      "aliases": [
+        "MI_SOST"
+      ]
+    },
+    {
+      "value": 29124,
+      "name": "QK_MIDI_SOFT",
+      "label": "QK_MIDI_SOFT",
+      "group": "midi",
+      "aliases": [
+        "MI_SOFT"
+      ]
+    },
+    {
+      "value": 29125,
+      "name": "QK_MIDI_LEGATO",
+      "label": "QK_MIDI_LEGATO",
+      "group": "midi",
+      "aliases": [
+        "MI_LEG"
+      ]
+    },
+    {
+      "value": 29126,
+      "name": "QK_MIDI_MODULATION",
+      "label": "QK_MIDI_MODULATION",
+      "group": "midi",
+      "aliases": [
+        "MI_MOD"
+      ]
+    },
+    {
+      "value": 29127,
+      "name": "QK_MIDI_MODULATION_SPEED_DOWN",
+      "label": "QK_MIDI_MODULATION_SPEED_DOWN",
+      "group": "midi",
+      "aliases": [
+        "MI_MODD"
+      ]
+    },
+    {
+      "value": 29128,
+      "name": "QK_MIDI_MODULATION_SPEED_UP",
+      "label": "QK_MIDI_MODULATION_SPEED_UP",
+      "group": "midi",
+      "aliases": [
+        "MI_MODU"
+      ]
+    },
+    {
+      "value": 29129,
+      "name": "QK_MIDI_PITCH_BEND_DOWN",
+      "label": "QK_MIDI_PITCH_BEND_DOWN",
+      "group": "midi",
+      "aliases": [
+        "MI_BNDD"
+      ]
+    },
+    {
+      "value": 29130,
+      "name": "QK_MIDI_PITCH_BEND_UP",
+      "label": "QK_MIDI_PITCH_BEND_UP",
+      "group": "midi",
+      "aliases": [
+        "MI_BNDU"
+      ]
+    },
+    {
+      "value": 29184,
+      "name": "QK_SEQUENCER_ON",
+      "label": "Sequencer On",
+      "group": "sequencer",
+      "aliases": [
+        "SQ_ON"
+      ]
+    },
+    {
+      "value": 29185,
+      "name": "QK_SEQUENCER_OFF",
+      "label": "Sequencer Off",
+      "group": "sequencer",
+      "aliases": [
+        "SQ_OFF"
+      ]
+    },
+    {
+      "value": 29186,
+      "name": "QK_SEQUENCER_TOGGLE",
+      "label": "Toggle Sequencer",
+      "group": "sequencer",
+      "aliases": [
+        "SQ_TOGG"
+      ]
+    },
+    {
+      "value": 29187,
+      "name": "QK_SEQUENCER_TEMPO_DOWN",
+      "label": "Tempo Down",
+      "group": "sequencer",
+      "aliases": [
+        "SQ_TMPD"
+      ]
+    },
+    {
+      "value": 29188,
+      "name": "QK_SEQUENCER_TEMPO_UP",
+      "label": "Tempo Up",
+      "group": "sequencer",
+      "aliases": [
+        "SQ_TMPU"
+      ]
+    },
+    {
+      "value": 29189,
+      "name": "QK_SEQUENCER_RESOLUTION_DOWN",
+      "label": "Resolution Down",
+      "group": "sequencer",
+      "aliases": [
+        "SQ_RESD"
+      ]
+    },
+    {
+      "value": 29190,
+      "name": "QK_SEQUENCER_RESOLUTION_UP",
+      "label": "Resolution Up",
+      "group": "sequencer",
+      "aliases": [
+        "SQ_RESU"
+      ]
+    },
+    {
+      "value": 29191,
+      "name": "QK_SEQUENCER_STEPS_ALL",
+      "label": "All Steps",
+      "group": "sequencer",
+      "aliases": [
+        "SQ_SALL"
+      ]
+    },
+    {
+      "value": 29192,
+      "name": "QK_SEQUENCER_STEPS_CLEAR",
+      "label": "Clear Steps",
+      "group": "sequencer",
+      "aliases": [
+        "SQ_SCLR"
+      ]
+    },
+    {
+      "value": 29696,
+      "name": "QK_JOYSTICK_BUTTON_0",
+      "label": "Button 0",
+      "group": "joystick",
+      "aliases": [
+        "JS_0"
+      ]
+    },
+    {
+      "value": 29697,
+      "name": "QK_JOYSTICK_BUTTON_1",
+      "label": "Button 1",
+      "group": "joystick",
+      "aliases": [
+        "JS_1"
+      ]
+    },
+    {
+      "value": 29698,
+      "name": "QK_JOYSTICK_BUTTON_2",
+      "label": "Button 2",
+      "group": "joystick",
+      "aliases": [
+        "JS_2"
+      ]
+    },
+    {
+      "value": 29699,
+      "name": "QK_JOYSTICK_BUTTON_3",
+      "label": "Button 3",
+      "group": "joystick",
+      "aliases": [
+        "JS_3"
+      ]
+    },
+    {
+      "value": 29700,
+      "name": "QK_JOYSTICK_BUTTON_4",
+      "label": "Button 4",
+      "group": "joystick",
+      "aliases": [
+        "JS_4"
+      ]
+    },
+    {
+      "value": 29701,
+      "name": "QK_JOYSTICK_BUTTON_5",
+      "label": "Button 5",
+      "group": "joystick",
+      "aliases": [
+        "JS_5"
+      ]
+    },
+    {
+      "value": 29702,
+      "name": "QK_JOYSTICK_BUTTON_6",
+      "label": "Button 6",
+      "group": "joystick",
+      "aliases": [
+        "JS_6"
+      ]
+    },
+    {
+      "value": 29703,
+      "name": "QK_JOYSTICK_BUTTON_7",
+      "label": "Button 7",
+      "group": "joystick",
+      "aliases": [
+        "JS_7"
+      ]
+    },
+    {
+      "value": 29704,
+      "name": "QK_JOYSTICK_BUTTON_8",
+      "label": "Button 8",
+      "group": "joystick",
+      "aliases": [
+        "JS_8"
+      ]
+    },
+    {
+      "value": 29705,
+      "name": "QK_JOYSTICK_BUTTON_9",
+      "label": "Button 9",
+      "group": "joystick",
+      "aliases": [
+        "JS_9"
+      ]
+    },
+    {
+      "value": 29706,
+      "name": "QK_JOYSTICK_BUTTON_10",
+      "label": "Button 10",
+      "group": "joystick",
+      "aliases": [
+        "JS_10"
+      ]
+    },
+    {
+      "value": 29707,
+      "name": "QK_JOYSTICK_BUTTON_11",
+      "label": "Button 11",
+      "group": "joystick",
+      "aliases": [
+        "JS_11"
+      ]
+    },
+    {
+      "value": 29708,
+      "name": "QK_JOYSTICK_BUTTON_12",
+      "label": "Button 12",
+      "group": "joystick",
+      "aliases": [
+        "JS_12"
+      ]
+    },
+    {
+      "value": 29709,
+      "name": "QK_JOYSTICK_BUTTON_13",
+      "label": "Button 13",
+      "group": "joystick",
+      "aliases": [
+        "JS_13"
+      ]
+    },
+    {
+      "value": 29710,
+      "name": "QK_JOYSTICK_BUTTON_14",
+      "label": "Button 14",
+      "group": "joystick",
+      "aliases": [
+        "JS_14"
+      ]
+    },
+    {
+      "value": 29711,
+      "name": "QK_JOYSTICK_BUTTON_15",
+      "label": "Button 15",
+      "group": "joystick",
+      "aliases": [
+        "JS_15"
+      ]
+    },
+    {
+      "value": 29712,
+      "name": "QK_JOYSTICK_BUTTON_16",
+      "label": "Button 16",
+      "group": "joystick",
+      "aliases": [
+        "JS_16"
+      ]
+    },
+    {
+      "value": 29713,
+      "name": "QK_JOYSTICK_BUTTON_17",
+      "label": "Button 17",
+      "group": "joystick",
+      "aliases": [
+        "JS_17"
+      ]
+    },
+    {
+      "value": 29714,
+      "name": "QK_JOYSTICK_BUTTON_18",
+      "label": "Button 18",
+      "group": "joystick",
+      "aliases": [
+        "JS_18"
+      ]
+    },
+    {
+      "value": 29715,
+      "name": "QK_JOYSTICK_BUTTON_19",
+      "label": "Button 19",
+      "group": "joystick",
+      "aliases": [
+        "JS_19"
+      ]
+    },
+    {
+      "value": 29716,
+      "name": "QK_JOYSTICK_BUTTON_20",
+      "label": "Button 20",
+      "group": "joystick",
+      "aliases": [
+        "JS_20"
+      ]
+    },
+    {
+      "value": 29717,
+      "name": "QK_JOYSTICK_BUTTON_21",
+      "label": "Button 21",
+      "group": "joystick",
+      "aliases": [
+        "JS_21"
+      ]
+    },
+    {
+      "value": 29718,
+      "name": "QK_JOYSTICK_BUTTON_22",
+      "label": "Button 22",
+      "group": "joystick",
+      "aliases": [
+        "JS_22"
+      ]
+    },
+    {
+      "value": 29719,
+      "name": "QK_JOYSTICK_BUTTON_23",
+      "label": "Button 23",
+      "group": "joystick",
+      "aliases": [
+        "JS_23"
+      ]
+    },
+    {
+      "value": 29720,
+      "name": "QK_JOYSTICK_BUTTON_24",
+      "label": "Button 24",
+      "group": "joystick",
+      "aliases": [
+        "JS_24"
+      ]
+    },
+    {
+      "value": 29721,
+      "name": "QK_JOYSTICK_BUTTON_25",
+      "label": "Button 25",
+      "group": "joystick",
+      "aliases": [
+        "JS_25"
+      ]
+    },
+    {
+      "value": 29722,
+      "name": "QK_JOYSTICK_BUTTON_26",
+      "label": "Button 26",
+      "group": "joystick",
+      "aliases": [
+        "JS_26"
+      ]
+    },
+    {
+      "value": 29723,
+      "name": "QK_JOYSTICK_BUTTON_27",
+      "label": "Button 27",
+      "group": "joystick",
+      "aliases": [
+        "JS_27"
+      ]
+    },
+    {
+      "value": 29724,
+      "name": "QK_JOYSTICK_BUTTON_28",
+      "label": "Button 28",
+      "group": "joystick",
+      "aliases": [
+        "JS_28"
+      ]
+    },
+    {
+      "value": 29725,
+      "name": "QK_JOYSTICK_BUTTON_29",
+      "label": "Button 29",
+      "group": "joystick",
+      "aliases": [
+        "JS_29"
+      ]
+    },
+    {
+      "value": 29726,
+      "name": "QK_JOYSTICK_BUTTON_30",
+      "label": "Button 30",
+      "group": "joystick",
+      "aliases": [
+        "JS_30"
+      ]
+    },
+    {
+      "value": 29727,
+      "name": "QK_JOYSTICK_BUTTON_31",
+      "label": "Button 31",
+      "group": "joystick",
+      "aliases": [
+        "JS_31"
+      ]
+    },
+    {
+      "value": 29760,
+      "name": "QK_PROGRAMMABLE_BUTTON_1",
+      "label": "Button 1",
+      "group": "programmable_button",
+      "aliases": [
+        "PB_1"
+      ]
+    },
+    {
+      "value": 29761,
+      "name": "QK_PROGRAMMABLE_BUTTON_2",
+      "label": "Button 2",
+      "group": "programmable_button",
+      "aliases": [
+        "PB_2"
+      ]
+    },
+    {
+      "value": 29762,
+      "name": "QK_PROGRAMMABLE_BUTTON_3",
+      "label": "Button 3",
+      "group": "programmable_button",
+      "aliases": [
+        "PB_3"
+      ]
+    },
+    {
+      "value": 29763,
+      "name": "QK_PROGRAMMABLE_BUTTON_4",
+      "label": "Button 4",
+      "group": "programmable_button",
+      "aliases": [
+        "PB_4"
+      ]
+    },
+    {
+      "value": 29764,
+      "name": "QK_PROGRAMMABLE_BUTTON_5",
+      "label": "Button 5",
+      "group": "programmable_button",
+      "aliases": [
+        "PB_5"
+      ]
+    },
+    {
+      "value": 29765,
+      "name": "QK_PROGRAMMABLE_BUTTON_6",
+      "label": "Button 6",
+      "group": "programmable_button",
+      "aliases": [
+        "PB_6"
+      ]
+    },
+    {
+      "value": 29766,
+      "name": "QK_PROGRAMMABLE_BUTTON_7",
+      "label": "Button 7",
+      "group": "programmable_button",
+      "aliases": [
+        "PB_7"
+      ]
+    },
+    {
+      "value": 29767,
+      "name": "QK_PROGRAMMABLE_BUTTON_8",
+      "label": "Button 8",
+      "group": "programmable_button",
+      "aliases": [
+        "PB_8"
+      ]
+    },
+    {
+      "value": 29768,
+      "name": "QK_PROGRAMMABLE_BUTTON_9",
+      "label": "Button 9",
+      "group": "programmable_button",
+      "aliases": [
+        "PB_9"
+      ]
+    },
+    {
+      "value": 29769,
+      "name": "QK_PROGRAMMABLE_BUTTON_10",
+      "label": "Button 10",
+      "group": "programmable_button",
+      "aliases": [
+        "PB_10"
+      ]
+    },
+    {
+      "value": 29770,
+      "name": "QK_PROGRAMMABLE_BUTTON_11",
+      "label": "Button 11",
+      "group": "programmable_button",
+      "aliases": [
+        "PB_11"
+      ]
+    },
+    {
+      "value": 29771,
+      "name": "QK_PROGRAMMABLE_BUTTON_12",
+      "label": "Button 12",
+      "group": "programmable_button",
+      "aliases": [
+        "PB_12"
+      ]
+    },
+    {
+      "value": 29772,
+      "name": "QK_PROGRAMMABLE_BUTTON_13",
+      "label": "Button 13",
+      "group": "programmable_button",
+      "aliases": [
+        "PB_13"
+      ]
+    },
+    {
+      "value": 29773,
+      "name": "QK_PROGRAMMABLE_BUTTON_14",
+      "label": "Button 14",
+      "group": "programmable_button",
+      "aliases": [
+        "PB_14"
+      ]
+    },
+    {
+      "value": 29774,
+      "name": "QK_PROGRAMMABLE_BUTTON_15",
+      "label": "Button 15",
+      "group": "programmable_button",
+      "aliases": [
+        "PB_15"
+      ]
+    },
+    {
+      "value": 29775,
+      "name": "QK_PROGRAMMABLE_BUTTON_16",
+      "label": "Button 16",
+      "group": "programmable_button",
+      "aliases": [
+        "PB_16"
+      ]
+    },
+    {
+      "value": 29776,
+      "name": "QK_PROGRAMMABLE_BUTTON_17",
+      "label": "Button 17",
+      "group": "programmable_button",
+      "aliases": [
+        "PB_17"
+      ]
+    },
+    {
+      "value": 29777,
+      "name": "QK_PROGRAMMABLE_BUTTON_18",
+      "label": "Button 18",
+      "group": "programmable_button",
+      "aliases": [
+        "PB_18"
+      ]
+    },
+    {
+      "value": 29778,
+      "name": "QK_PROGRAMMABLE_BUTTON_19",
+      "label": "Button 19",
+      "group": "programmable_button",
+      "aliases": [
+        "PB_19"
+      ]
+    },
+    {
+      "value": 29779,
+      "name": "QK_PROGRAMMABLE_BUTTON_20",
+      "label": "Button 20",
+      "group": "programmable_button",
+      "aliases": [
+        "PB_20"
+      ]
+    },
+    {
+      "value": 29780,
+      "name": "QK_PROGRAMMABLE_BUTTON_21",
+      "label": "Button 21",
+      "group": "programmable_button",
+      "aliases": [
+        "PB_21"
+      ]
+    },
+    {
+      "value": 29781,
+      "name": "QK_PROGRAMMABLE_BUTTON_22",
+      "label": "Button 22",
+      "group": "programmable_button",
+      "aliases": [
+        "PB_22"
+      ]
+    },
+    {
+      "value": 29782,
+      "name": "QK_PROGRAMMABLE_BUTTON_23",
+      "label": "Button 23",
+      "group": "programmable_button",
+      "aliases": [
+        "PB_23"
+      ]
+    },
+    {
+      "value": 29783,
+      "name": "QK_PROGRAMMABLE_BUTTON_24",
+      "label": "Button 24",
+      "group": "programmable_button",
+      "aliases": [
+        "PB_24"
+      ]
+    },
+    {
+      "value": 29784,
+      "name": "QK_PROGRAMMABLE_BUTTON_25",
+      "label": "Button 25",
+      "group": "programmable_button",
+      "aliases": [
+        "PB_25"
+      ]
+    },
+    {
+      "value": 29785,
+      "name": "QK_PROGRAMMABLE_BUTTON_26",
+      "label": "Button 26",
+      "group": "programmable_button",
+      "aliases": [
+        "PB_26"
+      ]
+    },
+    {
+      "value": 29786,
+      "name": "QK_PROGRAMMABLE_BUTTON_27",
+      "label": "Button 27",
+      "group": "programmable_button",
+      "aliases": [
+        "PB_27"
+      ]
+    },
+    {
+      "value": 29787,
+      "name": "QK_PROGRAMMABLE_BUTTON_28",
+      "label": "Button 28",
+      "group": "programmable_button",
+      "aliases": [
+        "PB_28"
+      ]
+    },
+    {
+      "value": 29788,
+      "name": "QK_PROGRAMMABLE_BUTTON_29",
+      "label": "Button 29",
+      "group": "programmable_button",
+      "aliases": [
+        "PB_29"
+      ]
+    },
+    {
+      "value": 29789,
+      "name": "QK_PROGRAMMABLE_BUTTON_30",
+      "label": "Button 30",
+      "group": "programmable_button",
+      "aliases": [
+        "PB_30"
+      ]
+    },
+    {
+      "value": 29790,
+      "name": "QK_PROGRAMMABLE_BUTTON_31",
+      "label": "Button 31",
+      "group": "programmable_button",
+      "aliases": [
+        "PB_31"
+      ]
+    },
+    {
+      "value": 29791,
+      "name": "QK_PROGRAMMABLE_BUTTON_32",
+      "label": "Button 32",
+      "group": "programmable_button",
+      "aliases": [
+        "PB_32"
+      ]
+    },
+    {
+      "value": 29824,
+      "name": "QK_AUDIO_ON",
+      "label": "Audio On",
+      "group": "audio",
+      "aliases": [
+        "AU_ON"
+      ]
+    },
+    {
+      "value": 29825,
+      "name": "QK_AUDIO_OFF",
+      "label": "Audio Off",
+      "group": "audio",
+      "aliases": [
+        "AU_OFF"
+      ]
+    },
+    {
+      "value": 29826,
+      "name": "QK_AUDIO_TOGGLE",
+      "label": "Toggle Audio",
+      "group": "audio",
+      "aliases": [
+        "AU_TOGG"
+      ]
+    },
+    {
+      "value": 29834,
+      "name": "QK_AUDIO_CLICKY_TOGGLE",
+      "label": "Toggle Audio Clicky",
+      "group": "audio",
+      "aliases": [
+        "CK_TOGG"
+      ]
+    },
+    {
+      "value": 29835,
+      "name": "QK_AUDIO_CLICKY_ON",
+      "label": "Audio Clicky On",
+      "group": "audio",
+      "aliases": [
+        "CK_ON"
+      ]
+    },
+    {
+      "value": 29836,
+      "name": "QK_AUDIO_CLICKY_OFF",
+      "label": "Audio Clicky Off",
+      "group": "audio",
+      "aliases": [
+        "CK_OFF"
+      ]
+    },
+    {
+      "value": 29837,
+      "name": "QK_AUDIO_CLICKY_UP",
+      "label": "Audio Clicky Up",
+      "group": "audio",
+      "aliases": [
+        "CK_UP"
+      ]
+    },
+    {
+      "value": 29838,
+      "name": "QK_AUDIO_CLICKY_DOWN",
+      "label": "Audio Clicky Down",
+      "group": "audio",
+      "aliases": [
+        "CK_DOWN"
+      ]
+    },
+    {
+      "value": 29839,
+      "name": "QK_AUDIO_CLICKY_RESET",
+      "label": "Audio Clicky Reset",
+      "group": "audio",
+      "aliases": [
+        "CK_RST"
+      ]
+    },
+    {
+      "value": 29840,
+      "name": "QK_MUSIC_ON",
+      "label": "Music On",
+      "group": "audio",
+      "aliases": [
+        "MU_ON"
+      ]
+    },
+    {
+      "value": 29841,
+      "name": "QK_MUSIC_OFF",
+      "label": "Music Off",
+      "group": "audio",
+      "aliases": [
+        "MU_OFF"
+      ]
+    },
+    {
+      "value": 29842,
+      "name": "QK_MUSIC_TOGGLE",
+      "label": "Toggle Music",
+      "group": "audio",
+      "aliases": [
+        "MU_TOGG"
+      ]
+    },
+    {
+      "value": 29843,
+      "name": "QK_MUSIC_MODE_NEXT",
+      "label": "Music Next",
+      "group": "audio",
+      "aliases": [
+        "MU_NEXT"
+      ]
+    },
+    {
+      "value": 29844,
+      "name": "QK_AUDIO_VOICE_NEXT",
+      "label": "Audio Voice Next",
+      "group": "audio",
+      "aliases": [
+        "AU_NEXT"
+      ]
+    },
+    {
+      "value": 29845,
+      "name": "QK_AUDIO_VOICE_PREVIOUS",
+      "label": "Audio Voice Previous",
+      "group": "audio",
+      "aliases": [
+        "AU_PREV"
+      ]
+    },
+    {
+      "value": 29936,
+      "name": "QK_STENO_BOLT",
+      "label": "QK_STENO_BOLT",
+      "group": "steno",
+      "aliases": []
+    },
+    {
+      "value": 29937,
+      "name": "QK_STENO_GEMINI",
+      "label": "QK_STENO_GEMINI",
+      "group": "steno",
+      "aliases": []
+    },
+    {
+      "value": 29938,
+      "name": "QK_STENO_COMB",
+      "label": "QK_STENO_COMB",
+      "group": "steno",
+      "aliases": []
+    },
+    {
+      "value": 30464,
+      "name": "QK_MACRO_0",
+      "label": "Macro 0",
+      "group": "macro",
+      "aliases": [
+        "MC_0"
+      ]
+    },
+    {
+      "value": 30465,
+      "name": "QK_MACRO_1",
+      "label": "Macro 1",
+      "group": "macro",
+      "aliases": [
+        "MC_1"
+      ]
+    },
+    {
+      "value": 30466,
+      "name": "QK_MACRO_2",
+      "label": "Macro 2",
+      "group": "macro",
+      "aliases": [
+        "MC_2"
+      ]
+    },
+    {
+      "value": 30467,
+      "name": "QK_MACRO_3",
+      "label": "Macro 3",
+      "group": "macro",
+      "aliases": [
+        "MC_3"
+      ]
+    },
+    {
+      "value": 30468,
+      "name": "QK_MACRO_4",
+      "label": "Macro 4",
+      "group": "macro",
+      "aliases": [
+        "MC_4"
+      ]
+    },
+    {
+      "value": 30469,
+      "name": "QK_MACRO_5",
+      "label": "Macro 5",
+      "group": "macro",
+      "aliases": [
+        "MC_5"
+      ]
+    },
+    {
+      "value": 30470,
+      "name": "QK_MACRO_6",
+      "label": "Macro 6",
+      "group": "macro",
+      "aliases": [
+        "MC_6"
+      ]
+    },
+    {
+      "value": 30471,
+      "name": "QK_MACRO_7",
+      "label": "Macro 7",
+      "group": "macro",
+      "aliases": [
+        "MC_7"
+      ]
+    },
+    {
+      "value": 30472,
+      "name": "QK_MACRO_8",
+      "label": "Macro 8",
+      "group": "macro",
+      "aliases": [
+        "MC_8"
+      ]
+    },
+    {
+      "value": 30473,
+      "name": "QK_MACRO_9",
+      "label": "Macro 9",
+      "group": "macro",
+      "aliases": [
+        "MC_9"
+      ]
+    },
+    {
+      "value": 30474,
+      "name": "QK_MACRO_10",
+      "label": "Macro 10",
+      "group": "macro",
+      "aliases": [
+        "MC_10"
+      ]
+    },
+    {
+      "value": 30475,
+      "name": "QK_MACRO_11",
+      "label": "Macro 11",
+      "group": "macro",
+      "aliases": [
+        "MC_11"
+      ]
+    },
+    {
+      "value": 30476,
+      "name": "QK_MACRO_12",
+      "label": "Macro 12",
+      "group": "macro",
+      "aliases": [
+        "MC_12"
+      ]
+    },
+    {
+      "value": 30477,
+      "name": "QK_MACRO_13",
+      "label": "Macro 13",
+      "group": "macro",
+      "aliases": [
+        "MC_13"
+      ]
+    },
+    {
+      "value": 30478,
+      "name": "QK_MACRO_14",
+      "label": "Macro 14",
+      "group": "macro",
+      "aliases": [
+        "MC_14"
+      ]
+    },
+    {
+      "value": 30479,
+      "name": "QK_MACRO_15",
+      "label": "Macro 15",
+      "group": "macro",
+      "aliases": [
+        "MC_15"
+      ]
+    },
+    {
+      "value": 30480,
+      "name": "QK_MACRO_16",
+      "label": "Macro 16",
+      "group": "macro",
+      "aliases": [
+        "MC_16"
+      ]
+    },
+    {
+      "value": 30481,
+      "name": "QK_MACRO_17",
+      "label": "Macro 17",
+      "group": "macro",
+      "aliases": [
+        "MC_17"
+      ]
+    },
+    {
+      "value": 30482,
+      "name": "QK_MACRO_18",
+      "label": "Macro 18",
+      "group": "macro",
+      "aliases": [
+        "MC_18"
+      ]
+    },
+    {
+      "value": 30483,
+      "name": "QK_MACRO_19",
+      "label": "Macro 19",
+      "group": "macro",
+      "aliases": [
+        "MC_19"
+      ]
+    },
+    {
+      "value": 30484,
+      "name": "QK_MACRO_20",
+      "label": "Macro 20",
+      "group": "macro",
+      "aliases": [
+        "MC_20"
+      ]
+    },
+    {
+      "value": 30485,
+      "name": "QK_MACRO_21",
+      "label": "Macro 21",
+      "group": "macro",
+      "aliases": [
+        "MC_21"
+      ]
+    },
+    {
+      "value": 30486,
+      "name": "QK_MACRO_22",
+      "label": "Macro 22",
+      "group": "macro",
+      "aliases": [
+        "MC_22"
+      ]
+    },
+    {
+      "value": 30487,
+      "name": "QK_MACRO_23",
+      "label": "Macro 23",
+      "group": "macro",
+      "aliases": [
+        "MC_23"
+      ]
+    },
+    {
+      "value": 30488,
+      "name": "QK_MACRO_24",
+      "label": "Macro 24",
+      "group": "macro",
+      "aliases": [
+        "MC_24"
+      ]
+    },
+    {
+      "value": 30489,
+      "name": "QK_MACRO_25",
+      "label": "Macro 25",
+      "group": "macro",
+      "aliases": [
+        "MC_25"
+      ]
+    },
+    {
+      "value": 30490,
+      "name": "QK_MACRO_26",
+      "label": "Macro 26",
+      "group": "macro",
+      "aliases": [
+        "MC_26"
+      ]
+    },
+    {
+      "value": 30491,
+      "name": "QK_MACRO_27",
+      "label": "Macro 27",
+      "group": "macro",
+      "aliases": [
+        "MC_27"
+      ]
+    },
+    {
+      "value": 30492,
+      "name": "QK_MACRO_28",
+      "label": "Macro 28",
+      "group": "macro",
+      "aliases": [
+        "MC_28"
+      ]
+    },
+    {
+      "value": 30493,
+      "name": "QK_MACRO_29",
+      "label": "Macro 29",
+      "group": "macro",
+      "aliases": [
+        "MC_29"
+      ]
+    },
+    {
+      "value": 30494,
+      "name": "QK_MACRO_30",
+      "label": "Macro 30",
+      "group": "macro",
+      "aliases": [
+        "MC_30"
+      ]
+    },
+    {
+      "value": 30495,
+      "name": "QK_MACRO_31",
+      "label": "Macro 31",
+      "group": "macro",
+      "aliases": [
+        "MC_31"
+      ]
+    },
+    {
+      "value": 30592,
+      "name": "QK_OUTPUT_AUTO",
+      "label": "Output Auto",
+      "group": "connection",
+      "aliases": [
+        "OU_AUTO"
+      ]
+    },
+    {
+      "value": 30593,
+      "name": "QK_OUTPUT_NEXT",
+      "label": "Next Output",
+      "group": "connection",
+      "aliases": [
+        "OU_NEXT"
+      ]
+    },
+    {
+      "value": 30594,
+      "name": "QK_OUTPUT_PREV",
+      "label": "Previous Output",
+      "group": "connection",
+      "aliases": [
+        "OU_PREV"
+      ]
+    },
+    {
+      "value": 30595,
+      "name": "QK_OUTPUT_NONE",
+      "label": "None",
+      "group": "connection",
+      "aliases": [
+        "OU_NONE"
+      ]
+    },
+    {
+      "value": 30596,
+      "name": "QK_OUTPUT_USB",
+      "label": "USB",
+      "group": "connection",
+      "aliases": [
+        "OU_USB"
+      ]
+    },
+    {
+      "value": 30597,
+      "name": "QK_OUTPUT_2P4GHZ",
+      "label": "2.4GHz",
+      "group": "connection",
+      "aliases": [
+        "OU_2P4G"
+      ]
+    },
+    {
+      "value": 30598,
+      "name": "QK_OUTPUT_BLUETOOTH",
+      "label": "Bluetooth",
+      "group": "connection",
+      "aliases": [
+        "OU_BT"
+      ]
+    },
+    {
+      "value": 30608,
+      "name": "QK_BLUETOOTH_PROFILE_NEXT",
+      "label": "Bluetooth Profile Next",
+      "group": "connection",
+      "aliases": [
+        "BT_NEXT"
+      ]
+    },
+    {
+      "value": 30609,
+      "name": "QK_BLUETOOTH_PROFILE_PREV",
+      "label": "Bluetooth Profile Previous",
+      "group": "connection",
+      "aliases": [
+        "BT_PREV"
+      ]
+    },
+    {
+      "value": 30610,
+      "name": "QK_BLUETOOTH_UNPAIR",
+      "label": "Unpair",
+      "group": "connection",
+      "aliases": [
+        "BT_UNPR"
+      ]
+    },
+    {
+      "value": 30611,
+      "name": "QK_BLUETOOTH_PROFILE1",
+      "label": "Bluetooth Profile 1",
+      "group": "connection",
+      "aliases": [
+        "BT_PRF1"
+      ]
+    },
+    {
+      "value": 30612,
+      "name": "QK_BLUETOOTH_PROFILE2",
+      "label": "Bluetooth Profile 2",
+      "group": "connection",
+      "aliases": [
+        "BT_PRF2"
+      ]
+    },
+    {
+      "value": 30613,
+      "name": "QK_BLUETOOTH_PROFILE3",
+      "label": "Bluetooth Profile 3",
+      "group": "connection",
+      "aliases": [
+        "BT_PRF3"
+      ]
+    },
+    {
+      "value": 30614,
+      "name": "QK_BLUETOOTH_PROFILE4",
+      "label": "Bluetooth Profile 4",
+      "group": "connection",
+      "aliases": [
+        "BT_PRF4"
+      ]
+    },
+    {
+      "value": 30615,
+      "name": "QK_BLUETOOTH_PROFILE5",
+      "label": "Bluetooth Profile 5",
+      "group": "connection",
+      "aliases": [
+        "BT_PRF5"
+      ]
+    },
+    {
+      "value": 30720,
+      "name": "QK_BACKLIGHT_ON",
+      "label": "Backlight On",
+      "group": "backlight",
+      "aliases": [
+        "BL_ON"
+      ]
+    },
+    {
+      "value": 30721,
+      "name": "QK_BACKLIGHT_OFF",
+      "label": "Backlight Off",
+      "group": "backlight",
+      "aliases": [
+        "BL_OFF"
+      ]
+    },
+    {
+      "value": 30722,
+      "name": "QK_BACKLIGHT_TOGGLE",
+      "label": "Toggle Backlight",
+      "group": "backlight",
+      "aliases": [
+        "BL_TOGG"
+      ]
+    },
+    {
+      "value": 30723,
+      "name": "QK_BACKLIGHT_DOWN",
+      "label": "Backlight Down",
+      "group": "backlight",
+      "aliases": [
+        "BL_DOWN"
+      ]
+    },
+    {
+      "value": 30724,
+      "name": "QK_BACKLIGHT_UP",
+      "label": "Backlight Up",
+      "group": "backlight",
+      "aliases": [
+        "BL_UP"
+      ]
+    },
+    {
+      "value": 30725,
+      "name": "QK_BACKLIGHT_STEP",
+      "label": "Backlight Step",
+      "group": "backlight",
+      "aliases": [
+        "BL_STEP"
+      ]
+    },
+    {
+      "value": 30726,
+      "name": "QK_BACKLIGHT_TOGGLE_BREATHING",
+      "label": "Toggle Breathing",
+      "group": "backlight",
+      "aliases": [
+        "BL_BRTG"
+      ]
+    },
+    {
+      "value": 30736,
+      "name": "QK_LED_MATRIX_ON",
+      "label": "LED Matrix On",
+      "group": "led_matrix",
+      "aliases": [
+        "LM_ON"
+      ]
+    },
+    {
+      "value": 30737,
+      "name": "QK_LED_MATRIX_OFF",
+      "label": "LED Matrix Off",
+      "group": "led_matrix",
+      "aliases": [
+        "LM_OFF"
+      ]
+    },
+    {
+      "value": 30738,
+      "name": "QK_LED_MATRIX_TOGGLE",
+      "label": "Toggle LED Matrix",
+      "group": "led_matrix",
+      "aliases": [
+        "LM_TOGG"
+      ]
+    },
+    {
+      "value": 30739,
+      "name": "QK_LED_MATRIX_MODE_NEXT",
+      "label": "LED Matrix Next",
+      "group": "led_matrix",
+      "aliases": [
+        "LM_NEXT"
+      ]
+    },
+    {
+      "value": 30740,
+      "name": "QK_LED_MATRIX_MODE_PREVIOUS",
+      "label": "LED Matrix Previous",
+      "group": "led_matrix",
+      "aliases": [
+        "LM_PREV"
+      ]
+    },
+    {
+      "value": 30741,
+      "name": "QK_LED_MATRIX_BRIGHTNESS_UP",
+      "label": "LED Matrix Brightness Up",
+      "group": "led_matrix",
+      "aliases": [
+        "LM_BRIU"
+      ]
+    },
+    {
+      "value": 30742,
+      "name": "QK_LED_MATRIX_BRIGHTNESS_DOWN",
+      "label": "LED Matrix Brightness Down",
+      "group": "led_matrix",
+      "aliases": [
+        "LM_BRID"
+      ]
+    },
+    {
+      "value": 30743,
+      "name": "QK_LED_MATRIX_SPEED_UP",
+      "label": "LED Matrix Speed Up",
+      "group": "led_matrix",
+      "aliases": [
+        "LM_SPDU"
+      ]
+    },
+    {
+      "value": 30744,
+      "name": "QK_LED_MATRIX_SPEED_DOWN",
+      "label": "LED Matrix Speed Down",
+      "group": "led_matrix",
+      "aliases": [
+        "LM_SPDD"
+      ]
+    },
+    {
+      "value": 30745,
+      "name": "QK_LED_MATRIX_FLAG_NEXT",
+      "label": "LED Matrix Flag Next",
+      "group": "led_matrix",
+      "aliases": [
+        "LM_FLGN"
+      ]
+    },
+    {
+      "value": 30746,
+      "name": "QK_LED_MATRIX_FLAG_PREVIOUS",
+      "label": "LED Matrix Flag Previous",
+      "group": "led_matrix",
+      "aliases": [
+        "LM_FLGP"
+      ]
+    },
+    {
+      "value": 30752,
+      "name": "QK_UNDERGLOW_TOGGLE",
+      "label": "Toggle RGB Underglow",
+      "group": "underglow",
+      "aliases": [
+        "UG_TOGG"
+      ]
+    },
+    {
+      "value": 30753,
+      "name": "QK_UNDERGLOW_MODE_NEXT",
+      "label": "RGB Underglow Next",
+      "group": "underglow",
+      "aliases": [
+        "UG_NEXT"
+      ]
+    },
+    {
+      "value": 30754,
+      "name": "QK_UNDERGLOW_MODE_PREVIOUS",
+      "label": "RGB Underglow Previous",
+      "group": "underglow",
+      "aliases": [
+        "UG_PREV"
+      ]
+    },
+    {
+      "value": 30755,
+      "name": "QK_UNDERGLOW_HUE_UP",
+      "label": "RGB Underglow Hue Up",
+      "group": "underglow",
+      "aliases": [
+        "UG_HUEU"
+      ]
+    },
+    {
+      "value": 30756,
+      "name": "QK_UNDERGLOW_HUE_DOWN",
+      "label": "RGB Underglow Hue Down",
+      "group": "underglow",
+      "aliases": [
+        "UG_HUED"
+      ]
+    },
+    {
+      "value": 30757,
+      "name": "QK_UNDERGLOW_SATURATION_UP",
+      "label": "RGB Underglow Saturation Up",
+      "group": "underglow",
+      "aliases": [
+        "UG_SATU"
+      ]
+    },
+    {
+      "value": 30758,
+      "name": "QK_UNDERGLOW_SATURATION_DOWN",
+      "label": "RGB Underglow Saturation Down",
+      "group": "underglow",
+      "aliases": [
+        "UG_SATD"
+      ]
+    },
+    {
+      "value": 30759,
+      "name": "QK_UNDERGLOW_VALUE_UP",
+      "label": "RGB Underglow Value Up",
+      "group": "underglow",
+      "aliases": [
+        "UG_VALU"
+      ]
+    },
+    {
+      "value": 30760,
+      "name": "QK_UNDERGLOW_VALUE_DOWN",
+      "label": "RGB Underglow Value Down",
+      "group": "underglow",
+      "aliases": [
+        "UG_VALD"
+      ]
+    },
+    {
+      "value": 30761,
+      "name": "QK_UNDERGLOW_SPEED_UP",
+      "label": "RGB Underglow Speed Up",
+      "group": "underglow",
+      "aliases": [
+        "UG_SPDU"
+      ]
+    },
+    {
+      "value": 30762,
+      "name": "QK_UNDERGLOW_SPEED_DOWN",
+      "label": "RGB Underglow Speed Down",
+      "group": "underglow",
+      "aliases": [
+        "UG_SPDD"
+      ]
+    },
+    {
+      "value": 30763,
+      "name": "RGB_MODE_PLAIN",
+      "label": "RGB_MODE_PLAIN",
+      "group": "rgb",
+      "aliases": [
+        "RGB_M_P"
+      ]
+    },
+    {
+      "value": 30764,
+      "name": "RGB_MODE_BREATHE",
+      "label": "RGB_MODE_BREATHE",
+      "group": "rgb",
+      "aliases": [
+        "RGB_M_B"
+      ]
+    },
+    {
+      "value": 30765,
+      "name": "RGB_MODE_RAINBOW",
+      "label": "RGB_MODE_RAINBOW",
+      "group": "rgb",
+      "aliases": [
+        "RGB_M_R"
+      ]
+    },
+    {
+      "value": 30766,
+      "name": "RGB_MODE_SWIRL",
+      "label": "RGB_MODE_SWIRL",
+      "group": "rgb",
+      "aliases": [
+        "RGB_M_SW"
+      ]
+    },
+    {
+      "value": 30767,
+      "name": "RGB_MODE_SNAKE",
+      "label": "RGB_MODE_SNAKE",
+      "group": "rgb",
+      "aliases": [
+        "RGB_M_SN"
+      ]
+    },
+    {
+      "value": 30768,
+      "name": "RGB_MODE_KNIGHT",
+      "label": "RGB_MODE_KNIGHT",
+      "group": "rgb",
+      "aliases": [
+        "RGB_M_K"
+      ]
+    },
+    {
+      "value": 30769,
+      "name": "RGB_MODE_XMAS",
+      "label": "RGB_MODE_XMAS",
+      "group": "rgb",
+      "aliases": [
+        "RGB_M_X"
+      ]
+    },
+    {
+      "value": 30770,
+      "name": "RGB_MODE_GRADIENT",
+      "label": "RGB_MODE_GRADIENT",
+      "group": "rgb",
+      "aliases": [
+        "RGB_M_G"
+      ]
+    },
+    {
+      "value": 30771,
+      "name": "RGB_MODE_RGBTEST",
+      "label": "RGB_MODE_RGBTEST",
+      "group": "rgb",
+      "aliases": [
+        "RGB_M_T"
+      ]
+    },
+    {
+      "value": 30772,
+      "name": "RGB_MODE_TWINKLE",
+      "label": "RGB_MODE_TWINKLE",
+      "group": "rgb",
+      "aliases": [
+        "RGB_M_TW"
+      ]
+    },
+    {
+      "value": 30784,
+      "name": "QK_RGB_MATRIX_ON",
+      "label": "RGB Matrix On",
+      "group": "rgb_matrix",
+      "aliases": [
+        "RM_ON"
+      ]
+    },
+    {
+      "value": 30785,
+      "name": "QK_RGB_MATRIX_OFF",
+      "label": "RGB Matrix Off",
+      "group": "rgb_matrix",
+      "aliases": [
+        "RM_OFF"
+      ]
+    },
+    {
+      "value": 30786,
+      "name": "QK_RGB_MATRIX_TOGGLE",
+      "label": "Toggle RGB Matrix",
+      "group": "rgb_matrix",
+      "aliases": [
+        "RM_TOGG"
+      ]
+    },
+    {
+      "value": 30787,
+      "name": "QK_RGB_MATRIX_MODE_NEXT",
+      "label": "RGB Matrix Next",
+      "group": "rgb_matrix",
+      "aliases": [
+        "RM_NEXT"
+      ]
+    },
+    {
+      "value": 30788,
+      "name": "QK_RGB_MATRIX_MODE_PREVIOUS",
+      "label": "RGB Matrix Previous",
+      "group": "rgb_matrix",
+      "aliases": [
+        "RM_PREV"
+      ]
+    },
+    {
+      "value": 30789,
+      "name": "QK_RGB_MATRIX_HUE_UP",
+      "label": "RGB Matrix Hue Up",
+      "group": "rgb_matrix",
+      "aliases": [
+        "RM_HUEU"
+      ]
+    },
+    {
+      "value": 30790,
+      "name": "QK_RGB_MATRIX_HUE_DOWN",
+      "label": "RGB Matrix Hue Down",
+      "group": "rgb_matrix",
+      "aliases": [
+        "RM_HUED"
+      ]
+    },
+    {
+      "value": 30791,
+      "name": "QK_RGB_MATRIX_SATURATION_UP",
+      "label": "RGB Matrix Saturation Up",
+      "group": "rgb_matrix",
+      "aliases": [
+        "RM_SATU"
+      ]
+    },
+    {
+      "value": 30792,
+      "name": "QK_RGB_MATRIX_SATURATION_DOWN",
+      "label": "RGB Matrix Saturation Down",
+      "group": "rgb_matrix",
+      "aliases": [
+        "RM_SATD"
+      ]
+    },
+    {
+      "value": 30793,
+      "name": "QK_RGB_MATRIX_VALUE_UP",
+      "label": "RGB Matrix Value Up",
+      "group": "rgb_matrix",
+      "aliases": [
+        "RM_VALU"
+      ]
+    },
+    {
+      "value": 30794,
+      "name": "QK_RGB_MATRIX_VALUE_DOWN",
+      "label": "RGB Matrix Value Down",
+      "group": "rgb_matrix",
+      "aliases": [
+        "RM_VALD"
+      ]
+    },
+    {
+      "value": 30795,
+      "name": "QK_RGB_MATRIX_SPEED_UP",
+      "label": "RGB Matrix Speed Up",
+      "group": "rgb_matrix",
+      "aliases": [
+        "RM_SPDU"
+      ]
+    },
+    {
+      "value": 30796,
+      "name": "QK_RGB_MATRIX_SPEED_DOWN",
+      "label": "RGB Matrix Speed Down",
+      "group": "rgb_matrix",
+      "aliases": [
+        "RM_SPDD"
+      ]
+    },
+    {
+      "value": 30797,
+      "name": "QK_RGB_MATRIX_FLAG_NEXT",
+      "label": "RGB Matrix Flag Next",
+      "group": "rgb_matrix",
+      "aliases": [
+        "RM_FLGN"
+      ]
+    },
+    {
+      "value": 30798,
+      "name": "QK_RGB_MATRIX_FLAG_PREVIOUS",
+      "label": "RGB Matrix Flag Previous",
+      "group": "rgb_matrix",
+      "aliases": [
+        "RM_FLGP"
+      ]
+    },
+    {
+      "value": 31744,
+      "name": "QK_BOOTLOADER",
+      "label": "Bootloader",
+      "group": "quantum",
+      "aliases": [
+        "QK_BOOT"
+      ]
+    },
+    {
+      "value": 31745,
+      "name": "QK_REBOOT",
+      "label": "Reboot",
+      "group": "quantum",
+      "aliases": [
+        "QK_RBT"
+      ]
+    },
+    {
+      "value": 31746,
+      "name": "QK_DEBUG_TOGGLE",
+      "label": "Toggle Debug",
+      "group": "quantum",
+      "aliases": [
+        "DB_TOGG"
+      ]
+    },
+    {
+      "value": 31747,
+      "name": "QK_CLEAR_EEPROM",
+      "label": "Clear EEPROM",
+      "group": "quantum",
+      "aliases": [
+        "EE_CLR"
+      ]
+    },
+    {
+      "value": 31748,
+      "name": "QK_MAKE",
+      "label": "Make",
+      "group": "quantum",
+      "aliases": []
+    },
+    {
+      "value": 31760,
+      "name": "QK_AUTO_SHIFT_DOWN",
+      "label": "Auto Shift Down",
+      "group": "quantum",
+      "aliases": [
+        "AS_DOWN"
+      ]
+    },
+    {
+      "value": 31761,
+      "name": "QK_AUTO_SHIFT_UP",
+      "label": "Auto Shift Up",
+      "group": "quantum",
+      "aliases": [
+        "AS_UP"
+      ]
+    },
+    {
+      "value": 31762,
+      "name": "QK_AUTO_SHIFT_REPORT",
+      "label": "Auto Shift Report",
+      "group": "quantum",
+      "aliases": [
+        "AS_RPT"
+      ]
+    },
+    {
+      "value": 31763,
+      "name": "QK_AUTO_SHIFT_ON",
+      "label": "Auto Shift On",
+      "group": "quantum",
+      "aliases": [
+        "AS_ON"
+      ]
+    },
+    {
+      "value": 31764,
+      "name": "QK_AUTO_SHIFT_OFF",
+      "label": "Auto Shift Off",
+      "group": "quantum",
+      "aliases": [
+        "AS_OFF"
+      ]
+    },
+    {
+      "value": 31765,
+      "name": "QK_AUTO_SHIFT_TOGGLE",
+      "label": "Toggle Auto Shift",
+      "group": "quantum",
+      "aliases": [
+        "AS_TOGG"
+      ]
+    },
+    {
+      "value": 31766,
+      "name": "QK_GRAVE_ESCAPE",
+      "label": "Grave Esc",
+      "group": "quantum",
+      "aliases": [
+        "QK_GESC"
+      ]
+    },
+    {
+      "value": 31767,
+      "name": "QK_VELOCIKEY_TOGGLE",
+      "label": "QK_VELOCIKEY_TOGGLE",
+      "group": "quantum",
+      "aliases": [
+        "VK_TOGG"
+      ]
+    },
+    {
+      "value": 31768,
+      "name": "QK_SPACE_CADET_LEFT_CTRL_PARENTHESIS_OPEN",
+      "label": "LCtl/(",
+      "group": "quantum",
+      "aliases": [
+        "SC_LCPO"
+      ]
+    },
+    {
+      "value": 31769,
+      "name": "QK_SPACE_CADET_RIGHT_CTRL_PARENTHESIS_CLOSE",
+      "label": "RCtl/)",
+      "group": "quantum",
+      "aliases": [
+        "SC_RCPC"
+      ]
+    },
+    {
+      "value": 31770,
+      "name": "QK_SPACE_CADET_LEFT_SHIFT_PARENTHESIS_OPEN",
+      "label": "LSft/)",
+      "group": "quantum",
+      "aliases": [
+        "SC_LSPO"
+      ]
+    },
+    {
+      "value": 31771,
+      "name": "QK_SPACE_CADET_RIGHT_SHIFT_PARENTHESIS_CLOSE",
+      "label": "RSft/)",
+      "group": "quantum",
+      "aliases": [
+        "SC_RSPC"
+      ]
+    },
+    {
+      "value": 31772,
+      "name": "QK_SPACE_CADET_LEFT_ALT_PARENTHESIS_OPEN",
+      "label": "LAlt/(",
+      "group": "quantum",
+      "aliases": [
+        "SC_LAPO"
+      ]
+    },
+    {
+      "value": 31773,
+      "name": "QK_SPACE_CADET_RIGHT_ALT_PARENTHESIS_CLOSE",
+      "label": "RAlt/)",
+      "group": "quantum",
+      "aliases": [
+        "SC_RAPC"
+      ]
+    },
+    {
+      "value": 31774,
+      "name": "QK_SPACE_CADET_RIGHT_SHIFT_ENTER",
+      "label": "RSft/Ent",
+      "group": "quantum",
+      "aliases": [
+        "SC_SENT"
+      ]
+    },
+    {
+      "value": 31776,
+      "name": "QK_OUTPUT_AUTO",
+      "label": "QK_OUTPUT_AUTO",
+      "group": "quantum",
+      "aliases": [
+        "OU_AUTO"
+      ]
+    },
+    {
+      "value": 31777,
+      "name": "QK_OUTPUT_USB",
+      "label": "QK_OUTPUT_USB",
+      "group": "quantum",
+      "aliases": [
+        "OU_USB"
+      ]
+    },
+    {
+      "value": 31778,
+      "name": "QK_OUTPUT_BLUETOOTH",
+      "label": "QK_OUTPUT_BLUETOOTH",
+      "group": "quantum",
+      "aliases": [
+        "OU_BT"
+      ]
+    },
+    {
+      "value": 31792,
+      "name": "QK_UNICODE_MODE_NEXT",
+      "label": "Unicode Mode Next",
+      "group": "quantum",
+      "aliases": [
+        "UC_NEXT"
+      ]
+    },
+    {
+      "value": 31793,
+      "name": "QK_UNICODE_MODE_PREVIOUS",
+      "label": "Unicode Mode Previous",
+      "group": "quantum",
+      "aliases": [
+        "UC_PREV"
+      ]
+    },
+    {
+      "value": 31794,
+      "name": "QK_UNICODE_MODE_MACOS",
+      "label": "Unicode Mode macOS",
+      "group": "quantum",
+      "aliases": [
+        "UC_MAC"
+      ]
+    },
+    {
+      "value": 31795,
+      "name": "QK_UNICODE_MODE_LINUX",
+      "label": "Unicode Mode Linux",
+      "group": "quantum",
+      "aliases": [
+        "UC_LINX"
+      ]
+    },
+    {
+      "value": 31796,
+      "name": "QK_UNICODE_MODE_WINDOWS",
+      "label": "Unicode Mode Windows",
+      "group": "quantum",
+      "aliases": [
+        "UC_WIN"
+      ]
+    },
+    {
+      "value": 31797,
+      "name": "QK_UNICODE_MODE_BSD",
+      "label": "Unicode Mode BSD",
+      "group": "quantum",
+      "aliases": [
+        "UC_BSD"
+      ]
+    },
+    {
+      "value": 31798,
+      "name": "QK_UNICODE_MODE_WINCOMPOSE",
+      "label": "Unicode Mode WinCompose",
+      "group": "quantum",
+      "aliases": [
+        "UC_WINC"
+      ]
+    },
+    {
+      "value": 31799,
+      "name": "QK_UNICODE_MODE_EMACS",
+      "label": "Unicode Mode emacs",
+      "group": "quantum",
+      "aliases": [
+        "UC_EMAC"
+      ]
+    },
+    {
+      "value": 31808,
+      "name": "QK_HAPTIC_ON",
+      "label": "Haptic On",
+      "group": "quantum",
+      "aliases": [
+        "HF_ON"
+      ]
+    },
+    {
+      "value": 31809,
+      "name": "QK_HAPTIC_OFF",
+      "label": "Haptic Off",
+      "group": "quantum",
+      "aliases": [
+        "HF_OFF"
+      ]
+    },
+    {
+      "value": 31810,
+      "name": "QK_HAPTIC_TOGGLE",
+      "label": "Toggle Haptic",
+      "group": "quantum",
+      "aliases": [
+        "HF_TOGG"
+      ]
+    },
+    {
+      "value": 31811,
+      "name": "QK_HAPTIC_RESET",
+      "label": "Haptic Reset",
+      "group": "quantum",
+      "aliases": [
+        "HF_RST"
+      ]
+    },
+    {
+      "value": 31812,
+      "name": "QK_HAPTIC_FEEDBACK_TOGGLE",
+      "label": "Toggle Haptic Feedback",
+      "group": "quantum",
+      "aliases": [
+        "HF_FDBK"
+      ]
+    },
+    {
+      "value": 31813,
+      "name": "QK_HAPTIC_BUZZ_TOGGLE",
+      "label": "Toggle Haptic Buzz",
+      "group": "quantum",
+      "aliases": [
+        "HF_BUZZ"
+      ]
+    },
+    {
+      "value": 31814,
+      "name": "QK_HAPTIC_MODE_NEXT",
+      "label": "Haptic Mode Next",
+      "group": "quantum",
+      "aliases": [
+        "HF_NEXT"
+      ]
+    },
+    {
+      "value": 31815,
+      "name": "QK_HAPTIC_MODE_PREVIOUS",
+      "label": "Haptic Mode Previous",
+      "group": "quantum",
+      "aliases": [
+        "HF_PREV"
+      ]
+    },
+    {
+      "value": 31816,
+      "name": "QK_HAPTIC_CONTINUOUS_TOGGLE",
+      "label": "Toggle Haptic Continuous",
+      "group": "quantum",
+      "aliases": [
+        "HF_CONT"
+      ]
+    },
+    {
+      "value": 31817,
+      "name": "QK_HAPTIC_CONTINUOUS_UP",
+      "label": "Haptic Continuous Up",
+      "group": "quantum",
+      "aliases": [
+        "HF_CONU"
+      ]
+    },
+    {
+      "value": 31818,
+      "name": "QK_HAPTIC_CONTINUOUS_DOWN",
+      "label": "Haptic Continuous Down",
+      "group": "quantum",
+      "aliases": [
+        "HF_COND"
+      ]
+    },
+    {
+      "value": 31819,
+      "name": "QK_HAPTIC_DWELL_UP",
+      "label": "Haptic Dwell Up",
+      "group": "quantum",
+      "aliases": [
+        "HF_DWLU"
+      ]
+    },
+    {
+      "value": 31820,
+      "name": "QK_HAPTIC_DWELL_DOWN",
+      "label": "Haptic Dwell Down",
+      "group": "quantum",
+      "aliases": [
+        "HF_DWLD"
+      ]
+    },
+    {
+      "value": 31824,
+      "name": "QK_COMBO_ON",
+      "label": "Combo On",
+      "group": "quantum",
+      "aliases": [
+        "CM_ON"
+      ]
+    },
+    {
+      "value": 31825,
+      "name": "QK_COMBO_OFF",
+      "label": "Combo Off",
+      "group": "quantum",
+      "aliases": [
+        "CM_OFF"
+      ]
+    },
+    {
+      "value": 31826,
+      "name": "QK_COMBO_TOGGLE",
+      "label": "Toggle Combo",
+      "group": "quantum",
+      "aliases": [
+        "CM_TOGG"
+      ]
+    },
+    {
+      "value": 31827,
+      "name": "QK_DYNAMIC_MACRO_RECORD_START_1",
+      "label": "Dynamic Macro Record 1",
+      "group": "quantum",
+      "aliases": [
+        "DM_REC1"
+      ]
+    },
+    {
+      "value": 31828,
+      "name": "QK_DYNAMIC_MACRO_RECORD_START_2",
+      "label": "Dynamic Macro Record 2",
+      "group": "quantum",
+      "aliases": [
+        "DM_REC2"
+      ]
+    },
+    {
+      "value": 31829,
+      "name": "QK_DYNAMIC_MACRO_RECORD_STOP",
+      "label": "Dynamic Macro Stop Recording",
+      "group": "quantum",
+      "aliases": [
+        "DM_RSTP"
+      ]
+    },
+    {
+      "value": 31830,
+      "name": "QK_DYNAMIC_MACRO_PLAY_1",
+      "label": "Dynamic Macro Play 1",
+      "group": "quantum",
+      "aliases": [
+        "DM_PLY1"
+      ]
+    },
+    {
+      "value": 31831,
+      "name": "QK_DYNAMIC_MACRO_PLAY_2",
+      "label": "Dynamic Macro Play 2",
+      "group": "quantum",
+      "aliases": [
+        "DM_PLY2"
+      ]
+    },
+    {
+      "value": 31832,
+      "name": "QK_LEADER",
+      "label": "Leader",
+      "group": "quantum",
+      "aliases": [
+        "QK_LEAD"
+      ]
+    },
+    {
+      "value": 31833,
+      "name": "QK_LOCK",
+      "label": "Lock",
+      "group": "quantum",
+      "aliases": []
+    },
+    {
+      "value": 31834,
+      "name": "QK_ONE_SHOT_ON",
+      "label": "One Shot On",
+      "group": "quantum",
+      "aliases": [
+        "OS_ON"
+      ]
+    },
+    {
+      "value": 31835,
+      "name": "QK_ONE_SHOT_OFF",
+      "label": "One Shot Off",
+      "group": "quantum",
+      "aliases": [
+        "OS_OFF"
+      ]
+    },
+    {
+      "value": 31836,
+      "name": "QK_ONE_SHOT_TOGGLE",
+      "label": "Toggle One Shot",
+      "group": "quantum",
+      "aliases": [
+        "OS_TOGG"
+      ]
+    },
+    {
+      "value": 31837,
+      "name": "QK_KEY_OVERRIDE_TOGGLE",
+      "label": "Toggle Key Overrides",
+      "group": "quantum",
+      "aliases": [
+        "KO_TOGG"
+      ]
+    },
+    {
+      "value": 31838,
+      "name": "QK_KEY_OVERRIDE_ON",
+      "label": "Key Overrides On",
+      "group": "quantum",
+      "aliases": [
+        "KO_ON"
+      ]
+    },
+    {
+      "value": 31839,
+      "name": "QK_KEY_OVERRIDE_OFF",
+      "label": "Key Overrides Off",
+      "group": "quantum",
+      "aliases": [
+        "KO_OFF"
+      ]
+    },
+    {
+      "value": 31840,
+      "name": "QK_SECURE_LOCK",
+      "label": "Lock",
+      "group": "quantum",
+      "aliases": [
+        "SE_LOCK"
+      ]
+    },
+    {
+      "value": 31841,
+      "name": "QK_SECURE_UNLOCK",
+      "label": "Unlock",
+      "group": "quantum",
+      "aliases": [
+        "SE_UNLK"
+      ]
+    },
+    {
+      "value": 31842,
+      "name": "QK_SECURE_TOGGLE",
+      "label": "Toggle Lock",
+      "group": "quantum",
+      "aliases": [
+        "SE_TOGG"
+      ]
+    },
+    {
+      "value": 31843,
+      "name": "QK_SECURE_REQUEST",
+      "label": "Request Unlock",
+      "group": "quantum",
+      "aliases": [
+        "SE_REQ"
+      ]
+    },
+    {
+      "value": 31856,
+      "name": "QK_DYNAMIC_TAPPING_TERM_PRINT",
+      "label": "Print Dynamic Tapping Term",
+      "group": "quantum",
+      "aliases": [
+        "DT_PRNT"
+      ]
+    },
+    {
+      "value": 31857,
+      "name": "QK_DYNAMIC_TAPPING_TERM_UP",
+      "label": "Dynamic Tapping Term Up",
+      "group": "quantum",
+      "aliases": [
+        "DT_UP"
+      ]
+    },
+    {
+      "value": 31858,
+      "name": "QK_DYNAMIC_TAPPING_TERM_DOWN",
+      "label": "Dynamic Tapping Term Down",
+      "group": "quantum",
+      "aliases": [
+        "DT_DOWN"
+      ]
+    },
+    {
+      "value": 31859,
+      "name": "QK_CAPS_WORD_TOGGLE",
+      "label": "Toggle Caps Word",
+      "group": "quantum",
+      "aliases": [
+        "CW_TOGG"
+      ]
+    },
+    {
+      "value": 31860,
+      "name": "QK_AUTOCORRECT_ON",
+      "label": "Autocorrect On",
+      "group": "quantum",
+      "aliases": [
+        "AC_ON"
+      ]
+    },
+    {
+      "value": 31861,
+      "name": "QK_AUTOCORRECT_OFF",
+      "label": "Autocorrect Off",
+      "group": "quantum",
+      "aliases": [
+        "AC_OFF"
+      ]
+    },
+    {
+      "value": 31862,
+      "name": "QK_AUTOCORRECT_TOGGLE",
+      "label": "Toggle Autocorrect",
+      "group": "quantum",
+      "aliases": [
+        "AC_TOGG"
+      ]
+    },
+    {
+      "value": 31863,
+      "name": "QK_TRI_LAYER_LOWER",
+      "label": "Lower",
+      "group": "quantum",
+      "aliases": [
+        "TL_LOWR"
+      ]
+    },
+    {
+      "value": 31864,
+      "name": "QK_TRI_LAYER_UPPER",
+      "label": "Upper",
+      "group": "quantum",
+      "aliases": [
+        "TL_UPPR"
+      ]
+    },
+    {
+      "value": 31865,
+      "name": "QK_REPEAT_KEY",
+      "label": "Repeat",
+      "group": "quantum",
+      "aliases": [
+        "QK_REP"
+      ]
+    },
+    {
+      "value": 31866,
+      "name": "QK_ALT_REPEAT_KEY",
+      "label": "Repeat Alternate",
+      "group": "quantum",
+      "aliases": [
+        "QK_AREP"
+      ]
+    },
+    {
+      "value": 31867,
+      "name": "QK_LAYER_LOCK",
+      "label": "Layer Lock",
+      "group": "quantum",
+      "aliases": [
+        "QK_LLCK"
+      ]
+    },
+    {
+      "value": 32256,
+      "name": "QK_KB_0",
+      "label": "Keyboard 0",
+      "group": "kb",
+      "aliases": []
+    },
+    {
+      "value": 32257,
+      "name": "QK_KB_1",
+      "label": "Keyboard 1",
+      "group": "kb",
+      "aliases": []
+    },
+    {
+      "value": 32258,
+      "name": "QK_KB_2",
+      "label": "Keyboard 2",
+      "group": "kb",
+      "aliases": []
+    },
+    {
+      "value": 32259,
+      "name": "QK_KB_3",
+      "label": "Keyboard 3",
+      "group": "kb",
+      "aliases": []
+    },
+    {
+      "value": 32260,
+      "name": "QK_KB_4",
+      "label": "Keyboard 4",
+      "group": "kb",
+      "aliases": []
+    },
+    {
+      "value": 32261,
+      "name": "QK_KB_5",
+      "label": "Keyboard 5",
+      "group": "kb",
+      "aliases": []
+    },
+    {
+      "value": 32262,
+      "name": "QK_KB_6",
+      "label": "Keyboard 6",
+      "group": "kb",
+      "aliases": []
+    },
+    {
+      "value": 32263,
+      "name": "QK_KB_7",
+      "label": "Keyboard 7",
+      "group": "kb",
+      "aliases": []
+    },
+    {
+      "value": 32264,
+      "name": "QK_KB_8",
+      "label": "Keyboard 8",
+      "group": "kb",
+      "aliases": []
+    },
+    {
+      "value": 32265,
+      "name": "QK_KB_9",
+      "label": "Keyboard 9",
+      "group": "kb",
+      "aliases": []
+    },
+    {
+      "value": 32266,
+      "name": "QK_KB_10",
+      "label": "Keyboard 10",
+      "group": "kb",
+      "aliases": []
+    },
+    {
+      "value": 32267,
+      "name": "QK_KB_11",
+      "label": "Keyboard 11",
+      "group": "kb",
+      "aliases": []
+    },
+    {
+      "value": 32268,
+      "name": "QK_KB_12",
+      "label": "Keyboard 12",
+      "group": "kb",
+      "aliases": []
+    },
+    {
+      "value": 32269,
+      "name": "QK_KB_13",
+      "label": "Keyboard 13",
+      "group": "kb",
+      "aliases": []
+    },
+    {
+      "value": 32270,
+      "name": "QK_KB_14",
+      "label": "Keyboard 14",
+      "group": "kb",
+      "aliases": []
+    },
+    {
+      "value": 32271,
+      "name": "QK_KB_15",
+      "label": "Keyboard 15",
+      "group": "kb",
+      "aliases": []
+    },
+    {
+      "value": 32272,
+      "name": "QK_KB_16",
+      "label": "Keyboard 16",
+      "group": "kb",
+      "aliases": []
+    },
+    {
+      "value": 32273,
+      "name": "QK_KB_17",
+      "label": "Keyboard 17",
+      "group": "kb",
+      "aliases": []
+    },
+    {
+      "value": 32274,
+      "name": "QK_KB_18",
+      "label": "Keyboard 18",
+      "group": "kb",
+      "aliases": []
+    },
+    {
+      "value": 32275,
+      "name": "QK_KB_19",
+      "label": "Keyboard 19",
+      "group": "kb",
+      "aliases": []
+    },
+    {
+      "value": 32276,
+      "name": "QK_KB_20",
+      "label": "Keyboard 20",
+      "group": "kb",
+      "aliases": []
+    },
+    {
+      "value": 32277,
+      "name": "QK_KB_21",
+      "label": "Keyboard 21",
+      "group": "kb",
+      "aliases": []
+    },
+    {
+      "value": 32278,
+      "name": "QK_KB_22",
+      "label": "Keyboard 22",
+      "group": "kb",
+      "aliases": []
+    },
+    {
+      "value": 32279,
+      "name": "QK_KB_23",
+      "label": "Keyboard 23",
+      "group": "kb",
+      "aliases": []
+    },
+    {
+      "value": 32280,
+      "name": "QK_KB_24",
+      "label": "Keyboard 24",
+      "group": "kb",
+      "aliases": []
+    },
+    {
+      "value": 32281,
+      "name": "QK_KB_25",
+      "label": "Keyboard 25",
+      "group": "kb",
+      "aliases": []
+    },
+    {
+      "value": 32282,
+      "name": "QK_KB_26",
+      "label": "Keyboard 26",
+      "group": "kb",
+      "aliases": []
+    },
+    {
+      "value": 32283,
+      "name": "QK_KB_27",
+      "label": "Keyboard 27",
+      "group": "kb",
+      "aliases": []
+    },
+    {
+      "value": 32284,
+      "name": "QK_KB_28",
+      "label": "Keyboard 28",
+      "group": "kb",
+      "aliases": []
+    },
+    {
+      "value": 32285,
+      "name": "QK_KB_29",
+      "label": "Keyboard 29",
+      "group": "kb",
+      "aliases": []
+    },
+    {
+      "value": 32286,
+      "name": "QK_KB_30",
+      "label": "Keyboard 30",
+      "group": "kb",
+      "aliases": []
+    },
+    {
+      "value": 32287,
+      "name": "QK_KB_31",
+      "label": "Keyboard 31",
+      "group": "kb",
+      "aliases": []
+    },
+    {
+      "value": 32320,
+      "name": "QK_USER_0",
+      "label": "User 0",
+      "group": "user",
+      "aliases": []
+    },
+    {
+      "value": 32321,
+      "name": "QK_USER_1",
+      "label": "User 1",
+      "group": "user",
+      "aliases": []
+    },
+    {
+      "value": 32322,
+      "name": "QK_USER_2",
+      "label": "User 2",
+      "group": "user",
+      "aliases": []
+    },
+    {
+      "value": 32323,
+      "name": "QK_USER_3",
+      "label": "User 3",
+      "group": "user",
+      "aliases": []
+    },
+    {
+      "value": 32324,
+      "name": "QK_USER_4",
+      "label": "User 4",
+      "group": "user",
+      "aliases": []
+    },
+    {
+      "value": 32325,
+      "name": "QK_USER_5",
+      "label": "User 5",
+      "group": "user",
+      "aliases": []
+    },
+    {
+      "value": 32326,
+      "name": "QK_USER_6",
+      "label": "User 6",
+      "group": "user",
+      "aliases": []
+    },
+    {
+      "value": 32327,
+      "name": "QK_USER_7",
+      "label": "User 7",
+      "group": "user",
+      "aliases": []
+    },
+    {
+      "value": 32328,
+      "name": "QK_USER_8",
+      "label": "User 8",
+      "group": "user",
+      "aliases": []
+    },
+    {
+      "value": 32329,
+      "name": "QK_USER_9",
+      "label": "User 9",
+      "group": "user",
+      "aliases": []
+    },
+    {
+      "value": 32330,
+      "name": "QK_USER_10",
+      "label": "User 10",
+      "group": "user",
+      "aliases": []
+    },
+    {
+      "value": 32331,
+      "name": "QK_USER_11",
+      "label": "User 11",
+      "group": "user",
+      "aliases": []
+    },
+    {
+      "value": 32332,
+      "name": "QK_USER_12",
+      "label": "User 12",
+      "group": "user",
+      "aliases": []
+    },
+    {
+      "value": 32333,
+      "name": "QK_USER_13",
+      "label": "User 13",
+      "group": "user",
+      "aliases": []
+    },
+    {
+      "value": 32334,
+      "name": "QK_USER_14",
+      "label": "User 14",
+      "group": "user",
+      "aliases": []
+    },
+    {
+      "value": 32335,
+      "name": "QK_USER_15",
+      "label": "User 15",
+      "group": "user",
+      "aliases": []
+    },
+    {
+      "value": 32336,
+      "name": "QK_USER_16",
+      "label": "User 16",
+      "group": "user",
+      "aliases": []
+    },
+    {
+      "value": 32337,
+      "name": "QK_USER_17",
+      "label": "User 17",
+      "group": "user",
+      "aliases": []
+    },
+    {
+      "value": 32338,
+      "name": "QK_USER_18",
+      "label": "User 18",
+      "group": "user",
+      "aliases": []
+    },
+    {
+      "value": 32339,
+      "name": "QK_USER_19",
+      "label": "User 19",
+      "group": "user",
+      "aliases": []
+    },
+    {
+      "value": 32340,
+      "name": "QK_USER_20",
+      "label": "User 20",
+      "group": "user",
+      "aliases": []
+    },
+    {
+      "value": 32341,
+      "name": "QK_USER_21",
+      "label": "User 21",
+      "group": "user",
+      "aliases": []
+    },
+    {
+      "value": 32342,
+      "name": "QK_USER_22",
+      "label": "User 22",
+      "group": "user",
+      "aliases": []
+    },
+    {
+      "value": 32343,
+      "name": "QK_USER_23",
+      "label": "User 23",
+      "group": "user",
+      "aliases": []
+    },
+    {
+      "value": 32344,
+      "name": "QK_USER_24",
+      "label": "User 24",
+      "group": "user",
+      "aliases": []
+    },
+    {
+      "value": 32345,
+      "name": "QK_USER_25",
+      "label": "User 25",
+      "group": "user",
+      "aliases": []
+    },
+    {
+      "value": 32346,
+      "name": "QK_USER_26",
+      "label": "User 26",
+      "group": "user",
+      "aliases": []
+    },
+    {
+      "value": 32347,
+      "name": "QK_USER_27",
+      "label": "User 27",
+      "group": "user",
+      "aliases": []
+    },
+    {
+      "value": 32348,
+      "name": "QK_USER_28",
+      "label": "User 28",
+      "group": "user",
+      "aliases": []
+    },
+    {
+      "value": 32349,
+      "name": "QK_USER_29",
+      "label": "User 29",
+      "group": "user",
+      "aliases": []
+    },
+    {
+      "value": 32350,
+      "name": "QK_USER_30",
+      "label": "User 30",
+      "group": "user",
+      "aliases": []
+    },
+    {
+      "value": 32351,
+      "name": "QK_USER_31",
+      "label": "User 31",
+      "group": "user",
+      "aliases": []
+    }
+  ]
+}

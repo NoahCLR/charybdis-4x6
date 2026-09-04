@@ -24,7 +24,13 @@ which is frozen and lives beside this one.
 npm install
 npm run check           # syntax + the full live-link test suite
 npm run probe:live-link # read-only enumeration of matching HID interfaces
+npm run keycodes        # regenerate live-link/keycode-catalog.json from a QMK checkout
 ```
+
+The keycode catalog is vendored on purpose. The app renders keycodes read back
+from a device, where they arrive as bare `uint16` values, and it must do that
+without a firmware workspace. `npm run keycodes -- --check` fails if the
+checked-in catalog has drifted from the QMK tree beside this repo.
 
 Open the panel from the command palette: **Charybdis: Open Charybdis Live**.
 
