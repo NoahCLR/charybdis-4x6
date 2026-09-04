@@ -120,7 +120,7 @@ Kept, as durable specs under `docs/architecture/`:
 - `profile-split-v1.md` — the split protocol
 - `authority-state-table.md` — source, device, and split authority; safe
   activation
-- `stage-00-baseline.md` — EEPROM maps, storage ceilings, resource baselines
+- `storage-and-resource-baseline.md` — EEPROM maps, storage ceilings, and the measured resource baseline
 - `field-classification.md` — the field inventory the product goal cites
 - `pointing-cadence-known-issue.md` — the parked R-21 investigation
 
@@ -132,6 +132,17 @@ none of which describes how the thing works.
 
 The gate inverts: `NOAH_LIVE_PROFILE_OWNER=no` builds an owner-free image. The
 live app targets ordinary firmware rather than a special engineering artifact.
+
+One coupling surfaced while implementing this and is worth stating, because it
+changes what "ordinary firmware" means. The owner requires a provisioned
+`NOAH_PHYSICAL_HALF`, since durable profile origin identity is side-specific.
+The generic half-less convenience build therefore cannot carry the owner. It
+now reports that at configure time and builds without it, rather than failing.
+
+So the firmware you flash — the side-specific left/right pair — has the owner
+by default, and the single generic image does not. If that split is wrong, the
+alternative is to make the generic build an error, which would break the plain
+`qmk compile` documented in the root README.
 
 The opt-out is kept deliberately. It is the only remaining lever for comparing
 ordinary against live behaviour on identical source, which matters for R-21

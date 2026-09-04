@@ -71,21 +71,32 @@ ifneq ($(strip $(NOAH_PHYSICAL_HALF)),)
     endif
 endif
 
-# Complete live-profile owner composition is available only as a deliberate
-# side-specific engineering artifact while its linked state and hardware
-# high-water evidence are under review.
-ifneq ($(strip $(NOAH_LIVE_PROFILE_OWNER)),)
+# The live-profile owner is part of ordinary firmware. The live editing app
+# talks to it, so it is no longer a deliberate engineering artifact.
+#
+# It requires a provisioned physical half, because durable profile origin
+# identity is side-specific. The generic half-less convenience build therefore
+# cannot carry it and says so rather than failing; flash the side-specific pair
+# to get the owner.
+#
+# NOAH_LIVE_PROFILE_OWNER=no builds an owner-free image from the same source.
+# That is the only remaining lever for comparing ordinary against live-profile
+# behaviour without changing branches, which matters while the pointing cadence
+# regression in docs/architecture/pointing-cadence-known-issue.md is unresolved.
+NOAH_LIVE_PROFILE_OWNER ?= yes
+ifneq ($(strip $(NOAH_LIVE_PROFILE_OWNER)),no)
     ifneq ($(strip $(NOAH_LIVE_PROFILE_OWNER)),yes)
-        $(error NOAH_LIVE_PROFILE_OWNER must be `yes` when specified)
+        $(error NOAH_LIVE_PROFILE_OWNER must be `yes` or `no`)
     endif
-    ifeq ($(strip $(NOAH_PHYSICAL_HALF)),)
-        $(error NOAH_LIVE_PROFILE_OWNER=yes requires NOAH_PHYSICAL_HALF=left or right)
+    ifneq ($(strip $(NOAH_PHYSICAL_HALF)),)
+        ifneq ($(strip $(VIA_ENABLE)),yes)
+            $(error NOAH_LIVE_PROFILE_OWNER=yes requires VIA_ENABLE=yes)
+        endif
+        OPT_DEFS += -DNOAH_LIVE_PROFILE_OWNER_ENABLE
+        SRC += $(NOAH_LIVE_PROFILE_OWNER_SOURCES)
+    else
+        $(info noah: live-profile owner omitted; NOAH_PHYSICAL_HALF is not provisioned)
     endif
-    ifneq ($(strip $(VIA_ENABLE)),yes)
-        $(error NOAH_LIVE_PROFILE_OWNER=yes requires VIA_ENABLE=yes)
-    endif
-    OPT_DEFS += -DNOAH_LIVE_PROFILE_OWNER_ENABLE
-    SRC += $(NOAH_LIVE_PROFILE_OWNER_SOURCES)
 endif
 
 # Candidate routing and advertised write capabilities are one stricter switch
@@ -93,14 +104,20 @@ endif
 # dependency prevents a firmware image from advertising mutation without the
 # owner that receives it, or from accepting hidden writes while advertising a
 # read-only channel.
-ifneq ($(strip $(NOAH_LIVE_PROFILE_MUTATION)),)
+# The mutation route is the write path the live editing app needs, so it
+# follows the owner rather than being separately opted into. It cannot outlive
+# the owner: without one there is nothing to route a candidate into.
+NOAH_LIVE_PROFILE_MUTATION ?= yes
+ifneq ($(strip $(NOAH_LIVE_PROFILE_MUTATION)),no)
     ifneq ($(strip $(NOAH_LIVE_PROFILE_MUTATION)),yes)
-        $(error NOAH_LIVE_PROFILE_MUTATION must be `yes` when specified)
+        $(error NOAH_LIVE_PROFILE_MUTATION must be `yes` or `no`)
     endif
-    ifneq ($(strip $(NOAH_LIVE_PROFILE_OWNER)),yes)
+    ifeq ($(strip $(NOAH_LIVE_PROFILE_OWNER)),no)
         $(error NOAH_LIVE_PROFILE_MUTATION=yes requires NOAH_LIVE_PROFILE_OWNER=yes)
     endif
-    OPT_DEFS += -DNOAH_LIVE_PROFILE_MUTATION_ENABLE
+    ifneq ($(strip $(NOAH_PHYSICAL_HALF)),)
+        OPT_DEFS += -DNOAH_LIVE_PROFILE_MUTATION_ENABLE
+    endif
 endif
 
 # Temporary, read-only on-device cadence recorder used to compare ordinary and
