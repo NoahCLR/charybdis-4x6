@@ -2160,3 +2160,57 @@ Next steps:
 3. Resume R-21 from `pointing-cadence-investigation.md` when an owner-approved
    measurement path is available; the 1.1 ms magnitude is the constraint any
    candidate has to satisfy.
+
+### 2026-09-04 — Memory policy corrected; runtime context zero-initialised
+
+The memory gates were built on an unsound assumption, found while answering
+what the real RP2040 RAM headroom is.
+
+- `noah_runtime_singleton`, the 18,848 B runtime context, sat in `.data`
+  because four members carried non-zero defaults. The linked initialiser image
+  was **4 non-zero bytes out of 18,848**, so the build spent 18 KB of flash on
+  a 99.98% zero image plus a boot-time copy of it, and charged those bytes to
+  the `.data` side of the budget.
+- That exposed the defect in the gate. `.bss` and `.data` placement is an
+  initialisation artifact, not a memory property. Zeroing the initialiser moved
+  the identical 18,848 B from `.data` to `.bss` and the `.bss` gate went from
+  PASS at 25,868 B to FAIL at 44,716 B on a change that **reduced** total
+  memory by 8 B and freed 18,796 B of flash. A gate that fails a build for
+  using less memory is measuring the wrong thing.
+- The static initialiser was also incomplete. It set four of the seven non-zero
+  core defaults that `key_runtime_core_state_reset()` sets, and no production
+  path called that reset, so firmware booted with
+  `token_allocation_failed_packed_key_pos`, `preview_display_last_semantic_layer`
+  and `preview_display_bridge_layer` at `0` instead of their `UINT8_MAX`
+  sentinels. Every host test calls the reset and therefore could never see it.
+  The two preview fields can produce a brief wrong preview layer at boot; the
+  third is inert given its only consumers. Production and test now share one
+  definition of the defaults.
+
+Landed:
+
+- `noah_runtime_singleton` is zero-initialised. `noah_runtime_shared_state_post_init()`
+  applies the core defaults and runs first in `noah_keyboard_post_init_user()`,
+  declared on the public `runtime_reset.h` seam so the internal-header layering
+  gate stays satisfied. The init-order test records the new first stage.
+- `check_firmware_memory_budget.py` enforces static RAM as `.data` + `.bss` and
+  the core-memory floor. The `.bss`-only limit is retained as an opt-in flag,
+  no longer enforced by default, and the rationale the limits never carried is
+  now in the module docstring.
+
+Measured after the change: ordinary `.data`+`.bss` 48,864 B against 51,000 B
+(2,136 B slack, PASS) and flash load image 163,780 B down to 144,984 B. The
+live-owner build is 51,820 B, **820 B over the static RAM gate** — a real
+overage, where the old report showed a misleading 2,820 B `.bss` failure.
+
+Verification: `run_all_host_tests.sh`, `run_runtime_init_order_tests.sh`,
+`run_feature_gate_compile_tests.sh`, fresh `qmk compile`, memory and stack
+budget checks, `git diff --check`.
+
+Next steps:
+
+1. Close the live-owner build's 820 B static RAM overage, or re-derive the
+   51,000 B ceiling with recorded rationale. Physical headroom is ~205 KB, so
+   this is a policy decision, not a hardware one.
+2. Then the logical-generation manifest across VIA and custom storage.
+3. R-21 stays parked and blocking; see `pointing-cadence-investigation.md`.

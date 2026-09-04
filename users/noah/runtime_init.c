@@ -25,6 +25,7 @@
 #include "lib/profile/storage/profile_store_runtime_hooks.h"
 #include "lib/rgb/core/rgb_runtime.h"
 #include "lib/state/diagnostics/runtime_diag.h"
+#include "lib/state/shared/runtime_reset.h"
 #include "lib/split/runtime_sync.h"
 
 typedef void (*noah_runtime_init_stage_fn_t)(void);
@@ -75,7 +76,7 @@ void noah_housekeeping_task_user(void) {
 
 void noah_keyboard_post_init_user(void) {
     static const noah_runtime_init_stage_fn_t stages[] = {
-        key_origin_registry_init, noah_qmk_combo_origin_init, macro_payload_engine_init, noah_via_macro_defaults_keyboard_post_init, noah_profile_store_runtime_init, noah_rgb_runtime_post_init, split_runtime_sync_init, noah_qmk_via_split_sync_init, noah_qmk_via_split_mirror_init, noah_qmk_durable_io_init,
+        noah_runtime_shared_state_post_init, key_origin_registry_init, noah_qmk_combo_origin_init, macro_payload_engine_init, noah_via_macro_defaults_keyboard_post_init, noah_profile_store_runtime_init, noah_rgb_runtime_post_init, split_runtime_sync_init, noah_qmk_via_split_sync_init, noah_qmk_via_split_mirror_init, noah_qmk_durable_io_init,
     };
 
     noah_runtime_diag_post_init();

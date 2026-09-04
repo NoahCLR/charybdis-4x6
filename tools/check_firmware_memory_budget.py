@@ -1,5 +1,25 @@
 #!/usr/bin/env python3
-"""Report and enforce firmware storage policies with RP2040 SRAM accounting."""
+"""Report and enforce firmware storage policies with RP2040 SRAM accounting.
+
+Policy rationale
+----------------
+Static RAM cost is `.data` + `.bss`. The split between those two sections is an
+initialisation artifact, not a memory property: a single non-zero member forces
+an entire object into `.data`, where it additionally costs flash for a mostly
+zero initialiser image plus a boot-time copy. Zero that member and the identical
+bytes move to `.bss`. Gating either section alone therefore fails builds that
+reduce total memory and passes builds that increase it, so only the sum is
+enforced. The per-section figures stay in the report because the `.data` share
+is a useful signal of accidental initialisers.
+
+`--max-data-bss` is the static RAM gate. `--min-sram0-free` is the exhaustion
+guard: it protects the linker-managed core-memory span that ChibiOS allocates
+from at runtime. Both are policy ceilings well inside physical capacity, and
+policy slack must never be reported as hardware headroom (see R-07).
+
+`--max-static-bss` is retained for explicit opt-in use and is not enforced by
+default; pass it to pin a section budget deliberately.
+"""
 
 import argparse
 import pathlib
@@ -208,7 +228,8 @@ def main(argv=None):
     parser.add_argument("--baseline-macro-storage", type=int, default=41440)
     parser.add_argument("--min-reclaimed", type=int, default=32768)
     parser.add_argument("--max-macro-storage", type=int, default=8192)
-    parser.add_argument("--max-static-bss", type=int, default=26000)
+    # Not enforced unless explicitly passed; see the module docstring.
+    parser.add_argument("--max-static-bss", type=int, default=None)
     parser.add_argument(
         "--max-data-bss",
         "--max-static-ram",
@@ -247,7 +268,7 @@ def main(argv=None):
         failures.append("named macro storage {} exceeds {} B".format(macro_storage, args.max_macro_storage))
     if reclaimed < args.min_reclaimed:
         failures.append("reclaimed {} is below {} B".format(reclaimed, args.min_reclaimed))
-    if memory["static_bss"] > args.max_static_bss:
+    if args.max_static_bss is not None and memory["static_bss"] > args.max_static_bss:
         failures.append("static BSS {} exceeds {} B".format(memory["static_bss"], args.max_static_bss))
     if memory["data_bss"] > args.max_data_bss:
         failures.append(
@@ -273,8 +294,9 @@ def main(argv=None):
             print("{}: {} B".format(name, symbols[name]))
     print("named macro storage: {} B (limit {} B)".format(macro_storage, args.max_macro_storage))
     print("reclaimed from {} B baseline: {} B (minimum {} B)".format(args.baseline_macro_storage, reclaimed, args.min_reclaimed))
-    print("SRAM0-3 .bss span: {} B (policy limit {} B)".format(memory["static_bss"], args.max_static_bss))
-    print("SRAM0-3 .data span: {} B".format(memory["static_data"]))
+    bss_limit = "limit {} B".format(args.max_static_bss) if args.max_static_bss is not None else "informational"
+    print("SRAM0-3 .bss span: {} B ({})".format(memory["static_bss"], bss_limit))
+    print("SRAM0-3 .data span: {} B (informational; nonzero initialisers also cost flash)".format(memory["static_data"]))
     print(
         "SRAM0-3 .data + .bss policy span: {} B (policy limit {} B)".format(
             memory["data_bss"], args.max_data_bss

@@ -9,18 +9,16 @@
 
 __attribute__((weak)) void noah_owned_keycode_reset_for_test(void) {}
 
-static noah_runtime_context_t noah_runtime_singleton = {
-    .shared =
-        {
-            .core =
-                {
-                    .next_token_id              = 1u,
-                    .next_feedback_sequence     = 1u,
-                    .pending_release_head_index = KEY_RUNTIME_CORE_PENDING_RELEASE_INDEX_NONE,
-                    .pending_release_tail_index = KEY_RUNTIME_CORE_PENDING_RELEASE_INDEX_NONE,
-                },
-        },
-};
+// Zero-initialised on purpose. A partial static initialiser here set four of
+// the seven non-zero core defaults and, because any non-zero member forces the
+// whole 18 KB context into .data, also spent 18 KB of flash on an image that
+// was 99.98% zeros plus a boot-time copy of it. Production now runs the same
+// reset the tests do, so both paths start from one definition of the defaults.
+static noah_runtime_context_t noah_runtime_singleton;
+
+void noah_runtime_shared_state_post_init(void) {
+    key_runtime_core_state_reset(&noah_runtime_singleton.shared.core);
+}
 
 noah_runtime_context_t *noah_runtime_context(void) {
     return &noah_runtime_singleton;

@@ -114,30 +114,28 @@ milliseconds per iteration.
 
 ## Measured RAM State (R-07)
 
-Recorded here because it was measured during this investigation and bears on
-any fix that wants to spend RAM. Fresh builds at `8bf794cb`:
+Recorded here because it was measured during this investigation. The figures
+below are **after** the 2026-09-04 memory-policy correction; see
+`progress.md` for what changed and why.
 
 | | ordinary | live-owner |
 | --- | ---: | ---: |
-| `.bss` | 25,868 B | 28,820 B |
-| `.data` | 22,996 B | 23,000 B |
-| `.data` + `.bss` | 48,864 B | 51,820 B |
-| Linked occupancy, unique banks | 56,328 B | 59,280 B |
+| `.data` + `.bss` (static RAM) | 48,864 B | 51,820 B |
+| `.bss` (informational) | 44,716 B | 47,668 B |
+| `.data` (informational) | 4,148 B | 4,152 B |
 | Free/core span at boot | 213,272 B | 210,320 B |
 
 Against `tools/check_firmware_memory_budget.py`:
 
-- `.bss` ≤ 26,000 B: ordinary has 132 B of slack. **The live-owner build is
-  2,820 B over and fails.**
-- `.data` + `.bss` ≤ 51,000 B: ordinary has 2,136 B of slack. **The
-  live-owner build is 820 B over and fails.**
-- Free/core span ≥ 204,800 B: both pass.
+- `.data` + `.bss` ≤ 51,000 B: ordinary has 2,136 B of slack. **The live-owner
+  build is 820 B over and fails.**
+- Free/core span ≥ 204,800 B: both pass, by 8,472 B and 5,520 B.
 
 Physical SRAM is 270,336 B, so roughly 205 KB is unused. Exactly the
-distinction R-07 warns about: there is ample hardware headroom and almost no
-policy headroom. The largest single consumer is the wear-levelling RAM mirror
-at 16,392 B in both builds; `runtime_owner` at 3,172 B is the entire
-live-build delta.
+distinction R-07 warns about: ample hardware headroom, almost no policy
+headroom. The largest single consumer is the wear-levelling RAM mirror at
+16,392 B in both builds; `runtime_owner` at 3,172 B is the entire live-build
+delta.
 
-The live-owner build not passing its own memory policy is an open Stage 06
+The live-owner build exceeding the static RAM gate by 820 B is an open Stage 06
 item independent of the cadence regression.
