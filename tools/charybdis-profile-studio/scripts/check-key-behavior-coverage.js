@@ -4,13 +4,11 @@
 const fs = require("fs");
 const path = require("path");
 const vm = require("vm");
-const {createRequire} = require("module");
 
 const extensionRoot = path.resolve(__dirname, "..");
 const repoRoot = path.resolve(extensionRoot, "..", "..");
 const sourcePath = path.join(extensionRoot, "extension.js");
 const source = fs.readFileSync(sourcePath, "utf8");
-const requireFromExtension = createRequire(sourcePath);
 
 const context = {
     console,
@@ -36,7 +34,7 @@ const context = {
                 Uri: {file: (fsPath) => ({fsPath})},
             };
         }
-        return requireFromExtension(name);
+        return require(name);
     },
 };
 
@@ -147,50 +145,15 @@ const appendedCheck = `
     assert(
         extensionSource.includes('id="compileFirmware"') &&
             extensionSource.includes("Compile left + right") &&
-            getClientScript().includes('type: liveEdit ? "compileLiveEditFirmware" : "compileFirmware"') &&
-            getClientScript().includes('type: liveEdit ? "applyAllChangesAndCompileLiveEdit" : "applyAllChangesAndCompile"') &&
-            extensionSource.includes('side: \`\${sidePrefix}left\`') &&
-            extensionSource.includes('env: ["FORCE_SLAVE=yes", "NOAH_PHYSICAL_HALF=left", ...performanceEnv, ...engineeringEnv]') &&
-            extensionSource.includes('side: \`\${sidePrefix}right\`') &&
-            extensionSource.includes('env: ["FORCE_MASTER=yes", "NOAH_PHYSICAL_HALF=right", ...performanceEnv, ...engineeringEnv]') &&
+            getClientScript().includes('type: "compileFirmware"') &&
+            getClientScript().includes('type: "applyAllChangesAndCompile"') &&
+            extensionSource.includes('env: "FORCE_MASTER"') &&
+            extensionSource.includes('env: "FORCE_SLAVE"') &&
             extensionSource.includes('spawn("qmk", args') &&
             extensionSource.includes("channel.show(true)") &&
             firmwareTargetName(profileTargetForKeymap("noah"), "left") === "bastardkb_charybdis_4x6_noah_left" &&
-            firmwareTargetName(profileTargetForKeymap("noah"), "right") === "bastardkb_charybdis_4x6_noah_right" &&
-            firmwareTargetName(profileTargetForKeymap("noah"), "live_edit_left") === "bastardkb_charybdis_4x6_noah_live_edit_left" &&
-            firmwareTargetName(profileTargetForKeymap("noah"), "live_edit_right") === "bastardkb_charybdis_4x6_noah_live_edit_right",
-        "Profile Studio compile button should build explicit MASTER_RIGHT-aware left and right firmware targets with visible streamed output"
-    );
-    assert(
-        extensionSource.includes('id="compilePerformanceComparisonFirmware"') &&
-            extensionSource.includes("Compile performance comparison") &&
-            getClientScript().includes('type: "compilePerformanceComparisonFirmware"') &&
-            getClientScript().includes('type: "applyAllChangesAndCompilePerformanceComparison"') &&
-            extensionSource.includes('compileProfileFirmware(root, target, {performanceVariant: "baseline"})') &&
-            extensionSource.includes('compileProfileFirmware(root, target, {liveEdit: true, performanceVariant: "live_edit"})') &&
-            extensionSource.includes('"NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS=yes"') &&
-            extensionSource.includes('["NOAH_LIVE_PROFILE_OWNER=", "NOAH_LIVE_PROFILE_MUTATION="]') &&
-            firmwareTargetName(profileTargetForKeymap("noah"), "performance_baseline_left") === "bastardkb_charybdis_4x6_noah_performance_baseline_left" &&
-            firmwareTargetName(profileTargetForKeymap("noah"), "performance_baseline_right") === "bastardkb_charybdis_4x6_noah_performance_baseline_right" &&
-            firmwareTargetName(profileTargetForKeymap("noah"), "performance_live_edit_left") === "bastardkb_charybdis_4x6_noah_performance_live_edit_left" &&
-            firmwareTargetName(profileTargetForKeymap("noah"), "performance_live_edit_right") === "bastardkb_charybdis_4x6_noah_performance_live_edit_right" &&
-            extensionSource.includes("Flash the ordinary diagnostic baseline pair first") &&
-            extensionSource.includes("then flash the live-profile engineering pair"),
-        "Profile Studio should build an isolated four-image performance comparison and tell the user to flash the baseline pair first"
-    );
-    assert(
-        extensionSource.includes('id="compileLiveEditFirmware"') &&
-            extensionSource.includes("Compile live-edit test") &&
-            extensionSource.includes('id="applyLiveProfile"') &&
-            extensionSource.includes("Apply live") &&
-            getClientScript().includes('type: "applyLiveProfile"') &&
-            getClientScript().includes('type: "applyAllChangesAndApplyLiveProfile"') &&
-            getClientScript().includes("liveLink.mutationCompatibility?.available") &&
-            getClientScript().includes("Live apply complete") &&
-            extensionSource.includes("buildCanonicalStudioProfileV1(model") &&
-            extensionSource.includes("compileViaLayout(model)") &&
-            extensionSource.includes("state.liveLink.applyLiveProfile(compiled.blob, {layoutEntries})"),
-        "Profile Studio should expose a capability-gated, source-compiled RGB, behavior, and VIA-layout live apply and a separate engineering firmware build"
+            firmwareTargetName(profileTargetForKeymap("noah"), "right") === "bastardkb_charybdis_4x6_noah_right",
+        "Profile Studio compile button should build explicit left and right firmware targets with visible streamed output"
     );
     assert(
         getClientScript().includes("Unsaved Studio changes") &&
@@ -301,36 +264,7 @@ const appendedCheck = `
     );
 
     const model = await buildModel(${JSON.stringify(repoRoot)});
-    const liveLayout = compileViaLayout(model);
-    assert(
-        liveLayout.length === model.layers.length * 56 &&
-            liveLayout.every((entry) => Number.isInteger(entry.keycode) && entry.keycode >= 0 && entry.keycode <= 0xffff),
-        "Profile Studio should compile every authored Charybdis layout slot to a standard VIA matrix keycode before live apply"
-    );
     const aliases = model.qmkKeycodeAliases || {};
-    const compiledProfileFixture = new Map(require("fs").readFileSync(path.join(${JSON.stringify(repoRoot)}, "tests", "fixtures", "compiled_profile_v1.fixture"), "utf8")
-        .split(/\\r?\\n/)
-        .filter((line) => line && !line.startsWith("#"))
-        .map((line) => {
-            const separator = line.indexOf("=");
-            return [line.slice(0, separator), line.slice(separator + 1)];
-        }));
-    const liveProfile = buildCanonicalStudioProfileV1(model, {capabilities: {
-        maxLogicalLayers: 8,
-        maxBehaviorRows: 64,
-        maxTapStepsPerBehavior: 5,
-        maxPopulatedBehaviorSteps: 128,
-        hardcodedMacroSlots: 16,
-        viaMacroSlots: 64,
-        maxProfilePayload: 4064,
-        physicalLedCount: 58,
-    }});
-    assert(
-        liveProfile.blob.toString("hex") === compiledProfileFixture.get("profile.full.hex"),
-        "Profile Studio source compilation must reproduce the firmware's exact canonical compiled-default blob; " +
-            "got " + liveProfile.blob.length + " bytes / " + liveProfile.blob.toString("hex").slice(0, 96) +
-            ", expected " + (compiledProfileFixture.get("profile.full.hex").length / 2) + " bytes / " + compiledProfileFixture.get("profile.full.hex").slice(0, 96)
-    );
     assert(
         model.activeProfile && model.activeProfile.keymap === "noah" && model.activeProfile.buildable,
         "Profile Studio should treat the default noah profile as buildable even without a keymap-local rules.mk"

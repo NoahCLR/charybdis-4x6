@@ -5,9 +5,6 @@ const { execFile, spawn } = require("child_process");
 const fs = require("fs/promises");
 const path = require("path");
 const { promisify } = require("util");
-const {buildCanonicalStudioProfileV1} = require("./live-link/compiled-profile-v1");
-const {ProfileDeviceService} = require("./live-link/profile-device-service");
-const {compileViaLayout} = require("./live-link/via-layout-v1");
 
 const execFileAsync = promisify(execFile);
 let profileStudioOutputChannel = undefined;
@@ -895,7 +892,7 @@ function lastUsefulLogLine(text) {
     return lines.slice(-1)[0] || "";
 }
 
-async function compileProfileFirmware(root, target, options = {}) {
+async function compileProfileFirmware(root, target) {
     requireActiveProfile(target);
     if (!target.buildable) {
         throw new Error(`Profile ${target.keymap} is incomplete and cannot be compiled.`);
@@ -904,49 +901,21 @@ async function compileProfileFirmware(root, target, options = {}) {
     const channel = studioOutputChannel();
     channel.show(true);
     channel.appendLine("");
-    const liveEdit = options.liveEdit === true;
-    const performanceVariant = options.performanceVariant || "";
-    if (performanceVariant && performanceVariant !== "baseline" && performanceVariant !== "live_edit") {
-        throw new Error(`Unknown performance firmware variant: ${performanceVariant}`);
-    }
-    if ((performanceVariant === "baseline" && liveEdit) || (performanceVariant === "live_edit" && !liveEdit)) {
-        throw new Error("Performance firmware variant does not match its live-profile feature selection.");
-    }
-    const variantLabel = performanceVariant === "baseline"
-        ? " performance baseline"
-        : performanceVariant === "live_edit"
-            ? " live-profile performance"
-            : liveEdit
-                ? " live-edit test"
-                : "";
-    const sidePrefix = performanceVariant ? `performance_${performanceVariant}_` : liveEdit ? "live_edit_" : "";
-    const engineeringEnv = liveEdit ? ["NOAH_LIVE_PROFILE_OWNER=yes", "NOAH_LIVE_PROFILE_MUTATION=yes"] : [];
-    const performanceEnv = performanceVariant
-        ? [
-            "NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS=yes",
-            ...(liveEdit ? [] : ["NOAH_LIVE_PROFILE_OWNER=", "NOAH_LIVE_PROFILE_MUTATION="]),
-        ]
-        : [];
-    channel.appendLine(`Starting ${target.keymap}${variantLabel} firmware compile`);
-    const title = `Compiling ${target.keymap}${variantLabel} left and right firmware`;
+    channel.appendLine(`Starting ${target.keymap} firmware compile`);
+    const title = `Compiling ${target.keymap} left and right firmware`;
     const task = async (progress = { report() {} }) => {
         const builds = [];
         progress.report({ message: "left firmware" });
         builds.push(await runQmkCompile(root, target, {
-            side: `${sidePrefix}left`,
+            side: "left",
             label: "left",
-            // This keyboard is MASTER_RIGHT, so the forced slave artifact is
-            // the physical left half. Physical identity is a separate flash-
-            // provisioned contract and remains stable if transport role swaps.
-            env: ["FORCE_SLAVE=yes", "NOAH_PHYSICAL_HALF=left", ...performanceEnv, ...engineeringEnv],
-            role: "FORCE_SLAVE",
+            env: "FORCE_MASTER",
         }));
         progress.report({ message: "right firmware" });
         builds.push(await runQmkCompile(root, target, {
-            side: `${sidePrefix}right`,
+            side: "right",
             label: "right",
-            env: ["FORCE_MASTER=yes", "NOAH_PHYSICAL_HALF=right", ...performanceEnv, ...engineeringEnv],
-            role: "FORCE_MASTER",
+            env: "FORCE_SLAVE",
         }));
         return builds;
     };
@@ -960,32 +929,19 @@ async function compileProfileFirmware(root, target, options = {}) {
     return task();
 }
 
-function compileLiveEditProfileFirmware(root, target) {
-    return compileProfileFirmware(root, target, {liveEdit: true});
-}
-
-async function compilePerformanceComparisonFirmware(root, target) {
-    const baseline = await compileProfileFirmware(root, target, {performanceVariant: "baseline"});
-    const engineering = await compileProfileFirmware(root, target, {liveEdit: true, performanceVariant: "live_edit"});
-    return {baseline, engineering};
-}
-
 function runQmkCompile(root, target, build) {
     const firmwareTarget = firmwareTargetName(target, build.side);
-    const buildEnvironment = Array.isArray(build.env) ? build.env : [String(build.env || "")];
     const args = [
         "compile",
         "-kb",
         target.keyboard || PROFILE_KEYBOARD,
         "-km",
         target.keymap,
+        "-e",
+        `${build.env}=yes`,
+        "-e",
+        `TARGET=${firmwareTarget}`,
     ];
-    for (const assignment of buildEnvironment) {
-        if (assignment) {
-            args.push("-e", assignment.includes("=") ? assignment : `${assignment}=yes`);
-        }
-    }
-    args.push("-e", `TARGET=${firmwareTarget}`);
     const channel = studioOutputChannel();
     channel.show(true);
     channel.appendLine("");
@@ -1023,7 +979,7 @@ function runQmkCompile(root, target, build) {
                     resolve({
                         side: build.side,
                         label: build.label,
-                        role: build.role,
+                        role: build.env,
                         firmware: `${firmwareTarget}.uf2`,
                         path: path.join(root, `${firmwareTarget}.uf2`),
                     });
@@ -1041,15 +997,6 @@ function runQmkCompile(root, target, build) {
 function compiledFirmwareNotice(target, builds) {
     const firmware = builds.map((build) => build.firmware).join(", ");
     return `Compiled ${target.keymap} firmware for left and right halves: ${firmware}.`;
-}
-
-function performanceComparisonFirmwareNotice(target, comparison) {
-    const pair = (builds) => builds.map((build) => build.firmware).join(", ");
-    return `Compiled ${target.keymap} performance comparison firmware. Flash the ordinary diagnostic baseline pair first: ${pair(comparison.baseline)}. Capture the baseline, then flash the live-profile engineering pair: ${pair(comparison.engineering)}.`;
-}
-
-function formatDigest(value) {
-    return `0x${(Number(value) >>> 0).toString(16).toUpperCase().padStart(8, "0")}`;
 }
 
 async function renderProfileTemplates(keymap) {
@@ -1104,7 +1051,7 @@ async function openStudio(context) {
         );
         return;
     }
-    const state = { activeProfileId: "", liveLink: undefined };
+    const state = { activeProfileId: "" };
 
     const panel = vscode.window.createWebviewPanel(
         "charybdisProfileStudio",
@@ -1117,15 +1064,6 @@ async function openStudio(context) {
     );
 
     panel.webview.html = getStudioHtml(panel.webview);
-
-    state.liveLink = new ProfileDeviceService({
-        onChange(snapshot) {
-            panel.webview.postMessage({type: "liveLinkState", liveLink: snapshot});
-        },
-    });
-    panel.onDidDispose(() => {
-        void state.liveLink?.close();
-    }, undefined, context.subscriptions);
 
     panel.webview.onDidReceiveMessage(
         async (message) => {
@@ -1166,43 +1104,6 @@ async function handleWebviewMessage(panel, root, state, message) {
         case "ready":
             await postModel(panel, root, state);
             return;
-        case "enumerateLiveDevices":
-            await state.liveLink.enumerate();
-            return;
-        case "connectLiveDevice":
-            await state.liveLink.connect(message.deviceId);
-            return;
-        case "refreshLiveDevice":
-            await state.liveLink.refresh();
-            return;
-        case "disconnectLiveDevice":
-            await state.liveLink.disconnect();
-            return;
-        case "applyLiveProfile": {
-            const {profiles, target} = await activeProfileTarget(root, state);
-            const model = await buildModel(root, requireActiveProfile(target), profiles);
-            state.liveLink.setProfileSummary(profileSummaryFromModel(model));
-            const compiled = buildCanonicalStudioProfileV1(model, {capabilities: state.liveLink.snapshot().capabilities || {}});
-            const layoutEntries = compileViaLayout(model);
-            const snapshot = await state.liveLink.applyLiveProfile(compiled.blob, {layoutEntries});
-            if (!snapshot.error && snapshot.liveApply?.state === "complete") {
-                await postModel(panel, root, state, liveApplySuccessNotice(compiled, snapshot));
-            }
-            return;
-        }
-        case "applyAllChangesAndApplyLiveProfile": {
-            const target = await checkedMessageProfile(root, state, message);
-            await applyAllChanges(root, target, message);
-            const model = await buildModel(root, target);
-            state.liveLink.setProfileSummary(profileSummaryFromModel(model));
-            const compiled = buildCanonicalStudioProfileV1(model, {capabilities: state.liveLink.snapshot().capabilities || {}});
-            const layoutEntries = compileViaLayout(model);
-            const snapshot = await state.liveLink.applyLiveProfile(compiled.blob, {layoutEntries});
-            if (!snapshot.error && snapshot.liveApply?.state === "complete") {
-                await postModel(panel, root, state, `Applied staged changes. ${liveApplySuccessNotice(compiled, snapshot)}`, { activeLayer: message.activeLayer, appliedLayerChanges: Boolean(message.adds?.length || message.deletes?.length) });
-            }
-            return;
-        }
         case "refresh": {
             const removedProfiles = await pruneMissingProfileBuildTargets(root);
             const notice = removedProfiles.length
@@ -1326,34 +1227,6 @@ async function handleWebviewMessage(panel, root, state, message) {
             }
             return;
         }
-        case "compileLiveEditFirmware": {
-            const target = await checkedMessageProfile(root, state, message);
-            try {
-                const builds = await compileLiveEditProfileFirmware(root, target);
-                const notice = `Compiled live-edit test firmware: ${builds.map((build) => build.firmware).join(", ")}.`;
-                panel.webview.postMessage({ type: "compileResult", notice });
-                vscode.window.showInformationMessage(notice);
-            } catch (error) {
-                const text = error instanceof Error ? error.message : String(error);
-                panel.webview.postMessage({ type: "compileResult", error: text });
-                vscode.window.showErrorMessage(`Charybdis Profile Studio: ${text}`);
-            }
-            return;
-        }
-        case "compilePerformanceComparisonFirmware": {
-            const target = await checkedMessageProfile(root, state, message);
-            try {
-                const comparison = await compilePerformanceComparisonFirmware(root, target);
-                const notice = performanceComparisonFirmwareNotice(target, comparison);
-                panel.webview.postMessage({ type: "compileResult", notice });
-                vscode.window.showInformationMessage(notice);
-            } catch (error) {
-                const text = error instanceof Error ? error.message : String(error);
-                panel.webview.postMessage({ type: "compileResult", error: text });
-                vscode.window.showErrorMessage(`Charybdis Profile Studio: ${text}`);
-            }
-            return;
-        }
         case "openSource":
             await openSource(root, requireActiveProfile((await activeProfileTarget(root, state)).target), message.file);
             return;
@@ -1368,20 +1241,6 @@ async function handleWebviewMessage(panel, root, state, message) {
             await applyAllChanges(root, target, message);
             const builds = await compileProfileFirmware(root, target);
             await postModel(panel, root, state, `Applied staged changes and ${compiledFirmwareNotice(target, builds)}`, { activeLayer: message.activeLayer, appliedLayerChanges: Boolean(message.adds?.length || message.deletes?.length) });
-            return;
-        }
-        case "applyAllChangesAndCompileLiveEdit": {
-            const target = await checkedMessageProfile(root, state, message);
-            await applyAllChanges(root, target, message);
-            const builds = await compileLiveEditProfileFirmware(root, target);
-            await postModel(panel, root, state, `Applied staged changes and compiled live-edit test firmware: ${builds.map((build) => build.firmware).join(", ")}.`, { activeLayer: message.activeLayer, appliedLayerChanges: Boolean(message.adds?.length || message.deletes?.length) });
-            return;
-        }
-        case "applyAllChangesAndCompilePerformanceComparison": {
-            const target = await checkedMessageProfile(root, state, message);
-            await applyAllChanges(root, target, message);
-            const comparison = await compilePerformanceComparisonFirmware(root, target);
-            await postModel(panel, root, state, `Applied staged changes and ${performanceComparisonFirmwareNotice(target, comparison)}`, { activeLayer: message.activeLayer, appliedLayerChanges: Boolean(message.adds?.length || message.deletes?.length) });
             return;
         }
         case "applyAllChangesAndGenerateProfileDocs": {
@@ -1468,14 +1327,6 @@ async function handleWebviewMessage(panel, root, state, message) {
     }
 }
 
-function liveApplySuccessNotice(compiled, snapshot) {
-    const layout = snapshot.liveApply?.result?.layout;
-    const layoutNotice = layout
-        ? ` Verified ${layout.checkedKeys} layer keys and changed ${layout.changedKeys}.`
-        : "";
-    return `Applied ${compiled.byteLength}-byte RGB/behavior profile ${formatDigest(compiled.digest)} and persisted it on both halves.${layoutNotice}`;
-}
-
 async function promptForProfileName(options = {}) {
     const value = await vscode.window.showInputBox({
         title: options.title || "Charybdis profile",
@@ -1521,46 +1372,7 @@ async function openSource(root, target, file) {
 async function postModel(panel, root, state, notice, options = {}) {
     const { profiles, target } = await activeProfileTarget(root, state);
     const model = await buildModel(root, target, profiles);
-    state.liveLink?.setProfileSummary(profileSummaryFromModel(model));
-    panel.webview.postMessage({ type: "model", model, liveLink: state.liveLink?.snapshot(), notice, ...options });
-}
-
-function profileSummaryFromModel(model) {
-    const behaviors = Array.isArray(model?.keyBehaviors) ? model.keyBehaviors : [];
-    const combos = Array.isArray(model?.combos) ? model.combos : [];
-    const rgb = model?.rgb || {};
-    const stageGroupRows = [
-        rgb.layerLedGroups,
-        rgb.pdModeLedGroups,
-        rgb.comboFeedbackLedGroups,
-        rgb.keyBehaviorFeedbackLedGroups,
-    ].flatMap((rows) => Array.isArray(rows) ? rows : []);
-    const allLedGroups = (Array.isArray(rgb.ledGroups) ? rgb.ledGroups : []).concat(stageGroupRows);
-    const ledGroupSignatures = new Set();
-    let highestLedIndex = 0;
-    for (const group of allLedGroups) {
-        const ledIndices = Array.isArray(group?.ledIndices)
-            ? group.ledIndices.filter((value) => Number.isInteger(Number(value))).map(Number).sort((a, b) => a - b)
-            : [];
-        if (ledIndices.length) {
-            ledGroupSignatures.add(ledIndices.join(","));
-            highestLedIndex = Math.max(highestLedIndex, ...ledIndices);
-        }
-    }
-    return {
-        layerCount: Array.isArray(model?.layers) ? model.layers.length : 0,
-        behaviorRows: behaviors.length,
-        maxTapStepsPerBehavior: behaviors.reduce((maximum, row) => Math.max(
-            maximum,
-            ...(Array.isArray(row?.steps) ? row.steps.map((step) => Number(step?.tapCount || 0) + 1) : [0])
-        ), 0),
-        populatedBehaviorSteps: behaviors.reduce((total, row) => total + (Array.isArray(row?.steps) ? row.steps.length : 0), 0),
-        comboCount: combos.length,
-        maxKeysPerCombo: combos.reduce((maximum, combo) => Math.max(maximum, Array.isArray(combo?.inputs) ? combo.inputs.length : 0), 0),
-        reusableRgbGroups: ledGroupSignatures.size,
-        rgbStageGroupRows: stageGroupRows.length,
-        highestLedIndex,
-    };
+    panel.webview.postMessage({ type: "model", model, notice, ...options });
 }
 
 async function buildModel(root, target = DEFAULT_PROFILE_TARGET, profiles) {
@@ -1622,7 +1434,6 @@ async function buildModel(root, target = DEFAULT_PROFILE_TARGET, profiles) {
         qmkKeycodes: qmkKeycodeCatalog.entries,
         qmkKeyLabels: qmkKeycodeCatalog.labels,
         qmkKeycodeAliases: qmkKeycodeCatalog.aliases,
-        qmkKeycodeValues: qmkKeycodeCatalog.values,
         qmkKeycodeSource: qmkKeycodeCatalog.source,
         macroPayloadKeycodes: safe("macroPayloadKeycodes", [], () => parseMacroPayloadKeycodes(macroPayloadKeycodesText)),
         diagnostics,
@@ -1651,7 +1462,6 @@ function emptyModel(root, profiles, target, qmkKeycodeCatalog, diagnostics = [])
         qmkKeycodes: qmkKeycodeCatalog.entries,
         qmkKeyLabels: qmkKeycodeCatalog.labels,
         qmkKeycodeAliases: qmkKeycodeCatalog.aliases,
-        qmkKeycodeValues: qmkKeycodeCatalog.values,
         qmkKeycodeSource: qmkKeycodeCatalog.source,
         macroPayloadKeycodes: [],
         diagnostics,
@@ -1692,13 +1502,11 @@ async function loadQmkKeycodeCatalog(root) {
     }
 
     const entries = Array.from(entriesByValue.values()).sort(compareQmkKeycodes);
-    const values = qmkKeycodeValuesFromEntries(entries);
     return {
         source: `${path.join(keycodeDir, "*.hjson")} + ${path.join(keycodeDir, "extras", "keycodes_us_*.hjson")}`,
         entries,
         labels: qmkKeyLabelsFromEntries(entries),
         aliases: qmkKeyAliasesFromEntries(entries),
-        values,
     };
 }
 
@@ -1760,7 +1568,6 @@ function parseQmkKeycodeHjsonSectionEntries(text, sectionName) {
             continue;
         }
         entries.push({
-            sourceExpression: decodeHjsonString(match[1]),
             key,
             label: extractHjsonStringField(body, "label") || key,
             group: extractHjsonStringField(body, "group") || "other",
@@ -1843,47 +1650,6 @@ function qmkKeyAliasesFromEntries(entries) {
     return aliases;
 }
 
-function qmkKeycodeValuesFromEntries(entries) {
-    const values = {};
-    const unresolved = new Set(entries);
-    for (let pass = 0; pass < entries.length + 1 && unresolved.size; pass += 1) {
-        let changed = false;
-        for (const entry of Array.from(unresolved)) {
-            const numeric = qmkCatalogExpressionValue(entry.sourceExpression, values);
-            if (!Number.isInteger(numeric)) continue;
-            entry.numericValue = numeric;
-            for (const name of [entry.value, entry.key].concat(entry.aliases || [])) {
-                if (name && !name.startsWith("!")) values[name] = numeric;
-            }
-            unresolved.delete(entry);
-            changed = true;
-        }
-        if (!changed) break;
-    }
-    values._______ = values.KC_TRNS ?? values.KC_TRANSPARENT ?? 1;
-    values.XXXXXXX = values.KC_NO ?? 0;
-    return values;
-}
-
-function qmkCatalogExpressionValue(value, values) {
-    const expression = normalizeExpr(value || "");
-    if (/^0x[0-9a-f]+$/i.test(expression)) return Number.parseInt(expression, 16);
-    if (Number.isInteger(values[expression])) return values[expression];
-    const match = expression.match(/^([A-Z][A-Z0-9_]*)\((.+)\)$/);
-    const modifiers = {
-        C: 0x0100, LCTL: 0x0100,
-        S: 0x0200, LSFT: 0x0200,
-        A: 0x0400, LALT: 0x0400,
-        G: 0x0800, LGUI: 0x0800,
-        LCAG: 0x0d00, LCA: 0x0500, LCG: 0x0900, LCS: 0x0300,
-        LAG: 0x0c00, LSG: 0x0a00, LAS: 0x0600,
-        MEH: 0x0700, HYPR: 0x0f00,
-    };
-    if (!match || modifiers[match[1]] === undefined) return undefined;
-    const inner = qmkCatalogExpressionValue(match[2], values);
-    return Number.isInteger(inner) ? (modifiers[match[1]] | inner) & 0xffff : undefined;
-}
-
 function buildQmkKeycodeSearch(entry, value) {
     const terms = uniqueStrings([value, entry.key, entry.label, QMK_KEY_LABELS[value], QMK_KEY_LABELS[entry.key], displayKeyExpression(value)]
         .concat(entry.aliases || [])
@@ -1932,7 +1698,6 @@ function fallbackQmkKeycodeCatalog() {
         entries,
         labels: { ...QMK_KEY_LABELS },
         aliases: qmkKeyAliasesFromEntries(entries),
-        values: qmkKeycodeValuesFromEntries(entries),
     };
 }
 
@@ -4657,33 +4422,6 @@ function getStudioHtml() {
             align-items: center;
             justify-content: flex-end;
         }
-        .live-device-select {
-            flex: 0 1 280px;
-            min-width: 210px;
-            max-width: 34vw;
-        }
-        .live-status-chip {
-            display: inline-flex;
-            align-items: center;
-            min-height: 28px;
-            border: 1px solid var(--line);
-            border-radius: 999px;
-            padding: 4px 9px;
-            color: var(--muted);
-            background: rgba(32, 38, 42, 0.64);
-            font-size: 11px;
-            font-weight: 650;
-        }
-        .live-status-chip.connected,
-        .live-status-chip.compatible {
-            border-color: #2aa88e;
-            color: #7ee3ce;
-        }
-        .live-status-chip.incompatible,
-        .live-status-chip.error {
-            border-color: var(--danger);
-            color: #ff9b9b;
-        }
         .profile-picker-label {
             color: var(--muted);
             font-size: 11px;
@@ -4771,52 +4509,6 @@ function getStudioHtml() {
         main {
             display: block;
             padding: 14px;
-        }
-        #liveLinkPanelHost:not(:empty) {
-            display: block;
-            padding: 14px 14px 0;
-        }
-        .live-link-summary {
-            display: grid;
-            grid-template-columns: minmax(0, 1fr) auto;
-            gap: 12px;
-            align-items: start;
-        }
-        .live-link-heading {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            align-items: center;
-        }
-        .live-link-grid {
-            display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 10px;
-            margin-top: 12px;
-        }
-        .live-link-card {
-            min-width: 0;
-            border: 1px solid var(--line);
-            border-radius: 7px;
-            padding: 10px;
-            background: rgba(32, 38, 42, 0.54);
-        }
-        .live-link-card dl {
-            display: grid;
-            grid-template-columns: minmax(0, 1fr) auto;
-            gap: 5px 10px;
-            margin: 0;
-        }
-        .live-link-card dt { color: var(--muted); }
-        .live-link-card dd {
-            margin: 0;
-            text-align: right;
-            font-family: var(--vscode-editor-font-family, ui-monospace, monospace);
-        }
-        .live-link-diagnostics {
-            margin: 10px 0 0;
-            padding-left: 20px;
-            color: var(--muted);
         }
         section, details.panel {
             border: 1px solid var(--line);
@@ -6548,9 +6240,6 @@ function getStudioHtml() {
             .layout-selected-key-column {
                 padding: 8px 0 0;
             }
-            .live-link-grid {
-                grid-template-columns: 1fr;
-            }
         }
     </style>
     <style id="behaviorColorStyle" nonce="${nonce}"></style>
@@ -6582,18 +6271,6 @@ function getStudioHtml() {
                     <button id="reload" class="primary">Reload source</button>
                 </div>
             </div>
-            <div class="header-action-row toolbar">
-                <span class="profile-picker-label">Live keyboard</span>
-                <select id="liveDeviceSelect" class="live-device-select" aria-label="Live keyboard"></select>
-                <span id="liveLinkStatus" class="live-status-chip">Not scanned</span>
-                <div class="header-button-group">
-                    <button id="enumerateLiveDevices">Find keyboards</button>
-                    <button id="connectLiveDevice" disabled>Connect</button>
-                    <button id="refreshLiveDevice" disabled>Refresh</button>
-                    <button id="applyLiveProfile" class="primary" disabled>Apply live</button>
-                    <button id="disconnectLiveDevice" disabled>Disconnect</button>
-                </div>
-            </div>
             <div class="header-action-row">
                 <span class="profile-picker-label">Profile overview</span>
                 <button id="generateProfileDocs">Create overview doc</button>
@@ -6601,12 +6278,9 @@ function getStudioHtml() {
             <div class="header-action-row">
                 <span class="profile-picker-label">Firmware</span>
                 <button id="compileFirmware" class="primary">Compile left + right</button>
-                <button id="compileLiveEditFirmware">Compile live-edit test</button>
-                <button id="compilePerformanceComparisonFirmware">Compile performance comparison</button>
             </div>
         </div>
     </header>
-    <div id="liveLinkPanelHost"></div>
     <main id="app"></main>
     <div id="tooltip" class="tooltip" hidden></div>
     <div id="keyPickerHost"></div>
@@ -6622,22 +6296,6 @@ function getClientScript() {
 (function () {
     const vscode = acquireVsCodeApi();
     let model = undefined;
-    let liveLink = {
-        phase: "idle",
-        scanned: false,
-        busy: false,
-        connected: false,
-        devices: [],
-        selectedDeviceId: "",
-        capabilities: null,
-        status: null,
-        compatibility: null,
-        mutationCompatibility: null,
-        liveApply: {state: "idle", progress: null, result: null, error: null},
-        error: null,
-        diagnostics: []
-    };
-    let liveDeviceSelection = "";
     let activeLayer = undefined;
     let selectedKey = 0;
     let activeBehaviorKeycode = "";
@@ -6709,16 +6367,8 @@ function getClientScript() {
         openConfig: "Open config.h beside the studio so you can inspect layer enum and timing settings.",
         generateProfileDocs: "Create or refresh the generated profile overview Markdown and assets from the active profile source files on disk.",
         compileFirmware: "Compile separate left and right UF2 firmware files for the active profile.",
-        compileLiveEditFirmware: "Compile distinct left and right engineering UF2 files with the live-profile owner and mutation route enabled. Ordinary firmware compilation is unchanged.",
-        compilePerformanceComparisonFirmware: "Compile four diagnostic UF2 files from the same source: an ordinary left/right baseline and a live-profile engineering left/right comparison pair.",
         applyAll: "Write all staged Studio changes, including layer structure and staged layout edits.",
-        reload: "Reload keymap.c, config.h, and rgb_config.c from disk, discarding uncommitted Studio edits.",
-        liveDeviceSelect: "Choose a compatible Charybdis QMK Raw HID interface found by the latest scan.",
-        enumerateLiveDevices: "Scan for the Charybdis Raw HID interface without opening it or sending a report.",
-        connectLiveDevice: "Open the selected Raw HID interface and read Profile Wire capabilities and status. This does not modify the keyboard.",
-        refreshLiveDevice: "Read Profile Wire capabilities and status again. Only read requests are sent.",
-        applyLiveProfile: "Synchronize layer keys through standard VIA and build RGB and key behaviors from the active source files, persist them on both halves, and activate everything without reflashing.",
-        disconnectLiveDevice: "Close Profile Studio's Raw HID connection to the keyboard."
+        reload: "Reload keymap.c, config.h, and rgb_config.c from disk, discarding uncommitted Studio edits."
     };
     const viewTooltips = {
         layout: "Edit layer keys and behavior rows using the physical keyboard layout as the filter.",
@@ -7175,33 +6825,6 @@ function getClientScript() {
     document.getElementById("compileFirmware").addEventListener("click", () => {
         requestFirmwareCompile();
     });
-    document.getElementById("compileLiveEditFirmware").addEventListener("click", () => {
-        requestFirmwareCompile(true);
-    });
-    document.getElementById("compilePerformanceComparisonFirmware").addEventListener("click", () => {
-        requestPerformanceComparisonCompile();
-    });
-    document.getElementById("liveDeviceSelect").addEventListener("change", (event) => {
-        liveDeviceSelection = event.target.value || "";
-        renderLiveLinkControls();
-    });
-    document.getElementById("enumerateLiveDevices").addEventListener("click", () => {
-        vscode.postMessage({type: "enumerateLiveDevices"});
-    });
-    document.getElementById("connectLiveDevice").addEventListener("click", () => {
-        if (liveDeviceSelection) {
-            vscode.postMessage({type: "connectLiveDevice", deviceId: liveDeviceSelection});
-        }
-    });
-    document.getElementById("refreshLiveDevice").addEventListener("click", () => {
-        vscode.postMessage({type: "refreshLiveDevice"});
-    });
-    document.getElementById("applyLiveProfile").addEventListener("click", () => {
-        requestLiveApply();
-    });
-    document.getElementById("disconnectLiveDevice").addEventListener("click", () => {
-        vscode.postMessage({type: "disconnectLiveDevice"});
-    });
     document.addEventListener("pointerover", (event) => {
         const target = tooltipTarget(event.target);
         if (target) showTooltip(target, event);
@@ -7314,7 +6937,6 @@ function getClientScript() {
             clearFloatingStatus();
             viewDrafts = {};
             model = event.data.model;
-            updateLiveLinkState(event.data.liveLink);
             Object.assign(qmkKeyLabels, model.qmkKeyLabels || {});
             Object.assign(qmkKeyAliases, model.qmkKeycodeAliases || {});
             macroPayloadKeycodes = new Set(model.macroPayloadKeycodes || []);
@@ -7345,9 +6967,6 @@ function getClientScript() {
             normalizeRgbGroupState();
             render();
             resetLocalHistory();
-        }
-        if (event.data.type === "liveLinkState") {
-            updateLiveLinkState(event.data.liveLink);
         }
         if (event.data.type === "error") {
             clearFloatingStatus();
@@ -8596,14 +8215,7 @@ function getClientScript() {
 
     function compilePostMessage(message) {
         const payload = messageWithActiveProfile(message);
-        const performanceComparison = String(message?.type || "").includes("PerformanceComparison");
-        showFloatingStatus(performanceComparison ? "Compiling four performance comparison firmware files..." : "Compiling left and right firmware...", false);
-        vscode.postMessage(payload);
-    }
-
-    function liveApplyPostMessage(message) {
-        const payload = messageWithActiveProfile(message);
-        showFloatingStatus("Building and applying live profile...", false, "Live apply");
+        showFloatingStatus("Compiling left and right firmware...", false);
         vscode.postMessage(payload);
     }
 
@@ -8630,78 +8242,26 @@ function getClientScript() {
         }
     }
 
-    async function requestFirmwareCompile(liveEdit = false) {
+    async function requestFirmwareCompile() {
         if (!model?.activeProfile?.buildable) return;
         captureActiveMacroDraft();
         captureLayoutComboBuilderInputs();
         const summary = compileUnsavedSummary();
         if (!summary.hasUnsaved) {
-            compilePostMessage({ type: liveEdit ? "compileLiveEditFirmware" : "compileFirmware", activeLayer });
+            compilePostMessage({ type: "compileFirmware", activeLayer });
             return;
         }
 
         const choice = await showCompileConfirmDialog(summary);
         if (choice === "apply") {
             compilePostMessage({
-                type: liveEdit ? "applyAllChangesAndCompileLiveEdit" : "applyAllChangesAndCompile",
+                type: "applyAllChangesAndCompile",
                 ...layerStructurePayload(),
                 layoutGroups: pendingLayoutChangeGroups(),
                 activeLayer,
             });
         } else if (choice === "saved") {
-            compilePostMessage({ type: liveEdit ? "compileLiveEditFirmware" : "compileFirmware", activeLayer });
-        }
-    }
-
-    async function requestPerformanceComparisonCompile() {
-        if (!model?.activeProfile?.buildable) return;
-        captureActiveMacroDraft();
-        captureLayoutComboBuilderInputs();
-        const summary = compileUnsavedSummary();
-        if (!summary.hasUnsaved) {
-            compilePostMessage({ type: "compilePerformanceComparisonFirmware", activeLayer });
-            return;
-        }
-
-        const choice = await showCompileConfirmDialog(summary);
-        if (choice === "apply") {
-            compilePostMessage({
-                type: "applyAllChangesAndCompilePerformanceComparison",
-                ...layerStructurePayload(),
-                layoutGroups: pendingLayoutChangeGroups(),
-                activeLayer,
-            });
-        } else if (choice === "saved") {
-            compilePostMessage({ type: "compilePerformanceComparisonFirmware", activeLayer });
-        }
-    }
-
-    async function requestLiveApply() {
-        if (!liveLink.mutationCompatibility?.available || liveLink.busy) return;
-        captureActiveMacroDraft();
-        captureLayoutComboBuilderInputs();
-        const summary = compileUnsavedSummary();
-        if (!summary.hasUnsaved) {
-            liveApplyPostMessage({type: "applyLiveProfile", activeLayer});
-            return;
-        }
-        const choice = await showUnsavedActionDialog(summary, {
-            titleId: "liveApplyConfirmTitle",
-            diskNotice: "Live apply synchronizes layer keys and builds RGB and key behaviors from the profile source files currently on disk.",
-            applyDescription: "Apply all staged and deploy writes staged layer and layout changes before synchronizing the VIA layout and persisting the live profile.",
-            localNote: "Local form edits are not written by the header Apply all action. Use each card's Apply button first if those edits should be deployed.",
-            applyLabel: "Apply all staged and deploy",
-            savedLabel: "Deploy saved source only",
-        });
-        if (choice === "apply") {
-            liveApplyPostMessage({
-                type: "applyAllChangesAndApplyLiveProfile",
-                ...layerStructurePayload(),
-                layoutGroups: pendingLayoutChangeGroups(),
-                activeLayer,
-            });
-        } else if (choice === "saved") {
-            liveApplyPostMessage({type: "applyLiveProfile", activeLayer});
+            compilePostMessage({ type: "compileFirmware", activeLayer });
         }
     }
 
@@ -9129,7 +8689,6 @@ function getClientScript() {
     }
 
     function render() {
-        renderLiveLinkControls();
         if (!model) {
             app.innerHTML = "<section>Loading...</section>";
             hydrateTooltips();
@@ -9144,218 +8703,6 @@ function getClientScript() {
         restoreActiveViewDraft();
         hydrateTooltips();
         scheduleMacroSlotBrowserHeightSync();
-    }
-
-    function updateLiveLinkState(next) {
-        const wasApplying = Boolean(liveLink.busy && liveLink.phase === "applying-live");
-        if (next && typeof next === "object") {
-            liveLink = next;
-        }
-        const devices = Array.isArray(liveLink.devices) ? liveLink.devices : [];
-        const knownIds = devices.map((device) => device.id);
-        if (liveLink.selectedDeviceId && knownIds.includes(liveLink.selectedDeviceId)) {
-            liveDeviceSelection = liveLink.selectedDeviceId;
-        } else if (!knownIds.includes(liveDeviceSelection)) {
-            liveDeviceSelection = knownIds[0] || "";
-        }
-        renderLiveLinkControls();
-        if (wasApplying && !liveLink.busy) {
-            if (liveLink.liveApply?.state === "complete") {
-                showFloatingStatus(
-                    "Profile " + formatHex(liveLink.liveApply.result?.digest, 8) + " is persisted and active on both halves.",
-                    false,
-                    "Live apply complete"
-                );
-            } else {
-                showFloatingStatus(
-                    liveLink.liveApply?.error?.message || liveLink.error?.message || "Live apply did not complete.",
-                    true,
-                    "Live apply failed"
-                );
-            }
-        }
-    }
-
-    function renderLiveLinkControls() {
-        const select = document.getElementById("liveDeviceSelect");
-        const statusChip = document.getElementById("liveLinkStatus");
-        const host = document.getElementById("liveLinkPanelHost");
-        if (!select || !statusChip || !host) return;
-        const devices = Array.isArray(liveLink.devices) ? liveLink.devices : [];
-        if (!liveLink.scanned) {
-            select.innerHTML = "<option value=''>Scan to find a keyboard</option>";
-        } else if (!devices.length) {
-            select.innerHTML = "<option value=''>No compatible keyboard found</option>";
-        } else {
-            select.innerHTML = devices.map((device) =>
-                "<option value='" + escapeAttr(device.id) + "'>" + escapeHtml(device.label || "Charybdis keyboard") + "</option>"
-            ).join("");
-        }
-        if (devices.some((device) => device.id === liveDeviceSelection)) {
-            select.value = liveDeviceSelection;
-        }
-        select.disabled = Boolean(liveLink.busy || liveLink.connected || !devices.length);
-        setHeaderButtonDisabled("enumerateLiveDevices", Boolean(liveLink.busy || liveLink.connected));
-        setHeaderButtonDisabled("connectLiveDevice", Boolean(liveLink.busy || liveLink.connected || !liveDeviceSelection));
-        setHeaderButtonDisabled("refreshLiveDevice", Boolean(liveLink.busy || !liveLink.connected));
-        setHeaderButtonDisabled("applyLiveProfile", Boolean(liveLink.busy || !liveLink.mutationCompatibility?.available));
-        const applyButton = document.getElementById("applyLiveProfile");
-        if (applyButton) applyButton.textContent = liveLink.status?.candidatePending ? "Resume live" : "Apply live";
-        setHeaderButtonDisabled("disconnectLiveDevice", Boolean(liveLink.busy || !liveLink.connected));
-        const chip = liveLinkStatus();
-        statusChip.textContent = chip.label;
-        statusChip.className = "live-status-chip" + (chip.kind ? " " + chip.kind : "");
-        host.innerHTML = renderLiveLinkPanel();
-        hydrateTooltips();
-    }
-
-    function liveLinkStatus() {
-        if (liveLink.busy) {
-            const labels = {enumerating: "Scanning...", connecting: "Connecting...", refreshing: "Reading...", "applying-live": "Applying live...", disconnecting: "Disconnecting..."};
-            return {label: labels[liveLink.phase] || "Working...", kind: ""};
-        }
-        if (liveLink.error) return {label: "Live error", kind: "error"};
-        if (liveLink.connected && liveLink.compatibility) {
-            return liveLink.compatibility.compatible
-                ? {label: "Connected · compatible", kind: "compatible"}
-                : {label: "Connected · incompatible", kind: "incompatible"};
-        }
-        if (liveLink.connected) return {label: "Connected", kind: "connected"};
-        if (!liveLink.scanned) return {label: "Not scanned", kind: ""};
-        return Array.isArray(liveLink.devices) && liveLink.devices.length
-            ? {label: "Keyboard available", kind: ""}
-            : {label: "No keyboard found", kind: ""};
-    }
-
-    function renderLiveLinkPanel() {
-        const diagnostics = Array.isArray(liveLink.diagnostics) ? liveLink.diagnostics : [];
-        if (!liveLink.scanned && !liveLink.connected && !liveLink.error && !diagnostics.length) return "";
-        const device = (liveLink.devices || []).find((candidate) => candidate.id === liveLink.selectedDeviceId);
-        const compatibility = liveLink.compatibility;
-        const summaryKind = liveLink.error ? "error" : compatibility?.compatible === false ? "incompatible" : compatibility?.compatible ? "compatible" : "";
-        const summaryText = liveLink.error
-            ? liveLink.error.code + ": " + liveLink.error.message
-            : compatibility
-                ? (compatibility.compatible
-                    ? (liveLink.mutationCompatibility?.available
-                        ? "Ready to synchronize layer keys and build, persist, and activate RGB and key behaviors from the current source files."
-                        : "Read-compatible, but live apply is unavailable: " + (liveLink.mutationCompatibility?.reasons?.[0] || "the split keyboard is not ready."))
-                    : "Do not attempt a future live deploy until every compatibility blocker below is resolved.")
-                : liveLink.connected
-                    ? "Connected; waiting for Profile Wire capability and status reads."
-                    : (liveLink.devices || []).length
-                        ? "A compatible Raw HID interface is available. Connect to read firmware capabilities and profile status."
-                        : "No matching Charybdis Raw HID interface was found. The source editor remains fully available.";
-        return "<section class='panel live-link-panel' aria-label='Live keyboard status'>" +
-            "<div class='live-link-summary'>" +
-            "<div><div class='live-link-heading'><h2>Live keyboard</h2><span class='live-status-chip " + summaryKind + "'>" + escapeHtml(liveLinkStatus().label) + "</span></div>" +
-            "<p class='" + (liveLink.error ? "error" : compatibility?.compatible === false ? "warning" : "muted") + "'>" + escapeHtml(summaryText) + "</p></div>" +
-            (device ? "<div class='source-pill'>" + escapeHtml(device.label) + "</div>" : "") +
-            "</div>" +
-            renderLiveLinkDetails() +
-            (diagnostics.length ? "<h3>Diagnostics</h3><ul class='live-link-diagnostics'>" + diagnostics.map((entry) => "<li>" + escapeHtml(entry) + "</li>").join("") + "</ul>" : "") +
-            "</section>";
-    }
-
-    function renderLiveLinkDetails() {
-        const capabilities = liveLink.capabilities;
-        const status = liveLink.status;
-        const viaIdentity = liveLink.viaIdentity;
-        const compatibility = liveLink.compatibility;
-        if (!capabilities && !status && !compatibility) return "";
-        return "<div class='live-link-grid'>" +
-            (capabilities ? liveDefinitionCard("Firmware capabilities", [
-                ["Protocol", capabilityVersion(capabilities.protocol)],
-                ["Schema", capabilityVersion(capabilities.schema)],
-                ["VIA protocol", formatHex(viaIdentity?.protocolVersion, 4)],
-                ["VIA firmware", formatHex(viaIdentity?.firmwareVersion, 8)],
-                ["Report size", capabilities.reportSize + " bytes"],
-                ["Profile payload", capabilities.maxProfilePayload + " bytes"],
-                ["Domains", formatHex(capabilities.supportedDomainMask, 2)],
-                ["Action ABI", formatHex(capabilities.actionAbiDigest, 8)]
-            ]) : "") +
-            (status ? liveDefinitionCard("Device profile state", [
-                ["State flags", formatHex(status.stateFlags, 4)],
-                ["Second half detected", yesNo(status.peerKnown)],
-                ["Halves converged", yesNo(status.peerConverged)],
-                ["Candidate pending", yesNo(status.candidatePending)],
-                ["Safe-boundary wait", yesNo(status.waitingSafeBoundary)],
-                ["Active kind", String(status.activeKind)],
-                ["Active digest", formatHex(status.activeDigest, 8)],
-                ["Committed digest", formatHex(status.committedDigest, 8)],
-                ["Active generation", generationLabel(status.activeGeneration, status.activeOriginHalf)],
-                ["Committed generation", generationLabel(status.committedGeneration, status.committedOriginHalf)],
-                ["Last error", String(status.lastError)]
-            ]) : "") +
-            (liveLink.candidateStatus ? liveDefinitionCard("Candidate transaction", [
-                ["State", liveLink.candidateStatus.stateName || String(liveLink.candidateStatus.state)],
-                ["Transaction", String(liveLink.candidateStatus.transactionId || 0)],
-                ["Digest", formatHex(liveLink.candidateStatus.digest, 8)],
-                ["Last operation", String(liveLink.candidateStatus.lastOperation)],
-                ["Device error", liveLink.candidateStatus.error?.name || String(liveLink.candidateStatus.error?.id || 0)]
-            ]) : "") +
-            (liveLink.liveApply?.state && liveLink.liveApply.state !== "idle" ? liveApplyCard(liveLink.liveApply) : "") +
-            (compatibility ? liveCompatibilityCard(compatibility) : "") +
-            "</div>";
-    }
-
-    function liveApplyCard(application) {
-        const progress = application.progress || {};
-        const sent = Number(progress.bytesSent) || 0;
-        const total = Number(progress.totalBytes) || 0;
-        const layoutCompleted = Number(progress.completed) || 0;
-        const layoutTotal = Number(progress.total) || 0;
-        const layoutResult = application.result?.layout;
-        const outcome = application.error
-            ? application.error.code + ": " + application.error.message
-            : application.state === "complete"
-                ? "Persisted and active · " + formatHex(application.result?.digest, 8)
-                : "Phase: " + String(application.state || "working").replaceAll("-", " ");
-        return "<div class='live-link-card'><h3>Live apply</h3><p class='" + (application.error ? "error" : application.state === "complete" ? "notice" : "muted") + "'>" + escapeHtml(outcome) + "</p>" +
-            (total ? "<dl><dt>Transfer</dt><dd>" + escapeHtml(String(sent) + " / " + String(total) + " bytes") + "</dd></dl>" : "") +
-            (layoutTotal ? "<dl><dt>Layer keys</dt><dd>" + escapeHtml(String(layoutCompleted) + " / " + String(layoutTotal) + " checked") + "</dd><dt>Changes found</dt><dd>" + escapeHtml(String(Number(progress.changed) || 0)) + "</dd></dl>" : "") +
-            (layoutResult ? "<dl><dt>Layer keys verified</dt><dd>" + escapeHtml(String(layoutResult.checkedKeys)) + "</dd><dt>Layer keys changed</dt><dd>" + escapeHtml(String(layoutResult.changedKeys)) + "</dd></dl>" : "") +
-            "</div>";
-    }
-
-    function liveDefinitionCard(title, entries) {
-        return "<div class='live-link-card'><h3>" + escapeHtml(title) + "</h3><dl>" + entries.map(([label, value]) =>
-            "<dt>" + escapeHtml(label) + "</dt><dd>" + escapeHtml(value) + "</dd>"
-        ).join("") + "</dl></div>";
-    }
-
-    function liveCompatibilityCard(compatibility) {
-        const failed = (compatibility.checks || []).filter((check) => !check.ok);
-        const mutationReasons = liveLink.mutationCompatibility?.available
-            ? []
-            : (liveLink.mutationCompatibility?.reasons || []).filter((reason) => !(compatibility.reasons || []).includes(reason));
-        const capacityChecks = (compatibility.checks || []).filter((check) => [
-            "Logical layers", "Key behavior rows", "Populated behavior steps", "Reusable RGB groups", "RGB stage-group rows"
-        ].includes(check.label));
-        return "<div class='live-link-card'><h3>Source compatibility</h3>" +
-            (failed.length
-                ? "<ul class='live-link-diagnostics'>" + failed.map((check) => "<li class='error'>" + escapeHtml(check.message) + "</li>").join("") + "</ul>"
-                : "<p class='notice'>Compatible</p>") +
-            (mutationReasons.length ? "<h3>Live apply unavailable</h3><ul class='live-link-diagnostics'>" + mutationReasons.map((reason) => "<li class='warning'>" + escapeHtml(reason) + "</li>").join("") + "</ul>" : "") +
-            "<dl>" + capacityChecks.map((check) =>
-                "<dt>" + escapeHtml(check.label) + "</dt><dd>" + escapeHtml(String(check.actual) + " / " + String(check.limit)) + "</dd>"
-            ).join("") + "</dl></div>";
-    }
-
-    function capabilityVersion(version) {
-        return String(version?.major ?? "?") + "." + String(version?.minor ?? "?");
-    }
-
-    function yesNo(value) {
-        return value ? "Yes" : "No";
-    }
-
-    function generationLabel(counter, originHalf) {
-        return String(counter || 0) + " · half " + String(originHalf || 0);
-    }
-
-    function formatHex(value, width) {
-        return "0x" + (Number(value) >>> 0).toString(16).toUpperCase().padStart(width, "0");
     }
 
     function renderProfileControls() {
@@ -9385,8 +8732,6 @@ function getClientScript() {
         setHeaderButtonDisabled("openRgb", !editable);
         setHeaderButtonDisabled("generateProfileDocs", !editable);
         setHeaderButtonDisabled("compileFirmware", !Boolean(model.activeProfile?.buildable));
-        setHeaderButtonDisabled("compileLiveEditFirmware", !Boolean(model.activeProfile?.buildable));
-        setHeaderButtonDisabled("compilePerformanceComparisonFirmware", !Boolean(model.activeProfile?.buildable));
     }
 
     function renderProfileOption(profile) {

@@ -40,13 +40,8 @@
     }
   },
   "scripts": {
-    "check": "node --check extension.js && node --check scripts/capture-screenshots.js && node --check scripts/probe-live-link.js && node --check live-link/device-adapter.js && node --check live-link/request-coordinator.js && node --check live-link/fake-device-adapter.js && node --check live-link/node-hid-adapter.js && node --check live-link/profile-wire-v1.js && node --check live-link/runtime-cadence-v1.js && node --check live-link/profile-device-service.js && node --check live-link/profile-blob-v1.js && node --check live-link/key-behavior-domain-v1.js && node --check live-link/rgb-domain-v1.js && node --check live-link/compiled-profile-v1.js && node --check live-link/via-layout-v1.js && node --check live-link/profile-candidate-v1.js && node --check live-link/candidate-upload-coordinator.js && node --check tests/live-link/transport.test.js && node --check tests/live-link/node-hid-adapter.test.js && node --check tests/live-link/profile-wire-v1.test.js && node --check tests/live-link/runtime-cadence-v1.test.js && node --check tests/live-link/profile-device-service.test.js && node --check tests/live-link/profile-blob-v1.test.js && node --check tests/live-link/key-behavior-domain-v1.test.js && node --check tests/live-link/rgb-domain-v1.test.js && node --check tests/live-link/compiled-profile-v1.test.js && node --check tests/live-link/via-layout-v1.test.js && node --check tests/live-link/profile-candidate-v1.test.js && node --check tests/live-link/candidate-upload-coordinator.test.js && node scripts/check-key-behavior-coverage.js && npm run test:live-link",
+    "check": "node --check extension.js && node --check scripts/capture-screenshots.js && node scripts/check-key-behavior-coverage.js",
     "install:local": "sh scripts/install-local.sh",
-    "probe:live-link": "node scripts/probe-live-link.js",
-    "screenshots": "node scripts/capture-screenshots.js",
-    "test:live-link": "node --test tests/live-link/*.test.js"
-  },
-  "dependencies": {
-    "node-hid": "^3.4.0"
+    "screenshots": "node scripts/capture-screenshots.js"
   }
 }
