@@ -92,7 +92,7 @@ Every current and future setting must be classified as one of:
 The UI must explain a non-live boundary instead of silently omitting the field
 or offering an operation the connected firmware cannot perform. The maintained
 field inventory is
-[`field-classification.md`](../../review/2026-08-24-review-01/field-classification.md).
+[`field-classification.md`](../architecture/field-classification.md).
 
 ## Product Capabilities
 

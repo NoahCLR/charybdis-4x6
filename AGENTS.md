@@ -12,23 +12,9 @@ Use this repo like production firmware, not a scratch keymap.
 - If the task depends on upstream QMK behavior or build wiring, inspect the relevant files in `../bastardkb-qmk` instead of guessing how upstream behaves.
 - `README.md` and the files under `docs/` are the main human-facing documentation set for this repo.
 - For doc fixes, doc updates, doc audits, or user-facing explanation work, check `README.md` and the relevant files under `docs/` first.
-- Review folders under `review/` are internal architecture/planning notes, not the default target for normal documentation requests.
-- For refactors or runtime architecture work, read the newest review folder under `review/` first. The newest open review folder is the primary source of truth for that architecture work; closed review folders are historical context unless you are checking closure history.
-- If the newest review folder is internally contradictory, reconcile it before using it as the source of truth for follow-up work on the same thread.
-- Name new review folders with a sortable ISO date prefix. For distinct reviews opened on the same day, append a zero-padded review sequence such as `review/2026-04-11-review-01/`, `review/2026-04-11-review-02/`, and `review/2026-04-11-review-03/` so "newest review" is unambiguous.
-- If work belongs to an existing open review, continue in that folder instead of creating a same-day duplicate with a different naming pattern. If the related review is closed, open the next sortable review folder instead.
-- Each new review lives in its own folder under `review/` and must include:
-  - `userspace-architecture-review.md`: current architecture decisions, tradeoffs, and intended structure
-  - `progress.md`: completed work, in-flight work, verification, and next steps
-- Do not recreate deleted root-level review files if the active review has moved into a subfolder.
-
-## Review Prompt Templates
-
-- Review prompt templates live under `prompts/`, when using one of these files always mention it in the chat!!.
-- Use `prompts/initial-architecture-review.md` for the first architecture pass on a new thread.
-- Use `prompts/follow-up-architecture-audit.md` for critical audits of landed refactor work.
-- Use `prompts/closure-verification-review.md` to decide whether an active review thread is actually ready to close.
-- Prefer referencing these files by path in requests instead of pasting prompt text into the chat.
+- For refactors or runtime architecture work, read `docs/LIVE_EDIT_APP_DIRECTION.md` first. It carries the current direction, the decisions behind it, and what is deliberately left undesigned.
+- The durable specs live under `docs/architecture/`: the Profile Wire and split protocols, the authority state tables, the storage and resource baseline, the field classification, and the known-issue notes. Treat those as the contract; change them deliberately.
+- This repo no longer keeps dated review folders or finding registers. Record decisions in the doc they govern, next to the thing they constrain.
 
 ## Repo Boundaries
 
@@ -129,73 +115,3 @@ Repo-specific guardrails:
   physical/linker bank, fresh linked accounting, the applicable policy, and
   runtime high-water evidence. Preserve conservative designs when useful, but
   do not justify them with policy values presented as hardware capacity.
-
-## Active Review Thread
-
-- For one architecture/refactor thread, keep one active review folder until the thread is closed.
-- Routine remediation, re-audit, and closure verification for the same thread belong in the active review folder, not a new same-day folder.
-- Create a new review folder only when:
-  - the architecture topic is materially different, or
-  - the previous thread is explicitly closed and a new thread is starting.
-- If you create a new review folder, state in `progress.md` why the active folder was not continued.
-- Once a review folder records a closure verdict, treat that folder as immutable
-  history. Do not append follow-up findings, cleanup notes, new verification, or
-  post-closure remediation to it.
-- If architecture/refactor work happens after closure, open the next sortable
-  review folder and state in its `progress.md` why the closed folder was not
-  continued.
-
-## Review Integrity Rules
-
-- A review folder must be internally coherent for the tree it describes.
-- A closed review folder must remain a coherent snapshot of the tree at closure.
-  Post-closure work belongs in a new review folder, even when it is related to
-  the closed thread.
-- If later remediation lands after an audit, either:
-  - update the active review folder so its findings and landed state agree, or
-  - add an explicit `Reconciliation Note` that labels older findings as audit-time snapshot only.
-- Never leave a review folder containing both:
-  - “this has landed”, and
-  - stale open findings about the same issue,
-  without an explicit reconciliation note.
-
-## Required Review Structure
-
-- For follow-up architecture reviews, include a `Prior Finding Status` section.
-- For each major prior finding, mark it as:
-  - `open`
-  - `partially resolved`
-  - `resolved`
-  - `regressed`
-- When marking a finding `resolved`, include:
-  - code references
-  - enforcement references such as compile gates or tests
-  - verification commands that passed
-
-## Finding Lifecycle
-
-- Track each major finding across follow-up passes as one of:
-  - `open`
-  - `partially resolved`
-  - `resolved`
-  - `regressed`
-- Do not mark a finding `resolved` because the code looks cleaner. Mark it `resolved` only when the closure bar below is met.
-
-## Closure Bar
-
-- Do not call architecture work resolved because it looks cleaner.
-- A seam/boundary/API finding is only resolved when:
-  - the current code matches the intended design
-  - compile gates or tests mechanically enforce the claim
-  - docs and the active open review note match the current tree
-  - `sh tests/host/run_all_host_tests.sh` passes
-  - `qmk compile -kb bastardkb/charybdis/4x6 -km noah` passes
-
-## Review Before New Review
-
-- If the newest open review folder is contradictory, reconcile it before
-  opening another follow-up review on the same thread.
-- If the newest review folder is closed and later work reveals a documentation
-  or review-history problem, do not edit the closed folder unless the user
-  explicitly asks to correct historical record. Open the next sortable review
-  folder for post-closure work and document the reason there.

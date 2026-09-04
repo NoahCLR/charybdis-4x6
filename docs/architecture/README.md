@@ -20,6 +20,19 @@ This directory explains how the runtime is shaped and where changes belong.
   scan, RGB, pointing-device, split, or macro boundaries.
 - Use [memory-budgets.md](./memory-budgets.md) before interpreting target RAM,
   allocator, EEPROM-cache, or stack numbers.
+- Use [profile-wire-v1.md](./profile-wire-v1.md) and
+  [profile-split-v1.md](./profile-split-v1.md) for the HID and split protocols
+  the live app speaks.
+- Use [authority-state-table.md](./authority-state-table.md) for source, device,
+  and split authority plus safe activation.
+- Use
+  [storage-and-resource-baseline.md](./storage-and-resource-baseline.md) for
+  EEPROM maps, storage ceilings, and the measured resource baseline.
+- Use [field-classification.md](./field-classification.md) for which settings
+  are live-editable, structurally bounded, or compiled-only.
+- Use [pointing-cadence-known-issue.md](./pointing-cadence-known-issue.md)
+  before investigating pointing performance. It records what has already been
+  eliminated with evidence.
 - Use [device-resident-profile.md](./device-resident-profile.md) for the target
   Profile Studio authority, readback, source import/export, and performance
   contracts. Current source-driven live apply is an interim implementation.
