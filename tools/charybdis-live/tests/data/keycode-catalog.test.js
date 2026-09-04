@@ -5,6 +5,7 @@ const test = require("node:test");
 
 const {CATALOG_FORMAT, parseKeycodeEntries} = require("../../scripts/generate-keycode-catalog");
 const catalog = require("../../core/data/keycode-catalog.json");
+const {lookup, metadata, resolve} = require("../../core/data/keycode-catalog");
 
 // These assertions run against the vendored file, not a QMK checkout, so they
 // hold on a machine that has no firmware workspace at all. That is the point of
@@ -81,4 +82,59 @@ test("the parser drops negated aliases and reads the aliases section too", () =>
 
     assert.deepEqual(entries.map((entry) => entry.name), ["KC_ONE", "KC_TWO"]);
     assert.deepEqual(entries[0].aliases, ["OK"]);
+});
+
+// Resolution is what makes readback legible: the device sends a uint16 and the
+// user has to see a key. The expected values below were cross-checked against
+// the compiled expectations in the via-layout tests.
+
+test("basic keycodes resolve to their catalog entry", () => {
+    assert.deepEqual(resolve(0x0004), {value: 0x0004, name: "KC_A", label: "A", group: "basic", kind: "basic", known: true});
+    assert.equal(resolve(0x001c).name, "KC_Y");
+    assert.equal(resolve(0x0001).name, "KC_TRANSPARENT");
+});
+
+test("layer keycodes decode their layer argument", () => {
+    assert.equal(resolve(0x5220).name, "MO(0)");
+    assert.equal(resolve(0x5222).name, "MO(2)");
+    assert.equal(resolve(0x5222).layer, 2);
+    assert.equal(resolve(0x5220).kind, "layer");
+});
+
+test("layer-tap keycodes decode both the layer and the tapped key", () => {
+    const decoded = resolve(0x4005);
+    assert.equal(decoded.name, "LT(0,KC_B)");
+    assert.equal(decoded.layer, 0);
+    assert.equal(decoded.tap, "KC_B");
+    assert.equal(decoded.kind, "layer-tap");
+    assert.equal(resolve(0x4105).name, "LT(1,KC_B)");
+});
+
+test("custom firmware keycodes still resolve, since the device may report them", () => {
+    // The authored profile's RIGHT_THUMB compiles to a QK_USER value.
+    assert.equal(resolve(0x7e5d).known, true);
+    assert.match(resolve(0x7e5d).name, /^QK_USER_/);
+});
+
+test("an unrecognised keycode renders as hex rather than a guess", () => {
+    const decoded = resolve(0xfffe);
+    assert.equal(decoded.known, false);
+    assert.equal(decoded.name, "0xFFFE");
+    assert.equal(decoded.kind, "unknown");
+});
+
+test("out-of-range and non-integer inputs never throw", () => {
+    for (const value of [-1, 0x10000, 1.5, undefined, null, "KC_A"]) {
+        const decoded = resolve(value);
+        assert.equal(decoded.known, false);
+        assert.equal(typeof decoded.name, "string");
+    }
+});
+
+test("names and aliases resolve back to entries, and metadata is reported", () => {
+    assert.equal(lookup("KC_A").value, 0x0004);
+    assert.equal(lookup("_______").name, "KC_TRANSPARENT");
+    assert.equal(lookup("nonsense"), undefined);
+    assert.equal(metadata().keycodeCount, catalog.entries.length);
+    assert.equal(metadata().qmkVersion, catalog.qmkVersion);
 });

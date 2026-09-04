@@ -94,3 +94,32 @@ button:not(:disabled):hover { background: var(--vscode-button-hoverBackground); 
 .diagnostics { margin: 0; padding-left: 18px; font-family: var(--vscode-editor-font-family); font-size: 0.8rem; }
 
 .muted { opacity: 0.7; }
+
+.layout__controls { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+
+.layout__progress { display: grid; gap: 6px; }
+.layout__bar { height: 4px; border-radius: 999px; background: var(--vscode-panel-border, rgba(128,128,128,0.35)); overflow: hidden; }
+.layout__bar-fill { height: 100%; background: var(--vscode-progressBar-background, #0e70c0); transition: width 120ms linear; }
+
+.layout__tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.layout__tab { background: transparent; color: var(--vscode-foreground); border-color: var(--vscode-panel-border, rgba(128,128,128,0.35)); }
+.layout__tab.is-active { border-color: var(--vscode-focusBorder); color: var(--vscode-foreground); background: var(--vscode-list-activeSelectionBackground, rgba(128,128,128,0.18)); }
+
+.layout__board { width: 100%; height: auto; display: block; }
+.layout__key rect {
+    fill: var(--vscode-editorWidget-background, rgba(128, 128, 128, 0.16));
+    stroke: var(--vscode-panel-border, rgba(128, 128, 128, 0.4));
+    stroke-width: 1.5;
+}
+.layout__key text {
+    fill: var(--vscode-foreground);
+    font-family: var(--vscode-font-family);
+    font-size: 15px;
+    font-weight: 600;
+}
+.layout__key--transparent rect { fill: transparent; stroke-dasharray: 3 3; }
+.layout__key--transparent text { opacity: 0.45; }
+.layout__key--empty rect { fill: transparent; opacity: 0.35; }
+.layout__key--layer rect { stroke: var(--vscode-focusBorder); }
+.layout__key--unknown rect { stroke: var(--vscode-editorWarning-foreground, #cca700); }
+.layout__key--unknown text { font-size: 11px; font-family: var(--vscode-editor-font-family); }

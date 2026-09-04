@@ -7,6 +7,7 @@
 
 import {element} from "./dom.js";
 import {renderIdentity} from "./views/identity.js";
+import {renderLayout} from "./views/layout.js";
 import {renderDevices} from "./views/devices.js";
 import {renderStatus} from "./views/status.js";
 import {renderDiagnostics} from "./views/diagnostics.js";
@@ -15,6 +16,7 @@ const vscode = acquireVsCodeApi();
 const app = document.getElementById("app");
 
 let snapshot = null;
+let activeLayer = 0;
 
 function send(message) {
     vscode.postMessage(message);
@@ -43,7 +45,17 @@ function render() {
     const sections = [header, renderDevices(snapshot, (deviceId) => send({type: "connect", deviceId}))];
 
     if (snapshot.connected) {
-        sections.push(renderIdentity(snapshot), renderStatus(snapshot));
+        sections.push(
+            renderLayout({...snapshot, activeLayer}, {
+                readLayout: () => send({type: "readLayout"}),
+                selectLayer: (layer) => {
+                    activeLayer = layer;
+                    render();
+                },
+            }),
+            renderIdentity(snapshot),
+            renderStatus(snapshot)
+        );
     } else {
         sections.push(
             element(

@@ -120,6 +120,37 @@ async function readViaKeycode(connection, entry, options = {}) {
     return decodeViaGetKeycodeResponse(response, request);
 }
 
+// Reads the whole layout out of the keyboard, one position at a time, because
+// standard VIA has no bulk keycode read. 56 positions per layer, so a five
+// layer board is 280 sequential round trips; the coordinator serialises them
+// and onProgress lets the UI show that it is working rather than hung.
+async function readViaLayout(connection, options = {}) {
+    assertConnection(connection);
+    const layerCount = options.layerCount;
+    if (!Number.isInteger(layerCount) || layerCount < 1 || layerCount > 16) {
+        throw new ViaLayoutError("VIA_LAYOUT_INVALID_ARGUMENT", "layerCount must be an integer from 1 through 16.");
+    }
+
+    const total = layerCount * CHARYBDIS_4X6_LAYOUT_MATRIX.length;
+    const layers = [];
+    let done = 0;
+
+    for (let layer = 0; layer < layerCount; layer += 1) {
+        const positions = [];
+        for (let layoutIndex = 0; layoutIndex < CHARYBDIS_4X6_LAYOUT_MATRIX.length; layoutIndex += 1) {
+            const [row, column] = CHARYBDIS_4X6_LAYOUT_MATRIX[layoutIndex];
+            const keycode = await readViaKeycode(connection, {layer, row, column}, options);
+            positions.push({layoutIndex, row, column, keycode});
+            done += 1;
+            if (typeof options.onProgress === "function") {
+                options.onProgress({done, total, layer});
+            }
+        }
+        layers.push({layer, positions});
+    }
+    return layers;
+}
+
 async function writeViaKeycode(connection, entry, options = {}) {
     assertConnection(connection);
     const request = buildViaSetKeycodeRequest(entry);
@@ -213,6 +244,7 @@ module.exports = {
     decodeViaGetKeycodeResponse,
     decodeViaSetKeycodeResponse,
     readViaKeycode,
+    readViaLayout,
     synchronizeViaLayout,
     viaKeycodeResponseMatcher,
     writeViaKeycode,

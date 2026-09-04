@@ -11,12 +11,15 @@ const test = require("node:test");
 
 const APP_ROOT = path.resolve(__dirname, "..");
 
-// A layer may import from itself and from the layers listed here.
+// A layer may import from itself and from the layers listed here. `data` is
+// inert vendored content with no dependencies of its own, so anything may read
+// it without creating a cycle.
 const ALLOWED_IMPORTS = {
-    transport: [],
-    schema: [],
-    protocol: ["transport", "schema"],
-    session: ["transport", "protocol", "schema"],
+    data: [],
+    transport: ["data"],
+    schema: ["data"],
+    protocol: ["transport", "schema", "data"],
+    session: ["transport", "protocol", "schema", "data"],
 };
 
 function sourceFiles(dir) {

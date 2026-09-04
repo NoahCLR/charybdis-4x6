@@ -70,6 +70,9 @@ async function handleMessage(panel, service, message) {
             case "refresh":
                 await service.refresh();
                 return;
+            case "readLayout":
+                await service.readLayout();
+                return;
             case "disconnect":
                 await service.disconnect();
                 return;

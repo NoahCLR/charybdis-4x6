@@ -4,7 +4,8 @@ const {RAW_HID_REPORT_SIZE} = require("../transport/device-adapter");
 const {NodeHidDeviceAdapter} = require("../transport/node-hid-adapter");
 const {DeviceRequestCoordinator} = require("../transport/request-coordinator");
 const {CandidateUploadCoordinator} = require("./candidate-upload-coordinator");
-const {synchronizeViaLayout} = require("../protocol/via-layout-v1");
+const {readViaLayout, synchronizeViaLayout} = require("../protocol/via-layout-v1");
+const keycodeCatalog = require("../data/keycode-catalog");
 const {
     CANDIDATE_OPERATION,
     CANDIDATE_STATE,
@@ -69,6 +70,7 @@ class ProfileDeviceService {
         this.diagnostics = [];
         this.lastRefreshedAt = "";
         this.liveApply = {state: "idle", progress: null, result: null, error: null};
+        this.layout = undefined;
     }
 
     setProfileSummary(summary) {
@@ -149,6 +151,63 @@ class ProfileDeviceService {
                 compatibility.compatible
                     ? "Live profile schema and current source capacities are compatible."
                     : `Live compatibility check found ${compatibility.reasons.length} blocking issue${compatibility.reasons.length === 1 ? "" : "s"}.`
+            );
+        });
+    }
+
+// Reads the layout the keyboard is actually running and resolves each
+    // keycode through the vendored catalog. This is device-first: nothing here
+    // consults the authored source. Layer count comes from the firmware's own
+    // advertised capacity rather than from a compiled constant.
+    async readLayout() {
+        if (!this.connection?.connected) {
+            this.setError(new Error("Connect to a keyboard before reading its layout."));
+            this.emitChange();
+            return this.snapshot();
+        }
+        const layerCount = this.capabilities?.compiledLayerCount;
+        if (!Number.isInteger(layerCount) || layerCount < 1) {
+            this.setError(new Error("Refresh capabilities before reading the layout."));
+            this.emitChange();
+            return this.snapshot();
+        }
+
+        return this.runOperation("reading layout", async () => {
+            const connection = this.connection;
+            this.layout = {state: "reading", progress: {done: 0, total: 0}, layers: [], readAt: ""};
+            this.emitChange();
+
+            const layers = await readViaLayout(connection, {
+                layerCount,
+                onProgress: (progress) => {
+                    this.layout = {...this.layout, progress};
+                    this.emitChange();
+                },
+            });
+            if (this.connection !== connection || !connection.connected) {
+                throw new Error("The keyboard disconnected while its layout was being read.");
+            }
+
+            this.layout = {
+                state: "read",
+                progress: null,
+                readAt: new Date().toISOString(),
+                catalog: keycodeCatalog.metadata(),
+                layers: layers.map(({layer, positions}) => ({
+                    layer,
+                    keys: positions.map((position) => ({
+                        ...position,
+                        resolved: keycodeCatalog.resolve(position.keycode),
+                    })),
+                })),
+            };
+            const unknown = this.layout.layers
+                .flatMap((entry) => entry.keys)
+                .filter((key) => !key.resolved.known).length;
+            this.addDiagnostic(
+                unknown === 0
+                    ? `Read ${layerCount} layers from the keyboard.`
+                    : `Read ${layerCount} layers; ${unknown} keycodes are not in the vendored catalog.`
             );
         });
     }
@@ -345,6 +404,7 @@ class ProfileDeviceService {
                 this.status
             ),
             liveApply: cloneLiveApply(this.liveApply),
+            layout: this.layout ? JSON.parse(JSON.stringify(this.layout)) : null,
             error: this.error ? {...this.error} : null,
             diagnostics: this.diagnostics.slice(),
             lastRefreshedAt: this.lastRefreshedAt,
@@ -387,6 +447,7 @@ class ProfileDeviceService {
     }
 
     clearConnection() {
+        this.layout = undefined;
         this.disposeConnectionListener?.();
         this.disposeConnectionListener = undefined;
         this.connection = undefined;

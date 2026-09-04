@@ -260,10 +260,14 @@ npm run install:local
 Press `F5` with the `Run Charybdis Live` launch configuration to run it in an
 Extension Development Host instead.
 
-It currently shows what the keyboard reports about itself: VIA and Profile Wire
+It shows what the keyboard reports about itself — VIA and Profile Wire
 versions, schema, capacities, storage geometry, and committed profile status
-including whether both halves agree on a generation. Reading the committed
-payload back is the next step. Flash the side-specific firmware pair, which
+including whether both halves agree on a generation — and reads the live layout
+off the device and draws it on the real Charybdis geometry, resolving keycodes
+through a vendored catalog rather than the source files.
+
+Reading the committed custom profile payload, which owns RGB and key
+behaviours, is the next step. Flash the side-specific firmware pair, which
 carries the live-profile owner by default; the generic image does not.
 
 The direction, the decisions behind the split, and what is deliberately left

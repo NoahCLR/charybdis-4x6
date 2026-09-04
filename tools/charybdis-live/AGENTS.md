@@ -44,11 +44,14 @@ to stop and reconsider, not to work around.
 
 | Layer | May import |
 | --- | --- |
-| `transport/` | nothing in `core/` except `transport/device-adapter` |
-| `schema/` | `schema/` only |
-| `protocol/` | `transport/`, `schema/` |
-| `session/` | `transport/`, `protocol/`, `schema/` |
+| `data/` | nothing — inert vendored content |
+| `transport/` | `data/` |
+| `schema/` | `data/` |
+| `protocol/` | `transport/`, `schema/`, `data/` |
+| `session/` | `transport/`, `protocol/`, `schema/`, `data/` |
 | `media/` | nothing from `core/` — it receives snapshots as messages |
+
+Every layer may also import from itself.
 
 `extension.js` imports `core/session/` and the `vscode` module. Nothing else
 imports `vscode`.
