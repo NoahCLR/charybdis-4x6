@@ -68,6 +68,10 @@ function publish(panel, session) {
     session.notice = undefined;
 }
 
+// The webview sets its own "Working..." status on every message it posts, and
+// only a model reply clears it. So every path through here must publish,
+// including the ones that decline or fail — otherwise the panel sits on
+// "Working..." with no way to know anything went wrong.
 async function handleMessage(panel, session, message) {
     try {
         switch (message?.type) {
@@ -87,24 +91,29 @@ async function handleMessage(panel, session, message) {
             case "requestCloneProfile":
             case "requestRenameProfile":
             case "requestDeleteProfile":
-                vscode.window.showInformationMessage(
-                    "Charybdis Live edits the connected keyboard and has no profile files. Use Profile Studio for source profiles."
-                );
+                session.notice = "Charybdis Live edits the connected keyboard and has no profile files. Use Profile Studio for source profiles.";
+                publish(panel, session);
                 return;
             case "applyLayerChanges":
             case "saveBehavior":
             case "addBehavior":
             case "addCombo":
-                vscode.window.showInformationMessage(
-                    "That domain needs the committed profile read, which is not implemented yet. Layout editing works today."
-                );
+                session.notice = "That domain needs the committed profile read. Layout editing works today.";
+                publish(panel, session);
                 return;
             default:
+                // Even an unrecognised message has already put the panel into
+                // "Working...", so answer it.
+                publish(panel, session);
                 return;
         }
     } catch (error) {
         const text = error instanceof Error ? error.message : String(error);
+        const code = error?.code ? ` [${error.code}]` : "";
         vscode.window.showErrorMessage(`Charybdis Live: ${text}`);
+        // Put it in the panel too. A toast is easy to miss and disappears,
+        // and the panel is where someone looks when it seems stuck.
+        session.notice = `Failed${code}: ${text}`;
         publish(panel, session);
     }
 }
@@ -149,10 +158,19 @@ async function connectAndRead(panel, session) {
     // The committed profile is only present on firmware that has one. A
     // keyboard running compiled defaults is a normal state, not an error, so a
     // failure here leaves the layout read standing.
-    await vscode.window.withProgress(
-        {location: vscode.ProgressLocation.Notification, title: "Reading committed profile"},
-        () => service.readCommittedProfile()
-    );
+    // A keyboard with no committed profile is a normal state, so a failure here
+    // must not discard the layout read that already succeeded.
+    try {
+        await vscode.window.withProgress(
+            {location: vscode.ProgressLocation.Notification, title: "Reading committed profile"},
+            () => service.readCommittedProfile()
+        );
+    } catch (error) {
+        const text = error instanceof Error ? error.message : String(error);
+        session.notice = `Read the layout. The committed profile could not be read: ${text}`;
+        publish(panel, session);
+        return;
+    }
 
     const state = service.snapshot();
     session.notice = state.committed?.state === "read"
