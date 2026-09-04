@@ -403,7 +403,7 @@ function getStudioHtml() {
     <meta charset="UTF-8">
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${nonce}' 'unsafe-inline'; script-src 'nonce-${nonce}';">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Charybdis Profile Studio</title>
+    <title>Charybdis Live</title>
     <style nonce="${nonce}">
         :root {
             --bg: #1f2428;
@@ -456,6 +456,15 @@ function getStudioHtml() {
             align-items: center;
             justify-content: flex-end;
         }
+        .device-chip {
+            font-size: 0.78rem;
+            padding: 2px 10px;
+            border-radius: 999px;
+            border: 1px solid currentColor;
+        }
+        .device-chip--ok { color: #6fcf97; }
+        .device-chip--idle { opacity: 0.65; }
+
         .profile-picker-label {
             color: var(--muted);
             font-size: 11px;
@@ -2281,37 +2290,21 @@ function getStudioHtml() {
 <body>
     <header>
         <div class="header-title">
-            <h1>Charybdis Profile Studio</h1>
-            <div id="subtitle" class="muted">Loading keymap.c, config.h, and rgb_config.c</div>
+            <h1>Charybdis Live</h1>
+            <div id="subtitle" class="muted">Connecting to the keyboard</div>
         </div>
         <div class="header-actions">
-            <div class="header-action-row profile-picker">
-                <span class="profile-picker-label">Profile</span>
-                <select id="profileSelect" aria-label="Profile"></select>
-                <div class="header-button-group">
-                    <button id="createProfile">New profile</button>
-                    <button id="cloneProfile">Clone</button>
-                    <button id="renameProfile">Rename</button>
-                    <button id="deleteProfile">Delete</button>
-                </div>
+            <div class="header-action-row">
+                <span class="profile-picker-label">Keyboard</span>
+                <span id="deviceChip" class="device-chip device-chip--idle">Not connected</span>
+                <span id="deviceGeneration" class="muted"></span>
             </div>
             <div class="header-action-row toolbar">
-                <span class="profile-picker-label">Source</span>
+                <span class="profile-picker-label">Device</span>
                 <div class="header-button-group">
-                    <button id="openKeymap">keymap.c</button>
-                    <button id="openRgb">rgb_config.c</button>
-                    <button id="openConfig">config.h</button>
-                    <button id="applyAll" class="primary dirty" hidden disabled>Apply all</button>
-                    <button id="reload" class="primary">Reload source</button>
+                    <button id="applyAll" class="primary dirty" hidden disabled>Apply to keyboard</button>
+                    <button id="reload" class="primary">Read from keyboard</button>
                 </div>
-            </div>
-            <div class="header-action-row">
-                <span class="profile-picker-label">Profile overview</span>
-                <button id="generateProfileDocs">Create overview doc</button>
-            </div>
-            <div class="header-action-row">
-                <span class="profile-picker-label">Firmware</span>
-                <button id="compileFirmware" class="primary">Compile left + right</button>
             </div>
         </div>
     </header>
@@ -2391,7 +2384,8 @@ function getClientScript() {
     ];
     // Tooltip copy should say what the control affects, where it writes or stages data, and any non-obvious fallback semantics.
     const headerTooltips = {
-        profileSelect: "Choose which keymap folder Profile Studio edits. Switching profiles discards uncommitted Studio edits.",
+        deviceChip: "The keyboard this window is editing.",
+        deviceGeneration: "The committed profile generation and digest the keyboard reports, and whether both halves agree.",
         createProfile: "Create a new keymap folder from the starter Profile Studio template and register it in qmk.json.",
         cloneProfile: "Copy the active keymap folder to a new profile and register the clone in qmk.json.",
         renameProfile: "Move the active non-default profile folder to a new keymap name and update qmk.json.",
@@ -2401,8 +2395,8 @@ function getClientScript() {
         openConfig: "Open config.h beside the studio so you can inspect layer enum and timing settings.",
         generateProfileDocs: "Create or refresh the generated profile overview Markdown and assets from the active profile source files on disk.",
         compileFirmware: "Compile separate left and right UF2 firmware files for the active profile.",
-        applyAll: "Write all staged Studio changes, including layer structure and staged layout edits.",
-        reload: "Reload keymap.c, config.h, and rgb_config.c from disk, discarding uncommitted Studio edits."
+        applyAll: "Write staged edits to the connected keyboard. Each key is read back after writing.",
+        reload: "Re-read the layout from the connected keyboard, discarding staged edits."
     };
     const viewTooltips = {
         layout: "Edit layer keys and behavior rows using the physical keyboard layout as the filter.",
@@ -2830,33 +2824,33 @@ function getClientScript() {
         discardLocalDraftState();
         post({ type: "refresh" });
     });
-    document.getElementById("profileSelect").addEventListener("change", (event) => {
+    document.getElementById("profileSelect")?.addEventListener("change", (event) => {
         discardLocalDraftState();
         post({ type: "selectProfile", profileId: event.target.value || "" });
     });
-    document.getElementById("createProfile").addEventListener("click", () => {
+    document.getElementById("createProfile")?.addEventListener("click", () => {
         discardLocalDraftState();
         post({ type: "requestCreateProfile" });
     });
-    document.getElementById("cloneProfile").addEventListener("click", () => {
+    document.getElementById("cloneProfile")?.addEventListener("click", () => {
         discardLocalDraftState();
         post({ type: "requestCloneProfile" });
     });
-    document.getElementById("renameProfile").addEventListener("click", () => {
+    document.getElementById("renameProfile")?.addEventListener("click", () => {
         discardLocalDraftState();
         post({ type: "requestRenameProfile" });
     });
-    document.getElementById("deleteProfile").addEventListener("click", () => {
+    document.getElementById("deleteProfile")?.addEventListener("click", () => {
         discardLocalDraftState();
         post({ type: "requestDeleteProfile" });
     });
-    document.getElementById("openKeymap").addEventListener("click", () => vscode.postMessage({ type: "openSource", file: "keymap" }));
-    document.getElementById("openRgb").addEventListener("click", () => vscode.postMessage({ type: "openSource", file: "rgb" }));
-    document.getElementById("openConfig").addEventListener("click", () => vscode.postMessage({ type: "openSource", file: "config" }));
-    document.getElementById("generateProfileDocs").addEventListener("click", () => {
+    document.getElementById("openKeymap")?.addEventListener("click", () => vscode.postMessage({ type: "openSource", file: "keymap" }));
+    document.getElementById("openRgb")?.addEventListener("click", () => vscode.postMessage({ type: "openSource", file: "rgb" }));
+    document.getElementById("openConfig")?.addEventListener("click", () => vscode.postMessage({ type: "openSource", file: "config" }));
+    document.getElementById("generateProfileDocs")?.addEventListener("click", () => {
         requestProfileDocsGeneration();
     });
-    document.getElementById("compileFirmware").addEventListener("click", () => {
+    document.getElementById("compileFirmware")?.addEventListener("click", () => {
         requestFirmwareCompile();
     });
     document.addEventListener("pointerover", (event) => {
@@ -4730,13 +4724,36 @@ function getClientScript() {
         }
 
         renderProfileControls();
-        subtitle.textContent = model.activeProfile ? model.root + " / " + model.activeProfile.keymap : model.root;
+        renderDeviceHeader();
         updateLayoutKeyBehaviorColorStyle();
         app.innerHTML = renderDiagnostics() + renderViewTabs() + renderActiveView();
         initializeDirtyTracking();
         restoreActiveViewDraft();
         hydrateTooltips();
         scheduleMacroSlotBrowserHeightSync();
+    }
+
+    // Charybdis Live: the header reports the connected keyboard rather than a
+    // profile directory. model.device is supplied by this app's host; Studio
+    // never sent it.
+    function renderDeviceHeader() {
+        const device = model.device || {};
+        const chip = document.getElementById("deviceChip");
+        if (chip) {
+            chip.textContent = device.connected ? (device.label || "Connected") : "Not connected";
+            chip.className = "device-chip device-chip--" + (device.connected ? "ok" : "idle");
+        }
+
+        const generation = document.getElementById("deviceGeneration");
+        if (generation) {
+            generation.textContent = device.connected && device.summary ? device.summary : "";
+        }
+
+        if (subtitle) {
+            subtitle.textContent = device.connected
+                ? (device.subtitle || "Reading from the connected keyboard")
+                : "Connect a Charybdis, then use Read from keyboard.";
+        }
     }
 
     function renderProfileControls() {
@@ -5574,7 +5591,7 @@ function getClientScript() {
     }
 
     function renderViewTabs() {
-        return "<div class='view-tabs' role='tablist' aria-label='Profile Studio views'>" + views.map(([id, label]) =>
+        return "<div class='view-tabs' role='tablist' aria-label='Charybdis Live views'>" + views.map(([id, label]) =>
             "<button type='button' role='tab' aria-selected='" + (activeView === id ? "true" : "false") + "' class='" + viewTabClasses(id).join(" ") + "' data-action='selectView' data-view-tab data-view='" + escapeAttr(id) + "'>" + escapeHtml(label) + "</button>"
         ).join("") + "</div>";
     }

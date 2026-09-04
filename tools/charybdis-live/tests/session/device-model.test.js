@@ -113,3 +113,46 @@ test("the connected device stands in for Studio's profile files", () => {
     // No file paths, because there are no files.
     assert.equal(model.activeProfile.keymapPath, "");
 });
+
+// The header is the first thing a user sees, and getting it wrong was the
+// original sin of the port: it showed profile files and firmware compile
+// buttons in an app that edits a keyboard.
+
+test("the header reports the keyboard, not a profile directory", () => {
+    const disconnected = buildDeviceModel({}).device;
+    assert.equal(disconnected.connected, false);
+    assert.match(disconnected.label + disconnected.summary, /^$/);
+
+    const connected = buildDeviceModel({
+        capabilities: {compiledLayerCount: 5},
+        device: {manufacturer: "bastardkb", product: "Charybdis 4x6"},
+        status: {committedGeneration: 7, committedDigest: 0xabcd1234, activeGeneration: 7, peerGeneration: 7},
+    }).device;
+    assert.equal(connected.connected, true);
+    assert.equal(connected.label, "bastardkb Charybdis 4x6");
+    assert.match(connected.summary, /generation 7/);
+    assert.match(connected.summary, /0xABCD1234/);
+});
+
+test("half divergence is stated plainly rather than shown as healthy", () => {
+    const converged = buildDeviceModel({
+        capabilities: {}, status: {committedGeneration: 4, activeGeneration: 4, peerGeneration: 4, committedDigest: 1},
+    }).device;
+    assert.match(converged.summary, /both halves agree/);
+
+    const diverged = buildDeviceModel({
+        capabilities: {}, status: {committedGeneration: 4, activeGeneration: 4, peerGeneration: 3, committedDigest: 1},
+    }).device;
+    assert.match(diverged.summary, /not converged/);
+});
+
+test("the subtitle says what to do next", () => {
+    const idle = buildDeviceModel({capabilities: {}}).device;
+    assert.match(idle.subtitle, /Read from keyboard/);
+
+    const read = buildDeviceModel({
+        capabilities: {},
+        layout: {state: "read", layers: [{layer: 0, keys: []}, {layer: 1, keys: []}]},
+    }).device;
+    assert.match(read.subtitle, /2 layers read/);
+});

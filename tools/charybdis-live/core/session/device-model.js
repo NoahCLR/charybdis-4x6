@@ -44,6 +44,10 @@ function buildDeviceModel(state = {}) {
         qmkKeycodeSource: CATALOG_SOURCE,
 
         diagnostics: diagnosticsFor(state),
+
+        // Not a Studio field. The ported header renders this instead of a
+        // profile picker, because the thing being edited is a keyboard.
+        device: deviceHeader(state),
     };
 }
 
@@ -103,6 +107,36 @@ function activeProfileFromDevice(state) {
         configPath: "",
         rgbPath: "",
     };
+}
+
+function deviceHeader(state) {
+    const connected = Boolean(state.capabilities);
+    if (!connected) {
+        return {connected: false, label: "", summary: "", subtitle: ""};
+    }
+    const label = [state.device?.manufacturer, state.device?.product].filter(Boolean).join(" ") || "Charybdis";
+    const status = state.status;
+    const summary = status
+        ? `generation ${status.committedGeneration} · ${hex(status.committedDigest)} · ${convergence(status)}`
+        : "";
+    const layers = state.layout?.state === "read" ? state.layout.layers.length : 0;
+    const subtitle = layers
+        ? `${layers} layers read from the keyboard`
+        : "Connected. Use Read from keyboard to load its layout.";
+    return {connected: true, label, summary, subtitle};
+}
+
+// Both halves agreeing is the thing worth seeing at a glance; anything else
+// gets said plainly rather than hidden behind a green chip.
+function convergence(status) {
+    const agreed =
+        status.activeGeneration === status.committedGeneration &&
+        status.committedGeneration === status.peerGeneration;
+    return agreed ? "both halves agree" : "halves not converged";
+}
+
+function hex(value) {
+    return typeof value === "number" ? `0x${(value >>> 0).toString(16).toUpperCase().padStart(8, "0")}` : "";
 }
 
 function diagnosticsFor(state) {
