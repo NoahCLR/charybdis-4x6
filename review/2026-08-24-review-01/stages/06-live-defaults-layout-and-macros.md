@@ -93,7 +93,11 @@ Changing a policy applies its side effects explicitly:
 ## Deliverables
 
 - [x] Standard VIA layout source push with semantic diff and connected-half readback
-- [ ] Steady-state pointing cadence instrumentation and accepted regression threshold
+- [ ] Steady-state pointing cadence instrumentation and accepted regression
+      threshold — **parked 2026-09-04**; R-21 occurred and is unexplained. See
+      `../pointing-cadence-investigation.md`
+- [ ] Live-owner build passes its own memory policy (`.bss` and `.data`+`.bss`
+      gates currently fail; see the same file)
 - [ ] Idle profile scheduler and live RGB materialization remediation
 - [ ] Chunked committed custom-profile readback
 - [ ] Unified device snapshot across Profile Wire and standard VIA

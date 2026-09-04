@@ -31,7 +31,7 @@ dependency status without duplicating or prematurely resolving its findings.
 | 03 — Live RGB | engineering vertical slice hardware-confirmed; broader persistence matrix pending | Studio compiles and applies authored RGB successfully on the real two-half board |
 | 04 — Live key behaviors | engineering vertical slice complete; hardware and timing evidence pending | Studio compiles supported authored behaviors and the gated provider publishes them through the runtime lookup seam |
 | 05 — Milestone A integration | in progress; initial two-half live-edit path operational | RGB and standard layout apply are confirmed; custom behavior, recovery, and resource matrix remain |
-| 06 — Defaults, layout, and macros | replanned around device-first sessions; standard-VIA layout apply hardware-confirmed | base-key apply works; cadence measurement/remediation, complete device readback, generation-bound drafts, peer/reboot/role matrix, macros, and defaults remain |
+| 06 — Defaults, layout, and macros | replanned around device-first sessions; standard-VIA layout apply hardware-confirmed; cadence remediation parked with R-21 open | base-key apply works; cadence cause unexplained and parked, live-owner memory policy failing, complete device readback, generation-bound drafts, peer/reboot/role matrix, macros, and defaults remain |
 | 07 — Combos and layer structure | blocked on Stage 06 | open |
 | 08 — Production closure | blocked on Stage 07 | open |
 
@@ -2111,3 +2111,52 @@ Next steps:
    and external VIA edit semantics.
 3. Implement complete device readback and a repository-independent device
    snapshot, ending in a real-keyboard open/edit/apply/readback checkpoint.
+
+### 2026-09-04 — Cadence regression investigated, then parked; suite restored
+
+- Restored the host suite. The previous checkpoint left the committed
+  `LAYER_BASE` introspection SVG one glyph out of step with `keymap.c`, which
+  failed `run_profile_introspection_checks.sh` and `run_tooling_checks.sh` and,
+  under `set -eu`, stopped `run_all_host_tests.sh` at check 58 of 75. The same
+  checkpoint added `live-link/runtime-cadence-v1.js` without registering it in
+  the Studio check list or giving it a test, so 478 lines of wire decoding were
+  not syntax-checked. Both are fixed in `5c6f5b7b`.
+- Quantified the symptom against `refactor/aug` (`87f356cd`): reported mouse
+  rate fell from ~450 Hz to ~300 Hz on the live-edit engineering build, which
+  is about 1.1 ms of added work per main-loop iteration. Polling is unthrottled
+  on both branches, so poll rate is main-loop rate.
+- Bounded the split reconciler's steady-state cost with a new host probe
+  (`8bf794cb`): a converged pair scanned across 5 s of elapsed time at 450 Hz
+  performs 5 exchanges, 0 EEPROM reads and 0 writes across 2250 scans. The
+  reconciler is eliminated as a cause and that budget is now enforced.
+- Eliminated, with evidence rather than inspection: the pointing task, the poll
+  throttle, split pointing, VIA macro reseeding, the split mirror step, and the
+  layer key-LED map rebuild. Two hypotheses this pass raised were then
+  falsified by measurement — per-batch RGB re-materialization and per-accessor
+  `copy_active` are real waste but land in microseconds per second, and the
+  reader-backed RGB view does not touch flash at all, because QMK's
+  wear-levelling driver mirrors the whole 16 KiB logical EEPROM in RAM and
+  `wear_leveling_read()` is a `memcpy` from that cache.
+- Measured fresh RAM state and recorded it against R-07. The ordinary build
+  holds 132 B of `.bss` policy slack; the live-owner build is 2,820 B over the
+  `.bss` gate and 820 B over the combined gate, so it does not pass its own
+  memory policy, while roughly 205 KB of physical SRAM stays unused.
+- Parked the cadence regression by owner decision. Hardware bisect and the
+  compile-gated on-device recorder were both declined. The candidate inventory
+  of everything that newly runs every cycle, the eliminated causes, the
+  uncosted remainder, and the available measurement paths are recorded in
+  `pointing-cadence-investigation.md` so the next pass resumes instead of
+  re-deriving.
+- R-21 stays open and blocking for Stage 06 closure. Stage 06 now also carries
+  the live-owner memory-policy failure as an explicit deliverable. No
+  performance fix was applied, and no threshold is enforced yet.
+
+Next steps:
+
+1. Milestone 1 is parked, not met. Do not treat the live surface as cleared for
+   expansion on cadence grounds.
+2. Proceed to the logical-generation manifest across VIA and custom storage,
+   including cross-store failure recovery and external VIA edit detection.
+3. Resume R-21 from `pointing-cadence-investigation.md` when an owner-approved
+   measurement path is available; the 1.1 ms magnitude is the constraint any
+   candidate has to satisfy.
