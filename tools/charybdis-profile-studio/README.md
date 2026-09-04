@@ -90,6 +90,15 @@ endpoint. If an older test pair leaves a candidate in `PREPARING_PEER`,
 power-cycle both halves together and flash the freshly built pair before
 retrying.
 
+Use `Compile performance comparison` for a controlled Milestone 1 cadence
+comparison. It builds four images from the same source: ordinary
+`performance_baseline_left` and `performance_baseline_right` images, followed
+by engineering `performance_live_edit_left` and
+`performance_live_edit_right` images. All four enable the read-only performance
+diagnostics. The baseline pair explicitly disables the live-profile owner and
+mutation route; the engineering pair enables both. Flash and capture the
+baseline pair first, then flash the engineering pair.
+
 ## Screenshots
 
 - [Layout tab](../../docs/media/profile-studio/studio-layout-tab.png)

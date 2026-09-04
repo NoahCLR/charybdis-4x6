@@ -149,10 +149,10 @@ const appendedCheck = `
             extensionSource.includes("Compile left + right") &&
             getClientScript().includes('type: liveEdit ? "compileLiveEditFirmware" : "compileFirmware"') &&
             getClientScript().includes('type: liveEdit ? "applyAllChangesAndCompileLiveEdit" : "applyAllChangesAndCompile"') &&
-            extensionSource.includes('side: liveEdit ? "live_edit_left" : "left"') &&
-            extensionSource.includes('env: ["FORCE_SLAVE=yes", "NOAH_PHYSICAL_HALF=left", ...engineeringEnv]') &&
-            extensionSource.includes('side: liveEdit ? "live_edit_right" : "right"') &&
-            extensionSource.includes('env: ["FORCE_MASTER=yes", "NOAH_PHYSICAL_HALF=right", ...engineeringEnv]') &&
+            extensionSource.includes('side: \`\${sidePrefix}left\`') &&
+            extensionSource.includes('env: ["FORCE_SLAVE=yes", "NOAH_PHYSICAL_HALF=left", ...performanceEnv, ...engineeringEnv]') &&
+            extensionSource.includes('side: \`\${sidePrefix}right\`') &&
+            extensionSource.includes('env: ["FORCE_MASTER=yes", "NOAH_PHYSICAL_HALF=right", ...performanceEnv, ...engineeringEnv]') &&
             extensionSource.includes('spawn("qmk", args') &&
             extensionSource.includes("channel.show(true)") &&
             firmwareTargetName(profileTargetForKeymap("noah"), "left") === "bastardkb_charybdis_4x6_noah_left" &&
@@ -160,6 +160,23 @@ const appendedCheck = `
             firmwareTargetName(profileTargetForKeymap("noah"), "live_edit_left") === "bastardkb_charybdis_4x6_noah_live_edit_left" &&
             firmwareTargetName(profileTargetForKeymap("noah"), "live_edit_right") === "bastardkb_charybdis_4x6_noah_live_edit_right",
         "Profile Studio compile button should build explicit MASTER_RIGHT-aware left and right firmware targets with visible streamed output"
+    );
+    assert(
+        extensionSource.includes('id="compilePerformanceComparisonFirmware"') &&
+            extensionSource.includes("Compile performance comparison") &&
+            getClientScript().includes('type: "compilePerformanceComparisonFirmware"') &&
+            getClientScript().includes('type: "applyAllChangesAndCompilePerformanceComparison"') &&
+            extensionSource.includes('compileProfileFirmware(root, target, {performanceVariant: "baseline"})') &&
+            extensionSource.includes('compileProfileFirmware(root, target, {liveEdit: true, performanceVariant: "live_edit"})') &&
+            extensionSource.includes('"NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS=yes"') &&
+            extensionSource.includes('["NOAH_LIVE_PROFILE_OWNER=", "NOAH_LIVE_PROFILE_MUTATION="]') &&
+            firmwareTargetName(profileTargetForKeymap("noah"), "performance_baseline_left") === "bastardkb_charybdis_4x6_noah_performance_baseline_left" &&
+            firmwareTargetName(profileTargetForKeymap("noah"), "performance_baseline_right") === "bastardkb_charybdis_4x6_noah_performance_baseline_right" &&
+            firmwareTargetName(profileTargetForKeymap("noah"), "performance_live_edit_left") === "bastardkb_charybdis_4x6_noah_performance_live_edit_left" &&
+            firmwareTargetName(profileTargetForKeymap("noah"), "performance_live_edit_right") === "bastardkb_charybdis_4x6_noah_performance_live_edit_right" &&
+            extensionSource.includes("Flash the ordinary diagnostic baseline pair first") &&
+            extensionSource.includes("then flash the live-profile engineering pair"),
+        "Profile Studio should build an isolated four-image performance comparison and tell the user to flash the baseline pair first"
     );
     assert(
         extensionSource.includes('id="compileLiveEditFirmware"') &&

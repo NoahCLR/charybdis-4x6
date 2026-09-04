@@ -345,6 +345,7 @@ compile_variant "tests/host/include/noah_compile_config.h" "-DVIA_ENABLE -DSPLIT
 compile_variant "tests/host/include/noah_compile_config.h" "-DVIA_ENABLE -DSPLIT_KEYBOARD $RGB_TEST_FLAGS" "$PROFILE_WIRE_COMPILE_SOURCES"
 compile_variant "tests/host/include/noah_compile_config.h" "-DVIA_ENABLE -DSPLIT_KEYBOARD -DNOAH_PHYSICAL_HALF_LEFT -DNOAH_LIVE_PROFILE_OWNER_ENABLE $RGB_TEST_FLAGS" "$PROFILE_WIRE_COMPILE_SOURCES"
 compile_variant "tests/host/include/noah_compile_config.h" "-DVIA_ENABLE -DSPLIT_KEYBOARD -DNOAH_PHYSICAL_HALF_LEFT -DNOAH_LIVE_PROFILE_OWNER_ENABLE -DNOAH_LIVE_PROFILE_MUTATION_ENABLE $RGB_TEST_FLAGS" "$PROFILE_WIRE_COMPILE_SOURCES"
+compile_variant "tests/host/include/noah_compile_config.h" "-DVIA_ENABLE -DNOAH_RUNTIME_DIAG_TEST_BACKEND -DNOAH_PROFILE_PERFORMANCE_DIAGNOSTICS_ENABLE" "$PROFILE_WIRE_COMPILE_SOURCES users/noah/lib/state/diagnostics/runtime_diag.c"
 compile_variant_must_fail "tests/host/include/noah_compile_config.h" "-DVIA_ENABLE -DNOAH_LIVE_PROFILE_MUTATION_ENABLE" "users/noah/lib/compat/qmk_via_profile_channel.c"
 compile_variant "tests/host/include/noah_compile_config.h" "-DSPLIT_KEYBOARD -DNOAH_PHYSICAL_HALF_LEFT" "users/noah/lib/compat/qmk_physical_half.c"
 compile_variant "tests/host/include/noah_compile_config.h" "-DSPLIT_KEYBOARD -DNOAH_PHYSICAL_HALF_RIGHT" "users/noah/lib/compat/qmk_physical_half.c"

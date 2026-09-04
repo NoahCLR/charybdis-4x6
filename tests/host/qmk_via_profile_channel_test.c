@@ -8,6 +8,7 @@
 #include "users/noah/lib/profile/protocol/profile_wire_v1.h"
 #include "users/noah/lib/profile/storage/profile_storage_layout.h"
 #include "users/noah/lib/profile/storage/profile_store_runtime.h"
+#include "users/noah/lib/state/diagnostics/runtime_diag.h"
 
 void via_custom_value_command_kb(uint8_t *data, uint8_t length);
 
@@ -18,6 +19,16 @@ enum {
 static noah_profile_store_runtime_state_t store_runtime_state;
 static noah_profile_store_record_t        store_runtime_record;
 static bool                               store_runtime_has_committed;
+
+#ifdef NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS_ENABLE
+bool noah_runtime_cadence_wire_page(uint8_t page, uint8_t payload[NOAH_RUNTIME_CADENCE_WIRE_PAYLOAD_SIZE]) {
+    if (!payload || page >= NOAH_RUNTIME_CADENCE_WIRE_PAGES) return false;
+    memset(payload, 0, NOAH_RUNTIME_CADENCE_WIRE_PAYLOAD_SIZE);
+    payload[0] = 1u;
+    payload[1] = page;
+    return true;
+}
+#endif
 
 #ifdef NOAH_LIVE_PROFILE_OWNER_ENABLE
 static noah_profile_owner_status_t live_owner_status;
@@ -303,6 +314,27 @@ static void test_hook_rejects_unsupported_or_malformed_commands(void) {
     via_custom_value_command_kb(NULL, 0u);
 }
 
+#ifdef NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS_ENABLE
+static void test_cadence_read_route_is_bounded_and_canonical(void) {
+    uint8_t frame[NOAH_PROFILE_WIRE_V1_REPORT_SIZE];
+
+    make_request(frame, NOAH_RUNTIME_CADENCE_WIRE_VALUE, 0x71u, 3u);
+    via_custom_value_command_kb(frame, sizeof(frame));
+    assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK);
+    assert(frame[6] == NOAH_RUNTIME_CADENCE_WIRE_PAYLOAD_SIZE);
+    assert(frame[WIRE_PAYLOAD] == 1u && frame[WIRE_PAYLOAD + 1u] == 3u);
+
+    make_request(frame, NOAH_RUNTIME_CADENCE_WIRE_VALUE, 0x72u, NOAH_RUNTIME_CADENCE_WIRE_PAGES);
+    via_custom_value_command_kb(frame, sizeof(frame));
+    assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_UNKNOWN_PAGE);
+    assert(frame[6] == 0u);
+
+    make_request(frame, NOAH_RUNTIME_CADENCE_WIRE_VALUE, 0u, 0u);
+    via_custom_value_command_kb(frame, sizeof(frame));
+    assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_MALFORMED);
+}
+#endif
+
 int main(void) {
 #ifdef NOAH_LIVE_PROFILE_OWNER_ENABLE
     initialize_live_owner_status();
@@ -314,6 +346,9 @@ int main(void) {
     test_status_surfaces_read_only_store_discovery();
 #endif
     test_hook_rejects_unsupported_or_malformed_commands();
+#ifdef NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS_ENABLE
+    test_cadence_read_route_is_bounded_and_canonical();
+#endif
     puts("qmk VIA Profile Wire channel tests passed");
     return 0;
 }

@@ -905,26 +905,47 @@ async function compileProfileFirmware(root, target, options = {}) {
     channel.show(true);
     channel.appendLine("");
     const liveEdit = options.liveEdit === true;
-    channel.appendLine(`Starting ${target.keymap}${liveEdit ? " live-edit test" : ""} firmware compile`);
-    const title = `Compiling ${target.keymap}${liveEdit ? " live-edit test" : ""} left and right firmware`;
+    const performanceVariant = options.performanceVariant || "";
+    if (performanceVariant && performanceVariant !== "baseline" && performanceVariant !== "live_edit") {
+        throw new Error(`Unknown performance firmware variant: ${performanceVariant}`);
+    }
+    if ((performanceVariant === "baseline" && liveEdit) || (performanceVariant === "live_edit" && !liveEdit)) {
+        throw new Error("Performance firmware variant does not match its live-profile feature selection.");
+    }
+    const variantLabel = performanceVariant === "baseline"
+        ? " performance baseline"
+        : performanceVariant === "live_edit"
+            ? " live-profile performance"
+            : liveEdit
+                ? " live-edit test"
+                : "";
+    const sidePrefix = performanceVariant ? `performance_${performanceVariant}_` : liveEdit ? "live_edit_" : "";
     const engineeringEnv = liveEdit ? ["NOAH_LIVE_PROFILE_OWNER=yes", "NOAH_LIVE_PROFILE_MUTATION=yes"] : [];
+    const performanceEnv = performanceVariant
+        ? [
+            "NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS=yes",
+            ...(liveEdit ? [] : ["NOAH_LIVE_PROFILE_OWNER=", "NOAH_LIVE_PROFILE_MUTATION="]),
+        ]
+        : [];
+    channel.appendLine(`Starting ${target.keymap}${variantLabel} firmware compile`);
+    const title = `Compiling ${target.keymap}${variantLabel} left and right firmware`;
     const task = async (progress = { report() {} }) => {
         const builds = [];
         progress.report({ message: "left firmware" });
         builds.push(await runQmkCompile(root, target, {
-            side: liveEdit ? "live_edit_left" : "left",
+            side: `${sidePrefix}left`,
             label: "left",
             // This keyboard is MASTER_RIGHT, so the forced slave artifact is
             // the physical left half. Physical identity is a separate flash-
             // provisioned contract and remains stable if transport role swaps.
-            env: ["FORCE_SLAVE=yes", "NOAH_PHYSICAL_HALF=left", ...engineeringEnv],
+            env: ["FORCE_SLAVE=yes", "NOAH_PHYSICAL_HALF=left", ...performanceEnv, ...engineeringEnv],
             role: "FORCE_SLAVE",
         }));
         progress.report({ message: "right firmware" });
         builds.push(await runQmkCompile(root, target, {
-            side: liveEdit ? "live_edit_right" : "right",
+            side: `${sidePrefix}right`,
             label: "right",
-            env: ["FORCE_MASTER=yes", "NOAH_PHYSICAL_HALF=right", ...engineeringEnv],
+            env: ["FORCE_MASTER=yes", "NOAH_PHYSICAL_HALF=right", ...performanceEnv, ...engineeringEnv],
             role: "FORCE_MASTER",
         }));
         return builds;
@@ -941,6 +962,12 @@ async function compileProfileFirmware(root, target, options = {}) {
 
 function compileLiveEditProfileFirmware(root, target) {
     return compileProfileFirmware(root, target, {liveEdit: true});
+}
+
+async function compilePerformanceComparisonFirmware(root, target) {
+    const baseline = await compileProfileFirmware(root, target, {performanceVariant: "baseline"});
+    const engineering = await compileProfileFirmware(root, target, {liveEdit: true, performanceVariant: "live_edit"});
+    return {baseline, engineering};
 }
 
 function runQmkCompile(root, target, build) {
@@ -1014,6 +1041,11 @@ function runQmkCompile(root, target, build) {
 function compiledFirmwareNotice(target, builds) {
     const firmware = builds.map((build) => build.firmware).join(", ");
     return `Compiled ${target.keymap} firmware for left and right halves: ${firmware}.`;
+}
+
+function performanceComparisonFirmwareNotice(target, comparison) {
+    const pair = (builds) => builds.map((build) => build.firmware).join(", ");
+    return `Compiled ${target.keymap} performance comparison firmware. Flash the ordinary diagnostic baseline pair first: ${pair(comparison.baseline)}. Capture the baseline, then flash the live-profile engineering pair: ${pair(comparison.engineering)}.`;
 }
 
 function formatDigest(value) {
@@ -1308,6 +1340,20 @@ async function handleWebviewMessage(panel, root, state, message) {
             }
             return;
         }
+        case "compilePerformanceComparisonFirmware": {
+            const target = await checkedMessageProfile(root, state, message);
+            try {
+                const comparison = await compilePerformanceComparisonFirmware(root, target);
+                const notice = performanceComparisonFirmwareNotice(target, comparison);
+                panel.webview.postMessage({ type: "compileResult", notice });
+                vscode.window.showInformationMessage(notice);
+            } catch (error) {
+                const text = error instanceof Error ? error.message : String(error);
+                panel.webview.postMessage({ type: "compileResult", error: text });
+                vscode.window.showErrorMessage(`Charybdis Profile Studio: ${text}`);
+            }
+            return;
+        }
         case "openSource":
             await openSource(root, requireActiveProfile((await activeProfileTarget(root, state)).target), message.file);
             return;
@@ -1329,6 +1375,13 @@ async function handleWebviewMessage(panel, root, state, message) {
             await applyAllChanges(root, target, message);
             const builds = await compileLiveEditProfileFirmware(root, target);
             await postModel(panel, root, state, `Applied staged changes and compiled live-edit test firmware: ${builds.map((build) => build.firmware).join(", ")}.`, { activeLayer: message.activeLayer, appliedLayerChanges: Boolean(message.adds?.length || message.deletes?.length) });
+            return;
+        }
+        case "applyAllChangesAndCompilePerformanceComparison": {
+            const target = await checkedMessageProfile(root, state, message);
+            await applyAllChanges(root, target, message);
+            const comparison = await compilePerformanceComparisonFirmware(root, target);
+            await postModel(panel, root, state, `Applied staged changes and ${performanceComparisonFirmwareNotice(target, comparison)}`, { activeLayer: message.activeLayer, appliedLayerChanges: Boolean(message.adds?.length || message.deletes?.length) });
             return;
         }
         case "applyAllChangesAndGenerateProfileDocs": {
@@ -6549,6 +6602,7 @@ function getStudioHtml() {
                 <span class="profile-picker-label">Firmware</span>
                 <button id="compileFirmware" class="primary">Compile left + right</button>
                 <button id="compileLiveEditFirmware">Compile live-edit test</button>
+                <button id="compilePerformanceComparisonFirmware">Compile performance comparison</button>
             </div>
         </div>
     </header>
@@ -6656,6 +6710,7 @@ function getClientScript() {
         generateProfileDocs: "Create or refresh the generated profile overview Markdown and assets from the active profile source files on disk.",
         compileFirmware: "Compile separate left and right UF2 firmware files for the active profile.",
         compileLiveEditFirmware: "Compile distinct left and right engineering UF2 files with the live-profile owner and mutation route enabled. Ordinary firmware compilation is unchanged.",
+        compilePerformanceComparisonFirmware: "Compile four diagnostic UF2 files from the same source: an ordinary left/right baseline and a live-profile engineering left/right comparison pair.",
         applyAll: "Write all staged Studio changes, including layer structure and staged layout edits.",
         reload: "Reload keymap.c, config.h, and rgb_config.c from disk, discarding uncommitted Studio edits.",
         liveDeviceSelect: "Choose a compatible Charybdis QMK Raw HID interface found by the latest scan.",
@@ -7122,6 +7177,9 @@ function getClientScript() {
     });
     document.getElementById("compileLiveEditFirmware").addEventListener("click", () => {
         requestFirmwareCompile(true);
+    });
+    document.getElementById("compilePerformanceComparisonFirmware").addEventListener("click", () => {
+        requestPerformanceComparisonCompile();
     });
     document.getElementById("liveDeviceSelect").addEventListener("change", (event) => {
         liveDeviceSelection = event.target.value || "";
@@ -8538,7 +8596,8 @@ function getClientScript() {
 
     function compilePostMessage(message) {
         const payload = messageWithActiveProfile(message);
-        showFloatingStatus("Compiling left and right firmware...", false);
+        const performanceComparison = String(message?.type || "").includes("PerformanceComparison");
+        showFloatingStatus(performanceComparison ? "Compiling four performance comparison firmware files..." : "Compiling left and right firmware...", false);
         vscode.postMessage(payload);
     }
 
@@ -8591,6 +8650,29 @@ function getClientScript() {
             });
         } else if (choice === "saved") {
             compilePostMessage({ type: liveEdit ? "compileLiveEditFirmware" : "compileFirmware", activeLayer });
+        }
+    }
+
+    async function requestPerformanceComparisonCompile() {
+        if (!model?.activeProfile?.buildable) return;
+        captureActiveMacroDraft();
+        captureLayoutComboBuilderInputs();
+        const summary = compileUnsavedSummary();
+        if (!summary.hasUnsaved) {
+            compilePostMessage({ type: "compilePerformanceComparisonFirmware", activeLayer });
+            return;
+        }
+
+        const choice = await showCompileConfirmDialog(summary);
+        if (choice === "apply") {
+            compilePostMessage({
+                type: "applyAllChangesAndCompilePerformanceComparison",
+                ...layerStructurePayload(),
+                layoutGroups: pendingLayoutChangeGroups(),
+                activeLayer,
+            });
+        } else if (choice === "saved") {
+            compilePostMessage({ type: "compilePerformanceComparisonFirmware", activeLayer });
         }
     }
 
@@ -9304,6 +9386,7 @@ function getClientScript() {
         setHeaderButtonDisabled("generateProfileDocs", !editable);
         setHeaderButtonDisabled("compileFirmware", !Boolean(model.activeProfile?.buildable));
         setHeaderButtonDisabled("compileLiveEditFirmware", !Boolean(model.activeProfile?.buildable));
+        setHeaderButtonDisabled("compilePerformanceComparisonFirmware", !Boolean(model.activeProfile?.buildable));
     }
 
     function renderProfileOption(profile) {

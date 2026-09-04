@@ -102,3 +102,16 @@ ifneq ($(strip $(NOAH_LIVE_PROFILE_MUTATION)),)
     endif
     OPT_DEFS += -DNOAH_LIVE_PROFILE_MUTATION_ENABLE
 endif
+
+# Temporary, read-only on-device cadence recorder used to compare ordinary and
+# live-profile firmware from the same source revision. The recorder is absent
+# from normal artifacts and requires VIA for bounded post-capture readback.
+ifneq ($(strip $(NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS)),)
+    ifneq ($(strip $(NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS)),yes)
+        $(error NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS must be `yes` when specified)
+    endif
+    ifneq ($(strip $(VIA_ENABLE)),yes)
+        $(error NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS=yes requires VIA_ENABLE=yes)
+    endif
+    OPT_DEFS += -DNOAH_PROFILE_PERFORMANCE_DIAGNOSTICS_ENABLE
+endif

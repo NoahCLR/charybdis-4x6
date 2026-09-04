@@ -872,8 +872,33 @@ static void test_partial_runtime_install_rolls_back(void) {
     rgb_install_allowed = true;
 }
 
+static void test_clean_idle_scans_do_not_repeat_host_session_cleanup(void) {
+    noah_profile_owner_t owner;
+    memory_t             memory;
+    uint32_t             refreshes;
+
+    memset(&memory, 0, sizeof(memory));
+    memset(memory.bytes, 0xff, sizeof(memory.bytes));
+    boot_empty(&owner, &memory);
+    refreshes = noah_profile_owner_test_ready_refresh_count();
+
+    for (uint32_t scan = 0u; scan < 4096u; scan++) {
+        assert(!noah_profile_owner_scan(&owner, true, 500u));
+    }
+    assert(noah_profile_owner_test_ready_refresh_count() == refreshes);
+
+    owner.host_activity_known = true;
+    assert(!noah_profile_owner_scan(&owner, true, 500u));
+    assert(noah_profile_owner_test_ready_refresh_count() == refreshes + 1u);
+    for (uint32_t scan = 0u; scan < 4096u; scan++) {
+        assert(!noah_profile_owner_scan(&owner, true, 500u));
+    }
+    assert(noah_profile_owner_test_ready_refresh_count() == refreshes + 1u);
+}
+
 int main(void) {
     test_partial_runtime_install_rolls_back();
+    test_clean_idle_scans_do_not_repeat_host_session_cleanup();
     test_empty_boot_live_commit_and_timeout();
     test_two_consecutive_live_commits_use_distributed_prepare_barrier();
     test_simultaneous_hosts_choose_stable_physical_origin_before_durability();

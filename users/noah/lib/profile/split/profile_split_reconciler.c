@@ -1021,8 +1021,8 @@ bool noah_profile_split_reconciler_scan_mode(noah_profile_split_reconciler_t *re
     }
     previous_local = reconciler->local_descriptor;
     refresh_local(reconciler);
-    refresh_metadata_response(reconciler);
     if (!descriptor_equal(&previous_local, &reconciler->local_descriptor)) {
+        refresh_metadata_response(reconciler);
         // Publish the durable local change before any retry/backoff return so
         // activation cannot observe an older converged authority snapshot.
         publish_authority(reconciler);
@@ -1075,7 +1075,6 @@ bool noah_profile_split_reconciler_scan_mode(noah_profile_split_reconciler_t *re
             reconciler->peer_activity_known = false;
             invalidate_peer(reconciler);
         }
-        publish_authority(reconciler);
         return false;
     }
     if (!reconciler->attempt_immediate && !deadline_reached(now_ms, reconciler->next_attempt_at)) {

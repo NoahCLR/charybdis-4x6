@@ -148,3 +148,7 @@ const noah_profile_store_record_t      *noah_profile_owner_committed(const noah_
 noah_profile_candidate_transaction_t  *noah_profile_owner_host_transaction(noah_profile_owner_t *owner);
 noah_profile_split_reconciler_t        *noah_profile_owner_split_reconciler(noah_profile_owner_t *owner);
 bool                                    noah_profile_owner_status(const noah_profile_owner_t *owner, noah_profile_owner_status_t *status);
+
+#ifdef NOAH_PROFILE_OWNER_TEST_DIAGNOSTICS
+uint32_t noah_profile_owner_test_ready_refresh_count(void);
+#endif

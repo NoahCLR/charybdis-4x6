@@ -1047,6 +1047,51 @@ static void test_refresh_publishes_new_local_authority_during_backoff(void) {
     assert(authority.local.generation == 22u);
 }
 
+static void test_idle_scans_do_not_republish_unchanged_metadata(void) {
+    half_t   left;
+    half_t   right;
+    uint8_t  left_metadata_sequence;
+    uint8_t  right_metadata_sequence;
+    uint32_t left_authority_publications;
+    uint32_t right_authority_publications;
+    uint32_t left_reads;
+    uint32_t right_reads;
+    uint32_t left_writes;
+    uint32_t right_writes;
+    uint32_t left_exchanges;
+    uint32_t right_exchanges;
+    uint32_t before_deadline;
+
+    half_storage_init(&left);
+    half_storage_init(&right);
+    pair_init(&left, &right);
+    run_pair_until_converged(&left, &right, false);
+
+    left_metadata_sequence        = left.reconciler.metadata_sequence;
+    right_metadata_sequence       = right.reconciler.metadata_sequence;
+    left_authority_publications   = left.reconciler.authority.status.publication_count;
+    right_authority_publications  = right.reconciler.authority.status.publication_count;
+    left_reads                    = left.memory.reads;
+    right_reads                   = right.memory.reads;
+    left_writes                   = left.memory.writes;
+    right_writes                  = right.memory.writes;
+    left_exchanges                = left.link.exchanges;
+    right_exchanges               = right.link.exchanges;
+    before_deadline               = right.reconciler.next_attempt_at == 0u ? 0u : right.reconciler.next_attempt_at - 1u;
+
+    for (uint32_t scan = 0u; scan < MAX_SCANS; scan++) {
+        assert(!noah_profile_split_reconciler_scan(&left.reconciler, false, before_deadline));
+        assert(!noah_profile_split_reconciler_scan(&right.reconciler, true, before_deadline));
+    }
+    assert(left.reconciler.metadata_sequence == left_metadata_sequence);
+    assert(right.reconciler.metadata_sequence == right_metadata_sequence);
+    assert(left.reconciler.authority.status.publication_count == left_authority_publications);
+    assert(right.reconciler.authority.status.publication_count == right_authority_publications);
+    assert(left.memory.reads == left_reads && right.memory.reads == right_reads);
+    assert(left.memory.writes == left_writes && right.memory.writes == right_writes);
+    assert(left.link.exchanges == left_exchanges && right.link.exchanges == right_exchanges);
+}
+
 int main(void) {
     test_compiled_convergence();
     test_newer_master_pushes_exact_record();
@@ -1073,6 +1118,7 @@ int main(void) {
     test_cancel_refuses_matching_durable_peer();
     test_crossed_prepare_begin_loser_abort_does_not_deadlock();
     test_refresh_publishes_new_local_authority_during_backoff();
+    test_idle_scans_do_not_republish_unchanged_metadata();
     puts("profile split reconciler host tests passed");
     return 0;
 }

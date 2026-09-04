@@ -8,6 +8,11 @@
 #include "../policy/pointer_layer_policy.h"
 #include "../../compat/qmk_auto_mouse_contract.h"
 #include "../../compat/qmk_pointing_contract.h"
+#include "../../state/diagnostics/runtime_diag.h"
+
+#if defined(NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS_ENABLE) && POINTING_DEVICE_TASK_THROTTLE_MS != 0
+#    error "cadence acceptance requires unthrottled pointing-device polling"
+#endif
 
 #if defined(NOAH_POINTING_IDLE_NOISE_SUPPRESSION_ENABLE)
 #    if !defined(NOAH_POINTING_IDLE_NOISE_SUPPRESSION_IDLE_MS)
@@ -86,6 +91,10 @@ bool noah_is_mouse_record_user(uint16_t keycode, keyrecord_t *record) {
 
 report_mouse_t noah_pointing_device_task_user(report_mouse_t mouse_report) {
     report_mouse_t output = mouse_report;
+
+#if defined(NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS_ENABLE)
+    noah_runtime_cadence_note_pointing_poll();
+#endif
 
 #ifdef POINTING_DEVICE_ENABLE
     pd_mode_mask_t active_mode_id = pd_mode_local_active_snapshot();

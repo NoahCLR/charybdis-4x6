@@ -46,6 +46,9 @@ void noah_eeconfig_init_user(void) {
 }
 
 void noah_matrix_scan_user(void) {
+#if defined(NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS_ENABLE)
+    noah_runtime_cadence_note_matrix_scan();
+#endif
     noah_via_macro_defaults_matrix_scan();
     noah_qmk_durable_io_matrix_scan();
 

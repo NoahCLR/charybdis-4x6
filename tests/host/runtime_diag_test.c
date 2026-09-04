@@ -122,6 +122,71 @@ static void test_indicator_expires_after_timeout(void) {
     CHECK(!noah_runtime_diag_indicator_active());
 }
 
+static uint16_t read_u16(const uint8_t *bytes) {
+    return (uint16_t)(bytes[0] | ((uint16_t)bytes[1] << 8u));
+}
+
+static uint32_t read_u32(const uint8_t *bytes) {
+    return (uint32_t)bytes[0] | ((uint32_t)bytes[1] << 8u) | ((uint32_t)bytes[2] << 16u) | ((uint32_t)bytes[3] << 24u);
+}
+
+static void test_cadence_records_one_second_windows_and_histogram(void) {
+    uint8_t metadata[NOAH_RUNTIME_CADENCE_WIRE_PAYLOAD_SIZE];
+    uint8_t window[NOAH_RUNTIME_CADENCE_WIRE_PAYLOAD_SIZE];
+
+    test_reset();
+    noah_runtime_diag_test_backend_set_realtime_counter(0u);
+    noah_runtime_cadence_note_matrix_scan();
+    noah_runtime_cadence_note_pointing_poll();
+    noah_runtime_diag_test_backend_set_realtime_counter(900u);
+    noah_runtime_cadence_note_matrix_scan();
+    noah_runtime_cadence_note_pointing_poll();
+    noah_runtime_diag_test_backend_set_realtime_counter(1100u);
+    noah_runtime_cadence_note_pointing_poll();
+    noah_runtime_diag_test_backend_set_realtime_counter(1000000u);
+    noah_runtime_cadence_note_matrix_scan();
+
+    CHECK(noah_runtime_cadence_wire_page(0u, metadata));
+    CHECK(metadata[0] == 1u);
+    CHECK(metadata[1] == NOAH_RUNTIME_CADENCE_WIRE_PAGES);
+    CHECK(metadata[2] == 1u);
+    CHECK(read_u32(&metadata[3]) == 1u);
+    CHECK(read_u32(&metadata[7]) == 1000000u);
+    CHECK(read_u16(&metadata[11]) == 1000u);
+    CHECK(read_u16(&metadata[19]) == 5000u);
+    CHECK(metadata[21] == 1u);
+
+    CHECK(noah_runtime_cadence_wire_page(1u, window));
+    CHECK(read_u32(window) == 1u);
+    CHECK(window[4] == 0u);
+    CHECK(read_u32(&window[5]) == 900u);
+    CHECK(read_u16(&window[9]) == 2u);
+    CHECK(read_u16(&window[11]) == 3u);
+    CHECK(read_u16(&window[13]) == 2u);
+    for (uint8_t bucket = 1u; bucket < NOAH_RUNTIME_CADENCE_HISTOGRAM_BUCKETS; bucket++) {
+        CHECK(read_u16(&window[13u + bucket * 2u]) == 0u);
+    }
+    CHECK(noah_runtime_cadence_wire_page(2u, window));
+    CHECK(window[4] == 0xffu);
+    CHECK(!noah_runtime_cadence_wire_page(NOAH_RUNTIME_CADENCE_WIRE_PAGES, window));
+}
+
+static void test_cadence_uses_wrap_safe_microsecond_gaps(void) {
+    uint8_t window[NOAH_RUNTIME_CADENCE_WIRE_PAYLOAD_SIZE];
+
+    test_reset();
+    noah_runtime_diag_test_backend_set_realtime_counter(UINT32_MAX - 500u);
+    noah_runtime_cadence_note_pointing_poll();
+    noah_runtime_diag_test_backend_set_realtime_counter(700u);
+    noah_runtime_cadence_note_pointing_poll();
+    noah_runtime_diag_test_backend_set_realtime_counter(999499u);
+    noah_runtime_cadence_note_matrix_scan();
+
+    CHECK(noah_runtime_cadence_wire_page(1u, window));
+    CHECK(read_u32(&window[5]) == 1201u);
+    CHECK(read_u16(&window[15]) == 1u);
+}
+
 int main(void) {
     test_post_init_starts_boot_indicator_and_watchdog();
     test_post_init_starts_boot_indicator_and_watchdog_on_slave();
@@ -129,6 +194,8 @@ int main(void) {
     test_heartbeat_updates_watchdog_without_reboot_stage();
     test_watchdog_heartbeat_skips_most_loop_passes();
     test_indicator_expires_after_timeout();
+    test_cadence_records_one_second_windows_and_histogram();
+    test_cadence_uses_wrap_safe_microsecond_gaps();
 
     puts("runtime_diag host tests passed");
     return 0;

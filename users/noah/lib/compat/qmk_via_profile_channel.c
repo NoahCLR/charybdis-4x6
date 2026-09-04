@@ -4,6 +4,8 @@
 
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
+#include <string.h>
+
 #if defined(NOAH_LIVE_PROFILE_MUTATION_ENABLE) && (!defined(NOAH_LIVE_PROFILE_OWNER_ENABLE) || !defined(VIA_ENABLE))
 #    error "live-profile mutation requires the complete VIA owner"
 #endif
@@ -21,6 +23,7 @@
 #    include "../profile/protocol/profile_wire_v1.h"
 #    include "../profile/storage/profile_storage_layout.h"
 #    include "../profile/storage/profile_store_runtime.h"
+#    include "../state/diagnostics/runtime_diag.h"
 
 #    ifndef VIA_FIRMWARE_VERSION
 #        define VIA_FIRMWARE_VERSION 0u
@@ -195,7 +198,39 @@ static void noah_profile_channel_refresh_store_status(void) {
     }
 }
 
+#    ifdef NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS_ENABLE
+static bool noah_profile_channel_handle_cadence_get(uint8_t *data, uint8_t length) {
+    if (!data || length != NOAH_PROFILE_WIRE_V1_REPORT_SIZE || data[0] != NOAH_PROFILE_WIRE_V1_COMMAND_GET || data[1] != NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL || data[2] != NOAH_RUNTIME_CADENCE_WIRE_VALUE) {
+        return false;
+    }
+    for (uint8_t index = 5u; index < NOAH_PROFILE_WIRE_V1_REPORT_SIZE; index++) {
+        if (data[index] != 0u) {
+            memset(&data[5], 0, NOAH_PROFILE_WIRE_V1_REPORT_SIZE - 5u);
+            data[5] = NOAH_PROFILE_WIRE_V1_STATUS_MALFORMED;
+            return true;
+        }
+    }
+    if (data[3] == 0u || data[4] >= NOAH_RUNTIME_CADENCE_WIRE_PAGES) {
+        memset(&data[5], 0, NOAH_PROFILE_WIRE_V1_REPORT_SIZE - 5u);
+        data[5] = data[3] == 0u ? NOAH_PROFILE_WIRE_V1_STATUS_MALFORMED : NOAH_PROFILE_WIRE_V1_STATUS_UNKNOWN_PAGE;
+        return true;
+    }
+    data[5] = NOAH_PROFILE_WIRE_V1_STATUS_OK;
+    data[6] = NOAH_RUNTIME_CADENCE_WIRE_PAYLOAD_SIZE;
+    if (!noah_runtime_cadence_wire_page(data[4], &data[7])) {
+        memset(&data[5], 0, NOAH_PROFILE_WIRE_V1_REPORT_SIZE - 5u);
+        data[5] = NOAH_PROFILE_WIRE_V1_STATUS_UNAVAILABLE;
+    }
+    return true;
+}
+#    endif
+
 NOAH_PROFILE_CHANNEL_STACK_BOUNDARY void via_custom_value_command_kb(uint8_t *data, uint8_t length) {
+#    ifdef NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS_ENABLE
+    if (noah_profile_channel_handle_cadence_get(data, length)) {
+        return;
+    }
+#    endif
 #    ifdef NOAH_LIVE_PROFILE_MUTATION_ENABLE
     if (data && length == NOAH_PROFILE_WIRE_V1_REPORT_SIZE && data[0] == NOAH_PROFILE_WIRE_V1_COMMAND_GET && data[1] == NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL && data[2] == NOAH_PROFILE_CANDIDATE_V1_VALUE_STATUS) {
         noah_profile_candidate_v1_status_t candidate;

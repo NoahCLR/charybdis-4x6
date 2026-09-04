@@ -10,6 +10,10 @@
 
 #include "../storage/profile_storage_layout.h"
 
+#ifdef NOAH_PROFILE_OWNER_TEST_DIAGNOSTICS
+static uint32_t noah_profile_owner_ready_refresh_count;
+#endif
+
 enum {
     OWNER_SCHEDULE_HOST = 0u,
     OWNER_SCHEDULE_SPLIT,
@@ -117,6 +121,10 @@ static void reset_host_barrier(noah_profile_owner_t *owner) {
     owner->host_cancel_reason                  = NOAH_PROFILE_CANDIDATE_V1_ERROR_NONE;
     owner->host_cancel_pending                 = false;
     owner->host_barrier_progress_offset        = 0u;
+}
+
+static bool host_session_cleanup_needed(const noah_profile_owner_t *owner) {
+    return owner && (owner->host_activity_known || owner->host_barrier_descriptor_known || owner->host_barrier_started || owner->host_barrier_local_published || owner->host_barrier_peer_commit_authorized || owner->host_cancel_pending || owner->host_cancel_reason != NOAH_PROFILE_CANDIDATE_V1_ERROR_NONE || owner->host_barrier_progress_offset != 0u);
 }
 
 static bool peer_can_supersede_host(const noah_profile_owner_t *owner, const noah_profile_split_descriptor_t *peer) {
@@ -483,11 +491,20 @@ static bool scan_peer_activation(noah_profile_owner_t *owner) {
 static void refresh_ready_state(noah_profile_owner_t *owner) {
     noah_effective_profile_status_t status;
 
+#ifdef NOAH_PROFILE_OWNER_TEST_DIAGNOSTICS
+    noah_profile_owner_ready_refresh_count++;
+#endif
     if (!owner || noah_effective_profile_provider_status(&owner->provider, &status) != NOAH_EFFECTIVE_PROFILE_OK) {
         return;
     }
     owner->state = status.active.kind == NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE ? NOAH_PROFILE_OWNER_READY_VALIDATED : NOAH_PROFILE_OWNER_READY_COMPILED;
 }
+
+#ifdef NOAH_PROFILE_OWNER_TEST_DIAGNOSTICS
+uint32_t noah_profile_owner_test_ready_refresh_count(void) {
+    return noah_profile_owner_ready_refresh_count;
+}
+#endif
 
 static noah_profile_candidate_expire_result_t finish_host_precommit_cancel(noah_profile_owner_t *owner) {
     if (!owner || !owner->host_cancel_pending || owner->reconciler.prepared_push_active) {
@@ -780,7 +797,7 @@ static bool scan_running(noah_profile_owner_t *owner, bool master, uint32_t now_
                 if (worked && owner->host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_ACTIVATING && !owner->config.peer_required) {
                     (void)publish_validated_descriptor(owner);
                 }
-                if (owner->host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE && noah_profile_candidate_store_backend_admission_owner(candidate_backend(owner)) != NOAH_PROFILE_STORAGE_ADMISSION_HOST) {
+                if (owner->host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE && noah_profile_candidate_store_backend_admission_owner(candidate_backend(owner)) != NOAH_PROFILE_STORAGE_ADMISSION_HOST && host_session_cleanup_needed(owner)) {
                     owner->host_activity_known = false;
                     reset_host_barrier(owner);
                     refresh_ready_state(owner);

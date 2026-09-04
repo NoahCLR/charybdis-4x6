@@ -21,6 +21,7 @@ build_and_run() {
         -DQMK_KEYBOARD_H='"qmk_stub.h"' \
         -DQMK_STUB_SUPPRESS_LAYER_COUNT \
         -DVIA_ENABLE \
+        -DNOAH_PROFILE_OWNER_TEST_DIAGNOSTICS \
         -DTOTAL_EEPROM_BYTE_COUNT=0x4000u \
         -I"$ROOT" \
         -I"$ROOT/users/noah" \

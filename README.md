@@ -166,6 +166,10 @@ The Firmware row's `Compile left + right` action opens the Charybdis Profile
 Studio output pane and streams QMK while it builds left and right UF2 files for
 the active profile. `Compile live-edit test` builds a separately named pair
 with the engineering live-profile owner and mutation route enabled.
+`Compile performance comparison` builds four diagnostic UF2 files from the
+same source tree: an ordinary left/right baseline and a live-profile
+engineering left/right pair. Flash and capture the ordinary baseline pair
+first, then flash the engineering pair for the comparison run.
 
 Use Profile Studio when you want to:
 

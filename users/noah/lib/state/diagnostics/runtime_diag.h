@@ -11,6 +11,14 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+enum {
+    NOAH_RUNTIME_CADENCE_WIRE_VALUE       = 0x03u,
+    NOAH_RUNTIME_CADENCE_WINDOW_COUNT     = 30u,
+    NOAH_RUNTIME_CADENCE_HISTOGRAM_BUCKETS = 6u,
+    NOAH_RUNTIME_CADENCE_WIRE_PAGES       = NOAH_RUNTIME_CADENCE_WINDOW_COUNT + 1u,
+    NOAH_RUNTIME_CADENCE_WIRE_PAYLOAD_SIZE = 25u,
+};
+
 typedef enum {
     NOAH_RUNTIME_DIAG_STAGE_IDLE = 0,
     NOAH_RUNTIME_DIAG_STAGE_PROCESS_RECORD,
@@ -36,8 +44,15 @@ uint8_t                   noah_runtime_diag_watchdog_reboot_count(void);
 bool                      noah_runtime_diag_indicator_active(void);
 void                      noah_runtime_diag_reset_for_test(void);
 
+#if defined(NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS_ENABLE) || defined(NOAH_RUNTIME_DIAG_TEST_BACKEND)
+void noah_runtime_cadence_note_matrix_scan(void);
+void noah_runtime_cadence_note_pointing_poll(void);
+bool noah_runtime_cadence_wire_page(uint8_t page, uint8_t payload[NOAH_RUNTIME_CADENCE_WIRE_PAYLOAD_SIZE]);
+#endif
+
 #if defined(NOAH_RUNTIME_DIAG_TEST_BACKEND)
 void     noah_runtime_diag_test_backend_reset(void);
+void     noah_runtime_diag_test_backend_set_realtime_counter(uint32_t value);
 uint32_t noah_runtime_diag_test_backend_scratch(uint8_t index);
 bool     noah_runtime_diag_test_backend_watchdog_enabled(void);
 uint32_t noah_runtime_diag_test_backend_watchdog_enable_count(void);

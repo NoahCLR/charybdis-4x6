@@ -37,11 +37,174 @@ typedef struct {
 
 static noah_runtime_diag_state_t noah_runtime_diag_state;
 
+#if defined(NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS_ENABLE) || defined(NOAH_RUNTIME_DIAG_TEST_BACKEND)
+enum {
+    NOAH_RUNTIME_CADENCE_WINDOW_US = 1000000u,
+};
+
+typedef struct {
+    uint32_t max_pointing_gap_us;
+    uint16_t matrix_scans;
+    uint16_t pointing_polls;
+    uint16_t gap_histogram[NOAH_RUNTIME_CADENCE_HISTOGRAM_BUCKETS];
+} noah_runtime_cadence_window_t;
+
+typedef struct {
+    noah_runtime_cadence_window_t completed[NOAH_RUNTIME_CADENCE_WINDOW_COUNT];
+    noah_runtime_cadence_window_t current;
+    uint32_t                      window_started_at;
+    uint32_t                      last_pointing_poll_at;
+    uint32_t                      sequence;
+    uint8_t                       next_window;
+    uint8_t                       completed_count;
+    bool                          started;
+    bool                          last_pointing_poll_known;
+} noah_runtime_cadence_state_t;
+
+static noah_runtime_cadence_state_t noah_runtime_cadence_state;
+
+static const uint16_t noah_runtime_cadence_histogram_upper_us[NOAH_RUNTIME_CADENCE_HISTOGRAM_BUCKETS - 1u] = {
+    1000u, 1250u, 1500u, 2000u, 5000u,
+};
+
+_Static_assert(sizeof(noah_runtime_cadence_window_t) == 20u, "cadence window wire representation drifted");
+#endif
+
 #if defined(NOAH_RUNTIME_DIAG_TEST_BACKEND)
 static uint32_t noah_runtime_diag_test_backend_scratch_regs[8];
+static uint32_t noah_runtime_diag_test_backend_realtime_counter;
 static bool     noah_runtime_diag_test_backend_watchdog_enabled_flag;
 static uint32_t noah_runtime_diag_test_backend_watchdog_enable_calls;
 static uint32_t noah_runtime_diag_test_backend_watchdog_update_calls;
+#endif
+
+#if defined(NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS_ENABLE) || defined(NOAH_RUNTIME_DIAG_TEST_BACKEND)
+static uint32_t noah_runtime_cadence_realtime_counter(void) {
+#    if defined(NOAH_RUNTIME_DIAG_TEST_BACKEND)
+    return noah_runtime_diag_test_backend_realtime_counter;
+#    elif defined(QMK_MCU_RP2040)
+    return chSysGetRealtimeCounterX();
+#    else
+#        error "performance diagnostics require the RP2040 realtime counter"
+#    endif
+}
+
+static void noah_runtime_cadence_write_u16(uint8_t *target, uint16_t value) {
+    target[0] = (uint8_t)value;
+    target[1] = (uint8_t)(value >> 8u);
+}
+
+static void noah_runtime_cadence_write_u32(uint8_t *target, uint32_t value) {
+    target[0] = (uint8_t)value;
+    target[1] = (uint8_t)(value >> 8u);
+    target[2] = (uint8_t)(value >> 16u);
+    target[3] = (uint8_t)(value >> 24u);
+}
+
+static void noah_runtime_cadence_increment_u16(uint16_t *value) {
+    if (*value != UINT16_MAX) {
+        (*value)++;
+    }
+}
+
+static void noah_runtime_cadence_store_current(void) {
+    noah_runtime_cadence_state.completed[noah_runtime_cadence_state.next_window] = noah_runtime_cadence_state.current;
+    noah_runtime_cadence_state.next_window = (uint8_t)((noah_runtime_cadence_state.next_window + 1u) % NOAH_RUNTIME_CADENCE_WINDOW_COUNT);
+    if (noah_runtime_cadence_state.completed_count < NOAH_RUNTIME_CADENCE_WINDOW_COUNT) {
+        noah_runtime_cadence_state.completed_count++;
+    }
+    memset(&noah_runtime_cadence_state.current, 0, sizeof(noah_runtime_cadence_state.current));
+    noah_runtime_cadence_state.sequence++;
+}
+
+static void noah_runtime_cadence_advance(uint32_t now) {
+    uint32_t elapsed;
+    uint32_t windows;
+
+    if (!noah_runtime_cadence_state.started) {
+        noah_runtime_cadence_state.started           = true;
+        noah_runtime_cadence_state.window_started_at = now;
+        return;
+    }
+    elapsed = now - noah_runtime_cadence_state.window_started_at;
+    windows = elapsed / NOAH_RUNTIME_CADENCE_WINDOW_US;
+    if (windows == 0u) {
+        return;
+    }
+    if (windows > NOAH_RUNTIME_CADENCE_WINDOW_COUNT) {
+        windows = NOAH_RUNTIME_CADENCE_WINDOW_COUNT;
+    }
+    noah_runtime_cadence_store_current();
+    for (uint32_t skipped = 1u; skipped < windows; skipped++) {
+        noah_runtime_cadence_store_current();
+    }
+    noah_runtime_cadence_state.window_started_at += (elapsed / NOAH_RUNTIME_CADENCE_WINDOW_US) * NOAH_RUNTIME_CADENCE_WINDOW_US;
+}
+
+void noah_runtime_cadence_note_matrix_scan(void) {
+    noah_runtime_cadence_advance(noah_runtime_cadence_realtime_counter());
+    noah_runtime_cadence_increment_u16(&noah_runtime_cadence_state.current.matrix_scans);
+}
+
+void noah_runtime_cadence_note_pointing_poll(void) {
+    uint32_t now = noah_runtime_cadence_realtime_counter();
+
+    noah_runtime_cadence_advance(now);
+    noah_runtime_cadence_increment_u16(&noah_runtime_cadence_state.current.pointing_polls);
+    if (noah_runtime_cadence_state.last_pointing_poll_known) {
+        uint32_t gap = now - noah_runtime_cadence_state.last_pointing_poll_at;
+        uint8_t  bucket;
+
+        if (gap > noah_runtime_cadence_state.current.max_pointing_gap_us) {
+            noah_runtime_cadence_state.current.max_pointing_gap_us = gap;
+        }
+        for (bucket = 0u; bucket < NOAH_RUNTIME_CADENCE_HISTOGRAM_BUCKETS - 1u && gap > noah_runtime_cadence_histogram_upper_us[bucket]; bucket++) {
+        }
+        noah_runtime_cadence_increment_u16(&noah_runtime_cadence_state.current.gap_histogram[bucket]);
+    }
+    noah_runtime_cadence_state.last_pointing_poll_at    = now;
+    noah_runtime_cadence_state.last_pointing_poll_known = true;
+}
+
+bool noah_runtime_cadence_wire_page(uint8_t page, uint8_t payload[NOAH_RUNTIME_CADENCE_WIRE_PAYLOAD_SIZE]) {
+    uint32_t sequence;
+
+    if (!payload || page >= NOAH_RUNTIME_CADENCE_WIRE_PAGES) {
+        return false;
+    }
+    memset(payload, 0, NOAH_RUNTIME_CADENCE_WIRE_PAYLOAD_SIZE);
+    sequence = noah_runtime_cadence_state.sequence;
+    if (page == 0u) {
+        payload[0] = 1u;
+        payload[1] = NOAH_RUNTIME_CADENCE_WIRE_PAGES;
+        payload[2] = noah_runtime_cadence_state.completed_count;
+        noah_runtime_cadence_write_u32(&payload[3], sequence);
+        noah_runtime_cadence_write_u32(&payload[7], NOAH_RUNTIME_CADENCE_WINDOW_US);
+        for (uint8_t bucket = 0u; bucket < NOAH_RUNTIME_CADENCE_HISTOGRAM_BUCKETS - 1u; bucket++) {
+            noah_runtime_cadence_write_u16(&payload[11u + bucket * 2u], noah_runtime_cadence_histogram_upper_us[bucket]);
+        }
+        payload[21] = noah_runtime_cadence_state.started ? 1u : 0u;
+        return true;
+    }
+
+    noah_runtime_cadence_write_u32(payload, sequence);
+    payload[4] = 0xffu;
+    if ((uint8_t)(page - 1u) < noah_runtime_cadence_state.completed_count) {
+        uint8_t logical_index = (uint8_t)(page - 1u);
+        uint8_t oldest        = (uint8_t)((noah_runtime_cadence_state.next_window + NOAH_RUNTIME_CADENCE_WINDOW_COUNT - noah_runtime_cadence_state.completed_count) % NOAH_RUNTIME_CADENCE_WINDOW_COUNT);
+        uint8_t stored        = (uint8_t)((oldest + logical_index) % NOAH_RUNTIME_CADENCE_WINDOW_COUNT);
+        const noah_runtime_cadence_window_t *window = &noah_runtime_cadence_state.completed[stored];
+
+        payload[4] = logical_index;
+        noah_runtime_cadence_write_u32(&payload[5], window->max_pointing_gap_us);
+        noah_runtime_cadence_write_u16(&payload[9], window->matrix_scans);
+        noah_runtime_cadence_write_u16(&payload[11], window->pointing_polls);
+        for (uint8_t bucket = 0u; bucket < NOAH_RUNTIME_CADENCE_HISTOGRAM_BUCKETS; bucket++) {
+            noah_runtime_cadence_write_u16(&payload[13u + bucket * 2u], window->gap_histogram[bucket]);
+        }
+    }
+    return true;
+}
 #endif
 
 static uint32_t noah_runtime_diag_backend_timer_read32(void) {
@@ -152,6 +315,9 @@ bool noah_runtime_diag_indicator_active(void) {
 
 void noah_runtime_diag_reset_for_test(void) {
     memset(&noah_runtime_diag_state, 0, sizeof(noah_runtime_diag_state));
+#if defined(NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS_ENABLE) || defined(NOAH_RUNTIME_DIAG_TEST_BACKEND)
+    memset(&noah_runtime_cadence_state, 0, sizeof(noah_runtime_cadence_state));
+#endif
 #if defined(NOAH_RUNTIME_DIAG_TEST_BACKEND)
     noah_runtime_diag_test_backend_reset();
 #endif
@@ -163,6 +329,11 @@ void noah_runtime_diag_test_backend_reset(void) {
     noah_runtime_diag_test_backend_watchdog_enabled_flag = false;
     noah_runtime_diag_test_backend_watchdog_enable_calls = 0u;
     noah_runtime_diag_test_backend_watchdog_update_calls = 0u;
+    noah_runtime_diag_test_backend_realtime_counter      = 0u;
+}
+
+void noah_runtime_diag_test_backend_set_realtime_counter(uint32_t value) {
+    noah_runtime_diag_test_backend_realtime_counter = value;
 }
 
 uint32_t noah_runtime_diag_test_backend_scratch(uint8_t index) {

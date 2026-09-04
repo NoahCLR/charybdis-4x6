@@ -201,6 +201,16 @@ output pane and streams QMK output while each side builds.
 `bastardkb_charybdis_4x6_<name>_live_edit_right.uf2`, adding the explicit
 engineering owner and mutation gates without changing the ordinary build.
 
+`Compile performance comparison` builds four side-specific diagnostic images
+from the same source tree. Every image enables
+`NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS=yes`. The ordinary baseline explicitly
+leaves the live-profile owner and mutation route disabled and produces
+`bastardkb_charybdis_4x6_<name>_performance_baseline_left.uf2` plus the matching
+right image. The engineering pair enables both live-profile gates and produces
+the matching `performance_live_edit_left` and `performance_live_edit_right`
+images. Flash the baseline pair first and capture its diagnostic run before
+flashing the engineering pair.
+
 ## Editing Model
 
 The UI is split into Layout, Macros, RGB, and Defaults work areas. Most edits
