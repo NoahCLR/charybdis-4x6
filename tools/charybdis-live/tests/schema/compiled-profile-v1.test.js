@@ -5,13 +5,13 @@ const fs = require("node:fs");
 const path = require("node:path");
 const test = require("node:test");
 
-const {decodeProfileBlob, encodeProfileBlob} = require("../../live-link/profile-blob-v1");
-const {decodeKeyBehaviorDomain, encodeKeyBehaviorDomain} = require("../../live-link/key-behavior-domain-v1");
-const {decodeRgbDomainV1, encodeRgbDomainV1} = require("../../live-link/rgb-domain-v1");
+const {decodeProfileBlob, encodeProfileBlob} = require("../../core/schema/profile-blob-v1");
+const {decodeKeyBehaviorDomain, encodeKeyBehaviorDomain} = require("../../core/schema/key-behavior-domain-v1");
+const {decodeRgbDomainV1, encodeRgbDomainV1} = require("../../core/schema/rgb-domain-v1");
 const {
     buildCanonicalStudioProfileV1,
     semanticActionForExpression,
-} = require("../../live-link/compiled-profile-v1");
+} = require("../../core/schema/compiled-profile-v1");
 
 const fixturePath = path.resolve(__dirname, "../../../../tests/fixtures/compiled_profile_v1.fixture");
 const fixture = new Map(fs.readFileSync(fixturePath, "utf8")

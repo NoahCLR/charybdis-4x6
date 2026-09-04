@@ -79,6 +79,9 @@ shared package with one consumer is premature. Moved with `git mv` so history
 follows. Extract to a shared package only if Studio ever needs device access
 again.
 
+It landed as `live-link/` and was layered into `core/` by D-L10 below; the
+directory name in this decision is historical.
+
 ### D-L04 — Profile Studio is frozen at `refactor/aug`
 
 Bug fixes only. It is not a development target. This is what makes forking
@@ -177,6 +180,21 @@ With D-L08 this ships by default, so it is now felt in daily use rather than
 only in an engineering build. Details, the full candidate inventory, and the
 remaining measurement paths are in
 [`architecture/pointing-cadence-known-issue.md`](architecture/pointing-cadence-known-issue.md).
+
+### D-L10 — The live app is layered, and the layering is enforced by review
+
+`core/` is split into `transport`, `schema`, `protocol`, `session`, and `data`,
+with imports pointing one way and `tests/` mirroring it. `media/` never imports
+`core/`; it renders snapshots the host posts, so the core stays runnable in a
+plain Node process and the UI stays replaceable.
+
+The structure exists because the thing being replaced was a 14,539-line file
+that grew one convenience at a time. The rules, and where new work belongs, are
+in [`tools/charybdis-live/AGENTS.md`](../tools/charybdis-live/AGENTS.md).
+
+The canonical profile format and generation-bound drafts get a new
+`core/model/` layer between `schema/` and `session/` when that format is
+designed. It is deliberately absent until then.
 
 ## Delivery
 

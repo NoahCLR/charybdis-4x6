@@ -1,7 +1,7 @@
 "use strict";
 
-const {RAW_HID_REPORT_SIZE, normalizeRawHidReport} = require("./device-adapter");
-const {crc32, decodeProfileBlob, fnv1a32, PROFILE_DOMAIN_IDS} = require("./profile-blob-v1");
+const {RAW_HID_REPORT_SIZE, normalizeRawHidReport} = require("../transport/device-adapter");
+const {crc32, decodeProfileBlob, fnv1a32, PROFILE_DOMAIN_IDS} = require("../schema/profile-blob-v1");
 const {
     PROFILE_WIRE_DOMAINS,
     PROFILE_WIRE_V1,

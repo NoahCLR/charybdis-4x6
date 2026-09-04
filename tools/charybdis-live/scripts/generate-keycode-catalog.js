@@ -17,7 +17,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const KEYCODE_DATA_RELATIVE_PATH = path.join("data", "constants", "keycodes");
-const OUTPUT_RELATIVE_PATH = path.join("live-link", "keycode-catalog.json");
+const OUTPUT_RELATIVE_PATH = path.join("core", "data", "keycode-catalog.json");
 const CATALOG_FORMAT = "charybdis-keycode-catalog-v1";
 
 function main(argv) {

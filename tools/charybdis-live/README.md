@@ -11,12 +11,20 @@ which is frozen and lives beside this one.
 ## Layout
 
 - `extension.js` — the VS Code surface only: command, panel, message relay.
+- `core/` — the app, with no host dependency, layered so imports point one way:
+  - `transport/` — device adapters and the request coordinator
+  - `schema/` — profile byte formats and domain decoders
+  - `protocol/` — wire formats spoken to the device
+  - `session/` — stateful orchestration across a connection
+  - `data/` — vendored data such as the keycode catalog
 - `media/` — the webview, as real ES modules loaded through
-  `webview.asWebviewUri()`. No template literal, no bundler.
-- `live-link/` — the device core: transport, Profile Wire protocol, profile
-  schema domains, and the device session. It has no `vscode` import, so this
-  extension shell can be replaced by a standalone app without touching it.
-- `tests/live-link/` — host tests for the core, run with `node --test`.
+  `webview.asWebviewUri()`. No template literal, no bundler. It never imports
+  the core; it renders snapshots the host posts.
+- `tests/` — mirrors `core/`, one directory per layer.
+
+The layer rules and where new work belongs are in
+[`AGENTS.md`](./AGENTS.md). The short version: nothing here may read the
+firmware repository.
 
 ## Commands
 
@@ -24,7 +32,7 @@ which is frozen and lives beside this one.
 npm install
 npm run check           # syntax + the full live-link test suite
 npm run probe:live-link # read-only enumeration of matching HID interfaces
-npm run keycodes        # regenerate live-link/keycode-catalog.json from a QMK checkout
+npm run keycodes        # regenerate core/data/keycode-catalog.json from a QMK checkout
 ```
 
 The keycode catalog is vendored on purpose. The app renders keycodes read back

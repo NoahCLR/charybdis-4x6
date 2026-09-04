@@ -7,7 +7,7 @@ const test = require("node:test");
 const {
     LIVE_LINK_ERROR_CODES,
     RAW_HID_REPORT_SIZE,
-} = require("../../live-link/device-adapter");
+} = require("../../core/transport/device-adapter");
 const {
     CHARYBDIS_PRODUCT_ID,
     CHARYBDIS_VENDOR_ID,
@@ -17,7 +17,7 @@ const {
     QMK_RAW_HID_USAGE_PAGE,
     addNodeHidReportId,
     normalizeNodeHidInputReport,
-} = require("../../live-link/node-hid-adapter");
+} = require("../../core/transport/node-hid-adapter");
 const {main: runProbe} = require("../../scripts/probe-live-link");
 
 function matchingDescriptor(overrides = {}) {

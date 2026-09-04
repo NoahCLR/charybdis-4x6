@@ -1,7 +1,7 @@
 "use strict";
 
-const {RAW_HID_REPORT_SIZE, normalizeRawHidReport} = require("./device-adapter");
-const {resolveNativeQmkExpression} = require("./compiled-profile-v1");
+const {RAW_HID_REPORT_SIZE, normalizeRawHidReport} = require("../transport/device-adapter");
+const {resolveNativeQmkExpression} = require("../schema/compiled-profile-v1");
 
 const VIA_LAYOUT_COMMANDS = Object.freeze({
     GET_KEYCODE: 0x04,

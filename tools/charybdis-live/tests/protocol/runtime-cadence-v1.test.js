@@ -3,8 +3,8 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 
-const {RAW_HID_REPORT_SIZE} = require("../../live-link/device-adapter");
-const {PROFILE_WIRE_STATUS, PROFILE_WIRE_V1} = require("../../live-link/profile-wire-v1");
+const {RAW_HID_REPORT_SIZE} = require("../../core/transport/device-adapter");
+const {PROFILE_WIRE_STATUS, PROFILE_WIRE_V1} = require("../../core/protocol/profile-wire-v1");
 const {
     RUNTIME_CADENCE_THRESHOLDS,
     RUNTIME_CADENCE_V1,
@@ -18,7 +18,7 @@ const {
     readRuntimeCadenceCapture,
     readRuntimeCadenceMetadata,
     summarizeRuntimeCadence,
-} = require("../../live-link/runtime-cadence-v1");
+} = require("../../core/protocol/runtime-cadence-v1");
 
 // The encoder below is an independent reference implementation of the firmware
 // page layout in users/noah/lib/state/diagnostics/runtime_diag.c. Keeping it

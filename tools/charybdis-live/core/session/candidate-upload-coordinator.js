@@ -20,7 +20,7 @@ const {
     decodeCandidateAcknowledgement,
     normalizeCandidateMetadata,
     readCandidateStatus,
-} = require("./profile-candidate-v1");
+} = require("../protocol/profile-candidate-v1");
 
 const DEFAULT_POLL_INTERVAL_MS = 10;
 const DEFAULT_MAX_BUSY_RESUBMISSIONS = 3;

@@ -14,14 +14,14 @@ const {
     decodeRgbDomainV1,
     encodeRgbDomainV1,
     encodeStudioRgbDomainV1,
-} = require("../../live-link/rgb-domain-v1");
+} = require("../../core/schema/rgb-domain-v1");
 const {
     PROFILE_DOMAIN_IDS,
     crc32,
     decodeProfileBlob,
     encodeProfileBlob,
     fnv1a32,
-} = require("../../live-link/profile-blob-v1");
+} = require("../../core/schema/profile-blob-v1");
 
 function fixture() {
     const semantic = JSON.parse(fs.readFileSync(path.join(__dirname, "../fixtures/rgb-domain-v1.json"), "utf8"));

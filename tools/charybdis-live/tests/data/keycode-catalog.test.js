@@ -4,7 +4,7 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 
 const {CATALOG_FORMAT, parseKeycodeEntries} = require("../../scripts/generate-keycode-catalog");
-const catalog = require("../../live-link/keycode-catalog.json");
+const catalog = require("../../core/data/keycode-catalog.json");
 
 // These assertions run against the vendored file, not a QMK checkout, so they
 // hold on a machine that has no firmware workspace at all. That is the point of

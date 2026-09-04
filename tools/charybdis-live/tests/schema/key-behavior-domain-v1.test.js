@@ -13,7 +13,7 @@ const {
     decodeKeyBehaviorDomainEnvelope,
     encodeKeyBehaviorDomain,
     encodeKeyBehaviorDomainEnvelope,
-} = require("../../live-link/key-behavior-domain-v1");
+} = require("../../core/schema/key-behavior-domain-v1");
 const {
     PROFILE_ACTION_KINDS,
     PROFILE_DOMAIN_IDS,
@@ -21,7 +21,7 @@ const {
     decodeProfileBlob,
     encodeProfileBlob,
     fnv1a32,
-} = require("../../live-link/profile-blob-v1");
+} = require("../../core/schema/profile-blob-v1");
 
 function fixtures() {
     const values = new Map(fs.readFileSync(path.join(__dirname, "../../../../tests/fixtures/key_behavior_domain_v1.fixture"), "utf8")

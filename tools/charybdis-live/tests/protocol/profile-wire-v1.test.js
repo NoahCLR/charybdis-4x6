@@ -21,7 +21,7 @@ const {
     profileResponseMatcher,
     readProfileCapabilities,
     readViaIdentity,
-} = require("../../live-link/profile-wire-v1");
+} = require("../../core/protocol/profile-wire-v1");
 
 function goldenFixtures() {
     const fixturePath = path.resolve(__dirname, "../../../../tests/fixtures/profile_wire_v1_reads.fixture");

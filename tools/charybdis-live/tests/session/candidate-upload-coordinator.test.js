@@ -3,7 +3,7 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 
-const {encodeProfileBlob, PROFILE_DOMAIN_IDS} = require("../../live-link/profile-blob-v1");
+const {encodeProfileBlob, PROFILE_DOMAIN_IDS} = require("../../core/schema/profile-blob-v1");
 const {
     CANDIDATE_ADMISSION,
     CANDIDATE_ERROR,
@@ -12,14 +12,14 @@ const {
     CandidateRequestIdSequence,
     CandidateTransactionIdSequence,
     PROFILE_CANDIDATE_V1,
-} = require("../../live-link/profile-candidate-v1");
+} = require("../../core/protocol/profile-candidate-v1");
 const {
     CandidateUploadCoordinator,
     CandidateUploadError,
     FIRMWARE_HOST_PRECOMMIT_TIMEOUT_MS,
     FIRMWARE_PREPARING_PEER_NO_PROGRESS_TIMEOUT_MS,
     candidateStatusStallTimeoutMs,
-} = require("../../live-link/candidate-upload-coordinator");
+} = require("../../core/session/candidate-upload-coordinator");
 
 function representativeBlob(payloadSize = 41) {
     return encodeProfileBlob({

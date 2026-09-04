@@ -2,6 +2,43 @@
 
 Use this repo like production firmware, not a scratch keymap.
 
+## Current Goal
+
+**Build first-grade control software for this keyboard.** A person connects a
+Charybdis, sees the configuration that is actually running on it, changes
+anything supported, saves it safely to both halves, and can back it up or
+recover it later — with no repository, no C, and no reflash.
+
+The direction is one sentence: **the keyboard becomes the source of truth, and
+the live app becomes a client of the keyboard rather than a client of the
+repository.**
+
+Read [`docs/LIVE_EDIT_APP_DIRECTION.md`](./docs/LIVE_EDIT_APP_DIRECTION.md)
+before doing architecture work. It carries the decisions, the delivery slices,
+the known issue this branch inherits, and what is deliberately still
+undesigned. The end goal it serves is in
+[`docs/tooling/PROFILE_STUDIO_PRODUCT_GOAL.md`](./docs/tooling/PROFILE_STUDIO_PRODUCT_GOAL.md)
+and [`docs/architecture/device-resident-profile.md`](./docs/architecture/device-resident-profile.md).
+
+### Two tools, one line between them
+
+- **`tools/charybdis-live/`** edits the connected keyboard over Raw HID. It is
+  the active development target. It must never read the firmware repository;
+  see its own [`AGENTS.md`](./tools/charybdis-live/AGENTS.md) for the layer
+  rules before adding files.
+- **`tools/charybdis-profile-studio/`** edits `keymap.c`, `config.h`, and
+  `rgb_config.c`. It is **frozen** at its `refactor/aug` state. Bug fixes only.
+  Do not add features to it, and do not give it device capabilities.
+
+Work that blurs that line is the thing this branch exists to undo.
+
+### Where we are
+
+Slice 1 is done: the live app connects and reports what the keyboard says about
+itself. Slice 2 is bounded, chunked readback of the committed profile payload,
+which gates device-first editing, drafts, apply, backup, and recovery. The
+canonical profile format is load-bearing and not yet designed.
+
 ## Start Here
 
 - Start every task with `git status --short`.

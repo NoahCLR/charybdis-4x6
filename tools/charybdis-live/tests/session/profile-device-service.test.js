@@ -3,21 +3,21 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 
-const {FakeDeviceAdapter} = require("../../live-link/fake-device-adapter");
+const {FakeDeviceAdapter} = require("../../core/transport/fake-device-adapter");
 const {
     CANDIDATE_ERROR,
     CANDIDATE_OPERATION,
     CANDIDATE_STATE,
     candidateMetadataForBlob,
-} = require("../../live-link/profile-candidate-v1");
-const {encodeProfileBlob, PROFILE_DOMAIN_IDS} = require("../../live-link/profile-blob-v1");
+} = require("../../core/protocol/profile-candidate-v1");
+const {encodeProfileBlob, PROFILE_DOMAIN_IDS} = require("../../core/schema/profile-blob-v1");
 const {
     ProfileRequestIdSequence,
     ProfileDeviceService,
     evaluateProfileCompatibility,
     evaluateLiveMutationCompatibility,
-} = require("../../live-link/profile-device-service");
-const {PROFILE_ACTIVE_KIND, PROFILE_WIRE_FEATURES, PROFILE_WIRE_V1, VIA_READS} = require("../../live-link/profile-wire-v1");
+} = require("../../core/session/profile-device-service");
+const {PROFILE_ACTIVE_KIND, PROFILE_WIRE_FEATURES, PROFILE_WIRE_V1, VIA_READS} = require("../../core/protocol/profile-wire-v1");
 
 function response(request, payload) {
     const report = Buffer.from(request);

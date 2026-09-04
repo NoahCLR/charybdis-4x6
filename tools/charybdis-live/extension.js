@@ -4,7 +4,7 @@
 //
 // This file is deliberately thin. It owns the VS Code surface only: the
 // command, the panel, and message relay. Every decision about the device, the
-// protocol, and the profile lives in live-link/, which has no vscode import so
+// protocol, and the profile lives in core/, which has no vscode import so
 // that this shell can be replaced by a standalone app later without touching
 // it. Nothing here parses a firmware repository; see
 // docs/LIVE_EDIT_APP_DIRECTION.md.
@@ -12,7 +12,7 @@
 const path = require("node:path");
 const vscode = require("vscode");
 
-const {ProfileDeviceService} = require("./live-link/profile-device-service");
+const {ProfileDeviceService} = require("./core/session/profile-device-service");
 
 const VIEW_TYPE = "charybdisLive.panel";
 

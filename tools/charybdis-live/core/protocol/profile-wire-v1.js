@@ -1,6 +1,6 @@
 "use strict";
 
-const {RAW_HID_REPORT_SIZE, normalizeRawHidReport} = require("./device-adapter");
+const {RAW_HID_REPORT_SIZE, normalizeRawHidReport} = require("../transport/device-adapter");
 
 const PROFILE_WIRE_V1 = Object.freeze({
     CAPABILITY_PAGE_COUNT: 2,

@@ -1,14 +1,17 @@
-# Live Link Transport Boundary
+# Charybdis Live Core
 
-This package is the transport boundary for Profile Studio's future VIA Raw HID
-connection. The coordinator and protocol layers have no VS Code or webview
+This is the app itself: everything except the VS Code shell. It is layered
+`transport` -> `schema` -> `protocol` -> `session`, with imports pointing one
+way; see [`../AGENTS.md`](../AGENTS.md).
+
+It has no VS Code or webview dependency. The coordinator and protocol layers have no VS Code or webview
 dependency. The concrete desktop adapter keeps `node-hid` lazy-loaded and
 injectable so the same boundary remains usable in tests and harnesses.
 
-`profile-device-service.js` owns the Stage 01 read path and the explicitly gated
+`session/profile-device-service.js` owns the Stage 01 read path and the explicitly gated
 engineering live-apply path. It enumerates devices, keeps native paths and
 connected handles outside the webview, reads the capability and status pages,
-and publishes a sanitized snapshot for the Studio UI. Its compatibility result
+and publishes a sanitized snapshot for the app UI. Its compatibility result
 checks protocol and schema majors, 32-byte framing, Milestone A domain support,
 the current source profile against advertised capacities, and all four
 candidate/persistence/activation/peer capability bits before enabling writes.
@@ -61,7 +64,7 @@ assigns name-independent ids to 58-bit LED-group bitmaps, preserves ordered
 renderer rows, and enforces compiled stages, complete identity tables,
 brightness, references, and fixed capacities. The exact byte contract and
 intentional runtime/device deferrals are frozen in
-[`rgb-domain-v1.md`](rgb-domain-v1.md). The matching firmware decoder is the
+[`schema/rgb-domain-v1.md`](./schema/rgb-domain-v1.md). The matching firmware decoder is the
 reader-backed `users/noah/lib/profile/schema/profile_rgb_v1.c` implementation.
 
 ## Adapter contract

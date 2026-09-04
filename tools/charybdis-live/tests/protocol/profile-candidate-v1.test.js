@@ -5,7 +5,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const test = require("node:test");
 
-const {encodeProfileBlob, PROFILE_DOMAIN_IDS} = require("../../live-link/profile-blob-v1");
+const {encodeProfileBlob, PROFILE_DOMAIN_IDS} = require("../../core/schema/profile-blob-v1");
 const {
     CANDIDATE_ADMISSION,
     CANDIDATE_ERROR,
@@ -24,7 +24,7 @@ const {
     decodeCandidateAcknowledgement,
     decodeCandidateStatusResponse,
     readCandidateStatus,
-} = require("../../live-link/profile-candidate-v1");
+} = require("../../core/protocol/profile-candidate-v1");
 
 function goldenFixtures() {
     const fixturePath = path.resolve(__dirname, "../../../../tests/fixtures/profile_candidate_v1.fixture");

@@ -13,7 +13,7 @@ const {
     compileViaLayout,
     decodeViaGetKeycodeResponse,
     synchronizeViaLayout,
-} = require("../../live-link/via-layout-v1");
+} = require("../../core/protocol/via-layout-v1");
 
 function modelWithLayers(layerCount = 1) {
     const keycodes = ["KC_A", "MO(LAYER_BASE)", "LT(LAYER_BASE,KC_B)", "VIA_MACRO_11", "RIGHT_THUMB"];

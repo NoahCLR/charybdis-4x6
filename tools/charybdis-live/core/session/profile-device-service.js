@@ -1,17 +1,17 @@
 "use strict";
 
-const {RAW_HID_REPORT_SIZE} = require("./device-adapter");
-const {NodeHidDeviceAdapter} = require("./node-hid-adapter");
-const {DeviceRequestCoordinator} = require("./request-coordinator");
+const {RAW_HID_REPORT_SIZE} = require("../transport/device-adapter");
+const {NodeHidDeviceAdapter} = require("../transport/node-hid-adapter");
+const {DeviceRequestCoordinator} = require("../transport/request-coordinator");
 const {CandidateUploadCoordinator} = require("./candidate-upload-coordinator");
-const {synchronizeViaLayout} = require("./via-layout-v1");
+const {synchronizeViaLayout} = require("../protocol/via-layout-v1");
 const {
     CANDIDATE_OPERATION,
     CANDIDATE_STATE,
     CANDIDATE_STATE_NAMES,
     candidateMetadataForBlob,
     readCandidateStatus,
-} = require("./profile-candidate-v1");
+} = require("../protocol/profile-candidate-v1");
 const {
     PROFILE_WIRE_KNOWN_MASKS,
     PROFILE_WIRE_FEATURES,
@@ -21,7 +21,7 @@ const {
     readProfileCapabilities,
     readProfileStatus,
     readViaIdentity,
-} = require("./profile-wire-v1");
+} = require("../protocol/profile-wire-v1");
 
 const PROFILE_STUDIO_PROTOCOL = Object.freeze({major: 1, minor: 0});
 const PROFILE_STUDIO_SCHEMA = Object.freeze({major: 1, minor: 0});

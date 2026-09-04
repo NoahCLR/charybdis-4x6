@@ -19,7 +19,7 @@ const {
     fnv1a32,
     readDomainEnvelope,
     readSemanticAction,
-} = require("../../live-link/profile-blob-v1");
+} = require("../../core/schema/profile-blob-v1");
 
 function fixtures() {
     const values = new Map(fs.readFileSync(path.join(__dirname, "../../../../tests/fixtures/profile_blob_v1.fixture"), "utf8")

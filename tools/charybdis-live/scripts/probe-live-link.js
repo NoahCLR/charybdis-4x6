@@ -7,7 +7,7 @@ const {
     NodeHidDeviceAdapter,
     QMK_RAW_HID_USAGE,
     QMK_RAW_HID_USAGE_PAGE,
-} = require("../live-link/node-hid-adapter");
+} = require("../core/transport/node-hid-adapter");
 
 const TARGET = Object.freeze({
     vendorId: CHARYBDIS_VENDOR_ID,

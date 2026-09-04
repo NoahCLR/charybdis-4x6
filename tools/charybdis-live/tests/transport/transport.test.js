@@ -6,9 +6,9 @@ const test = require("node:test");
 const {
     LIVE_LINK_ERROR_CODES,
     RAW_HID_REPORT_SIZE,
-} = require("../../live-link/device-adapter");
-const {FakeDeviceAdapter} = require("../../live-link/fake-device-adapter");
-const {DeviceRequestCoordinator} = require("../../live-link/request-coordinator");
+} = require("../../core/transport/device-adapter");
+const {FakeDeviceAdapter} = require("../../core/transport/fake-device-adapter");
+const {DeviceRequestCoordinator} = require("../../core/transport/request-coordinator");
 
 function report(command, marker = 0) {
     const value = Buffer.alloc(RAW_HID_REPORT_SIZE);
