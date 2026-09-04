@@ -96,8 +96,8 @@ Changing a policy applies its side effects explicitly:
 - [ ] Steady-state pointing cadence instrumentation and accepted regression
       threshold — **parked 2026-09-04**; R-21 occurred and is unexplained. See
       `../pointing-cadence-investigation.md`
-- [ ] Live-owner build passes the static RAM gate (`.data`+`.bss` is 820 B over
-      the 51,000 B limit; see the same file)
+- [x] Live-owner build passes the re-derived static RAM gates (2026-09-04; the
+      previous 820 B overage was against a limit with no derivation)
 - [ ] Idle profile scheduler and live RGB materialization remediation
 - [ ] Chunked committed custom-profile readback
 - [ ] Unified device snapshot across Profile Wire and standard VIA

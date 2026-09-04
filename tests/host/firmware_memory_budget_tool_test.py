@@ -156,10 +156,18 @@ class FirmwareMemoryBudgetToolTest(unittest.TestCase):
         self.assertEqual(stderr, "")
         self.assertIn("firmware memory policy: PASS", stdout)
         self.assertIn("RP2040 physical SRAM per MCU: 270336 B", stdout)
-        self.assertIn(".data + .bss policy span: 49824 B (policy limit 51000 B)", stdout)
+        self.assertIn(
+            ".data + .bss static RAM: 49824 B (regression tripwire 57344 B, 7520 B below it)",
+            stdout,
+        )
+        # True headroom must be reported separately from policy distance so
+        # policy slack cannot read as a hardware limit (R-07).
+        self.assertIn("true static RAM headroom: 208216 B", stdout)
         self.assertIn("fixed linked occupancy across unique SRAM banks: 57288 B", stdout)
         self.assertIn("linker-managed free/core-memory span at boot: 212312 B", stdout)
-        self.assertNotIn("static RAM", stdout)
+        # The section split is an initialisation artifact, so it is reported
+        # without a limit unless one is passed explicitly.
+        self.assertIn("SRAM0-3 .bss span: 25524 B (informational)", stdout)
         self.assertNotIn("linker heap", stdout)
 
     def test_new_policy_flags_fail_at_exact_data_and_free_span_thresholds(self):
@@ -173,7 +181,7 @@ class FirmwareMemoryBudgetToolTest(unittest.TestCase):
         self.assertIn("firmware memory policy: FAIL", stdout)
         self.assertIn(".data + .bss policy span 49824 exceeds 49823 B", stderr)
         self.assertIn(
-            "SRAM0-3 linker-managed free/core-memory span 212312 is below 212313 B",
+            "SRAM0-3 newlib arena 212312 B is below the 212313 B safety floor",
             stderr,
         )
 
@@ -186,7 +194,25 @@ class FirmwareMemoryBudgetToolTest(unittest.TestCase):
         )
         self.assertEqual(result, 1)
         self.assertIn(".data + .bss policy span 49824 exceeds 49823 B", stderr)
-        self.assertIn("free/core-memory span 212312 is below 212313 B", stderr)
+        self.assertIn("newlib arena 212312 B is below the 212313 B safety floor", stderr)
+
+    def test_section_split_is_not_gated_unless_requested(self):
+        # 25524 B of .bss would fail the retired 26000 B default only if the
+        # split were still enforced by default.
+        result, _, stderr = self.run_main()
+        self.assertEqual(result, 0)
+        self.assertEqual(stderr, "")
+
+        result, _, stderr = self.run_main("--max-static-bss", "25523")
+        self.assertEqual(result, 1)
+        self.assertIn("static BSS 25524 exceeds 25523 B", stderr)
+
+    def test_arena_floor_defaults_well_below_the_measured_span(self):
+        # The default floor guards the newlib arena rather than implicitly
+        # capping static RAM, so a 212312 B span passes comfortably.
+        result, stdout, _ = self.run_main()
+        self.assertEqual(result, 0)
+        self.assertIn("policy minimum 4096 B", stdout)
 
     def test_rejects_non_rp2040_physical_bank_capacity(self):
         wrong_layout = LAYOUT_OUTPUT.replace("20042000 A __ram5_end__", "20043000 A __ram5_end__")

@@ -12,10 +12,22 @@ reduce total memory and passes builds that increase it, so only the sum is
 enforced. The per-section figures stay in the report because the `.data` share
 is a useful signal of accidental initialisers.
 
-`--max-data-bss` is the static RAM gate. `--min-sram0-free` is the exhaustion
-guard: it protects the linker-managed core-memory span that ChibiOS allocates
-from at runtime. Both are policy ceilings well inside physical capacity, and
-policy slack must never be reported as hardware headroom (see R-07).
+Two gates with two different jobs, because conflating them is how policy slack
+gets mistaken for hardware headroom (R-07).
+
+`--min-sram0-free` is the safety floor: the arena between `__heap_base__` and
+the end of SRAM0-3 that newlib serves `malloc` from via `_sbrk`. Measured on
+2026-09-04, the only reachable caller in this firmware is `rand()` from
+`rgb_task_render`, which allocates its reentrancy state once, on the order of
+tens of bytes; `srand` is never called and ChibiOS core/heap allocation is not
+linked in. The floor is therefore set at 4 KiB, roughly two orders of magnitude
+above observed demand. Raise it only with evidence of a new allocator.
+
+`--max-data-bss` is a regression tripwire, not a hardware limit. Static RAM can
+physically grow to nearly SRAM0-3 (262,144 B) minus that floor; the tripwire
+exists to catch unplanned growth, so it sits just above the largest supported
+build variant. Crossing it means "justify this growth and raise the line", not
+"the chip is full". Raise it deliberately and record why.
 
 `--max-static-bss` is retained for explicit opt-in use and is not enforced by
 default; pass it to pin a section budget deliberately.
@@ -235,7 +247,9 @@ def main(argv=None):
         "--max-static-ram",
         dest="max_data_bss",
         type=int,
-        default=51000,
+        # Regression tripwire above the largest supported variant (the
+        # live-owner build at 51,820 B on 2026-09-04), not a hardware limit.
+        default=57344,
         help="policy ceiling for .data + .bss; --max-static-ram is a compatibility alias",
     )
     parser.add_argument(
@@ -243,7 +257,8 @@ def main(argv=None):
         "--min-heap",
         dest="min_sram0_free",
         type=int,
-        default=204800,
+        # Safety floor for the newlib arena; see the module docstring.
+        default=4096,
         help="minimum SRAM0-3 linker-managed free/core-memory span at boot; --min-heap is a compatibility alias",
     )
     args = parser.parse_args(argv)
@@ -276,7 +291,7 @@ def main(argv=None):
         )
     if memory["ram0_free"] < args.min_sram0_free:
         failures.append(
-            "SRAM0-3 linker-managed free/core-memory span {} is below {} B".format(
+            "SRAM0-3 newlib arena {} B is below the {} B safety floor".format(
                 memory["ram0_free"], args.min_sram0_free
             )
         )
@@ -298,8 +313,16 @@ def main(argv=None):
     print("SRAM0-3 .bss span: {} B ({})".format(memory["static_bss"], bss_limit))
     print("SRAM0-3 .data span: {} B (informational; nonzero initialisers also cost flash)".format(memory["static_data"]))
     print(
-        "SRAM0-3 .data + .bss policy span: {} B (policy limit {} B)".format(
-            memory["data_bss"], args.max_data_bss
+        "SRAM0-3 .data + .bss static RAM: {} B (regression tripwire {} B, {} B below it)".format(
+            memory["data_bss"], args.max_data_bss, args.max_data_bss - memory["data_bss"]
+        )
+    )
+    print(
+        "true static RAM headroom: {} B (SRAM0-3 {} B minus linked prefix {} B and the {} B arena floor)".format(
+            memory["ram0_free"] - args.min_sram0_free,
+            RP2040_SRAM0_BYTES,
+            memory["ram0_fixed_prefix"],
+            args.min_sram0_free,
         )
     )
     print(

@@ -114,28 +114,23 @@ milliseconds per iteration.
 
 ## Measured RAM State (R-07)
 
-Recorded here because it was measured during this investigation. The figures
-below are **after** the 2026-09-04 memory-policy correction; see
-`progress.md` for what changed and why.
+Measured during this investigation, after the 2026-09-04 memory-policy
+correction. See `progress.md` for what changed and why.
 
 | | ordinary | live-owner |
 | --- | ---: | ---: |
-| `.data` + `.bss` (static RAM) | 48,864 B | 51,820 B |
-| `.bss` (informational) | 44,716 B | 47,668 B |
-| `.data` (informational) | 4,148 B | 4,152 B |
-| Free/core span at boot | 213,272 B | 210,320 B |
+| Static RAM (`.data` + `.bss`) | 48,872 B | 51,820 B |
+| Below the regression tripwire (57,344 B) | 8,472 B | 5,524 B |
+| **True static RAM headroom** | **209,168 B** | **206,224 B** |
 
-Against `tools/check_firmware_memory_budget.py`:
+Both builds pass. The headroom row is the point: SRAM0-3 is 262,144 B, and the
+newlib arena's only reachable consumer in this firmware is `rand()` from
+`rgb_task_render` allocating its reentrancy state once, so the safety floor is
+4 KiB against roughly 206 KB of genuinely free memory.
 
-- `.data` + `.bss` ≤ 51,000 B: ordinary has 2,136 B of slack. **The live-owner
-  build is 820 B over and fails.**
-- Free/core span ≥ 204,800 B: both pass, by 8,472 B and 5,520 B.
-
-Physical SRAM is 270,336 B, so roughly 205 KB is unused. Exactly the
-distinction R-07 warns about: ample hardware headroom, almost no policy
-headroom. The largest single consumer is the wear-levelling RAM mirror at
+The old gates read as a hard constraint at ~51 KB and were neither. They are
+now a tripwire that catches unplanned growth and a floor that guards the
+arena, reported separately from true headroom so R-07's confusion cannot
+recur. The largest single consumer is the wear-levelling RAM mirror at
 16,392 B in both builds; `runtime_owner` at 3,172 B is the entire live-build
 delta.
-
-The live-owner build exceeding the static RAM gate by 820 B is an open Stage 06
-item independent of the cadence regression.

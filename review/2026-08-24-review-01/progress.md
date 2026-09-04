@@ -2214,3 +2214,41 @@ Next steps:
    this is a policy decision, not a hardware one.
 2. Then the logical-generation manifest across VIA and custom storage.
 3. R-21 stays parked and blocking; see `pointing-cadence-investigation.md`.
+
+### 2026-09-04 — Memory gates re-derived from measured demand
+
+Follow-up to the policy correction above, on the principle that real headroom
+must not be reported as a constraint.
+
+- Measured what actually consumes the linker-managed arena. `__heap_base__` to
+  the end of SRAM0-3 is newlib's `malloc` region reached through `_sbrk`. The
+  only reachable caller in this firmware is `rand()` from `rgb_task_render`,
+  which allocates its reentrancy state once, on the order of tens of bytes.
+  `srand` is never called and ChibiOS core/heap allocation is not linked in.
+  The old 204,800 B floor reserved roughly 200 KB of SRAM for that.
+- Because the floor implicitly capped static RAM near 51 KB, the live-owner
+  build's 820 B "overage" was an artifact of an undocumented reservation, not a
+  memory shortage.
+
+Landed:
+
+- The arena floor is now a derived safety guard at 4 KiB, about two orders of
+  magnitude above observed demand.
+- Static RAM is one regression tripwire at 57,344 B, sitting above the largest
+  supported variant, explicitly documented as a change detector rather than a
+  hardware limit, to be raised deliberately with a recorded reason.
+- Every run now prints policy distance and **true static RAM headroom** as
+  separate lines, so R-07's confusion is structural rather than a footnote.
+
+Measured after the change, both PASS: ordinary static RAM 48,872 B with
+209,168 B of true headroom; live-owner 51,820 B with 206,224 B. SRAM0-3 is
+262,144 B. The Stage 06 memory-policy deliverable is closed; it described a
+constraint that did not exist.
+
+Verification: `run_all_host_tests.sh`, fresh ordinary and live-owner
+`qmk compile`, memory and stack budget checks, `git diff --check`.
+
+Next steps:
+
+1. Proceed to the logical-generation manifest across VIA and custom storage.
+2. R-21 stays parked and blocking; see `pointing-cadence-investigation.md`.
