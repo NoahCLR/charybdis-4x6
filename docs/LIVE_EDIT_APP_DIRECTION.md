@@ -100,7 +100,34 @@ to a name. The live app needs both directions and cannot depend on a firmware
 workspace for either. Vendoring also turns QMK version drift into a diffable
 file rather than silent behaviour change.
 
-### D-L06 — Fork the presentation, rebuild the state
+### D-L06 — Port the whole UI, rebuild only the model source
+
+**Superseded in execution, and the correction matters.** This decision
+originally said to fork Studio's presentation — layout geometry, key faces,
+colour controls — and rebuild the rest. That was based on a wrong reading of
+where the reusable seam sits.
+
+Studio's webview does no file access at all. It is a pure renderer: the host
+posts a `model` object, the webview renders it, and edits come back as typed
+messages (`updateLayoutKeys`, `saveBehavior`, `addCombo`). The webview never
+knew the model came from parsed C. So the seam is the model, not the widgets,
+and the whole UI ports unchanged as long as something produces the same shape.
+
+Trying to lift "the presentation" out of 534 functions in one template literal
+is impossible; the model boundary one level up is free. The live app therefore
+takes Studio's UI verbatim into `webview/` and supplies the model from the
+keyboard via `core/session/device-model.js`.
+
+The cost is real and accepted: a large template literal now lives in an app
+otherwise organised into small modules. It is exempted from the layer rules by
+path, still tested for the two properties that matter — it cannot import
+device layers and cannot touch the filesystem — and gets decomposed tab by tab
+as each is rewired.
+
+The original text follows, kept because the reasoning it got wrong is worth
+remembering.
+
+### D-L06 (original) — Fork the presentation, rebuild the state
 
 The live app takes the expensive-to-rebuild visual work: the Charybdis layout
 geometry, key-face rendering, colour controls, layer tabs, and the CSS. It does

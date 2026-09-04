@@ -17,9 +17,9 @@ which is frozen and lives beside this one.
   - `protocol/` — wire formats spoken to the device
   - `session/` — stateful orchestration across a connection
   - `data/` — vendored data such as the keycode catalog
-- `media/` — the webview, as real ES modules loaded through
-  `webview.asWebviewUri()`. No template literal, no bundler. It never imports
-  the core; it renders snapshots the host posts.
+- `webview/` — Profile Studio's editing UI, ported verbatim. It renders the
+  `model` the host posts and sends edits back as typed messages; it never
+  imports the core and cannot touch the filesystem.
 - `tests/` — mirrors `core/`, one directory per layer.
 
 The layer rules and where new work belongs are in

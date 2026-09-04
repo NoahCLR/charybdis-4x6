@@ -31,11 +31,30 @@ core/               the app, with no host dependency
   protocol/         wire formats spoken to the device
   session/          stateful orchestration across a connection
   data/             vendored data, e.g. the keycode catalog
-media/              webview: real ES modules, no template literal
-  views/            one module per panel
+webview/            Profile Studio's editing UI, ported verbatim
 scripts/            developer entry points and build steps
 tests/              mirrors core/, one directory per layer
 ```
+
+### About `webview/`
+
+`studio-ui.js` is Profile Studio's UI, unmodified. It is a pure renderer: it
+reads the `model` the host posts and sends edits back as typed messages. That
+seam is why the port works, and it is why the UI did not have to be rebuilt.
+
+It is one large template literal, the shape this app otherwise avoids. Keeping
+it verbatim was deliberate: it is roughly 8,700 lines of working, visually
+tuned UI, and rewriting it to prove a structural point would have traded a real
+editor for a tidier empty one.
+
+It is exempt from the layer rules by path. Two things still hold and are
+tested: it may not import `transport/`, `protocol/` or `session/`, and it may
+not touch the filesystem.
+
+It still carries stale copy — tooltips and help text mentioning the C source
+files, inherited from the editor it came from. Those are display strings, not
+behaviour. Rewrite them as you rewire each tab to the device, rather than in
+one sweep.
 
 ## Layer Rules
 
@@ -65,7 +84,8 @@ replaceable.
 - A new device command or wire format → `protocol/`
 - A new profile domain or byte layout → `schema/`
 - Anything holding state across a connection → `session/`
-- A new panel → `media/views/`, one module per panel
+- A new panel or a rewritten tab → `webview/`, decomposed out of the
+  monolith as you touch it
 - The canonical profile format, drafts, and generation binding → a new
   `core/model/` layer between `schema/` and `session/`. It does not exist yet;
   create it when the format is designed, not before.

@@ -2,17 +2,21 @@
 
 // Charybdis Live — extension host.
 //
-// This file is deliberately thin. It owns the VS Code surface only: the
-// command, the panel, and message relay. Every decision about the device, the
-// protocol, and the profile lives in core/, which has no vscode import so
-// that this shell can be replaced by a standalone app later without touching
-// it. Nothing here parses a firmware repository; see
+// Thin on purpose. It owns the VS Code surface (command, panel, message relay)
+// and nothing else. Device, protocol and profile decisions live in core/, which
+// has no vscode import so this shell can be replaced by a standalone app later
+// without touching it. Nothing here parses a firmware repository; see
 // docs/LIVE_EDIT_APP_DIRECTION.md.
+//
+// The webview is Profile Studio's editing UI, ported verbatim. It renders a
+// `model` and posts typed edits back, so this file's job is to build that model
+// from the keyboard and turn those edits into device writes.
 
-const path = require("node:path");
 const vscode = require("vscode");
 
 const {ProfileDeviceService} = require("./core/session/profile-device-service");
+const {buildDeviceModel} = require("./core/session/device-model");
+const {getStudioHtml} = require("./webview/studio-ui");
 
 const VIEW_TYPE = "charybdisLive.panel";
 
@@ -31,100 +35,138 @@ function activate(context) {
 
 function deactivate() {}
 
-function openPanel(context) {
-    const panel = vscode.window.createWebviewPanel(
-        VIEW_TYPE,
-        "Charybdis Live",
-        vscode.ViewColumn.One,
-        {
-            enableScripts: true,
-            retainContextWhenHidden: true,
-            localResourceRoots: [vscode.Uri.file(path.join(context.extensionPath, "media"))],
-        }
-    );
-
-    const service = new ProfileDeviceService({
-        onChange: (snapshot) => post(panel, {type: "snapshot", snapshot}),
+function openPanel() {
+    const panel = vscode.window.createWebviewPanel(VIEW_TYPE, "Charybdis Live", vscode.ViewColumn.One, {
+        enableScripts: true,
+        retainContextWhenHidden: true,
     });
 
-    panel.webview.html = renderHtml(panel.webview, context);
-    panel.webview.onDidReceiveMessage((message) => handleMessage(panel, service, message));
+    const session = {service: undefined, notice: undefined};
+    session.service = new ProfileDeviceService({
+        onChange: () => publish(panel, session),
+    });
+
+    panel.webview.html = getStudioHtml();
+    panel.webview.onDidReceiveMessage((message) => handleMessage(panel, session, message));
     panel.onDidDispose(() => {
-        void service.close();
+        void session.service.close();
     });
-
-    // Publish the empty snapshot immediately so the view renders before any
-    // device work happens.
-    post(panel, {type: "snapshot", snapshot: service.snapshot()});
 }
 
-async function handleMessage(panel, service, message) {
+function publish(panel, session) {
+    const state = session.service.snapshot();
+    void panel.webview.postMessage({
+        type: "model",
+        model: buildDeviceModel({
+            capabilities: state.capabilities,
+            status: state.status,
+            layout: state.layout,
+            device: state.devices.find((device) => device.id === state.selectedDeviceId),
+        }),
+        notice: session.notice,
+    });
+    session.notice = undefined;
+}
+
+async function handleMessage(panel, session, message) {
     try {
         switch (message?.type) {
-            case "scan":
-                await service.enumerate();
-                return;
-            case "connect":
-                await service.connect(message.deviceId);
-                return;
+            case "ready":
             case "refresh":
-                await service.refresh();
+                await connectAndRead(panel, session);
                 return;
-            case "readLayout":
-                await service.readLayout();
+            case "updateLayoutKeys":
+                await writeLayoutKeys(panel, session, message);
                 return;
-            case "disconnect":
-                await service.disconnect();
+
+            // Studio surfaces these against a repository. This app has none,
+            // and the domains behind them need the committed payload read.
+            // Say so rather than failing silently.
+            case "selectProfile":
+            case "requestCreateProfile":
+            case "requestCloneProfile":
+            case "requestRenameProfile":
+            case "requestDeleteProfile":
+                vscode.window.showInformationMessage(
+                    "Charybdis Live edits the connected keyboard and has no profile files. Use Profile Studio for source profiles."
+                );
+                return;
+            case "applyLayerChanges":
+            case "saveBehavior":
+            case "addBehavior":
+            case "addCombo":
+                vscode.window.showInformationMessage(
+                    "That domain needs the committed profile read, which is not implemented yet. Layout editing works today."
+                );
                 return;
             default:
                 return;
         }
     } catch (error) {
-        // The service records its own error state and emits a snapshot, so the
-        // panel stays truthful. Surface it once here for the operations a user
-        // started explicitly.
         const text = error instanceof Error ? error.message : String(error);
         vscode.window.showErrorMessage(`Charybdis Live: ${text}`);
+        publish(panel, session);
     }
 }
 
-function post(panel, message) {
-    void panel.webview.postMessage(message);
-}
-
-function renderHtml(webview, context) {
-    const asset = (...parts) =>
-        webview.asWebviewUri(vscode.Uri.file(path.join(context.extensionPath, ...parts)));
-    const nonce = createNonce();
-    const csp = [
-        "default-src 'none'",
-        `style-src ${webview.cspSource}`,
-        `script-src 'nonce-${nonce}'`,
-    ].join("; ");
-
-    return `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="${csp}">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="stylesheet" href="${asset("media", "main.css")}">
-<title>Charybdis Live</title>
-</head>
-<body>
-<main id="app"></main>
-<script nonce="${nonce}" type="module" src="${asset("media", "main.js")}"></script>
-</body>
-</html>`;
-}
-
-function createNonce() {
-    const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-    let nonce = "";
-    for (let index = 0; index < 32; index += 1) {
-        nonce += alphabet[Math.floor(Math.random() * alphabet.length)];
+// Connect, learn what the keyboard is, and read what it is running. Studio's
+// Reload button maps onto this: there it re-read the files, here the device.
+async function connectAndRead(panel, session) {
+    const service = session.service;
+    await service.enumerate();
+    const devices = service.snapshot().devices;
+    if (!devices.length) {
+        session.notice = "No Charybdis Raw HID interface found. Connect the keyboard and reload.";
+        publish(panel, session);
+        return;
     }
-    return nonce;
+
+    if (!service.snapshot().connected) {
+        let deviceId = devices[0].id;
+        if (devices.length > 1) {
+            const picked = await vscode.window.showQuickPick(
+                devices.map((device) => ({
+                    label: [device.manufacturer, device.product].filter(Boolean).join(" ") || "Charybdis",
+                    description: device.id,
+                    id: device.id,
+                })),
+                {title: "Several Charybdis interfaces matched"}
+            );
+            if (!picked) {
+                return;
+            }
+            deviceId = picked.id;
+        }
+        await service.connect(deviceId);
+    }
+
+    await service.refresh();
+    await vscode.window.withProgress(
+        {location: vscode.ProgressLocation.Notification, title: "Reading layout from the keyboard"},
+        () => service.readLayout()
+    );
+    session.notice = "Read the layout from the connected keyboard.";
+    publish(panel, session);
+}
+
+async function writeLayoutKeys(panel, session, message) {
+    const service = session.service;
+    if (!service.snapshot().connected) {
+        throw new Error("Connect to a keyboard before changing its layout.");
+    }
+    const groups = Array.isArray(message.layers)
+        ? message.layers
+        : [{layer: message.layer, changes: message.changes || []}];
+
+    const result = await vscode.window.withProgress(
+        {location: vscode.ProgressLocation.Notification, title: "Writing keys to the keyboard"},
+        () => service.writeLayoutKeys(groups)
+    );
+
+    session.notice = result.rejected.length
+        ? `Wrote ${result.written} keys. Refused ${result.rejected.length}: ${result.rejected.map((entry) => entry.keycode).join(", ")}.`
+        : `Wrote ${result.written} key${result.written === 1 ? "" : "s"} to the keyboard.`;
+    publish(panel, session);
 }
 
 module.exports = {activate, deactivate};

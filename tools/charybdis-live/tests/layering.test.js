@@ -65,7 +65,7 @@ test("core layers import only downward", () => {
 });
 
 test("only the extension shell knows about VS Code", () => {
-    for (const dir of ["core", "media", "scripts"]) {
+    for (const dir of ["core", "scripts", "webview"]) {
         for (const file of sourceFiles(dir)) {
             const text = fs.readFileSync(file, "utf8");
             assert.ok(
@@ -76,27 +76,47 @@ test("only the extension shell knows about VS Code", () => {
     }
 });
 
-test("the webview never reaches into the core", () => {
-    for (const file of sourceFiles("media")) {
+test("the ported webview stays a renderer", () => {
+    // studio-ui.js may read the vendored catalog to bake constants into the
+    // page, but it must not reach for device or session logic: the UI renders
+    // the model the host posts and nothing else.
+    const forbidden = ["core/transport", "core/protocol", "core/session"];
+    for (const file of sourceFiles("webview")) {
         for (const target of [...requiresIn(file), ...importsIn(file)]) {
             assert.ok(
-                !target.includes("core/") && !target.includes("../core"),
-                `${path.relative(APP_ROOT, file)} imports the core; it must render posted snapshots instead`
+                !forbidden.some((prefix) => target.includes(prefix)),
+                `${path.relative(APP_ROOT, file)} imports ${target}; the UI must render the posted model instead`
             );
         }
     }
 });
 
-test("nothing at runtime reads the firmware repository", () => {
+test("nothing we author mentions the firmware repository", () => {
     // The one sanctioned QMK reader is the catalog generator, which is a build
     // step producing a checked-in file rather than a runtime dependency.
-    const runtime = [...sourceFiles("core"), ...sourceFiles("media"), path.join(APP_ROOT, "extension.js")];
-    for (const file of runtime) {
+    const authored = [...sourceFiles("core"), path.join(APP_ROOT, "extension.js")];
+    for (const file of authored) {
         const text = fs.readFileSync(file, "utf8");
         for (const marker of ["keymap.c", "rgb_config.c", "config.h", "bastardkb-qmk", "qmk_firmware", ".hjson"]) {
             assert.ok(
                 !text.includes(marker),
                 `${path.relative(APP_ROOT, file)} references ${marker}; this app must not read the repository`
+            );
+        }
+    }
+});
+
+test("the ported UI cannot touch the filesystem, whatever its copy still says", () => {
+    // studio-ui.js carries stale mentions of the C source files in tooltips and
+    // help text, inherited from the editor it was ported from. Those are display
+    // strings and get rewritten tab by tab. What must never come back is the
+    // ability to act on them, so assert on capability rather than wording.
+    for (const file of sourceFiles("webview")) {
+        const text = fs.readFileSync(file, "utf8");
+        for (const capability of ['require("node:fs")', 'require("fs")', "readFileSync", "writeFileSync", "child_process"]) {
+            assert.ok(
+                !text.includes(capability),
+                `${path.relative(APP_ROOT, file)} uses ${capability}; the ported UI must stay a renderer`
             );
         }
     }

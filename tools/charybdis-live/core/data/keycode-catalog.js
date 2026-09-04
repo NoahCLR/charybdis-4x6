@@ -134,8 +134,71 @@ function unknown(value) {
     return {value, name: hex, label: hex, group: "unknown", kind: "unknown", known: false};
 }
 
+// The inverse of resolve(): turn an authored expression back into the uint16
+// the device stores. Returns undefined rather than guessing, so a caller can
+// refuse the write instead of sending a wrong keycode to the keyboard.
+function encode(expression) {
+    const text = String(expression || "").trim();
+    if (!text) {
+        return undefined;
+    }
+
+    const direct = BY_NAME.get(text);
+    if (direct) {
+        return direct.value;
+    }
+
+    const layerForm = text.match(/^(MO|TG|OSL|TO)\(\s*(\d+)\s*\)$/);
+    if (layerForm) {
+        const bases = {MO: MOMENTARY_BASE, TG: TOGGLE_BASE, OSL: ONESHOT_BASE, TO: LAYER_MOVE_BASE};
+        const layer = Number(layerForm[2]);
+        return layer < 32 ? bases[layerForm[1]] + layer : undefined;
+    }
+
+    const layerTap = text.match(/^LT\(\s*(\d+)\s*,\s*([A-Za-z0-9_]+)\s*\)$/);
+    if (layerTap) {
+        const layer = Number(layerTap[1]);
+        const tapped = BY_NAME.get(layerTap[2]);
+        if (layer < 16 && tapped && tapped.value <= 0xff) {
+            return 0x4000 | (layer << 8) | tapped.value;
+        }
+        return undefined;
+    }
+
+    const hex = text.match(/^0[xX]([0-9a-fA-F]{1,4})$/);
+    if (hex) {
+        return Number.parseInt(hex[1], 16);
+    }
+
+    return undefined;
+}
+
 function lookup(name) {
     return BY_NAME.get(name);
+}
+
+// The ported Studio UI expects QMK's alias table: every name and alias
+// mapping to its canonical keycode name. Studio built this from a parsed QMK
+// checkout; here it comes from the vendored catalog.
+function aliasTable() {
+    const aliases = {};
+    for (const entry of catalog.entries) {
+        aliases[entry.name] = entry.name;
+    }
+    for (const entry of catalog.entries) {
+        for (const alias of entry.aliases) {
+            if (!aliases[alias]) {
+                aliases[alias] = entry.name;
+            }
+        }
+    }
+    aliases._______ = "_______";
+    aliases.XXXXXXX = "XXXXXXX";
+    return aliases;
+}
+
+function entries() {
+    return catalog.entries;
 }
 
 function metadata() {
@@ -146,4 +209,4 @@ function metadata() {
     };
 }
 
-module.exports = {lookup, metadata, resolve};
+module.exports = {aliasTable, encode, entries, lookup, metadata, resolve};

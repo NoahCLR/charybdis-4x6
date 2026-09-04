@@ -4,7 +4,7 @@ const {RAW_HID_REPORT_SIZE} = require("../transport/device-adapter");
 const {NodeHidDeviceAdapter} = require("../transport/node-hid-adapter");
 const {DeviceRequestCoordinator} = require("../transport/request-coordinator");
 const {CandidateUploadCoordinator} = require("./candidate-upload-coordinator");
-const {readViaLayout, synchronizeViaLayout} = require("../protocol/via-layout-v1");
+const {CHARYBDIS_4X6_LAYOUT_MATRIX, readViaKeycode, readViaLayout, synchronizeViaLayout, writeViaKeycode} = require("../protocol/via-layout-v1");
 const keycodeCatalog = require("../data/keycode-catalog");
 const {
     CANDIDATE_OPERATION,
@@ -210,6 +210,84 @@ class ProfileDeviceService {
                     : `Read ${layerCount} layers; ${unknown} keycodes are not in the vendored catalog.`
             );
         });
+    }
+
+// Applies layout edits to the keyboard and reads each one back.
+    //
+    // A keycode expression the vendored catalog cannot encode is refused, not
+    // approximated: writing a guessed value would silently change what the
+    // key does. Refusals are returned so the caller can report them.
+    async writeLayoutKeys(groups) {
+        if (!this.connection?.connected) {
+            throw new Error("Connect to a keyboard before changing its layout.");
+        }
+
+        const planned = [];
+        const rejected = [];
+        for (const group of Array.isArray(groups) ? groups : []) {
+            const layer = this.layerIndexFor(group.layer);
+            if (layer === undefined) {
+                for (const change of group.changes || []) {
+                    rejected.push({...change, reason: `unknown layer ${group.layer}`});
+                }
+                continue;
+            }
+            for (const change of group.changes || []) {
+                const position = CHARYBDIS_4X6_LAYOUT_MATRIX[change.layoutIndex];
+                const keycode = keycodeCatalog.encode(change.keycode);
+                if (!position || keycode === undefined) {
+                    rejected.push({...change, reason: position ? "keycode not in the vendored catalog" : "position outside the layout"});
+                    continue;
+                }
+                planned.push({layer, row: position[0], column: position[1], keycode, layoutIndex: change.layoutIndex, expression: change.keycode});
+            }
+        }
+
+        // runOperation reports through the snapshot and swallows the error
+        // into error state, so count outside it. A partial count after a
+        // failure is the truth: those keys really were written.
+        const outcome = {written: 0, rejected};
+        await this.runOperation("writing layout", async () => {
+            const connection = this.connection;
+            for (const entry of planned) {
+                await writeViaKeycode(connection, entry);
+                const readBack = await readViaKeycode(connection, entry);
+                if (readBack !== entry.keycode) {
+                    throw new Error(
+                        `The keyboard reported 0x${readBack.toString(16)} after writing ${entry.expression}; layout write aborted.`
+                    );
+                }
+                this.applyLayoutKey(entry, readBack);
+                outcome.written += 1;
+            }
+            this.addDiagnostic(
+                rejected.length
+                    ? `Wrote ${outcome.written} keys and refused ${rejected.length}.`
+                    : `Wrote ${outcome.written} keys to the keyboard.`
+            );
+        });
+        return outcome;
+    }
+
+    layerIndexFor(name) {
+        const match = String(name || "").match(/(\d+)/);
+        if (!match) {
+            return undefined;
+        }
+        const index = Number(match[1]);
+        const known = this.layout?.layers?.some((entry) => entry.layer === index);
+        return known ? index : undefined;
+    }
+
+    // Keep the cached layout in step with the device so the UI does not need a
+    // full re-read after every edit.
+    applyLayoutKey(entry, keycode) {
+        const layer = this.layout?.layers?.find((candidate) => candidate.layer === entry.layer);
+        const key = layer?.keys?.find((candidate) => candidate.layoutIndex === entry.layoutIndex);
+        if (key) {
+            key.keycode = keycode;
+            key.resolved = keycodeCatalog.resolve(keycode);
+        }
     }
 
     async disconnect() {
