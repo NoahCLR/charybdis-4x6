@@ -1,22 +1,24 @@
 # Charybdis Profile Studio
 
+> Profile Studio edits the authored C profile. Editing the **connected
+> keyboard** is a separate app: see
+> [`tools/charybdis-live/`](../../tools/charybdis-live/) and
+> [`LIVE_EDIT_APP_DIRECTION.md`](../LIVE_EDIT_APP_DIRECTION.md). Studio is
+> frozen; it is no longer a development target.
+
 Charybdis Profile Studio is the repo-local VS Code extension under
 [`tools/charybdis-profile-studio/`](../../tools/charybdis-profile-studio/).
-It currently edits the authored C profile visually. The long-term live-edit
-authority is the keyboard's readable committed logical profile, as defined in
-[`device-resident-profile.md`](../architecture/device-resident-profile.md).
-The complete user-facing product goal and quality bar are maintained in
-[`PROFILE_STUDIO_PRODUCT_GOAL.md`](./PROFILE_STUDIO_PRODUCT_GOAL.md).
+It edits the authored profile visually while keeping the C source files as the
+only source of truth.
 
 For the shorter user-facing guide and screenshot links, see
 [`tools/charybdis-profile-studio/README.md`](../../tools/charybdis-profile-studio/README.md).
 
-## Current Source-Driven Ownership
+## Source Ownership
 
 There is no sidecar profile format. The Studio parses existing C authoring
 blocks, renders a VS Code webview, and applies narrow patches back to those
-same blocks. This describes current behavior, not the intended authority of a
-connected live session.
+same blocks.
 
 The extension writes the selected profile under
 `keyboards/bastardkb/charybdis/4x6/keymaps/<name>/`. For the current `noah`
@@ -30,105 +32,6 @@ profile, the editable files are:
 
 For complex behavior rows, direct source editing is still expected after using
 the Studio as a starter.
-
-## Target Device-First Ownership
-
-When a live keyboard is connected, its exact committed generation becomes the
-editing baseline. Studio must be able to download the complete supported
-logical profile, create a generation-bound draft, commit it to both halves, and
-read it back. Source import and source export remain explicit operations; a
-connection never silently overwrites the keyboard or the repository.
-
-The device stores structured configuration values, not literal C text. The C
-files remain compiled defaults, recovery input, and the reviewable
-version-control representation. Initially one logical Studio profile may still
-be backed by standard VIA storage for layout/macros and the custom profile store
-for RGB, behaviors, and policy domains. That physical split must be covered by
-one logical manifest and transaction coordinator before the software can claim
-that a complete profile was committed atomically.
-
-## Live Keyboard And Engineering Apply
-
-The header's `Live keyboard` row supports both read-only inspection and the
-first engineering live-apply path:
-
-- `Find keyboards` enumerates the matching QMK Raw HID interface without
-  opening it.
-- `Connect` opens the selected interface and sends only standard VIA identity
-  reads plus Profile Wire requests for capabilities and status.
-- `Refresh` repeats those capability and status reads.
-- `Apply live` appears only when the connected firmware advertises the complete
-  candidate-write, persistent-commit, runtime-activation, and peer-reconciliation
-  contract and reports the second half as detected and converged. It compiles
-  RGB and `key_behaviors[]` from source on disk, uploads the canonical profile,
-  persists it on both halves, and activates it. It also compiles every authored
-  layer slot to the keyboard's VIA matrix coordinates, reads the current
-  dynamic keymap, writes only differences, and verifies each changed key by
-  readback. Those standard VIA writes use the firmware's existing immediate
-  split mirror and durable reconciliation rather than a second profile format.
-- `Disconnect` closes the host connection.
-
-Despite the current feature name, Profile Wire's `READ_SURFACE` exposes only
-capability and status pages. It does not yet expose the committed custom-profile
-bytes. Standard VIA can read layout keycodes, but Studio cannot currently
-reconstruct the complete profile from the keyboard.
-
-The native HID path and connected handle stay in the extension host. The
-webview receives an opaque device id, a display label, decoded capabilities and
-status, and sanitized errors/diagnostics.
-
-The live panel compares protocol and schema majors, report framing, Milestone A
-domain support, the standard VIA firmware version, and the active source
-profile's layer, behavior, combo, RGB group, and LED requirements with the
-capacities reported by firmware. An
-incompatible result disables `Apply live`. Ordinary source Apply actions still
-write only the C files; use `Apply live` as the explicit device operation.
-
-Ordinary firmware reports its compiled/read-only store view and advertises no
-mutation capability. The side-specific live-edit test artifacts enable the
-complete owner and mutation route together. Their D-022 barrier prepares the
-peer, commits locally, authorizes the peer commit, requires exact convergence,
-then publishes the new runtime generation only at a safe activation boundary.
-Profile Studio performs a final status read and reports success only when the
-same digest is both active and committed.
-
-### First two-half test
-
-1. Install or reload the current Profile Studio extension.
-2. Use `Compile live-edit test` in the Firmware row, or use the labeled UF2
-   files already built at the repository root.
-3. Flash `bastardkb_charybdis_4x6_noah_live_edit_left.uf2` to the physical left
-   half and `bastardkb_charybdis_4x6_noah_live_edit_right.uf2` to the physical
-   right half using the normal UF2 bootloader workflow.
-4. Reconnect the keyboard normally, open Profile Studio, then choose `Find
-   keyboards` and `Connect`.
-5. Confirm the Live panel says `Second half detected: Yes`, `Halves converged:
-   Yes`, and that live apply is available. Make and apply a small
-   source edit—first an obvious RGB color, then a base-layer letter such as
-   `KC_Y` to `KC_X`—and choose `Apply live`. Local form drafts must be applied
-   to source first; the live compiler intentionally reads the three files on
-   disk.
-6. Confirm the Live apply card says `Persisted and active` and reports the
-   checked/changed layer-key counts. Exercise the changed key and behavior on
-   both halves, then reboot once to verify persistence.
-
-If Studio reports that the second half was not detected while ordinary keys on
-that half still work, the core QMK split link may be healthy while the profile
-endpoint is not. Both live-edit artifacts must include the slave durable-I/O
-scan hook; rebuild and flash the current pair rather than treating working keys
-as proof that the profile endpoint is running. A candidate left in
-`PREPARING_PEER` by an older pair is still pre-commit. Power-cycle both halves
-together, flash the current matching left/right pair, reconnect, and refresh.
-Studio can resume a matching recoverable candidate after the split is healthy;
-it refuses a mismatched or unsafe candidate instead of overwriting it.
-
-This pair is an engineering acceptance build, not the ordinary daily firmware.
-Its reviewed stack paths pass and its linked fixed occupancy is far below the
-270,336 bytes of physical SRAM available on each RP2040, but its `.bss` and
-`.data + .bss` regression policies remain red and runtime high-water has not
-yet been measured. If the first test behaves unexpectedly, stop live writes and
-flash the ordinary left/right firmware pair; ordinary firmware does not activate
-the persisted live profile.
 
 ## Profiles And New Keymaps
 
@@ -189,27 +92,10 @@ warns before generation when Studio has staged layout/layer edits or dirty local
 forms, because the overview is generated from the source files currently on
 disk.
 The Firmware row's `Compile left + right` button builds
-`bastardkb_charybdis_4x6_<name>_left.uf2` with `FORCE_SLAVE=yes` plus
-`NOAH_PHYSICAL_HALF=left`, and the matching right artifact with
-`FORCE_MASTER=yes` plus `NOAH_PHYSICAL_HALF=right`. The role mapping follows
-the keyboard's `MASTER_RIGHT` configuration. Physical identity is embedded in
-each artifact independently, so a USB-role swap or EEPROM reset cannot change
-the durable live-profile origin. The action opens the Charybdis Profile Studio
-output pane and streams QMK output while each side builds.
-`Compile live-edit test` uses the same physical mapping and produces
-`bastardkb_charybdis_4x6_<name>_live_edit_left.uf2` and
-`bastardkb_charybdis_4x6_<name>_live_edit_right.uf2`, adding the explicit
-engineering owner and mutation gates without changing the ordinary build.
-
-`Compile performance comparison` builds four side-specific diagnostic images
-from the same source tree. Every image enables
-`NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS=yes`. The ordinary baseline explicitly
-leaves the live-profile owner and mutation route disabled and produces
-`bastardkb_charybdis_4x6_<name>_performance_baseline_left.uf2` plus the matching
-right image. The engineering pair enables both live-profile gates and produces
-the matching `performance_live_edit_left` and `performance_live_edit_right`
-images. Flash the baseline pair first and capture its diagnostic run before
-flashing the engineering pair.
+`bastardkb_charybdis_4x6_<name>_left.uf2` with `FORCE_MASTER=yes` and
+`bastardkb_charybdis_4x6_<name>_right.uf2` with `FORCE_SLAVE=yes`. It opens the
+Charybdis Profile Studio output pane and streams the QMK output while each side
+builds.
 
 ## Editing Model
 
@@ -218,11 +104,6 @@ are local drafts until an apply action writes them to source.
 
 - Layout-slot edits are staged and written to `keymap.c` only when a layout
   apply action is pressed.
-- In the current milestone, `Apply live` treats source as authoritative for all
-  authored layer slots. It compares all slots with the connected keyboard,
-  sends standard VIA writes only for differences, and verifies each write.
-  Unused matrix cells are left untouched. Device-first readback will replace
-  this implicit direction with explicit keyboard/source import and export.
 - The Layout board's apply button appears on every layer whenever any layer has
   staged layout edits, and writes all staged layout edits in one pass.
 - Layer add/delete is a separate staged operation written only by

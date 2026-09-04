@@ -234,33 +234,43 @@ npm run install:local
 The full Studio guide is
 [`docs/tooling/PROFILE_STUDIO.md`](./docs/tooling/PROFILE_STUDIO.md).
 
-Normal firmware keeps the Live keyboard connection read-only. The separately
-labeled live-edit test firmware now exposes the first end-to-end engineering
-path: Profile Studio compiles RGB and `key_behaviors[]` directly from the
-authored source files and synchronizes every authored `keymaps[][]` slot through
-standard VIA. The custom profile is validated, prepared, persistently committed,
-and activated on both halves; layout writes are read back on the connected half
-and enter the existing immediate-mirror and durable split-reconciliation paths.
-Real-board testing confirms that both an RGB color and a normal base-layer
-keycode can now be changed without reflashing. This is the first usable
-engineering milestone, but it is not production-promoted: the broader hardware
-acceptance matrix and runtime high-water measurements are still open, and the
-engineering image remains above two conservative static-memory regression
-policies (not the RP2040's physical RAM capacity).
+Profile Studio edits the authored source files. Live editing of the connected
+keyboard is a separate app.
 
-This first milestone is still source-driven. The keyboard exposes status and
-identity but not yet the complete committed custom-profile payload, so Studio
-cannot yet reconstruct RGB and custom behaviors from the keyboard alone. Full
-device readback, device-first editing, explicit source import/export, and
-generation-conflict handling are the next architectural goal.
+## Charybdis Live
 
-Working keys on the slave prove QMK's core split transport, not the separate
-live-profile endpoint. The engineering firmware therefore advances durable
-profile and VIA receiver work from QMK's dedicated slave scan hook as well as
-the master scan hook, and Studio keeps live apply disabled until profile status
-confirms that both halves are present and converged.
+[Charybdis Live](./tools/charybdis-live/) edits the connected keyboard over Raw
+HID. It never parses this repository, so it does not need a firmware workspace
+open. Profile Studio owns `.c` authoring; this app owns the device.
 
-The next sections explain the keymap and RGB models that the Studio edits.
+From VS Code with this repo folder open:
+
+1. Run the VS Code task `Install Charybdis Live Extension`.
+2. Reload VS Code.
+3. Open it from the `$(radio-tower) Charybdis Live` status bar item, or run
+   `Charybdis: Open Charybdis Live` from the command palette.
+
+You can also install it from a shell:
+
+```sh
+cd tools/charybdis-live
+npm run install:local
+```
+
+Press `F5` with the `Run Charybdis Live` launch configuration to run it in an
+Extension Development Host instead.
+
+It currently shows what the keyboard reports about itself: VIA and Profile Wire
+versions, schema, capacities, storage geometry, and committed profile status
+including whether both halves agree on a generation. Reading the committed
+payload back is the next step. Flash the side-specific firmware pair, which
+carries the live-profile owner by default; the generic image does not.
+
+The direction, the decisions behind the split, and what is deliberately left
+undesigned are in
+[`docs/LIVE_EDIT_APP_DIRECTION.md`](./docs/LIVE_EDIT_APP_DIRECTION.md).
+
+The next sections explain the keymap and RGB models that Profile Studio edits.
 
 ## The Keymap Model
 

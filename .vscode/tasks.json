@@ -46,6 +46,24 @@
             "problemMatcher": []
         },
         {
+            "label": "Install Charybdis Live Extension",
+            "type": "process",
+            "command": "${workspaceFolder}/tools/charybdis-live/scripts/install-local.sh",
+            "problemMatcher": []
+        },
+        {
+            "label": "Regenerate Live Keycode Catalog",
+            "type": "process",
+            "command": "npm",
+            "args": [
+                "--prefix",
+                "${workspaceFolder}/tools/charybdis-live",
+                "run",
+                "keycodes"
+            ],
+            "problemMatcher": []
+        },
+        {
             "label": "Format repo",
             "type": "process",
             "command": "bash",

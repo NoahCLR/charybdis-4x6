@@ -20,6 +20,13 @@ function activate(context) {
     context.subscriptions.push(
         vscode.commands.registerCommand("charybdisLive.open", () => openPanel(context))
     );
+
+    const status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 2);
+    status.text = "$(radio-tower) Charybdis Live";
+    status.tooltip = "Open Charybdis Live — edit the connected keyboard";
+    status.command = "charybdisLive.open";
+    status.show();
+    context.subscriptions.push(status);
 }
 
 function deactivate() {}
