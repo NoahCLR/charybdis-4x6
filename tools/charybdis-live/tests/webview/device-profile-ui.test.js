@@ -33,7 +33,7 @@ test("device readback renders all behavior rows, timing zeros, branches and RGB 
     assert.equal(host.all("tbody")[0].children.length, 37);
     assert.match(host.textContent, /Tap\/hold: 0/);
     assert.match(host.textContent, /Double Tap Branch/);
-    assert.match(host.textContent, /TAP_ON_RELEASE_AFTER_HOLD/);
+    assert.match(host.textContent, /Tap on release/);
     assert.match(host.textContent, /VIA_MACRO_10/);
     assert.match(host.textContent, /Auto-mouse anchor flag/);
     assert.equal(host.all("tbody")[0].children[0].children[3].textContent, "Not set");
@@ -56,12 +56,26 @@ test("device strings stay text and cannot inject markup into the new view", () =
     assert.equal(document.nodes.deviceBehaviors.all("img").length, 0);
 });
 
+test("every behaviour row can open the editor using its exact device identity", () => {
+    const document = documentForView();
+    const model = buildDeviceModel({committed: decodedDeviceProfile()});
+    const messages = [];
+    renderDeviceProfileDetails(document, model, message => messages.push(message));
+    const buttons = document.nodes.deviceBehaviors.all("button");
+    assert.equal(buttons.length, 37);
+    assert.equal(document.nodes.deviceBehaviors.all("code")[0].title, model.keyBehaviors[0].keycode);
+    for (const [index, button] of buttons.entries()) {
+        button.onclick();
+        assert.deepEqual(messages.at(-1), {type: "editBehavior", keycode: model.keyBehaviors[index].keycode});
+    }
+});
+
 test("the generated webview script includes the device renderer and parses as delivered", () => {
     const html = getStudioHtml();
     const script = html.match(/<script nonce="[^"]+">([\s\S]*?)<\/script>/)[1];
     new vm.Script(script);
     assert.match(script, /function renderDeviceProfileDetails/);
-    assert.match(script, /renderDeviceProfileDetails\(document, model, post\)/);
+    assert.match(script, /renderDeviceProfileDetails\(document, model, post, displayKeyExpression\)/);
     assert.match(script, /\["behaviors", "Behaviours"\]/);
 });
 

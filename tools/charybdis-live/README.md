@@ -124,7 +124,28 @@ the candidate lease, waits for both halves, and requires exact payload readback.
 Combo saves also verify the effective native table. An absent combo domain
 retains compiled combos; an empty domain disables them. Flash the current
 side-specific pair before using combo writes, then reload the extension and
-read the keyboard. Behaviour edits are the next profile writer to connect.
+read the keyboard.
+
+Behaviour edits use the same verified profile save. Select a key in Layout or
+choose **Edit behaviour** in the Behaviours list. Save changes to timing,
+tap-count branches, tap/hold/long-hold actions, repeat rates and the additional
+auto-mouse anchor flag; add a row for a key without one or delete an existing
+row. Blank timing values become zero (firmware default), and disabled branches
+are removed. An empty row can still carry timing and anchor policy. The app
+preserves untouched rows and RGB/combo bytes, validates advertised capacities
+and action references, and requires exact committed readback before reporting
+success. The existing behaviour-capable firmware needs no reflash for this
+editor connection; reload VS Code and read the keyboard again.
+
+Behaviour drafts stay attached to their device and row while switching keys
+or views. Failed saves keep the fields editable. A draft based on an older
+profile remains visible but cannot be saved over the new profile; use
+**Discard row changes** to load that row again, or **Read from keyboard** to
+discard local edits and refresh. Successful saves clear only the saved row's
+draft. These drafts are held in the open editor, not stored as backups.
+Timing fields use millisecond labels, key shortcuts use readable names, and
+tap branches wrap to fit the window.
+
 Macro payloads and global policy defaults are not read yet. `READ_SURFACE`
 still means capability/status reporting, not payload readback.
 

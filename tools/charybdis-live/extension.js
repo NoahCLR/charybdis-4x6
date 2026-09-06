@@ -64,11 +64,14 @@ function publish(panel, session) {
             committed: state.committed,
             baseRgb: state.baseRgb,
             combos: state.combos,
+            busy: state.busy || session.savingBehavior,
             device: state.devices.find((device) => device.id === state.selectedDeviceId),
         }),
         notice: session.notice,
+        savedBehavior: session.savedBehavior,
     });
     session.notice = undefined;
+    session.savedBehavior = undefined;
 }
 
 // The webview sets its own "Working..." status on every message it posts, and
@@ -107,9 +110,21 @@ async function handleMessage(panel, session, message) {
                 publish(panel, session);
                 return;
             case "applyLayerChanges":
+                session.notice = "This edit is not connected to the profile writer yet.";
+                publish(panel, session);
+                return;
             case "saveBehavior":
             case "addBehavior":
-                session.notice = "This edit is not connected to the profile writer yet.";
+            case "deleteBehavior":
+                session.savingBehavior = true;
+                try {
+                    await vscode.window.withProgress(
+                        {location: vscode.ProgressLocation.Notification, title: "Saving behaviour to both halves"},
+                        () => session.service.saveProfileEdit(message)
+                    );
+                    session.savedBehavior = message.type === "addBehavior" ? "new" : message.behavior?.keycode || message.keycode;
+                    session.notice = "Saved to both halves and verified by reading the profile back.";
+                } finally {session.savingBehavior = false;}
                 publish(panel, session);
                 return;
             case "addCombo":

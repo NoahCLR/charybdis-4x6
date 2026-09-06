@@ -303,8 +303,13 @@ Modifier shortcuts such as Cmd+N use the same keycode conversion for layout
 and combo saves, including the picker's short spellings.
 Auto-mouse fade follows the underlying colours in its default mode; the chosen
 end colour is used only by the other two modes. The static preview does not
-animate timeout fades. Behaviour editing and macro/default read-write remain
-next steps. Readback requires the side-specific firmware pair,
+animate timeout fades. Behaviour rows can be added, edited and deleted from
+the layout or Behaviours view, including tap branches, hold actions, timing,
+repeat rates and the auto-mouse anchor flag. Saves preserve other rows and
+domains and verify the committed payload. Unsaved behaviour edits stay with
+their row when switching views; a changed profile blocks a stale save and a
+failed save keeps the draft. Macro/default read-write remains
+a next step. Readback requires the side-specific firmware pair,
 which carries the live-profile owner by default; the generic image does not.
 After updating the extension, reload VS Code and use **Read from keyboard**.
 

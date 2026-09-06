@@ -13,9 +13,10 @@ const {bytes, capabilities} = require("../fixtures/device-profile");
 
 const {fixturePages, responseFor} = require("../fixtures/device-combos");
 
-function harness({source = "compiled", fail = false, failBase = false, failCombos = false, payload = bytes} = {}) {
+function harness({source = "compiled", fail = false, failBase = false, failCombos = false, payload = bytes, allowSaves = false, corruptSave = false} = {}) {
     const messages = [];
     const requests = [];
+    const candidates = [];
     let receive, open, dispose;
     const panel = {webview: {postMessage(message) {messages.push(message);}, onDidReceiveMessage(handler) {receive = handler;}}, onDidDispose(handler) {dispose = handler;}};
     const connection = {connected: true, async request(request) {
@@ -67,6 +68,20 @@ function harness({source = "compiled", fail = false, failBase = false, failCombo
         async enumerate() {return this.snapshot();}
         async refresh() {return this.snapshot();}
         async readLayout() {this.layout = {state: "read", layers: [{layer: 0, keys: []}]}; return this.snapshot();}
+        async applyLiveProfile(candidate, options) {
+            if (!allowSaves) return super.applyLiveProfile(candidate, options);
+            // Stand in only for the already-tested transaction coordinator.
+            // The real edit, save orchestration, HID readback and UI relay run.
+            assert.equal(options.expectedBase.digest, fnv1a32(payload));
+            assert.equal(options.expectedBase.source, source);
+            candidates.push(Buffer.from(candidate));
+            payload = Buffer.from(candidate);
+            if (corruptSave) payload[22] ^= 1;
+            source = "committed";
+            this.status = {...this.status, committedGeneration: 9, activeGeneration: 9, peerGeneration: 9};
+            this.liveApply = {state: "complete", error: null};
+            return this.snapshot();
+        }
         async close() {connection.connected = false;}
     }
     const vscode = {StatusBarAlignment: {Left: 1}, ViewColumn: {One: 1}, ProgressLocation: {Notification: 1},
@@ -83,8 +98,42 @@ function harness({source = "compiled", fail = false, failBase = false, failCombo
     vm.runInNewContext(fs.readFileSync(file, "utf8"), sandbox, {filename: file});
     sandbox.module.exports.activate({subscriptions: []});
     open();
-    return {messages, requests, panel, read: () => receive({type: "ready"}), send: (message) => receive(message), close: () => dispose()};
+    return {messages, requests, candidates, panel, read: () => receive({type: "ready"}), send: (message) => receive(message), close: () => dispose()};
 }
+
+test("behaviour messages save through the service and publish only verified readback", async () => {
+    const app = harness({allowSaves: true});
+    await app.read();
+    const original = app.messages.at(-1).model.keyBehaviors[0];
+    const count = app.requests.length;
+    await app.send({type: "saveBehavior", behavior: {...original, tapHoldTerm: "175"}});
+    assert.equal(app.candidates.length, 1);
+    assert.match(app.messages.at(-1).notice, /Saved to both halves and verified/);
+    assert.equal(app.messages.at(-1).model.keyBehaviors.find(row => row.keycode === original.keycode).tapHoldTerm, "175");
+    assert.ok(app.requests.length > count + 40, "saving must reread the payload over HID");
+    await app.send({type: "addBehavior", behavior: {keycode: "KC_A", tap: {helper: "TAP_SENDS", action: "G(KC_N)"}}});
+    assert.equal(app.messages.at(-1).model.keyBehaviors.length, 38);
+    await app.send({type: "deleteBehavior", keycode: "KC_A"});
+    assert.equal(app.candidates.length, 3);
+    assert.equal(app.messages.at(-1).model.keyBehaviors.length, 37);
+    assert.match(app.messages.at(-1).notice, /Saved to both halves and verified/);
+    app.close();
+});
+
+test("invalid behaviour edits send no candidate and failed readback never reports save success", async () => {
+    const app = harness({allowSaves: true, corruptSave: true});
+    await app.read();
+    const behavior = app.messages.at(-1).model.keyBehaviors[0];
+    const count = app.requests.length;
+    await app.send({type: "saveBehavior", behavior: {...behavior, tapHoldTerm: "not a duration"}});
+    assert.equal(app.candidates.length, 0);
+    assert.equal(app.requests.length, count);
+    assert.match(app.messages.at(-1).notice, /Failed.*Tap\/hold time/);
+    await app.send({type: "saveBehavior", behavior: {...behavior, tapHoldTerm: "200"}});
+    assert.equal(app.candidates.length, 1);
+    assert.match(app.messages.at(-1).notice, /Failed.*did not match the readback/);
+    app.close();
+});
 
 for (const source of ["compiled", "committed"]) test(`${source} HID read reaches the actual extension publication with UI fields`, async () => {
     const app = harness({source});

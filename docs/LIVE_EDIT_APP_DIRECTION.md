@@ -415,6 +415,31 @@ assignment creation/removal use the same save path. Auto-mouse's follow-real-
 destination mode deliberately ignores the end colour; its control is disabled
 and explained in that mode. The static preview does not animate timeout fades.
 
-Next: behaviour editing, macro read/write, full backup/recovery and the remaining
+Next: macro read/write, full backup/recovery and the remaining
 policy domains. This is not acceptance of the complete product; the known
 pointing-cadence and hardware acceptance work still apply.
+
+Behaviour editing now uses that same generation-bound save path. The app patches
+only domain `0x20`, preserving other domains and untouched rows. Editor labels
+resolve through the shipped vocabulary and stable semantic action kinds;
+existing target/action identities survive equivalent aliases. Sparse tap
+branches, all four hold modes, repeat rates, zero/default timing and the anchor
+flag round-trip through the existing v1 codec. Firmware-advertised row, step
+and action-reference limits are checked before upload. New rows, replacements
+and deletion are available from the layout and the Behaviours view. No firmware
+format or runtime change is needed. Changed-setting persistence across reboot
+and role changes remains part of the hardware acceptance matrix.
+
+The behaviour editor keeps an ephemeral draft per device and row, pinned to
+the source/generation/digest/origin first edited. A failed save or model update
+does not silently discard or rebase it. The host checks the UI's expected base
+before encoding and retains the existing device checks around lease acquisition.
+Stale drafts are visible and save-disabled until explicitly discarded. This
+is bounded row editing, not the still-pending whole-profile draft coordinator.
+
+Connected-device validation added an unused, action-free `KC_F24` row at
+generation 11 and deleted it at generation 12. Both saves converged on both
+halves; the restored 1,293-byte payload matched the original generation 10
+payload exactly. Browser checks separately cover row switching, failed-save
+draft retention, stale-draft blocking and explicit discard. Physical execution
+of changed actions and reboot/role-swap acceptance are still outstanding.

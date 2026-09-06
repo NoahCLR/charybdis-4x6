@@ -7,6 +7,14 @@ const {buildDeviceModel} = require("../../core/session/device-model");
 const {decodedDeviceProfile} = require("../fixtures/device-profile");
 const {resolve} = require("../../core/data/keycode-catalog");
 
+test("behaviour editing requires supported firmware and a complete idle read", () => {
+    const state = {capabilities: {supportedDomainMask: 3}, committed: decodedDeviceProfile()};
+    assert.equal(buildDeviceModel(state).behaviorEditing.writable, true);
+    for (const update of [{capabilities: {supportedDomainMask: 1}}, {committed: null}, {busy: true}, {committed: {...state.committed, failures: [{domainId: 0x10}]}}]) {
+        assert.equal(buildDeviceModel({...state, ...update}).behaviorEditing.writable, false);
+    }
+});
+
 // The ported Studio UI renders whatever shape it is given, so these assertions
 // pin the contract between the device and that UI. Getting a field name wrong
 // here shows up as a silently empty tab, which is exactly the failure the port

@@ -43,6 +43,8 @@ function buildDeviceModel(state = {}) {
         // Read off the keyboard when the committed profile has been read;
         // empty rather than fabricated before that.
         keyBehaviors: committedKeyBehaviors(state.committed),
+        behaviorEditing: {busy: Boolean(state.busy), writable: Boolean(state.capabilities?.supportedDomainMask & 2) && state.committed?.state === "read" && !state.committed.failures?.length && !state.busy},
+        profileIdentity: state.committed?.state === "read" ? {source: state.committed.source, generation: state.committed.generation, digest: state.committed.digest, originHalf: state.committed.originHalf} : null,
         rgb: {...committedRgb(state.committed), baseEffect: baseRgbForView(state.baseRgb)},
 
         // Independently read native combo definitions.

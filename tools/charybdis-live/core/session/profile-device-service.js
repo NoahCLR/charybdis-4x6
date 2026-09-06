@@ -475,6 +475,7 @@ class ProfileDeviceService {
         if (this.busy || this.savingEdit) throw new Error("Wait for the current keyboard operation to finish.");
         if (!this.profileBytes || this.committed?.state !== "read" || this.committed.failures.length) throw new Error("Read a complete keyboard profile before saving changes.");
         const expectedBase = {source: this.committed.source, generation: this.committed.generation, digest: this.committed.digest, originHalf: this.committed.originHalf};
+        if (optionsBaseChanged(message.expectedBase, expectedBase)) throw liveApplyError("PROFILE_EDIT_CONFLICT", "The keyboard changed since this draft was opened. Read from keyboard before saving again.");
         const next = editDeviceProfile(this.profileBytes, message, {capabilities: this.capabilities, combos: this.combos});
         const expectedCombosDigest = COMBO_EDITS.has(message.type) ? this.combos.digest : undefined;
         this.savingEdit = true;
@@ -995,6 +996,10 @@ function assertProfileBase(status, base) {
         ? status.committedGeneration === 0 && status.compiledDefaultDigest === base.digest
         : status.committedGeneration === base.generation && status.committedDigest === base.digest && status.committedOriginHalf === base.originHalf;
     if (!matches) throw liveApplyError("PROFILE_EDIT_CONFLICT", "The keyboard changed since this edit was loaded. Read from keyboard and make the edit again.");
+}
+
+function optionsBaseChanged(draft, current) {
+    return draft !== undefined && (!draft || ["source", "generation", "digest", "originHalf"].some(key => draft[key] !== current[key]));
 }
 
 function assertAppliedStatus(status, digest) {

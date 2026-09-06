@@ -6,6 +6,7 @@ const keycodes = require("../data/keycode-catalog");
 const {semanticActionForExpression, resolveNativeQmkExpression} = require("../schema/compiled-profile-v1");
 const {encodeComboDomainV1, decodeComboDomainV1} = require("../schema/combo-domain-v1");
 const {actionName} = require("./device-profile-view");
+const {BEHAVIOR_EDITS, editKeyBehaviors} = require("./key-behavior-edits");
 const COMBO_EDITS = new Set(["addCombo", "saveCombo", "deleteCombo", "updateComboHoldTerm"]);
 
 const RGB_EDITS = new Set(["updateLayerColor", "updatePdModeColor", "updateAutomouseFade", "updateComboFeedback", "updateKeyBehaviorFeedback", "updateRgbStages", "saveRgbReusableLedGroup", "deleteRgbReusableLedGroup", "addRgbLedGroup", "deleteRgbLedGroup"]);
@@ -42,6 +43,12 @@ function existing(rows, predicate, label) {
 
 function editDeviceProfile(bytes, message, context = {}) {
     if (COMBO_EDITS.has(message.type)) return editCombos(bytes, message, context);
+    if (BEHAVIOR_EDITS.has(message.type)) {
+        const profile = decodeProfileBlob(bytes);
+        const domain = existing(profile.domains, row => row.id === PROFILE_DOMAIN_IDS.KEY_BEHAVIORS, "Key behaviours");
+        domain.payload = editKeyBehaviors(domain.payload, message, context.capabilities);
+        return encodeProfileBlob(profile);
+    }
     if (!RGB_EDITS.has(message.type)) throw invalid("Unsupported profile edit.");
     const profile = decodeProfileBlob(bytes);
     const domain = existing(profile.domains, row => row.id === PROFILE_DOMAIN_IDS.RGB, "RGB");

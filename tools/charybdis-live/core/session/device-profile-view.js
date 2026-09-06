@@ -161,4 +161,4 @@ function combosForView(read, labels) {
     }));
 }
 
-module.exports = {actionName, baseRgbForView, behaviorAliasesForView, behaviorRowsForView, combosForView, rgbForView};
+module.exports = {actionName, NATIVE_ACTION_ABI_V1, baseRgbForView, behaviorAliasesForView, behaviorRowsForView, combosForView, rgbForView};

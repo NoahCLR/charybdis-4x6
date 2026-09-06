@@ -18,6 +18,7 @@
 
 const keycodeCatalog = require("../core/data/keycode-catalog");
 const {renderDeviceProfileDetails} = require("./device-profile-ui");
+const {createBehaviorDraftStore} = require("./behavior-drafts");
 const {renderDeviceCombos} = require("./combo-ui");
 const {combosForLayerPreview} = require("./combo-preview");
 const {layoutKeyKind, layerPreviewPaint, composedLayerPreviewPaint, baseEffectPreviewNote} = require("./layer-preview");
@@ -1564,7 +1565,7 @@ function getStudioHtml() {
         }
         .behavior-branch-grid {
             display: grid;
-            grid-template-columns: repeat(5, minmax(340px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
             gap: 14px;
             align-items: start;
             overflow-x: auto;
@@ -2317,6 +2318,7 @@ function getStudioHtml() {
     <div id="keyPickerHost"></div>
     <script nonce="${nonce}">
 ${renderDeviceProfileDetails.toString()}
+${createBehaviorDraftStore.toString()}
 ${renderDeviceCombos.toString()}
 ${combosForLayerPreview.toString()}
 ${layoutKeyKind.toString()}
@@ -2339,6 +2341,8 @@ function getClientScript() {
     let activeBehaviorKeycode = "";
     let activeView = "layout";
     let viewDrafts = {};
+    const behaviorDrafts = createBehaviorDraftStore();
+    let behaviorSavePending = false;
     let rgbGroupTarget = "layer";
     let rgbGroupOwner = "";
     let rgbSelectedLeds = [];
@@ -2445,10 +2449,11 @@ function getClientScript() {
     };
     const actionTooltips = {
         applyKey: "Stage the selected key value as a pending layout edit. Use Apply layout change to write staged edits to keymap.c.",
-        saveSelectedBehavior: "Saving key behaviour changes to the keyboard is not supported yet.",
+        saveSelectedBehavior: "Save this behaviour to both keyboard halves and verify the readback.",
+        deleteSelectedBehavior: "Remove this behaviour row from both halves. The key then uses its normal action.",
         editComboOutputBehavior: "Load this combo output keycode into the behavior editor so its key_behaviors[] row can be created or edited.",
         editLayoutCombo: "Load this existing combo into the combo builder so its output or physical input keys can be edited.",
-        addBehavior: "Adding key behaviour rows to the keyboard is not supported yet.",
+        addBehavior: "Add this behaviour to both keyboard halves and verify the readback.",
         updateLayerColor: "Save these settings to both keyboard halves and verify the readback.",
         updatePdModeColor: "Save these settings to both keyboard halves and verify the readback.",
         updateAutomouseFade: "Save these settings to both keyboard halves and verify the readback.",
@@ -2978,9 +2983,12 @@ function getClientScript() {
 
     window.addEventListener("message", (event) => {
         if (event.data.type === "model") {
+            captureBehaviorDrafts();
             clearFloatingStatus();
             viewDrafts = {};
             model = event.data.model;
+            behaviorSavePending = false;
+            if (event.data.savedBehavior) behaviorDrafts.remove(behaviorDraftKey(event.data.savedBehavior));
             Object.assign(qmkKeyLabels, model.qmkKeyLabels || {});
             qmkKeyAliases = {...baseQmkKeyAliases, ...(model.qmkKeycodeAliases || {})};
             macroPayloadKeycodes = new Set(model.macroPayloadKeycodes || []);
@@ -3095,6 +3103,7 @@ function getClientScript() {
             if (!hasPendingLayerChanges()) return;
             post({ type: "applyLayerChanges", ...layerStructurePayload(), activeLayer });
         } else if (action === "selectLayer") {
+            storeActiveViewDraft();
             activeLayer = target.dataset.layer;
             selectedKey = 0;
             activeBehaviorKeycode = "";
@@ -3131,6 +3140,7 @@ function getClientScript() {
             render();
             commitLocalHistory(before);
         } else if (action === "selectKey") {
+            storeActiveViewDraft();
             const index = Number(target.dataset.index);
             const now = Date.now();
             const isDoubleClick = lastLayoutKeyClick.index === index && now - lastLayoutKeyClick.time < 450;
@@ -3143,6 +3153,7 @@ function getClientScript() {
             }
             currentLocalSnapshot = serializeLocalState();
         } else if (action === "editComboOutputBehavior") {
+            storeActiveViewDraft();
             activeBehaviorKeycode = target.dataset.keycode || "";
             layoutComboPicking = false;
             lastLayoutKeyClick = { index: undefined, time: 0 };
@@ -3379,6 +3390,12 @@ function getClientScript() {
             post({ type: "addBehavior", behavior: readBehaviorForm() });
         } else if (action === "saveSelectedBehavior") {
             post({ type: "saveBehavior", behavior: readSelectedBehaviorForm() });
+        } else if (action === "deleteSelectedBehavior") {
+            post({ type: "deleteBehavior", keycode: document.getElementById("selectedBehaviorKeycode").value });
+        } else if (action === "discardBehaviorDraft") {
+            behaviorDrafts.remove(behaviorDraftKey(target.closest("[data-behavior-draft]").dataset.behaviorDraft));
+            delete viewDrafts[activeView];
+            render(); resetLocalHistory();
         }
     });
 
@@ -4696,13 +4713,26 @@ function getClientScript() {
     }
 
     function post(message) {
+        if (message.type === "editBehavior") {
+            if (!model.keyBehaviors.some(row => row.keycode === message.keycode)) return;
+            storeActiveViewDraft();
+            activeView = "behaviors";
+            activeBehaviorKeycode = message.keycode;
+            render(); document.querySelector(".selected-behavior-editor")?.scrollIntoView({block: "start"}); return;
+        }
         if (message.type === "editComboInLayout") {
             const combo = model.combos.find(row => row.id === message.id);
             if (combo) loadLayoutComboIntoBuilder(combo);
             render(); document.getElementById("layoutComboBuilder")?.scrollIntoView({block: "center"}); return;
         }
-        storeActiveViewDraft();
+        if (message.type === "refresh") {behaviorDrafts.clear(); viewDrafts = {};}
+        else storeActiveViewDraft();
         dismissedStatusSignature = "";
+        if (["saveBehavior", "addBehavior", "deleteBehavior"].includes(message.type)) {
+            const row = message.type === "addBehavior" ? "new" : message.behavior?.keycode || message.keycode;
+            message.expectedBase = behaviorDrafts.get(behaviorDraftKey(row))?.base || model.profileIdentity;
+            behaviorSavePending = true;
+        }
         notice = "Working...";
         layoutNotice = "";
         render();
@@ -4727,6 +4757,7 @@ function getClientScript() {
         activeMacroKeycode = "";
         macroDrafts = {};
         viewDrafts = {};
+        behaviorDrafts.clear();
         resetMacroRecorderState();
         pendingLayoutEdits = {};
         pendingLayerAdds = [];
@@ -4757,10 +4788,15 @@ function getClientScript() {
         updateLayoutKeyBehaviorColorStyle();
         app.innerHTML = renderDiagnostics() + renderViewTabs() + renderActiveView();
         syncAutoMousePolicy();
-        renderDeviceProfileDetails(document, model, post);
+        renderDeviceProfileDetails(document, model, post, displayKeyExpression);
         renderDeviceCombos(document, model, post);
         initializeDirtyTracking();
         restoreActiveViewDraft();
+        restoreBehaviorDrafts();
+        refreshDirtyTabIndicators();
+        if (behaviorSavePending || model.behaviorEditing?.busy) {
+            for (const control of app.querySelectorAll("[data-behavior-draft] input, [data-behavior-draft] select, [data-behavior-draft] button")) control.disabled = true;
+        }
         hydrateTooltips();
         scheduleMacroSlotBrowserHeightSync();
     }
@@ -4989,8 +5025,9 @@ function getClientScript() {
     function restoreLocalControls(snapshots) {
         const controls = localEditableControls();
         snapshots.forEach((snapshot, index) => {
-            const control = controls[index];
+            const control = snapshot.id ? controls.find(item => item.id === snapshot.id) : controls[index];
             if (!control) return;
+            if (snapshot.binding !== (control.closest("[data-behavior-draft]")?.dataset.behaviorDraft || "")) return;
             if (control.type === "checkbox" || control.type === "radio") {
                 control.checked = Boolean(snapshot.checked);
             } else {
@@ -5018,18 +5055,50 @@ function getClientScript() {
 
     function localEditableControls() {
         return Array.from(app.querySelectorAll("input, select, textarea"))
-            .filter((control) => !control.disabled);
+            .filter((control) => !control.disabled && control.type !== "hidden");
     }
 
     function controlSnapshot(control) {
+        const identity = {id: control.id, binding: control.closest("[data-behavior-draft]")?.dataset.behaviorDraft || ""};
         if (control.type === "checkbox" || control.type === "radio") {
-            return { checked: Boolean(control.checked) };
+            return {...identity, checked: Boolean(control.checked)};
         }
-        return { value: control.value || "" };
+        return {...identity, value: control.value || ""};
+    }
+
+    function behaviorDraftKey(keycode) {
+        return JSON.stringify([model?.activeProfile?.id, keycode]);
+    }
+
+    function captureBehaviorDrafts() {
+        for (const form of app.querySelectorAll("[data-behavior-draft]")) {
+            const key = behaviorDraftKey(form.dataset.behaviorDraft);
+            if (form.classList.contains("dirty")) {
+                const controls = Array.from(form.querySelectorAll("input, select, textarea")).filter(control => control.type !== "hidden").map(controlSnapshot);
+                behaviorDrafts.capture(key, controls, model?.profileIdentity);
+            } else behaviorDrafts.remove(key);
+        }
+    }
+
+    function restoreBehaviorDrafts() {
+        for (const form of app.querySelectorAll("[data-behavior-draft]")) {
+            const draft = behaviorDrafts.get(behaviorDraftKey(form.dataset.behaviorDraft));
+            if (draft) restoreLocalControls(draft.controls);
+        }
+        refreshRestoredLocalState();
+    }
+
+    function behaviorDraftNotice(keycode) {
+        const key = behaviorDraftKey(keycode);
+        if (!behaviorDrafts.get(key)) return "";
+        const stale = behaviorDrafts.stale(key, model.profileIdentity);
+        return "<p class='muted'>" + (stale ? "The keyboard changed since this draft was opened. Your edits are kept here; discard them to load the current row." : "Unsaved changes stay with this row while you switch views.") + "</p>" +
+            "<button type='button' data-action='discardBehaviorDraft'>Discard row changes</button>";
     }
 
     function storeActiveViewDraft() {
         if (!model || !activeView) return;
+        captureBehaviorDrafts();
         const dirty = Boolean(app.querySelector("[data-dirty-section].dirty"));
         if (!dirty) {
             delete viewDrafts[activeView];
@@ -5091,7 +5160,7 @@ function getClientScript() {
         button.textContent = dirty ? "Unsaved - " + cleanLabel : cleanLabel;
         button.classList.toggle("dirty", dirty);
         button.setAttribute("aria-label", dirty ? "Unsaved changes: " + cleanLabel : cleanLabel);
-        button.disabled = !dirty;
+        button.disabled = !dirty || button.hasAttribute("data-write-unavailable");
     }
 
     function refreshDirtyTabIndicators() {
@@ -5631,6 +5700,7 @@ function getClientScript() {
     function viewTabDirty(viewId) {
         if (viewHasDirtyDomSection(viewId)) return true;
         if (viewDrafts[viewId]?.dirty) return true;
+        if (viewId === "behaviors" && behaviorDrafts.keys().some(key => JSON.parse(key)[0] === model?.activeProfile?.id)) return true;
         if (viewId === "layout") return layoutViewHasUnsavedChanges();
         if (viewId === "macros") return macroViewHasUnsavedChanges();
         if (viewId === "rgb") return rgbViewHasUnsavedChanges();
@@ -5660,7 +5730,12 @@ function getClientScript() {
     }
 
     function renderActiveView() {
-        if (activeView === "behaviors") return "<section id='deviceBehaviors' class='panel'></section>";
+        if (activeView === "behaviors") {
+            const row = behaviorForKey(activeBehaviorKeycode);
+            return "<section id='deviceBehaviors' class='panel'></section>" +
+                (row ? renderSelectedBehaviorEditor({keycode: row.keycode}, row) : "") +
+                "<details class='panel'><summary>Add a behaviour</summary>" + renderBehaviorForm() + "</details>";
+        }
         if (activeView === "macros") return renderMacroStudio();
         if (activeView === "rgb") return renderRgbStudio();
         if (activeView === "defaults") return renderDefaultsStudio();
@@ -5819,40 +5894,37 @@ function getClientScript() {
         for (let index = 0; index < 5; index += 1) {
             steps.push(row.steps.find((step) => step.tapCount === index) || { tapCount: index, tapCountName: tapBranchName(index) });
         }
-        const title = selected.behaviorTitle || "Behavior on this key";
+        const title = selected.behaviorTitle || "Behaviour on this key";
         const context = selected.behaviorContext
             ? "<div><span class='muted'>Reachable via</span><br><code data-tooltip='Visible selected key or combo output that reaches this behavior row.'>" + escapeHtml(selected.behaviorContext) + "</code></div>"
             : "";
-        return "<div class='card selected-behavior-editor' data-dirty-section><h3>" + escapeHtml(title) + "</h3>" +
+        const writable = model.behaviorEditing?.writable && !behaviorSavePending && !behaviorDrafts.stale(behaviorDraftKey(row.keycode), model.profileIdentity);
+        return "<div class='card selected-behavior-editor' data-dirty-section data-behavior-draft='" + escapeAttr(row.keycode) + "'><h3>" + escapeHtml(title) + "</h3>" +
             "<input type='hidden' id='selectedBehaviorKeycode' value='" + escapeAttr(row.keycode) + "'>" +
-            "<div><span class='muted'>Device key</span><br><code class='source-pill' data-tooltip='Key or action reported by the keyboard for this behaviour row.'>" + escapeHtml(row.keycode) + "</code></div>" +
+            "<div><span class='muted'>Key</span><br><code class='source-pill' data-tooltip='" + escapeAttr(row.keycode) + "'>" + escapeHtml(displayKeyExpression(row.keycode)) + "</code></div>" +
             context +
+            "<p class='muted'>Choose what this key does after a tap, hold or repeated tap. Zero timing uses the keyboard default.</p>" +
+            behaviorDraftNotice(row.keycode) +
             "<div class='form-grid four'>" +
             renderTimingInput("selectedTapHoldTerm", "tap_hold_term", row.tapHoldTerm || "", row.keycode) +
             renderTimingInput("selectedLongerHoldTerm", "longer_hold_term", row.longerHoldTerm || "", row.keycode) +
             renderTimingInput("selectedMultiTapTerm", "multi_tap_term", row.multiTapTerm || "", row.keycode) +
-            (isKeymapCustomKeycode(row.keycode) ? renderKeepsAutoMouseAnchoredToggle(row.keepsAutoMouseAnchored) : "") +
+            renderKeepsAutoMouseAnchoredToggle(row.keepsAutoMouseAnchored) +
             "</div>" +
             "<div class='behavior-branch-grid'>" +
             steps.map(renderBehaviorStepEditor).join("") +
             "</div>" +
-            "<button data-action='saveSelectedBehavior' data-dirty-button class='primary'>Save behavior row</button></div>";
+            "<button data-action='saveSelectedBehavior' data-dirty-button class='primary'" + (writable ? "" : " disabled data-write-unavailable") + ">Save behaviour</button>" +
+            (behavior ? "<button data-action='deleteSelectedBehavior'" + (writable ? "" : " disabled") + ">Delete behaviour</button>" : "") +
+            (!model.behaviorEditing?.writable ? "<p class='muted'>Read a complete keyboard profile with behaviour write support before saving.</p>" : "") + "</div>";
     }
 
     function renderTimingInput(id, field, value, keycode) {
         const fallback = behaviorTimingDefault(field, keycode);
         const placeholder = "default: " + fallback.label;
         const tooltip = timingTooltip(field, fallback);
-        return "<label data-tooltip='" + escapeAttr(tooltip) + "'><span>" + field + "</span><input id='" + id + "' data-validate='optional-term' inputmode='numeric' value='" + escapeAttr(value || "") + "' placeholder='" + escapeAttr(placeholder) + "' data-tooltip='" + escapeAttr(tooltip) + "'></label>";
-    }
-
-    // Mouse keycodes and pointer-mode keys are already classified as mouse
-    // records by the firmware, so the anchor flag can only change the answer
-    // for a keycode whose behavior is authored here. Offering it elsewhere
-    // would show "off" for keys that are in fact anchored.
-    function isKeymapCustomKeycode(keycode) {
-        const candidate = canonicalKeyExpression(keycode || "");
-        return (model.customKeycodes || []).some((entry) => canonicalKeyExpression(entry) === candidate);
+        const label = {tap_hold_term: "Tap / hold (ms)", longer_hold_term: "Long hold (ms)", multi_tap_term: "Repeated taps (ms)"}[field] || field;
+        return "<label data-tooltip='" + escapeAttr(tooltip) + "'><span>" + label + "</span><input id='" + id + "' data-validate='optional-term' inputmode='numeric' value='" + escapeAttr(value || "") + "' placeholder='" + escapeAttr(placeholder) + "' data-tooltip='" + escapeAttr(tooltip) + "'></label>";
     }
 
     function renderKeepsAutoMouseAnchoredToggle(checked) {
@@ -7650,15 +7722,17 @@ function getClientScript() {
     }
 
     function renderBehaviorForm() {
-        return "<div class='card' data-dirty-section>" +
-            "<h3>Append simple single-tap branch row</h3>" +
+        const writable = model.behaviorEditing?.writable && !behaviorSavePending && !behaviorDrafts.stale(behaviorDraftKey("new"), model.profileIdentity);
+        return "<div class='card' data-dirty-section data-behavior-draft='new'>" +
+            "<h3>New behaviour</h3><p class='muted'>Choose a key and its first tap and hold actions. After saving, use Edit behaviour to add repeated-tap branches.</p>" +
+            behaviorDraftNotice("new") +
             "<div class='form-grid'>" +
             "<label><span>Key</span><input id='behaviorKeycode' data-validate='layout-key' placeholder='A'></label>" +
             renderTimingInput("behaviorTapHoldTerm", "tap_hold_term", "", "") +
             renderActionInputs("tap", "Tap", ["", "TAP_SENDS"]) +
             renderActionInputs("hold", "Hold", ["", "PRESS_AND_HOLD_UNTIL_RELEASE", "TAP_AT_HOLD_THRESHOLD", "TAP_ON_RELEASE_AFTER_HOLD", "REPEAT_WHILE_HELD"]) +
             renderActionInputs("longHold", "Long hold", ["", "PRESS_AND_HOLD_UNTIL_RELEASE", "TAP_AT_HOLD_THRESHOLD", "TAP_ON_RELEASE_AFTER_HOLD", "REPEAT_WHILE_HELD"]) +
-            "<button data-action='addBehavior' data-dirty-button class='primary'>Append behavior row</button>" +
+            "<button data-action='addBehavior' data-dirty-button class='primary'" + (writable ? "" : " disabled data-write-unavailable") + ">Add behaviour</button>" +
             "</div></div>";
     }
 
@@ -7707,7 +7781,7 @@ function getClientScript() {
 
     function readBehaviorForm() {
         return {
-            keycode: document.getElementById("behaviorKeycode").value,
+            keycode: canonicalLayoutKeyExpression(document.getElementById("behaviorKeycode").value),
             tapHoldTerm: document.getElementById("behaviorTapHoldTerm").value,
             tap: readAction("tap"),
             hold: readAction("hold"),
@@ -7715,9 +7789,7 @@ function getClientScript() {
         };
     }
 
-    // The anchor toggle is only rendered for keymap-local custom keycodes. When
-    // it is absent the row keeps whatever it already authored: reading the
-    // missing control would write false back over a hand-authored flag.
+    // Preserve the device flag if a control is absent during a view transition.
     function readSelectedKeepsAutoMouseAnchored() {
         const control = document.getElementById("selectedKeepsAutoMouseAnchored");
         if (control) {
@@ -7766,7 +7838,7 @@ function getClientScript() {
         const repeatInput = document.getElementById(prefix + "Repeat");
         return {
             helper,
-            action: document.getElementById(prefix + "Action").value,
+            action: canonicalLayoutKeyExpression(document.getElementById(prefix + "Action").value),
             repeatHz: repeatInput ? repeatInput.value : ""
         };
     }
