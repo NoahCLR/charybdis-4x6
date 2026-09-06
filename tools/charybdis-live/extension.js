@@ -61,6 +61,9 @@ function publish(panel, session) {
             capabilities: state.capabilities,
             status: state.status,
             layout: state.layout,
+            committed: state.committed,
+            baseRgb: state.baseRgb,
+            combos: state.combos,
             device: state.devices.find((device) => device.id === state.selectedDeviceId),
         }),
         notice: session.notice,
@@ -106,8 +109,28 @@ async function handleMessage(panel, session, message) {
             case "applyLayerChanges":
             case "saveBehavior":
             case "addBehavior":
+                session.notice = "This edit is not connected to the profile writer yet.";
+                publish(panel, session);
+                return;
             case "addCombo":
-                session.notice = "That domain needs the committed profile read. Layout editing works today.";
+            case "saveCombo":
+            case "deleteCombo":
+            case "updateComboHoldTerm":
+            case "saveRgbReusableLedGroup":
+            case "deleteRgbReusableLedGroup":
+            case "updateLayerColor":
+            case "updatePdModeColor":
+            case "updateAutomouseFade":
+            case "updateComboFeedback":
+            case "updateKeyBehaviorFeedback":
+            case "addRgbLedGroup":
+            case "deleteRgbLedGroup":
+            case "updateRgbStages":
+                await vscode.window.withProgress(
+                    {location: vscode.ProgressLocation.Notification, title: "Saving keyboard profile to both halves"},
+                    () => session.service.saveProfileEdit(message)
+                );
+                session.notice = "Saved to both halves and verified by reading the profile back.";
                 publish(panel, session);
                 return;
             default:
@@ -164,14 +187,11 @@ async function connectAndRead(panel, session) {
         () => service.readLayout()
     );
 
-    // The committed profile is only present on firmware that has one. A
-    // keyboard running compiled defaults is a normal state, not an error, so a
-    // failure here leaves the layout read standing.
     // A keyboard with no committed profile is a normal state, so a failure here
     // must not discard the layout read that already succeeded.
     try {
         await vscode.window.withProgress(
-            {location: vscode.ProgressLocation.Notification, title: "Reading committed profile"},
+            {location: vscode.ProgressLocation.Notification, title: "Reading keyboard profile"},
             () => service.readCommittedProfile()
         );
     } catch (error) {
@@ -181,10 +201,18 @@ async function connectAndRead(panel, session) {
         return;
     }
 
+    await service.readBaseRgb();
+    await service.readCombos();
     const state = service.snapshot();
-    session.notice = state.committed?.state === "read"
-        ? `Read the layout and committed profile generation ${state.committed.generation}.`
-        : "Read the layout. The keyboard reports no committed profile, so RGB and key behaviours are running compiled defaults.";
+    if (state.error || state.committed?.state !== "read") {
+        session.notice = `The keyboard profile could not be read: ${state.error?.message || "no verified profile was returned"}.`;
+    } else {
+        const description = state.committed.source === "compiled"
+            ? "the keyboard's compiled defaults"
+            : `committed profile generation ${state.committed.generation}`;
+        const failures = state.committed.failures?.length || 0;
+        session.notice = `Read the layout and ${description}.` + (failures ? ` ${failures} domain(s) could not be decoded; see diagnostics.` : "");
+    }
     publish(panel, session);
 }
 

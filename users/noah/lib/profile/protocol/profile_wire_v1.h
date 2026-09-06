@@ -20,6 +20,7 @@ enum {
     // same page layout. A keyboard with nothing committed is still running
     // something, and this is it.
     NOAH_PROFILE_WIRE_V1_VALUE_COMPILED   = 0x05u,
+    NOAH_PROFILE_WIRE_V1_VALUE_COMBOS     = 0x06u,
     // Page 0 of a payload read is metadata; pages 1..N carry raw payload
     // bytes, a full report payload each.
     NOAH_PROFILE_WIRE_V1_PAYLOAD_METADATA_PAGE = 0u,

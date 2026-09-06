@@ -43,7 +43,7 @@ Initial domain ids:
 | ---: | --- | ---: |
 | `0x10` | Milestone A RGB | 1 |
 | `0x20` | Milestone A key behaviors | 1 |
-| `0x30` | Later combos | reserved |
+| `0x30` | Combo overrides | 1 |
 | `0x40` | Later hardcoded macros | reserved |
 | `0x50` | Later live defaults | reserved |
 
@@ -229,6 +229,62 @@ length, schema, capacity, and semantic validation before activation.
 The project uses VIA's existing custom channel (`channel_id = 0`) and 32-byte
 reports. The extension host always sends and receives exactly 32 bytes.
 
+### Native Combo Readback — GET Value `0x06`
+
+This optional read uses the envelope below. It reports the connected half's
+effective native combo definitions. It observes the active `0x30` override when
+present, otherwise the compiled table. Its digest also covers transient global
+enable state, so it is separate from canonical profile identity.
+Older firmware returns VIA unhandled (`0xff`); clients must show unsupported
+rather than infer an empty table. Firmware built without combos reports a
+valid disabled empty table. No SET or SAVE operation exists for this value.
+
+Every successful page has exactly 25 payload bytes. Metadata is page 0:
+
+| Offset | Size | Field |
+| ---: | ---: | --- |
+| 0 | 1 | readout version, `1` |
+| 1 | 1 | row count, `0..32` |
+| 2 | 1 | maximum inputs per row, `4` |
+| 3 | 1 | layer count, `1..8` |
+| 4 | 1 | current global combo enable state, `0` or `1` |
+| 5 | 1 | flags: bit 0 no timer, 1 strict timer, 2 custom trigger hook, 3 custom release hook, 4 custom repress hook, 5 fixed reference layer |
+| 6 | 8 | input reference layer for each layer; unused entries zero |
+| 14 | 4 | FNV-1a 32-bit digest of metadata bytes 0..13 followed by all complete row payloads in order |
+| 18 | 7 | reserved, zero |
+
+Page `n+1` contains row `n`:
+
+| Offset | Size | Field |
+| ---: | ---: | --- |
+| 0 | 1 | zero-based row index |
+| 1 | 1 | input count, `2..4` |
+| 2 | 2 | native output keycode; zero means a firmware callback |
+| 4 | 2 | combo window in milliseconds, including per-combo hook result |
+| 6 | 2 | combo hold threshold in milliseconds |
+| 8 | 1 | flags: bit 0 must hold, 1 must tap, 2 press in order |
+| 9 | 8 | up to four native input keycodes in declared order; unused entries zero |
+| 17 | 8 | reserved, zero |
+
+Inputs are distinct nonzero keycodes. Timing zero is preserved verbatim. Input
+order matters when the order flag is set. Native codes use the connected
+firmware's action ABI; custom source names and callback bodies are not sent.
+Additional trigger/release predicates and transient per-combo engine state
+are not serialized. The hold requirement follows QMK's effective precedence,
+including its suppression under no-timer mode.
+Fixed-reference mode reads the reference layer directly even when it equals
+the selected layer; transparent keys do not inherit in this lookup. Without
+this flag, an identity reference uses the effective key from the active stack.
+
+Clients read metadata, every row, then metadata again. Accept only equal
+metadata and a matching digest, with at most two complete attempts (68 GETs at
+the maximum capacity). This detects ordinary changes, not an atomic snapshot
+or an active layer stack. Failure clears prior combo rows without discarding
+independent profile or base-lighting reads. Firmware uses a bounded cold-path
+table scan and a 25-byte row scratch buffer; it allocates no persistent cache.
+Malformed requests use status 1, unknown pages status 2, and tables that cannot
+be represented within these limits status 3. Error payloads are empty and zero.
+
 ### Read Request And Response Envelope
 
 Capability and status reads use this exact request header:
@@ -332,7 +388,7 @@ Begin candidate uses this complete layout:
 | ---: | ---: | --- |
 | 5 | 1 | schema major |
 | 6 | 1 | schema minor |
-| 7 | 1 | requested-domain mask; bits 0 RGB and 1 key behaviors |
+| 7 | 1 | requested-domain mask; bits 0 RGB, 1 key behaviors, 2 combos |
 | 8 | 1 | flags, initially zero |
 | 9 | 2 | canonical blob length, `8..4064` |
 | 11 | 4 | CRC32 of the exact canonical blob |
@@ -341,7 +397,7 @@ Begin candidate uses this complete layout:
 | 23 | 9 | reserved, all zero |
 
 The requested-domain mask may be zero for the canonical empty profile and may
-contain no bits other than 0 and 1. Compatibility with the build's advertised
+contain no bits other than 0, 1 and 2. Compatibility with the build's advertised
 schema, domain mask, action ABI, and capacity is checked by the scan owner
 before storage work begins.
 
@@ -552,3 +608,36 @@ and error id without returning source strings from firmware.
 - overlong, duplicate, out-of-order, reserved-bit, and unknown-domain input;
 - invalid action ABI and invalid cross-reference;
 - canonical C/JavaScript byte-for-byte round trips.
+
+
+## Combo Domain `0x30`, Version 1
+
+Capability `supported_domain_mask` bit 2 advertises combo overrides. Profiles
+without this domain use compiled combos. The four-byte payload header contains
+row count (0..32) followed by three zero bytes. Zero rows explicitly disable
+all definitions. Each row is exactly 28 bytes, in priority/index order:
+
+| Offset | Bytes | Field |
+| ---: | ---: | --- |
+| 0 | 1 | input count, 2..4 |
+| 1 | 1 | flags: bit 0 must hold, bit 1 tap only, bit 2 ordered |
+| 2 | 2 | combo window in ms, little endian |
+| 4 | 2 | shared hold threshold in ms, little endian |
+| 6 | 2 | reserved, zero |
+| 8 | 4 | output semantic action |
+| 12 | 16 | four semantic input slots; unused slots zero |
+
+Hold and tap-only flags are mutually exclusive. Every row must carry the same
+hold threshold because QMK exposes one global hold/tap wait. Input actions must
+be distinct, including after native translation; no-action/transparent inputs
+and callback/no-action outputs are rejected. Semantic references must exist in
+the compiled action ABI. Unknown flags, trailing bytes and nonzero unused slots
+are rejected. Incremental validation reads each row in 12- and 16-byte steps,
+preserving the one-read / 20-byte scan bound.
+
+The existing candidate/commit/split protocol carries this domain with the rest
+of the profile. There is no new mutation on GET value `0x06`. The owner publishes
+the native table at the strict idle boundary; QMK, origin tracking and readback
+use that same table. A cold publication copies at most 896 bytes; key processing
+and combo readback use RAM only. A failed copy makes combo readback unavailable
+and exposes zero definitions rather than a partially decoded table.

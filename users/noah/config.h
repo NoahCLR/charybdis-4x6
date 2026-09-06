@@ -11,6 +11,8 @@
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
+#include "lib/compat/qmk_live_combo_config.h"
+
 // ─── Split keyboard sync ───────────────────────────────────────────────────
 //
 // The Charybdis 4x6 is a split keyboard — each half has its own MCU.

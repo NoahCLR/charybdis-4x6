@@ -240,13 +240,16 @@ static void fail_integration(noah_profile_owner_t *owner) {
     if (owner->runtimes_installed) {
         noah_effective_key_behavior_runtime_uninstall(&owner->key_behaviors);
         noah_effective_rgb_runtime_uninstall(&owner->rgb);
+#ifdef COMBO_ENABLE
+        noah_effective_combo_runtime_uninstall(&owner->combos);
+#endif
         owner->runtimes_installed = false;
     }
     owner->state = NOAH_PROFILE_OWNER_INTEGRATION_ERROR;
 }
 
 static bool initialize_runtime_graph(noah_profile_owner_t *owner) {
-    noah_effective_profile_invalidator_t invalidators[2];
+    noah_effective_profile_invalidator_t invalidators[3];
     noah_profile_candidate_backend_t     host_backend;
     noah_profile_candidate_compatibility_t host_compatibility;
     noah_profile_split_reconciler_config_t split_config;
@@ -259,6 +262,9 @@ static bool initialize_runtime_graph(noah_profile_owner_t *owner) {
 
     noah_effective_key_behavior_runtime_init(&owner->key_behaviors);
     noah_effective_rgb_runtime_init(&owner->rgb);
+#ifdef COMBO_ENABLE
+    noah_effective_combo_runtime_init(&owner->combos);
+#endif
     invalidators[0] = (noah_effective_profile_invalidator_t){
         .callback = noah_effective_key_behavior_runtime_invalidate,
         .context  = &owner->key_behaviors,
@@ -267,10 +273,19 @@ static bool initialize_runtime_graph(noah_profile_owner_t *owner) {
         .callback = noah_effective_rgb_runtime_invalidate,
         .context  = &owner->rgb,
     };
+#ifdef COMBO_ENABLE
+    invalidators[2] = (noah_effective_profile_invalidator_t){.callback = noah_effective_combo_runtime_invalidate, .context = &owner->combos};
+#endif
     observer         = owner->config.peer_required ? owner_peer_observer : no_peer_observer;
     observer_context = owner->config.peer_required ? owner : NULL;
     noah_profile_activation_policy_init(&owner->activation_policy, observer, observer_context);
-    if (noah_effective_profile_provider_init(&owner->provider, &owner->compiled_snapshot, noah_profile_activation_policy_safe_boundary, &owner->activation_policy, invalidators, 2u) != NOAH_EFFECTIVE_PROFILE_OK) {
+    if (noah_effective_profile_provider_init(&owner->provider, &owner->compiled_snapshot, noah_profile_activation_policy_safe_boundary, &owner->activation_policy, invalidators,
+#ifdef COMBO_ENABLE
+        3u
+#else
+        2u
+#endif
+    ) != NOAH_EFFECTIVE_PROFILE_OK) {
         return false;
     }
     noah_effective_key_behavior_runtime_invalidate(&owner->key_behaviors, 0u, owner->compiled_snapshot.identity, owner->compiled_snapshot.identity, &owner->compiled_snapshot);
@@ -323,6 +338,13 @@ static bool initialize_runtime_graph(noah_profile_owner_t *owner) {
         noah_effective_key_behavior_runtime_uninstall(&owner->key_behaviors);
         return false;
     }
+#ifdef COMBO_ENABLE
+    if (!noah_effective_combo_runtime_install(&owner->combos)) {
+        noah_effective_key_behavior_runtime_uninstall(&owner->key_behaviors);
+        noah_effective_rgb_runtime_uninstall(&owner->rgb);
+        return false;
+    }
+#endif
     owner->runtimes_installed = true;
     owner->discovery_result   = noah_profile_store_boot_select_begin(&owner->store);
     if (owner->discovery_result != NOAH_PROFILE_STORE_IN_PROGRESS) {

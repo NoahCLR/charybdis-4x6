@@ -410,12 +410,56 @@ static void test_live_automouse_profile_and_stale_frame(const char *fixture_path
     noah_effective_rgb_runtime_uninstall(&runtime);
 }
 
+static void test_live_automouse_policy_modes(const char *fixture_path) {
+    uint8_t payload[TEST_RGB_PAYLOAD_SIZE];
+    size_t length = fixture_payload(fixture_path, payload, sizeof(payload));
+    size_t layer_offset = 16u + (size_t)payload[4] * 9u;
+    size_t fade_offset = layer_offset + (size_t)payload[5] * 5u + (size_t)payload[6] * 5u;
+    // A pass-through base and mapped-only lower layer distinguish all policies.
+    payload[layer_offset + 1] = payload[layer_offset + 2] = payload[layer_offset + 3] = 0;
+    noah_profile_rgb_v1_limits_t limits = noah_profile_rgb_v1_default_limits();
+    limits.logical_layer_count = LAYER_COUNT; limits.maximum_brightness = 200; limits.tap_branch_color_count = 4;
+    noah_effective_rgb_runtime_t runtime;
+    noah_effective_rgb_runtime_init(&runtime);
+    CHECK(noah_effective_rgb_runtime_install(&runtime));
+    for (uint8_t mode = 0; mode < 3; mode++) {
+        payload[fade_offset] = mode;
+        noah_effective_profile_snapshot_t snapshot = {.identity = test_identity(20u + mode)};
+        noah_profile_rgb_v1_error_t error;
+        CHECK(noah_profile_rgb_v1_decode(payload, length, &limits, &snapshot.profile.rgb, &error) == NOAH_PROFILE_RGB_V1_OK);
+        snapshot.profile.domain_mask = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB;
+        noah_effective_rgb_runtime_invalidate(&runtime, mode + 1, (noah_effective_profile_identity_t){0}, snapshot.identity, &snapshot);
+        noah_effective_rgb_frame_t frame;
+        CHECK(rgb_effective_config_capture_frame(&frame) == NOAH_EFFECTIVE_RGB_OK);
+        test_reset();
+        test_keymap[LAYER_NAV][0][1] = 4;
+        layer_state = ((layer_state_t)1u << LAYER_NAV) | ((layer_state_t)1u << LAYER_SYM);
+        fake_automouse_progress = AUTOMOUSE_RGB_ACTIVE_SPAN;
+        rgb_runtime_frame_t destination;
+        CHECK(rgb_runtime_layer_stage_render_effective_frame(&destination, (layer_state_t)1u << LAYER_NAV, &frame, 0, RGB_MATRIX_LED_COUNT));
+        for (uint8_t led = 0; led < RGB_MATRIX_LED_COUNT; led++) ws2812_leds[led] = (ws2812_led_t){.r = 21, .g = 22, .b = 23};
+        CHECK(rgb_runtime_automouse_stage_render_effective(layer_state, &frame, 0, RGB_MATRIX_LED_COUNT));
+        unsigned retained = 0, filled = 0;
+        for (uint8_t led = 0; led < RGB_MATRIX_LED_COUNT; led++) {
+            rgb_t expected;
+            if (mode == 2 || (mode == 1 && !destination.painted[led])) expected = rgb_from_hsv((hsv_t){.h = 8, .s = 9, .v = 10});
+            else if (destination.painted[led]) expected = destination.colors[led];
+            else expected = (rgb_t){.r = 21, .g = 22, .b = 23};
+            check_output_led(led, expected);
+            if (destination.painted[led]) retained++; else filled++;
+        }
+        CHECK(retained > 0 && filled > 0);
+    }
+    noah_effective_rgb_runtime_uninstall(&runtime);
+}
+
 int main(int argc, char **argv) {
     CHECK(argc == 2);
     test_base_layer_is_visible_when_no_overlay_layer_is_active();
     test_base_layer_remains_under_mapped_only_overlay_layers();
     test_live_layer_profile_and_stale_frame(argv[1]);
     test_live_automouse_profile_and_stale_frame(argv[1]);
+    test_live_automouse_policy_modes(argv[1]);
 
     puts("rgb_base_underlay host tests passed");
     return 0;

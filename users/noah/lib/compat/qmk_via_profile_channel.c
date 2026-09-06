@@ -19,6 +19,7 @@
 #ifdef VIA_ENABLE
 
 #    include "via.h"
+#    include "qmk_combo_readback.h"
 
 #    include "../profile/protocol/profile_wire_v1.h"
 #    include "../profile/storage/profile_storage_layout.h"
@@ -343,6 +344,7 @@ static bool noah_profile_channel_handle_payload_get(uint8_t *data, uint8_t lengt
 }
 
 NOAH_PROFILE_CHANNEL_STACK_BOUNDARY void via_custom_value_command_kb(uint8_t *data, uint8_t length) {
+    if (noah_qmk_combo_readback_get(data, length)) return;
 #    ifdef NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS_ENABLE
     if (noah_profile_channel_handle_cadence_get(data, length)) {
         return;

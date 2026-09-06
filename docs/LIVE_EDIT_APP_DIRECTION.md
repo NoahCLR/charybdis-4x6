@@ -216,6 +216,83 @@ because no device command exposes them:
 Both are keyboard-definition data of the kind VIA and Vial ship per board. No
 configuration flows from them; they only decode what the device sends.
 
+Readback must be tested through the extension's posted model and the rendered
+controls, not just the byte decoders. The initial readback implementation omitted
+the profile from the extension publication and forwarded wire-domain objects
+without adapting them to the UI. Passing codec tests did not prove display.
+`device-profile-view.js` now converts validated device domains into presentation
+fields. The separate behaviours view lists every returned row; RGB includes
+stage state and resolved group membership. Zero timing values remain visible,
+with the unreported firmware-default duration stated explicitly.
+
+Semantic target links to opaque VIA keycodes are enabled only for the known v1
+native action ABI advertised by the keyboard. An unfamiliar ABI keeps semantic
+rows inspectable without guessing native key identities. Source names and
+unreported policy values are never reconstructed from the repository. Recorded
+device bytes used by regression tests are test-only fixtures, not runtime data.
+
+Layer preview membership follows the firmware rule: both transparent and
+no-action keycodes are unmapped, regardless of their QMK alias spelling. The
+preview honours all-keys mode and disabled layer stages as well. Tests exercise
+the delivered key renderer, including unsaved edits whose numeric readback is
+stale. Standard modified keycodes decode structurally; complete numeric IDs
+remain for unnamed custom keys. Catalog generation honours QMK fragment resets
+and deletions, and every decoded uint16 must encode back to its original value.
+
+### D-L12 — RGB rule identity and preview appearance are separate
+
+Pass-through is a layer paint operation, not white, black, or a copy of a
+compiled default colour. The app reads current QMK RGB Matrix settings over
+standard VIA channel 3, GET `0x08`, values 1–4 (relative brightness, effect,
+speed, hue/saturation). These settings are outside custom-profile generation
+identity and remain separate in the session and presentation models.
+
+The read requires consecutive matching samples, up to four samples (16 GETs).
+This detects ordinary changes during readback; VIA offers no atomic snapshot.
+Unsupported, malformed, or unstable reads clear the previous base colour and
+leave custom-profile readback intact. Disconnect clears both.
+
+The board is explicitly a **selected-layer preview**. It assumes base plus
+the selected layer, paints their colours in layer order, then their applicable
+LED groups in reported order. All-keys/mapped-only membership, pass-through,
+owning-layer group inheritance and disabled layer stages follow the firmware
+rules. RGB Matrix off suppresses the full preview. Solid colour mode can be
+drawn from the read settings; unimplemented effects use labelled placeholders.
+Transparent-key identity is independent of inherited RGB fill.
+
+This is not rendered LED telemetry. VIA brightness is scaled to an unreported
+compiled ceiling; display intensity is approximate. Effect flags, idle/suspend,
+animation phase, active/locked layers and transient feedback are not supplied
+by these reads. Refresh is explicit through **Read from keyboard**. Exact live
+appearance remains a future device-frame readout, not host reconstruction of
+unreported state. No firmware or profile-format change is required for this
+settings-based preview.
+
+### D-L13 — Combo readback is device data, separate from persisted profiles
+
+Profile Wire GET value `0x06` exposes the native combo table the connected
+half runs, with effective per-combo timing and hold/tap/order rules, global
+enabled state, and layer-reference mapping. The bounded read supports up to
+32 rows of four inputs. A metadata digest and a repeated metadata read detect
+ordinary mid-read changes. Exact framing is in `architecture/profile-wire-v1.md`.
+This is an optional probe: old firmware returns VIA unhandled, and the app
+shows an update message without losing its other readback.
+
+This read does not introduce the reserved combo profile domain `0x30`, a
+generation, an EEPROM representation or a mutation route. Definitions are
+native numeric keycodes under the connected firmware's ABI. The app uses its
+vendored keycode vocabulary and already-validated semantic labels, never source
+files. Combo names are stable generated row labels. Firmware callback outputs
+and additional custom trigger/release hooks are explicitly identified as opaque.
+
+The initial readout listed every returned row in a Combos tab; D-L14 returns editing to the layout. Layout badges show where the selected
+layer over Layer 0 supplies all inputs, respecting reported reference layers
+and transparent keys; they do not claim to observe the active layer stack or
+evaluate arbitrary trigger predicates. No per-combo transient engine state is
+presented as configuration. Global disable suppresses preview badges.
+
+Readback was proven on the connected keyboard. D-L14 adds the combo domain and generation-bound persistence.
+
 ### D-L09 — The live app owns a canonical profile format, not `.c`
 
 Backup, restore, sharing, and version control all go through a canonical
@@ -300,3 +377,44 @@ completed slice.
 - **External VIA writes.** Another VIA client can change layout underneath the
   app. Those changes are adopted into a new generation or surfaced as a
   conflict; they must not silently escape profile identity.
+
+### D-L14 — Save device edits as a complete, generation-bound profile
+
+RGB edits now patch the verified device payload and retain every untouched
+profile domain. A save checks the original generation/digest/origin before
+staging and again after acquiring the candidate lease. Conflicts abort before
+chunks. The existing split commit barrier persists and activates the candidate
+on both halves; the app then reads the entire committed payload and requires
+byte equality. Combo edits additionally bind the native readout digest and
+verify that the running combo table matches the saved domain.
+
+Combos use optional canonical domain `0x30` v1 (specified in Profile Wire).
+Absent means compiled fallback; an explicit empty table means no combos. Both
+halves validate actions, references, duplicate native inputs and the shared hold
+threshold before persistence. QMK introspection, combo origin tracking and GET
+`0x06` all use the same effective native table. Publication is blocked by the
+existing strict idle boundary. At publication the combo invalidator copies at
+most 32 rows / 896 bytes once into owner-held native records; ordinary typing
+and readback perform zero profile-reader calls. This bounded cold copy is a
+specific exception to the metadata-only invalidation used by the other domains.
+A failed copy exposes no partial table and makes native readback unavailable.
+The validator state policy moves from 352 to 356 bytes for its optional native
+translation callback; the owner and provider state policies remain unchanged.
+
+QMK's hold/tap wait is global. All rows must carry the same threshold, and the
+UI edits it as one shared setting. The local compatibility header supplies the
+QMK hook configuration; no upstream source is changed. Custom trigger/release
+hooks, callback outputs and disabled combo timing are not editable through this
+format. Their readout remains available.
+
+Combo editing stays beside the physical layout, including input selection on
+the board. A collapsed all-combos list below the layer overview covers rows
+unreachable on the selected layer; there is no separate combo navigation tab.
+RGB stage toggles, colours, locality, fade policy, reusable LED membership and
+assignment creation/removal use the same save path. Auto-mouse's follow-real-
+destination mode deliberately ignores the end colour; its control is disabled
+and explained in that mode. The static preview does not animate timeout fades.
+
+Next: behaviour editing, macro read/write, full backup/recovery and the remaining
+policy domains. This is not acceptance of the complete product; the known
+pointing-cadence and hardware acceptance work still apply.

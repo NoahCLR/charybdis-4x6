@@ -25,7 +25,7 @@ behavior. The UI must explain every intentional non-live boundary.
 | `keymaps[][]` | Standard VIA-owned state; C is compiled default | 06 | QMK dynamic keymap/VIA reconciliation |
 | `VIA_MACROS` | Standard VIA-owned state; C is compiled default | 06 | QMK dynamic macro storage |
 | `HARDCODED_MACROS` | Later custom live domain | 06 | macro provider and profile schema |
-| `COMBOS` | Later live structural data | 07 | combo validator/provider |
+| `COMBOS` | GET `0x06` readout; optional live domain `0x30` for rows, timing and matching flags | 07 | combo validator/provider |
 | Logical layer names/order | Later fixed-capacity structure | 07 | whole-profile cross-reference validator |
 | Custom-keycode enum and handler code | Executable firmware/action ABI | flash required | firmware build |
 

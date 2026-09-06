@@ -6,7 +6,7 @@
 
 #if defined(COMBO_ENABLE)
 
-#    include "noah_keymap_ids.h"
+#    include "qmk_effective_combos.h"
 #    include "../split/runtime_sync.h"
 
 #    ifndef COMBO_ONLY_FROM_LAYER
@@ -128,11 +128,11 @@ static uint16_t combo_origin_combo_keycode_for_record(keyrecord_t *record) {
 }
 
 static combo_t *combo_origin_combo_get(uint16_t combo_index) {
-    if (combo_index >= noah_combo_count) {
+    if (combo_index >= noah_qmk_combo_count()) {
         return NULL;
     }
 
-    return &key_combos[combo_index];
+    return noah_qmk_combo_get(combo_index);
 }
 
 static void combo_origin_bitmap_fill_all_keys(uint8_t *out_bitmap) {
@@ -404,7 +404,7 @@ static uint16_t combo_origin_latest_legal_wait_ms(void) {
     // so a shorter candidate cannot expire while another buffered combo still
     // legally delays the shared flush.
 #        ifdef COMBO_TERM_PER_COMBO
-    for (uint16_t combo_index = 0; combo_index < noah_combo_count; combo_index++) {
+    for (uint16_t combo_index = 0; combo_index < noah_qmk_combo_count(); combo_index++) {
         combo_t *combo      = combo_origin_combo_get(combo_index);
         uint16_t combo_term = combo ? get_combo_term(combo_index, combo) : 0;
 
@@ -467,7 +467,7 @@ static void combo_origin_pending_output_reconcile(bool observe_deadline) {
 }
 
 static void combo_origin_note_completed_pressed_combos(void) {
-    for (uint16_t combo_index = 0; combo_index < noah_combo_count; combo_index++) {
+    for (uint16_t combo_index = 0; combo_index < noah_qmk_combo_count(); combo_index++) {
         combo_t *combo = combo_origin_combo_get(combo_index);
         uint8_t  combo_bitmap[KEY_ORIGIN_BITMAP_SIZE];
         keypos_t owner_key_pos = {0};
@@ -563,7 +563,7 @@ static combo_origin_pending_output_entry_t *combo_origin_pending_entry_for_press
 
     // QMK does not put the combo index in COMBO_EVENT. Active combo state gives
     // us the exact compatible indices; buffer order follows completion order.
-    for (uint16_t combo_index = 0; combo_index < noah_combo_count; combo_index++) {
+    for (uint16_t combo_index = 0; combo_index < noah_qmk_combo_count(); combo_index++) {
         combo_t                             *combo = combo_origin_combo_get(combo_index);
         combo_origin_pending_output_entry_t *candidate;
 
@@ -613,7 +613,7 @@ static bool combo_origin_collect_untracked_active_combo(uint16_t keycode, uint16
     *out_complete_at   = 0;
     key_origin_bitmap_clear(out_bitmap);
 
-    for (uint16_t combo_index = 0; combo_index < noah_combo_count; combo_index++) {
+    for (uint16_t combo_index = 0; combo_index < noah_qmk_combo_count(); combo_index++) {
         combo_t *combo = combo_origin_combo_get(combo_index);
 
         if (!(combo && combo->keycode == keycode && combo_origin_combo_is_active(combo)) || combo_origin_active_cache_has_combo(combo_index)) {
@@ -747,7 +747,7 @@ void noah_qmk_combo_origin_pressed_combo_bitmap(uint8_t *out_bitmap) {
 
     key_origin_bitmap_clear(out_bitmap);
 
-    for (uint16_t combo_index = 0; combo_index < noah_combo_count; combo_index++) {
+    for (uint16_t combo_index = 0; combo_index < noah_qmk_combo_count(); combo_index++) {
         combo_t *combo = combo_origin_combo_get(combo_index);
         uint8_t  combo_bitmap[KEY_ORIGIN_BITMAP_SIZE];
         keypos_t owner_key_pos = {0};
@@ -795,7 +795,7 @@ bool noah_qmk_combo_origin_pressed_combo_matches(uint16_t keycode, keypos_t owne
         }
     }
 
-    for (uint16_t combo_index = 0; combo_index < noah_combo_count; combo_index++) {
+    for (uint16_t combo_index = 0; combo_index < noah_qmk_combo_count(); combo_index++) {
         combo_t *combo = combo_origin_combo_get(combo_index);
         uint8_t  combo_bitmap[KEY_ORIGIN_BITMAP_SIZE];
         keypos_t combo_owner_key_pos = {0};

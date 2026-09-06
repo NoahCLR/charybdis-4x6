@@ -26,16 +26,39 @@ for (const entry of catalog.entries) {
 // QMK's quantum keycode ranges. Kept here rather than derived from the catalog
 // because the catalog lists the range markers only as boundaries, which the
 // generator deliberately drops.
-const QUANTUM = Object.freeze([
-    {mask: 0xf000, base: 0x4000, kind: "layer-tap", layerBits: 0x0f00, layerShift: 8, keyBits: 0x00ff},
-    {mask: 0xf000, base: 0x5000, kind: "layer", layerBits: 0x0fff, layerShift: 0, keyBits: 0},
-    {mask: 0xf000, base: 0x6000, kind: "mod-tap", layerBits: 0x1f00, layerShift: 8, keyBits: 0x00ff},
+const LAYER_FORMS = Object.freeze([
+    {base: 0x5200, name: "TO", label: "Layer move"},
+    {base: 0x5220, name: "MO", label: "Layer hold"},
+    {base: 0x5240, name: "DF", label: "Default layer"},
+    {base: 0x5260, name: "TG", label: "Layer toggle"},
+    {base: 0x5280, name: "OSL", label: "One-shot layer"},
+    {base: 0x52c0, name: "TT", label: "Layer tap toggle"},
+    {base: 0x52e0, name: "PDF", label: "Persistent default layer"},
 ]);
+const MODIFIERS = [
+    {bit: 1, name: "CTL", label: "Ctrl"}, {bit: 2, name: "SFT", label: "Shift"},
+    {bit: 4, name: "ALT", label: "Alt"}, {bit: 8, name: "GUI", label: "Cmd"},
+];
+// Modified-key spellings share QMK's five modifier bits. The picker emits
+// short forms (for example G for Cmd), while device readback uses long forms.
+const MODIFIER_WRAPPERS = new Map(Object.entries({
+    C: 0x01, LCTL: 0x01, S: 0x02, LSFT: 0x02,
+    A: 0x04, LALT: 0x04, LOPT: 0x04,
+    G: 0x08, LGUI: 0x08, LCMD: 0x08, LWIN: 0x08,
+    LCS: 0x03, LCA: 0x05, LCG: 0x09, LSA: 0x06, LSG: 0x0a, LAG: 0x0c,
+    LCSG: 0x0b, LCAG: 0x0d, LSAG: 0x0e, MEH: 0x07, HYPR: 0x0f,
+    RCTL: 0x11, RSFT: 0x12, RALT: 0x14, ALGR: 0x14, ROPT: 0x14,
+    RGUI: 0x18, RCMD: 0x18, RWIN: 0x18,
+    RCS: 0x13, RCA: 0x15, RCG: 0x19, RSA: 0x16, RSG: 0x1a, RAG: 0x1c,
+    RCSG: 0x1b, RCAG: 0x1d, RSAG: 0x1e,
+}));
 
-const MOMENTARY_BASE = 0x5220;
-const TOGGLE_BASE = 0x5260;
-const ONESHOT_BASE = 0x5280;
-const LAYER_MOVE_BASE = 0x5240;
+function modifiers(bits) {
+    const side = bits & 0x10 ? "R" : "L";
+    return MODIFIERS.filter(mod => bits & mod.bit).map(mod => ({
+        name: side + mod.name, label: (side === "R" ? "Right " : "") + mod.label,
+    }));
+}
 
 function resolve(value) {
     if (!Number.isInteger(value) || value < 0 || value > 0xffff) {
@@ -64,18 +87,30 @@ function resolve(value) {
         return tap;
     }
 
+    if (value >= 0x0100 && value <= 0x1fff) {
+        const key = BY_VALUE.get(value & 0xff);
+        const mods = modifiers((value >> 8) & 0x1f);
+        if (key && mods.length) return {
+            value, name: mods.reduceRight((name, mod) => `${mod.name}(${name})`, key.name),
+            label: [...mods.map(mod => mod.label), key.label].join("+"),
+            group: "modifiers", kind: "modified", known: true,
+        };
+    }
+    if (value >= 0x52a0 && value <= 0x52bf) {
+        const mods = modifiers(value & 0x1f);
+        if (mods.length) return {
+            value, name: `OSM(${mods.map(mod => `MOD_${mod.name}`).join("|")})`,
+            label: `One-shot ${mods.map(mod => mod.label).join("+")}`,
+            group: "modifiers", kind: "one-shot-mod", known: true,
+        };
+    }
+
     return unknown(value);
 }
 
 // MO/TG/OSL/TO carry the layer in the low bits of a fixed base.
 function resolveLayerKeycode(value) {
-    const forms = [
-        {base: MOMENTARY_BASE, name: "MO", label: "Layer hold"},
-        {base: TOGGLE_BASE, name: "TG", label: "Layer toggle"},
-        {base: ONESHOT_BASE, name: "OSL", label: "One-shot layer"},
-        {base: LAYER_MOVE_BASE, name: "TO", label: "Layer move"},
-    ];
-    for (const form of forms) {
+    for (const form of LAYER_FORMS) {
         const layer = value - form.base;
         if (layer >= 0 && layer < 32) {
             return {
@@ -95,38 +130,33 @@ function resolveLayerKeycode(value) {
 // LT(layer, kc) and mod-tap share a shape: a behaviour in the high nibble, a
 // basic keycode in the low byte.
 function resolveTapHold(value) {
-    for (const range of QUANTUM) {
-        if ((value & range.mask) !== range.base || range.kind === "layer") {
-            continue;
-        }
-        const tapped = BY_VALUE.get(value & range.keyBits);
-        const argument = (value & range.layerBits) >> range.layerShift;
-        if (!tapped) {
-            continue;
-        }
-        if (range.kind === "layer-tap") {
-            return {
-                value,
-                name: `LT(${argument},${tapped.name})`,
-                label: `${tapped.label} / layer ${argument}`,
-                group: "layer",
-                kind: "layer-tap",
-                layer: argument,
-                tap: tapped.name,
-                known: true,
-            };
-        }
+    const tapped = BY_VALUE.get(value & 0xff);
+    if (!tapped) return undefined;
+    if ((value & 0xf000) === 0x4000) {
+        const argument = (value >> 8) & 0x0f;
         return {
             value,
-            name: `MT(${argument},${tapped.name})`,
-            label: `${tapped.label} / mod`,
-            group: "modifiers",
-            kind: "mod-tap",
+            name: `LT(${argument},${tapped.name})`,
+            label: `${tapped.label} / layer ${argument}`,
+            group: "layer",
+            kind: "layer-tap",
+            layer: argument,
             tap: tapped.name,
             known: true,
         };
     }
-    return undefined;
+    if ((value & 0xe000) !== 0x2000) return undefined;
+    const mods = modifiers((value >> 8) & 0x1f);
+    if (!mods.length) return undefined;
+    return {
+        value,
+        name: `MT(${mods.map(mod => `MOD_${mod.name}`).join("|")},${tapped.name})`,
+        label: `${tapped.label} / ${mods.map(mod => mod.label).join("+")}`,
+        group: "modifiers",
+        kind: "mod-tap",
+        tap: tapped.name,
+        known: true,
+    };
 }
 
 function unknown(value) {
@@ -148,11 +178,28 @@ function encode(expression) {
         return direct.value;
     }
 
-    const layerForm = text.match(/^(MO|TG|OSL|TO)\(\s*(\d+)\s*\)$/);
+    const layerForm = text.match(/^(MO|TG|OSL|TO|DF|TT|PDF)\(\s*(\d+)\s*\)$/);
     if (layerForm) {
-        const bases = {MO: MOMENTARY_BASE, TG: TOGGLE_BASE, OSL: ONESHOT_BASE, TO: LAYER_MOVE_BASE};
         const layer = Number(layerForm[2]);
-        return layer < 32 ? bases[layerForm[1]] + layer : undefined;
+        return layer < 32 ? LAYER_FORMS.find(form => form.name === layerForm[1]).base + layer : undefined;
+    }
+
+    const wrapper = text.match(/^([A-Z]+)\(\s*(.+)\s*\)$/);
+    if (wrapper && MODIFIER_WRAPPERS.has(wrapper[1])) {
+        const key = encode(wrapper[2]);
+        if (key === undefined || key > 0x1fff) return undefined;
+        return key | (MODIFIER_WRAPPERS.get(wrapper[1]) << 8);
+    }
+    const modTap = text.match(/^MT\(\s*([^,]+)\s*,\s*([A-Za-z0-9_]+)\s*\)$/);
+    if (modTap) {
+        const bits = encodeModifiers(modTap[1]);
+        const tapped = BY_NAME.get(modTap[2]);
+        return bits !== undefined && tapped && tapped.value <= 0xff ? 0x2000 | (bits << 8) | tapped.value : undefined;
+    }
+    const oneshot = text.match(/^OSM\(\s*(.+)\s*\)$/);
+    if (oneshot) {
+        const bits = encodeModifiers(oneshot[1]);
+        return bits === undefined ? undefined : 0x52a0 | bits;
     }
 
     const layerTap = text.match(/^LT\(\s*(\d+)\s*,\s*([A-Za-z0-9_]+)\s*\)$/);
@@ -171,6 +218,16 @@ function encode(expression) {
     }
 
     return undefined;
+}
+
+function encodeModifiers(expression) {
+    let bits = 0;
+    for (const part of expression.split("|")) {
+        const match = part.trim().match(/^MOD_([LR])(CTL|SFT|ALT|GUI)$/);
+        if (!match) return undefined;
+        bits |= MODIFIERS.find(mod => mod.name === match[2]).bit | (match[1] === "R" ? 0x10 : 0);
+    }
+    return bits;
 }
 
 function lookup(name) {

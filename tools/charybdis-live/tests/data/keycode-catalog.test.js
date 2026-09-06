@@ -2,10 +2,13 @@
 
 const assert = require("node:assert/strict");
 const test = require("node:test");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
 
-const {CATALOG_FORMAT, parseKeycodeEntries} = require("../../scripts/generate-keycode-catalog");
+const {buildCatalog, CATALOG_FORMAT, parseKeycodeEntries} = require("../../scripts/generate-keycode-catalog");
 const catalog = require("../../core/data/keycode-catalog.json");
-const {lookup, metadata, resolve} = require("../../core/data/keycode-catalog");
+const {encode, lookup, metadata, resolve} = require("../../core/data/keycode-catalog");
 
 // These assertions run against the vendored file, not a QMK checkout, so they
 // hold on a machine that has no firmware workspace at all. That is the point of
@@ -22,6 +25,25 @@ test("the shipped catalog declares its format and provenance", () => {
 test("numeric values are unique, so a device keycode resolves to one entry", () => {
     const values = catalog.entries.map((entry) => entry.value);
     assert.equal(new Set(values).size, values.length);
+});
+
+test("catalog revisions reset only their fragment and remove deleted values", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "live-keycode-spec-"));
+    try {
+        const dir = path.join(root, "data/constants/keycodes");
+        fs.mkdirSync(dir, {recursive: true});
+        fs.writeFileSync(path.join(root, "version.txt"), "test");
+        for (const [name, keycodes] of Object.entries({
+            "0.0.1_basic": {"0x0004": {key: "KC_A"}},
+            "0.0.1_midi": {"0x7190": {key: "VELOCITY"}},
+            "0.0.2_midi": {"!reset!": 0, "0x7166": {key: "VELOCITY"}},
+            "0.0.1_quantum": {"0x7C20": {key: "OLD_OUTPUT"}, "0x7C30": {key: "KEEP"}},
+            "0.0.2_quantum": {"0x7C20": "!delete!"},
+        })) fs.writeFileSync(path.join(dir, `keycodes_${name}.hjson`), JSON.stringify({keycodes}));
+        assert.deepEqual(buildCatalog(root).entries.map(entry => entry.value), [0x0004, 0x7166, 0x7c30]);
+    } finally {
+        fs.rmSync(root, {recursive: true, force: true});
+    }
 });
 
 test("every entry can be rendered and written", () => {
@@ -137,4 +159,65 @@ test("names and aliases resolve back to entries, and metadata is reported", () =
     assert.equal(lookup("nonsense"), undefined);
     assert.equal(metadata().keycodeCount, catalog.entries.length);
     assert.equal(metadata().qmkVersion, catalog.qmkVersion);
+});
+
+test("shortcuts read from the keyboard include every modifier and basic key", () => {
+    for (const [value, name, label] of [
+        [0x0226, "LSFT(KC_9)", "Shift+9"],
+        [0x0806, "LGUI(KC_C)", "Cmd+C"],
+        [0x0a1d, "LSFT(LGUI(KC_Z))", "Shift+Cmd+Z"],
+        [0x1104, "RCTL(KC_A)", "Right Ctrl+A"],
+        [0x1f04, "RCTL(RSFT(RALT(RGUI(KC_A))))", "Right Ctrl+Right Shift+Right Alt+Right Cmd+A"],
+    ]) {
+        assert.equal(resolve(value).name, name);
+        assert.equal(resolve(value).label, label);
+        assert.equal(encode(name), value);
+    }
+});
+
+test("picker shortcuts and QMK modifier aliases encode identically to device readback", () => {
+    for (const [forms, value] of [
+        [["C(KC_N)", "LCTL(KC_N)"], 0x0111],
+        [["S(KC_N)", "LSFT(KC_N)"], 0x0211],
+        [["A(KC_N)", "LALT(KC_N)", "LOPT(KC_N)"], 0x0411],
+        [["G(KC_N)", "LGUI(KC_N)", "LCMD(KC_N)", "LWIN(KC_N)"], 0x0811],
+        [["ALGR(KC_N)", "ROPT(KC_N)", "RALT(KC_N)"], 0x1411],
+        [["RCMD(KC_N)", "RWIN(KC_N)", "RGUI(KC_N)"], 0x1811],
+        [["S(G(KC_N))", "LSG(KC_N)"], 0x0a11],
+        [["C(A(G(KC_N)))", "LCAG(KC_N)"], 0x0d11],
+        [["C(S(A(KC_N)))", "MEH(KC_N)"], 0x0711],
+        [["C(S(A(G(KC_N))))", "HYPR(KC_N)"], 0x0f11],
+        [["RCTL(RSFT(RGUI(KC_N)))", "RCSG(KC_N)"], 0x1b11],
+    ]) {
+        for (const form of forms) {
+            assert.equal(encode(form), value, form);
+            assert.equal(encode(resolve(encode(form)).name), value, form);
+        }
+    }
+    assert.equal(resolve(encode("G(KC_N)")).label, "Cmd+N");
+    for (const form of ["G(MO(1))", "G(LT(1,KC_N))", "G(MT(MOD_LCTL,KC_N))", "G(UNKNOWN)", "G(KC_N,KC_C)", "UNKNOWN(KC_N)"]) {
+        assert.equal(encode(form), undefined, form);
+    }
+});
+
+test("tap-hold and layer forms use their distinct QMK ranges", () => {
+    assert.equal(resolve(0x2104).name, "MT(MOD_LCTL,KC_A)");
+    assert.equal(resolve(0x3804).name, "MT(MOD_RGUI,KC_A)");
+    assert.notEqual(resolve(0x6104).kind, "mod-tap");
+    assert.equal(resolve(0x52a3).name, "OSM(MOD_LCTL|MOD_LSFT)");
+    for (const [base, form] of [[0x5200, "TO"], [0x5220, "MO"], [0x5240, "DF"], [0x5260, "TG"], [0x5280, "OSL"], [0x52c0, "TT"], [0x52e0, "PDF"]]) {
+        assert.equal(resolve(base + 3).name, `${form}(3)`);
+        assert.equal(encode(`${form}(31)`), base + 31);
+        assert.equal(encode(`${form}(32)`), undefined);
+    }
+    assert.equal(encode("MT(MOD_UNKNOWN,KC_A)"), undefined);
+    assert.equal(encode("OSM(MOD_UNKNOWN)"), undefined);
+    assert.equal(encode("LGUI(MO(1))"), undefined);
+});
+
+test("every resolved uint16 can be written back without changing its value", () => {
+    for (let value = 0; value <= 0xffff; value++) {
+        const decoded = resolve(value);
+        assert.equal(encode(decoded.name), value, `${value}: ${decoded.name}`);
+    }
 });

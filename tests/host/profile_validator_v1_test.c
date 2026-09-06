@@ -110,7 +110,7 @@ static noah_profile_validator_v1_declaration_t declaration_for(const uint8_t *by
 static noah_profile_validator_v1_compatibility_t compatibility(void) {
     noah_profile_validator_v1_compatibility_t value = noah_profile_validator_v1_default_compatibility(ACTION_ABI_DIGEST);
 
-    value.required_domain_mask       = NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS;
+    value.required_domain_mask       = (NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS);
     value.allowed_domain_mask        = NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS;
     value.logical_layer_count        = 3u;
     value.supported_pd_mode_mask     = NOAH_PROFILE_RGB_V1_PD_MODE_MASK_ALL;
@@ -160,7 +160,7 @@ static void test_golden_incremental_phases(const char *fixture_path) {
     size_t length = fixture_hex(fixture_path, "profile.full.hex", &bytes[5], TEST_BUFFER_SIZE);
     instrumented_reader_t state = {.bytes = bytes, .length = length + 10u};
     noah_profile_reader_t reader = {.read = instrumented_read, .context = &state, .length = length + 10u};
-    noah_profile_validator_v1_declaration_t declaration = declaration_for(&bytes[5], length, NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS);
+    noah_profile_validator_v1_declaration_t declaration = declaration_for(&bytes[5], length, (NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS));
     noah_profile_validator_v1_compatibility_t compatible = compatibility();
     noah_profile_validator_v1_t validator;
     noah_profile_validator_v1_profile_t profile;
@@ -196,7 +196,7 @@ static void test_golden_incremental_phases(const char *fixture_path) {
     expect_result(result, NOAH_PROFILE_VALIDATOR_V1_VALID);
     assert(validator.phase == NOAH_PROFILE_VALIDATOR_V1_PHASE_VALID);
     expect_result(noah_profile_validator_v1_profile(&validator, &profile, &error), NOAH_PROFILE_VALIDATOR_V1_VALID);
-    assert(profile.domain_mask == NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS && profile.domain_count == 2u);
+    assert(profile.domain_mask == (NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS) && profile.domain_count == 2u);
     assert(profile.byte_length == length && profile.crc32 == declaration.crc32 && profile.digest == declaration.digest);
     assert(profile.rgb.layer_color_count == 3u && profile.key_behaviors.row_count == 2u);
 }
@@ -206,7 +206,7 @@ static void test_identity_capacity_and_masks(const char *fixture_path) {
     uint8_t empty[NOAH_PROFILE_BLOB_V1_HEADER_SIZE] = {'N', 'L', 'P', '1', 1u, 0u, 0u, 1u};
     size_t full_length = fixture_hex(fixture_path, "profile.full.hex", full, sizeof(full));
     noah_profile_validator_v1_compatibility_t compatible = compatibility();
-    noah_profile_validator_v1_declaration_t declaration = declaration_for(full, full_length, NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS);
+    noah_profile_validator_v1_declaration_t declaration = declaration_for(full, full_length, (NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS));
     noah_profile_validator_v1_error_t error;
     instrumented_reader_t state = {.bytes = full, .length = full_length};
     noah_profile_reader_t reader = {.read = instrumented_read, .context = &state, .length = full_length};
@@ -231,7 +231,7 @@ static void test_identity_capacity_and_masks(const char *fixture_path) {
     compatible.required_domain_mask = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB;
     expect_result(validate(empty, sizeof(empty), &declaration, &compatible, &error), NOAH_PROFILE_VALIDATOR_V1_MISSING_DOMAIN);
 
-    declaration = declaration_for(full, full_length, NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS);
+    declaration = declaration_for(full, full_length, (NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS));
     compatible = compatibility();
     declaration.domain_mask = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB;
     expect_result(validate(full, full_length, &declaration, &compatible, &error), NOAH_PROFILE_VALIDATOR_V1_DOMAIN_MASK_MISMATCH);
@@ -253,42 +253,42 @@ static void test_blob_and_domain_rejections(const char *fixture_path) {
     noah_profile_validator_v1_error_t error;
 
     memcpy(bytes, valid, length); bytes[0] = 'X';
-    declaration = declaration_for(bytes, length, NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS);
+    declaration = declaration_for(bytes, length, (NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS));
     expect_result(validate(bytes, length, &declaration, &compatible, &error), NOAH_PROFILE_VALIDATOR_V1_INVALID_BLOB);
     assert(error.detail_kind == NOAH_PROFILE_VALIDATOR_V1_DETAIL_BLOB && error.detail_code == NOAH_PROFILE_CODEC_V1_INVALID_MAGIC);
 
     memcpy(bytes, valid, length); bytes[6] = 1u;
-    declaration = declaration_for(bytes, length, NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS);
+    declaration = declaration_for(bytes, length, (NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS));
     expect_result(validate(bytes, length, &declaration, &compatible, &error), NOAH_PROFILE_VALIDATOR_V1_INVALID_BLOB);
     assert(error.detail_code == NOAH_PROFILE_CODEC_V1_TRAILING_BYTES);
 
     memcpy(bytes, valid, length); bytes[behavior_envelope] = NOAH_PROFILE_DOMAIN_V1_RGB;
-    declaration = declaration_for(bytes, length, NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS);
+    declaration = declaration_for(bytes, length, (NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS));
     expect_result(validate(bytes, length, &declaration, &compatible, &error), NOAH_PROFILE_VALIDATOR_V1_INVALID_BLOB);
     assert(error.detail_code == NOAH_PROFILE_CODEC_V1_DUPLICATE_DOMAIN && error.domain_index == 1u);
 
     memcpy(reversed, valid, NOAH_PROFILE_BLOB_V1_HEADER_SIZE);
     memcpy(&reversed[NOAH_PROFILE_BLOB_V1_HEADER_SIZE], &valid[behavior_envelope], length - behavior_envelope);
     memcpy(&reversed[NOAH_PROFILE_BLOB_V1_HEADER_SIZE + length - behavior_envelope], &valid[NOAH_PROFILE_BLOB_V1_HEADER_SIZE], behavior_envelope - NOAH_PROFILE_BLOB_V1_HEADER_SIZE);
-    declaration = declaration_for(reversed, length, NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS);
+    declaration = declaration_for(reversed, length, (NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS));
     expect_result(validate(reversed, length, &declaration, &compatible, &error), NOAH_PROFILE_VALIDATOR_V1_INVALID_BLOB);
     assert(error.detail_code == NOAH_PROFILE_CODEC_V1_DOMAIN_ORDER && error.domain_index == 1u);
 
-    memcpy(bytes, valid, length); bytes[8] = 0x30u;
-    declaration = declaration_for(bytes, length, NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS);
+    memcpy(bytes, valid, length); bytes[8] = 0x40u;
+    declaration = declaration_for(bytes, length, (NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS));
     expect_result(validate(bytes, length, &declaration, &compatible, &error), NOAH_PROFILE_VALIDATOR_V1_UNSUPPORTED_DOMAIN);
 
     memcpy(bytes, valid, length); bytes[12] = 2u;
-    declaration = declaration_for(bytes, length, NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS);
+    declaration = declaration_for(bytes, length, (NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS));
     expect_result(validate(bytes, length, &declaration, &compatible, &error), NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN);
     assert(error.detail_kind == NOAH_PROFILE_VALIDATOR_V1_DETAIL_RGB && error.detail_code == NOAH_PROFILE_RGB_V1_INVALID_VERSION && error.byte_offset == 12u);
 
     memcpy(bytes, valid, length); bytes[behavior_payload + 2u] = 1u;
-    declaration = declaration_for(bytes, length, NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS);
+    declaration = declaration_for(bytes, length, (NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS));
     expect_result(validate(bytes, length, &declaration, &compatible, &error), NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN);
     assert(error.detail_kind == NOAH_PROFILE_VALIDATOR_V1_DETAIL_KEY_BEHAVIOR && error.detail_code == NOAH_PROFILE_CODEC_V1_RESERVED_FIELDS);
 
-    declaration = declaration_for(valid, length, NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS);
+    declaration = declaration_for(valid, length, (NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS));
     compatible.behavior_limits.max_rows = 1u;
     expect_result(validate(valid, length, &declaration, &compatible, &error), NOAH_PROFILE_VALIDATOR_V1_CAPACITY_EXCEEDED);
 
@@ -340,7 +340,7 @@ static void test_stable_action_cross_references(const char *fixture_path) {
 static void test_read_failures(const char *fixture_path) {
     uint8_t full[TEST_BUFFER_SIZE];
     size_t length = fixture_hex(fixture_path, "profile.full.hex", full, sizeof(full));
-    noah_profile_validator_v1_declaration_t declaration = declaration_for(full, length, NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS);
+    noah_profile_validator_v1_declaration_t declaration = declaration_for(full, length, (NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS));
     noah_profile_validator_v1_compatibility_t compatible = compatibility();
     instrumented_reader_t state = {.bytes = full, .length = length, .fail_call = 1u};
     noah_profile_reader_t reader = {.read = instrumented_read, .context = &state, .length = length};
@@ -372,6 +372,52 @@ static void test_read_failures(const char *fixture_path) {
     assert(error.domain_id == NOAH_PROFILE_DOMAIN_V1_RGB && error.detail_kind == NOAH_PROFILE_VALIDATOR_V1_DETAIL_RGB);
 }
 
+static void test_combo_domain(void) {
+    uint8_t bytes[8 + 4 + 4 + 32 * 28] = {'N', 'L', 'P', '1', 1, 0, 1, 1, 0x30, 1, 0x84, 3, 32, 0, 0, 0};
+    const uint8_t row[28] = {2, 0, 45, 0, 200, 0, 0, 0, 1, 0, 41, 0, 1, 0, 4, 0, 1, 0, 5};
+    for (unsigned index = 0; index < 32; index++) memcpy(&bytes[16 + 28 * index], row, sizeof(row));
+    noah_profile_validator_v1_compatibility_t compatible = compatibility();
+    compatible.required_domain_mask = 0;
+    noah_profile_validator_v1_declaration_t declaration = declaration_for(bytes, sizeof(bytes), 4);
+    noah_profile_validator_v1_error_t error;
+    instrumented_reader_t state = {.bytes = bytes, .length = sizeof(bytes)};
+    noah_profile_reader_t reader = {.read = instrumented_read, .context = &state, .length = sizeof(bytes)};
+    noah_profile_validator_v1_t validator;
+    noah_profile_validator_v1_result_t result = noah_profile_validator_v1_begin(&validator, &reader, 0, &declaration, &compatible, &error);
+    for (unsigned step = 0; result == NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS && step < 500; step++) {
+        reset_step_counts(&state);
+        result = noah_profile_validator_v1_step(&validator, 20, &error);
+        assert(state.step_calls <= 1 && state.step_bytes <= 20);
+    }
+    expect_result(result, NOAH_PROFILE_VALIDATOR_V1_VALID);
+    assert(validator.profile.combos.row_count == 32 && validator.profile.combos.payload_offset == 12);
+    const unsigned bad_offsets[] = {13, 14, 15, 22, 23, 40};
+    for (unsigned index = 0; index < sizeof(bad_offsets) / sizeof(bad_offsets[0]); index++) {
+        unsigned offset = bad_offsets[index]; uint8_t old = bytes[offset]; bytes[offset] = 1;
+        declaration = declaration_for(bytes, sizeof(bytes), 4);
+        expect_result(validate(bytes, sizeof(bytes), &declaration, &compatible, &error), NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN);
+        assert(error.domain_id == 0x30);
+        bytes[offset] = old;
+    }
+    // Distinct semantic operands may not reference an absent logical layer.
+    bytes[28] = 2; bytes[30] = 3;
+    declaration = declaration_for(bytes, sizeof(bytes), 4);
+    expect_result(validate(bytes, sizeof(bytes), &declaration, &compatible, &error), NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN);
+    memcpy(&bytes[16], row, sizeof(row));
+    // One global hold threshold: a later row cannot silently store another.
+    bytes[48] = 199;
+    declaration = declaration_for(bytes, sizeof(bytes), 4);
+    expect_result(validate(bytes, sizeof(bytes), &declaration, &compatible, &error), NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN);
+    memcpy(&bytes[44], row, sizeof(row));
+    memcpy(&bytes[32], &bytes[28], 4); // duplicate input
+    declaration = declaration_for(bytes, sizeof(bytes), 4);
+    expect_result(validate(bytes, sizeof(bytes), &declaration, &compatible, &error), NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN);
+    // An explicitly empty table disables all combos; missing domain is fallback.
+    bytes[10] = 4; bytes[11] = 0; bytes[12] = 0;
+    declaration = declaration_for(bytes, 16, 4);
+    expect_result(validate(bytes, 16, &declaration, &compatible, &error), NOAH_PROFILE_VALIDATOR_V1_VALID);
+}
+
 int main(int argc, char **argv) {
     assert(argc == 2);
     test_golden_incremental_phases(argv[1]);
@@ -379,6 +425,7 @@ int main(int argc, char **argv) {
     test_blob_and_domain_rejections(argv[1]);
     test_stable_action_cross_references(argv[1]);
     test_read_failures(argv[1]);
+    test_combo_domain();
     puts("profile validator v1 host tests passed");
     return 0;
 }

@@ -453,3 +453,13 @@ test("request id allocation wraps from 255 to 1 without emitting zero", () => {
     assert.deepEqual([ids.next(), ids.next(), ids.next(), ids.next()], [0xfe, 0xff, 1, 2]);
     assert.throws(() => new ProfileRequestIdSequence(0), /1 through 255/);
 });
+
+test("a stale profile edit is refused before candidate upload", async () => {
+    let uploads = 0;
+    const {service} = serviceHarness({mutation: true, createCandidateUploadCoordinator() {return {upload() {uploads++;}};}});
+    const scanned = await service.enumerate();
+    await service.connect(scanned.devices[0].id);
+    const result = await service.applyLiveProfile(liveProfileBlob(), {expectedBase: {source: "compiled", digest: 1}});
+    assert.equal(result.error.code, "PROFILE_EDIT_CONFLICT");
+    assert.equal(uploads, 0);
+});

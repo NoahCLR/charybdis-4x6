@@ -31,10 +31,12 @@ enum {
     DOMAIN_ENVELOPE_SIZE       = 4u,
     PROFILE_BLOB_CANONICAL_BIT = 1u,
     DOMAIN_ID_RGB              = 0x10u,
+    DOMAIN_ID_COMBOS = 0x30u,
+    DOMAIN_MASK_COMBOS = 1u << 2,
     DOMAIN_ID_KEY_BEHAVIORS    = 0x20u,
     DOMAIN_MASK_RGB            = 1u << 0,
     DOMAIN_MASK_KEY_BEHAVIORS  = 1u << 1,
-    DOMAIN_MASK_ALL            = DOMAIN_MASK_RGB | DOMAIN_MASK_KEY_BEHAVIORS,
+    DOMAIN_MASK_ALL            = DOMAIN_MASK_RGB | DOMAIN_MASK_KEY_BEHAVIORS | DOMAIN_MASK_COMBOS,
 };
 
 static const uint8_t header_magic[2]   = {'N', 'P'};
@@ -97,6 +99,7 @@ static uint8_t domain_mask_for_id(uint8_t domain_id) {
     if (domain_id == DOMAIN_ID_RGB) {
         return DOMAIN_MASK_RGB;
     }
+    if (domain_id == DOMAIN_ID_COMBOS) return DOMAIN_MASK_COMBOS;
     if (domain_id == DOMAIN_ID_KEY_BEHAVIORS) {
         return DOMAIN_MASK_KEY_BEHAVIORS;
     }

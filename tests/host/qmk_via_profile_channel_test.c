@@ -526,6 +526,22 @@ static void test_compiled_read_reports_unavailable_when_absent(void) {
     store_has_compiled = true;
 }
 
+static void test_combo_read_route_without_combo_feature(void) {
+    uint8_t frame[NOAH_PROFILE_WIRE_V1_REPORT_SIZE];
+    make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_COMBOS, 17u, 0u);
+    via_custom_value_command_kb(frame, sizeof(frame));
+    assert(frame[0] == id_custom_get_value && frame[3] == 17u);
+    assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK && frame[6] == 25u);
+    assert(frame[7] == 1u && frame[8] == 0u && frame[9] == 4u && frame[11] == 0u);
+    make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_COMBOS, 18u, 1u);
+    via_custom_value_command_kb(frame, sizeof(frame));
+    assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_UNKNOWN_PAGE && frame[6] == 0u);
+    make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_COMBOS, 19u, 0u);
+    frame[0] = id_custom_set_value;
+    via_custom_value_command_kb(frame, sizeof(frame));
+    assert(frame[0] == id_unhandled);
+}
+
 int main(void) {
 #ifdef NOAH_LIVE_PROFILE_OWNER_ENABLE
     initialize_live_owner_status();
@@ -547,6 +563,7 @@ int main(void) {
     test_payload_read_surfaces_storage_failure();
     test_compiled_read_serves_what_the_firmware_runs();
     test_compiled_read_reports_unavailable_when_absent();
+    test_combo_read_route_without_combo_feature();
     puts("qmk VIA Profile Wire channel tests passed");
     return 0;
 }

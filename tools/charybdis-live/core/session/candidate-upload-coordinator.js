@@ -163,6 +163,9 @@ class CandidateUploadCoordinator {
                 context,
                 {metadata: context.metadata}
             );
+            // BEGIN has acquired the firmware's exclusive store admission.
+            // A draft-base mismatch now aborts through the ordinary failure path.
+            if (options.verifyBase) await options.verifyBase();
             this.emitProgress(context);
 
             context.phase = UPLOAD_PHASE.WRITING;

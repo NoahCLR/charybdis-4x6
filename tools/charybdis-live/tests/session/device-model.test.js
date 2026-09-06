@@ -4,6 +4,8 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 
 const {buildDeviceModel} = require("../../core/session/device-model");
+const {decodedDeviceProfile} = require("../fixtures/device-profile");
+const {resolve} = require("../../core/data/keycode-catalog");
 
 // The ported Studio UI renders whatever shape it is given, so these assertions
 // pin the contract between the device and that UI. Getting a field name wrong
@@ -20,6 +22,18 @@ const MODEL_FIELDS = [
 function layoutWith(keys) {
     return {state: "read", layers: [{layer: 0, keys}]};
 }
+
+test("device shortcut labels stay complete and semantic names require the advertised ABI", () => {
+    const values = [0x0806, 0x0a1d, 0x7e50, 0x7e61, 0x7e62];
+    const state = {
+        layout: layoutWith(values.map((keycode, layoutIndex) => ({keycode, layoutIndex, resolved: resolve(keycode)}))),
+        committed: decodedDeviceProfile(), capabilities: {actionAbiDigest: 0xdcb00959},
+    };
+    const model = buildDeviceModel(state);
+    assert.deepEqual(model.layers[0].positions.map(key => key.display), ["Cmd+C", "Shift+Cmd+Z", "Dragscroll", "0x7E61", "0x7E62"]);
+    assert.equal(model.layers[0].positions[2].keycode, "QK_USER_16", "the editable identity still encodes to the original numeric value");
+    assert.equal(buildDeviceModel({...state, capabilities: {}}).layers[0].positions[2].display, "User 16");
+});
 
 test("the model always carries every field the UI reads", () => {
     const model = buildDeviceModel({});
@@ -90,11 +104,12 @@ test("an unresolved keycode is shown, not hidden", () => {
     });
     assert.equal(model.layers[0].positions[0].keycode, "0xFFFE");
     assert.equal(model.layers[0].positions[0].value, 0xfffe);
+    assert.equal(model.layers[0].positions[0].display, "0xFFFE");
 });
 
 test("domains awaiting the payload read stay empty rather than invented", () => {
     const model = buildDeviceModel({capabilities: {compiledLayerCount: 5}});
-    assert.deepEqual(model.rgb, {});
+    assert.deepEqual(model.rgb, {baseEffect: {state: "unread", message: "Base RGB has not been read from the keyboard."}});
     assert.deepEqual(model.keyBehaviors, []);
     assert.deepEqual(model.combos, []);
     assert.deepEqual(model.viaMacros, []);
@@ -175,29 +190,23 @@ function committedRead(overrides = {}) {
 }
 
 test("decoded domains reach the UI only after a verified read", () => {
-    const rgb = {stageEnableMask: 3, layerColors: [{layerId: 0}]};
-    const behaviors = {rows: [{keycode: 4}]};
+    const {rgb, keyBehaviors: behaviors} = decodedDeviceProfile().domains;
 
     const reading = buildDeviceModel({committed: {state: "reading", progress: {done: 10, total: 320}}});
-    assert.deepEqual(reading.rgb, {}, "a partial read must not render as device state");
+    assert.deepEqual(reading.rgb, {baseEffect: {state: "unread", message: "Base RGB has not been read from the keyboard."}}, "a partial read must not render as device state");
     assert.deepEqual(reading.keyBehaviors, []);
 
     const done = buildDeviceModel({committed: committedRead({domains: {rgb, keyBehaviors: behaviors}})});
-    assert.deepEqual(done.rgb, rgb);
-    assert.deepEqual(done.keyBehaviors, behaviors.rows);
+    assert.equal(done.rgb.layerColors[0].layer, "Layer 0");
+    assert.equal(done.rgb.layerColors.length, 5);
+    assert.equal(done.keyBehaviors.length, 37);
+    assert.ok(done.keyBehaviors.every(row => row.keycode && row.steps.every(step => Number.isInteger(step.tapCount))));
 });
 
-test("key behaviours decode whether the domain is a list or a wrapper", () => {
-    const asRows = buildDeviceModel({committed: committedRead({domains: {keyBehaviors: {rows: [{keycode: 1}]}}})});
-    assert.deepEqual(asRows.keyBehaviors, [{keycode: 1}]);
-
-    const asArray = buildDeviceModel({committed: committedRead({domains: {keyBehaviors: [{keycode: 2}]}})});
-    assert.deepEqual(asArray.keyBehaviors, [{keycode: 2}]);
-});
 
 test("a keyboard with no committed profile says so instead of looking broken", () => {
     const model = buildDeviceModel({capabilities: {}, committed: {state: "none", reason: "no committed profile"}});
-    assert.deepEqual(model.rgb, {});
+    assert.deepEqual(model.rgb, {baseEffect: {state: "unread", message: "Base RGB has not been read from the keyboard."}});
     assert.deepEqual(model.keyBehaviors, []);
     assert.match(model.diagnostics.join(" "), /need the committed profile read/);
 });
@@ -205,12 +214,12 @@ test("a keyboard with no committed profile says so instead of looking broken", (
 test("a domain that fails to decode is named, and the others still render", () => {
     const model = buildDeviceModel({
         committed: committedRead({
-            domains: {rgb: {stageEnableMask: 1}},
+            domains: {rgb: decodedDeviceProfile().domains.rgb},
             failures: [{domainId: 0x20, message: "row count exceeds the declared limit"}],
         }),
     });
 
-    assert.deepEqual(model.rgb, {stageEnableMask: 1}, "one bad domain must not discard the whole profile");
+    assert.equal(model.rgb.layerColors.length, 5, "one bad domain must not discard the whole profile");
     assert.deepEqual(model.keyBehaviors, []);
     assert.match(model.diagnostics.join(" "), /0x20 did not decode/);
     assert.match(model.diagnostics.join(" "), /row count exceeds/);
@@ -234,10 +243,11 @@ test("compiled defaults are shown, and labelled as compiled", () => {
     const model = buildDeviceModel({
         capabilities: {},
         status: {committedGeneration: 0, committedDigest: 0, activeGeneration: 0, peerGeneration: 0},
-        committed: committedRead({source: "compiled", generation: 0, byteLength: 210, domains: {rgb: {stageEnableMask: 7}}}),
+        committed: committedRead({source: "compiled", generation: 0, byteLength: 210, domains: decodedDeviceProfile().domains}),
     });
 
-    assert.deepEqual(model.rgb, {stageEnableMask: 7}, "the tabs must populate from compiled defaults");
+    assert.equal(model.rgb.layerColors.length, 5, "the tabs must populate from compiled defaults");
+    assert.equal(model.keyBehaviors.length, 37);
     assert.match(model.diagnostics.join(" "), /compiled defaults/);
     assert.match(model.diagnostics.join(" "), /Nothing is committed/);
     assert.match(model.device.subtitle, /compiled defaults/);

@@ -100,7 +100,7 @@ static void assert_golden(const noah_profile_compiled_v1_t *profile) {
 
 static noah_profile_validator_v1_compatibility_t compatibility(uint32_t action_abi_digest) {
     noah_profile_validator_v1_compatibility_t value = noah_profile_validator_v1_default_compatibility(action_abi_digest);
-    value.required_domain_mask            = NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS;
+    value.required_domain_mask            = (NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS);
     value.logical_layer_count             = LAYER_COUNT;
     value.supported_pd_mode_mask          = (uint8_t)((1u << PD_MODE_COUNT) - 1u);
     value.via_macro_slot_count            = VIA_MACRO_SLOT_COUNT;
@@ -169,7 +169,12 @@ static void test_real_authored_profile(void) {
     assert(!noah_profile_compiled_v1_compatibility(&profile, NULL));
     assert(noah_profile_compiled_v1_compatibility(&profile, &runtime_compatibility));
     assert(runtime_compatibility.required_domain_mask == 0u);
+#ifdef COMBO_ENABLE
+    assert(runtime_compatibility.allowed_domain_mask == (profile.metadata.domain_mask | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_COMBOS));
+    assert(runtime_compatibility.combo_to_native != NULL);
+#else
     assert(runtime_compatibility.allowed_domain_mask == profile.metadata.domain_mask);
+#endif
     assert(runtime_compatibility.action_abi_digest == profile.metadata.action_abi_digest);
     assert(runtime_compatibility.logical_layer_count == LAYER_COUNT);
     assert(runtime_compatibility.supported_pd_mode_mask == (uint8_t)((UINT32_C(1) << PD_MODE_COUNT) - 1u));

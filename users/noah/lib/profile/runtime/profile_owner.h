@@ -10,6 +10,7 @@
 #include "effective_key_behavior_runtime.h"
 #include "effective_profile_provider.h"
 #include "effective_rgb_runtime.h"
+#include "effective_combo_runtime.h"
 #include "profile_activation_policy.h"
 #include "../schema/profile_compiled_defaults_v1.h"
 #include "../split/profile_split_reconciler.h"
@@ -79,6 +80,9 @@ typedef struct {
     noah_profile_activation_policy_t            activation_policy;
     noah_effective_key_behavior_runtime_t       key_behaviors;
     noah_effective_rgb_runtime_t                rgb;
+#ifdef COMBO_ENABLE
+    noah_effective_combo_runtime_t              combos;
+#endif
     noah_profile_candidate_transaction_t        host_transaction;
     noah_profile_peer_store_backend_t           peer_store;
     noah_profile_split_reconciler_t             reconciler;

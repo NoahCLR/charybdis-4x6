@@ -22,6 +22,7 @@ build_and_run() {
         "$ROOT/users/noah/lib/profile/schema/key_behavior_domain_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_rgb_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_validator_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_combo_v1.c" \
         "$ROOT/users/noah/lib/profile/storage/profile_checksum.c" \
         -o "$BUILD_DIR/profile_validator_work_budget_test_$name"
     "$BUILD_DIR/profile_validator_work_budget_test_$name"

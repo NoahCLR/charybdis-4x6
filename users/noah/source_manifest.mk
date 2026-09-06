@@ -8,6 +8,7 @@ NOAH_COMMON_SOURCES := \
     hooks.c \
     lib/profile/protocol/profile_candidate_v1.c \
     lib/profile/schema/profile_blob_v1.c \
+    lib/profile/schema/profile_combo_v1.c \
     lib/profile/schema/profile_reader.c \
     lib/profile/schema/key_behavior_domain_v1.c \
     lib/profile/schema/profile_rgb_v1.c \
@@ -17,6 +18,7 @@ NOAH_COMMON_SOURCES := \
     lib/profile/runtime/effective_profile_provider.c \
     lib/profile/runtime/effective_key_behavior_runtime.c \
     lib/profile/runtime/effective_rgb_runtime.c \
+    lib/profile/runtime/effective_combo_runtime.c \
     lib/profile/runtime/profile_activation_policy.c \
     lib/profile/split/profile_split_authority.c \
     lib/profile/split/profile_split_protocol_v1.c \
@@ -34,6 +36,8 @@ NOAH_COMMON_SOURCES := \
     lib/compat/qmk_physical_half.c \
     lib/compat/qmk_profile_split_transport.c \
     lib/compat/qmk_via_profile_channel.c \
+    lib/compat/qmk_combo_readback.c \
+    lib/compat/qmk_effective_combos.c \
     lib/compat/qmk_contract.c \
     lib/compat/qmk_mod_contract.c \
     lib/compat/qmk_via_contract.c \

@@ -12,11 +12,23 @@
 // be a lie about what the keyboard is running.
 
 const keycodeCatalog = require("../data/keycode-catalog");
+const {baseRgbForView, behaviorAliasesForView, behaviorRowsForView, combosForView, rgbForView} = require("./device-profile-view");
 
 const CATALOG_SOURCE = "vendored QMK keycode catalog";
 
 function buildDeviceModel(state = {}) {
     const catalog = catalogViews();
+    if (state.committed?.state === "read" && state.committed.domains?.keyBehaviors) {
+        const aliases = behaviorAliasesForView(state.committed.domains.keyBehaviors, state.capabilities);
+        Object.assign(catalog.aliases, aliases);
+        for (const [key, semantic] of Object.entries(aliases)) {
+            const words = semantic.replace(/_/g, " ").toLowerCase();
+            const label = words.charAt(0).toUpperCase() + words.slice(1);
+            catalog.labels[key] = label;
+            const entry = catalog.entries.find(entry => entry.key === key);
+            if (entry) entry.label = label;
+        }
+    }
     return {
         // Repo concepts Studio carried. The live app has no repository, so it
         // reports the connected device instead of a profile directory.
@@ -25,16 +37,18 @@ function buildDeviceModel(state = {}) {
         activeProfile: activeProfileFromDevice(state),
         files: {},
 
-        layers: layersFromDevice(state.layout),
+        layers: layersFromDevice(state.layout, catalog.labels),
         customKeycodes: [],
 
         // Read off the keyboard when the committed profile has been read;
         // empty rather than fabricated before that.
         keyBehaviors: committedKeyBehaviors(state.committed),
-        rgb: committedRgb(state.committed),
+        rgb: {...committedRgb(state.committed), baseEffect: baseRgbForView(state.baseRgb)},
 
+        // Independently read native combo definitions.
+        combos: combosForView(state.combos, catalog.labels),
+        comboReadback: state.combos ? {...state.combos, rows: undefined, writable: Boolean(state.capabilities?.supportedDomainMask & 4) && state.committed?.state === "read" && !state.busy} : {state: "unread"},
         // Still awaiting their own reads.
-        combos: [],
         viaMacros: [],
         hardcodedMacros: [],
         behaviorTimingDefaults: {},
@@ -56,22 +70,25 @@ function buildDeviceModel(state = {}) {
 
 // The UI keys layers by name and the device only knows indexes, so synthesise
 // stable names. They are display strings, not identifiers from source.
-function layersFromDevice(layout) {
+function layersFromDevice(layout, labels) {
     if (!layout || layout.state !== "read" || !Array.isArray(layout.layers)) {
         return [];
     }
     return layout.layers.map((entry) => ({
         name: `Layer ${entry.layer}`,
         index: entry.layer,
-        positions: entry.keys.map((key) => ({
-            layoutIndex: key.layoutIndex,
-            keycode: key.resolved.name,
-            display: displayFor(key.resolved),
-            editLabel: key.resolved.label,
-            row: key.row,
-            column: key.column,
-            value: key.keycode,
-        })),
+        positions: entry.keys.map((key) => {
+            const resolved = {...key.resolved, label: labels[key.resolved.name] || key.resolved.label};
+            return {
+                layoutIndex: key.layoutIndex,
+                keycode: key.resolved.name,
+                display: displayFor(resolved),
+                editLabel: resolved.label,
+                row: key.row,
+                column: key.column,
+                value: key.keycode,
+            };
+        }),
     }));
 }
 
@@ -90,7 +107,9 @@ function displayFor(resolved) {
     if (resolved.kind === "layer-tap" || resolved.kind === "mod-tap") {
         return trim(resolved.tap);
     }
-    return resolved.label.length <= 5 ? resolved.label : trim(resolved.name);
+    // The SVG renderer scales labels to fit. Truncating here loses shortcut
+    // modifiers and makes distinct unknown device IDs look identical.
+    return resolved.label;
 }
 
 function trim(name) {
@@ -101,7 +120,7 @@ function trim(name) {
 // The decoded domains reach the UI only once the whole payload verified, so a
 // half-read profile is never rendered as if it were the keyboard's state.
 function committedRgb(committed) {
-    return committed?.state === "read" && committed.domains?.rgb ? committed.domains.rgb : {};
+    return committed?.state === "read" && committed.domains?.rgb ? rgbForView(committed.domains.rgb) : {};
 }
 
 function committedKeyBehaviors(committed) {
@@ -109,7 +128,7 @@ function committedKeyBehaviors(committed) {
     if (!decoded) {
         return [];
     }
-    return Array.isArray(decoded) ? decoded : decoded.rows || [];
+    return behaviorRowsForView(decoded);
 }
 
 function activeProfileFromDevice(state) {
@@ -184,7 +203,9 @@ function diagnosticsFor(state) {
     } else {
         notes.push("RGB and key behaviours need the committed profile read.");
     }
-    notes.push("Combos, macros and policy defaults are not read yet.");
+    if (state.combos?.state === "read") notes.push(`${state.combos.rows.length} combos read from the keyboard. Combos are ${state.combos.enabled ? "enabled" : "disabled"}.`);
+    else notes.push(state.combos?.error?.message || "Combos have not been read from the keyboard yet.");
+    notes.push("Macro payloads and policy defaults are not read yet.");
     return notes;
 }
 

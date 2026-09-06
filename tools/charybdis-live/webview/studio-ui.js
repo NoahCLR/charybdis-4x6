@@ -17,6 +17,10 @@
 // through the model.
 
 const keycodeCatalog = require("../core/data/keycode-catalog");
+const {renderDeviceProfileDetails} = require("./device-profile-ui");
+const {renderDeviceCombos} = require("./combo-ui");
+const {combosForLayerPreview} = require("./combo-preview");
+const {layoutKeyKind, layerPreviewPaint, composedLayerPreviewPaint, baseEffectPreviewNote} = require("./layer-preview");
 
 function getNonce() {
     const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
@@ -2312,6 +2316,13 @@ function getStudioHtml() {
     <div id="tooltip" class="tooltip" hidden></div>
     <div id="keyPickerHost"></div>
     <script nonce="${nonce}">
+${renderDeviceProfileDetails.toString()}
+${renderDeviceCombos.toString()}
+${combosForLayerPreview.toString()}
+${layoutKeyKind.toString()}
+${layerPreviewPaint.toString()}
+${composedLayerPreviewPaint.toString()}
+${baseEffectPreviewNote.toString()}
 ${getClientScript()}
     </script>
 </body>
@@ -2338,6 +2349,7 @@ function getClientScript() {
     let layoutComboPicking = false;
     let layoutComboSelection = [];
     let layoutComboOutput = "";
+    let layoutComboPolicyDraft;
     let layoutComboInputs = "";
     let activeLayoutComboOriginal = undefined;
     let activeLayoutComboOriginalSource = "";
@@ -2378,6 +2390,7 @@ function getClientScript() {
     const tapCountNames = ${JSON.stringify(TAP_COUNT_NAMES)};
     const views = [
         ["layout", "Layout"],
+        ["behaviors", "Behaviours"],
         ["macros", "Macros"],
         ["rgb", "RGB"],
         ["defaults", "Defaults"]
@@ -2401,7 +2414,9 @@ function getClientScript() {
     const viewTooltips = {
         layout: "Edit layer keys and behavior rows using the physical keyboard layout as the filter.",
         macros: "Build, record, preview, and edit VIA macro payload strings in keymap.c.",
-        rgb: "Edit rgb_config.c layer colors, feedback colors, locality, and LED group tables.",
+        rgb: "Inspect layer colours, feedback, locality, and LED groups read from the keyboard.",
+        behaviors: "Inspect every key behaviour row read from the keyboard.",
+        combos: "Inspect the combo definitions and timing reported by the keyboard.",
         defaults: "Edit config.h key timing, pointer speed, pointing-mode speed, sniping, auto-mouse, base lighting, and lighting feedback defaults."
     };
     const panelTooltips = {
@@ -2409,8 +2424,8 @@ function getClientScript() {
         Layout: "Physical keyboard preview, layer tabs, selected-key editor, combo builder, and selected-key behavior editor for the active layer.",
         "Layer Overview": "Read-only summary of behavior rows, macros, combos, and pointing modes reachable from keys on the active layer.",
         "Macro Builder": "Build, record, preview, and write payload strings for the VIA_MACROS(MACRO) table in keymap.c. Payload edits stay local until Apply macro.",
-        "Combo Builder": "Create or update COMBOS(COMBO) rows in keymap.c. Output chooses what the combo emits; inputs are physical key slots from the layout.",
-        "RGB LED Group Builder": "Select physical LEDs and append a row to one of the rgb_config.c LED group tables. Reusable groups define LED sets; table rows decide where and how they are used.",
+        "Combo Builder": "Read and edit keyboard combos beside the keyboard layout.",
+        "RGB LED Group Builder": "Edit physical LED groups and save them to both halves.",
         "Layer Colors": "Edit layer_colors[] HSV values and render mode for each layer. LED group rows can override specific LEDs.",
         "Layer LED Groups": "Inspect layer_led_groups_data[] rows that override specific LEDs for one layer or all layers.",
         "Auto-mouse Fade": "Edit the destination color and fade mode used as auto-mouse approaches its timeout.",
@@ -2430,21 +2445,21 @@ function getClientScript() {
     };
     const actionTooltips = {
         applyKey: "Stage the selected key value as a pending layout edit. Use Apply layout change to write staged edits to keymap.c.",
-        saveSelectedBehavior: "Create or replace the key_behaviors[] row for this selected keycode in keymap.c.",
+        saveSelectedBehavior: "Saving key behaviour changes to the keyboard is not supported yet.",
         editComboOutputBehavior: "Load this combo output keycode into the behavior editor so its key_behaviors[] row can be created or edited.",
         editLayoutCombo: "Load this existing combo into the combo builder so its output or physical input keys can be edited.",
-        addBehavior: "Append a simple key_behaviors[] row to keymap.c.",
-        updateLayerColor: "Write this layer HSV color and render mode back to layer_colors[] in rgb_config.c.",
-        updatePdModeColor: "Write this pointing-mode HSV color and locality back to pd_mode_colors[] in rgb_config.c.",
-        updateAutomouseFade: "Write this auto-mouse fade destination color and fade mode back to rgb_config.c.",
-        updateComboFeedback: "Write combo feedback HSV color and locality back to rgb_config.c.",
-        updateKeyBehaviorFeedback: "Write all key behavior feedback colors, locality, and policy fields back to rgb_config.c.",
+        addBehavior: "Adding key behaviour rows to the keyboard is not supported yet.",
+        updateLayerColor: "Save these settings to both keyboard halves and verify the readback.",
+        updatePdModeColor: "Save these settings to both keyboard halves and verify the readback.",
+        updateAutomouseFade: "Save these settings to both keyboard halves and verify the readback.",
+        updateComboFeedback: "Save these settings to both keyboard halves and verify the readback.",
+        updateKeyBehaviorFeedback: "Save these settings to both keyboard halves and verify the readback.",
         updateConfigDefaults: "Write these default settings back to config.h.",
-        saveRgbReusableLedGroup: "Create, update, or rename a reusable RGB_LED_GROUP_* definition in rgb_config.c using the currently selected LEDs.",
+        saveRgbReusableLedGroup: "Save these settings to both keyboard halves and verify the readback.",
         deleteRgbReusableLedGroup: "Delete this reusable RGB_LED_GROUP_* definition. Used groups are disabled because table rows still reference them.",
         editReusableLedGroup: "Load this reusable LED group into the editor so its name or LED membership can be changed.",
         useReusableLedGroup: "Use this reusable LED set as the LED group source for the row builder above.",
-        clearReusableLedGroupDraft: "Clear the reusable LED group editor without changing rgb_config.c.",
+        clearReusableLedGroupDraft: "Clear the local LED group selection.",
         showAddLayerDraft: "Open the staged new-layer form. Nothing is written until Apply layer changes.",
         cancelLayerDraft: "Close the new-layer form without staging a layer.",
         stageLayerDraft: "Stage a fully transparent layer with a random RGB color.",
@@ -2494,18 +2509,18 @@ function getClientScript() {
         "layout index": "The physical LAYOUT() slot index for the selected key. It is fixed by the keyboard geometry.",
         key: "User-facing key label or expression to stage for the selected LAYOUT() slot, for example A, Enter, Space, _______, LT(LAYER_NAV, Slash), or Shift+Esc.",
         source: "The raw C expression currently stored for this row or selected source slot.",
-        tap_hold_term: "Optional tap-vs-hold boundary for this key behavior row. Valid range: 1-65535 ms; empty uses the displayed default.",
-        longer_hold_term: "Optional hold-vs-long-hold boundary for this key behavior row. Valid range: 1-65535 ms; empty uses the displayed default.",
-        multi_tap_term: "Optional repeated-tap window for this key behavior row. Valid range: 1-65535 ms; empty uses the displayed default.",
+        tap_hold_term: "Optional tap-vs-hold boundary for this key behavior row. Device timing value: 0-65535 ms. Zero uses the firmware default, whose duration is not reported.",
+        longer_hold_term: "Optional hold-vs-long-hold boundary for this key behavior row. Device timing value: 0-65535 ms. Zero uses the firmware default, whose duration is not reported.",
+        multi_tap_term: "Optional repeated-tap window for this key behavior row. Device timing value: 0-65535 ms. Zero uses the firmware default, whose duration is not reported.",
         keeps_auto_mouse_anchored: "Treat this row as a mouse gesture, so pressing the key keeps the pointer layer up instead of letting auto mouse reset on it. Needed for keys that drive the mouse without being mouse keycodes or pointer-mode keys, and required for a transparent tap tier on the pointer layer to reach the layer below.",
         tap: "Enable the tap-tier action for this tap-count branch. When enabled, choose a helper and action below.",
         hold: "Enable the hold-tier action that can run after the tap-hold term for this branch.",
         "long hold": "Enable the long-hold-tier action that can run after the longer-hold term for this branch.",
-        table: "Choose which rgb_config.c LED group table receives the new row: layer, pointing mode, combo feedback, or key-behavior feedback.",
+        table: "Choose a layer, pointing mode, combo feedback, or key behaviour feedback LED group table to inspect.",
         owner: "Owner for the selected LED group table. It decides which layer, pointing mode, or feedback semantic the row applies to; combo feedback has one shared owner.",
         "pointing mode": "Pointing mode whose RGB color or LED group row is being edited.",
         semantic: "Key-behavior feedback state that owns this LED group, such as tap pending, tap committed, hold active, or all feedback groups.",
-        "group name": "Reusable RGB_LED_GROUP_* definition name near the LED map in rgb_config.c. The name stores only LED membership, not color or owner.",
+        "group name": "Display label for an LED group. The device reports group IDs and membership, not authored names.",
         "LED group": "Choose a reusable RGB_LED_GROUP_* LED set, or use the current inline LED selection from the board.",
         mode: "Select how this RGB row behaves. For layers it controls which keys are painted; for auto-mouse it controls how the fade destination is reached.",
         locality: "Choose where this feedback paints: both halves, one half, the triggering key half, or only the triggering keys.",
@@ -2514,7 +2529,7 @@ function getClientScript() {
         h: "QMK HSV hue channel, 0-255. Hue chooses the color family.",
         s: "QMK HSV saturation channel, 0-255. 0 is white/gray; 255 is fully saturated.",
         v: "QMK HSV value/brightness channel. Use 0-255 or a safe constant such as RGB_MATRIX_MAXIMUM_BRIGHTNESS.",
-        output: "The key or action produced by this combo, written as the combo output in keymap.c.",
+        output: "The native key or action this combo produces, as reported by the keyboard.",
         "output behavior": "The key behavior row that runs after this combo emits its output keycode, if one exists.",
         inputs: "Comma-separated physical combo input key expressions, such as D, F. Use the layout picker to choose slots from the active layer.",
         slot: "The VIA macro keycode slot. Selecting a slot changes the editor target but does not write files.",
@@ -2529,7 +2544,7 @@ function getClientScript() {
         "delay threshold ms": "Only elapsed gaps at or above this many milliseconds become delay commands.",
         "delay round ms": "Round recorded delays to this many milliseconds before applying the threshold.",
         leds: "Physical RGB LED indices contained in this row or reusable group.",
-        "led group": "Authored LED group expression in rgb_config.c. Reusable groups reference RGB_LED_GROUP_*; inline rows spell out RGB_LED_GROUP(...).",
+        "led group": "LED group membership reported by the keyboard.",
         color: "HSV color expression used by this row. HSV(0, 0, 0) means inherit the owning stage color for LED group rows.",
         default: "The current value written for this config.h macro.",
         setting: "The user-facing name for this config.h default.",
@@ -2542,7 +2557,8 @@ function getClientScript() {
         "reachable via": "The visible key or behavior action that can reach this pointing mode."
     };
     const qmkKeyLabels = ${JSON.stringify(QMK_KEY_LABELS)};
-    const qmkKeyAliases = ${JSON.stringify(keycodeCatalog.aliasTable())};
+    const baseQmkKeyAliases = ${JSON.stringify(keycodeCatalog.aliasTable())};
+    let qmkKeyAliases = {...baseQmkKeyAliases};
     const shiftedKeyOutputLabels = ${JSON.stringify(SHIFTED_KEY_OUTPUT_LABELS)};
     const shiftedKeyBaseLabels = ${JSON.stringify(SHIFTED_KEY_BASE_LABELS)};
     let macroPayloadKeycodes = new Set();
@@ -2966,7 +2982,7 @@ function getClientScript() {
             viewDrafts = {};
             model = event.data.model;
             Object.assign(qmkKeyLabels, model.qmkKeyLabels || {});
-            Object.assign(qmkKeyAliases, model.qmkKeycodeAliases || {});
+            qmkKeyAliases = {...baseQmkKeyAliases, ...(model.qmkKeycodeAliases || {})};
             macroPayloadKeycodes = new Set(model.macroPayloadKeycodes || []);
             notice = event.data.notice || "";
             layoutNotice = "";
@@ -3326,18 +3342,22 @@ function getClientScript() {
                 keycode: row.dataset.keycode,
                 payload: payloadControl.value
             });
+        } else if (action === "deleteRgbLedGroup") {
+            post({type: "deleteRgbLedGroup", target: target.dataset.target, index: Number(target.dataset.index)});
+        } else if (action === "deleteLayoutCombo") {
+            post({type: "deleteCombo", id: Number(target.dataset.id)});
         } else if (action === "addCombo") {
             post({ type: "addCombo", ...readComboBuilder(target) });
         } else if (action === "addLayoutCombo") {
             const payload = readComboBuilder(target);
-            const original = activeLayoutComboOriginal;
+            const original = (model.combos || []).find(row => comboIdentityEquals(row, activeLayoutComboOriginal));
             const originalSource = activeLayoutComboOriginalSource;
             layoutComboPicking = false;
             layoutComboSelection = [];
             layoutComboOutput = "";
             layoutComboInputs = "";
             clearLayoutComboOriginal();
-            post(layoutComboShouldSaveOriginal(original, originalSource, payload.inputs) ? { type: "saveCombo", ...payload, originalOutput: original.output, originalInputs: original.inputs.join(", ") } : { type: "addCombo", ...payload });
+            post(layoutComboShouldSaveOriginal(original, originalSource, payload.inputs.join(", ")) ? { type: "saveCombo", ...payload, id: original.id } : { type: "addCombo", ...payload });
         } else if (action === "applyLayoutChanges") {
             const groups = pendingLayoutChangeGroups();
             const stagedEditLayer = groups.find((group) => pendingLayerAdd(group.layer));
@@ -3372,6 +3392,7 @@ function getClientScript() {
             commitLocalHistory(before);
             return;
         }
+        if (event.target?.name === "mode" && event.target.closest("[data-automouse-policy]")) syncAutoMousePolicy();
         if (event.target?.name === "target" && event.target.closest("#rgbGroupBuilder")) {
             rgbGroupTarget = event.target.value;
             rgbGroupOwner = "";
@@ -3587,6 +3608,7 @@ function getClientScript() {
         const inputs = document.getElementById("layoutComboInputs");
         if (output) layoutComboOutput = output.value;
         if (inputs) layoutComboInputs = inputs.value;
+        if (document.getElementById("layoutComboTerm")) layoutComboPolicyDraft = readLayoutComboPolicy();
     }
 
     function updateLayoutComboClearState(builder) {
@@ -3653,6 +3675,7 @@ function getClientScript() {
 
     function clearLayoutComboOriginal() {
         activeLayoutComboOriginal = undefined;
+        layoutComboPolicyDraft = undefined;
         activeLayoutComboOriginalSource = "";
     }
 
@@ -3673,6 +3696,7 @@ function getClientScript() {
     function loadLayoutComboIntoBuilder(combo) {
         if (!combo) return;
         layoutComboOutput = combo.output || "";
+        layoutComboPolicyDraft = {...combo};
         layoutComboInputs = (combo.inputs || []).join(", ");
         setLayoutComboOriginal(comboIdentity(combo), "explicit");
         syncLayoutComboSelectionFromInputs();
@@ -4672,6 +4696,11 @@ function getClientScript() {
     }
 
     function post(message) {
+        if (message.type === "editComboInLayout") {
+            const combo = model.combos.find(row => row.id === message.id);
+            if (combo) loadLayoutComboIntoBuilder(combo);
+            render(); document.getElementById("layoutComboBuilder")?.scrollIntoView({block: "center"}); return;
+        }
         storeActiveViewDraft();
         dismissedStatusSignature = "";
         notice = "Working...";
@@ -4727,6 +4756,9 @@ function getClientScript() {
         renderDeviceHeader();
         updateLayoutKeyBehaviorColorStyle();
         app.innerHTML = renderDiagnostics() + renderViewTabs() + renderActiveView();
+        syncAutoMousePolicy();
+        renderDeviceProfileDetails(document, model, post);
+        renderDeviceCombos(document, model, post);
         initializeDirtyTracking();
         restoreActiveViewDraft();
         hydrateTooltips();
@@ -4882,6 +4914,7 @@ function getClientScript() {
             layoutComboPicking,
             layoutComboSelection,
             layoutComboOutput,
+            layoutComboPolicyDraft,
             layoutComboInputs,
             activeLayoutComboOriginal,
             activeLayoutComboOriginalSource: activeLayoutComboOriginal ? activeLayoutComboOriginalSource : "",
@@ -4923,6 +4956,7 @@ function getClientScript() {
             layoutComboPicking = Boolean(state.layoutComboPicking);
             layoutComboSelection = Array.isArray(state.layoutComboSelection) ? state.layoutComboSelection : [];
             layoutComboOutput = state.layoutComboOutput || "";
+            layoutComboPolicyDraft = state.layoutComboPolicyDraft;
             layoutComboInputs = state.layoutComboInputs || "";
             activeLayoutComboOriginal = normalizeLayoutComboOriginal(state.activeLayoutComboOriginal);
             activeLayoutComboOriginalSource = normalizeLayoutComboOriginalSource(state.activeLayoutComboOriginalSource, activeLayoutComboOriginal);
@@ -5156,7 +5190,7 @@ function getClientScript() {
         } else if (rule === "hsv-value") {
             error = validateHsvValue(value);
         } else if (rule === "optional-term") {
-            error = validateOptionalTerm(value, "Enter 1-" + keyBehaviorTimingMaxMs + " ms.", false);
+            error = value === "0" ? "" : validateOptionalTerm(value, "Enter 0-" + keyBehaviorTimingMaxMs + " ms (0 uses the firmware default).", false);
         } else if (rule === "layout-key") {
             error = validateLayoutKeyInput(value);
         } else if (rule === "rgb-led-group-name") {
@@ -5237,13 +5271,7 @@ function getClientScript() {
         return layoutKeyExpressionError(canonicalLayoutKeyExpression(value));
     }
 
-    function validateRgbLedGroupName(value) {
-        if (!value) return "Enter a reusable RGB_LED_GROUP_* name.";
-        if (!/^RGB_LED_GROUP_[A-Z0-9_]+$/.test(value)) {
-            return "Use a name like RGB_LED_GROUP_THUMBS.";
-        }
-        return "";
-    }
+    function validateRgbLedGroupName(value) { return ""; }
 
     function validateComboInputs(value) {
         const parts = splitLayoutArguments(String(value || "")).filter(Boolean);
@@ -5632,6 +5660,7 @@ function getClientScript() {
     }
 
     function renderActiveView() {
+        if (activeView === "behaviors") return "<section id='deviceBehaviors' class='panel'></section>";
         if (activeView === "macros") return renderMacroStudio();
         if (activeView === "rgb") return renderRgbStudio();
         if (activeView === "defaults") return renderDefaultsStudio();
@@ -5640,13 +5669,14 @@ function getClientScript() {
 
     function renderLayerStudio() {
         const layer = currentLayer();
-        if (!layer) return panel("Layers", "<p class='muted'>No LAYOUT blocks found.</p>", true);
+        if (!layer) return panel("Layers", "<p class='muted'>No layout has been read from the keyboard.</p>", true);
         const selected = layerPositionByLayoutIndex(layer, selectedKey) || layer.positions[0];
         const behaviorTarget = behaviorEditorTarget(layer, selected);
         const selectedBehavior = behaviorForKey(behaviorTarget.keycode);
         return "<div class='stack'>" +
             panel("Layout", renderLayerTabs() + renderLayoutWithSelectedKeyEditor(layer, selected) + renderSelectedBehaviorEditor(behaviorTarget, selectedBehavior), true) +
             panel("Layer Overview", renderLayerOverview(layer), true) +
+            "<details class='panel'><summary>All keyboard combos and shared timing</summary><section id='deviceCombos'></section></details>" +
             "</div>";
     }
 
@@ -5740,7 +5770,10 @@ function getClientScript() {
         const inputValue = layoutComboInputs || selectedPositions.map((position) => position.keycode).join(", ");
         const inputPickingLabel = layoutComboPicking ? "Done picking inputs" : "Pick input keys on layout";
         const canClear = Boolean(layoutComboOutput || layoutComboInputs || selectedPositions.length);
-        const editing = Boolean(activeLayoutComboOriginal);
+        const original = (model.combos || []).find(row => comboIdentityEquals(row, activeLayoutComboOriginal));
+        const editing = Boolean(original);
+        const policy = layoutComboPolicyDraft || original || model.combos?.[0] || {};
+        const writable = Boolean(model.comboReadback?.writable) && !model.comboReadback.noTimer && !model.comboReadback.customTrigger && !model.comboReadback.customRelease && !model.comboReadback.customRepress;
         return "<div id='layoutComboBuilder' class='card selected-key-edit-card layout-combo-builder-card' data-dirty-section data-combo-builder>" +
             "<h3>" + (editing ? "Edit combo" : "Create combo") + "</h3>" +
             "<div class='selected-key-edit-fields'>" +
@@ -5751,7 +5784,14 @@ function getClientScript() {
             "<button type='button' class='combo-pick-toggle " + (layoutComboPicking ? "active" : "") + "' aria-pressed='" + (layoutComboPicking ? "true" : "false") + "' data-action='toggleLayoutComboPicking'>" + inputPickingLabel + "</button>" +
             "<button type='button' data-action='clearLayoutComboSelection' data-layout-combo-clear" + (canClear ? "" : " disabled") + ">Clear</button>" +
             "</div>" +
-            "<button data-action='addLayoutCombo' data-dirty-button class='primary'>" + (editing ? "Save combo row" : "Append combo row") + "</button>" +
+            "<label><span>Combo window (ms)</span><input id='layoutComboTerm' type='number' min='0' max='65535' value='" + escapeAttr(policy.termMs ?? "") + "'></label>" +
+            (!model.combos?.length ? "<label><span>Hold threshold (ms)</span><input id='layoutComboHoldTerm' type='number' min='0' max='65535' value='" + escapeAttr(policy.holdTermMs ?? "") + "'></label>" : "") +
+            "<label><input id='layoutComboMustHold' type='checkbox'" + (policy.mustHold ? " checked" : "") + "> Require hold</label>" +
+            "<label><input id='layoutComboMustTap' type='checkbox'" + (policy.mustTap ? " checked" : "") + "> Tap only</label>" +
+            "<label><input id='layoutComboOrdered' type='checkbox'" + (policy.ordered ? " checked" : "") + "> Press inputs in order</label>" +
+            "<button data-action='addLayoutCombo' data-dirty-button class='primary'" + (writable ? "" : " disabled") + ">" + (editing ? "Save combo" : "Add combo") + "</button>" +
+            (editing ? "<button data-action='deleteLayoutCombo' data-id='" + original.id + "'" + (writable ? "" : " disabled") + ">Delete combo</button>" : "") +
+            (!writable ? "<p class='muted'>Read a complete keyboard profile with combo write support to save changes.</p>" : "") +
             "</div>" +
             "</div>";
     }
@@ -5785,7 +5825,7 @@ function getClientScript() {
             : "";
         return "<div class='card selected-behavior-editor' data-dirty-section><h3>" + escapeHtml(title) + "</h3>" +
             "<input type='hidden' id='selectedBehaviorKeycode' value='" + escapeAttr(row.keycode) + "'>" +
-            "<div><span class='muted'>Source</span><br><code class='source-pill' data-tooltip='Raw keycode that owns this key_behaviors[] row in keymap.c.'>" + escapeHtml(row.keycode) + "</code></div>" +
+            "<div><span class='muted'>Device key</span><br><code class='source-pill' data-tooltip='Key or action reported by the keyboard for this behaviour row.'>" + escapeHtml(row.keycode) + "</code></div>" +
             context +
             "<div class='form-grid four'>" +
             renderTimingInput("selectedTapHoldTerm", "tap_hold_term", row.tapHoldTerm || "", row.keycode) +
@@ -6391,7 +6431,8 @@ function getClientScript() {
             renderLayoutBoardInfoButton() +
             "<div class='layout-board-header'>" +
             "<h3 class='layout-board-title'>" + escapeHtml(layer.name) + "</h3>" +
-            "<p class='layout-board-subtitle' data-tooltip='Layer RGB summary: render mode, authored HSV color, and whether pass-through exposes the default RGB Matrix color.'>" + escapeHtml(subtitle) + "</p>" +
+            "<p class='layout-board-subtitle' data-tooltip='Layer RGB rule and the selected-layer preview over the keyboard base effect.'>" + escapeHtml(subtitle) + "</p>" +
+            "<p class='layout-board-subtitle'>Selected-layer preview over base; temporary feedback is not shown. " + escapeHtml(baseEffectPreviewNote(model.rgb?.baseEffect)) + "</p>" +
             "</div>" +
             "<div class='layout-board-stage'>" +
             "<svg class='keyboard-svg layout-board-svg' viewBox='" + viewBox.x + " " + viewBox.y + " " + viewBox.width + " " + viewBox.height + "' preserveAspectRatio='xMidYMid meet' role='img' aria-label='" + escapeAttr(layer.name + " keyboard layout") + "'>" +
@@ -6413,7 +6454,7 @@ function getClientScript() {
             "Drag one key onto another to swap staged keycodes.",
             "Copy and paste work between selected keys.",
             "Dashed outlines are staged edits until Apply layout changes.",
-            "Dots mark key_behaviors[] tap, hold, and long hold branches; combo badges mark active-layer combo inputs."
+            "Dots mark key_behaviors[] tap, hold, and long hold branches; combo badges mark inputs available in the selected-layer preview."
         ].join("\\n");
     }
 
@@ -6441,7 +6482,7 @@ function getClientScript() {
         const comboSelected = layoutComboSelection.includes(position.layoutIndex);
         const style = keyStyle(position);
         const dots = behaviorDotsForKey(position.keycode);
-        const badges = comboBadgesForKey(position.keycode);
+        const badges = comboBadgesForKey(position.keycode, position.layoutIndex);
         const keyFaceState = { hasBehavior: dots.length > 0, hasCombo: badges.length > 0 };
         const cx = visual.x + keyboardGeometry.keyWidth / 2;
         const cy = visual.y + keyboardGeometry.keyHeight / 2;
@@ -6474,7 +6515,7 @@ function getClientScript() {
             lines.push("Custom key behavior: " + displayAction(behavior.keycode) + branchSuffix);
             lines.push(...branches);
         }
-        const comboLines = layoutKeyComboTooltipLines(position.keycode);
+        const comboLines = layoutKeyComboTooltipLines(position.keycode, position.layoutIndex);
         if (comboLines.length) {
             lines.push("Combos:");
             lines.push(...comboLines);
@@ -6512,9 +6553,9 @@ function getClientScript() {
         return lines;
     }
 
-    function layoutKeyComboTooltipLines(keycode) {
+    function layoutKeyComboTooltipLines(keycode, layoutIndex) {
         const lines = [];
-        for (const combo of combosForKey(keycode)) {
+        for (const combo of combosForKey(keycode, layoutIndex)) {
             const inputText = (combo.inputDisplays || combo.inputs || []).join(" + ");
             const outputText = combo.outputDisplay || displayAction(combo.output);
             lines.push("  " + combo.badge + "  " + inputText + " -> " + outputText);
@@ -6539,7 +6580,7 @@ function getClientScript() {
         const label = position.display || position.keycode;
         const rawCode = label === position.keycode ? "" : position.keycode;
         const behavior = behaviorForKey(position.keycode);
-        const combos = combosForKey(position.keycode);
+        const combos = combosForKey(position.keycode, position.layoutIndex);
         const macroKeycodes = macroKeycodesInExpression(position.keycode);
         const sections = [];
 
@@ -7153,43 +7194,41 @@ function getClientScript() {
     function layerPreviewColor(layerColor) {
         if (!layerColor?.color) return undefined;
         if (!layerColorIsPassthrough(layerColor.color)) return layerColor.color;
-        if (layerColor.layer === "LAYER_BASE") return model.rgb?.defaultColor || layerColor.color;
         return undefined;
     }
 
+    function baseLayerName() {
+        return model.layers?.find((layer) => layer.index === 0)?.name;
+    }
+
     function layerColorSubtitle(layerColor) {
-        if (!layerColor) return "No layer RGB config parsed";
+        if (!layerColor) return "No layer RGB configuration reported";
         const color = layerColor.color || {};
         const passthrough = layerColorIsPassthrough(color);
-        const fallback = layerColor.layer === "LAYER_BASE" && passthrough && model.rgb?.defaultColor;
-        const suffix = passthrough
-            ? (fallback ? " • pass-through, showing default RGB " + fallback.expression : " • pass-through to lower/default RGB")
-            : "";
-        return "RGB matrix " + layerColor.mode + " • authored HSV(" + [color.h, color.s, color.v].join(", ") + ")" + suffix;
+        const suffix = passthrough ? " • Pass-through: shows the colour underneath" : "";
+        return "RGB matrix " + layerColor.mode + " • device HSV(" + [color.h, color.s, color.v].join(", ") + ")" + suffix + (model.rgb?.layerColorsEnabled === false ? " • layer colours disabled" : "");
     }
 
     function keyStyle(position) {
-        if (position.keycode === "_______") {
-            return { fill: "#5f686d", stroke: "#87929a", text: "#f0f4f5" };
-        }
-        if (position.keycode === "XXXXXXX") {
-            return { fill: "#aeb4b7", stroke: "#7f898e", text: "#293036" };
-        }
-
         const layerColor = colorForLayer(activeLayer);
         const fill = layerKeyFill(position, layerColor);
         if (fill) {
             return { fill, stroke: shadeColor(fill, -26), text: idealText(fill) };
         }
+        if (layoutKeyKind(position.keycode) === "transparent") {
+            return { fill: "#5f686d", stroke: "#87929a", text: "#f0f4f5" };
+        }
+        if (layoutKeyKind(position.keycode) === "disabled") {
+            return { fill: "#aeb4b7", stroke: "#7f898e", text: "#293036" };
+        }
+
         return { fill: "#f2f4f2", stroke: "#c7ceca", text: "#18201d" };
     }
 
     function layerKeyFill(position, layerColor) {
-        if (!layerColor || !layerColor.color) return "";
-        const mode = layerColor.mode;
-        const isReal = position.keycode !== "_______" && position.keycode !== "XXXXXXX";
-        if (mode === "KEYS_MAPPED_ON_THIS_LAYER_ONLY" && !isReal) return "";
-        const previewColor = layerPreviewColor(layerColor);
+        const base = layerWithPendingLayoutEdits(model.layers?.find(layer => layer.index === 0));
+        const rgb = {...model.rgb, layerColors: [...(model.rgb?.layerColors || []).filter(row => row.layer !== activeLayer), layerColor].filter(Boolean)};
+        const previewColor = composedLayerPreviewPaint(rgb, base, currentLayer(), position, layoutToLedIndex[position.layoutIndex]);
         if (!previewColor) return "";
         const css = hsvToHex(previewColor);
         if (!css) return "";
@@ -7229,12 +7268,14 @@ function getClientScript() {
         }).join("");
     }
 
-    function comboBadgesForKey(keycode) {
-        return combosForKey(keycode).map((combo) => combo.badge);
+    function comboBadgesForKey(keycode, layoutIndex) {
+        return combosForKey(keycode, layoutIndex).map((combo) => combo.badge);
     }
 
-    function combosForKey(keycode) {
-        return layerCombos(currentLayer()).filter((combo) => combo.inputs.some((input) => keyExpressionsEquivalent(input, keycode)));
+    function combosForKey(keycode, layoutIndex) {
+        return layerCombos(currentLayer()).filter((combo) => layoutIndex !== undefined
+            ? combo.inputPositions.includes(layoutIndex)
+            : combo.inputs.some((input) => keyExpressionsEquivalent(input, keycode)));
     }
 
     function renderComboBadges(badges, visual, keyFaceState = {}) {
@@ -7400,8 +7441,8 @@ function getClientScript() {
             return "<p class='muted'>No authored behavior rows are active on this layer.</p>";
         }
         return "<table><thead><tr>" +
-            renderTooltipHeader("Reachable via", "Physical keys, combo inputs, or combo outputs on the active layer that use this key_behaviors[] row.") +
-            renderTooltipHeader("Behavior", "Authored keycode that owns the key_behaviors[] row.") +
+            renderTooltipHeader("Reachable via", "Physical keys or actions on the active layer that use this device behaviour row.") +
+            renderTooltipHeader("Behavior", "Key or action reported by the keyboard for this behaviour row.") +
             renderTooltipHeader("Steps", "Tap-count branch actions attached to this behavior row.") +
             "</tr></thead><tbody>" +
             rows.map((row) =>
@@ -7413,25 +7454,18 @@ function getClientScript() {
     }
 
     function layerCombos(layer) {
-        const keycodes = new Set(layer.positions.map((position) => canonicalKeyExpression(position.keycode)));
-        const rows = [];
-        for (const combo of model.combos) {
-            if (combo.inputs.every((input) => keycodes.has(canonicalKeyExpression(input)))) {
-                rows.push({ ...combo, badge: "C" + (rows.length + 1) });
-            }
-        }
-        return rows;
+        return combosForLayerPreview(model, layer, canonicalKeyExpression);
     }
 
     function renderLayerComboTable(layer) {
         const combos = layerCombos(layer);
         if (!combos.length) {
-            return "<h3>Combos</h3><p class='muted'>No combos resolve entirely from keys on this layer.</p>";
+            return "<h3>Combos</h3><p class='muted'>No enabled combos have all their inputs in this selected-layer preview. See the Combos tab for the full device readout.</p>";
         }
-        return "<h3>Combos</h3><table><thead><tr>" +
-            renderTooltipHeader("Badge", "Small combo badge shown on the physical layout preview for this active-layer combo.") +
+        return "<h3>Combos</h3><p class='muted'>Inputs available with this layer over Layer 0, using the keyboard’s combo layer mapping. Additional firmware conditions may apply.</p><table><thead><tr>" +
+            renderTooltipHeader("Badge", "Stable combo badge shown where the selected-layer preview provides its inputs.") +
             renderTooltipHeader("Inputs", "Physical input keys that must be pressed together for this combo.") +
-            renderTooltipHeader("Output", "Keycode emitted by this combo, plus an edit action for the combo row.") +
+            renderTooltipHeader("Output", "Keycode emitted by this combo. Edit and save this combo beside the keyboard layout.") +
             renderTooltipHeader("Output behavior", "Behavior row that can run after the combo emits its output keycode.") +
             "</tr></thead><tbody>" +
             combos.map(renderLayerComboRow).join("") +
@@ -7644,15 +7678,24 @@ function getClientScript() {
     }
 
     function actionText(action) {
-        return action.helper + "(" + displayAction(action.actionDisplay || action.action) + (action.repeatHz ? ", " + action.repeatHz : "") + ")";
+        return action.helper + "(" + displayAction(action.actionDisplay || action.action) + (action.helper === "REPEAT_WHILE_HELD" ? ", " + action.repeatHz : "") + ")";
     }
 
     function readComboBuilder(target) {
         const builder = target.closest("[data-combo-builder]") || document;
         return {
-            output: fieldValueFromMarker(builder, "[data-combo-output]"),
-            inputs: fieldValueFromMarker(builder, "[data-combo-inputs]")
+            output: canonicalLayoutKeyExpression(fieldValueFromMarker(builder, "[data-combo-output]")),
+            inputs: splitLayoutArguments(fieldValueFromMarker(builder, "[data-combo-inputs]")).map(canonicalLayoutKeyExpression),
+            ...readLayoutComboPolicy()
         };
+    }
+
+    function readLayoutComboPolicy() {
+        return {termMs: document.getElementById("layoutComboTerm")?.value,
+            holdTermMs: document.getElementById("layoutComboHoldTerm")?.value ?? model.combos?.[0]?.holdTermMs,
+            mustHold: Boolean(document.getElementById("layoutComboMustHold")?.checked),
+            mustTap: Boolean(document.getElementById("layoutComboMustTap")?.checked),
+            ordered: Boolean(document.getElementById("layoutComboOrdered")?.checked)};
     }
 
     function fieldValueFromMarker(root, selector) {
@@ -7839,6 +7882,7 @@ function getClientScript() {
     function renderRgbStudio() {
         const rgb = model.rgb || {};
         return "<div class='stack'>" +
+            "<section id='deviceRgbStages' class='panel'></section>" +
             panel("RGB LED Group Builder", renderRgbBuilderWorkspace(rgb), true) +
             panel("Layer Colors", renderLayerRgbSection(rgb), true) +
             panel("Auto-mouse Fade", renderAutomouseCard(rgb.automouseFade), false) +
@@ -7943,7 +7987,7 @@ function getClientScript() {
         return "<div id='rgbReusableGroups' class='card' data-dirty-section>" +
             "<h3 class='rgb-builder-subsection-title'>Reusable LED Groups</h3>" +
             "<div class='form-grid four'>" +
-            "<label><span>group name</span><input id='rgbReusableGroupName' data-validate='rgb-led-group-name' value='" + escapeAttr(rgbReusableGroupDraftName) + "' placeholder='RGB_LED_GROUP_THUMBS' spellcheck='false'></label>" +
+            "<label><span>group name</span><input id='rgbReusableGroupName' readonly value='" + escapeAttr(rgbReusableGroupDraftName) + "' placeholder='Assigned by keyboard' spellcheck='false'></label>" +
             "<div class='rgb-selected-list' data-tooltip='LED indices currently selected on the builder board. Saving a reusable group stores this LED membership only; color and owner stay in table rows.'><span class='rgb-led-list-label'>selected LEDs</span>" + selected + "</div>" +
             "<button type='button' data-action='clearReusableLedGroupDraft'>Clear editor</button>" +
             "<button type='button' data-action='saveRgbReusableLedGroup' data-dirty-button class='primary'>" + (editing ? "Save group" : "Create group") + "</button>" +
@@ -7955,10 +7999,10 @@ function getClientScript() {
 
     function renderReusableLedGroupsTable(groups) {
         if (!groups.length) {
-            return "<p class='muted'>No reusable RGB_LED_GROUP_* definitions were parsed.</p>";
+            return "<p class='muted'>No reusable LED groups were returned by the keyboard.</p>";
         }
         return "<table><thead><tr>" +
-            renderTooltipHeader("Group", "Reusable RGB_LED_GROUP_* definition name and source expression from rgb_config.c.") +
+            renderTooltipHeader("Group", "Group ID and LED membership reported by the keyboard. Group names are display labels.") +
             renderTooltipHeader("LEDs", "Physical LED indices stored by this reusable group.") +
             renderTooltipHeader("Used by", "Enabled LED group table rows that reference this reusable definition.") +
             renderTooltipHeader("Actions", "Load, use, or delete this reusable LED group definition.") +
@@ -8418,24 +8462,38 @@ function getClientScript() {
 
     function renderAutomouseCard(config) {
         if (!config) {
-            return "<p class='muted'>No active automouse fade config parsed.</p>";
+            return "<p class='muted'>No auto-mouse fade configuration was returned by the keyboard.</p>";
         }
-        return "<details class='card rgb-subsection collapsible-card' data-dirty-section>" +
+        return "<details class='card rgb-subsection collapsible-card' data-dirty-section data-automouse-policy>" +
             renderRgbConfigSummary("Fade destination", config.end_color, config.mode, {
                 summaryTooltip: "Auto-mouse fade destination. Click to edit the HSV color and fade mode used as auto-mouse approaches timeout."
             }) +
             "<div class='rgb-subsection-body'>" +
-            renderHsvColorControl(config.end_color) +
+            "<fieldset data-automouse-end-color style='border:0;padding:0;margin:0'>" + renderHsvColorControl(config.end_color) + "</fieldset>" +
+            "<p data-automouse-policy-help></p>" +
+            "<p class='muted'>This controls the fade as auto-mouse approaches timeout. The static layer preview does not animate this fade.</p>" +
             "<div class='form-grid four'>" +
-            "<label data-tooltip='Auto-mouse fade mode. It controls whether the timeout fade ends on the real destination color, where the base effect would show, or on all keys.'><span>mode</span><select name='mode' data-tooltip='Auto-mouse fade mode. It controls whether the timeout fade ends on the real destination color, where the base effect would show, or on all keys.'>" + options(automouseFadeModes, config.mode) + "</select></label>" +
+            "<label data-tooltip='Auto-mouse fade mode. It controls whether the timeout fade ends on the real destination color, where the base effect would show, or on all keys.'><span>mode</span><select name='mode' data-tooltip='Auto-mouse fade mode. It controls whether the timeout fade ends on the real destination color, where the base effect would show, or on all keys.'>" + automouseFadeModes.map(mode => "<option value='" + mode + "'" + (mode === config.mode ? " selected" : "") + ">" + ({FOLLOW_REAL_DESTINATION: "Fade to the underlying layers and base effect", END_COLOR_WHERE_BASE_EFFECT_WOULD_SHOW: "Use end colour where the base effect shows", END_COLOR_ON_ALL_KEYS: "Use end colour on every key"}[mode]) + "</option>").join("") + "</select></label>" +
             "<button data-action='updateAutomouseFade' data-dirty-button class='primary'>Apply</button>" +
             "</div>" +
             "</div></details>";
     }
 
+    function syncAutoMousePolicy() {
+        const card = document.querySelector("[data-automouse-policy]");
+        if (!card) return;
+        const mode = card.querySelector("[name='mode']").value;
+        card.querySelector("[data-automouse-end-color]").disabled = mode === "FOLLOW_REAL_DESTINATION";
+        card.querySelector("[data-automouse-policy-help]").textContent = {
+            FOLLOW_REAL_DESTINATION: "The fade follows the colours underneath the auto-mouse layer. The end colour is unused in this mode.",
+            END_COLOR_WHERE_BASE_EFFECT_WOULD_SHOW: "The end colour fills LEDs with no underlying layer colour. Other layer colours remain visible.",
+            END_COLOR_ON_ALL_KEYS: "The fade ends at the chosen colour across all keys. Pointing-mode, combo and key feedback may still paint over it."
+        }[mode];
+    }
+
     function renderComboFeedbackCard(config) {
         if (!config) {
-            return "<p class='muted'>No active combo feedback config parsed.</p>";
+            return "<p class='muted'>No combo feedback configuration was returned by the keyboard.</p>";
         }
         return "<details class='card rgb-subsection collapsible-card' data-dirty-section>" +
             renderRgbConfigSummary("Active combo color", config.color, config.locality, {
@@ -8452,7 +8510,7 @@ function getClientScript() {
 
     function renderKeyBehaviorFeedbackCard(config) {
         if (!config) {
-            return "<p class='muted'>No active key behavior feedback config parsed.</p>";
+            return "<p class='muted'>No key behaviour feedback configuration was returned by the keyboard.</p>";
         }
         const colorRows = [
             ["Tap committed", "tapCommittedColor", config.tapCommittedColor],
@@ -8498,25 +8556,22 @@ function getClientScript() {
 
     function layerRgbSummaryOptions(row) {
         if (!layerColorIsPassthrough(row.color)) return {};
-        const defaultColor = model.rgb?.defaultColor;
-        const previewColor = row.layer === "LAYER_BASE" && defaultColor ? defaultColor : undefined;
-        const behavior = row.layer === "LAYER_BASE"
+        const defaultColor = model.rgb?.baseEffect?.state === "read" ? model.rgb.baseEffect.previewColor : undefined;
+        const previewColor = row.layer === baseLayerName() && defaultColor ? defaultColor : undefined;
+        const behavior = row.layer === baseLayerName()
             ? "HSV(0, 0, 0) leaves the base layer unpainted, so the default RGB Matrix effect shows."
             : "HSV(0, 0, 0) leaves this layer unpainted, so lower active layers or the default RGB Matrix effect show.";
         return {
             previewColor: previewColor || row.color,
-            extraMeta: row.layer === "LAYER_BASE" ? "default RGB" : "pass-through",
+            extraMeta: "Pass-through",
             passThroughSwatch: !previewColor,
-            swatchTooltip: behavior + (previewColor ? " Preview uses " + colorExpression(previewColor) + "." : "")
+            swatchTooltip: behavior + (previewColor ? " Swatch uses the last-read base effect at relative brightness." : "")
         };
     }
 
     function layerPassthroughNote(row) {
         if (!layerColorIsPassthrough(row.color)) return "";
-        if (row.layer === "LAYER_BASE" && model.rgb?.defaultColor) {
-            return "<p class='muted'>HSV(0, 0, 0) leaves the base layer unpainted; the preview swatch shows the default RGB Matrix color " + escapeHtml(colorExpression(model.rgb.defaultColor)) + ".</p>";
-        }
-        return "<p class='muted'>HSV(0, 0, 0) leaves this layer unpainted, so lower active layers or the default RGB Matrix effect show through.</p>";
+        return "<p class='muted'>Pass-through leaves this layer unpainted, so lower layers or the base RGB effect show through. " + escapeHtml(baseEffectPreviewNote(model.rgb?.baseEffect)) + "</p>";
     }
 
     function renderRgbConfigSummary(label, color, meta = "", options = {}) {
@@ -8562,14 +8617,15 @@ function getClientScript() {
         const ownerHeader = ownerLabel ? renderTooltipHeader(ownerLabel, ledGroupOwnerHeaderTooltip(ownerLabel, tableKind)) : "";
         return "<table><thead><tr>" + ownerHeader +
             renderTooltipHeader("Color", "Color used by this LED group row. HSV(0, 0, 0) inherits the owning stage color.") +
-            renderTooltipHeader("LED group", "Reusable or inline RGB_LED_GROUP expression authored in rgb_config.c.") +
-            renderTooltipHeader("LEDs", "Physical LED indices contained by this row after resolving reusable groups.") +
+            renderTooltipHeader("LED group", "LED group reported by the keyboard for this row.") +
+            renderTooltipHeader("LEDs", "Physical LED indices contained by this row after resolving reusable groups.") + "<th>Remove</th>" +
             "</tr></thead><tbody>" +
-            rows.map((row) => "<tr>" +
+            rows.map((row, index) => "<tr>" +
                 (ownerLabel ? "<td>" + renderLedGroupOwnerCell(row, tableKind) + "</td>" : "") +
                 renderLedGroupColorCell(row, tableKind) +
                 "<td>" + renderLedGroupExpressionCell(row) + "</td>" +
                 "<td data-tooltip='" + escapeAttr("Resolved physical LED indices for this row: " + ((row.ledIndices || []).join(", ") || "none")) + "'><code>" + escapeHtml((row.ledIndices || []).join(", ")) + "</code></td>" +
+                "<td><button type='button' data-action='deleteRgbLedGroup' data-target='" + escapeAttr(tableKind) + "' data-index='" + index + "'>Remove assignment</button></td>" +
                 "</tr>").join("") +
             "</tbody></table>";
     }
@@ -8626,21 +8682,21 @@ function getClientScript() {
     }
 
     function baseLayerVisiblePreviewColor() {
-        const baseLayer = colorForLayer("LAYER_BASE");
-        return layerPreviewColor(baseLayer) || model.rgb?.defaultColor || baseLayer?.color;
+        const baseLayer = colorForLayer(baseLayerName());
+        const effect = model.rgb?.baseEffect;
+        if (effect?.state === "read" && !effect.enabled) return effect.previewColor;
+        return (model.rgb?.layerColorsEnabled === false ? undefined : layerPreviewColor(baseLayer)) || (effect?.state === "read" ? effect.previewColor : undefined);
     }
 
     function layerLedGroupInheritedPreviewColor(layerName) {
         const layerColor = colorForLayer(layerName);
-        return layerPreviewColor(layerColor) || baseLayerVisiblePreviewColor() || layerColor?.color;
+        // Group inheritance takes the owning layer's colour only. It does
+        // not turn pass-through into an explicit copy of the base effect.
+        return layerPreviewColor(layerColor);
     }
 
     function trackballUnderlyingPreviewColor() {
-        const activeLayerColor = colorForLayer(activeLayer);
-        if (activeLayerColor?.mode === "ALL_KEYS" && !layerColorIsPassthrough(activeLayerColor.color)) {
-            return activeLayerColor.color;
-        }
-        return baseLayerVisiblePreviewColor();
+        return composedLayerPreviewPaint(model.rgb, model.layers?.find(layer => layer.index === 0), currentLayer(), {layoutIndex: -1, keycode: "KC_NO"}, 56);
     }
 
     function rgbLedGroupInheritedColor(row, tableKind = "") {
@@ -8682,7 +8738,7 @@ function getClientScript() {
             "<label><span>picker</span><input type='color' data-color-picker value='" + hex + "'></label>" +
             hsvInputs(color) +
             "</div>" +
-            "<code class='muted' data-color-expression data-tooltip='" + escapeAttr("Authored HSV expression that will be written back to rgb_config.c: " + expression) + "'>" + escapeHtml(expression) + "</code>" +
+            "<code class='muted' data-color-expression data-tooltip='" + escapeAttr("HSV channels shown by this control: " + expression) + "'>" + escapeHtml(expression) + "</code>" +
             "</div>";
     }
 
@@ -8721,7 +8777,7 @@ function getClientScript() {
         if (expression) {
             const nextExpression = colorExpression(color);
             expression.textContent = nextExpression;
-            expression.setAttribute("data-tooltip", "Authored HSV expression that will be written back to rgb_config.c: " + nextExpression);
+            expression.setAttribute("data-tooltip", "HSV channels shown by this control: " + nextExpression);
         }
         const subsection = control.closest(".rgb-subsection");
         if (subsection) {

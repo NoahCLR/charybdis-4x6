@@ -43,6 +43,7 @@ static bool profile_view_valid(const noah_profile_validator_v1_profile_t *profil
     if ((profile->domain_mask & NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS) != 0u && (!reader_equal(reader, &profile->key_behaviors.reader) || !reader_range_valid(reader, profile->key_behaviors.base_offset, profile->key_behaviors.byte_length) || !range_contained(base_offset, profile->byte_length, profile->key_behaviors.base_offset, profile->key_behaviors.byte_length))) {
         return false;
     }
+    if ((profile->domain_mask & NOAH_PROFILE_VALIDATOR_V1_DOMAIN_COMBOS) && (profile->combos.row_count > 32u || !range_contained(base_offset, profile->byte_length, base_offset + profile->combos.payload_offset, 4u + (size_t)profile->combos.row_count * 28u))) return false;
     return true;
 }
 
@@ -362,7 +363,7 @@ noah_effective_profile_result_t noah_effective_profile_provider_poll(noah_effect
     if (!provider->has_pending) {
         return NOAH_EFFECTIVE_PROFILE_NO_PENDING;
     }
-    if (!provider->safe_boundary && (provider->pending.profile.domain_mask & NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS) != 0u) {
+    if (!provider->safe_boundary && ((provider->pending.profile.domain_mask & NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS) || ((provider->pending.profile.domain_mask | provider->active_banks[provider->active_index].profile.domain_mask) & NOAH_PROFILE_VALIDATOR_V1_DOMAIN_COMBOS))) {
         return NOAH_EFFECTIVE_PROFILE_SAFE_BOUNDARY_REQUIRED;
     }
     update_begin(provider);

@@ -53,6 +53,8 @@ build_hook_and_run() {
         "$ROOT/users/noah/lib/compat/qmk_via_profile_channel.c" \
         "$ROOT/users/noah/lib/profile/protocol/profile_wire_v1.c" \
         "$ROOT/users/noah/lib/profile/protocol/profile_candidate_v1.c" \
+        "$ROOT/users/noah/lib/compat/qmk_combo_readback.c" \
+        "$ROOT/users/noah/lib/profile/storage/profile_checksum.c" \
         -o "$BUILD_DIR/qmk_via_profile_channel_test_$name"
     "$BUILD_DIR/qmk_via_profile_channel_test_$name"
 }

@@ -60,11 +60,20 @@ function buildCatalog(qmkRoot) {
         throw new Error(`No keycode data found in ${keycodeDir}`);
     }
 
-    // Later spec revisions supersede earlier ones for the same numeric value,
-    // and the file list is sorted, so a plain overwrite keeps the newest.
-    const byValue = new Map();
+    // QMK applies revision resets within a fragment (midi, basic, etc.),
+    // before combining fragments. A global overwrite leaves removed numeric
+    // IDs around, sometimes pointing to a name that now means another value.
+    const fragments = new Map();
     for (const file of files) {
+        const fragment = path.basename(file).replace(/_\d+\.\d+\.\d+/, "");
+        if (!fragments.has(fragment)) fragments.set(fragment, new Map());
+        const byValue = fragments.get(fragment);
         const text = fs.readFileSync(file, "utf8");
+        const body = findSectionBody(text, "keycodes");
+        if (/^\s*"!reset!"\s*:/.test(body)) byValue.clear();
+        for (const match of body.matchAll(/"(0x[0-9a-f]+)"\s*:\s*"!delete!"/gi)) {
+            byValue.delete(Number.parseInt(match[1], 16));
+        }
         for (const entry of parseKeycodeEntries(text)) {
             if (shouldSkip(entry)) {
                 continue;
@@ -73,7 +82,13 @@ function buildCatalog(qmkRoot) {
         }
     }
 
+    const byValue = new Map([...fragments.values()].flatMap(fragment => [...fragment]));
     const entries = Array.from(byValue.values()).sort((left, right) => left.value - right.value);
+    const names = new Set();
+    for (const entry of entries) {
+        if (names.has(entry.name)) throw new Error(`Duplicate keycode name ${entry.name}`);
+        names.add(entry.name);
+    }
     return {
         format: CATALOG_FORMAT,
         qmkVersion: readQmkVersion(qmkRoot),

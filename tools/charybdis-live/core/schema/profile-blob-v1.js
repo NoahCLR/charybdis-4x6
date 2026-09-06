@@ -15,11 +15,13 @@ const PROFILE_BLOB_V1 = Object.freeze({
 const PROFILE_DOMAIN_IDS = Object.freeze({
     RGB: 0x10,
     KEY_BEHAVIORS: 0x20,
+    COMBOS: 0x30,
 });
 
 const PROFILE_DOMAIN_VERSIONS = Object.freeze({
     [PROFILE_DOMAIN_IDS.RGB]: 1,
     [PROFILE_DOMAIN_IDS.KEY_BEHAVIORS]: 1,
+    [PROFILE_DOMAIN_IDS.COMBOS]: 1,
 });
 
 const PROFILE_ACTION_KINDS = Object.freeze({

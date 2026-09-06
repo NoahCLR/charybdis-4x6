@@ -6,9 +6,13 @@ const {DeviceRequestCoordinator} = require("../transport/request-coordinator");
 const {CandidateUploadCoordinator} = require("./candidate-upload-coordinator");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX, readViaKeycode, readViaLayout, synchronizeViaLayout, writeViaKeycode} = require("../protocol/via-layout-v1");
 const keycodeCatalog = require("../data/keycode-catalog");
+const {readViaRgbMatrix} = require("../protocol/via-rgb-matrix-v1");
+const {readDeviceCombos} = require("../protocol/combo-readback-v1");
+const {editDeviceProfile, COMBO_EDITS, assertEffectiveCombos} = require("./device-profile-edits");
 const {readCommittedPayload, readCompiledPayload} = require("../protocol/profile-payload-v1");
 const {PROFILE_DOMAIN_IDS, decodeProfileBlob} = require("../schema/profile-blob-v1");
 const {decodeRgbDomainV1} = require("../schema/rgb-domain-v1");
+const {decodeComboDomainV1} = require("../schema/combo-domain-v1");
 const {decodeKeyBehaviorDomain} = require("../schema/key-behavior-domain-v1");
 const {
     CANDIDATE_OPERATION,
@@ -76,6 +80,9 @@ class ProfileDeviceService {
         this.liveApply = {state: "idle", progress: null, result: null, error: null};
         this.layout = undefined;
         this.committed = undefined;
+        this.profileBytes = undefined;
+        this.baseRgb = undefined;
+        this.combos = undefined;
     }
 
     setProfileSummary(summary) {
@@ -311,6 +318,7 @@ class ProfileDeviceService {
 
         return this.runOperation("reading profile", async () => {
             const connection = this.connection;
+            this.profileBytes = undefined;
             this.committed = {state: "reading", progress: {done: 0, total: 0}};
             this.emitChange();
 
@@ -354,6 +362,8 @@ class ProfileDeviceService {
                         domains.rgb = decodeRgbDomainV1(domain.payload);
                     } else if (domain.id === PROFILE_DOMAIN_IDS.KEY_BEHAVIORS) {
                         domains.keyBehaviors = decodeKeyBehaviorDomain(domain.payload);
+                    } else if (domain.id === PROFILE_DOMAIN_IDS.COMBOS) {
+                        domains.combos = decodeComboDomainV1(domain.payload);
                     }
                 } catch (error) {
                     failures.push({domainId: domain.id, message: error instanceof Error ? error.message : String(error)});
@@ -374,6 +384,7 @@ class ProfileDeviceService {
                 domains,
                 failures,
             };
+            this.profileBytes = Buffer.from(bytes);
             const described = source === "compiled"
                 ? "the firmware's compiled defaults"
                 : `committed generation ${metadata.generation}`;
@@ -383,6 +394,47 @@ class ProfileDeviceService {
                     : `Read ${described} from the keyboard (${bytes.length} bytes).`
             );
         });
+    }
+
+    async readCombos() {
+        const connection = this.connection;
+        this.combos = {state: "reading"};
+        this.emitChange();
+        try {
+            if (!connection?.connected) throw new Error("Connect to a keyboard before reading combos.");
+            const read = await readDeviceCombos(connection, {nextRequestId: () => this.requestIds.next()});
+            if (this.connection !== connection || !connection.connected) return this.snapshot();
+            this.combos = {state: "read", ...read, readAt: new Date().toISOString()};
+        } catch (error) {
+            if (this.connection !== connection) return this.snapshot();
+            this.combos = connection?.connected ? {state: "unavailable", error: publicError(error)} : undefined;
+        }
+        this.emitChange();
+        return this.snapshot();
+    }
+
+    async readBaseRgb() {
+        const connection = this.connection;
+        this.baseRgb = {state: "reading"};
+        this.emitChange();
+        try {
+            if (!connection?.connected) throw new Error("Connect to a keyboard before reading base RGB.");
+            const settings = await readViaRgbMatrix(connection);
+            if (this.connection !== connection || !connection.connected) return this.snapshot();
+            this.baseRgb = {state: "read", ...settings, readAt: new Date().toISOString()};
+        } catch (error) {
+            if (this.connection !== connection) return this.snapshot();
+            if (!connection?.connected) {
+                this.baseRgb = undefined;
+            } else {
+                // This optional read must not discard a usable profile or
+                // mask an earlier layout/profile error. Clear stale colour.
+                this.baseRgb = {state: "unavailable", error: publicError(error)};
+                this.addDiagnostic(`Base RGB: ${this.baseRgb.error.message}`);
+            }
+        }
+        this.emitChange();
+        return this.snapshot();
     }
 
     async disconnect() {
@@ -414,6 +466,29 @@ class ProfileDeviceService {
         return this.snapshot();
     }
 
+    async assertComboBase(digest) {
+        const fresh = await readDeviceCombos(this.connection, {nextRequestId: () => this.requestIds.next()});
+        if (fresh.digest !== digest) throw liveApplyError("PROFILE_EDIT_CONFLICT", "Combos changed since the last read. Read from keyboard before saving again.");
+    }
+
+    async saveProfileEdit(message) {
+        if (this.busy || this.savingEdit) throw new Error("Wait for the current keyboard operation to finish.");
+        if (!this.profileBytes || this.committed?.state !== "read" || this.committed.failures.length) throw new Error("Read a complete keyboard profile before saving changes.");
+        const expectedBase = {source: this.committed.source, generation: this.committed.generation, digest: this.committed.digest, originHalf: this.committed.originHalf};
+        const next = editDeviceProfile(this.profileBytes, message, {capabilities: this.capabilities, combos: this.combos});
+        const expectedCombosDigest = COMBO_EDITS.has(message.type) ? this.combos.digest : undefined;
+        this.savingEdit = true;
+        try {
+            const result = await this.applyLiveProfile(next, {expectedBase, expectedCombosDigest});
+            if (result.error || result.liveApply?.state !== "complete") throw new Error(result.error?.message || "The keyboard did not confirm the save.");
+            await this.readCommittedProfile();
+            if (!this.profileBytes?.equals(next) || this.committed?.source !== "committed") throw new Error("The saved profile did not match the readback. Read from keyboard before retrying.");
+            await this.readCombos();
+            assertEffectiveCombos(next, this.combos);
+            return this.snapshot();
+        } finally {this.savingEdit = false;}
+    }
+
     async applyLiveProfile(value, options = {}) {
         const blob = copyBytes(value, "Live profile blob");
         const layoutEntries = options.layoutEntries === undefined
@@ -443,7 +518,7 @@ class ProfileDeviceService {
         try {
             metadata = candidateMetadataForBlob(blob, {
                 actionAbiDigest: this.capabilities.actionAbiDigest,
-                requestedDomains: REQUIRED_PROFILE_DOMAIN_MASK,
+
             });
         } catch (error) {
             this.setError(error);
@@ -464,6 +539,8 @@ class ProfileDeviceService {
             });
             try {
                 this.status = await readProfileStatus(this.connection, {nextRequestId: () => this.requestIds.next()});
+                if (options.expectedBase) assertProfileBase(this.status, options.expectedBase);
+                if (options.expectedCombosDigest !== undefined) await this.assertComboBase(options.expectedCombosDigest);
                 const currentMutation = evaluateLiveMutationCompatibility(
                     this.capabilities,
                     compatibility,
@@ -490,7 +567,11 @@ class ProfileDeviceService {
                     );
                     this.emitChange();
                 } else if (this.candidateStatus.state === CANDIDATE_STATE.IDLE) {
-                    prepared = await coordinator.upload(blob, {metadata});
+                    prepared = await coordinator.upload(blob, {metadata, ...(options.expectedBase ? {verifyBase: async () => {
+                        this.status = await readProfileStatus(this.connection, {nextRequestId: () => this.requestIds.next()});
+                        assertProfileBase(this.status, options.expectedBase);
+                        if (options.expectedCombosDigest !== undefined) await this.assertComboBase(options.expectedCombosDigest);
+                    }} : {})});
                 } else {
                     throw activeCandidateError(this.candidateStatus, metadata.digest);
                 }
@@ -579,6 +660,8 @@ class ProfileDeviceService {
             liveApply: cloneLiveApply(this.liveApply),
             layout: this.layout ? JSON.parse(JSON.stringify(this.layout)) : null,
             committed: this.committed ? JSON.parse(JSON.stringify(this.committed)) : null,
+            baseRgb: this.baseRgb ? JSON.parse(JSON.stringify(this.baseRgb)) : null,
+            combos: this.combos ? JSON.parse(JSON.stringify(this.combos)) : null,
             error: this.error ? {...this.error} : null,
             diagnostics: this.diagnostics.slice(),
             lastRefreshedAt: this.lastRefreshedAt,
@@ -621,8 +704,11 @@ class ProfileDeviceService {
     }
 
     clearConnection() {
+        this.profileBytes = undefined;
         this.layout = undefined;
         this.committed = undefined;
+        this.baseRgb = undefined;
+        this.combos = undefined;
         this.disposeConnectionListener?.();
         this.disposeConnectionListener = undefined;
         this.connection = undefined;
@@ -902,6 +988,13 @@ function liveApplyError(code, message) {
 
 function hexDigest(value) {
     return `0x${(Number(value) >>> 0).toString(16).padStart(8, "0")}`;
+}
+
+function assertProfileBase(status, base) {
+    const matches = base.source === "compiled"
+        ? status.committedGeneration === 0 && status.compiledDefaultDigest === base.digest
+        : status.committedGeneration === base.generation && status.committedDigest === base.digest && status.committedOriginHalf === base.originHalf;
+    if (!matches) throw liveApplyError("PROFILE_EDIT_CONFLICT", "The keyboard changed since this edit was loaded. Read from keyboard and make the edit again.");
 }
 
 function assertAppliedStatus(status, digest) {

@@ -710,3 +710,17 @@ test("cleanup resubmits an idempotent abort after busy status becomes poisoned",
     assert.equal(operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_ABORT).length, 2);
     assert.equal(harness.status.state, CANDIDATE_STATE.IDLE);
 });
+
+test("a profile changed after BEGIN is aborted before any chunks or commit", async () => {
+    const firmware = new CandidateFirmwareHarness();
+    const coordinator = new CandidateUploadCoordinator(firmware, {pollIntervalMs: 0});
+    let checked = false;
+    await assert.rejects(coordinator.upload(representativeBlob(), {actionAbiDigest: 0x12345678, verifyBase: async () => {
+        checked = true;
+        assert.ok(firmware.writes.some(report => report[2] === PROFILE_CANDIDATE_V1.VALUE_BEGIN));
+        throw Object.assign(new Error("Profile changed"), {code: "PROFILE_EDIT_CONFLICT"});
+    }}), /Profile changed/);
+    assert.equal(checked, true);
+    assert.ok(firmware.writes.some(report => report[2] === PROFILE_CANDIDATE_V1.VALUE_ABORT));
+    assert.equal(firmware.writes.some(report => [PROFILE_CANDIDATE_V1.VALUE_CHUNK, PROFILE_CANDIDATE_V1.VALUE_COMMIT].includes(report[2])), false);
+});

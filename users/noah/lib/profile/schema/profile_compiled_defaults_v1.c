@@ -755,6 +755,12 @@ noah_profile_reader_t noah_profile_compiled_v1_reader(const noah_profile_compile
     };
 }
 
+#ifdef COMBO_ENABLE
+static bool combo_to_native(const noah_profile_action_v1_t *action, uint16_t *native) {
+    return noah_profile_action_runtime_v1_to_native(action, native) == NOAH_PROFILE_ACTION_RUNTIME_V1_OK;
+}
+#endif
+
 bool noah_profile_compiled_v1_compatibility(const noah_profile_compiled_v1_t *profile, noah_profile_validator_v1_compatibility_t *compatibility) {
     noah_profile_validator_v1_compatibility_t result;
 
@@ -763,6 +769,10 @@ bool noah_profile_compiled_v1_compatibility(const noah_profile_compiled_v1_t *pr
     }
     result                              = noah_profile_validator_v1_default_compatibility(profile->metadata.action_abi_digest);
     result.allowed_domain_mask          = profile->metadata.domain_mask;
+#ifdef COMBO_ENABLE
+    result.allowed_domain_mask |= NOAH_PROFILE_VALIDATOR_V1_DOMAIN_COMBOS;
+    result.combo_to_native = combo_to_native;
+#endif
     result.required_domain_mask         = 0u;
     result.logical_layer_count          = LAYER_COUNT;
     result.supported_pd_mode_mask       = (uint8_t)((UINT32_C(1) << PD_MODE_COUNT) - 1u);

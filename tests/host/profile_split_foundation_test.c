@@ -25,7 +25,7 @@ static noah_profile_split_descriptor_t committed_descriptor(uint32_t generation,
     descriptor.payload_crc32  = UINT32_C(0xA1B2C3D4) ^ digest;
     descriptor.payload_digest = digest;
     descriptor.payload_length = 1089u;
-    descriptor.domain_mask    = NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS;
+    descriptor.domain_mask    = (NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS);
     descriptor.profile_flags  = 1u;
     descriptor.origin_half    = origin;
     descriptor.has_profile    = true;

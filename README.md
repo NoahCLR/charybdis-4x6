@@ -266,9 +266,47 @@ including whether both halves agree on a generation — and reads the live layou
 off the device and draws it on the real Charybdis geometry, resolving keycodes
 through a vendored catalog rather than the source files.
 
-Reading the committed custom profile payload, which owns RGB and key
-behaviours, is the next step. Flash the side-specific firmware pair, which
-carries the live-profile owner by default; the generic image does not.
+It also reads the custom profile payload and displays its RGB configuration
+and key behaviours. When nothing is committed, it reads the flashed firmware's
+compiled defaults from the keyboard and labels them accordingly. The
+**Behaviours** tab lists every returned row, including timing, tap branches,
+hold modes, and auto-mouse anchoring. **RGB** shows colours, LED groups, and
+enabled stages. A timing value of zero means the firmware default; the default
+duration is not reported. Unknown keycodes remain numeric instead of borrowing
+names from the source files.
+
+Layer previews respect the keyboard's mapped-keys-only RGB policy, including
+transparent keys. The app also reads the current base RGB effect over VIA:
+pass-through leaves that effect visible. The selected-layer preview composes
+base and selected layer colours, then their LED groups, using the last read.
+Solid colours and RGB off are shown; other effects are labelled as unavailable
+for simulation. Brightness is approximate and transient feedback is not shown.
+Use **Read from keyboard** after changing lighting on the board.
+Standard modifier shortcuts have readable labels; unknown
+custom key IDs remain complete and distinct.
+
+The combo editor beside the layout reads native definitions and timing from the keyboard
+over Profile Wire value `0x06`. It shows inputs, outputs, enabled state,
+tap/hold/order requirements and layer references. Stable combo badges appear
+on the selected-layer preview, including inherited inputs. Custom firmware
+trigger conditions are flagged but cannot be evaluated by this preview.
+Older firmware shows an explicit unsupported message: build and flash both
+halves with `sh tools/build-firmware-pair.sh`, then read again. No combo data
+is filled in from the repository.
+
+Layout, RGB and combo writes work through their Save/Apply controls. RGB and
+combo saves preserve untouched settings, reject stale reads, commit to both
+halves and verify the readback. Combo editing includes board input selection,
+per-row timing and requirements, deletion, and one shared hold threshold. The
+collapsed all-combos list under the layer overview includes every reported row.
+Modifier shortcuts such as Cmd+N use the same keycode conversion for layout
+and combo saves, including the picker's short spellings.
+Auto-mouse fade follows the underlying colours in its default mode; the chosen
+end colour is used only by the other two modes. The static preview does not
+animate timeout fades. Behaviour editing and macro/default read-write remain
+next steps. Readback requires the side-specific firmware pair,
+which carries the live-profile owner by default; the generic image does not.
+After updating the extension, reload VS Code and use **Read from keyboard**.
 
 The direction, the decisions behind the split, and what is deliberately left
 undesigned are in
