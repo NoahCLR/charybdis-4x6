@@ -7,7 +7,11 @@
 #include <stdint.h>
 
 enum {
+#ifdef NOAH_LEGACY_SNAPSHOT_BRIDGE
     NOAH_QMK_VIA_SYNC_METADATA_SCHEMA          = 1u,
+#else
+    NOAH_QMK_VIA_SYNC_METADATA_SCHEMA          = 2u,
+#endif
     NOAH_QMK_VIA_SYNC_METADATA_GENERATION_BITS = 27u,
 };
 

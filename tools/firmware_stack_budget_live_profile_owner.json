@@ -15,6 +15,11 @@
       },
       "indirect_edges": [
         {
+          "caller": "noah_profile_candidate_store_backend_activation_step",
+          "callee": "noah_effective_settings_invalidate",
+          "reason": "provider publication invokes the portable settings invalidator, including the inlined QMK apply helper"
+        },
+        {
           "caller": "noah_qmk_durable_io_matrix_scan",
           "callee": "noah_profile_store_runtime_matrix_scan_step",
           "reason": "the shared master/slave durable-I/O scheduler dispatches the engineering live-profile owner through its rotating step table"
@@ -61,6 +66,14 @@
         }
       ],
       "paths": [
+        {
+          "name": "portable profile globals and macro readback",
+          "functions": ["main", "via_custom_value_command_kb", "capture", "macro_payload_compile", "macro_payload_lookup_keycode", "strlen"]
+        },
+        {
+          "name": "portable profile settings publication",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_store_backend_activation_step", "noah_effective_settings_invalidate", "nvm_eeconfig_update_keymap", "eeprom_update_word", "wear_leveling_write"]
+        },
         {
           "name": "engineering owner compiled-profile validation",
           "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "noah_profile_validator_v1_step"]

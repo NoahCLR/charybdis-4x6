@@ -4,7 +4,7 @@ const keycodes = require("../data/keycode-catalog");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {decodeKeyBehaviorDomain, encodeKeyBehaviorDomain, KEY_BEHAVIOR_HOLD_MODES} = require("../schema/key-behavior-domain-v1");
 const {semanticActionForExpression, resolveNativeQmkExpression} = require("../schema/compiled-profile-v1");
-const {actionName, NATIVE_ACTION_ABI_V1} = require("./device-profile-view");
+const {actionName, knownActionAbi} = require("./device-profile-view");
 
 const BEHAVIOR_EDITS = new Set(["saveBehavior", "addBehavior", "deleteBehavior"]);
 const invalid = message => Object.assign(new Error(message), {code: "INVALID_BEHAVIOR_EDIT"});
@@ -21,7 +21,7 @@ function integer(value, max, label, optional = false) {
 function editKeyBehaviors(payload, message, capabilities = {}) {
     if (!(capabilities.supportedDomainMask & 2)) throw invalid("This firmware does not support saving key behaviours.");
     const {rows} = decodeKeyBehaviorDomain(payload);
-    const knownAbi = capabilities.actionAbiDigest === NATIVE_ACTION_ABI_V1;
+    const knownAbi = knownActionAbi(capabilities.actionAbiDigest);
     const native = action => action.kind === ACTION.QMK_KEYCODE ? action.operand
         : knownAbi ? resolveNativeQmkExpression(actionName(action), {}) : undefined;
     const equivalent = (left, right) => (left.kind === right.kind && left.operand === right.operand)

@@ -9,6 +9,7 @@ NOAH_COMMON_SOURCES := \
     lib/profile/protocol/profile_candidate_v1.c \
     lib/profile/schema/profile_blob_v1.c \
     lib/profile/schema/profile_combo_v1.c \
+    lib/profile/schema/profile_settings_v1.c \
     lib/profile/schema/profile_reader.c \
     lib/profile/schema/key_behavior_domain_v1.c \
     lib/profile/schema/profile_rgb_v1.c \
@@ -19,6 +20,8 @@ NOAH_COMMON_SOURCES := \
     lib/profile/runtime/effective_key_behavior_runtime.c \
     lib/profile/runtime/effective_rgb_runtime.c \
     lib/profile/runtime/effective_combo_runtime.c \
+    lib/profile/runtime/effective_settings_runtime.c \
+    lib/compat/qmk_portable_profile.c \
     lib/profile/runtime/profile_activation_policy.c \
     lib/profile/split/profile_split_authority.c \
     lib/profile/split/profile_split_protocol_v1.c \

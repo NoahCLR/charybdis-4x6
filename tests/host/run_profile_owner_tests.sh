@@ -38,6 +38,7 @@ build_and_run() {
         "$ROOT/users/noah/lib/profile/schema/profile_rgb_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_validator_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_combo_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_settings_v1.c" \
         "$ROOT/users/noah/lib/profile/split/profile_split_authority.c" \
         "$ROOT/users/noah/lib/profile/split/profile_split_protocol_v1.c" \
         "$ROOT/users/noah/lib/profile/split/profile_split_reconciler.c" \

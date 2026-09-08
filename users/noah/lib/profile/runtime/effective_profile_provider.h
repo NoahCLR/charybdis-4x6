@@ -14,7 +14,7 @@ enum {
     NOAH_EFFECTIVE_PROFILE_MAX_INVALIDATORS    = 8u,
     NOAH_EFFECTIVE_PROFILE_ORIGIN_COMPILED     = UINT8_MAX,
     // This is a firmware-state regression policy, not a physical-RAM claim.
-    NOAH_EFFECTIVE_PROFILE_PROVIDER_STATE_BUDGET_32BIT = 768u,
+    NOAH_EFFECTIVE_PROFILE_PROVIDER_STATE_BUDGET_32BIT = 784u,
 };
 
 typedef enum {

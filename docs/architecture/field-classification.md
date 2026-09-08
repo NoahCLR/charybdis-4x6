@@ -24,9 +24,9 @@ behavior. The UI must explain every intentional non-live boundary.
 | Hold mode and repeat rate | Milestone A behavior policy | 04 | behavior validator and lifecycle runtime |
 | `keymaps[][]` | Standard VIA-owned state; C is compiled default | 06 | QMK dynamic keymap/VIA reconciliation |
 | `VIA_MACROS` | Standard VIA-owned state; C is compiled default | 06 | QMK dynamic macro storage |
-| `HARDCODED_MACROS` | Later custom live domain | 06 | macro provider and profile schema |
+| `HARDCODED_MACROS` | Portable settings domain `0x40`, 16 instruction streams | 06 | macro provider and profile schema |
 | `COMBOS` | GET `0x06` readout; optional live domain `0x30` for rows, timing and matching flags | 07 | combo validator/provider |
-| Logical layer names/order | Later fixed-capacity structure | 07 | whole-profile cross-reference validator |
+| Logical layer names/order | Eight-layer bank; portable names and reference-preserving order | 07 | whole-profile cross-reference validator |
 | Custom-keycode enum and handler code | Executable firmware/action ABI | flash required | firmware build |
 
 ## `rgb_config.c`
@@ -57,22 +57,25 @@ profile-local numeric group ids and LED bitmaps, not C preprocessor names.
 
 ## `config.h`
 
-### Later Live Policy
+### Portable Live Policy
 
-These values are parsed today and are candidates for Stage 06 after Milestone A:
+Complete profile export/import now carries the following settings. Dedicated
+policy editors remain pending:
 
 - `TAPPING_TERM`, `COMBO_TERM`, `CUSTOM_TAP_HOLD_TERM`,
   `CUSTOM_LONGER_HOLD_TERM`, and `CUSTOM_MULTI_TAP_TERM`;
-- normal and sniping DPI defaults and steps;
+- current normal and sniping DPI (the ladders remain compiled capabilities);
 - pointing-mode DPI overrides;
 - auto-sniping enable/layer;
 - auto-mouse enable, layer, and timeout;
 - default RGB effect, HSV value, and idle timeout;
 - key-feedback flash period and auto-mouse RGB dead time.
 
-Each requires an existing QMK setter, a userspace provider seam, or an explicit
-fork compatibility wrapper. Until Stage 06 migrates a field, it remains a
-compiled default.
+The [portable settings contract](portable-profile-v1.md) supplies a bounded
+runtime cache and QMK setters. It also includes debounce, activation delay,
+movement threshold, combo enable/reference policy, RGB speed/flags, persistent
+default-layer state and QMK keymap options. Combo timing is materialized in the
+combo domain. Both macro banks and eight user-facing layer names are portable.
 
 ### Compiled Capability Or Feature Inclusion
 
@@ -108,7 +111,8 @@ Safety ceilings can bound live values but cannot themselves be raised live.
 
 ### Source-Only Or Executable
 
-- comments, labels, whitespace, macro names, and layer presentation names;
+- comments, source labels, whitespace and C macro names (user-facing layer
+  names are portable settings);
 - C helper implementations and QMK hooks;
 - USB descriptors, VID/PID, Raw HID report size, and split transaction ids;
 - hardware pins, drivers, sensor type, and matrix geometry.

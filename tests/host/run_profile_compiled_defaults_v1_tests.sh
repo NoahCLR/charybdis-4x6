@@ -22,6 +22,14 @@ noah_host_export_qmk_cpath "$ROOT"
     printf '#include "%s/config.h"\n' "$KEYMAP_PATH"
 } >"$CONFIG"
 
+node - "$ROOT" "$BUILD_DIR/portable.bin" <<'JS'
+const fs = require("node:fs");
+const root = process.argv[2] + "/tools/charybdis-live";
+const {document} = require(root + "/tests/fixtures/portable-profile");
+const {validateSnapshot} = require(root + "/core/model/portable-profile");
+fs.writeFileSync(process.argv[3], validateSnapshot(document()).profile);
+JS
+
 build_and_run() {
     name="$1"
     shift
@@ -51,12 +59,21 @@ build_and_run() {
         "$ROOT/users/noah/lib/profile/schema/profile_rgb_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_validator_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_combo_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_settings_v1.c" \
         "$ROOT/users/noah/lib/profile/storage/profile_checksum.c" \
         -o "$bin"
-    "$bin" "$ROOT/tests/fixtures/compiled_profile_v1.fixture"
+    if [ "$name" = bridge ]; then
+        "$bin" "$ROOT/tests/fixtures/compiled_profile_v1.fixture"
+    elif [ "$name" = empty ]; then
+        "$bin" "$ROOT/tests/fixtures/compiled_profile_eight_v1.fixture" --empty-profile "$BUILD_DIR/portable.bin"
+    else
+        "$bin" "$ROOT/tests/fixtures/compiled_profile_eight_v1.fixture" ${NOAH_WRITE_COMPILED_FIXTURE:+--write-fixture}
+    fi
 }
 
 build_and_run normal
+build_and_run bridge -DNOAH_LEGACY_SNAPSHOT_BRIDGE
+build_and_run empty -DNOAH_KEYMAP_EMPTY_KEY_BEHAVIORS -DNOAH_KEYMAP_EMPTY_COMBOS -DNOAH_PORTABLE_PROFILE_ENABLE
 build_and_run sanitized -fsanitize=address,undefined -fno-omit-frame-pointer
 
 # Keep the materializer available when RGB is compiled out: that variant emits

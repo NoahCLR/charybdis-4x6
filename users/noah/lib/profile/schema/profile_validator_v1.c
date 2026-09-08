@@ -204,6 +204,7 @@ static noah_profile_validator_v1_result_t blob_header_step(noah_profile_validato
 }
 
 static uint8_t domain_mask_for_id(uint8_t domain_id) {
+    if (domain_id == NOAH_PROFILE_DOMAIN_V1_SETTINGS) return NOAH_PROFILE_VALIDATOR_V1_DOMAIN_SETTINGS;
     if (domain_id == NOAH_PROFILE_DOMAIN_V1_COMBOS) return NOAH_PROFILE_VALIDATOR_V1_DOMAIN_COMBOS;
     if (domain_id == NOAH_PROFILE_DOMAIN_V1_RGB) return NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB;
     if (domain_id == NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIORS) return NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS;
@@ -257,7 +258,7 @@ static noah_profile_validator_v1_result_t domain_header_step(noah_profile_valida
     if (domain_mask == 0u || (domain_mask & validator->compatibility.allowed_domain_mask) == 0u) {
         return reject(validator, NOAH_PROFILE_VALIDATOR_V1_UNSUPPORTED_DOMAIN, validator->blob_offset, validator->domain_index, header[0], NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U16, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_DETAIL_BLOB, NOAH_PROFILE_CODEC_V1_UNKNOWN_DOMAIN, error);
     }
-    if ((header[0] == NOAH_PROFILE_DOMAIN_V1_COMBOS && header[1] != 1u) || (header[0] == NOAH_PROFILE_DOMAIN_V1_RGB && header[1] != NOAH_PROFILE_DOMAIN_V1_RGB_VERSION) || (header[0] == NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIORS && header[1] != NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIOR_VERSION)) {
+    if ((header[0] == NOAH_PROFILE_DOMAIN_V1_SETTINGS && header[1] != 1u) || (header[0] == NOAH_PROFILE_DOMAIN_V1_COMBOS && header[1] != 1u) || (header[0] == NOAH_PROFILE_DOMAIN_V1_RGB && header[1] != NOAH_PROFILE_DOMAIN_V1_RGB_VERSION) || (header[0] == NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIORS && header[1] != NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIOR_VERSION)) {
         return reject(validator, NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN, validator->blob_offset + 1u, validator->domain_index, header[0], NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U16, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_DETAIL_BLOB, NOAH_PROFILE_CODEC_V1_UNKNOWN_DOMAIN_VERSION, error);
     }
     if (validator->domain_index != 0u && header[0] == validator->previous_domain_id) {
@@ -356,7 +357,23 @@ invalid:
     return reject(validator, NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN, offset, validator->domain_index, NOAH_PROFILE_DOMAIN_V1_COMBOS, 0u, state->row_index, 0u, 0u, NOAH_PROFILE_VALIDATOR_V1_DETAIL_BLOB, NOAH_PROFILE_CODEC_V1_INVALID_ACTION, error);
 }
 
+static noah_profile_validator_v1_result_t settings_decode_step(noah_profile_validator_v1_t *v, noah_profile_validator_v1_error_t *error) {
+    noah_profile_settings_v1_validation_t *state = &v->domain_validation.settings;
+    uint8_t byte;
+    size_t offset = v->domain_payload_offset + state->offset;
+    if (read_blob(v, offset, &byte, 1, error) != NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS) return v->terminal_result;
+    if (!noah_profile_settings_v1_consume(state, byte, v->domain_payload_length, v->compatibility.logical_layer_count))
+        return reject_simple(v, NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN, offset, error);
+    if (state->offset < v->domain_payload_length) return NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;
+    if (!noah_profile_settings_v1_complete(state, v->domain_payload_length)) return reject_simple(v, NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN, offset, error);
+    v->profile.settings = (noah_profile_settings_v1_view_t){v->domain_payload_offset, v->domain_payload_length};
+    v->blob_offset = v->domain_payload_offset + v->domain_payload_length;
+    v->domain_index++; v->phase = NOAH_PROFILE_VALIDATOR_V1_PHASE_DOMAIN_HEADER;
+    return NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;
+}
+
 static noah_profile_validator_v1_result_t domain_decode_step(noah_profile_validator_v1_t *validator, noah_profile_validator_v1_error_t *error) {
+    if (validator->current_domain_id == NOAH_PROFILE_DOMAIN_V1_SETTINGS) return settings_decode_step(validator, error);
     if (validator->current_domain_id == NOAH_PROFILE_DOMAIN_V1_COMBOS) return combo_decode_step(validator, error);
     if (validator->current_domain_id == NOAH_PROFILE_DOMAIN_V1_RGB) {
         noah_profile_rgb_v1_error_t error_rgb;

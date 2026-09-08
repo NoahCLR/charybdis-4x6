@@ -19,7 +19,8 @@ const ALLOWED_IMPORTS = {
     transport: ["data"],
     schema: ["data"],
     protocol: ["transport", "schema", "data"],
-    session: ["transport", "protocol", "schema", "data"],
+    model: ["schema", "data"],
+    session: ["transport", "protocol", "model", "schema", "data"],
 };
 
 function sourceFiles(dir) {

@@ -1,3 +1,4 @@
+#include "lib/profile/runtime/effective_settings_runtime.h"
 // ────────────────────────────────────────────────────────────────────────────
 // Key Behavior Lookup
 // ────────────────────────────────────────────────────────────────────────────
@@ -234,17 +235,17 @@ key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
     noah_action_desc_t                    desc = noah_action_describe(keycode);
     bool                                  custom_lt = has_authored && noah_action_desc_uses_authored_layer_tap_contract(desc);
 
-    uint16_t tap_term = CUSTOM_TAP_HOLD_TERM;
+    uint16_t tap_term = noah_setting(NOAH_SETTING_TAP_HOLD_TERM, CUSTOM_TAP_HOLD_TERM);
     if (live_result == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK && live.tap_hold_term) {
         tap_term = live.tap_hold_term;
     } else if (config && config->tap_hold_term) {
         tap_term = config->tap_hold_term;
     } else if (custom_lt) {
-        tap_term = TAPPING_TERM;
+        tap_term = noah_setting(NOAH_SETTING_TAPPING_TERM, TAPPING_TERM);
     }
 
-    uint16_t longer_term = live_result == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK && live.longer_hold_term ? live.longer_hold_term : (config && config->longer_hold_term ? config->longer_hold_term : CUSTOM_LONGER_HOLD_TERM);
-    uint16_t multi_term  = live_result == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK && live.multi_tap_term ? live.multi_tap_term : (config && config->multi_tap_term ? config->multi_tap_term : CUSTOM_MULTI_TAP_TERM);
+    uint16_t longer_term = live_result == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK && live.longer_hold_term ? live.longer_hold_term : (config && config->longer_hold_term ? config->longer_hold_term : noah_setting(NOAH_SETTING_LONG_HOLD_TERM, CUSTOM_LONGER_HOLD_TERM));
+    uint16_t multi_term  = live_result == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK && live.multi_tap_term ? live.multi_tap_term : (config && config->multi_tap_term ? config->multi_tap_term : noah_setting(NOAH_SETTING_MULTI_TAP_TERM, CUSTOM_MULTI_TAP_TERM));
     uint8_t  tap_depth   = live_result == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK ? live.authored_tap_depth : key_behavior_authored_tap_depth_in_config(config);
     return (key_behavior_view_t){
         .config             = config,

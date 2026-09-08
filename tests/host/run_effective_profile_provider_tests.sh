@@ -21,6 +21,7 @@ build_and_run() {
         "$ROOT/users/noah/lib/profile/runtime/effective_profile_provider.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_validator_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_combo_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_settings_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_rgb_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/key_behavior_domain_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_blob_v1.c" \

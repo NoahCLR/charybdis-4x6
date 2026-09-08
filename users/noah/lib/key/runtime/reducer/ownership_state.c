@@ -1,3 +1,4 @@
+#include "lib/profile/runtime/effective_settings_runtime.h"
 #include "ownership_state.h"
 
 #include "../planning/scan_planner.h"
@@ -1120,7 +1121,7 @@ static bool key_runtime_core_flashing_feedback_lease_visible(const lease_t *leas
         return false;
     }
 
-    return ((timer_elapsed(lease->feedback_started_at) / KEY_FEEDBACK_FLASH_HALF_PERIOD_MS) & 1u) == 0u;
+    return ((timer_elapsed(lease->feedback_started_at) / noah_setting(NOAH_SETTING_FEEDBACK_PERIOD, KEY_FEEDBACK_FLASH_HALF_PERIOD_MS)) & 1u) == 0u;
 }
 
 static bool key_runtime_core_feedback_sequence_is_newer_or_equal(uint32_t candidate, uint32_t current) {

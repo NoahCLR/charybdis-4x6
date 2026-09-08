@@ -12,8 +12,13 @@
 
 // ─── Layers ────────────────────────────────────────────────────────────────
 //
-// If you add or remove a layer, update the enum below.
-// LAYER_COUNT is derived automatically as the last sentinel value.
+// The standard image reserves eight layers. The temporary export bridge
+// retains the deployed five-layer storage geometry.
+#ifdef NOAH_LEGACY_SNAPSHOT_BRIDGE
+#    define NOAH_LAYER_BANK_COUNT 5
+#else
+#    define NOAH_LAYER_BANK_COUNT 8
+#endif
 #ifndef __ASSEMBLER__
 enum charybdis_keymap_layers {
     LAYER_BASE = 0, // Default QWERTY typing layer
@@ -21,8 +26,9 @@ enum charybdis_keymap_layers {
     LAYER_SYM,      // Symbols, brackets, and DPI controls
     LAYER_NAV,      // Navigation, media, macros, and mouse buttons (current sniping layer)
     LAYER_POINTER,  // Dedicated pointer layout; default auto-mouse target layer
+    LAYER_EXTRA_1, LAYER_EXTRA_2, LAYER_EXTRA_3,
     // ─── Add new layers above this line. ───────────────────────────────────
-    LAYER_COUNT, // sentinel — must be last — used for VIA Dynamic layer count
+    LAYER_COUNT = NOAH_LAYER_BANK_COUNT, // sentinel — used for VIA Dynamic layer count
 };
 #endif
 
@@ -134,3 +140,12 @@ enum charybdis_keymap_layers {
 #    endif
 
 #endif // RGB_MATRIX_ENABLE
+
+#if defined(NOAH_PORTABLE_PROFILE_ENABLE) && !defined(__ASSEMBLER__)
+#    include <stdint.h>
+uint32_t noah_setting(uint8_t id, uint32_t fallback);
+#    define AUTO_MOUSE_DELAY noah_setting(25, 200)
+#    define AUTO_MOUSE_THRESHOLD noah_setting(26, 10)
+#    undef RGB_MATRIX_TIMEOUT
+#    define RGB_MATRIX_TIMEOUT 0
+#endif

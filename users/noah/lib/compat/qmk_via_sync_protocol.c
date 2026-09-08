@@ -22,6 +22,11 @@ enum {
     NOAH_QMK_VIA_SYNC_WIRE_CRC            = 31,
 };
 
+// Keep this named boundary available to both stack manifests. LTO otherwise
+// inlines it or merges it with QMK's identical CRC helper.
+#ifdef NOAH_STACK_BUDGET_ENABLE
+__attribute__((noinline, noclone, no_icf))
+#endif
 static uint8_t noah_qmk_via_sync_crc8(const uint8_t *data, size_t length) {
     uint8_t crc = 0u;
 

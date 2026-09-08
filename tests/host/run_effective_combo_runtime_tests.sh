@@ -19,6 +19,7 @@ build_and_run() {
         "$ROOT/users/noah/lib/compat/qmk_effective_combos.c" \
         "$ROOT/users/noah/lib/compat/qmk_combo_readback.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_combo_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_settings_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_blob_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
         "$ROOT/users/noah/lib/profile/storage/profile_checksum.c" \

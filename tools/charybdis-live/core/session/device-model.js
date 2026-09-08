@@ -207,7 +207,7 @@ function diagnosticsFor(state) {
     }
     if (state.combos?.state === "read") notes.push(`${state.combos.rows.length} combos read from the keyboard. Combos are ${state.combos.enabled ? "enabled" : "disabled"}.`);
     else notes.push(state.combos?.error?.message || "Combos have not been read from the keyboard yet.");
-    notes.push("Macro payloads and policy defaults are not read yet.");
+    notes.push(state.capabilities?.supportedDomainMask & 8 ? "Complete profile backups include both macro banks and global keyboard settings." : "Macro payloads and policy defaults need the complete-profile firmware update.");
     return notes;
 }
 

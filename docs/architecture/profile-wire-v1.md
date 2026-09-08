@@ -44,7 +44,7 @@ Initial domain ids:
 | `0x10` | Milestone A RGB | 1 |
 | `0x20` | Milestone A key behaviors | 1 |
 | `0x30` | Combo overrides | 1 |
-| `0x40` | Later hardcoded macros | reserved |
+| `0x40` | Portable settings, names and user macros | 1 |
 | `0x50` | Later live defaults | reserved |
 
 ## Action Encoding
@@ -215,11 +215,14 @@ contract is mirrored in
 - Transport and storage CRC32 detect corruption of the exact canonical blob.
 - Canonical payload digest is FNV-1a 32-bit in v1 for cheap comparison with the
   existing split tooling. CRC and digest are separate fields.
-- Source digest is the canonical blob digest produced from the three files.
+- The legacy source-digest status field reports the firmware's compiled-profile
+  digest. The live app reads it from the keyboard and never hashes source files.
 - Compiled-default digest is the canonical blob digest materialized into the
   firmware.
 - Action-ABI digest covers supported standard QMK values, stable userspace
   action ids, layer ids, PD ids, macro capacities, and relevant schema ceilings.
+  It is independent of authored rows; an empty profile uses the same vocabulary
+  as a populated one.
 
 Digest collisions are acceptable for drift display but never replace CRC,
 length, schema, capacity, and semantic validation before activation.
@@ -316,8 +319,8 @@ Capabilities use two pages. Page 0 contains the response-layout version, page
 count, protocol/schema versions, report and chunk sizes, status-page count,
 feature flags, action-ABI digest, firmware version, and compiled-default
 digest. Page 1 contains compiled and maximum layer/behavior/combo/RGB/macro
-capacities plus the 4,064-byte payload, 4,096-byte slot, and 7,551-byte VIA
-macro bounds. Feature bits distinguish schema/storage knowledge from candidate
+capacities plus the 4,064-byte payload, 4,096-byte slot, and advertised VIA
+macro bound (7,191 bytes on eight-layer firmware; 7,551 on the five-layer bridge). Feature bits distinguish schema/storage knowledge from candidate
 write, commit, preview, activation, and peer support, so read-only firmware
 does not advertise write operations prematurely.
 
@@ -338,8 +341,9 @@ Capability feature bits are:
 | 10 | action-ABI digest available |
 | 11 | compiled-profile digest available |
 
-Supported-domain-mask bit 0 is RGB and bit 1 is key behaviors. A domain bit
-must agree exactly with its schema feature bit. Candidate chunk capacity is
+Supported-domain-mask bits 0–3 are RGB, key behaviors, combos and portable
+settings respectively. RGB and behavior domain bits must agree exactly with
+their schema feature bits. Candidate chunk capacity is
 zero exactly when candidate writes are absent and otherwise is `1..20`.
 Commit and runtime activation require candidate writes. RGB preview also
 requires the RGB domain. Peer reconciliation requires both split-keyboard and
@@ -388,7 +392,7 @@ Begin candidate uses this complete layout:
 | ---: | ---: | --- |
 | 5 | 1 | schema major |
 | 6 | 1 | schema minor |
-| 7 | 1 | requested-domain mask; bits 0 RGB, 1 key behaviors, 2 combos |
+| 7 | 1 | requested-domain mask; bits 0 RGB, 1 key behaviors, 2 combos, 3 settings |
 | 8 | 1 | flags, initially zero |
 | 9 | 2 | canonical blob length, `8..4064` |
 | 11 | 4 | CRC32 of the exact canonical blob |
@@ -397,7 +401,7 @@ Begin candidate uses this complete layout:
 | 23 | 9 | reserved, all zero |
 
 The requested-domain mask may be zero for the canonical empty profile and may
-contain no bits other than 0, 1 and 2. Compatibility with the build's advertised
+contain no bits other than 0, 1, 2 and 3. Compatibility with the build's advertised
 schema, domain mask, action ABI, and capacity is checked by the scan owner
 before storage work begins.
 
@@ -641,3 +645,13 @@ the native table at the strict idle boundary; QMK, origin tracking and readback
 use that same table. A cold publication copies at most 896 bytes; key processing
 and combo readback use RAM only. A failed copy makes combo readback unavailable
 and exposes zero definitions rather than a partially decoded table.
+
+## Portable Settings And Complete Readback
+
+Domain `0x40` v1 and GET values `0x07`/`0x08` are specified in
+[portable-profile-v1.md](portable-profile-v1.md). The canonical envelope now
+permits four known domains; an unknown domain still rejects the candidate.
+The settings validator uses the existing bounded reader and safe publication
+boundary. Validator/provider state policies are 360/784 bytes respectively.
+The compiled payload continues to contain RGB and behaviours; full export
+materializes effective combos and settings from their device readback commands.

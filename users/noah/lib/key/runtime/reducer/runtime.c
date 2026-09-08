@@ -1,3 +1,4 @@
+#include "lib/profile/runtime/effective_settings_runtime.h"
 // ────────────────────────────────────────────────────────────────────────────
 // Key Runtime Core Foundation
 // ────────────────────────────────────────────────────────────────────────────
@@ -213,15 +214,15 @@ static void key_runtime_core_tap_series_active_set(key_runtime_core_state_t *sta
 }
 
 static uint16_t key_runtime_core_default_hold_term(uint16_t keycode) {
-    return (IS_QK_LAYER_TAP(keycode) || IS_QK_MOD_TAP(keycode)) ? TAPPING_TERM : CUSTOM_TAP_HOLD_TERM;
+    return (IS_QK_LAYER_TAP(keycode) || IS_QK_MOD_TAP(keycode)) ? noah_setting(NOAH_SETTING_TAPPING_TERM, TAPPING_TERM) : noah_setting(NOAH_SETTING_TAP_HOLD_TERM, CUSTOM_TAP_HOLD_TERM);
 }
 
 static uint16_t key_runtime_core_default_longer_hold_term(void) {
-    return CUSTOM_LONGER_HOLD_TERM;
+    return noah_setting(NOAH_SETTING_LONG_HOLD_TERM, CUSTOM_LONGER_HOLD_TERM);
 }
 
 static uint16_t key_runtime_core_default_multi_tap_term(void) {
-    return CUSTOM_MULTI_TAP_TERM;
+    return noah_setting(NOAH_SETTING_MULTI_TAP_TERM, CUSTOM_MULTI_TAP_TERM);
 }
 
 static press_token_t *key_runtime_core_press_token_state(key_runtime_core_state_t *state, keypos_t key_pos) {

@@ -7,3 +7,5 @@
 
 bool    macro_dispatch(uint16_t keycode);
 uint8_t macro_dispatch_validate_all(void);
+
+void macro_dispatch_invalidate(void);

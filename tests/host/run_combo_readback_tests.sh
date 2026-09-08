@@ -18,7 +18,7 @@ build_and_run() {
         "$ROOT/users/noah/lib/profile/storage/profile_checksum.c" \
         -o "$BUILD_DIR/test_$name"
     if [ "$name" = normal ] || [ "$name" = sanitized ]; then
-        "$BUILD_DIR/test_$name" "$ROOT/tests/fixtures/combo_readback_v1.fixture"
+        "$BUILD_DIR/test_$name" "$ROOT/tests/fixtures/combo_readback_eight_v1.fixture"
     else
         "$BUILD_DIR/test_$name"
     fi

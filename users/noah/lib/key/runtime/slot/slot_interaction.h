@@ -1,3 +1,4 @@
+#include "lib/profile/runtime/effective_settings_runtime.h"
 // ────────────────────────────────────────────────────────────────────────────
 // Key Runtime Interaction
 // ────────────────────────────────────────────────────────────────────────────
@@ -43,9 +44,9 @@ static inline key_runtime_slot_interaction_t key_runtime_slot_interaction_defaul
     return (key_runtime_slot_interaction_t){
         .binding =
             {
-                .tap_hold_term    = CUSTOM_TAP_HOLD_TERM,
-                .longer_hold_term = CUSTOM_LONGER_HOLD_TERM,
-                .multi_tap_term   = CUSTOM_MULTI_TAP_TERM,
+                .tap_hold_term    = noah_setting(NOAH_SETTING_TAP_HOLD_TERM, CUSTOM_TAP_HOLD_TERM),
+                .longer_hold_term = noah_setting(NOAH_SETTING_LONG_HOLD_TERM, CUSTOM_LONGER_HOLD_TERM),
+                .multi_tap_term   = noah_setting(NOAH_SETTING_MULTI_TAP_TERM, CUSTOM_MULTI_TAP_TERM),
             },
         .layer = UINT8_MAX,
         .contract =

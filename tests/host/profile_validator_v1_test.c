@@ -274,7 +274,7 @@ static void test_blob_and_domain_rejections(const char *fixture_path) {
     expect_result(validate(reversed, length, &declaration, &compatible, &error), NOAH_PROFILE_VALIDATOR_V1_INVALID_BLOB);
     assert(error.detail_code == NOAH_PROFILE_CODEC_V1_DOMAIN_ORDER && error.domain_index == 1u);
 
-    memcpy(bytes, valid, length); bytes[8] = 0x40u;
+    memcpy(bytes, valid, length); bytes[8] = 0x50u;
     declaration = declaration_for(bytes, length, (NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS));
     expect_result(validate(bytes, length, &declaration, &compatible, &error), NOAH_PROFILE_VALIDATOR_V1_UNSUPPORTED_DOMAIN);
 

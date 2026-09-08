@@ -1,3 +1,4 @@
+#include "lib/profile/runtime/effective_settings_runtime.h"
 // ────────────────────────────────────────────────────────────────────────────
 // PD Runtime
 // ────────────────────────────────────────────────────────────────────────────
@@ -137,7 +138,7 @@ layer_state_t noah_layer_state_set_user(layer_state_t state) {
 #ifdef POINTING_DEVICE_ENABLE
     bool auto_sniping_active = false;
 #    if defined(CHARYBDIS_AUTO_SNIPING_ENABLE)
-    auto_sniping_active = layer_state_cmp(state, CHARYBDIS_AUTO_SNIPING_LAYER);
+    auto_sniping_active = (noah_setting(NOAH_SETTING_AUTO_SNIPING_ENABLED, 1) && layer_state_cmp(state, noah_setting(NOAH_SETTING_AUTO_SNIPING_LAYER, CHARYBDIS_AUTO_SNIPING_LAYER)));
 #    endif
     pd_mode_set_auto_sniping_layer_active(auto_sniping_active);
     // Sniping can temporarily own CPI, so queue a re-apply of the active

@@ -1,3 +1,4 @@
+#include "lib/profile/runtime/effective_settings_runtime.h"
 // ────────────────────────────────────────────────────────────────────────────
 // RGB Runtime
 // ────────────────────────────────────────────────────────────────────────────
@@ -316,6 +317,13 @@ bool noah_rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) 
     painted |= rgb_runtime_render_key_feedback_stage(led_min, led_max);
 #    endif
 
+#ifdef NOAH_PORTABLE_PROFILE_ENABLE
+    uint32_t timeout = noah_setting(NOAH_SETTING_RGB_TIMEOUT, 900000);
+    if (timeout && last_input_activity_elapsed() > timeout) {
+        for (uint8_t led = led_min; led < led_max; led++) rgb_matrix_set_color(led, 0, 0, 0);
+        return true;
+    }
+#endif
     return painted;
 }
 #else

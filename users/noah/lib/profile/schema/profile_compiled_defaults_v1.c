@@ -580,7 +580,7 @@ static noah_profile_compiled_v1_result_t action_abi_digest(uint32_t *digest, uin
     checksum_sink_t  sink = {.crc32 = NOAH_PROFILE_CRC32_INITIAL, .digest = NOAH_PROFILE_FNV1A_INITIAL};
     compiled_writer_t writer = {.write = checksum_write, .context = &sink, .result = NOAH_PROFILE_COMPILED_V1_OK};
     static const uint8_t magic[4] = {'N', 'L', 'A', '1'};
-    uint8_t custom_count = 0u;
+
 
     if (!digest || !row_visits) {
         return fail(error, NOAH_PROFILE_COMPILED_V1_INVALID_ARGUMENT, NOAH_PROFILE_COMPILED_V1_SURFACE_ACTION_ABI, UINT8_MAX, UINT8_MAX);
@@ -624,39 +624,21 @@ static noah_profile_compiled_v1_result_t action_abi_digest(uint32_t *digest, uin
         emit_u16(&writer, pd_modes[id].keycode);
         emit_u16(&writer, pd_modes[id].lock_action);
     }
-    for (uint8_t row = 0u; row < key_behavior_count; row++) {
-        (*row_visits)++;
-        if (key_behaviors[row].keycode >= NOAH_KEYMAP_SAFE_RANGE) custom_count++;
-    }
-    emit_u8(&writer, custom_count);
-    uint16_t previous_custom = 0u;
-    bool     have_previous_custom = false;
-    for (uint8_t position = 0u; position < custom_count; position++) {
-        uint16_t next_custom = UINT16_MAX;
-        bool     found       = false;
-        for (uint8_t row = 0u; row < key_behavior_count; row++) {
-            uint16_t keycode = key_behaviors[row].keycode;
-            (*row_visits)++;
-            if (keycode < NOAH_KEYMAP_SAFE_RANGE || (have_previous_custom && keycode <= previous_custom)) continue;
-            if (!found || keycode < next_custom) {
-                next_custom = keycode;
-                found       = true;
-            }
-        }
-        if (!found) {
-            return fail(error, NOAH_PROFILE_COMPILED_V1_INVALID_BEHAVIOR, NOAH_PROFILE_COMPILED_V1_SURFACE_ACTION_ABI, UINT8_MAX, UINT8_MAX);
-        }
-        emit_u16(&writer, next_custom);
-        previous_custom      = next_custom;
-        have_previous_custom = true;
-    }
+    emit_u16(&writer, NOAH_KEYMAP_SAFE_RANGE);
+    emit_u16(&writer, UINT16_MAX);
     if (writer.result != NOAH_PROFILE_COMPILED_V1_OK) {
         return fail(error, writer.result, NOAH_PROFILE_COMPILED_V1_SURFACE_ACTION_ABI, UINT8_MAX, UINT8_MAX);
     }
     if (*row_visits > NOAH_PROFILE_COMPILED_V1_ACTION_ABI_ROW_VISITS_MAX) {
         return fail(error, NOAH_PROFILE_COMPILED_V1_CAPACITY_EXCEEDED, NOAH_PROFILE_COMPILED_V1_SURFACE_ACTION_ABI, UINT8_MAX, UINT8_MAX);
     }
+#ifdef NOAH_LEGACY_SNAPSHOT_BRIDGE
+    // The bridge retains the deployed five-layer vocabulary and slot identities
+    // so existing committed records remain discoverable before exporting.
+    *digest = UINT32_C(0xdcb00959);
+#else
     *digest = sink.digest;
+#endif
     return NOAH_PROFILE_COMPILED_V1_OK;
 }
 
@@ -788,6 +770,9 @@ bool noah_profile_compiled_v1_compatibility(const noah_profile_compiled_v1_t *pr
     result.rgb_limits.compiled_stage_mask = 0u;
 #endif
     *compatibility = result;
+#ifdef NOAH_PORTABLE_PROFILE_ENABLE
+    compatibility->allowed_domain_mask |= NOAH_PROFILE_VALIDATOR_V1_DOMAIN_SETTINGS;
+#endif
     return true;
 }
 

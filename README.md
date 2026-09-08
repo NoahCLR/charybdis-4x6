@@ -308,8 +308,8 @@ the layout or Behaviours view, including tap branches, hold actions, timing,
 repeat rates and the auto-mouse anchor flag. Saves preserve other rows and
 domains and verify the committed payload. Unsaved behaviour edits stay with
 their row when switching views; a changed profile blocks a stale save and a
-failed save keeps the draft. Macro/default read-write remains
-a next step. Readback requires the side-specific firmware pair,
+failed save keeps the draft. Complete export/import includes macros and global
+settings; dedicated editors for those settings remain a next step. Readback requires the side-specific firmware pair,
 which carries the live-profile owner by default; the generic image does not.
 After updating the extension, reload VS Code and use **Read from keyboard**.
 
@@ -624,3 +624,36 @@ documentation.
 <div align="center">
 <video src="https://github.com/user-attachments/assets/fb5749e2-6f30-44de-99d7-9bd47f94659a" controls></video>
 </div>
+
+### Complete keyboard profiles
+
+Charybdis Live's **Export profile** saves the configuration read from the
+keyboard: every layer and key position, behaviours, combos, both macro banks,
+lighting and global settings. Flashed defaults and live edits become one
+portable file. **Import profile** shows a review, saves a recovery copy, restores
+both halves and verifies the complete readback. A failed or interrupted restore
+reports the saved recovery file instead of claiming success. Recovery files are
+kept in the extension's local storage; the app shows their full path.
+
+The standard firmware reserves eight layers. **Manage layers** names and orders
+the overlays, with the highest-priority layer shown first and Base fixed at the
+bottom. Moving a layer updates the keys, behaviours, combos, RGB assignments and
+pointer settings that refer to it. There is no need to change the layer count
+or reflash for ordinary profile editing.
+
+For an existing five-layer keyboard, perform the one-time storage upgrade in
+this order. Do not flash the eight-layer image before saving the backup:
+
+1. Build `sh tools/build-firmware-pair.sh --snapshot-bridge` and flash both
+   `_snapshot_bridge` images. This keeps the five-layer storage layout and
+   existing committed-profile identity.
+2. Install the updated Live extension, reload it and choose **Export profile**.
+3. Build `sh tools/build-firmware-pair.sh` and flash the regular eight-layer pair.
+4. Choose **Import profile** and restore the file. Extra layers start transparent;
+   the app translates existing user trigger IDs automatically.
+
+The bridge and regular firmware share the same engines. Executable custom
+combo hooks and unsupported macro content cannot be represented as profile
+data; export reports these explicitly instead of producing an incomplete file.
+The [portable profile contract](docs/architecture/portable-profile-v1.md) records
+format limits, compatibility, restore ordering and remaining hardware checks.

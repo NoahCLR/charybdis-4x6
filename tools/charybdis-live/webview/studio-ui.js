@@ -17,6 +17,7 @@
 // through the model.
 
 const keycodeCatalog = require("../core/data/keycode-catalog");
+const {renderPortableProfile} = require("./portable-profile-ui");
 const {renderDeviceProfileDetails} = require("./device-profile-ui");
 const {createBehaviorDraftStore} = require("./behavior-drafts");
 const {renderDeviceCombos} = require("./combo-ui");
@@ -2313,10 +2314,12 @@ function getStudioHtml() {
             </div>
         </div>
     </header>
+    <div id="portableProfile" style="margin:0 24px"></div>
     <main id="app"></main>
     <div id="tooltip" class="tooltip" hidden></div>
     <div id="keyPickerHost"></div>
     <script nonce="${nonce}">
+${renderPortableProfile.toString()}
 ${renderDeviceProfileDetails.toString()}
 ${createBehaviorDraftStore.toString()}
 ${renderDeviceCombos.toString()}
@@ -4727,6 +4730,10 @@ function getClientScript() {
         }
         if (message.type === "refresh") {behaviorDrafts.clear(); viewDrafts = {};}
         else storeActiveViewDraft();
+        if (["choosePortableProfile", "managePortableLayers", "restorePortableProfile", "savePortableLayers"].includes(message.type) && ["layout", "behaviors", "rgb", "macros", "defaults"].some(viewTabDirty)) {
+            notice = "Save or discard your current edits before importing a profile or changing layer priority.";
+            dismissedStatusSignature = ""; render(); return;
+        }
         dismissedStatusSignature = "";
         if (["saveBehavior", "addBehavior", "deleteBehavior"].includes(message.type)) {
             const row = message.type === "addBehavior" ? "new" : message.behavior?.keycode || message.keycode;
@@ -4788,6 +4795,7 @@ function getClientScript() {
         updateLayoutKeyBehaviorColorStyle();
         app.innerHTML = renderDiagnostics() + renderViewTabs() + renderActiveView();
         syncAutoMousePolicy();
+        renderPortableProfile(document, model, post);
         renderDeviceProfileDetails(document, model, post, displayKeyExpression);
         renderDeviceCombos(document, model, post);
         initializeDirtyTracking();
@@ -5769,14 +5777,14 @@ function getClientScript() {
         return selected;
     }
 
-    function renderLayerTabs(showLayerFlow = true, showDirty = true) {
+    function renderLayerTabs(showLayerFlow = false, showDirty = true) {
         const layers = layersForUi();
         const deleteDisabled = !activeLayer || activeLayer === "LAYER_BASE";
         return "<div class='tabs layer-tabs'>" + layers.map((layer) => {
             const pending = pendingLayerAdd(layer.name);
             const dirty = showDirty && layerTabDirty(layer.name);
             const classes = ["tab", "layer-tab", layer.name === activeLayer ? "active" : "", pending ? "pending-add" : "", dirty ? "dirty" : ""].filter(Boolean).join(" ");
-            return "<button class='" + classes + "' data-action='selectLayer' data-layer-tab" + (showDirty ? " data-layer-dirty-scope='layout'" : "") + " data-layer='" + escapeAttr(layer.name) + "'>" + escapeHtml(layer.name + (pending ? " *" : "")) + "</button>";
+            return "<button class='" + classes + "' data-action='selectLayer' data-layer-tab" + (showDirty ? " data-layer-dirty-scope='layout'" : "") + " data-layer='" + escapeAttr(layer.name) + "'>" + escapeHtml((layer.displayName || layer.name) + (pending ? " *" : "")) + "</button>";
         }).join("") + (showLayerFlow ?
             "<button type='button' class='layer-tab-action' data-action='showAddLayerDraft' aria-label='Add layer'>+</button>" +
             "<button type='button' class='layer-tab-action' data-action='deleteLayerDraft'" + (deleteDisabled ? " disabled" : "") + " aria-label='Delete active layer'>-</button>" : "") +
@@ -6502,12 +6510,12 @@ function getClientScript() {
         return "<div class='board layout-board-card'>" +
             renderLayoutBoardInfoButton() +
             "<div class='layout-board-header'>" +
-            "<h3 class='layout-board-title'>" + escapeHtml(layer.name) + "</h3>" +
+            "<h3 class='layout-board-title'>" + escapeHtml(layer.displayName || layer.name) + "</h3>" +
             "<p class='layout-board-subtitle' data-tooltip='Layer RGB rule and the selected-layer preview over the keyboard base effect.'>" + escapeHtml(subtitle) + "</p>" +
             "<p class='layout-board-subtitle'>Selected-layer preview over base; temporary feedback is not shown. " + escapeHtml(baseEffectPreviewNote(model.rgb?.baseEffect)) + "</p>" +
             "</div>" +
             "<div class='layout-board-stage'>" +
-            "<svg class='keyboard-svg layout-board-svg' viewBox='" + viewBox.x + " " + viewBox.y + " " + viewBox.width + " " + viewBox.height + "' preserveAspectRatio='xMidYMid meet' role='img' aria-label='" + escapeAttr(layer.name + " keyboard layout") + "'>" +
+            "<svg class='keyboard-svg layout-board-svg' viewBox='" + viewBox.x + " " + viewBox.y + " " + viewBox.width + " " + viewBox.height + "' preserveAspectRatio='xMidYMid meet' role='img' aria-label='" + escapeAttr((layer.displayName || layer.name) + " keyboard layout") + "'>" +
             layer.positions.map(renderSvgKey).join("") +
             "</svg>" +
             "</div>" +

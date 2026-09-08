@@ -169,7 +169,7 @@ static void test_domain_envelopes(void) {
     for (size_t length = 0u; length < written; length++) {
         expect_result(noah_profile_domain_v1_decode(encoded, length, &decoded, &error), NOAH_PROFILE_CODEC_V1_TRUNCATED);
     }
-    encoded[0] = 0x40u;
+    encoded[0] = 0x50u;
     expect_result(noah_profile_domain_v1_decode(encoded, written, &decoded, &error), NOAH_PROFILE_CODEC_V1_UNKNOWN_DOMAIN);
     encoded[0] = NOAH_PROFILE_DOMAIN_V1_RGB;
     encoded[1] = 2u;
@@ -219,9 +219,9 @@ static void test_blob_rejections(const char *fixture_path) {
     expect_result(noah_profile_blob_v1_decode(mutated, valid_length, &blob, &error), NOAH_PROFILE_CODEC_V1_NONCANONICAL);
 
     memcpy(mutated, valid, valid_length);
-    mutated[8] = 0x40u;
+    mutated[8] = 0x50u;
     expect_result(noah_profile_blob_v1_decode(mutated, valid_length, &blob, &error), NOAH_PROFILE_CODEC_V1_UNKNOWN_DOMAIN);
-    assert(error.domain_index == 0u && error.domain_id == 0x40u);
+    assert(error.domain_index == 0u && error.domain_id == 0x50u);
     memcpy(mutated, valid, valid_length);
     mutated[9] = 2u;
     expect_result(noah_profile_blob_v1_decode(mutated, valid_length, &blob, &error), NOAH_PROFILE_CODEC_V1_UNKNOWN_DOMAIN_VERSION);
@@ -260,7 +260,7 @@ static void test_blob_encoder_bounds(void) {
 
     expect_result(noah_profile_blob_v1_encode(domains, 2u, output, 15u, &written, &error), NOAH_PROFILE_CODEC_V1_OUTPUT_TOO_SMALL);
     expect_result(noah_profile_blob_v1_encode(domains, 3u, output, sizeof(output), &written, &error), NOAH_PROFILE_CODEC_V1_DUPLICATE_DOMAIN);
-    domains[1].id = 0x40u;
+    domains[1].id = 0x50u;
     expect_result(noah_profile_blob_v1_encode(domains, 2u, output, sizeof(output), &written, &error), NOAH_PROFILE_CODEC_V1_UNKNOWN_DOMAIN);
     domains[1].id      = NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIORS;
     domains[1].version = 2u;

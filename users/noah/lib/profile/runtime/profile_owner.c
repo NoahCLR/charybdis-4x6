@@ -3,6 +3,7 @@
 // ──────────────────────────────────────────────────────────────────────────
 
 #include "profile_owner.h"
+#include "effective_settings_runtime.h"
 
 #include <limits.h>
 #include <stddef.h>
@@ -249,7 +250,7 @@ static void fail_integration(noah_profile_owner_t *owner) {
 }
 
 static bool initialize_runtime_graph(noah_profile_owner_t *owner) {
-    noah_effective_profile_invalidator_t invalidators[3];
+    noah_effective_profile_invalidator_t invalidators[4];
     noah_profile_candidate_backend_t     host_backend;
     noah_profile_candidate_compatibility_t host_compatibility;
     noah_profile_split_reconciler_config_t split_config;
@@ -276,11 +277,16 @@ static bool initialize_runtime_graph(noah_profile_owner_t *owner) {
 #ifdef COMBO_ENABLE
     invalidators[2] = (noah_effective_profile_invalidator_t){.callback = noah_effective_combo_runtime_invalidate, .context = &owner->combos};
 #endif
+#ifdef NOAH_PORTABLE_PROFILE_ENABLE
+    invalidators[3] = (noah_effective_profile_invalidator_t){.callback = noah_effective_settings_invalidate, .context = NULL};
+#endif
     observer         = owner->config.peer_required ? owner_peer_observer : no_peer_observer;
     observer_context = owner->config.peer_required ? owner : NULL;
     noah_profile_activation_policy_init(&owner->activation_policy, observer, observer_context);
     if (noah_effective_profile_provider_init(&owner->provider, &owner->compiled_snapshot, noah_profile_activation_policy_safe_boundary, &owner->activation_policy, invalidators,
-#ifdef COMBO_ENABLE
+#ifdef NOAH_PORTABLE_PROFILE_ENABLE
+        4u
+#elif defined(COMBO_ENABLE)
         3u
 #else
         2u
@@ -752,6 +758,9 @@ static bool advance_host_postcommit_barrier(noah_profile_owner_t *owner) {
 }
 
 static bool scan_running(noah_profile_owner_t *owner, bool master, uint32_t now_ms, bool activating_boot) {
+#ifdef NOAH_PORTABLE_PROFILE_ENABLE
+    noah_effective_settings_boot(activating_boot);
+#endif
     noah_profile_storage_admission_owner_t admission = noah_profile_candidate_store_backend_admission_owner(candidate_backend(owner));
     uint32_t                               host_timeout_ms;
 

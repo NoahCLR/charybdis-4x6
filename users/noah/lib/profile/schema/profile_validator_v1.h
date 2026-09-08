@@ -10,18 +10,20 @@
 #include "key_behavior_domain_v1.h"
 #include "profile_rgb_v1.h"
 #include "profile_combo_v1.h"
+#include "profile_settings_v1.h"
 
 enum {
     NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB          = 1u << 0,
     NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS = 1u << 1,
+    NOAH_PROFILE_VALIDATOR_V1_DOMAIN_SETTINGS = 1u << 3,
     NOAH_PROFILE_VALIDATOR_V1_DOMAIN_COMBOS = 1u << 2,
-    NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS       = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_COMBOS,
+    NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS       = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_COMBOS | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_SETTINGS,
     NOAH_PROFILE_VALIDATOR_V1_STEP_READ_MAX       = 20u,
     NOAH_PROFILE_VALIDATOR_V1_CHECKSUM_CHUNK_MAX  = NOAH_PROFILE_VALIDATOR_V1_STEP_READ_MAX,
     // Regression policy for the payload-independent 32-bit scan state. This
     // is not a hardware SRAM-capacity claim; target resource gates account
     // for the linked instance separately.
-    NOAH_PROFILE_VALIDATOR_V1_EMBEDDED_STATE_BUDGET = 356u,
+    NOAH_PROFILE_VALIDATOR_V1_EMBEDDED_STATE_BUDGET = 360u,
     NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8    = 0xffu,
     NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U16   = 0xffffu,
 };
@@ -117,9 +119,11 @@ typedef struct {
     noah_profile_rgb_v1_view_t     rgb;
     noah_key_behavior_domain_v1_t  key_behaviors;
     noah_profile_combo_v1_view_t combos;
+    noah_profile_settings_v1_view_t settings;
 } noah_profile_validator_v1_profile_t;
 
 typedef union {
+    noah_profile_settings_v1_validation_t settings;
     noah_profile_combo_v1_validation_t combos;
     noah_profile_rgb_v1_validation_t                rgb;
     noah_key_behavior_domain_v1_validation_t        key_behaviors;

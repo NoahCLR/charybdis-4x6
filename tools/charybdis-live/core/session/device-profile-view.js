@@ -61,8 +61,9 @@ function behaviorRowsForView(domain) {
 // targets to VIA keycodes only when the device advertises that exact ABI.
 // Unknown ABIs still have fully readable semantic rows in the behaviours view.
 const NATIVE_ACTION_ABI_V1 = 0xdcb00959;
+const knownActionAbi = value => [NATIVE_ACTION_ABI_V1, 0xeb80829c].includes(value);
 function behaviorAliasesForView(domain, capabilities) {
-    if (capabilities?.actionAbiDigest !== NATIVE_ACTION_ABI_V1) return {};
+    if (!knownActionAbi(capabilities?.actionAbiDigest)) return {};
     const aliases = {};
     for (const row of domain.rows) {
         if (row.target.kind === ACTION.QMK_KEYCODE) continue;
@@ -161,4 +162,4 @@ function combosForView(read, labels) {
     }));
 }
 
-module.exports = {actionName, NATIVE_ACTION_ABI_V1, baseRgbForView, behaviorAliasesForView, behaviorRowsForView, combosForView, rgbForView};
+module.exports = {knownActionAbi, actionName, NATIVE_ACTION_ABI_V1, baseRgbForView, behaviorAliasesForView, behaviorRowsForView, combosForView, rgbForView};

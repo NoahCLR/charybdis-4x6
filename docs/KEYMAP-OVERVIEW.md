@@ -229,6 +229,66 @@ No authored combos resolve entirely from keys on this layer.
 | `C2` | `VOLUME` + `MS_BTN1` + `MS_BTN2` | `G(T)` (`G(KC_T)`) |
 | `C3` | `MS_BTN1` + `VOLUME` | `LGUI` (`KC_LGUI`) |
 
+### `LAYER_EXTRA_1`
+
+- RGB matrix render mode: `KEYS_MAPPED_ON_THIS_LAYER_ONLY`
+- Authored layer color: `HSV(0, 0, 0)`
+- Preview color: no override
+
+![LAYER_EXTRA_1](media/profile-introspection/profile-layer-LAYER_EXTRA_1.svg)
+
+#### Key Behaviors On This Layer
+
+No authored key-behavior rows are present on this layer.
+
+#### PD Modes Reachable On This Layer
+
+No pd modes are directly placed or reachable through key behaviors on this layer.
+
+#### Combos Available On This Layer
+
+No authored combos resolve entirely from keys on this layer.
+
+### `LAYER_EXTRA_2`
+
+- RGB matrix render mode: `KEYS_MAPPED_ON_THIS_LAYER_ONLY`
+- Authored layer color: `HSV(0, 0, 0)`
+- Preview color: no override
+
+![LAYER_EXTRA_2](media/profile-introspection/profile-layer-LAYER_EXTRA_2.svg)
+
+#### Key Behaviors On This Layer
+
+No authored key-behavior rows are present on this layer.
+
+#### PD Modes Reachable On This Layer
+
+No pd modes are directly placed or reachable through key behaviors on this layer.
+
+#### Combos Available On This Layer
+
+No authored combos resolve entirely from keys on this layer.
+
+### `LAYER_EXTRA_3`
+
+- RGB matrix render mode: `KEYS_MAPPED_ON_THIS_LAYER_ONLY`
+- Authored layer color: `HSV(0, 0, 0)`
+- Preview color: no override
+
+![LAYER_EXTRA_3](media/profile-introspection/profile-layer-LAYER_EXTRA_3.svg)
+
+#### Key Behaviors On This Layer
+
+No authored key-behavior rows are present on this layer.
+
+#### PD Modes Reachable On This Layer
+
+No pd modes are directly placed or reachable through key behaviors on this layer.
+
+#### Combos Available On This Layer
+
+No authored combos resolve entirely from keys on this layer.
+
 ## PD Mode Colors
 
 These overlays come from `pd_mode_colors[]` in [rgb_config.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c). Each row chooses its own locality and color for the matching pointing mode.
@@ -377,7 +437,7 @@ No filled hardcoded macro slots.
 
 ### Shared Keycode Surfaces
 
-- Layers: `LAYER_BASE`, `LAYER_NUM`, `LAYER_SYM`, `LAYER_NAV`, `LAYER_POINTER`
+- Layers: `LAYER_BASE`, `LAYER_NUM`, `LAYER_SYM`, `LAYER_NAV`, `LAYER_POINTER`, `LAYER_EXTRA_1`, `LAYER_EXTRA_2`, `LAYER_EXTRA_3`
 - Keymap-local custom keycodes: `RIGHT_THUMB`, `LEFT_THUMB`, `CLICK_SPAM`, `DRAG_WINDOW`
 - PD color overlays: `PD_MODE_DRAGSCROLL`, `PD_MODE_VOLUME`, `PD_MODE_BRIGHTNESS`, `PD_MODE_ARROW`, `PD_MODE_PINCH`, `PD_MODE_ZOOM`
 - Auto-mouse fade destination mode: `FOLLOW_REAL_DESTINATION`
@@ -394,6 +454,9 @@ No filled hardcoded macro slots.
 | `LAYER_SYM` | `KEYS_MAPPED_ON_THIS_LAYER_ONLY` | `HSV(169, 255, 200)` | <img alt="LAYER_SYM preview color" src="media/profile-introspection/profile-color-swatch-0006ff.svg" width="96" height="28" /> |
 | `LAYER_NAV` | `KEYS_MAPPED_ON_THIS_LAYER_ONLY` | `HSV(180, 255, 200)` | <img alt="LAYER_NAV preview color" src="media/profile-introspection/profile-color-swatch-3c00ff.svg" width="96" height="28" /> |
 | `LAYER_POINTER` | `KEYS_MAPPED_ON_THIS_LAYER_ONLY` | `HSV(0, 0, 150)` | <img alt="LAYER_POINTER preview color" src="media/profile-introspection/profile-color-swatch-ffffff.svg" width="96" height="28" /> |
+| `LAYER_EXTRA_1` | `KEYS_MAPPED_ON_THIS_LAYER_ONLY` | `HSV(0, 0, 0)` | no override |
+| `LAYER_EXTRA_2` | `KEYS_MAPPED_ON_THIS_LAYER_ONLY` | `HSV(0, 0, 0)` | no override |
+| `LAYER_EXTRA_3` | `KEYS_MAPPED_ON_THIS_LAYER_ONLY` | `HSV(0, 0, 0)` | no override |
 
 ### Layer LED Groups
 
@@ -414,7 +477,7 @@ Reusable groups define physical LED sets once near the LED map in `rgb_config.c`
 
 | Field | Value |
 | --- | --- |
-| `layer_count` | `5` |
+| `layer_count` | `8` |
 | `layout_key_count` | `56` |
 | `key_behavior_count` | `37` |
 | `key_behavior_step_count` | `48` |
@@ -484,6 +547,7 @@ These values come from the keymap config and the shared userspace config. When t
 | `NOAH_PROFILE_STORAGE_SLOT_A_END_ADDR` | `0x2FFFu` | [users/noah/config.h](../users/noah/config.h) |
 | `NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR` | `0x3000u` | [users/noah/config.h](../users/noah/config.h) |
 | `NOAH_PROFILE_STORAGE_SLOT_B_END_ADDR` | `0x3FFFu` | [users/noah/config.h](../users/noah/config.h) |
+| `NOAH_LAYER_BANK_COUNT` | `8` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
 | `TAPPING_TERM` | `200` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
 | `COMBO_TERM` | `50` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
 | `KEY_BEHAVIOR_MAX_TAP_COUNT` | `5` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
@@ -510,13 +574,15 @@ These values come from the keymap config and the shared userspace config. When t
 | `RGB_MATRIX_MAXIMUM_BRIGHTNESS` | `200` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
 | `RGB_MATRIX_DEFAULT_VAL` | `RGB_MATRIX_MAXIMUM_BRIGHTNESS` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
 | `RGB_MATRIX_LED_FLUSH_LIMIT` | `32` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
-| `RGB_MATRIX_TIMEOUT` | `900000` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
+| `RGB_MATRIX_TIMEOUT` | `0` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
 | `RGB_PD_MODE_FEEDBACK_ENABLE` | `defined` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
 | `RGB_COMBO_FEEDBACK_ENABLE` | `defined` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
 | `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE` | `defined` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
 | `RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS` | `200` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
 | `RGB_AUTOMOUSE_GRADIENT_ENABLE` | `defined` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
 | `AUTOMOUSE_RGB_DEAD_TIME` | `(AUTO_MOUSE_TIME/3)` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
+| `AUTO_MOUSE_DELAY` | `noah_setting(25,200)` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
+| `AUTO_MOUSE_THRESHOLD` | `noah_setting(26,10)` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
 
 ## Generated Assets
 

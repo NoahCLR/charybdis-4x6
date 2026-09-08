@@ -1,6 +1,8 @@
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
 #include <stdint.h>
+#include <string.h>
+#include "../profile/runtime/effective_settings_runtime.h"
 
 #ifdef CONSOLE_ENABLE
 #    include "print.h"
@@ -24,6 +26,9 @@ static bool macro_dispatch_lookup_payload(uint8_t slot, const char **payload, vo
 }
 
 static bool macro_dispatch_load_ir(uint8_t slot, macro_payload_ir_t *ir, void *context) {
+#ifdef NOAH_PORTABLE_PROFILE_ENABLE
+    if (noah_effective_settings_macro(slot, ir)) return true;
+#endif
     const char *payload = NULL;
 
     (void)context;
@@ -100,3 +105,5 @@ bool macro_dispatch(uint16_t keycode) {
 
     return true;
 }
+
+void macro_dispatch_invalidate(void) {memset(hardcoded_macro_slots, 0, sizeof(hardcoded_macro_slots));}

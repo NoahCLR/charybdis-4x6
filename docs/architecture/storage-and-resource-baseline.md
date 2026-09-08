@@ -84,7 +84,7 @@ prefer bounded indexes and derived caches where that keeps ownership simple.
 `WEAR_LEVELING_BACKING_SIZE` is 32,768 bytes. RP2040 wear leveling exposes
 half of that as 16,384 bytes of logical EEPROM.
 
-### Current Map
+### Historical Map Before The Profile Partition
 
 | Range | Bytes | Owner |
 | --- | ---: | --- |
@@ -97,14 +97,14 @@ half of that as 16,384 bytes of logical EEPROM.
 Current authored VIA macro defaults use approximately 258 bytes including
 slot terminators.
 
-### Accepted Profile Partition
+### Current Eight-Layer Profile Partition
 
 | Range | Bytes | Owner |
 | --- | ---: | --- |
 | `0x0000–0x0024` | 37 | QMK EECONFIG |
 | `0x0025–0x0028` | 4 | VIA config |
-| `0x0029–0x0280` | 600 | Dynamic keymap |
-| `0x0281–0x1FFF` | 7,551 | VIA macros |
+| `0x0029–0x03E8` | 960 | Dynamic keymap: 8 × 10 × 6 × 2 |
+| `0x03E9–0x1FFF` | 7,191 | VIA macros |
 | `0x2000–0x2FFF` | 4,096 | Live-profile slot A |
 | `0x3000–0x3FFF` | 4,096 | Live-profile slot B |
 
@@ -197,3 +197,10 @@ maximum can be reached simultaneously.
 
 The sibling QMK checkout was inspected and used for build artifacts. No sibling
 source file was edited by this project pass.
+
+The temporary snapshot bridge retains the five-layer keymap at
+`0x0029–0x0280` and 7,551-byte macro bank at `0x0281–0x1FFF`. Its VIA
+reconciliation metadata remains schema 1; the eight-layer image uses schema 2.
+Export before changing geometry. See [portable-profile-v1.md](portable-profile-v1.md)
+for the migration, effective settings cache and recovery sequence. Neither
+variant increases the 16 KiB logical EEPROM or its wear-level cache.

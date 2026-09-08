@@ -29,6 +29,7 @@ core/               the app, with no host dependency
   transport/        device adapters and the request coordinator
   schema/           profile byte formats and domain decoders
   protocol/         wire formats spoken to the device
+  model/            complete portable documents and layer-reference rewrites
   session/          stateful orchestration across a connection
   data/             vendored data, e.g. the keycode catalog
 webview/            Profile Studio's editing UI, ported verbatim
@@ -67,7 +68,8 @@ to stop and reconsider, not to work around.
 | `transport/` | `data/` |
 | `schema/` | `data/` |
 | `protocol/` | `transport/`, `schema/`, `data/` |
-| `session/` | `transport/`, `protocol/`, `schema/`, `data/` |
+| `model/` | `schema/`, `data/` |
+| `session/` | `transport/`, `protocol/`, `schema/`, `model/`, `data/` |
 | `media/` | nothing from `core/` — it receives snapshots as messages |
 
 Every layer may also import from itself.
@@ -86,9 +88,8 @@ replaceable.
 - Anything holding state across a connection → `session/`
 - A new panel or a rewritten tab → `webview/`, decomposed out of the
   monolith as you touch it
-- The canonical profile format, drafts, and generation binding → a new
-  `core/model/` layer between `schema/` and `session/`. It does not exist yet;
-  create it when the format is designed, not before.
+- Portable documents, completeness and layer-reference rewrites → `core/model/`.
+  File dialogs and recovery-file storage remain in `extension.js`.
 
 ## Conventions
 
@@ -113,3 +114,11 @@ npm run keycodes -- --check   # fails if the vendored catalog has drifted
 
 The repo's `sh tests/host/run_tooling_checks.sh` runs this app's checks as well
 as Profile Studio's.
+
+## Portable profile model
+
+`core/model/` now owns the portable document, completeness checks, layer
+reordering and migration from a five-layer snapshot. It may import only
+`schema/`, `data/` and itself. `session/` may also import `model/`. The model
+never opens files. The extension owns export/import dialogs and recovery files;
+all configuration contents still originate at the keyboard.

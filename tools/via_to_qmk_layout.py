@@ -453,6 +453,7 @@ def configure_keymap_target(keymap: str | None, keymap_path: str | Path | None) 
 # range. This is why RIGHT_THUMB / LEFT_THUMB do not need hardcoded
 # REPLACEMENTS entries: their CUSTOM(n) indices are derived from keymap.c.
 BASE_REPLACEMENTS = dict(REPLACEMENTS)
+LAYER_NAMES = load_layer_names_from_config()
 refresh_keymap_local_replacements()
 
 
@@ -668,9 +669,15 @@ def render_all_layers(via_json_path: Path, indent="  "):
     all_tokens = [via_layer_to_layout_tokens(layer) for layer in via_layers]
 
     blocks = []
+    # The one-time snapshot bridge keeps the old five-layer storage bank.
+    # Preserve its guards when regenerating this profile's standard layout.
+    bridge = "NOAH_LEGACY_SNAPSHOT_BRIDGE" in KEYMAP_FILE.with_name("config.h").read_text()
     for idx, tokens in enumerate(all_tokens):
         name = layer_name_for_index(idx)
-        blocks.append(render_layer(name, tokens, indent))
+        block = render_layer(name, tokens, indent)
+        if bridge and idx >= 5:
+            block = "#ifndef NOAH_LEGACY_SNAPSHOT_BRIDGE\n" + block + "\n#endif"
+        blocks.append(block)
     return "\n\n".join(blocks)
 
 

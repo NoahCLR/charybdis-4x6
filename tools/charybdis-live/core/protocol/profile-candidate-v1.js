@@ -25,7 +25,7 @@ const PROFILE_CANDIDATE_V1 = Object.freeze({
     MAX_BLOB_SIZE: 4064,
     STATUS_LAYOUT_VERSION: 1,
     STATUS_PAYLOAD_SIZE: 25,
-    KNOWN_DOMAIN_MASK: PROFILE_WIRE_DOMAINS.RGB | PROFILE_WIRE_DOMAINS.KEY_BEHAVIORS | PROFILE_WIRE_DOMAINS.COMBOS,
+    KNOWN_DOMAIN_MASK: PROFILE_WIRE_DOMAINS.RGB | PROFILE_WIRE_DOMAINS.KEY_BEHAVIORS | PROFILE_WIRE_DOMAINS.COMBOS | PROFILE_WIRE_DOMAINS.SETTINGS,
 });
 
 const CANDIDATE_ADMISSION = Object.freeze({
@@ -333,6 +333,7 @@ function candidateMetadataForBlob(value, options = {}) {
     for (const domain of decoded.domains) {
         if (domain.id === PROFILE_DOMAIN_IDS.RGB) derivedDomains |= PROFILE_WIRE_DOMAINS.RGB;
         if (domain.id === PROFILE_DOMAIN_IDS.KEY_BEHAVIORS) derivedDomains |= PROFILE_WIRE_DOMAINS.KEY_BEHAVIORS;
+        if (domain.id === PROFILE_DOMAIN_IDS.SETTINGS) derivedDomains |= PROFILE_WIRE_DOMAINS.SETTINGS;
         if (domain.id === PROFILE_DOMAIN_IDS.COMBOS) derivedDomains |= PROFILE_WIRE_DOMAINS.COMBOS;
     }
     const requestedDomains = options.requestedDomains === undefined

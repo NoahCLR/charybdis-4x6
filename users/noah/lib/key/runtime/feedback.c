@@ -1,3 +1,4 @@
+#include "lib/profile/runtime/effective_settings_runtime.h"
 // ────────────────────────────────────────────────────────────────────────────
 // Key Runtime Feedback
 // ────────────────────────────────────────────────────────────────────────────
@@ -256,7 +257,7 @@ static bool key_feedback_pulse_active(void) {
         return false;
     }
 
-    if (timer_elapsed(state->feedback_pulse_timer) < KEY_FEEDBACK_FLASH_HALF_PERIOD_MS) {
+    if (timer_elapsed(state->feedback_pulse_timer) < noah_setting(NOAH_SETTING_FEEDBACK_PERIOD, KEY_FEEDBACK_FLASH_HALF_PERIOD_MS)) {
         return true;
     }
 

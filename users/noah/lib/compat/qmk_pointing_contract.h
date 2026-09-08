@@ -1,3 +1,4 @@
+#include "lib/profile/runtime/effective_settings_runtime.h"
 // ────────────────────────────────────────────────────────────────────────────
 // QMK Pointing Contract Compatibility
 // ────────────────────────────────────────────────────────────────────────────
@@ -34,7 +35,7 @@ static inline uint16_t noah_qmk_contract_pointer_sniping_dpi(void) {
 }
 
 static inline uint16_t noah_qmk_contract_pointer_dragscroll_dpi(void) {
-    return CHARYBDIS_DRAGSCROLL_DPI;
+    return noah_setting(NOAH_SETTING_DRAGSCROLL_DPI, CHARYBDIS_DRAGSCROLL_DPI);
 }
 #else
 static inline bool noah_qmk_contract_pointer_sniping_enabled(void) {

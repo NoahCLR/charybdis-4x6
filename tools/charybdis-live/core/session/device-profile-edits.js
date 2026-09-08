@@ -5,7 +5,7 @@ const {decodeRgbDomainV1, encodeRgbDomainV1, RGB_LAYER_MODES, RGB_LOCALITIES, RG
 const keycodes = require("../data/keycode-catalog");
 const {semanticActionForExpression, resolveNativeQmkExpression} = require("../schema/compiled-profile-v1");
 const {encodeComboDomainV1, decodeComboDomainV1} = require("../schema/combo-domain-v1");
-const {actionName} = require("./device-profile-view");
+const {actionName, knownActionAbi} = require("./device-profile-view");
 const {BEHAVIOR_EDITS, editKeyBehaviors} = require("./key-behavior-edits");
 const COMBO_EDITS = new Set(["addCombo", "saveCombo", "deleteCombo", "updateComboHoldTerm"]);
 
@@ -123,7 +123,7 @@ function editCombos(bytes, message, context) {
         if (/^MO\(/.test(name)) return semanticActionForExpression(name, {});
         const native = keycodes.encode(name);
         if (native !== undefined) return nativeAction(native);
-        if (context.capabilities.actionAbiDigest !== 0xdcb00959) throw invalid("Named custom actions require a matching keyboard action vocabulary.");
+        if (!knownActionAbi(context.capabilities.actionAbiDigest)) throw invalid("Named custom actions require a matching keyboard action vocabulary.");
         return semanticActionForExpression(name, {layers: Array.from({length: read.layerReferences.length}, (_, id) => ({name: `Layer ${id}`}))});
     };
     if (message.type === "updateComboHoldTerm") {

@@ -20,6 +20,7 @@
 
 #    include "via.h"
 #    include "qmk_combo_readback.h"
+#    include "qmk_portable_profile.h"
 
 #    include "../profile/protocol/profile_wire_v1.h"
 #    include "../profile/storage/profile_storage_layout.h"
@@ -376,6 +377,7 @@ NOAH_PROFILE_CHANNEL_STACK_BOUNDARY void via_custom_value_command_kb(uint8_t *da
         (void)noah_profile_channel_refresh_owner(false);
     }
 #    endif
+    if (noah_qmk_portable_profile_get(data, length)) return;
     if (noah_profile_channel_handle_payload_get(data, length)) {
         return;
     }

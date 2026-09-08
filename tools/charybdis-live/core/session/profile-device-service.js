@@ -1,5 +1,8 @@
 "use strict";
 
+const {readSettings} = require("../protocol/portable-profile-v1");
+const {decodeSettings} = require("../schema/settings-domain-v1");
+const {captureProfile, restoreProfile} = require("./portable-profile-session");
 const {RAW_HID_REPORT_SIZE} = require("../transport/device-adapter");
 const {NodeHidDeviceAdapter} = require("../transport/node-hid-adapter");
 const {DeviceRequestCoordinator} = require("../transport/request-coordinator");
@@ -10,7 +13,7 @@ const {readViaRgbMatrix} = require("../protocol/via-rgb-matrix-v1");
 const {readDeviceCombos} = require("../protocol/combo-readback-v1");
 const {editDeviceProfile, COMBO_EDITS, assertEffectiveCombos} = require("./device-profile-edits");
 const {readCommittedPayload, readCompiledPayload} = require("../protocol/profile-payload-v1");
-const {PROFILE_DOMAIN_IDS, decodeProfileBlob} = require("../schema/profile-blob-v1");
+const {PROFILE_DOMAIN_IDS, decodeProfileBlob, encodeProfileBlob, fnv1a32} = require("../schema/profile-blob-v1");
 const {decodeRgbDomainV1} = require("../schema/rgb-domain-v1");
 const {decodeComboDomainV1} = require("../schema/combo-domain-v1");
 const {decodeKeyBehaviorDomain} = require("../schema/key-behavior-domain-v1");
@@ -362,6 +365,8 @@ class ProfileDeviceService {
                         domains.rgb = decodeRgbDomainV1(domain.payload);
                     } else if (domain.id === PROFILE_DOMAIN_IDS.KEY_BEHAVIORS) {
                         domains.keyBehaviors = decodeKeyBehaviorDomain(domain.payload);
+                    } else if (domain.id === PROFILE_DOMAIN_IDS.SETTINGS) {
+                        domains.settings = decodeSettings(domain.payload);
                     } else if (domain.id === PROFILE_DOMAIN_IDS.COMBOS) {
                         domains.combos = decodeComboDomainV1(domain.payload);
                     }
@@ -476,18 +481,26 @@ class ProfileDeviceService {
         if (!this.profileBytes || this.committed?.state !== "read" || this.committed.failures.length) throw new Error("Read a complete keyboard profile before saving changes.");
         const expectedBase = {source: this.committed.source, generation: this.committed.generation, digest: this.committed.digest, originHalf: this.committed.originHalf};
         if (optionsBaseChanged(message.expectedBase, expectedBase)) throw liveApplyError("PROFILE_EDIT_CONFLICT", "The keyboard changed since this draft was opened. Read from keyboard before saving again.");
-        const next = editDeviceProfile(this.profileBytes, message, {capabilities: this.capabilities, combos: this.combos});
+
         const expectedCombosDigest = COMBO_EDITS.has(message.type) ? this.combos.digest : undefined;
-        this.savingEdit = true;
+        this.savingEdit = true; this.emitChange();
         try {
-            const result = await this.applyLiveProfile(next, {expectedBase, expectedCombosDigest});
+            const base = decodeProfileBlob(this.profileBytes);
+            const settings = base.domains.find(domain => domain.id === PROFILE_DOMAIN_IDS.SETTINGS);
+            let expectedSettingsDigest;
+            if (settings) {
+                settings.payload = await readSettings(this.connection, this.requestIds);
+                expectedSettingsDigest = fnv1a32(settings.payload);
+            }
+            const next = editDeviceProfile(encodeProfileBlob(base), message, {capabilities: this.capabilities, combos: this.combos});
+            const result = await this.applyLiveProfile(next, {expectedBase, expectedCombosDigest, expectedSettingsDigest});
             if (result.error || result.liveApply?.state !== "complete") throw new Error(result.error?.message || "The keyboard did not confirm the save.");
             await this.readCommittedProfile();
             if (!this.profileBytes?.equals(next) || this.committed?.source !== "committed") throw new Error("The saved profile did not match the readback. Read from keyboard before retrying.");
             await this.readCombos();
             assertEffectiveCombos(next, this.combos);
             return this.snapshot();
-        } finally {this.savingEdit = false;}
+        } finally {this.savingEdit = false; this.emitChange();}
     }
 
     async applyLiveProfile(value, options = {}) {
@@ -541,6 +554,7 @@ class ProfileDeviceService {
             try {
                 this.status = await readProfileStatus(this.connection, {nextRequestId: () => this.requestIds.next()});
                 if (options.expectedBase) assertProfileBase(this.status, options.expectedBase);
+                if (options.expectedSettingsDigest !== undefined && fnv1a32(await readSettings(this.connection, this.requestIds)) !== options.expectedSettingsDigest) throw liveApplyError("PROFILE_EDIT_CONFLICT", "Keyboard settings changed while saving. Read the keyboard again.");
                 if (options.expectedCombosDigest !== undefined) await this.assertComboBase(options.expectedCombosDigest);
                 const currentMutation = evaluateLiveMutationCompatibility(
                     this.capabilities,
@@ -571,7 +585,8 @@ class ProfileDeviceService {
                     prepared = await coordinator.upload(blob, {metadata, ...(options.expectedBase ? {verifyBase: async () => {
                         this.status = await readProfileStatus(this.connection, {nextRequestId: () => this.requestIds.next()});
                         assertProfileBase(this.status, options.expectedBase);
-                        if (options.expectedCombosDigest !== undefined) await this.assertComboBase(options.expectedCombosDigest);
+                        if (options.expectedSettingsDigest !== undefined && fnv1a32(await readSettings(this.connection, this.requestIds)) !== options.expectedSettingsDigest) throw liveApplyError("PROFILE_EDIT_CONFLICT", "Keyboard settings changed while saving. Read the keyboard again.");
+                if (options.expectedCombosDigest !== undefined) await this.assertComboBase(options.expectedCombosDigest);
                     }} : {})});
                 } else {
                     throw activeCandidateError(this.candidateStatus, metadata.digest);
@@ -625,6 +640,34 @@ class ProfileDeviceService {
         });
     }
 
+    async readPortableProfile({forRestore = false} = {}) {
+        if (!this.connection?.connected || this.busy || this.savingEdit) throw new Error("Connect the keyboard and wait for the current operation to finish.");
+        let result;
+        await this.runOperation("reading complete profile", async () => {
+            result = await captureProfile(this.connection, this.requestIds, this.capabilities, message => {
+                this.portableProgress = message; this.emitChange();
+            }, false, forRestore);
+            this.portable = result;
+        });
+        this.portableProgress = "";
+        if (this.error) throw Object.assign(new Error(this.error.message), this.error);
+        return result;
+    }
+
+    async restorePortableProfile(document, options) {
+        if (!this.connection?.connected || this.busy || this.savingEdit) throw new Error("Connect the keyboard and wait for the current operation to finish.");
+        let result;
+        await this.runOperation("restoring complete profile", async () => {
+            result = await restoreProfile(this.connection, this.requestIds, this.capabilities, document, {...options,
+                onProgress: message => {this.portableProgress = message; this.emitChange();},
+            });
+            this.portable = result;
+        });
+        this.portableProgress = "";
+        if (this.error) throw Object.assign(new Error(this.error.message), this.error);
+        return result;
+    }
+
     async close() {
         this.disposeConnectionListener?.();
         this.disposeConnectionListener = undefined;
@@ -641,7 +684,7 @@ class ProfileDeviceService {
         return {
             phase: this.phase,
             scanned: this.scanned,
-            busy: this.busy,
+            busy: this.busy || this.savingEdit,
             connected: Boolean(this.connection?.connected),
             devices: this.devices.map((device) => ({...device})),
             selectedDeviceId: this.connectionPublicId,
@@ -658,6 +701,8 @@ class ProfileDeviceService {
                 Boolean(this.connection?.connected),
                 this.status
             ),
+            portableSummary: this.committed?.domains?.settings ? {names: this.committed.domains.settings.names.map((name, index) => name || (index ? `Layer ${index}` : "Base"))} : this.portable?.summary || null,
+            portableProgress: this.portableProgress || "",
             liveApply: cloneLiveApply(this.liveApply),
             layout: this.layout ? JSON.parse(JSON.stringify(this.layout)) : null,
             committed: this.committed ? JSON.parse(JSON.stringify(this.committed)) : null,
@@ -705,6 +750,7 @@ class ProfileDeviceService {
     }
 
     clearConnection() {
+        this.portable = undefined; this.portableProgress = "";
         this.profileBytes = undefined;
         this.layout = undefined;
         this.committed = undefined;

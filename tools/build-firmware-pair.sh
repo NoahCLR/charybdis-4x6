@@ -14,7 +14,7 @@ set -eu
 # is durable identity burned into the artifact. Keeping them separate is the
 # contract, so both are passed explicitly here.
 #
-#   sh tools/build-firmware-pair.sh [--no-owner]
+#   sh tools/build-firmware-pair.sh [--no-owner|--snapshot-bridge]
 #
 # --no-owner builds the comparison pair without the live-profile owner, for
 # A/B against ordinary behaviour while the pointing cadence regression in
@@ -30,9 +30,12 @@ SUFFIX=""
 if [ "${1:-}" = "--no-owner" ]; then
     OWNER_ARGS="-e NOAH_LIVE_PROFILE_OWNER=no -e NOAH_LIVE_PROFILE_MUTATION=no"
     SUFFIX="_no_owner"
+elif [ "${1:-}" = "--snapshot-bridge" ]; then
+    OWNER_ARGS="-e NOAH_LEGACY_SNAPSHOT_BRIDGE=yes"
+    SUFFIX="_snapshot_bridge"
 elif [ $# -gt 0 ]; then
     echo "Unknown argument: $1" >&2
-    echo "Usage: sh tools/build-firmware-pair.sh [--no-owner]" >&2
+    echo "Usage: sh tools/build-firmware-pair.sh [--no-owner|--snapshot-bridge]" >&2
     exit 1
 fi
 
@@ -71,7 +74,9 @@ build_half FORCE_MASTER right "${n}_charybdis_right${SUFFIX}"
 build_half FORCE_SLAVE left "${n}_charybdis_left${SUFFIX}"
 
 echo
-if [ -n "$SUFFIX" ]; then
+if [ "$SUFFIX" = "_snapshot_bridge" ]; then
+    echo "Built the five-layer backup bridge. Export a complete profile before moving to eight layers."
+elif [ -n "$SUFFIX" ]; then
     echo "Built the comparison pair WITHOUT the live-profile owner."
 else
     echo "Built the flashable pair with the live-profile owner enabled."

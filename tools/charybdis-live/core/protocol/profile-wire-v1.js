@@ -24,7 +24,7 @@ const PROFILE_WIRE_KNOWN_MASKS = Object.freeze({
     FEATURE_FLAGS: 0x00000fff,
     REQUIRED_READ_FEATURES: 0x0000000f,
     STATE_FLAGS: 0x00ff,
-    SUPPORTED_DOMAINS: 0x07,
+    SUPPORTED_DOMAINS: 0x0f,
 });
 
 const PROFILE_WIRE_FEATURES = Object.freeze({
@@ -46,6 +46,7 @@ const PROFILE_WIRE_DOMAINS = Object.freeze({
     RGB: 1 << 0,
     KEY_BEHAVIORS: 1 << 1,
     COMBOS: 1 << 2,
+    SETTINGS: 1 << 3,
 });
 
 const PROFILE_ACTIVE_KIND = Object.freeze({

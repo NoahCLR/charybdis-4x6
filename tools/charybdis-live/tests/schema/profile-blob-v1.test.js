@@ -108,7 +108,7 @@ test("domain envelope readers support later domain codecs without accepting padd
 
 test("strict blob decode rejects unknown, duplicate, out-of-order, truncated, and trailing domains", () => {
     const header = Buffer.from("4e4c503101000101", "hex");
-    assert.throws(() => decodeProfileBlob(Buffer.concat([header, Buffer.from("40010000", "hex")])), (error) => error.code === "UNKNOWN_DOMAIN");
+    assert.throws(() => decodeProfileBlob(Buffer.concat([header, Buffer.from("50010000", "hex")])), (error) => error.code === "UNKNOWN_DOMAIN");
     assert.throws(() => decodeProfileBlob(Buffer.concat([header, Buffer.from("10020000", "hex")])), (error) => error.code === "UNKNOWN_DOMAIN_VERSION");
 
     const duplicateHeader = Buffer.from("4e4c503101000201", "hex");
@@ -142,7 +142,7 @@ test("blob encoder rejects duplicate, unknown, oversized, and invalid inputs", (
         {id: PROFILE_DOMAIN_IDS.RGB, version: 1, payload: Buffer.alloc(0)},
         {id: PROFILE_DOMAIN_IDS.RGB, version: 1, payload: Buffer.alloc(0)},
     ]}), (error) => error.code === "DUPLICATE_DOMAIN");
-    assert.throws(() => encodeProfileBlob({domains: [{id: 0x40, version: 1, payload: Buffer.alloc(0)}]}), (error) => error.code === "UNKNOWN_DOMAIN");
+    assert.throws(() => encodeProfileBlob({domains: [{id: 0x50, version: 1, payload: Buffer.alloc(0)}]}), (error) => error.code === "UNKNOWN_DOMAIN");
     assert.throws(() => encodeProfileBlob({domains: [{
         id: PROFILE_DOMAIN_IDS.RGB,
         version: 1,
@@ -153,8 +153,8 @@ test("blob encoder rejects duplicate, unknown, oversized, and invalid inputs", (
 });
 
 test("callers can explicitly register a future domain without weakening v1 defaults", () => {
-    const domainVersions = {...PROFILE_DOMAIN_VERSIONS, 0x40: 1};
-    const encoded = encodeProfileBlob({domains: [{id: 0x40, version: 1, payload: hex("aabb")}]}, {domainVersions});
+    const domainVersions = {...PROFILE_DOMAIN_VERSIONS, 0x50: 1};
+    const encoded = encodeProfileBlob({domains: [{id: 0x50, version: 1, payload: hex("aabb")}]}, {domainVersions});
     assert.throws(() => decodeProfileBlob(encoded), (error) => error.code === "UNKNOWN_DOMAIN");
     assert.equal(decodeProfileBlob(encoded, {domainVersions}).domains[0].payload.toString("hex"), "aabb");
 });

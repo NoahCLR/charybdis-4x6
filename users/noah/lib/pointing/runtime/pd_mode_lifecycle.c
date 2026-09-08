@@ -1,3 +1,4 @@
+#include "lib/profile/runtime/effective_settings_runtime.h"
 // ────────────────────────────────────────────────────────────────────────────
 // PD Mode Lifecycle
 // ────────────────────────────────────────────────────────────────────────────
@@ -95,8 +96,16 @@ void pd_mode_apply_active_dpi(void) {
         return;
     }
 
-    if (active_mode && active_mode->dpi != 0) {
-        pointing_device_set_cpi(active_mode->dpi);
+    uint16_t mode_dpi = active_mode ? active_mode->dpi : 0;
+    switch (snapshot.local.active_mode) {
+        case PD_MODE_VOLUME: mode_dpi = noah_setting(NOAH_SETTING_VOLUME_DPI, mode_dpi); break;
+        case PD_MODE_BRIGHTNESS: mode_dpi = noah_setting(NOAH_SETTING_BRIGHTNESS_DPI, mode_dpi); break;
+        case PD_MODE_ZOOM: mode_dpi = noah_setting(NOAH_SETTING_ZOOM_DPI, mode_dpi); break;
+        case PD_MODE_ARROW: mode_dpi = noah_setting(NOAH_SETTING_ARROW_DPI, mode_dpi); break;
+        default: break;
+    }
+    if (mode_dpi != 0) {
+        pointing_device_set_cpi(mode_dpi);
         return;
     }
 

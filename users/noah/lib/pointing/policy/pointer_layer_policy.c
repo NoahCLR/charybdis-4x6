@@ -1,3 +1,4 @@
+#include "lib/profile/runtime/effective_settings_runtime.h"
 // ────────────────────────────────────────────────────────────────────────────
 // Pointer Layer Policy
 // ────────────────────────────────────────────────────────────────────────────
@@ -75,12 +76,12 @@ layer_state_t pointer_layer_policy_apply(layer_state_t state) {
     bool               auto_mouse_anchored  = pointer_layer_policy_auto_mouse_anchored(snapshot);
     uint8_t            auto_mouse_layer     = noah_qmk_contract_auto_mouse_layer();
     layer_state_t      auto_mouse_mask      = (layer_state_t)1 << auto_mouse_layer;
-    bool               sniping_layer_active = layer_state_cmp(state, CHARYBDIS_AUTO_SNIPING_LAYER);
+    bool               sniping_layer_active = (noah_setting(NOAH_SETTING_AUTO_SNIPING_ENABLED, 1) && layer_state_cmp(state, noah_setting(NOAH_SETTING_AUTO_SNIPING_LAYER, CHARYBDIS_AUTO_SNIPING_LAYER)));
 
     // Arrow mode consumes trackball motion as arrows, so keep the keyboard on
     // the current typing/nav surface instead of forcing the pointer layer back
     // underneath it. Holding NAV can still expose the pointer-button layout.
-    if (prefers_typing_layer && auto_mouse_layer != CHARYBDIS_AUTO_SNIPING_LAYER) {
+    if (prefers_typing_layer && auto_mouse_layer != noah_setting(NOAH_SETTING_AUTO_SNIPING_LAYER, CHARYBDIS_AUTO_SNIPING_LAYER)) {
         state &= ~auto_mouse_mask;
         return state;
     }
@@ -89,7 +90,7 @@ layer_state_t pointer_layer_policy_apply(layer_state_t state) {
     // layer is active and auto-mouse targets some other layer, strip that
     // separate pointer layer regardless of anchors so NAV keeps keymap
     // precedence and sniping stays enabled.
-    if (sniping_layer_active && auto_mouse_layer != CHARYBDIS_AUTO_SNIPING_LAYER) {
+    if (sniping_layer_active && auto_mouse_layer != noah_setting(NOAH_SETTING_AUTO_SNIPING_LAYER, CHARYBDIS_AUTO_SNIPING_LAYER)) {
         state &= ~auto_mouse_mask;
         return state;
     }
@@ -115,7 +116,7 @@ void pointer_layer_policy_debug_snapshot(layer_state_t state, pointer_layer_poli
         .pd_mode_anchor_active     = pd_mode_policy_snapshot_keeps_auto_mouse_anchored(snapshot),
         .prefers_typing_layer      = pd_mode_policy_snapshot_prefers_typing_layer(snapshot),
         .auto_mouse_toggle_enabled = noah_qmk_contract_auto_mouse_toggle_enabled(),
-        .sniping_layer_active      = layer_state_cmp(state, CHARYBDIS_AUTO_SNIPING_LAYER),
+        .sniping_layer_active      = (noah_setting(NOAH_SETTING_AUTO_SNIPING_ENABLED, 1) && layer_state_cmp(state, noah_setting(NOAH_SETTING_AUTO_SNIPING_LAYER, CHARYBDIS_AUTO_SNIPING_LAYER))),
         .auto_mouse_key_tracker    = noah_qmk_contract_auto_mouse_key_tracker(),
         .auto_mouse_layer          = noah_qmk_contract_auto_mouse_layer(),
     };

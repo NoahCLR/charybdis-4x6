@@ -30,8 +30,8 @@ uint16_t automouse_rgb_current_progress(void) {
         progress = 0;
     }
 
-    if (progress > AUTOMOUSE_RGB_ACTIVE_SPAN) {
-        progress = AUTOMOUSE_RGB_ACTIVE_SPAN;
+    if (progress > (noah_setting(NOAH_SETTING_AUTO_MOUSE_TIMEOUT, AUTO_MOUSE_TIME) - noah_setting(NOAH_SETTING_AUTO_MOUSE_DEAD_TIME, AUTOMOUSE_RGB_DEAD_TIME))) {
+        progress = (noah_setting(NOAH_SETTING_AUTO_MOUSE_TIMEOUT, AUTO_MOUSE_TIME) - noah_setting(NOAH_SETTING_AUTO_MOUSE_DEAD_TIME, AUTOMOUSE_RGB_DEAD_TIME));
     }
 
     return progress;

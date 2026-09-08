@@ -7,6 +7,7 @@
 #ifdef VIA_ENABLE
 
 #    include "noah_keymap_ids.h"
+#    include "../compat/qmk_portable_profile.h"
 #    include "macro_payload.h"
 #    include "via_macro_provider.h"
 #    include "../compat/qmk_via_split_mirror.h"
@@ -211,6 +212,7 @@ bool noah_via_macro_defaults_reseed_for_recovery(void) {
 }
 
 void via_init_kb(void) {
+    noah_qmk_portable_storage_init();
     via_macro_seed_post_init_pending = noah_qmk_via_should_seed_defaults_post_init();
 }
 

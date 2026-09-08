@@ -14,6 +14,7 @@
 
 const vscode = require("vscode");
 
+const {validateSnapshot, summary, reorderLayers} = require("./core/session/portable-profile-session");
 const {ProfileDeviceService} = require("./core/session/profile-device-service");
 const {buildDeviceModel} = require("./core/session/device-model");
 const {getStudioHtml} = require("./webview/studio-ui");
@@ -35,13 +36,13 @@ function activate(context) {
 
 function deactivate() {}
 
-function openPanel() {
+function openPanel(context) {
     const panel = vscode.window.createWebviewPanel(VIEW_TYPE, "Charybdis Live", vscode.ViewColumn.One, {
         enableScripts: true,
         retainContextWhenHidden: true,
     });
 
-    const session = {service: undefined, notice: undefined};
+    const session = {service: undefined, notice: undefined, recoveryRoot: context.globalStorageUri};
     session.service = new ProfileDeviceService({
         onChange: () => publish(panel, session),
     });
@@ -55,9 +56,7 @@ function openPanel() {
 
 function publish(panel, session) {
     const state = session.service.snapshot();
-    void panel.webview.postMessage({
-        type: "model",
-        model: buildDeviceModel({
+    const model = buildDeviceModel({
             capabilities: state.capabilities,
             status: state.status,
             layout: state.layout,
@@ -66,7 +65,18 @@ function publish(panel, session) {
             combos: state.combos,
             busy: state.busy || session.savingBehavior,
             device: state.devices.find((device) => device.id === state.selectedDeviceId),
-        }),
+        });
+    model.portable = {
+        available: state.connected && [5, 8].includes(state.capabilities?.compiledLayerCount) && (state.capabilities?.supportedDomainMask & 15) === 15,
+        eightLayers: state.capabilities?.compiledLayerCount === 8,
+        legacy: state.capabilities?.compiledLayerCount === 5,
+        busy: state.busy || session.portableBusy,
+        progress: state.portableProgress,
+        review: session.portableReview ? {incoming: summary(session.portableReview.document), current: session.portableReview.before.summary} : null,
+        layers: session.portableLayers ? {key: session.portableLayers.before.fingerprint, order: session.portableLayers.order, names: session.portableLayers.names} : null,
+    };
+    model.layers?.forEach((layer, index) => {layer.displayName = state.portableSummary?.names[index] || layer.name;});
+    void panel.webview.postMessage({type: "model", model,
         notice: session.notice,
         savedBehavior: session.savedBehavior,
     });
@@ -80,7 +90,17 @@ function publish(panel, session) {
 // "Working..." with no way to know anything went wrong.
 async function handleMessage(panel, session, message) {
     try {
+        if (session.portableBusy) {publish(panel, session); return;}
         switch (message?.type) {
+            case "exportPortableProfile":
+            case "choosePortableProfile":
+            case "restorePortableProfile":
+            case "managePortableLayers":
+            case "editPortableLayer":
+            case "savePortableLayers":
+            case "cancelPortableReview":
+                await portableMessage(panel, session, message);
+                return;
             case "ready":
             case "refresh":
                 await connectAndRead(panel, session);
@@ -259,3 +279,68 @@ async function writeLayoutKeys(panel, session, message) {
 }
 
 module.exports = {activate, deactivate};
+
+async function portableMessage(panel, session, message) {
+    session.portableBusy = true;
+    try {
+        const service = session.service;
+        if (message.names !== undefined) {
+            const draft = session.portableLayers;
+            if (!draft || !Array.isArray(message.names) || message.names.length !== 8) throw new Error("Read the layers again before naming them.");
+            reorderLayers(draft.before.document, draft.order, draft.order.map(old => message.names[old]));
+            draft.names = [...message.names];
+        }
+        const saveRecovery = async document => {
+            await vscode.workspace.fs.createDirectory(session.recoveryRoot);
+            const suffix = document.format === "charybdis-profile" ? ".charybdis.json" : ".diagnostic.json";
+            const uri = vscode.Uri.joinPath(session.recoveryRoot, "recovery-" + new Date().toISOString().replace(/[:.]/g, "-") + suffix);
+            await vscode.workspace.fs.writeFile(uri, Buffer.from(JSON.stringify(document, null, 2) + "\n"));
+            session.lastRecovery = uri;
+            return uri.fsPath;
+        };
+        if (message.type === "cancelPortableReview") {
+            session.portableReview = undefined; session.portableLayers = undefined;
+        } else if (message.type === "exportPortableProfile") {
+            const snapshot = await service.readPortableProfile();
+            const uri = await vscode.window.showSaveDialog({title: "Export complete keyboard profile", saveLabel: "Export profile", filters: {"Charybdis profile": ["charybdis.json", "json"]}});
+            if (uri) {
+                await vscode.workspace.fs.writeFile(uri, Buffer.from(JSON.stringify(snapshot.document, null, 2) + "\n"));
+                session.notice = "Complete keyboard profile exported to " + uri.fsPath;
+            }
+        } else if (message.type === "choosePortableProfile") {
+            const files = await vscode.window.showOpenDialog({title: "Choose a keyboard profile", canSelectMany: false, filters: {"Charybdis profile": ["charybdis.json", "json"]}});
+            if (files?.length) {
+                if ((await vscode.workspace.fs.stat(files[0])).size > 100000) throw new Error("This profile file is too large.");
+                const value = validateSnapshot(Buffer.from(await vscode.workspace.fs.readFile(files[0])).toString("utf8"), service.capabilities);
+                session.portableReview = {document: value.document, before: await service.readPortableProfile({forRestore: true})};
+                session.portableLayers = undefined;
+            }
+        } else if (message.type === "managePortableLayers") {
+            const before = await service.readPortableProfile();
+            session.portableReview = undefined;
+            session.portableLayers = {before, order: Array.from({length: 8}, (_, id) => id), names: [...before.summary.names]};
+        } else if (message.type === "editPortableLayer") {
+            const draft = session.portableLayers, id = message.id;
+            if (!draft || !Number.isInteger(id) || id < 0 || id > 7) throw new Error("Read the layers again before editing them.");
+            if (message.name !== undefined) {
+                if (typeof message.name !== "string") throw new Error("Enter a layer name.");
+                const names = [...draft.names]; names[id] = message.name;
+                reorderLayers(draft.before.document, draft.order, draft.order.map(old => names[old]));
+                draft.names = names;
+            } else {
+                const from = draft.order.indexOf(id), to = from + message.direction;
+                if (id === 0 || ![1, -1].includes(message.direction) || to < 1 || to > 7) throw new Error("Base stays at the bottom of the layer order.");
+                [draft.order[from], draft.order[to]] = [draft.order[to], draft.order[from]];
+            }
+        } else {
+            const review = session.portableReview, draft = session.portableLayers;
+            const before = message.type === "savePortableLayers" ? draft?.before : review?.before;
+            if (!before) throw new Error("Review the profile before restoring it.");
+            const document = message.type === "savePortableLayers" ? reorderLayers(before.document, draft.order, draft.order.map(old => draft.names[old])) : review.document;
+            await service.restorePortableProfile(document, {expectedFingerprint: before.fingerprint, saveRecovery});
+            session.portableReview = undefined; session.portableLayers = undefined;
+            await service.readLayout(); await service.readCommittedProfile(); await service.readCombos(); await service.readBaseRgb();
+            session.notice = "Complete profile saved to both halves and verified. " + (before.incomplete ? "Interrupted data retained for diagnosis: " : "Recovery copy: ") + session.lastRecovery.fsPath;
+        }
+    } finally {session.portableBusy = false; publish(panel, session);}
+}

@@ -116,7 +116,7 @@ ifneq ($(strip $(NOAH_LIVE_PROFILE_MUTATION)),no)
         $(error NOAH_LIVE_PROFILE_MUTATION=yes requires NOAH_LIVE_PROFILE_OWNER=yes)
     endif
     ifneq ($(strip $(NOAH_PHYSICAL_HALF)),)
-        OPT_DEFS += -DNOAH_LIVE_PROFILE_MUTATION_ENABLE
+        OPT_DEFS += -DNOAH_LIVE_PROFILE_MUTATION_ENABLE -DNOAH_PORTABLE_PROFILE_ENABLE
     endif
 endif
 
@@ -131,4 +131,10 @@ ifneq ($(strip $(NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS)),)
         $(error NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS=yes requires VIA_ENABLE=yes)
     endif
     OPT_DEFS += -DNOAH_PROFILE_PERFORMANCE_DIAGNOSTICS_ENABLE
+endif
+
+# One-time readback bridge for a deployed five-layer board. It deliberately
+# preserves its VIA addresses and legacy profile compatibility identity.
+ifeq ($(strip $(NOAH_LEGACY_SNAPSHOT_BRIDGE)),yes)
+    OPT_DEFS += -DNOAH_LEGACY_SNAPSHOT_BRIDGE
 endif

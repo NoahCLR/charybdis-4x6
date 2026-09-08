@@ -15,6 +15,33 @@ decided along the way.
 The keyboard becomes the source of truth, and the live app becomes a client of
 the keyboard rather than a client of the repository.
 
+## Current Product Status
+
+The live app reads configuration from the keyboard without a firmware workspace
+at runtime. Layout, behaviours, combos and RGB have working editors and device
+save paths. Complete export/import includes both macro banks and global settings;
+eight-layer naming and reference-preserving reordering are implemented. The user
+reports that the new workflow appears to work on their keyboard. This is useful
+manual feedback, not completion of the hardware acceptance matrix.
+
+| Product surface | Current state |
+| --- | --- |
+| Layout and eight layers | Read/write; names and overlay order travel with complete profiles |
+| Key behaviours, combos and RGB | Read/write editors; custom-profile saves verify readback and both halves |
+| Macros and global policy | Read/write through complete export/import; dedicated editor models and save handlers remain unwired |
+| Backup and restore | Complete supported snapshots, review, recovery file and verified restore; interrupted restores can be retried |
+| Drafts and Apply | Layout drafts and generation-bound behaviour drafts exist; one whole-profile draft, semantic review and coordinated Apply remain pending |
+| Recovery and release readiness | Guided reset/recovery, broad hardware acceptance, performance work and standalone packaging remain pending |
+
+Next feature work is the macro editor, followed by global settings such as
+timing, DPI and auto-mouse policy. The complete-profile read/write path supplies
+their data; they must use it without introducing a repository dependency. Then
+unify editing, undo/redo and change review across domains. The two storage
+owners still require a complete logical-generation contract: today's restore
+is recoverable but not atomic across all domains. Resolve the inherited pointing
+cadence regression and finish reboot, USB-role, interruption and blank-firmware
+restore acceptance before calling the product complete.
+
 ## Why This Branch Exists
 
 Profile Studio was being asked to be two products at once: a `.c` authoring
@@ -330,9 +357,9 @@ The structure exists because the thing being replaced was a 14,539-line file
 that grew one convenience at a time. The rules, and where new work belongs, are
 in [`tools/charybdis-live/AGENTS.md`](../tools/charybdis-live/AGENTS.md).
 
-The canonical profile format and generation-bound drafts get a new
-`core/model/` layer between `schema/` and `session/` when that format is
-designed. It is deliberately absent until then.
+D-L15 adds `core/model/` for the canonical portable document and layer-reference
+rewrites. Generation-bound behaviour drafts exist; the whole-profile draft
+coordinator remains pending.
 
 ## Delivery
 
@@ -364,11 +391,12 @@ completed slice.
 7. **Acceptance**: compatibility, migration, performance, resource, and
    real-hardware matrices before promotion. R-21 must be resolved here.
 
-## Undesigned And Load-Bearing
+## Remaining Load-Bearing Contracts
 
-- **The canonical profile format.** D-L09 made it the durable artifact users
-  keep. Slice 2 will force its shape whether or not it has been decided
-  deliberately.
+- **The canonical profile format is defined.** D-L15 and
+  [portable-profile-v1.md](architecture/portable-profile-v1.md) specify the
+  complete supported backup. Future schema migrations and the remaining
+  hardware acceptance must preserve that artifact.
 - **One logical generation across two stores.** Standard VIA owns dynamic
   layout and macros; the custom store owns RGB, behaviours, and policy. One
   manifest must bind them, and a partial cross-store write must be refused
@@ -443,3 +471,52 @@ halves; the restored 1,293-byte payload matched the original generation 10
 payload exactly. Browser checks separately cover row switching, failed-save
 draft retention, stale-draft blocking and explicit discard. Physical execution
 of changed actions and reboot/role-swap acceptance are still outstanding.
+
+### D-L15 — A portable profile is the complete effective configuration
+
+Export/import owns the whole keyboard snapshot. Flashed and committed domains
+are materialized into the same document from device reads. The file contains
+all matrix positions, all 64 VIA macros, all 16 user macro instruction streams,
+RGB, behaviours, effective combos, global settings and layer names. Missing
+and explicitly empty domains have different runtime meanings; complete files
+must carry all four domains and cannot fall back to destination authored data.
+The contract is in [portable-profile-v1.md](architecture/portable-profile-v1.md).
+
+The standard image reserves eight layers. Base stays at index zero; the app
+moves overlays and rewrites references together. The action ABI describes the
+engine vocabulary, independently of authored behaviour rows. Empty-profile and
+populated-profile builds must advertise the same ABI.
+
+A five-layer deployment needs a one-time snapshot bridge before changing its
+storage geometry. `tools/build-firmware-pair.sh --snapshot-bridge` keeps the
+five-layer addresses and deployed profile identity while exposing full readback.
+Export there, then install the regular eight-layer pair and import. Import
+expands the unused layers transparently and translates the three-position shift
+in user trigger IDs. No firmware is flashed automatically by the app.
+
+Import validates and reviews before writing, saves a local recovery document,
+and checks the reviewed state again after acquiring the candidate lease. The
+custom profile commits first; VIA macro/layout writes follow with macro
+invalidation during transfer. Success requires exact whole-profile readback and
+both storage owners' split convergence. This remains a recoverable sequence
+across two durable owners, not one atomic transaction. Interrupted work retains
+its recovery file and reports incomplete restoration.
+
+Next: finish hardware acceptance of bridge/export/update/import, power loss and
+USB role changes. Dedicated macro and global-policy editors and the inherited
+pointing-cadence regression remain separate work toward product acceptance.
+
+D-L15 verification: the app has 278 passing tests, including exact macro-write
+invalidation/retry, incomplete-restore recovery, legacy migration, layer-name
+retention and bridge-first guidance. The host suite passes, and the firmware
+validator accepts an app-generated complete populated payload when compiled
+with zero authored behaviours and combos. Both eight-layer and bridge pairs
+build. Both reviewed stack manifests and the memory gate pass; fresh accounting
+is in [memory-budgets.md](architecture/memory-budgets.md). A read-only check still
+found the connected board on five-layer firmware before handoff. The user has
+since reported that the new workflow appears to work and requested the commit.
+The individual migration, restore and persistence steps have not been recorded
+as a completed hardware matrix. A subsequent read-only probe found the HID
+interface but could not open it, so it did not establish a new layer count or
+generation. Next is recording bridge/export/update/import acceptance, then
+reboot, power-loss and USB-role checks.

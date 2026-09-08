@@ -8,6 +8,7 @@
 #include "users/noah/lib/profile/schema/profile_compiled_defaults_v1.h"
 #include "users/noah/lib/profile/schema/profile_validator_v1.h"
 #include "users/noah/lib/profile/runtime/profile_action_runtime_v1.h"
+#include "users/noah/lib/profile/storage/profile_checksum.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
 #include "users/noah/noah_keymap.h"
 
@@ -95,7 +96,9 @@ static void assert_golden(const noah_profile_compiled_v1_t *profile) {
     assert(profile->metadata.crc32 == fixture_u32("profile.crc32", 16));
     assert(profile->metadata.digest == fixture_u32("profile.fnv1a32", 16));
     assert(profile->metadata.action_abi_digest == fixture_u32("profile.action_abi", 16));
+#ifndef NOAH_LEGACY_SNAPSHOT_BRIDGE
     assert(profile->metadata.action_abi_row_visits == fixture_u32("profile.action_abi_row_visits", 10));
+#endif
 }
 
 static noah_profile_validator_v1_compatibility_t compatibility(uint32_t action_abi_digest) {
@@ -148,7 +151,7 @@ static void test_real_authored_profile(void) {
     noah_profile_codec_v1_error_t codec_error;
     noah_profile_reader_t reader;
     noah_profile_reader_t copied_reader;
-    uint8_t custom_target_count = 0u;
+
     uint8_t slice[37];
 
     assert(noah_profile_compiled_v1_open(NULL, &error) == NOAH_PROFILE_COMPILED_V1_INVALID_ARGUMENT);
@@ -159,10 +162,7 @@ static void test_real_authored_profile(void) {
     assert(profile.metadata.crc32 != 0u);
     assert(profile.metadata.digest != 0u);
     assert(profile.metadata.action_abi_digest != 0u);
-    for (uint8_t row = 0u; row < key_behavior_count; row++) {
-        if (key_behaviors[row].keycode >= NOAH_KEYMAP_SAFE_RANGE) custom_target_count++;
-    }
-    assert(profile.metadata.action_abi_row_visits == (uint16_t)(key_behavior_count * (custom_target_count + 1u)));
+    assert(profile.metadata.action_abi_row_visits == 0);
     assert(profile.metadata.action_abi_row_visits <= NOAH_PROFILE_COMPILED_V1_ACTION_ABI_ROW_VISITS_MAX);
     assert(sizeof(profile) <= 20u);
     assert(!noah_profile_compiled_v1_compatibility(NULL, &runtime_compatibility));
@@ -259,8 +259,48 @@ static void test_semantic_action_translation(void) {
     assert(noah_profile_action_runtime_v1_to_native(&action, &native) == NOAH_PROFILE_ACTION_RUNTIME_V1_INVALID_ARGUMENT);
 }
 
+static void validate_import_on_empty_firmware(const noah_profile_compiled_v1_t *compiled, const char *path) {
+    FILE *file = fopen(path, "rb"); assert(file);
+    size_t length = fread(output, 1, sizeof(output), file); assert(feof(file)); fclose(file);
+    noah_profile_reader_t reader = noah_profile_reader_from_memory(output, length);
+    noah_profile_validator_v1_compatibility_t compatible;
+    assert(noah_profile_compiled_v1_compatibility(compiled, &compatible));
+    noah_profile_validator_v1_declaration_t declaration = {
+        .schema_major = 1, .schema_minor = 0, .domain_mask = 15, .byte_length = length,
+        .crc32 = noah_profile_crc32_finish(noah_profile_crc32_update(NOAH_PROFILE_CRC32_INITIAL, output, length)),
+        .digest = noah_profile_fnv1a_update(NOAH_PROFILE_FNV1A_INITIAL, output, length),
+        .action_abi_digest = compiled->metadata.action_abi_digest,
+    };
+    noah_profile_validator_v1_t validator;
+    noah_profile_validator_v1_error_t error;
+    noah_profile_validator_v1_result_t result = noah_profile_validator_v1_begin(&validator, &reader, 0, &declaration, &compatible, &error);
+    for (size_t step = 0; result == NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS && step < 5000; step++) result = noah_profile_validator_v1_step(&validator, 20, &error);
+    if (result != NOAH_PROFILE_VALIDATOR_V1_VALID) fprintf(stderr, "portable import failed: %u domain=%u field=%u byte=%zu\n", result, error.domain_id, error.field_id, error.byte_offset);
+    assert(result == NOAH_PROFILE_VALIDATOR_V1_VALID);
+    assert(validator.profile.domain_mask == 15);
+    assert(validator.profile.settings.length >= 344);
+}
+
 int main(int argc, char **argv) {
-    assert(argc == 2);
+    assert(argc >= 2 && argc <= 4);
+    if (argc == 3 && strcmp(argv[2], "--write-fixture") == 0) {
+        noah_profile_compiled_v1_t profile;
+        assert(noah_profile_compiled_v1_open(&profile, NULL) == NOAH_PROFILE_COMPILED_V1_OK);
+        assert(noah_profile_compiled_v1_write(&profile, collect, NULL, NULL) == NOAH_PROFILE_COMPILED_V1_OK);
+        FILE *file = fopen(argv[1], "w"); assert(file);
+        fprintf(file, "profile.byte_length=%u\nprofile.crc32=%08x\nprofile.fnv1a32=%08x\nprofile.action_abi=%08x\nprofile.action_abi_row_visits=%u\nprofile.full.hex=", profile.metadata.byte_length, (unsigned)profile.metadata.crc32, (unsigned)profile.metadata.digest, (unsigned)profile.metadata.action_abi_digest, profile.metadata.action_abi_row_visits);
+        for (size_t i = 0; i < output_length; i++) fprintf(file, "%02x", output[i]);
+        fputc('\n', file); fclose(file); return 0;
+    }
+    if (argc == 4 && strcmp(argv[2], "--empty-profile") == 0) {
+        noah_profile_compiled_v1_t profile;
+        fixture_path = argv[1];
+        assert(key_behavior_count == 0 && noah_combo_count == 0);
+        assert(noah_profile_compiled_v1_open(&profile, NULL) == NOAH_PROFILE_COMPILED_V1_OK);
+        assert(profile.metadata.action_abi_digest == fixture_u32("profile.action_abi", 16));
+        validate_import_on_empty_firmware(&profile, argv[3]);
+        puts("empty firmware accepts the app's complete populated profile and preserves its action ABI"); return 0;
+    }
     fixture_path = argv[1];
     test_semantic_action_translation();
     test_real_authored_profile();

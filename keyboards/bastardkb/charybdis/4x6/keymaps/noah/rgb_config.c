@@ -98,6 +98,12 @@ const layer_color_config_t layer_colors[LAYER_COUNT] = {
             .color = HSV(0, 0, 150),
             .mode  = KEYS_MAPPED_ON_THIS_LAYER_ONLY,
         },
+#ifndef NOAH_LEGACY_SNAPSHOT_BRIDGE
+    [LAYER_EXTRA_1] = {.color = HSV(0, 0, 0), .mode = KEYS_MAPPED_ON_THIS_LAYER_ONLY},
+    [LAYER_EXTRA_2] = {.color = HSV(0, 0, 0), .mode = KEYS_MAPPED_ON_THIS_LAYER_ONLY},
+    [LAYER_EXTRA_3] = {.color = HSV(0, 0, 0), .mode = KEYS_MAPPED_ON_THIS_LAYER_ONLY},
+#endif
+
 };
 
 // ─── Layer LED Groups ───────────────────────────────────────────────────────

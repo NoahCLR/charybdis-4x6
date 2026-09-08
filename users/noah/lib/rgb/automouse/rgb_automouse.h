@@ -1,3 +1,4 @@
+#include "lib/profile/runtime/effective_settings_runtime.h"
 // ────────────────────────────────────────────────────────────────────────────
 // Auto-Mouse RGB Timeout Fade
 // ────────────────────────────────────────────────────────────────────────────
@@ -40,15 +41,15 @@ _Static_assert(AUTOMOUSE_RGB_ACTIVE_SPAN > 0, "AUTOMOUSE_RGB_ACTIVE_SPAN must be
 _Static_assert(AUTOMOUSE_RGB_SYNC_STEP > 0, "AUTOMOUSE_RGB_SYNC_STEP must be greater than zero");
 
 static inline uint16_t automouse_rgb_progress(uint16_t raw_elapsed) {
-    if (raw_elapsed > AUTO_MOUSE_TIME) {
-        raw_elapsed = AUTO_MOUSE_TIME;
+    if (raw_elapsed > noah_setting(NOAH_SETTING_AUTO_MOUSE_TIMEOUT, AUTO_MOUSE_TIME)) {
+        raw_elapsed = noah_setting(NOAH_SETTING_AUTO_MOUSE_TIMEOUT, AUTO_MOUSE_TIME);
     }
 
-    if (raw_elapsed <= AUTOMOUSE_RGB_DEAD_TIME) {
+    if (raw_elapsed <= noah_setting(NOAH_SETTING_AUTO_MOUSE_DEAD_TIME, AUTOMOUSE_RGB_DEAD_TIME)) {
         return 0;
     }
 
-    return raw_elapsed - AUTOMOUSE_RGB_DEAD_TIME;
+    return raw_elapsed - noah_setting(NOAH_SETTING_AUTO_MOUSE_DEAD_TIME, AUTOMOUSE_RGB_DEAD_TIME);
 }
 
 static inline uint16_t automouse_rgb_quantize_progress(uint16_t raw_elapsed) {
@@ -66,11 +67,11 @@ static inline uint16_t automouse_rgb_quantize_progress(uint16_t raw_elapsed) {
 uint16_t              automouse_rgb_current_progress(void);
 bool                  automouse_rgb_should_render(void);
 static inline uint8_t automouse_rgb_blend_amount(uint16_t progress) {
-    if (progress >= AUTOMOUSE_RGB_ACTIVE_SPAN) {
+    if (progress >= (noah_setting(NOAH_SETTING_AUTO_MOUSE_TIMEOUT, AUTO_MOUSE_TIME) - noah_setting(NOAH_SETTING_AUTO_MOUSE_DEAD_TIME, AUTOMOUSE_RGB_DEAD_TIME))) {
         return UINT8_MAX;
     }
 
-    return (uint8_t)((uint32_t)progress * UINT8_MAX / AUTOMOUSE_RGB_ACTIVE_SPAN);
+    return (uint8_t)((uint32_t)progress * UINT8_MAX / (noah_setting(NOAH_SETTING_AUTO_MOUSE_TIMEOUT, AUTO_MOUSE_TIME) - noah_setting(NOAH_SETTING_AUTO_MOUSE_DEAD_TIME, AUTOMOUSE_RGB_DEAD_TIME)));
 }
 #else
 static inline uint16_t automouse_rgb_current_progress(void) {
