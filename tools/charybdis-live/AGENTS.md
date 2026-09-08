@@ -39,7 +39,8 @@ tests/              mirrors core/, one directory per layer
 
 ### About `webview/`
 
-`studio-ui.js` is Profile Studio's UI, unmodified. It is a pure renderer: it
+`studio-ui.js` retains Profile Studio's UI, with device wiring and copy changes.
+It is a pure renderer: it
 reads the `model` the host posts and sends edits back as typed messages. That
 seam is why the port works, and it is why the UI did not have to be rebuilt.
 

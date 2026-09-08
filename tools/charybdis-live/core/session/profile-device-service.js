@@ -3,6 +3,9 @@
 const {readSettings} = require("../protocol/portable-profile-v1");
 const {decodeSettings} = require("../schema/settings-domain-v1");
 const {captureProfile, restoreProfile} = require("./portable-profile-session");
+const {macroEditorView, editMacro} = require("../model/macro-editor");
+const {resolveNativeQmkExpression} = require("../schema/compiled-profile-v1");
+const {knownActionAbi} = require("./device-profile-view");
 const {RAW_HID_REPORT_SIZE} = require("../transport/device-adapter");
 const {NodeHidDeviceAdapter} = require("../transport/node-hid-adapter");
 const {DeviceRequestCoordinator} = require("../transport/request-coordinator");
@@ -249,7 +252,8 @@ class ProfileDeviceService {
             }
             for (const change of group.changes || []) {
                 const position = CHARYBDIS_4X6_LAYOUT_MATRIX[change.layoutIndex];
-                const keycode = keycodeCatalog.encode(change.keycode);
+                const macro = /^(?:VIA_MACRO|MACRO)_\d+$/.test(change.keycode || "");
+                const keycode = keycodeCatalog.encode(change.keycode) ?? (macro && knownActionAbi(this.capabilities?.actionAbiDigest) ? resolveNativeQmkExpression(change.keycode, {}) : undefined);
                 if (!position || keycode === undefined) {
                     rejected.push({...change, reason: position ? "keycode not in the vendored catalog" : "position outside the layout"});
                     continue;
@@ -648,6 +652,7 @@ class ProfileDeviceService {
                 this.portableProgress = message; this.emitChange();
             }, false, forRestore);
             this.portable = result;
+            this.macroView = macroEditorView(result);
         });
         this.portableProgress = "";
         if (this.error) throw Object.assign(new Error(this.error.message), this.error);
@@ -662,10 +667,16 @@ class ProfileDeviceService {
                 onProgress: message => {this.portableProgress = message; this.emitChange();},
             });
             this.portable = result;
+            this.macroView = macroEditorView(result);
         });
         this.portableProgress = "";
         if (this.error) throw Object.assign(new Error(this.error.message), this.error);
         return result;
+    }
+
+    async saveMacroEdit(message, {saveRecovery} = {}) {
+        const document = editMacro(this.portable, message, this.capabilities);
+        return this.restorePortableProfile(document, {expectedFingerprint: message.expectedFingerprint, saveRecovery});
     }
 
     async close() {
@@ -703,6 +714,7 @@ class ProfileDeviceService {
             ),
             portableSummary: this.committed?.domains?.settings ? {names: this.committed.domains.settings.names.map((name, index) => name || (index ? `Layer ${index}` : "Base"))} : this.portable?.summary || null,
             portableProgress: this.portableProgress || "",
+            macroView: this.macroView ? JSON.parse(JSON.stringify(this.macroView)) : null,
             liveApply: cloneLiveApply(this.liveApply),
             layout: this.layout ? JSON.parse(JSON.stringify(this.layout)) : null,
             committed: this.committed ? JSON.parse(JSON.stringify(this.committed)) : null,
@@ -751,6 +763,7 @@ class ProfileDeviceService {
 
     clearConnection() {
         this.portable = undefined; this.portableProgress = "";
+        this.macroView = undefined;
         this.profileBytes = undefined;
         this.layout = undefined;
         this.committed = undefined;

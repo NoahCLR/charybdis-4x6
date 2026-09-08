@@ -10,13 +10,18 @@ const {PROFILE_WIRE_V1, PROFILE_WIRE_STATUS} = require("../../core/protocol/prof
 const {PROFILE_PAYLOAD_V1} = require("../../core/protocol/profile-payload-v1");
 const {crc32, fnv1a32} = require("../../core/schema/profile-blob-v1");
 const {bytes, capabilities} = require("../fixtures/device-profile");
+const {document} = require("../fixtures/portable-profile");
+const {fingerprint, summary} = require("../../core/model/portable-profile");
+const {macroEditorView} = require("../../core/model/macro-editor");
 
 const {fixturePages, responseFor} = require("../fixtures/device-combos");
 
-function harness({source = "compiled", fail = false, failBase = false, failCombos = false, payload = bytes, allowSaves = false, corruptSave = false} = {}) {
+function harness({source = "compiled", fail = false, failBase = false, failCombos = false, payload = bytes, allowSaves = false, corruptSave = false, portable = false, failMacro = false} = {}) {
     const messages = [];
     const requests = [];
     const candidates = [];
+    const recoveryFiles = [];
+    let portableDocument = document();
     let receive, open, dispose;
     const panel = {webview: {postMessage(message) {messages.push(message);}, onDidReceiveMessage(handler) {receive = handler;}}, onDidDispose(handler) {dispose = handler;}};
     const connection = {connected: true, async request(request) {
@@ -61,13 +66,30 @@ function harness({source = "compiled", fail = false, failBase = false, failCombo
             this.connection = connection;
             this.devices = [{id: "test-device", product: "Test keyboard"}];
             this.connectionPublicId = "test-device";
-            this.capabilities = capabilities;
+            this.capabilities = portable ? {...capabilities, compiledLayerCount: 8, supportedDomainMask: 15, actionAbiDigest: portableDocument.actionAbiDigest} : capabilities;
             this.requestIds = new ProfileRequestIdSequence(1);
             this.status = {activeGeneration: source === "compiled" ? 0 : 9, committedGeneration: source === "compiled" ? 0 : 9, peerGeneration: source === "compiled" ? 0 : 9};
         }
         async enumerate() {return this.snapshot();}
         async refresh() {return this.snapshot();}
         async readLayout() {this.layout = {state: "read", layers: [{layer: 0, keys: []}]}; return this.snapshot();}
+        async readPortableProfile() {
+            if (!portable) return super.readPortableProfile();
+            this.portable = {document: portableDocument, fingerprint: fingerprint(portableDocument), summary: summary(portableDocument)};
+            this.macroView = macroEditorView(this.portable);
+            this.emitChange();
+            return this.portable;
+        }
+        async restorePortableProfile(target, options) {
+            if (!portable) return super.restorePortableProfile(target, options);
+            // Only the already-tested restore transport is substituted here.
+            // The real macro edit, recovery-file writer and UI relay run.
+            assert.equal(options.expectedFingerprint, fingerprint(portableDocument));
+            await options.saveRecovery(portableDocument);
+            if (failMacro) throw Error("macro readback mismatch");
+            portableDocument = target;
+            return this.readPortableProfile();
+        }
         async applyLiveProfile(candidate, options) {
             if (!allowSaves) return super.applyLiveProfile(candidate, options);
             // Stand in only for the already-tested transaction coordinator.
@@ -87,19 +109,47 @@ function harness({source = "compiled", fail = false, failBase = false, failCombo
     const vscode = {StatusBarAlignment: {Left: 1}, ViewColumn: {One: 1}, ProgressLocation: {Notification: 1},
         commands: {registerCommand(id, callback) {open = callback; return {}; }},
         window: {createStatusBarItem: () => ({show() {}}), createWebviewPanel: () => panel,
-            withProgress: (options, task) => task(), showErrorMessage() {}}};
+            withProgress: (options, task) => task(), showErrorMessage() {}},
+        Uri: {joinPath: (root, name) => ({fsPath: root.fsPath + "/" + name})},
+        workspace: {fs: {createDirectory: async () => {}, writeFile: async (uri, bytes) => recoveryFiles.push({uri, document: JSON.parse(bytes.toString())})}}};
     const file = path.resolve(__dirname, "../../extension.js");
     const localRequire = createRequire(file);
-    const sandbox = {module: {exports: {}}, require(name) {
+    const sandbox = {module: {exports: {}}, Buffer, require(name) {
         if (name === "vscode") return vscode;
         if (name === "./core/session/profile-device-service") return {ProfileDeviceService: Service};
         return localRequire(name);
     }};
     vm.runInNewContext(fs.readFileSync(file, "utf8"), sandbox, {filename: file});
-    sandbox.module.exports.activate({subscriptions: []});
+    sandbox.module.exports.activate({subscriptions: [], globalStorageUri: {fsPath: "/recovery"}});
     open();
-    return {messages, requests, candidates, panel, read: () => receive({type: "ready"}), send: (message) => receive(message), close: () => dispose()};
+    return {messages, requests, candidates, recoveryFiles, panel, read: () => receive({type: "ready"}), send: (message) => receive(message), close: () => dispose()};
 }
+
+test("the existing macro Apply message reaches the keyboard writer and acknowledges verified readback", async () => {
+    const app = harness({portable: true}); await app.read();
+    const model = app.messages.at(-1).model;
+    assert.equal(model.viaMacros.length, 64); assert.equal(model.hardcodedMacros.length, 16);
+    await app.send({type: "updateViaMacro", keycode: "MACRO_0", payload: "{KC_LGUI,KC_N}", expectedFingerprint: model.macroEditing.identity});
+    const final = app.messages.at(-1);
+    assert.match(final.notice, /Macro saved to both halves and verified/);
+    assert.equal(final.savedMacro.keycode, "MACRO_0");
+    assert.match(final.model.hardcodedMacros[0].payload, /KC_N/);
+    assert.equal(app.recoveryFiles.length, 1);
+    assert.equal(fingerprint(app.recoveryFiles[0].document), model.macroEditing.identity);
+    app.close();
+});
+
+test("a failed macro save retains the device readout and never acknowledges the draft", async () => {
+    const app = harness({portable: true, failMacro: true}); await app.read();
+    const model = app.messages.at(-1).model;
+    await app.send({type: "updateViaMacro", keycode: "VIA_MACRO_0", payload: "hello", expectedFingerprint: model.macroEditing.identity});
+    const final = app.messages.at(-1);
+    assert.match(final.notice, /Failed.*macro readback mismatch/);
+    assert.equal(final.savedMacro, undefined);
+    assert.equal(final.model.viaMacros[0].empty, true);
+    assert.equal(final.model.macroEditing.writable, true);
+    app.close();
+});
 
 test("behaviour messages save through the service and publish only verified readback", async () => {
     const app = harness({allowSaves: true});

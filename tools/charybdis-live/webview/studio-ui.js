@@ -2362,6 +2362,8 @@ function getClientScript() {
     let activeLayoutComboOriginalSource = "";
     let activeMacroKeycode = "";
     let macroDrafts = {};
+    let macroDraftBases = {};
+    let macroSavePending = false;
     let macroRecording = false;
     let macroRecordDelays = true;
     let macroRecorderMode = "compact";
@@ -2420,7 +2422,7 @@ function getClientScript() {
     };
     const viewTooltips = {
         layout: "Edit layer keys and behavior rows using the physical keyboard layout as the filter.",
-        macros: "Build, record, preview, and edit VIA macro payload strings in keymap.c.",
+        macros: "Build, record, preview, and save macros on the keyboard.",
         rgb: "Inspect layer colours, feedback, locality, and LED groups read from the keyboard.",
         behaviors: "Inspect every key behaviour row read from the keyboard.",
         combos: "Inspect the combo definitions and timing reported by the keyboard.",
@@ -2430,7 +2432,7 @@ function getClientScript() {
         Status: "Parser messages, write status, and warnings from the current studio model.",
         Layout: "Physical keyboard preview, layer tabs, selected-key editor, combo builder, and selected-key behavior editor for the active layer.",
         "Layer Overview": "Read-only summary of behavior rows, macros, combos, and pointing modes reachable from keys on the active layer.",
-        "Macro Builder": "Build, record, preview, and write payload strings for the VIA_MACROS(MACRO) table in keymap.c. Payload edits stay local until Apply macro.",
+        "Macro Builder": "Build, record, preview, and save macros on the keyboard. Drafts stay local until Apply macro.",
         "Combo Builder": "Read and edit keyboard combos beside the keyboard layout.",
         "RGB LED Group Builder": "Edit physical LED groups and save them to both halves.",
         "Layer Colors": "Edit layer_colors[] HSV values and render mode for each layer. LED group rows can override specific LEDs.",
@@ -2477,10 +2479,11 @@ function getClientScript() {
         addRgbLedGroup: "Append a new row to the selected RGB LED group table using the chosen owner, LED group source, and HSV color.",
         clearRgbSelection: "Remove all inline LED selections from the group builder. Reusable group definitions are not changed.",
         toggleRgbTrackball: "Add or remove the trackball LED index 56 from the current inline LED selection.",
-        updateViaMacro: "Write the selected VIA macro payload draft back to the VIA_MACROS(MACRO) row in keymap.c.",
-        selectMacroSlot: "Select this VIA macro slot for editing. Unsaved drafts in other slots are kept locally.",
+        updateViaMacro: "Save the selected macro to both halves, keeping a recovery copy and verifying readback.",
+        selectMacroSlot: "Select this macro slot for editing. Unsaved drafts in other slots are kept locally.",
         insertMacroStep: "Insert the configured step at the cursor in the selected payload draft.",
-        clearMacroPayload: "Clear the selected macro payload draft. Nothing is written to keymap.c until Apply macro.",
+        clearMacroPayload: "Clear the selected macro draft. The keyboard changes when you choose Apply macro.",
+        discardMacroDraft: "Discard this slot's local edits and show its last keyboard readback.",
         startMacroRecording: "Start capturing browser keydown and keyup events and append the generated payload to the selected macro draft.",
         stopMacroRecording: "Stop recording and keep the generated payload in the selected macro draft.",
         clearMacroRecording: "Clear the current recording take and restore the payload captured when recording started.",
@@ -2540,8 +2543,8 @@ function getClientScript() {
         output: "The native key or action this combo produces, as reported by the keyboard.",
         "output behavior": "The key behavior row that runs after this combo emits its output keycode, if one exists.",
         inputs: "Comma-separated physical combo input key expressions, such as D, F. Use the layout picker to choose slots from the active layer.",
-        slot: "The VIA macro keycode slot. Selecting a slot changes the editor target but does not write files.",
-        payload: "Raw VIA macro payload string for the selected slot. Plain ASCII types text; {KC_A} taps keys; {KC_LGUI,KC_SPC} taps chords; {+KC_A}/{-KC_A} hold and release; {250} waits milliseconds.",
+        slot: "The macro keycode slot. Selecting a slot changes the editor target without changing the keyboard.",
+        payload: "Macro payload for the selected slot. ASCII types text; {KC_A} taps keys; {KC_LGUI,KC_SPC} taps chords; {+KC_A}/{-KC_A} hold and release; {250} waits milliseconds. Use {{ and }} for literal braces.",
         "step type": "Choose which payload fragment the step builder inserts: tap/chord, text, key down, key up, or delay.",
         text: "Plain ASCII text inserted directly into the macro payload. Braces are reserved for macro commands.",
         "macro keys": "One or more raw macro keycodes to tap together, such as KC_A, KC_LGUI, KC_SPC. Friendly chords are converted before insertion.",
@@ -2987,9 +2990,12 @@ function getClientScript() {
     window.addEventListener("message", (event) => {
         if (event.data.type === "model") {
             captureBehaviorDrafts();
+            captureActiveMacroDraft();
             clearFloatingStatus();
             viewDrafts = {};
             model = event.data.model;
+            if (!model.portable?.busy) macroSavePending = false;
+            acceptMacroSave(event.data.savedMacro);
             behaviorSavePending = false;
             if (event.data.savedBehavior) behaviorDrafts.remove(behaviorDraftKey(event.data.savedBehavior));
             Object.assign(qmkKeyLabels, model.qmkKeyLabels || {});
@@ -3346,6 +3352,7 @@ function getClientScript() {
                 group: readRgbLedGroupBuilder(form)
             });
         } else if (action === "updateViaMacro") {
+            if (!macroWriteAvailable(activeMacroKeycode)) return;
             stopMacroRecording(true);
             clearMacroRecorderSession(false);
             const row = target.closest("[data-macro-editor]") || target.closest("tr");
@@ -3356,6 +3363,12 @@ function getClientScript() {
                 keycode: row.dataset.keycode,
                 payload: payloadControl.value
             });
+        } else if (action === "discardMacroDraft") {
+            stopMacroRecording(false);
+            delete macroDrafts[activeMacroKeycode];
+            delete macroDraftBases[activeMacroKeycode];
+            delete viewDrafts.macros;
+            render();
         } else if (action === "deleteRgbLedGroup") {
             post({type: "deleteRgbLedGroup", target: target.dataset.target, index: Number(target.dataset.index)});
         } else if (action === "deleteLayoutCombo") {
@@ -3590,10 +3603,9 @@ function getClientScript() {
     }
 
     function normalizeMacroBuilderState() {
-        const slots = model?.viaMacros || [];
+        const slots = allMacroSlots();
         if (!slots.length) {
             activeMacroKeycode = "";
-            macroDrafts = {};
             return;
         }
 
@@ -3611,6 +3623,7 @@ function getClientScript() {
             }
         }
         macroDrafts = nextDrafts;
+        macroDraftBases = Object.fromEntries(Object.entries(macroDraftBases).filter(([key]) => Object.prototype.hasOwnProperty.call(macroDrafts, key)));
     }
 
     function toggleLayoutComboKey(layoutIndex) {
@@ -4740,6 +4753,11 @@ function getClientScript() {
             message.expectedBase = behaviorDrafts.get(behaviorDraftKey(row))?.base || model.profileIdentity;
             behaviorSavePending = true;
         }
+        if (message.type === "updateViaMacro") {
+            if (!macroWriteAvailable(message.keycode)) return;
+            message.expectedFingerprint = macroDraftBases[message.keycode] || model.macroEditing?.identity;
+            macroSavePending = true;
+        }
         notice = "Working...";
         layoutNotice = "";
         render();
@@ -4763,6 +4781,7 @@ function getClientScript() {
         clearLayoutComboOriginal();
         activeMacroKeycode = "";
         macroDrafts = {};
+        macroDraftBases = {};
         viewDrafts = {};
         behaviorDrafts.clear();
         resetMacroRecorderState();
@@ -4964,6 +4983,7 @@ function getClientScript() {
             activeLayoutComboOriginalSource: activeLayoutComboOriginal ? activeLayoutComboOriginalSource : "",
             activeMacroKeycode,
             macroDrafts,
+            macroDraftBases,
             macroRecordDelays,
             macroRecorderMode,
             macroRecorderDelayThreshold,
@@ -5006,6 +5026,7 @@ function getClientScript() {
             activeLayoutComboOriginalSource = normalizeLayoutComboOriginalSource(state.activeLayoutComboOriginalSource, activeLayoutComboOriginal);
             activeMacroKeycode = state.activeMacroKeycode || "";
             macroDrafts = state.macroDrafts && typeof state.macroDrafts === "object" ? state.macroDrafts : {};
+            macroDraftBases = state.macroDraftBases && typeof state.macroDraftBases === "object" ? state.macroDraftBases : {};
             macroRecordDelays = typeof state.macroRecordDelays === "boolean" ? state.macroRecordDelays : macroRecordDelays;
             macroRecorderMode = state.macroRecorderMode === "exact" ? "exact" : "compact";
             macroRecorderDelayThreshold = state.macroRecorderDelayThreshold || macroRecorderDelayThreshold;
@@ -5153,6 +5174,8 @@ function getClientScript() {
         for (const button of section.querySelectorAll("[data-dirty-button]")) {
             setDirtyButtonState(button, dirty);
         }
+        const discardMacro = section.querySelector("[data-action='discardMacroDraft']");
+        if (discardMacro) discardMacro.disabled = !macroSlotDirty(section.dataset.keycode || "") || macroSavePending;
     }
 
     function sectionHasCustomDirtyState(section) {
@@ -6614,7 +6637,7 @@ function getClientScript() {
             const slot = macroSlotForKeycode(macroKeycode);
             const payload = macroPayloadForSlot(slot);
             const parsed = payload ? parseMacroPayloadPreview(payload) : { steps: [], error: "" };
-            const title = (slot?.kind === "via" || /^VIA_MACRO_/.test(macroKeycode || "") ? "VIA macro " : "Hardcoded macro ") + macroSlotNumber(macroKeycode);
+            const title = (slot?.kind === "via" || /^VIA_MACRO_/.test(macroKeycode || "") ? "VIA macro " : "User macro ") + macroSlotNumber(macroKeycode);
             lines.push("  " + title + " (" + macroKeycode + ")");
             if (!slot) {
                 lines.push("      No parsed payload for this keycode.");
@@ -6920,7 +6943,7 @@ function getClientScript() {
         const slot = macroSlotForKeycode(keycode);
         const payload = macroPayloadForSlot(slot);
         const parsed = payload ? parseMacroPayloadPreview(payload) : { steps: [], error: "" };
-        const slotKind = slot?.kind === "via" || /^VIA_MACRO_/.test(keycode || "") ? "VIA macro" : "Hardcoded macro";
+        const slotKind = slot?.kind === "via" || /^VIA_MACRO_/.test(keycode || "") ? "VIA macro" : "User macro";
         const title = slotKind + " " + macroSlotNumber(keycode);
         const previewLimit = 4;
         const previewSteps = parsed.steps.slice(0, previewLimit);
@@ -6945,7 +6968,7 @@ function getClientScript() {
     function macroKeycodesInExpression(expression) {
         const found = [];
         const seen = new Set();
-        for (const match of String(expression || "").matchAll(/\\b(?:VIA_MACRO|MACRO)_\\d+\\b/g)) {
+        for (const match of canonicalLayoutKeyExpression(expression || "").matchAll(/\\b(?:VIA_MACRO|MACRO)_\\d+\\b/g)) {
             if (seen.has(match[0])) continue;
             seen.add(match[0]);
             found.push(match[0]);
@@ -7586,7 +7609,7 @@ function getClientScript() {
 
     function renderMacroPayload(slot) {
         if (!slot) return "<span class='muted'>No parsed payload.</span>";
-        const kind = slot.kind === "via" ? "VIA" : "Hardcoded";
+        const kind = slot.kind === "via" ? "VIA" : "User";
         const payload = slot.payload ? escapeHtml(slot.payload) : "<span class='muted'>empty</span>";
         return "<code class='muted'>" + kind + "</code><br>" + payload;
     }
@@ -7630,11 +7653,12 @@ function getClientScript() {
     }
 
     function macroSlotForKeycode(keycode) {
-        return (model.viaMacros || []).concat(model.hardcodedMacros || []).find((slot) => slot.keycode === keycode);
+        const canonical = canonicalLayoutKeyExpression(keycode);
+        return allMacroSlots().find((slot) => slot.keycode === canonical);
     }
 
     function looksLikeMacroKeycode(keycode) {
-        return /^VIA_MACRO_\d+$/.test(keycode || "") || /^MACRO_\d+$/.test(keycode || "");
+        return /^VIA_MACRO_\\d+$/.test(keycode || "") || /^MACRO_\\d+$/.test(keycode || "");
     }
 
     function renderLayerPdModeTable(layer) {
@@ -8995,9 +9019,9 @@ function getClientScript() {
 
     function renderMacroStudio() {
         normalizeMacroBuilderState();
-        const slots = model.viaMacros || [];
+        const slots = allMacroSlots();
         if (!slots.length) {
-            return staticPanel("Macro Builder", "<p class='muted'>No VIA_MACROS(MACRO) rows were parsed.</p>");
+            return staticPanel("Macro Builder", "<p class='muted'>Read a keyboard with complete-profile support to load its macros. If the read failed, see Status and read the keyboard again.</p>");
         }
         const active = activeMacroSlot() || slots[0];
         return staticPanel("Macro Builder",
@@ -9015,17 +9039,17 @@ function getClientScript() {
         const edited = slots.filter((slot) => macroSlotDirty(slot.keycode)).length;
         const totalChars = payloads.reduce((sum, payload) => sum + payload.length, 0);
         return "<div class='macro-stat-row macro-builder-summary'>" +
-            renderMacroChip("slots", filled + " / " + slots.length + " filled", "", "Filled VIA macro slots out of all parsed VIA_MACROS(MACRO) rows.") +
-            renderMacroChip("payload chars", String(totalChars), "", "Total source characters across all current macro payload drafts.") +
-            (edited ? renderMacroChip("edited", String(edited), "warning", "Slots with local payload drafts that differ from keymap.c and still need Apply macro.") : "") +
-            renderMacroChip("target", "VIA_MACROS(MACRO)", "", "Macro payloads are written to the VIA_MACROS(MACRO) table in keymap.c.") +
+            renderMacroChip("slots", filled + " / " + slots.length + " filled", "", "Filled macro slots across both banks read from the keyboard.") +
+            renderMacroChip("payload chars", String(totalChars), "", "Total characters across all current macro drafts.") +
+            (edited ? renderMacroChip("edited", String(edited), "warning", "Local drafts that still need Apply macro.") : "") +
+            renderMacroChip("target", "Keyboard", "", "Apply saves to both halves and verifies the complete profile.") +
             "</div>";
     }
 
     function renderMacroSlotBrowser(slots) {
         return "<div class='card macro-slot-browser'>" +
-            "<h3 data-tooltip='Parsed VIA macro slots from the VIA_MACROS(MACRO) table. Select a slot to edit its payload draft.'>VIA Macro Slots</h3>" +
-            "<div class='macro-slot-list' role='listbox' aria-label='VIA macro slots'>" +
+            "<h3 data-tooltip='Both macro banks read from the keyboard. Each slot keeps its existing key assignment.'>Macro Slots</h3>" +
+            "<div class='macro-slot-list' role='listbox' aria-label='Macro slots'>" +
             slots.map(renderMacroSlotButton).join("") +
             "</div>" +
             "</div>";
@@ -9036,7 +9060,7 @@ function getClientScript() {
         const active = slot.keycode === activeMacroKeycode;
         const dirty = macroSlotDirty(slot.keycode);
         const empty = payload.length === 0;
-        const label = "VIA " + macroSlotNumber(slot.keycode);
+        const label = (slot.kind === "via" ? "VIA " : "User ") + macroSlotNumber(slot.keycode);
         const state = dirty ? "edited" : empty ? "empty" : payload.length + " chars";
         const classes = ["macro-slot-button", active ? "active" : "", dirty ? "dirty" : "", empty ? "empty" : ""].filter(Boolean).join(" ");
         const tooltip = macroSlotTooltip(label, state, payload);
@@ -9049,7 +9073,7 @@ function getClientScript() {
     function macroSlotTooltip(label, state, payload) {
         const text = String(payload || "");
         const preview = text ? text : "empty";
-        return label + " - " + state + "\\nSelect to edit this VIA macro slot. Payload draft: " + truncateTooltipText(preview, 420);
+        return label + " - " + state + "\\nSelect to edit this macro slot. Payload draft: " + truncateTooltipText(preview, 420);
     }
 
     function truncateTooltipText(value, limit) {
@@ -9072,13 +9096,17 @@ function getClientScript() {
 
     function renderMacroEditor(slot, payload) {
         const parsed = parseMacroPayloadPreview(payload);
+        const stale = macroDraftStale(slot.keycode);
         const status = parsed.error ? "invalid" : payload ? "ready" : "empty";
         return "<div class='card macro-editor-card' data-dirty-section data-macro-editor data-keycode='" + escapeAttr(slot.keycode) + "'>" +
             "<div class='macro-builder-head'>" +
             "<div><h3>" + escapeHtml(displayKeyExpression(slot.keycode)) + "</h3>" +
             "<div class='muted' data-tooltip='" + escapeAttr(macroEditorStatusTooltip(slot, status, parsed.error)) + "'><code>" + escapeHtml(slot.keycode) + "</code> - " + escapeHtml(status) + "</div></div>" +
-            "<button data-action='updateViaMacro' data-dirty-button class='primary'>Apply macro</button>" +
+            "<div class='toolbar'><button data-action='discardMacroDraft'" + (macroSlotDirty(slot.keycode) ? "" : " disabled") + ">Discard draft</button>" +
+            "<button data-action='updateViaMacro' data-dirty-button class='primary'" + (macroWriteAvailable(slot.keycode) ? "" : " disabled data-write-unavailable") + ">Apply macro</button></div>" +
             "</div>" +
+            (stale ? "<p role='status' class='warning'>The keyboard changed after this draft was opened. Your draft is kept; copy it if needed, then discard the draft and read the keyboard before applying again.</p>" : "") +
+            (!model.macroEditing?.writable && !model.portable?.busy ? "<p class='muted'>Macro editing requires the eight-layer complete-profile firmware and a successful keyboard read.</p>" : "") +
             "<label><span>Payload</span><textarea class='macro-payload-textarea monospace' data-macro-payload data-validate='macro-payload' spellcheck='false'>" + escapeHtml(payload) + "</textarea></label>" +
             "</div>";
     }
@@ -9086,7 +9114,7 @@ function getClientScript() {
     function macroEditorStatusTooltip(slot, status, error) {
         const keycode = displayKeyExpression(slot?.keycode || "");
         if (status === "invalid") return keycode + " payload has a parse error: " + error;
-        if (status === "ready") return keycode + " has a non-empty payload draft. Apply macro writes it back to keymap.c.";
+        if (status === "ready") return keycode + " has a non-empty draft. Apply macro saves it to both halves and verifies readback.";
         return keycode + " is empty. Add text, insert steps, or record events before applying.";
     }
 
@@ -9137,7 +9165,7 @@ function getClientScript() {
         const delayFieldClass = "macro-recorder-delay-fields" + (macroRecordDelays ? "" : " inactive");
         const delayFieldAttrs = macroRecordDelays ? " data-validate='positive-int'" : " tabindex='-1'";
         return "<div class='macro-builder-head macro-recorder-header'>" +
-            "<div><h3 data-tooltip='Record keyboard events in the browser and append the generated payload to the selected VIA macro draft.'>Record Macro</h3>" +
+            "<div><h3 data-tooltip='Record keyboard events in the browser and append the generated payload to the selected macro draft.'>Record Macro</h3>" +
             "<div class='muted macro-recorder-state' data-tooltip='" + escapeAttr("Recorder state for " + displayKeyExpression(slot.keycode) + ": " + stateText) + "'>" + state + "</div></div>" +
             "<div class='macro-stat-row macro-recorder-stats'>" +
             renderMacroChip("events", String(eventCount), "", "Captured key down/up events in the current recording take.") +
@@ -9205,11 +9233,36 @@ function getClientScript() {
     }
 
     function activeMacroSlot() {
-        return (model.viaMacros || []).find((slot) => slot.keycode === activeMacroKeycode);
+        return allMacroSlots().find((slot) => slot.keycode === activeMacroKeycode);
     }
 
     function macroSlotByKeycode(keycode) {
-        return (model.viaMacros || []).find((slot) => slot.keycode === keycode);
+        return allMacroSlots().find((slot) => slot.keycode === keycode);
+    }
+
+    function allMacroSlots() {
+        return (model?.viaMacros || []).concat(model?.hardcodedMacros || []);
+    }
+
+    function macroDraftStale(keycode) {
+        return Boolean(macroDraftBases[keycode] && macroDraftBases[keycode] !== model?.macroEditing?.identity);
+    }
+
+    function macroWriteAvailable(keycode) {
+        return Boolean(model?.macroEditing?.writable && !macroSavePending && !macroDraftStale(keycode));
+    }
+
+    function acceptMacroSave(saved) {
+        if (!saved) return;
+        if (macroDrafts[saved.keycode] === saved.payload) {
+            delete macroDrafts[saved.keycode];
+            delete macroDraftBases[saved.keycode];
+        }
+        // Only an acknowledged edit from this exact base can advance other
+        // drafts. An external keyboard change must still make them stale.
+        for (const key of Object.keys(macroDraftBases)) {
+            if (macroDraftBases[key] === saved.expectedFingerprint) macroDraftBases[key] = model.macroEditing?.identity || "";
+        }
     }
 
     function macroPayloadForSlot(slot) {
@@ -9236,10 +9289,12 @@ function getClientScript() {
         if (nextPayload === String(slot.payload || "")) {
             const nextDrafts = { ...macroDrafts };
             delete nextDrafts[keycode];
+            delete macroDraftBases[keycode];
             macroDrafts = nextDrafts;
             return;
         }
         macroDrafts = { ...macroDrafts, [keycode]: nextPayload };
+        if (!macroDraftBases[keycode]) macroDraftBases[keycode] = model.macroEditing?.identity || "";
     }
 
     function captureActiveMacroDraft() {
@@ -9261,7 +9316,7 @@ function getClientScript() {
 
         const flushText = (end) => {
             if (end <= textStart) return;
-            const text = payload.slice(textStart, end);
+            const text = payload.slice(textStart, end).replace(/{{/g, "{").replace(/}}/g, "}");
             steps.push({
                 kind: "text",
                 kindLabel: "Text",
@@ -9272,6 +9327,7 @@ function getClientScript() {
 
         while (index < payload.length) {
             const char = payload[index];
+            if ((char === "{" || char === "}") && payload[index + 1] === char) {index += 2; continue;}
             if (char.charCodeAt(0) > 0x7F) {
                 return { steps, error: "Macro payloads only support ASCII text." };
             }
@@ -9771,12 +9827,8 @@ function getClientScript() {
                 reportFieldError(input, "Enter text to insert.");
                 return "";
             }
-            if (/[{}]/.test(text)) {
-                reportFieldError(input, "Text steps cannot include { or }.");
-                return "";
-            }
             setFieldError(input, "");
-            return text;
+            return text.replace(/[{}]/g, brace => brace + brace);
         }
         if (type === "delay") {
             const input = workbench.querySelector("#macroStepDelay");

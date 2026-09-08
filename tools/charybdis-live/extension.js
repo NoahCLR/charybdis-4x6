@@ -63,7 +63,8 @@ function publish(panel, session) {
             committed: state.committed,
             baseRgb: state.baseRgb,
             combos: state.combos,
-            busy: state.busy || session.savingBehavior,
+            macroView: state.macroView,
+            busy: state.busy || session.savingBehavior || session.portableBusy,
             device: state.devices.find((device) => device.id === state.selectedDeviceId),
         });
     model.portable = {
@@ -79,9 +80,11 @@ function publish(panel, session) {
     void panel.webview.postMessage({type: "model", model,
         notice: session.notice,
         savedBehavior: session.savedBehavior,
+        savedMacro: session.savedMacro,
     });
     session.notice = undefined;
     session.savedBehavior = undefined;
+    session.savedMacro = undefined;
 }
 
 // The webview sets its own "Working..." status on every message it posts, and
@@ -145,6 +148,19 @@ async function handleMessage(panel, session, message) {
                     session.savedBehavior = message.type === "addBehavior" ? "new" : message.behavior?.keycode || message.keycode;
                     session.notice = "Saved to both halves and verified by reading the profile back.";
                 } finally {session.savingBehavior = false;}
+                publish(panel, session);
+                return;
+            case "updateViaMacro":
+                session.portableBusy = true;
+                try {
+                    await vscode.window.withProgress(
+                        {location: vscode.ProgressLocation.Notification, title: "Saving macro to both halves"},
+                        () => session.service.saveMacroEdit(message, {saveRecovery: document => saveRecoveryFile(session, document)})
+                    );
+                    await session.service.readCommittedProfile();
+                    session.savedMacro = {keycode: message.keycode, payload: message.payload, expectedFingerprint: message.expectedFingerprint};
+                    session.notice = "Macro saved to both halves and verified. Recovery copy: " + session.lastRecovery.fsPath;
+                } finally {session.portableBusy = false;}
                 publish(panel, session);
                 return;
             case "addCombo":
@@ -238,6 +254,11 @@ async function connectAndRead(panel, session) {
 
     await service.readBaseRgb();
     await service.readCombos();
+    let macroFailure = "";
+    if ((service.capabilities?.supportedDomainMask & 15) === 15) {
+        try {await service.readPortableProfile();}
+        catch (error) {macroFailure = " Macros could not be read: " + error.message;}
+    }
     const state = service.snapshot();
     if (state.error || state.committed?.state !== "read") {
         session.notice = `The keyboard profile could not be read: ${state.error?.message || "no verified profile was returned"}.`;
@@ -248,6 +269,7 @@ async function connectAndRead(panel, session) {
         const failures = state.committed.failures?.length || 0;
         session.notice = `Read the layout and ${description}.` + (failures ? ` ${failures} domain(s) could not be decoded; see diagnostics.` : "");
     }
+    if (macroFailure) session.notice += macroFailure;
     publish(panel, session);
 }
 
@@ -280,6 +302,15 @@ async function writeLayoutKeys(panel, session, message) {
 
 module.exports = {activate, deactivate};
 
+async function saveRecoveryFile(session, document) {
+    await vscode.workspace.fs.createDirectory(session.recoveryRoot);
+    const suffix = document.format === "charybdis-profile" ? ".charybdis.json" : ".diagnostic.json";
+    const uri = vscode.Uri.joinPath(session.recoveryRoot, "recovery-" + new Date().toISOString().replace(/[:.]/g, "-") + suffix);
+    await vscode.workspace.fs.writeFile(uri, Buffer.from(JSON.stringify(document, null, 2) + "\n"));
+    session.lastRecovery = uri;
+    return uri.fsPath;
+}
+
 async function portableMessage(panel, session, message) {
     session.portableBusy = true;
     try {
@@ -290,14 +321,7 @@ async function portableMessage(panel, session, message) {
             reorderLayers(draft.before.document, draft.order, draft.order.map(old => message.names[old]));
             draft.names = [...message.names];
         }
-        const saveRecovery = async document => {
-            await vscode.workspace.fs.createDirectory(session.recoveryRoot);
-            const suffix = document.format === "charybdis-profile" ? ".charybdis.json" : ".diagnostic.json";
-            const uri = vscode.Uri.joinPath(session.recoveryRoot, "recovery-" + new Date().toISOString().replace(/[:.]/g, "-") + suffix);
-            await vscode.workspace.fs.writeFile(uri, Buffer.from(JSON.stringify(document, null, 2) + "\n"));
-            session.lastRecovery = uri;
-            return uri.fsPath;
-        };
+        const saveRecovery = document => saveRecoveryFile(session, document);
         if (message.type === "cancelPortableReview") {
             session.portableReview = undefined; session.portableLayers = undefined;
         } else if (message.type === "exportPortableProfile") {

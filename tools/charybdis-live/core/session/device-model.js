@@ -12,12 +12,22 @@
 // be a lie about what the keyboard is running.
 
 const keycodeCatalog = require("../data/keycode-catalog");
-const {baseRgbForView, behaviorAliasesForView, behaviorRowsForView, combosForView, rgbForView} = require("./device-profile-view");
+const {baseRgbForView, behaviorAliasesForView, behaviorRowsForView, combosForView, rgbForView, knownActionAbi} = require("./device-profile-view");
+const {resolveNativeQmkExpression} = require("../schema/compiled-profile-v1");
 
 const CATALOG_SOURCE = "vendored QMK keycode catalog";
 
 function buildDeviceModel(state = {}) {
     const catalog = catalogViews();
+    if (state.macroView && knownActionAbi(state.capabilities?.actionAbiDigest)) {
+        for (const slot of [...state.macroView.viaMacros, ...state.macroView.hardcodedMacros]) {
+            const native = keycodeCatalog.resolve(resolveNativeQmkExpression(slot.keycode, {})).name;
+            const label = (slot.kind === "via" ? "VIA macro " : "User macro ") + slot.keycode.split("_").at(-1);
+            catalog.aliases[native] = slot.keycode;
+            catalog.labels[native] = label;
+            catalog.labels[slot.keycode] = label;
+        }
+    }
     if (state.committed?.state === "read" && state.committed.domains?.keyBehaviors) {
         const aliases = behaviorAliasesForView(state.committed.domains.keyBehaviors, state.capabilities);
         Object.assign(catalog.aliases, aliases);
@@ -50,12 +60,13 @@ function buildDeviceModel(state = {}) {
         // Independently read native combo definitions.
         combos: combosForView(state.combos, catalog.labels),
         comboReadback: state.combos ? {...state.combos, rows: undefined, writable: Boolean(state.capabilities?.supportedDomainMask & 4) && state.committed?.state === "read" && !state.busy} : {state: "unread"},
-        // Still awaiting their own reads.
-        viaMacros: [],
-        hardcodedMacros: [],
+        viaMacros: state.macroView?.viaMacros || [],
+        hardcodedMacros: state.macroView?.hardcodedMacros || [],
+        macroEditing: {identity: state.macroView?.identity || "", writable: Boolean(state.macroView) && state.capabilities?.compiledLayerCount === 8 && !state.busy},
+        // Global policy still awaits its dedicated editor model.
         behaviorTimingDefaults: {},
         configDefaults: [],
-        macroPayloadKeycodes: [],
+        macroPayloadKeycodes: state.macroView?.macroPayloadKeycodes || [],
 
         qmkKeycodes: catalog.entries,
         qmkKeyLabels: catalog.labels,

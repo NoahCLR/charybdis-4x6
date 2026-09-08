@@ -308,8 +308,13 @@ the layout or Behaviours view, including tap branches, hold actions, timing,
 repeat rates and the auto-mouse anchor flag. Saves preserve other rows and
 domains and verify the committed payload. Unsaved behaviour edits stay with
 their row when switching views; a changed profile blocks a stale save and a
-failed save keeps the draft. Complete export/import includes macros and global
-settings; dedicated editors for those settings remain a next step. Readback requires the side-specific firmware pair,
+failed save keeps the draft. The Macros view reuses Studio's slot browser,
+recorder, step builder and preview. It reads all 64 VIA and 16 user macro slots
+from the keyboard; **Apply macro** saves either bank with a recovery copy and
+verified readback. Empty slots are editable, and **Clear** followed by Apply
+removes a macro's contents. Failed saves keep drafts. Complete export/import
+also includes global settings; their dedicated controls remain a next step.
+Readback requires the side-specific firmware pair,
 which carries the live-profile owner by default; the generic image does not.
 After updating the extension, reload VS Code and use **Read from keyboard**.
 

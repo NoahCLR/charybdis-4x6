@@ -162,6 +162,7 @@ checks exercise naming, moving, saving and reviewing an import. Both standard
 and bridge pairs build. The user reports that the new workflow appears to work
 on their keyboard. Physical bridge/export/upgrade/import, restoration onto
 firmware without authored behaviours or combos, reboot, power loss and USB-role
-changes still require a recorded acceptance matrix. Dedicated macro/global-policy
-editors and the inherited pointing-cadence regression remain separate product
-work.
+changes still require a recorded acceptance matrix. The existing Studio macro
+builder now reads and edits both device banks through this complete-profile
+restore path. Global-policy controls and the inherited pointing-cadence
+regression remain separate product work.

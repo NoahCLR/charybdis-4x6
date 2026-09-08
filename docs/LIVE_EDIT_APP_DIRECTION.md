@@ -28,12 +28,13 @@ manual feedback, not completion of the hardware acceptance matrix.
 | --- | --- |
 | Layout and eight layers | Read/write; names and overlay order travel with complete profiles |
 | Key behaviours, combos and RGB | Read/write editors; custom-profile saves verify readback and both halves |
-| Macros and global policy | Read/write through complete export/import; dedicated editor models and save handlers remain unwired |
+| Macros | Studio's existing builder, recorder and preview wired to both device banks; verified save and draft retention |
+| Global policy | Read/write through complete export/import; dedicated editor model and save handlers remain unwired |
 | Backup and restore | Complete supported snapshots, review, recovery file and verified restore; interrupted restores can be retried |
 | Drafts and Apply | Layout drafts and generation-bound behaviour drafts exist; one whole-profile draft, semantic review and coordinated Apply remain pending |
 | Recovery and release readiness | Guided reset/recovery, broad hardware acceptance, performance work and standalone packaging remain pending |
 
-Next feature work is the macro editor, followed by global settings such as
+Next feature work is wiring Studio's existing global settings controls for
 timing, DPI and auto-mouse policy. The complete-profile read/write path supplies
 their data; they must use it without introducing a repository dependency. Then
 unify editing, undo/redo and change review across domains. The two storage
@@ -503,8 +504,8 @@ across two durable owners, not one atomic transaction. Interrupted work retains
 its recovery file and reports incomplete restoration.
 
 Next: finish hardware acceptance of bridge/export/update/import, power loss and
-USB role changes. Dedicated macro and global-policy editors and the inherited
-pointing-cadence regression remain separate work toward product acceptance.
+USB role changes. D-L16 wires the macro editor; global-policy controls and the
+inherited pointing-cadence regression remain work toward product acceptance.
 
 D-L15 verification: the app has 278 passing tests, including exact macro-write
 invalidation/retry, incomplete-restore recovery, legacy migration, layer-name
@@ -520,3 +521,40 @@ as a completed hardware matrix. A subsequent read-only probe found the HID
 interface but could not open it, so it did not establish a new layer count or
 generation. Next is recording bridge/export/update/import acceptance, then
 reboot, power-loss and USB-role checks.
+
+### D-L16 — Wire Studio's macro UI to the existing complete-profile writer
+
+The slot browser, payload editor, browser-event recorder, step builder and
+preview remain the existing Studio interface. The device model now supplies
+all 64 VIA and 16 user slots, including empty slots, from coherent complete
+readback. Both banks use the same editor; their existing key identities stay
+stable. The layout picker resolves those identities through the advertised
+action vocabulary, including slots beyond the vendored catalog's named macro
+range; the existing layout hover cards and overview show their device payloads.
+No source parser or new firmware command is involved.
+
+The host translates the existing text/command syntax into each bank's native
+bytes, validates supported keys, balanced holds, delays and storage capacity,
+and patches only the selected slot in the reviewed snapshot. Doubled braces
+represent literal braces in text. Apply uses the existing complete-profile
+restore path with recovery-file creation, stale-base checks, both-half
+convergence and exact readback. It therefore inherits the recoverable, non-atomic
+cross-store contract; a narrower macro-only writer is not introduced here.
+
+Drafts retain their original complete-profile fingerprint. Failed saves keep
+their contents; external changes block stale writes. A verified save advances
+other drafts from that exact base because the submitted edit changed only the
+selected macro. A per-slot Discard action restores the last readback. Editing
+requires the eight-layer complete-profile image; the five-layer bridge remains
+available for readback and export.
+
+Verification includes schema and model round trips, bank capacity and stale
+draft rejection, the real extension Apply-message/recovery/acknowledgement
+route, and browser checks of Cmd+N insertion, recording, clearing user macros,
+immediate discard, failed-save retention and preserving other drafts after a
+successful save. Browser writes use a simulated keyboard; physical macro
+execution remains part of hardware acceptance. Next: wire the existing Defaults
+controls to global settings and finish the recorded hardware matrix.
+
+The app has 293 passing tests for this checkpoint, and the full host suite
+passes. No firmware source or protocol contract changed in this wiring pass.
