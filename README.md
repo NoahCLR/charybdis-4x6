@@ -312,8 +312,23 @@ failed save keeps the draft. The Macros view reuses Studio's slot browser,
 recorder, step builder and preview. It reads all 64 VIA and 16 user macro slots
 from the keyboard; **Apply macro** saves either bank with a recovery copy and
 verified readback. Empty slots are editable, and **Clear** followed by Apply
-removes a macro's contents. Failed saves keep drafts. Complete export/import
-also includes global settings; their dedicated controls remain a next step.
+removes a macro's contents. Failed saves keep drafts. The existing **Defaults**
+panels now read and save key timing, combo enablement, normal/sniping and mode
+DPI, auto-sniping, auto-mouse activation and fade timing, base lighting and
+feedback flash timing. Each section keeps its draft across view changes,
+refreshes and failed saves; **Discard changes** reloads its last readback. A
+refresh that detects a changed profile keeps the draft but blocks a stale save.
+Saving creates a recovery copy and verifies the complete profile on both halves. Behaviour timing
+placeholders use the defaults read from the board.
+
+Defaults also includes lighting effects and LED selection, startup layers,
+keyboard-wide key options, and combo layer matching. The keyboard reports its
+brightness limit, available effects and supported key options; unsupported
+options stay read-only. Update both halves with the current firmware pair to
+enable these capability-dependent controls. Older complete-profile firmware
+still supports the other settings. All section saves preserve unrelated values,
+including native option bits the editor does not expose. Lighting colour and
+effect changes now save correctly while lighting is switched off.
 Readback requires the side-specific firmware pair,
 which carries the live-profile owner by default; the generic image does not.
 After updating the extension, reload VS Code and use **Read from keyboard**.

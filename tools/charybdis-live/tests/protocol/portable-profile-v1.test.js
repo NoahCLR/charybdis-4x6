@@ -1,7 +1,7 @@
 "use strict";
 const {test} = require("node:test");
 const assert = require("node:assert/strict");
-const {readSettings, readStorageStatus, waitForStorage} = require("../../core/protocol/portable-profile-v1");
+const {readSettings, readSettingsLimits, readStorageStatus, waitForStorage} = require("../../core/protocol/portable-profile-v1");
 const {encodeSettings} = require("../../core/schema/settings-domain-v1");
 const {crc32, fnv1a32} = require("../../core/schema/profile-blob-v1");
 const ids = () => {let value = 0; return {next: () => value = value % 255 + 1};};
@@ -25,4 +25,19 @@ test("convergence requires matching peer identity, valid digest and no pending w
     bytes[1] |= 8; assert.equal((await readStorageStatus(connection,ids())).ready,false);
     await assert.rejects(waitForStorage(connection,ids(),{timeoutMs:1,pollMs:1}),/not finished/);
     bytes[1] = 6; await assert.rejects(waitForStorage(connection,ids()),/recovery/);
+});
+
+
+test("optional brightness limits distinguish old firmware from malformed readback", async () => {
+    const connection = {request: async (request, options) => {
+        assert.equal(request[2], 8); assert.equal(request[4], 1);
+        const reply = response(request, Buffer.from([1, 200])); assert(options.matchResponse(reply)); return reply;
+    }};
+    assert.deepEqual(await readSettingsLimits(connection, ids()), {brightnessMax: 200});
+    assert.deepEqual(await readSettingsLimits({request: async request => response(request, Buffer.from([1,0]))}, ids()), {brightnessMax: 0});
+    await assert.rejects(readSettingsLimits({request: async request => response(request, Buffer.from([1]), 2)}, ids()), /status 2/);
+    assert.equal(await readSettingsLimits({request: async request => response(request, Buffer.alloc(0), 2)}, ids()), null);
+    await assert.rejects(readSettingsLimits({request: async request => response(request, Buffer.from([1,200,0]))}, ids()), /limits/);
+    await assert.rejects(readSettingsLimits({request: async request => {const reply = response(request, Buffer.alloc(0), 2); reply[3]++; return reply;}}, ids()), /correlation/);
+    await assert.rejects(readSettingsLimits({request: async request => {const reply = response(request, Buffer.alloc(0), 2); reply[31] = 1; return reply;}}, ids()), /trailing/);
 });

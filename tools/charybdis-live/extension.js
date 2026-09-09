@@ -64,6 +64,7 @@ function publish(panel, session) {
             baseRgb: state.baseRgb,
             combos: state.combos,
             macroView: state.macroView,
+            settingsView: state.settingsView,
             busy: state.busy || session.savingBehavior || session.portableBusy,
             device: state.devices.find((device) => device.id === state.selectedDeviceId),
         });
@@ -81,10 +82,12 @@ function publish(panel, session) {
         notice: session.notice,
         savedBehavior: session.savedBehavior,
         savedMacro: session.savedMacro,
+        savedSettings: session.savedSettings,
     });
     session.notice = undefined;
     session.savedBehavior = undefined;
     session.savedMacro = undefined;
+    session.savedSettings = undefined;
 }
 
 // The webview sets its own "Working..." status on every message it posts, and
@@ -148,6 +151,21 @@ async function handleMessage(panel, session, message) {
                     session.savedBehavior = message.type === "addBehavior" ? "new" : message.behavior?.keycode || message.keycode;
                     session.notice = "Saved to both halves and verified by reading the profile back.";
                 } finally {session.savingBehavior = false;}
+                publish(panel, session);
+                return;
+            case "updateConfigDefaults":
+                session.portableBusy = true;
+                try {
+                    await vscode.window.withProgress(
+                        {location: vscode.ProgressLocation.Notification, title: "Saving settings to both halves"},
+                        () => session.service.saveSettingsEdit(message, {saveRecovery: document => saveRecoveryFile(session, document)})
+                    );
+                    await session.service.readCommittedProfile();
+                    await session.service.readBaseRgb();
+                    await session.service.readCombos();
+                    session.savedSettings = {sectionId: message.sectionId, fields: message.fields, expectedFingerprint: message.expectedFingerprint};
+                    session.notice = "Settings saved to both halves and verified. Recovery copy: " + session.lastRecovery.fsPath;
+                } finally {session.portableBusy = false;}
                 publish(panel, session);
                 return;
             case "updateViaMacro":
@@ -257,7 +275,7 @@ async function connectAndRead(panel, session) {
     let macroFailure = "";
     if ((service.capabilities?.supportedDomainMask & 15) === 15) {
         try {await service.readPortableProfile();}
-        catch (error) {macroFailure = " Macros could not be read: " + error.message;}
+        catch (error) {macroFailure = " Macros and global settings could not be read: " + error.message;}
     }
     const state = service.snapshot();
     if (state.error || state.committed?.state !== "read") {

@@ -12,6 +12,7 @@ const {crc32, fnv1a32} = require("../../core/schema/profile-blob-v1");
 const {bytes, capabilities} = require("../fixtures/device-profile");
 const {document} = require("../fixtures/portable-profile");
 const {fingerprint, summary} = require("../../core/model/portable-profile");
+const {settingsEditorView} = require("../../core/model/settings-editor");
 const {macroEditorView} = require("../../core/model/macro-editor");
 
 const {fixturePages, responseFor} = require("../fixtures/device-combos");
@@ -75,8 +76,9 @@ function harness({source = "compiled", fail = false, failBase = false, failCombo
         async readLayout() {this.layout = {state: "read", layers: [{layer: 0, keys: []}]}; return this.snapshot();}
         async readPortableProfile() {
             if (!portable) return super.readPortableProfile();
-            this.portable = {document: portableDocument, fingerprint: fingerprint(portableDocument), summary: summary(portableDocument)};
+            this.portable = {document: portableDocument, fingerprint: fingerprint(portableDocument), summary: summary(portableDocument), options: require("../fixtures/keyboard-options").options()};
             this.macroView = macroEditorView(this.portable);
+            this.settingsView = settingsEditorView(this.portable);
             this.emitChange();
             return this.portable;
         }
@@ -271,4 +273,48 @@ test("an unsupported combo read leaves the other device domains visible", async 
     assert.equal(model.comboReadback.error.code, "COMBO_UNSUPPORTED");
     assert.match(model.diagnostics.join(" "), /updated firmware pair/);
     app.close();
+});
+
+
+test("Defaults Apply uses the real settings editor, recovery writer and verified acknowledgement", async () => {
+    const app = harness({portable: true}); await app.read();
+    const model = app.messages.at(-1).model;
+    const section = model.configDefaults.find(section => section.id === "normalPointerSpeed");
+    await app.send({type: "updateConfigDefaults", sectionId: section.id, expectedFingerprint: model.settingsEditing.identity,
+        fields: section.fields.map(field => ({macro: field.macro, value: field.macro === "normalDpi" ? "1600" : field.value}))});
+    const final = app.messages.at(-1);
+    assert.match(final.notice, /Settings saved to both halves and verified/);
+    assert.equal(final.savedSettings.sectionId, section.id);
+    assert.equal(final.model.configDefaults.find(section => section.id === "normalPointerSpeed").fields[0].value, "1600");
+    assert.equal(app.recoveryFiles.length, 1);
+    assert.equal(fingerprint(app.recoveryFiles[0].document), model.settingsEditing.identity);
+    app.close();
+});
+
+test("failed Defaults saves never acknowledge or replace the last verified values", async () => {
+    const app = harness({portable: true, failMacro: true}); await app.read();
+    const model = app.messages.at(-1).model, section = model.configDefaults.find(section => section.id === "normalPointerSpeed");
+    await app.send({type: "updateConfigDefaults", sectionId: section.id, expectedFingerprint: model.settingsEditing.identity,
+        fields: section.fields.map(field => ({macro: field.macro, value: field.macro === "normalDpi" ? "1600" : field.value}))});
+    const final = app.messages.at(-1);
+    assert.match(final.notice, /Failed.*readback mismatch/);
+    assert.equal(final.savedSettings, undefined);
+    assert.equal(final.model.configDefaults.find(section => section.id === "normalPointerSpeed").fields[0].value, "1200");
+    assert.equal(final.model.settingsEditing.writable, true);
+    app.close();
+});
+
+
+test("native settings sections save through the existing extension route and preserve other banks", async () => {
+    const app = harness({portable: true}); await app.read();
+    for (const [sectionId, key, next] of [["startupLayers", "startupLayer7", true], ["comboReferences", "comboReference7", "Layer 0"], ["keyboardOptions", "swapLeftAltGui", true], ["rgbAppearance", "effectMode", "2"]]) {
+        const model = app.messages.at(-1).model, section = model.configDefaults.find(section => section.id === sectionId);
+        await app.send({type: "updateConfigDefaults", sectionId, expectedFingerprint: model.settingsEditing.identity,
+            fields: section.fields.map(field => field.kind === "toggle" ? {macro: field.macro, enabled: field.macro === key ? next : field.enabled} : {macro: field.macro, value: field.macro === key ? next : field.value})});
+        const final = app.messages.at(-1), field = final.model.configDefaults.find(section => section.id === sectionId).fields.find(field => field.macro === key);
+        assert.equal(final.savedSettings?.sectionId, sectionId);
+        assert.equal(field.kind === "toggle" ? field.enabled : field.value, next);
+        assert.equal(final.model.viaMacros.length, 64); assert.equal(final.model.hardcodedMacros.length, 16);
+    }
+    assert.equal(app.recoveryFiles.length, 4); app.close();
 });

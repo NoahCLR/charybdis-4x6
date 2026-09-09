@@ -118,6 +118,65 @@ Readiness requires only the digest-valid flag, no reported error/conflict, and
 matching local/peer generation and digest. These are VIA storage identities;
 the custom-profile owner retains its separate status and generation.
 
+GET value `0x08`, page 1 is optional editor metadata: exactly two bytes,
+version `1` and the device's actual RGB maximum brightness (uint8, including
+zero). The firmware reports `RGB_MATRIX_MAXIMUM_BRIGHTNESS`; it does not
+change LED state. Earlier firmware rejects this page with status `2`. The app
+treats only that canonical, correlated rejection as absent metadata; malformed
+or other failed replies remain errors. Without the limit, the Defaults brightness
+field is read-only. Other settings and existing export/import stay available.
+With a reported limit, Defaults and full-profile restore reject an excessive
+brightness before writing. This metadata is not configuration, is not exported,
+and does not alter the portable profile fingerprint or payload schema.
+
+GET value `0x08`, page 2 adds optional native editor capabilities. Its nine-byte
+metadata payload is:
+
+| Offset | Value |
+| --- | --- |
+| 0 | Version `1` |
+| 1 | Chunk size `25` |
+| 2–3 | Body length, uint16 little-endian |
+| 4 | Effect count; effect IDs are 1 through this count |
+| 5 | Semantic key-option count, exactly `13` |
+| 6–7 | Supported semantic key-option bitmask, uint16 little-endian |
+| 8 | OR of this keyboard's LED classification flags |
+
+Pages 3 onward return successive body chunks, with an exact short final chunk.
+The body is 13 native uint16 little-endian key-option masks followed by one
+64-byte, NUL-terminated, zero-padded ASCII effect token per effect. Names follow
+`[A-Z][A-Z0-9_]*`; names, masks and support flags come from the running firmware's
+QMK build. The masks are distinct, nonzero single bits, derived from the native
+keymap union rather than assuming its bitfield layout. Semantic option IDs are:
+
+| ID | Key option |
+| --- | --- |
+| 0 | Swap Control and Caps Lock |
+| 1 | Caps Lock becomes Control |
+| 2 | Swap left Alt and GUI |
+| 3 | Swap right Alt and GUI |
+| 4 | Disable GUI keys |
+| 5 | Swap Grave and Escape |
+| 6 | Swap Backslash and Backspace |
+| 7 | NKRO |
+| 8 | Swap left Control and GUI |
+| 9 | Swap right Control and GUI |
+| 10 | Enable one-shot keys |
+| 11 | Swap Escape and Caps Lock |
+| 12 | Autocorrect |
+
+The host bounds total body length to pages 3–255 and rechecks page 2 after
+reading. Only a canonical correlated status `2` with empty payload on page 2
+means unavailable metadata. Unsupported bits, malformed names/masks, invalid
+lengths, failed chunks and changed metadata are errors. Supported LED classes
+are modifier (1), underglow (2), keylight (4) and indicator (8). The UI offers
+their reported combinations, plus all (255) and none (0), and preserves a
+current custom selection. Missing metadata makes effects, LED selection and
+native key options read-only. Supported semantic bits gate editable key options.
+Restore rejects an effect absent from the advertised inventory before staging.
+This metadata is not exported and does not remap native effect IDs between
+different firmware builds.
+
 ## Layer order and restoration
 
 The standard image reserves eight layers. Base stays at index zero. The app
@@ -164,5 +223,29 @@ on their keyboard. Physical bridge/export/upgrade/import, restoration onto
 firmware without authored behaviours or combos, reboot, power loss and USB-role
 changes still require a recorded acceptance matrix. The existing Studio macro
 builder now reads and edits both device banks through this complete-profile
-restore path. Global-policy controls and the inherited pointing-cadence
-regression remain separate product work.
+restore path. Defaults controls use that path too. The inherited pointing-cadence
+regression and unified draft/review/Apply remain separate product work.
+
+
+## Defaults editor
+
+Studio's existing section controls receive effective scalar values from the
+complete snapshot. Section saves preserve both macro banks, layer names and
+all unedited profile bytes, use the complete-profile recovery/restore path, and
+acknowledge only verified readback. Drafts are keyed by device and section and
+retain their original complete-profile fingerprint. Failed saves and re-reads
+keep drafts; external changes block stale saves until discard. Verified macro
+and settings edits can advance unrelated drafts from their exact common base.
+
+Dedicated controls cover all 28 settings, subject to advertised capabilities:
+timing and pointer policies, all four bytes of lighting setting 21, HSV (22),
+startup layers (23), supported native key options (24), and per-layer combo
+references (27). Unedited bytes and unknown native bits remain intact. Startup
+layers require a nonzero final mask; combo references use the reported names.
+
+The firmware applies native lighting while temporarily enabled because QMK
+ignores mode/HSV setters when disabled. At the existing safe activation boundary
+it synchronously applies all lighting values, then restores and saves the final
+enabled state. The renderer cannot run between these operations. This permits
+editing saved colours/effects while lighting stays off and restoring a profile
+whose lighting state differs from the current state.

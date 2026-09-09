@@ -31,6 +31,20 @@ async function readStorageStatus(connection, ids) {
     result.ready = result.flags === 4 && !result.error && !result.conflicts && result.generation === result.peerGeneration && result.digest === result.peerDigest;
     return result;
 }
+async function readSettingsLimits(connection, ids) {
+    const request = buildProfileGetRequest(8, 1, ids.next());
+    const response = await connection.request(request, {matchResponse: response => profileResponseMatcher(response, request)});
+    let bytes;
+    try {bytes = decodeProfileResponse(response, request, {allowShortPayload: true});}
+    catch (error) {
+        // Earlier complete-profile images reject this optional page. Other
+        // failures remain errors, including malformed or uncorrelated replies.
+        if (error.code === "DEVICE_REJECTED" && error.status === 2 && response[6] === 0) return null;
+        throw error;
+    }
+    if (bytes.length !== 2 || bytes[0] !== 1) throw fail("Unsupported keyboard settings limits.");
+    return {brightnessMax: bytes[1]};
+}
 async function waitForStorage(connection, ids, {timeoutMs = 90000, pollMs = 150} = {}) {
     const deadline = Date.now() + timeoutMs;
     do {
@@ -41,4 +55,4 @@ async function waitForStorage(connection, ids, {timeoutMs = 90000, pollMs = 150}
     } while (Date.now() < deadline);
     throw fail("The two halves have not finished saving. Keep the recovery file and reconnect both halves.");
 }
-module.exports = {readSettings, readStorageStatus, waitForStorage};
+module.exports = {readSettings, readSettingsLimits, readStorageStatus, waitForStorage};

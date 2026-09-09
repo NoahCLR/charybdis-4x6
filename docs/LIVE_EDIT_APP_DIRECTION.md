@@ -29,14 +29,13 @@ manual feedback, not completion of the hardware acceptance matrix.
 | Layout and eight layers | Read/write; names and overlay order travel with complete profiles |
 | Key behaviours, combos and RGB | Read/write editors; custom-profile saves verify readback and both halves |
 | Macros | Studio's existing builder, recorder and preview wired to both device banks; verified save and draft retention |
-| Global policy | Read/write through complete export/import; dedicated editor model and save handlers remain unwired |
+| Global policy | Defaults panels cover all 28 portable scalars, including startup layers, combo matching and device-reported lighting/key options; unsupported firmware features stay read-only |
 | Backup and restore | Complete supported snapshots, review, recovery file and verified restore; interrupted restores can be retried |
 | Drafts and Apply | Layout drafts and generation-bound behaviour drafts exist; one whole-profile draft, semantic review and coordinated Apply remain pending |
 | Recovery and release readiness | Guided reset/recovery, broad hardware acceptance, performance work and standalone packaging remain pending |
 
-Next feature work is wiring Studio's existing global settings controls for
-timing, DPI and auto-mouse policy. The complete-profile read/write path supplies
-their data; they must use it without introducing a repository dependency. Then
+Studio's existing Defaults controls now use complete-profile readback and the
+verified restore path, including native options reported by firmware. Next,
 unify editing, undo/redo and change review across domains. The two storage
 owners still require a complete logical-generation contract: today's restore
 is recoverable but not atomic across all domains. Resolve the inherited pointing
@@ -558,3 +557,116 @@ controls to global settings and finish the recorded hardware matrix.
 
 The app has 293 passing tests for this checkpoint, and the full host suite
 passes. No firmware source or protocol contract changed in this wiring pass.
+
+
+### D-L17 — Device-backed Defaults and reported brightness limits
+
+The existing Defaults section cards now edit timing, combo enablement, normal
+and sniping DPI, mode overrides, auto-sniping, auto-mouse activation and fade
+timing, base HSV/speed/enablement/idle timeout, and feedback flash timing. The
+model supplies actual settings from the complete keyboard snapshot, including
+zeros, rather than build-time ladder parameters or authored defaults. Behaviour
+timing placeholders use the same readback. Auto-mouse timeout and fade delay
+share a section so the required ordering can be validated together.
+
+Each section patches only its scalar fields in the existing settings domain.
+Layer names, both macro banks and all other domains remain byte-for-byte intact.
+The existing complete-profile restore path owns recovery, stale-base checks,
+both-half convergence and exact readback. There is no new settings write command
+and the recoverable, non-atomic two-owner contract is unchanged.
+
+Section drafts retain their original full-profile fingerprint and survive view
+changes, failed writes and re-reads. Discard is per section. A verified section
+save advances other settings and macro drafts from that exact base; a verified
+macro save likewise advances settings drafts. External changes still block
+stale saves. This bounded coordination is not the unified whole-profile draft
+and Apply model.
+
+Brightness exposed a device constraint missing from readback: QMK clamps the
+saved value to its compiled maximum. GET value 0x08 page 1 now reports that limit
+from firmware. The app never infers it from source files or by writing temporary
+lighting values. Older firmware returns the existing unsupported-page status;
+the app leaves brightness read-only while keeping the other controls usable.
+New firmware enables a bounded brightness control. Complete-profile restores
+also reject brightness above a reported destination limit before staging.
+The wire addition is documented in portable-profile-v1.md; no profile document
+or settings payload version changes.
+
+The current RGB effect and LED flags, boot-layer mask, native keymap options and
+combo reference-layer map remain preserved and import/export-capable. Their
+dedicated controls are still pending; they must not be advertised as editable
+in Defaults. Build-time LED cadence and pointer ladder definitions are not
+portable settings and are not fabricated as device controls.
+
+Verification covers section round trips, unchanged-domain preservation, packed
+lighting channels, bounds and cross-field validation, stale drafts, recovery
+handoff, the extension acknowledgement route, and optional limits decoding.
+Browser checks with a simulated keyboard confirmed loaded fields and failed-save
+draft retention; they also caught the inherited C-identifier layer validator,
+which now accepts the keyboard's reported layer names. Remaining browser
+interactions were blocked by automatic approval review's usage limit. Actual
+hardware operation, persistence and interruption acceptance remain pending.
+Next: finish browser/hardware acceptance and the remaining native settings UI,
+then unified draft/review/Apply and guided recovery.
+
+D-L17 verification: `npm --prefix tools/charybdis-live run check` passes all
+306 app tests; `sh tests/host/run_all_host_tests.sh` and
+`sh tests/host/run_feature_gate_compile_tests.sh` pass. The required
+`qmk compile -kb bastardkb/charybdis/4x6 -km noah` passes, and
+`sh tools/build-firmware-pair.sh` builds both owner-enabled halves, including
+the optional limit page. The generated pair is build 9 in the branch's builds
+folder. No keyboard was flashed or configuration written during this pass.
+
+### D-L18 — Native settings use device-reported capabilities
+
+Defaults now adds startup-layer toggles, per-layer combo matching, keyboard-wide
+key options, named lighting effects and LED-class selection. Advanced sections
+start collapsed and retain their open state after a save. Startup layers require
+at least one selection and are validated after the whole section is patched,
+so changing from one startup layer to another works in one save. Packed RGB
+bytes, combo nibbles and unknown key-option bits survive unrelated edits.
+
+Optional GET 0x08 page 2 and bounded pages 3 onward report QMK's actual enabled
+effect inventory, supported semantic key options, their native bit masks and
+the LED classes present on this keyboard. The app decodes this metadata over
+HID and never reads firmware sources. Page 1 brightness metadata remains
+compatible. Older firmware's canonical unsupported-page reply leaves dependent
+controls read-only; malformed metadata is an error. Complete-profile restore
+checks advertised effect availability before staging, alongside brightness.
+The profile format and the recoverable, non-atomic two-owner save contract are
+unchanged. Native effect IDs still require compatible firmware; the metadata
+does not introduce cross-build effect-name migration.
+
+QMK ignores mode and HSV changes while RGB is disabled. The compat adapter now
+temporarily enables lighting without saving, applies settings synchronously at
+the existing safe activation boundary, then restores and persists the requested
+on/off state. No renderer runs between these steps. Host tests model QMK's
+disabled setters and cover all four initial/final on/off combinations, actual
+QMK option masks, enabled-effect inventory, paging and C-to-app decoding.
+
+Browser checks with a simulated keyboard cover supported and disabled key
+options, startup validation, retained section expansion, an unrelated timing
+draft surviving a verified startup-layer save, combo matching, and saved effect,
+LED selection and HSV while lighting is off. A two-window check caught the
+shared refresh handler clearing Defaults drafts; refresh now retains them and
+blocks stale saves after another editor changes the profile. A delivered-script
+regression test covers this reset boundary. Physical LED behaviour, reboot
+persistence and interruption acceptance still require testing on the keyboard.
+Next: unified whole-profile draft/review/Apply, guided recovery and the remaining
+hardware acceptance and pointing-cadence work.
+
+D-L18 verification: `npm --prefix tools/charybdis-live run check` passes 316
+app tests. `sh tests/host/run_qmk_portable_editor_tests.sh`,
+`sh tests/host/run_feature_gate_compile_tests.sh` and the complete
+`sh tests/host/run_all_host_tests.sh` pass. The required generic
+`qmk compile -kb bastardkb/charybdis/4x6 -km noah` and
+`sh tools/build-firmware-pair.sh` pass; normal flashable outputs are build 10.
+An instrumented left build with `NOAH_STACK_BUDGET_ENABLE=yes` passes
+`python3 tools/check_firmware_stack_budget.py` with both the baseline and
+live-profile-owner manifests. `sh tests/host/run_firmware_memory_budget_checks.sh`
+passes for both the instrumented and final normal left image. The normal left
+image remains at 55,684 bytes of static `.data + .bss`, below the 57,344-byte
+regression tripwire, with a 206,456-byte SRAM0–3 boot core-memory span. These are
+per-half linked measurements, not runtime high-water evidence. No firmware was
+flashed or physical keyboard configuration written; sibling folders received
+generated QMK build files and the numbered pair only.

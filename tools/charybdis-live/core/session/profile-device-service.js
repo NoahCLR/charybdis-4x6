@@ -1,8 +1,10 @@
 "use strict";
 
-const {readSettings} = require("../protocol/portable-profile-v1");
+const {readSettings, readSettingsLimits} = require("../protocol/portable-profile-v1");
+const {readKeyboardOptions} = require("../protocol/keyboard-options-v1");
 const {decodeSettings} = require("../schema/settings-domain-v1");
-const {captureProfile, restoreProfile} = require("./portable-profile-session");
+const {captureProfile, restoreProfile, validateSnapshot} = require("./portable-profile-session");
+const {settingsEditorView, editSettings} = require("../model/settings-editor");
 const {macroEditorView, editMacro} = require("../model/macro-editor");
 const {resolveNativeQmkExpression} = require("../schema/compiled-profile-v1");
 const {knownActionAbi} = require("./device-profile-view");
@@ -651,8 +653,11 @@ class ProfileDeviceService {
             result = await captureProfile(this.connection, this.requestIds, this.capabilities, message => {
                 this.portableProgress = message; this.emitChange();
             }, false, forRestore);
+            result.limits = await readSettingsLimits(this.connection, this.requestIds);
+            result.options = await readKeyboardOptions(this.connection, this.requestIds);
             this.portable = result;
             this.macroView = macroEditorView(result);
+            this.settingsView = settingsEditorView(result);
         });
         this.portableProgress = "";
         if (this.error) throw Object.assign(new Error(this.error.message), this.error);
@@ -663,15 +668,29 @@ class ProfileDeviceService {
         if (!this.connection?.connected || this.busy || this.savingEdit) throw new Error("Connect the keyboard and wait for the current operation to finish.");
         let result;
         await this.runOperation("restoring complete profile", async () => {
+            const limits = await readSettingsLimits(this.connection, this.requestIds);
+            const brightness = (validateSnapshot(document, this.capabilities).settings.values[22] >>> 16) & 255;
+            if (limits && brightness > limits.brightnessMax) throw Object.assign(new Error(`This profile's brightness exceeds the keyboard's reported limit of ${limits.brightnessMax}. Lower the brightness before restoring it.`), {code: "SETTINGS_LIMIT_EXCEEDED"});
+            const keyboardOptions = await readKeyboardOptions(this.connection, this.requestIds);
+            const effect = (validateSnapshot(document, this.capabilities).settings.values[21] >>> 8) & 255;
+            if (keyboardOptions && !keyboardOptions.effects.some(item => item.id === effect)) throw Object.assign(new Error("This profile uses a lighting effect unavailable on this keyboard."), {code: "SETTINGS_LIMIT_EXCEEDED"});
             result = await restoreProfile(this.connection, this.requestIds, this.capabilities, document, {...options,
                 onProgress: message => {this.portableProgress = message; this.emitChange();},
             });
+            result.limits = limits;
+            result.options = keyboardOptions;
             this.portable = result;
             this.macroView = macroEditorView(result);
+            this.settingsView = settingsEditorView(result);
         });
         this.portableProgress = "";
         if (this.error) throw Object.assign(new Error(this.error.message), this.error);
         return result;
+    }
+
+    async saveSettingsEdit(message, {saveRecovery} = {}) {
+        const document = editSettings(this.portable, message, this.capabilities);
+        return this.restorePortableProfile(document, {expectedFingerprint: message.expectedFingerprint, saveRecovery});
     }
 
     async saveMacroEdit(message, {saveRecovery} = {}) {
@@ -714,6 +733,7 @@ class ProfileDeviceService {
             ),
             portableSummary: this.committed?.domains?.settings ? {names: this.committed.domains.settings.names.map((name, index) => name || (index ? `Layer ${index}` : "Base"))} : this.portable?.summary || null,
             portableProgress: this.portableProgress || "",
+            settingsView: this.settingsView ? JSON.parse(JSON.stringify(this.settingsView)) : null,
             macroView: this.macroView ? JSON.parse(JSON.stringify(this.macroView)) : null,
             liveApply: cloneLiveApply(this.liveApply),
             layout: this.layout ? JSON.parse(JSON.stringify(this.layout)) : null,
@@ -764,6 +784,7 @@ class ProfileDeviceService {
     clearConnection() {
         this.portable = undefined; this.portableProgress = "";
         this.macroView = undefined;
+        this.settingsView = undefined;
         this.profileBytes = undefined;
         this.layout = undefined;
         this.committed = undefined;

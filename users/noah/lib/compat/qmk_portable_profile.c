@@ -1,5 +1,6 @@
 #include QMK_KEYBOARD_H
 #include "qmk_portable_profile.h"
+#include "qmk_portable_editor.h"
 #ifdef NOAH_PORTABLE_PROFILE_ENABLE
 #    include <string.h>
 #    include "eeconfig.h"
@@ -144,16 +145,8 @@ void noah_qmk_portable_apply(void) {
     dpi = noah_setting(NOAH_SETTING_SNIPING_DPI, charybdis_get_pointer_sniping_dpi());
     for (uint8_t i = 0; i < 4 && charybdis_get_pointer_sniping_dpi() != dpi; i++)
         charybdis_cycle_pointer_sniping_dpi(true);
-    uint32_t rgb = noah_setting(NOAH_SETTING_RGB_MODE, setting_default(NOAH_SETTING_RGB_MODE));
-    rgb_matrix_mode((rgb >> 8) & 255);
-    rgb_matrix_set_speed((rgb >> 16) & 255);
-    rgb_matrix_set_flags(rgb >> 24);
-    if (rgb & 255)
-        rgb_matrix_enable();
-    else
-        rgb_matrix_disable();
-    rgb = noah_setting(NOAH_SETTING_RGB_COLOR, setting_default(NOAH_SETTING_RGB_COLOR));
-    rgb_matrix_sethsv(rgb & 255, (rgb >> 8) & 255, (rgb >> 16) & 255);
+    noah_qmk_portable_apply_lighting(noah_setting(NOAH_SETTING_RGB_MODE, setting_default(NOAH_SETTING_RGB_MODE)),
+                                     noah_setting(NOAH_SETTING_RGB_COLOR, setting_default(NOAH_SETTING_RGB_COLOR)));
     uint8_t layers = noah_setting(NOAH_SETTING_DEFAULT_LAYERS, default_layer_state);
     default_layer_set(layers);
     eeconfig_update_default_layer(layers);
@@ -173,7 +166,8 @@ bool noah_qmk_portable_profile_get(uint8_t *frame, uint8_t length) {
     uint8_t *p = frame + 7;
     if (frame[2] == 8) {
         if (frame[4]) {
-            frame[5] = 2;
+            frame[6] = noah_qmk_portable_editor_page(frame[4], p);
+            if (!frame[6]) frame[5] = 2;
             return true;
         }
         noah_qmk_via_split_sync_debug_snapshot_t s = noah_qmk_via_split_sync_debug_snapshot();

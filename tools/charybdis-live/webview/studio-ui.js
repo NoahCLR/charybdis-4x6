@@ -20,6 +20,7 @@ const keycodeCatalog = require("../core/data/keycode-catalog");
 const {renderPortableProfile} = require("./portable-profile-ui");
 const {renderDeviceProfileDetails} = require("./device-profile-ui");
 const {createBehaviorDraftStore} = require("./behavior-drafts");
+const {createSettingsDraftStore} = require("./settings-drafts");
 const {renderDeviceCombos} = require("./combo-ui");
 const {combosForLayerPreview} = require("./combo-preview");
 const {layoutKeyKind, layerPreviewPaint, composedLayerPreviewPaint, baseEffectPreviewNote} = require("./layer-preview");
@@ -2322,6 +2323,7 @@ function getStudioHtml() {
 ${renderPortableProfile.toString()}
 ${renderDeviceProfileDetails.toString()}
 ${createBehaviorDraftStore.toString()}
+${createSettingsDraftStore.toString()}
 ${renderDeviceCombos.toString()}
 ${combosForLayerPreview.toString()}
 ${layoutKeyKind.toString()}
@@ -2345,6 +2347,9 @@ function getClientScript() {
     let activeView = "layout";
     let viewDrafts = {};
     const behaviorDrafts = createBehaviorDraftStore();
+    const settingsDrafts = createSettingsDraftStore();
+    let settingsSavePending = false;
+    const settingsOpen = {};
     let behaviorSavePending = false;
     let rgbGroupTarget = "layer";
     let rgbGroupOwner = "";
@@ -2426,7 +2431,7 @@ function getClientScript() {
         rgb: "Inspect layer colours, feedback, locality, and LED groups read from the keyboard.",
         behaviors: "Inspect every key behaviour row read from the keyboard.",
         combos: "Inspect the combo definitions and timing reported by the keyboard.",
-        defaults: "Edit config.h key timing, pointer speed, pointing-mode speed, sniping, auto-mouse, base lighting, and lighting feedback defaults."
+        defaults: "Edit the keyboard’s timing, pointer speed, auto-mouse and lighting settings."
     };
     const panelTooltips = {
         Status: "Parser messages, write status, and warnings from the current studio model.",
@@ -2444,13 +2449,13 @@ function getClientScript() {
         "Combo Feedback LED Groups": "Inspect combo_feedback_led_groups_data[] rows that override the combo feedback footprint.",
         "Key Behavior Feedback": "Edit key-behavior feedback colors, locality, and policy for tap, hold, long-hold, and tap-count branch states.",
         "Key Behavior Feedback LED Groups": "Inspect key_behavior_feedback_led_groups_data[] rows that override specific feedback semantics or all feedback groups.",
-        "Key Timing": "Edit config.h timing defaults for QMK dual-role keys, combos, and custom key_behaviors[] tap, hold, and multi-tap handling.",
-        "Normal Pointer Speed": "Edit config.h normal pointer DPI/CPI ladder minimum and step size.",
-        "Pointing Mode Speeds": "Edit config.h pointer DPI/CPI used while drag-scroll or pointing modes are active. Pointing-mode overrides of 0 fall back to normal pointer speed.",
-        "Sniping": "Edit config.h sniping sensitivity ladder and automatic sniping layer trigger.",
-        "Auto-mouse": "Edit config.h auto-mouse enablement, destination layer, and timeout after pointing movement.",
-        "Base Lighting": "Edit config.h base RGB Matrix mode, color, brightness cap, and inactivity timeout.",
-        "Lighting Feedback": "Edit config.h RGB feedback stage toggles, visible feedback timing, auto-mouse fade timing, and LED refresh cadence."
+        "Key Timing": "Adjust the keyboard’s tap, hold and repeated-tap timing. Individual behaviours can override these values.",
+        "Pointer Speed": "Adjust the saved normal and sniping pointer speeds.",
+        "Pointing Mode Speeds": "Adjust sensitivity while scrolling or using pointing modes. Mode overrides of 0 use normal pointer speed.",
+        "Sniping": "Choose whether a layer automatically enables fine pointer control.",
+        "Auto-mouse": "Adjust automatic layer activation from trackball movement and its timeout lighting.",
+        "Base Lighting": "Adjust the keyboard’s saved lighting, colour, brightness, animation speed and idle timeout.",
+        "Lighting Feedback": "Adjust how quickly held-key feedback flashes. Feedback colours and policies are in RGB."
     };
     const actionTooltips = {
         applyKey: "Stage the selected key value as a pending layout edit. Use Apply layout change to write staged edits to keymap.c.",
@@ -2464,7 +2469,7 @@ function getClientScript() {
         updateAutomouseFade: "Save these settings to both keyboard halves and verify the readback.",
         updateComboFeedback: "Save these settings to both keyboard halves and verify the readback.",
         updateKeyBehaviorFeedback: "Save these settings to both keyboard halves and verify the readback.",
-        updateConfigDefaults: "Write these default settings back to config.h.",
+        updateConfigDefaults: "Save these settings to both keyboard halves and verify the result.",
         saveRgbReusableLedGroup: "Save these settings to both keyboard halves and verify the readback.",
         deleteRgbReusableLedGroup: "Delete this reusable RGB_LED_GROUP_* definition. Used groups are disabled because table rows still reference them.",
         editReusableLedGroup: "Load this reusable LED group into the editor so its name or LED membership can be changed.",
@@ -2558,7 +2563,7 @@ function getClientScript() {
         "led group": "LED group membership reported by the keyboard.",
         color: "HSV color expression used by this row. HSV(0, 0, 0) means inherit the owning stage color for LED group rows.",
         default: "The current value written for this config.h macro.",
-        setting: "The user-facing name for this config.h default.",
+        setting: "The name of this keyboard setting.",
         macro: "The exact config.h #define patched by this control.",
         rgb: "The RGB color and locality associated with this reachable pointing mode.",
         badge: "The small badge shown on the layout preview for this combo.",
@@ -2848,7 +2853,10 @@ function getClientScript() {
         applyAllStagedChanges();
     });
     document.getElementById("reload").addEventListener("click", () => {
+        captureSettingsDrafts();
+        const retainedSettings = settingsDrafts.snapshot();
         discardLocalDraftState();
+        settingsDrafts.restore(retainedSettings);
         post({ type: "refresh" });
     });
     document.getElementById("profileSelect")?.addEventListener("change", (event) => {
@@ -2991,11 +2999,19 @@ function getClientScript() {
         if (event.data.type === "model") {
             captureBehaviorDrafts();
             captureActiveMacroDraft();
+            captureSettingsDrafts();
             clearFloatingStatus();
             viewDrafts = {};
             model = event.data.model;
             if (!model.portable?.busy) macroSavePending = false;
             acceptMacroSave(event.data.savedMacro);
+            if (!model.portable?.busy) settingsSavePending = false;
+            const savedSettings = event.data.savedSettings;
+            if (savedSettings) {
+                settingsDrafts.accept(settingsDraftKey(savedSettings.sectionId), savedSettings.fields, savedSettings.expectedFingerprint, model.settingsEditing?.identity);
+                advanceMacroDraftBases(savedSettings.expectedFingerprint);
+            }
+            if (event.data.savedMacro) settingsDrafts.accept(null, null, event.data.savedMacro.expectedFingerprint, model.settingsEditing?.identity);
             behaviorSavePending = false;
             if (event.data.savedBehavior) behaviorDrafts.remove(behaviorDraftKey(event.data.savedBehavior));
             Object.assign(qmkKeyLabels, model.qmkKeyLabels || {});
@@ -3339,10 +3355,16 @@ function getClientScript() {
                     locality: value(card, "locality")
                 }
             });
+        } else if (action === "discardSettingsDraft") {
+            captureSettingsDrafts();
+            settingsDrafts.remove(settingsDraftKey(target.closest("[data-config-section]").dataset.configSection));
+            delete viewDrafts.defaults;
+            render(); resetLocalHistory();
         } else if (action === "updateConfigDefaults") {
             const section = target.closest("[data-config-section]");
             post({
                 type: "updateConfigDefaults",
+                sectionId: section.dataset.configSection,
                 fields: readConfigDefaultFields(section)
             });
         } else if (action === "addRgbLedGroup") {
@@ -4753,6 +4775,11 @@ function getClientScript() {
             message.expectedBase = behaviorDrafts.get(behaviorDraftKey(row))?.base || model.profileIdentity;
             behaviorSavePending = true;
         }
+        if (message.type === "updateConfigDefaults") {
+            if (!settingsWriteAvailable(message.sectionId)) return;
+            message.expectedFingerprint = settingsDrafts.get(settingsDraftKey(message.sectionId))?.base || model.settingsEditing?.identity;
+            settingsSavePending = true;
+        }
         if (message.type === "updateViaMacro") {
             if (!macroWriteAvailable(message.keycode)) return;
             message.expectedFingerprint = macroDraftBases[message.keycode] || model.macroEditing?.identity;
@@ -4784,6 +4811,7 @@ function getClientScript() {
         macroDraftBases = {};
         viewDrafts = {};
         behaviorDrafts.clear();
+        settingsDrafts.clear();
         resetMacroRecorderState();
         pendingLayoutEdits = {};
         pendingLayerAdds = [];
@@ -4820,7 +4848,11 @@ function getClientScript() {
         initializeDirtyTracking();
         restoreActiveViewDraft();
         restoreBehaviorDrafts();
+        restoreSettingsDrafts();
         refreshDirtyTabIndicators();
+        if (settingsSavePending || model.portable?.busy) {
+            for (const control of app.querySelectorAll("[data-config-section] input, [data-config-section] select, [data-config-section] button")) control.disabled = true;
+        }
         if (behaviorSavePending || model.behaviorEditing?.busy) {
             for (const control of app.querySelectorAll("[data-behavior-draft] input, [data-behavior-draft] select, [data-behavior-draft] button")) control.disabled = true;
         }
@@ -4962,6 +4994,7 @@ function getClientScript() {
     }
 
     function serializeLocalState() {
+        captureSettingsDrafts();
         return JSON.stringify({
             activeView,
             activeLayer,
@@ -4984,6 +5017,7 @@ function getClientScript() {
             activeMacroKeycode,
             macroDrafts,
             macroDraftBases,
+            settingsDraftState: settingsDrafts.snapshot(),
             macroRecordDelays,
             macroRecorderMode,
             macroRecorderDelayThreshold,
@@ -5027,6 +5061,7 @@ function getClientScript() {
             activeMacroKeycode = state.activeMacroKeycode || "";
             macroDrafts = state.macroDrafts && typeof state.macroDrafts === "object" ? state.macroDrafts : {};
             macroDraftBases = state.macroDraftBases && typeof state.macroDraftBases === "object" ? state.macroDraftBases : {};
+            settingsDrafts.restore(state.settingsDraftState);
             macroRecordDelays = typeof state.macroRecordDelays === "boolean" ? state.macroRecordDelays : macroRecordDelays;
             macroRecorderMode = state.macroRecorderMode === "exact" ? "exact" : "compact";
             macroRecorderDelayThreshold = state.macroRecorderDelayThreshold || macroRecorderDelayThreshold;
@@ -5128,6 +5163,8 @@ function getClientScript() {
     function storeActiveViewDraft() {
         if (!model || !activeView) return;
         captureBehaviorDrafts();
+        captureSettingsDrafts();
+        if (activeView === "defaults") {delete viewDrafts.defaults; return;}
         const dirty = Boolean(app.querySelector("[data-dirty-section].dirty"));
         if (!dirty) {
             delete viewDrafts[activeView];
@@ -5174,6 +5211,8 @@ function getClientScript() {
         for (const button of section.querySelectorAll("[data-dirty-button]")) {
             setDirtyButtonState(button, dirty);
         }
+        const discardSettings = section.querySelector("[data-action='discardSettingsDraft']");
+        if (discardSettings) discardSettings.disabled = (!dirty && !settingsDrafts.get(settingsDraftKey(section.dataset.configSection))) || settingsSavePending;
         const discardMacro = section.querySelector("[data-action='discardMacroDraft']");
         if (discardMacro) discardMacro.disabled = !macroSlotDirty(section.dataset.keycode || "") || macroSavePending;
     }
@@ -5283,7 +5322,10 @@ function getClientScript() {
             return true;
         }
         let error = "";
-        if (rule === "uint8") {
+        if (control.hasAttribute("data-setting-min")) {
+            const minimum = Number(control.dataset.settingMin), maximum = Number(control.dataset.settingMax);
+            if (!/^\\d+$/.test(value) || Number(value) < minimum || Number(value) > maximum) error = "Enter a whole number from " + minimum + " to " + maximum + ".";
+        } else if (rule === "uint8") {
             error = validateUint8(value, "Enter an integer from 0 to 255.");
         } else if (rule === "timing-ms") {
             error = validateMsTermNumber(value, "Enter 1-" + keyBehaviorTimingMaxMs + " ms.", false);
@@ -5425,6 +5467,7 @@ function getClientScript() {
     }
 
     function validateLayerIdentifier(value) {
+        if (layersForUi().some(layer => layer.name === value)) return "";
         const identifierError = validateIdentifier(value, "Enter a LAYER_* identifier.");
         if (identifierError) return identifierError;
         return String(value || "").startsWith("LAYER_") ? "" : "Enter a LAYER_* identifier.";
@@ -5732,6 +5775,7 @@ function getClientScript() {
         if (viewHasDirtyDomSection(viewId)) return true;
         if (viewDrafts[viewId]?.dirty) return true;
         if (viewId === "behaviors" && behaviorDrafts.keys().some(key => JSON.parse(key)[0] === model?.activeProfile?.id)) return true;
+        if (viewId === "defaults" && settingsDrafts.keys().some(key => JSON.parse(key)[0] === model?.activeProfile?.id)) return true;
         if (viewId === "layout") return layoutViewHasUnsavedChanges();
         if (viewId === "macros") return macroViewHasUnsavedChanges();
         if (viewId === "rgb") return rgbViewHasUnsavedChanges();
@@ -7898,6 +7942,37 @@ function getClientScript() {
         };
     }
 
+    function settingsDraftKey(sectionId) {
+        return JSON.stringify([model?.activeProfile?.id, sectionId]);
+    }
+
+    function settingsWriteAvailable(sectionId) {
+        return Boolean(model?.settingsEditing?.writable && !settingsSavePending && !settingsDrafts.stale(settingsDraftKey(sectionId), model.settingsEditing.identity));
+    }
+
+    function captureSettingsDrafts() {
+        for (const section of app.querySelectorAll("[data-config-section]")) {
+            settingsOpen[settingsDraftKey(section.dataset.configSection)] = section.closest("details").open;
+            const definition = model?.configDefaults?.find(item => item.id === section.dataset.configSection);
+            if (!definition) continue;
+            const original = definition.fields.map(field => field.kind === "toggle" ? {macro: field.macro, enabled: field.enabled} : {macro: field.macro, value: field.value});
+            settingsDrafts.capture(settingsDraftKey(definition.id), readConfigDefaultFields(section), original, model.settingsEditing?.identity);
+        }
+    }
+
+    function restoreSettingsDrafts() {
+        for (const section of app.querySelectorAll("[data-config-section]")) {
+            const draft = settingsDrafts.get(settingsDraftKey(section.dataset.configSection));
+            if (draft) for (const field of section.querySelectorAll("[data-config-field]")) {
+                const saved = draft.fields.find(item => item.macro === field.dataset.macro), control = field.querySelector("input, select");
+                if (!saved || !control) continue;
+                if (control.type === "checkbox") control.checked = saved.enabled;
+                else control.value = saved.value;
+            }
+            updateDirtySection(section);
+        }
+    }
+
     function readConfigDefaultFields(section) {
         return Array.from(section?.querySelectorAll("[data-config-field]") || []).map((field) => {
             const macro = field.dataset.macro || "";
@@ -7918,17 +7993,21 @@ function getClientScript() {
     function renderDefaultsStudio() {
         const sections = model.configDefaults || [];
         if (!sections.length) {
-            return panel("Defaults", "<p class='muted'>No config.h default fields were parsed.</p>", true);
+            return panel("Defaults", "<p class='muted'>Read a complete profile from the keyboard to load its settings.</p>", true);
         }
-        return "<div class='stack'>" + sections.map(renderConfigDefaultSection).join("") + "</div>";
+        return "<div class='stack'><p class='muted'>Settings read from the keyboard. Apply saves a recovery copy and verifies both halves.</p>" + sections.map(renderConfigDefaultSection).join("") + "</div>";
     }
 
     function renderConfigDefaultSection(section) {
-        return "<details class='panel' open>" +
+        const writable = settingsWriteAvailable(section.id);
+        const open = settingsOpen[settingsDraftKey(section.id)] ?? section.expanded !== false;
+        return "<details class='panel'" + (open ? " open" : "") + ">" +
             "<summary><h2>" + escapeHtml(section.label || "Defaults") + "</h2></summary>" +
             "<div id='configDefaults-" + escapeAttr(section.id || "") + "' class='panel-body config-default-section' data-dirty-section data-config-section='" + escapeAttr(section.id || "") + "'>" +
+            (section.description ? "<p class='muted'>" + escapeHtml(section.description) + "</p>" : "") +
+            (settingsDrafts.stale(settingsDraftKey(section.id), model.settingsEditing?.identity) ? "<p class='muted'>The keyboard changed since these edits began. Your draft is kept; discard it to load the latest settings.</p>" : "") +
             "<div class='config-default-grid'>" + (section.fields || []).map(renderConfigDefaultField).join("") + "</div>" +
-            "<div class='toolbar'><button type='button' class='primary' data-action='updateConfigDefaults' data-dirty-button>Apply " + escapeHtml(section.label || "defaults") + "</button></div>" +
+            "<div class='toolbar'><button type='button' class='primary' data-action='updateConfigDefaults' data-dirty-button" + (writable ? "" : " data-write-unavailable disabled") + ">Apply " + escapeHtml(section.label || "defaults") + "</button><button type='button' data-action='discardSettingsDraft'>Discard changes</button></div>" +
             "</div></details>";
     }
 
@@ -7937,7 +8016,6 @@ function getClientScript() {
         return "<div class='card config-default-field' data-config-field data-macro='" + escapeAttr(field.macro || "") + "' data-kind='" + escapeAttr(field.kind || "") + "' data-tooltip='" + escapeAttr(tooltip) + "'>" +
             "<div class='config-default-field-head'>" +
             "<span class='config-default-field-title'>" + escapeHtml(field.label || field.macro || "Default") + "</span>" +
-            "<code class='muted'>" + escapeHtml(field.macro || "") + "</code>" +
             (field.hint ? "<span class='config-default-field-hint'>" + escapeHtml(field.hint) + "</span>" : "") +
             "</div>" +
             renderConfigDefaultControl(field) +
@@ -7948,28 +8026,33 @@ function getClientScript() {
         const tooltip = configDefaultTooltip(field);
         if (field.kind === "toggle") {
             return "<label class='toggle-inline' data-tooltip='" + escapeAttr(tooltip) + "'>" +
-                "<input type='checkbox' name='" + escapeAttr(field.macro || "") + "'" + (field.enabled ? " checked" : "") + " data-tooltip='" + escapeAttr(tooltip) + "'>" +
+                "<input type='checkbox' id='setting-" + escapeAttr(field.macro || "") + "' aria-label='" + escapeAttr(field.label || "") + "' name='" + escapeAttr(field.macro || "") + "'" + (field.enabled ? " checked" : "") + (field.readOnly ? " disabled aria-readonly='true'" : "") + " data-tooltip='" + escapeAttr(tooltip) + "'>" +
                 "<span class='toggle-switch' aria-hidden='true'></span><span class='toggle-label'>enabled</span>" +
                 "</label>";
         }
         if (field.kind === "layer") {
-            let layers = layersForUi().map((layer) => [layer.name, layer.name]);
+            let layers = layersForUi().map((layer) => [layer.name, layer.displayName || layer.name]);
             const fieldValue = field.value || layers[0]?.[0] || "";
             if (fieldValue && !layers.some(([value]) => value === fieldValue)) {
                 layers = [[fieldValue, fieldValue + " (missing)"]].concat(layers);
             }
-            return "<label data-tooltip='" + escapeAttr(tooltip) + "'><span>default</span><select name='" + escapeAttr(field.macro || "") + "' data-validate='layer' data-tooltip='" + escapeAttr(tooltip) + "'>" + optionsWithLabels(layers, fieldValue) + "</select></label>";
+            return "<label data-tooltip='" + escapeAttr(tooltip) + "'><span>value</span><select id='setting-" + escapeAttr(field.macro || "") + "' aria-label='" + escapeAttr(field.label || "") + "' name='" + escapeAttr(field.macro || "") + "' data-validate='layer' data-tooltip='" + escapeAttr(tooltip) + "'>" + optionsWithLabels(layers, fieldValue) + "</select></label>";
+        }
+        if (field.choices) {
+            return "<label><span>value</span><select id='setting-" + escapeAttr(field.macro) + "' aria-label='" + escapeAttr(field.label) + "' name='" + escapeAttr(field.macro) + "'" + (field.readOnly ? " disabled aria-readonly='true'" : "") + ">" + optionsWithLabels(field.choices.map(choice => typeof choice === "object" ? [String(choice.value), choice.label] : [String(choice), String(choice)]), field.value) + "</select></label>";
         }
         const validate = configDefaultValidationRule(field);
         const inputMode = configDefaultInputMode(field);
-        return "<label data-tooltip='" + escapeAttr(tooltip) + "'><span>default</span><input name='" + escapeAttr(field.macro || "") + "' value='" + escapeAttr(field.value || "") + "' spellcheck='false' data-tooltip='" + escapeAttr(tooltip) + "'" +
+        return "<label data-tooltip='" + escapeAttr(tooltip) + "'><span>value</span><input id='setting-" + escapeAttr(field.macro || "") + "' aria-label='" + escapeAttr(field.label || "") + "' name='" + escapeAttr(field.macro || "") + "' value='" + escapeAttr(field.value ?? "") + "' spellcheck='false' data-tooltip='" + escapeAttr(tooltip) + "'" +
+            (field.readOnly ? " readonly aria-readonly='true'" : "") +
+            " data-setting-min='" + (field.min ?? 0) + "' data-setting-max='" + (field.max ?? 65535) + "'" +
             (inputMode ? " inputmode='" + escapeAttr(inputMode) + "'" : "") +
             (validate ? " data-validate='" + escapeAttr(validate) + "'" : "") +
             "></label>";
     }
 
     function configDefaultTooltip(field) {
-        return field.tooltip || ("Edits " + (field.macro || "this config.h macro") + " in config.h.");
+        return field.tooltip || field.hint || ("Change " + (field.label || "this setting") + " on the keyboard.");
     }
 
     function configDefaultValidationRule(field) {
@@ -9260,8 +9343,12 @@ function getClientScript() {
         }
         // Only an acknowledged edit from this exact base can advance other
         // drafts. An external keyboard change must still make them stale.
+        advanceMacroDraftBases(saved.expectedFingerprint);
+    }
+
+    function advanceMacroDraftBases(previous) {
         for (const key of Object.keys(macroDraftBases)) {
-            if (macroDraftBases[key] === saved.expectedFingerprint) macroDraftBases[key] = model.macroEditing?.identity || "";
+            if (macroDraftBases[key] === previous) macroDraftBases[key] = model.macroEditing?.identity || "";
         }
     }
 

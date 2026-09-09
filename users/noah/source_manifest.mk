@@ -22,6 +22,7 @@ NOAH_COMMON_SOURCES := \
     lib/profile/runtime/effective_combo_runtime.c \
     lib/profile/runtime/effective_settings_runtime.c \
     lib/compat/qmk_portable_profile.c \
+    lib/compat/qmk_portable_editor.c \
     lib/profile/runtime/profile_activation_policy.c \
     lib/profile/split/profile_split_authority.c \
     lib/profile/split/profile_split_protocol_v1.c \

@@ -63,9 +63,9 @@ function buildDeviceModel(state = {}) {
         viaMacros: state.macroView?.viaMacros || [],
         hardcodedMacros: state.macroView?.hardcodedMacros || [],
         macroEditing: {identity: state.macroView?.identity || "", writable: Boolean(state.macroView) && state.capabilities?.compiledLayerCount === 8 && !state.busy},
-        // Global policy still awaits its dedicated editor model.
-        behaviorTimingDefaults: {},
-        configDefaults: [],
+        behaviorTimingDefaults: state.settingsView?.timing || {},
+        configDefaults: state.settingsView?.sections || [],
+        settingsEditing: {identity: state.settingsView?.identity || "", writable: Boolean(state.settingsView) && state.capabilities?.compiledLayerCount === 8 && !state.busy},
         macroPayloadKeycodes: state.macroView?.macroPayloadKeycodes || [],
 
         qmkKeycodes: catalog.entries,
