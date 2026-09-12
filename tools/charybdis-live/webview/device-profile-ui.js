@@ -24,16 +24,18 @@ function renderDeviceProfileDetails(document, model, post = () => {}, displayKey
             : "No RGB configuration has been read from the keyboard."));
         if (states.length) {
             const controls = element("div");
+            if (model.draft) {controls.id = "rgbStageDraft"; controls.setAttribute("data-dirty-section", "");}
             const inputs = states.map(stage => {
                 const label = element("label", stage.label + " ");
                 const input = element("input"); input.type = "checkbox"; input.checked = stage.enabled;
                 label.append(input); controls.append(label); return {input, bit: stage.bit};
             });
-            const save = element("button", "Save RGB policies"); save.type = "button";
+            const save = element("button", model.draft ? "Keep RGB policies" : "Save RGB policies"); save.type = "button";
+            if (model.draft) save.setAttribute("data-dirty-button", "");
             save.onclick = () => post({type: "updateRgbStages", stageEnableMask: inputs.reduce((mask, {input, bit}) => mask | (input.checked ? bit : 0), 0)});
             controls.append(save); stages.append(controls);
         }
-        stages.append(element("p", "Save writes the edited RGB settings to both halves, preserving the other profile settings.", "muted"));
+        stages.append(element("p", model.draft ? "Keep RGB edits in your draft, then review and apply them with your other changes." : "Save writes the edited RGB settings to both halves, preserving the other profile settings.", "muted"));
     }
     const host = document.getElementById("deviceBehaviors");
     if (!host) return;

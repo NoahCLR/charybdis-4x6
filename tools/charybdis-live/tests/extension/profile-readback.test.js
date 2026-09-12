@@ -124,31 +124,40 @@ function harness({source = "compiled", fail = false, failBase = false, failCombo
     vm.runInNewContext(fs.readFileSync(file, "utf8"), sandbox, {filename: file});
     sandbox.module.exports.activate({subscriptions: [], globalStorageUri: {fsPath: "/recovery"}});
     open();
-    return {messages, requests, candidates, recoveryFiles, panel, read: () => receive({type: "ready"}), send: (message) => receive(message), close: () => dispose()};
+    const send = message => receive({draftId:messages.at(-1)?.model.draft?.id, draftRevision:messages.at(-1)?.model.draft?.revision,...message});
+    return {messages, requests, candidates, recoveryFiles, panel, read: () => receive({type: "ready"}), send,
+        apply: async () => {await send({type:"reviewProfileDraft"}); await send({type:"applyProfileDraft"});}, close: () => dispose()};
 }
 
-test("the existing macro Apply message reaches the keyboard writer and acknowledges verified readback", async () => {
+test("the macro editor keeps a local change and shared Apply verifies it with recovery", async () => {
     const app = harness({portable: true}); await app.read();
     const model = app.messages.at(-1).model;
     assert.equal(model.viaMacros.length, 64); assert.equal(model.hardcodedMacros.length, 16);
     await app.send({type: "updateViaMacro", keycode: "MACRO_0", payload: "{KC_LGUI,KC_N}", expectedFingerprint: model.macroEditing.identity});
+    assert.equal(app.recoveryFiles.length,0);
+    assert.equal(app.messages.at(-1).acceptedEdit.message.keycode,"MACRO_0");
+    assert.equal(app.messages.at(-1).model.draft.dirty,true);
+    await app.apply();
     const final = app.messages.at(-1);
-    assert.match(final.notice, /Macro saved to both halves and verified/);
-    assert.equal(final.savedMacro.keycode, "MACRO_0");
+    assert.match(final.notice, /Complete profile applied to both halves and verified/);
+    assert.equal(final.model.draft.dirty,false);
     assert.match(final.model.hardcodedMacros[0].payload, /KC_N/);
     assert.equal(app.recoveryFiles.length, 1);
     assert.equal(fingerprint(app.recoveryFiles[0].document), model.macroEditing.identity);
     app.close();
 });
 
-test("a failed macro save retains the device readout and never acknowledges the draft", async () => {
+test("a failed shared Apply retains the macro draft and never reports device save success", async () => {
     const app = harness({portable: true, failMacro: true}); await app.read();
     const model = app.messages.at(-1).model;
     await app.send({type: "updateViaMacro", keycode: "VIA_MACRO_0", payload: "hello", expectedFingerprint: model.macroEditing.identity});
+    await app.apply();
     const final = app.messages.at(-1);
     assert.match(final.notice, /Failed.*macro readback mismatch/);
     assert.equal(final.savedMacro, undefined);
-    assert.equal(final.model.viaMacros[0].empty, true);
+    assert.equal(final.model.viaMacros[0].payload, "hello");
+    assert.equal(final.model.draft.dirty,true);
+    assert.equal(fingerprint(app.recoveryFiles[0].document),model.macroEditing.identity);
     assert.equal(final.model.macroEditing.writable, true);
     app.close();
 });
@@ -276,45 +285,64 @@ test("an unsupported combo read leaves the other device domains visible", async 
 });
 
 
-test("Defaults Apply uses the real settings editor, recovery writer and verified acknowledgement", async () => {
+test("Defaults changes enter the shared draft before the recovery-backed Apply", async () => {
     const app = harness({portable: true}); await app.read();
     const model = app.messages.at(-1).model;
     const section = model.configDefaults.find(section => section.id === "normalPointerSpeed");
     await app.send({type: "updateConfigDefaults", sectionId: section.id, expectedFingerprint: model.settingsEditing.identity,
         fields: section.fields.map(field => ({macro: field.macro, value: field.macro === "normalDpi" ? "1600" : field.value}))});
+    assert.equal(app.messages.at(-1).acceptedEdit.message.sectionId,section.id);
+    assert.equal(app.recoveryFiles.length,0);
+    await app.apply();
     const final = app.messages.at(-1);
-    assert.match(final.notice, /Settings saved to both halves and verified/);
-    assert.equal(final.savedSettings.sectionId, section.id);
+    assert.match(final.notice, /Complete profile applied to both halves and verified/);
     assert.equal(final.model.configDefaults.find(section => section.id === "normalPointerSpeed").fields[0].value, "1600");
     assert.equal(app.recoveryFiles.length, 1);
     assert.equal(fingerprint(app.recoveryFiles[0].document), model.settingsEditing.identity);
     app.close();
 });
 
-test("failed Defaults saves never acknowledge or replace the last verified values", async () => {
+test("failed shared Apply retains Defaults changes and preserves the original recovery snapshot", async () => {
     const app = harness({portable: true, failMacro: true}); await app.read();
     const model = app.messages.at(-1).model, section = model.configDefaults.find(section => section.id === "normalPointerSpeed");
     await app.send({type: "updateConfigDefaults", sectionId: section.id, expectedFingerprint: model.settingsEditing.identity,
         fields: section.fields.map(field => ({macro: field.macro, value: field.macro === "normalDpi" ? "1600" : field.value}))});
+    await app.apply();
     const final = app.messages.at(-1);
     assert.match(final.notice, /Failed.*readback mismatch/);
     assert.equal(final.savedSettings, undefined);
-    assert.equal(final.model.configDefaults.find(section => section.id === "normalPointerSpeed").fields[0].value, "1200");
+    assert.equal(final.model.configDefaults.find(section => section.id === "normalPointerSpeed").fields[0].value, "1600");
+    assert.equal(final.model.draft.dirty,true);
+    assert.equal(fingerprint(app.recoveryFiles[0].document),model.settingsEditing.identity);
     assert.equal(final.model.settingsEditing.writable, true);
     app.close();
 });
 
 
-test("native settings sections save through the existing extension route and preserve other banks", async () => {
+test("native settings sections compose through existing messages and save together once", async () => {
     const app = harness({portable: true}); await app.read();
     for (const [sectionId, key, next] of [["startupLayers", "startupLayer7", true], ["comboReferences", "comboReference7", "Layer 0"], ["keyboardOptions", "swapLeftAltGui", true], ["rgbAppearance", "effectMode", "2"]]) {
         const model = app.messages.at(-1).model, section = model.configDefaults.find(section => section.id === sectionId);
         await app.send({type: "updateConfigDefaults", sectionId, expectedFingerprint: model.settingsEditing.identity,
             fields: section.fields.map(field => field.kind === "toggle" ? {macro: field.macro, enabled: field.macro === key ? next : field.enabled} : {macro: field.macro, value: field.macro === key ? next : field.value})});
         const final = app.messages.at(-1), field = final.model.configDefaults.find(section => section.id === sectionId).fields.find(field => field.macro === key);
-        assert.equal(final.savedSettings?.sectionId, sectionId);
+        assert.equal(final.acceptedEdit?.message.sectionId, sectionId);
         assert.equal(field.kind === "toggle" ? field.enabled : field.value, next);
         assert.equal(final.model.viaMacros.length, 64); assert.equal(final.model.hardcodedMacros.length, 16);
     }
-    assert.equal(app.recoveryFiles.length, 4); app.close();
+    assert.equal(app.recoveryFiles.length,0);
+    await app.apply();
+    assert.equal(app.recoveryFiles.length,1);
+    assert.equal(app.messages.at(-1).model.draft.dirty,false); app.close();
+});
+
+test("draft combos do not masquerade as keyboard readback in diagnostics", async () => {
+    const app = harness({portable:true}); await app.read();
+    const before = app.messages.at(-1).model;
+    await app.send({type:"addCombo",inputs:["KC_D","KC_F"],output:"G(KC_N)",termMs:"50",holdTermMs:"200"});
+    const after = app.messages.at(-1).model;
+    assert.equal(after.combos.length,before.combos.length+1);
+    assert.deepEqual(after.diagnostics,before.diagnostics);
+    assert.equal(after.device.summary,before.device.summary);
+    assert.equal(app.recoveryFiles.length,0); app.close();
 });

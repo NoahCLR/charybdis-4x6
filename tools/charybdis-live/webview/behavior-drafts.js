@@ -14,6 +14,7 @@ function createBehaviorDraftStore() {
         get: key => copy(rows.get(key)),
         keys: () => Array.from(rows.keys()),
         stale: (key, base) => rows.has(key) && !same(rows.get(key).base, base),
+        advance: (previous, next) => {for (const row of rows.values()) if (same(row.base, previous)) row.base = copy(next);},
         remove: key => rows.delete(key),
         clear: () => rows.clear(),
     };

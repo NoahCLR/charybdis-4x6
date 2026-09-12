@@ -224,7 +224,7 @@ firmware without authored behaviours or combos, reboot, power loss and USB-role
 changes still require a recorded acceptance matrix. The existing Studio macro
 builder now reads and edits both device banks through this complete-profile
 restore path. Defaults controls use that path too. The inherited pointing-cadence
-regression and unified draft/review/Apply remain separate product work.
+regression and physical acceptance remain separate product work.
 
 
 ## Defaults editor
@@ -249,3 +249,25 @@ it synchronously applies all lighting values, then restores and saves the final
 enabled state. The renderer cannot run between these operations. This permits
 editing saved colours/effects while lighting stays off and restoring a profile
 whose lighting state differs from the current state.
+
+
+## Shared editor draft
+
+For a complete eight-layer snapshot, the session owns a base fingerprint and a
+validated target document. All editor messages stage through the existing pure
+editors; layer moves and imports stage whole documents. Undo/redo retains up to
+100 transitions. Messages carry both a unique draft instance ID and revision;
+Apply additionally requires review of that exact revision and the original device.
+
+The semantic review compares layout, names, actions, macros, RGB and settings.
+Re-reading preserves a dirty target. If the saved fingerprint differs, editing
+and Apply are blocked until the user explicitly reviews against the new read.
+This rebases the complete target without merging conflicting external changes.
+A failed/interrupted restore retains the target; an incomplete recovery read
+uses its diagnostic fingerprint and clearly states that a full comparison is
+unavailable.
+
+Apply invokes one existing complete-profile restore, with recovery storage before
+writes and target fingerprint verification before resetting history. No firmware
+atomicity is added. Export still captures saved state. Drafts are window-local;
+unkept forms and kept changes are not crash-persistent backups.

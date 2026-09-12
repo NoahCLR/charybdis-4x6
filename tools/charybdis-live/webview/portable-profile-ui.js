@@ -1,4 +1,5 @@
 "use strict";
+const {renderProfileDraft} = require("./profile-draft-ui");
 function renderPortableProfile(document, model, post) {
     const host = document.getElementById("portableProfile");
     if (!host) return;
@@ -17,13 +18,14 @@ function renderPortableProfile(document, model, post) {
         : (state.available ? "A complete backup of the saved keyboard configuration." : "Connect a keyboard with complete-profile firmware to manage its backups and layers.");
     toolbar.append(el("span", state.progress || guidance, "muted"));
     host.append(toolbar);
+    if (model.draft) renderProfileDraft(document, host, model, post);
     if (state.review) {
         const review = el("section"); review.setAttribute("aria-label", "Review profile import"); review.style.cssText = "padding:18px;border:1px solid var(--border);border-radius:12px;margin-bottom:18px";
-        review.append(el("h2", "Restore this profile?"));
+        review.append(el("h2", model.draft ? "Use this profile as your draft?" : "Restore this profile?"));
         const incoming = state.review.incoming, current = state.review.current;
         for (const [label, key] of [["Layers", "layers"], ["Key behaviours", "behaviors"], ["Combos", "combos"], ["Macros with content", "macros"]]) review.append(el("p", `${label}: ${current ? current[key] + " → " : ""}${incoming[key]}`));
-        review.append(el("p", current ? "This replaces the keyboard's layout, behaviours, combos, macros, lighting and settings. A recovery copy is saved automatically before restoring." : "An interrupted restore left incomplete macros. This profile will replace the incomplete configuration. The interrupted data will be kept as a diagnostic copy; retain your original backup for recovery."));
-        review.append(button("Restore profile", () => post({type: "restorePortableProfile"})), button("Cancel", () => post({type: "cancelPortableReview"})));
+        review.append(el("p", model.draft ? "This replaces your local draft. Review its differences before applying anything to the keyboard." : current ? "This replaces the keyboard's layout, behaviours, combos, macros, lighting and settings. A recovery copy is saved automatically before restoring." : "An interrupted restore left incomplete macros. This profile will replace the incomplete configuration. The interrupted data will be kept as a diagnostic copy; retain your original backup for recovery."));
+        review.append(button(model.draft ? "Use as draft" : "Restore profile", () => post({type: "restorePortableProfile"})), button("Cancel", () => post({type: "cancelPortableReview"})));
         host.append(review);
     }
     if (state.layers) {
@@ -49,7 +51,7 @@ function renderPortableProfile(document, model, post) {
             else row.append(el("span", "Base · always underneath", "muted"));
             list.append(row);
         }
-        panel.append(list, button("Save layer changes", () => post({type: "savePortableLayers", names: currentNames()})), button("Cancel", () => post({type: "cancelPortableReview"})));
+        panel.append(list, button(model.draft ? "Keep layer changes" : "Save layer changes", () => post({type: "savePortableLayers", names: currentNames()})), button("Cancel", () => post({type: "cancelPortableReview"})));
         host.append(panel);
     }
 }

@@ -12,6 +12,9 @@ __pycache__/
 *.uf2
 compile_commands.json
 
+# Local keyboard backups and hardware-acceptance evidence
+backups/
+
 # Claude Code
 .claude/
 CLAUDE.md

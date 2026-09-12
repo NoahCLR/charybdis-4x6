@@ -18,6 +18,7 @@
 
 const keycodeCatalog = require("../core/data/keycode-catalog");
 const {renderPortableProfile} = require("./portable-profile-ui");
+const {renderProfileDraft} = require("./profile-draft-ui");
 const {renderDeviceProfileDetails} = require("./device-profile-ui");
 const {createBehaviorDraftStore} = require("./behavior-drafts");
 const {createSettingsDraftStore} = require("./settings-drafts");
@@ -2321,6 +2322,7 @@ function getStudioHtml() {
     <div id="keyPickerHost"></div>
     <script nonce="${nonce}">
 ${renderPortableProfile.toString()}
+${renderProfileDraft.toString()}
 ${renderDeviceProfileDetails.toString()}
 ${createBehaviorDraftStore.toString()}
 ${createSettingsDraftStore.toString()}
@@ -2349,6 +2351,7 @@ function getClientScript() {
     const behaviorDrafts = createBehaviorDraftStore();
     const settingsDrafts = createSettingsDraftStore();
     let settingsSavePending = false;
+    let draftRequestPending = false;
     const settingsOpen = {};
     let behaviorSavePending = false;
     let rgbGroupTarget = "layer";
@@ -2853,6 +2856,7 @@ function getClientScript() {
         applyAllStagedChanges();
     });
     document.getElementById("reload").addEventListener("click", () => {
+        if (model?.draft) {storeActiveViewDraft(); post({type: "refresh"}); return;}
         captureSettingsDrafts();
         const retainedSettings = settingsDrafts.snapshot();
         discardLocalDraftState();
@@ -3001,8 +3005,28 @@ function getClientScript() {
             captureActiveMacroDraft();
             captureSettingsDrafts();
             clearFloatingStatus();
-            viewDrafts = {};
+            const oldIdentity = model?.profileIdentity;
+            if (!event.data.model.draft || event.data.resetDraftForms) viewDrafts = {};
             model = event.data.model;
+            if (!model.draft?.busy) draftRequestPending = false;
+            const accepted = event.data.acceptedEdit;
+            if (event.data.resetDraftForms) discardLocalDraftState();
+            if (accepted) {
+                const edit = accepted.message;
+                settingsDrafts.accept(edit.type === "updateConfigDefaults" ? settingsDraftKey(edit.sectionId) : null, edit.fields, accepted.previousFingerprint, model.settingsEditing?.identity);
+                if (edit.type === "updateViaMacro") acceptMacroSave({...edit, expectedFingerprint: accepted.previousFingerprint});
+                advanceMacroDraftBases(accepted.previousFingerprint);
+                behaviorDrafts.advance(oldIdentity, model.profileIdentity);
+                if (["saveBehavior", "addBehavior", "deleteBehavior"].includes(edit.type)) behaviorDrafts.remove(behaviorDraftKey(edit.type === "addBehavior" ? "new" : edit.behavior?.keycode || edit.keycode));
+                // Only the submitted generic form is replaced by its accepted
+                // model. Other tabs retain their unfinished form controls.
+                const unfinished = viewDrafts[edit.draftView];
+                if (unfinished && edit.draftSection) {
+                    unfinished.controls = unfinished.controls.filter(control => control.section !== edit.draftSection);
+                    if (!unfinished.controls.length) delete viewDrafts[edit.draftView];
+                }
+                if (["addCombo", "saveCombo", "deleteCombo"].includes(edit.type)) {layoutComboInputs = ""; layoutComboOutput = ""; layoutComboSelection = []; clearLayoutComboOriginal();}
+            }
             if (!model.portable?.busy) macroSavePending = false;
             acceptMacroSave(event.data.savedMacro);
             if (!model.portable?.busy) settingsSavePending = false;
@@ -3401,11 +3425,13 @@ function getClientScript() {
             const payload = readComboBuilder(target);
             const original = (model.combos || []).find(row => comboIdentityEquals(row, activeLayoutComboOriginal));
             const originalSource = activeLayoutComboOriginalSource;
-            layoutComboPicking = false;
-            layoutComboSelection = [];
-            layoutComboOutput = "";
-            layoutComboInputs = "";
-            clearLayoutComboOriginal();
+            if (!model.draft) {
+                layoutComboPicking = false;
+                layoutComboSelection = [];
+                layoutComboOutput = "";
+                layoutComboInputs = "";
+                clearLayoutComboOriginal();
+            }
             post(layoutComboShouldSaveOriginal(original, originalSource, payload.inputs.join(", ")) ? { type: "saveCombo", ...payload, id: original.id } : { type: "addCombo", ...payload });
         } else if (action === "applyLayoutChanges") {
             const groups = pendingLayoutChangeGroups();
@@ -4300,12 +4326,14 @@ function getClientScript() {
     }
 
     function applyAllStagedChanges() {
+        if (model?.draft && !pendingLayoutChangeCount()) {post({type: "reviewProfileDraft"}); return;}
         if (!hasApplyAllChanges()) return;
         post({
             type: "applyAllChanges",
             ...layerStructurePayload(),
             layoutGroups: pendingLayoutChangeGroups(),
             activeLayer,
+            reviewAfter: Boolean(model?.draft),
         });
     }
 
@@ -4763,7 +4791,21 @@ function getClientScript() {
             if (combo) loadLayoutComboIntoBuilder(combo);
             render(); document.getElementById("layoutComboBuilder")?.scrollIntoView({block: "center"}); return;
         }
-        if (message.type === "refresh") {behaviorDrafts.clear(); viewDrafts = {};}
+        if (model?.draft) {
+            if (draftRequestPending) return;
+            message.draftRevision = model.draft.revision;
+            message.draftId = model.draft.id;
+            message.draftView = activeView;
+            message.draftSection = draftSectionKey(document.activeElement);
+            if (["reviewProfileDraft", "applyProfileDraft", "undoProfileDraft", "redoProfileDraft", "rebaseProfileDraft"].includes(message.type) || message.reviewAfter) {
+                storeActiveViewDraft();
+                if (["behaviors", "rgb", "macros", "defaults"].some(viewTabDirty) || (!message.reviewAfter && layoutViewHasUnsavedChanges())) {
+                    notice = "Keep or discard your unfinished form edits before reviewing or changing the profile draft.";
+                    dismissedStatusSignature = ""; render(); return;
+                }
+            }
+        }
+        if (message.type === "refresh") {if (!model?.draft) {behaviorDrafts.clear(); viewDrafts = {};}}
         else storeActiveViewDraft();
         if (["choosePortableProfile", "managePortableLayers", "restorePortableProfile", "savePortableLayers"].includes(message.type) && ["layout", "behaviors", "rgb", "macros", "defaults"].some(viewTabDirty)) {
             notice = "Save or discard your current edits before importing a profile or changing layer priority.";
@@ -4787,6 +4829,7 @@ function getClientScript() {
         }
         notice = "Working...";
         layoutNotice = "";
+        if (model?.draft) draftRequestPending = true;
         render();
         resetLocalHistory();
         const activeProfileId = model?.activeProfile?.id || "";
@@ -4845,6 +4888,19 @@ function getClientScript() {
         renderPortableProfile(document, model, post);
         renderDeviceProfileDetails(document, model, post, displayKeyExpression);
         renderDeviceCombos(document, model, post);
+        const reload = document.getElementById("reload");
+        if (model.draft && reload) {
+            reload.disabled = Boolean(model.draft.busy);
+            reload.setAttribute("data-tooltip", "Read the keyboard again while keeping your draft and unfinished edits.");
+            reload.setAttribute("aria-label", "Read from keyboard");
+        }
+        if (model.draft) {
+            for (const control of app.querySelectorAll("button[data-action]")) {
+                if (!writeActions.has(control.dataset.action) && control.dataset.action !== "applyLayoutChanges") continue;
+                control.textContent = control.textContent.replace(/^Apply\\b/, "Keep").replace(/^Save\\b/, "Keep");
+                control.dataset.tooltip = "Keep this edit in your draft. Apply to the keyboard from change review.";
+            }
+        }
         initializeDirtyTracking();
         restoreActiveViewDraft();
         restoreBehaviorDrafts();
@@ -4858,6 +4914,9 @@ function getClientScript() {
         }
         hydrateTooltips();
         scheduleMacroSlotBrowserHeightSync();
+        if (model.draft && (draftRequestPending || model.draft.busy)) {
+            for (const control of document.querySelectorAll("#app input, #app select, #app textarea, #app button, #portableProfile button, #applyAll, #reload")) control.disabled = true;
+        }
     }
 
     // Charybdis Live: the header reports the connected keyboard rather than a
@@ -5089,7 +5148,7 @@ function getClientScript() {
     function restoreLocalControls(snapshots) {
         const controls = localEditableControls();
         snapshots.forEach((snapshot, index) => {
-            const control = snapshot.id ? controls.find(item => item.id === snapshot.id) : controls[index];
+            const control = snapshot.id ? controls.find(item => item.id === snapshot.id) : controls[snapshot.index ?? index];
             if (!control) return;
             if (snapshot.binding !== (control.closest("[data-behavior-draft]")?.dataset.behaviorDraft || "")) return;
             if (control.type === "checkbox" || control.type === "radio") {
@@ -5128,6 +5187,12 @@ function getClientScript() {
             return {...identity, checked: Boolean(control.checked)};
         }
         return {...identity, value: control.value || ""};
+    }
+
+    function draftSectionKey(control) {
+        const section = control?.closest?.("[data-dirty-section]");
+        if (!section) return "";
+        return section.id || (section.dataset.layer ? "layer:" + section.dataset.layer : section.dataset.mode ? "mode:" + section.dataset.mode : "section:" + Array.from(app.querySelectorAll("[data-dirty-section]")).indexOf(section));
     }
 
     function behaviorDraftKey(keycode) {
@@ -5176,7 +5241,9 @@ function getClientScript() {
             [activeView]: {
                 dirty: true,
                 labels: labels.length ? labels : [viewLabel(activeView) + " form edits"],
-                controls: localEditableControls().map(controlSnapshot),
+                controls: model.draft
+                    ? localEditableControls().map((control, index) => ({...controlSnapshot(control), index, section: draftSectionKey(control), dirty: Boolean(control.closest("[data-dirty-section].dirty"))})).filter(control => control.dirty)
+                    : localEditableControls().map(controlSnapshot),
             },
         };
     }
@@ -5189,6 +5256,8 @@ function getClientScript() {
     }
 
     function initializeDirtyTracking() {
+        // Resolve pass-through previews before recording the clean form values.
+        for (const control of document.querySelectorAll("[data-color-control]")) updateColorControl(control);
         for (const section of document.querySelectorAll("[data-dirty-section]")) {
             section.dataset.dirtyBaseline = dirtySnapshot(section);
             updateDirtySection(section);
@@ -5254,6 +5323,14 @@ function getClientScript() {
     function updateHeaderApplyAllState() {
         const button = document.getElementById("applyAll");
         if (!button) return;
+        if (model?.draft) {
+            button.hidden = false;
+            button.disabled = model.draft.busy || !model.draft.connected || model.draft.stale || (!model.draft.dirty && !pendingLayoutChangeCount());
+            button.textContent = "Review changes";
+            button.setAttribute("aria-label", "Review all profile changes");
+            button.setAttribute("data-tooltip", "Review your complete profile draft before applying it to the keyboard.");
+            return;
+        }
         const active = hasApplyAllChanges();
         button.hidden = !active;
         button.disabled = !active;
@@ -7995,7 +8072,7 @@ function getClientScript() {
         if (!sections.length) {
             return panel("Defaults", "<p class='muted'>Read a complete profile from the keyboard to load its settings.</p>", true);
         }
-        return "<div class='stack'><p class='muted'>Settings read from the keyboard. Apply saves a recovery copy and verifies both halves.</p>" + sections.map(renderConfigDefaultSection).join("") + "</div>";
+        return "<div class='stack'><p class='muted'>" + (model.draft ? "Keep each section’s edits in your profile draft, then review and apply all changes together." : "Settings read from the keyboard. Apply saves a recovery copy and verifies both halves.") + "</p>" + sections.map(renderConfigDefaultSection).join("") + "</div>";
     }
 
     function renderConfigDefaultSection(section) {
@@ -9125,7 +9202,7 @@ function getClientScript() {
             renderMacroChip("slots", filled + " / " + slots.length + " filled", "", "Filled macro slots across both banks read from the keyboard.") +
             renderMacroChip("payload chars", String(totalChars), "", "Total characters across all current macro drafts.") +
             (edited ? renderMacroChip("edited", String(edited), "warning", "Local drafts that still need Apply macro.") : "") +
-            renderMacroChip("target", "Keyboard", "", "Apply saves to both halves and verifies the complete profile.") +
+            renderMacroChip("target", model.draft ? "Profile draft" : "Keyboard", "", model.draft ? "Keep edits here, then apply them from profile review." : "Apply saves to both halves and verifies the complete profile.") +
             "</div>";
     }
 
@@ -9197,7 +9274,7 @@ function getClientScript() {
     function macroEditorStatusTooltip(slot, status, error) {
         const keycode = displayKeyExpression(slot?.keycode || "");
         if (status === "invalid") return keycode + " payload has a parse error: " + error;
-        if (status === "ready") return keycode + " has a non-empty draft. Apply macro saves it to both halves and verifies readback.";
+        if (status === "ready") return keycode + (model.draft ? " has a non-empty form. Keep macro includes it in your profile draft." : " has a non-empty draft. Apply macro saves it to both halves and verifies readback.");
         return keycode + " is empty. Add text, insert steps, or record events before applying.";
     }
 

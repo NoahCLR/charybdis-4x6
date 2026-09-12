@@ -53,7 +53,7 @@ test("Read from keyboard retains Defaults drafts across the shared draft reset",
     const script = getStudioHtml().match(/<script nonce="[^"]+">([\s\S]*?)<\/script>/)[1];
     const store = createSettingsDraftStore(), sent = [];
     let refresh;
-    const context = vm.createContext({settingsDrafts: store,
+    const context = vm.createContext({settingsDrafts: store, model: {},
         document: {getElementById: id => {assert.equal(id, "reload"); return {addEventListener: (event, handler) => {assert.equal(event, "click"); refresh = handler;}};}},
         captureSettingsDrafts: () => store.capture("board:timing", fields("175"), fields("150"), "before"),
         post: message => sent.push(message.type), clearLayoutComboOriginal() {}, resetMacroRecorderState() {},

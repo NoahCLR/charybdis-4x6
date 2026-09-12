@@ -31,12 +31,12 @@ manual feedback, not completion of the hardware acceptance matrix.
 | Macros | Studio's existing builder, recorder and preview wired to both device banks; verified save and draft retention |
 | Global policy | Defaults panels cover all 28 portable scalars, including startup layers, combo matching and device-reported lighting/key options; unsupported firmware features stay read-only |
 | Backup and restore | Complete supported snapshots, review, recovery file and verified restore; interrupted restores can be retried |
-| Drafts and Apply | Layout drafts and generation-bound behaviour drafts exist; one whole-profile draft, semantic review and coordinated Apply remain pending |
+| Drafts and Apply | Eight-layer profiles share one draft, semantic change review, undo/redo and a coordinated verified Apply; unfinished forms stay local until kept |
 | Recovery and release readiness | Guided reset/recovery, broad hardware acceptance, performance work and standalone packaging remain pending |
 
 Studio's existing Defaults controls now use complete-profile readback and the
-verified restore path, including native options reported by firmware. Next,
-unify editing, undo/redo and change review across domains. The two storage
+verified restore path, including native options reported by firmware. Editing,
+undo/redo and change review now share a complete-profile draft. The two storage
 owners still require a complete logical-generation contract: today's restore
 is recoverable but not atomic across all domains. Resolve the inherited pointing
 cadence regression and finish reboot, USB-role, interruption and blank-firmware
@@ -670,3 +670,89 @@ regression tripwire, with a 206,456-byte SRAM0–3 boot core-memory span. These 
 per-half linked measurements, not runtime high-water evidence. No firmware was
 flashed or physical keyboard configuration written; sibling folders received
 generated QMK build files and the numbered pair only.
+
+
+### D-L19 — Shared whole-profile draft and review
+
+A complete eight-layer device snapshot seeds one window-local profile draft.
+Layout, behaviours, combos, RGB, both macro banks and Defaults use their existing
+validated editors to update that draft. Import and layer naming/reordering also
+replace the draft, preserving the same undo history. Keep does not write HID.
+Review lists semantic before/after values by domain, and Apply requires the exact
+reviewed draft revision and matching connected device. The header continues to
+report the actual device generation; draft revisions are never device generations.
+
+Unfinished forms survive keeping another section and re-reading the device.
+Undo/redo and review require those forms to be kept or discarded first. An
+external fingerprint change preserves the target and blocks a stale Apply.
+Review against keyboard explicitly compares that target against a fresh read;
+it does not silently merge external edits. Interrupted restore retains the target
+and requires another read/review before retrying. An incomplete read is labelled
+as recovery with no full semantic comparison, never as a complete backup.
+
+Apply uses the existing complete-profile restore with a recovery copy before
+writing and verified readback afterward. This does not change the wire or storage
+contracts and does not make VIA/custom-owner writes atomic. Export continues to
+capture the saved board, not unapplied window-local changes. Older firmware keeps
+its supported direct-save paths. Closing the editor still loses local drafts.
+
+Verification includes composed edits across all six editor areas, no-write staging,
+revision/device binding, undo/redo, stale reads, interrupted apply retention, text-only
+review rendering and browser interaction with the real extension and a simulated
+keyboard. Browser checks cover unfinished Defaults/RGB preservation, refresh,
+macro staging and combined review. Physical acceptance remains outstanding.
+
+Next: guided recovery and persisted draft recovery, the complete logical-generation
+contract, and physical reboot/interruption/blank-firmware acceptance.
+
+
+Hardware acceptance on 2026-09-12: the connected eight-layer keyboard reported
+37 behaviours, seven combos and 12 populated macros. Two complete reads matched;
+a same-half power cycle preserved the complete snapshot at generation 12.
+Moving USB to the left exposed no Raw HID interface, consistent with the normal
+pair's FORCE_SLAVE/usb_disconnect policy. USB role migration is not applicable
+to that pair and remains untested with role-switching firmware.
+
+Returning USB to the right initially produced a storage-recovery error. A
+follow-up status read was ready with no conflicts, and the full snapshot still
+matched the original. The cause of that temporary condition is not confirmed.
+Using the actual ProfileDraftSession and complete-profile Apply over HID, a
+single last-layer display-name change committed at generation 13; independent
+readback matched the target and both halves converged. Restoring the original
+snapshot committed at generation 14; independent readback exactly matched the
+original configuration and both halves converged without errors. Recovery copies
+and machine-readable evidence are held locally under backups/. This exercised
+the live service path, not the actual VS Code UI. No firmware was flashed.
+The connected firmware does not implement the optional settings-limit/options
+queries, so capability-dependent controls remain untested on hardware.
+
+Next hardware checks: reboot after this save/restore, representative runtime
+behaviour changes, and later explicitly approved interruption/blank-firmware
+recovery tests. Investigate transient reconnect readiness before presenting it
+as a persistent recovery requirement.
+
+Post-save/restore reboot on 2026-09-12: custom-profile generation 14 and its
+original digest remained converged. The first complete capture failed again.
+A diagnostic at 16:49:44 UTC observed VIA storage flags 7 (dirty, recovery
+required, digest valid), generation 9 on both sides, local digest 2839131957,
+peer digest 1961381780, and no acknowledgement. At 16:50:04 UTC it reported
+flags 4, matching digest 1961381780 and acknowledgement 9, with no errors or
+conflicts. The subsequent complete profile exactly matched the original backup.
+No host configuration writes occurred during these checks. This proves eventual
+recovery to the expected configuration; it does not prove clean startup or
+independent durable retention on each half. Clarify which halves lost power,
+then investigate the dirty/recovery transition before marking reboot acceptance
+fully passed. Do not suppress the readiness error without establishing its cause.
+
+Power-setup correction and separate test, 2026-09-12: the user clarified that
+only one half lost power during the preceding recovery observation; the other
+remained powered. It must not be treated as a simultaneous cold boot. The user
+then disconnected power from both halves and reconnected USB only to the right.
+The first diagnostic at 16:53:16 UTC reported clean VIA flags 4, generation 9,
+matching digests 1961381780, acknowledgement 9, and no errors/conflicts. The
+complete read at 16:53:30 UTC matched the original snapshot exactly; custom
+profile generation 14 remained converged. This full-power-cycle persistence
+check passed at observation, without host configuration writes. The earlier
+one-half power-cycle recovery transition remains an open issue; the passing
+cold-boot check does not explain or dismiss it. Next: representative runtime
+edit tests and investigation of the one-half reconnect path.

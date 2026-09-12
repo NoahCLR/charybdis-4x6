@@ -15,7 +15,7 @@ function renderDeviceCombos(document, model, post = () => {}) {
         host.append(node("p", read?.error?.message || "Read from keyboard to load its combos."));
         return;
     }
-    host.append(node("p", `Combos are ${read.enabled ? "enabled" : "disabled"}. These definitions and timing values came from the keyboard. Save updates both halves and verifies the profile readback.`));
+    host.append(node("p", `Combos are ${read.enabled ? "enabled" : "disabled"}. ` + (model.draft ? "These are the definitions in your profile draft. Keep edits here, then review and apply the profile to the keyboard." : "These definitions and timing values came from the keyboard. Save updates both halves and verifies the profile readback.")));
     host.append(node("p", read.noTimer ? "Combo timing is disabled." : read.strictTimer ? "The combo window starts at the first input press." : "The combo window is extended by subsequent input presses."));
     if (read.customTrigger || read.customRelease || read.customRepress) host.append(node("p", "Additional firmware conditions affect combo triggering or release; they cannot be described by this readout."));
     const references = (read.layerReferences || []).map((target, layer) => target !== layer ? `Layer ${layer} uses Layer ${target}` : "").filter(Boolean);
@@ -33,8 +33,10 @@ function renderDeviceCombos(document, model, post = () => {}) {
     };
     if (writable && rows.length) {
         const shared = node("div");
+        if (model.draft) {shared.id = "comboHoldDraft"; shared.setAttribute("data-dirty-section", "");}
         const hold = field(shared, "Shared hold threshold (ms)", rows[0].holdTermMs, "number");
-        const save = node("button", "Save hold threshold"); save.type = "button";
+        const save = node("button", model.draft ? "Keep hold threshold" : "Save hold threshold"); save.type = "button";
+        if (model.draft) save.setAttribute("data-dirty-button", "");
         save.onclick = () => post({type: "updateComboHoldTerm", holdTermMs: hold.value});
         shared.append(save); host.append(shared);
     }

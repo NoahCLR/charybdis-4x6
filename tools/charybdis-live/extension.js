@@ -16,6 +16,7 @@ const vscode = require("vscode");
 
 const {validateSnapshot, summary, reorderLayers} = require("./core/session/portable-profile-session");
 const {ProfileDeviceService} = require("./core/session/profile-device-service");
+const {ProfileDraftSession, DRAFT_EDITS} = require("./core/session/profile-draft-session");
 const {buildDeviceModel} = require("./core/session/device-model");
 const {getStudioHtml} = require("./webview/studio-ui");
 
@@ -56,7 +57,27 @@ function openPanel(context) {
 
 function publish(panel, session) {
     const state = session.service.snapshot();
-    const model = buildDeviceModel({
+    const portable = session.service.portable;
+    if (portable && portable !== session.observedPortable && !portable.incomplete && state.connected && state.capabilities?.compiledLayerCount === 8) {
+        if (!session.draft) session.draft = new ProfileDraftSession(portable, state.selectedDeviceId, state.capabilities);
+        else session.draft.observe(portable, state.selectedDeviceId);
+        session.observedPortable = portable;
+    }
+    const editing = session.draft ? session.draft.editingState(state) : state;
+    const modelState = {
+            ...editing,
+            busy: editing.busy || session.savingBehavior || session.portableBusy,
+            device: state.devices.find((device) => device.id === state.selectedDeviceId),
+        };
+    const model = buildDeviceModel(modelState);
+    if (session.draft) {
+        model.draft = {...session.draft.view(state), busy: Boolean(state.busy || session.portableBusy)};
+        if (model.draft.matching) {
+            model.profileIdentity = session.draft.identity();
+            const names = session.draft.current.summary.names;
+            model.layers?.forEach((layer, i) => {layer.displayName = names[i];});
+        }
+        const actual = buildDeviceModel({
             capabilities: state.capabilities,
             status: state.status,
             layout: state.layout,
@@ -68,6 +89,10 @@ function publish(panel, session) {
             busy: state.busy || session.savingBehavior || session.portableBusy,
             device: state.devices.find((device) => device.id === state.selectedDeviceId),
         });
+        model.device = actual.device;
+        model.diagnostics = actual.diagnostics;
+        if (model.draft.dirty) model.device.subtitle = "Showing your local draft · the keyboard still runs the last applied profile";
+    }
     model.portable = {
         available: state.connected && [5, 8].includes(state.capabilities?.compiledLayerCount) && (state.capabilities?.supportedDomainMask & 15) === 15,
         eightLayers: state.capabilities?.compiledLayerCount === 8,
@@ -77,17 +102,21 @@ function publish(panel, session) {
         review: session.portableReview ? {incoming: summary(session.portableReview.document), current: session.portableReview.before.summary} : null,
         layers: session.portableLayers ? {key: session.portableLayers.before.fingerprint, order: session.portableLayers.order, names: session.portableLayers.names} : null,
     };
-    model.layers?.forEach((layer, index) => {layer.displayName = state.portableSummary?.names[index] || layer.name;});
+    if (!model.draft?.matching) model.layers?.forEach((layer, index) => {layer.displayName = state.portableSummary?.names[index] || layer.name;});
     void panel.webview.postMessage({type: "model", model,
         notice: session.notice,
         savedBehavior: session.savedBehavior,
         savedMacro: session.savedMacro,
         savedSettings: session.savedSettings,
+        acceptedEdit: session.acceptedEdit,
+        resetDraftForms: session.resetDraftForms,
     });
     session.notice = undefined;
     session.savedBehavior = undefined;
     session.savedMacro = undefined;
     session.savedSettings = undefined;
+    session.acceptedEdit = undefined;
+    session.resetDraftForms = undefined;
 }
 
 // The webview sets its own "Working..." status on every message it posts, and
@@ -97,6 +126,20 @@ function publish(panel, session) {
 async function handleMessage(panel, session, message) {
     try {
         if (session.portableBusy) {publish(panel, session); return;}
+        if (session.draft && (DRAFT_EDITS.has(message?.type) || /^(?:review|undo|redo|discard|apply|rebase|close)ProfileDraft/.test(message?.type || "")) && message.draftId !== session.draft.id) throw new Error("This edit belongs to an older draft. Read the keyboard before continuing.");
+        if (session.draft && DRAFT_EDITS.has(message?.type)) {
+            const state = session.service.snapshot();
+            if (state.busy || !state.connected || state.selectedDeviceId !== session.draft.deviceId) throw new Error("Reconnect the keyboard this draft belongs to and wait for its current operation.");
+            session.acceptedEdit = session.draft.stage(message);
+            if (message.reviewAfter) session.draft.review(session.draft.revision);
+            session.notice = "Changes kept in this app. Review changes to apply them to the keyboard.";
+            publish(panel, session);
+            return;
+        }
+        if (["reviewProfileDraft", "undoProfileDraft", "redoProfileDraft", "discardProfileDraft", "applyProfileDraft", "rebaseProfileDraft", "closeProfileDraftReview"].includes(message?.type)) {
+            await draftMessage(panel, session, message);
+            return;
+        }
         switch (message?.type) {
             case "exportPortableProfile":
             case "choosePortableProfile":
@@ -354,13 +397,13 @@ async function portableMessage(panel, session, message) {
             if (files?.length) {
                 if ((await vscode.workspace.fs.stat(files[0])).size > 100000) throw new Error("This profile file is too large.");
                 const value = validateSnapshot(Buffer.from(await vscode.workspace.fs.readFile(files[0])).toString("utf8"), service.capabilities);
-                session.portableReview = {document: value.document, before: await service.readPortableProfile({forRestore: true})};
+                session.portableReview = {document: value.document, before: session.draft?.current || await service.readPortableProfile({forRestore: true}), revision: session.draft?.revision};
                 session.portableLayers = undefined;
             }
         } else if (message.type === "managePortableLayers") {
-            const before = await service.readPortableProfile();
+            const before = session.draft?.current || await service.readPortableProfile();
             session.portableReview = undefined;
-            session.portableLayers = {before, order: Array.from({length: 8}, (_, id) => id), names: [...before.summary.names]};
+            session.portableLayers = {before, revision: session.draft?.revision, order: Array.from({length: 8}, (_, id) => id), names: [...before.summary.names]};
         } else if (message.type === "editPortableLayer") {
             const draft = session.portableLayers, id = message.id;
             if (!draft || !Number.isInteger(id) || id < 0 || id > 7) throw new Error("Read the layers again before editing them.");
@@ -379,10 +422,53 @@ async function portableMessage(panel, session, message) {
             const before = message.type === "savePortableLayers" ? draft?.before : review?.before;
             if (!before) throw new Error("Review the profile before restoring it.");
             const document = message.type === "savePortableLayers" ? reorderLayers(before.document, draft.order, draft.order.map(old => draft.names[old])) : review.document;
+            if (session.draft) {
+                session.draft.replace(document, message.type === "savePortableLayers" ? draft.revision : review.revision);
+                session.portableReview = undefined; session.portableLayers = undefined;
+                session.resetDraftForms = true;
+                session.notice = "Profile changes kept in this app. Review changes to apply them to the keyboard.";
+                return;
+            }
             await service.restorePortableProfile(document, {expectedFingerprint: before.fingerprint, saveRecovery});
             session.portableReview = undefined; session.portableLayers = undefined;
             await service.readLayout(); await service.readCommittedProfile(); await service.readCombos(); await service.readBaseRgb();
             session.notice = "Complete profile saved to both halves and verified. " + (before.incomplete ? "Interrupted data retained for diagnosis: " : "Recovery copy: ") + session.lastRecovery.fsPath;
+        }
+    } finally {session.portableBusy = false; publish(panel, session);}
+}
+
+async function draftMessage(panel, session, message) {
+    const draft = session.draft, service = session.service;
+    if (!draft) throw new Error("Read a complete keyboard profile before editing.");
+    session.portableBusy = true;
+    try {
+        if (message.type === "reviewProfileDraft") draft.review(message.draftRevision);
+        else if (message.type === "closeProfileDraftReview") {draft.assertRevision(message.draftRevision, {allowStale: true}); draft.reviewedRevision = null;}
+        else if (message.type === "undoProfileDraft") {draft.undo(message.draftRevision); session.resetDraftForms = true;}
+        else if (message.type === "redoProfileDraft") {draft.redo(message.draftRevision); session.resetDraftForms = true;}
+        else if (message.type === "discardProfileDraft") {
+            draft.assertRevision(message.draftRevision, {allowStale: true});
+            const state = service.snapshot();
+            if (!state.connected) throw new Error("Reconnect and read the keyboard before discarding its draft.");
+            const snapshot = await service.readPortableProfile();
+            session.draft = new ProfileDraftSession(snapshot, state.selectedDeviceId, state.capabilities);
+            session.portableReview = undefined; session.portableLayers = undefined;
+            session.resetDraftForms = true;
+            session.notice = "Draft discarded. Showing the saved keyboard configuration.";
+        } else if (message.type === "rebaseProfileDraft") {
+            draft.assertRevision(message.draftRevision, {allowStale: true});
+            if (service.snapshot().selectedDeviceId !== draft.deviceId) throw new Error("Reconnect the keyboard this draft belongs to.");
+            const snapshot = await service.readPortableProfile({forRestore: true});
+            draft.observe(snapshot, draft.deviceId);
+            draft.rebase(message.draftRevision);
+            session.resetDraftForms = true;
+            session.notice = "Review now compares your draft with the latest keyboard state. Apply will replace the differences shown.";
+        } else {
+            await vscode.window.withProgress({location: vscode.ProgressLocation.Notification, title: "Applying the complete profile to both halves"},
+                () => draft.apply(service, message.draftRevision, document => saveRecoveryFile(session, document)));
+            session.resetDraftForms = true;
+            await service.readLayout(); await service.readCommittedProfile(); await service.readCombos(); await service.readBaseRgb();
+            session.notice = "Complete profile applied to both halves and verified. Recovery copy: " + session.lastRecovery.fsPath;
         }
     } finally {session.portableBusy = false; publish(panel, session);}
 }
