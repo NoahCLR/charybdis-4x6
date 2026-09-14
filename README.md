@@ -339,12 +339,17 @@ Reading the keyboard again preserves your draft and unfinished forms. If another
 client changed the keyboard, **Review against keyboard** shows what applying
 your retained draft would replace. Drafts live in the current editor window;
 closing it loses unapplied changes. A complete Apply remains recoverable rather
-than atomic across the keyboard’s separate storage owners. Apply now takes one
-complete recovery snapshot, checks the post-lease identity without rereading the
-whole macro bank, and transfers only changed 28-byte VIA blocks. This removes
-hundreds of Raw HID exchanges from ordinary edits. The old-or-new firmware
+than atomic across the keyboard’s separate storage owners. Apply verifies and
+reuses the complete snapshot already loaded in the editor as its recovery base,
+checks the post-lease identity without rereading the whole macro bank, and
+transfers only changed 28-byte VIA blocks. This removes hundreds of Raw HID
+exchanges from ordinary edits. The old-or-new firmware
 transaction that will replace the remaining two-owner window is specified in
 [`docs/architecture/logical-profile-transaction-v1.md`](docs/architecture/logical-profile-transaction-v1.md).
+The current firmware also collects the expected split-mailbox acknowledgement
+after 5 ms instead of applying the 50 ms transport-failure backoff to every
+14-byte peer chunk. Build and flash both halves to receive that save-speed
+improvement.
 
 Readback requires the side-specific firmware pair,
 which carries the live-profile owner by default; the generic image does not.

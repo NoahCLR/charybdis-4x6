@@ -32,7 +32,7 @@ manual feedback, not completion of the hardware acceptance matrix.
 | Global policy | Defaults panels cover all 28 portable scalars, including startup layers, combo matching and device-reported lighting/key options; unsupported firmware features stay read-only |
 | Backup and restore | Complete supported snapshots, review, recovery file and verified restore; interrupted restores can be retried |
 | Drafts and Apply | Eight-layer profiles share one draft, semantic change review, undo/redo and a coordinated verified Apply; unfinished forms stay local until kept |
-| Recovery and release readiness | Differential Apply transfer is implemented; atomic logical commit, guided recovery, broad hardware acceptance and standalone packaging remain pending |
+| Recovery and release readiness | Differential Apply transfer and verified recovery-base reuse are implemented; atomic logical commit, guided recovery, broad hardware acceptance and standalone packaging remain pending |
 
 Studio's existing Defaults controls now use complete-profile readback and the
 verified restore path, including native options reported by firmware. Editing,
@@ -715,13 +715,45 @@ fourth time for verification, and rewrote the whole macro bank even when it was
 unchanged. A small edit could therefore exceed 1,100 VIA exchanges before
 candidate status polling and split work.
 
-Apply now captures once, uses custom/VIA/settings identities for the post-lease
-compare-and-swap check, writes only changed 28-byte layout and macro blocks, and
-reads those blocks back exactly. Stable final custom and VIA identities still
-have to prove both-half convergence. An unchanged macro bank sends no macro
-writes; a five-byte edit in one block sends one data write bracketed by the two
-macro-validity writes. Refresh and Export continue to perform an independent
-complete keyboard read.
+Apply now verifies and reuses the complete snapshot already loaded in the editor
+as its recovery base, uses custom/VIA/settings identities for the preflight and
+post-lease compare-and-swap checks, writes only changed 28-byte layout and macro
+blocks, and reads those blocks back exactly. Stable final custom and VIA
+identities still have to prove both-half convergence. An unchanged macro bank
+sends no macro writes; a five-byte edit in one block sends one data write
+bracketed by the two macro-validity writes. Refresh and Export continue to
+perform an independent complete keyboard read.
+
+Hardware timing on 2026-09-14 measured the remaining path before recovery-base
+reuse. A layer-name-only Apply took 13.05 seconds and 1,402 Raw HID requests,
+despite writing zero VIA bytes. The complete safety capture cost 2.96 seconds;
+candidate upload and validation reached the commit barrier at 4.97 seconds; the
+two-half custom-profile commit then took 8.06 seconds and accounted for 717
+candidate-status reads. An exact restore repeated the same 13.05-second shape,
+and an independent final read proved the original fingerprint at generation 10.
+Recovery-base reuse reduced the same measured Apply to 10.14 seconds and 875
+requests. A detailed state trace then isolated 7.2–7.4 seconds in
+`PREPARING_PEER`, 0.23 seconds in local `COMMITTING`, and about 0.78 seconds in
+peer convergence and activation.
+
+The split delay was an unintended interaction between the scan-owned receiver
+mailbox and generic failure backoff. Every mutating split RPC first returns
+`BUSY` to acknowledge mailbox admission, then publishes its result from matrix
+scan context. The sender treated that expected first response like a transport
+failure and waited 50 ms for every 14-byte chunk. Expected admission now gets
+one bounded 5 ms acknowledgement retry; a peer that remains busy still enters
+the existing exponential 100–1000 ms backoff, and transport failures retain the
+original 50–1000 ms path. This changes scheduling only, keeps one operation per
+scan, and keeps the existing failure semantics.
+
+Physical timing after flashing both halves confirmed the change. The same
+layer-name-only Apply completed in 5.51 seconds and its exact restore in 4.92
+seconds. `PREPARING_PEER` fell from 7.2–7.4 seconds to 1.9–2.1 seconds; local
+commit remained about 0.2 seconds and convergence/activation about 0.7 seconds.
+An independent final read matched the exact pre-flash content fingerprint
+`3951067804:168945532:1805986991` at generation 3. This covers an uninterrupted
+save and restore; power-loss acceptance at the shortened acknowledgement timing
+still belongs with the logical-transaction interruption matrix.
 
 This optimization does not turn the current two-owner sequence into an atomic
 commit. The accepted firmware design is

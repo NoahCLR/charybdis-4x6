@@ -593,6 +593,19 @@ static void retry_later(noah_profile_split_reconciler_t *reconciler, uint32_t no
     }
 }
 
+static void retry_admitted_mailbox(noah_profile_split_reconciler_t *reconciler, uint32_t now) {
+    if (reconciler->retry_ms != NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS) {
+        retry_later(reconciler, now);
+        return;
+    }
+    reconciler->attempt_immediate = false;
+    reconciler->next_attempt_at   = now + NOAH_PROFILE_SPLIT_ADMISSION_RETRY_MS;
+    reconciler->retry_ms          = NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS * 2u;
+    if (reconciler->retry_count != UINT32_MAX) {
+        reconciler->retry_count++;
+    }
+}
+
 static void note_progress(noah_profile_split_reconciler_t *reconciler, uint32_t now) {
     reconciler->attempt_immediate = false;
     reconciler->retry_ms        = NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS;
@@ -737,7 +750,7 @@ static void push_begin(noah_profile_split_reconciler_t *reconciler, uint32_t now
         return;
     }
     if (response_busy(&response)) {
-        retry_later(reconciler, now);
+        retry_admitted_mailbox(reconciler, now);
         return;
     }
     if (!response_ack_matches(&response, &reconciler->transfer_descriptor) || response.offset > reconciler->transfer_descriptor.payload_length) {
@@ -798,7 +811,7 @@ static void push_send(noah_profile_split_reconciler_t *reconciler, uint32_t now)
         return;
     }
     if (response_busy(&response)) {
-        retry_later(reconciler, now);
+        retry_admitted_mailbox(reconciler, now);
         return;
     }
     if (!response_ack_matches(&response, &reconciler->transfer_descriptor) || response.offset != expected_offset) {
@@ -832,7 +845,7 @@ static void push_commit(noah_profile_split_reconciler_t *reconciler, uint32_t no
             publish_authority(reconciler);
             return;
         }
-        retry_later(reconciler, now);
+        retry_admitted_mailbox(reconciler, now);
         return;
     }
     if (!response_ack_matches(&response, &reconciler->transfer_descriptor)) {
@@ -853,7 +866,7 @@ static void push_abort(noah_profile_split_reconciler_t *reconciler, uint32_t now
         return;
     }
     if (response_busy(&response)) {
-        retry_later(reconciler, now);
+        retry_admitted_mailbox(reconciler, now);
         return;
     }
     if (!response_ack_matches(&response, &reconciler->transfer_descriptor)) {
@@ -920,7 +933,7 @@ static void pull_request(noah_profile_split_reconciler_t *reconciler, uint32_t n
         return;
     }
     if (response_busy(&response)) {
-        retry_later(reconciler, now);
+        retry_admitted_mailbox(reconciler, now);
         return;
     }
     if (response.kind != NOAH_PROFILE_SPLIT_V1_PAYLOAD_CHUNK || response.status != NOAH_PROFILE_SPLIT_V1_STATUS_OK || response.generation != request.generation || response.payload_digest != request.payload_digest || response.payload_length != request.payload_length || response.offset != request.offset) {

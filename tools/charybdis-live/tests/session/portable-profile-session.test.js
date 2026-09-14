@@ -23,8 +23,27 @@ function fixture() {
 test("restore saves recovery first, restores both stores, then verifies complete readback", async () => {
     const f = fixture(), result = await restoreProfile({}, {}, capabilities, f.targetDocument, f.options);
     assert.equal(result.fingerprint, fingerprint(f.targetDocument));
-    assert.deepEqual({...result.performance, elapsedMs: 0}, {elapsedMs: 0, layoutBytes: 28, macroBytes: 28, layoutReports: 1, macroReports: 3});
+    assert.deepEqual({...result.performance, elapsedMs: 0}, {elapsedMs: 0, baseSource: "device-read", layoutBytes: 28, macroBytes: 28, layoutReports: 1, macroReports: 3});
     assert.deepEqual(f.events, ["backup", "stage", "commit", "macros", "layout", "both halves"]);
+});
+test("restore verifies and reuses the reviewed snapshot without rereading its complete payload", async () => {
+    const f = fixture();
+    let captures = 0, identityReads = 0;
+    f.operations.capture = async () => {captures++; throw Error("must not capture");};
+    f.operations.readIdentity = async () => {identityReads++; return f.identity;};
+    f.options.baseSnapshot = {document: f.source, fingerprint: fingerprint(f.source), summary: summary(f.source), identity: f.identity};
+    const result = await restoreProfile({}, {}, capabilities, f.targetDocument, f.options);
+    assert.equal(captures, 0);
+    assert.equal(identityReads, 2);
+    assert.equal(result.performance.baseSource, "verified-cache");
+    assert.deepEqual(f.events, ["backup", "stage", "commit", "macros", "layout", "both halves"]);
+});
+test("a changed device identity rejects a cached recovery base before saving or staging", async () => {
+    const f = fixture();
+    f.options.baseSnapshot = {document: f.source, fingerprint: fingerprint(f.source), summary: summary(f.source), identity: f.identity};
+    f.operations.readIdentity = async () => ({...f.identity, storageGeneration: f.identity.storageGeneration + 1});
+    await assert.rejects(restoreProfile({}, {}, capabilities, f.targetDocument, f.options), /changed/);
+    assert.deepEqual(f.events, []);
 });
 test("stale review and failed recovery save perform no device mutations", async () => {
     const f = fixture(); f.options.expectedFingerprint = "stale";

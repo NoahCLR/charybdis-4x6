@@ -668,13 +668,17 @@ class ProfileDeviceService {
         if (!this.connection?.connected || this.busy || this.savingEdit) throw new Error("Connect the keyboard and wait for the current operation to finish.");
         let result;
         await this.runOperation("restoring complete profile", async () => {
-            const limits = await readSettingsLimits(this.connection, this.requestIds);
+            const cachedBase = options?.expectedFingerprint && this.portable?.fingerprint === options.expectedFingerprint
+                ? this.portable
+                : undefined;
+            const limits = cachedBase?.limits || await readSettingsLimits(this.connection, this.requestIds);
             const brightness = (validateSnapshot(document, this.capabilities).settings.values[22] >>> 16) & 255;
             if (limits && brightness > limits.brightnessMax) throw Object.assign(new Error(`This profile's brightness exceeds the keyboard's reported limit of ${limits.brightnessMax}. Lower the brightness before restoring it.`), {code: "SETTINGS_LIMIT_EXCEEDED"});
-            const keyboardOptions = await readKeyboardOptions(this.connection, this.requestIds);
+            const keyboardOptions = cachedBase?.options || await readKeyboardOptions(this.connection, this.requestIds);
             const effect = (validateSnapshot(document, this.capabilities).settings.values[21] >>> 8) & 255;
             if (keyboardOptions && !keyboardOptions.effects.some(item => item.id === effect)) throw Object.assign(new Error("This profile uses a lighting effect unavailable on this keyboard."), {code: "SETTINGS_LIMIT_EXCEEDED"});
             result = await restoreProfile(this.connection, this.requestIds, this.capabilities, document, {...options,
+                baseSnapshot: cachedBase,
                 onProgress: message => {this.portableProgress = message; this.emitChange();},
             });
             result.limits = limits;

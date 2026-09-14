@@ -14,6 +14,11 @@
 enum {
     NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS = 50u,
     NOAH_PROFILE_SPLIT_RETRY_MAX_MS     = 1000u,
+    // Mutating RPC callbacks acknowledge mailbox admission with BUSY; the
+    // receiver's next matrix scan publishes the actual result. Collect that
+    // expected acknowledgement promptly without weakening the exponential
+    // backoff used when the peer remains busy or transport fails.
+    NOAH_PROFILE_SPLIT_ADMISSION_RETRY_MS = 5u,
     NOAH_PROFILE_SPLIT_POLL_MS          = 1000u,
     // A passive half cannot actively probe the link. Missing three normal
     // master polls invalidates its peer observation and therefore activation.

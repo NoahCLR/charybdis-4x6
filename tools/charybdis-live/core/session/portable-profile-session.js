@@ -73,7 +73,7 @@ async function verifyRanges(connection, readStored, command, target, ranges, {ve
         if (actual[0] !== target.at(-1)) throw fail("RESTORE_VERIFY_FAILED", "Layout or macro readback did not match the imported profile.");
     }
 }
-async function restoreProfile(connection, ids, capabilities, document, {expectedFingerprint, saveRecovery, onProgress = () => {}, operations = {}} = {}) {
+async function restoreProfile(connection, ids, capabilities, document, {expectedFingerprint, saveRecovery, baseSnapshot, onProgress = () => {}, operations = {}} = {}) {
     const startedAt = Date.now();
     requireReady(capabilities);
     requireReady(capabilities, true);
@@ -90,7 +90,16 @@ async function restoreProfile(connection, ids, capabilities, document, {expected
     const readProfile = operations.readProfile || readProfileStatus;
     const createCoordinator = operations.createCoordinator || ((c, options) => new CandidateUploadCoordinator(c, options));
     if (typeof saveRecovery !== "function") throw fail("RECOVERY_REQUIRED", "Save a recovery copy before restoring this keyboard.");
-    const before = await capture(connection, ids, capabilities, onProgress, false, true);
+    let before;
+    if (baseSnapshot?.document && baseSnapshot.identity && (!expectedFingerprint || baseSnapshot.fingerprint === expectedFingerprint)) {
+        if (!baseSnapshot.incomplete) validateSnapshot(baseSnapshot.document, capabilities);
+        onProgress("Verifying the current keyboard configuration");
+        const liveIdentity = await currentIdentity(connection, ids, {allowCandidate: false});
+        if (identityKey(liveIdentity) !== identityKey(baseSnapshot.identity)) throw fail("PROFILE_CHANGED", "The keyboard changed since the restore was reviewed. Review it again.");
+        before = baseSnapshot;
+    } else {
+        before = await capture(connection, ids, capabilities, onProgress, false, true);
+    }
     if (expectedFingerprint && before.fingerprint !== expectedFingerprint) throw fail("PROFILE_CHANGED", "The keyboard changed since the restore was reviewed. Review it again.");
     const recovery = await saveRecovery(before.document);
     if (!recovery) throw fail("RECOVERY_REQUIRED", "A recovery copy could not be saved. The keyboard has not been changed.");
@@ -134,7 +143,7 @@ async function restoreProfile(connection, ids, capabilities, document, {expected
         if (status.activeKind !== PROFILE_ACTIVE_KIND.COMMITTED || status.activeDigest !== fnv1a32(target.profile) || status.committedDigest !== fnv1a32(target.profile) || !(status.stateFlags & 32) || status.conflictCount || !storage.ready || !storageAfter.ready || storage.generation !== storageAfter.generation || storage.digest !== storageAfter.digest || storageAfter.digest !== expectedStorageDigest) throw fail("RESTORE_VERIFY_FAILED", "The keyboard did not confirm the imported profile on both halves.");
         const resultFingerprint = fingerprint(document);
         return {document, fingerprint: resultFingerprint, summary: summary(document), status, identity: snapshotIdentity(status, storageAfter, encodeSettings(target.settings)), recovery,
-            performance: {elapsedMs: Date.now() - startedAt, layoutBytes, macroBytes, layoutReports: layoutRanges.reduce((sum, range) => sum + Math.ceil(range.bytes.length / VIA_STORAGE.CHUNK), 0), macroReports: macroWriteNeeded ? 2 + macroRanges.reduce((sum, range) => sum + Math.ceil(range.bytes.length / VIA_STORAGE.CHUNK), 0) : 0}};
+            performance: {elapsedMs: Date.now() - startedAt, baseSource: before === baseSnapshot ? "verified-cache" : "device-read", layoutBytes, macroBytes, layoutReports: layoutRanges.reduce((sum, range) => sum + Math.ceil(range.bytes.length / VIA_STORAGE.CHUNK), 0), macroReports: macroWriteNeeded ? 2 + macroRanges.reduce((sum, range) => sum + Math.ceil(range.bytes.length / VIA_STORAGE.CHUNK), 0) : 0}};
     } catch (error) {
         if (mutated) throw fail("RESTORE_INCOMPLETE", `Restore was interrupted. Keep both halves connected. ${before.incomplete ? `Import your original complete backup again. Interrupted data was saved for diagnosis at ${recovery}.` : `Import the recovery file ${recovery}.`} ${error.message}`);
         throw error;

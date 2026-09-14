@@ -615,6 +615,35 @@ static void run_prepared_push_until_ready(half_t *sender, half_t *receiver, cons
     (void)run_prepared_push_until_ready_at(sender, receiver, descriptor, source, 10000u);
 }
 
+static void test_prepared_push_collects_expected_mailbox_ack_without_failure_backoff(void) {
+    half_t                          left;
+    half_t                          right;
+    noah_profile_split_descriptor_t descriptor;
+    staged_source_t                 source = {.bytes = empty_profile, .length = sizeof(empty_profile)};
+    uint32_t                        exchanges;
+    uint32_t                        started_at = 10000u;
+
+    half_storage_init(&left);
+    half_storage_init(&right);
+    pair_init(&left, &right);
+    run_pair_until_converged(&left, &right, false);
+    descriptor = committed_descriptor(&right, 19u, 1u);
+    assert(noah_profile_split_reconciler_prepared_push_begin(&right.reconciler, &descriptor, &source, staged_read));
+
+    exchanges = right.link.exchanges;
+    assert_one_scan_budget(&right, true, started_at);
+    assert(right.link.exchanges == exchanges + 1u);
+    assert(right.reconciler.next_attempt_at == started_at + NOAH_PROFILE_SPLIT_ADMISSION_RETRY_MS);
+    assert(right.reconciler.retry_ms == NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS * 2u);
+    assert(!noah_profile_split_reconciler_scan(&right.reconciler, true, started_at + NOAH_PROFILE_SPLIT_ADMISSION_RETRY_MS - 1u));
+    assert(right.link.exchanges == exchanges + 1u);
+
+    assert_one_scan_budget(&left, false, started_at);
+    assert_one_scan_budget(&right, true, started_at + NOAH_PROFILE_SPLIT_ADMISSION_RETRY_MS);
+    assert(right.reconciler.state == NOAH_PROFILE_SPLIT_RECONCILER_PUSH_READ);
+    assert(right.reconciler.retry_ms == NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS);
+}
+
 static void test_prepared_push_pauses_before_commit_then_authorizes(void) {
     half_t                           left;
     half_t                           right;
@@ -1152,6 +1181,7 @@ int main(void) {
     test_convergence_only_pushes_host_record_without_importing();
     test_convergence_only_refuses_newer_peer_import();
     test_convergence_only_answers_inbound_prepare_busy_without_storage();
+    test_prepared_push_collects_expected_mailbox_ack_without_failure_backoff();
     test_prepared_push_pauses_before_commit_then_authorizes();
     test_prepared_push_cancel_aborts_peer_lease();
     test_maximum_candidate_prepares_within_owner_no_progress_window();
