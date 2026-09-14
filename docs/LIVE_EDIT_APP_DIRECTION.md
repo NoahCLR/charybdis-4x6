@@ -32,7 +32,7 @@ manual feedback, not completion of the hardware acceptance matrix.
 | Global policy | Defaults panels cover all 28 portable scalars, including startup layers, combo matching and device-reported lighting/key options; unsupported firmware features stay read-only |
 | Backup and restore | Complete supported snapshots, review, recovery file and verified restore; interrupted restores can be retried |
 | Drafts and Apply | Eight-layer profiles share one draft, semantic change review, undo/redo and a coordinated verified Apply; unfinished forms stay local until kept |
-| Recovery and release readiness | Guided reset/recovery, broad hardware acceptance, performance work and standalone packaging remain pending |
+| Recovery and release readiness | Differential Apply transfer is implemented; atomic logical commit, guided recovery, broad hardware acceptance and standalone packaging remain pending |
 
 Studio's existing Defaults controls now use complete-profile readback and the
 verified restore path, including native options reported by firmware. Editing,
@@ -704,6 +704,34 @@ macro staging and combined review. Physical acceptance remains outstanding.
 
 Next: guided recovery and persisted draft recovery, the complete logical-generation
 contract, and physical reboot/interruption/blank-firmware acceptance.
+
+### D-L20 — Differential Apply and the logical transaction boundary
+
+The observed Apply delay comes primarily from redundant VIA transfers. The VIA
+macro bank is 7,191 bytes and a standard 32-byte Raw HID report carries 28 data
+bytes, so one complete macro read costs 257 request/response exchanges. The old
+restore path captured the complete profile three times, read the VIA regions a
+fourth time for verification, and rewrote the whole macro bank even when it was
+unchanged. A small edit could therefore exceed 1,100 VIA exchanges before
+candidate status polling and split work.
+
+Apply now captures once, uses custom/VIA/settings identities for the post-lease
+compare-and-swap check, writes only changed 28-byte layout and macro blocks, and
+reads those blocks back exactly. Stable final custom and VIA identities still
+have to prove both-half convergence. An unchanged macro bank sends no macro
+writes; a five-byte edit in one block sends one data write bracketed by the two
+macro-validity writes. Refresh and Export continue to perform an independent
+complete keyboard read.
+
+This optimization does not turn the current two-owner sequence into an atomic
+commit. The accepted firmware design is
+[`architecture/logical-profile-transaction-v1.md`](architecture/logical-profile-transaction-v1.md):
+stage target VIA bytes on the non-USB half, bind that identity into prepared
+custom records on both halves, use the USB-side custom marker as the logical
+decision, then roll the target VIA copy forward before activation. It avoids
+doubling QMK's EEPROM RAM cache and defines old-or-new behavior for each power
+loss boundary. Firmware implementation and physical interruption acceptance are
+the next slice.
 
 
 Hardware acceptance on 2026-09-12: the connected eight-layer keyboard reported

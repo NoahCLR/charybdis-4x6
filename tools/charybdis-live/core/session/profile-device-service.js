@@ -682,6 +682,10 @@ class ProfileDeviceService {
             this.portable = result;
             this.macroView = macroEditorView(result);
             this.settingsView = settingsEditorView(result);
+            if (result.performance) {
+                const seconds = (result.performance.elapsedMs / 1000).toFixed(1);
+                this.addDiagnostic(`Saved the complete profile in ${seconds} s; transferred ${result.performance.layoutBytes} changed layout bytes and ${result.performance.macroBytes} changed macro bytes.`);
+            }
         });
         this.portableProgress = "";
         if (this.error) throw Object.assign(new Error(this.error.message), this.error);

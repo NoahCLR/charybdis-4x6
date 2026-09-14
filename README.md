@@ -339,7 +339,12 @@ Reading the keyboard again preserves your draft and unfinished forms. If another
 client changed the keyboard, **Review against keyboard** shows what applying
 your retained draft would replace. Drafts live in the current editor window;
 closing it loses unapplied changes. A complete Apply remains recoverable rather
-than atomic across the keyboard’s separate storage owners.
+than atomic across the keyboard’s separate storage owners. Apply now takes one
+complete recovery snapshot, checks the post-lease identity without rereading the
+whole macro bank, and transfers only changed 28-byte VIA blocks. This removes
+hundreds of Raw HID exchanges from ordinary edits. The old-or-new firmware
+transaction that will replace the remaining two-owner window is specified in
+[`docs/architecture/logical-profile-transaction-v1.md`](docs/architecture/logical-profile-transaction-v1.md).
 
 Readback requires the side-specific firmware pair,
 which carries the live-profile owner by default; the generic image does not.

@@ -1,7 +1,7 @@
 "use strict";
 const {test} = require("node:test");
 const assert = require("node:assert/strict");
-const {VIA_STORAGE, readViaStorage, readRegion, writeRegion, writeViaMacros} = require("../../core/protocol/via-storage-v1");
+const {VIA_STORAGE, viaStorageDigest, readViaStorage, readRegion, writeRegion, changedRanges, writeChangedRegion, writeViaMacros} = require("../../core/protocol/via-storage-v1");
 function keyboard() {
     const layout = Buffer.alloc(960, 1), macros = Buffer.alloc(7191);
     return {layout, macros, async request(request) {
@@ -24,10 +24,25 @@ test("reads every matrix position and the entire macro bank, including unused st
     assert.equal(read.layers, 8); assert.equal(read.macroSlots, 64);
     assert.deepEqual(read.layout, device.layout); assert.deepEqual(read.macros, device.macros);
 });
+test("computes the firmware's canonical digest for the complete VIA store", () => {
+    const device = keyboard();
+    assert.equal(viaStorageDigest(device), 1170160570);
+    assert.throws(() => viaStorageDigest({layout: Buffer.alloc(1), macros: device.macros}), /geometry/);
+});
 test("writes across chunk and final partial boundaries with exact acknowledgements", async () => {
     const device = keyboard(), bytes = Buffer.alloc(960, 17), progress = [];
     await writeRegion(device, VIA_STORAGE.LAYOUT_WRITE, bytes, {onProgress: value => progress.push(value)});
     assert.deepEqual(device.layout, bytes); assert.equal(progress.at(-1).completed, 960);
+});
+test("writes only changed byte ranges and reads them back at their absolute offsets", async () => {
+    const device = keyboard(), current = Buffer.from(device.layout), target = Buffer.from(current), requests = [];
+    target[10] = 4; target[11] = 5; target[900] = 6;
+    const request = device.request.bind(device);
+    device.request = async bytes => {requests.push(Buffer.from(bytes)); return request(bytes);};
+    assert.deepEqual(changedRanges(current, target).map(range => [range.offset, range.bytes.length]), [[0, 28], [896, 28]]);
+    await writeChangedRegion(device, VIA_STORAGE.LAYOUT_WRITE, target, current);
+    assert.deepEqual(requests.map(bytes => [bytes.readUInt16BE(1), bytes[3]]), [[0, 28], [896, 28]]);
+    assert.deepEqual(await readRegion(device, VIA_STORAGE.LAYOUT_READ, 2, {startOffset: 10}), target.subarray(10, 12));
 });
 test("rejects an incomplete macro write and corrupted response headers", async () => {
     const device = keyboard(); device.macros[7190] = 1;
@@ -42,6 +57,15 @@ test("macro execution stays invalidated until the last acknowledged byte", async
     await writeViaMacros(device, target);
     assert.ok(sentinels.slice(0, -1).every(value => value === 1));
     assert.equal(sentinels.at(-1), 0); assert.deepEqual(device.macros, target);
+});
+test("a small macro edit does not transfer the unused macro capacity", async () => {
+    const device = keyboard(), current = Buffer.from(device.macros), target = Buffer.from(current), requests = [];
+    target.write("hello");
+    const request = device.request.bind(device);
+    device.request = async bytes => {requests.push(Buffer.from(bytes)); const response = await request(bytes); return response;};
+    await writeViaMacros(device, target, {current});
+    assert.deepEqual(requests.map(bytes => [bytes.readUInt16BE(1), bytes[3]]), [[7190, 1], [0, 28], [7190, 1]]);
+    assert.deepEqual(device.macros, target);
 });
 test("an interrupted macro transfer stays invalid and can be replaced on retry", async () => {
     const device = keyboard(), request = device.request.bind(device); let writes = 0;

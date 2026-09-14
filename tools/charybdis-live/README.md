@@ -146,8 +146,12 @@ draft. These drafts are held in the open editor, not stored as backups.
 Timing fields use millisecond labels, key shortcuts use readable names, and
 tap branches wrap to fit the window.
 
-Macro payloads and global policy defaults are not read yet. `READ_SURFACE`
-still means capability/status reporting, not payload readback.
+Complete readback includes both macro banks and global policy defaults. All
+editors contribute to one local draft; Apply saves a recovery snapshot, commits
+the custom profile, writes only changed VIA blocks, reads those blocks back and
+requires stable identities on both halves. The current firmware sequence remains
+recoverable across its custom and VIA storage owners while the logical atomic
+transaction is implemented.
 
 After updating the installed extension, reload VS Code and choose **Read from
 keyboard**. Firmware that already returns the profile needs no reflash for UI

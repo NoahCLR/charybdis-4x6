@@ -188,13 +188,15 @@ move with their layers. Save/discard other pending edits before reordering or
 importing; stale layout drafts must not be applied to a new layer order.
 
 Restore validates the file, captures a coherent current state, shows a review,
-and saves a local recovery file before staging. It checks the reviewed
-fingerprint again after acquiring the profile lease. The firmware validates the
-candidate and commits the custom profile to both halves first. VIA macros and
-matrix writes follow. Macro execution is invalidated by writing the final bank
-byte to one before any content changes and enabled by writing it to zero only
-after all content acknowledgements. Success requires exact matrix/macro bytes,
-complete effective-profile equality, and convergence of both persistence owners.
+and saves a local recovery file before staging. After acquiring the profile
+lease it compares the custom status, VIA generation/digest and settings digest
+without transferring the complete matrix and macro bank again. The firmware
+validates the candidate and commits the custom profile to both halves first.
+Only changed 28-byte VIA blocks follow. Macro execution is invalidated by
+writing the final bank byte to one before content changes and enabled by writing
+it to zero only after all content acknowledgements. Success requires exact
+changed-block readback, stable unchanged bytes from the coherent base, complete
+effective-profile identity, and convergence of both persistence owners.
 
 This is a recoverable sequence across two owners, not an atomic whole-keyboard
 transaction. A timeout after commit is reported as incomplete and retains the
@@ -203,6 +205,11 @@ incomplete bytes are saved as `charybdis-recovery-capture` diagnostic JSON,
 never presented as an importable full profile. Keep the original complete
 backup. Storage conflicts or a pending custom-profile transaction must finish
 or recover before a new restore.
+
+The replacement atomic ordering is specified in
+[`logical-profile-transaction-v1.md`](logical-profile-transaction-v1.md). Until
+that firmware contract lands, the recovery file remains the cross-owner safety
+boundary.
 
 ## Upgrade and acceptance
 
