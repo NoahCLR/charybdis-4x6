@@ -884,4 +884,15 @@ two-byte no-op for a custom-only generation), and does not issue an impossible
 postdecision abort if that write is interrupted. Host coverage includes fresh
 and resumed decision callbacks, peer-recovery preservation, and the firmware
 reconciliation fence. Side-specific pair 16 contains the fix; connected timing
-on that pair remains required to close this acceptance finding.
+on that pair closes the original acceptance finding. An unchanged complete
+Apply finished in 6.76 seconds and an independent read matched the original
+fingerprint. A layer-7 key change transferred one 28-byte aligned range and
+finished in 7.16 seconds; restoring it finished in 6.65 seconds. Both saves
+converged immediately with no conflict or device error, and the final read
+matched the exact original fingerprint at custom and peer generation 3. A
+separate unchanged phase trace finished in 6.60 seconds at generation 4: profile
+upload and validation reached 2.01 seconds, peer VIA staging reached 2.56
+seconds, the durable decision became visible at 5.45 seconds, and final
+cross-half convergence completed at 6.58 seconds. This shows the remaining
+latency is validation and durable publication on the keyboard rather than a
+hidden host timeout or full-store copy.
