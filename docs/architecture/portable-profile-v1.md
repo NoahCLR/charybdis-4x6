@@ -190,26 +190,21 @@ importing; stale layout drafts must not be applied to a new layer order.
 Restore validates the file, captures a coherent current state, shows a review,
 and saves a local recovery file before staging. After acquiring the profile
 lease it compares the custom status, VIA generation/digest and settings digest
-without transferring the complete matrix and macro bank again. The firmware
-validates the candidate and commits the custom profile to both halves first.
-Only changed 28-byte VIA blocks follow. Macro execution is invalidated by
-writing the final bank byte to one before content changes and enabled by writing
-it to zero only after all content acknowledgements. Success requires exact
-changed-block readback, stable unchanged bytes from the coherent base, complete
-effective-profile identity, and convergence of both persistence owners.
+without transferring the complete matrix and macro bank again. The app sends
+only changed VIA blocks to the non-USB half while that copy is inactive, then
+firmware validates and durably prepares the custom record on both halves with
+the exact target VIA generation and digest. The USB-side custom marker is the
+logical decision. Firmware commits the peer custom record, accepts its staged
+VIA copy, copies the target VIA state back to the USB half, and activates only
+after both identities converge.
 
-This is a recoverable sequence across two owners, not an atomic whole-keyboard
-transaction. A timeout after commit is reported as incomplete and retains the
-recovery path. A subsequent import can replace an interrupted macro bank; the
-incomplete bytes are saved as `charybdis-recovery-capture` diagnostic JSON,
-never presented as an importable full profile. Keep the original complete
-backup. Storage conflicts or a pending custom-profile transaction must finish
-or recover before a new restore.
-
-The replacement atomic ordering is specified in
-[`logical-profile-transaction-v1.md`](logical-profile-transaction-v1.md). Until
-that firmware contract lands, the recovery file remains the cross-owner safety
-boundary.
+A timeout after the decision is reported as incomplete and retains the recovery
+path. On reboot, a committed logical record fences normal VIA reconciliation
+and effective-profile activation until its bound VIA generation is recovered.
+Before the decision, an interrupted prepared record remains inactive and the
+old USB-side VIA copy restores the peer. The detailed ordering is specified in
+[`logical-profile-transaction-v1.md`](logical-profile-transaction-v1.md).
+Physical power-loss acceptance at each durable boundary remains required.
 
 ## Upgrade and acceptance
 
@@ -275,6 +270,7 @@ uses its diagnostic fingerprint and clearly states that a full comparison is
 unavailable.
 
 Apply invokes one existing complete-profile restore, with recovery storage before
-writes and target fingerprint verification before resetting history. No firmware
-atomicity is added. Export still captures saved state. Drafts are window-local;
-unkept forms and kept changes are not crash-persistent backups.
+writes and target fingerprint verification before resetting history. Current
+firmware publishes the custom and VIA stores as one logical generation. Export
+still captures saved state. Drafts are window-local; unkept forms and kept
+changes are not crash-persistent backups.

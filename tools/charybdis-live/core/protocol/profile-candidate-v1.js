@@ -25,6 +25,7 @@ const PROFILE_CANDIDATE_V1 = Object.freeze({
     MAX_BLOB_SIZE: 4064,
     STATUS_LAYOUT_VERSION: 1,
     STATUS_PAYLOAD_SIZE: 25,
+    LOGICAL_STORE_FORMAT: 2,
     KNOWN_DOMAIN_MASK: PROFILE_WIRE_DOMAINS.RGB | PROFILE_WIRE_DOMAINS.KEY_BEHAVIORS | PROFILE_WIRE_DOMAINS.COMBOS | PROFILE_WIRE_DOMAINS.SETTINGS,
 });
 
@@ -148,6 +149,11 @@ function buildCandidateBeginRequest(transactionId, metadata) {
     report.writeUInt32LE(normalized.crc32, 11);
     report.writeUInt32LE(normalized.digest, 15);
     report.writeUInt32LE(normalized.actionAbiDigest, 19);
+    report[23] = normalized.storeFormatVersion;
+    if (normalized.storeFormatVersion === PROFILE_CANDIDATE_V1.LOGICAL_STORE_FORMAT) {
+        report.writeUInt32LE(normalized.viaGeneration, 24);
+        report.writeUInt32LE(normalized.viaDigest, 28);
+    }
     return report;
 }
 
@@ -355,6 +361,9 @@ function candidateMetadataForBlob(value, options = {}) {
         crc32: crc32(blob),
         digest: fnv1a32(blob),
         actionAbiDigest: assertU32(options.actionAbiDigest, "Action-ABI digest"),
+        storeFormatVersion: options.viaGeneration === undefined && options.viaDigest === undefined ? 0 : PROFILE_CANDIDATE_V1.LOGICAL_STORE_FORMAT,
+        viaGeneration: options.viaGeneration === undefined ? 0 : assertU32(options.viaGeneration, "VIA generation"),
+        viaDigest: options.viaDigest === undefined ? 0 : assertU32(options.viaDigest, "VIA digest"),
     };
 }
 
@@ -370,6 +379,15 @@ function normalizeCandidateMetadata(metadata) {
     if (payloadLength < PROFILE_CANDIDATE_V1.MIN_BLOB_SIZE || payloadLength > PROFILE_CANDIDATE_V1.MAX_BLOB_SIZE) {
         throw new RangeError(`Candidate payload length must be ${PROFILE_CANDIDATE_V1.MIN_BLOB_SIZE} through ${PROFILE_CANDIDATE_V1.MAX_BLOB_SIZE}.`);
     }
+    const storeFormatVersion = metadata.storeFormatVersion === undefined ? 0 : assertU8(metadata.storeFormatVersion, "Candidate store format");
+    if (storeFormatVersion !== 0 && storeFormatVersion !== PROFILE_CANDIDATE_V1.LOGICAL_STORE_FORMAT) {
+        throw new RangeError(`Candidate store format must be zero or ${PROFILE_CANDIDATE_V1.LOGICAL_STORE_FORMAT}.`);
+    }
+    const viaGeneration = metadata.viaGeneration === undefined ? 0 : assertU32(metadata.viaGeneration, "VIA generation");
+    const viaDigest = metadata.viaDigest === undefined ? 0 : assertU32(metadata.viaDigest, "VIA digest");
+    if (storeFormatVersion === 0 ? (viaGeneration !== 0 || viaDigest !== 0) : (viaGeneration === 0 || viaDigest === 0)) {
+        throw new RangeError("Logical candidates require a nonzero VIA generation and digest; legacy candidates require both to be zero.");
+    }
     return {
         schemaMajor: assertU8(metadata.schemaMajor, "Candidate schema major"),
         schemaMinor: assertU8(metadata.schemaMinor, "Candidate schema minor"),
@@ -379,6 +397,9 @@ function normalizeCandidateMetadata(metadata) {
         crc32: assertU32(metadata.crc32, "Candidate CRC32"),
         digest: assertU32(metadata.digest, "Candidate digest"),
         actionAbiDigest: assertU32(metadata.actionAbiDigest, "Candidate action-ABI digest"),
+        storeFormatVersion,
+        viaGeneration,
+        viaDigest,
     };
 }
 

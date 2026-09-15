@@ -21,7 +21,7 @@ const PROFILE_WIRE_STATUS = Object.freeze({
 });
 
 const PROFILE_WIRE_KNOWN_MASKS = Object.freeze({
-    FEATURE_FLAGS: 0x00000fff,
+    FEATURE_FLAGS: 0x00001fff,
     REQUIRED_READ_FEATURES: 0x0000000f,
     STATE_FLAGS: 0x00ff,
     SUPPORTED_DOMAINS: 0x0f,
@@ -40,6 +40,7 @@ const PROFILE_WIRE_FEATURES = Object.freeze({
     PEER_RECONCILIATION: 1 << 9,
     ACTION_ABI_DIGEST: 1 << 10,
     COMPILED_PROFILE_HASH: 1 << 11,
+    ATOMIC_LOGICAL_APPLY: 1 << 12,
 });
 
 const PROFILE_WIRE_DOMAINS = Object.freeze({
@@ -229,6 +230,10 @@ function decodeCapabilityPages(pages) {
     if (hasFeature(PROFILE_WIRE_FEATURES.PEER_RECONCILIATION)
         && (!hasFeature(PROFILE_WIRE_FEATURES.SPLIT_KEYBOARD) || !hasFeature(PROFILE_WIRE_FEATURES.PERSISTENT_COMMIT))) {
         throw new ProfileWireProtocolError("MALFORMED_RESPONSE", "Peer reconciliation requires split-keyboard and persistent-commit support.");
+    }
+    if (hasFeature(PROFILE_WIRE_FEATURES.ATOMIC_LOGICAL_APPLY)
+        && (!hasFeature(PROFILE_WIRE_FEATURES.PEER_RECONCILIATION) || !hasFeature(PROFILE_WIRE_FEATURES.RUNTIME_ACTIVATION))) {
+        throw new ProfileWireProtocolError("MALFORMED_RESPONSE", "Atomic logical Apply requires peer reconciliation and runtime activation.");
     }
     if (decoded.compiledLayerCount > decoded.maxLogicalLayers) {
         throw new ProfileWireProtocolError("MALFORMED_RESPONSE", "Compiled layer count exceeds the advertised logical-layer capacity.");

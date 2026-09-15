@@ -72,22 +72,17 @@ logical profile.
 
 ## Current Implementation Gap
 
-The current engineering milestone is source-driven:
+The live app now reads the complete supported configuration from the keyboard,
+edits all current domains, exports/imports a materialized eight-layer snapshot,
+and applies one custom/VIA logical generation without consulting repository
+sources. Both custom halves are durably prepared before the decision marker;
+activation and reboot recovery require the bound VIA identity to converge.
 
-- Studio parses the three C files;
-- `Apply live` uploads RGB and custom key behaviors through Profile Wire;
-- layout keys are diffed, written, and read back through standard VIA;
-- the firmware reports capabilities, status, generations, and digests.
-
-It cannot yet download the committed custom profile payload. Profile Wire's
-current `READ_SURFACE` feature means capability and status pages only; it does
-not mean complete profile readback. Studio therefore cannot currently open the
-keyboard as its configuration source.
-
-The existing canonical schemas, validation, dual-slot store, safe activation,
-generation tracking, split prepare/commit barrier, and convergence checks remain
-useful foundations. The missing architecture is host-readable committed data and
-a device-first editor lifecycle.
+Remaining product work is physical interruption acceptance across each durable
+boundary, adoption or conflict reporting for writes made by external VIA
+clients, guided recovery, the known one-half reconnect transition, broad
+hardware acceptance, and standalone distribution. Until the interruption
+matrix is recorded, Apply continues to create a recovery file.
 
 ## Required Device-First Operations
 
@@ -136,20 +131,11 @@ physical capacity.
 
 ## Implementation Sequence
 
-1. Measure and remove the current steady-state scan and RGB costs.
-2. Freeze the logical-generation manifest, cross-store commit/recovery rules,
-   and external VIA edit semantics.
-3. Add bounded, chunked readback of the exact committed custom profile payload.
-4. Add a device snapshot model that combines Profile Wire and standard VIA data.
-5. Make connected Studio sessions open from that snapshot and guard writes with
-   generation/digest conflict detection.
-6. Add named desktop backup/restore plus explicit source import and canonical
-   source export.
-7. Extend the device schema to supported defaults, macros, combos, and logical
-   layer structure within advertised capacities.
-8. Prove reboot, reconnect, both USB orientations, role swap, interruption,
-   two-half convergence, and polling/resource regressions before production
-   promotion.
+Items 1 and 3–7 are implemented. The logical-generation manifest and
+cross-store commit/recovery ordering in item 2 are implemented; external VIA
+edit adoption remains. Item 8 is the active acceptance phase: prove reboot,
+reconnect, applicable USB/role configurations, interruption, two-half
+convergence, and polling/resource regressions before production promotion.
 
 ## Completion Criterion
 

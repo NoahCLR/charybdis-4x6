@@ -20,13 +20,13 @@ bool noah_profile_split_descriptor_valid(const noah_profile_split_descriptor_t *
         return false;
     }
     if (!descriptor->readable) {
-        return !descriptor->has_profile && descriptor->generation == 0u && descriptor->payload_crc32 == 0u && descriptor->payload_digest == 0u && descriptor->compiled_default_digest == 0u && descriptor->action_abi_digest == 0u && descriptor->payload_length == 0u && descriptor->schema_major == 0u && descriptor->schema_minor == 0u && descriptor->domain_mask == 0u && descriptor->profile_flags == 0u && descriptor->origin_half == 0u;
+        return !descriptor->has_profile && !descriptor->logical && descriptor->generation == 0u && descriptor->payload_crc32 == 0u && descriptor->payload_digest == 0u && descriptor->compiled_default_digest == 0u && descriptor->action_abi_digest == 0u && descriptor->payload_length == 0u && descriptor->schema_major == 0u && descriptor->schema_minor == 0u && descriptor->domain_mask == 0u && descriptor->profile_flags == 0u && descriptor->origin_half == 0u;
     }
     if (descriptor->schema_major != NOAH_PROFILE_BLOB_V1_SCHEMA_MAJOR || descriptor->schema_minor != NOAH_PROFILE_BLOB_V1_SCHEMA_MINOR) {
         return false;
     }
     if (!descriptor->has_profile) {
-        return descriptor_empty_profile_fields(descriptor);
+        return !descriptor->logical && descriptor_empty_profile_fields(descriptor);
     }
     return descriptor->generation != 0u && descriptor->origin_half <= 1u && descriptor->payload_length >= NOAH_PROFILE_BLOB_V1_HEADER_SIZE && descriptor->payload_length <= NOAH_PROFILE_BLOB_V1_MAX_SIZE && (descriptor->domain_mask & (uint8_t)~NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS) == 0u && (descriptor->profile_flags & (uint8_t)~NOAH_PROFILE_STORE_ALLOWED_FLAGS) == 0u;
 }
@@ -36,7 +36,7 @@ static bool compatible(const noah_profile_split_descriptor_t *local, const noah_
 }
 
 static bool same_record(const noah_profile_split_descriptor_t *local, const noah_profile_split_descriptor_t *peer) {
-    return local->generation == peer->generation && local->origin_half == peer->origin_half && local->payload_crc32 == peer->payload_crc32 && local->payload_digest == peer->payload_digest && local->payload_length == peer->payload_length && local->domain_mask == peer->domain_mask && local->profile_flags == peer->profile_flags;
+    return local->generation == peer->generation && local->origin_half == peer->origin_half && local->payload_crc32 == peer->payload_crc32 && local->payload_digest == peer->payload_digest && local->payload_length == peer->payload_length && local->domain_mask == peer->domain_mask && local->profile_flags == peer->profile_flags && local->logical == peer->logical;
 }
 
 noah_profile_split_authority_state_t noah_profile_split_authority_compare(const noah_profile_split_descriptor_t *local, const noah_profile_split_descriptor_t *peer) {

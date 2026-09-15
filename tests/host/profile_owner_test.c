@@ -26,6 +26,44 @@ static uint32_t compiled_reads;
 static bool     key_installed;
 static bool     rgb_installed;
 static bool     rgb_install_allowed = true;
+static bool     logical_via_ready;
+static bool     logical_via_converged;
+static uint16_t logical_via_accept_count;
+static uint16_t logical_via_abort_count;
+
+static bool test_logical_via_ready(void *context, uint16_t transaction_id, uint32_t generation, uint32_t digest) {
+    (void)context; (void)transaction_id; (void)generation; (void)digest; return logical_via_ready;
+}
+
+static bool test_logical_via_accept(void *context, uint16_t transaction_id, uint32_t generation, uint32_t digest) {
+    (void)context; (void)transaction_id; (void)generation; (void)digest; logical_via_accept_count++; return true;
+}
+
+static bool test_logical_via_abort(void *context, uint16_t transaction_id, uint32_t generation, uint32_t digest) {
+    (void)context; (void)transaction_id; (void)generation; (void)digest; logical_via_abort_count++; return true;
+}
+
+static bool test_logical_via_converged(void *context, uint32_t generation, uint32_t digest) {
+    (void)context; (void)generation; (void)digest; return logical_via_converged;
+}
+
+static bool test_logical_via_boot_recover(void *context, uint32_t generation, uint32_t digest) {
+    (void)context; (void)generation; (void)digest; return true;
+}
+
+static void test_logical_via_boot_release(void *context) {
+    (void)context;
+}
+
+static const noah_profile_logical_via_ops_t test_logical_via_ops = {
+    .ready        = test_logical_via_ready,
+    .accept       = test_logical_via_accept,
+    .abort        = test_logical_via_abort,
+    .converged    = test_logical_via_converged,
+    .boot_recover = test_logical_via_boot_recover,
+    .boot_release = test_logical_via_boot_release,
+    .context      = NULL,
+};
 
 static noah_profile_split_descriptor_t peer_descriptor(const noah_profile_owner_t *owner, uint32_t generation);
 
@@ -183,6 +221,13 @@ static void begin_frame(uint8_t frame[32], uint16_t transaction_id) {
     write_u16(&frame[9], declaration.payload_length); write_u32(&frame[11], declaration.crc32); write_u32(&frame[15], declaration.digest); write_u32(&frame[19], declaration.action_abi_digest);
 }
 
+static void logical_begin_frame(uint8_t frame[32], uint16_t transaction_id, uint32_t via_generation, uint32_t via_digest) {
+    begin_frame(frame, transaction_id);
+    frame[23] = NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL;
+    write_u32(&frame[24], via_generation);
+    write_u32(&frame[28], via_digest);
+}
+
 static void chunk_frame(uint8_t frame[32], uint16_t transaction_id) {
     memset(frame, 0, 32u);
     frame[0] = NOAH_PROFILE_CANDIDATE_V1_COMMAND_SET; frame[1] = NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL; frame[2] = NOAH_PROFILE_CANDIDATE_V1_VALUE_CHUNK;
@@ -231,6 +276,7 @@ static void boot_empty_pair(noah_profile_owner_t *left, memory_t *left_memory, n
         .split_transport_context = left_link,
         .origin_half             = 0u,
         .peer_required           = true,
+        .logical_via             = &test_logical_via_ops,
     }));
     assert(noah_profile_owner_init(right, &(noah_profile_owner_config_t){
         .store_io                = {.read = memory_read, .write = memory_write, .context = right_memory},
@@ -238,6 +284,7 @@ static void boot_empty_pair(noah_profile_owner_t *left, memory_t *left_memory, n
         .split_transport_context = right_link,
         .origin_half             = 1u,
         .peer_required           = true,
+        .logical_via             = &test_logical_via_ops,
     }));
     for (uint32_t guard = 0u; guard < 4096u && (left->state != NOAH_PROFILE_OWNER_READY_COMPILED || right->state != NOAH_PROFILE_OWNER_READY_COMPILED); guard++) {
         scan_pair(left, right, now);
@@ -896,9 +943,65 @@ static void test_clean_idle_scans_do_not_repeat_host_session_cleanup(void) {
     assert(noah_profile_owner_test_ready_refresh_count() == refreshes + 1u);
 }
 
+static void test_logical_commit_waits_for_via_stage_and_convergence(void) {
+    noah_profile_owner_t left;
+    noah_profile_owner_t right;
+    memory_t left_memory;
+    memory_t right_memory;
+    split_link_t left_link = {.peer = &right};
+    split_link_t right_link = {.peer = &left};
+    uint8_t frame[32];
+    uint32_t now = 250000u;
+
+    memset(&left_memory, 0, sizeof(left_memory));
+    memset(&right_memory, 0, sizeof(right_memory));
+    memset(left_memory.bytes, 0xff, sizeof(left_memory.bytes));
+    memset(right_memory.bytes, 0xff, sizeof(right_memory.bytes));
+    logical_via_ready = false;
+    logical_via_converged = false;
+    logical_via_accept_count = 0u;
+    logical_via_abort_count = 0u;
+    boot_empty_pair(&left, &left_memory, &right, &right_memory, &left_link, &right_link, &now);
+
+    logical_begin_frame(frame, 201u, 6u, UINT32_C(0xabcdef01));
+    send_and_scan_pair(&left, &right, frame, &now);
+    chunk_frame(frame, 201u); send_and_scan_pair(&left, &right, frame, &now);
+    simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_VALIDATE, 201u); send_and_scan_pair(&left, &right, frame, &now);
+    for (uint32_t guard = 0u; guard < 64u && left.host_transaction.status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATED; guard++) scan_pair(&left, &right, &now);
+    assert(left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATED);
+    simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT, 201u); send_and_scan_pair(&left, &right, frame, &now);
+    for (uint32_t guard = 0u; guard < 64u; guard++) scan_pair(&left, &right, &now);
+    assert(left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_PREPARING_PEER);
+    assert(!left.host_barrier_started && left.store.committed.slot == NOAH_PROFILE_SLOT_NONE);
+
+    logical_via_ready = true;
+    for (uint32_t guard = 0u; guard < 4096u && left.store.committed.slot == NOAH_PROFILE_SLOT_NONE; guard++) scan_pair(&left, &right, &now);
+    assert(left.store.committed.slot != NOAH_PROFILE_SLOT_NONE);
+    assert(right.store.committed.slot == NOAH_PROFILE_SLOT_NONE);
+    assert(right.store.prepared_durable);
+    assert(right.store.candidate.format_version == NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL);
+    assert(right.store.candidate.via_generation == 6u);
+    assert(right.store.candidate.via_digest == UINT32_C(0xabcdef01));
+    for (uint32_t guard = 0u; guard < 4096u && logical_via_accept_count == 0u; guard++) scan_pair(&left, &right, &now);
+    assert(logical_via_accept_count == 1u);
+    assert(left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_CONVERGING_PEER);
+    assert(left.store.committed.format_version == NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL);
+    assert(right.store.committed.format_version == NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL);
+    assert(right.store.committed.via_generation == 6u);
+    assert(right.store.committed.via_digest == UINT32_C(0xabcdef01));
+    assert(left.state != NOAH_PROFILE_OWNER_READY_VALIDATED);
+
+    logical_via_converged = true;
+    for (uint32_t guard = 0u; guard < 256u && left.host_transaction.status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE; guard++) scan_pair(&left, &right, &now);
+    assert(left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE);
+    assert(left.state == NOAH_PROFILE_OWNER_READY_VALIDATED);
+    assert(logical_via_abort_count == 0u);
+}
+
 int main(void) {
     test_partial_runtime_install_rolls_back();
     test_clean_idle_scans_do_not_repeat_host_session_cleanup();
+    test_logical_commit_waits_for_via_stage_and_convergence();
     test_empty_boot_live_commit_and_timeout();
     test_two_consecutive_live_commits_use_distributed_prepare_barrier();
     test_simultaneous_hosts_choose_stable_physical_origin_before_durability();

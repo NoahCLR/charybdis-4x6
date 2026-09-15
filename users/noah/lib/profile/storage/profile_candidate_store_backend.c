@@ -13,11 +13,11 @@
 #ifdef VIA_ENABLE
 
 static bool metadata_equal(const noah_profile_candidate_v1_metadata_t *left, const noah_profile_candidate_v1_metadata_t *right) {
-    return left && right && left->schema_major == right->schema_major && left->schema_minor == right->schema_minor && left->requested_domains == right->requested_domains && left->flags == right->flags && left->payload_length == right->payload_length && left->crc32 == right->crc32 && left->digest == right->digest && left->action_abi_digest == right->action_abi_digest;
+    return left && right && left->schema_major == right->schema_major && left->schema_minor == right->schema_minor && left->requested_domains == right->requested_domains && left->flags == right->flags && left->payload_length == right->payload_length && left->crc32 == right->crc32 && left->digest == right->digest && left->action_abi_digest == right->action_abi_digest && left->store_format_version == right->store_format_version && left->via_generation == right->via_generation && left->via_digest == right->via_digest;
 }
 
 static bool committed_record_equal(const noah_profile_store_record_t *left, const noah_profile_store_record_t *right) {
-    return left && right && left->slot == right->slot && left->schema_major == right->schema_major && left->schema_minor == right->schema_minor && left->domain_mask == right->domain_mask && left->flags == right->flags && left->payload_length == right->payload_length && left->generation == right->generation && left->origin_half == right->origin_half && left->payload_crc32 == right->payload_crc32 && left->payload_digest == right->payload_digest && left->compiled_default_digest == right->compiled_default_digest && left->action_abi_digest == right->action_abi_digest;
+    return left && right && left->slot == right->slot && left->format_version == right->format_version && left->schema_major == right->schema_major && left->schema_minor == right->schema_minor && left->domain_mask == right->domain_mask && left->flags == right->flags && left->payload_length == right->payload_length && left->generation == right->generation && left->origin_half == right->origin_half && left->payload_crc32 == right->payload_crc32 && left->payload_digest == right->payload_digest && left->compiled_default_digest == right->compiled_default_digest && left->action_abi_digest == right->action_abi_digest && left->via_generation == right->via_generation && left->via_digest == right->via_digest;
 }
 
 static bool validated_profile_matches_record(const noah_profile_validator_v1_profile_t *profile, const noah_profile_store_record_t *record) {
@@ -25,11 +25,11 @@ static bool validated_profile_matches_record(const noah_profile_validator_v1_pro
 }
 
 static bool metadata_matches_candidate(const noah_profile_candidate_v1_metadata_t *metadata, const noah_profile_store_candidate_t *candidate) {
-    return metadata && candidate && metadata->schema_major == candidate->schema_major && metadata->schema_minor == candidate->schema_minor && metadata->requested_domains == candidate->domain_mask && metadata->flags == 0u && metadata->payload_length == candidate->payload_length && metadata->crc32 == candidate->payload_crc32 && metadata->digest == candidate->payload_digest && metadata->action_abi_digest == candidate->action_abi_digest;
+    return metadata && candidate && metadata->schema_major == candidate->schema_major && metadata->schema_minor == candidate->schema_minor && metadata->requested_domains == candidate->domain_mask && metadata->flags == 0u && metadata->payload_length == candidate->payload_length && metadata->crc32 == candidate->payload_crc32 && metadata->digest == candidate->payload_digest && metadata->action_abi_digest == candidate->action_abi_digest && (metadata->store_format_version == 0u ? (candidate->format_version == 0u || candidate->format_version == NOAH_PROFILE_STORE_FORMAT_VERSION_LEGACY) : metadata->store_format_version == candidate->format_version) && metadata->via_generation == candidate->via_generation && metadata->via_digest == candidate->via_digest;
 }
 
 static bool store_candidate_equal(const noah_profile_store_candidate_t *left, const noah_profile_store_candidate_t *right) {
-    return left && right && left->schema_major == right->schema_major && left->schema_minor == right->schema_minor && left->domain_mask == right->domain_mask && left->flags == right->flags && left->payload_length == right->payload_length && left->generation == right->generation && left->origin_half == right->origin_half && left->payload_crc32 == right->payload_crc32 && left->payload_digest == right->payload_digest && left->compiled_default_digest == right->compiled_default_digest && left->action_abi_digest == right->action_abi_digest;
+    return left && right && left->format_version == right->format_version && left->schema_major == right->schema_major && left->schema_minor == right->schema_minor && left->domain_mask == right->domain_mask && left->flags == right->flags && left->payload_length == right->payload_length && left->generation == right->generation && left->origin_half == right->origin_half && left->payload_crc32 == right->payload_crc32 && left->payload_digest == right->payload_digest && left->compiled_default_digest == right->compiled_default_digest && left->action_abi_digest == right->action_abi_digest && left->via_generation == right->via_generation && left->via_digest == right->via_digest;
 }
 
 static bool candidate_payload_start(const noah_profile_candidate_store_backend_t *backend, uint16_t *address) {
@@ -164,6 +164,7 @@ static noah_profile_candidate_backend_result_t begin_candidate(void *context, co
         return NOAH_PROFILE_CANDIDATE_BACKEND_IO_ERROR;
     }
     candidate = (noah_profile_store_candidate_t){
+        .format_version          = metadata->store_format_version == 0u ? NOAH_PROFILE_STORE_FORMAT_VERSION_LEGACY : metadata->store_format_version,
         .schema_major            = metadata->schema_major,
         .schema_minor            = metadata->schema_minor,
         .domain_mask             = metadata->requested_domains,
@@ -175,6 +176,8 @@ static noah_profile_candidate_backend_result_t begin_candidate(void *context, co
         .payload_digest          = metadata->digest,
         .compiled_default_digest = backend->compiled_default_digest,
         .action_abi_digest       = metadata->action_abi_digest,
+        .via_generation          = metadata->via_generation,
+        .via_digest              = metadata->via_digest,
     };
     return map_store_result(begin_exact_with_owner(backend, metadata, &candidate, NOAH_PROFILE_STORAGE_ADMISSION_HOST));
 }
@@ -384,6 +387,63 @@ static noah_profile_candidate_backend_result_t commit_begin_candidate(void *cont
     }
     backend->validation_complete = false;
     return result == NOAH_PROFILE_STORE_OK ? NOAH_PROFILE_CANDIDATE_BACKEND_OK : NOAH_PROFILE_CANDIDATE_BACKEND_IO_ERROR;
+}
+
+noah_profile_candidate_backend_result_t noah_profile_candidate_store_backend_prepare_durable_begin(noah_profile_candidate_store_backend_t *backend) {
+    noah_profile_store_result_t result;
+
+    if (!backend || !backend->store || !backend->validation_complete || backend->committed_available) {
+        return NOAH_PROFILE_CANDIDATE_BACKEND_REJECTED;
+    }
+    if (backend->store->prepared_durable && backend->store->commit_phase == NOAH_PROFILE_STORE_COMMIT_IDLE) {
+        return NOAH_PROFILE_CANDIDATE_BACKEND_OK;
+    }
+    result = noah_profile_store_prepare_durable_begin(backend->store);
+    return result == NOAH_PROFILE_STORE_IN_PROGRESS ? NOAH_PROFILE_CANDIDATE_BACKEND_IN_PROGRESS : (result == NOAH_PROFILE_STORE_OK ? NOAH_PROFILE_CANDIDATE_BACKEND_OK : NOAH_PROFILE_CANDIDATE_BACKEND_IO_ERROR);
+}
+
+noah_profile_candidate_backend_result_t noah_profile_candidate_store_backend_prepare_durable_step(noah_profile_candidate_store_backend_t *backend, uint8_t byte_budget) {
+    noah_profile_store_record_t prepared;
+    noah_profile_store_result_t result;
+
+    if (!backend || !backend->store || !backend->validation_complete) {
+        return NOAH_PROFILE_CANDIDATE_BACKEND_REJECTED;
+    }
+    result = noah_profile_store_prepare_durable_step(backend->store, byte_budget, &prepared);
+    if (result == NOAH_PROFILE_STORE_IN_PROGRESS) {
+        return NOAH_PROFILE_CANDIDATE_BACKEND_IN_PROGRESS;
+    }
+    return result == NOAH_PROFILE_STORE_OK ? NOAH_PROFILE_CANDIDATE_BACKEND_OK : (result == NOAH_PROFILE_STORE_DURABILITY_UNKNOWN ? NOAH_PROFILE_CANDIDATE_BACKEND_DURABILITY_UNKNOWN : NOAH_PROFILE_CANDIDATE_BACKEND_IO_ERROR);
+}
+
+noah_profile_candidate_backend_result_t noah_profile_candidate_store_backend_prepared_commit_begin(noah_profile_candidate_store_backend_t *backend) {
+    noah_profile_store_result_t result;
+
+    if (!backend || !backend->store || !backend->validation_complete || !backend->store->prepared_durable) {
+        return NOAH_PROFILE_CANDIDATE_BACKEND_REJECTED;
+    }
+    result = noah_profile_store_prepared_commit_begin(backend->store);
+    return result == NOAH_PROFILE_STORE_IN_PROGRESS ? NOAH_PROFILE_CANDIDATE_BACKEND_IN_PROGRESS : (result == NOAH_PROFILE_STORE_OK ? NOAH_PROFILE_CANDIDATE_BACKEND_OK : NOAH_PROFILE_CANDIDATE_BACKEND_IO_ERROR);
+}
+
+noah_profile_candidate_backend_result_t noah_profile_candidate_store_backend_prepared_commit_step(noah_profile_candidate_store_backend_t *backend, uint8_t byte_budget) {
+    noah_profile_store_record_t record;
+    noah_profile_store_result_t result;
+
+    if (!backend || !backend->store || !backend->validation_complete) {
+        return NOAH_PROFILE_CANDIDATE_BACKEND_REJECTED;
+    }
+    result = noah_profile_store_prepared_commit_step(backend->store, byte_budget, &record);
+    if (result == NOAH_PROFILE_STORE_IN_PROGRESS) {
+        return NOAH_PROFILE_CANDIDATE_BACKEND_IN_PROGRESS;
+    }
+    if (result != NOAH_PROFILE_STORE_OK) {
+        backend->validation_complete = false;
+        return result == NOAH_PROFILE_STORE_DURABILITY_UNKNOWN ? NOAH_PROFILE_CANDIDATE_BACKEND_DURABILITY_UNKNOWN : NOAH_PROFILE_CANDIDATE_BACKEND_IO_ERROR;
+    }
+    backend->committed_record    = record;
+    backend->committed_available = true;
+    return NOAH_PROFILE_CANDIDATE_BACKEND_OK;
 }
 
 static noah_profile_candidate_backend_result_t commit_step_candidate(void *context, uint8_t byte_budget) {

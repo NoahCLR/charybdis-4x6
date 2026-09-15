@@ -127,6 +127,7 @@ noah_profile_candidate_v1_decode_result_t noah_profile_candidate_v1_decode(const
         metadata->crc32             = read_u32(&frame[11]);
         metadata->digest            = read_u32(&frame[15]);
         metadata->action_abi_digest = read_u32(&frame[19]);
+        metadata->store_format_version = frame[23];
         if ((metadata->requested_domains & (uint8_t)~NOAH_PROFILE_CANDIDATE_V1_KNOWN_DOMAINS) != 0u) {
             return fail(error, NOAH_PROFILE_CANDIDATE_V1_DECODE_MALFORMED, 7u);
         }
@@ -136,7 +137,18 @@ noah_profile_candidate_v1_decode_result_t noah_profile_candidate_v1_decode(const
         if (metadata->payload_length < NOAH_PROFILE_CANDIDATE_V1_MIN_BLOB_SIZE || metadata->payload_length > NOAH_PROFILE_CANDIDATE_V1_MAX_BLOB_SIZE) {
             return fail(error, NOAH_PROFILE_CANDIDATE_V1_DECODE_MALFORMED, 9u);
         }
-        return require_zero(frame, 23u, NOAH_PROFILE_WIRE_V1_REPORT_SIZE, error);
+        if (metadata->store_format_version == 0u) {
+            return require_zero(frame, 24u, NOAH_PROFILE_WIRE_V1_REPORT_SIZE, error);
+        }
+        if (metadata->store_format_version != 2u) {
+            return fail(error, NOAH_PROFILE_CANDIDATE_V1_DECODE_MALFORMED, 23u);
+        }
+        metadata->via_generation = read_u32(&frame[24]);
+        metadata->via_digest     = read_u32(&frame[28]);
+        if (metadata->via_generation == 0u || metadata->via_digest == 0u) {
+            return fail(error, NOAH_PROFILE_CANDIDATE_V1_DECODE_MALFORMED, metadata->via_generation == 0u ? 24u : 28u);
+        }
+        return NOAH_PROFILE_CANDIDATE_V1_DECODE_OK;
     }
 
     if (command->operation == NOAH_PROFILE_CANDIDATE_V1_OPERATION_CHUNK) {

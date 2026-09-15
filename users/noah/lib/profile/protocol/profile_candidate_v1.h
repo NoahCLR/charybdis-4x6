@@ -109,6 +109,12 @@ typedef struct {
     uint32_t crc32;
     uint32_t digest;
     uint32_t action_abi_digest;
+    // Zero is the legacy custom-only transaction. Format 2 binds the custom
+    // candidate to the target VIA identity carried in the remaining bytes of
+    // the BEGIN report.
+    uint8_t  store_format_version;
+    uint32_t via_generation;
+    uint32_t via_digest;
 } noah_profile_candidate_v1_metadata_t;
 
 typedef struct {

@@ -113,6 +113,28 @@ Repartitioning the existing 16 KiB logical EEPROM does not enlarge its linked
 wear-level cache. Increasing logical EEPROM does increase that cache roughly
 byte-for-byte and therefore requires a fresh linked measurement.
 
+## Current Atomic-Apply Checkpoint — 2026-09-15
+
+The normal eight-layer, owner-enabled left image from
+`sh tools/build-firmware-pair.sh` links the `runtime_owner` at exactly 4,096
+bytes, meeting its unchanged 4,096-byte engineering state policy. The owner
+reuses boot-only store records for candidate staging after discovery and keeps
+one pointer to immutable VIA transaction operations; these lifetime changes do
+not alter the persistent record or wire layouts.
+
+`sh tests/host/run_firmware_memory_budget_checks.sh` reports 4,152 bytes of
+SRAM0–3 `.data`, 51,644 bytes of SRAM0–3 `.bss`, and 55,796 bytes combined.
+That is 1,548 bytes below the 57,344-byte regression tripwire. The linked
+SRAM0–3 core-memory span at boot is 206,344 bytes, and fixed occupancy across
+the unique SRAM banks is 63,256 bytes. These are per-half linked measurements,
+not runtime high-water values.
+
+The fresh instrumented owner build passes the reviewed-path stack check. Its
+largest named main-process path remains 1,824/1,920 bytes and its largest named
+split-slave path remains 328/768 bytes. The manifest now follows VIA generation
+commit through `noah_qmk_via_sync_state_complete_mutation`; the result covers
+the named paths only.
+
 ## Stack Accounting
 
 SRAM4 is separate from the SRAM0–3 allocation span:

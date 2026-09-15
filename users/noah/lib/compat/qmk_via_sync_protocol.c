@@ -71,6 +71,10 @@ static bool noah_qmk_via_sync_frame_shape_is_valid(const noah_qmk_via_sync_frame
         case NOAH_QMK_VIA_SYNC_MESSAGE_METADATA:
         case NOAH_QMK_VIA_SYNC_MESSAGE_SNAPSHOT_BEGIN:
         case NOAH_QMK_VIA_SYNC_MESSAGE_SNAPSHOT_COMMIT:
+        case NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_BEGIN:
+        case NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_VERIFY:
+        case NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_ACCEPT:
+        case NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_ABORT:
             return frame->region == NOAH_QMK_VIA_SYNC_REGION_NONE && frame->offset == 0u && frame->region_length == 0u && frame->payload_length == 0u;
         case NOAH_QMK_VIA_SYNC_MESSAGE_PUSH_CHUNK:
             return region_valid && frame->payload_length != 0u && frame->region_length != 0u && frame->offset <= frame->region_length && frame->payload_length <= frame->region_length - frame->offset;

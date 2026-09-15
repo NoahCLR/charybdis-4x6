@@ -32,15 +32,15 @@ manual feedback, not completion of the hardware acceptance matrix.
 | Global policy | Defaults panels cover all 28 portable scalars, including startup layers, combo matching and device-reported lighting/key options; unsupported firmware features stay read-only |
 | Backup and restore | Complete supported snapshots, review, recovery file and verified restore; interrupted restores can be retried |
 | Drafts and Apply | Eight-layer profiles share one draft, semantic change review, undo/redo and a coordinated verified Apply; unfinished forms stay local until kept |
-| Recovery and release readiness | Differential Apply transfer and verified recovery-base reuse are implemented; atomic logical commit, guided recovery, broad hardware acceptance and standalone packaging remain pending |
+| Recovery and release readiness | Atomic logical Apply, differential transfer, reboot recovery fencing and verified recovery-base reuse are implemented; physical interruption acceptance, external VIA adoption, guided recovery, broad hardware acceptance and standalone packaging remain pending |
 
 Studio's existing Defaults controls now use complete-profile readback and the
 verified restore path, including native options reported by firmware. Editing,
-undo/redo and change review now share a complete-profile draft. The two storage
-owners still require a complete logical-generation contract: today's restore
-is recoverable but not atomic across all domains. Resolve the inherited pointing
-cadence regression and finish reboot, USB-role, interruption and blank-firmware
-restore acceptance before calling the product complete.
+undo/redo and change review now share a complete-profile draft. Apply binds VIA
+and custom storage to one durable logical generation and blocks activation while
+recovery is incomplete. Finish physical decision-boundary interruption tests,
+external VIA adoption, guided recovery, the inherited pointing cadence work,
+and blank-firmware restore acceptance before calling the product complete.
 
 ## Why This Branch Exists
 
@@ -211,8 +211,8 @@ ordinary against live behaviour on identical source, which matters for R-21
 (below), and it is the fallback if the regression proves intolerable in daily
 use.
 
-Static RAM for the owner build is 51,820 B against the 57,344 B regression
-tripwire, so this needs no memory policy change.
+Static RAM for the current owner build is 55,796 B against the 57,344 B
+regression tripwire, so this needs no memory policy change.
 
 ### D-L11 — Current state comes from the keyboard, including compiled defaults
 
@@ -755,15 +755,15 @@ An independent final read matched the exact pre-flash content fingerprint
 save and restore; power-loss acceptance at the shortened acknowledgement timing
 still belongs with the logical-transaction interruption matrix.
 
-This optimization does not turn the current two-owner sequence into an atomic
-commit. The accepted firmware design is
+This optimization did not by itself turn the two-owner sequence into an atomic
+commit. The accepted firmware design was
 [`architecture/logical-profile-transaction-v1.md`](architecture/logical-profile-transaction-v1.md):
 stage target VIA bytes on the non-USB half, bind that identity into prepared
 custom records on both halves, use the USB-side custom marker as the logical
 decision, then roll the target VIA copy forward before activation. It avoids
 doubling QMK's EEPROM RAM cache and defines old-or-new behavior for each power
-loss boundary. Firmware implementation and physical interruption acceptance are
-the next slice.
+loss boundary. D-L21 implements that contract; physical interruption acceptance
+remains.
 
 
 Hardware acceptance on 2026-09-12: the connected eight-layer keyboard reported
@@ -816,3 +816,54 @@ check passed at observation, without host configuration writes. The earlier
 one-half power-cycle recovery transition remains an open issue; the passing
 cold-boot check does not explain or dismiss it. Next: representative runtime
 edit tests and investigation of the one-half reconnect path.
+
+### D-L21 — Apply publishes one atomic logical generation
+
+Complete Apply now treats the custom Profile Wire record and standard VIA
+layout/macro store as one logical generation. The host acquires the candidate
+lease, binds the candidate to the next VIA generation and canonical digest, and
+sends only changed VIA ranges to the non-USB half. Firmware verifies that staged
+copy before it makes durable custom intent. Both custom slots reach a prepared
+marker before the USB-side marker becomes the decision record. The peer custom
+record commits next, its VIA copy is accepted, and ordinary split reconciliation
+rolls that exact VIA identity back to the USB half. Runtime activation waits for
+both custom and VIA convergence.
+
+Storage format 2 keeps the existing 32-byte header and 4,064-byte payload. A
+distinct `NQ` header packs domain/origin/flags, stores the VIA binding, and still
+retains the compiled-default and action-ABI digests needed after firmware
+updates. Its custom payload digest is derived again during validation. Format-1
+`NP` records remain readable and migrate on the next complete Apply.
+
+Boot begins with VIA reconciliation fenced. A committed logical record supplies
+the required VIA generation and digest; firmware either adopts a matching local
+staged bank or asks the peer to accept and supply it. The effective profile does
+not activate until that recovery converges. A prepared marker without the USB
+decision is ignored by boot selection, so the previous committed generation
+remains authority.
+
+The app requires the new atomic capability for complete Apply. It keeps the
+recovery file, stale-base comparison, differential range selection and final
+exact readback. Deterministic predecision failures request both VIA-stage and
+custom-candidate aborts. Refresh and Export remain independent full reads.
+
+Host coverage exercises both header formats, incompatible compiled/action
+identities, durable prepare and reboot selection, abort and decision ordering,
+role recovery, bound-profile propagation, staged VIA fencing/acceptance and
+postdecision boot recovery. Remaining acceptance is physical power interruption
+at each durable boundary, the one-half reconnect case, external VIA-writer
+adoption, guided recovery, and blank-firmware restore.
+
+D-L21 verification: `sh tests/host/run_all_host_tests.sh` passes, including 340
+live-app tests. The side-specific `sh tools/build-firmware-pair.sh` build passes
+with the owner enabled on both halves. The linked left-half owner is exactly
+4,096 bytes, within its unchanged 4,096-byte engineering policy. The normal
+left image passes `sh tests/host/run_firmware_memory_budget_checks.sh` at 55,796
+bytes of SRAM0–3 `.data + .bss`, 1,548 bytes below the 57,344-byte regression
+tripwire, with a 206,344-byte linker/core-memory span at boot. The fresh
+instrumented owner build passes the reviewed-path stack manifest; its largest
+named main-process path is 1,824/1,920 bytes and its largest named split-slave
+path is 328/768 bytes. These are per-half linked results and reviewed-path
+estimates, not runtime high-water measurements. The build wrote generated QMK
+artifacts and numbered firmware pairs in sibling output directories; no sibling
+source was edited.

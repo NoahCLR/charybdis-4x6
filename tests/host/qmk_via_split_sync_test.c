@@ -281,7 +281,7 @@ bool transaction_rpc_exec(int8_t transaction_id, uint8_t request_size, const voi
             .generation = rpc_mode == TEST_RPC_PEER_NEWER ? 9u : request.generation,
             .digest     = (rpc_mode == TEST_RPC_PEER_NEWER || rpc_mode == TEST_RPC_PEER_DIVERGED) ? peer_digest() : request.digest,
         };
-    } else if (request.kind == NOAH_QMK_VIA_SYNC_MESSAGE_SNAPSHOT_BEGIN) {
+    } else if (request.kind == NOAH_QMK_VIA_SYNC_MESSAGE_SNAPSHOT_BEGIN || request.kind == NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_BEGIN) {
         peer_session_active = true;
         peer_begin_count++;
         response = (noah_qmk_via_sync_frame_t){.kind = NOAH_QMK_VIA_SYNC_MESSAGE_ACK, .generation = request.generation, .digest = request.digest};
@@ -308,6 +308,8 @@ bool transaction_rpc_exec(int8_t transaction_id, uint8_t request_size, const voi
         CHECK(destination != NULL);
         memcpy(&destination[request.offset], request.payload, request.payload_length);
         response = (noah_qmk_via_sync_frame_t){.kind = NOAH_QMK_VIA_SYNC_MESSAGE_ACK, .region = request.region, .generation = request.generation, .offset = request.offset + request.payload_length, .region_length = request.region_length, .digest = request.digest};
+    } else if (request.kind == NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_VERIFY || request.kind == NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_ACCEPT || request.kind == NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_ABORT) {
+        response = (noah_qmk_via_sync_frame_t){.kind = NOAH_QMK_VIA_SYNC_MESSAGE_ACK, .generation = request.generation, .digest = request.digest};
     } else if (request.kind == NOAH_QMK_VIA_SYNC_MESSAGE_SNAPSHOT_COMMIT) {
         rpc_commit_count++;
         response = (noah_qmk_via_sync_frame_t){.kind = NOAH_QMK_VIA_SYNC_MESSAGE_ACK, .status = rpc_commit_count == 1u ? NOAH_QMK_VIA_SYNC_STATUS_BUSY : NOAH_QMK_VIA_SYNC_STATUS_OK, .generation = request.generation, .digest = request.digest};
@@ -370,6 +372,11 @@ static noah_qmk_via_sync_frame_t callback_exchange(noah_qmk_via_sync_frame_t req
     return response;
 }
 
+static void test_init_ready(void) {
+    noah_qmk_via_split_sync_init();
+    noah_qmk_via_logical_boot_release();
+}
+
 static void test_receiver_returns_structured_error_for_corrupt_frame(void) {
     noah_qmk_via_sync_frame_t request = {.kind = NOAH_QMK_VIA_SYNC_MESSAGE_METADATA, .generation = 5u};
     noah_qmk_via_sync_frame_t response;
@@ -378,7 +385,7 @@ static void test_receiver_returns_structured_error_for_corrupt_frame(void) {
 
     test_reset();
     fake_master = false;
-    noah_qmk_via_split_sync_init();
+    test_init_ready();
     CHECK(noah_qmk_via_sync_frame_encode(&request, request_wire));
     request_wire[8] ^= 0x80u;
     uint32_t effects_before_callback = durable_effect_count;
@@ -394,7 +401,7 @@ static void test_receiver_returns_structured_error_for_corrupt_frame(void) {
 
 static void test_equal_boot_handshake_and_periodic_refresh(void) {
     test_reset();
-    noah_qmk_via_split_sync_init();
+    test_init_ready();
     scan_many(0u, 4u);
     CHECK(rpc_count == 1u);
     noah_qmk_via_split_sync_debug_snapshot_t debug = noah_qmk_via_split_sync_debug_snapshot();
@@ -411,7 +418,7 @@ static void test_equal_boot_handshake_and_periodic_refresh(void) {
 static void test_disconnect_uses_bounded_exponential_retry(void) {
     test_reset();
     rpc_mode = TEST_RPC_DISCONNECTED;
-    noah_qmk_via_split_sync_init();
+    test_init_ready();
     scan_many(0u, 3u);
     CHECK(rpc_count == 1u);
     scan_at(49u);
@@ -430,7 +437,7 @@ static void test_local_mutation_commits_then_pushes_complete_snapshot(void) {
 
     test_reset();
     rpc_mode = TEST_RPC_PEER_DIRTY;
-    noah_qmk_via_split_sync_init();
+    test_init_ready();
     noah_qmk_via_split_sync_note_mutation(NOAH_QMK_VIA_COMMAND_EFFECT_SPLIT_MIRROR | NOAH_QMK_VIA_COMMAND_EFFECT_INVALIDATE_RGB);
     local_keymap[1] = 0xA5u;
     CHECK(noah_qmk_via_sync_metadata_decode(user_eeconfig_word, &metadata));
@@ -456,7 +463,7 @@ static void test_each_outbound_boundary_recovers_from_loss(void) {
         rpc_mode         = TEST_RPC_PEER_DIRTY;
         drop_rpc_at      = drop_at;
         drop_after_apply = (drop_at & 1u) != 0u;
-        noah_qmk_via_split_sync_init();
+        test_init_ready();
         local_keymap[1] = (uint8_t)(0xA0u + drop_at);
         noah_qmk_via_split_sync_note_mutation(NOAH_QMK_VIA_COMMAND_EFFECT_SPLIT_MIRROR);
 
@@ -476,7 +483,7 @@ static void test_each_outbound_boundary_recovers_from_loss(void) {
 static void test_peer_losing_snapshot_session_mid_push_renegotiates(void) {
     test_reset();
     rpc_mode = TEST_RPC_PEER_DIRTY;
-    noah_qmk_via_split_sync_init();
+    test_init_ready();
     local_keymap[1] = 0x5Au;
     noah_qmk_via_split_sync_note_mutation(NOAH_QMK_VIA_COMMAND_EFFECT_SPLIT_MIRROR);
 
@@ -504,7 +511,7 @@ static void test_peer_losing_snapshot_session_mid_push_renegotiates(void) {
 static uint16_t run_push_with_transient_rejects(uint8_t rejects) {
     test_reset();
     rpc_mode = TEST_RPC_PEER_DIRTY;
-    noah_qmk_via_split_sync_init();
+    test_init_ready();
     local_keymap[1] = 0x77u;
     noah_qmk_via_split_sync_note_mutation(NOAH_QMK_VIA_COMMAND_EFFECT_SPLIT_MIRROR);
 
@@ -531,7 +538,7 @@ static void test_newer_peer_is_pulled_and_accepted(void) {
     peer_config[1] = 0x44u;
     peer_keymap[0] = 0x55u;
     peer_macro[1]  = 0x66u;
-    noah_qmk_via_split_sync_init();
+    test_init_ready();
     scan_many(0u, 20u);
 
     CHECK(memcmp(local_config, peer_config, sizeof(local_config)) == 0);
@@ -551,7 +558,7 @@ static void test_equal_generation_digest_conflict_makes_master_advance_and_push(
     test_reset();
     rpc_mode       = TEST_RPC_PEER_DIVERGED;
     peer_keymap[2] = 0xD1u;
-    noah_qmk_via_split_sync_init();
+    test_init_ready();
     scan_many(0u, 20u);
     scan_at(70u);
 
@@ -566,7 +573,7 @@ static void test_equal_generation_digest_conflict_makes_master_advance_and_push(
 static void test_role_change_forces_new_metadata_session(void) {
     test_reset();
     fake_master = false;
-    noah_qmk_via_split_sync_init();
+    test_init_ready();
     scan_many(0u, 5u);
     CHECK(rpc_count == 0u);
 
@@ -582,7 +589,7 @@ static void test_dirty_reboot_pulls_clean_peer(void) {
     user_eeconfig_word = noah_qmk_via_sync_metadata_encode((noah_qmk_via_sync_metadata_t){.generation = 5u, .dirty = true});
     rpc_mode           = TEST_RPC_PEER_NEWER;
     peer_keymap[0]     = 0xB1u;
-    noah_qmk_via_split_sync_init();
+    test_init_ready();
     scan_many(0u, 20u);
 
     CHECK(local_keymap[0] == 0xB1u);
@@ -596,7 +603,7 @@ static void test_mutation_during_dirty_recovery_does_not_block_reconciliation(vo
     user_eeconfig_word = noah_qmk_via_sync_metadata_encode((noah_qmk_via_sync_metadata_t){.generation = 5u, .dirty = true});
     rpc_mode           = TEST_RPC_PEER_NEWER;
     peer_keymap[0]     = 0xC1u;
-    noah_qmk_via_split_sync_init();
+    test_init_ready();
 
     local_keymap[0] = 0xD1u;
     noah_qmk_via_split_sync_note_mutation(NOAH_QMK_VIA_COMMAND_EFFECT_SPLIT_MIRROR);
@@ -612,7 +619,7 @@ static void test_two_dirty_halves_reseed_current_master_before_authority(void) {
     test_reset();
     user_eeconfig_word = noah_qmk_via_sync_metadata_encode((noah_qmk_via_sync_metadata_t){.generation = 5u, .dirty = true});
     rpc_mode           = TEST_RPC_PEER_DIRTY;
-    noah_qmk_via_split_sync_init();
+    test_init_ready();
     scan_many(0u, 6u);
 
     CHECK(eeconfig_init_via_count == 1u);
@@ -628,7 +635,7 @@ static void test_two_dirty_halves_reseed_current_master_before_authority(void) {
 static void test_failed_macro_reseed_keeps_generation_dirty_and_sends_nothing(void) {
     test_reset();
     fake_seed_succeeded = false;
-    noah_qmk_via_split_sync_init();
+    test_init_ready();
     noah_qmk_via_split_sync_note_mutation(NOAH_QMK_VIA_COMMAND_EFFECT_RESEED_MACROS | NOAH_QMK_VIA_COMMAND_EFFECT_SPLIT_MIRROR);
     scan_many(0u, 10u);
 
@@ -646,7 +653,7 @@ static void test_two_dirty_recovery_seed_failure_stays_non_authoritative(void) {
     user_eeconfig_word  = noah_qmk_via_sync_metadata_encode((noah_qmk_via_sync_metadata_t){.generation = 5u, .dirty = true});
     rpc_mode            = TEST_RPC_PEER_DIRTY;
     fake_seed_succeeded = false;
-    noah_qmk_via_split_sync_init();
+    test_init_ready();
     scan_many(0u, 20u);
 
     CHECK(eeconfig_init_via_count == 1u);
@@ -671,7 +678,7 @@ static void test_receiver_validates_order_accepts_duplicate_and_acks_after_diges
 
     test_reset();
     fake_master = false;
-    noah_qmk_via_split_sync_init();
+    test_init_ready();
     scan_many(0u, 2u);
 
     peer_config[1] = 0x91u;
@@ -712,7 +719,7 @@ static void test_receiver_digest_mismatch_never_publishes_clean_generation(void)
     test_reset();
     fake_master  = false;
     wrong_digest = peer_digest() ^ 1u;
-    noah_qmk_via_split_sync_init();
+    test_init_ready();
     scan_many(0u, 2u);
 
     (void)callback_exchange((noah_qmk_via_sync_frame_t){.kind = NOAH_QMK_VIA_SYNC_MESSAGE_SNAPSHOT_BEGIN, .generation = 8u, .digest = wrong_digest});
@@ -732,6 +739,101 @@ static void test_receiver_digest_mismatch_never_publishes_clean_generation(void)
     CHECK(!debug.receiver_active);
 }
 
+static void test_logical_receiver_stays_dirty_until_decision_accept(void) {
+    noah_qmk_via_sync_frame_t response;
+    uint32_t                  target_digest;
+
+    test_reset();
+    fake_master = false;
+    test_init_ready();
+    scan_many(0u, 2u);
+
+    peer_keymap[1] = 0x71u;
+    peer_macro[0]  = 0x72u;
+    target_digest  = peer_digest();
+    response = callback_exchange((noah_qmk_via_sync_frame_t){.kind = NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_BEGIN, .generation = 7u, .digest = target_digest});
+    CHECK(response.status == NOAH_QMK_VIA_SYNC_STATUS_OK);
+    (void)callback_exchange((noah_qmk_via_sync_frame_t){.kind = NOAH_QMK_VIA_SYNC_MESSAGE_PUSH_CHUNK, .region = NOAH_QMK_VIA_SYNC_REGION_KEYMAP, .generation = 7u, .region_length = TEST_KEYMAP_SIZE, .digest = target_digest, .payload_length = TEST_KEYMAP_SIZE, .payload = {peer_keymap[0], peer_keymap[1], peer_keymap[2]}});
+    (void)callback_exchange((noah_qmk_via_sync_frame_t){.kind = NOAH_QMK_VIA_SYNC_MESSAGE_PUSH_CHUNK, .region = NOAH_QMK_VIA_SYNC_REGION_MACRO, .generation = 7u, .region_length = TEST_MACRO_SIZE, .digest = target_digest, .payload_length = TEST_MACRO_SIZE, .payload = {peer_macro[0], peer_macro[1]}});
+    (void)callback_exchange((noah_qmk_via_sync_frame_t){.kind = NOAH_QMK_VIA_SYNC_MESSAGE_PUSH_CHUNK, .region = NOAH_QMK_VIA_SYNC_REGION_VIA_CONFIG, .generation = 7u, .region_length = TEST_CONFIG_SIZE, .digest = target_digest, .payload_length = TEST_CONFIG_SIZE, .payload = {peer_config[0], peer_config[1]}});
+    response = callback_exchange((noah_qmk_via_sync_frame_t){.kind = NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_VERIFY, .generation = 7u, .digest = target_digest});
+    CHECK(response.status == NOAH_QMK_VIA_SYNC_STATUS_BUSY);
+    scan_many(10u, 2u);
+    response = callback_exchange((noah_qmk_via_sync_frame_t){.kind = NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_VERIFY, .generation = 7u, .digest = target_digest});
+    CHECK(response.status == NOAH_QMK_VIA_SYNC_STATUS_OK);
+    CHECK(noah_qmk_via_sync_state_snapshot().metadata.generation == 7u);
+    CHECK(noah_qmk_via_sync_state_snapshot().metadata.dirty);
+    CHECK(noah_qmk_via_sync_state_snapshot().recovery_required);
+    CHECK(rgb_invalidate_count == 0u && macro_invalidate_count == 0u);
+
+    response = callback_exchange((noah_qmk_via_sync_frame_t){.kind = NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_ACCEPT, .generation = 7u, .digest = target_digest});
+    CHECK(response.status == NOAH_QMK_VIA_SYNC_STATUS_OK);
+    CHECK(!noah_qmk_via_sync_state_snapshot().metadata.dirty);
+    CHECK(!noah_qmk_via_sync_state_snapshot().recovery_required);
+    CHECK(rgb_invalidate_count == 1u && macro_invalidate_count == 1u);
+}
+
+static void test_logical_master_queue_fences_reconciliation_until_accept(void) {
+    noah_qmk_via_logical_status_t status;
+    noah_qmk_via_sync_frame_t begin = {
+        .kind       = NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_BEGIN,
+        .generation = 7u,
+        .digest     = UINT32_C(0x12345678),
+    };
+    noah_qmk_via_sync_frame_t chunk = {
+        .kind           = NOAH_QMK_VIA_SYNC_MESSAGE_PUSH_CHUNK,
+        .region         = NOAH_QMK_VIA_SYNC_REGION_KEYMAP,
+        .generation     = 7u,
+        .offset         = 0u,
+        .region_length  = TEST_KEYMAP_SIZE,
+        .digest         = UINT32_C(0x12345678),
+        .payload_length = TEST_KEYMAP_SIZE,
+        .payload        = {0x91u, 0x92u, 0x93u},
+    };
+    noah_qmk_via_sync_frame_t verify = {
+        .kind       = NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_VERIFY,
+        .generation = 7u,
+        .digest     = UINT32_C(0x12345678),
+    };
+    noah_qmk_via_sync_frame_t accept = {
+        .kind       = NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_ACCEPT,
+        .generation = 7u,
+        .digest     = UINT32_C(0x12345678),
+    };
+
+    test_reset();
+    test_init_ready();
+    scan_many(0u, 2u);
+    rpc_count = 0u;
+
+    CHECK(noah_qmk_via_logical_submit(41u, &begin));
+    CHECK(!noah_qmk_via_logical_submit(41u, &chunk));
+    scan_at(10u);
+    CHECK(noah_qmk_via_logical_status(&status));
+    CHECK(status.state == NOAH_QMK_VIA_LOGICAL_STAGING && !status.pending && status.operation_sequence == 1u);
+    CHECK(rpc_count == 1u);
+
+    CHECK(noah_qmk_via_logical_submit(41u, &chunk));
+    scan_at(11u);
+    CHECK(peer_keymap[0] == 0x91u && peer_keymap[2] == 0x93u);
+    CHECK(noah_qmk_via_logical_status(&status));
+    CHECK(status.state == NOAH_QMK_VIA_LOGICAL_STAGING && status.operation_sequence == 2u);
+
+    CHECK(noah_qmk_via_logical_submit(41u, &verify));
+    scan_at(12u);
+    CHECK(noah_qmk_via_logical_status(&status));
+    CHECK(status.state == NOAH_QMK_VIA_LOGICAL_STAGED && status.operation_sequence == 3u);
+    scan_at(2000u);
+    CHECK(rpc_count == 3u);
+
+    CHECK(noah_qmk_via_logical_submit(41u, &accept));
+    scan_at(2001u);
+    CHECK(noah_qmk_via_logical_status(&status));
+    CHECK(status.state == NOAH_QMK_VIA_LOGICAL_ACCEPTED && status.operation_sequence == 4u);
+    scan_at(2002u);
+    CHECK(rpc_count == 5u);
+}
+
 static void test_replacement_snapshot_restarts_in_progress_verification(void) {
     noah_qmk_via_sync_frame_t response;
     uint32_t                  first_digest;
@@ -739,7 +841,7 @@ static void test_replacement_snapshot_restarts_in_progress_verification(void) {
 
     test_reset();
     fake_master = false;
-    noah_qmk_via_split_sync_init();
+    test_init_ready();
     scan_many(0u, 2u);
 
     peer_keymap[0] = 0x31u;
@@ -775,6 +877,33 @@ static void test_replacement_snapshot_restarts_in_progress_verification(void) {
     CHECK(local_macro[1] == 0x42u);
 }
 
+static void test_boot_fence_recovers_matching_staged_logical_bank(void) {
+    noah_qmk_via_sync_frame_t response;
+    noah_qmk_via_sync_metadata_t metadata;
+    uint32_t target_digest;
+
+    test_reset();
+    fake_master        = false;
+    local_keymap[0]    = 0x71u;
+    user_eeconfig_word = noah_qmk_via_sync_metadata_encode((noah_qmk_via_sync_metadata_t){.generation = 6u, .dirty = true});
+    target_digest      = local_digest();
+    noah_qmk_via_split_sync_init();
+    scan_many(0u, 32u);
+
+    response = callback_exchange((noah_qmk_via_sync_frame_t){.kind = NOAH_QMK_VIA_SYNC_MESSAGE_METADATA, .generation = 5u, .digest = UINT32_C(0x12345678)});
+    CHECK(response.kind == NOAH_QMK_VIA_SYNC_MESSAGE_METADATA);
+    CHECK(response.status == NOAH_QMK_VIA_SYNC_STATUS_BUSY);
+    CHECK(noah_qmk_via_logical_boot_recover(6u, target_digest));
+    scan_many(100u, 4u);
+
+    CHECK(noah_qmk_via_sync_metadata_decode(user_eeconfig_word, &metadata));
+    CHECK(metadata.generation == 6u && !metadata.dirty);
+    CHECK(!noah_qmk_via_sync_state_snapshot().recovery_required);
+    response = callback_exchange((noah_qmk_via_sync_frame_t){.kind = NOAH_QMK_VIA_SYNC_MESSAGE_METADATA, .generation = 6u, .digest = target_digest});
+    CHECK(response.kind == NOAH_QMK_VIA_SYNC_MESSAGE_METADATA);
+    CHECK(response.status == NOAH_QMK_VIA_SYNC_STATUS_OK);
+}
+
 int main(void) {
     test_receiver_returns_structured_error_for_corrupt_frame();
     test_equal_boot_handshake_and_periodic_refresh();
@@ -793,7 +922,10 @@ int main(void) {
     test_two_dirty_recovery_seed_failure_stays_non_authoritative();
     test_receiver_validates_order_accepts_duplicate_and_acks_after_digest();
     test_receiver_digest_mismatch_never_publishes_clean_generation();
+    test_logical_receiver_stays_dirty_until_decision_accept();
+    test_logical_master_queue_fences_reconciliation_until_accept();
     test_replacement_snapshot_restarts_in_progress_verification();
+    test_boot_fence_recovers_matching_staged_logical_bank();
 
     puts("qmk_via_split_sync host tests passed");
     return 0;

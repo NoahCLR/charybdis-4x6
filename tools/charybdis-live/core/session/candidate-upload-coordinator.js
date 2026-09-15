@@ -311,6 +311,21 @@ class CandidateUploadCoordinator {
         }
     }
 
+    async abort(transactionId) {
+        if (this.uploading) throw new CandidateUploadError("UPLOAD_BUSY", "A candidate operation is already active.", {phase: UPLOAD_PHASE.ABORTING, safeToRetry: true});
+        const context = createUploadContext();
+        context.transactionId = normalizeTransactionId(transactionId);
+        this.uploading = true;
+        try {
+            context.status = await this.readStatus(context, {ambiguous: false});
+            const result = await this.bestEffortAbort(context);
+            if (!result.succeeded) throw new CandidateUploadError("ABORT_FAILED", "The prepared profile could not be cancelled cleanly.", {phase: UPLOAD_PHASE.ABORTING, ambiguous: true, safeToRetry: false});
+            return {transactionId: context.transactionId, status: cloneStatus(context.status)};
+        } finally {
+            this.uploading = false;
+        }
+    }
+
     async performMutation(frame, context, operationDetails = {}) {
         let baseline = context.status;
         let busyResubmissions = 0;

@@ -21,6 +21,7 @@
 #    include "via.h"
 #    include "qmk_combo_readback.h"
 #    include "qmk_portable_profile.h"
+#    include "qmk_via_logical_profile.h"
 
 #    include "../profile/protocol/profile_wire_v1.h"
 #    include "../profile/storage/profile_storage_layout.h"
@@ -44,7 +45,7 @@
 #    endif
 
 #    ifdef NOAH_LIVE_PROFILE_MUTATION_ENABLE
-#        define NOAH_PROFILE_MUTATION_CAPABILITIES (NOAH_PROFILE_FEATURE_CANDIDATE_WRITE | NOAH_PROFILE_FEATURE_PERSISTENT_COMMIT | NOAH_PROFILE_FEATURE_RUNTIME_ACTIVATION | NOAH_PROFILE_FEATURE_PEER_RECONCILIATION)
+#        define NOAH_PROFILE_MUTATION_CAPABILITIES (NOAH_PROFILE_FEATURE_CANDIDATE_WRITE | NOAH_PROFILE_FEATURE_PERSISTENT_COMMIT | NOAH_PROFILE_FEATURE_RUNTIME_ACTIVATION | NOAH_PROFILE_FEATURE_PEER_RECONCILIATION | NOAH_PROFILE_FEATURE_ATOMIC_LOGICAL_APPLY)
 #        define NOAH_PROFILE_MUTATION_CHUNK_MAX NOAH_PROFILE_CANDIDATE_V1_CHUNK_MAX
 #    else
 #        define NOAH_PROFILE_MUTATION_CAPABILITIES 0u
@@ -346,6 +347,9 @@ static bool noah_profile_channel_handle_payload_get(uint8_t *data, uint8_t lengt
 
 NOAH_PROFILE_CHANNEL_STACK_BOUNDARY void via_custom_value_command_kb(uint8_t *data, uint8_t length) {
     if (noah_qmk_combo_readback_get(data, length)) return;
+#    ifdef NOAH_LIVE_PROFILE_MUTATION_ENABLE
+    if (noah_qmk_via_logical_profile_handle(data, length)) return;
+#    endif
 #    ifdef NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS_ENABLE
     if (noah_profile_channel_handle_cadence_get(data, length)) {
         return;

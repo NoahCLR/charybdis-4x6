@@ -206,11 +206,27 @@ test("metadata is derived from the canonical blob and its exact domain mask", ()
     assert.equal(metadata.requestedDomains, 1);
     assert.equal(metadata.payloadLength, blob.length);
     assert.equal(metadata.actionAbiDigest, 0x12345678);
+    assert.equal(metadata.storeFormatVersion, 0);
     assert.notEqual(metadata.crc32, metadata.digest);
     assert.throws(
         () => candidateMetadataForBlob(blob, {actionAbiDigest: 1, requestedDomains: 2}),
         (error) => error.code === "DOMAIN_MASK_MISMATCH"
     );
+});
+
+test("logical candidate begin binds the target VIA identity", () => {
+    const blob = encodeProfileBlob({domains: []});
+    const metadata = candidateMetadataForBlob(blob, {
+        actionAbiDigest: 0x12345678,
+        viaGeneration: 9,
+        viaDigest: 0x89abcdef,
+    });
+    const report = buildCandidateBeginRequest(0x4321, metadata);
+    assert.equal(report[23], 2);
+    assert.equal(report.readUInt32LE(24), 9);
+    assert.equal(report.readUInt32LE(28), 0x89abcdef);
+    assert.throws(() => buildCandidateBeginRequest(1, {...metadata, viaDigest: 0}), /nonzero VIA/);
+    assert.throws(() => buildCandidateBeginRequest(1, {...metadata, storeFormatVersion: 0}), /legacy candidates/);
 });
 
 test("request and transaction id allocators wrap without emitting zero", () => {

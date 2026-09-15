@@ -4,7 +4,7 @@ const assert = require("node:assert/strict");
 const {captureProfile, restoreProfile, fingerprint, summary, validateSnapshot} = require("../../core/session/portable-profile-session");
 const {document} = require("../fixtures/portable-profile");
 const {viaStorageDigest} = require("../../core/protocol/via-storage-v1");
-const capabilities = {compiledLayerCount: 8, supportedDomainMask: 15, actionAbiDigest: 0xeb80829c, candidateChunkMax: 20, viaMacroBytes: 7191};
+const capabilities = {compiledLayerCount: 8, supportedDomainMask: 15, featureFlags: 1 << 12, actionAbiDigest: 0xeb80829c, candidateChunkMax: 20, viaMacroBytes: 7191};
 function fixture() {
     const source = document(), targetDocument = structuredClone(source), events = [];
     targetDocument.layers[0][0] ^= 1; targetDocument.macros[0] = Buffer.from("hello").toString("base64");
@@ -13,8 +13,9 @@ function fixture() {
     const storageDigest = viaStorageDigest(target);
     const operations = {capture, readIdentity: async () => identity, readCandidate: async () => ({state: 0}),
         createCoordinator: () => ({upload: async (bytes, options) => {events.push("stage"); await options.verifyBase(); return {transactionId: 1, metadata: {digest: 42}};}, commit: async () => {events.push("commit");}}),
-        writeMacros: async () => events.push("macros"), writeLayout: async () => events.push("layout"), waitStorage: async () => {events.push("both halves"); return {ready: true, generation: 8, digest: storageDigest};},
-        readStorage: async () => ({ready: true, generation: 8, digest: storageDigest}),
+        createViaCoordinator: () => ({stage: async options => {events.push("via stage"); assert.equal(options.generation, 5); assert.equal(options.digest, storageDigest);}, abort: async () => {events.push("via abort");}}),
+        waitStorage: async () => {events.push("both halves"); return {ready: true, generation: 5, digest: storageDigest};},
+        readStorage: async () => ({ready: true, generation: 5, digest: storageDigest}),
         readStored: async (connection, command, length, options = {}) => (command === 0x12 ? target.layout : target.macros).subarray(options.startOffset || 0, (options.startOffset || 0) + length),
         readProfile: async () => ({activeKind: 1, activeDigest: require("../../core/schema/profile-blob-v1").fnv1a32(target.profile), committedDigest: require("../../core/schema/profile-blob-v1").fnv1a32(target.profile), stateFlags: 32, conflictCount: 0})};
     const options = {operations, expectedFingerprint: fingerprint(source), saveRecovery: async backup => {assert.equal(fingerprint(backup), fingerprint(source)); events.push("backup"); return "/recovery.json";}};
@@ -23,8 +24,8 @@ function fixture() {
 test("restore saves recovery first, restores both stores, then verifies complete readback", async () => {
     const f = fixture(), result = await restoreProfile({}, {}, capabilities, f.targetDocument, f.options);
     assert.equal(result.fingerprint, fingerprint(f.targetDocument));
-    assert.deepEqual({...result.performance, elapsedMs: 0}, {elapsedMs: 0, baseSource: "device-read", layoutBytes: 28, macroBytes: 28, layoutReports: 1, macroReports: 3});
-    assert.deepEqual(f.events, ["backup", "stage", "commit", "macros", "layout", "both halves"]);
+    assert.deepEqual({...result.performance, elapsedMs: 0}, {elapsedMs: 0, baseSource: "device-read", layoutBytes: 28, macroBytes: 28, viaConfigReports: 1, layoutReports: 3, macroReports: 3});
+    assert.deepEqual(f.events, ["backup", "stage", "via stage", "commit", "both halves"]);
 });
 test("restore verifies and reuses the reviewed snapshot without rereading its complete payload", async () => {
     const f = fixture();
@@ -36,7 +37,7 @@ test("restore verifies and reuses the reviewed snapshot without rereading its co
     assert.equal(captures, 0);
     assert.equal(identityReads, 2);
     assert.equal(result.performance.baseSource, "verified-cache");
-    assert.deepEqual(f.events, ["backup", "stage", "commit", "macros", "layout", "both halves"]);
+    assert.deepEqual(f.events, ["backup", "stage", "via stage", "commit", "both halves"]);
 });
 test("a changed device identity rejects a cached recovery base before saving or staging", async () => {
     const f = fixture();
@@ -58,9 +59,9 @@ test("changes after acquiring the profile lease prevent commit", async () => {
     assert.deepEqual(f.events, ["backup", "stage"]);
 });
 test("an interrupted write reports recovery and cannot report a successful restore", async () => {
-    const f = fixture(); f.operations.writeMacros = async () => {throw Error("disconnected");};
+    const f = fixture(); f.operations.createViaCoordinator = () => ({stage: async () => {throw Error("disconnected");}, abort: async () => {}});
     await assert.rejects(restoreProfile({}, {}, capabilities, f.targetDocument, f.options), error => error.code === "RESTORE_INCOMPLETE" && error.message.includes("/recovery.json"));
-    assert.deepEqual(f.events, ["backup", "stage", "commit"]);
+    assert.deepEqual(f.events, ["backup", "stage"]);
 });
 test("mismatching final hardware readback fails verification", async () => {
     const f = fixture(); f.operations.readStored = async () => Buffer.alloc(1);

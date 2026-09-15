@@ -9,6 +9,7 @@
 #include "users/noah/lib/profile/storage/profile_storage_layout.h"
 #include "users/noah/lib/profile/storage/profile_store_runtime.h"
 #include "users/noah/lib/state/diagnostics/runtime_diag.h"
+#include "users/noah/lib/compat/qmk_via_split_sync.h"
 
 void via_custom_value_command_kb(uint8_t *data, uint8_t length);
 
@@ -19,6 +20,29 @@ enum {
 static noah_profile_store_runtime_state_t store_runtime_state;
 static noah_profile_store_record_t        store_runtime_record;
 static bool                               store_runtime_has_committed;
+
+#if defined(VIA_ENABLE) && defined(SPLIT_TRANSACTION_IDS_USER)
+uint16_t noah_qmk_via_storage_region_size(noah_qmk_via_sync_region_t region) {
+    switch (region) {
+        case NOAH_QMK_VIA_SYNC_REGION_VIA_CONFIG: return 2u;
+        case NOAH_QMK_VIA_SYNC_REGION_KEYMAP: return 960u;
+        case NOAH_QMK_VIA_SYNC_REGION_MACRO: return 7191u;
+        default: return 0u;
+    }
+}
+
+bool noah_qmk_via_logical_submit(uint16_t transaction_id, const noah_qmk_via_sync_frame_t *request) {
+    (void)transaction_id;
+    (void)request;
+    return true;
+}
+
+bool noah_qmk_via_logical_status(noah_qmk_via_logical_status_t *status) {
+    if (!status) return false;
+    *status = (noah_qmk_via_logical_status_t){0};
+    return true;
+}
+#endif
 
 #ifdef NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS_ENABLE
 bool noah_runtime_cadence_wire_page(uint8_t page, uint8_t payload[NOAH_RUNTIME_CADENCE_WIRE_PAYLOAD_SIZE]) {
@@ -189,7 +213,7 @@ static uint32_t expected_feature_flags(void) {
     flags |= NOAH_PROFILE_FEATURE_RGB_SCHEMA | NOAH_PROFILE_FEATURE_KEY_BEHAVIOR_SCHEMA | NOAH_PROFILE_FEATURE_ACTION_ABI_DIGEST | NOAH_PROFILE_FEATURE_COMPILED_PROFILE_HASH;
 #endif
 #ifdef NOAH_LIVE_PROFILE_MUTATION_ENABLE
-    flags |= NOAH_PROFILE_FEATURE_CANDIDATE_WRITE | NOAH_PROFILE_FEATURE_PERSISTENT_COMMIT | NOAH_PROFILE_FEATURE_RUNTIME_ACTIVATION | NOAH_PROFILE_FEATURE_PEER_RECONCILIATION;
+    flags |= NOAH_PROFILE_FEATURE_CANDIDATE_WRITE | NOAH_PROFILE_FEATURE_PERSISTENT_COMMIT | NOAH_PROFILE_FEATURE_RUNTIME_ACTIVATION | NOAH_PROFILE_FEATURE_PEER_RECONCILIATION | NOAH_PROFILE_FEATURE_ATOMIC_LOGICAL_APPLY;
 #endif
     return flags;
 }

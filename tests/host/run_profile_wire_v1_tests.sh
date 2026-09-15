@@ -51,6 +51,7 @@ build_hook_and_run() {
         -include "$ROOT/tests/host/include/noah_compile_config.h" \
         "$ROOT/tests/host/qmk_via_profile_channel_test.c" \
         "$ROOT/users/noah/lib/compat/qmk_via_profile_channel.c" \
+        "$ROOT/users/noah/lib/compat/qmk_via_logical_profile.c" \
         "$ROOT/users/noah/lib/profile/protocol/profile_wire_v1.c" \
         "$ROOT/users/noah/lib/profile/protocol/profile_candidate_v1.c" \
         "$ROOT/users/noah/lib/compat/qmk_combo_readback.c" \

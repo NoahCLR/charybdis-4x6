@@ -23,6 +23,15 @@ transaction intent but is never active authority. The committed marker is the
 logical decision record. Existing format-1 records remain readable as unbound
 migration input; the first logical Apply replaces them.
 
+Format 2 keeps the 32-byte header and 4,064-byte payload capacity. Its `NQ`
+magic distinguishes it from the legacy `NP` header. It packs domain, origin and
+profile flags into one byte; retains payload CRC32, compiled-default digest and
+action-ABI digest; stores the bound VIA generation and digest; derives the
+canonical payload digest again during validation; protects bytes 0–28 with
+CRC16; and uses byte 31 as the one-byte prepared/committed marker. This preserves
+firmware-update compatibility checks instead of treating the current firmware's
+identities as if they had been stored with the profile.
+
 The effective-profile owner may publish a committed custom record only while
 the local VIA identity matches the record's bound VIA identity. A mismatch is a
 recovery state and blocks normal output until reconciliation completes.
@@ -91,8 +100,24 @@ without rereading the 7,191-byte macro bank. It transfers only changed 28-byte
 VIA blocks. Success uses exact changed-block readback plus stable custom and VIA
 identities on both halves; Refresh and Export remain independent full reads.
 
-The optimized host path implements this transfer rule before the new firmware
-transaction lands. It does not by itself make the two stores atomic.
+The logical staging channel carries 12 data bytes per report because every chunk
+also carries transaction, region, generation and digest correlation. Apply keeps
+the differential range selection, so ordinary edits still avoid transferring the
+unchanged macro capacity.
+
+## Implementation Status
+
+The storage format, candidate binding, peer VIA staging channel, two-half durable
+prepare, USB-side decision marker, peer commit, VIA roll-forward, activation
+gate, boot recovery fence, and app coordinator are implemented. Host tests cover
+prepared-marker reboot selection, incompatible firmware identities, predecision
+abort, decision ordering, role recovery, bound-record split transfer, staged VIA
+acceptance and reboot recovery. The firmware advertises atomic logical Apply as
+a required write capability, so the app refuses complete Apply on older images.
+
+Physical interruption tests at every durable boundary and external VIA-writer
+adoption remain acceptance work. The recovery file remains part of Apply while
+that hardware matrix is incomplete.
 
 ## Implementation Gates
 
@@ -105,4 +130,3 @@ transaction lands. It does not by itself make the two stores atomic.
 - external VIA adoption and conflict tests;
 - feature-gate, stack, full host, and firmware builds;
 - physical interruption tests at every durable boundary.
-

@@ -19,6 +19,8 @@ typedef enum {
     NOAH_PROFILE_PEER_STORE_IDLE,
     NOAH_PROFILE_PEER_STORE_RECEIVING,
     NOAH_PROFILE_PEER_STORE_VALIDATING,
+    NOAH_PROFILE_PEER_STORE_PREPARING,
+    NOAH_PROFILE_PEER_STORE_PREPARED,
     NOAH_PROFILE_PEER_STORE_COMMITTING,
     NOAH_PROFILE_PEER_STORE_COMMITTED,
     NOAH_PROFILE_PEER_STORE_REJECTED,
@@ -51,6 +53,7 @@ typedef struct {
     noah_profile_peer_store_state_t         state;
     noah_profile_peer_store_result_t        result;
     uint16_t                                next_offset;
+    bool                                    auto_commit;
 } noah_profile_peer_store_backend_t;
 
 // The peer receiver borrows the one candidate backend already shared with the
@@ -60,6 +63,7 @@ void noah_profile_peer_store_backend_init(noah_profile_peer_store_backend_t *pee
 // Opens exact sender-owned staging. Generation, physical origin, persistent
 // flags, and all payload identities are preserved unchanged.
 noah_profile_peer_store_result_t noah_profile_peer_store_backend_begin(noah_profile_peer_store_backend_t *peer, const noah_profile_split_descriptor_t *descriptor);
+noah_profile_peer_store_result_t noah_profile_peer_store_backend_begin_logical(noah_profile_peer_store_backend_t *peer, const noah_profile_split_descriptor_t *descriptor, uint32_t via_generation, uint32_t via_digest);
 
 // Accepts only sequential chunks. A fully repeated chunk is idempotent when
 // its staged bytes match; gaps, partial overlaps, and conflicting repeats
@@ -69,6 +73,8 @@ noah_profile_peer_store_result_t noah_profile_peer_store_backend_write(noah_prof
 // Starts whole-profile validation after every declared byte arrived. step()
 // performs at most one bounded validator/store operation per call.
 noah_profile_peer_store_result_t noah_profile_peer_store_backend_commit_begin(noah_profile_peer_store_backend_t *peer, const noah_profile_split_descriptor_t *descriptor);
+noah_profile_peer_store_result_t noah_profile_peer_store_backend_prepare_durable_begin(noah_profile_peer_store_backend_t *peer, const noah_profile_split_descriptor_t *descriptor);
+noah_profile_peer_store_result_t noah_profile_peer_store_backend_prepared_commit_begin(noah_profile_peer_store_backend_t *peer, const noah_profile_split_descriptor_t *descriptor);
 noah_profile_peer_store_result_t noah_profile_peer_store_backend_step(noah_profile_peer_store_backend_t *peer, uint8_t byte_budget);
 
 // Abort is allowed only before marker-last commit begins. Once durability can

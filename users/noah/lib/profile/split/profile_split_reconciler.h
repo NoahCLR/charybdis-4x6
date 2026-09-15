@@ -35,13 +35,16 @@ typedef enum {
     NOAH_PROFILE_SPLIT_RECONCILER_UNINITIALIZED = 0u,
     NOAH_PROFILE_SPLIT_RECONCILER_PASSIVE,
     NOAH_PROFILE_SPLIT_RECONCILER_DISCOVER,
+    NOAH_PROFILE_SPLIT_RECONCILER_PUSH_BIND,
     NOAH_PROFILE_SPLIT_RECONCILER_PUSH_BEGIN,
     NOAH_PROFILE_SPLIT_RECONCILER_PUSH_READ,
     NOAH_PROFILE_SPLIT_RECONCILER_PUSH_SEND,
+    NOAH_PROFILE_SPLIT_RECONCILER_PUSH_DURABLE,
     NOAH_PROFILE_SPLIT_RECONCILER_PUSH_PREPARED,
     NOAH_PROFILE_SPLIT_RECONCILER_PUSH_COMMIT,
     NOAH_PROFILE_SPLIT_RECONCILER_PUSH_ABORT,
     NOAH_PROFILE_SPLIT_RECONCILER_PULL_BEGIN,
+    NOAH_PROFILE_SPLIT_RECONCILER_PULL_BIND,
     NOAH_PROFILE_SPLIT_RECONCILER_PULL_REQUEST,
     NOAH_PROFILE_SPLIT_RECONCILER_PULL_WRITE,
     NOAH_PROFILE_SPLIT_RECONCILER_PULL_COMMIT_BEGIN,
@@ -53,12 +56,14 @@ typedef enum {
 
 typedef bool (*noah_profile_split_local_descriptor_fn)(void *context, noah_profile_split_descriptor_t *descriptor);
 typedef bool (*noah_profile_split_local_read_fn)(void *context, const noah_profile_split_descriptor_t *descriptor, uint16_t offset, uint8_t *bytes, uint8_t length);
+typedef bool (*noah_profile_split_local_binding_fn)(void *context, const noah_profile_split_descriptor_t *descriptor, uint32_t *via_generation, uint32_t *via_digest);
 typedef bool (*noah_profile_split_exchange_fn)(void *context, const uint8_t request[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE], uint8_t response[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE]);
 
 typedef struct {
     void                                    *local_context;
     noah_profile_split_local_descriptor_fn  local_descriptor;
     noah_profile_split_local_read_fn        local_read;
+    noah_profile_split_local_binding_fn     local_binding;
     void                                    *transport_context;
     noah_profile_split_exchange_fn           exchange;
     noah_profile_peer_store_backend_t       *peer_store;
@@ -112,6 +117,12 @@ typedef struct {
     uint32_t                               last_peer_activity_at;
     uint32_t                               transport_failure_count;
     uint32_t                               retry_count;
+    uint32_t                               prepared_via_generation;
+    uint32_t                               prepared_via_digest;
+    uint32_t                               incoming_via_generation;
+    uint32_t                               incoming_via_digest;
+    uint32_t                               incoming_profile_generation;
+    uint32_t                               incoming_profile_digest;
     uint16_t                               transfer_offset;
     uint8_t                                outbound_chunk_length;
     uint8_t                                outbound_chunk[NOAH_PROFILE_SPLIT_V1_CHUNK_MAX];
@@ -136,6 +147,8 @@ typedef struct {
     bool                                   prepared_remote_started;
     bool                                   prepared_commit_authorized;
     bool                                   prepared_cancel_refused;
+    bool                                   prepared_logical;
+    bool                                   incoming_logical_binding;
     bool                                   attempt_immediate;
 } noah_profile_split_reconciler_t;
 
@@ -156,6 +169,7 @@ bool noah_profile_split_reconciler_scan_mode(noah_profile_split_reconciler_t *re
 // The reconciler transfers and ACKs every payload byte, then pauses in
 // PUSH_PREPARED until the owner explicitly authorizes the peer commit.
 bool noah_profile_split_reconciler_prepared_push_begin(noah_profile_split_reconciler_t *reconciler, const noah_profile_split_descriptor_t *descriptor, void *source_context, noah_profile_split_local_read_fn source_read);
+bool noah_profile_split_reconciler_prepared_push_begin_logical(noah_profile_split_reconciler_t *reconciler, const noah_profile_split_descriptor_t *descriptor, void *source_context, noah_profile_split_local_read_fn source_read, uint32_t via_generation, uint32_t via_digest);
 bool noah_profile_split_reconciler_prepared_push_ready(const noah_profile_split_reconciler_t *reconciler, noah_profile_split_descriptor_t *descriptor);
 bool noah_profile_split_reconciler_prepared_push_authorize_commit(noah_profile_split_reconciler_t *reconciler, const noah_profile_split_descriptor_t *descriptor);
 // Cancellation is scan-owned: once the peer admitted PREPARE_BEGIN, this

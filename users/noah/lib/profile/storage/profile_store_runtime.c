@@ -12,6 +12,8 @@
 #ifdef NOAH_LIVE_PROFILE_OWNER_ENABLE
 #    include "../../compat/qmk_physical_half.h"
 #    include "../../compat/qmk_profile_split_transport.h"
+#    include "../../compat/qmk_via_logical_profile.h"
+#    include "../../compat/qmk_via_split_sync.h"
 #    include "../runtime/profile_owner.h"
 #endif
 
@@ -27,6 +29,46 @@ static noah_profile_owner_t runtime_owner;
 static bool                 runtime_owner_initialized;
 static bool                 runtime_transport_registered;
 static bool                 runtime_integration_error;
+
+static bool runtime_logical_via_ready(void *context, uint16_t transaction_id, uint32_t generation, uint32_t digest) {
+    (void)context;
+    return noah_qmk_via_logical_staged(transaction_id, generation, digest);
+}
+
+static bool runtime_logical_via_accept(void *context, uint16_t transaction_id, uint32_t generation, uint32_t digest) {
+    (void)context;
+    return noah_qmk_via_logical_profile_accept(transaction_id, generation, digest);
+}
+
+static bool runtime_logical_via_abort(void *context, uint16_t transaction_id, uint32_t generation, uint32_t digest) {
+    (void)context;
+    return noah_qmk_via_logical_profile_abort(transaction_id, generation, digest);
+}
+
+static bool runtime_logical_via_converged(void *context, uint32_t generation, uint32_t digest) {
+    (void)context;
+    return noah_qmk_via_logical_converged(generation, digest);
+}
+
+static bool runtime_logical_via_boot_recover(void *context, uint32_t generation, uint32_t digest) {
+    (void)context;
+    return noah_qmk_via_logical_boot_recover(generation, digest);
+}
+
+static void runtime_logical_via_boot_release(void *context) {
+    (void)context;
+    noah_qmk_via_logical_boot_release();
+}
+
+static const noah_profile_logical_via_ops_t runtime_logical_via_ops = {
+    .ready        = runtime_logical_via_ready,
+    .accept       = runtime_logical_via_accept,
+    .abort        = runtime_logical_via_abort,
+    .converged    = runtime_logical_via_converged,
+    .boot_recover = runtime_logical_via_boot_recover,
+    .boot_release = runtime_logical_via_boot_release,
+    .context      = NULL,
+};
 #endif
 
 void noah_profile_store_runtime_init(void) {
@@ -44,6 +86,7 @@ void noah_profile_store_runtime_init(void) {
             .split_transport_context = NULL,
             .origin_half             = origin,
             .peer_required           = true,
+            .logical_via             = &runtime_logical_via_ops,
         })) {
         runtime_integration_error = true;
         runtime_state             = NOAH_PROFILE_STORE_RUNTIME_INTEGRATION_ERROR;

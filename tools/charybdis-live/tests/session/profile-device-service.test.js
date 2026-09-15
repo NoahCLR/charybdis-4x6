@@ -42,6 +42,7 @@ function readPages(options = {}) {
                 | PROFILE_WIRE_FEATURES.PERSISTENT_COMMIT
                 | PROFILE_WIRE_FEATURES.RUNTIME_ACTIVATION
                 | PROFILE_WIRE_FEATURES.PEER_RECONCILIATION
+                | PROFILE_WIRE_FEATURES.ATOMIC_LOGICAL_APPLY
             : 0);
     capabilityIdentity.set([1, 2, 1, 0, options.schemaMajor || 1, 0, 32, options.mutation ? 20 : 0, 2], 0);
     capabilityIdentity.writeUInt32LE(featureFlags, 9);
@@ -209,7 +210,8 @@ test("persistent live apply requires every mutation capability", () => {
     const completeFlags = PROFILE_WIRE_FEATURES.CANDIDATE_WRITE
         | PROFILE_WIRE_FEATURES.PERSISTENT_COMMIT
         | PROFILE_WIRE_FEATURES.RUNTIME_ACTIVATION
-        | PROFILE_WIRE_FEATURES.PEER_RECONCILIATION;
+        | PROFILE_WIRE_FEATURES.PEER_RECONCILIATION
+        | PROFILE_WIRE_FEATURES.ATOMIC_LOGICAL_APPLY;
     const readyStatus = {peerKnown: true, peerConverged: true, candidatePending: false};
     assert.equal(evaluateLiveMutationCompatibility({featureFlags: completeFlags, candidateChunkMax: 20}, compatible, true, readyStatus).available, true);
 
@@ -226,7 +228,8 @@ test("persistent live apply requires a detected and converged second half", () =
         featureFlags: PROFILE_WIRE_FEATURES.CANDIDATE_WRITE
             | PROFILE_WIRE_FEATURES.PERSISTENT_COMMIT
             | PROFILE_WIRE_FEATURES.RUNTIME_ACTIVATION
-            | PROFILE_WIRE_FEATURES.PEER_RECONCILIATION,
+            | PROFILE_WIRE_FEATURES.PEER_RECONCILIATION
+            | PROFILE_WIRE_FEATURES.ATOMIC_LOGICAL_APPLY,
         candidateChunkMax: 20,
     };
     const peerMissing = evaluateLiveMutationCompatibility(

@@ -130,7 +130,19 @@ static bool local_descriptor(void *context, noah_profile_split_descriptor_t *des
         descriptor->profile_flags           = record->flags;
         descriptor->origin_half             = record->origin_half;
         descriptor->has_profile             = true;
+        descriptor->logical                 = record->format_version == NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL;
     }
+    return true;
+}
+
+static bool local_binding(void *context, const noah_profile_split_descriptor_t *descriptor, uint32_t *via_generation, uint32_t *via_digest) {
+    half_t *half = context;
+
+    if (!half || !descriptor || !descriptor->logical || !via_generation || !via_digest || half->store.committed.slot == NOAH_PROFILE_SLOT_NONE || half->store.committed.generation != descriptor->generation || half->store.committed.payload_digest != descriptor->payload_digest || half->store.committed.format_version != NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL) {
+        return false;
+    }
+    *via_generation = half->store.committed.via_generation;
+    *via_digest     = half->store.committed.via_digest;
     return true;
 }
 
@@ -235,6 +247,20 @@ static void install_profile(half_t *half, uint32_t generation, uint8_t origin) {
     install_profile_with_flags(half, generation, origin, NOAH_PROFILE_STORE_FLAG_OVERRIDE);
 }
 
+static void install_logical_profile(half_t *half, uint32_t generation, uint8_t origin, uint32_t via_generation, uint32_t via_digest) {
+    noah_profile_split_descriptor_t descriptor = committed_descriptor(half, generation, origin);
+    noah_profile_peer_store_result_t result;
+
+    descriptor.logical = true;
+    assert(noah_profile_peer_store_backend_begin_logical(&half->peer_store, &descriptor, via_generation, via_digest) == NOAH_PROFILE_PEER_STORE_OK);
+    assert(noah_profile_peer_store_backend_write(&half->peer_store, descriptor.generation, descriptor.payload_digest, 0u, empty_profile, sizeof(empty_profile)) == NOAH_PROFILE_PEER_STORE_OK);
+    result = noah_profile_peer_store_backend_commit_begin(&half->peer_store, &descriptor);
+    while (result == NOAH_PROFILE_PEER_STORE_IN_PROGRESS) {
+        result = noah_profile_peer_store_backend_step(&half->peer_store, NOAH_PROFILE_SPLIT_V1_CHUNK_MAX);
+    }
+    assert(result == NOAH_PROFILE_PEER_STORE_OK);
+}
+
 static void pair_init(half_t *left, half_t *right) {
     noah_profile_split_reconciler_config_t left_config;
     noah_profile_split_reconciler_config_t right_config;
@@ -245,6 +271,7 @@ static void pair_init(half_t *left, half_t *right) {
         .local_context   = left,
         .local_descriptor = local_descriptor,
         .local_read       = local_read,
+        .local_binding    = local_binding,
         .transport_context = &left->link,
         .exchange           = exchange,
         .peer_store         = &left->peer_store,
@@ -253,6 +280,7 @@ static void pair_init(half_t *left, half_t *right) {
         .local_context   = right,
         .local_descriptor = local_descriptor,
         .local_read       = local_read,
+        .local_binding    = local_binding,
         .transport_context = &right->link,
         .exchange           = exchange,
         .peer_store         = &right->peer_store,
@@ -312,6 +340,9 @@ static void assert_records_match(const half_t *left, const half_t *right) {
     assert(a->payload_digest == b->payload_digest);
     assert(a->compiled_default_digest == b->compiled_default_digest);
     assert(a->action_abi_digest == b->action_abi_digest);
+    assert(a->format_version == b->format_version);
+    assert(a->via_generation == b->via_generation);
+    assert(a->via_digest == b->via_digest);
 }
 
 static void test_compiled_convergence(void) {
@@ -350,6 +381,36 @@ static void test_newer_slave_is_pulled_without_role_authority(void) {
     run_pair_until_converged(&left, &right, false);
     assert_records_match(&left, &right);
     assert(right.store.committed.generation == 7u && right.store.committed.origin_half == 0u);
+}
+
+static void test_logical_binding_survives_master_push(void) {
+    half_t left;
+    half_t right;
+
+    half_storage_init(&left);
+    half_storage_init(&right);
+    install_logical_profile(&right, 8u, 1u, 12u, UINT32_C(0x91a2b3c4));
+    pair_init(&left, &right);
+    run_pair_until_converged(&left, &right, false);
+    assert_records_match(&left, &right);
+    assert(left.store.committed.format_version == NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL);
+    assert(left.store.committed.via_generation == 12u);
+    assert(left.store.committed.via_digest == UINT32_C(0x91a2b3c4));
+}
+
+static void test_logical_binding_survives_slave_pull(void) {
+    half_t left;
+    half_t right;
+
+    half_storage_init(&left);
+    half_storage_init(&right);
+    install_logical_profile(&left, 9u, 0u, 13u, UINT32_C(0xa1b2c3d4));
+    pair_init(&left, &right);
+    run_pair_until_converged(&left, &right, false);
+    assert_records_match(&left, &right);
+    assert(right.store.committed.format_version == NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL);
+    assert(right.store.committed.via_generation == 13u);
+    assert(right.store.committed.via_digest == UINT32_C(0xa1b2c3d4));
 }
 
 static void test_disconnect_invalidates_then_reconnects(void) {
@@ -660,7 +721,8 @@ static void test_prepared_push_pauses_before_commit_then_authorizes(void) {
     run_prepared_push_until_ready(&right, &left, &descriptor, &source);
     assert(source.reads == 1u);
     assert(left.store.committed.slot == NOAH_PROFILE_SLOT_NONE);
-    assert(noah_profile_peer_store_backend_state(&left.peer_store) == NOAH_PROFILE_PEER_STORE_RECEIVING);
+    assert(noah_profile_peer_store_backend_state(&left.peer_store) == NOAH_PROFILE_PEER_STORE_PREPARED);
+    assert(left.store.prepared_durable);
     assert(noah_profile_candidate_store_backend_admission_owner(&left.candidate_backend) == NOAH_PROFILE_STORAGE_ADMISSION_PEER);
 
     exchanges_at_barrier = right.link.exchanges;
@@ -714,13 +776,13 @@ static void test_prepared_push_cancel_aborts_peer_lease(void) {
     assert(noah_profile_candidate_store_backend_admission_owner(&left.candidate_backend) == NOAH_PROFILE_STORAGE_ADMISSION_NONE);
 }
 
-static void test_maximum_candidate_prepares_within_owner_no_progress_window(void) {
+static void test_maximum_candidate_resolves_within_owner_no_progress_window(void) {
     half_t                           left;
     half_t                           right;
     noah_profile_split_descriptor_t descriptor;
     staged_source_t                  source = {.bytes = max_profile, .length = sizeof(max_profile)};
     uint32_t                         start_at = 100000u;
-    uint32_t                         prepared_at;
+    uint32_t                         resolved_at = start_at;
 
     half_storage_init(&left);
     half_storage_init(&right);
@@ -731,19 +793,22 @@ static void test_maximum_candidate_prepares_within_owner_no_progress_window(void
     descriptor.payload_crc32           = payload_crc(max_profile, sizeof(max_profile));
     descriptor.payload_digest          = payload_digest(max_profile, sizeof(max_profile));
 
-    prepared_at = run_prepared_push_until_ready_at(&right, &left, &descriptor, &source, start_at);
-    assert((uint32_t)(prepared_at - start_at) < MAX_PREPARE_TIME_MS);
-    assert(source.reads == (sizeof(max_profile) + NOAH_PROFILE_SPLIT_V1_CHUNK_MAX - 1u) / NOAH_PROFILE_SPLIT_V1_CHUNK_MAX);
-    assert(noah_profile_candidate_store_backend_admission_owner(&left.candidate_backend) == NOAH_PROFILE_STORAGE_ADMISSION_PEER);
-
-    assert(noah_profile_split_reconciler_prepared_push_cancel(&right.reconciler, &descriptor));
-    for (uint32_t scan = 0u; scan < MAX_SCANS && right.reconciler.prepared_push_active; scan++) {
-        uint32_t now = prepared_at + NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS + scan * NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS;
-
-        assert_one_scan_budget(&right, true, now);
-        assert_one_scan_budget(&left, false, now);
+    assert(noah_profile_split_reconciler_prepared_push_begin(&right.reconciler, &descriptor, &source, staged_read));
+    for (uint32_t scan = 0u; scan < MAX_SCANS; scan++) {
+        resolved_at = start_at + scan * NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS;
+        assert_one_scan_budget(&right, true, resolved_at);
+        assert_one_scan_budget(&left, false, resolved_at);
+        if (right.reconciler.state == NOAH_PROFILE_SPLIT_RECONCILER_STOPPED || noah_profile_split_reconciler_prepared_push_ready(&right.reconciler, NULL)) {
+            break;
+        }
     }
-    assert(!right.reconciler.prepared_push_active);
+    // This deliberately maximal all-zero payload is semantically invalid,
+    // but transfer plus whole-payload validation must still reach a terminal
+    // result before the owner's no-progress guard can fire.
+    assert(right.reconciler.state == NOAH_PROFILE_SPLIT_RECONCILER_STOPPED);
+    assert(right.reconciler.last_status == NOAH_PROFILE_SPLIT_V1_STATUS_VALIDATION_ERROR);
+    assert((uint32_t)(resolved_at - start_at) < MAX_PREPARE_TIME_MS);
+    assert(source.reads == (sizeof(max_profile) + NOAH_PROFILE_SPLIT_V1_CHUNK_MAX - 1u) / NOAH_PROFILE_SPLIT_V1_CHUNK_MAX);
     assert(noah_profile_candidate_store_backend_admission_owner(&left.candidate_backend) == NOAH_PROFILE_STORAGE_ADMISSION_NONE);
 }
 
@@ -800,7 +865,7 @@ static void test_prepared_push_restarts_across_both_half_role_changes(void) {
     assert(left.store.committed.generation == descriptor.generation);
 }
 
-static void test_receiver_prepare_lease_expires_when_sender_vanishes(void) {
+static void test_receiver_durable_prepare_survives_sender_pause(void) {
     half_t                           left;
     half_t                           right;
     noah_profile_split_descriptor_t descriptor;
@@ -818,14 +883,14 @@ static void test_receiver_prepare_lease_expires_when_sender_vanishes(void) {
     assert(noah_profile_split_reconciler_provisional_peer_descriptor(&left.reconciler, &provisional));
 
     expired_at = left.reconciler.last_peer_activity_at + NOAH_PROFILE_SPLIT_PREPARE_LEASE_MS;
-    assert(noah_profile_split_reconciler_scan(&left.reconciler, false, expired_at));
-    assert(noah_profile_peer_store_backend_state(&left.peer_store) == NOAH_PROFILE_PEER_STORE_IDLE);
-    assert(noah_profile_candidate_store_backend_admission_owner(&left.candidate_backend) == NOAH_PROFILE_STORAGE_ADMISSION_NONE);
-    assert(left.reconciler.transfer_owner == NOAH_PROFILE_SPLIT_TRANSFER_NONE);
+    assert(!noah_profile_split_reconciler_scan(&left.reconciler, false, expired_at));
+    assert(noah_profile_peer_store_backend_state(&left.peer_store) == NOAH_PROFILE_PEER_STORE_PREPARED);
+    assert(left.store.prepared_durable);
+    assert(noah_profile_candidate_store_backend_admission_owner(&left.candidate_backend) == NOAH_PROFILE_STORAGE_ADMISSION_PEER);
+    assert(left.reconciler.transfer_owner == NOAH_PROFILE_SPLIT_TRANSFER_REMOTE_PUSH);
     assert(!noah_profile_split_reconciler_provisional_peer_descriptor(&left.reconciler, &provisional));
 
-    // If the sender returns after authorizing durability, the receiver's
-    // short-offset BUSY makes it rebuild the expired lease before commit.
+    // The sender can authorize the decision later without retransferring.
     assert(noah_profile_split_reconciler_prepared_push_authorize_commit(&right.reconciler, &descriptor));
     for (uint32_t scan = 0u; scan < MAX_SCANS && left.store.committed.slot == NOAH_PROFILE_SLOT_NONE; scan++) {
         uint32_t now = expired_at + NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS + scan * NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS;
@@ -1170,6 +1235,8 @@ int main(void) {
     test_compiled_convergence();
     test_newer_master_pushes_exact_record();
     test_newer_slave_is_pulled_without_role_authority();
+    test_logical_binding_survives_master_push();
+    test_logical_binding_survives_slave_pull();
     test_disconnect_invalidates_then_reconnects();
     test_corrupt_response_restarts_fail_closed();
     test_lost_reply_after_admission_is_idempotent();
@@ -1184,9 +1251,9 @@ int main(void) {
     test_prepared_push_collects_expected_mailbox_ack_without_failure_backoff();
     test_prepared_push_pauses_before_commit_then_authorizes();
     test_prepared_push_cancel_aborts_peer_lease();
-    test_maximum_candidate_prepares_within_owner_no_progress_window();
+    test_maximum_candidate_resolves_within_owner_no_progress_window();
     test_prepared_push_restarts_across_both_half_role_changes();
-    test_receiver_prepare_lease_expires_when_sender_vanishes();
+    test_receiver_durable_prepare_survives_sender_pause();
     test_prepare_authorize_and_cancel_are_immediate_after_timer_high_bit();
     test_cancel_after_prepare_rejection_is_idempotent();
     test_cancel_after_dropped_prepare_begin_releases_or_noops();

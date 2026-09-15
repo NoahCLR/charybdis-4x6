@@ -41,8 +41,9 @@ typedef struct {
     uint8_t  domain_mask;
     uint8_t  profile_flags;
     uint8_t  origin_half;
-    bool     readable;
-    bool     has_profile;
+    bool     readable : 1;
+    bool     has_profile : 1;
+    bool     logical : 1;
 } noah_profile_split_descriptor_t;
 
 typedef struct {

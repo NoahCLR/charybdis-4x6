@@ -50,12 +50,29 @@ typedef enum {
     NOAH_PROFILE_OWNER_CONCURRENT_COMMIT,
 } noah_profile_owner_state_t;
 
+typedef bool (*noah_profile_logical_via_ready_fn)(void *context, uint16_t transaction_id, uint32_t generation, uint32_t digest);
+typedef bool (*noah_profile_logical_via_command_fn)(void *context, uint16_t transaction_id, uint32_t generation, uint32_t digest);
+typedef bool (*noah_profile_logical_via_converged_fn)(void *context, uint32_t generation, uint32_t digest);
+typedef bool (*noah_profile_logical_via_boot_recover_fn)(void *context, uint32_t generation, uint32_t digest);
+typedef void (*noah_profile_logical_via_boot_release_fn)(void *context);
+
+typedef struct {
+    noah_profile_logical_via_ready_fn        ready;
+    noah_profile_logical_via_command_fn      accept;
+    noah_profile_logical_via_command_fn      abort;
+    noah_profile_logical_via_converged_fn    converged;
+    noah_profile_logical_via_boot_recover_fn boot_recover;
+    noah_profile_logical_via_boot_release_fn boot_release;
+    void                                    *context;
+} noah_profile_logical_via_ops_t;
+
 typedef struct {
     noah_profile_store_io_t             store_io;
     noah_profile_split_exchange_fn      split_exchange;
     void                               *split_transport_context;
     uint8_t                             origin_half;
     bool                                peer_required;
+    const noah_profile_logical_via_ops_t *logical_via;
 } noah_profile_owner_config_t;
 
 // The compiled validator is needed only before the candidate backend exists,
@@ -95,17 +112,20 @@ typedef struct {
     uint32_t                                     host_last_activity_at;
     uint16_t                                     host_barrier_progress_offset;
     uint8_t                                      scheduler_cursor;
-    bool                                         boot_activation_started;
-    bool                                         peer_activation_started;
-    bool                                         host_activity_known;
-    bool                                         descriptor_readable;
-    bool                                         split_initialized;
-    bool                                         runtimes_installed;
-    bool                                         host_barrier_descriptor_known;
-    bool                                         host_barrier_started;
-    bool                                         host_barrier_local_published;
-    bool                                         host_barrier_peer_commit_authorized;
-    bool                                         host_cancel_pending;
+    bool                                         boot_activation_started : 1;
+    bool                                         peer_activation_started : 1;
+    bool                                         host_activity_known : 1;
+    bool                                         descriptor_readable : 1;
+    bool                                         split_initialized : 1;
+    bool                                         runtimes_installed : 1;
+    bool                                         host_barrier_descriptor_known : 1;
+    bool                                         host_barrier_started : 1;
+    bool                                         host_barrier_local_published : 1;
+    bool                                         host_barrier_peer_commit_authorized : 1;
+    bool                                         host_cancel_pending : 1;
+    bool                                         host_via_accept_requested : 1;
+    bool                                         host_via_abort_requested : 1;
+    bool                                         boot_via_resolution_known : 1;
 } noah_profile_owner_t;
 
 // Protocol-neutral, caller-owned observation of the complete live-profile

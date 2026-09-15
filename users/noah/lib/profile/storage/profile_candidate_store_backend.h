@@ -72,6 +72,14 @@ bool noah_profile_candidate_store_backend_release_admission(noah_profile_candida
 bool noah_profile_candidate_store_backend_staged_candidate(const noah_profile_candidate_store_backend_t *backend, noah_profile_store_candidate_t *candidate);
 bool noah_profile_candidate_store_backend_staged_read(void *context, const noah_profile_store_candidate_t *candidate, uint16_t offset, uint8_t *bytes, uint8_t length);
 
+// Split logical transactions persist intent and the decision in separate
+// phases. These calls retain the validated profile and admission lease across
+// the prepared boundary.
+noah_profile_candidate_backend_result_t noah_profile_candidate_store_backend_prepare_durable_begin(noah_profile_candidate_store_backend_t *backend);
+noah_profile_candidate_backend_result_t noah_profile_candidate_store_backend_prepare_durable_step(noah_profile_candidate_store_backend_t *backend, uint8_t byte_budget);
+noah_profile_candidate_backend_result_t noah_profile_candidate_store_backend_prepared_commit_begin(noah_profile_candidate_store_backend_t *backend);
+noah_profile_candidate_backend_result_t noah_profile_candidate_store_backend_prepared_commit_step(noah_profile_candidate_store_backend_t *backend, uint8_t byte_budget);
+
 // Cold/test convenience wrapper around the interface's bounded commit steps.
 // Staging and validation never call it; production durability still requires
 // an explicit commit operation owned by scan context.

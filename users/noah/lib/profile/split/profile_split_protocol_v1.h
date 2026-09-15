@@ -26,6 +26,13 @@ typedef enum {
     // pull a newer durable profile from the sibling without making USB role
     // part of authority. The response is a correlated PAYLOAD_CHUNK.
     NOAH_PROFILE_SPLIT_V1_PAYLOAD_REQUEST = 8u,
+    // Carries the VIA identity bound to a format-2 custom record. It is sent
+    // before PREPARE_BEGIN so the peer can write the exact same slot header.
+    NOAH_PROFILE_SPLIT_V1_LOGICAL_BIND = 9u,
+    // Validates the received payload and persists only the prepared marker.
+    // PREPARE_COMMIT remains the later logical decision command.
+    NOAH_PROFILE_SPLIT_V1_PREPARE_DURABLE = 10u,
+    NOAH_PROFILE_SPLIT_V1_LOGICAL_BIND_REQUEST = 11u,
 } noah_profile_split_v1_kind_t;
 
 typedef enum {
@@ -52,6 +59,9 @@ typedef struct {
     uint16_t                        payload_length;
     uint8_t                         chunk_length;
     uint8_t                         chunk[NOAH_PROFILE_SPLIT_V1_CHUNK_MAX];
+    uint8_t                         store_format_version;
+    uint32_t                        via_generation;
+    uint32_t                        via_digest;
 } noah_profile_split_v1_frame_t;
 
 bool noah_profile_split_v1_frame_encode(const noah_profile_split_v1_frame_t *frame, uint8_t out[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE]);

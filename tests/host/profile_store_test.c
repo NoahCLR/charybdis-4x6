@@ -241,7 +241,7 @@ static void test_commit_and_boot_selection(void) {
     CHECK(eeprom.last_write_length == NOAH_PROFILE_STORAGE_COMMIT_MARKER_SIZE);
     first_candidate = candidate_for(empty_profile, sizeof(empty_profile), 1u, 0u);
     header          = &eeprom.bytes[NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR];
-    CHECK(header[0] == 'N' && header[1] == 'P' && header[2] == NOAH_PROFILE_STORE_FORMAT_VERSION && header[3] == 0x10u);
+    CHECK(header[0] == 'N' && header[1] == 'P' && header[2] == NOAH_PROFILE_STORE_FORMAT_VERSION_LEGACY && header[3] == 0x10u);
     CHECK(load_u16(&header[4]) == sizeof(empty_profile));
     CHECK(load_u32(&header[6]) == 1u && header[10] == 0u && header[11] == NOAH_PROFILE_STORE_FLAG_OVERRIDE);
     CHECK(load_u32(&header[12]) == first_candidate.payload_crc32);
@@ -260,6 +260,59 @@ static void test_commit_and_boot_selection(void) {
     initialize_store(&store, &eeprom, NOAH_PROFILE_STORE_OK);
     CHECK(store.committed.slot == NOAH_PROFILE_SLOT_B && store.committed.generation == 7u);
     CHECK(noah_profile_store_next_generation(&store, &next) && next == 8u);
+}
+
+static void test_logical_header_binds_via_identity(void) {
+    noah_profile_store_t           store;
+    noah_profile_store_t           rebooted;
+    noah_profile_store_record_t    record;
+    noah_profile_store_candidate_t candidate;
+    const uint8_t                 *header;
+
+    reset_eeprom(&eeprom);
+    initialize_store(&store, &eeprom, NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE);
+    candidate                = candidate_for(empty_profile, sizeof(empty_profile), 1u, 0u);
+    candidate.format_version = NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL;
+    candidate.via_generation = 17u;
+    candidate.via_digest     = UINT32_C(0x89ABCDEF);
+    CHECK(noah_profile_store_prepare_begin(&store, &candidate) == NOAH_PROFILE_STORE_OK);
+    CHECK(noah_profile_store_prepare_write(&store, 0u, empty_profile, sizeof(empty_profile)) == NOAH_PROFILE_STORE_OK);
+    CHECK(noah_profile_store_prepare_commit(&store, &record) == NOAH_PROFILE_STORE_OK);
+    CHECK(record.format_version == NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL);
+    CHECK(record.via_generation == candidate.via_generation && record.via_digest == candidate.via_digest);
+    header = &eeprom.bytes[NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR];
+    CHECK(header[0] == 'N' && header[1] == 'Q');
+    CHECK(load_u16(&header[3]) == candidate.payload_length);
+    CHECK(load_u32(&header[5]) == candidate.generation);
+    CHECK(load_u32(&header[9]) == candidate.payload_crc32);
+    CHECK(load_u32(&header[13]) == candidate.compiled_default_digest);
+    CHECK(load_u32(&header[17]) == candidate.action_abi_digest);
+    CHECK(load_u32(&header[21]) == candidate.via_generation);
+    CHECK(load_u32(&header[25]) == candidate.via_digest);
+    CHECK(load_u16(&header[29]) == noah_profile_crc16_ccitt_update(NOAH_PROFILE_CRC16_INITIAL, header, 29u));
+    CHECK(header[31] == 0xA5u);
+
+    initialize_store(&rebooted, &eeprom, NOAH_PROFILE_STORE_OK);
+    CHECK(rebooted.committed.format_version == NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL);
+    CHECK(rebooted.committed.payload_digest == candidate.payload_digest);
+    CHECK(rebooted.committed.via_generation == candidate.via_generation);
+    CHECK(rebooted.committed.via_digest == candidate.via_digest);
+    {
+        noah_profile_store_compatibility_t incompatible = compatibility();
+        noah_profile_store_record_t selected;
+        incompatible.compiled_default_digest ^= 1u;
+        noah_profile_store_init(&rebooted, io_for(&eeprom), incompatible);
+        CHECK(noah_profile_store_boot_select(&rebooted, &selected) == NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE);
+        incompatible = compatibility();
+        incompatible.action_abi_digest ^= 1u;
+        noah_profile_store_init(&rebooted, io_for(&eeprom), incompatible);
+        CHECK(noah_profile_store_boot_select(&rebooted, &selected) == NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE);
+    }
+    initialize_store(&rebooted, &eeprom, NOAH_PROFILE_STORE_OK);
+
+    candidate.generation     = 2u;
+    candidate.via_generation = 0u;
+    CHECK(noah_profile_store_prepare_begin(&rebooted, &candidate) == NOAH_PROFILE_STORE_INVALID_ARGUMENT);
 }
 
 static void test_chunk_and_candidate_guards(void) {
@@ -326,6 +379,68 @@ static void test_commit_state_machine_is_scan_bounded(void) {
     CHECK(result == NOAH_PROFILE_STORE_OK);
     CHECK(record.slot == NOAH_PROFILE_SLOT_A && record.generation == 1u);
     CHECK(!store.prepare_active && store.commit_phase == NOAH_PROFILE_STORE_COMMIT_IDLE);
+}
+
+static void test_durable_prepare_is_not_authority_until_decided(void) {
+    noah_profile_store_t        store;
+    noah_profile_store_t        rebooted;
+    noah_profile_store_record_t record;
+    noah_profile_store_result_t result;
+
+    reset_eeprom(&eeprom);
+    initialize_store(&store, &eeprom, NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE);
+    {
+        noah_profile_store_candidate_t candidate = candidate_for(empty_profile, sizeof(empty_profile), 1u, 0u);
+        candidate.format_version = NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL;
+        candidate.via_generation = 3u;
+        candidate.via_digest     = UINT32_C(0x76543210);
+        CHECK(noah_profile_store_prepare_begin(&store, &candidate) == NOAH_PROFILE_STORE_OK);
+        CHECK(noah_profile_store_prepare_write(&store, 0u, empty_profile, sizeof(empty_profile)) == NOAH_PROFILE_STORE_OK);
+    }
+    CHECK(noah_profile_store_prepare_durable_begin(&store) == NOAH_PROFILE_STORE_IN_PROGRESS);
+    do {
+        result = noah_profile_store_prepare_durable_step(&store, 5u, &record);
+    } while (result == NOAH_PROFILE_STORE_IN_PROGRESS);
+    CHECK(result == NOAH_PROFILE_STORE_OK);
+    CHECK(store.prepare_active && store.prepared_durable);
+    CHECK(eeprom.bytes[NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR + 31u] == 0x5Au);
+
+    // A reset before the decision marker retains the previous authority. On a
+    // first transaction that means compiled defaults remain authoritative.
+    initialize_store(&rebooted, &eeprom, NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE);
+
+    CHECK(noah_profile_store_prepared_commit_begin(&store) == NOAH_PROFILE_STORE_IN_PROGRESS);
+    do {
+        result = noah_profile_store_prepared_commit_step(&store, 1u, &record);
+    } while (result == NOAH_PROFILE_STORE_IN_PROGRESS);
+    CHECK(result == NOAH_PROFILE_STORE_OK);
+    CHECK(!store.prepare_active && !store.prepared_durable);
+    CHECK(record.generation == 1u && record.format_version == NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL);
+    CHECK(eeprom.bytes[NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR + 31u] == 0xA5u);
+    initialize_store(&rebooted, &eeprom, NOAH_PROFILE_STORE_OK);
+    CHECK(rebooted.committed.generation == 1u);
+}
+
+static void test_durable_prepare_can_be_aborted_before_decision(void) {
+    noah_profile_store_t        store;
+    noah_profile_store_t        rebooted;
+    noah_profile_store_result_t result;
+
+    reset_eeprom(&eeprom);
+    initialize_store(&store, &eeprom, NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE);
+    {
+        noah_profile_store_candidate_t candidate = candidate_for(rgb_profile, sizeof(rgb_profile), 1u, 1u);
+        CHECK(noah_profile_store_prepare_begin(&store, &candidate) == NOAH_PROFILE_STORE_OK);
+        CHECK(noah_profile_store_prepare_write(&store, 0u, rgb_profile, sizeof(rgb_profile)) == NOAH_PROFILE_STORE_OK);
+    }
+    CHECK(noah_profile_store_prepare_durable_begin(&store) == NOAH_PROFILE_STORE_IN_PROGRESS);
+    do {
+        result = noah_profile_store_prepare_durable_step(&store, 20u, NULL);
+    } while (result == NOAH_PROFILE_STORE_IN_PROGRESS);
+    CHECK(result == NOAH_PROFILE_STORE_OK && store.prepared_durable);
+    CHECK(noah_profile_store_prepare_abort(&store) == NOAH_PROFILE_STORE_OK);
+    CHECK(!store.prepare_active && !store.prepared_durable);
+    initialize_store(&rebooted, &eeprom, NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE);
 }
 
 static void test_destructive_reuse_guard_brackets_every_prepare(void) {
@@ -660,8 +775,11 @@ static void test_boot_selection_state_machine_is_scan_bounded(void) {
 int main(void) {
     test_checksums();
     test_commit_and_boot_selection();
+    test_logical_header_binds_via_identity();
     test_chunk_and_candidate_guards();
     test_commit_state_machine_is_scan_bounded();
+    test_durable_prepare_is_not_authority_until_decided();
+    test_durable_prepare_can_be_aborted_before_decision();
     test_destructive_reuse_guard_brackets_every_prepare();
     test_payload_and_header_validation();
     test_checksum_mismatch_never_commits();

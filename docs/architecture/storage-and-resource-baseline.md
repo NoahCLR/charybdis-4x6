@@ -121,7 +121,8 @@ equal to the logical EEPROM size.
 Each slot contains a 32-byte storage header followed by at most 4,064 bytes of
 canonical Profile Wire payload.
 
-The canonical header is independent of compiler struct layout:
+The legacy format-1 header remains readable and is independent of compiler
+struct layout:
 
 | Offset | Size | Field |
 | ---: | ---: | --- |
@@ -143,14 +144,36 @@ The packed schema field intentionally limits each stored schema component to
 four bits in storage format v1. A later schema outside that range requires a
 new storage format rather than a noncanonical reinterpretation of this header.
 
+Atomic logical Apply writes format 2:
+
+| Offset | Size | Field |
+| ---: | ---: | --- |
+| 0 | 2 | logical storage magic `NQ` |
+| 2 | 1 | domain mask in bits 0–3, origin in bit 4, profile flag in bit 5; bits 6–7 reserved |
+| 3 | 2 | payload length, little-endian |
+| 5 | 4 | custom generation, little-endian |
+| 9 | 4 | payload CRC32, little-endian |
+| 13 | 4 | compiled-default digest, little-endian |
+| 17 | 4 | action-ABI digest, little-endian |
+| 21 | 4 | bound VIA generation, little-endian |
+| 25 | 4 | bound canonical VIA digest, little-endian |
+| 29 | 2 | CRC16-CCITT over bytes 0 through 28, little-endian |
+| 31 | 1 | state marker: `5A` prepared, `A5` committed, `00` invalid |
+
+Format 2 derives the schema, domain mask and FNV-1a payload digest while
+validating the canonical payload. The header retains the compiled-default and
+action-ABI identities so a reflash cannot silently adopt incompatible sparse
+profile data.
+
 Inactive-slot commit ordering is:
 
 1. invalidate its commit marker;
 2. write the payload in bounded scan-context chunks;
 3. write the non-commit header;
 4. read back and verify payload and header checksums;
-5. write the commit marker atomically as the final operation;
-6. publish only after the activation owner accepts the candidate.
+5. write and verify the prepared marker;
+6. after the coordinator's decision, replace it with the commit marker;
+7. publish only after the activation owner accepts the complete logical state.
 
 At boot, firmware selects the newest valid compatible slot. If neither slot is
 valid, it uses compiled defaults. Interrupted writes never invalidate the
@@ -166,7 +189,7 @@ authority identities are reported as conflicts rather than selected silently.
 
 | Surface | Ceiling |
 | --- | ---: |
-| Logical layers | schema maximum 8; firmware initially advertises compiled 5 |
+| Logical layers | schema and firmware maximum 8 |
 | Key-behavior rows | 64 |
 | Tap steps per behavior | 5 |
 | Populated behavior steps | 128 aggregate |
@@ -197,6 +220,15 @@ maximum can be reached simultaneously.
 
 The sibling QMK checkout was inspected and used for build artifacts. No sibling
 source file was edited by this project pass.
+
+The 2026-09-15 atomic logical-Apply image keeps the owner at exactly 4,096 bytes
+on the 32-bit target, meeting its unchanged engineering state policy. Its normal
+left-half SRAM0–3 `.data + .bss` is 55,796 bytes against the 57,344-byte
+regression tripwire, and its linker/core-memory span at boot is 206,344 bytes.
+The reviewed-path stack check passes at 1,824/1,920 bytes for the largest named
+main-process path and 328/768 bytes for the largest named split-slave path. The
+memory figures are linked values per half; the stack figures cover the manifest
+paths only and are not runtime high-water evidence.
 
 The temporary snapshot bridge retains the five-layer keymap at
 `0x0029–0x0280` and 7,551-byte macro bank at `0x0281–0x1FFF`. Its VIA

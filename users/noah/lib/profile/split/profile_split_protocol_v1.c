@@ -8,6 +8,7 @@
 #include <string.h>
 
 #include "../schema/profile_blob_v1.h"
+#include "../storage/profile_store.h"
 
 enum {
     WIRE_VERSION          = 0u,
@@ -32,9 +33,13 @@ enum {
     WIRE_CHUNK_LENGTH     = 16u,
     WIRE_CHUNK            = 17u,
     WIRE_CRC              = 31u,
+    WIRE_BIND_FORMAT      = 12u,
+    WIRE_BIND_VIA_GEN     = 13u,
+    WIRE_BIND_VIA_DIGEST  = 17u,
     WIRE_FLAG_HAS_PROFILE = 1u << 0,
     WIRE_FLAG_READABLE    = 1u << 1,
-    WIRE_DESCRIPTOR_FLAGS = WIRE_FLAG_HAS_PROFILE | WIRE_FLAG_READABLE,
+    WIRE_FLAG_LOGICAL     = 1u << 2,
+    WIRE_DESCRIPTOR_FLAGS = WIRE_FLAG_HAS_PROFILE | WIRE_FLAG_READABLE | WIRE_FLAG_LOGICAL,
 };
 
 static uint8_t crc8(const uint8_t *bytes, size_t length) {
@@ -79,11 +84,11 @@ static bool bytes_zero(const uint8_t *bytes, size_t length) {
 }
 
 static bool descriptor_kind(noah_profile_split_v1_kind_t kind) {
-    return kind == NOAH_PROFILE_SPLIT_V1_METADATA || kind == NOAH_PROFILE_SPLIT_V1_PREPARE_BEGIN || kind == NOAH_PROFILE_SPLIT_V1_PREPARE_COMMIT || kind == NOAH_PROFILE_SPLIT_V1_ABORT;
+    return kind == NOAH_PROFILE_SPLIT_V1_METADATA || kind == NOAH_PROFILE_SPLIT_V1_PREPARE_BEGIN || kind == NOAH_PROFILE_SPLIT_V1_PREPARE_DURABLE || kind == NOAH_PROFILE_SPLIT_V1_PREPARE_COMMIT || kind == NOAH_PROFILE_SPLIT_V1_ABORT;
 }
 
 static bool descriptor_zero(const noah_profile_split_descriptor_t *descriptor) {
-    return descriptor && descriptor->generation == 0u && descriptor->payload_crc32 == 0u && descriptor->payload_digest == 0u && descriptor->compiled_default_digest == 0u && descriptor->action_abi_digest == 0u && descriptor->payload_length == 0u && descriptor->schema_major == 0u && descriptor->schema_minor == 0u && descriptor->domain_mask == 0u && descriptor->profile_flags == 0u && descriptor->origin_half == 0u && !descriptor->readable && !descriptor->has_profile;
+    return descriptor && descriptor->generation == 0u && descriptor->payload_crc32 == 0u && descriptor->payload_digest == 0u && descriptor->compiled_default_digest == 0u && descriptor->action_abi_digest == 0u && descriptor->payload_length == 0u && descriptor->schema_major == 0u && descriptor->schema_minor == 0u && descriptor->domain_mask == 0u && descriptor->profile_flags == 0u && descriptor->origin_half == 0u && !descriptor->readable && !descriptor->has_profile && !descriptor->logical;
 }
 
 static bool transfer_shape_valid(const noah_profile_split_v1_frame_t *frame) {
@@ -105,9 +110,23 @@ static bool transfer_shape_valid(const noah_profile_split_v1_frame_t *frame) {
     return frame->kind == NOAH_PROFILE_SPLIT_V1_ERROR && frame->status != NOAH_PROFILE_SPLIT_V1_STATUS_OK && frame->status != NOAH_PROFILE_SPLIT_V1_STATUS_BUSY;
 }
 
+static bool logical_bind_shape_valid(const noah_profile_split_v1_frame_t *frame) {
+    return frame && descriptor_zero(&frame->descriptor) && frame->status == NOAH_PROFILE_SPLIT_V1_STATUS_OK && frame->generation != 0u && frame->payload_digest != 0u && frame->offset == 0u && frame->payload_length == 0u && frame->chunk_length == 0u && bytes_zero(frame->chunk, sizeof(frame->chunk)) && frame->store_format_version == NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL && frame->via_generation != 0u && frame->via_digest != 0u;
+}
+
+static bool logical_bind_request_shape_valid(const noah_profile_split_v1_frame_t *frame) {
+    return frame && descriptor_zero(&frame->descriptor) && frame->status == NOAH_PROFILE_SPLIT_V1_STATUS_OK && frame->generation != 0u && frame->payload_digest != 0u && frame->offset == 0u && frame->payload_length == 0u && frame->chunk_length == 0u && bytes_zero(frame->chunk, sizeof(frame->chunk)) && frame->store_format_version == 0u && frame->via_generation == 0u && frame->via_digest == 0u;
+}
+
 static bool frame_shape_valid(const noah_profile_split_v1_frame_t *frame) {
-    if (!frame || frame->kind < NOAH_PROFILE_SPLIT_V1_METADATA || frame->kind > NOAH_PROFILE_SPLIT_V1_PAYLOAD_REQUEST || frame->status > NOAH_PROFILE_SPLIT_V1_STATUS_VALIDATION_ERROR) {
+    if (!frame || frame->kind < NOAH_PROFILE_SPLIT_V1_METADATA || frame->kind > NOAH_PROFILE_SPLIT_V1_LOGICAL_BIND_REQUEST || frame->status > NOAH_PROFILE_SPLIT_V1_STATUS_VALIDATION_ERROR) {
         return false;
+    }
+    if (frame->kind == NOAH_PROFILE_SPLIT_V1_LOGICAL_BIND) {
+        return logical_bind_shape_valid(frame);
+    }
+    if (frame->kind == NOAH_PROFILE_SPLIT_V1_LOGICAL_BIND_REQUEST) {
+        return logical_bind_request_shape_valid(frame);
     }
     if (descriptor_kind(frame->kind)) {
         if (!noah_profile_split_descriptor_valid(&frame->descriptor) || frame->generation != 0u || frame->payload_digest != 0u || frame->offset != 0u || frame->payload_length != 0u || frame->chunk_length != 0u || !bytes_zero(frame->chunk, sizeof(frame->chunk))) {
@@ -130,7 +149,7 @@ bool noah_profile_split_v1_frame_encode(const noah_profile_split_v1_frame_t *fra
     out[WIRE_KIND]    = (uint8_t)frame->kind;
     out[WIRE_STATUS]  = (uint8_t)frame->status;
     if (descriptor_kind(frame->kind)) {
-        out[WIRE_FLAGS]         = (frame->descriptor.has_profile ? WIRE_FLAG_HAS_PROFILE : 0u) | (frame->descriptor.readable ? WIRE_FLAG_READABLE : 0u);
+        out[WIRE_FLAGS]         = (frame->descriptor.has_profile ? WIRE_FLAG_HAS_PROFILE : 0u) | (frame->descriptor.readable ? WIRE_FLAG_READABLE : 0u) | (frame->descriptor.logical ? WIRE_FLAG_LOGICAL : 0u);
         out[WIRE_SCHEMA_MAJOR]  = frame->descriptor.schema_major;
         out[WIRE_SCHEMA_MINOR]  = frame->descriptor.schema_minor;
         out[WIRE_PROFILE_FLAGS] = frame->descriptor.profile_flags;
@@ -142,6 +161,12 @@ bool noah_profile_split_v1_frame_encode(const noah_profile_split_v1_frame_t *fra
         write_u32(&out[WIRE_COMPILED_DIGEST], frame->descriptor.compiled_default_digest);
         write_u32(&out[WIRE_ACTION_ABI], frame->descriptor.action_abi_digest);
         out[WIRE_DOMAIN_MASK] = frame->descriptor.domain_mask;
+    } else if (frame->kind == NOAH_PROFILE_SPLIT_V1_LOGICAL_BIND || frame->kind == NOAH_PROFILE_SPLIT_V1_LOGICAL_BIND_REQUEST) {
+        write_u32(&out[WIRE_TRANSFER_GEN], frame->generation);
+        write_u32(&out[WIRE_TRANSFER_DIGEST], frame->payload_digest);
+        out[WIRE_BIND_FORMAT] = frame->store_format_version;
+        write_u32(&out[WIRE_BIND_VIA_GEN], frame->via_generation);
+        write_u32(&out[WIRE_BIND_VIA_DIGEST], frame->via_digest);
     } else {
         write_u32(&out[WIRE_TRANSFER_GEN], frame->generation);
         write_u32(&out[WIRE_TRANSFER_DIGEST], frame->payload_digest);
@@ -180,7 +205,17 @@ bool noah_profile_split_v1_frame_decode(const uint8_t *wire, uint8_t length, noa
             .origin_half             = wire[WIRE_ORIGIN_HALF],
             .readable                = (wire[WIRE_FLAGS] & WIRE_FLAG_READABLE) != 0u,
             .has_profile             = (wire[WIRE_FLAGS] & WIRE_FLAG_HAS_PROFILE) != 0u,
+            .logical                 = (wire[WIRE_FLAGS] & WIRE_FLAG_LOGICAL) != 0u,
         };
+    } else if (decoded.kind == NOAH_PROFILE_SPLIT_V1_LOGICAL_BIND || decoded.kind == NOAH_PROFILE_SPLIT_V1_LOGICAL_BIND_REQUEST) {
+        if (wire[WIRE_FLAGS] != 0u || !bytes_zero(&wire[21], 10u)) {
+            return false;
+        }
+        decoded.generation           = read_u32(&wire[WIRE_TRANSFER_GEN]);
+        decoded.payload_digest       = read_u32(&wire[WIRE_TRANSFER_DIGEST]);
+        decoded.store_format_version = wire[WIRE_BIND_FORMAT];
+        decoded.via_generation       = read_u32(&wire[WIRE_BIND_VIA_GEN]);
+        decoded.via_digest           = read_u32(&wire[WIRE_BIND_VIA_DIGEST]);
     } else {
         if (wire[WIRE_FLAGS] != 0u || wire[WIRE_CHUNK_LENGTH] > NOAH_PROFILE_SPLIT_V1_CHUNK_MAX || !bytes_zero(&wire[WIRE_CHUNK + wire[WIRE_CHUNK_LENGTH]], NOAH_PROFILE_SPLIT_V1_CHUNK_MAX - wire[WIRE_CHUNK_LENGTH])) {
             return false;

@@ -229,7 +229,7 @@
         },
         {
           "name": "matrix scan VIA verified generation commit",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_via_split_sync_matrix_scan_step", "noah_qmk_via_sync_state_persist", "eeprom_update_dword", "wear_leveling_write"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_via_split_sync_matrix_scan_step", "noah_qmk_via_sync_state_complete_mutation", "noah_qmk_via_sync_state_persist", "eeprom_update_dword", "wear_leveling_write"]
         },
         {
           "name": "matrix scan VIA two-dirty default recovery",

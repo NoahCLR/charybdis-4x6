@@ -63,6 +63,12 @@ noah_profile_peer_store_result_t noah_profile_peer_store_backend_begin(noah_prof
     return NOAH_PROFILE_PEER_STORE_BUSY;
 }
 
+noah_profile_peer_store_result_t noah_profile_peer_store_backend_begin_logical(noah_profile_peer_store_backend_t *peer, const noah_profile_split_descriptor_t *descriptor, uint32_t via_generation, uint32_t via_digest) {
+    (void)via_generation;
+    (void)via_digest;
+    return noah_profile_peer_store_backend_begin(peer, descriptor);
+}
+
 noah_profile_peer_store_result_t noah_profile_peer_store_backend_write(noah_profile_peer_store_backend_t *peer, uint32_t generation, uint32_t payload_digest, uint16_t offset, const uint8_t *bytes, uint8_t length) {
     (void)peer;
     (void)generation;
@@ -74,6 +80,18 @@ noah_profile_peer_store_result_t noah_profile_peer_store_backend_write(noah_prof
 }
 
 noah_profile_peer_store_result_t noah_profile_peer_store_backend_commit_begin(noah_profile_peer_store_backend_t *peer, const noah_profile_split_descriptor_t *descriptor) {
+    (void)peer;
+    (void)descriptor;
+    return NOAH_PROFILE_PEER_STORE_BUSY;
+}
+
+noah_profile_peer_store_result_t noah_profile_peer_store_backend_prepare_durable_begin(noah_profile_peer_store_backend_t *peer, const noah_profile_split_descriptor_t *descriptor) {
+    (void)peer;
+    (void)descriptor;
+    return NOAH_PROFILE_PEER_STORE_BUSY;
+}
+
+noah_profile_peer_store_result_t noah_profile_peer_store_backend_prepared_commit_begin(noah_profile_peer_store_backend_t *peer, const noah_profile_split_descriptor_t *descriptor) {
     (void)peer;
     (void)descriptor;
     return NOAH_PROFILE_PEER_STORE_BUSY;

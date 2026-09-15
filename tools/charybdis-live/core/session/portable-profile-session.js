@@ -1,11 +1,12 @@
 "use strict";
-const {readViaStorage, readRegion, writeChangedRegion, writeViaMacros, changedRanges, viaStorageDigest, VIA_STORAGE} = require("../protocol/via-storage-v1");
+const {readViaStorage, readRegion, changedRanges, viaStorageDigest, VIA_STORAGE} = require("../protocol/via-storage-v1");
 const {readSettings, readStorageStatus, waitForStorage} = require("../protocol/portable-profile-v1");
 const {readProfileStatus, PROFILE_ACTIVE_KIND} = require("../protocol/profile-wire-v1");
 const {readCommittedPayload, readCompiledPayload} = require("../protocol/profile-payload-v1");
 const {readDeviceCombos} = require("../protocol/combo-readback-v1");
 const {candidateMetadataForBlob, readCandidateStatus, CANDIDATE_STATE} = require("../protocol/profile-candidate-v1");
 const {CandidateUploadCoordinator} = require("./candidate-upload-coordinator");
+const {LogicalViaStageCoordinator} = require("./logical-via-stage-coordinator");
 const {createSnapshot, validateSnapshot, materializeProfile, fingerprint, summary, reorderLayers} = require("../model/portable-profile");
 const {encodeSettings} = require("../schema/settings-domain-v1");
 const {crc32, fnv1a32} = require("../schema/profile-blob-v1");
@@ -22,8 +23,8 @@ function capturedBase(before, capabilities) {
     return base;
 }
 function requireReady(capabilities, writing = false) {
-    if ((writing ? capabilities?.compiledLayerCount !== 8 : ![5, 8].includes(capabilities?.compiledLayerCount)) || (capabilities?.supportedDomainMask & 15) !== 15) {
-        const guidance = capabilities?.compiledLayerCount === 5 ? "Use the five-layer backup bridge on both halves and export your profile before installing the eight-layer firmware. Import becomes available after that update." : "Complete backups require firmware with complete-profile support on both halves.";
+    if ((writing ? capabilities?.compiledLayerCount !== 8 : ![5, 8].includes(capabilities?.compiledLayerCount)) || (capabilities?.supportedDomainMask & 15) !== 15 || (writing && !(capabilities?.featureFlags & (1 << 12)))) {
+        const guidance = capabilities?.compiledLayerCount === 5 ? "Use the five-layer backup bridge on both halves and export your profile before installing the eight-layer firmware. Import becomes available after that update." : "Complete profile Apply requires firmware with atomic profile support on both halves.";
         throw fail("FIRMWARE_UPDATE_REQUIRED", guidance + " Your current keyboard configuration has not been changed.");
     }
 }
@@ -82,13 +83,12 @@ async function restoreProfile(connection, ids, capabilities, document, {expected
     const capture = operations.capture || captureProfile;
     const currentIdentity = operations.readIdentity || readIdentity;
     const readCandidate = operations.readCandidate || readCandidateStatus;
-    const writeMacros = operations.writeMacros || writeViaMacros;
-    const writeLayout = operations.writeLayout || ((c, bytes, current) => writeChangedRegion(c, VIA_STORAGE.LAYOUT_WRITE, bytes, current));
     const waitStorage = operations.waitStorage || waitForStorage;
     const readStorage = operations.readStorage || readStorageStatus;
     const readStored = operations.readStored || readRegion;
     const readProfile = operations.readProfile || readProfileStatus;
     const createCoordinator = operations.createCoordinator || ((c, options) => new CandidateUploadCoordinator(c, options));
+    const createViaCoordinator = operations.createViaCoordinator || ((c, options) => new LogicalViaStageCoordinator(c, options));
     if (typeof saveRecovery !== "function") throw fail("RECOVERY_REQUIRED", "Save a recovery copy before restoring this keyboard.");
     let before;
     if (baseSnapshot?.document && baseSnapshot.identity && (!expectedFingerprint || baseSnapshot.fingerprint === expectedFingerprint)) {
@@ -110,41 +110,40 @@ async function restoreProfile(connection, ids, capabilities, document, {expected
     const candidate = await readCandidate(connection, options);
     if (candidate.state !== CANDIDATE_STATE.IDLE) throw fail("KEYBOARD_BUSY", "The keyboard has an unfinished profile transaction. Finish or recover it before restoring.");
     const coordinator = createCoordinator(connection, {chunkSize: capabilities.candidateChunkMax, requestIds: ids, onProgress: progress => onProgress(`Preparing profile: ${progress.phase}`)});
+    const viaCoordinator = createViaCoordinator(connection, {requestIds: ids, onProgress: progress => onProgress(`Preparing keyboard storage: ${progress.completed} / ${progress.total} bytes`)});
+    const expectedStorageDigest = viaStorageDigest(target);
+    if (beforeIdentity.storageGeneration >= 0xffffffff) throw fail("STORAGE_GENERATION_EXHAUSTED", "The keyboard storage generation cannot advance safely.");
+    const targetStorageGeneration = beforeIdentity.storageGeneration + 1;
     let mutated = false, prepared;
     try {
-        prepared = await coordinator.upload(target.profile, {metadata: candidateMetadataForBlob(target.profile, {actionAbiDigest: capabilities.actionAbiDigest}), verifyBase: async () => {
+        prepared = await coordinator.upload(target.profile, {metadata: candidateMetadataForBlob(target.profile, {actionAbiDigest: capabilities.actionAbiDigest, viaGeneration: targetStorageGeneration, viaDigest: expectedStorageDigest}), verifyBase: async () => {
             const identity = await currentIdentity(connection, ids, {allowCandidate: true});
             if (identityKey(identity) !== identityKey(beforeIdentity)) throw fail("PROFILE_CHANGED", "The keyboard changed before restore could start.");
         }});
-        // VIA and the custom profile have separate durable owners. The recovery
-        // file remains usable if either owner is interrupted between these steps.
-        onProgress("Saving behaviours, combos, lighting and settings to both halves");
         mutated = true;
+        onProgress("Staging changed keys and macros on the other half");
+        await viaCoordinator.stage({transactionId: prepared.transactionId, generation: targetStorageGeneration, digest: expectedStorageDigest, target, current: base});
+        onProgress("Publishing one complete profile to both halves");
         await coordinator.commit(prepared.transactionId, {digest: prepared.metadata.digest});
         const macroRanges = changedRanges(base.macros, target.macros, {end: target.macros.length - 1});
         const layoutRanges = changedRanges(base.layout, target.layout);
         const macroBytes = macroRanges.reduce((sum, range) => sum + range.bytes.length, 0);
         const layoutBytes = layoutRanges.reduce((sum, range) => sum + range.bytes.length, 0);
         const macroWriteNeeded = macroRanges.length > 0 || base.macros.at(-1) !== target.macros.at(-1);
-        if (macroWriteNeeded) {
-            onProgress("Restoring changed macros");
-            await writeMacros(connection, target.macros, {current: base.macros});
-        }
-        if (layoutRanges.length) {
-            onProgress("Restoring changed keys across all eight layers");
-            await writeLayout(connection, target.layout, base.layout);
-        }
         const storage = await waitStorage(connection, ids);
         await verifyRanges(connection, readStored, VIA_STORAGE.LAYOUT_READ, target.layout, layoutRanges);
         await verifyRanges(connection, readStored, VIA_STORAGE.MACRO_READ, target.macros, macroRanges, {verifyFinalByte: macroRanges.length > 0});
         const status = await readProfile(connection, options);
         const storageAfter = await readStorage(connection, ids);
-        const expectedStorageDigest = viaStorageDigest(target);
-        if (status.activeKind !== PROFILE_ACTIVE_KIND.COMMITTED || status.activeDigest !== fnv1a32(target.profile) || status.committedDigest !== fnv1a32(target.profile) || !(status.stateFlags & 32) || status.conflictCount || !storage.ready || !storageAfter.ready || storage.generation !== storageAfter.generation || storage.digest !== storageAfter.digest || storageAfter.digest !== expectedStorageDigest) throw fail("RESTORE_VERIFY_FAILED", "The keyboard did not confirm the imported profile on both halves.");
+        if (status.activeKind !== PROFILE_ACTIVE_KIND.COMMITTED || status.activeDigest !== fnv1a32(target.profile) || status.committedDigest !== fnv1a32(target.profile) || !(status.stateFlags & 32) || status.conflictCount || !storage.ready || !storageAfter.ready || storage.generation !== targetStorageGeneration || storageAfter.generation !== targetStorageGeneration || storage.generation !== storageAfter.generation || storage.digest !== storageAfter.digest || storageAfter.digest !== expectedStorageDigest) throw fail("RESTORE_VERIFY_FAILED", "The keyboard did not confirm the imported profile on both halves.");
         const resultFingerprint = fingerprint(document);
         return {document, fingerprint: resultFingerprint, summary: summary(document), status, identity: snapshotIdentity(status, storageAfter, encodeSettings(target.settings)), recovery,
-            performance: {elapsedMs: Date.now() - startedAt, baseSource: before === baseSnapshot ? "verified-cache" : "device-read", layoutBytes, macroBytes, layoutReports: layoutRanges.reduce((sum, range) => sum + Math.ceil(range.bytes.length / VIA_STORAGE.CHUNK), 0), macroReports: macroWriteNeeded ? 2 + macroRanges.reduce((sum, range) => sum + Math.ceil(range.bytes.length / VIA_STORAGE.CHUNK), 0) : 0}};
+            performance: {elapsedMs: Date.now() - startedAt, baseSource: before === baseSnapshot ? "verified-cache" : "device-read", layoutBytes, macroBytes, viaConfigReports: 1, layoutReports: layoutRanges.reduce((sum, range) => sum + Math.ceil(range.bytes.length / 12), 0), macroReports: macroWriteNeeded ? macroRanges.reduce((sum, range) => sum + Math.ceil(range.bytes.length / 12), 0) : 0}};
     } catch (error) {
+        if (prepared) {
+            try { await viaCoordinator.abort({transactionId: prepared.transactionId, generation: targetStorageGeneration, digest: expectedStorageDigest}); } catch {}
+            try { await coordinator.abort(prepared.transactionId); } catch {}
+        }
         if (mutated) throw fail("RESTORE_INCOMPLETE", `Restore was interrupted. Keep both halves connected. ${before.incomplete ? `Import your original complete backup again. Interrupted data was saved for diagnosis at ${recovery}.` : `Import the recovery file ${recovery}.`} ${error.message}`);
         throw error;
     }
