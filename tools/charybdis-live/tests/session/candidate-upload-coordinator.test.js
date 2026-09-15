@@ -12,6 +12,7 @@ const {
     CandidateRequestIdSequence,
     CandidateTransactionIdSequence,
     PROFILE_CANDIDATE_V1,
+    candidateMetadataForBlob,
 } = require("../../core/protocol/profile-candidate-v1");
 const {
     CandidateUploadCoordinator,
@@ -361,7 +362,11 @@ test("a split commit polls through peer preparation and convergence before activ
     });
     const client = coordinator(harness);
     const prepared = await client.upload(representativeBlob(1), {actionAbiDigest: 1, transactionId: 0x1234});
-    const result = await client.commit(prepared.transactionId, {digest: prepared.metadata.digest});
+    const decisions = [];
+    const result = await client.commit(prepared.transactionId, {digest: prepared.metadata.digest, afterDecision: async decision => {
+        decisions.push(decision);
+        assert.equal(decision.status.state, CANDIDATE_STATE.CONVERGING_PEER);
+    }});
 
     assert.equal(result.status.state, CANDIDATE_STATE.IDLE);
     assert.equal(result.status.lastOperation, CANDIDATE_OPERATION.COMMIT);
@@ -373,7 +378,33 @@ test("a split commit polls through peer preparation and convergence before activ
     ]) {
         assert.equal(harness.reportedStates.includes(state), true, `missing reported candidate state ${state}`);
     }
+    assert.equal(decisions.length, 1);
+    assert.equal(decisions[0].transactionId, prepared.transactionId);
+    assert.equal(decisions[0].digest, prepared.metadata.digest);
     assert.equal(operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_COMMIT).length, 1);
+});
+
+test("resuming a post-decision commit invokes local roll-forward once", async () => {
+    const harness = new CandidateFirmwareHarness({splitBarrier: true, convergenceReads: 2, activationReads: 2});
+    const blob = representativeBlob(1);
+    const metadata = candidateMetadataForBlob(blob, {actionAbiDigest: 1});
+    harness.status = {
+        ...harness.status,
+        state: CANDIDATE_STATE.CONVERGING_PEER,
+        lastOperation: CANDIDATE_OPERATION.COMMIT,
+        transactionId: 0x1234,
+        payloadLength: blob.length,
+        nextOffset: blob.length,
+        digest: metadata.digest,
+    };
+    harness.commitCountdown = 0;
+    harness.convergenceCountdown = 2;
+    harness.activationCountdown = 2;
+    let decisions = 0;
+    const result = await coordinator(harness).commit(0x1234, {digest: metadata.digest, afterDecision: async () => { decisions++; }});
+    assert.equal(result.status.state, CANDIDATE_STATE.IDLE);
+    assert.equal(decisions, 1);
+    assert.equal(operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_COMMIT).length, 0);
 });
 
 test("lost commit acknowledgement is safely resolved from progressing status", async () => {

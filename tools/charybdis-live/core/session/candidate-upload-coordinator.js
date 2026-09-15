@@ -254,6 +254,10 @@ class CandidateUploadCoordinator {
         context.transactionId = normalizeTransactionId(transactionId);
         context.onProgress = typeof options.onProgress === "function" ? options.onProgress : undefined;
         context.expectedDigest = options.digest === undefined ? undefined : normalizeInteger(options.digest, "Candidate digest", 0, 0xffffffff);
+        if (options.afterDecision !== undefined && typeof options.afterDecision !== "function") {
+            throw new TypeError("afterDecision must be a function.");
+        }
+        context.afterDecision = options.afterDecision;
         this.uploading = true;
         try {
             throwIfCancelled(context);
@@ -507,6 +511,19 @@ class CandidateUploadCoordinator {
             assertCandidateIdentity(status, context);
             if (status.digest !== context.expectedDigest) {
                 throw uploadError("CANDIDATE_IDENTITY_MISMATCH", "Commit status digest changed during persistence.", context, {status, safeToRetry: false});
+            }
+            if (status.state === CANDIDATE_STATE.CONVERGING_PEER && context.afterDecision && !context.decisionHandled) {
+                // CONVERGING_PEER begins only after the local custom-profile
+                // commit marker is durable. The caller may now roll the VIA
+                // store forward on the USB half while the peer remains the
+                // recovery copy for an interrupted post-decision write.
+                context.decisionHandled = true;
+                await context.afterDecision({
+                    transactionId: context.transactionId,
+                    digest: context.expectedDigest,
+                    status: cloneStatus(status),
+                });
+                budget.deadline = this.now() + budget.timeoutMs;
             }
             if (commitIsComplete(status, context)) {
                 assertNoDeviceError(status, context);
@@ -786,12 +803,14 @@ function createUploadContext(signal) {
     }
     return {
         abortNeeded: false,
+        afterDecision: undefined,
         blob: undefined,
         bytesSent: 0,
         cancellationSuppressed: false,
         chunkCount: 0,
         chunkIndex: -1,
         metadata: undefined,
+        decisionHandled: false,
         onProgress: undefined,
         operation: CANDIDATE_OPERATION.NONE,
         phase: UPLOAD_PHASE.PREFLIGHT,

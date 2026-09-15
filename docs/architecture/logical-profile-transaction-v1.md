@@ -65,8 +65,10 @@ partially replaced bank.
    point. Runtime activation remains blocked because its VIA store is still old.
 7. The peer commits the same custom record, accepts its staged VIA generation,
    and becomes the complete new replica.
-8. VIA snapshot reconciliation copies the peer's target VIA regions to the USB
-   half. The USB half verifies and accepts the target VIA generation.
+8. After the decision is observable, the host waits for the peer VIA accept and
+   writes only the changed VIA ranges to the USB half. A custom-only change uses
+   one verified no-op keycode write to advance the bound VIA generation. The
+   peer remains the complete recovery copy throughout this roll-forward.
 9. Once both halves report the same logical manifest and no transfer is pending,
    the effective-profile owner activates at the existing safe behavior boundary.
 
@@ -103,7 +105,10 @@ identities on both halves; Refresh and Export remain independent full reads.
 The logical staging channel carries 12 data bytes per report because every chunk
 also carries transaction, region, generation and digest correlation. Apply keeps
 the differential range selection, so ordinary edits still avoid transferring the
-unchanged macro capacity.
+unchanged macro capacity. Firmware holds ordinary full-store reconciliation after
+the decision while the connected host performs this differential roll-forward.
+If the host disappears, reboot recovery deliberately clears that volatile hold
+and can copy the peer's complete target.
 
 ## Implementation Status
 

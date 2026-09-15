@@ -826,8 +826,11 @@ sends only changed VIA ranges to the non-USB half. Firmware verifies that staged
 copy before it makes durable custom intent. Both custom slots reach a prepared
 marker before the USB-side marker becomes the decision record. The peer custom
 record commits next, its VIA copy is accepted, and ordinary split reconciliation
-rolls that exact VIA identity back to the USB half. Runtime activation waits for
-both custom and VIA convergence.
+is held while the host writes only the changed VIA ranges to the USB half. The
+peer remains the complete recovery copy until the USB-side VIA identity is
+verified. A reboot after a postdecision disconnect clears the volatile hold and
+recovers the complete target from the peer. Runtime activation waits for both
+custom and VIA convergence.
 
 Storage format 2 keeps the existing 32-byte header and 4,064-byte payload. A
 distinct `NQ` header packs domain/origin/flags, stores the VIA binding, and still
@@ -854,7 +857,7 @@ postdecision boot recovery. Remaining acceptance is physical power interruption
 at each durable boundary, the one-half reconnect case, external VIA-writer
 adoption, guided recovery, and blank-firmware restore.
 
-D-L21 verification: `sh tests/host/run_all_host_tests.sh` passes, including 340
+D-L21 verification: `sh tests/host/run_all_host_tests.sh` passes, including 343
 live-app tests. The side-specific `sh tools/build-firmware-pair.sh` build passes
 with the owner enabled on both halves. The linked left-half owner is exactly
 4,096 bytes, within its unchanged 4,096-byte engineering policy. The normal
@@ -867,3 +870,18 @@ path is 328/768 bytes. These are per-half linked results and reviewed-path
 estimates, not runtime high-water measurements. The build wrote generated QMK
 artifacts and numbered firmware pairs in sibling output directories; no sibling
 source was edited.
+
+First connected-hardware acceptance on 2026-09-15 exposed an orchestration gap:
+an unchanged Apply made both custom markers durable and accepted peer VIA
+generation 2, but the host waited about 16 seconds and timed out while ordinary
+reconciliation copied the complete 8 KiB-class VIA store back to USB. The board
+subsequently converged safely to custom generation 1 and VIA generation 2 with
+the exact original profile fingerprint; an independent complete read matched
+`3951067804:2420465131:3452861139` in 3.0 seconds, proving recovery but missing
+the latency contract. The follow-up path now starts USB roll-forward as soon as the durable
+decision and peer VIA accept are visible, sends only changed ranges (or one
+two-byte no-op for a custom-only generation), and does not issue an impossible
+postdecision abort if that write is interrupted. Host coverage includes fresh
+and resumed decision callbacks, peer-recovery preservation, and the firmware
+reconciliation fence. Side-specific pair 16 contains the fix; connected timing
+on that pair remains required to close this acceptance finding.

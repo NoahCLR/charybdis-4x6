@@ -777,34 +777,38 @@ static void test_logical_master_queue_fences_reconciliation_until_accept(void) {
     noah_qmk_via_logical_status_t status;
     noah_qmk_via_sync_frame_t begin = {
         .kind       = NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_BEGIN,
-        .generation = 7u,
-        .digest     = UINT32_C(0x12345678),
+        .generation = 6u,
+        .digest     = 0u,
     };
     noah_qmk_via_sync_frame_t chunk = {
         .kind           = NOAH_QMK_VIA_SYNC_MESSAGE_PUSH_CHUNK,
         .region         = NOAH_QMK_VIA_SYNC_REGION_KEYMAP,
-        .generation     = 7u,
+        .generation     = 6u,
         .offset         = 0u,
         .region_length  = TEST_KEYMAP_SIZE,
-        .digest         = UINT32_C(0x12345678),
+        .digest         = 0u,
         .payload_length = TEST_KEYMAP_SIZE,
         .payload        = {0x91u, 0x92u, 0x93u},
     };
     noah_qmk_via_sync_frame_t verify = {
         .kind       = NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_VERIFY,
-        .generation = 7u,
-        .digest     = UINT32_C(0x12345678),
+        .generation = 6u,
+        .digest     = 0u,
     };
     noah_qmk_via_sync_frame_t accept = {
         .kind       = NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_ACCEPT,
-        .generation = 7u,
-        .digest     = UINT32_C(0x12345678),
+        .generation = 6u,
+        .digest     = 0u,
     };
 
     test_reset();
     test_init_ready();
     scan_many(0u, 2u);
     rpc_count = 0u;
+    peer_keymap[0] = chunk.payload[0];
+    peer_keymap[1] = chunk.payload[1];
+    peer_keymap[2] = chunk.payload[2];
+    begin.digest = chunk.digest = verify.digest = accept.digest = peer_digest();
 
     CHECK(noah_qmk_via_logical_submit(41u, &begin));
     CHECK(!noah_qmk_via_logical_submit(41u, &chunk));
@@ -831,7 +835,18 @@ static void test_logical_master_queue_fences_reconciliation_until_accept(void) {
     CHECK(noah_qmk_via_logical_status(&status));
     CHECK(status.state == NOAH_QMK_VIA_LOGICAL_ACCEPTED && status.operation_sequence == 4u);
     scan_at(2002u);
+    CHECK(rpc_count == 4u);
+    CHECK(!noah_qmk_via_logical_converged(6u, begin.digest));
+
+    memcpy(local_keymap, peer_keymap, sizeof(local_keymap));
+    noah_qmk_via_split_sync_note_mutation(NOAH_QMK_VIA_COMMAND_EFFECT_SPLIT_MIRROR);
+    scan_many(2003u, 4u);
+    CHECK(noah_qmk_via_sync_state_snapshot().metadata.generation == 6u);
+    CHECK(!noah_qmk_via_sync_state_snapshot().metadata.dirty);
     CHECK(rpc_count == 5u);
+    CHECK(noah_qmk_via_logical_converged(6u, begin.digest));
+    CHECK(noah_qmk_via_logical_status(&status));
+    CHECK(status.state == NOAH_QMK_VIA_LOGICAL_IDLE);
 }
 
 static void test_replacement_snapshot_restarts_in_progress_verification(void) {

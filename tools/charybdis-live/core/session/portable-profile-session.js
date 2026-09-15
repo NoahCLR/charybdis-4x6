@@ -1,5 +1,5 @@
 "use strict";
-const {readViaStorage, readRegion, changedRanges, viaStorageDigest, VIA_STORAGE} = require("../protocol/via-storage-v1");
+const {readViaStorage, readRegion, writeRegion, writeViaMacros, changedRanges, viaStorageDigest, VIA_STORAGE} = require("../protocol/via-storage-v1");
 const {readSettings, readStorageStatus, waitForStorage} = require("../protocol/portable-profile-v1");
 const {readProfileStatus, PROFILE_ACTIVE_KIND} = require("../protocol/profile-wire-v1");
 const {readCommittedPayload, readCompiledPayload} = require("../protocol/profile-payload-v1");
@@ -74,6 +74,35 @@ async function verifyRanges(connection, readStored, command, target, ranges, {ve
         if (actual[0] !== target.at(-1)) throw fail("RESTORE_VERIFY_FAILED", "Layout or macro readback did not match the imported profile.");
     }
 }
+
+async function rollForwardLocalStorage(connection, target, base, layoutRanges, macroRanges, onProgress) {
+    const layoutBytes = layoutRanges.reduce((sum, range) => sum + range.bytes.length, 0);
+    const macroBytes = macroRanges.reduce((sum, range) => sum + range.bytes.length, 0);
+    const total = layoutBytes + macroBytes || 2;
+    let completed = 0;
+    for (const range of layoutRanges) {
+        await writeRegion(connection, VIA_STORAGE.LAYOUT_WRITE, range.bytes, {
+            startOffset: range.offset,
+            onProgress: progress => onProgress(`Applying keyboard storage: ${completed + progress.completed} / ${total} bytes`),
+        });
+        completed += range.bytes.length;
+    }
+    if (macroRanges.length) {
+        await writeViaMacros(connection, target.macros, {
+            current: base.macros,
+            onProgress: progress => onProgress(`Applying keyboard storage: ${completed + progress.completed} / ${total} bytes`),
+        });
+        completed += macroBytes;
+    }
+    if (!layoutRanges.length && !macroRanges.length) {
+        // A custom-only change still advances the bound VIA generation. A
+        // verified no-op keycode write gives QMK's normal mutation tracker the
+        // durable generation transition without changing the layout.
+        await writeRegion(connection, VIA_STORAGE.LAYOUT_WRITE, target.layout.subarray(0, 2), {
+            onProgress: progress => onProgress(`Applying keyboard storage: ${progress.completed} / ${total} bytes`),
+        });
+    }
+}
 async function restoreProfile(connection, ids, capabilities, document, {expectedFingerprint, saveRecovery, baseSnapshot, onProgress = () => {}, operations = {}} = {}) {
     const startedAt = Date.now();
     requireReady(capabilities);
@@ -89,6 +118,7 @@ async function restoreProfile(connection, ids, capabilities, document, {expected
     const readProfile = operations.readProfile || readProfileStatus;
     const createCoordinator = operations.createCoordinator || ((c, options) => new CandidateUploadCoordinator(c, options));
     const createViaCoordinator = operations.createViaCoordinator || ((c, options) => new LogicalViaStageCoordinator(c, options));
+    const rollForwardLocal = operations.rollForwardLocal || rollForwardLocalStorage;
     if (typeof saveRecovery !== "function") throw fail("RECOVERY_REQUIRED", "Save a recovery copy before restoring this keyboard.");
     let before;
     if (baseSnapshot?.document && baseSnapshot.identity && (!expectedFingerprint || baseSnapshot.fingerprint === expectedFingerprint)) {
@@ -114,7 +144,9 @@ async function restoreProfile(connection, ids, capabilities, document, {expected
     const expectedStorageDigest = viaStorageDigest(target);
     if (beforeIdentity.storageGeneration >= 0xffffffff) throw fail("STORAGE_GENERATION_EXHAUSTED", "The keyboard storage generation cannot advance safely.");
     const targetStorageGeneration = beforeIdentity.storageGeneration + 1;
-    let mutated = false, prepared;
+    const macroRanges = changedRanges(base.macros, target.macros, {end: target.macros.length - 1});
+    const layoutRanges = changedRanges(base.layout, target.layout);
+    let mutated = false, prepared, decisionObserved = false;
     try {
         prepared = await coordinator.upload(target.profile, {metadata: candidateMetadataForBlob(target.profile, {actionAbiDigest: capabilities.actionAbiDigest, viaGeneration: targetStorageGeneration, viaDigest: expectedStorageDigest}), verifyBase: async () => {
             const identity = await currentIdentity(connection, ids, {allowCandidate: true});
@@ -124,9 +156,13 @@ async function restoreProfile(connection, ids, capabilities, document, {expected
         onProgress("Staging changed keys and macros on the other half");
         await viaCoordinator.stage({transactionId: prepared.transactionId, generation: targetStorageGeneration, digest: expectedStorageDigest, target, current: base});
         onProgress("Publishing one complete profile to both halves");
-        await coordinator.commit(prepared.transactionId, {digest: prepared.metadata.digest});
-        const macroRanges = changedRanges(base.macros, target.macros, {end: target.macros.length - 1});
-        const layoutRanges = changedRanges(base.layout, target.layout);
+        await coordinator.commit(prepared.transactionId, {digest: prepared.metadata.digest, afterDecision: async () => {
+            decisionObserved = true;
+            onProgress("Waiting for the staged recovery copy");
+            await viaCoordinator.waitUntilAccepted({transactionId: prepared.transactionId, generation: targetStorageGeneration, digest: expectedStorageDigest});
+            onProgress("Applying changed keys and macros on the connected half");
+            await rollForwardLocal(connection, target, base, layoutRanges, macroRanges, onProgress);
+        }});
         const macroBytes = macroRanges.reduce((sum, range) => sum + range.bytes.length, 0);
         const layoutBytes = layoutRanges.reduce((sum, range) => sum + range.bytes.length, 0);
         const macroWriteNeeded = macroRanges.length > 0 || base.macros.at(-1) !== target.macros.at(-1);
@@ -140,7 +176,7 @@ async function restoreProfile(connection, ids, capabilities, document, {expected
         return {document, fingerprint: resultFingerprint, summary: summary(document), status, identity: snapshotIdentity(status, storageAfter, encodeSettings(target.settings)), recovery,
             performance: {elapsedMs: Date.now() - startedAt, baseSource: before === baseSnapshot ? "verified-cache" : "device-read", layoutBytes, macroBytes, viaConfigReports: 1, layoutReports: layoutRanges.reduce((sum, range) => sum + Math.ceil(range.bytes.length / 12), 0), macroReports: macroWriteNeeded ? macroRanges.reduce((sum, range) => sum + Math.ceil(range.bytes.length / 12), 0) : 0}};
     } catch (error) {
-        if (prepared) {
+        if (prepared && !decisionObserved) {
             try { await viaCoordinator.abort({transactionId: prepared.transactionId, generation: targetStorageGeneration, digest: expectedStorageDigest}); } catch {}
             try { await coordinator.abort(prepared.transactionId); } catch {}
         }

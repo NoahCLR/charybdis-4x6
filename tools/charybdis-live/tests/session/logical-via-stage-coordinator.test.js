@@ -35,3 +35,19 @@ test("coordinator stages only changed VIA blocks and always restores config vali
     assert.deepEqual(chunks.map(request => request.readUInt16LE(6)), [0, 0, 12, 0, 12]);
     assert.equal(connection.state, LOGICAL_VIA_STATE.STAGED);
 });
+
+test("coordinator waits for the firmware-owned decision accept", async () => {
+    const connection = new Harness(); let id = 0;
+    connection.transactionId = 5; connection.generation = 6; connection.digest = 7;
+    connection.state = LOGICAL_VIA_STATE.STAGED;
+    let polls = 0;
+    const original = connection.request.bind(connection);
+    connection.request = async (...args) => {
+        if (args[0][0] === 8 && ++polls === 2) connection.state = LOGICAL_VIA_STATE.ACCEPTED;
+        return original(...args);
+    };
+    const coordinator = new LogicalViaStageCoordinator(connection, {requestIds: {next: () => ++id}, pollMs: 0});
+    const status = await coordinator.waitUntilAccepted({transactionId: 5, generation: 6, digest: 7});
+    assert.equal(status.state, LOGICAL_VIA_STATE.ACCEPTED);
+    assert.equal(polls, 2);
+});

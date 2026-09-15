@@ -150,8 +150,10 @@ Complete readback includes both macro banks and global policy defaults. All
 editors contribute to one local draft. Apply saves a recovery snapshot, stages
 only changed VIA blocks on the other half, prepares the custom profile on both
 halves, and then publishes one logical generation. Activation waits for stable
-custom and VIA identities on both halves. A reboot after the decision marker
-recovers the bound VIA generation before enabling the saved profile.
+custom and VIA identities on both halves. After the decision, Apply waits for
+the peer recovery copy and writes only changed VIA ranges to the USB half. A
+reboot after the decision marker recovers the bound VIA generation before
+enabling the saved profile.
 
 After updating the installed extension, reload VS Code and choose **Read from
 keyboard**. Firmware that already returns the profile needs no reflash for UI

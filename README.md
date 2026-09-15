@@ -345,7 +345,8 @@ only after the VIA and custom identities converge, and boot recovery finishes a
 decided transaction before enabling the saved profile. Apply also verifies and
 reuses the complete snapshot already loaded in the editor, checks the post-lease
 identity without rereading the whole macro bank, and transfers only changed VIA
-blocks. The transaction and recovery contract is specified in
+blocks to the peer staging copy and then to the USB half after the decision. The
+transaction and recovery contract is specified in
 [`docs/architecture/logical-profile-transaction-v1.md`](docs/architecture/logical-profile-transaction-v1.md).
 Build and flash both halves to enable atomic complete-profile Apply. Physical
 power-loss acceptance across every decision boundary is still in progress, so

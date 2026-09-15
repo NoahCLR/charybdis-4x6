@@ -1297,6 +1297,21 @@ bool noah_qmk_via_split_sync_matrix_scan_step(void) {
         // direction while that transaction is live.
         return false;
     }
+    if (noah_qmk_via_logical.status.state == NOAH_QMK_VIA_LOGICAL_ACCEPTED) {
+        noah_qmk_via_sync_state_snapshot_t local = noah_qmk_via_sync_state_snapshot();
+        shared = noah_qmk_via_shared_snapshot();
+        if (!noah_qmk_via_local_state_is_clean(local, shared) || local.metadata.generation != noah_qmk_via_logical.status.generation || shared.digest != noah_qmk_via_logical.status.digest) {
+            // The decision marker is durable and the peer owns the recovery
+            // copy. Hold ordinary reconciliation while the host applies only
+            // its changed VIA ranges to this USB half. A reboot intentionally
+            // clears this volatile fence and boot recovery can pull the peer's
+            // complete copy if the host disappeared mid-roll-forward.
+            return false;
+        }
+        ATOMIC_BLOCK_RESTORESTATE {
+            noah_qmk_via_logical.status.state = NOAH_QMK_VIA_LOGICAL_IDLE;
+        }
+    }
     if (!master || noah_qmk_via_tx_phase == NOAH_QMK_VIA_TX_PULL_VERIFY) {
         if (noah_qmk_via_tx_phase == NOAH_QMK_VIA_TX_PULL_VERIFY && shared.digest_valid) {
             if (shared.digest == noah_qmk_via_tx_digest && noah_qmk_via_sync_state_accept_remote(noah_qmk_via_tx_generation)) {

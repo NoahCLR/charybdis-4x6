@@ -56,6 +56,20 @@ class LogicalViaStageCoordinator {
         return this.operation(buildLogicalViaVerifyRequest(transactionId, generation, digest), transactionId, [LOGICAL_VIA_STATE.STAGED]);
     }
 
+    async waitUntilAccepted({transactionId, generation, digest}) {
+        const deadline = Date.now() + this.timeoutMs;
+        do {
+            const status = await readLogicalViaStatus(this.connection, {nextRequestId: () => this.requestIds.next()});
+            const exact = status.transactionId === transactionId && status.generation === generation && status.digest === digest;
+            if (status.state === LOGICAL_VIA_STATE.ERROR) throw Object.assign(new Error(`Peer VIA acceptance failed with status ${status.lastStatus}.`), {code: "LOGICAL_VIA_ACCEPT_FAILED", status});
+            // IDLE with the exact retained identity means firmware already
+            // released the normal-reconciliation fence after local roll-forward.
+            if (exact && !status.pending && [LOGICAL_VIA_STATE.ACCEPTED, LOGICAL_VIA_STATE.IDLE].includes(status.state)) return status;
+            await delay(this.pollMs);
+        } while (Date.now() < deadline);
+        throw Object.assign(new Error("Timed out waiting for the staged VIA profile to become the recovery authority."), {code: "LOGICAL_VIA_ACCEPT_TIMEOUT"});
+    }
+
     async abort({transactionId, generation, digest}) {
         return this.operation(buildLogicalViaAbortRequest(transactionId, generation, digest), transactionId, [LOGICAL_VIA_STATE.ABORTED]);
     }
