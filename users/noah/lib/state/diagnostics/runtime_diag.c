@@ -109,7 +109,7 @@ static void noah_runtime_cadence_increment_u16(uint16_t *value) {
 
 static void noah_runtime_cadence_store_current(void) {
     noah_runtime_cadence_state.completed[noah_runtime_cadence_state.next_window] = noah_runtime_cadence_state.current;
-    noah_runtime_cadence_state.next_window = (uint8_t)((noah_runtime_cadence_state.next_window + 1u) % NOAH_RUNTIME_CADENCE_WINDOW_COUNT);
+    noah_runtime_cadence_state.next_window                                       = (uint8_t)((noah_runtime_cadence_state.next_window + 1u) % NOAH_RUNTIME_CADENCE_WINDOW_COUNT);
     if (noah_runtime_cadence_state.completed_count < NOAH_RUNTIME_CADENCE_WINDOW_COUNT) {
         noah_runtime_cadence_state.completed_count++;
     }
@@ -190,10 +190,10 @@ bool noah_runtime_cadence_wire_page(uint8_t page, uint8_t payload[NOAH_RUNTIME_C
     noah_runtime_cadence_write_u32(payload, sequence);
     payload[4] = 0xffu;
     if ((uint8_t)(page - 1u) < noah_runtime_cadence_state.completed_count) {
-        uint8_t logical_index = (uint8_t)(page - 1u);
-        uint8_t oldest        = (uint8_t)((noah_runtime_cadence_state.next_window + NOAH_RUNTIME_CADENCE_WINDOW_COUNT - noah_runtime_cadence_state.completed_count) % NOAH_RUNTIME_CADENCE_WINDOW_COUNT);
-        uint8_t stored        = (uint8_t)((oldest + logical_index) % NOAH_RUNTIME_CADENCE_WINDOW_COUNT);
-        const noah_runtime_cadence_window_t *window = &noah_runtime_cadence_state.completed[stored];
+        uint8_t                              logical_index = (uint8_t)(page - 1u);
+        uint8_t                              oldest        = (uint8_t)((noah_runtime_cadence_state.next_window + NOAH_RUNTIME_CADENCE_WINDOW_COUNT - noah_runtime_cadence_state.completed_count) % NOAH_RUNTIME_CADENCE_WINDOW_COUNT);
+        uint8_t                              stored        = (uint8_t)((oldest + logical_index) % NOAH_RUNTIME_CADENCE_WINDOW_COUNT);
+        const noah_runtime_cadence_window_t *window        = &noah_runtime_cadence_state.completed[stored];
 
         payload[4] = logical_index;
         noah_runtime_cadence_write_u32(&payload[5], window->max_pointing_gap_us);

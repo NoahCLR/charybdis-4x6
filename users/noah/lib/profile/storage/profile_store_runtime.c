@@ -81,13 +81,13 @@ void noah_profile_store_runtime_init(void) {
     discovery_result             = NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE;
 #    if defined(VIA_ENABLE) && defined(SPLIT_KEYBOARD) && defined(SPLIT_TRANSACTION_IDS_USER)
     if (!noah_qmk_physical_half_origin(&origin) || !noah_profile_owner_init(&runtime_owner, &(noah_profile_owner_config_t){
-            .store_io                = noah_qmk_profile_eeprom_io(),
-            .split_exchange          = noah_qmk_profile_split_transport_exchange,
-            .split_transport_context = NULL,
-            .origin_half             = origin,
-            .peer_required           = true,
-            .logical_via             = &runtime_logical_via_ops,
-        })) {
+                                                                                                .store_io                = noah_qmk_profile_eeprom_io(),
+                                                                                                .split_exchange          = noah_qmk_profile_split_transport_exchange,
+                                                                                                .split_transport_context = NULL,
+                                                                                                .origin_half             = origin,
+                                                                                                .peer_required           = true,
+                                                                                                .logical_via             = &runtime_logical_via_ops,
+                                                                                            })) {
         runtime_integration_error = true;
         runtime_state             = NOAH_PROFILE_STORE_RUNTIME_INTEGRATION_ERROR;
         return;
@@ -257,10 +257,10 @@ bool noah_profile_store_runtime_read_committed(uint16_t offset, uint8_t *target,
 // compiled digest walks the authored tables, and nothing on the scan path
 // needs it. One open is enough, since the compiled bytes cannot change at
 // runtime.
-static bool                        compiled_opened;
-static bool                        compiled_valid;
-static noah_profile_compiled_v1_t  compiled_profile;
-static noah_profile_reader_t       compiled_reader;
+static bool                       compiled_opened;
+static bool                       compiled_valid;
+static noah_profile_compiled_v1_t compiled_profile;
+static noah_profile_reader_t      compiled_reader;
 
 static bool ensure_compiled_open(void) {
     if (!compiled_opened) {

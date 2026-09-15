@@ -134,16 +134,21 @@ static bool combo_metadata(uint8_t out[25]) {
         if (!combo_row(index, row)) return false;
         digest = noah_profile_fnv1a_update(digest, row, sizeof(row));
     }
-    for (uint8_t byte = 0u; byte < 4u; byte++) out[14u + byte] = (uint8_t)(digest >> (8u * byte));
+    for (uint8_t byte = 0u; byte < 4u; byte++)
+        out[14u + byte] = (uint8_t)(digest >> (8u * byte));
     return true;
 }
 
 bool noah_qmk_combo_readback_get(uint8_t *report, uint8_t length) {
     if (!report || length != 32u || report[0] != 0x08u || report[1] != 0u || report[2] != NOAH_PROFILE_WIRE_V1_VALUE_COMBOS) return false;
     bool valid = report[3] != 0u;
-    for (uint8_t byte = 5u; byte < 32u; byte++) valid = valid && report[byte] == 0u;
+    for (uint8_t byte = 5u; byte < 32u; byte++)
+        valid = valid && report[byte] == 0u;
     memset(&report[5], 0, 27u);
-    if (!valid) {report[5] = NOAH_PROFILE_WIRE_V1_STATUS_MALFORMED; return true;}
+    if (!valid) {
+        report[5] = NOAH_PROFILE_WIRE_V1_STATUS_MALFORMED;
+        return true;
+    }
     if (!combo_metadata(&report[7])) {
         memset(&report[7], 0, 25u);
         report[5] = NOAH_PROFILE_WIRE_V1_STATUS_UNAVAILABLE;

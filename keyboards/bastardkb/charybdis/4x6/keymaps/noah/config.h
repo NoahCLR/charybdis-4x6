@@ -26,7 +26,9 @@ enum charybdis_keymap_layers {
     LAYER_SYM,      // Symbols, brackets, and DPI controls
     LAYER_NAV,      // Navigation, media, macros, and mouse buttons (current sniping layer)
     LAYER_POINTER,  // Dedicated pointer layout; default auto-mouse target layer
-    LAYER_EXTRA_1, LAYER_EXTRA_2, LAYER_EXTRA_3,
+    LAYER_EXTRA_1,
+    LAYER_EXTRA_2,
+    LAYER_EXTRA_3,
     // ─── Add new layers above this line. ───────────────────────────────────
     LAYER_COUNT = NOAH_LAYER_BANK_COUNT, // sentinel — used for VIA Dynamic layer count
 };

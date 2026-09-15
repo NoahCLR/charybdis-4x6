@@ -204,11 +204,11 @@ static noah_effective_profile_result_t request_snapshot(noah_effective_profile_p
 }
 
 noah_effective_profile_result_t noah_effective_profile_provider_request_validated(noah_effective_profile_provider_t *provider, const noah_effective_profile_snapshot_t *snapshot) {
-    noah_effective_profile_result_t result;
+    noah_effective_profile_result_t          result;
     const noah_effective_profile_identity_t *active;
-    noah_effective_profile_backing_t          candidate_backing;
-    noah_effective_profile_backing_t          active_backing;
-    noah_effective_profile_backing_t          compiled_backing;
+    noah_effective_profile_backing_t         candidate_backing;
+    noah_effective_profile_backing_t         active_backing;
+    noah_effective_profile_backing_t         compiled_backing;
 
     result = mutation_guard(provider);
     if (result != NOAH_EFFECTIVE_PROFILE_OK) {
@@ -385,7 +385,7 @@ noah_effective_profile_result_t noah_effective_profile_provider_poll(noah_effect
     next_index = (uint8_t)(provider->active_index ^ 1u);
 
     update_begin(provider);
-    provider->publication_in_progress = true;
+    provider->publication_in_progress  = true;
     provider->active_banks[next_index] = pending;
     provider->active_index             = next_index;
     memset(&provider->pending, 0, sizeof(provider->pending));
@@ -395,7 +395,7 @@ noah_effective_profile_result_t noah_effective_profile_provider_poll(noah_effect
     if (provider->publication_count != UINT32_MAX) {
         provider->publication_count++;
     }
-    active                            = provider->active_banks[provider->active_index].identity;
+    active = provider->active_banks[provider->active_index].identity;
 
     for (invalidator_index = 0u; invalidator_index < provider->invalidator_count; invalidator_index++) {
         provider->invalidators[invalidator_index].callback(provider->invalidators[invalidator_index].context, provider->publication_count, previous, active, &provider->active_banks[provider->active_index]);

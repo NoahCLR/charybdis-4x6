@@ -11,19 +11,18 @@ enum {
     ACTION_ABI_DIGEST = 0x11223344u,
 };
 
-static uint8_t eeprom_bytes[NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE];
-static uint32_t eeprom_read_calls;
-static uint32_t eeprom_write_calls;
-static uint16_t eeprom_last_read_length;
-static uint16_t eeprom_last_write_length;
-static uint32_t safe_boundary_reasons;
-static const uint8_t empty_profile[] = {'N', 'L', 'P', '1', 1u, 0u, 0u, 1u};
-static const uint8_t behavior_profile[] =
-    "\x4e\x4c\x50\x31\x01\x00\x01\x01\x20\x01\x3a\x00\x02\x03\x00\x00"
-    "\x20\x00\x01\x00\x34\x12\x96\x00\x90\x01\xaf\x00\x01\x02\x00\x02"
-    "\x03\x19\x01\x00\x28\x00\x02\x05\x06\x00\x0a\x00\x02\x00\x03\x00"
-    "\x03\x00\x12\x00\x04\x00\x02\x00\x00\x00\x00\x00\x00\x00\x00\x01"
-    "\x01\x01\x07\x00\x02\x00";
+static uint8_t       eeprom_bytes[NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE];
+static uint32_t      eeprom_read_calls;
+static uint32_t      eeprom_write_calls;
+static uint16_t      eeprom_last_read_length;
+static uint16_t      eeprom_last_write_length;
+static uint32_t      safe_boundary_reasons;
+static const uint8_t empty_profile[]    = {'N', 'L', 'P', '1', 1u, 0u, 0u, 1u};
+static const uint8_t behavior_profile[] = "\x4e\x4c\x50\x31\x01\x00\x01\x01\x20\x01\x3a\x00\x02\x03\x00\x00"
+                                          "\x20\x00\x01\x00\x34\x12\x96\x00\x90\x01\xaf\x00\x01\x02\x00\x02"
+                                          "\x03\x19\x01\x00\x28\x00\x02\x05\x06\x00\x0a\x00\x02\x00\x03\x00"
+                                          "\x03\x00\x12\x00\x04\x00\x02\x00\x00\x00\x00\x00\x00\x00\x00\x01"
+                                          "\x01\x01\x07\x00\x02\x00";
 
 static uint32_t always_safe(void *context) {
     (void)context;
@@ -118,11 +117,12 @@ static noah_profile_candidate_v1_status_t transaction_status(const noah_profile_
 static void init_store(noah_profile_store_t *store) {
     noah_profile_store_record_t selected;
 
-    noah_profile_store_init(store, (noah_profile_store_io_t){
-                                         .read    = memory_read,
-                                         .write   = memory_write,
-                                         .context = eeprom_bytes,
-                                     },
+    noah_profile_store_init(store,
+                            (noah_profile_store_io_t){
+                                .read    = memory_read,
+                                .write   = memory_write,
+                                .context = eeprom_bytes,
+                            },
                             (noah_profile_store_compatibility_t){
                                 .schema_major            = NOAH_PROFILE_STORE_SCHEMA_MAJOR,
                                 .schema_minor            = NOAH_PROFILE_STORE_SCHEMA_MINOR,
@@ -276,9 +276,9 @@ static void test_activation_request_retries_after_transient_provider_reuse(void)
     uint8_t                                unrelated_bytes[1] = {0u};
     noah_profile_reader_t                  unrelated_reader   = noah_profile_reader_from_memory(unrelated_bytes, sizeof(unrelated_bytes));
     noah_effective_profile_backing_t       unrelated_backing  = {
-              .reader      = unrelated_reader,
-              .base_offset = 0u,
-              .byte_length = sizeof(unrelated_bytes),
+        .reader      = unrelated_reader,
+        .base_offset = 0u,
+        .byte_length = sizeof(unrelated_bytes),
     };
 
     memset(eeprom_bytes, 0xff, sizeof(eeprom_bytes));
@@ -332,23 +332,23 @@ static void test_checksum_rejection_and_abort_preserve_last_known_good(void) {
 }
 
 static void test_committed_view_keeps_its_slot_when_next_candidate_starts(void) {
-    noah_profile_store_t                     store;
-    noah_profile_candidate_store_backend_t   backend;
-    noah_effective_profile_provider_t        provider;
-    noah_profile_candidate_backend_t         interface;
-    noah_profile_candidate_v1_metadata_t     first_metadata = metadata_for(behavior_profile, sizeof(behavior_profile) - 1u);
-    noah_profile_candidate_v1_metadata_t     next_metadata  = metadata_for(empty_profile, sizeof(empty_profile));
-    noah_profile_candidate_v1_error_t        error          = noah_profile_candidate_v1_no_error();
-    noah_profile_validator_v1_profile_t      retained;
-    noah_key_behavior_row_v1_view_t          row;
-    noah_profile_codec_v1_error_t            codec_error;
+    noah_profile_store_t                   store;
+    noah_profile_candidate_store_backend_t backend;
+    noah_effective_profile_provider_t      provider;
+    noah_profile_candidate_backend_t       interface;
+    noah_profile_candidate_v1_metadata_t   first_metadata = metadata_for(behavior_profile, sizeof(behavior_profile) - 1u);
+    noah_profile_candidate_v1_metadata_t   next_metadata  = metadata_for(empty_profile, sizeof(empty_profile));
+    noah_profile_candidate_v1_error_t      error          = noah_profile_candidate_v1_no_error();
+    noah_profile_validator_v1_profile_t    retained;
+    noah_key_behavior_row_v1_view_t        row;
+    noah_profile_codec_v1_error_t          codec_error;
 
     memset(eeprom_bytes, 0xff, sizeof(eeprom_bytes));
     init_store(&store);
     init_backend(&backend, &store, &provider, init_provider(&provider));
     backend.compatibility.allowed_domain_mask = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS;
-    interface = noah_profile_candidate_store_backend_interface(&backend);
-    first_metadata.requested_domains = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS;
+    interface                                 = noah_profile_candidate_store_backend_interface(&backend);
+    first_metadata.requested_domains          = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS;
 
     assert(interface.begin(interface.context, &first_metadata) == NOAH_PROFILE_CANDIDATE_BACKEND_OK);
     for (uint16_t offset = 0u; offset < first_metadata.payload_length;) {
@@ -432,10 +432,10 @@ static void test_scan_owner_composes_bounded_commit_and_safe_activation(void) {
 
     memset(eeprom_bytes, 0xff, sizeof(eeprom_bytes));
     eeprom_read_calls = eeprom_write_calls = 0u;
-    safe_boundary_reasons = 0u;
+    safe_boundary_reasons                  = 0u;
     init_store(&store);
     init_backend(&backend, &store, &provider, init_provider(&provider));
-    interface = noah_profile_candidate_store_backend_interface(&backend);
+    interface     = noah_profile_candidate_store_backend_interface(&backend);
     compatibility = (noah_profile_candidate_compatibility_t){
         .schema_major          = 1u,
         .schema_minor          = 0u,
@@ -491,20 +491,20 @@ static void test_scan_owner_composes_bounded_commit_and_safe_activation(void) {
 }
 
 static void test_reboot_adopts_committed_profile_through_bounded_validator(void) {
-    noah_profile_store_t                   store;
-    noah_profile_store_t                   rebooted;
-    noah_profile_candidate_store_backend_t backend;
-    noah_profile_candidate_store_backend_t rebooted_backend;
-    noah_effective_profile_provider_t      provider;
-    noah_effective_profile_provider_t      rebooted_provider;
-    noah_profile_candidate_backend_t       interface;
-    noah_profile_candidate_v1_metadata_t   metadata = metadata_for(empty_profile, sizeof(empty_profile));
-    noah_profile_candidate_v1_error_t      error    = noah_profile_candidate_v1_no_error();
+    noah_profile_store_t                    store;
+    noah_profile_store_t                    rebooted;
+    noah_profile_candidate_store_backend_t  backend;
+    noah_profile_candidate_store_backend_t  rebooted_backend;
+    noah_effective_profile_provider_t       provider;
+    noah_effective_profile_provider_t       rebooted_provider;
+    noah_profile_candidate_backend_t        interface;
+    noah_profile_candidate_v1_metadata_t    metadata = metadata_for(empty_profile, sizeof(empty_profile));
+    noah_profile_candidate_v1_error_t       error    = noah_profile_candidate_v1_no_error();
     noah_profile_candidate_backend_result_t result;
-    noah_profile_store_record_t            selected;
-    noah_effective_profile_status_t        status;
-    uint32_t                               compiled_digest;
-    uint16_t                               steps = 0u;
+    noah_profile_store_record_t             selected;
+    noah_effective_profile_status_t         status;
+    uint32_t                                compiled_digest;
+    uint16_t                                steps = 0u;
 
     memset(eeprom_bytes, 0xff, sizeof(eeprom_bytes));
     init_store(&store);
@@ -517,7 +517,7 @@ static void test_reboot_adopts_committed_profile_through_bounded_validator(void)
     assert(noah_profile_store_boot_select(&rebooted, &selected) == NOAH_PROFILE_STORE_OK);
     init_backend(&rebooted_backend, &rebooted, &rebooted_provider, init_provider(&rebooted_provider));
     eeprom_write_calls = 0u;
-    result = noah_profile_candidate_store_backend_adopt_committed_begin(&rebooted_backend, &selected, &error);
+    result             = noah_profile_candidate_store_backend_adopt_committed_begin(&rebooted_backend, &selected, &error);
     assert(result == NOAH_PROFILE_CANDIDATE_BACKEND_IN_PROGRESS);
     while (result == NOAH_PROFILE_CANDIDATE_BACKEND_IN_PROGRESS) {
         uint32_t reads_before = eeprom_read_calls;
@@ -595,7 +595,7 @@ static void test_host_and_peer_share_one_explicit_admission_lease(void) {
     compiled_digest = init_provider(&provider);
     init_backend(&backend, &store, &provider, compiled_digest);
     interface = noah_profile_candidate_store_backend_interface(&backend);
-    exact = (noah_profile_store_candidate_t){
+    exact     = (noah_profile_store_candidate_t){
         .schema_major            = metadata.schema_major,
         .schema_minor            = metadata.schema_minor,
         .domain_mask             = metadata.requested_domains,
@@ -639,7 +639,7 @@ static void test_owner_activation_api_checks_lease_and_exposes_exact_commit(void
     compiled_digest = init_provider(&provider);
     init_backend(&backend, &store, &provider, compiled_digest);
     interface = noah_profile_candidate_store_backend_interface(&backend);
-    exact = (noah_profile_store_candidate_t){
+    exact     = (noah_profile_store_candidate_t){
         .schema_major            = metadata.schema_major,
         .schema_minor            = metadata.schema_minor,
         .domain_mask             = metadata.requested_domains,

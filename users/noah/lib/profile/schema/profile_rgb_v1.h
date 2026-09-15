@@ -10,32 +10,32 @@
 #include "profile_reader.h"
 
 enum {
-    NOAH_PROFILE_RGB_V1_DOMAIN_ID               = NOAH_PROFILE_DOMAIN_V1_RGB,
-    NOAH_PROFILE_RGB_V1_DOMAIN_VERSION          = NOAH_PROFILE_DOMAIN_V1_RGB_VERSION,
-    NOAH_PROFILE_RGB_V1_FORMAT_VERSION          = 1u,
-    NOAH_PROFILE_RGB_V1_HEADER_SIZE             = 16u,
-    NOAH_PROFILE_RGB_V1_PHYSICAL_LED_COUNT      = 58u,
-    NOAH_PROFILE_RGB_V1_LED_BITMAP_SIZE         = 8u,
-    NOAH_PROFILE_RGB_V1_MAX_GROUPS              = 16u,
-    NOAH_PROFILE_RGB_V1_MAX_LOGICAL_LAYERS      = 8u,
-    NOAH_PROFILE_RGB_V1_MAX_PD_MODES            = 6u,
-    NOAH_PROFILE_RGB_V1_MAX_STAGE_GROUP_ROWS    = 32u,
-    NOAH_PROFILE_RGB_V1_MAX_TAP_BRANCH_COLORS   = 4u,
-    NOAH_PROFILE_RGB_V1_MAX_PAYLOAD_SIZE        = NOAH_PROFILE_BLOB_V1_MAX_SIZE - NOAH_PROFILE_BLOB_V1_HEADER_SIZE - NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE,
-    NOAH_PROFILE_RGB_V1_SELECTOR_ALL            = 0xffu,
-    NOAH_PROFILE_RGB_V1_STAGE_LAYER             = 1u << 0,
-    NOAH_PROFILE_RGB_V1_STAGE_AUTOMOUSE         = 1u << 1,
-    NOAH_PROFILE_RGB_V1_STAGE_PD_MODE           = 1u << 2,
-    NOAH_PROFILE_RGB_V1_STAGE_COMBO             = 1u << 3,
-    NOAH_PROFILE_RGB_V1_STAGE_KEY_BEHAVIOR      = 1u << 4,
-    NOAH_PROFILE_RGB_V1_STAGE_MASK_ALL          = 0x1fu,
-    NOAH_PROFILE_RGB_V1_PD_MODE_MASK_ALL        = 0x3fu,
+    NOAH_PROFILE_RGB_V1_DOMAIN_ID             = NOAH_PROFILE_DOMAIN_V1_RGB,
+    NOAH_PROFILE_RGB_V1_DOMAIN_VERSION        = NOAH_PROFILE_DOMAIN_V1_RGB_VERSION,
+    NOAH_PROFILE_RGB_V1_FORMAT_VERSION        = 1u,
+    NOAH_PROFILE_RGB_V1_HEADER_SIZE           = 16u,
+    NOAH_PROFILE_RGB_V1_PHYSICAL_LED_COUNT    = 58u,
+    NOAH_PROFILE_RGB_V1_LED_BITMAP_SIZE       = 8u,
+    NOAH_PROFILE_RGB_V1_MAX_GROUPS            = 16u,
+    NOAH_PROFILE_RGB_V1_MAX_LOGICAL_LAYERS    = 8u,
+    NOAH_PROFILE_RGB_V1_MAX_PD_MODES          = 6u,
+    NOAH_PROFILE_RGB_V1_MAX_STAGE_GROUP_ROWS  = 32u,
+    NOAH_PROFILE_RGB_V1_MAX_TAP_BRANCH_COLORS = 4u,
+    NOAH_PROFILE_RGB_V1_MAX_PAYLOAD_SIZE      = NOAH_PROFILE_BLOB_V1_MAX_SIZE - NOAH_PROFILE_BLOB_V1_HEADER_SIZE - NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE,
+    NOAH_PROFILE_RGB_V1_SELECTOR_ALL          = 0xffu,
+    NOAH_PROFILE_RGB_V1_STAGE_LAYER           = 1u << 0,
+    NOAH_PROFILE_RGB_V1_STAGE_AUTOMOUSE       = 1u << 1,
+    NOAH_PROFILE_RGB_V1_STAGE_PD_MODE         = 1u << 2,
+    NOAH_PROFILE_RGB_V1_STAGE_COMBO           = 1u << 3,
+    NOAH_PROFILE_RGB_V1_STAGE_KEY_BEHAVIOR    = 1u << 4,
+    NOAH_PROFILE_RGB_V1_STAGE_MASK_ALL        = 0x1fu,
+    NOAH_PROFILE_RGB_V1_PD_MODE_MASK_ALL      = 0x3fu,
     // Validation performs at most one reader call per step. The v1 header is
     // the largest record; the remaining records are at most 11 bytes.
-    NOAH_PROFILE_RGB_V1_VALIDATION_READ_MAX     = 20u,
+    NOAH_PROFILE_RGB_V1_VALIDATION_READ_MAX = 20u,
     // Payload-independent 32-bit representation regression policies. These
     // are not statements of RP2040 hardware capacity.
-    NOAH_PROFILE_RGB_V1_EMBEDDED_VIEW_BUDGET    = 40u,
+    NOAH_PROFILE_RGB_V1_EMBEDDED_VIEW_BUDGET       = 40u,
     NOAH_PROFILE_RGB_V1_EMBEDDED_VALIDATION_BUDGET = 72u,
 };
 
@@ -168,19 +168,19 @@ typedef struct {
 // NOAH_PROFILE_RGB_V1_EMBEDDED_VIEW_BUDGET; host pointers are intentionally
 // wider. Accessors copy only one fixed-size record at a time.
 typedef struct {
-    noah_profile_reader_t         reader;
-    size_t                        base_offset;
-    uint16_t                      byte_length;
-    uint16_t                      stage_enable_mask;
-    uint8_t                       group_count;
-    uint8_t                       layer_color_count;
-    uint8_t                       layer_group_count;
-    uint8_t                       pd_color_count;
-    uint8_t                       pd_group_count;
-    uint8_t                       combo_group_count;
-    uint8_t                       tap_branch_color_count;
-    uint8_t                       key_group_count;
-    noah_profile_rgb_v1_limits_t  limits;
+    noah_profile_reader_t        reader;
+    size_t                       base_offset;
+    uint16_t                     byte_length;
+    uint16_t                     stage_enable_mask;
+    uint8_t                      group_count;
+    uint8_t                      layer_color_count;
+    uint8_t                      layer_group_count;
+    uint8_t                      pd_color_count;
+    uint8_t                      pd_group_count;
+    uint8_t                      combo_group_count;
+    uint8_t                      tap_branch_color_count;
+    uint8_t                      key_group_count;
+    noah_profile_rgb_v1_limits_t limits;
 } noah_profile_rgb_v1_view_t;
 
 typedef enum {

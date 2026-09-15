@@ -174,17 +174,17 @@ static noah_profile_peer_store_result_t begin_with_binding(noah_profile_peer_sto
     }
 
     peer->metadata = (noah_profile_candidate_v1_metadata_t){
-        .schema_major      = descriptor->schema_major,
-        .schema_minor      = descriptor->schema_minor,
-        .requested_domains = descriptor->domain_mask,
-        .flags             = 0u,
-        .payload_length    = descriptor->payload_length,
-        .crc32             = descriptor->payload_crc32,
-        .digest            = descriptor->payload_digest,
-        .action_abi_digest = descriptor->action_abi_digest,
+        .schema_major         = descriptor->schema_major,
+        .schema_minor         = descriptor->schema_minor,
+        .requested_domains    = descriptor->domain_mask,
+        .flags                = 0u,
+        .payload_length       = descriptor->payload_length,
+        .crc32                = descriptor->payload_crc32,
+        .digest               = descriptor->payload_digest,
+        .action_abi_digest    = descriptor->action_abi_digest,
         .store_format_version = format_version,
-        .via_generation    = via_generation,
-        .via_digest        = via_digest,
+        .via_generation       = via_generation,
+        .via_digest           = via_digest,
     };
     candidate = (noah_profile_store_candidate_t){
         .format_version          = format_version,
@@ -272,7 +272,7 @@ noah_profile_peer_store_result_t noah_profile_peer_store_backend_commit_begin(no
     }
 
     peer->auto_commit = true;
-    result = peer->interface.validation_begin(peer->interface.context, &peer->metadata, &peer->validation_error);
+    result            = peer->interface.validation_begin(peer->interface.context, &peer->metadata, &peer->validation_error);
     if (result == NOAH_PROFILE_CANDIDATE_BACKEND_IN_PROGRESS) {
         peer->state  = NOAH_PROFILE_PEER_STORE_VALIDATING;
         peer->result = NOAH_PROFILE_PEER_STORE_IN_PROGRESS;
@@ -297,7 +297,7 @@ noah_profile_peer_store_result_t noah_profile_peer_store_backend_prepare_durable
         return state_result(peer);
     }
     peer->auto_commit = false;
-    result = peer->interface.validation_begin(peer->interface.context, &peer->metadata, &peer->validation_error);
+    result            = peer->interface.validation_begin(peer->interface.context, &peer->metadata, &peer->validation_error);
     if (result == NOAH_PROFILE_CANDIDATE_BACKEND_IN_PROGRESS) {
         peer->state  = NOAH_PROFILE_PEER_STORE_VALIDATING;
         peer->result = NOAH_PROFILE_PEER_STORE_IN_PROGRESS;

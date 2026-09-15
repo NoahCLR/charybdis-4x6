@@ -12,11 +12,11 @@ enum {
     NOAH_PROFILE_STORE_FORMAT_VERSION_LEGACY  = 1u,
     NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL = 2u,
     NOAH_PROFILE_STORE_FORMAT_VERSION         = NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL,
-    NOAH_PROFILE_STORE_SCHEMA_MAJOR   = 1u,
-    NOAH_PROFILE_STORE_SCHEMA_MINOR   = 0u,
-    NOAH_PROFILE_STORE_IO_CHUNK_MAX   = 32u,
-    NOAH_PROFILE_STORE_FLAG_OVERRIDE  = 1u << 0,
-    NOAH_PROFILE_STORE_ALLOWED_FLAGS  = NOAH_PROFILE_STORE_FLAG_OVERRIDE,
+    NOAH_PROFILE_STORE_SCHEMA_MAJOR           = 1u,
+    NOAH_PROFILE_STORE_SCHEMA_MINOR           = 0u,
+    NOAH_PROFILE_STORE_IO_CHUNK_MAX           = 32u,
+    NOAH_PROFILE_STORE_FLAG_OVERRIDE          = 1u << 0,
+    NOAH_PROFILE_STORE_ALLOWED_FLAGS          = NOAH_PROFILE_STORE_FLAG_OVERRIDE,
     // Regression policy for the persistent store's complete writable state
     // on the 32-bit RP2040 target. This is not a physical SRAM limit.
     NOAH_PROFILE_STORE_STATE_BUDGET_32BIT = 384u,
@@ -163,39 +163,39 @@ typedef struct {
             noah_profile_store_record_t boot_current;
         };
     };
-    noah_profile_slot_t                candidate_slot;
-    uint16_t                           candidate_written;
-    uint32_t                           candidate_crc32_state;
-    uint32_t                           candidate_digest_state;
-    noah_profile_store_commit_phase_t  commit_phase;
-    uint16_t                           commit_offset;
-    uint32_t                           commit_crc32_state;
-    uint32_t                           commit_digest_state;
-    uint8_t                            commit_domain_count;
-    uint8_t                            commit_domain_index;
-    uint8_t                            commit_prior_domain;
-    uint8_t                            commit_domain_mask;
-    uint8_t                            commit_record_offset;
-    bool                               boot_scanned;
-    bool                               conflict;
-    bool                               reconciliation_required;
-    bool                               prepare_active;
-    bool                               prepared_durable;
-    bool                               auto_commit_prepared;
-    bool                               reuse_active;
-    uint8_t                            scratch[NOAH_PROFILE_STORE_IO_CHUNK_MAX];
-    noah_profile_store_result_t        boot_slot_a_result;
-    noah_profile_store_result_t        boot_slot_b_result;
-    noah_profile_store_result_t        boot_result;
-    noah_profile_store_boot_phase_t    boot_phase;
-    uint16_t                           boot_payload_start;
-    uint16_t                           boot_offset;
-    uint32_t                           boot_crc32_state;
-    uint32_t                           boot_digest_state;
-    uint8_t                            boot_domain_count;
-    uint8_t                            boot_domain_index;
-    uint8_t                            boot_prior_domain;
-    uint8_t                            boot_expected_domain_mask;
+    noah_profile_slot_t               candidate_slot;
+    uint16_t                          candidate_written;
+    uint32_t                          candidate_crc32_state;
+    uint32_t                          candidate_digest_state;
+    noah_profile_store_commit_phase_t commit_phase;
+    uint16_t                          commit_offset;
+    uint32_t                          commit_crc32_state;
+    uint32_t                          commit_digest_state;
+    uint8_t                           commit_domain_count;
+    uint8_t                           commit_domain_index;
+    uint8_t                           commit_prior_domain;
+    uint8_t                           commit_domain_mask;
+    uint8_t                           commit_record_offset;
+    bool                              boot_scanned;
+    bool                              conflict;
+    bool                              reconciliation_required;
+    bool                              prepare_active;
+    bool                              prepared_durable;
+    bool                              auto_commit_prepared;
+    bool                              reuse_active;
+    uint8_t                           scratch[NOAH_PROFILE_STORE_IO_CHUNK_MAX];
+    noah_profile_store_result_t       boot_slot_a_result;
+    noah_profile_store_result_t       boot_slot_b_result;
+    noah_profile_store_result_t       boot_result;
+    noah_profile_store_boot_phase_t   boot_phase;
+    uint16_t                          boot_payload_start;
+    uint16_t                          boot_offset;
+    uint32_t                          boot_crc32_state;
+    uint32_t                          boot_digest_state;
+    uint8_t                           boot_domain_count;
+    uint8_t                           boot_domain_index;
+    uint8_t                           boot_prior_domain;
+    uint8_t                           boot_expected_domain_mask;
 } noah_profile_store_t;
 
 void                        noah_profile_store_init(noah_profile_store_t *store, noah_profile_store_io_t io, noah_profile_store_compatibility_t compatibility);

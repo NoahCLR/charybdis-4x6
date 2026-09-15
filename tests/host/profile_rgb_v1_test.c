@@ -37,7 +37,10 @@ static bool fixture_value(const char *path, const char *key, char *value, size_t
         size_t length;
         if (strncmp(line, key, key_length) != 0 || line[key_length] != '=') continue;
         length = strcspn(&line[key_length + 1u], "\r\n");
-        if (length + 1u > capacity) { fclose(file); return false; }
+        if (length + 1u > capacity) {
+            fclose(file);
+            return false;
+        }
         memcpy(value, &line[key_length + 1u], length);
         value[length] = '\0';
         fclose(file);
@@ -79,11 +82,11 @@ static unsigned fixture_uint(const char *path, const char *key) {
 
 static noah_profile_rgb_v1_limits_t fixture_limits(const char *path) {
     noah_profile_rgb_v1_limits_t limits = noah_profile_rgb_v1_default_limits();
-    limits.compiled_stage_mask    = (uint16_t)fixture_uint(path, "codec.compiled_stage_mask");
-    limits.logical_layer_count    = (uint8_t)fixture_uint(path, "codec.logical_layer_count");
-    limits.maximum_brightness     = (uint8_t)fixture_uint(path, "codec.maximum_brightness");
-    limits.tap_branch_color_count = (uint8_t)fixture_uint(path, "codec.tap_branch_color_count");
-    limits.supported_pd_mode_mask = (uint8_t)fixture_uint(path, "codec.supported_pd_mode_mask");
+    limits.compiled_stage_mask          = (uint16_t)fixture_uint(path, "codec.compiled_stage_mask");
+    limits.logical_layer_count          = (uint8_t)fixture_uint(path, "codec.logical_layer_count");
+    limits.maximum_brightness           = (uint8_t)fixture_uint(path, "codec.maximum_brightness");
+    limits.tap_branch_color_count       = (uint8_t)fixture_uint(path, "codec.tap_branch_color_count");
+    limits.supported_pd_mode_mask       = (uint8_t)fixture_uint(path, "codec.supported_pd_mode_mask");
     return limits;
 }
 
@@ -104,7 +107,7 @@ static noah_profile_rgb_v1_validation_result_t drive_incremental(noah_profile_rg
     while (progress == NOAH_PROFILE_RGB_V1_VALIDATION_IN_PROGRESS) {
         size_t calls_before = context->calls;
         size_t bytes_before = context->bytes_read;
-        progress = noah_profile_rgb_v1_validation_step(validation, error);
+        progress            = noah_profile_rgb_v1_validation_step(validation, error);
         assert(context->calls - calls_before <= 1u);
         assert(context->bytes_read - bytes_before <= NOAH_PROFILE_RGB_V1_VALIDATION_READ_MAX);
         (*steps)++;
@@ -121,20 +124,20 @@ static void expect_decode(const uint8_t *bytes, size_t length, const noah_profil
 }
 
 static void test_shared_golden_and_accessors(const char *fixture_path) {
-    uint8_t                       payload[TEST_BUFFER_SIZE];
-    size_t                        length = fixture_hex(fixture_path, "payload.hex", payload, sizeof(payload));
-    noah_profile_rgb_v1_limits_t  limits = fixture_limits(fixture_path);
-    noah_profile_rgb_v1_view_t    view;
-    noah_profile_rgb_v1_error_t   error;
-    noah_profile_rgb_v1_group_t   group;
-    noah_profile_rgb_v1_layer_color_t layer;
-    noah_profile_rgb_v1_group_row_t group_row;
-    noah_profile_rgb_v1_automouse_t automouse;
-    noah_profile_rgb_v1_pd_color_t pd;
-    noah_profile_rgb_v1_feedback_t combo;
+    uint8_t                               payload[TEST_BUFFER_SIZE];
+    size_t                                length = fixture_hex(fixture_path, "payload.hex", payload, sizeof(payload));
+    noah_profile_rgb_v1_limits_t          limits = fixture_limits(fixture_path);
+    noah_profile_rgb_v1_view_t            view;
+    noah_profile_rgb_v1_error_t           error;
+    noah_profile_rgb_v1_group_t           group;
+    noah_profile_rgb_v1_layer_color_t     layer;
+    noah_profile_rgb_v1_group_row_t       group_row;
+    noah_profile_rgb_v1_automouse_t       automouse;
+    noah_profile_rgb_v1_pd_color_t        pd;
+    noah_profile_rgb_v1_feedback_t        combo;
     noah_profile_rgb_v1_combo_group_row_t combo_row;
-    noah_profile_rgb_v1_hsv_t color;
-    noah_profile_rgb_v1_key_feedback_t key;
+    noah_profile_rgb_v1_hsv_t             color;
+    noah_profile_rgb_v1_key_feedback_t    key;
 
     assert(length == 153u);
     expect_result(noah_profile_rgb_v1_decode(payload, length, &limits, &view, &error), NOAH_PROFILE_RGB_V1_OK);
@@ -175,13 +178,13 @@ static void test_shared_golden_and_accessors(const char *fixture_path) {
 }
 
 static void test_reader_is_bounded(const char *fixture_path) {
-    uint8_t                       padded[TEST_BUFFER_SIZE + 14u];
-    size_t                        length = fixture_hex(fixture_path, "payload.hex", &padded[7], TEST_BUFFER_SIZE);
-    noah_profile_rgb_v1_limits_t  limits = fixture_limits(fixture_path);
-    instrumented_reader_t         context = {.bytes = padded, .length = length + 14u};
-    noah_profile_reader_t         reader = {.read = instrumented_read, .context = &context, .length = length + 14u};
-    noah_profile_rgb_v1_view_t    view;
-    noah_profile_rgb_v1_error_t   error;
+    uint8_t                            padded[TEST_BUFFER_SIZE + 14u];
+    size_t                             length  = fixture_hex(fixture_path, "payload.hex", &padded[7], TEST_BUFFER_SIZE);
+    noah_profile_rgb_v1_limits_t       limits  = fixture_limits(fixture_path);
+    instrumented_reader_t              context = {.bytes = padded, .length = length + 14u};
+    noah_profile_reader_t              reader  = {.read = instrumented_read, .context = &context, .length = length + 14u};
+    noah_profile_rgb_v1_view_t         view;
+    noah_profile_rgb_v1_error_t        error;
     noah_profile_rgb_v1_key_feedback_t key;
 
     expect_result(noah_profile_rgb_v1_decode_reader(&reader, 7u, length, &limits, &view, &error), NOAH_PROFILE_RGB_V1_OK);
@@ -193,7 +196,7 @@ static void test_reader_is_bounded(const char *fixture_path) {
     expect_result(noah_profile_rgb_v1_key_feedback(&view, &key, &error), NOAH_PROFILE_RGB_V1_OK);
     assert(context.max_read == 11u);
 
-    context.calls = 0u;
+    context.calls     = 0u;
     context.fail_call = 3u;
     expect_result(noah_profile_rgb_v1_decode_reader(&reader, 7u, length, &limits, &view, &error), NOAH_PROFILE_RGB_V1_READ_ERROR);
     context.fail_call = 0u;
@@ -201,17 +204,17 @@ static void test_reader_is_bounded(const char *fixture_path) {
 }
 
 static void test_incremental_reader_budget_and_failures(const char *fixture_path) {
-    uint8_t                                  padded[TEST_BUFFER_SIZE + 14u];
-    size_t                                   length = fixture_hex(fixture_path, "payload.hex", &padded[7], TEST_BUFFER_SIZE);
-    noah_profile_rgb_v1_limits_t             limits = fixture_limits(fixture_path);
-    instrumented_reader_t                    context = {.bytes = padded, .length = length + 14u};
-    noah_profile_reader_t                    reader = {.read = instrumented_read, .context = &context, .length = length + 14u};
-    noah_profile_rgb_v1_validation_t         validation;
-    noah_profile_rgb_v1_validation_result_t  progress;
-    noah_profile_rgb_v1_view_t               view;
-    noah_profile_rgb_v1_error_t              error;
-    size_t                                   steps = 0u;
-    size_t                                   successful_calls;
+    uint8_t                                 padded[TEST_BUFFER_SIZE + 14u];
+    size_t                                  length  = fixture_hex(fixture_path, "payload.hex", &padded[7], TEST_BUFFER_SIZE);
+    noah_profile_rgb_v1_limits_t            limits  = fixture_limits(fixture_path);
+    instrumented_reader_t                   context = {.bytes = padded, .length = length + 14u};
+    noah_profile_reader_t                   reader  = {.read = instrumented_read, .context = &context, .length = length + 14u};
+    noah_profile_rgb_v1_validation_t        validation;
+    noah_profile_rgb_v1_validation_result_t progress;
+    noah_profile_rgb_v1_view_t              view;
+    noah_profile_rgb_v1_error_t             error;
+    size_t                                  steps = 0u;
+    size_t                                  successful_calls;
 
     assert(sizeof(validation) <= 128u);
     progress = noah_profile_rgb_v1_validation_begin(&validation, &reader, 7u, length, &limits, &error);
@@ -235,11 +238,11 @@ static void test_incremental_reader_budget_and_failures(const char *fixture_path
     for (size_t fail_call = 1u; fail_call <= successful_calls; fail_call++) {
         noah_profile_rgb_v1_error_t retained;
 
-        context.calls = 0u;
+        context.calls      = 0u;
         context.bytes_read = 0u;
-        context.max_read = 0u;
-        context.fail_call = fail_call;
-        steps = 0u;
+        context.max_read   = 0u;
+        context.fail_call  = fail_call;
+        steps              = 0u;
         assert(noah_profile_rgb_v1_validation_begin(&validation, &reader, 7u, length, &limits, &error) == NOAH_PROFILE_RGB_V1_VALIDATION_IN_PROGRESS);
         progress = drive_incremental(&validation, &context, &error, &steps);
         assert(progress == NOAH_PROFILE_RGB_V1_VALIDATION_REJECTED);
@@ -271,23 +274,28 @@ static void test_incremental_error_locations(const char *fixture_path) {
     noah_profile_rgb_v1_view_t   view;
     noah_profile_rgb_v1_error_t  error;
 
-    memcpy(mutated, valid, length); mutated[0] = 2u;
+    memcpy(mutated, valid, length);
+    mutated[0] = 2u;
     expect_result(noah_profile_rgb_v1_decode(mutated, length, &limits, &view, &error), NOAH_PROFILE_RGB_V1_INVALID_VERSION);
     assert(error.offset == 0u && error.table == NOAH_PROFILE_RGB_V1_TABLE_HEADER && error.row == UINT8_MAX && error.field == NOAH_PROFILE_RGB_V1_FIELD_FORMAT_VERSION);
 
-    memcpy(mutated, valid, length); memcpy(&mutated[26], &valid[17], 8u);
+    memcpy(mutated, valid, length);
+    memcpy(&mutated[26], &valid[17], 8u);
     expect_result(noah_profile_rgb_v1_decode(mutated, length, &limits, &view, &error), NOAH_PROFILE_RGB_V1_DUPLICATE_BITMAP);
     assert(error.offset == 26u && error.table == NOAH_PROFILE_RGB_V1_TABLE_GROUPS && error.row == 1u && error.field == NOAH_PROFILE_RGB_V1_FIELD_BITMAP);
 
-    memcpy(mutated, valid, length); mutated[46] = 201u;
+    memcpy(mutated, valid, length);
+    mutated[46] = 201u;
     expect_result(noah_profile_rgb_v1_decode(mutated, length, &limits, &view, &error), NOAH_PROFILE_RGB_V1_BRIGHTNESS_EXCEEDED);
     assert(error.offset == 46u && error.table == NOAH_PROFILE_RGB_V1_TABLE_LAYER_COLORS && error.row == 0u && error.field == NOAH_PROFILE_RGB_V1_FIELD_COLOR);
 
-    memcpy(mutated, valid, length); mutated[62] = 3u;
+    memcpy(mutated, valid, length);
+    mutated[62] = 3u;
     expect_result(noah_profile_rgb_v1_decode(mutated, length, &limits, &view, &error), NOAH_PROFILE_RGB_V1_INVALID_REFERENCE);
     assert(error.offset == 62u && error.table == NOAH_PROFILE_RGB_V1_TABLE_LAYER_GROUPS && error.row == 0u && error.field == NOAH_PROFILE_RGB_V1_FIELD_GROUP_ID);
 
-    memcpy(mutated, valid, length); mutated[72] = 6u;
+    memcpy(mutated, valid, length);
+    mutated[72] = 6u;
     expect_result(noah_profile_rgb_v1_decode(mutated, length, &limits, &view, &error), NOAH_PROFILE_RGB_V1_INVALID_ID);
     assert(error.offset == 72u && error.table == NOAH_PROFILE_RGB_V1_TABLE_PD_COLORS && error.row == 0u && error.field == NOAH_PROFILE_RGB_V1_FIELD_ID);
 }
@@ -299,39 +307,60 @@ static void test_headers_lengths_and_dictionary(const char *fixture_path) {
     size_t                       length = fixture_hex(fixture_path, "payload.hex", valid, sizeof(valid));
     noah_profile_rgb_v1_limits_t limits = fixture_limits(fixture_path);
 
-    for (size_t truncated = 0u; truncated < length; truncated++) expect_decode(valid, truncated, &limits, NOAH_PROFILE_RGB_V1_TRUNCATED);
-    memcpy(mutated, valid, length); mutated[length] = 0u;
+    for (size_t truncated = 0u; truncated < length; truncated++)
+        expect_decode(valid, truncated, &limits, NOAH_PROFILE_RGB_V1_TRUNCATED);
+    memcpy(mutated, valid, length);
+    mutated[length] = 0u;
     expect_decode(mutated, length + 1u, &limits, NOAH_PROFILE_RGB_V1_TRAILING_BYTES);
-    memcpy(mutated, valid, length); mutated[0] = 2u;
+    memcpy(mutated, valid, length);
+    mutated[0] = 2u;
     expect_decode(mutated, length, &limits, NOAH_PROFILE_RGB_V1_INVALID_VERSION);
     for (size_t offset = 1u; offset <= 15u; offset += offset == 1u ? 13u : 1u) {
-        memcpy(mutated, valid, length); mutated[offset] = 1u;
+        memcpy(mutated, valid, length);
+        mutated[offset] = 1u;
         expect_decode(mutated, length, &limits, NOAH_PROFILE_RGB_V1_RESERVED_BITS);
     }
-    memcpy(mutated, valid, length); mutated[2] |= 0x20u;
+    memcpy(mutated, valid, length);
+    mutated[2] |= 0x20u;
     expect_decode(mutated, length, &limits, NOAH_PROFILE_RGB_V1_RESERVED_BITS);
-    memcpy(mutated, valid, length); mutated[12] = 57u;
+    memcpy(mutated, valid, length);
+    mutated[12] = 57u;
     expect_decode(mutated, length, &limits, NOAH_PROFILE_RGB_V1_INCOMPATIBLE_GEOMETRY);
-    memcpy(mutated, valid, length); mutated[13] = 7u;
+    memcpy(mutated, valid, length);
+    mutated[13] = 7u;
     expect_decode(mutated, length, &limits, NOAH_PROFILE_RGB_V1_INCOMPATIBLE_GEOMETRY);
-    memcpy(mutated, valid, length); mutated[4] = NOAH_PROFILE_RGB_V1_MAX_GROUPS + 1u;
+    memcpy(mutated, valid, length);
+    mutated[4] = NOAH_PROFILE_RGB_V1_MAX_GROUPS + 1u;
     expect_decode(mutated, length, &limits, NOAH_PROFILE_RGB_V1_CAPACITY_EXCEEDED);
-    memcpy(mutated, valid, length); mutated[5] = NOAH_PROFILE_RGB_V1_MAX_LOGICAL_LAYERS + 1u;
+    memcpy(mutated, valid, length);
+    mutated[5] = NOAH_PROFILE_RGB_V1_MAX_LOGICAL_LAYERS + 1u;
     expect_decode(mutated, length, &limits, NOAH_PROFILE_RGB_V1_CAPACITY_EXCEEDED);
-    memcpy(mutated, valid, length); mutated[7] = NOAH_PROFILE_RGB_V1_MAX_PD_MODES + 1u;
+    memcpy(mutated, valid, length);
+    mutated[7] = NOAH_PROFILE_RGB_V1_MAX_PD_MODES + 1u;
     expect_decode(mutated, length, &limits, NOAH_PROFILE_RGB_V1_CAPACITY_EXCEEDED);
-    memcpy(mutated, valid, length); mutated[10] = NOAH_PROFILE_RGB_V1_MAX_TAP_BRANCH_COLORS + 1u;
+    memcpy(mutated, valid, length);
+    mutated[10] = NOAH_PROFILE_RGB_V1_MAX_TAP_BRANCH_COLORS + 1u;
     expect_decode(mutated, length, &limits, NOAH_PROFILE_RGB_V1_CAPACITY_EXCEEDED);
-    memcpy(mutated, valid, length); mutated[6] = NOAH_PROFILE_RGB_V1_MAX_STAGE_GROUP_ROWS; mutated[8] = 1u; mutated[9] = 0u; mutated[11] = 0u;
+    memcpy(mutated, valid, length);
+    mutated[6]  = NOAH_PROFILE_RGB_V1_MAX_STAGE_GROUP_ROWS;
+    mutated[8]  = 1u;
+    mutated[9]  = 0u;
+    mutated[11] = 0u;
     expect_decode(mutated, length, &limits, NOAH_PROFILE_RGB_V1_CAPACITY_EXCEEDED);
 
-    memcpy(mutated, valid, length); mutated[16] = 1u;
+    memcpy(mutated, valid, length);
+    mutated[16] = 1u;
     expect_decode(mutated, length, &limits, NOAH_PROFILE_RGB_V1_NONCANONICAL_ORDER);
-    memcpy(mutated, valid, length); mutated[24] = 4u;
+    memcpy(mutated, valid, length);
+    mutated[24] = 4u;
     expect_decode(mutated, length, &limits, NOAH_PROFILE_RGB_V1_RESERVED_BITS);
-    memcpy(mutated, valid, length); memcpy(&mutated[26], &valid[17], 8u);
+    memcpy(mutated, valid, length);
+    memcpy(&mutated[26], &valid[17], 8u);
     expect_decode(mutated, length, &limits, NOAH_PROFILE_RGB_V1_DUPLICATE_BITMAP);
-    memcpy(mutated, valid, length); memcpy(swap, &mutated[26], 8u); memcpy(&mutated[26], &mutated[35], 8u); memcpy(&mutated[35], swap, 8u);
+    memcpy(mutated, valid, length);
+    memcpy(swap, &mutated[26], 8u);
+    memcpy(&mutated[26], &mutated[35], 8u);
+    memcpy(&mutated[35], swap, 8u);
     expect_decode(mutated, length, &limits, NOAH_PROFILE_RGB_V1_NONCANONICAL_ORDER);
 }
 
@@ -341,92 +370,117 @@ static void test_fields_features_and_surfaces(const char *fixture_path) {
     size_t                       length = fixture_hex(fixture_path, "payload.hex", valid, sizeof(valid));
     noah_profile_rgb_v1_limits_t limits = fixture_limits(fixture_path);
 
-    memcpy(mutated, valid, length); mutated[43] = 1u;
+    memcpy(mutated, valid, length);
+    mutated[43] = 1u;
     expect_decode(mutated, length, &limits, NOAH_PROFILE_RGB_V1_NONCANONICAL_ORDER);
-    memcpy(mutated, valid, length); mutated[47] = 2u;
+    memcpy(mutated, valid, length);
+    mutated[47] = 2u;
     expect_decode(mutated, length, &limits, NOAH_PROFILE_RGB_V1_INVALID_ENUM);
-    memcpy(mutated, valid, length); mutated[46] = 201u;
+    memcpy(mutated, valid, length);
+    mutated[46] = 201u;
     expect_decode(mutated, length, &limits, NOAH_PROFILE_RGB_V1_BRIGHTNESS_EXCEEDED);
-    memcpy(mutated, valid, length); mutated[58] = 3u;
+    memcpy(mutated, valid, length);
+    mutated[58] = 3u;
     expect_decode(mutated, length, &limits, NOAH_PROFILE_RGB_V1_INVALID_SELECTOR);
-    memcpy(mutated, valid, length); mutated[62] = 3u;
+    memcpy(mutated, valid, length);
+    mutated[62] = 3u;
     expect_decode(mutated, length, &limits, NOAH_PROFILE_RGB_V1_INVALID_REFERENCE);
-    memcpy(mutated, valid, length); mutated[68] = 3u;
+    memcpy(mutated, valid, length);
+    mutated[68] = 3u;
     expect_decode(mutated, length, &limits, NOAH_PROFILE_RGB_V1_INVALID_ENUM);
-    memcpy(mutated, valid, length); mutated[72] = 6u;
+    memcpy(mutated, valid, length);
+    mutated[72] = 6u;
     expect_decode(mutated, length, &limits, NOAH_PROFILE_RGB_V1_INVALID_ID);
-    memcpy(mutated, valid, length); mutated[77] = 0u;
+    memcpy(mutated, valid, length);
+    mutated[77] = 0u;
     expect_decode(mutated, length, &limits, NOAH_PROFILE_RGB_V1_NONCANONICAL_ORDER);
-    memcpy(mutated, valid, length); mutated[76] = 5u;
+    memcpy(mutated, valid, length);
+    mutated[76] = 5u;
     expect_decode(mutated, length, &limits, NOAH_PROFILE_RGB_V1_INVALID_ENUM);
-    memcpy(mutated, valid, length); mutated[102] = 6u;
+    memcpy(mutated, valid, length);
+    mutated[102] = 6u;
     expect_decode(mutated, length, &limits, NOAH_PROFILE_RGB_V1_INVALID_SELECTOR);
-    memcpy(mutated, valid, length); mutated[115] = 5u;
+    memcpy(mutated, valid, length);
+    mutated[115] = 5u;
     expect_decode(mutated, length, &limits, NOAH_PROFILE_RGB_V1_INVALID_ENUM);
-    memcpy(mutated, valid, length); mutated[119] = 3u;
+    memcpy(mutated, valid, length);
+    mutated[119] = 3u;
     expect_decode(mutated, length, &limits, NOAH_PROFILE_RGB_V1_INVALID_REFERENCE);
-    memcpy(mutated, valid, length); mutated[141] = 2u;
+    memcpy(mutated, valid, length);
+    mutated[141] = 2u;
     expect_decode(mutated, length, &limits, NOAH_PROFILE_RGB_V1_INVALID_ENUM);
-    memcpy(mutated, valid, length); mutated[142] = 5u;
+    memcpy(mutated, valid, length);
+    mutated[142] = 5u;
     expect_decode(mutated, length, &limits, NOAH_PROFILE_RGB_V1_INVALID_ENUM);
-    memcpy(mutated, valid, length); mutated[148] = 4u;
+    memcpy(mutated, valid, length);
+    mutated[148] = 4u;
     expect_decode(mutated, length, &limits, NOAH_PROFILE_RGB_V1_INVALID_SELECTOR);
 
     limits.logical_layer_count = 4u;
     expect_decode(valid, length, &limits, NOAH_PROFILE_RGB_V1_INCOMPLETE_SURFACE);
-    limits = fixture_limits(fixture_path); limits.tap_branch_color_count = 3u;
+    limits                        = fixture_limits(fixture_path);
+    limits.tap_branch_color_count = 3u;
     expect_decode(valid, length, &limits, NOAH_PROFILE_RGB_V1_INCOMPLETE_SURFACE);
-    limits = fixture_limits(fixture_path); limits.compiled_stage_mask &= (uint16_t)~NOAH_PROFILE_RGB_V1_STAGE_AUTOMOUSE;
-    expect_decode(valid, length, &limits, NOAH_PROFILE_RGB_V1_UNSUPPORTED_STAGE);
-    memcpy(mutated, valid, length); mutated[2] &= (uint8_t)~NOAH_PROFILE_RGB_V1_STAGE_AUTOMOUSE;
-    expect_decode(mutated, length, &limits, NOAH_PROFILE_RGB_V1_UNSUPPORTED_STAGE_DATA);
-    memcpy(mutated, valid, length); mutated[2] = 0u; mutated[3] = 0u;
     limits = fixture_limits(fixture_path);
+    limits.compiled_stage_mask &= (uint16_t)~NOAH_PROFILE_RGB_V1_STAGE_AUTOMOUSE;
+    expect_decode(valid, length, &limits, NOAH_PROFILE_RGB_V1_UNSUPPORTED_STAGE);
+    memcpy(mutated, valid, length);
+    mutated[2] &= (uint8_t)~NOAH_PROFILE_RGB_V1_STAGE_AUTOMOUSE;
+    expect_decode(mutated, length, &limits, NOAH_PROFILE_RGB_V1_UNSUPPORTED_STAGE_DATA);
+    memcpy(mutated, valid, length);
+    mutated[2] = 0u;
+    mutated[3] = 0u;
+    limits     = fixture_limits(fixture_path);
     expect_decode(mutated, length, &limits, NOAH_PROFILE_RGB_V1_OK);
 
     limits.supported_pd_mode_mask = 0x1fu;
     expect_decode(valid, length, &limits, NOAH_PROFILE_RGB_V1_INVALID_ID);
 
-    limits = fixture_limits(fixture_path); limits.max_payload_size = (uint16_t)(length - 1u);
+    limits                  = fixture_limits(fixture_path);
+    limits.max_payload_size = (uint16_t)(length - 1u);
     expect_decode(valid, length, &limits, NOAH_PROFILE_RGB_V1_CAPACITY_EXCEEDED);
-    limits = fixture_limits(fixture_path); limits.compiled_stage_mask = 0x20u;
+    limits                     = fixture_limits(fixture_path);
+    limits.compiled_stage_mask = 0x20u;
     expect_decode(valid, length, &limits, NOAH_PROFILE_RGB_V1_INVALID_ARGUMENT);
-    limits = fixture_limits(fixture_path); limits.tap_branch_color_count = 0u;
+    limits                        = fixture_limits(fixture_path);
+    limits.tap_branch_color_count = 0u;
     expect_decode(valid, length, &limits, NOAH_PROFILE_RGB_V1_INVALID_ARGUMENT);
 }
 
 static void test_canonical_empty_forms(void) {
-    uint8_t payload[40] = {0};
-    noah_profile_rgb_v1_limits_t limits = noah_profile_rgb_v1_default_limits();
+    uint8_t                      payload[40] = {0};
+    noah_profile_rgb_v1_limits_t limits      = noah_profile_rgb_v1_default_limits();
 
-    payload[0]  = NOAH_PROFILE_RGB_V1_FORMAT_VERSION;
-    payload[2]  = NOAH_PROFILE_RGB_V1_STAGE_LAYER;
-    payload[5]  = 1u;
-    payload[12] = NOAH_PROFILE_RGB_V1_PHYSICAL_LED_COUNT;
-    payload[13] = NOAH_PROFILE_RGB_V1_LED_BITMAP_SIZE;
-    limits.compiled_stage_mask = NOAH_PROFILE_RGB_V1_STAGE_LAYER;
-    limits.logical_layer_count = 1u;
+    payload[0]                    = NOAH_PROFILE_RGB_V1_FORMAT_VERSION;
+    payload[2]                    = NOAH_PROFILE_RGB_V1_STAGE_LAYER;
+    payload[5]                    = 1u;
+    payload[12]                   = NOAH_PROFILE_RGB_V1_PHYSICAL_LED_COUNT;
+    payload[13]                   = NOAH_PROFILE_RGB_V1_LED_BITMAP_SIZE;
+    limits.compiled_stage_mask    = NOAH_PROFILE_RGB_V1_STAGE_LAYER;
+    limits.logical_layer_count    = 1u;
     limits.supported_pd_mode_mask = 0u;
     expect_decode(payload, sizeof(payload), &limits, NOAH_PROFILE_RGB_V1_OK);
     payload[21] = 1u;
     expect_decode(payload, sizeof(payload), &limits, NOAH_PROFILE_RGB_V1_UNSUPPORTED_STAGE_DATA);
-    payload[21] = 0u; payload[25] = 1u;
+    payload[21] = 0u;
+    payload[25] = 1u;
     expect_decode(payload, sizeof(payload), &limits, NOAH_PROFILE_RGB_V1_UNSUPPORTED_STAGE_DATA);
-    payload[25] = 0u; payload[29] = 1u;
+    payload[25] = 0u;
+    payload[29] = 1u;
     expect_decode(payload, sizeof(payload), &limits, NOAH_PROFILE_RGB_V1_UNSUPPORTED_STAGE_DATA);
 }
 
 static void test_maximum_dictionary_and_rows(void) {
-    uint8_t payload[344] = {0};
-    size_t offset;
-    noah_profile_rgb_v1_limits_t limits = noah_profile_rgb_v1_default_limits();
-    noah_profile_rgb_v1_view_t view;
-    noah_profile_rgb_v1_error_t error;
-    instrumented_reader_t context;
-    noah_profile_reader_t reader;
-    noah_profile_rgb_v1_validation_t validation;
+    uint8_t                                 payload[344] = {0};
+    size_t                                  offset;
+    noah_profile_rgb_v1_limits_t            limits = noah_profile_rgb_v1_default_limits();
+    noah_profile_rgb_v1_view_t              view;
+    noah_profile_rgb_v1_error_t             error;
+    instrumented_reader_t                   context;
+    noah_profile_reader_t                   reader;
+    noah_profile_rgb_v1_validation_t        validation;
     noah_profile_rgb_v1_validation_result_t progress;
-    size_t steps = 0u;
+    size_t                                  steps = 0u;
 
     payload[0]  = NOAH_PROFILE_RGB_V1_FORMAT_VERSION;
     payload[2]  = NOAH_PROFILE_RGB_V1_STAGE_LAYER;
@@ -435,28 +489,28 @@ static void test_maximum_dictionary_and_rows(void) {
     payload[6]  = NOAH_PROFILE_RGB_V1_MAX_STAGE_GROUP_ROWS;
     payload[12] = NOAH_PROFILE_RGB_V1_PHYSICAL_LED_COUNT;
     payload[13] = NOAH_PROFILE_RGB_V1_LED_BITMAP_SIZE;
-    offset = NOAH_PROFILE_RGB_V1_HEADER_SIZE;
+    offset      = NOAH_PROFILE_RGB_V1_HEADER_SIZE;
     for (uint8_t group = 0u; group < NOAH_PROFILE_RGB_V1_MAX_GROUPS; group++) {
-        payload[offset] = group;
+        payload[offset]      = group;
         payload[offset + 1u] = group;
         offset += 9u;
     }
     offset += 5u; // one canonical layer-zero row
     for (uint8_t row = 0u; row < NOAH_PROFILE_RGB_V1_MAX_STAGE_GROUP_ROWS; row++) {
-        payload[offset] = NOAH_PROFILE_RGB_V1_SELECTOR_ALL;
+        payload[offset]      = NOAH_PROFILE_RGB_V1_SELECTOR_ALL;
         payload[offset + 4u] = 0u;
         offset += 5u;
     }
     assert(offset + 4u + 4u + 11u == sizeof(payload));
-    limits.compiled_stage_mask = NOAH_PROFILE_RGB_V1_STAGE_LAYER;
-    limits.logical_layer_count = 1u;
+    limits.compiled_stage_mask    = NOAH_PROFILE_RGB_V1_STAGE_LAYER;
+    limits.logical_layer_count    = 1u;
     limits.supported_pd_mode_mask = 0u;
     expect_result(noah_profile_rgb_v1_decode(payload, sizeof(payload), &limits, &view, &error), NOAH_PROFILE_RGB_V1_OK);
     assert(view.group_count == NOAH_PROFILE_RGB_V1_MAX_GROUPS);
     assert(view.layer_group_count == NOAH_PROFILE_RGB_V1_MAX_STAGE_GROUP_ROWS);
 
     context = (instrumented_reader_t){.bytes = payload, .length = sizeof(payload)};
-    reader = (noah_profile_reader_t){.read = instrumented_read, .context = &context, .length = sizeof(payload)};
+    reader  = (noah_profile_reader_t){.read = instrumented_read, .context = &context, .length = sizeof(payload)};
     assert(noah_profile_rgb_v1_validation_begin(&validation, &reader, 0u, sizeof(payload), &limits, &error) == NOAH_PROFILE_RGB_V1_VALIDATION_IN_PROGRESS);
     progress = drive_incremental(&validation, &context, &error, &steps);
     assert(progress == NOAH_PROFILE_RGB_V1_VALIDATION_VALID);

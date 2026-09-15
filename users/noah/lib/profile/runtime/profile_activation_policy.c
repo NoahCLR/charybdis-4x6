@@ -14,7 +14,7 @@
 #include "../../macro/macro_payload.h"
 
 static void capture_runtime(noah_profile_activation_snapshot_t *snapshot) {
-    noah_key_runtime_activity_snapshot_t  key_runtime = {0};
+    noah_key_runtime_activity_snapshot_t   key_runtime = {0};
     macro_payload_debug_snapshot_t         macro       = {0};
     noah_qmk_combo_origin_debug_snapshot_t combo       = {0};
 
@@ -36,14 +36,14 @@ static void capture_runtime(noah_profile_activation_snapshot_t *snapshot) {
         .real_mods               = get_mods(),
         .weak_mods               = get_weak_mods(),
 #ifndef NO_ACTION_ONESHOT
-        .oneshot_mods            = get_oneshot_mods(),
-        .oneshot_locked_mods     = get_oneshot_locked_mods(),
-        .oneshot_layer_active    = is_oneshot_layer_active() ? 1u : 0u,
+        .oneshot_mods         = get_oneshot_mods(),
+        .oneshot_locked_mods  = get_oneshot_locked_mods(),
+        .oneshot_layer_active = is_oneshot_layer_active() ? 1u : 0u,
 #endif
-        .macro_engine_state      = (uint8_t)macro.state,
-        .macro_hold_count        = macro.active_hold_count,
-        .combo_pending_count     = combo.pending_count,
-        .combo_active_count      = combo.active_count,
+        .macro_engine_state  = (uint8_t)macro.state,
+        .macro_hold_count    = macro.active_hold_count,
+        .combo_pending_count = combo.pending_count,
+        .combo_active_count  = combo.active_count,
     };
 }
 
@@ -102,11 +102,11 @@ uint32_t noah_profile_activation_reason_mask(const noah_profile_activation_snaps
 }
 
 uint32_t noah_profile_activation_policy_safe_boundary(void *context) {
-    noah_profile_activation_policy_t *policy = context;
+    noah_profile_activation_policy_t  *policy = context;
     noah_profile_activation_snapshot_t snapshot;
     uint32_t                           reason_mask;
     uint32_t                           evaluation_count;
-    uint8_t                           unresolved_peer_count = 1u;
+    uint8_t                            unresolved_peer_count = 1u;
 
     if (!(policy && policy->initialized)) {
         return NOAH_PROFILE_ACTIVATION_REASON_INTERNAL;

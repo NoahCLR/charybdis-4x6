@@ -19,10 +19,10 @@ enum {
     // expected acknowledgement promptly without weakening the exponential
     // backoff used when the peer remains busy or transport fails.
     NOAH_PROFILE_SPLIT_ADMISSION_RETRY_MS = 5u,
-    NOAH_PROFILE_SPLIT_POLL_MS          = 1000u,
+    NOAH_PROFILE_SPLIT_POLL_MS            = 1000u,
     // A passive half cannot actively probe the link. Missing three normal
     // master polls invalidates its peer observation and therefore activation.
-    NOAH_PROFILE_SPLIT_PEER_TIMEOUT_MS  = 3000u,
+    NOAH_PROFILE_SPLIT_PEER_TIMEOUT_MS = 3000u,
     // A receiver holds staged peer storage only while the sender remains
     // active. This is a pre-marker lease; expiry never interrupts COMMITTING
     // or a durability-unknown recovery state.
@@ -60,13 +60,13 @@ typedef bool (*noah_profile_split_local_binding_fn)(void *context, const noah_pr
 typedef bool (*noah_profile_split_exchange_fn)(void *context, const uint8_t request[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE], uint8_t response[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE]);
 
 typedef struct {
-    void                                    *local_context;
-    noah_profile_split_local_descriptor_fn  local_descriptor;
-    noah_profile_split_local_read_fn        local_read;
-    noah_profile_split_local_binding_fn     local_binding;
-    void                                    *transport_context;
-    noah_profile_split_exchange_fn           exchange;
-    noah_profile_peer_store_backend_t       *peer_store;
+    void                                  *local_context;
+    noah_profile_split_local_descriptor_fn local_descriptor;
+    noah_profile_split_local_read_fn       local_read;
+    noah_profile_split_local_binding_fn    local_binding;
+    void                                  *transport_context;
+    noah_profile_split_exchange_fn         exchange;
+    noah_profile_peer_store_backend_t     *peer_store;
 } noah_profile_split_reconciler_config_t;
 
 typedef struct {
@@ -111,7 +111,7 @@ typedef struct {
     noah_profile_split_transfer_owner_t    transfer_owner;
     noah_profile_split_v1_status_t         last_status;
     void                                  *prepared_source_context;
-    noah_profile_split_local_read_fn        prepared_source_read;
+    noah_profile_split_local_read_fn       prepared_source_read;
     uint32_t                               next_attempt_at;
     uint32_t                               retry_ms;
     uint32_t                               last_peer_activity_at;
@@ -130,12 +130,12 @@ typedef struct {
     uint8_t                                cached_request_wire[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE];
     uint8_t                                cached_response_wire[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE];
     uint8_t                                metadata_response_wire[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE];
-    noah_runtime_publication_generation_t mailbox_sequence;
-    noah_runtime_publication_generation_t response_sequence;
-    noah_runtime_publication_generation_t metadata_sequence;
-    volatile uint8_t                      peer_activity_sequence;
-    uint8_t                               mailbox_consumed_sequence;
-    uint8_t                               observed_peer_activity_sequence;
+    noah_runtime_publication_generation_t  mailbox_sequence;
+    noah_runtime_publication_generation_t  response_sequence;
+    noah_runtime_publication_generation_t  metadata_sequence;
+    volatile uint8_t                       peer_activity_sequence;
+    uint8_t                                mailbox_consumed_sequence;
+    uint8_t                                observed_peer_activity_sequence;
     bool                                   initialized;
     bool                                   role_known;
     bool                                   master;
@@ -186,4 +186,4 @@ bool noah_profile_split_reconciler_provisional_peer_descriptor(const noah_profil
 bool noah_profile_split_reconciler_refresh_authority(noah_profile_split_reconciler_t *reconciler);
 
 const noah_profile_split_authority_t *noah_profile_split_reconciler_authority(const noah_profile_split_reconciler_t *reconciler);
-bool noah_profile_split_reconciler_status(const noah_profile_split_reconciler_t *reconciler, noah_profile_split_reconciler_status_t *status);
+bool                                  noah_profile_split_reconciler_status(const noah_profile_split_reconciler_t *reconciler, noah_profile_split_reconciler_status_t *status);

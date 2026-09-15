@@ -2,7 +2,9 @@
 #include <stdint.h>
 #define RGB_MATRIX_LED_COUNT 3
 #define RGB_MATRIX_MAXIMUM_BRIGHTNESS 180
-typedef struct {uint8_t flags[RGB_MATRIX_LED_COUNT];} led_config_t;
+typedef struct {
+    uint8_t flags[RGB_MATRIX_LED_COUNT];
+} led_config_t;
 extern led_config_t g_led_config;
 enum {
     RGB_MATRIX_NONE,

@@ -81,14 +81,14 @@ typedef struct {
 } noah_qmk_via_slave_mailbox_t;
 
 typedef struct {
-    noah_qmk_via_sync_frame_t request;
+    noah_qmk_via_sync_frame_t     request;
     noah_qmk_via_logical_status_t status;
 } noah_qmk_via_logical_transaction_t;
 
 static noah_qmk_via_shared_state_t          noah_qmk_via_shared_state;
 static noah_qmk_via_storage_digest_cursor_t noah_qmk_via_local_digest_cursor;
-static noah_qmk_via_slave_mailbox_t          noah_qmk_via_slave_mailbox;
-static noah_qmk_via_logical_transaction_t    noah_qmk_via_logical;
+static noah_qmk_via_slave_mailbox_t         noah_qmk_via_slave_mailbox;
+static noah_qmk_via_logical_transaction_t   noah_qmk_via_logical;
 
 static noah_qmk_via_tx_phase_t    noah_qmk_via_tx_phase;
 static noah_qmk_via_sync_region_t noah_qmk_via_tx_region;
@@ -336,12 +336,12 @@ static void noah_qmk_via_handle_snapshot_begin(const noah_qmk_via_sync_frame_t *
         if (!finalizing) {
             noah_qmk_via_receiver_epoch++;
             noah_qmk_via_receiver = (noah_qmk_via_receiver_t){
-                .finalizing = true,
+                .finalizing      = true,
                 .logical_staging = logical_staging,
-                .generation = request->generation,
-                .digest     = request->digest,
-                .region     = first_region,
-                .offset     = first_offset,
+                .generation      = request->generation,
+                .digest          = request->digest,
+                .region          = first_region,
+                .offset          = first_offset,
             };
         }
     }
@@ -374,10 +374,10 @@ static void noah_qmk_via_handle_snapshot_begin(const noah_qmk_via_sync_frame_t *
 }
 
 static void noah_qmk_via_handle_logical_stage_verify(const noah_qmk_via_sync_frame_t *request, uint8_t target_size, void *target) {
-    bool staged;
-    bool active;
-    bool verifying;
-    bool logical_staging;
+    bool     staged;
+    bool     active;
+    bool     verifying;
+    bool     logical_staging;
     uint32_t generation;
     uint32_t digest;
 
@@ -406,9 +406,9 @@ static void noah_qmk_via_handle_logical_stage_verify(const noah_qmk_via_sync_fra
 }
 
 static void noah_qmk_via_handle_logical_stage_accept(const noah_qmk_via_sync_frame_t *request, uint8_t target_size, void *target) {
-    bool matches;
+    bool                               matches;
     noah_qmk_via_sync_state_snapshot_t state;
-    noah_qmk_via_shared_state_t shared;
+    noah_qmk_via_shared_state_t        shared;
 
     ATOMIC_BLOCK_RESTORESTATE {
         matches = noah_qmk_via_receiver.logical_staging && noah_qmk_via_receiver.staged && request->generation == noah_qmk_via_receiver.generation && request->digest == noah_qmk_via_receiver.digest;
@@ -428,12 +428,12 @@ static void noah_qmk_via_handle_logical_stage_accept(const noah_qmk_via_sync_fra
         return;
     }
     ATOMIC_BLOCK_RESTORESTATE {
-        noah_qmk_via_receiver.logical_staging = false;
-        noah_qmk_via_receiver.staged          = false;
-        noah_qmk_via_receiver.committed       = true;
+        noah_qmk_via_receiver.logical_staging         = false;
+        noah_qmk_via_receiver.staged                  = false;
+        noah_qmk_via_receiver.committed               = true;
         noah_qmk_via_shared_state.replication_pending = false;
-        noah_qmk_via_boot_authority_known = true;
-        noah_qmk_via_boot_recovery_active = false;
+        noah_qmk_via_boot_authority_known             = true;
+        noah_qmk_via_boot_recovery_active             = false;
     }
     via_macro_provider_invalidate_all();
     noah_rgb_runtime_invalidate_layer_maps();
@@ -1010,13 +1010,13 @@ static bool noah_qmk_via_receiver_verify_tick(void) {
     if (logical_staging) {
         ATOMIC_BLOCK_RESTORESTATE {
             if (noah_qmk_via_receiver_epoch == epoch && noah_qmk_via_receiver.verifying && noah_qmk_via_receiver.logical_staging) {
-                noah_qmk_via_receiver.active     = false;
-                noah_qmk_via_receiver.verifying  = false;
-                noah_qmk_via_receiver.staged     = true;
-                noah_qmk_via_shared_state.digest = noah_qmk_via_receiver_verify_digest;
-                noah_qmk_via_shared_state.digest_valid = true;
-                noah_qmk_via_shared_state.digest_active = false;
-                noah_qmk_via_shared_state.pending_effects = NOAH_QMK_VIA_COMMAND_EFFECT_NONE;
+                noah_qmk_via_receiver.active                  = false;
+                noah_qmk_via_receiver.verifying               = false;
+                noah_qmk_via_receiver.staged                  = true;
+                noah_qmk_via_shared_state.digest              = noah_qmk_via_receiver_verify_digest;
+                noah_qmk_via_shared_state.digest_valid        = true;
+                noah_qmk_via_shared_state.digest_active       = false;
+                noah_qmk_via_shared_state.pending_effects     = NOAH_QMK_VIA_COMMAND_EFFECT_NONE;
                 noah_qmk_via_shared_state.replication_pending = false;
                 noah_qmk_via_shared_state.digest_epoch++;
             }
@@ -1121,9 +1121,9 @@ static bool noah_qmk_via_local_digest_tick(void) {
 
 void noah_qmk_via_split_sync_init(void) {
     ATOMIC_BLOCK_RESTORESTATE {
-        noah_qmk_via_shared_state = (noah_qmk_via_shared_state_t){0};
+        noah_qmk_via_shared_state  = (noah_qmk_via_shared_state_t){0};
         noah_qmk_via_slave_mailbox = (noah_qmk_via_slave_mailbox_t){0};
-        noah_qmk_via_logical = (noah_qmk_via_logical_transaction_t){0};
+        noah_qmk_via_logical       = (noah_qmk_via_logical_transaction_t){0};
     }
     noah_qmk_via_receiver                 = (noah_qmk_via_receiver_t){0};
     noah_qmk_via_receiver_epoch           = 0u;
@@ -1190,12 +1190,12 @@ bool noah_qmk_via_logical_boot_recover(uint32_t generation, uint32_t digest) {
 
 static bool noah_qmk_via_logical_boot_recovery_tick(bool master) {
     noah_qmk_via_sync_state_snapshot_t state;
-    noah_qmk_via_shared_state_t shared;
-    noah_qmk_via_sync_frame_t request;
-    noah_qmk_via_sync_frame_t response;
-    bool active;
-    uint32_t generation;
-    uint32_t digest;
+    noah_qmk_via_shared_state_t        shared;
+    noah_qmk_via_sync_frame_t          request;
+    noah_qmk_via_sync_frame_t          response;
+    bool                               active;
+    uint32_t                           generation;
+    uint32_t                           digest;
 
     ATOMIC_BLOCK_RESTORESTATE {
         active     = noah_qmk_via_boot_recovery_active;
@@ -1215,8 +1215,8 @@ static bool noah_qmk_via_logical_boot_recovery_tick(bool master) {
             return true;
         }
         ATOMIC_BLOCK_RESTORESTATE {
-            noah_qmk_via_boot_authority_known = true;
-            noah_qmk_via_boot_recovery_active = false;
+            noah_qmk_via_boot_authority_known             = true;
+            noah_qmk_via_boot_recovery_active             = false;
             noah_qmk_via_shared_state.replication_pending = master;
         }
         via_macro_provider_invalidate_all();
@@ -1274,7 +1274,7 @@ bool noah_qmk_via_split_sync_matrix_scan_step(void) {
             return true;
         }
         ATOMIC_BLOCK_RESTORESTATE {
-            noah_qmk_via_logical.status.pending = false;
+            noah_qmk_via_logical.status.pending     = false;
             noah_qmk_via_logical.status.last_status = response.status;
             noah_qmk_via_logical.status.operation_sequence++;
             if (response.kind != NOAH_QMK_VIA_SYNC_MESSAGE_ACK || response.status != NOAH_QMK_VIA_SYNC_STATUS_OK) {
@@ -1299,7 +1299,7 @@ bool noah_qmk_via_split_sync_matrix_scan_step(void) {
     }
     if (noah_qmk_via_logical.status.state == NOAH_QMK_VIA_LOGICAL_ACCEPTED) {
         noah_qmk_via_sync_state_snapshot_t local = noah_qmk_via_sync_state_snapshot();
-        shared = noah_qmk_via_shared_snapshot();
+        shared                                   = noah_qmk_via_shared_snapshot();
         if (!noah_qmk_via_local_state_is_clean(local, shared) || local.metadata.generation != noah_qmk_via_logical.status.generation || shared.digest != noah_qmk_via_logical.status.digest) {
             // The decision marker is durable and the peer owns the recovery
             // copy. Hold ordinary reconciliation while the host applies only
@@ -1364,7 +1364,7 @@ bool noah_qmk_via_logical_submit(uint16_t transaction_id, const noah_qmk_via_syn
     if (transaction_id == 0u || !request || !is_keyboard_master()) {
         return false;
     }
-    begin = request->kind == NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_BEGIN;
+    begin    = request->kind == NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_BEGIN;
     terminal = request->kind == NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_ACCEPT || request->kind == NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_ABORT;
     if (!begin && request->kind != NOAH_QMK_VIA_SYNC_MESSAGE_PUSH_CHUNK && request->kind != NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_VERIFY && !terminal) {
         return false;
@@ -1380,8 +1380,8 @@ bool noah_qmk_via_logical_submit(uint16_t transaction_id, const noah_qmk_via_syn
             transaction_id = 0u;
         }
         if (transaction_id != 0u) {
-            noah_qmk_via_logical.request = *request;
-            noah_qmk_via_logical.status.pending = true;
+            noah_qmk_via_logical.request            = *request;
+            noah_qmk_via_logical.status.pending     = true;
             noah_qmk_via_logical.status.last_status = NOAH_QMK_VIA_SYNC_STATUS_BUSY;
             if (begin) {
                 noah_qmk_via_logical.status.state          = NOAH_QMK_VIA_LOGICAL_STAGING;
@@ -1410,8 +1410,8 @@ bool noah_qmk_via_logical_staged(uint16_t transaction_id, uint32_t generation, u
 }
 
 bool noah_qmk_via_logical_converged(uint32_t generation, uint32_t digest) {
-    noah_qmk_via_sync_state_snapshot_t state = noah_qmk_via_sync_state_snapshot();
-    noah_qmk_via_shared_state_t shared = noah_qmk_via_shared_snapshot();
+    noah_qmk_via_sync_state_snapshot_t state  = noah_qmk_via_sync_state_snapshot();
+    noah_qmk_via_shared_state_t        shared = noah_qmk_via_shared_snapshot();
     if (generation == 0u || digest == 0u || !noah_qmk_via_local_state_is_clean(state, shared) || state.metadata.generation != generation || shared.digest != digest) {
         return false;
     }

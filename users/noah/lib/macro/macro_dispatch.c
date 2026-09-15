@@ -106,4 +106,6 @@ bool macro_dispatch(uint16_t keycode) {
     return true;
 }
 
-void macro_dispatch_invalidate(void) {memset(hardcoded_macro_slots, 0, sizeof(hardcoded_macro_slots));}
+void macro_dispatch_invalidate(void) {
+    memset(hardcoded_macro_slots, 0, sizeof(hardcoded_macro_slots));
+}

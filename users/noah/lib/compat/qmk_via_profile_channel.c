@@ -53,43 +53,45 @@
 #    endif
 
 static noah_profile_wire_v1_read_service_t noah_profile_wire_v1_read_service = {
-    .capabilities = {
-        .protocol_major                 = 1u,
-        .protocol_minor                 = 0u,
-        .schema_major                   = 1u,
-        .schema_minor                   = 0u,
-        // Stage 01 is intentionally read-only. Candidate capacity and domain
-        // support remain zero until the corresponding decoders and activation
-        // paths exist; the frozen schema ceilings below are declaration
-        // metadata, not a claim that writes are accepted.
-        .candidate_chunk_max            = 0u,
-        .feature_flags                  = NOAH_PROFILE_FEATURE_READ_SURFACE | NOAH_PROFILE_FEATURE_STORAGE_LAYOUT | NOAH_PROFILE_SPLIT_CAPABILITY,
-        .action_abi_digest              = 0u,
-        .firmware_version               = VIA_FIRMWARE_VERSION,
-        .compiled_default_digest        = 0u,
-        .compiled_layer_count           = DYNAMIC_KEYMAP_LAYER_COUNT,
-        .max_logical_layers             = NOAH_PROFILE_WIRE_V1_MAX_LOGICAL_LAYERS,
-        .max_behavior_rows              = NOAH_PROFILE_WIRE_V1_MAX_BEHAVIOR_ROWS,
-        .max_tap_steps_per_behavior     = NOAH_PROFILE_WIRE_V1_MAX_TAP_STEPS_PER_BEHAVIOR,
-        .max_populated_behavior_steps   = NOAH_PROFILE_WIRE_V1_MAX_POPULATED_BEHAVIOR_STEPS,
-        .max_combos                     = NOAH_PROFILE_WIRE_V1_MAX_COMBOS,
-        .max_keys_per_combo             = NOAH_PROFILE_WIRE_V1_MAX_KEYS_PER_COMBO,
-        .max_reusable_rgb_groups        = NOAH_PROFILE_WIRE_V1_MAX_REUSABLE_RGB_GROUPS,
-        .max_rgb_stage_group_rows       = NOAH_PROFILE_WIRE_V1_MAX_RGB_STAGE_GROUP_ROWS,
-        .physical_led_count             = NOAH_PROFILE_LED_COUNT,
-        .led_bitmap_size                = NOAH_PROFILE_WIRE_V1_LED_BITMAP_SIZE,
-        .hardcoded_macro_slots          = NOAH_PROFILE_WIRE_V1_MAX_HARDCODED_MACRO_SLOTS,
-        .via_macro_slots                = DYNAMIC_KEYMAP_MACRO_COUNT,
-        .max_profile_payload            = NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX,
-        .profile_slot_payload           = NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX,
-        .profile_slot_size              = NOAH_PROFILE_STORAGE_SLOT_A_SIZE,
-        .via_macro_bytes                = NOAH_PROFILE_STORAGE_VIA_MACRO_SIZE,
-        .supported_domain_mask          = 0u,
-    },
-    .status = {
-        .state_flags = NOAH_PROFILE_STATE_ACTIVE_IS_COMPILED_DEFAULT | NOAH_PROFILE_STATE_DIGESTS_UNAVAILABLE,
-        .active_kind = NOAH_PROFILE_ACTIVE_COMPILED_ONLY,
-    },
+    .capabilities =
+        {
+            .protocol_major = 1u,
+            .protocol_minor = 0u,
+            .schema_major   = 1u,
+            .schema_minor   = 0u,
+            // Stage 01 is intentionally read-only. Candidate capacity and domain
+            // support remain zero until the corresponding decoders and activation
+            // paths exist; the frozen schema ceilings below are declaration
+            // metadata, not a claim that writes are accepted.
+            .candidate_chunk_max          = 0u,
+            .feature_flags                = NOAH_PROFILE_FEATURE_READ_SURFACE | NOAH_PROFILE_FEATURE_STORAGE_LAYOUT | NOAH_PROFILE_SPLIT_CAPABILITY,
+            .action_abi_digest            = 0u,
+            .firmware_version             = VIA_FIRMWARE_VERSION,
+            .compiled_default_digest      = 0u,
+            .compiled_layer_count         = DYNAMIC_KEYMAP_LAYER_COUNT,
+            .max_logical_layers           = NOAH_PROFILE_WIRE_V1_MAX_LOGICAL_LAYERS,
+            .max_behavior_rows            = NOAH_PROFILE_WIRE_V1_MAX_BEHAVIOR_ROWS,
+            .max_tap_steps_per_behavior   = NOAH_PROFILE_WIRE_V1_MAX_TAP_STEPS_PER_BEHAVIOR,
+            .max_populated_behavior_steps = NOAH_PROFILE_WIRE_V1_MAX_POPULATED_BEHAVIOR_STEPS,
+            .max_combos                   = NOAH_PROFILE_WIRE_V1_MAX_COMBOS,
+            .max_keys_per_combo           = NOAH_PROFILE_WIRE_V1_MAX_KEYS_PER_COMBO,
+            .max_reusable_rgb_groups      = NOAH_PROFILE_WIRE_V1_MAX_REUSABLE_RGB_GROUPS,
+            .max_rgb_stage_group_rows     = NOAH_PROFILE_WIRE_V1_MAX_RGB_STAGE_GROUP_ROWS,
+            .physical_led_count           = NOAH_PROFILE_LED_COUNT,
+            .led_bitmap_size              = NOAH_PROFILE_WIRE_V1_LED_BITMAP_SIZE,
+            .hardcoded_macro_slots        = NOAH_PROFILE_WIRE_V1_MAX_HARDCODED_MACRO_SLOTS,
+            .via_macro_slots              = DYNAMIC_KEYMAP_MACRO_COUNT,
+            .max_profile_payload          = NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX,
+            .profile_slot_payload         = NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX,
+            .profile_slot_size            = NOAH_PROFILE_STORAGE_SLOT_A_SIZE,
+            .via_macro_bytes              = NOAH_PROFILE_STORAGE_VIA_MACRO_SIZE,
+            .supported_domain_mask        = 0u,
+        },
+    .status =
+        {
+            .state_flags = NOAH_PROFILE_STATE_ACTIVE_IS_COMPILED_DEFAULT | NOAH_PROFILE_STATE_DIGESTS_UNAVAILABLE,
+            .active_kind = NOAH_PROFILE_ACTIVE_COMPILED_ONLY,
+        },
 };
 
 #    ifdef NOAH_LIVE_PROFILE_OWNER_ENABLE
@@ -101,11 +103,11 @@ static void noah_profile_channel_refresh_owner_capabilities(const noah_profile_o
     if (!owner) {
         return;
     }
-    noah_profile_wire_v1_read_service.capabilities.feature_flags = NOAH_PROFILE_FEATURE_READ_SURFACE | NOAH_PROFILE_FEATURE_STORAGE_LAYOUT | NOAH_PROFILE_SPLIT_CAPABILITY | NOAH_PROFILE_FEATURE_RGB_SCHEMA | NOAH_PROFILE_FEATURE_KEY_BEHAVIOR_SCHEMA | NOAH_PROFILE_FEATURE_ACTION_ABI_DIGEST | NOAH_PROFILE_FEATURE_COMPILED_PROFILE_HASH | NOAH_PROFILE_MUTATION_CAPABILITIES;
-    noah_profile_wire_v1_read_service.capabilities.action_abi_digest         = owner->action_abi_digest;
-    noah_profile_wire_v1_read_service.capabilities.compiled_default_digest   = owner->compiled_default_digest;
-    noah_profile_wire_v1_read_service.capabilities.supported_domain_mask     = owner->supported_domain_mask;
-    noah_profile_wire_v1_read_service.capabilities.candidate_chunk_max       = NOAH_PROFILE_MUTATION_CHUNK_MAX;
+    noah_profile_wire_v1_read_service.capabilities.feature_flags           = NOAH_PROFILE_FEATURE_READ_SURFACE | NOAH_PROFILE_FEATURE_STORAGE_LAYOUT | NOAH_PROFILE_SPLIT_CAPABILITY | NOAH_PROFILE_FEATURE_RGB_SCHEMA | NOAH_PROFILE_FEATURE_KEY_BEHAVIOR_SCHEMA | NOAH_PROFILE_FEATURE_ACTION_ABI_DIGEST | NOAH_PROFILE_FEATURE_COMPILED_PROFILE_HASH | NOAH_PROFILE_MUTATION_CAPABILITIES;
+    noah_profile_wire_v1_read_service.capabilities.action_abi_digest       = owner->action_abi_digest;
+    noah_profile_wire_v1_read_service.capabilities.compiled_default_digest = owner->compiled_default_digest;
+    noah_profile_wire_v1_read_service.capabilities.supported_domain_mask   = owner->supported_domain_mask;
+    noah_profile_wire_v1_read_service.capabilities.candidate_chunk_max     = NOAH_PROFILE_MUTATION_CHUNK_MAX;
 }
 
 static void noah_profile_channel_latch_owner_status(const noah_profile_owner_status_t *owner) {
@@ -114,7 +116,7 @@ static void noah_profile_channel_latch_owner_status(const noah_profile_owner_sta
     if (!owner) {
         return;
     }
-    status = &noah_profile_wire_v1_read_service.status;
+    status  = &noah_profile_wire_v1_read_service.status;
     *status = (noah_profile_wire_v1_device_status_t){
         .source_digest                 = owner->compiled_default_digest,
         .compiled_default_digest       = owner->compiled_default_digest,
@@ -251,13 +253,13 @@ static void noah_profile_channel_write_u32(uint8_t *target, uint32_t value) {
 // This is the read D-026 requires. The READ_SURFACE capability bit describes
 // status reporting and is not this.
 static bool noah_profile_channel_handle_payload_get(uint8_t *data, uint8_t length) {
-    const noah_profile_store_record_t   *record = NULL;
-    noah_profile_compiled_v1_metadata_t  compiled_metadata;
-    uint16_t                             payload_length;
-    uint16_t                             offset;
-    uint16_t                             remaining;
-    uint8_t                              chunk;
-    bool                                 compiled;
+    const noah_profile_store_record_t  *record = NULL;
+    noah_profile_compiled_v1_metadata_t compiled_metadata;
+    uint16_t                            payload_length;
+    uint16_t                            offset;
+    uint16_t                            remaining;
+    uint8_t                             chunk;
+    bool                                compiled;
 
     if (!data || length != NOAH_PROFILE_WIRE_V1_REPORT_SIZE || data[0] != NOAH_PROFILE_WIRE_V1_COMMAND_GET || data[1] != NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL) {
         return false;
@@ -334,8 +336,7 @@ static bool noah_profile_channel_handle_payload_get(uint8_t *data, uint8_t lengt
     remaining = (uint16_t)(payload_length - offset);
     chunk     = remaining < NOAH_PROFILE_WIRE_V1_PAYLOAD_SIZE ? (uint8_t)remaining : NOAH_PROFILE_WIRE_V1_PAYLOAD_SIZE;
 
-    if (!(compiled ? noah_profile_store_runtime_read_compiled(offset, &data[7], chunk)
-                   : noah_profile_store_runtime_read_committed(offset, &data[7], chunk))) {
+    if (!(compiled ? noah_profile_store_runtime_read_compiled(offset, &data[7], chunk) : noah_profile_store_runtime_read_committed(offset, &data[7], chunk))) {
         memset(&data[5], 0, NOAH_PROFILE_WIRE_V1_REPORT_SIZE - 5u);
         data[5] = NOAH_PROFILE_WIRE_V1_STATUS_UNAVAILABLE;
         return true;

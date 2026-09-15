@@ -12,17 +12,12 @@ enum {
     TEST_RGB_PAYLOAD_SIZE = NOAH_PROFILE_RGB_V1_MAX_PAYLOAD_SIZE,
 };
 
-const layer_color_config_t layer_colors[LAYER_COUNT] = {0};
-const layer_led_group_t *const layer_led_groups      = NULL;
-const uint8_t                  layer_led_group_count = 0u;
+const layer_color_config_t     layer_colors[LAYER_COUNT] = {0};
+const layer_led_group_t *const layer_led_groups          = NULL;
+const uint8_t                  layer_led_group_count     = 0u;
 
 const pd_mode_color_t pd_mode_colors[] = {
-    {.pointing_mode = PD_MODE_DRAGSCROLL, .color = HSV(101, 102, 103), .locality = RGB_LEFT_HALF},
-    {.pointing_mode = PD_MODE_VOLUME, .color = HSV(111, 112, 113), .locality = RGB_LEFT_HALF},
-    {.pointing_mode = PD_MODE_BRIGHTNESS, .color = HSV(121, 122, 123), .locality = RGB_LEFT_HALF},
-    {.pointing_mode = PD_MODE_ZOOM, .color = HSV(131, 132, 133), .locality = RGB_LEFT_HALF},
-    {.pointing_mode = PD_MODE_ARROW, .color = HSV(141, 142, 143), .locality = RGB_LEFT_HALF},
-    {.pointing_mode = PD_MODE_PINCH, .color = HSV(151, 152, 153), .locality = RGB_LEFT_HALF},
+    {.pointing_mode = PD_MODE_DRAGSCROLL, .color = HSV(101, 102, 103), .locality = RGB_LEFT_HALF}, {.pointing_mode = PD_MODE_VOLUME, .color = HSV(111, 112, 113), .locality = RGB_LEFT_HALF}, {.pointing_mode = PD_MODE_BRIGHTNESS, .color = HSV(121, 122, 123), .locality = RGB_LEFT_HALF}, {.pointing_mode = PD_MODE_ZOOM, .color = HSV(131, 132, 133), .locality = RGB_LEFT_HALF}, {.pointing_mode = PD_MODE_ARROW, .color = HSV(141, 142, 143), .locality = RGB_LEFT_HALF}, {.pointing_mode = PD_MODE_PINCH, .color = HSV(151, 152, 153), .locality = RGB_LEFT_HALF},
 };
 const uint8_t pd_mode_color_count = (uint8_t)ARRAY_SIZE(pd_mode_colors);
 
@@ -135,8 +130,8 @@ static void check_unpainted(const rgb_runtime_frame_t *frame, uint8_t led) {
 typedef struct {
     const uint8_t                     *bytes;
     noah_effective_rgb_runtime_t      *runtime;
-    noah_effective_profile_identity_t previous;
-    noah_effective_profile_identity_t active;
+    noah_effective_profile_identity_t  previous;
+    noah_effective_profile_identity_t  active;
     noah_effective_profile_snapshot_t *snapshot;
     size_t                             calls;
     size_t                             invalidate_on_call;
@@ -161,7 +156,7 @@ static void test_compiled_and_live_pd_rendering(const char *fixture_path) {
     noah_profile_rgb_v1_error_t       error;
     noah_effective_rgb_runtime_t      runtime;
     noah_effective_rgb_frame_t        profile_frame;
-    noah_effective_profile_identity_t active = test_identity(1u);
+    noah_effective_profile_identity_t active   = test_identity(1u);
     noah_effective_profile_snapshot_t snapshot = {0};
     rgb_runtime_frame_t               frame;
     rgb_t                             compiled_color = hsv_to_rgb(pd_mode_colors[PD_MODE_INDEX_VOLUME].color);
@@ -202,9 +197,9 @@ static void test_compiled_and_live_pd_rendering(const char *fixture_path) {
         check_led(&frame, led, live_color);
     }
 
-    noah_effective_profile_identity_t next = test_identity(2u);
+    noah_effective_profile_identity_t next          = test_identity(2u);
     noah_effective_profile_snapshot_t behavior_only = {.identity = next};
-    invalidating_reader_t             reader = {
+    invalidating_reader_t             reader        = {
         .bytes              = payload,
         .runtime            = &runtime,
         .previous           = active,

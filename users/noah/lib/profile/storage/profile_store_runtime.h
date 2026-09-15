@@ -19,7 +19,7 @@ typedef enum {
 } noah_profile_store_runtime_state_t;
 
 noah_profile_store_runtime_state_t noah_profile_store_runtime_state(void);
-noah_profile_store_result_t noah_profile_store_runtime_discovery_result(void);
+noah_profile_store_result_t        noah_profile_store_runtime_discovery_result(void);
 const noah_profile_store_record_t *noah_profile_store_runtime_committed(void);
 
 // Bounded read of the committed payload for host readback. Refuses any range

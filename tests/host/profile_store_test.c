@@ -299,7 +299,7 @@ static void test_logical_header_binds_via_identity(void) {
     CHECK(rebooted.committed.via_digest == candidate.via_digest);
     {
         noah_profile_store_compatibility_t incompatible = compatibility();
-        noah_profile_store_record_t selected;
+        noah_profile_store_record_t        selected;
         incompatible.compiled_default_digest ^= 1u;
         noah_profile_store_init(&rebooted, io_for(&eeprom), incompatible);
         CHECK(noah_profile_store_boot_select(&rebooted, &selected) == NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE);
@@ -391,9 +391,9 @@ static void test_durable_prepare_is_not_authority_until_decided(void) {
     initialize_store(&store, &eeprom, NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE);
     {
         noah_profile_store_candidate_t candidate = candidate_for(empty_profile, sizeof(empty_profile), 1u, 0u);
-        candidate.format_version = NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL;
-        candidate.via_generation = 3u;
-        candidate.via_digest     = UINT32_C(0x76543210);
+        candidate.format_version                 = NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL;
+        candidate.via_generation                 = 3u;
+        candidate.via_digest                     = UINT32_C(0x76543210);
         CHECK(noah_profile_store_prepare_begin(&store, &candidate) == NOAH_PROFILE_STORE_OK);
         CHECK(noah_profile_store_prepare_write(&store, 0u, empty_profile, sizeof(empty_profile)) == NOAH_PROFILE_STORE_OK);
     }
@@ -763,8 +763,8 @@ static void test_boot_selection_state_machine_is_scan_bounded(void) {
     CHECK(store.boot_scanned && !store.conflict);
 
     {
-        uint32_t reads_before = eeprom.read_calls;
-        noah_profile_store_record_t repeated = {0};
+        uint32_t                    reads_before = eeprom.read_calls;
+        noah_profile_store_record_t repeated     = {0};
 
         CHECK(noah_profile_store_boot_select_step(&store, 1u, &repeated) == NOAH_PROFILE_STORE_OK);
         CHECK(eeprom.read_calls == reads_before);

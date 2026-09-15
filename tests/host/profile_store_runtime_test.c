@@ -242,9 +242,6 @@ static void test_old_compiled_default_record_falls_back(void) {
     assert(qmk_write_calls == 0u);
 }
 
-
-
-
 int main(void) {
     test_qmk_adapter_is_slot_bounded_and_read_only();
     test_qmk_write_adapter_is_slot_bounded();

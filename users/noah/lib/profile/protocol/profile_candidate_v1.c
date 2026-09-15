@@ -7,19 +7,19 @@
 #include <string.h>
 
 enum {
-    FRAME_COMMAND        = 0u,
-    FRAME_CHANNEL        = 1u,
-    FRAME_VALUE          = 2u,
-    FRAME_TRANSACTION    = 3u,
-    FRAME_BODY           = 5u,
-    FRAME_ACK_ADMISSION  = 5u,
-    FRAME_ACK_ERROR      = 6u,
-    FRAME_ACK_OFFSET     = 7u,
-    FRAME_READ_REQUEST   = 3u,
-    FRAME_READ_PAGE      = 4u,
-    FRAME_READ_STATUS    = 5u,
-    FRAME_READ_LENGTH    = 6u,
-    FRAME_READ_PAYLOAD   = 7u,
+    FRAME_COMMAND          = 0u,
+    FRAME_CHANNEL          = 1u,
+    FRAME_VALUE            = 2u,
+    FRAME_TRANSACTION      = 3u,
+    FRAME_BODY             = 5u,
+    FRAME_ACK_ADMISSION    = 5u,
+    FRAME_ACK_ERROR        = 6u,
+    FRAME_ACK_OFFSET       = 7u,
+    FRAME_READ_REQUEST     = 3u,
+    FRAME_READ_PAGE        = 4u,
+    FRAME_READ_STATUS      = 5u,
+    FRAME_READ_LENGTH      = 6u,
+    FRAME_READ_PAYLOAD     = 7u,
     OPERATION_PAYLOAD_SIZE = 25u,
 };
 
@@ -119,14 +119,14 @@ noah_profile_candidate_v1_decode_result_t noah_profile_candidate_v1_decode(const
     if (command->operation == NOAH_PROFILE_CANDIDATE_V1_OPERATION_BEGIN) {
         noah_profile_candidate_v1_metadata_t *metadata = &command->payload.begin;
 
-        metadata->schema_major      = frame[5];
-        metadata->schema_minor      = frame[6];
-        metadata->requested_domains = frame[7];
-        metadata->flags             = frame[8];
-        metadata->payload_length    = read_u16(&frame[9]);
-        metadata->crc32             = read_u32(&frame[11]);
-        metadata->digest            = read_u32(&frame[15]);
-        metadata->action_abi_digest = read_u32(&frame[19]);
+        metadata->schema_major         = frame[5];
+        metadata->schema_minor         = frame[6];
+        metadata->requested_domains    = frame[7];
+        metadata->flags                = frame[8];
+        metadata->payload_length       = read_u16(&frame[9]);
+        metadata->crc32                = read_u32(&frame[11]);
+        metadata->digest               = read_u32(&frame[15]);
+        metadata->action_abi_digest    = read_u32(&frame[19]);
         metadata->store_format_version = frame[23];
         if ((metadata->requested_domains & (uint8_t)~NOAH_PROFILE_CANDIDATE_V1_KNOWN_DOMAINS) != 0u) {
             return fail(error, NOAH_PROFILE_CANDIDATE_V1_DECODE_MALFORMED, 7u);
@@ -152,8 +152,8 @@ noah_profile_candidate_v1_decode_result_t noah_profile_candidate_v1_decode(const
     }
 
     if (command->operation == NOAH_PROFILE_CANDIDATE_V1_OPERATION_CHUNK) {
-        uint16_t end;
-        uint8_t  chunk_length = frame[7];
+        uint16_t                                  end;
+        uint8_t                                   chunk_length = frame[7];
         noah_profile_candidate_v1_decode_result_t result;
 
         command->payload.chunk.offset = read_u16(&frame[5]);
@@ -235,11 +235,11 @@ bool noah_profile_candidate_v1_handle_status_get(const noah_profile_candidate_v1
     }
 
     begin_status_response(frame, NOAH_PROFILE_WIRE_V1_STATUS_OK, OPERATION_PAYLOAD_SIZE);
-    payload     = &frame[FRAME_READ_PAYLOAD];
-    payload[0]  = 1u;
-    payload[1]  = (uint8_t)status->state;
-    payload[2]  = (uint8_t)status->last_operation;
-    payload[3]  = status->flags;
+    payload    = &frame[FRAME_READ_PAYLOAD];
+    payload[0] = 1u;
+    payload[1] = (uint8_t)status->state;
+    payload[2] = (uint8_t)status->last_operation;
+    payload[3] = status->flags;
     write_u16(&payload[4], status->transaction_id);
     write_u16(&payload[6], status->next_offset);
     write_u16(&payload[8], status->payload_length);

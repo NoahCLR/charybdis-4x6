@@ -18,23 +18,23 @@ typedef enum {
 } noah_profile_storage_admission_owner_t;
 
 typedef struct {
-    noah_profile_store_t                      *store;
-    noah_effective_profile_provider_t         *provider;
+    noah_profile_store_t                     *store;
+    noah_effective_profile_provider_t        *provider;
     noah_profile_validator_v1_compatibility_t compatibility;
     noah_profile_validator_v1_t               validator;
-    noah_profile_validator_v1_profile_t        validated_profile;
-    noah_profile_candidate_v1_metadata_t       metadata;
-    noah_profile_reader_t                      staged_reader;
-    noah_effective_profile_snapshot_t          activation_snapshot;
-    noah_profile_store_record_t                committed_record;
-    uint32_t                                   compiled_default_digest;
-    uint8_t                                    origin_half;
-    bool                                       validation_complete;
-    bool                                       committed_available;
-    bool                                       activation_requested;
-    bool                                       reuse_guard_installed;
-    bool                                       validating_committed_record;
-    noah_profile_storage_admission_owner_t     admission_owner;
+    noah_profile_validator_v1_profile_t       validated_profile;
+    noah_profile_candidate_v1_metadata_t      metadata;
+    noah_profile_reader_t                     staged_reader;
+    noah_effective_profile_snapshot_t         activation_snapshot;
+    noah_profile_store_record_t               committed_record;
+    uint32_t                                  compiled_default_digest;
+    uint8_t                                   origin_half;
+    bool                                      validation_complete;
+    bool                                      committed_available;
+    bool                                      activation_requested;
+    bool                                      reuse_guard_installed;
+    bool                                      validating_committed_record;
+    noah_profile_storage_admission_owner_t    admission_owner;
 } noah_profile_candidate_store_backend_t;
 
 // backend and store must remain at stable addresses for their shared lifetime:
@@ -63,7 +63,7 @@ noah_profile_candidate_backend_result_t noah_profile_candidate_store_backend_ado
 // overwrite the other's retained validated view. Abort or a successful
 // activation releases it; durability-unknown deliberately retains it.
 noah_profile_storage_admission_owner_t noah_profile_candidate_store_backend_admission_owner(const noah_profile_candidate_store_backend_t *backend);
-bool noah_profile_candidate_store_backend_release_admission(noah_profile_candidate_store_backend_t *backend, noah_profile_storage_admission_owner_t owner);
+bool                                   noah_profile_candidate_store_backend_release_admission(noah_profile_candidate_store_backend_t *backend, noah_profile_storage_admission_owner_t owner);
 
 // While a validated HOST candidate is still precommit, the split owner may
 // stream its exact bytes to the sibling's inactive slot. These observations

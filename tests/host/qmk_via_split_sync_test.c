@@ -751,7 +751,7 @@ static void test_logical_receiver_stays_dirty_until_decision_accept(void) {
     peer_keymap[1] = 0x71u;
     peer_macro[0]  = 0x72u;
     target_digest  = peer_digest();
-    response = callback_exchange((noah_qmk_via_sync_frame_t){.kind = NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_BEGIN, .generation = 7u, .digest = target_digest});
+    response       = callback_exchange((noah_qmk_via_sync_frame_t){.kind = NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_BEGIN, .generation = 7u, .digest = target_digest});
     CHECK(response.status == NOAH_QMK_VIA_SYNC_STATUS_OK);
     (void)callback_exchange((noah_qmk_via_sync_frame_t){.kind = NOAH_QMK_VIA_SYNC_MESSAGE_PUSH_CHUNK, .region = NOAH_QMK_VIA_SYNC_REGION_KEYMAP, .generation = 7u, .region_length = TEST_KEYMAP_SIZE, .digest = target_digest, .payload_length = TEST_KEYMAP_SIZE, .payload = {peer_keymap[0], peer_keymap[1], peer_keymap[2]}});
     (void)callback_exchange((noah_qmk_via_sync_frame_t){.kind = NOAH_QMK_VIA_SYNC_MESSAGE_PUSH_CHUNK, .region = NOAH_QMK_VIA_SYNC_REGION_MACRO, .generation = 7u, .region_length = TEST_MACRO_SIZE, .digest = target_digest, .payload_length = TEST_MACRO_SIZE, .payload = {peer_macro[0], peer_macro[1]}});
@@ -775,7 +775,7 @@ static void test_logical_receiver_stays_dirty_until_decision_accept(void) {
 
 static void test_logical_master_queue_fences_reconciliation_until_accept(void) {
     noah_qmk_via_logical_status_t status;
-    noah_qmk_via_sync_frame_t begin = {
+    noah_qmk_via_sync_frame_t     begin = {
         .kind       = NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_BEGIN,
         .generation = 6u,
         .digest     = 0u,
@@ -804,7 +804,7 @@ static void test_logical_master_queue_fences_reconciliation_until_accept(void) {
     test_reset();
     test_init_ready();
     scan_many(0u, 2u);
-    rpc_count = 0u;
+    rpc_count      = 0u;
     peer_keymap[0] = chunk.payload[0];
     peer_keymap[1] = chunk.payload[1];
     peer_keymap[2] = chunk.payload[2];
@@ -893,9 +893,9 @@ static void test_replacement_snapshot_restarts_in_progress_verification(void) {
 }
 
 static void test_boot_fence_recovers_matching_staged_logical_bank(void) {
-    noah_qmk_via_sync_frame_t response;
+    noah_qmk_via_sync_frame_t    response;
     noah_qmk_via_sync_metadata_t metadata;
-    uint32_t target_digest;
+    uint32_t                     target_digest;
 
     test_reset();
     fake_master        = false;

@@ -13,13 +13,12 @@ enum {
     REASON_MACRO_BUSY = 1u << 3,
 };
 
-static const uint8_t canonical_empty_profile[] = {'N', 'L', 'P', '1', 1u, 0u, 0u, 1u};
-static const uint8_t canonical_behavior_profile[] =
-    "\x4e\x4c\x50\x31\x01\x00\x01\x01\x20\x01\x3a\x00\x02\x03\x00\x00"
-    "\x20\x00\x01\x00\x34\x12\x96\x00\x90\x01\xaf\x00\x01\x02\x00\x02"
-    "\x03\x19\x01\x00\x28\x00\x02\x05\x06\x00\x0a\x00\x02\x00\x03\x00"
-    "\x03\x00\x12\x00\x04\x00\x02\x00\x00\x00\x00\x00\x00\x00\x00\x01"
-    "\x01\x01\x07\x00\x02\x00";
+static const uint8_t canonical_empty_profile[]    = {'N', 'L', 'P', '1', 1u, 0u, 0u, 1u};
+static const uint8_t canonical_behavior_profile[] = "\x4e\x4c\x50\x31\x01\x00\x01\x01\x20\x01\x3a\x00\x02\x03\x00\x00"
+                                                    "\x20\x00\x01\x00\x34\x12\x96\x00\x90\x01\xaf\x00\x01\x02\x00\x02"
+                                                    "\x03\x19\x01\x00\x28\x00\x02\x05\x06\x00\x0a\x00\x02\x00\x03\x00"
+                                                    "\x03\x00\x12\x00\x04\x00\x02\x00\x00\x00\x00\x00\x00\x00\x00\x01"
+                                                    "\x01\x01\x07\x00\x02\x00";
 
 typedef struct {
     uint8_t prefix[5];
@@ -69,8 +68,8 @@ static uint32_t safe_boundary(void *context) {
 }
 
 static uint32_t reentrant_safe_boundary(void *context) {
-    safe_boundary_context_t          *boundary = context;
-    noah_effective_profile_status_t   status;
+    safe_boundary_context_t        *boundary = context;
+    noah_effective_profile_status_t status;
 
     boundary->saw_cancel_guard = noah_effective_profile_provider_cancel_pending(boundary->provider) == NOAH_EFFECTIVE_PROFILE_REENTRANT;
     boundary->saw_poll_guard   = noah_effective_profile_provider_poll(boundary->provider) == NOAH_EFFECTIVE_PROFILE_REENTRANT;
@@ -80,10 +79,10 @@ static uint32_t reentrant_safe_boundary(void *context) {
 }
 
 static void invalidate(void *context, uint32_t publication_count, noah_effective_profile_identity_t previous, noah_effective_profile_identity_t active, const noah_effective_profile_snapshot_t *callback_view) {
-    invalidation_context_t            *invalidation = context;
-    noah_effective_profile_snapshot_t  copied;
-    noah_effective_profile_status_t    status;
-    uint8_t                            magic[4];
+    invalidation_context_t           *invalidation = context;
+    noah_effective_profile_snapshot_t copied;
+    noah_effective_profile_status_t   status;
+    uint8_t                           magic[4];
 
     assert(publication_count == invalidation->expected_publication);
     assert(previous.generation == invalidation->expected_previous_generation);
@@ -96,7 +95,7 @@ static void invalidate(void *context, uint32_t publication_count, noah_effective
     invalidation->saw_callback_view       = callback_view && callback_view->identity.generation == active.generation && callback_view->identity.payload_digest == active.payload_digest && noah_effective_profile_snapshot_read(callback_view, 0u, magic, sizeof(magic)) && memcmp(magic, "NLP1", sizeof(magic)) == 0;
     invalidation->saw_active_generation   = invalidation->saw_callback_view;
     invalidation->saw_pending_clear       = !invalidation->provider->has_pending && invalidation->provider->publication_in_progress;
-    invalidation->saw_reentrant_guard = noah_effective_profile_provider_request_compiled_fallback(invalidation->provider) == NOAH_EFFECTIVE_PROFILE_REENTRANT;
+    invalidation->saw_reentrant_guard     = noah_effective_profile_provider_request_compiled_fallback(invalidation->provider) == NOAH_EFFECTIVE_PROFILE_REENTRANT;
 }
 
 static noah_profile_validator_v1_profile_t validate_profile(const noah_profile_reader_t *reader, size_t base_offset, uint16_t byte_length, uint8_t domain_mask) {
@@ -111,7 +110,7 @@ static noah_profile_validator_v1_profile_t validate_profile(const noah_profile_r
 
     assert(byte_length <= sizeof(bytes));
     assert(noah_profile_reader_read(reader, base_offset, bytes, byte_length));
-    crc_state = noah_profile_crc32_update(NOAH_PROFILE_CRC32_INITIAL, bytes, byte_length);
+    crc_state   = noah_profile_crc32_update(NOAH_PROFILE_CRC32_INITIAL, bytes, byte_length);
     declaration = (noah_profile_validator_v1_declaration_t){
         .schema_major      = NOAH_PROFILE_BLOB_V1_SCHEMA_MAJOR,
         .schema_minor      = NOAH_PROFILE_BLOB_V1_SCHEMA_MINOR,
@@ -124,7 +123,7 @@ static noah_profile_validator_v1_profile_t validate_profile(const noah_profile_r
     };
     compatibility.required_domain_mask = domain_mask;
     compatibility.allowed_domain_mask  = domain_mask;
-    result = noah_profile_validator_v1_begin(&validator, reader, base_offset, &declaration, &compatibility, &error);
+    result                             = noah_profile_validator_v1_begin(&validator, reader, base_offset, &declaration, &compatibility, &error);
     while (result == NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS) {
         result = noah_profile_validator_v1_step(&validator, NOAH_PROFILE_VALIDATOR_V1_CHECKSUM_CHUNK_MAX, &error);
     }
@@ -139,27 +138,27 @@ static void init_backing(backing_t *backing, uint8_t marker) {
 }
 
 static noah_effective_profile_snapshot_t make_compiled(backing_t *backing) {
-    noah_profile_reader_t                reader = noah_profile_reader_from_memory((const uint8_t *)backing, sizeof(*backing));
-    noah_profile_validator_v1_profile_t  profile = validate_profile(&reader, offsetof(backing_t, profile), sizeof(backing->profile), 0u);
-    noah_effective_profile_snapshot_t    snapshot;
+    noah_profile_reader_t               reader  = noah_profile_reader_from_memory((const uint8_t *)backing, sizeof(*backing));
+    noah_profile_validator_v1_profile_t profile = validate_profile(&reader, offsetof(backing_t, profile), sizeof(backing->profile), 0u);
+    noah_effective_profile_snapshot_t   snapshot;
 
     assert(noah_effective_profile_snapshot_make_compiled(&profile, &reader, offsetof(backing_t, profile), &snapshot) == NOAH_EFFECTIVE_PROFILE_OK);
     return snapshot;
 }
 
 static noah_effective_profile_snapshot_t make_live(backing_t *backing, uint32_t generation, uint8_t origin, uint32_t compiled_default_digest) {
-    noah_profile_reader_t                reader = noah_profile_reader_from_memory((const uint8_t *)backing, sizeof(*backing));
-    noah_profile_validator_v1_profile_t  profile = validate_profile(&reader, offsetof(backing_t, profile), sizeof(backing->profile), 0u);
-    noah_effective_profile_snapshot_t    snapshot;
+    noah_profile_reader_t               reader  = noah_profile_reader_from_memory((const uint8_t *)backing, sizeof(*backing));
+    noah_profile_validator_v1_profile_t profile = validate_profile(&reader, offsetof(backing_t, profile), sizeof(backing->profile), 0u);
+    noah_effective_profile_snapshot_t   snapshot;
 
     assert(noah_effective_profile_snapshot_make_validated(&profile, &reader, offsetof(backing_t, profile), generation, origin, compiled_default_digest, &snapshot) == NOAH_EFFECTIVE_PROFILE_OK);
     return snapshot;
 }
 
 static noah_effective_profile_snapshot_t make_live_behavior(behavior_backing_t *backing, uint32_t generation, uint8_t origin, uint32_t compiled_default_digest) {
-    noah_profile_reader_t                reader = noah_profile_reader_from_memory((const uint8_t *)backing, sizeof(*backing));
-    noah_profile_validator_v1_profile_t  profile = validate_profile(&reader, offsetof(behavior_backing_t, profile), sizeof(backing->profile), NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS);
-    noah_effective_profile_snapshot_t    snapshot;
+    noah_profile_reader_t               reader  = noah_profile_reader_from_memory((const uint8_t *)backing, sizeof(*backing));
+    noah_profile_validator_v1_profile_t profile = validate_profile(&reader, offsetof(behavior_backing_t, profile), sizeof(backing->profile), NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS);
+    noah_effective_profile_snapshot_t   snapshot;
 
     assert(noah_effective_profile_snapshot_make_validated(&profile, &reader, offsetof(behavior_backing_t, profile), generation, origin, compiled_default_digest, &snapshot) == NOAH_EFFECTIVE_PROFILE_OK);
     return snapshot;
@@ -184,13 +183,13 @@ static void expect_active(const noah_effective_profile_provider_t *provider, noa
 }
 
 static void test_initial_compiled_snapshot_and_fail_closed_copies(void) {
-    backing_t                           compiled_backing;
-    noah_effective_profile_snapshot_t   compiled;
-    noah_effective_profile_snapshot_t   copied;
-    noah_effective_profile_snapshot_t   copied_again;
-    noah_effective_profile_provider_t   provider;
-    noah_effective_profile_status_t     status;
-    uint8_t                             bytes[sizeof(canonical_empty_profile)];
+    backing_t                         compiled_backing;
+    noah_effective_profile_snapshot_t compiled;
+    noah_effective_profile_snapshot_t copied;
+    noah_effective_profile_snapshot_t copied_again;
+    noah_effective_profile_provider_t provider;
+    noah_effective_profile_status_t   status;
+    uint8_t                           bytes[sizeof(canonical_empty_profile)];
 
     init_backing(&compiled_backing, 0x11u);
     compiled = make_compiled(&compiled_backing);
@@ -221,11 +220,11 @@ static void test_initial_compiled_snapshot_and_fail_closed_copies(void) {
 }
 
 static void test_nested_domain_views_must_stay_inside_blob(void) {
-    backing_t                          compiled_backing;
-    behavior_backing_t                 live_backing;
-    noah_profile_reader_t              reader;
+    backing_t                           compiled_backing;
+    behavior_backing_t                  live_backing;
+    noah_profile_reader_t               reader;
     noah_profile_validator_v1_profile_t profile;
-    noah_effective_profile_snapshot_t  snapshot;
+    noah_effective_profile_snapshot_t   snapshot;
 
     init_backing(&compiled_backing, 0x18u);
     memset(&live_backing, 0x19u, sizeof(live_backing));
@@ -236,22 +235,22 @@ static void test_nested_domain_views_must_stay_inside_blob(void) {
     profile.key_behaviors.base_offset = 0u;
     assert(noah_effective_profile_snapshot_make_validated(&profile, &reader, offsetof(behavior_backing_t, profile), 1u, 0u, make_compiled(&compiled_backing).identity.payload_digest, &snapshot) == NOAH_EFFECTIVE_PROFILE_INVALID_SNAPSHOT);
 
-    profile = validate_profile(&reader, offsetof(behavior_backing_t, profile), sizeof(live_backing.profile), NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS);
+    profile                           = validate_profile(&reader, offsetof(behavior_backing_t, profile), sizeof(live_backing.profile), NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS);
     profile.key_behaviors.base_offset = offsetof(behavior_backing_t, profile) + sizeof(live_backing.profile);
     profile.key_behaviors.byte_length = 1u;
     assert(noah_effective_profile_snapshot_make_validated(&profile, &reader, offsetof(behavior_backing_t, profile), 1u, 0u, make_compiled(&compiled_backing).identity.payload_digest, &snapshot) == NOAH_EFFECTIVE_PROFILE_INVALID_SNAPSHOT);
 }
 
 static void test_safe_boundary_reentrancy_and_missing_behavior_predicate(void) {
-    backing_t                           compiled_backing;
-    backing_t                           live_backing;
-    behavior_backing_t                  behavior_backing;
-    noah_effective_profile_snapshot_t   compiled;
-    noah_effective_profile_snapshot_t   live;
-    noah_effective_profile_snapshot_t   behavior;
-    noah_effective_profile_provider_t   provider;
-    noah_effective_profile_status_t     status;
-    safe_boundary_context_t             boundary;
+    backing_t                         compiled_backing;
+    backing_t                         live_backing;
+    behavior_backing_t                behavior_backing;
+    noah_effective_profile_snapshot_t compiled;
+    noah_effective_profile_snapshot_t live;
+    noah_effective_profile_snapshot_t behavior;
+    noah_effective_profile_provider_t provider;
+    noah_effective_profile_status_t   status;
+    safe_boundary_context_t           boundary;
 
     init_backing(&compiled_backing, 0x1au);
     init_backing(&live_backing, 0x1bu);
@@ -286,17 +285,17 @@ static void test_safe_boundary_reentrancy_and_missing_behavior_predicate(void) {
 }
 
 static void test_safe_wait_and_exactly_once_ordered_publication(void) {
-    backing_t                           compiled_backing;
-    backing_t                           live_backing;
-    noah_effective_profile_snapshot_t   compiled;
-    noah_effective_profile_snapshot_t   live;
-    noah_effective_profile_snapshot_t   copied;
-    noah_effective_profile_provider_t   provider;
-    noah_effective_profile_status_t     status;
-    invalidation_context_t              contexts[3];
+    backing_t                            compiled_backing;
+    backing_t                            live_backing;
+    noah_effective_profile_snapshot_t    compiled;
+    noah_effective_profile_snapshot_t    live;
+    noah_effective_profile_snapshot_t    copied;
+    noah_effective_profile_provider_t    provider;
+    noah_effective_profile_status_t      status;
+    invalidation_context_t               contexts[3];
     noah_effective_profile_invalidator_t invalidators[3];
-    invalidation_log_t                  log;
-    size_t                              index;
+    invalidation_log_t                   log;
+    size_t                               index;
 
     init_backing(&compiled_backing, 0x21u);
     init_backing(&live_backing, 0x22u);
@@ -305,13 +304,13 @@ static void test_safe_wait_and_exactly_once_ordered_publication(void) {
     memset(contexts, 0, sizeof(contexts));
     memset(&log, 0, sizeof(log));
     for (index = 0u; index < 3u; index++) {
-        contexts[index].provider             = &provider;
-        contexts[index].log                  = &log;
-        contexts[index].callback_id          = (uint8_t)(index + 1u);
-        contexts[index].expected_publication = 1u;
+        contexts[index].provider                     = &provider;
+        contexts[index].log                          = &log;
+        contexts[index].callback_id                  = (uint8_t)(index + 1u);
+        contexts[index].expected_publication         = 1u;
         contexts[index].expected_previous_generation = 0u;
         contexts[index].expected_active_generation   = 7u;
-        invalidators[index] = (noah_effective_profile_invalidator_t){
+        invalidators[index]                          = (noah_effective_profile_invalidator_t){
             .callback = invalidate,
             .context  = &contexts[index],
         };
@@ -364,28 +363,28 @@ static void test_safe_wait_and_exactly_once_ordered_publication(void) {
 }
 
 static void test_rollback_fallback_and_retained_snapshot_immutability(void) {
-    backing_t                          compiled_backing;
-    behavior_backing_t                 first_backing;
-    behavior_backing_t                 second_backing;
-    noah_effective_profile_snapshot_t  compiled;
-    noah_effective_profile_snapshot_t  first;
-    noah_effective_profile_snapshot_t  second;
-    noah_effective_profile_snapshot_t  retained_first;
-    noah_effective_profile_snapshot_t  active;
-    noah_effective_profile_provider_t  provider;
-    noah_effective_profile_status_t    status;
-    noah_key_behavior_row_v1_view_t    row;
-    noah_profile_codec_v1_error_t      codec_error;
-    uint8_t                            bytes[sizeof(canonical_behavior_profile) - 1u];
+    backing_t                         compiled_backing;
+    behavior_backing_t                first_backing;
+    behavior_backing_t                second_backing;
+    noah_effective_profile_snapshot_t compiled;
+    noah_effective_profile_snapshot_t first;
+    noah_effective_profile_snapshot_t second;
+    noah_effective_profile_snapshot_t retained_first;
+    noah_effective_profile_snapshot_t active;
+    noah_effective_profile_provider_t provider;
+    noah_effective_profile_status_t   status;
+    noah_key_behavior_row_v1_view_t   row;
+    noah_profile_codec_v1_error_t     codec_error;
+    uint8_t                           bytes[sizeof(canonical_behavior_profile) - 1u];
 
     init_backing(&compiled_backing, 0x31u);
     memset(&first_backing, 0x32u, sizeof(first_backing));
     memset(&second_backing, 0x33u, sizeof(second_backing));
     memcpy(first_backing.profile, canonical_behavior_profile, sizeof(first_backing.profile));
     memcpy(second_backing.profile, canonical_behavior_profile, sizeof(second_backing.profile));
-    compiled = make_compiled(&compiled_backing);
-    first    = make_live_behavior(&first_backing, 10u, 0u, compiled.identity.payload_digest);
-    second   = make_live_behavior(&second_backing, 11u, 1u, compiled.identity.payload_digest);
+    compiled                  = make_compiled(&compiled_backing);
+    first                     = make_live_behavior(&first_backing, 10u, 0u, compiled.identity.payload_digest);
+    second                    = make_live_behavior(&second_backing, 11u, 1u, compiled.identity.payload_digest);
     safe_boundary_reason_mask = 0u;
     assert(noah_effective_profile_provider_init(&provider, &compiled, safe_boundary, &safe_boundary_reason_mask, NULL, 0u) == NOAH_EFFECTIVE_PROFILE_OK);
     assert(noah_effective_profile_provider_request_rollback(&provider) == NOAH_EFFECTIVE_PROFILE_NO_ROLLBACK);
@@ -429,13 +428,13 @@ static void test_rollback_fallback_and_retained_snapshot_immutability(void) {
 }
 
 static void test_rejection_busy_and_cancel_contracts(void) {
-    backing_t                          compiled_backing;
-    backing_t                          live_backing;
-    noah_effective_profile_snapshot_t  compiled;
-    noah_effective_profile_snapshot_t  first;
-    noah_effective_profile_snapshot_t  second;
-    noah_effective_profile_snapshot_t  invalid;
-    noah_effective_profile_provider_t  provider;
+    backing_t                         compiled_backing;
+    backing_t                         live_backing;
+    noah_effective_profile_snapshot_t compiled;
+    noah_effective_profile_snapshot_t first;
+    noah_effective_profile_snapshot_t second;
+    noah_effective_profile_snapshot_t invalid;
+    noah_effective_profile_provider_t provider;
 
     init_backing(&compiled_backing, 0x41u);
     init_backing(&live_backing, 0x42u);
@@ -462,24 +461,24 @@ static void test_rejection_busy_and_cancel_contracts(void) {
 }
 
 static void test_discard_rollback_before_backing_reuse(void) {
-    backing_t                          compiled_backing;
-    behavior_backing_t                 first_backing;
-    behavior_backing_t                 second_backing;
-    noah_effective_profile_snapshot_t  compiled;
-    noah_effective_profile_snapshot_t  first;
-    noah_effective_profile_snapshot_t  second;
-    noah_effective_profile_snapshot_t  active;
-    noah_effective_profile_provider_t  provider;
-    noah_effective_profile_status_t    status;
+    backing_t                         compiled_backing;
+    behavior_backing_t                first_backing;
+    behavior_backing_t                second_backing;
+    noah_effective_profile_snapshot_t compiled;
+    noah_effective_profile_snapshot_t first;
+    noah_effective_profile_snapshot_t second;
+    noah_effective_profile_snapshot_t active;
+    noah_effective_profile_provider_t provider;
+    noah_effective_profile_status_t   status;
 
     init_backing(&compiled_backing, 0x51u);
     memset(&first_backing, 0x52u, sizeof(first_backing));
     memset(&second_backing, 0x53u, sizeof(second_backing));
     memcpy(first_backing.profile, canonical_behavior_profile, sizeof(first_backing.profile));
     memcpy(second_backing.profile, canonical_behavior_profile, sizeof(second_backing.profile));
-    compiled = make_compiled(&compiled_backing);
-    first    = make_live_behavior(&first_backing, 20u, 0u, compiled.identity.payload_digest);
-    second   = make_live_behavior(&second_backing, 21u, 1u, compiled.identity.payload_digest);
+    compiled                  = make_compiled(&compiled_backing);
+    first                     = make_live_behavior(&first_backing, 20u, 0u, compiled.identity.payload_digest);
+    second                    = make_live_behavior(&second_backing, 21u, 1u, compiled.identity.payload_digest);
     safe_boundary_reason_mask = 0u;
     assert(noah_effective_profile_provider_init(&provider, &compiled, safe_boundary, &safe_boundary_reason_mask, NULL, 0u) == NOAH_EFFECTIVE_PROFILE_OK);
     assert(noah_effective_profile_provider_request_validated(&provider, &first) == NOAH_EFFECTIVE_PROFILE_OK);
@@ -510,19 +509,19 @@ static void test_discard_rollback_before_backing_reuse(void) {
 }
 
 static void test_backing_reuse_requires_explicit_active_aware_reservation(void) {
-    backing_t                          compiled_backing;
-    backing_t                          first_backing;
-    backing_t                          second_backing;
-    noah_effective_profile_snapshot_t  compiled;
-    noah_effective_profile_snapshot_t  first;
-    noah_effective_profile_snapshot_t  second;
-    noah_effective_profile_snapshot_t  same_active_backing;
-    noah_effective_profile_snapshot_t  compiled_as_live;
-    noah_effective_profile_backing_t   compiled_range;
-    noah_effective_profile_backing_t   first_range;
-    noah_effective_profile_backing_t   second_range;
-    noah_effective_profile_provider_t  provider;
-    noah_effective_profile_status_t    status;
+    backing_t                         compiled_backing;
+    backing_t                         first_backing;
+    backing_t                         second_backing;
+    noah_effective_profile_snapshot_t compiled;
+    noah_effective_profile_snapshot_t first;
+    noah_effective_profile_snapshot_t second;
+    noah_effective_profile_snapshot_t same_active_backing;
+    noah_effective_profile_snapshot_t compiled_as_live;
+    noah_effective_profile_backing_t  compiled_range;
+    noah_effective_profile_backing_t  first_range;
+    noah_effective_profile_backing_t  second_range;
+    noah_effective_profile_provider_t provider;
+    noah_effective_profile_status_t   status;
 
     init_backing(&compiled_backing, 0x61u);
     init_backing(&first_backing, 0x62u);
@@ -532,9 +531,9 @@ static void test_backing_reuse_requires_explicit_active_aware_reservation(void) 
     second              = make_live(&second_backing, 31u, 1u, compiled.identity.payload_digest);
     same_active_backing = make_live(&second_backing, 32u, 1u, compiled.identity.payload_digest);
     assert(noah_effective_profile_snapshot_make_validated(&compiled.profile, &compiled.reader, compiled.base_offset, 33u, 0u, compiled.identity.payload_digest, &compiled_as_live) == NOAH_EFFECTIVE_PROFILE_OK);
-    compiled_range      = make_backing(&compiled_backing, sizeof(compiled_backing));
-    first_range         = make_backing(&first_backing, sizeof(first_backing));
-    second_range        = make_backing(&second_backing, sizeof(second_backing));
+    compiled_range = make_backing(&compiled_backing, sizeof(compiled_backing));
+    first_range    = make_backing(&first_backing, sizeof(first_backing));
+    second_range   = make_backing(&second_backing, sizeof(second_backing));
 
     assert(noah_effective_profile_provider_init(&provider, &compiled, NULL, NULL, NULL, 0u) == NOAH_EFFECTIVE_PROFILE_OK);
     assert(noah_effective_profile_provider_begin_backing_reuse(&provider, &compiled_range) == NOAH_EFFECTIVE_PROFILE_ACTIVE_BACKING_PINNED);

@@ -107,7 +107,7 @@ noah_effective_rgb_result_t noah_effective_rgb_runtime_capture_frame(const noah_
 }
 
 noah_effective_rgb_result_t noah_effective_rgb_runtime_frame_status(const noah_effective_rgb_runtime_t *runtime, const noah_effective_rgb_frame_t *frame) {
-    noah_effective_rgb_frame_t active;
+    noah_effective_rgb_frame_t  active;
     noah_effective_rgb_result_t result;
 
     if (!frame || !frame->valid) {

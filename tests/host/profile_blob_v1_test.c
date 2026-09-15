@@ -17,14 +17,7 @@ typedef struct {
 } action_fixture_t;
 
 static const action_fixture_t action_fixtures[] = {
-    {"NONE", NOAH_PROFILE_ACTION_V1_NONE},
-    {"QMK_KEYCODE", NOAH_PROFILE_ACTION_V1_QMK_KEYCODE},
-    {"LAYER_MOMENTARY", NOAH_PROFILE_ACTION_V1_LAYER_MOMENTARY},
-    {"LAYER_LOCK", NOAH_PROFILE_ACTION_V1_LAYER_LOCK},
-    {"PD_MODE_MOMENTARY", NOAH_PROFILE_ACTION_V1_PD_MODE_MOMENTARY},
-    {"PD_MODE_LOCK", NOAH_PROFILE_ACTION_V1_PD_MODE_LOCK},
-    {"VIA_MACRO", NOAH_PROFILE_ACTION_V1_VIA_MACRO},
-    {"HARDCODED_MACRO", NOAH_PROFILE_ACTION_V1_HARDCODED_MACRO},
+    {"NONE", NOAH_PROFILE_ACTION_V1_NONE}, {"QMK_KEYCODE", NOAH_PROFILE_ACTION_V1_QMK_KEYCODE}, {"LAYER_MOMENTARY", NOAH_PROFILE_ACTION_V1_LAYER_MOMENTARY}, {"LAYER_LOCK", NOAH_PROFILE_ACTION_V1_LAYER_LOCK}, {"PD_MODE_MOMENTARY", NOAH_PROFILE_ACTION_V1_PD_MODE_MOMENTARY}, {"PD_MODE_LOCK", NOAH_PROFILE_ACTION_V1_PD_MODE_LOCK}, {"VIA_MACRO", NOAH_PROFILE_ACTION_V1_VIA_MACRO}, {"HARDCODED_MACRO", NOAH_PROFILE_ACTION_V1_HARDCODED_MACRO},
 };
 
 static void expect_result(noah_profile_codec_v1_result_t actual, noah_profile_codec_v1_result_t expected) {
@@ -92,8 +85,8 @@ static size_t fixture_hex(const char *path, const char *key, uint8_t *output, si
 }
 
 static uint32_t fixture_u32(const char *path, const char *key, int base) {
-    char         encoded[64];
-    char        *end;
+    char          encoded[64];
+    char         *end;
     unsigned long value;
 
     assert(fixture_value(path, key, encoded, sizeof(encoded)));
@@ -103,15 +96,15 @@ static uint32_t fixture_u32(const char *path, const char *key, int base) {
 }
 
 static void test_shared_blob_vectors(const char *fixture_path) {
-    uint8_t                       expected[TEST_BUFFER_SIZE];
-    uint8_t                       encoded[TEST_BUFFER_SIZE];
-    size_t                        expected_length;
-    size_t                        written;
-    noah_profile_blob_v1_t        blob;
-    noah_profile_codec_v1_error_t error;
-    static const uint8_t          rgb_payload[]      = {0xDEu, 0xADu, 0xBEu, 0xEFu};
-    static const uint8_t          behavior_payload[] = {0x00u, 0x01u, 0x02u};
-    const noah_profile_domain_v1_t unsorted[]        = {
+    uint8_t                        expected[TEST_BUFFER_SIZE];
+    uint8_t                        encoded[TEST_BUFFER_SIZE];
+    size_t                         expected_length;
+    size_t                         written;
+    noah_profile_blob_v1_t         blob;
+    noah_profile_codec_v1_error_t  error;
+    static const uint8_t           rgb_payload[]      = {0xDEu, 0xADu, 0xBEu, 0xEFu};
+    static const uint8_t           behavior_payload[] = {0x00u, 0x01u, 0x02u};
+    const noah_profile_domain_v1_t unsorted[]         = {
         {.id = NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIORS, .version = 1u, .payload = behavior_payload, .payload_length = sizeof(behavior_payload)},
         {.id = NOAH_PROFILE_DOMAIN_V1_RGB, .version = 1u, .payload = rgb_payload, .payload_length = sizeof(rgb_payload)},
     };
@@ -143,14 +136,14 @@ static void test_shared_blob_vectors(const char *fixture_path) {
 }
 
 static void test_domain_envelopes(void) {
-    static const uint8_t         payload[] = {0xAAu, 0xBBu};
-    noah_profile_domain_v1_t     input     = {.id = NOAH_PROFILE_DOMAIN_V1_RGB, .version = 1u, .payload = payload, .payload_length = sizeof(payload)};
-    noah_profile_domain_v1_t     decoded;
+    static const uint8_t          payload[] = {0xAAu, 0xBBu};
+    noah_profile_domain_v1_t      input     = {.id = NOAH_PROFILE_DOMAIN_V1_RGB, .version = 1u, .payload = payload, .payload_length = sizeof(payload)};
+    noah_profile_domain_v1_t      decoded;
     noah_profile_codec_v1_error_t error;
-    uint8_t                      encoded[16];
-    uint8_t                      stream[18] = {0xCCu};
-    size_t                       written;
-    size_t                       next_offset;
+    uint8_t                       encoded[16];
+    uint8_t                       stream[18] = {0xCCu};
+    size_t                        written;
+    size_t                        next_offset;
 
     expect_result(noah_profile_domain_v1_encode(&input, encoded, sizeof(encoded), &written, &error), NOAH_PROFILE_CODEC_V1_OK);
     assert(written == 6u);
@@ -183,7 +176,7 @@ static void test_domain_envelopes(void) {
     expect_result(noah_profile_domain_v1_encode(&input, encoded, sizeof(encoded), &written, &error), NOAH_PROFILE_CODEC_V1_CAPACITY_EXCEEDED);
     input.payload_length = sizeof(payload);
     expect_result(noah_profile_domain_v1_encode(&input, encoded, 5u, &written, &error), NOAH_PROFILE_CODEC_V1_OUTPUT_TOO_SMALL);
-    input.payload        = NULL;
+    input.payload = NULL;
     expect_result(noah_profile_domain_v1_encode(&input, encoded, sizeof(encoded), &written, &error), NOAH_PROFILE_CODEC_V1_INVALID_ARGUMENT);
     expect_result(noah_profile_domain_v1_read(encoded, sizeof(encoded), sizeof(encoded) + 1u, &decoded, &next_offset, &error), NOAH_PROFILE_CODEC_V1_INVALID_ARGUMENT);
 }
@@ -299,9 +292,9 @@ static void test_shared_action_vectors(const char *fixture_path) {
 }
 
 static void expect_invalid_operand(uint8_t kind, uint16_t operand, const noah_profile_action_v1_limits_t *limits) {
-    noah_profile_action_v1_t     action = {.kind = kind, .flags = 0u, .operand = operand};
+    noah_profile_action_v1_t      action = {.kind = kind, .flags = 0u, .operand = operand};
     noah_profile_codec_v1_error_t error;
-    uint8_t                      encoded[NOAH_PROFILE_BLOB_V1_ACTION_SIZE];
+    uint8_t                       encoded[NOAH_PROFILE_BLOB_V1_ACTION_SIZE];
 
     expect_result(noah_profile_action_v1_encode(&action, limits, encoded, &error), NOAH_PROFILE_CODEC_V1_INVALID_OPERAND);
     assert(error.offset == 2u);
@@ -338,7 +331,7 @@ static void test_action_rejections_and_streams(void) {
     limits.max_logical_layers = 0u;
     expect_invalid_operand(NOAH_PROFILE_ACTION_V1_LAYER_MOMENTARY, 0u, &limits);
     limits.max_logical_layers = UINT32_C(0x10000);
-    action = (noah_profile_action_v1_t){.kind = NOAH_PROFILE_ACTION_V1_LAYER_MOMENTARY, .operand = UINT16_MAX};
+    action                    = (noah_profile_action_v1_t){.kind = NOAH_PROFILE_ACTION_V1_LAYER_MOMENTARY, .operand = UINT16_MAX};
     expect_result(noah_profile_action_v1_encode(&action, &limits, bytes, &error), NOAH_PROFILE_CODEC_V1_OK);
     limits.max_logical_layers = UINT32_C(0x10001);
     expect_result(noah_profile_action_v1_encode(&action, &limits, bytes, &error), NOAH_PROFILE_CODEC_V1_INVALID_ARGUMENT);

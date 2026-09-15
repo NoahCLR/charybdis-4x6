@@ -5,16 +5,34 @@
 #include "keycode_config.h"
 #include "rgb_matrix.h"
 #include "users/noah/lib/compat/qmk_portable_editor.h"
-led_config_t g_led_config = {{1, 4, 4}};
-static bool enabled, saved_enabled;
+led_config_t   g_led_config = {{1, 4, 4}};
+static bool    enabled, saved_enabled;
 static uint8_t effect, speed, flags, h, s, v;
-void rgb_matrix_enable_noeeprom(void) {enabled = true;}
-void rgb_matrix_enable(void) {enabled = saved_enabled = true;}
-void rgb_matrix_disable(void) {enabled = saved_enabled = false;}
-void rgb_matrix_mode(uint8_t value) {if (enabled) effect = value;}
-void rgb_matrix_set_speed(uint8_t value) {speed = value;}
-void rgb_matrix_set_flags(uint8_t value) {flags = value;}
-void rgb_matrix_sethsv(uint16_t hue, uint8_t saturation, uint8_t brightness) {if (enabled) {h = hue; s = saturation; v = brightness;}}
+void           rgb_matrix_enable_noeeprom(void) {
+    enabled = true;
+}
+void rgb_matrix_enable(void) {
+    enabled = saved_enabled = true;
+}
+void rgb_matrix_disable(void) {
+    enabled = saved_enabled = false;
+}
+void rgb_matrix_mode(uint8_t value) {
+    if (enabled) effect = value;
+}
+void rgb_matrix_set_speed(uint8_t value) {
+    speed = value;
+}
+void rgb_matrix_set_flags(uint8_t value) {
+    flags = value;
+}
+void rgb_matrix_sethsv(uint16_t hue, uint8_t saturation, uint8_t brightness) {
+    if (enabled) {
+        h = hue;
+        s = saturation;
+        v = brightness;
+    }
+}
 
 int main(int argc, char **argv) {
     uint8_t payload[25] = {0}, metadata[25] = {0}, bytes[6400] = {0};
@@ -32,7 +50,8 @@ int main(int argc, char **argv) {
         uint8_t count = noah_qmk_portable_editor_page(page, payload);
         assert(count == (length - offset < 25 ? length - offset : 25));
         memcpy(bytes + offset, payload, count);
-        for (unsigned i = count; i < sizeof(payload); i++) assert(payload[i] == 0xa5);
+        for (unsigned i = count; i < sizeof(payload); i++)
+            assert(payload[i] == 0xa5);
         offset += count;
     }
     assert(noah_qmk_portable_editor_page(255, payload) == 0);
@@ -45,12 +64,14 @@ int main(int argc, char **argv) {
 #else
     assert((metadata[6] | metadata[7] << 8) == 0x0400);
 #endif
-    for (unsigned before = 0; before < 2; before++) for (unsigned after = 0; after < 2; after++) {
-        enabled = before; effect = h = s = v = 0;
-        noah_qmk_portable_apply_lighting(after | 1u << 8 | 35u << 16 | 5u << 24, 70u | 200u << 8 | 100u << 16);
-        assert(enabled == after && saved_enabled == after);
-        assert(effect == 1 && speed == 35 && flags == 5 && h == 70 && s == 200 && v == 100);
-    }
+    for (unsigned before = 0; before < 2; before++)
+        for (unsigned after = 0; after < 2; after++) {
+            enabled = before;
+            effect = h = s = v = 0;
+            noah_qmk_portable_apply_lighting(after | 1u << 8 | 35u << 16 | 5u << 24, 70u | 200u << 8 | 100u << 16);
+            assert(enabled == after && saved_enabled == after);
+            assert(effect == 1 && speed == 35 && flags == 5 && h == 70 && s == 200 && v == 100);
+        }
     if (argc > 1) {
         FILE *file = fopen(argv[1], "wb");
         assert(file);

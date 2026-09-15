@@ -259,8 +259,8 @@ noah_profile_codec_v1_result_t noah_profile_blob_v1_decode(const uint8_t *bytes,
     offset             = NOAH_PROFILE_BLOB_V1_HEADER_SIZE;
 
     for (index = 0u; index < blob->domain_count; index++) {
-        noah_profile_domain_v1_t      domain;
-        noah_profile_codec_v1_error_t domain_error;
+        noah_profile_domain_v1_t       domain;
+        noah_profile_codec_v1_error_t  domain_error;
         noah_profile_codec_v1_result_t result;
         size_t                         next_offset;
 

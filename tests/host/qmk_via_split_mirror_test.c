@@ -11,9 +11,9 @@
 #include "via.h"
 
 enum {
-    TEST_RPC_SIZE = RPC_M2S_BUFFER_SIZE,
+    TEST_RPC_SIZE    = RPC_M2S_BUFFER_SIZE,
     TEST_PAYLOAD_MAX = TEST_RPC_SIZE - 4u,
-    TEST_SINK_SIZE = UINT8_MAX,
+    TEST_SINK_SIZE   = UINT8_MAX,
 };
 
 static slave_callback_t registered_callback;
@@ -240,7 +240,7 @@ static void test_wrapping_payload_sizes_are_rejected_without_touching_storage(vo
 static void test_every_classified_mirror_command_is_implemented(void) {
     for (uint16_t command = 0u; command <= UINT8_MAX; command++) {
         uint8_t frame[TEST_RPC_SIZE] = {0};
-        uint8_t effects             = NOAH_QMK_VIA_COMMAND_EFFECT_NONE;
+        uint8_t effects              = NOAH_QMK_VIA_COMMAND_EFFECT_NONE;
 
         frame[0] = (uint8_t)command;
         if (frame[0] == id_set_keyboard_value) {

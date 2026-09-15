@@ -9,18 +9,18 @@
 #include "../../state/shared/runtime_publication.h"
 
 enum {
-    NOAH_PROFILE_ACTIVATION_REASON_PHYSICAL_PRESS       = 1u << 0,
-    NOAH_PROFILE_ACTIVATION_REASON_TAP_SERIES           = 1u << 1,
-    NOAH_PROFILE_ACTIVATION_REASON_RUNTIME_LEASE        = 1u << 2,
-    NOAH_PROFILE_ACTIVATION_REASON_DEFERRED_RELEASE     = 1u << 3,
-    NOAH_PROFILE_ACTIVATION_REASON_PERSISTENT_INTENT    = 1u << 4,
-    NOAH_PROFILE_ACTIVATION_REASON_OWNED_OUTPUT         = 1u << 5,
-    NOAH_PROFILE_ACTIVATION_REASON_MODIFIER_OR_ONESHOT  = 1u << 6,
-    NOAH_PROFILE_ACTIVATION_REASON_ONESHOT_LAYER        = 1u << 7,
-    NOAH_PROFILE_ACTIVATION_REASON_MACRO                = 1u << 8,
-    NOAH_PROFILE_ACTIVATION_REASON_COMBO                = 1u << 9,
-    NOAH_PROFILE_ACTIVATION_REASON_PEER                 = 1u << 10,
-    NOAH_PROFILE_ACTIVATION_REASON_INTERNAL             = 1u << 30,
+    NOAH_PROFILE_ACTIVATION_REASON_PHYSICAL_PRESS      = 1u << 0,
+    NOAH_PROFILE_ACTIVATION_REASON_TAP_SERIES          = 1u << 1,
+    NOAH_PROFILE_ACTIVATION_REASON_RUNTIME_LEASE       = 1u << 2,
+    NOAH_PROFILE_ACTIVATION_REASON_DEFERRED_RELEASE    = 1u << 3,
+    NOAH_PROFILE_ACTIVATION_REASON_PERSISTENT_INTENT   = 1u << 4,
+    NOAH_PROFILE_ACTIVATION_REASON_OWNED_OUTPUT        = 1u << 5,
+    NOAH_PROFILE_ACTIVATION_REASON_MODIFIER_OR_ONESHOT = 1u << 6,
+    NOAH_PROFILE_ACTIVATION_REASON_ONESHOT_LAYER       = 1u << 7,
+    NOAH_PROFILE_ACTIVATION_REASON_MACRO               = 1u << 8,
+    NOAH_PROFILE_ACTIVATION_REASON_COMBO               = 1u << 9,
+    NOAH_PROFILE_ACTIVATION_REASON_PEER                = 1u << 10,
+    NOAH_PROFILE_ACTIVATION_REASON_INTERNAL            = 1u << 30,
 };
 
 typedef struct {
@@ -47,7 +47,7 @@ typedef struct {
 typedef bool (*noah_profile_activation_peer_observer_fn)(void *context, uint8_t *unresolved_count);
 
 typedef struct {
-    noah_runtime_publication_generation_t publication_sequence;
+    noah_runtime_publication_generation_t    publication_sequence;
     noah_profile_activation_peer_observer_fn peer_observer;
     void                                    *peer_context;
     noah_profile_activation_snapshot_t       last_snapshot;

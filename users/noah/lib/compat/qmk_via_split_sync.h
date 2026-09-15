@@ -101,13 +101,20 @@ static inline bool noah_qmk_via_logical_status(noah_qmk_via_logical_status_t *st
     return false;
 }
 static inline bool noah_qmk_via_logical_staged(uint16_t transaction_id, uint32_t generation, uint32_t digest) {
-    (void)transaction_id; (void)generation; (void)digest; return false;
+    (void)transaction_id;
+    (void)generation;
+    (void)digest;
+    return false;
 }
 static inline bool noah_qmk_via_logical_converged(uint32_t generation, uint32_t digest) {
-    (void)generation; (void)digest; return false;
+    (void)generation;
+    (void)digest;
+    return false;
 }
 static inline void noah_qmk_via_logical_boot_release(void) {}
 static inline bool noah_qmk_via_logical_boot_recover(uint32_t generation, uint32_t digest) {
-    (void)generation; (void)digest; return false;
+    (void)generation;
+    (void)digest;
+    return false;
 }
 #endif

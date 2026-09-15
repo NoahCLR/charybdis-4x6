@@ -13,19 +13,19 @@
 #include "profile_settings_v1.h"
 
 enum {
-    NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB          = 1u << 0,
+    NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB           = 1u << 0,
     NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS = 1u << 1,
-    NOAH_PROFILE_VALIDATOR_V1_DOMAIN_SETTINGS = 1u << 3,
-    NOAH_PROFILE_VALIDATOR_V1_DOMAIN_COMBOS = 1u << 2,
-    NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS       = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_COMBOS | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_SETTINGS,
-    NOAH_PROFILE_VALIDATOR_V1_STEP_READ_MAX       = 20u,
-    NOAH_PROFILE_VALIDATOR_V1_CHECKSUM_CHUNK_MAX  = NOAH_PROFILE_VALIDATOR_V1_STEP_READ_MAX,
+    NOAH_PROFILE_VALIDATOR_V1_DOMAIN_SETTINGS      = 1u << 3,
+    NOAH_PROFILE_VALIDATOR_V1_DOMAIN_COMBOS        = 1u << 2,
+    NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS        = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_COMBOS | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_SETTINGS,
+    NOAH_PROFILE_VALIDATOR_V1_STEP_READ_MAX        = 20u,
+    NOAH_PROFILE_VALIDATOR_V1_CHECKSUM_CHUNK_MAX   = NOAH_PROFILE_VALIDATOR_V1_STEP_READ_MAX,
     // Regression policy for the payload-independent 32-bit scan state. This
     // is not a hardware SRAM-capacity claim; target resource gates account
     // for the linked instance separately.
     NOAH_PROFILE_VALIDATOR_V1_EMBEDDED_STATE_BUDGET = 360u,
-    NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8    = 0xffu,
-    NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U16   = 0xffffu,
+    NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8      = 0xffu,
+    NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U16     = 0xffffu,
 };
 
 typedef enum {
@@ -105,62 +105,62 @@ typedef struct {
     // Optional firmware translation gate. Rejects native aliases of the same
     // combo input and actions the installed engine cannot execute.
     bool (*combo_to_native)(const noah_profile_action_v1_t *action, uint16_t *native);
-    noah_key_behavior_limits_v1_t  behavior_limits;
-    noah_profile_rgb_v1_limits_t   rgb_limits;
+    noah_key_behavior_limits_v1_t behavior_limits;
+    noah_profile_rgb_v1_limits_t  rgb_limits;
 } noah_profile_validator_v1_compatibility_t;
 
 typedef struct {
-    uint8_t                        domain_mask;
-    uint8_t                        domain_count;
-    uint16_t                       byte_length;
-    uint32_t                       crc32;
-    uint32_t                       digest;
-    uint32_t                       action_abi_digest;
-    noah_profile_rgb_v1_view_t     rgb;
-    noah_key_behavior_domain_v1_t  key_behaviors;
-    noah_profile_combo_v1_view_t combos;
+    uint8_t                         domain_mask;
+    uint8_t                         domain_count;
+    uint16_t                        byte_length;
+    uint32_t                        crc32;
+    uint32_t                        digest;
+    uint32_t                        action_abi_digest;
+    noah_profile_rgb_v1_view_t      rgb;
+    noah_key_behavior_domain_v1_t   key_behaviors;
+    noah_profile_combo_v1_view_t    combos;
     noah_profile_settings_v1_view_t settings;
 } noah_profile_validator_v1_profile_t;
 
 typedef union {
-    noah_profile_settings_v1_validation_t settings;
-    noah_profile_combo_v1_validation_t combos;
-    noah_profile_rgb_v1_validation_t                rgb;
-    noah_key_behavior_domain_v1_validation_t        key_behaviors;
+    noah_profile_settings_v1_validation_t    settings;
+    noah_profile_combo_v1_validation_t       combos;
+    noah_profile_rgb_v1_validation_t         rgb;
+    noah_key_behavior_domain_v1_validation_t key_behaviors;
 } noah_profile_validator_v1_domain_validation_t;
 
 // Caller-owned, payload-independent state. Treat fields after phase as
 // private; they are public only so firmware can allocate the object statically.
 typedef struct {
-    noah_profile_validator_v1_phase_t         phase;
-    noah_profile_validator_v1_result_t        terminal_result;
-    noah_profile_validator_v1_error_t         terminal_error;
-    noah_profile_reader_t                     reader;
-    size_t                                    base_offset;
-    noah_profile_validator_v1_declaration_t   declaration;
-    noah_profile_validator_v1_compatibility_t compatibility;
-    noah_profile_validator_v1_profile_t       profile;
-    size_t                                    checksum_offset;
-    uint32_t                                  crc32_state;
-    uint32_t                                  digest_state;
-    size_t                                    blob_offset;
-    size_t                                    domain_payload_offset;
-    uint16_t                                  domain_payload_length;
-    uint8_t                                   declared_domain_count;
-    uint8_t                                   domain_index;
-    uint8_t                                   current_domain_id;
-    uint8_t                                   previous_domain_id;
-    uint8_t                                   seen_domain_mask;
+    noah_profile_validator_v1_phase_t             phase;
+    noah_profile_validator_v1_result_t            terminal_result;
+    noah_profile_validator_v1_error_t             terminal_error;
+    noah_profile_reader_t                         reader;
+    size_t                                        base_offset;
+    noah_profile_validator_v1_declaration_t       declaration;
+    noah_profile_validator_v1_compatibility_t     compatibility;
+    noah_profile_validator_v1_profile_t           profile;
+    size_t                                        checksum_offset;
+    uint32_t                                      crc32_state;
+    uint32_t                                      digest_state;
+    size_t                                        blob_offset;
+    size_t                                        domain_payload_offset;
+    uint16_t                                      domain_payload_length;
+    uint8_t                                       declared_domain_count;
+    uint8_t                                       domain_index;
+    uint8_t                                       current_domain_id;
+    uint8_t                                       previous_domain_id;
+    uint8_t                                       seen_domain_mask;
     noah_profile_validator_v1_domain_validation_t domain_validation;
-    size_t                                    reference_error_offset;
-    uint16_t                                  reference_error_row;
-    uint8_t                                   reference_error_step;
-    uint8_t                                   reference_error_field;
-    bool                                      has_reference_error;
+    size_t                                        reference_error_offset;
+    uint16_t                                      reference_error_row;
+    uint8_t                                       reference_error_step;
+    uint8_t                                       reference_error_field;
+    bool                                          has_reference_error;
 } noah_profile_validator_v1_t;
 
 noah_profile_validator_v1_compatibility_t noah_profile_validator_v1_default_compatibility(uint32_t action_abi_digest);
-noah_profile_validator_v1_error_t noah_profile_validator_v1_no_error(void);
+noah_profile_validator_v1_error_t         noah_profile_validator_v1_no_error(void);
 
 // begin performs compatibility/capacity checks but no reader I/O. A successful
 // begin returns IN_PROGRESS. base_offset allows validating a slot-bounded view.

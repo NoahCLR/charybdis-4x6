@@ -15,24 +15,24 @@ enum {
     NOAH_PROFILE_WIRE_V1_VALUE_STATUS     = 0x02u,
     // 0x03 is the performance cadence recorder, present only in diagnostic
     // builds; see users/noah/lib/state/diagnostics/runtime_diag.h.
-    NOAH_PROFILE_WIRE_V1_VALUE_PAYLOAD    = 0x04u,
+    NOAH_PROFILE_WIRE_V1_VALUE_PAYLOAD = 0x04u,
     // The compiled defaults the firmware was built with, served through the
     // same page layout. A keyboard with nothing committed is still running
     // something, and this is it.
-    NOAH_PROFILE_WIRE_V1_VALUE_COMPILED   = 0x05u,
-    NOAH_PROFILE_WIRE_V1_VALUE_COMBOS     = 0x06u,
+    NOAH_PROFILE_WIRE_V1_VALUE_COMPILED = 0x05u,
+    NOAH_PROFILE_WIRE_V1_VALUE_COMBOS   = 0x06u,
     // Page 0 of a payload read is metadata; pages 1..N carry raw payload
     // bytes, a full report payload each.
     NOAH_PROFILE_WIRE_V1_PAYLOAD_METADATA_PAGE = 0u,
-    NOAH_PROFILE_WIRE_V1_CAPABILITY_PAGES = 2u,
-    NOAH_PROFILE_WIRE_V1_STATUS_PAGES     = 2u,
+    NOAH_PROFILE_WIRE_V1_CAPABILITY_PAGES      = 2u,
+    NOAH_PROFILE_WIRE_V1_STATUS_PAGES          = 2u,
 };
 
 typedef enum {
-    NOAH_PROFILE_WIRE_V1_STATUS_OK             = 0u,
-    NOAH_PROFILE_WIRE_V1_STATUS_MALFORMED      = 1u,
-    NOAH_PROFILE_WIRE_V1_STATUS_UNKNOWN_PAGE   = 2u,
-    NOAH_PROFILE_WIRE_V1_STATUS_UNAVAILABLE    = 3u,
+    NOAH_PROFILE_WIRE_V1_STATUS_OK           = 0u,
+    NOAH_PROFILE_WIRE_V1_STATUS_MALFORMED    = 1u,
+    NOAH_PROFILE_WIRE_V1_STATUS_UNKNOWN_PAGE = 2u,
+    NOAH_PROFILE_WIRE_V1_STATUS_UNAVAILABLE  = 3u,
 } noah_profile_wire_v1_status_code_t;
 
 enum {
@@ -51,18 +51,18 @@ enum {
     NOAH_PROFILE_FEATURE_PEER_RECONCILIATION   = 1u << 9,
     NOAH_PROFILE_FEATURE_ACTION_ABI_DIGEST     = 1u << 10,
     NOAH_PROFILE_FEATURE_COMPILED_PROFILE_HASH = 1u << 11,
-    NOAH_PROFILE_FEATURE_ATOMIC_LOGICAL_APPLY   = 1u << 12,
+    NOAH_PROFILE_FEATURE_ATOMIC_LOGICAL_APPLY  = 1u << 12,
 };
 
 enum {
     NOAH_PROFILE_STATE_ACTIVE_IS_COMPILED_DEFAULT = 1u << 0,
     NOAH_PROFILE_STATE_COMMITTED_VALID            = 1u << 1,
-    NOAH_PROFILE_STATE_CANDIDATE_PENDING           = 1u << 2,
-    NOAH_PROFILE_STATE_PREVIEW_ACTIVE              = 1u << 3,
-    NOAH_PROFILE_STATE_PEER_KNOWN                  = 1u << 4,
-    NOAH_PROFILE_STATE_PEER_CONVERGED              = 1u << 5,
-    NOAH_PROFILE_STATE_WAITING_SAFE_BOUNDARY       = 1u << 6,
-    NOAH_PROFILE_STATE_DIGESTS_UNAVAILABLE         = 1u << 7,
+    NOAH_PROFILE_STATE_CANDIDATE_PENDING          = 1u << 2,
+    NOAH_PROFILE_STATE_PREVIEW_ACTIVE             = 1u << 3,
+    NOAH_PROFILE_STATE_PEER_KNOWN                 = 1u << 4,
+    NOAH_PROFILE_STATE_PEER_CONVERGED             = 1u << 5,
+    NOAH_PROFILE_STATE_WAITING_SAFE_BOUNDARY      = 1u << 6,
+    NOAH_PROFILE_STATE_DIGESTS_UNAVAILABLE        = 1u << 7,
 };
 
 typedef enum {
@@ -124,7 +124,7 @@ typedef struct {
 } noah_profile_wire_v1_device_status_t;
 
 typedef struct {
-    noah_profile_wire_v1_capabilities_t capabilities;
+    noah_profile_wire_v1_capabilities_t  capabilities;
     noah_profile_wire_v1_device_status_t status;
 } noah_profile_wire_v1_read_service_t;
 

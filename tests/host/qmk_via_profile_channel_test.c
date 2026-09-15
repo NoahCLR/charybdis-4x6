@@ -24,10 +24,14 @@ static bool                               store_runtime_has_committed;
 #if defined(VIA_ENABLE) && defined(SPLIT_TRANSACTION_IDS_USER)
 uint16_t noah_qmk_via_storage_region_size(noah_qmk_via_sync_region_t region) {
     switch (region) {
-        case NOAH_QMK_VIA_SYNC_REGION_VIA_CONFIG: return 2u;
-        case NOAH_QMK_VIA_SYNC_REGION_KEYMAP: return 960u;
-        case NOAH_QMK_VIA_SYNC_REGION_MACRO: return 7191u;
-        default: return 0u;
+        case NOAH_QMK_VIA_SYNC_REGION_VIA_CONFIG:
+            return 2u;
+        case NOAH_QMK_VIA_SYNC_REGION_KEYMAP:
+            return 960u;
+        case NOAH_QMK_VIA_SYNC_REGION_MACRO:
+            return 7191u;
+        default:
+            return 0u;
     }
 }
 
@@ -95,36 +99,36 @@ static void initialize_live_owner_status(void) {
         .origin         = 1u,
         .kind           = NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE,
     };
-    live_owner_status.pending                 = (noah_effective_profile_identity_t){
+    live_owner_status.pending = (noah_effective_profile_identity_t){
         .generation     = 8u,
         .payload_digest = UINT32_C(0x21222324),
         .origin         = 0u,
         .kind           = NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE,
     };
-    live_owner_status.has_pending             = true;
+    live_owner_status.has_pending               = true;
     live_owner_status.safe_boundary_reason_mask = 1u;
-    live_owner_status.committed               = (noah_profile_split_descriptor_t){
+    live_owner_status.committed                 = (noah_profile_split_descriptor_t){
         .generation     = 7u,
         .payload_digest = UINT32_C(0x31323334),
         .origin_half    = 1u,
         .readable       = true,
         .has_profile    = true,
     };
-    live_owner_status.has_committed            = true;
-    live_owner_status.candidate                = (noah_profile_candidate_v1_status_t){
+    live_owner_status.has_committed = true;
+    live_owner_status.candidate     = (noah_profile_candidate_v1_status_t){
         .state          = NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATED,
         .transaction_id = UINT16_C(0x4142),
     };
-    live_owner_status.candidate_pending        = true;
+    live_owner_status.candidate_pending             = true;
     live_owner_status.last_committed_transaction_id = UINT16_C(0x5152);
-    live_owner_status.peer                     = (noah_profile_split_descriptor_t){
+    live_owner_status.peer                          = (noah_profile_split_descriptor_t){
         .generation  = 9u,
         .origin_half = 0u,
         .readable    = true,
         .has_profile = true,
     };
-    live_owner_status.peer_known               = true;
-    live_owner_status.authority_state           = NOAH_PROFILE_SPLIT_AUTHORITY_PEER_NEWER;
+    live_owner_status.peer_known      = true;
+    live_owner_status.authority_state = NOAH_PROFILE_SPLIT_AUTHORITY_PEER_NEWER;
 }
 #endif
 
@@ -315,7 +319,7 @@ static void test_status_surfaces_read_only_store_discovery(void) {
 }
 #else
 static void test_status_surfaces_coherent_owner_snapshot(void) {
-    uint8_t frame[NOAH_PROFILE_WIRE_V1_REPORT_SIZE];
+    uint8_t  frame[NOAH_PROFILE_WIRE_V1_REPORT_SIZE];
     uint16_t expected_flags = NOAH_PROFILE_STATE_COMMITTED_VALID | NOAH_PROFILE_STATE_CANDIDATE_PENDING | NOAH_PROFILE_STATE_PEER_KNOWN | NOAH_PROFILE_STATE_WAITING_SAFE_BOUNDARY;
 
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_STATUS, 0x41u, 0u);
@@ -329,7 +333,7 @@ static void test_status_surfaces_coherent_owner_snapshot(void) {
     assert(read_u32(&frame[WIRE_PAYLOAD + 20u]) == live_owner_status.committed.payload_digest);
     assert(frame[WIRE_PAYLOAD + 24u] == NOAH_PROFILE_ACTIVE_COMMITTED);
 
-    live_owner_status.active.generation = 99u;
+    live_owner_status.active.generation        = 99u;
     live_owner_status.candidate.transaction_id = UINT16_C(0x6162);
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_STATUS, 0x42u, 1u);
     via_custom_value_command_kb(frame, sizeof(frame));
@@ -410,23 +414,22 @@ static void test_cadence_read_route_is_bounded_and_canonical(void) {
 }
 #endif
 
-
 // Committed-payload readback. The wire contract is: page 0 is metadata,
 // pages 1..N are raw payload bytes, and anything past the payload is refused
 // rather than served as zeros.
 static void test_payload_read_reports_metadata_then_chunks(void) {
     uint8_t frame[NOAH_PROFILE_WIRE_V1_REPORT_SIZE];
 
-    store_runtime_has_committed = true;
-    store_runtime_record.slot            = NOAH_PROFILE_SLOT_A;
-    store_runtime_record.payload_length  = 60u;
-    store_runtime_record.generation      = 9u;
-    store_runtime_record.payload_digest  = UINT32_C(0xAABBCCDD);
-    store_runtime_record.payload_crc32   = UINT32_C(0x11223344);
-    store_runtime_record.schema_major    = 1u;
-    store_runtime_record.schema_minor    = 2u;
-    store_runtime_record.domain_mask     = 0x03u;
-    store_runtime_record.origin_half     = 1u;
+    store_runtime_has_committed         = true;
+    store_runtime_record.slot           = NOAH_PROFILE_SLOT_A;
+    store_runtime_record.payload_length = 60u;
+    store_runtime_record.generation     = 9u;
+    store_runtime_record.payload_digest = UINT32_C(0xAABBCCDD);
+    store_runtime_record.payload_crc32  = UINT32_C(0x11223344);
+    store_runtime_record.schema_major   = 1u;
+    store_runtime_record.schema_minor   = 2u;
+    store_runtime_record.domain_mask    = 0x03u;
+    store_runtime_record.origin_half    = 1u;
 
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_PAYLOAD, 1u, 0u);
     via_custom_value_command_kb(frame, sizeof(frame));
@@ -512,7 +515,6 @@ static void test_payload_read_surfaces_storage_failure(void) {
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_UNAVAILABLE);
     store_read_committed_fails = false;
 }
-
 
 static void test_compiled_read_serves_what_the_firmware_runs(void) {
     uint8_t frame[NOAH_PROFILE_WIRE_V1_REPORT_SIZE];

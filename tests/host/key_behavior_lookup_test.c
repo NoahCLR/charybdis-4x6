@@ -693,21 +693,21 @@ static void test_momentary_layer_query_matches_hold_materialization(void) {
 }
 
 static void test_live_profile_behavior_replaces_compiled_rows_atomically(void) {
-    uint8_t                                payload[256];
-    size_t                                 written;
-    noah_profile_codec_v1_error_t          codec_error;
-    noah_key_behavior_domain_v1_t          domain;
-    noah_profile_action_v1_t               target;
-    noah_profile_action_v1_t               tap_zero;
-    noah_profile_action_v1_t               tap_one;
-    noah_key_behavior_step_v1_t            steps[2];
-    noah_key_behavior_row_v1_t             rows[1];
-    noah_effective_key_behavior_runtime_t  runtime;
-    noah_effective_profile_snapshot_t      callback_view = {0};
-    noah_effective_profile_identity_t      active = {.generation = 7u, .payload_digest = 0x1111u, .kind = NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE};
-    noah_effective_key_behavior_row_t      token;
-    key_behavior_view_t                    behavior;
-    key_behavior_step_t                    step;
+    uint8_t                               payload[256];
+    size_t                                written;
+    noah_profile_codec_v1_error_t         codec_error;
+    noah_key_behavior_domain_v1_t         domain;
+    noah_profile_action_v1_t              target;
+    noah_profile_action_v1_t              tap_zero;
+    noah_profile_action_v1_t              tap_one;
+    noah_key_behavior_step_v1_t           steps[2];
+    noah_key_behavior_row_v1_t            rows[1];
+    noah_effective_key_behavior_runtime_t runtime;
+    noah_effective_profile_snapshot_t     callback_view = {0};
+    noah_effective_profile_identity_t     active        = {.generation = 7u, .payload_digest = 0x1111u, .kind = NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE};
+    noah_effective_key_behavior_row_t     token;
+    key_behavior_view_t                   behavior;
+    key_behavior_step_t                   step;
 
     CHECK(noah_profile_action_runtime_v1_from_native(TEST_MULTI_TAP_KEY, &target) == NOAH_PROFILE_ACTION_RUNTIME_V1_OK);
     CHECK(noah_profile_action_runtime_v1_from_native(KC_Z, &tap_zero) == NOAH_PROFILE_ACTION_RUNTIME_V1_OK);
@@ -716,10 +716,11 @@ static void test_live_profile_behavior_replaces_compiled_rows_atomically(void) {
         .tap_index     = 0u,
         .presence_mask = NOAH_KEY_BEHAVIOR_DOMAIN_V1_STEP_HAS_TAP | NOAH_KEY_BEHAVIOR_DOMAIN_V1_STEP_HAS_HOLD,
         .tap           = tap_zero,
-        .hold          = {
-            .mode   = NOAH_KEY_BEHAVIOR_HOLD_V1_PRESS_AND_HOLD_UNTIL_RELEASE,
-            .action = {.kind = NOAH_PROFILE_ACTION_V1_LAYER_MOMENTARY, .operand = 2u},
-        },
+        .hold =
+            {
+                .mode   = NOAH_KEY_BEHAVIOR_HOLD_V1_PRESS_AND_HOLD_UNTIL_RELEASE,
+                .action = {.kind = NOAH_PROFILE_ACTION_V1_LAYER_MOMENTARY, .operand = 2u},
+            },
     };
     steps[1] = (noah_key_behavior_step_v1_t){
         .tap_index     = 1u,
@@ -740,8 +741,8 @@ static void test_live_profile_behavior_replaces_compiled_rows_atomically(void) {
 
     noah_effective_key_behavior_runtime_init(&runtime);
     CHECK(noah_effective_key_behavior_runtime_install(&runtime));
-    callback_view.identity            = active;
-    callback_view.profile.domain_mask = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS;
+    callback_view.identity              = active;
+    callback_view.profile.domain_mask   = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS;
     callback_view.profile.key_behaviors = domain;
     noah_effective_key_behavior_runtime_invalidate(&runtime, 1u, (noah_effective_profile_identity_t){0}, active, &callback_view);
 

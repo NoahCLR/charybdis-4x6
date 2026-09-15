@@ -8,16 +8,16 @@
 #include "users/noah/lib/profile/storage/profile_checksum.h"
 
 enum {
-    TEST_ROW_COUNT                 = NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_ROWS,
+    TEST_ROW_COUNT                = NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_ROWS,
     TEST_STEPS_PER_ROW            = 2u,
-    TEST_STEP_COUNT                = TEST_ROW_COUNT * TEST_STEPS_PER_ROW,
-    TEST_ACTION_ABI                = 0x12345678u,
-    STEP_READ_CALL_LIMIT           = 1u,
-    STEP_BYTE_LIMIT                = NOAH_PROFILE_VALIDATOR_V1_STEP_READ_MAX,
-    MAX_VALIDATION_STEPS           = 1200u,
-    MAX_BEHAVIOR_DOMAIN_STEPS      = 897u,
-    MAX_RGB_DOMAIN_STEPS           = 58u,
-    TEST_MAXIMUM_RGB_PAYLOAD_SIZE  = 344u,
+    TEST_STEP_COUNT               = TEST_ROW_COUNT * TEST_STEPS_PER_ROW,
+    TEST_ACTION_ABI               = 0x12345678u,
+    STEP_READ_CALL_LIMIT          = 1u,
+    STEP_BYTE_LIMIT               = NOAH_PROFILE_VALIDATOR_V1_STEP_READ_MAX,
+    MAX_VALIDATION_STEPS          = 1200u,
+    MAX_BEHAVIOR_DOMAIN_STEPS     = 897u,
+    MAX_RGB_DOMAIN_STEPS          = 58u,
+    TEST_MAXIMUM_RGB_PAYLOAD_SIZE = 344u,
 };
 
 typedef struct {
@@ -68,20 +68,22 @@ static size_t build_maximum_behavior_profile(void) {
 
     for (uint16_t row_index = 0u; row_index < TEST_ROW_COUNT; row_index++) {
         for (uint8_t step_index = 0u; step_index < TEST_STEPS_PER_ROW; step_index++) {
-            const uint16_t action_base = (uint16_t)(0x200u + row_index * 8u + step_index * 3u);
+            const uint16_t action_base   = (uint16_t)(0x200u + row_index * 8u + step_index * 3u);
             steps[row_index][step_index] = (noah_key_behavior_step_v1_t){
                 .tap_index     = step_index,
                 .presence_mask = NOAH_KEY_BEHAVIOR_DOMAIN_V1_STEP_HAS_TAP | NOAH_KEY_BEHAVIOR_DOMAIN_V1_STEP_HAS_HOLD | NOAH_KEY_BEHAVIOR_DOMAIN_V1_STEP_HAS_LONG_HOLD,
                 .tap           = qmk_action(action_base),
-                .hold = {
-                    .mode      = NOAH_KEY_BEHAVIOR_HOLD_V1_REPEAT_WHILE_HELD,
-                    .repeat_hz = NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_REPEAT_HZ,
-                    .action    = qmk_action((uint16_t)(action_base + 1u)),
-                },
-                .long_hold = {
-                    .mode   = NOAH_KEY_BEHAVIOR_HOLD_V1_TAP_AT_THRESHOLD,
-                    .action = qmk_action((uint16_t)(action_base + 2u)),
-                },
+                .hold =
+                    {
+                        .mode      = NOAH_KEY_BEHAVIOR_HOLD_V1_REPEAT_WHILE_HELD,
+                        .repeat_hz = NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_REPEAT_HZ,
+                        .action    = qmk_action((uint16_t)(action_base + 1u)),
+                    },
+                .long_hold =
+                    {
+                        .mode   = NOAH_KEY_BEHAVIOR_HOLD_V1_TAP_AT_THRESHOLD,
+                        .action = qmk_action((uint16_t)(action_base + 2u)),
+                    },
             };
         }
         rows[row_index] = (noah_key_behavior_row_v1_t){
@@ -116,8 +118,8 @@ static void record_phase_budget(phase_budget_t *budget, const instrumented_reade
 }
 
 static void run_maximum_rgb_profile(void) {
-    size_t offset;
-    size_t profile_length;
+    size_t                        offset;
+    size_t                        profile_length;
     noah_profile_codec_v1_error_t codec_error;
 
     memset(rgb_payload, 0, sizeof(rgb_payload));
@@ -128,7 +130,7 @@ static void run_maximum_rgb_profile(void) {
     rgb_payload[6]  = NOAH_PROFILE_RGB_V1_MAX_STAGE_GROUP_ROWS;
     rgb_payload[12] = NOAH_PROFILE_RGB_V1_PHYSICAL_LED_COUNT;
     rgb_payload[13] = NOAH_PROFILE_RGB_V1_LED_BITMAP_SIZE;
-    offset = NOAH_PROFILE_RGB_V1_HEADER_SIZE;
+    offset          = NOAH_PROFILE_RGB_V1_HEADER_SIZE;
     for (uint8_t group = 0u; group < NOAH_PROFILE_RGB_V1_MAX_GROUPS; group++) {
         rgb_payload[offset]      = group;
         rgb_payload[offset + 1u] = group;
@@ -161,7 +163,7 @@ static void run_maximum_rgb_profile(void) {
         .length  = profile_length,
     };
     noah_profile_validator_v1_compatibility_t compatibility = noah_profile_validator_v1_default_compatibility(TEST_ACTION_ABI);
-    noah_profile_validator_v1_declaration_t declaration = {
+    noah_profile_validator_v1_declaration_t   declaration   = {
         .schema_major      = NOAH_PROFILE_BLOB_V1_SCHEMA_MAJOR,
         .schema_minor      = NOAH_PROFILE_BLOB_V1_SCHEMA_MINOR,
         .domain_mask       = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB,
@@ -170,27 +172,27 @@ static void run_maximum_rgb_profile(void) {
         .digest            = noah_profile_fnv1a_update(NOAH_PROFILE_FNV1A_INITIAL, profile_blob, profile_length),
         .action_abi_digest = TEST_ACTION_ABI,
     };
-    noah_profile_validator_v1_t validator;
+    noah_profile_validator_v1_t       validator;
     noah_profile_validator_v1_error_t error;
-    phase_budget_t budgets[NOAH_PROFILE_VALIDATOR_V1_PHASE_REJECTED + 1u] = {{0}};
-    size_t total_steps = 0u;
+    phase_budget_t                    budgets[NOAH_PROFILE_VALIDATOR_V1_PHASE_REJECTED + 1u] = {{0}};
+    size_t                            total_steps                                            = 0u;
 
-    compatibility.required_domain_mask             = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB;
-    compatibility.allowed_domain_mask              = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB;
-    compatibility.logical_layer_count              = 1u;
-    compatibility.supported_pd_mode_mask           = 0u;
-    compatibility.rgb_limits.compiled_stage_mask   = NOAH_PROFILE_RGB_V1_STAGE_LAYER;
-    compatibility.rgb_limits.logical_layer_count   = 1u;
+    compatibility.required_domain_mask              = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB;
+    compatibility.allowed_domain_mask               = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB;
+    compatibility.logical_layer_count               = 1u;
+    compatibility.supported_pd_mode_mask            = 0u;
+    compatibility.rgb_limits.compiled_stage_mask    = NOAH_PROFILE_RGB_V1_STAGE_LAYER;
+    compatibility.rgb_limits.logical_layer_count    = 1u;
     compatibility.rgb_limits.supported_pd_mode_mask = 0u;
     assert(noah_profile_validator_v1_begin(&validator, &reader, 0u, &declaration, &compatibility, &error) == NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS);
 
     noah_profile_validator_v1_result_t result = NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;
     while (result == NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS) {
         const noah_profile_validator_v1_phase_t phase = validator.phase;
-        reader_state.step_calls    = 0u;
-        reader_state.step_bytes    = 0u;
-        reader_state.step_max_read = 0u;
-        result = noah_profile_validator_v1_step(&validator, NOAH_PROFILE_VALIDATOR_V1_CHECKSUM_CHUNK_MAX, &error);
+        reader_state.step_calls                       = 0u;
+        reader_state.step_bytes                       = 0u;
+        reader_state.step_max_read                    = 0u;
+        result                                        = noah_profile_validator_v1_step(&validator, NOAH_PROFILE_VALIDATOR_V1_CHECKSUM_CHUNK_MAX, &error);
         assert(reader_state.step_calls <= STEP_READ_CALL_LIMIT);
         assert(reader_state.step_bytes <= STEP_BYTE_LIMIT);
         assert(reader_state.step_max_read <= STEP_BYTE_LIMIT);
@@ -208,8 +210,8 @@ static void run_maximum_rgb_profile(void) {
 }
 
 int main(void) {
-    const size_t profile_length = build_maximum_behavior_profile();
-    instrumented_reader_t reader_state = {
+    const size_t          profile_length = build_maximum_behavior_profile();
+    instrumented_reader_t reader_state   = {
         .bytes  = profile_blob,
         .length = profile_length,
     };
@@ -219,7 +221,7 @@ int main(void) {
         .length  = profile_length,
     };
     noah_profile_validator_v1_compatibility_t compatibility = noah_profile_validator_v1_default_compatibility(TEST_ACTION_ABI);
-    noah_profile_validator_v1_declaration_t declaration = {
+    noah_profile_validator_v1_declaration_t   declaration   = {
         .schema_major      = NOAH_PROFILE_BLOB_V1_SCHEMA_MAJOR,
         .schema_minor      = NOAH_PROFILE_BLOB_V1_SCHEMA_MINOR,
         .domain_mask       = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS,
@@ -230,9 +232,9 @@ int main(void) {
     };
     noah_profile_validator_v1_t       validator;
     noah_profile_validator_v1_error_t error;
-    phase_budget_t budgets[NOAH_PROFILE_VALIDATOR_V1_PHASE_REJECTED + 1u] = {{0}};
-    size_t total_steps = 0u;
-    clock_t started = clock();
+    phase_budget_t                    budgets[NOAH_PROFILE_VALIDATOR_V1_PHASE_REJECTED + 1u] = {{0}};
+    size_t                            total_steps                                            = 0u;
+    clock_t                           started                                                = clock();
 
     compatibility.required_domain_mask = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS;
     compatibility.allowed_domain_mask  = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS;
@@ -241,10 +243,10 @@ int main(void) {
     noah_profile_validator_v1_result_t result = NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;
     while (result == NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS) {
         const noah_profile_validator_v1_phase_t phase = validator.phase;
-        reader_state.step_calls    = 0u;
-        reader_state.step_bytes    = 0u;
-        reader_state.step_max_read = 0u;
-        result = noah_profile_validator_v1_step(&validator, NOAH_PROFILE_VALIDATOR_V1_CHECKSUM_CHUNK_MAX, &error);
+        reader_state.step_calls                       = 0u;
+        reader_state.step_bytes                       = 0u;
+        reader_state.step_max_read                    = 0u;
+        result                                        = noah_profile_validator_v1_step(&validator, NOAH_PROFILE_VALIDATOR_V1_CHECKSUM_CHUNK_MAX, &error);
         assert(phase <= NOAH_PROFILE_VALIDATOR_V1_PHASE_REJECTED);
         assert(reader_state.step_calls <= STEP_READ_CALL_LIMIT);
         assert(reader_state.step_bytes <= STEP_BYTE_LIMIT);

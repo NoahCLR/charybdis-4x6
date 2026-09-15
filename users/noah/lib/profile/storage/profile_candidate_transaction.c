@@ -21,7 +21,7 @@ static void set_simple_error(noah_profile_candidate_transaction_t *transaction, 
 }
 
 static void poison(noah_profile_candidate_transaction_t *transaction, noah_profile_candidate_v1_error_id_t code, uint16_t byte_offset) {
-    transaction->poisoned    = true;
+    transaction->poisoned     = true;
     transaction->status.state = NOAH_PROFILE_CANDIDATE_V1_STATE_REJECTED;
     set_simple_error(transaction, code, byte_offset);
 }
@@ -98,7 +98,7 @@ bool noah_profile_candidate_transaction_receive(noah_profile_candidate_transacti
 
 static bool process_begin(noah_profile_candidate_transaction_t *transaction, const noah_profile_candidate_v1_command_t *command) {
     const noah_profile_candidate_v1_metadata_t *metadata = &command->payload.begin;
-    noah_profile_candidate_backend_result_t      result;
+    noah_profile_candidate_backend_result_t     result;
 
     if (transaction->has_candidate) {
         if (command->transaction_id != transaction->status.transaction_id) {
@@ -151,11 +151,11 @@ static bool process_begin(noah_profile_candidate_transaction_t *transaction, con
         return false;
     }
 
-    transaction->metadata      = *metadata;
-    transaction->has_candidate = true;
-    transaction->poisoned      = false;
+    transaction->metadata           = *metadata;
+    transaction->has_candidate      = true;
+    transaction->poisoned           = false;
     transaction->status.next_offset = 0u;
-    result = transaction->backend.begin(transaction->backend.context, metadata);
+    result                          = transaction->backend.begin(transaction->backend.context, metadata);
     if (result == NOAH_PROFILE_CANDIDATE_BACKEND_BUSY) {
         transaction->has_candidate = false;
         transaction->poisoned      = false;
@@ -176,9 +176,9 @@ static bool process_begin(noah_profile_candidate_transaction_t *transaction, con
 }
 
 static void process_chunk(noah_profile_candidate_transaction_t *transaction, const noah_profile_candidate_v1_command_t *command) {
-    const uint16_t offset = command->payload.chunk.offset;
-    const uint8_t  length = command->payload.chunk.length;
-    const uint16_t end    = (uint16_t)(offset + length);
+    const uint16_t                          offset = command->payload.chunk.offset;
+    const uint8_t                           length = command->payload.chunk.length;
+    const uint16_t                          end    = (uint16_t)(offset + length);
     noah_profile_candidate_backend_result_t result;
 
     if (!transaction->has_candidate) {
@@ -315,8 +315,8 @@ static void process_abort(noah_profile_candidate_transaction_t *transaction, con
     }
 
     transaction->last_aborted_transaction_id = command->transaction_id;
-    transaction->has_candidate                = false;
-    transaction->poisoned                     = false;
+    transaction->has_candidate               = false;
+    transaction->poisoned                    = false;
     memset(&transaction->metadata, 0, sizeof(transaction->metadata));
     transaction->status.state          = NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE;
     transaction->status.next_offset    = 0u;
@@ -476,7 +476,7 @@ static bool process_mailbox(noah_profile_candidate_transaction_t *transaction, c
 }
 
 static void process_validation_step(noah_profile_candidate_transaction_t *transaction) {
-    noah_profile_candidate_v1_error_t       error = noah_profile_candidate_v1_no_error();
+    noah_profile_candidate_v1_error_t       error  = noah_profile_candidate_v1_no_error();
     noah_profile_candidate_backend_result_t result = transaction->backend.validation_step(transaction->backend.context, NOAH_PROFILE_CANDIDATE_SCAN_BYTE_BUDGET, &error);
 
     if (result == NOAH_PROFILE_CANDIDATE_BACKEND_IN_PROGRESS) {
@@ -517,8 +517,8 @@ static void process_activation_step(noah_profile_candidate_transaction_t *transa
         activation_failed(transaction);
         return;
     }
-    transaction->has_candidate                 = false;
-    transaction->poisoned                      = false;
+    transaction->has_candidate = false;
+    transaction->poisoned      = false;
     memset(&transaction->metadata, 0, sizeof(transaction->metadata));
     transaction->status.state = NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE;
     clear_error(transaction);
@@ -530,7 +530,7 @@ bool noah_profile_candidate_transaction_scan(noah_profile_candidate_transaction_
     }
     if (transaction->mailbox.pending) {
         noah_profile_candidate_v1_command_t command = transaction->mailbox.command;
-        transaction->mailbox.pending               = false;
+        transaction->mailbox.pending                = false;
         if (process_mailbox(transaction, &command)) {
             transaction->mailbox.command = command;
             transaction->mailbox.pending = true;
@@ -570,7 +570,7 @@ static noah_profile_candidate_expire_result_t cancel_precommit(noah_profile_cand
             return NOAH_PROFILE_CANDIDATE_EXPIRE_MAILBOX_BUSY;
         }
         transaction->status.last_operation = transaction->mailbox.command.operation;
-        transaction->mailbox.pending = false;
+        transaction->mailbox.pending       = false;
         memset(&transaction->mailbox.command, 0, sizeof(transaction->mailbox.command));
     }
     if (reason == NOAH_PROFILE_CANDIDATE_V1_ERROR_PEER_SUPERSEDED || reason == NOAH_PROFILE_CANDIDATE_V1_ERROR_PEER_PREPARE_YIELDED) {
@@ -585,8 +585,8 @@ static noah_profile_candidate_expire_result_t cancel_precommit(noah_profile_cand
     }
 
     transaction->last_aborted_transaction_id = transaction->status.transaction_id;
-    transaction->has_candidate                = false;
-    transaction->poisoned                     = false;
+    transaction->has_candidate               = false;
+    transaction->poisoned                    = false;
     memset(&transaction->metadata, 0, sizeof(transaction->metadata));
     transaction->status.state = NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE;
     if (reason == NOAH_PROFILE_CANDIDATE_V1_ERROR_TIMEOUT) {
@@ -644,7 +644,7 @@ void noah_profile_candidate_transaction_status(const noah_profile_candidate_tran
         return;
     }
 
-    *status = transaction->status;
+    *status       = transaction->status;
     status->flags = 0u;
     if (transaction->mailbox.pending) {
         status->flags |= NOAH_PROFILE_CANDIDATE_V1_STATUS_MAILBOX_PENDING;

@@ -199,7 +199,7 @@ bool key_behavior_has_more_taps(uint16_t keycode, uint8_t count) {
 }
 
 bool key_behavior_keeps_auto_mouse_anchored(uint16_t keycode) {
-    noah_effective_key_behavior_row_t live;
+    noah_effective_key_behavior_row_t    live;
     noah_effective_key_behavior_result_t result = noah_effective_key_behavior_lookup(keycode, &live);
 
     if (result == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK) {
@@ -228,12 +228,12 @@ bool key_behavior_future_tap_path_has_foreign_pd_mode(uint16_t keycode, uint8_t 
 }
 
 key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
-    noah_effective_key_behavior_row_t    live = {0};
-    noah_effective_key_behavior_result_t live_result = noah_effective_key_behavior_lookup(keycode, &live);
-    const key_behavior_t                 *config = live_result == NOAH_EFFECTIVE_KEY_BEHAVIOR_COMPILED_FALLBACK ? key_behavior_config_lookup(keycode) : NULL;
-    bool                                  has_authored = live_result == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK || config;
-    noah_action_desc_t                    desc = noah_action_describe(keycode);
-    bool                                  custom_lt = has_authored && noah_action_desc_uses_authored_layer_tap_contract(desc);
+    noah_effective_key_behavior_row_t    live         = {0};
+    noah_effective_key_behavior_result_t live_result  = noah_effective_key_behavior_lookup(keycode, &live);
+    const key_behavior_t                *config       = live_result == NOAH_EFFECTIVE_KEY_BEHAVIOR_COMPILED_FALLBACK ? key_behavior_config_lookup(keycode) : NULL;
+    bool                                 has_authored = live_result == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK || config;
+    noah_action_desc_t                   desc         = noah_action_describe(keycode);
+    bool                                 custom_lt    = has_authored && noah_action_desc_uses_authored_layer_tap_contract(desc);
 
     uint16_t tap_term = noah_setting(NOAH_SETTING_TAP_HOLD_TERM, CUSTOM_TAP_HOLD_TERM);
     if (live_result == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK && live.tap_hold_term) {

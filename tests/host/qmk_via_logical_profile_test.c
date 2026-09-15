@@ -8,22 +8,26 @@
 #include "users/noah/lib/profile/protocol/profile_wire_v1.h"
 
 static noah_qmk_via_logical_status_t fake_status;
-static bool submit_result;
-static uint16_t submitted_transaction;
-static noah_qmk_via_sync_frame_t submitted_request;
+static bool                          submit_result;
+static uint16_t                      submitted_transaction;
+static noah_qmk_via_sync_frame_t     submitted_request;
 
 uint16_t noah_qmk_via_storage_region_size(noah_qmk_via_sync_region_t region) {
     switch (region) {
-        case NOAH_QMK_VIA_SYNC_REGION_VIA_CONFIG: return 2u;
-        case NOAH_QMK_VIA_SYNC_REGION_KEYMAP: return 960u;
-        case NOAH_QMK_VIA_SYNC_REGION_MACRO: return 7191u;
-        default: return 0u;
+        case NOAH_QMK_VIA_SYNC_REGION_VIA_CONFIG:
+            return 2u;
+        case NOAH_QMK_VIA_SYNC_REGION_KEYMAP:
+            return 960u;
+        case NOAH_QMK_VIA_SYNC_REGION_MACRO:
+            return 7191u;
+        default:
+            return 0u;
     }
 }
 
 bool noah_qmk_via_logical_submit(uint16_t transaction_id, const noah_qmk_via_sync_frame_t *request) {
     submitted_transaction = transaction_id;
-    submitted_request = *request;
+    submitted_request     = *request;
     return submit_result;
 }
 
@@ -33,10 +37,10 @@ bool noah_qmk_via_logical_status(noah_qmk_via_logical_status_t *status) {
 }
 
 static void reset(void) {
-    fake_status = (noah_qmk_via_logical_status_t){0};
-    submit_result = true;
+    fake_status           = (noah_qmk_via_logical_status_t){0};
+    submit_result         = true;
     submitted_transaction = 0u;
-    submitted_request = (noah_qmk_via_sync_frame_t){0};
+    submitted_request     = (noah_qmk_via_sync_frame_t){0};
 }
 
 static void mutation_header(uint8_t frame[32], uint8_t value, uint16_t transaction_id) {
@@ -72,10 +76,10 @@ static void test_sparse_chunk_preserves_identity(void) {
     uint8_t frame[32];
     reset();
     mutation_header(frame, NOAH_QMK_VIA_LOGICAL_VALUE_CHUNK, 7u);
-    frame[5] = NOAH_QMK_VIA_SYNC_REGION_KEYMAP;
-    frame[6] = 24u;
-    frame[8] = 0xc0u;
-    frame[9] = 0x03u;
+    frame[5]  = NOAH_QMK_VIA_SYNC_REGION_KEYMAP;
+    frame[6]  = 24u;
+    frame[8]  = 0xc0u;
+    frame[9]  = 0x03u;
     frame[10] = 3u;
     frame[11] = 0xa1u;
     frame[12] = 0xa2u;
@@ -92,12 +96,12 @@ static void test_status_is_canonical(void) {
     uint8_t frame[32] = {NOAH_PROFILE_WIRE_V1_COMMAND_GET, NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL, NOAH_QMK_VIA_LOGICAL_VALUE_STATUS, 5u};
     reset();
     fake_status = (noah_qmk_via_logical_status_t){
-        .state = NOAH_QMK_VIA_LOGICAL_STAGED,
-        .last_status = NOAH_QMK_VIA_SYNC_STATUS_OK,
-        .transaction_id = 44u,
+        .state              = NOAH_QMK_VIA_LOGICAL_STAGED,
+        .last_status        = NOAH_QMK_VIA_SYNC_STATUS_OK,
+        .transaction_id     = 44u,
         .operation_sequence = 17u,
-        .generation = 8u,
-        .digest = UINT32_C(0x55667788),
+        .generation         = 8u,
+        .digest             = UINT32_C(0x55667788),
     };
     assert(noah_qmk_via_logical_profile_handle(frame, sizeof(frame)));
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK && frame[6] == 18u);

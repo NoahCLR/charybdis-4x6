@@ -11,8 +11,8 @@
 #include "../../state/shared/runtime_publication.h"
 
 enum {
-    NOAH_EFFECTIVE_PROFILE_MAX_INVALIDATORS    = 8u,
-    NOAH_EFFECTIVE_PROFILE_ORIGIN_COMPILED     = UINT8_MAX,
+    NOAH_EFFECTIVE_PROFILE_MAX_INVALIDATORS = 8u,
+    NOAH_EFFECTIVE_PROFILE_ORIGIN_COMPILED  = UINT8_MAX,
     // This is a firmware-state regression policy, not a physical-RAM claim.
     NOAH_EFFECTIVE_PROFILE_PROVIDER_STATE_BUDGET_32BIT = 784u,
 };
@@ -57,9 +57,9 @@ typedef struct {
 // copied snapshot is in use. Consumers that span an activation boundary must
 // retain copied semantic records, not pointers into reader-backed payloads.
 typedef struct {
-    noah_effective_profile_identity_t  identity;
-    noah_profile_reader_t              reader;
-    size_t                             base_offset;
+    noah_effective_profile_identity_t   identity;
+    noah_profile_reader_t               reader;
+    size_t                              base_offset;
     noah_profile_validator_v1_profile_t profile;
 } noah_effective_profile_snapshot_t;
 
@@ -103,29 +103,29 @@ typedef struct {
 // the publication sequence makes copied observations fail closed instead of
 // exposing a partially updated provider state.
 typedef struct {
-    noah_runtime_publication_generation_t publication_sequence;
-    noah_effective_profile_snapshot_t    active_banks[2];
-    noah_effective_profile_snapshot_t    compiled_defaults;
-    noah_effective_profile_snapshot_t    pending;
-    noah_effective_profile_backing_t     reuse_backing;
+    noah_runtime_publication_generation_t   publication_sequence;
+    noah_effective_profile_snapshot_t       active_banks[2];
+    noah_effective_profile_snapshot_t       compiled_defaults;
+    noah_effective_profile_snapshot_t       pending;
+    noah_effective_profile_backing_t        reuse_backing;
     noah_effective_profile_safe_boundary_fn safe_boundary;
-    void                                *safe_boundary_context;
-    noah_effective_profile_invalidator_t invalidators[NOAH_EFFECTIVE_PROFILE_MAX_INVALIDATORS];
-    uint32_t                             safe_boundary_reason_mask;
-    uint32_t                             publication_count;
-    uint8_t                              active_index;
-    uint8_t                              invalidator_count;
-    bool                                 has_pending;
-    bool                                 rollback_available;
-    bool                                 publication_in_progress;
-    bool                                 safe_boundary_evaluation_in_progress;
-    bool                                 backing_reuse_in_progress;
-    bool                                 initialized;
+    void                                   *safe_boundary_context;
+    noah_effective_profile_invalidator_t    invalidators[NOAH_EFFECTIVE_PROFILE_MAX_INVALIDATORS];
+    uint32_t                                safe_boundary_reason_mask;
+    uint32_t                                publication_count;
+    uint8_t                                 active_index;
+    uint8_t                                 invalidator_count;
+    bool                                    has_pending;
+    bool                                    rollback_available;
+    bool                                    publication_in_progress;
+    bool                                    safe_boundary_evaluation_in_progress;
+    bool                                    backing_reuse_in_progress;
+    bool                                    initialized;
 } noah_effective_profile_provider_t;
 
 noah_effective_profile_result_t noah_effective_profile_snapshot_make_compiled(const noah_profile_validator_v1_profile_t *profile, const noah_profile_reader_t *reader, size_t base_offset, noah_effective_profile_snapshot_t *snapshot);
 noah_effective_profile_result_t noah_effective_profile_snapshot_make_validated(const noah_profile_validator_v1_profile_t *profile, const noah_profile_reader_t *reader, size_t base_offset, uint32_t generation, uint8_t origin, uint32_t compiled_default_digest, noah_effective_profile_snapshot_t *snapshot);
-bool noah_effective_profile_snapshot_read(const noah_effective_profile_snapshot_t *snapshot, size_t offset, uint8_t *target, size_t length);
+bool                            noah_effective_profile_snapshot_read(const noah_effective_profile_snapshot_t *snapshot, size_t offset, uint8_t *target, size_t length);
 
 noah_effective_profile_result_t noah_effective_profile_provider_init(noah_effective_profile_provider_t *provider, const noah_effective_profile_snapshot_t *compiled_defaults, noah_effective_profile_safe_boundary_fn safe_boundary, void *safe_boundary_context, const noah_effective_profile_invalidator_t *invalidators, size_t invalidator_count);
 

@@ -8,8 +8,8 @@
 #include "users/noah/lib/profile/storage/profile_checksum.h"
 
 enum {
-    ACTION_ABI_DIGEST = UINT32_C(0x11223344),
-    MAX_SCANS         = 4096u,
+    ACTION_ABI_DIGEST   = UINT32_C(0x11223344),
+    MAX_SCANS           = 4096u,
     MAX_PREPARE_TIME_MS = 60000u,
 };
 
@@ -213,8 +213,7 @@ static void half_storage_init(half_t *half) {
     assert(noah_effective_profile_snapshot_make_compiled(&profile, &reader, 0u, &compiled) == NOAH_EFFECTIVE_PROFILE_OK);
     assert(noah_effective_profile_provider_init(&half->provider, &compiled, always_safe, NULL, NULL, 0u) == NOAH_EFFECTIVE_PROFILE_OK);
     half->compiled_digest = compiled.identity.payload_digest;
-    noah_profile_store_init(&half->store,
-                            (noah_profile_store_io_t){.read = memory_read, .write = memory_write, .context = &half->memory},
+    noah_profile_store_init(&half->store, (noah_profile_store_io_t){.read = memory_read, .write = memory_write, .context = &half->memory},
                             (noah_profile_store_compatibility_t){
                                 .schema_major            = NOAH_PROFILE_STORE_SCHEMA_MAJOR,
                                 .schema_minor            = NOAH_PROFILE_STORE_SCHEMA_MINOR,
@@ -230,7 +229,7 @@ static void half_storage_init(half_t *half) {
 }
 
 static void install_profile_with_flags(half_t *half, uint32_t generation, uint8_t origin, uint8_t flags) {
-    noah_profile_split_descriptor_t descriptor = committed_descriptor(half, generation, origin);
+    noah_profile_split_descriptor_t  descriptor = committed_descriptor(half, generation, origin);
     noah_profile_peer_store_result_t result;
 
     descriptor.profile_flags = flags;
@@ -248,7 +247,7 @@ static void install_profile(half_t *half, uint32_t generation, uint8_t origin) {
 }
 
 static void install_logical_profile(half_t *half, uint32_t generation, uint8_t origin, uint32_t via_generation, uint32_t via_digest) {
-    noah_profile_split_descriptor_t descriptor = committed_descriptor(half, generation, origin);
+    noah_profile_split_descriptor_t  descriptor = committed_descriptor(half, generation, origin);
     noah_profile_peer_store_result_t result;
 
     descriptor.logical = true;
@@ -268,22 +267,22 @@ static void pair_init(half_t *left, half_t *right) {
     left->link.peer  = right;
     right->link.peer = left;
     left_config      = (noah_profile_split_reconciler_config_t){
-        .local_context   = left,
-        .local_descriptor = local_descriptor,
-        .local_read       = local_read,
-        .local_binding    = local_binding,
+        .local_context     = left,
+        .local_descriptor  = local_descriptor,
+        .local_read        = local_read,
+        .local_binding     = local_binding,
         .transport_context = &left->link,
-        .exchange           = exchange,
-        .peer_store         = &left->peer_store,
+        .exchange          = exchange,
+        .peer_store        = &left->peer_store,
     };
     right_config = (noah_profile_split_reconciler_config_t){
-        .local_context   = right,
-        .local_descriptor = local_descriptor,
-        .local_read       = local_read,
-        .local_binding    = local_binding,
+        .local_context     = right,
+        .local_descriptor  = local_descriptor,
+        .local_read        = local_read,
+        .local_binding     = local_binding,
         .transport_context = &right->link,
-        .exchange           = exchange,
-        .peer_store         = &right->peer_store,
+        .exchange          = exchange,
+        .peer_store        = &right->peer_store,
     };
     noah_profile_split_reconciler_init(&left->reconciler, &left_config);
     noah_profile_split_reconciler_init(&right->reconciler, &right_config);
@@ -414,10 +413,10 @@ static void test_logical_binding_survives_slave_pull(void) {
 }
 
 static void test_disconnect_invalidates_then_reconnects(void) {
-    half_t                                 left;
-    half_t                                 right;
+    half_t                                left;
+    half_t                                right;
     noah_profile_split_authority_status_t status;
-    uint8_t                                unresolved = 0u;
+    uint8_t                               unresolved = 0u;
 
     half_storage_init(&left);
     half_storage_init(&right);
@@ -488,11 +487,11 @@ static void test_role_change_restarts_and_preserves_physical_origin(void) {
 }
 
 static void test_concurrent_commit_stops_without_overwrite(void) {
-    half_t                                  left;
-    half_t                                  right;
+    half_t                                 left;
+    half_t                                 right;
     noah_profile_split_reconciler_status_t status;
-    uint32_t                                left_writes;
-    uint32_t                                right_writes;
+    uint32_t                               left_writes;
+    uint32_t                               right_writes;
 
     half_storage_init(&left);
     half_storage_init(&right);
@@ -514,11 +513,11 @@ static void test_concurrent_commit_stops_without_overwrite(void) {
 }
 
 static void test_same_tuple_corruption_stops_without_overwrite(void) {
-    half_t                                  left;
-    half_t                                  right;
+    half_t                                 left;
+    half_t                                 right;
     noah_profile_split_reconciler_status_t status;
-    uint32_t                                left_writes;
-    uint32_t                                right_writes;
+    uint32_t                               left_writes;
+    uint32_t                               right_writes;
 
     half_storage_init(&left);
     half_storage_init(&right);
@@ -540,8 +539,8 @@ static void test_same_tuple_corruption_stops_without_overwrite(void) {
 }
 
 static void test_incompatible_firmware_stops_without_write(void) {
-    half_t                                  left;
-    half_t                                  right;
+    half_t                                 left;
+    half_t                                 right;
     noah_profile_split_reconciler_status_t status;
 
     half_storage_init(&left);
@@ -613,20 +612,20 @@ static void test_convergence_only_refuses_newer_peer_import(void) {
 }
 
 static void test_convergence_only_answers_inbound_prepare_busy_without_storage(void) {
-    half_t                         left;
-    half_t                         right;
+    half_t                        left;
+    half_t                        right;
     noah_profile_split_v1_frame_t request;
     noah_profile_split_v1_frame_t response;
-    uint8_t                        request_wire[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE];
-    uint8_t                        response_wire[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE];
-    uint32_t                       right_writes;
+    uint8_t                       request_wire[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE];
+    uint8_t                       response_wire[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE];
+    uint32_t                      right_writes;
 
     half_storage_init(&left);
     half_storage_init(&right);
     install_profile(&left, 16u, 0u);
     pair_init(&left, &right);
     right_writes = right.memory.writes;
-    request = (noah_profile_split_v1_frame_t){
+    request      = (noah_profile_split_v1_frame_t){
         .kind       = NOAH_PROFILE_SPLIT_V1_PREPARE_BEGIN,
         .status     = NOAH_PROFILE_SPLIT_V1_STATUS_OK,
         .descriptor = committed_descriptor(&left, 16u, 0u),
@@ -635,7 +634,7 @@ static void test_convergence_only_answers_inbound_prepare_busy_without_storage(v
     assert(noah_profile_split_reconciler_receive(&right.reconciler, request_wire, sizeof(request_wire), response_wire, sizeof(response_wire)));
     assert(noah_profile_split_reconciler_scan_mode(&right.reconciler, false, 0u, NOAH_PROFILE_SPLIT_RECONCILE_CONVERGENCE_ONLY));
     {
-        noah_profile_split_descriptor_t provisional;
+        noah_profile_split_descriptor_t       provisional;
         noah_profile_split_authority_status_t authority;
 
         assert(noah_profile_split_reconciler_provisional_peer_descriptor(&right.reconciler, &provisional));
@@ -706,11 +705,11 @@ static void test_prepared_push_collects_expected_mailbox_ack_without_failure_bac
 }
 
 static void test_prepared_push_pauses_before_commit_then_authorizes(void) {
-    half_t                           left;
-    half_t                           right;
+    half_t                          left;
+    half_t                          right;
     noah_profile_split_descriptor_t descriptor;
-    staged_source_t                  source = {.bytes = empty_profile, .length = sizeof(empty_profile)};
-    uint32_t                         exchanges_at_barrier;
+    staged_source_t                 source = {.bytes = empty_profile, .length = sizeof(empty_profile)};
+    uint32_t                        exchanges_at_barrier;
 
     half_storage_init(&left);
     half_storage_init(&right);
@@ -750,10 +749,10 @@ static void test_prepared_push_pauses_before_commit_then_authorizes(void) {
 }
 
 static void test_prepared_push_cancel_aborts_peer_lease(void) {
-    half_t                           left;
-    half_t                           right;
+    half_t                          left;
+    half_t                          right;
     noah_profile_split_descriptor_t descriptor;
-    staged_source_t                  source = {.bytes = empty_profile, .length = sizeof(empty_profile)};
+    staged_source_t                 source = {.bytes = empty_profile, .length = sizeof(empty_profile)};
 
     half_storage_init(&left);
     half_storage_init(&right);
@@ -777,21 +776,21 @@ static void test_prepared_push_cancel_aborts_peer_lease(void) {
 }
 
 static void test_maximum_candidate_resolves_within_owner_no_progress_window(void) {
-    half_t                           left;
-    half_t                           right;
+    half_t                          left;
+    half_t                          right;
     noah_profile_split_descriptor_t descriptor;
-    staged_source_t                  source = {.bytes = max_profile, .length = sizeof(max_profile)};
-    uint32_t                         start_at = 100000u;
-    uint32_t                         resolved_at = start_at;
+    staged_source_t                 source      = {.bytes = max_profile, .length = sizeof(max_profile)};
+    uint32_t                        start_at    = 100000u;
+    uint32_t                        resolved_at = start_at;
 
     half_storage_init(&left);
     half_storage_init(&right);
     pair_init(&left, &right);
     run_pair_until_converged(&left, &right, false);
-    descriptor                         = committed_descriptor(&right, 32u, 1u);
-    descriptor.payload_length          = sizeof(max_profile);
-    descriptor.payload_crc32           = payload_crc(max_profile, sizeof(max_profile));
-    descriptor.payload_digest          = payload_digest(max_profile, sizeof(max_profile));
+    descriptor                = committed_descriptor(&right, 32u, 1u);
+    descriptor.payload_length = sizeof(max_profile);
+    descriptor.payload_crc32  = payload_crc(max_profile, sizeof(max_profile));
+    descriptor.payload_digest = payload_digest(max_profile, sizeof(max_profile));
 
     assert(noah_profile_split_reconciler_prepared_push_begin(&right.reconciler, &descriptor, &source, staged_read));
     for (uint32_t scan = 0u; scan < MAX_SCANS; scan++) {
@@ -813,10 +812,10 @@ static void test_maximum_candidate_resolves_within_owner_no_progress_window(void
 }
 
 static void test_prepared_push_restarts_across_both_half_role_changes(void) {
-    half_t                           left;
-    half_t                           right;
+    half_t                          left;
+    half_t                          right;
     noah_profile_split_descriptor_t descriptor;
-    staged_source_t                  source = {.bytes = empty_profile, .length = sizeof(empty_profile)};
+    staged_source_t                 source = {.bytes = empty_profile, .length = sizeof(empty_profile)};
 
     half_storage_init(&left);
     half_storage_init(&right);
@@ -866,12 +865,12 @@ static void test_prepared_push_restarts_across_both_half_role_changes(void) {
 }
 
 static void test_receiver_durable_prepare_survives_sender_pause(void) {
-    half_t                           left;
-    half_t                           right;
+    half_t                          left;
+    half_t                          right;
     noah_profile_split_descriptor_t descriptor;
     noah_profile_split_descriptor_t provisional;
-    staged_source_t                  source = {.bytes = empty_profile, .length = sizeof(empty_profile)};
-    uint32_t                         expired_at;
+    staged_source_t                 source = {.bytes = empty_profile, .length = sizeof(empty_profile)};
+    uint32_t                        expired_at;
 
     half_storage_init(&left);
     half_storage_init(&right);
@@ -903,13 +902,13 @@ static void test_receiver_durable_prepare_survives_sender_pause(void) {
 }
 
 static void test_prepare_authorize_and_cancel_are_immediate_after_timer_high_bit(void) {
-    half_t                           left;
-    half_t                           right;
+    half_t                          left;
+    half_t                          right;
     noah_profile_split_descriptor_t cancel_descriptor;
     noah_profile_split_descriptor_t commit_descriptor;
-    staged_source_t                  source = {.bytes = empty_profile, .length = sizeof(empty_profile)};
-    uint32_t                         now;
-    uint32_t                         exchanges;
+    staged_source_t                 source = {.bytes = empty_profile, .length = sizeof(empty_profile)};
+    uint32_t                        now;
+    uint32_t                        exchanges;
 
     half_storage_init(&left);
     half_storage_init(&right);
@@ -952,10 +951,10 @@ static void test_prepare_authorize_and_cancel_are_immediate_after_timer_high_bit
 }
 
 static void test_cancel_after_prepare_rejection_is_idempotent(void) {
-    half_t                           left;
-    half_t                           right;
+    half_t                          left;
+    half_t                          right;
     noah_profile_split_descriptor_t descriptor;
-    staged_source_t                  source = {.bytes = empty_profile, .length = sizeof(empty_profile)};
+    staged_source_t                 source = {.bytes = empty_profile, .length = sizeof(empty_profile)};
 
     half_storage_init(&left);
     half_storage_init(&right);
@@ -988,10 +987,10 @@ static void test_cancel_after_prepare_rejection_is_idempotent(void) {
 
 static void test_cancel_after_dropped_prepare_begin_releases_or_noops(void) {
     for (uint8_t drop_before = 0u; drop_before <= 1u; drop_before++) {
-        half_t                           left;
-        half_t                           right;
+        half_t                          left;
+        half_t                          right;
         noah_profile_split_descriptor_t descriptor;
-        staged_source_t                  source = {.bytes = empty_profile, .length = sizeof(empty_profile)};
+        staged_source_t                 source = {.bytes = empty_profile, .length = sizeof(empty_profile)};
 
         half_storage_init(&left);
         half_storage_init(&right);
@@ -1021,10 +1020,10 @@ static void test_cancel_after_dropped_prepare_begin_releases_or_noops(void) {
 }
 
 static void test_cancel_refuses_matching_durable_peer(void) {
-    half_t                           left;
-    half_t                           right;
+    half_t                          left;
+    half_t                          right;
     noah_profile_split_descriptor_t descriptor;
-    staged_source_t                  source = {.bytes = empty_profile, .length = sizeof(empty_profile)};
+    staged_source_t                 source = {.bytes = empty_profile, .length = sizeof(empty_profile)};
 
     half_storage_init(&left);
     half_storage_init(&right);
@@ -1055,13 +1054,13 @@ static void test_cancel_refuses_matching_durable_peer(void) {
 }
 
 static void run_crossed_begin_loser_abort(bool left_sends_first) {
-    half_t                           left;
-    half_t                           right;
+    half_t                          left;
+    half_t                          right;
     noah_profile_split_descriptor_t left_descriptor;
     noah_profile_split_descriptor_t right_descriptor;
     noah_profile_split_descriptor_t observed;
-    staged_source_t                  left_source  = {.bytes = empty_profile, .length = sizeof(empty_profile)};
-    staged_source_t                  right_source = {.bytes = empty_profile, .length = sizeof(empty_profile)};
+    staged_source_t                 left_source  = {.bytes = empty_profile, .length = sizeof(empty_profile)};
+    staged_source_t                 right_source = {.bytes = empty_profile, .length = sizeof(empty_profile)};
 
     half_storage_init(&left);
     half_storage_init(&right);
@@ -1112,12 +1111,12 @@ static void test_crossed_prepare_begin_loser_abort_does_not_deadlock(void) {
 }
 
 static void test_refresh_publishes_new_local_authority_during_backoff(void) {
-    half_t                                 left;
-    half_t                                 right;
+    half_t                                left;
+    half_t                                right;
     noah_profile_split_authority_status_t authority;
-    uint32_t                               before_publications;
-    uint32_t                               before_exchanges;
-    uint32_t                               before_deadline;
+    uint32_t                              before_publications;
+    uint32_t                              before_exchanges;
+    uint32_t                              before_deadline;
 
     half_storage_init(&left);
     half_storage_init(&right);
@@ -1173,14 +1172,12 @@ static void test_converged_steady_state_cost_is_bounded_by_poll_deadline(void) {
         (void)noah_profile_split_reconciler_scan(&left.reconciler, false, now);
     }
 
-    exchanges = (left.link.exchanges + right.link.exchanges) - exchanges;
-    reads     = (left.memory.reads + right.memory.reads) - reads;
-    writes    = (left.memory.writes + right.memory.writes) - writes;
+    exchanges      = (left.link.exchanges + right.link.exchanges) - exchanges;
+    reads          = (left.memory.reads + right.memory.reads) - reads;
+    writes         = (left.memory.writes + right.memory.writes) - writes;
     expected_polls = elapsed_ms / NOAH_PROFILE_SPLIT_POLL_MS;
 
-    printf("steady state: %u scans over %u ms -> %u exchanges, %u reads, %u writes (expected <= %u exchanges)\n",
-           (unsigned)scans, (unsigned)elapsed_ms, (unsigned)exchanges, (unsigned)reads, (unsigned)writes,
-           (unsigned)(expected_polls + 1u));
+    printf("steady state: %u scans over %u ms -> %u exchanges, %u reads, %u writes (expected <= %u exchanges)\n", (unsigned)scans, (unsigned)elapsed_ms, (unsigned)exchanges, (unsigned)reads, (unsigned)writes, (unsigned)(expected_polls + 1u));
 
     assert(writes == 0u);
     assert(exchanges <= expected_polls + 1u);
@@ -1206,17 +1203,17 @@ static void test_idle_scans_do_not_republish_unchanged_metadata(void) {
     pair_init(&left, &right);
     run_pair_until_converged(&left, &right, false);
 
-    left_metadata_sequence        = left.reconciler.metadata_sequence;
-    right_metadata_sequence       = right.reconciler.metadata_sequence;
-    left_authority_publications   = left.reconciler.authority.status.publication_count;
-    right_authority_publications  = right.reconciler.authority.status.publication_count;
-    left_reads                    = left.memory.reads;
-    right_reads                   = right.memory.reads;
-    left_writes                   = left.memory.writes;
-    right_writes                  = right.memory.writes;
-    left_exchanges                = left.link.exchanges;
-    right_exchanges               = right.link.exchanges;
-    before_deadline               = right.reconciler.next_attempt_at == 0u ? 0u : right.reconciler.next_attempt_at - 1u;
+    left_metadata_sequence       = left.reconciler.metadata_sequence;
+    right_metadata_sequence      = right.reconciler.metadata_sequence;
+    left_authority_publications  = left.reconciler.authority.status.publication_count;
+    right_authority_publications = right.reconciler.authority.status.publication_count;
+    left_reads                   = left.memory.reads;
+    right_reads                  = right.memory.reads;
+    left_writes                  = left.memory.writes;
+    right_writes                 = right.memory.writes;
+    left_exchanges               = left.link.exchanges;
+    right_exchanges              = right.link.exchanges;
+    before_deadline              = right.reconciler.next_attempt_at == 0u ? 0u : right.reconciler.next_attempt_at - 1u;
 
     for (uint32_t scan = 0u; scan < MAX_SCANS; scan++) {
         assert(!noah_profile_split_reconciler_scan(&left.reconciler, false, before_deadline));

@@ -37,8 +37,17 @@ static void check_round_trip(const noah_qmk_via_sync_frame_t *source) {
 
 static void test_all_message_shapes_round_trip(void) {
     static const noah_qmk_via_sync_frame_t frames[] = {
-        {.kind = NOAH_QMK_VIA_SYNC_MESSAGE_METADATA, .generation = 1u, .digest = UINT32_C(0x12345678)}, {.kind = NOAH_QMK_VIA_SYNC_MESSAGE_SNAPSHOT_BEGIN, .generation = 2u, .digest = UINT32_C(0x87654321)}, {.kind = NOAH_QMK_VIA_SYNC_MESSAGE_PUSH_CHUNK, .region = NOAH_QMK_VIA_SYNC_REGION_KEYMAP, .generation = 3u, .offset = 14u, .region_length = 30u, .digest = 9u, .payload_length = 14u, .payload = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13}}, {.kind = NOAH_QMK_VIA_SYNC_MESSAGE_PULL_CHUNK, .region = NOAH_QMK_VIA_SYNC_REGION_MACRO, .generation = 4u, .offset = 28u, .region_length = 30u, .digest = 10u}, {.kind = NOAH_QMK_VIA_SYNC_MESSAGE_SNAPSHOT_COMMIT, .generation = 5u, .digest = 11u}, {.kind = NOAH_QMK_VIA_SYNC_MESSAGE_ACK, .generation = 6u, .digest = 12u}, {.kind = NOAH_QMK_VIA_SYNC_MESSAGE_ERROR, .status = NOAH_QMK_VIA_SYNC_STATUS_DIGEST_MISMATCH, .generation = 7u, .digest = 13u},
-        {.kind = NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_BEGIN, .generation = 8u, .digest = 14u}, {.kind = NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_VERIFY, .generation = 8u, .digest = 14u}, {.kind = NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_ACCEPT, .generation = 8u, .digest = 14u}, {.kind = NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_ABORT, .generation = 8u, .digest = 14u},
+        {.kind = NOAH_QMK_VIA_SYNC_MESSAGE_METADATA, .generation = 1u, .digest = UINT32_C(0x12345678)},
+        {.kind = NOAH_QMK_VIA_SYNC_MESSAGE_SNAPSHOT_BEGIN, .generation = 2u, .digest = UINT32_C(0x87654321)},
+        {.kind = NOAH_QMK_VIA_SYNC_MESSAGE_PUSH_CHUNK, .region = NOAH_QMK_VIA_SYNC_REGION_KEYMAP, .generation = 3u, .offset = 14u, .region_length = 30u, .digest = 9u, .payload_length = 14u, .payload = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13}},
+        {.kind = NOAH_QMK_VIA_SYNC_MESSAGE_PULL_CHUNK, .region = NOAH_QMK_VIA_SYNC_REGION_MACRO, .generation = 4u, .offset = 28u, .region_length = 30u, .digest = 10u},
+        {.kind = NOAH_QMK_VIA_SYNC_MESSAGE_SNAPSHOT_COMMIT, .generation = 5u, .digest = 11u},
+        {.kind = NOAH_QMK_VIA_SYNC_MESSAGE_ACK, .generation = 6u, .digest = 12u},
+        {.kind = NOAH_QMK_VIA_SYNC_MESSAGE_ERROR, .status = NOAH_QMK_VIA_SYNC_STATUS_DIGEST_MISMATCH, .generation = 7u, .digest = 13u},
+        {.kind = NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_BEGIN, .generation = 8u, .digest = 14u},
+        {.kind = NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_VERIFY, .generation = 8u, .digest = 14u},
+        {.kind = NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_ACCEPT, .generation = 8u, .digest = 14u},
+        {.kind = NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_ABORT, .generation = 8u, .digest = 14u},
     };
 
     for (size_t index = 0u; index < sizeof(frames) / sizeof(frames[0]); index++) {

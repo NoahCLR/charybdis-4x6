@@ -3346,8 +3346,8 @@ static void test_key_runtime_core_token_allocator_exhaustion_fails_closed(void) 
 #endif
 
 static void test_key_runtime_activity_snapshot_uses_authoritative_counts(void) {
-    key_runtime_core_state_t             *state = key_runtime_core_state();
-    noah_key_runtime_activity_snapshot_t  snapshot;
+    key_runtime_core_state_t            *state = key_runtime_core_state();
+    noah_key_runtime_activity_snapshot_t snapshot;
 
     test_reset_stubs();
     noah_runtime_reset_for_test();

@@ -11,15 +11,15 @@
 _Static_assert(NOAH_PROFILE_SPLIT_V1_FRAME_SIZE == 32u, "transport fixture requires the reviewed 32-byte profile frame");
 
 static slave_callback_t registered_callback;
-static int8_t            registered_id;
-static uint8_t           registration_count;
-static uint8_t           rpc_exec_count;
-static int8_t            rpc_exec_id;
-static uint8_t           rpc_request_size;
-static uint8_t           rpc_response_size;
-static uint8_t           rpc_request[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE];
-static bool              rpc_exec_result;
-static uint8_t           peer_begin_count;
+static int8_t           registered_id;
+static uint8_t          registration_count;
+static uint8_t          rpc_exec_count;
+static int8_t           rpc_exec_id;
+static uint8_t          rpc_request_size;
+static uint8_t          rpc_response_size;
+static uint8_t          rpc_request[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE];
+static bool             rpc_exec_result;
+static uint8_t          peer_begin_count;
 
 static void test_fail(const char *expr, const char *file, int line) {
     fprintf(stderr, "test failed: %s (%s:%d)\n", expr, file, line);
@@ -204,8 +204,8 @@ static bool reconciler_mailbox_pending(const noah_profile_split_reconciler_t *re
 }
 
 static void test_init_registers_exact_profile_transaction(void) {
-    noah_profile_split_reconciler_t reconciler = {0};
-    noah_profile_split_reconciler_t other_reconciler = {0};
+    noah_profile_split_reconciler_t   reconciler       = {0};
+    noah_profile_split_reconciler_t   other_reconciler = {0};
     noah_profile_peer_store_backend_t peer_store;
     noah_profile_peer_store_backend_t other_peer_store;
 
@@ -227,16 +227,16 @@ static void test_init_registers_exact_profile_transaction(void) {
 }
 
 static void test_callback_forwards_and_reuses_cached_busy_response(void) {
-    noah_profile_split_reconciler_t reconciler;
+    noah_profile_split_reconciler_t   reconciler;
     noah_profile_peer_store_backend_t peer_store;
-    noah_profile_split_v1_frame_t request = {
+    noah_profile_split_v1_frame_t     request = {
         .kind       = NOAH_PROFILE_SPLIT_V1_PREPARE_BEGIN,
         .status     = NOAH_PROFILE_SPLIT_V1_STATUS_OK,
         .descriptor = committed_descriptor(),
     };
     noah_profile_split_v1_frame_t response;
-    uint8_t request_wire[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE];
-    uint8_t response_wire[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE];
+    uint8_t                       request_wire[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE];
+    uint8_t                       response_wire[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE];
 
     reset_transport_stubs();
     init_reconciler(&reconciler, &peer_store);
@@ -278,9 +278,9 @@ static void test_callback_forwards_and_reuses_cached_busy_response(void) {
 }
 
 static void test_callback_rejects_invalid_sizes_without_leaking_output(void) {
-    noah_profile_split_reconciler_t reconciler;
+    noah_profile_split_reconciler_t   reconciler;
     noah_profile_peer_store_backend_t peer_store;
-    noah_profile_split_v1_frame_t request = {
+    noah_profile_split_v1_frame_t     request = {
         .kind       = NOAH_PROFILE_SPLIT_V1_PREPARE_BEGIN,
         .status     = NOAH_PROFILE_SPLIT_V1_STATUS_OK,
         .descriptor = committed_descriptor(),

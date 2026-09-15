@@ -37,7 +37,7 @@ typedef struct {
 } noah_effective_key_behavior_snapshot_t;
 
 typedef struct {
-    noah_runtime_publication_generation_t publication_sequence;
+    noah_runtime_publication_generation_t  publication_sequence;
     noah_effective_key_behavior_snapshot_t banks[2];
     uint32_t                               next_epoch;
     uint8_t                                active_index;

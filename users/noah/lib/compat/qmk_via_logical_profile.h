@@ -38,6 +38,9 @@ static inline bool noah_qmk_via_logical_profile_accept(uint16_t transaction_id, 
     return false;
 }
 static inline bool noah_qmk_via_logical_profile_abort(uint16_t transaction_id, uint32_t generation, uint32_t digest) {
-    (void)transaction_id; (void)generation; (void)digest; return false;
+    (void)transaction_id;
+    (void)generation;
+    (void)digest;
+    return false;
 }
 #endif

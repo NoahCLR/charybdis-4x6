@@ -10,8 +10,8 @@
 
 #    include "keymap_introspection.h" // QMK
 
-static bool  layer_key_led_map_dirty = true;
-static bool  layer_key_led_map[LAYER_COUNT][RGB_MATRIX_LED_COUNT];
+static bool layer_key_led_map_dirty = true;
+static bool layer_key_led_map[LAYER_COUNT][RGB_MATRIX_LED_COUNT];
 #    ifdef RGB_LAYER_STAGE_TEST_BACKEND
 static uint32_t layer_group_scan_count = 0;
 #    endif

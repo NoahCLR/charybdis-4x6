@@ -56,8 +56,8 @@ void noah_effective_key_behavior_runtime_invalidate(void *context, uint32_t publ
         return;
     }
 
-    runtime->next_epoch = next_epoch(runtime->next_epoch);
-    next.identity       = active;
+    runtime->next_epoch    = next_epoch(runtime->next_epoch);
+    next.identity          = active;
     next.publication_count = publication_count;
     next.epoch             = runtime->next_epoch;
     next.valid             = callback_view && identity_equal(callback_view->identity, active);
@@ -161,11 +161,11 @@ static noah_effective_key_behavior_result_t codec_result(noah_profile_codec_v1_r
 
 noah_effective_key_behavior_result_t noah_effective_key_behavior_runtime_lookup(const noah_effective_key_behavior_runtime_t *runtime, uint16_t keycode, noah_effective_key_behavior_row_t *row) {
     noah_effective_key_behavior_snapshot_t snapshot;
-    noah_key_behavior_row_v1_view_t         encoded_row;
-    noah_profile_action_v1_t                target;
-    noah_profile_codec_v1_error_t           error;
-    noah_effective_key_behavior_result_t    result;
-    bool                                    found;
+    noah_key_behavior_row_v1_view_t        encoded_row;
+    noah_profile_action_v1_t               target;
+    noah_profile_codec_v1_error_t          error;
+    noah_effective_key_behavior_result_t   result;
+    bool                                   found;
 
     if (!row) {
         return NOAH_EFFECTIVE_KEY_BEHAVIOR_INVALID_ARGUMENT;
@@ -210,9 +210,9 @@ noah_effective_key_behavior_result_t noah_effective_key_behavior_runtime_lookup(
 
 noah_effective_key_behavior_result_t noah_effective_key_behavior_runtime_step(const noah_effective_key_behavior_runtime_t *runtime, uint32_t epoch, uint8_t row_index, uint8_t tap_count, key_behavior_step_t *step) {
     noah_effective_key_behavior_snapshot_t snapshot;
-    noah_key_behavior_row_v1_view_t         row;
-    noah_profile_codec_v1_error_t           error;
-    noah_effective_key_behavior_result_t    result;
+    noah_key_behavior_row_v1_view_t        row;
+    noah_profile_codec_v1_error_t          error;
+    noah_effective_key_behavior_result_t   result;
 
     if (!step || tap_count == 0u || tap_count > KEY_BEHAVIOR_MAX_TAP_COUNT) {
         return NOAH_EFFECTIVE_KEY_BEHAVIOR_INVALID_ARGUMENT;

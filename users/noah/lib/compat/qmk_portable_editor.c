@@ -28,10 +28,7 @@ static const char effect_names[][64] = {
 #    endif
 };
 static const keymap_config_t option_masks[] = {
-    {.swap_control_capslock = true}, {.capslock_to_control = true}, {.swap_lalt_lgui = true},
-    {.swap_ralt_rgui = true}, {.no_gui = true}, {.swap_grave_esc = true},
-    {.swap_backslash_backspace = true}, {.nkro = true}, {.swap_lctl_lgui = true},
-    {.swap_rctl_rgui = true}, {.oneshot_enable = true}, {.swap_escape_capslock = true}, {.autocorrect_enable = true},
+    {.swap_control_capslock = true}, {.capslock_to_control = true}, {.swap_lalt_lgui = true}, {.swap_ralt_rgui = true}, {.no_gui = true}, {.swap_grave_esc = true}, {.swap_backslash_backspace = true}, {.nkro = true}, {.swap_lctl_lgui = true}, {.swap_rctl_rgui = true}, {.oneshot_enable = true}, {.swap_escape_capslock = true}, {.autocorrect_enable = true},
 };
 enum { OPTIONS_COUNT = 13, EFFECT_COUNT = sizeof(effect_names) / sizeof(effect_names[0]), EDITOR_BYTES = OPTIONS_COUNT * 2 + sizeof(effect_names) };
 _Static_assert(EFFECT_COUNT == RGB_MATRIX_EFFECT_MAX - 1, "editor effect inventory must match QMK");
@@ -62,9 +59,10 @@ uint8_t noah_qmk_portable_editor_page(uint8_t page, uint8_t *payload) {
         return 2;
     }
     if (page == 2) {
-        uint16_t options = supported_options();
-        uint8_t led_flags = 0;
-        for (uint8_t i = 0; i < RGB_MATRIX_LED_COUNT; i++) led_flags |= g_led_config.flags[i];
+        uint16_t options   = supported_options();
+        uint8_t  led_flags = 0;
+        for (uint8_t i = 0; i < RGB_MATRIX_LED_COUNT; i++)
+            led_flags |= g_led_config.flags[i];
         const uint8_t metadata[] = {1, 25, EDITOR_BYTES & 255, EDITOR_BYTES >> 8, EFFECT_COUNT, OPTIONS_COUNT, options & 255, options >> 8, led_flags};
         memcpy(payload, metadata, sizeof(metadata));
         return sizeof(metadata);
@@ -87,7 +85,9 @@ void noah_qmk_portable_apply_lighting(uint32_t mode, uint32_t color) {
     rgb_matrix_set_speed((mode >> 16) & 255);
     rgb_matrix_set_flags(mode >> 24);
     rgb_matrix_sethsv(color & 255, (color >> 8) & 255, (color >> 16) & 255);
-    if (mode & 255) rgb_matrix_enable();
-    else rgb_matrix_disable();
+    if (mode & 255)
+        rgb_matrix_enable();
+    else
+        rgb_matrix_disable();
 }
 #endif

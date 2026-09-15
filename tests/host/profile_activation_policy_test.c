@@ -10,7 +10,7 @@
 #include "users/noah/lib/macro/macro_payload.h"
 #include "users/noah/lib/profile/runtime/profile_activation_policy.h"
 
-static noah_key_runtime_activity_snapshot_t  runtime_activity;
+static noah_key_runtime_activity_snapshot_t   runtime_activity;
 static macro_payload_debug_snapshot_t         macro_activity;
 static noah_qmk_combo_origin_debug_snapshot_t combo_activity;
 static uint16_t                               managed_usage_count;
@@ -99,30 +99,19 @@ static void test_reason_bits_are_exact_and_composable(void) {
     assert(noah_profile_activation_reason_mask(NULL) == NOAH_PROFILE_ACTIVATION_REASON_INTERNAL);
 
     snapshot = (noah_profile_activation_snapshot_t){
-        .physical_press_count   = 1u,
-        .tap_series_count       = 2u,
-        .runtime_lease_count    = 3u,
-        .deferred_release_count = 4u,
+        .physical_press_count    = 1u,
+        .tap_series_count        = 2u,
+        .runtime_lease_count     = 3u,
+        .deferred_release_count  = 4u,
         .persistent_intent_count = 5u,
-        .owned_output_count     = 6u,
-        .real_mods              = 1u,
-        .oneshot_layer_active   = 1u,
-        .macro_engine_state     = MACRO_PAYLOAD_ENGINE_WAITING,
-        .combo_active_count     = 1u,
-        .unresolved_peer_count  = 1u,
+        .owned_output_count      = 6u,
+        .real_mods               = 1u,
+        .oneshot_layer_active    = 1u,
+        .macro_engine_state      = MACRO_PAYLOAD_ENGINE_WAITING,
+        .combo_active_count      = 1u,
+        .unresolved_peer_count   = 1u,
     };
-    assert(noah_profile_activation_reason_mask(&snapshot) ==
-           (NOAH_PROFILE_ACTIVATION_REASON_PHYSICAL_PRESS |
-            NOAH_PROFILE_ACTIVATION_REASON_TAP_SERIES |
-            NOAH_PROFILE_ACTIVATION_REASON_RUNTIME_LEASE |
-            NOAH_PROFILE_ACTIVATION_REASON_DEFERRED_RELEASE |
-            NOAH_PROFILE_ACTIVATION_REASON_PERSISTENT_INTENT |
-            NOAH_PROFILE_ACTIVATION_REASON_OWNED_OUTPUT |
-            NOAH_PROFILE_ACTIVATION_REASON_MODIFIER_OR_ONESHOT |
-            NOAH_PROFILE_ACTIVATION_REASON_ONESHOT_LAYER |
-            NOAH_PROFILE_ACTIVATION_REASON_MACRO |
-            NOAH_PROFILE_ACTIVATION_REASON_COMBO |
-            NOAH_PROFILE_ACTIVATION_REASON_PEER));
+    assert(noah_profile_activation_reason_mask(&snapshot) == (NOAH_PROFILE_ACTIVATION_REASON_PHYSICAL_PRESS | NOAH_PROFILE_ACTIVATION_REASON_TAP_SERIES | NOAH_PROFILE_ACTIVATION_REASON_RUNTIME_LEASE | NOAH_PROFILE_ACTIVATION_REASON_DEFERRED_RELEASE | NOAH_PROFILE_ACTIVATION_REASON_PERSISTENT_INTENT | NOAH_PROFILE_ACTIVATION_REASON_OWNED_OUTPUT | NOAH_PROFILE_ACTIVATION_REASON_MODIFIER_OR_ONESHOT | NOAH_PROFILE_ACTIVATION_REASON_ONESHOT_LAYER | NOAH_PROFILE_ACTIVATION_REASON_MACRO | NOAH_PROFILE_ACTIVATION_REASON_COMBO | NOAH_PROFILE_ACTIVATION_REASON_PEER));
 }
 
 static void test_runtime_capture_and_status(void) {
@@ -137,21 +126,21 @@ static void test_runtime_capture_and_status(void) {
     assert(noah_profile_activation_policy_safe_boundary(&policy) == 0u);
     assert(peer.calls == 1u);
 
-    runtime_activity.press_token_count      = 1u;
-    runtime_activity.tap_series_count       = 2u;
-    runtime_activity.lease_count            = 3u;
-    runtime_activity.pending_release_count  = 4u;
+    runtime_activity.press_token_count       = 1u;
+    runtime_activity.tap_series_count        = 2u;
+    runtime_activity.lease_count             = 3u;
+    runtime_activity.pending_release_count   = 4u;
     runtime_activity.persistent_intent_count = 5u;
-    managed_usage_count                     = 6u;
-    weak_mods                               = 0x02u;
-    oneshot_mods                            = 0x04u;
-    locked_oneshot_mods                     = 0x08u;
-    oneshot_layer_active                    = true;
-    macro_activity.state                    = MACRO_PAYLOAD_ENGINE_OUTPUT;
-    macro_activity.active_hold_count        = 7u;
-    combo_activity.pending_count            = 8u;
-    combo_activity.active_count             = 9u;
-    peer.unresolved_count                   = 10u;
+    managed_usage_count                      = 6u;
+    weak_mods                                = 0x02u;
+    oneshot_mods                             = 0x04u;
+    locked_oneshot_mods                      = 0x08u;
+    oneshot_layer_active                     = true;
+    macro_activity.state                     = MACRO_PAYLOAD_ENGINE_OUTPUT;
+    macro_activity.active_hold_count         = 7u;
+    combo_activity.pending_count             = 8u;
+    combo_activity.active_count              = 9u;
+    peer.unresolved_count                    = 10u;
 
     reasons = noah_profile_activation_policy_safe_boundary(&policy);
     assert((reasons & NOAH_PROFILE_ACTIVATION_REASON_PEER) != 0u);
@@ -210,9 +199,9 @@ static void test_evaluation_count_saturates(void) {
 
 static void test_status_fails_closed_during_publication(void) {
     noah_profile_activation_policy_t   policy;
-    noah_profile_activation_snapshot_t snapshot = {.physical_press_count = 99u};
-    peer_fixture_t                     peer = {.succeeds = true, .unresolved_count = 0u};
-    uint32_t                           reasons = 99u;
+    noah_profile_activation_snapshot_t snapshot    = {.physical_press_count = 99u};
+    peer_fixture_t                     peer        = {.succeeds = true, .unresolved_count = 0u};
+    uint32_t                           reasons     = 99u;
     uint32_t                           evaluations = 99u;
 
     reset_activity();

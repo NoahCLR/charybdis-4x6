@@ -31,7 +31,7 @@ typedef enum {
     NOAH_PROFILE_SPLIT_V1_LOGICAL_BIND = 9u,
     // Validates the received payload and persists only the prepared marker.
     // PREPARE_COMMIT remains the later logical decision command.
-    NOAH_PROFILE_SPLIT_V1_PREPARE_DURABLE = 10u,
+    NOAH_PROFILE_SPLIT_V1_PREPARE_DURABLE      = 10u,
     NOAH_PROFILE_SPLIT_V1_LOGICAL_BIND_REQUEST = 11u,
 } noah_profile_split_v1_kind_t;
 

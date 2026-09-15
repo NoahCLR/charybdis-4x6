@@ -147,23 +147,23 @@ static void test_init_install_and_fail_closed_capture(void) {
 }
 
 static void test_callback_only_live_view_and_frame_staleness(const char *fixture_path) {
-    uint8_t                            payload[TEST_BUFFER_SIZE];
-    size_t                             payload_length = fixture_hex(fixture_path, "payload.hex", payload, sizeof(payload));
-    instrumented_reader_t              reader_context = {.bytes = payload, .length = payload_length};
-    noah_profile_reader_t              reader = {.read = instrumented_read, .context = &reader_context, .length = payload_length};
-    noah_profile_rgb_v1_limits_t       limits = fixture_limits(fixture_path);
-    noah_profile_rgb_v1_view_t         view;
-    noah_profile_rgb_v1_error_t        error;
-    noah_effective_rgb_runtime_t       runtime;
-    noah_effective_rgb_frame_t         live_frame;
-    noah_effective_rgb_frame_t         fallback_frame;
-    noah_effective_profile_identity_t  live_identity = identity(7u, NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE);
-    noah_effective_profile_snapshot_t  live = live_rgb_snapshot(live_identity, (noah_profile_rgb_v1_view_t){0});
-    noah_profile_rgb_v1_layer_color_t  layer;
-    size_t                             calls_after_decode;
+    uint8_t                           payload[TEST_BUFFER_SIZE];
+    size_t                            payload_length = fixture_hex(fixture_path, "payload.hex", payload, sizeof(payload));
+    instrumented_reader_t             reader_context = {.bytes = payload, .length = payload_length};
+    noah_profile_reader_t             reader         = {.read = instrumented_read, .context = &reader_context, .length = payload_length};
+    noah_profile_rgb_v1_limits_t      limits         = fixture_limits(fixture_path);
+    noah_profile_rgb_v1_view_t        view;
+    noah_profile_rgb_v1_error_t       error;
+    noah_effective_rgb_runtime_t      runtime;
+    noah_effective_rgb_frame_t        live_frame;
+    noah_effective_rgb_frame_t        fallback_frame;
+    noah_effective_profile_identity_t live_identity = identity(7u, NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE);
+    noah_effective_profile_snapshot_t live          = live_rgb_snapshot(live_identity, (noah_profile_rgb_v1_view_t){0});
+    noah_profile_rgb_v1_layer_color_t layer;
+    size_t                            calls_after_decode;
 
     assert(noah_profile_rgb_v1_decode_reader(&reader, 0u, payload_length, &limits, &view, &error) == NOAH_PROFILE_RGB_V1_OK);
-    live.profile.rgb = view;
+    live.profile.rgb   = view;
     calls_after_decode = reader_context.calls;
 
     noah_effective_rgb_runtime_init(&runtime);
@@ -180,7 +180,7 @@ static void test_callback_only_live_view_and_frame_staleness(const char *fixture
     assert(layer.layer_id == 2u && layer.color.h == 40u && layer.color.s == 50u && layer.color.v == 60u && layer.mode == 1u);
 
     noah_effective_profile_identity_t behavior_only_identity = identity(8u, NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE);
-    noah_effective_profile_snapshot_t behavior_only = fallback_snapshot(behavior_only_identity);
+    noah_effective_profile_snapshot_t behavior_only          = fallback_snapshot(behavior_only_identity);
     noah_effective_rgb_runtime_invalidate(&runtime, 2u, live_identity, behavior_only_identity, &behavior_only);
     assert(noah_effective_rgb_runtime_frame_status(&runtime, &live_frame) == NOAH_EFFECTIVE_RGB_STALE);
     assert(noah_effective_rgb_runtime_capture_frame(&runtime, &fallback_frame) == NOAH_EFFECTIVE_RGB_COMPILED_FALLBACK);
@@ -193,7 +193,7 @@ static void test_callback_only_live_view_and_frame_staleness(const char *fixture
 static void test_invalid_callback_identity_fails_closed(void) {
     noah_effective_rgb_runtime_t      runtime;
     noah_effective_rgb_frame_t        frame;
-    noah_effective_profile_identity_t active = identity(3u, NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE);
+    noah_effective_profile_identity_t active     = identity(3u, NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE);
     noah_effective_profile_snapshot_t mismatched = fallback_snapshot(identity(4u, NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE));
 
     noah_effective_rgb_runtime_init(&runtime);

@@ -23,8 +23,8 @@ enum {
     NOAH_PROFILE_CANDIDATE_V1_MAX_BLOB_SIZE       = 4064u,
     NOAH_PROFILE_CANDIDATE_V1_DOMAIN_RGB          = 1u << 0,
     NOAH_PROFILE_CANDIDATE_V1_DOMAIN_KEY_BEHAVIOR = 1u << 1,
-    NOAH_PROFILE_CANDIDATE_V1_DOMAIN_COMBOS = 1u << 2,
-    NOAH_PROFILE_CANDIDATE_V1_DOMAIN_SETTINGS = 1u << 3,
+    NOAH_PROFILE_CANDIDATE_V1_DOMAIN_COMBOS       = 1u << 2,
+    NOAH_PROFILE_CANDIDATE_V1_DOMAIN_SETTINGS     = 1u << 3,
     NOAH_PROFILE_CANDIDATE_V1_KNOWN_DOMAINS       = NOAH_PROFILE_CANDIDATE_V1_DOMAIN_RGB | NOAH_PROFILE_CANDIDATE_V1_DOMAIN_KEY_BEHAVIOR | NOAH_PROFILE_CANDIDATE_V1_DOMAIN_COMBOS | NOAH_PROFILE_CANDIDATE_V1_DOMAIN_SETTINGS,
     NOAH_PROFILE_CANDIDATE_V1_LOCATION_NONE_U8    = 0xFFu,
     NOAH_PROFILE_CANDIDATE_V1_LOCATION_NONE_U16   = 0xFFFFu,
@@ -101,10 +101,10 @@ enum {
 };
 
 typedef struct {
-    uint8_t schema_major;
-    uint8_t schema_minor;
-    uint8_t requested_domains;
-    uint8_t flags;
+    uint8_t  schema_major;
+    uint8_t  schema_minor;
+    uint8_t  requested_domains;
+    uint8_t  flags;
     uint16_t payload_length;
     uint32_t crc32;
     uint32_t digest;
