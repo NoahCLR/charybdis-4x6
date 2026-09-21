@@ -175,7 +175,20 @@ function activeProfileFromDevice(state) {
 function deviceHeader(state) {
     const connected = Boolean(state.capabilities);
     if (!connected) {
-        return {connected: false, label: "", summary: "", subtitle: ""};
+        return {
+            connected: false,
+            label: "",
+            summary: "",
+            subtitle: "",
+            health: {
+                profile: "unavailable",
+                converged: false,
+                recoveryPending: false,
+                busy: false,
+                phase: state.phase || "idle",
+                error: state.error?.message || "",
+            },
+        };
     }
     const label = [state.device?.manufacturer, state.device?.product].filter(Boolean).join(" ") || "Charybdis";
     const status = state.status;
@@ -197,16 +210,33 @@ function deviceHeader(state) {
     const subtitle = parts.length
         ? `${parts.join(" and ")} read from the keyboard`
         : "Connected. Use Read from keyboard to load its configuration.";
-    return {connected: true, label, summary, subtitle};
+    const converged = Boolean(status) && halvesConverged(status);
+    return {
+        connected: true,
+        label,
+        summary,
+        subtitle,
+        health: {
+            profile: !status ? "unread" : converged ? "synced" : "attention",
+            converged,
+            recoveryPending: Boolean(state.mutationCompatibility?.recoveryPending || status?.candidatePending),
+            busy: Boolean(state.busy),
+            phase: state.phase || "connected",
+            error: state.error?.message || state.liveApply?.error?.message || "",
+        },
+    };
 }
 
 // Both halves agreeing is the thing worth seeing at a glance; anything else
 // gets said plainly rather than hidden behind a green chip.
 function convergence(status) {
-    const agreed =
+    return halvesConverged(status) ? "both halves agree" : "halves not converged";
+}
+
+function halvesConverged(status) {
+    return Boolean(status) &&
         status.activeGeneration === status.committedGeneration &&
         status.committedGeneration === status.peerGeneration;
-    return agreed ? "both halves agree" : "halves not converged";
 }
 
 function hex(value) {

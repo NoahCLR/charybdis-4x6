@@ -52,7 +52,7 @@ function renderPortableProfile(document, model, post) {
             else row.append(el("span", "Base · always underneath", "muted"));
             list.append(row);
         }
-        panel.append(list, button(model.draft ? "Keep layer changes" : "Save layer changes", () => post({type: "savePortableLayers", names: currentNames()})), button("Cancel", () => post({type: "cancelPortableReview"})));
+        panel.append(list, button(model.draft ? "Keep layers in draft" : "Save layers to keyboard", () => post({type: "savePortableLayers", names: currentNames()})), button("Cancel", () => post({type: "cancelPortableReview"})));
         host.append(panel);
     }
 }

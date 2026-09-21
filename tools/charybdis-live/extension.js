@@ -8,9 +8,9 @@
 // without touching it. Nothing here parses a firmware repository; see
 // docs/LIVE_EDIT_APP_DIRECTION.md.
 //
-// The webview is Profile Studio's editing UI, ported verbatim. It renders a
-// `model` and posts typed edits back, so this file's job is to build that model
-// from the keyboard and turn those edits into device writes.
+// The webview renders a keyboard-backed `model` and posts typed edits back, so
+// this file's job is to build that model and turn those edits into device
+// writes.
 
 const vscode = require("vscode");
 
@@ -169,17 +169,6 @@ async function handleMessage(panel, session, message) {
                 });
                 return;
 
-            // Studio surfaces these against a repository. This app has none,
-            // and the domains behind them need the committed payload read.
-            // Say so rather than failing silently.
-            case "selectProfile":
-            case "requestCreateProfile":
-            case "requestCloneProfile":
-            case "requestRenameProfile":
-            case "requestDeleteProfile":
-                session.notice = "Charybdis Live edits the connected keyboard and has no profile files. Use Profile Studio for source profiles.";
-                publish(panel, session);
-                return;
             case "applyLayerChanges":
                 session.notice = "This edit is not connected to the profile writer yet.";
                 publish(panel, session);

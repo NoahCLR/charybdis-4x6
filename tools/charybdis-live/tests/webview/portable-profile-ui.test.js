@@ -27,7 +27,7 @@ test("moving or saving a layer includes its current name even before blur", () =
     assert.equal(f.messages[0].names[4], "Trackball"); assert.equal(f.messages[0].direction, 1);
     f.model.portable.layers.order = [0, 1, 2, 3, 5, 4, 6, 7]; f.render();
     assert.equal(f.host.all("input")[2].value, "Trackball");
-    f.button("Save layer changes").onclick(); assert.equal(f.messages[1].names[4], "Trackball");
+    f.button("Save layers to keyboard").onclick(); assert.equal(f.messages[1].names[4], "Trackball");
 });
 test("base cannot move and busy controls cannot start overlapping operations", () => {
     const f = fixture(), base = f.host.all("li").at(-1);

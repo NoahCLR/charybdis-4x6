@@ -1,15 +1,14 @@
 "use strict";
 
-// Charybdis Live webview — Profile Studio's editing UI, ported wholesale.
+// Charybdis Live webview.
 //
 // This is a pure renderer. It reads a `model` object the host posts and sends
 // edits back as typed messages, and performs no file access of its own. That
-// seam is why the port works: Studio's host built the model by parsing C, and
-// this app builds the same shape from the connected keyboard.
+// The host builds that shape entirely from the connected keyboard.
 //
 // It is one large template literal, the shape this app otherwise avoids.
-// Keeping it verbatim is deliberate. It is roughly 8,700 lines of working,
-// visually tuned UI; rewriting it to prove a structural point would trade a
+// It is being decomposed tab by tab while retaining the working, visually
+// tuned editor; rewriting it wholesale would trade a
 // real editor for a tidier empty one. It is exempted from the layering guard
 // by path and gets decomposed tab by tab as each is rewired to the device.
 //
@@ -441,23 +440,18 @@ function getStudioHtml() {
             position: sticky;
             top: 0;
             z-index: 2;
-            display: flex;
+            display: grid;
+            grid-template-columns: minmax(210px, auto) minmax(0, 1fr) auto;
             align-items: center;
-            justify-content: space-between;
-            gap: 12px;
-            padding: 14px 18px;
+            gap: 16px;
+            padding: 12px 18px;
             border-bottom: 1px solid var(--line);
             background: #20262a;
         }
         .header-title {
             min-width: 0;
         }
-        .header-actions {
-            display: grid;
-            gap: 7px;
-            justify-items: end;
-            min-width: min(900px, 100%);
-        }
+        .header-actions { display: flex; align-items: center; justify-content: flex-end; }
         .header-action-row {
             display: flex;
             flex-wrap: wrap;
@@ -473,6 +467,50 @@ function getStudioHtml() {
         }
         .device-chip--ok { color: #6fcf97; }
         .device-chip--idle { opacity: 0.65; }
+        .device-status {
+            min-width: 0;
+            display: grid;
+            gap: 5px;
+        }
+        .device-status-primary,
+        .device-health-strip {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 6px;
+            min-width: 0;
+        }
+        .device-status-summary {
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            color: var(--muted);
+            font-size: 11px;
+        }
+        .health-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            min-height: 24px;
+            padding: 2px 8px;
+            border: 1px solid rgba(168, 178, 184, 0.28);
+            border-radius: 999px;
+            color: var(--muted);
+            background: rgba(255, 255, 255, 0.025);
+            font-size: 11px;
+            white-space: nowrap;
+        }
+        .health-pill::before {
+            content: "";
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: currentColor;
+        }
+        .health-pill--ok { color: #6fcf97; border-color: rgba(111, 207, 151, 0.3); }
+        .health-pill--warn { color: var(--warn); border-color: rgba(242, 184, 75, 0.34); }
+        .health-pill--error { color: var(--danger); border-color: rgba(255, 107, 107, 0.34); }
 
         .profile-picker-label {
             color: var(--muted);
@@ -589,111 +627,32 @@ function getStudioHtml() {
         .panel > .panel-body {
             min-width: 0;
         }
-        .status-popup {
-            position: fixed;
-            top: 66px;
-            right: 18px;
-            z-index: 5;
-            display: grid;
-            gap: 8px;
-            width: min(520px, calc(100vw - 36px));
-            max-height: min(360px, calc(100vh - 92px));
-            overflow: auto;
-            border: 1px solid var(--line);
-            border-radius: 8px;
-            background: #20262a;
-            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.36);
-            padding: 12px;
-        }
-        .status-popup-header {
+        .status-center { display: grid; gap: 8px; margin-bottom: 10px; }
+        .status-banner {
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            gap: 10px;
+            gap: 8px;
+            min-height: 34px;
+            padding: 7px 10px;
+            border: 1px solid rgba(49, 198, 164, 0.26);
+            border-radius: 7px;
+            background: rgba(49, 198, 164, 0.055);
         }
-        .status-popup-title {
-            color: var(--muted);
-            font-size: 12px;
-            font-weight: 650;
+        .status-banner--error {
+            border-color: rgba(255, 107, 107, 0.4);
+            background: rgba(255, 107, 107, 0.07);
+            color: #ffd8d8;
         }
-        .status-popup-dismiss {
-            position: relative;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 28px;
-            height: 28px;
-            min-width: 28px;
+        .device-diagnostics {
             padding: 0;
+            border: 0;
+            background: transparent;
             color: var(--muted);
-            line-height: 1;
+            font-size: 11px;
         }
-        .status-popup-dismiss::before,
-        .status-popup-dismiss::after {
-            content: "";
-            position: absolute;
-            width: 12px;
-            height: 2px;
-            border-radius: 999px;
-            background: currentColor;
-        }
-        .status-popup-dismiss::before {
-            transform: rotate(45deg);
-        }
-        .status-popup-dismiss::after {
-            transform: rotate(-45deg);
-        }
-        .status-popup-dismiss:hover {
-            color: var(--text);
-            border-color: var(--accent);
-        }
-        .status-popup-body {
-            display: grid;
-            gap: 6px;
-        }
-        .modal-backdrop {
-            position: fixed;
-            inset: 0;
-            z-index: 10;
-            display: grid;
-            place-items: center;
-            padding: 18px;
-            background: rgba(9, 12, 14, 0.72);
-        }
-        .confirm-dialog {
-            display: grid;
-            gap: 14px;
-            width: min(560px, 100%);
-            max-height: min(680px, calc(100vh - 36px));
-            overflow: auto;
-            border: 1px solid var(--line);
-            border-radius: 8px;
-            background: var(--panel);
-            box-shadow: 0 18px 48px rgba(0, 0, 0, 0.46);
-            padding: 16px;
-        }
-        .confirm-dialog h2 {
-            margin: 0;
-        }
-        .confirm-dialog p {
-            margin: 0;
-            color: var(--muted);
-        }
-        .confirm-list {
-            display: grid;
-            gap: 8px;
-            margin: 0;
-            padding-left: 18px;
-        }
-        .confirm-list li {
-            padding-left: 2px;
-        }
-        .confirm-actions {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            justify-content: flex-end;
-        }
+        .device-diagnostics > summary { cursor: pointer; width: fit-content; }
+        .device-diagnostics-list { display: grid; gap: 4px; margin-top: 7px; }
+        .device-diagnostics-list p { margin: 0; }
         .stack { display: grid; gap: 14px; }
         .view-tabs {
             display: flex;
@@ -1671,6 +1630,52 @@ function getStudioHtml() {
             font-size: 12px;
             font-weight: 650;
         }
+        .toggle-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 8px 14px;
+        }
+        .toggle-grid .toggle-inline {
+            padding: 6px 8px;
+            border: 1px solid rgba(168, 178, 184, 0.18);
+            border-radius: 7px;
+            background: rgba(255, 255, 255, 0.018);
+        }
+        .rgb-overview {
+            display: grid;
+            grid-template-columns: minmax(210px, 0.8fr) minmax(420px, 1.8fr) auto;
+            align-items: center;
+            gap: 14px 20px;
+            padding: 10px 12px;
+            border: 1px solid rgba(168, 178, 184, 0.24);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.018);
+        }
+        .rgb-overview-copy { display: grid; gap: 1px; min-width: 0; }
+        .rgb-overview-eyebrow {
+            color: var(--muted);
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.07em;
+            text-transform: uppercase;
+        }
+        .rgb-overview-title { font-size: 12px; font-weight: 650; }
+        .rgb-overview-meta,
+        .rgb-overview-note { color: var(--muted); font-size: 10px; }
+        .rgb-overview-note { max-width: 240px; text-align: right; }
+        .rgb-stage-controls {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 6px 12px;
+            min-width: 0;
+        }
+        .rgb-stage-toggle { grid-template-columns: 30px auto; gap: 6px; }
+        .rgb-stage-toggle .toggle-switch { width: 30px; height: 16px; }
+        .rgb-stage-toggle .toggle-switch::after { width: 12px; height: 12px; }
+        .rgb-stage-toggle input[type="checkbox"]:checked + .toggle-switch::after { transform: translateX(14px); }
+        .rgb-stage-toggle .toggle-label { font-size: 11px; font-weight: 550; }
+        .rgb-stage-save { padding: 5px 8px; font-size: 11px; }
         .selected-behavior-editor {
             display: grid;
             gap: 14px;
@@ -2257,6 +2262,10 @@ function getStudioHtml() {
             flex-wrap: wrap;
         }
         @media (max-width: 1240px) {
+            header { grid-template-columns: minmax(180px, auto) minmax(0, 1fr); }
+            .header-actions { grid-column: 1 / -1; justify-content: flex-end; }
+            .rgb-overview { grid-template-columns: 1fr; }
+            .rgb-overview-note { max-width: none; text-align: left; }
             .view-tab { min-width: 0; }
             .rgb-builder-layout,
             .layout-with-key-editor {
@@ -2302,18 +2311,22 @@ function getStudioHtml() {
             <h1>Charybdis Live</h1>
             <div id="subtitle" class="muted">Connecting to the keyboard</div>
         </div>
-        <div class="header-actions">
-            <div class="header-action-row">
-                <span class="profile-picker-label">Keyboard</span>
+        <div class="device-status" aria-label="Keyboard status">
+            <div class="device-status-primary">
                 <span id="deviceChip" class="device-chip device-chip--idle">Not connected</span>
-                <span id="deviceGeneration" class="muted"></span>
+                <span id="deviceGeneration" class="device-status-summary"></span>
             </div>
-            <div class="header-action-row toolbar">
-                <span class="profile-picker-label">Device</span>
-                <div class="header-button-group">
-                    <button id="applyAll" class="primary dirty" hidden disabled>Apply to keyboard</button>
-                    <button id="reload" class="primary">Read from keyboard</button>
-                </div>
+            <div class="device-health-strip">
+                <span id="connectionHealth" class="health-pill">Disconnected</span>
+                <span id="profileHealth" class="health-pill">Profile unavailable</span>
+                <span id="draftHealth" class="health-pill">Draft unavailable</span>
+                <span id="recoveryHealth" class="health-pill">Recovery unknown</span>
+            </div>
+        </div>
+        <div class="header-actions">
+            <div class="header-button-group">
+                <button id="applyAll" class="primary dirty" hidden disabled>Review changes</button>
+                <button id="reload" class="primary">Read from keyboard</button>
             </div>
         </div>
     </header>
@@ -2398,7 +2411,6 @@ function getClientScript() {
     let lastLayoutKeyClick = { index: undefined, time: 0 };
     let keyPicker = undefined;
     let notice = "";
-    let dismissedStatusSignature = "";
     let layoutNotice = "";
     let localUndoStack = [];
     let localRedoStack = [];
@@ -2420,17 +2432,8 @@ function getClientScript() {
     const headerTooltips = {
         deviceChip: "The keyboard this window is editing.",
         deviceGeneration: "The committed profile generation and digest the keyboard reports, and whether both halves agree.",
-        createProfile: "Create a new keymap folder from the starter Profile Studio template and register it in qmk.json.",
-        cloneProfile: "Copy the active keymap folder to a new profile and register the clone in qmk.json.",
-        renameProfile: "Move the active non-default profile folder to a new keymap name and update qmk.json.",
-        deleteProfile: "Delete the active non-default profile folder and remove its qmk.json build target.",
-        openKeymap: "Open keymap.c beside the studio so you can inspect or hand-edit the source.",
-        openRgb: "Open rgb_config.c beside the studio so you can inspect or hand-edit the source.",
-        openConfig: "Open config.h beside the studio so you can inspect layer enum and timing settings.",
-        generateProfileDocs: "Create or refresh the generated profile overview Markdown and assets from the active profile source files on disk.",
-        compileFirmware: "Compile separate left and right UF2 firmware files for the active profile.",
-        applyAll: "Write staged edits to the connected keyboard. Each key is read back after writing.",
-        reload: "Re-read the layout from the connected keyboard, discarding staged edits."
+        applyAll: "Review the complete local draft before applying it to both keyboard halves.",
+        reload: "Read the connected keyboard again while keeping the local draft."
     };
     const viewTooltips = {
         layout: "Edit layer keys and behavior rows using the physical keyboard layout as the filter.",
@@ -2440,21 +2443,20 @@ function getClientScript() {
         defaults: "Edit the keyboard’s timing, pointer speed, auto-mouse and lighting settings."
     };
     const panelTooltips = {
-        Status: "Parser messages, write status, and warnings from the current studio model.",
         Layout: "Physical keyboard preview, layer tabs, selected-key editor, combo builder, and selected-key behavior editor for the active layer.",
-        "Layer Overview": "Read-only summary of behavior rows, macros, combos, and pointing modes reachable from keys on the active layer.",
-        "Macro Builder": "Build, record, preview, and save macros on the keyboard. Drafts stay local until Apply macro.",
+        "Layer Overview": "Read-only summary of behavior rows, combos, macros, and pointing modes reachable from keys on the active layer.",
+        "Macro Builder": "Build, record, and preview macros. Keep edits in the draft, then apply the complete profile.",
         "Combo Builder": "Read and edit keyboard combos beside the keyboard layout.",
         "RGB LED Group Builder": "Edit physical LED groups and save them to both halves.",
-        "Layer Colors": "Edit layer_colors[] HSV values and render mode for each layer. LED group rows can override specific LEDs.",
-        "Layer LED Groups": "Inspect layer_led_groups_data[] rows that override specific LEDs for one layer or all layers.",
+        "Layer Colors": "Edit the colour and paint mode for each layer. LED group rows can override specific LEDs.",
+        "Layer LED Groups": "Inspect LED overrides for one layer or all layers.",
         "Auto-mouse Fade": "Edit the destination color and fade mode used as auto-mouse approaches its timeout.",
-        "Pointing-mode Colors": "Edit pd_mode_colors[] HSV values and locality for each active pointing mode.",
-        "Pointing-mode LED Groups": "Inspect pd_mode_led_groups_data[] rows that override specific LEDs for one pointing mode or all pointing modes.",
+        "Pointing-mode Colors": "Edit colour and locality for each active pointing mode.",
+        "Pointing-mode LED Groups": "Inspect LED overrides for one pointing mode or all pointing modes.",
         "Combo Feedback": "Edit combo feedback color and locality shown while combo member keys are active.",
-        "Combo Feedback LED Groups": "Inspect combo_feedback_led_groups_data[] rows that override the combo feedback footprint.",
+        "Combo Feedback LED Groups": "Inspect LED overrides for combo feedback.",
         "Key Behavior Feedback": "Edit key-behavior feedback colors, locality, and policy for tap, hold, long-hold, and tap-count branch states.",
-        "Key Behavior Feedback LED Groups": "Inspect key_behavior_feedback_led_groups_data[] rows that override specific feedback semantics or all feedback groups.",
+        "Key Behavior Feedback LED Groups": "Inspect LED overrides for individual feedback states or all feedback states.",
         "Key Timing": "Adjust the keyboard’s tap, hold and repeated-tap timing. Individual behaviours can override these values.",
         "Pointer Speed": "Adjust the saved normal and sniping pointer speeds.",
         "Pointing Mode Speeds": "Adjust sensitivity while scrolling or using pointing modes. Mode overrides of 0 use normal pointer speed.",
@@ -2464,43 +2466,42 @@ function getClientScript() {
         "Lighting Feedback": "Adjust how quickly held-key feedback flashes. Feedback colours and policies are in RGB."
     };
     const actionTooltips = {
-        applyKey: "Stage the selected key value as a pending layout edit. Use Apply layout change to write staged edits to keymap.c.",
-        saveSelectedBehavior: "Save this behaviour to both keyboard halves and verify the readback.",
-        deleteSelectedBehavior: "Remove this behaviour row from both halves. The key then uses its normal action.",
-        editComboOutputBehavior: "Load this combo output keycode into the behavior editor so its key_behaviors[] row can be created or edited.",
+        applyKey: "Keep the selected key change in the local draft.",
+        saveSelectedBehavior: "Keep this behaviour change in the local draft.",
+        deleteSelectedBehavior: "Remove this behaviour from the local draft. The key then uses its normal action.",
+        editComboOutputBehavior: "Open this combo output in the behaviour editor.",
         editLayoutCombo: "Load this existing combo into the combo builder so its output or physical input keys can be edited.",
-        updateLayerColor: "Save these settings to both keyboard halves and verify the readback.",
-        updatePdModeColor: "Save these settings to both keyboard halves and verify the readback.",
-        updateAutomouseFade: "Save these settings to both keyboard halves and verify the readback.",
-        updateComboFeedback: "Save these settings to both keyboard halves and verify the readback.",
-        updateKeyBehaviorFeedback: "Save these settings to both keyboard halves and verify the readback.",
-        updateConfigDefaults: "Save these settings to both keyboard halves and verify the result.",
-        saveRgbReusableLedGroup: "Save these settings to both keyboard halves and verify the readback.",
-        deleteRgbReusableLedGroup: "Delete this reusable RGB_LED_GROUP_* definition. Used groups are disabled because table rows still reference them.",
+        updateLayerColor: "Keep these settings in the local draft.",
+        updatePdModeColor: "Keep these settings in the local draft.",
+        updateAutomouseFade: "Keep these settings in the local draft.",
+        updateComboFeedback: "Keep these settings in the local draft.",
+        updateKeyBehaviorFeedback: "Keep these settings in the local draft.",
+        updateConfigDefaults: "Keep these settings in the local draft.",
+        saveRgbReusableLedGroup: "Keep this reusable LED set in the local draft.",
+        deleteRgbReusableLedGroup: "Delete this reusable LED set. Sets still referenced by a row cannot be deleted.",
         editReusableLedGroup: "Load this reusable LED group into the editor so its name or LED membership can be changed.",
         useReusableLedGroup: "Use this reusable LED set as the LED group source for the row builder above.",
         clearReusableLedGroupDraft: "Clear the local LED group selection.",
-        showAddLayerDraft: "Open the staged new-layer form. Nothing is written until Apply layer changes.",
+        showAddLayerDraft: "Open the staged new-layer form. Keep it in the draft before reviewing and applying.",
         cancelLayerDraft: "Close the new-layer form without staging a layer.",
         stageLayerDraft: "Stage a fully transparent layer with a random RGB color.",
-        deleteLayerDraft: "Stage deletion of the active layer. Apply will fail if firmware references still use it.",
+        deleteLayerDraft: "Stage deletion of the active layer. Review will flag any references that still use it.",
         discardLayerChanges: "Discard staged layer additions and deletions.",
-        applyLayerChanges: "Write staged layer additions and deletions to config.h, keymap.c, and rgb_config.c.",
+        applyLayerChanges: "Keep staged layer changes in the local draft.",
         addRgbLedGroup: "Append a new row to the selected RGB LED group table using the chosen owner, LED group source, and HSV color.",
         clearRgbSelection: "Remove all inline LED selections from the group builder. Reusable group definitions are not changed.",
         toggleRgbTrackball: "Add or remove the trackball LED index 56 from the current inline LED selection.",
-        updateViaMacro: "Save the selected macro to both halves, keeping a recovery copy and verifying readback.",
+        updateViaMacro: "Keep the selected macro in the local draft.",
         selectMacroSlot: "Select this macro slot for editing. Unsaved drafts in other slots are kept locally.",
         insertMacroStep: "Insert the configured step at the cursor in the selected payload draft.",
-        clearMacroPayload: "Clear the selected macro draft. The keyboard changes when you choose Apply macro.",
+        clearMacroPayload: "Clear the selected macro draft. The keyboard changes only after profile review and Apply.",
         discardMacroDraft: "Discard this slot's local edits and show its last keyboard readback.",
         startMacroRecording: "Start capturing browser keydown and keyup events and append the generated payload to the selected macro draft.",
         stopMacroRecording: "Stop recording and keep the generated payload in the selected macro draft.",
         clearMacroRecording: "Clear the current recording take and restore the payload captured when recording started.",
-        dismissStatus: "Dismiss the current status popup until the status changes.",
-        addCombo: "Append a COMBOS(COMBO) row using the entered output keycode and input key expressions.",
+        addCombo: "Add a combo to the local draft using the entered output and input keys.",
         addLayoutCombo: "Append a combo row, or replace the loaded combo row, using the selected physical layout slots as inputs.",
-        applyLayoutChanges: "Write pending layout drag/drop and paste edits back to keymap.c.",
+        applyLayoutChanges: "Keep pending layout edits in the local draft.",
         toggleLayoutComboPicking: "Switch the layout board into combo input picking mode; click keys on the board to add or remove inputs.",
         toggleLayoutComboKey: "Add or remove this key from the pending layout combo.",
         clearLayoutComboSelection: "Clear the pending layout combo input keys.",
@@ -2524,11 +2525,31 @@ function getClientScript() {
         "addCombo",
         "addLayoutCombo"
     ]);
+    const draftActionLabels = {
+        applyKey: "Keep key in draft",
+        applyLayoutChanges: "Keep layout in draft",
+        saveSelectedBehavior: "Keep behaviour in draft",
+        deleteSelectedBehavior: "Remove behaviour in draft",
+        updateLayerColor: "Keep colour in draft",
+        updatePdModeColor: "Keep colour in draft",
+        updateAutomouseFade: "Keep fade in draft",
+        updateComboFeedback: "Keep feedback in draft",
+        updateKeyBehaviorFeedback: "Keep feedback in draft",
+        updateConfigDefaults: "Keep settings in draft",
+        saveRgbReusableLedGroup: "Keep LED set in draft",
+        deleteRgbReusableLedGroup: "Remove LED set in draft",
+        addRgbLedGroup: "Keep LED row in draft",
+        updateViaMacro: "Keep macro in draft",
+        addCombo: "Keep combo in draft",
+        addLayoutCombo: "Keep combo in draft",
+        deleteLayoutCombo: "Remove combo in draft",
+        updateComboHoldTerm: "Keep timing in draft",
+    };
     const fieldTooltips = {
         layer: "The active firmware layer shown in the board preview. Switch layers with the tabs above the board.",
-        "layout index": "The physical LAYOUT() slot index for the selected key. It is fixed by the keyboard geometry.",
-        key: "User-facing key label or expression to stage for the selected LAYOUT() slot, for example A, Enter, Space, _______, LT(LAYER_NAV, Slash), or Shift+Esc.",
-        source: "The raw C expression currently stored for this row or selected source slot.",
+        "layout index": "The physical position index for this key. It is fixed by the keyboard geometry.",
+        key: "Key label or expression to keep for this position, for example A, Enter, Space, _______, LT(LAYER_NAV, Slash), or Shift+Esc.",
+        source: "The canonical key value stored in the current keyboard profile.",
         tap_hold_term: "Optional tap-vs-hold boundary for this key behavior row. Device timing value: 0-65535 ms. Zero uses the firmware default, whose duration is not reported.",
         longer_hold_term: "Optional hold-vs-long-hold boundary for this key behavior row. Device timing value: 0-65535 ms. Zero uses the firmware default, whose duration is not reported.",
         multi_tap_term: "Optional repeated-tap window for this key behavior row. Device timing value: 0-65535 ms. Zero uses the firmware default, whose duration is not reported.",
@@ -2541,14 +2562,14 @@ function getClientScript() {
         "pointing mode": "Pointing mode whose RGB color or LED group row is being edited.",
         semantic: "Key-behavior feedback state that owns this LED group, such as tap pending, tap committed, hold active, or all feedback groups.",
         "group name": "Display label for an LED group. The device reports group IDs and membership, not authored names.",
-        "LED group": "Choose a reusable RGB_LED_GROUP_* LED set, or use the current inline LED selection from the board.",
+        "LED group": "Choose a reusable LED set, or use the current LED selection from the board.",
         mode: "Select how this RGB row behaves. For layers it controls which keys are painted; for auto-mouse it controls how the fade destination is reached.",
         locality: "Choose where this feedback paints: both halves, one half, the triggering key half, or only the triggering keys.",
         "tap commit mode": "Choose which key-behavior taps show tap-commit feedback after the tap action commits.",
-        picker: "Pick an approximate RGB color. The studio converts the browser color into QMK HSV channels.",
-        h: "QMK HSV hue channel, 0-255. Hue chooses the color family.",
-        s: "QMK HSV saturation channel, 0-255. 0 is white/gray; 255 is fully saturated.",
-        v: "QMK HSV value/brightness channel. Use 0-255 or a safe constant such as RGB_MATRIX_MAXIMUM_BRIGHTNESS.",
+        picker: "Pick an approximate RGB colour. The app stores it as device HSV channels.",
+        h: "Device hue channel, 0-255. Hue chooses the colour family.",
+        s: "Device saturation channel, 0-255. 0 is white/grey; 255 is fully saturated.",
+        v: "Device brightness channel, 0-255.",
         output: "The native key or action this combo produces, as reported by the keyboard.",
         "output behavior": "The key behavior row that runs after this combo emits its output keycode, if one exists.",
         inputs: "Comma-separated physical combo input key expressions, such as D, F. Use the layout picker to choose slots from the active layer.",
@@ -2566,9 +2587,9 @@ function getClientScript() {
         leds: "Physical RGB LED indices contained in this row or reusable group.",
         "led group": "LED group membership reported by the keyboard.",
         color: "HSV color expression used by this row. HSV(0, 0, 0) means inherit the owning stage color for LED group rows.",
-        default: "The current value written for this config.h macro.",
+        default: "The value currently stored in the keyboard profile.",
         setting: "The name of this keyboard setting.",
-        macro: "The exact config.h #define patched by this control.",
+        macro: "The stable profile field used for this keyboard setting.",
         rgb: "The RGB color and locality associated with this reachable pointing mode.",
         badge: "The small badge shown on the layout preview for this combo.",
         behavior: "The key behavior row attached to this keycode.",
@@ -2864,35 +2885,6 @@ function getClientScript() {
         settingsDrafts.restore(retainedSettings);
         post({ type: "refresh" });
     });
-    document.getElementById("profileSelect")?.addEventListener("change", (event) => {
-        discardLocalDraftState();
-        post({ type: "selectProfile", profileId: event.target.value || "" });
-    });
-    document.getElementById("createProfile")?.addEventListener("click", () => {
-        discardLocalDraftState();
-        post({ type: "requestCreateProfile" });
-    });
-    document.getElementById("cloneProfile")?.addEventListener("click", () => {
-        discardLocalDraftState();
-        post({ type: "requestCloneProfile" });
-    });
-    document.getElementById("renameProfile")?.addEventListener("click", () => {
-        discardLocalDraftState();
-        post({ type: "requestRenameProfile" });
-    });
-    document.getElementById("deleteProfile")?.addEventListener("click", () => {
-        discardLocalDraftState();
-        post({ type: "requestDeleteProfile" });
-    });
-    document.getElementById("openKeymap")?.addEventListener("click", () => vscode.postMessage({ type: "openSource", file: "keymap" }));
-    document.getElementById("openRgb")?.addEventListener("click", () => vscode.postMessage({ type: "openSource", file: "rgb" }));
-    document.getElementById("openConfig")?.addEventListener("click", () => vscode.postMessage({ type: "openSource", file: "config" }));
-    document.getElementById("generateProfileDocs")?.addEventListener("click", () => {
-        requestProfileDocsGeneration();
-    });
-    document.getElementById("compileFirmware")?.addEventListener("click", () => {
-        requestFirmwareCompile();
-    });
     document.addEventListener("pointerover", (event) => {
         const target = tooltipTarget(event.target);
         if (target) showTooltip(target, event);
@@ -3005,7 +2997,6 @@ function getClientScript() {
             captureBehaviorDrafts();
             captureActiveMacroDraft();
             captureSettingsDrafts();
-            clearFloatingStatus();
             const oldIdentity = model?.profileIdentity;
             if (!event.data.model.draft || event.data.resetDraftForms) viewDrafts = {};
             model = event.data.model;
@@ -3071,17 +3062,10 @@ function getClientScript() {
             resetLocalHistory();
         }
         if (event.data.type === "error") {
-            clearFloatingStatus();
             notice = event.data.message || "Unknown error";
             layoutNotice = "";
             render();
             resetLocalHistory();
-        }
-        if (event.data.type === "compileResult") {
-            showFloatingStatus(event.data.error || event.data.notice || "Firmware compile finished.", Boolean(event.data.error));
-        }
-        if (event.data.type === "docsResult") {
-            showFloatingStatus(event.data.error || event.data.notice || "Profile overview docs generated.", Boolean(event.data.error), "Profile overview");
         }
     });
 
@@ -3298,9 +3282,6 @@ function getClientScript() {
         } else if (action === "openKeyPicker") {
             const pickerTarget = target.dataset.target;
             openKeyPicker(pickerTarget, target.dataset.mode || "single", pickerTarget === "keycodeInput" ? { layoutStageIndex: selectedKey } : {});
-        } else if (action === "dismissStatus") {
-            dismissedStatusSignature = currentStatusSignature();
-            render();
         } else if (action === "insertMacroStep") {
             const before = currentLocalSnapshot || serializeLocalState();
             if (insertMacroStep(target)) {
@@ -3438,13 +3419,13 @@ function getClientScript() {
             const groups = pendingLayoutChangeGroups();
             const stagedEditLayer = groups.find((group) => pendingLayerAdd(group.layer));
             if (stagedEditLayer) {
-                notice = "Use Apply layer changes to write staged key edits on " + stagedEditLayer.layer + ".";
+                notice = "Keep the layer changes in your draft before editing keys on " + stagedEditLayer.layer + ".";
                 render();
                 return;
             }
             const stagedLayer = pendingAddedLayerReference(groups.flatMap((group) => group.changes));
             if (stagedLayer) {
-                notice = "Apply layer changes before writing layout keys that reference " + stagedLayer.name + ".";
+                notice = "Keep the layer changes in your draft before editing keys that reference " + stagedLayer.name + ".";
                 render();
                 return;
             }
@@ -4259,7 +4240,7 @@ function getClientScript() {
         layoutComboOutput = "";
         layoutComboInputs = "";
         clearLayoutComboOriginal();
-        notice = "Staged " + name + ". Use Apply layer changes to write config.h, keymap.c, and rgb_config.c.";
+        notice = "Staged " + name + ". Keep the layer change in your draft when it is ready.";
         render();
         return true;
     }
@@ -4280,7 +4261,7 @@ function getClientScript() {
             notice = "Discarded staged layer " + deleteName + ".";
         } else if (!pendingLayerDeletes.includes(deleteName)) {
             pendingLayerDeletes = pendingLayerDeletes.concat([deleteName]);
-            notice = "Staged deletion of " + deleteName + ". Use Apply layer changes to write source files.";
+            notice = "Staged deletion of " + deleteName + ". Keep the layer change in your draft when it is ready.";
         }
 
         const nextLayers = layersForUi();
@@ -4336,115 +4317,6 @@ function getClientScript() {
         });
     }
 
-    function messageWithActiveProfile(message) {
-        const activeProfileId = model?.activeProfile?.id || "";
-        return activeProfileId && !message.profileId ? { ...message, profileId: activeProfileId } : message;
-    }
-
-    function profileDocsPostMessage(message) {
-        const payload = messageWithActiveProfile(message);
-        showFloatingStatus("Generating profile overview doc...", false, "Profile overview");
-        vscode.postMessage(payload);
-    }
-
-    function compilePostMessage(message) {
-        const payload = messageWithActiveProfile(message);
-        showFloatingStatus("Compiling left and right firmware...", false);
-        vscode.postMessage(payload);
-    }
-
-    async function requestProfileDocsGeneration() {
-        if (!model?.activeProfile?.editable) return;
-        captureActiveMacroDraft();
-        captureLayoutComboBuilderInputs();
-        const summary = compileUnsavedSummary();
-        if (!summary.hasUnsaved) {
-            profileDocsPostMessage({ type: "generateProfileDocs", activeLayer });
-            return;
-        }
-
-        const choice = await showProfileDocsConfirmDialog(summary);
-        if (choice === "apply") {
-            profileDocsPostMessage({
-                type: "applyAllChangesAndGenerateProfileDocs",
-                ...layerStructurePayload(),
-                layoutGroups: pendingLayoutChangeGroups(),
-                activeLayer,
-            });
-        } else if (choice === "saved") {
-            profileDocsPostMessage({ type: "generateProfileDocs", activeLayer });
-        }
-    }
-
-    async function requestFirmwareCompile() {
-        if (!model?.activeProfile?.buildable) return;
-        captureActiveMacroDraft();
-        captureLayoutComboBuilderInputs();
-        const summary = compileUnsavedSummary();
-        if (!summary.hasUnsaved) {
-            compilePostMessage({ type: "compileFirmware", activeLayer });
-            return;
-        }
-
-        const choice = await showCompileConfirmDialog(summary);
-        if (choice === "apply") {
-            compilePostMessage({
-                type: "applyAllChangesAndCompile",
-                ...layerStructurePayload(),
-                layoutGroups: pendingLayoutChangeGroups(),
-                activeLayer,
-            });
-        } else if (choice === "saved") {
-            compilePostMessage({ type: "compileFirmware", activeLayer });
-        }
-    }
-
-    function compileUnsavedSummary() {
-        const staged = [];
-        if (pendingLayerAdds.length) {
-            staged.push("Add " + pendingLayerAdds.length + " layer " + plural(pendingLayerAdds.length, "draft", "drafts") + ": " + pendingLayerAdds.map((layer) => layer.name).join(", "));
-        }
-        if (pendingLayerDeletes.length) {
-            staged.push("Delete " + pendingLayerDeletes.length + " layer " + plural(pendingLayerDeletes.length, "draft", "drafts") + ": " + pendingLayerDeletes.join(", "));
-        }
-        for (const group of pendingLayoutChangeGroups()) {
-            staged.push(group.layer + ": " + group.changes.length + " staged layout " + plural(group.changes.length, "key", "keys"));
-        }
-        const local = dirtySectionSummaries();
-        return {
-            staged,
-            local,
-            canApplyAll: staged.length > 0,
-            hasUnsaved: staged.length > 0 || local.length > 0,
-        };
-    }
-
-    function dirtySectionSummaries() {
-        const labels = [];
-        const seen = new Set();
-        const add = (label) => addDirtySummaryLabel(labels, seen, label);
-        for (const label of currentDirtySectionLabels()) {
-            add(label);
-        }
-        for (const [viewId, draft] of Object.entries(viewDrafts || {})) {
-            if (viewId === activeView || !draft?.dirty) continue;
-            const draftLabels = Array.isArray(draft.labels) ? draft.labels : [];
-            if (draftLabels.length) {
-                for (const label of draftLabels) {
-                    add(label);
-                }
-            } else {
-                add(viewLabel(viewId) + " form edits");
-            }
-        }
-        for (const keycode of Object.keys(macroDrafts || {})) {
-            if (macroSlotDirty(keycode)) {
-                add("Macro " + keycode);
-            }
-        }
-        return labels;
-    }
-
     function currentDirtySectionLabels() {
         const labels = [];
         const seen = new Set();
@@ -4467,10 +4339,6 @@ function getClientScript() {
         return view?.[1] || viewId || "View";
     }
 
-    function plural(count, singular, pluralValue) {
-        return count === 1 ? singular : pluralValue;
-    }
-
     function dirtySectionLabel(section) {
         if (section.id === "layoutComboBuilder") return "Layout combo builder";
         if (section.id === "rgbGroupBuilder") return "RGB LED group builder";
@@ -4490,74 +4358,6 @@ function getClientScript() {
         if (heading) return heading;
         const button = section.querySelector("[data-dirty-button]");
         return button?.dataset.cleanLabel || button?.textContent || "Unsaved form";
-    }
-
-    function showProfileDocsConfirmDialog(summary) {
-        return showUnsavedActionDialog(summary, {
-            titleId: "profileDocsConfirmTitle",
-            diskNotice: "Profile overview generation reads the profile source files currently on disk.",
-            applyDescription: "Apply all staged and generate writes staged layer and layout changes before creating the overview doc.",
-            localNote: "Local form edits are not written by the header Apply all action. Use each card's Apply button first if those edits should be included in the overview doc.",
-            applyLabel: "Apply all staged and generate",
-            savedLabel: "Keep as is and generate",
-        });
-    }
-
-    function showCompileConfirmDialog(summary) {
-        return showUnsavedActionDialog(summary, {
-            titleId: "compileConfirmTitle",
-            diskNotice: "Firmware compile reads the profile source files currently on disk.",
-            applyDescription: "Apply all staged and compile writes staged layer and layout changes before building both firmware files.",
-            localNote: "Local form edits are not written by the header Apply all action. Use each card's Apply button first if those edits should be compiled.",
-            applyLabel: "Apply all staged and compile",
-            savedLabel: "Keep as is and compile",
-        });
-    }
-
-    function showUnsavedActionDialog(summary, action) {
-        return new Promise((resolve) => {
-            const backdrop = document.createElement("div");
-            backdrop.className = "modal-backdrop";
-            const stagedList = summary.staged.length
-                ? "<h3>Apply all can write</h3><ul class='confirm-list'>" + summary.staged.map((item) => "<li>" + escapeHtml(item) + "</li>").join("") + "</ul>"
-                : "";
-            const localList = summary.local.length
-                ? "<h3>Local form edits</h3><ul class='confirm-list'>" + summary.local.map((item) => "<li>" + escapeHtml(item) + "</li>").join("") + "</ul>"
-                : "";
-            const localNote = summary.local.length
-                ? "<p>" + escapeHtml(action.localNote) + "</p>"
-                : "";
-            backdrop.innerHTML =
-                "<div class='confirm-dialog' role='dialog' aria-modal='true' aria-labelledby='" + escapeHtml(action.titleId) + "'>" +
-                "<h2 id='" + escapeHtml(action.titleId) + "'>Unsaved Studio changes</h2>" +
-                "<p>" + escapeHtml(action.diskNotice) + "</p>" +
-                (summary.canApplyAll ? "<p>" + escapeHtml(action.applyDescription) + "</p>" : "") +
-                localNote +
-                stagedList +
-                localList +
-                "<div class='confirm-actions'>" +
-                (summary.canApplyAll ? "<button type='button' class='primary' data-choice='apply'>" + escapeHtml(action.applyLabel) + "</button>" : "") +
-                "<button type='button' data-choice='saved'>" + escapeHtml(action.savedLabel) + "</button>" +
-                "<button type='button' data-choice='cancel'>Cancel</button>" +
-                "</div>" +
-                "</div>";
-            const close = (choice) => {
-                document.removeEventListener("keydown", onKeyDown);
-                backdrop.remove();
-                resolve(choice);
-            };
-            const onKeyDown = (event) => {
-                if (event.key === "Escape") close("cancel");
-            };
-            backdrop.addEventListener("click", (event) => {
-                if (event.target === backdrop) close("cancel");
-                const choice = event.target?.closest?.("[data-choice]")?.dataset.choice;
-                if (choice) close(choice);
-            });
-            document.addEventListener("keydown", onKeyDown);
-            document.body.appendChild(backdrop);
-            backdrop.querySelector("[data-choice]")?.focus();
-        });
     }
 
     function createTransparentLayerDraft(name) {
@@ -4793,17 +4593,16 @@ function getClientScript() {
                 storeActiveViewDraft();
                 if (hasBehaviorDrafts() || ["rgb", "macros", "defaults", "pdModes"].some(viewTabDirty) || (!message.reviewAfter && layoutViewHasUnsavedChanges())) {
                     notice = "Keep or discard your unfinished form edits before reviewing or changing the profile draft.";
-                    dismissedStatusSignature = ""; render(); return;
+                    render(); return;
                 }
             }
         }
         if (message.type === "refresh") {if (!model?.draft) {behaviorDrafts.clear(); viewDrafts = {};}}
         else storeActiveViewDraft();
         if (["choosePortableProfile", "managePortableLayers", "restorePortableProfile", "savePortableLayers"].includes(message.type) && ["layout", "rgb", "macros", "defaults", "pdModes"].some(viewTabDirty)) {
-            notice = "Save or discard your current edits before importing a profile or changing layer priority.";
-            dismissedStatusSignature = ""; render(); return;
+            notice = "Keep or discard your current edits before importing a profile or changing layer priority.";
+            render(); return;
         }
-        dismissedStatusSignature = "";
         if (["saveBehavior", "addBehavior", "deleteBehavior"].includes(message.type)) {
             const row = message.type === "addBehavior" ? "new" : message.behavior?.keycode || message.keycode;
             message.expectedBase = behaviorDrafts.get(behaviorDraftKey(row))?.base || model.profileIdentity;
@@ -4872,7 +4671,6 @@ function getClientScript() {
             return;
         }
 
-        renderProfileControls();
         renderDeviceHeader();
         updateLayoutKeyBehaviorColorStyle();
         app.innerHTML = renderDiagnostics() + renderViewTabs() + renderActiveView();
@@ -4889,8 +4687,9 @@ function getClientScript() {
         }
         if (model.draft) {
             for (const control of app.querySelectorAll("button[data-action]")) {
-                if (!writeActions.has(control.dataset.action) && control.dataset.action !== "applyLayoutChanges") continue;
-                control.textContent = control.textContent.replace(/^Apply\\b/, "Keep").replace(/^Save\\b/, "Keep");
+                const label = draftActionLabels[control.dataset.action];
+                if (!label) continue;
+                control.textContent = label;
                 control.dataset.tooltip = "Keep this edit in your draft. Apply to the keyboard from change review.";
             }
         }
@@ -4917,6 +4716,7 @@ function getClientScript() {
     // never sent it.
     function renderDeviceHeader() {
         const device = model.device || {};
+        const health = device.health || {};
         const chip = document.getElementById("deviceChip");
         if (chip) {
             chip.textContent = device.connected ? (device.label || "Connected") : "Not connected";
@@ -4928,55 +4728,29 @@ function getClientScript() {
             generation.textContent = device.connected && device.summary ? device.summary : "";
         }
 
+        const setHealth = (id, text, tone = "") => {
+            const item = document.getElementById(id);
+            if (!item) return;
+            item.textContent = text;
+            item.className = "health-pill" + (tone ? " health-pill--" + tone : "");
+        };
+        setHealth("connectionHealth", device.connected ? (health.busy ? health.phase || "Working" : "Connected") : "Disconnected", device.connected ? "ok" : "");
+        setHealth("profileHealth",
+            health.profile === "synced" ? "Both halves synced" : health.profile === "attention" ? "Halves need attention" : health.profile === "unread" ? "Profile not read" : "Profile unavailable",
+            health.profile === "synced" ? "ok" : health.profile === "attention" ? "warn" : "");
+        const draft = model.draft;
+        setHealth("draftHealth",
+            !draft ? "Draft unavailable" : draft.busy ? "Draft applying" : draft.stale ? "Draft needs review" : draft.dirty ? draft.changes.length + " draft change" + (draft.changes.length === 1 ? "" : "s") : "Draft clean",
+            draft?.stale ? "warn" : draft?.dirty ? "warn" : draft ? "ok" : "");
+        setHealth("recoveryHealth",
+            !device.connected ? "Recovery unknown" : health.recoveryPending ? "Recovery pending" : "Recovery clear",
+            health.recoveryPending ? "warn" : device.connected ? "ok" : "");
+
         if (subtitle) {
             subtitle.textContent = device.connected
                 ? (device.subtitle || "Reading from the connected keyboard")
                 : "Connect a Charybdis, then use Read from keyboard.";
         }
-    }
-
-    function renderProfileControls() {
-        const select = document.getElementById("profileSelect");
-        const create = document.getElementById("createProfile");
-        if (!select) return;
-        const profiles = model.profiles || [];
-        if (!profiles.length) {
-            select.innerHTML = "<option value=''>No profiles</option>";
-            select.value = "";
-            select.disabled = true;
-        } else {
-            select.innerHTML = profiles.map(renderProfileOption).join("");
-            select.value = model.activeProfile?.id || "";
-            select.disabled = false;
-        }
-        if (create) {
-            create.disabled = false;
-        }
-        const editable = Boolean(model.activeProfile?.editable);
-        const mutable = editable && model.activeProfile?.keymap !== "noah";
-        setHeaderButtonDisabled("cloneProfile", !editable);
-        setHeaderButtonDisabled("renameProfile", !mutable);
-        setHeaderButtonDisabled("deleteProfile", !mutable);
-        setHeaderButtonDisabled("openKeymap", !editable);
-        setHeaderButtonDisabled("openConfig", !editable);
-        setHeaderButtonDisabled("openRgb", !editable);
-        setHeaderButtonDisabled("generateProfileDocs", !editable);
-        setHeaderButtonDisabled("compileFirmware", !Boolean(model.activeProfile?.buildable));
-    }
-
-    function renderProfileOption(profile) {
-        const flags = [
-            profile.editable ? "" : "incomplete",
-            profile.registered ? "" : "unregistered",
-        ].filter(Boolean);
-        const label = profile.keymap + (flags.length ? " (" + flags.join(", ") + ")" : "");
-        const disabled = profile.editable ? "" : " disabled";
-        return "<option value='" + escapeAttr(profile.id) + "'" + disabled + ">" + escapeHtml(label) + "</option>";
-    }
-
-    function setHeaderButtonDisabled(id, disabled) {
-        const button = document.getElementById(id);
-        if (button) button.disabled = disabled;
     }
 
     function scheduleMacroSlotBrowserHeightSync() {
@@ -5336,8 +5110,8 @@ function getClientScript() {
             layerChanges ? layerChanges + " layer " + (layerChanges === 1 ? "change" : "changes") : "",
             count ? count + " layout " + (count === 1 ? "change" : "changes") : "",
         ].filter(Boolean).join(", ");
-        button.textContent = summary ? "Apply all (" + summary + ")" : "Apply all";
-        button.setAttribute("aria-label", summary ? "Apply all staged changes: " + summary : "Apply all staged changes");
+        button.textContent = summary ? "Review changes (" + summary + ")" : "Review changes";
+        button.setAttribute("aria-label", summary ? "Review all draft changes: " + summary : "Review all draft changes");
     }
 
     function dirtySnapshot(section) {
@@ -5779,51 +5553,19 @@ function getClientScript() {
         return "";
     }
 
-    function showFloatingStatus(message, isError, title) {
-        clearFloatingStatus();
-        const popup = document.createElement("div");
-        popup.className = "status-popup";
-        popup.dataset.ephemeralStatus = "1";
-        popup.setAttribute("role", isError ? "alert" : "status");
-        popup.setAttribute("aria-live", isError ? "assertive" : "polite");
-        popup.innerHTML =
-            "<div class='status-popup-header'>" +
-            "<div class='status-popup-title'>" + escapeHtml(title || (isError ? "Compile failed" : "Firmware")) + "</div>" +
-            "<button type='button' class='status-popup-dismiss' aria-label='Dismiss status popup'></button>" +
-            "</div>" +
-            "<div class='status-popup-body'><div class='" + (isError ? "error" : "notice") + "'>" + escapeHtml(message) + "</div></div>";
-        popup.querySelector("button")?.addEventListener("click", () => popup.remove());
-        document.body.appendChild(popup);
-    }
-
-    function clearFloatingStatus() {
-        for (const existing of document.querySelectorAll("[data-ephemeral-status]")) {
-            existing.remove();
-        }
-    }
-
     function renderDiagnostics() {
-        const items = [];
-        if (notice) items.push("<div class='notice'>" + escapeHtml(notice) + "</div>");
-        for (const diagnostic of model.diagnostics || []) {
-            items.push("<div class='warning'>" + escapeHtml(diagnostic) + "</div>");
-        }
-        const signature = currentStatusSignature();
-        if (!items.length || signature === dismissedStatusSignature) return "";
-        return "<div class='status-popup' role='status' aria-live='polite'>" +
-            "<div class='status-popup-header'>" +
-            "<div class='status-popup-title'>Status</div>" +
-            "<button type='button' class='status-popup-dismiss' data-action='dismissStatus' aria-label='Dismiss status popup'></button>" +
-            "</div>" +
-            "<div class='status-popup-body'>" + items.join("") + "</div>" +
-            "</div>";
-    }
-
-    function currentStatusSignature() {
-        return JSON.stringify({
-            notice: notice || "",
-            diagnostics: model?.diagnostics || []
-        });
+        const error = model.device?.health?.error || "";
+        const diagnostics = model.diagnostics || [];
+        if (!notice && !error && !diagnostics.length) return "";
+        const banner = error
+            ? "<div class='status-banner status-banner--error' role='alert'>" + escapeHtml(error) + "</div>"
+            : notice
+                ? "<div class='status-banner' role='status' aria-live='polite'>" + escapeHtml(notice) + "</div>"
+                : "";
+        const details = diagnostics.length
+            ? "<details class='device-diagnostics'><summary>Device details · " + diagnostics.length + "</summary><div class='device-diagnostics-list'>" + diagnostics.map(item => "<p>" + escapeHtml(item) + "</p>").join("") + "</div></details>"
+            : "";
+        return "<div class='status-center'>" + banner + details + "</div>";
     }
 
     function panel(title, body, open = true) {
@@ -5958,7 +5700,7 @@ function getClientScript() {
         return "<div class='layer-flow-actions'>" +
             "<div class='layer-flow-summary'>" + additions.concat(deletions).join("") + "</div>" +
             "<button type='button' data-action='discardLayerChanges'>Discard</button>" +
-            "<button type='button' class='primary dirty' data-action='applyLayerChanges'>Apply layer changes</button>" +
+            "<button type='button' class='primary dirty' data-action='applyLayerChanges'>Keep layers in draft</button>" +
             "</div>";
     }
 
@@ -5981,7 +5723,7 @@ function getClientScript() {
             "<label><span>Layer</span><input disabled value='" + escapeAttr(layer.name) + "'></label>" +
             "<label><span>Layout index</span><input disabled value='" + selected.layoutIndex + "'></label>" +
             renderKeyPickerInput("keycodeInput", "Key", selected.editLabel || selected.display || selected.keycode, "A, Enter, Space, _______", "single", "", "", "data-validate='layout-key'") +
-            "<div><span class='muted'>Source</span><br><code class='source-pill' data-tooltip='Raw keymap.c expression currently stored in this selected LAYOUT() slot.'>" + escapeHtml(selected.keycode) + "</code></div>" +
+            "<div><span class='muted'>Stored key</span><br><code class='source-pill' data-tooltip='Canonical key value in the current profile draft.'>" + escapeHtml(selected.keycode) + "</code></div>" +
             "<button data-action='applyKey' data-dirty-button class='primary'>Stage key</button>" +
             "</div>" +
             "</div>";
@@ -6008,14 +5750,20 @@ function getClientScript() {
             "</div>" +
             "<label><span>Combo window (ms)</span><input id='layoutComboTerm' type='number' min='0' max='65535' value='" + escapeAttr(policy.termMs ?? "") + "'></label>" +
             (!model.combos?.length ? "<label><span>Hold threshold (ms)</span><input id='layoutComboHoldTerm' type='number' min='0' max='65535' value='" + escapeAttr(policy.holdTermMs ?? "") + "'></label>" : "") +
-            "<label><input id='layoutComboMustHold' type='checkbox'" + (policy.mustHold ? " checked" : "") + "> Require hold</label>" +
-            "<label><input id='layoutComboMustTap' type='checkbox'" + (policy.mustTap ? " checked" : "") + "> Tap only</label>" +
-            "<label><input id='layoutComboOrdered' type='checkbox'" + (policy.ordered ? " checked" : "") + "> Press inputs in order</label>" +
-            "<button data-action='addLayoutCombo' data-dirty-button class='primary'" + (writable ? "" : " disabled") + ">" + (editing ? "Save combo" : "Add combo") + "</button>" +
+            "<div class='toggle-grid'>" +
+            renderToggle("layoutComboMustHold", "Require hold", policy.mustHold) +
+            renderToggle("layoutComboMustTap", "Tap only", policy.mustTap) +
+            renderToggle("layoutComboOrdered", "Press inputs in order", policy.ordered) +
+            "</div>" +
+            "<button data-action='addLayoutCombo' data-dirty-button class='primary'" + (writable ? "" : " disabled") + ">Keep combo in draft</button>" +
             (editing ? "<button data-action='deleteLayoutCombo' data-id='" + original.id + "'" + (writable ? "" : " disabled") + ">Delete combo</button>" : "") +
             (!writable ? "<p class='muted'>Read a complete keyboard profile with combo write support to save changes.</p>" : "") +
             "</div>" +
             "</div>";
+    }
+
+    function renderToggle(id, label, checked, attributes = "") {
+        return "<label class='toggle-inline'><input id='" + escapeAttr(id) + "' type='checkbox' role='switch'" + (checked ? " checked" : "") + attributes + "><span class='toggle-switch' aria-hidden='true'></span><span class='toggle-label'>" + escapeHtml(label) + "</span></label>";
     }
 
     function renderLayoutComboSelectedList(layer) {
@@ -6061,7 +5809,7 @@ function getClientScript() {
             "<div class='behavior-branch-grid'>" +
             steps.map(renderBehaviorStepEditor).join("") +
             "</div>" +
-            "<button data-action='saveSelectedBehavior' data-dirty-button class='primary'" + (writable ? "" : " disabled data-write-unavailable") + ">Save behaviour</button>" +
+            "<button data-action='saveSelectedBehavior' data-dirty-button class='primary'" + (writable ? "" : " disabled data-write-unavailable") + ">Keep behaviour in draft</button>" +
             (behavior ? "<button data-action='deleteSelectedBehavior'" + (writable ? "" : " disabled") + ">Delete behaviour</button>" : "") +
             (!model.behaviorEditing?.writable ? "<p class='muted'>Read a complete keyboard profile with behaviour write support before saving.</p>" : "") + "</div>";
     }
@@ -6076,7 +5824,7 @@ function getClientScript() {
 
     function renderKeepsAutoMouseAnchoredToggle(checked) {
         const tooltip = fieldTooltips.keeps_auto_mouse_anchored || "";
-        return "<label class='toggle-inline' data-tooltip='" + escapeAttr(tooltip) + "'><input type='checkbox' id='selectedKeepsAutoMouseAnchored'" + (checked ? " checked" : "") + " data-tooltip='" + escapeAttr(tooltip) + "'><span class='toggle-switch' aria-hidden='true'></span><span class='toggle-label'>keeps auto mouse anchored</span></label>";
+        return "<label class='toggle-inline' data-tooltip='" + escapeAttr(tooltip) + "'><input type='checkbox' role='switch' id='selectedKeepsAutoMouseAnchored'" + (checked ? " checked" : "") + " data-tooltip='" + escapeAttr(tooltip) + "'><span class='toggle-switch' aria-hidden='true'></span><span class='toggle-label'>keeps auto mouse anchored</span></label>";
     }
 
     function behaviorTimingDefault(field, keycode) {
@@ -6137,7 +5885,7 @@ function getClientScript() {
         const enabled = Boolean(selected);
         const escapedPrefix = escapeAttr(prefix);
         return "<div class='behavior-helper-control'>" +
-            "<label class='toggle-inline'><input type='checkbox' id='" + escapedPrefix + "Enabled' data-helper-enabled data-helper-prefix='" + escapedPrefix + "'" + (enabled ? " checked" : "") + "><span class='toggle-switch' aria-hidden='true'></span><span class='toggle-label'>" + escapeHtml(label) + "</span></label>" +
+            "<label class='toggle-inline'><input type='checkbox' role='switch' id='" + escapedPrefix + "Enabled' data-helper-enabled data-helper-prefix='" + escapedPrefix + "'" + (enabled ? " checked" : "") + "><span class='toggle-switch' aria-hidden='true'></span><span class='toggle-label'>" + escapeHtml(label) + "</span></label>" +
             "<label class='behavior-helper-select' data-helper-select-prefix='" + escapedPrefix + "'" + (enabled ? "" : " hidden") + "><span>" + escapeHtml(label) + " helper</span><select id='" + escapedPrefix + "Helper' data-helper-select data-helper-prefix='" + escapedPrefix + "'>" + helperOptions(helpers, selected) + "</select></label>" +
             "</div>";
     }
@@ -6679,12 +6427,12 @@ function getClientScript() {
 
     function layoutBoardHelpTooltip() {
         return [
-            "Click a physical key to edit its LAYOUT() slot.",
+            "Click a physical key to edit that keyboard position.",
             "Double-click a key to open the keycode picker.",
             "Drag one key onto another to swap staged keycodes.",
             "Copy and paste work between selected keys.",
-            "Dashed outlines are staged edits until Apply layout changes.",
-            "Dots mark key_behaviors[] tap, hold, and long hold branches; combo badges mark inputs available in the selected-layer preview."
+            "Dashed outlines are staged edits until they are kept in the draft.",
+            "Dots mark tap, hold, and long-hold behaviour branches; combo badges mark inputs available in the selected-layer preview."
         ].join("\\n");
     }
 
@@ -6699,7 +6447,7 @@ function getClientScript() {
 
     function renderLayoutBoardApplyButton(count) {
         if (!count) return "";
-        const label = count === 1 ? "Apply layout change" : "Apply all " + count + " layout changes";
+        const label = count === 1 ? "Keep layout in draft" : "Keep " + count + " layout changes in draft";
         return "<div class='layout-board-apply'>" +
             "<button type='button' data-action='applyLayoutChanges' class='primary dirty' aria-label='" + escapeAttr("Unsaved changes: " + label) + "'>" + escapeHtml(label) + "</button>" +
             "</div>";
@@ -7631,8 +7379,8 @@ function getClientScript() {
     function renderLayerOverview(layer) {
         return "<div class='stack'>" +
             "<div><h3>Behaviors</h3>" + renderLayerBehaviorTable(layer) + "</div>" +
-            "<div>" + renderLayerMacroTable(layer) + "</div>" +
             "<div>" + renderLayerComboTable(layer) + "</div>" +
+            "<div>" + renderLayerMacroTable(layer) + "</div>" +
             "<div>" + renderLayerPdModeTable(layer) + "</div>" +
             "</div>";
     }
@@ -7795,7 +7543,7 @@ function getClientScript() {
         }
         return "<h3>PD Modes</h3><table><thead><tr>" +
             renderTooltipHeader("Reachable via", "Visible key, combo output, or behavior action on this layer that can activate the pointing mode.") +
-            renderTooltipHeader("Mode", "Pointing mode reached from this layer, with the action or lock keycode that activates it.") +
+            renderTooltipHeader("Mode", "Device-stored pointing-mode name and whether the reachable action holds or toggles it.") +
             renderTooltipHeader("RGB", "Pointing-mode feedback color and locality used when this mode is active.") +
             "</tr></thead><tbody>" +
             rows.map((row) => "<tr><td>" + escapeHtml(row.source) + "</td><td>" + renderPdModeCell(row) + "</td><td>" + renderInlineSwatch(row.color) + " <code class='muted'>" + escapeHtml(row.locality || "no override") + "</code></td></tr>").join("") +
@@ -7803,8 +7551,7 @@ function getClientScript() {
     }
 
     function renderPdModeCell(row) {
-        const action = row.locked ? "lock action: " : "action: ";
-        return escapeHtml(row.mode) + "<br><code class='muted'>" + action + escapeHtml(row.keycode) + "</code>";
+        return escapeHtml(row.displayName) + "<br><span class='muted'>" + (row.locked ? "Toggle" : "Hold") + "</span>";
     }
 
     function collectLayerPdModes(layer) {
@@ -7833,34 +7580,68 @@ function getClientScript() {
     }
 
     function addPdModeCandidate(rows, seen, keycode, source) {
-        if (!looksLikePdMode(keycode)) return;
-        const mode = pdModeNameForKeycode(keycode);
-        const key = mode + source;
+        const action = pdModeActionForKeycode(keycode);
+        if (!action) return;
+        const key = action.mode + source;
         if (seen.has(key)) return;
         seen.add(key);
-        const color = colorForPdMode(mode);
+        const color = colorForPdMode(action.mode);
         rows.push({
             source,
-            keycode,
-            mode,
-            locked: isPdModeLockKeycode(keycode),
+            keycode: action.keycode,
+            mode: action.mode,
+            displayName: pdModeDisplayName(action.mode),
+            locked: action.locked,
             color: color?.color,
             locality: color?.locality
         });
     }
 
     function looksLikePdMode(keycode) {
-        return /(^|_)MODE(_LOCK)?$/.test(keycode) || keycode === "DRAGSCROLL" || keycode === "DRAGSCROLL_LOCK";
+        return Boolean(pdModeActionForKeycode(keycode));
     }
 
     function pdModeNameForKeycode(keycode) {
-        if (keycode === "DRAGSCROLL" || keycode === "DRAGSCROLL_LOCK") return "PD_MODE_DRAGSCROLL";
-        const base = keycode.replace(/_MODE_LOCK$/, "").replace(/_MODE$/, "").replace(/_LOCK$/, "");
-        return "PD_MODE_" + base;
+        return pdModeActionForKeycode(keycode)?.mode || "";
     }
 
     function isPdModeLockKeycode(keycode) {
-        return /_MODE_LOCK$/.test(keycode || "") || keycode === "DRAGSCROLL_LOCK";
+        return Boolean(pdModeActionForKeycode(keycode)?.locked);
+    }
+
+    function pdModeActionForKeycode(keycode) {
+        const canonical = canonicalLayoutKeyExpression(keycode || "");
+        if (!canonical) return undefined;
+
+        if (canonical === "DRAGSCROLL" || canonical === "DRAGSCROLL_LOCK") {
+            return {keycode: canonical, mode: "PD_MODE_DRAGSCROLL", locked: canonical.endsWith("_LOCK")};
+        }
+
+        const slot = canonical.match(/^PD_SLOT_(\\d+)(_LOCK)?$/);
+        if (slot) {
+            return {keycode: canonical, mode: "PD_MODE_SLOT_" + slot[1], locked: Boolean(slot[2])};
+        }
+
+        const named = canonical.match(/^([A-Z][A-Z0-9_]*)_MODE(_LOCK)?$/);
+        if (!named) return undefined;
+        return {keycode: canonical, mode: "PD_MODE_" + named[1], locked: Boolean(named[2])};
+    }
+
+    function pdModeDisplayName(mode) {
+        const id = [
+            "PD_MODE_DRAGSCROLL",
+            "PD_MODE_VOLUME",
+            "PD_MODE_BRIGHTNESS",
+            "PD_MODE_ZOOM",
+            "PD_MODE_ARROW",
+            "PD_MODE_PINCH",
+            "PD_MODE_SLOT_6",
+            "PD_MODE_SLOT_7",
+        ].indexOf(mode);
+        const storedName = id < 0 ? "" : String((model.pdModes || []).find((slot) => Number(slot.id) === id)?.name || "").trim();
+        if (storedName) return storedName;
+        if (id >= 0) return "Pointing mode " + (id + 1);
+        return titleCase(String(mode || "").replace(/^PD_MODE_/, ""));
     }
 
     function colorForPdMode(mode) {
@@ -8045,7 +7826,7 @@ function getClientScript() {
             (section.description ? "<p class='muted'>" + escapeHtml(section.description) + "</p>" : "") +
             (settingsDrafts.stale(settingsDraftKey(section.id), model.settingsEditing?.identity) ? "<p class='muted'>The keyboard changed since these edits began. Your draft is kept; discard it to load the latest settings.</p>" : "") +
             "<div class='config-default-grid'>" + (section.fields || []).map(renderConfigDefaultField).join("") + "</div>" +
-            "<div class='toolbar'><button type='button' class='primary' data-action='updateConfigDefaults' data-dirty-button" + (writable ? "" : " data-write-unavailable disabled") + ">Apply " + escapeHtml(section.label || "defaults") + "</button><button type='button' data-action='discardSettingsDraft'>Discard changes</button></div>" +
+            "<div class='toolbar'><button type='button' class='primary' data-action='updateConfigDefaults' data-dirty-button" + (writable ? "" : " data-write-unavailable disabled") + ">Keep settings in draft</button><button type='button' data-action='discardSettingsDraft'>Discard changes</button></div>" +
             "</div></details>";
     }
 
@@ -8064,7 +7845,7 @@ function getClientScript() {
         const tooltip = configDefaultTooltip(field);
         if (field.kind === "toggle") {
             return "<label class='toggle-inline' data-tooltip='" + escapeAttr(tooltip) + "'>" +
-                "<input type='checkbox' id='setting-" + escapeAttr(field.macro || "") + "' aria-label='" + escapeAttr(field.label || "") + "' name='" + escapeAttr(field.macro || "") + "'" + (field.enabled ? " checked" : "") + (field.readOnly ? " disabled aria-readonly='true'" : "") + " data-tooltip='" + escapeAttr(tooltip) + "'>" +
+                "<input type='checkbox' role='switch' id='setting-" + escapeAttr(field.macro || "") + "' aria-label='" + escapeAttr(field.label || "") + "' name='" + escapeAttr(field.macro || "") + "'" + (field.enabled ? " checked" : "") + (field.readOnly ? " disabled aria-readonly='true'" : "") + " data-tooltip='" + escapeAttr(tooltip) + "'>" +
                 "<span class='toggle-switch' aria-hidden='true'></span><span class='toggle-label'>enabled</span>" +
                 "</label>";
         }
@@ -8107,7 +7888,7 @@ function getClientScript() {
     function renderRgbStudio() {
         const rgb = model.rgb || {};
         return "<div class='stack'>" +
-            "<section id='deviceRgbStages' class='panel'></section>" +
+            "<section id='deviceRgbStages' class='rgb-overview' aria-label='Keyboard lighting status'></section>" +
             panel("RGB LED Group Builder", renderRgbBuilderWorkspace(rgb), true) +
             panel("Layer Colors", renderLayerRgbSection(rgb), true) +
             panel("Auto-mouse Fade", renderAutomouseCard(rgb.automouseFade), false) +
@@ -8186,17 +7967,17 @@ function getClientScript() {
     }
 
     function rgbGroupOwnerTooltip(target) {
-        if (target === "layer") return "Layer or all-layer owner for the new layer_led_groups_data[] row.";
-        if (target === "pdMode") return "Pointing mode or all-modes owner for the new pd_mode_led_groups_data[] row.";
-        if (target === "keyBehavior") return "Feedback semantic that owns the new key_behavior_feedback_led_groups_data[] row.";
+        if (target === "layer") return "Layer or all-layer owner for the new LED override row.";
+        if (target === "pdMode") return "Pointing mode or all-modes owner for the new LED override row.";
+        if (target === "keyBehavior") return "Feedback state that owns the new LED override row.";
         return "Owner for the selected RGB LED group table.";
     }
 
     function rgbBuilderSelectionTooltip() {
         if (rgbBuilderUsesReusableGroup()) {
-            return "LEDs from the selected reusable RGB_LED_GROUP_* definition. The new table row references that reusable group instead of writing inline LED indices.";
+            return "LEDs from the selected reusable set. The new row references that set instead of storing another copy of its LED indices.";
         }
-        return "Inline LED indices selected on the board for the new table row. These are written as RGB_LED_GROUP(...).";
+        return "LED indices selected on the board for the new override row.";
     }
 
     function rgbBuilderDefinedTooltip() {
@@ -8215,7 +7996,7 @@ function getClientScript() {
             "<label><span>group name</span><input id='rgbReusableGroupName' readonly value='" + escapeAttr(rgbReusableGroupDraftName) + "' placeholder='Assigned by keyboard' spellcheck='false'></label>" +
             "<div class='rgb-selected-list' data-tooltip='LED indices currently selected on the builder board. Saving a reusable group stores this LED membership only; color and owner stay in table rows.'><span class='rgb-led-list-label'>selected LEDs</span>" + selected + "</div>" +
             "<button type='button' data-action='clearReusableLedGroupDraft'>Clear editor</button>" +
-            "<button type='button' data-action='saveRgbReusableLedGroup' data-dirty-button class='primary'>" + (editing ? "Save group" : "Create group") + "</button>" +
+            "<button type='button' data-action='saveRgbReusableLedGroup' data-dirty-button class='primary'>Keep LED set in draft</button>" +
             "</div>" +
             (editing ? "<p class='muted' data-tooltip='Saving replaces the reusable group definition with the current name and selected LEDs. Existing table rows that reference the group keep using the updated LED set.'>Editing <code>" + escapeHtml(rgbReusableGroupOriginalName) + "</code>; selected LEDs replace the reusable group definition.</p>" : "") +
             renderReusableLedGroupsTable(groups) +
@@ -8576,7 +8357,7 @@ function getClientScript() {
         return "<div class='board layout-board-card'>" +
             "<div class='layout-board-header'>" +
             "<h3 class='layout-board-title'>LED group selector</h3>" +
-            "<p class='layout-board-subtitle' data-tooltip='Click board LEDs to build an inline RGB_LED_GROUP(...) row or a reusable RGB_LED_GROUP_* definition. The active layer only provides labels and geometry.'>Physical LED indices - " + escapeHtml(layer.name) + "</p>" +
+            "<p class='layout-board-subtitle' data-tooltip='Click board LEDs to build an override row or reusable LED set. The active layer only provides labels and geometry.'>Physical LED indices - " + escapeHtml(layer.name) + "</p>" +
             "</div>" +
             "<div class='layout-board-stage'>" +
             "<svg class='keyboard-svg layout-board-svg' viewBox='" + viewBox.x + " " + viewBox.y + " " + viewBox.width + " " + viewBox.height + "' preserveAspectRatio='xMidYMid meet' role='img' aria-label='RGB LED group selector'>" +
@@ -8758,7 +8539,7 @@ function getClientScript() {
             branchRows.map(([label, id, color]) =>
                 renderRgbColorSubpanel(label, id, color, " data-tap-branch-color")
             ).join("") +
-            "<button data-action='updateKeyBehaviorFeedback' data-dirty-button class='primary'>Apply key behavior feedback</button>" +
+            "<button data-action='updateKeyBehaviorFeedback' data-dirty-button class='primary'>Keep feedback in draft</button>" +
             "</div>";
     }
 
@@ -8865,8 +8646,8 @@ function getClientScript() {
     function renderLedGroupExpressionCell(row) {
         const kind = row.ledGroupKind === "reusable" ? "reusable" : "inline";
         const tooltip = kind === "reusable"
-            ? "Reusable RGB_LED_GROUP_* reference. Editing the reusable definition changes every row that uses it."
-            : "Inline RGB_LED_GROUP(...) expression stored directly on this table row.";
+            ? "Reusable LED set. Editing the set changes every row that uses it."
+            : "LED membership stored directly on this override row.";
         return "<code data-tooltip='" + escapeAttr(tooltip) + "'>" + escapeHtml(row.ledGroup || "") + "</code><div class='muted'>" + kind + "</div>";
     }
 
@@ -9162,7 +8943,7 @@ function getClientScript() {
         return "<div class='macro-stat-row macro-builder-summary'>" +
             renderMacroChip("slots", filled + " / " + slots.length + " filled", "", "Filled macro slots across both banks read from the keyboard.") +
             renderMacroChip("payload chars", String(totalChars), "", "Total characters across all current macro drafts.") +
-            (edited ? renderMacroChip("edited", String(edited), "warning", "Local drafts that still need Apply macro.") : "") +
+            (edited ? renderMacroChip("edited", String(edited), "warning", "Local macro forms that have not been kept in the profile draft yet.") : "") +
             renderMacroChip("target", model.draft ? "Profile draft" : "Keyboard", "", model.draft ? "Keep edits here, then apply them from profile review." : "Apply saves to both halves and verifies the complete profile.") +
             "</div>";
     }
@@ -9224,7 +9005,7 @@ function getClientScript() {
             "<div><h3>" + escapeHtml(displayKeyExpression(slot.keycode)) + "</h3>" +
             "<div class='muted' data-tooltip='" + escapeAttr(macroEditorStatusTooltip(slot, status, parsed.error)) + "'><code>" + escapeHtml(slot.keycode) + "</code> - " + escapeHtml(status) + "</div></div>" +
             "<div class='toolbar'><button data-action='discardMacroDraft'" + (macroSlotDirty(slot.keycode) ? "" : " disabled") + ">Discard draft</button>" +
-            "<button data-action='updateViaMacro' data-dirty-button class='primary'" + (macroWriteAvailable(slot.keycode) ? "" : " disabled data-write-unavailable") + ">Apply macro</button></div>" +
+            "<button data-action='updateViaMacro' data-dirty-button class='primary'" + (macroWriteAvailable(slot.keycode) ? "" : " disabled data-write-unavailable") + ">Keep macro in draft</button></div>" +
             "</div>" +
             (stale ? "<p role='status' class='warning'>The keyboard changed after this draft was opened. Your draft is kept; copy it if needed, then discard the draft and read the keyboard before applying again.</p>" : "") +
             (!model.macroEditing?.writable && !model.portable?.busy ? "<p class='muted'>Macro editing requires the eight-layer complete-profile firmware and a successful keyboard read.</p>" : "") +
@@ -9235,7 +9016,7 @@ function getClientScript() {
     function macroEditorStatusTooltip(slot, status, error) {
         const keycode = displayKeyExpression(slot?.keycode || "");
         if (status === "invalid") return keycode + " payload has a parse error: " + error;
-        if (status === "ready") return keycode + (model.draft ? " has a non-empty form. Keep macro includes it in your profile draft." : " has a non-empty draft. Apply macro saves it to both halves and verifies readback.");
+        if (status === "ready") return keycode + (model.draft ? " has a non-empty form. Keep macro includes it in your profile draft." : " has a non-empty draft. Saving writes it to both halves and verifies readback.");
         return keycode + " is empty. Add text, insert steps, or record events before applying.";
     }
 
@@ -9297,7 +9078,7 @@ function getClientScript() {
             "<div class='macro-recorder-controls'>" +
             "<div class='macro-recorder-primary-row'>" +
             "<label><span>Record mode</span><select id='macroRecorderMode' name='macroRecorderMode'>" + optionsWithLabels(modeOptions, macroRecorderMode) + "</select></label>" +
-            "<label class='macro-recorder-toggle'><span class='macro-recorder-toggle-label'>Record delays</span><input id='macroRecordDelays' name='macroRecordDelays' type='checkbox' " + (macroRecordDelays ? "checked" : "") + "><span class='macro-recorder-toggle-track' aria-hidden='true'></span></label>" +
+            "<label class='macro-recorder-toggle'><span class='macro-recorder-toggle-label'>Record delays</span><input id='macroRecordDelays' name='macroRecordDelays' type='checkbox' role='switch' " + (macroRecordDelays ? "checked" : "") + "><span class='macro-recorder-toggle-track' aria-hidden='true'></span></label>" +
             "</div>" +
             "<div class='" + delayFieldClass + "' aria-disabled='" + (macroRecordDelays ? "false" : "true") + "'>" +
             "<label><span>Delay threshold ms</span><input id='macroRecorderDelayThreshold' name='macroRecorderDelayThreshold'" + delayFieldAttrs + " inputmode='numeric' value='" + escapeAttr(macroRecorderDelayThreshold) + "'></label>" +
@@ -9324,7 +9105,7 @@ function getClientScript() {
             renderMacroChip("source chars", String((payload || "").length), "", "Characters in the raw payload source string.") +
             renderMacroChip("encoded bytes", parsed.error ? "unknown" : String(stats.bytes), "", "Approximate encoded macro payload bytes after parsing commands.") +
             renderMacroChip("steps", String(parsed.steps.length), "", "Parsed text, tap/chord, down/up, and delay steps in this payload.") +
-            (parsed.error ? renderMacroChip("invalid", parsed.error, "warning", "Payload parse error. Apply macro is disabled until this is fixed.") : "") +
+            (parsed.error ? renderMacroChip("invalid", parsed.error, "warning", "Payload parse error. Keeping the macro is disabled until this is fixed.") : "") +
             "</div>" +
             (parsed.steps.length ? "<div class='macro-preview-list'>" + parsed.steps.map(renderMacroPreviewStep).join("") + "</div>" : "<p class='muted' data-tooltip='This slot currently has an empty payload draft.'>This macro is empty.</p>");
     }

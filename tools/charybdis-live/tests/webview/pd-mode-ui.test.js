@@ -46,7 +46,7 @@ test("eight forms keep valid engine-specific controls and the original draft ide
     assert.equal(document.getElementById("pd-6-thresholdH").parentElement.parentElement.hidden, false);
     assert.equal(document.getElementById("pd-6-thresholdX").parentElement.parentElement.hidden, true);
     document.getElementById("pd-6-name").value = "New scroll";
-    form.all().find(node => node.tagName === "button" && node.textContent === "Keep mode").dispatch("click");
+    form.all().find(node => node.tagName === "button" && node.textContent === "Keep mode in draft").dispatch("click");
     assert.equal(messages[0].config.kind, 2); assert.equal(messages[0].config.name, "New scroll");
     assert.equal(messages[0].config.scroll.divisorV, 8);
     assert.equal(messages[0].config.directions, undefined);
@@ -64,6 +64,8 @@ test("normal flow uses the shared keycode picker while uncommon controls stay ad
     assert(advanced.all().includes(document.getElementById("pd-6-pointerLayer")));
     assert(advanced.all().includes(document.getElementById("pd-6-thresholdX")));
     assert(advanced.all().includes(document.getElementById("pd-6-button0-kind")));
+    assert.equal(document.getElementById("pd-6-scrollMods-1").parentElement.className, "toggle-inline");
+    assert.equal(document.getElementById("pd-6-scrollMods-1").parentElement.children[1].className, "toggle-switch");
     assert(!advanced.all().includes(document.getElementById("pd-6-axis")));
     assert.equal(document.getElementById("pd-6-axis").parentElement.parentElement.children[0].textContent, "Directional actions");
     assert.equal(document.getElementById("pd-3-up-key").value, "G(KC_EQL)");
@@ -74,7 +76,7 @@ test("normal flow uses the shared keycode picker while uncommon controls stay ad
     buttonShortcut.parentElement.children.find(node => node.tagName === "button").dispatch("click");
     assert.deepEqual(pickerCalls, [{id: "pd-6-left-key", mode: "single"}, {id: "pd-4-button1-tap-key", mode: "single"}]);
     left.value = "Cmd+KC_Z";
-    form.all().find(node => node.tagName === "button" && node.textContent === "Keep mode").dispatch("click");
+    form.all().find(node => node.tagName === "button" && node.textContent === "Keep mode in draft").dispatch("click");
     assert.equal(messages[0].config.directions.left.keycode, "G(KC_Z)");
 });
 test("layout picker uses current mode labels and canonical firmware actions", () => {

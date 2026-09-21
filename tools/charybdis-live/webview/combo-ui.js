@@ -35,7 +35,7 @@ function renderDeviceCombos(document, model, post = () => {}) {
         const shared = node("div");
         if (model.draft) {shared.id = "comboHoldDraft"; shared.setAttribute("data-dirty-section", "");}
         const hold = field(shared, "Shared hold threshold (ms)", rows[0].holdTermMs, "number");
-        const save = node("button", model.draft ? "Keep hold threshold" : "Save hold threshold"); save.type = "button";
+        const save = node("button", model.draft ? "Keep timing in draft" : "Save timing to keyboard"); save.type = "button";
         if (model.draft) save.setAttribute("data-dirty-button", "");
         save.onclick = () => post({type: "updateComboHoldTerm", holdTermMs: hold.value});
         shared.append(save); host.append(shared);

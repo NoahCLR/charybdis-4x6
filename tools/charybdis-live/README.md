@@ -17,7 +17,7 @@ which is frozen and lives beside this one.
   - `protocol/` — wire formats spoken to the device
   - `session/` — stateful orchestration across a connection
   - `data/` — vendored data such as the keycode catalog
-- `webview/` — the ported editing UI and a separate device-profile renderer. They render the
+- `webview/` — the live editing UI and device-profile renderers. They render the
   `model` the host posts and sends edits back as typed messages; it never
   imports the core and cannot touch the filesystem.
 - `tests/` — mirrors `core/`, one directory per layer.
@@ -48,6 +48,12 @@ The app connects to a keyboard and shows what the keyboard says about
 itself: VIA and Profile Wire versions, schema, capacities, storage geometry,
 and committed profile status including whether both halves agree on a
 generation.
+
+The header keeps connection, both-half convergence, draft state and recovery
+state together. Editors use the same flow throughout: keep local edits in the
+draft, review them together, then apply the complete profile. Boolean settings
+use compact switches; RGB stage policy is a quiet summary above the detailed
+LED group editor rather than a second full-size panel.
 
 The app reads the VIA layout and the committed profile payload. If nothing is
 committed, it reads the firmware's compiled defaults from the keyboard. These
@@ -82,6 +88,11 @@ Standard modifier shortcuts, tap-hold keys,
 and one-shot modifiers are decoded from their numeric QMK values. Device
 semantic targets have readable labels when the advertised action ABI is known;
 other custom keys retain complete numeric IDs because source names are not sent.
+The selected-layer overview lists behaviours, combos, macros and pointing modes
+in that order. Pointing-mode reachability resolves the same device-advertised
+aliases used by the layout, including actions reached through behaviour rows and
+configurable pointing-mode slots. Its summary rows use each slot's device-stored
+name and describe its action as hold or toggle instead of exposing firmware IDs.
 
 The model adapter translates validated wire domains into presentation fields;
 it does not parse or consult firmware source. Tests cover chunked readback

@@ -28,7 +28,7 @@ manual feedback, not completion of the hardware acceptance matrix.
 | --- | --- |
 | Layout and eight layers | Read/write; names and overlay order travel with complete profiles |
 | Key behaviours, combos and RGB | Read/write editors; custom-profile saves verify readback and both halves |
-| Macros | Studio's existing builder, recorder and preview wired to both device banks; verified save and draft retention |
+| Macros | Builder, recorder and preview wired to both device banks; verified save and draft retention |
 | Global policy | Defaults panels cover all 28 portable scalars, including startup layers, combo matching and device-reported lighting/key options; unsupported firmware features stay read-only |
 | Backup and restore | Complete supported snapshots, review, recovery file and verified restore; interrupted restores can be retried |
 | Drafts and Apply | Eight-layer profiles share one draft, semantic change review, undo/redo and a coordinated verified Apply; unfinished forms stay local until kept |
@@ -41,6 +41,12 @@ and custom storage to one durable logical generation and blocks activation while
 recovery is incomplete. Finish physical decision-boundary interruption tests,
 external VIA adoption, guided recovery, the inherited pointing cadence work,
 and blank-firmware restore acceptance before calling the product complete.
+
+The live shell presents connection, both-half convergence, draft state and
+recovery state as one compact health strip. Editors use a consistent
+keep-in-draft → review → apply vocabulary, and boolean policy controls render as
+switches. This is presentation over the same device-authoritative model; it does
+not add a second source of state.
 
 ## Eight configurable PD-mode slots
 

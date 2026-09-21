@@ -12,30 +12,39 @@ function renderDeviceProfileDetails(document, model) {
     const stages = document.getElementById("deviceRgbStages");
     if (stages) {
         const base = model.rgb?.baseEffect;
-        stages.replaceChildren(element("h2", "Base RGB effect"));
-        stages.append(element("p", base?.state === "read"
-            ? `${base.effectName} · Brightness ${base.brightnessPercent}% of the device limit · Hue ${base.hue}, saturation ${base.saturation} · Speed ${base.speed}`
-            : base?.message || "Base RGB has not been read from the keyboard."));
-        stages.append(element("p", "The layer preview uses the last-read base effect. Brightness is approximate; animations and temporary feedback are not simulated. Use Read from keyboard to refresh.", "muted"));
-        stages.append(element("h2", "RGB stages"));
+        const overview = element("div", undefined, "rgb-overview-copy");
+        overview.append(element("span", "Keyboard lighting", "rgb-overview-eyebrow"));
+        overview.append(element("strong", base?.state === "read"
+            ? `${base.effectName} · ${base.brightnessPercent}% brightness`
+            : base?.message || "Base effect not read", "rgb-overview-title"));
+        overview.append(element("span", base?.state === "read"
+            ? `Hue ${base.hue} · Saturation ${base.saturation} · Speed ${base.speed}`
+            : "Read from keyboard to load the current effect.", "rgb-overview-meta"));
+        stages.replaceChildren(overview);
         const states = model.rgb?.stages || [];
-        stages.append(element("p", states.length
-            ? states.map((stage) => `${stage.label}: ${stage.enabled ? "enabled" : "disabled"}`).join(" · ")
-            : "No RGB configuration has been read from the keyboard."));
         if (states.length) {
-            const controls = element("div");
+            const controls = element("div", undefined, "rgb-stage-controls");
             if (model.draft) {controls.id = "rgbStageDraft"; controls.setAttribute("data-dirty-section", "");}
             const inputs = states.map(stage => {
-                const label = element("label", stage.label + " ");
+                const label = element("label", undefined, "toggle-inline rgb-stage-toggle");
                 const input = element("input"); input.type = "checkbox"; input.checked = stage.enabled;
-                label.append(input); controls.append(label); return {input, bit: stage.bit};
+                input.setAttribute?.("aria-label", stage.label);
+                input.setAttribute?.("role", "switch");
+                const track = element("span", undefined, "toggle-switch"); track.setAttribute?.("aria-hidden", "true");
+                label.append(input, track, element("span", stage.label, "toggle-label"));
+                controls.append(label); return {input, bit: stage.bit};
             });
-            const save = element("button", model.draft ? "Keep RGB policies" : "Save RGB policies"); save.type = "button";
+            const save = element("button", model.draft ? "Keep stages in draft" : "Save stages to keyboard"); save.type = "button";
+            save.className = "rgb-stage-save";
             if (model.draft) save.setAttribute("data-dirty-button", "");
             save.onclick = () => post({type: "updateRgbStages", stageEnableMask: inputs.reduce((mask, {input, bit}) => mask | (input.checked ? bit : 0), 0)});
             controls.append(save); stages.append(controls);
+        } else {
+            stages.append(element("span", "No RGB stage configuration has been read.", "rgb-overview-meta"));
         }
-        stages.append(element("p", model.draft ? "Keep RGB edits in your draft, then review and apply them with your other changes." : "Save writes the edited RGB settings to both halves, preserving the other profile settings.", "muted"));
+        const note = element("span", "Preview uses the last read from the keyboard; animations and temporary feedback are not simulated.", "rgb-overview-note");
+        note.setAttribute?.("title", "Brightness is approximate. Use Read from keyboard to refresh the base effect.");
+        stages.append(note);
     }
 }
 

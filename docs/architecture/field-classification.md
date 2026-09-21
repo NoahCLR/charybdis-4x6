@@ -59,8 +59,8 @@ profile-local numeric group ids and LED bitmaps, not C preprocessor names.
 
 ### Portable Live Policy
 
-Complete profile export/import now carries the following settings. Dedicated
-policy editors remain pending:
+Complete profile export/import and the device-backed Defaults editors now carry
+the following settings:
 
 - `TAPPING_TERM`, `COMBO_TERM`, `CUSTOM_TAP_HOLD_TERM`,
   `CUSTOM_LONGER_HOLD_TERM`, and `CUSTOM_MULTI_TAP_TERM`;

@@ -29,13 +29,17 @@ function documentForView() {
 test("device readback renders RGB stages", () => {
     const document = documentForView();
     renderDeviceProfileDetails(document, buildDeviceModel({committed: decodedDeviceProfile()}));
-    assert.match(document.nodes.deviceRgbStages.textContent, /Layer colours: enabled/);
+    assert.match(document.nodes.deviceRgbStages.textContent, /Keyboard lighting/);
+    assert.match(document.nodes.deviceRgbStages.textContent, /Layer colours/);
+    assert.equal(document.nodes.deviceRgbStages.all("input").length, 5);
+    assert.ok(document.nodes.deviceRgbStages.all("input").every(input => input.type === "checkbox" && input.checked));
+    assert.ok(document.nodes.deviceRgbStages.all("label").every(label => label.className.includes("toggle-inline")));
     renderDeviceProfileDetails(document, buildDeviceModel({baseRgb: {state: "read", effectId: 1, hue: 0, saturation: 255, brightness: 255, speed: 32}}));
-    assert.match(document.nodes.deviceRgbStages.textContent, /Solid colour · Brightness 100%/);
-    assert.match(document.nodes.deviceRgbStages.textContent, /Hue 0, saturation 255/);
-    assert.match(document.nodes.deviceRgbStages.textContent, /last-read/);
+    assert.match(document.nodes.deviceRgbStages.textContent, /Solid colour · 100% brightness/);
+    assert.match(document.nodes.deviceRgbStages.textContent, /Hue 0 · Saturation 255/);
+    assert.match(document.nodes.deviceRgbStages.textContent, /last read/);
     renderDeviceProfileDetails(document, buildDeviceModel({}));
-    assert.match(document.nodes.deviceRgbStages.textContent, /No RGB configuration/);
+    assert.match(document.nodes.deviceRgbStages.textContent, /No RGB stage configuration/);
 });
 
 test("the generated webview script includes the device renderer and parses as delivered", () => {
@@ -48,6 +52,81 @@ test("the generated webview script includes the device renderer and parses as de
     assert.match(script, /renderSelectedBehaviorEditor\(behaviorTarget, selectedBehavior\)/);
     assert(script.indexOf('["macros", "Macros"]') < script.indexOf('["pdModes", "Pointing modes"]'));
     assert(script.indexOf('["pdModes", "Pointing modes"]') < script.indexOf('["rgb", "RGB"]'));
+    assert.match(html, /id="connectionHealth"/);
+    assert.match(html, /id="profileHealth"/);
+    assert.match(html, /id="draftHealth"/);
+    assert.match(html, /id="recoveryHealth"/);
+    assert.doesNotMatch(script, /keymap\.c|rgb_config\.c|["']config\.h["']|compileFirmware|generateProfileDocs/);
+});
+
+test("the layer overview orders combos before macros", () => {
+    const script = getStudioHtml().match(/<script nonce="[^"]+">([\s\S]*?)<\/script>/)[1];
+    const overview = script.slice(script.indexOf("    function renderLayerOverview("), script.indexOf("    function renderTooltipHeader("));
+    assert(overview.indexOf("renderLayerBehaviorTable") < overview.indexOf("renderLayerComboTable"));
+    assert(overview.indexOf("renderLayerComboTable") < overview.indexOf("renderLayerMacroTable"));
+    assert(overview.indexOf("renderLayerMacroTable") < overview.indexOf("renderLayerPdModeTable"));
+});
+
+test("the layer overview resolves every configured pointing-mode alias", () => {
+    const script = getStudioHtml().match(/<script nonce="[^"]+">([\s\S]*?)<\/script>/)[1];
+    const functions = script.slice(script.indexOf("    function collectLayerPdModes("), script.indexOf("    function renderStep("));
+    const aliases = {
+        "0x7E50": "DRAGSCROLL",
+        "0x7E51": "VOLUME_MODE",
+        "0x7E52": "BRIGHTNESS_MODE",
+        "0x7E53": "ZOOM_MODE",
+        "0x7E5A": "ARROW_MODE_LOCK",
+        "0x7E55": "PINCH_MODE",
+        "0x7EF0": "PD_SLOT_6",
+    };
+    const behaviors = new Map([["0x7E55", {steps: [{tapCountName: "Double Tap Branch", hold: {action: "0x7E53", helper: "PRESS_AND_HOLD_UNTIL_RELEASE"}}]}]]);
+    const context = vm.createContext({
+        model: {
+            pdModes: [{id: 4, name: "Arrow"}, {id: 6, name: "Window switch"}],
+            rgb: {pdModeColors: [
+                {pointingMode: "PD_MODE_DRAGSCROLL", color: {h: "1", s: "2", v: "3"}, locality: "RGB_RIGHT_HALF"},
+                {pointingMode: "PD_MODE_SLOT_6", color: {h: "4", s: "5", v: "6"}, locality: "RGB_BOTH_HALVES"},
+            ]},
+        },
+        canonicalLayoutKeyExpression: keycode => aliases[keycode] || keycode,
+        behaviorForKey: keycode => behaviors.get(keycode),
+        layerCombos: () => [],
+    });
+    vm.runInContext(functions, context);
+    const layer = {positions: [
+        {keycode: "0x7E52", display: "Brightness"},
+        {keycode: "0x7E55", display: "Pinch"},
+        {keycode: "0x7E51", display: "Volume"},
+        {keycode: "0x7E50", display: "Dragscroll"},
+        {keycode: "0x7E5A", display: "Arrow toggle"},
+        {keycode: "0x7EF0", display: "Custom mode"},
+    ]};
+    const rows = context.collectLayerPdModes(layer);
+    assert.deepEqual(new Set(rows.map(row => row.mode)), new Set([
+        "PD_MODE_BRIGHTNESS",
+        "PD_MODE_PINCH",
+        "PD_MODE_ZOOM",
+        "PD_MODE_VOLUME",
+        "PD_MODE_DRAGSCROLL",
+        "PD_MODE_ARROW",
+        "PD_MODE_SLOT_6",
+    ]));
+    assert.equal(rows.find(row => row.mode === "PD_MODE_ZOOM").keycode, "ZOOM_MODE");
+    assert.equal(rows.find(row => row.mode === "PD_MODE_ARROW").displayName, "Arrow");
+    assert.equal(rows.find(row => row.mode === "PD_MODE_SLOT_6").keycode, "PD_SLOT_6");
+    assert.equal(rows.find(row => row.mode === "PD_MODE_SLOT_6").displayName, "Window switch");
+    assert.deepEqual(rows.find(row => row.mode === "PD_MODE_DRAGSCROLL").color, {h: "1", s: "2", v: "3"});
+});
+
+test("the layer overview presents pointing modes by their clean device names", () => {
+    const script = getStudioHtml().match(/<script nonce="[^"]+">([\s\S]*?)<\/script>/)[1];
+    const render = script.slice(script.indexOf("    function renderPdModeCell("), script.indexOf("    function collectLayerPdModes("));
+    const context = vm.createContext({escapeHtml: value => String(value).replace(/</g, "&lt;")});
+    vm.runInContext(render, context);
+    const html = context.renderPdModeCell({displayName: "Window <switch>", locked: false, mode: "PD_MODE_SLOT_6", keycode: "PD_SLOT_6"});
+    assert.match(html, /Window &lt;switch>/);
+    assert.match(html, /Hold/);
+    assert.doesNotMatch(html, /PD_MODE_SLOT_6|PD_SLOT_6/);
 });
 
 

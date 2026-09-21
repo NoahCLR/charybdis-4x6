@@ -59,7 +59,7 @@ test("Read from keyboard retains Defaults drafts across the shared draft reset",
         post: message => sent.push(message.type), clearLayoutComboOriginal() {}, resetMacroRecorderState() {},
         behaviorDrafts: {clear() {}}, keyPickerHost: {innerHTML: ""}});
     vm.runInContext(script.slice(script.indexOf("    function discardLocalDraftState("), script.indexOf("    function render()")), context);
-    vm.runInContext(script.slice(script.indexOf('    document.getElementById("reload")'), script.indexOf('    document.getElementById("profileSelect")')), context);
+    vm.runInContext(script.slice(script.indexOf('    document.getElementById("reload")'), script.indexOf('document.addEventListener("pointerover"')), context);
     refresh();
     assert.equal(store.get("board:timing").fields[0].value, "175");
     assert.equal(store.stale("board:timing", "external"), true);

@@ -34,7 +34,7 @@ function renderPdModes(document, model, post, keycodeTools = {}) {
     if (!host) return;
     const node = (tag, text) => {const element = document.createElement(tag); if (text !== undefined) element.textContent = text; return element;};
     host.replaceChildren(node("h2", "Pointing modes"));
-    host.append(node("p", "Choose a name, movement type, speed and the actions you want. Less common tuning stays under Advanced. Keep changes in your draft, then review and Apply."));
+    host.append(node("p", "Choose a name, movement type, speed and the actions you want. Less common tuning stays under Advanced. Keep changes in your draft, then review and apply."));
     const slots = model.pdModes || [], writable = Boolean(model.pdModeEditing?.writable && model.draft), dpiChoices = pdModeDpiChoices(model);
     if (slots.length !== 8) {
         host.append(node("p", "This firmware has fixed pointing modes. The configurable-mode firmware and a migrated profile are required to edit these slots."));
@@ -93,10 +93,15 @@ function renderPdModes(document, model, post, keycodeTools = {}) {
         const modifierChoices = [[1, "Left Ctrl"], [2, "Left Shift"], [4, "Left Alt / Option"], [8, "Left GUI / Command"], [16, "Right Ctrl"], [32, "Right Shift"], [64, "Right Alt / Option"], [128, "Right GUI / Command"]];
         const modifiers = (parent, label, prefix, mask) => {
             const details = node("details"); details.append(node("summary", label)); parent.append(details);
+            const toggleGrid = node("div"); toggleGrid.className = "toggle-grid"; details.append(toggleGrid);
             const controls = modifierChoices.map(([bit, text]) => {
-                const wrapper = node("label", text + " "), input = node("input"); input.type = "checkbox";
+                const wrapper = node("label"), input = node("input"); input.type = "checkbox";
                 input.id = `pd-${slot.id}-${prefix}-${bit}`; input.name = `${prefix}-${bit}`; input.checked = Boolean(mask & bit); input.disabled = !writable;
-                wrapper.style.display = "block"; wrapper.append(input); details.append(wrapper); return [bit, input];
+                input.setAttribute("role", "switch");
+                wrapper.className = "toggle-inline";
+                const track = node("span"); track.className = "toggle-switch"; track.setAttribute("aria-hidden", "true");
+                const caption = node("span", text); caption.className = "toggle-label";
+                wrapper.append(input, track, caption); toggleGrid.append(wrapper); return [bit, input];
             });
             return () => controls.reduce((mask, [bit, input]) => mask | (input.checked ? bit : 0), 0);
         };
@@ -133,7 +138,7 @@ function renderPdModes(document, model, post, keycodeTools = {}) {
         const hint = slot.id < 6 ? ["DRAGSCROLL", "VOLUME_MODE", "BRIGHTNESS_MODE", "ZOOM_MODE", "ARROW_MODE", "PINCH_MODE"][slot.id] : `PD_SLOT_${slot.id}`;
         form.append(node("p", `Assign ${hint} to hold this mode, or ${hint}_LOCK to toggle it. Its lighting is under RGB → Pointing modes.`));
         const send = message => post({...message, slot: slot.id, expectedBase: JSON.parse(identity.value)});
-        const keep = button("Keep mode", () => {
+        const keep = button(model.draft ? "Keep mode in draft" : "Save mode to keyboard", () => {
             if (!form.reportValidity()) return;
             const config = {id: slot.id, kind: Number(kind.value), name: name.value.trim(), dpi: Number(dpi.value), pointerLayer: Number(pointer.value), buttons: buttons.map(read => read())};
             if (config.kind === 1) {
@@ -144,7 +149,7 @@ function renderPdModes(document, model, post, keycodeTools = {}) {
             }
             send({type: "savePdMode", config});
         });
-        keep.title = "Keep in the shared draft; Apply after reviewing all changes.";
+        keep.title = "Keep in the shared draft; review and apply all changes together.";
         if (slot.kind) button("Clear slot", () => send({type: "clearPdMode"}));
         else {
             const source = field(form, "Copy from", "source", slots.find(row => row.kind)?.id ?? 0, slots.filter(row => row.kind).map(row => [row.id, `Slot ${row.id + 1} · ${row.name}`]));

@@ -169,6 +169,31 @@ test("half divergence is stated plainly rather than shown as healthy", () => {
     assert.match(diverged.summary, /not converged/);
 });
 
+test("the header exposes one health model for connection, convergence and recovery", () => {
+    const disconnected = buildDeviceModel({phase: "empty", error: {message: "Keyboard unavailable"}}).device;
+    assert.deepEqual(disconnected.health, {
+        profile: "unavailable",
+        converged: false,
+        recoveryPending: false,
+        busy: false,
+        phase: "empty",
+        error: "Keyboard unavailable",
+    });
+
+    const connected = buildDeviceModel({
+        capabilities: {},
+        busy: true,
+        phase: "reading profile",
+        status: {committedGeneration: 4, activeGeneration: 4, peerGeneration: 4, committedDigest: 1, candidatePending: true},
+        mutationCompatibility: {recoveryPending: true},
+    }).device;
+    assert.equal(connected.health.profile, "synced");
+    assert.equal(connected.health.converged, true);
+    assert.equal(connected.health.recoveryPending, true);
+    assert.equal(connected.health.busy, true);
+    assert.equal(connected.health.phase, "reading profile");
+});
+
 test("the subtitle says what to do next", () => {
     const idle = buildDeviceModel({capabilities: {}}).device;
     assert.match(idle.subtitle, /Read from keyboard/);
