@@ -22,7 +22,7 @@ const {renderProfileDraft} = require("./profile-draft-ui");
 const {renderDeviceProfileDetails} = require("./device-profile-ui");
 const {createBehaviorDraftStore} = require("./behavior-drafts");
 const {createSettingsDraftStore} = require("./settings-drafts");
-const {pointingModePickerRows, renderPdModes} = require("./pd-mode-ui");
+const {pdModeDpiChoices, pointingModePickerRows, renderPdModes} = require("./pd-mode-ui");
 const {renderDeviceCombos} = require("./combo-ui");
 const {combosForLayerPreview} = require("./combo-preview");
 const {layoutKeyKind, layerPreviewPaint, composedLayerPreviewPaint, baseEffectPreviewNote} = require("./layer-preview");
@@ -2330,6 +2330,7 @@ ${createSettingsDraftStore.toString()}
 ${renderDeviceCombos.toString()}
 ${renderPdModes.toString()}
 ${pointingModePickerRows.toString()}
+${pdModeDpiChoices.toString()}
 ${combosForLayerPreview.toString()}
 ${layoutKeyKind.toString()}
 ${layerPreviewPaint.toString()}

@@ -1,6 +1,6 @@
 "use strict";
 const test = require("node:test"), assert = require("node:assert/strict");
-const {pointingModePickerRows, renderPdModes} = require("../../webview/pd-mode-ui");
+const {pdModeDpiChoices, pointingModePickerRows, renderPdModes} = require("../../webview/pd-mode-ui");
 const {document: fixture} = require("../fixtures/pd-profile");
 const {validateSnapshot} = require("../../core/model/portable-profile");
 // Minimal DOM seam; deliberately forbids parsing device strings as markup.
@@ -22,7 +22,11 @@ function setup(writable = true) {
     const document = {createElement: tag => new Node(tag), getElementById: id => id === "pdModes" ? host : host.all().find(node => node.id === id)};
     const identity = {source: "draft", generation: 0, digest: 123, originHalf: 255};
     const qmkKeycodes = [{keycode: 0x1d, value: "KC_Z", label: "Z"}, {keycode: 0x2e, value: "KC_EQL", label: "="}, {keycode: 0x50, value: "KC_LEFT", label: "Left"}];
-    renderPdModes(document, {pdModes: slots, pdModeEditing: {writable}, draft: {}, profileIdentity: identity, qmkKeycodes}, value => messages.push(value), {
+    const configDefaults = [{id: "normalPointerSpeed", fields: [
+        {macro: "normalDpi", choices: [400, 600, 800]},
+        {macro: "snipingDpi", choices: [100, 200, 300, 400]},
+    ]}];
+    renderPdModes(document, {pdModes: slots, pdModeEditing: {writable}, draft: {}, profileIdentity: identity, qmkKeycodes, configDefaults}, value => messages.push(value), {
         open: (id, mode) => pickerCalls.push({id, mode}),
         canonicalize: value => value === "Cmd+KC_Z" ? "G(KC_Z)" : value,
     });
@@ -31,6 +35,10 @@ function setup(writable = true) {
 test("eight forms keep valid engine-specific controls and the original draft identity", () => {
     const {host, document, messages, identity} = setup();
     assert.equal(host.all().filter(node => node.tagName === "form").length, 8);
+    const dpi = document.getElementById("pd-0-dpi");
+    assert.equal(dpi.tagName, "select");
+    assert.deepEqual(dpi.children.map(option => [option.value, option.textContent]), [["0", "Use normal pointer speed"], ["100", "100 DPI"], ["200", "200 DPI"], ["300", "300 DPI"], ["400", "400 DPI"], ["600", "600 DPI"], ["800", "800 DPI"]]);
+    assert.equal(dpi.value, "100");
     const form = document.getElementById("pdSlot6"), kind = document.getElementById("pd-6-kind");
     kind.value = "2";
     // Restore sets values without a native change event.
@@ -75,4 +83,10 @@ test("layout picker uses current mode labels and canonical firmware actions", ()
     ]};
     assert.deepEqual(pointingModePickerRows(model), [[model.qmkKeycodes[1], model.qmkKeycodes[2]]]);
     assert(!pointingModePickerRows(model).flat().some(entry => entry.value === "SLOT_7_MODE"));
+});
+test("DPI choices combine device ladders with values already stored in modes", () => {
+    assert.deepEqual(pdModeDpiChoices({
+        configDefaults: [{fields: [{macro: "normalDpi", choices: [400, 600]}, {macro: "effectMode", choices: [1, 2]}]}],
+        pdModes: [{dpi: 0}, {dpi: 350}],
+    }), [[0, "Use normal pointer speed"], [350, "350 DPI"], [400, "400 DPI"], [600, "600 DPI"]]);
 });

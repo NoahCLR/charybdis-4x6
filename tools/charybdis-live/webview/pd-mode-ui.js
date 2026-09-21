@@ -10,6 +10,24 @@ function pointingModePickerRows(model, columns = 4) {
     return rows;
 }
 
+function pdModeDpiChoices(model) {
+    const labels = new Map([[0, "Use normal pointer speed"]]);
+    for (const section of model?.configDefaults || []) {
+        for (const field of section.fields || []) {
+            if (!field.choices || !/Dpi$/.test(field.macro || "")) continue;
+            for (const choice of field.choices) {
+                const value = Number(typeof choice === "object" ? choice.value : choice);
+                if (Number.isInteger(value) && value > 0 && value <= 65535) labels.set(value, typeof choice === "object" && choice.label ? choice.label : `${value} DPI`);
+            }
+        }
+    }
+    for (const slot of model?.pdModes || []) {
+        const value = Number(slot.dpi);
+        if (Number.isInteger(value) && value > 0 && value <= 65535 && !labels.has(value)) labels.set(value, `${value} DPI`);
+    }
+    return [...labels].sort(([a], [b]) => a - b);
+}
+
 // Serialized into the webview. Device text is only assigned through textContent.
 function renderPdModes(document, model, post, keycodeTools = {}) {
     const host = document.getElementById("pdModes");
@@ -17,7 +35,7 @@ function renderPdModes(document, model, post, keycodeTools = {}) {
     const node = (tag, text) => {const element = document.createElement(tag); if (text !== undefined) element.textContent = text; return element;};
     host.replaceChildren(node("h2", "Pointing modes"));
     host.append(node("p", "Choose a name, movement type, speed and the actions you want. Less common tuning stays under Advanced. Keep changes in your draft, then review and Apply."));
-    const slots = model.pdModes || [], writable = Boolean(model.pdModeEditing?.writable && model.draft);
+    const slots = model.pdModes || [], writable = Boolean(model.pdModeEditing?.writable && model.draft), dpiChoices = pdModeDpiChoices(model);
     if (slots.length !== 8) {
         host.append(node("p", "This firmware has fixed pointing modes. The configurable-mode firmware and a migrated profile are required to edit these slots."));
         return;
@@ -63,7 +81,7 @@ function renderPdModes(document, model, post, keycodeTools = {}) {
         const identity = field(form, "", "identity", JSON.stringify(model.profileIdentity)); identity.parentElement.hidden = true;
         const name = field(form, "Name", "name", slot.name); name.maxLength = 23;
         const kind = field(form, "Movement", "kind", slot.kind || 1, [[1, "Directional keys / shortcuts"], [2, "Scrolling"]]);
-        const dpi = field(form, "DPI (0 uses normal pointer speed)", "dpi", slot.dpi);
+        const dpi = field(form, "DPI", "dpi", slot.dpi, dpiChoices);
         const movement = group(form, "Directional actions");
         const scrolling = group(form, "Scrolling", slot.kind === 2);
         const advanced = group(form, "Advanced", false); advanced.dataset.pdAdvanced = String(slot.id);
@@ -146,4 +164,4 @@ function renderPdModes(document, model, post, keycodeTools = {}) {
     });
 }
 
-module.exports = {pointingModePickerRows, renderPdModes};
+module.exports = {pdModeDpiChoices, pointingModePickerRows, renderPdModes};
