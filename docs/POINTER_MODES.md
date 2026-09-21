@@ -17,8 +17,8 @@ slots, followed by two empty slots; their names do not select special code.
 
 Use an empty slot to create directional key/shortcut actions or a scrolling
 mode, or duplicate an existing slot. The normal path is name, movement type,
-a DPI preset (including normal pointer speed), then either four direction
-actions or scroll direction/modifiers. Direction
+a DPI preset (including normal pointer speed), then either an axis choice and
+the relevant direction actions or scroll direction/modifiers. Direction
 actions and mouse-button shortcuts use the same keycode picker as Layout, so a
 plain key or modified key such as `G(KC_Z)` can be selected instead of typed.
 Choose **Keep mode**, assign the mode's hold or toggle action in Layout, set

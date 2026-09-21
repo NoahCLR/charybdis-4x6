@@ -87,7 +87,7 @@ function renderPdModes(document, model, post, keycodeTools = {}) {
         const advanced = group(form, "Advanced", false); advanced.dataset.pdAdvanced = String(slot.id);
         const pointer = field(advanced, "After this mode ends", "pointerLayer", slot.pointerLayer, [[0, "Keep pointer layer active"], [1, "Return to typing layer"]]);
         const directionAdvanced = group(advanced, "Direction tuning and modifier rules", false);
-        const axis = field(directionAdvanced, "Active axes", "axis", slot.kind === 1 ? slot.axis : 2, [[0, "Vertical only"], [1, "Horizontal only"], [2, "Dominant axis"]]);
+        const axis = field(movement, "Active axes", "axis", slot.kind === 1 ? slot.axis : 2, [[0, "Vertical only"], [1, "Horizontal only"], [2, "Dominant axis"]]);
         const tx = field(directionAdvanced, "Horizontal movement per tap", "thresholdX", slot.thresholdX || 40);
         const ty = field(directionAdvanced, "Vertical movement per tap", "thresholdY", slot.thresholdY || 50);
         const modifierChoices = [[1, "Left Ctrl"], [2, "Left Shift"], [4, "Left Alt / Option"], [8, "Left GUI / Command"], [16, "Right Ctrl"], [32, "Right Shift"], [64, "Right Alt / Option"], [128, "Right GUI / Command"]];

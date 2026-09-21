@@ -64,6 +64,8 @@ test("normal flow uses the shared keycode picker while uncommon controls stay ad
     assert(advanced.all().includes(document.getElementById("pd-6-pointerLayer")));
     assert(advanced.all().includes(document.getElementById("pd-6-thresholdX")));
     assert(advanced.all().includes(document.getElementById("pd-6-button0-kind")));
+    assert(!advanced.all().includes(document.getElementById("pd-6-axis")));
+    assert.equal(document.getElementById("pd-6-axis").parentElement.parentElement.children[0].textContent, "Directional actions");
     assert.equal(document.getElementById("pd-3-up-key").value, "G(KC_EQL)");
     assert.equal(document.getElementById("pd-1-left-key").parentElement.parentElement.hidden, true);
     assert.equal(document.getElementById("pd-1-up-key").parentElement.parentElement.hidden, false);
