@@ -63,6 +63,26 @@
           "caller": "io_read",
           "callee": "noah_qmk_profile_eeprom_read",
           "reason": "the writable profile store invokes its injected QMK EEPROM read adapter"
+        },
+        {
+          "caller": "noah_profile_candidate_store_backend_activation_step",
+          "callee": "noah_effective_pd_invalidate",
+          "reason": "Provider publication invokes the validated immutable PD cache invalidator."
+        },
+        {
+          "caller": "noah_profile_reader_read",
+          "callee": "compiled_reader_read",
+          "reason": "Boot PD cache uses the compiled-profile reader callback before store initialization."
+        },
+        {
+          "caller": "noah_profile_reader_read",
+          "callee": "staged_reader_read",
+          "reason": "Committed PD cache uses the candidate backend immutable EEPROM reader callback."
+        },
+        {
+          "caller": "staged_reader_read",
+          "callee": "noah_qmk_profile_eeprom_read",
+          "reason": "The staged profile reader invokes the installed bounded EEPROM adapter."
         }
       ],
       "paths": [
@@ -96,7 +116,7 @@
         },
         {
           "name": "engineering owner host marker-last commit write",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_transaction_scan", "commit_step_candidate", "io_write", "noah_qmk_profile_eeprom_write", "wear_leveling_write"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_transaction_scan", "commit_step_candidate", "noah_profile_store_prepare_commit_step", "io_write", "noah_qmk_profile_eeprom_write", "wear_leveling_write"]
         },
         {
           "name": "engineering owner key-behavior publication",
@@ -117,6 +137,18 @@
         {
           "name": "engineering mutation Raw HID dispatch",
           "functions": ["main", "via_custom_value_command_kb"]
+        },
+        {
+          "name": "PD compiled cache initialization",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "noah_effective_pd_invalidate", "noah_profile_reader_read", "compiled_reader_read", "write_pd_payload", "noah_profile_pd_v1_validate_record.part.2"]
+        },
+        {
+          "name": "PD published cache EEPROM read",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_store_backend_activation_step", "noah_effective_pd_invalidate", "noah_profile_reader_read", "staged_reader_read", "noah_qmk_profile_eeprom_read", "wear_leveling_read"]
+        },
+        {
+          "name": "PD published record validation",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_store_backend_activation_step", "noah_effective_pd_invalidate", "noah_profile_pd_v1_validate_record.part.2"]
         }
       ]
     },

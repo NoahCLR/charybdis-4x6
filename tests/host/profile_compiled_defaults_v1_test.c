@@ -8,6 +8,7 @@
 #include "users/noah/lib/profile/schema/profile_compiled_defaults_v1.h"
 #include "users/noah/lib/profile/schema/profile_validator_v1.h"
 #include "users/noah/lib/profile/runtime/profile_action_runtime_v1.h"
+#include "users/noah/lib/profile/runtime/effective_pd_runtime.h"
 #include "users/noah/lib/profile/storage/profile_checksum.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
 #include "users/noah/noah_keymap.h"
@@ -16,10 +17,20 @@ enum {
     OUTPUT_CAPACITY = NOAH_PROFILE_BLOB_V1_MAX_SIZE,
 };
 
+// Migration tripwire: adding PD slots must not renumber deployed native keys.
+_Static_assert(MACRO_0 == 0x7e40 && MACRO_15 == 0x7e4f, "preserve macro identities");
+_Static_assert(DRAGSCROLL == 0x7e50 && VOLUME_MODE == 0x7e51 && BRIGHTNESS_MODE == 0x7e52 && ZOOM_MODE == 0x7e53 && ARROW_MODE == 0x7e54 && PINCH_MODE == 0x7e55, "preserve PD momentary identities");
+_Static_assert(DRAGSCROLL_LOCK == 0x7e56 && VOLUME_MODE_LOCK == 0x7e57 && BRIGHTNESS_MODE_LOCK == 0x7e58 && ZOOM_MODE_LOCK == 0x7e59 && ARROW_MODE_LOCK == 0x7e5a && PINCH_MODE_LOCK == 0x7e5b, "preserve PD lock identities");
+_Static_assert(LAYER_LOCK_BASE == 0x7e5c, "preserve layer lock identities");
+_Static_assert(NOAH_KEYMAP_SAFE_RANGE == 0x7e5c + LAYER_COUNT, "preserve authored custom trigger identities");
+
 static uint8_t     output[OUTPUT_CAPACITY];
 static size_t      output_length;
 static size_t      largest_write;
 static const char *fixture_path;
+static size_t behavior_visits;
+
+void noah_compiled_defaults_test_behavior_visit(void) { behavior_visits++; }
 
 #define NOAH_PD_MODE_TEST_ROW(name, mode_keycode, handler, key_handler, reset, dpi, mode_traits, lifecycle) [PD_MODE_INDEX_##name] = {.mode_flag = PD_MODE_##name, .keycode = (mode_keycode), .lock_action = mode_keycode##_LOCK, .traits = (mode_traits)},
 const pd_mode_def_t pd_modes[PD_MODE_COUNT] = {NOAH_PD_MODE_LIST(NOAH_PD_MODE_TEST_ROW)};
@@ -168,13 +179,16 @@ static void test_real_authored_profile(void) {
     assert(!noah_profile_compiled_v1_compatibility(NULL, &runtime_compatibility));
     assert(!noah_profile_compiled_v1_compatibility(&profile, NULL));
     assert(noah_profile_compiled_v1_compatibility(&profile, &runtime_compatibility));
-    assert(runtime_compatibility.required_domain_mask == 0u);
-#ifdef COMBO_ENABLE
-    assert(runtime_compatibility.allowed_domain_mask == (profile.metadata.domain_mask | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_COMBOS));
-    assert(runtime_compatibility.combo_to_native != NULL);
-#else
-    assert(runtime_compatibility.allowed_domain_mask == profile.metadata.domain_mask);
+    assert(runtime_compatibility.required_domain_mask == NOAH_PROFILE_VALIDATOR_V1_DOMAIN_PD);
+    uint8_t allowed_domains = profile.metadata.domain_mask;
+#ifdef NOAH_PORTABLE_PROFILE_ENABLE
+    allowed_domains |= NOAH_PROFILE_VALIDATOR_V1_DOMAIN_SETTINGS;
 #endif
+#ifdef COMBO_ENABLE
+    allowed_domains |= NOAH_PROFILE_VALIDATOR_V1_DOMAIN_COMBOS;
+    assert(runtime_compatibility.combo_to_native != NULL);
+#endif
+    assert(runtime_compatibility.allowed_domain_mask == allowed_domains);
     assert(runtime_compatibility.action_abi_digest == profile.metadata.action_abi_digest);
     assert(runtime_compatibility.logical_layer_count == LAYER_COUNT);
     assert(runtime_compatibility.supported_pd_mode_mask == (uint8_t)((UINT32_C(1) << PD_MODE_COUNT) - 1u));
@@ -193,7 +207,7 @@ static void test_real_authored_profile(void) {
     assert(output_length == profile.metadata.byte_length);
     assert(largest_write <= NOAH_PROFILE_RGB_V1_HEADER_SIZE);
     assert(noah_profile_blob_v1_decode(output, output_length, &decoded, &codec_error) == NOAH_PROFILE_CODEC_V1_OK);
-    assert(decoded.domain_count == 2u);
+    assert(decoded.domain_count == (NOAH_PROFILE_PD_COUNT == 8 ? 3u : 2u));
     assert(decoded.domains[0].id == NOAH_PROFILE_DOMAIN_V1_RGB);
     assert(decoded.domains[1].id == NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIORS);
     assert(decoded.crc32 == profile.metadata.crc32);
@@ -215,6 +229,29 @@ static void test_real_authored_profile(void) {
         assert(memcmp(slice, &output[offset], length) == 0);
     }
     assert(!noah_profile_reader_read(&reader, output_length - 1u, slice, 2u));
+#ifdef NOAH_PD_PROFILE_ENABLE
+    // Boot and compiled fallback must warm the real PD cache without replaying
+    // canonical behavior sorting for every 20-byte read in the same scan.
+    noah_effective_profile_snapshot_t snapshot = {.reader = reader};
+    snapshot.profile.domain_mask = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_PD;
+    snapshot.profile.pd.offset = (size_t)(decoded.domains[2].payload - output);
+    snapshot.profile.pd.length = decoded.domains[2].payload_length;
+    behavior_visits = 0;
+    noah_effective_pd_invalidate(NULL, 0, snapshot.identity, snapshot.identity, &snapshot);
+    assert(noah_effective_pd_ready());
+    for (uint8_t slot = 0; slot < 8; slot++)
+        assert(memcmp(noah_effective_pd_record(slot), decoded.domains[2].payload + 8 + slot * 96, 96) == 0);
+    fprintf(stderr, "compiled PD cache warmup: %zu behavior-row sorts\n", behavior_visits);
+    assert(behavior_visits == 0);
+    // Exercise every PD byte and record boundary against the full golden stream.
+    for (size_t offset = snapshot.profile.pd.offset; offset < output_length; offset++) {
+        size_t length = output_length - offset;
+        if (length > sizeof(slice)) length = sizeof(slice);
+        assert(noah_profile_reader_read(&reader, offset, slice, length));
+        assert(memcmp(slice, output + offset, length) == 0);
+    }
+    assert(behavior_visits == 0);
+#endif
     validate_whole_profile(&profile);
 
     printf("compiled profile v1: %u bytes crc32=%08x fnv1a=%08x action_abi=%08x\n", profile.metadata.byte_length, (unsigned)profile.metadata.crc32, (unsigned)profile.metadata.digest, (unsigned)profile.metadata.action_abi_digest);
@@ -248,7 +285,7 @@ static void test_semantic_action_translation(void) {
     assert(noah_profile_action_runtime_v1_to_native(&action, &native) == NOAH_PROFILE_ACTION_RUNTIME_V1_INVALID_ARGUMENT);
 }
 
-static void validate_import_on_empty_firmware(const noah_profile_compiled_v1_t *compiled, const char *path) {
+static void validate_portable_import(const noah_profile_compiled_v1_t *compiled, const char *path) {
     FILE *file = fopen(path, "rb");
     assert(file);
     size_t length = fread(output, 1, sizeof(output), file);
@@ -258,9 +295,9 @@ static void validate_import_on_empty_firmware(const noah_profile_compiled_v1_t *
     noah_profile_validator_v1_compatibility_t compatible;
     assert(noah_profile_compiled_v1_compatibility(compiled, &compatible));
     noah_profile_validator_v1_declaration_t declaration = {
-        .schema_major      = 1,
+        .schema_major      = NOAH_PROFILE_BLOB_V1_SCHEMA_MAJOR,
         .schema_minor      = 0,
-        .domain_mask       = 15,
+        .domain_mask       = NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS,
         .byte_length       = length,
         .crc32             = noah_profile_crc32_finish(noah_profile_crc32_update(NOAH_PROFILE_CRC32_INITIAL, output, length)),
         .digest            = noah_profile_fnv1a_update(NOAH_PROFILE_FNV1A_INITIAL, output, length),
@@ -273,8 +310,11 @@ static void validate_import_on_empty_firmware(const noah_profile_compiled_v1_t *
         result = noah_profile_validator_v1_step(&validator, 20, &error);
     if (result != NOAH_PROFILE_VALIDATOR_V1_VALID) fprintf(stderr, "portable import failed: %u domain=%u field=%u byte=%zu\n", result, error.domain_id, error.field_id, error.byte_offset);
     assert(result == NOAH_PROFILE_VALIDATOR_V1_VALID);
-    assert(validator.profile.domain_mask == 15);
+    assert(validator.profile.domain_mask == NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS);
     assert(validator.profile.settings.length >= 344);
+#ifdef NOAH_PD_PROFILE_ENABLE
+    assert(validator.profile.pd.length == NOAH_PROFILE_PD_V1_SIZE);
+#endif
 }
 
 int main(int argc, char **argv) {
@@ -292,14 +332,14 @@ int main(int argc, char **argv) {
         fclose(file);
         return 0;
     }
-    if (argc == 4 && strcmp(argv[2], "--empty-profile") == 0) {
+    if (argc == 4 && (strcmp(argv[2], "--empty-profile") == 0 || strcmp(argv[2], "--import-profile") == 0)) {
         noah_profile_compiled_v1_t profile;
         fixture_path = argv[1];
-        assert(key_behavior_count == 0 && noah_combo_count == 0);
+        if (strcmp(argv[2], "--empty-profile") == 0) assert(key_behavior_count == 0 && noah_combo_count == 0);
         assert(noah_profile_compiled_v1_open(&profile, NULL) == NOAH_PROFILE_COMPILED_V1_OK);
         assert(profile.metadata.action_abi_digest == fixture_u32("profile.action_abi", 16));
-        validate_import_on_empty_firmware(&profile, argv[3]);
-        puts("empty firmware accepts the app's complete populated profile and preserves its action ABI");
+        validate_portable_import(&profile, argv[3]);
+        puts("firmware accepts the app's complete populated profile and preserves its action ABI");
         return 0;
     }
     fixture_path = argv[1];

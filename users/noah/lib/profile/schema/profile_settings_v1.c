@@ -2,6 +2,9 @@
 #include <string.h>
 
 bool noah_profile_setting_v1_valid(uint8_t id, uint32_t v, uint8_t layers) {
+#ifdef NOAH_PD_PROFILE_ENABLE
+    if (id >= NOAH_SETTING_DRAGSCROLL_DPI && id <= NOAH_SETTING_ARROW_DPI) return v == 0;
+#endif
     switch (id) {
         case NOAH_SETTING_FEEDBACK_PERIOD:
             return v > 0 && v <= 65535;
@@ -120,7 +123,7 @@ bool noah_profile_settings_v1_consume(noah_profile_settings_v1_validation_t *s, 
     if (!s || length < NOAH_SETTINGS_FIXED_SIZE + 32 || length > NOAH_SETTINGS_MAX_SIZE || s->offset >= length) return false;
     uint16_t offset = s->offset++;
     if (offset < 8) {
-        static const uint8_t header[8] = {1, 8, 28, 16, 0, 0, 0, 0};
+        static const uint8_t header[8] = {NOAH_SETTINGS_VERSION, 8, 28, 16, 0, 0, 0, 0};
         return b == header[offset];
     }
     if (offset < 8 + 28 * 4) {

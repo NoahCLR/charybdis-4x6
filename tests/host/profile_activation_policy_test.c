@@ -10,6 +10,14 @@
 #include "users/noah/lib/macro/macro_payload.h"
 #include "users/noah/lib/profile/runtime/profile_activation_policy.h"
 
+#ifdef NOAH_PD_PROFILE_ENABLE
+static uint8_t pd_active, pd_locked;
+static bool pd_pending_release;
+uint8_t pd_mode_local_active_snapshot(void) { return pd_active; }
+uint8_t pd_mode_local_locked_snapshot(void) { return pd_locked; }
+bool noah_pd_engine_pending_release(void) { return pd_pending_release; }
+#endif
+
 static noah_key_runtime_activity_snapshot_t   runtime_activity;
 static macro_payload_debug_snapshot_t         macro_activity;
 static noah_qmk_combo_origin_debug_snapshot_t combo_activity;
@@ -213,6 +221,28 @@ static void test_status_fails_closed_during_publication(void) {
     assert(evaluations == 99u);
 }
 
+#ifdef NOAH_PD_PROFILE_ENABLE
+static void test_configured_pd_blocks_until_release_and_does_not_wrap(void) {
+    noah_profile_activation_policy_t policy;
+    peer_fixture_t peer = {.succeeds = true};
+    reset_activity();
+    noah_profile_activation_policy_init(&policy, observe_peer, &peer);
+    for (uint8_t i = 0; i < 8; i++) {
+        pd_active = (uint8_t)(1u << i);
+        assert(noah_profile_activation_policy_safe_boundary(&policy) == NOAH_PROFILE_ACTIVATION_REASON_PERSISTENT_INTENT);
+        pd_active = 0; pd_locked = (uint8_t)(1u << i);
+        assert(noah_profile_activation_policy_safe_boundary(&policy) == NOAH_PROFILE_ACTIVATION_REASON_PERSISTENT_INTENT);
+        pd_locked = 0;
+    }
+    pd_pending_release = true;
+    assert(noah_profile_activation_policy_safe_boundary(&policy) == NOAH_PROFILE_ACTIVATION_REASON_PERSISTENT_INTENT);
+    runtime_activity.persistent_intent_count = UINT8_MAX;
+    assert(noah_profile_activation_policy_safe_boundary(&policy) == NOAH_PROFILE_ACTIVATION_REASON_PERSISTENT_INTENT);
+    runtime_activity.persistent_intent_count = 0; pd_pending_release = false;
+    assert(noah_profile_activation_policy_safe_boundary(&policy) == 0);
+}
+#endif
+
 int main(void) {
     test_reason_bits_are_exact_and_composable();
     test_runtime_capture_and_status();
@@ -220,6 +250,9 @@ int main(void) {
     test_evaluation_count_saturates();
     test_status_fails_closed_during_publication();
 
+#ifdef NOAH_PD_PROFILE_ENABLE
+    test_configured_pd_blocks_until_release_and_does_not_wrap();
+#endif
     puts("profile activation policy host tests passed");
     return 0;
 }

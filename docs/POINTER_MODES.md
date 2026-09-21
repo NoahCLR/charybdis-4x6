@@ -9,6 +9,36 @@ authored choices, see [KEYMAP.md](./KEYMAP.md). For the shared tap / hold /
 multi-tap model, see [INTERACTION_MODEL.md](./INTERACTION_MODEL.md) and the
 top-level [README](../README.md).
 
+The [eight-slot live PD-mode migration plan](architecture/live-pd-modes-plan.md)
+describes the implemented configurable replacement and the remaining hardware
+acceptance checks. Side-specific schema-2 firmware exposes eight slots in
+Charybdis Live → Pointing modes. The six defaults below are records in those
+slots, followed by two empty slots; their names do not select special code.
+
+Use an empty slot to create directional key/shortcut actions or a scrolling
+mode, or duplicate an existing slot. The normal path is name, movement type,
+DPI, then either four direction actions or scroll direction/modifiers. Direction
+actions and mouse-button shortcuts use the same keycode picker as Layout, so a
+plain key or modified key such as `G(KC_Z)` can be selected instead of typed.
+Choose **Keep mode**, assign the mode's hold or toggle action in Layout, set
+its color under RGB → Pointing modes, then review and
+Apply the draft. The layout key picker reads populated slots from the current
+draft, so a newly named mode appears immediately with its canonical hold and
+toggle actions.
+
+**Advanced** holds pointer-layer policy, active axes and thresholds, per-action
+modifier inheritance, scroll gesture ratios/timing and mouse-button overrides.
+Volume, brightness, zoom, arrow navigation, history shortcuts and
+modifier-assisted scrolling use the same facilities. Mouse buttons 1–3 can pass
+through, be consumed, tap a shortcut or hold modifiers. A slot with existing
+bindings must be unbound before clearing it.
+
+Macro programs, recursive mode/layer actions and arbitrary scripts are not
+motion outputs. Ordinary pointer movement and auto-sniping remain outside the
+slot bank. Dragscroll and Pinch use this repository's scroll implementation.
+Legacy/generic firmware retains the fixed six-mode system; installing the new
+pair requires the backup/migration procedure in the root README.
+
 ## Shared Rules
 
 Across the current pd-mode runtime:

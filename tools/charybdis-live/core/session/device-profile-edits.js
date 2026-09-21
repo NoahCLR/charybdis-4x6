@@ -1,4 +1,5 @@
 "use strict";
+const {encodePdDomain, decodePdDomain} = require("../schema/pd-mode-domain-v1");
 const {decodeProfileBlob, encodeProfileBlob, PROFILE_DOMAIN_IDS} = require("../schema/profile-blob-v1");
 const {decodeRgbDomainV1, encodeRgbDomainV1, RGB_LAYER_MODES, RGB_LOCALITIES, RGB_AUTOMOUSE_MODES, RGB_TAP_COMMIT_MODES, RGB_PD_MODE_IDS, RGB_KEY_SEMANTICS} = require("../schema/rgb-domain-v1");
 
@@ -9,6 +10,7 @@ const {actionName, knownActionAbi} = require("./device-profile-view");
 const {BEHAVIOR_EDITS, editKeyBehaviors} = require("./key-behavior-edits");
 const COMBO_EDITS = new Set(["addCombo", "saveCombo", "deleteCombo", "updateComboHoldTerm"]);
 
+const PD_EDITS = new Set(["savePdMode", "clearPdMode", "duplicatePdMode"]);
 const RGB_EDITS = new Set(["updateLayerColor", "updatePdModeColor", "updateAutomouseFade", "updateComboFeedback", "updateKeyBehaviorFeedback", "updateRgbStages", "saveRgbReusableLedGroup", "deleteRgbReusableLedGroup", "addRgbLedGroup", "deleteRgbLedGroup"]);
 const invalid = message => Object.assign(new Error(message), {code: "INVALID_PROFILE_EDIT"});
 function integer(value, max, label) {
@@ -42,6 +44,31 @@ function existing(rows, predicate, label) {
 }
 
 function editDeviceProfile(bytes, message, context = {}) {
+    if (PD_EDITS.has(message.type)) {
+        if (!(context.capabilities?.supportedDomainMask & 16)) throw invalid("PD editing needs firmware with eight configurable slots.");
+        const profile = decodeProfileBlob(bytes);
+        if (profile.schema.major !== 2) throw invalid("Upgrade this profile before editing modes.");
+        const domain = existing(profile.domains, row => row.id === 80, "Pointing modes");
+        const slots = decodePdDomain(domain.payload), id = integer(message.slot, 7, "Slot");
+        if (message.type === "clearPdMode") slots[id] = {id, kind: 0, name: ""};
+        else if (message.type === "duplicatePdMode") {
+            const source = integer(message.source, 7, "Source slot");
+            if (slots[id].kind || !slots[source].kind || id === source) throw invalid("Choose a configured source and an empty destination slot.");
+            slots[id] = {...slots[source], id};
+        } else slots[id] = {...structuredClone(message.config), id};
+        const keyValues = {};
+        for (const entry of keycodes.entries()) for (const name of [entry.name, ...entry.aliases]) keyValues[name] = entry.value;
+        const convertTap = tap => {
+            if (!tap || typeof tap.keycode !== "string") return;
+            const native = resolveNativeQmkExpression(tap.keycode, {qmkKeycodeValues: keyValues});
+            if (native === undefined) throw invalid(`Unknown PD shortcut: ${tap.keycode}`);
+            tap.keycode = native;
+        };
+        Object.values(slots[id].directions || {}).forEach(convertTap);
+        slots[id].buttons?.forEach(button => convertTap(button.tap));
+        domain.payload = encodePdDomain(slots);
+        return encodeProfileBlob(profile);
+    }
     if (COMBO_EDITS.has(message.type)) return editCombos(bytes, message, context);
     if (BEHAVIOR_EDITS.has(message.type)) {
         const profile = decodeProfileBlob(bytes);
@@ -117,7 +144,8 @@ function editCombos(bytes, message, context) {
     const profile = decodeProfileBlob(bytes);
     let domain = profile.domains.find(row => row.id === PROFILE_DOMAIN_IDS.COMBOS);
     const nativeAction = operand => ({kind: 1, operand});
-    const rows = domain ? decodeComboDomainV1(domain.payload) : read.rows.map(row => ({...row, output: nativeAction(row.output), inputs: row.inputs.map(nativeAction)}));
+    const actionOptions = {actionLimits: {maxPdModes: profile.schema.major === 2 ? 8 : 6}};
+    const rows = domain ? decodeComboDomainV1(domain.payload, actionOptions) : read.rows.map(row => ({...row, output: nativeAction(row.output), inputs: row.inputs.map(nativeAction)}));
     const expression = value => {
         const name = String(value).trim();
         if (/^MO\(/.test(name)) return semanticActionForExpression(name, {});
@@ -137,19 +165,20 @@ function editCombos(bytes, message, context) {
         if (message.type === "saveCombo") rows[integer(message.id, rows.length - 1, "Combo index")] = row;
         else rows.push(row);
     }
-    const payload = encodeComboDomainV1(rows);
+    const payload = encodeComboDomainV1(rows, actionOptions);
     if (domain) domain.payload = payload;
     else profile.domains.push({id: PROFILE_DOMAIN_IDS.COMBOS, version: 1, payload});
     return encodeProfileBlob(profile);
 }
 
 function assertEffectiveCombos(bytes, read) {
-    const domain = decodeProfileBlob(bytes).domains.find(row => row.id === PROFILE_DOMAIN_IDS.COMBOS);
+    const profile = decodeProfileBlob(bytes);
+    const domain = profile.domains.find(row => row.id === PROFILE_DOMAIN_IDS.COMBOS);
     if (!domain) return;
     if (read?.state !== "read") throw invalid("The profile was saved, but the running combos could not be verified. Read from keyboard before retrying.");
     const native = action => action.kind === 1 ? action.operand : resolveNativeQmkExpression(actionName(action), {});
-    const expected = decodeComboDomainV1(domain.payload).map(row => ({...row, inputs: row.inputs.map(native), output: native(row.output)}));
+    const expected = decodeComboDomainV1(domain.payload, {actionLimits: {maxPdModes: profile.schema.major === 2 ? 8 : 6}}).map(row => ({...row, inputs: row.inputs.map(native), output: native(row.output)}));
     if (expected.length !== read.rows.length || expected.some((row, index) => { const actual = read.rows[index]; return ["id", "output", "termMs", "holdTermMs", "mustHold", "mustTap", "ordered"].some(key => row[key] !== actual[key]) || JSON.stringify(row.inputs) !== JSON.stringify(actual.inputs); })) throw invalid("The saved combo profile does not match the running combo table. Flash the current firmware pair and read from keyboard again.");
 }
 
-module.exports = {RGB_EDITS, COMBO_EDITS, editDeviceProfile, assertEffectiveCombos};
+module.exports = {PD_EDITS, RGB_EDITS, COMBO_EDITS, editDeviceProfile, assertEffectiveCombos};

@@ -111,7 +111,7 @@ static bool transfer_shape_valid(const noah_profile_split_v1_frame_t *frame) {
 }
 
 static bool logical_bind_shape_valid(const noah_profile_split_v1_frame_t *frame) {
-    return frame && descriptor_zero(&frame->descriptor) && frame->status == NOAH_PROFILE_SPLIT_V1_STATUS_OK && frame->generation != 0u && frame->payload_digest != 0u && frame->offset == 0u && frame->payload_length == 0u && frame->chunk_length == 0u && bytes_zero(frame->chunk, sizeof(frame->chunk)) && frame->store_format_version == NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL && frame->via_generation != 0u && frame->via_digest != 0u;
+    return frame && descriptor_zero(&frame->descriptor) && frame->status == NOAH_PROFILE_SPLIT_V1_STATUS_OK && frame->generation != 0u && frame->payload_digest != 0u && frame->offset == 0u && frame->payload_length == 0u && frame->chunk_length == 0u && bytes_zero(frame->chunk, sizeof(frame->chunk)) && frame->store_format_version == NOAH_PROFILE_LOGICAL_STORE_VERSION && frame->via_generation != 0u && frame->via_digest != 0u;
 }
 
 static bool logical_bind_request_shape_valid(const noah_profile_split_v1_frame_t *frame) {

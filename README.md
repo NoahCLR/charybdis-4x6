@@ -54,6 +54,56 @@ hours of useful firmware and hardware tinkering. If you want to support the
 creator, buy the hardware from [BastardKB](https://bastardkb.com/) rather than
 from a knockoff seller.
 
+## Configurable pointing modes
+
+The live editor now has **Pointing modes** with eight slots and eight matching
+RGB configurations. Dragscroll, Volume, Brightness, Zoom, Arrow and Pinch occupy
+the first six slots; the remaining two start empty. Create directional key or
+shortcut actions with the shared keycode picker, duplicate a mode, or configure
+scrolling with optional held modifiers. The everyday flow shows name, movement,
+DPI and actions; pointer policy, thresholds, timing, modifier rules and mouse
+buttons are under **Advanced**. Keep changes in the shared draft, bind its
+hold/toggle action, set RGB, then review and Apply. See
+[Pointer modes](docs/POINTER_MODES.md).
+
+**Upgrade existing keyboards through verified backup and restore.** The new
+firmware changes EEPROM geometry; flashing it directly can lose the old profile.
+
+1. Export your complete current profile and retain the original firmware pair.
+2. Build an old-geometry readback bridge with `NOAH_PD_PROFILE=no` for each
+   physical half, using the same authored configuration as the old firmware.
+   It retains the old ABI/geometry and reports compiled PD tuning. For a
+   five-layer source, also use `NOAH_LEGACY_SNAPSHOT_BRIDGE=yes`.
+3. On that bridge, choose **Export PD upgrade** in Charybdis Live. It saves and
+   verifies the original and a sibling `.pd8.charybdis.json` profile. Do not
+   proceed without both files. Missing source tuning is rejected, never guessed.
+4. Build the new side-specific pair (default `NOAH_PD_PROFILE=yes`), install it
+   on both halves, import the `.pd8.charybdis.json` file, review and Apply.
+   Read back and export again, then check all six original modes and both halves.
+
+Use `sh tools/build-firmware-pair.sh --pd-snapshot-bridge` for the eight-layer
+readback bridge and `sh tools/build-firmware-pair.sh` for the new pair.
+Alternatively, add `-e NOAH_PD_PROFILE=no` to each side-specific `qmk compile`
+command for the bridge. The new right build uses `-e NOAH_PHYSICAL_HALF=right -e FORCE_MASTER=yes`;
+the left uses `-e NOAH_PHYSICAL_HALF=left -e FORCE_SLAVE=yes`. A generic build
+without a provisioned half does not include the live profile owner.
+Downgrading likewise requires restoring the original backup on the original
+firmware geometry. Keep the bridge paired with its matching authored source;
+using different compiled tuning cannot recover the original tuning.
+
+Implementation and automated verification are in place. Physical migration,
+power-interruption, pointing cadence and allocator/stack high-water acceptance
+remain release gates; this work does not flash a keyboard automatically. The
+[implementation plan](docs/architecture/live-pd-modes-plan.md) records progress.
+
+The first PD pair (`1_charybdis_right.uf2` / `1_charybdis_left.uf2`) produced
+startup freezes and repeated startup lighting on hardware before profile import.
+The corrected reader avoids repeatedly serializing the full default profile
+while warming the PD cache. The second pair fixed startup, but its settings
+validator still rejected settings-v2 imports. Use the corrected
+`3_charybdis_right.uf2` / `3_charybdis_left.uf2` pair (or a newer rebuild); the schema,
+storage geometry and exported `.pd8.charybdis.json` backup remain unchanged.
+
 ## What This Userspace Is For
 
 This repo is my Charybdis 4x6 userspace and profile. The interesting part is
@@ -268,9 +318,9 @@ through a vendored catalog rather than the source files.
 
 It also reads the custom profile payload and displays its RGB configuration
 and key behaviours. When nothing is committed, it reads the flashed firmware's
-compiled defaults from the keyboard and labels them accordingly. The
-**Behaviours** tab lists every returned row, including timing, tap branches,
-hold modes, and auto-mouse anchoring. **RGB** shows colours, LED groups, and
+compiled defaults from the keyboard and labels them accordingly. Select a key
+in **Layout** to inspect and edit its timing, tap branches, hold modes and
+auto-mouse anchoring. **RGB** shows colours, LED groups, and
 enabled stages. A timing value of zero means the firmware default; the default
 duration is not reported. Unknown keycodes remain numeric instead of borrowing
 names from the source files.
@@ -304,7 +354,7 @@ and combo saves, including the picker's short spellings.
 Auto-mouse fade follows the underlying colours in its default mode; the chosen
 end colour is used only by the other two modes. The static preview does not
 animate timeout fades. Behaviour rows can be added, edited and deleted from
-the layout or Behaviours view, including tap branches, hold actions, timing,
+the selected key in Layout, including tap branches, hold actions, timing,
 repeat rates and the auto-mouse anchor flag. Saves preserve other rows and
 domains and verify the committed payload. Unsaved behaviour edits stay with
 their row when switching views; a changed profile blocks a stale save and a
@@ -637,6 +687,10 @@ Use the docs based on what you want to change:
   longer-hold, and multi-tap semantics
 - [`docs/POINTER_MODES.md`](./docs/POINTER_MODES.md): what each trackball mode
   does once active
+- [`docs/architecture/live-pd-modes-plan.md`](./docs/architecture/live-pd-modes-plan.md):
+  migration plan and progress toward eight live-configurable PD slots and matching RGB settings
+- [`docs/architecture/pd-mode-domain-v1.md`](./docs/architecture/pd-mode-domain-v1.md):
+  eight-slot wire contract, schema/ABI migration and capacity checks
 - [`docs/RGB_CONFIG.md`](./docs/RGB_CONFIG.md): RGB authoring model, render
   order, LED groups, and auto-mouse fade
 - [`docs/ADDING_PD_MODE.md`](./docs/ADDING_PD_MODE.md): maintainer guide for

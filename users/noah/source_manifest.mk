@@ -10,6 +10,7 @@ NOAH_COMMON_SOURCES := \
     lib/profile/schema/profile_blob_v1.c \
     lib/profile/schema/profile_combo_v1.c \
     lib/profile/schema/profile_settings_v1.c \
+    lib/profile/schema/profile_pd_v1.c \
     lib/profile/schema/profile_reader.c \
     lib/profile/schema/key_behavior_domain_v1.c \
     lib/profile/schema/profile_rgb_v1.c \
@@ -21,6 +22,7 @@ NOAH_COMMON_SOURCES := \
     lib/profile/runtime/effective_rgb_runtime.c \
     lib/profile/runtime/effective_combo_runtime.c \
     lib/profile/runtime/effective_settings_runtime.c \
+    lib/profile/runtime/effective_pd_runtime.c \
     lib/compat/qmk_portable_profile.c \
     lib/compat/qmk_portable_editor.c \
     lib/profile/runtime/profile_activation_policy.c \
@@ -125,6 +127,7 @@ NOAH_COMMON_SOURCES := \
     lib/rgb/core/rgb_validation.c
 
 NOAH_POINTING_SOURCES := \
+    lib/pointing/modes/pd_mode_configured.c \
     lib/pointing/runtime/pd_runtime.c \
     lib/pointing/runtime/pd_mode_snapshot.c \
     lib/pointing/runtime/pd_mode_key_runtime_bridge.c \
@@ -149,3 +152,6 @@ NOAH_LIVE_PROFILE_OWNER_SOURCES := \
 
 NOAH_RGB_KEYMAP_SOURCES := \
     $(KEYMAP_PATH)/rgb_config.c
+
+NOAH_PROFILE_KEYMAP_SOURCES := \
+    $(KEYMAP_PATH)/pd_config.c

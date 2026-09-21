@@ -5,9 +5,10 @@ BUILD_DIR="$(mktemp -d)"
 trap 'rm -rf "$BUILD_DIR"' EXIT INT TERM
 . "$ROOT/tests/host/noah_host_qmk_env.sh"
 noah_host_export_qmk_cpath "$ROOT"
-for variant in normal sanitized; do
+for variant in normal sanitized configured configured_sanitized; do
     flags=""
-    if [ "$variant" = sanitized ]; then flags="-fsanitize=address,undefined -fno-omit-frame-pointer"; fi
+    case "$variant" in *sanitized) flags="-fsanitize=address,undefined -fno-omit-frame-pointer";; esac
+    case "$variant" in configured*) flags="$flags -DNOAH_PD_PROFILE_ENABLE";; esac
     cc -std=c11 -Wall -Wextra -Werror -pedantic $flags -DNOAH_PORTABLE_PROFILE_ENABLE -DQMK_KEYBOARD_H='"qmk_stub.h"' \
         -I"$ROOT" -I"$ROOT/users/noah" -I"$ROOT/tests/host/include" \
         "$ROOT/tests/host/profile_settings_v1_test.c" \

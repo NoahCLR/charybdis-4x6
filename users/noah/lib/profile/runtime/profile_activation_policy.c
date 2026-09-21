@@ -1,3 +1,7 @@
+#ifdef NOAH_PD_PROFILE_ENABLE
+#    include "../../pointing/defs/pd_modes.h"
+#    include "../../pointing/modes/pd_mode_configured.h"
+#endif
 // ───────────────────────────────────────────────────────────────────────────
 // Live-Profile Activation Safety Policy
 // ───────────────────────────────────────────────────────────────────────────
@@ -45,6 +49,13 @@ static void capture_runtime(noah_profile_activation_snapshot_t *snapshot) {
         .combo_pending_count = combo.pending_count,
         .combo_active_count  = combo.active_count,
     };
+#ifdef NOAH_PD_PROFILE_ENABLE
+    // Retain the existing wire reason: a configured mode is persistent intent
+    // until its lock/hold and any consumed button releases have drained.
+    if (pd_mode_local_active_snapshot() || pd_mode_local_locked_snapshot() || noah_pd_engine_pending_release()) {
+        if (snapshot->persistent_intent_count != UINT8_MAX) snapshot->persistent_intent_count++;
+    }
+#endif
 }
 
 void noah_profile_activation_policy_init(noah_profile_activation_policy_t *policy, noah_profile_activation_peer_observer_fn peer_observer, void *peer_context) {

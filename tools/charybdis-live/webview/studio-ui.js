@@ -22,6 +22,7 @@ const {renderProfileDraft} = require("./profile-draft-ui");
 const {renderDeviceProfileDetails} = require("./device-profile-ui");
 const {createBehaviorDraftStore} = require("./behavior-drafts");
 const {createSettingsDraftStore} = require("./settings-drafts");
+const {pointingModePickerRows, renderPdModes} = require("./pd-mode-ui");
 const {renderDeviceCombos} = require("./combo-ui");
 const {combosForLayerPreview} = require("./combo-preview");
 const {layoutKeyKind, layerPreviewPaint, composedLayerPreviewPaint, baseEffectPreviewNote} = require("./layer-preview");
@@ -2327,6 +2328,8 @@ ${renderDeviceProfileDetails.toString()}
 ${createBehaviorDraftStore.toString()}
 ${createSettingsDraftStore.toString()}
 ${renderDeviceCombos.toString()}
+${renderPdModes.toString()}
+${pointingModePickerRows.toString()}
 ${combosForLayerPreview.toString()}
 ${layoutKeyKind.toString()}
 ${layerPreviewPaint.toString()}
@@ -2407,8 +2410,8 @@ function getClientScript() {
     const tapCountNames = ${JSON.stringify(TAP_COUNT_NAMES)};
     const views = [
         ["layout", "Layout"],
-        ["behaviors", "Behaviours"],
         ["macros", "Macros"],
+        ["pdModes", "Pointing modes"],
         ["rgb", "RGB"],
         ["defaults", "Defaults"]
     ];
@@ -2432,7 +2435,6 @@ function getClientScript() {
         layout: "Edit layer keys and behavior rows using the physical keyboard layout as the filter.",
         macros: "Build, record, preview, and save macros on the keyboard.",
         rgb: "Inspect layer colours, feedback, locality, and LED groups read from the keyboard.",
-        behaviors: "Inspect every key behaviour row read from the keyboard.",
         combos: "Inspect the combo definitions and timing reported by the keyboard.",
         defaults: "Edit the keyboard’s timing, pointer speed, auto-mouse and lighting settings."
     };
@@ -2466,7 +2468,6 @@ function getClientScript() {
         deleteSelectedBehavior: "Remove this behaviour row from both halves. The key then uses its normal action.",
         editComboOutputBehavior: "Load this combo output keycode into the behavior editor so its key_behaviors[] row can be created or edited.",
         editLayoutCombo: "Load this existing combo into the combo builder so its output or physical input keys can be edited.",
-        addBehavior: "Add this behaviour to both keyboard halves and verify the readback.",
         updateLayerColor: "Save these settings to both keyboard halves and verify the readback.",
         updatePdModeColor: "Save these settings to both keyboard halves and verify the readback.",
         updateAutomouseFade: "Save these settings to both keyboard halves and verify the readback.",
@@ -2509,7 +2510,6 @@ function getClientScript() {
     const writeActions = new Set([
         "applyKey",
         "saveSelectedBehavior",
-        "addBehavior",
         "updateLayerColor",
         "updatePdModeColor",
         "updateAutomouseFade",
@@ -3450,8 +3450,6 @@ function getClientScript() {
             if (groups.length) {
                 post({ type: "updateLayoutKeys", layers: groups });
             }
-        } else if (action === "addBehavior") {
-            post({ type: "addBehavior", behavior: readBehaviorForm() });
         } else if (action === "saveSelectedBehavior") {
             post({ type: "saveBehavior", behavior: readSelectedBehaviorForm() });
         } else if (action === "deleteSelectedBehavior") {
@@ -4779,13 +4777,6 @@ function getClientScript() {
     }
 
     function post(message) {
-        if (message.type === "editBehavior") {
-            if (!model.keyBehaviors.some(row => row.keycode === message.keycode)) return;
-            storeActiveViewDraft();
-            activeView = "behaviors";
-            activeBehaviorKeycode = message.keycode;
-            render(); document.querySelector(".selected-behavior-editor")?.scrollIntoView({block: "start"}); return;
-        }
         if (message.type === "editComboInLayout") {
             const combo = model.combos.find(row => row.id === message.id);
             if (combo) loadLayoutComboIntoBuilder(combo);
@@ -4799,7 +4790,7 @@ function getClientScript() {
             message.draftSection = draftSectionKey(document.activeElement);
             if (["reviewProfileDraft", "applyProfileDraft", "undoProfileDraft", "redoProfileDraft", "rebaseProfileDraft"].includes(message.type) || message.reviewAfter) {
                 storeActiveViewDraft();
-                if (["behaviors", "rgb", "macros", "defaults"].some(viewTabDirty) || (!message.reviewAfter && layoutViewHasUnsavedChanges())) {
+                if (hasBehaviorDrafts() || ["rgb", "macros", "defaults", "pdModes"].some(viewTabDirty) || (!message.reviewAfter && layoutViewHasUnsavedChanges())) {
                     notice = "Keep or discard your unfinished form edits before reviewing or changing the profile draft.";
                     dismissedStatusSignature = ""; render(); return;
                 }
@@ -4807,7 +4798,7 @@ function getClientScript() {
         }
         if (message.type === "refresh") {if (!model?.draft) {behaviorDrafts.clear(); viewDrafts = {};}}
         else storeActiveViewDraft();
-        if (["choosePortableProfile", "managePortableLayers", "restorePortableProfile", "savePortableLayers"].includes(message.type) && ["layout", "behaviors", "rgb", "macros", "defaults"].some(viewTabDirty)) {
+        if (["choosePortableProfile", "managePortableLayers", "restorePortableProfile", "savePortableLayers"].includes(message.type) && ["layout", "rgb", "macros", "defaults", "pdModes"].some(viewTabDirty)) {
             notice = "Save or discard your current edits before importing a profile or changing layer priority.";
             dismissedStatusSignature = ""; render(); return;
         }
@@ -4886,8 +4877,9 @@ function getClientScript() {
         app.innerHTML = renderDiagnostics() + renderViewTabs() + renderActiveView();
         syncAutoMousePolicy();
         renderPortableProfile(document, model, post);
-        renderDeviceProfileDetails(document, model, post, displayKeyExpression);
+        renderDeviceProfileDetails(document, model);
         renderDeviceCombos(document, model, post);
+        renderPdModes(document, model, post, {open: openKeyPicker, canonicalize: canonicalLayoutKeyExpression});
         const reload = document.getElementById("reload");
         if (model.draft && reload) {
             reload.disabled = Boolean(model.draft.busy);
@@ -5099,7 +5091,7 @@ function getClientScript() {
         }
         restoringLocalSnapshot = true;
         try {
-            activeView = state.activeView || activeView;
+            activeView = views.some(([id]) => id === state.activeView) ? state.activeView : "layout";
             activeLayer = state.activeLayer || activeLayer;
             selectedKey = Number.isInteger(state.selectedKey) ? state.selectedKey : selectedKey;
             activeBehaviorKeycode = state.activeBehaviorKeycode || "";
@@ -5160,6 +5152,9 @@ function getClientScript() {
     }
 
     function refreshRestoredLocalState() {
+        for (const form of document.querySelectorAll("#pdModes form")) {
+            form.dispatchEvent(new Event("restore-pd-controls"));
+        }
         for (const select of document.querySelectorAll("[data-helper-select]")) {
             updateHelperFields(select.id.replace(/Helper$/, ""));
         }
@@ -5851,7 +5846,7 @@ function getClientScript() {
     function viewTabDirty(viewId) {
         if (viewHasDirtyDomSection(viewId)) return true;
         if (viewDrafts[viewId]?.dirty) return true;
-        if (viewId === "behaviors" && behaviorDrafts.keys().some(key => JSON.parse(key)[0] === model?.activeProfile?.id)) return true;
+        if (viewId === "layout" && hasBehaviorDrafts()) return true;
         if (viewId === "defaults" && settingsDrafts.keys().some(key => JSON.parse(key)[0] === model?.activeProfile?.id)) return true;
         if (viewId === "layout") return layoutViewHasUnsavedChanges();
         if (viewId === "macros") return macroViewHasUnsavedChanges();
@@ -5865,6 +5860,10 @@ function getClientScript() {
 
     function layoutViewHasUnsavedChanges() {
         return Boolean(hasPendingLayerChanges() || pendingLayoutChangeCount());
+    }
+
+    function hasBehaviorDrafts() {
+        return behaviorDrafts.keys().some(key => JSON.parse(key)[0] === model?.activeProfile?.id);
     }
 
     function macroViewHasUnsavedChanges() {
@@ -5882,12 +5881,7 @@ function getClientScript() {
     }
 
     function renderActiveView() {
-        if (activeView === "behaviors") {
-            const row = behaviorForKey(activeBehaviorKeycode);
-            return "<section id='deviceBehaviors' class='panel'></section>" +
-                (row ? renderSelectedBehaviorEditor({keycode: row.keycode}, row) : "") +
-                "<details class='panel'><summary>Add a behaviour</summary>" + renderBehaviorForm() + "</details>";
-        }
+        if (activeView === "pdModes") return "<section id='pdModes' class='panel'></section>";
         if (activeView === "macros") return renderMacroStudio();
         if (activeView === "rgb") return renderRgbStudio();
         if (activeView === "defaults") return renderDefaultsStudio();
@@ -6193,6 +6187,18 @@ function getClientScript() {
             keyPicker.keys = [layerTap[2].trim()];
             return;
         }
+        let wrapped = canonicalLayoutKeyExpression(text), wrappedModifiers = [];
+        for (;;) {
+            const call = wrapped.match(/^([A-Z][A-Z0-9_]*)\((.+)\)$/), labels = call && modWrapperLabels[call[1]];
+            if (!call || !labels) break;
+            wrappedModifiers = wrappedModifiers.concat(labels);
+            wrapped = call[2].trim();
+        }
+        if (wrappedModifiers.length) {
+            keyPicker.mods = [...new Set(wrappedModifiers)];
+            keyPicker.keys = [wrapped];
+            return;
+        }
         const parts = text.split("+").map((part) => part.trim()).filter(Boolean);
         if (parts.length > 1) {
             const mods = parts.slice(0, -1).filter((part) => keyPickerModifiers.includes(part));
@@ -6293,10 +6299,9 @@ function getClientScript() {
                 };
             }
             if (section.id === "modes") {
-                const modes = (model.rgb?.pdModeColors || []).map((row) => row.pointingMode.replace(/^PD_MODE_/, ""));
                 return {
                     ...section,
-                    rows: modes.map((mode) => [mode + "_MODE", mode + "_MODE_LOCK"])
+                    rows: pointingModePickerRows(model)
                 };
             }
             if (section.id === "macros") {
@@ -7861,41 +7866,6 @@ function getClientScript() {
         return (model.rgb?.pdModeColors || []).find((row) => row.pointingMode === mode);
     }
 
-    function renderBehaviorStudio() {
-        return panel("Behavior Builder",
-            renderBehaviorForm() +
-            "<h3 style='margin-top: 14px'>Existing rows</h3>" +
-            "<table><thead><tr><th>Keycode</th><th>Steps</th></tr></thead><tbody>" +
-            model.keyBehaviors.map((row) =>
-                "<tr><td>" + escapeHtml(displayAction(row.keycode)) + "<br><code class='muted'>" + escapeHtml(row.keycode) + "</code></td><td>" + row.steps.map(renderStep).join("<br>") + "</td></tr>"
-            ).join("") +
-            "</tbody></table>",
-            true
-        );
-    }
-
-    function renderBehaviorForm() {
-        const writable = model.behaviorEditing?.writable && !behaviorSavePending && !behaviorDrafts.stale(behaviorDraftKey("new"), model.profileIdentity);
-        return "<div class='card' data-dirty-section data-behavior-draft='new'>" +
-            "<h3>New behaviour</h3><p class='muted'>Choose a key and its first tap and hold actions. After saving, use Edit behaviour to add repeated-tap branches.</p>" +
-            behaviorDraftNotice("new") +
-            "<div class='form-grid'>" +
-            "<label><span>Key</span><input id='behaviorKeycode' data-validate='layout-key' placeholder='A'></label>" +
-            renderTimingInput("behaviorTapHoldTerm", "tap_hold_term", "", "") +
-            renderActionInputs("tap", "Tap", ["", "TAP_SENDS"]) +
-            renderActionInputs("hold", "Hold", ["", "PRESS_AND_HOLD_UNTIL_RELEASE", "TAP_AT_HOLD_THRESHOLD", "TAP_ON_RELEASE_AFTER_HOLD", "REPEAT_WHILE_HELD"]) +
-            renderActionInputs("longHold", "Long hold", ["", "PRESS_AND_HOLD_UNTIL_RELEASE", "TAP_AT_HOLD_THRESHOLD", "TAP_ON_RELEASE_AFTER_HOLD", "REPEAT_WHILE_HELD"]) +
-            "<button data-action='addBehavior' data-dirty-button class='primary'" + (writable ? "" : " disabled data-write-unavailable") + ">Add behaviour</button>" +
-            "</div></div>";
-    }
-
-    function renderActionInputs(prefix, label, helpers) {
-        const hasRepeat = helpers.includes("REPEAT_WHILE_HELD");
-        return renderHelperControl(prefix, label, helpers, "") +
-            renderKeyPickerInput(prefix + "Action", label + " action", "", "Esc, Shift+\`, Cmd+Q", "single", "", "data-helper-action-prefix='" + escapeAttr(prefix) + "' hidden", "data-validate='layout-key'") +
-            (hasRepeat ? "<label data-helper-field data-helper-prefix='" + prefix + "' data-helper-value='REPEAT_WHILE_HELD' hidden><span>" + label + " repeat Hz</span><input id='" + prefix + "Repeat' data-validate='positive-int' inputmode='numeric' placeholder='only for REPEAT_WHILE_HELD'></label>" : "");
-    }
-
     function renderStep(step) {
         const parts = [];
         if (step.tap) parts.push("tap " + actionText(step.tap));
@@ -7930,16 +7900,6 @@ function getClientScript() {
         if (!marked) return "";
         if ("value" in marked) return marked.value || "";
         return marked.querySelector("input, select, textarea")?.value || "";
-    }
-
-    function readBehaviorForm() {
-        return {
-            keycode: canonicalLayoutKeyExpression(document.getElementById("behaviorKeycode").value),
-            tapHoldTerm: document.getElementById("behaviorTapHoldTerm").value,
-            tap: readAction("tap"),
-            hold: readAction("hold"),
-            longHold: readAction("longHold")
-        };
     }
 
     // Preserve the device flag if a control is absent during a view transition.
@@ -8713,7 +8673,7 @@ function getClientScript() {
 
     function renderPdColorCard(row) {
         return "<details class='card rgb-subsection collapsible-card' data-dirty-section data-mode='" + escapeAttr(row.pointingMode) + "'>" +
-            renderRgbConfigSummary(row.pointingMode, row.color, row.locality, {
+            renderRgbConfigSummary((model.pdModes || []).find(slot => ["PD_MODE_DRAGSCROLL", "PD_MODE_VOLUME", "PD_MODE_BRIGHTNESS", "PD_MODE_ZOOM", "PD_MODE_ARROW", "PD_MODE_PINCH", "PD_MODE_SLOT_6", "PD_MODE_SLOT_7"][slot.id] === row.pointingMode)?.name || row.pointingMode, row.color, row.locality, {
                 summaryTooltip: "Pointing-mode feedback color for " + row.pointingMode + ". Click to edit HSV color and locality for this active mode."
             }) +
             "<div class='rgb-subsection-body'>" +

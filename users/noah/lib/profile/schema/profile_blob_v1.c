@@ -11,7 +11,11 @@
 #include "../storage/profile_storage_layout.h"
 
 static const uint8_t profile_magic[4]      = {'N', 'L', 'P', '1'};
-static const uint8_t ordered_domain_ids[4] = {NOAH_PROFILE_DOMAIN_V1_RGB, NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIORS, NOAH_PROFILE_DOMAIN_V1_COMBOS, NOAH_PROFILE_DOMAIN_V1_SETTINGS};
+static const uint8_t ordered_domain_ids[] = {NOAH_PROFILE_DOMAIN_V1_RGB, NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIORS, NOAH_PROFILE_DOMAIN_V1_COMBOS, NOAH_PROFILE_DOMAIN_V1_SETTINGS
+#ifdef NOAH_PD_PROFILE_ENABLE
+, NOAH_PROFILE_DOMAIN_V1_PD
+#endif
+};
 
 static void write_u16(uint8_t *target, uint16_t value) {
     target[0] = (uint8_t)value;
@@ -45,11 +49,19 @@ static noah_profile_codec_v1_result_t fail(noah_profile_codec_v1_error_t *error,
 }
 
 static bool domain_version_is_known(uint8_t id, uint8_t version) {
-    return (id == NOAH_PROFILE_DOMAIN_V1_SETTINGS && version == 1u) || (id == NOAH_PROFILE_DOMAIN_V1_COMBOS && version == 1u) || (id == NOAH_PROFILE_DOMAIN_V1_RGB && version == NOAH_PROFILE_DOMAIN_V1_RGB_VERSION) || (id == NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIORS && version == NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIOR_VERSION);
+    return
+#ifdef NOAH_PD_PROFILE_ENABLE
+        (id == NOAH_PROFILE_DOMAIN_V1_PD && version == 1u) ||
+#endif
+        (id == NOAH_PROFILE_DOMAIN_V1_SETTINGS && version == NOAH_PROFILE_SETTINGS_VERSION) || (id == NOAH_PROFILE_DOMAIN_V1_COMBOS && version == 1u) || (id == NOAH_PROFILE_DOMAIN_V1_RGB && version == NOAH_PROFILE_DOMAIN_V1_RGB_VERSION) || (id == NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIORS && version == NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIOR_VERSION);
 }
 
 static bool domain_id_is_known(uint8_t id) {
-    return id == NOAH_PROFILE_DOMAIN_V1_SETTINGS || id == NOAH_PROFILE_DOMAIN_V1_COMBOS || id == NOAH_PROFILE_DOMAIN_V1_RGB || id == NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIORS;
+    return
+#ifdef NOAH_PD_PROFILE_ENABLE
+        id == NOAH_PROFILE_DOMAIN_V1_PD ||
+#endif
+        id == NOAH_PROFILE_DOMAIN_V1_SETTINGS || id == NOAH_PROFILE_DOMAIN_V1_COMBOS || id == NOAH_PROFILE_DOMAIN_V1_RGB || id == NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIORS;
 }
 
 static noah_profile_codec_v1_result_t validate_domain(const noah_profile_domain_v1_t *domain, uint8_t domain_index, noah_profile_codec_v1_error_t *error) {

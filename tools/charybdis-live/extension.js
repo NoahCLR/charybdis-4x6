@@ -14,7 +14,7 @@
 
 const vscode = require("vscode");
 
-const {validateSnapshot, summary, reorderLayers} = require("./core/session/portable-profile-session");
+const {upgradePdSnapshot, validateSnapshot, summary, reorderLayers} = require("./core/session/portable-profile-session");
 const {ProfileDeviceService} = require("./core/session/profile-device-service");
 const {ProfileDraftSession, DRAFT_EDITS} = require("./core/session/profile-draft-session");
 const {buildDeviceModel} = require("./core/session/device-model");
@@ -97,6 +97,7 @@ function publish(panel, session) {
         available: state.connected && [5, 8].includes(state.capabilities?.compiledLayerCount) && (state.capabilities?.supportedDomainMask & 15) === 15,
         eightLayers: state.capabilities?.compiledLayerCount === 8,
         legacy: state.capabilities?.compiledLayerCount === 5,
+        pdUpgradeAvailable: Boolean(state.capabilities?.featureFlags & (1 << 13)),
         busy: state.busy || session.portableBusy,
         progress: state.portableProgress,
         review: session.portableReview ? {incoming: summary(session.portableReview.document), current: session.portableReview.before.summary} : null,
@@ -141,6 +142,7 @@ async function handleMessage(panel, session, message) {
             return;
         }
         switch (message?.type) {
+            case "exportPdUpgrade":
             case "exportPortableProfile":
             case "choosePortableProfile":
             case "restorePortableProfile":
@@ -385,6 +387,23 @@ async function portableMessage(panel, session, message) {
         const saveRecovery = document => saveRecoveryFile(session, document);
         if (message.type === "cancelPortableReview") {
             session.portableReview = undefined; session.portableLayers = undefined;
+        } else if (message.type === "exportPdUpgrade") {
+            const snapshot = await service.readPortableProfile(), upgraded = upgradePdSnapshot(snapshot.document);
+            const uri = await vscode.window.showSaveDialog({title: "Save original profile and PD upgrade", saveLabel: "Save both profiles", filters: {"Charybdis profile": ["charybdis.json"]}});
+            if (uri) {
+                const next = uri.with({path: uri.path.replace(/(?:\.charybdis)?\.json$/i, "") + ".pd8.charybdis.json"});
+                let exists = false;
+                try {await vscode.workspace.fs.stat(next); exists = true;} catch (error) {if (error.code !== "FileNotFound") throw error;}
+                if (exists || next.toString() === uri.toString()) throw new Error("The upgraded backup path already exists. Choose a new backup name.");
+                for (const [target, value] of [[uri, snapshot.document], [next, upgraded]]) {
+                    const bytes = Buffer.from(JSON.stringify(value, null, 2) + "\n");
+                    await vscode.workspace.fs.writeFile(target, bytes);
+                    const verified = Buffer.from(await vscode.workspace.fs.readFile(target));
+                    if (!verified.equals(bytes)) throw new Error("Backup verification failed. Keep the existing firmware until both backups are saved.");
+                    validateSnapshot(verified.toString("utf8"));
+                }
+                session.notice = "Original and eight-slot profiles saved and verified. Keep the original firmware pair too. After installing the new firmware on both halves, import " + next.fsPath;
+            }
         } else if (message.type === "exportPortableProfile") {
             const snapshot = await service.readPortableProfile();
             const uri = await vscode.window.showSaveDialog({title: "Export complete keyboard profile", saveLabel: "Export profile", filters: {"Charybdis profile": ["charybdis.json", "json"]}});

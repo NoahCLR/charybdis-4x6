@@ -1,3 +1,4 @@
+#include "../profile/runtime/effective_pd_runtime.h"
 // ───────────────────────────────────────────────────────────────────────────────
 // QMK VIA Live Profile Custom Channel
 // ───────────────────────────────────────────────────────────────────────────────
@@ -44,6 +45,12 @@
 #        define NOAH_PROFILE_LED_COUNT 0u
 #    endif
 
+#    if defined(NOAH_PORTABLE_PROFILE_ENABLE) && !defined(NOAH_PD_PROFILE_ENABLE)
+#        define NOAH_PD_SOURCE_CAPABILITY NOAH_PROFILE_FEATURE_LEGACY_PD_SOURCE
+#    else
+#        define NOAH_PD_SOURCE_CAPABILITY 0u
+#    endif
+
 #    ifdef NOAH_LIVE_PROFILE_MUTATION_ENABLE
 #        define NOAH_PROFILE_MUTATION_CAPABILITIES (NOAH_PROFILE_FEATURE_CANDIDATE_WRITE | NOAH_PROFILE_FEATURE_PERSISTENT_COMMIT | NOAH_PROFILE_FEATURE_RUNTIME_ACTIVATION | NOAH_PROFILE_FEATURE_PEER_RECONCILIATION | NOAH_PROFILE_FEATURE_ATOMIC_LOGICAL_APPLY)
 #        define NOAH_PROFILE_MUTATION_CHUNK_MAX NOAH_PROFILE_CANDIDATE_V1_CHUNK_MAX
@@ -57,7 +64,7 @@ static noah_profile_wire_v1_read_service_t noah_profile_wire_v1_read_service = {
         {
             .protocol_major = 1u,
             .protocol_minor = 0u,
-            .schema_major   = 1u,
+            .schema_major   = NOAH_PROFILE_SCHEMA_MAJOR,
             .schema_minor   = 0u,
             // Stage 01 is intentionally read-only. Candidate capacity and domain
             // support remain zero until the corresponding decoders and activation
@@ -103,7 +110,7 @@ static void noah_profile_channel_refresh_owner_capabilities(const noah_profile_o
     if (!owner) {
         return;
     }
-    noah_profile_wire_v1_read_service.capabilities.feature_flags           = NOAH_PROFILE_FEATURE_READ_SURFACE | NOAH_PROFILE_FEATURE_STORAGE_LAYOUT | NOAH_PROFILE_SPLIT_CAPABILITY | NOAH_PROFILE_FEATURE_RGB_SCHEMA | NOAH_PROFILE_FEATURE_KEY_BEHAVIOR_SCHEMA | NOAH_PROFILE_FEATURE_ACTION_ABI_DIGEST | NOAH_PROFILE_FEATURE_COMPILED_PROFILE_HASH | NOAH_PROFILE_MUTATION_CAPABILITIES;
+    noah_profile_wire_v1_read_service.capabilities.feature_flags           = NOAH_PROFILE_FEATURE_READ_SURFACE | NOAH_PROFILE_FEATURE_STORAGE_LAYOUT | NOAH_PROFILE_SPLIT_CAPABILITY | NOAH_PROFILE_FEATURE_RGB_SCHEMA | NOAH_PROFILE_FEATURE_KEY_BEHAVIOR_SCHEMA | NOAH_PROFILE_FEATURE_ACTION_ABI_DIGEST | NOAH_PROFILE_FEATURE_COMPILED_PROFILE_HASH | NOAH_PROFILE_MUTATION_CAPABILITIES | NOAH_PD_SOURCE_CAPABILITY;
     noah_profile_wire_v1_read_service.capabilities.action_abi_digest       = owner->action_abi_digest;
     noah_profile_wire_v1_read_service.capabilities.compiled_default_digest = owner->compiled_default_digest;
     noah_profile_wire_v1_read_service.capabilities.supported_domain_mask   = owner->supported_domain_mask;
@@ -141,6 +148,16 @@ static void noah_profile_channel_latch_owner_status(const noah_profile_owner_sta
         status->active_digest = owner->compiled_default_digest;
         status->active_kind   = NOAH_PROFILE_ACTIVE_COMPILED_ONLY;
     }
+#ifdef NOAH_PD_PROFILE_ENABLE
+    if (!noah_effective_pd_ready()) {
+        status->state_flags |= NOAH_PROFILE_STATE_DIGESTS_UNAVAILABLE;
+        status->state_flags &= (uint16_t)~NOAH_PROFILE_STATE_ACTIVE_IS_COMPILED_DEFAULT;
+        status->active_digest = 0;
+        status->active_generation = 0;
+        status->active_kind = NOAH_PROFILE_ACTIVE_PENDING;
+        status->last_error = NOAH_PROFILE_CANDIDATE_V1_ERROR_ACTIVATION_FAILED;
+    }
+#endif
     if (owner->has_pending) {
         status->pending_digest = owner->pending.payload_digest;
     }

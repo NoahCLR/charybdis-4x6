@@ -1,3 +1,5 @@
+#include "../modes/pd_mode_configured.h"
+#include "../../profile/runtime/effective_pd_runtime.h"
 #include "lib/profile/runtime/effective_settings_runtime.h"
 // ────────────────────────────────────────────────────────────────────────────
 // PD Mode Lifecycle
@@ -83,19 +85,32 @@ void pd_mode_apply_active_dpi(void) {
     pd_mode_runtime_shared_state()->active_dpi_sync_pending = false;
 
     pd_mode_snapshot_t   snapshot    = pd_mode_snapshot();
+#ifndef NOAH_PD_PROFILE_ENABLE
     const pd_mode_def_t *active_mode = pd_mode_lookup(snapshot.local.active_mode);
+#endif
     bool                 sniping     = pd_mode_auto_sniping_layer_active() || noah_qmk_contract_pointer_sniping_enabled();
 
+#ifdef NOAH_PD_PROFILE_ENABLE
+    const uint8_t *configured = noah_effective_pd_for_mask(snapshot.local.active_mode);
+    uint16_t mode_dpi = configured ? (uint16_t)configured[4] | (uint16_t)configured[5] << 8 : 0;
+    if (configured && configured[1] == 2) {
+        pointing_device_set_cpi(mode_dpi ? mode_dpi : noah_qmk_contract_pointer_default_dpi());
+        return;
+    }
+#else
     if (pd_mode_policy_mode_uses_dragscroll_backend(snapshot.local.active_mode)) {
         pointing_device_set_cpi(noah_qmk_contract_pointer_dragscroll_dpi());
         return;
     }
+
+#endif
 
     if (sniping) {
         pointing_device_set_cpi(noah_qmk_contract_pointer_sniping_dpi());
         return;
     }
 
+#ifndef NOAH_PD_PROFILE_ENABLE
     uint16_t mode_dpi = active_mode ? active_mode->dpi : 0;
     switch (snapshot.local.active_mode) {
         case PD_MODE_VOLUME:
@@ -113,6 +128,7 @@ void pd_mode_apply_active_dpi(void) {
         default:
             break;
     }
+#endif
     if (mode_dpi != 0) {
         pointing_device_set_cpi(mode_dpi);
         return;
@@ -147,7 +163,9 @@ void pd_mode_transition_activate(pd_mode_mask_t mode) {
 
 static void pd_mode_transition_deactivate_with_lock_state(pd_mode_mask_t mode, bool was_locked) {
     bool                 was_active = pd_mode_local_active(mode);
+#ifndef NOAH_PD_PROFILE_ENABLE
     const pd_mode_def_t *def        = pd_mode_lookup(mode);
+#endif
 #ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
     bool was_any_mode_active = pd_any_local_mode_active();
 #endif
@@ -157,9 +175,11 @@ static void pd_mode_transition_deactivate_with_lock_state(pd_mode_mask_t mode, b
     pd_mode_auto_mouse_deactivate(mode, was_any_mode_active, was_locked);
 #endif
 
+#ifndef NOAH_PD_PROFILE_ENABLE
     if (def && def->reset) {
         def->reset();
     }
+#endif
 
     pd_mode_request_active_dpi_sync();
 
@@ -201,6 +221,9 @@ void pd_mode_transition_unlock(pd_mode_mask_t mode) {
 }
 
 bool pd_mode_handle_key_event(uint16_t keycode, keyrecord_t *record) {
+#ifdef NOAH_PD_PROFILE_ENABLE
+    return noah_pd_engine_key(keycode, record);
+#else
     pd_mode_snapshot_t   snapshot = pd_mode_snapshot();
     const pd_mode_def_t *def      = pd_mode_lookup(snapshot.local.active_mode);
 
@@ -209,4 +232,5 @@ bool pd_mode_handle_key_event(uint16_t keycode, keyrecord_t *record) {
     }
 
     return false;
+#endif
 }

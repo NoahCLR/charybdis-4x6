@@ -160,10 +160,26 @@ Atomic logical Apply writes format 2:
 | 29 | 2 | CRC16-CCITT over bytes 0 through 28, little-endian |
 | 31 | 1 | state marker: `5A` prepared, `A5` committed, `00` invalid |
 
-Format 2 derives the schema, domain mask and FNV-1a payload digest while
-validating the canonical payload. The header retains the compiled-default and
+Format 2 binds schema 1.0 and derives the domain mask and FNV-1a payload digest
+while validating the canonical payload. The header retains the compiled-default and
 action-ABI identities so a reflash cannot silently adopt incompatible sparse
 profile data.
+
+### Schema-2 PD geometry
+
+Side-specific PD-enabled owner builds select schema 2, format-3 `NR` and a
+5,088-byte payload ceiling. Identity byte 2 uses domain bits 0–4, origin bit 5,
+override bit 6 and reserved bit 7; CRC and markers retain `NQ` offsets. Format 3
+accepts RGB/settings v2 and key-behavior/combo/PD v1. Host candidate and split
+writers bind it to the same logical VIA generation as format 2.
+
+The lower 8 KiB VIA allocation is unchanged. Slot A is `0x2000..0x33ff`, slot B
+`0x3400..0x47ff`, each with a 32-byte header. Logical EEPROM is 18 KiB and
+wear-level backing is 36 KiB. Geometry changes the flash base; migrate via a
+verified complete backup and restore, never in-place reinterpretation. Builds
+with `NOAH_PD_PROFILE=no` retain the 16 KiB map above as a readback bridge.
+See [the domain contract](pd-mode-domain-v1.md) and the deliberately revised
+feature-specific policy in [memory budgets](memory-budgets.md).
 
 Inactive-slot commit ordering is:
 

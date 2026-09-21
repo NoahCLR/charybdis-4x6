@@ -1,3 +1,4 @@
+const {decodePdDomain} = require("../schema/pd-mode-domain-v1");
 "use strict";
 
 const {readSettings, readSettingsLimits} = require("../protocol/portable-profile-v1");
@@ -371,11 +372,13 @@ class ProfileDeviceService {
                     if (domain.id === PROFILE_DOMAIN_IDS.RGB) {
                         domains.rgb = decodeRgbDomainV1(domain.payload);
                     } else if (domain.id === PROFILE_DOMAIN_IDS.KEY_BEHAVIORS) {
-                        domains.keyBehaviors = decodeKeyBehaviorDomain(domain.payload);
+                        domains.keyBehaviors = decodeKeyBehaviorDomain(domain.payload, {actionLimits: {maxPdModes: blob.schema.major === 2 ? 8 : 6}});
+                    } else if (domain.id === PROFILE_DOMAIN_IDS.PD_MODES) {
+                        domains.pdModes = decodePdDomain(domain.payload);
                     } else if (domain.id === PROFILE_DOMAIN_IDS.SETTINGS) {
                         domains.settings = decodeSettings(domain.payload);
                     } else if (domain.id === PROFILE_DOMAIN_IDS.COMBOS) {
-                        domains.combos = decodeComboDomainV1(domain.payload);
+                        domains.combos = decodeComboDomainV1(domain.payload, {actionLimits: {maxPdModes: blob.schema.major === 2 ? 8 : 6}});
                     }
                 } catch (error) {
                     failures.push({domainId: domain.id, message: error instanceof Error ? error.message : String(error)});
@@ -904,7 +907,7 @@ function evaluateProfileCompatibility(capabilities, summary = {}, viaIdentity = 
     const source = normalizeProfileSummary(summary);
     const checks = [
         equalityCheck("Protocol major", capabilities?.protocol?.major, PROFILE_STUDIO_PROTOCOL.major),
-        equalityCheck("Schema major", capabilities?.schema?.major, PROFILE_STUDIO_SCHEMA.major),
+        equalityCheck("Schema major", capabilities?.schema?.major, capabilities?.supportedDomainMask & 16 ? 2 : PROFILE_STUDIO_SCHEMA.major),
         equalityCheck("VIA protocol version", viaIdentity?.protocolVersion, VIA_READS.EXPECTED_PROTOCOL_VERSION),
         equalityCheck("VIA firmware version", viaIdentity?.firmwareVersion, capabilities?.firmwareVersion),
         equalityCheck("Raw HID report size", capabilities?.reportSize, RAW_HID_REPORT_SIZE),

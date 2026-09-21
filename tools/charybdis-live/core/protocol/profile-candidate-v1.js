@@ -22,11 +22,11 @@ const PROFILE_CANDIDATE_V1 = Object.freeze({
     VALUE_STATUS: 0x18,
     CHUNK_MAX: 20,
     MIN_BLOB_SIZE: 8,
-    MAX_BLOB_SIZE: 4064,
+    MAX_BLOB_SIZE: 5088,
     STATUS_LAYOUT_VERSION: 1,
     STATUS_PAYLOAD_SIZE: 25,
     LOGICAL_STORE_FORMAT: 2,
-    KNOWN_DOMAIN_MASK: PROFILE_WIRE_DOMAINS.RGB | PROFILE_WIRE_DOMAINS.KEY_BEHAVIORS | PROFILE_WIRE_DOMAINS.COMBOS | PROFILE_WIRE_DOMAINS.SETTINGS,
+    KNOWN_DOMAIN_MASK: PROFILE_WIRE_DOMAINS.RGB | PROFILE_WIRE_DOMAINS.KEY_BEHAVIORS | PROFILE_WIRE_DOMAINS.COMBOS | PROFILE_WIRE_DOMAINS.SETTINGS | PROFILE_WIRE_DOMAINS.PD_MODES,
 });
 
 const CANDIDATE_ADMISSION = Object.freeze({
@@ -150,7 +150,7 @@ function buildCandidateBeginRequest(transactionId, metadata) {
     report.writeUInt32LE(normalized.digest, 15);
     report.writeUInt32LE(normalized.actionAbiDigest, 19);
     report[23] = normalized.storeFormatVersion;
-    if (normalized.storeFormatVersion === PROFILE_CANDIDATE_V1.LOGICAL_STORE_FORMAT) {
+    if (normalized.storeFormatVersion !== 0) {
         report.writeUInt32LE(normalized.viaGeneration, 24);
         report.writeUInt32LE(normalized.viaDigest, 28);
     }
@@ -340,6 +340,7 @@ function candidateMetadataForBlob(value, options = {}) {
         if (domain.id === PROFILE_DOMAIN_IDS.RGB) derivedDomains |= PROFILE_WIRE_DOMAINS.RGB;
         if (domain.id === PROFILE_DOMAIN_IDS.KEY_BEHAVIORS) derivedDomains |= PROFILE_WIRE_DOMAINS.KEY_BEHAVIORS;
         if (domain.id === PROFILE_DOMAIN_IDS.SETTINGS) derivedDomains |= PROFILE_WIRE_DOMAINS.SETTINGS;
+        if (domain.id === PROFILE_DOMAIN_IDS.PD_MODES) derivedDomains |= PROFILE_WIRE_DOMAINS.PD_MODES;
         if (domain.id === PROFILE_DOMAIN_IDS.COMBOS) derivedDomains |= PROFILE_WIRE_DOMAINS.COMBOS;
     }
     const requestedDomains = options.requestedDomains === undefined
@@ -361,7 +362,7 @@ function candidateMetadataForBlob(value, options = {}) {
         crc32: crc32(blob),
         digest: fnv1a32(blob),
         actionAbiDigest: assertU32(options.actionAbiDigest, "Action-ABI digest"),
-        storeFormatVersion: options.viaGeneration === undefined && options.viaDigest === undefined ? 0 : PROFILE_CANDIDATE_V1.LOGICAL_STORE_FORMAT,
+        storeFormatVersion: options.viaGeneration === undefined && options.viaDigest === undefined ? 0 : (decoded.schema.major === 2 ? 3 : PROFILE_CANDIDATE_V1.LOGICAL_STORE_FORMAT),
         viaGeneration: options.viaGeneration === undefined ? 0 : assertU32(options.viaGeneration, "VIA generation"),
         viaDigest: options.viaDigest === undefined ? 0 : assertU32(options.viaDigest, "VIA digest"),
     };
@@ -376,11 +377,11 @@ function normalizeCandidateMetadata(metadata) {
         throw new RangeError("Candidate flags must be zero for Profile Wire v1.");
     }
     const payloadLength = assertU16(metadata.payloadLength, "Candidate payload length");
-    if (payloadLength < PROFILE_CANDIDATE_V1.MIN_BLOB_SIZE || payloadLength > PROFILE_CANDIDATE_V1.MAX_BLOB_SIZE) {
+    if (payloadLength < PROFILE_CANDIDATE_V1.MIN_BLOB_SIZE || payloadLength > (metadata.schemaMajor === 2 ? 5088 : 4064)) {
         throw new RangeError(`Candidate payload length must be ${PROFILE_CANDIDATE_V1.MIN_BLOB_SIZE} through ${PROFILE_CANDIDATE_V1.MAX_BLOB_SIZE}.`);
     }
     const storeFormatVersion = metadata.storeFormatVersion === undefined ? 0 : assertU8(metadata.storeFormatVersion, "Candidate store format");
-    if (storeFormatVersion !== 0 && storeFormatVersion !== PROFILE_CANDIDATE_V1.LOGICAL_STORE_FORMAT) {
+    if (storeFormatVersion !== 0 && storeFormatVersion !== (metadata.schemaMajor === 2 ? 3 : PROFILE_CANDIDATE_V1.LOGICAL_STORE_FORMAT)) {
         throw new RangeError(`Candidate store format must be zero or ${PROFILE_CANDIDATE_V1.LOGICAL_STORE_FORMAT}.`);
     }
     const viaGeneration = metadata.viaGeneration === undefined ? 0 : assertU32(metadata.viaGeneration, "VIA generation");

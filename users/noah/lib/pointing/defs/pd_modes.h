@@ -113,3 +113,7 @@ bool pd_mode_auto_sniping_layer_active(void);
 // mode with a custom DPI is active. Dragscroll-like modes use the shared local
 // dragscroll DPI; auto/manual sniping uses Charybdis's configured sniping CPI.
 void pd_mode_apply_active_dpi(void);
+
+#ifdef NOAH_PD_PROFILE_ENABLE
+pd_mode_traits_t pd_mode_effective_traits(pd_mode_mask_t mode);
+#endif

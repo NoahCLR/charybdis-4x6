@@ -203,7 +203,7 @@ static void process_logical_bind_request(noah_profile_split_reconciler_t *reconc
             .status               = NOAH_PROFILE_SPLIT_V1_STATUS_OK,
             .generation           = request->generation,
             .payload_digest       = request->payload_digest,
-            .store_format_version = NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL,
+            .store_format_version = NOAH_PROFILE_LOGICAL_STORE_VERSION,
             .via_generation       = via_generation,
             .via_digest           = via_digest,
         };
@@ -831,7 +831,7 @@ static void push_bind(noah_profile_split_reconciler_t *reconciler, uint32_t now)
         .status               = NOAH_PROFILE_SPLIT_V1_STATUS_OK,
         .generation           = reconciler->transfer_descriptor.generation,
         .payload_digest       = reconciler->transfer_descriptor.payload_digest,
-        .store_format_version = NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL,
+        .store_format_version = NOAH_PROFILE_LOGICAL_STORE_VERSION,
         .via_generation       = reconciler->prepared_via_generation,
         .via_digest           = reconciler->prepared_via_digest,
     };
@@ -1037,7 +1037,7 @@ static void pull_bind(noah_profile_split_reconciler_t *reconciler, uint32_t now)
         retry_admitted_mailbox(reconciler, now);
         return;
     }
-    if (response.kind != NOAH_PROFILE_SPLIT_V1_LOGICAL_BIND || response.status != NOAH_PROFILE_SPLIT_V1_STATUS_OK || response.generation != request.generation || response.payload_digest != request.payload_digest || response.store_format_version != NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL || response.via_generation == 0u || response.via_digest == 0u) {
+    if (response.kind != NOAH_PROFILE_SPLIT_V1_LOGICAL_BIND || response.status != NOAH_PROFILE_SPLIT_V1_STATUS_OK || response.generation != request.generation || response.payload_digest != request.payload_digest || response.store_format_version != NOAH_PROFILE_LOGICAL_STORE_VERSION || response.via_generation == 0u || response.via_digest == 0u) {
         handle_protocol_error(reconciler, &response, now);
         return;
     }

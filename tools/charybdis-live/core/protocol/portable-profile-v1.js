@@ -1,3 +1,4 @@
+const {decodePdDomain} = require("../schema/pd-mode-domain-v1");
 "use strict";
 const {buildProfileGetRequest, decodeProfileResponse, profileResponseMatcher} = require("./profile-wire-v1");
 const {crc32, fnv1a32} = require("../schema/profile-blob-v1");
@@ -23,6 +24,20 @@ async function readSettings(connection, ids) {
     const bytes = Buffer.concat(chunks), after = await page(connection, 7, 0, ids);
     if (!before.equals(after) || crc32(bytes) !== before.readUInt32LE(4) || fnv1a32(bytes) !== before.readUInt32LE(8)) throw fail("Keyboard settings changed during the read. Try again.");
     decodeSettings(bytes); return bytes;
+}
+async function readLegacyPdSource(connection, ids) {
+    const before = await page(connection, 9, 0, ids);
+    if (before.length !== 12 || before[0] !== 1 || before[1] !== 25 || before.readUInt16LE(2) !== 776) throw fail("Invalid legacy pointing-mode metadata.");
+    const chunks = [];
+    for (let offset = 0; offset < 776; offset += 25) {
+        const chunk = await page(connection, 9, 1 + offset / 25, ids);
+        if (chunk.length !== Math.min(25, 776 - offset)) throw fail("Truncated pointing-mode read.");
+        chunks.push(chunk);
+    }
+    const bytes = Buffer.concat(chunks), after = await page(connection, 9, 0, ids);
+    if (!before.equals(after) || crc32(bytes) !== before.readUInt32LE(4) || fnv1a32(bytes) !== before.readUInt32LE(8)) throw fail("Pointing modes changed during backup. Read the keyboard again.");
+    decodePdDomain(bytes);
+    return bytes;
 }
 async function readStorageStatus(connection, ids) {
     const bytes = await page(connection, 8, 0, ids);
@@ -55,4 +70,4 @@ async function waitForStorage(connection, ids, {timeoutMs = 90000, pollMs = 150}
     } while (Date.now() < deadline);
     throw fail("The two halves have not finished saving. Keep the recovery file and reconnect both halves.");
 }
-module.exports = {readSettings, readSettingsLimits, readStorageStatus, waitForStorage};
+module.exports = {readLegacyPdSource, readSettings, readSettingsLimits, readStorageStatus, waitForStorage};

@@ -21,10 +21,10 @@ const PROFILE_WIRE_STATUS = Object.freeze({
 });
 
 const PROFILE_WIRE_KNOWN_MASKS = Object.freeze({
-    FEATURE_FLAGS: 0x00001fff,
+    FEATURE_FLAGS: 0x00003fff,
     REQUIRED_READ_FEATURES: 0x0000000f,
     STATE_FLAGS: 0x00ff,
-    SUPPORTED_DOMAINS: 0x0f,
+    SUPPORTED_DOMAINS: 0x1f,
 });
 
 const PROFILE_WIRE_FEATURES = Object.freeze({
@@ -41,6 +41,7 @@ const PROFILE_WIRE_FEATURES = Object.freeze({
     ACTION_ABI_DIGEST: 1 << 10,
     COMPILED_PROFILE_HASH: 1 << 11,
     ATOMIC_LOGICAL_APPLY: 1 << 12,
+    LEGACY_PD_SOURCE: 1 << 13,
 });
 
 const PROFILE_WIRE_DOMAINS = Object.freeze({
@@ -48,6 +49,7 @@ const PROFILE_WIRE_DOMAINS = Object.freeze({
     KEY_BEHAVIORS: 1 << 1,
     COMBOS: 1 << 2,
     SETTINGS: 1 << 3,
+    PD_MODES: 1 << 4,
 });
 
 const PROFILE_ACTIVE_KIND = Object.freeze({

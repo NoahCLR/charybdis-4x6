@@ -1,0 +1,246 @@
+# PD-mode domain v1
+
+Implemented in schema-2 side-specific owner builds: domain codec, incremental
+validation, immutable effective cache, shared engines, persistence/split writers,
+portable migration and live editor. Legacy bridge builds retain schema 1.
+Hardware upgrade and physical release acceptance remain pending; see
+[the implementation plan](live-pd-modes-plan.md).
+
+## Domain and record encoding
+
+Domain ID `0x50`, version `1`. All multibyte integers are unsigned,
+little-endian. The payload is exactly 776 bytes: the eight-byte header
+`01 08 60 00 00 00 00 00`, then eight 96-byte records in ID order `0..7`.
+The surrounding profile domain envelope adds four bytes. RGB remains in its
+own domain; schema 2 contains eight corresponding ID/HSV/locality rows.
+
+| Record offset | Bytes | Meaning |
+| --- | --- | --- |
+| 0 | 1 | Slot ID, equal to record index |
+| 1 | 1 | Kind: disabled `0`, directional `1`, scrolling `2` |
+| 2 | 1 | Pointer-layer policy: keep available `0`, prefer typing `1` |
+| 3 | 1 | Directional axis: vertical `0`, horizontal `1`, dominant `2`; scrolling uses zero |
+| 4 | 2 | DPI: zero inherits; otherwise explicit value |
+| 6 | 1 | Owned scrolling modifiers; directional modes use zero |
+| 7 | 1 | Reserved, zero |
+| 8 | 24 | UTF-8 name, NUL terminated and zero padded |
+| 32, 34 | 2 each | Directional X/Y thresholds |
+| 36, 40, 44, 48 | 4 each | Left/right/up/down tap records |
+| 52, 58, 64 | 6 each | Mouse button 1/2/3 override records |
+| 70, 72 | 2 each | Scroll H/V activation thresholds |
+| 74, 76 | 2 each | Scroll H/V divisors |
+| 78, 80, 82 | 2 each | Scroll output interval, buffer expiry, axis timeout in ms |
+| 84, 85 | 1 each | Scroll start ratio numerator/denominator |
+| 86, 87 | 1 each | Scroll sustain ratio numerator/denominator |
+| 88 | 1 | Cross-axis decay divisor |
+| 89 | 1 | Invert flags: bit 0 horizontal, bit 1 vertical |
+| 90 | 6 | Reserved, zero |
+
+Names contain at most 23 UTF-8 bytes, no embedded NUL, ASCII C0 controls or DEL,
+and no malformed, overlong or surrogate encodings. Configured modes require a
+nonempty name. Disabled modes may retain their name; everything except ID and
+name is zero. Disabled RGB rows are separately retained by the RGB domain.
+
+Directional modes require positive thresholds for used axes and zero thresholds
+and outputs for unused axes. All scrolling parameters are zero. A configured
+axis may have no output in either direction. Scrolling modes zero the axis and
+directional fields. Their thresholds, divisors and axis timeout are positive;
+expiry is at least the timeout. Interval zero means no output throttling.
+Ratio numerators and denominators are positive, start and sustain are at least
+1:1, and sustain cannot exceed start. Decay is at least two. Only two inversion
+bits exist. Integer bounds follow their encoded widths.
+
+These are format bounds, not proof that every value is supported by the sensor
+or safe in the old handlers' arithmetic. Runtime integration must advertise
+hardware DPI limits and use bounded arithmetic across the accepted range.
+Preserve zero/inherit behavior deliberately: source-driver clamping of old
+scroll DPI must be resolved during migration, not inferred from the fixture.
+
+## Taps, modifiers and buttons
+
+A tap is `keycode:u16, modifierPolicy:u8, mask:u8`. No output is four zero bytes.
+Policies are inherit `0`, mask selected ambient modifiers `1`, and exact
+shortcut `2`. Mask is nonzero only for policy 1. Modifier masks use the normal
+eight left/right HID modifier bits. Exact emission temporarily isolates the
+shortcut, then restores other owners' modifiers.
+
+The allowlist is tied to the audited QMK 0.0.8 native ABI:
+
+- Plain `0x0004..0x00c2`: keyboard `0x04..0xa4`, system `0xa5..0xa7`,
+  consumer `0xa8..0xc2`.
+- Modified keyboard taps: high byte `0x01..0x1f` with at least one of its low
+  four modifier bits set, low byte `0x04..0xa4`.
+
+Standalone modifiers, mouse actions, layer/PD controls, macro triggers and
+custom/control keycodes are rejected. Modified consumer/system codes are not
+part of this vocabulary. This prevents recursive activation and unbalanced
+holds through motion outputs. The engine must still dispatch through existing
+owned-output helpers and apply the existing four-tap/32-step work ceilings.
+
+A button record is `kind:u8, modifiers:u8, tap:4 bytes`. Pass-through `0` and
+consume `1` require five zero payload bytes. Tap `2` requires modifiers zero
+and a nonempty valid tap. Hold-modifiers `3` requires a nonzero modifier mask
+and zero tap bytes. Both engine families can use these button records.
+Late releases must follow the owner that acquired the output across mode
+replacement; this codec does not implement that lifecycle.
+
+## Validation and evidence
+
+Firmware implements whole-payload and single-record cold validators in
+`users/noah/lib/profile/schema/profile_pd_v1.c`; no cache, heap or pointing-path
+decode is introduced. The app codec lives in
+`tools/charybdis-live/core/schema/pd-mode-domain-v1.js`. It rejects unknown
+object fields, coercion, explicit null values, truncation, trailing bytes,
+reserved data, incorrect ID order and noncanonical encodings.
+
+Validation errors are `INVALID_ARGUMENT`, `INVALID_LENGTH`, `INVALID_HEADER`,
+`INVALID_ID`, `RESERVED`, `INVALID_NAME`, `INVALID_POLICY`, `INVALID_ACTION`,
+and `INVALID_PARAMETER`, with a byte offset. Record-validator offsets are
+record-relative; whole-domain offsets are payload-relative. Object-encoding
+errors without a corresponding byte position use zero. C success is `OK`.
+
+`tests/fixtures/pd_mode_domain_v1.json` records six repository presets and two
+disabled slots, with independently packed golden bytes. It is test evidence,
+**never a fallback migration source**. C/JS differential validation covers
+7,765 cases, including byte mutations, all truncated lengths and Unicode;
+the C runner also uses ASan/UBSan. Tests freeze existing native action values
+and prove that legacy schema-1 readers/writers reject domain `0x50`.
+
+## Capacity gate
+
+`measurePdProfileUpgrade` validates a complete current portable profile and
+explicitly supplied slot definitions before measuring this candidate upgrade.
+It neither supplies missing legacy settings nor produces a writable migrated
+document. With unchanged settings length, growth is 776 payload + 4 envelope
++ 10 for the two additional RGB rows = **790 bytes**.
+
+| Complete fixture | Old bytes | Candidate bytes | Fits 4,064? |
+| --- | ---: | ---: | --- |
+| Existing portable test profile | 1,488 | 2,278 | Yes |
+| 32 combos, 918 bytes of IR macro payload | 3,274 | 4,064 | Exactly |
+| Same, 919 bytes of IR macro payload | 3,275 | 4,065 | No |
+| Same, full 1,024-byte IR macro payload | 3,380 | 4,170 | No, 106 bytes over |
+
+These are valid complete profiles, not sums of independent theoretical maxima.
+Thus unchanged geometry plus this encoding **cannot migrate every valid old
+profile**. Compacting only this new domain cannot guarantee room in an already
+full old payload. The selected path is a deliberate storage migration, preserving
+the whole VIA bank and providing two 5 KiB profile slots:
+
+| Schema-2 range | Bytes | Owner |
+| --- | ---: | --- |
+| `0x0000..0x1fff` | 8,192 | Existing QMK/VIA allocation, unchanged |
+| `0x2000..0x33ff` | 5,120 | Profile slot A, 32-byte header + 5,088-byte payload |
+| `0x3400..0x47ff` | 5,120 | Profile slot B, same layout |
+
+Logical EEPROM becomes 18,432 bytes; RP2040 wear-level backing becomes 36,864
+bytes. The fork requires backing at least twice logical, an integral logical
+multiple, and 4 KiB flash erase sectors: these sizes meet all three constraints.
+All addresses still fit uint16 and the existing 25-byte readback pages fit the
+one-byte page index. No sibling source change is required for those limits.
+
+The maximum old payload, 4,064 bytes, plus 790 is 4,854 bytes, leaving 234 bytes
+in the schema-2 slot. This proves aggregate capacity for every valid old payload
+under the specified unchanged-length migration, without truncating macros,
+combos, names or slots. Further migration growth must re-run this proof.
+`measurePdProfileUpgrade` reports both current capacity and `plannedStorage`,
+leaving its input intact. Negotiated schema-1 capacity stays 4,064 bytes;
+schema-2 devices accept up to 5,088. `upgradePdSnapshot` materializes the
+validated migrated document from device-reported source definitions.
+
+PD-enabled firmware selects the expanded geometry. The larger wear-level cache
+adds 2,048 bytes in SRAM0–3 per half; fresh linked accounting and the deliberate
+feature-specific policy are in [memory budgets](memory-budgets.md). Physical
+high-water acceptance remains outstanding. The backing region's physical base
+and write-log layout change, so interpreting old flash in place is unsafe.
+Require a verified complete old backup, source PD readback, saved old firmware
+pair, and materialized migrated document **before flashing either half**. Restore
+through the new logical Apply after both halves have compatible firmware.
+Downgrade likewise restores the old backup; never reinterpret the new bank.
+
+## Integration and identity gates
+
+Schema 2 adds domain `0x50`, advertised by supported-domain bit 4.
+The legacy logical storage header format 2 (`NQ`) cannot encode that mask:
+its identity byte packs domain bits 0–3, origin in bit 4 and flags in bit 5.
+Naively extending the mask corrupts origin. PD-enabled owners select
+format 3 (`NR`) with the same offsets, five domain bits, origin in bit 5,
+flags in bit 6, and reserved bit 7. It binds schema **2.0**; `NQ` binds schema
+**1.0**. Neither takes its schema identity from the reader's expectation.
+Header CRC, VIA binding, prepared/committed markers and bounded I/O are unchanged.
+Admission rejects incompatible schema/format pairs before invalidating a slot.
+
+Synchronous validation, bounded boot scanning and commit shape validation all
+use the same domain-version rules: `NR` accepts RGB v2, key behaviors v1,
+combos v1, settings v2 and PD v1; `NP`/`NQ` retain the old four-domain v1 rules.
+The blob framing magic remains `NLP1`; its explicit schema bytes distinguish
+schema 2.0. Domain bodies still require semantic validation upstream; store
+shape checks alone do not make a candidate publishable.
+
+Store tests cover all 128 mask/origin/flag combinations, both validation paths,
+reserved bits with repaired CRCs, domain-mask disagreement, wrong domain
+versions, rejection by the schema-1 reader, one-byte commit steps, durable
+prepare/abort, and every write cut with all partial lengths 0..32. Reboot must
+select one whole generation with its matching origin, flags and VIA binding.
+This tests the header protocol in the existing fake EEPROM geometry; it does
+not prove physical flash-geometry migration.
+
+The integrated contract is blob schema 2.0, RGB v2 with eight rows, settings v2
+with retired DPI scalars 10–14 encoded as zero, portable document v2 and PD v1.
+The action ABI is `0x61072732`, generated from the compiled vocabulary. The
+legacy eight-layer ABI remains `0xeb80829c`; the five-layer bridge remains
+`0xdcb00959`. The HID envelope stays version 1. Candidate metadata uses format 3
+with VIA generation/digest binding; owner, peer store and split admission all
+select that same format. Incompatible peers cannot Apply.
+
+The settings body's first byte must use the same selected settings version as
+its enclosing domain header. Complete app-generated schema-2 profiles are tested
+through the compiled firmware compatibility and incremental validator, including
+the settings domain; compiled factory defaults alone do not exercise that domain.
+Settings-v2 tests reject legacy body headers and nonzero retired DPI scalars.
+
+Legacy GET subcommand 9, advertised by feature bit 13, returns a versioned,
+CRC/FNV-checked 776-byte source domain in 25-byte pages. These are source
+compiled definitions, independent of current DPI edits. Legacy live DPI comes
+from settings during upgrade (dragscroll zero normalizes to 100). Complete
+schema-1 documents may carry this evidence as `pdModeSource`; upgrade refuses
+missing or incompatible evidence. The app saves both original and migrated
+files and verifies their contents before recommending the geometry upgrade.
+
+The effective PD cache reads only on initialization/publication, in chunks of
+at most 20 bytes, then validates all eight records before becoming ready. A
+failed read or validation leaves it unavailable; the owner fails closed and
+status does not advertise an active compiled fallback. Motion performs no
+profile storage reads. Activation waits for held/locked modes and intercepted
+button releases, using the existing persistent-intent reason bit.
+
+The compiled reader must service PD-only reads directly from the final fixed-size
+PD payload, using the same encoder and validators as full serialization. A
+20-byte read limit alone does not bound CPU work: replaying the preceding RGB
+and cubic behavior canonicalization for all 39 cache reads caused 1,443 row
+sorts in one startup scan on the authored profile. The compiled-cache integration
+test requires zero behavior-row sorts during warming and checks every PD byte
+boundary against the full golden serialization. No watchdog timeout is relaxed.
+
+Existing native IDs are fixed by executable assertions:
+
+| Native action | Deployed eight-layer value |
+| --- | --- |
+| Macro 0–15 | `0x7e40..0x7e4f` |
+| PD hold 0–5 | `0x7e50..0x7e55` |
+| PD lock 0–5 | `0x7e56..0x7e5b` |
+| Layer lock 0–7 | `0x7e5c..0x7e63` |
+| Right thumb, left thumb, click spam, drag window | `0x7e64..0x7e67` |
+
+The five-layer bridge has a different custom-action base, `0x7e61`; it retains
+its own ABI and requires explicit translation when supported. New
+hold-6/lock-6/hold-7/lock-7 values are `0x7ef0..0x7ef3`, within QMK's user range
+and unused by current authored actions. These are allocated explicitly and excluded from generic custom-action
+dispatch; enum expansion preserves all old values. A final ABI digest comes from the actual
+integrated vocabulary, never a guessed constant.
+
+Old backups lack compiled thresholds and modifier/scroll policies. The
+old-geometry readback bridge must match the source firmware's authored tuning.
+Action ABI alone cannot recover that tuning. The five-layer bridge can supply
+the same source domain before layer and action-reference migration. Hardware
+acceptance remains distinct from codec and runtime parity tests.

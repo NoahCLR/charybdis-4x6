@@ -1236,7 +1236,122 @@ static void test_arrow_mode_copy_shortcut_suspends_ambient_mods(void) {
     CHECK(runtime_fixture.send_keyboard_report_count == 2);
 }
 
+#ifdef NOAH_PD_PROFILE_ENABLE
+#include "users/noah/lib/pointing/modes/pd_mode_configured.h"
+#include "pd_mode_engine_fixture.h"
+#include "users/noah/lib/profile/schema/profile_pd_v1.h"
+static uint8_t engine_mod_owners[8];
+void keyboard_mod_ownership_register(uint16_t key) {
+    CHECK(key >= KC_LEFT_CTRL && key <= KC_RIGHT_GUI);
+    engine_mod_owners[key - KC_LEFT_CTRL]++;
+    add_mods(MOD_BIT(key));
+}
+void keyboard_mod_ownership_unregister(uint16_t key) {
+    CHECK(engine_mod_owners[key - KC_LEFT_CTRL]);
+    if (!--engine_mod_owners[key - KC_LEFT_CTRL]) del_mods(MOD_BIT(key));
+}
+uint8_t keyboard_mod_ownership_managed_only_mask(uint8_t mods) {
+    uint8_t result = 0;
+    for (uint8_t bit = 0; bit < 8; bit++) if (engine_mod_owners[bit]) result |= (1u << bit);
+    return result & mods;
+}
+static void test_configured_presets_match_legacy_motion(void) {
+    for (uint8_t id = 0; id < 8; id++) {
+        uint8_t record[96];
+        noah_profile_pd_v1_encode_record(&noah_pd_defaults[id], record);
+        CHECK(noah_profile_pd_v1_validate_record(record, 96, id, NULL) == NOAH_PROFILE_PD_V1_OK);
+        CHECK(memcmp(record, pd_engine_fixture + 8 + id * 96, 96) == 0);
+    }
+    report_mouse_t (*legacy[6])(report_mouse_t) = {handle_dragscroll_mode, handle_volume_mode, handle_brightness_mode, handle_zoom_mode, handle_arrow_mode, handle_dragscroll_mode};
+    struct observation {report_mouse_t report; synthetic_tap_call_t taps[8]; uint8_t count;} expected[64];
+    report_mouse_t inputs[64];
+    uint32_t random = 12345;
+    for (uint8_t i = 0; i < 64; i++) {
+        random = random * 1664525u + 1013904223u;
+        inputs[i] = (report_mouse_t){.x = (int16_t)(random >> 16), .y = (int16_t)random};
+        if (i % 4 == 0) inputs[i] = (report_mouse_t){0};
+    }
+    for (uint8_t slot = 0; slot < 6; slot++) {
+        const uint8_t *p = pd_engine_fixture + 8 + slot * 96;
+        for (uint8_t pass = 0; pass < 2; pass++) {
+            test_reset_stubs();
+            if (pass) noah_pd_engine_enter(p);
+            for (uint8_t i = 0; i < 64; i++) {
+                test_clear_logs();
+                fake_time32 = 1000u + i * 17u;
+                fake_mods = MOD_BIT(KC_LEFT_ALT) | MOD_BIT(KC_RIGHT_SHIFT);
+                report_mouse_t report = pass ? noah_pd_engine_motion(inputs[i]) : legacy[slot](inputs[i]);
+                if (!pass) {
+                    expected[i].report = report;
+                    expected[i].count = synthetic_tap_call_count;
+                    memcpy(expected[i].taps, synthetic_tap_calls, sizeof(synthetic_tap_calls));
+                } else {
+                    CHECK(report.x == expected[i].report.x && report.y == expected[i].report.y);
+                    CHECK(report.h == expected[i].report.h && report.v == expected[i].report.v);
+                    CHECK(synthetic_tap_call_count == expected[i].count);
+                    for (uint8_t tap = 0; tap < synthetic_tap_call_count; tap++) {
+                        CHECK(synthetic_tap_calls[tap].keycode == expected[i].taps[tap].keycode);
+                        CHECK(synthetic_tap_calls[tap].real == expected[i].taps[tap].real);
+                    }
+                }
+            }
+            if (pass) noah_pd_engine_exit();
+        }
+    }
+}
+static void test_configured_release_ownership_and_custom_slot(void) {
+    uint8_t slot[96];
+    memcpy(slot, pd_engine_fixture + 8 + 4 * 96, 96);
+    slot[0] = 7; // Identity/name do not select Arrow's behavior.
+    test_reset_stubs();
+    noah_pd_engine_enter(slot);
+    keyrecord_t first = test_record(true), second = test_record(true);
+    second.event.key.col++;
+    CHECK(noah_pd_engine_key(MS_BTN1, &first));
+    CHECK(noah_pd_engine_key(MS_BTN1, &second));
+    CHECK(engine_mod_owners[5] == 2);
+    first.event.pressed = false;
+    CHECK(noah_pd_engine_key(MS_BTN1, &first));
+    CHECK(engine_mod_owners[5] == 1 && (fake_mods & MOD_BIT(KC_RIGHT_SHIFT)));
+    // Switching releases old owned output but retains the old release route.
+    noah_pd_engine_enter(slot);
+    CHECK(engine_mod_owners[5] == 0 && noah_pd_engine_pending_release());
+    first.event.pressed = true;
+    CHECK(noah_pd_engine_key(MS_BTN1, &first));
+    second.event.pressed = false;
+    CHECK(noah_pd_engine_key(MS_BTN1, &second));
+    CHECK(engine_mod_owners[5] == 1); // Late old release cannot release new Shift.
+    first.event.pressed = false;
+    CHECK(noah_pd_engine_key(MS_BTN1, &first));
+    CHECK(!noah_pd_engine_pending_release());
+    first.event.pressed = true;
+    CHECK(noah_pd_engine_key(MS_BTN2, &first));
+    CHECK(literal_tap_calls[0].keycode == G(KC_C));
+    noah_pd_engine_exit();
+    first.event.pressed = false;
+    CHECK(noah_pd_engine_key(MS_BTN2, &first));
+    CHECK(!noah_pd_engine_pending_release());
+    memcpy(slot, pd_engine_fixture + 8 + 1 * 96, 96);
+    slot[0] = 7;
+    slot[34] = 1; slot[35] = 0;
+    slot[44] = KC_A; slot[48] = KC_B;
+    noah_pd_engine_enter(slot);
+    test_clear_logs();
+    noah_pd_engine_motion((report_mouse_t){.y = INT16_MAX});
+    CHECK(synthetic_tap_call_count == 4 && synthetic_tap_calls[0].keycode == KC_B);
+    test_clear_logs();
+    noah_pd_engine_motion((report_mouse_t){.y = -1});
+    CHECK(synthetic_tap_call_count == 1 && synthetic_tap_calls[0].keycode == KC_A);
+    noah_pd_engine_exit();
+    CHECK(noah_pd_engine_motion((report_mouse_t){.x = 13}).x == 13);
+}
+#endif
+
 int main(void) {
+#ifdef NOAH_PD_PROFILE_ENABLE
+    test_configured_presets_match_legacy_motion();
+    test_configured_release_ownership_and_custom_slot();
+#endif
     test_dragscroll_horizontal_lock_filters_vertical_jitter();
     test_dragscroll_vertical_lock_filters_horizontal_jitter();
     test_dragscroll_near_diagonal_motion_waits_for_dominant_axis();

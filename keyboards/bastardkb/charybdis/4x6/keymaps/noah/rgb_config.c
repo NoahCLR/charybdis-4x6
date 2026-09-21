@@ -169,6 +169,10 @@ const automouse_fade_end_config_t automouse_fade_end_config = {
 // { .pointing_mode = ..., .color = HSV(hue, sat, val), .locality = ... }
 #    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_PD_MODE_FEEDBACK_ENABLE)
 const pd_mode_color_t pd_mode_colors[] = {
+#        ifdef NOAH_PD_PROFILE_ENABLE
+    {.pointing_mode = PD_MODE_SLOT_6, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
+    {.pointing_mode = PD_MODE_SLOT_7, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
+#        endif
     {
         .pointing_mode = PD_MODE_DRAGSCROLL,
         .color         = HSV(21, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),

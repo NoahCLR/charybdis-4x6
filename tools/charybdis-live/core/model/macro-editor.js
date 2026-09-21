@@ -29,7 +29,7 @@ function editMacro(snapshot, message, capabilities) {
     else {
         value.settings.macros[index] = bytes;
         const domains = decodeProfileBlob(value.profile).domains.map(domain => domain.id === 0x40 ? {...domain, payload: encodeSettings(value.settings)} : domain);
-        document.profile = encodeProfileBlob({domains}).toString("base64");
+        document.profile = encodeProfileBlob({schema: {major: value.document.version, minor: 0}, domains}).toString("base64");
     }
     validateSnapshot(document, capabilities);
     return document;

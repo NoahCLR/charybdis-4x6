@@ -17,6 +17,7 @@ const PROFILE_DOMAIN_IDS = Object.freeze({
     KEY_BEHAVIORS: 0x20,
     COMBOS: 0x30,
     SETTINGS: 0x40,
+    PD_MODES: 0x50,
 });
 
 const PROFILE_DOMAIN_VERSIONS = Object.freeze({
@@ -25,6 +26,14 @@ const PROFILE_DOMAIN_VERSIONS = Object.freeze({
     [PROFILE_DOMAIN_IDS.COMBOS]: 1,
     [PROFILE_DOMAIN_IDS.SETTINGS]: 1,
 });
+
+const PROFILE_BLOB_V2 = Object.freeze({...PROFILE_BLOB_V1, SCHEMA_MAJOR: 2, MAX_SIZE: 5088});
+const PROFILE_DOMAIN_VERSIONS_V2 = Object.freeze({...PROFILE_DOMAIN_VERSIONS, 16: 2, 64: 2, 80: 1});
+function schemaFormat(major) {
+    if (major === 1) return PROFILE_BLOB_V1;
+    if (major === 2) return PROFILE_BLOB_V2;
+    throw profileBlobError("INCOMPATIBLE_SCHEMA", `Profile schema ${major} is not supported.`);
+}
 
 const PROFILE_ACTION_KINDS = Object.freeze({
     NONE: 0,
@@ -56,7 +65,8 @@ class ProfileBlobProtocolError extends Error {
 }
 
 function encodeProfileBlob(profile = {}, options = {}) {
-    const domainVersions = normalizeDomainVersions(options.domainVersions);
+    const format = schemaFormat(profile?.schema?.major ?? 1);
+    const domainVersions = normalizeDomainVersions(options.domainVersions ?? (format.SCHEMA_MAJOR === 2 ? PROFILE_DOMAIN_VERSIONS_V2 : undefined));
     if (!profile || typeof profile !== "object") {
         throw new TypeError("Profile blob input must be an object.");
     }
@@ -73,13 +83,13 @@ function encodeProfileBlob(profile = {}, options = {}) {
 
     const encodedDomains = domains.map((domain) => encodeDomainEnvelope(domain, {domainVersions}));
     const totalLength = PROFILE_BLOB_V1.HEADER_SIZE + encodedDomains.reduce((total, domain) => total + domain.length, 0);
-    if (totalLength > PROFILE_BLOB_V1.MAX_SIZE) {
-        throw profileBlobError("CAPACITY_EXCEEDED", `Profile blob is ${totalLength} bytes; maximum is ${PROFILE_BLOB_V1.MAX_SIZE}.`);
+    if (totalLength > format.MAX_SIZE) {
+        throw profileBlobError("CAPACITY_EXCEEDED", `Profile blob is ${totalLength} bytes; maximum is ${format.MAX_SIZE}.`);
     }
 
     const output = Buffer.alloc(totalLength);
     MAGIC_BYTES.copy(output, 0);
-    output[4] = PROFILE_BLOB_V1.SCHEMA_MAJOR;
+    output[4] = format.SCHEMA_MAJOR;
     output[5] = PROFILE_BLOB_V1.SCHEMA_MINOR;
     output[6] = domains.length;
     output[7] = PROFILE_BLOB_V1.CANONICAL_FLAG;
@@ -93,17 +103,19 @@ function encodeProfileBlob(profile = {}, options = {}) {
 
 function decodeProfileBlob(value, options = {}) {
     const bytes = copyBytes(value, "Profile blob");
-    const domainVersions = normalizeDomainVersions(options.domainVersions);
+
     if (bytes.length < PROFILE_BLOB_V1.HEADER_SIZE) {
         throw profileBlobError("TRUNCATED", `Profile blob needs an ${PROFILE_BLOB_V1.HEADER_SIZE}-byte header.`);
     }
-    if (bytes.length > PROFILE_BLOB_V1.MAX_SIZE) {
-        throw profileBlobError("CAPACITY_EXCEEDED", `Profile blob is ${bytes.length} bytes; maximum is ${PROFILE_BLOB_V1.MAX_SIZE}.`);
+    const format = schemaFormat(bytes[4]);
+    const domainVersions = normalizeDomainVersions(options.domainVersions ?? (format.SCHEMA_MAJOR === 2 ? PROFILE_DOMAIN_VERSIONS_V2 : undefined));
+    if (bytes.length > format.MAX_SIZE) {
+        throw profileBlobError("CAPACITY_EXCEEDED", `Profile blob is ${bytes.length} bytes; maximum is ${format.MAX_SIZE}.`);
     }
     if (!bytes.subarray(0, MAGIC_BYTES.length).equals(MAGIC_BYTES)) {
         throw profileBlobError("INVALID_MAGIC", `Profile blob magic must be ${PROFILE_BLOB_V1.MAGIC}.`);
     }
-    if (bytes[4] !== PROFILE_BLOB_V1.SCHEMA_MAJOR || bytes[5] !== PROFILE_BLOB_V1.SCHEMA_MINOR) {
+    if (bytes[4] !== format.SCHEMA_MAJOR || bytes[5] !== PROFILE_BLOB_V1.SCHEMA_MINOR) {
         throw profileBlobError("INCOMPATIBLE_SCHEMA", `Profile blob schema ${bytes[4]}.${bytes[5]} is not supported.`);
     }
     if ((bytes[7] & ~PROFILE_BLOB_V1.KNOWN_FLAGS) !== 0) {
@@ -385,6 +397,8 @@ module.exports = {
     PROFILE_ACTION_KINDS,
     PROFILE_ACTION_LIMITS,
     PROFILE_BLOB_V1,
+    PROFILE_BLOB_V2,
+    PROFILE_DOMAIN_VERSIONS_V2,
     PROFILE_DOMAIN_IDS,
     PROFILE_DOMAIN_VERSIONS,
     ProfileBlobProtocolError,

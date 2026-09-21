@@ -61,6 +61,8 @@ const RGB_PD_MODE_IDS = Object.freeze({
     PD_MODE_ZOOM: 3,
     PD_MODE_ARROW: 4,
     PD_MODE_PINCH: 5,
+    PD_MODE_SLOT_6: 6,
+    PD_MODE_SLOT_7: 7,
 });
 
 const BLACK = Object.freeze({h: 0, s: 0, v: 0});
@@ -75,10 +77,10 @@ class RgbDomainProtocolError extends Error {
 }
 
 function encodeRgbDomainV1(profile, options = {}) {
-    const limits = normalizeOptions(options);
+    const limits = normalizeOptions({...options, formatVersion: profile?.formatVersion ?? options.formatVersion ?? 1});
     const value = normalizeProfile(profile, limits);
     const header = Buffer.alloc(RGB_DOMAIN_V1.HEADER_SIZE);
-    header[0] = RGB_DOMAIN_V1.FORMAT_VERSION;
+    header[0] = value.formatVersion;
     header[1] = 0;
     header.writeUInt16LE(value.stageEnableMask, 2);
     header[4] = value.groups.length;
@@ -152,14 +154,14 @@ function encodeRgbDomainV1(profile, options = {}) {
 
 function decodeRgbDomainV1(value, options = {}) {
     const bytes = copyBytes(value, "RGB domain payload");
-    const limits = normalizeOptions(options);
+    const limits = normalizeOptions({...options, formatVersion: bytes[0]});
     if (bytes.length < RGB_DOMAIN_V1.HEADER_SIZE) {
         throw rgbError("TRUNCATED", `RGB domain needs a ${RGB_DOMAIN_V1.HEADER_SIZE}-byte header.`);
     }
     if (bytes.length > RGB_DOMAIN_V1.MAX_PAYLOAD_SIZE) {
         throw rgbError("CAPACITY_EXCEEDED", `RGB domain payload is ${bytes.length} bytes; maximum is ${RGB_DOMAIN_V1.MAX_PAYLOAD_SIZE}.`);
     }
-    if (bytes[0] !== RGB_DOMAIN_V1.FORMAT_VERSION) {
+    if (![1, 2].includes(bytes[0])) {
         throw rgbError("INVALID_VERSION", `RGB payload format ${bytes[0]} is not supported.`);
     }
     if (bytes[1] !== 0 || bytes[14] !== 0 || bytes[15] !== 0) {
@@ -274,7 +276,7 @@ function decodeRgbDomainV1(value, options = {}) {
 }
 
 function createRgbDomainV1(profile, options = {}) {
-    return {id: RGB_DOMAIN_V1.DOMAIN_ID, version: RGB_DOMAIN_V1.DOMAIN_VERSION, payload: encodeRgbDomainV1(profile, options)};
+    return {id: RGB_DOMAIN_V1.DOMAIN_ID, version: profile.formatVersion ?? 1, payload: encodeRgbDomainV1(profile, options)};
 }
 
 function canonicalizeStudioRgbDomainV1(model, options = {}) {
@@ -346,7 +348,7 @@ function normalizeProfile(profile, limits) {
     if (!profile || typeof profile !== "object") {
         throw new TypeError("RGB domain input must be an object.");
     }
-    if (profile.formatVersion !== undefined && profile.formatVersion !== RGB_DOMAIN_V1.FORMAT_VERSION) {
+    if (profile.formatVersion !== undefined && ![1, 2].includes(profile.formatVersion)) {
         throw rgbError("INVALID_VERSION", `RGB payload format ${profile.formatVersion} is not supported.`);
     }
     const stageEnableMask = assertStageMask(profile.stageEnableMask, limits.compiledStageMask, "stageEnableMask");
@@ -392,7 +394,7 @@ function normalizeProfile(profile, limits) {
         throw rgbError("CAPACITY_EXCEEDED", `RGB stage group rows total ${groupRowCount}; maximum is ${RGB_DOMAIN_V1.MAX_STAGE_GROUP_ROWS}.`);
     }
     const normalized = {
-        formatVersion: RGB_DOMAIN_V1.FORMAT_VERSION,
+        formatVersion: profile.formatVersion ?? limits.formatVersion,
         stageEnableMask,
         groups,
         layerColors,
@@ -410,6 +412,8 @@ function normalizeProfile(profile, limits) {
 }
 
 function normalizeOptions(options = {}) {
+    const formatVersion = options.formatVersion ?? 1;
+    const maxPdModes = formatVersion === 2 ? 8 : 6;
     const maxLogicalLayers = options.maxLogicalLayers === undefined ? RGB_DOMAIN_V1.MAX_LOGICAL_LAYERS : assertU8(options.maxLogicalLayers, "maxLogicalLayers");
     if (maxLogicalLayers > RGB_DOMAIN_V1.MAX_LOGICAL_LAYERS) {
         throw new RangeError(`maxLogicalLayers cannot exceed ${RGB_DOMAIN_V1.MAX_LOGICAL_LAYERS}.`);
@@ -419,17 +423,18 @@ function normalizeOptions(options = {}) {
         throw new RangeError("logicalLayerCount must be between one and maxLogicalLayers.");
     }
     const supportedPdModeIds = options.supportedPdModeIds === undefined
-        ? Object.values(RGB_PD_MODE_IDS)
+        ? Object.values(RGB_PD_MODE_IDS).filter(id => id < maxPdModes)
         : Array.from(options.supportedPdModeIds, (value) => assertU8(value, "supportedPdModeIds entry"));
     supportedPdModeIds.sort((left, right) => left - right);
-    if (supportedPdModeIds.length > RGB_DOMAIN_V1.MAX_PD_MODES || new Set(supportedPdModeIds).size !== supportedPdModeIds.length) {
+    if (supportedPdModeIds.length > maxPdModes || new Set(supportedPdModeIds).size !== supportedPdModeIds.length) {
         throw new RangeError(`supportedPdModeIds must contain at most ${RGB_DOMAIN_V1.MAX_PD_MODES} unique ids.`);
     }
-    const knownPdModeIds = new Set(Object.values(RGB_PD_MODE_IDS));
+    const knownPdModeIds = new Set(Object.values(RGB_PD_MODE_IDS).filter(id => id < maxPdModes));
     if (supportedPdModeIds.some((id) => !knownPdModeIds.has(id))) {
         throw new RangeError("supportedPdModeIds contains an id outside the Profile Wire v1 PD-mode registry.");
     }
     return {
+        formatVersion, maxPdModes,
         compiledStageMask: assertStageMask(options.compiledStageMask === undefined ? RGB_STAGE_MASK_ALL : options.compiledStageMask, RGB_STAGE_MASK_ALL, "compiledStageMask"),
         logicalLayerCount,
         maxLogicalLayers,
@@ -533,7 +538,7 @@ function assertCompiledSurfaces(profile, limits) {
 }
 
 function assertHeaderCounts(counts, limits) {
-    if (counts.groups > RGB_DOMAIN_V1.MAX_GROUPS || counts.layerColors > limits.maxLogicalLayers || counts.pdColors > RGB_DOMAIN_V1.MAX_PD_MODES || counts.branchColors > RGB_DOMAIN_V1.MAX_TAP_BRANCH_COLORS) {
+    if (counts.groups > RGB_DOMAIN_V1.MAX_GROUPS || counts.layerColors > limits.maxLogicalLayers || counts.pdColors > limits.maxPdModes || counts.branchColors > RGB_DOMAIN_V1.MAX_TAP_BRANCH_COLORS) {
         throw rgbError("CAPACITY_EXCEEDED", "RGB payload header count exceeds a fixed v1 capacity.");
     }
     if (counts.layerGroups + counts.pdGroups + counts.comboGroups + counts.keyGroups > RGB_DOMAIN_V1.MAX_STAGE_GROUP_ROWS) {

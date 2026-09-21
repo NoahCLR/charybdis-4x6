@@ -1,3 +1,4 @@
+#include "effective_pd_runtime.h"
 // ──────────────────────────────────────────────────────────────────────────
 // Single Live-Profile Runtime Owner
 // ──────────────────────────────────────────────────────────────────────────
@@ -72,7 +73,7 @@ static noah_profile_split_descriptor_t descriptor_from_candidate(const noah_prof
         .origin_half             = candidate->origin_half,
         .readable                = true,
         .has_profile             = true,
-        .logical                 = candidate->format_version == NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL,
+        .logical                 = candidate->format_version == NOAH_PROFILE_LOGICAL_STORE_VERSION,
     };
 }
 
@@ -95,7 +96,7 @@ static bool host_staged_read(void *context, const noah_profile_split_descriptor_
                                           .origin_half             = candidate.origin_half,
                                           .readable                = true,
                                           .has_profile             = true,
-                                          .logical                 = candidate.format_version == NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL,
+                                          .logical                 = candidate.format_version == NOAH_PROFILE_LOGICAL_STORE_VERSION,
                                       })) {
         return false;
     }
@@ -175,7 +176,7 @@ static bool record_payload_start(noah_profile_slot_t slot, uint16_t *address) {
 }
 
 static bool record_matches_descriptor(const noah_profile_store_record_t *record, const noah_profile_split_descriptor_t *descriptor) {
-    return record && descriptor && descriptor->readable && descriptor->has_profile && record->slot != NOAH_PROFILE_SLOT_NONE && record->schema_major == descriptor->schema_major && record->schema_minor == descriptor->schema_minor && record->domain_mask == descriptor->domain_mask && record->flags == descriptor->profile_flags && record->payload_length == descriptor->payload_length && record->generation == descriptor->generation && record->origin_half == descriptor->origin_half && record->payload_crc32 == descriptor->payload_crc32 && record->payload_digest == descriptor->payload_digest && record->compiled_default_digest == descriptor->compiled_default_digest && record->action_abi_digest == descriptor->action_abi_digest && (record->format_version == NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL) == descriptor->logical;
+    return record && descriptor && descriptor->readable && descriptor->has_profile && record->slot != NOAH_PROFILE_SLOT_NONE && record->schema_major == descriptor->schema_major && record->schema_minor == descriptor->schema_minor && record->domain_mask == descriptor->domain_mask && record->flags == descriptor->profile_flags && record->payload_length == descriptor->payload_length && record->generation == descriptor->generation && record->origin_half == descriptor->origin_half && record->payload_crc32 == descriptor->payload_crc32 && record->payload_digest == descriptor->payload_digest && record->compiled_default_digest == descriptor->compiled_default_digest && record->action_abi_digest == descriptor->action_abi_digest && (record->format_version == NOAH_PROFILE_LOGICAL_STORE_VERSION) == descriptor->logical;
 }
 
 static bool local_descriptor(void *context, noah_profile_split_descriptor_t *descriptor) {
@@ -224,7 +225,7 @@ static bool publish_validated_descriptor(noah_profile_owner_t *owner) {
         .origin_half             = record.origin_half,
         .readable                = true,
         .has_profile             = true,
-        .logical                 = record.format_version == NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL,
+        .logical                 = record.format_version == NOAH_PROFILE_LOGICAL_STORE_VERSION,
     };
     if (!same_record) {
         owner->boot_via_resolution_known = false;
@@ -242,7 +243,7 @@ static bool resolve_boot_via_authority(noah_profile_owner_t *owner) {
     }
     via    = owner->config.logical_via;
     record = owner->store.committed.slot == NOAH_PROFILE_SLOT_NONE ? NULL : &owner->store.committed;
-    if (record && record->format_version == NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL) {
+    if (record && record->format_version == NOAH_PROFILE_LOGICAL_STORE_VERSION) {
         if (owner->boot_via_resolution_known) {
             return true;
         }
@@ -284,7 +285,7 @@ static bool local_binding(void *context, const noah_profile_split_descriptor_t *
         return false;
     }
     record = owner->store.committed.slot == NOAH_PROFILE_SLOT_NONE ? NULL : &owner->store.committed;
-    if (!record_matches_descriptor(record, descriptor) || record->format_version != NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL) {
+    if (!record_matches_descriptor(record, descriptor) || record->format_version != NOAH_PROFILE_LOGICAL_STORE_VERSION) {
         return false;
     }
     *via_generation = record->via_generation;
@@ -308,14 +309,19 @@ static void fail_integration(noah_profile_owner_t *owner) {
 }
 
 static bool initialize_runtime_graph(noah_profile_owner_t *owner) {
-    noah_effective_profile_invalidator_t     invalidators[4];
+    noah_effective_profile_invalidator_t     invalidators[5];
+    uint8_t invalidator_count = 0;
     noah_profile_candidate_backend_t         host_backend;
     noah_profile_candidate_compatibility_t   host_compatibility;
     noah_profile_split_reconciler_config_t   split_config;
     noah_profile_activation_peer_observer_fn observer;
     void                                    *observer_context;
 
-    if (!owner || noah_profile_validator_v1_profile(&owner->staging.compiled_validator, &owner->compiled_profile, NULL) != NOAH_PROFILE_VALIDATOR_V1_VALID || noah_effective_profile_snapshot_make_compiled(&owner->compiled_profile, &owner->compiled_reader, 0u, &owner->compiled_snapshot) != NOAH_EFFECTIVE_PROFILE_OK) {
+    // The provider does not exist until provider_init below. Borrow its pending
+    // view for boot validation, then copy it into the independent snapshot
+    // before provider_init clears the provider. No extra permanent profile view
+    // or large automatic workspace is needed for this boot-only operation.
+    if (!owner || noah_profile_validator_v1_profile(&owner->staging.compiled_validator, &owner->provider.pending.profile, NULL) != NOAH_PROFILE_VALIDATOR_V1_VALID || noah_effective_profile_snapshot_make_compiled(&owner->provider.pending.profile, &owner->compiled_reader, 0u, &owner->compiled_snapshot) != NOAH_EFFECTIVE_PROFILE_OK) {
         return false;
     }
 
@@ -324,36 +330,36 @@ static bool initialize_runtime_graph(noah_profile_owner_t *owner) {
 #ifdef COMBO_ENABLE
     noah_effective_combo_runtime_init(&owner->combos);
 #endif
-    invalidators[0] = (noah_effective_profile_invalidator_t){
+    invalidators[invalidator_count++] = (noah_effective_profile_invalidator_t){
         .callback = noah_effective_key_behavior_runtime_invalidate,
         .context  = &owner->key_behaviors,
     };
-    invalidators[1] = (noah_effective_profile_invalidator_t){
+    invalidators[invalidator_count++] = (noah_effective_profile_invalidator_t){
         .callback = noah_effective_rgb_runtime_invalidate,
         .context  = &owner->rgb,
     };
 #ifdef COMBO_ENABLE
-    invalidators[2] = (noah_effective_profile_invalidator_t){.callback = noah_effective_combo_runtime_invalidate, .context = &owner->combos};
+    invalidators[invalidator_count++] = (noah_effective_profile_invalidator_t){.callback = noah_effective_combo_runtime_invalidate, .context = &owner->combos};
 #endif
 #ifdef NOAH_PORTABLE_PROFILE_ENABLE
-    invalidators[3] = (noah_effective_profile_invalidator_t){.callback = noah_effective_settings_invalidate, .context = NULL};
+    invalidators[invalidator_count++] = (noah_effective_profile_invalidator_t){.callback = noah_effective_settings_invalidate, .context = NULL};
+#endif
+#ifdef NOAH_PD_PROFILE_ENABLE
+    invalidators[invalidator_count++] = (noah_effective_profile_invalidator_t){.callback = noah_effective_pd_invalidate, .context = NULL};
 #endif
     observer         = owner->config.peer_required ? owner_peer_observer : no_peer_observer;
     observer_context = owner->config.peer_required ? owner : NULL;
     noah_profile_activation_policy_init(&owner->activation_policy, observer, observer_context);
-    if (noah_effective_profile_provider_init(&owner->provider, &owner->compiled_snapshot, noah_profile_activation_policy_safe_boundary, &owner->activation_policy, invalidators,
-#ifdef NOAH_PORTABLE_PROFILE_ENABLE
-                                             4u
-#elif defined(COMBO_ENABLE)
-                                             3u
-#else
-                                             2u
-#endif
+    if (noah_effective_profile_provider_init(&owner->provider, &owner->compiled_snapshot, noah_profile_activation_policy_safe_boundary, &owner->activation_policy, invalidators, invalidator_count
                                              ) != NOAH_EFFECTIVE_PROFILE_OK) {
         return false;
     }
     noah_effective_key_behavior_runtime_invalidate(&owner->key_behaviors, 0u, owner->compiled_snapshot.identity, owner->compiled_snapshot.identity, &owner->compiled_snapshot);
     noah_effective_rgb_runtime_invalidate(&owner->rgb, 0u, owner->compiled_snapshot.identity, owner->compiled_snapshot.identity, &owner->compiled_snapshot);
+#ifdef NOAH_PD_PROFILE_ENABLE
+    noah_effective_pd_invalidate(NULL, 0u, owner->compiled_snapshot.identity, owner->compiled_snapshot.identity, &owner->compiled_snapshot);
+    if (!noah_effective_pd_ready()) return false;
+#endif
 
     noah_profile_store_init(&owner->store, owner->config.store_io,
                             (noah_profile_store_compatibility_t){
@@ -519,7 +525,7 @@ static bool scan_boot_reconciliation(noah_profile_owner_t *owner, bool master, u
         return scan_running(owner, master, now_ms, false);
     }
     if (boot_peer_converged(owner)) {
-        if (owner->store.committed.format_version == NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL && (!owner->config.logical_via || !owner->config.logical_via->converged || !owner->config.logical_via->converged(owner->config.logical_via->context, owner->store.committed.via_generation, owner->store.committed.via_digest))) {
+        if (owner->store.committed.format_version == NOAH_PROFILE_LOGICAL_STORE_VERSION && (!owner->config.logical_via || !owner->config.logical_via->converged || !owner->config.logical_via->converged(owner->config.logical_via->context, owner->store.committed.via_generation, owner->store.committed.via_digest))) {
             return false;
         }
         owner->boot_activation_started = false;
@@ -656,7 +662,7 @@ static bool request_host_precommit_cancel(noah_profile_owner_t *owner, noah_prof
     if (reason == NOAH_PROFILE_CANDIDATE_V1_ERROR_NONE && !host_mailbox_is_matching_abort(owner)) {
         return false;
     }
-    if (owner->store.prepare_active && owner->store.candidate.format_version == NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL && !owner->host_via_abort_requested) {
+    if (owner->store.prepare_active && owner->store.candidate.format_version == NOAH_PROFILE_LOGICAL_STORE_VERSION && !owner->host_via_abort_requested) {
         if (!owner->config.logical_via || !owner->config.logical_via->abort || !owner->config.logical_via->abort(owner->config.logical_via->context, owner->host_transaction.status.transaction_id, owner->store.candidate.via_generation, owner->store.candidate.via_digest)) {
             return false;
         }
@@ -715,7 +721,7 @@ static bool begin_or_advance_host_barrier(noah_profile_owner_t *owner) {
         return false;
     }
     descriptor = descriptor_from_candidate(&candidate);
-    if (candidate.format_version == NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL) {
+    if (candidate.format_version == NOAH_PROFILE_LOGICAL_STORE_VERSION) {
         if (!owner->config.logical_via || !owner->config.logical_via->ready || !owner->config.logical_via->accept || !owner->config.logical_via->abort || !owner->config.logical_via->converged) {
             fail_integration(owner);
             return true;
@@ -746,7 +752,7 @@ static bool begin_or_advance_host_barrier(noah_profile_owner_t *owner) {
         }
     }
     if (!owner->host_barrier_started) {
-        bool began = candidate.format_version == NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL ? noah_profile_split_reconciler_prepared_push_begin_logical(&owner->reconciler, &owner->host_barrier_descriptor, owner, host_staged_read, candidate.via_generation, candidate.via_digest) : noah_profile_split_reconciler_prepared_push_begin(&owner->reconciler, &owner->host_barrier_descriptor, owner, host_staged_read);
+        bool began = candidate.format_version == NOAH_PROFILE_LOGICAL_STORE_VERSION ? noah_profile_split_reconciler_prepared_push_begin_logical(&owner->reconciler, &owner->host_barrier_descriptor, owner, host_staged_read, candidate.via_generation, candidate.via_digest) : noah_profile_split_reconciler_prepared_push_begin(&owner->reconciler, &owner->host_barrier_descriptor, owner, host_staged_read);
         if (!began) {
             return false;
         }
@@ -833,7 +839,7 @@ static bool advance_host_postcommit_barrier(noah_profile_owner_t *owner) {
         }
         return false;
     }
-    if (owner->store.committed.format_version == NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL) {
+    if (owner->store.committed.format_version == NOAH_PROFILE_LOGICAL_STORE_VERSION) {
         if (!owner->host_via_accept_requested) {
             if (!owner->config.logical_via || !owner->config.logical_via->accept || !owner->config.logical_via->accept(owner->config.logical_via->context, owner->host_transaction.status.transaction_id, owner->store.committed.via_generation, owner->store.committed.via_digest)) {
                 return false;
@@ -958,6 +964,12 @@ bool noah_profile_owner_scan(noah_profile_owner_t *owner, bool master, uint32_t 
     if (!owner) {
         return false;
     }
+#ifdef NOAH_PD_PROFILE_ENABLE
+    if (owner->runtimes_installed && !noah_effective_pd_ready()) {
+        owner->state = NOAH_PROFILE_OWNER_INTEGRATION_ERROR;
+        return false;
+    }
+#endif
     switch (owner->state) {
         case NOAH_PROFILE_OWNER_VALIDATING_COMPILED:
             validator_result = noah_profile_validator_v1_step(&owner->staging.compiled_validator, NOAH_PROFILE_CANDIDATE_SCAN_BYTE_BUDGET, NULL);

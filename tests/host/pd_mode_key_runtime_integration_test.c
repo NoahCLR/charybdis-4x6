@@ -2,6 +2,11 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#ifdef NOAH_PD_PROFILE_ENABLE
+#include "users/noah/lib/profile/runtime/effective_pd_runtime.h"
+#include "users/noah/lib/pointing/modes/pd_mode_configured.h"
+#endif
 
 #include "key_runtime_integration_harness.h"
 #include "users/noah/lib/action/action_dispatch.h"
@@ -247,7 +252,43 @@ static void test_configure_pinch_transparent_profile_path(keypos_t key_pos) {
     layer_state = test_layer_mask(TEST_LAYER_BASE) | test_layer_mask(TEST_LAYER_POINTER);
 }
 
+#ifdef NOAH_PD_PROFILE_ENABLE
+static uint8_t configured_pd_bytes[NOAH_PROFILE_PD_V1_SIZE];
+static bool configured_pd_read(void *context, size_t offset, uint8_t *target, size_t length) {
+    (void)context;
+    if (offset > sizeof(configured_pd_bytes) || length > sizeof(configured_pd_bytes) - offset) return false;
+    memcpy(target, configured_pd_bytes + offset, length);
+    return true;
+}
+static void publish_configured_pd(void) {
+    noah_effective_profile_snapshot_t view = {0};
+    view.reader = (noah_profile_reader_t){.read = configured_pd_read, .length = sizeof(configured_pd_bytes)};
+    view.profile.domain_mask = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_PD;
+    view.profile.pd.length = sizeof(configured_pd_bytes);
+    noah_effective_pd_invalidate(NULL, 0, view.identity, view.identity, &view);
+    CHECK(noah_effective_pd_ready());
+}
+static void load_configured_pd(void) {
+    noah_pd_engine_exit();
+    memset(configured_pd_bytes, 0, sizeof(configured_pd_bytes));
+    configured_pd_bytes[0] = 1; configured_pd_bytes[1] = 8; configured_pd_bytes[2] = 96;
+    for (uint8_t i = 0; i < 8; i++) noah_profile_pd_v1_encode_record(&noah_pd_defaults[i], configured_pd_bytes + 8 + i * 96);
+    publish_configured_pd();
+}
+report_mouse_t noah_pd_configured_scroll(const uint8_t *record, report_mouse_t report) {
+    (void)record;
+    return report; // Motion parity is covered by pd_mode_handlers_test.
+}
+// Configured directional modes reset their shared engine, never legacy state.
+#define EXPECT_VOLUME_RESETS(count) CHECK(reset_volume_count == 0)
+#else
+#define EXPECT_VOLUME_RESETS(count) CHECK(reset_volume_count == (count))
+#endif
+
 static void test_reset_state(void) {
+#ifdef NOAH_PD_PROFILE_ENABLE
+    load_configured_pd();
+#endif
     noah_runtime_reset_for_test();
     test_reset_keymap();
 
@@ -863,7 +904,7 @@ static void test_authored_single_press_preserves_default_pd_mode_hold(void) {
     CHECK(pd_mode_local_locked_snapshot() == 0);
     CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == KC_NO);
     CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == KC_NO);
-    CHECK(reset_volume_count == 1);
+    EXPECT_VOLUME_RESETS(1);
     CHECK(current_cpi == default_dpi);
 }
 
@@ -1017,7 +1058,7 @@ static void test_interrupted_locked_pd_mode_press_unlocks_on_press_and_releases_
     CHECK(pd_mode_set_lock_state(PD_MODE_VOLUME, true));
     CHECK(pd_mode_local_active_snapshot() == PD_MODE_VOLUME);
     CHECK(pd_mode_local_locked_snapshot() == PD_MODE_VOLUME);
-    CHECK(reset_volume_count == 0);
+    EXPECT_VOLUME_RESETS(0);
 
     key_runtime_integration_run(&fake_time, press_and_interrupt, ARRAY_SIZE(press_and_interrupt));
     CHECK(pd_mode_local_active_snapshot() == PD_MODE_VOLUME);
@@ -1025,7 +1066,7 @@ static void test_interrupted_locked_pd_mode_press_unlocks_on_press_and_releases_
     CHECK(!pd_mode_local_locked(PD_MODE_VOLUME));
     CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == VOLUME_MODE);
     CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == VOLUME_MODE);
-    CHECK(reset_volume_count == 1);
+    EXPECT_VOLUME_RESETS(1);
 
     key_runtime_integration_run(&fake_time, release_steps, ARRAY_SIZE(release_steps));
     CHECK(pd_mode_local_active_snapshot() == 0);
@@ -1034,7 +1075,7 @@ static void test_interrupted_locked_pd_mode_press_unlocks_on_press_and_releases_
     CHECK(!pd_mode_local_locked(PD_MODE_VOLUME));
     CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == KC_NO);
     CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == KC_NO);
-    CHECK(reset_volume_count == 2);
+    EXPECT_VOLUME_RESETS(2);
 }
 
 static void test_authored_pd_mode_hold_dispatches_authored_tap_key_immediately(void) {
@@ -1162,7 +1203,7 @@ static void test_authored_hold_action_activates_pd_mode_while_held(void) {
     CHECK(pd_mode_local_locked_snapshot() == 0);
     CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == KC_NO);
     CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == KC_NO);
-    CHECK(reset_volume_count == 1);
+    EXPECT_VOLUME_RESETS(1);
     CHECK(current_cpi == default_dpi);
 }
 
@@ -1188,7 +1229,7 @@ static void test_authored_double_tap_lock_locks_pd_mode(void) {
     CHECK(pd_mode_local_active(PD_MODE_VOLUME));
     CHECK(pd_mode_local_locked(PD_MODE_VOLUME));
     CHECK(noah_runtime_debug_slot_owner_keycode(test_keypos(1, 2)) == KC_NO);
-    CHECK(reset_volume_count == 1);
+    EXPECT_VOLUME_RESETS(1);
 }
 
 static void test_authored_second_press_hold_branches_into_other_pd_mode(void) {
@@ -1207,7 +1248,7 @@ static void test_authored_second_press_hold_branches_into_other_pd_mode(void) {
     CHECK(!pd_mode_local_active(PD_MODE_VOLUME));
     CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == VOLUME_MODE);
     CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == BRIGHTNESS_MODE);
-    CHECK(reset_volume_count == 1);
+    EXPECT_VOLUME_RESETS(1);
 
     key_runtime_integration_run(&fake_time, &scenario[6], 2);
     CHECK(pd_mode_local_active_snapshot() == 0);
@@ -1356,7 +1397,11 @@ static void test_dragscroll_child_overlap_stays_quiescent(uint16_t parent_keycod
         CHECK(noah_runtime_debug_slot_owner_keycode(child_pos) == DRAGSCROLL);
         CHECK(noah_runtime_debug_slot_held_action_keycode(child_pos) == DRAGSCROLL);
         CHECK(noah_runtime_debug_deferred_release_count() == 0);
+#ifdef NOAH_PD_PROFILE_ENABLE
+        CHECK(reset_dragscroll_count == 1); // Entry clears the shared scroll accumulator.
+#else
         CHECK(reset_dragscroll_count == 0);
+#endif
 
         key_runtime_integration_advance(&fake_time, TEST_PD_TAP_HOLD_TERM + 1);
         key_runtime_integration_scan();
@@ -1380,7 +1425,11 @@ static void test_dragscroll_child_overlap_stays_quiescent(uint16_t parent_keycod
         }
 
         key_runtime_integration_scan();
+#ifdef NOAH_PD_PROFILE_ENABLE
+        CHECK(reset_dragscroll_count == 2); // Entry and exit each reset the engine.
+#else
         CHECK(reset_dragscroll_count == 1);
+#endif
         test_assert_pd_overlap_quiescent(parent_pos, child_pos);
 
         CHECK(key_runtime_integration_process_record(KC_C, test_keypos(0, 1), true));
@@ -1907,7 +1956,39 @@ static void test_gui_double_tap_hold_with_authored_pd_hold_keeps_processed_child
     }
 }
 
+#ifdef NOAH_PD_PROFILE_ENABLE
+static void test_last_slot_hold_lock_dpi_and_disabled_slot(void) {
+    keypos_t pos = test_keypos(0, 0);
+    test_reset_state();
+    action_dispatch(VOLUME_MODE_LOCK);
+    CHECK(pd_mode_local_locked_snapshot() == PD_MODE_VOLUME);
+    action_dispatch(PD_SLOT_6_LOCK);
+    CHECK(pd_mode_local_locked_snapshot() == PD_MODE_VOLUME);
+    action_dispatch(VOLUME_MODE_LOCK);
+    CHECK(pd_mode_local_active_snapshot() == 0);
+    noah_pd_config_t last = noah_pd_defaults[1];
+    last.id = 7; last.dpi = 1200;
+    noah_profile_pd_v1_encode_record(&last, configured_pd_bytes + 8 + 7 * 96);
+    publish_configured_pd();
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_7, pos, true));
+    CHECK(pd_mode_local_active_snapshot() == PD_MODE_SLOT_7);
+    key_runtime_integration_scan(); // CPI synchronization is scan-owned.
+    CHECK(current_cpi == 1200);
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_7, pos, false));
+    key_runtime_integration_scan();
+    CHECK(pd_mode_local_active_snapshot() == 0);
+    CHECK(current_cpi == default_dpi);
+    action_dispatch(PD_SLOT_7_LOCK);
+    CHECK(pd_mode_local_locked_snapshot() == PD_MODE_SLOT_7);
+    action_dispatch(PD_SLOT_7_LOCK);
+    CHECK(pd_mode_local_locked_snapshot() == 0);
+}
+#endif
+
 int main(void) {
+#ifdef NOAH_PD_PROFILE_ENABLE
+    test_last_slot_hold_lock_dpi_and_disabled_slot();
+#endif
     test_authored_single_press_preserves_default_pd_mode_hold();
     test_authored_single_press_pd_mode_hold_dispatches_plain_taps_immediately();
     test_raw_lt_hold_dispatches_authored_tap_key_immediately();

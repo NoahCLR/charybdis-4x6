@@ -772,7 +772,217 @@ static void test_boot_selection_state_machine_is_scan_bounded(void) {
     }
 }
 
+// These are storage-envelope fixtures: domain bodies are opaque to this layer.
+// The schema validator remains responsible for semantic payload validation.
+static uint16_t pd_payload(uint8_t *payload, uint8_t mask) {
+    const uint8_t header[] = {'N', 'L', 'P', '1', 2u, 0u, 0u, 1u};
+    uint16_t length = sizeof(header);
+    memcpy(payload, header, sizeof(header));
+    for (uint8_t domain = 0u; domain < 5u; domain++) {
+        if (!(mask & (1u << domain))) continue;
+        payload[6]++;
+        payload[length++] = (uint8_t)((domain + 1u) * 0x10u);
+        payload[length++] = domain == 0u || domain == 3u ? 2u : 1u;
+        payload[length++] = 1u;
+        payload[length++] = 0u;
+        payload[length++] = (uint8_t)(0x80u + domain);
+    }
+    return length;
+}
+
+static noah_profile_store_compatibility_t pd_compatibility(void) {
+    noah_profile_store_compatibility_t value = compatibility();
+    value.schema_major = 2u;
+    return value;
+}
+
+static void initialize_pd_store(noah_profile_store_t *store) {
+    noah_profile_store_record_t record;
+    noah_profile_store_init(store, io_for(&eeprom), pd_compatibility());
+    noah_profile_store_result_t result = noah_profile_store_boot_select(store, &record);
+    CHECK(result == NOAH_PROFILE_STORE_OK || result == NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE);
+}
+
+static noah_profile_store_candidate_t pd_candidate(const uint8_t *payload, uint16_t length, uint8_t mask, uint32_t generation, uint8_t origin, uint8_t flags) {
+    noah_profile_store_candidate_t value = candidate_for(payload, length, generation, origin);
+    value.schema_major = 2u;
+    value.format_version = NOAH_PROFILE_STORE_FORMAT_VERSION_PD;
+    value.domain_mask = mask;
+    value.flags = flags;
+    value.via_generation = generation + 20u;
+    value.via_digest = UINT32_C(0xABCD0000) + generation;
+    return value;
+}
+
+static noah_profile_store_result_t stage_pd(noah_profile_store_t *store, const uint8_t *payload, const noah_profile_store_candidate_t *candidate) {
+    noah_profile_store_result_t result = noah_profile_store_prepare_begin(store, candidate);
+    if (result != NOAH_PROFILE_STORE_OK) return result;
+    for (uint16_t at = 0u; at < candidate->payload_length;) {
+        uint16_t length = candidate->payload_length - at;
+        if (length > 5u) length = 5u;
+        result = noah_profile_store_prepare_write(store, at, &payload[at], length);
+        if (result != NOAH_PROFILE_STORE_OK) return result;
+        at += length;
+    }
+    return NOAH_PROFILE_STORE_OK;
+}
+
+static noah_profile_store_result_t commit_pd(noah_profile_store_t *store, const uint8_t *payload, const noah_profile_store_candidate_t *candidate) {
+    noah_profile_store_result_t result = stage_pd(store, payload, candidate);
+    return result == NOAH_PROFILE_STORE_OK ? noah_profile_store_prepare_commit(store, NULL) : result;
+}
+
+static void test_pd_header_all_identity_bits_and_boot_paths(void) {
+    for (uint8_t origin = 0u; origin < 2u; origin++) {
+        for (uint8_t flags = 0u; flags < 2u; flags++) {
+            for (uint8_t mask = 0u; mask < 32u; mask++) {
+                uint8_t payload[33];
+                uint16_t length = pd_payload(payload, mask);
+                noah_profile_store_t store, rebooted;
+                noah_profile_store_record_t record;
+                noah_profile_store_candidate_t candidate = pd_candidate(payload, length, mask, 1u, origin, flags);
+                reset_eeprom(&eeprom);
+                initialize_pd_store(&store);
+                CHECK(commit_pd(&store, payload, &candidate) == NOAH_PROFILE_STORE_OK);
+                const uint8_t *header = &eeprom.bytes[NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR];
+                CHECK(header[0] == 'N' && header[1] == 'R');
+                CHECK(header[2] == (uint8_t)(mask | (origin << 5u) | (flags << 6u)));
+                CHECK(load_u16(&header[29]) == noah_profile_crc16_ccitt_update(NOAH_PROFILE_CRC16_INITIAL, header, 29u));
+                CHECK(header[31] == 0xA5u);
+                CHECK(noah_profile_store_validate_slot(&store, NOAH_PROFILE_SLOT_A, true, &record) == NOAH_PROFILE_STORE_OK);
+                CHECK(record.domain_mask == mask && record.origin_half == origin && record.flags == flags);
+                CHECK(record.payload_digest == candidate.payload_digest && record.schema_major == 2u);
+                CHECK(record.via_generation == candidate.via_generation && record.via_digest == candidate.via_digest);
+                noah_profile_store_init(&rebooted, io_for(&eeprom), pd_compatibility());
+                CHECK(noah_profile_store_boot_select_begin(&rebooted) == NOAH_PROFILE_STORE_IN_PROGRESS);
+                noah_profile_store_result_t result;
+                do {
+                    uint32_t reads = eeprom.read_calls;
+                    result = noah_profile_store_boot_select_step(&rebooted, 1u, &record);
+                    CHECK(eeprom.read_calls <= reads + 1u);
+                    CHECK(eeprom.last_read_length <= NOAH_PROFILE_STORE_IO_CHUNK_MAX);
+                } while (result == NOAH_PROFILE_STORE_IN_PROGRESS);
+                CHECK(result == NOAH_PROFILE_STORE_OK);
+                CHECK(record.domain_mask == mask && record.origin_half == origin && record.flags == flags);
+                // The deployed schema-1 reader must never reinterpret NR as NQ.
+                initialize_store(&rebooted, &eeprom, NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE);
+                CHECK(noah_profile_store_validate_slot(&rebooted, NOAH_PROFILE_SLOT_A, true, &record) == NOAH_PROFILE_STORE_INCOMPATIBLE_SCHEMA);
+            }
+        }
+    }
+}
+
+static void test_pd_header_rejects_bad_contracts_before_writing(void) {
+    uint8_t payload[33];
+    uint16_t length = pd_payload(payload, 31u);
+    noah_profile_store_t store;
+    noah_profile_store_candidate_t valid = pd_candidate(payload, length, 31u, 1u, 1u, 1u), candidate;
+    reset_eeprom(&eeprom);
+    initialize_pd_store(&store);
+    for (uint8_t invalid = 0u; invalid < 8u; invalid++) {
+        candidate = valid;
+        switch (invalid) {
+            case 0: candidate.domain_mask = 0x3fu; break;
+            case 1: candidate.via_generation = 0u; break;
+            case 2: candidate.via_digest = 0u; break;
+            case 3: candidate.origin_half = 2u; break;
+            case 4: candidate.flags = 2u; break;
+            case 5: candidate.format_version = NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL; break;
+            case 6: candidate.schema_major = 1u; break;
+            case 7: candidate.schema_minor = 1u; break;
+        }
+        CHECK(noah_profile_store_prepare_begin(&store, &candidate) != NOAH_PROFILE_STORE_OK);
+        CHECK(eeprom.write_calls == 0u);
+    }
+    CHECK(commit_pd(&store, payload, &valid) == NOAH_PROFILE_STORE_OK);
+    uint8_t *header = &eeprom.bytes[NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR];
+    noah_profile_store_record_t record;
+    // Reserved bits and mask/payload disagreement stay invalid even with a valid CRC.
+    header[2] |= 0x80u;
+    store_u16(&header[29], noah_profile_crc16_ccitt_update(NOAH_PROFILE_CRC16_INITIAL, header, 29u));
+    CHECK(noah_profile_store_validate_slot(&store, NOAH_PROFILE_SLOT_A, true, &record) == NOAH_PROFILE_STORE_INVALID_HEADER);
+    header[2] = 0x6fu; // Correct origin/flags, but drops PD from the mask.
+    store_u16(&header[29], noah_profile_crc16_ccitt_update(NOAH_PROFILE_CRC16_INITIAL, header, 29u));
+    CHECK(noah_profile_store_validate_slot(&store, NOAH_PROFILE_SLOT_A, true, &record) == NOAH_PROFILE_STORE_INVALID_PAYLOAD);
+    initialize_pd_store(&store);
+    CHECK(noah_profile_store_boot_select(&store, &record) == NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE);
+
+    for (uint8_t domain = 0u; domain < 5u; domain++) {
+        reset_eeprom(&eeprom);
+        initialize_pd_store(&store);
+        length = pd_payload(payload, 31u);
+        payload[9u + 5u * domain] = domain == 0u || domain == 3u ? 1u : 2u;
+        candidate = pd_candidate(payload, length, 31u, 1u, 0u, 1u);
+        CHECK(commit_pd(&store, payload, &candidate) == NOAH_PROFILE_STORE_INVALID_PAYLOAD);
+        CHECK(noah_profile_store_boot_select(&store, &record) == NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE);
+    }
+    // NQ still rejects the fifth bit at admission, before invalidating a slot.
+    reset_eeprom(&eeprom);
+    initialize_store(&store, &eeprom, NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE);
+    candidate = candidate_for(empty_profile, sizeof(empty_profile), 1u, 0u);
+    candidate.format_version = NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL;
+    candidate.domain_mask = 16u;
+    candidate.via_generation = 1u;
+    candidate.via_digest = 1u;
+    CHECK(noah_profile_store_prepare_begin(&store, &candidate) == NOAH_PROFILE_STORE_INVALID_ARGUMENT);
+    CHECK(eeprom.write_calls == 0u);
+}
+
+static void test_pd_header_power_loss_keeps_complete_generation(void) {
+    uint8_t payload[33];
+    uint16_t length = pd_payload(payload, 31u);
+    noah_profile_store_t store, rebooted;
+    noah_profile_store_record_t record;
+    noah_profile_store_candidate_t first = pd_candidate(payload, length, 31u, 1u, 0u, 1u);
+    noah_profile_store_candidate_t second = pd_candidate(payload, length, 31u, 2u, 1u, 0u);
+    reset_eeprom(&eeprom);
+    initialize_pd_store(&store);
+    CHECK(commit_pd(&store, payload, &first) == NOAH_PROFILE_STORE_OK);
+    memcpy(eeprom_snapshot, eeprom.bytes, sizeof(eeprom_snapshot));
+    uint32_t before = eeprom.write_calls;
+    CHECK(commit_pd(&store, payload, &second) == NOAH_PROFILE_STORE_OK);
+    uint32_t writes = eeprom.write_calls - before;
+    for (uint32_t cut = 1u; cut <= writes; cut++) {
+        for (uint16_t partial = 0u; partial <= NOAH_PROFILE_STORE_IO_CHUNK_MAX; partial++) {
+            reset_eeprom(&eeprom);
+            memcpy(eeprom.bytes, eeprom_snapshot, sizeof(eeprom_snapshot));
+            initialize_pd_store(&store);
+            CHECK(noah_profile_store_boot_select(&store, &record) == NOAH_PROFILE_STORE_OK);
+            eeprom.fail_write_call = cut;
+            eeprom.fail_partial_bytes = partial;
+            CHECK(commit_pd(&store, payload, &second) != NOAH_PROFILE_STORE_OK);
+            eeprom.fail_write_call = 0u;
+            noah_profile_store_init(&rebooted, io_for(&eeprom), pd_compatibility());
+            CHECK(noah_profile_store_boot_select(&rebooted, &record) == NOAH_PROFILE_STORE_OK);
+            CHECK(record.generation == 1u || record.generation == 2u);
+            CHECK(record.domain_mask == 31u && record.payload_digest == first.payload_digest);
+            CHECK(record.origin_half == (record.generation == 1u ? 0u : 1u));
+            CHECK(record.flags == (record.generation == 1u ? 1u : 0u));
+            CHECK(record.via_generation == record.generation + 20u);
+            CHECK(record.via_digest == UINT32_C(0xABCD0000) + record.generation);
+        }
+    }
+    // A durable prepared NR record is inspectable but never selected at boot.
+    reset_eeprom(&eeprom);
+    memcpy(eeprom.bytes, eeprom_snapshot, sizeof(eeprom_snapshot));
+    initialize_pd_store(&store);
+    CHECK(noah_profile_store_boot_select(&store, &record) == NOAH_PROFILE_STORE_OK);
+    CHECK(stage_pd(&store, payload, &second) == NOAH_PROFILE_STORE_OK);
+    CHECK(noah_profile_store_prepare_durable_begin(&store) == NOAH_PROFILE_STORE_IN_PROGRESS);
+    noah_profile_store_result_t result;
+    do { result = noah_profile_store_prepare_durable_step(&store, 1u, &record); } while (result == NOAH_PROFILE_STORE_IN_PROGRESS);
+    CHECK(result == NOAH_PROFILE_STORE_OK && store.prepared_durable);
+    CHECK(noah_profile_store_validate_slot(&store, NOAH_PROFILE_SLOT_B, false, &record) == NOAH_PROFILE_STORE_OK);
+    CHECK(record.generation == 2u);
+    noah_profile_store_init(&rebooted, io_for(&eeprom), pd_compatibility());
+    CHECK(noah_profile_store_boot_select(&rebooted, &record) == NOAH_PROFILE_STORE_OK && record.generation == 1u);
+    CHECK(noah_profile_store_prepare_abort(&store) == NOAH_PROFILE_STORE_OK);
+}
+
 int main(void) {
+    test_pd_header_all_identity_bits_and_boot_paths();
+    test_pd_header_rejects_bad_contracts_before_writing();
+    test_pd_header_power_loss_keeps_complete_generation();
     test_checksums();
     test_commit_and_boot_selection();
     test_logical_header_binds_via_identity();

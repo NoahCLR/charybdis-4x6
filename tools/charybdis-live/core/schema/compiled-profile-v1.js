@@ -49,6 +49,10 @@ const PD_ACTIONS = Object.freeze({
     ARROW_MODE: {kind: PROFILE_ACTION_KINDS.PD_MODE_MOMENTARY, operand: RGB_PD_MODE_IDS.PD_MODE_ARROW},
     ARROW_MODE_LOCK: {kind: PROFILE_ACTION_KINDS.PD_MODE_LOCK, operand: RGB_PD_MODE_IDS.PD_MODE_ARROW},
     PINCH_MODE: {kind: PROFILE_ACTION_KINDS.PD_MODE_MOMENTARY, operand: RGB_PD_MODE_IDS.PD_MODE_PINCH},
+    PD_SLOT_6: {kind: PROFILE_ACTION_KINDS.PD_MODE_MOMENTARY, operand: 6},
+    PD_SLOT_6_LOCK: {kind: PROFILE_ACTION_KINDS.PD_MODE_LOCK, operand: 6},
+    PD_SLOT_7: {kind: PROFILE_ACTION_KINDS.PD_MODE_MOMENTARY, operand: 7},
+    PD_SLOT_7_LOCK: {kind: PROFILE_ACTION_KINDS.PD_MODE_LOCK, operand: 7},
     PINCH_MODE_LOCK: {kind: PROFILE_ACTION_KINDS.PD_MODE_LOCK, operand: RGB_PD_MODE_IDS.PD_MODE_PINCH},
 });
 
@@ -85,7 +89,7 @@ function buildCanonicalStudioProfileV1(model, options = {}) {
     const capabilities = options.capabilities || {};
     const actionLimits = {
         maxLogicalLayers: capabilities.maxLogicalLayers,
-        maxPdModes: Object.keys(RGB_PD_MODE_IDS).length,
+        maxPdModes: 6,
         maxViaMacroSlots: capabilities.viaMacroSlots,
         maxHardcodedMacroSlots: capabilities.hardcodedMacroSlots,
     };
@@ -213,6 +217,8 @@ function resolveNativeQmkExpression(value, model) {
     match = expression.match(/^MACRO_(\d+)$/);
     if (match && Number(match[1]) < HARDCODED_MACRO_SLOTS) return QMK_USER_BASE + Number(match[1]);
 
+    const extraPd = {PD_SLOT_6: 0x7ef0, PD_SLOT_6_LOCK: 0x7ef1, PD_SLOT_7: 0x7ef2, PD_SLOT_7_LOCK: 0x7ef3};
+    if (Object.hasOwn(extraPd, expression)) return extraPd[expression];
     const pdModeNames = ["DRAGSCROLL", "VOLUME_MODE", "BRIGHTNESS_MODE", "ZOOM_MODE", "ARROW_MODE", "PINCH_MODE"];
     const pdModeIndex = pdModeNames.indexOf(expression.replace(/_LOCK$/, ""));
     if (pdModeIndex >= 0) {
@@ -258,7 +264,7 @@ function resolveNativeQmkExpression(value, model) {
 
 function localCustomKeycodeValues(model) {
     const layerCount = Array.isArray(model?.layers) ? model.layers.length : 0;
-    const pdModeCount = Object.keys(RGB_PD_MODE_IDS).length;
+    const pdModeCount = 6;
     const first = QMK_USER_BASE + HARDCODED_MACRO_SLOTS + (pdModeCount * 2) + layerCount;
     return Object.fromEntries((model?.customKeycodes || []).map((name, index) => [name, first + index]));
 }

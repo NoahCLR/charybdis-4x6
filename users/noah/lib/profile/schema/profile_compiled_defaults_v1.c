@@ -199,6 +199,10 @@ static size_t behavior_row_body_length(const key_behavior_t *row) {
 }
 
 static const key_behavior_t *behavior_row_in_canonical_order(uint8_t wanted, noah_profile_compiled_v1_error_t *error) {
+#ifdef NOAH_COMPILED_DEFAULTS_TEST
+    extern void noah_compiled_defaults_test_behavior_visit(void);
+    noah_compiled_defaults_test_behavior_visit();
+#endif
     for (uint8_t candidate = 0u; candidate < key_behavior_count; candidate++) {
         noah_profile_action_v1_t candidate_action;
         uint8_t                  rank = 0u;
@@ -651,10 +655,31 @@ static noah_profile_compiled_v1_result_t action_abi_digest(uint32_t *digest, uin
     return NOAH_PROFILE_COMPILED_V1_OK;
 }
 
+#ifdef NOAH_PD_PROFILE_ENABLE
+static noah_profile_compiled_v1_result_t write_pd_payload(compiled_writer_t *writer, noah_profile_compiled_v1_error_t *error) {
+    static const uint8_t pd_header[8] = {1, 8, 96, 0, 0, 0, 0, 0};
+    if (!emit(writer, pd_header, sizeof(pd_header))) return writer->result;
+    for (uint8_t slot = 0; slot < 8; slot++) {
+        uint8_t record[96];
+        noah_profile_pd_v1_encode_record(&noah_pd_defaults[slot], record);
+        if (noah_profile_pd_v1_validate_record(record, sizeof(record), slot, NULL) != NOAH_PROFILE_PD_V1_OK)
+            return fail(error, NOAH_PROFILE_COMPILED_V1_INVALID_ACTION, NOAH_PROFILE_COMPILED_V1_SURFACE_NONE, slot, UINT8_MAX);
+        for (uint8_t offset = 0; offset < sizeof(record); offset++)
+            if (!emit_u8(writer, record[offset])) return writer->result;
+    }
+    return writer->result;
+}
+#endif
+
 static noah_profile_compiled_v1_result_t write_blob(compiled_writer_t *writer, noah_profile_compiled_v1_error_t *error) {
     static const uint8_t              magic[4] = {'N', 'L', 'P', '1'};
     size_t                            behavior_length;
     uint8_t                           behavior_steps;
+#ifdef NOAH_PD_PROFILE_ENABLE
+    const uint8_t pd_domains = 1;
+#else
+    const uint8_t pd_domains = 0;
+#endif
     noah_profile_compiled_v1_result_t result;
 #if defined(RGB_MATRIX_ENABLE)
     size_t  rgb_length;
@@ -675,9 +700,9 @@ static noah_profile_compiled_v1_result_t write_blob(compiled_writer_t *writer, n
 
     if (!(emit(writer, magic, sizeof(magic)) && emit_u8(writer, NOAH_PROFILE_BLOB_V1_SCHEMA_MAJOR) && emit_u8(writer, NOAH_PROFILE_BLOB_V1_SCHEMA_MINOR)
 #if defined(RGB_MATRIX_ENABLE)
-          && emit_u8(writer, 2u)
+          && emit_u8(writer, 2u + pd_domains)
 #else
-          && emit_u8(writer, 1u)
+          && emit_u8(writer, 1u + pd_domains)
 #endif
           && emit_u8(writer, NOAH_PROFILE_BLOB_V1_CANONICAL_FLAG)))
         return writer->result;
@@ -687,7 +712,13 @@ static noah_profile_compiled_v1_result_t write_blob(compiled_writer_t *writer, n
     if (result != NOAH_PROFILE_COMPILED_V1_OK) return result;
 #endif
     if (!(emit_u8(writer, NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIORS) && emit_u8(writer, NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIOR_VERSION) && emit_u16(writer, (uint16_t)behavior_length))) return writer->result;
-    return write_behavior_payload(writer, error);
+    result = write_behavior_payload(writer, error);
+    if (result != NOAH_PROFILE_COMPILED_V1_OK || writer->stopped) return result;
+#ifdef NOAH_PD_PROFILE_ENABLE
+    if (!(emit_u8(writer, NOAH_PROFILE_DOMAIN_V1_PD) && emit_u8(writer, 1) && emit_u16(writer, NOAH_PROFILE_PD_V1_SIZE))) return writer->result;
+    return write_pd_payload(writer, error);
+#endif
+    return writer->result;
 }
 
 noah_profile_compiled_v1_result_t noah_profile_compiled_v1_open(noah_profile_compiled_v1_t *profile, noah_profile_compiled_v1_error_t *error) {
@@ -708,6 +739,9 @@ noah_profile_compiled_v1_result_t noah_profile_compiled_v1_open(noah_profile_com
     if (writer.offset > UINT16_MAX || writer.offset > NOAH_PROFILE_BLOB_V1_MAX_SIZE) return fail(error, NOAH_PROFILE_COMPILED_V1_CAPACITY_EXCEEDED, NOAH_PROFILE_COMPILED_V1_SURFACE_NONE, UINT8_MAX, UINT8_MAX);
 #if defined(RGB_MATRIX_ENABLE)
     domain_mask |= NOAH_PROFILE_COMPILED_V1_DOMAIN_MASK_RGB;
+#endif
+#ifdef NOAH_PD_PROFILE_ENABLE
+    domain_mask |= NOAH_PROFILE_VALIDATOR_V1_DOMAIN_PD;
 #endif
     profile->metadata = (noah_profile_compiled_v1_metadata_t){
         .byte_length           = (uint16_t)writer.offset,
@@ -736,7 +770,22 @@ static bool compiled_reader_read(void *context, size_t offset, uint8_t *target, 
     range_sink_t                      sink    = {.start = offset, .end = offset + length, .target = target};
     noah_profile_compiled_v1_error_t  error;
     compiled_writer_t                 writer = {.write = range_write, .context = &sink, .result = NOAH_PROFILE_COMPILED_V1_OK, .allow_early_stop = true};
-    return profile && write_blob(&writer, &error) == NOAH_PROFILE_COMPILED_V1_OK && sink.copied == length;
+    if (!profile) return false;
+#ifdef NOAH_PD_PROFILE_ENABLE
+    // PD is the final, fixed-size domain in write_blob. Boot/fallback warms its
+    // cache synchronously in 20-byte reads. Replaying preceding RGB and cubic
+    // behavior canonicalization for each read can starve the scan watchdog.
+    // Seek directly to the PD payload; keep the same encoder and validation.
+    if (profile->metadata.byte_length >= NOAH_PROFILE_PD_V1_SIZE &&
+        (profile->metadata.domain_mask & NOAH_PROFILE_VALIDATOR_V1_DOMAIN_PD) != 0u) {
+        size_t pd_start = profile->metadata.byte_length - NOAH_PROFILE_PD_V1_SIZE;
+        if (offset >= pd_start) {
+            sink.stream_offset = pd_start;
+            return write_pd_payload(&writer, &error) == NOAH_PROFILE_COMPILED_V1_OK && sink.copied == length;
+        }
+    }
+#endif
+    return write_blob(&writer, &error) == NOAH_PROFILE_COMPILED_V1_OK && sink.copied == length;
 }
 
 noah_profile_reader_t noah_profile_compiled_v1_reader(const noah_profile_compiled_v1_t *profile) {
@@ -765,7 +814,7 @@ bool noah_profile_compiled_v1_compatibility(const noah_profile_compiled_v1_t *pr
     result.allowed_domain_mask |= NOAH_PROFILE_VALIDATOR_V1_DOMAIN_COMBOS;
     result.combo_to_native = combo_to_native;
 #endif
-    result.required_domain_mask              = 0u;
+    result.required_domain_mask              = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_PD;
     result.logical_layer_count               = LAYER_COUNT;
     result.supported_pd_mode_mask            = (uint8_t)((UINT32_C(1) << PD_MODE_COUNT) - 1u);
     result.via_macro_slot_count              = VIA_MACRO_SLOT_COUNT;

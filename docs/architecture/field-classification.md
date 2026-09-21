@@ -119,6 +119,23 @@ Safety ceilings can bound live values but cannot themselves be raised live.
 
 These require source changes and a firmware build.
 
+## Configurable PD Slots
+
+The [eight-slot migration plan](live-pd-modes-plan.md) covers configuration that
+formerly lived partly outside the authored profile files. Schema 2 carries
+eight stable PD identities. Retired settings scalars 10–14 are canonical zero;
+per-slot records are the single owner of mode DPI.
+
+| Surface | Classification | Owner |
+| --- | --- | --- |
+| Eight slot names, enabled state and engine selection | Bounded live structure | PD profile validator and effective slot provider |
+| Directional outputs, thresholds and modifier filters | Live policy/actions within an advertised vocabulary | PD engine and action ownership |
+| Scroll inversion, scaling, axis selection and timing | Live policy with validated numeric bounds | Repository-owned scroll engine |
+| Mode-owned modifiers and mouse-button overrides | Bounded live policies | PD lifecycle and existing ownership APIs |
+| Per-slot CPI and pointer-layer policy | Live policy; migrate existing DPI scalars to one owner | PD provider and compatibility layer |
+| Eight RGB configurations and slot-targeted LED groups | Live data linked by stable slot ID | Existing RGB domain and renderer |
+| Slot ceiling, engine implementations and output work limits | Compiled capacity/capability/safety | Firmware build and capability reporting |
+
 ## Canonical Identity Rules
 
 - Standard QMK keycodes may use a 16-bit operand only when the stored

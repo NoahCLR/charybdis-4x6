@@ -13,7 +13,7 @@ static bool descriptor_equal(const noah_profile_split_descriptor_t *left, const 
 }
 
 static bool record_matches_descriptor(const noah_profile_store_record_t *record, const noah_profile_split_descriptor_t *descriptor) {
-    return record && descriptor && record->slot != NOAH_PROFILE_SLOT_NONE && record->schema_major == descriptor->schema_major && record->schema_minor == descriptor->schema_minor && record->domain_mask == descriptor->domain_mask && record->flags == descriptor->profile_flags && record->payload_length == descriptor->payload_length && record->generation == descriptor->generation && record->origin_half == descriptor->origin_half && record->payload_crc32 == descriptor->payload_crc32 && record->payload_digest == descriptor->payload_digest && record->compiled_default_digest == descriptor->compiled_default_digest && record->action_abi_digest == descriptor->action_abi_digest && (record->format_version == NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL) == descriptor->logical;
+    return record && descriptor && record->slot != NOAH_PROFILE_SLOT_NONE && record->schema_major == descriptor->schema_major && record->schema_minor == descriptor->schema_minor && record->domain_mask == descriptor->domain_mask && record->flags == descriptor->profile_flags && record->payload_length == descriptor->payload_length && record->generation == descriptor->generation && record->origin_half == descriptor->origin_half && record->payload_crc32 == descriptor->payload_crc32 && record->payload_digest == descriptor->payload_digest && record->compiled_default_digest == descriptor->compiled_default_digest && record->action_abi_digest == descriptor->action_abi_digest && (record->format_version == NOAH_PROFILE_LOGICAL_STORE_VERSION) == descriptor->logical;
 }
 
 static bool record_same_tuple(const noah_profile_store_record_t *record, const noah_profile_split_descriptor_t *descriptor) {
@@ -224,7 +224,7 @@ noah_profile_peer_store_result_t noah_profile_peer_store_backend_begin_logical(n
     if (via_generation == 0u || via_digest == 0u) {
         return NOAH_PROFILE_PEER_STORE_INVALID_METADATA;
     }
-    return begin_with_binding(peer, descriptor, NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL, via_generation, via_digest);
+    return begin_with_binding(peer, descriptor, NOAH_PROFILE_LOGICAL_STORE_VERSION, via_generation, via_digest);
 }
 
 noah_profile_peer_store_result_t noah_profile_peer_store_backend_write(noah_profile_peer_store_backend_t *peer, uint32_t generation, uint32_t payload_digest, uint16_t offset, const uint8_t *bytes, uint8_t length) {

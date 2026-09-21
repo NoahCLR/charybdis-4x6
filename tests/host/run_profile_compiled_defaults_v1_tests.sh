@@ -28,6 +28,7 @@ const root = process.argv[2] + "/tools/charybdis-live";
 const {document} = require(root + "/tests/fixtures/portable-profile");
 const {validateSnapshot} = require(root + "/core/model/portable-profile");
 fs.writeFileSync(process.argv[3], validateSnapshot(document()).profile);
+fs.writeFileSync(process.argv[3] + '.pd', validateSnapshot(require(root + '/tests/fixtures/pd-profile').document()).profile);
 JS
 
 build_and_run() {
@@ -35,6 +36,7 @@ build_and_run() {
     shift
     bin="$BUILD_DIR/profile_compiled_defaults_v1_test_$name"
     cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic "$@" \
+        -DNOAH_COMPILED_DEFAULTS_TEST \
         -DCOMBO_ENABLE \
         -DPOINTING_DEVICE_ENABLE \
         -DRGB_MATRIX_ENABLE \
@@ -50,6 +52,9 @@ build_and_run() {
         -include "$CONFIG" \
         "$ROOT/tests/host/profile_compiled_defaults_v1_test.c" \
         "$KEYMAP_PATH/keymap.c" \
+        "$KEYMAP_PATH/pd_config.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_pd_v1.c" \
+        "$ROOT/users/noah/lib/profile/runtime/effective_pd_runtime.c" \
         "$KEYMAP_PATH/rgb_config.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_compiled_defaults_v1.c" \
         "$ROOT/users/noah/lib/profile/runtime/profile_action_runtime_v1.c" \
@@ -62,7 +67,13 @@ build_and_run() {
         "$ROOT/users/noah/lib/profile/schema/profile_settings_v1.c" \
         "$ROOT/users/noah/lib/profile/storage/profile_checksum.c" \
         -o "$bin"
-    if [ "$name" = bridge ]; then
+    if [ "$name" = configured ] || [ "$name" = configured_sanitized ]; then
+        "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" ${NOAH_WRITE_PD_FIXTURE:+--write-fixture}
+        "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --import-profile "$BUILD_DIR/portable.bin.pd"
+        if [ -n "${NOAH_TEST_PD_IMPORT:-}" ]; then
+            "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --import-profile "$NOAH_TEST_PD_IMPORT"
+        fi
+    elif [ "$name" = bridge ]; then
         "$bin" "$ROOT/tests/fixtures/compiled_profile_v1.fixture"
     elif [ "$name" = empty ]; then
         "$bin" "$ROOT/tests/fixtures/compiled_profile_eight_v1.fixture" --empty-profile "$BUILD_DIR/portable.bin"
@@ -71,6 +82,8 @@ build_and_run() {
     fi
 }
 
+build_and_run configured -DNOAH_PD_PROFILE_ENABLE -DNOAH_PORTABLE_PROFILE_ENABLE
+build_and_run configured_sanitized -DNOAH_PD_PROFILE_ENABLE -DNOAH_PORTABLE_PROFILE_ENABLE -fsanitize=address,undefined -fno-omit-frame-pointer
 build_and_run normal
 build_and_run bridge -DNOAH_LEGACY_SNAPSHOT_BRIDGE
 build_and_run empty -DNOAH_KEYMAP_EMPTY_KEY_BEHAVIORS -DNOAH_KEYMAP_EMPTY_COMBOS -DNOAH_PORTABLE_PROFILE_ENABLE

@@ -1,13 +1,13 @@
 "use strict";
 const {readViaStorage, readRegion, writeRegion, writeViaMacros, changedRanges, viaStorageDigest, VIA_STORAGE} = require("../protocol/via-storage-v1");
-const {readSettings, readStorageStatus, waitForStorage} = require("../protocol/portable-profile-v1");
+const {readLegacyPdSource, readSettings, readStorageStatus, waitForStorage} = require("../protocol/portable-profile-v1");
 const {readProfileStatus, PROFILE_ACTIVE_KIND} = require("../protocol/profile-wire-v1");
 const {readCommittedPayload, readCompiledPayload} = require("../protocol/profile-payload-v1");
 const {readDeviceCombos} = require("../protocol/combo-readback-v1");
 const {candidateMetadataForBlob, readCandidateStatus, CANDIDATE_STATE} = require("../protocol/profile-candidate-v1");
 const {CandidateUploadCoordinator} = require("./candidate-upload-coordinator");
 const {LogicalViaStageCoordinator} = require("./logical-via-stage-coordinator");
-const {createSnapshot, validateSnapshot, materializeProfile, fingerprint, summary, reorderLayers} = require("../model/portable-profile");
+const {upgradePdSnapshot, createSnapshot, validateSnapshot, materializeProfile, fingerprint, summary, reorderLayers} = require("../model/portable-profile");
 const {encodeSettings} = require("../schema/settings-domain-v1");
 const {crc32, fnv1a32} = require("../schema/profile-blob-v1");
 const fail = (code, message) => Object.assign(new Error(message), {code});
@@ -37,6 +37,7 @@ async function captureProfile(connection, ids, capabilities, onProgress = () => 
     const defaults = await readCompiledPayload(connection, options);
     const active = before.activeKind === PROFILE_ACTIVE_KIND.COMMITTED ? await readCommittedPayload(connection, options) : defaults;
     const combos = await readDeviceCombos(connection, options), settings = await readSettings(connection, ids);
+    const pdSource = capabilities.featureFlags & (1 << 13) ? await readLegacyPdSource(connection, ids) : null;
     const via = await readViaStorage(connection, {allowIncomplete});
     if (!settings.equals(await readSettings(connection, ids))) throw fail("PROFILE_CHANGED", "Keyboard settings changed during the backup. Read it again before continuing.");
     const profile = materializeProfile(active.bytes, defaults.bytes, combos, settings);
@@ -52,6 +53,7 @@ async function captureProfile(connection, ids, capabilities, onProgress = () => 
             identity: snapshotIdentity(after, storageAfter, settings)};
     }
     const document = createSnapshot({profile, via, actionAbiDigest: capabilities.actionAbiDigest});
+    if (pdSource) document.pdModeSource = {version: 1, actionAbiDigest: capabilities.actionAbiDigest, compiledDefaultDigest: capabilities.compiledDefaultDigest, domain: pdSource.toString("base64")};
     validateSnapshot(document, capabilities);
     return {document, fingerprint: fingerprint(document), summary: summary(document), status: after, identity: snapshotIdentity(after, storageAfter, settings)};
 }
@@ -184,4 +186,4 @@ async function restoreProfile(connection, ids, capabilities, document, {expected
         throw error;
     }
 }
-module.exports = {captureProfile, readIdentity, restoreProfile, validateSnapshot, summary, fingerprint, reorderLayers};
+module.exports = {upgradePdSnapshot, captureProfile, readIdentity, restoreProfile, validateSnapshot, summary, fingerprint, reorderLayers};

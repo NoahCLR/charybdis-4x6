@@ -4,7 +4,7 @@ const {validateSnapshot, fingerprint, summary, reorderLayers} = require("../mode
 const {profileReview} = require("../model/profile-review");
 const {editSettings, settingsEditorView} = require("../model/settings-editor");
 const {editMacro, macroEditorView} = require("../model/macro-editor");
-const {editDeviceProfile, RGB_EDITS, COMBO_EDITS} = require("./device-profile-edits");
+const {editDeviceProfile, RGB_EDITS, COMBO_EDITS, PD_EDITS} = require("./device-profile-edits");
 const {BEHAVIOR_EDITS} = require("./key-behavior-edits");
 const {actionName, knownActionAbi} = require("./device-profile-view");
 const {resolveNativeQmkExpression} = require("../schema/compiled-profile-v1");
@@ -13,7 +13,7 @@ const keycodes = require("../data/keycode-catalog");
 const {randomUUID} = require("node:crypto");
 const copy = value => JSON.parse(JSON.stringify(value));
 const fail = text => Object.assign(new Error(text), {code: "PROFILE_DRAFT_CONFLICT"});
-const DRAFT_EDITS = new Set([...RGB_EDITS, ...COMBO_EDITS, ...BEHAVIOR_EDITS, "updateConfigDefaults", "updateViaMacro", "updateLayoutKeys", "applyAllChanges"]);
+const DRAFT_EDITS = new Set([...PD_EDITS, ...RGB_EDITS, ...COMBO_EDITS, ...BEHAVIOR_EDITS, "updateConfigDefaults", "updateViaMacro", "updateLayoutKeys", "applyAllChanges"]);
 
 class ProfileDraftSession {
     constructor(snapshot, deviceId, capabilities) {
@@ -71,7 +71,7 @@ class ProfileDraftSession {
         else if (["updateLayoutKeys", "applyAllChanges"].includes(message.type)) document = this.editLayout(message);
         else {
             if (!DRAFT_EDITS.has(message.type)) throw fail("Unsupported draft edit.");
-            if (message.expectedBase && ["source", "generation", "digest", "originHalf"].some(key => message.expectedBase[key] !== this.identity()[key])) throw fail("This behaviour form belongs to an older draft. Reload that row before keeping changes.");
+            if (message.expectedBase && ["source", "generation", "digest", "originHalf"].some(key => message.expectedBase[key] !== this.identity()[key])) throw fail("This form belongs to an older draft. Reload it before keeping changes.");
             document = {...current.document, profile: editDeviceProfile(Buffer.from(current.document.profile, "base64"), message, {capabilities: this.capabilities, combos: this.combos()}).toString("base64")};
         }
         this.replace(document, message.draftRevision);
@@ -140,7 +140,7 @@ class ProfileDraftSession {
             brightness: max ? Math.min(255, Math.round(brightness * 255 / max)) : 0, hue: values[22] & 255, saturation: (values[22] >>> 8) & 255, speed: (values[21] >>> 16) & 255};
         return {...state, busy: state.busy || this.stale || !state.connected,
             layout: {state: "read", layers: current.document.layers.map((values, layer) => ({layer, keys: CHARYBDIS_4X6_LAYOUT_MATRIX.map(([row, column], layoutIndex) => ({row, column, layoutIndex, keycode: values[row * 6 + column], resolved: keycodes.resolve(values[row * 6 + column])}))}))},
-            committed: {...state.committed, state: "read", failures: [], domains: {rgb: value.rgb, keyBehaviors: value.behaviors, settings: value.settings}},
+            committed: {...state.committed, state: "read", failures: [], domains: {rgb: value.rgb, keyBehaviors: value.behaviors, settings: value.settings, pdModes: value.pdModes}},
             baseRgb, combos: this.combos(), macroView: macroEditorView(current), settingsView: settingsEditorView(current)};
     }
     view(state) {

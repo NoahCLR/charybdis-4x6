@@ -27,6 +27,7 @@ function actionName(action) {
         case ACTION.HARDCODED_MACRO: return `MACRO_${action.operand}`;
         case ACTION.PD_MODE_MOMENTARY:
         case ACTION.PD_MODE_LOCK: {
+            if (action.operand >= 6) return `PD_SLOT_${action.operand}${action.kind === ACTION.PD_MODE_LOCK ? "_LOCK" : ""}`;
             const mode = enumName(RGB_PD_MODE_IDS, action.operand).replace(/^PD_MODE_/, "");
             return (mode === "DRAGSCROLL" ? mode : `${mode}_MODE`) + (action.kind === ACTION.PD_MODE_LOCK ? "_LOCK" : "");
         }
@@ -61,7 +62,7 @@ function behaviorRowsForView(domain) {
 // targets to VIA keycodes only when the device advertises that exact ABI.
 // Unknown ABIs still have fully readable semantic rows in the behaviours view.
 const NATIVE_ACTION_ABI_V1 = 0xdcb00959;
-const knownActionAbi = value => [NATIVE_ACTION_ABI_V1, 0xeb80829c].includes(value);
+const knownActionAbi = value => [NATIVE_ACTION_ABI_V1, 0xeb80829c, 0x61072732].includes(value);
 function behaviorAliasesForView(domain, capabilities) {
     if (!knownActionAbi(capabilities?.actionAbiDigest)) return {};
     const aliases = {};

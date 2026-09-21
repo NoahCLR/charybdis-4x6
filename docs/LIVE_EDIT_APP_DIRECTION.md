@@ -42,6 +42,26 @@ recovery is incomplete. Finish physical decision-boundary interruption tests,
 external VIA adoption, guided recovery, the inherited pointing cadence work,
 and blank-firmware restore acceptance before calling the product complete.
 
+## Eight configurable PD-mode slots
+
+Side-specific owner firmware now reads and writes eight device-owned pointing
+slots and eight RGB rows. The six original modes are authored records consumed
+by shared directional and scroll engines; two slots start empty. The live
+Pointing modes tab uses the shared keycode picker and keeps its normal flow to
+name, movement type, DPI and actions. Pointer policy, thresholds, scroll tuning,
+modifier policies and mouse-button overrides remain available under a collapsed
+Advanced section. Hold/toggle bindings, RGB, review, undo/redo and complete
+backups use the same slot identities.
+
+This is a schema and EEPROM geometry upgrade. Export a verified original and
+migrated profile through the old-geometry readback bridge before flashing the
+new pair. See [the migration plan](architecture/live-pd-modes-plan.md),
+[the domain contract](architecture/pd-mode-domain-v1.md) and
+[resource accounting](architecture/memory-budgets.md). Automated and local editor
+checks do not replace the pending two-half physical migration, interruption,
+cadence and high-water acceptance checks. No hardware has been flashed by this
+implementation work.
+
 ## Why This Branch Exists
 
 Profile Studio was being asked to be two products at once: a `.c` authoring
@@ -454,7 +474,7 @@ existing target/action identities survive equivalent aliases. Sparse tap
 branches, all four hold modes, repeat rates, zero/default timing and the anchor
 flag round-trip through the existing v1 codec. Firmware-advertised row, step
 and action-reference limits are checked before upload. New rows, replacements
-and deletion are available from the layout and the Behaviours view. No firmware
+and deletion are available from the selected key in Layout. No firmware
 format or runtime change is needed. Changed-setting persistence across reboot
 and role changes remains part of the hardware acceptance matrix.
 

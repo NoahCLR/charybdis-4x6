@@ -28,6 +28,7 @@ build_and_run() {
     "$BUILD_DIR/profile_activation_policy_test_$name"
 }
 
+build_and_run configured -DNOAH_PD_PROFILE_ENABLE -DPOINTING_DEVICE_ENABLE
 build_and_run normal
 build_and_run sanitized -fsanitize=address,undefined -fno-omit-frame-pointer
 

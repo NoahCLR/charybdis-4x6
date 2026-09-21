@@ -93,7 +93,10 @@ def load_pd_mode_keycodes() -> list[str]:
         if not match:
             raise SystemExit(f"could not parse pd_mode_manifest.h row: {raw_line!r}")
 
-        keycodes.append(match.group(1))
+        # Appended live slots use explicit 0x7ef0..0x7ef3 identities and do
+        # not consume entries in the deployed contiguous userspace block.
+        if match.group(1) not in ("PD_SLOT_6", "PD_SLOT_7"):
+            keycodes.append(match.group(1))
 
     if not keycodes:
         raise SystemExit(f"no pd modes found in manifest: {PD_MODE_MANIFEST_FILE}")
@@ -205,6 +208,9 @@ for i in range(HARDCODED_MACRO_COUNT):
 for i, keycode in enumerate(PD_MODE_KEYCODES, start=HARDCODED_MACRO_COUNT):
     REPLACEMENTS[f"CUSTOM({VIA_CUSTOM_BASE + i})"] = keycode
 
+
+for offset, name in enumerate(("PD_SLOT_6", "PD_SLOT_6_LOCK", "PD_SLOT_7", "PD_SLOT_7_LOCK")):
+    REPLACEMENTS[f"CUSTOM({240 + offset})"] = name
 
 def load_keymap_local_custom_keycodes() -> list[str]:
     # keymap.c owns the tail of the custom SAFE_RANGE block. Keycodes that are

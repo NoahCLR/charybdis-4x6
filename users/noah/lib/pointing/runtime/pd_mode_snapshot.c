@@ -37,7 +37,11 @@ static void pd_mode_snapshot_fill_view(pd_mode_snapshot_view_t *view, pd_mode_ma
     view->active_index  = pd_mode_snapshot_mode_index(active_mode);
     view->locked_index  = pd_mode_snapshot_mode_index(locked_mode);
     view->owner_sides   = owner_sides;
+#ifdef NOAH_PD_PROFILE_ENABLE
+    view->active_traits = pd_mode_effective_traits(active_mode);
+#else
     view->active_traits = view->active_index < PD_MODE_COUNT ? pd_modes[view->active_index].traits : (pd_mode_traits_t)0;
+#endif
 }
 
 pd_mode_snapshot_t pd_mode_snapshot(void) {

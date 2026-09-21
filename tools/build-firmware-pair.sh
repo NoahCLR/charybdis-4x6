@@ -14,7 +14,7 @@ set -eu
 # is durable identity burned into the artifact. Keeping them separate is the
 # contract, so both are passed explicitly here.
 #
-#   sh tools/build-firmware-pair.sh [--no-owner|--snapshot-bridge]
+#   sh tools/build-firmware-pair.sh [--no-owner|--snapshot-bridge|--pd-snapshot-bridge]
 #
 # --no-owner builds the comparison pair without the live-profile owner, for
 # A/B against ordinary behaviour while the pointing cadence regression in
@@ -33,9 +33,12 @@ if [ "${1:-}" = "--no-owner" ]; then
 elif [ "${1:-}" = "--snapshot-bridge" ]; then
     OWNER_ARGS="-e NOAH_LEGACY_SNAPSHOT_BRIDGE=yes"
     SUFFIX="_snapshot_bridge"
+elif [ "${1:-}" = "--pd-snapshot-bridge" ]; then
+    OWNER_ARGS="-e NOAH_PD_PROFILE=no"
+    SUFFIX="_pd_snapshot_bridge"
 elif [ $# -gt 0 ]; then
     echo "Unknown argument: $1" >&2
-    echo "Usage: sh tools/build-firmware-pair.sh [--no-owner|--snapshot-bridge]" >&2
+    echo "Usage: sh tools/build-firmware-pair.sh [--no-owner|--snapshot-bridge|--pd-snapshot-bridge]" >&2
     exit 1
 fi
 
@@ -76,9 +79,11 @@ build_half FORCE_SLAVE left "${n}_charybdis_left${SUFFIX}"
 echo
 if [ "$SUFFIX" = "_snapshot_bridge" ]; then
     echo "Built the five-layer backup bridge. Export a complete profile before moving to eight layers."
+elif [ "$SUFFIX" = "_pd_snapshot_bridge" ]; then
+    echo "Built the old-geometry PD backup bridge. Use Export PD upgrade before flashing the new pair."
 elif [ -n "$SUFFIX" ]; then
     echo "Built the comparison pair WITHOUT the live-profile owner."
 else
-    echo "Built the flashable pair with the live-profile owner enabled."
+    echo "Built the eight-PD-slot pair. Verify original and migrated backups before flashing: EEPROM geometry changes."
 fi
 echo "Flash the right half to the master side and the left half to the slave side."

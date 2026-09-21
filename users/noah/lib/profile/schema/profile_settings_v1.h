@@ -2,11 +2,12 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include "profile_reader.h"
+#include "profile_versions.h"
 
 // Portable settings are data; the macro instruction vocabulary is fixed by
 // the firmware ABI. Names are UTF-8, zero terminated and zero padded.
 enum {
-    NOAH_SETTINGS_VERSION     = 1,
+    NOAH_SETTINGS_VERSION     = NOAH_PROFILE_SETTINGS_VERSION,
     NOAH_SETTINGS_COUNT       = 28,
     NOAH_SETTINGS_LAYERS      = 8,
     NOAH_SETTINGS_NAME_BYTES  = 24,

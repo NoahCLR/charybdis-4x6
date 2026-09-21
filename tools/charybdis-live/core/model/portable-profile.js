@@ -1,3 +1,4 @@
+const {decodePdDomain, encodePdDomain} = require("../schema/pd-mode-domain-v1");
 "use strict";
 const {decodeProfileBlob, encodeProfileBlob, crc32, fnv1a32} = require("../schema/profile-blob-v1");
 const {decodeRgbDomainV1, encodeRgbDomainV1} = require("../schema/rgb-domain-v1");
@@ -53,17 +54,18 @@ function macroBank(slots, capacity) {
 function materializeProfile(active, defaults, combos, settings) {
     if (!combos || combos.noTimer || combos.customTrigger || combos.customRelease || combos.customRepress || combos.strictTimer || combos.fixedReference) throw fail("This keyboard uses combo hooks or timing that cannot be represented by a portable profile.");
     const live = decodeProfileBlob(active), fallback = decodeProfileBlob(defaults);
-    const domains = [0x10, 0x20].map(id => {
+    if (live.schema.major !== fallback.schema.major) throw fail("Active and default profiles use different schemas.");
+    const domains = (live.schema.major === 2 ? [0x10, 0x20, 0x50] : [0x10, 0x20]).map(id => {
         const domain = live.domains.find(d => d.id === id) || fallback.domains.find(d => d.id === id);
         if (!domain) throw fail("The keyboard did not report every profile domain.");
         return domain;
     });
     const rows = combos.rows.map(row => ({...row, inputs: row.inputs.map(operand => ({kind: 1, operand})), output: {kind: 1, operand: row.output}}));
-    domains.push({id: 0x30, version: 1, payload: encodeComboDomainV1(rows)}, {id: 0x40, version: 1, payload: settings});
-    return encodeProfileBlob({domains});
+    domains.push({id: 0x30, version: 1, payload: encodeComboDomainV1(rows)}, {id: 0x40, version: live.schema.major, payload: settings});
+    return encodeProfileBlob({schema: live.schema, domains});
 }
 function createSnapshot({profile, via, actionAbiDigest}) {
-    const document = {format: "charybdis-profile", version: 1, keyboard: "charybdis-4x6", actionAbiDigest,
+    const document = {format: "charybdis-profile", version: decodeProfileBlob(profile).schema.major, keyboard: "charybdis-4x6", actionAbiDigest,
         layers: Array.from({length: via.layers}, (_, layer) => Array.from({length: 60}, (_, pos) => via.layout.readUInt16BE((layer * 60 + pos) * 2))),
         profile: profile.toString("base64"), macros: macroSlots(via.macros, via.macroSlots).map(bytes => bytes.toString("base64"))};
     validateSnapshot(document); return document;
@@ -73,28 +75,64 @@ function validateSnapshot(value, capabilities) {
         if (Buffer.byteLength(value) > 100000) throw fail("This profile file is too large.");
         try {value = JSON.parse(value);} catch {throw fail("This is not a valid profile file.");}
     }
-    if (!value || value.format !== "charybdis-profile" || value.version !== 1 || value.keyboard !== "charybdis-4x6" || !Number.isInteger(value.actionAbiDigest) || value.actionAbiDigest < 1 || value.actionAbiDigest > 0xffffffff) throw fail("Choose a supported Charybdis profile file.");
-    if (Object.keys(value).some(key => !["format", "version", "keyboard", "actionAbiDigest", "layers", "profile", "macros"].includes(key))) throw fail("This profile contains unsupported fields.");
+    if (!value || value.format !== "charybdis-profile" || ![1, 2].includes(value.version) || value.keyboard !== "charybdis-4x6" || !Number.isInteger(value.actionAbiDigest) || value.actionAbiDigest < 1 || value.actionAbiDigest > 0xffffffff) throw fail("Choose a supported Charybdis profile file.");
+    if (Object.keys(value).some(key => !["format", "version", "keyboard", "actionAbiDigest", "layers", "profile", "macros", "pdModeSource"].includes(key))) throw fail("This profile contains unsupported fields.");
     if (!Array.isArray(value.layers) || ![5, 8].includes(value.layers.length) || value.layers.some(keys => !Array.isArray(keys) || keys.length !== 60 || !keys.every(u16))) throw fail("A complete profile must contain all matrix layers.");
     if (!Array.isArray(value.macros) || value.macros.length !== 64) throw fail("A complete profile must contain all 64 macro slots.");
     const macros = value.macros.map(slot => {const bytes = base64(slot, 8192, "macro"); validateViaMacro(bytes); return bytes;});
-    const profile = base64(value.profile, 4064, "profile data"), domains = decodeProfileBlob(profile).domains;
-    if (domains.map(d => d.id).join() !== "16,32,48,64") throw fail("The profile is missing configuration. Partial profiles cannot be restored as a complete backup.");
-    const rgb = decodeRgbDomainV1(domains[0].payload), behaviors = decodeKeyBehaviorDomain(domains[1].payload), combos = decodeComboDomainV1(domains[2].payload), settings = decodeSettings(domains[3].payload);
+    const profile = base64(value.profile, value.version === 2 ? 5088 : 4064, "profile data"), decoded = decodeProfileBlob(profile), domains = decoded.domains;
+    if (decoded.schema.major !== value.version || domains.map(d => d.id).join() !== (value.version === 2 ? "16,32,48,64,80" : "16,32,48,64")) throw fail("The profile is missing configuration. Partial profiles cannot be restored as a complete backup.");
+    const actionOptions = {actionLimits: {maxPdModes: value.version === 2 ? 8 : 6}};
+    const rgb = decodeRgbDomainV1(domains[0].payload), behaviors = decodeKeyBehaviorDomain(domains[1].payload, actionOptions), combos = decodeComboDomainV1(domains[2].payload, actionOptions), settings = decodeSettings(domains[3].payload);
+    const pdModes = value.version === 2 ? decodePdDomain(domains[4].payload) : undefined;
+    if (rgb.formatVersion !== value.version || (settings.formatVersion ?? 1) !== value.version) throw fail("Profile domain versions disagree.");
     if (rgb.layerColors.length !== value.layers.length || rgb.layerColors.some(row => row.layerId >= 8)) throw fail("RGB does not cover all eight layers.");
+    const checkPd = id => {if (pdModes && id !== undefined && !pdModes[id]?.kind) throw fail(`Slot ${id + 1} is disabled but still has a binding. Remove its bindings before clearing it.`);};
+    const checkNativePd = code => checkPd(code >= 0x7e50 && code <= 0x7e5b ? (code - 0x7e50) % 6 : code >= 0x7ef0 && code <= 0x7ef3 ? 6 + Math.floor((code - 0x7ef0) / 2) : undefined);
+    if (pdModes) value.layers.flat().forEach(checkNativePd);
     const checkAction = action => {
+        if ([4, 5].includes(action.kind)) checkPd(action.operand);
+        if (action.kind === 1) checkNativePd(action.operand);
         if ([2, 3].includes(action.kind) && action.operand >= 8) throw fail("A profile action references a missing layer.");
     };
     walkActions(behaviors, checkAction); walkActions(combos, checkAction);
+    if (value.pdModeSource !== undefined) {
+        const source = value.pdModeSource;
+        if (value.version !== 1 || !source || source.version !== 1 || ![0xdcb00959, 0xeb80829c].includes(source.actionAbiDigest) || !Number.isInteger(source.compiledDefaultDigest) || source.compiledDefaultDigest < 1 || source.compiledDefaultDigest > 0xffffffff || Object.keys(source).some(key => !["version", "actionAbiDigest", "compiledDefaultDigest", "domain"].includes(key))) throw fail("Unsupported pointing-mode migration source.");
+        const modes = decodePdDomain(base64(source.domain, 776, "pointing-mode source"));
+        if (modes.some((mode, id) => mode.kind !== [2, 1, 1, 1, 1, 2, 0, 0][id])) throw fail("The migration source does not represent the six legacy modes.");
+    }
     const layout = Buffer.alloc(value.layers.length * 120); value.layers.flat().forEach((v, id) => layout.writeUInt16BE(v, id * 2));
     if (capabilities?.compiledLayerCount === 8 && value.layers.length === 5) {
         return validateSnapshot(upgradeFiveLayerSnapshot(value), capabilities);
     }
+    if (capabilities?.schema?.major === 2 && value.version === 1) return validateSnapshot(upgradePdSnapshot(value), capabilities);
     const capacity = capabilities?.viaMacroBytes ?? (value.layers.length === 5 ? 7551 : 7191);
-    if (capabilities && (value.actionAbiDigest !== capabilities.actionAbiDigest || capabilities.compiledLayerCount !== value.layers.length || (capabilities.supportedDomainMask & 15) !== 15)) throw fail("The connected firmware does not support this profile's action vocabulary or eight-layer storage.");
+    if (capabilities && (value.actionAbiDigest !== capabilities.actionAbiDigest || capabilities.compiledLayerCount !== value.layers.length || (capabilities.supportedDomainMask & (value.version === 2 ? 31 : 15)) !== (value.version === 2 ? 31 : 15))) throw fail("The connected firmware does not support this profile's action vocabulary or eight-layer storage.");
     const bank = macroBank(macros, capacity);
-    return {document: value, profile, layout, macros: bank, settings, rgb, behaviors, combos};
+    return {document: value, profile, layout, macros: bank, settings, rgb, behaviors, combos, ...(pdModes ? {pdModes} : {})};
 }
+function upgradePdSnapshot(source) {
+    if (source.layers?.length === 5) source = upgradeFiveLayerSnapshot(source);
+    const value = validateSnapshot(source);
+    if (source.version !== 1 || source.actionAbiDigest !== 0xeb80829c) throw fail("This profile does not use the supported legacy action vocabulary.");
+    if (!source.pdModeSource) throw fail("This backup does not contain the old pointing-mode settings. Keep the original firmware and export a new backup using its matching PD readback bridge before changing storage geometry.");
+    const slots = decodePdDomain(Buffer.from(source.pdModeSource.domain, "base64"));
+    for (let id = 0; id < 6; id++) slots[id].dpi = id === 0 || id === 5 ? Math.max(100, value.settings.values[10]) : value.settings.values[10 + id];
+    const rgb = value.rgb; rgb.formatVersion = 2;
+    for (let id = 6; id < 8; id++) rgb.pdModeColors.push({pdModeId: id, color: {h: 0, s: 0, v: 0}, locality: 2});
+    const settings = value.settings; settings.formatVersion = 2; settings.values.fill(0, 10, 15);
+    const profile = encodeProfileBlob({schema: {major: 2, minor: 0}, domains: [
+        {id: 16, version: 2, payload: encodeRgbDomainV1(rgb)}, {id: 32, version: 1, payload: encodeKeyBehaviorDomain(value.behaviors)},
+        {id: 48, version: 1, payload: encodeComboDomainV1(value.combos)}, {id: 64, version: 2, payload: encodeSettings(settings)},
+        {id: 80, version: 1, payload: encodePdDomain(slots)},
+    ]});
+    const result = {...source, version: 2, actionAbiDigest: 0x61072732, profile: profile.toString("base64")};
+    delete result.pdModeSource;
+    validateSnapshot(result);
+    return result;
+}
+
 function walkActions(value, action) {
     if (!value || typeof value !== "object") return;
     if (Number.isInteger(value.kind) && Number.isInteger(value.operand)) {action(value); return;}
@@ -102,7 +140,7 @@ function walkActions(value, action) {
 }
 function fingerprint(document) {
     const {profile, layout, macros} = validateSnapshot(document);
-    const bytes = Buffer.concat([profile, layout, macros]);
+    const bytes = Buffer.concat([profile, layout, macros, ...(document.pdModeSource ? [Buffer.from(document.pdModeSource.domain, "base64")] : [])]);
     return `${document.actionAbiDigest}:${crc32(bytes)}:${fnv1a32(bytes)}`;
 }
 function reorderLayers(document, order, names) {
@@ -121,7 +159,8 @@ function reorderLayers(document, order, names) {
         return code;
     }
     result.layers = order.map(old => document.layers[old].map(native));
-    const {rgb, behaviors, combos, settings} = validated;
+    const {rgb, behaviors, combos, settings, pdModes} = validated;
+    const actionOptions = {actionLimits: {maxPdModes: pdModes ? 8 : 6}};
     const action = a => {if ([2, 3].includes(a.kind)) a.operand = remap[a.operand]; else if (a.kind === 1) a.operand = native(a.operand);};
     walkActions(behaviors, action); walkActions(combos, action);
     rgb.layerColors.forEach(row => {row.layerId = remap[row.layerId];}); rgb.layerColors.sort((a, b) => a.layerId - b.layerId);
@@ -130,9 +169,10 @@ function reorderLayers(document, order, names) {
     settings.values[5] = remap[settings.values[5]]; settings.values[9] = remap[settings.values[9]];
     settings.values[23] = remap.reduce((mask, next, old) => mask | ((settings.values[23] >> old) & 1) << next, 0);
     const oldReferences = settings.values[27]; settings.values[27] = order.reduce((packed, old, next) => (packed | remap[(oldReferences >>> (old * 4)) & 15] << (next * 4)) >>> 0, 0);
-    result.profile = encodeProfileBlob({domains: [
-        {id: 16, version: 1, payload: encodeRgbDomainV1(rgb)}, {id: 32, version: 1, payload: encodeKeyBehaviorDomain(behaviors)},
-        {id: 48, version: 1, payload: encodeComboDomainV1(combos)}, {id: 64, version: 1, payload: encodeSettings(settings)},
+    result.profile = encodeProfileBlob({schema: {major: document.version, minor: 0}, domains: [
+        {id: 16, version: document.version, payload: encodeRgbDomainV1(rgb)}, {id: 32, version: 1, payload: encodeKeyBehaviorDomain(behaviors, actionOptions)},
+        {id: 48, version: 1, payload: encodeComboDomainV1(combos, actionOptions)}, {id: 64, version: document.version, payload: encodeSettings(settings)},
+        ...(pdModes ? [{id: 80, version: 1, payload: encodePdDomain(pdModes)}] : []),
     ]}).toString("base64");
     validateSnapshot(result); return result;
 }
@@ -161,4 +201,4 @@ function summary(document) {
         macros: value.document.macros.filter(Boolean).length + value.settings.macros.filter(bytes => bytes.length).length,
         names: value.settings.names.map((name, index) => name || (index ? `Layer ${index}` : "Base"))};
 }
-module.exports = {createSnapshot, validateSnapshot, materializeProfile, macroSlots, macroBank, validateViaMacro, fingerprint, reorderLayers, summary};
+module.exports = {upgradePdSnapshot, createSnapshot, validateSnapshot, materializeProfile, macroSlots, macroBank, validateViaMacro, fingerprint, reorderLayers, summary};

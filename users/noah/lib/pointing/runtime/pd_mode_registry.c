@@ -6,6 +6,7 @@
 
 #include "noah_keymap_ids.h"
 #include "../defs/pd_mode_manifest.h"
+#include "../defs/pd_mode_defaults.h"
 #include "pd_mode_internal.h"
 #include "pd_mode_buffered_tap_internal.h"
 #include "pd_mode_keyboard_event_internal.h"
@@ -13,10 +14,28 @@
 #include "../../compat/qmk_auto_mouse_contract.h"
 
 #include "../modes/pd_mode_handlers.h"
+#include "../modes/pd_mode_configured.h"
+#include "../../profile/runtime/effective_pd_runtime.h"
 
+#ifdef NOAH_PD_PROFILE_ENABLE
+pd_mode_traits_t pd_mode_effective_traits(pd_mode_mask_t mode) {
+    const uint8_t *record = noah_effective_pd_for_mask(mode);
+    if (!record) return PD_MODE_TRAIT_NONE;
+    pd_mode_traits_t traits = record[2] ? PD_MODE_TRAIT_PREFER_TYPING_LAYER : PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED;
+    if (record[1] == 2) {
+        traits |= PD_MODE_TRAIT_ENABLE_DRAGSCROLL_BACKEND;
+        if (!record[2]) traits |= PD_MODE_TRAIT_LOCK_OWNS_AUTO_MOUSE_TOGGLE;
+    }
+    return traits;
+}
+#endif
 static inline bool pd_mode_registry_has_trait(pd_mode_mask_t mode, pd_mode_traits_t trait) {
+#ifdef NOAH_PD_PROFILE_ENABLE
+    return (pd_mode_effective_traits(mode) & trait) == trait;
+#else
     const pd_mode_def_t *def = pd_mode_lookup(mode);
     return def && (def->traits & trait) == trait;
+#endif
 }
 
 #ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
@@ -60,36 +79,41 @@ static const pd_mode_lifecycle_hooks_t pd_mode_auto_mouse_lock_toggle_hooks = {
 // 0 = no override: normal pointer DPI is used while that mode is active.
 // Dragscroll and pinch are excluded — the shared dragscroll handler manages
 // their CPI through pd_mode_apply_active_dpi().
-#ifndef PD_MODE_VOLUME_DPI
-#    define PD_MODE_VOLUME_DPI 0
-#endif
-#ifndef PD_MODE_BRIGHTNESS_DPI
-#    define PD_MODE_BRIGHTNESS_DPI 0
-#endif
-#ifndef PD_MODE_ZOOM_DPI
-#    define PD_MODE_ZOOM_DPI 0
-#endif
-#ifndef PD_MODE_ARROW_DPI
-#    define PD_MODE_ARROW_DPI 0
-#endif
 
 #define NOAH_PD_MODE_REGISTRY_ROW(name, keycode, handler, key_handler, reset, dpi, traits, lifecycle) {PD_MODE_##name, keycode, keycode##_LOCK, handler, key_handler, reset, dpi, traits, lifecycle},
 const pd_mode_def_t pd_modes[PD_MODE_COUNT] = {NOAH_PD_MODE_LIST(NOAH_PD_MODE_REGISTRY_ROW)};
 #undef NOAH_PD_MODE_REGISTRY_ROW
 
 static const pd_mode_lifecycle_hooks_t *pd_mode_lifecycle_hooks_for_mode(pd_mode_mask_t mode) {
+#ifdef NOAH_PD_PROFILE_ENABLE
+#    ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
+    return pd_mode_has_trait(mode, PD_MODE_TRAIT_LOCK_OWNS_AUTO_MOUSE_TOGGLE) ? &pd_mode_auto_mouse_lock_toggle_hooks : NULL;
+#    else
+    (void)mode;
+    return NULL;
+#    endif
+#else
     const pd_mode_def_t *def = pd_mode_lookup(mode);
     return def ? def->lifecycle : NULL;
+#endif
 }
 
 static uint8_t pd_mode_lifecycle_buffered_tap_masked_real_mods(pd_mode_mask_t mode) {
+#ifdef NOAH_PD_PROFILE_ENABLE
+    return noah_pd_engine_masked_mods(noah_effective_pd_for_mask(mode));
+#else
     const pd_mode_lifecycle_hooks_t *hooks = pd_mode_lifecycle_hooks_for_mode(mode);
     return hooks && hooks->buffered_tap_masked_real_mods ? hooks->buffered_tap_masked_real_mods(mode) : 0;
+#endif
 }
 
 static uint8_t pd_mode_lifecycle_keyboard_event_masked_real_mods(pd_mode_mask_t mode) {
+#ifdef NOAH_PD_PROFILE_ENABLE
+    return noah_pd_engine_masked_mods(noah_effective_pd_for_mask(mode));
+#else
     const pd_mode_lifecycle_hooks_t *hooks = pd_mode_lifecycle_hooks_for_mode(mode);
     return hooks && hooks->keyboard_event_masked_real_mods ? hooks->keyboard_event_masked_real_mods(mode) : 0;
+#endif
 }
 
 static void pd_mode_run_lifecycle_callback(void (*callback)(pd_mode_mask_t mode), pd_mode_mask_t mode) {
@@ -99,11 +123,17 @@ static void pd_mode_run_lifecycle_callback(void (*callback)(pd_mode_mask_t mode)
 }
 
 void pd_mode_registry_run_activate_hooks(pd_mode_mask_t mode) {
+#ifdef NOAH_PD_PROFILE_ENABLE
+    noah_pd_engine_enter(noah_effective_pd_for_mask(mode));
+#endif
     const pd_mode_lifecycle_hooks_t *hooks = pd_mode_lifecycle_hooks_for_mode(mode);
     pd_mode_run_lifecycle_callback(hooks ? hooks->on_activate : NULL, mode);
 }
 
 void pd_mode_registry_run_deactivate_hooks(pd_mode_mask_t mode) {
+#ifdef NOAH_PD_PROFILE_ENABLE
+    noah_pd_engine_exit();
+#endif
     const pd_mode_lifecycle_hooks_t *hooks = pd_mode_lifecycle_hooks_for_mode(mode);
     pd_mode_run_lifecycle_callback(hooks ? hooks->on_deactivate : NULL, mode);
 }

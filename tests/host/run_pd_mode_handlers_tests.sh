@@ -34,6 +34,33 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-variable -pe
     -o "$BIN"
 
 "$BIN"
+# Run the same legacy expectations plus configured-engine parity and ownership.
+python3 - "$ROOT" "$BUILD_DIR/pd_mode_engine_fixture.h" <<'PYFIX'
+import json, sys
+from pathlib import Path
+fixture=json.loads(Path(sys.argv[1], 'tests/fixtures/pd_mode_domain_v1.json').read_text())
+Path(sys.argv[2]).write_text('static const unsigned char pd_engine_fixture[] = {' + ','.join(str(b) for b in bytes.fromhex(fixture['hex'])) + '};\n')
+PYFIX
+cc -DNOAH_PD_PROFILE_ENABLE -I"$BUILD_DIR" -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-variable -pedantic \
+    -DQMK_KEYBOARD_H='"qmk_stub.h"' \
+    -DPOINTING_DEVICE_ENABLE \
+    -I"$ROOT" \
+    -I"$ROOT/users/noah" \
+    -I"$ROOT/tests/host/include" \
+    -include "$ROOT/tests/host/include/noah_compile_config_no_automouse.h" \
+    "$ROOT/tests/host/pd_mode_handlers_test.c" \
+    "$ROOT/keyboards/bastardkb/charybdis/4x6/keymaps/noah/pd_config.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_pd_v1.c" \
+    "$ROOT/users/noah/lib/pointing/modes/pd_mode_configured.c" \
+    "$ROOT/users/noah/lib/pointing/modes/pd_mode_dragscroll.c" \
+    "$ROOT/users/noah/lib/pointing/modes/pd_mode_volume.c" \
+    "$ROOT/users/noah/lib/pointing/modes/pd_mode_brightness.c" \
+    "$ROOT/users/noah/lib/pointing/modes/pd_mode_zoom.c" \
+    "$ROOT/users/noah/lib/pointing/modes/pd_mode_arrow.c" \
+    "$ROOT/users/noah/lib/state/modifiers/keyboard_mod_state.c" \
+    -o "$BIN"
+
+"$BIN"
 
 expect_config_compile_failure() {
     label="$1"

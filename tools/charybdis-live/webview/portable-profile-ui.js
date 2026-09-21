@@ -10,6 +10,7 @@ function renderPortableProfile(document, model, post) {
     const button = (text, action, disabled = false) => {const b = el("button", text); b.type = "button"; b.disabled = busy || disabled; b.onclick = action; return b;};
     host.replaceChildren();
     const toolbar = el("div"); toolbar.style.cssText = "display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 0";
+    if (state.pdUpgradeAvailable) toolbar.append(button("Export PD upgrade", () => post({type: "exportPdUpgrade"}), !state.available));
     toolbar.append(button("Export profile", () => post({type: "exportPortableProfile"}), !state.available));
     toolbar.append(button("Import profile", () => post({type: "choosePortableProfile"}), !state.available || !state.eightLayers));
     toolbar.append(button("Manage layers", () => post({type: "managePortableLayers"}), !state.available || !state.eightLayers));

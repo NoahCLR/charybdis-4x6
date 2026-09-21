@@ -44,9 +44,11 @@ function validateMacroIr(bytes) {
     return bytes;
 }
 function encodeSettings(value, layers = 8) {
+    const version = value?.formatVersion ?? 1;
+    if (![1, 2].includes(version) || (version === 2 && value?.values?.slice(10, 15).some(v => v !== 0))) throw fail("Unsupported settings format or retired PD settings.");
     if (!value || !Array.isArray(value.values) || value.values.length !== 28 || !value.values.every((v, id) => validSetting(id, v, layers)) || value.values[6] <= value.values[16]) throw fail("Invalid keyboard settings.");
     if (!Array.isArray(value.names) || value.names.length !== 8 || !Array.isArray(value.macros) || value.macros.length !== 16) throw fail("Missing layer names or macros.");
-    const fixed = Buffer.alloc(312); Buffer.from([1, 8, 28, 16]).copy(fixed);
+    const fixed = Buffer.alloc(312); Buffer.from([version, 8, 28, 16]).copy(fixed);
     value.values.forEach((v, id) => fixed.writeUInt32LE(v, 8 + id * 4));
     value.names.forEach((name, id) => {
         if (typeof name !== "string" || /[\u0000-\u001f\u007f]/u.test(name) || Buffer.byteLength(name) > 23 || Buffer.from(name).toString() !== name) throw fail("Layer names must fit 23 UTF-8 bytes and contain no control characters.");
@@ -58,7 +60,7 @@ function encodeSettings(value, layers = 8) {
     return output;
 }
 function decodeSettings(bytes, layers = 8) {
-    if (!Buffer.isBuffer(bytes) || bytes.length < 344 || bytes.length > 1368 || !bytes.subarray(0, 8).equals(Buffer.from([1, 8, 28, 16, 0, 0, 0, 0]))) throw fail("Unsupported settings format.");
+    if (!Buffer.isBuffer(bytes) || bytes.length < 344 || bytes.length > 1368 || ![1, 2].includes(bytes[0]) || !bytes.subarray(0, 8).equals(Buffer.from([bytes[0], 8, 28, 16, 0, 0, 0, 0]))) throw fail("Unsupported settings format.");
     const values = Array.from({length: 28}, (_, id) => bytes.readUInt32LE(8 + id * 4));
     const names = Array.from({length: 8}, (_, id) => {
         const field = bytes.subarray(120 + id * 24, 144 + id * 24), end = field.indexOf(0);
@@ -75,6 +77,6 @@ function decodeSettings(bytes, layers = 8) {
         const result = Buffer.from(bytes.subarray(offset, offset + length)); offset += length; return result;
     });
     if (offset !== bytes.length) throw fail("Unexpected settings data.");
-    const result = {values, names, macros}; encodeSettings(result, layers); return result;
+    const result = {values, names, macros, ...(bytes[0] === 2 ? {formatVersion: 2} : {})}; encodeSettings(result, layers); return result;
 }
 module.exports = {SETTINGS, validSetting, validateMacroIr, encodeSettings, decodeSettings};

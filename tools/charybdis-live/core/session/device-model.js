@@ -39,6 +39,18 @@ function buildDeviceModel(state = {}) {
             if (entry) entry.label = label;
         }
     }
+    if (knownActionAbi(state.capabilities?.actionAbiDigest)) for (const slot of state.committed?.domains?.pdModes || []) {
+        if (!slot.kind) continue;
+        for (const locked of [false, true]) {
+            const name = slot.id < 6 ? ["DRAGSCROLL", "VOLUME_MODE", "BRIGHTNESS_MODE", "ZOOM_MODE", "ARROW_MODE", "PINCH_MODE"][slot.id] + (locked ? "_LOCK" : "") : `PD_SLOT_${slot.id}${locked ? "_LOCK" : ""}`;
+            const code = slot.id < 6 ? 0x7e50 + slot.id + (locked ? 6 : 0) : 0x7ef0 + (slot.id - 6) * 2 + Number(locked);
+            const label = `${slot.name} · ${locked ? "toggle" : "hold"}`, native = keycodeCatalog.resolve(code).name;
+            catalog.aliases[native] = name; catalog.labels[native] = label; catalog.labels[name] = label;
+            const entry = catalog.entries.find(entry => entry.keycode === code);
+            const presentation = {value: name, key: name, label, group: "Pointing modes", aliases: [native], keycode: code, searchTerms: [name, label], search: `${name} ${label}`.toLowerCase(), searchCompact: `${name}${label}`.toLowerCase()};
+            if (entry) Object.assign(entry, presentation); else catalog.entries.push(presentation);
+        }
+    }
     return {
         // Repo concepts Studio carried. The live app has no repository, so it
         // reports the connected device instead of a profile directory.
@@ -52,6 +64,8 @@ function buildDeviceModel(state = {}) {
 
         // Read off the keyboard when the committed profile has been read;
         // empty rather than fabricated before that.
+        pdModes: state.committed?.domains?.pdModes || [],
+        pdModeEditing: {writable: Boolean(state.capabilities?.supportedDomainMask & 16) && state.committed?.state === "read" && !state.committed.failures?.length && !state.busy},
         keyBehaviors: committedKeyBehaviors(state.committed),
         behaviorEditing: {busy: Boolean(state.busy), writable: Boolean(state.capabilities?.supportedDomainMask & 2) && state.committed?.state === "read" && !state.committed.failures?.length && !state.busy},
         profileIdentity: state.committed?.state === "read" ? {source: state.committed.source, generation: state.committed.generation, digest: state.committed.digest, originHalf: state.committed.originHalf} : null,

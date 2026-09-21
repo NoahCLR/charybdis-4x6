@@ -1,5 +1,19 @@
 # Adding A Pointing-Device Mode
 
+For ordinary mode creation, use **Charybdis Live → Pointing modes**. Schema-2
+firmware has eight fixed slots; directional keys/shortcuts, scrolling, modifier
+policies and button overrides are configuration, not new C handlers. See
+[Pointer modes](POINTER_MODES.md) for that workflow.
+
+The manifest-extension recipe below describes the legacy compiled runtime. It
+is not the procedure for adding a ninth slot or changing an existing slot's
+behavior in schema 2. A new engine family needs an explicit domain/version and
+capability design, validators and migration, plus shared runtime implementation.
+Keep existing native IDs stable; author factory records in `pd_config.c` and
+put reusable engine logic under `users/noah/lib/pointing/`. The current contract
+is [PD-mode domain v1](architecture/pd-mode-domain-v1.md).
+
+
 This is a maintainer-facing guide for adding a new pointing-device mode to the
 `noah` userspace.
 

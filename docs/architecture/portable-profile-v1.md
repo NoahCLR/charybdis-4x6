@@ -1,5 +1,14 @@
 # Portable keyboard profile v1
 
+> Schema-2 PD extension: side-specific PD-enabled builds keep the v1 HID/split
+> envelope and add domain `0x50` (mask bit 4), profile schema 2.0, RGB/settings
+> v2, eight PD slots, and a 5,088-byte custom payload ceiling. Logical storage
+> is format 3 (`NR`) with the same VIA generation/digest binding; portable
+> documents are version 2. Existing schema-1/format-2 bridge behavior below
+> remains supported by the app. The exact version/geometry/ABI and legacy GET 9
+> migration contract is in [PD-mode domain v1](pd-mode-domain-v1.md).
+
+
 A profile export is the effective configuration read from the keyboard. Flashed
 and committed data have the same representation. An absent live domain is
 materialized from device readback before export; it never means “use the

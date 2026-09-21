@@ -921,6 +921,7 @@ def qmk_preview_hsv_to_rgb(h: int, s: int, v: int) -> tuple[int, int, int]:
 
 def parse_pd_mode_colors(raw_text: str, known_values: dict[str, str]) -> list[dict[str, object]]:
     body = extract_initializer_body(raw_text, r"pd_mode_colors\[\]\s*=")
+    body = re.sub(r"^\s*#.*$", "", body, flags=re.MULTILINE)
     rows: list[dict[str, object]] = []
 
     for entry in split_top_level(strip_comments(body)):
@@ -950,7 +951,7 @@ def parse_pd_mode_colors(raw_text: str, known_values: dict[str, str]) -> list[di
 
 def parse_pd_mode_manifest(text: str) -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
-    for row in parse_macro_table(text, "NOAH_PD_MODE_LIST", "PDM"):
+    for row in parse_macro_table(text, "NOAH_PD_MODE_LEGACY_LIST", "PDM") + parse_macro_table(text, "NOAH_PD_MODE_LIST", "PDM"):
         if len(row) != 8:
             die(f"unexpected pd mode manifest row: {row!r}")
         name, mode_keycode, _pointer_handler, _key_handler, _reset_fn, dpi_override, traits, lifecycle = row

@@ -20,7 +20,8 @@ function integer(value, max, label, optional = false) {
 
 function editKeyBehaviors(payload, message, capabilities = {}) {
     if (!(capabilities.supportedDomainMask & 2)) throw invalid("This firmware does not support saving key behaviours.");
-    const {rows} = decodeKeyBehaviorDomain(payload);
+    const maxPdModes = capabilities.supportedDomainMask & 16 ? 8 : 6;
+    const {rows} = decodeKeyBehaviorDomain(payload, {actionLimits: {maxPdModes}});
     const knownAbi = knownActionAbi(capabilities.actionAbiDigest);
     const native = action => action.kind === ACTION.QMK_KEYCODE ? action.operand
         : knownAbi ? resolveNativeQmkExpression(actionName(action), {}) : undefined;
@@ -106,7 +107,7 @@ function editKeyBehaviors(payload, message, capabilities = {}) {
     }
     return encodeKeyBehaviorDomain({rows}, {
         limits: {maxRows: capabilities.maxBehaviorRows, maxPopulatedSteps: capabilities.maxPopulatedBehaviorSteps, maxTapStepsPerBehavior: capabilities.maxTapStepsPerBehavior},
-        actionLimits: {maxLogicalLayers: capabilities.compiledLayerCount, maxViaMacroSlots: capabilities.viaMacroSlots, maxHardcodedMacroSlots: capabilities.hardcodedMacroSlots},
+        actionLimits: {maxPdModes, maxLogicalLayers: capabilities.compiledLayerCount, maxViaMacroSlots: capabilities.viaMacroSlots, maxHardcodedMacroSlots: capabilities.hardcodedMacroSlots},
     });
 }
 

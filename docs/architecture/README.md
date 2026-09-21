@@ -30,6 +30,12 @@ This directory explains how the runtime is shaped and where changes belong.
   EEPROM maps, storage ceilings, and the measured resource baseline.
 - Use [field-classification.md](./field-classification.md) for which settings
   are live-editable, structurally bounded, or compiled-only.
+- Use [live-pd-modes-plan.md](./live-pd-modes-plan.md) for implementation progress
+  on eight configurable PD slots and eight RGB configurations, and the remaining
+  physical upgrade/acceptance matrix.
+- Use [pd-mode-domain-v1.md](./pd-mode-domain-v1.md) for the implemented
+  schema-2 codec, validation, capacity evidence, storage/ABI contract and
+  verified legacy-backup migration path.
 - Use [pointing-cadence-known-issue.md](./pointing-cadence-known-issue.md)
   before investigating pointing performance. It records what has already been
   eliminated with evidence.

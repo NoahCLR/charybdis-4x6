@@ -304,6 +304,8 @@ Key-local PD RGB localities are gated by `RGB_PD_MODE_ACTIVE_HALF_ENABLE` in [us
 
 | Pointing Mode | Locality | Authored HSV | Preview Color |
 | --- | --- | --- | --- |
+| `PD_MODE_SLOT_6` | `RGB_RIGHT_HALF` | `HSV(0, 0, 0)` | <img alt="PD_MODE_SLOT_6 color" src="media/profile-introspection/profile-color-swatch-000000.svg" width="96" height="28" /> |
+| `PD_MODE_SLOT_7` | `RGB_RIGHT_HALF` | `HSV(0, 0, 0)` | <img alt="PD_MODE_SLOT_7 color" src="media/profile-introspection/profile-color-swatch-000000.svg" width="96" height="28" /> |
 | `PD_MODE_DRAGSCROLL` | `RGB_RIGHT_HALF` | `HSV(21, 255, 200)` | <img alt="PD_MODE_DRAGSCROLL color" src="media/profile-introspection/profile-color-swatch-ff7e00.svg" width="96" height="28" /> |
 | `PD_MODE_VOLUME` | `RGB_RIGHT_HALF` | `HSV(43, 255, 200)` | <img alt="PD_MODE_VOLUME color" src="media/profile-introspection/profile-color-swatch-fcff00.svg" width="96" height="28" /> |
 | `PD_MODE_BRIGHTNESS` | `RGB_RIGHT_HALF` | `HSV(213, 255, 200)` | <img alt="PD_MODE_BRIGHTNESS color" src="media/profile-introspection/profile-color-swatch-ff00fc.svg" width="96" height="28" /> |
@@ -439,7 +441,7 @@ No filled hardcoded macro slots.
 
 - Layers: `LAYER_BASE`, `LAYER_NUM`, `LAYER_SYM`, `LAYER_NAV`, `LAYER_POINTER`, `LAYER_EXTRA_1`, `LAYER_EXTRA_2`, `LAYER_EXTRA_3`
 - Keymap-local custom keycodes: `RIGHT_THUMB`, `LEFT_THUMB`, `CLICK_SPAM`, `DRAG_WINDOW`
-- PD color overlays: `PD_MODE_DRAGSCROLL`, `PD_MODE_VOLUME`, `PD_MODE_BRIGHTNESS`, `PD_MODE_ARROW`, `PD_MODE_PINCH`, `PD_MODE_ZOOM`
+- PD color overlays: `PD_MODE_SLOT_6`, `PD_MODE_SLOT_7`, `PD_MODE_DRAGSCROLL`, `PD_MODE_VOLUME`, `PD_MODE_BRIGHTNESS`, `PD_MODE_ARROW`, `PD_MODE_PINCH`, `PD_MODE_ZOOM`
 - Auto-mouse fade destination mode: `FOLLOW_REAL_DESTINATION`
 - Key-behavior feedback locality: `RGB_KEY_HALF`
 - Key-behavior tap-commit feedback: `KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS`
@@ -487,8 +489,8 @@ Reusable groups define physical LED sets once near the LED map in `rgb_config.c`
 | `hardcoded_macro_count` | `16` |
 | `hardcoded_macro_non_empty_count` | `0` |
 | `keymap_custom_keycode_count` | `4` |
-| `pd_mode_count` | `6` |
-| `pd_mode_color_count` | `6` |
+| `pd_mode_count` | `8` |
+| `pd_mode_color_count` | `8` |
 | `reusable_led_group_count` | `4` |
 | `layer_led_group_count` | `0` |
 | `pd_mode_led_group_count` | `1` |

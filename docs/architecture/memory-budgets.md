@@ -202,3 +202,40 @@ effect in normal firmware. Instrumentation slightly changes static accounting:
 `.data` 4,148 B, `.bss` 51,556 B, sum 55,704 B; boot SRAM0–3 core-memory span
 206,432 B. The same memory policy passes. These checks cover named linked
 paths, not a global/interrupt maximum or measured runtime high-water.
+
+## Eight-PD-slot resource policy — 2026-09-20
+
+Schema-2 owner builds deliberately expand logical EEPROM from 16 to 18 KiB.
+The wear-level cache grows by 2,048 bytes per half; the mode cache adds 776
+bytes plus readiness state, and button-release ownership adds bounded matrix
+state. The old cold export workspace remains separate from effective settings:
+sharing them would invalidate a multi-packet export when a profile publishes.
+The owner drops a duplicate boot-only profile view, using the not-yet-initialized
+provider's pending view before provider initialization copies the independent
+compiled snapshot. Its linked state is now 4,016 bytes, below the unchanged
+4,096-byte owner policy. Validator and provider policies stay 360/784 bytes.
+
+The fresh right-half schema-2 ELF (`bastardkb_charybdis_4x6_noah_pd8_right`)
+links 4,152 bytes of `.data` and 54,556 bytes of `.bss`: 58,708 bytes combined.
+This fails the previous 57,344-byte policy by 1,364 bytes. We explicitly budget
+3,072 additional bytes for this feature, making its regression tripwire 60,416
+bytes. The measurement leaves 1,708 bytes of policy margin. The legacy geometry
+keeps its original tripwire; the gate selects the increment only when the ELF's
+recorded compiler flags enable `NOAH_PD_PROFILE_ENABLE`.
+
+The SRAM0–3 fixed prefix is 58,712 bytes and its boot linker/core-memory span is
+203,432 bytes. Fixed linked occupancy across the unique SRAM banks is 66,168
+bytes per half. These are linked measurements, not runtime-free-memory or
+high-water measurements. This budget change accounts for the agreed storage
+and cache representation; it does not prove hardware cadence or runtime stack
+safety. Measure allocator/stack high-water and the physical interruption matrix
+on the pair before treating this as a release-qualified firmware upgrade.
+
+Final pair verification (2026-09-21): normal right and left images both measure
+58,708 bytes of `.data + .bss` and a 203,432-byte boot core-memory span per half.
+The instrumented left image measures 58,696 and 203,440 bytes respectively; its
+largest reviewed main-process path is 1,264/1,920 bytes and split-slave path is
+280/768 bytes. PD cache initialization, EEPROM read and validation paths are
+explicitly covered in the owner stack manifest. All corresponding memory and
+reviewed-path gates pass under the documented feature-specific policy; runtime
+high-water and hardware acceptance are still pending.

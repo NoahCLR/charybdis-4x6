@@ -235,6 +235,9 @@ bool noah_action_kind_match_qmk_behavior(uint16_t action, pd_mode_mask_t pd_mode
 bool noah_action_kind_match_keymap_custom(uint16_t action, pd_mode_mask_t pd_mode, noah_action_desc_t *out) {
     (void)pd_mode;
 
+#ifdef NOAH_PD_PROFILE_ENABLE
+    if (action >= PD_SLOT_6 && action <= PD_SLOT_7_LOCK) return false;
+#endif
     if (!(out && action >= NOAH_KEYMAP_SAFE_RANGE)) {
         return false;
     }

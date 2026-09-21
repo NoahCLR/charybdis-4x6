@@ -7,10 +7,8 @@
 #if defined(POINTING_DEVICE_ENABLE)
 
 #    include "pd_mode_handler_common.h"
+#    include "../defs/pd_mode_defaults.h"
 
-#    ifndef BRIGHTNESS_THRESHOLD
-#        define BRIGHTNESS_THRESHOLD 60
-#    endif
 
 PD_MODE_VALIDATE_AXIS_THRESHOLD(BRIGHTNESS_THRESHOLD);
 

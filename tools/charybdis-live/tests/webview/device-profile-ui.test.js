@@ -22,52 +22,20 @@ class Node {
     all(tag) {return this.children.flatMap(child => [...(child.tagName === tag ? [child] : []), ...child.all(tag)]);}
 }
 function documentForView() {
-    const nodes = {deviceCombos: new Node("section"), deviceBehaviors: new Node("section"), deviceRgbStages: new Node("section")};
+    const nodes = {deviceCombos: new Node("section"), deviceRgbStages: new Node("section")};
     return {nodes, createElement: tag => new Node(tag), getElementById: id => nodes[id]};
 }
 
-test("device readback renders all behavior rows, timing zeros, branches and RGB stages", () => {
+test("device readback renders RGB stages", () => {
     const document = documentForView();
     renderDeviceProfileDetails(document, buildDeviceModel({committed: decodedDeviceProfile()}));
-    const host = document.nodes.deviceBehaviors;
-    assert.equal(host.all("tbody")[0].children.length, 37);
-    assert.match(host.textContent, /Tap\/hold: 0/);
-    assert.match(host.textContent, /Double Tap Branch/);
-    assert.match(host.textContent, /Tap on release/);
-    assert.match(host.textContent, /VIA_MACRO_10/);
-    assert.match(host.textContent, /Auto-mouse anchor flag/);
-    assert.equal(host.all("tbody")[0].children[0].children[3].textContent, "Not set");
     assert.match(document.nodes.deviceRgbStages.textContent, /Layer colours: enabled/);
     renderDeviceProfileDetails(document, buildDeviceModel({baseRgb: {state: "read", effectId: 1, hue: 0, saturation: 255, brightness: 255, speed: 32}}));
     assert.match(document.nodes.deviceRgbStages.textContent, /Solid colour · Brightness 100%/);
     assert.match(document.nodes.deviceRgbStages.textContent, /Hue 0, saturation 255/);
     assert.match(document.nodes.deviceRgbStages.textContent, /last-read/);
     renderDeviceProfileDetails(document, buildDeviceModel({}));
-    assert.equal(host.all("tbody").length, 0, "a new empty read must clear old rows");
     assert.match(document.nodes.deviceRgbStages.textContent, /No RGB configuration/);
-});
-
-test("device strings stay text and cannot inject markup into the new view", () => {
-    const document = documentForView();
-    const model = buildDeviceModel({committed: decodedDeviceProfile()});
-    model.keyBehaviors[0].keycode = '<img src=x onerror="throw 1">';
-    renderDeviceProfileDetails(document, model);
-    assert.match(document.nodes.deviceBehaviors.textContent, /<img src=x/);
-    assert.equal(document.nodes.deviceBehaviors.all("img").length, 0);
-});
-
-test("every behaviour row can open the editor using its exact device identity", () => {
-    const document = documentForView();
-    const model = buildDeviceModel({committed: decodedDeviceProfile()});
-    const messages = [];
-    renderDeviceProfileDetails(document, model, message => messages.push(message));
-    const buttons = document.nodes.deviceBehaviors.all("button");
-    assert.equal(buttons.length, 37);
-    assert.equal(document.nodes.deviceBehaviors.all("code")[0].title, model.keyBehaviors[0].keycode);
-    for (const [index, button] of buttons.entries()) {
-        button.onclick();
-        assert.deepEqual(messages.at(-1), {type: "editBehavior", keycode: model.keyBehaviors[index].keycode});
-    }
 });
 
 test("the generated webview script includes the device renderer and parses as delivered", () => {
@@ -75,8 +43,11 @@ test("the generated webview script includes the device renderer and parses as de
     const script = html.match(/<script nonce="[^"]+">([\s\S]*?)<\/script>/)[1];
     new vm.Script(script);
     assert.match(script, /function renderDeviceProfileDetails/);
-    assert.match(script, /renderDeviceProfileDetails\(document, model, post, displayKeyExpression\)/);
-    assert.match(script, /\["behaviors", "Behaviours"\]/);
+    assert.match(script, /renderDeviceProfileDetails\(document, model\)/);
+    assert.doesNotMatch(script, /\["behaviors", "Behaviours"\]/);
+    assert.match(script, /renderSelectedBehaviorEditor\(behaviorTarget, selectedBehavior\)/);
+    assert(script.indexOf('["macros", "Macros"]') < script.indexOf('["pdModes", "Pointing modes"]'));
+    assert(script.indexOf('["pdModes", "Pointing modes"]') < script.indexOf('["rgb", "RGB"]'));
 });
 
 

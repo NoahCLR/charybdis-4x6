@@ -11,13 +11,19 @@
 #include "profile_rgb_v1.h"
 #include "profile_combo_v1.h"
 #include "profile_settings_v1.h"
+#include "profile_pd_v1.h"
 
 enum {
     NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB           = 1u << 0,
     NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS = 1u << 1,
     NOAH_PROFILE_VALIDATOR_V1_DOMAIN_SETTINGS      = 1u << 3,
     NOAH_PROFILE_VALIDATOR_V1_DOMAIN_COMBOS        = 1u << 2,
-    NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS        = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_COMBOS | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_SETTINGS,
+#ifdef NOAH_PD_PROFILE_ENABLE
+    NOAH_PROFILE_VALIDATOR_V1_DOMAIN_PD = 1u << 4,
+#else
+    NOAH_PROFILE_VALIDATOR_V1_DOMAIN_PD = 0u,
+#endif
+    NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS        = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_COMBOS | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_SETTINGS | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_PD,
     NOAH_PROFILE_VALIDATOR_V1_STEP_READ_MAX        = 20u,
     NOAH_PROFILE_VALIDATOR_V1_CHECKSUM_CHUNK_MAX   = NOAH_PROFILE_VALIDATOR_V1_STEP_READ_MAX,
     // Regression policy for the payload-independent 32-bit scan state. This
@@ -120,9 +126,15 @@ typedef struct {
     noah_key_behavior_domain_v1_t   key_behaviors;
     noah_profile_combo_v1_view_t    combos;
     noah_profile_settings_v1_view_t settings;
+#ifdef NOAH_PD_PROFILE_ENABLE
+    noah_profile_settings_v1_view_t pd;
+#endif
 } noah_profile_validator_v1_profile_t;
 
 typedef union {
+#ifdef NOAH_PD_PROFILE_ENABLE
+    struct { uint8_t bytes[96]; uint8_t slot, used; bool header; } pd;
+#endif
     noah_profile_settings_v1_validation_t    settings;
     noah_profile_combo_v1_validation_t       combos;
     noah_profile_rgb_v1_validation_t         rgb;
@@ -151,12 +163,12 @@ typedef struct {
     uint8_t                                       current_domain_id;
     uint8_t                                       previous_domain_id;
     uint8_t                                       seen_domain_mask;
+    bool                                          has_reference_error;
     noah_profile_validator_v1_domain_validation_t domain_validation;
     size_t                                        reference_error_offset;
     uint16_t                                      reference_error_row;
     uint8_t                                       reference_error_step;
     uint8_t                                       reference_error_field;
-    bool                                          has_reference_error;
 } noah_profile_validator_v1_t;
 
 noah_profile_validator_v1_compatibility_t noah_profile_validator_v1_default_compatibility(uint32_t action_abi_digest);

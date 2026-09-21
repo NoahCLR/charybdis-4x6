@@ -171,7 +171,7 @@ test("candidate status uses normal request correlation and decodes structured lo
 test("candidate codecs reject noncanonical padding, invalid bounds, and unknown status values", () => {
     const fixtures = goldenFixtures();
     assert.throws(() => buildCandidateChunkRequest(1, 0, Buffer.alloc(0)), /1 through 20/);
-    assert.throws(() => buildCandidateChunkRequest(1, 4050, Buffer.alloc(20)), /end at or before/);
+    assert.throws(() => buildCandidateChunkRequest(1, 5070, Buffer.alloc(20)), /end at or before/);
     assert.throws(() => buildCandidateAbortRequest(0), /nonzero/);
 
     const badAck = Buffer.from(fixtures["begin-queued-ack"]);

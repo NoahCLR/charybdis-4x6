@@ -7,10 +7,8 @@
 #if defined(POINTING_DEVICE_ENABLE)
 
 #    include "pd_mode_handler_common.h"
+#    include "../defs/pd_mode_defaults.h"
 
-#    ifndef ZOOM_THRESHOLD
-#        define ZOOM_THRESHOLD 80
-#    endif
 
 PD_MODE_VALIDATE_AXIS_THRESHOLD(ZOOM_THRESHOLD);
 

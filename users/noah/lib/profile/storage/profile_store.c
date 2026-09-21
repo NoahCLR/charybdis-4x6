@@ -47,17 +47,44 @@ enum {
     DOMAIN_ID_KEY_BEHAVIORS           = 0x20u,
     DOMAIN_MASK_RGB                   = 1u << 0,
     DOMAIN_MASK_KEY_BEHAVIORS         = 1u << 1,
+    DOMAIN_ID_PD                      = 0x50u,
+    DOMAIN_MASK_PD                    = 1u << 4,
     DOMAIN_MASK_ALL                   = DOMAIN_MASK_RGB | DOMAIN_MASK_KEY_BEHAVIORS | DOMAIN_MASK_COMBOS | DOMAIN_MASK_SETTINGS,
 };
 
 static const uint8_t legacy_header_magic[2]  = {'N', 'P'};
 static const uint8_t logical_header_magic[2] = {'N', 'Q'};
+static const uint8_t pd_header_magic[2]      = {'N', 'R'};
 static const uint8_t profile_magic[4]        = {'N', 'L', 'P', '1'};
 static const uint8_t commit_marker[2]        = {0xA5u, 0x5Au};
 static const uint8_t prepared_marker[2]      = {0x5Au, 0xA5u};
 static const uint8_t invalid_marker[2]       = {0u, 0u};
 static const uint8_t logical_commit_marker   = 0xA5u;
 static const uint8_t logical_prepared_marker = 0x5Au;
+
+// Both logical headers retain the same offsets, checksums and marker protocol.
+// NR has its own schema identity; never infer its schema from the reader.
+static bool logical_format(uint8_t version) {
+    return version == NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL || version == NOAH_PROFILE_STORE_FORMAT_VERSION_PD;
+}
+
+static uint8_t format_schema(uint8_t version) {
+    return version == NOAH_PROFILE_STORE_FORMAT_VERSION_PD ? 2u : 1u;
+}
+
+static uint8_t format_domain_mask(uint8_t version) {
+    return version == NOAH_PROFILE_STORE_FORMAT_VERSION_PD ? DOMAIN_MASK_ALL | DOMAIN_MASK_PD : DOMAIN_MASK_ALL;
+}
+
+static bool domain_version_valid(uint8_t format, uint8_t id, uint8_t version) {
+    if (format == NOAH_PROFILE_STORE_FORMAT_VERSION_PD) {
+        if (id == DOMAIN_ID_RGB || id == DOMAIN_ID_SETTINGS) return version == 2u;
+        if (id == DOMAIN_ID_PD) return version == 1u;
+    } else if (id == DOMAIN_ID_PD) {
+        return false;
+    }
+    return version == 1u;
+}
 
 static uint16_t read_u16(const uint8_t *source) {
     return (uint16_t)source[0] | ((uint16_t)source[1] << 8u);
@@ -114,6 +141,7 @@ static uint8_t domain_mask_for_id(uint8_t domain_id) {
     if (domain_id == DOMAIN_ID_RGB) {
         return DOMAIN_MASK_RGB;
     }
+    if (domain_id == DOMAIN_ID_PD) return DOMAIN_MASK_PD;
     if (domain_id == DOMAIN_ID_SETTINGS) return DOMAIN_MASK_SETTINGS;
     if (domain_id == DOMAIN_ID_COMBOS) return DOMAIN_MASK_COMBOS;
     if (domain_id == DOMAIN_ID_KEY_BEHAVIORS) {
@@ -124,9 +152,11 @@ static uint8_t domain_mask_for_id(uint8_t domain_id) {
 
 static void encode_header(uint8_t *header, const noah_profile_store_candidate_t *candidate) {
     memset(header, 0, NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE);
-    if (candidate->format_version == NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL) {
-        memcpy(header, logical_header_magic, sizeof(logical_header_magic));
-        header[LOGICAL_HEADER_IDENTITY] = (uint8_t)((candidate->domain_mask & 0x0Fu) | (candidate->origin_half << 4u) | ((candidate->flags & 1u) << 5u));
+    if (logical_format(candidate->format_version)) {
+        bool pd = candidate->format_version == NOAH_PROFILE_STORE_FORMAT_VERSION_PD;
+        uint8_t origin_shift = pd ? 5u : 4u;
+        memcpy(header, pd ? pd_header_magic : logical_header_magic, sizeof(logical_header_magic));
+        header[LOGICAL_HEADER_IDENTITY] = (uint8_t)(candidate->domain_mask | (candidate->origin_half << origin_shift) | (candidate->flags << (origin_shift + 1u)));
         write_u16(&header[LOGICAL_HEADER_PAYLOAD_LENGTH], candidate->payload_length);
         write_u32(&header[LOGICAL_HEADER_GENERATION], candidate->generation);
         write_u32(&header[LOGICAL_HEADER_PAYLOAD_CRC32], candidate->payload_crc32);
@@ -158,31 +188,35 @@ static noah_profile_store_result_t decode_header(noah_profile_store_t *store, no
     if (memcmp(header, legacy_header_magic, sizeof(legacy_header_magic)) == 0 && header[LEGACY_HEADER_FORMAT_VERSION] == NOAH_PROFILE_STORE_FORMAT_VERSION_LEGACY) {
         format_version = NOAH_PROFILE_STORE_FORMAT_VERSION_LEGACY;
     } else if (memcmp(header, logical_header_magic, sizeof(logical_header_magic)) == 0) {
-        format_version = NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL;
+        format_version = NOAH_PROFILE_LOGICAL_STORE_VERSION;
+    } else if (memcmp(header, pd_header_magic, sizeof(pd_header_magic)) == 0) {
+        format_version = NOAH_PROFILE_STORE_FORMAT_VERSION_PD;
     } else {
         return NOAH_PROFILE_STORE_INVALID_HEADER;
     }
-    if (require_commit && (format_version == NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL ? header[LOGICAL_HEADER_MARKER] != logical_commit_marker : memcmp(&header[LEGACY_HEADER_MARKER], commit_marker, sizeof(commit_marker)) != 0)) {
+    if (require_commit && (logical_format(format_version) ? header[LOGICAL_HEADER_MARKER] != logical_commit_marker : memcmp(&header[LEGACY_HEADER_MARKER], commit_marker, sizeof(commit_marker)) != 0)) {
         return NOAH_PROFILE_STORE_INVALID_HEADER;
     }
-    expected_crc = noah_profile_crc16_ccitt_update(NOAH_PROFILE_CRC16_INITIAL, header, format_version == NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL ? LOGICAL_HEADER_CHECKSUMMED_LENGTH : LEGACY_HEADER_CHECKSUMMED_LENGTH);
-    if (read_u16(&header[format_version == NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL ? LOGICAL_HEADER_CRC16 : LEGACY_HEADER_CRC16]) != expected_crc) {
+    expected_crc = noah_profile_crc16_ccitt_update(NOAH_PROFILE_CRC16_INITIAL, header, logical_format(format_version) ? LOGICAL_HEADER_CHECKSUMMED_LENGTH : LEGACY_HEADER_CHECKSUMMED_LENGTH);
+    if (read_u16(&header[logical_format(format_version) ? LOGICAL_HEADER_CRC16 : LEGACY_HEADER_CRC16]) != expected_crc) {
         return NOAH_PROFILE_STORE_CHECKSUM_MISMATCH;
     }
 
     memset(record, 0, sizeof(*record));
     record->slot           = slot;
     record->format_version = format_version;
-    if (format_version == NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL) {
+    if (logical_format(format_version)) {
         uint8_t identity = header[LOGICAL_HEADER_IDENTITY];
-        if ((identity & 0xC0u) != 0u) {
+        bool pd = format_version == NOAH_PROFILE_STORE_FORMAT_VERSION_PD;
+        uint8_t origin_shift = pd ? 5u : 4u;
+        if ((identity & (pd ? 0x80u : 0xC0u)) != 0u) {
             return NOAH_PROFILE_STORE_INVALID_HEADER;
         }
-        record->schema_major            = store->compatibility.schema_major;
-        record->schema_minor            = store->compatibility.schema_minor;
-        record->domain_mask             = identity & 0x0Fu;
-        record->origin_half             = (identity >> 4u) & 1u;
-        record->flags                   = (identity >> 5u) & 1u;
+        record->schema_major            = format_schema(format_version);
+        record->schema_minor            = 0u;
+        record->domain_mask             = identity & format_domain_mask(format_version);
+        record->origin_half             = (identity >> origin_shift) & 1u;
+        record->flags                   = (identity >> (origin_shift + 1u)) & 1u;
         record->payload_length          = read_u16(&header[LOGICAL_HEADER_PAYLOAD_LENGTH]);
         record->generation              = read_u32(&header[LOGICAL_HEADER_GENERATION]);
         record->payload_crc32           = read_u32(&header[LOGICAL_HEADER_PAYLOAD_CRC32]);
@@ -201,12 +235,12 @@ static noah_profile_store_result_t decode_header(noah_profile_store_t *store, no
         record->payload_digest          = read_u32(&header[LEGACY_HEADER_PAYLOAD_DIGEST]);
         record->compiled_default_digest = read_u32(&header[LEGACY_HEADER_COMPILED_DIGEST]);
         record->action_abi_digest       = read_u32(&header[LEGACY_HEADER_ACTION_ABI_DIGEST]);
-        if (record->schema_major != store->compatibility.schema_major || record->schema_minor != store->compatibility.schema_minor) {
-            return NOAH_PROFILE_STORE_INCOMPATIBLE_SCHEMA;
-        }
+    }
+    if (record->schema_major != store->compatibility.schema_major || record->schema_minor != store->compatibility.schema_minor) {
+        return NOAH_PROFILE_STORE_INCOMPATIBLE_SCHEMA;
     }
 
-    if (record->payload_length < PROFILE_BLOB_HEADER_SIZE || record->payload_length > NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX || record->generation == 0u || record->origin_half > 1u || (record->flags & (uint8_t)~NOAH_PROFILE_STORE_ALLOWED_FLAGS) != 0u || (format_version == NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL && (record->via_generation == 0u || record->via_digest == 0u))) {
+    if (record->payload_length < PROFILE_BLOB_HEADER_SIZE || record->payload_length > NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX || record->generation == 0u || record->origin_half > 1u || (record->flags & (uint8_t)~NOAH_PROFILE_STORE_ALLOWED_FLAGS) != 0u || (logical_format(format_version) && (record->via_generation == 0u || record->via_digest == 0u))) {
         return NOAH_PROFILE_STORE_INVALID_HEADER;
     }
     if (record->action_abi_digest != store->compatibility.action_abi_digest) {
@@ -246,14 +280,14 @@ static noah_profile_store_result_t validate_blob_shape(noah_profile_store_t *sto
         domain_id      = store->scratch[0];
         domain_version = store->scratch[1];
         domain_length  = read_u16(&store->scratch[2]);
-        if (domain_id <= prior_domain || domain_mask_for_id(domain_id) == 0u || domain_version != 1u || (uint32_t)offset + DOMAIN_ENVELOPE_SIZE + domain_length > record->payload_length) {
+        if (domain_id <= prior_domain || domain_mask_for_id(domain_id) == 0u || !domain_version_valid(record->format_version, domain_id, domain_version) || (uint32_t)offset + DOMAIN_ENVELOPE_SIZE + domain_length > record->payload_length) {
             return NOAH_PROFILE_STORE_INVALID_PAYLOAD;
         }
         record->domain_mask |= domain_mask_for_id(domain_id);
         prior_domain = domain_id;
         offset       = (uint16_t)(offset + DOMAIN_ENVELOPE_SIZE + domain_length);
     }
-    if (offset != record->payload_length || (record->format_version == NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL && record->domain_mask != expected_domain_mask)) {
+    if (offset != record->payload_length || (logical_format(record->format_version) && record->domain_mask != expected_domain_mask)) {
         return NOAH_PROFILE_STORE_INVALID_PAYLOAD;
     }
     return NOAH_PROFILE_STORE_OK;
@@ -277,7 +311,7 @@ static noah_profile_store_result_t validate_payload(noah_profile_store_t *store,
         digest = noah_profile_fnv1a_update(digest, store->scratch, length);
         offset = (uint16_t)(offset + length);
     }
-    if (noah_profile_crc32_finish(crc) != record->payload_crc32 || (record->format_version != NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL && digest != record->payload_digest)) {
+    if (noah_profile_crc32_finish(crc) != record->payload_crc32 || (!logical_format(record->format_version) && digest != record->payload_digest)) {
         return NOAH_PROFILE_STORE_CHECKSUM_MISMATCH;
     }
     record->payload_digest = digest;
@@ -537,7 +571,7 @@ noah_profile_store_result_t noah_profile_store_boot_select_step(noah_profile_sto
         store->boot_digest_state = noah_profile_fnv1a_update(store->boot_digest_state, store->scratch, length);
         store->boot_offset       = (uint16_t)(store->boot_offset + length);
         if (store->boot_offset == store->boot_current.payload_length) {
-            if (noah_profile_crc32_finish(store->boot_crc32_state) != store->boot_current.payload_crc32 || (store->boot_current.format_version != NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL && store->boot_digest_state != store->boot_current.payload_digest)) {
+            if (noah_profile_crc32_finish(store->boot_crc32_state) != store->boot_current.payload_crc32 || (!logical_format(store->boot_current.format_version) && store->boot_digest_state != store->boot_current.payload_digest)) {
                 return boot_finish_slot(store, NOAH_PROFILE_STORE_CHECKSUM_MISMATCH, selected);
             }
             store->boot_current.payload_digest = store->boot_digest_state;
@@ -560,7 +594,7 @@ noah_profile_store_result_t noah_profile_store_boot_select_step(noah_profile_sto
         store->boot_offset               = PROFILE_BLOB_HEADER_SIZE;
         store->boot_current.domain_mask  = 0u;
         if (store->boot_domain_count == 0u) {
-            bool shape_valid = store->boot_offset == store->boot_current.payload_length && (store->boot_current.format_version != NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL || store->boot_expected_domain_mask == 0u);
+            bool shape_valid = store->boot_offset == store->boot_current.payload_length && (!logical_format(store->boot_current.format_version) || store->boot_expected_domain_mask == 0u);
             return boot_finish_slot(store, shape_valid ? NOAH_PROFILE_STORE_OK : NOAH_PROFILE_STORE_INVALID_PAYLOAD, selected);
         }
         store->boot_phase = boot_shape_domain_phase(slot_a);
@@ -581,7 +615,7 @@ noah_profile_store_result_t noah_profile_store_boot_select_step(noah_profile_sto
         domain_id      = store->scratch[0];
         domain_version = store->scratch[1];
         domain_length  = read_u16(&store->scratch[2]);
-        if (domain_id <= store->boot_prior_domain || domain_mask_for_id(domain_id) == 0u || domain_version != 1u || (uint32_t)store->boot_offset + DOMAIN_ENVELOPE_SIZE + domain_length > store->boot_current.payload_length) {
+        if (domain_id <= store->boot_prior_domain || domain_mask_for_id(domain_id) == 0u || !domain_version_valid(store->boot_current.format_version, domain_id, domain_version) || (uint32_t)store->boot_offset + DOMAIN_ENVELOPE_SIZE + domain_length > store->boot_current.payload_length) {
             return boot_finish_slot(store, NOAH_PROFILE_STORE_INVALID_PAYLOAD, selected);
         }
         store->boot_current.domain_mask |= domain_mask_for_id(domain_id);
@@ -589,7 +623,7 @@ noah_profile_store_result_t noah_profile_store_boot_select_step(noah_profile_sto
         store->boot_offset       = (uint16_t)(store->boot_offset + DOMAIN_ENVELOPE_SIZE + domain_length);
         store->boot_domain_index++;
         if (store->boot_domain_index == store->boot_domain_count) {
-            bool shape_valid = store->boot_offset == store->boot_current.payload_length && (store->boot_current.format_version != NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL || store->boot_current.domain_mask == store->boot_expected_domain_mask);
+            bool shape_valid = store->boot_offset == store->boot_current.payload_length && (!logical_format(store->boot_current.format_version) || store->boot_current.domain_mask == store->boot_expected_domain_mask);
             return boot_finish_slot(store, shape_valid ? NOAH_PROFILE_STORE_OK : NOAH_PROFILE_STORE_INVALID_PAYLOAD, selected);
         }
         return NOAH_PROFILE_STORE_IN_PROGRESS;
@@ -597,10 +631,10 @@ noah_profile_store_result_t noah_profile_store_boot_select_step(noah_profile_sto
 }
 
 static noah_profile_store_result_t validate_candidate(const noah_profile_store_t *store, const noah_profile_store_candidate_t *candidate) {
-    if (!candidate || candidate->payload_length < PROFILE_BLOB_HEADER_SIZE || candidate->payload_length > NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX || candidate->generation == 0u || candidate->origin_half > 1u || candidate->schema_major > 15u || candidate->schema_minor > 15u || (candidate->flags & (uint8_t)~NOAH_PROFILE_STORE_ALLOWED_FLAGS) != 0u || (candidate->format_version != NOAH_PROFILE_STORE_FORMAT_VERSION_LEGACY && candidate->format_version != NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL) || (candidate->format_version == NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL && (candidate->via_generation == 0u || candidate->via_digest == 0u))) {
+    if (!candidate || candidate->payload_length < PROFILE_BLOB_HEADER_SIZE || candidate->payload_length > NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX || candidate->generation == 0u || candidate->origin_half > 1u || candidate->schema_major > 15u || candidate->schema_minor > 15u || (candidate->flags & (uint8_t)~NOAH_PROFILE_STORE_ALLOWED_FLAGS) != 0u || (candidate->format_version != NOAH_PROFILE_STORE_FORMAT_VERSION_LEGACY && !logical_format(candidate->format_version)) || (logical_format(candidate->format_version) && (candidate->via_generation == 0u || candidate->via_digest == 0u))) {
         return NOAH_PROFILE_STORE_INVALID_ARGUMENT;
     }
-    if (candidate->schema_major != store->compatibility.schema_major || candidate->schema_minor != store->compatibility.schema_minor) {
+    if (candidate->schema_major != store->compatibility.schema_major || candidate->schema_minor != store->compatibility.schema_minor || (logical_format(candidate->format_version) && (candidate->schema_major != format_schema(candidate->format_version) || candidate->schema_minor != 0u))) {
         return NOAH_PROFILE_STORE_INCOMPATIBLE_SCHEMA;
     }
     if (candidate->action_abi_digest != store->compatibility.action_abi_digest) {
@@ -609,7 +643,7 @@ static noah_profile_store_result_t validate_candidate(const noah_profile_store_t
     if (candidate->compiled_default_digest != store->compatibility.compiled_default_digest) {
         return NOAH_PROFILE_STORE_INCOMPATIBLE_COMPILED_DEFAULT;
     }
-    if ((candidate->domain_mask & (uint8_t)~DOMAIN_MASK_ALL) != 0u) {
+    if ((candidate->domain_mask & (uint8_t)~format_domain_mask(candidate->format_version)) != 0u) {
         return NOAH_PROFILE_STORE_INVALID_ARGUMENT;
     }
     if (store->committed.slot != NOAH_PROFILE_SLOT_NONE && !generation_is_newer(candidate->generation, store->committed.generation)) {
@@ -770,7 +804,7 @@ noah_profile_store_result_t noah_profile_store_prepare_commit_step(noah_profile_
     if (byte_budget == 0u || byte_budget > 20u || !slot_start(store->candidate_slot, &start)) {
         return NOAH_PROFILE_STORE_INVALID_ARGUMENT;
     }
-    if (store->candidate.format_version == NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL) {
+    if (logical_format(store->candidate.format_version)) {
         marker_offset  = LOGICAL_HEADER_MARKER;
         marker_length  = 1u;
         prepared_value = &logical_prepared_marker;
@@ -878,7 +912,7 @@ noah_profile_store_result_t noah_profile_store_prepare_commit_step(noah_profile_
             domain_id      = store->scratch[0];
             domain_version = store->scratch[1];
             domain_length  = read_u16(&store->scratch[2]);
-            if (domain_id <= store->commit_prior_domain || domain_mask_for_id(domain_id) == 0u || domain_version != 1u || (uint32_t)store->commit_offset + DOMAIN_ENVELOPE_SIZE + domain_length > store->candidate.payload_length) {
+            if (domain_id <= store->commit_prior_domain || domain_mask_for_id(domain_id) == 0u || !domain_version_valid(store->candidate.format_version, domain_id, domain_version) || (uint32_t)store->commit_offset + DOMAIN_ENVELOPE_SIZE + domain_length > store->candidate.payload_length) {
                 return finish_prepare(store, NOAH_PROFILE_STORE_INVALID_PAYLOAD);
             }
             store->commit_prior_domain = domain_id;

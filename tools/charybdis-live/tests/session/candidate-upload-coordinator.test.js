@@ -643,7 +643,8 @@ test("default status stall timing scales and gives peer preparation its unobserv
     );
     assert.equal(maximum > minimum, true);
     assert.equal(maximum < FIRMWARE_HOST_PRECOMMIT_TIMEOUT_MS, true);
-    assert.equal(maximum, 13180);
+    assert.equal(candidateStatusStallTimeoutMs(4064), 13180);
+    assert.equal(maximum, 14000);
     assert.equal(preparing, 80000);
     assert.equal(preparing > FIRMWARE_PREPARING_PEER_NO_PROGRESS_TIMEOUT_MS, true);
 });

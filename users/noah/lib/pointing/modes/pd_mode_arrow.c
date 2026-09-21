@@ -9,16 +9,11 @@
 #    include "../../action/action_dispatch.h"
 #    include "../../action/owned_keycode.h"
 #    include "pd_mode_handler_common.h"
+#    include "../defs/pd_mode_defaults.h"
 
 #    define ARROW_VERTICAL_MASKED_MODS (MOD_BIT(KC_LEFT_ALT) | MOD_BIT(KC_RIGHT_ALT))
 #    define ARROW_SELECTION_SHIFT_KEYCODE KC_RIGHT_SHIFT
 
-#    ifndef ARROW_THRESHOLD_X
-#        define ARROW_THRESHOLD_X 40
-#    endif
-#    ifndef ARROW_THRESHOLD_Y
-#        define ARROW_THRESHOLD_Y 50
-#    endif
 
 PD_MODE_VALIDATE_AXIS_THRESHOLD(ARROW_THRESHOLD_X);
 PD_MODE_VALIDATE_AXIS_THRESHOLD(ARROW_THRESHOLD_Y);

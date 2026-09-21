@@ -23,6 +23,28 @@ function behavior(row) {
         `Keep auto-mouse anchored: ${row.keepsAutoMouseAnchored ? "yes" : "no"}`,
         ...row.steps.map(step => `${step.tapIndex + 1} tap${step.tapIndex ? "s" : ""}: ${action(step.tap)}; hold ${hold(step.hold)}; long hold ${hold(step.longHold)}`)].join("\n");
 }
+function pointingFields(slot) {
+    const result = new Map([["Movement", ["Empty", "Directional keys / shortcuts", "Scrolling"][slot?.kind || 0]], ["Name", slot?.name || "Empty"]]);
+    if (!slot?.kind) return result;
+    const mods = mask => ["Left Ctrl", "Left Shift", "Left Alt", "Left GUI", "Right Ctrl", "Right Shift", "Right Alt", "Right GUI"].filter((_, bit) => mask & (1 << bit)).join(" + ") || "None";
+    const tap = output => !output?.keycode ? "None" : `${key(output.keycode)} · ${output.modifierPolicy === 2 ? "Exact shortcut" : output.modifierPolicy === 1 ? "Ignore " + mods(output.mask) : "Inherit modifiers"}`;
+    result.set("DPI", slot.dpi || "Normal pointer speed");
+    result.set("Pointer layer", slot.pointerLayer ? "Return to typing layer" : "Keep pointer layer active");
+    if (slot.kind === 1) {
+        result.set("Axes", ["Vertical only", "Horizontal only", "Dominant axis"][slot.axis]);
+        result.set("Horizontal movement per tap", slot.thresholdX);
+        result.set("Vertical movement per tap", slot.thresholdY);
+        for (const direction of ["left", "right", "up", "down"]) result.set(direction[0].toUpperCase() + direction.slice(1), tap(slot.directions[direction]));
+    } else {
+        result.set("Scroll modifiers", mods(slot.heldModifiers));
+        const labels = {thresholdH: "Horizontal activation threshold", thresholdV: "Vertical activation threshold", divisorH: "Horizontal movement per wheel step", divisorV: "Vertical movement per wheel step", intervalMs: "Minimum interval (ms)", expireMs: "Gesture expiry (ms)", lockMs: "Axis lock timeout (ms)", startNumerator: "Axis selection ratio numerator", startDenominator: "Axis selection ratio denominator", sustainNumerator: "Axis retention ratio numerator", sustainDenominator: "Axis retention ratio denominator", decayDivisor: "Cross-axis decay divisor"};
+        for (const [field, label] of Object.entries(labels)) result.set(label, slot.scroll[field]);
+        result.set("Reverse scrolling", ["Neither axis", "Horizontal", "Vertical", "Both axes"][slot.scroll.invert]);
+    }
+    slot.buttons.forEach((button, index) => result.set(`Button ${index + 1}`, button.kind === 3 ? "Hold " + mods(button.modifiers) : button.kind === 2 ? tap(button.tap) : button.kind === 1 ? "Consume" : "Pass through"));
+    return result;
+}
+
 const hsv = c => `HSV(${c.h}, ${c.s}, ${c.v})`;
 
 // Compare complete validated snapshots. The review describes final differences,
@@ -52,6 +74,10 @@ function profileReview(before, after) {
     for (const field of next) {const old = previous.find(item => item.macro === field.macro); if (old?.raw !== field.raw) add("Defaults", `${field.section} · ${field.label}`, old?.value, field.value);}
     const masks = after.options?.keymapMasks.reduce((mask, value) => mask | value, 0) || 0;
     add("Defaults", "Other saved key options", `0x${(a.settings.values[24] & ~masks).toString(16)}`, `0x${(b.settings.values[24] & ~masks).toString(16)}`);
+    for (let id = 0; id < 8; id++) {
+        const old = pointingFields(a.pdModes?.[id]), next = pointingFields(b.pdModes?.[id]);
+        for (const label of new Set([...old.keys(), ...next.keys()])) add("Pointing modes", `Slot ${id + 1} · ${label}`, old.get(label), next.get(label));
+    }
     const rgb = value => {
         const r = value.rgb, result = new Map();
         result.set("Enabled feedback", Object.entries(rgbEnums.RGB_STAGE_BITS).filter(([, bit]) => r.stageEnableMask & bit).map(([name]) => words(name)).join(", ") || "None");

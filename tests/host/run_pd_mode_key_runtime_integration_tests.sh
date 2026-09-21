@@ -93,3 +93,11 @@ compile_test "$BIN"
 
 compile_test "$LEGACY_BIN" -DPD_MODE_KEY_RUNTIME_TEST_LEGACY_PINCH_IMPLICIT
 "$LEGACY_BIN"
+
+compile_test "$BUILD_DIR/configured" -DNOAH_PD_PROFILE_ENABLE \
+    "$ROOT/keyboards/bastardkb/charybdis/4x6/keymaps/noah/pd_config.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_pd_v1.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
+    "$ROOT/users/noah/lib/profile/runtime/effective_pd_runtime.c" \
+    "$ROOT/users/noah/lib/pointing/modes/pd_mode_configured.c"
+"$BUILD_DIR/configured"

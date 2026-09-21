@@ -14,13 +14,16 @@ static uint8_t bytes[344];
 static void    defaults(void) {
     const uint32_t values[28] = {200, 150, 400, 150, 1, 4, 1200, 25, 1, 3, 100, 0, 0, 400, 400, 200, 400, 900000, 1200, 200, 1, 257, 0xc8ff00, 1, 0, 200, 10, 0x76543210};
     memset(bytes, 0, sizeof(bytes));
-    bytes[0] = 1;
+    bytes[0] = NOAH_SETTINGS_VERSION;
     bytes[1] = 8;
     bytes[2] = 28;
     bytes[3] = 16;
     for (uint8_t i = 0; i < 28; i++)
         for (uint8_t j = 0; j < 4; j++)
             bytes[8 + i * 4 + j] = values[i] >> (j * 8);
+#ifdef NOAH_PD_PROFILE_ENABLE
+    memset(bytes + 8 + NOAH_SETTING_DRAGSCROLL_DPI * 4, 0, 5 * 4);
+#endif
 }
 static bool valid(void) {
     noah_profile_settings_v1_validation_t state = {0};
@@ -31,6 +34,16 @@ static bool valid(void) {
 int main(void) {
     defaults();
     assert(valid());
+    bytes[0] = NOAH_SETTINGS_VERSION == 2 ? 1 : 2;
+    assert(!valid());
+    defaults();
+#ifdef NOAH_PD_PROFILE_ENABLE
+    for (uint8_t id = NOAH_SETTING_DRAGSCROLL_DPI; id <= NOAH_SETTING_ARROW_DPI; id++) {
+        bytes[8 + id * 4] = 1;
+        assert(!valid());
+        bytes[8 + id * 4] = 0;
+    }
+#endif
     bytes[8 + 4 * 4] = 2;
     assert(!valid());
     defaults();

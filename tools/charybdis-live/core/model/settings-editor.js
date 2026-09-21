@@ -76,6 +76,7 @@ function settingValue(field, values) {
 function settingsSections(snapshot, settings) {
     const options = snapshot.options;
     const result = sections.map(section => ({...section, fields: section.fields.map(field => ({...field}))}));
+    if (settings.formatVersion === 2) for (const section of result) section.fields = section.fields.filter(field => field.id < 10 || field.id > 14);
     const rgb = result.find(section => section.id === "rgbAppearance");
     const currentEffect = (settings.values[21] >>> 8) & 255, currentFlags = settings.values[21] >>> 24;
     const effects = options?.effects.map(effect => ({value: effect.id, label: effect.name.toLowerCase().replace(/_/g, " ").replace(/^./, c => c.toUpperCase())})) || [];
@@ -147,7 +148,7 @@ function editSettings(snapshot, message, capabilities) {
     if (!value.settings.values.every((number, id) => validSetting(id, number))) throw fail("A setting is outside the keyboard's supported range.");
     if (value.settings.values[6] <= value.settings.values[16]) throw fail("Auto-mouse timeout must be longer than its lighting fade delay. Adjust both in Auto-mouse before saving.");
     const domains = decodeProfileBlob(value.profile).domains.map(domain => domain.id === 0x40 ? {...domain, payload: encodeSettings(value.settings)} : domain);
-    const document = {...value.document, profile: encodeProfileBlob({domains}).toString("base64")};
+    const document = {...value.document, profile: encodeProfileBlob({schema: {major: value.document.version, minor: 0}, domains}).toString("base64")};
     validateSnapshot(document, capabilities);
     return document;
 }

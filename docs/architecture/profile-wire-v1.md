@@ -1,5 +1,14 @@
 # Profile Wire V1
 
+> Schema-2 PD extension: side-specific PD-enabled builds keep the v1 HID/split
+> envelope and add domain `0x50` (mask bit 4), profile schema 2.0, RGB/settings
+> v2, eight PD slots, and a 5,088-byte custom payload ceiling. Logical storage
+> is format 3 (`NR`) with the same VIA generation/digest binding; portable
+> documents are version 2. Existing schema-1/format-2 bridge behavior below
+> remains supported by the app. The exact version/geometry/ABI and legacy GET 9
+> migration contract is in [PD-mode domain v1](pd-mode-domain-v1.md).
+
+
 Status: accepted Stage 00 wire contract
 
 All multi-byte integers use little-endian byte order. All reserved bytes and
@@ -21,7 +30,7 @@ The blob is independent of Raw HID framing and EEPROM slot metadata.
 | 7 | 1 | flags; bit 0 means canonical encoding, all others reserved |
 
 The transport candidate length or storage header supplies total blob length.
-The maximum is 4,064 bytes.
+Schema 1 is capped at 4,064 bytes; schema 2 is capped at 5,088 bytes.
 
 ### Domain Envelope — 4 Bytes Plus Payload
 
@@ -319,7 +328,7 @@ Capabilities use two pages. Page 0 contains the response-layout version, page
 count, protocol/schema versions, report and chunk sizes, status-page count,
 feature flags, action-ABI digest, firmware version, and compiled-default
 digest. Page 1 contains compiled and maximum layer/behavior/combo/RGB/macro
-capacities plus the 4,064-byte payload, 4,096-byte slot, and advertised VIA
+capacities plus the selected schema's payload/slot capacities and advertised VIA
 macro bound (7,191 bytes on eight-layer firmware; 7,551 on the five-layer bridge). Feature bits distinguish schema/storage knowledge from candidate
 write, commit, preview, activation, and peer support, so read-only firmware
 does not advertise write operations prematurely.
@@ -392,16 +401,16 @@ Begin candidate uses this complete layout:
 | ---: | ---: | --- |
 | 5 | 1 | schema major |
 | 6 | 1 | schema minor |
-| 7 | 1 | requested-domain mask; bits 0 RGB, 1 key behaviors, 2 combos, 3 settings |
+| 7 | 1 | requested-domain mask; bits 0 RGB, 1 key behaviors, 2 combos, 3 settings, and schema-2 bit 4 PD |
 | 8 | 1 | flags, initially zero |
-| 9 | 2 | canonical blob length, `8..4064` |
+| 9 | 2 | canonical blob length, `8..4064` for schema 1 or `8..5088` for schema 2 |
 | 11 | 4 | CRC32 of the exact canonical blob |
 | 15 | 4 | FNV-1a digest of the exact canonical blob |
 | 19 | 4 | action-ABI digest used to encode actions |
 | 23 | 9 | reserved, all zero |
 
 The requested-domain mask may be zero for the canonical empty profile and may
-contain no bits other than 0, 1, 2 and 3. Compatibility with the build's advertised
+contain only the domains advertised by that firmware. Compatibility with the build's advertised
 schema, domain mask, action ABI, and capacity is checked by the scan owner
 before storage work begins.
 
@@ -417,7 +426,7 @@ Candidate chunk uses this complete layout:
 Chunks are sequential. A retry of an already staged `{transaction, offset,
 length, bytes}` tuple is accepted after the scan owner reads and compares the
 staged bytes. A retry with different bytes rejects and poisons that candidate.
-Partial overlaps, gaps, writes beyond the declared length or 4,064-byte bound,
+Partial overlaps, gaps, writes beyond the declared length or selected schema bound,
 and nonzero padding are rejected.
 
 Validate and abort contain only the five-byte common header; bytes 5 through

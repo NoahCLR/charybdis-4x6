@@ -15,7 +15,7 @@
 enum {
     NOAH_PROFILE_COMPILED_V1_DOMAIN_MASK_RGB           = 1u << 0,
     NOAH_PROFILE_COMPILED_V1_DOMAIN_MASK_KEY_BEHAVIORS = 1u << 1,
-    NOAH_PROFILE_COMPILED_V1_DOMAIN_MASK_ALL           = NOAH_PROFILE_COMPILED_V1_DOMAIN_MASK_RGB | NOAH_PROFILE_COMPILED_V1_DOMAIN_MASK_KEY_BEHAVIORS,
+    NOAH_PROFILE_COMPILED_V1_DOMAIN_MASK_ALL           = NOAH_PROFILE_COMPILED_V1_DOMAIN_MASK_RGB | NOAH_PROFILE_COMPILED_V1_DOMAIN_MASK_KEY_BEHAVIORS | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_PD,
     // The virtual reader may replay canonical records from byte zero through
     // the requested slice. This is a cold identity/export path, never the
     // effective-profile lookup path used by RGB frames or key events.
@@ -77,8 +77,10 @@ noah_profile_compiled_v1_result_t noah_profile_compiled_v1_write(const noah_prof
 
 // Cold-path reader for validation, identity, export, and reset persistence.
 // An arbitrary read regenerates preceding records and stops after the record
-// containing the requested end. Its declared worst-case replay is the frozen
-// 4,064-byte blob ceiling above. The reader borrows profile for its lifetime.
+// containing the requested end. PD-only reads start at the final PD payload,
+// so synchronous cache warming never replays RGB/behavior canonicalization.
+// The worst-case replay is the selected schema's blob ceiling above.
+// The reader borrows profile for its lifetime.
 // Runtime providers must read compiled defaults directly from authored tables,
 // not call this virtual reader from key-event or RGB-frame hot paths.
 noah_profile_reader_t noah_profile_compiled_v1_reader(const noah_profile_compiled_v1_t *profile);

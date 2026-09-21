@@ -13,11 +13,12 @@
 #    include "../profile/storage/profile_checksum.h"
 #    include "../profile/storage/profile_store_runtime.h"
 #    include "../macro/macro_payload.h"
+#    include "../profile/schema/profile_pd_v1.h"
 
 // Cold readback workspace, never used by key events or RGB rendering.
 void noah_qmk_portable_storage_init(void) {
     uint32_t word = eeconfig_read_user();
-#    ifdef NOAH_LEGACY_SNAPSHOT_BRIDGE
+#    if defined(NOAH_LEGACY_SNAPSHOT_BRIDGE) || defined(NOAH_PD_READBACK_BRIDGE)
     noah_qmk_via_sync_metadata_t metadata;
     // Keep recognized five-layer data across a build-date change. Dirty
     // storage remains marked for recovery; never erase the recovery source.
@@ -39,6 +40,9 @@ static void u32(uint8_t *p, uint32_t v) {
         p[i] = v >> (8 * i);
 }
 static uint32_t setting_default(uint8_t id) {
+#ifdef NOAH_PD_PROFILE_ENABLE
+    if (id >= NOAH_SETTING_DRAGSCROLL_DPI && id <= NOAH_SETTING_ARROW_DPI) return 0;
+#endif
     switch (id) {
         case NOAH_SETTING_TAPPING_TERM:
             return TAPPING_TERM;
@@ -107,7 +111,7 @@ static bool capture(void) {
     bool live = noah_effective_settings_copy(snapshot, &snapshot_length);
     if (!live) {
         memset(snapshot, 0, sizeof(snapshot));
-        const uint8_t header[8] = {1, 8, 28, 16, 0, 0, 0, 0};
+        const uint8_t header[8] = {NOAH_SETTINGS_VERSION, 8, 28, 16, 0, 0, 0, 0};
         memcpy(snapshot, header, 8);
         snapshot_length = NOAH_SETTINGS_FIXED_SIZE;
         for (uint8_t slot = 0; slot < 16; slot++) {
@@ -127,6 +131,19 @@ static bool capture(void) {
     }
     return true;
 }
+#ifndef NOAH_PD_PROFILE_ENABLE
+static bool capture_legacy_pd(void) {
+    const uint8_t header[8] = {1, 8, 96, 0, 0, 0, 0, 0};
+    memcpy(snapshot, header, 8);
+    snapshot_length = NOAH_PROFILE_PD_V1_SIZE;
+    for (uint8_t id = 0; id < 8; id++) {
+        uint8_t *record = snapshot + 8 + (size_t)id * 96;
+        noah_profile_pd_v1_encode_record(&noah_pd_defaults[id], record);
+
+    }
+    return noah_profile_pd_v1_validate(snapshot, snapshot_length, NULL) == NOAH_PROFILE_PD_V1_OK;
+}
+#endif
 void noah_qmk_portable_apply(void) {
     set_auto_mouse_enable(noah_setting(NOAH_SETTING_AUTO_MOUSE_ENABLED, get_auto_mouse_enable()));
     set_auto_mouse_layer(noah_setting(NOAH_SETTING_AUTO_MOUSE_LAYER, get_auto_mouse_layer()));
@@ -153,7 +170,11 @@ void noah_qmk_portable_apply(void) {
     eeconfig_update_keymap(&keymap_config);
 }
 bool noah_qmk_portable_profile_get(uint8_t *frame, uint8_t length) {
-    if (!frame || length != 32 || frame[0] != 8 || frame[1] || (frame[2] != 7 && frame[2] != 8)) return false;
+    if (!frame || length != 32 || frame[0] != 8 || frame[1] || (frame[2] != 7 && frame[2] != 8
+#ifndef NOAH_PD_PROFILE_ENABLE
+        && frame[2] != 9
+#endif
+        )) return false;
     bool malformed = !frame[3];
     for (uint8_t i = 5; i < 32; i++)
         malformed |= frame[i] != 0;
@@ -181,7 +202,13 @@ bool noah_qmk_portable_profile_get(uint8_t *frame, uint8_t length) {
         u16(p + 23, s.conflict_count);
         frame[6] = 25;
     } else if (!frame[4]) {
-        if (!capture()) {
+        if (!(frame[2] == 7 ? capture() :
+#ifndef NOAH_PD_PROFILE_ENABLE
+              capture_legacy_pd()
+#else
+              false
+#endif
+              )) {
             snapshot_length = 0;
             frame[5]        = 3;
             return true;
