@@ -21,7 +21,7 @@ function getHtml(webview, extensionUri) {
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} data:; style-src ${webview.cspSource}; script-src 'nonce-${id}';">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} data:; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${id}';">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Charybdis Live v2</title>
 <link rel="stylesheet" href="${uri("styles.css")}">

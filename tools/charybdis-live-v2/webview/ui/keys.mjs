@@ -4,7 +4,7 @@
 import {css, isOff, label as hsvLabel} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {LED_INDEX} from "../view/geometry.mjs";
-import {actionLabel, behaviourFor, behaviourTiers, comboKeysOnLayer, combosForKey, keyFace, keyMeaning, macroKeycodes, pointingSlotFor} from "../view/keyface.mjs";
+import {actionLabel, behaviourFor, behaviourGridSteps, behaviourTiers, comboKeysOnLayer, combosForKey, keyFace, keyMeaning, macroKeycodes, pointingSlotFor} from "../view/keyface.mjs";
 import {feedbackColours, layerColourRow, pdColourRow, stageEnabled} from "../view/lighting.mjs";
 import {currentLayer, getModel, layerName, layers, positionAt, post, render, selectedPosition, state, writable} from "../store.mjs";
 import {board} from "./board.mjs";
@@ -62,13 +62,19 @@ export function screenKeys() {
         <span class="muted" style="font-size:12px">${lit
             ? `lit ${esc(hsvLabel(row.color))} on ${row.mode === "ALL_KEYS" ? "every key" : "keys mapped here"}`
             : "no layer colour · the base effect shows through"}</span></div>`));
-    if (state.comboPicking) stage.appendChild(pickBar());
+    if (state.placement) stage.appendChild(placementBar());
+    else if (state.comboPicking) stage.appendChild(pickBar());
     stage.appendChild(board(model, layer, {
         selected: state.selected,
-        picking: state.comboPicking,
+        picking: state.comboPicking || Boolean(state.placement),
         inputs: state.comboPicking ? state.comboInputs : [],
         onKey: (index) => {
-            if (state.comboPicking) {
+            if (state.placement) {
+                const placement = state.placement;
+                state.placement = null;
+                state.selected = index;
+                post({type: "updateLayoutKeys", layer: layer.name, changes: [{layoutIndex: index, keycode: placement.keycode}]});
+            } else if (state.comboPicking) {
                 state.comboInputs = state.comboInputs.includes(index)
                     ? state.comboInputs.filter((value) => value !== index) : [...state.comboInputs, index];
             } else {
@@ -86,6 +92,16 @@ export function screenKeys() {
     pad.appendChild(bench());
     main.appendChild(content);
     return main;
+}
+
+function placementBar() {
+    const placement = state.placement;
+    const node = el(`<div class="pickbar">
+        <span><b>Placing ${esc(placement?.label || placement?.keycode || "keycode")}</b> — choose a layer, then click its destination key</span>
+        <code class="n">${esc(placement?.keycode || "")}</code>
+        <span class="right" style="margin-left:auto"><button class="btn tiny ghost" data-act="cancel">Cancel</button></span></div>`);
+    node.querySelector('[data-act="cancel"]').addEventListener("click", () => { state.placement = null; render(); });
+    return node;
 }
 
 function legend(model) {
@@ -239,10 +255,14 @@ function tabBehaviours(body, right) {
     const selectedCode = keyMeaning(selectedPosition());
     if (writable() && selectedCode && !behaviourFor(model, selectedCode)) {
         const add = el(`<button class="btn tiny" data-tip="Give the selected key a behaviour: taps, holds, long holds and repeated-tap branches.">+ Behaviour on ${esc(keyFace(selectedPosition()).main || selectedCode)}</button>`);
-        add.addEventListener("click", () => post({
-            type: "addBehavior", expectedBase: model.profileIdentity,
-            behavior: {keycode: selectedCode, steps: [{tapCount: 0, tap: {helper: "TAP_SENDS", action: selectedCode}}]},
-        }));
+        add.addEventListener("click", () => {
+            state.behaviourRow = selectedCode;
+            state.cell = null;
+            post({
+                type: "addBehavior", expectedBase: model.profileIdentity,
+                behavior: {keycode: selectedCode, steps: [{tapCount: 0, tap: {helper: "TAP_SENDS", action: selectedCode}}]},
+            });
+        });
         right.appendChild(add);
     }
 
@@ -278,7 +298,7 @@ function tierDot(model, kind) {
 
 function behaviourEditor(behaviour) {
     const model = getModel();
-    const steps = [...(behaviour.steps || [])].sort((a, b) => a.tapCount - b.tapCount);
+    const steps = behaviourGridSteps(behaviour, model?.behaviorEditing?.maxTapStepsPerBehavior);
     const colours = feedbackColours(model);
     const canEdit = writable();
 
@@ -364,27 +384,32 @@ function cellEditor(behaviour, step, kind) {
                 <input class="input mono" data-repeat value="${esc(branch.repeatHz || "")}" ${canEdit ? "" : "disabled"}></label>` : "<span></span>"}
             <div class="row" style="gap:8px;align-items:end">
                 ${branch ? `<button class="btn ghost" data-act="clear" ${canEdit ? "" : "disabled"}>Remove tier</button>` : ""}
-                <button class="btn primary" data-act="keep" ${canEdit ? "" : "disabled"}>Keep in draft</button>
+                <span class="note">Changes are kept in the draft automatically.</span>
             </div>
         </div>
     </div>`);
+    const stage = (action = node.querySelector("[data-action]").value.trim()) => {
+        const helper = kind === "tap" ? "TAP_SENDS" : node.querySelector("[data-helper]").value;
+        const repeatHz = node.querySelector("[data-repeat]")?.value || "0";
+        saveBehaviour(document, behaviour, {
+            tapCount: step.tapCount,
+            kind,
+            branch: action ? {helper, action, repeatHz} : null,
+        });
+    };
     node.querySelector('[data-act="close"]').addEventListener("click", () => { state.cell = null; render(); });
     node.querySelector('[data-act="pick"]')?.addEventListener("click", () => openPicker({
         title: `${kind === "tap" ? "Tap" : kind === "hold" ? "Hold" : "Long hold"} action`,
         context: `${behaviour.keycode} · ${step.tapCount + 1}× branch`,
         seed: branch?.action ? [branch.action] : [],
         onPick: (expression) => {
-            node.querySelector("[data-action]").value = expression;
             state.picker = null;
+            stage(expression);
             render();
         },
     }));
-    node.querySelector('[data-act="keep"]')?.addEventListener("click", () => {
-        const action = node.querySelector("[data-action]").value.trim();
-        const helper = kind === "tap" ? "TAP_SENDS" : node.querySelector("[data-helper]").value;
-        const repeatHz = node.querySelector("[data-repeat]")?.value || "0";
-        saveBehaviour(document, behaviour, {tapCount: step.tapCount, kind, branch: action ? {helper, action, repeatHz} : null});
-    });
+    node.querySelectorAll("[data-action], [data-helper], [data-repeat]").forEach((field) =>
+        field.addEventListener("change", () => stage()));
     node.querySelector('[data-act="clear"]')?.addEventListener("click", () =>
         saveBehaviour(document, behaviour, {tapCount: step.tapCount, kind, branch: null}));
     return node;
@@ -399,7 +424,9 @@ function saveBehaviour(root, behaviour, change) {
         return field ? field.value.trim() || "0" : String(fallback ?? "0");
     };
     const anchorField = root.querySelector?.("[data-anchor]");
-    const steps = (behaviour.steps || []).map((step) => {
+    const sourceSteps = new Map((behaviour.steps || []).map((step) => [step.tapCount, step]));
+    if (change && !sourceSteps.has(change.tapCount)) sourceSteps.set(change.tapCount, {tapCount: change.tapCount});
+    const steps = [...sourceSteps.values()].sort((left, right) => left.tapCount - right.tapCount).map((step) => {
         const next = {tapCount: step.tapCount};
         for (const [kind, field] of Object.entries(TIER_FIELDS)) {
             const branch = change && change.tapCount === step.tapCount && change.kind === kind ? change.branch : step[field];
@@ -409,7 +436,7 @@ function saveBehaviour(root, behaviour, change) {
                 : {helper: branch.helper, action: branch.action, repeatHz: branch.repeatHz || "0"};
         }
         return next;
-    });
+    }).filter((step) => step.tap || step.hold || step.longHold);
     post({
         type: "saveBehavior",
         expectedBase: model.profileIdentity,

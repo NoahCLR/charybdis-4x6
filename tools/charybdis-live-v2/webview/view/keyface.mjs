@@ -57,6 +57,16 @@ export function behaviourTiers(behaviour) {
     ].filter((tier) => tier.count > 0);
 }
 
+// The device stores only populated tap steps, but the editor is a matrix of
+// every step the firmware supports. Keep empty columns visible so a one-step
+// behaviour can grow without first inventing data for the other columns.
+export function behaviourGridSteps(behaviour, advertisedMaximum = 5) {
+    const requested = Number(advertisedMaximum);
+    const maximum = Number.isInteger(requested) && requested > 0 ? Math.min(requested, 5) : 5;
+    const populated = new Map((behaviour?.steps || []).map((step) => [step.tapCount, step]));
+    return Array.from({length: maximum}, (_, tapCount) => populated.get(tapCount) || {tapCount});
+}
+
 // Whether this key is one of a combo's inputs. The keyboard reports per-layer
 // input references only when its firmware tracks them, so this falls back to
 // the keycodes themselves — and everything that answers "is this combo on this

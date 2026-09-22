@@ -17,18 +17,25 @@ export const state = {
     comboInputs: [],
     comboOutput: "",
     comboEditId: null,
+    placement: null,     // {keycode, label}: next board click places it on the current layer
     stage: "layers",
     layersOpen: false,  // the layer-stack panel on the layer row
     layersAsked: false, // its stack is requested once per opening
     pdSlot: 0,
-    pdKind: null,      // a Movement change not kept yet: {slot, kind}
+    pdKind: null,      // movement selection while the rebuilt form catches up: {slot, kind}
+    pdAdvanced: null,
     pdPreview: false,
     feedbackRow: "hold",
     macroSlot: null,
     macroBank: "via",
     macroDrafts: {},
+    macroSteps: {},
+    macroCursors: {},
     recording: null,
     recordDelays: true,
+    recordMode: "compact",
+    recordDelayThreshold: 30,
+    recordDelayRound: 10,
     ledPicks: [],
     trackball: false,
     rowColour: {h: "0", s: "0", v: "0"},

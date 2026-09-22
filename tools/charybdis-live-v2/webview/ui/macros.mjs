@@ -2,10 +2,10 @@
 //
 // Slots have no name on the device, so they are identified by their number and
 // their payload. The preview parses that payload for reading; the host parses
-// it again for real when the slot is kept, and says so if it disagrees.
+// it again for real when the slot is staged, and says so if it disagrees.
 
 import {el, esc} from "../lib/dom.mjs";
-import {describeStep, macroPeek, parseMacro, unreleased} from "../view/macro.mjs";
+import {describeStep, macroPeek, parseMacro, serializeMacro, unreleased} from "../view/macro.mjs";
 import {getModel, post, render, state, writable} from "../store.mjs";
 import {openPicker} from "./picker.mjs";
 import {topbar, unavailable} from "./shell.mjs";
@@ -91,31 +91,46 @@ function editor(model, slot, canEdit) {
     const textarea = card.querySelector("textarea");
     textarea.addEventListener("input", () => {
         state.macroDrafts = {...state.macroDrafts, [slot.keycode]: textarea.value};
-        render();
-        const again = document.querySelector("textarea");
-        if (again) { again.focus(); again.setSelectionRange(again.value.length, again.value.length); }
+        state.macroCursors = {...state.macroCursors, [slot.keycode]: textarea.selectionStart};
+    });
+    textarea.addEventListener("change", () => stageMacro(model, slot, textarea.value));
+    for (const eventName of ["click", "keyup", "select"]) textarea.addEventListener(eventName, () => {
+        state.macroCursors = {...state.macroCursors, [slot.keycode]: textarea.selectionStart};
     });
     card.querySelector('[data-act="place"]').addEventListener("click", () => {
+        state.placement = {keycode: slot.keycode, label: slot.keycode};
         state.screen = "keys"; state.tab = "key"; render();
     });
 
     const body = card.querySelector(".card-b");
     body.append(stepBuilder(model, slot, canEdit, textarea));
-    body.append(preview(slot, steps, error, held, payload));
+    body.append(preview(model, slot, steps, error, held, payload, canEdit));
     body.append(actions(model, slot, canEdit, dirty, payload));
     wrap.append(card);
-    wrap.append(recorder(slot, canEdit, textarea));
+    wrap.append(recorder(model, slot, canEdit, textarea));
     return wrap;
 }
 
+function stageMacro(model, slot, payload) {
+    const parsed = parseMacro(payload);
+    if (parsed.error || unreleased(parsed.steps).length) return false;
+    state.macroDrafts = {...state.macroDrafts, [slot.keycode]: payload};
+    post({
+        type: "updateViaMacro", keycode: slot.keycode, payload,
+        expectedFingerprint: model?.macroEditing?.identity,
+    });
+    return true;
+}
+
 function stepBuilder(model, slot, canEdit, textarea) {
+    const stepDraft = state.macroSteps?.[slot.keycode] || {kind: "tap", value: ""};
     const node = el(`<div class="card" style="background:var(--surface-2)">
-        <div class="card-h" style="padding:10px 12px"><h3>Add a step</h3><span class="right note">appended to the payload</span></div>
+        <div class="card-h" style="padding:10px 12px"><h3>Add a step</h3><span class="right note">inserted at the cursor</span></div>
         <div class="card-b" style="padding:12px;display:grid;grid-template-columns:160px minmax(0,1fr) auto;gap:8px;align-items:end">
             <label class="field"><span>Step</span><select class="input" data-kind ${canEdit ? "" : "disabled"}>
-                ${STEP_KINDS.map(([value, text]) => `<option value="${value}">${text}</option>`).join("")}</select></label>
+                ${STEP_KINDS.map(([value, text]) => `<option value="${value}" ${stepDraft.kind === value ? "selected" : ""}>${text}</option>`).join("")}</select></label>
             <label class="field"><span data-label>Keys</span>
-                <div class="input-row"><input class="input mono" data-value placeholder="KC_LGUI, KC_D" ${canEdit ? "" : "disabled"}>
+                <div class="input-row"><input class="input mono" data-value value="${esc(stepDraft.value)}" placeholder="KC_LGUI, KC_D" ${canEdit ? "" : "disabled"}>
                 <button class="btn" data-act="pick" ${canEdit ? "" : "disabled"}>Pick…</button></div></label>
             <button class="btn" data-act="insert" ${canEdit ? "" : "disabled"}>Add step</button>
         </div></div>`);
@@ -129,12 +144,20 @@ function stepBuilder(model, slot, canEdit, textarea) {
         value.placeholder = mode === "text" ? "typed literally" : mode === "delay" ? "120" : "KC_LGUI, KC_D";
         pick.style.display = mode === "text" || mode === "delay" ? "none" : "";
     };
-    kind.addEventListener("change", sync);
+    const remember = () => {
+        state.macroSteps = {...state.macroSteps, [slot.keycode]: {kind: kind.value, value: value.value}};
+    };
+    kind.addEventListener("change", () => { remember(); sync(); });
+    value.addEventListener("input", remember);
     sync();
     pick.addEventListener("click", () => openPicker({
         title: "Macro step keys", context: slot.keycode, mode: "list",
         seed: value.value.split(",").map((name) => name.trim()).filter(Boolean),
-        onPick: (expression) => { value.value = expression; state.picker = null; render(); },
+        onPick: (expression) => {
+            state.macroSteps = {...state.macroSteps, [slot.keycode]: {kind: kind.value, value: expression}};
+            state.picker = null;
+            render();
+        },
     }));
     node.querySelector('[data-act="insert"]').addEventListener("click", () => {
         const text = value.value.trim();
@@ -145,42 +168,61 @@ function stepBuilder(model, slot, canEdit, textarea) {
             : kind.value === "press" ? `{+${keys}}`
             : kind.value === "release" ? `{-${keys}}`
             : `{${keys}}`;
-        textarea.value += addition;
-        state.macroDrafts = {...state.macroDrafts, [slot.keycode]: textarea.value};
+        const cursor = Math.max(0, Math.min(textarea.value.length,
+            state.macroCursors?.[slot.keycode] ?? textarea.selectionStart ?? textarea.value.length));
+        textarea.value = `${textarea.value.slice(0, cursor)}${addition}${textarea.value.slice(cursor)}`;
+        state.macroCursors = {...state.macroCursors, [slot.keycode]: cursor + addition.length};
+        stageMacro(model, slot, textarea.value);
         render();
     });
     return node;
 }
 
-function preview(slot, steps, error, held, payload) {
+function preview(model, slot, steps, error, held, payload, canEdit) {
     const node = el(`<div>
         <div class="sect-h"><h4>Payload preview</h4>
             <span class="right note">${payload.length} source chars · ${slot.bytes} bytes as read · ${steps.length} step${steps.length === 1 ? "" : "s"}</span></div>
     </div>`);
-    if (error) node.append(el(`<div class="unavailable">${esc(error)} The keyboard would refuse this payload, so it cannot be kept until it reads cleanly.</div>`));
+    if (error) node.append(el(`<div class="unavailable">${esc(error)} The keyboard would refuse this payload, so it cannot be staged until it reads cleanly.</div>`));
     if (!error && held.length) node.append(el(`<div class="unavailable">This macro never releases ${esc(held.join(", "))}. The keyboard would keep holding ${held.length === 1 ? "it" : "them"} after the macro ends.</div>`));
     if (!steps.length) node.append(el(`<p class="note">This slot is empty. Type a payload, add a step, or record one.</p>`));
-    for (const step of steps) {
-        node.append(el(`<div class="step"><span class="grip">⠿</span><span class="kind">${esc(step.kind)}</span>
-            <span class="tok">${esc(describeStep(step))}</span></div>`));
-    }
+    steps.forEach((step, index) => {
+        const row = el(`<div class="step"><span class="grip">⠿</span><span class="kind">${esc(step.kind)}</span>
+            <span class="tok">${esc(describeStep(step))}</span><span class="right row" style="gap:4px">
+                <button class="btn tiny ghost" data-move="-1" ${canEdit && index > 0 ? "" : "disabled"} aria-label="Move step up">↑</button>
+                <button class="btn tiny ghost" data-move="1" ${canEdit && index < steps.length - 1 ? "" : "disabled"} aria-label="Move step down">↓</button>
+                <button class="btn tiny ghost" data-remove ${canEdit ? "" : "disabled"}>Remove</button></span></div>`);
+        row.querySelector("[data-remove]")?.addEventListener("click", () => {
+            const next = steps.filter((_, candidate) => candidate !== index);
+            const nextPayload = serializeMacro(next);
+            stageMacro(model, slot, nextPayload);
+            render();
+        });
+        row.querySelectorAll("[data-move]").forEach((button) => button.addEventListener("click", () => {
+            const target = index + Number(button.dataset.move);
+            if (target < 0 || target >= steps.length) return;
+            const next = steps.slice();
+            [next[index], next[target]] = [next[target], next[index]];
+            const nextPayload = serializeMacro(next);
+            stageMacro(model, slot, nextPayload);
+            render();
+        }));
+        node.append(row);
+    });
     node.append(el(`<div class="meter" style="margin-top:10px"><i style="width:${Math.min(100, (slot.bytes / 128) * 100)}%"></i></div>`));
-    node.append(el(`<p class="note" style="margin-top:6px">The byte count is the keyboard's, from the last read; keeping the slot updates it.</p>`));
+    node.append(el(`<p class="note" style="margin-top:6px">The byte count is the keyboard's, from the last read; staging the slot updates it.</p>`));
     return node;
 }
 
 function actions(model, slot, canEdit, dirty, payload) {
-    const {error} = parseMacro(payload);
+    const {steps, error} = parseMacro(payload);
+    const blocked = Boolean(error || unreleased(steps).length);
     const node = el(`<div class="row" style="gap:8px">
-        <button class="btn primary" data-act="keep" ${canEdit && !error ? "" : "disabled"}>Keep macro in draft</button>
+        <span class="note">${blocked ? "Fix the payload before it can be staged." : "Valid changes are kept in the draft automatically."}</span>
         <button class="btn ghost" data-act="discard" ${dirty ? "" : "disabled"}
-            data-tip="Drop this slot's local edits and show the payload last read from the keyboard.">Discard slot changes</button>
+            data-tip="Drop text that has not passed validation and show the latest staged payload.">Discard local text</button>
         <button class="btn ghost" data-act="clear" ${canEdit ? "" : "disabled"}>Clear payload</button>
     </div>`);
-    node.querySelector('[data-act="keep"]').addEventListener("click", () => post({
-        type: "updateViaMacro", keycode: slot.keycode, payload,
-        expectedFingerprint: model?.macroEditing?.identity,
-    }));
     node.querySelector('[data-act="discard"]').addEventListener("click", () => {
         const drafts = {...state.macroDrafts};
         delete drafts[slot.keycode];
@@ -188,7 +230,7 @@ function actions(model, slot, canEdit, dirty, payload) {
         render();
     });
     node.querySelector('[data-act="clear"]').addEventListener("click", () => {
-        state.macroDrafts = {...state.macroDrafts, [slot.keycode]: ""};
+        stageMacro(model, slot, "");
         render();
     });
     return node;
@@ -209,31 +251,46 @@ const codeToKeycode = (code) => EVENT_CODES[code]
     || (/^Digit(\d)$/.test(code) ? `KC_${code.slice(5)}` : "")
     || (/^F(\d{1,2})$/.test(code) ? `KC_${code}` : "");
 
-function recorder(slot, canEdit, textarea) {
+function recorder(model, slot, canEdit, textarea) {
     const recording = state.recording?.slot === slot.keycode;
     const node = el(`<div class="card">
         <div class="card-h"><h3>Record</h3><span class="right"><span class="tag">${recording ? "recording" : "idle"}</span></span></div>
-        <div class="card-b" style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px;align-items:end">
-            <div class="row" style="gap:14px">
+        <div class="card-b" style="display:grid;gap:14px">
+            <div class="row" style="gap:12px;align-items:end;flex-wrap:wrap">
+                <label class="field" style="min-width:190px"><span>Capture style</span><select class="input" data-mode ${recording ? "disabled" : ""}>
+                    <option value="compact" ${state.recordMode !== "explicit" ? "selected" : ""}>Compact taps</option>
+                    <option value="explicit" ${state.recordMode === "explicit" ? "selected" : ""}>Explicit press and release</option>
+                </select></label>
                 <label class="sw"><input type="checkbox" data-delays ${state.recordDelays !== false ? "checked" : ""}>
                     <span class="track"></span><span class="txt">Record delays</span></label>
-                <span class="note">${recording ? "Typing here is captured. Modifiers arrive as the host sees them, not as the keyboard sends them." : "Captures this window's key events and appends them to the payload."}</span>
+                <label class="field" style="width:120px"><span>After (ms)</span><input class="input mono" data-threshold value="${esc(state.recordDelayThreshold)}" ${state.recordDelays === false ? "disabled" : ""}></label>
+                <label class="field" style="width:120px"><span>Round to (ms)</span><input class="input mono" data-round value="${esc(state.recordDelayRound)}" ${state.recordDelays === false ? "disabled" : ""}></label>
             </div>
             <div class="row" style="gap:8px">
-                <button class="btn ghost" data-act="clear-take" ${state.recording?.before !== undefined ? "" : "disabled"}>Clear take</button>
-                <button class="btn ${recording ? "" : "primary"}" data-act="record" ${canEdit ? "" : "disabled"}>${recording ? "Stop" : "● Record"}</button>
+                <span class="note">${recording ? "Typing in this window is captured. Press Escape or Stop when the take is done." : "Captures this window's key events at the end of the payload."}</span>
+                <span class="right row" style="gap:8px"><button class="btn ghost" data-act="clear-take" ${state.recording?.before !== undefined ? "" : "disabled"}>Clear take</button>
+                <button class="btn ${recording ? "" : "primary"}" data-act="record" ${canEdit ? "" : "disabled"}>${recording ? "Stop" : "● Record"}</button></span>
             </div>
         </div></div>`);
 
-    node.querySelector("[data-delays]").addEventListener("change", (event) => { state.recordDelays = event.target.checked; });
+    node.querySelector("[data-mode]").addEventListener("change", (event) => { state.recordMode = event.target.value; });
+    node.querySelector("[data-delays]").addEventListener("change", (event) => { state.recordDelays = event.target.checked; render(); });
+    node.querySelector("[data-threshold]").addEventListener("change", (event) => {
+        state.recordDelayThreshold = Math.max(0, Number(event.target.value) || 0);
+    });
+    node.querySelector("[data-round]").addEventListener("change", (event) => {
+        state.recordDelayRound = Math.max(1, Number(event.target.value) || 1);
+    });
     node.querySelector('[data-act="clear-take"]').addEventListener("click", () => {
         const before = state.recording?.before;
+        document.removeEventListener("keydown", onRecordKey, true);
+        document.removeEventListener("keyup", onRecordKey, true);
         state.recording = null;
         if (before !== undefined) state.macroDrafts = {...state.macroDrafts, [slot.keycode]: before};
         render();
     });
     node.querySelector('[data-act="record"]').addEventListener("click", () => {
-        if (recording) { stopRecording(); return; }
+        if (recording) { stopRecording(model, slot); return; }
         startRecording(slot, textarea.value);
     });
     return node;
@@ -242,27 +299,40 @@ function recorder(slot, canEdit, textarea) {
 function startRecording(slot, before) {
     state.recording = {slot: slot.keycode, before, last: Date.now()};
     document.addEventListener("keydown", onRecordKey, true);
+    document.addEventListener("keyup", onRecordKey, true);
     render();
 }
 
-function stopRecording() {
+function stopRecording(model = getModel(), slot = null) {
+    const recordedSlot = state.recording?.slot;
     document.removeEventListener("keydown", onRecordKey, true);
+    document.removeEventListener("keyup", onRecordKey, true);
     state.recording = state.recording ? {...state.recording, slot: null} : null;
+    const target = slot || [...(model?.viaMacros || []), ...(model?.hardcodedMacros || [])]
+        .find((candidate) => candidate.keycode === recordedSlot);
+    if (target) stageMacro(model, target, state.macroDrafts?.[target.keycode] ?? target.payload ?? "");
     render();
 }
 
 function onRecordKey(event) {
     const recording = state.recording;
     if (!recording?.slot) return;
-    if (event.key === "Escape") { stopRecording(); return; }
+    if (event.key === "Escape" && event.type === "keydown") { event.preventDefault(); stopRecording(); return; }
     const keycode = codeToKeycode(event.code);
     if (!keycode) return;
+    if (event.repeat) { event.preventDefault(); return; }
+    if (state.recordMode !== "explicit" && event.type === "keyup") return;
     event.preventDefault();
     const now = Date.now();
     const gap = now - recording.last;
     const current = state.macroDrafts?.[recording.slot] ?? "";
-    const delay = state.recordDelays !== false && gap > 30 ? `{${Math.round(gap / 10) * 10}}` : "";
-    state.macroDrafts = {...state.macroDrafts, [recording.slot]: `${current}${delay}{${keycode}}`};
+    const threshold = Math.max(0, Number(state.recordDelayThreshold) || 0);
+    const round = Math.max(1, Number(state.recordDelayRound) || 1);
+    const delay = state.recordDelays !== false && gap > threshold ? `{${Math.round(gap / round) * round}}` : "";
+    const command = state.recordMode === "explicit"
+        ? `{${event.type === "keydown" ? "+" : "-"}${keycode}}`
+        : `{${keycode}}`;
+    state.macroDrafts = {...state.macroDrafts, [recording.slot]: `${current}${delay}${command}`};
     state.recording = {...recording, last: now};
     render();
 }

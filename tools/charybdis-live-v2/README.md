@@ -43,8 +43,9 @@ layer on the row above the board and drops open over it, so a layer is renamed
 and reordered where its keys are on screen.
 
 Every colour on screen is a colour the keyboard emits; one amber signal marks
-work that has not reached the keyboard yet. Edits stage into one draft, and the
-floating bar is the only way they leave the window.
+work that has not reached the keyboard yet. Complete edits stage into one draft
+as they are made; incomplete builders such as a new combo keep their local form
+until it is valid. The floating bar is the only way changes leave the window.
 
 ## Commands
 
@@ -89,17 +90,17 @@ Every screen is drawn and wired to the host:
 | Surface | What it edits |
 | --- | --- |
 | Keys | Layout keys, key behaviours, combos, layer names and priority; reachable macros and pointing modes are shown in place |
-| Pointing modes | All eight slots: movement, speed, direction shortcuts, scroll tuning, buttons, bindings, clear and duplicate |
+| Pointing modes | All eight slots: movement, speed, direction shortcuts, scroll tuning, buttons, bindings, placement, clear and duplicate |
 | Lighting | Six stages, the stage mask, layer and pointing-mode colours with their localities, combo and key feedback, auto-mouse fade, LED group rows and reusable groups |
-| Macros | Both banks: payload, step builder, parsed preview, recorder |
+| Macros | Both banks: payload, insert-at-cursor step builder, reorder/remove controls, parsed preview, configurable recorder and placement |
 | Settings | Every section the keyboard reports, posted whole, read-only where the firmware cannot report |
 | Profile & backups | Export, import with review, upgrade export, recovery state |
 | Device | Read-only: connection, committed generation, what was read |
 
-The one gap against the previous interface is the **keycode picker's catalogue
-sections**: it offers the keyboard's own groups, the ANSI board, layers,
-pointing modes and both macro banks, and searches across all of them, but does
-not yet reproduce v1's hand-curated symbol, numpad and mouse panels.
+The keycode picker leads with the ANSI board, then task-shaped Symbols,
+Navigation, Numpad, Layers, Pointing modes, Macros, Mouse, Media, Lighting,
+Magic and Custom sections. The complete QMK catalogue remains available under
+More keys, Other QMK and All keycodes, and search spans all of it.
 
 Colour on any screen comes from the model, never from a constant, and a stage
 that is switched off is drawn as off — hollow dots, plain badges, unlit keys.

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {behaviourFor, behaviourTiers, bindingKeycode, bindingsForSlot, comboKeysOnLayer, combosForKey, keyFace, keyMeaning, macroKeycodes, pointingSlotFor, slotKeycodes} from "../webview/view/keyface.mjs";
+import {behaviourFor, behaviourGridSteps, behaviourTiers, bindingKeycode, bindingsForSlot, comboKeysOnLayer, combosForKey, keyFace, keyMeaning, macroKeycodes, pointingSlotFor, slotKeycodes} from "../webview/view/keyface.mjs";
 
 test("a key face uses the model's own resolution, and names the layer a dual-role key reaches", () => {
     assert.deepEqual(keyFace({keycode: "KC_TRANSPARENT", display: "▽"}), {main: "▽", sub: "", kind: "transparent"});
@@ -24,6 +24,16 @@ test("tiers count the branches that use them, so a key shows what it can do", ()
     assert.deepEqual(behaviourTiers(behaviour), [{kind: "tap", count: 3}, {kind: "hold", count: 2}, {kind: "long", count: 2}]);
     assert.deepEqual(behaviourTiers(undefined), []);
     assert.equal(behaviourFor(model, "KC_A"), undefined);
+});
+
+test("the behaviour editor keeps every supported tap column visible", () => {
+    const behaviour = {steps: [{tapCount: 0, tap: {action: "KC_A"}}, {tapCount: 3, hold: {action: "KC_B"}}]};
+    const steps = behaviourGridSteps(behaviour, 5);
+    assert.deepEqual(steps.map((step) => step.tapCount), [0, 1, 2, 3, 4]);
+    assert.equal(steps[0], behaviour.steps[0], "populated cells keep the device-backed row");
+    assert.deepEqual(steps[1], {tapCount: 1}, "missing cells are empty editor slots");
+    assert.equal(steps[3], behaviour.steps[1]);
+    assert.equal(behaviourGridSteps(behaviour, 3).length, 3, "a lower advertised device limit is respected");
 });
 
 test("combos follow the device's own input positions before falling back to keycodes", () => {

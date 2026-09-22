@@ -8,8 +8,9 @@ const {decodedDeviceProfile} = require("../fixtures/device-profile");
 const {resolve} = require("../../core/data/keycode-catalog");
 
 test("behaviour editing requires supported firmware and a complete idle read", () => {
-    const state = {capabilities: {supportedDomainMask: 3}, committed: decodedDeviceProfile()};
+    const state = {capabilities: {supportedDomainMask: 3, maxTapStepsPerBehavior: 5}, committed: decodedDeviceProfile()};
     assert.equal(buildDeviceModel(state).behaviorEditing.writable, true);
+    assert.equal(buildDeviceModel(state).behaviorEditing.maxTapStepsPerBehavior, 5);
     for (const update of [{capabilities: {supportedDomainMask: 1}}, {committed: null}, {busy: true}, {committed: {...state.committed, failures: [{domainId: 0x10}]}}]) {
         assert.equal(buildDeviceModel({...state, ...update}).behaviorEditing.writable, false);
     }

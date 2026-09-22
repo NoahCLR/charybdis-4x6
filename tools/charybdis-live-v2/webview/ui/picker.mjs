@@ -5,6 +5,7 @@
 import {el, esc} from "../lib/dom.mjs";
 import {getModel, layerName, layers, post, render, state} from "../store.mjs";
 import {PICKER_BOARD} from "../view/picker-board.mjs";
+import {entriesForPickerSection, pickerSections} from "../view/picker-sections.mjs";
 
 const MODIFIERS = [
     ["Ctrl", "C"], ["Shift", "S"], ["Alt", "A"], ["Cmd", "G"],
@@ -28,18 +29,6 @@ function expression() {
     return value;
 }
 
-function sections(model) {
-    const catalogue = model?.qmkKeycodes || [];
-    const groups = [...new Set(catalogue.map((entry) => entry.group).filter(Boolean))];
-    return [
-        {id: "board", label: "Keyboard", kind: "board"},
-        {id: "layers", label: "Layers", kind: "layers"},
-        {id: "modes", label: "Pointing modes", kind: "group", group: "Pointing modes"},
-        {id: "macros", label: "Macros", kind: "macros"},
-        ...groups.filter((group) => group !== "Pointing modes").map((group) => ({id: `g:${group}`, label: group, kind: "group", group})),
-    ];
-}
-
 const chunk = (values, size) => values.reduce((rows, value, index) =>
     (index % size ? rows[rows.length - 1].push(value) : rows.push([value]), rows), []);
 
@@ -61,7 +50,7 @@ function sectionBody(model) {
             <div class="pk-rows">${chunk(matches, 8).map((row) => `<div class="pk-row">${row.map((entry) => keyButton(entry, picked(entry.value))).join("")}</div>`).join("")}</div></div>`;
     }
 
-    const section = sections(model).find((entry) => entry.id === picker.section) || sections(model)[0];
+    const section = pickerSections().find((entry) => entry.id === picker.section) || pickerSections()[0];
     if (section.kind === "board") {
         const keys = PICKER_BOARD.keys.map((key) => {
             const on = picked(key.value);
@@ -97,7 +86,7 @@ function sectionBody(model) {
                 <span class="l">${esc(slot.keycode.replace(/^VIA_MACRO_/, "M").replace(/^MACRO_/, "U"))}</span>
                 <span class="c">${slot.empty ? "empty" : `${slot.bytes} B`}</span></button>`).join("")}</div>`).join("")}</div></div>`;
     }
-    const entries = catalogue.filter((entry) => entry.group === section.group);
+    const entries = entriesForPickerSection(catalogue, section);
     if (!entries.length) return `<p class="note" style="padding:18px">The keyboard's catalogue has nothing in this section.</p>`;
     return `<div class="pk-body"><div class="pk-rows">${chunk(entries.slice(0, 160), 8).map((row) =>
         `<div class="pk-row">${row.map((entry) => keyButton(entry, picked(entry.value))).join("")}</div>`).join("")}</div></div>`;
@@ -120,7 +109,7 @@ export function pickerOverlay() {
                 data-tip="Wraps the picked key as ${wrap}(key).">${name}</button>`).join("")}
             <span class="note" style="margin-left:auto">held together with the key</span></div>`}
         <div class="sheet-b" style="display:grid;grid-template-columns:186px minmax(0,1fr);align-items:start">
-            <div class="picker-side">${sections(model).map((section) =>
+            <div class="picker-side">${pickerSections().map((section) =>
                 `<button data-sec="${esc(section.id)}" aria-current="${picker.section === section.id && !picker.search}">${esc(section.label)}</button>`).join("")}</div>
             <div>${sectionBody(model)}</div>
         </div>

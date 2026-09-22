@@ -71,7 +71,11 @@ function buildDeviceModel(state = {}) {
         pdModes: state.committed?.domains?.pdModes || [],
         pdModeEditing: {writable: Boolean(state.capabilities?.supportedDomainMask & 16) && state.committed?.state === "read" && !state.committed.failures?.length && !state.busy},
         keyBehaviors: committedKeyBehaviors(state.committed),
-        behaviorEditing: {busy: Boolean(state.busy), writable: Boolean(state.capabilities?.supportedDomainMask & 2) && state.committed?.state === "read" && !state.committed.failures?.length && !state.busy},
+        behaviorEditing: {
+            busy: Boolean(state.busy),
+            writable: Boolean(state.capabilities?.supportedDomainMask & 2) && state.committed?.state === "read" && !state.committed.failures?.length && !state.busy,
+            maxTapStepsPerBehavior: state.capabilities?.maxTapStepsPerBehavior || 5,
+        },
         profileIdentity: state.committed?.state === "read" ? {source: state.committed.source, generation: state.committed.generation, digest: state.committed.digest, originHalf: state.committed.originHalf} : null,
         rgb: {...committedRgb(state.committed), baseEffect: baseRgbForView(state.baseRgb)},
 

@@ -123,7 +123,8 @@ function editor(model, slot, canEdit, slots) {
     const scrolling = kind === KIND.SCROLLING;
     const row = pdColourRow(model, slot.id);
     const wrap = el(`<div class="stack"></div>`);
-    const form = {};   // live values, read back when the slot is kept
+    const form = {};   // live values, read back whenever a complete field changes
+    let stageCurrent = () => {};
 
     const field = (label, value, key, options = {}) => {
         const node = el(`<label class="field"><span>${esc(label)}</span>
@@ -150,7 +151,12 @@ function editor(model, slot, canEdit, slots) {
         node.querySelector("[data-pick]").addEventListener("click", () => openPicker({
             title: label, context: `${slot.name} · slot ${slot.id + 1}`,
             seed: name ? [name] : [],
-            onPick: (expression) => { input.value = expression; state.picker = null; render(); },
+            onPick: (expression) => {
+                input.value = expression;
+                state.picker = null;
+                stageCurrent();
+                render();
+            },
         }));
         return node;
     };
@@ -170,9 +176,11 @@ function editor(model, slot, canEdit, slots) {
             <span class="swatch-lg ${row && !isOff(row.color) ? "" : "swatch-off"}" style="width:18px;height:18px;border-radius:5px;${row && !isOff(row.color) ? `background:${css(row.color)}` : ""}"></span>
             <h3>${esc(slot.name || `Slot ${slot.id + 1}`)}</h3><span class="tag">slot ${slot.id + 1}</span>
             <span class="right row" style="gap:8px">
+                ${slots.some((candidate) => !candidate.kind) ? `<button class="btn ghost" data-act="duplicate" ${canEdit ? "" : "disabled"}
+                    data-tip="Copy this mode into the first empty slot.">Duplicate mode</button>` : ""}
                 <button class="btn ghost" data-act="clear" ${canEdit ? "" : "disabled"}
                     data-tip="Empty this slot. Keys bound to it stay on the board and do nothing until it is configured again.">Clear slot</button>
-                <button class="btn primary" data-act="keep" ${canEdit ? "" : "disabled"}>Keep mode in draft</button></span></div>
+                <span class="note">changes stage automatically</span></span></div>
         <div class="card-b grid3"></div></div>`);
     const headBody = head.querySelector(".card-b");
     const name = el(`<label class="field"><span>Name</span>
@@ -232,7 +240,8 @@ function editor(model, slot, canEdit, slots) {
             <div class="row" style="gap:8px;flex-wrap:wrap">
                 <span class="act"><span class="k">${esc(bindingName(slot))}</span><span class="how">hold</span></span>
                 <span class="act"><span class="k">${esc(bindingName(slot))}_LOCK</span><span class="how">toggle</span></span>
-                <span class="note">${esc(placedOn(model, slot))}</span></div>
+                <span class="note">${esc(placedOn(model, slot))}</span>
+                <button class="btn tiny ghost" data-act="place" ${canEdit ? "" : "disabled"}>Place on a layer…</button></div>
             ${slot.kind ? `<p class="note">Clearing the slot leaves those keys where they are. The keyboard keeps its mode keycodes whatever a slot holds, and refuses to activate an empty one — so they do nothing until this slot is configured again.</p>` : ""}
             <div class="row" style="gap:10px">
                 <span class="swatch-lg ${row && !isOff(row.color) ? "" : "swatch-off"}" style="${row && !isOff(row.color) ? `background:${css(row.color)}` : ""}"></span>
@@ -243,10 +252,16 @@ function editor(model, slot, canEdit, slots) {
     reach.querySelector('[data-act="lighting"]').addEventListener("click", () => {
         state.screen = "lighting"; state.stage = "pd"; render();
     });
+    reach.querySelector('[data-act="place"]').addEventListener("click", () => {
+        state.placement = {keycode: bindingName(slot), label: slot.name || `Pointing slot ${slot.id + 1}`};
+        state.screen = "keys";
+        state.tab = "key";
+        render();
+    });
     wrap.append(reach);
 
     // ── advanced ──────────────────────────────────────────────────────────
-    const advanced = el(`<details class="card"><summary class="card-h" style="cursor:pointer;list-style:none">
+    const advanced = el(`<details class="card" ${state.pdAdvanced === slot.id ? "open" : ""}><summary class="card-h" style="cursor:pointer;list-style:none">
         <h3>Advanced</h3><span class="right muted" style="font-size:11.5px">thresholds, ratios, modifier rules, mouse buttons</span></summary>
         <div class="card-b stack" style="gap:16px"></div></details>`);
     const advancedBody = advanced.querySelector(".card-b");
@@ -278,14 +293,28 @@ function editor(model, slot, canEdit, slots) {
     advancedBody.append(buttons);
     wrap.append(advanced);
 
+    advanced.addEventListener("toggle", () => {
+        state.pdAdvanced = advanced.open ? slot.id : null;
+    });
+
+    stageCurrent = () => {
+        const config = readConfig(slot, form);
+        post({type: "savePdMode", slot: slot.id, expectedBase: model.profileIdentity, config});
+    };
+    wrap.addEventListener("change", (event) => {
+        if (!event.target.matches("input, select")) return;
+        stageCurrent();
+    });
+
     head.querySelector('[data-act="clear"]').addEventListener("click", () => {
         state.pdKind = null;
         post({type: "clearPdMode", slot: slot.id, expectedBase: model.profileIdentity});
     });
-    head.querySelector('[data-act="keep"]').addEventListener("click", () => {
-        const config = readConfig(slot, form);
-        state.pdKind = null;
-        post({type: "savePdMode", slot: slot.id, expectedBase: model.profileIdentity, config});
+    head.querySelector('[data-act="duplicate"]')?.addEventListener("click", () => {
+        const target = slots.find((candidate) => !candidate.kind);
+        if (!target) return;
+        state.pdSlot = target.id;
+        post({type: "duplicatePdMode", slot: target.id, source: slot.id, expectedBase: model.profileIdentity});
     });
     return wrap;
 }

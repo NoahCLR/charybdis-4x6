@@ -3,7 +3,6 @@
 
 import {el, esc} from "../lib/dom.mjs";
 import {getModel, post, render, state} from "../store.mjs";
-import {STAGE_ORDER, stageEnabled} from "../view/lighting.mjs";
 
 const ICONS = {
     keys: '<svg viewBox="0 0 16 16"><rect x="1.5" y="3.5" width="13" height="9" rx="2"/><path d="M4 6.5h.01M6.5 6.5h.01M9 6.5h.01M11.5 6.5h.01M5 9.5h6"/></svg>',
@@ -29,33 +28,17 @@ export const SCREENS = [
     ]},
 ];
 
-function counts(model) {
-    const filledMacros = [...(model?.viaMacros || []), ...(model?.hardcodedMacros || [])].filter((slot) => !slot.empty).length;
-    const macroSlots = (model?.viaMacros?.length || 0) + (model?.hardcodedMacros?.length || 0);
-    const settings = (model?.configDefaults || []).reduce((total, section) => total + (section.fields?.length || 0), 0);
-    return {
-        keys: model?.layers?.length ? `${model.layers.length} layers` : "",
-        pointing: model?.pdModes?.length ? `${model.pdModes.filter((slot) => slot.kind).length} / ${model.pdModes.length}` : "",
-        lighting: model?.rgb?.stages ? `${STAGE_ORDER.filter((stage) => stageEnabled(model, stage.id)).length} / ${STAGE_ORDER.length}` : "",
-        macros: macroSlots ? `${filledMacros} / ${macroSlots}` : "",
-        settings: settings ? String(settings) : "",
-        profile: "",
-        device: model?.activeProfile ? "" : "",
-    };
-}
-
 export function rail() {
     const model = getModel();
     const device = model?.device || {};
     const health = device.health || {};
-    const count = counts(model);
     const draft = model?.draft;
     const line = (tone, text, tip) =>
         `<div class="stat" data-tip="${esc(tip)}"><i class="dot ${tone}"></i> ${esc(text)}</div>`;
 
     const nav = SCREENS.map((group) => `<div class="rail-group">${group.group}</div>` + group.items.map((item) => `
         <button class="nav-item" data-screen="${item.id}" aria-current="${state.screen === item.id}">
-            ${ICONS[item.icon]}<span>${item.label}</span><span class="nav-count">${esc(count[item.id] || "")}</span>
+            ${ICONS[item.icon]}<span>${item.label}</span>
         </button>`).join("")).join("");
 
     const node = el(`<aside class="rail">

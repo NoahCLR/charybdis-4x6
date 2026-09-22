@@ -16,13 +16,12 @@ export function screenProfile() {
     const portable = model?.portable || {};
     const health = model?.device?.health || {};
     const busy = Boolean(portable.busy);
+    const canExport = portable.available && !busy;
+    const canImport = portable.available && portable.eightLayers && !busy;
 
     const main = el(`<div class="main">${topbar(
         "Profile & backups",
         "A complete backup is everything the keyboard stores: layers, behaviours, combos, both macro banks, lighting and settings.",
-        `<button class="btn ghost" data-act="import" ${portable.available && portable.eightLayers && !busy ? "" : "disabled"}>Import…</button>
-         <button class="btn" data-act="export" ${portable.available && !busy ? "" : "disabled"}
-            data-tip="Write a complete backup of everything the keyboard stores to a file.">Export profile</button>`,
     )}</div>`);
 
     const content = el(`<div class="content"><div class="pad" style="max-width:960px;display:grid;gap:14px"></div></div>`);
@@ -36,6 +35,28 @@ export function screenProfile() {
     }
     if (portable.review) pad.appendChild(reviewCard(model, portable, busy));
 
+    const actions = el(`<div class="profile-actions">
+        <div class="card profile-action">
+            <div class="card-b">
+                <span class="profile-action-mark"><svg viewBox="0 0 24 24"><path d="M12 3v12M7.5 10.5 12 15l4.5-4.5M4 19h16"/></svg></span>
+                <h3>Export profile</h3>
+                <p class="note">Save a complete, portable backup of the profile currently running on the keyboard. Keep it somewhere safe before experimenting or updating firmware.</p>
+                <button class="btn primary" data-act="export" ${canExport ? "" : "disabled"}>Export profile…</button>
+            </div>
+        </div>
+        <div class="card profile-action">
+            <div class="card-b">
+                <span class="profile-action-mark"><svg viewBox="0 0 24 24"><path d="M12 21V9M7.5 13.5 12 9l4.5 4.5M4 5h16"/></svg></span>
+                <h3>Import profile</h3>
+                <p class="note">Choose a complete backup and review its differences first. Import replaces the local draft; nothing is written to the keyboard until you review and apply it.</p>
+                <button class="btn" data-act="import" ${canImport ? "" : "disabled"}>Choose profile…</button>
+            </div>
+        </div>
+    </div>`);
+    actions.querySelector('[data-act="export"]').addEventListener("click", () => post({type: "exportPortableProfile"}));
+    actions.querySelector('[data-act="import"]').addEventListener("click", () => post({type: "choosePortableProfile"}));
+    pad.appendChild(actions);
+
     if (portable.pdUpgradeAvailable) {
         const card = el(`<div class="card"><div class="card-h"><h3>Firmware upgrade</h3>
             <span class="right"><span class="chip"><i class="dot draft"></i>geometry change ahead</span></span></div>
@@ -47,19 +68,15 @@ export function screenProfile() {
         pad.appendChild(card);
     }
 
-    pad.appendChild(el(`<div class="grid2">
-        <div class="card"><div class="card-h"><h3>Layer priority</h3></div>
-            <div class="card-b"><p class="note">Layer names and order live in <b>Keys → Layers</b>, where the board shows what each one holds.</p></div></div>
-        <div class="card"><div class="card-h"><h3>Recovery</h3>
-            <span class="right"><span class="chip"><i class="dot ${health.recoveryPending ? "draft" : "on"}"></i>${health.recoveryPending ? "pending" : "clear"}</span></span></div>
-            <div class="card-b"><p class="note">${health.recoveryPending
-                ? "An apply was interrupted. The keyboard is still running its last complete profile; the recovery copy restores it, and Apply retries from there."
-                : "A recovery copy is written before every apply and released once both halves confirm. Nothing is outstanding."}</p></div></div>
+    pad.appendChild(el(`<div class="profile-recovery">
+        <i class="dot ${health.recoveryPending ? "draft" : "on"}" style="margin-top:6px"></i>
+        <div class="copy"><b>Automatic recovery</b><p class="note">${health.recoveryPending
+            ? "An apply was interrupted. The keyboard is still running its last complete profile; the recovery copy restores it, and Apply retries from there."
+            : "A recovery copy is written before every apply and released once both halves confirm. Nothing is outstanding."}</p></div>
+        <span class="chip state">${health.recoveryPending ? "pending" : "clear"}</span>
     </div>`));
 
     main.appendChild(content);
-    main.querySelector('[data-act="export"]').addEventListener("click", () => post({type: "exportPortableProfile"}));
-    main.querySelector('[data-act="import"]').addEventListener("click", () => post({type: "choosePortableProfile"}));
     return main;
 }
 

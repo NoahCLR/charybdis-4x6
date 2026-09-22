@@ -38,6 +38,16 @@ export const describeStep = (step) => step.kind === "text" ? step.text
     : step.kind === "delay" ? `${step.delay} ms`
     : step.keys.join(" + ");
 
+export function serializeMacroStep(step) {
+    if (step.kind === "text") return String(step.text ?? "").replaceAll("{", "{{").replaceAll("}", "}}");
+    if (step.kind === "delay") return `{${Math.max(0, Number(step.delay) || 0)}}`;
+    const keys = (step.keys || []).join(",");
+    if (!keys) return "";
+    return step.kind === "press" ? `{+${keys}}` : step.kind === "release" ? `{-${keys}}` : `{${keys}}`;
+}
+
+export const serializeMacro = (steps) => steps.map(serializeMacroStep).join("");
+
 // What a slot shows on its cell. Every macro on a real keyboard tends to open
 // with the same modifier press, so the head of the payload makes them all look
 // identical; what tells them apart is the key they actually send.
