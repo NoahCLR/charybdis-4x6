@@ -63,6 +63,7 @@ export function rail() {
                     health.recoveryPending ? "Recovery pending" : device.connected ? "Recovery clear" : "Recovery unknown",
                     "A recovery copy is written before every apply.")}
             </div>
+            ${railMessage()}
         </div>
         <nav class="rail-nav">${nav}</nav>
         <div class="rail-foot">
@@ -78,6 +79,7 @@ export function rail() {
         state.screen = button.dataset.screen;
         render();
     }));
+    node.querySelector('[data-act="dismiss"]')?.addEventListener("click", () => { state.notice = ""; state.error = ""; render(); });
     node.querySelector('[data-act="refresh"]').addEventListener("click", () => post({type: "refresh"}));
     node.querySelector('[data-act="undo"]').addEventListener("click", () => post({type: "undoProfileDraft"}));
     node.querySelector('[data-act="redo"]').addEventListener("click", () => post({type: "redoProfileDraft"}));
@@ -89,17 +91,16 @@ export const topbar = (title, subtitle, actions = "") => `<header class="topbar"
     <div class="topbar-actions">${actions}</div>
 </header>`;
 
-export function notices() {
+// What the keyboard or the host last said — a read, a save, a refusal — sits
+// with the device health it describes, not over the screen being worked in.
+function railMessage() {
     const model = getModel();
     const error = state.error || model?.device?.health?.error;
-    const notice = state.notice;
-    if (!error && !notice) return null;
-    const node = el(`<div class="notice ${error ? "err" : ""}" role="status">
-        <i class="dot ${error ? "err" : "on"}"></i>
-        <span>${esc(error || notice)}</span>
-        <button class="btn tiny ghost" data-dismiss style="margin-left:auto">Dismiss</button></div>`);
-    node.querySelector("[data-dismiss]").addEventListener("click", () => { state.notice = ""; state.error = ""; render(); });
-    return node;
+    const message = error || state.notice;
+    if (!message) return "";
+    return `<div class="rail-message ${error ? "err" : ""}" role="status">
+        <span>${esc(message)}</span>
+        <button class="btn tiny ghost icon" data-act="dismiss" aria-label="Dismiss">✕</button></div>`;
 }
 
 export function commitBar() {

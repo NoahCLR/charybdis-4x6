@@ -122,6 +122,12 @@ code { color: inherit; background: none; padding: 0; border-radius: 0; }
 .rail-product { margin-top: 12px; font-size: 12.5px; font-weight: 520; }
 .rail-meta { margin-top: 3px; font-size: 11px; color: var(--text-3); font-family: var(--mono); }
 .rail-status { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
+.rail-message { margin-top: 12px; display: flex; align-items: flex-start; gap: 6px; padding: 7px 6px 7px 9px;
+  border-left: 2px solid var(--text-2); border-radius: 0 7px 7px 0; background: var(--surface-2);
+  font-size: 11.5px; line-height: 1.45; color: var(--text-2); overflow-wrap: anywhere; max-height: 160px; overflow-y: auto; }
+.rail-message.err { border-left-color: var(--danger); color: var(--text); }
+.rail-message span { flex: 1; min-width: 0; }
+.rail-message .btn { flex: none; margin-top: -2px; }
 .stat { display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--text-2); }
 .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--text-3); flex: none; }
 .dot.on { background: var(--text); }
@@ -646,10 +652,10 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .step .grip { color: var(--text-3); font-size: 12px; cursor: grab; }
 .step .kind { font-size: 10px; letter-spacing: .07em; text-transform: uppercase; color: var(--text-3); width: 54px; }
 .tok { display: inline-flex; align-items: center; height: 22px; padding: 0 7px; border-radius: 5px; background: var(--surface-3); border: 1px solid var(--line); font-family: var(--mono); font-size: 11px; }
+/* Progress inside a screen (Profile & backups); messages live in the rail. */
 .notice { display: flex; align-items: center; gap: 10px; margin: 16px 24px -4px; padding: 10px 13px;
   border: 1px solid var(--line-2); border-left: 2px solid var(--text-2); border-radius: 0 9px 9px 0;
   background: var(--surface-2); font-size: 12.5px; }
-.notice.err { border-left-color: var(--danger); }
 .stagedot { width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--line-3); display: inline-block; }
 .stagedot.on { background: var(--text-2); border-color: var(--text-2); }
 .paintorder { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 2px 4px; }

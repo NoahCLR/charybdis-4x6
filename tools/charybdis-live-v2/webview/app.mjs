@@ -16,7 +16,7 @@ import {screenSettings} from "./ui/settings.mjs";
 import {screenPointing} from "./ui/pointing.mjs";
 import {screenMacros} from "./ui/macros.mjs";
 import {screenProfile} from "./ui/profile.mjs";
-import {commitBar, notices, rail, topbar, unavailable} from "./ui/shell.mjs";
+import {commitBar, rail, topbar, unavailable} from "./ui/shell.mjs";
 
 const root = document.getElementById("root");
 let renderedScreen = null;
@@ -111,8 +111,6 @@ function render() {
     const app = el(`<div class="app"></div>`);
     app.appendChild(rail());
     const screen = (SCREENS[state.screen] || screenKeys)();
-    const notice = notices();
-    if (notice) screen.querySelector(".content")?.prepend(notice);
     if (!model) {
         screen.querySelector(".content")?.prepend(el(`<div class="pad"><div class="screen-stub">
             <h3>Looking for a keyboard</h3><p class="note">Connect a Charybdis and this panel will read it.</p></div></div>`));

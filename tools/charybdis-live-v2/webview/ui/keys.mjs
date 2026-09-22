@@ -407,6 +407,18 @@ function tierDot(model, kind) {
     return `<i class="fbdot" style="${lit ? `background:${css(colour)}` : "background:none;border-style:dashed"}"></i>`;
 }
 
+// An empty timing field falls back to the keyboard's own default, which it
+// reports and Settings · Key Timing edits — so the note names both.
+function timingDefaultsNote(model) {
+    const defaults = model?.behaviorTimingDefaults || {};
+    const values = [["tap / hold", defaults.tapHoldTerm], ["long hold", defaults.longerHoldTerm], ["repeated taps", defaults.multiTapTerm]]
+        .filter(([, value]) => String(value ?? "").trim() !== "")
+        .map(([name, value]) => `${name} ${value} ms`);
+    return values.length
+        ? `Timing left empty uses the keyboard default from Settings · Key Timing: ${values.join(", ")}.`
+        : "Timing left empty uses the keyboard default from Settings · Key Timing.";
+}
+
 function behaviourEditor(behaviour) {
     const model = getModel();
     const steps = behaviourGridSteps(behaviour, model?.behaviorEditing?.maxTapStepsPerBehavior);
@@ -432,7 +444,7 @@ function behaviourEditor(behaviour) {
             <div>
                 <div class="row" style="gap:9px"><h3 style="font-size:15px">${esc(actionLabel(model, behaviour.keycode))}</h3>
                     ${actionLabel(model, behaviour.keycode) === behaviour.keycode ? "" : `<code class="dim">${esc(behaviour.keycode)}</code>`}</div>
-                <p class="note" style="margin-top:3px">Timing left empty uses the keyboard default, whose duration the firmware does not report.</p>
+                <p class="note" style="margin-top:3px">${esc(timingDefaultsNote(model))}</p>
             </div>
             <div class="right row" style="gap:8px;margin-left:auto">
                 <button class="btn ghost" data-act="rekey" ${canEdit ? "" : "disabled"}
