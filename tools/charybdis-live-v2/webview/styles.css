@@ -25,6 +25,9 @@
   --text-3: #626270;
   --inv-bg: #ffffff;
   --inv-text: #0a0a0c;
+  /* Rings ride on top of the light a key emits, so they are the one colour
+     that has to stay legible against any of it. */
+  --ring: #ffffff;
   --draft: #e3b341;
   --danger: #ff6b5e;
   --shadow: 0 1px 2px rgba(0,0,0,.6), 0 12px 32px rgba(0,0,0,.45);
@@ -44,6 +47,7 @@
   --surface-3: #f1f1ef;
   --key: #ffffff;
   --key-hi: #f0f0ee;
+  --ring: #0c0c0e;
   --line: rgba(0,0,0,.10);
   --line-2: rgba(0,0,0,.16);
   --line-3: rgba(0,0,0,.34);
@@ -276,10 +280,12 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 .keys-pad .board { width: 100%; }
 .kc-rect { fill: var(--key); stroke: var(--line-2); stroke-width: 1; transition: fill .12s ease, stroke .12s ease; }
 .kc:hover .kc-rect { fill: var(--key-hi); stroke: var(--line-3); }
-.kc-label { fill: var(--text); font-family: var(--sans); font-size: 15px; font-weight: 500; text-anchor: middle; dominant-baseline: middle; letter-spacing: -.02em; }
-.kc-label.sm { font-size: 12px; }
-.kc-label.xs { font-size: 10.5px; font-family: var(--mono); }
-.kc-sub { fill: var(--text-3); font-family: var(--mono); font-size: 9.5px; text-anchor: middle; }
+/* One typeface at one weight carries every cap; the size comes from the room
+   its row leaves, so a long legend shrinks rather than changing face. */
+.kc-label { fill: var(--text); font-family: var(--sans); font-weight: 500; text-anchor: middle; dominant-baseline: middle; letter-spacing: -.02em; }
+.kc-sub { fill: var(--text); font-family: var(--sans); font-weight: 700; opacity: .78; text-anchor: middle; dominant-baseline: middle; }
+/* The rule is what makes a tap legend and a hold legend read as one key. */
+.kc-sep { opacity: .42; }
 .kc-trns .kc-label { fill: var(--text-3); }
 .kc-trns .kc-rect { fill: transparent; stroke: var(--line); stroke-dasharray: 3 3; }
 .kc-none .kc-rect { fill: transparent; stroke: var(--line); }
@@ -294,16 +300,17 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 .pickbar .n { font-family: var(--mono); font-size: 11px; color: var(--text-2); }
 .kc.sel .kc-label { fill: var(--text); }
 .kc-mark { fill: var(--text-2); }
-.kc-ring { fill: none; stroke: #fff; stroke-width: 2.4; }
-:root[data-theme="light"] .kc-ring { stroke: #0c0c0e; }
-.kc-inring { fill: none; stroke: #fff; stroke-width: 2; stroke-dasharray: 5 3.5; }
-:root[data-theme="light"] .kc-inring { stroke: #0c0c0e; }
+.kc-ring { fill: none; stroke: var(--ring); stroke-width: 2.4; }
+.kc-inring { fill: none; stroke: var(--ring); stroke-width: 2; stroke-dasharray: 5 3.5; }
+/* Where the selected row is reached from. It rides outside the key edge so it
+   reads apart from the selection ring drawn inside it. */
+.kc-reach { fill: none; stroke: var(--ring); stroke-width: 2.2; opacity: .9; }
 .kc-badge { fill: var(--text-3); font-family: var(--mono); font-size: 9px; text-anchor: middle; }
 .kc-ball circle { transition: fill .12s ease, stroke .12s ease; }
 .kc-ball[data-trackball] { cursor: crosshair; }
 .kc-ball[data-trackball]:hover circle { stroke: var(--text); }
-.kc-dotn { font-family: var(--mono); font-size: 5.6px; font-weight: 700; text-anchor: middle; dominant-baseline: central; }
-.kc-badgetext { fill: #f5f5f3; font-family: var(--mono); font-size: 5.8px; font-weight: 700; text-anchor: middle; dominant-baseline: central; }
+.kc-dotn { font-family: var(--mono); font-size: 5.8px; font-weight: 700; text-anchor: middle; dominant-baseline: central; }
+.kc-badgetext { fill: #f5f5f3; font-family: var(--mono); font-weight: 700; text-anchor: middle; dominant-baseline: central; }
 .legend-item .ldot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; border: 1px solid rgba(255,255,255,.5); }
 .legend-item .lbadge { display: inline-grid; place-items: center; width: 17px; height: 11px; border-radius: 3px;
   border: 1px solid rgba(245,245,243,.7); background: rgba(8,8,10,.86); color: #f5f5f3;
@@ -482,6 +489,14 @@ table.t th { text-align: left; font-size: 10.5px; letter-spacing: .08em; text-tr
 table.t td { padding: 9px 12px; border-top: 1px solid var(--line); vertical-align: top; }
 table.t td.mono { font-family: var(--mono); font-size: 11.5px; }
 table.t td.t-group { padding: 0; }
+/* A row that can say where it is reached from picks itself, and the board
+   rings those keys while it is picked. */
+[data-reach] { cursor: pointer; }
+table.t tr[data-reach]:hover > td { background: var(--surface-2); }
+table.t tr[data-picked] > td { background: var(--surface-3); }
+table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text); }
+.pd-card[data-reach]:hover { border-color: var(--line-3); }
+.pd-card[data-picked] { border-color: var(--text); background: var(--surface-3); }
 .del { color: var(--text-3); text-decoration: line-through; }
 .ins { color: var(--text); }
 
@@ -688,9 +703,7 @@ details > summary { list-style: none; }
 /* The prototype had a floating theme toggle; the panel follows VS Code's own
    light and dark instead, and nothing floats over the commit bar. */
 .scr-toggle { display: none; }
-/* The light palette is declared once, at the top of this sheet. */
-body.vscode-light .kc-ring { stroke: #0c0c0e; }
-body.vscode-light .kc-inring { stroke: #0c0c0e; }
+/* The light palette is declared once, at the top of this sheet, rings and all. */
 
 /* ── states the real app has and the prototype faked ───────────────────── */
 .screen-stub { display: grid; gap: 10px; padding: 26px; border: 1px dashed var(--line-2);

@@ -18,6 +18,9 @@ export const state = {
     // way and opens the same way: what the layer holds itself, and the rest a
     // click away.
     groups: {behaviours: openGroups(), macros: openGroups(), combos: openGroups(), pointing: openGroups()},
+    // The row picked in each tab. The board rings the keys that reach it, so
+    // a row in a table can answer "where do I press for this".
+    reachRow: {macros: null, combos: null, pointing: null},
     cell: null,
     comboOpen: false,
     comboPicking: false,

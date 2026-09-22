@@ -1,11 +1,11 @@
 // The board's hover card: everything a key reaches, without clicking and
 // without leaving the layer you are reading.
 
-import {css, isOff, label as hsvLabel} from "../lib/colour.mjs";
+import {css, isOff} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {actionLabel, behaviourFor, behaviourTiers, bindingsForSlot, combosForKey, keyFace, keyMeaning, macroKeycodes, pointingSlotFor} from "../view/keyface.mjs";
-import {feedbackColours, layerColourRow, pdColourRow, stageEnabled} from "../view/lighting.mjs";
-import {getModel, layerName, positionAt} from "../store.mjs";
+import {feedbackColours, pdColourRow, stageEnabled} from "../view/lighting.mjs";
+import {getModel, positionAt} from "../store.mjs";
 
 const tip = el(`<div class="tip" hidden></div>`);
 const card = el(`<div class="hovercard" hidden></div>`);
@@ -92,7 +92,7 @@ function keyCard(index) {
         const slots = [...(model?.viaMacros || []), ...(model?.hardcodedMacros || [])];
         sections.push(`<div class="hc-sect"><div class="hc-h">Macro payload</div>${macros.map((keycode) => {
             const macro = slots.find((row) => row.keycode === keycode);
-            return `<div class="hc-sub">${esc(keycode)} · ${macro ? `${macro.bytes} bytes` : "not reported"}</div>`
+            return `<div class="hc-sub">${esc(keycode)}${macro ? "" : " · not reported"}</div>`
                 + (macro?.payload ? `<div class="hc-step"><span class="k">payload</span><span class="v">${esc(macro.payload.slice(0, 64))}</span></div>` : "");
         }).join("")}</div>`);
     }
@@ -112,13 +112,6 @@ function keyCard(index) {
             ${(combo.inputDisplays || combo.inputs || []).map((input) => `<span class="hc-chip">${esc(input)}</span>`).join('<span class="hc-life">+</span>')}
             <span class="hc-life">→</span><span class="hc-chip out">${esc(combo.outputDisplay || combo.output)}</span></div>`).join("")}</div>`);
     }
-    const layerRow = layerColourRow(model, layer?.index);
-    const layerLit = stageEnabled(model, "layers") && layerRow && !isOff(layerRow.color);
-    sections.push(`<div class="hc-sect"><div class="hc-h">Light</div>
-        <div class="hc-flow">${layerLit ? `<span class="swatch-lg" style="width:12px;height:12px;border-radius:4px;background:${css(layerRow.color)}"></span>` : `<span class="swatch-lg swatch-off" style="width:12px;height:12px;border-radius:4px"></span>`}
-        <span class="hc-life">${layerLit
-            ? `${esc(layerName(layer))} · ${hsvLabel(layerRow.color)} · ${layerRow.mode === "ALL_KEYS" ? "all keys" : "keys mapped here"}`
-            : "no layer colour · the base effect shows"}</span></div></div>`);
     if (!behaviour && !combos.length && !macros.length && !slot) {
         sections.unshift(`<div class="hc-sect"><div class="hc-empty">No key behaviour, macro, combo or pointing mode on this key.</div></div>`);
     }

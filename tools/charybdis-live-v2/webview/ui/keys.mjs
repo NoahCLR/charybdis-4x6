@@ -4,7 +4,7 @@
 import {css, isOff, label as hsvLabel} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {LED_INDEX} from "../view/geometry.mjs";
-import {actionLabel, behaviourFor, behaviourGridSteps, behaviourGroups, behaviourTiers, comboGroups, combosForKey, keyFace, keyMeaning, macroReach, pointingReach, pointingSlotFor} from "../view/keyface.mjs";
+import {actionLabel, behaviourFor, behaviourGridSteps, behaviourGroups, behaviourTiers, comboGroups, combosForKey, keyFace, keyMeaning, macroReach, pointingReach, pointingSlotFor, pointingVariant, reachKeys} from "../view/keyface.mjs";
 import {feedbackColours, layerColourRow, pdColourRow, stageEnabled} from "../view/lighting.mjs";
 import {currentLayer, getModel, layerName, layers, positionAt, post, render, selectedPosition, state, writable} from "../store.mjs";
 import {board} from "./board.mjs";
@@ -66,6 +66,7 @@ export function screenKeys() {
     else if (state.comboPicking) stage.appendChild(pickBar());
     stage.appendChild(board(model, layer, {
         selected: state.selected,
+        reach: reachHighlight(model),
         picking: state.comboPicking || Boolean(state.placement),
         inputs: state.comboPicking ? state.comboInputs : [],
         onKey: (index) => {
@@ -136,9 +137,13 @@ function pickBar() {
 // Every tab that answers "what does this layer reach" draws its groups the
 // same way: a counted header, the first open and the rest a click away. The
 // group a tab does not have simply has no rows.
-const GROUP_TITLES = {here: "On this layer", branches: "Through a behaviour",
-    through: "Through this layer", belowBranches: "Through a behaviour below",
-    elsewhere: "Elsewhere on the board"};
+const GROUP_TITLES = {
+    here: "On this layer",
+    branches: "Through a behaviour on this layer",
+    through: "Through a transparent key",
+    belowBranches: "Through a behaviour under a transparent key",
+    elsewhere: "Unreachable from this layer",
+};
 
 // The order every reach list reads in: the two this layer holds itself, then
 // the two it only reaches under a transparent key, then the rest of the board.
@@ -164,10 +169,57 @@ const attachGroupToggles = (node) => node.querySelectorAll("[data-group-tab]").f
         render();
     }));
 
+// The keys the board rings: the ones that reach whatever row is picked in the
+// open tab. A behaviour is found on the keys carrying it; anything a branch
+// sends is found on the same keys, which is the whole point of saying so.
+function reachHighlight(model) {
+    const stack = layers(), at = state.layer;
+    const found = (groups, picked) => {
+        const [group, ...rest] = String(picked).split(":");
+        const name = rest.join(":");
+        return ({here: groups.onKeys, branches: groups.fromBranches,
+            through: groups.throughKeys, belowBranches: groups.fromBranchesBelow}[group] || [])
+            .find((entry) => String(entry.name) === name);
+    };
+    if (state.tab === "behaviours") {
+        return state.behaviourRow ? reachKeys(stack, at, {behaviours: [{keycode: state.behaviourRow}]}) : [];
+    }
+    const picked = state.reachRow[state.tab];
+    if (!picked) return [];
+    if (state.tab === "combos") {
+        const groups = comboGroups(model, stack, at);
+        const entry = [groups.onKeys, groups.throughKeys, groups.elsewhere].flat()
+            .find((row) => picked.endsWith(`:${row.combo.id}`));
+        return reachKeys(stack, at, entry);
+    }
+    if (state.tab === "macros") return reachKeys(stack, at, found(macroReach(model, stack, at), picked));
+    if (state.tab === "pointing") return reachKeys(stack, at, found(pointingReach(model, stack, at), picked));
+    return [];
+}
+
+// Rows across the tabs pick themselves the same way, and picking the same row
+// again lets go of it.
+const attachReachRows = (node, tab) => node.querySelectorAll("[data-reach]").forEach((row) =>
+    row.addEventListener("click", (event) => {
+        if (event.target.closest("button")) return;
+        const picked = row.dataset.reach;
+        state.reachRow[tab] = state.reachRow[tab] === picked ? null : picked;
+        render();
+    }));
+
+// One thing can be listed under several routes, so a pick names the route it
+// was made from — otherwise picking it in one group would ring the keys of all
+// of them.
+const reachAttrs = (tab, group, name) => {
+    const picked = `${group}:${name}`;
+    return ` data-reach="${esc(picked)}"${state.reachRow[tab] === picked ? ' data-picked="true"' : ""}`;
+};
+
 // A tab's own number is what this layer stores: a key here, or a behaviour
 // mapped here firing it from a branch — the two groups it leads with. What the
 // stack lets it reach is in the tab, not in the count.
-const storedCount = (reach) => reach.onKeys.length + reach.fromBranches.length;
+const storedCount = (reach) =>
+    new Set([...reach.onKeys, ...reach.fromBranches].map((entry) => entry.name)).size;
 
 function bench() {
     const model = getModel();
@@ -557,10 +609,10 @@ function tabCombos(body, right) {
         post({type: "updateComboHoldTerm", holdTermMs: comboHoldTerm(model, written), expectedBase: model.profileIdentity});
     });
     const groupsOf = comboGroups(model, layers(), state.layer);
-    const row = (entry, reachedBy) => {
+    const row = (group, entry, reachedBy) => {
         const combo = entry.combo;
         const requires = [combo.mustHold ? "hold" : "", combo.mustTap ? "tap only" : "", combo.ordered ? "in order" : ""].filter(Boolean).join(" · ") || "—";
-        return `<tr><td class="mono">${esc(combo.badge || "")}</td>
+        return `<tr${reachAttrs("combos", group, combo.id)}><td class="mono">${esc(combo.badge || "")}</td>
             <td>${(combo.inputDisplays || combo.inputs || []).map((input) => `<span class="tok">${esc(input)}</span>`).join(" + ")}</td>
             <td class="mono">${esc(combo.outputDisplay || combo.output)}</td>
             <td class="mono">${esc(combo.termMs ?? "")} ms</td>
@@ -569,16 +621,18 @@ function tabCombos(body, right) {
             <td style="text-align:right"><button class="btn tiny ghost" data-edit="${esc(String(combo.id))}" ${canEdit ? "" : "disabled"}>Edit</button></td></tr>`;
     };
     const comboGroupRows = [
-        {id: "here", rows: groupsOf.onKeys.map((entry) => row(entry, keysReach(entry.keys))),
+        {id: "here", rows: groupsOf.onKeys.map((entry) => row("here", entry, keysReach(entry.keys))),
             empty: readback.state === "read" ? "No combo has all of its inputs on this layer." : "Combos have not been read from this keyboard."},
-        {id: "through", rows: groupsOf.throughKeys.map((entry) => row(entry, keysReach(entry.keys))),
+        {id: "through", rows: groupsOf.throughKeys.map((entry) => row("through", entry, keysReach(entry.keys))),
             empty: "No combo is completed by keys falling through."},
-        {id: "elsewhere", rows: groupsOf.elsewhere.map((entry) => row(entry,
+        {id: "elsewhere", rows: groupsOf.elsewhere.map((entry) => row("elsewhere", entry,
             entry.inputs ? `${entry.keys.length} of ${entry.inputs} inputs, never at once` : "no inputs")),
             empty: "Every combo on the board fires from this layer."},
     ];
-    node.querySelector("#comboTable").replaceWith(reachTable("combos", comboGroupRows,
-        ["Combo", "Inputs", "Sends", "Window", "Requires", "Reached by", ""]));
+    const comboTable = reachTable("combos", comboGroupRows,
+        ["Combo", "Inputs", "Sends", "Window", "Requires", "Reached by", ""]);
+    attachReachRows(comboTable, "combos");
+    node.querySelector("#comboTable").replaceWith(comboTable);
 
     node.querySelectorAll("[data-edit]").forEach((button) => button.addEventListener("click", () => {
         const combo = combos.find((row) => String(row.id) === button.dataset.edit);
@@ -670,29 +724,29 @@ function tabMacros(body, right) {
     open.addEventListener("click", () => { state.screen = "macros"; render(); });
     right.appendChild(open);
 
-    const row = (keycode, reachedBy) => {
+    const row = (group, keycode, reachedBy) => {
         const slot = slots.find((entry) => entry.keycode === keycode);
-        return `<tr>
+        return `<tr${reachAttrs("macros", group, keycode)}>
             <td>${esc(actionLabel(model, keycode))} <code class="dim">${esc(keycode)}</code></td>
             <td class="mono">${esc(slot?.payload || "—")}</td>
-            <td class="mono">${esc(slot?.bytes ?? "—")}</td>
             <td class="muted">${reachedBy}</td></tr>`;
     };
     const groups = [
-        {id: "here", rows: reach.onKeys.map((entry) => row(entry.name, keysReach(entry.keys))),
+        {id: "here", rows: reach.onKeys.map((entry) => row("here", entry.name, reachLabel(model, entry))),
             empty: "No macro keycode is placed on this layer."},
-        {id: "through", rows: reach.throughKeys.map((entry) => row(entry.name, keysReach(entry.keys))),
+        {id: "through", rows: reach.throughKeys.map((entry) => row("through", entry.name, reachLabel(model, entry))),
             empty: "No transparent key falls through to a macro key."},
-        {id: "branches", rows: reach.fromBranches.map((entry) => row(entry.name, branchReach(model, entry))),
+        {id: "branches", rows: reach.fromBranches.map((entry) => row("branches", entry.name, reachLabel(model, entry))),
             empty: "No behaviour mapped on this layer sends a macro."},
-        {id: "belowBranches", rows: reach.fromBranchesBelow.map((entry) => row(entry.name, branchReach(model, entry))),
+        {id: "belowBranches", rows: reach.fromBranchesBelow.map((entry) => row("belowBranches", entry.name, reachLabel(model, entry))),
             empty: "No behaviour under a transparent key sends a macro."},
-        {id: "elsewhere", rows: reach.elsewhere.map((keycode) => row(keycode, "not reached from this layer")),
+        {id: "elsewhere", rows: reach.elsewhere.map((keycode) => row("elsewhere", keycode, "not reached from this layer")),
             empty: "Every stored macro is reached from this layer."},
     ];
 
-    body.replaceChildren(reachTable("macros", groups,
-        ["Slot", "Payload", "Bytes", "Reached by"]));
+    const node = reachTable("macros", groups, ["Slot", "Payload", "Reached by"]);
+    attachReachRows(node, "macros");
+    body.replaceChildren(node);
 }
 
 // Where a reach came from, in the words of the thing that reaches it. A
@@ -709,8 +763,25 @@ const keysReach = (keys) => {
 // A behaviour that only answers through a transparent key still fires its
 // branches, so it belongs here — named with the layer that holds it, because
 // that is the part this layer does not store.
-const branchReach = (model, entry) => `from ${entry.behaviours.map((row) =>
-    esc(actionLabel(model, row.keycode)) + (row.layer ? ` · on ${sourceLabel(row)}` : "")).join(", ")}`;
+// A branch names both what it sends and the behaviour it comes from — but only
+// when those differ from what the row is already titled with. A macro row is
+// its own macro, so repeating it would be noise; a pointing mode is a slot, and
+// which of its two keycodes a branch sends is the whole point.
+const branchReach = (model, entry, showSends = true) => entry.behaviours.map((row) => {
+    const from = `from ${esc(actionLabel(model, row.keycode))}`
+        + (row.layer ? ` · on ${sourceLabel(row)}` : "");
+    return showSends && row.action && String(entry.name) !== String(row.action)
+        ? `sends ${esc(actionLabel(model, row.action))} · ${from}` : from;
+}).join(", ");
+
+// Every way this layer reaches one thing, not only the way it was grouped by.
+// A macro can sit on a key here *and* be fired from a behaviour's branch; the
+// board rings both sets of keys, so the row has to name both or the two
+// disagree about the same entry.
+const reachLabel = (model, entry) => [
+    entry.keys?.length ? keysReach(entry.keys) : "",
+    entry.behaviours?.length ? branchReach(model, entry) : "",
+].filter(Boolean).join(" · ");
 
 // A grouped table: the column header once, then a counted header row per
 // group. One table keeps the columns lined up across the groups being
@@ -738,15 +809,16 @@ function tabPointing(body, right) {
     open.addEventListener("click", () => { state.screen = "pointing"; render(); });
     right.appendChild(open);
 
-    const card = (slotId, reachedBy) => {
+    const card = (group, slotId, reachedBy, variant) => {
         const slot = (model?.pdModes || []).find((entry) => entry.id === Number(slotId));
         if (!slot) return "";
         const row = pdColourRow(model, slot.id);
         const lit = slot.kind && row && !isOff(row.color);
-        return `<div class="pd-card">
+        return `<div class="pd-card"${reachAttrs("pointing", group, slot.id)}>
             <div class="row" style="gap:9px">
                 <span class="swatch-lg ${lit ? "" : "swatch-off"}" style="width:16px;height:16px;border-radius:5px;${lit ? `background:${css(row.color)}` : ""}"></span>
-                <b>${esc(slot.name || `Slot ${slot.id + 1}`)}</b><span class="tag">slot ${slot.id + 1}</span></div>
+                <b>${esc(slot.name || `Slot ${slot.id + 1}`)}${variant ? ` · ${esc(variant)}` : ""}</b>
+                <span class="tag">slot ${slot.id + 1}</span></div>
             <div class="note">${slot.kind
                 ? `${slot.kind === 2 ? "Scrolling" : "Directional"}${slot.dpi ? ` · ${slot.dpi} DPI` : " · normal pointer speed"}`
                 : "Empty · the keyboard refuses to activate it, so these keys do nothing yet"}</div>
@@ -754,20 +826,31 @@ function tabPointing(body, right) {
             ${slot.kind ? `<div class="note">its colour paints ${esc(row?.locality || "its locality").toLowerCase().replace(/rgb_/, "").replace(/_/g, " ")} while the mode runs — not this key</div>` : ""}
         </div>`;
     };
-    const onKeyCard = (entry) => card(entry.name, `on ${entry.keys
-        .map((key) => esc(keyFace(key.position).main || keyMeaning(key.position))).join(", ")}${entry.keys
-        .some((key) => key.fellThrough) ? ` · ${esc(layerName(entry.keys.find((key) => key.fellThrough).layer))}` : ""}`);
+    // Holding a mode and toggling it on are the same mode reached two ways, so
+    // the card is named for the one its route uses. A route that uses both
+    // keeps them in the line beneath, where they can be told apart per key.
+    const reachCard = (group) => (entry) => {
+        const variants = [...new Set([
+            ...entry.keys.map((key) => pointingVariant(model, keyMeaning(key.position))),
+            ...(entry.behaviours || []).map((row) => pointingVariant(model, row.action)),
+        ])];
+        const only = variants.length === 1 ? variants[0] : "";
+        return card(group, entry.name, [
+            entry.keys.length ? keysReach(entry.keys) : "",
+            entry.behaviours?.length ? branchReach(model, entry, !only) : "",
+        ].filter(Boolean).join(" · "), only);
+    };
 
     const groups = [
-        {id: "here", cards: reach.onKeys.map(onKeyCard),
+        {id: "here", cards: reach.onKeys.map(reachCard("here")),
             empty: "No pointing mode is placed on this layer."},
-        {id: "through", cards: reach.throughKeys.map(onKeyCard),
+        {id: "through", cards: reach.throughKeys.map(reachCard("through")),
             empty: "No transparent key falls through to a pointing-mode key."},
-        {id: "branches", cards: reach.fromBranches.map((entry) => card(entry.name, branchReach(model, entry))),
+        {id: "branches", cards: reach.fromBranches.map(reachCard("branches")),
             empty: "No behaviour mapped on this layer sends a pointing mode."},
-        {id: "belowBranches", cards: reach.fromBranchesBelow.map((entry) => card(entry.name, branchReach(model, entry))),
+        {id: "belowBranches", cards: reach.fromBranchesBelow.map(reachCard("belowBranches")),
             empty: "No behaviour under a transparent key sends a pointing mode."},
-        {id: "elsewhere", cards: reach.elsewhere.map((slotId) => card(slotId, "not reached from this layer")),
+        {id: "elsewhere", cards: reach.elsewhere.map((slotId) => card("elsewhere", slotId, "not reached from this layer")),
             empty: "Every configured mode is reached from this layer."},
     ];
     const section = (group) => `<div class="reach-group">
@@ -780,6 +863,7 @@ function tabPointing(body, right) {
     const node = el(`<div class="stack" style="gap:10px;padding:2px 0">
         ${inGroupOrder(groups).map(section).join("")}</div>`);
     attachGroupToggles(node);
+    attachReachRows(node, "pointing");
     body.replaceChildren(node);
 }
 

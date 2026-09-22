@@ -241,8 +241,9 @@ test("a macro fired from a behaviour branch is reached, though no key shows it",
     assert.deepEqual(base.throughKeys, [], "the base layer has nothing under it to fall through to");
     assert.deepEqual(base.fromBranches.map((entry) => entry.name), ["VIA_MACRO_1", "VIA_MACRO_2"],
         "both branches are found, tap and long hold alike");
-    assert.deepEqual(base.fromBranches[0].behaviours, [{keycode: "KC_ESCAPE", layer: null, whileHeld: false}],
-        "named by the behaviour that fires it, which is mapped right here");
+    assert.deepEqual(base.fromBranches[0].behaviours,
+        [{keycode: "KC_ESCAPE", action: "VIA_MACRO_1", layer: null, whileHeld: false}],
+        "named by the behaviour that fires it and by what its branch sends");
     assert.deepEqual(base.fromBranchesBelow, [], "nothing lies under the base layer to reach a behaviour through");
     assert.deepEqual(base.elsewhere, [], "an empty slot is not a macro this layer is missing");
 
@@ -323,7 +324,7 @@ test("a combo fires only if one activation carries every input at once", () => {
         "and it names the layer you have to hold as well");
 });
 
-test("a thing reached several ways is reported once, by its shortest route", () => {
+test("a thing reached several ways is listed under each of them", () => {
     const at = (layoutIndex, keycode) => ({layoutIndex, keycode, display: keycode});
     const model = {
         viaMacros: [
@@ -340,18 +341,18 @@ test("a thing reached several ways is reported once, by its shortest route", () 
         {index: 1, name: "Numbers", positions: [at(0, "KC_ESCAPE"), at(1, "KC_TRANSPARENT"), at(2, "KC_B")]},
     ];
 
-    // VIA_MACRO_1 sits on a key below *and* is fired by KC_B, a behaviour mapped
-    // on Numbers itself. The behaviour is the shorter route, so it leads — and
-    // it is what the tab counts, which the old "any key wins" rule dropped.
+    // VIA_MACRO_1 sits on a key below and is also fired by KC_B, a behaviour
+    // mapped on Numbers itself. Both are real ways to reach it, so both are
+    // answered — each entry carrying only the route it is filed under.
     const above = macroReach(model, stack, 1);
     assert.deepEqual(above.onKeys, [], "no macro keycode is on a key of Numbers");
-    assert.deepEqual(above.fromBranches.map((entry) => entry.name).sort(), ["VIA_MACRO_0", "VIA_MACRO_1"],
-        "both behaviours are mapped here, so both of their macros are stored here");
-    assert.deepEqual(above.throughKeys, [], "the key below is the longer route, so it does not lead");
-    assert.deepEqual(above.fromBranchesBelow, []);
-    const promoted = above.fromBranches.find((entry) => entry.name === "VIA_MACRO_1");
-    assert.deepEqual(promoted.keys.map((key) => key.position.layoutIndex), [1],
-        "and the entry still carries the route it did not lead with");
+    assert.deepEqual(above.fromBranches.map((entry) => entry.name).sort(), ["VIA_MACRO_0", "VIA_MACRO_1"]);
+    assert.deepEqual(above.throughKeys.map((entry) => entry.name), ["VIA_MACRO_1"],
+        "the key below is a second way to the same macro, not a lost one");
+    assert.deepEqual(above.throughKeys[0].behaviours, [],
+        "and that entry answers for the key alone, so picking it rings only that key");
+    assert.deepEqual(above.fromBranches.find((entry) => entry.name === "VIA_MACRO_1").keys, []);
+    assert.deepEqual(above.elsewhere, []);
 });
 
 test("reach lists read down the stack, the default layer first", () => {
@@ -378,4 +379,23 @@ test("reach lists read down the stack, the default layer first", () => {
         ["Base", "Numbers", "Symbols"], "macros answered lower in the stack come first");
     assert.deepEqual(behaviourGroups(model, stack, 3).through.map((entry) => entry.layer.name),
         ["Base", "Numbers", "Symbols"], "and so do behaviours");
+});
+
+test("a branch keeps which of a pointing mode's two keycodes it sends", () => {
+    // A slot answers to both a hold and a toggle keycode. Collapsing them to the
+    // slot is right for saying which mode is reached, but the row has to keep
+    // the difference or holding and toggling read the same.
+    const model = {
+        pdModes: [{id: 0, name: "Dragscroll", kind: 2}],
+        qmkKeycodeAliases: {},
+        keyBehaviors: [{keycode: "DRAGSCROLL", steps: [{tapCount: 0, hold: {action: "DRAGSCROLL_LOCK"}}]}],
+    };
+    const stack = [{index: 0, name: "Base", positions: [{layoutIndex: 50, keycode: "DRAGSCROLL", display: "Dragscroll · hold"}]}];
+    const reach = pointingReach(model, stack, 0);
+
+    assert.deepEqual(reach.onKeys.map((entry) => entry.name), ["0"], "the key holds the mode");
+    assert.deepEqual(reach.fromBranches.map((entry) => entry.name), ["0"], "and its own behaviour toggles it");
+    assert.deepEqual(reach.fromBranches[0].behaviours,
+        [{keycode: "DRAGSCROLL", action: "DRAGSCROLL_LOCK", layer: null, whileHeld: false}],
+        "so the branch keeps the toggle keycode, not just the slot it lands on");
 });

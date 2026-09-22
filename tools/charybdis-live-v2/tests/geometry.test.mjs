@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {GEO, LED_INDEX, TRACKBALL_LED, inLocality, isRightHalf, keyVisual, trackballInLocality} from "../webview/view/geometry.mjs";
+import {GEO, LED_INDEX, TRACKBALL_LED, fitText, inLocality, isRightHalf, keyFaceRows, keyVisual, trackballInLocality} from "../webview/view/geometry.mjs";
 
 test("the board splits into halves the way the LED numbering does", () => {
     assert.equal(isRightHalf(0), false, "left home column");
@@ -42,4 +42,38 @@ test("the trackball LED sits on the right half and is nobody's trigger key", () 
     assert.equal(trackballInLocality("RGB_KEY_HALF", 7), true, "a right-half trigger reaches it");
     assert.equal(trackballInLocality("RGB_KEY_HALF", 0), false, "a left-half trigger does not");
     assert.equal(trackballInLocality("RGB_KEYS_ONLY", 7), false, "no key maps to the trackball LED");
+});
+
+test("the key face drops its legend by how many rows sit above it", () => {
+    const plain = keyFaceRows(0);
+    assert.equal(plain.mainY, GEO.keyH / 2, "with nothing above, the legend is simply centred");
+    assert.equal(plain.tierY, undefined);
+
+    assert.equal(keyFaceRows(0, {tiers: true}).mainY, 36, "one row above pushes it down");
+    assert.equal(keyFaceRows(0, {tiers: true, combos: true}).mainY, 40.4, "two rows push it further");
+    assert.deepEqual(
+        [keyFaceRows(0, {tiers: true, combos: true}).tierY, keyFaceRows(0, {tiers: true, combos: true}).comboY],
+        [6.3, 14.2], "and the two rows stack without overlapping");
+    assert.equal(keyFaceRows(0, {combos: true}).comboY, 7.2, "a combo row alone sits where the dots would");
+
+    // A hold legend takes the bottom of the cap, with the rule between them.
+    const dual = keyFaceRows(0, {tiers: true, sub: true});
+    assert.ok(dual.mainY < dual.separatorY && dual.separatorY < dual.subY, "tap, rule, hold, in that order");
+    assert.ok(dual.subY < GEO.keyH, "and the hold legend stays on the cap");
+});
+
+test("a legend is sized to its row rather than bucketed by length", () => {
+    const row = {max: 12, min: 7, width: 48};
+    assert.deepEqual(fitText("Esc", row), {size: 12, squeeze: 0}, "a short legend takes the full size");
+    assert.deepEqual(fitText("Tab", row).size, 12, "and so does another of the same width");
+
+    const long = fitText("Left Control", row);
+    assert.ok(long.size < 12 && long.size >= 7, "a long one shrinks to fit instead of changing face");
+    assert.equal(long.squeeze, 48, "and is compressed into the row it was given");
+
+    // Wider glyphs shrink further than narrow ones of the same count, which a
+    // rule counting characters cannot tell apart.
+    assert.ok(fitText("MMMMMMMM", row).size < fitText("iiiiiiii", row).size);
+    assert.equal(fitText("", row).size, 12, "an empty legend has nothing to fit");
+    assert.equal(fitText("Left Control", {max: 12, min: 11, width: 48}).size, 11, "the floor holds");
 });

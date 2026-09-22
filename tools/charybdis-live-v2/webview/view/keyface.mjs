@@ -136,6 +136,25 @@ const sourceRank = (entry) => Math.min(
 const downTheStack = (entries) => [...entries].sort((one, other) => sourceRank(one) - sourceRank(other));
 
 /**
+ * Where to press for this, on this layer.
+ *
+ * The keys that name it, and — for anything a behaviour branch sends — the keys
+ * carrying that behaviour, because those are the ones you actually reach it
+ * through. A key answered from a layer below keeps its physical position, which
+ * is what the board draws.
+ */
+export function reachKeys(stack, at, entry) {
+    const indexes = new Set((entry?.keys || []).map((key) => key.position.layoutIndex));
+    const behaviours = new Set((entry?.behaviours || []).map((row) => row.keycode));
+    if (behaviours.size) {
+        for (const {position} of reachablePositions(stack, at)) {
+            if (behaviours.has(keyMeaning(position))) indexes.add(position.layoutIndex);
+        }
+    }
+    return [...indexes];
+}
+
+/**
  * Behaviours, grouped by how this layer reaches them.
  *
  * A key stored on this layer reaches its behaviour directly. A transparent key
@@ -153,11 +172,10 @@ export function behaviourGroups(model, stack, at) {
         else if (!through.some((entry) => entry.row === row)) through.push({row, layer, whileHeld});
     }
 
-    // A behaviour reached both ways is simply on this layer.
-    const direct = new Set(here);
-    const fell = through.filter((entry) => !direct.has(entry.row));
-    const reached = new Set([...here, ...fell.map((entry) => entry.row)]);
-    return {here, through: downTheStack(fell),
+    // A behaviour reached both ways is listed under both, the same as anything
+    // else: the groups say how this layer gets at it, not which way won.
+    const reached = new Set([...here, ...through.map((entry) => entry.row)]);
+    return {here, through: downTheStack(through),
         elsewhere: (model?.keyBehaviors || []).filter((row) => !reached.has(row))};
 }
 
@@ -292,25 +310,27 @@ export function reachGroups(model, stack, at, namesOf, all) {
             for (const tier of [step.tap, step.hold, step.longHold]) {
                 for (const name of namesOf(tier?.action)) {
                     const rows = reachOf(name)[from ? "belowRows" : "directRows"];
-                    if (!rows.some((entry) => entry.keycode === row.keycode)) {
-                        rows.push({keycode: row.keycode, layer: from, whileHeld});
+                    // The action matters as well as the behaviour: a pointing
+                    // mode answers to two keycodes, and which one a branch
+                    // sends is the difference between holding and toggling it.
+                    if (!rows.some((entry) => entry.keycode === row.keycode && entry.action === tier.action)) {
+                        rows.push({keycode: row.keycode, action: tier.action, layer: from, whileHeld});
                     }
                 }
             }
         }
     }
 
-    // One thing is often reached several ways. It is reported once, by the
-    // shortest route — the order the groups themselves read in — and its entry
-    // still carries every route, so a row can name them all.
+    // One thing is often reached several ways, and the groups answer which way
+    // rather than which way first — so it is listed under each route it has,
+    // each entry carrying only that route. A macro sitting on a key here that a
+    // behaviour here also fires is two answers, not one with a footnote.
     const onKeys = [], fromBranches = [], throughKeys = [], fromBranchesBelow = [];
     for (const [name, reach] of found) {
-        const behaviours = [...reach.directRows, ...reach.belowRows];
-        const keys = [...reach.directKeys, ...reach.fellKeys];
-        if (reach.directKeys.length) onKeys.push({name, keys, behaviours});
-        else if (reach.directRows.length) fromBranches.push({name, keys, behaviours});
-        else if (reach.fellKeys.length) throughKeys.push({name, keys, behaviours});
-        else fromBranchesBelow.push({name, keys, behaviours});
+        if (reach.directKeys.length) onKeys.push({name, keys: reach.directKeys, behaviours: []});
+        if (reach.directRows.length) fromBranches.push({name, keys: [], behaviours: reach.directRows});
+        if (reach.fellKeys.length) throughKeys.push({name, keys: reach.fellKeys, behaviours: []});
+        if (reach.belowRows.length) fromBranchesBelow.push({name, keys: [], behaviours: reach.belowRows});
     }
     return {onKeys, fromBranches,
         throughKeys: downTheStack(throughKeys), fromBranchesBelow: downTheStack(fromBranchesBelow),
@@ -360,6 +380,19 @@ export function pointingSlotFor(model, keycode) {
     if (numbered) return slots.find((slot) => slot.id === Number(numbered[1]));
     const value = typeof keycode === "number" ? keycode : /^0x[0-9a-f]+$/i.test(String(keycode)) ? Number(keycode) : NaN;
     return Number.isInteger(value) ? slots.find((slot) => slotKeycodes(slot).includes(value)) : undefined;
+}
+
+// Which of a slot's two keycodes this is. Everything else about the mode is the
+// same either way, so holding it or toggling it on is the only thing a route
+// has to carry beyond the slot itself.
+export function pointingVariant(model, keycode) {
+    const alias = model?.qmkKeycodeAliases?.[keycode] ?? keycode;
+    if (/_LOCK$/.test(String(alias))) return "toggle";
+    const slot = pointingSlotFor(model, keycode);
+    const value = typeof keycode === "number" ? keycode
+        : /^0x[0-9a-f]+$/i.test(String(keycode)) ? Number(keycode) : NaN;
+    if (slot && Number.isInteger(value) && slotKeycodes(slot)[1] === value) return "toggle";
+    return "hold";
 }
 
 // The two values a slot answers to: hold and toggle. Matching on the numbers

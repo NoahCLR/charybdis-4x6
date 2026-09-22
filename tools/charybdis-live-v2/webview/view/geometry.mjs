@@ -68,3 +68,49 @@ export function trackballInLocality(locality, triggerIndex) {
         default: return true;
     }
 }
+
+// ── the key face ────────────────────────────────────────────────────────
+//
+// Where the marks and legends sit on one cap. The rows are a designed set, not
+// a running offset: how far the legend drops depends on how many rows sit above
+// it, and each case was tuned against the others. Lifted from the app's own
+// board, so the two cannot drift.
+export function keyFaceRows(y, {tiers = false, combos = false, sub = false} = {}) {
+    const rows = {comboHeight: 8.2};
+    if (tiers && combos) { rows.tierY = y + 6.3; rows.comboY = y + 14.2; }
+    else if (tiers) { rows.tierY = y + 7.5; }
+    else if (combos) { rows.comboY = y + 7.2; }
+
+    const above = (tiers ? 1 : 0) + (combos ? 1 : 0);
+    if (sub) {
+        rows.mainY = [y + 24.5, y + 29.3, y + 32.2][above];
+        rows.separatorY = [y + 37.4, y + 40.8, y + 43.4][above];
+        rows.subY = [y + 48.8, y + 51.8, y + 53.5][above];
+    } else {
+        rows.mainY = [y + GEO.keyH / 2, y + 36, y + 40.4][above];
+    }
+    return rows;
+}
+
+// Roughly how wide a legend runs, so a label can be sized to fit its row rather
+// than bucketed by how many characters it happens to have.
+const charWidth = (char) => {
+    if (char === " ") return 0.32;
+    if (/[.,:;!'|]/.test(char)) return 0.26;
+    if (/[/\\()[\]{}]/.test(char)) return 0.34;
+    if (/[MW@#%&]/.test(char)) return 0.82;
+    if (/[A-Z0-9_]/.test(char)) return 0.62;
+    if (/[a-z]/.test(char)) return 0.54;
+    return 0.58;
+};
+
+/**
+ * The size a legend takes to sit inside `width`, never above `max` and never
+ * below `min`. `squeeze` is set when even the smallest size overruns, and is
+ * the width to compress the glyphs into rather than let them spill off the cap.
+ */
+export function fitText(text, {max, min, width}) {
+    const unit = [...String(text || "")].reduce((total, char) => total + charWidth(char), 0);
+    const preferred = unit > 0 ? Math.min(max, width / unit) : max;
+    return {size: Math.round(Math.max(min, preferred) * 100) / 100, squeeze: unit * max > width ? width : 0};
+}
