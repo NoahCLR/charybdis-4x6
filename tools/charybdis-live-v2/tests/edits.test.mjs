@@ -163,6 +163,28 @@ test("a settings section is posted whole, and a partial section is refused", () 
     }), /complete settings section/i);
 });
 
+test("behaviour timing defaults follow the draft's Key Timing, and its undo", () => {
+    const draft = session();
+    const {buildDeviceModel} = require(path.join(here, "..", "core", "session", "device-model"));
+    const {settingsEditorView} = require(path.join(here, "..", "core", "model", "settings-editor"));
+    // what extension.js builds the webview's model from while a draft is open
+    const timing = () => buildDeviceModel(draft.editingState({selectedDeviceId: "test-device"})).behaviorTimingDefaults;
+    const before = timing().tapHoldTerm;
+    assert.match(before, /^\d+$/, "the keyboard reports its default");
+    const section = settingsEditorView(draft.current).sections.find((row) => row.id === "keyTiming");
+    const next = String(Number(before) + 35);
+    draft.stage({
+        type: "updateConfigDefaults", draftId: draft.id, draftRevision: draft.revision,
+        sectionId: section.id, expectedFingerprint: draft.current.fingerprint,
+        fields: section.fields.map((field) => field.kind === "toggle"
+            ? {macro: field.macro, enabled: field.enabled}
+            : {macro: field.macro, value: field.macro === "tapHoldTerm" ? next : field.value}),
+    });
+    assert.equal(timing().tapHoldTerm, next, "the behaviour editor's note reads the drafted default");
+    draft.undo(draft.revision);
+    assert.equal(timing().tapHoldTerm, before, "and undo puts it back");
+});
+
 test("a pointing slot is posted whole, with its shortcuts as names", () => {
     const draft = session();
     const before = require(path.join(here, "..", "core", "model", "portable-profile"))

@@ -63,9 +63,9 @@ export function rail() {
                     health.recoveryPending ? "Recovery pending" : device.connected ? "Recovery clear" : "Recovery unknown",
                     "A recovery copy is written before every apply.")}
             </div>
-            ${railMessage()}
         </div>
         <nav class="rail-nav">${nav}</nav>
+        ${railMessage()}
         <div class="rail-foot">
             <span class="note">Draft history</span>
             <button class="btn tiny ghost icon" data-act="undo" ${draft?.canUndo ? "" : "disabled"}
@@ -92,7 +92,8 @@ export const topbar = (title, subtitle, actions = "") => `<header class="topbar"
 </header>`;
 
 // What the keyboard or the host last said — a read, a save, a refusal — sits
-// with the device health it describes, not over the screen being worked in.
+// in the rail's free space above the draft history: not over the screen being
+// worked in, and below the navigation so nothing moves when it appears.
 function railMessage() {
     const model = getModel();
     const error = state.error || model?.device?.health?.error;
