@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {behaviourFor, behaviourTiers, bindingKeycode, bindingsForSlot, combosForKey, keyFace, macroKeycodes, pointingSlotFor, slotKeycodes} from "../webview/view/keyface.mjs";
+import {behaviourFor, behaviourTiers, bindingKeycode, bindingsForSlot, comboKeysOnLayer, combosForKey, keyFace, keyMeaning, macroKeycodes, pointingSlotFor, slotKeycodes} from "../webview/view/keyface.mjs";
 
 test("a key face uses the model's own resolution, and names the layer a dual-role key reaches", () => {
     assert.deepEqual(keyFace({keycode: "KC_TRANSPARENT", display: "▽"}), {main: "▽", sub: "", kind: "transparent"});
@@ -52,6 +52,28 @@ test("a key for an empty pointing slot says so on its second line", () => {
     assert.deepEqual(keyFace({keycode: "0x7EF0", display: "Slot 7 · hold (empty)"}),
         {main: "Slot 7 · hold", sub: "empty", kind: "key"});
     assert.equal(keyFace({keycode: "QK_USER_16", display: "Dragscroll · hold"}).sub, "");
+});
+
+test("what a key reaches is looked up by what its value means", () => {
+    // The keyboard stores a behaviour target, a macro and a pointing mode as
+    // plain user keycodes; every domain that refers back to them uses the
+    // semantic name. A lookup that matched the stored name would find nothing.
+    const model = {
+        keyBehaviors: [{keycode: "DRAGSCROLL", steps: [{tapCount: 1, hold: {action: "KC_ESC"}}]}],
+        combos: [{badge: "C1", inputs: ["VIA_MACRO_0", "KC_F"], output: "KC_ESC"}],
+        pdModes: [{id: 0, name: "Dragscroll", kind: 2}],
+    };
+    const pointingKey = {layoutIndex: 3, keycode: "QK_USER_16", semantic: "DRAGSCROLL"};
+    const macroKey = {layoutIndex: 4, keycode: "QK_MACRO_0", semantic: "VIA_MACRO_0"};
+
+    assert.equal(keyMeaning(pointingKey), "DRAGSCROLL");
+    assert.equal(keyMeaning({keycode: "KC_A"}), "KC_A", "an ordinary key means itself");
+    assert.equal(keyMeaning(undefined), "");
+    assert.equal(behaviourFor(model, keyMeaning(pointingKey)).keycode, "DRAGSCROLL");
+    assert.deepEqual(macroKeycodes(keyMeaning(macroKey)), ["VIA_MACRO_0"]);
+    assert.equal(pointingSlotFor(model, keyMeaning(pointingKey)).name, "Dragscroll");
+    assert.deepEqual(combosForKey(model, macroKey).map((combo) => combo.badge), ["C1"],
+        "a combo input named semantically still finds its key");
 });
 
 test("a pointing key is recognised as the keyboard names it, not only as the app labels it", () => {
@@ -110,4 +132,28 @@ test("an empty slot's bindings are found by the keyboard's own values, not by a 
     const found = bindingsForSlot(model, {id: 6, kind: 0});
     assert.equal(found.keys.length, 1, "the key bound to the empty slot is found");
     assert.deepEqual(found.behaviours.map((row) => row.keycode), ["LEFT_THUMB"]);
+});
+
+test("the combo table and the board's badges count the same keys", () => {
+    // Real keyboards do not always report per-layer input references, and when
+    // they do not, the board matched by keycode while the table looked at the
+    // missing field and called every combo unreachable.
+    const combo = {badge: "C1", inputs: ["KC_D", "LT(3,KC_F)"], output: "KC_TAB"};
+    const layer = {name: "Layer 0", positions: [
+        {layoutIndex: 27, keycode: "KC_D"}, {layoutIndex: 28, keycode: "LT(3,KC_F)"}, {layoutIndex: 29, keycode: "KC_G"}]};
+    const model = {combos: [combo], layers: [layer]};
+
+    assert.deepEqual(comboKeysOnLayer(layer, combo).map((key) => key.layoutIndex), [27, 28]);
+    assert.deepEqual(combosForKey(model, layer.positions[0]).map((row) => row.badge), ["C1"],
+        "the badge and the count come from one predicate");
+    assert.deepEqual(combosForKey(model, layer.positions[2]), []);
+
+    const half = {name: "Layer 3", positions: [{layoutIndex: 27, keycode: "KC_D"}]};
+    assert.equal(comboKeysOnLayer(half, combo).length, 1, "a partly present combo is not reachable");
+    assert.deepEqual(comboKeysOnLayer(undefined, combo), []);
+
+    // A device that does report positions still wins, on those positions.
+    const reported = {badge: "C2", inputs: ["KC_N", "KC_M"], inputPositions: [42]};
+    assert.deepEqual(comboKeysOnLayer({positions: [{layoutIndex: 42, keycode: "KC_X"}, {layoutIndex: 43, keycode: "KC_M"}]}, reported)
+        .map((key) => key.layoutIndex), [42]);
 });

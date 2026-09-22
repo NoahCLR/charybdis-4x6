@@ -63,7 +63,7 @@ function buildDeviceModel(state = {}) {
         activeProfile: activeProfileFromDevice(state),
         files: {},
 
-        layers: layersFromDevice(state.layout, catalog.labels),
+        layers: layersFromDevice(state.layout, catalog.labels, catalog.aliases),
         customKeycodes: [],
 
         // Read off the keyboard when the committed profile has been read;
@@ -101,7 +101,7 @@ function buildDeviceModel(state = {}) {
 
 // The UI keys layers by name and the device only knows indexes, so synthesise
 // stable names. They are display strings, not identifiers from source.
-function layersFromDevice(layout, labels) {
+function layersFromDevice(layout, labels, aliases = {}) {
     if (!layout || layout.state !== "read" || !Array.isArray(layout.layers)) {
         return [];
     }
@@ -110,9 +110,18 @@ function layersFromDevice(layout, labels) {
         index: entry.layer,
         positions: entry.keys.map((key) => {
             const resolved = {...key.resolved, label: labels[key.resolved.name] || key.resolved.label};
+            // A dual-role key shows what it taps, named the way that keycode is
+            // named everywhere else: `/`, not `SLASH`.
+            if (resolved.tap && labels[resolved.tap]) resolved.tapLabel = labels[resolved.tap];
             return {
                 layoutIndex: key.layoutIndex,
                 keycode: key.resolved.name,
+                // What the value means, beside what the keyboard calls it. A
+                // behaviour row, a macro slot and a pointing mode are all named
+                // semantically, while a position arrives as `QK_USER_16` or as
+                // bare hex, so every lookup that crosses that gap matches on
+                // this and nothing has to re-derive the mapping.
+                semantic: aliases[key.resolved.name] || key.resolved.name,
                 display: displayFor(resolved),
                 editLabel: resolved.label,
                 row: key.row,
@@ -136,7 +145,7 @@ function displayFor(resolved) {
         return `L${resolved.layer}`;
     }
     if (resolved.kind === "layer-tap" || resolved.kind === "mod-tap") {
-        return trim(resolved.tap);
+        return resolved.tapLabel || trim(resolved.tap);
     }
     // The SVG renderer scales labels to fit. Truncating here loses shortcut
     // modifiers and makes distinct unknown device IDs look identical.

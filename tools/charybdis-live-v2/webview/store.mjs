@@ -18,7 +18,10 @@ export const state = {
     comboOutput: "",
     comboEditId: null,
     stage: "layers",
+    layersOpen: false,  // the layer-stack panel on the layer row
+    layersAsked: false, // its stack is requested once per opening
     pdSlot: 0,
+    pdKind: null,      // a Movement change not kept yet: {slot, kind}
     pdPreview: false,
     feedbackRow: "hold",
     macroSlot: null,

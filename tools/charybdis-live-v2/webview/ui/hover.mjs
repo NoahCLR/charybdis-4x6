@@ -3,7 +3,7 @@
 
 import {css, isOff, label as hsvLabel} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
-import {behaviourFor, behaviourTiers, bindingsForSlot, combosForKey, keyFace, macroKeycodes, pointingSlotFor} from "../view/keyface.mjs";
+import {actionLabel, behaviourFor, behaviourTiers, bindingsForSlot, combosForKey, keyFace, keyMeaning, macroKeycodes, pointingSlotFor} from "../view/keyface.mjs";
 import {feedbackColours, layerColourRow, pdColourRow, stageEnabled} from "../view/lighting.mjs";
 import {getModel, layerName, positionAt} from "../store.mjs";
 
@@ -62,10 +62,10 @@ function keyCard(index) {
     const position = positionAt(layer, index);
     if (!position) return "";
     const face = keyFace(position);
-    const behaviour = behaviourFor(model, position.keycode);
+    const behaviour = behaviourFor(model, keyMeaning(position));
     const combos = combosForKey(model, position);
-    const macros = macroKeycodes(position.keycode);
-    const slot = pointingSlotFor(model, position.keycode);
+    const macros = macroKeycodes(keyMeaning(position));
+    const slot = pointingSlotFor(model, keyMeaning(position));
     const lit = stageEnabled(model, "key");
     const colours = feedbackColours(model);
     const sections = [];
@@ -82,7 +82,7 @@ function keyCard(index) {
             return `<div class="hc-branch"><span class="hc-n" style="${tint}">${step.tapCount + 1}×</span><div>${rows}</div></div>`;
         }).join("");
         sections.push(`<div class="hc-sect"><div class="hc-h">Key behaviour</div>
-            <div class="hc-sub">${esc(behaviour.keycode)} · ${behaviour.steps.length} branch${behaviour.steps.length === 1 ? "" : "es"} · tap/hold ${timing(behaviour.tapHoldTerm)}${behaviour.keepsAutoMouseAnchored ? " · keeps auto-mouse anchored" : ""}</div>
+            <div class="hc-sub">${esc(actionLabel(model, behaviour.keycode))} · ${behaviour.steps.length} branch${behaviour.steps.length === 1 ? "" : "es"} · tap/hold ${timing(behaviour.tapHoldTerm)}${behaviour.keepsAutoMouseAnchored ? " · keeps auto-mouse anchored" : ""}</div>
             ${branches}
             <div class="hc-sub" style="margin:7px 0 0">${lit
                 ? "The dot beside each tier is the colour the keyboard flashes on this key when that tier resolves."

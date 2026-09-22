@@ -422,6 +422,11 @@ async function portableMessage(panel, session, message) {
                 reorderLayers(draft.before.document, draft.order, draft.order.map(old => names[old]));
                 draft.names = names;
             } else {
+                // The form posts every name with the move, because the rows are
+                // rebuilt from this draft afterwards: dropping them here would
+                // quietly undo whatever was typed before the move.
+                if (Array.isArray(message.names) && message.names.length === draft.names.length
+                    && message.names.every(name => typeof name === "string")) draft.names = [...message.names];
                 const from = draft.order.indexOf(id), to = from + message.direction;
                 if (id === 0 || ![1, -1].includes(message.direction) || to < 1 || to > 7) throw new Error("Base stays at the bottom of the layer order.");
                 [draft.order[from], draft.order[to]] = [draft.order[to], draft.order[from]];

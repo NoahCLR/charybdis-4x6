@@ -38,6 +38,20 @@ export const describeStep = (step) => step.kind === "text" ? step.text
     : step.kind === "delay" ? `${step.delay} ms`
     : step.keys.join(" + ");
 
+// What a slot shows on its cell. Every macro on a real keyboard tends to open
+// with the same modifier press, so the head of the payload makes them all look
+// identical; what tells them apart is the key they actually send.
+export function macroPeek(payload, label = (name) => name) {
+    const {steps} = parseMacro(payload);
+    const text = steps.filter((step) => step.kind === "text").map((step) => step.text).join("").trim();
+    if (text) return text;
+    const taps = steps.filter((step) => step.kind === "tap").flatMap((step) => step.keys);
+    if (taps.length) return taps.map(label).join(" ");
+    const held = steps.filter((step) => step.kind === "press").flatMap((step) => step.keys);
+    if (held.length) return held.map(label).join(" + ");
+    return steps[0] ? describeStep(steps[0]) : "";
+}
+
 // Held keys that are never released leave the keyboard holding them, so the
 // preview says so rather than letting it through quietly.
 export function unreleased(steps) {

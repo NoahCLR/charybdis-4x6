@@ -21,6 +21,10 @@ const POINTER_LAYER = [[0, "Keep the pointer layer active"], [1, "Return to the 
 const BUTTON_KINDS = [[0, "Pass through"], [1, "Consume"], [2, "Tap a shortcut"], [3, "Hold modifiers"]];
 const MODIFIER_POLICY = [[0, "Inherit held modifiers"], [1, "Ignore the selected modifiers"], [2, "Use only this shortcut"]];
 const DIRECTIONS = [["up", "Up"], ["left", "Left"], ["right", "Right"], ["down", "Down"]];
+// Every scroll field the record holds, and the four the Scrolling card shows
+// itself. A field rendered twice registers its reader twice, and the second
+// input silently wins, so Advanced shows only what the card above does not.
+const SCROLL_LEAD = ["divisorH", "divisorV", "intervalMs", "lockMs"];
 const SCROLL_FIELDS = [
     ["thresholdH", "Horizontal activation threshold"], ["thresholdV", "Vertical activation threshold"],
     ["divisorH", "Movement per wheel step ↔"], ["divisorV", "Movement per wheel step ↕"],
@@ -66,7 +70,7 @@ export function screenPointing() {
             <div class="note mono dim">${esc(bindingName(slot))}</div>
             ${!slot.kind && bindingsForSlot(model, slot).keys.length
                 ? `<div class="note">${bindingsForSlot(model, slot).keys.length} key${bindingsForSlot(model, slot).keys.length === 1 ? " still reaches" : "s still reach"} it · inert</div>` : ""}</button>`);
-        card.addEventListener("click", () => { state.pdSlot = slot.id; render(); });
+        card.addEventListener("click", () => { state.pdSlot = slot.id; state.pdKind = null; render(); });
         list.append(card);
     }
     pad.appendChild(list);
@@ -111,7 +115,12 @@ function emptySlot(model, slot, canEdit, slots) {
 }
 
 function editor(model, slot, canEdit, slots) {
-    const scrolling = slot.kind === KIND.SCROLLING;
+    // The kind being edited, which is the stored one until the Movement select
+    // changes it. The form has to be rebuilt on that change: each section
+    // registers the readers for its own fields, so a directional record cannot
+    // be read out of a scrolling form.
+    const kind = state.pdKind?.slot === slot.id ? state.pdKind.kind : slot.kind;
+    const scrolling = kind === KIND.SCROLLING;
     const row = pdColourRow(model, slot.id);
     const wrap = el(`<div class="stack"></div>`);
     const form = {};   // live values, read back when the slot is kept
@@ -162,7 +171,7 @@ function editor(model, slot, canEdit, slots) {
             <h3>${esc(slot.name || `Slot ${slot.id + 1}`)}</h3><span class="tag">slot ${slot.id + 1}</span>
             <span class="right row" style="gap:8px">
                 <button class="btn ghost" data-act="clear" ${canEdit ? "" : "disabled"}
-                    data-tip="Empty this slot. Its bindings must be removed from the layers first.">Clear slot</button>
+                    data-tip="Empty this slot. Keys bound to it stay on the board and do nothing until it is configured again.">Clear slot</button>
                 <button class="btn primary" data-act="keep" ${canEdit ? "" : "disabled"}>Keep mode in draft</button></span></div>
         <div class="card-b grid3"></div></div>`);
     const headBody = head.querySelector(".card-b");
@@ -170,7 +179,8 @@ function editor(model, slot, canEdit, slots) {
         <input class="input" value="${esc(slot.name)}" maxlength="23" ${canEdit ? "" : "disabled"}></label>`);
     form.name = () => name.querySelector("input").value.trim();
     headBody.append(name);
-    headBody.append(select("Movement", [[KIND.DIRECTIONAL, "Directional keys / shortcuts"], [KIND.SCROLLING, "Scrolling"]], slot.kind, "kind"));
+    headBody.append(select("Movement", [[KIND.DIRECTIONAL, "Directional keys / shortcuts"], [KIND.SCROLLING, "Scrolling"]], kind, "kind",
+        {onChange: (event) => { state.pdKind = {slot: slot.id, kind: Number(event.target.value)}; render(); }}));
     headBody.append(field("Pointer speed while active", slot.dpi, "dpi", {tip: "DPI used while this mode runs. 0 uses the normal pointer speed."}));
     wrap.append(head);
 
@@ -249,7 +259,10 @@ function editor(model, slot, canEdit, slots) {
     advancedBody.append(behaviour);
     if (scrolling) {
         const grid = el(`<div class="grid3"></div>`);
-        for (const [key, label] of SCROLL_FIELDS) grid.append(field(label, slot.scroll?.[key], `scroll:${key}`));
+        for (const [key, label] of SCROLL_FIELDS) {
+            if (SCROLL_LEAD.includes(key)) continue;
+            grid.append(field(label, slot.scroll?.[key], `scroll:${key}`));
+        }
         advancedBody.append(grid);
     }
     const buttons = el(`<div class="stack" style="gap:12px"><div class="sect-h"><h4>Mouse button overrides</h4></div></div>`);
@@ -265,11 +278,15 @@ function editor(model, slot, canEdit, slots) {
     advancedBody.append(buttons);
     wrap.append(advanced);
 
-    head.querySelector('[data-act="clear"]').addEventListener("click", () =>
-        post({type: "clearPdMode", slot: slot.id, expectedBase: model.profileIdentity}));
-    head.querySelector('[data-act="keep"]').addEventListener("click", () => post({
-        type: "savePdMode", slot: slot.id, expectedBase: model.profileIdentity, config: readConfig(slot, form),
-    }));
+    head.querySelector('[data-act="clear"]').addEventListener("click", () => {
+        state.pdKind = null;
+        post({type: "clearPdMode", slot: slot.id, expectedBase: model.profileIdentity});
+    });
+    head.querySelector('[data-act="keep"]').addEventListener("click", () => {
+        const config = readConfig(slot, form);
+        state.pdKind = null;
+        post({type: "savePdMode", slot: slot.id, expectedBase: model.profileIdentity, config});
+    });
     return wrap;
 }
 
@@ -303,8 +320,8 @@ function readConfig(slot, form) {
         config.thresholdY = number(form.thresholdY?.(), slot.thresholdY);
         config.directions = Object.fromEntries(DIRECTIONS.map(([direction]) => [direction, {
             keycode: form[`dir:${direction}`] ? form[`dir:${direction}`]() || "0" : String(slot.directions?.[direction]?.keycode ?? 0),
-            modifierPolicy: form[`dirPolicy:${direction}`](),
-            mask: form[`dirMask:${direction}`](),
+            modifierPolicy: form[`dirPolicy:${direction}`] ? form[`dirPolicy:${direction}`]() : slot.directions?.[direction]?.modifierPolicy ?? 0,
+            mask: form[`dirMask:${direction}`] ? form[`dirMask:${direction}`]() : slot.directions?.[direction]?.mask ?? 0,
         }]));
     } else {
         config.heldModifiers = form.heldModifiers ? form.heldModifiers() : slot.heldModifiers;

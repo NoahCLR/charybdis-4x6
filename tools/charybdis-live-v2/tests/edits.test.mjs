@@ -204,3 +204,130 @@ test("a macro payload is posted as the text the keyboard stores", () => {
         expectedFingerprint: draft.current.fingerprint,
     }), /macro command|}/i, "a payload the keyboard cannot parse is refused");
 });
+
+// ── the edits that had no payload test until the wiring audit ──────────────
+//
+// Each of these is the message a control in the interface posts. They are here
+// because an unposted or misshapen payload is invisible in the browser: the
+// edit simply never lands, which is how the combo hold threshold and the first
+// combo on an empty keyboard were both broken.
+
+test("the first combo on a keyboard with none carries a hold threshold the device reported", () => {
+    const draft = session();
+    // ui/keys.mjs comboBuilder(): holdTerm() falls back to the tapping term the
+    // keyboard reports, because there is no stored combo to copy one from.
+    draft.stage({
+        type: "addCombo", draftId: draft.id, draftRevision: draft.revision,
+        inputs: ["KC_D", "KC_F"], output: "KC_ESCAPE", termMs: "50", holdTermMs: "200",
+        mustHold: false, mustTap: false, ordered: false,
+    });
+    const combos = portable.validateSnapshot(draft.document).combos;
+    assert.equal(combos.length, 1);
+    assert.equal(combos[0].holdTermMs, 200);
+    const fresh = session();
+    assert.throws(() => fresh.stage({
+        type: "addCombo", draftId: fresh.id, draftRevision: fresh.revision,
+        inputs: ["KC_J", "KC_K"], output: "KC_TAB", termMs: "50", holdTermMs: undefined,
+        mustHold: false, mustTap: false, ordered: false,
+    }), /Hold threshold/, "an absent threshold is refused, so the interface must send one");
+});
+
+test("the shared hold threshold is its own message, and reaches every combo", () => {
+    const draft = session();
+    for (const [inputs, output] of [[["KC_D", "KC_F"], "KC_ESCAPE"], [["KC_J", "KC_K"], "KC_TAB"]]) {
+        draft.stage({
+            type: "addCombo", draftId: draft.id, draftRevision: draft.revision,
+            inputs, output, termMs: "50", holdTermMs: "200", mustHold: false, mustTap: false, ordered: false,
+        });
+    }
+    // exactly what the Combos tab posts when the threshold field changes
+    draft.stage({type: "updateComboHoldTerm", draftId: draft.id, draftRevision: draft.revision, holdTermMs: "275"});
+    assert.deepEqual(portable.validateSnapshot(draft.document).combos.map((row) => row.holdTermMs), [275, 275],
+        "QMK keeps one threshold for all combos, so the edit lands on every row");
+});
+
+test("a combo is edited and deleted by the id the interface holds", () => {
+    const draft = session();
+    draft.stage({
+        type: "addCombo", draftId: draft.id, draftRevision: draft.revision,
+        inputs: ["KC_D", "KC_F"], output: "KC_ESCAPE", termMs: "50", holdTermMs: "200",
+        mustHold: false, mustTap: false, ordered: false,
+    });
+    draft.stage({
+        type: "saveCombo", draftId: draft.id, draftRevision: draft.revision, id: 0,
+        inputs: ["KC_D", "KC_F"], output: "KC_TAB", termMs: "40", holdTermMs: "200",
+        mustHold: true, mustTap: false, ordered: true,
+    });
+    const saved = portable.validateSnapshot(draft.document).combos[0];
+    assert.equal(saved.termMs, 40);
+    assert.equal(saved.mustHold, true);
+    assert.equal(saved.ordered, true);
+    draft.stage({type: "deleteCombo", draftId: draft.id, draftRevision: draft.revision, id: 0});
+    assert.deepEqual(portable.validateSnapshot(draft.document).combos, []);
+});
+
+test("a behaviour row is added for a key without one, and deleted again", () => {
+    const draft = session();
+    const rows = () => portable.validateSnapshot(draft.document).behaviors.rows.length;
+    const before = rows();
+    // the shape the "+ Behaviour on …" button posts: one tap branch, no timing
+    draft.stage({
+        type: "addBehavior", draftId: draft.id, draftRevision: draft.revision, expectedBase: draft.identity(),
+        behavior: {keycode: "KC_Q", steps: [{tapCount: 0, tap: {helper: "TAP_SENDS", action: "KC_Q"}}]},
+    });
+    assert.equal(rows(), before + 1);
+    draft.stage({type: "deleteBehavior", draftId: draft.id, draftRevision: draft.revision,
+        keycode: "KC_Q", expectedBase: draft.identity()});
+    assert.equal(rows(), before);
+});
+
+test("auto-mouse fade and combo feedback post their colour beside their mode", () => {
+    const draft = session();
+    // ui/lighting.mjs: hsvPayload() spreads h/s/v beside the field being changed
+    draft.stage({
+        type: "updateAutomouseFade", draftId: draft.id, draftRevision: draft.revision,
+        mode: "END_COLOR_WHERE_BASE_EFFECT_WOULD_SHOW", h: 128, s: 255, v: 180,
+    });
+    draft.stage({
+        type: "updateComboFeedback", draftId: draft.id, draftRevision: draft.revision,
+        locality: "RGB_KEYS_ONLY", h: 32, s: 255, v: 200,
+    });
+    const rgb = portable.validateSnapshot(draft.document).rgb;
+    assert.equal(rgb.automouseFade.endColor.h, 128);
+    assert.notEqual(rgb.automouseFade.mode, portable.validateSnapshot(session().document).rgb.automouseFade.mode,
+        "the mode posted beside the colour is the one that lands");
+    assert.equal(rgb.comboFeedback.color.h, 32);
+    assert.notEqual(rgb.comboFeedback.locality, portable.validateSnapshot(session().document).rgb.comboFeedback.locality);
+});
+
+test("an LED group row is added and removed the way the group builder posts it", () => {
+    const draft = session();
+    const layerRows = () => portable.validateSnapshot(draft.document).rgb.layerGroupRows.length;
+    const before = layerRows();
+    draft.stage({
+        type: "addRgbLedGroup", draftId: draft.id, draftRevision: draft.revision,
+        group: {target: "layer", owner: "Layer 3", ledIndices: [12, 13, 14], h: 85, s: 255, v: 200,
+            locality: "RGB_BOTH_HALVES"},
+    });
+    assert.equal(layerRows(), before + 1);
+    draft.stage({type: "deleteRgbLedGroup", draftId: draft.id, draftRevision: draft.revision,
+        target: "layer", index: before});
+    assert.equal(layerRows(), before);
+});
+
+test("a reusable LED group is saved from the selection and deleted by the name shown", () => {
+    const draft = session();
+    const groups = () => portable.validateSnapshot(draft.document).rgb.groups;
+    const before = groups().length;
+    // the builder posts the LED selection; the keyboard names groups by index
+    draft.stage({
+        type: "saveRgbReusableLedGroup", draftId: draft.id, draftRevision: draft.revision,
+        group: {ledIndices: [15, 16, 17]},
+    });
+    assert.equal(groups().length, before + 1);
+    assert.deepEqual(groups().at(-1).leds, [15, 16, 17]);
+    // the interface names a group by its id, which is where it was appended
+    draft.stage({type: "deleteRgbReusableLedGroup", draftId: draft.id, draftRevision: draft.revision,
+        name: `Group ${before}`});
+    assert.equal(groups().length, before);
+});

@@ -27,9 +27,10 @@ const PREVIEW_BASE = [
     "KC_LGUI", "KC_SPC", "KC_ESC", "KC_ENT", "KC_ENT", "KC_DEL", "KC_BSPC", "KC_BSPC",
 ];
 
-// Two pointing-mode buttons: one for a configured slot and one for an empty
-// slot, so the preview shows both the live case and the inert one.
-const PREVIEW_PD_BINDINGS = {50: 0x7e50, 52: 0x7ef0};
+// Keys the keyboard stores as bare user keycodes: a configured pointing mode, an
+// empty slot, and a VIA macro. The preview carries all three because they are
+// the values whose stored name and semantic name differ.
+const PREVIEW_PD_BINDINGS = {50: 0x7e50, 52: 0x7ef0, 48: 0x7700};
 
 function fillPreviewLayer(document) {
     for (const [layoutIndex, code] of Object.entries(PREVIEW_PD_BINDINGS)) {
@@ -80,19 +81,99 @@ function buildModel() {
     model.profileIdentity = session.identity();
     // The host adds this block from the live connection; the preview supplies
     // the shape a complete-profile keyboard reports so the screen can be seen.
+    const names = session.current.summary.names;
     model.portable = {
         available: true, eightLayers: true, legacy: false, pdUpgradeAvailable: false,
-        busy: false, progress: "", review: null, layers: null,
+        busy: false, progress: "", review: null,
+        // The host loads this when Keys → Layers asks for it; the preview has
+        // no host, so it ships the shape that screen renders.
+        layers: {key: snapshot.fingerprint, order: Array.from({length: 8}, (_, id) => id), names: [...names]},
     };
-    const names = session.current.summary.names;
     model.layers.forEach((layer, index) => { layer.displayName = names[index] || layer.name; });
     return model;
 }
 
-const model = buildModel();
+// `--device` renders the interface against the keyboard that is plugged in,
+// read-only, the way the host builds its model. Fixture data cannot show what a
+// real profile does to a surface — every naming inconsistency found so far came
+// from looking at this.
+async function deviceModel() {
+    const {ProfileDeviceService} = require("../core/session/profile-device-service");
+    const service = new ProfileDeviceService({onChange: () => {}});
+    try {
+        await service.enumerate();
+        const devices = service.snapshot().devices;
+        if (!devices.length) throw new Error("no Charybdis Raw HID interface found");
+        await service.connect(devices[0].id);
+        await service.refresh();
+        await service.readLayout();
+        await service.readCommittedProfile();
+        await service.readBaseRgb();
+        await service.readCombos();
+        if ((service.capabilities?.supportedDomainMask & 15) === 15) await service.readPortableProfile();
+
+        const state = service.snapshot();
+        const read = service.portable;
+        const draft = read && !read.incomplete && state.capabilities?.compiledLayerCount === 8
+            ? new ProfileDraftSession(read, state.selectedDeviceId, state.capabilities) : undefined;
+        const device = state.devices.find((entry) => entry.id === state.selectedDeviceId);
+        const model = buildDeviceModel({...(draft ? draft.editingState(state) : state), device});
+        if (draft) {
+            model.draft = {...draft.view(state), busy: false};
+            model.profileIdentity = draft.identity();
+            const names = draft.current.summary.names;
+            model.layers?.forEach((layer, index) => {layer.displayName = names[index] || layer.name;});
+        }
+        model.portable = {
+            available: true, eightLayers: state.capabilities?.compiledLayerCount === 8, legacy: false,
+            pdUpgradeAvailable: Boolean(state.capabilities?.featureFlags & (1 << 13)),
+            busy: false, progress: "", review: null,
+            layers: {key: draft?.current.fingerprint, order: Array.from({length: 8}, (_, id) => id),
+                names: [...(draft?.current.summary.names || [])]},
+        };
+        return model;
+    } finally {
+        await service.close();
+    }
+}
+
+const model = process.argv.includes("--device") ? deviceModel() : buildModel();
+// `--vscode` also writes the page as the panel actually renders it: the host
+// puts its own stylesheet in front of this one (a cascade layer that dresses
+// <code> and pads the body) and hangs its theme class on <body>. Both of those
+// have broken this interface before, and neither is visible in dev/index.html.
+function writeHostPages(page) {
+    const root = "/Applications/Visual Studio Code.app/Contents/Resources/app";
+    const shell = path.join(root, "out/vs/workbench/contrib/webview/browser/pre/index.html");
+    if (!fs.existsSync(shell)) {
+        console.log("skipped --vscode: no VS Code install at " + root);
+        return;
+    }
+    const source = fs.readFileSync(shell, "utf8");
+    const opening = source.indexOf("defaultStyles.textContent = `") + "defaultStyles.textContent = `".length;
+    const hostStyles = source.slice(opening, source.indexOf("`;", opening));
+    const theme = (name) => {
+        const data = JSON.parse(fs.readFileSync(path.join(root, "extensions/theme-defaults/themes", name), "utf8"));
+        const inherited = data.include ? theme(data.include.replace(/^\.\//, "")) : {};
+        return {...inherited, ...(data.colors || {})};
+    };
+    for (const [label, file, klass] of [["dark", "dark_modern.json", "vscode-dark"], ["light", "light_modern.json", "vscode-light"]]) {
+        const colours = theme(file);
+        const declarations = Object.entries(colours).map(([key, value]) => `  --vscode-${key.replace(/\./g, "-")}: ${value};`).join("\n");
+        const injected = `<style>\n${hostStyles}\n</style>\n<style>\n:root {\n`
+            + `  --vscode-font-family: -apple-system, sans-serif;\n  --vscode-font-size: 13px;\n`
+            + `  --monaco-monospace-font: "SF Mono", Menlo, monospace;\n${declarations}\n}\n`
+            + `html, body { background: var(--vscode-editor-background); }\n</style>\n`;
+        fs.writeFileSync(path.join(__dirname, "..", "dev", `vscode-${label}.html`),
+            page.replace("<body>", `<body class="vscode-body ${klass}">`).replace("<link rel=", injected + "<link rel="));
+        console.log(`written dev/vscode-${label}.html`);
+    }
+}
+
+Promise.resolve(model).then((model) => {
 fs.mkdirSync(path.join(__dirname, "..", "dev"), {recursive: true});
 fs.writeFileSync(path.join(__dirname, "..", "dev", "model.json"), JSON.stringify(model));
-fs.writeFileSync(path.join(__dirname, "..", "dev", "index.html"), `<!doctype html>
+const page = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <title>Charybdis Live v2 — preview</title>
 <link rel="stylesheet" href="../webview/styles.css?built=${Date.now()}">
@@ -128,7 +209,9 @@ if (wantedScreen) {
 </head><body><div id="root"></div>
 <script type="module" src="../webview/app.mjs?built=${Date.now()}"></script>
 </body></html>
-`);
+`;
+fs.writeFileSync(path.join(__dirname, "..", "dev", "index.html"), page);
+if (process.argv.includes("--vscode")) writeHostPages(page);
 console.log("layers", model.layers.length,
     "· behaviours", model.keyBehaviors.length,
     "· combos", model.combos.length,
@@ -137,3 +220,4 @@ console.log("layers", model.layers.length,
     "· settings sections", model.configDefaults.length,
     "· rgb layer rows", model.rgb.layerColors?.length);
 console.log("written dev/index.html");
+}).catch((error) => {console.error(String(error.message || error)); process.exit(1);});

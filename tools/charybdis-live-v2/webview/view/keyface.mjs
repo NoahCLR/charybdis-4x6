@@ -27,6 +27,21 @@ export function keyFace(position) {
 
 const shortLayer = (name) => name.replace(/^LAYER_/, "").toLowerCase();
 
+// A position carries two names: the one the keyboard stores (`QK_USER_16`, or
+// bare hex for a value the shipped vocabulary never named) and the one the rest
+// of the profile uses (`DRAGSCROLL`, `VIA_MACRO_0`, `LEFT_THUMB`). Behaviour
+// rows, macro slots and pointing slots are all keyed by the second, so every
+// lookup from a key to what it reaches goes through this.
+export const keyMeaning = (position) => position?.semantic || position?.keycode || "";
+
+// How a keycode name is spoken in prose: the label the keyboard's own
+// vocabulary gives it, so a behaviour row, a reach line and the key cap all
+// call one key the same thing. Names the vocabulary does not cover — a device
+// action outside the advertised ABI — keep their numeric identity.
+export const actionLabel = (model, name) => model?.qmkKeyLabels?.[name]
+    || model?.qmkKeyLabels?.[model?.qmkKeycodeAliases?.[name]]
+    || String(name ?? "");
+
 export const behaviourFor = (model, keycode) =>
     (model?.keyBehaviors || []).find((row) => row.keycode === keycode);
 
@@ -42,11 +57,31 @@ export function behaviourTiers(behaviour) {
     ].filter((tier) => tier.count > 0);
 }
 
+// Whether this key is one of a combo's inputs. The keyboard reports per-layer
+// input references only when its firmware tracks them, so this falls back to
+// the keycodes themselves — and everything that answers "is this combo on this
+// layer" goes through here, or the board's badges and the combo table disagree.
+const comboTouches = (combo, position) => Array.isArray(combo?.inputPositions) && combo.inputPositions.length
+    ? combo.inputPositions.includes(position.layoutIndex)
+    : (combo?.inputs || []).some((input) => input === position.keycode || input === keyMeaning(position));
+
 export function combosForKey(model, position) {
     if (!position) return [];
-    return (model?.combos || []).filter((combo) => Array.isArray(combo.inputPositions)
-        ? combo.inputPositions.includes(position.layoutIndex)
-        : (combo.inputs || []).includes(position.keycode));
+    return (model?.combos || []).filter((combo) => comboTouches(combo, position));
+}
+
+// The keys on a layer that carry this combo's inputs. A combo fires from the
+// keycodes the active layer produces, so all of its inputs have to be there.
+export function comboKeysOnLayer(layer, combo) {
+    if (!layer || !combo) return [];
+    const inputs = combo.inputs || [];
+    const found = new Map();
+    for (const position of layer.positions || []) {
+        if (!comboTouches(combo, position)) continue;
+        const input = inputs.find((name) => name === position.keycode || name === keyMeaning(position)) ?? position.keycode;
+        if (!found.has(input)) found.set(input, position);
+    }
+    return [...found.values()];
 }
 
 export const macroKeycodes = (keycode) =>

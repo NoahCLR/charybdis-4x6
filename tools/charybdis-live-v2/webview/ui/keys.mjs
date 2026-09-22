@@ -4,11 +4,12 @@
 import {css, isOff, label as hsvLabel} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {LED_INDEX} from "../view/geometry.mjs";
-import {behaviourFor, behaviourTiers, combosForKey, keyFace, macroKeycodes, pointingSlotFor} from "../view/keyface.mjs";
+import {actionLabel, behaviourFor, behaviourTiers, comboKeysOnLayer, combosForKey, keyFace, keyMeaning, macroKeycodes, pointingSlotFor} from "../view/keyface.mjs";
 import {feedbackColours, layerColourRow, pdColourRow, stageEnabled} from "../view/lighting.mjs";
 import {currentLayer, getModel, layerName, layers, positionAt, post, render, selectedPosition, state, writable} from "../store.mjs";
 import {board} from "./board.mjs";
 import {layerBar} from "./layerbar.mjs";
+import {attachLayersControl} from "./layers.mjs";
 import {openPicker} from "./picker.mjs";
 import {topbar, unavailable} from "./shell.mjs";
 
@@ -37,9 +38,7 @@ export function screenKeys() {
     const main = el(`<div class="main">${topbar(
         "Keys",
         "The keyboard stays on screen. Pick a key on it, then work in the tab you need — the key itself, its behaviour, the combos it belongs to, and the macros and pointing modes this layer reaches.",
-        `<button class="btn ghost" data-act="lighting" data-tip="Open the lighting stages that paint this board.">Lighting…</button>`,
     )}</div>`);
-    main.querySelector('[data-act="lighting"]').addEventListener("click", () => { state.screen = "lighting"; render(); });
 
     const blocked = unavailable(model);
     if (!layer) {
@@ -49,7 +48,9 @@ export function screenKeys() {
         return main;
     }
 
-    main.appendChild(layerBar());
+    const bar = layerBar();
+    attachLayersControl(bar);
+    main.appendChild(bar);
     const content = el(`<div class="content"><div class="pad keys-pad"></div></div>`);
     const pad = content.firstElementChild;
 
@@ -72,7 +73,7 @@ export function screenKeys() {
                     ? state.comboInputs.filter((value) => value !== index) : [...state.comboInputs, index];
             } else {
                 state.selected = index;
-                const behaviour = behaviourFor(model, positionAt(layer, index)?.keycode);
+                const behaviour = behaviourFor(model, keyMeaning(positionAt(layer, index)));
                 if (state.tab === "behaviours" && behaviour) { state.behaviourRow = behaviour.keycode; state.cell = null; }
             }
             render();
@@ -119,11 +120,12 @@ function pickBar() {
 function bench() {
     const model = getModel();
     const layer = currentLayer();
-    const codes = (layer?.positions || []).map((position) => position.keycode);
+    const codes = (layer?.positions || []).map(keyMeaning);
     const counts = {
         key: String(state.selected),
         behaviours: String(new Set(codes.filter((code) => behaviourFor(model, code))).size),
-        combos: String((model?.combos || []).length),
+        combos: String((model?.combos || []).filter((combo) =>
+            comboKeysOnLayer(layer, combo).length >= (combo.inputs || []).length && (combo.inputs || []).length).length),
         macros: String(new Set(codes.flatMap(macroKeycodes)).size),
         pointing: String(new Set(codes.filter((code) => pointingSlotFor(model, code))).size),
     };
@@ -151,16 +153,16 @@ function tabKey(body, right) {
     const layer = currentLayer();
     const position = selectedPosition();
     const face = keyFace(position);
-    const behaviour = behaviourFor(model, position?.keycode);
+    const behaviour = behaviourFor(model, keyMeaning(position));
     const combos = combosForKey(model, position);
-    const slot = pointingSlotFor(model, position?.keycode);
+    const slot = pointingSlotFor(model, keyMeaning(position));
     right.innerHTML = `<span class="note">index ${position?.layoutIndex ?? "—"} · row ${position?.row ?? "—"} · col ${position?.column ?? "—"} · LED ${LED_INDEX[position?.layoutIndex] ?? "—"}</span>`;
 
     const node = el(`<div class="tab-grid three">
         <section>
             <div class="sect-h"><h4>This position on ${esc(layerName(layer))}</h4></div>
             <div class="field"><span>Keycode</span>
-                <div class="input-row"><input class="input mono" id="keycodeField" value="${esc(position?.keycode || "")}" ${writable() ? "" : "disabled"}>
+                <div class="input-row"><input class="input mono" id="keycodeField" value="${esc(keyMeaning(position))}" ${writable() ? "" : "disabled"}>
                 <button class="btn" data-act="pick" ${writable() ? "" : "disabled"}>Pick…</button></div></div>
             <dl class="kv" style="margin-top:12px">
                 <dt>Resolves to</dt><dd>${esc(face.main || "—")}${face.sub ? ` · ${esc(face.sub)}` : ""}</dd>
@@ -191,7 +193,7 @@ function tabKey(body, right) {
             <div class="stack" style="gap:8px">
                 <button class="reach ${behaviour ? "" : "empty"}" data-goto="behaviours">
                     <span class="rl">Behaviour</span>
-                    <span class="rv">${behaviour ? `${esc(behaviour.keycode)} · ${behaviour.steps.length} branches` : "none on this key"}</span>
+                    <span class="rv">${behaviour ? `${esc(actionLabel(model, behaviour.keycode))} · ${behaviour.steps.length} branch${behaviour.steps.length === 1 ? "" : "es"}` : "none on this key"}</span>
                     <span class="ra">${behaviour ? "Edit" : "Add"}</span></button>
                 <button class="reach ${combos.length ? "" : "empty"}" data-goto="combos">
                     <span class="rl">Combos</span>
@@ -203,6 +205,11 @@ function tabKey(body, right) {
         </section>
     </div>`);
     node.querySelector('[data-act="pick"]')?.addEventListener("click", () => pickKeycodeFor(position.layoutIndex));
+    node.querySelector("#keycodeField")?.addEventListener("change", (event) => {
+        const written = event.target.value.trim();
+        if (!written || written === keyMeaning(position)) return;
+        post({type: "updateLayoutKeys", layer: layer.name, changes: [{layoutIndex: position.layoutIndex, keycode: written}]});
+    });
     node.querySelectorAll("[data-golayer]").forEach((button) => button.addEventListener("click", () => {
         state.layer = Number(button.dataset.golayer);
         render();
@@ -220,16 +227,16 @@ function tabKey(body, right) {
 function tabBehaviours(body, right) {
     const model = getModel();
     const layer = currentLayer();
-    const onLayer = [...new Set((layer?.positions || []).map((position) => position.keycode))]
+    const onLayer = [...new Set((layer?.positions || []).map(keyMeaning))]
         .map((code) => behaviourFor(model, code)).filter(Boolean);
     const elsewhere = (model?.keyBehaviors || []).filter((row) => !onLayer.includes(row));
     if (!state.behaviourRow || !behaviourFor(model, state.behaviourRow)) {
-        state.behaviourRow = behaviourFor(model, selectedPosition()?.keycode)?.keycode || onLayer[0]?.keycode || elsewhere[0]?.keycode || null;
+        state.behaviourRow = behaviourFor(model, keyMeaning(selectedPosition()))?.keycode || onLayer[0]?.keycode || elsewhere[0]?.keycode || null;
     }
     const behaviour = behaviourFor(model, state.behaviourRow);
 
     right.replaceChildren();
-    const selectedCode = selectedPosition()?.keycode || "";
+    const selectedCode = keyMeaning(selectedPosition());
     if (writable() && selectedCode && !behaviourFor(model, selectedCode)) {
         const add = el(`<button class="btn tiny" data-tip="Give the selected key a behaviour: taps, holds, long holds and repeated-tap branches.">+ Behaviour on ${esc(keyFace(selectedPosition()).main || selectedCode)}</button>`);
         add.addEventListener("click", () => post({
@@ -240,7 +247,8 @@ function tabBehaviours(body, right) {
     }
 
     const item = (row, quiet) => `<button class="rowitem ${row.keycode === state.behaviourRow ? "on" : ""} ${quiet ? "quiet" : ""}" data-row="${esc(row.keycode)}">
-        <span class="t">${esc(row.keycode)}</span>
+        <span class="t">${esc(actionLabel(model, row.keycode))}${actionLabel(model, row.keycode) === row.keycode ? ""
+            : ` <code class="dim">${esc(row.keycode)}</code>`}</span>
         <span class="m">${behaviourTiers(row).map((tier) => tierDot(model, tier.kind)).join("")} ${row.steps.length} branch${row.steps.length === 1 ? "" : "es"}${quiet ? " · not on this layer" : ""}</span></button>`;
 
     const node = el(`<div class="tab-split">
@@ -291,7 +299,8 @@ function behaviourEditor(behaviour) {
     const node = el(`<div>
         <div class="beh-head">
             <div>
-                <div class="row" style="gap:9px"><h3 style="font-size:15px">${esc(behaviour.keycode)}</h3></div>
+                <div class="row" style="gap:9px"><h3 style="font-size:15px">${esc(actionLabel(model, behaviour.keycode))}</h3>
+                    ${actionLabel(model, behaviour.keycode) === behaviour.keycode ? "" : `<code class="dim">${esc(behaviour.keycode)}</code>`}</div>
                 <p class="note" style="margin-top:3px">Timing left empty uses the keyboard default, whose duration the firmware does not report.</p>
             </div>
             <div class="right row" style="gap:8px;margin-left:auto">
@@ -418,6 +427,13 @@ function saveBehaviour(root, behaviour, change) {
 const zeroBlank = (value) => Number(value) ? String(value) : "";
 
 /* ── combos ────────────────────────────────────────────────────────────── */
+
+// QMK keeps one hold threshold for every combo, and falls back to the tapping
+// term when nothing is stored — so a keyboard with no combos yet still has an
+// answer, and it is the device's own, not a number this app invented.
+const comboHoldTerm = (model, written) => String(written || model?.combos?.[0]?.holdTermMs
+    || model?.behaviorTimingDefaults?.tappingTerm || "").trim();
+
 function tabCombos(body, right) {
     const model = getModel();
     const combos = model?.combos || [];
@@ -439,20 +455,26 @@ function tabCombos(body, right) {
         <div>
             <div class="row" style="gap:16px;padding:0 0 12px">
                 <label class="field" style="width:180px"><span>Hold threshold · all combos</span>
-                    <input class="input mono" value="${esc(combos[0]?.holdTermMs ?? "")}" ${canEdit ? "" : "disabled"}
-                    data-tip="Shared by every combo, exactly as QMK does it."></label>
+                    <input class="input mono" id="comboHoldTerm" value="${esc(combos[0]?.holdTermMs ?? "")}"
+                    placeholder="${esc(model?.behaviorTimingDefaults?.tappingTerm ?? "")}" ${canEdit ? "" : "disabled"}
+                    data-tip="Shared by every combo, exactly as QMK does it. Empty means the keyboard's tapping term."></label>
                 <span class="note" style="margin:18px 0 0 auto">${combos.length} combo${combos.length === 1 ? "" : "s"} read from the keyboard${readback.enabled === false ? " · combos are disabled on the keyboard" : ""}</span>
             </div>
             ${combos.length ? `<table class="t"><thead><tr><th>Combo</th><th>Inputs</th><th>Sends</th><th>Window</th><th>Requires</th><th>On this layer</th><th></th></tr></thead>
                 <tbody>${combos.map((combo) => {
-                    const here = (combo.inputPositions || []).length > 0;
+                    // Counted the same way the board draws its badges, so the
+                    // two cannot say different things about one combo.
+                    const present = comboKeysOnLayer(layer, combo).length;
+                    const inputs = (combo.inputs || []).length;
+                    const here = present >= inputs && inputs > 0;
                     const requires = [combo.mustHold ? "hold" : "", combo.mustTap ? "tap only" : "", combo.ordered ? "in order" : ""].filter(Boolean).join(" · ") || "—";
                     return `<tr><td class="mono">${esc(combo.badge || "")}</td>
                         <td>${(combo.inputDisplays || combo.inputs || []).map((input) => `<span class="tok">${esc(input)}</span>`).join(" + ")}</td>
                         <td class="mono">${esc(combo.outputDisplay || combo.output)}</td>
                         <td class="mono">${esc(combo.termMs ?? "")} ms</td>
                         <td class="muted">${esc(requires)}</td>
-                        <td class="${here ? "" : "dim"}">${here ? "reachable" : "inputs not on this layer"}</td>
+                        <td class="${here ? "" : "dim"}">${here ? "reachable"
+                            : present ? `${present} of ${inputs} inputs here` : "inputs not on this layer"}</td>
                         <td style="text-align:right"><button class="btn tiny ghost" data-edit="${esc(String(combo.id))}" ${canEdit ? "" : "disabled"}>Edit</button></td></tr>`;
                 }).join("")}</tbody></table>`
                 : `<p class="note">${esc(readback.state === "read" ? "This keyboard has no combos stored." : "Combos have not been read from this keyboard.")}</p>`}
@@ -460,6 +482,13 @@ function tabCombos(body, right) {
         <div id="comboSide"></div>
     </div>`);
 
+    // One threshold for every combo, the way QMK stores it, so it is posted on
+    // its own rather than riding along with whichever row is saved next.
+    node.querySelector("#comboHoldTerm")?.addEventListener("change", (event) => {
+        const written = event.target.value.trim();
+        if (written === String(combos[0]?.holdTermMs ?? "")) return;
+        post({type: "updateComboHoldTerm", holdTermMs: comboHoldTerm(model, written), expectedBase: model.profileIdentity});
+    });
     node.querySelectorAll("[data-edit]").forEach((button) => button.addEventListener("click", () => {
         const combo = combos.find((row) => String(row.id) === button.dataset.edit);
         state.comboEditId = combo?.id ?? null;
@@ -469,12 +498,12 @@ function tabCombos(body, right) {
         render();
     }));
     const side = node.querySelector("#comboSide");
-    side.appendChild(state.comboOpen ? comboBuilder(layer, canEdit) : el(`<div class="empty-card">
+    side.appendChild(state.comboOpen ? comboBuilder(layer, canEdit, () => comboHoldTerm(model, node.querySelector("#comboHoldTerm")?.value)) : el(`<div class="empty-card">
         <p class="note">Pick <b>New combo</b> to build one: choose what it sends, then click its input keys straight on the board.</p></div>`));
     body.replaceChildren(node);
 }
 
-function comboBuilder(layer, canEdit) {
+function comboBuilder(layer, canEdit, holdTerm) {
     const model = getModel();
     const inputs = state.comboInputs.map((index) => positionAt(layer, index)).filter(Boolean);
     const editing = state.comboEditId !== null;
@@ -488,7 +517,7 @@ function comboBuilder(layer, canEdit) {
                 <button class="btn" data-act="pickout" ${canEdit ? "" : "disabled"}>Pick…</button></div></div>
             <div class="field"><span>Inputs</span>
                 <div class="row" style="gap:6px;flex-wrap:wrap">
-                    ${inputs.length ? inputs.map((position) => `<span class="chip"><span class="mono">${esc(keyFace(position).main || position.keycode)}</span>
+                    ${inputs.length ? inputs.map((position) => `<span class="chip"><span class="mono">${esc(keyFace(position).main || keyMeaning(position))}</span>
                         <button data-remove="${position.layoutIndex}" style="color:var(--text-3)">✕</button></span>`).join("")
                         : `<span class="note">no inputs yet</span>`}
                 </div>
@@ -530,7 +559,7 @@ function comboBuilder(layer, canEdit) {
             output: node.querySelector("[data-output]").value.trim(),
             inputs: inputs.map((position) => position.keycode),
             termMs: node.querySelector("[data-term]").value,
-            holdTermMs: model?.combos?.[0]?.holdTermMs,
+            holdTermMs: holdTerm(),
             mustHold: node.querySelector("[data-musthold]").checked,
             mustTap: node.querySelector("[data-musttap]").checked,
             ordered: node.querySelector("[data-ordered]").checked,
@@ -545,7 +574,7 @@ function tabMacros(body, right) {
     const model = getModel();
     const layer = currentLayer();
     const slots = [...(model?.viaMacros || []), ...(model?.hardcodedMacros || [])];
-    const used = [...new Set((layer?.positions || []).flatMap((position) => macroKeycodes(position.keycode)))];
+    const used = [...new Set((layer?.positions || []).flatMap((position) => macroKeycodes(keyMeaning(position))))];
     right.replaceChildren();
     const open = el(`<button class="btn tiny ghost">Open the Macros view</button>`);
     open.addEventListener("click", () => { state.screen = "macros"; render(); });
@@ -554,8 +583,8 @@ function tabMacros(body, right) {
         ? `<table class="t"><thead><tr><th>Slot</th><th>Payload</th><th>Bytes</th><th>Keys on this layer</th></tr></thead><tbody>
             ${used.map((keycode) => {
                 const slot = slots.find((row) => row.keycode === keycode);
-                const keys = (layer.positions || []).filter((position) => position.keycode === keycode);
-                return `<tr><td class="mono">${esc(keycode)}</td>
+                const keys = (layer.positions || []).filter((position) => keyMeaning(position) === keycode);
+                return `<tr><td>${esc(actionLabel(model, keycode))} <code class="dim">${esc(keycode)}</code></td>
                     <td class="mono">${esc(slot?.payload || "—")}</td>
                     <td class="mono">${esc(slot?.bytes ?? "—")}</td>
                     <td class="muted">index ${keys.map((position) => position.layoutIndex).join(", ")}</td></tr>`;
@@ -566,7 +595,7 @@ function tabMacros(body, right) {
 function tabPointing(body, right) {
     const model = getModel();
     const layer = currentLayer();
-    const reached = [...new Set((layer?.positions || []).map((position) => pointingSlotFor(model, position.keycode)).filter(Boolean))];
+    const reached = [...new Set((layer?.positions || []).map((position) => pointingSlotFor(model, keyMeaning(position))).filter(Boolean))];
     right.replaceChildren();
     const open = el(`<button class="btn tiny ghost">Open the Pointing modes view</button>`);
     open.addEventListener("click", () => { state.screen = "pointing"; render(); });
@@ -574,7 +603,7 @@ function tabPointing(body, right) {
     body.replaceChildren(el(`<div style="padding:2px 0">${reached.length
         ? `<div class="pd-reach">${reached.map((slot) => {
             const row = pdColourRow(model, slot.id);
-            const keys = (layer.positions || []).filter((position) => pointingSlotFor(model, position.keycode)?.id === slot.id);
+            const keys = (layer.positions || []).filter((position) => pointingSlotFor(model, keyMeaning(position))?.id === slot.id);
             return `<div class="pd-card">
                 <div class="row" style="gap:9px">
                     ${slot.kind && row && !isOff(row.color) ? `<span class="swatch-lg" style="width:16px;height:16px;border-radius:5px;background:${css(row.color)}"></span>` : `<span class="swatch-lg swatch-off" style="width:16px;height:16px;border-radius:5px"></span>`}
@@ -582,7 +611,7 @@ function tabPointing(body, right) {
                 <div class="note">${slot.kind
                     ? `${slot.kind === 2 ? "Scrolling" : "Directional"}${slot.dpi ? ` · ${slot.dpi} DPI` : " · normal pointer speed"}`
                     : "Empty · the keyboard refuses to activate it, so these keys do nothing yet"}</div>
-                <div class="note">on ${keys.map((position) => esc(keyFace(position).main || position.keycode)).join(", ")}</div>
+                <div class="note">on ${keys.map((position) => esc(keyFace(position).main || keyMeaning(position))).join(", ")}</div>
                 ${slot.kind ? `<div class="note">its colour paints ${esc(row?.locality || "its locality").toLowerCase().replace(/rgb_/, "").replace(/_/g, " ")} while the mode runs — not this key</div>` : ""}
             </div>`;
         }).join("")}</div>`
@@ -597,7 +626,7 @@ function pickKeycodeFor(layoutIndex) {
     openPicker({
         title: `Keycode on ${layerName(layer)}`,
         context: `index ${layoutIndex}`,
-        seed: position?.keycode ? [position.keycode] : [],
+        seed: position ? [keyMeaning(position)] : [],
         onPick: (expression) => {
             state.picker = null;
             post({type: "updateLayoutKeys", layer: layer.name, changes: [{layoutIndex, keycode: expression}]});

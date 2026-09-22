@@ -87,6 +87,12 @@ Every layer may also import from itself.
   accept must not be refused here; where something is merely inert — a key bound
   to an empty pointing slot, for instance — the profile carries the fact and the
   interface explains the consequence.
+- Look a key up by what its value means, never by what the keyboard calls it.
+  A position carries both: `keycode` is the stored name (`QK_USER_16`, or bare
+  hex where the vocabulary names nothing) and `semantic` is the name every other
+  domain uses (`DRAGSCROLL`, `VIA_MACRO_0`, `LEFT_THUMB`). Behaviour rows, macro
+  slots and pointing slots are keyed by the second, so a lookup goes through
+  `keyMeaning(position)`; matching on `position.keycode` silently finds nothing.
 - Colour comes from the model, never from a constant. If a surface shows a hue,
   it asks `view/lighting.mjs` for it, and a stage that is off must look off.
 - Edits are posted, never applied locally. The draft lives in the host, so what
@@ -101,3 +107,37 @@ npm run preview               # then serve the folder and open dev/index.html
 ```
 
 The repo's `sh tests/host/run_tooling_checks.sh` runs this app's checks too.
+
+### Checking it the way the panel renders it
+
+`dev/index.html` is this interface alone. The panel is this interface *inside*
+the host's own stylesheet, which arrives in a cascade layer — so it loses to
+every property this sheet declares, and wins every property it does not. That
+has already cost us twice: `body { padding: 0 20px }` squeezed the whole app,
+and the host's `code { background; color; padding; border-radius }` turned every
+inline keycode into a coloured chip in a black-and-white interface.
+
+`npm run preview -- --vscode` writes `dev/vscode-dark.html` and
+`dev/vscode-light.html`: the same page with the host's real stylesheet and theme
+colours read out of the installed app, under the theme class it puts on `<body>`.
+Look at a new surface there, not only in `dev/index.html`.
+
+### Proving a control is wired
+
+A control that posts nothing looks exactly like one that works, and no unit test
+sees it: the tests stage payloads, they do not press buttons. So when a screen
+gains an editable control, drive it in the preview, which logs every post to
+`window.__posted`:
+
+```js
+// change one control, then press the surface's own save button if it has one
+window.__posted.length = 0;
+el.value = "777"; el.dispatchEvent(new Event("change", {bubbles: true}));
+// the sentinel has to appear in what was posted
+JSON.stringify(window.__posted).includes("777");
+```
+
+Two failures this catches, both of which shipped into v2 unnoticed: a field with
+no listener at all, and a field rendered twice, where the second registration
+silently wins and edits to the visible one are dropped. Then add the payload to
+`tests/edits.test.mjs` so its shape is pinned for good.

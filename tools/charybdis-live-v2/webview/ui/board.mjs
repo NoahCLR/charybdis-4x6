@@ -4,7 +4,7 @@
 
 import {css, idealText, isOff} from "../lib/colour.mjs";
 import {GEO, LED_INDEX, keyVisual} from "../view/geometry.mjs";
-import {behaviourFor, behaviourTiers, combosForKey, keyFace} from "../view/keyface.mjs";
+import {behaviourFor, behaviourTiers, combosForKey, keyFace, keyMeaning} from "../view/keyface.mjs";
 import {keyLight, stageEnabled, tierColour} from "../view/lighting.mjs";
 import {el, esc} from "../lib/dom.mjs";
 
@@ -43,7 +43,7 @@ export function board(model, layer, options = {}) {
 
         let marks = "", lift = 0;
         if (faces && mode !== "leds") {
-            const tiers = behaviourTiers(behaviourFor(model, position.keycode));
+            const tiers = behaviourTiers(behaviourFor(model, keyMeaning(position)));
             const combos = combosForKey(model, position);
             const dotY = visual.y + (combos.length ? 6.6 : 8);
             const step = 9.6, startX = cx - ((tiers.length - 1) * step) / 2;
@@ -80,7 +80,7 @@ export function board(model, layer, options = {}) {
         const fit = main.length > 7 ? ` textLength="${GEO.keyW - 12}" lengthAdjust="spacingAndGlyphs"` : "";
         const labelY = cy + lift + (face.sub ? -5 : 0);
         keys += `<g class="${classes}${selected === index ? " sel" : ""}" data-key="${index}" tabindex="0" role="button"
-            aria-label="${esc(position.keycode)} at index ${index}"${transform}>
+            aria-label="${esc(keyMeaning(position))} at index ${index}"${transform}>
             <rect class="kc-rect" x="${visual.x}" y="${visual.y}" width="${GEO.keyW}" height="${GEO.keyH}" rx="${GEO.radius}"${fill}></rect>
             ${selected === index ? ring("kc-ring") : ""}${inputs.includes(index) ? ring("kc-inring") : ""}
             ${marks}

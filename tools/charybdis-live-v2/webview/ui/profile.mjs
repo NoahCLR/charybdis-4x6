@@ -1,12 +1,14 @@
-// Profile & backups: the whole keyboard as one file, and the layer order that
-// everything else refers to.
+// Profile & backups: the whole keyboard as one file.
+//
+// Layer names and priority are edited beside the board, in Keys → Layers, where
+// what a layer holds is visible while it is named.
 //
 // A complete profile is layers, behaviours, combos, both macro banks, lighting
 // and settings. Restoring one replaces all of that, so the review says what is
 // in the file against what is on the keyboard before anything is written.
 
 import {el, esc} from "../lib/dom.mjs";
-import {getModel, post, render, state} from "../store.mjs";
+import {getModel, post} from "../store.mjs";
 import {topbar} from "./shell.mjs";
 
 export function screenProfile() {
@@ -33,7 +35,6 @@ export function screenProfile() {
             : "Connect a keyboard with complete-profile firmware to manage its backups and layers.")}</div>`));
     }
     if (portable.review) pad.appendChild(reviewCard(model, portable, busy));
-    if (portable.layers) pad.appendChild(layersCard(portable, busy));
 
     if (portable.pdUpgradeAvailable) {
         const card = el(`<div class="card"><div class="card-h"><h3>Firmware upgrade</h3>
@@ -47,9 +48,8 @@ export function screenProfile() {
     }
 
     pad.appendChild(el(`<div class="grid2">
-        <div class="card"><div class="card-h"><h3>Layer priority</h3>
-            <span class="right"><button class="btn tiny ghost" data-act="layers" ${portable.available && portable.eightLayers && !busy ? "" : "disabled"}>Manage layers</button></span></div>
-            <div class="card-b"><p class="note">Higher layers win; base stays underneath. Moving a layer rewrites every key, behaviour and setting that refers to it, so nothing silently points at the wrong layer.</p></div></div>
+        <div class="card"><div class="card-h"><h3>Layer priority</h3></div>
+            <div class="card-b"><p class="note">Layer names and order live in <b>Keys → Layers</b>, where the board shows what each one holds.</p></div></div>
         <div class="card"><div class="card-h"><h3>Recovery</h3>
             <span class="right"><span class="chip"><i class="dot ${health.recoveryPending ? "draft" : "on"}"></i>${health.recoveryPending ? "pending" : "clear"}</span></span></div>
             <div class="card-b"><p class="note">${health.recoveryPending
@@ -60,7 +60,6 @@ export function screenProfile() {
     main.appendChild(content);
     main.querySelector('[data-act="export"]').addEventListener("click", () => post({type: "exportPortableProfile"}));
     main.querySelector('[data-act="import"]').addEventListener("click", () => post({type: "choosePortableProfile"}));
-    main.querySelector('[data-act="layers"]').addEventListener("click", () => post({type: "managePortableLayers"}));
     return main;
 }
 
@@ -89,44 +88,6 @@ function reviewCard(model, portable, busy) {
                 <button class="btn ghost" data-act="cancel" ${busy ? "disabled" : ""}>Cancel</button></div>
         </div></div>`);
     node.querySelector('[data-act="restore"]').addEventListener("click", () => post({type: "restorePortableProfile"}));
-    node.querySelector('[data-act="cancel"]').addEventListener("click", () => post({type: "cancelPortableReview"}));
-    return node;
-}
-
-function layersCard(portable, busy) {
-    // The order arrives newest-first from the device model's point of view;
-    // priority reads top-down, so the highest layer is shown first.
-    const names = [...portable.layers.names];
-    const order = [...portable.layers.order].reverse();
-    const node = el(`<div class="card">
-        <div class="card-h"><h3>Layer priority</h3><span class="right note">higher layers win · base stays underneath</span></div>
-        <div class="list"></div>
-        <div class="card-b" style="display:grid;gap:10px">
-            <p class="note">Moving a layer updates the keys, behaviours and settings that refer to it.</p>
-            <div class="row" style="gap:8px">
-                <button class="btn primary" data-act="save" ${busy ? "disabled" : ""}>Keep layers in draft</button>
-                <button class="btn ghost" data-act="cancel" ${busy ? "disabled" : ""}>Cancel</button></div>
-        </div></div>`);
-    const list = node.querySelector(".list");
-    order.forEach((layerId) => {
-        const position = portable.layers.order.indexOf(layerId);
-        const row = el(`<div class="list-row" style="grid-template-columns:1fr auto auto">
-            <input class="input" value="${esc(names[layerId])}" data-name="${layerId}" ${busy ? "disabled" : ""}
-                aria-label="${layerId ? `Name for layer ${layerId}` : "Base layer name"}">
-            ${layerId
-                ? `<button class="btn tiny ghost" data-move="1" data-id="${layerId}" ${position === 7 || busy ? "disabled" : ""}>Move up</button>
-                   <button class="btn tiny ghost" data-move="-1" data-id="${layerId}" ${position === 1 || busy ? "disabled" : ""}>Move down</button>`
-                : `<span class="tag" style="grid-column:span 2">base · always underneath</span>`}</div>`);
-        list.append(row);
-    });
-    const currentNames = () => {
-        node.querySelectorAll("[data-name]").forEach((input) => { names[Number(input.dataset.name)] = input.value; });
-        return [...names];
-    };
-    node.querySelectorAll("[data-move]").forEach((button) => button.addEventListener("click", () => post({
-        type: "editPortableLayer", id: Number(button.dataset.id), direction: Number(button.dataset.move), names: currentNames(),
-    })));
-    node.querySelector('[data-act="save"]').addEventListener("click", () => post({type: "savePortableLayers", names: currentNames()}));
     node.querySelector('[data-act="cancel"]').addEventListener("click", () => post({type: "cancelPortableReview"}));
     return node;
 }

@@ -43,6 +43,32 @@ test("device shortcut labels stay complete and semantic names require the advert
     assert.equal(buildDeviceModel({...state, capabilities: {}}).layers[0].positions[2].display, "User 16");
 });
 
+test("a position carries what its value means, not only what the keyboard calls it", () => {
+    // A pointing mode, a macro and a behaviour target are all stored as plain
+    // user keycodes, while every other domain names them semantically. The
+    // position publishes both, so a lookup from a key to what it reaches has
+    // something to match on and does not re-derive the mapping.
+    const values = [0x7e50, 0x7700, 0x7e41, 0x0004];
+    const model = buildDeviceModel({
+        layout: layoutWith(values.map((keycode, layoutIndex) => ({keycode, layoutIndex, resolved: resolve(keycode)}))),
+        committed: decodedDeviceProfile(),
+        capabilities: {actionAbiDigest: 0xdcb00959},
+        macroView: {viaMacros: [{keycode: "VIA_MACRO_0", kind: "via"}], hardcodedMacros: [{keycode: "MACRO_1", kind: "user"}]},
+    });
+    assert.deepEqual(model.layers[0].positions.map((key) => [key.keycode, key.semantic]), [
+        ["QK_USER_16", "DRAGSCROLL"], ["QK_MACRO_0", "VIA_MACRO_0"], ["QK_USER_1", "MACRO_1"], ["KC_A", "KC_A"]]);
+});
+
+test("a dual-role key shows its tap the way that keycode is named elsewhere", () => {
+    // `LT(3,KC_SLASH)` used to read SLASH on the cap while a plain slash read /,
+    // so the same key looked like two different keys across layers.
+    const model = buildDeviceModel({
+        layout: layoutWith([0x4338, 0x4109].map((keycode, layoutIndex) => ({keycode, layoutIndex, resolved: resolve(keycode)}))),
+    });
+    assert.deepEqual(model.layers[0].positions.map((key) => [key.keycode, key.display]),
+        [["LT(3,KC_SLASH)", "/"], ["LT(1,KC_F)", "F"]]);
+});
+
 test("the model always carries every field the UI reads", () => {
     const model = buildDeviceModel({});
     for (const field of MODEL_FIELDS) {
@@ -83,7 +109,7 @@ test("device layers become the layer model the UI keys on", () => {
     assert.equal(model.layers[0].name, "Layer 0");
     assert.equal(model.layers[0].index, 0);
     assert.deepEqual(model.layers[0].positions[0], {
-        layoutIndex: 0, keycode: "KC_A", display: "A", editLabel: "A", row: 0, column: 0, value: 0x0004,
+        layoutIndex: 0, keycode: "KC_A", semantic: "KC_A", display: "A", editLabel: "A", row: 0, column: 0, value: 0x0004,
     });
     // Transparent gets a glyph rather than the word, to fit a key cap.
     assert.equal(model.layers[0].positions[1].display, "▽");

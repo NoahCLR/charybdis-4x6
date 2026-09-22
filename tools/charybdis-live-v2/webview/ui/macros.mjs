@@ -5,7 +5,7 @@
 // it again for real when the slot is kept, and says so if it disagrees.
 
 import {el, esc} from "../lib/dom.mjs";
-import {describeStep, parseMacro, unreleased} from "../view/macro.mjs";
+import {describeStep, macroPeek, parseMacro, unreleased} from "../view/macro.mjs";
 import {getModel, post, render, state, writable} from "../store.mjs";
 import {openPicker} from "./picker.mjs";
 import {topbar, unavailable} from "./shell.mjs";
@@ -54,12 +54,12 @@ export function screenMacros() {
     const cells = grid.querySelector(".macro-grid");
     bank.forEach((row, index) => {
         const {steps} = parseMacro(row.payload);
-        const peek = steps.find((step) => step.kind === "text")?.text || (steps[0] ? describeStep(steps[0]) : "");
+        const peek = macroPeek(row.payload, (name) => model?.qmkKeyLabels?.[name] || name);
         const cell = el(`<button class="mslot ${row.empty ? "" : "filled"}" data-slot="${esc(row.keycode)}"
             aria-current="${row.keycode === slot?.keycode}"
-            data-tip="${esc(row.keycode)} · ${row.empty ? "empty slot" : `${row.bytes} bytes · ${steps.length} steps`}">
+            data-tip="${esc(row.keycode)} · ${row.empty ? "empty slot" : `${row.bytes} bytes · ${steps.length} steps · ${esc(row.payload)}`}">
             <span class="n">${state.macroBank === "user" ? "U" : "M"}${index}</span>
-            <span class="v">${row.empty ? "—" : esc(peek.length > 9 ? `${peek.slice(0, 8)}…` : peek)}</span></button>`);
+            <span class="v">${row.empty ? "—" : esc(peek.length > 13 ? `${peek.slice(0, 12)}…` : peek)}</span></button>`);
         cell.addEventListener("click", () => { state.macroSlot = row.keycode; render(); });
         cells.append(cell);
     });

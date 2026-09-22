@@ -16,7 +16,7 @@ export function layerBar(trailing = "") {
             <span class="swatch ${lit ? "" : "swatch-off"}" style="${lit ? `background:${css(row.color)}` : ""}"></span>
             <span>${esc(layerName(layer))}</span><span class="idx">${layer.index}</span></button>`;
     }).join("");
-    const node = el(`<div><div class="layerbar">${chips}${trailing}</div></div>`);
+    const node = el(`<div class="layerbar-wrap"><div class="layerbar">${chips}${trailing}</div></div>`);
     node.querySelectorAll("[data-layer]").forEach((button) => button.addEventListener("click", () => {
         state.layer = Number(button.dataset.layer);
         render();

@@ -9,6 +9,7 @@ import {getModel, post, render as rerender, setModel, setRenderer, state} from "
 import {bindLayerIndex, hideHover, mountHover} from "./ui/hover.mjs";
 import {pickerOverlay} from "./ui/picker.mjs";
 import {screenKeys} from "./ui/keys.mjs";
+import {closeLayers} from "./ui/layers.mjs";
 import {screenLighting} from "./ui/lighting.mjs";
 import {screenSettings} from "./ui/settings.mjs";
 import {screenPointing} from "./ui/pointing.mjs";
@@ -153,6 +154,7 @@ addEventListener("keydown", (event) => {
     if (event.key !== "Escape") return;
     hideHover();
     if (state.picker) { state.picker = null; render(); return; }
+    if (state.layersOpen) { closeLayers(); render(); return; }
     if (state.overlay) { state.overlay = null; render(); }
 });
 

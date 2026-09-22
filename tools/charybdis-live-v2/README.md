@@ -37,7 +37,10 @@ badges on the key face in the feedback colours the keyboard flashes.
 
 Underneath it, one workbench whose tabs are the key, its behaviour, its combos,
 and the macros and pointing modes the layer reaches. A behaviour is tap count ×
-tier, so it is drawn as a grid.
+tier, so it is drawn as a grid. The layer stack is not one of those tabs, because
+it is not a property of the selected key: **Edit layers** sits after the last
+layer on the row above the board and drops open over it, so a layer is renamed
+and reordered where its keys are on screen.
 
 Every colour on screen is a colour the keyboard emits; one amber signal marks
 work that has not reached the keyboard yet. Edits stage into one draft, and the
@@ -49,11 +52,30 @@ floating bar is the only way they leave the window.
 npm install
 npm run check           # syntax across the tree, then all tests
 npm run preview         # build dev/model.json from the test fixtures
+npm run preview -- --device  # …or from the keyboard that is plugged in, read-only
+npm run preview -- --vscode  # also write dev/vscode-{dark,light}.html, as the panel renders
 npm run probe:live-link # read-only enumeration of matching HID interfaces
 npm run keycodes        # regenerate core/data/keycode-catalog.json from a QMK checkout
 ```
 
-Open the panel from the command palette: **Charybdis: Open Charybdis Live v2**.
+## Installing it
+
+The extensions in this repo are installed by symlinking the folder into VS
+Code's extension directory, so the checkout *is* the installed extension and a
+window reload picks up every edit:
+
+```sh
+ln -s "$PWD" ~/.vscode/extensions/noah.charybdis-live-v2-0.1.0   # then reload the window
+```
+
+That gives a **Charybdis Live v2** button in the status bar, beside v1's. The
+panel also opens from the command palette — **Charybdis: Open Charybdis Live
+v2** — and the repo's `.vscode/launch.json` has *Run Charybdis Live v2*, which
+launches an Extension Development Host with a debugger attached instead.
+
+Both apps can be installed at once; they own separate commands and panels. Only
+one may hold the keyboard's Raw HID interface at a time, so close one panel
+before reading from the other.
 
 To work on the interface without a keyboard, run `npm run preview`, serve this
 folder (`python3 -m http.server 8972`) and open `dev/index.html`. The preview
@@ -66,12 +88,12 @@ Every screen is drawn and wired to the host:
 
 | Surface | What it edits |
 | --- | --- |
-| Keys | Layout keys, key behaviours, combos; reachable macros and pointing modes are shown in place |
+| Keys | Layout keys, key behaviours, combos, layer names and priority; reachable macros and pointing modes are shown in place |
 | Pointing modes | All eight slots: movement, speed, direction shortcuts, scroll tuning, buttons, bindings, clear and duplicate |
 | Lighting | Six stages, the stage mask, layer and pointing-mode colours with their localities, combo and key feedback, auto-mouse fade, LED group rows and reusable groups |
 | Macros | Both banks: payload, step builder, parsed preview, recorder |
 | Settings | Every section the keyboard reports, posted whole, read-only where the firmware cannot report |
-| Profile & backups | Export, import with review, layer priority, upgrade export, recovery state |
+| Profile & backups | Export, import with review, upgrade export, recovery state |
 | Device | Read-only: connection, committed generation, what was read |
 
 The one gap against the previous interface is the **keycode picker's catalogue
