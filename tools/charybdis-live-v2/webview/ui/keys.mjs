@@ -50,7 +50,6 @@ export function screenKeys() {
 
     const bar = layerBar();
     attachLayersControl(bar);
-    main.appendChild(bar);
     const content = el(`<div class="content"><div class="pad keys-pad"></div></div>`);
     const pad = content.firstElementChild;
 
@@ -90,7 +89,9 @@ export function screenKeys() {
     }));
     stage.appendChild(legend(model));
     pad.appendChild(stage);
-    pad.appendChild(bench());
+    const workbench = el(`<div class="workbench-stack"></div>`);
+    workbench.append(bar, bench());
+    pad.appendChild(workbench);
     main.appendChild(content);
     return main;
 }

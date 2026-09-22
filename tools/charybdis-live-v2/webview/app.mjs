@@ -5,6 +5,7 @@
 // always what would be applied.
 
 import {el, esc} from "./lib/dom.mjs";
+import {captureContentScroll, restoreContentScroll} from "./lib/scroll.mjs";
 import {getModel, post, render as rerender, setModel, setRenderer, state} from "./store.mjs";
 import {bindLayerIndex, hideHover, mountHover} from "./ui/hover.mjs";
 import {pickerOverlay} from "./ui/picker.mjs";
@@ -18,6 +19,7 @@ import {screenProfile} from "./ui/profile.mjs";
 import {commitBar, notices, rail, topbar, unavailable} from "./ui/shell.mjs";
 
 const root = document.getElementById("root");
+let renderedScreen = null;
 
 const SCREENS = {
     keys: screenKeys,
@@ -102,6 +104,7 @@ function reviewOverlay() {
 }
 
 function render() {
+    const scroll = captureContentScroll(root, renderedScreen, state.screen);
     hideHover();
     const model = getModel();
     root.replaceChildren();
@@ -118,6 +121,8 @@ function render() {
     const bar = commitBar();
     if (bar) screen.appendChild(bar);
     root.appendChild(app);
+    restoreContentScroll(root, scroll);
+    renderedScreen = state.screen;
 
     const picker = pickerOverlay();
     if (picker) root.appendChild(picker);

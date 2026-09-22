@@ -2,7 +2,7 @@
 //
 // It hangs off the layer row rather than the workbench below, because it is not
 // a property of the selected key like the tabs there are — it is the row itself,
-// so the control sits after the last layer and drops open over the board.
+// so the control sits after the last layer and drops open over the workbench.
 //
 // The order is the host's to hold. Moving a layer rewrites every key, behaviour
 // and setting that refers to it, so the edit is staged there and arrives back

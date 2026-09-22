@@ -58,7 +58,6 @@ export function screenLighting() {
         `<button class="btn ghost" data-act="read">Read lighting</button>`,
     )}</div>`);
     main.querySelector('[data-act="read"]').addEventListener("click", () => post({type: "refresh"}));
-    main.appendChild(layerBar(`<span class="note" style="margin-left:10px">the board below shows this layer</span>`));
 
     const content = el(`<div class="content"><div class="pad keys-pad"></div></div>`);
     const pad = content.firstElementChild;
@@ -111,7 +110,10 @@ export function screenLighting() {
     const bit = stageBit(model, state.stage);
     if (bit !== undefined) right.appendChild(stageSwitch(model, state.stage, bit));
     stageBody(bench.querySelector("#benchBody"));
-    pad.appendChild(bench);
+    const bar = layerBar(`<span class="note" style="margin-left:10px">the board above shows this layer</span>`);
+    const workbench = el(`<div class="workbench-stack"></div>`);
+    workbench.append(bar, bench);
+    pad.appendChild(workbench);
 
     main.appendChild(content);
     return main;
