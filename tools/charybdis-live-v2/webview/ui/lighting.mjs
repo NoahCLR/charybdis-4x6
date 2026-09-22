@@ -165,6 +165,7 @@ function paintOrder(model) {
 function stageBody(body) {
     const model = getModel();
     const canEdit = writable();
+    const colourControl = (options) => colourEditor({maximumBrightness: model.rgb.maximumBrightness, ...options});
     const node = el(`<div></div>`);
     const stack = (...nodes) => { const box = el(`<div class="stack" style="gap:12px"></div>`); box.append(...nodes); return box; };
     const section = (title, extra = "") => el(`<section><div class="sect-h"><h4>${esc(title)}</h4>${extra}</div></section>`);
@@ -176,7 +177,7 @@ function stageBody(body) {
         node.className = "tab-grid three";
         const colour = section("Colour");
         colour.append(base.previewColor
-            ? colourEditor({colour: base.previewColor, title: "Base effect", canEdit: false})
+            ? colourControl({colour: base.previewColor, title: "Base effect", canEdit: false})
             : el(`<div class="callout">${esc(base.enabled === false ? "The base effect is switched off." : "This effect animates, so it has no single colour to show.")}</div>`));
         const facts = section("What the keyboard reports");
         facts.append(el(`<dl class="kv" style="grid-template-columns:150px 1fr">
@@ -208,7 +209,7 @@ function stageBody(body) {
         const row = layerColourRow(model, layer?.index);
         const main = el(`<div class="tab-grid two" style="gap:22px"></div>`);
         const colour = section(`${layerName(layer)} colour`);
-        colour.append(colourEditor({
+        colour.append(colourControl({
             colour: row?.color, canEdit, title: `${layerName(layer)} layer`,
             offNote: "No colour is stored for this layer, so the base effect shows through wherever it would paint.",
             onChange: (next) => post({type: "updateLayerColor", layer: row.layer, mode: row.mode, ...next}),
@@ -244,7 +245,7 @@ function stageBody(body) {
         endColour.append(unused
             ? el(`<div class="row" style="gap:10px;opacity:.5"><span class="swatch-lg ${isOff(fade.end_color) ? "swatch-off" : ""}" style="width:34px;height:34px;${isOff(fade.end_color) ? "" : `background:${css(fade.end_color)}`}"></span>
                 <div><div style="font-size:12.5px">Unused in this mode</div><div class="note mono">${esc(hsvLabel(fade.end_color))}</div></div></div>`)
-            : colourEditor({colour: fade.end_color, canEdit, title: "Fade destination",
+            : colourControl({colour: fade.end_color, canEdit, title: "Fade destination",
                 onChange: (next) => post({type: "updateAutomouseFade", mode: fade.mode, ...next})}));
         if (unused) endColour.append(el(`<p class="note" style="margin-top:10px">Follow-the-real-destination lands on whatever the board would show once the auto-mouse layer drops out, so the end colour is not read. It stays disabled rather than pretending to matter.</p>`));
         const note = section("What this stage does");
@@ -267,7 +268,7 @@ function stageBody(body) {
         const row = pdColourRow(model, state.pdSlot);
         const main = el(`<div class="tab-grid two" style="gap:22px"></div>`);
         const colour = section(`${slotName(model, state.pdSlot)} colour`);
-        colour.append(colourEditor({
+        colour.append(colourControl({
             colour: row?.color, canEdit, title: `${slotName(model, state.pdSlot)} while active`,
             offNote: "No colour is stored, so this mode paints nothing while it runs.",
             onChange: (next) => post({type: "updatePdModeColor", pointingMode: PD_MODE_IDS[state.pdSlot], locality: row.locality, ...next}),
@@ -295,7 +296,7 @@ function stageBody(body) {
         const combo = model.rgb.comboFeedback || {};
         node.className = "tab-grid three";
         const colour = section("Colour");
-        colour.append(colourEditor({
+        colour.append(colourControl({
             colour: combo.color, canEdit, title: "Combo feedback",
             offNote: "No colour is stored, so combo keys are not repainted while their inputs are held.",
             onChange: (next) => post({type: "updateComboFeedback", locality: combo.locality, ...next}),
@@ -335,7 +336,7 @@ function stageBody(body) {
         });
         const main = el(`<div class="tab-grid two" style="gap:22px"></div>`);
         const colour = section(current?.label || "Feedback");
-        colour.append(colourEditor({
+        colour.append(colourControl({
             colour: current?.colour, canEdit, title: current?.label || "",
             offNote: "No colour is stored for this semantic, so the keyboard flashes nothing for it.",
             onChange: (next) => post(feedbackMessage(model, current.id, next)),
@@ -431,6 +432,7 @@ function groupBuilder(model, canEdit) {
     </aside>`);
     node.append(colourEditor({
         colour: state.rowColour || {h: "0", s: "0", v: "0"}, canEdit, title: "Row colour",
+        maximumBrightness: model.rgb.maximumBrightness,
         offNote: "A row stored as HSV(0, 0, 0) inherits its stage colour instead of painting its own.",
         onChange: (next) => { state.rowColour = {h: String(next.h), s: String(next.s), v: String(next.v)}; render(); },
     }));

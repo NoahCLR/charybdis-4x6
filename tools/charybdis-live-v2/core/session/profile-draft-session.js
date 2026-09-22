@@ -72,7 +72,9 @@ class ProfileDraftSession {
         else {
             if (!DRAFT_EDITS.has(message.type)) throw fail("Unsupported draft edit.");
             if (message.expectedBase && ["source", "generation", "digest", "originHalf"].some(key => message.expectedBase[key] !== this.identity()[key])) throw fail("This form belongs to an older draft. Reload it before keeping changes.");
-            document = {...current.document, profile: editDeviceProfile(Buffer.from(current.document.profile, "base64"), message, {capabilities: this.capabilities, combos: this.combos()}).toString("base64")};
+            document = {...current.document, profile: editDeviceProfile(Buffer.from(current.document.profile, "base64"), message, {
+                capabilities: this.capabilities, combos: this.combos(), maximumBrightness: current.limits?.brightnessMax,
+            }).toString("base64")};
         }
         this.replace(document, message.draftRevision);
         return {message: copy(message), previousFingerprint: before, fingerprint: this.current.fingerprint};

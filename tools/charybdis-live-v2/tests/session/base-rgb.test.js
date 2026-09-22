@@ -19,7 +19,9 @@ test("base RGB survives independently of the profile, but never survives failure
     assert.equal(state.baseRgb.state, "read");
     assert.equal(state.error.message, "Earlier profile failure");
     assert.deepEqual(buildDeviceModel(state).rgb.baseEffect.previewColor, {h: "0", s: "255", v: "255"});
-    const limited = buildDeviceModel({...state, settingsView: {brightnessMax: 200}}).rgb.baseEffect;
+    const limitedModel = buildDeviceModel({...state, settingsView: {brightnessMax: 200}});
+    const limited = limitedModel.rgb.baseEffect;
+    assert.equal(limitedModel.rgb.maximumBrightness, 200, "the picker receives the same absolute brightness domain");
     assert.equal(limited.brightness, 255, "the VIA read remains verbatim");
     assert.equal(limited.brightnessPercent, 100);
     assert.deepEqual(limited.previewColor, {h: "0", s: "255", v: "200"}, "the preview uses the keyboard's absolute brightness domain");

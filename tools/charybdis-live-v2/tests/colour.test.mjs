@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {css, hsv, idealText, isOff, label, rgb} from "../webview/lib/colour.mjs";
+import {brightnessLimit, clampHsv, css, hsv, idealText, isOff, label, rgb, valuePercent} from "../webview/lib/colour.mjs";
 
 const colour = (h, s, v) => ({h: String(h), s: String(s), v: String(v)});
 
@@ -24,4 +24,13 @@ test("legends flip to black only when the key is genuinely bright", () => {
     assert.match(idealText(colour(43, 255, 255)), /rgba\(0,0,0/, "yellow takes a black legend");
     assert.match(idealText(colour(170, 255, 200)), /rgba\(255,255,255/, "blue takes a white one");
     assert.match(idealText(colour(0, 0, 0)), /rgba\(255,255,255/, "an unlit key stays white");
+});
+
+test("the colour picker uses the keyboard's reported brightness space", () => {
+    assert.equal(brightnessLimit(200), 200);
+    assert.equal(brightnessLimit(undefined), 255, "older models retain the full byte range");
+    assert.deepEqual(clampHsv([300, -2, 239], 200), {h: 255, s: 0, v: 200});
+    assert.equal(valuePercent(100, 200), 50);
+    assert.equal(valuePercent(239, 200), 100);
+    assert.equal(valuePercent(10, 0), 0);
 });

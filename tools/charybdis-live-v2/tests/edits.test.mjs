@@ -18,7 +18,7 @@ const capabilities = {compiledLayerCount: 8, supportedDomainMask: 31, actionAbiD
 
 function session() {
     const doc = pdDocument();
-    const snapshot = {document: doc, fingerprint: portable.fingerprint(doc), summary: portable.summary(doc)};
+    const snapshot = {document: doc, fingerprint: portable.fingerprint(doc), summary: portable.summary(doc), limits: {brightnessMax: 200}};
     return new ProfileDraftSession(snapshot, "test-device", capabilities);
 }
 
@@ -89,6 +89,12 @@ test("a colour changed in Lighting is staged as the keyboard stores it", () => {
     assert.equal(draft.dirty, true);
     const areas = draft.view({selectedDeviceId: "test-device", connected: true}).changes.map((change) => change.area);
     assert.ok(areas.length, "the colour change is reviewable");
+
+    const tooBright = session();
+    assert.throws(() => tooBright.stage({
+        type: "updateLayerColor", draftId: tooBright.id, draftRevision: tooBright.revision,
+        layer: "Layer 3", mode: "KEYS_MAPPED_ON_THIS_LAYER_ONLY", h: 60, s: 255, v: 201,
+    }), /Brightness must be between 0 and 200/);
 });
 
 test("switching a stage off is a mask edit, and the mask survives the round trip", () => {

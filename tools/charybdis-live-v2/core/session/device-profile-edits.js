@@ -24,8 +24,8 @@ function enumValue(value, values, label) {
     if (!Object.hasOwn(values, value)) throw invalid(`Unknown ${label}: ${value}.`);
     return values[value];
 }
-function color(value) {
-    return {h: integer(value.h ?? value.hue, 255, "Hue"), s: integer(value.s ?? value.sat, 255, "Saturation"), v: integer(value.v ?? value.val, 255, "Brightness")};
+function color(value, maximumBrightness = 255) {
+    return {h: integer(value.h ?? value.hue, 255, "Hue"), s: integer(value.s ?? value.sat, 255, "Saturation"), v: integer(value.v ?? value.val, maximumBrightness, "Brightness")};
 }
 function namedId(value, prefix) {
     const match = String(value).match(new RegExp(`^${prefix} (\\d+)$`));
@@ -79,22 +79,25 @@ function editDeviceProfile(bytes, message, context = {}) {
     if (!RGB_EDITS.has(message.type)) throw invalid("Unsupported profile edit.");
     const profile = decodeProfileBlob(bytes);
     const domain = existing(profile.domains, row => row.id === PROFILE_DOMAIN_IDS.RGB, "RGB");
-    const rgb = decodeRgbDomainV1(domain.payload);
+    const maximumBrightness = context.maximumBrightness ?? 255;
+    const rgbOptions = {maximumBrightness};
+    const rgb = decodeRgbDomainV1(domain.payload, rgbOptions);
+    const editColor = (value) => color(value, maximumBrightness);
     switch (message.type) {
         case "updateLayerColor": {
             const row = existing(rgb.layerColors, row => row.layerId === namedId(message.layer, "Layer"), "Layer");
-            row.color = color(message); row.mode = enumValue(message.mode, RGB_LAYER_MODES, "layer policy"); break;
+            row.color = editColor(message); row.mode = enumValue(message.mode, RGB_LAYER_MODES, "layer policy"); break;
         }
         case "updatePdModeColor": {
             const id = enumValue(message.pointingMode, RGB_PD_MODE_IDS, "pointing mode");
             const row = existing(rgb.pdModeColors, row => row.pdModeId === id, "Pointing mode");
-            row.color = color(message); row.locality = enumValue(message.locality, RGB_LOCALITIES, "locality"); break;
+            row.color = editColor(message); row.locality = enumValue(message.locality, RGB_LOCALITIES, "locality"); break;
         }
-        case "updateAutomouseFade": rgb.automouseFade = {mode: enumValue(message.mode, RGB_AUTOMOUSE_MODES, "fade policy"), endColor: color(message)}; break;
-        case "updateComboFeedback": rgb.comboFeedback = {color: color(message), locality: enumValue(message.locality, RGB_LOCALITIES, "locality")}; break;
+        case "updateAutomouseFade": rgb.automouseFade = {mode: enumValue(message.mode, RGB_AUTOMOUSE_MODES, "fade policy"), endColor: editColor(message)}; break;
+        case "updateComboFeedback": rgb.comboFeedback = {color: editColor(message), locality: enumValue(message.locality, RGB_LOCALITIES, "locality")}; break;
         case "updateKeyBehaviorFeedback": {
             const feedback = message.config;
-            rgb.keyFeedback = {tapBranchColors: feedback.tapBranchColors.map(color), tapCommittedColor: color(feedback.tapCommittedColor), holdActiveColor: color(feedback.holdActiveColor), longHoldActiveColor: color(feedback.longHoldActiveColor), tapCommitMode: enumValue(feedback.tapCommitMode, RGB_TAP_COMMIT_MODES, "tap policy"), locality: enumValue(feedback.locality, RGB_LOCALITIES, "locality")}; break;
+            rgb.keyFeedback = {tapBranchColors: feedback.tapBranchColors.map(editColor), tapCommittedColor: editColor(feedback.tapCommittedColor), holdActiveColor: editColor(feedback.holdActiveColor), longHoldActiveColor: editColor(feedback.longHoldActiveColor), tapCommitMode: enumValue(feedback.tapCommitMode, RGB_TAP_COMMIT_MODES, "tap policy"), locality: enumValue(feedback.locality, RGB_LOCALITIES, "locality")}; break;
         }
         case "updateRgbStages": rgb.stageEnableMask = integer(message.stageEnableMask, 31, "RGB stage mask"); break;
         case "saveRgbReusableLedGroup": {
@@ -120,7 +123,7 @@ function editDeviceProfile(bytes, message, context = {}) {
                 groupId = rgb.groups.length;
                 rgb.groups.push({id: groupId, leds: group.ledIndices.map(value => integer(value, 57, "LED index"))});
             }
-            const row = {color: color(group), groupId};
+            const row = {color: editColor(group), groupId};
             if (group.target === "layer") row.selector = group.owner === "RGB_LAYER_GROUP_ALL" ? 255 : namedId(group.owner, "Layer");
             if (group.target === "pdMode") row.selector = group.owner === "RGB_PD_MODE_GROUP_ALL" ? 255 : enumValue(group.owner, RGB_PD_MODE_IDS, "pointing mode");
             if (group.target === "keyBehavior") row.semantic = enumValue(group.owner, RGB_KEY_SEMANTICS, "key feedback type");
@@ -132,7 +135,7 @@ function editDeviceProfile(bytes, message, context = {}) {
             rows.splice(index, 1); break;
         }
     }
-    domain.payload = encodeRgbDomainV1(rgb);
+    domain.payload = encodeRgbDomainV1(rgb, rgbOptions);
     return encodeProfileBlob(profile);
 }
 

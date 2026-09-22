@@ -26,6 +26,22 @@ export const label = (colour) => {
     return `HSV(${h}, ${s}, ${v})`;
 };
 
+export const brightnessLimit = (value) => Number.isInteger(value)
+    ? Math.max(0, Math.min(255, value))
+    : 255;
+
+const clamp = (value, maximum) => Math.max(0, Math.min(maximum, Math.round(Number(value) || 0)));
+
+export function clampHsv(channels, maximumBrightness) {
+    const maximum = brightnessLimit(maximumBrightness);
+    return {h: clamp(channels[0], 255), s: clamp(channels[1], 255), v: clamp(channels[2], maximum)};
+}
+
+export function valuePercent(value, maximumBrightness) {
+    const maximum = brightnessLimit(maximumBrightness);
+    return maximum ? clamp(value, maximum) * 100 / maximum : 0;
+}
+
 // Relative luminance decides black or white legends: the keyboard picks the
 // colour, the label still has to be readable on it.
 export function idealText(colour) {
