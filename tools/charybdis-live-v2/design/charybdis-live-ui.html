@@ -248,8 +248,8 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 }
 :root[data-theme="light"] .board { background: radial-gradient(120% 90% at 50% 0%, rgba(0,0,0,.02), transparent 60%), var(--surface); }
 .board svg { display: block; width: 100%; height: auto; }
-/* auto margins would stop a grid item stretching, so centre it explicitly */
-.keys-pad .board { width: 100%; max-width: 900px; justify-self: center; }
+/* the board spans the pad, the same width as the workbench beneath it */
+.keys-pad .board { width: 100%; }
 .kc-rect { fill: var(--key); stroke: var(--line-2); stroke-width: 1; transition: fill .12s ease, stroke .12s ease; }
 .kc:hover .kc-rect { fill: var(--key-hi); stroke: var(--line-3); }
 .kc-label { fill: var(--text); font-family: var(--sans); font-size: 15px; font-weight: 500; text-anchor: middle; dominant-baseline: middle; letter-spacing: -.02em; }

@@ -45,6 +45,44 @@ export const actionLabel = (model, name) => model?.qmkKeyLabels?.[name]
 export const behaviourFor = (model, keycode) =>
     (model?.keyBehaviors || []).find((row) => row.keycode === keycode);
 
+/**
+ * Behaviours, grouped by how this layer reaches them.
+ *
+ * A key stored on this layer reaches its behaviour directly. A transparent key
+ * lets the layer underneath answer, so a behaviour stored below still fires
+ * while this layer is active — that one is reached *through* the layer, and it
+ * is worth naming which layer answers. Everything else the profile carries is
+ * somewhere this layer never reaches.
+ *
+ * `stack` is the layers in index order and `at` is the position of the current
+ * one in it, because falling through only ever goes down.
+ */
+export function behaviourGroups(model, stack, at) {
+    const layer = stack[at];
+    const here = [...new Set((layer?.positions || []).map(keyMeaning))]
+        .map((code) => behaviourFor(model, code)).filter(Boolean);
+
+    // Walk down the way the firmware does: a transparent key falls through, and
+    // anything else — a real keycode or a disabled one — stops the walk.
+    const through = [];
+    for (const position of layer?.positions || []) {
+        if (keyFace(position).kind !== "transparent") continue;
+        for (let below = at - 1; below >= 0; below -= 1) {
+            const there = (stack[below]?.positions || [])
+                .find((other) => other.layoutIndex === position.layoutIndex);
+            if (!there || keyFace(there).kind === "transparent") continue;
+            const row = behaviourFor(model, keyMeaning(there));
+            if (row && !here.includes(row) && !through.some((entry) => entry.row === row)) {
+                through.push({row, layer: stack[below]});
+            }
+            break;
+        }
+    }
+
+    const reached = new Set([...here, ...through.map((entry) => entry.row)]);
+    return {here, through, elsewhere: (model?.keyBehaviors || []).filter((row) => !reached.has(row))};
+}
+
 // One dot per tier the behaviour uses anywhere, carrying how many branches use
 // it — the same shape the feedback stage flashes.
 export function behaviourTiers(behaviour) {

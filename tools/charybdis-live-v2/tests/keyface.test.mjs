@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {behaviourFor, behaviourGridSteps, behaviourTiers, bindingKeycode, bindingsForSlot, comboKeysOnLayer, combosForKey, keyFace, keyMeaning, macroKeycodes, pointingSlotFor, slotKeycodes} from "../webview/view/keyface.mjs";
+import {behaviourFor, behaviourGridSteps, behaviourGroups, behaviourTiers, bindingKeycode, bindingsForSlot, comboKeysOnLayer, combosForKey, keyFace, keyMeaning, macroKeycodes, pointingSlotFor, slotKeycodes} from "../webview/view/keyface.mjs";
 
 test("a key face uses the model's own resolution, and names the layer a dual-role key reaches", () => {
     assert.deepEqual(keyFace({keycode: "KC_TRANSPARENT", display: "▽"}), {main: "▽", sub: "", kind: "transparent"});
@@ -166,4 +166,31 @@ test("the combo table and the board's badges count the same keys", () => {
     const reported = {badge: "C2", inputs: ["KC_N", "KC_M"], inputPositions: [42]};
     assert.deepEqual(comboKeysOnLayer({positions: [{layoutIndex: 42, keycode: "KC_X"}, {layoutIndex: 43, keycode: "KC_M"}]}, reported)
         .map((key) => key.layoutIndex), [42]);
+});
+
+test("behaviours group by how this layer reaches them", () => {
+    const model = {keyBehaviors: [
+        {keycode: "KC_ESCAPE", steps: []},
+        {keycode: "LEFT_THUMB", steps: []},
+        {keycode: "KC_1", steps: []},
+        {keycode: "KC_9", steps: []},
+    ]};
+    const at = (layoutIndex, keycode) => ({layoutIndex, keycode, display: keycode});
+    const stack = [
+        {index: 0, name: "Base", positions: [at(0, "KC_ESCAPE"), at(1, "KC_1"), at(2, "KC_9"), at(3, "KC_B")]},
+        {index: 1, name: "Numbers", positions: [at(0, "LEFT_THUMB"), at(1, "KC_TRANSPARENT"), at(2, "KC_NO"), at(3, "KC_TRANSPARENT")]},
+    ];
+
+    const groups = behaviourGroups(model, stack, 1);
+    assert.deepEqual(groups.here.map((row) => row.keycode), ["LEFT_THUMB"], "stored on this layer");
+    assert.deepEqual(groups.through.map((entry) => entry.row.keycode), ["KC_1"],
+        "a transparent key lets the layer underneath answer");
+    assert.equal(groups.through[0].layer.name, "Base", "and the group names the layer that answers");
+    assert.deepEqual(groups.elsewhere.map((row) => row.keycode), ["KC_ESCAPE", "KC_9"],
+        "KC_ESCAPE is covered on this layer and KC_NO stops the fall-through to KC_9");
+
+    const base = behaviourGroups(model, stack, 0);
+    assert.deepEqual(base.here.map((row) => row.keycode), ["KC_ESCAPE", "KC_1", "KC_9"]);
+    assert.deepEqual(base.through, [], "nothing lies under the base layer");
+    assert.deepEqual(base.elsewhere.map((row) => row.keycode), ["LEFT_THUMB"]);
 });

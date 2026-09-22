@@ -43,7 +43,9 @@ export function rail() {
 
     const node = el(`<aside class="rail">
         <div class="rail-device">
-            <div class="rail-mark"><span class="mark-glyph">C</span> Charybdis Live</div>
+            <div class="rail-mark"><span class="mark-glyph">C</span> <span class="nm">Charybdis Live</span>
+                <button class="btn tiny ghost" data-act="refresh" aria-label="Read keyboard"
+                    data-tip="Read the connected keyboard again while keeping your draft.">Read</button></div>
             <div class="rail-product">${esc(device.label || "No keyboard connected")}</div>
             <div class="rail-meta">${esc(device.summary || "—")}</div>
             <div class="rail-status">
@@ -64,8 +66,7 @@ export function rail() {
         </div>
         <nav class="rail-nav">${nav}</nav>
         <div class="rail-foot">
-            <button class="btn tiny ghost" data-act="refresh" style="flex:1"
-                data-tip="Read the connected keyboard again while keeping your draft.">Read keyboard</button>
+            <span class="note">Draft history</span>
             <button class="btn tiny ghost icon" data-act="undo" ${draft?.canUndo ? "" : "disabled"}
                 data-tip="Undo the last edit in the draft. The keyboard is not touched until you apply.">↺</button>
             <button class="btn tiny ghost icon" data-act="redo" ${draft?.canRedo ? "" : "disabled"}

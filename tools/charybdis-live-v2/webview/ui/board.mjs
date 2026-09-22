@@ -3,16 +3,16 @@
 // stays readable, and marks what each key reaches.
 
 import {css, idealText, isOff} from "../lib/colour.mjs";
-import {GEO, LED_INDEX, keyVisual} from "../view/geometry.mjs";
+import {GEO, LED_INDEX, TRACKBALL_LED, keyVisual} from "../view/geometry.mjs";
 import {behaviourFor, behaviourTiers, combosForKey, keyFace, keyMeaning} from "../view/keyface.mjs";
-import {keyLight, stageEnabled, tierColour} from "../view/lighting.mjs";
+import {keyLight, stageEnabled, tierColour, trackballLight} from "../view/lighting.mjs";
 import {el, esc} from "../lib/dom.mjs";
 
 const TIER_KINDS = ["tap", "hold", "long"];
 
 export function board(model, layer, options = {}) {
     const {selected, mode = "light", picks = [], inputs = [], pdActive = null,
-        faces = true, onKey, onOpen, onSwap} = options;
+        faces = true, trackball = false, onKey, onOpen, onSwap, onTrackball} = options;
     const positions = layer?.positions || [];
     const feedbackOn = stageEnabled(model, "key");
     const comboColour = model?.rgb?.comboFeedback?.color;
@@ -89,10 +89,13 @@ export function board(model, layer, options = {}) {
         </g>`;
     }
 
-    const ball = `<g><circle cx="${GEO.trackball.x}" cy="${GEO.trackball.y}" r="${GEO.trackball.r}" fill="none" stroke="var(--line-2)" stroke-dasharray="3 4"></circle>
-        <text x="${GEO.trackball.x}" y="${GEO.trackball.y + 40}" class="kc-badge">trackball</text></g>`;
+    // The trackball LED is index 56 and belongs to no key, but it is lit like
+    // every other LED, so it is drawn with the light it emits rather than as an
+    // outline of where the ball sits.
+    const ball = trackballGlyph(model, layer, {mode, pdActive, trackball, clickable: Boolean(onTrackball)});
+    if (ball.glow) glow += ball.glow;
     const node = el(`<div class="board ${options.picking ? "picking" : ""}">
-        <svg viewBox="${GEO.viewBox}" xmlns="http://www.w3.org/2000/svg">${glow}${ball}${keys}</svg></div>`);
+        <svg viewBox="${GEO.viewBox}" xmlns="http://www.w3.org/2000/svg">${glow}${ball.markup}${keys}</svg></div>`);
 
     node.querySelectorAll("[data-key]").forEach((group) => {
         const index = Number(group.dataset.key);
@@ -108,7 +111,30 @@ export function board(model, layer, options = {}) {
             });
         }
     });
+    node.querySelector("[data-trackball]")?.addEventListener("click", () => onTrackball());
     return node;
+}
+
+// The trackball's own LED. In light mode it shows what it emits; in the LED
+// selector it shows its index and whether the pending group has picked it, the
+// same two things every key shows there.
+function trackballGlyph(model, layer, {mode, pdActive, trackball, clickable}) {
+    const {x, y, r} = GEO.trackball;
+    const light = trackballLight(model, layer, {pdActive});
+    const paint = css(light.colour);
+    const picked = mode === "leds"
+        ? `fill:${trackball ? "var(--key-hi)" : "var(--key)"};stroke:var(--text);stroke-width:${trackball ? 2 : 1}`
+        : `fill:${paint};stroke:rgba(255,255,255,.3)`;
+    const text = mode === "leds" ? "" : idealText(light.colour);
+    const markup = `<g class="kc kc-ball${trackball ? " sel" : ""}"${clickable ? ' data-trackball="1" tabindex="0" role="button"' : ""}
+        aria-label="Trackball LED ${TRACKBALL_LED}">
+        <circle cx="${x}" cy="${y}" r="${r}" style="${picked}"></circle>
+        ${mode === "leds" ? `<text class="kc-label sm" x="${x}" y="${y}">${TRACKBALL_LED}</text>` : ""}
+        <text x="${x}" y="${y + r + 14}" class="kc-badge">trackball</text></g>`;
+    return {
+        markup,
+        glow: mode === "leds" ? "" : `<circle class="kc-glow" cx="${x}" cy="${y}" r="${r}" fill="${paint}"></circle>`,
+    };
 }
 
 export const boardTierKinds = TIER_KINDS;

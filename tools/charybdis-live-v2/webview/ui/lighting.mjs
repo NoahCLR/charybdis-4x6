@@ -81,12 +81,14 @@ export function screenLighting() {
         mode: onGroups ? "leds" : "light",
         faces: !onGroups,
         picks: state.ledPicks,
+        trackball: state.trackball,
         pdActive: preview ? {color: preview.color, locality: preview.locality, triggerIndex: undefined} : null,
         onKey: onGroups ? (index) => {
             state.ledPicks = state.ledPicks.includes(index)
                 ? state.ledPicks.filter((value) => value !== index) : [...state.ledPicks, index];
             render();
         } : undefined,
+        onTrackball: onGroups ? () => { state.trackball = !state.trackball; render(); } : undefined,
     }));
     stageWrap.appendChild(paintOrder(model));
     stageWrap.querySelector('[data-act="clearleds"]')?.addEventListener("click", () => { state.ledPicks = []; render(); });

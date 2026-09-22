@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {isOff} from "../webview/lib/colour.mjs";
-import {baseColour, feedbackColours, keyLight, pdColourRow, stageEnabled} from "../webview/view/lighting.mjs";
+import {baseColour, feedbackColours, keyLight, pdColourRow, stageEnabled, trackballLight} from "../webview/view/lighting.mjs";
 
 const colour = (h, s, v) => ({h: String(h), s: String(s), v: String(v)});
 const position = (layoutIndex, keycode) => ({layoutIndex, keycode});
@@ -105,4 +105,23 @@ test("feedback colours come back per semantic, missing ones as black", () => {
     assert.deepEqual(colours.hold, colour(18, 255, 200));
     assert.deepEqual(colours.branches[0], colour(169, 255, 200));
     assert.equal(isOff(feedbackColours({}).tap), true);
+});
+
+test("the trackball LED is lit like any other: base effect, and an all-keys wash", () => {
+    const m = model();
+    const base = trackballLight(m, {index: 3});
+    assert.deepEqual(base.colour, colour(140, 210, 180), "a mapped-keys-only layer never reaches it");
+    assert.equal(base.source, "base");
+
+    const wash = trackballLight(m, {index: 4});
+    assert.deepEqual(wash.colour, colour(0, 0, 158), "an all-keys layer paints every LED, this one too");
+    assert.equal(wash.source, "layer");
+
+    const dark = model({rgb: {...model().rgb, baseEffect: {state: "read", enabled: false}}});
+    assert.equal(isOff(trackballLight(dark, {index: 3}).colour), true);
+
+    const row = pdColourRow(m, 0);
+    const held = trackballLight(m, {index: 3}, {pdActive: {color: row.color, locality: row.locality}});
+    assert.deepEqual(held.colour, row.color, "a right-half overlay covers the trackball LED");
+    assert.equal(held.source, "pointing");
 });

@@ -4,7 +4,7 @@
 import {css, isOff, label as hsvLabel} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {LED_INDEX} from "../view/geometry.mjs";
-import {actionLabel, behaviourFor, behaviourGridSteps, behaviourTiers, comboKeysOnLayer, combosForKey, keyFace, keyMeaning, macroKeycodes, pointingSlotFor} from "../view/keyface.mjs";
+import {actionLabel, behaviourFor, behaviourGridSteps, behaviourGroups, behaviourTiers, comboKeysOnLayer, combosForKey, keyFace, keyMeaning, macroKeycodes, pointingSlotFor} from "../view/keyface.mjs";
 import {feedbackColours, layerColourRow, pdColourRow, stageEnabled} from "../view/lighting.mjs";
 import {currentLayer, getModel, layerName, layers, positionAt, post, render, selectedPosition, state, writable} from "../store.mjs";
 import {board} from "./board.mjs";
@@ -243,11 +243,10 @@ function tabKey(body, right) {
 function tabBehaviours(body, right) {
     const model = getModel();
     const layer = currentLayer();
-    const onLayer = [...new Set((layer?.positions || []).map(keyMeaning))]
-        .map((code) => behaviourFor(model, code)).filter(Boolean);
-    const elsewhere = (model?.keyBehaviors || []).filter((row) => !onLayer.includes(row));
+    const {here, through, elsewhere} = behaviourGroups(model, layers(), state.layer);
     if (!state.behaviourRow || !behaviourFor(model, state.behaviourRow)) {
-        state.behaviourRow = behaviourFor(model, keyMeaning(selectedPosition()))?.keycode || onLayer[0]?.keycode || elsewhere[0]?.keycode || null;
+        state.behaviourRow = behaviourFor(model, keyMeaning(selectedPosition()))?.keycode
+            || here[0]?.keycode || through[0]?.row.keycode || elsewhere[0]?.keycode || null;
     }
     const behaviour = behaviourFor(model, state.behaviourRow);
 
@@ -266,21 +265,55 @@ function tabBehaviours(body, right) {
         right.appendChild(add);
     }
 
-    const item = (row, quiet) => `<button class="rowitem ${row.keycode === state.behaviourRow ? "on" : ""} ${quiet ? "quiet" : ""}" data-row="${esc(row.keycode)}">
+    const item = (row, note) => `<button class="rowitem ${row.keycode === state.behaviourRow ? "on" : ""} ${note ? "quiet" : ""}" data-row="${esc(row.keycode)}">
         <span class="t">${esc(actionLabel(model, row.keycode))}${actionLabel(model, row.keycode) === row.keycode ? ""
             : ` <code class="dim">${esc(row.keycode)}</code>`}</span>
-        <span class="m">${behaviourTiers(row).map((tier) => tierDot(model, tier.kind)).join("")} ${row.steps.length} branch${row.steps.length === 1 ? "" : "es"}${quiet ? " · not on this layer" : ""}</span></button>`;
+        <span class="m">${behaviourTiers(row).map((tier) => tierDot(model, tier.kind)).join("")} ${row.steps.length} branch${row.steps.length === 1 ? "" : "es"}${note ? ` · ${esc(note)}` : ""}</span></button>`;
+
+    // A selection made anywhere else — the board, the Key tab, a fresh
+    // behaviour — can land in a closed group, so the group holding it opens
+    // once when the selection moves there. Closing it again then sticks.
+    const groups = [
+        {id: "here", title: "On this layer", rows: here.map((row) => ({row, note: ""})),
+            empty: "No key behaviour is placed on this layer."},
+        {id: "through", title: "Through this layer",
+            rows: through.map((entry) => ({row: entry.row, note: `on ${layerName(entry.layer)}`}))},
+        {id: "elsewhere", title: "Elsewhere on the board",
+            rows: elsewhere.map((row) => ({row, note: "not on this layer"}))},
+    ];
+    if (state.behaviourRow !== state.behaviourRowShown) {
+        const holding = groups.find((group) => group.rows.some((entry) => entry.row.keycode === state.behaviourRow));
+        if (holding) state.behaviourGroups[holding.id] = true;
+        state.behaviourRowShown = state.behaviourRow;
+    }
+
+    const section = (group) => {
+        const open = state.behaviourGroups[group.id];
+        const body = group.rows.length
+            ? group.rows.map((entry) => item(entry.row, entry.note)).join("")
+            : `<p class="note" style="padding:10px 12px">${esc(group.empty)}</p>`;
+        return `<div class="rowgroup">
+            <button class="rowlist-h toggle" data-group="${group.id}" aria-expanded="${open}">
+                <span class="chev">${open ? "▾" : "▸"}</span>
+                <span class="ttl">${esc(group.title)}</span>
+                <span class="n">${group.rows.length}</span></button>
+            ${open ? body : ""}</div>`;
+    };
 
     const node = el(`<div class="tab-split">
         <aside class="rowlist">
-            <div class="rowlist-h">On this layer</div>
-            ${onLayer.length ? onLayer.map((row) => item(row, false)).join("") : `<p class="note" style="padding:10px 12px">No key behaviour is placed on this layer.</p>`}
-            ${elsewhere.length ? `<div class="rowlist-h" style="border-top:1px solid var(--line);border-bottom:0">Elsewhere</div>${elsewhere.map((row) => item(row, true)).join("")}` : ""}
+            ${groups.filter((group) => group.rows.length || group.empty).map(section).join("")}
         </aside>
         <div class="beh-main"></div>
     </div>`);
+    node.querySelectorAll("[data-group]").forEach((button) => button.addEventListener("click", () => {
+        const id = button.dataset.group;
+        state.behaviourGroups[id] = !state.behaviourGroups[id];
+        render();
+    }));
     node.querySelectorAll("[data-row]").forEach((button) => button.addEventListener("click", () => {
         state.behaviourRow = button.dataset.row;
+        state.behaviourRowShown = button.dataset.row;
         state.cell = null;
         render();
     }));

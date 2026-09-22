@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {GEO, LED_INDEX, inLocality, isRightHalf, keyVisual} from "../webview/view/geometry.mjs";
+import {GEO, LED_INDEX, TRACKBALL_LED, inLocality, isRightHalf, keyVisual, trackballInLocality} from "../webview/view/geometry.mjs";
 
 test("the board splits into halves the way the LED numbering does", () => {
     assert.equal(isRightHalf(0), false, "left home column");
@@ -32,4 +32,14 @@ test("every position lands inside the drawn board", () => {
         assert.ok(x >= vx && x + GEO.keyW <= vx + vw, `key ${index} is inside horizontally`);
         assert.ok(y >= vy && y + GEO.keyH <= vy + vh, `key ${index} is inside vertically`);
     }
+});
+
+test("the trackball LED sits on the right half and is nobody's trigger key", () => {
+    assert.equal(TRACKBALL_LED, 56, "the index the firmware solders the trackball LED at");
+    assert.equal(trackballInLocality("RGB_BOTH_HALVES"), true);
+    assert.equal(trackballInLocality("RGB_RIGHT_HALF"), true);
+    assert.equal(trackballInLocality("RGB_LEFT_HALF"), false);
+    assert.equal(trackballInLocality("RGB_KEY_HALF", 7), true, "a right-half trigger reaches it");
+    assert.equal(trackballInLocality("RGB_KEY_HALF", 0), false, "a left-half trigger does not");
+    assert.equal(trackballInLocality("RGB_KEYS_ONLY", 7), false, "no key maps to the trackball LED");
 });

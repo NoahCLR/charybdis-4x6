@@ -111,6 +111,10 @@ code { color: inherit; background: none; padding: 0; border-radius: 0; }
   display: grid; place-items: center;
   font-family: var(--mono); font-size: 11px; font-weight: 700;
 }
+/* Reading the keyboard again sits with what it says about the keyboard, so a
+   stale panel is corrected where it is noticed. */
+.rail-mark .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rail-mark .btn { margin-left: auto; flex: none; }
 .rail-product { margin-top: 12px; font-size: 12.5px; font-weight: 520; }
 .rail-meta { margin-top: 3px; font-size: 11px; color: var(--text-3); font-family: var(--mono); }
 .rail-status { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
@@ -130,7 +134,8 @@ code { color: inherit; background: none; padding: 0; border-radius: 0; }
 .nav-item:hover { background: var(--surface-2); color: var(--text); }
 .nav-item[aria-current="true"] { background: var(--surface-3); color: var(--text); font-weight: 520; }
 .nav-item svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.4; opacity: .85; }
-.rail-foot { padding: 12px; border-top: 1px solid var(--line); display: flex; gap: 8px; }
+.rail-foot { padding: 12px; border-top: 1px solid var(--line); display: flex; gap: 8px; align-items: center; }
+.rail-foot .note { margin-right: auto; }
 
 /* ── main ────────────────────────────────────────────────────────────── */
 .main { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--bg); }
@@ -267,8 +272,8 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 }
 :root[data-theme="light"] .board { background: radial-gradient(120% 90% at 50% 0%, rgba(0,0,0,.02), transparent 60%), var(--surface); }
 .board svg { display: block; width: 100%; height: auto; }
-/* auto margins would stop a grid item stretching, so centre it explicitly */
-.keys-pad .board { width: 100%; max-width: 900px; justify-self: center; }
+/* the board spans the pad, the same width as the workbench beneath it */
+.keys-pad .board { width: 100%; }
 .kc-rect { fill: var(--key); stroke: var(--line-2); stroke-width: 1; transition: fill .12s ease, stroke .12s ease; }
 .kc:hover .kc-rect { fill: var(--key-hi); stroke: var(--line-3); }
 .kc-label { fill: var(--text); font-family: var(--sans); font-size: 15px; font-weight: 500; text-anchor: middle; dominant-baseline: middle; letter-spacing: -.02em; }
@@ -294,6 +299,9 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 .kc-inring { fill: none; stroke: #fff; stroke-width: 2; stroke-dasharray: 5 3.5; }
 :root[data-theme="light"] .kc-inring { stroke: #0c0c0e; }
 .kc-badge { fill: var(--text-3); font-family: var(--mono); font-size: 9px; text-anchor: middle; }
+.kc-ball circle { transition: fill .12s ease, stroke .12s ease; }
+.kc-ball[data-trackball] { cursor: crosshair; }
+.kc-ball[data-trackball]:hover circle { stroke: var(--text); }
 .kc-dotn { font-family: var(--mono); font-size: 5.6px; font-weight: 700; text-anchor: middle; dominant-baseline: central; }
 .kc-badgetext { fill: #f5f5f3; font-family: var(--mono); font-size: 5.8px; font-weight: 700; text-anchor: middle; dominant-baseline: central; }
 .legend-item .ldot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; border: 1px solid rgba(255,255,255,.5); }
@@ -390,6 +398,13 @@ button.tier:hover { background: var(--surface-3); }
 .rowitem .t { font-size: 12.5px; }
 .rowitem .m { font-size: 10.5px; color: var(--text-3); }
 .rowitem.quiet { opacity: .62; }
+.rowgroup + .rowgroup > .rowlist-h { border-top: 1px solid var(--line); }
+.rowlist-h.toggle { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; }
+.rowlist-h.toggle:hover { background: var(--surface-3); color: var(--text-2); }
+.rowlist-h.toggle[aria-expanded="false"] { border-bottom: 0; }
+.rowlist-h .chev { flex: none; width: 7px; font-size: 8px; color: var(--text-3); }
+.rowlist-h .ttl { flex: 1; min-width: 0; }
+.rowlist-h .n { flex: none; font-family: var(--mono); font-size: 10px; letter-spacing: 0; color: var(--text-3); }
 
 .beh-head { display: flex; align-items: flex-start; gap: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
 .beh-timing { display: grid; grid-template-columns: repeat(3, minmax(0, 150px)) auto; gap: 14px; align-items: end; padding: 13px 0 16px; }

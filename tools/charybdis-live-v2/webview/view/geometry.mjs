@@ -55,3 +55,16 @@ export function keyVisual(layoutIndex) {
         ? {x: GEO.leftX[column], y: GEO.leftTopY[column] + row * GEO.rowStep + GEO.yOffset, angle: 0}
         : {x: GEO.rightX[column - 6], y: GEO.rightTopY[column - 6] + row * GEO.rowStep + GEO.yOffset, angle: 0};
 }
+
+// The trackball LED answers localities on its own terms: it is soldered on the
+// right half, and no key maps to it, so a locality that names the trigger key
+// never reaches it.
+export function trackballInLocality(locality, triggerIndex) {
+    switch (locality) {
+        case "RGB_LEFT_HALF": return false;
+        case "RGB_RIGHT_HALF": return true;
+        case "RGB_KEY_HALF": return triggerIndex === undefined ? true : isRightHalf(triggerIndex);
+        case "RGB_KEYS_ONLY": return false;
+        default: return true;
+    }
+}

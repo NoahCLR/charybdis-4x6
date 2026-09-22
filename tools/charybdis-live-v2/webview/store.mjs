@@ -11,6 +11,10 @@ export const state = {
     selected: 0,
     tab: "key",
     behaviourRow: null,
+    // Which groups of the behaviour list stand open. Only the behaviours this
+    // layer holds itself are worth opening unasked; the rest are context.
+    behaviourGroups: {here: true, through: false, elsewhere: false},
+    behaviourRowShown: null,
     cell: null,
     comboOpen: false,
     comboPicking: false,

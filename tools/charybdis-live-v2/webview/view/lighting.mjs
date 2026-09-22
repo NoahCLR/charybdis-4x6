@@ -5,7 +5,7 @@
 // from the draft, because the draft is what the model carries.
 
 import {hsv, isOff} from "../lib/colour.mjs";
-import {inLocality} from "./geometry.mjs";
+import {inLocality, trackballInLocality} from "./geometry.mjs";
 
 const OFF = {h: "0", s: "0", v: "0"};
 
@@ -87,6 +87,31 @@ export function keyLight(model, layer, position, options = {}) {
     const preview = options.pdActive;
     if (preview && stageEnabled(model, "pd") && !isOff(preview.color)
         && inLocality(position.layoutIndex, preview.locality, preview.triggerIndex)) {
+        colour = preview.color;
+        source = "pointing";
+    }
+    return {colour, source};
+}
+
+/**
+ * The colour the trackball LED would show. It is LED 56, soldered on the right
+ * half and wired to no key, so it takes the base effect and an all-keys layer
+ * wash like any other LED — but a layer that paints only the keys mapped on it
+ * never reaches the trackball, because no key maps there.
+ */
+export function trackballLight(model, layer, options = {}) {
+    const base = stageEnabled(model, "base") ? baseColour(model) : null;
+    let colour = base || OFF, source = base ? "base" : "off";
+
+    const row = layerColourRow(model, layer?.index);
+    if (stageEnabled(model, "layers") && row && !isOff(row.color) && row.mode === "ALL_KEYS") {
+        colour = row.color;
+        source = "layer";
+    }
+
+    const preview = options.pdActive;
+    if (preview && stageEnabled(model, "pd") && !isOff(preview.color)
+        && trackballInLocality(preview.locality, preview.triggerIndex)) {
         colour = preview.color;
         source = "pointing";
     }
