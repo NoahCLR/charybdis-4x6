@@ -17,6 +17,8 @@ export function mountHover(root) {
         const key = event.target.closest?.("[data-key]");
         const hinted = event.target.closest?.("[data-tip]");
         clearTimeout(timer);
+        // A key being dragged to a swap is not a key being read.
+        if (document.querySelector(".kc.dragging")) { hideHover(); return; }
         if (key) {
             const rect = key.getBoundingClientRect();
             timer = setTimeout(() => { card.innerHTML = keyCard(Number(key.dataset.key)); place(card, rect, 14, true); }, 140);

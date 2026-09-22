@@ -287,6 +287,32 @@ test("a behaviour row is added for a key without one, and deleted again", () => 
     assert.equal(rows(), before);
 });
 
+test("a behaviour moves to another key, and overwrites or swaps with one already there", () => {
+    const draft = session();
+    const rows = () => portable.validateSnapshot(draft.document).behaviors.rows.length;
+    const add = (keycode, action) => draft.stage({
+        type: "addBehavior", draftId: draft.id, draftRevision: draft.revision, expectedBase: draft.identity(),
+        behavior: {keycode, steps: [{tapCount: 0, tap: {helper: "TAP_SENDS", action}}]},
+    });
+    // exactly what ui/keys.mjs posts from the behaviour header's key picker
+    const retarget = (keycode, target, conflict) => draft.stage({
+        type: "retargetBehavior", draftId: draft.id, draftRevision: draft.revision, expectedBase: draft.identity(),
+        keycode, target, ...(conflict ? {conflict} : {}),
+    });
+    add("KC_Q", "KC_A");
+    add("KC_W", "KC_B");
+    const before = rows();
+    retarget("KC_Q", "KC_E");
+    assert.equal(rows(), before, "moving to a free key keeps the row count");
+    assert.throws(() => retarget("KC_E", "KC_W"), /overwrite it or swap/);
+    retarget("KC_E", "KC_W", "swap");
+    assert.equal(rows(), before);
+    retarget("KC_W", "KC_E", "overwrite");
+    assert.equal(rows(), before - 1, "overwriting drops the row that was there");
+    draft.undo(draft.revision);
+    assert.equal(rows(), before, "one undo brings the overwritten row back");
+});
+
 test("auto-mouse fade and combo feedback post their colour beside their mode", () => {
     const draft = session();
     // ui/lighting.mjs: hsvPayload() spreads h/s/v beside the field being changed

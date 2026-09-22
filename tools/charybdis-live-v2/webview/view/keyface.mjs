@@ -45,6 +45,18 @@ export const actionLabel = (model, name) => model?.qmkKeyLabels?.[name]
 export const behaviourFor = (model, keycode) =>
     (model?.keyBehaviors || []).find((row) => row.keycode === keycode);
 
+// One spelling per key: the picker says KC_ENT where a behaviour row says
+// KC_ENTER, and an expression may or may not space its arguments. Every name
+// inside it goes through the keyboard's alias table.
+export const canonicalKeycode = (model, expression) => String(expression ?? "").replace(/\s+/g, "")
+    .replace(/[A-Za-z_][A-Za-z0-9_]*/g, (name) => model?.qmkKeycodeAliases?.[name] ?? name);
+
+// The behaviour row a picked expression would land on, however it is spelled.
+export const behaviourListeningTo = (model, expression) => {
+    const wanted = canonicalKeycode(model, expression);
+    return (model?.keyBehaviors || []).find((row) => canonicalKeycode(model, row.keycode) === wanted);
+};
+
 // Every activation this layer can be the top of: layer 0 is always on, this
 // layer is held, and any set of the layers between may be held alongside.
 // Eight layers make at most 64 of them, so the ones that need exact answers

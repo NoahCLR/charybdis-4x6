@@ -177,13 +177,14 @@ async function handleMessage(panel, session, message) {
             case "saveBehavior":
             case "addBehavior":
             case "deleteBehavior":
+            case "retargetBehavior":
                 session.savingBehavior = true;
                 try {
                     await vscode.window.withProgress(
                         {location: vscode.ProgressLocation.Notification, title: "Saving behaviour to both halves"},
                         () => session.service.saveProfileEdit(message)
                     );
-                    session.savedBehavior = message.type === "addBehavior" ? "new" : message.behavior?.keycode || message.keycode;
+                    session.savedBehavior = message.type === "addBehavior" ? "new" : message.type === "retargetBehavior" ? message.target : message.behavior?.keycode || message.keycode;
                     session.notice = "Saved to both halves and verified by reading the profile back.";
                 } finally {session.savingBehavior = false;}
                 publish(panel, session);

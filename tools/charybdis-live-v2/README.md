@@ -37,7 +37,11 @@ badges on the key face in the feedback colours the keyboard flashes.
 
 Underneath it, one workbench whose tabs are the key, its behaviour, its combos,
 and the macros and pointing modes the layer reaches. A behaviour is tap count ×
-tier, so it is drawn as a grid. The layer stack is not one of those tabs, because
+tier, so it is drawn as a grid. **Change key…** moves a behaviour to another
+key through the keycode picker; when that key already has one, you choose to
+overwrite it, swap the two, or cancel, and either is one undoable draft step.
+On the board, ⌘C and ⌘V copy a key onto the selected key, and ⌘Z / ⇧⌘Z step
+the draft everywhere except inside a text field, which keeps its own undo. The layer stack is not one of those tabs, because
 it is not a property of the selected key: **Edit layers** sits after the last
 layer on the row above the board and drops open over it, so a layer is renamed
 and reordered where its keys are on screen.

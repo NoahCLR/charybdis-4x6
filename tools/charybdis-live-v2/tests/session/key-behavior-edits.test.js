@@ -102,3 +102,38 @@ test("invalid edits and references are rejected before upload", () => {
     assert.throws(() => edit({type: "saveBehavior", behavior: form()}, {...capabilities, maxPopulatedBehaviorSteps: original.populatedStepCount}), /step count/);
     assert.throws(() => edit({type: "saveBehavior", behavior: form()}, {...capabilities, maxTapStepsPerBehavior: 4}), /Tap index/);
 });
+
+test("retargeting moves a row to a free key and keeps everything it does", () => {
+    const [first] = views;
+    const moved = edit({type: "retargetBehavior", keycode: first.keycode, target: "KC_A"});
+    const before = rowFor(payload, first.keycode), after = rowFor(moved, "KC_A");
+    assert.equal(rowFor(moved, first.keycode), undefined);
+    assert.deepEqual({...after, target: undefined}, {...before, target: undefined});
+    assert.equal(decodeKeyBehaviorDomain(moved).rowCount, original.rowCount);
+    assert.deepEqual(edit({type: "retargetBehavior", keycode: "KC_A", target: first.keycode}, capabilities, moved), payload);
+});
+
+test("retargeting onto a key with its own row needs a choice: overwrite or swap", () => {
+    const [first, second] = views;
+    const message = {type: "retargetBehavior", keycode: first.keycode, target: second.keycode};
+    assert.throws(() => edit(message), /overwrite it or swap/);
+    assert.throws(() => edit({...message, conflict: "merge"}), /overwrite it or swap/);
+
+    const overwritten = edit({...message, conflict: "overwrite"});
+    assert.equal(decodeKeyBehaviorDomain(overwritten).rowCount, original.rowCount - 1);
+    assert.equal(rowFor(overwritten, first.keycode), undefined);
+    assert.deepEqual(rowFor(overwritten, second.keycode).steps, rowFor(payload, first.keycode).steps);
+
+    const swapped = edit({...message, conflict: "swap"});
+    assert.equal(decodeKeyBehaviorDomain(swapped).rowCount, original.rowCount);
+    assert.deepEqual(rowFor(swapped, second.keycode).steps, rowFor(payload, first.keycode).steps);
+    assert.deepEqual(rowFor(swapped, first.keycode).steps, rowFor(payload, second.keycode).steps);
+    assert.deepEqual(edit({...message, conflict: "swap"}, capabilities, swapped), payload);
+});
+
+test("retargeting refuses a missing row, its own key and raw layer keycodes", () => {
+    const [first] = views;
+    assert.throws(() => edit({type: "retargetBehavior", keycode: "KC_F24", target: "KC_A"}), /no longer present/);
+    assert.throws(() => edit({type: "retargetBehavior", keycode: first.keycode, target: first.keycode}), /already listens/);
+    assert.throws(() => edit({type: "retargetBehavior", keycode: first.keycode, target: "TG(2)"}), /MO\(layer\)/);
+});

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {behaviourFor, behaviourGridSteps, behaviourGroups, behaviourTiers, macroReach, pointingReach, reachablePositions, resolvedPositions, bindingKeycode, bindingsForSlot, comboGroups, combosForKey, keyFace, keyMeaning, macroKeycodes, pointingSlotFor, slotKeycodes} from "../webview/view/keyface.mjs";
+import {behaviourFor, behaviourListeningTo, canonicalKeycode, behaviourGridSteps, behaviourGroups, behaviourTiers, macroReach, pointingReach, reachablePositions, resolvedPositions, bindingKeycode, bindingsForSlot, comboGroups, combosForKey, keyFace, keyMeaning, macroKeycodes, pointingSlotFor, slotKeycodes} from "../webview/view/keyface.mjs";
 
 test("a key face uses the model's own resolution, and names the layer a dual-role key reaches", () => {
     assert.deepEqual(keyFace({keycode: "KC_TRANSPARENT", display: "▽"}), {main: "▽", sub: "", kind: "transparent"});
@@ -398,4 +398,17 @@ test("a branch keeps which of a pointing mode's two keycodes it sends", () => {
     assert.deepEqual(reach.fromBranches[0].behaviours,
         [{keycode: "DRAGSCROLL", action: "DRAGSCROLL_LOCK", layer: null, whileHeld: false}],
         "so the branch keeps the toggle keycode, not just the slot it lands on");
+});
+
+test("a picked key finds the behaviour it would collide with, whatever its spelling", () => {
+    const model = {
+        qmkKeycodeAliases: {KC_ENT: "KC_ENTER", KC_ENTER: "KC_ENTER", KC_SLSH: "KC_SLASH", KC_SLASH: "KC_SLASH"},
+        keyBehaviors: [{keycode: "KC_ENTER"}, {keycode: "LT(3,KC_SLASH)"}, {keycode: "DRAGSCROLL"}],
+    };
+    assert.equal(canonicalKeycode(model, "KC_ENT"), "KC_ENTER");
+    assert.equal(canonicalKeycode(model, "LT(3, KC_SLSH)"), "LT(3,KC_SLASH)");
+    assert.equal(behaviourListeningTo(model, "KC_ENT").keycode, "KC_ENTER");
+    assert.equal(behaviourListeningTo(model, "LT(3, KC_SLSH)").keycode, "LT(3,KC_SLASH)");
+    assert.equal(behaviourListeningTo(model, "DRAGSCROLL").keycode, "DRAGSCROLL");
+    assert.equal(behaviourListeningTo(model, "KC_A"), undefined);
 });

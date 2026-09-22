@@ -4,7 +4,7 @@
 import {css, isOff, label as hsvLabel} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {LED_INDEX} from "../view/geometry.mjs";
-import {actionLabel, behaviourFor, behaviourGridSteps, behaviourGroups, behaviourTiers, comboGroups, combosForKey, keyFace, keyMeaning, macroReach, pointingReach, pointingSlotFor, pointingVariant, reachKeys} from "../view/keyface.mjs";
+import {actionLabel, behaviourFor, behaviourListeningTo, canonicalKeycode, behaviourGridSteps, behaviourGroups, behaviourTiers, comboGroups, combosForKey, keyFace, keyMeaning, macroReach, pointingReach, pointingSlotFor, pointingVariant, reachKeys} from "../view/keyface.mjs";
 import {feedbackColours, layerColourRow, pdColourRow, stageEnabled} from "../view/lighting.mjs";
 import {currentLayer, getModel, layerName, layers, positionAt, post, render, selectedPosition, state, writable} from "../store.mjs";
 import {board} from "./board.mjs";
@@ -117,7 +117,8 @@ function legend(model) {
         <span class="legend-item">${dot(colours.long)} long hold branch</span>
         <span class="legend-item"><i class="lbadge">C1</i> combo input</span>
         <span class="legend-item"><span class="m" style="border-style:dashed"></span> transparent · falls through</span>
-        <span class="legend-item dim">double-click to pick a keycode${writable() ? " · drag one key onto another to swap" : ""}</span>
+        <span class="legend-item dim">double-click to pick a keycode${writable() ? " · drag one key onto another to swap · ⌘C and ⌘V copy between keys" : " · ⌘C copies a key"}</span>
+        ${state.keyClipboard ? `<span class="legend-item">copied <code class="n">${esc(state.keyClipboard.keycode)}</code></span>` : ""}
     </div>`);
 }
 
@@ -434,6 +435,8 @@ function behaviourEditor(behaviour) {
                 <p class="note" style="margin-top:3px">Timing left empty uses the keyboard default, whose duration the firmware does not report.</p>
             </div>
             <div class="right row" style="gap:8px;margin-left:auto">
+                <button class="btn ghost" data-act="rekey" ${canEdit ? "" : "disabled"}
+                    data-tip="Pick the key this behaviour listens to. Everything it does moves with it.">Change key…</button>
                 <button class="btn ghost" data-act="remove" ${canEdit ? "" : "disabled"}
                     data-tip="Remove this behaviour from the draft. Its keys then send their plain keycode.">Remove behaviour</button>
             </div>
@@ -467,6 +470,8 @@ function behaviourEditor(behaviour) {
         const step = steps.find((row) => String(row.tapCount) === tapCount);
         if (step) node.querySelector("#cellEditor").appendChild(cellEditor(behaviour, step, kind));
     }
+    node.querySelector('[data-act="rekey"]')?.addEventListener("click", () => pickBehaviourKey(behaviour));
+    if (state.retarget?.from === behaviour.keycode) node.append(retargetPrompt(behaviour));
     node.querySelector('[data-act="remove"]')?.addEventListener("click", () =>
         post({type: "deleteBehavior", keycode: behaviour.keycode, expectedBase: model.profileIdentity}));
     const commit = () => saveBehaviour(node, behaviour);
@@ -882,6 +887,86 @@ function pickKeycodeFor(layoutIndex) {
             post({type: "updateLayoutKeys", layer: layer.name, changes: [{layoutIndex, keycode: expression}]});
         },
     });
+}
+
+// ⌘C copies the selected key's keycode and ⌘V stores it on the selected key,
+// on any layer. Text fields keep their own copy and paste.
+export function keysShortcut(event) {
+    if (state.screen !== "keys" || state.overlay || state.picker || state.retarget || state.recording || state.comboPicking) return false;
+    if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return false;
+    const key = event.key.toLowerCase();
+    if (key !== "c" && key !== "v") return false;
+    if (event.target.closest?.("input, textarea, select, [contenteditable]")) return false;
+    if (key === "c" && String(getSelection?.() || "")) return false;
+    const layer = currentLayer();
+    const position = positionAt(layer, state.selected);
+    if (!position) return false;
+
+    event.preventDefault();
+    if (key === "c") {
+        state.keyClipboard = {keycode: position.keycode, label: keyFace(position).main};
+        navigator.clipboard?.writeText(position.keycode).catch(() => {});
+        render();
+    } else if (state.keyClipboard && writable() && state.keyClipboard.keycode !== position.keycode) {
+        post({type: "updateLayoutKeys", layer: layer.name, changes: [{layoutIndex: position.layoutIndex, keycode: state.keyClipboard.keycode}]});
+    }
+    return true;
+}
+
+// A behaviour belongs to the key it listens to, so changing that key moves the
+// whole row. A key that already has a row is never replaced silently: the
+// person chooses to overwrite it, swap the two, or leave both alone.
+function pickBehaviourKey(behaviour) {
+    openPicker({
+        title: "Key this behaviour listens to",
+        context: actionLabel(getModel(), behaviour.keycode),
+        seed: [behaviour.keycode],
+        onPick: (expression) => {
+            state.picker = null;
+            const model = getModel();
+            const to = canonicalKeycode(model, expression);
+            if (!to || to === canonicalKeycode(model, behaviour.keycode)) { render(); return; }
+            const existing = behaviourListeningTo(model, expression);
+            if (existing) { state.retarget = {from: behaviour.keycode, to: expression, existing: existing.keycode}; render(); return; }
+            retargetBehaviour(behaviour.keycode, expression);
+        },
+    });
+}
+
+function retargetBehaviour(from, to, conflict) {
+    const model = getModel();
+    state.retarget = null;
+    state.behaviourRow = conflict === "swap" || conflict === "overwrite"
+        ? behaviourListeningTo(model, to).keycode : canonicalKeycode(model, to);
+    state.behaviourRowShown = null;
+    state.cell = null;
+    post({type: "retargetBehavior", keycode: from, target: to, expectedBase: model.profileIdentity, ...(conflict ? {conflict} : {})});
+    render();
+}
+
+function retargetPrompt(behaviour) {
+    const model = getModel();
+    const {to, existing} = state.retarget;
+    const name = (keycode) => `<b>${esc(actionLabel(model, keycode))}</b> <code class="dim">${esc(keycode)}</code>`;
+    const node = el(`<div class="scrim"><div class="sheet" role="alertdialog" aria-label="Key already has a behaviour" style="width:min(520px,100%)">
+        <div class="sheet-h"><h2>${esc(actionLabel(model, existing))} already has a behaviour</h2></div>
+        <div class="sheet-b" style="padding:16px 18px"><p style="font-size:13px;line-height:1.55">
+            You are moving the behaviour on ${name(behaviour.keycode)} to ${name(existing)}, which has its own.</p>
+            <ul class="note" style="margin:10px 0 0 18px;line-height:1.7">
+                <li><b>Overwrite</b> replaces it; ${esc(actionLabel(model, behaviour.keycode))} then sends its plain keycode.</li>
+                <li><b>Swap</b> gives each key the other's behaviour.</li></ul></div>
+        <div class="sheet-f"><span class="note">Both are one step in the draft, so ⌘Z takes them back.</span>
+            <span class="right"><button class="btn" data-act="cancel">Cancel</button>
+                <button class="btn" data-act="swap">Swap</button>
+                <button class="btn primary" data-act="overwrite">Overwrite</button></span></div>
+    </div></div>`);
+    node.addEventListener("click", (event) => {
+        const act = event.target === node ? "cancel" : event.target.closest("[data-act]")?.dataset.act;
+        if (act === "cancel") { state.retarget = null; render(); }
+        if (act === "swap" || act === "overwrite") retargetBehaviour(behaviour.keycode, to, act);
+    });
+    queueMicrotask(() => node.querySelector('[data-act="cancel"]')?.focus());
+    return node;
 }
 
 function swapKeys(from, to) {

@@ -276,6 +276,8 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 }
 :root[data-theme="light"] .board { background: radial-gradient(120% 90% at 50% 0%, rgba(0,0,0,.02), transparent 60%), var(--surface); }
 .board svg { display: block; width: 100%; height: auto; }
+/* The board is a control, not text: nothing on it highlights. */
+.board, .board-legend { -webkit-user-select: none; user-select: none; }
 /* the board spans the pad, the same width as the workbench beneath it */
 .keys-pad .board { width: 100%; }
 .kc-rect { fill: var(--key); stroke: var(--line-2); stroke-width: 1; transition: fill .12s ease, stroke .12s ease; }
@@ -304,6 +306,11 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 .kc-inring { fill: none; stroke: var(--ring); stroke-width: 2; stroke-dasharray: 5 3.5; }
 /* Where the selected row is reached from. It rides outside the key edge so it
    reads apart from the selection ring drawn inside it. */
+.kc.dragging { cursor: grabbing; filter: drop-shadow(0 6px 10px rgba(0,0,0,.55)); }
+.kc.dragging .kc-rect { transition: none; }
+.kc.drop-target .kc-rect { stroke: var(--ring); stroke-width: 2.4; stroke-dasharray: 5 3.5; }
+.board [data-key] { touch-action: none; }
+.sv-field, .hue-ramp { touch-action: none; cursor: crosshair; }
 .kc-reach { fill: none; stroke: var(--ring); stroke-width: 2.2; opacity: .9; }
 .kc-badge { fill: var(--text-3); font-family: var(--mono); font-size: 9px; text-anchor: middle; }
 .kc-ball circle { transition: fill .12s ease, stroke .12s ease; }

@@ -6,7 +6,8 @@ const {decodeKeyBehaviorDomain, encodeKeyBehaviorDomain, KEY_BEHAVIOR_HOLD_MODES
 const {semanticActionForExpression, resolveNativeQmkExpression} = require("../schema/compiled-profile-v1");
 const {actionName, knownActionAbi} = require("./device-profile-view");
 
-const BEHAVIOR_EDITS = new Set(["saveBehavior", "addBehavior", "deleteBehavior"]);
+const BEHAVIOR_EDITS = new Set(["saveBehavior", "addBehavior", "deleteBehavior", "retargetBehavior"]);
+const RETARGET_CONFLICTS = new Set(["overwrite", "swap"]);
 const invalid = message => Object.assign(new Error(message), {code: "INVALID_BEHAVIOR_EDIT"});
 const normalized = value => String(value ?? "").replace(/\s+/g, "");
 
@@ -27,6 +28,10 @@ function editKeyBehaviors(payload, message, capabilities = {}) {
         : knownAbi ? resolveNativeQmkExpression(actionName(action), {}) : undefined;
     const equivalent = (left, right) => (left.kind === right.kind && left.operand === right.operand)
         || (native(left) !== undefined && native(left) === native(right));
+    const encode = (rows) => encodeKeyBehaviorDomain({rows}, {
+        limits: {maxRows: capabilities.maxBehaviorRows, maxPopulatedSteps: capabilities.maxPopulatedBehaviorSteps, maxTapStepsPerBehavior: capabilities.maxTapStepsPerBehavior},
+        actionLimits: {maxPdModes, maxLogicalLayers: capabilities.compiledLayerCount, maxViaMacroSlots: capabilities.viaMacroSlots, maxHardcodedMacroSlots: capabilities.hardcodedMacroSlots},
+    });
     const action = (value, previous) => {
         const name = String(value ?? "").trim();
         if (!name) throw invalid("Choose an action for each enabled behaviour branch.");
@@ -47,6 +52,34 @@ function editKeyBehaviors(payload, message, capabilities = {}) {
         }
         return previous && equivalent(previous, result) ? previous : result;
     };
+    const rowFor = (keycode) => {
+        const named = rows.find(row => normalized(actionName(row.target)) === normalized(keycode));
+        const target = action(keycode, named?.target);
+        return {target, index: rows.findIndex(row => equivalent(row.target, target))};
+    };
+
+    // Move a row to the key it listens to. When that key already has a row the
+    // edit says what happens to it: replaced, or given the old key in a swap.
+    if (message.type === "retargetBehavior") {
+        const from = rowFor(message.keycode);
+        if (from.index < 0) throw invalid("This behaviour row is no longer present. Read from keyboard again.");
+        const to = rowFor(message.target);
+        if (to.index === from.index) throw invalid("This behaviour already listens to that key.");
+        if (to.index >= 0) {
+            if (!RETARGET_CONFLICTS.has(message.conflict)) throw invalid("That key already has a behaviour. Choose to overwrite it or swap the two.");
+            if (message.conflict === "swap") {
+                rows[to.index] = {...rows[to.index], target: rows[from.index].target};
+                rows[from.index] = {...rows[from.index], target: to.target};
+            } else {
+                rows[from.index] = {...rows[from.index], target: to.target};
+                rows.splice(to.index, 1);
+            }
+        } else {
+            rows[from.index] = {...rows[from.index], target: to.target};
+        }
+        return encode(rows);
+    }
+
     const form = message.type === "deleteBehavior" ? {keycode: message.keycode} : message.behavior;
     if (!form || typeof form !== "object") throw invalid("Choose a behaviour row to save.");
     const named = rows.find(row => normalized(actionName(row.target)) === normalized(form.keycode));
@@ -105,10 +138,7 @@ function editKeyBehaviors(payload, message, capabilities = {}) {
         if (previous) rows[index] = row;
         else rows.push(row);
     }
-    return encodeKeyBehaviorDomain({rows}, {
-        limits: {maxRows: capabilities.maxBehaviorRows, maxPopulatedSteps: capabilities.maxPopulatedBehaviorSteps, maxTapStepsPerBehavior: capabilities.maxTapStepsPerBehavior},
-        actionLimits: {maxPdModes, maxLogicalLayers: capabilities.compiledLayerCount, maxViaMacroSlots: capabilities.viaMacroSlots, maxHardcodedMacroSlots: capabilities.hardcodedMacroSlots},
-    });
+    return encode(rows);
 }
 
 module.exports = {BEHAVIOR_EDITS, editKeyBehaviors};

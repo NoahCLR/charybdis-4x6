@@ -9,7 +9,7 @@ import {captureContentScroll, restoreContentScroll} from "./lib/scroll.mjs";
 import {getModel, post, render as rerender, setModel, setRenderer, state} from "./store.mjs";
 import {bindLayerIndex, hideHover, mountHover} from "./ui/hover.mjs";
 import {pickerOverlay} from "./ui/picker.mjs";
-import {screenKeys} from "./ui/keys.mjs";
+import {keysShortcut, screenKeys} from "./ui/keys.mjs";
 import {closeLayers} from "./ui/layers.mjs";
 import {screenLighting} from "./ui/lighting.mjs";
 import {screenSettings} from "./ui/settings.mjs";
@@ -155,10 +155,33 @@ addEventListener("message", (event) => {
     render();
 });
 
+// A field that holds text keeps its own undo: ⌘Z there edits the text, not
+// the draft. Everywhere else it steps the draft, as the ↺ ↻ buttons do.
+const TEXT_INPUTS = new Set(["text", "search", "number", "email", "url", "tel", "password"]);
+const editsText = (target) => Boolean(target?.closest?.("textarea, [contenteditable]:not([contenteditable=\"false\"])"))
+    || (target?.tagName === "INPUT" && TEXT_INPUTS.has(target.type));
+
+function historyShortcut(event) {
+    if (!(event.metaKey || event.ctrlKey) || event.altKey) return false;
+    const key = event.key.toLowerCase();
+    const undo = key === "z" && !event.shiftKey;
+    const redo = (key === "z" && event.shiftKey) || (key === "y" && !event.shiftKey);
+    if (!undo && !redo) return false;
+    if (editsText(event.target) || state.recording || state.retarget) return false;
+    event.preventDefault();
+    const draft = getModel()?.draft;
+    if (!draft || draft.busy) return true;
+    if (undo && draft.canUndo) post({type: "undoProfileDraft"});
+    if (redo && draft.canRedo) post({type: "redoProfileDraft"});
+    return true;
+}
+
 addEventListener("keydown", (event) => {
+    if (historyShortcut(event) || keysShortcut(event)) return;
     if (event.key !== "Escape") return;
     hideHover();
     if (state.picker) { state.picker = null; render(); return; }
+    if (state.retarget) { state.retarget = null; render(); return; }
     if (state.layersOpen) { closeLayers(); render(); return; }
     if (state.overlay) { state.overlay = null; render(); }
 });

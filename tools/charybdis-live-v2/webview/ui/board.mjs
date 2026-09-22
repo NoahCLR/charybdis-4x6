@@ -7,6 +7,7 @@ import {GEO, LED_INDEX, TRACKBALL_LED, fitText, keyFaceRows, keyVisual} from "..
 import {behaviourFor, behaviourTiers, combosForKey, keyFace, keyMeaning} from "../view/keyface.mjs";
 import {keyLight, stageEnabled, tierColour, trackballLight} from "../view/lighting.mjs";
 import {el, esc} from "../lib/dom.mjs";
+import {hideHover} from "./hover.mjs";
 
 const TIER_KINDS = ["tap", "hold", "long"];
 
@@ -118,20 +119,73 @@ export function board(model, layer, options = {}) {
 
     node.querySelectorAll("[data-key]").forEach((group) => {
         const index = Number(group.dataset.key);
-        if (onKey) group.addEventListener("click", () => onKey(index));
+        if (onKey) group.addEventListener("click", () => { if (!node.justDragged) onKey(index); });
         if (onOpen) group.addEventListener("dblclick", () => onOpen(index));
-        if (onSwap) {
-            group.addEventListener("pointerdown", (event) => { node.dragFrom = index; group.setPointerCapture?.(event.pointerId); });
-            group.addEventListener("pointerup", (event) => {
-                const target = document.elementFromPoint(event.clientX, event.clientY)?.closest("[data-key]");
-                const to = target ? Number(target.dataset.key) : index;
-                if (node.dragFrom !== undefined && node.dragFrom !== to) onSwap(node.dragFrom, to);
-                node.dragFrom = undefined;
-            });
-        }
+        if (onSwap) dragToSwap(node, group, index, onSwap);
     });
     node.querySelector("[data-trackball]")?.addEventListener("click", () => onTrackball());
     return node;
+}
+
+// Drag one key onto another to swap what they store. The key follows the
+// pointer and the key under it is marked, so the swap is visible before it
+// lands; a press that never moves stays a click.
+const DRAG_THRESHOLD = 4;
+
+function dragToSwap(node, group, index, onSwap) {
+    const svg = node.querySelector("svg");
+    const resting = group.getAttribute("transform") || "";
+    let drag = null;
+
+    const targetAt = (event) => document.elementsFromPoint(event.clientX, event.clientY)
+        .map((hit) => hit.closest?.("[data-key]"))
+        .find((hit) => hit && hit !== group) || null;
+    const mark = (target) => {
+        if (drag.target === target) return;
+        drag.target?.classList.remove("drop-target");
+        target?.classList.add("drop-target");
+        drag.target = target;
+    };
+    const reset = () => {
+        group.classList.remove("dragging");
+        if (resting) group.setAttribute("transform", resting); else group.removeAttribute("transform");
+        drag?.target?.classList.remove("drop-target");
+        drag = null;
+    };
+
+    group.addEventListener("pointerdown", (event) => {
+        if (event.button !== 0) return;
+        drag = {x: event.clientX, y: event.clientY, moved: false, target: null};
+        group.setPointerCapture?.(event.pointerId);
+    });
+    group.addEventListener("pointermove", (event) => {
+        if (!drag) return;
+        const dx = event.clientX - drag.x, dy = event.clientY - drag.y;
+        if (!drag.moved) {
+            if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+            drag.moved = true;
+            group.classList.add("dragging");
+            hideHover();
+            // Raise it above its neighbours; moving the node drops capture, so re-arm it.
+            svg.appendChild(group);
+            group.setPointerCapture?.(event.pointerId);
+        }
+        const scale = svg.viewBox.baseVal.width / svg.getBoundingClientRect().width;
+        group.setAttribute("transform", `translate(${dx * scale} ${dy * scale}) ${resting}`.trim());
+        mark(targetAt(event));
+    });
+    group.addEventListener("pointerup", (event) => {
+        if (!drag) return;
+        const moved = drag.moved || Math.hypot(event.clientX - drag.x, event.clientY - drag.y) >= DRAG_THRESHOLD;
+        const target = moved ? targetAt(event) : null;
+        reset();
+        if (!moved) return;
+        // The click that follows this release belongs to the drag, not a selection.
+        node.justDragged = true;
+        setTimeout(() => { node.justDragged = false; });
+        if (target) onSwap(index, Number(target.dataset.key));
+    });
+    group.addEventListener("pointercancel", reset);
 }
 
 // The trackball's own LED. In light mode it shows what it emits; in the LED

@@ -39,18 +39,10 @@ export function colourEditor({colour, title, canEdit = true, onChange, offNote, 
     const field = el(`<div class="sv-field" data-tip="Brightness is limited to ${maximum}, as reported by this keyboard."
         style="background:linear-gradient(to top, #000, transparent), linear-gradient(to right, ${topWhite}, ${topHue})">
         <span class="thumb" style="left:${(s / 255) * 100}%;top:${100 - valuePercent(v, maximum)}%"></span></div>`);
-    if (canEdit) field.addEventListener("pointerdown", (event) => {
-        const rect = field.getBoundingClientRect();
-        commit([h, ((event.clientX - rect.left) / rect.width) * 255, (1 - (event.clientY - rect.top) / rect.height) * maximum]);
-    });
     node.append(field);
 
     const ramp = el(`<div class="swatch-pick"><span class="label" style="width:34px">Hue</span>
         <span class="hue-ramp"><span class="thumb" style="left:${(h / 255) * 100}%"></span></span></div>`);
-    if (canEdit) ramp.querySelector(".hue-ramp").addEventListener("pointerdown", (event) => {
-        const rect = event.currentTarget.getBoundingClientRect();
-        commit([((event.clientX - rect.left) / rect.width) * 255, s, v]);
-    });
     node.append(ramp);
 
     const fields = el(`<div class="grid3">
@@ -62,5 +54,51 @@ export function colourEditor({colour, title, canEdit = true, onChange, offNote, 
         commit(next);
     }));
     node.append(fields);
+
+    // Dragging previews locally and commits once on release: every commit
+    // round-trips through the model and redraws this control, which would
+    // drop the pointer mid-drag.
+    if (canEdit) {
+        const hueRamp = ramp.querySelector(".hue-ramp");
+        let draft = [h, s, v];
+        const preview = (next) => {
+            draft = next.map(Math.round);
+            const [dh, ds, dv] = draft;
+            const shown = {h: String(dh), s: String(ds), v: String(dv)};
+            head.querySelector(".swatch-lg").style.background = css(shown);
+            head.querySelector(".note").textContent = `${hsvLabel(shown)} · rgb(${rgb(shown).join(", ")})`;
+            field.style.background = `linear-gradient(to top, #000, transparent), linear-gradient(to right, ${topWhite}, ${css({h: String(dh), s: "255", v: String(maximum)})})`;
+            field.querySelector(".thumb").style.left = `${(ds / 255) * 100}%`;
+            field.querySelector(".thumb").style.top = `${100 - valuePercent(dv, maximum)}%`;
+            hueRamp.querySelector(".thumb").style.left = `${(dh / 255) * 100}%`;
+            fields.querySelectorAll("[data-channel]").forEach((input) => { input.value = draft[Number(input.dataset.channel)]; });
+        };
+        const unit = (value) => Math.max(0, Math.min(1, value));
+        dragSurface(field, (x, y) => preview([draft[0], x * 255, (1 - y) * maximum]), () => commit(draft));
+        dragSurface(hueRamp, (x) => preview([x * 255, draft[1], draft[2]]), () => commit(draft));
+
+        function dragSurface(surface, move, done) {
+            const at = (event) => {
+                const rect = surface.getBoundingClientRect();
+                move(unit((event.clientX - rect.left) / rect.width), unit((event.clientY - rect.top) / rect.height));
+            };
+            surface.addEventListener("pointerdown", (event) => {
+                if (event.button !== 0) return;
+                event.preventDefault();
+                surface.setPointerCapture?.(event.pointerId);
+                surface.dataset.dragging = "1";
+                at(event);
+            });
+            surface.addEventListener("pointermove", (event) => { if (surface.dataset.dragging) at(event); });
+            const end = (event) => {
+                if (!surface.dataset.dragging) return;
+                delete surface.dataset.dragging;
+                surface.releasePointerCapture?.(event.pointerId);
+                done();
+            };
+            surface.addEventListener("pointerup", end);
+            surface.addEventListener("pointercancel", end);
+        }
+    }
     return node;
 }

@@ -68,9 +68,9 @@ export function rail() {
         <div class="rail-foot">
             <span class="note">Draft history</span>
             <button class="btn tiny ghost icon" data-act="undo" ${draft?.canUndo ? "" : "disabled"}
-                data-tip="Undo the last edit in the draft. The keyboard is not touched until you apply.">↺</button>
+                data-tip="Undo the last edit in the draft (⌘Z). The keyboard is not touched until you apply.">↺</button>
             <button class="btn tiny ghost icon" data-act="redo" ${draft?.canRedo ? "" : "disabled"}
-                data-tip="Redo the edit you just undid.">↻</button>
+                data-tip="Redo the edit you just undid (⇧⌘Z).">↻</button>
         </div>
     </aside>`);
 

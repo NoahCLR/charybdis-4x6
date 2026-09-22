@@ -28,6 +28,8 @@ export const state = {
     comboOutput: "",
     comboEditId: null,
     placement: null,     // {keycode, label}: next board click places it on the current layer
+    retarget: null,      // {from, to, existing}: a behaviour move waiting on overwrite / swap / cancel
+    keyClipboard: null,  // {keycode, label}: the key ⌘C copied, for ⌘V onto the selected key
     stage: "layers",
     layersOpen: false,  // the layer-stack panel on the layer row
     layersAsked: false, // its stack is requested once per opening
