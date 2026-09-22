@@ -633,11 +633,12 @@ function tabCombos(body, right) {
         {id: "through", rows: groupsOf.throughKeys.map((entry) => row("through", entry, keysReach(entry.keys))),
             empty: "No combo is completed by keys falling through."},
         {id: "elsewhere", rows: groupsOf.elsewhere.map((entry) => row("elsewhere", entry,
-            entry.inputs ? `${entry.keys.length} of ${entry.inputs} inputs, never at once` : "no inputs")),
+            entry.inputs ? `${entry.covered} of ${entry.inputs} inputs, never at once` : "no inputs")),
             empty: "Every combo on the board fires from this layer."},
     ];
-    const comboTable = reachTable("combos", comboGroupRows,
-        ["Combo", "Inputs", "Sends", "Window", "Requires", "Reached by", ""]);
+    const comboTable = reachTable("combos", comboGroupRows, [
+        ["Combo", "7%"], ["Inputs", "31%"], ["Sends", "13%"], ["Window", "8%"],
+        ["Requires", "12%"], ["Reached by", "21%"], ["", "8%"]]);
     attachReachRows(comboTable, "combos");
     node.querySelector("#comboTable").replaceWith(comboTable);
 
@@ -764,7 +765,7 @@ function tabMacros(body, right) {
             empty: "Every stored macro is reached from this layer."},
     ];
 
-    const node = reachTable("macros", groups, ["Slot", "Payload", "Reached by", ""]);
+    const node = reachTable("macros", groups, [["Slot", "24%"], ["Payload", "44%"], ["Reached by", "24%"], ["", "8%"]]);
     attachReachRows(node, "macros");
     node.querySelectorAll("[data-editmacro]").forEach((button) => button.addEventListener("click", () => {
         const keycode = button.dataset.editmacro;
@@ -812,7 +813,8 @@ const reachLabel = (model, entry) => [
 
 // A grouped table: the column header once, then a counted header row per
 // group. One table keeps the columns lined up across the groups being
-// compared, which is the point of showing them together.
+// compared, which is the point of showing them together. Each column is given
+// its width, so unfolding a group never re-sizes the ones already on screen.
 function reachTable(tab, groups, columns) {
     const section = (group) => `<tbody class="rowgroup">
         <tr><td colspan="${columns.length}" class="t-group">${groupHeader(tab, group.id, group.rows.length)}</td></tr>
@@ -820,8 +822,9 @@ function reachTable(tab, groups, columns) {
             ? (group.rows.length ? group.rows.join("")
                 : `<tr><td colspan="${columns.length}"><p class="note">${esc(group.empty)}</p></td></tr>`)
             : ""}</tbody>`;
-    const node = el(`<div style="padding:2px 0"><table class="t">
-        <thead><tr>${columns.map((name) => `<th>${esc(name)}</th>`).join("")}</tr></thead>
+    const node = el(`<div style="padding:2px 0"><table class="t fixed">
+        <colgroup>${columns.map(([, width]) => `<col style="width:${width}">`).join("")}</colgroup>
+        <thead><tr>${columns.map(([name]) => `<th>${esc(name)}</th>`).join("")}</tr></thead>
         ${inGroupOrder(groups).map(section).join("")}
     </table></div>`);
     attachGroupToggles(node);

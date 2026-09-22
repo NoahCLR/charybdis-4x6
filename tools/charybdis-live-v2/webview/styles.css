@@ -501,6 +501,8 @@ table.t th { text-align: left; font-size: 10.5px; letter-spacing: .08em; text-tr
 table.t td { padding: 9px 12px; border-top: 1px solid var(--line); vertical-align: top; }
 table.t td.mono { font-family: var(--mono); font-size: 11.5px; }
 table.t td.t-group { padding: 0; }
+table.t.fixed { table-layout: fixed; }
+table.t.fixed td { overflow-wrap: anywhere; }
 /* A row that can say where it is reached from picks itself, and the board
    rings those keys while it is picked. */
 [data-reach] { cursor: pointer; }

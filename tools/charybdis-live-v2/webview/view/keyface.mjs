@@ -226,18 +226,19 @@ export function combosForKey(model, position) {
     return (model?.combos || []).filter((combo) => comboTouches(combo, position));
 }
 
-// The positions among these that carry a combo's inputs, one per input. A
-// combo fires from the keycodes the active layer produces, so all of its
-// inputs have to be there.
+// Every position among these that carries one of a combo's inputs, and how
+// many distinct inputs they cover. A combo fires from the keycodes the active
+// layer produces, so all of its inputs have to be covered; an input placed on
+// two keys can be pressed on either, so both are its keys.
 function comboKeysAmong(positions, combo) {
     const inputs = combo?.inputs || [];
-    const found = new Map();
+    const keys = [], covered = new Set();
     for (const position of positions) {
         if (!comboTouches(combo, position)) continue;
-        const input = inputs.find((name) => name === position.keycode || name === keyMeaning(position)) ?? position.keycode;
-        if (!found.has(input)) found.set(input, position);
+        keys.push(position);
+        covered.add(inputs.find((name) => name === position.keycode || name === keyMeaning(position)) ?? position.keycode);
     }
-    return [...found.values()];
+    return {keys, covered: covered.size};
 }
 
 /**
@@ -267,13 +268,13 @@ export function comboGroups(model, stack, at) {
         const inputs = (combo.inputs || []).length;
         let fires = null, most = null;
         for (const {held, resolved, answering} of tries) {
-            const keys = comboKeysAmong(resolved.map((entry) => entry.position), combo)
-                .map((position) => answering.get(position));
-            if (!most || keys.length > most.keys.length) most = {keys, held};
-            if (inputs && keys.length >= inputs && (!fires || held.length < fires.held.length)) fires = {keys, held};
+            const found = comboKeysAmong(resolved.map((entry) => entry.position), combo);
+            const keys = found.keys.map((position) => answering.get(position));
+            if (!most || found.covered > most.covered) most = {keys, held, covered: found.covered};
+            if (inputs && found.covered >= inputs && (!fires || held.length < fires.held.length)) fires = {keys, held, covered: found.covered};
         }
-        if (!fires) { elsewhere.push({combo, inputs, keys: most?.keys || [], held: []}); continue; }
-        const entry = {combo, inputs, keys: fires.keys, held: fires.held.map((index) => stack[index])};
+        if (!fires) { elsewhere.push({combo, inputs, covered: most?.covered || 0, keys: most?.keys || [], held: []}); continue; }
+        const entry = {combo, inputs, covered: fires.covered, keys: fires.keys, held: fires.held.map((index) => stack[index])};
         (entry.keys.every((key) => !key.fellThrough) ? onKeys : throughKeys).push(entry);
     }
     return {onKeys, throughKeys: downTheStack(throughKeys), fromBranches: [], fromBranchesBelow: [], elsewhere};

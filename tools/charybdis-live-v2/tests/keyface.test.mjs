@@ -429,3 +429,24 @@ test("an existing combo opens with its inputs on the board, and keeps the ones t
     assert.deepEqual(comboEditInputs({}, stack, 1, partly),
         {positions: [1], codes: {1: "KC_BTN1"}, extras: ["KC_F13"]});
 });
+
+test("an input placed on two keys rings both, and still counts as one input", () => {
+    const at = (layoutIndex, keycode) => ({layoutIndex, keycode, display: keycode});
+    const combo = {id: 7, badge: "C7", inputs: ["G(KC_C)", "G(KC_V)"], output: "G(KC_A)"};
+    const layer = {index: 0, name: "Navigation", positions: [
+        at(3, "G(KC_C)"), at(4, "G(KC_V)"), at(19, "G(KC_C)"), at(21, "G(KC_V)"), at(20, "KC_UP")]};
+    const groups = comboGroups({combos: [combo]}, [layer], 0);
+    assert.equal(groups.onKeys.length, 1);
+    assert.deepEqual(groups.onKeys[0].keys.map((key) => key.position.layoutIndex), [3, 4, 19, 21],
+        "every key carrying an input is where the combo can be pressed");
+    assert.equal(groups.onKeys[0].covered, 2);
+
+    const half = {index: 0, name: "Half", positions: [at(3, "G(KC_C)"), at(19, "G(KC_C)")]};
+    const partial = comboGroups({combos: [combo]}, [half], 0);
+    assert.deepEqual(partial.onKeys, [], "two copies of one input do not complete a two-input combo");
+    assert.equal(partial.elsewhere[0].covered, 1);
+
+    const edit = comboEditInputs({}, [layer], 0, combo);
+    assert.deepEqual(edit, {positions: [3, 4], codes: {3: "G(KC_C)", 4: "G(KC_V)"}, extras: []},
+        "the builder still holds one key per input, so saving does not duplicate inputs");
+});
