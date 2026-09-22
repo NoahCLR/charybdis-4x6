@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {behaviourFor, behaviourListeningTo, canonicalKeycode, behaviourGridSteps, behaviourGroups, behaviourTiers, macroReach, pointingReach, reachablePositions, resolvedPositions, bindingKeycode, bindingsForSlot, comboGroups, combosForKey, keyFace, keyMeaning, macroKeycodes, pointingSlotFor, slotKeycodes} from "../webview/view/keyface.mjs";
+import {behaviourFor, comboEditInputs, behaviourListeningTo, canonicalKeycode, behaviourGridSteps, behaviourGroups, behaviourTiers, macroReach, pointingReach, reachablePositions, resolvedPositions, bindingKeycode, bindingsForSlot, comboGroups, combosForKey, keyFace, keyMeaning, macroKeycodes, pointingSlotFor, slotKeycodes} from "../webview/view/keyface.mjs";
 
 test("a key face uses the model's own resolution, and names the layer a dual-role key reaches", () => {
     assert.deepEqual(keyFace({keycode: "KC_TRANSPARENT", display: "▽"}), {main: "▽", sub: "", kind: "transparent"});
@@ -411,4 +411,21 @@ test("a picked key finds the behaviour it would collide with, whatever its spell
     assert.equal(behaviourListeningTo(model, "LT(3, KC_SLSH)").keycode, "LT(3,KC_SLASH)");
     assert.equal(behaviourListeningTo(model, "DRAGSCROLL").keycode, "DRAGSCROLL");
     assert.equal(behaviourListeningTo(model, "KC_A"), undefined);
+});
+
+test("an existing combo opens with its inputs on the board, and keeps the ones this layer cannot reach", () => {
+    const layer = (index, keycodes) => ({index, positions: keycodes.map((keycode, layoutIndex) => ({layoutIndex, keycode, display: keycode}))});
+    const stack = [
+        layer(0, ["KC_A", "KC_B", "KC_C", "KC_D"]),
+        layer(1, ["KC_TRANSPARENT", "KC_BTN1", "KC_BTN2", "KC_X"]),
+    ];
+    const onLayer = {badge: "C1", inputs: ["KC_BTN1", "KC_BTN2"], output: "KC_ESC"};
+    assert.deepEqual(comboEditInputs({}, stack, 1, onLayer),
+        {positions: [1, 2], codes: {1: "KC_BTN1", 2: "KC_BTN2"}, extras: []});
+    const through = {badge: "C2", inputs: ["KC_A", "KC_BTN1"], output: "KC_TAB"};
+    assert.deepEqual(comboEditInputs({}, stack, 1, through),
+        {positions: [0, 1], codes: {0: "KC_A", 1: "KC_BTN1"}, extras: []}, "a key falling through keeps the name it resolves to");
+    const partly = {badge: "C3", inputs: ["KC_BTN1", "KC_F13"], output: "KC_TAB"};
+    assert.deepEqual(comboEditInputs({}, stack, 1, partly),
+        {positions: [1], codes: {1: "KC_BTN1"}, extras: ["KC_F13"]});
 });

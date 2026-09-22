@@ -4,7 +4,7 @@
 import {css, isOff, label as hsvLabel} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {LED_INDEX} from "../view/geometry.mjs";
-import {actionLabel, behaviourFor, behaviourListeningTo, canonicalKeycode, behaviourGridSteps, behaviourGroups, behaviourTiers, comboGroups, combosForKey, keyFace, keyMeaning, macroReach, pointingReach, pointingSlotFor, pointingVariant, reachKeys} from "../view/keyface.mjs";
+import {actionLabel, behaviourFor, behaviourListeningTo, canonicalKeycode, behaviourGridSteps, behaviourGroups, behaviourTiers, comboEditInputs, comboGroups, combosForKey, keyFace, keyMeaning, macroReach, pointingReach, pointingSlotFor, pointingVariant, reachKeys} from "../view/keyface.mjs";
 import {feedbackColours, layerColourRow, pdColourRow, stageEnabled} from "../view/lighting.mjs";
 import {currentLayer, getModel, layerName, layers, positionAt, post, render, selectedPosition, state, writable} from "../store.mjs";
 import {board} from "./board.mjs";
@@ -67,7 +67,7 @@ export function screenKeys() {
         selected: state.selected,
         reach: reachHighlight(model),
         picking: state.comboPicking || Boolean(state.placement),
-        inputs: state.comboPicking ? state.comboInputs : [],
+        inputs: state.comboPicking || (state.comboOpen && state.tab === "combos") ? state.comboInputs : [],
         onKey: (index) => {
             if (state.placement) {
                 const placement = state.placement;
@@ -117,7 +117,7 @@ function legend(model) {
         <span class="legend-item">${dot(colours.long)} long hold branch</span>
         <span class="legend-item"><i class="lbadge">C1</i> combo input</span>
         <span class="legend-item"><span class="m" style="border-style:dashed"></span> transparent · falls through</span>
-        <span class="legend-item dim">double-click to pick a keycode${writable() ? " · drag one key onto another to swap · ⌘C and ⌘V copy between keys" : " · ⌘C copies a key"}</span>
+        <span class="legend-item dim">double-click to pick a keycode${writable() ? " · drag one key onto another to swap · ⌘C and ⌘V copy between keys · delete makes a key transparent" : " · ⌘C copies a key"}</span>
         ${state.keyClipboard ? `<span class="legend-item">copied <code class="n">${esc(state.keyClipboard.keycode)}</code></span>` : ""}
     </div>`);
 }
@@ -131,7 +131,7 @@ function pickBar() {
         <span class="right" style="margin-left:auto;display:flex;gap:6px">
             <button class="btn tiny ghost" data-act="clear">Clear</button>
             <button class="btn tiny" data-act="done">Done</button></span></div>`);
-    node.querySelector('[data-act="clear"]').addEventListener("click", () => { state.comboInputs = []; render(); });
+    node.querySelector('[data-act="clear"]').addEventListener("click", () => { state.comboInputs = []; state.comboExtraInputs = []; render(); });
     node.querySelector('[data-act="done"]').addEventListener("click", () => { state.comboPicking = false; render(); });
     return node;
 }
@@ -587,6 +587,7 @@ function tabCombos(body, right) {
     toggle.addEventListener("click", () => {
         state.comboOpen = !state.comboOpen;
         state.comboEditId = null;
+        state.comboInputs = []; state.comboInputCodes = {}; state.comboExtraInputs = [];
         if (!state.comboOpen) state.comboPicking = false;
         render();
     });
@@ -645,7 +646,10 @@ function tabCombos(body, right) {
         state.comboEditId = combo?.id ?? null;
         state.comboOpen = true;
         state.comboOutput = combo?.output || "";
-        state.comboInputs = (combo?.inputPositions || []).slice();
+        const inputs = comboEditInputs(model, layers(), state.layer, combo);
+        state.comboInputs = inputs.positions;
+        state.comboInputCodes = inputs.codes;
+        state.comboExtraInputs = inputs.extras;
         render();
     }));
     const side = node.querySelector("#comboSide");
@@ -668,9 +672,13 @@ function comboBuilder(layer, canEdit, holdTerm) {
                 <button class="btn" data-act="pickout" ${canEdit ? "" : "disabled"}>Pick…</button></div></div>
             <div class="field"><span>Inputs</span>
                 <div class="row" style="gap:6px;flex-wrap:wrap">
-                    ${inputs.length ? inputs.map((position) => `<span class="chip"><span class="mono">${esc(keyFace(position).main || keyMeaning(position))}</span>
+                    ${inputs.length ? inputs.map((position) => `<span class="chip"><span class="mono">${esc(state.comboInputCodes[position.layoutIndex]
+                        ? actionLabel(model, state.comboInputCodes[position.layoutIndex]) : keyFace(position).main || keyMeaning(position))}</span>
                         <button data-remove="${position.layoutIndex}" style="color:var(--text-3)">✕</button></span>`).join("")
-                        : `<span class="note">no inputs yet</span>`}
+                        : (state.comboExtraInputs.length ? "" : `<span class="note">no inputs yet</span>`)}
+                    ${state.comboExtraInputs.map((input) => `<span class="chip" data-tip="Not reachable from this layer, so it is not on the board. It stays an input unless you remove it.">
+                        <span class="mono">${esc(actionLabel(model, input))}</span>
+                        <button data-remove-extra="${esc(input)}" style="color:var(--text-3)">✕</button></span>`).join("")}
                 </div>
                 <div class="row" style="gap:6px;margin-top:4px">
                     <button class="btn tiny ${state.comboPicking ? "primary" : ""}" data-act="pickboard" ${canEdit ? "" : "disabled"}
@@ -695,6 +703,10 @@ function comboBuilder(layer, canEdit, holdTerm) {
         state.comboInputs = state.comboInputs.filter((index) => index !== Number(button.dataset.remove));
         render();
     }));
+    node.querySelectorAll("[data-remove-extra]").forEach((button) => button.addEventListener("click", () => {
+        state.comboExtraInputs = state.comboExtraInputs.filter((input) => input !== button.dataset.removeExtra);
+        render();
+    }));
     node.querySelector('[data-act="pickboard"]')?.addEventListener("click", () => { state.comboPicking = !state.comboPicking; render(); });
     node.querySelector('[data-act="pickout"]')?.addEventListener("click", () => openPicker({
         title: "Combo output", context: editing ? original?.badge : "new combo",
@@ -702,13 +714,14 @@ function comboBuilder(layer, canEdit, holdTerm) {
         onPick: (expression) => { state.comboOutput = expression; state.picker = null; render(); },
     }));
     node.querySelector('[data-act="cancel"]').addEventListener("click", () => {
-        state.comboOpen = false; state.comboPicking = false; state.comboEditId = null; render();
+        state.comboOpen = false; state.comboPicking = false; state.comboEditId = null;
+        state.comboInputs = []; state.comboInputCodes = {}; state.comboExtraInputs = []; render();
     });
     node.querySelector('[data-act="delete"]')?.addEventListener("click", () => post({type: "deleteCombo", id: state.comboEditId}));
     node.querySelector('[data-act="keep"]')?.addEventListener("click", () => {
         const payload = {
             output: node.querySelector("[data-output]").value.trim(),
-            inputs: inputs.map((position) => position.keycode),
+            inputs: [...inputs.map((position) => state.comboInputCodes[position.layoutIndex] ?? position.keycode), ...state.comboExtraInputs],
             termMs: node.querySelector("[data-term]").value,
             holdTermMs: holdTerm(),
             mustHold: node.querySelector("[data-musthold]").checked,
@@ -735,7 +748,8 @@ function tabMacros(body, right) {
         return `<tr${reachAttrs("macros", group, keycode)}>
             <td>${esc(actionLabel(model, keycode))} <code class="dim">${esc(keycode)}</code></td>
             <td class="mono">${esc(slot?.payload || "—")}</td>
-            <td class="muted">${reachedBy}</td></tr>`;
+            <td class="muted">${reachedBy}</td>
+            <td style="text-align:right">${slot ? `<button class="btn tiny ghost" data-editmacro="${esc(keycode)}">Edit</button>` : ""}</td></tr>`;
     };
     const groups = [
         {id: "here", rows: reach.onKeys.map((entry) => row("here", entry.name, reachLabel(model, entry))),
@@ -750,8 +764,15 @@ function tabMacros(body, right) {
             empty: "Every stored macro is reached from this layer."},
     ];
 
-    const node = reachTable("macros", groups, ["Slot", "Payload", "Reached by"]);
+    const node = reachTable("macros", groups, ["Slot", "Payload", "Reached by", ""]);
     attachReachRows(node, "macros");
+    node.querySelectorAll("[data-editmacro]").forEach((button) => button.addEventListener("click", () => {
+        const keycode = button.dataset.editmacro;
+        state.macroBank = (model?.hardcodedMacros || []).some((entry) => entry.keycode === keycode) ? "user" : "via";
+        state.macroSlot = keycode;
+        state.screen = "macros";
+        render();
+    }));
     body.replaceChildren(node);
 }
 
@@ -824,7 +845,8 @@ function tabPointing(body, right) {
             <div class="row" style="gap:9px">
                 <span class="swatch-lg ${lit ? "" : "swatch-off"}" style="width:16px;height:16px;border-radius:5px;${lit ? `background:${css(row.color)}` : ""}"></span>
                 <b>${esc(slot.name || `Slot ${slot.id + 1}`)}${variant ? ` · ${esc(variant)}` : ""}</b>
-                <span class="tag">slot ${slot.id + 1}</span></div>
+                <span class="tag">slot ${slot.id + 1}</span>
+                <button class="btn tiny ghost" data-editpd="${slot.id}" style="margin-left:auto">Edit</button></div>
             <div class="note">${slot.kind
                 ? `${slot.kind === 2 ? "Scrolling" : "Directional"}${slot.dpi ? ` · ${slot.dpi} DPI` : " · normal pointer speed"}`
                 : "Empty · the keyboard refuses to activate it, so these keys do nothing yet"}</div>
@@ -870,6 +892,12 @@ function tabPointing(body, right) {
         ${inGroupOrder(groups).map(section).join("")}</div>`);
     attachGroupToggles(node);
     attachReachRows(node, "pointing");
+    node.querySelectorAll("[data-editpd]").forEach((button) => button.addEventListener("click", () => {
+        state.pdSlot = Number(button.dataset.editpd);
+        state.pdKind = null;
+        state.screen = "pointing";
+        render();
+    }));
     body.replaceChildren(node);
 }
 
@@ -890,12 +918,14 @@ function pickKeycodeFor(layoutIndex) {
 }
 
 // ⌘C copies the selected key's keycode and ⌘V stores it on the selected key,
-// on any layer. Text fields keep their own copy and paste.
+// on any layer; Delete or Backspace makes it transparent. Text fields keep
+// their own copy, paste and delete.
 export function keysShortcut(event) {
     if (state.screen !== "keys" || state.overlay || state.picker || state.retarget || state.recording || state.comboPicking) return false;
-    if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return false;
     const key = event.key.toLowerCase();
-    if (key !== "c" && key !== "v") return false;
+    const clear = (key === "delete" || key === "backspace") && !(event.metaKey || event.ctrlKey || event.altKey || event.shiftKey);
+    const clipboard = (key === "c" || key === "v") && (event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey;
+    if (!clear && !clipboard) return false;
     if (event.target.closest?.("input, textarea, select, [contenteditable]")) return false;
     if (key === "c" && String(getSelection?.() || "")) return false;
     const layer = currentLayer();
@@ -903,12 +933,19 @@ export function keysShortcut(event) {
     if (!position) return false;
 
     event.preventDefault();
-    if (key === "c") {
+    const store = (keycode) => {
+        if (writable() && keycode !== position.keycode) {
+            post({type: "updateLayoutKeys", layer: layer.name, changes: [{layoutIndex: position.layoutIndex, keycode}]});
+        }
+    };
+    if (clear) {
+        if (keyFace(position).kind !== "transparent") store("KC_TRANSPARENT");
+    } else if (key === "c") {
         state.keyClipboard = {keycode: position.keycode, label: keyFace(position).main};
         navigator.clipboard?.writeText(position.keycode).catch(() => {});
         render();
-    } else if (state.keyClipboard && writable() && state.keyClipboard.keycode !== position.keycode) {
-        post({type: "updateLayoutKeys", layer: layer.name, changes: [{layoutIndex: position.layoutIndex, keycode: state.keyClipboard.keycode}]});
+    } else if (state.keyClipboard) {
+        store(state.keyClipboard.keycode);
     }
     return true;
 }

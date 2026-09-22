@@ -37,6 +37,24 @@ test("a key picked in the interface lands on the layer the board was showing", (
         "the change is reviewable before it is applied");
 });
 
+test("delete on a key posts it as transparent, which the draft stores", () => {
+    const draft = session();
+    draft.stage({
+        type: "updateLayoutKeys", draftId: draft.id, draftRevision: draft.revision,
+        layer: "Layer 0", changes: [{layoutIndex: 27, keycode: "KC_B"}],
+    });
+    const before = draft.document.layers[0].slice();
+    // exactly what keysShortcut() in ui/keys.mjs posts for Delete / Backspace
+    draft.stage({
+        type: "updateLayoutKeys", draftId: draft.id, draftRevision: draft.revision,
+        layer: "Layer 0", changes: [{layoutIndex: 27, keycode: "KC_TRANSPARENT"}],
+    });
+    const after = draft.document.layers[0];
+    const changed = after.map((code, slot) => code !== before[slot] ? slot : -1).filter((slot) => slot >= 0);
+    assert.equal(changed.length, 1, "only the deleted key changes");
+    assert.equal(after[changed[0]], 1, "it now holds KC_TRANSPARENT");
+});
+
 test("swapping two keys is one message and one draft step", () => {
     const draft = session();
     draft.stage({

@@ -134,7 +134,6 @@ async function handleMessage(panel, session, message) {
             if (state.busy || !state.connected || state.selectedDeviceId !== session.draft.deviceId) throw new Error("Reconnect the keyboard this draft belongs to and wait for its current operation.");
             session.acceptedEdit = session.draft.stage(message);
             if (message.reviewAfter) session.draft.review(session.draft.revision);
-            session.notice = "Changes kept in this app. Review changes to apply them to the keyboard.";
             publish(panel, session);
             return;
         }
@@ -441,7 +440,6 @@ async function portableMessage(panel, session, message) {
                 session.draft.replace(document, message.type === "savePortableLayers" ? draft.revision : review.revision);
                 session.portableReview = undefined; session.portableLayers = undefined;
                 session.resetDraftForms = true;
-                session.notice = "Profile changes kept in this app. Review changes to apply them to the keyboard.";
                 return;
             }
             await service.restorePortableProfile(document, {expectedFingerprint: before.fingerprint, saveRecovery});

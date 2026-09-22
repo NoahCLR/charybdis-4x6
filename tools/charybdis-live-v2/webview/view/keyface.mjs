@@ -279,6 +279,25 @@ export function comboGroups(model, stack, at) {
     return {onKeys, throughKeys: downTheStack(throughKeys), fromBranches: [], fromBranchesBelow: [], elsewhere};
 }
 
+// What the combo builder starts from when an existing combo is opened: the
+// board positions its inputs sit on from this layer, each with the input name
+// the keyboard stores, and any input this layer cannot reach, which is kept
+// rather than silently dropped on save.
+export function comboEditInputs(model, stack, at, combo) {
+    const groups = comboGroups({...model, combos: [combo]}, stack, at);
+    const entry = groups.onKeys[0] || groups.throughKeys[0] || groups.elsewhere[0];
+    const names = combo?.inputs || [];
+    const positions = [], codes = {}, used = new Set();
+    for (const {position} of entry?.keys || []) {
+        const input = names.find((name) => !used.has(name) && (name === position.keycode || name === keyMeaning(position)));
+        if (input === undefined || positions.includes(position.layoutIndex)) continue;
+        used.add(input);
+        positions.push(position.layoutIndex);
+        codes[position.layoutIndex] = input;
+    }
+    return {positions, codes, extras: names.filter((name) => !used.has(name))};
+}
+
 export const macroKeycodes = (keycode) =>
     [...String(keycode || "").matchAll(/\b((?:VIA_)?MACRO_\d+)\b/g)].map((match) => match[1]);
 

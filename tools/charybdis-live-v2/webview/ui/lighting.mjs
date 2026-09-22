@@ -157,7 +157,6 @@ function paintOrder(model) {
         chip.addEventListener("click", () => { state.stage = stage.id; render(); });
         row.appendChild(chip);
     });
-    row.appendChild(el(`<span class="note" style="margin-left:auto">animations, idle fade and momentary feedback are not simulated</span>`));
     return row;
 }
 

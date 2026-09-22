@@ -25,6 +25,8 @@ export const state = {
     comboOpen: false,
     comboPicking: false,
     comboInputs: [],
+    comboInputCodes: {},  // layoutIndex → the input name the keyboard stores, for a combo being edited
+    comboExtraInputs: [], // inputs of the combo being edited that this layer cannot reach
     comboOutput: "",
     comboEditId: null,
     placement: null,     // {keycode, label}: next board click places it on the current layer

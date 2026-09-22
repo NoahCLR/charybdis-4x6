@@ -376,7 +376,7 @@ button.tier:hover { background: var(--surface-3); }
 .act .how { color: var(--text-3); font-family: var(--sans); font-size: 10.5px; }
 .act.empty { border-style: dashed; color: var(--text-3); background: none; font-family: var(--sans); font-size: 11.5px; }
 /* ── workbench ───────────────────────────────────────────────────────── */
-.keys-pad { display: grid; gap: 18px; max-width: 1280px; }
+.keys-pad { display: grid; gap: 18px; }
 .workbench-stack { display: grid; gap: 7px; min-width: 0; }
 .workbench-stack .layerbar {
   padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius);
