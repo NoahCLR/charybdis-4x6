@@ -25,6 +25,27 @@ test("locality answers for the regions the firmware defines", () => {
     assert.equal(inLocality(6, "RGB_KEYS_ONLY", undefined), false, "with no trigger, nothing is the trigger key");
 });
 
+test("the trackball is drawn at its own size, clear of the keys around it", () => {
+    const {x, y, r} = GEO.trackball;
+    // A 34mm ball among 19.05mm key pitches is nearly two keys across.
+    assert.ok(Math.abs(2 * r / ((66 + GEO.rowStep) / 2) - 34 / 19.05) < 0.1,
+        "the ball keeps its real size against the key pitch");
+
+    for (let index = 0; index < 56; index += 1) {
+        const key = keyVisual(index);
+        // Nearest point of the cap to the ball's centre, which is enough for
+        // the unrotated caps and conservative for the angled thumbs.
+        const nearestX = Math.max(key.x, Math.min(x, key.x + GEO.keyW));
+        const nearestY = Math.max(key.y, Math.min(y, key.y + GEO.keyH));
+        const gap = Math.hypot(x - nearestX, y - nearestY) - r;
+        assert.ok(gap > 0, `key ${index} overlaps the ball by ${(-gap).toFixed(1)}`);
+    }
+
+    const [vx, vy, vw, vh] = GEO.viewBox.split(" ").map(Number);
+    assert.ok(x - r >= vx && x + r <= vx + vw, "the ball is inside the board horizontally");
+    assert.ok(y - r >= vy && y + r + 12 <= vy + vh, "and its caption still fits beneath it");
+});
+
 test("every position lands inside the drawn board", () => {
     const [vx, vy, vw, vh] = GEO.viewBox.split(" ").map(Number);
     for (let index = 0; index < 56; index += 1) {

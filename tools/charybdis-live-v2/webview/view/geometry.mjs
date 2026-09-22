@@ -2,6 +2,10 @@
 // carries, and which half it belongs to. Lifted from the app's own board so a
 // second interface cannot teach a different keyboard.
 
+// The trackball is a 34mm sphere among 19.05mm key pitches, so it is nearly
+// two keys across — drawn at its own size rather than as a marker, and sitting
+// where the keyboard puts it: outboard of the thumb cluster, under the inner
+// columns of the right half.
 export const GEO = {
     keyW: 58, keyH: 58, radius: 7, yOffset: 54, rowStep: 64,
     viewBox: "20 96 1082 478",
@@ -12,7 +16,7 @@ export const GEO = {
         51: {x: 576, y: 358, angle: -17}, 52: {x: 648, y: 350, angle: -10}, 53: {x: 398, y: 432, angle: 9},
         54: {x: 468, y: 446, angle: 15}, 55: {x: 578, y: 432, angle: -15},
     },
-    trackball: {x: 690, y: 500, r: 26},
+    trackball: {x: 776, y: 480, r: 58},
 };
 
 export const LED_INDEX = {

@@ -149,7 +149,7 @@ function trackballGlyph(model, layer, {mode, pdActive, trackball, clickable}) {
         aria-label="Trackball LED ${TRACKBALL_LED}">
         <circle cx="${x}" cy="${y}" r="${r}" style="${picked}"></circle>
         ${mode === "leds" ? `<text class="kc-label sm" x="${x}" y="${y}">${TRACKBALL_LED}</text>` : ""}
-        <text x="${x}" y="${y + r + 14}" class="kc-badge">trackball</text></g>`;
+        <text x="${x}" y="${y + r + 12}" class="kc-badge">trackball</text></g>`;
     return {
         markup,
         glow: mode === "leds" ? "" : `<circle class="kc-glow" cx="${x}" cy="${y}" r="${r}" fill="${paint}"></circle>`,
