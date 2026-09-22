@@ -1,0 +1,106 @@
+// What a key shows: its legend, and the marks for everything it reaches.
+//
+// The model already resolved each position to a display label; this adds the
+// layer-tap hint, the behaviour tiers and the combo badges, and nothing else.
+
+const TRANSPARENT = new Set(["KC_TRANSPARENT", "KC_TRNS", "_______"]);
+const DISABLED = new Set(["KC_NO", "XXXXXXX"]);
+
+export function keyFace(position) {
+    if (!position) return {main: "", sub: "", kind: "none"};
+    const keycode = position.keycode || "";
+    if (TRANSPARENT.has(keycode)) return {main: "▽", sub: "", kind: "transparent"};
+    if (DISABLED.has(keycode)) return {main: "", sub: "", kind: "disabled"};
+    const layerTap = /^LT\(\s*([A-Z0-9_]+)\s*,/.exec(keycode);
+    const momentary = /^MO\(\s*([A-Z0-9_]+)\s*\)$/.exec(keycode);
+    // A pointing key for a slot that holds nothing keeps its own name on the
+    // cap; that it is inert belongs on the second line, where a key cap says
+    // what is true of the key rather than of its label.
+    const emptySlot = /^(.+) \(empty\)$/.exec(position.display || "");
+    if (emptySlot) return {main: emptySlot[1], sub: "empty", kind: "key"};
+    return {
+        main: position.display || keycode,
+        sub: layerTap ? shortLayer(layerTap[1]) : momentary ? "momentary" : "",
+        kind: layerTap || momentary ? "layer" : "key",
+    };
+}
+
+const shortLayer = (name) => name.replace(/^LAYER_/, "").toLowerCase();
+
+export const behaviourFor = (model, keycode) =>
+    (model?.keyBehaviors || []).find((row) => row.keycode === keycode);
+
+// One dot per tier the behaviour uses anywhere, carrying how many branches use
+// it — the same shape the feedback stage flashes.
+export function behaviourTiers(behaviour) {
+    if (!behaviour) return [];
+    const count = (pick) => (behaviour.steps || []).filter((step) => step[pick]).length;
+    return [
+        {kind: "tap", count: count("tap")},
+        {kind: "hold", count: count("hold")},
+        {kind: "long", count: count("longHold")},
+    ].filter((tier) => tier.count > 0);
+}
+
+export function combosForKey(model, position) {
+    if (!position) return [];
+    return (model?.combos || []).filter((combo) => Array.isArray(combo.inputPositions)
+        ? combo.inputPositions.includes(position.layoutIndex)
+        : (combo.inputs || []).includes(position.keycode));
+}
+
+export const macroKeycodes = (keycode) =>
+    [...String(keycode || "").matchAll(/\b((?:VIA_)?MACRO_\d+)\b/g)].map((match) => match[1]);
+
+// A layout position carries the keyboard's own name for its keycode, which for
+// a pointing mode is a bare user keycode (`QK_USER_16`) or, for a slot the
+// vocabulary does not name at all, its hex. So resolve the alias the model
+// published first, then fall back to the number: an empty slot has no name to
+// match on, and its keycodes exist regardless.
+export function pointingSlotFor(model, keycode) {
+    const slots = model?.pdModes || [];
+    const alias = model?.qmkKeycodeAliases?.[keycode] ?? keycode;
+    const name = String(alias || "").replace(/_LOCK$/, "");
+    const legacy = ["DRAGSCROLL", "VOLUME_MODE", "BRIGHTNESS_MODE", "ZOOM_MODE", "ARROW_MODE", "PINCH_MODE"];
+    const index = legacy.indexOf(name);
+    if (index >= 0) return slots.find((slot) => slot.id === index);
+    const numbered = /^PD_SLOT_(\d)$/.exec(name);
+    if (numbered) return slots.find((slot) => slot.id === Number(numbered[1]));
+    const value = typeof keycode === "number" ? keycode : /^0x[0-9a-f]+$/i.test(String(keycode)) ? Number(keycode) : NaN;
+    return Number.isInteger(value) ? slots.find((slot) => slotKeycodes(slot).includes(value)) : undefined;
+}
+
+// The two values a slot answers to: hold and toggle. Matching on the numbers
+// rather than on names matters for an empty slot, whose record carries no name
+// for the model to resolve — the keycode exists on the keyboard either way.
+export const slotKeycodes = (slot) => slot.id < 6
+    ? [0x7e50 + slot.id, 0x7e50 + slot.id + 6]
+    : [0x7ef0 + (slot.id - 6) * 2, 0x7ef0 + (slot.id - 6) * 2 + 1];
+
+// What still reaches a pointing slot. The keyboard keeps its mode keycodes
+// whatever a slot holds, so a key bound to an empty slot is inert rather than
+// invalid — and the interface has to say which keys those are.
+export function bindingsForSlot(model, slot) {
+    if (!slot) return {keys: [], behaviours: [], layers: []};
+    const values = new Set(slotKeycodes(slot));
+    const names = new Set([bindingKeycode(slot), `${bindingKeycode(slot)}_LOCK`]);
+    for (const entry of model?.qmkKeycodes || []) {
+        if (values.has(entry.keycode)) names.add(entry.value);
+    }
+    const keys = [];
+    const layers = new Set();
+    for (const layer of model?.layers || []) {
+        for (const position of layer.positions || []) {
+            if (!names.has(position.keycode) && !values.has(position.value)) continue;
+            keys.push({layer, position});
+            layers.add(layer.displayName || layer.name);
+        }
+    }
+    const behaviours = (model?.keyBehaviors || []).filter((row) => (row.steps || []).some((step) =>
+        ["tap", "hold", "longHold"].some((tier) => names.has(step[tier]?.action))));
+    return {keys, behaviours, layers: [...layers]};
+}
+
+const LEGACY_BINDINGS = ["DRAGSCROLL", "VOLUME_MODE", "BRIGHTNESS_MODE", "ZOOM_MODE", "ARROW_MODE", "PINCH_MODE"];
+export const bindingKeycode = (slot) =>
+    slot.id < LEGACY_BINDINGS.length ? LEGACY_BINDINGS[slot.id] : `PD_SLOT_${slot.id}`;

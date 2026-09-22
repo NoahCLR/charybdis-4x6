@@ -1,0 +1,37 @@
+{
+  "name": "charybdis-live-v2",
+  "displayName": "Charybdis Live v2",
+  "description": "Live firmware editor for the Charybdis, second interface. Reuses the tested device core and rewrites the surface.",
+  "version": "0.1.0",
+  "publisher": "noah",
+  "private": true,
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "charybdisLiveV2.open",
+        "title": "Open Charybdis Live v2",
+        "category": "Charybdis"
+      }
+    ]
+  },
+  "scripts": {
+    "check": "sh scripts/check.sh",
+    "test": "node --test tests/",
+    "keycodes": "node scripts/generate-keycode-catalog.js",
+    "probe:live-link": "node scripts/probe-live-link.js",
+    "preview": "node scripts/preview.js"
+  },
+  "dependencies": {
+    "node-hid": "^3.4.0"
+  }
+}

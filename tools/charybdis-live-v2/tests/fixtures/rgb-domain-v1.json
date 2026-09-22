@@ -1,0 +1,122 @@
+{
+  "profile": {
+    "formatVersion": 1,
+    "stageEnableMask": 31,
+    "groups": [
+      {"id": 0, "leds": []},
+      {"id": 1, "leds": [57]},
+      {"id": 2, "leds": [0, 1]}
+    ],
+    "layerColors": [
+      {"layerId": 0, "color": {"h": 1, "s": 2, "v": 3}, "mode": 0},
+      {"layerId": 1, "color": {"h": 10, "s": 20, "v": 30}, "mode": 1},
+      {"layerId": 2, "color": {"h": 40, "s": 50, "v": 60}, "mode": 1}
+    ],
+    "layerGroupRows": [
+      {"selector": 255, "color": {"h": 0, "s": 0, "v": 0}, "groupId": 2},
+      {"selector": 2, "color": {"h": 5, "s": 6, "v": 7}, "groupId": 1}
+    ],
+    "automouseFade": {"mode": 2, "endColor": {"h": 8, "s": 9, "v": 10}},
+    "pdModeColors": [
+      {"pdModeId": 0, "color": {"h": 11, "s": 12, "v": 13}, "locality": 2},
+      {"pdModeId": 1, "color": {"h": 21, "s": 22, "v": 23}, "locality": 2},
+      {"pdModeId": 2, "color": {"h": 31, "s": 32, "v": 33}, "locality": 2},
+      {"pdModeId": 3, "color": {"h": 41, "s": 42, "v": 43}, "locality": 2},
+      {"pdModeId": 4, "color": {"h": 51, "s": 52, "v": 53}, "locality": 2},
+      {"pdModeId": 5, "color": {"h": 61, "s": 62, "v": 63}, "locality": 2}
+    ],
+    "pdModeGroupRows": [
+      {"selector": 255, "color": {"h": 0, "s": 0, "v": 0}, "groupId": 2},
+      {"selector": 1, "color": {"h": 70, "s": 71, "v": 72}, "groupId": 1}
+    ],
+    "comboFeedback": {"color": {"h": 80, "s": 81, "v": 82}, "locality": 3},
+    "comboGroupRows": [
+      {"color": {"h": 0, "s": 0, "v": 0}, "groupId": 2}
+    ],
+    "keyFeedback": {
+      "tapBranchColors": [
+        {"h": 90, "s": 91, "v": 92},
+        {"h": 100, "s": 101, "v": 102},
+        {"h": 110, "s": 111, "v": 112},
+        {"h": 120, "s": 121, "v": 122}
+      ],
+      "tapCommittedColor": {"h": 0, "s": 0, "v": 130},
+      "holdActiveColor": {"h": 18, "s": 200, "v": 200},
+      "longHoldActiveColor": {"h": 148, "s": 200, "v": 200},
+      "tapCommitMode": 1,
+      "locality": 3
+    },
+    "keyGroupRows": [
+      {"semantic": 255, "color": {"h": 0, "s": 0, "v": 0}, "groupId": 2},
+      {"semantic": 2, "color": {"h": 1, "s": 2, "v": 3}, "groupId": 1}
+    ]
+  },
+  "studioModel": {
+    "layers": [
+      {"name": "LAYER_BASE"},
+      {"name": "LAYER_ONE"},
+      {"name": "LAYER_TWO"}
+    ],
+    "configDefaults": [
+      {"id": "rgbAppearance", "fields": [
+        {"macro": "RGB_MATRIX_MAXIMUM_BRIGHTNESS", "value": "200", "enabled": true}
+      ]},
+      {"id": "lightingFeedback", "fields": [
+        {"macro": "RGB_AUTOMOUSE_GRADIENT_ENABLE", "enabled": true},
+        {"macro": "RGB_PD_MODE_FEEDBACK_ENABLE", "enabled": true},
+        {"macro": "RGB_COMBO_FEEDBACK_ENABLE", "enabled": true},
+        {"macro": "RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE", "enabled": true}
+      ]}
+    ],
+    "rgb": {
+      "ledGroups": [
+        {"name": "RGB_LED_GROUP_THUMBS", "ledIndices": [1, 0]},
+        {"name": "RGB_LED_GROUP_TRACKBALL", "ledIndices": [57]},
+        {"name": "RGB_LED_GROUP_EMPTY", "ledIndices": []}
+      ],
+      "layerColors": [
+        {"layer": "LAYER_TWO", "color": {"h": "40", "s": "50", "v": "60"}, "mode": "KEYS_MAPPED_ON_THIS_LAYER_ONLY"},
+        {"layer": "LAYER_BASE", "color": {"h": "1", "s": "2", "v": "3"}, "mode": "ALL_KEYS"},
+        {"layer": "LAYER_ONE", "color": {"h": "10", "s": "20", "v": "30"}, "mode": "KEYS_MAPPED_ON_THIS_LAYER_ONLY"}
+      ],
+      "layerLedGroups": [
+        {"owner": "RGB_LAYER_GROUP_ALL", "color": {"h": "0", "s": "0", "v": "0"}, "ledGroup": "RGB_LED_GROUP_THUMBS", "ledIndices": [1, 0], "ledGroupKind": "reusable"},
+        {"owner": "LAYER_TWO", "color": {"h": "5", "s": "6", "v": "7"}, "ledGroup": "RGB_LED_GROUP(57)", "ledIndices": [57], "ledGroupKind": "inline"}
+      ],
+      "automouseFade": {"mode": "END_COLOR_ON_ALL_KEYS", "end_color": {"h": "8", "s": "9", "v": "10"}},
+      "pdModeColors": [
+        {"pointingMode": "PD_MODE_PINCH", "color": {"h": "61", "s": "62", "v": "63"}, "locality": "RGB_RIGHT_HALF"},
+        {"pointingMode": "PD_MODE_DRAGSCROLL", "color": {"h": "11", "s": "12", "v": "13"}, "locality": "RGB_RIGHT_HALF"},
+        {"pointingMode": "PD_MODE_ARROW", "color": {"h": "51", "s": "52", "v": "53"}, "locality": "RGB_RIGHT_HALF"},
+        {"pointingMode": "PD_MODE_VOLUME", "color": {"h": "21", "s": "22", "v": "23"}, "locality": "RGB_RIGHT_HALF"},
+        {"pointingMode": "PD_MODE_ZOOM", "color": {"h": "41", "s": "42", "v": "43"}, "locality": "RGB_RIGHT_HALF"},
+        {"pointingMode": "PD_MODE_BRIGHTNESS", "color": {"h": "31", "s": "32", "v": "33"}, "locality": "RGB_RIGHT_HALF"}
+      ],
+      "pdModeLedGroups": [
+        {"owner": "RGB_PD_MODE_GROUP_ALL", "color": {"h": "0", "s": "0", "v": "0"}, "ledGroup": "RGB_LED_GROUP_THUMBS", "ledIndices": [0, 1], "ledGroupKind": "reusable"},
+        {"owner": "PD_MODE_VOLUME", "color": {"h": "70", "s": "71", "v": "72"}, "ledGroup": "RGB_LED_GROUP_TRACKBALL", "ledIndices": [57], "ledGroupKind": "reusable"}
+      ],
+      "comboFeedback": {"color": {"h": "80", "s": "81", "v": "82"}, "locality": "RGB_KEY_HALF"},
+      "comboFeedbackLedGroups": [
+        {"color": {"h": "0", "s": "0", "v": "0"}, "ledGroup": "RGB_LED_GROUP_THUMBS", "ledIndices": [0, 1], "ledGroupKind": "reusable"}
+      ],
+      "keyBehaviorFeedback": {
+        "tapBranchColors": [
+          {"h": "90", "s": "91", "v": "92"},
+          {"h": "100", "s": "101", "v": "102"},
+          {"h": "110", "s": "111", "v": "112"},
+          {"h": "120", "s": "121", "v": "122"}
+        ],
+        "tapCommittedColor": {"h": "0", "s": "0", "v": "130"},
+        "holdActiveColor": {"h": "18", "s": "200", "v": "RGB_MATRIX_MAXIMUM_BRIGHTNESS"},
+        "longHoldActiveColor": {"h": "148", "s": "200", "v": "RGB_MATRIX_MAXIMUM_BRIGHTNESS"},
+        "tapCommitMode": "KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS",
+        "locality": "RGB_KEY_HALF"
+      },
+      "keyBehaviorFeedbackLedGroups": [
+        {"owner": "KEY_FEEDBACK_GROUP_ALL", "color": {"h": "0", "s": "0", "v": "0"}, "ledGroup": "RGB_LED_GROUP_THUMBS", "ledIndices": [0, 1], "ledGroupKind": "reusable"},
+        {"owner": "KEY_FEEDBACK_GROUP_HOLD_ACTIVE", "color": {"h": "1", "s": "2", "v": "3"}, "ledGroup": "RGB_LED_GROUP_TRACKBALL", "ledIndices": [57], "ledGroupKind": "reusable"}
+      ]
+    }
+  }
+}
