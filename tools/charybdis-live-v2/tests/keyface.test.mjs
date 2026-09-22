@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {behaviourFor, behaviourGridSteps, behaviourGroups, behaviourTiers, bindingKeycode, bindingsForSlot, comboKeysOnLayer, combosForKey, keyFace, keyMeaning, macroKeycodes, pointingSlotFor, slotKeycodes} from "../webview/view/keyface.mjs";
+import {behaviourFor, behaviourGridSteps, behaviourGroups, behaviourTiers, macroReach, pointingReach, reachablePositions, resolvedPositions, bindingKeycode, bindingsForSlot, comboGroups, combosForKey, keyFace, keyMeaning, macroKeycodes, pointingSlotFor, slotKeycodes} from "../webview/view/keyface.mjs";
 
 test("a key face uses the model's own resolution, and names the layer a dual-role key reaches", () => {
     assert.deepEqual(keyFace({keycode: "KC_TRANSPARENT", display: "▽"}), {main: "▽", sub: "", kind: "transparent"});
@@ -153,19 +153,41 @@ test("the combo table and the board's badges count the same keys", () => {
         {layoutIndex: 27, keycode: "KC_D"}, {layoutIndex: 28, keycode: "LT(3,KC_F)"}, {layoutIndex: 29, keycode: "KC_G"}]};
     const model = {combos: [combo], layers: [layer]};
 
-    assert.deepEqual(comboKeysOnLayer(layer, combo).map((key) => key.layoutIndex), [27, 28]);
+    const whole = comboGroups(model, [layer], 0);
+    assert.deepEqual(whole.onKeys[0].keys.map((key) => key.position.layoutIndex), [27, 28]);
     assert.deepEqual(combosForKey(model, layer.positions[0]).map((row) => row.badge), ["C1"],
         "the badge and the count come from one predicate");
     assert.deepEqual(combosForKey(model, layer.positions[2]), []);
 
     const half = {name: "Layer 3", positions: [{layoutIndex: 27, keycode: "KC_D"}]};
-    assert.equal(comboKeysOnLayer(half, combo).length, 1, "a partly present combo is not reachable");
-    assert.deepEqual(comboKeysOnLayer(undefined, combo), []);
+    const partial = comboGroups({combos: [combo]}, [half], 0);
+    assert.deepEqual(partial.onKeys, [], "a partly present combo is not reachable");
+    assert.equal(partial.elsewhere[0].keys.length, 1, "and the table still says how much of it is here");
 
     // A device that does report positions still wins, on those positions.
     const reported = {badge: "C2", inputs: ["KC_N", "KC_M"], inputPositions: [42]};
-    assert.deepEqual(comboKeysOnLayer({positions: [{layoutIndex: 42, keycode: "KC_X"}, {layoutIndex: 43, keycode: "KC_M"}]}, reported)
-        .map((key) => key.layoutIndex), [42]);
+    const byPosition = comboGroups({combos: [reported]},
+        [{positions: [{layoutIndex: 42, keycode: "KC_X"}, {layoutIndex: 43, keycode: "KC_M"}]}], 0);
+    assert.deepEqual(byPosition.elsewhere[0].keys.map((key) => key.position.layoutIndex), [42]);
+});
+
+test("combos group by whether this layer produces all of their inputs", () => {
+    const combo = {id: 1, badge: "C1", inputs: ["KC_D", "KC_F"], output: "KC_TAB"};
+    const at = (layoutIndex, keycode) => ({layoutIndex, keycode, display: keycode});
+    const stack = [
+        {index: 0, name: "Base", positions: [at(27, "KC_D"), at(28, "KC_F")]},
+        {index: 1, name: "Numbers", positions: [at(27, "KC_TRANSPARENT"), at(28, "KC_TRANSPARENT")]},
+        {index: 2, name: "Symbols", positions: [at(27, "KC_TRANSPARENT"), at(28, "KC_NO")]},
+    ];
+    const model = {combos: [combo]};
+
+    assert.equal(comboGroups(model, stack, 0).onKeys.length, 1, "both inputs are stored here");
+    const above = comboGroups(model, stack, 1);
+    assert.equal(above.onKeys.length, 0);
+    assert.equal(above.throughKeys.length, 1, "both inputs fall through, so the combo still fires");
+    const blocked = comboGroups(model, stack, 2);
+    assert.equal(blocked.throughKeys.length, 0);
+    assert.equal(blocked.elsewhere[0].keys.length, 1, "KC_NO takes one input away, so it cannot fire");
 });
 
 test("behaviours group by how this layer reaches them", () => {
@@ -193,4 +215,167 @@ test("behaviours group by how this layer reaches them", () => {
     assert.deepEqual(base.here.map((row) => row.keycode), ["KC_ESCAPE", "KC_1", "KC_9"]);
     assert.deepEqual(base.through, [], "nothing lies under the base layer");
     assert.deepEqual(base.elsewhere.map((row) => row.keycode), ["LEFT_THUMB"]);
+});
+
+test("a macro fired from a behaviour branch is reached, though no key shows it", () => {
+    const model = {
+        viaMacros: [
+            {kind: "via", keycode: "VIA_MACRO_0", payload: "{KC_A}", bytes: 3, empty: false},
+            {kind: "via", keycode: "VIA_MACRO_1", payload: "{KC_B}", bytes: 3, empty: false},
+            {kind: "via", keycode: "VIA_MACRO_2", payload: "{KC_C}", bytes: 3, empty: false},
+            {kind: "via", keycode: "VIA_MACRO_3", payload: "", bytes: 0, empty: true},
+        ],
+        keyBehaviors: [
+            {keycode: "KC_ESCAPE", steps: [{tapCount: 1, tap: {action: "VIA_MACRO_1"}}]},
+            {keycode: "KC_B", steps: [{tapCount: 0, longHold: {action: "VIA_MACRO_2"}}]},
+        ],
+    };
+    const at = (layoutIndex, keycode) => ({layoutIndex, keycode, display: keycode});
+    const stack = [
+        {index: 0, name: "Base", positions: [at(0, "KC_ESCAPE"), at(1, "VIA_MACRO_0"), at(2, "KC_B")]},
+        {index: 1, name: "Numbers", positions: [at(0, "KC_TRANSPARENT"), at(1, "KC_TRANSPARENT"), at(2, "KC_NO")]},
+    ];
+
+    const base = macroReach(model, stack, 0);
+    assert.deepEqual(base.onKeys.map((entry) => entry.name), ["VIA_MACRO_0"], "the only macro a key carries");
+    assert.deepEqual(base.throughKeys, [], "the base layer has nothing under it to fall through to");
+    assert.deepEqual(base.fromBranches.map((entry) => entry.name), ["VIA_MACRO_1", "VIA_MACRO_2"],
+        "both branches are found, tap and long hold alike");
+    assert.deepEqual(base.fromBranches[0].behaviours, [{keycode: "KC_ESCAPE", layer: null, whileHeld: false}],
+        "named by the behaviour that fires it, which is mapped right here");
+    assert.deepEqual(base.fromBranchesBelow, [], "nothing lies under the base layer to reach a behaviour through");
+    assert.deepEqual(base.elsewhere, [], "an empty slot is not a macro this layer is missing");
+
+    const above = macroReach(model, stack, 1);
+    assert.deepEqual(above.onKeys, [], "no key on Numbers carries a macro itself");
+    assert.deepEqual(above.throughKeys.map((entry) => entry.name), ["VIA_MACRO_0"],
+        "a transparent key lets the macro key underneath answer");
+    assert.equal(above.throughKeys[0].keys[0].layer.name, "Base", "and the group names the layer it came from");
+    assert.deepEqual(above.fromBranches, [], "no behaviour mapped on Numbers sends a macro");
+    assert.equal(above.fromBranchesBelow.find((entry) => entry.name === "VIA_MACRO_1").behaviours[0].layer.name,
+        "Base", "and the entry names the layer holding that behaviour, since this one does not");
+    assert.deepEqual(above.elsewhere, ["VIA_MACRO_2"],
+        "KC_NO on the layer being viewed is the top answer, so KC_B on Base is not reached");
+});
+
+test("a transparent key can be answered by any layer below that is held with this one", () => {
+    // The real stack: Base, Numbers, Symbols, with LT(NUM,SPC) on a thumb and
+    // LT(SYM,J) on the other hand, so {Base, Numbers, Symbols} is a real hold.
+    const at = (layoutIndex, keycode) => ({layoutIndex, keycode, display: keycode});
+    const stack = [
+        {index: 0, name: "Base", positions: [at(0, "KC_8"), at(1, "KC_RIGHT_ALT"), at(2, "VIA_MACRO_0")]},
+        {index: 1, name: "Numbers", positions: [at(0, "KC_P7"), at(1, "KC_NO"), at(2, "KC_TRANSPARENT")]},
+        {index: 2, name: "Symbols", positions: [at(0, "KC_TRANSPARENT"), at(1, "KC_TRANSPARENT"), at(2, "KC_TRANSPARENT")]},
+    ];
+
+    // Symbols alone: the default layer answers everything.
+    assert.deepEqual(resolvedPositions(stack, 2, []).map((entry) => entry.position.keycode),
+        ["KC_8", "KC_RIGHT_ALT", "VIA_MACRO_0"]);
+    // Symbols with Numbers held: Numbers wins where it has a key, KC_NO included.
+    assert.deepEqual(resolvedPositions(stack, 2, [1]).map((entry) => entry.position.keycode),
+        ["KC_P7", "KC_NO", "VIA_MACRO_0"], "and its transparent position still falls to Base");
+
+    // Both are real, so both are reachable, each named with what it needs.
+    const reachable = reachablePositions(stack, 2);
+    const atZero = reachable.filter((entry) => entry.position.layoutIndex === 0);
+    assert.deepEqual(atZero.map((entry) => [entry.position.keycode, entry.layer.name, entry.whileHeld]),
+        [["KC_P7", "Numbers", true], ["KC_8", "Base", false]],
+        "Numbers answers only while held; Base always does");
+
+    // An intermediate KC_NO is one real outcome — the key does nothing while
+    // Numbers is held — but it takes nothing away, because dropping Numbers
+    // leaves Base answering. It names nothing, so no group ever lists it.
+    assert.deepEqual(reachable.filter((entry) => entry.position.layoutIndex === 1)
+        .map((entry) => [entry.position.keycode, entry.whileHeld]),
+        [["KC_NO", true], ["KC_RIGHT_ALT", false]]);
+    const model = {keyBehaviors: [{keycode: "KC_RIGHT_ALT", steps: [{tapCount: 0, hold: {action: "ARROW_MODE"}}]}],
+        pdModes: [{id: 4, name: "Arrow", kind: 1}]};
+    assert.deepEqual(pointingReach(model, stack, 2).fromBranchesBelow.map((entry) => entry.name), ["4"],
+        "so the behaviour on Base is reached, and the mode its branch sends with it");
+});
+
+test("a combo fires only if one activation carries every input at once", () => {
+    const at = (layoutIndex, keycode) => ({layoutIndex, keycode, display: keycode});
+    const combo = {id: 1, badge: "C1", inputs: ["KC_D", "KC_F"], output: "KC_TAB"};
+    // KC_D answers only with Numbers held; KC_F only without it. Each input is
+    // reachable, the pair never is — which a per-key union would miss.
+    const split = [
+        {index: 0, name: "Base", positions: [at(27, "KC_X"), at(28, "KC_F")]},
+        {index: 1, name: "Numbers", positions: [at(27, "KC_D"), at(28, "KC_NO")]},
+        {index: 2, name: "Symbols", positions: [at(27, "KC_TRANSPARENT"), at(28, "KC_TRANSPARENT")]},
+    ];
+    const never = comboGroups({combos: [combo]}, split, 2);
+    assert.deepEqual(never.onKeys, []);
+    assert.deepEqual(never.throughKeys, [], "no single hold carries both inputs");
+    assert.equal(never.elsewhere.length, 1);
+    assert.equal(never.elsewhere[0].keys.length, 1, "and the row says how far any one hold gets");
+
+    // Move KC_F onto Numbers and one hold carries both.
+    const together = [
+        split[0],
+        {index: 1, name: "Numbers", positions: [at(27, "KC_D"), at(28, "KC_F")]},
+        split[2],
+    ];
+    const fires = comboGroups({combos: [combo]}, together, 2);
+    assert.deepEqual(fires.elsewhere, []);
+    assert.equal(fires.throughKeys.length, 1);
+    assert.deepEqual(fires.throughKeys[0].held.map((layer) => layer.name), ["Numbers"],
+        "and it names the layer you have to hold as well");
+});
+
+test("a thing reached several ways is reported once, by its shortest route", () => {
+    const at = (layoutIndex, keycode) => ({layoutIndex, keycode, display: keycode});
+    const model = {
+        viaMacros: [
+            {kind: "via", keycode: "VIA_MACRO_0", payload: "{KC_A}", bytes: 3, empty: false},
+            {kind: "via", keycode: "VIA_MACRO_1", payload: "{KC_B}", bytes: 3, empty: false},
+        ],
+        keyBehaviors: [
+            {keycode: "KC_ESCAPE", steps: [{tapCount: 1, tap: {action: "VIA_MACRO_0"}}]},
+            {keycode: "KC_B", steps: [{tapCount: 1, tap: {action: "VIA_MACRO_1"}}]},
+        ],
+    };
+    const stack = [
+        {index: 0, name: "Base", positions: [at(0, "KC_ESCAPE"), at(1, "VIA_MACRO_1"), at(2, "KC_X")]},
+        {index: 1, name: "Numbers", positions: [at(0, "KC_ESCAPE"), at(1, "KC_TRANSPARENT"), at(2, "KC_B")]},
+    ];
+
+    // VIA_MACRO_1 sits on a key below *and* is fired by KC_B, a behaviour mapped
+    // on Numbers itself. The behaviour is the shorter route, so it leads — and
+    // it is what the tab counts, which the old "any key wins" rule dropped.
+    const above = macroReach(model, stack, 1);
+    assert.deepEqual(above.onKeys, [], "no macro keycode is on a key of Numbers");
+    assert.deepEqual(above.fromBranches.map((entry) => entry.name).sort(), ["VIA_MACRO_0", "VIA_MACRO_1"],
+        "both behaviours are mapped here, so both of their macros are stored here");
+    assert.deepEqual(above.throughKeys, [], "the key below is the longer route, so it does not lead");
+    assert.deepEqual(above.fromBranchesBelow, []);
+    const promoted = above.fromBranches.find((entry) => entry.name === "VIA_MACRO_1");
+    assert.deepEqual(promoted.keys.map((key) => key.position.layoutIndex), [1],
+        "and the entry still carries the route it did not lead with");
+});
+
+test("reach lists read down the stack, the default layer first", () => {
+    const at = (layoutIndex, keycode) => ({layoutIndex, keycode, display: keycode});
+    const clear = (indexes) => indexes.map((i) => at(i, "KC_TRANSPARENT"));
+    const model = {
+        viaMacros: [0, 1, 2].map((n) => ({kind: "via", keycode: `VIA_MACRO_${n}`, payload: "{KC_A}", bytes: 3, empty: false})),
+        keyBehaviors: [
+            {keycode: "KC_A", steps: [{tapCount: 0, tap: {action: "KC_A"}}]},
+            {keycode: "KC_B", steps: [{tapCount: 0, tap: {action: "KC_B"}}]},
+            {keycode: "KC_C", steps: [{tapCount: 0, tap: {action: "KC_C"}}]},
+        ],
+    };
+    // Each layer under the top one answers a different position, so the order
+    // the rows come back in is the order of the layers that answer them.
+    const stack = [
+        {index: 0, name: "Base", positions: [at(0, "VIA_MACRO_2"), at(1, "KC_NO"), at(2, "KC_NO"), at(3, "KC_C")]},
+        {index: 1, name: "Numbers", positions: [at(0, "KC_NO"), at(1, "VIA_MACRO_1"), at(2, "KC_NO"), at(3, "KC_B")]},
+        {index: 2, name: "Symbols", positions: [at(0, "KC_NO"), at(1, "KC_NO"), at(2, "VIA_MACRO_0"), at(3, "KC_A")]},
+        {index: 3, name: "Top", positions: clear([0, 1, 2, 3])},
+    ];
+
+    assert.deepEqual(macroReach(model, stack, 3).throughKeys.map((entry) => entry.keys[0].layer.name),
+        ["Base", "Numbers", "Symbols"], "macros answered lower in the stack come first");
+    assert.deepEqual(behaviourGroups(model, stack, 3).through.map((entry) => entry.layer.name),
+        ["Base", "Numbers", "Symbols"], "and so do behaviours");
 });

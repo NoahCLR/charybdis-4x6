@@ -5,16 +5,19 @@
 
 const vscode = acquireVsCodeApi();
 
+const openGroups = () => ({here: true, branches: true, through: false, belowBranches: false, elsewhere: false});
+
 export const state = {
     screen: "keys",
     layer: 0,
     selected: 0,
     tab: "key",
     behaviourRow: null,
-    // Which groups of the behaviour list stand open. Only the behaviours this
-    // layer holds itself are worth opening unasked; the rest are context.
-    behaviourGroups: {here: true, through: false, elsewhere: false},
     behaviourRowShown: null,
+    // Every tab that answers "what does this layer reach" is grouped the same
+    // way and opens the same way: what the layer holds itself, and the rest a
+    // click away.
+    groups: {behaviours: openGroups(), macros: openGroups(), combos: openGroups(), pointing: openGroups()},
     cell: null,
     comboOpen: false,
     comboPicking: false,

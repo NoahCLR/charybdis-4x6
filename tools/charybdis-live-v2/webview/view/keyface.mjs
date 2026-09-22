@@ -45,6 +45,96 @@ export const actionLabel = (model, name) => model?.qmkKeyLabels?.[name]
 export const behaviourFor = (model, keycode) =>
     (model?.keyBehaviors || []).find((row) => row.keycode === keycode);
 
+// Every activation this layer can be the top of: layer 0 is always on, this
+// layer is held, and any set of the layers between may be held alongside.
+// Eight layers make at most 64 of them, so the ones that need exact answers
+// simply enumerate.
+//
+// Layer 0 stands in for the default layer. The keyboard can move that with
+// NOAH_SETTING_DEFAULT_LAYERS and does not report it, but layer 0 is also what
+// the firmware falls back to when nothing active answers, so the set of layers
+// that can answer is right either way — only whether an answer needs a layer
+// held would be misread, and only on a keyboard whose default has moved.
+export function activations(at) {
+    const sets = [[]];
+    for (let layer = 1; layer < at; layer += 1) {
+        for (const held of [...sets]) sets.push([...held, layer]);
+    }
+    return sets;
+}
+
+/**
+ * What each key of this layer answers with under one activation.
+ *
+ * The firmware resolves a press by scanning the layers whose bit is set,
+ * highest first, and taking the first that is not transparent. An inactive
+ * layer is skipped entirely — it neither answers nor blocks — so `held` names
+ * the layers on besides layer 0 and this one.
+ */
+export function resolvedPositions(stack, at, held = []) {
+    const active = new Set([0, at, ...held]);
+    const resolved = [];
+    for (const position of stack[at]?.positions || []) {
+        if (keyFace(position).kind !== "transparent") {
+            resolved.push({position, layer: stack[at], fellThrough: false, whileHeld: false});
+            continue;
+        }
+        for (let below = at - 1; below >= 0; below -= 1) {
+            if (!active.has(below)) continue;
+            const there = (stack[below]?.positions || [])
+                .find((other) => other.layoutIndex === position.layoutIndex);
+            if (!there || keyFace(there).kind === "transparent") continue;
+            resolved.push({position: there, layer: stack[below], fellThrough: true, whileHeld: below !== 0});
+            break;
+        }
+    }
+    return resolved;
+}
+
+/**
+ * Every answer this layer's keys can give, across every activation.
+ *
+ * For one key this is exactly the union of the layers below that are not
+ * transparent at that position: holding {default, M, this} makes M answer, and
+ * every answer is some such M. So the set is built directly rather than by
+ * enumerating activations — they would produce the same thing. A key answered
+ * by anything but the default layer only answers that way while that layer is
+ * held too, which `whileHeld` records.
+ *
+ * Anything reached through a single key — a behaviour, and so the macros and
+ * pointing modes its branches send — is exact here. Combos are not: their
+ * inputs have to answer at the same time, under one activation, so they
+ * enumerate instead.
+ */
+export function reachablePositions(stack, at) {
+    const reachable = [];
+    for (const position of stack[at]?.positions || []) {
+        if (keyFace(position).kind !== "transparent") {
+            reachable.push({position, layer: stack[at], fellThrough: false, whileHeld: false});
+            continue;
+        }
+        for (let below = at - 1; below >= 0; below -= 1) {
+            const there = (stack[below]?.positions || [])
+                .find((other) => other.layoutIndex === position.layoutIndex);
+            if (!there || keyFace(there).kind === "transparent") continue;
+            reachable.push({position: there, layer: stack[below], fellThrough: true, whileHeld: below !== 0});
+        }
+    }
+    return reachable;
+}
+
+// Reach lists read down the stack: what the default layer answers first, then
+// what each layer you would have to hold adds. An entry answered by several
+// layers sorts by the nearest one to the default, which is also the layer its
+// row names first. Sorting is stable, so entries from one layer keep the order
+// the board gave them.
+const sourceRank = (entry) => Math.min(
+    entry.layer ? entry.layer.index ?? 0 : Infinity,
+    ...(entry.keys || []).filter((key) => key.fellThrough).map((key) => key.layer?.index ?? 0),
+    ...(entry.behaviours || []).filter((row) => row.layer).map((row) => row.layer.index ?? 0),
+);
+const downTheStack = (entries) => [...entries].sort((one, other) => sourceRank(one) - sourceRank(other));
+
 /**
  * Behaviours, grouped by how this layer reaches them.
  *
@@ -53,34 +143,22 @@ export const behaviourFor = (model, keycode) =>
  * while this layer is active — that one is reached *through* the layer, and it
  * is worth naming which layer answers. Everything else the profile carries is
  * somewhere this layer never reaches.
- *
- * `stack` is the layers in index order and `at` is the position of the current
- * one in it, because falling through only ever goes down.
  */
 export function behaviourGroups(model, stack, at) {
-    const layer = stack[at];
-    const here = [...new Set((layer?.positions || []).map(keyMeaning))]
-        .map((code) => behaviourFor(model, code)).filter(Boolean);
-
-    // Walk down the way the firmware does: a transparent key falls through, and
-    // anything else — a real keycode or a disabled one — stops the walk.
-    const through = [];
-    for (const position of layer?.positions || []) {
-        if (keyFace(position).kind !== "transparent") continue;
-        for (let below = at - 1; below >= 0; below -= 1) {
-            const there = (stack[below]?.positions || [])
-                .find((other) => other.layoutIndex === position.layoutIndex);
-            if (!there || keyFace(there).kind === "transparent") continue;
-            const row = behaviourFor(model, keyMeaning(there));
-            if (row && !here.includes(row) && !through.some((entry) => entry.row === row)) {
-                through.push({row, layer: stack[below]});
-            }
-            break;
-        }
+    const here = [], through = [];
+    for (const {position, layer, fellThrough, whileHeld} of reachablePositions(stack, at)) {
+        const row = behaviourFor(model, keyMeaning(position));
+        if (!row) continue;
+        if (!fellThrough) { if (!here.includes(row)) here.push(row); }
+        else if (!through.some((entry) => entry.row === row)) through.push({row, layer, whileHeld});
     }
 
-    const reached = new Set([...here, ...through.map((entry) => entry.row)]);
-    return {here, through, elsewhere: (model?.keyBehaviors || []).filter((row) => !reached.has(row))};
+    // A behaviour reached both ways is simply on this layer.
+    const direct = new Set(here);
+    const fell = through.filter((entry) => !direct.has(entry.row));
+    const reached = new Set([...here, ...fell.map((entry) => entry.row)]);
+    return {here, through: downTheStack(fell),
+        elsewhere: (model?.keyBehaviors || []).filter((row) => !reached.has(row))};
 }
 
 // One dot per tier the behaviour uses anywhere, carrying how many branches use
@@ -118,13 +196,13 @@ export function combosForKey(model, position) {
     return (model?.combos || []).filter((combo) => comboTouches(combo, position));
 }
 
-// The keys on a layer that carry this combo's inputs. A combo fires from the
-// keycodes the active layer produces, so all of its inputs have to be there.
-export function comboKeysOnLayer(layer, combo) {
-    if (!layer || !combo) return [];
-    const inputs = combo.inputs || [];
+// The positions among these that carry a combo's inputs, one per input. A
+// combo fires from the keycodes the active layer produces, so all of its
+// inputs have to be there.
+function comboKeysAmong(positions, combo) {
+    const inputs = combo?.inputs || [];
     const found = new Map();
-    for (const position of layer.positions || []) {
+    for (const position of positions) {
         if (!comboTouches(combo, position)) continue;
         const input = inputs.find((name) => name === position.keycode || name === keyMeaning(position)) ?? position.keycode;
         if (!found.has(input)) found.set(input, position);
@@ -132,8 +210,139 @@ export function comboKeysOnLayer(layer, combo) {
     return [...found.values()];
 }
 
+/**
+ * Combos, grouped the way everything else is — but a combo is the one thing a
+ * union cannot answer.
+ *
+ * A combo needs every input present at the same time, under one activation. Its
+ * inputs could each be reachable under some hold and still never be reachable
+ * together: one answered only while Numbers is held, another only while it is
+ * not. So every activation this layer can top is tried, and the combo fires if
+ * any single one carries all of its inputs — preferring the one that holds the
+ * fewest extra layers, because that is the easiest way to press it.
+ *
+ * It has no branch case either: a behaviour fires a keycode, never a chord.
+ */
+export function comboGroups(model, stack, at) {
+    // The activations do not depend on the combo, so each is resolved once and
+    // every combo is tried against it. Resolving per combo instead re-walks the
+    // whole board 64 times over, on every render.
+    const tries = activations(at).map((held) => {
+        const resolved = resolvedPositions(stack, at, held);
+        return {held, resolved, answering: new Map(resolved.map((entry) => [entry.position, entry]))};
+    });
+
+    const onKeys = [], throughKeys = [], elsewhere = [];
+    for (const combo of model?.combos || []) {
+        const inputs = (combo.inputs || []).length;
+        let fires = null, most = null;
+        for (const {held, resolved, answering} of tries) {
+            const keys = comboKeysAmong(resolved.map((entry) => entry.position), combo)
+                .map((position) => answering.get(position));
+            if (!most || keys.length > most.keys.length) most = {keys, held};
+            if (inputs && keys.length >= inputs && (!fires || held.length < fires.held.length)) fires = {keys, held};
+        }
+        if (!fires) { elsewhere.push({combo, inputs, keys: most?.keys || [], held: []}); continue; }
+        const entry = {combo, inputs, keys: fires.keys, held: fires.held.map((index) => stack[index])};
+        (entry.keys.every((key) => !key.fellThrough) ? onKeys : throughKeys).push(entry);
+    }
+    return {onKeys, throughKeys: downTheStack(throughKeys), fromBranches: [], fromBranchesBelow: [], elsewhere};
+}
+
 export const macroKeycodes = (keycode) =>
     [...String(keycode || "").matchAll(/\b((?:VIA_)?MACRO_\d+)\b/g)].map((match) => match[1]);
+
+/**
+ * How this layer reaches a set of things named by keycode — the one shape the
+ * Macros and Pointing modes tabs both group by, so they cannot drift apart.
+ *
+ *   on this layer        a key here names it
+ *   through a behaviour  a branch of a behaviour mapped here sends it, which
+ *                        no key cap can show
+ *   through this layer   a transparent key lets a lower layer's key name it
+ *   through a behaviour  a transparent key lets a lower layer's behaviour
+ *     below              answer, and one of its branches sends it
+ *   elsewhere            the profile carries it, this layer reaches it no way
+ *
+ * The first two are what this layer itself holds, which is what a tab counts;
+ * the next two it only reaches down the stack. `namesOf(keycode)` answers which
+ * of the things a keycode names, as stable string keys, and `all` is every name
+ * worth reporting as unreached.
+ */
+export function reachGroups(model, stack, at, namesOf, all) {
+    const found = new Map();
+    const reachOf = (name) => {
+        if (!found.has(name)) found.set(name, {directKeys: [], fellKeys: [], directRows: [], belowRows: []});
+        return found.get(name);
+    };
+
+    for (const {position, layer, fellThrough, whileHeld} of reachablePositions(stack, at)) {
+        for (const name of namesOf(keyMeaning(position))) {
+            reachOf(name)[fellThrough ? "fellKeys" : "directKeys"].push({position, layer, fellThrough, whileHeld});
+        }
+    }
+
+    // Every behaviour this layer can fire, including the ones it only reaches
+    // because a transparent key lets the default layer answer. Those carry the
+    // layer that holds them, so a row can say so.
+    const {here, through} = behaviourGroups(model, stack, at);
+    for (const {row, from, whileHeld} of [...here.map((row) => ({row, from: null, whileHeld: false})),
+        ...through.map((item) => ({row: item.row, from: item.layer, whileHeld: item.whileHeld}))]) {
+        for (const step of row.steps || []) {
+            for (const tier of [step.tap, step.hold, step.longHold]) {
+                for (const name of namesOf(tier?.action)) {
+                    const rows = reachOf(name)[from ? "belowRows" : "directRows"];
+                    if (!rows.some((entry) => entry.keycode === row.keycode)) {
+                        rows.push({keycode: row.keycode, layer: from, whileHeld});
+                    }
+                }
+            }
+        }
+    }
+
+    // One thing is often reached several ways. It is reported once, by the
+    // shortest route — the order the groups themselves read in — and its entry
+    // still carries every route, so a row can name them all.
+    const onKeys = [], fromBranches = [], throughKeys = [], fromBranchesBelow = [];
+    for (const [name, reach] of found) {
+        const behaviours = [...reach.directRows, ...reach.belowRows];
+        const keys = [...reach.directKeys, ...reach.fellKeys];
+        if (reach.directKeys.length) onKeys.push({name, keys, behaviours});
+        else if (reach.directRows.length) fromBranches.push({name, keys, behaviours});
+        else if (reach.fellKeys.length) throughKeys.push({name, keys, behaviours});
+        else fromBranchesBelow.push({name, keys, behaviours});
+    }
+    return {onKeys, fromBranches,
+        throughKeys: downTheStack(throughKeys), fromBranchesBelow: downTheStack(fromBranchesBelow),
+        elsewhere: all.filter((name) => !found.has(name))};
+}
+
+/**
+ * Macro slots, grouped by how this layer sets them off.
+ *
+ * A key on this layer can carry a macro keycode, which the board shows. A
+ * transparent key lets a lower layer's macro key answer instead, which the
+ * board shows only as falling through. A behaviour this layer reaches can fire
+ * one from any of its branches, and that the board cannot show at all, because
+ * the key cap carries the behaviour, not what its branches send. The rest are
+ * slots holding a payload nothing here reaches.
+ */
+export const macroReach = (model, stack, at) => reachGroups(model, stack, at, macroKeycodes,
+    [...(model?.viaMacros || []), ...(model?.hardcodedMacros || [])]
+        // An empty slot is not a macro this layer is missing, it is a slot.
+        .filter((slot) => !slot.empty).map((slot) => slot.keycode));
+
+/**
+ * Pointing modes, grouped the same four ways. A mode is reached by the key that
+ * holds or toggles it, by a transparent key letting a lower one do so, or by a
+ * behaviour branch that sends its keycode.
+ */
+export const pointingReach = (model, stack, at) => reachGroups(model, stack, at,
+    (keycode) => { const slot = pointingSlotFor(model, keycode); return slot ? [String(slot.id)] : []; },
+    // A slot with no movement cannot be activated, so it is not a mode this
+    // layer is missing either.
+    (model?.pdModes || []).filter((slot) => slot.kind).map((slot) => String(slot.id)));
+
 
 // A layout position carries the keyboard's own name for its keycode, which for
 // a pointing mode is a bare user keycode (`QK_USER_16`) or, for a slot the
