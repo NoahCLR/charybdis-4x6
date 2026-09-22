@@ -77,7 +77,7 @@ function buildDeviceModel(state = {}) {
             maxTapStepsPerBehavior: state.capabilities?.maxTapStepsPerBehavior || 5,
         },
         profileIdentity: state.committed?.state === "read" ? {source: state.committed.source, generation: state.committed.generation, digest: state.committed.digest, originHalf: state.committed.originHalf} : null,
-        rgb: {...committedRgb(state.committed), baseEffect: baseRgbForView(state.baseRgb)},
+        rgb: {...committedRgb(state.committed), baseEffect: baseRgbForView(state.baseRgb, state.settingsView?.brightnessMax)},
 
         // Independently read native combo definitions.
         combos: combosForView(state.combos, catalog.labels),

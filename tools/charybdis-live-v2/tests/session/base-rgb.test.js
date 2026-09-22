@@ -19,6 +19,10 @@ test("base RGB survives independently of the profile, but never survives failure
     assert.equal(state.baseRgb.state, "read");
     assert.equal(state.error.message, "Earlier profile failure");
     assert.deepEqual(buildDeviceModel(state).rgb.baseEffect.previewColor, {h: "0", s: "255", v: "255"});
+    const limited = buildDeviceModel({...state, settingsView: {brightnessMax: 200}}).rgb.baseEffect;
+    assert.equal(limited.brightness, 255, "the VIA read remains verbatim");
+    assert.equal(limited.brightnessPercent, 100);
+    assert.deepEqual(limited.previewColor, {h: "0", s: "255", v: "200"}, "the preview uses the keyboard's absolute brightness domain");
     state.baseRgb.hue = 99;
     assert.equal(service.snapshot().baseRgb.hue, 0, "snapshots cannot mutate the cached read");
     fail = true;
@@ -40,4 +44,10 @@ test("off, brightness zero, and unrecognised effects have distinct presentation"
     const unknown = baseRgbForView({...state, effectId: 42});
     assert.equal(unknown.effectName, "Effect 42");
     assert.equal(unknown.previewColor, undefined, "an effect's configured hue is not its rendered frame");
+});
+
+test("relative VIA brightness is normalized to the reported keyboard maximum", () => {
+    const state = {state: "read", effectId: 1, brightness: 128, hue: 17, saturation: 240, speed: 0};
+    assert.deepEqual(baseRgbForView(state, 200).previewColor, {h: "17", s: "240", v: "100"});
+    assert.deepEqual(baseRgbForView(state).previewColor, {h: "17", s: "240", v: "128"}, "unknown limits preserve the raw read");
 });

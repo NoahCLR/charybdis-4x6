@@ -102,6 +102,7 @@ function settingsEditorView(snapshot) {
     if (!snapshot?.document || snapshot.incomplete) return null;
     const {settings} = validateSnapshot(snapshot.document);
     return {identity: snapshot.fingerprint,
+        brightnessMax: snapshot.limits?.brightnessMax,
         sections: settingsSections(snapshot, settings).map(section => ({...section, fields: section.fields.map(field => {
             const value = settingValue(field, settings.values);
             const brightness = field.macro === "brightness";

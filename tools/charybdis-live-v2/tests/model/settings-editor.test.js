@@ -13,6 +13,7 @@ function message(current, sectionId, updates = {}) {
 
 test("Defaults and inherited behaviour timing come entirely from the complete keyboard snapshot", () => {
     const current = snapshot(), view = settingsEditorView(current);
+    assert.equal(view.brightnessMax, 200);
     const model = buildDeviceModel({settingsView: view, capabilities: {compiledLayerCount: 8}});
     assert.equal(model.configDefaults.length, 10);
     const fields = model.configDefaults.flatMap(section => section.fields);

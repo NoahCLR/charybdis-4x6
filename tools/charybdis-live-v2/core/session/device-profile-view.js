@@ -132,18 +132,23 @@ function rgbForView(domain) {
     };
 }
 
-function baseRgbForView(read) {
+function baseRgbForView(read, maximumBrightness) {
     if (read?.state !== "read") return {state: read?.state || "unread", message: read?.error?.message || "Base RGB has not been read from the keyboard."};
     const {effectId, hue, saturation, brightness, speed, readAt} = read;
     const enabled = effectId !== 0;
+    const previewBrightness = Number.isInteger(maximumBrightness)
+        ? Math.round(brightness * maximumBrightness / 255)
+        : brightness;
     return {
         state: "read", enabled, effectId, hue, saturation, brightness, speed, readAt,
         effectName: !enabled ? "Off" : effectId === 1 ? "Solid colour" : `Effect ${effectId}`,
         brightnessPercent: Math.round(brightness * 100 / 255),
-        // VIA brightness is relative to the device's compiled limit. This
-        // swatch uses that relative intensity, not an invented absolute HSV V.
+        // VIA reports brightness as 0..255 relative to the compiled limit,
+        // while profile colours store their absolute HSV value. Put the base
+        // effect back in that absolute domain before comparing or composing it
+        // with layer colours. Keep `brightness` above verbatim for readback UI.
         previewColor: !enabled ? {h: "0", s: "0", v: "0"} : effectId === 1
-            ? {h: String(hue), s: String(saturation), v: String(brightness)} : undefined,
+            ? {h: String(hue), s: String(saturation), v: String(previewBrightness)} : undefined,
     };
 }
 
