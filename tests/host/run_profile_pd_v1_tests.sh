@@ -8,7 +8,7 @@ node - "$ROOT" "$BUILD_DIR/corpus.bin" <<'JS'
 const fs = require("node:fs");
 const root = process.argv[2];
 const fixture = require(root + "/tests/fixtures/pd_mode_domain_v1.json");
-const {decodePdDomain, encodePdDomain} = require(root + "/tools/charybdis-live/core/schema/pd-mode-domain-v1");
+const {decodePdDomain, encodePdDomain} = require(root + "/tools/charybdis-live-v2/core/schema/pd-mode-domain-v1");
 const golden = Buffer.from(fixture.hex, "hex");
 if (!encodePdDomain(fixture.slots).equals(golden)) throw new Error("PD fixture drift");
 const chunks = [];
@@ -26,6 +26,18 @@ for (let offset = 0; offset < golden.length; offset++) {
 }
 for (let length = 0; length < golden.length; length++) add(golden.subarray(0, length));
 add(Buffer.concat([golden, Buffer.from([0])]));
+// An eight-direction mode: diagonals live in bytes 70..86 and the
+// empty-diagonal policy in byte 86. Every byte of that record is mutated too.
+const eightSlots = structuredClone(fixture.slots);
+Object.assign(eightSlots[4], {axis: 3, thresholdX: 40, thresholdY: 40, emptyDiagonal: 1,
+    diagonals: {upLeft: {keycode: 0x50, modifierPolicy: 0, mask: 0}, upRight: {keycode: 0x4f, modifierPolicy: 1, mask: 2}, downLeft: {keycode: 0, modifierPolicy: 0, mask: 0}, downRight: {keycode: 0x51, modifierPolicy: 2, mask: 0}}});
+const eight = encodePdDomain(eightSlots);
+add(eight);
+for (let offset = 8 + 4 * 96; offset < 8 + 5 * 96; offset++) {
+    for (const value of [0, 1, 2, 3, 4, 0x7f, 0x80, 0xff]) {
+        const bytes = Buffer.from(eight); bytes[offset] = value; add(bytes);
+    }
+}
 for (const name of ["Édition ⌘", "😀".repeat(5), "x".repeat(23)]) {
     const slots = structuredClone(fixture.slots); slots[7].name = name; add(encodePdDomain(slots));
 }

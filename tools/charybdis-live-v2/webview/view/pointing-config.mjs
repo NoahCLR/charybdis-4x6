@@ -5,7 +5,11 @@
 
 export const KIND = {DIRECTIONAL: 1, SCROLLING: 2};
 export const DIRECTIONS = [["up", "Up"], ["left", "Left"], ["right", "Right"], ["down", "Down"]];
-export const AXIS = {VERTICAL: 0, HORIZONTAL: 1, DOMINANT: 2};
+export const AXIS = {VERTICAL: 0, HORIZONTAL: 1, DOMINANT: 2, EIGHT: 3};
+// Eight directions add the diagonals, stored beside the straight directions.
+export const DIAGONALS = [["upLeft", "Up-left"], ["upRight", "Up-right"], ["downLeft", "Down-left"], ["downRight", "Down-right"]];
+// What an eight-direction mode does when a diagonal has no shortcut.
+export const EMPTY_DIAGONAL = [[0, "Nearest straight direction"], [1, "Both neighbouring directions"], [2, "Nothing"]];
 // The directions each axis setting reads. The keyboard refuses a mode that
 // keeps a shortcut or a threshold on an axis it does not read, so the form
 // draws only these and the record carries the others as zero.
@@ -13,6 +17,7 @@ export const AXIS_DIRECTIONS = {
     [AXIS.VERTICAL]: ["up", "down"],
     [AXIS.HORIZONTAL]: ["left", "right"],
     [AXIS.DOMINANT]: ["up", "left", "right", "down"],
+    [AXIS.EIGHT]: ["up", "left", "right", "down"],
 };
 export const axisReads = (axis) => AXIS_DIRECTIONS[axis] || AXIS_DIRECTIONS[AXIS.DOMINANT];
 export const readsHorizontal = (axis) => axisReads(axis).includes("left");
@@ -100,6 +105,15 @@ export function readConfig(slot, form) {
             modifierPolicy: form[`dirPolicy:${direction}`] ? form[`dirPolicy:${direction}`]() : slot.directions?.[direction]?.modifierPolicy ?? 0,
             mask: form[`dirMask:${direction}`] ? form[`dirMask:${direction}`]() : slot.directions?.[direction]?.mask ?? 0,
         } : {keycode: "0", modifierPolicy: 0, mask: 0}]));
+        // Diagonals exist only in eight-direction mode; any other axis
+        // carries them as zero, which the keyboard requires.
+        const eight = axis === AXIS.EIGHT;
+        config.diagonals = Object.fromEntries(DIAGONALS.map(([diagonal]) => [diagonal, eight ? {
+            keycode: form[`diag:${diagonal}`] ? form[`diag:${diagonal}`]() || "0" : String(slot.diagonals?.[diagonal]?.keycode ?? 0),
+            modifierPolicy: slot.diagonals?.[diagonal]?.modifierPolicy ?? 0,
+            mask: slot.diagonals?.[diagonal]?.mask ?? 0,
+        } : {keycode: "0", modifierPolicy: 0, mask: 0}]));
+        config.emptyDiagonal = eight ? (form.emptyDiagonal ? form.emptyDiagonal() : slot.emptyDiagonal ?? 0) : 0;
     } else {
         config.heldModifiers = form.heldModifiers ? form.heldModifiers() : slot.heldModifiers;
         config.scroll = Object.fromEntries(SCROLL_FIELDS.map(([key]) => [key,

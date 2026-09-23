@@ -1023,3 +1023,15 @@ reads it while the keyboard is `PREPARING_PEER` and counts its movement as
 progress, so a slow copy no longer runs into the stall window it used to wait
 out blind. Firmware without page 1 answers `UNKNOWN_PAGE` and keeps the old
 behaviour.
+
+### D-L24 — Directional modes can read eight directions
+
+A directional mode can now read eight directions: the four straight ones plus
+up-left, up-right, down-left and down-right, each with its own shortcut. The
+trackball's motion is classified into 45-degree wedges; a diagonal with no
+shortcut sends the nearer straight direction, both neighbours, or nothing, as
+the mode chooses. It is axis policy `3` in the unchanged 96-byte PD record,
+with the diagonals in bytes a directional record otherwise leaves zero (see
+[PD-mode domain v1](architecture/pd-mode-domain-v1.md)). Older firmware and
+apps reject axis `3`, so the domain version stays `1`. The C/JS differential
+corpus now loads the v2 app's codec, since v1 is frozen and would disagree.

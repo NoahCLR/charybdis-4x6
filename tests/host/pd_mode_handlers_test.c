@@ -1299,6 +1299,68 @@ static void test_configured_presets_match_legacy_motion(void) {
         }
     }
 }
+// Eight directions: 45-degree wedges over one accumulated motion vector. A
+// straight tap needs its axis threshold, a diagonal needs both.
+static void eight_way_slot(uint8_t slot[96], uint8_t empty_policy) {
+    memcpy(slot, pd_engine_fixture + 8 + 4 * 96, 96); // Arrow: left/right/up/down arrows
+    slot[3]  = NOAH_PD_AXIS_EIGHT;
+    slot[32] = 10; slot[33] = 0;
+    slot[34] = 10; slot[35] = 0;
+    memset(slot + 70, 0, 20);
+    slot[70] = KC_HOME; // up-left
+    slot[78] = KC_END;  // down-left
+    slot[86] = empty_policy;
+}
+
+static void eight_way_move(int16_t x, int16_t y) {
+    test_clear_logs();
+    CHECK(noah_pd_engine_motion((report_mouse_t){.x = x, .y = y}).x == 0);
+}
+
+static void test_configured_eight_directions(void) {
+    uint8_t slot[96];
+
+    eight_way_slot(slot, NOAH_PD_EMPTY_DIAGONAL_NEAREST);
+    test_reset_stubs();
+    noah_pd_engine_enter(slot);
+    eight_way_move(10, 0);
+    CHECK(synthetic_tap_call_count == 1 && synthetic_tap_calls[0].keycode == KC_RIGHT);
+    eight_way_move(10, 3); // 17 degrees: still straight, and the drift is not saved up
+    CHECK(synthetic_tap_call_count == 1 && synthetic_tap_calls[0].keycode == KC_RIGHT);
+    eight_way_move(0, 9);
+    CHECK(synthetic_tap_call_count == 0);
+    eight_way_move(-10, -10); // a reversal drops the backlog before the diagonal
+    CHECK(synthetic_tap_call_count == 1 && synthetic_tap_calls[0].keycode == KC_HOME);
+    eight_way_move(-10, 10);
+    CHECK(synthetic_tap_call_count == 1 && synthetic_tap_calls[0].keycode == KC_END);
+    // An unfinished diagonal waits for its second axis.
+    eight_way_move(-10, -9);
+    CHECK(synthetic_tap_call_count == 0);
+    eight_way_move(0, -1);
+    CHECK(synthetic_tap_call_count == 1 && synthetic_tap_calls[0].keycode == KC_HOME);
+    // Up-right is empty: nearest leans to whichever axis moved further.
+    eight_way_move(12, -10);
+    CHECK(synthetic_tap_call_count == 1 && synthetic_tap_calls[0].keycode == KC_RIGHT);
+    eight_way_move(8, -12); // with the 2 left over from the last tap: x 10, y -12
+    CHECK(synthetic_tap_call_count == 1 && synthetic_tap_calls[0].keycode == KC_UP);
+    // A long straight move is capped per tick like every discrete mode.
+    eight_way_move(10 * 10, 0);
+    CHECK(synthetic_tap_call_count == NOAH_PD_MODE_MAX_TAPS_PER_TICK);
+
+    eight_way_slot(slot, NOAH_PD_EMPTY_DIAGONAL_BOTH);
+    noah_pd_engine_enter(slot);
+    eight_way_move(10, -10);
+    CHECK(synthetic_tap_call_count == 2 && synthetic_tap_calls[0].keycode == KC_RIGHT && synthetic_tap_calls[1].keycode == KC_UP);
+
+    eight_way_slot(slot, NOAH_PD_EMPTY_DIAGONAL_NOTHING);
+    noah_pd_engine_enter(slot);
+    eight_way_move(10, -10);
+    CHECK(synthetic_tap_call_count == 0);
+    eight_way_move(1, 0); // the dead zone consumed its motion
+    CHECK(synthetic_tap_call_count == 0);
+    noah_pd_engine_exit();
+}
+
 static void test_configured_release_ownership_and_custom_slot(void) {
     uint8_t slot[96];
     memcpy(slot, pd_engine_fixture + 8 + 4 * 96, 96);
@@ -1351,6 +1413,7 @@ int main(void) {
 #ifdef NOAH_PD_PROFILE_ENABLE
     test_configured_presets_match_legacy_motion();
     test_configured_release_ownership_and_custom_slot();
+    test_configured_eight_directions();
 #endif
     test_dragscroll_horizontal_lock_filters_vertical_jitter();
     test_dragscroll_vertical_lock_filters_horizontal_jitter();

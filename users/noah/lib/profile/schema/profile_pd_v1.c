@@ -1,7 +1,7 @@
 #include "profile_pd_v1.h"
 #include <string.h>
 
-_Static_assert(sizeof(noah_pd_config_t) == 96 && offsetof(noah_pd_config_t, scroll) == 70 && offsetof(noah_pd_config_t, directions) == 36, "PD native structure layout drift");
+_Static_assert(sizeof(noah_pd_config_t) == 96 && offsetof(noah_pd_config_t, scroll) == 70 && offsetof(noah_pd_config_t, directions) == 36 && offsetof(noah_pd_config_t, diagonals) == 70 && offsetof(noah_pd_config_t, empty_diagonal) == 86, "PD native structure layout drift");
 
 static void write_u16(uint8_t *p, uint16_t value) { p[0] = (uint8_t)value; p[1] = (uint8_t)(value >> 8); }
 void noah_profile_pd_v1_encode_record(const noah_pd_config_t *config, uint8_t output[96]) {
@@ -11,7 +11,11 @@ void noah_profile_pd_v1_encode_record(const noah_pd_config_t *config, uint8_t ou
     write_u16(output + 34, config->threshold_y);
     for (uint8_t i = 0; i < 4; i++) write_u16(output + 36 + i * 4, config->directions[i].keycode);
     for (uint8_t i = 0; i < 3; i++) write_u16(output + 54 + i * 6, config->buttons[i].tap.keycode);
-    for (uint8_t i = 0; i < 7; i++) write_u16(output + 70 + i * 2, config->scroll[i]);
+    if (config->kind == 2u) {
+        for (uint8_t i = 0; i < 7; i++) write_u16(output + 70 + i * 2, config->scroll[i]);
+    } else {
+        for (uint8_t i = 0; i < 4; i++) write_u16(output + 70 + i * 4, config->diagonals[i].keycode);
+    }
 }
 
 static noah_profile_pd_v1_result_t fail(noah_profile_pd_v1_error_t *error, noah_profile_pd_v1_result_t code, size_t offset) {
@@ -82,7 +86,7 @@ noah_profile_pd_v1_result_t noah_profile_pd_v1_validate_record(const uint8_t *p,
     if (p[0] != slot) return fail(error, NOAH_PROFILE_PD_V1_INVALID_ID, 0);
     if (p[7] || !zero(p + 90, 6)) return fail(error, NOAH_PROFILE_PD_V1_RESERVED, p[7] ? 7 : 90);
     if (!name_valid(p + 8)) return fail(error, NOAH_PROFILE_PD_V1_INVALID_NAME, 8);
-    if (p[1] > 2 || p[2] > 1 || p[3] > 2) return fail(error, NOAH_PROFILE_PD_V1_INVALID_POLICY, 1);
+    if (p[1] > 2 || p[2] > 1 || p[3] > NOAH_PD_AXIS_EIGHT) return fail(error, NOAH_PROFILE_PD_V1_INVALID_POLICY, 1);
     if (p[1] == 0) {
         if (!zero(p + 2, 6) || !zero(p + 32, 64)) return fail(error, NOAH_PROFILE_PD_V1_INVALID_PARAMETER, 2);
         return fail(error, NOAH_PROFILE_PD_V1_OK, 0);
@@ -99,7 +103,17 @@ noah_profile_pd_v1_result_t noah_profile_pd_v1_validate_record(const uint8_t *p,
             return fail(error, NOAH_PROFILE_PD_V1_INVALID_ACTION, i);
         }
     }
-    if (p[1] == 1) {
+    if (p[1] == 1 && p[3] == NOAH_PD_AXIS_EIGHT) {
+        // Both axes are read, so both need a threshold; bytes 70..86 carry
+        // the diagonals and byte 86 what an empty one does.
+        if (p[6]) return fail(error, NOAH_PROFILE_PD_V1_INVALID_PARAMETER, 6);
+        if (!u16(p + 32) || !u16(p + 34)) return fail(error, NOAH_PROFILE_PD_V1_INVALID_PARAMETER, 32);
+        for (size_t i = 70; i < 86; i += 4) {
+            if (!tap_valid(p + i)) return fail(error, NOAH_PROFILE_PD_V1_INVALID_ACTION, i);
+        }
+        if (p[86] > NOAH_PD_EMPTY_DIAGONAL_NOTHING) return fail(error, NOAH_PROFILE_PD_V1_INVALID_POLICY, 86);
+        if (!zero(p + 87, 3)) return fail(error, NOAH_PROFILE_PD_V1_RESERVED, 87);
+    } else if (p[1] == 1) {
         if (p[6] || !zero(p + 70, 20)) return fail(error, NOAH_PROFILE_PD_V1_INVALID_PARAMETER, 6);
         if ((p[3] != 0 && !u16(p + 32)) || (p[3] != 1 && !u16(p + 34))) return fail(error, NOAH_PROFILE_PD_V1_INVALID_PARAMETER, 32);
         if ((p[3] == 0 && (u16(p + 32) || !zero(p + 36, 8))) ||

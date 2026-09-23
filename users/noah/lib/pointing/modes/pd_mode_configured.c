@@ -4,10 +4,14 @@
 #include "pd_mode_handler_common.h"
 #include "../../state/ownership/keyboard_mod_ownership.h"
 #include "../../state/modifiers/keyboard_mod_policy.h"
+#include "../../profile/schema/profile_pd_v1.h"
 
 static const uint8_t *active;
 static pd_mode_axis_state_t axes[2];
 static bool axis_x;
+// Eight directions accumulate one motion vector rather than one axis at a
+// time: the wedge a tap belongs to depends on both components together.
+static int32_t eight[2];
 // Per-origin release ownership survives mode replacement. A consumed bit is
 // retained after releasing modifiers so an old release cannot hit a new mode.
 static struct { uint8_t modifiers; bool consumed; } buttons[MATRIX_ROWS][MATRIX_COLS];
@@ -37,6 +41,75 @@ static void direction_tap(uint16_t direction) {
     emit_tap(active + 36u + direction * 4u);
 }
 
+enum { DIR_LEFT = 0, DIR_RIGHT, DIR_UP, DIR_DOWN };
+
+// Adds one report's component, dropping the backlog on a reversal and capping
+// it at NOAH_PD_MODE_MAX_BACKLOG_TAPS taps, as the single-axis path does.
+static void eight_accumulate(int32_t *acc, int16_t delta, uint16_t threshold) {
+    int32_t cap = (int32_t)threshold * (NOAH_PD_MODE_MAX_BACKLOG_TAPS + 1);
+    if ((delta > 0 && *acc < 0) || (delta < 0 && *acc > 0)) *acc = 0;
+    *acc += delta;
+    if (*acc > cap) *acc = cap;
+    if (*acc < -cap) *acc = -cap;
+}
+
+// 45-degree wedges: motion within 22.5 degrees of an axis is straight.
+// tan(22.5) ~= 70/169, which keeps the comparison in integers.
+static bool eight_straight(uint32_t along, uint32_t across) {
+    return across * 169u <= along * 70u;
+}
+
+static void eight_way(report_mouse_t report) {
+    uint16_t tx = u16(active + 32), ty = u16(active + 34);
+    uint8_t  budget = NOAH_PD_MODE_MAX_TAPS_PER_TICK;
+
+    eight_accumulate(&eight[0], report.x, tx);
+    eight_accumulate(&eight[1], report.y, ty);
+    while (budget) {
+        int32_t  x = eight[0], y = eight[1];
+        uint32_t ax = (uint32_t)(x < 0 ? -x : x), ay = (uint32_t)(y < 0 ? -y : y);
+        uint16_t horizontal = x < 0 ? DIR_LEFT : DIR_RIGHT, vertical = y < 0 ? DIR_UP : DIR_DOWN;
+
+        if (eight_straight(ax, ay)) {
+            if (ax < tx) break;
+            direction_tap(horizontal);
+            eight[0] += x < 0 ? tx : -(int32_t)tx;
+            eight[1] = 0; // drift across a straight tap is not saved up
+            budget--;
+            continue;
+        }
+        if (eight_straight(ay, ax)) {
+            if (ay < ty) break;
+            direction_tap(vertical);
+            eight[1] += y < 0 ? ty : -(int32_t)ty;
+            eight[0] = 0;
+            budget--;
+            continue;
+        }
+        if (ax < tx || ay < ty) break;
+        // Diagonals are stored up-left, up-right, down-left, down-right.
+        const uint8_t *diagonal = active + 70u + ((y < 0 ? 0u : 2u) + (x < 0 ? 0u : 1u)) * 4u;
+        if (u16(diagonal)) {
+            emit_tap(diagonal);
+            budget--;
+        } else if (active[86] == NOAH_PD_EMPTY_DIAGONAL_BOTH) {
+            if (budget < 2u) break;
+            direction_tap(horizontal);
+            direction_tap(vertical);
+            budget -= 2u;
+        } else if (active[86] == NOAH_PD_EMPTY_DIAGONAL_NEAREST) {
+            // The straight direction this motion leans toward, measured
+            // against each axis's own threshold.
+            direction_tap((uint64_t)ax * ty >= (uint64_t)ay * tx ? horizontal : vertical);
+            budget--;
+        } else {
+            budget--; // a dead zone still consumes the motion
+        }
+        eight[0] += x < 0 ? tx : -(int32_t)tx;
+        eight[1] += y < 0 ? ty : -(int32_t)ty;
+    }
+}
+
 void noah_pd_engine_exit(void) {
     owned_modifiers(scroll_modifiers, false);
     scroll_modifiers = 0;
@@ -49,6 +122,7 @@ void noah_pd_engine_exit(void) {
     active = NULL;
     pd_mode_axis_reset(&axes[0]);
     pd_mode_axis_reset(&axes[1]);
+    eight[0] = eight[1] = 0;
     axis_x = true;
     reset_dragscroll_mode();
 }
@@ -70,6 +144,10 @@ report_mouse_t noah_pd_engine_motion(report_mouse_t report) {
     if (active[1] == 2u) return noah_pd_configured_scroll(active, report);
     uint8_t policy = active[3], budget = NOAH_PD_MODE_MAX_TAPS_PER_TICK;
     bool was_x = axis_x;
+    if (policy == NOAH_PD_AXIS_EIGHT) {
+        eight_way(report);
+        return pd_mode_freeze_mouse();
+    }
     if (policy == 2u) {
         int32_t x = report.x, y = report.y;
         if (x < 0) x = -x;

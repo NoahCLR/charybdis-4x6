@@ -7,7 +7,7 @@
 
 import {css, isOff} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
-import {DIRECTIONS, KIND, SCROLL_FIELDS, axisReads, dpiOptions, readConfig, readsHorizontal, readsVertical, startingRecord} from "../view/pointing-config.mjs";
+import {AXIS, DIAGONALS, DIRECTIONS, EMPTY_DIAGONAL, KIND, SCROLL_FIELDS, axisReads, dpiOptions, readConfig, readsHorizontal, readsVertical, startingRecord} from "../view/pointing-config.mjs";
 import {MODIFIER_BITS, keyName, modifierNames} from "../view/keyvalues.mjs";
 import {bindingsForSlot} from "../view/keyface.mjs";
 import {pdColourRow, stageEnabled} from "../view/lighting.mjs";
@@ -17,12 +17,12 @@ import {openPicker} from "./picker.mjs";
 import {topbar, unavailable} from "./shell.mjs";
 
 
-const AXES = [[2, "Dominant axis"], [0, "Vertical only"], [1, "Horizontal only"]];
+const AXES = [[2, "Dominant axis"], [3, "Eight directions"], [0, "Vertical only"], [1, "Horizontal only"]];
 const INVERT = [[0, "Neither axis"], [1, "Horizontal"], [2, "Vertical"], [3, "Both axes"]];
 const POINTER_LAYER = [[0, "Keep the pointer layer active"], [1, "Return to the typing layer"]];
 const BUTTON_KINDS = [[0, "Pass through"], [1, "Consume"], [2, "Tap a shortcut"], [3, "Hold modifiers"]];
 const BUTTON_TAP = 2;
-const ARROWS = {up: "↑", left: "←", right: "→", down: "↓"};
+const ARROWS = {up: "↑", left: "←", right: "→", down: "↓", upLeft: "↖", upRight: "↗", downLeft: "↙", downRight: "↘"};
 
 // The four scroll fields the Scrolling card shows itself. A field rendered
 // twice registers its reader twice, and the second input silently wins, so
@@ -221,7 +221,7 @@ function editor(model, slot, canEdit, slots) {
         const reads = axisReads(slot.axis);
         const card = el(`<div class="card">
             <div class="card-h"><h3>What each direction sends</h3><span class="right" data-axis></span></div>
-            <div class="card-b"><div class="pd-cross ${reads.length === 4 ? "" : reads.includes("up") ? "vertical" : "horizontal"}"></div></div></div>`);
+            <div class="card-b stack"><div class="pd-cross ${slot.axis === AXIS.EIGHT ? "eight" : reads.length === 4 ? "" : reads.includes("up") ? "vertical" : "horizontal"}"></div></div></div>`);
         card.querySelector("[data-axis]").append(select("Reads", AXES, slot.axis, "axis", {inline: true,
             tip: "Which movement this mode turns into keys. Switching to one axis empties the other axis's shortcuts."}));
         const cross = card.querySelector(".pd-cross");
@@ -234,10 +234,21 @@ function editor(model, slot, canEdit, slots) {
             form[`dirPolicy:${direction}`] = () => slot.directions?.[direction]?.modifierPolicy ?? 0;
             form[`dirMask:${direction}`] = () => slot.directions?.[direction]?.mask ?? 0;
         }
+        if (slot.axis === AXIS.EIGHT) {
+            for (const [diagonal, label] of DIAGONALS) {
+                cross.append(shortcut(label, slot.diagonals?.[diagonal]?.keycode, `diag:${diagonal}`, {
+                    klass: `arm ${diagonal}`, labelHtml: `<b>${ARROWS[diagonal]}</b> ${esc(label)}`,
+                }));
+            }
+            // Movement within 22.5° of a diagonal counts as that diagonal.
+            card.querySelector(".card-b").append(select("When a diagonal is empty", EMPTY_DIAGONAL, slot.emptyDiagonal ?? 0, "emptyDiagonal",
+                {tip: "What moving toward a diagonal with no shortcut sends: the straight direction it leans toward, both neighbouring directions, or nothing."}));
+        }
         cross.append(el(`<div class="hub" aria-hidden="true"><svg viewBox="0 0 64 64">
             <circle cx="32" cy="32" r="22"/><circle cx="32" cy="32" r="3"/>
             ${reads.includes("up") ? `<path d="M32 4l-4 5h8z"/>` : ""}${reads.includes("down") ? `<path d="M32 60l-4-5h8z"/>` : ""}
             ${reads.includes("left") ? `<path d="M4 32l5-4v8z"/>` : ""}${reads.includes("right") ? `<path d="M60 32l-5-4v8z"/>` : ""}
+            ${slot.axis === AXIS.EIGHT ? `<path d="M12 12l7 1-6 6z"/><path d="M52 12l-7 1 6 6z"/><path d="M12 52l7-1-6-6z"/><path d="M52 52l-7-1 6-6z"/>` : ""}
             </svg><span class="tag">trackball</span></div>`));
         wrap.append(card);
     } else {

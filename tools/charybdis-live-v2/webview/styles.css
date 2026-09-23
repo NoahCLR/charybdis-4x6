@@ -707,6 +707,12 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 /* One axis read: only its two arms are drawn, on either side of the ball. */
 .pd-cross.vertical { grid-template-columns: minmax(0, 340px); justify-content: center; grid-template-areas: "up" "hub" "down"; }
 .pd-cross.horizontal { grid-template-areas: "left hub right"; }
+.pd-cross + .field { max-width: 340px; }
+.pd-cross.eight { grid-template-areas: "upLeft up upRight" "left hub right" "downLeft down downRight"; }
+.pd-cross .arm.upLeft { grid-area: upLeft; }
+.pd-cross .arm.upRight { grid-area: upRight; }
+.pd-cross .arm.downLeft { grid-area: downLeft; }
+.pd-cross .arm.downRight { grid-area: downRight; }
 .pd-cross .arm.up { grid-area: up; }
 .pd-cross .arm.left { grid-area: left; }
 .pd-cross .arm.right { grid-area: right; }

@@ -387,6 +387,29 @@ test("a mode set to one axis posts the other axis empty, which the draft accepts
     assert.ok(after.directions.up.keycode > 0);
 });
 
+test("an eight-direction mode posts its diagonals and empty-diagonal choice, and another axis posts them empty", () => {
+    const draft = session();
+    const slot = decoded(draft).pdModes[4];
+    const eight = readConfig(slot, formOf({kind: KIND.DIRECTIONAL, name: "Arrow", dpi: "0", axis: AXIS.EIGHT, emptyDiagonal: 1,
+        thresholdX: "40", thresholdY: "40", "dir:up": "KC_UP", "dir:down": "KC_DOWN", "dir:left": "KC_LEFT", "dir:right": "KC_RIGHT",
+        "diag:upLeft": "KC_HOME", "diag:downRight": "KC_END"}));
+    assert.equal(eight.diagonals.upLeft.keycode, "KC_HOME");
+    assert.equal(eight.diagonals.upRight.keycode, "0", "a diagonal without a shortcut stays empty");
+    stage(draft, edits.pdMode(4, eight, draft.identity()));
+    const after = decoded(draft).pdModes[4];
+    assert.equal(after.axis, AXIS.EIGHT);
+    assert.equal(after.emptyDiagonal, 1);
+    assert.ok(after.diagonals.upLeft.keycode > 0 && after.diagonals.downRight.keycode > 0);
+    assert.equal(after.scroll.divisorH, 0, "a directional record's bytes 70..90 are not scroll settings");
+
+    const back = readConfig(after, formOf({kind: KIND.DIRECTIONAL, name: "Arrow", dpi: "0", axis: AXIS.DOMINANT}));
+    assert.deepEqual(Object.values(back.diagonals).map(tap => tap.keycode), ["0", "0", "0", "0"]);
+    assert.equal(back.emptyDiagonal, 0);
+    stage(draft, edits.pdMode(4, back, draft.identity()));
+    assert.equal(decoded(draft).pdModes[4].axis, AXIS.DOMINANT);
+    assert.equal(decoded(draft).pdModes[4].diagonals.upLeft.keycode, 0);
+});
+
 test("an axis switched back on starts from the shipped threshold, and a typed zero on a read axis is posted as typed", () => {
     const draft = session();
     const vertical = {...decoded(draft).pdModes[1], axis: AXIS.VERTICAL, thresholdX: 0, thresholdY: 70};

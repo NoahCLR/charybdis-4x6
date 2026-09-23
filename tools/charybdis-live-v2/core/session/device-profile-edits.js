@@ -75,6 +75,7 @@ function editDeviceProfile(bytes, message, context = {}) {
             tap.keycode = native;
         };
         Object.values(slots[id].directions || {}).forEach(convertTap);
+        Object.values(slots[id].diagonals || {}).forEach(convertTap);
         slots[id].buttons?.forEach(button => convertTap(button.tap));
         domain.payload = encodePdDomain(slots);
         return encodeProfileBlob(profile);

@@ -19,7 +19,7 @@ own domain; schema 2 contains eight corresponding ID/HSV/locality rows.
 | 0 | 1 | Slot ID, equal to record index |
 | 1 | 1 | Kind: disabled `0`, directional `1`, scrolling `2` |
 | 2 | 1 | Pointer-layer policy: keep available `0`, prefer typing `1` |
-| 3 | 1 | Directional axis: vertical `0`, horizontal `1`, dominant `2`; scrolling uses zero |
+| 3 | 1 | Directional axis: vertical `0`, horizontal `1`, dominant `2`, eight directions `3`; scrolling uses zero |
 | 4 | 2 | DPI: zero inherits; otherwise explicit value |
 | 6 | 1 | Owned scrolling modifiers; directional modes use zero |
 | 7 | 1 | Reserved, zero |
@@ -36,13 +36,33 @@ own domain; schema 2 contains eight corresponding ID/HSV/locality rows.
 | 89 | 1 | Invert flags: bit 0 horizontal, bit 1 vertical |
 | 90 | 6 | Reserved, zero |
 
+Eight-direction records (kind `1`, axis `3`, added 2026-09-23) reuse bytes
+70..90, which every other directional record leaves zero:
+
+| Record offset | Bytes | Meaning |
+| --- | --- | --- |
+| 70, 74, 78, 82 | 4 each | Up-left/up-right/down-left/down-right tap records |
+| 86 | 1 | Empty diagonal: nearest straight direction `0`, both neighbours `1`, nothing `2` |
+| 87 | 3 | Reserved, zero |
+
+Firmware and apps that predate axis `3` reject it as an unknown axis policy,
+so the domain version stays `1`: an older reader refuses such a profile rather
+than misreading it.
+
 Names contain at most 23 UTF-8 bytes, no embedded NUL, ASCII C0 controls or DEL,
 and no malformed, overlong or surrogate encodings. Configured modes require a
 nonempty name. Disabled modes may retain their name; everything except ID and
 name is zero. Disabled RGB rows are separately retained by the RGB domain.
 
 Directional modes require positive thresholds for used axes and zero thresholds
-and outputs for unused axes. All scrolling parameters are zero. A configured
+and outputs for unused axes. All scrolling parameters are zero; eight-direction
+modes instead carry their diagonals there, read both axes and so need both
+thresholds. The runtime accumulates one motion vector and classifies it into
+45-degree wedges (tan 22.5° taken as 70/169): a straight tap needs its axis
+threshold and drops drift on the other axis, a diagonal needs both thresholds.
+An empty diagonal follows byte 86; "nearest" compares each component against
+its own threshold. Taps per report and the backlog use the same caps as the
+other discrete modes. A configured
 axis may have no output in either direction. Scrolling modes zero the axis and
 directional fields. Their thresholds, divisors and axis timeout are positive;
 expiry is at least the timeout. Interval zero means no output throttling.

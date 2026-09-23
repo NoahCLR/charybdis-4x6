@@ -15,6 +15,22 @@ enum {
     NOAH_PROFILE_PD_V1_SIZE        = 776,
 };
 
+// Directional axis policies (record byte 3). Eight directions reads both axes
+// and classifies motion into 45-degree wedges; its four diagonal shortcuts
+// live in bytes 70..86, which a directional record otherwise leaves zero.
+enum {
+    NOAH_PD_AXIS_VERTICAL = 0,
+    NOAH_PD_AXIS_HORIZONTAL,
+    NOAH_PD_AXIS_DOMINANT,
+    NOAH_PD_AXIS_EIGHT,
+};
+// What an eight-direction mode does when a diagonal has no shortcut (byte 86).
+enum {
+    NOAH_PD_EMPTY_DIAGONAL_NEAREST = 0, // the nearer straight direction
+    NOAH_PD_EMPTY_DIAGONAL_BOTH,        // both neighbouring straight directions
+    NOAH_PD_EMPTY_DIAGONAL_NOTHING,     // a dead zone
+};
+
 typedef enum {
     NOAH_PROFILE_PD_V1_OK = 0,
     NOAH_PROFILE_PD_V1_INVALID_ARGUMENT,
@@ -44,8 +60,17 @@ typedef struct {
     uint16_t threshold_x, threshold_y;
     noah_pd_tap_t directions[4]; // left, right, up, down
     noah_pd_button_t buttons[3];
-    uint16_t scroll[7]; // H/V threshold, H/V divisor, interval, expiry, timeout
-    uint8_t scroll_policy[6]; // start N/D, sustain N/D, decay, inversion bits
+    union {
+        struct {
+            uint16_t scroll[7];       // H/V threshold, H/V divisor, interval, expiry, timeout
+            uint8_t  scroll_policy[6]; // start N/D, sustain N/D, decay, inversion bits
+        };
+        struct {
+            noah_pd_tap_t diagonals[4]; // eight directions: up-left, up-right, down-left, down-right
+            uint8_t       empty_diagonal;
+            uint8_t       diagonal_reserved[3];
+        };
+    };
     uint8_t tail_reserved[6];
 } noah_pd_config_t;
 extern const noah_pd_config_t noah_pd_defaults[8];
