@@ -450,3 +450,13 @@ test("an input placed on two keys rings both, and still counts as one input", ()
     assert.deepEqual(edit, {positions: [3, 4], codes: {3: "G(KC_C)", 4: "G(KC_V)"}, extras: []},
         "the builder still holds one key per input, so saving does not duplicate inputs");
 });
+
+test("a picked key matches its behaviour row however its modifiers are spelled", () => {
+    const model = {qmkKeycodeAliases: {KC_C: "KC_C", KC_ENT: "KC_ENTER", KC_ENTER: "KC_ENTER"}, keyBehaviors: [{keycode: "LGUI(KC_C)"}, {keycode: "LCTL(LSFT(KC_ENTER))"}]};
+    assert.equal(canonicalKeycode(model, "G(KC_C)"), "LGUI(KC_C)");
+    assert.equal(behaviourListeningTo(model, "G(KC_C)")?.keycode, "LGUI(KC_C)", "the picker's Cmd wrapper");
+    assert.equal(behaviourListeningTo(model, "LCMD(KC_C)")?.keycode, "LGUI(KC_C)");
+    assert.equal(behaviourListeningTo(model, "S(C(KC_ENT))")?.keycode, "LCTL(LSFT(KC_ENTER))", "nesting order and aliases");
+    assert.equal(behaviourListeningTo(model, "LCS(KC_ENT)")?.keycode, "LCTL(LSFT(KC_ENTER))", "a combined wrapper");
+    assert.equal(behaviourListeningTo(model, "C(KC_C)"), undefined, "a different modifier is a different key");
+});

@@ -32,6 +32,16 @@ function namedId(value, prefix) {
     if (!match) throw invalid(`Choose a reported ${prefix.toLowerCase()}.`);
     return integer(match[1], 255, prefix);
 }
+// A group is its set of LEDs, so two groups never hold the same set: a row
+// or a saved selection that matches an existing group reuses it.
+const ledSet = leds => [...new Set(leds)].sort((left, right) => left - right).join(",");
+const sameLeds = (left, right) => ledSet(left) === ledSet(right);
+function groupFor(rgb, leds) {
+    const found = rgb.groups.find(row => sameLeds(row.leds, leds));
+    if (found) return found.id;
+    rgb.groups.push({id: rgb.groups.length, leds});
+    return rgb.groups.length - 1;
+}
 function groupRows(rgb, target) {
     const table = {layer: "layerGroupRows", pdMode: "pdModeGroupRows", combo: "comboGroupRows", keyBehavior: "keyGroupRows"}[target];
     if (!table) throw invalid("Unknown LED group target.");
@@ -103,8 +113,12 @@ function editDeviceProfile(bytes, message, context = {}) {
         case "saveRgbReusableLedGroup": {
             const group = message.group;
             const leds = group.ledIndices.map(value => integer(value, 57, "LED index"));
-            if (group.originalName) existing(rgb.groups, row => row.id === namedId(group.originalName, "Group"), "LED group").leds = leds;
-            else rgb.groups.push({id: rgb.groups.length, leds});
+            if (group.originalName) {
+                const target = existing(rgb.groups, row => row.id === namedId(group.originalName, "Group"), "LED group");
+                const twin = rgb.groups.find(row => row !== target && sameLeds(row.leds, leds));
+                if (twin) throw invalid(`Group ${twin.id} already holds exactly these LEDs.`);
+                target.leds = leds;
+            } else groupFor(rgb, leds);
             break;
         }
         case "deleteRgbReusableLedGroup": {
@@ -112,17 +126,19 @@ function editDeviceProfile(bytes, message, context = {}) {
             existing(rgb.groups, row => row.id === id, "LED group");
             const references = [rgb.layerGroupRows, rgb.pdModeGroupRows, rgb.comboGroupRows, rgb.keyGroupRows].flat();
             if (references.some(row => row.groupId === id)) throw invalid("Remove this group's RGB assignments before deleting it.");
+            // Group ids are positions: consecutive from zero. Removing one
+            // renumbers the ones after it, and every row follows its group.
             rgb.groups = rgb.groups.filter(row => row.id !== id);
+            const renumbered = new Map(rgb.groups.map((row, index) => [row.id, index]));
+            rgb.groups.forEach((row, index) => {row.id = index;});
+            for (const row of references) row.groupId = renumbered.get(row.groupId);
             break;
         }
         case "addRgbLedGroup": {
             const group = message.group;
             let groupId;
             if (group.ledGroupName) groupId = existing(rgb.groups, row => row.id === namedId(group.ledGroupName, "Group"), "LED group").id;
-            else {
-                groupId = rgb.groups.length;
-                rgb.groups.push({id: groupId, leds: group.ledIndices.map(value => integer(value, 57, "LED index"))});
-            }
+            else groupId = groupFor(rgb, group.ledIndices.map(value => integer(value, 57, "LED index")));
             const row = {color: editColor(group), groupId};
             if (group.target === "layer") row.selector = group.owner === "RGB_LAYER_GROUP_ALL" ? 255 : namedId(group.owner, "Layer");
             if (group.target === "pdMode") row.selector = group.owner === "RGB_PD_MODE_GROUP_ALL" ? 255 : enumValue(group.owner, RGB_PD_MODE_IDS, "pointing mode");

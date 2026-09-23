@@ -227,6 +227,22 @@ test("a pointing slot is posted whole, with its shortcuts as names", () => {
     assert.ok(after.directions.up.keycode > 0, "and the named shortcut became the keyboard's own value");
 });
 
+test("a directional slot switched to scrolling posts the starter tuning, which the draft accepts", () => {
+    const draft = session();
+    // ui/pointing.mjs startingRecord() seeds an empty scroll record with the
+    // shipped Dragscroll tuning, so readConfig() posts a valid mode.
+    draft.stage({
+        type: "savePdMode", draftId: draft.id, draftRevision: draft.revision, expectedBase: draft.identity(), slot: 1,
+        config: {
+            id: 1, kind: 2, name: "Volume", dpi: 0, pointerLayer: 0, heldModifiers: 0,
+            scroll: {thresholdH: 2, thresholdV: 3, divisorH: 6, divisorV: 8, intervalMs: 8, expireMs: 80, lockMs: 55,
+                startNumerator: 7, startDenominator: 4, sustainNumerator: 5, sustainDenominator: 4, decayDivisor: 4, invert: 0},
+            buttons: [0, 1, 2].map(() => ({kind: 0, modifiers: 0, tap: {keycode: "0", modifierPolicy: 0, mask: 0}})),
+        },
+    });
+    assert.equal(portable.validateSnapshot(draft.document).pdModes[1].kind, 2);
+});
+
 test("clearing a slot leaves its button on the board, inert until it is configured again", () => {
     const draft = session();
     // The fixture reaches slot 6 from a behaviour. The keyboard's mode keycodes
@@ -365,6 +381,28 @@ test("a behaviour moves to another key, and overwrites or swaps with one already
     assert.equal(rows(), before - 1, "overwriting drops the row that was there");
     draft.undo(draft.revision);
     assert.equal(rows(), before, "one undo brings the overwritten row back");
+});
+
+test("LED group rows land in every table, and groups renumber when one is deleted", () => {
+    const draft = session();
+    const rgb = () => portable.validateSnapshot(draft.document).rgb;
+    const stage = (message) => draft.stage({draftId: draft.id, draftRevision: draft.revision, ...message});
+    const ledsOf = (id) => rgb().groups.find((group) => group.id === id).leds;
+    const startCount = rgb().groups.length;
+    // what ui/lighting.mjs groupBuilder posts for each table
+    for (const [target, owner] of [["layer", "Layer 2"], ["pdMode", "PD_MODE_VOLUME"], ["combo", undefined], ["keyBehavior", "KEY_FEEDBACK_GROUP_HOLD_ACTIVE"]]) {
+        stage({type: "addRgbLedGroup", group: {target, ...(owner ? {owner} : {}), ledIndices: [1, 2], h: 10, s: 255, v: 100}});
+    }
+    assert.equal(rgb().groups.length, startCount + 1, "rows with the same LEDs share one group");
+
+    for (const leds of [[40], [41], [42]]) stage({type: "saveRgbReusableLedGroup", group: {ledIndices: leds}});
+    const byLeds = (leds) => rgb().groups.find((group) => group.leds.join() === leds.join()).id;
+    stage({type: "addRgbLedGroup", group: {target: "layer", owner: "Layer 3", ledGroupName: `Group ${byLeds([42])}`, h: 1, s: 1, v: 1}});
+    stage({type: "deleteRgbReusableLedGroup", name: `Group ${byLeds([40])}`});
+    const ids = rgb().groups.map((group) => group.id);
+    assert.deepEqual(ids, ids.map((_, index) => index), "ids stay consecutive from zero");
+    const layerRow = rgb().layerGroupRows.find((row) => row.selector === 3);
+    assert.deepEqual(ledsOf(layerRow.groupId), [42], "a row still paints the LEDs it pointed at");
 });
 
 test("auto-mouse fade and combo feedback post their colour beside their mode", () => {

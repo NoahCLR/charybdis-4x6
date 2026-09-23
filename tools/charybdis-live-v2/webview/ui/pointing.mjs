@@ -33,6 +33,17 @@ const SCROLL_FIELDS = [
     ["sustainNumerator", "Axis retention ratio · numerator"], ["sustainDenominator", "Axis retention ratio · denominator"],
     ["decayDivisor", "Cross-axis decay divisor"],
 ];
+// A slot switched to another kind of movement starts from the firmware's own
+// shipped tuning for that kind — Dragscroll's scroll record and Volume's
+// vertical threshold — wherever the stored record is still empty, so the first
+// field changed posts a valid mode instead of an all-zero one.
+const SCROLL_STARTER = {thresholdH: 2, thresholdV: 3, divisorH: 6, divisorV: 8, intervalMs: 8, expireMs: 80, lockMs: 55,
+    startNumerator: 7, startDenominator: 4, sustainNumerator: 5, sustainDenominator: 4, decayDivisor: 4, invert: 0};
+function startingRecord(slot, kind) {
+    if (kind === KIND.SCROLLING && !SCROLL_FIELDS.some(([key]) => Number(slot.scroll?.[key]))) return {...slot, scroll: {...SCROLL_STARTER}};
+    if (kind === KIND.DIRECTIONAL && !Number(slot.thresholdX) && !Number(slot.thresholdY)) return {...slot, thresholdX: 0, thresholdY: 60};
+    return slot;
+}
 const BINDINGS = ["DRAGSCROLL", "VOLUME_MODE", "BRIGHTNESS_MODE", "ZOOM_MODE", "ARROW_MODE", "PINCH_MODE"];
 const bindingName = (slot) => slot.id < BINDINGS.length ? BINDINGS[slot.id] : `PD_SLOT_${slot.id}`;
 
@@ -120,6 +131,7 @@ function editor(model, slot, canEdit, slots) {
     // registers the readers for its own fields, so a directional record cannot
     // be read out of a scrolling form.
     const kind = state.pdKind?.slot === slot.id ? state.pdKind.kind : slot.kind;
+    if (kind !== slot.kind) slot = startingRecord(slot, kind);
     const scrolling = kind === KIND.SCROLLING;
     const row = pdColourRow(model, slot.id);
     const wrap = el(`<div class="stack"></div>`);
@@ -188,7 +200,10 @@ function editor(model, slot, canEdit, slots) {
     form.name = () => name.querySelector("input").value.trim();
     headBody.append(name);
     headBody.append(select("Movement", [[KIND.DIRECTIONAL, "Directional keys / shortcuts"], [KIND.SCROLLING, "Scrolling"]], kind, "kind",
-        {onChange: (event) => { state.pdKind = {slot: slot.id, kind: Number(event.target.value)}; render(); }}));
+        // Switching movement only redraws the form for the other kind: its
+        // fields start empty, so staging now would post an invalid record.
+        // The slot is staged once a field of the new form is changed.
+        {onChange: (event) => { event.stopPropagation(); state.pdKind = {slot: slot.id, kind: Number(event.target.value)}; render(); }}));
     headBody.append(field("Pointer speed while active", slot.dpi, "dpi", {tip: "DPI used while this mode runs. 0 uses the normal pointer speed."}));
     wrap.append(head);
 

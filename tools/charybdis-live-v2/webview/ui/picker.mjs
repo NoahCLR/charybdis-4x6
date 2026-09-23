@@ -17,6 +17,10 @@ export function openPicker({title, context, seed = [], mode = "single", onPick})
     render();
 }
 
+// Layer keycodes are posted by index — MO(1), LOCK_LAYER(1), LT(1, KC_A) —
+// the form the keyboard reports and the draft encodes; the name is display.
+const layerTapName = (index) => layerName(layers()[Number(index)]) || `Layer ${index}`;
+
 export const closePicker = () => { state.picker = null; render(); };
 
 function expression() {
@@ -70,12 +74,12 @@ function sectionBody(model) {
         return `<div class="pk-body"><div class="pk-layers">${layers().map((layer) => `
             <div class="pk-layer">
                 <span></span><span class="nm">${esc(layerName(layer))}</span>
-                <button class="pk wide ${picked(`MO(${layer.name})`) ? "on" : ""}" data-pick="MO(${esc(layer.name)})"><span class="l">Hold</span><span class="c">MO</span></button>
-                <button class="pk wide ${picked(`LOCK_LAYER(${layer.name})`) ? "on" : ""}" data-pick="LOCK_LAYER(${esc(layer.name)})"><span class="l">Lock</span><span class="c">LOCK_LAYER</span></button>
-                <button class="pk wide ${picker.layerTap === layer.name ? "on" : ""}" data-lt="${esc(layer.name)}"><span class="l">Tap-hold</span><span class="c">LT(…)</span></button>
+                <button class="pk wide ${picked(`MO(${layer.index})`) ? "on" : ""}" data-pick="MO(${layer.index})"><span class="l">Hold</span><span class="c">MO(${layer.index})</span></button>
+                <button class="pk wide ${picked(`LOCK_LAYER(${layer.index})`) ? "on" : ""}" data-pick="LOCK_LAYER(${layer.index})"><span class="l">Lock</span><span class="c">LOCK_LAYER(${layer.index})</span></button>
+                <button class="pk wide ${picker.layerTap === String(layer.index) ? "on" : ""}" data-lt="${layer.index}"><span class="l">Tap-hold</span><span class="c">LT(${layer.index}, …)</span></button>
             </div>`).join("")}</div>
             <p class="note" style="margin-top:12px">${picker.layerTap
-                ? `Tap-hold on <b>${esc(picker.layerTap)}</b> is armed — now pick the tap key from any section.`
+                ? `Tap-hold on <b>${esc(layerTapName(picker.layerTap))}</b> is armed — now pick the tap key from any section.`
                 : "Hold reaches the layer while the key is down. Lock toggles it. Tap-hold asks for a tap key next."}</p></div>`;
     }
     if (section.kind === "macros") {
@@ -115,7 +119,7 @@ export function pickerOverlay() {
         </div>
         <div class="sheet-f">
             <span class="label">Selected</span>
-            ${picker.layerTap ? `<button class="chip" data-act="clearlt">LT ${esc(picker.layerTap)} ✕</button>` : ""}
+            ${picker.layerTap ? `<button class="chip" data-act="clearlt">LT ${esc(layerTapName(picker.layerTap))} ✕</button>` : ""}
             ${picker.keys.length ? picker.keys.map((key, index) => `<button class="chip" data-remove="${index}">${esc(key)} ✕</button>`).join("")
                 : `<span class="note">nothing picked yet</span>`}
             <code class="mono" style="margin-left:10px;color:var(--text)">${esc(value || "—")}</code>

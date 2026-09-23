@@ -45,11 +45,28 @@ export const actionLabel = (model, name) => model?.qmkKeyLabels?.[name]
 export const behaviourFor = (model, keycode) =>
     (model?.keyBehaviors || []).find((row) => row.keycode === keycode);
 
-// One spelling per key: the picker says KC_ENT where a behaviour row says
-// KC_ENTER, and an expression may or may not space its arguments. Every name
-// inside it goes through the keyboard's alias table.
-export const canonicalKeycode = (model, expression) => String(expression ?? "").replace(/\s+/g, "")
-    .replace(/[A-Za-z_][A-Za-z0-9_]*/g, (name) => model?.qmkKeycodeAliases?.[name] ?? name);
+// One spelling per key: the picker says KC_ENT and G(KC_C) where a behaviour
+// row says KC_ENTER and LGUI(KC_C), and an expression may or may not space its
+// arguments or nest two modifiers either way round. Every name goes through the
+// keyboard's alias table, and every modifier wrapper becomes one ordered set.
+const WRAPPER_MODS = {
+    C: ["LCTL"], LCTL: ["LCTL"], S: ["LSFT"], LSFT: ["LSFT"], A: ["LALT"], LALT: ["LALT"], LOPT: ["LALT"],
+    G: ["LGUI"], LGUI: ["LGUI"], LCMD: ["LGUI"], LWIN: ["LGUI"],
+    RCTL: ["RCTL"], RSFT: ["RSFT"], RALT: ["RALT"], ROPT: ["RALT"], ALGR: ["RALT"], RGUI: ["RGUI"], RCMD: ["RGUI"], RWIN: ["RGUI"],
+    LCS: ["LCTL", "LSFT"], LCA: ["LCTL", "LALT"], LCG: ["LCTL", "LGUI"], LSA: ["LSFT", "LALT"], LSG: ["LSFT", "LGUI"],
+    LAG: ["LALT", "LGUI"], LCAG: ["LCTL", "LALT", "LGUI"], MEH: ["LCTL", "LSFT", "LALT"], HYPR: ["LCTL", "LSFT", "LALT", "LGUI"],
+};
+const MOD_ORDER = ["LCTL", "LSFT", "LALT", "LGUI", "RCTL", "RSFT", "RALT", "RGUI"];
+export function canonicalKeycode(model, expression) {
+    let text = String(expression ?? "").replace(/\s+/g, "");
+    const mods = new Set();
+    for (let match; (match = /^([A-Z]+)\((.*)\)$/.exec(text)) && WRAPPER_MODS[match[1]];) {
+        WRAPPER_MODS[match[1]].forEach((mod) => mods.add(mod));
+        text = match[2];
+    }
+    const inner = text.replace(/[A-Za-z_][A-Za-z0-9_]*/g, (name) => model?.qmkKeycodeAliases?.[name] ?? name);
+    return MOD_ORDER.filter((mod) => mods.has(mod)).reduceRight((wrapped, mod) => `${mod}(${wrapped})`, inner);
+}
 
 // The behaviour row a picked expression would land on, however it is spelled.
 export const behaviourListeningTo = (model, expression) => {

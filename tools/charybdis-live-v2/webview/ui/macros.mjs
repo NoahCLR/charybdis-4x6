@@ -268,7 +268,7 @@ function recorder(model, slot, canEdit, textarea) {
             </div>
             <div class="row" style="gap:8px">
                 <span class="note">${recording ? "Typing in this window is captured. Press Escape or Stop when the take is done." : "Captures this window's key events at the end of the payload."}</span>
-                <span class="right row" style="gap:8px"><button class="btn ghost" data-act="clear-take" ${state.recording?.before !== undefined ? "" : "disabled"}>Clear take</button>
+                <span class="right row" style="gap:8px"><button class="btn ghost" data-act="clear-take" ${recording || state.lastTake?.slot === slot.keycode ? "" : "disabled"}>Clear take</button>
                 <button class="btn ${recording ? "" : "primary"}" data-act="record" ${canEdit ? "" : "disabled"}>${recording ? "Stop" : "● Record"}</button></span>
             </div>
         </div></div>`);
@@ -281,12 +281,20 @@ function recorder(model, slot, canEdit, textarea) {
     node.querySelector("[data-round]").addEventListener("change", (event) => {
         state.recordDelayRound = Math.max(1, Number(event.target.value) || 1);
     });
+    // Clear take puts the payload back to what it was before Record. A take
+    // still in progress was never staged; a finished one was, so its restore
+    // is staged too, rather than only rewriting the text on screen.
     node.querySelector('[data-act="clear-take"]').addEventListener("click", () => {
-        const before = state.recording?.before;
+        const take = state.recording?.slot === slot.keycode ? state.recording
+            : state.lastTake?.slot === slot.keycode ? state.lastTake : null;
+        if (!take) return;
+        const staged = !state.recording;
         document.removeEventListener("keydown", onRecordKey, true);
         document.removeEventListener("keyup", onRecordKey, true);
         state.recording = null;
-        if (before !== undefined) state.macroDrafts = {...state.macroDrafts, [slot.keycode]: before};
+        state.lastTake = null;
+        state.macroDrafts = {...state.macroDrafts, [slot.keycode]: take.before};
+        if (staged) stageMacro(model, slot, take.before);
         render();
     });
     node.querySelector('[data-act="record"]').addEventListener("click", () => {
@@ -296,8 +304,13 @@ function recorder(model, slot, canEdit, textarea) {
     return node;
 }
 
+// A take appends to what the payload held when Record was pressed. The
+// recording state exists only while keys are being captured, so everything
+// that pauses for a recording — undo, the key shortcuts — resumes on Stop.
 function startRecording(slot, before) {
-    state.recording = {slot: slot.keycode, before, last: Date.now()};
+    state.lastTake = null;
+    state.macroDrafts = {...state.macroDrafts, [slot.keycode]: before};
+    state.recording = {slot: slot.keycode, before, last: Date.now(), captured: false};
     document.addEventListener("keydown", onRecordKey, true);
     document.addEventListener("keyup", onRecordKey, true);
     render();
@@ -307,7 +320,8 @@ function stopRecording(model = getModel(), slot = null) {
     const recordedSlot = state.recording?.slot;
     document.removeEventListener("keydown", onRecordKey, true);
     document.removeEventListener("keyup", onRecordKey, true);
-    state.recording = state.recording ? {...state.recording, slot: null} : null;
+    state.lastTake = state.recording ? {slot: recordedSlot, before: state.recording.before} : null;
+    state.recording = null;
     const target = slot || [...(model?.viaMacros || []), ...(model?.hardcodedMacros || [])]
         .find((candidate) => candidate.keycode === recordedSlot);
     if (target) stageMacro(model, target, state.macroDrafts?.[target.keycode] ?? target.payload ?? "");
@@ -328,11 +342,13 @@ function onRecordKey(event) {
     const current = state.macroDrafts?.[recording.slot] ?? "";
     const threshold = Math.max(0, Number(state.recordDelayThreshold) || 0);
     const round = Math.max(1, Number(state.recordDelayRound) || 1);
-    const delay = state.recordDelays !== false && gap > threshold ? `{${Math.round(gap / round) * round}}` : "";
+    // The pause before the first key is the time it took to start typing, not
+    // part of the macro.
+    const delay = recording.captured && state.recordDelays !== false && gap > threshold ? `{${Math.round(gap / round) * round}}` : "";
     const command = state.recordMode === "explicit"
         ? `{${event.type === "keydown" ? "+" : "-"}${keycode}}`
         : `{${keycode}}`;
     state.macroDrafts = {...state.macroDrafts, [recording.slot]: `${current}${delay}${command}`};
-    state.recording = {...recording, last: now};
+    state.recording = {...recording, last: now, captured: true};
     render();
 }

@@ -45,7 +45,8 @@ export const state = {
     macroDrafts: {},
     macroSteps: {},
     macroCursors: {},
-    recording: null,
+    recording: null,     // {slot, before, last, captured} only while a take is being captured
+    lastTake: null,      // {slot, before}: the finished take Clear take can undo
     recordDelays: true,
     recordMode: "compact",
     recordDelayThreshold: 30,
@@ -53,6 +54,7 @@ export const state = {
     ledPicks: [],
     trackball: false,
     rowColour: {h: "0", s: "0", v: "0"},
+    ledRow: {target: "layer", owner: "", source: ""}, // the LED group row being built, kept across renders
     settingsSearch: "",
     overlay: null,
     picker: null,

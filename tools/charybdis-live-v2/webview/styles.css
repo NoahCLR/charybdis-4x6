@@ -185,6 +185,8 @@ code { color: inherit; background: none; padding: 0; border-radius: 0; }
 }
 .seg button[aria-pressed="true"] { background: var(--surface-3); color: var(--text); font-weight: 520; box-shadow: 0 1px 0 rgba(0,0,0,.25); }
 
+/* The hidden attribute wins over any component display rule. */
+[hidden] { display: none !important; }
 .field { display: grid; gap: 6px; }
 .field > span, .label { font-size: 11px; color: var(--text-2); letter-spacing: .01em; }
 .input, select.input {

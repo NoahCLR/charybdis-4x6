@@ -31,6 +31,7 @@ const helperLabel = (kind, helper) => kind === "tap" ? "tap sends"
     : (HOLD_HELPERS.find(([name]) => name === helper) || [, String(helper || "").toLowerCase().replace(/_/g, " ")])[1];
 
 const TIER_FIELDS = {tap: "tap", hold: "hold", long: "longHold"};
+const DEFAULT_REPEAT_HZ = "20";
 
 export function screenKeys() {
     const model = getModel();
@@ -507,8 +508,8 @@ function cellEditor(behaviour, step, kind) {
                 <select class="input" data-helper ${canEdit ? "" : "disabled"}>
                     ${HOLD_HELPERS.map(([value, text]) => `<option value="${value}" ${branch?.helper === value ? "selected" : ""}>${text}</option>`).join("")}
                 </select></label>`}
-            ${branch?.helper === "REPEAT_WHILE_HELD" ? `<label class="field"><span>Repeat rate</span>
-                <input class="input mono" data-repeat value="${esc(branch.repeatHz || "")}" ${canEdit ? "" : "disabled"}></label>` : "<span></span>"}
+            ${kind === "tap" ? "<span></span>" : `<label class="field" data-repeat-field ${branch?.helper === "REPEAT_WHILE_HELD" ? "" : "hidden"}><span>Repeat rate · Hz</span>
+                <input class="input mono" type="number" min="1" max="100" step="1" data-repeat value="${esc(Number(branch?.repeatHz) > 0 ? branch.repeatHz : DEFAULT_REPEAT_HZ)}" ${canEdit ? "" : "disabled"}></label>`}
             <div class="row" style="gap:8px;align-items:end">
                 ${branch ? `<button class="btn ghost" data-act="clear" ${canEdit ? "" : "disabled"}>Remove tier</button>` : ""}
                 <span class="note">Changes are kept in the draft automatically.</span>
@@ -517,7 +518,10 @@ function cellEditor(behaviour, step, kind) {
     </div>`);
     const stage = (action = node.querySelector("[data-action]").value.trim()) => {
         const helper = kind === "tap" ? "TAP_SENDS" : node.querySelector("[data-helper]").value;
-        const repeatHz = node.querySelector("[data-repeat]")?.value || "0";
+        // The rate only means something for "repeat while held", and there it
+        // must be 1–100 Hz; the field starts at a valid rate the first time
+        // the helper is chosen, rather than posting 0.
+        const repeatHz = helper === "REPEAT_WHILE_HELD" ? (node.querySelector("[data-repeat]")?.value.trim() || DEFAULT_REPEAT_HZ) : "0";
         saveBehaviour(document, behaviour, {
             tapCount: step.tapCount,
             kind,
@@ -535,6 +539,10 @@ function cellEditor(behaviour, step, kind) {
             render();
         },
     }));
+    node.querySelector("[data-helper]")?.addEventListener("change", (event) => {
+        const field = node.querySelector("[data-repeat-field]");
+        if (field) field.hidden = event.target.value !== "REPEAT_WHILE_HELD";
+    });
     node.querySelectorAll("[data-action], [data-helper], [data-repeat]").forEach((field) =>
         field.addEventListener("change", () => stage()));
     node.querySelector('[data-act="clear"]')?.addEventListener("click", () =>

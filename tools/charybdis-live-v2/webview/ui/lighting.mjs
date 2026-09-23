@@ -413,22 +413,45 @@ function groupRowsTable(rows, target, ownerLabel) {
     return node;
 }
 
+// Who a row belongs to depends on its table: a layer, a pointing mode, a key
+// feedback state, or — for combo feedback — nobody, since every combo shares
+// one colour. The values are the names the host's RGB enums use.
+const KEY_FEEDBACK_OWNERS = [
+    ["KEY_FEEDBACK_GROUP_ALL", "Every feedback state"],
+    ["KEY_FEEDBACK_GROUP_TAP_BRANCH_PENDING", "Tap branch pending"],
+    ["KEY_FEEDBACK_GROUP_TAP_COMMITTED", "Tap committed"],
+    ["KEY_FEEDBACK_GROUP_HOLD_ACTIVE", "Hold active"],
+    ["KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE", "Long hold active"],
+];
+function rowOwners(model, target) {
+    if (target === "layer") return [...layers().map((layer) => [`Layer ${layer.index}`, layerName(layer)]), ["RGB_LAYER_GROUP_ALL", "All layers"]];
+    if (target === "pdMode") return [...(model.rgb.pdModeColors || []).map((row, index) =>
+        [row.pointingMode, (model.pdModes || []).find((slot) => slot.id === index)?.name || `Slot ${index + 1}`]), ["RGB_PD_MODE_GROUP_ALL", "All pointing modes"]];
+    if (target === "keyBehavior") return KEY_FEEDBACK_OWNERS;
+    return [];
+}
+
 function groupBuilder(model, canEdit) {
     const groups = model.rgb.ledGroups || [];
+    const draft = state.ledRow;
+    const owners = rowOwners(model, draft.target);
+    if (!owners.some(([value]) => value === draft.owner)) draft.owner = owners[0]?.[0] ?? "";
+    if (draft.source && !groups.some((group) => group.name === draft.source)) draft.source = "";
+    const option = (value, text, current) => `<option value="${esc(value)}" ${value === current ? "selected" : ""}>${esc(text)}</option>`;
     const node = el(`<aside class="stack" style="gap:12px">
         <div class="sect-h"><h4>New row from the selection</h4><span class="right tag">${state.ledPicks.length} LEDs</span></div>
         <label class="field"><span>Table</span><select class="input" data-target ${canEdit ? "" : "disabled"}>
-            <option value="layer">Layer LED groups</option>
-            <option value="pdMode">Pointing-mode LED groups</option>
-            <option value="combo">Combo feedback LED groups</option>
-            <option value="keyBehavior">Key feedback LED groups</option></select></label>
-        <label class="field"><span>Owner</span><select class="input" data-owner ${canEdit ? "" : "disabled"}>
-            ${layers().map((layer) => `<option value="Layer ${layer.index}">${esc(layerName(layer))}</option>`).join("")}
-            <option value="RGB_LAYER_GROUP_ALL">All layers</option></select></label>
+            ${[["layer", "Layer LED groups"], ["pdMode", "Pointing-mode LED groups"], ["combo", "Combo feedback LED groups"], ["keyBehavior", "Key feedback LED groups"]]
+                .map(([value, text]) => option(value, text, draft.target)).join("")}</select></label>
+        ${owners.length ? `<label class="field"><span>Owner</span><select class="input" data-owner ${canEdit ? "" : "disabled"}>
+            ${owners.map(([value, text]) => option(value, text, draft.owner)).join("")}</select></label>` : ""}
         <label class="field"><span>LEDs</span><select class="input" data-source ${canEdit ? "" : "disabled"}>
-            <option value="">Inline selection from the board</option>
-            ${groups.map((group) => `<option value="${esc(group.name)}">${esc(group.name)} · ${group.ledIndices.length} LEDs</option>`).join("")}</select></label>
+            ${option("", "Inline selection from the board", draft.source)}
+            ${groups.map((group) => option(group.name, `${group.name} · ${group.ledIndices.length} LEDs`, draft.source)).join("")}</select></label>
     </aside>`);
+    node.querySelector("[data-target]").addEventListener("change", (event) => { draft.target = event.target.value; draft.owner = ""; render(); });
+    node.querySelector("[data-owner]")?.addEventListener("change", (event) => { draft.owner = event.target.value; });
+    node.querySelector("[data-source]").addEventListener("change", (event) => { draft.source = event.target.value; });
     node.append(colourEditor({
         colour: state.rowColour || {h: "0", s: "0", v: "0"}, canEdit, title: "Row colour",
         maximumBrightness: model.rgb.maximumBrightness,
@@ -436,16 +459,15 @@ function groupBuilder(model, canEdit) {
         onChange: (next) => { state.rowColour = {h: String(next.h), s: String(next.s), v: String(next.v)}; render(); },
     }));
     const actions = el(`<div class="row" style="gap:8px">
-        <button class="btn primary" data-act="keep" ${canEdit ? "" : "disabled"}>Keep row in draft</button>
+        <button class="btn primary" data-act="keep" ${canEdit && (draft.source || state.ledPicks.length) ? "" : "disabled"}
+            data-tip="Pick LEDs on the board, or choose a saved group, to give the row something to paint.">Keep row in draft</button>
         <button class="btn ghost" data-act="save" ${canEdit ? "" : "disabled"}
             data-tip="Store this selection as a named group other rows can point at.">Save selection as a group</button></div>`);
     actions.querySelector('[data-act="keep"]').addEventListener("click", () => {
-        const target = node.querySelector("[data-target]").value;
-        const owner = node.querySelector("[data-owner]").value;
-        const source = node.querySelector("[data-source]").value;
         post({type: "addRgbLedGroup", group: {
-            target, owner,
-            ...(source ? {ledGroupName: source} : {ledIndices: ledIndices()}),
+            target: draft.target,
+            ...(draft.target === "combo" ? {} : {owner: draft.owner}),
+            ...(draft.source ? {ledGroupName: draft.source} : {ledIndices: ledIndices()}),
             ...hsvPayload(state.rowColour),
         }});
     });
