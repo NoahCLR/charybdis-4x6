@@ -9,7 +9,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const {ProfileDraftSession} = require("../core/session/profile-draft-session");
-const {buildDeviceModel} = require("../core/session/device-model");
+const {buildPanelModel, startLayerEdit} = require("../core/session/panel-session");
 const portable = require("../core/model/portable-profile");
 const keycodes = require("../core/data/keycode-catalog");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../core/protocol/via-layout-v1");
@@ -75,21 +75,10 @@ function buildModel() {
         devices: [{id: deviceId, manufacturer: "Bastard Keyboards", product: "Charybdis 4x6"}],
         baseRgb: {state: "read", effectId: 1, brightness: 180, hue: 140, saturation: 210, speed: 60},
     };
-    const editing = session.editingState(state);
-    const model = buildDeviceModel({...editing, device: state.devices[0]});
-    model.draft = {...session.view(state), busy: false};
-    model.profileIdentity = session.identity();
-    // The host adds this block from the live connection; the preview supplies
-    // the shape a complete-profile keyboard reports so the screen can be seen.
-    const names = session.current.summary.names;
-    model.portable = {
-        available: true, eightLayers: true, legacy: false, pdUpgradeAvailable: false,
-        busy: false, progress: "", review: null,
-        // The host loads this when Keys → Layers asks for it; the preview has
-        // no host, so it ships the shape that screen renders.
-        layers: {key: snapshot.fingerprint, order: Array.from({length: 8}, (_, id) => id), names: [...names]},
-    };
-    model.layers.forEach((layer, index) => { layer.displayName = names[index] || layer.name; });
+    // The host's own model builder, so the preview cannot drift from it. The
+    // layer editor is open so Edit layers has something to show.
+    const panel = {service: {portable: null}, draft: session, portableLayers: startLayerEdit(snapshot, session.revision)};
+    const model = buildPanelModel(panel, state);
     return model;
 }
 
@@ -112,25 +101,11 @@ async function deviceModel() {
         await service.readCombos();
         if ((service.capabilities?.supportedDomainMask & 15) === 15) await service.readPortableProfile();
 
-        const state = service.snapshot();
-        const read = service.portable;
-        const draft = read && !read.incomplete && state.capabilities?.compiledLayerCount === 8
-            ? new ProfileDraftSession(read, state.selectedDeviceId, state.capabilities) : undefined;
-        const device = state.devices.find((entry) => entry.id === state.selectedDeviceId);
-        const model = buildDeviceModel({...(draft ? draft.editingState(state) : state), device});
-        if (draft) {
-            model.draft = {...draft.view(state), busy: false};
-            model.profileIdentity = draft.identity();
-            const names = draft.current.summary.names;
-            model.layers?.forEach((layer, index) => {layer.displayName = names[index] || layer.name;});
-        }
-        model.portable = {
-            available: true, eightLayers: state.capabilities?.compiledLayerCount === 8, legacy: false,
-            pdUpgradeAvailable: Boolean(state.capabilities?.featureFlags & (1 << 13)),
-            busy: false, progress: "", review: null,
-            layers: {key: draft?.current.fingerprint, order: Array.from({length: 8}, (_, id) => id),
-                names: [...(draft?.current.summary.names || [])]},
-        };
+        // Exactly the model the panel would build for this keyboard.
+        const panel = {service};
+        const model = buildPanelModel(panel, service.snapshot());
+        if (panel.draft) panel.portableLayers = startLayerEdit(panel.draft.current, panel.draft.revision);
+        model.portable.layers = panel.portableLayers ? {key: panel.portableLayers.before.fingerprint, order: panel.portableLayers.order, names: panel.portableLayers.names} : null;
         return model;
     } finally {
         await service.close();

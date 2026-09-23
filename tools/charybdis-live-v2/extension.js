@@ -8,16 +8,17 @@
 // without touching it. Nothing here parses a firmware repository; see
 // docs/LIVE_EDIT_APP_DIRECTION.md.
 //
-// The webview renders a keyboard-backed `model` and posts typed edits back, so
-// this file's job is to build that model and turn those edits into device
-// writes.
+// The webview renders a keyboard-backed `model` and posts typed edits back.
+// What the model holds and where each message goes is decided in
+// core/session/panel-session.js; this file adds the VS Code parts — dialogs,
+// files, progress and the panel itself.
 
 const vscode = require("vscode");
 
-const {upgradePdSnapshot, validateSnapshot, summary, reorderLayers} = require("./core/session/portable-profile-session");
+const {upgradePdSnapshot, validateSnapshot} = require("./core/session/portable-profile-session");
 const {ProfileDeviceService} = require("./core/session/profile-device-service");
-const {ProfileDraftSession, DRAFT_EDITS} = require("./core/session/profile-draft-session");
-const {buildDeviceModel} = require("./core/session/device-model");
+const {ProfileDraftSession} = require("./core/session/profile-draft-session");
+const {applyLayerEdit, buildPanelModel, layerEditDocument, routeMessage, startLayerEdit, takeOutbox} = require("./core/session/panel-session");
 const {getHtml} = require("./panel-html");
 
 const VIEW_TYPE = "charybdisLiveV2.panel";
@@ -57,62 +58,8 @@ function openPanel(context) {
 }
 
 function publish(panel, session) {
-    const state = session.service.snapshot();
-    const portable = session.service.portable;
-    if (portable && portable !== session.observedPortable && !portable.incomplete && state.connected && state.capabilities?.compiledLayerCount === 8) {
-        if (!session.draft) session.draft = new ProfileDraftSession(portable, state.selectedDeviceId, state.capabilities);
-        else session.draft.observe(portable, state.selectedDeviceId);
-        session.observedPortable = portable;
-    }
-    const editing = session.draft ? session.draft.editingState(state) : state;
-    const modelState = {
-            ...editing,
-            busy: editing.busy || session.portableBusy,
-            device: state.devices.find((device) => device.id === state.selectedDeviceId),
-        };
-    const model = buildDeviceModel(modelState);
-    if (session.draft) {
-        model.draft = {...session.draft.view(state), busy: Boolean(state.busy || session.portableBusy)};
-        if (model.draft.matching) {
-            model.profileIdentity = session.draft.identity();
-            const names = session.draft.current.summary.names;
-            model.layers?.forEach((layer, i) => {layer.displayName = names[i];});
-        }
-        const actual = buildDeviceModel({
-            capabilities: state.capabilities,
-            status: state.status,
-            layout: state.layout,
-            committed: state.committed,
-            baseRgb: state.baseRgb,
-            combos: state.combos,
-            macroView: state.macroView,
-            settingsView: state.settingsView,
-            busy: state.busy || session.portableBusy,
-            device: state.devices.find((device) => device.id === state.selectedDeviceId),
-        });
-        model.device = actual.device;
-        model.diagnostics = actual.diagnostics;
-        if (model.draft.dirty) model.device.subtitle = "Showing your local draft · the keyboard still runs the last applied profile";
-    }
-    model.portable = {
-        available: state.connected && [5, 8].includes(state.capabilities?.compiledLayerCount) && (state.capabilities?.supportedDomainMask & 15) === 15,
-        eightLayers: state.capabilities?.compiledLayerCount === 8,
-        legacy: state.capabilities?.compiledLayerCount === 5,
-        pdUpgradeAvailable: Boolean(state.capabilities?.featureFlags & (1 << 13)),
-        busy: state.busy || session.portableBusy,
-        progress: state.portableProgress,
-        review: session.portableReview ? {incoming: summary(session.portableReview.document), current: session.portableReview.before.summary} : null,
-        layers: session.portableLayers ? {key: session.portableLayers.before.fingerprint, order: session.portableLayers.order, names: session.portableLayers.names} : null,
-    };
-    if (!model.draft?.matching) model.layers?.forEach((layer, index) => {layer.displayName = state.portableSummary?.names[index] || layer.name;});
-    void panel.webview.postMessage({type: "model", model,
-        notice: session.notice,
-        acceptedEdit: session.acceptedEdit,
-        resetDraftForms: session.resetDraftForms,
-    });
-    session.notice = undefined;
-    session.acceptedEdit = undefined;
-    session.resetDraftForms = undefined;
+    const model = buildPanelModel(session, session.service.snapshot());
+    void panel.webview.postMessage({type: "model", model, ...takeOutbox(session)});
 }
 
 // Every path through here publishes, including the ones that decline or fail:
@@ -121,47 +68,13 @@ function publish(panel, session) {
 // as a notice rather than as silence.
 async function handleMessage(panel, session, message) {
     try {
-        if (session.portableBusy) {publish(panel, session); return;}
-        if (session.draft && (DRAFT_EDITS.has(message?.type) || /^(?:review|undo|redo|discard|apply|rebase|close)ProfileDraft/.test(message?.type || "")) && message.draftId !== session.draft.id) throw new Error("This edit belongs to an older draft. Read the keyboard before continuing.");
-        if (session.draft && DRAFT_EDITS.has(message?.type)) {
-            const state = session.service.snapshot();
-            if (state.busy || !state.connected || state.selectedDeviceId !== session.draft.deviceId) throw new Error("Reconnect the keyboard this draft belongs to and wait for its current operation.");
-            session.acceptedEdit = session.draft.stage(message);
-            if (message.reviewAfter) session.draft.review(session.draft.revision);
-            publish(panel, session);
-            return;
-        }
-        // Every change leaves this window through a reviewed draft. Without one
-        // (a keyboard whose profile could not be read, or older firmware) the
-        // app is read-only; an edit that reaches here is refused, never written.
-        if (!session.draft && DRAFT_EDITS.has(message?.type)) {
-            throw new Error("This keyboard has no editable draft, so the change was not written. Read the keyboard again; if it stays read-only, update both halves to firmware with profile editing.");
-        }
-        if (["reviewProfileDraft", "undoProfileDraft", "redoProfileDraft", "discardProfileDraft", "applyProfileDraft", "rebaseProfileDraft", "closeProfileDraftReview"].includes(message?.type)) {
-            await draftMessage(panel, session, message);
-            return;
-        }
-        switch (message?.type) {
-            case "exportPdUpgrade":
-            case "exportPortableProfile":
-            case "choosePortableProfile":
-            case "restorePortableProfile":
-            case "managePortableLayers":
-            case "editPortableLayer":
-            case "savePortableLayers":
-            case "cancelPortableReview":
-                await portableMessage(panel, session, message);
-                return;
-            case "ready":
-            case "refresh":
-                await connectAndRead(panel, session);
-                return;
-            default:
-                // Even an unrecognised message is answered, so the panel is
-                // never left waiting on a reply.
-                publish(panel, session);
-                return;
-        }
+        const route = routeMessage(session, message, session.service.snapshot());
+        if (route === "draft") await draftMessage(panel, session, message);
+        else if (route === "portable") await portableMessage(panel, session, message);
+        else if (route === "read") await connectAndRead(panel, session);
+        // A staged edit, and even an unrecognised message, is answered, so the
+        // panel is never left waiting on a reply.
+        else publish(panel, session);
     } catch (error) {
         const text = error instanceof Error ? error.message : String(error);
         const code = error?.code ? ` [${error.code}]` : "";
@@ -259,12 +172,7 @@ async function portableMessage(panel, session, message) {
     session.portableBusy = true;
     try {
         const service = session.service;
-        if (message.names !== undefined) {
-            const draft = session.portableLayers;
-            if (!draft || !Array.isArray(message.names) || message.names.length !== 8) throw new Error("Read the layers again before naming them.");
-            reorderLayers(draft.before.document, draft.order, draft.order.map(old => message.names[old]));
-            draft.names = [...message.names];
-        }
+        if (message.type === "savePortableLayers" && message.names !== undefined) applyLayerEdit(session.portableLayers, message);
         const saveRecovery = document => saveRecoveryFile(session, document);
         if (message.type === "cancelPortableReview") {
             session.portableReview = undefined; session.portableLayers = undefined;
@@ -303,30 +211,14 @@ async function portableMessage(panel, session, message) {
         } else if (message.type === "managePortableLayers") {
             const before = session.draft?.current || await service.readPortableProfile();
             session.portableReview = undefined;
-            session.portableLayers = {before, revision: session.draft?.revision, order: Array.from({length: 8}, (_, id) => id), names: [...before.summary.names]};
+            session.portableLayers = startLayerEdit(before, session.draft?.revision);
         } else if (message.type === "editPortableLayer") {
-            const draft = session.portableLayers, id = message.id;
-            if (!draft || !Number.isInteger(id) || id < 0 || id > 7) throw new Error("Read the layers again before editing them.");
-            if (message.name !== undefined) {
-                if (typeof message.name !== "string") throw new Error("Enter a layer name.");
-                const names = [...draft.names]; names[id] = message.name;
-                reorderLayers(draft.before.document, draft.order, draft.order.map(old => names[old]));
-                draft.names = names;
-            } else {
-                // The form posts every name with the move, because the rows are
-                // rebuilt from this draft afterwards: dropping them here would
-                // quietly undo whatever was typed before the move.
-                if (Array.isArray(message.names) && message.names.length === draft.names.length
-                    && message.names.every(name => typeof name === "string")) draft.names = [...message.names];
-                const from = draft.order.indexOf(id), to = from + message.direction;
-                if (id === 0 || ![1, -1].includes(message.direction) || to < 1 || to > 7) throw new Error("Base stays at the bottom of the layer order.");
-                [draft.order[from], draft.order[to]] = [draft.order[to], draft.order[from]];
-            }
+            applyLayerEdit(session.portableLayers, message);
         } else {
             const review = session.portableReview, draft = session.portableLayers;
             const before = message.type === "savePortableLayers" ? draft?.before : review?.before;
             if (!before) throw new Error("Review the profile before restoring it.");
-            const document = message.type === "savePortableLayers" ? reorderLayers(before.document, draft.order, draft.order.map(old => draft.names[old])) : review.document;
+            const document = message.type === "savePortableLayers" ? layerEditDocument(draft) : review.document;
             if (session.draft) {
                 session.draft.replace(document, message.type === "savePortableLayers" ? draft.revision : review.revision);
                 session.portableReview = undefined; session.portableLayers = undefined;
