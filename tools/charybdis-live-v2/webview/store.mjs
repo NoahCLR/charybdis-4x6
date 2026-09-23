@@ -39,6 +39,7 @@ export const state = {
     pdSlot: 0,
     pdKind: null,      // movement selection while the rebuilt form catches up: {slot, kind}
     pdAdvanced: false,  // Advanced open on the pointing editor, whichever slot is shown
+    applyDismissed: 0,  // the failed Apply (by id) the person closed, so it stays closed
     pdPreview: false,
     feedbackRow: "hold",
     macroSlot: null,

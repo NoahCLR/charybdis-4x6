@@ -534,6 +534,33 @@ route and advertise candidate writes. Its successful 25-byte payload is:
 | 21 | 2 | candidate byte offset, or `0xFFFF` |
 | 23 | 2 | operation sequence, incremented after each processed mailbox item |
 
+Page 1 (added 2026-09-23) reports the save's copy to the other half, which
+page 0 cannot show: during `PREPARING_PEER` page 0 stays identical until the
+peer is ready. Builds with the live-profile owner answer it; others answer
+`UNKNOWN_PAGE`, which the host treats as "not reported". Its 25-byte payload is:
+
+| Payload offset | Size | Field |
+| ---: | ---: | --- |
+| 0 | 1 | layout version, `1` |
+| 1 | 1 | peer phase |
+| 2 | 1 | the peer's last split status |
+| 3 | 1 | flags: bit 0 peer cleanup pending, bit 1 this half is transport master |
+| 4 | 2 | bytes of the profile transferred to the peer |
+| 6 | 2 | bytes to transfer |
+| 8 | 4 | split retries since boot |
+| 12 | 4 | split transport failures since boot |
+| 16 | 9 | reserved, zero |
+
+Peer phases are `0` idle, `1` binding the staged VIA copy, `2` beginning, `3`
+sending, `4` the peer validating and writing its prepared copy, `5` the peer
+prepared, `6` the peer committing, `7` aborting the peer's copy, `8` the split
+reconciler stopped (the last status says why), and `9` waiting for the link
+between steps. Split statuses are `0` ok, `1` invalid frame, `2`
+incompatible, `3` stale, `4` conflict, `5` corrupt, `6` busy, `7` range
+error, `8` digest mismatch, `9` storage error and `10` validation error. The
+host treats a change of phase, offset or last status as progress when it
+decides whether a commit has stalled.
+
 Candidate states are `0` idle, `1` receiving, `2` complete, `3` validating,
 `4` validated, `5` rejected, `6` committing, `7` activating, `8` preparing
 the peer before local durability, `9` converging the peer after local

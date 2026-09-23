@@ -499,6 +499,46 @@ static void test_operation_status_codec(void) {
     assert(!noah_profile_candidate_v1_handle_status_get(&status, frame, 31u));
 }
 
+// Page 1 carries the save's copy to the other half. Page 0 is unchanged and
+// still refuses page 1, so a build without the owner keeps answering it with
+// UNKNOWN_PAGE.
+static void test_peer_status_page(void) {
+    const noah_profile_candidate_v1_peer_status_t peer = {
+        .phase                   = NOAH_PROFILE_CANDIDATE_V1_PEER_PHASE_SENDING,
+        .last_status             = 6u,
+        .flags                   = NOAH_PROFILE_CANDIDATE_V1_PEER_FLAG_CLEANUP_PENDING | NOAH_PROFILE_CANDIDATE_V1_PEER_FLAG_MASTER | 0x80u,
+        .transfer_offset         = 0x0102u,
+        .transfer_length         = 0x0304u,
+        .retry_count             = 0x05060708u,
+        .transport_failure_count = 0x090a0b0cu,
+    };
+    uint8_t frame[NOAH_PROFILE_WIRE_V1_REPORT_SIZE];
+
+    load_fixture("operation-status-request", frame);
+    assert(!noah_profile_candidate_v1_handle_peer_status_get(&peer, frame, sizeof(frame)));
+    frame[4] = 1u;
+    assert(noah_profile_candidate_v1_handle_peer_status_get(&peer, frame, sizeof(frame)));
+    assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK && frame[6] == 25u);
+    assert(frame[7] == 1u && frame[8] == NOAH_PROFILE_CANDIDATE_V1_PEER_PHASE_SENDING && frame[9] == 6u);
+    assert(frame[10] == 0x03u); // unknown flag bits never reach the wire
+    assert(frame[11] == 0x02u && frame[12] == 0x01u && frame[13] == 0x04u && frame[14] == 0x03u);
+    assert(frame[15] == 0x08u && frame[18] == 0x05u && frame[19] == 0x0cu && frame[22] == 0x09u);
+    for (uint8_t index = 23u; index < NOAH_PROFILE_WIRE_V1_REPORT_SIZE; index++) {
+        assert(frame[index] == 0u);
+    }
+    load_fixture("operation-status-request", frame);
+    frame[4]  = 1u;
+    frame[31] = 1u;
+    assert(noah_profile_candidate_v1_handle_peer_status_get(&peer, frame, sizeof(frame)));
+    assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_MALFORMED);
+    load_fixture("operation-status-request", frame);
+    frame[4] = 2u;
+    assert(!noah_profile_candidate_v1_handle_peer_status_get(&peer, frame, sizeof(frame)));
+    frame[4] = 1u;
+    assert(!noah_profile_candidate_v1_handle_peer_status_get(NULL, frame, sizeof(frame)));
+    assert(!noah_profile_candidate_v1_handle_peer_status_get(&peer, frame, 31u));
+}
+
 static void test_mailbox_and_begin_retries(void) {
     static const uint8_t                   profile[8] = {'N', 'L', 'P', '1', 1u, 0u, 0u, 1u};
     fake_backend_t                         fake;
@@ -1262,6 +1302,7 @@ int main(int argc, char **argv) {
     test_exact_frame_codecs();
     test_malformed_frame_matrix();
     test_operation_status_codec();
+    test_peer_status_page();
     test_mailbox_and_begin_retries();
     test_sequential_chunks_and_duplicate_rules();
     test_bounded_validation_and_error_locations();

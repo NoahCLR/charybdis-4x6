@@ -237,3 +237,44 @@ test("request and transaction id allocators wrap without emitting zero", () => {
     assert.throws(() => new CandidateRequestIdSequence(0), /nonzero/);
     assert.throws(() => new CandidateTransactionIdSequence(0), /nonzero/);
 });
+
+// Candidate status page 1, mirroring noah_profile_candidate_v1_handle_peer_status_get.
+const {CANDIDATE_PEER_PHASE, buildCandidatePeerStatusRequest, readCandidatePeerStatus} = require("../../core/protocol/profile-candidate-v1");
+function peerResponse(request, {status = 0, payload = null} = {}) {
+    const response = Buffer.from(request);
+    response.fill(0, 5);
+    response[5] = status;
+    if (payload) {
+        response[6] = payload.length;
+        payload.copy(response, 7);
+    }
+    return response;
+}
+function peerPayload() {
+    const payload = Buffer.alloc(25);
+    payload[0] = 1;
+    payload[1] = CANDIDATE_PEER_PHASE.SENDING;
+    payload[2] = 6;
+    payload[3] = 0x03;
+    payload.writeUInt16LE(40, 4);
+    payload.writeUInt16LE(120, 6);
+    payload.writeUInt32LE(7, 8);
+    payload.writeUInt32LE(2, 12);
+    return payload;
+}
+test("candidate status page 1 reports the copy to the other half, and older firmware reports nothing", async () => {
+    let ids = 0x50;
+    const reply = (options) => ({async request(actual) { return peerResponse(actual, options); }});
+    const peer = await readCandidatePeerStatus(reply({payload: peerPayload()}), {nextRequestId: () => ids++});
+    assert.deepEqual(peer, {phase: CANDIDATE_PEER_PHASE.SENDING, phaseName: "SENDING", lastStatus: 6, lastStatusName: "BUSY",
+        cleanupPending: true, master: true, transferOffset: 40, transferLength: 120, retryCount: 7, transportFailureCount: 2});
+    assert.equal(buildCandidatePeerStatusRequest(0x51)[4], 1, "page 1");
+
+    assert.equal(await readCandidatePeerStatus(reply({status: 2}), {nextRequestId: () => ids++}), null, "UNKNOWN_PAGE is 'not reported'");
+
+    for (const [offset, value, pattern] of [[1, 10, /phase/], [2, 11, /peer status/], [3, 0x04, /flag/], [20, 1, /reserved/]]) {
+        const payload = peerPayload();
+        payload[offset] = value;
+        await assert.rejects(readCandidatePeerStatus(reply({payload}), {nextRequestId: () => ids++}), pattern);
+    }
+});

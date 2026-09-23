@@ -66,7 +66,7 @@ class ProfileDeviceService {
         this.error = undefined;
         this.diagnostics = [];
         this.lastRefreshedAt = "";
-        this.liveApply = {state: "idle", progress: null, result: null, error: null};
+        this.liveApply = {state: "idle"};
         this.layout = undefined;
         this.committed = undefined;
         this.profileBytes = undefined;
@@ -420,6 +420,7 @@ class ProfileDeviceService {
     async restorePortableProfile(document, options) {
         if (!this.connection?.connected || this.busy) throw new Error("Connect the keyboard and wait for the current operation to finish.");
         let result, started = false;
+        this.liveApply = {state: "idle"};
         await this.runOperation("restoring complete profile", async () => {
             const cachedBase = options?.expectedFingerprint && this.portable?.fingerprint === options.expectedFingerprint
                 ? this.portable
@@ -433,7 +434,10 @@ class ProfileDeviceService {
             started = true;
             result = await restoreProfile(this.connection, this.requestIds, this.capabilities, document, {...options,
                 baseSnapshot: cachedBase,
-                onProgress: message => {this.portableProgress = message; this.emitChange();},
+                onProgress: message => {this.portableProgress = message;},
+                // The step view the commit bar draws; it outlives the apply
+                // when it failed, so the person can see where and why.
+                onApplyProgress: view => {this.liveApply = view; this.emitChange();},
             });
             result.limits = limits;
             result.options = keyboardOptions;
@@ -562,7 +566,7 @@ class ProfileDeviceService {
         this.viaIdentity = undefined;
         this.requestIds = undefined;
         this.lastRefreshedAt = "";
-        this.liveApply = {state: "idle", progress: null, result: null, error: null};
+        this.liveApply = {state: "idle"};
     }
 
     setError(error) {
@@ -628,10 +632,15 @@ function cleanText(value) {
 }
 
 function publicError(error) {
-    return {
+    const result = {
         code: cleanText(error?.code) || cleanText(error?.name) || "LIVE_LINK_ERROR",
         message: cleanText(error?.message) || String(error || "Unknown live-link error."),
     };
+    // Where an Apply failed, why, and what was saved (see apply-progress.js).
+    for (const key of ["step", "stepLabel", "reason", "saved"]) {
+        if (typeof error?.[key] === "string" && error[key]) result[key] = cleanText(error[key]);
+    }
+    return result;
 }
 
 function normalizeProfileSummary(summary = {}) {
@@ -765,12 +774,7 @@ function evaluateLiveMutationCompatibility(capabilities, compatibility, connecte
 }
 
 function cloneLiveApply(value) {
-    return {
-        state: value?.state || "idle",
-        progress: value?.progress ? {...value.progress} : null,
-        result: value?.result ? {...value.result} : null,
-        error: value?.error ? {...value.error} : null,
-    };
+    return value && value.state !== "idle" ? JSON.parse(JSON.stringify(value)) : {state: "idle"};
 }
 
 function cloneCandidateStatus(status) {

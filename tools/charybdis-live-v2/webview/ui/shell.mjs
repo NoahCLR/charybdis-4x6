@@ -114,10 +114,57 @@ function railMessage() {
         <button class="btn tiny ghost icon" data-act="dismiss" aria-label="Dismiss">✕</button></div>`;
 }
 
+// One Apply's steps, as the keyboard reports them. The running step carries
+// what it is doing now and, where there is one, how many bytes are through.
+function applySteps(apply) {
+    const rows = apply.steps.map((step) => {
+        const current = step.state === "active";
+        const counted = current && apply.bytes
+            ? `<span class="ap-bar"><i style="width:${Math.round((apply.bytes.completed / apply.bytes.total) * 100)}%"></i></span>
+               <span class="ap-bytes">${apply.bytes.completed} / ${apply.bytes.total} bytes</span>` : "";
+        return `<li class="${step.state}"><span class="mark">${step.state === "active" ? '<span class="spin"></span>' : ""}</span>
+            <span class="lbl">${esc(step.label)}</span>
+            ${current && (apply.detail || counted) ? `<span class="ap-detail">${esc(apply.detail)}${counted}</span>` : ""}</li>`;
+    }).join("");
+    return `<ol class="ap-steps">${rows}</ol>`;
+}
+
+const SAVED_VERDICT = {
+    none: "Nothing was saved. The keyboard kept the profile it had.",
+    unknown: "The keyboard may have saved part of it. Read the keyboard to see what it runs now.",
+};
+
 export function commitBar() {
     const model = getModel();
     const draft = model?.draft;
+    const apply = model?.apply;
     if (!draft) return null;
+
+    if (draft.busy && apply?.state === "applying") {
+        const index = apply.steps.findIndex((step) => step.state === "active");
+        return el(`<div class="commit applying ap">
+            <div class="ap-head"><strong>Applying to the keyboard</strong>
+                <span class="muted">step ${index + 1} of ${apply.steps.length}</span></div>
+            ${applySteps(apply)}
+            <div class="note">The keyboard keeps running its saved profile until both halves confirm.</div></div>`);
+    }
+    // A failed Apply stays on screen until it is dismissed, so where it
+    // stopped and why can be read after the fact.
+    if (!draft.busy && apply?.state === "failed" && state.applyDismissed !== apply.id) {
+        const node = el(`<div class="commit ap failed">
+            <div class="ap-head"><i class="dot err"></i><strong>Apply stopped at: ${esc(apply.failure.label)}</strong></div>
+            <p class="ap-reason">${esc(apply.failure.reason)}</p>
+            <p class="ap-saved">${esc(SAVED_VERDICT[apply.failure.saved] || SAVED_VERDICT.unknown)}</p>
+            ${applySteps(apply)}
+            <div class="ap-actions"><button class="btn ghost tiny" data-act="dismiss">Dismiss</button>
+                <button class="btn tiny" data-act="read">Read keyboard</button></div></div>`);
+        node.querySelector('[data-act="dismiss"]').addEventListener("click", () => {
+            state.applyDismissed = apply.id;
+            render();
+        });
+        node.querySelector('[data-act="read"]').addEventListener("click", () => post({type: "refresh"}));
+        return node;
+    }
 
     if (draft.busy) {
         return el(`<div class="commit applying">

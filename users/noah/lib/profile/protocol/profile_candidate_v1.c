@@ -256,4 +256,32 @@ bool noah_profile_candidate_v1_handle_status_get(const noah_profile_candidate_v1
     return true;
 }
 
+bool noah_profile_candidate_v1_handle_peer_status_get(const noah_profile_candidate_v1_peer_status_t *peer, uint8_t *frame, size_t length) {
+    uint8_t *payload;
+
+    if (!peer || !frame || length != NOAH_PROFILE_WIRE_V1_REPORT_SIZE) {
+        return false;
+    }
+    if (frame[FRAME_COMMAND] != NOAH_PROFILE_WIRE_V1_COMMAND_GET || frame[FRAME_CHANNEL] != NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL || frame[FRAME_VALUE] != NOAH_PROFILE_CANDIDATE_V1_VALUE_STATUS || frame[FRAME_READ_PAGE] != 1u) {
+        return false;
+    }
+    if (frame[FRAME_READ_REQUEST] == 0u || !status_request_reserved_bytes_are_zero(frame)) {
+        begin_status_response(frame, NOAH_PROFILE_WIRE_V1_STATUS_MALFORMED, 0u);
+        return true;
+    }
+
+    begin_status_response(frame, NOAH_PROFILE_WIRE_V1_STATUS_OK, OPERATION_PAYLOAD_SIZE);
+    payload    = &frame[FRAME_READ_PAYLOAD];
+    payload[0] = 1u;
+    payload[1] = (uint8_t)peer->phase;
+    payload[2] = peer->last_status;
+    payload[3] = (uint8_t)(peer->flags & NOAH_PROFILE_CANDIDATE_V1_PEER_FLAGS_KNOWN);
+    write_u16(&payload[4], peer->transfer_offset);
+    write_u16(&payload[6], peer->transfer_length);
+    write_u32(&payload[8], peer->retry_count);
+    write_u32(&payload[12], peer->transport_failure_count);
+    // Bytes 16..24 are reserved and stay zero.
+    return true;
+}
+
 _Static_assert(FRAME_READ_PAYLOAD + OPERATION_PAYLOAD_SIZE == NOAH_PROFILE_WIRE_V1_REPORT_SIZE, "Candidate status must fill one 32-byte report exactly");

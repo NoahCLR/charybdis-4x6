@@ -681,6 +681,31 @@ test("observable split state progress renews the stall deadline", async () => {
     assert.equal(now > 2, true);
 });
 
+test("the copy to the other half moving on keeps a long peer preparation alive, and reaches progress", async () => {
+    const run = async (readPeerStatus) => {
+        let now = 0;
+        const peers = [];
+        const harness = new CandidateFirmwareHarness({splitBarrier: true, prepareReads: 12, commitReads: 1, convergenceReads: 1, activationReads: 1});
+        const client = new CandidateUploadCoordinator(harness, {
+            pollIntervalMs: 1, statusStallTimeoutMs: 3, now: () => now, async sleep(ms) { now += ms; },
+            readPeerStatus, onProgress: (progress) => { if (progress.peer) peers.push(progress.peer.transferOffset); },
+        });
+        const prepared = await client.upload(representativeBlob(1), {actionAbiDigest: 1, transactionId: 0x1234});
+        return {result: await client.commit(prepared.transactionId, {digest: prepared.metadata.digest}), peers};
+    };
+    // Page 0 stays identical through PREPARING_PEER, so without page 1 the
+    // short stall window expires before the peer is ready.
+    await assert.rejects(run(undefined), (error) => error.code === "COMMIT_OUTCOME_AMBIGUOUS");
+    let offset = 0;
+    const {result, peers} = await run(async () => ({phase: 3, phaseName: "SENDING", lastStatus: 0, lastStatusName: "OK", transferOffset: offset += 10, transferLength: 200, retryCount: 0, transportFailureCount: 0}));
+    assert.equal(result.status.state, CANDIDATE_STATE.IDLE);
+    assert.ok(peers.length >= 10 && peers.every((value, index) => index === 0 || value >= peers[index - 1]), "each peer read reaches progress");
+    // Firmware without page 1 answers null once and is not asked again.
+    let asked = 0;
+    await assert.rejects(run(async () => { asked++; return null; }), (error) => error.code === "COMMIT_OUTCOME_AMBIGUOUS");
+    assert.equal(asked, 1);
+});
+
 test("an unexpected polling failure cleans up the admitted candidate before retry", async () => {
     const harness = new CandidateFirmwareHarness();
     let sleepCalls = 0;

@@ -70,6 +70,14 @@ bool noah_profile_store_runtime_candidate_status(noah_profile_candidate_v1_statu
     return true;
 }
 
+static noah_profile_candidate_v1_peer_status_t live_peer_status = {.phase = NOAH_PROFILE_CANDIDATE_V1_PEER_PHASE_SENDING, .transfer_offset = 40u, .transfer_length = 120u};
+
+bool noah_profile_store_runtime_peer_transfer(noah_profile_candidate_v1_peer_status_t *peer) {
+    if (!peer) return false;
+    *peer = live_peer_status;
+    return true;
+}
+
 bool noah_profile_store_runtime_candidate_receive(uint8_t *frame, size_t length) {
     if (!frame || length != NOAH_PROFILE_WIRE_V1_REPORT_SIZE || frame[0] != NOAH_PROFILE_CANDIDATE_V1_COMMAND_SET || frame[1] != NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL || frame[2] != NOAH_PROFILE_CANDIDATE_V1_VALUE_BEGIN) {
         return false;
@@ -386,6 +394,17 @@ static void test_hook_rejects_unsupported_or_malformed_commands(void) {
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK);
     assert(frame[WIRE_PAYLOAD + 1u] == NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATED);
     assert(read_u16(&frame[WIRE_PAYLOAD + 4u]) == live_owner_status.candidate.transaction_id);
+#else
+    assert(frame[0] == id_unhandled);
+#endif
+
+    make_request(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_STATUS, 3u, 1u);
+    via_custom_value_command_kb(frame, sizeof(frame));
+#ifdef NOAH_LIVE_PROFILE_MUTATION_ENABLE
+    assert(frame[0] == id_custom_get_value);
+    assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK);
+    assert(frame[WIRE_PAYLOAD + 1u] == NOAH_PROFILE_CANDIDATE_V1_PEER_PHASE_SENDING);
+    assert(read_u16(&frame[WIRE_PAYLOAD + 4u]) == 40u && read_u16(&frame[WIRE_PAYLOAD + 6u]) == 120u);
 #else
     assert(frame[0] == id_unhandled);
 #endif

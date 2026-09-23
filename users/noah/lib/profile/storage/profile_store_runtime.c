@@ -301,6 +301,15 @@ bool noah_profile_store_runtime_owner_status(noah_profile_owner_status_t *status
 #endif
 }
 
+bool noah_profile_store_runtime_peer_transfer(noah_profile_candidate_v1_peer_status_t *peer) {
+#if defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)
+    return runtime_owner_initialized && !runtime_integration_error && noah_profile_owner_peer_transfer(&runtime_owner, peer);
+#else
+    (void)peer;
+    return false;
+#endif
+}
+
 bool noah_profile_store_runtime_candidate_status(noah_profile_candidate_v1_status_t *status) {
 #if defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)
     noah_profile_owner_status_t owner_status;

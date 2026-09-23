@@ -997,3 +997,29 @@ measurements.
 Next: flash the pair and confirm a normal Apply still converges; capture the
 peer's own state the next time a push stops being acknowledged, so the cause,
 not just the wedge, can be fixed.
+
+### D-L23 — Apply shows its steps, and a failure says where, why and what was saved
+
+The commit bar showed a spinner and "Working" for the whole Apply. The step
+text existed, but it only reached the Profile screen, and each coordinator
+poll overwrote the step before it. A failure reached the panel as a code and
+message, with the step it happened in dropped along the way.
+
+`core/session/apply-progress.js` now names the ten steps of an Apply and
+tracks them forward only: check the keyboard, save a recovery copy, send the
+profile, keyboard checks it, stage keys and macros on the other half, copy
+the profile to the other half, save it on this half, finish the other half,
+write keys and macros on this half, check both halves. `restoreProfile()`
+reports into it at each real boundary, with byte counts where the transfer has
+them. A failure keeps the step it happened in, a reason from the keyboard's
+own error (or the other half's last answer), and whether anything was saved.
+The commit bar draws the steps while they run and keeps a failed Apply on
+screen until it is dismissed.
+
+Firmware adds candidate status page 1 (see
+[Profile Wire V1](architecture/profile-wire-v1.md#candidate-operation-status)):
+the peer phase, transferred bytes and the peer's last split status. The host
+reads it while the keyboard is `PREPARING_PEER` and counts its movement as
+progress, so a slow copy no longer runs into the stall window it used to wait
+out blind. Firmware without page 1 answers `UNKNOWN_PAGE` and keeps the old
+behaviour.

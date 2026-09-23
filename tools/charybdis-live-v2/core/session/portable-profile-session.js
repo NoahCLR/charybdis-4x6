@@ -4,7 +4,8 @@ const {readLegacyPdSource, readSettings, readStorageStatus, waitForStorage} = re
 const {readProfileStatus, PROFILE_ACTIVE_KIND} = require("../protocol/profile-wire-v1");
 const {readCommittedPayload, readCompiledPayload} = require("../protocol/profile-payload-v1");
 const {readDeviceCombos} = require("../protocol/combo-readback-v1");
-const {candidateMetadataForBlob, readCandidateStatus, CANDIDATE_STATE} = require("../protocol/profile-candidate-v1");
+const {candidateMetadataForBlob, readCandidatePeerStatus, readCandidateStatus, CANDIDATE_STATE} = require("../protocol/profile-candidate-v1");
+const {ApplyProgress, failureReason} = require("./apply-progress");
 const {CandidateUploadCoordinator} = require("./candidate-upload-coordinator");
 const {LogicalViaStageCoordinator} = require("./logical-via-stage-coordinator");
 const {upgradePdSnapshot, createSnapshot, validateSnapshot, materializeProfile, fingerprint, summary, reorderLayers} = require("../model/portable-profile");
@@ -85,14 +86,14 @@ async function rollForwardLocalStorage(connection, target, base, layoutRanges, m
     for (const range of layoutRanges) {
         await writeRegion(connection, VIA_STORAGE.LAYOUT_WRITE, range.bytes, {
             startOffset: range.offset,
-            onProgress: progress => onProgress(`Applying keyboard storage: ${completed + progress.completed} / ${total} bytes`),
+            onProgress: progress => onProgress({completed: completed + progress.completed, total}),
         });
         completed += range.bytes.length;
     }
     if (macroRanges.length) {
         await writeViaMacros(connection, target.macros, {
             current: base.macros,
-            onProgress: progress => onProgress(`Applying keyboard storage: ${completed + progress.completed} / ${total} bytes`),
+            onProgress: progress => onProgress({completed: completed + progress.completed, total}),
         });
         completed += macroBytes;
     }
@@ -101,7 +102,7 @@ async function rollForwardLocalStorage(connection, target, base, layoutRanges, m
         // verified no-op keycode write gives QMK's normal mutation tracker the
         // durable generation transition without changing the layout.
         await writeRegion(connection, VIA_STORAGE.LAYOUT_WRITE, target.layout.subarray(0, 2), {
-            onProgress: progress => onProgress(`Applying keyboard storage: ${progress.completed} / ${total} bytes`),
+            onProgress: progress => onProgress({completed: progress.completed, total}),
         });
     }
 }
@@ -115,95 +116,162 @@ async function peerRestartGuidance(connection, readProfile, options) {
     } catch {}
     return "";
 }
-async function restoreProfile(connection, ids, capabilities, document, {expectedFingerprint, saveRecovery, baseSnapshot, onProgress = () => {}, operations = {}} = {}) {
-    const startedAt = Date.now();
-    requireReady(capabilities);
-    requireReady(capabilities, true);
-    const target = validateSnapshot(document, capabilities);
-    document = target.document;
-    const capture = operations.capture || captureProfile;
-    const currentIdentity = operations.readIdentity || readIdentity;
-    const readCandidate = operations.readCandidate || readCandidateStatus;
-    const waitStorage = operations.waitStorage || waitForStorage;
-    const readStorage = operations.readStorage || readStorageStatus;
-    const readStored = operations.readStored || readRegion;
-    const readProfile = operations.readProfile || readProfileStatus;
-    const createCoordinator = operations.createCoordinator || ((c, options) => new CandidateUploadCoordinator(c, options));
-    const createViaCoordinator = operations.createViaCoordinator || ((c, options) => new LogicalViaStageCoordinator(c, options));
-    const rollForwardLocal = operations.rollForwardLocal || rollForwardLocalStorage;
-    if (typeof saveRecovery !== "function") throw fail("RECOVERY_REQUIRED", "Save a recovery copy before restoring this keyboard.");
-    let before;
-    if (baseSnapshot?.document && baseSnapshot.identity && (!expectedFingerprint || baseSnapshot.fingerprint === expectedFingerprint)) {
-        if (!baseSnapshot.incomplete) validateSnapshot(baseSnapshot.document, capabilities);
-        onProgress("Verifying the current keyboard configuration");
-        const liveIdentity = await currentIdentity(connection, ids, {allowCandidate: false});
-        if (identityKey(liveIdentity) !== identityKey(baseSnapshot.identity)) throw fail("PROFILE_CHANGED", "The keyboard changed since the restore was reviewed. Review it again.");
-        before = baseSnapshot;
-    } else {
-        before = await capture(connection, ids, capabilities, onProgress, false, true);
-    }
-    if (expectedFingerprint && before.fingerprint !== expectedFingerprint) throw fail("PROFILE_CHANGED", "The keyboard changed since the restore was reviewed. Review it again.");
-    const recovery = await saveRecovery(before.document);
-    if (!recovery) throw fail("RECOVERY_REQUIRED", "A recovery copy could not be saved. The keyboard has not been changed.");
-    const options = {nextRequestId: () => ids.next()};
-    const base = capturedBase(before, capabilities);
-    const beforeIdentity = before.identity;
-    if (!beforeIdentity) throw fail("PROFILE_IDENTITY_UNAVAILABLE", "The keyboard read did not include a stable save identity.");
-    const candidate = await readCandidate(connection, options);
-    if (candidate.state !== CANDIDATE_STATE.IDLE) throw fail("KEYBOARD_BUSY", "The keyboard has an unfinished profile transaction. Finish or recover it before restoring.");
-    const coordinator = createCoordinator(connection, {chunkSize: capabilities.candidateChunkMax, requestIds: ids, onProgress: progress => onProgress(`Preparing profile: ${progress.phase}`)});
-    const viaCoordinator = createViaCoordinator(connection, {requestIds: ids, onProgress: progress => onProgress(`Preparing keyboard storage: ${progress.completed} / ${progress.total} bytes`)});
-    const expectedStorageDigest = viaStorageDigest(target);
-    if (beforeIdentity.storageGeneration >= 0xffffffff) throw fail("STORAGE_GENERATION_EXHAUSTED", "The keyboard storage generation cannot advance safely.");
-    const targetStorageGeneration = beforeIdentity.storageGeneration + 1;
-    const macroRanges = changedRanges(base.macros, target.macros, {end: target.macros.length - 1});
-    const layoutRanges = changedRanges(base.layout, target.layout);
-    let mutated = false, prepared, decisionObserved = false, commitRequested = false;
+// What the keyboard is doing for the "Copy the profile to the other half" step,
+// from candidate status page 1.
+const PEER_DETAIL = Object.freeze({
+    BINDING: "Binding keys and macros to the new profile",
+    BEGINNING: "Starting the copy",
+    SENDING: "Sending",
+    PREPARING: "The other half is checking and storing its copy",
+    PREPARED: "The other half is ready",
+    COMMITTING: "The other half is saving",
+    ABORTING: "Cancelling the copy on the other half",
+    WAITING: "Waiting for the link between the halves",
+});
+function peerReport(peer) {
+    if (!peer) return {detail: "Waiting for the other half"};
+    const busy = peer.lastStatusName === "BUSY" ? " · the other half is busy" : "";
+    const report = {detail: `${PEER_DETAIL[peer.phaseName] || "Waiting for the other half"}${busy}`};
+    if (peer.phaseName === "SENDING" || peer.phaseName === "BEGINNING") Object.assign(report, {completed: peer.transferOffset, total: peer.transferLength});
+    return report;
+}
+// The coordinators report phases; each lands on the step it belongs to.
+function coordinatorReport(progress, applyProgress) {
+    const state = progress.status?.state;
+    if (["preflight", "begin", "writing"].includes(progress.phase)) applyProgress.report("upload", {completed: progress.bytesSent, total: progress.totalBytes});
+    else if (["validate", "validating", "complete"].includes(progress.phase) && !progress.operation) applyProgress.report("validate");
+    else if (state === CANDIDATE_STATE.PREPARING_PEER) applyProgress.report("peer", peerReport(progress.peer));
+    else if (state === CANDIDATE_STATE.COMMITTING) applyProgress.report("commit", {detail: "Writing the profile"});
+    else if (state === CANDIDATE_STATE.CONVERGING_PEER) applyProgress.report("converge");
+    else if (state === CANDIDATE_STATE.ACTIVATING) applyProgress.report("verify", {detail: "Switching to the new profile"});
+}
+// The step view as one line, for the Profile screen and notifications.
+function progressText(view) {
+    if (view.failure) return `Failed at: ${view.failure.label}`;
+    const step = view.steps.find(item => item.id === view.current);
+    const counted = view.bytes ? ` ${view.bytes.completed} / ${view.bytes.total} bytes` : "";
+    return `${step?.label || ""}${view.detail ? ` · ${view.detail}` : ""}${counted}`;
+}
+
+// Every failure leaves with the step it happened in, the keyboard's reason,
+// and what can honestly be said about what was saved.
+function withFailure(error, applyProgress, saved) {
+    const cause = error.cause || error;
+    const failure = applyProgress.fail({reason: failureReason(cause, cause.progress?.peer), saved});
+    return Object.assign(error, {step: failure.step, stepLabel: failure.label, reason: failure.reason, saved: failure.saved});
+}
+
+async function restoreProfile(connection, ids, capabilities, document, {expectedFingerprint, saveRecovery, baseSnapshot, onProgress = () => {}, onApplyProgress = () => {}, operations = {}} = {}) {
+    const applyProgress = new ApplyProgress(view => {
+        onApplyProgress(view);
+        onProgress(progressText(view));
+    });
+    applyProgress.report("check");
+    let mutated = false;
     try {
-        prepared = await coordinator.upload(target.profile, {metadata: candidateMetadataForBlob(target.profile, {actionAbiDigest: capabilities.actionAbiDigest, viaGeneration: targetStorageGeneration, viaDigest: expectedStorageDigest}), verifyBase: async () => {
-            const identity = await currentIdentity(connection, ids, {allowCandidate: true});
-            if (identityKey(identity) !== identityKey(beforeIdentity)) throw fail("PROFILE_CHANGED", "The keyboard changed before restore could start.");
-        }});
-        mutated = true;
-        onProgress("Staging changed keys and macros on the other half");
-        await viaCoordinator.stage({transactionId: prepared.transactionId, generation: targetStorageGeneration, digest: expectedStorageDigest, target, current: base});
-        onProgress("Publishing one complete profile to both halves");
-        commitRequested = true;
-        await coordinator.commit(prepared.transactionId, {digest: prepared.metadata.digest, afterDecision: async () => {
-            decisionObserved = true;
-            onProgress("Waiting for the staged recovery copy");
-            await viaCoordinator.waitUntilAccepted({transactionId: prepared.transactionId, generation: targetStorageGeneration, digest: expectedStorageDigest});
-            onProgress("Applying changed keys and macros on the connected half");
-            await rollForwardLocal(connection, target, base, layoutRanges, macroRanges, onProgress);
-        }});
-        const macroBytes = macroRanges.reduce((sum, range) => sum + range.bytes.length, 0);
-        const layoutBytes = layoutRanges.reduce((sum, range) => sum + range.bytes.length, 0);
-        const macroWriteNeeded = macroRanges.length > 0 || base.macros.at(-1) !== target.macros.at(-1);
-        const storage = await waitStorage(connection, ids);
-        await verifyRanges(connection, readStored, VIA_STORAGE.LAYOUT_READ, target.layout, layoutRanges);
-        await verifyRanges(connection, readStored, VIA_STORAGE.MACRO_READ, target.macros, macroRanges, {verifyFinalByte: macroRanges.length > 0});
-        const status = await readProfile(connection, options);
-        const storageAfter = await readStorage(connection, ids);
-        if (status.activeKind !== PROFILE_ACTIVE_KIND.COMMITTED || status.activeDigest !== fnv1a32(target.profile) || status.committedDigest !== fnv1a32(target.profile) || !(status.stateFlags & 32) || status.conflictCount || !storage.ready || !storageAfter.ready || storage.generation !== targetStorageGeneration || storageAfter.generation !== targetStorageGeneration || storage.generation !== storageAfter.generation || storage.digest !== storageAfter.digest || storageAfter.digest !== expectedStorageDigest) throw fail("RESTORE_VERIFY_FAILED", "The keyboard did not confirm the imported profile on both halves.");
-        const resultFingerprint = fingerprint(document);
-        return {document, fingerprint: resultFingerprint, summary: summary(document), status, identity: snapshotIdentity(status, storageAfter, encodeSettings(target.settings)), recovery,
-            performance: {elapsedMs: Date.now() - startedAt, baseSource: before === baseSnapshot ? "verified-cache" : "device-read", layoutBytes, macroBytes, viaConfigReports: 1, layoutReports: layoutRanges.reduce((sum, range) => sum + Math.ceil(range.bytes.length / 12), 0), macroReports: macroWriteNeeded ? macroRanges.reduce((sum, range) => sum + Math.ceil(range.bytes.length / 12), 0) : 0}};
+        return await restoreSteps();
     } catch (error) {
-        let cancelled = false;
-        if (prepared && !decisionObserved) {
-            try { await viaCoordinator.abort({transactionId: prepared.transactionId, generation: targetStorageGeneration, digest: expectedStorageDigest}); } catch {}
-            // The keyboard returns to idle on ABORT only while no commit
-            // marker exists, so a completed abort proves nothing was saved.
-            try { await coordinator.abort(prepared.transactionId); cancelled = true; } catch {}
+        // Nothing reached the keyboard before the upload; after it, the
+        // inner handler has already said whether anything was saved.
+        throw withFailure(error, applyProgress, !mutated || error.code === "RESTORE_NOT_SAVED" ? "none" : "unknown");
+    }
+
+    async function restoreSteps() {
+        const startedAt = Date.now();
+        requireReady(capabilities);
+        requireReady(capabilities, true);
+        const target = validateSnapshot(document, capabilities);
+        document = target.document;
+        const capture = operations.capture || captureProfile;
+        const currentIdentity = operations.readIdentity || readIdentity;
+        const readCandidate = operations.readCandidate || readCandidateStatus;
+        const waitStorage = operations.waitStorage || waitForStorage;
+        const readStorage = operations.readStorage || readStorageStatus;
+        const readStored = operations.readStored || readRegion;
+        const readProfile = operations.readProfile || readProfileStatus;
+        const createCoordinator = operations.createCoordinator || ((c, options) => new CandidateUploadCoordinator(c, options));
+        const createViaCoordinator = operations.createViaCoordinator || ((c, options) => new LogicalViaStageCoordinator(c, options));
+        const rollForwardLocal = operations.rollForwardLocal || rollForwardLocalStorage;
+        if (typeof saveRecovery !== "function") throw fail("RECOVERY_REQUIRED", "Save a recovery copy before restoring this keyboard.");
+        let before;
+        if (baseSnapshot?.document && baseSnapshot.identity && (!expectedFingerprint || baseSnapshot.fingerprint === expectedFingerprint)) {
+            if (!baseSnapshot.incomplete) validateSnapshot(baseSnapshot.document, capabilities);
+            applyProgress.report("check", {detail: "Comparing with the reviewed profile"});
+            const liveIdentity = await currentIdentity(connection, ids, {allowCandidate: false});
+            if (identityKey(liveIdentity) !== identityKey(baseSnapshot.identity)) throw fail("PROFILE_CHANGED", "The keyboard changed since the restore was reviewed. Review it again.");
+            before = baseSnapshot;
+        } else {
+            before = await capture(connection, ids, capabilities, message => applyProgress.report("check", {detail: message}), false, true);
         }
-        if (!mutated) throw error;
-        const restart = await peerRestartGuidance(connection, readProfile, options);
-        // Before the commit was sent, or once the keyboard confirmed the
-        // cancel, the profile it had is still the one it runs.
-        if (!decisionObserved && (!commitRequested || cancelled)) {
-            throw fail("RESTORE_NOT_SAVED", `Nothing was saved: the keyboard kept the profile it had. ${error.message}${restart}`);
+        if (expectedFingerprint && before.fingerprint !== expectedFingerprint) throw fail("PROFILE_CHANGED", "The keyboard changed since the restore was reviewed. Review it again.");
+        applyProgress.report("backup");
+        const recovery = await saveRecovery(before.document);
+        if (!recovery) throw fail("RECOVERY_REQUIRED", "A recovery copy could not be saved. The keyboard has not been changed.");
+        const options = {nextRequestId: () => ids.next()};
+        const base = capturedBase(before, capabilities);
+        const beforeIdentity = before.identity;
+        if (!beforeIdentity) throw fail("PROFILE_IDENTITY_UNAVAILABLE", "The keyboard read did not include a stable save identity.");
+        const candidate = await readCandidate(connection, options);
+        if (candidate.state !== CANDIDATE_STATE.IDLE) throw fail("KEYBOARD_BUSY", "The keyboard has an unfinished profile transaction. Finish or recover it before restoring.");
+        const coordinator = createCoordinator(connection, {chunkSize: capabilities.candidateChunkMax, requestIds: ids,
+            readPeerStatus: operations.readPeerStatus === undefined ? readCandidatePeerStatus : operations.readPeerStatus,
+            onProgress: progress => coordinatorReport(progress, applyProgress)});
+        const viaCoordinator = createViaCoordinator(connection, {requestIds: ids, onProgress: progress => applyProgress.report("stage", {completed: progress.completed, total: progress.total})});
+        const expectedStorageDigest = viaStorageDigest(target);
+        if (beforeIdentity.storageGeneration >= 0xffffffff) throw fail("STORAGE_GENERATION_EXHAUSTED", "The keyboard storage generation cannot advance safely.");
+        const targetStorageGeneration = beforeIdentity.storageGeneration + 1;
+        const macroRanges = changedRanges(base.macros, target.macros, {end: target.macros.length - 1});
+        const layoutRanges = changedRanges(base.layout, target.layout);
+        let prepared, decisionObserved = false, commitRequested = false;
+        try {
+            applyProgress.report("upload");
+            prepared = await coordinator.upload(target.profile, {metadata: candidateMetadataForBlob(target.profile, {actionAbiDigest: capabilities.actionAbiDigest, viaGeneration: targetStorageGeneration, viaDigest: expectedStorageDigest}), verifyBase: async () => {
+                const identity = await currentIdentity(connection, ids, {allowCandidate: true});
+                if (identityKey(identity) !== identityKey(beforeIdentity)) throw fail("PROFILE_CHANGED", "The keyboard changed before restore could start.");
+            }});
+            mutated = true;
+            applyProgress.report("stage");
+            await viaCoordinator.stage({transactionId: prepared.transactionId, generation: targetStorageGeneration, digest: expectedStorageDigest, target, current: base});
+            applyProgress.report("peer", peerReport(null));
+            commitRequested = true;
+            await coordinator.commit(prepared.transactionId, {digest: prepared.metadata.digest, afterDecision: async () => {
+                decisionObserved = true;
+                applyProgress.report("converge", {detail: "Waiting for the other half's copy of keys and macros"});
+                await viaCoordinator.waitUntilAccepted({transactionId: prepared.transactionId, generation: targetStorageGeneration, digest: expectedStorageDigest});
+                applyProgress.report("local");
+                await rollForwardLocal(connection, target, base, layoutRanges, macroRanges, counted => applyProgress.report("local", counted));
+            }});
+            const macroBytes = macroRanges.reduce((sum, range) => sum + range.bytes.length, 0);
+            const layoutBytes = layoutRanges.reduce((sum, range) => sum + range.bytes.length, 0);
+            const macroWriteNeeded = macroRanges.length > 0 || base.macros.at(-1) !== target.macros.at(-1);
+            applyProgress.report("verify", {detail: "Reading back both halves"});
+            const storage = await waitStorage(connection, ids);
+            await verifyRanges(connection, readStored, VIA_STORAGE.LAYOUT_READ, target.layout, layoutRanges);
+            await verifyRanges(connection, readStored, VIA_STORAGE.MACRO_READ, target.macros, macroRanges, {verifyFinalByte: macroRanges.length > 0});
+            const status = await readProfile(connection, options);
+            const storageAfter = await readStorage(connection, ids);
+            if (status.activeKind !== PROFILE_ACTIVE_KIND.COMMITTED || status.activeDigest !== fnv1a32(target.profile) || status.committedDigest !== fnv1a32(target.profile) || !(status.stateFlags & 32) || status.conflictCount || !storage.ready || !storageAfter.ready || storage.generation !== targetStorageGeneration || storageAfter.generation !== targetStorageGeneration || storage.generation !== storageAfter.generation || storage.digest !== storageAfter.digest || storageAfter.digest !== expectedStorageDigest) throw fail("RESTORE_VERIFY_FAILED", "The keyboard did not confirm the imported profile on both halves.");
+            const resultFingerprint = fingerprint(document);
+            applyProgress.finish();
+            return {document, fingerprint: resultFingerprint, summary: summary(document), status, identity: snapshotIdentity(status, storageAfter, encodeSettings(target.settings)), recovery,
+                performance: {elapsedMs: Date.now() - startedAt, baseSource: before === baseSnapshot ? "verified-cache" : "device-read", layoutBytes, macroBytes, viaConfigReports: 1, layoutReports: layoutRanges.reduce((sum, range) => sum + Math.ceil(range.bytes.length / 12), 0), macroReports: macroWriteNeeded ? macroRanges.reduce((sum, range) => sum + Math.ceil(range.bytes.length / 12), 0) : 0}};
+        } catch (error) {
+            let cancelled = false;
+            if (prepared && !decisionObserved) {
+                try { await viaCoordinator.abort({transactionId: prepared.transactionId, generation: targetStorageGeneration, digest: expectedStorageDigest}); } catch {}
+                // The keyboard returns to idle on ABORT only while no commit
+                // marker exists, so a completed abort proves nothing was saved.
+                try { await coordinator.abort(prepared.transactionId); cancelled = true; } catch {}
+            }
+            if (!mutated) throw error;
+            const restart = await peerRestartGuidance(connection, readProfile, options);
+            // Before the commit was sent, or once the keyboard confirmed the
+            // cancel, the profile it had is still the one it runs.
+            if (!decisionObserved && (!commitRequested || cancelled)) {
+                throw Object.assign(fail("RESTORE_NOT_SAVED", `Nothing was saved: the keyboard kept the profile it had. ${error.message}${restart}`), {cause: error});
+            }
+            throw Object.assign(fail("RESTORE_INCOMPLETE", `Restore was interrupted. Keep both halves connected. ${before.incomplete ? `Import your original complete backup again. Interrupted data was saved for diagnosis at ${recovery}.` : `Import the recovery file ${recovery}.`} ${error.message}${restart}`), {cause: error});
         }
-        throw fail("RESTORE_INCOMPLETE", `Restore was interrupted. Keep both halves connected. ${before.incomplete ? `Import your original complete backup again. Interrupted data was saved for diagnosis at ${recovery}.` : `Import the recovery file ${recovery}.`} ${error.message}${restart}`);
     }
 }
 module.exports = {upgradePdSnapshot, captureProfile, readIdentity, restoreProfile, validateSnapshot, summary, fingerprint, reorderLayers};

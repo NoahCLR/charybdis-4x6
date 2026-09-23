@@ -75,6 +75,8 @@ function buildPanelModel(session, state) {
         model.diagnostics = actual.diagnostics;
         if (model.draft.dirty && model.draft.matching) model.device.subtitle = "Showing your local draft · the keyboard still runs the last applied profile";
     }
+    // The last Apply's steps: live while it runs, kept when it failed.
+    model.apply = state.liveApply && state.liveApply.state !== "idle" ? state.liveApply : null;
     model.portable = {
         available: Boolean(state.connected && [5, 8].includes(state.capabilities?.compiledLayerCount) && (state.capabilities?.supportedDomainMask & 15) === 15),
         eightLayers: state.capabilities?.compiledLayerCount === 8,

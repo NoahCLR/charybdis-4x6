@@ -1551,6 +1551,7 @@ bool noah_profile_split_reconciler_status(const noah_profile_split_reconciler_t 
         .mailbox_pending         = mailbox_pending(reconciler),
         .transfer_pending        = transfer_pending(reconciler),
         .peer_cleanup_pending    = reconciler->orphan_pending,
+        .prepared_push_active    = reconciler->prepared_push_active,
     };
     return true;
 }

@@ -38,4 +38,5 @@ bool noah_profile_store_runtime_read_compiled(uint16_t offset, uint8_t *target, 
 // static runtime owner is never exposed for direct mutation.
 bool noah_profile_store_runtime_owner_status(noah_profile_owner_status_t *status);
 bool noah_profile_store_runtime_candidate_status(noah_profile_candidate_v1_status_t *status);
+bool noah_profile_store_runtime_peer_transfer(noah_profile_candidate_v1_peer_status_t *peer);
 bool noah_profile_store_runtime_candidate_receive(uint8_t *frame, size_t length);

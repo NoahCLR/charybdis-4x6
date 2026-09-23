@@ -23,7 +23,13 @@ function fixture() {
     return {source, targetDocument, target, identity, events, operations, options};
 }
 test("restore saves recovery first, restores both stores, then verifies complete readback", async () => {
-    const f = fixture(), result = await restoreProfile({}, {}, capabilities, f.targetDocument, f.options);
+    const f = fixture(), views = [];
+    f.options.onApplyProgress = view => views.push(view);
+    const result = await restoreProfile({}, {}, capabilities, f.targetDocument, f.options);
+    const reached = [...new Set(views.map(view => view.current))];
+    assert.deepEqual(reached, ["check", "backup", "upload", "stage", "peer", "converge", "local", "verify"],
+        "each boundary the fake coordinators pass through is reported, in order");
+    assert.equal(views.at(-1).state, "done");
     assert.equal(result.fingerprint, fingerprint(f.targetDocument));
     assert.deepEqual({...result.performance, elapsedMs: 0}, {elapsedMs: 0, baseSource: "device-read", layoutBytes: 28, macroBytes: 28, viaConfigReports: 1, layoutReports: 3, macroReports: 3});
     assert.deepEqual(f.events, ["backup", "stage", "via stage", "commit", "via accepted", "local roll-forward", "both halves"]);
@@ -74,6 +80,26 @@ function stalledCommit(f, {abortConfirmed}) {
         abort: async () => {f.events.push("abort"); if (!abortConfirmed) throw Object.assign(Error("could not cancel"), {code: "ABORT_FAILED"}); return {transactionId: 1, status: {state: 0}};},
     });
 }
+test("a failure carries the step it happened in, why, and what was saved", async () => {
+    const f = fixture(), views = [];
+    f.options.onApplyProgress = view => views.push(view);
+    f.operations.createCoordinator = () => ({
+        upload: async (bytes, options) => {await options.verifyBase(); return {transactionId: 1, metadata: {digest: 42}};},
+        commit: async () => {throw Object.assign(Error("Candidate commit made no observable progress."), {code: "COMMIT_OUTCOME_AMBIGUOUS", progress: {peer: {lastStatusName: "BUSY"}}});},
+        abort: async () => ({transactionId: 1, status: {state: 0}}),
+    });
+    await assert.rejects(restoreProfile({}, {}, capabilities, f.targetDocument, f.options), error => error.code === "RESTORE_NOT_SAVED"
+        && error.step === "peer" && error.stepLabel === "Copy the profile to the other half"
+        && error.reason === "The other half kept answering that it was busy." && error.saved === "none");
+    assert.equal(views.at(-1).state, "failed");
+    assert.equal(views.at(-1).failure.step, "peer");
+
+    const early = fixture();
+    early.operations.readIdentity = async () => ({...early.identity, storageDigest: 99});
+    early.options.baseSnapshot = {document: early.source, fingerprint: fingerprint(early.source), summary: summary(early.source), identity: early.identity};
+    await assert.rejects(restoreProfile({}, {}, capabilities, early.targetDocument, early.options), error => error.code === "PROFILE_CHANGED"
+        && error.step === "check" && error.saved === "none", "a refusal before the upload changed nothing");
+});
 test("a sent commit the keyboard then cancels is reported as not saved", async () => {
     const f = fixture(); stalledCommit(f, {abortConfirmed: true});
     await assert.rejects(restoreProfile({}, {}, capabilities, f.targetDocument, f.options), error => error.code === "RESTORE_NOT_SAVED"

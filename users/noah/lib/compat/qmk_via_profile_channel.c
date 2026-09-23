@@ -378,8 +378,12 @@ NOAH_PROFILE_CHANNEL_STACK_BOUNDARY void via_custom_value_command_kb(uint8_t *da
 #    endif
 #    ifdef NOAH_LIVE_PROFILE_MUTATION_ENABLE
     if (data && length == NOAH_PROFILE_WIRE_V1_REPORT_SIZE && data[0] == NOAH_PROFILE_WIRE_V1_COMMAND_GET && data[1] == NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL && data[2] == NOAH_PROFILE_CANDIDATE_V1_VALUE_STATUS) {
-        noah_profile_candidate_v1_status_t candidate;
+        noah_profile_candidate_v1_status_t      candidate;
+        noah_profile_candidate_v1_peer_status_t peer;
 
+        if (data[4] == 1u && noah_profile_store_runtime_peer_transfer(&peer) && noah_profile_candidate_v1_handle_peer_status_get(&peer, data, length)) {
+            return;
+        }
         if (noah_profile_store_runtime_candidate_status(&candidate) && noah_profile_candidate_v1_handle_status_get(&candidate, data, length)) {
             return;
         }

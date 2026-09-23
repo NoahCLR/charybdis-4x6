@@ -153,6 +153,9 @@ typedef struct {
     bool                                 peer_cleanup_pending;
 } noah_profile_owner_status_t;
 
+// The save's copy to the other half, for candidate status page 1.
+bool noah_profile_owner_peer_transfer(const noah_profile_owner_t *owner, noah_profile_candidate_v1_peer_status_t *peer);
+
 // Initializes metadata and begins incremental validation of the compiled
 // canonical profile. It performs no EEPROM or split-transport I/O.
 bool noah_profile_owner_init(noah_profile_owner_t *owner, const noah_profile_owner_config_t *config);

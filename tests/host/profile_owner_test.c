@@ -631,6 +631,14 @@ static void test_host_abort_ends_when_peer_never_acknowledges(void) {
     }
     assert(noah_profile_split_reconciler_prepared_push_ready(&left.reconciler, NULL));
     assert(!owner_peer_cleanup_pending(&left));
+    {
+        noah_profile_candidate_v1_peer_status_t peer;
+
+        assert(noah_profile_owner_peer_transfer(&left, &peer));
+        assert(peer.phase == NOAH_PROFILE_CANDIDATE_V1_PEER_PHASE_PREPARED);
+        assert(peer.transfer_length > 0u && peer.transfer_offset == peer.transfer_length);
+        assert(peer.flags == NOAH_PROFILE_CANDIDATE_V1_PEER_FLAG_MASTER);
+    }
 
     // Durability unknown on the peer: every ABORT is BUSY until it restarts.
     right.peer_store.state = NOAH_PROFILE_PEER_STORE_RECONCILE_REQUIRED;
@@ -651,6 +659,15 @@ static void test_host_abort_ends_when_peer_never_acknowledges(void) {
     // Nothing became durable on either half.
     assert(left.store.committed.slot == NOAH_PROFILE_SLOT_NONE && right.store.committed.slot == NOAH_PROFILE_SLOT_NONE);
     assert(owner_peer_cleanup_pending(&left));
+    {
+        noah_profile_candidate_v1_peer_status_t peer;
+
+        // Released: no transfer is active, and page 1 says cleanup is owed.
+        assert(noah_profile_owner_peer_transfer(&left, &peer));
+        assert(peer.phase == NOAH_PROFILE_CANDIDATE_V1_PEER_PHASE_IDLE);
+        assert(peer.flags & NOAH_PROFILE_CANDIDATE_V1_PEER_FLAG_CLEANUP_PENDING);
+        assert(peer.retry_count > 0u);
+    }
 
     // The next save cannot stack a second transfer onto the wedged peer. It
     // ends on the host's own timeout instead of waiting forever.

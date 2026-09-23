@@ -1073,6 +1073,56 @@ bool noah_profile_owner_status(const noah_profile_owner_t *owner, noah_profile_o
     return true;
 }
 
+static noah_profile_candidate_v1_peer_phase_t peer_phase(const noah_profile_split_reconciler_status_t *status) {
+    if (status->state == NOAH_PROFILE_SPLIT_RECONCILER_STOPPED) {
+        return NOAH_PROFILE_CANDIDATE_V1_PEER_PHASE_STOPPED;
+    }
+    if (!status->prepared_push_active) {
+        return NOAH_PROFILE_CANDIDATE_V1_PEER_PHASE_IDLE;
+    }
+    switch (status->state) {
+        case NOAH_PROFILE_SPLIT_RECONCILER_PUSH_BIND:
+            return NOAH_PROFILE_CANDIDATE_V1_PEER_PHASE_BINDING;
+        case NOAH_PROFILE_SPLIT_RECONCILER_PUSH_BEGIN:
+            return NOAH_PROFILE_CANDIDATE_V1_PEER_PHASE_BEGINNING;
+        case NOAH_PROFILE_SPLIT_RECONCILER_PUSH_READ:
+        case NOAH_PROFILE_SPLIT_RECONCILER_PUSH_SEND:
+            return NOAH_PROFILE_CANDIDATE_V1_PEER_PHASE_SENDING;
+        case NOAH_PROFILE_SPLIT_RECONCILER_PUSH_DURABLE:
+            return NOAH_PROFILE_CANDIDATE_V1_PEER_PHASE_PREPARING;
+        case NOAH_PROFILE_SPLIT_RECONCILER_PUSH_PREPARED:
+            return NOAH_PROFILE_CANDIDATE_V1_PEER_PHASE_PREPARED;
+        case NOAH_PROFILE_SPLIT_RECONCILER_PUSH_COMMIT:
+        case NOAH_PROFILE_SPLIT_RECONCILER_VERIFY:
+        case NOAH_PROFILE_SPLIT_RECONCILER_CONVERGED:
+            return NOAH_PROFILE_CANDIDATE_V1_PEER_PHASE_COMMITTING;
+        case NOAH_PROFILE_SPLIT_RECONCILER_PUSH_ABORT:
+            return NOAH_PROFILE_CANDIDATE_V1_PEER_PHASE_ABORTING;
+        default:
+            // A lost exchange drops the reconciler back to DISCOVER while the
+            // push stays active; it resumes where it left off.
+            return NOAH_PROFILE_CANDIDATE_V1_PEER_PHASE_WAITING;
+    }
+}
+
+bool noah_profile_owner_peer_transfer(const noah_profile_owner_t *owner, noah_profile_candidate_v1_peer_status_t *peer) {
+    noah_profile_split_reconciler_status_t status;
+
+    if (!owner || !peer || owner->state == NOAH_PROFILE_OWNER_UNINITIALIZED || !owner->split_initialized || !noah_profile_split_reconciler_status(&owner->reconciler, &status)) {
+        return false;
+    }
+    *peer = (noah_profile_candidate_v1_peer_status_t){
+        .phase                   = peer_phase(&status),
+        .last_status             = (uint8_t)status.last_status,
+        .flags                   = (uint8_t)((status.peer_cleanup_pending ? NOAH_PROFILE_CANDIDATE_V1_PEER_FLAG_CLEANUP_PENDING : 0u) | (status.master ? NOAH_PROFILE_CANDIDATE_V1_PEER_FLAG_MASTER : 0u)),
+        .transfer_offset         = status.transfer_offset,
+        .transfer_length         = status.transfer_length,
+        .retry_count             = status.retry_count,
+        .transport_failure_count = status.transport_failure_count,
+    };
+    return true;
+}
+
 #if UINTPTR_MAX == UINT32_MAX
 _Static_assert(sizeof(noah_profile_owner_t) <= NOAH_PROFILE_OWNER_STATE_BUDGET_32BIT, "live-profile owner state exceeded its 32-bit engineering regression policy");
 #endif

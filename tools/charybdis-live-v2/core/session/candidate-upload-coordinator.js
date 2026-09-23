@@ -104,6 +104,10 @@ class CandidateUploadCoordinator {
         );
         this.requestTimeoutMs = options.requestTimeoutMs;
         this.onProgress = typeof options.onProgress === "function" ? options.onProgress : undefined;
+        // Reads candidate status page 1 while the keyboard prepares the other
+        // half. Optional: without it (or on firmware that answers null) the
+        // peer phase is waited out blind, as before page 1 existed.
+        this.readPeerStatus = typeof options.readPeerStatus === "function" ? options.readPeerStatus : undefined;
         this.sleep = typeof options.sleep === "function" ? options.sleep : defaultSleep;
         this.now = typeof options.now === "function" ? options.now : Date.now;
         this.transactionIds = options.transactionIds || new CandidateTransactionIdSequence(options.transactionIdStart);
@@ -520,6 +524,7 @@ class CandidateUploadCoordinator {
                 : await this.readStatus(context, {ambiguous: true});
             first = false;
             context.status = status;
+            if (status.state === CANDIDATE_STATE.PREPARING_PEER) await this.refreshPeerStatus(context);
             this.emitProgress(context);
             assertCandidateIdentity(status, context);
             if (status.digest !== context.expectedDigest) {
@@ -548,7 +553,8 @@ class CandidateUploadCoordinator {
             if (!COMMIT_IN_PROGRESS_STATES.includes(status.state)) {
                 throw uploadError("INVALID_COMMIT_STATE", `Firmware entered candidate state ${status.state} during commit.`, context, {status, safeToRetry: false});
             }
-            if (!this.statusBudgetAllowsAnotherPoll(budget, status)) break;
+            // The copy to the other half moving on counts as progress.
+            if (!this.statusBudgetAllowsAnotherPoll(budget, status, peerProgressFingerprint(context.peer))) break;
             await this.waitBeforePoll(context);
         }
         throw uploadError("COMMIT_OUTCOME_AMBIGUOUS", "Candidate commit made no observable progress within its firmware-aware wait window.", context, {
@@ -583,7 +589,7 @@ class CandidateUploadCoordinator {
         return {
             configuredTimeoutMs: this.statusStallTimeoutMs,
             deadline: this.now() + timeoutMs,
-            fingerprint: statusProgressFingerprint(baseline),
+            fingerprint: `${statusProgressFingerprint(baseline)}|`,
             maxPolls: this.maxStatusPolls,
             payloadLength: candidatePayloadLength(context),
             polls: 0,
@@ -591,9 +597,20 @@ class CandidateUploadCoordinator {
         };
     }
 
-    statusBudgetAllowsAnotherPoll(budget, status) {
+    async refreshPeerStatus(context) {
+        if (!this.readPeerStatus || context.peerUnsupported) return;
+        try {
+            const peer = await this.readPeerStatus(this.connection, {nextRequestId: () => this.requestIds.next(), signal: requestSignal(context), timeoutMs: this.requestTimeoutMs});
+            if (peer === null) context.peerUnsupported = true;
+            else context.peer = peer;
+        } catch {
+            // Page 1 is advisory; the page-0 poll decides the commit's outcome.
+        }
+    }
+
+    statusBudgetAllowsAnotherPoll(budget, status, extra = "") {
         const now = this.now();
-        const fingerprint = statusProgressFingerprint(status);
+        const fingerprint = `${statusProgressFingerprint(status)}|${extra}`;
         budget.polls += 1;
         if (fingerprint !== budget.fingerprint) {
             budget.fingerprint = fingerprint;
@@ -903,8 +920,13 @@ function assertNoActiveCandidate(status) {
     }
 }
 
+function peerProgressFingerprint(peer) {
+    return peer ? [peer.phase, peer.transferOffset, peer.lastStatus].join(":") : "";
+}
+
 function progressFor(context) {
     return {
+        peer: context.peer ? {...context.peer} : null,
         phase: context.phase,
         transactionId: context.transactionId,
         operation: context.operation,

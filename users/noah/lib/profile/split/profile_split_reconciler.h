@@ -93,6 +93,7 @@ typedef struct {
     // its ABORT. Cleared when the peer does; until then no new prepared push
     // starts, and a peer that never answers needs a restart.
     bool peer_cleanup_pending;
+    bool prepared_push_active;
 } noah_profile_split_reconciler_status_t;
 
 typedef enum {

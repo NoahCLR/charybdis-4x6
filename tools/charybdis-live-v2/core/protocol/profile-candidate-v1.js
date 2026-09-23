@@ -5,6 +5,7 @@ const {RAW_HID_REPORT_SIZE, normalizeRawHidReport} = require("../transport/devic
 const {crc32, decodeProfileBlob, fnv1a32, PROFILE_DOMAIN_IDS} = require("../schema/profile-blob-v1");
 const {
     PROFILE_WIRE_DOMAINS,
+    PROFILE_WIRE_STATUS,
     PROFILE_WIRE_V1,
     buildProfileGetRequest,
     decodeProfileResponse,
@@ -330,6 +331,71 @@ async function readCandidateStatus(connection, options = {}) {
     return decodeCandidateStatusResponse(response, request);
 }
 
+// Candidate status page 1: how far a save's copy to the other half has got,
+// and the other half's last answer. The phase names mirror
+// noah_profile_candidate_v1_peer_phase_t; the reasons mirror
+// noah_profile_split_v1_status_t.
+const CANDIDATE_PEER_PHASE = Object.freeze({
+    IDLE: 0, BINDING: 1, BEGINNING: 2, SENDING: 3, PREPARING: 4, PREPARED: 5, COMMITTING: 6, ABORTING: 7, STOPPED: 8, WAITING: 9,
+});
+const CANDIDATE_PEER_PHASE_NAMES = Object.freeze(Object.fromEntries(Object.entries(CANDIDATE_PEER_PHASE).map(([name, value]) => [value, name])));
+const SPLIT_STATUS_NAMES = Object.freeze([
+    "OK", "INVALID_FRAME", "INCOMPATIBLE", "STALE", "CONFLICT", "CORRUPT", "BUSY", "RANGE_ERROR", "DIGEST_MISMATCH", "STORAGE_ERROR", "VALIDATION_ERROR",
+]);
+const CANDIDATE_PEER_FLAGS = Object.freeze({CLEANUP_PENDING: 1 << 0, MASTER: 1 << 1, KNOWN_MASK: 0x03});
+
+function buildCandidatePeerStatusRequest(requestId) {
+    return buildProfileGetRequest(PROFILE_CANDIDATE_V1.VALUE_STATUS, 1, assertU8(requestId, "Candidate peer status request id", {nonzero: true}));
+}
+
+function decodeCandidatePeerStatusResponse(response, request) {
+    const payload = decodeProfileResponse(response, request);
+    if (payload.length !== PROFILE_CANDIDATE_V1.STATUS_PAYLOAD_SIZE || payload[0] !== 1) {
+        throw candidateProtocolError("INCOMPATIBLE_RESPONSE", "Unsupported candidate peer status layout.");
+    }
+    const phase = payload[1];
+    const lastStatus = payload[2];
+    const flags = payload[3];
+    if (CANDIDATE_PEER_PHASE_NAMES[phase] === undefined) {
+        throw candidateProtocolError("INCOMPATIBLE_RESPONSE", `Unknown peer transfer phase ${phase}.`);
+    }
+    if (SPLIT_STATUS_NAMES[lastStatus] === undefined) {
+        throw candidateProtocolError("INCOMPATIBLE_RESPONSE", `Unknown peer status ${lastStatus}.`);
+    }
+    if ((flags & ~CANDIDATE_PEER_FLAGS.KNOWN_MASK) !== 0) {
+        throw candidateProtocolError("INCOMPATIBLE_RESPONSE", "Candidate peer status contains unknown flag bits.");
+    }
+    if (payload.subarray(16).some(Boolean)) {
+        throw candidateProtocolError("NONCANONICAL_RESPONSE", "Candidate peer status reserved bytes must be zero.");
+    }
+    return {
+        phase,
+        phaseName: CANDIDATE_PEER_PHASE_NAMES[phase],
+        lastStatus,
+        lastStatusName: SPLIT_STATUS_NAMES[lastStatus],
+        cleanupPending: (flags & CANDIDATE_PEER_FLAGS.CLEANUP_PENDING) !== 0,
+        master: (flags & CANDIDATE_PEER_FLAGS.MASTER) !== 0,
+        transferOffset: payload.readUInt16LE(4),
+        transferLength: payload.readUInt16LE(6),
+        retryCount: payload.readUInt32LE(8),
+        transportFailureCount: payload.readUInt32LE(12),
+    };
+}
+
+// Firmware before page 1 answers UNKNOWN_PAGE; that is "not reported", not a
+// failure, and resolves to null.
+async function readCandidatePeerStatus(connection, options = {}) {
+    if (typeof options.nextRequestId !== "function") throw new TypeError("nextRequestId must be a function.");
+    const request = buildCandidatePeerStatusRequest(assertNextRequestId(options.nextRequestId));
+    const response = await requestHandled(connection, request, {matchResponse: profileResponseMatcher, signal: options.signal, timeoutMs: options.timeoutMs}, "the candidate peer status read");
+    try {
+        return decodeCandidatePeerStatusResponse(response, request);
+    } catch (error) {
+        if (error?.code === "DEVICE_REJECTED" && error.status === PROFILE_WIRE_STATUS.UNKNOWN_PAGE) return null;
+        throw error;
+    }
+}
+
 function candidateMetadataForBlob(value, options = {}) {
     const blob = copyBytes(value, "Candidate profile blob");
     if (blob.length < PROFILE_CANDIDATE_V1.MIN_BLOB_SIZE || blob.length > PROFILE_CANDIDATE_V1.MAX_BLOB_SIZE) {
@@ -503,4 +569,10 @@ module.exports = {
     decodeCandidateStatusResponse,
     normalizeCandidateMetadata,
     readCandidateStatus,
+    CANDIDATE_PEER_PHASE,
+    CANDIDATE_PEER_PHASE_NAMES,
+    SPLIT_STATUS_NAMES,
+    buildCandidatePeerStatusRequest,
+    decodeCandidatePeerStatusResponse,
+    readCandidatePeerStatus,
 };

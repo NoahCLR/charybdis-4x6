@@ -238,7 +238,7 @@ function deviceHeader(state) {
             restartNeeded: Boolean(status?.peerCleanupPending),
             busy: Boolean(state.busy),
             phase: state.phase || "connected",
-            error: state.error?.message || state.liveApply?.error?.message || "",
+            error: state.error?.message || state.liveApply?.failure?.reason || "",
         },
     };
 }

@@ -173,4 +173,41 @@ void noah_profile_candidate_v1_encode_ack(uint8_t frame[NOAH_PROFILE_WIRE_V1_REP
 // wired into the production VIA hook until candidate-write support is complete.
 bool noah_profile_candidate_v1_handle_status_get(const noah_profile_candidate_v1_status_t *status, uint8_t *frame, size_t length);
 
+// Status page 1: how far a save's copy to the other half has got, and the
+// other half's last answer. Page 0 cannot show it, so without this the host
+// waits out PREPARING_PEER blind. The phase is a stable wire enum, mapped
+// from the split reconciler's internal states by the owner.
+typedef enum {
+    NOAH_PROFILE_CANDIDATE_V1_PEER_PHASE_IDLE = 0u,
+    NOAH_PROFILE_CANDIDATE_V1_PEER_PHASE_BINDING,    // binding the staged VIA copy
+    NOAH_PROFILE_CANDIDATE_V1_PEER_PHASE_BEGINNING,  // PREPARE_BEGIN not yet admitted
+    NOAH_PROFILE_CANDIDATE_V1_PEER_PHASE_SENDING,    // payload bytes in flight
+    NOAH_PROFILE_CANDIDATE_V1_PEER_PHASE_PREPARING,  // peer validating and writing its prepared copy
+    NOAH_PROFILE_CANDIDATE_V1_PEER_PHASE_PREPARED,   // peer holds a complete inactive copy
+    NOAH_PROFILE_CANDIDATE_V1_PEER_PHASE_COMMITTING, // peer commit authorized, converging
+    NOAH_PROFILE_CANDIDATE_V1_PEER_PHASE_ABORTING,   // cancelling the peer's copy
+    NOAH_PROFILE_CANDIDATE_V1_PEER_PHASE_STOPPED,    // reconciler stopped; last_status says why
+    NOAH_PROFILE_CANDIDATE_V1_PEER_PHASE_WAITING,    // retrying the link between steps
+} noah_profile_candidate_v1_peer_phase_t;
+
+enum {
+    NOAH_PROFILE_CANDIDATE_V1_PEER_FLAG_CLEANUP_PENDING = 1u << 0,
+    NOAH_PROFILE_CANDIDATE_V1_PEER_FLAG_MASTER          = 1u << 1,
+    NOAH_PROFILE_CANDIDATE_V1_PEER_FLAGS_KNOWN          = 0x03u,
+};
+
+typedef struct {
+    noah_profile_candidate_v1_peer_phase_t phase;
+    uint8_t                                last_status; // noah_profile_split_v1_status_t of the last peer answer
+    uint8_t                                flags;
+    uint16_t                               transfer_offset;
+    uint16_t                               transfer_length;
+    uint32_t                               retry_count;             // cumulative since boot
+    uint32_t                               transport_failure_count; // cumulative since boot
+} noah_profile_candidate_v1_peer_status_t;
+
+// Handles value 0x18 page 1 only, and returns false for anything else so the
+// caller falls through to the page-0 codec.
+bool noah_profile_candidate_v1_handle_peer_status_get(const noah_profile_candidate_v1_peer_status_t *peer, uint8_t *frame, size_t length);
+
 noah_profile_candidate_v1_error_t noah_profile_candidate_v1_no_error(void);
