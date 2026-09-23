@@ -88,12 +88,20 @@ async function handleMessage(panel, session, message) {
 
 // Connect, learn what the keyboard is, and read what it is running.
 async function connectAndRead(panel, session) {
+    try {
+        await readKeyboard(panel, session);
+    } finally {
+        session.readBusy = false;
+        publish(panel, session);
+    }
+}
+
+async function readKeyboard(panel, session) {
     const service = session.service;
     await service.enumerate();
     const devices = service.snapshot().devices;
     if (!devices.length) {
         session.notice = "No Charybdis Raw HID interface found. Connect the keyboard and reload.";
-        publish(panel, session);
         return;
     }
 
@@ -132,7 +140,6 @@ async function connectAndRead(panel, session) {
     } catch (error) {
         const text = error instanceof Error ? error.message : String(error);
         session.notice = `Read the layout. The committed profile could not be read: ${text}`;
-        publish(panel, session);
         return;
     }
 
@@ -154,7 +161,6 @@ async function connectAndRead(panel, session) {
         session.notice = `Read the layout and ${description}.` + (failures ? ` ${failures} domain(s) could not be decoded; see diagnostics.` : "");
     }
     if (macroFailure) session.notice += macroFailure;
-    publish(panel, session);
 }
 
 module.exports = {activate, deactivate};

@@ -56,7 +56,7 @@ export function screenLighting() {
     const main = el(`<div class="main">${topbar(
         "Lighting",
         "The only colour in this app is colour the keyboard emits. Stages paint in order, and the board below is the result — your draft's result, before anything is applied.",
-        `<button class="btn ghost" data-act="read">Read lighting</button>`,
+        `<button class="btn ghost" data-act="read" ${model?.device?.health?.busy ? "disabled" : ""}>Read lighting</button>`,
     )}</div>`);
     main.querySelector('[data-act="read"]').addEventListener("click", () => post({type: "refresh"}));
 

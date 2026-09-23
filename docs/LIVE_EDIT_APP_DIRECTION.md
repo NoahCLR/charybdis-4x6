@@ -47,6 +47,10 @@ recovery state as one compact health strip. Editors use a consistent
 keep-in-draft → review → apply vocabulary, and boolean policy controls render as
 switches. This is presentation over the same device-authoritative model; it does
 not add a second source of state.
+Convergence requires the firmware's peer-known and peer-converged flags as well
+as matching generations. Read from keyboard is serialized across its full
+workflow, and compiled defaults are selected from fresh status rather than from
+an arbitrary committed-payload rejection.
 
 ## Eight configurable PD-mode slots
 

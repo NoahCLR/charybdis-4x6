@@ -20,7 +20,7 @@ const {decodeRgbDomainV1} = require("../schema/rgb-domain-v1");
 const {decodeComboDomainV1} = require("../schema/combo-domain-v1");
 const {decodeKeyBehaviorDomain} = require("../schema/key-behavior-domain-v1");
 const {CANDIDATE_STATE_NAMES, readCandidateStatus} = require("../protocol/profile-candidate-v1");
-const {PROFILE_WIRE_KNOWN_MASKS, PROFILE_WIRE_FEATURES, PROFILE_WIRE_V1, VIA_READS, readProfileCapabilities, readProfileStatus, readViaIdentity} = require("../protocol/profile-wire-v1");
+const {PROFILE_ACTIVE_KIND, PROFILE_STATE_FLAGS, PROFILE_WIRE_KNOWN_MASKS, PROFILE_WIRE_FEATURES, PROFILE_WIRE_V1, VIA_READS, readProfileCapabilities, readProfileStatus, readViaIdentity} = require("../protocol/profile-wire-v1");
 
 const PROFILE_STUDIO_PROTOCOL = Object.freeze({major: 1, minor: 0});
 const PROFILE_STUDIO_SCHEMA = Object.freeze({major: 1, minor: 0});
@@ -251,37 +251,27 @@ class ProfileDeviceService {
             this.committed = {state: "reading", progress: {done: 0, total: 0}};
             this.emitChange();
 
-            let read;
-            let source = "committed";
-            try {
-                read = await readCommittedPayload(connection, {
-                    nextRequestId: () => this.requestIds.next(),
-                    onProgress: (progress) => {
-                        this.committed = {...this.committed, progress};
-                        this.emitChange();
-                    },
-                });
-            } catch (error) {
-                if (error?.code !== "DEVICE_REJECTED") {
-                    throw error;
-                }
-                // Nothing committed. The keyboard is still running something —
-                // the defaults it was compiled with — so read those instead of
-                // showing an empty editor and calling it device state.
-                read = await readCompiledPayload(connection, {
-                    nextRequestId: () => this.requestIds.next(),
-                    onProgress: (progress) => {
-                        this.committed = {...this.committed, progress};
-                        this.emitChange();
-                    },
-                });
-                source = "compiled";
+            // Decide from a fresh status before requesting payload pages. A
+            // rejected committed chunk can mean a read failed mid-transfer;
+            // it must not be interpreted as proof that nothing is committed.
+            const status = await readProfileStatus(connection, {nextRequestId: () => this.requestIds.next()});
+            if (this.connection !== connection || !connection.connected) {
+                throw new Error("The keyboard disconnected while its profile status was being read.");
             }
+            this.status = status;
+            const source = status.activeKind === PROFILE_ACTIVE_KIND.COMPILED_ONLY
+                && !(status.stateFlags & PROFILE_STATE_FLAGS.COMMITTED_VALID) ? "compiled" : "committed";
+            const read = await (source === "compiled" ? readCompiledPayload : readCommittedPayload)(connection, {
+                nextRequestId: () => this.requestIds.next(),
+                onProgress: (progress) => {
+                    this.committed = {...this.committed, progress};
+                    this.emitChange();
+                },
+            });
             const {metadata, bytes} = read;
             if (this.connection !== connection || !connection.connected) {
                 throw new Error("The keyboard disconnected while its profile was being read.");
             }
-
             const blob = decodeProfileBlob(bytes);
             const domains = {};
             const failures = [];

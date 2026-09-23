@@ -55,9 +55,26 @@ test("every other message names the handler that answers it", () => {
     assert.equal(routeMessage(session, {type: "applyProfileDraft", draftId: id}, connected()), "draft");
     assert.equal(routeMessage(session, {type: "choosePortableProfile"}, connected()), "portable");
     assert.equal(routeMessage(session, {type: "refresh"}, connected()), "read");
+    assert.equal(session.readBusy, true);
+    assert.equal(routeMessage(session, {type: "ready"}, connected()), "none", "a second read cannot overlap the first");
+    session.readBusy = false;
     assert.equal(routeMessage(session, {type: "ready"}, connected()), "read");
+    session.readBusy = false;
+    assert.equal(routeMessage(session, {type: "refresh"}, connected({busy: true})), "none", "another device operation blocks readback");
     assert.equal(routeMessage(session, {type: "somethingNew"}, connected()), "none");
     assert.equal(routeMessage({...session, portableBusy: true}, {type: "refresh"}, connected()), "none", "a busy backup answers without starting anything");
+});
+
+test("an in-flight read keeps the panel busy across service operation gaps", () => {
+    const session = panelWithDraft();
+    assert.equal(routeMessage(session, {type: "refresh"}, connected()), "read");
+    const model = buildPanelModel(session, connected({busy: false}));
+    assert.equal(model.device.health.busy, true);
+    assert.equal(model.portable.busy, true);
+    assert.equal(model.draft.busy, true);
+    assert.equal(routeMessage(session, {type: "refresh"}, connected()), "none");
+    session.readBusy = false;
+    assert.equal(buildPanelModel(session, connected({busy: false})).device.health.busy, false);
 });
 
 test("the model shows the draft's surfaces but the keyboard's own header", () => {

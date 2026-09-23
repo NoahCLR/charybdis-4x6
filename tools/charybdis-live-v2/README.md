@@ -119,6 +119,12 @@ review and apply. A keyboard the app cannot open a draft for — its profile
 could not be read, or its firmware predates profile editing — is read-only:
 the host refuses any edit rather than writing it directly.
 
+**Read from keyboard** runs one complete read at a time. The health strip says
+both halves agree only after the firmware reports a known, converged peer;
+matching generation numbers alone are insufficient. A failed committed-profile
+read remains an error instead of being labelled as compiled defaults. Those
+defaults are shown only when fresh device status reports no committed profile.
+
 ## One rule that differs from v1
 
 A key bound to a **cleared pointing slot** is allowed. The keyboard keeps its

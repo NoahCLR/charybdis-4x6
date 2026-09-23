@@ -41,7 +41,7 @@ function screenDevice() {
     const main = el(`<div class="main">${topbar(
         "Device",
         "What the keyboard says about itself. Everything this app shows comes from here — it never reads a firmware repository.",
-        `<button class="btn" data-act="read">Read from keyboard</button>`,
+        `<button class="btn" data-act="read" ${device.health?.busy ? "disabled" : ""}>Read from keyboard</button>`,
     )}
         <div class="content"><div class="pad" style="max-width:940px;display:grid;gap:14px">
             <div class="grid2">

@@ -162,7 +162,7 @@ test("the header reports the keyboard, not a profile directory", () => {
     const connected = buildDeviceModel({
         capabilities: {compiledLayerCount: 5},
         device: {manufacturer: "bastardkb", product: "Charybdis 4x6"},
-        status: {committedGeneration: 7, committedDigest: 0xabcd1234, activeGeneration: 7, peerGeneration: 7},
+        status: {committedGeneration: 7, committedDigest: 0xabcd1234, activeGeneration: 7, peerGeneration: 7, peerKnown: true, peerConverged: true},
     }).device;
     assert.equal(connected.connected, true);
     assert.equal(connected.label, "bastardkb Charybdis 4x6");
@@ -172,14 +172,22 @@ test("the header reports the keyboard, not a profile directory", () => {
 
 test("half divergence is stated plainly rather than shown as healthy", () => {
     const converged = buildDeviceModel({
-        capabilities: {}, status: {committedGeneration: 4, activeGeneration: 4, peerGeneration: 4, committedDigest: 1},
+        capabilities: {}, status: {committedGeneration: 4, activeGeneration: 4, peerGeneration: 4, committedDigest: 1, peerKnown: true, peerConverged: true},
     }).device;
     assert.match(converged.summary, /both halves agree/);
 
     const diverged = buildDeviceModel({
-        capabilities: {}, status: {committedGeneration: 4, activeGeneration: 4, peerGeneration: 3, committedDigest: 1},
+        capabilities: {}, status: {committedGeneration: 4, activeGeneration: 4, peerGeneration: 3, committedDigest: 1, peerKnown: true, peerConverged: false},
     }).device;
     assert.match(diverged.summary, /not converged/);
+
+    for (const peer of [{peerKnown: false, peerConverged: false}, {peerKnown: true, peerConverged: false}, {peerKnown: true, peerConverged: true, conflictCount: 1}]) {
+        const absentOrUnready = buildDeviceModel({capabilities: {}, status: {
+            committedGeneration: 0, activeGeneration: 0, peerGeneration: 0, committedDigest: 0, ...peer,
+        }}).device;
+        assert.equal(absentOrUnready.health.converged, false);
+        assert.match(absentOrUnready.summary, /not converged/);
+    }
 });
 
 test("the header exposes one health model for connection, convergence and recovery", () => {
@@ -197,7 +205,7 @@ test("the header exposes one health model for connection, convergence and recove
         capabilities: {},
         busy: true,
         phase: "reading profile",
-        status: {committedGeneration: 4, activeGeneration: 4, peerGeneration: 4, committedDigest: 1, candidatePending: true},
+        status: {committedGeneration: 4, activeGeneration: 4, peerGeneration: 4, committedDigest: 1, candidatePending: true, peerKnown: true, peerConverged: true},
         mutationCompatibility: {recoveryPending: true},
     }).device;
     assert.equal(connected.health.profile, "synced");

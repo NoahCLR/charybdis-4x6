@@ -245,6 +245,9 @@ function convergence(status) {
 
 function halvesConverged(status) {
     return Boolean(status) &&
+        status.peerKnown === true &&
+        status.peerConverged === true &&
+        !status.conflictCount &&
         status.activeGeneration === status.committedGeneration &&
         status.committedGeneration === status.peerGeneration;
 }

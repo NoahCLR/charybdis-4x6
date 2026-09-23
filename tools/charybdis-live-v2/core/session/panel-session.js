@@ -37,9 +37,9 @@ function observePortable(session, state) {
 function buildPanelModel(session, state) {
     observePortable(session, state);
     const device = state.devices?.find((entry) => entry.id === state.selectedDeviceId);
-    const busy = Boolean(state.busy || session.portableBusy);
+    const busy = Boolean(state.busy || session.portableBusy || session.readBusy);
     const editing = session.draft ? session.draft.editingState(state) : state;
-    const model = buildDeviceModel({...editing, busy: editing.busy || session.portableBusy, device});
+    const model = buildDeviceModel({...editing, busy: editing.busy || session.portableBusy || session.readBusy, device});
     if (session.draft) {
         model.draft = {...session.draft.view(state), busy};
         if (model.draft.matching) {
@@ -88,7 +88,7 @@ function takeOutbox(session) {
  */
 function routeMessage(session, message, state) {
     const type = message?.type;
-    if (session.portableBusy) return "none";
+    if (session.portableBusy || session.readBusy) return "none";
     if (session.draft && (DRAFT_EDITS.has(type) || DRAFT_CONTROLS.has(type)) && message.draftId !== session.draft.id) {
         throw new Error("This edit belongs to an older draft. Read the keyboard before continuing.");
     }
@@ -107,7 +107,11 @@ function routeMessage(session, message, state) {
     }
     if (DRAFT_CONTROLS.has(type)) return "draft";
     if (PORTABLE_MESSAGES.has(type)) return "portable";
-    if (type === "ready" || type === "refresh") return "read";
+    if (type === "ready" || type === "refresh") {
+        if (state.busy) return "none";
+        session.readBusy = true;
+        return "read";
+    }
     return "none";
 }
 

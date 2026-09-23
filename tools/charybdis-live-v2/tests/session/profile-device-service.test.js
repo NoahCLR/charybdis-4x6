@@ -4,6 +4,7 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 
 const {FakeDeviceAdapter} = require("../../core/transport/fake-device-adapter");
+const {crc32, fnv1a32} = require("../../core/schema/profile-blob-v1");
 const {CANDIDATE_ERROR, CANDIDATE_OPERATION, CANDIDATE_STATE} = require("../../core/protocol/profile-candidate-v1");
 const {
     ProfileRequestIdSequence,
@@ -11,7 +12,8 @@ const {
     evaluateProfileCompatibility,
     evaluateLiveMutationCompatibility,
 } = require("../../core/session/profile-device-service");
-const {PROFILE_ACTIVE_KIND, PROFILE_WIRE_FEATURES, PROFILE_WIRE_V1, VIA_READS} = require("../../core/protocol/profile-wire-v1");
+const {PROFILE_ACTIVE_KIND, PROFILE_WIRE_FEATURES, PROFILE_WIRE_STATUS, PROFILE_WIRE_V1, VIA_READS} = require("../../core/protocol/profile-wire-v1");
+const {document} = require("../fixtures/pd-profile");
 
 function response(request, payload) {
     const report = Buffer.from(request);
@@ -126,6 +128,64 @@ function serviceHarness(options = {}) {
     });
     return {adapter, changes, service};
 }
+
+function profileReadHarness({committed, rejectChunk = false}) {
+    const bytes = Buffer.from(document().profile, "base64");
+    const seen = [];
+    const identity = Buffer.alloc(25), generation = Buffer.alloc(25);
+    identity[0] = 1; identity[1] = 2;
+    identity.writeUInt16LE(committed ? 0x32 : 0x31, 2);
+    identity[24] = committed ? PROFILE_ACTIVE_KIND.COMMITTED : PROFILE_ACTIVE_KIND.COMPILED_ONLY;
+    if (committed) {
+        generation.writeUInt32LE(4, 0);
+        generation.writeUInt32LE(4, 5);
+        generation.writeUInt32LE(4, 10);
+    }
+    const metadata = Buffer.alloc(25);
+    metadata[0] = 1; metadata[1] = 25;
+    metadata.writeUInt16LE(bytes.length, 2);
+    metadata.writeUInt32LE(committed ? 4 : 0, 4);
+    metadata.writeUInt32LE(fnv1a32(bytes), 8);
+    metadata.writeUInt32LE(crc32(bytes), 12);
+    metadata[16] = 2; metadata[18] = 31;
+    const connection = {connected: true, async request(request) {
+        seen.push([request[2], request[4]]);
+        if (request[2] === PROFILE_WIRE_V1.VALUE_STATUS) return response(request, request[4] ? generation : identity);
+        if (rejectChunk && request[4] === 1) {
+            const rejected = response(request, Buffer.alloc(0));
+            rejected[5] = PROFILE_WIRE_STATUS.UNAVAILABLE;
+            return rejected;
+        }
+        return response(request, request[4] ? bytes.subarray((request[4] - 1) * 25, request[4] * 25) : metadata);
+    }};
+    const service = new ProfileDeviceService({adapter: new FakeDeviceAdapter()});
+    service.connection = connection;
+    service.requestIds = new ProfileRequestIdSequence();
+    return {service, seen};
+}
+
+test("profile read chooses compiled defaults from a fresh status", async () => {
+    const {service, seen} = profileReadHarness({committed: false});
+    service.status = {activeKind: PROFILE_ACTIVE_KIND.COMMITTED, committedGeneration: 9};
+    const state = await service.readCommittedProfile();
+    assert.equal(state.error, null);
+    assert.equal(state.committed.source, "compiled");
+    assert.equal(state.committed.state, "read");
+    assert.equal(state.status.activeKind, PROFILE_ACTIVE_KIND.COMPILED_ONLY);
+    assert.ok(seen.some(([value]) => value === 5));
+    assert.ok(!seen.some(([value]) => value === 4));
+});
+
+test("a rejected committed payload chunk stays a read failure", async () => {
+    const {service, seen} = profileReadHarness({committed: true, rejectChunk: true});
+    service.status = {activeKind: PROFILE_ACTIVE_KIND.COMPILED_ONLY, committedGeneration: 0};
+    const state = await service.readCommittedProfile();
+    assert.equal(state.error.code, "DEVICE_REJECTED");
+    assert.equal(state.committed.state, "reading");
+    assert.equal(state.status.activeKind, PROFILE_ACTIVE_KIND.COMMITTED, "a failed payload read still reports the fresh device status");
+    assert.ok(seen.some(([value]) => value === 4));
+    assert.ok(!seen.some(([value]) => value === 5), "a failed committed chunk is not treated as missing storage");
+});
 
 test("service exposes opaque descriptors and performs only capability/status reads", async () => {
     const {adapter, service} = serviceHarness();

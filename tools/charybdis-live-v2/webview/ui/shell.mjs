@@ -44,7 +44,7 @@ export function rail() {
     const node = el(`<aside class="rail">
         <div class="rail-device">
             <div class="rail-mark"><span class="mark-glyph">C</span> <span class="nm">Charybdis Live</span>
-                <button class="btn tiny ghost" data-act="refresh" aria-label="Read keyboard"
+                <button class="btn tiny ghost" data-act="refresh" aria-label="Read keyboard" ${health.busy ? "disabled" : ""}
                     data-tip="Read the connected keyboard again while keeping your draft.">Read</button></div>
             <div class="rail-product">${esc(device.label || "No keyboard connected")}</div>
             <div class="rail-meta">${esc(device.summary || "—")}</div>
