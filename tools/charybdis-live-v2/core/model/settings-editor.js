@@ -84,7 +84,7 @@ function settingValue(field, values) {
 function settingsSections(snapshot, settings) {
     const options = snapshot.options;
     const result = sections.map(section => ({...section, fields: section.fields.map(field => ({...field}))}));
-    if (settings.formatVersion === 2) for (const section of result) section.fields = section.fields.filter(field => field.id < 10 || field.id > 14);
+    if ((settings.formatVersion ?? 1) >= 2) for (const section of result) section.fields = section.fields.filter(field => field.id < 10 || field.id > 14);
     const rgb = result.find(section => section.id === "rgbAppearance");
     const currentEffect = (settings.values[21] >>> 8) & 255, currentFlags = settings.values[21] >>> 24;
     const effects = options?.effects.map(effect => ({value: effect.id, label: effect.name.toLowerCase().replace(/_/g, " ").replace(/^./, c => c.toUpperCase())})) || [];

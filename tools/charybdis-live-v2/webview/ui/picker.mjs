@@ -73,12 +73,12 @@ function sectionBody(model) {
                 : "Hold reaches the layer while the key is down. Lock toggles it. Tap-hold asks for a tap key next."}</p></div>`;
     }
     if (section.kind === "macros") {
-        const slots = [...(model?.viaMacros || []), ...(model?.hardcodedMacros || [])];
-        if (!slots.length) return `<p class="note" style="padding:18px">This keyboard has not reported its macro banks.</p>`;
+        const slots = model?.viaMacros || [];
+        if (!slots.length) return `<p class="note" style="padding:18px">This keyboard has not reported its macros.</p>`;
         return `<div class="pk-body"><div class="pk-rows">${chunk(slots, 8).map((row) => `<div class="pk-row">${row.map((slot) =>
-            `<button class="pk ${picked(slot.keycode) ? "on" : ""}" data-pick="${esc(slot.keycode)}">
-                <span class="l">${esc(slot.keycode.replace(/^VIA_MACRO_/, "M").replace(/^MACRO_/, "U"))}</span>
-                <span class="c">${slot.empty ? "empty" : `${slot.bytes} B`}</span></button>`).join("")}</div>`).join("")}</div></div>`;
+            `<button class="pk ${slot.name ? "wide" : ""} ${picked(slot.keycode) ? "on" : ""}" data-pick="${esc(slot.keycode)}" data-tip="${esc(slot.keycode)}">
+                <span class="l">${esc(slot.name || slot.keycode.replace(/^VIA_MACRO_/, "M"))}</span>
+                <span class="c">${slot.name ? `M${esc(slot.keycode.split("_").at(-1))} · ` : ""}${slot.empty ? "empty" : `${slot.bytes} B`}</span></button>`).join("")}</div>`).join("")}</div></div>`;
     }
     const entries = entriesForPickerSection(catalogue, section);
     if (!entries.length) return `<p class="note" style="padding:18px">The keyboard's catalogue has nothing in this section.</p>`;

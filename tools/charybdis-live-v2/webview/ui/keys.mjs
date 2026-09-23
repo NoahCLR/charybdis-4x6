@@ -723,7 +723,7 @@ function comboBuilder(layer, canEdit, holdTerm) {
 /* ── what this layer reaches ───────────────────────────────────────────── */
 function tabMacros(body, right) {
     const model = getModel();
-    const slots = [...(model?.viaMacros || []), ...(model?.hardcodedMacros || [])];
+    const slots = model?.viaMacros || [];
     const reach = macroReach(model, layers(), state.layer);
     right.replaceChildren();
     const open = el(`<button class="btn tiny ghost">Open the Macros view</button>`);
@@ -755,7 +755,6 @@ function tabMacros(body, right) {
     attachReachRows(node, "macros");
     node.querySelectorAll("[data-editmacro]").forEach((button) => button.addEventListener("click", () => {
         const keycode = button.dataset.editmacro;
-        state.macroBank = (model?.hardcodedMacros || []).some((entry) => entry.keycode === keycode) ? "user" : "via";
         state.macroSlot = keycode;
         state.screen = "macros";
         render();

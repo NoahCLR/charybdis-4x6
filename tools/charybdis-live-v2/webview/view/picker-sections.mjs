@@ -14,6 +14,10 @@ const NAVIGATION = new Set([
 
 const valueOf = (entry) => entry.value || entry.key || entry.name || "";
 const inGroups = (...groups) => (entry) => groups.includes(entry.group);
+// QK_USER_0..15 were the retired user macros. The values stay reserved so
+// every later custom keycode keeps its number, but nothing answers them.
+const RETIRED = /^QK_USER_(?:[0-9]|1[0-5])$/;
+const isCustom = (entry) => inGroups("kb", "user", "macro", "internal")(entry) && !RETIRED.test(valueOf(entry));
 const isSymbol = (entry) => entry.group === "basic" && SYMBOLS.has(valueOf(entry));
 const isNavigation = (entry) => entry.group === "basic" && NAVIGATION.has(valueOf(entry));
 const isNumpad = (entry) => entry.group === "basic" && /^KC_(?:KP|NUMPAD)_/.test(valueOf(entry));
@@ -35,12 +39,12 @@ export function pickerSections() {
         {id: "media", label: "Media", kind: "catalogue", filter: inGroups("media", "audio")},
         {id: "lighting", label: "Lighting", kind: "catalogue", filter: inGroups("backlight", "led_matrix", "underglow", "rgb", "rgb_matrix")},
         {id: "magic", label: "Magic", kind: "catalogue", filter: inGroups("magic", "swap_hands")},
-        {id: "custom", label: "Custom", kind: "catalogue", filter: inGroups("kb", "user", "macro", "internal")},
+        {id: "custom", label: "Custom", kind: "catalogue", filter: isCustom},
         {id: "more", label: "More keys", kind: "catalogue", filter: isMoreKey},
         {id: "other", label: "Other QMK", kind: "catalogue", filter: inGroups(
             "connection", "joystick", "midi", "programmable_button", "quantum", "sequencer", "steno", "system",
         )},
-        {id: "all", label: "All keycodes", kind: "catalogue", filter: () => true},
+        {id: "all", label: "All keycodes", kind: "catalogue", filter: (entry) => !RETIRED.test(valueOf(entry))},
     ];
 }
 

@@ -26,9 +26,10 @@ function semanticLabel(semantic) {
 function buildDeviceModel(state = {}) {
     const catalog = catalogViews();
     if (state.macroView && knownActionAbi(state.capabilities?.actionAbiDigest)) {
-        for (const slot of [...state.macroView.viaMacros, ...state.macroView.hardcodedMacros]) {
+        for (const slot of state.macroView.viaMacros) {
             const native = keycodeCatalog.resolve(resolveNativeQmkExpression(slot.keycode, {})).name;
-            const label = (slot.kind === "via" ? "VIA macro " : "User macro ") + slot.keycode.split("_").at(-1);
+            // A named macro reads by its name everywhere a key is labelled.
+            const label = slot.name || `VIA macro ${slot.keycode.split("_").at(-1)}`;
             catalog.aliases[native] = slot.keycode;
             catalog.labels[native] = label;
             catalog.labels[slot.keycode] = label;
@@ -93,7 +94,7 @@ function buildDeviceModel(state = {}) {
         combos: combosForView(state.combos, catalog.labels),
         comboReadback: state.combos ? {...state.combos, rows: undefined, writable: Boolean(state.capabilities?.supportedDomainMask & 4) && state.committed?.state === "read" && !state.busy} : {state: "unread"},
         viaMacros: state.macroView?.viaMacros || [],
-        hardcodedMacros: state.macroView?.hardcodedMacros || [],
+        macroNameSpace: state.macroView?.names || null,
         macroEditing: {identity: state.macroView?.identity || "", writable: Boolean(state.macroView) && state.capabilities?.compiledLayerCount === 8 && !state.busy},
         behaviorTimingDefaults: state.settingsView?.timing || {},
         configDefaults: state.settingsView?.sections || [],

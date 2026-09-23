@@ -61,7 +61,7 @@ function materializeProfile(active, defaults, combos, settings) {
         return domain;
     });
     const rows = combos.rows.map(row => ({...row, inputs: row.inputs.map(operand => ({kind: 1, operand})), output: {kind: 1, operand: row.output}}));
-    domains.push({id: 0x30, version: 1, payload: encodeComboDomainV1(rows)}, {id: 0x40, version: live.schema.major, payload: settings});
+    domains.push({id: 0x30, version: 1, payload: encodeComboDomainV1(rows)}, {id: 0x40, version: settings[0], payload: settings});
     return encodeProfileBlob({schema: live.schema, domains});
 }
 function createSnapshot({profile, via, actionAbiDigest}) {
@@ -85,7 +85,10 @@ function validateSnapshot(value, capabilities) {
     const actionOptions = {actionLimits: {maxPdModes: value.version === 2 ? 8 : 6}};
     const rgb = decodeRgbDomainV1(domains[0].payload), behaviors = decodeKeyBehaviorDomain(domains[1].payload, actionOptions), combos = decodeComboDomainV1(domains[2].payload, actionOptions), settings = decodeSettings(domains[3].payload);
     const pdModes = value.version === 2 ? decodePdDomain(domains[4].payload) : undefined;
-    if (rgb.formatVersion !== value.version || (settings.formatVersion ?? 1) !== value.version) throw fail("Profile domain versions disagree.");
+    // Settings may be one version ahead of the document: v3 names the VIA
+    // macros inside a schema-2 profile.
+    const settingsVersion = settings.formatVersion ?? 1;
+    if (rgb.formatVersion !== value.version || !(settingsVersion === value.version || (value.version === 2 && settingsVersion === 3)) || domains[3].version !== settingsVersion) throw fail("Profile domain versions disagree.");
     if (rgb.layerColors.length !== value.layers.length || rgb.layerColors.some(row => row.layerId >= 8)) throw fail("RGB does not cover all eight layers.");
     // A binding for an empty slot is allowed, because the keyboard allows it:
     // the mode keycodes are a fixed registry, and the runtime refuses to
@@ -184,7 +187,7 @@ function reorderLayers(document, order, names) {
     const oldReferences = settings.values[27]; settings.values[27] = order.reduce((packed, old, next) => (packed | remap[(oldReferences >>> (old * 4)) & 15] << (next * 4)) >>> 0, 0);
     result.profile = encodeProfileBlob({schema: {major: document.version, minor: 0}, domains: [
         {id: 16, version: document.version, payload: encodeRgbDomainV1(rgb)}, {id: 32, version: 1, payload: encodeKeyBehaviorDomain(behaviors, actionOptions)},
-        {id: 48, version: 1, payload: encodeComboDomainV1(combos, actionOptions)}, {id: 64, version: document.version, payload: encodeSettings(settings)},
+        {id: 48, version: 1, payload: encodeComboDomainV1(combos, actionOptions)}, {id: 64, version: settings.formatVersion ?? document.version, payload: encodeSettings(settings)},
         ...(pdModes ? [{id: 80, version: 1, payload: encodePdDomain(pdModes)}] : []),
     ]}).toString("base64");
     validateSnapshot(result); return result;
@@ -211,7 +214,7 @@ function upgradeFiveLayerSnapshot(source) {
 function summary(document) {
     const value = validateSnapshot(document);
     return {layers: value.document.layers.length, behaviors: value.behaviors.rows.length, combos: value.combos.length,
-        macros: value.document.macros.filter(Boolean).length + value.settings.macros.filter(bytes => bytes.length).length,
+        macros: value.document.macros.filter(Boolean).length + (value.settings.macros || []).filter(bytes => bytes.length).length,
         names: value.settings.names.map((name, index) => name || (index ? `Layer ${index}` : "Base"))};
 }
 module.exports = {upgradePdSnapshot, createSnapshot, validateSnapshot, materializeProfile, macroSlots, macroBank, validateViaMacro, fingerprint, reorderLayers, summary};

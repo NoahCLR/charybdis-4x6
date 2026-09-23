@@ -86,6 +86,55 @@ static bool ir_byte(noah_profile_settings_v1_validation_t *s, uint8_t b) {
     if (!--s->remaining) s->opcode = 0;
     return true;
 }
+// One byte of printable UTF-8: no NUL, controls or DEL, no overlong or
+// surrogate encodings.
+static bool utf8_byte(noah_profile_settings_v1_validation_t *s, uint8_t b) {
+    if (s->utf8_remaining) {
+        if (b < s->utf8_min || b > s->utf8_max) return false;
+        s->utf8_remaining--;
+        s->utf8_min = 0x80;
+        s->utf8_max = 0xbf;
+        return true;
+    }
+    if (b < 0x20 || b == 0x7f) return false;
+    if (b < 0x80) return true;
+    s->utf8_min = 0x80;
+    s->utf8_max = 0xbf;
+    if (b >= 0xc2 && b <= 0xdf)
+        s->utf8_remaining = 1;
+    else if (b >= 0xe0 && b <= 0xef) {
+        s->utf8_remaining = 2;
+        if (b == 0xe0) s->utf8_min = 0xa0;
+        if (b == 0xed) s->utf8_max = 0x9f;
+    } else if (b >= 0xf0 && b <= 0xf4) {
+        s->utf8_remaining = 3;
+        if (b == 0xf0) s->utf8_min = 0x90;
+        if (b == 0xf4) s->utf8_max = 0x8f;
+    } else
+        return false;
+    return true;
+}
+// v3: one byte of the 64 length-prefixed VIA macro names.
+static bool macro_name_byte(noah_profile_settings_v1_validation_t *s, uint8_t b) {
+    if (s->slot >= NOAH_SETTINGS_MACRO_NAMES) return false;
+    if (!s->macro_offset) {
+        if (b > NOAH_SETTINGS_MACRO_NAME_MAX) return false;
+        s->macro_length   = b;
+        s->utf8_remaining = 0;
+        if (b)
+            s->macro_offset = 1;
+        else
+            s->slot++;
+        return true;
+    }
+    if (!utf8_byte(s, b)) return false;
+    if (s->macro_offset++ == s->macro_length) {
+        if (s->utf8_remaining) return false;
+        s->slot++;
+        s->macro_offset = 0;
+    }
+    return true;
+}
 static bool name_byte(noah_profile_settings_v1_validation_t *s, uint8_t b, uint8_t column) {
     if (!column) {
         s->name_ended     = false;
@@ -123,7 +172,13 @@ bool noah_profile_settings_v1_consume(noah_profile_settings_v1_validation_t *s, 
     if (!s || length < NOAH_SETTINGS_FIXED_SIZE + 32 || length > NOAH_SETTINGS_MAX_SIZE || s->offset >= length) return false;
     uint16_t offset = s->offset++;
     if (offset < 8) {
-        static const uint8_t header[8] = {NOAH_SETTINGS_VERSION, 8, 28, 16, 0, 0, 0, 0};
+        static const uint8_t header[8] = {0, 8, 28, 0, 0, 0, 0, 0};
+        if (!offset) {
+            if (!NOAH_PROFILE_SETTINGS_VERSION_ACCEPTED(b) || (s->expected_version && b != s->expected_version)) return false;
+            s->version = b;
+            return true;
+        }
+        if (offset == 3) return b == (s->version >= 3u ? NOAH_SETTINGS_MACRO_NAMES : NOAH_SETTINGS_MACROS);
         return b == header[offset];
     }
     if (offset < 8 + 28 * 4) {
@@ -140,6 +195,7 @@ bool noah_profile_settings_v1_consume(noah_profile_settings_v1_validation_t *s, 
         return true;
     }
     if (offset < NOAH_SETTINGS_FIXED_SIZE) return name_byte(s, b, (offset - 120) % 24);
+    if (s->version >= 3u) return macro_name_byte(s, b);
     if (s->slot >= 16) return false;
     if (s->macro_offset < 2) {
         if (!s->macro_offset)
@@ -162,5 +218,5 @@ bool noah_profile_settings_v1_consume(noah_profile_settings_v1_validation_t *s, 
     return true;
 }
 bool noah_profile_settings_v1_complete(const noah_profile_settings_v1_validation_t *s, uint16_t length) {
-    return s && s->offset == length && s->slot == 16 && !s->macro_offset;
+    return s && s->offset == length && s->slot == (s->version >= 3u ? NOAH_SETTINGS_MACRO_NAMES : NOAH_SETTINGS_MACROS) && !s->macro_offset;
 }

@@ -194,7 +194,7 @@ console.log("layers", model.layers.length,
     "· behaviours", model.keyBehaviors.length,
     "· combos", model.combos.length,
     "· pd slots", model.pdModes.length,
-    "· macros", model.viaMacros.length + model.hardcodedMacros.length,
+    "· macros", model.viaMacros.length,
     "· settings sections", model.configDefaults.length,
     "· rgb layer rows", model.rgb.layerColors?.length);
 console.log("written dev/index.html");

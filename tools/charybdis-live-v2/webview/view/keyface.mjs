@@ -469,7 +469,7 @@ export function reachGroups(model, stack, at, namesOf, all) {
  * slots holding a payload nothing here reaches.
  */
 export const macroReach = (model, stack, at) => reachGroups(model, stack, at, macroKeycodes,
-    [...(model?.viaMacros || []), ...(model?.hardcodedMacros || [])]
+    (model?.viaMacros || [])
         // An empty slot is not a macro this layer is missing, it is a slot.
         .filter((slot) => !slot.empty).map((slot) => slot.keycode));
 

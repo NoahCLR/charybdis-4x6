@@ -1,8 +1,8 @@
-// Macros: both banks the keyboard reports, edited as the payload it stores.
+// Macros: the 64 VIA slots the keyboard reports, edited as the payload it
+// stores, each with an optional name kept in the keyboard's profile.
 //
-// Slots have no name on the device, so they are identified by their number and
-// their payload. The preview parses that payload for reading; the host parses
-// it again for real when the slot is staged, and says so if it disagrees.
+// The preview parses the payload for reading; the host parses it again for
+// real when the slot is staged, and says so if it disagrees.
 
 import {el, esc} from "../lib/dom.mjs";
 import {describeStep, macroPeek, parseMacro, serializeMacro, unreleased} from "../view/macro.mjs";
@@ -18,24 +18,15 @@ const STEP_KINDS = [
 
 export function screenMacros() {
     const model = getModel();
-    const via = model?.viaMacros || [];
-    const user = model?.hardcodedMacros || [];
+    const bank = model?.viaMacros || [];
     const canEdit = writable() && Boolean(model?.macroEditing?.writable);
-    const bank = state.macroBank === "user" ? user : via;
     const slot = bank.find((row) => row.keycode === state.macroSlot) || bank[0];
 
     const main = el(`<div class="main">${topbar(
         "Macros",
-        `${via.length + user.length} slots on the keyboard: ${via.length} VIA slots and ${user.length} user slots. Slots have no name on the keyboard, so they are identified by their number and their payload.`,
-        `<div class="seg" data-bank>
-            <button data-b="via" aria-pressed="${state.macroBank !== "user"}">VIA bank · ${via.length}</button>
-            <button data-b="user" aria-pressed="${state.macroBank === "user"}">User bank · ${user.length}</button></div>`,
+        `${bank.length} macro slots on the keyboard. Give one a name and it shows by that name on keys, in the picker and in the key card; the name is saved on the keyboard with everything else.`,
+        "",
     )}</div>`);
-    main.querySelectorAll("[data-bank] button").forEach((button) => button.addEventListener("click", () => {
-        state.macroBank = button.dataset.b;
-        state.macroSlot = null;
-        render();
-    }));
 
     const content = el(`<div class="content"><div class="pad" style="display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:20px;align-items:start"></div></div>`);
     const pad = content.firstElementChild;
@@ -48,7 +39,7 @@ export function screenMacros() {
     }
 
     const filled = bank.filter((row) => !row.empty).length;
-    const grid = el(`<div class="card"><div class="card-h"><h3>${state.macroBank === "user" ? "User slots" : "VIA slots"}</h3>
+    const grid = el(`<div class="card"><div class="card-h"><h3>Slots</h3>
         <span class="right tag">${filled} of ${bank.length} filled</span></div>
         <div class="card-b"><div class="macro-grid"></div>
         <p class="note" style="margin-top:12px">Empty slots stay visible so you can see what the keyboard has room for.</p></div></div>`);
@@ -59,8 +50,8 @@ export function screenMacros() {
         const cell = el(`<button class="mslot ${row.empty ? "" : "filled"}" data-slot="${esc(row.keycode)}"
             aria-current="${row.keycode === slot?.keycode}"
             data-tip="${esc(row.keycode)} · ${row.empty ? "empty slot" : `${row.bytes} bytes · ${steps.length} steps · ${esc(row.payload)}`}">
-            <span class="n">${state.macroBank === "user" ? "U" : "M"}${index}</span>
-            <span class="v">${row.empty ? "—" : esc(peek.length > 13 ? `${peek.slice(0, 12)}…` : peek)}</span></button>`);
+            <span class="n">M${index}</span>
+            <span class="v">${row.name ? esc(row.name.length > 13 ? `${row.name.slice(0, 12)}…` : row.name) : row.empty ? "—" : esc(peek.length > 13 ? `${peek.slice(0, 12)}…` : peek)}</span></button>`);
         cell.addEventListener("click", () => { state.macroSlot = row.keycode; render(); });
         cells.append(cell);
     });
@@ -79,17 +70,20 @@ function editor(model, slot, canEdit) {
 
     const wrap = el(`<div class="stack"></div>`);
     const card = el(`<div class="card">
-        <div class="card-h"><h3>${state.macroBank === "user" ? "User" : "VIA"} macro ${slot.keycode.split("_").at(-1)}</h3>
+        <div class="card-h"><h3>${esc(slot.name || `Macro ${slot.keycode.split("_").at(-1)}`)}</h3>
             <code class="dim">${esc(slot.keycode)}</code>
             <span class="right row" style="gap:8px">
                 <span class="chip"><i class="dot ${dirty ? "draft" : "on"}"></i>${dirty ? "edited here" : "as read"}</span>
                 <button class="btn tiny ghost" data-act="place" ${writable() ? "" : "disabled"}>Place on a key…</button></span></div>
         <div class="card-b stack">
+            ${nameField(model, slot, canEdit)}
             <label class="field"><span>Payload</span>
                 <textarea class="input mono" rows="3" style="height:auto;padding:9px 10px;resize:vertical" ${canEdit ? "" : "disabled"}
                     data-tip="Exactly as the keyboard stores it. Text is literal; {KC_A} taps, {+KC_A} presses, {-KC_A} releases, {120} waits. Use {{ and }} for literal braces.">${esc(payload)}</textarea></label>
         </div></div>`);
     const textarea = card.querySelector("textarea");
+    const nameInput = card.querySelector("[data-name]");
+    nameInput?.addEventListener("change", () => post(edits.macroNameMessage(slot.keycode, nameInput.value, model?.macroEditing?.identity)));
     textarea.addEventListener("input", () => {
         state.macroDrafts = {...state.macroDrafts, [slot.keycode]: textarea.value};
         state.macroCursors = {...state.macroCursors, [slot.keycode]: textarea.selectionStart};
@@ -110,6 +104,19 @@ function editor(model, slot, canEdit) {
     wrap.append(card);
     wrap.append(recorder(model, slot, canEdit, textarea));
     return wrap;
+}
+
+// Names share the space the retired user macros had, so the field says how
+// much of it is left. The host enforces the byte limits; the counter explains.
+function nameField(model, slot, canEdit) {
+    const space = model?.macroNameSpace;
+    if (!space) return "";
+    const own = new TextEncoder().encode(slot.name || "").length;
+    const left = space.shared - space.used;
+    return `<label class="field"><span>Name</span>
+        <input class="input" data-name value="${esc(slot.name || "")}" placeholder="Macro ${esc(slot.keycode.split("_").at(-1))}" ${canEdit ? "" : "disabled"}
+            data-tip="Up to ${space.perName} bytes. All 64 names share ${space.shared} bytes; ${left} are free.">
+        <span class="note">${own} / ${space.perName} bytes · ${left} of ${space.shared} shared bytes free</span></label>`;
 }
 
 function stageMacro(model, slot, payload) {
@@ -320,7 +327,7 @@ function stopRecording(model = getModel(), slot = null) {
     document.removeEventListener("keyup", onRecordKey, true);
     state.lastTake = state.recording ? {slot: recordedSlot, before: state.recording.before} : null;
     state.recording = null;
-    const target = slot || [...(model?.viaMacros || []), ...(model?.hardcodedMacros || [])]
+    const target = slot || (model?.viaMacros || [])
         .find((candidate) => candidate.keycode === recordedSlot);
     if (target) stageMacro(model, target, state.macroDrafts?.[target.keycode] ?? target.payload ?? "");
     render();

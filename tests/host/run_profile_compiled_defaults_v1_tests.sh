@@ -29,6 +29,14 @@ const {document} = require(root + "/tests/fixtures/portable-profile");
 const {validateSnapshot} = require(root + "/core/model/portable-profile");
 fs.writeFileSync(process.argv[3], validateSnapshot(document()).profile);
 fs.writeFileSync(process.argv[3] + '.pd', validateSnapshot(require(root + '/tests/fixtures/pd-profile').document()).profile);
+// Settings v3 (named VIA macros) as the v2 app writes it. The v1 import
+// above stays the stored-v2 compatibility check.
+const v2 = process.argv[2] + "/tools/charybdis-live-v2";
+const {fingerprint, validateSnapshot: validateV2} = require(v2 + "/core/model/portable-profile");
+const {editMacro} = require(v2 + "/core/model/macro-editor");
+let named = require(v2 + "/tests/fixtures/pd-profile").document();
+for (const [keycode, name] of [["VIA_MACRO_0", "Sign-off"], ["VIA_MACRO_63", "Édition ⌘"]]) named = editMacro({document: named, fingerprint: fingerprint(named)}, {keycode, name, expectedFingerprint: fingerprint(named)});
+fs.writeFileSync(process.argv[3] + '.pd3', validateV2(named).profile);
 JS
 
 build_and_run() {
@@ -70,6 +78,7 @@ build_and_run() {
     if [ "$name" = configured ] || [ "$name" = configured_sanitized ]; then
         "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" ${NOAH_WRITE_PD_FIXTURE:+--write-fixture}
         "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --import-profile "$BUILD_DIR/portable.bin.pd"
+        "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --import-profile "$BUILD_DIR/portable.bin.pd3"
         if [ -n "${NOAH_TEST_PD_IMPORT:-}" ]; then
             "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --import-profile "$NOAH_TEST_PD_IMPORT"
         fi

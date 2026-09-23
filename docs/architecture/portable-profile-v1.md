@@ -75,6 +75,32 @@ tap keys. Key lists and concurrently held sets are bounded to 16 and must not
 duplicate keys or leave them pressed. Controls and malformed UTF-8 are rejected
 in names. Firmware validation reads at most one byte per settings step.
 
+### Version 3: VIA macro names instead of user macros
+
+Schema-2 firmware from 2026-09-23 writes settings version 3 and still reads
+version 2, so a keyboard's stored profile survives the update. The 16 user
+macros are retired; version 3 names the 64 VIA macros in their place:
+
+| Offset | Bytes | Contents |
+| ---: | ---: | --- |
+| 0 | 8 | `[3, 8, 28, 64, 0, 0, 0, 0]`: version, layer-name count, scalar count, macro-name count, reserved zeros |
+| 8 | 112 | 28 uint32 scalar values, as in version 2 |
+| 120 | 192 | Eight layer names, as in version 2 |
+| 312 | variable | 64 records: uint8 length (0–23), then that many bytes of UTF-8 |
+
+The ceiling stays 1,368 bytes, so the 64 names share 992 bytes of text: each
+can be 23 bytes, but not all of them at once. Names contain no NUL, C0
+controls, DEL, overlong or surrogate encodings. The envelope version and the
+payload's first byte must agree. The minimum is 376 bytes, all names empty.
+
+The firmware never reads a name; they are profile data for the app, saved and
+copied to the other half with everything else. A version-3 domain reads as an
+explicitly empty user-macro bank, so the compiled user-macro defaults stay
+silent. The keycodes `MACRO_0`–`MACRO_15` (`QK_USER_0`–`QK_USER_15`) keep their
+values so every later custom keycode and the action ABI digest are unchanged.
+The app upgrades a profile to version 3 only when a macro is named; any other
+edit keeps the version it read, and a schema-1 profile cannot carry names.
+
 | Scalar ID | Meaning |
 | ---: | --- |
 | 0–3 | Tapping, tap/hold, long-hold and multi-tap timing (ms) |

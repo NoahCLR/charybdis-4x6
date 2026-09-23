@@ -78,7 +78,10 @@ function profileReview(before, after) {
     const combo = row => row ? `${row.inputs.map(action).join(" + ")} → ${action(row.output)}\nWindow ${row.termMs} ms; hold ${row.holdTermMs} ms${row.mustHold ? "; require hold" : ""}${row.mustTap ? "; tap only" : ""}${row.ordered ? "; ordered" : ""}` : "None";
     for (let i = 0; i < Math.max(a.combos.length, b.combos.length); i++) add("Combos", `Combo ${i + 1}`, combo(a.combos[i]), combo(b.combos[i]));
     const macrosA = macroEditorView(before), macrosB = macroEditorView(after);
-    for (const bank of ["viaMacros", "hardcodedMacros"]) macrosA[bank].forEach((slot, i) => add("Macros", `${slot.kind === "via" ? "VIA" : "User"} macro ${i}`, slot.payload || "Empty", macrosB[bank][i].payload || "Empty"));
+    macrosA.viaMacros.forEach((slot, i) => {
+        add("Macros", `VIA macro ${i}`, slot.payload || "Empty", macrosB.viaMacros[i].payload || "Empty");
+        add("Macros", `VIA macro ${i} name`, slot.name || "No name", macrosB.viaMacros[i].name || "No name");
+    });
     const fields = (snapshot, settings) => settingsEditorView(snapshot).sections.flatMap(section => section.fields.map(field => {
         let value = field.value;
         if (field.kind === "toggle") value = field.enabled ? "On" : "Off";

@@ -22,7 +22,7 @@ test("behaviour editing requires supported firmware and a complete idle read", (
 // is most exposed to.
 
 const MODEL_FIELDS = [
-    "layers", "keyBehaviors", "combos", "viaMacros", "hardcodedMacros", "behaviorTimingDefaults",
+    "layers", "keyBehaviors", "combos", "viaMacros", "macroNameSpace", "behaviorTimingDefaults",
     "configDefaults", "rgb", "qmkKeycodes", "qmkKeyLabels", "qmkKeycodeAliases",
     "qmkKeycodeSource", "macroPayloadKeycodes", "diagnostics",
 ];
@@ -48,15 +48,16 @@ test("a position carries what its value means, not only what the keyboard calls 
     // user keycodes, while every other domain names them semantically. The
     // position publishes both, so a lookup from a key to what it reaches has
     // something to match on and does not re-derive the mapping.
-    const values = [0x7e50, 0x7700, 0x7e41, 0x0004];
+    const values = [0x7e50, 0x7700, 0x0004];
     const model = buildDeviceModel({
         layout: layoutWith(values.map((keycode, layoutIndex) => ({keycode, layoutIndex, resolved: resolve(keycode)}))),
         committed: decodedDeviceProfile(),
         capabilities: {actionAbiDigest: 0xdcb00959},
-        macroView: {viaMacros: [{keycode: "VIA_MACRO_0", kind: "via"}], hardcodedMacros: [{keycode: "MACRO_1", kind: "user"}]},
+        macroView: {viaMacros: [{keycode: "VIA_MACRO_0", kind: "via", name: "Sign-off"}]},
     });
     assert.deepEqual(model.layers[0].positions.map((key) => [key.keycode, key.semantic]), [
-        ["QK_USER_16", "DRAGSCROLL"], ["QK_MACRO_0", "VIA_MACRO_0"], ["QK_USER_1", "MACRO_1"], ["KC_A", "KC_A"]]);
+        ["QK_USER_16", "DRAGSCROLL"], ["QK_MACRO_0", "VIA_MACRO_0"], ["KC_A", "KC_A"]]);
+    assert.equal(model.qmkKeyLabels.QK_MACRO_0, "Sign-off", "a named macro is labelled by its name");
 });
 
 test("a dual-role key shows its tap the way that keycode is named elsewhere", () => {

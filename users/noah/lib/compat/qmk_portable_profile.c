@@ -111,6 +111,12 @@ static bool capture(void) {
     bool live = noah_effective_settings_copy(snapshot, &snapshot_length);
     if (!live) {
         memset(snapshot, 0, sizeof(snapshot));
+#if NOAH_PROFILE_SETTINGS_VERSION >= 3u
+        // v3: no user macros; the 64 VIA macro names start empty.
+        const uint8_t header[8] = {NOAH_SETTINGS_VERSION, 8, 28, NOAH_SETTINGS_MACRO_NAMES, 0, 0, 0, 0};
+        memcpy(snapshot, header, 8);
+        snapshot_length = NOAH_SETTINGS_FIXED_SIZE + NOAH_SETTINGS_MACRO_NAMES;
+#else
         const uint8_t header[8] = {NOAH_SETTINGS_VERSION, 8, 28, 16, 0, 0, 0, 0};
         memcpy(snapshot, header, 8);
         snapshot_length = NOAH_SETTINGS_FIXED_SIZE;
@@ -123,6 +129,7 @@ static bool capture(void) {
             memcpy(snapshot + snapshot_length, ir.bytes, ir.length);
             snapshot_length += ir.length;
         }
+#endif
     }
     for (uint8_t id = 0; id < NOAH_SETTINGS_COUNT; id++) {
         uint32_t value = setting_default(id);

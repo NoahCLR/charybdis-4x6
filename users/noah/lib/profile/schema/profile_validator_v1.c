@@ -262,7 +262,7 @@ static noah_profile_validator_v1_result_t domain_header_step(noah_profile_valida
     if (domain_mask == 0u || (domain_mask & validator->compatibility.allowed_domain_mask) == 0u) {
         return reject(validator, NOAH_PROFILE_VALIDATOR_V1_UNSUPPORTED_DOMAIN, validator->blob_offset, validator->domain_index, header[0], NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U16, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_DETAIL_BLOB, NOAH_PROFILE_CODEC_V1_UNKNOWN_DOMAIN, error);
     }
-    if ((header[0] == NOAH_PROFILE_DOMAIN_V1_PD && header[1] != 1u) || (header[0] == NOAH_PROFILE_DOMAIN_V1_SETTINGS && header[1] != NOAH_PROFILE_SETTINGS_VERSION) || (header[0] == NOAH_PROFILE_DOMAIN_V1_COMBOS && header[1] != 1u) || (header[0] == NOAH_PROFILE_DOMAIN_V1_RGB && header[1] != NOAH_PROFILE_DOMAIN_V1_RGB_VERSION) || (header[0] == NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIORS && header[1] != NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIOR_VERSION)) {
+    if ((header[0] == NOAH_PROFILE_DOMAIN_V1_PD && header[1] != 1u) || (header[0] == NOAH_PROFILE_DOMAIN_V1_SETTINGS && !NOAH_PROFILE_SETTINGS_VERSION_ACCEPTED(header[1])) || (header[0] == NOAH_PROFILE_DOMAIN_V1_COMBOS && header[1] != 1u) || (header[0] == NOAH_PROFILE_DOMAIN_V1_RGB && header[1] != NOAH_PROFILE_DOMAIN_V1_RGB_VERSION) || (header[0] == NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIORS && header[1] != NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIOR_VERSION)) {
         return reject(validator, NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN, validator->blob_offset + 1u, validator->domain_index, header[0], NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U16, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_DETAIL_BLOB, NOAH_PROFILE_CODEC_V1_UNKNOWN_DOMAIN_VERSION, error);
     }
     if (validator->domain_index != 0u && header[0] == validator->previous_domain_id) {
@@ -277,6 +277,8 @@ static noah_profile_validator_v1_result_t domain_header_step(noah_profile_valida
     validator->previous_domain_id = header[0];
     validator->seen_domain_mask   = (uint8_t)(validator->seen_domain_mask | domain_mask);
     memset(&validator->domain_validation, 0, sizeof(validator->domain_validation));
+    // The payload's own version byte must repeat the envelope's.
+    if (header[0] == NOAH_PROFILE_DOMAIN_V1_SETTINGS) validator->domain_validation.settings.expected_version = header[1];
     validator->phase = NOAH_PROFILE_VALIDATOR_V1_PHASE_DOMAIN_DECODE;
     return NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;
 }

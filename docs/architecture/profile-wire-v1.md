@@ -53,7 +53,7 @@ Initial domain ids:
 | `0x10` | Milestone A RGB | 1 |
 | `0x20` | Milestone A key behaviors | 1 |
 | `0x30` | Combo overrides | 1 |
-| `0x40` | Portable settings, names and user macros | 1 |
+| `0x40` | Portable settings, layer names, and user macros (v1/v2) or VIA macro names (v3; see [portable profile](portable-profile-v1.md)) | 1 |
 | `0x50` | Later live defaults | reserved |
 
 ## Action Encoding

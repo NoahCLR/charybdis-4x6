@@ -134,6 +134,8 @@ export const deleteLedGroup = (name) => ({type: "deleteRgbReusableLedGroup", nam
 // ── macros, pointing, settings ──────────────────────────────────────────
 
 export const macroMessage = (keycode, payload, identity) => ({type: "updateViaMacro", keycode, payload, expectedFingerprint: identity});
+// A VIA macro's name; its steps stay as they are.
+export const macroNameMessage = (keycode, name, identity) => ({type: "updateViaMacro", keycode, name: String(name ?? "").trim(), expectedFingerprint: identity});
 
 export const pdMode = (slot, config, identity) => ({type: "savePdMode", slot, expectedBase: identity, config});
 export const clearPdMode = (slot, identity) => ({type: "clearPdMode", slot, expectedBase: identity});

@@ -91,7 +91,7 @@ function keyCard(index) {
                 : "Key feedback is switched off, so none of these flash on the keyboard."}</div></div>`);
     }
     if (macros.length) {
-        const slots = [...(model?.viaMacros || []), ...(model?.hardcodedMacros || [])];
+        const slots = model?.viaMacros || [];
         sections.push(`<div class="hc-sect"><div class="hc-h">Macro payload</div>${macros.map((keycode) => {
             const macro = slots.find((row) => row.keycode === keycode);
             return `<div class="hc-sub">${esc(keycode)}${macro ? "" : " · not reported"}</div>`

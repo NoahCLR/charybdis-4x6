@@ -87,8 +87,8 @@
       ],
       "paths": [
         {
-          "name": "portable profile globals and macro readback",
-          "functions": ["main", "via_custom_value_command_kb", "capture", "macro_payload_compile", "macro_payload_lookup_keycode", "strlen"]
+          "name": "portable profile globals and macro-name readback",
+          "functions": ["main", "via_custom_value_command_kb", "noah_setting"]
         },
         {
           "name": "portable profile settings publication",

@@ -1035,3 +1035,19 @@ with the diagonals in bytes a directional record otherwise leaves zero (see
 [PD-mode domain v1](architecture/pd-mode-domain-v1.md)). Older firmware and
 apps reject axis `3`, so the domain version stays `1`. The C/JS differential
 corpus now loads the v2 app's codec, since v1 is frozen and would disagree.
+
+### D-L25 — VIA macros have names; user macros are retired
+
+The 16 user macros are retired and the 64 VIA macros can be named. Names live
+in settings domain version 3, in the space the user macros had, so the
+worst-case profile does not grow; they are saved atomically with every Apply,
+copied to the other half and carried in backups. Firmware accepts stored
+version 2 and writes version 3. The `MACRO_n` keycodes keep their numbers
+(reserved, inert) so the action ABI digest and every later keycode are
+unchanged. The app labels a named macro by its name on keys, in the picker and
+in the key card. See
+[portable profile](architecture/portable-profile-v1.md#version-3-via-macro-names-instead-of-user-macros).
+
+Next: remove the firmware's user-macro runtime (`macro_dispatch`, the
+compiled `HARDCODED_MACROS` list and the tooling that requires them) and shrink
+the settings RAM cache, which only needs the fixed part at runtime.

@@ -21,7 +21,7 @@ test("one draft composes every editor without changing its device snapshot", () 
     const {draft,snapshot} = fixture(), original = JSON.stringify(snapshot);
     stage(draft,{type:"updateLayoutKeys",layers:[{layer:"Layer 0",changes:[{layoutIndex:0,keycode:"KC_A"}]}]});
     stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_0",payload:"hello"});
-    stage(draft,{type:"updateViaMacro",keycode:"MACRO_0",payload:"{KC_LGUI,KC_N}"});
+    stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_1",payload:"{KC_LGUI,KC_N}"});
     stage(draft,settings(draft,"keyTiming",{tapHoldTerm:"175"}));
     const row = behaviorRowsForView(validateSnapshot(draft.document).behaviors)[0];
     stage(draft,{type:"saveBehavior",behavior:{...row,tapHoldTerm:"210"},expectedBase:draft.identity()});
@@ -97,7 +97,7 @@ test("apply requires the reviewed revision and original device, uses one verifie
     assert.equal(draft.dirty,false); assert.equal(draft.cursor,0);
 });
 test("interrupted apply retains the full target and can review against an incomplete recovery capture", async () => {
-    const {draft} = fixture(); stage(draft,{type:"updateViaMacro",keycode:"MACRO_0",payload:"retained"}); draft.review(draft.revision);
+    const {draft} = fixture(); stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_2",payload:"retained"}); draft.review(draft.revision);
     const target = draft.current.fingerprint;
     const service={snapshot:()=>({connected:true,selectedDeviceId:"board"}),restorePortableProfile:async()=>{throw Object.assign(Error("interrupted"),{code:"RESTORE_INCOMPLETE"});}};
     await assert.rejects(draft.apply(service,draft.revision,()=>"recovery"),/interrupted/);

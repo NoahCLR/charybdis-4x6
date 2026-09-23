@@ -24,6 +24,12 @@ bool noah_effective_settings_copy(uint8_t *output, uint16_t *length) {
 }
 bool noah_effective_settings_macro(uint8_t slot, macro_payload_ir_t *ir) {
     if (!settings_length || slot >= 16 || !ir) return false;
+    // v3 carries no user macros: an explicitly empty bank, so the compiled
+    // defaults stay silent too.
+    if (settings[0] >= 3u) {
+        ir->length = 0;
+        return true;
+    }
     uint16_t offset = NOAH_SETTINGS_FIXED_SIZE;
     for (uint8_t i = 0; i <= slot; i++) {
         uint16_t length = settings[offset] | (uint16_t)settings[offset + 1] << 8;

@@ -78,7 +78,9 @@ static uint8_t format_domain_mask(uint8_t version) {
 
 static bool domain_version_valid(uint8_t format, uint8_t id, uint8_t version) {
     if (format == NOAH_PROFILE_STORE_FORMAT_VERSION_PD) {
-        if (id == DOMAIN_ID_RGB || id == DOMAIN_ID_SETTINGS) return version == 2u;
+        if (id == DOMAIN_ID_RGB) return version == 2u;
+        // v2 is what an existing keyboard stores; v3 is what it now writes.
+        if (id == DOMAIN_ID_SETTINGS) return version == 2u || version == 3u;
         if (id == DOMAIN_ID_PD) return version == 1u;
     } else if (id == DOMAIN_ID_PD) {
         return false;

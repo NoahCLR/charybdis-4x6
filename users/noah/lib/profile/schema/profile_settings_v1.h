@@ -5,7 +5,12 @@
 #include "profile_versions.h"
 
 // Portable settings are data; the macro instruction vocabulary is fixed by
-// the firmware ABI. Names are UTF-8, zero terminated and zero padded.
+// the firmware ABI. Layer names are UTF-8, zero terminated and zero padded.
+//
+// After the fixed part, v1 and v2 carry 16 user-macro IR records (u16 length
+// plus instructions). v3 instead names the 64 VIA macros: 64 records of a u8
+// length (0..23) and that many UTF-8 bytes. The size ceiling is unchanged, so
+// the names share the space the user macros had.
 enum {
     NOAH_SETTINGS_VERSION     = NOAH_PROFILE_SETTINGS_VERSION,
     NOAH_SETTINGS_COUNT       = 28,
@@ -13,6 +18,8 @@ enum {
     NOAH_SETTINGS_NAME_BYTES  = 24,
     NOAH_SETTINGS_MACROS      = 16,
     NOAH_SETTINGS_MACRO_BYTES = 1024,
+    NOAH_SETTINGS_MACRO_NAMES = 64,
+    NOAH_SETTINGS_MACRO_NAME_MAX = 23,
     NOAH_SETTINGS_FIXED_SIZE  = 8 + 28 * 4 + 8 * 24,
     NOAH_SETTINGS_MAX_SIZE    = NOAH_SETTINGS_FIXED_SIZE + 16 * 2 + 1024,
 };
@@ -56,6 +63,7 @@ typedef struct {
     uint32_t value, timeout, dead_time;
     uint8_t  slot, opcode, remaining, held[16], held_count, tap[16], tap_count;
     uint8_t  utf8_remaining, utf8_min, utf8_max;
+    uint8_t  version, expected_version; // expected_version: the envelope's, 0 when unknown
     bool     name_ended;
 } noah_profile_settings_v1_validation_t;
 // One byte per call, permitting the whole-profile owner to retain its 20-byte

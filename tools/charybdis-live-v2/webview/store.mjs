@@ -43,7 +43,6 @@ export const state = {
     pdPreview: false,
     feedbackRow: "hold",
     macroSlot: null,
-    macroBank: "via",
     macroDrafts: {},
     macroSteps: {},
     macroCursors: {},

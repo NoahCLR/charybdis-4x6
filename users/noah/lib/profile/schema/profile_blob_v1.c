@@ -53,7 +53,7 @@ static bool domain_version_is_known(uint8_t id, uint8_t version) {
 #ifdef NOAH_PD_PROFILE_ENABLE
         (id == NOAH_PROFILE_DOMAIN_V1_PD && version == 1u) ||
 #endif
-        (id == NOAH_PROFILE_DOMAIN_V1_SETTINGS && version == NOAH_PROFILE_SETTINGS_VERSION) || (id == NOAH_PROFILE_DOMAIN_V1_COMBOS && version == 1u) || (id == NOAH_PROFILE_DOMAIN_V1_RGB && version == NOAH_PROFILE_DOMAIN_V1_RGB_VERSION) || (id == NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIORS && version == NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIOR_VERSION);
+        (id == NOAH_PROFILE_DOMAIN_V1_SETTINGS && NOAH_PROFILE_SETTINGS_VERSION_ACCEPTED(version)) || (id == NOAH_PROFILE_DOMAIN_V1_COMBOS && version == 1u) || (id == NOAH_PROFILE_DOMAIN_V1_RGB && version == NOAH_PROFILE_DOMAIN_V1_RGB_VERSION) || (id == NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIORS && version == NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIOR_VERSION);
 }
 
 static bool domain_id_is_known(uint8_t id) {
