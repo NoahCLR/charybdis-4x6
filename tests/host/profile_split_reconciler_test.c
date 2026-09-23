@@ -775,6 +775,125 @@ static void test_prepared_push_cancel_aborts_peer_lease(void) {
     assert(noah_profile_candidate_store_backend_admission_owner(&left.candidate_backend) == NOAH_PROFILE_STORAGE_ADMISSION_NONE);
 }
 
+static bool peer_cleanup_pending(const half_t *half) {
+    noah_profile_split_reconciler_status_t status;
+
+    assert(noah_profile_split_reconciler_status(&half->reconciler, &status));
+    return status.peer_cleanup_pending;
+}
+
+// Scans the sender alone until its prepared push is released, and returns how
+// long that took. The peer is deliberately not scanned: it is either
+// unreachable or wedged in a state that answers every ABORT with BUSY.
+static uint32_t run_sender_until_prepared_push_released(half_t *sender, uint32_t start_at) {
+    uint32_t now = start_at;
+
+    for (uint32_t scan = 0u; scan < MAX_SCANS && sender->reconciler.prepared_push_active; scan++) {
+        now = start_at + scan * NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS;
+        assert_one_scan_budget(sender, true, now);
+    }
+    assert(!sender->reconciler.prepared_push_active);
+    return now - start_at;
+}
+
+// The keyboard wedged in PREPARING_PEER on 2026-09-23: the peer stopped
+// acknowledging, the host cancelled, and the peer ABORT was retried forever.
+// Every host-owned wait above this one depends on it ending.
+static void test_prepared_abort_is_bounded_when_peer_goes_silent(void) {
+    half_t                          left;
+    half_t                          right;
+    noah_profile_split_descriptor_t descriptor;
+    noah_profile_split_descriptor_t next;
+    staged_source_t                 source = {.bytes = empty_profile, .length = sizeof(empty_profile)};
+    uint32_t                        elapsed;
+
+    half_storage_init(&left);
+    half_storage_init(&right);
+    pair_init(&left, &right);
+    run_pair_until_converged(&left, &right, false);
+    descriptor = committed_descriptor(&right, 23u, 1u);
+    run_prepared_push_until_ready(&right, &left, &descriptor, &source);
+    assert(noah_profile_peer_store_backend_state(&left.peer_store) == NOAH_PROFILE_PEER_STORE_PREPARED);
+
+    right.link.connected = false;
+    assert(noah_profile_split_reconciler_prepared_push_cancel(&right.reconciler, &descriptor));
+    elapsed = run_sender_until_prepared_push_released(&right, 40000u);
+    assert(elapsed >= NOAH_PROFILE_SPLIT_PREPARED_ABORT_TIMEOUT_MS);
+    assert(elapsed < NOAH_PROFILE_SPLIT_PREPARED_ABORT_TIMEOUT_MS + 2u * NOAH_PROFILE_SPLIT_RETRY_MAX_MS);
+
+    // Released locally, but the peer never confirmed: it may still hold the
+    // provisional lease, so the sender remembers and says so.
+    assert(peer_cleanup_pending(&right));
+    assert(left.store.committed.slot == NOAH_PROFILE_SLOT_NONE);
+    next = committed_descriptor(&right, 24u, 1u);
+    assert(!noah_profile_split_reconciler_prepared_push_begin(&right.reconciler, &next, &source, staged_read));
+
+    // Once the peer answers again, the remembered ABORT releases its lease.
+    right.link.connected = true;
+    for (uint32_t scan = 0u; scan < MAX_SCANS && peer_cleanup_pending(&right); scan++) {
+        uint32_t now = 60000u + scan * NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS;
+
+        assert_one_scan_budget(&right, true, now);
+        assert_one_scan_budget(&left, false, now);
+    }
+    assert(!peer_cleanup_pending(&right));
+    assert(noah_profile_peer_store_backend_state(&left.peer_store) == NOAH_PROFILE_PEER_STORE_IDLE);
+    assert(noah_profile_candidate_store_backend_admission_owner(&left.candidate_backend) == NOAH_PROFILE_STORAGE_ADMISSION_NONE);
+    assert(left.store.committed.slot == NOAH_PROFILE_SLOT_NONE);
+    run_pair_until_converged(&left, &right, false);
+    assert(noah_profile_split_reconciler_prepared_push_begin(&right.reconciler, &next, &source, staged_read));
+}
+
+// A peer store in RECONCILE_REQUIRED (durability unknown) answers every ABORT
+// with BUSY until it restarts. The sender still releases in bounded time,
+// keeps polling metadata, and never reports the peer as cleaned up.
+static void test_prepared_abort_is_bounded_when_peer_stays_busy(void) {
+    half_t                          left;
+    half_t                          right;
+    noah_profile_split_descriptor_t descriptor;
+    staged_source_t                 source = {.bytes = empty_profile, .length = sizeof(empty_profile)};
+    uint32_t                        elapsed;
+    uint32_t                        exchanges;
+    uint32_t                        writes;
+
+    half_storage_init(&left);
+    half_storage_init(&right);
+    pair_init(&left, &right);
+    run_pair_until_converged(&left, &right, false);
+    descriptor = committed_descriptor(&right, 25u, 1u);
+    run_prepared_push_until_ready(&right, &left, &descriptor, &source);
+    left.peer_store.state = NOAH_PROFILE_PEER_STORE_RECONCILE_REQUIRED;
+
+    assert(noah_profile_split_reconciler_prepared_push_cancel(&right.reconciler, &descriptor));
+    for (uint32_t scan = 0u; scan < MAX_SCANS && right.reconciler.prepared_push_active; scan++) {
+        uint32_t now = 70000u + scan * NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS;
+
+        assert_one_scan_budget(&right, true, now);
+        assert_one_scan_budget(&left, false, now);
+        elapsed = now - 70000u;
+    }
+    assert(!right.reconciler.prepared_push_active);
+    assert(elapsed >= NOAH_PROFILE_SPLIT_PREPARED_ABORT_TIMEOUT_MS);
+    assert(elapsed < NOAH_PROFILE_SPLIT_PREPARED_ABORT_TIMEOUT_MS + 2u * NOAH_PROFILE_SPLIT_RETRY_MAX_MS);
+    assert(peer_cleanup_pending(&right));
+
+    // The wedged peer keeps answering BUSY. The remembered ABORT is retried
+    // at a bounded rate, metadata polling continues, and nothing is written.
+    exchanges = right.link.exchanges;
+    writes    = left.memory.writes + right.memory.writes;
+    for (uint32_t scan = 0u; scan < 2250u; scan++) {
+        uint32_t now = 90000u + (scan * 5000u) / 2250u;
+
+        (void)noah_profile_split_reconciler_scan(&right.reconciler, true, now);
+        (void)noah_profile_split_reconciler_scan(&left.reconciler, false, now);
+    }
+    assert(peer_cleanup_pending(&right));
+    assert(right.link.exchanges > exchanges);
+    assert(right.link.exchanges - exchanges <= 2u * (5000u / NOAH_PROFILE_SPLIT_RETRY_MAX_MS) + 2u);
+    assert(left.memory.writes + right.memory.writes == writes);
+    assert(left.store.committed.slot == NOAH_PROFILE_SLOT_NONE);
+}
+
 static void test_maximum_candidate_resolves_within_owner_no_progress_window(void) {
     half_t                          left;
     half_t                          right;
@@ -1248,6 +1367,8 @@ int main(void) {
     test_prepared_push_collects_expected_mailbox_ack_without_failure_backoff();
     test_prepared_push_pauses_before_commit_then_authorizes();
     test_prepared_push_cancel_aborts_peer_lease();
+    test_prepared_abort_is_bounded_when_peer_goes_silent();
+    test_prepared_abort_is_bounded_when_peer_stays_busy();
     test_maximum_candidate_resolves_within_owner_no_progress_window();
     test_prepared_push_restarts_across_both_half_role_changes();
     test_receiver_durable_prepare_survives_sender_pause();

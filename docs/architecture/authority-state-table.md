@@ -47,6 +47,28 @@ id; the loser aborts peer staging first and then reports
 without a tiebreaker: equal-generation/different-origin records are an explicit
 conflict.
 
+### Cancelled prepare, peer
+
+A host abort, host timeout, supersession or yield before the local marker
+cancels the peer staging with a split `ABORT`, and the host transaction cannot
+end while that prepared push is active. The `ABORT` is bounded by
+`NOAH_PROFILE_SPLIT_PREPARED_ABORT_TIMEOUT_MS` (15 s). If the peer stays
+silent or answers `BUSY` past it, the USB half releases its own side: the host
+transaction ends, and durable authority on both halves is unchanged because no
+marker exists. The peer may still hold its provisional lease, so the USB half
+reports peer cleanup pending, retries the same `ABORT` about once a second in
+idle slots, keeps polling metadata, and starts no prepared push or ordinary
+transfer until the peer acknowledges it. A refused cancel (the peer reports
+matching durable state) is not released: it stops fail closed as before.
+
+The bound exists because of a field wedge on 2026-09-23. The peer answered
+every `ABORT` with `BUSY`; a peer store in `RECONCILE_REQUIRED` (durability
+unknown) does that until it restarts. The unbounded retry held the host's own
+`ABORT` in the candidate mailbox, and the host timeout, which requires an empty
+mailbox, never ran, so only a power cycle released the keyboard. A peer that
+never acknowledges still needs a restart, but the keyboard now says so instead
+of hanging.
+
 ## User Operations
 
 | Operation | Source | USB half | Peer half | Required visible result |

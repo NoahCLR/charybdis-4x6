@@ -48,6 +48,8 @@ static void clear_prepared_push(noah_profile_split_reconciler_t *reconciler) {
     reconciler->prepared_logical           = false;
     reconciler->prepared_via_generation    = 0u;
     reconciler->prepared_via_digest        = 0u;
+    reconciler->abort_deadline             = 0u;
+    reconciler->abort_deadline_known       = false;
 }
 
 static noah_profile_split_reconciler_state_t prepared_payload_complete_state(const noah_profile_split_reconciler_t *reconciler) {
@@ -741,6 +743,20 @@ static void handle_protocol_error(noah_profile_split_reconciler_t *reconciler, c
     stop_with_status(reconciler, response->status);
 }
 
+// transfer_descriptor names a released push's unacknowledged ABORT, and the
+// peer may still hold its lease: any transfer now would only meet BUSY. Keep
+// polling until the cleanup is confirmed.
+static bool orphan_defers_transfer(noah_profile_split_reconciler_t *reconciler, uint32_t now) {
+    if (!reconciler->orphan_pending) {
+        return false;
+    }
+    reconciler->last_status = NOAH_PROFILE_SPLIT_V1_STATUS_BUSY;
+    reconciler->state       = NOAH_PROFILE_SPLIT_RECONCILER_DISCOVER;
+    retry_later(reconciler, now);
+    publish_authority(reconciler);
+    return true;
+}
+
 static void begin_authority_action(noah_profile_split_reconciler_t *reconciler, noah_profile_split_authority_state_t authority_state, uint32_t now, noah_profile_split_reconcile_mode_t mode) {
     reconciler->last_status = NOAH_PROFILE_SPLIT_V1_STATUS_OK;
     switch (authority_state) {
@@ -754,6 +770,9 @@ static void begin_authority_action(noah_profile_split_reconciler_t *reconciler, 
             publish_authority(reconciler);
             break;
         case NOAH_PROFILE_SPLIT_AUTHORITY_LOCAL_NEWER:
+            if (orphan_defers_transfer(reconciler, now)) {
+                break;
+            }
             reconciler->transfer_descriptor = reconciler->local_descriptor;
             reconciler->transfer_offset     = 0u;
             reconciler->prepared_logical    = reconciler->local_descriptor.logical && reconciler->config.local_binding && reconciler->config.local_binding(reconciler->config.local_context, &reconciler->local_descriptor, &reconciler->prepared_via_generation, &reconciler->prepared_via_digest);
@@ -765,6 +784,9 @@ static void begin_authority_action(noah_profile_split_reconciler_t *reconciler, 
             publish_authority(reconciler);
             break;
         case NOAH_PROFILE_SPLIT_AUTHORITY_PEER_NEWER:
+            if (orphan_defers_transfer(reconciler, now)) {
+                break;
+            }
             if (mode == NOAH_PROFILE_SPLIT_RECONCILE_CONVERGENCE_ONLY) {
                 reconciler->last_status = NOAH_PROFILE_SPLIT_V1_STATUS_BUSY;
                 reconciler->state       = NOAH_PROFILE_SPLIT_RECONCILER_DISCOVER;
@@ -822,6 +844,28 @@ static void metadata_exchange(noah_profile_split_reconciler_t *reconciler, uint3
     reconciler->peer_descriptor = response.descriptor;
     note_progress(reconciler, now);
     begin_authority_action(reconciler, noah_profile_split_authority_compare(&reconciler->local_descriptor, &reconciler->peer_descriptor), now, mode);
+}
+
+// Retries the ABORT a released push never had acknowledged. One RPC, at most
+// once per NOAH_PROFILE_SPLIT_RETRY_MAX_MS, in an idle slot, so metadata
+// polling carries on between attempts.
+static void orphan_abort(noah_profile_split_reconciler_t *reconciler, uint32_t now) {
+    noah_profile_split_v1_frame_t response;
+    noah_profile_split_v1_frame_t request = {.kind = NOAH_PROFILE_SPLIT_V1_ABORT, .status = NOAH_PROFILE_SPLIT_V1_STATUS_OK, .descriptor = reconciler->transfer_descriptor};
+
+    reconciler->abort_deadline = now + NOAH_PROFILE_SPLIT_RETRY_MAX_MS;
+    if (!rpc_exchange(reconciler, &request, &response, now) || response_busy(&response)) {
+        return;
+    }
+    if (response_ack_matches(&response, &reconciler->transfer_descriptor)) {
+        reconciler->orphan_pending = false;
+        publish_authority(reconciler);
+        return;
+    }
+    // Any other answer means the peer reports durable state for this
+    // descriptor, which no cancelled push may produce. Stop fail closed and
+    // keep the cleanup pending, as a refused cancel does.
+    handle_protocol_error(reconciler, &response, now);
 }
 
 static void push_bind(noah_profile_split_reconciler_t *reconciler, uint32_t now) {
@@ -996,15 +1040,42 @@ static void push_durable(noah_profile_split_reconciler_t *reconciler, uint32_t n
     publish_authority(reconciler);
 }
 
+// The peer did not acknowledge ABORT in time. Neither half holds a marker for
+// this descriptor, so releasing the push leaves durable authority untouched;
+// what may remain is the peer's provisional lease. Keep that as cleanup work
+// rather than letting it hold the host transaction, which cannot end while a
+// prepared push is active.
+static void release_unacknowledged_abort(noah_profile_split_reconciler_t *reconciler, uint32_t now) {
+    clear_prepared_push(reconciler);
+    reconciler->orphan_pending  = true;
+    reconciler->abort_deadline  = now + NOAH_PROFILE_SPLIT_RETRY_MAX_MS;
+    reconciler->transfer_offset = 0u;
+    reconciler->last_status     = NOAH_PROFILE_SPLIT_V1_STATUS_BUSY;
+    reconciler->state           = NOAH_PROFILE_SPLIT_RECONCILER_DISCOVER;
+    publish_authority(reconciler);
+}
+
 static void push_abort(noah_profile_split_reconciler_t *reconciler, uint32_t now) {
     noah_profile_split_v1_frame_t response;
     noah_profile_split_v1_frame_t request = {.kind = NOAH_PROFILE_SPLIT_V1_ABORT, .status = NOAH_PROFILE_SPLIT_V1_STATUS_OK, .descriptor = reconciler->transfer_descriptor};
 
+    if (!reconciler->abort_deadline_known) {
+        reconciler->abort_deadline       = now + NOAH_PROFILE_SPLIT_PREPARED_ABORT_TIMEOUT_MS;
+        reconciler->abort_deadline_known = true;
+    }
     if (!rpc_exchange(reconciler, &request, &response, now)) {
+        if (deadline_reached(now, reconciler->abort_deadline)) {
+            release_unacknowledged_abort(reconciler, now);
+            return;
+        }
         reconciler->state = NOAH_PROFILE_SPLIT_RECONCILER_PUSH_ABORT;
         return;
     }
     if (response_busy(&response)) {
+        if (deadline_reached(now, reconciler->abort_deadline)) {
+            release_unacknowledged_abort(reconciler, now);
+            return;
+        }
         retry_admitted_mailbox(reconciler, now);
         return;
     }
@@ -1267,6 +1338,11 @@ bool noah_profile_split_reconciler_scan_mode(noah_profile_split_reconciler_t *re
         publish_authority(reconciler);
         return true;
     }
+    // Peer cleanup takes an idle slot only: never one inside a transfer.
+    if (reconciler->orphan_pending && deadline_reached(now_ms, reconciler->abort_deadline) && (reconciler->state == NOAH_PROFILE_SPLIT_RECONCILER_DISCOVER || reconciler->state == NOAH_PROFILE_SPLIT_RECONCILER_VERIFY || reconciler->state == NOAH_PROFILE_SPLIT_RECONCILER_CONVERGED)) {
+        orphan_abort(reconciler, now_ms);
+        return true;
+    }
     switch (reconciler->state) {
         case NOAH_PROFILE_SPLIT_RECONCILER_DISCOVER:
         case NOAH_PROFILE_SPLIT_RECONCILER_VERIFY:
@@ -1346,6 +1422,11 @@ static bool prepared_push_begin(noah_profile_split_reconciler_t *reconciler, con
     }
     if (reconciler->prepared_push_active) {
         return descriptor_equal(&reconciler->transfer_descriptor, descriptor) && reconciler->prepared_logical == logical && reconciler->prepared_via_generation == via_generation && reconciler->prepared_via_digest == via_digest;
+    }
+    // The peer may still hold a released push's lease; a second provisional
+    // transfer would only meet BUSY. Wait for its cleanup to be confirmed.
+    if (reconciler->orphan_pending) {
+        return false;
     }
     if (!(reconciler->role_known && reconciler->master && reconciler->transfer_owner == NOAH_PROFILE_SPLIT_TRANSFER_NONE) || (reconciler->state != NOAH_PROFILE_SPLIT_RECONCILER_DISCOVER && reconciler->state != NOAH_PROFILE_SPLIT_RECONCILER_CONVERGED && reconciler->state != NOAH_PROFILE_SPLIT_RECONCILER_STOPPED)) {
         return false;
@@ -1469,6 +1550,7 @@ bool noah_profile_split_reconciler_status(const noah_profile_split_reconciler_t 
         .master                  = reconciler->master,
         .mailbox_pending         = mailbox_pending(reconciler),
         .transfer_pending        = transfer_pending(reconciler),
+        .peer_cleanup_pending    = reconciler->orphan_pending,
     };
     return true;
 }

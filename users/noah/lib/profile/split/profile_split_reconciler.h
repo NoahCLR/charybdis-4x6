@@ -27,6 +27,15 @@ enum {
     // active. This is a pre-marker lease; expiry never interrupts COMMITTING
     // or a durability-unknown recovery state.
     NOAH_PROFILE_SPLIT_PREPARE_LEASE_MS = 3000u,
+    // How long a cancelled prepared push waits for the peer to acknowledge its
+    // ABORT before the sender releases its own side. It is well past any
+    // legitimate BUSY a responsive peer gives (a durable prepare or commit
+    // step sequence), and well inside the owner's no-progress window. After
+    // it, the peer may still hold the provisional lease: the sender records
+    // that, keeps retrying the ABORT, and refuses a new prepared push until
+    // the peer confirms. No marker exists on either half at this point, so
+    // releasing never changes durable authority.
+    NOAH_PROFILE_SPLIT_PREPARED_ABORT_TIMEOUT_MS = 15000u,
     // Firmware-state regression policy, not an RP2040 SRAM-capacity claim.
     NOAH_PROFILE_SPLIT_RECONCILER_STATE_BUDGET_32BIT = 768u,
 };
@@ -80,6 +89,10 @@ typedef struct {
     bool                                  master;
     bool                                  mailbox_pending;
     bool                                  transfer_pending;
+    // A cancelled prepared push was released without the peer acknowledging
+    // its ABORT. Cleared when the peer does; until then no new prepared push
+    // starts, and a peer that never answers needs a restart.
+    bool peer_cleanup_pending;
 } noah_profile_split_reconciler_status_t;
 
 typedef enum {
@@ -119,6 +132,9 @@ typedef struct {
     uint32_t                               retry_count;
     uint32_t                               prepared_via_generation;
     uint32_t                               prepared_via_digest;
+    // While a prepared push is cancelled, when it is released without the
+    // peer's ABORT acknowledgement; after that, when the ABORT is next retried.
+    uint32_t                               abort_deadline;
     uint32_t                               incoming_via_generation;
     uint32_t                               incoming_via_digest;
     uint32_t                               incoming_profile_generation;
@@ -147,6 +163,10 @@ typedef struct {
     bool                                   prepared_remote_started;
     bool                                   prepared_commit_authorized;
     bool                                   prepared_cancel_refused;
+    bool                                   abort_deadline_known;
+    // A released push's ABORT is still unacknowledged. `transfer_descriptor`
+    // keeps naming it: no other transfer starts until the peer confirms.
+    bool                                   orphan_pending;
     bool                                   prepared_logical;
     bool                                   incoming_logical_binding;
     bool                                   attempt_immediate;
@@ -174,6 +194,8 @@ bool noah_profile_split_reconciler_prepared_push_ready(const noah_profile_split_
 bool noah_profile_split_reconciler_prepared_push_authorize_commit(noah_profile_split_reconciler_t *reconciler, const noah_profile_split_descriptor_t *descriptor);
 // Cancellation is scan-owned: once the peer admitted PREPARE_BEGIN, this
 // schedules an idempotent protocol ABORT rather than touching storage here.
+// The ABORT is bounded by NOAH_PROFILE_SPLIT_PREPARED_ABORT_TIMEOUT_MS; past
+// it the push is released and the ABORT continues as peer cleanup.
 bool noah_profile_split_reconciler_prepared_push_cancel(noah_profile_split_reconciler_t *reconciler, const noah_profile_split_descriptor_t *descriptor);
 
 // PREPARE_BEGIN intent is deliberately separate from durable peer metadata.

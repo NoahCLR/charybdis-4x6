@@ -6,6 +6,7 @@ const path = require("node:path");
 const test = require("node:test");
 
 const {
+    PROFILE_STATE_FLAGS,
     PROFILE_WIRE_KNOWN_MASKS,
     PROFILE_WIRE_FEATURES,
     PROFILE_WIRE_V1,
@@ -124,6 +125,7 @@ test("JavaScript consumes the same golden reports as the C firmware codec", () =
         peerKnown: true,
         peerConverged: true,
         waitingSafeBoundary: true,
+        peerCleanupPending: false,
     });
 });
 
@@ -254,7 +256,18 @@ test("patterned status vectors decode every semantic field exactly", () => {
         peerKnown: true,
         peerConverged: true,
         waitingSafeBoundary: true,
+        peerCleanupPending: false,
     });
+});
+
+test("status reports a cancelled save the peer never confirmed", () => {
+    const identity = Buffer.alloc(25);
+    identity.set([1, 2], 0);
+    identity.writeUInt16LE(PROFILE_STATE_FLAGS.PEER_CLEANUP_PENDING | PROFILE_STATE_FLAGS.PEER_KNOWN, 2);
+    const decoded = decodeStatusPages([identity, Buffer.alloc(25)]);
+    assert.equal(decoded.peerCleanupPending, true);
+    assert.equal(decoded.peerKnown, true);
+    assert.equal(decoded.candidatePending, false);
 });
 
 test("decoders reject unknown masks, active kinds, and invalid ranges", () => {

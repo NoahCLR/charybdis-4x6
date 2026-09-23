@@ -596,6 +596,79 @@ static void test_host_abort_is_coordinated_at_each_prepare_boundary(void) {
     }
 }
 
+static bool owner_peer_cleanup_pending(const noah_profile_owner_t *owner) {
+    noah_profile_owner_status_t status;
+
+    assert(noah_profile_owner_status(owner, &status));
+    return status.peer_cleanup_pending;
+}
+
+// The keyboard wedged this way on 2026-09-23: the peer answered every split
+// ABORT with BUSY, so the host's own ABORT sat in the mailbox, the host
+// timeout (which needs an empty mailbox) never ran, and only a power cycle
+// released the transaction.
+static void test_host_abort_ends_when_peer_never_acknowledges(void) {
+    noah_profile_owner_t left;
+    noah_profile_owner_t right;
+    memory_t             left_memory;
+    memory_t             right_memory;
+    split_link_t         left_link  = {.peer = &right};
+    split_link_t         right_link = {.peer = &left};
+    uint8_t              frame[32];
+    uint32_t             now = 200000u;
+    uint32_t             aborted_at;
+
+    memset(&left_memory, 0, sizeof(left_memory));
+    memset(&right_memory, 0, sizeof(right_memory));
+    memset(left_memory.bytes, 0xff, sizeof(left_memory.bytes));
+    memset(right_memory.bytes, 0xff, sizeof(right_memory.bytes));
+    boot_empty_pair(&left, &left_memory, &right, &right_memory, &left_link, &right_link, &now);
+    stage_valid_candidate_pair(&left, &right, 1u, &now);
+    simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT, 1u);
+    send_and_scan_pair(&left, &right, frame, &now);
+    for (uint32_t guard = 0u; guard < 1024u && !noah_profile_split_reconciler_prepared_push_ready(&left.reconciler, NULL); guard++) {
+        scan_pair(&left, &right, &now);
+    }
+    assert(noah_profile_split_reconciler_prepared_push_ready(&left.reconciler, NULL));
+    assert(!owner_peer_cleanup_pending(&left));
+
+    // Durability unknown on the peer: every ABORT is BUSY until it restarts.
+    right.peer_store.state = NOAH_PROFILE_PEER_STORE_RECONCILE_REQUIRED;
+    simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_ABORT, 1u);
+    assert(noah_profile_owner_receive(&left, frame, sizeof(frame)));
+    aborted_at = now;
+    for (uint32_t guard = 0u; guard < 4096u && left.host_transaction.status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE; guard++) {
+        scan_pair(&left, &right, &now);
+        assert(left.state != NOAH_PROFILE_OWNER_STORAGE_ERROR && left.state != NOAH_PROFILE_OWNER_INTEGRATION_ERROR);
+    }
+    assert(left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE);
+    assert(left.host_transaction.status.last_operation == NOAH_PROFILE_CANDIDATE_V1_OPERATION_ABORT);
+    assert(left.host_transaction.status.error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_NONE);
+    assert(!left.host_transaction.mailbox.pending);
+    assert(now - aborted_at <= NOAH_PROFILE_SPLIT_PREPARED_ABORT_TIMEOUT_MS + 2u * NOAH_PROFILE_SPLIT_RETRY_MAX_MS);
+    assert(!left.store.prepare_active);
+    assert(noah_profile_candidate_store_backend_admission_owner(&left.staging.candidate_backend) == NOAH_PROFILE_STORAGE_ADMISSION_NONE);
+    // Nothing became durable on either half.
+    assert(left.store.committed.slot == NOAH_PROFILE_SLOT_NONE && right.store.committed.slot == NOAH_PROFILE_SLOT_NONE);
+    assert(owner_peer_cleanup_pending(&left));
+
+    // The next save cannot stack a second transfer onto the wedged peer. It
+    // ends on the host's own timeout instead of waiting forever.
+    stage_valid_candidate_pair(&left, &right, 2u, &now);
+    simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT, 2u);
+    send_and_scan_pair(&left, &right, frame, &now);
+    assert(left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_PREPARING_PEER);
+    aborted_at = now;
+    for (uint32_t guard = 0u; guard < 4096u && left.host_transaction.status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE; guard++) {
+        scan_pair(&left, &right, &now);
+    }
+    assert(left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE);
+    assert(left.host_transaction.status.error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_TIMEOUT);
+    assert(now - aborted_at <= NOAH_PROFILE_OWNER_HOST_TIMEOUT_MS + 2u * NOAH_PROFILE_SPLIT_RETRY_MAX_MS);
+    assert(left.store.committed.slot == NOAH_PROFILE_SLOT_NONE && right.store.committed.slot == NOAH_PROFILE_SLOT_NONE);
+    assert(owner_peer_cleanup_pending(&left));
+}
+
 static void test_barrier_mailbox_retries_and_postcommit_abort_do_not_starve(void) {
     noah_profile_owner_t left;
     noah_profile_owner_t right;
@@ -1084,6 +1157,7 @@ int main(void) {
     test_simultaneous_hosts_choose_stable_physical_origin_before_durability();
     test_prepared_peer_is_aborted_before_host_timeout_releases_candidate();
     test_host_abort_is_coordinated_at_each_prepare_boundary();
+    test_host_abort_ends_when_peer_never_acknowledges();
     test_barrier_mailbox_retries_and_postcommit_abort_do_not_starve();
     test_local_known_commit_failure_aborts_prepared_peer_first();
     test_prepare_uses_extended_no_progress_timeout();

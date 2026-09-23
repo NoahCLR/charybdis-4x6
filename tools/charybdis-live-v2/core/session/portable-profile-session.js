@@ -105,6 +105,16 @@ async function rollForwardLocalStorage(connection, target, base, layoutRanges, m
         });
     }
 }
+// A peer that never acknowledged a cancelled save keeps its lease until it
+// restarts, and the keyboard refuses new saves until then. Best effort: the
+// save has already failed, so an unreadable status only loses the hint.
+async function peerRestartGuidance(connection, readProfile, options) {
+    try {
+        const status = await readProfile(connection, options);
+        if (status?.peerCleanupPending) return " The other half did not confirm the cancel. Unplug the USB cable (not the cable between the halves), wait a few seconds and plug it back in before saving again.";
+    } catch {}
+    return "";
+}
 async function restoreProfile(connection, ids, capabilities, document, {expectedFingerprint, saveRecovery, baseSnapshot, onProgress = () => {}, operations = {}} = {}) {
     const startedAt = Date.now();
     requireReady(capabilities);
@@ -148,7 +158,7 @@ async function restoreProfile(connection, ids, capabilities, document, {expected
     const targetStorageGeneration = beforeIdentity.storageGeneration + 1;
     const macroRanges = changedRanges(base.macros, target.macros, {end: target.macros.length - 1});
     const layoutRanges = changedRanges(base.layout, target.layout);
-    let mutated = false, prepared, decisionObserved = false;
+    let mutated = false, prepared, decisionObserved = false, commitRequested = false;
     try {
         prepared = await coordinator.upload(target.profile, {metadata: candidateMetadataForBlob(target.profile, {actionAbiDigest: capabilities.actionAbiDigest, viaGeneration: targetStorageGeneration, viaDigest: expectedStorageDigest}), verifyBase: async () => {
             const identity = await currentIdentity(connection, ids, {allowCandidate: true});
@@ -158,6 +168,7 @@ async function restoreProfile(connection, ids, capabilities, document, {expected
         onProgress("Staging changed keys and macros on the other half");
         await viaCoordinator.stage({transactionId: prepared.transactionId, generation: targetStorageGeneration, digest: expectedStorageDigest, target, current: base});
         onProgress("Publishing one complete profile to both halves");
+        commitRequested = true;
         await coordinator.commit(prepared.transactionId, {digest: prepared.metadata.digest, afterDecision: async () => {
             decisionObserved = true;
             onProgress("Waiting for the staged recovery copy");
@@ -178,12 +189,21 @@ async function restoreProfile(connection, ids, capabilities, document, {expected
         return {document, fingerprint: resultFingerprint, summary: summary(document), status, identity: snapshotIdentity(status, storageAfter, encodeSettings(target.settings)), recovery,
             performance: {elapsedMs: Date.now() - startedAt, baseSource: before === baseSnapshot ? "verified-cache" : "device-read", layoutBytes, macroBytes, viaConfigReports: 1, layoutReports: layoutRanges.reduce((sum, range) => sum + Math.ceil(range.bytes.length / 12), 0), macroReports: macroWriteNeeded ? macroRanges.reduce((sum, range) => sum + Math.ceil(range.bytes.length / 12), 0) : 0}};
     } catch (error) {
+        let cancelled = false;
         if (prepared && !decisionObserved) {
             try { await viaCoordinator.abort({transactionId: prepared.transactionId, generation: targetStorageGeneration, digest: expectedStorageDigest}); } catch {}
-            try { await coordinator.abort(prepared.transactionId); } catch {}
+            // The keyboard returns to idle on ABORT only while no commit
+            // marker exists, so a completed abort proves nothing was saved.
+            try { await coordinator.abort(prepared.transactionId); cancelled = true; } catch {}
         }
-        if (mutated) throw fail("RESTORE_INCOMPLETE", `Restore was interrupted. Keep both halves connected. ${before.incomplete ? `Import your original complete backup again. Interrupted data was saved for diagnosis at ${recovery}.` : `Import the recovery file ${recovery}.`} ${error.message}`);
-        throw error;
+        if (!mutated) throw error;
+        const restart = await peerRestartGuidance(connection, readProfile, options);
+        // Before the commit was sent, or once the keyboard confirmed the
+        // cancel, the profile it had is still the one it runs.
+        if (!decisionObserved && (!commitRequested || cancelled)) {
+            throw fail("RESTORE_NOT_SAVED", `Nothing was saved: the keyboard kept the profile it had. ${error.message}${restart}`);
+        }
+        throw fail("RESTORE_INCOMPLETE", `Restore was interrupted. Keep both halves connected. ${before.incomplete ? `Import your original complete backup again. Interrupted data was saved for diagnosis at ${recovery}.` : `Import the recovery file ${recovery}.`} ${error.message}${restart}`);
     }
 }
 module.exports = {upgradePdSnapshot, captureProfile, readIdentity, restoreProfile, validateSnapshot, summary, fingerprint, reorderLayers};

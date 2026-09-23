@@ -150,6 +150,7 @@ typedef struct {
     bool                                 peer_known;
     bool                                 peer_converged;
     bool                                 transfer_pending;
+    bool                                 peer_cleanup_pending;
 } noah_profile_owner_status_t;
 
 // Initializes metadata and begins incremental validation of the compiled

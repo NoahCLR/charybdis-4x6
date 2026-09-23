@@ -949,3 +949,37 @@ seconds, the durable decision became visible at 5.45 seconds, and final
 cross-half convergence completed at 6.58 seconds. This shows the remaining
 latency is validation and durable publication on the keyboard rather than a
 hidden host timeout or full-store copy.
+
+### D-L22 — A cancelled save ends in bounded time, and says why it ended
+
+On 2026-09-23 an Apply of a lighting-effect change stuck in `PREPARING_PEER`
+until the keyboard was unplugged. Read-only status reads while it was stuck
+showed the candidate frozen at operation sequence 750 with the host's own
+`ABORT` still in the mailbox, the peer still readable, both halves at committed
+generation 19 and VIA storage ready at generation 20. The peer had stopped
+acknowledging the push and then answered the cancel's split `ABORT` with
+`BUSY`. That `ABORT` was retried without limit, and the host timeout needs an
+empty mailbox, so nothing could end the transaction. A full power cycle
+recovered cleanly, as the authority table predicts before any marker. Why the
+peer stopped responding is still unknown: breathing was not active yet, since
+the effect only applies after commit.
+
+Firmware now bounds that `ABORT` (15 s). Past it the USB half releases its own
+side, reports *peer cleanup pending* as status flag bit 8, retries the `ABORT`
+in idle slots and starts no new save or split transfer until the peer
+acknowledges. The contract is in
+[the authority state table](architecture/authority-state-table.md#cancelled-prepare-peer)
+and [Profile Wire V1](architecture/profile-wire-v1.md). The frozen v1 app
+predates the flag and rejects status while it is set.
+
+The app no longer tells a user to import a recovery file after a save that
+never reached the commit decision. When the failure came before the commit was
+sent, or the keyboard confirmed the cancel by returning to idle (it refuses to
+once a marker exists), Apply reports `RESTORE_NOT_SAVED`: nothing was saved and
+the keyboard kept its profile. An unconfirmed cancel after the commit was sent
+stays `RESTORE_INCOMPLETE` with its recovery file. While cleanup is pending,
+the rail shows *Restart the keyboard* and the failure message says to unplug
+the USB cable rather than the cable between the halves.
+
+Next: capture the peer's own state the next time a push stops being
+acknowledged, so the cause, not just the wedge, can be fixed.

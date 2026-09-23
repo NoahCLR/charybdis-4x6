@@ -64,6 +64,10 @@ enum {
     NOAH_PROFILE_STATE_PEER_CONVERGED             = 1u << 5,
     NOAH_PROFILE_STATE_WAITING_SAFE_BOUNDARY      = 1u << 6,
     NOAH_PROFILE_STATE_DIGESTS_UNAVAILABLE        = 1u << 7,
+    // A cancelled save's peer ABORT was never acknowledged; see
+    // NOAH_PROFILE_SPLIT_PREPARED_ABORT_TIMEOUT_MS. No new save starts until
+    // the peer confirms, and a peer that never does needs a restart.
+    NOAH_PROFILE_STATE_PEER_CLEANUP_PENDING = 1u << 8,
 };
 
 typedef enum {

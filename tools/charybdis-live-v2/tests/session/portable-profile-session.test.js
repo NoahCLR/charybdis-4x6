@@ -59,10 +59,39 @@ test("changes after acquiring the profile lease prevent commit", async () => {
     await assert.rejects(restoreProfile({}, {}, capabilities, f.targetDocument, f.options), /changed/);
     assert.deepEqual(f.events, ["backup", "stage"]);
 });
-test("an interrupted write reports recovery and cannot report a successful restore", async () => {
+test("a failure before the commit is sent reports that nothing was saved, not a recovery import", async () => {
     const f = fixture(); f.operations.createViaCoordinator = () => ({stage: async () => {throw Error("disconnected");}, abort: async () => {}});
-    await assert.rejects(restoreProfile({}, {}, capabilities, f.targetDocument, f.options), error => error.code === "RESTORE_INCOMPLETE" && error.message.includes("/recovery.json"));
+    await assert.rejects(restoreProfile({}, {}, capabilities, f.targetDocument, f.options), error => error.code === "RESTORE_NOT_SAVED"
+        && /Nothing was saved/.test(error.message) && error.message.includes("disconnected") && !error.message.includes("/recovery.json"));
     assert.deepEqual(f.events, ["backup", "stage"]);
+});
+// The coordinator for a commit that was sent and then stopped answering, as
+// on 2026-09-23. Its abort resolves only when the keyboard returns to idle.
+function stalledCommit(f, {abortConfirmed}) {
+    f.operations.createCoordinator = () => ({
+        upload: async (bytes, options) => {f.events.push("stage"); await options.verifyBase(); return {transactionId: 1, metadata: {digest: 42}};},
+        commit: async () => {f.events.push("commit"); throw Object.assign(Error("Candidate commit made no observable progress within its firmware-aware wait window."), {code: "COMMIT_OUTCOME_AMBIGUOUS"});},
+        abort: async () => {f.events.push("abort"); if (!abortConfirmed) throw Object.assign(Error("could not cancel"), {code: "ABORT_FAILED"}); return {transactionId: 1, status: {state: 0}};},
+    });
+}
+test("a sent commit the keyboard then cancels is reported as not saved", async () => {
+    const f = fixture(); stalledCommit(f, {abortConfirmed: true});
+    await assert.rejects(restoreProfile({}, {}, capabilities, f.targetDocument, f.options), error => error.code === "RESTORE_NOT_SAVED"
+        && /Nothing was saved/.test(error.message) && /no observable progress/.test(error.message) && !/Unplug/.test(error.message));
+    assert.deepEqual(f.events, ["backup", "stage", "via stage", "commit", "via abort", "abort"]);
+});
+test("a sent commit the keyboard never confirms cancelling stays an interrupted restore with its recovery file", async () => {
+    const f = fixture(); stalledCommit(f, {abortConfirmed: false});
+    await assert.rejects(restoreProfile({}, {}, capabilities, f.targetDocument, f.options), error => error.code === "RESTORE_INCOMPLETE" && error.message.includes("/recovery.json"));
+});
+test("a peer that never confirmed the cancel adds restart guidance", async () => {
+    const f = fixture(); stalledCommit(f, {abortConfirmed: true});
+    f.operations.readProfile = async () => ({peerCleanupPending: true});
+    await assert.rejects(restoreProfile({}, {}, capabilities, f.targetDocument, f.options), error => error.code === "RESTORE_NOT_SAVED"
+        && /Unplug the USB cable \(not the cable between the halves\)/.test(error.message));
+    f.operations.readProfile = async () => {throw Error("unreadable");};
+    await assert.rejects(restoreProfile({}, {}, capabilities, f.targetDocument, f.options), error => error.code === "RESTORE_NOT_SAVED" && !/Unplug/.test(error.message),
+        "an unreadable status only loses the hint");
 });
 test("a post-decision local-write interruption preserves the peer recovery copy", async () => {
     const f = fixture();

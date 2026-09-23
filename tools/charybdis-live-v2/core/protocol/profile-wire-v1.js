@@ -24,7 +24,7 @@ const PROFILE_WIRE_STATUS = Object.freeze({
 const PROFILE_WIRE_KNOWN_MASKS = Object.freeze({
     FEATURE_FLAGS: 0x00003fff,
     REQUIRED_READ_FEATURES: 0x0000000f,
-    STATE_FLAGS: 0x00ff,
+    STATE_FLAGS: 0x01ff,
     SUPPORTED_DOMAINS: 0x1f,
 });
 
@@ -69,6 +69,9 @@ const PROFILE_STATE_FLAGS = Object.freeze({
     PEER_CONVERGED: 1 << 5,
     WAITING_SAFE_BOUNDARY: 1 << 6,
     DIGESTS_UNAVAILABLE: 1 << 7,
+    // A cancelled save's peer ABORT was never acknowledged. No save starts
+    // until the peer confirms; a peer that never does needs a restart.
+    PEER_CLEANUP_PENDING: 1 << 8,
 });
 
 const VIA_READS = Object.freeze({
@@ -283,6 +286,7 @@ function decodeStatusPages(pages) {
     decoded.peerKnown = (decoded.stateFlags & PROFILE_STATE_FLAGS.PEER_KNOWN) !== 0;
     decoded.peerConverged = (decoded.stateFlags & PROFILE_STATE_FLAGS.PEER_CONVERGED) !== 0;
     decoded.waitingSafeBoundary = (decoded.stateFlags & PROFILE_STATE_FLAGS.WAITING_SAFE_BOUNDARY) !== 0;
+    decoded.peerCleanupPending = (decoded.stateFlags & PROFILE_STATE_FLAGS.PEER_CLEANUP_PENDING) !== 0;
     assertKnownMask(decoded.stateFlags, PROFILE_WIRE_KNOWN_MASKS.STATE_FLAGS, "status state flags");
     if (!Object.values(PROFILE_ACTIVE_KIND).includes(decoded.activeKind)) {
         throw new ProfileWireProtocolError("INCOMPATIBLE_RESPONSE", `Unknown active profile kind ${decoded.activeKind}.`);

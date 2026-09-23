@@ -1027,8 +1027,9 @@ noah_profile_split_reconciler_t *noah_profile_owner_split_reconciler(noah_profil
 
 bool noah_profile_owner_status(const noah_profile_owner_t *owner, noah_profile_owner_status_t *status) {
     noah_effective_profile_status_t       provider;
-    noah_profile_split_authority_status_t authority;
-    const noah_profile_store_record_t    *committed;
+    noah_profile_split_authority_status_t  authority;
+    noah_profile_split_reconciler_status_t reconciler;
+    const noah_profile_store_record_t     *committed;
 
     if (!owner || !status || owner->state == NOAH_PROFILE_OWNER_UNINITIALIZED) {
         return false;
@@ -1065,6 +1066,9 @@ bool noah_profile_owner_status(const noah_profile_owner_t *owner, noah_profile_o
         status->peer_known       = authority.peer.readable;
         status->transfer_pending = authority.transfer_pending;
         status->peer_converged   = !authority.transfer_pending && (authority.state == NOAH_PROFILE_SPLIT_AUTHORITY_COMPILED_CONVERGED || authority.state == NOAH_PROFILE_SPLIT_AUTHORITY_COMMITTED_CONVERGED);
+    }
+    if (owner->split_initialized && noah_profile_split_reconciler_status(&owner->reconciler, &reconciler)) {
+        status->peer_cleanup_pending = reconciler.peer_cleanup_pending;
     }
     return true;
 }

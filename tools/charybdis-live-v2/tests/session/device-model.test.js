@@ -196,6 +196,7 @@ test("the header exposes one health model for connection, convergence and recove
         profile: "unavailable",
         converged: false,
         recoveryPending: false,
+        restartNeeded: false,
         busy: false,
         phase: "empty",
         error: "Keyboard unavailable",
@@ -213,6 +214,12 @@ test("the header exposes one health model for connection, convergence and recove
     assert.equal(connected.health.recoveryPending, true);
     assert.equal(connected.health.busy, true);
     assert.equal(connected.health.phase, "reading profile");
+    assert.equal(connected.health.restartNeeded, false);
+    const wedged = buildDeviceModel({
+        capabilities: {compiledLayerCount: 8},
+        status: {committedGeneration: 4, activeGeneration: 4, peerGeneration: 4, committedDigest: 1, peerKnown: true, peerConverged: true, peerCleanupPending: true},
+    }).device;
+    assert.equal(wedged.health.restartNeeded, true, "the rail asks for a restart while the peer holds a cancelled save");
 });
 
 test("the subtitle says what to do next", () => {

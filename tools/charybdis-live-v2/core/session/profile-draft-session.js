@@ -141,7 +141,7 @@ class ProfileDraftSession {
             this.reset(result);
             return result;
         } catch (error) {
-            if (["RESTORE_INCOMPLETE", "PROFILE_CHANGED", "RESTORE_VERIFY_FAILED"].includes(error.code)) this.needsRead = true;
+            if (["RESTORE_INCOMPLETE", "RESTORE_NOT_SAVED", "PROFILE_CHANGED", "RESTORE_VERIFY_FAILED"].includes(error.code)) this.needsRead = true;
             throw error;
         }
     }

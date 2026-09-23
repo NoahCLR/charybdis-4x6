@@ -366,6 +366,29 @@ state. Until the store and generated compiled digest land, firmware truthfully
 reports `compiled-only` with `digests unavailable`; zero is not presented as a
 real digest.
 
+State flags (page 0, bytes 2–3). Bits 9–15 are reserved and must be zero.
+
+| Bit | Flag |
+| ---: | --- |
+| 0 | active profile is the compiled default |
+| 1 | committed record valid |
+| 2 | candidate pending |
+| 3 | preview active |
+| 4 | peer known |
+| 5 | peer converged |
+| 6 | waiting for a safe activation boundary |
+| 7 | digests unavailable |
+| 8 | peer cleanup pending |
+
+Peer cleanup pending (added 2026-09-23) means a cancelled save's split ABORT
+was never acknowledged, so the USB half released its own side after
+`NOAH_PROFILE_SPLIT_PREPARED_ABORT_TIMEOUT_MS` (see the
+[authority state table](authority-state-table.md#cancelled-prepare-peer)). No
+marker exists on either half, and durable authority is unchanged. Until the
+peer acknowledges the retried ABORT, the keyboard starts no new save or split
+transfer; a peer that never does needs a restart. A decoder that predates the
+bit rejects the status while it is set, as it rejects any unknown flag.
+
 ### Candidate Mutation Envelope
 
 Candidate staging mutations use VIA custom set command `0x07`; durable commit

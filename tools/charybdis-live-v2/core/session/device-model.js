@@ -196,6 +196,7 @@ function deviceHeader(state) {
                 profile: "unavailable",
                 converged: false,
                 recoveryPending: false,
+                restartNeeded: false,
                 busy: false,
                 phase: state.phase || "idle",
                 error: state.error?.message || "",
@@ -232,6 +233,9 @@ function deviceHeader(state) {
             profile: !status ? "unread" : converged ? "synced" : "attention",
             converged,
             recoveryPending: Boolean(state.mutationCompatibility?.recoveryPending || status?.candidatePending),
+            // The other half never confirmed a cancelled save. Only a restart
+            // releases it, and the keyboard refuses new saves until then.
+            restartNeeded: Boolean(status?.peerCleanupPending),
             busy: Boolean(state.busy),
             phase: state.phase || "connected",
             error: state.error?.message || state.liveApply?.error?.message || "",
