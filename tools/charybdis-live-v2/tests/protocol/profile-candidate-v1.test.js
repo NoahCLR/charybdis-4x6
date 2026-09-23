@@ -43,6 +43,7 @@ test("JavaScript emits the exact candidate frames consumed by the firmware fixtu
     assert.equal(CANDIDATE_ERROR.PEER_PREPARE_YIELDED, 21);
     assert.equal(CANDIDATE_ERROR.POSTCOMMIT_AUTHORITY_LOST, 22);
     assert.equal(CANDIDATE_ERROR.PEER_COMMIT_CONFLICT, 23);
+    assert.equal(CANDIDATE_ERROR.PEER_TRANSFER_FAILED, 24);
     assert.equal(CANDIDATE_STATE.PREPARING_PEER, 8);
     assert.equal(CANDIDATE_STATE.CONVERGING_PEER, 9);
     const fixtures = goldenFixtures();

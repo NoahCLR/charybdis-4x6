@@ -214,7 +214,14 @@ left to abort, kept the `PEER` admission, and refused every later copy as
 "prepare in progress" until the half was power cycled. It now releases the
 admission whenever the rejected copy leaves no prepare open. A sender whose
 ABORT is answered with a correlated storage error treats the cancel as done,
-since the receiver has then rejected the copy and released its storage. If both halves change
+since the receiver has then rejected the copy and released its storage.
+
+A receiver that cannot store a prepared copy, typically one failed flash write,
+answers a correlated storage error. Until the commit is authorized nothing is
+durable on either half, so the sender sends the copy again from
+`PREPARE_BEGIN` (or the logical bind), up to two times, before it stops with
+that status. The owner then ends the host's Apply at once with candidate error
+`24` rather than waiting out its no-progress timeout. If both halves change
 transport roles, an outbound prepared source retains its candidate correlation
 but restarts at `PREPARE_BEGIN` before resuming chunks or an authorized commit;
 it never assumes the new receiver retained volatile prepare state.

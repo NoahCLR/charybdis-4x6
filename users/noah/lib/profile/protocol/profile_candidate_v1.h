@@ -69,6 +69,10 @@ typedef enum {
     NOAH_PROFILE_CANDIDATE_V1_ERROR_PEER_PREPARE_YIELDED,
     NOAH_PROFILE_CANDIDATE_V1_ERROR_POSTCOMMIT_AUTHORITY_LOST,
     NOAH_PROFILE_CANDIDATE_V1_ERROR_PEER_COMMIT_CONFLICT,
+    // The copy to the other half stopped for good before any commit (after
+    // its storage retries); candidate status page 1 says what the peer
+    // answered last. Nothing was saved on either half.
+    NOAH_PROFILE_CANDIDATE_V1_ERROR_PEER_TRANSFER_FAILED,
 } noah_profile_candidate_v1_error_id_t;
 
 typedef enum {

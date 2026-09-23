@@ -615,6 +615,7 @@ abort, and `5` commit. Error ids are stable:
 | 21 | simultaneous peer prepare won deterministic arbitration |
 | 22 | local durability completed but peer authority was lost before activation |
 | 23 | peer committed a conflicting identity during postcommit convergence |
+| 24 | the copy to the peer stopped before any commit, after its storage retries; page 1 names the peer's last answer, and nothing was saved |
 
 Errors which have no domain/table/row/tap/field location use the sentinels
 above. The operation sequence lets a host distinguish a newly processed

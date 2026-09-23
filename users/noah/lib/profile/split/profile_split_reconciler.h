@@ -27,6 +27,8 @@ enum {
     // active. This is a pre-marker lease; expiry never interrupts COMMITTING
     // or a durability-unknown recovery state.
     NOAH_PROFILE_SPLIT_PREPARE_LEASE_MS = 3000u,
+    // Times a prepared copy is sent again after the receiver fails to store it.
+    NOAH_PROFILE_SPLIT_PREPARED_STORAGE_RETRIES = 2u,
     // How long a cancelled prepared push waits for the peer to acknowledge its
     // ABORT before the sender releases its own side. It is well past any
     // legitimate BUSY a responsive peer gives (a durable prepare or commit
@@ -144,6 +146,7 @@ typedef struct {
     uint8_t                                last_busy_store_state;
     uint8_t                                last_busy_owner;
     uint8_t                                last_busy_admission;
+    uint8_t                                prepared_storage_retries;
     // This half's store state, transfer owner and storage admission as of its
     // last scan, for BUSY replies the split callback writes before any scan.
     volatile uint8_t                       published_store_state;

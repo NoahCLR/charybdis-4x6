@@ -121,6 +121,8 @@ noah_profile_candidate_expire_result_t noah_profile_candidate_transaction_supers
 // Deterministic simultaneous-host arbitration. The losing physical origin
 // aborts only its still-provisional candidate and reports a distinct status.
 noah_profile_candidate_expire_result_t noah_profile_candidate_transaction_yield_precommit(noah_profile_candidate_transaction_t *transaction);
+// The copy to the other half stopped for good before any commit.
+noah_profile_candidate_expire_result_t noah_profile_candidate_transaction_peer_failed_precommit(noah_profile_candidate_transaction_t *transaction);
 
 // Fail closed after local marker-last durability. This retains the candidate
 // and backend lease/backing so a two-slot runtime cannot overwrite the active

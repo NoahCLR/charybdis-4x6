@@ -622,6 +622,8 @@ static noah_profile_candidate_expire_result_t finish_host_precommit_cancel(noah_
             return noah_profile_candidate_transaction_supersede_precommit(&owner->host_transaction);
         case NOAH_PROFILE_CANDIDATE_V1_ERROR_PEER_PREPARE_YIELDED:
             return noah_profile_candidate_transaction_yield_precommit(&owner->host_transaction);
+        case NOAH_PROFILE_CANDIDATE_V1_ERROR_PEER_TRANSFER_FAILED:
+            return noah_profile_candidate_transaction_peer_failed_precommit(&owner->host_transaction);
         case NOAH_PROFILE_CANDIDATE_V1_ERROR_STORAGE_FAILURE:
             return noah_profile_candidate_transaction_cleanup_failed_precommit(&owner->host_transaction);
         default:
@@ -656,7 +658,7 @@ static bool advance_host_precommit_cancel(noah_profile_owner_t *owner) {
 }
 
 static bool request_host_precommit_cancel(noah_profile_owner_t *owner, noah_profile_candidate_v1_error_id_t reason) {
-    if (!owner || (reason != NOAH_PROFILE_CANDIDATE_V1_ERROR_NONE && reason != NOAH_PROFILE_CANDIDATE_V1_ERROR_TIMEOUT && reason != NOAH_PROFILE_CANDIDATE_V1_ERROR_PEER_SUPERSEDED && reason != NOAH_PROFILE_CANDIDATE_V1_ERROR_PEER_PREPARE_YIELDED && reason != NOAH_PROFILE_CANDIDATE_V1_ERROR_STORAGE_FAILURE)) {
+    if (!owner || (reason != NOAH_PROFILE_CANDIDATE_V1_ERROR_NONE && reason != NOAH_PROFILE_CANDIDATE_V1_ERROR_TIMEOUT && reason != NOAH_PROFILE_CANDIDATE_V1_ERROR_PEER_SUPERSEDED && reason != NOAH_PROFILE_CANDIDATE_V1_ERROR_PEER_PREPARE_YIELDED && reason != NOAH_PROFILE_CANDIDATE_V1_ERROR_PEER_TRANSFER_FAILED && reason != NOAH_PROFILE_CANDIDATE_V1_ERROR_STORAGE_FAILURE)) {
         return false;
     }
     if (reason == NOAH_PROFILE_CANDIDATE_V1_ERROR_NONE && !host_mailbox_is_matching_abort(owner)) {
@@ -758,6 +760,15 @@ static bool begin_or_advance_host_barrier(noah_profile_owner_t *owner) {
         }
         owner->host_barrier_started = true;
         return true;
+    }
+    {
+        // The copy stopped for good (its storage retries are spent, or the
+        // peer answered a terminal error): end the Apply now with that reason
+        // instead of waiting out the no-progress timeout.
+        noah_profile_split_reconciler_status_t split;
+        if (noah_profile_split_reconciler_status(&owner->reconciler, &split) && split.prepared_push_active && split.state == NOAH_PROFILE_SPLIT_RECONCILER_STOPPED) {
+            return request_host_precommit_cancel(owner, NOAH_PROFILE_CANDIDATE_V1_ERROR_PEER_TRANSFER_FAILED);
+        }
     }
     if (!noah_profile_split_reconciler_prepared_push_ready(&owner->reconciler, &prepared)) {
         return false;

@@ -58,6 +58,11 @@ test("the reason is the keyboard's own when it gave one, else the other half's l
     assert.equal(failureReason({message: "disconnected"}), "disconnected");
 });
 
+test("a copy that stopped on the other half names its answer", () => {
+    assert.equal(failureReason({deviceError: {name: "PEER_TRANSFER_FAILED"}}, {lastStatusName: "STORAGE_ERROR"}), "The other half could not store the profile, even after trying again.");
+    assert.equal(failureReason({deviceError: {name: "PEER_TRANSFER_FAILED"}}, null), "The other half could not take the profile.");
+});
+
 test("a copy the other half keeps refusing says what it is waiting on", () => {
     const stalled = {message: "made no observable progress"};
     assert.equal(failureReason(stalled, {lastStatusName: "OK", busyStreak: 40, busyReason: "OTHER_COPY"}), "The other half was still holding an earlier, unfinished copy.");

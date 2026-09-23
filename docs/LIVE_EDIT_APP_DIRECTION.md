@@ -1119,3 +1119,10 @@ in its abort; each left the receiver stuck before the fix. Why the flash write
 failed is still open. The busy details were also misleading: they kept the
 last informative reply across Applies. Every busy reply now carries the
 receiver's current store state and storage admission, and they reset per copy.
+
+A failed store on the other half is now retried: the copy is sent again from
+the start up to two times, which is safe because nothing is durable before
+the commit is authorized. If it still fails, the Apply ends at once with
+candidate error `PEER_TRANSFER_FAILED`, and the app says the other half could
+not store the profile, instead of waiting out its timer and showing an
+unrelated digest message.

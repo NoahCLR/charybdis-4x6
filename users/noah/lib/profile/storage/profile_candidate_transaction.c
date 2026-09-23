@@ -573,7 +573,7 @@ static noah_profile_candidate_expire_result_t cancel_precommit(noah_profile_cand
         transaction->mailbox.pending       = false;
         memset(&transaction->mailbox.command, 0, sizeof(transaction->mailbox.command));
     }
-    if (reason == NOAH_PROFILE_CANDIDATE_V1_ERROR_PEER_SUPERSEDED || reason == NOAH_PROFILE_CANDIDATE_V1_ERROR_PEER_PREPARE_YIELDED) {
+    if (reason == NOAH_PROFILE_CANDIDATE_V1_ERROR_PEER_SUPERSEDED || reason == NOAH_PROFILE_CANDIDATE_V1_ERROR_PEER_PREPARE_YIELDED || reason == NOAH_PROFILE_CANDIDATE_V1_ERROR_PEER_TRANSFER_FAILED) {
         // Supersession is an asynchronous status event even when no host
         // command was queued. Advance exactly once so polling can distinguish
         // it from the prior processed operation.
@@ -608,6 +608,10 @@ noah_profile_candidate_expire_result_t noah_profile_candidate_transaction_supers
 
 noah_profile_candidate_expire_result_t noah_profile_candidate_transaction_yield_precommit(noah_profile_candidate_transaction_t *transaction) {
     return cancel_precommit(transaction, NOAH_PROFILE_CANDIDATE_V1_ERROR_PEER_PREPARE_YIELDED, true);
+}
+
+noah_profile_candidate_expire_result_t noah_profile_candidate_transaction_peer_failed_precommit(noah_profile_candidate_transaction_t *transaction) {
+    return cancel_precommit(transaction, NOAH_PROFILE_CANDIDATE_V1_ERROR_PEER_TRANSFER_FAILED, true);
 }
 
 bool noah_profile_candidate_transaction_fail_postcommit(noah_profile_candidate_transaction_t *transaction, noah_profile_candidate_v1_error_id_t reason) {

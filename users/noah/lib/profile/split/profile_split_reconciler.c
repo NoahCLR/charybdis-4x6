@@ -814,6 +814,19 @@ static void handle_protocol_error(noah_profile_split_reconciler_t *reconciler, c
         transport_lost(reconciler, now);
         return;
     }
+    // The receiver could not store this copy, typically one failed flash
+    // write. Before the commit is authorized nothing is durable on either
+    // half and the receiver has released its storage, so send the copy again
+    // from the start, a bounded number of times, before giving up.
+    if (reconciler->prepared_push_active && !reconciler->prepared_commit_authorized && response->status == NOAH_PROFILE_SPLIT_V1_STATUS_STORAGE_ERROR && response->generation == reconciler->transfer_descriptor.generation && response->payload_digest == reconciler->transfer_descriptor.payload_digest && reconciler->prepared_storage_retries < NOAH_PROFILE_SPLIT_PREPARED_STORAGE_RETRIES) {
+        reconciler->prepared_storage_retries++;
+        reconciler->transfer_offset       = 0u;
+        reconciler->outbound_chunk_length = 0u;
+        reconciler->state                 = reconciler->prepared_logical ? NOAH_PROFILE_SPLIT_RECONCILER_PUSH_BIND : NOAH_PROFILE_SPLIT_RECONCILER_PUSH_BEGIN;
+        retry_later(reconciler, now);
+        publish_authority(reconciler);
+        return;
+    }
     if (response->status == NOAH_PROFILE_SPLIT_V1_STATUS_STALE || response->status == NOAH_PROFILE_SPLIT_V1_STATUS_BUSY) {
         reconciler->state = NOAH_PROFILE_SPLIT_RECONCILER_DISCOVER;
         retry_later(reconciler, now);
@@ -1557,6 +1570,7 @@ static bool prepared_push_begin(noah_profile_split_reconciler_t *reconciler, con
     reconciler->last_busy_store_state      = 0u;
     reconciler->last_busy_owner            = 0u;
     reconciler->last_busy_admission        = 0u;
+    reconciler->prepared_storage_retries   = 0u;
     reconciler->state                      = logical ? NOAH_PROFILE_SPLIT_RECONCILER_PUSH_BIND : NOAH_PROFILE_SPLIT_RECONCILER_PUSH_BEGIN;
     publish_authority(reconciler);
     return true;

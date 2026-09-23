@@ -818,6 +818,70 @@ static void test_prepare_uses_extended_no_progress_timeout(void) {
     assert(noah_profile_candidate_store_backend_admission_owner(&left.staging.candidate_backend) == NOAH_PROFILE_STORAGE_ADMISSION_NONE);
 }
 
+// The other half fails to store its copy (one flash write). Up to the split
+// storage retries the copy is sent again and the Apply commits; past them the
+// Apply ends at once with PEER_TRANSFER_FAILED, not after the no-progress
+// timeout, and both halves stay ready for the next one.
+static void run_peer_store_write_failures(uint8_t failures, uint16_t transaction_id) {
+    noah_profile_owner_t left;
+    noah_profile_owner_t right;
+    memory_t             left_memory;
+    memory_t             right_memory;
+    split_link_t         left_link  = {.peer = &right};
+    split_link_t         right_link = {.peer = &left};
+    uint8_t              frame[32];
+    uint32_t             now      = 300000u;
+    uint32_t             started;
+    uint8_t              armed    = 0u;
+    bool                 in_phase = false;
+
+    memset(&left_memory, 0, sizeof(left_memory));
+    memset(&right_memory, 0, sizeof(right_memory));
+    memset(left_memory.bytes, 0xff, sizeof(left_memory.bytes));
+    memset(right_memory.bytes, 0xff, sizeof(right_memory.bytes));
+    boot_empty_pair(&left, &left_memory, &right, &right_memory, &left_link, &right_link, &now);
+    stage_valid_candidate_pair(&left, &right, transaction_id, &now);
+    simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT, transaction_id);
+    send_and_scan_pair(&left, &right, frame, &now);
+    started = now;
+    for (uint32_t guard = 0u; guard < 8192u && left.host_transaction.status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE; guard++) {
+        bool preparing = noah_profile_peer_store_backend_state(&right.peer_store) == NOAH_PROFILE_PEER_STORE_PREPARING;
+        if (preparing && !in_phase && armed < failures) {
+            armed++;
+            right_memory.fail_next_write = true;
+        }
+        in_phase = preparing;
+        scan_pair(&left, &right, &now);
+    }
+    right_memory.fail_next_write = false;
+    if (left.host_transaction.status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE) {
+        noah_profile_split_reconciler_status_t split;
+        (void)noah_profile_split_reconciler_status(&left.reconciler, &split);
+        fprintf(stderr, "failures %u armed %u: host state %u error %u cancel %u | split state %u status %u retries %u active %u | peer store %u owner %u admission %u peer owner state %u\n", (unsigned)failures, (unsigned)armed, (unsigned)left.host_transaction.status.state, (unsigned)left.host_transaction.status.error.code, (unsigned)left.host_cancel_pending, (unsigned)split.state, (unsigned)split.last_status, (unsigned)left.reconciler.prepared_storage_retries, (unsigned)split.prepared_push_active, (unsigned)noah_profile_peer_store_backend_state(&right.peer_store), (unsigned)right.reconciler.transfer_owner, (unsigned)noah_profile_candidate_store_backend_admission_owner(&right.staging.candidate_backend), (unsigned)right.state);
+    }
+    assert(armed == failures);
+    assert(left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE);
+    assert(left.state == NOAH_PROFILE_OWNER_READY_COMPILED || left.state == NOAH_PROFILE_OWNER_READY_VALIDATED);
+    assert(right.state == NOAH_PROFILE_OWNER_READY_COMPILED || right.state == NOAH_PROFILE_OWNER_READY_VALIDATED);
+    if (failures <= NOAH_PROFILE_SPLIT_PREPARED_STORAGE_RETRIES) {
+        assert(left.host_transaction.status.error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_NONE);
+        assert(left.committed_descriptor.generation == 1u && right.committed_descriptor.generation == 1u);
+        return;
+    }
+    assert(left.host_transaction.status.error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_PEER_TRANSFER_FAILED);
+    assert((uint32_t)(now - started) < NOAH_PROFILE_OWNER_HOST_BARRIER_NO_PROGRESS_MS / 4u);
+    assert(!left.store.committed.generation && !right.store.committed.generation);
+    assert(noah_profile_candidate_store_backend_admission_owner(&right.staging.candidate_backend) == NOAH_PROFILE_STORAGE_ADMISSION_NONE);
+    // Nothing was saved, and the next Apply goes through.
+    stage_valid_candidate_pair(&left, &right, (uint16_t)(transaction_id + 1u), &now);
+    commit_valid_candidate_pair(&left, &right, (uint16_t)(transaction_id + 1u), 1u, &now);
+}
+
+static void test_peer_store_write_failure_retries_then_fails_fast(void) {
+    run_peer_store_write_failures(1u, 170u);
+    run_peer_store_write_failures(NOAH_PROFILE_SPLIT_PREPARED_STORAGE_RETRIES + 1u, 180u);
+}
+
 static void test_unexpected_newer_postcommit_authority_never_activates(void) {
     noah_profile_owner_t            left;
     noah_profile_owner_t            right;
@@ -1178,6 +1242,7 @@ int main(void) {
     test_barrier_mailbox_retries_and_postcommit_abort_do_not_starve();
     test_local_known_commit_failure_aborts_prepared_peer_first();
     test_prepare_uses_extended_no_progress_timeout();
+    test_peer_store_write_failure_retries_then_fails_fast();
     test_unexpected_newer_postcommit_authority_never_activates();
     test_boot_reconciles_different_generations_before_activation();
     test_peer_authority_supersedes_only_precommit_host_generation();

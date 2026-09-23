@@ -125,6 +125,7 @@ const DEVICE_REASONS = Object.freeze({
     PEER_PREPARE_YIELDED: "The other half was saving a profile of its own at the same time.",
     POSTCOMMIT_AUTHORITY_LOST: "The other half reported a newer profile after this half saved.",
     PEER_COMMIT_CONFLICT: "The two halves disagree about which profile is current.",
+    PEER_TRANSFER_FAILED: "The other half could not take the profile.",
 });
 
 // The other half's last answer to the split transfer, when the keyboard
@@ -135,7 +136,7 @@ const PEER_REASONS = Object.freeze({
     CONFLICT: "The other half holds a conflicting profile.",
     CORRUPT: "The other half's copy was damaged.",
     INCOMPATIBLE: "The other half runs incompatible firmware.",
-    STORAGE_ERROR: "The other half could not write its storage.",
+    STORAGE_ERROR: "The other half could not store the profile, even after trying again.",
     VALIDATION_ERROR: "The other half rejected the profile.",
     DIGEST_MISMATCH: "The copy on the other half did not match what was sent.",
     RANGE_ERROR: "The copy to the other half went out of order.",
@@ -163,6 +164,8 @@ const PEER_BUSY_REASONS = Object.freeze({
 function failureReason(error, peer) {
     const device = error?.deviceError || error?.status?.error;
     if (device?.name && device.name !== "NONE") {
+        // The copy to the other half stopped: its last answer says why.
+        if (device.name === "PEER_TRANSFER_FAILED" && peer?.lastStatusName && PEER_REASONS[peer.lastStatusName]) return PEER_REASONS[peer.lastStatusName];
         const known = DEVICE_REASONS[device.name];
         if (known) return device.name === "VALIDATION_REJECTED" ? `${known}${locate(device)}.` : known;
         return `The keyboard reported ${device.name}.`;
