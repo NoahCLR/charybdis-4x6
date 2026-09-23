@@ -38,7 +38,7 @@ export const state = {
     layersAsked: false, // its stack is requested once per opening
     pdSlot: 0,
     pdKind: null,      // movement selection while the rebuilt form catches up: {slot, kind}
-    pdAdvanced: null,
+    pdAdvanced: false,  // Advanced open on the pointing editor, whichever slot is shown
     pdPreview: false,
     feedbackRow: "hold",
     macroSlot: null,

@@ -3,6 +3,7 @@
 const {validateSnapshot} = require("./portable-profile");
 const {decodeProfileBlob, encodeProfileBlob} = require("../schema/profile-blob-v1");
 const {encodeSettings, validSetting} = require("../schema/settings-domain-v1");
+const {dpiChoices} = require("./pointer-dpi");
 const fail = message => Object.assign(new Error(message), {code: "INVALID_SETTINGS_EDIT"});
 const number = (macro, id, label, hint = "0–65535 ms", extra = {}) => ({macro, id, label, hint, kind: "number", validate: "nonnegative-int", ...extra});
 const toggle = (macro, id, label, hint) => ({macro, id, label, hint, kind: "toggle"});
@@ -20,12 +21,19 @@ const sections = [
         toggle("combosEnabled", 20, "Combos", "Individual combo timing is available in the keyboard view."),
     ]},
     {id: "normalPointerSpeed", label: "Pointer Speed", fields: [
-        number("normalDpi", 18, "Normal pointer DPI", "400–3400, in steps of 200", {choices: Array.from({length: 16}, (_, i) => 400 + i * 200)}),
-        number("snipingDpi", 19, "Sniping DPI", "Lower DPI gives finer pointer control.", {choices: [100, 200, 300, 400]}),
+        // Every DPI field offers the one list in pointer-dpi.js. These two are
+        // held in the upstream Charybdis config, which the keyboard only
+        // accepts in its own steps, so they offer the part of the list the
+        // keyboard accepts. The others take any stored value, so the list is
+        // what they offer, not a rule: `open` keeps a stored value that is not
+        // on it saveable.
+        number("normalDpi", 18, "Normal pointer DPI", "400–3400, in steps of 200: the steps this firmware stores.", {choices: dpiChoices({accepts: v => validSetting(18, v)})}),
+        number("snipingDpi", 19, "Sniping DPI", "100–400: the steps this firmware stores. Lower DPI gives finer pointer control.", {choices: dpiChoices({accepts: v => validSetting(19, v)})}),
     ]},
     {id: "pointingModeSpeeds", label: "Pointing Mode Speeds", fields: [
-        number("dragscrollDpi", 10, "Drag-scroll DPI", "Trackball sensitivity while scrolling; this is an explicit DPI value."),
-        ...["Volume", "Brightness", "Zoom", "Arrow"].map((name, i) => number(name.toLowerCase() + "Dpi", 11 + i, name + " mode DPI", "0 uses normal pointer DPI.")),
+        number("dragscrollDpi", 10, "Drag-scroll DPI", "Trackball sensitivity while scrolling; this is an explicit DPI value.", {choices: dpiChoices(), open: true}),
+        ...["Volume", "Brightness", "Zoom", "Arrow"].map((name, i) => number(name.toLowerCase() + "Dpi", 11 + i, name + " mode DPI",
+            "Normal pointer speed keeps the normal pointer DPI.", {choices: dpiChoices({normalSpeed: true}), open: true})),
     ]},
     {id: "sniping", label: "Sniping", fields: [
         toggle("autoSniping", 8, "Auto-sniping", "Use sniping speed while the selected layer is active."),
@@ -136,7 +144,7 @@ function editSettings(snapshot, message, capabilities) {
                 if (snapshot.limits?.brightnessMax === undefined) throw fail("Read the keyboard's brightness limit before changing brightness. Update both halves if this field is unavailable.");
                 if (number > snapshot.limits.brightnessMax) throw fail(`Brightness must be between 0 and ${snapshot.limits.brightnessMax}, the keyboard's reported limit.`);
             }
-            if (number < (field.min ?? 0) || number > (field.max ?? 65535) || (field.choices && !field.choices.some(choice => (typeof choice === "object" ? choice.value : choice) === number))) throw fail(`${field.label} is outside the keyboard's supported range${field.hint ? ": " + field.hint : "."}`);
+            if (number < (field.min ?? 0) || number > (field.max ?? 65535) || (field.choices && !field.open && !field.choices.some(choice => (typeof choice === "object" ? choice.value : choice) === number))) throw fail(`${field.label} is outside the keyboard's supported range${field.hint ? ": " + field.hint : "."}`);
         }
         const previous = settingValue(field, value.settings.values);
         if (field.readOnly && number !== previous) throw fail(`${field.label} cannot be changed with this firmware. ${field.hint || ""}`);

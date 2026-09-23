@@ -10,7 +10,7 @@ import {createRequire} from "node:module";
 import path from "node:path";
 import {fileURLToPath} from "node:url";
 import * as edits from "../webview/view/edits.mjs";
-import {KIND, SCROLL_STARTER, readConfig, startingRecord} from "../webview/view/pointing-config.mjs";
+import {AXIS, DIRECTIONAL_STARTER_THRESHOLD, KIND, SCROLL_STARTER, dpiOptions, readConfig, startingRecord} from "../webview/view/pointing-config.mjs";
 
 const require = createRequire(import.meta.url);
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -350,6 +350,54 @@ test("a pointing slot is posted whole, with its shortcuts as names", () => {
     const after = decoded(draft).pdModes[1];
     assert.equal(after.thresholdY, 70, "the edited threshold reached the profile");
     assert.ok(after.directions.up.keycode > 0, "and the named shortcut became the keyboard's own value");
+});
+
+test("a pointing mode picks its speed from the model's DPI list, and keeps a stored speed outside it", () => {
+    const choices = buildDeviceModel({}).pdModeEditing.dpiChoices;
+    const options = dpiOptions(choices, 400);
+    assert.deepEqual(options.map(([value, label]) => ({value, label})), choices, "exactly the shared list");
+    assert.deepEqual(options[0], [0, "Normal pointer speed"]);
+    assert.deepEqual(dpiOptions(choices, 250).find(([dpi]) => dpi === 250), [250, "250 DPI · as stored"]);
+    assert.deepEqual(dpiOptions(choices, 250).map(([dpi]) => dpi).slice(2, 5), [200, 250, 300], "in its place in the list");
+    assert.deepEqual(dpiOptions(choices, 8000).at(-1), [8000, "8000 DPI · as stored"]);
+
+    // The select posts a number; the record carries it as the slot's DPI.
+    const draft = session();
+    const slot = decoded(draft).pdModes[4];
+    stage(draft, edits.pdMode(4, readConfig(slot, formOf({kind: slot.kind, name: slot.name, dpi: 800})), draft.identity()));
+    assert.equal(decoded(draft).pdModes[4].dpi, 800);
+});
+
+test("a mode set to one axis posts the other axis empty, which the draft accepts", () => {
+    const draft = session();
+    const slot = decoded(draft).pdModes[4];
+    assert.equal(slot.axis, AXIS.DOMINANT, "the fixture's slot 5 reads both axes");
+    const stored = {...slot, thresholdX: 40, thresholdY: 40,
+        directions: {left: {keycode: 0x50, modifierPolicy: 0, mask: 0}, right: {keycode: 0x4f, modifierPolicy: 0, mask: 0},
+            up: {keycode: 0x52, modifierPolicy: 0, mask: 0}, down: {keycode: 0x51, modifierPolicy: 0, mask: 0}}};
+    // Vertical only: the form draws Up and Down and the vertical threshold, nothing else.
+    const config = readConfig(stored, formOf({kind: KIND.DIRECTIONAL, name: "Arrow", dpi: "0", axis: AXIS.VERTICAL,
+        thresholdY: "40", "dir:up": "KC_UP", "dir:down": "KC_DOWN"}));
+    assert.equal(config.thresholdX, 0, "the unread axis has no threshold");
+    assert.deepEqual([config.directions.left, config.directions.right], [{keycode: "0", modifierPolicy: 0, mask: 0}, {keycode: "0", modifierPolicy: 0, mask: 0}]);
+    stage(draft, edits.pdMode(4, config, draft.identity()));
+    const after = decoded(draft).pdModes[4];
+    assert.equal(after.axis, AXIS.VERTICAL);
+    assert.equal(after.directions.left.keycode, 0, "the keyboard stores the unread shortcuts as empty");
+    assert.ok(after.directions.up.keycode > 0);
+});
+
+test("an axis switched back on starts from the shipped threshold, and a typed zero on a read axis is posted as typed", () => {
+    const draft = session();
+    const vertical = {...decoded(draft).pdModes[1], axis: AXIS.VERTICAL, thresholdX: 0, thresholdY: 70};
+    const widened = readConfig(vertical, formOf({kind: KIND.DIRECTIONAL, name: "Volume", dpi: "0", axis: AXIS.DOMINANT}));
+    assert.equal(widened.thresholdX, DIRECTIONAL_STARTER_THRESHOLD, "the axis that was off starts from the shipped tuning");
+    assert.equal(widened.thresholdY, 70, "the axis that was already read keeps its value");
+    stage(draft, edits.pdMode(1, widened, draft.identity()));
+    assert.equal(decoded(draft).pdModes[1].axis, AXIS.DOMINANT);
+
+    const zeroed = readConfig(vertical, formOf({kind: KIND.DIRECTIONAL, name: "Volume", dpi: "0", axis: AXIS.VERTICAL, thresholdY: "0"}));
+    assert.equal(zeroed.thresholdY, 0, "the keyboard decides whether a zero is allowed, not the form");
 });
 
 test("a directional slot switched to scrolling posts the starter tuning, which the draft accepts", () => {

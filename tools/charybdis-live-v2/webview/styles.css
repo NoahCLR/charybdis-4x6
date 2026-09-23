@@ -636,16 +636,101 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .sheet-f .chip { cursor: pointer; }
 
 /* ── misc screens ────────────────────────────────────────────────────── */
-.slotcard { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); padding: 13px 14px; text-align: left; display: grid; gap: 9px; }
+/* ── pointing modes ──────────────────────────────────────────────────── */
+.pd-page { display: grid; grid-template-columns: 236px minmax(0, 1fr); gap: 20px; align-items: start; }
+/* The slot list stays in reach while a long mode is scrolled. */
+.pd-slots { position: sticky; top: 0; display: grid; gap: 6px; }
+.pd-swatch { width: 12px; height: 12px; border-radius: 4px; border: 1px solid var(--line-2); flex: none; display: inline-block; }
+.pd-swatch.lg { width: 16px; height: 16px; border-radius: 5px; }
+.slotcard {
+  display: grid; grid-template-columns: 12px minmax(0, 1fr) auto; column-gap: 10px; row-gap: 3px; align-items: center; align-content: start;
+  padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); text-align: left;
+  transition: border-color .12s ease, background .12s ease;
+}
 .slotcard:hover { border-color: var(--line-2); }
-.slotcard[aria-current="true"] { border-color: var(--line-3); background: var(--surface-2); }
-.slotcard .top { display: flex; align-items: center; gap: 9px; }
-.slotcard .nm { font-size: 13px; font-weight: 520; }
-.slotcard .no { font-family: var(--mono); font-size: 10px; color: var(--text-3); margin-left: auto; }
-.dpad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
-.dpad .cell { height: 44px; border-radius: 7px; border: 1px solid var(--line); background: var(--surface-2); display: grid; place-items: center; gap: 1px; font-size: 11.5px; }
-.dpad .cell.mid { border: 0; background: none; }
-.dpad .cell .c { font-family: var(--mono); font-size: 9.5px; color: var(--text-3); }
+.slotcard[aria-current="true"] { border-color: var(--line-3); background: var(--surface-2); box-shadow: inset 2px 0 0 var(--text); }
+.slotcard .nm { font-size: 12.5px; font-weight: 540; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.slotcard .no { font-family: var(--mono); font-size: 10px; color: var(--text-3); }
+.slotcard .meta { grid-column: 2 / -1; font-size: 11px; color: var(--text-3); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.slotcard .meta.mono { font-size: 10px; }
+.slotcard .meta.warn { color: var(--draft); }
+.slotcard.empty .nm { color: var(--text-2); font-weight: 480; }
+/* The editor sizes its own grids from its own width, not the window's: the
+   panel can be much narrower than the screen it sits on. */
+.pd-editor { container: pd / inline-size; min-width: 0; }
+.pd-editor .card-h .tag { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.pd-identity { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(0, .8fr); gap: 12px; }
+.pd-grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-items: end; }
+.pd-grid4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; align-items: end; }
+.pd-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px 24px; align-items: start;
+  padding-top: 14px; border-top: 1px solid var(--line); }
+.pd-copy { display: grid; grid-template-columns: minmax(0, 260px) auto; justify-content: start; gap: 8px; align-items: end; }
+/* A unit rides inside its input, so every field in a row keeps one width. */
+.affix { position: relative; display: block; }
+.affix i { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); pointer-events: none;
+  font-style: normal; font-family: var(--mono); font-size: 10.5px; color: var(--text-3); }
+.affix.unit .input { padding-right: 38px; }
+.field.inline { display: flex; align-items: center; gap: 8px; }
+.field.inline > span { white-space: nowrap; }
+.field.inline select.input { height: 28px; width: auto; min-width: 150px; background-position: calc(100% - 15px) 12px, calc(100% - 10px) 12px; }
+.pd-mods { display: grid; gap: 7px 8px; align-items: center; justify-items: start; }
+.pd-mods .h { font-size: 10.5px; color: var(--text-3); }
+.pd-mods .s { font-size: 11px; color: var(--text-2); }
+/* The four directions sit where the ball sends them, each arm its own field. */
+.pd-cross {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr); gap: 14px 16px; align-items: center;
+  grid-template-areas: ". up ." "left hub right" ". down .";
+}
+/* One axis read: only its two arms are drawn, on either side of the ball. */
+.pd-cross.vertical { grid-template-columns: minmax(0, 340px); justify-content: center; grid-template-areas: "up" "hub" "down"; }
+.pd-cross.horizontal { grid-template-areas: "left hub right"; }
+.pd-cross .arm.up { grid-area: up; }
+.pd-cross .arm.left { grid-area: left; }
+.pd-cross .arm.right { grid-area: right; }
+.pd-cross .arm.down { grid-area: down; }
+.pd-cross .arm > span b { font-weight: 600; color: var(--text); margin-right: 2px; }
+.pd-cross .hub { grid-area: hub; display: grid; justify-items: center; gap: 4px; }
+.pd-cross .hub svg { width: 64px; height: 64px; }
+.pd-cross .hub circle { fill: var(--surface-2); stroke: var(--line-3); stroke-width: 1.2; }
+.pd-cross .hub circle + circle { fill: var(--text-3); stroke: none; }
+.pd-cross .hub path { fill: var(--text-2); }
+/* A value the keyboard keeps but does not read in this configuration. */
+.field.unread .input { color: var(--text-3); border-style: dashed; }
+.pd-lines { display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; gap: 12px; align-items: center; }
+.pd-lines .lbl { font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); font-weight: 600; }
+.pd-lines .val { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.pd-lines .btn { justify-self: end; }
+.pd-lines .foot { grid-column: 2 / -1; padding-top: 10px; border-top: 1px solid var(--line); }
+.pd-advanced > summary { cursor: pointer; border-bottom-color: transparent; }
+.pd-advanced[open] > summary { border-bottom-color: var(--line); }
+.pd-advanced .chev { width: 10px; height: 10px; fill: none; stroke: var(--text-3); stroke-width: 1.5; transition: transform .12s ease; }
+.pd-advanced[open] .chev { transform: rotate(90deg); }
+.pd-sect + .pd-sect { padding-top: 14px; border-top: 1px solid var(--line); }
+.pd-ratio { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 6px; align-items: center; }
+.pd-ratio i { font-style: normal; color: var(--text-3); font-family: var(--mono); }
+.pd-buttons { display: grid; grid-template-columns: 52px minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, .8fr); gap: 8px 12px; align-items: center; }
+.pd-buttons .h { font-size: 10.5px; color: var(--text-3); }
+.pd-buttons .n { font-family: var(--mono); font-size: 11px; color: var(--text-2); }
+.pd-buttons .narrow { display: none; }
+@container pd (max-width: 720px) {
+  .pd-grid4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pd-grid3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pd-split { grid-template-columns: minmax(0, 1fr); }
+}
+@container pd (max-width: 600px) {
+  .pd-identity { grid-template-columns: minmax(0, 1fr); }
+  .pd-cross.pd-cross { grid-template-columns: minmax(0, 1fr); grid-template-areas: none; }
+  .pd-cross .arm.arm { grid-area: auto; }
+  .pd-cross .hub { display: none; }
+  .pd-buttons { grid-template-columns: 28px minmax(0, 1fr); }
+  .pd-buttons .h { display: none; }
+  .pd-buttons .narrow { display: inline; }
+  .pd-buttons > :not(.n) { grid-column: 2; }
+}
+@media (max-width: 1020px) {
+  .pd-page { grid-template-columns: minmax(0, 1fr); }
+  .pd-slots { position: static; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
+}
 .meter { height: 4px; border-radius: 2px; background: var(--surface-3); overflow: hidden; }
 .meter i { display: block; height: 100%; background: var(--text-2); }
 .macro-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 5px; }

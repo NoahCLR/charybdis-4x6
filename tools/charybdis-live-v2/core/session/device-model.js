@@ -12,6 +12,7 @@
 const keycodeCatalog = require("../data/keycode-catalog");
 const {baseRgbForView, behaviorAliasesForView, behaviorRowsForView, combosForView, rgbForView, knownActionAbi} = require("./device-profile-view");
 const {resolveNativeQmkExpression} = require("../schema/compiled-profile-v1");
+const {dpiChoices} = require("../model/pointer-dpi");
 
 const CATALOG_SOURCE = "vendored QMK keycode catalog";
 
@@ -75,7 +76,8 @@ function buildDeviceModel(state = {}) {
         // Read off the keyboard when the committed profile has been read;
         // empty rather than fabricated before that.
         pdModes: state.committed?.domains?.pdModes || [],
-        pdModeEditing: {writable: Boolean(state.capabilities?.supportedDomainMask & 16) && state.committed?.state === "read" && !state.committed.failures?.length && !state.busy},
+        pdModeEditing: {writable: Boolean(state.capabilities?.supportedDomainMask & 16) && state.committed?.state === "read" && !state.committed.failures?.length && !state.busy,
+            dpiChoices: dpiChoices({normalSpeed: true})},
         keyBehaviors: committedKeyBehaviors(state.committed),
         behaviorEditing: {
             busy: Boolean(state.busy),

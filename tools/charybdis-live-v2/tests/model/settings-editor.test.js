@@ -5,6 +5,7 @@ const {document} = require("../fixtures/portable-profile");
 const {fingerprint, validateSnapshot} = require("../../core/model/portable-profile");
 const {settingsEditorView, editSettings} = require("../../core/model/settings-editor");
 const {buildDeviceModel} = require("../../core/session/device-model");
+const {POINTER_DPI} = require("../../core/model/pointer-dpi");
 const snapshot = () => {const value = document(); return {document: value, fingerprint: fingerprint(value), limits: {brightnessMax: 200}};};
 function message(current, sectionId, updates = {}) {
     const section = settingsEditorView(current).sections.find(section => section.id === sectionId);
@@ -66,6 +67,25 @@ test("invalid settings, incomplete sections and stale drafts fail before any dev
     assert.throws(() => editSettings(current, {...invalid, fields: []}), /complete/);
 });
 
+
+test("every DPI field offers the one list, limited only where the keyboard limits it", () => {
+    const current = snapshot();
+    const fields = settingsEditorView(current).sections.flatMap(section => section.fields).filter(field => /Dpi$/.test(field.macro));
+    assert.deepEqual(fields.map(field => field.macro), ["normalDpi", "snipingDpi", "dragscrollDpi", "volumeDpi", "brightnessDpi", "zoomDpi", "arrowDpi"]);
+    for (const field of fields) {
+        assert.ok(field.choices.every(choice => choice.value === 0 || POINTER_DPI.includes(choice.value)), `${field.macro} picks from the shared list`);
+    }
+    const values = macro => fields.find(field => field.macro === macro).choices.map(choice => choice.value);
+    assert.deepEqual(values("normalDpi"), POINTER_DPI.filter(v => v >= 400 && v % 200 === 0), "the steps the firmware stores");
+    assert.deepEqual(values("snipingDpi"), [100, 200, 300, 400], "the steps the firmware stores");
+    assert.deepEqual(values("dragscrollDpi"), [...POINTER_DPI]);
+    assert.deepEqual(values("volumeDpi"), [0, ...POINTER_DPI], "a mode can keep the normal pointer speed");
+
+    // The mode speeds take any stored value, so one outside the list saves.
+    const edit = fields => editSettings(current, message(current, "pointingModeSpeeds", fields));
+    assert.equal(validateSnapshot(edit({dragscrollDpi: "250", zoomDpi: "5000"})).settings.values[10], 250);
+    assert.throws(() => editSettings(current, message(current, "normalPointerSpeed", {snipingDpi: "500"})), /range/, "the keyboard refuses it");
+});
 
 test("brightness uses a reported device limit and stays read-only on older firmware", () => {
     const current = snapshot();
