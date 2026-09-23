@@ -3,7 +3,7 @@
 
 import {css, isOff} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
-import {actionLabel, behaviourFor, behaviourTiers, bindingsForSlot, combosForKey, keyFace, keyMeaning, macroKeycodes, pointingSlotFor} from "../view/keyface.mjs";
+import {actionLabel, behaviourFor, behaviourTiers, bindingsForSlot, combosAt, keyFace, keyMeaning, macroKeycodes, pointingSlotFor} from "../view/keyface.mjs";
 import {feedbackColours, pdColourRow, stageEnabled} from "../view/lighting.mjs";
 import {getModel, positionAt} from "../store.mjs";
 
@@ -65,7 +65,7 @@ function keyCard(index) {
     if (!position) return "";
     const face = keyFace(position);
     const behaviour = behaviourFor(model, keyMeaning(position));
-    const combos = combosForKey(model, position);
+    const combos = combosAt(model, model?.layers || [], layer?.index ?? 0, index);
     const macros = macroKeycodes(keyMeaning(position));
     const slot = pointingSlotFor(model, keyMeaning(position));
     const lit = stageEnabled(model, "key");

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {behaviourFor, comboEditInputs, comboReferenceLayer, behaviourListeningTo, canonicalKeycode, behaviourGridSteps, behaviourGroups, behaviourTiers, macroReach, pointingReach, reachablePositions, resolvedPositions, bindingKeycode, bindingsForSlot, comboGroups, combosForKey, keyFace, keyMeaning, macroKeycodes, pointingSlotFor, slotKeycodes} from "../webview/view/keyface.mjs";
+import {behaviourFor, comboEditInputs, comboReferenceLayer, combosAt, behaviourListeningTo, canonicalKeycode, behaviourGridSteps, behaviourGroups, behaviourTiers, macroReach, pointingReach, reachablePositions, resolvedPositions, bindingKeycode, bindingsForSlot, comboGroups, combosForKey, keyFace, keyMeaning, macroKeycodes, pointingSlotFor, slotKeycodes} from "../webview/view/keyface.mjs";
 
 test("a key face uses the model's own resolution, and names the layer a dual-role key reaches", () => {
     assert.deepEqual(keyFace({keycode: "KC_TRANSPARENT", display: "▽"}), {main: "▽", sub: "", kind: "transparent"});
@@ -482,4 +482,24 @@ test("combos follow the keyboard's combo layer matching", () => {
 
     const edit = comboEditInputs({...settings}, stack, 1, combo);
     assert.deepEqual(edit.codes, {13: "KC_Q", 14: "KC_W"}, "the builder opens with the keys the keyboard matches");
+});
+
+test("a key's combo badges are the combos the table says fire on this layer", () => {
+    const at = (layoutIndex, keycode) => ({layoutIndex, keycode, display: keycode});
+    const combo = {id: 1, badge: "C1", inputs: ["KC_D", "KC_F"], output: "KC_TAB"};
+    const stack = [
+        {index: 0, name: "Base", positions: [at(1, "KC_D"), at(2, "KC_F")]},
+        {index: 1, name: "Numbers", positions: [at(1, "KC_TRANSPARENT"), at(2, "KC_TRANSPARENT")]},
+        {index: 2, name: "Symbols", positions: [at(1, "KC_D"), at(2, "KC_NO")]},
+    ];
+    const model = {combos: [combo], layers: stack};
+    const badges = (layer, key) => combosAt(model, stack, layer, key).map((row) => row.badge);
+    assert.deepEqual(badges(0, 1), ["C1"]);
+    assert.deepEqual(badges(1, 1), ["C1"], "both inputs fall through, so the transparent keys carry the badge");
+    assert.deepEqual(badges(2, 1), [], "KC_D is here, but KC_F is not, so C1 never fires and marks nothing");
+
+    const referenced = {...model, configDefaults: [{id: "comboReferences", fields: [{macro: "comboReference2", value: "Layer 0"}]}]};
+    assert.deepEqual(combosAt(referenced, stack, 2, 2).map((row) => row.badge), ["C1"],
+        "under Combo Layer Matching the keys Base supplies are marked");
+    assert.equal(combosAt(model, stack, 0, 1), combosAt(model, stack, 0, 1), "one grouping per model and layer");
 });

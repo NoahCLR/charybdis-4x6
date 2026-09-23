@@ -238,6 +238,8 @@ const comboTouches = (combo, position) => Array.isArray(combo?.inputPositions) &
     ? combo.inputPositions.includes(position.layoutIndex)
     : (combo?.inputs || []).some((input) => input === position.keycode || input === keyMeaning(position));
 
+// The matching rule alone, for one key, with no layer in view. Screens ask
+// combosAt(), which applies it the way the keyboard does on the layer shown.
 export function combosForKey(model, position) {
     if (!position) return [];
     return (model?.combos || []).filter((combo) => comboTouches(combo, position));
@@ -321,6 +323,35 @@ export function comboGroups(model, stack, at) {
     }
     return {onKeys, throughKeys: downTheStack(throughKeys), fromBranches: [], fromBranchesBelow: [], elsewhere};
 }
+
+// The combos a key is pressed for on this layer, keyed by layout index: the
+// ones the combo table lists as firing here — on this layer's own keys,
+// through transparent keys, or on the reference layer's keys under Combo Layer
+// Matching. A combo that can never fire from this layer marks no key, however
+// many keycodes it shares with it. The board asks once per key, so each
+// (model, layer) is grouped once.
+const combosByModel = new WeakMap();
+export function combosOnLayer(model, stack, at) {
+    if (!model) return new Map();
+    let perLayer = combosByModel.get(model);
+    if (!perLayer) combosByModel.set(model, perLayer = new Map());
+    const cached = perLayer.get(at);
+    if (cached?.stack === stack) return cached.keys;
+    const {onKeys, throughKeys} = comboGroups(model, stack, at);
+    const order = new Map((model.combos || []).map((combo, index) => [combo, index]));
+    const keys = new Map();
+    for (const entry of [...onKeys, ...throughKeys]) {
+        for (const key of entry.keys) {
+            const combos = keys.get(key.position.layoutIndex) || [];
+            if (!combos.includes(entry.combo)) combos.push(entry.combo);
+            keys.set(key.position.layoutIndex, combos);
+        }
+    }
+    for (const combos of keys.values()) combos.sort((a, b) => order.get(a) - order.get(b));
+    perLayer.set(at, {stack, keys});
+    return keys;
+}
+export const combosAt = (model, stack, at, layoutIndex) => combosOnLayer(model, stack, at).get(layoutIndex) || [];
 
 // What the combo builder starts from when an existing combo is opened: the
 // board positions its inputs sit on from this layer, each with the input name

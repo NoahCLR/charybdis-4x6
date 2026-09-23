@@ -4,7 +4,7 @@
 
 import {css, idealText, isOff} from "../lib/colour.mjs";
 import {GEO, LED_INDEX, TRACKBALL_LED, fitText, keyFaceRows, keyVisual} from "../view/geometry.mjs";
-import {behaviourFor, behaviourTiers, combosForKey, keyFace, keyMeaning} from "../view/keyface.mjs";
+import {behaviourFor, behaviourTiers, combosAt, keyFace, keyMeaning} from "../view/keyface.mjs";
 import {keyLight, stageEnabled, tierColour, trackballLight} from "../view/lighting.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {hideHover} from "./hover.mjs";
@@ -44,7 +44,7 @@ export function board(model, layer, options = {}) {
 
         const showMarks = faces && mode !== "leds";
         const tiers = showMarks ? behaviourTiers(behaviourFor(model, keyMeaning(position))) : [];
-        const combos = showMarks ? combosForKey(model, position) : [];
+        const combos = showMarks ? combosAt(model, model?.layers || [], layer?.index ?? 0, index) : [];
         const sub = mode === "leds" ? "" : face.sub;
         const rows = keyFaceRows(visual.y,
             {tiers: tiers.length > 0, combos: combos.length > 0, sub: Boolean(sub)});

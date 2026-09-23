@@ -4,7 +4,7 @@
 import {css, isOff, label as hsvLabel} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {LED_INDEX} from "../view/geometry.mjs";
-import {actionLabel, behaviourFor, behaviourListeningTo, canonicalKeycode, behaviourGridSteps, behaviourGroups, behaviourTiers, comboEditInputs, comboGroups, combosForKey, keyFace, keyMeaning, macroReach, pointingReach, pointingSlotFor, pointingVariant, reachKeys} from "../view/keyface.mjs";
+import {actionLabel, behaviourFor, behaviourListeningTo, canonicalKeycode, behaviourGridSteps, behaviourGroups, behaviourTiers, comboEditInputs, comboGroups, combosAt, keyFace, keyMeaning, macroReach, pointingReach, pointingSlotFor, pointingVariant, reachKeys} from "../view/keyface.mjs";
 import {feedbackColours, layerColourRow, pdColourRow, stageEnabled} from "../view/lighting.mjs";
 import {currentLayer, getModel, layerName, layers, positionAt, post, render, selectedPosition, state, writable} from "../store.mjs";
 import * as edits from "../view/edits.mjs";
@@ -259,7 +259,7 @@ function tabKey(body, right) {
     const position = selectedPosition();
     const face = keyFace(position);
     const behaviour = behaviourFor(model, keyMeaning(position));
-    const combos = combosForKey(model, position);
+    const combos = position ? combosAt(model, layers(), state.layer, position.layoutIndex) : [];
     const slot = pointingSlotFor(model, keyMeaning(position));
     right.innerHTML = `<span class="note">index ${position?.layoutIndex ?? "—"} · row ${position?.row ?? "—"} · col ${position?.column ?? "—"} · LED ${LED_INDEX[position?.layoutIndex] ?? "—"}</span>`;
 
