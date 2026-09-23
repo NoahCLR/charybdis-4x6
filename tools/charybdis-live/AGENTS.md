@@ -1,4 +1,9 @@
-# Charybdis Live — Agent Instructions
+# Charybdis Live (v1) — Agent Instructions
+
+**This app is frozen and unmaintained.** The live app is
+[`tools/charybdis-live-v2/`](../charybdis-live-v2/); develop there (D-L21 in
+`docs/LIVE_EDIT_APP_DIRECTION.md`). The rules below are kept as the record of
+what v2 inherited.
 
 This app edits the **connected keyboard**. Profile Studio, beside it, edits the
 `.c` files and is frozen. Do not blur that line.

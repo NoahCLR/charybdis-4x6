@@ -79,8 +79,9 @@ Every layer may also import from itself.
   `tests/edits.test.mjs` stages each builder's output against a real
   `ProfileDraftSession`, so a change of message shape fails there rather than
   on a keyboard.
-- Build DOM nodes, never HTML strings from device values; everything from the
-  keyboard goes through `esc()` or `textContent`.
+- Markup is built with `el()` from template strings, so every value from the
+  keyboard or the host goes through `esc()` (or `textContent`) — including in
+  attributes. Nothing unescaped reaches `el()` or `innerHTML`.
 - Decode defensively. Everything arriving from a device is untrusted input:
   validate length, reject noncanonical encodings, and fail with a stable code
   rather than a guess.

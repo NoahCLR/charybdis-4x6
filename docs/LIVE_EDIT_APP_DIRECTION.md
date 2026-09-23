@@ -381,11 +381,28 @@ plain Node process and the UI stays replaceable.
 
 The structure exists because the thing being replaced was a 14,539-line file
 that grew one convenience at a time. The rules, and where new work belongs, are
-in [`tools/charybdis-live/AGENTS.md`](../tools/charybdis-live/AGENTS.md).
+now in [`tools/charybdis-live-v2/AGENTS.md`](../tools/charybdis-live-v2/AGENTS.md)
+(see D-L21); there the webview's pure `view/` and `ui/` modules take the place
+of `media/`, and receive the model as a message the same way.
 
 D-L15 adds `core/model/` for the canonical portable document and layer-reference
 rewrites. Generation-bound behaviour drafts exist; the whole-profile draft
 coordinator remains pending.
+
+### D-L21 — Charybdis Live v2 is the app; v1 is frozen
+
+`tools/charybdis-live-v2/` is the live app and the only one developed. It keeps
+the core, the layering and the one rule (nothing reads the firmware
+repository), and replaces v1's ported Studio interface with its own: browser ES
+modules with pure, tested `view/` modules, every posted edit built by
+`webview/view/edits.mjs` and staged against a real draft in
+`tests/edits.test.mjs`, and a board that shows what the firmware does. Edits
+exist only as a reviewed draft; a keyboard the app cannot open a draft for is
+read-only, and the host refuses edits rather than writing them directly.
+
+`tools/charybdis-live/` (v1) is frozen and unmaintained, alongside Profile
+Studio. Neither gets features. Its `AGENTS.md` still states v1's rules, which v2
+inherited.
 
 ## Delivery
 

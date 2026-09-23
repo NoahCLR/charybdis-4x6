@@ -234,9 +234,8 @@ function lookup(name) {
     return BY_NAME.get(name);
 }
 
-// The ported Studio UI expects QMK's alias table: every name and alias
-// mapping to its canonical keycode name. Studio built this from a parsed QMK
-// checkout; here it comes from the vendored catalog.
+// QMK's alias table: every name and alias mapping to its canonical keycode
+// name, built from the vendored catalog.
 function aliasTable() {
     const aliases = {};
     for (const entry of catalog.entries) {

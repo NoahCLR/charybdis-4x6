@@ -20,12 +20,15 @@ undesigned. The end goal it serves is in
 [`docs/tooling/PROFILE_STUDIO_PRODUCT_GOAL.md`](./docs/tooling/PROFILE_STUDIO_PRODUCT_GOAL.md)
 and [`docs/architecture/device-resident-profile.md`](./docs/architecture/device-resident-profile.md).
 
-### Two tools, one line between them
+### The tools, and the line between them
 
-- **`tools/charybdis-live/`** edits the connected keyboard over Raw HID. It is
-  the active development target. It must never read the firmware repository;
-  see its own [`AGENTS.md`](./tools/charybdis-live/AGENTS.md) for the layer
-  rules before adding files.
+- **`tools/charybdis-live-v2/`** edits the connected keyboard over Raw HID. It
+  is the app and the active development target. It must never read the
+  firmware repository; see its own
+  [`AGENTS.md`](./tools/charybdis-live-v2/AGENTS.md) for the layer rules before
+  adding files.
+- **`tools/charybdis-live/`** is the previous live app (v1). It is **frozen**
+  and unmaintained; do not add features to it (D-L21).
 - **`tools/charybdis-profile-studio/`** edits `keymap.c`, `config.h`, and
   `rgb_config.c`. It is **frozen** at its `refactor/aug` state. Bug fixes only.
   Do not add features to it, and do not give it device capabilities.
@@ -34,10 +37,13 @@ Work that blurs that line is the thing this branch exists to undo.
 
 ### Where we are
 
-Slice 1 is done: the live app connects and reports what the keyboard says about
-itself. Slice 2 is bounded, chunked readback of the committed profile payload,
-which gates device-first editing, drafts, apply, backup, and recovery. The
-canonical profile format is load-bearing and not yet designed.
+The live app reads everything it edits from the keyboard, keeps every change in
+one reviewed draft with undo and redo, and applies it to both halves through a
+recovery-first logical transaction; complete profiles back up and restore. What
+remains before calling it complete — physical interruption acceptance, external
+VIA adoption, guided recovery, broad hardware acceptance and packaging — is
+tracked under "Current Product Status" in
+[`docs/LIVE_EDIT_APP_DIRECTION.md`](./docs/LIVE_EDIT_APP_DIRECTION.md).
 
 ## Start Here
 

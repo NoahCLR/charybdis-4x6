@@ -965,7 +965,7 @@ function normalizeRequestId(value) {
 
 function equalityCheck(label, actual, expected) {
     const ok = Number(actual) === Number(expected);
-    return {label, ok, actual, limit: expected, message: ok ? "" : `${label} is ${actual}; Profile Studio requires ${expected}.`};
+    return {label, ok, actual, limit: expected, message: ok ? "" : `${label} is ${actual}; Charybdis Live requires ${expected}.`};
 }
 
 function minimumCheck(label, actual, expected) {
@@ -1070,8 +1070,8 @@ function activeCandidateError(status, requestedDigest) {
     const stateName = candidateStateName(status?.state);
     const sameDigest = (Number(status?.digest) >>> 0) === (Number(requestedDigest) >>> 0);
     const reason = sameDigest
-        ? `Its ${stateName} state cannot be resumed safely by Profile Studio.`
-        : `Its digest ${hexDigest(status?.digest)} does not match the current source digest ${hexDigest(requestedDigest)}.`;
+        ? `Its ${stateName} state cannot be resumed safely by Charybdis Live.`
+        : `Its digest ${hexDigest(status?.digest)} does not match the digest of the profile being applied, ${hexDigest(requestedDigest)}.`;
     const error = liveApplyError(
         "ACTIVE_CANDIDATE",
         `Firmware already has candidate transaction ${status?.transactionId || 0} in ${stateName}. `

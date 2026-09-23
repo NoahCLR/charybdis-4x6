@@ -203,7 +203,7 @@ class CoordinatedDeviceConnection {
     async disconnect() {
         const reason = liveLinkError(
             LIVE_LINK_ERROR_CODES.DISCONNECTED,
-            `Device ${this.deviceId} was disconnected by Profile Studio.`,
+            `Device ${this.deviceId} was disconnected by Charybdis Live.`,
             {deviceId: this.deviceId}
         );
         await this.terminate(reason, {activeError: reason, closeDevice: true});

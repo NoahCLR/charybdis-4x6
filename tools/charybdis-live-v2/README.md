@@ -40,8 +40,13 @@ and the macros and pointing modes the layer reaches. A behaviour is tap count ×
 tier, so it is drawn as a grid. **Change key…** moves a behaviour to another
 key through the keycode picker; when that key already has one, you choose to
 overwrite it, swap the two, or cancel, and either is one undoable draft step.
-On the board, ⌘C and ⌘V copy a key onto the selected key, and ⌘Z / ⇧⌘Z step
-the draft everywhere except inside a text field, which keeps its own undo. The layer stack is not one of those tabs, because
+On the board, drag one key onto another to swap them, ⌘C and ⌘V copy a key
+onto the selected key, and Delete or Backspace makes it transparent. ⌘Z undoes
+and ⇧⌘Z or ⌘Y redoes the draft everywhere except inside a text field, which
+keeps its own undo. Board keys work from the keyboard too: Space or Enter
+selects one, and Enter on the selected key opens its picker.
+
+The layer stack is not one of those tabs, because
 it is not a property of the selected key: **Edit layers** sits after the last
 layer on the row above the board and drops open over it, so a layer is renamed
 and reordered where its keys are on screen.

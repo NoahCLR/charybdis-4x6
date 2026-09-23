@@ -1,71 +1,57 @@
 # Charybdis Live Core
 
-This is the app itself: everything except the VS Code shell. It is layered
-`transport` -> `schema` -> `protocol` -> `session`, with imports pointing one
-way; see [`../AGENTS.md`](../AGENTS.md).
+This is the app itself: everything except the VS Code shell and the webview.
+It has no VS Code or webview dependency. Its layers — `data`, `transport`,
+`schema`, `protocol`, `model`, `session` — import in one direction only; the
+table is in [`../AGENTS.md`](../AGENTS.md) and `tests/layering.test.js`
+enforces it.
 
-It has no VS Code or webview dependency. The coordinator and protocol layers have no VS Code or webview
-dependency. The concrete desktop adapter keeps `node-hid` lazy-loaded and
-injectable so the same boundary remains usable in tests and harnesses.
+## Reading the keyboard
 
-`session/profile-device-service.js` owns the Stage 01 read path and the explicitly gated
-engineering live-apply path. It enumerates devices, keeps native paths and
-connected handles outside the webview, reads the capability and status pages,
-and publishes a sanitized snapshot for the app UI. Its compatibility result
-checks protocol and schema majors, 32-byte framing, Milestone A domain support,
-the current source profile against advertised capacities, and all four
-candidate/persistence/activation/peer capability bits before enabling writes.
-It also requires fresh firmware status proving that the peer is known and both
-halves are converged. Ordinary firmware remains read-only.
+`session/profile-device-service.js` enumerates matching interfaces, keeps
+native paths and handles out of the webview, and reads what the keyboard says
+about itself: VIA and firmware versions, the Profile Wire capability and status
+pages, the layout, the committed profile, combos, macro banks, settings,
+keyboard options and the base RGB effect. It publishes a sanitized snapshot;
+`session/device-model.js` turns that into the `model` the webview renders.
 
-Each refresh first reads the standard VIA protocol and firmware versions, then
-cross-checks the firmware version reported by Profile Wire. Custom Profile Wire
-pages use one monotonically increasing nonzero request-id sequence for the
-whole connected session (wrapping `255` to `1`), so a delayed response from an
-older refresh cannot satisfy a newer request.
+Custom Profile Wire pages use one monotonically increasing nonzero request-id
+sequence per connected session (wrapping `255` to `1`), so a delayed response
+from an older request cannot satisfy a newer one.
 
-## Canonical profile blob foundation
+## Editing and applying
 
-`profile-blob-v1.js` is the desktop-side Stage 02 codec foundation. It encodes
-and strictly decodes the `NLP1` header and ordered domain envelopes. Unknown
-domains remain rejected by default; dedicated domain codecs compose through
-the explicit domain-version registry.
+Every edit is staged in `session/profile-draft-session.js`: a complete
+portable profile (`model/portable-profile.js`) with undo and redo history, a
+review built by `model/profile-review.js`, and staleness checks on every
+message (draft id, revision, and the base the form was built from). The domain
+edits themselves live in `session/device-profile-edits.js` and
+`session/key-behavior-edits.js`.
 
-The same module owns four-byte semantic action values, including bounded
-logical-layer, PD-mode, VIA-macro, and hardcoded-macro operands, plus canonical
-FNV-1a 32-bit and CRC32 helpers. Its stream readers return exact next offsets
-so later domain decoders can compose them without accepting implicit padding or
-trailing bytes. `compiled-profile-v1.js` converts Profile Studio's parsed model
-into that exact canonical blob for the RGB and key-behavior Milestone A
-domains.
+Apply goes through `session/portable-profile-session.js`: a recovery copy is
+written before the first device write, the profile is staged on both halves
+through the candidate mailbox (`protocol/profile-candidate-v1.js`,
+`session/candidate-upload-coordinator.js`) and the peer VIA stage
+(`session/logical-via-stage-coordinator.js`), and one generation is published.
+Staging never retries an ambiguous transport outcome, commit is
+transaction/digest-correlated and idempotent across a lost acknowledgement, and
+success is accepted only after a fresh status read reports the new generation
+on both halves. A keyboard the app cannot open a draft for is read-only; the
+host refuses edits rather than writing them directly.
 
-`profile-candidate-v1.js` is the exact desktop codec for the Stage 02 candidate
-mailbox: begin, sequential chunks, validate, custom-save commit, abort,
-immediate admission, and operation status. `candidate-upload-coordinator.js`
-derives metadata from a canonical blob, prepares it without activation, and
-offers a separate commit call for D-013's source-then-device ordering. Staging
-never retries an ambiguous transport outcome and performs an idempotent abort
-after deterministic failure. Commit is transaction/digest-correlated,
-idempotent across a lost acknowledgement, waits through bounded committing and
-safe-activation states, and reports final-marker uncertainty as an ambiguous
-outcome requiring status reconciliation. The device service now uses this
-coordinator for the engineering `Apply live` operation and accepts success only
-after a fresh general-status read reports the exact candidate digest as both
-committed and active. Refresh also reads candidate status. A matching
-recoverable transaction is resumed instead of uploaded over, while a mismatched
-or unsafe active candidate is refused with an explicit two-half cold-recovery
-instruction. Production firmware routing and capability advertising remain
-disabled; only a firmware built with the separate owner and mutation gates
-exposes this path.
+## Byte formats
 
-`rgb-domain-v1.js` is the desktop half of the domain `0x10` v1 codec. It covers the
-complete Milestone A RGB surface, canonicalizes Profile Studio's parsed model,
-assigns name-independent ids to 58-bit LED-group bitmaps, preserves ordered
-renderer rows, and enforces compiled stages, complete identity tables,
-brightness, references, and fixed capacities. The exact byte contract and
-intentional runtime/device deferrals are frozen in
-[`schema/rgb-domain-v1.md`](./schema/rgb-domain-v1.md). The matching firmware decoder is the
-reader-backed `users/noah/lib/profile/schema/profile_rgb_v1.c` implementation.
+`schema/profile-blob-v1.js` encodes and strictly decodes the `NLP1` header and
+its ordered domain envelopes, the four-byte semantic action values, and the
+FNV-1a 32-bit and CRC32 helpers. Unknown domains are rejected. The domain
+codecs — `rgb-domain-v1.js`, `key-behavior-domain-v1.js`,
+`combo-domain-v1.js`, `pd-mode-domain-v1.js`, `settings-domain-v1.js` — are
+exact inverses of their decoders and enforce the firmware's limits. The RGB
+byte contract is frozen in [`schema/rgb-domain-v1.md`](./schema/rgb-domain-v1.md);
+its firmware counterpart is `users/noah/lib/profile/schema/profile_rgb_v1.c`.
+`schema/compiled-profile-v1.js` resolves expressions in the keyboard's
+vocabulary (`KC_A`, `LT(1, KC_A)`, `DRAGSCROLL`, `VIA_MACRO_3`) to actions and
+native keycodes, refusing any whose bits would land on another keycode.
 
 ## Adapter contract
 
@@ -165,10 +151,12 @@ The UI should branch on `error.code`, not error message text.
 
 ## Tests
 
-Run:
-
 ```sh
-npm run test:live-link
+npm run check   # syntax across the tree, then every test
+npm test        # the tests alone
 ```
 
-The tests use only Node's built-in test runner and the fake adapter.
+The tests use Node's built-in runner and the fake adapter. Golden vectors are
+read from the firmware repository's `tests/fixtures/` and the upstream
+`keyboard.json` in `../bastardkb-qmk`, so the suite expects this checkout's
+sibling layout; the app itself never reads either at runtime.

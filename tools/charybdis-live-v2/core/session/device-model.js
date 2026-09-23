@@ -1,11 +1,9 @@
 "use strict";
 
-// Builds the model the ported Studio UI renders, from device state.
+// Builds the model the webview renders, from device state.
 //
-// This is the whole point of the port. Studio's host produced this shape by
-// parsing the authored C source files. The UI never knew that; it just renders
-// `model` and posts typed edits back. So the same UI works unchanged as long as
-// something produces the same shape — and here that something is the keyboard.
+// The webview never reads a file: it renders `model` and posts typed edits
+// back, and everything in `model` comes from what the keyboard reported.
 //
 // Domains the device cannot report yet come back empty rather than invented.
 // An empty RGB tab is truthful; a tab populated from the authored source would
@@ -107,8 +105,7 @@ function buildDeviceModel(state = {}) {
 
         diagnostics: diagnosticsFor(state),
 
-        // Not a Studio field. The ported header renders this instead of a
-        // profile picker, because the thing being edited is a keyboard.
+        // The rail's header: which keyboard this is, and its health.
         device: deviceHeader(state),
     };
 }
@@ -279,8 +276,8 @@ function diagnosticsFor(state) {
     return notes;
 }
 
-// Studio's catalog entries key on the keycode *name*; ours key on the numeric
-// value, so map between them here rather than reshaping the vendored file.
+// The webview's catalog entries key on the keycode *name*; the vendored
+// catalog keys on the numeric value, so map between them here.
 function catalogViews() {
     const aliases = keycodeCatalog.aliasTable();
     const entries = [];

@@ -1,9 +1,8 @@
 # RGB Domain V1
 
-This document freezes Profile Studio's canonical desktop encoding for Profile
-Wire domain `0x10`, version `1`. It covers every Milestone A surface parsed
-from `rgb_config.c`; it is not connected to preview, candidate transfer,
-commit, source rewriting, or firmware activation yet.
+This document freezes the canonical encoding for Profile Wire domain `0x10`,
+version `1`: every Milestone A RGB surface, as the keyboard stores it and the
+live app decodes, edits and re-encodes it for the candidate mailbox.
 
 All integers are unsigned. Multi-byte integers are little-endian. Every HSV is
 three bytes in `h, s, v` order. Hue and saturation accept `0..255`; value is
@@ -103,8 +102,8 @@ Canonical ids are assigned by unsigned lexicographic comparison of the eight
 bitmap bytes, lowest first. They are consecutive from zero, and every group
 row must reference one of them. This makes macro names, declaration order,
 inline-versus-reusable source syntax, LED-list order, and duplicate LED indices
-irrelevant to the bytes. Profile Studio retains authored group-row order
-because later overlapping rows repaint earlier rows.
+irrelevant to the bytes. Group-row order is kept as stored, because later
+overlapping rows repaint earlier rows.
 
 Layer colors are canonicalized by layer id and must cover the complete logical
 layer set from zero. PD colors are canonicalized by stable PD id and must cover
@@ -117,12 +116,11 @@ remain ordered data.
 perform matching strict validation for versions, reserved fields, compiled
 feature inclusion, complete surfaces, capacities, stable ids, enums,
 selectors, references, geometry, brightness, canonical ordering, and exact
-length. `canonicalizeStudioRgbDomainV1()` is the adapter from Profile Studio's
-parsed model; `createRgbDomainV1()` and `createStudioRgbDomainV1()` produce
-domain objects accepted by the generic `profile-blob-v1.js` encoder.
+length. `createRgbDomainV1()` produces the domain object accepted by the
+generic `profile-blob-v1.js` encoder.
 
-The JSON fixture contains the normalized semantic profile and representative
-parsed Studio model. `tests/fixtures/rgb_domain_v1.fixture` is the single
+The JSON fixture contains the normalized semantic profile.
+`tests/fixtures/rgb_domain_v1.fixture` is the single
 cross-language source for codec limits, the exact payload and whole-blob
 bytes, FNV-1a, and CRC32 vectors.
 

@@ -115,10 +115,10 @@ function publish(panel, session) {
     session.resetDraftForms = undefined;
 }
 
-// The webview sets its own "Working..." status on every message it posts, and
-// only a model reply clears it. So every path through here must publish,
-// including the ones that decline or fail — otherwise the panel sits on
-// "Working..." with no way to know anything went wrong.
+// Every path through here publishes, including the ones that decline or fail:
+// the webview waits on that reply — a combo builder closes when its edit is
+// accepted and stays open when it is refused — and a refusal reaches the panel
+// as a notice rather than as silence.
 async function handleMessage(panel, session, message) {
     try {
         if (session.portableBusy) {publish(panel, session); return;}
@@ -157,8 +157,8 @@ async function handleMessage(panel, session, message) {
                 await connectAndRead(panel, session);
                 return;
             default:
-                // Even an unrecognised message has already put the panel into
-                // "Working...", so answer it.
+                // Even an unrecognised message is answered, so the panel is
+                // never left waiting on a reply.
                 publish(panel, session);
                 return;
         }
@@ -173,8 +173,7 @@ async function handleMessage(panel, session, message) {
     }
 }
 
-// Connect, learn what the keyboard is, and read what it is running. Studio's
-// Reload button maps onto this: there it re-read the files, here the device.
+// Connect, learn what the keyboard is, and read what it is running.
 async function connectAndRead(panel, session) {
     const service = session.service;
     await service.enumerate();

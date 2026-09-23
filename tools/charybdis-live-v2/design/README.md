@@ -71,7 +71,8 @@ unlit keys black.
   primary object.
 - Pointing modes lead with name, movement, speed and actions; thresholds, axis
   ratios and button overrides stay under Advanced.
-- The four health pills become three always-visible lines in the rail.
+- The four health pills become four always-visible lines in the rail, with the
+  last message from the keyboard in the free space above Draft history.
 
 ## Kept from the old app, deliberately
 
