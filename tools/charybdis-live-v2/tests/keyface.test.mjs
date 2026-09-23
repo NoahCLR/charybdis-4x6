@@ -504,3 +504,17 @@ test("a key carries the badges of combos its own keycode fires on this layer, li
         "under Combo Layer Matching the keys Base supplies are marked");
     assert.equal(combosAt(model, stack, 0, 1), combosAt(model, stack, 0, 1), "one grouping per model and layer");
 });
+
+test("a key cap tells layer keys and mod-taps apart from plain keys", () => {
+    const face = (keycode, display) => keyFace({keycode, display});
+    assert.deepEqual(face("MO(1)", "L1"), {main: "L1", sub: "momentary", kind: "layer"});
+    assert.equal(face("TG(1)", "L1").sub, "toggle");
+    assert.equal(face("TO(2)", "L2").sub, "move");
+    assert.equal(face("OSL(3)", "L3").sub, "one-shot");
+    assert.equal(face("TT(1)", "L1").sub, "tap-toggle");
+    assert.equal(face("DF(0)", "L0").sub, "default");
+    assert.deepEqual(face("MT(MOD_LSFT,KC_A)", "A"), {main: "A", sub: "Shift", kind: "key"});
+    assert.equal(face("MT(MOD_LCTL|MOD_LSFT|MOD_LGUI,KC_A)", "A").sub, "Ctrl+Shift+Cmd");
+    assert.equal(face("MT(MOD_RALT,KC_B)", "B").sub, "RAlt");
+    assert.deepEqual(face("KC_A", "A"), {main: "A", sub: "", kind: "key"}, "a plain A has no second line");
+});

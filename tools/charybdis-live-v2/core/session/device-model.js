@@ -17,6 +17,13 @@ const {resolveNativeQmkExpression} = require("../schema/compiled-profile-v1");
 
 const CATALOG_SOURCE = "vendored QMK keycode catalog";
 
+// LEFT_THUMB → "Left thumb", LOCK_LAYER(2) → "Lock layer 2".
+function semanticLabel(semantic) {
+    const [, name, args] = /^([A-Z][A-Z0-9_]*)(?:\((.*)\))?$/.exec(semantic) || [, semantic, undefined];
+    const words = name.replace(/_/g, " ").toLowerCase();
+    return words.charAt(0).toUpperCase() + words.slice(1) + (args === undefined ? "" : ` ${args.replace(/\s+/g, "")}`);
+}
+
 function buildDeviceModel(state = {}) {
     const catalog = catalogViews();
     if (state.macroView && knownActionAbi(state.capabilities?.actionAbiDigest)) {
@@ -28,13 +35,22 @@ function buildDeviceModel(state = {}) {
             catalog.labels[slot.keycode] = label;
         }
     }
+    // A behaviour row keyed by a semantic target gives its keycode a name only
+    // where the vocabulary has none better than a bare user slot: LOCK_LAYER(2)
+    // reads "Lock layer 2" instead of "User 30". A key the catalog already
+    // names — MO(1) is "Layer hold 1" — or one an earlier pass named, such as
+    // "VIA macro 0", keeps that name, so one key reads the same on every
+    // screen and in the picker whether or not a behaviour sits on it.
     if (state.committed?.state === "read" && state.committed.domains?.keyBehaviors) {
         const aliases = behaviorAliasesForView(state.committed.domains.keyBehaviors, state.capabilities);
         Object.assign(catalog.aliases, aliases);
         for (const [key, semantic] of Object.entries(aliases)) {
-            const words = semantic.replace(/_/g, " ").toLowerCase();
-            const label = words.charAt(0).toUpperCase() + words.slice(1);
+            const vocabulary = keycodeCatalog.resolve(resolveNativeQmkExpression(semantic, {}));
+            const generic = !vocabulary.known || vocabulary.group === "user";
+            if (!generic || (catalog.labels[key] !== undefined && catalog.labels[key] !== vocabulary.label)) continue;
+            const label = semanticLabel(semantic);
             catalog.labels[key] = label;
+            catalog.labels[semantic] = label;
             const entry = catalog.entries.find(entry => entry.key === key);
             if (entry) entry.label = label;
         }

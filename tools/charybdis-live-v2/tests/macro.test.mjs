@@ -56,3 +56,21 @@ test("a slot's cell shows what the macro sends, not the modifier they all start 
     assert.equal(macroPeek("{+KC_LEFT_GUI}", label), "Left GUI", "a press with no tap is all there is to show");
     assert.equal(macroPeek("", label), "");
 });
+
+test("the preview refuses exactly what the host refuses", async () => {
+    const {createRequire} = await import("node:module");
+    const require = createRequire(import.meta.url);
+    const {parsePayload, macroKeycodes} = require("../core/schema/macro-payload.js");
+    const keys = macroKeycodes();
+    const hostAccepts = (payload) => { try { parsePayload(payload); return true; } catch { return false; } };
+    const previewAccepts = (payload) => { const {steps, error} = parseMacro(payload, {keys}); return !error && !unreleased(steps).length; };
+    for (const payload of [
+        "hello{120}{KC_ENT}", "{+KC_LGUI}{KC_LSFT,KC_4}{-KC_LGUI}", "{65535}", "a{{b}}c",
+        "{+KC_A,KC_B}", "{-KC_A,KC_B}", "{65536}", "{KC_A,KC_A}", "{-KC_A}", "{+KC_A}{+KC_A}{-KC_A}",
+        "{+KC_A}", "{KC_NOT_A_KEY}", "café", "{KC_A", "a}", "x".repeat(32769),
+        `{${Array.from({length: 17}, (_, index) => ["KC_A", "KC_B", "KC_C", "KC_D", "KC_E", "KC_F", "KC_G", "KC_H", "KC_I", "KC_J", "KC_K", "KC_L", "KC_M", "KC_N", "KC_O", "KC_P", "KC_Q"][index]).join(",")}}`,
+    ]) {
+        assert.equal(previewAccepts(payload), hostAccepts(payload), payload.length > 40 ? `${payload.slice(0, 40)}…` : payload);
+    }
+    assert.equal(parseMacro("{KC_NOT_A_KEY}").error, "", "without the host's key list, names are not judged");
+});

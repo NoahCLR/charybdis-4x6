@@ -332,3 +332,20 @@ test("a committed profile is still reported as committed", () => {
     assert.doesNotMatch(model.device.summary, /compiled defaults/);
     assert.match(model.diagnostics.join(" "), /Committed profile generation 7/);
 });
+
+test("a behaviour on a key never renames what the vocabulary already names", () => {
+    const committed = decodedDeviceProfile();
+    const row = (target) => ({target, tapHoldTerm: 0, longerHoldTerm: 0, multiTapTerm: 0, keepsAutoMouseAnchored: false, steps: []});
+    committed.domains = {...committed.domains, keyBehaviors: {...committed.domains.keyBehaviors, rows: [
+        row({kind: 2, flags: 0, operand: 1}),   // MO(1)
+        row({kind: 3, flags: 0, operand: 2}),   // LOCK_LAYER(2)
+        row({kind: 6, flags: 0, operand: 0}),   // VIA_MACRO_0
+    ]}};
+    const macroView = {viaMacros: [{kind: "via", keycode: "VIA_MACRO_0", payload: ""}], hardcodedMacros: []};
+    const labels = buildDeviceModel({committed, macroView, capabilities: {actionAbiDigest: 0xdcb00959}}).qmkKeyLabels;
+    const plain = buildDeviceModel({macroView, capabilities: {actionAbiDigest: 0xdcb00959}}).qmkKeyLabels;
+    assert.equal(labels["MO(1)"], plain["MO(1)"], "MO(1) reads as it does with no behaviour on it, not \"Mo(1)\"");
+    assert.equal(labels.QK_MACRO_0, "VIA macro 0", "the macro screen's name, not \"Via macro 0\"");
+    assert.equal(labels.QK_USER_30, "Lock layer 2", "a bare user slot takes the behaviour's name, read naturally");
+    assert.equal(labels["LOCK_LAYER(2)"], "Lock layer 2");
+});

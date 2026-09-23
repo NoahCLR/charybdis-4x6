@@ -1,31 +1,61 @@
 // Reading a macro payload for display.
 //
 // The keyboard stores a macro as text: literal characters, {KC_X} to tap,
-// {+KC_X} to press, {-KC_X} to release and {120} to wait. This parses that for
-// the preview only — the host re-parses and validates it on save, so anything
-// this cannot read is reported rather than guessed at.
+// {+KC_X} to press, {-KC_X} to release and {120} to wait. This parses it for
+// the preview and checks it by the same rules the host enforces on save
+// (core/schema/macro-payload.js), so the preview never calls valid what the
+// host would refuse. `options.keys` is the host's list of key names a macro
+// may send; without it, key names are not checked. A key still held at the end
+// is not an error here — the step builder passes through that state — and
+// unreleased() reports it.
 
-export function parseMacro(payload) {
+const MAX_CHARACTERS = 32768, MAX_DELAY = 65535, MAX_KEYS = 16;
+const printable = (character) => {
+    const code = character.charCodeAt(0);
+    return code === 9 || code === 10 || (code >= 32 && code <= 126);
+};
+
+export function parseMacro(payload, options = {}) {
     const steps = [];
+    const held = new Set();
     let text = "";
     const flush = () => { if (text) steps.push({kind: "text", text}); text = ""; };
     const source = String(payload ?? "");
+    const allowed = options.keys?.length ? new Set(options.keys) : null;
+    if (source.length > MAX_CHARACTERS) return fail(steps, "A macro is at most 32,768 characters.");
 
     for (let index = 0; index < source.length;) {
         const character = source[index++];
         if ((character === "{" || character === "}") && source[index] === character) { text += character; index++; continue; }
         if (character === "}") return fail(steps, "Unexpected } — use }} for a literal closing brace.");
-        if (character !== "{") { text += character; continue; }
+        if (character !== "{") {
+            if (!printable(character)) return fail(steps, "Macros support ASCII text, tabs and newlines.");
+            text += character; continue;
+        }
         flush();
         const end = source.indexOf("}", index);
         if (end < 0) return fail(steps, "A macro command is missing its }.");
         const command = source.slice(index, end).trim();
         index = end + 1;
-        if (/^\d+$/.test(command)) { steps.push({kind: "delay", delay: Number(command)}); continue; }
+        if (/^\d+$/.test(command)) {
+            if (Number(command) > MAX_DELAY) return fail(steps, "A macro delay must be between 0 and 65,535 milliseconds.");
+            steps.push({kind: "delay", delay: Number(command)}); continue;
+        }
         if (!command) return fail(steps, "An empty {} is not a macro command.");
         const kind = command[0] === "+" ? "press" : command[0] === "-" ? "release" : "tap";
         const keys = (kind === "tap" ? command : command.slice(1)).split(",").map((name) => name.trim()).filter(Boolean);
         if (!keys.length) return fail(steps, "A macro command needs at least one key.");
+        if (kind !== "tap" && keys.length !== 1) return fail(steps, "A press or release names one key; use a tap for a chord.");
+        if (keys.length > MAX_KEYS || new Set(keys).size !== keys.length) return fail(steps, "A chord is up to 16 distinct keys.");
+        const unknown = allowed && keys.find((key) => !allowed.has(key));
+        if (unknown) return fail(steps, `${unknown} is not a key a macro can send.`);
+        if (kind === "release") {
+            if (!held.delete(keys[0])) return fail(steps, `${keys[0]} is released but was never pressed.`);
+        } else {
+            if (keys.some((key) => held.has(key))) return fail(steps, "A macro presses a key that is already held.");
+            if (held.size + keys.length > MAX_KEYS) return fail(steps, "A macro holds at most 16 keys at once.");
+            if (kind === "press") held.add(keys[0]);
+        }
         steps.push({kind, keys});
     }
     flush();

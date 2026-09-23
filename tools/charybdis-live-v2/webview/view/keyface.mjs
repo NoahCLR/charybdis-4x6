@@ -12,18 +12,31 @@ export function keyFace(position) {
     if (TRANSPARENT.has(keycode)) return {main: "▽", sub: "", kind: "transparent"};
     if (DISABLED.has(keycode)) return {main: "", sub: "", kind: "disabled"};
     const layerTap = /^LT\(\s*([A-Z0-9_]+)\s*,/.exec(keycode);
-    const momentary = /^MO\(\s*([A-Z0-9_]+)\s*\)$/.exec(keycode);
+    const layerKey = /^(MO|TO|TG|OSL|DF|PDF|TT)\(\s*([A-Z0-9_]+)\s*\)$/.exec(keycode);
+    const modTap = /^MT\(([^,]+),/.exec(keycode);
     // A pointing key for a slot that holds nothing keeps its own name on the
     // cap; that it is inert belongs on the second line, where a key cap says
     // what is true of the key rather than of its label.
     const emptySlot = /^(.+) \(empty\)$/.exec(position.display || "");
     if (emptySlot) return {main: emptySlot[1], sub: "empty", kind: "key"};
+    // Every layer keycode reads "L1" on the cap, so the second line says what
+    // it does to that layer; a mod-tap reads as its tap key, so the second
+    // line names the modifier its hold sends — otherwise MT(Shift, A) and a
+    // plain A, or MO(1) and TG(1), would be indistinguishable on the board.
     return {
         main: position.display || keycode,
-        sub: layerTap ? shortLayer(layerTap[1]) : momentary ? "momentary" : "",
-        kind: layerTap || momentary ? "layer" : "key",
+        sub: layerTap ? shortLayer(layerTap[1]) : layerKey ? LAYER_VERBS[layerKey[1]] : modTap ? modTapHold(modTap[1]) : "",
+        kind: layerTap || layerKey ? "layer" : "key",
     };
 }
+
+const LAYER_VERBS = {MO: "momentary", TO: "move", TG: "toggle", OSL: "one-shot", DF: "default", PDF: "default", TT: "tap-toggle"};
+const MOD_WORDS = {CTL: "Ctrl", SFT: "Shift", ALT: "Alt", GUI: "Cmd"};
+// MOD_LCTL|MOD_LSFT → "Ctrl+Shift"; right-hand modifiers are marked R.
+const modTapHold = (mods) => mods.split("|").map((mod) => {
+    const match = /^MOD_([LR])(CTL|SFT|ALT|GUI)$/.exec(mod.trim());
+    return match ? `${match[1] === "R" ? "R" : ""}${MOD_WORDS[match[2]]}` : mod.trim();
+}).join("+");
 
 const shortLayer = (name) => name.replace(/^LAYER_/, "").toLowerCase();
 

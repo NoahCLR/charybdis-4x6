@@ -73,7 +73,7 @@ export function screenMacros() {
 function editor(model, slot, canEdit) {
     const draft = state.macroDrafts?.[slot.keycode];
     const payload = draft ?? slot.payload ?? "";
-    const {steps, error} = parseMacro(payload);
+    const {steps, error} = parseMacro(payload, {keys: model?.macroPayloadKeycodes});
     const held = unreleased(steps);
     const dirty = draft !== undefined && draft !== slot.payload;
 
@@ -113,7 +113,7 @@ function editor(model, slot, canEdit) {
 }
 
 function stageMacro(model, slot, payload) {
-    const parsed = parseMacro(payload);
+    const parsed = parseMacro(payload, {keys: model?.macroPayloadKeycodes});
     if (parsed.error || unreleased(parsed.steps).length) return false;
     state.macroDrafts = {...state.macroDrafts, [slot.keycode]: payload};
     post(edits.macroMessage(slot.keycode, payload, model?.macroEditing?.identity));
@@ -213,7 +213,7 @@ function preview(model, slot, steps, error, held, payload, canEdit) {
 }
 
 function actions(model, slot, canEdit, dirty, payload) {
-    const {steps, error} = parseMacro(payload);
+    const {steps, error} = parseMacro(payload, {keys: model?.macroPayloadKeycodes});
     const blocked = Boolean(error || unreleased(steps).length);
     const node = el(`<div class="row" style="gap:8px">
         <span class="note">${blocked ? "Fix the payload before it can be staged." : "Valid changes are kept in the draft automatically."}</span>
