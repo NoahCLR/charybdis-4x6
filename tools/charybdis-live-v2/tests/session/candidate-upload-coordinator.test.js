@@ -85,6 +85,15 @@ class CandidateFirmwareHarness {
                 : PROFILE_CANDIDATE_V1.COMMAND_SET
         );
         const operation = operationForValue(report[2]);
+        // A profile owner that is not ready leaves the frame to QMK, which
+        // echoes it back with byte 0 set to id_unhandled.
+        if (this.options.unhandledOperation === operation) {
+            const response = Buffer.from(report);
+            response[0] = 0xff;
+            assert.equal(requestOptions.matchResponse(response, report), true, "the unhandled echo answers the frame");
+            assert.equal(requestOptions.matchResponse(Buffer.alloc(32, 0xff), report), false, "a stray 0xFF report does not");
+            return response;
+        }
         if (this.options.busyOnce?.has(operation) && !this.busied.has(operation)) {
             this.busied.add(operation);
             if (operation === CANDIDATE_OPERATION.VALIDATE && this.options.processBusyValidate) {
@@ -755,4 +764,16 @@ test("a profile changed after BEGIN is aborted before any chunks or commit", asy
     assert.equal(checked, true);
     assert.ok(firmware.writes.some(report => report[2] === PROFILE_CANDIDATE_V1.VALUE_ABORT));
     assert.equal(firmware.writes.some(report => [PROFILE_CANDIDATE_V1.VALUE_CHUNK, PROFILE_CANDIDATE_V1.VALUE_COMMIT].includes(report[2])), false);
+});
+
+test("a keyboard that is not ready refuses the frame outright, and that is not a lost response", async () => {
+    const harness = new CandidateFirmwareHarness({unhandledOperation: CANDIDATE_OPERATION.BEGIN});
+    await assert.rejects(coordinator(harness).upload(representativeBlob(), {actionAbiDigest: 0x12345678}), (error) => {
+        assert.ok(error instanceof CandidateUploadError);
+        assert.equal(error.code, "KEYBOARD_NOT_READY");
+        assert.equal(error.ambiguous, false, "the keyboard answered: nothing was admitted");
+        assert.match(error.message, /not ready/);
+        return true;
+    });
+    assert.equal(operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_CHUNK).length, 0, "nothing is staged after the refusal");
 });

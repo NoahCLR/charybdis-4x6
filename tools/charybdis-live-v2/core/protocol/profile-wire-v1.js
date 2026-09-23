@@ -1,5 +1,6 @@
 "use strict";
 
+const {isUnhandledEcho, requestHandled} = require("./via-unhandled-v1");
 const {RAW_HID_REPORT_SIZE, normalizeRawHidReport} = require("../transport/device-adapter");
 
 const PROFILE_WIRE_V1 = Object.freeze({
@@ -313,11 +314,11 @@ async function readProfilePages(connection, valueId, pageCount, options = {}) {
             ? assertByte(nextRequestId(), "requestId", {nonzero: true})
             : requestId;
         const request = buildProfileGetRequest(valueId, page, currentRequestId);
-        const response = await connection.request(request, {
+        const response = await requestHandled(connection, request, {
             matchResponse: profileResponseMatcher,
             signal: options.signal,
             timeoutMs: options.timeoutMs,
-        });
+        }, `Profile Wire page ${page} of value ${valueId}`);
         pages.push(Buffer.from(decodeProfileResponse(response, request)));
         requestId = currentRequestId === 0xff ? 1 : currentRequestId + 1;
     }
@@ -340,7 +341,7 @@ function buildViaFirmwareVersionRequest() {
 function viaReadResponseMatcher(response, request) {
     const actual = normalizeRawHidReport(response, "VIA read response");
     const expected = normalizeRawHidReport(request, "VIA read request");
-    return actual[0] === expected[0] || actual[0] === VIA_READS.UNHANDLED;
+    return actual[0] === expected[0] || isUnhandledEcho(actual, expected);
 }
 
 function decodeViaProtocolVersion(response) {

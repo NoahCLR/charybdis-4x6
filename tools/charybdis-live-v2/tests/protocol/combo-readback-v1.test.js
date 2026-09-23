@@ -59,7 +59,13 @@ test("malformed limits, row shape, duplicates and reserved bytes are rejected be
 });
 
 test("older firmware is explicitly unsupported and changing readout has a bounded retry", async () => {
-    await assert.rejects(readDeviceCombos({request: async () => Buffer.alloc(32, 0xff)}), {code: "COMBO_UNSUPPORTED"});
+    // QMK's unhandled reply echoes the request with byte 0 set to 0xFF; a stray
+    // 0xFF report that is not an echo of this request is not an answer to it.
+    await assert.rejects(readDeviceCombos({request: async (request) => Object.assign(Buffer.from(request), {0: 0xff})}), {code: "COMBO_UNSUPPORTED"});
+    await assert.rejects(readDeviceCombos({request: async (request, options) => {
+        assert.equal(options.matchResponse(Buffer.alloc(32, 0xff), request), false, "a foreign 0xFF report is ignored");
+        return Object.assign(Buffer.from(request), {0: 0xff});
+    }}), {code: "COMBO_UNSUPPORTED"});
     let calls = 0;
     const pages = fixturePages();
     const once = {request: async request => {

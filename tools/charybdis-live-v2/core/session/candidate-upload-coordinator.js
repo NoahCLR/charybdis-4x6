@@ -1,5 +1,6 @@
 "use strict";
 
+const {isUnhandledEcho, orUnhandled} = require("../protocol/via-unhandled-v1");
 const {
     CANDIDATE_ADMISSION,
     CANDIDATE_ERROR,
@@ -338,7 +339,7 @@ class CandidateUploadCoordinator {
             let response;
             try {
                 response = await this.connection.request(frame, {
-                    matchResponse: candidateMutationResponseMatcher,
+                    matchResponse: orUnhandled(candidateMutationResponseMatcher, frame),
                     signal: requestSignal(context),
                     timeoutMs: this.requestTimeoutMs,
                 });
@@ -348,6 +349,18 @@ class CandidateUploadCoordinator {
                     "The candidate mutation response was lost; the keyboard may or may not have admitted it.",
                     context,
                     {ambiguous: true, cause, safeToRetry: context.operation === CANDIDATE_OPERATION.COMMIT}
+                );
+            }
+            // The profile owner takes candidate frames only while it is ready;
+            // while it reconciles the halves, recovers, or has a storage error,
+            // the frame falls through to QMK's unhandled reply. That is a
+            // definite answer — this frame was not admitted — not a lost one.
+            if (isUnhandledEcho(response, frame)) {
+                throw uploadError(
+                    "KEYBOARD_NOT_READY",
+                    `The keyboard is not ready to take a profile ${operationLabel(context.operation)} right now; it may be reconciling its halves or recovering. Read the keyboard again, then retry.`,
+                    context,
+                    {ambiguous: false, safeToRetry: false}
                 );
             }
             let acknowledgment;

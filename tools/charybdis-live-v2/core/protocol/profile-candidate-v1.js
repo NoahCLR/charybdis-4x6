@@ -1,5 +1,6 @@
 "use strict";
 
+const {requestHandled} = require("./via-unhandled-v1");
 const {RAW_HID_REPORT_SIZE, normalizeRawHidReport} = require("../transport/device-adapter");
 const {crc32, decodeProfileBlob, fnv1a32, PROFILE_DOMAIN_IDS} = require("../schema/profile-blob-v1");
 const {
@@ -321,11 +322,11 @@ async function readCandidateStatus(connection, options = {}) {
         ? assertNextRequestId(options.nextRequestId)
         : assertU8(options.requestId === undefined ? 1 : options.requestId, "Candidate status request id", {nonzero: true});
     const request = buildCandidateStatusRequest(requestId);
-    const response = await connection.request(request, {
+    const response = await requestHandled(connection, request, {
         matchResponse: profileResponseMatcher,
         signal: options.signal,
         timeoutMs: options.timeoutMs,
-    });
+    }, "the candidate status read");
     return decodeCandidateStatusResponse(response, request);
 }
 

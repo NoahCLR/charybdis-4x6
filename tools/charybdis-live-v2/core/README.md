@@ -128,6 +128,13 @@ const response = await connection.request(report, {
 The default matcher compares byte 0. Versioned custom live-profile frames must
 supply a matcher that also checks their transaction id.
 
+When nothing on the keyboard handles a report, QMK answers with the request
+echoed back and byte 0 set to `0xFF`. Every protocol module accepts exactly that
+echo of its own request (`protocol/via-unhandled-v1.js`) and treats it as a
+definite refusal: a stable error such as `UNHANDLED` or `KEYBOARD_NOT_READY`,
+with the connection left open. A `0xFF` report that is not an echo of the
+request — another client's reply — is never taken for an answer.
+
 Cancellation of a queued request removes only that request. Timeout,
 cancellation, write failure, malformed input, or matcher failure after a
 request has reached the device invalidates the whole connection. This is the

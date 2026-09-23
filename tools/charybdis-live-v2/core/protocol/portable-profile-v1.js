@@ -1,13 +1,14 @@
-const {decodePdDomain} = require("../schema/pd-mode-domain-v1");
 "use strict";
+const {isUnhandledEcho, orUnhandled} = require("./via-unhandled-v1");
+const {decodePdDomain} = require("../schema/pd-mode-domain-v1");
 const {buildProfileGetRequest, decodeProfileResponse, profileResponseMatcher} = require("./profile-wire-v1");
 const {crc32, fnv1a32} = require("../schema/profile-blob-v1");
 const {decodeSettings} = require("../schema/settings-domain-v1");
 const fail = message => Object.assign(new Error(message), {code: "PORTABLE_PROFILE_UNAVAILABLE"});
 async function page(connection, value, pageIndex, ids) {
     const request = buildProfileGetRequest(value, pageIndex, ids.next());
-    const response = await connection.request(request, {matchResponse: response => response[0] === 255 || profileResponseMatcher(response, request)});
-    if (response[0] === 255 || response[5] !== 0) throw fail("Update both halves to firmware with complete profile backup support, then read the keyboard again.");
+    const response = await connection.request(request, {matchResponse: orUnhandled(profileResponseMatcher, request)});
+    if (isUnhandledEcho(response, request) || response[5] !== 0) throw fail("Update both halves to firmware with complete profile backup support, then read the keyboard again.");
     return Buffer.from(decodeProfileResponse(response, request, {allowShortPayload: true}));
 }
 async function readSettings(connection, ids) {
@@ -48,7 +49,9 @@ async function readStorageStatus(connection, ids) {
 }
 async function readSettingsLimits(connection, ids) {
     const request = buildProfileGetRequest(8, 1, ids.next());
-    const response = await connection.request(request, {matchResponse: response => profileResponseMatcher(response, request)});
+    const response = await connection.request(request, {matchResponse: orUnhandled(profileResponseMatcher, request)});
+    // Firmware without this optional page reports no limit.
+    if (isUnhandledEcho(response, request)) return null;
     let bytes;
     try {bytes = decodeProfileResponse(response, request, {allowShortPayload: true});}
     catch (error) {

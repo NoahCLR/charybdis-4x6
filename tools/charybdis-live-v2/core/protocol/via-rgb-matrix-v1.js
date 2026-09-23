@@ -1,4 +1,5 @@
 "use strict";
+const {isUnhandledEcho, orUnhandled} = require("./via-unhandled-v1");
 
 const {RAW_HID_REPORT_SIZE, normalizeRawHidReport} = require("../transport/device-adapter");
 
@@ -18,10 +19,9 @@ async function readSample(connection) {
         request[0] = VIA_RGB_MATRIX.GET;
         request[1] = VIA_RGB_MATRIX.CHANNEL;
         request[2] = id;
-        const matches = response => response[0] === VIA_RGB_MATRIX.UNHANDLED ||
-            (response[0] === request[0] && response[1] === request[1] && response[2] === id);
-        const response = normalizeRawHidReport(await connection.request(request, {matchResponse: matches}), "VIA RGB Matrix response");
-        if (response[0] === VIA_RGB_MATRIX.UNHANDLED) {
+        const matches = response => response[0] === request[0] && response[1] === request[1] && response[2] === id;
+        const response = normalizeRawHidReport(await connection.request(request, {matchResponse: orUnhandled(matches, request)}), "VIA RGB Matrix response");
+        if (isUnhandledEcho(response, request)) {
             throw failure("RGB_MATRIX_UNSUPPORTED", "The keyboard does not support base RGB readback.");
         }
         if (!matches(response) || response.subarray(3 + count).some(byte => byte !== 0)) {

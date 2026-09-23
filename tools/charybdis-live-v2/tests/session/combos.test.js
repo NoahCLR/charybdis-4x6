@@ -5,11 +5,15 @@ const {ProfileDeviceService, ProfileRequestIdSequence} = require("../../core/ses
 const {buildDeviceModel} = require("../../core/session/device-model");
 const {fixturePages, responseFor} = require("../fixtures/device-combos");
 
+// What QMK answers when nothing handles a report: the request echoed back with
+// byte 0 set to id_unhandled.
+const unhandled = (request) => Object.assign(Buffer.from(request), {0: 0xff});
+
 test("combo snapshots publish readable native keys and clear stale rows after failure or disconnect", async () => {
     const service = new ProfileDeviceService();
     service.requestIds = new ProfileRequestIdSequence(1);
     let fail = false;
-    service.connection = {connected: true, request: async request => fail ? Buffer.alloc(32, 0xff) : responseFor(request, fixturePages())};
+    service.connection = {connected: true, request: async request => fail ? unhandled(request) : responseFor(request, fixturePages())};
     service.error = {message: "Earlier profile failure"};
     let state = await service.readCombos();
     const model = buildDeviceModel(state);

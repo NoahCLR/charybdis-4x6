@@ -1,4 +1,5 @@
 "use strict";
+const {isUnhandledEcho, orUnhandled} = require("./via-unhandled-v1");
 
 const {RAW_HID_REPORT_SIZE, normalizeRawHidReport} = require("../transport/device-adapter");
 
@@ -16,8 +17,8 @@ function viaStorageDigest({layout, macros}) {
 }
 
 async function exchange(connection, request) {
-    const response = normalizeRawHidReport(await connection.request(request, {matchResponse: data => data[0] === request[0] || data[0] === 0xff}), "VIA storage response");
-    if (response[0] !== request[0]) throw fail("The keyboard does not support this storage operation.");
+    const response = normalizeRawHidReport(await connection.request(request, {matchResponse: orUnhandled((data) => data[0] === request[0], request)}), "VIA storage response");
+    if (isUnhandledEcho(response, request)) throw fail("The keyboard does not support this storage operation.");
     return response;
 }
 

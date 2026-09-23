@@ -1,4 +1,5 @@
 "use strict";
+const {isUnhandledEcho, orUnhandled} = require("./via-unhandled-v1");
 const {buildProfileGetRequest, decodeProfileResponse, profileResponseMatcher} = require("./profile-wire-v1");
 const {fnv1a32} = require("../schema/profile-blob-v1");
 
@@ -40,9 +41,9 @@ async function readDeviceCombos(connection, options = {}) {
         const id = options.nextRequestId ? options.nextRequestId() : (nextId = nextId % 255 + 1);
         const request = buildProfileGetRequest(COMBO_READBACK_V1.VALUE, page, id);
         const response = await connection.request(request, {
-            matchResponse: (actual, expected) => actual[0] === 0xff || profileResponseMatcher(actual, expected),
+            matchResponse: orUnhandled(profileResponseMatcher, request),
         });
-        if (response[0] === 0xff) throw fail("COMBO_UNSUPPORTED", "This firmware does not expose combos. Flash the updated firmware pair to read them.");
+        if (isUnhandledEcho(response, request)) throw fail("COMBO_UNSUPPORTED", "This firmware does not expose combos. Flash the updated firmware pair to read them.");
         return Buffer.from(decodeProfileResponse(response, request));
     };
     for (let attempt = 0; attempt < 2; attempt++) {

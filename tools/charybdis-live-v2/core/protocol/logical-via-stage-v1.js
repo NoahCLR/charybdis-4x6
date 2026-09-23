@@ -1,4 +1,5 @@
 "use strict";
+const {isUnhandledEcho, orUnhandled} = require("./via-unhandled-v1");
 
 const {RAW_HID_REPORT_SIZE, normalizeRawHidReport} = require("../transport/device-adapter");
 const {PROFILE_WIRE_V1, buildProfileGetRequest, decodeProfileResponse, profileResponseMatcher} = require("./profile-wire-v1");
@@ -106,16 +107,16 @@ function decodeLogicalViaStatus(response, request) {
 }
 
 async function sendLogicalViaMutation(connection, request) {
-    const response = await connection.request(request, {matchResponse: data => data[0] === 0xff || mutationMatcher(data, request)});
-    if (response[0] === 0xff) throw new LogicalViaStageError("UNSUPPORTED", "The keyboard does not support atomic profile staging.");
+    const response = await connection.request(request, {matchResponse: orUnhandled(mutationMatcher, request)});
+    if (isUnhandledEcho(response, request)) throw new LogicalViaStageError("UNSUPPORTED", "The keyboard does not support atomic profile staging.");
     return decodeLogicalViaAcknowledgement(response, request);
 }
 
 async function readLogicalViaStatus(connection, options = {}) {
     if (typeof options.nextRequestId !== "function") throw new TypeError("nextRequestId must be a function.");
     const request = buildLogicalViaStatusRequest(options.nextRequestId());
-    const response = await connection.request(request, {matchResponse: data => data[0] === 0xff || profileResponseMatcher(data, request)});
-    if (response[0] === 0xff) throw new LogicalViaStageError("UNSUPPORTED", "The keyboard does not support atomic profile staging.");
+    const response = await connection.request(request, {matchResponse: orUnhandled(profileResponseMatcher, request)});
+    if (isUnhandledEcho(response, request)) throw new LogicalViaStageError("UNSUPPORTED", "The keyboard does not support atomic profile staging.");
     return decodeLogicalViaStatus(response, request);
 }
 

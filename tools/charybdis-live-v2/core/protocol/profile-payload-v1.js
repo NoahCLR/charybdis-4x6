@@ -1,5 +1,6 @@
 "use strict";
 
+const {requestHandled} = require("./via-unhandled-v1");
 // Reads the committed profile payload off the keyboard.
 //
 // The device serves page 0 as metadata and pages 1..N as raw payload, a full
@@ -153,11 +154,11 @@ function verify(bytes, metadata) {
 
 async function requestPage(connection, value, page, requestIds, options) {
     const request = buildProfileGetRequest(value, page, requestIds.next());
-    const response = await connection.request(request, {
+    const response = await requestHandled(connection, request, {
         matchResponse: profileResponseMatcher,
         signal: options.signal,
         timeoutMs: options.timeoutMs,
-    });
+    }, `profile payload page ${page}`);
     return Buffer.from(decodeProfileResponse(response, request, {allowShortPayload: true}));
 }
 

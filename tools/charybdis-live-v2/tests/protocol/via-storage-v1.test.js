@@ -77,7 +77,7 @@ test("an interrupted macro transfer stays invalid and can be replaced on retry",
     assert.deepEqual((await readViaStorage(device)).macros, target);
 });
 test("rejects unhandled commands, bad capacities and malformed write echoes", async () => {
-    await assert.rejects(readViaStorage({request: async () => Buffer.alloc(32, 255)}), /not support/);
+    await assert.rejects(readViaStorage({request: async (request) => Object.assign(Buffer.from(request), {0: 0xff})}), /not support/);
     const device = keyboard(), request = device.request.bind(device);
     device.request = async data => {const r = await request(data); if (r[0] === 0x11) r[1] = 9; return r;};
     await assert.rejects(readViaStorage(device), /geometry/);

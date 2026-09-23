@@ -1,10 +1,16 @@
 "use strict";
+const {isUnhandledEcho, orUnhandled, unhandledError} = require("./via-unhandled-v1");
 const {buildProfileGetRequest, decodeProfileResponse, profileResponseMatcher} = require("./profile-wire-v1");
 const fail = message => Object.assign(new Error(message), {code: "INVALID_KEYBOARD_OPTIONS"});
 
 async function readPage(connection, ids, page, optional = false) {
     const request = buildProfileGetRequest(8, page, ids.next());
-    const response = await connection.request(request, {matchResponse: response => profileResponseMatcher(response, request)});
+    const response = await connection.request(request, {matchResponse: orUnhandled(profileResponseMatcher, request)});
+    // An optional page on firmware without it is simply absent.
+    if (isUnhandledEcho(response, request)) {
+        if (optional) return null;
+        throw unhandledError(`keyboard options page ${page}`);
+    }
     try {return Buffer.from(decodeProfileResponse(response, request, {allowShortPayload: true}));}
     catch (error) {
         if (optional && error.code === "DEVICE_REJECTED" && error.status === 2 && response[6] === 0) return null;

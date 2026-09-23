@@ -1,4 +1,5 @@
 "use strict";
+const {isUnhandledEcho} = require("./via-unhandled-v1");
 
 const {RAW_HID_REPORT_SIZE, normalizeRawHidReport} = require("../transport/device-adapter");
 
@@ -45,7 +46,7 @@ function buildViaGetKeycodeRequest(entry) {
 function viaKeycodeResponseMatcher(response, request) {
     const actual = normalizeRawHidReport(response, "VIA keycode response");
     const expected = normalizeRawHidReport(request, "VIA keycode request");
-    return actual[0] === VIA_LAYOUT_COMMANDS.UNHANDLED
+    return isUnhandledEcho(actual, expected)
         || (actual[0] === expected[0]
             && actual[1] === expected[1]
             && actual[2] === expected[2]

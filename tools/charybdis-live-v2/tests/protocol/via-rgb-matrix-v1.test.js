@@ -16,8 +16,7 @@ function device(sample = () => ({brightness: 255, effectId: 1, speed: 32, hue: 0
         response.set(data, 3);
         assert.equal(options.matchResponse(response), true);
         assert.equal(options.matchResponse(Buffer.alloc(32)), false);
-        mutate?.(response);
-        return response;
+        return mutate?.(response, request) || response;
     }};
 }
 
@@ -40,7 +39,8 @@ test("a change mid-read retries, while continuous changes stop within sixteen GE
 });
 
 test("unsupported and malformed responses cannot become an RGB colour", async () => {
-    await assert.rejects(readViaRgbMatrix(device(undefined, response => {response[0] = 0xff;})), {code: "RGB_MATRIX_UNSUPPORTED"});
+    // QMK's unhandled reply is the request echoed with byte 0 set to 0xFF.
+    await assert.rejects(readViaRgbMatrix(device(undefined, (response, request) => Object.assign(Buffer.from(request), {0: 0xff}))), {code: "RGB_MATRIX_UNSUPPORTED"});
     for (const change of [response => {response[1] = 2;}, response => {response[31] = 1;}]) {
         await assert.rejects(readViaRgbMatrix(device(undefined, change)), {code: "RGB_MATRIX_MALFORMED"});
     }
