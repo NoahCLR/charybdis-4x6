@@ -7,6 +7,7 @@ import {LED_INDEX} from "../view/geometry.mjs";
 import {actionLabel, behaviourFor, behaviourListeningTo, canonicalKeycode, behaviourGridSteps, behaviourGroups, behaviourTiers, comboEditInputs, comboGroups, combosForKey, keyFace, keyMeaning, macroReach, pointingReach, pointingSlotFor, pointingVariant, reachKeys} from "../view/keyface.mjs";
 import {feedbackColours, layerColourRow, pdColourRow, stageEnabled} from "../view/lighting.mjs";
 import {currentLayer, getModel, layerName, layers, positionAt, post, render, selectedPosition, state, writable} from "../store.mjs";
+import * as edits from "../view/edits.mjs";
 import {board} from "./board.mjs";
 import {layerBar} from "./layerbar.mjs";
 import {attachLayersControl} from "./layers.mjs";
@@ -30,8 +31,7 @@ const HOLD_HELPERS = [
 const helperLabel = (kind, helper) => kind === "tap" ? "tap sends"
     : (HOLD_HELPERS.find(([name]) => name === helper) || [, String(helper || "").toLowerCase().replace(/_/g, " ")])[1];
 
-const TIER_FIELDS = {tap: "tap", hold: "hold", long: "longHold"};
-const DEFAULT_REPEAT_HZ = "20";
+const {TIER_FIELDS, DEFAULT_REPEAT_HZ} = edits;
 
 export function screenKeys() {
     const model = getModel();
@@ -74,7 +74,7 @@ export function screenKeys() {
                 const placement = state.placement;
                 state.placement = null;
                 state.selected = index;
-                if (writable()) post({type: "updateLayoutKeys", layer: layer.name, changes: [{layoutIndex: index, keycode: placement.keycode}]});
+                if (writable()) post(edits.setKey(layer.name, index, placement.keycode));
             } else if (state.comboPicking) {
                 state.comboInputs = state.comboInputs.includes(index)
                     ? state.comboInputs.filter((value) => value !== index) : [...state.comboInputs, index];
@@ -313,7 +313,7 @@ function tabKey(body, right) {
     node.querySelector("#keycodeField")?.addEventListener("change", (event) => {
         const written = event.target.value.trim();
         if (!written || written === keyMeaning(position)) return;
-        post({type: "updateLayoutKeys", layer: layer.name, changes: [{layoutIndex: position.layoutIndex, keycode: written}]});
+        post(edits.setKey(layer.name, position.layoutIndex, written));
     });
     node.querySelectorAll("[data-golayer]").forEach((button) => button.addEventListener("click", () => {
         state.layer = Number(button.dataset.golayer);
@@ -346,10 +346,7 @@ function tabBehaviours(body, right) {
         add.addEventListener("click", () => {
             state.behaviourRow = selectedCode;
             state.cell = null;
-            post({
-                type: "addBehavior", expectedBase: model.profileIdentity,
-                behavior: {keycode: selectedCode, steps: [{tapCount: 0, tap: {helper: "TAP_SENDS", action: selectedCode}}]},
-            });
+            post(edits.addBehaviour(selectedCode, model.profileIdentity));
         });
         right.appendChild(add);
     }
@@ -486,7 +483,7 @@ function behaviourEditor(behaviour) {
     node.querySelector('[data-act="rekey"]')?.addEventListener("click", () => pickBehaviourKey(behaviour));
     if (state.retarget?.from === behaviour.keycode) node.append(retargetPrompt(behaviour));
     node.querySelector('[data-act="remove"]')?.addEventListener("click", () =>
-        post({type: "deleteBehavior", keycode: behaviour.keycode, expectedBase: model.profileIdentity}));
+        post(edits.deleteBehaviour(behaviour.keycode, model.profileIdentity)));
     const commit = () => saveBehaviour(node, behaviour);
     node.querySelectorAll("[data-term]").forEach((input) => input.addEventListener("change", commit));
     node.querySelector("[data-anchor]")?.addEventListener("change", commit);
@@ -517,15 +514,10 @@ function cellEditor(behaviour, step, kind) {
         </div>
     </div>`);
     const stage = (action = node.querySelector("[data-action]").value.trim()) => {
-        const helper = kind === "tap" ? "TAP_SENDS" : node.querySelector("[data-helper]").value;
-        // The rate only means something for "repeat while held", and there it
-        // must be 1–100 Hz; the field starts at a valid rate the first time
-        // the helper is chosen, rather than posting 0.
-        const repeatHz = helper === "REPEAT_WHILE_HELD" ? (node.querySelector("[data-repeat]")?.value.trim() || DEFAULT_REPEAT_HZ) : "0";
         saveBehaviour(document, behaviour, {
             tapCount: step.tapCount,
             kind,
-            branch: action ? {helper, action, repeatHz} : null,
+            branch: edits.cellBranch(kind, {action, helper: node.querySelector("[data-helper]")?.value, repeatHz: node.querySelector("[data-repeat]")?.value}),
         });
     };
     node.querySelector('[data-act="close"]').addEventListener("click", () => { state.cell = null; render(); });
@@ -550,40 +542,15 @@ function cellEditor(behaviour, step, kind) {
     return node;
 }
 
-// One behaviour row, posted whole: the form is the row, and the host applies
-// it to the draft.
+// One behaviour row, posted whole: the timing fields and the anchor switch
+// as they are on screen, with one cell replaced.
 function saveBehaviour(root, behaviour, change) {
-    const model = getModel();
-    const read = (name, fallback) => {
+    const terms = Object.fromEntries(["tapHoldTerm", "longerHoldTerm", "multiTapTerm"].flatMap((name) => {
         const field = root.querySelector?.(`[data-term="${name}"]`);
-        return field ? field.value.trim() || "0" : String(fallback ?? "0");
-    };
+        return field ? [[name, field.value]] : [];
+    }));
     const anchorField = root.querySelector?.("[data-anchor]");
-    const sourceSteps = new Map((behaviour.steps || []).map((step) => [step.tapCount, step]));
-    if (change && !sourceSteps.has(change.tapCount)) sourceSteps.set(change.tapCount, {tapCount: change.tapCount});
-    const steps = [...sourceSteps.values()].sort((left, right) => left.tapCount - right.tapCount).map((step) => {
-        const next = {tapCount: step.tapCount};
-        for (const [kind, field] of Object.entries(TIER_FIELDS)) {
-            const branch = change && change.tapCount === step.tapCount && change.kind === kind ? change.branch : step[field];
-            if (!branch) continue;
-            next[field] = kind === "tap"
-                ? {helper: "TAP_SENDS", action: branch.action}
-                : {helper: branch.helper, action: branch.action, repeatHz: branch.repeatHz || "0"};
-        }
-        return next;
-    }).filter((step) => step.tap || step.hold || step.longHold);
-    post({
-        type: "saveBehavior",
-        expectedBase: model.profileIdentity,
-        behavior: {
-            keycode: behaviour.keycode,
-            tapHoldTerm: read("tapHoldTerm", behaviour.tapHoldTerm),
-            longerHoldTerm: read("longerHoldTerm", behaviour.longerHoldTerm),
-            multiTapTerm: read("multiTapTerm", behaviour.multiTapTerm),
-            keepsAutoMouseAnchored: anchorField ? anchorField.checked : behaviour.keepsAutoMouseAnchored,
-            steps,
-        },
-    });
+    post(edits.saveBehaviour(behaviour, {terms, anchored: anchorField ? anchorField.checked : undefined, change}, getModel().profileIdentity));
 }
 
 const zeroBlank = (value) => Number(value) ? String(value) : "";
@@ -633,7 +600,7 @@ function tabCombos(body, right) {
     node.querySelector("#comboHoldTerm")?.addEventListener("change", (event) => {
         const written = event.target.value.trim();
         if (written === String(combos[0]?.holdTermMs ?? "")) return;
-        post({type: "updateComboHoldTerm", holdTermMs: comboHoldTerm(model, written), expectedBase: model.profileIdentity});
+        post(edits.comboHoldTerm(comboHoldTerm(model, written), model.profileIdentity));
     });
     const groupsOf = comboGroups(model, layers(), state.layer);
     const row = (group, entry, reachedBy) => {
@@ -738,18 +705,17 @@ function comboBuilder(layer, canEdit, holdTerm) {
         state.comboOpen = false; state.comboPicking = false; state.comboEditId = null;
         state.comboInputs = []; state.comboInputCodes = {}; state.comboExtraInputs = []; render();
     });
-    node.querySelector('[data-act="delete"]')?.addEventListener("click", () => post({type: "deleteCombo", id: state.comboEditId}));
+    node.querySelector('[data-act="delete"]')?.addEventListener("click", () => post(edits.deleteCombo(state.comboEditId)));
     node.querySelector('[data-act="keep"]')?.addEventListener("click", () => {
-        const payload = {
-            output: node.querySelector("[data-output]").value.trim(),
+        post(edits.comboMessage(editing ? state.comboEditId : null, {
+            output: node.querySelector("[data-output]").value,
             inputs: [...inputs.map((position) => state.comboInputCodes[position.layoutIndex] ?? position.keycode), ...state.comboExtraInputs],
             termMs: node.querySelector("[data-term]").value,
             holdTermMs: holdTerm(),
             mustHold: node.querySelector("[data-musthold]").checked,
             mustTap: node.querySelector("[data-musttap]").checked,
             ordered: node.querySelector("[data-ordered]").checked,
-        };
-        post(editing ? {type: "saveCombo", id: state.comboEditId, ...payload} : {type: "addCombo", ...payload});
+        }));
     });
     return node;
 }
@@ -937,7 +903,7 @@ function pickKeycodeFor(layoutIndex) {
         seed: position ? [keyMeaning(position)] : [],
         onPick: (expression) => {
             state.picker = null;
-            post({type: "updateLayoutKeys", layer: layer.name, changes: [{layoutIndex, keycode: expression}]});
+            post(edits.setKey(layer.name, layoutIndex, expression));
         },
     });
 }
@@ -947,30 +913,26 @@ function pickKeycodeFor(layoutIndex) {
 // their own copy, paste and delete.
 export function keysShortcut(event) {
     if (state.screen !== "keys" || state.overlay || state.picker || state.retarget || state.recording || state.comboPicking) return false;
-    const key = event.key.toLowerCase();
-    const clear = (key === "delete" || key === "backspace") && !(event.metaKey || event.ctrlKey || event.altKey || event.shiftKey);
-    const clipboard = (key === "c" || key === "v") && (event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey;
-    if (!clear && !clipboard) return false;
+    const action = edits.keyAction(event);
+    if (!action) return false;
     if (event.target.closest?.("input, textarea, select, [contenteditable]")) return false;
-    if (key === "c" && String(getSelection?.() || "")) return false;
+    if (action === "copy" && String(getSelection?.() || "")) return false;
     const layer = currentLayer();
     const position = positionAt(layer, state.selected);
     if (!position) return false;
 
     event.preventDefault();
-    const store = (keycode) => {
-        if (writable() && keycode !== position.keycode) {
-            post({type: "updateLayoutKeys", layer: layer.name, changes: [{layoutIndex: position.layoutIndex, keycode}]});
-        }
+    const store = (message) => {
+        if (writable() && message.changes[0].keycode !== position.keycode) post(message);
     };
-    if (clear) {
-        if (keyFace(position).kind !== "transparent") store("KC_TRANSPARENT");
-    } else if (key === "c") {
+    if (action === "clear") {
+        if (keyFace(position).kind !== "transparent") store(edits.clearKey(layer.name, position.layoutIndex));
+    } else if (action === "copy") {
         state.keyClipboard = {keycode: position.keycode, label: keyFace(position).main};
         navigator.clipboard?.writeText(position.keycode).catch(() => {});
         render();
     } else if (state.keyClipboard) {
-        store(state.keyClipboard.keycode);
+        store(edits.setKey(layer.name, position.layoutIndex, state.keyClipboard.keycode));
     }
     return true;
 }
@@ -1002,7 +964,7 @@ function retargetBehaviour(from, to, conflict) {
         ? behaviourListeningTo(model, to).keycode : canonicalKeycode(model, to);
     state.behaviourRowShown = null;
     state.cell = null;
-    post({type: "retargetBehavior", keycode: from, target: to, expectedBase: model.profileIdentity, ...(conflict ? {conflict} : {})});
+    post(edits.retargetBehaviour(from, to, model.profileIdentity, conflict));
     render();
 }
 
@@ -1036,8 +998,5 @@ function swapKeys(from, to) {
     const a = positionAt(layer, from), b = positionAt(layer, to);
     if (!a || !b) return;
     state.selected = to;
-    post({type: "updateLayoutKeys", layer: layer.name, changes: [
-        {layoutIndex: from, keycode: b.keycode},
-        {layoutIndex: to, keycode: a.keycode},
-    ]});
+    post(edits.swapKeys(layer.name, a, b));
 }

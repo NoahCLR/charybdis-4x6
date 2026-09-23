@@ -7,43 +7,26 @@
 
 import {css, isOff} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
+import {DIRECTIONS, KIND, SCROLL_FIELDS, readConfig, startingRecord} from "../view/pointing-config.mjs";
 import {MODIFIER_BITS, keyName, modifierNames} from "../view/keyvalues.mjs";
 import {bindingsForSlot} from "../view/keyface.mjs";
 import {PD_MODE_IDS, pdColourRow, stageEnabled} from "../view/lighting.mjs";
 import {getModel, post, render, state, writable} from "../store.mjs";
+import * as edits from "../view/edits.mjs";
 import {openPicker} from "./picker.mjs";
 import {topbar, unavailable} from "./shell.mjs";
 
-const KIND = {DIRECTIONAL: 1, SCROLLING: 2};
+
 const AXES = [[2, "Dominant axis"], [0, "Vertical only"], [1, "Horizontal only"]];
 const INVERT = [[0, "Neither axis"], [1, "Horizontal"], [2, "Vertical"], [3, "Both axes"]];
 const POINTER_LAYER = [[0, "Keep the pointer layer active"], [1, "Return to the typing layer"]];
 const BUTTON_KINDS = [[0, "Pass through"], [1, "Consume"], [2, "Tap a shortcut"], [3, "Hold modifiers"]];
 const MODIFIER_POLICY = [[0, "Inherit held modifiers"], [1, "Ignore the selected modifiers"], [2, "Use only this shortcut"]];
-const DIRECTIONS = [["up", "Up"], ["left", "Left"], ["right", "Right"], ["down", "Down"]];
-// Every scroll field the record holds, and the four the Scrolling card shows
-// itself. A field rendered twice registers its reader twice, and the second
-// input silently wins, so Advanced shows only what the card above does not.
+
+// The four scroll fields the Scrolling card shows itself. A field rendered
+// twice registers its reader twice, and the second input silently wins, so
+// Advanced shows only what the card above does not.
 const SCROLL_LEAD = ["divisorH", "divisorV", "intervalMs", "lockMs"];
-const SCROLL_FIELDS = [
-    ["thresholdH", "Horizontal activation threshold"], ["thresholdV", "Vertical activation threshold"],
-    ["divisorH", "Movement per wheel step ↔"], ["divisorV", "Movement per wheel step ↕"],
-    ["intervalMs", "Minimum interval (ms)"], ["expireMs", "Gesture expiry (ms)"], ["lockMs", "Axis lock timeout (ms)"],
-    ["startNumerator", "Axis selection ratio · numerator"], ["startDenominator", "Axis selection ratio · denominator"],
-    ["sustainNumerator", "Axis retention ratio · numerator"], ["sustainDenominator", "Axis retention ratio · denominator"],
-    ["decayDivisor", "Cross-axis decay divisor"],
-];
-// A slot switched to another kind of movement starts from the firmware's own
-// shipped tuning for that kind — Dragscroll's scroll record and Volume's
-// vertical threshold — wherever the stored record is still empty, so the first
-// field changed posts a valid mode instead of an all-zero one.
-const SCROLL_STARTER = {thresholdH: 2, thresholdV: 3, divisorH: 6, divisorV: 8, intervalMs: 8, expireMs: 80, lockMs: 55,
-    startNumerator: 7, startDenominator: 4, sustainNumerator: 5, sustainDenominator: 4, decayDivisor: 4, invert: 0};
-function startingRecord(slot, kind) {
-    if (kind === KIND.SCROLLING && !SCROLL_FIELDS.some(([key]) => Number(slot.scroll?.[key]))) return {...slot, scroll: {...SCROLL_STARTER}};
-    if (kind === KIND.DIRECTIONAL && !Number(slot.thresholdX) && !Number(slot.thresholdY)) return {...slot, thresholdX: 0, thresholdY: 60};
-    return slot;
-}
 const BINDINGS = ["DRAGSCROLL", "VOLUME_MODE", "BRIGHTNESS_MODE", "ZOOM_MODE", "ARROW_MODE", "PINCH_MODE"];
 const bindingName = (slot) => slot.id < BINDINGS.length ? BINDINGS[slot.id] : `PD_SLOT_${slot.id}`;
 
@@ -118,10 +101,8 @@ function emptySlot(model, slot, canEdit, slots) {
             : `<p class="note">No configured slot to copy from yet.</p>`}
         ${canEdit ? "" : `<div class="unavailable">${esc(unavailable(model) || "This firmware cannot store configurable pointing modes.")}</div>`}
     </div></div>`);
-    node.querySelector('[data-act="duplicate"]')?.addEventListener("click", () => post({
-        type: "duplicatePdMode", slot: slot.id, source: Number(node.querySelector("[data-source]").value),
-        expectedBase: model.profileIdentity,
-    }));
+    node.querySelector('[data-act="duplicate"]')?.addEventListener("click", () =>
+        post(edits.duplicatePdMode(slot.id, Number(node.querySelector("[data-source]").value), model.profileIdentity)));
     return node;
 }
 
@@ -314,7 +295,7 @@ function editor(model, slot, canEdit, slots) {
 
     stageCurrent = () => {
         const config = readConfig(slot, form);
-        post({type: "savePdMode", slot: slot.id, expectedBase: model.profileIdentity, config});
+        post(edits.pdMode(slot.id, config, model.profileIdentity));
     };
     wrap.addEventListener("change", (event) => {
         if (!event.target.matches("input, select")) return;
@@ -323,57 +304,15 @@ function editor(model, slot, canEdit, slots) {
 
     head.querySelector('[data-act="clear"]').addEventListener("click", () => {
         state.pdKind = null;
-        post({type: "clearPdMode", slot: slot.id, expectedBase: model.profileIdentity});
+        post(edits.clearPdMode(slot.id, model.profileIdentity));
     });
     head.querySelector('[data-act="duplicate"]')?.addEventListener("click", () => {
         const target = slots.find((candidate) => !candidate.kind);
         if (!target) return;
         state.pdSlot = target.id;
-        post({type: "duplicatePdMode", slot: target.id, source: slot.id, expectedBase: model.profileIdentity});
+        post(edits.duplicatePdMode(target.id, slot.id, model.profileIdentity));
     });
     return wrap;
-}
-
-// The slot is posted whole, with the fields this form owns replaced: the
-// firmware stores one record, so half a record is never sent.
-function readConfig(slot, form) {
-    const number = (value, fallback) => {
-        const text = String(value ?? "").trim();
-        return /^\d+$/.test(text) ? Number(text) : fallback;
-    };
-    const kind = form.kind();
-    const config = {
-        id: slot.id,
-        kind,
-        name: form.name(),
-        dpi: number(form.dpi(), slot.dpi),
-        pointerLayer: form.pointerLayer ? form.pointerLayer() : slot.pointerLayer,
-        buttons: (slot.buttons || []).map((button, index) => ({
-            kind: form[`button:${index}:kind`] ? form[`button:${index}:kind`]() : button.kind,
-            modifiers: form[`button:${index}:modifiers`] ? form[`button:${index}:modifiers`]() : button.modifiers,
-            tap: {
-                keycode: form[`button:${index}:tap`] ? form[`button:${index}:tap`]() || "0" : String(button.tap?.keycode ?? 0),
-                modifierPolicy: button.tap?.modifierPolicy ?? 0,
-                mask: button.tap?.mask ?? 0,
-            },
-        })),
-    };
-    if (kind === KIND.DIRECTIONAL) {
-        config.axis = form.axis ? form.axis() : slot.axis;
-        config.thresholdX = number(form.thresholdX?.(), slot.thresholdX);
-        config.thresholdY = number(form.thresholdY?.(), slot.thresholdY);
-        config.directions = Object.fromEntries(DIRECTIONS.map(([direction]) => [direction, {
-            keycode: form[`dir:${direction}`] ? form[`dir:${direction}`]() || "0" : String(slot.directions?.[direction]?.keycode ?? 0),
-            modifierPolicy: form[`dirPolicy:${direction}`] ? form[`dirPolicy:${direction}`]() : slot.directions?.[direction]?.modifierPolicy ?? 0,
-            mask: form[`dirMask:${direction}`] ? form[`dirMask:${direction}`]() : slot.directions?.[direction]?.mask ?? 0,
-        }]));
-    } else {
-        config.heldModifiers = form.heldModifiers ? form.heldModifiers() : slot.heldModifiers;
-        config.scroll = Object.fromEntries(SCROLL_FIELDS.map(([key]) => [key,
-            number(form[`scroll:${key}`]?.(), slot.scroll?.[key] ?? 0)]));
-        config.scroll.invert = form.invert ? form.invert() : slot.scroll?.invert ?? 0;
-    }
-    return config;
 }
 
 // Counted through the slot's values rather than its names: a layout position
@@ -388,5 +327,3 @@ function placedOn(model, slot) {
     const places = [...counts].map(([name, count]) => `${name} · ${count} key${count === 1 ? "" : "s"}`);
     return places.length ? `on ${places.join(", ")}` : "not placed on any layer";
 }
-
-export const POINTING_KINDS = KIND;

@@ -5,6 +5,7 @@
 // app decided on. A field the firmware cannot report stays visible and
 // read-only with its reason.
 
+import * as edits from "../view/edits.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {getModel, layers, post, render, state, writable} from "../store.mjs";
 import {topbar, unavailable} from "./shell.mjs";
@@ -62,16 +63,11 @@ function sectionCard(model, section, fields, canEdit, searching) {
 
     // A section is saved whole: the core validates the complete set, so every
     // field travels together and one changed value cannot half-write a section.
-    const submit = () => post({
-        type: "updateConfigDefaults",
-        sectionId: section.id,
-        expectedFingerprint: model?.settingsEditing?.identity,
-        fields: section.fields.map((field) => {
-            const input = node.querySelector(`[data-macro="${cssEscape(field.macro)}"]`);
-            if (field.kind === "toggle") return {macro: field.macro, enabled: input ? input.checked : field.enabled};
-            return {macro: field.macro, value: input ? input.value : field.value};
-        }),
-    });
+    const submit = () => post(edits.settingsSection(section, (field) => {
+        const input = node.querySelector(`[data-macro="${cssEscape(field.macro)}"]`);
+        if (!input) return undefined;
+        return field.kind === "toggle" ? input.checked : input.value;
+    }, model?.settingsEditing?.identity));
 
     for (const field of section.fields) {
         const hidden = !fields.includes(field);

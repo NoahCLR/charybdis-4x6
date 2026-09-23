@@ -1,11 +1,12 @@
 // Lighting: the same shape as Keys. The board is the constant, the paint order
 // sits under it, and each stage owns a full-width surface in the workbench.
 
-import {css, hsv, isOff, label as hsvLabel} from "../lib/colour.mjs";
+import {css, isOff, label as hsvLabel} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {LED_INDEX, TRACKBALL_LED} from "../view/geometry.mjs";
 import {PD_MODE_IDS, STAGE_ORDER, baseColour, feedbackColours, layerColourRow, pdColourRow, stageEnabled} from "../view/lighting.mjs";
 import {currentLayer, getModel, layerName, layers, post, render, state, writable} from "../store.mjs";
+import * as edits from "../view/edits.mjs";
 import {board} from "./board.mjs";
 import {colourEditor} from "./colour-editor.mjs";
 import {layerBar} from "./layerbar.mjs";
@@ -129,7 +130,7 @@ function stageSwitch(model, id, bit) {
         <span class="txt">${on ? "Stage on" : "Stage off"}</span></label>`);
     node.querySelector("input").addEventListener("change", (event) => {
         const mask = model.rgb.stageEnableMask ?? 0;
-        post({type: "updateRgbStages", stageEnableMask: event.target.checked ? mask | bit : mask & ~bit});
+        post(edits.rgbStages(mask, bit, event.target.checked));
     });
     return node;
 }
@@ -211,7 +212,7 @@ function stageBody(body) {
         colour.append(colourControl({
             colour: row?.color, canEdit, title: `${layerName(layer)} layer`,
             offNote: "No colour is stored for this layer, so the base effect shows through wherever it would paint.",
-            onChange: (next) => post({type: "updateLayerColor", layer: row.layer, mode: row.mode, ...next}),
+            onChange: (next) => post(edits.layerColour(row.layer, row.mode, next)),
         }));
         const where = section("Where it paints");
         const mode = el(`<label class="field"><span>Which keys light up</span>
@@ -220,7 +221,7 @@ function stageBody(body) {
                 <option value="ALL_KEYS" ${row?.mode === "ALL_KEYS" ? "selected" : ""}>All keys</option>
             </select></label>`);
         mode.querySelector("select").addEventListener("change", (event) =>
-            post({type: "updateLayerColor", layer: row.layer, mode: event.target.value, ...hsvPayload(row.color)}));
+            post(edits.layerColour(row.layer, event.target.value, row.color)));
         where.append(stack(mode, el(`<p class="note">Pass-through leaves whatever is underneath visible; transparent keys keep their ▽ on the board either way. The board above is already showing this.</p>`)));
         const overrides = section("LED overrides on this layer", `<span class="right"><button class="btn tiny ghost" data-act="groups">Edit groups</button></span>`);
         overrides.className = "span";
@@ -237,7 +238,7 @@ function stageBody(body) {
         const select = el(`<label class="field"><span>Fade mode</span><select class="input" ${canEdit ? "" : "disabled"}>
             ${FADE_MODES.map(([id, text]) => `<option value="${id}" ${fade.mode === id ? "selected" : ""}>${text}</option>`).join("")}</select></label>`);
         select.querySelector("select").addEventListener("change", (event) =>
-            post({type: "updateAutomouseFade", mode: event.target.value, ...hsvPayload(fade.end_color)}));
+            post(edits.automouseFade(event.target.value, fade.end_color)));
         policy.append(stack(select, el(`<p class="note">Auto-mouse lighting fades toward this destination over the remaining timeout. The timings live in Settings → Auto-mouse.</p>`)));
         const endColour = section("End colour");
         const unused = fade.mode === "FOLLOW_REAL_DESTINATION";
@@ -245,7 +246,7 @@ function stageBody(body) {
             ? el(`<div class="row" style="gap:10px;opacity:.5"><span class="swatch-lg ${isOff(fade.end_color) ? "swatch-off" : ""}" style="width:34px;height:34px;${isOff(fade.end_color) ? "" : `background:${css(fade.end_color)}`}"></span>
                 <div><div style="font-size:12.5px">Unused in this mode</div><div class="note mono">${esc(hsvLabel(fade.end_color))}</div></div></div>`)
             : colourControl({colour: fade.end_color, canEdit, title: "Fade destination",
-                onChange: (next) => post({type: "updateAutomouseFade", mode: fade.mode, ...next})}));
+                onChange: (next) => post(edits.automouseFade(fade.mode, next))}));
         if (unused) endColour.append(el(`<p class="note" style="margin-top:10px">Follow-the-real-destination lands on whatever the board would show once the auto-mouse layer drops out, so the end colour is not read. It stays disabled rather than pretending to matter.</p>`));
         const note = section("What this stage does");
         note.append(el(`<p class="note">When trackball movement raises the auto-mouse layer, its lighting fades back toward the destination over the remaining timeout. The board shows the destination, not the animation.</p>`));
@@ -270,7 +271,7 @@ function stageBody(body) {
         colour.append(colourControl({
             colour: row?.color, canEdit, title: `${slotName(model, state.pdSlot)} while active`,
             offNote: "No colour is stored, so this mode paints nothing while it runs.",
-            onChange: (next) => post({type: "updatePdModeColor", pointingMode: PD_MODE_IDS[state.pdSlot], locality: row.locality, ...next}),
+            onChange: (next) => post(edits.pdModeColour(PD_MODE_IDS[state.pdSlot], row.locality, next)),
         }));
         const where = section("Where it paints");
         const locality = el(`<label class="field"><span>Locality</span>
@@ -278,7 +279,7 @@ function stageBody(body) {
                 data-tip="The overlay is not drawn on the key that binds the mode; it paints this region while the mode runs.">
             ${LOCALITIES.map(([id, text]) => `<option value="${id}" ${row?.locality === id ? "selected" : ""}>${text}</option>`).join("")}</select></label>`);
         locality.querySelector("select").addEventListener("change", (event) =>
-            post({type: "updatePdModeColor", pointingMode: PD_MODE_IDS[state.pdSlot], locality: event.target.value, ...hsvPayload(row.color)}));
+            post(edits.pdModeColour(PD_MODE_IDS[state.pdSlot], event.target.value, row.color)));
         const previewSwitch = el(`<label class="sw"><input type="checkbox" ${state.pdPreview ? "checked" : ""}><span class="track"></span>
             <span class="txt">Preview it active on the board</span></label>`);
         previewSwitch.querySelector("input").addEventListener("change", (event) => { state.pdPreview = event.target.checked; render(); });
@@ -298,13 +299,13 @@ function stageBody(body) {
         colour.append(colourControl({
             colour: combo.color, canEdit, title: "Combo feedback",
             offNote: "No colour is stored, so combo keys are not repainted while their inputs are held.",
-            onChange: (next) => post({type: "updateComboFeedback", locality: combo.locality, ...next}),
+            onChange: (next) => post(edits.comboFeedback(combo.locality, next)),
         }));
         const where = section("Where it paints");
         const locality = el(`<label class="field"><span>Locality</span><select class="input" ${canEdit ? "" : "disabled"}>
             ${LOCALITIES.map(([id, text]) => `<option value="${id}" ${combo.locality === id ? "selected" : ""}>${text}</option>`).join("")}</select></label>`);
         locality.querySelector("select").addEventListener("change", (event) =>
-            post({type: "updateComboFeedback", locality: event.target.value, ...hsvPayload(combo.color)}));
+            post(edits.comboFeedback(event.target.value, combo.color)));
         where.append(stack(locality));
         const onBoard = section("On the board");
         const lit = stageEnabled(model, "combo") && !isOff(combo.color);
@@ -338,17 +339,17 @@ function stageBody(body) {
         colour.append(colourControl({
             colour: current?.colour, canEdit, title: current?.label || "",
             offNote: "No colour is stored for this semantic, so the keyboard flashes nothing for it.",
-            onChange: (next) => post(feedbackMessage(model, current.id, next)),
+            onChange: (next) => post(edits.keyFeedback(model.rgb.keyBehaviorFeedback, current.id, next)),
         }));
         const policy = section("Policy");
         const commit = el(`<label class="field"><span>Tap commit</span><select class="input" ${canEdit ? "" : "disabled"}>
             ${TAP_COMMIT.map(([id, text]) => `<option value="${id}" ${feedback.tapCommitMode === id ? "selected" : ""}>${text}</option>`).join("")}</select></label>`);
         commit.querySelector("select").addEventListener("change", (event) =>
-            post(feedbackMessage(model, null, null, {tapCommitMode: event.target.value})));
+            post(edits.keyFeedback(model.rgb.keyBehaviorFeedback, null, null, {tapCommitMode: event.target.value})));
         const locality = el(`<label class="field"><span>Where</span><select class="input" ${canEdit ? "" : "disabled"}>
             ${LOCALITIES.map(([id, text]) => `<option value="${id}" ${feedback.locality === id ? "selected" : ""}>${text}</option>`).join("")}</select></label>`);
         locality.querySelector("select").addEventListener("change", (event) =>
-            post(feedbackMessage(model, null, null, {locality: event.target.value})));
+            post(edits.keyFeedback(model.rgb.keyBehaviorFeedback, null, null, {locality: event.target.value})));
         policy.append(stack(commit, locality, el(`<p class="note">The flash interval lives in Settings → Lighting feedback, because the keyboard stores it with its timing.</p>`)));
         const onBoard = section("On the board");
         onBoard.className = "span";
@@ -373,32 +374,6 @@ function stageBody(body) {
     body.replaceChildren(node);
 }
 
-const hsvPayload = (colour) => {
-    const [h, s, v] = hsv(colour);
-    return {h, s, v};
-};
-
-// Key feedback is stored as one record, so any change posts the whole thing
-// with the one field replaced.
-function feedbackMessage(model, rowId, next, overrides = {}) {
-    const feedback = model.rgb.keyBehaviorFeedback || {};
-    const config = {
-        tapBranchColors: (feedback.tapBranchColors || []).map(hsvPayload),
-        tapCommittedColor: hsvPayload(feedback.tapCommittedColor),
-        holdActiveColor: hsvPayload(feedback.holdActiveColor),
-        longHoldActiveColor: hsvPayload(feedback.longHoldActiveColor),
-        tapCommitMode: feedback.tapCommitMode,
-        locality: feedback.locality,
-        ...overrides,
-    };
-    if (rowId && next) {
-        const branch = /^branch:(\d+)$/.exec(rowId);
-        if (branch) config.tapBranchColors[Number(branch[1])] = next;
-        else config[rowId] = next;
-    }
-    return {type: "updateKeyBehaviorFeedback", config};
-}
-
 function groupRowsTable(rows, target, ownerLabel) {
     if (!rows?.length) return el(`<p class="note" style="margin-top:8px">No LED override rows in this table. Rows override the stage colour on the LEDs they name.</p>`);
     const node = el(`<table class="t" style="margin-top:8px"><thead><tr><th>Owner</th><th>LEDs</th><th>Colour</th><th></th></tr></thead>
@@ -409,7 +384,7 @@ function groupRowsTable(rows, target, ownerLabel) {
                 <code class="dim" style="margin-left:6px">${esc(hsvLabel(row.color))}</code>${isOff(row.color) ? ` <span class="note">inherits the stage colour</span>` : ""}</td>
             <td style="text-align:right"><button class="btn tiny ghost" data-remove="${index}" ${writable() ? "" : "disabled"}>Remove</button></td></tr>`).join("")}</tbody></table>`);
     node.querySelectorAll("[data-remove]").forEach((button) => button.addEventListener("click", () =>
-        post({type: "deleteRgbLedGroup", target, index: Number(button.dataset.remove)})));
+        post(edits.deleteLedRow(target, Number(button.dataset.remove)))));
     return node;
 }
 
@@ -464,15 +439,10 @@ function groupBuilder(model, canEdit) {
         <button class="btn ghost" data-act="save" ${canEdit ? "" : "disabled"}
             data-tip="Store this selection as a named group other rows can point at.">Save selection as a group</button></div>`);
     actions.querySelector('[data-act="keep"]').addEventListener("click", () => {
-        post({type: "addRgbLedGroup", group: {
-            target: draft.target,
-            ...(draft.target === "combo" ? {} : {owner: draft.owner}),
-            ...(draft.source ? {ledGroupName: draft.source} : {ledIndices: ledIndices()}),
-            ...hsvPayload(state.rowColour),
-        }});
+        post(edits.ledRow(draft, ledIndices(), state.rowColour));
     });
     actions.querySelector('[data-act="save"]').addEventListener("click", () =>
-        post({type: "saveRgbReusableLedGroup", group: {ledIndices: ledIndices()}}));
+        post(edits.saveLedGroup(ledIndices())));
     node.append(actions);
     node.append(el(`<p class="note">Rows are applied in device order, so a later row wins on the LEDs it shares.</p>`));
     return node;
@@ -496,7 +466,7 @@ function groupTables(model, canEdit) {
                     data-tip="${group.usageCount ? "Rows still refer to this group, so it cannot be deleted." : "Delete this group."}">Remove</button></td></tr>`).join("")}
             </tbody></table>` : `<p class="note">This keyboard has no reusable LED groups yet.</p>`}</div>`));
     node.querySelectorAll("[data-delete]").forEach((button) => button.addEventListener("click", () =>
-        post({type: "deleteRgbReusableLedGroup", name: button.dataset.delete})));
+        post(edits.deleteLedGroup(button.dataset.delete))));
     for (const [title, rows, target] of [
         ["Rows in the layer table", model.rgb.layerLedGroups, "layer"],
         ["Rows in the pointing-mode table", model.rgb.pdModeLedGroups, "pdMode"],

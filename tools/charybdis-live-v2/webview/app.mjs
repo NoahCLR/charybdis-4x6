@@ -7,6 +7,7 @@
 import {el, esc} from "./lib/dom.mjs";
 import {captureContentScroll, restoreContentScroll} from "./lib/scroll.mjs";
 import {getModel, post, render as rerender, setModel, setRenderer, state} from "./store.mjs";
+import {historyAction} from "./view/edits.mjs";
 import {bindLayerIndex, hideHover, mountHover} from "./ui/hover.mjs";
 import {pickerOverlay} from "./ui/picker.mjs";
 import {keysShortcut, screenKeys} from "./ui/keys.mjs";
@@ -160,17 +161,13 @@ const editsText = (target) => Boolean(target?.closest?.("textarea, [contentedita
     || (target?.tagName === "INPUT" && TEXT_INPUTS.has(target.type));
 
 function historyShortcut(event) {
-    if (!(event.metaKey || event.ctrlKey) || event.altKey) return false;
-    const key = event.key.toLowerCase();
-    const undo = key === "z" && !event.shiftKey;
-    const redo = (key === "z" && event.shiftKey) || (key === "y" && !event.shiftKey);
-    if (!undo && !redo) return false;
-    if (editsText(event.target) || state.recording || state.retarget) return false;
+    const action = historyAction(event, {editingText: editsText(event.target), busy: Boolean(state.recording || state.retarget)});
+    if (!action) return false;
     event.preventDefault();
     const draft = getModel()?.draft;
     if (!draft || draft.busy) return true;
-    if (undo && draft.canUndo) post({type: "undoProfileDraft"});
-    if (redo && draft.canRedo) post({type: "redoProfileDraft"});
+    if (action === "undo" && draft.canUndo) post({type: "undoProfileDraft"});
+    if (action === "redo" && draft.canRedo) post({type: "redoProfileDraft"});
     return true;
 }
 

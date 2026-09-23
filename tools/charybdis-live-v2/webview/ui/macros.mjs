@@ -7,6 +7,7 @@
 import {el, esc} from "../lib/dom.mjs";
 import {describeStep, macroPeek, parseMacro, serializeMacro, unreleased} from "../view/macro.mjs";
 import {getModel, post, render, state, writable} from "../store.mjs";
+import * as edits from "../view/edits.mjs";
 import {openPicker} from "./picker.mjs";
 import {topbar, unavailable} from "./shell.mjs";
 
@@ -115,10 +116,7 @@ function stageMacro(model, slot, payload) {
     const parsed = parseMacro(payload);
     if (parsed.error || unreleased(parsed.steps).length) return false;
     state.macroDrafts = {...state.macroDrafts, [slot.keycode]: payload};
-    post({
-        type: "updateViaMacro", keycode: slot.keycode, payload,
-        expectedFingerprint: model?.macroEditing?.identity,
-    });
+    post(edits.macroMessage(slot.keycode, payload, model?.macroEditing?.identity));
     return true;
 }
 
@@ -340,15 +338,11 @@ function onRecordKey(event) {
     const now = Date.now();
     const gap = now - recording.last;
     const current = state.macroDrafts?.[recording.slot] ?? "";
-    const threshold = Math.max(0, Number(state.recordDelayThreshold) || 0);
-    const round = Math.max(1, Number(state.recordDelayRound) || 1);
-    // The pause before the first key is the time it took to start typing, not
-    // part of the macro.
-    const delay = recording.captured && state.recordDelays !== false && gap > threshold ? `{${Math.round(gap / round) * round}}` : "";
-    const command = state.recordMode === "explicit"
-        ? `{${event.type === "keydown" ? "+" : "-"}${keycode}}`
-        : `{${keycode}}`;
-    state.macroDrafts = {...state.macroDrafts, [recording.slot]: `${current}${delay}${command}`};
+    state.macroDrafts = {...state.macroDrafts, [recording.slot]: edits.recordedPayload(current, {
+        keycode, type: event.type, gap, captured: recording.captured,
+        delays: state.recordDelays !== false, threshold: state.recordDelayThreshold, round: state.recordDelayRound,
+        explicit: state.recordMode === "explicit",
+    })};
     state.recording = {...recording, last: now, captured: true};
     render();
 }

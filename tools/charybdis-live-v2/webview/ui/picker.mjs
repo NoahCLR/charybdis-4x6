@@ -5,12 +5,10 @@
 import {el, esc} from "../lib/dom.mjs";
 import {getModel, layerName, layers, post, render, state} from "../store.mjs";
 import {PICKER_BOARD} from "../view/picker-board.mjs";
+import {PICKER_MODIFIERS, pickerExpression} from "../view/edits.mjs";
 import {entriesForPickerSection, pickerSections} from "../view/picker-sections.mjs";
 
-const MODIFIERS = [
-    ["Ctrl", "C"], ["Shift", "S"], ["Alt", "A"], ["Cmd", "G"],
-    ["Right Ctrl", "RCTL"], ["Right Shift", "RSFT"], ["Right Alt", "RALT"], ["Right Cmd", "RGUI"],
-];
+const MODIFIERS = PICKER_MODIFIERS;
 
 export function openPicker({title, context, seed = [], mode = "single", onPick}) {
     state.picker = {title, context, mode, section: "board", search: "", mods: [], keys: seed.slice(), layerTap: null, onPick};
@@ -23,15 +21,7 @@ const layerTapName = (index) => layerName(layers()[Number(index)]) || `Layer ${i
 
 export const closePicker = () => { state.picker = null; render(); };
 
-function expression() {
-    const picker = state.picker;
-    if (!picker?.keys.length) return "";
-    if (picker.mode === "list") return picker.keys.join(", ");
-    let value = picker.keys[0];
-    for (const name of picker.mods) value = `${MODIFIERS.find(([label]) => label === name)[1]}(${value})`;
-    if (picker.layerTap) value = `LT(${picker.layerTap}, ${value})`;
-    return value;
-}
+const expression = () => state.picker ? pickerExpression(state.picker) : "";
 
 const chunk = (values, size) => values.reduce((rows, value, index) =>
     (index % size ? rows[rows.length - 1].push(value) : rows.push([value]), rows), []);

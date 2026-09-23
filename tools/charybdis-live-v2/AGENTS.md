@@ -73,9 +73,12 @@ Every layer may also import from itself.
 ## Conventions
 
 - Every `core/` module gets a test in the matching `tests/` directory.
-- Every payload the webview posts gets a test in `tests/edits.test.mjs` that
-  stages it against a real `ProfileDraftSession`, so a change of message shape
-  fails there rather than on a keyboard.
+- Every edit the webview posts is built by a pure function in
+  `webview/view/edits.mjs` (pointing records by `view/pointing-config.mjs`),
+  and screens post what those return rather than assembling objects inline.
+  `tests/edits.test.mjs` stages each builder's output against a real
+  `ProfileDraftSession`, so a change of message shape fails there rather than
+  on a keyboard.
 - Build DOM nodes, never HTML strings from device values; everything from the
   keyboard goes through `esc()` or `textContent`.
 - Decode defensively. Everything arriving from a device is untrusted input:
