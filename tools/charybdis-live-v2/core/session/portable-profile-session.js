@@ -128,9 +128,19 @@ const PEER_DETAIL = Object.freeze({
     ABORTING: "Cancelling the copy on the other half",
     WAITING: "Waiting for the link between the halves",
 });
+// What the other half says it is waiting on, once it has said BUSY a few
+// times in a row; a single BUSY is the routine first answer to a request.
+const PEER_BUSY_DETAIL = Object.freeze({
+    MAILBOX_FULL: "the other half has not handled the last request yet",
+    OTHER_COPY: "the other half still holds an earlier copy",
+    NO_LEASE: "the other half dropped this copy; starting it again",
+    STORE_WORKING: "the other half is still storing",
+    PULLING: "the other half is fetching a profile itself",
+    CONVERGENCE_ONLY: "the other half is finishing another save",
+});
 function peerReport(peer) {
     if (!peer) return {detail: "Waiting for the other half"};
-    const busy = peer.lastStatusName === "BUSY" ? " · the other half is busy" : "";
+    const busy = peer.busyStreak >= 3 ? ` · ${PEER_BUSY_DETAIL[peer.busyReason] || "the other half is busy"}` : "";
     const report = {detail: `${PEER_DETAIL[peer.phaseName] || "Waiting for the other half"}${busy}`};
     if (peer.phaseName === "SENDING" || peer.phaseName === "BEGINNING") Object.assign(report, {completed: peer.transferOffset, total: peer.transferLength});
     return report;
@@ -274,4 +284,4 @@ async function restoreProfile(connection, ids, capabilities, document, {expected
         }
     }
 }
-module.exports = {upgradePdSnapshot, captureProfile, readIdentity, restoreProfile, validateSnapshot, summary, fingerprint, reorderLayers};
+module.exports = {upgradePdSnapshot, captureProfile, readIdentity, restoreProfile, validateSnapshot, summary, fingerprint, reorderLayers, peerReport};

@@ -85,6 +85,12 @@ typedef struct {
     uint16_t                              transfer_length;
     uint32_t                              transport_failure_count;
     uint32_t                              retry_count;
+    // The last ACK/BUSY the peer sent: why, and what its store held. With the
+    // count of BUSY replies in a row they show what a stalled copy waits on.
+    uint16_t                              busy_streak;
+    uint8_t                               last_busy_reason;
+    uint8_t                               last_busy_store_state;
+    uint8_t                               last_busy_owner;
     bool                                  role_known;
     bool                                  master;
     bool                                  mailbox_pending;
@@ -129,8 +135,13 @@ typedef struct {
     uint32_t                               next_attempt_at;
     uint32_t                               retry_ms;
     uint32_t                               last_peer_activity_at;
+    uint32_t                               lease_activity_at; // last request for the leased copy
     uint32_t                               transport_failure_count;
     uint32_t                               retry_count;
+    uint16_t                               busy_streak; // ACK/BUSY replies in a row, saturating
+    uint8_t                                last_busy_reason;
+    uint8_t                                last_busy_store_state;
+    uint8_t                                last_busy_owner;
     uint32_t                               prepared_via_generation;
     uint32_t                               prepared_via_digest;
     // While a prepared push is cancelled, when it is released without the
@@ -159,6 +170,7 @@ typedef struct {
     bool                                   cached_response_valid;
     bool                                   metadata_response_valid;
     bool                                   peer_activity_known;
+    bool                                   lease_activity_known;
     bool                                   provisional_peer_descriptor_known;
     bool                                   prepared_push_active;
     bool                                   prepared_remote_started;

@@ -549,7 +549,23 @@ peer is ready. Builds with the live-profile owner answer it; others answer
 | 6 | 2 | bytes to transfer |
 | 8 | 4 | split retries since boot |
 | 12 | 4 | split transport failures since boot |
-| 16 | 9 | reserved, zero |
+| 16 | 2 | the peer's BUSY replies in a row (saturating) |
+| 18 | 1 | why the peer last held off: its last BUSY reason other than routine admission |
+| 19 | 1 | the peer's store state in that reply |
+| 20 | 1 | the peer's transfer owner in that reply |
+| 21 | 4 | reserved, zero |
+
+Busy reasons are `0` unspecified, `1` admitted (queued; the answer comes on a
+retry), `2` mailbox full (an earlier request is still unprocessed, which, if it
+persists, means the peer is not getting scan time), `3` the peer's store holds
+a different copy, `4` the store is not receiving this copy, `5` the store is
+validating, preparing or committing, `6` the peer is pulling a profile itself,
+and `7` the peer only converges just now. Store states are `0` uninitialized,
+`1` idle, `2` receiving, `3` validating, `4` preparing, `5` prepared, `6`
+committing, `7` committed, `8` rejected and `9` reconcile required; transfer
+owners are `0` none, `1` receiving a remote push, `2` pulling. The host
+reports these when a copy stalls; no decision depends on them. Bytes 16–20
+were reserved zero before 2026-09-24, so the older app refuses this page.
 
 Peer phases are `0` idle, `1` binding the staged VIA copy, `2` beginning, `3`
 sending, `4` the peer validating and writing its prepared copy, `5` the peer

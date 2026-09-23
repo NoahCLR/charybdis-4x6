@@ -32,6 +32,9 @@ enum {
     WIRE_TRANSFER_LENGTH  = 14u,
     WIRE_CHUNK_LENGTH     = 16u,
     WIRE_CHUNK            = 17u,
+    WIRE_BUSY_REASON      = 17u, // ACK/BUSY reuses the unused chunk bytes
+    WIRE_BUSY_STORE_STATE = 18u,
+    WIRE_BUSY_OWNER       = 19u,
     WIRE_CRC              = 31u,
     WIRE_BIND_FORMAT      = 12u,
     WIRE_BIND_VIA_GEN     = 13u,
@@ -91,8 +94,15 @@ static bool descriptor_zero(const noah_profile_split_descriptor_t *descriptor) {
     return descriptor && descriptor->generation == 0u && descriptor->payload_crc32 == 0u && descriptor->payload_digest == 0u && descriptor->compiled_default_digest == 0u && descriptor->action_abi_digest == 0u && descriptor->payload_length == 0u && descriptor->schema_major == 0u && descriptor->schema_minor == 0u && descriptor->domain_mask == 0u && descriptor->profile_flags == 0u && descriptor->origin_half == 0u && !descriptor->readable && !descriptor->has_profile && !descriptor->logical;
 }
 
+static bool busy_frame(const noah_profile_split_v1_frame_t *frame) {
+    return frame->kind == NOAH_PROFILE_SPLIT_V1_ACK && frame->status == NOAH_PROFILE_SPLIT_V1_STATUS_BUSY;
+}
+
 static bool transfer_shape_valid(const noah_profile_split_v1_frame_t *frame) {
     if (!descriptor_zero(&frame->descriptor) || frame->payload_length > NOAH_PROFILE_BLOB_V1_MAX_SIZE || frame->offset > frame->payload_length) {
+        return false;
+    }
+    if (busy_frame(frame) ? frame->busy_reason > NOAH_PROFILE_SPLIT_V1_BUSY_REASON_MAX : (frame->busy_reason || frame->busy_store_state || frame->busy_owner)) {
         return false;
     }
     if (frame->kind == NOAH_PROFILE_SPLIT_V1_PAYLOAD_CHUNK) {
@@ -127,6 +137,9 @@ static bool frame_shape_valid(const noah_profile_split_v1_frame_t *frame) {
     }
     if (frame->kind == NOAH_PROFILE_SPLIT_V1_LOGICAL_BIND_REQUEST) {
         return logical_bind_request_shape_valid(frame);
+    }
+    if (frame->kind != NOAH_PROFILE_SPLIT_V1_ACK && (frame->busy_reason || frame->busy_store_state || frame->busy_owner)) {
+        return false;
     }
     if (descriptor_kind(frame->kind)) {
         if (!noah_profile_split_descriptor_valid(&frame->descriptor) || frame->generation != 0u || frame->payload_digest != 0u || frame->offset != 0u || frame->payload_length != 0u || frame->chunk_length != 0u || !bytes_zero(frame->chunk, sizeof(frame->chunk))) {
@@ -174,6 +187,11 @@ bool noah_profile_split_v1_frame_encode(const noah_profile_split_v1_frame_t *fra
         write_u16(&out[WIRE_TRANSFER_LENGTH], frame->payload_length);
         out[WIRE_CHUNK_LENGTH] = frame->chunk_length;
         memcpy(&out[WIRE_CHUNK], frame->chunk, frame->chunk_length);
+        if (busy_frame(frame)) {
+            out[WIRE_BUSY_REASON]      = frame->busy_reason;
+            out[WIRE_BUSY_STORE_STATE] = frame->busy_store_state;
+            out[WIRE_BUSY_OWNER]       = frame->busy_owner;
+        }
     }
     out[WIRE_CRC] = crc8(out, WIRE_CRC);
     return true;
@@ -217,8 +235,16 @@ bool noah_profile_split_v1_frame_decode(const uint8_t *wire, uint8_t length, noa
         decoded.via_generation       = read_u32(&wire[WIRE_BIND_VIA_GEN]);
         decoded.via_digest           = read_u32(&wire[WIRE_BIND_VIA_DIGEST]);
     } else {
-        if (wire[WIRE_FLAGS] != 0u || wire[WIRE_CHUNK_LENGTH] > NOAH_PROFILE_SPLIT_V1_CHUNK_MAX || !bytes_zero(&wire[WIRE_CHUNK + wire[WIRE_CHUNK_LENGTH]], NOAH_PROFILE_SPLIT_V1_CHUNK_MAX - wire[WIRE_CHUNK_LENGTH])) {
+        bool    busy = decoded.kind == NOAH_PROFILE_SPLIT_V1_ACK && decoded.status == NOAH_PROFILE_SPLIT_V1_STATUS_BUSY;
+        uint8_t used = busy ? 3u : wire[WIRE_CHUNK_LENGTH];
+
+        if (wire[WIRE_FLAGS] != 0u || wire[WIRE_CHUNK_LENGTH] > NOAH_PROFILE_SPLIT_V1_CHUNK_MAX || (busy && wire[WIRE_CHUNK_LENGTH] != 0u) || !bytes_zero(&wire[WIRE_CHUNK + used], NOAH_PROFILE_SPLIT_V1_CHUNK_MAX - used)) {
             return false;
+        }
+        if (busy) {
+            decoded.busy_reason      = wire[WIRE_BUSY_REASON];
+            decoded.busy_store_state = wire[WIRE_BUSY_STORE_STATE];
+            decoded.busy_owner       = wire[WIRE_BUSY_OWNER];
         }
         decoded.generation     = read_u32(&wire[WIRE_TRANSFER_GEN]);
         decoded.payload_digest = read_u32(&wire[WIRE_TRANSFER_DIGEST]);

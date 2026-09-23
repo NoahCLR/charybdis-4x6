@@ -38,6 +38,14 @@ storage error `9`, and validation error `10`. Descriptor operations other than
 metadata require OK. Acknowledgement accepts only OK or busy; error frames
 accept neither.
 
+A busy acknowledgement says why in the unused chunk bytes: byte 17 is the busy
+reason, 18 the receiver's store state and 19 its transfer owner, with the chunk
+length still zero (the values are listed with candidate status page 1 in
+[Profile Wire](profile-wire-v1.md)). Every other frame keeps those bytes zero.
+Its offset is the receiver's progress only when the store holds the requested
+copy, and `0` otherwise: another copy's offset past the request's length
+cannot be encoded, and turned a busy reply into an invalid frame.
+
 ## Descriptor Frame
 
 Metadata, prepare begin, prepare commit, and abort use this layout:
@@ -186,7 +194,16 @@ initializes the reconciler.
 
 An abandoned inbound provisional prepare has its own passive lease expiry. The
 receiver aborts that incomplete inactive-slot candidate and releases `PEER`
-admission when its correlated sender activity expires. If both halves change
+admission 3 seconds after the last request for that copy, whatever else crosses
+the link. It used to time the lease from any frame, so metadata polls, or a
+newer copy's retries that the stale lease itself answered busy, kept it alive
+for as long as the halves stayed connected; only a restart cleared it. A lease
+no transfer owns any more expires the same way.
+
+A sender whose chunk keeps meeting busy, after the admission reply, at another
+offset or all the way to the longest backoff, restarts at `PREPARE_BEGIN`. That
+is idempotent for a live lease, which resumes at the receiver's offset, and
+re-creates a dropped one, where retrying the chunk would never end. If both halves change
 transport roles, an outbound prepared source retains its candidate correlation
 but restarts at `PREPARE_BEGIN` before resuming chunks or an authorized commit;
 it never assumes the new receiver retained volatile prepare state.

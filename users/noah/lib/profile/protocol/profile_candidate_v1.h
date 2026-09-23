@@ -204,6 +204,13 @@ typedef struct {
     uint16_t                               transfer_length;
     uint32_t                               retry_count;             // cumulative since boot
     uint32_t                               transport_failure_count; // cumulative since boot
+    // The peer's last ACK/BUSY: BUSY replies in a row, why
+    // (noah_profile_split_v1_busy_reason_t), and its store state and transfer
+    // owner then. Diagnostics for a copy that is not moving.
+    uint16_t                               busy_streak;
+    uint8_t                                busy_reason;
+    uint8_t                                busy_store_state;
+    uint8_t                                busy_owner;
 } noah_profile_candidate_v1_peer_status_t;
 
 // Handles value 0x18 page 1 only, and returns false for anything else so the

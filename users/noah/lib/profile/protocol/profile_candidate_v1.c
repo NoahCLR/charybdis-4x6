@@ -280,7 +280,11 @@ bool noah_profile_candidate_v1_handle_peer_status_get(const noah_profile_candida
     write_u16(&payload[6], peer->transfer_length);
     write_u32(&payload[8], peer->retry_count);
     write_u32(&payload[12], peer->transport_failure_count);
-    // Bytes 16..24 are reserved and stay zero.
+    write_u16(&payload[16], peer->busy_streak);
+    payload[18] = peer->busy_reason;
+    payload[19] = peer->busy_store_state;
+    payload[20] = peer->busy_owner;
+    // Bytes 21..24 are reserved and stay zero.
     return true;
 }
 

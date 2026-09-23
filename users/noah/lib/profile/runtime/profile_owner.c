@@ -1119,6 +1119,10 @@ bool noah_profile_owner_peer_transfer(const noah_profile_owner_t *owner, noah_pr
         .transfer_length         = status.transfer_length,
         .retry_count             = status.retry_count,
         .transport_failure_count = status.transport_failure_count,
+        .busy_streak             = status.busy_streak,
+        .busy_reason             = status.last_busy_reason,
+        .busy_store_state        = status.last_busy_store_state,
+        .busy_owner              = status.last_busy_owner,
     };
     return true;
 }

@@ -930,6 +930,175 @@ static void test_maximum_candidate_resolves_within_owner_no_progress_window(void
     assert(noah_profile_candidate_store_backend_admission_owner(&left.candidate_backend) == NOAH_PROFILE_STORAGE_ADMISSION_NONE);
 }
 
+// One lost exchange anywhere in a full-size copy, whether the request never
+// arrived or its reply was lost after the peer acted on it, must still let the
+// transfer finish. A copy that retries one chunk forever wedges Apply.
+static void test_prepared_push_survives_one_lost_exchange_anywhere(void) {
+    uint32_t exchanges_clean = 0u;
+
+    for (uint8_t after = 0u; after <= 1u; after++) {
+        for (uint32_t drop = 1u;; drop++) {
+            half_t                          left;
+            half_t                          right;
+            noah_profile_split_descriptor_t descriptor;
+            staged_source_t                 source   = {.bytes = max_profile, .length = sizeof(max_profile)};
+            uint32_t                        start_at = 100000u;
+            uint32_t                        base;
+            bool                            done = false;
+
+            half_storage_init(&left);
+            half_storage_init(&right);
+            pair_init(&left, &right);
+            run_pair_until_converged(&left, &right, false);
+            descriptor                = committed_descriptor(&right, 32u, 1u);
+            descriptor.payload_length = sizeof(max_profile);
+            descriptor.payload_crc32  = payload_crc(max_profile, sizeof(max_profile));
+            descriptor.payload_digest = payload_digest(max_profile, sizeof(max_profile));
+            base                      = right.link.exchanges;
+            if (after)
+                right.link.drop_after_delivery_exchange = base + drop;
+            else
+                right.link.drop_before_delivery_exchange = base + drop;
+            assert(noah_profile_split_reconciler_prepared_push_begin(&right.reconciler, &descriptor, &source, staged_read));
+            for (uint32_t scan = 0u; scan < MAX_SCANS * 2u && !done; scan++) {
+                uint32_t now = start_at + scan * NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS;
+                assert_one_scan_budget(&right, true, now);
+                assert_one_scan_budget(&left, false, now);
+                done = right.reconciler.state == NOAH_PROFILE_SPLIT_RECONCILER_STOPPED || noah_profile_split_reconciler_prepared_push_ready(&right.reconciler, NULL);
+            }
+            if (!done) {
+                fprintf(stderr, "copy wedged: exchange %u lost %s delivery; sender state %u, offset %u of %u, peer store state %u, retries %u\n", (unsigned)drop, after ? "after" : "before",
+                        (unsigned)right.reconciler.state, (unsigned)right.reconciler.transfer_offset, (unsigned)descriptor.payload_length, (unsigned)noah_profile_peer_store_backend_state(&left.peer_store), (unsigned)right.reconciler.retry_count);
+                assert(!"a single lost exchange wedged the copy");
+            }
+            // The fault never fired: every exchange of a clean copy is covered.
+            if ((after ? right.link.drop_after_delivery_exchange : right.link.drop_before_delivery_exchange) != 0u) {
+                if (!exchanges_clean) exchanges_clean = drop;
+                break;
+            }
+        }
+    }
+    assert(exchanges_clean > 2u * (sizeof(max_profile) / NOAH_PROFILE_SPLIT_V1_CHUNK_MAX));
+}
+
+// A receiver left holding a half-received lease, here because the sender
+// restarted mid-copy, must release it once that copy stops arriving, even
+// while the sender keeps talking. Otherwise every later copy is answered
+// BUSY for as long as the halves stay connected.
+static void run_stale_receive_lease(bool same_length) {
+    half_t                                 left;
+    half_t                                 right;
+    noah_profile_split_descriptor_t        stale;
+    noah_profile_split_descriptor_t        next;
+    staged_source_t                        stale_source = {.bytes = max_profile, .length = sizeof(max_profile)};
+    staged_source_t                        next_source  = {.bytes = same_length ? max_profile : empty_profile, .length = same_length ? sizeof(max_profile) : sizeof(empty_profile)};
+    noah_profile_split_reconciler_config_t config;
+    uint32_t                               now  = 100000u;
+    bool                                   done = false;
+
+    half_storage_init(&left);
+    half_storage_init(&right);
+    pair_init(&left, &right);
+    run_pair_until_converged(&left, &right, false);
+    stale                = committed_descriptor(&right, 40u, 1u);
+    stale.payload_length = sizeof(max_profile);
+    stale.payload_crc32  = payload_crc(max_profile, sizeof(max_profile));
+    stale.payload_digest = payload_digest(max_profile, sizeof(max_profile));
+    assert(noah_profile_split_reconciler_prepared_push_begin(&right.reconciler, &stale, &stale_source, staged_read));
+    for (uint32_t scan = 0u; scan < 64u; scan++, now += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS) {
+        assert_one_scan_budget(&right, true, now);
+        assert_one_scan_budget(&left, false, now);
+    }
+    assert(noah_profile_peer_store_backend_state(&left.peer_store) == NOAH_PROFILE_PEER_STORE_RECEIVING);
+    assert(noah_profile_peer_store_backend_next_offset(&left.peer_store) > sizeof(empty_profile));
+
+    // The sender restarts: it forgets the copy without cancelling it.
+    config = right.reconciler.config;
+    noah_profile_split_reconciler_init(&right.reconciler, &config);
+    next = committed_descriptor(&right, 41u, 1u);
+    if (same_length) {
+        // The field case: the new copy is as long as the stale one, so the
+        // stale lease's BUSY reply stays well formed and would repeat forever.
+        next.payload_length = stale.payload_length;
+        next.payload_crc32  = stale.payload_crc32;
+        next.payload_digest = stale.payload_digest ^ 1u;
+        next_source.bytes   = max_profile;
+    }
+    for (uint32_t scan = 0u; scan < 64u && !noah_profile_split_reconciler_prepared_push_begin(&right.reconciler, &next, &next_source, staged_read); scan++, now += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS) {
+        assert_one_scan_budget(&right, true, now);
+        assert_one_scan_budget(&left, false, now);
+    }
+    assert(right.reconciler.prepared_push_active);
+    // While the stale lease holds, the sender can say why it waits.
+    for (uint32_t scan = 0u; scan < 20u; scan++, now += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS) {
+        assert_one_scan_budget(&right, true, now);
+        assert_one_scan_budget(&left, false, now);
+    }
+    {
+        noah_profile_split_reconciler_status_t status;
+        assert(noah_profile_split_reconciler_status(&right.reconciler, &status));
+        assert(status.last_busy_reason == NOAH_PROFILE_SPLIT_V1_BUSY_OTHER_COPY);
+        assert(status.last_busy_store_state == NOAH_PROFILE_PEER_STORE_RECEIVING);
+        assert(status.busy_streak > 1u);
+    }
+    for (uint32_t scan = 0u; scan < MAX_SCANS && !done; scan++, now += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS) {
+        assert_one_scan_budget(&right, true, now);
+        assert_one_scan_budget(&left, false, now);
+        // Ready, or the whole copy arrived and was judged (the all-zero
+        // payload fails validation or its digest): either way it got through.
+        done = noah_profile_split_reconciler_prepared_push_ready(&right.reconciler, NULL) || (right.reconciler.state == NOAH_PROFILE_SPLIT_RECONCILER_STOPPED && right.reconciler.last_status != NOAH_PROFILE_SPLIT_V1_STATUS_INVALID_FRAME);
+    }
+    if (!done) fprintf(stderr, "stale lease (%s length): receiver store %u owner %u | sender state %u status %u retries %u\n", same_length ? "same" : "shorter", (unsigned)noah_profile_peer_store_backend_state(&left.peer_store), (unsigned)left.reconciler.transfer_owner, (unsigned)right.reconciler.state, (unsigned)right.reconciler.last_status, (unsigned)right.reconciler.retry_count);
+    assert(done && "the stale lease held the next copy off");
+    assert(noah_profile_peer_store_backend_state(&left.peer_store) != NOAH_PROFILE_PEER_STORE_RECEIVING || left.peer_store.descriptor.generation == next.generation);
+}
+
+// A receiver left holding a half-received lease, here because the sender
+// restarted mid-copy, must release it once that copy stops arriving, even
+// while the sender keeps talking. Otherwise every later copy is answered
+// BUSY for as long as the halves stay connected.
+static void test_stale_receive_lease_expires_while_the_link_stays_busy(void) {
+    run_stale_receive_lease(false);
+    run_stale_receive_lease(true);
+}
+
+// If the receiver drops its lease mid-copy, the chunks it is then sent are
+// answered BUSY. The sender must not retry one chunk forever: it restarts the
+// copy with PREPARE_BEGIN, which re-creates the lease or resumes a live one.
+static void test_prepared_push_restarts_when_the_receiver_drops_its_lease(void) {
+    half_t                          left;
+    half_t                          right;
+    noah_profile_split_descriptor_t descriptor;
+    staged_source_t                 source = {.bytes = max_profile, .length = sizeof(max_profile)};
+    uint32_t                        now    = 100000u;
+    bool                            done   = false;
+
+    half_storage_init(&left);
+    half_storage_init(&right);
+    pair_init(&left, &right);
+    run_pair_until_converged(&left, &right, false);
+    descriptor                = committed_descriptor(&right, 50u, 1u);
+    descriptor.payload_length = sizeof(max_profile);
+    descriptor.payload_crc32  = payload_crc(max_profile, sizeof(max_profile));
+    descriptor.payload_digest = payload_digest(max_profile, sizeof(max_profile));
+    assert(noah_profile_split_reconciler_prepared_push_begin(&right.reconciler, &descriptor, &source, staged_read));
+    for (uint32_t scan = 0u; scan < 64u; scan++, now += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS) {
+        assert_one_scan_budget(&right, true, now);
+        assert_one_scan_budget(&left, false, now);
+    }
+    assert(right.reconciler.transfer_offset > 0u);
+    // The receiver lets the lease go, as its lease timer would.
+    assert(noah_profile_peer_store_backend_abort(&left.peer_store, &left.peer_store.descriptor) == NOAH_PROFILE_PEER_STORE_OK);
+    left.reconciler.transfer_owner = NOAH_PROFILE_SPLIT_TRANSFER_NONE;
+    for (uint32_t scan = 0u; scan < MAX_SCANS && !done; scan++, now += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS) {
+        assert_one_scan_budget(&right, true, now);
+        assert_one_scan_budget(&left, false, now);
+        done = noah_profile_split_reconciler_prepared_push_ready(&right.reconciler, NULL) || (right.reconciler.state == NOAH_PROFILE_SPLIT_RECONCILER_STOPPED && right.reconciler.last_status == NOAH_PROFILE_SPLIT_V1_STATUS_VALIDATION_ERROR);
+    }
+    if (!done) fprintf(stderr, "dropped lease: receiver store %u | sender state %u offset %u status %u retries %u\n", (unsigned)noah_profile_peer_store_backend_state(&left.peer_store), (unsigned)right.reconciler.state, (unsigned)right.reconciler.transfer_offset, (unsigned)right.reconciler.last_status, (unsigned)right.reconciler.retry_count);
+    assert(done && "the sender retried a chunk the receiver would never accept");
+}
+
 static void test_prepared_push_restarts_across_both_half_role_changes(void) {
     half_t                          left;
     half_t                          right;
@@ -1377,6 +1546,9 @@ int main(void) {
     test_cancel_after_dropped_prepare_begin_releases_or_noops();
     test_cancel_refuses_matching_durable_peer();
     test_crossed_prepare_begin_loser_abort_does_not_deadlock();
+    test_prepared_push_survives_one_lost_exchange_anywhere();
+    test_stale_receive_lease_expires_while_the_link_stays_busy();
+    test_prepared_push_restarts_when_the_receiver_drops_its_lease();
     test_refresh_publishes_new_local_authority_during_backoff();
     test_idle_scans_do_not_republish_unchanged_metadata();
     test_converged_steady_state_cost_is_bounded_by_poll_deadline();

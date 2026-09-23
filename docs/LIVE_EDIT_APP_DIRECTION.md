@@ -1081,3 +1081,28 @@ Every macro name is guaranteed 20 characters. Settings version 4 limits a name
 to printable ASCII and sizes its ceiling for all 64 at full length, so the field
 no longer reports a budget shared with the other names; see
 [portable profile](architecture/portable-profile-v1.md#version-4-every-macro-name-gets-20-characters).
+
+### D-L27 — A stale copy on the other half can no longer hold off every later one
+
+Apply stalled twice on 2026-09-23 while copying to the other half: first at the
+last 14-byte chunk, then, on the next try, at the very first request. A
+read-only monitor of candidate status page 1 showed the other half answering
+busy about once a second, with nothing copied. Two faults made that permanent
+until a power cycle:
+
+- The receiver timed its provisional lease from any frame on the link, so the
+  sender's metadata polls and its retries of the next copy, which the stale
+  lease answered busy, kept that lease alive while the halves stayed
+  connected. The lease is now timed by requests for its own copy only.
+- A sender whose chunk met busy retried that chunk forever, even when the
+  receiver no longer held the copy. It now restarts at `PREPARE_BEGIN`, which
+  resumes a live lease and re-creates a dropped one.
+
+Writing the reproduction also found that a busy reply carried the stale copy's
+offset, which past the new copy's length could not be encoded and stopped the
+sender with an invalid frame; busy replies now report `0` for another copy.
+Busy replies also say why, and page 1 reports the last reason, the peer's
+store state and the busy streak. How the first attempt lost its lease is not
+proven; if a copy stalls again, those fields tell which side was waiting on
+what. See [profile split](architecture/profile-split-v1.md) and
+[Profile Wire](architecture/profile-wire-v1.md).

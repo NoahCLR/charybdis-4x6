@@ -148,6 +148,16 @@ function locate(error) {
     return error.rowIndex !== 0xffff && error.rowIndex !== undefined ? ` in ${domain}, row ${error.rowIndex + 1}` : ` in ${domain}`;
 }
 
+// Why the other half kept answering BUSY, when it said.
+const PEER_BUSY_REASONS = Object.freeze({
+    MAILBOX_FULL: "The other half stopped handling requests from this half.",
+    OTHER_COPY: "The other half was still holding an earlier, unfinished copy.",
+    NO_LEASE: "The other half dropped the copy partway and did not take it up again.",
+    STORE_WORKING: "The other half did not finish storing its copy.",
+    PULLING: "The other half was fetching a profile of its own.",
+    CONVERGENCE_ONLY: "The other half was finishing another save.",
+});
+
 // The keyboard's own reason when it gave one, else the other half's last
 // answer, else the host's message.
 function failureReason(error, peer) {
@@ -157,6 +167,7 @@ function failureReason(error, peer) {
         if (known) return device.name === "VALIDATION_REJECTED" ? `${known}${locate(device)}.` : known;
         return `The keyboard reported ${device.name}.`;
     }
+    if (peer && peer.busyStreak >= 3 && PEER_BUSY_REASONS[peer.busyReason]) return PEER_BUSY_REASONS[peer.busyReason];
     if (peer && peer.lastStatusName && peer.lastStatusName !== "OK" && PEER_REASONS[peer.lastStatusName]) return PEER_REASONS[peer.lastStatusName];
     if (peer && peer.transportFailureCount > 0 && /progress|timed out|timeout/i.test(error?.message || "")) return "The link between the halves stopped answering.";
     return error?.message || "The keyboard stopped answering.";

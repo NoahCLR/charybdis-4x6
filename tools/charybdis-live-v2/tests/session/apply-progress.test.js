@@ -57,3 +57,13 @@ test("the reason is the keyboard's own when it gave one, else the other half's l
     assert.equal(failureReason({message: "made no observable progress"}, {lastStatusName: "OK", transportFailureCount: 3}), "The link between the halves stopped answering.");
     assert.equal(failureReason({message: "disconnected"}), "disconnected");
 });
+
+test("a copy the other half keeps refusing says what it is waiting on", () => {
+    const stalled = {message: "made no observable progress"};
+    assert.equal(failureReason(stalled, {lastStatusName: "OK", busyStreak: 40, busyReason: "OTHER_COPY"}), "The other half was still holding an earlier, unfinished copy.");
+    assert.equal(failureReason(stalled, {lastStatusName: "OK", busyStreak: 40, busyReason: "MAILBOX_FULL"}), "The other half stopped handling requests from this half.");
+    assert.equal(failureReason(stalled, {lastStatusName: "BUSY", busyStreak: 1, busyReason: "OTHER_COPY"}), "The other half kept answering that it was busy.", "one BUSY is routine");
+    const {peerReport} = require("../../core/session/portable-profile-session");
+    assert.equal(peerReport({phaseName: "BEGINNING", transferOffset: 0, transferLength: 2520, busyStreak: 12, busyReason: "OTHER_COPY"}).detail, "Starting the copy · the other half still holds an earlier copy");
+    assert.equal(peerReport({phaseName: "SENDING", transferOffset: 28, transferLength: 2520, busyStreak: 1, busyReason: "ADMITTED"}).detail, "Sending");
+});

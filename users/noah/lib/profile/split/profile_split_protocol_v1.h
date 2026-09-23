@@ -49,6 +49,21 @@ typedef enum {
     NOAH_PROFILE_SPLIT_V1_STATUS_VALIDATION_ERROR,
 } noah_profile_split_v1_status_t;
 
+// Why a receiver answered ACK/BUSY, carried in that reply's unused chunk
+// bytes so the sender can report it. Diagnostic only: no decision depends on
+// it, and 0 means the receiver did not say.
+typedef enum {
+    NOAH_PROFILE_SPLIT_V1_BUSY_UNSPECIFIED  = 0u,
+    NOAH_PROFILE_SPLIT_V1_BUSY_ADMITTED     = 1u, // queued; the answer comes on a retry
+    NOAH_PROFILE_SPLIT_V1_BUSY_MAILBOX_FULL = 2u, // an earlier request is still unprocessed
+    NOAH_PROFILE_SPLIT_V1_BUSY_OTHER_COPY   = 3u, // the store holds a different copy
+    NOAH_PROFILE_SPLIT_V1_BUSY_NO_LEASE     = 4u, // the store is not receiving this copy
+    NOAH_PROFILE_SPLIT_V1_BUSY_STORE_WORKING = 5u, // validating, preparing or committing
+    NOAH_PROFILE_SPLIT_V1_BUSY_PULLING      = 6u, // the receiver is pulling a profile itself
+    NOAH_PROFILE_SPLIT_V1_BUSY_CONVERGENCE_ONLY = 7u, // the receiver only converges just now
+    NOAH_PROFILE_SPLIT_V1_BUSY_REASON_MAX   = NOAH_PROFILE_SPLIT_V1_BUSY_CONVERGENCE_ONLY,
+} noah_profile_split_v1_busy_reason_t;
+
 typedef struct {
     noah_profile_split_v1_kind_t    kind;
     noah_profile_split_v1_status_t  status;
@@ -62,6 +77,10 @@ typedef struct {
     uint8_t                         store_format_version;
     uint32_t                        via_generation;
     uint32_t                        via_digest;
+    // ACK/BUSY only; zero in every other frame.
+    uint8_t                         busy_reason;
+    uint8_t                         busy_store_state;
+    uint8_t                         busy_owner;
 } noah_profile_split_v1_frame_t;
 
 bool noah_profile_split_v1_frame_encode(const noah_profile_split_v1_frame_t *frame, uint8_t out[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE]);

@@ -343,6 +343,12 @@ const SPLIT_STATUS_NAMES = Object.freeze([
     "OK", "INVALID_FRAME", "INCOMPATIBLE", "STALE", "CONFLICT", "CORRUPT", "BUSY", "RANGE_ERROR", "DIGEST_MISMATCH", "STORAGE_ERROR", "VALIDATION_ERROR",
 ]);
 const CANDIDATE_PEER_FLAGS = Object.freeze({CLEANUP_PENDING: 1 << 0, MASTER: 1 << 1, KNOWN_MASK: 0x03});
+// Why the other half last answered BUSY, and what it held then; these mirror
+// noah_profile_split_v1_busy_reason_t, noah_profile_peer_store_state_t and
+// noah_profile_split_transfer_owner_t.
+const PEER_BUSY_REASON_NAMES = Object.freeze(["UNSPECIFIED", "ADMITTED", "MAILBOX_FULL", "OTHER_COPY", "NO_LEASE", "STORE_WORKING", "PULLING", "CONVERGENCE_ONLY"]);
+const PEER_STORE_STATE_NAMES = Object.freeze(["UNINITIALIZED", "IDLE", "RECEIVING", "VALIDATING", "PREPARING", "PREPARED", "COMMITTING", "COMMITTED", "REJECTED", "RECONCILE_REQUIRED"]);
+const PEER_TRANSFER_OWNER_NAMES = Object.freeze(["NONE", "REMOTE_PUSH", "LOCAL_PULL"]);
 
 function buildCandidatePeerStatusRequest(requestId) {
     return buildProfileGetRequest(PROFILE_CANDIDATE_V1.VALUE_STATUS, 1, assertU8(requestId, "Candidate peer status request id", {nonzero: true}));
@@ -365,7 +371,11 @@ function decodeCandidatePeerStatusResponse(response, request) {
     if ((flags & ~CANDIDATE_PEER_FLAGS.KNOWN_MASK) !== 0) {
         throw candidateProtocolError("INCOMPATIBLE_RESPONSE", "Candidate peer status contains unknown flag bits.");
     }
-    if (payload.subarray(16).some(Boolean)) {
+    const [busyReason, busyStoreState, busyOwner] = payload.subarray(18, 21);
+    if (PEER_BUSY_REASON_NAMES[busyReason] === undefined || PEER_STORE_STATE_NAMES[busyStoreState] === undefined || PEER_TRANSFER_OWNER_NAMES[busyOwner] === undefined) {
+        throw candidateProtocolError("INCOMPATIBLE_RESPONSE", "Unknown peer busy detail.");
+    }
+    if (payload.subarray(21).some(Boolean)) {
         throw candidateProtocolError("NONCANONICAL_RESPONSE", "Candidate peer status reserved bytes must be zero.");
     }
     return {
@@ -379,6 +389,12 @@ function decodeCandidatePeerStatusResponse(response, request) {
         transferLength: payload.readUInt16LE(6),
         retryCount: payload.readUInt32LE(8),
         transportFailureCount: payload.readUInt32LE(12),
+        // The other half's BUSY replies in a row, and the last one that said
+        // why (never the routine "admitted" reply to a new request).
+        busyStreak: payload.readUInt16LE(16),
+        busyReason: PEER_BUSY_REASON_NAMES[busyReason],
+        busyStoreState: PEER_STORE_STATE_NAMES[busyStoreState],
+        busyOwner: PEER_TRANSFER_OWNER_NAMES[busyOwner],
     };
 }
 
@@ -545,6 +561,9 @@ function candidateProtocolError(code, message, details) {
 }
 
 module.exports = {
+    PEER_BUSY_REASON_NAMES,
+    PEER_STORE_STATE_NAMES,
+    PEER_TRANSFER_OWNER_NAMES,
     CANDIDATE_ADMISSION,
     CANDIDATE_ADMISSION_NAMES,
     CANDIDATE_ERROR,
