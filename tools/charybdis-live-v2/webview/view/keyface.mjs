@@ -324,12 +324,14 @@ export function comboGroups(model, stack, at) {
     return {onKeys, throughKeys: downTheStack(throughKeys), fromBranches: [], fromBranchesBelow: [], elsewhere};
 }
 
-// The combos a key is pressed for on this layer, keyed by layout index: the
-// ones the combo table lists as firing here — on this layer's own keys,
-// through transparent keys, or on the reference layer's keys under Combo Layer
-// Matching. A combo that can never fire from this layer marks no key, however
-// many keycodes it shares with it. The board asks once per key, so each
-// (model, layer) is grouped once.
+// The combos a key carries on this layer, keyed by layout index. The board
+// marks what the layer stores, the same rule as behaviour dots: a transparent
+// key shows nothing of the layer below it, and what it inherits is listed in
+// the Combos tab under "through a transparent key". Of the rest, only combos
+// the table says fire from this layer count — so a key sharing one input of a
+// combo that can never fire here is not marked — and under Combo Layer
+// Matching the keys whose position the reference layer supplies are. The
+// board asks once per key, so each (model, layer) is grouped once.
 const combosByModel = new WeakMap();
 export function combosOnLayer(model, stack, at) {
     if (!model) return new Map();
@@ -342,6 +344,7 @@ export function combosOnLayer(model, stack, at) {
     const keys = new Map();
     for (const entry of [...onKeys, ...throughKeys]) {
         for (const key of entry.keys) {
+            if (key.fellThrough) continue;
             const combos = keys.get(key.position.layoutIndex) || [];
             if (!combos.includes(entry.combo)) combos.push(entry.combo);
             keys.set(key.position.layoutIndex, combos);

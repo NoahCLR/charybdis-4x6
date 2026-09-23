@@ -484,7 +484,7 @@ test("combos follow the keyboard's combo layer matching", () => {
     assert.deepEqual(edit.codes, {13: "KC_Q", 14: "KC_W"}, "the builder opens with the keys the keyboard matches");
 });
 
-test("a key's combo badges are the combos the table says fire on this layer", () => {
+test("a key carries the badges of combos its own keycode fires on this layer, like behaviour dots", () => {
     const at = (layoutIndex, keycode) => ({layoutIndex, keycode, display: keycode});
     const combo = {id: 1, badge: "C1", inputs: ["KC_D", "KC_F"], output: "KC_TAB"};
     const stack = [
@@ -495,7 +495,8 @@ test("a key's combo badges are the combos the table says fire on this layer", ()
     const model = {combos: [combo], layers: stack};
     const badges = (layer, key) => combosAt(model, stack, layer, key).map((row) => row.badge);
     assert.deepEqual(badges(0, 1), ["C1"]);
-    assert.deepEqual(badges(1, 1), ["C1"], "both inputs fall through, so the transparent keys carry the badge");
+    assert.deepEqual(badges(1, 1), [], "a transparent key shows nothing of the layer below, as behaviours do");
+    assert.equal(comboGroups(model, stack, 1).throughKeys.length, 1, "the Combos tab still lists it as reached through");
     assert.deepEqual(badges(2, 1), [], "KC_D is here, but KC_F is not, so C1 never fires and marks nothing");
 
     const referenced = {...model, configDefaults: [{id: "comboReferences", fields: [{macro: "comboReference2", value: "Layer 0"}]}]};
