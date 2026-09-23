@@ -197,11 +197,11 @@ static void test_busy_start_is_rejected_without_restarting_active_ir(void) {
     macro_payload_debug_snapshot_t snapshot;
 
     test_reset();
-    CHECK(macro_payload_start_ir(&active, MACRO_PAYLOAD_TEXT_OUTPUT_PLAIN, 0u, MACRO_PAYLOAD_SOURCE_HARDCODED, 3u, NULL, NULL) == MACRO_PAYLOAD_START_STARTED);
+    CHECK(macro_payload_start_ir(&active, MACRO_PAYLOAD_TEXT_OUTPUT_PLAIN, 0u, MACRO_PAYLOAD_SOURCE_VIA, 3u, NULL, NULL) == MACRO_PAYLOAD_START_STARTED);
     CHECK(macro_payload_start_ir(&other, MACRO_PAYLOAD_TEXT_OUTPUT_PLAIN, 0u, MACRO_PAYLOAD_SOURCE_VIA, 2u, NULL, NULL) == MACRO_PAYLOAD_START_BUSY);
     macro_payload_debug_snapshot(&snapshot);
     CHECK(snapshot.busy_rejection_count == 1u);
-    CHECK(snapshot.active_source == MACRO_PAYLOAD_SOURCE_HARDCODED);
+    CHECK(snapshot.active_source == MACRO_PAYLOAD_SOURCE_VIA);
     CHECK(snapshot.active_slot == 3u);
     CHECK(macro_payload_engine_cancel());
     test_drain_cleanup();

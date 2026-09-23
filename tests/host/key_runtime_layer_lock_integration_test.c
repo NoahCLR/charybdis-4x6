@@ -226,11 +226,6 @@ uint8_t key_behavior_validate_all(void) {
     return 0u;
 }
 
-bool macro_dispatch(uint16_t keycode) {
-    (void)keycode;
-    return false;
-}
-
 bool noah_synthetic_record_active(void) {
     return false;
 }

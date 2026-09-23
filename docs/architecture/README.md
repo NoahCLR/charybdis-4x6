@@ -83,7 +83,7 @@ The main rule is:
 | QMK-facing effect application | `users/noah/lib/key/runtime/projection/` | action dispatch, held/repeat registries, layer ownership, PD mode state, feedback |
 | Pending release dispatch queue | `users/noah/lib/key/runtime/queue/` | release/scan adapters and runtime debug |
 | Held action and repeat applied registries | `users/noah/lib/key/ownership/` | key-runtime projection and housekeeping |
-| Macro payload parsing, hardcoded macros, VIA macro defaults | `users/noah/lib/macro/` | action lifecycle, process flow, VIA default seeding |
+| Macro payload parsing, VIA macro defaults | `users/noah/lib/macro/` | action lifecycle, process flow, VIA default seeding |
 | PD mode definitions, state, policy, and handlers | `users/noah/lib/pointing/` | key runtime, pointing hook, RGB, split sync |
 | RGB rendering and validation | `users/noah/lib/rgb/` | RGB hook, authored RGB config, split/runtime feedback snapshots |
 | Shared storage, diagnostics, modifier policy, layer/mod ownership | `users/noah/lib/state/` | all runtime owners through narrow surfaces |

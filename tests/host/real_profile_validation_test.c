@@ -8,7 +8,6 @@
 #include "print.h"
 #include "users/noah/lib/action/synthetic_record.h"
 #include "users/noah/lib/action/owned_keycode.h"
-#include "users/noah/lib/macro/macro_dispatch.h"
 #include "users/noah/noah_keymap.h"
 #include "users/noah/noah_runtime.h"
 #include "users/noah/lib/key/behavior/keymap_validation.h"
@@ -194,7 +193,6 @@ int main(void) {
         fputs(log_buffer, stderr);
     }
     CHECK(keymap_validation_errors == 0u);
-    CHECK(macro_dispatch_validate_all() == 0u);
     noah_rgb_validate_config();
 
     if (log_buffer[0] != '\0') {

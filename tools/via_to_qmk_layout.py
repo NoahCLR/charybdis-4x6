@@ -195,8 +195,8 @@ for i in range(VIA_MACRO_COUNT):
 # users/noah/noah_keymap_ids.h's custom_keycodes enum (0-indexed from
 # SAFE_RANGE).
 # MACRO_0–15 are the first custom keycodes → CUSTOM(64)–CUSTOM(79).
-# These remain the hardcoded custom macros handled by macro_dispatch(), and
-# must stay distinct from VIA's dynamic MACRO(n) keycodes in the JSON export.
+# They are the retired user macros, now inert keys; they keep their identity
+# and must stay distinct from VIA's dynamic MACRO(n) keycodes in the JSON export.
 for i in range(HARDCODED_MACRO_COUNT):
     REPLACEMENTS[f"CUSTOM({VIA_CUSTOM_BASE + i})"] = f"MACRO_{i}"
 

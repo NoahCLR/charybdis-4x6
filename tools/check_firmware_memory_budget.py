@@ -40,7 +40,6 @@ import sys
 
 
 REQUIRED_SYMBOLS = (
-    "hardcoded_macro_slots",
     "via_macro_slots",
     "macro_slot_active_ir",
 )

@@ -82,7 +82,6 @@ NOAH_COMMON_SOURCES := \
     lib/key/ownership/held_repeat.c \
     lib/action/action_dispatch.c \
     lib/action/owned_keycode.c \
-    lib/macro/macro_dispatch.c \
     lib/macro/macro_slot_provider.c \
     lib/macro/macro_payload.c \
     lib/macro/macro_payload_decode_qmk.c \

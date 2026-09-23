@@ -7,14 +7,16 @@
 #include "action_kind_dispatch_internal.h"
 #include "action_kind_internal.h"
 #include "../compat/qmk_via_playback_contract.h"
-#include "../macro/macro_dispatch.h"
+#include "noah_keymap_ids.h"
 
 static bool noah_action_handle_macro_preflight(noah_action_desc_t desc) {
     if (noah_qmk_contract_try_play_via_macro(desc.action)) {
         return true;
     }
 
-    return macro_dispatch(desc.action);
+    // A retired user macro does nothing. Consume it: tapped as a keycode it
+    // would read as a modified basic key.
+    return NOAH_KEYCODE_IS_RETIRED_MACRO(desc.action);
 }
 
 void noah_action_tap(uint16_t action) {

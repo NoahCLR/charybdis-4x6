@@ -33,7 +33,6 @@ selected profile's `keymap.c`.
 
 It does not rewrite:
 
-- `HARDCODED_MACROS(MACRO)`
 - `COMBOS(COMBO)`
 - `key_behaviors[]`
 - `enum keymap_custom_keycodes`

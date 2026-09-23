@@ -9,6 +9,10 @@
 #include "noah_keymap_ids.h"
 #include "../../pointing/defs/pd_modes.h"
 
+// Retired user macros keep their action kind so stored profiles still decode;
+// the keys themselves do nothing.
+_Static_assert(MACRO_15 - MACRO_0 + 1 == NOAH_PROFILE_ACTION_V1_MAX_HARDCODED_MACRO_SLOTS, "retired macro identities drifted from the action ABI");
+
 noah_profile_action_runtime_v1_result_t noah_profile_action_runtime_v1_from_native(uint16_t native_action, noah_profile_action_v1_t *action) {
     if (!action) {
         return NOAH_PROFILE_ACTION_RUNTIME_V1_INVALID_ARGUMENT;
@@ -17,7 +21,7 @@ noah_profile_action_runtime_v1_result_t noah_profile_action_runtime_v1_from_nati
     if (native_action == KC_NO) {
         return NOAH_PROFILE_ACTION_RUNTIME_V1_OK;
     }
-    if (native_action >= MACRO_0 && native_action <= MACRO_15) {
+    if (NOAH_KEYCODE_IS_RETIRED_MACRO(native_action)) {
         action->kind    = NOAH_PROFILE_ACTION_V1_HARDCODED_MACRO;
         action->operand = (uint16_t)(native_action - MACRO_0);
         return NOAH_PROFILE_ACTION_RUNTIME_V1_OK;
@@ -87,7 +91,7 @@ noah_profile_action_runtime_v1_result_t noah_profile_action_runtime_v1_to_native
             *native_action = (uint16_t)(QK_MACRO_0 + action->operand);
             return NOAH_PROFILE_ACTION_RUNTIME_V1_OK;
         case NOAH_PROFILE_ACTION_V1_HARDCODED_MACRO:
-            if (action->operand >= HARDCODED_MACRO_SLOT_COUNT) break;
+            if (action->operand >= NOAH_PROFILE_ACTION_V1_MAX_HARDCODED_MACRO_SLOTS) break;
             *native_action = (uint16_t)(MACRO_0 + action->operand);
             return NOAH_PROFILE_ACTION_RUNTIME_V1_OK;
         default:

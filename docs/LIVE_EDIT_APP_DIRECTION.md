@@ -1048,6 +1048,11 @@ unchanged. The app labels a named macro by its name on keys, in the picker and
 in the key card. See
 [portable profile](architecture/portable-profile-v1.md#version-3-via-macro-names-instead-of-user-macros).
 
-Next: remove the firmware's user-macro runtime (`macro_dispatch`, the
-compiled `HARDCODED_MACROS` list and the tooling that requires them) and shrink
-the settings RAM cache, which only needs the fixed part at runtime.
+The firmware's user-macro runtime is gone: `macro_dispatch`, the compiled
+`HARDCODED_MACROS` list, and the introspection and memory-gate requirements
+for them. `MACRO_n` keys and actions are consumed and do nothing, since tapped
+as keycodes they would read as modified basic keys. The effective settings
+cache stays whole, because version-3 names fill the space the user macros had.
+The settings readback now streams from that cache instead of keeping a second
+copy, which saves 1,400 bytes of static RAM per half; see
+[memory budgets](architecture/memory-budgets.md#retired-user-macros-and-streamed-settings-readback--2026-09-23).

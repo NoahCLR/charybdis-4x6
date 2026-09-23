@@ -239,3 +239,23 @@ largest reviewed main-process path is 1,264/1,920 bytes and split-slave path is
 explicitly covered in the owner stack manifest. All corresponding memory and
 reviewed-path gates pass under the documented feature-specific policy; runtime
 high-water and hardware acceptance are still pending.
+
+## Retired user macros and streamed settings readback — 2026-09-23
+
+Removing the user-macro runtime frees its 16-byte slot metadata. The settings
+readback (GET `0x07`) no longer keeps its own 1,368-byte cold copy; it streams
+from the effective settings cache instead. That reverses the separation above.
+The copy never kept a backup intact across a publication: the reader re-reads
+page 0 after the chunks and requires the same length and digests, so a
+publication or a live RGB/DPI change during the read fails it either way. The
+effective cache itself stays 1,368 bytes: version-3 macro names fill the space
+the user macros had, and the readback returns them from it.
+
+Fresh right and left schema-2 pair ELFs each link 4,152 bytes of `.data` and
+53,164 bytes of `.bss`: 57,316 bytes, 1,400 below the 58,716 measured before
+this change and 3,100 bytes below the 60,416-byte tripwire. The SRAM0–3 fixed
+prefix is 57,320 bytes and the boot linker/core-memory span 204,824 bytes per
+half; fixed linked occupancy across the unique banks is 64,776 bytes. These are
+linked measurements, not runtime high-water. The reviewed stack paths pass; the
+largest main-process path is still 1,792 bytes and the settings readback path
+416 bytes.

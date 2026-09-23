@@ -397,11 +397,6 @@ bool noah_synthetic_record_active(void) {
     return false;
 }
 
-bool macro_dispatch(uint16_t keycode) {
-    (void)keycode;
-    return false;
-}
-
 void keyboard_mod_ownership_track_report_keycode_event(uint16_t keycode, keyrecord_t *record) {
     (void)keycode;
     (void)record;

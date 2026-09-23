@@ -77,7 +77,7 @@ Initial action kinds:
 | 4 | stable PD-mode id, momentary |
 | 5 | stable PD-mode id, lock |
 | 6 | VIA macro slot |
-| 7 | hardcoded macro slot |
+| 7 | retired user macro slot (`MACRO_0`–`15`); accepted so stored profiles decode, and inert |
 
 Userspace-owned actions are never encoded as raw custom-keycode enum values.
 Unsupported action kinds or operands reject the complete candidate.

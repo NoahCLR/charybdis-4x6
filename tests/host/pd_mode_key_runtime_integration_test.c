@@ -460,11 +460,6 @@ void wait_ms(uint16_t ms) {
     (void)ms;
 }
 
-bool macro_dispatch(uint16_t action) {
-    (void)action;
-    return false;
-}
-
 bool noah_synthetic_record_active(void) {
     return false;
 }

@@ -55,7 +55,7 @@ source trace because they rewrite or verify human-facing firmware docs.
 | `key/runtime/queue/` | Pending release dispatch queue | Authoritative queue inside key runtime | Deferred dispatch effects, release blockers | Ordered pending release snapshots and drains | release matrix, runtime debug, scenario tests | [KEY_RUNTIME](../KEY_RUNTIME.md) |
 | `key/runtime/slot/` | Per-key-position helpers | Helper data, not independent authority | Key positions, combo origins, materialized behavior | Packed key positions, origin bitmaps, slot interaction contracts | combo origin, PD, RGB, split, key-runtime tests | [KEY_RUNTIME](../KEY_RUNTIME.md) |
 | `key/runtime/trace/` and top-level `trace.*` | Runtime tracing | Diagnostic only | Runtime events, transition plans, projection snapshots | Trace entries and optional console output | `run_runtime_trace_tests.sh`, key-runtime trace variants | [KEY_RUNTIME](../KEY_RUNTIME.md) |
-| `macro/` | Hardcoded macros, VIA defaults, payload parser, compact slot metadata, one pinned shared IR, and scan-driven playback | Macro payload validation and one-active execution lifecycle | `MACRO_n`, `VIA_MACRO_n`, payload strings, VIA EEPROM, matrix scans | Lease-backed macro output, bounded cleanup, VIA default seeding | macro dispatch/payload/engine/provider/defaults/VIA lifecycle tests | [KEYMAP](../KEYMAP.md), [runtime-flow](./runtime-flow.md), [VIA_TO_QMK](../tooling/VIA_TO_QMK.md) |
+| `macro/` | VIA macro defaults, payload parser, compact slot metadata, one pinned shared IR, and scan-driven playback | Macro payload validation and one-active execution lifecycle | `VIA_MACRO_n`, payload strings, VIA EEPROM, matrix scans | Lease-backed macro output, bounded cleanup, VIA default seeding | macro payload/engine/provider/defaults/VIA lifecycle tests | [KEYMAP](../KEYMAP.md), [runtime-flow](./runtime-flow.md), [VIA_TO_QMK](../tooling/VIA_TO_QMK.md) |
 | `pointing/defs/` | PD mode manifest and generated keycodes | Authored PD identity | PD mode manifest macros | Mode ids, flags, keycodes, lock keycodes | PD mode and profile validation tests | [ADDING_PD_MODE](../ADDING_PD_MODE.md), [POINTER_MODES](../POINTER_MODES.md) |
 | `pointing/modes/` | Individual trackball mode handlers | Mode behavior only | Mouse reports and mode lifecycle callbacks | Transformed mouse reports, mode-specific reset/DPI behavior | `run_pd_mode_handlers_tests.sh`, `run_pd_mode_tests.sh` | [POINTER_MODES](../POINTER_MODES.md) |
 | `pointing/policy/` | Pointer layer and PD policy rules | Policy helper | Layer state, keycodes, PD traits | Pointer layer activation, mouse-record classification | `run_pointer_layer_policy_tests.sh`, PD/key-runtime integration tests | [POINTER_MODES](../POINTER_MODES.md) |
@@ -165,7 +165,7 @@ semantics without taking another platform timer sample.
 
 ### `macro/`
 
-- Dispatch and providers: `macro_dispatch.c/h`, `macro_slot_provider.c/h`,
+- Providers: `macro_slot_provider.c/h`,
   `via_macro_provider.c/h`, `via_macro_defaults.c/h`
 - Payload parser/encoder/runtime: `macro_payload.c/h`,
   `macro_payload_internal.h`, `macro_payload_decode_qmk.c`,
@@ -241,7 +241,7 @@ semantics without taking another platform timer sample.
 The authored profile boundary is intentionally outside `users/noah/lib/`:
 
 - `keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c` owns layers,
-  combos, hardcoded macro payloads, VIA macro defaults, key behaviors, and
+  combos, VIA macro defaults, key behaviors, and
   keymap-local custom keycodes.
 - `keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h` owns keymap-facing
   timing, layer ids, pointer tuning, and RGB feature flags.
@@ -262,7 +262,7 @@ Use the runner that matches the behavior touched while iterating, then use
 | Key behavior, authored profile validation, and generated overview | `run_profile_introspection_checks.sh`, `run_key_behavior_lookup_tests.sh`, `run_key_behavior_validation_tests.sh`, `run_keymap_validation_tests.sh`, `run_all_profile_validation_tests.sh`, `run_real_profile_thumb_layer_lock_integration_tests.sh` |
 | Key runtime | `run_key_runtime_release_matrix_tests.sh`, `run_key_runtime_modifier_hold_integration_tests.sh`, `run_pd_mode_key_runtime_integration_tests.sh`, `run_key_runtime_layer_lock_integration_tests.sh`, `run_key_runtime_scenario_tests.sh`, `run_key_runtime_integration_harness_tests.sh` |
 | Hooks, ownership, and boundaries | `run_hook_chaining_tests.sh`, `run_keyboard_mod_ownership_tests.sh`, `run_held_action_tests.sh`, `run_layer_ownership_tests.sh`, `run_feature_gate_compile_tests.sh` |
-| Macro, VIA, and QMK compatibility | `run_macro_dispatch_tests.sh`, `run_macro_payload_tests.sh`, `run_via_macro_defaults_tests.sh`, `run_via_macro_action_lifecycle_tests.sh`, `run_qmk_combo_origin_tests.sh`, `run_qmk_via_split_sync_tests.sh` |
+| Macro, VIA, and QMK compatibility | `run_macro_payload_tests.sh`, `run_qmk_portable_profile_tests.sh`, `run_via_macro_defaults_tests.sh`, `run_via_macro_action_lifecycle_tests.sh`, `run_qmk_combo_origin_tests.sh`, `run_qmk_via_split_sync_tests.sh` |
 | Pointing and PD mode | `run_pd_mode_tests.sh`, `run_pd_mode_handlers_tests.sh`, `run_pd_runtime_tests.sh`, `run_pointer_layer_policy_tests.sh` |
 | RGB and split | `run_rgb_validation_tests.sh`, `run_rgb_layer_render_tests.sh`, `run_split_runtime_sync_tests.sh` |
 | Runtime diagnostics and tracing | `run_runtime_init_order_tests.sh`, `run_runtime_debug_tests.sh`, `run_runtime_diag_tests.sh`, `run_runtime_trace_tests.sh` |

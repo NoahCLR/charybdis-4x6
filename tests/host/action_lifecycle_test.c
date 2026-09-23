@@ -40,7 +40,6 @@ static test_call_t pointer_action_call_1;
 static test_call_t pointer_action_call_2;
 static uint8_t     pointer_action_call_count;
 
-static uint8_t  macro_dispatch_calls;
 static uint8_t  pd_toggle_calls;
 static uint8_t  pd_press_calls;
 static uint8_t  pd_release_calls;
@@ -49,7 +48,6 @@ static keypos_t pd_press_key_pos;
 static keypos_t pd_release_key_pos;
 static uint8_t  split_sync_calls;
 
-static bool macro_dispatch_result;
 static bool pd_toggle_result;
 static bool pd_press_result;
 static bool pd_release_result;
@@ -100,7 +98,6 @@ static void test_reset_stubs(void) {
     pointer_action_call_1     = (test_call_t){0};
     pointer_action_call_2     = (test_call_t){0};
     pointer_action_call_count = 0;
-    macro_dispatch_calls      = 0;
     pd_toggle_calls           = 0;
     pd_press_calls            = 0;
     pd_release_calls          = 0;
@@ -108,17 +105,11 @@ static void test_reset_stubs(void) {
     pd_press_key_pos          = (keypos_t){0};
     pd_release_key_pos        = (keypos_t){0};
     split_sync_calls          = 0;
-    macro_dispatch_result     = false;
     pd_toggle_result          = false;
     pd_press_result           = false;
     pd_release_result         = false;
     owned_register_result     = false;
     owned_unregister_result   = false;
-}
-
-bool macro_dispatch(uint16_t action) {
-    macro_dispatch_calls++;
-    return action == MACRO_0 && macro_dispatch_result;
 }
 
 bool is_pd_mode_lock_action(uint16_t action) {
@@ -298,7 +289,6 @@ static void test_tap_handles_layer_lock_and_pd_lock(void) {
     test_reset_stubs();
 
     noah_action_tap(LOCK_LAYER(4));
-    CHECK(macro_dispatch_calls == 0);
     CHECK(layer_toggle_call.layer == 4);
     CHECK(split_sync_calls == 0);
     CHECK(tap_code16_call.keycode == KC_NO);
@@ -307,7 +297,6 @@ static void test_tap_handles_layer_lock_and_pd_lock(void) {
     pd_toggle_result = true;
 
     noah_action_tap(ARROW_MODE_LOCK);
-    CHECK(macro_dispatch_calls == 0);
     CHECK(pd_toggle_calls == 1);
     CHECK(pd_toggle_key_pos.row == MATRIX_ROWS);
     CHECK(pd_toggle_key_pos.col == MATRIX_COLS);
@@ -318,7 +307,6 @@ static void test_tap_handles_layer_lock_and_pd_lock(void) {
     pd_toggle_result = false;
 
     noah_action_tap(ARROW_MODE_LOCK);
-    CHECK(macro_dispatch_calls == 0);
     CHECK(pd_toggle_calls == 1);
     CHECK(split_sync_calls == 0);
 }
@@ -337,37 +325,40 @@ static void test_tap_at_preserves_pd_lock_origin_key_pos(void) {
 }
 
 static void test_tap_routes_macro_custom_qmk_and_plain_actions(void) {
+    keypos_t key_pos = test_keypos(1, 2);
+
+    // A retired user macro is consumed and does nothing; tapped as a keycode
+    // it would read as a modified basic key.
     test_reset_stubs();
-    macro_dispatch_result = true;
 
     noah_action_tap(MACRO_0);
-    CHECK(macro_dispatch_calls == 1);
+    noah_action_tap(MACRO_15);
+    noah_action_press(key_pos, MACRO_7);
     CHECK(tap_code16_call.keycode == KC_NO);
+    CHECK(register_code16_call.keycode == KC_NO);
+    CHECK(synthetic_tap_call.keycode == KC_NO);
+    CHECK(synthetic_record_call.keycode == KC_NO);
 
     test_reset_stubs();
 
     noah_action_tap(TEST_CUSTOM_ACTION);
-    CHECK(macro_dispatch_calls == 1);
     CHECK(synthetic_tap_call.keycode == TEST_CUSTOM_ACTION);
     CHECK(tap_code16_call.keycode == KC_NO);
 
     test_reset_stubs();
 
     noah_action_tap(TEST_QMK_BEHAVIOR_ACTION);
-    CHECK(macro_dispatch_calls == 1);
     CHECK(synthetic_qmk_tap_call.keycode == TEST_QMK_BEHAVIOR_ACTION);
     CHECK(tap_code16_call.keycode == KC_NO);
 
     test_reset_stubs();
 
     noah_action_tap(KC_C);
-    CHECK(macro_dispatch_calls == 1);
     CHECK(tap_code16_call.keycode == KC_C);
 
     test_reset_stubs();
 
     noah_action_tap(MS_BTN1);
-    CHECK(macro_dispatch_calls == 1);
     CHECK(tap_code16_call.keycode == MS_BTN1);
     CHECK(pointer_action_call_count == 2);
     CHECK(pointer_action_call_1.keycode == MS_BTN1);
@@ -380,7 +371,6 @@ static void test_tap_ignores_raw_layer_actions(void) {
     test_reset_stubs();
 
     noah_action_tap(TEST_RAW_LAYER_ACTION);
-    CHECK(macro_dispatch_calls == 1);
     CHECK(tap_code16_call.keycode == KC_NO);
     CHECK(synthetic_tap_call.keycode == KC_NO);
     CHECK(synthetic_qmk_tap_call.keycode == KC_NO);
@@ -393,7 +383,6 @@ static void test_press_routes_pd_mode_momentary_qmk_custom_and_plain(void) {
     pd_press_result = true;
 
     noah_action_press(key_pos, ARROW_MODE);
-    CHECK(macro_dispatch_calls == 1);
     CHECK(pd_press_calls == 1);
     CHECK(pd_press_key_pos.row == key_pos.row);
     CHECK(pd_press_key_pos.col == key_pos.col);
@@ -403,7 +392,6 @@ static void test_press_routes_pd_mode_momentary_qmk_custom_and_plain(void) {
     test_reset_stubs();
 
     noah_action_press(key_pos, MO(5));
-    CHECK(macro_dispatch_calls == 1);
     CHECK(pd_press_calls == 0);
     CHECK(layer_press_call.layer == 5);
     CHECK(layer_press_call.key_pos.row == key_pos.row);
@@ -451,7 +439,6 @@ static void test_press_ignores_raw_layer_actions_and_one_shot_actions(void) {
     test_reset_stubs();
 
     noah_action_press(key_pos, LOCK_LAYER(1));
-    CHECK(macro_dispatch_calls == 0);
     CHECK(layer_toggle_call.layer == 1);
     CHECK(pd_press_calls == 0);
     CHECK(register_code16_call.keycode == KC_NO);

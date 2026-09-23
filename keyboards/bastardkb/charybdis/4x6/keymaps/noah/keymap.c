@@ -4,7 +4,6 @@
 //
 // This translation unit owns the authored keymap data:
 //   - VIA_MACROS(MACRO)
-//   - HARDCODED_MACROS(MACRO)
 //   - COMBOS(COMBO)
 //   - key_behaviors[]
 //   - keymaps[][]
@@ -126,42 +125,6 @@ enum keymap_custom_keycodes {
     MACRO(VIA_MACRO_62, "")                                 \
     MACRO(VIA_MACRO_63, "")
 
-// ─── Hardcoded Macros ───────────────────────────────────────────────────────
-// HARDCODED_MACROS(MACRO) is the authored table for hardcoded custom macro
-// keycodes used by key_behaviors[] and authored layers.
-// All 16 slots are listed here so the slot limit stays visible in keymap.c.
-// Use an empty string for an unused slot.
-// VIA's dynamic macro payloads live in VIA_MACROS(MACRO) above.
-// Use VIA_MACRO_n when you want a QMK/VIA dynamic macro keycode instead of
-// one of these hardcoded custom macros.
-// In the VIA export JSON, these hardcoded custom macros remain CUSTOM(64+n),
-// while VIA's dynamic macro keycodes appear as MACRO(n).
-// Hardcoded macros use the same "{...}" payload language as VIA macros, but
-// they stay native to the firmware side and are interpreted at runtime by
-// users/noah/lib/macro/macro_payload.c.
-//
-// The via_to_qmk_layout.py converter never rewrites this block; it only knows the MACRO_n names
-// when converting VIA layout tokens.
-// If you need more hardcoded slots than MACRO_15, extend enum custom_keycodes
-// in users/noah/noah_keymap_ids.h.
-#define HARDCODED_MACROS(MACRO) \
-    MACRO(MACRO_0, "")          \
-    MACRO(MACRO_1, "")          \
-    MACRO(MACRO_2, "")          \
-    MACRO(MACRO_3, "")          \
-    MACRO(MACRO_4, "")          \
-    MACRO(MACRO_5, "")          \
-    MACRO(MACRO_6, "")          \
-    MACRO(MACRO_7, "")          \
-    MACRO(MACRO_8, "")          \
-    MACRO(MACRO_9, "")          \
-    MACRO(MACRO_10, "")         \
-    MACRO(MACRO_11, "")         \
-    MACRO(MACRO_12, "")         \
-    MACRO(MACRO_13, "")         \
-    MACRO(MACRO_14, "")         \
-    MACRO(MACRO_15, "")
-
 // ─── Combos ─────────────────────────────────────────────────────────────────
 //
 // COMBOS(COMBO) is the authored combo table.
@@ -198,7 +161,6 @@ enum keymap_custom_keycodes {
     COMBO(G(KC_T), (VOLUME_MODE, MS_BTN1, MS_BTN2))  \
     COMBO(KC_LGUI, (MS_BTN1, VOLUME_MODE))           \
     COMBO(G(KC_A), (G(KC_C), G(KC_V)))               \
-    /* COMBO(MACRO_0, (KC_Q, KC_W)) */               \
     /* COMBO(VIA_MACRO_0, (KC_U, KC_I)) */           \
     /* COMBO(LOCK_LAYER(LAYER_NAV), (KC_J, KC_K)) */ \
     /* COMBO(ARROW_MODE_LOCK, (KC_M, KC_COMM)) */    \
@@ -302,12 +264,10 @@ enum keymap_custom_keycodes {
 //   - Use the generated *_LOCK keycode to toggle a pointer-mode lock.
 //     Activating the same mode again unlocks it; pressing, holding or locking
 //     any other pointer-mode key also clears the previous lock.
-//   - Add hardcoded custom macros to HARDCODED_MACROS(MACRO) above, then use
-//     MACRO_n as the action in any helper: TAP_SENDS(MACRO_n),
-//     TAP_AT_HOLD_THRESHOLD(MACRO_n), TAP_ON_RELEASE_AFTER_HOLD(MACRO_n),
-//     PRESS_AND_HOLD_UNTIL_RELEASE(MACRO_n).
-//   - Use VIA_MACRO_n for a QMK/VIA dynamic macro keycode whose default
-//     contents come from VIA_MACROS(MACRO) above.
+//   - Use VIA_MACRO_n for a macro, as a key or as the action in any helper:
+//     TAP_SENDS(VIA_MACRO_n), PRESS_AND_HOLD_UNTIL_RELEASE(VIA_MACRO_n).
+//     Its default contents come from VIA_MACROS(MACRO) above. MACRO_0–15,
+//     the former user macros, are retired and do nothing.
 //   - Modded keycodes like G(KC_RIGHT), A(KC_LEFT), or S(KC_1) let one action
 //     send GUI, Alt, Shift, and similar variants without adding separate keys.
 //     Custom held actions decompose those into owned real mods plus the base

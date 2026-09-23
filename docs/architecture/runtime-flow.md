@@ -251,12 +251,9 @@ recovery are traced, but suppressed scans are intentionally silent.
 
 ```mermaid
 flowchart TD
-    keymap["keymap.c VIA_MACROS and HARDCODED_MACROS"] --> hardcoded["macro_dispatch hardcoded slots"]
-    keymap --> via_defaults["via_macro_defaults seeding"]
+    keymap["keymap.c VIA_MACROS"] --> via_defaults["via_macro_defaults seeding"]
     action["Action lifecycle"] --> via_play["VIA macro provider"]
-    action --> hardcoded
-    hardcoded --> provider["Compact slot metadata and shared IR"]
-    via_play --> provider
+    via_play --> provider["Compact slot metadata and shared IR"]
     provider --> payload["Validated macro IR"]
     payload --> engine["One-active scan engine"]
     scan["Matrix scan after key runtime"] --> engine
@@ -274,7 +271,9 @@ flowchart TD
     verify --> rgb_invalidate["Post-commit RGB and macro cache invalidation"]
 ```
 
-Hardcoded macros are source-owned. VIA macros are QMK dynamic macro slots with
+The former user macros (`MACRO_0`–`15`) are retired: the keys are consumed
+and do nothing, and the profile names VIA macros instead. VIA macros are QMK
+dynamic macro slots with
 source-authored defaults and durable split reconciliation. Macro reset does not
 publish until the authored defaults have seeded successfully. A transfer is
 limited to one storage/digest chunk or one RPC per scan, and a clean generation

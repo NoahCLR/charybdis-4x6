@@ -295,11 +295,6 @@ bool noah_synthetic_record_active(void) {
     return false;
 }
 
-bool macro_dispatch(uint16_t keycode) {
-    (void)keycode;
-    return false;
-}
-
 bool pd_mode_handle_key_event(uint16_t keycode, keyrecord_t *record) {
     (void)keycode;
     (void)record;

@@ -24,7 +24,7 @@ behavior. The UI must explain every intentional non-live boundary.
 | Hold mode and repeat rate | Milestone A behavior policy | 04 | behavior validator and lifecycle runtime |
 | `keymaps[][]` | Standard VIA-owned state; C is compiled default | 06 | QMK dynamic keymap/VIA reconciliation |
 | `VIA_MACROS` | Standard VIA-owned state; C is compiled default | 06 | QMK dynamic macro storage |
-| `HARDCODED_MACROS` | Portable settings domain `0x40`, 16 instruction streams | 06 | macro provider and profile schema |
+| VIA macro names | Portable settings domain `0x40` v3, 64 names of up to 23 bytes; replaces the retired user macros (v2's 16 instruction streams, still read) | 06 | profile schema |
 | `COMBOS` | GET `0x06` readout; optional live domain `0x30` for rows, timing and matching flags | 07 | combo validator/provider |
 | Logical layer names/order | Eight-layer bank; portable names and reference-preserving order | 07 | whole-profile cross-reference validator |
 | Custom-keycode enum and handler code | Executable firmware/action ABI | flash required | firmware build |

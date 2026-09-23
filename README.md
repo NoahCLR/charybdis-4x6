@@ -422,7 +422,6 @@ Use it for:
 - the physical layer layout
 - combos
 - VIA macro defaults
-- hardcoded macros
 - custom keycodes
 - `key_behaviors[]`
 - pointing-mode key placement and richer mode gestures
@@ -518,7 +517,7 @@ The helper vocabulary is:
   send `action` on release unless a longer hold replaces it
 
 `action` can be a normal keycode, a modified keycode such as `S(KC_1)`, a VIA
-macro, a hardcoded macro, a supported QMK behavior keycode such as `OSM()` or
+macro, a supported QMK behavior keycode such as `OSM()` or
 `MT()`, a generated pointing-mode lock such as `DRAGSCROLL_LOCK`, or a layer
 lock through `LOCK_LAYER(layer)`. For custom momentary layer holds, use
 `PRESS_AND_HOLD_UNTIL_RELEASE(MO(layer))` so the userspace owns the layer

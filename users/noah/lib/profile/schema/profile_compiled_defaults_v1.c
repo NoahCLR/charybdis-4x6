@@ -611,7 +611,8 @@ static noah_profile_compiled_v1_result_t action_abi_digest(uint32_t *digest, uin
     emit_u8(&writer, LAYER_COUNT);
     emit_u8(&writer, PD_MODE_COUNT);
     emit_u8(&writer, VIA_MACRO_SLOT_COUNT);
-    emit_u8(&writer, HARDCODED_MACRO_SLOT_COUNT);
+    // The retired user-macro range stays in the digest: its identities remain.
+    emit_u8(&writer, NOAH_PROFILE_ACTION_V1_MAX_HARDCODED_MACRO_SLOTS);
 #ifdef VIA_FIRMWARE_VERSION
     emit_u32(&writer, VIA_FIRMWARE_VERSION);
 #else
@@ -818,7 +819,7 @@ bool noah_profile_compiled_v1_compatibility(const noah_profile_compiled_v1_t *pr
     result.logical_layer_count               = LAYER_COUNT;
     result.supported_pd_mode_mask            = (uint8_t)((UINT32_C(1) << PD_MODE_COUNT) - 1u);
     result.via_macro_slot_count              = VIA_MACRO_SLOT_COUNT;
-    result.hardcoded_macro_slot_count        = HARDCODED_MACRO_SLOT_COUNT;
+    result.hardcoded_macro_slot_count        = NOAH_PROFILE_ACTION_V1_MAX_HARDCODED_MACRO_SLOTS;
     result.rgb_limits.logical_layer_count    = LAYER_COUNT;
     result.rgb_limits.supported_pd_mode_mask = result.supported_pd_mode_mask;
     result.rgb_limits.tap_branch_color_count = KEY_BEHAVIOR_MAX_TAP_COUNT - 1u;

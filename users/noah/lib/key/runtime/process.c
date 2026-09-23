@@ -6,7 +6,7 @@
 #include "deferred_release.h"
 #include "process_internal.h"
 #include "trace.h"
-#include "../../macro/macro_dispatch.h"
+#include "noah_keymap_ids.h"
 #include "../../pointing/defs/pd_modes.h"
 #include "../../pointing/runtime/pd_mode_keyboard_event_internal.h"
 #include "reducer/ownership_state.h"
@@ -201,9 +201,11 @@ static key_runtime_process_stage_outcome_t key_runtime_process_stage_direct_acti
     return KEY_RUNTIME_PROCESS_RETURN_FALSE;
 }
 
-static key_runtime_process_stage_outcome_t key_runtime_process_stage_macro_dispatch(key_runtime_process_ctx_t *ctx) {
-    if (ctx->record->event.pressed && macro_dispatch(ctx->keycode)) {
-        key_runtime_trace_message("process:macro_dispatch", "macro keycode consumed");
+// A retired user-macro key does nothing. Its press is consumed so the
+// keycode never reaches QMK.
+static key_runtime_process_stage_outcome_t key_runtime_process_stage_retired_macro(key_runtime_process_ctx_t *ctx) {
+    if (ctx->record->event.pressed && NOAH_KEYCODE_IS_RETIRED_MACRO(ctx->keycode)) {
+        key_runtime_trace_message("process:retired_macro", "retired macro keycode consumed");
         return KEY_RUNTIME_PROCESS_RETURN_FALSE;
     }
 
@@ -272,7 +274,7 @@ bool noah_pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
 
 bool noah_process_record_user(uint16_t keycode, keyrecord_t *record) {
     static const key_runtime_process_stage_entry_t stages[] = {
-        {.name = "synthetic_passthrough", .handler = key_runtime_process_stage_synthetic_passthrough}, {.name = "preflight", .handler = key_runtime_process_stage_preflight}, {.name = "release_slot_keycode", .handler = key_runtime_process_stage_release_slot_keycode}, {.name = "pd_mode", .handler = key_runtime_process_stage_pd_mode}, {.name = "handled_key", .handler = key_runtime_process_stage_handled_key}, {.name = "non_handled_release_cleanup", .handler = key_runtime_process_stage_non_handled_release_cleanup}, {.name = "direct_action", .handler = key_runtime_process_stage_direct_action}, {.name = "macro_dispatch", .handler = key_runtime_process_stage_macro_dispatch},
+        {.name = "synthetic_passthrough", .handler = key_runtime_process_stage_synthetic_passthrough}, {.name = "preflight", .handler = key_runtime_process_stage_preflight}, {.name = "release_slot_keycode", .handler = key_runtime_process_stage_release_slot_keycode}, {.name = "pd_mode", .handler = key_runtime_process_stage_pd_mode}, {.name = "handled_key", .handler = key_runtime_process_stage_handled_key}, {.name = "non_handled_release_cleanup", .handler = key_runtime_process_stage_non_handled_release_cleanup}, {.name = "direct_action", .handler = key_runtime_process_stage_direct_action}, {.name = "retired_macro", .handler = key_runtime_process_stage_retired_macro},
     };
     key_runtime_process_ctx_t ctx = {
         .keycode         = keycode,

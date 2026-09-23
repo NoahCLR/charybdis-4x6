@@ -6,7 +6,6 @@
 #define _KEYMAP_CONCAT_INNER(a_, b_) a_##b_
 #define _KEYMAP_CONCAT(a_, b_) _KEYMAP_CONCAT_INNER(a_, b_)
 #define _KEYMAP_VIA_MACRO_PAYLOAD_ENTRY(keycode_, payload_) [((keycode_) - VIA_MACRO_0)] = (payload_),
-#define _KEYMAP_HARDCODED_MACRO_PAYLOAD_ENTRY(keycode_, payload_) [((keycode_) - MACRO_0)] = (payload_),
 #define _KEYMAP_COMBO_OUTPUT_ENTRY(result_, keys_) (result_),
 #define _KEYMAP_STRIP_PARENS(...) __VA_ARGS__
 #define _KEYMAP_COMBO_BIND_DEF(result_, keys_) COMBO(((const uint16_t[]){_KEYMAP_STRIP_PARENS keys_, COMBO_END}), result_),
@@ -50,7 +49,6 @@
 
 #define MATERIALIZE_KEYMAP_DATA()                                                                                                       \
     const char *const via_macro_payloads[VIA_MACRO_SLOT_COUNT]             = {VIA_MACROS(_KEYMAP_VIA_MACRO_PAYLOAD_ENTRY)};             \
-    const char *const hardcoded_macro_payloads[HARDCODED_MACRO_SLOT_COUNT] = {HARDCODED_MACROS(_KEYMAP_HARDCODED_MACRO_PAYLOAD_ENTRY)}; \
     _KEYMAP_COMBO_DATA()                                                                                                                \
     _KEYMAP_COMBO_COUNT_DATA();                                                                                                         \
     _KEYMAP_COMBO_OUTPUT_DATA();                                                                                                        \

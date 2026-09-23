@@ -216,8 +216,8 @@ authority identities are reported as conflicts rather than selected silently.
 | Physical LEDs | compiled 58 |
 | LEDs per group | compiled 58 |
 | Canonical LED bitmap | 8 bytes |
-| Hardcoded macro slots | 16 |
-| Persisted hardcoded macro payload | 1,024 bytes aggregate |
+| Retired user-macro slots (action ABI range) | 16 |
+| Persisted user-macro payload (settings v1/v2 only) | 1,024 bytes aggregate |
 | Storage slot | 4,096 bytes |
 | Canonical profile payload | 4,064 bytes |
 

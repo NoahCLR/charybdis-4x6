@@ -99,7 +99,6 @@ run_validation_variant() {
         "$ROOT/users/noah/lib/action/action_kind.c" \
         "$ROOT/users/noah/lib/key/behavior/key_behavior_lookup.c" \
         "$ROOT/users/noah/lib/key/behavior/keymap_validation.c" \
-        "$ROOT/users/noah/lib/macro/macro_dispatch.c" \
         "$ROOT/users/noah/lib/macro/macro_payload_encode.c" \
         "$ROOT/users/noah/lib/macro/macro_payload_keycodes.c" \
         "$ROOT/users/noah/lib/macro/macro_payload_parse.c" \

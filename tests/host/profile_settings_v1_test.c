@@ -3,12 +3,9 @@
 #include <string.h>
 #include "users/noah/lib/profile/schema/profile_settings_v1.h"
 #include "users/noah/lib/profile/runtime/effective_settings_runtime.h"
-static unsigned applied, invalidated;
+static unsigned applied;
 void            noah_qmk_portable_apply(void) {
     applied++;
-}
-void macro_dispatch_invalidate(void) {
-    invalidated++;
 }
 static uint8_t  bytes[NOAH_SETTINGS_FIXED_SIZE + 64 + 32];
 static uint16_t length;
@@ -114,26 +111,32 @@ int main(void) {
     view.profile.settings                  = (noah_profile_settings_v1_view_t){0, length};
     noah_effective_settings_invalidate(NULL, 1, view.identity, view.identity, &view);
     assert(noah_setting(NOAH_SETTING_TAPPING_TERM, 99) == 200);
-    macro_payload_ir_t ir;
-    assert(noah_effective_settings_macro(15, &ir) && !ir.length);
-    assert(applied == 1 && invalidated == 1);
-    // Missing domain returns ownership to defaults; an explicitly empty bank
-    // above overrides all sixteen compiled slots.
+    // The whole stored domain stays readable, retired user macros included.
+    assert(applied == 1 && noah_effective_settings_length() == length);
+    for (uint16_t i = 0; i < length; i++)
+        assert(noah_effective_settings_byte(i) == bytes[i]);
+    assert(noah_effective_settings_byte(length) == 0);
+    // Missing domain returns ownership to defaults.
     view.profile.domain_mask = 0;
     noah_effective_settings_invalidate(NULL, 2, view.identity, view.identity, &view);
     assert(noah_setting(NOAH_SETTING_TAPPING_TERM, 99) == 99);
-    assert(!noah_effective_settings_macro(0, &ir));
+    assert(!noah_effective_settings_length() && !noah_effective_settings_byte(0));
+    assert(applied == 1);
 #ifdef NOAH_PD_PROFILE_ENABLE
     test_macro_names();
-    // A v3 domain has no user macros: every slot reads as explicitly empty.
+    // A v3 domain's names read back as stored.
     defaults_as(3);
+    bytes[NOAH_SETTINGS_FIXED_SIZE + 5]  = 2;
+    bytes[NOAH_SETTINGS_FIXED_SIZE + 6]  = 'O';
+    bytes[NOAH_SETTINGS_FIXED_SIZE + 7]  = 'K';
+    length                              += 2;
     view.reader              = noah_profile_reader_from_memory(bytes, length);
     view.profile.domain_mask = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_SETTINGS;
     view.profile.settings    = (noah_profile_settings_v1_view_t){0, length};
     noah_effective_settings_invalidate(NULL, 3, view.identity, view.identity, &view);
     assert(noah_setting(NOAH_SETTING_TAPPING_TERM, 99) == 200);
-    ir.length = 7;
-    assert(noah_effective_settings_macro(3, &ir) && !ir.length);
+    assert(noah_effective_settings_length() == length);
+    assert(noah_effective_settings_byte(NOAH_SETTINGS_FIXED_SIZE + 5) == 2 && noah_effective_settings_byte(NOAH_SETTINGS_FIXED_SIZE + 7) == 'K');
 #endif
     puts("portable settings validation and publication tests passed");
 }

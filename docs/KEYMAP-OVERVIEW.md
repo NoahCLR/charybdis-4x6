@@ -421,10 +421,6 @@ Authored key-feedback LED groups repaint after the feedback locality render insi
 | `VIA_MACRO_10` | `{KC_LGUI,KC_A}{50}{KC_LGUI,KC_C}` | `G(KC_C) double tap` |
 | `VIA_MACRO_11` | `{KC_LGUI,KC_LSFT,KC_DOT}` | `LAYER_SYM @ VIA11` |
 
-### Hardcoded Macros
-
-No filled hardcoded macro slots.
-
 ## Reference
 
 ### Authored Sources
@@ -486,8 +482,6 @@ Reusable groups define physical LED sets once near the LED map in `rgb_config.c`
 | `combo_count` | `7` |
 | `via_macro_count` | `64` |
 | `via_macro_non_empty_count` | `12` |
-| `hardcoded_macro_count` | `16` |
-| `hardcoded_macro_non_empty_count` | `0` |
 | `keymap_custom_keycode_count` | `4` |
 | `pd_mode_count` | `8` |
 | `pd_mode_color_count` | `8` |

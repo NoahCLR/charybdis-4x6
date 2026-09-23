@@ -592,11 +592,6 @@ bool noah_qmk_contract_try_play_via_macro(uint16_t action) {
     return false;
 }
 
-bool macro_dispatch(uint16_t keycode) {
-    (void)keycode;
-    return false;
-}
-
 bool noah_synthetic_record_active(void) {
     return false;
 }

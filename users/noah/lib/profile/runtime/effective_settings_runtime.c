@@ -1,7 +1,5 @@
 #include "effective_settings_runtime.h"
 #ifdef NOAH_PORTABLE_PROFILE_ENABLE
-#    include <string.h>
-#    include "../../macro/macro_dispatch.h"
 static uint8_t  settings[NOAH_SETTINGS_MAX_SIZE];
 static uint16_t settings_length;
 static bool     booting;
@@ -16,32 +14,13 @@ uint32_t noah_setting(uint8_t id, uint32_t fallback) {
     const uint8_t *p = &settings[8 + id * 4];
     return (uint32_t)p[0] | (uint32_t)p[1] << 8 | (uint32_t)p[2] << 16 | (uint32_t)p[3] << 24;
 }
-bool noah_effective_settings_copy(uint8_t *output, uint16_t *length) {
-    if (!settings_length || !output || !length) return false;
-    memcpy(output, settings, settings_length);
-    *length = settings_length;
-    return true;
+// The whole stored domain stays cached so readback can return its macro
+// names (v3) or retired user macros (v2) as stored.
+uint16_t noah_effective_settings_length(void) {
+    return settings_length;
 }
-bool noah_effective_settings_macro(uint8_t slot, macro_payload_ir_t *ir) {
-    if (!settings_length || slot >= 16 || !ir) return false;
-    // v3 carries no user macros: an explicitly empty bank, so the compiled
-    // defaults stay silent too.
-    if (settings[0] >= 3u) {
-        ir->length = 0;
-        return true;
-    }
-    uint16_t offset = NOAH_SETTINGS_FIXED_SIZE;
-    for (uint8_t i = 0; i <= slot; i++) {
-        uint16_t length = settings[offset] | (uint16_t)settings[offset + 1] << 8;
-        offset += 2;
-        if (i == slot) {
-            ir->length = length;
-            memcpy(ir->bytes, settings + offset, length);
-            return true;
-        }
-        offset += length;
-    }
-    return false;
+uint8_t noah_effective_settings_byte(uint16_t offset) {
+    return offset < settings_length ? settings[offset] : 0u;
 }
 void noah_effective_settings_invalidate(void *context, uint32_t publication, noah_effective_profile_identity_t previous, noah_effective_profile_identity_t active, const noah_effective_profile_snapshot_t *view) {
     (void)context;
@@ -63,7 +42,6 @@ void noah_effective_settings_invalidate(void *context, uint32_t publication, noa
             if (ok) settings_length = length;
         }
     }
-    macro_dispatch_invalidate();
     if (settings_length) noah_qmk_portable_apply();
 }
 #endif

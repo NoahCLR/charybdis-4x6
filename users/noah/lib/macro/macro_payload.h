@@ -28,7 +28,6 @@ typedef struct {
 
 typedef enum {
     MACRO_PAYLOAD_SOURCE_DIRECT = 0,
-    MACRO_PAYLOAD_SOURCE_HARDCODED,
     MACRO_PAYLOAD_SOURCE_VIA,
 } macro_payload_source_t;
 

@@ -39,7 +39,6 @@ LAYOUT_OUTPUT = "\n".join(
 
 MACRO_OUTPUT = "\n".join(
     (
-        "20000000 00000010 b hardcoded_macro_slots",
         "20000010 00000040 B via_macro_slots.lto_priv.7",
         "20000050 00000202 b macro_slot_active_ir.lto_priv.8",
         "20000254 00000004 b macro_slot_active_metadata.lto_priv.9",
@@ -75,7 +74,6 @@ class FirmwareMemoryBudgetToolTest(unittest.TestCase):
         symbols = MEMORY_BUDGET.parse_nm_symbols(
             "\n".join(
                 (
-                    "20000000 00000010 b hardcoded_macro_slots",
                     "20000010 00000040 B via_macro_slots.lto_priv.7",
                     "20000050 00000202 b macro_slot_active_ir.lto_priv.8",
                     "20000254 00000004 b macro_slot_active_metadata.lto_priv.9",
@@ -83,7 +81,6 @@ class FirmwareMemoryBudgetToolTest(unittest.TestCase):
                 )
             )
         )
-        self.assertEqual(symbols["hardcoded_macro_slots"], 16)
         self.assertEqual(symbols["via_macro_slots"], 64)
         self.assertEqual(symbols["macro_slot_active_ir"], 514)
         self.assertEqual(symbols["macro_slot_active_metadata"], 4)
@@ -91,16 +88,14 @@ class FirmwareMemoryBudgetToolTest(unittest.TestCase):
     def test_rejects_missing_required_symbol(self):
         with self.assertRaisesRegex(ValueError, "via_macro_slots"):
             MEMORY_BUDGET.parse_nm_symbols(
-                "20000000 00000010 b hardcoded_macro_slots\n"
                 "20000010 00000202 b macro_slot_active_ir\n"
             )
 
     def test_rejects_duplicate_canonical_symbol(self):
         with self.assertRaisesRegex(ValueError, "duplicate"):
             MEMORY_BUDGET.parse_nm_symbols(
-                "20000000 00000010 b hardcoded_macro_slots\n"
-                "20000010 00000010 b hardcoded_macro_slots.lto_priv.1\n"
                 "20000020 00000040 b via_macro_slots\n"
+                "20000030 00000040 b via_macro_slots.lto_priv.1\n"
                 "20000060 00000202 b macro_slot_active_ir\n"
             )
 

@@ -118,7 +118,7 @@ static noah_profile_validator_v1_compatibility_t compatibility(uint32_t action_a
     value.logical_layer_count                       = LAYER_COUNT;
     value.supported_pd_mode_mask                    = (uint8_t)((1u << PD_MODE_COUNT) - 1u);
     value.via_macro_slot_count                      = VIA_MACRO_SLOT_COUNT;
-    value.hardcoded_macro_slot_count                = HARDCODED_MACRO_SLOT_COUNT;
+    value.hardcoded_macro_slot_count                = NOAH_PROFILE_ACTION_V1_MAX_HARDCODED_MACRO_SLOTS;
     value.rgb_limits.logical_layer_count            = LAYER_COUNT;
     value.rgb_limits.supported_pd_mode_mask         = value.supported_pd_mode_mask;
     value.rgb_limits.maximum_brightness             = RGB_MATRIX_MAXIMUM_BRIGHTNESS;
@@ -193,7 +193,7 @@ static void test_real_authored_profile(void) {
     assert(runtime_compatibility.logical_layer_count == LAYER_COUNT);
     assert(runtime_compatibility.supported_pd_mode_mask == (uint8_t)((UINT32_C(1) << PD_MODE_COUNT) - 1u));
     assert(runtime_compatibility.via_macro_slot_count == VIA_MACRO_SLOT_COUNT);
-    assert(runtime_compatibility.hardcoded_macro_slot_count == HARDCODED_MACRO_SLOT_COUNT);
+    assert(runtime_compatibility.hardcoded_macro_slot_count == NOAH_PROFILE_ACTION_V1_MAX_HARDCODED_MACRO_SLOTS);
     assert(runtime_compatibility.rgb_limits.logical_layer_count == LAYER_COUNT);
     assert(runtime_compatibility.rgb_limits.maximum_brightness == RGB_MATRIX_MAXIMUM_BRIGHTNESS);
     assert(runtime_compatibility.rgb_limits.compiled_stage_mask == NOAH_PROFILE_RGB_V1_STAGE_MASK_ALL);

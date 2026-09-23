@@ -105,8 +105,9 @@ _Static_assert((QK_MACRO_0 + VIA_MACRO_SLOT_COUNT - 1) <= QK_MACRO_MAX, "VIA mac
 // Custom keycodes are assigned values starting from SAFE_RANGE so they don't
 // collide with any built-in QMK or Charybdis keycodes.
 //
-// MACRO_0–15 are hardcoded custom macro slots used by key_behaviors[] and
-// dispatched by macro_dispatch().
+// MACRO_0–15 once played the firmware's user macros. Those are retired: the
+// identities keep their values, so stored profiles and the action ABI stay
+// valid, but the keys do nothing. Name and edit VIA macros instead.
 // VIA macros use the VIA_MACRO_0–63 aliases.
 // Plain pointing-device mode keycodes work as default momentary holds.
 // Add a key_behaviors[] row when you want those keys to grow explicit tap,
@@ -157,12 +158,11 @@ _Static_assert(PD_SLOT_6 == 0x7ef0, "PD extension ABI changed");
 
 #define PD_MODE_KEYCODE_COUNT PD_MODE_COUNT
 #define PD_MODE_LOCK_KEYCODE_COUNT PD_MODE_COUNT
-#define HARDCODED_MACRO_SLOT_COUNT ((MACRO_15 - MACRO_0) + 1)
+#define NOAH_KEYCODE_IS_RETIRED_MACRO(keycode_) ((keycode_) >= MACRO_0 && (keycode_) <= MACRO_15)
 #define LOCK_LAYER(layer_) (LAYER_LOCK_BASE + (layer_))
 #define NOAH_KEYMAP_SAFE_RANGE CUSTOM_KEYCODES_END
 
 extern const char *const via_macro_payloads[VIA_MACRO_SLOT_COUNT];
-extern const char *const hardcoded_macro_payloads[HARDCODED_MACRO_SLOT_COUNT];
 #ifdef COMBO_ENABLE
 extern combo_t       key_combos[];
 extern const uint8_t noah_combo_count;

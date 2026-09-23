@@ -181,11 +181,6 @@ void noah_runtime_diag_heartbeat(void) {
     runtime_diag_heartbeat_count++;
 }
 
-bool macro_dispatch(uint16_t action) {
-    (void)action;
-    return false;
-}
-
 bool is_pd_mode_lock_action(uint16_t action) {
     (void)action;
     return false;

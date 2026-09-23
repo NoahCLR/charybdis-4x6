@@ -12,7 +12,6 @@
 #    include "../profile/runtime/effective_settings_runtime.h"
 #    include "../profile/storage/profile_checksum.h"
 #    include "../profile/storage/profile_store_runtime.h"
-#    include "../macro/macro_payload.h"
 #    include "../profile/schema/profile_pd_v1.h"
 
 // Cold readback workspace, never used by key events or RGB rendering.
@@ -29,9 +28,7 @@ void noah_qmk_portable_storage_init(void) {
     if ((word >> 28) != NOAH_QMK_VIA_SYNC_METADATA_SCHEMA) via_eeprom_set_valid(false);
 #    endif
 }
-static uint8_t  snapshot[NOAH_SETTINGS_MAX_SIZE];
-static uint16_t snapshot_length;
-static void     u16(uint8_t *p, uint16_t v) {
+static void u16(uint8_t *p, uint16_t v) {
     p[0] = v;
     p[1] = v >> 8;
 }
@@ -107,39 +104,40 @@ static uint32_t setting_default(uint8_t id) {
 static bool external_setting(uint8_t id) {
     return (id >= NOAH_SETTING_AUTO_MOUSE_ENABLED && id <= NOAH_SETTING_AUTO_MOUSE_DEBOUNCE) || (id >= NOAH_SETTING_DEFAULT_DPI && id <= NOAH_SETTING_KEYMAP_OPTIONS);
 }
-static bool capture(void) {
-    bool live = noah_effective_settings_copy(snapshot, &snapshot_length);
-    if (!live) {
-        memset(snapshot, 0, sizeof(snapshot));
+// Settings readback streams from the effective settings rather than keeping
+// a second copy. Page 0 describes the bytes as they are now; a change between
+// pages shows up as the digest mismatch the reader already checks for.
+static uint16_t settings_length(void) {
+    uint16_t length = noah_effective_settings_length();
+    if (length) return length;
 #if NOAH_PROFILE_SETTINGS_VERSION >= 3u
-        // v3: no user macros; the 64 VIA macro names start empty.
-        const uint8_t header[8] = {NOAH_SETTINGS_VERSION, 8, 28, NOAH_SETTINGS_MACRO_NAMES, 0, 0, 0, 0};
-        memcpy(snapshot, header, 8);
-        snapshot_length = NOAH_SETTINGS_FIXED_SIZE + NOAH_SETTINGS_MACRO_NAMES;
+    return NOAH_SETTINGS_FIXED_SIZE + NOAH_SETTINGS_MACRO_NAMES;
 #else
-        const uint8_t header[8] = {NOAH_SETTINGS_VERSION, 8, 28, 16, 0, 0, 0, 0};
-        memcpy(snapshot, header, 8);
-        snapshot_length = NOAH_SETTINGS_FIXED_SIZE;
-        for (uint8_t slot = 0; slot < 16; slot++) {
-            macro_payload_ir_t ir;
-            const char        *text = hardcoded_macro_payloads[slot];
-            if (!macro_payload_compile(text ? text : "", &ir) || snapshot_length + 2u + ir.length > sizeof(snapshot)) return false;
-            u16(snapshot + snapshot_length, ir.length);
-            snapshot_length += 2;
-            memcpy(snapshot + snapshot_length, ir.bytes, ir.length);
-            snapshot_length += ir.length;
-        }
+    return NOAH_SETTINGS_FIXED_SIZE + NOAH_SETTINGS_MACROS * 2u;
 #endif
-    }
-    for (uint8_t id = 0; id < NOAH_SETTINGS_COUNT; id++) {
+}
+static uint8_t settings_byte(uint16_t offset) {
+    if (offset >= 8u && offset < 8u + NOAH_SETTINGS_COUNT * 4u) {
+        uint8_t  id    = (offset - 8u) / 4u;
         uint32_t value = setting_default(id);
         if (!external_setting(id)) value = noah_setting(id, value);
-        u32(&snapshot[8 + id * 4], value);
+        return value >> (8u * ((offset - 8u) % 4u));
     }
-    return true;
+    if (noah_effective_settings_length()) return noah_effective_settings_byte(offset);
+    // No profile settings are live: the current version with every macro
+    // unnamed (v3), or every user macro empty (v1).
+#if NOAH_PROFILE_SETTINGS_VERSION >= 3u
+    const uint8_t header[8] = {NOAH_SETTINGS_VERSION, 8, NOAH_SETTINGS_COUNT, NOAH_SETTINGS_MACRO_NAMES, 0, 0, 0, 0};
+#else
+    const uint8_t header[8] = {NOAH_SETTINGS_VERSION, 8, NOAH_SETTINGS_COUNT, NOAH_SETTINGS_MACROS, 0, 0, 0, 0};
+#endif
+    return offset < 8u ? header[offset] : 0u;
 }
 #ifndef NOAH_PD_PROFILE_ENABLE
-static bool capture_legacy_pd(void) {
+// The bridge's legacy pointing source is encoded once, at page 0.
+static uint8_t  snapshot[NOAH_PROFILE_PD_V1_SIZE];
+static uint16_t snapshot_length;
+static bool     capture_legacy_pd(void) {
     const uint8_t header[8] = {1, 8, 96, 0, 0, 0, 0, 0};
     memcpy(snapshot, header, 8);
     snapshot_length = NOAH_PROFILE_PD_V1_SIZE;
@@ -151,6 +149,24 @@ static bool capture_legacy_pd(void) {
     return noah_profile_pd_v1_validate(snapshot, snapshot_length, NULL) == NOAH_PROFILE_PD_V1_OK;
 }
 #endif
+// Up to 25 readback bytes of `kind` from `offset`; 0 past the end.
+static uint8_t readback_fill(uint8_t kind, uint16_t offset, uint8_t *target) {
+#ifndef NOAH_PD_PROFILE_ENABLE
+    uint16_t length = kind == 7 ? settings_length() : snapshot_length;
+#else
+    uint16_t length = settings_length();
+    (void)kind;
+#endif
+    if (offset >= length) return 0;
+    uint8_t count = length - offset < 25u ? length - offset : 25u;
+    for (uint8_t i = 0; i < count; i++)
+#ifndef NOAH_PD_PROFILE_ENABLE
+        target[i] = kind == 7 ? settings_byte(offset + i) : snapshot[offset + i];
+#else
+        target[i] = settings_byte(offset + i);
+#endif
+    return count;
+}
 void noah_qmk_portable_apply(void) {
     set_auto_mouse_enable(noah_setting(NOAH_SETTING_AUTO_MOUSE_ENABLED, get_auto_mouse_enable()));
     set_auto_mouse_layer(noah_setting(NOAH_SETTING_AUTO_MOUSE_LAYER, get_auto_mouse_layer()));
@@ -209,32 +225,29 @@ bool noah_qmk_portable_profile_get(uint8_t *frame, uint8_t length) {
         u16(p + 23, s.conflict_count);
         frame[6] = 25;
     } else if (!frame[4]) {
-        if (!(frame[2] == 7 ? capture() :
 #ifndef NOAH_PD_PROFILE_ENABLE
-              capture_legacy_pd()
-#else
-              false
-#endif
-              )) {
+        if (frame[2] == 9 && !capture_legacy_pd()) {
             snapshot_length = 0;
             frame[5]        = 3;
             return true;
         }
+#endif
+        uint16_t length = 0;
+        uint32_t crc = NOAH_PROFILE_CRC32_INITIAL, fnv = NOAH_PROFILE_FNV1A_INITIAL;
+        uint8_t  chunk[25];
+        for (uint8_t count; (count = readback_fill(frame[2], length, chunk)); length += count) {
+            crc = noah_profile_crc32_update(crc, chunk, count);
+            fnv = noah_profile_fnv1a_update(fnv, chunk, count);
+        }
         p[0] = 1;
         p[1] = 25;
-        u16(p + 2, snapshot_length);
-        u32(p + 4, noah_profile_crc32_finish(noah_profile_crc32_update(NOAH_PROFILE_CRC32_INITIAL, snapshot, snapshot_length)));
-        u32(p + 8, noah_profile_fnv1a_update(NOAH_PROFILE_FNV1A_INITIAL, snapshot, snapshot_length));
+        u16(p + 2, length);
+        u32(p + 4, noah_profile_crc32_finish(crc));
+        u32(p + 8, fnv);
         frame[6] = 12;
     } else {
-        uint16_t offset = (frame[4] - 1) * 25u;
-        if (!snapshot_length || offset >= snapshot_length) {
-            frame[5] = 2;
-            return true;
-        }
-        uint8_t count = snapshot_length - offset < 25 ? snapshot_length - offset : 25;
-        memcpy(p, snapshot + offset, count);
-        frame[6] = count;
+        frame[6] = readback_fill(frame[2], (frame[4] - 1) * 25u, p);
+        if (!frame[6]) frame[5] = 2;
     }
     return true;
 }

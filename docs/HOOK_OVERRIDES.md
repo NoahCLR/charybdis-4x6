@@ -274,7 +274,7 @@ outright with no chaining helper and no compile gate to notice.
 | `is_keyboard_left_impl()` | `users/noah/lib/compat/qmk_physical_half.c` | flash-provisioned handedness under `NOAH_PHYSICAL_HALF=left/right`; empty for generic firmware |
 
 Authored-profile validation is also wired into `users/noah/rules.mk`, so
-invalid key behavior, keymap, hardcoded macro, or RGB authored data hard-fails
+invalid key behavior, keymap, or RGB authored data hard-fails
 the firmware build before flashing.
 
 ## Verification

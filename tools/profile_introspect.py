@@ -1941,7 +1941,6 @@ def build_profile_model() -> dict[str, object]:
     )
     keymap_custom_keycodes = parse_keymap_custom_keycodes(keymap_text)
     via_macros = parse_macro_slots(parse_macro_table(keymap_text, "VIA_MACROS", "MACRO"), kind="via")
-    hardcoded_macros = parse_macro_slots(parse_macro_table(keymap_text, "HARDCODED_MACROS", "MACRO"), kind="hardcoded")
     behaviors = parse_key_behaviors(keymap_text, config_macros)
     combos = parse_combos(keymap_text)
     parsed_layers = parse_layers(keymap_text, known_behaviors={behavior_lookup_key(behavior.keycode) for behavior in behaviors})
@@ -2017,15 +2016,11 @@ def build_profile_model() -> dict[str, object]:
         key_behavior_feedback_colors,
     )
 
-    macro_usages = collect_macro_usages(parsed_layers, behaviors, combos, via_macros + hardcoded_macros)
+    macro_usages = collect_macro_usages(parsed_layers, behaviors, combos, via_macros)
 
     via_slots = []
     for slot in via_macros:
         via_slots.append({**asdict(slot), "usages": macro_usages[slot.keycode]})
-
-    hardcoded_slots = []
-    for slot in hardcoded_macros:
-        hardcoded_slots.append({**asdict(slot), "usages": macro_usages[slot.keycode]})
 
     behavior_rows = [asdict(behavior) for behavior in behaviors]
     combos_rows = [asdict(combo) for combo in combos]
@@ -2038,8 +2033,6 @@ def build_profile_model() -> dict[str, object]:
         "combo_count": len(combos),
         "via_macro_count": len(via_macros),
         "via_macro_non_empty_count": sum(not slot.empty for slot in via_macros),
-        "hardcoded_macro_count": len(hardcoded_macros),
-        "hardcoded_macro_non_empty_count": sum(not slot.empty for slot in hardcoded_macros),
         "keymap_custom_keycode_count": len(keymap_custom_keycodes),
         "pd_mode_count": len(pd_modes),
         "pd_mode_color_count": len(pd_mode_colors),
@@ -2085,7 +2078,6 @@ def build_profile_model() -> dict[str, object]:
         },
         "keymap_custom_keycodes": keymap_custom_keycodes,
         "via_macros": via_slots,
-        "hardcoded_macros": hardcoded_slots,
         "combos": combos_rows,
         "key_behaviors": behavior_rows,
         "layers": parsed_layers,
@@ -3740,7 +3732,6 @@ def escape_mermaid_label(label: str) -> str:
 
 def render_macro_section(profile: dict[str, object]) -> str:
     via_slots = [slot for slot in profile["via_macros"] if not slot["empty"]]
-    hardcoded_slots = [slot for slot in profile["hardcoded_macros"] if not slot["empty"]]
     lines = [
         "## Macro Inventory",
         "",
@@ -3759,18 +3750,6 @@ def render_macro_section(profile: dict[str, object]) -> str:
     else:
         lines.append("No filled VIA macro slots.")
 
-    lines.extend(["", "### Hardcoded Macros", ""])
-    if hardcoded_slots:
-        lines.extend(
-            [
-                "| Slot | Payload | Usage |",
-                "| --- | --- | --- |",
-            ]
-        )
-        for slot in hardcoded_slots:
-            lines.append(f"| `{slot['keycode']}` | `{slot['payload']}` | {format_usages(slot['usages'])} |")
-    else:
-        lines.append("No filled hardcoded macro slots.")
     lines.append("")
     return "\n".join(lines)
 

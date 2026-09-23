@@ -94,9 +94,10 @@ controls, DEL, overlong or surrogate encodings. The envelope version and the
 payload's first byte must agree. The minimum is 376 bytes, all names empty.
 
 The firmware never reads a name; they are profile data for the app, saved and
-copied to the other half with everything else. A version-3 domain reads as an
-explicitly empty user-macro bank, so the compiled user-macro defaults stay
-silent. The keycodes `MACRO_0`–`MACRO_15` (`QK_USER_0`–`QK_USER_15`) keep their
+copied to the other half with everything else. The firmware no longer plays
+user macros at all: a version-2 domain's macro records are kept and read back
+as stored, but never run, and a `MACRO_n` key is consumed and does nothing.
+The keycodes `MACRO_0`–`MACRO_15` (`QK_USER_0`–`QK_USER_15`) keep their
 values so every later custom keycode and the action ABI digest are unchanged.
 The app upgrades a profile to version 3 only when a macro is named; any other
 edit keeps the version it read, and a schema-1 profile cannot carry names.
@@ -137,11 +138,14 @@ domain, and bind that read before and after acquiring the candidate lease.
 
 These use the existing Profile Wire custom GET envelope and request ID.
 
-GET value `0x07`, page 0 captures effective scalars, names and user macros into
-a cold snapshot. Its 12-byte payload is version `1`, chunk size `25`, uint16
-length, CRC32, and FNV-1a digest. Pages 1 onward return successive 25-byte chunks
-with an exact short final chunk. Reading page 0 again recaptures metadata; the
-host requires identity and both checksums to match. The complete export also
+GET value `0x07` reads the effective settings domain with its scalars overlaid
+by their live QMK owners. With no profile settings live it returns the current
+version with every macro unnamed. Page 0's 12-byte payload is version `1`,
+chunk size `25`, uint16 length, CRC32, and FNV-1a digest of the bytes as they
+are at that moment. Pages 1 onward return successive 25-byte chunks with an
+exact short final chunk, streamed from the live domain rather than a snapshot.
+The host reads page 0 again after the chunks and requires identity and both
+checksums to match, so a change during the read fails it. The complete export also
 rechecks settings after reading the VIA banks, so changing RGB or DPI during a
 backup invalidates the read.
 
