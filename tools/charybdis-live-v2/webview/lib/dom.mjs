@@ -9,10 +9,3 @@ export function el(markup) {
     template.innerHTML = String(markup).trim();
     return template.content.firstElementChild;
 }
-
-export function on(root, selector, type, handler) {
-    root.querySelectorAll(selector).forEach((node) => node.addEventListener(type, (event) => handler(event, node)));
-    return root;
-}
-
-export const clear = (node) => { while (node.firstChild) node.firstChild.remove(); return node; };

@@ -61,7 +61,6 @@ export const state = {
     picker: null,
     notice: "",
     error: "",
-    busyMessage: "",
 };
 
 // The combo builder, opened for a combo (or none, for a new one) and closed

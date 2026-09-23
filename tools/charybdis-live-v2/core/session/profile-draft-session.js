@@ -1,6 +1,6 @@
 "use strict";
 
-const {validateSnapshot, fingerprint, summary, reorderLayers} = require("../model/portable-profile");
+const {validateSnapshot, fingerprint, summary} = require("../model/portable-profile");
 const {profileReview} = require("../model/profile-review");
 const {editSettings, settingsEditorView} = require("../model/settings-editor");
 const {editMacro, macroEditorView} = require("../model/macro-editor");
@@ -96,7 +96,6 @@ class ProfileDraftSession {
         }
         return document;
     }
-    reorder(order, names, revision) {this.replace(reorderLayers(this.document, order, names), revision);}
     undo(revision) {this.assertRevision(revision); if (this.cursor) {this.cursor--; this.revision++; this.reviewedRevision = null;}}
     redo(revision) {this.assertRevision(revision); if (this.cursor + 1 < this.history.length) {this.cursor++; this.revision++; this.reviewedRevision = null;}}
     review(revision) {this.assertRevision(revision); this.reviewedRevision = this.revision;}

@@ -10,7 +10,7 @@ import {el, esc} from "../lib/dom.mjs";
 import {DIRECTIONS, KIND, SCROLL_FIELDS, readConfig, startingRecord} from "../view/pointing-config.mjs";
 import {MODIFIER_BITS, keyName, modifierNames} from "../view/keyvalues.mjs";
 import {bindingsForSlot} from "../view/keyface.mjs";
-import {PD_MODE_IDS, pdColourRow, stageEnabled} from "../view/lighting.mjs";
+import {pdColourRow, stageEnabled} from "../view/lighting.mjs";
 import {getModel, post, render, state, writable} from "../store.mjs";
 import * as edits from "../view/edits.mjs";
 import {openPicker} from "./picker.mjs";

@@ -22,8 +22,7 @@ test("behaviour editing requires supported firmware and a complete idle read", (
 // is most exposed to.
 
 const MODEL_FIELDS = [
-    "root", "profiles", "activeProfile", "files", "layers", "customKeycodes",
-    "keyBehaviors", "combos", "viaMacros", "hardcodedMacros", "behaviorTimingDefaults",
+    "layers", "keyBehaviors", "combos", "viaMacros", "hardcodedMacros", "behaviorTimingDefaults",
     "configDefaults", "rgb", "qmkKeycodes", "qmkKeyLabels", "qmkKeycodeAliases",
     "qmkKeycodeSource", "macroPayloadKeycodes", "diagnostics",
 ];
@@ -149,19 +148,6 @@ test("domains awaiting the payload read stay empty rather than invented", () => 
     assert.deepEqual(model.combos, []);
     assert.deepEqual(model.viaMacros, []);
     assert.match(model.diagnostics.join(" "), /committed profile read/);
-});
-
-test("the connected device stands in for Studio's profile files", () => {
-    const model = buildDeviceModel({
-        capabilities: {compiledLayerCount: 5},
-        device: {id: "dev0", manufacturer: "bastardkb", product: "Charybdis 4x6"},
-    });
-    assert.equal(model.activeProfile.name, "bastardkb Charybdis 4x6");
-    assert.equal(model.activeProfile.id, "dev0");
-    assert.deepEqual(model.profiles, []);
-    assert.equal(model.root, "");
-    // No file paths, because there are no files.
-    assert.equal(model.activeProfile.keymapPath, "");
 });
 
 // The header is the first thing a user sees, and getting it wrong was the

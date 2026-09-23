@@ -8,12 +8,9 @@ const test = require("node:test");
 const {
     RGB_DOMAIN_V1,
     RGB_STAGE_BITS,
-    canonicalizeStudioRgbDomainV1,
     createRgbDomainV1,
-    createStudioRgbDomainV1,
     decodeRgbDomainV1,
     encodeRgbDomainV1,
-    encodeStudioRgbDomainV1,
 } = require("../../core/schema/rgb-domain-v1");
 const {
     PROFILE_DOMAIN_IDS,
@@ -81,16 +78,7 @@ test("representative RGB payload and whole-profile blob match the shared C/JavaS
     assert.deepEqual(decodeRgbDomainV1(decoded.domains[0].payload, golden.codecOptions), golden.profile);
 });
 
-test("Profile Studio parsed RGB model canonicalizes to the same exact domain and blob", () => {
-    const golden = fixture();
-    const canonical = canonicalizeStudioRgbDomainV1(golden.studioModel);
-    assert.deepEqual(canonical.profile, golden.profile);
-    assert.equal(encodeStudioRgbDomainV1(golden.studioModel).toString("hex"), golden.payloadHex);
-    const blob = encodeProfileBlob({domains: [createStudioRgbDomainV1(golden.studioModel)]});
-    assert.equal(blob.toString("hex"), golden.blobHex);
-});
-
-test("identity tables and LED-group names canonicalize while renderer row order stays authored", () => {
+test("identity tables canonicalize while renderer row order stays authored", () => {
     const golden = fixture();
     const expected = encodeRgbDomainV1(golden.profile, golden.codecOptions);
 
@@ -101,28 +89,9 @@ test("identity tables and LED-group names canonicalize while renderer row order 
     remapGroupIds(direct, {0: 2, 1: 1, 2: 0});
     assert.deepEqual(encodeRgbDomainV1(direct, golden.codecOptions), expected);
 
-    const studio = clone(golden.studioModel);
-    studio.rgb.ledGroups.reverse();
-    studio.rgb.ledGroups[0].ledIndices.reverse();
-    studio.rgb.layerColors.reverse();
-    studio.rgb.pdModeColors.reverse();
-    studio.rgb.layerLedGroups[0].ledIndices.reverse();
-    assert.deepEqual(encodeStudioRgbDomainV1(studio), expected);
-
     const reorderedRows = clone(golden.profile);
     reorderedRows.layerGroupRows.reverse();
     assert.notDeepEqual(encodeRgbDomainV1(reorderedRows, golden.codecOptions), expected);
-});
-
-test("compiled-source adapter omits reusable groups that no renderer row references", () => {
-    const golden = fixture();
-    const expected = encodeStudioRgbDomainV1(golden.studioModel, {includeUnusedGroups: false});
-    const withAnotherUnusedGroup = clone(golden.studioModel);
-    withAnotherUnusedGroup.rgb.ledGroups.push({name: "RGB_LED_GROUP_UNUSED_TOO", ledIndices: [56]});
-    assert.deepEqual(
-        encodeStudioRgbDomainV1(withAnotherUnusedGroup, {includeUnusedGroups: false}),
-        expected
-    );
 });
 
 test("decoder rejects noncanonical headers, geometry, dictionary order, and bitmap bits", () => {
@@ -267,24 +236,4 @@ test("decoder rejects header count overflow, truncation, and trailing bytes", ()
     assertCode("TRUNCATED", () => decodeRgbDomainV1(valid.subarray(0, valid.length - 1), golden.codecOptions));
     assertCode("TRAILING_BYTES", () => decodeRgbDomainV1(Buffer.concat([valid, Buffer.from([0])]), golden.codecOptions));
     assertCode("TRUNCATED", () => decodeRgbDomainV1(Buffer.alloc(RGB_DOMAIN_V1.HEADER_SIZE - 1), golden.codecOptions));
-});
-
-test("Studio adapter rejects ambiguous identities, expressions, and feature capabilities", () => {
-    const golden = fixture();
-    const duplicateLayer = clone(golden.studioModel);
-    duplicateLayer.layers[1].name = duplicateLayer.layers[0].name;
-    assertCode("DUPLICATE_ID", () => canonicalizeStudioRgbDomainV1(duplicateLayer));
-    const duplicateGroup = clone(golden.studioModel);
-    duplicateGroup.rgb.ledGroups[1].name = duplicateGroup.rgb.ledGroups[0].name;
-    assertCode("DUPLICATE_ID", () => canonicalizeStudioRgbDomainV1(duplicateGroup));
-    const unknownEnum = clone(golden.studioModel);
-    unknownEnum.rgb.layerColors[0].mode = "FUTURE_LAYER_MODE";
-    assertCode("INVALID_ENUM", () => canonicalizeStudioRgbDomainV1(unknownEnum));
-    const unresolved = clone(golden.studioModel);
-    unresolved.rgb.layerColors[0].color.h = "UNKNOWN_HUE";
-    assertCode("UNRESOLVED_EXPRESSION", () => canonicalizeStudioRgbDomainV1(unresolved));
-    const cyclic = clone(golden.studioModel);
-    cyclic.rgb.layerColors[0].color.h = "COLOR_A";
-    assertCode("UNRESOLVED_EXPRESSION", () => canonicalizeStudioRgbDomainV1(cyclic, {constants: {COLOR_A: "COLOR_B", COLOR_B: "COLOR_A"}}));
-    assert.throws(() => canonicalizeStudioRgbDomainV1(golden.studioModel, {supportedPdModeIds: [6]}), /registry/);
 });

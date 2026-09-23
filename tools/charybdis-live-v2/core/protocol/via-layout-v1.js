@@ -1,7 +1,6 @@
 "use strict";
 
 const {RAW_HID_REPORT_SIZE, normalizeRawHidReport} = require("../transport/device-adapter");
-const {resolveNativeQmkExpression} = require("../schema/compiled-profile-v1");
 
 const VIA_LAYOUT_COMMANDS = Object.freeze({
     GET_KEYCODE: 0x04,
@@ -31,39 +30,6 @@ class ViaLayoutError extends Error {
         this.code = code;
         Object.assign(this, details);
     }
-}
-
-function compileViaLayout(model) {
-    if (!model || !Array.isArray(model.layers) || !model.layers.length) {
-        throw new ViaLayoutError("INVALID_LAYOUT_MODEL", "The active profile has no parsed layout layers to apply.");
-    }
-    if (model.layers.length > 0xff) {
-        throw new ViaLayoutError("LAYOUT_LAYER_LIMIT", "The active profile has too many layers for the VIA keymap protocol.");
-    }
-
-    const entries = [];
-    for (const [layerIndex, layer] of model.layers.entries()) {
-        if (!Array.isArray(layer.positions) || layer.positions.length !== CHARYBDIS_4X6_LAYOUT_MATRIX.length) {
-            throw new ViaLayoutError(
-                "LAYOUT_GEOMETRY_MISMATCH",
-                `${layer?.name || `Layer ${layerIndex}`} has ${layer?.positions?.length || 0} keys; the Charybdis 4x6 VIA layout requires ${CHARYBDIS_4X6_LAYOUT_MATRIX.length}.`
-            );
-        }
-        for (const [layoutIndex, position] of layer.positions.entries()) {
-            const expression = String(position?.keycode || "").trim();
-            const keycode = resolveNativeQmkExpression(expression, model);
-            if (!Number.isInteger(keycode) || keycode < 0 || keycode > 0xffff) {
-                throw new ViaLayoutError(
-                    "UNSUPPORTED_LAYOUT_KEYCODE",
-                    `${layer?.name || `Layer ${layerIndex}`} key ${layoutIndex + 1} (${expression || "empty"}) cannot be encoded as a VIA keycode.`,
-                    {expression, layer: layerIndex, layoutIndex}
-                );
-            }
-            const [row, column] = CHARYBDIS_4X6_LAYOUT_MATRIX[layoutIndex];
-            entries.push({layer: layerIndex, row, column, keycode, expression, layoutIndex});
-        }
-    }
-    return entries;
 }
 
 function buildViaGetKeycodeRequest(entry) {
@@ -240,7 +206,6 @@ module.exports = {
     ViaLayoutError,
     buildViaGetKeycodeRequest,
     buildViaSetKeycodeRequest,
-    compileViaLayout,
     decodeViaGetKeycodeResponse,
     decodeViaSetKeycodeResponse,
     readViaKeycode,

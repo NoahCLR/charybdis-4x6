@@ -1,21 +1,11 @@
 "use strict";
 
-const {
-    PROFILE_ACTION_KINDS,
-    PROFILE_DOMAIN_IDS,
-    decodeProfileBlob,
-    encodeProfileBlob,
-} = require("./profile-blob-v1");
-const {
-    KEY_BEHAVIOR_HOLD_MODES,
-    encodeKeyBehaviorDomain,
-} = require("./key-behavior-domain-v1");
-const {
-    RGB_PD_MODE_IDS,
-    createStudioRgbDomainV1,
-} = require("./rgb-domain-v1");
+// Expressions as the keyboard's vocabulary spells them — KC_A, LT(1, KC_A),
+// DRAGSCROLL, VIA_MACRO_3 — resolved to profile actions and native keycodes.
 
-const PROFILE_MILESTONE_DOMAIN_MASK = 0x03;
+const {PROFILE_ACTION_KINDS} = require("./profile-blob-v1");
+const {RGB_PD_MODE_IDS} = require("./rgb-domain-v1");
+
 const QMK_USER_BASE = 0x7e40;
 const QMK_MACRO_BASE = 0x7700;
 const HARDCODED_MACRO_SLOTS = 16;
@@ -28,13 +18,6 @@ const CHARYBDIS_KEYCODE_VALUES = Object.freeze({
     SNP_TOG: 0x7e05,
     DRGSCRL: 0x7e06,
     DRG_TOG: 0x7e07,
-});
-
-const HOLD_MODES = Object.freeze({
-    PRESS_AND_HOLD_UNTIL_RELEASE: KEY_BEHAVIOR_HOLD_MODES.PRESS_AND_HOLD_UNTIL_RELEASE,
-    TAP_AT_HOLD_THRESHOLD: KEY_BEHAVIOR_HOLD_MODES.TAP_AT_HOLD_THRESHOLD,
-    REPEAT_WHILE_HELD: KEY_BEHAVIOR_HOLD_MODES.REPEAT_WHILE_HELD,
-    TAP_ON_RELEASE_AFTER_HOLD: KEY_BEHAVIOR_HOLD_MODES.TAP_ON_RELEASE_AFTER_HOLD,
 });
 
 const PD_ACTIONS = Object.freeze({
@@ -73,109 +56,13 @@ const MODIFIER_BITS = Object.freeze({
     MOD_HYPR: 0x0f, MOD_MEH: 0x07,
 });
 
-class StudioProfileCompileError extends Error {
+class ProfileExpressionError extends Error {
     constructor(code, message, details = {}) {
         super(message);
-        this.name = "StudioProfileCompileError";
+        this.name = "ProfileExpressionError";
         this.code = code;
         Object.assign(this, details);
     }
-}
-
-function buildCanonicalStudioProfileV1(model, options = {}) {
-    if (!model || typeof model !== "object") {
-        throw new TypeError("Profile Studio model must be an object.");
-    }
-    const capabilities = options.capabilities || {};
-    const actionLimits = {
-        maxLogicalLayers: capabilities.maxLogicalLayers,
-        maxPdModes: 6,
-        maxViaMacroSlots: capabilities.viaMacroSlots,
-        maxHardcodedMacroSlots: capabilities.hardcodedMacroSlots,
-    };
-    for (const key of Object.keys(actionLimits)) {
-        if (!Number.isInteger(actionLimits[key])) delete actionLimits[key];
-    }
-    const rgbOptions = {
-        maxLogicalLayers: capabilities.maxLogicalLayers,
-        // The firmware's canonical compiled-default materializer stores only
-        // LED groups referenced by renderer rows. Source-only declarations
-        // have no runtime meaning and would make source/live identity drift.
-        includeUnusedGroups: false,
-    };
-    if (Number.isInteger(capabilities.physicalLedCount) && capabilities.physicalLedCount !== 58) {
-        throw compileError("INCOMPATIBLE_RGB_GEOMETRY", `Firmware reports ${capabilities.physicalLedCount} RGB LEDs; this profile schema requires 58.`);
-    }
-    const rgbDomain = createStudioRgbDomainV1(model, rgbOptions);
-    const behaviorRows = (model.keyBehaviors || []).map((row, rowIndex) => compileBehaviorRow(row, model, rowIndex));
-    const behaviorPayload = encodeKeyBehaviorDomain({rows: behaviorRows}, {
-        limits: {
-            maxRows: capabilities.maxBehaviorRows,
-            maxTapStepsPerBehavior: capabilities.maxTapStepsPerBehavior,
-            maxPopulatedSteps: capabilities.maxPopulatedBehaviorSteps,
-        },
-        actionLimits,
-    });
-    const blob = encodeProfileBlob({domains: [
-        rgbDomain,
-        {id: PROFILE_DOMAIN_IDS.KEY_BEHAVIORS, version: 1, payload: behaviorPayload},
-    ]});
-    if (Number.isInteger(capabilities.maxProfilePayload) && blob.length > capabilities.maxProfilePayload) {
-        throw compileError("CAPACITY_EXCEEDED", `Compiled live profile is ${blob.length} bytes; firmware accepts at most ${capabilities.maxProfilePayload}.`);
-    }
-    const decoded = decodeProfileBlob(blob);
-    return {
-        blob,
-        byteLength: blob.length,
-        crc32: decoded.crc32,
-        digest: decoded.digest,
-        domainMask: PROFILE_MILESTONE_DOMAIN_MASK,
-        behaviorRows: behaviorRows.length,
-    };
-}
-
-function compileBehaviorRow(row, model, rowIndex) {
-    const label = `Key behavior ${rowIndex + 1} (${String(row?.keycode || "missing target")})`;
-    if (!row || typeof row !== "object") throw compileError("INVALID_BEHAVIOR", `${label} is not an object.`, {row: rowIndex});
-    const compiled = {
-        target: semanticActionForExpression(row.keycode, model, `${label} target`),
-        tapHoldTerm: optionalU16(row.tapHoldTerm, `${label} tap-hold term`),
-        longerHoldTerm: optionalU16(row.longerHoldTerm, `${label} longer-hold term`),
-        multiTapTerm: optionalU16(row.multiTapTerm, `${label} multi-tap term`),
-        keepsAutoMouseAnchored: Boolean(row.keepsAutoMouseAnchored),
-        steps: [],
-    };
-    for (const [stepIndex, step] of (row.steps || []).entries()) {
-        const stepLabel = `${label}, tap branch ${Number(step.tapCount) + 1}`;
-        const value = {tapIndex: requiredInteger(step.tapCount, 0, 0xff, `${stepLabel} index`)};
-        if (step.tap) value.tap = compileTap(step.tap, model, `${stepLabel} tap`);
-        if (step.hold) value.hold = compileHold(step.hold, model, `${stepLabel} hold`);
-        if (step.longHold) value.longHold = compileHold(step.longHold, model, `${stepLabel} long hold`);
-        if (!value.tap && !value.hold && !value.longHold) {
-            throw compileError("EMPTY_BEHAVIOR_STEP", `${stepLabel} has no action.`, {row: rowIndex, step: stepIndex});
-        }
-        compiled.steps.push(value);
-    }
-    return compiled;
-}
-
-function compileTap(branch, model, label) {
-    if (String(branch.helper || "").trim() !== "TAP_SENDS") {
-        throw compileError("UNSUPPORTED_HELPER", `${label} uses ${branch.helper || "no helper"}; live profiles support TAP_SENDS for tap branches.`, {expression: branch.helper});
-    }
-    return semanticActionForExpression(branch.action, model, label);
-}
-
-function compileHold(branch, model, label) {
-    const helper = String(branch.helper || "").trim();
-    const mode = HOLD_MODES[helper];
-    if (!mode) {
-        throw compileError("UNSUPPORTED_HELPER", `${label} uses ${helper || "no helper"}; it has no stable live-profile hold mode.`, {expression: helper});
-    }
-    const repeatHz = helper === "REPEAT_WHILE_HELD"
-        ? requiredInteger(branch.repeatHz, 1, 100, `${label} repeat rate`)
-        : 0;
-    return {mode, repeatHz, action: semanticActionForExpression(branch.action, model, label)};
 }
 
 function semanticActionForExpression(value, model, label = "Action") {
@@ -329,21 +216,6 @@ function splitArguments(value) {
     return parts;
 }
 
-function optionalU16(value, label) {
-    if (value === undefined || value === null || String(value).trim() === "") return 0;
-    return requiredInteger(value, 1, 0xffff, label);
-}
-
-function requiredInteger(value, minimum, maximum, label) {
-    const text = String(value ?? "").trim();
-    if (!/^\d+$/.test(text)) throw compileError("UNRESOLVED_EXPRESSION", `${label} must be a literal integer for live apply; got ${text || "<empty>"}.`, {expression: text});
-    const number = Number(text);
-    if (!Number.isSafeInteger(number) || number < minimum || number > maximum) {
-        throw compileError("VALUE_OUT_OF_RANGE", `${label} must be ${minimum} through ${maximum}; got ${text}.`, {expression: text});
-    }
-    return number;
-}
-
 function normalizeExpression(value) {
     return String(value ?? "").replace(/\s+/g, " ").replace(/\s*,\s*/g, ",").trim();
 }
@@ -353,13 +225,10 @@ function unsupportedAction(label, expression) {
 }
 
 function compileError(code, message, details = {}) {
-    return new StudioProfileCompileError(code, message, details);
+    return new ProfileExpressionError(code, message, details);
 }
 
 module.exports = {
-    PROFILE_MILESTONE_DOMAIN_MASK,
-    StudioProfileCompileError,
-    buildCanonicalStudioProfileV1,
     resolveNativeQmkExpression,
     semanticActionForExpression,
 };

@@ -4,7 +4,7 @@
 // dots, the swatches and the review all answer the same way — and they answer
 // from the draft, because the draft is what the model carries.
 
-import {hsv, isOff} from "../lib/colour.mjs";
+import {isOff} from "../lib/colour.mjs";
 import {LED_INDEX, TRACKBALL_LED, inLocality, trackballInLocality} from "./geometry.mjs";
 
 const OFF = {h: "0", s: "0", v: "0"};
@@ -45,8 +45,6 @@ export const layerColourRow = (model, layerId) =>
 
 export const pdColourRow = (model, slotId) =>
     (model?.rgb?.pdModeColors || []).find((row) => row.pointingMode === PD_MODE_IDS[slotId]);
-
-export const comboColour = (model) => model?.rgb?.comboFeedback?.color || OFF;
 
 export function feedbackColours(model) {
     const feedback = model?.rgb?.keyBehaviorFeedback || {};
@@ -145,5 +143,3 @@ export function keyLight(model, layer, position, options = {}) {
 export function trackballLight(model, layer, options = {}) {
     return ledLight(model, layer, TRACKBALL_LED, undefined, options);
 }
-
-export const hsvTuple = hsv;

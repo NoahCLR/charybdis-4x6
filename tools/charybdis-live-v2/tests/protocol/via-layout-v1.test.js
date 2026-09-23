@@ -10,7 +10,6 @@ const {
     VIA_LAYOUT_COMMANDS,
     buildViaGetKeycodeRequest,
     buildViaSetKeycodeRequest,
-    compileViaLayout,
     decodeViaGetKeycodeResponse,
     readViaLayout,
     synchronizeViaLayout,
@@ -40,36 +39,6 @@ test("layout matrix stays identical to the pinned QMK keyboard contract", () => 
         CHARYBDIS_4X6_LAYOUT_MATRIX.map((entry) => Array.from(entry)),
         keyboard.layouts.LAYOUT.layout.map((entry) => entry.matrix)
     );
-});
-
-test("compiles authored LAYOUT order into the Charybdis VIA matrix", () => {
-    const entries = compileViaLayout(modelWithLayers());
-    assert.equal(entries.length, 56);
-    assert.deepEqual(entries.slice(0, 5).map(({row, column, keycode}) => ({row, column, keycode})), [
-        {row: 0, column: 0, keycode: 4},
-        {row: 0, column: 1, keycode: 0x5220},
-        {row: 0, column: 2, keycode: 0x4005},
-        {row: 0, column: 3, keycode: 0x770b},
-        {row: 0, column: 4, keycode: 0x7e5d},
-    ]);
-    assert.deepEqual(entries[55], {
-        layer: 0,
-        row: 9,
-        column: 5,
-        keycode: 1,
-        expression: "_______",
-        layoutIndex: 55,
-    });
-});
-
-test("rejects every layout before I/O when an expression is not representable", () => {
-    const model = modelWithLayers();
-    model.layers[0].positions[8].keycode = "NOT_A_REAL_KEYCODE";
-    assert.throws(() => compileViaLayout(model), (error) => {
-        assert.equal(error.code, "UNSUPPORTED_LAYOUT_KEYCODE");
-        assert.match(error.message, /LAYER_BASE key 9/);
-        return true;
-    });
 });
 
 test("encodes and decodes standard VIA keycode reports", () => {

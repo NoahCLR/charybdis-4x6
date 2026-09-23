@@ -2,7 +2,6 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const {actionName, behaviorAliasesForView, behaviorRowsForView, rgbForView} = require("../../core/session/device-profile-view");
-const {encodeRgbDomainV1, encodeStudioRgbDomainV1} = require("../../core/schema/rgb-domain-v1");
 const {encodeKeyBehaviorDomain, decodeKeyBehaviorDomain} = require("../../core/schema/key-behavior-domain-v1");
 const {decodedDeviceProfile, capabilities} = require("../fixtures/device-profile");
 const keycodes = require("../../core/data/keycode-catalog");
@@ -56,8 +55,6 @@ test("real device RGB retains every value and reference through the presentation
     assert.equal(view.ledGroups[0].usageCount, 3);
     assert.equal(view.pdModeLedGroups[0].owner, "RGB_PD_MODE_GROUP_ALL");
     assert.equal(view.keyBehaviorFeedbackLedGroups[0].owner, "KEY_FEEDBACK_GROUP_ALL");
-    const model = {rgb: view, layers: view.layerColors.map(row => ({name: row.layer}))};
-    assert.deepEqual(encodeStudioRgbDomainV1(model, {stageEnableMask: rgb.stageEnableMask}), encodeRgbDomainV1(rgb));
     assert.equal(JSON.stringify(rgb), original, "converting a snapshot cannot mutate it");
 });
 

@@ -36,7 +36,6 @@ const SCREENS = {
 function screenDevice() {
     const model = getModel();
     const device = model?.device || {};
-    const capabilities = model?.activeProfile ? model : {};
     const kv = (rows) => `<dl class="kv" style="grid-template-columns:170px 1fr">${rows
         .map(([key, value]) => `<dt>${esc(key)}</dt><dd>${esc(value ?? "—")}</dd>`).join("")}</dl>`;
     const main = el(`<div class="main">${topbar(

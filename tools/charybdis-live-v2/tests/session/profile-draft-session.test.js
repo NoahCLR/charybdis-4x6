@@ -3,7 +3,7 @@ const test = require("node:test"), assert = require("node:assert/strict");
 const {ProfileDraftSession} = require("../../core/session/profile-draft-session");
 const {document} = require("../fixtures/portable-profile");
 const {options} = require("../fixtures/keyboard-options");
-const {fingerprint, summary, validateSnapshot} = require("../../core/model/portable-profile");
+const {fingerprint, reorderLayers, summary, validateSnapshot} = require("../../core/model/portable-profile");
 const {settingsEditorView} = require("../../core/model/settings-editor");
 const {behaviorRowsForView} = require("../../core/session/device-profile-view");
 function fixture() {
@@ -96,7 +96,7 @@ test("interrupted apply retains the full target and can review against an incomp
 });
 test("layer reordering is undoable and updates layout and settings references together", () => {
     const {draft,snapshot} = fixture();
-    draft.reorder([0,2,1,3,4,5,6,7],["Base","Symbols","Numbers","Navigation","Pointer","Extra 1","Extra 2","Extra 3"],draft.revision);
+    draft.replace(reorderLayers(draft.document,[0,2,1,3,4,5,6,7],["Base","Symbols","Numbers","Navigation","Pointer","Extra 1","Extra 2","Extra 3"]),draft.revision);
     assert.equal(draft.current.summary.names[1],"Symbols");
     assert.equal(draft.document.layers[0][0],0x5222);
     draft.undo(draft.revision); assert.equal(draft.current.fingerprint,snapshot.fingerprint);

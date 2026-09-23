@@ -87,20 +87,6 @@ const milestoneCapabilities = {
     physicalLedCount: 58,
 };
 
-test("Studio source model compiles RGB and behaviors into one canonical milestone blob", () => {
-    const compiled = buildCanonicalStudioProfileV1(minimalStudioModel(), {capabilities: milestoneCapabilities});
-    const decoded = decodeProfileBlob(compiled.blob);
-    const behaviors = decodeKeyBehaviorDomain(decoded.domains[1].payload);
-
-    assert.equal(compiled.domainMask, 3);
-    assert.deepEqual(decoded.domains.map((domain) => domain.id), [0x10, 0x20]);
-    assert.equal(behaviors.rows.length, 1);
-    assert.equal(behaviors.rows[0].tapHoldTerm, 180);
-    assert.deepEqual(behaviors.rows[0].steps[0].tap, {kind: 1, flags: 0, operand: 4});
-    assert.deepEqual(behaviors.rows[0].steps[0].hold.action, {kind: 2, flags: 0, operand: 0});
-    assert.deepEqual(encodeProfileBlob({domains: decoded.domains}), compiled.blob);
-});
-
 test("semantic compiler maps stable actions and rejects source-only helpers", () => {
     const model = minimalStudioModel();
     assert.deepEqual(semanticActionForExpression("VIA_MACRO_12", model), {kind: 6, operand: 12});

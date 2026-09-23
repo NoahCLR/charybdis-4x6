@@ -72,15 +72,7 @@ function buildDeviceModel(state = {}) {
         }
     }
     return {
-        // Repo concepts Studio carried. The live app has no repository, so it
-        // reports the connected device instead of a profile directory.
-        root: "",
-        profiles: [],
-        activeProfile: activeProfileFromDevice(state),
-        files: {},
-
         layers: layersFromDevice(state.layout, catalog.labels, catalog.aliases),
-        customKeycodes: [],
 
         // Read off the keyboard when the committed profile has been read;
         // empty rather than fabricated before that.
@@ -191,20 +183,6 @@ function committedKeyBehaviors(committed) {
         return [];
     }
     return behaviorRowsForView(decoded);
-}
-
-function activeProfileFromDevice(state) {
-    if (!state.capabilities) {
-        return null;
-    }
-    const label = [state.device?.manufacturer, state.device?.product].filter(Boolean).join(" ");
-    return {
-        id: state.device?.id || "connected-device",
-        name: label || "Connected Charybdis",
-        keymapPath: "",
-        configPath: "",
-        rgbPath: "",
-    };
 }
 
 function deviceHeader(state) {

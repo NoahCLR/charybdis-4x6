@@ -101,7 +101,6 @@ function rgbForView(domain) {
     const all = RGB_DOMAIN_V1.SELECTOR_ALL;
     return {
         stageEnableMask: domain.stageEnableMask,
-        layerColorsEnabled: Boolean(domain.stageEnableMask & RGB_STAGE_BITS.LAYER),
         stages: [
             ["Layer colours", RGB_STAGE_BITS.LAYER], ["Auto-mouse fade", RGB_STAGE_BITS.AUTOMOUSE],
             ["Pointing modes", RGB_STAGE_BITS.PD_MODE], ["Combo feedback", RGB_STAGE_BITS.COMBO],

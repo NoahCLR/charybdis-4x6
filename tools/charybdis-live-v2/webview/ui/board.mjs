@@ -9,8 +9,6 @@ import {keyLight, stageEnabled, tierColour, trackballLight} from "../view/lighti
 import {el, esc} from "../lib/dom.mjs";
 import {hideHover} from "./hover.mjs";
 
-const TIER_KINDS = ["tap", "hold", "long"];
-
 export function board(model, layer, options = {}) {
     const {selected, mode = "light", picks = [], inputs = [], reach = [], pdActive = null,
         faces = true, trackball = false, onKey, onOpen, onSwap, onTrackball} = options;
@@ -209,5 +207,3 @@ function trackballGlyph(model, layer, {mode, pdActive, trackball, clickable}) {
         glow: mode === "leds" ? "" : `<circle class="kc-glow" cx="${x}" cy="${y}" r="${r}" fill="${paint}"></circle>`,
     };
 }
-
-export const boardTierKinds = TIER_KINDS;
