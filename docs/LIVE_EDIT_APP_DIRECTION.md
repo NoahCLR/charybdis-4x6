@@ -981,5 +981,19 @@ stays `RESTORE_INCOMPLETE` with its recovery file. While cleanup is pending,
 the rail shows *Restart the keyboard* and the failure message says to unplug
 the USB cable rather than the cable between the halves.
 
-Next: capture the peer's own state the next time a push stops being
-acknowledged, so the cause, not just the wedge, can be fixed.
+D-L22 verification: `sh tests/host/run_all_host_tests.sh` passes, including
+new reconciler tests for a silent and a permanently busy peer (both reproduce
+the unbounded retry against the previous firmware), an owner test of the
+field case, and 410 live-app tests. `sh tests/host/run_feature_gate_compile_tests.sh`,
+`qmk compile -kb bastardkb/charybdis/4x6 -km noah` and
+`sh tools/build-firmware-pair.sh` pass. The reconciler grows by 4 bytes on the
+32-bit target. The owner-enabled left image passes the memory gate at 58,708
+bytes of SRAM0–3 `.data + .bss`, 1,708 bytes below its 60,416-byte regression
+tripwire, with a 203,432-byte linker/core-memory span at boot; the owner stack
+manifest passes with its largest reviewed path at 1,272 bytes. These are
+per-half linked results and reviewed-path estimates, not runtime high-water
+measurements.
+
+Next: flash the pair and confirm a normal Apply still converges; capture the
+peer's own state the next time a push stops being acknowledged, so the cause,
+not just the wedge, can be fixed.
