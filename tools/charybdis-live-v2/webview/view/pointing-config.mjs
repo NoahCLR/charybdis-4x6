@@ -10,9 +10,11 @@ export const AXIS = {VERTICAL: 0, HORIZONTAL: 1, DOMINANT: 2, EIGHT: 3};
 export const DIAGONALS = [["upLeft", "Up-left"], ["upRight", "Up-right"], ["downLeft", "Down-left"], ["downRight", "Down-right"]];
 // What an eight-direction mode does when a diagonal has no shortcut.
 // What moving toward a direction with no shortcut does, in every directional
-// mode. "Both" combines a diagonal from its two straight directions; a
-// straight direction has nothing to combine, so there it acts as nearest.
-export const EMPTY_DIRECTION = [[0, "Its neighbours take over"], [1, "Both neighbours (diagonals)"], [2, "Nothing"]];
+// mode. "Both" sends the two compass neighbours, 45 degrees either side, the
+// one the movement leans toward first: a diagonal's straight directions, a
+// straight direction's diagonals. Only eight
+// directions has those, so elsewhere it acts as "its neighbours take over".
+export const EMPTY_DIRECTION = [[0, "Its neighbours take over"], [1, "Send both neighbours"], [2, "Nothing"]];
 // The directions each axis setting reads. The keyboard refuses a mode that
 // keeps a shortcut or a threshold on an axis it does not read, so the form
 // draws only these and the record carries the others as zero.

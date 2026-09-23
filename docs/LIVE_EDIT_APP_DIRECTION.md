@@ -1156,3 +1156,8 @@ parity test still holds the single-axis presets (Volume, Brightness) to the
 legacy handlers report for report. "When a diagonal is empty" became "When a
 direction is empty" and applies to every directional mode (byte 86 for axes
 0–3).
+"Send both neighbours" means the two compass neighbours, 45° either side: an
+empty diagonal sends its straight directions and an empty straight direction
+its two diagonals, the one the movement leans toward first. Modes without
+diagonals have no such neighbours, so there it acts as "its neighbours take
+over".

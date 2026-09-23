@@ -1409,17 +1409,22 @@ static void test_configured_eight_directions(void) {
     CHECK(directional_run(12, -10, 4, KC_RIGHT) >= 3);
     directional_clock += 500u;
     CHECK(directional_run(10, -12, 4, KC_UP) >= 3);
-    // Both: each diagonal step taps the two straight directions.
+    // Both: each diagonal step taps the two straight directions, the one the
+    // movement leans toward first.
     directional_slot(slot, NOAH_PD_AXIS_EIGHT, NOAH_PD_EMPTY_DIRECTION_BOTH, false);
     noah_pd_engine_enter(slot);
-    uint8_t both = 0;
-    for (uint8_t i = 0; i < 4; i++) {
-        directional_move(10, -10);
-        CHECK(synthetic_tap_call_count % 2u == 0u);
-        for (uint8_t tap = 0; tap < synthetic_tap_call_count; tap += 2) CHECK(tapped(tap) == KC_RIGHT && tapped(tap + 1u) == KC_UP);
-        both += synthetic_tap_call_count;
+    const struct { int16_t x, y; uint16_t lean, other; } both_leans[] = {{10, -8, KC_RIGHT, KC_UP}, {8, -10, KC_UP, KC_RIGHT}};
+    for (uint8_t lean = 0; lean < 2; lean++) {
+        uint8_t both = 0;
+        directional_clock += 500u;
+        for (uint8_t i = 0; i < 4; i++) {
+            directional_move(both_leans[lean].x, both_leans[lean].y);
+            CHECK(synthetic_tap_call_count % 2u == 0u);
+            for (uint8_t tap = 0; tap < synthetic_tap_call_count; tap += 2) CHECK(tapped(tap) == both_leans[lean].lean && tapped(tap + 1u) == both_leans[lean].other);
+            both += synthetic_tap_call_count;
+        }
+        CHECK(both >= 4);
     }
-    CHECK(both >= 6);
     // Nothing: the diagonal is a dead zone.
     directional_slot(slot, NOAH_PD_AXIS_EIGHT, NOAH_PD_EMPTY_DIRECTION_NOTHING, false);
     noah_pd_engine_enter(slot);
@@ -1446,10 +1451,29 @@ static void test_configured_empty_directions_and_single_axes(void) {
     slot[86] = NOAH_PD_EMPTY_DIRECTION_NOTHING;
     noah_pd_engine_enter(slot);
     CHECK(directional_run(-10, -3, 6, KC_NO) == 0);
-    // Both acts as nearest for a straight direction: nothing to combine.
+    // Without diagonals a straight direction has no compass neighbours, so
+    // "both" acts as nearest.
     slot[86] = NOAH_PD_EMPTY_DIRECTION_BOTH;
     noah_pd_engine_enter(slot);
     CHECK(directional_run(-10, -5, 8, KC_UP) >= 3);
+    // In eight directions an empty straight direction sends its two
+    // diagonals, the one the movement leans toward first: left leaning up taps
+    // up-left then down-left, left leaning down the other way round.
+    directional_slot(slot, NOAH_PD_AXIS_EIGHT, NOAH_PD_EMPTY_DIRECTION_BOTH, true);
+    slot[36] = 0; // left
+    noah_pd_engine_enter(slot);
+    const struct { int16_t y; uint16_t lean, other; } leans[] = {{-2, KC_HOME, KC_END}, {2, KC_END, KC_HOME}};
+    for (uint8_t lean = 0; lean < 2; lean++) {
+        uint8_t pairs = 0;
+        directional_clock += 500u;
+        for (uint8_t i = 0; i < 4; i++) {
+            directional_move(-10, leans[lean].y);
+            CHECK(synthetic_tap_call_count % 2u == 0u);
+            for (uint8_t tap = 0; tap < synthetic_tap_call_count; tap += 2) CHECK(tapped(tap) == leans[lean].lean && tapped(tap + 1u) == leans[lean].other);
+            pairs += synthetic_tap_call_count / 2u;
+        }
+        CHECK(pairs >= 3);
+    }
 
     // Horizontal only counts the horizontal part of any move.
     directional_slot(slot, NOAH_PD_AXIS_HORIZONTAL, 0, false);

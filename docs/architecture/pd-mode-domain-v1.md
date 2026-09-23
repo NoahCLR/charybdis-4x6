@@ -78,9 +78,12 @@ a diagonal takes half a step more before its first tap, so a turn from one axis
 to the other passes through it without firing.
 
 Byte 86 is what every directional mode does with motion toward a direction
-that exists but has no shortcut: `0` its neighbours take its share, `1` a
-diagonal taps both straight directions (a straight direction acts as `0`), and
-`2` the motion is consumed. Records with axis 0–2 carry byte 86 too; bytes
+that exists but has no shortcut: `0` its neighbours take its share, `1` both
+compass neighbours 45° either side are tapped (a diagonal's two straight
+directions, a straight direction's two diagonals; only eight directions has
+them, so in the other modes `1` acts as `0`; the one the movement leans
+toward is tapped first, and an empty neighbour sends nothing),
+and `2` the motion is consumed. Records with axis 0–2 carry byte 86 too; bytes
 70..85 stay zero outside eight directions, and 87..89 are always zero. A configured
 axis may have no output in either direction. Scrolling modes zero the axis and
 directional fields. Their thresholds, divisors and axis timeout are positive;

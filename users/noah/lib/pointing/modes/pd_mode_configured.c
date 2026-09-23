@@ -83,10 +83,6 @@ typedef struct {
 } direction_state_t;
 static direction_state_t direction;
 
-static void straight_tap(uint8_t slot) {
-    emit_tap(active + 36u + slot * 4u);
-}
-
 // Diagonal slots are stored up-left, up-right, down-left, down-right.
 static const uint8_t *direction_slot(uint8_t dir) {
     if (!(dir & 1u)) return active + 36u + straight_slot[dir] * 4u;
@@ -94,12 +90,14 @@ static const uint8_t *direction_slot(uint8_t dir) {
 }
 
 // The directions a heading may be given: those the axis policy has, less the
-// empty ones whose share goes to their neighbours.
+// empty ones whose share goes to their neighbours. "Both" keeps an empty
+// direction when both its compass neighbours, 45 degrees either side, exist;
+// only eight directions has them, so elsewhere it acts as nearest.
 static uint8_t available_directions(void) {
     uint8_t mask = axis_directions[active[3] & 3u], empty = active[86];
     for (uint8_t dir = 0; dir < 8; dir++) {
         if (!(mask & (1u << dir)) || u16(direction_slot(dir))) continue;
-        if (empty == NOAH_PD_EMPTY_DIRECTION_NEAREST || (empty == NOAH_PD_EMPTY_DIRECTION_BOTH && !(dir & 1u))) mask &= (uint8_t)~(1u << dir);
+        if (empty == NOAH_PD_EMPTY_DIRECTION_NEAREST || (empty == NOAH_PD_EMPTY_DIRECTION_BOTH && active[3] != NOAH_PD_AXIS_EIGHT)) mask &= (uint8_t)~(1u << dir);
     }
     return mask;
 }
@@ -147,9 +145,19 @@ static void directional_step(uint8_t dir, uint8_t *budget) {
     if (u16(slot)) {
         emit_tap(slot);
         (*budget)--;
-    } else if ((dir & 1u) && active[86] == NOAH_PD_EMPTY_DIRECTION_BOTH) {
-        straight_tap(direction_x[dir] < 0 ? SLOT_LEFT : SLOT_RIGHT);
-        straight_tap(direction_y[dir] < 0 ? SLOT_UP : SLOT_DOWN);
+    } else if (active[86] == NOAH_PD_EMPTY_DIRECTION_BOTH) {
+        // Both compass neighbours: a diagonal's two straight directions, a
+        // straight direction's two diagonals. An empty neighbour sends nothing.
+        // The one the movement leans toward goes first.
+        uint8_t  first = (uint8_t)((dir + 7u) & 7u), second = (uint8_t)((dir + 1u) & 7u);
+        uint16_t angle = heading_angle(direction.heading_x, direction.heading_y);
+        if (angle_between(angle, second) < angle_between(angle, first)) {
+            uint8_t swap = first;
+            first        = second;
+            second       = swap;
+        }
+        emit_tap(direction_slot(first));
+        emit_tap(direction_slot(second));
         *budget = *budget >= 2u ? (uint8_t)(*budget - 2u) : 0u;
     } else {
         (*budget)--; // a dead zone still consumes the motion

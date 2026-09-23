@@ -29,7 +29,7 @@ enum {
 // shortcut (byte 86, every directional record).
 enum {
     NOAH_PD_EMPTY_DIRECTION_NEAREST = 0, // its neighbours take its share
-    NOAH_PD_EMPTY_DIRECTION_BOTH,        // a diagonal taps both straight directions; a straight one acts as nearest
+    NOAH_PD_EMPTY_DIRECTION_BOTH,        // both compass neighbours (eight directions; elsewhere as nearest)
     NOAH_PD_EMPTY_DIRECTION_NOTHING,     // a dead zone
 };
 
