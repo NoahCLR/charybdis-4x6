@@ -832,6 +832,27 @@ static noah_profile_store_result_t commit_pd(noah_profile_store_t *store, const 
     return result == NOAH_PROFILE_STORE_OK ? noah_profile_store_prepare_commit(store, NULL) : result;
 }
 
+// The store's shape check accepts every settings version the validator does:
+// a profile with named macros (settings v4) once passed validation on both
+// halves and was then refused here on every try.
+static void test_pd_store_accepts_every_settings_version_the_validator_does(void) {
+    for (uint8_t version = 1u; version <= 5u; version++) {
+        uint8_t                        payload[33];
+        uint16_t                       length = pd_payload(payload, 1u << 3u);
+        noah_profile_store_t           store;
+        noah_profile_store_candidate_t candidate;
+
+        CHECK(payload[8] == 0x40u);
+        payload[9] = version;
+        candidate  = pd_candidate(payload, length, 1u << 3u, 1u, 0u, 0u);
+        reset_eeprom(&eeprom);
+        initialize_pd_store(&store);
+        noah_profile_store_result_t result = commit_pd(&store, payload, &candidate);
+        CHECK((result == NOAH_PROFILE_STORE_OK) == NOAH_PROFILE_PD_SETTINGS_VERSION_ACCEPTED(version));
+        CHECK(NOAH_PROFILE_PD_SETTINGS_VERSION_ACCEPTED(version) == (version >= 2u && version <= 4u));
+    }
+}
+
 static void test_pd_header_all_identity_bits_and_boot_paths(void) {
     for (uint8_t origin = 0u; origin < 2u; origin++) {
         for (uint8_t flags = 0u; flags < 2u; flags++) {
@@ -980,6 +1001,7 @@ static void test_pd_header_power_loss_keeps_complete_generation(void) {
 }
 
 int main(void) {
+    test_pd_store_accepts_every_settings_version_the_validator_does();
     test_pd_header_all_identity_bits_and_boot_paths();
     test_pd_header_rejects_bad_contracts_before_writing();
     test_pd_header_power_loss_keeps_complete_generation();

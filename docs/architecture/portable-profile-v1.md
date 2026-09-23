@@ -113,7 +113,7 @@ bytes a character. Each version keeps its own ceiling: firmware refuses a
 version-3 domain over 1,368 bytes, since that ceiling is what bounds version 3's
 names.
 
-Firmware from 2026-09-23 writes version 4 and still reads versions 2 and 3.
+Firmware from 2026-09-23 writes version 4 and still reads versions 2 and 3. The accepted set is defined once, as `NOAH_PROFILE_PD_SETTINGS_VERSION_ACCEPTED`, for both the validator and the store's shape check.
 The app upgrades to version 4 when a macro is named. A stored version-3 name
 keeps its printable ASCII characters, trimmed and cut to 20, and review shows
 any name that changed. The effective settings cache grows to 1,656 bytes, 288

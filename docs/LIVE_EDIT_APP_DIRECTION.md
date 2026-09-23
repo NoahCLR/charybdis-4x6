@@ -1126,3 +1126,11 @@ the commit is authorized. If it still fails, the Apply ends at once with
 candidate error `PEER_TRANSFER_FAILED`, and the app says the other half could
 not store the profile, instead of waiting out its timer and showing an
 unrelated digest message.
+
+The trigger behind every one of these stalls was settings version 4 itself.
+The store's shape check kept its own list of settings versions (2 and 3) and
+refused every stored copy that carried v4, after the validator on both halves
+had passed it; any profile with a named macro failed on the other half, every
+time. There is now one list, `NOAH_PROFILE_PD_SETTINGS_VERSION_ACCEPTED` in
+`profile_versions.h`, used by both, and a store test that stores settings v2,
+v3 and v4 and refuses the rest.
