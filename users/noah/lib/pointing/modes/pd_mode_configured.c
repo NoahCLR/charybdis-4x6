@@ -9,9 +9,6 @@
 static const uint8_t *active;
 static pd_mode_axis_state_t axes[2];
 static bool axis_x;
-// Eight directions accumulate one motion vector rather than one axis at a
-// time: the wedge a tap belongs to depends on both components together.
-static int32_t eight[2];
 // Per-origin release ownership survives mode replacement. A consumed bit is
 // retained after releasing modifiers so an old release cannot hit a new mode.
 static struct { uint8_t modifiers; bool consumed; } buttons[MATRIX_ROWS][MATRIX_COLS];
@@ -43,70 +40,156 @@ static void direction_tap(uint16_t direction) {
 
 enum { DIR_LEFT = 0, DIR_RIGHT, DIR_UP, DIR_DOWN };
 
-// Adds one report's component, dropping the backlog on a reversal and capping
-// it at NOAH_PD_MODE_MAX_BACKLOG_TAPS taps, as the single-axis path does.
-static void eight_accumulate(int32_t *acc, int16_t delta, uint16_t threshold) {
-    int32_t cap = (int32_t)threshold * (NOAH_PD_MODE_MAX_BACKLOG_TAPS + 1);
-    if ((delta > 0 && *acc < 0) || (delta < 0 && *acc > 0)) *acc = 0;
-    *acc += delta;
-    if (*acc > cap) *acc = cap;
-    if (*acc < -cap) *acc = -cap;
+// ── Directional engine: dominant axis (four directions) and eight directions ──
+//
+// One engine for both. Motion is measured in steps of each axis's own
+// threshold (4096 is one step, rounded per report so small moves add up
+// exactly), so a direction is judged the same way the taps are counted. A smoothed heading picks a direction and holds it until the
+// heading is clearly in another one, DIRECTION_HYSTERESIS past the boundary.
+// Only progress along the held direction counts; sideways drift is dropped. A
+// diagonal step is the same distance as a straight one. After a pause of
+// DIRECTION_IDLE_MS the next move chooses afresh, keeping its progress only if
+// it continues the same way; a move against the held direction releases it. Entering a diagonal takes half a step more
+// before its first tap, so turning from one axis to the other passes through
+// the diagonal without firing it.
+enum {
+    STEP = 4096,
+    DIRECTION_IDLE_MS = 150,
+    DIRECTION_NONE = 0xff,
+    // The heading must be at least this far along before it decides anything.
+    HEADING_MINIMUM = STEP / 16,
+};
+// Directions: 0 right, 1 down-right, 2 down, 3 down-left, 4 left, 5 up-left,
+// 6 up, 7 up-right. Even ones are straight. Report y grows downward.
+static const int8_t direction_x[8] = {1, 1, 0, -1, -1, -1, 0, 1};
+static const int8_t direction_y[8] = {0, 1, 1, 1, 0, -1, -1, -1};
+typedef struct {
+    int32_t  heading_x, heading_y; // smoothed motion, in STEP units
+    int32_t  progress;             // along the held direction, in STEP units
+    uint32_t last_motion;
+    uint8_t  held;                 // DIRECTION_NONE when free
+    bool     motion_known;
+    bool     fresh; // after a pause: choose without hysteresis, keep progress if unchanged
+} direction_state_t;
+static direction_state_t direction;
+
+// Diagonal slots in the record are stored up-left, up-right, down-left,
+// down-right; this maps a diagonal direction onto that order.
+static const uint8_t *diagonal_slot(uint8_t dir) {
+    uint8_t index = (direction_y[dir] < 0 ? 0u : 2u) + (direction_x[dir] < 0 ? 0u : 1u);
+    return active + 70u + index * 4u;
 }
 
-// 45-degree wedges: motion within 22.5 degrees of an axis is straight.
-// tan(22.5) ~= 70/169, which keeps the comparison in integers.
-static bool eight_straight(uint32_t along, uint32_t across) {
-    return across * 169u <= along * 70u;
+// Whether the diagonal of this quadrant takes part in the choice: never in
+// dominant-axis mode, and not when it is empty and empty diagonals go to the
+// nearest straight direction.
+static bool diagonal_available(uint8_t dir) {
+    return active[3] == NOAH_PD_AXIS_EIGHT && (u16(diagonal_slot(dir)) || active[86] != NOAH_PD_EMPTY_DIAGONAL_NEAREST);
 }
 
-static void eight_way(report_mouse_t report) {
+// The diagonal direction of the quadrant a heading points into.
+static uint8_t quadrant_diagonal(int32_t x, int32_t y) {
+    return y < 0 ? (x < 0 ? 5u : 7u) : (x < 0 ? 3u : 1u);
+}
+
+// Boundary tangents, as ratios: 22.5 degrees splits straight from diagonal and
+// 45 degrees splits the axes when no diagonal takes part. A held direction
+// keeps its range widened by 7.5 degrees on each side.
+//   tan 15 ~= 15/56, tan 22.5 ~= 70/169, tan 30 ~= 15/26, tan 52.5 ~= 30/23
+static uint8_t choose_direction(int32_t x, int32_t y) {
+    uint64_t ax = (uint64_t)(x < 0 ? -(int64_t)x : x), ay = (uint64_t)(y < 0 ? -(int64_t)y : y);
+    uint8_t  held = direction.held, diagonal = quadrant_diagonal(x, y);
+    bool     diagonals = diagonal_available(diagonal);
+
+    if (held != DIRECTION_NONE && !direction.fresh) {
+        int8_t hx = direction_x[held], hy = direction_y[held];
+        if (held & 1u) {
+            // A held diagonal stays while its quadrant is right and neither
+            // axis clearly dominates.
+            if (held == diagonal && ay * 56u >= ax * 15u && ax * 56u >= ay * 15u) return held;
+        } else if (hx && (x < 0) == (hx < 0) && x != 0) {
+            if (diagonals ? ay * 26u <= ax * 15u : ay * 23u <= ax * 30u) return held;
+        } else if (hy && (y < 0) == (hy < 0) && y != 0) {
+            if (diagonals ? ax * 26u <= ay * 15u : ax * 23u <= ay * 30u) return held;
+        }
+    }
+    if (diagonals && ay * 169u > ax * 70u && ax * 169u > ay * 70u) return diagonal;
+    if (ax >= ay) return x < 0 ? 4u : 0u;
+    return y < 0 ? 6u : 2u;
+}
+
+static void directional_step(uint8_t dir, uint8_t *budget) {
+    static const uint8_t straight[8] = {DIR_RIGHT, 0, DIR_DOWN, 0, DIR_LEFT, 0, DIR_UP, 0};
+    if (!(dir & 1u)) {
+        direction_tap(straight[dir]);
+        (*budget)--;
+        return;
+    }
+    if (u16(diagonal_slot(dir))) {
+        emit_tap(diagonal_slot(dir));
+        (*budget)--;
+    } else if (active[86] == NOAH_PD_EMPTY_DIAGONAL_BOTH) {
+        direction_tap(direction_x[dir] < 0 ? DIR_LEFT : DIR_RIGHT);
+        direction_tap(direction_y[dir] < 0 ? DIR_UP : DIR_DOWN);
+        *budget = *budget >= 2u ? (uint8_t)(*budget - 2u) : 0u;
+    } else {
+        (*budget)--; // a dead zone still consumes the motion
+    }
+}
+
+// A report's motion in STEP units of one axis's threshold, rounded.
+static int32_t steps(int16_t counts, uint16_t threshold) {
+    int32_t scaled = (int32_t)counts * STEP;
+    if (!threshold) return 0;
+    return (scaled < 0 ? scaled - threshold / 2 : scaled + threshold / 2) / threshold;
+}
+
+static void directional(report_mouse_t report) {
     uint16_t tx = u16(active + 32), ty = u16(active + 34);
     uint8_t  budget = NOAH_PD_MODE_MAX_TAPS_PER_TICK;
+    int32_t  cap    = (int32_t)STEP * (NOAH_PD_MODE_MAX_BACKLOG_TAPS + 1);
+    uint32_t now;
 
-    eight_accumulate(&eight[0], report.x, tx);
-    eight_accumulate(&eight[1], report.y, ty);
-    while (budget) {
-        int32_t  x = eight[0], y = eight[1];
-        uint32_t ax = (uint32_t)(x < 0 ? -x : x), ay = (uint32_t)(y < 0 ? -y : y);
-        uint16_t horizontal = x < 0 ? DIR_LEFT : DIR_RIGHT, vertical = y < 0 ? DIR_UP : DIR_DOWN;
+    if (!report.x && !report.y) return;
+    now = timer_read32();
+    if (direction.motion_known && timer_elapsed32(direction.last_motion) > DIRECTION_IDLE_MS) {
+        direction.fresh = true;
+    }
+    direction.last_motion  = now;
+    direction.motion_known = true;
 
-        if (eight_straight(ax, ay)) {
-            if (ax < tx) break;
-            direction_tap(horizontal);
-            eight[0] += x < 0 ? tx : -(int32_t)tx;
-            eight[1] = 0; // drift across a straight tap is not saved up
-            budget--;
-            continue;
-        }
-        if (eight_straight(ay, ax)) {
-            if (ay < ty) break;
-            direction_tap(vertical);
-            eight[1] += y < 0 ? ty : -(int32_t)ty;
-            eight[0] = 0;
-            budget--;
-            continue;
-        }
-        if (ax < tx || ay < ty) break;
-        // Diagonals are stored up-left, up-right, down-left, down-right.
-        const uint8_t *diagonal = active + 70u + ((y < 0 ? 0u : 2u) + (x < 0 ? 0u : 1u)) * 4u;
-        if (u16(diagonal)) {
-            emit_tap(diagonal);
-            budget--;
-        } else if (active[86] == NOAH_PD_EMPTY_DIAGONAL_BOTH) {
-            if (budget < 2u) break;
-            direction_tap(horizontal);
-            direction_tap(vertical);
-            budget -= 2u;
-        } else if (active[86] == NOAH_PD_EMPTY_DIAGONAL_NEAREST) {
-            // The straight direction this motion leans toward, measured
-            // against each axis's own threshold.
-            direction_tap((uint64_t)ax * ty >= (uint64_t)ay * tx ? horizontal : vertical);
-            budget--;
-        } else {
-            budget--; // a dead zone still consumes the motion
-        }
-        eight[0] += x < 0 ? tx : -(int32_t)tx;
-        eight[1] += y < 0 ? ty : -(int32_t)ty;
+    int32_t nx = steps(report.x, tx), ny = steps(report.y, ty);
+    if (direction.held != DIRECTION_NONE && (int64_t)direction_x[direction.held] * nx + (int64_t)direction_y[direction.held] * ny < 0) {
+        direction.held = DIRECTION_NONE; // a reversal starts a new move
+    }
+    // Half of each report into the heading: the widened ranges ride out a
+    // wobbling hand, and a real turn is followed within a report or two.
+    direction.heading_x += (nx - direction.heading_x) / 2;
+    direction.heading_y += (ny - direction.heading_y) / 2;
+    if (direction.held == DIRECTION_NONE || direction.fresh) {
+        direction.heading_x = nx;
+        direction.heading_y = ny;
+    }
+    int32_t hx = direction.heading_x, hy = direction.heading_y;
+    if ((hx < 0 ? -hx : hx) < HEADING_MINIMUM && (hy < 0 ? -hy : hy) < HEADING_MINIMUM) return;
+
+    uint8_t chosen = choose_direction(hx, hy);
+    direction.fresh = false;
+    if (chosen != direction.held) {
+        // A new direction starts from nothing, as dominant axis always did.
+        direction.held     = chosen;
+        direction.progress = chosen & 1u ? -STEP / 2 : 0;
+    }
+    int8_t  dx = direction_x[chosen], dy = direction_y[chosen];
+    int64_t along = (int64_t)dx * nx + (int64_t)dy * ny;
+    if (dx && dy) along = along * 181 / 256; // one diagonal step is one step long
+    if (along > cap) along = cap;
+    direction.progress += (int32_t)along;
+    if (direction.progress < -STEP / 2) direction.progress = -STEP / 2;
+    if (direction.progress > cap) direction.progress = cap;
+    while (budget && direction.progress >= STEP) {
+        directional_step(chosen, &budget);
+        direction.progress -= STEP;
     }
 }
 
@@ -122,7 +205,7 @@ void noah_pd_engine_exit(void) {
     active = NULL;
     pd_mode_axis_reset(&axes[0]);
     pd_mode_axis_reset(&axes[1]);
-    eight[0] = eight[1] = 0;
+    direction = (direction_state_t){.held = DIRECTION_NONE};
     axis_x = true;
     reset_dragscroll_mode();
 }
@@ -143,19 +226,11 @@ report_mouse_t noah_pd_engine_motion(report_mouse_t report) {
     if (!active) return report;
     if (active[1] == 2u) return noah_pd_configured_scroll(active, report);
     uint8_t policy = active[3], budget = NOAH_PD_MODE_MAX_TAPS_PER_TICK;
-    bool was_x = axis_x;
-    if (policy == NOAH_PD_AXIS_EIGHT) {
-        eight_way(report);
+    if (policy == NOAH_PD_AXIS_DOMINANT || policy == NOAH_PD_AXIS_EIGHT) {
+        directional(report);
         return pd_mode_freeze_mouse();
     }
-    if (policy == 2u) {
-        int32_t x = report.x, y = report.y;
-        if (x < 0) x = -x;
-        if (y < 0) y = -y;
-        if (x > y) axis_x = true;
-        else if (y > x) axis_x = false;
-        if (axis_x != was_x) pd_mode_axis_reset(&axes[axis_x ? 1 : 0]);
-    } else axis_x = policy == 1u;
+    axis_x = policy == NOAH_PD_AXIS_HORIZONTAL;
     if (axis_x) pd_mode_axis_emit(&axes[0], report.x, 1u, 0u, u16(active + 32), &budget, direction_tap);
     else pd_mode_axis_emit(&axes[1], report.y, 3u, 2u, u16(active + 34), &budget, direction_tap);
     return pd_mode_freeze_mouse();

@@ -57,12 +57,25 @@ name is zero. Disabled RGB rows are separately retained by the RGB domain.
 Directional modes require positive thresholds for used axes and zero thresholds
 and outputs for unused axes. All scrolling parameters are zero; eight-direction
 modes instead carry their diagonals there, read both axes and so need both
-thresholds. The runtime accumulates one motion vector and classifies it into
-45-degree wedges (tan 22.5° taken as 70/169): a straight tap needs its axis
-threshold and drops drift on the other axis, a diagonal needs both thresholds.
-An empty diagonal follows byte 86; "nearest" compares each component against
-its own threshold. Taps per report and the backlog use the same caps as the
-other discrete modes. A configured
+thresholds.
+
+Dominant-axis and eight-direction modes share one directional engine
+(2026-09-24); dominant axis is that engine with four directions. Motion is
+measured in steps of each axis's own threshold, rounded per report so small
+moves add up exactly. A smoothed heading (half of each report) chooses a
+direction: straight within 22.5° of an axis and diagonal otherwise when a
+diagonal takes part, or split at 45° when none does. The chosen direction is
+held until the heading is 7.5° past its boundary; a move against it releases
+it at once, and after a 150 ms pause the next move chooses afresh, keeping its
+progress only if it continues the same way. Only progress along the held
+direction counts and sideways drift is dropped; a diagonal step is one
+threshold step along the diagonal, and entering a diagonal takes half a step
+more before its first tap, so a turn from one axis to the other passes through
+it without firing. An empty diagonal follows byte 86: "nearest" leaves it out
+of the choice so that quadrant splits at 45°, "both" taps the two straight
+directions per step, and "nothing" consumes the step. Taps per report and the
+backlog use the same caps as the other discrete modes. Vertical-only and
+horizontal-only modes keep the single-axis accumulator. A configured
 axis may have no output in either direction. Scrolling modes zero the axis and
 directional fields. Their thresholds, divisors and axis timeout are positive;
 expiry is at least the timeout. Interval zero means no output throttling.

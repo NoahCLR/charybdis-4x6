@@ -1134,3 +1134,16 @@ had passed it; any profile with a named macro failed on the other half, every
 time. There is now one list, `NOAH_PROFILE_PD_SETTINGS_VERSION_ACCEPTED` in
 `profile_versions.h`, used by both, and a store test that stores settings v2,
 v3 and v4 and refuses the rest.
+
+### D-L28 — Dominant axis and eight directions are one directional engine
+
+Eight-direction modes chose the wedge from whatever motion was still banked
+and banked it differently per direction, so a slightly off-diagonal move
+alternated diagonal and straight taps. Dominant axis chose its axis per report
+with no smoothing. Both now run one engine, with four or eight directions: a
+smoothed heading, measured against each axis's own threshold, picks a
+direction and holds it until the heading is clearly elsewhere, and only
+progress along the held direction counts. Zoom and Arrow, the dominant-axis
+presets, therefore no longer match the legacy handlers report for report; the
+parity test keeps covering the single-axis presets. See
+[PD-mode domain v1](architecture/pd-mode-domain-v1.md).

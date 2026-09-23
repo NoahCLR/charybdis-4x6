@@ -1273,6 +1273,10 @@ static void test_configured_presets_match_legacy_motion(void) {
     }
     for (uint8_t slot = 0; slot < 6; slot++) {
         const uint8_t *p = pd_engine_fixture + 8 + slot * 96;
+        // Dominant-axis presets (zoom, arrow) run the directional engine,
+        // which deliberately holds a direction where the legacy handler
+        // switched axis per report; test_configured_dominant_axis covers them.
+        if (p[1] == 1u && p[3] == NOAH_PD_AXIS_DOMINANT) continue;
         for (uint8_t pass = 0; pass < 2; pass++) {
             test_reset_stubs();
             if (pass) noah_pd_engine_enter(p);
@@ -1299,65 +1303,161 @@ static void test_configured_presets_match_legacy_motion(void) {
         }
     }
 }
-// Eight directions: 45-degree wedges over one accumulated motion vector. A
-// straight tap needs its axis threshold, a diagonal needs both.
-static void eight_way_slot(uint8_t slot[96], uint8_t empty_policy) {
-    memcpy(slot, pd_engine_fixture + 8 + 4 * 96, 96); // Arrow: left/right/up/down arrows
-    slot[3]  = NOAH_PD_AXIS_EIGHT;
+// The directional engine, on the Arrow slot (left/right/up/down arrows) with
+// both thresholds at 10 so one step is one report of 10 counts.
+static void directional_slot(uint8_t slot[96], uint8_t axis, uint8_t empty_policy, bool diagonals) {
+    memcpy(slot, pd_engine_fixture + 8 + 4 * 96, 96);
+    slot[3]  = axis;
     slot[32] = 10; slot[33] = 0;
     slot[34] = 10; slot[35] = 0;
     memset(slot + 70, 0, 20);
-    slot[70] = KC_HOME; // up-left
-    slot[78] = KC_END;  // down-left
-    slot[86] = empty_policy;
+    if (diagonals) {
+        slot[70] = KC_HOME; // up-left
+        slot[74] = KC_PGUP; // up-right
+        slot[78] = KC_END;  // down-left
+        slot[82] = KC_PGDN; // down-right
+    }
+    slot[86] = axis == NOAH_PD_AXIS_EIGHT ? empty_policy : 0;
 }
 
-static void eight_way_move(int16_t x, int16_t y) {
+// The engine's clock for these tests; test_clear_logs() resets the fixture's.
+static uint32_t directional_clock;
+
+// One report, 8 ms after the last, and the taps it produced.
+static void directional_move(int16_t x, int16_t y) {
     test_clear_logs();
+    directional_clock += 8u;
+    fake_time32 = directional_clock;
     CHECK(noah_pd_engine_motion((report_mouse_t){.x = x, .y = y}).x == 0);
+}
+
+static uint16_t tapped(uint8_t index) {
+    return index < synthetic_tap_call_count ? synthetic_tap_calls[index].keycode : KC_NO;
+}
+
+// Taps from a run of identical reports, all expected to be `keycode`.
+static uint8_t directional_run(int16_t x, int16_t y, uint8_t reports, uint16_t keycode) {
+    uint8_t total = 0;
+    for (uint8_t i = 0; i < reports; i++) {
+        directional_move(x, y);
+        for (uint8_t tap = 0; tap < synthetic_tap_call_count; tap++) {
+            if (tapped(tap) != keycode) fprintf(stderr, "run (%d,%d) report %u: tapped 0x%04x, expected 0x%04x\n", x, y, (unsigned)i, (unsigned)tapped(tap), (unsigned)keycode);
+            CHECK(tapped(tap) == keycode);
+        }
+        total += synthetic_tap_call_count;
+    }
+    return total;
 }
 
 static void test_configured_eight_directions(void) {
     uint8_t slot[96];
 
-    eight_way_slot(slot, NOAH_PD_EMPTY_DIAGONAL_NEAREST);
+    directional_slot(slot, NOAH_PD_AXIS_EIGHT, NOAH_PD_EMPTY_DIAGONAL_NEAREST, true);
     test_reset_stubs();
+    directional_clock = 1000u;
     noah_pd_engine_enter(slot);
-    eight_way_move(10, 0);
-    CHECK(synthetic_tap_call_count == 1 && synthetic_tap_calls[0].keycode == KC_RIGHT);
-    eight_way_move(10, 3); // 17 degrees: still straight, and the drift is not saved up
-    CHECK(synthetic_tap_call_count == 1 && synthetic_tap_calls[0].keycode == KC_RIGHT);
-    eight_way_move(0, 9);
-    CHECK(synthetic_tap_call_count == 0);
-    eight_way_move(-10, -10); // a reversal drops the backlog before the diagonal
-    CHECK(synthetic_tap_call_count == 1 && synthetic_tap_calls[0].keycode == KC_HOME);
-    eight_way_move(-10, 10);
-    CHECK(synthetic_tap_call_count == 1 && synthetic_tap_calls[0].keycode == KC_END);
-    // An unfinished diagonal waits for its second axis.
-    eight_way_move(-10, -9);
-    CHECK(synthetic_tap_call_count == 0);
-    eight_way_move(0, -1);
-    CHECK(synthetic_tap_call_count == 1 && synthetic_tap_calls[0].keycode == KC_HOME);
-    // Up-right is empty: nearest leans to whichever axis moved further.
-    eight_way_move(12, -10);
-    CHECK(synthetic_tap_call_count == 1 && synthetic_tap_calls[0].keycode == KC_RIGHT);
-    eight_way_move(8, -12); // with the 2 left over from the last tap: x 10, y -12
-    CHECK(synthetic_tap_call_count == 1 && synthetic_tap_calls[0].keycode == KC_UP);
-    // A long straight move is capped per tick like every discrete mode.
-    eight_way_move(10 * 10, 0);
+
+    // A diagonal move gives diagonal taps only: no straight taps in between,
+    // even when it leans off 45 degrees (27 here) or wobbles.
+    CHECK(directional_run(10, 5, 6, KC_PGDN) >= 5);
+    CHECK(directional_run(10, 9, 1, KC_PGDN) >= 1);
+    CHECK(directional_run(10, 3, 1, KC_PGDN) <= 2); // 17 degrees for one report: the hold rides it out
+
+    // A straight move wobbling up to 35 degrees stays straight.
+    directional_clock += 500u; // a pause releases the hold
+    directional_move(10, 0);
+    CHECK(synthetic_tap_call_count == 1 && tapped(0) == KC_RIGHT);
+    const int16_t wobble[] = {3, 6, 2, 7, 4, 1, 6};
+    for (uint8_t i = 0; i < sizeof(wobble) / sizeof(wobble[0]); i++) {
+        directional_move(10, wobble[i]);
+        CHECK(synthetic_tap_call_count == 1 && tapped(0) == KC_RIGHT);
+    }
+
+    // Turning from right to down goes through the diagonal without firing it.
+    uint8_t diagonal = 0, down = 0;
+    for (uint8_t i = 0; i < 6; i++) {
+        directional_move(0, 10);
+        for (uint8_t tap = 0; tap < synthetic_tap_call_count; tap++) {
+            if (tapped(tap) == KC_PGDN) diagonal++;
+            if (tapped(tap) == KC_DOWN) down++;
+        }
+    }
+    CHECK(diagonal == 0 && down >= 4);
+
+    // A reversal switches at once.
+    directional_move(0, -10);
+    CHECK(synthetic_tap_call_count == 1 && tapped(0) == KC_UP);
+
+    // Every diagonal, one step each.
+    const struct { int16_t x, y; uint16_t key; } diagonals[] = {{-10, -10, KC_HOME}, {10, -10, KC_PGUP}, {-10, 10, KC_END}, {10, 10, KC_PGDN}};
+    for (uint8_t i = 0; i < 4; i++) {
+        directional_clock += 500u;
+        CHECK(directional_run(diagonals[i].x, diagonals[i].y, 4, diagonals[i].key) >= 3);
+    }
+
+    // A long move is capped per tick like every discrete mode.
+    directional_clock += 500u;
+    directional_move(10 * 10, 0);
     CHECK(synthetic_tap_call_count == NOAH_PD_MODE_MAX_TAPS_PER_TICK);
 
-    eight_way_slot(slot, NOAH_PD_EMPTY_DIAGONAL_BOTH);
+    // Empty diagonals. Nearest: the quadrant splits at 45 degrees, as in
+    // dominant axis, so a 40-degree move is horizontal and a 50-degree one
+    // vertical.
+    directional_slot(slot, NOAH_PD_AXIS_EIGHT, NOAH_PD_EMPTY_DIAGONAL_NEAREST, false);
     noah_pd_engine_enter(slot);
-    eight_way_move(10, -10);
-    CHECK(synthetic_tap_call_count == 2 && synthetic_tap_calls[0].keycode == KC_RIGHT && synthetic_tap_calls[1].keycode == KC_UP);
+    CHECK(directional_run(12, -10, 4, KC_RIGHT) >= 3);
+    directional_clock += 500u;
+    CHECK(directional_run(10, -12, 4, KC_UP) >= 3);
+    // Both: each diagonal step taps the two straight directions.
+    directional_slot(slot, NOAH_PD_AXIS_EIGHT, NOAH_PD_EMPTY_DIAGONAL_BOTH, false);
+    noah_pd_engine_enter(slot);
+    uint8_t both = 0;
+    for (uint8_t i = 0; i < 4; i++) {
+        directional_move(10, -10);
+        CHECK(synthetic_tap_call_count % 2u == 0u);
+        for (uint8_t tap = 0; tap < synthetic_tap_call_count; tap += 2) CHECK(tapped(tap) == KC_RIGHT && tapped(tap + 1u) == KC_UP);
+        both += synthetic_tap_call_count;
+    }
+    CHECK(both >= 6);
+    // Nothing: the diagonal is a dead zone.
+    directional_slot(slot, NOAH_PD_AXIS_EIGHT, NOAH_PD_EMPTY_DIAGONAL_NOTHING, false);
+    noah_pd_engine_enter(slot);
+    CHECK(directional_run(10, -10, 4, KC_NO) == 0);
+    noah_pd_engine_exit();
+}
 
-    eight_way_slot(slot, NOAH_PD_EMPTY_DIAGONAL_NOTHING);
+// Dominant axis is the same engine with four directions.
+static void test_configured_dominant_axis(void) {
+    uint8_t slot[96];
+
+    directional_slot(slot, NOAH_PD_AXIS_DOMINANT, 0, true); // diagonal slots are ignored
+    test_reset_stubs();
+    directional_clock = 1000u;
     noah_pd_engine_enter(slot);
-    eight_way_move(10, -10);
+    CHECK(directional_run(10, 0, 3, KC_RIGHT) == 3);
+    // Held right, a move drifting up to 50 degrees stays right...
+    CHECK(directional_run(10, 11, 4, KC_RIGHT) >= 3);
+    // ...and a clearly vertical one switches.
+    CHECK(directional_run(2, 10, 5, KC_DOWN) >= 3);
+    // Reversal is immediate on either axis; a right-angle turn takes a report
+    // longer, because the heading has to leave the held direction's range.
+    directional_move(0, -10);
+    CHECK(synthetic_tap_call_count == 1 && tapped(0) == KC_UP);
+    directional_move(-10, -2);
     CHECK(synthetic_tap_call_count == 0);
-    eight_way_move(1, 0); // the dead zone consumed its motion
+    CHECK(directional_run(-10, -2, 3, KC_LEFT) >= 2);
+    directional_move(10, 0);
+    CHECK(synthetic_tap_call_count == 1 && tapped(0) == KC_RIGHT);
+    // Small moves add up along the held direction, even across a pause.
+    directional_move(4, 0);
     CHECK(synthetic_tap_call_count == 0);
+    directional_clock += 500u;
+    directional_move(6, 0);
+    CHECK(synthetic_tap_call_count == 1 && tapped(0) == KC_RIGHT);
+    // Each axis counts in its own threshold.
+    slot[34] = 40;
+    noah_pd_engine_enter(slot);
+    CHECK(directional_run(0, 20, 4, KC_DOWN) == 2);
     noah_pd_engine_exit();
 }
 
@@ -1414,6 +1514,7 @@ int main(void) {
     test_configured_presets_match_legacy_motion();
     test_configured_release_ownership_and_custom_slot();
     test_configured_eight_directions();
+    test_configured_dominant_axis();
 #endif
     test_dragscroll_horizontal_lock_filters_vertical_jitter();
     test_dragscroll_vertical_lock_filters_horizontal_jitter();
