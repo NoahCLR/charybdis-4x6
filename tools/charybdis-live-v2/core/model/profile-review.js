@@ -9,7 +9,23 @@ const {KEY_BEHAVIOR_HOLD_MODES} = require("../schema/key-behavior-domain-v1");
 
 const words = text => String(text).replace(/^(RGB_|KEY_FEEDBACK_|PD_MODE_)/, "").replace(/_/g, " ").toLowerCase();
 const named = (values, value) => words(Object.entries(values).find(([, id]) => id === value)?.[0] ?? value);
-const key = value => keycodes.resolve(value).label;
+// A label is what a person reads, but many keycodes share one: KC_1 and KC_KP_1
+// are both "1". Where a label is shared, the review adds the keycode name, so
+// changing one for the other is never a row whose two sides look the same.
+let sharedLabels;
+function labelsUsedTwice() {
+    const seen = new Set(), shared = new Set();
+    for (let value = 0; value <= 0xffff; value++) {
+        const {label} = keycodes.resolve(value);
+        if (seen.has(label)) shared.add(label); else seen.add(label);
+    }
+    return shared;
+}
+function key(value) {
+    const {label, name} = keycodes.resolve(value);
+    sharedLabels ??= labelsUsedTwice();
+    return sharedLabels.has(label) && name !== label ? `${label} (${name})` : label;
+}
 function action(value) {
     if (!value || value.kind === 0) return "None";
     if (value.kind === 1) return key(value.operand);
@@ -95,6 +111,12 @@ function profileReview(before, after) {
     };
     const rgbA = rgb(a), rgbB = rgb(b);
     for (const label of new Set([...rgbA.keys(), ...rgbB.keys()])) add("RGB", label, rgbA.get(label), rgbB.get(label));
+    // The rows above describe the profile in words. If the stored bytes differ
+    // and none of them caught it, the review still must not read as empty:
+    // an apply always shows that something will change.
+    if (!changes.length && before.fingerprint !== after.fingerprint) {
+        changes.push({area: "Profile", label: "Stored profile", before: `fingerprint ${before.fingerprint}`, after: `fingerprint ${after.fingerprint} · a change this review cannot describe`});
+    }
     return changes;
 }
 module.exports = {profileReview};

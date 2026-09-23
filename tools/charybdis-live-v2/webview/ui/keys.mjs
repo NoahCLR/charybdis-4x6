@@ -73,7 +73,7 @@ export function screenKeys() {
                 const placement = state.placement;
                 state.placement = null;
                 state.selected = index;
-                post({type: "updateLayoutKeys", layer: layer.name, changes: [{layoutIndex: index, keycode: placement.keycode}]});
+                if (writable()) post({type: "updateLayoutKeys", layer: layer.name, changes: [{layoutIndex: index, keycode: placement.keycode}]});
             } else if (state.comboPicking) {
                 state.comboInputs = state.comboInputs.includes(index)
                     ? state.comboInputs.filter((value) => value !== index) : [...state.comboInputs, index];
@@ -84,7 +84,7 @@ export function screenKeys() {
             }
             render();
         },
-        onOpen: (index) => pickKeycodeFor(index),
+        onOpen: writable() ? (index) => pickKeycodeFor(index) : undefined,
         onSwap: writable() ? (from, to) => swapKeys(from, to) : undefined,
     }));
     stage.appendChild(legend(model));
@@ -117,7 +117,7 @@ function legend(model) {
         <span class="legend-item">${dot(colours.long)} long hold branch</span>
         <span class="legend-item"><i class="lbadge">C1</i> combo input</span>
         <span class="legend-item"><span class="m" style="border-style:dashed"></span> transparent · falls through</span>
-        <span class="legend-item dim">double-click to pick a keycode${writable() ? " · drag one key onto another to swap · ⌘C and ⌘V copy between keys · delete makes a key transparent" : " · ⌘C copies a key"}</span>
+        <span class="legend-item dim">${writable() ? "double-click to pick a keycode" : "select a key to read it"}${writable() ? " · drag one key onto another to swap · ⌘C and ⌘V copy between keys · delete makes a key transparent" : " · ⌘C copies a key"}</span>
         ${state.keyClipboard ? `<span class="legend-item">copied <code class="n">${esc(state.keyClipboard.keycode)}</code></span>` : ""}
     </div>`);
 }
@@ -918,6 +918,7 @@ function tabPointing(body, right) {
 
 /* ── key edits ─────────────────────────────────────────────────────────── */
 function pickKeycodeFor(layoutIndex) {
+    if (!writable()) return;
     const layer = currentLayer();
     const position = positionAt(layer, layoutIndex);
     state.selected = layoutIndex;

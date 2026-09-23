@@ -110,3 +110,17 @@ test("semantic compiler maps stable actions and rejects source-only helpers", ()
         (error) => error?.code === "UNSUPPORTED_ACTION"
     );
 });
+
+test("the native resolver refuses expressions whose bits would land on another keycode", () => {
+    const {resolveNativeQmkExpression: resolve} = require("../../core/schema/compiled-profile-v1");
+    // Well-formed expressions still resolve, including nested modifiers.
+    assert.equal(resolve("C(S(0x04))", {}), 0x0304);
+    assert.equal(resolve("LT(15,0x04)", {}), 0x4f04);
+    assert.equal(resolve("LOCK_LAYER(7)", {}) - resolve("LOCK_LAYER(0)", {}), 7);
+    // Each of these used to OR into an unrelated keycode: a dead user keycode,
+    // a macro with Ctrl dropped, RIGHT_THUMB, TO(4), QK_BOOTLOADER, MO(1)+mods.
+    for (const expression of ["G(VIA_MACRO_3)", "C(VIA_MACRO_3)", "C(DRAGSCROLL)", "LOCK_LAYER(8)",
+        "LT(18,0x04)", "LT(60,0x00)", "LCTL(MO(1))"]) {
+        assert.equal(resolve(expression, {}), undefined, expression);
+    }
+});

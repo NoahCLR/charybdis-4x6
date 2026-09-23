@@ -55,6 +55,20 @@ test("delete on a key posts it as transparent, which the draft stores", () => {
     assert.equal(after[changed[0]], 1, "it now holds KC_TRANSPARENT");
 });
 
+test("a modifier around a macro or pointing key is refused, not stored as another keycode", () => {
+    const draft = session();
+    const before = draft.document.layers[0].slice();
+    // what the picker builds for Cmd + VIA macro 3, and the other overflow shapes
+    for (const keycode of ["G(VIA_MACRO_3)", "C(DRAGSCROLL)", "LOCK_LAYER(8)", "LT(60, 0x00)"]) {
+        assert.throws(() => draft.stage({
+            type: "updateLayoutKeys", draftId: draft.id, draftRevision: draft.revision,
+            layer: "Layer 0", changes: [{layoutIndex: 3, keycode}],
+        }), /Cannot represent/, keycode);
+    }
+    assert.deepEqual(draft.document.layers[0], before);
+    assert.equal(draft.dirty, false);
+});
+
 test("swapping two keys is one message and one draft step", () => {
     const draft = session();
     draft.stage({

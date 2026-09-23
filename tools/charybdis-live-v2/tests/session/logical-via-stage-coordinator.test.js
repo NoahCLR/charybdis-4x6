@@ -16,7 +16,7 @@ class Harness {
         if (request[2] === LOGICAL_VIA_STAGE_V1.VALUE_BEGIN) { this.generation = request.readUInt32LE(5); this.digest = request.readUInt32LE(9); this.state = LOGICAL_VIA_STATE.STAGING; }
         if (request[2] === LOGICAL_VIA_STAGE_V1.VALUE_VERIFY) this.state = LOGICAL_VIA_STATE.STAGED;
         if (request[2] === LOGICAL_VIA_STAGE_V1.VALUE_ABORT) this.state = LOGICAL_VIA_STATE.ABORTED;
-        this.sequence += 1;
+        this.sequence = (this.sequence + 1) & 0xffff; // u16, as the firmware counts
         const response = Buffer.from(request); response.fill(0, 5); response[7] = 0xff;
         assert.equal(options.matchResponse(response), true); return response;
     }
@@ -50,4 +50,16 @@ test("coordinator waits for the firmware-owned decision accept", async () => {
     const status = await coordinator.waitUntilAccepted({transactionId: 5, generation: 6, digest: 7});
     assert.equal(status.state, LOGICAL_VIA_STATE.ACCEPTED);
     assert.equal(polls, 2);
+});
+
+test("the u16 operation counter may wrap to zero mid-transaction", async () => {
+    const connection = new Harness(); let id = 0;
+    connection.sequence = 0xfffe; // the next two operations finish on 0xffff and then 0
+    const coordinator = new LogicalViaStageCoordinator(connection, {requestIds: {next: () => ++id}, pollMs: 0, timeoutMs: 500});
+    const current = {layout: Buffer.alloc(24), macros: Buffer.alloc(24)};
+    const target = {layout: Buffer.from(current.layout), macros: Buffer.from(current.macros)};
+    target.layout[1] = 0x11;
+    await coordinator.stage({transactionId: 9, generation: 1, digest: 2, current, target});
+    assert.equal(connection.state, LOGICAL_VIA_STATE.STAGED, "a wrapped counter is a new operation, not a stall");
+    assert.ok(connection.sequence < 0xfffe);
 });

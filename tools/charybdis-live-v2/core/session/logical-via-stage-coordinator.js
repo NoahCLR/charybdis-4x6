@@ -21,7 +21,7 @@ class LogicalViaStageCoordinator {
         do {
             const status = await readLogicalViaStatus(this.connection, {nextRequestId: () => this.requestIds.next()});
             if (status.state === LOGICAL_VIA_STATE.ERROR) throw Object.assign(new Error(`Peer VIA staging failed with status ${status.lastStatus}.`), {code: "LOGICAL_VIA_STAGE_FAILED", status});
-            if (status.transactionId === transactionId && !status.pending && status.operationSequence > operationSequence && acceptedStates.includes(status.state)) return status;
+            if (status.transactionId === transactionId && !status.pending && status.operationSequence !== operationSequence && acceptedStates.includes(status.state)) return status;
             await delay(this.pollMs);
         } while (Date.now() < deadline);
         throw Object.assign(new Error("Timed out while staging the VIA profile on the other half."), {code: "LOGICAL_VIA_STAGE_TIMEOUT"});

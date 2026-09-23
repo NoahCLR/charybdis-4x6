@@ -644,7 +644,7 @@ class ProfileDeviceService {
                 }
             } catch (error) {
                 this.liveApply = {...this.liveApply, state: "failed", error: publicError(error)};
-                await this.refreshStatusAfterFailure();
+                await this.refreshStatus();
                 throw error;
             }
         });
@@ -670,7 +670,7 @@ class ProfileDeviceService {
 
     async restorePortableProfile(document, options) {
         if (!this.connection?.connected || this.busy || this.savingEdit) throw new Error("Connect the keyboard and wait for the current operation to finish.");
-        let result;
+        let result, started = false;
         await this.runOperation("restoring complete profile", async () => {
             const cachedBase = options?.expectedFingerprint && this.portable?.fingerprint === options.expectedFingerprint
                 ? this.portable
@@ -681,6 +681,7 @@ class ProfileDeviceService {
             const keyboardOptions = cachedBase?.options || await readKeyboardOptions(this.connection, this.requestIds);
             const effect = (validateSnapshot(document, this.capabilities).settings.values[21] >>> 8) & 255;
             if (keyboardOptions && !keyboardOptions.effects.some(item => item.id === effect)) throw Object.assign(new Error("This profile uses a lighting effect unavailable on this keyboard."), {code: "SETTINGS_LIMIT_EXCEEDED"});
+            started = true;
             result = await restoreProfile(this.connection, this.requestIds, this.capabilities, document, {...options,
                 baseSnapshot: cachedBase,
                 onProgress: message => {this.portableProgress = message; this.emitChange();},
@@ -696,6 +697,14 @@ class ProfileDeviceService {
             }
         });
         this.portableProgress = "";
+        // Once the restore has started — landed, failed, or stopped past the
+        // point of no return — the health the panel shows must be the
+        // keyboard's now, not the status read before the apply began. A
+        // refusal before the first write changed nothing, so it reads nothing.
+        if (started) {
+            await this.refreshStatus();
+            this.emitChange();
+        }
         if (this.error) throw Object.assign(new Error(this.error.message), this.error);
         return result;
     }
@@ -846,7 +855,7 @@ class ProfileDeviceService {
         }
     }
 
-    async refreshStatusAfterFailure() {
+    async refreshStatus() {
         if (!this.connection?.connected || !this.requestIds) return;
         try {
             this.status = await readProfileStatus(this.connection, {nextRequestId: () => this.requestIds.next()});
@@ -855,7 +864,7 @@ class ProfileDeviceService {
             });
             this.lastRefreshedAt = new Date().toISOString();
         } catch {
-            // Preserve the original mutation failure; Refresh remains available for a later explicit retry.
+            // Preserve the original outcome; Refresh remains available for a later explicit retry.
         }
     }
 }

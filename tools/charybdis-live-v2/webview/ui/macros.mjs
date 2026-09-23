@@ -82,7 +82,7 @@ function editor(model, slot, canEdit) {
             <code class="dim">${esc(slot.keycode)}</code>
             <span class="right row" style="gap:8px">
                 <span class="chip"><i class="dot ${dirty ? "draft" : "on"}"></i>${dirty ? "edited here" : "as read"}</span>
-                <button class="btn tiny ghost" data-act="place">Place on a key…</button></span></div>
+                <button class="btn tiny ghost" data-act="place" ${writable() ? "" : "disabled"}>Place on a key…</button></span></div>
         <div class="card-b stack">
             <label class="field"><span>Payload</span>
                 <textarea class="input mono" rows="3" style="height:auto;padding:9px 10px;resize:vertical" ${canEdit ? "" : "disabled"}

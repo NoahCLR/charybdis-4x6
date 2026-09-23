@@ -109,6 +109,11 @@ More keys, Other QMK and All keycodes, and search spans all of it.
 Colour on any screen comes from the model, never from a constant, and a stage
 that is switched off is drawn as off — hollow dots, plain badges, unlit keys.
 
+Every edit is kept in a local draft and reaches the keyboard only through
+review and apply. A keyboard the app cannot open a draft for — its profile
+could not be read, or its firmware predates profile editing — is read-only:
+the host refuses any edit rather than writing it directly.
+
 ## One rule that differs from v1
 
 A key bound to a **cleared pointing slot** is allowed. The keyboard keeps its

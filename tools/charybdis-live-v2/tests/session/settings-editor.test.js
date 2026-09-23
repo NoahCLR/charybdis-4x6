@@ -54,3 +54,16 @@ test("an unavailable lighting effect is refused before recovery or profile stagi
     await assert.rejects(service.restorePortableProfile(target, {saveRecovery: () => {throw Error("must not start restore");}}), /lighting effect unavailable/);
     assert.equal(requests.length, 7);
 });
+
+test("a restore that starts re-reads the keyboard's status, even when it fails", async () => {
+    const service = new ProfileDeviceService();
+    const base = {document: document(), fingerprint: fingerprint(document()), limits: {brightnessMax: 255}, options: require("../fixtures/keyboard-options").options()};
+    service.portable = base;
+    service.capabilities = {compiledLayerCount:8, supportedDomainMask:15, actionAbiDigest: document().actionAbiDigest};
+    service.requestIds = {next: () => 1};
+    service.connection = {connected: true, request: async () => {throw Object.assign(Error("link dropped mid-apply"), {code: "TIMEOUT"});}};
+    let refreshed = 0;
+    service.refreshStatus = async () => {refreshed++;};
+    await assert.rejects(service.restorePortableProfile(document(), {expectedFingerprint: base.fingerprint, saveRecovery: () => ({})}));
+    assert.equal(refreshed, 1, "the health strip is read again rather than left at its pre-apply value");
+});

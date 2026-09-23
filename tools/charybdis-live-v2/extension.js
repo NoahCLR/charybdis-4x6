@@ -67,7 +67,7 @@ function publish(panel, session) {
     const editing = session.draft ? session.draft.editingState(state) : state;
     const modelState = {
             ...editing,
-            busy: editing.busy || session.savingBehavior || session.portableBusy,
+            busy: editing.busy || session.portableBusy,
             device: state.devices.find((device) => device.id === state.selectedDeviceId),
         };
     const model = buildDeviceModel(modelState);
@@ -87,7 +87,7 @@ function publish(panel, session) {
             combos: state.combos,
             macroView: state.macroView,
             settingsView: state.settingsView,
-            busy: state.busy || session.savingBehavior || session.portableBusy,
+            busy: state.busy || session.portableBusy,
             device: state.devices.find((device) => device.id === state.selectedDeviceId),
         });
         model.device = actual.device;
@@ -107,16 +107,10 @@ function publish(panel, session) {
     if (!model.draft?.matching) model.layers?.forEach((layer, index) => {layer.displayName = state.portableSummary?.names[index] || layer.name;});
     void panel.webview.postMessage({type: "model", model,
         notice: session.notice,
-        savedBehavior: session.savedBehavior,
-        savedMacro: session.savedMacro,
-        savedSettings: session.savedSettings,
         acceptedEdit: session.acceptedEdit,
         resetDraftForms: session.resetDraftForms,
     });
     session.notice = undefined;
-    session.savedBehavior = undefined;
-    session.savedMacro = undefined;
-    session.savedSettings = undefined;
     session.acceptedEdit = undefined;
     session.resetDraftForms = undefined;
 }
@@ -137,6 +131,12 @@ async function handleMessage(panel, session, message) {
             publish(panel, session);
             return;
         }
+        // Every change leaves this window through a reviewed draft. Without one
+        // (a keyboard whose profile could not be read, or older firmware) the
+        // app is read-only; an edit that reaches here is refused, never written.
+        if (!session.draft && DRAFT_EDITS.has(message?.type)) {
+            throw new Error("This keyboard has no editable draft, so the change was not written. Read the keyboard again; if it stays read-only, update both halves to firmware with profile editing.");
+        }
         if (["reviewProfileDraft", "undoProfileDraft", "redoProfileDraft", "discardProfileDraft", "applyProfileDraft", "rebaseProfileDraft", "closeProfileDraftReview"].includes(message?.type)) {
             await draftMessage(panel, session, message);
             return;
@@ -155,87 +155,6 @@ async function handleMessage(panel, session, message) {
             case "ready":
             case "refresh":
                 await connectAndRead(panel, session);
-                return;
-            // The keyboard view's apply posts updateLayoutKeys; the header's
-            // Apply all posts applyAllChanges with the same layout edits under
-            // a different field, plus layer structure this app cannot change.
-            case "updateLayoutKeys":
-                await writeLayoutKeys(panel, session, {layers: message.layers, changes: message.changes, layer: message.layer});
-                return;
-            case "applyAllChanges":
-                await writeLayoutKeys(panel, session, {
-                    layers: message.layoutGroups,
-                    structural: (message.adds?.length || 0) + (message.deletes?.length || 0),
-                });
-                return;
-
-            case "applyLayerChanges":
-                session.notice = "This edit is not connected to the profile writer yet.";
-                publish(panel, session);
-                return;
-            case "saveBehavior":
-            case "addBehavior":
-            case "deleteBehavior":
-            case "retargetBehavior":
-                session.savingBehavior = true;
-                try {
-                    await vscode.window.withProgress(
-                        {location: vscode.ProgressLocation.Notification, title: "Saving behaviour to both halves"},
-                        () => session.service.saveProfileEdit(message)
-                    );
-                    session.savedBehavior = message.type === "addBehavior" ? "new" : message.type === "retargetBehavior" ? message.target : message.behavior?.keycode || message.keycode;
-                    session.notice = "Saved to both halves and verified by reading the profile back.";
-                } finally {session.savingBehavior = false;}
-                publish(panel, session);
-                return;
-            case "updateConfigDefaults":
-                session.portableBusy = true;
-                try {
-                    await vscode.window.withProgress(
-                        {location: vscode.ProgressLocation.Notification, title: "Saving settings to both halves"},
-                        () => session.service.saveSettingsEdit(message, {saveRecovery: document => saveRecoveryFile(session, document)})
-                    );
-                    await session.service.readCommittedProfile();
-                    await session.service.readBaseRgb();
-                    await session.service.readCombos();
-                    session.savedSettings = {sectionId: message.sectionId, fields: message.fields, expectedFingerprint: message.expectedFingerprint};
-                    session.notice = "Settings saved to both halves and verified. Recovery copy: " + session.lastRecovery.fsPath;
-                } finally {session.portableBusy = false;}
-                publish(panel, session);
-                return;
-            case "updateViaMacro":
-                session.portableBusy = true;
-                try {
-                    await vscode.window.withProgress(
-                        {location: vscode.ProgressLocation.Notification, title: "Saving macro to both halves"},
-                        () => session.service.saveMacroEdit(message, {saveRecovery: document => saveRecoveryFile(session, document)})
-                    );
-                    await session.service.readCommittedProfile();
-                    session.savedMacro = {keycode: message.keycode, payload: message.payload, expectedFingerprint: message.expectedFingerprint};
-                    session.notice = "Macro saved to both halves and verified. Recovery copy: " + session.lastRecovery.fsPath;
-                } finally {session.portableBusy = false;}
-                publish(panel, session);
-                return;
-            case "addCombo":
-            case "saveCombo":
-            case "deleteCombo":
-            case "updateComboHoldTerm":
-            case "saveRgbReusableLedGroup":
-            case "deleteRgbReusableLedGroup":
-            case "updateLayerColor":
-            case "updatePdModeColor":
-            case "updateAutomouseFade":
-            case "updateComboFeedback":
-            case "updateKeyBehaviorFeedback":
-            case "addRgbLedGroup":
-            case "deleteRgbLedGroup":
-            case "updateRgbStages":
-                await vscode.window.withProgress(
-                    {location: vscode.ProgressLocation.Notification, title: "Saving keyboard profile to both halves"},
-                    () => session.service.saveProfileEdit(message)
-                );
-                session.notice = "Saved to both halves and verified by reading the profile back.";
-                publish(panel, session);
                 return;
             default:
                 // Even an unrecognised message has already put the panel into
@@ -323,33 +242,6 @@ async function connectAndRead(panel, session) {
         session.notice = `Read the layout and ${description}.` + (failures ? ` ${failures} domain(s) could not be decoded; see diagnostics.` : "");
     }
     if (macroFailure) session.notice += macroFailure;
-    publish(panel, session);
-}
-
-async function writeLayoutKeys(panel, session, message) {
-    const service = session.service;
-    if (!service.snapshot().connected) {
-        throw new Error("Connect to a keyboard before changing its layout.");
-    }
-    const groups = Array.isArray(message.layers)
-        ? message.layers
-        : [{layer: message.layer, changes: message.changes || []}];
-
-    const result = await vscode.window.withProgress(
-        {location: vscode.ProgressLocation.Notification, title: "Writing keys to the keyboard"},
-        () => service.writeLayoutKeys(groups)
-    );
-
-    const notes = [`Wrote ${result.written} key${result.written === 1 ? "" : "s"} to the keyboard.`];
-    if (result.rejected.length) {
-        notes.push(`Refused ${result.rejected.length}: ${result.rejected.map((entry) => `${entry.keycode} (${entry.reason})`).join(", ")}.`);
-    }
-    if (message.structural) {
-        // Layer count is a compiled capability, so adding or removing layers is
-        // firmware work rather than something this app can apply.
-        notes.push(`Ignored ${message.structural} layer structure change${message.structural === 1 ? "" : "s"}: the layer count is compiled into the firmware.`);
-    }
-    session.notice = notes.join(" ");
     publish(panel, session);
 }
 

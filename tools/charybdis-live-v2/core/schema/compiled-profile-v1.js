@@ -200,6 +200,9 @@ function semanticActionForExpression(value, model, label = "Action") {
     return {kind: PROFILE_ACTION_KINDS.QMK_KEYCODE, operand: numeric};
 }
 
+const LOCK_LAYER_SLOTS = 8;
+const QK_MODS_MAX = 0x1fff;
+
 function resolveNativeQmkExpression(value, model) {
     const expression = normalizeExpression(value);
     if (/^(?:0x[0-9a-f]+|\d+)$/i.test(expression)) {
@@ -235,15 +238,20 @@ function resolveNativeQmkExpression(value, model) {
         const bases = {TO: 0x5200, MO: 0x5220, DF: 0x5240, TG: 0x5260, OSL: 0x5280};
         return layer === undefined || layer > 0x1f ? undefined : bases[call.name] | layer;
     }
+    // The firmware reserves LAYER_COUNT lock keycodes (noah_keymap_ids.h); a
+    // higher layer would land on the custom keycodes that follow them.
     if (call.name === "LOCK_LAYER" && call.args.length === 1) {
         const layer = layerIdOrUndefined(call.args[0], model);
-        return layer === undefined
+        return layer === undefined || layer >= LOCK_LAYER_SLOTS
             ? undefined
             : QMK_USER_BASE + HARDCODED_MACRO_SLOTS + (pdModeNames.length * 2) + layer;
     }
+    // A modifier wrapper only applies to a basic or already-modified key
+    // (QK_MODS, up to 0x1FFF). Anything above would OR the modifier bits into
+    // an unrelated keycode, e.g. C(VIA_MACRO_3) into a macro without Ctrl.
     if (MODIFIER_WRAPPERS[call.name] !== undefined && call.args.length === 1) {
         const keycode = resolveNativeQmkExpression(call.args[0], model);
-        return keycode === undefined ? undefined : (MODIFIER_WRAPPERS[call.name] | keycode) & 0xffff;
+        return keycode === undefined || keycode > QK_MODS_MAX ? undefined : MODIFIER_WRAPPERS[call.name] | keycode;
     }
     if (call.name === "OSM" && call.args.length === 1) {
         const mods = resolveModifierBits(call.args[0]);
@@ -252,7 +260,9 @@ function resolveNativeQmkExpression(value, model) {
     if (call.name === "LT" && call.args.length === 2) {
         const layer = layerIdOrUndefined(call.args[0], model);
         const keycode = resolveNativeQmkExpression(call.args[1], model);
-        return layer === undefined || keycode === undefined || keycode > 0xff ? undefined : 0x4000 | (layer << 8) | keycode;
+        // QK_LAYER_TAP has four layer bits; layer 16 and up would spill into
+        // TO(), MO() and QK_BOOTLOADER.
+        return layer === undefined || layer > 0x0f || keycode === undefined || keycode > 0xff ? undefined : 0x4000 | (layer << 8) | keycode;
     }
     if (call.name === "MT" && call.args.length === 2) {
         const mods = resolveModifierBits(call.args[0]);
