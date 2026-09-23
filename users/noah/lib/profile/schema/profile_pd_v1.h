@@ -15,20 +15,22 @@ enum {
     NOAH_PROFILE_PD_V1_SIZE        = 776,
 };
 
-// Directional axis policies (record byte 3). Eight directions reads both axes
-// and classifies motion into 45-degree wedges; its four diagonal shortcuts
-// live in bytes 70..86, which a directional record otherwise leaves zero.
+// Directional axis policies (record byte 3): which directions exist. Vertical
+// and horizontal have two, dominant axis the four straight ones, eight
+// directions adds the diagonals, whose shortcuts live in bytes 70..85 (zero
+// in every other directional record). One engine runs them all.
 enum {
     NOAH_PD_AXIS_VERTICAL = 0,
     NOAH_PD_AXIS_HORIZONTAL,
     NOAH_PD_AXIS_DOMINANT,
     NOAH_PD_AXIS_EIGHT,
 };
-// What an eight-direction mode does when a diagonal has no shortcut (byte 86).
+// What a directional mode does with motion toward a direction that has no
+// shortcut (byte 86, every directional record).
 enum {
-    NOAH_PD_EMPTY_DIAGONAL_NEAREST = 0, // the nearer straight direction
-    NOAH_PD_EMPTY_DIAGONAL_BOTH,        // both neighbouring straight directions
-    NOAH_PD_EMPTY_DIAGONAL_NOTHING,     // a dead zone
+    NOAH_PD_EMPTY_DIRECTION_NEAREST = 0, // its neighbours take its share
+    NOAH_PD_EMPTY_DIRECTION_BOTH,        // a diagonal taps both straight directions; a straight one acts as nearest
+    NOAH_PD_EMPTY_DIRECTION_NOTHING,     // a dead zone
 };
 
 typedef enum {
@@ -67,7 +69,7 @@ typedef struct {
         };
         struct {
             noah_pd_tap_t diagonals[4]; // eight directions: up-left, up-right, down-left, down-right
-            uint8_t       empty_diagonal;
+            uint8_t       empty_direction;
             uint8_t       diagonal_reserved[3];
         };
     };

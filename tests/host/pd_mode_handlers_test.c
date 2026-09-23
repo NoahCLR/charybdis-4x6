@@ -1292,6 +1292,7 @@ static void test_configured_presets_match_legacy_motion(void) {
                 } else {
                     CHECK(report.x == expected[i].report.x && report.y == expected[i].report.y);
                     CHECK(report.h == expected[i].report.h && report.v == expected[i].report.v);
+                    if (synthetic_tap_call_count != expected[i].count) fprintf(stderr, "slot %u report %u (%d,%d): engine %u taps, legacy %u; axis %u tx %u ty %u\n", (unsigned)slot, (unsigned)i, inputs[i].x, inputs[i].y, (unsigned)synthetic_tap_call_count, (unsigned)expected[i].count, (unsigned)p[3], (unsigned)(p[32] | p[33] << 8), (unsigned)(p[34] | p[35] << 8));
                     CHECK(synthetic_tap_call_count == expected[i].count);
                     for (uint8_t tap = 0; tap < synthetic_tap_call_count; tap++) {
                         CHECK(synthetic_tap_calls[tap].keycode == expected[i].taps[tap].keycode);
@@ -1352,7 +1353,7 @@ static uint8_t directional_run(int16_t x, int16_t y, uint8_t reports, uint16_t k
 static void test_configured_eight_directions(void) {
     uint8_t slot[96];
 
-    directional_slot(slot, NOAH_PD_AXIS_EIGHT, NOAH_PD_EMPTY_DIAGONAL_NEAREST, true);
+    directional_slot(slot, NOAH_PD_AXIS_EIGHT, NOAH_PD_EMPTY_DIRECTION_NEAREST, true);
     test_reset_stubs();
     directional_clock = 1000u;
     noah_pd_engine_enter(slot);
@@ -1403,13 +1404,13 @@ static void test_configured_eight_directions(void) {
     // Empty diagonals. Nearest: the quadrant splits at 45 degrees, as in
     // dominant axis, so a 40-degree move is horizontal and a 50-degree one
     // vertical.
-    directional_slot(slot, NOAH_PD_AXIS_EIGHT, NOAH_PD_EMPTY_DIAGONAL_NEAREST, false);
+    directional_slot(slot, NOAH_PD_AXIS_EIGHT, NOAH_PD_EMPTY_DIRECTION_NEAREST, false);
     noah_pd_engine_enter(slot);
     CHECK(directional_run(12, -10, 4, KC_RIGHT) >= 3);
     directional_clock += 500u;
     CHECK(directional_run(10, -12, 4, KC_UP) >= 3);
     // Both: each diagonal step taps the two straight directions.
-    directional_slot(slot, NOAH_PD_AXIS_EIGHT, NOAH_PD_EMPTY_DIAGONAL_BOTH, false);
+    directional_slot(slot, NOAH_PD_AXIS_EIGHT, NOAH_PD_EMPTY_DIRECTION_BOTH, false);
     noah_pd_engine_enter(slot);
     uint8_t both = 0;
     for (uint8_t i = 0; i < 4; i++) {
@@ -1420,9 +1421,43 @@ static void test_configured_eight_directions(void) {
     }
     CHECK(both >= 6);
     // Nothing: the diagonal is a dead zone.
-    directional_slot(slot, NOAH_PD_AXIS_EIGHT, NOAH_PD_EMPTY_DIAGONAL_NOTHING, false);
+    directional_slot(slot, NOAH_PD_AXIS_EIGHT, NOAH_PD_EMPTY_DIRECTION_NOTHING, false);
     noah_pd_engine_enter(slot);
     CHECK(directional_run(10, -10, 4, KC_NO) == 0);
+    noah_pd_engine_exit();
+}
+
+// Every directional mode is the engine; the policy for an empty direction
+// applies to straight directions too, and a single axis counts only itself.
+static void test_configured_empty_directions_and_single_axes(void) {
+    uint8_t slot[96];
+
+    // Dominant axis with "left" empty. Nearest: its share goes to up and down,
+    // so a move leaning up-left taps up, at the rate of its upward part.
+    directional_slot(slot, NOAH_PD_AXIS_DOMINANT, 0, false);
+    slot[36] = 0; // left
+    slot[86] = NOAH_PD_EMPTY_DIRECTION_NEAREST;
+    test_reset_stubs();
+    directional_clock = 1000u;
+    noah_pd_engine_enter(slot);
+    uint8_t up = directional_run(-10, -5, 8, KC_UP);
+    CHECK(up >= 3 && up <= 5);
+    // Nothing: moving left is a dead zone.
+    slot[86] = NOAH_PD_EMPTY_DIRECTION_NOTHING;
+    noah_pd_engine_enter(slot);
+    CHECK(directional_run(-10, -3, 6, KC_NO) == 0);
+    // Both acts as nearest for a straight direction: nothing to combine.
+    slot[86] = NOAH_PD_EMPTY_DIRECTION_BOTH;
+    noah_pd_engine_enter(slot);
+    CHECK(directional_run(-10, -5, 8, KC_UP) >= 3);
+
+    // Horizontal only counts the horizontal part of any move.
+    directional_slot(slot, NOAH_PD_AXIS_HORIZONTAL, 0, false);
+    slot[34] = slot[35] = 0;
+    memset(slot + 44, 0, 8); // up, down
+    noah_pd_engine_enter(slot);
+    CHECK(directional_run(3, 10, 10, KC_RIGHT) == 3);
+    CHECK(directional_run(-10, 10, 2, KC_LEFT) == 2);
     noah_pd_engine_exit();
 }
 
@@ -1515,6 +1550,7 @@ int main(void) {
     test_configured_release_ownership_and_custom_slot();
     test_configured_eight_directions();
     test_configured_dominant_axis();
+    test_configured_empty_directions_and_single_axes();
 #endif
     test_dragscroll_horizontal_lock_filters_vertical_jitter();
     test_dragscroll_vertical_lock_filters_horizontal_jitter();

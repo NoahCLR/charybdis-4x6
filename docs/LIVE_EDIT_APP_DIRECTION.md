@@ -1147,3 +1147,12 @@ progress along the held direction counts. Zoom and Arrow, the dominant-axis
 presets, therefore no longer match the legacy handlers report for report; the
 parity test keeps covering the single-axis presets. See
 [PD-mode domain v1](architecture/pd-mode-domain-v1.md).
+
+Vertical-only and horizontal-only modes then joined the same engine: the axis
+policy only says which directions exist, and motion toward a missing one goes
+to the nearest existing one, which for a single axis is exactly counting that
+axis. Counting in threshold X × threshold Y units keeps that exact, so the
+parity test still holds the single-axis presets (Volume, Brightness) to the
+legacy handlers report for report. "When a diagonal is empty" became "When a
+direction is empty" and applies to every directional mode (byte 86 for axes
+0–3).

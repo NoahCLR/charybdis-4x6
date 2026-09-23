@@ -59,23 +59,29 @@ and outputs for unused axes. All scrolling parameters are zero; eight-direction
 modes instead carry their diagonals there, read both axes and so need both
 thresholds.
 
-Dominant-axis and eight-direction modes share one directional engine
-(2026-09-24); dominant axis is that engine with four directions. Motion is
-measured in steps of each axis's own threshold, rounded per report so small
-moves add up exactly. A smoothed heading (half of each report) chooses a
-direction: straight within 22.5° of an axis and diagonal otherwise when a
-diagonal takes part, or split at 45° when none does. The chosen direction is
-held until the heading is 7.5° past its boundary; a move against it releases
-it at once, and after a 150 ms pause the next move chooses afresh, keeping its
-progress only if it continues the same way. Only progress along the held
-direction counts and sideways drift is dropped; a diagonal step is one
-threshold step along the diagonal, and entering a diagonal takes half a step
-more before its first tap, so a turn from one axis to the other passes through
-it without firing. An empty diagonal follows byte 86: "nearest" leaves it out
-of the choice so that quadrant splits at 45°, "both" taps the two straight
-directions per step, and "nothing" consumes the step. Taps per report and the
-backlog use the same caps as the other discrete modes. Vertical-only and
-horizontal-only modes keep the single-axis accumulator. A configured
+Every directional mode runs one engine (2026-09-24); the axis policy says
+which directions exist: vertical and horizontal two, dominant axis the four
+straight ones, eight directions all eight. Motion toward a direction that does
+not exist goes to the nearest one that does, which for a single axis is exactly
+counting that axis. Motion is counted in units of threshold X × threshold Y,
+so each axis moves in steps of its own threshold and a straight direction
+accumulates sensor counts exactly; the backlog keeps at most the capped whole
+steps and the part of one, and a still report drains it at the per-report
+budget, both as the single-axis accumulator did. A smoothed heading (half of
+each report) picks the nearest available direction and holds it until another
+is nearer by 15°, which moves each boundary 7.5° past the held side. A move
+against the held direction releases it at once, and after a 150 ms pause the
+next move chooses afresh, keeping its progress only if it continues the same
+way. Only progress along the held direction counts and sideways drift is
+dropped; a diagonal step is one threshold step along the diagonal, and entering
+a diagonal takes half a step more before its first tap, so a turn from one axis
+to the other passes through it without firing.
+
+Byte 86 is what every directional mode does with motion toward a direction
+that exists but has no shortcut: `0` its neighbours take its share, `1` a
+diagonal taps both straight directions (a straight direction acts as `0`), and
+`2` the motion is consumed. Records with axis 0–2 carry byte 86 too; bytes
+70..85 stay zero outside eight directions, and 87..89 are always zero. A configured
 axis may have no output in either direction. Scrolling modes zero the axis and
 directional fields. Their thresholds, divisors and axis timeout are positive;
 expiry is at least the timeout. Interval zero means no output throttling.

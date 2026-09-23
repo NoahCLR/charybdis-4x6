@@ -9,7 +9,10 @@ export const AXIS = {VERTICAL: 0, HORIZONTAL: 1, DOMINANT: 2, EIGHT: 3};
 // Eight directions add the diagonals, stored beside the straight directions.
 export const DIAGONALS = [["upLeft", "Up-left"], ["upRight", "Up-right"], ["downLeft", "Down-left"], ["downRight", "Down-right"]];
 // What an eight-direction mode does when a diagonal has no shortcut.
-export const EMPTY_DIAGONAL = [[0, "Nearest straight direction"], [1, "Both neighbouring directions"], [2, "Nothing"]];
+// What moving toward a direction with no shortcut does, in every directional
+// mode. "Both" combines a diagonal from its two straight directions; a
+// straight direction has nothing to combine, so there it acts as nearest.
+export const EMPTY_DIRECTION = [[0, "Its neighbours take over"], [1, "Both neighbours (diagonals)"], [2, "Nothing"]];
 // The directions each axis setting reads. The keyboard refuses a mode that
 // keeps a shortcut or a threshold on an axis it does not read, so the form
 // draws only these and the record carries the others as zero.
@@ -113,7 +116,7 @@ export function readConfig(slot, form) {
             modifierPolicy: slot.diagonals?.[diagonal]?.modifierPolicy ?? 0,
             mask: slot.diagonals?.[diagonal]?.mask ?? 0,
         } : {keycode: "0", modifierPolicy: 0, mask: 0}]));
-        config.emptyDiagonal = eight ? (form.emptyDiagonal ? form.emptyDiagonal() : slot.emptyDiagonal ?? 0) : 0;
+        config.emptyDirection = form.emptyDirection ? form.emptyDirection() : slot.emptyDirection ?? 0;
     } else {
         config.heldModifiers = form.heldModifiers ? form.heldModifiers() : slot.heldModifiers;
         config.scroll = Object.fromEntries(SCROLL_FIELDS.map(([key]) => [key,

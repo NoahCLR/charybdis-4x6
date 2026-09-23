@@ -1,7 +1,7 @@
 #include "profile_pd_v1.h"
 #include <string.h>
 
-_Static_assert(sizeof(noah_pd_config_t) == 96 && offsetof(noah_pd_config_t, scroll) == 70 && offsetof(noah_pd_config_t, directions) == 36 && offsetof(noah_pd_config_t, diagonals) == 70 && offsetof(noah_pd_config_t, empty_diagonal) == 86, "PD native structure layout drift");
+_Static_assert(sizeof(noah_pd_config_t) == 96 && offsetof(noah_pd_config_t, scroll) == 70 && offsetof(noah_pd_config_t, directions) == 36 && offsetof(noah_pd_config_t, diagonals) == 70 && offsetof(noah_pd_config_t, empty_direction) == 86, "PD native structure layout drift");
 
 static void write_u16(uint8_t *p, uint16_t value) { p[0] = (uint8_t)value; p[1] = (uint8_t)(value >> 8); }
 void noah_profile_pd_v1_encode_record(const noah_pd_config_t *config, uint8_t output[96]) {
@@ -111,10 +111,13 @@ noah_profile_pd_v1_result_t noah_profile_pd_v1_validate_record(const uint8_t *p,
         for (size_t i = 70; i < 86; i += 4) {
             if (!tap_valid(p + i)) return fail(error, NOAH_PROFILE_PD_V1_INVALID_ACTION, i);
         }
-        if (p[86] > NOAH_PD_EMPTY_DIAGONAL_NOTHING) return fail(error, NOAH_PROFILE_PD_V1_INVALID_POLICY, 86);
+        if (p[86] > NOAH_PD_EMPTY_DIRECTION_NOTHING) return fail(error, NOAH_PROFILE_PD_V1_INVALID_POLICY, 86);
         if (!zero(p + 87, 3)) return fail(error, NOAH_PROFILE_PD_V1_RESERVED, 87);
     } else if (p[1] == 1) {
-        if (p[6] || !zero(p + 70, 20)) return fail(error, NOAH_PROFILE_PD_V1_INVALID_PARAMETER, 6);
+        // No diagonals; byte 86 is what an empty direction does.
+        if (p[6] || !zero(p + 70, 16)) return fail(error, NOAH_PROFILE_PD_V1_INVALID_PARAMETER, 6);
+        if (p[86] > NOAH_PD_EMPTY_DIRECTION_NOTHING) return fail(error, NOAH_PROFILE_PD_V1_INVALID_POLICY, 86);
+        if (!zero(p + 87, 3)) return fail(error, NOAH_PROFILE_PD_V1_RESERVED, 87);
         if ((p[3] != 0 && !u16(p + 32)) || (p[3] != 1 && !u16(p + 34))) return fail(error, NOAH_PROFILE_PD_V1_INVALID_PARAMETER, 32);
         if ((p[3] == 0 && (u16(p + 32) || !zero(p + 36, 8))) ||
             (p[3] == 1 && (u16(p + 34) || !zero(p + 44, 8)))) return fail(error, NOAH_PROFILE_PD_V1_INVALID_PARAMETER, 32);

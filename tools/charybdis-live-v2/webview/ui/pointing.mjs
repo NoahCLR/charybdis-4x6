@@ -7,7 +7,7 @@
 
 import {css, isOff} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
-import {AXIS, DIAGONALS, DIRECTIONS, EMPTY_DIAGONAL, KIND, SCROLL_FIELDS, axisReads, dpiOptions, readConfig, readsHorizontal, readsVertical, startingRecord} from "../view/pointing-config.mjs";
+import {AXIS, DIAGONALS, DIRECTIONS, EMPTY_DIRECTION, KIND, SCROLL_FIELDS, axisReads, dpiOptions, readConfig, readsHorizontal, readsVertical, startingRecord} from "../view/pointing-config.mjs";
 import {MODIFIER_BITS, keyName, modifierNames} from "../view/keyvalues.mjs";
 import {bindingsForSlot} from "../view/keyface.mjs";
 import {pdColourRow, stageEnabled} from "../view/lighting.mjs";
@@ -240,10 +240,11 @@ function editor(model, slot, canEdit, slots) {
                     klass: `arm ${diagonal}`, labelHtml: `<b>${ARROWS[diagonal]}</b> ${esc(label)}`,
                 }));
             }
-            // Movement within 22.5° of a diagonal counts as that diagonal.
-            card.querySelector(".card-b").append(select("When a diagonal is empty", EMPTY_DIAGONAL, slot.emptyDiagonal ?? 0, "emptyDiagonal",
-                {tip: "What moving toward a diagonal with no shortcut sends: the straight direction it leans toward, both neighbouring directions, or nothing."}));
         }
+        // Every directional mode: what moving toward a direction with no
+        // shortcut does.
+        card.querySelector(".card-b").append(select("When a direction is empty", EMPTY_DIRECTION, slot.emptyDirection ?? 0, "emptyDirection",
+            {tip: "Moving toward a direction with no shortcut: its neighbours take over its share, a diagonal sends both straight directions, or the move does nothing."}));
         cross.append(el(`<div class="hub" aria-hidden="true"><svg viewBox="0 0 64 64">
             <circle cx="32" cy="32" r="22"/><circle cx="32" cy="32" r="3"/>
             ${reads.includes("up") ? `<path d="M32 4l-4 5h8z"/>` : ""}${reads.includes("down") ? `<path d="M32 60l-4-5h8z"/>` : ""}
