@@ -17,8 +17,7 @@ const vscode = require("vscode");
 
 const {upgradePdSnapshot, validateSnapshot} = require("./core/session/portable-profile-session");
 const {ProfileDeviceService} = require("./core/session/profile-device-service");
-const {ProfileDraftSession} = require("./core/session/profile-draft-session");
-const {applyLayerEdit, buildPanelModel, layerEditDocument, routeMessage, startLayerEdit, takeOutbox} = require("./core/session/panel-session");
+const {applyLayerEdit, buildPanelModel, discardDraftForDevice, layerEditDocument, routeMessage, startLayerEdit, takeOutbox} = require("./core/session/panel-session");
 const {getHtml} = require("./panel-html");
 
 const VIEW_TYPE = "charybdisLiveV2.panel";
@@ -71,7 +70,7 @@ async function handleMessage(panel, session, message) {
         const route = routeMessage(session, message, session.service.snapshot());
         if (route === "draft") await draftMessage(panel, session, message);
         else if (route === "portable") await portableMessage(panel, session, message);
-        else if (route === "read") await connectAndRead(panel, session);
+        else if (route === "read") await connectAndRead(panel, session, message.type === "selectDevice" ? message.deviceId : undefined);
         // A staged edit, and even an unrecognised message, is answered, so the
         // panel is never left waiting on a reply.
         else publish(panel, session);
@@ -87,16 +86,16 @@ async function handleMessage(panel, session, message) {
 }
 
 // Connect, learn what the keyboard is, and read what it is running.
-async function connectAndRead(panel, session) {
+async function connectAndRead(panel, session, selectedDeviceId) {
     try {
-        await readKeyboard(panel, session);
+        await readKeyboard(panel, session, selectedDeviceId);
     } finally {
         session.readBusy = false;
         publish(panel, session);
     }
 }
 
-async function readKeyboard(panel, session) {
+async function readKeyboard(panel, session, selectedDeviceId) {
     const service = session.service;
     await service.enumerate();
     const devices = service.snapshot().devices;
@@ -105,23 +104,16 @@ async function readKeyboard(panel, session) {
         return;
     }
 
-    if (!service.snapshot().connected) {
-        let deviceId = devices[0].id;
-        if (devices.length > 1) {
-            const picked = await vscode.window.showQuickPick(
-                devices.map((device) => ({
-                    label: [device.manufacturer, device.product].filter(Boolean).join(" ") || "Charybdis",
-                    description: device.id,
-                    id: device.id,
-                })),
-                {title: "Several Charybdis interfaces matched"}
-            );
-            if (!picked) {
-                return;
-            }
-            deviceId = picked.id;
-        }
+    if (selectedDeviceId && !devices.some((device) => device.id === selectedDeviceId)) {
+        throw new Error("The selected keyboard is no longer available. Read the device list again.");
+    }
+    if (!service.snapshot().connected || (selectedDeviceId && service.snapshot().selectedDeviceId !== selectedDeviceId)) {
+        const deviceId = selectedDeviceId || devices[0].id;
         await service.connect(deviceId);
+        const connected = service.snapshot();
+        if (!connected.connected || connected.selectedDeviceId !== deviceId) {
+            throw new Error(connected.error?.message || "Could not connect to the selected keyboard.");
+        }
     }
 
     await service.refresh();
@@ -252,16 +244,16 @@ async function draftMessage(panel, session, message) {
             draft.assertRevision(message.draftRevision, {allowStale: true});
             const state = service.snapshot();
             if (!state.connected) throw new Error("Reconnect and read the keyboard before discarding its draft.");
-            const snapshot = await service.readPortableProfile();
-            session.draft = new ProfileDraftSession(snapshot, state.selectedDeviceId, state.capabilities);
-            session.portableReview = undefined; session.portableLayers = undefined;
-            session.resetDraftForms = true;
-            session.notice = "Draft discarded. Showing the saved keyboard configuration.";
+            const snapshot = state.capabilities?.compiledLayerCount === 8 ? await service.readPortableProfile() : undefined;
+            discardDraftForDevice(session, state, snapshot);
+            session.notice = state.capabilities?.compiledLayerCount === 8
+                ? "Draft discarded. Showing the saved keyboard configuration."
+                : "Draft discarded. This keyboard remains read-only.";
         } else if (message.type === "rebaseProfileDraft") {
             draft.assertRevision(message.draftRevision, {allowStale: true});
             if (service.snapshot().selectedDeviceId !== draft.deviceId) throw new Error("Reconnect the keyboard this draft belongs to.");
             const snapshot = await service.readPortableProfile({forRestore: true});
-            draft.observe(snapshot, draft.deviceId);
+            draft.observe(snapshot, draft.deviceId, service.snapshot().connectionToken);
             draft.rebase(message.draftRevision);
             session.resetDraftForms = true;
             session.notice = "Review now compares your draft with the latest keyboard state. Apply will replace the differences shown.";

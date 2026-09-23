@@ -1,7 +1,7 @@
 "use strict";
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const {applyLayerEdit, buildPanelModel, layerEditDocument, routeMessage, startLayerEdit, takeOutbox} = require("../../core/session/panel-session");
+const {applyLayerEdit, buildPanelModel, discardDraftForDevice, layerEditDocument, routeMessage, startLayerEdit, takeOutbox} = require("../../core/session/panel-session");
 const {fingerprint, summary, validateSnapshot} = require("../../core/model/portable-profile");
 const {document} = require("../fixtures/pd-profile");
 
@@ -60,9 +60,75 @@ test("every other message names the handler that answers it", () => {
     session.readBusy = false;
     assert.equal(routeMessage(session, {type: "ready"}, connected()), "read");
     session.readBusy = false;
+    assert.equal(routeMessage(session, {type: "selectDevice", deviceId: "kb"}, connected()), "read");
+    session.readBusy = false;
+    assert.equal(routeMessage(session, {type: "selectDevice", deviceId: "other"}, connected({devices: [device, {id: "other"}]})), "read");
+    assert.equal(session.resetDraftForms, true, "switching devices clears unfinished form text, but keeps the host draft");
+    session.readBusy = false;
+    assert.throws(() => routeMessage(session, {type: "selectDevice", deviceId: "missing"}, connected()), /current device list/);
     assert.equal(routeMessage(session, {type: "refresh"}, connected({busy: true})), "none", "another device operation blocks readback");
     assert.equal(routeMessage(session, {type: "somethingNew"}, connected()), "none");
     assert.equal(routeMessage({...session, portableBusy: true}, {type: "refresh"}, connected()), "none", "a busy backup answers without starting anything");
+});
+
+test("switching keyboards preserves a dirty draft without showing it as editable on the other device", () => {
+    const session = panelWithDraft();
+    const original = session.draft;
+    const edit = {type: "updateLayoutKeys", layer: "Layer 1", changes: [{layoutIndex: 0, keycode: "KC_B"}]};
+    original.stage({...edit, draftRevision: original.revision});
+    session.service.portable = snapshot();
+    const other = connected({selectedDeviceId: "other", devices: [device, {id: "other", label: "Another Charybdis"}]});
+    const model = buildPanelModel(session, other);
+    assert.equal(session.draft, original);
+    assert.equal(model.draft.matching, false);
+    assert.equal(model.selectedDeviceId, "other");
+    assert.deepEqual(model.devices.map(({id}) => id), ["kb", "other"]);
+    assert.throws(() => routeMessage(session, {...edit, draftId: original.id, draftRevision: original.revision}, other), /Reconnect/);
+
+    original.reset(snapshot());
+    session.service.portable = snapshot();
+    buildPanelModel(session, other);
+    assert.notEqual(session.draft, original, "a clean draft follows the newly selected keyboard");
+    assert.equal(session.draft.deviceId, "other");
+});
+
+test("the panel marks a retained draft stale after reconnecting to the same device choice", () => {
+    const session = {service: {portable: snapshot()}};
+    buildPanelModel(session, connected({connectionToken: 1}));
+    session.draft.stage({type: "updateLayoutKeys", draftRevision: session.draft.revision, layer: "Layer 1", changes: [{layoutIndex: 0, keycode: "KC_B"}]});
+    session.service.portable = snapshot();
+    const model = buildPanelModel(session, connected({connectionToken: 2}));
+    assert.equal(model.draft.matching, true);
+    assert.equal(model.draft.connectionChanged, true);
+    assert.equal(model.draft.stale, true);
+});
+
+test("a new connection blocks draft edits before portable readback finishes", () => {
+    const session = {service: {portable: snapshot()}};
+    buildPanelModel(session, connected({connectionToken: 1}));
+    session.draft.stage({type: "updateLayoutKeys", draftRevision: session.draft.revision, layer: "Layer 1", changes: [{layoutIndex: 0, keycode: "KC_B"}]});
+    session.service.portable = undefined;
+    const current = connected({connectionToken: 2});
+    const model = buildPanelModel(session, current);
+    assert.equal(model.draft.connectionChanged, true);
+    assert.equal(model.draft.stale, true);
+    assert.throws(() => routeMessage(session, {type: "updateLayoutKeys", draftId: session.draft.id, draftRevision: session.draft.revision}, current), /Reconnect/);
+});
+
+test("discarding an old draft on a legacy keyboard clears it without opening an eight-layer draft", () => {
+    const session = panelWithDraft();
+    const legacy = connected({selectedDeviceId: "old", capabilities: {...capabilities, compiledLayerCount: 5}});
+    discardDraftForDevice(session, legacy);
+    assert.equal(session.draft, undefined);
+    assert.equal(session.resetDraftForms, true);
+    assert.equal(buildPanelModel(session, legacy).draft, undefined);
+});
+
+test("a clean draft closes automatically when selecting a legacy keyboard", () => {
+    const session = panelWithDraft();
+    const legacy = connected({selectedDeviceId: "old", capabilities: {...capabilities, compiledLayerCount: 5}});
+    assert.equal(buildPanelModel(session, legacy).draft, undefined);
+    assert.equal(session.resetDraftForms, true);
 });
 
 test("an in-flight read keeps the panel busy across service operation gaps", () => {

@@ -70,6 +70,21 @@ test("external reads retain the draft and require an explicit new comparison", (
     assert.equal(draft.current.fingerprint,target);
     assert.ok(draft.view({}).changes.some(c=>c.area==="Defaults" && c.before==="190" && c.after==="150"),"review reveals changes the draft would overwrite");
 });
+test("a reconnect requires review even when the HID path and profile are unchanged", async () => {
+    const {snapshot, caps} = fixture();
+    const draft = new ProfileDraftSession(snapshot, "board", caps, 1);
+    stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_0",payload:"mine"});
+    draft.observe(snapshot, "board", 2);
+    assert.equal(draft.connectionChanged, true);
+    assert.equal(draft.stale, true);
+    assert.throws(() => draft.review(draft.revision), /keyboard changed/);
+    draft.rebase(draft.revision);
+    assert.equal(draft.connectionToken, 2);
+    assert.equal(draft.stale, false);
+    assert.equal(draft.dirty, true);
+    const service = {snapshot: () => ({connected: true, selectedDeviceId: "board", connectionToken: 3})};
+    await assert.rejects(draft.apply(service, draft.revision, () => {}), /Review this draft/);
+});
 test("apply requires the reviewed revision and original device, uses one verified restore, then clears history", async () => {
     const {draft,snapshot} = fixture(), calls=[];
     stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_0",payload:"text"});

@@ -16,10 +16,13 @@ const fail = text => Object.assign(new Error(text), {code: "PROFILE_DRAFT_CONFLI
 const DRAFT_EDITS = new Set([...PD_EDITS, ...RGB_EDITS, ...COMBO_EDITS, ...BEHAVIOR_EDITS, "updateConfigDefaults", "updateViaMacro", "updateLayoutKeys", "applyAllChanges"]);
 
 class ProfileDraftSession {
-    constructor(snapshot, deviceId, capabilities) {
+    constructor(snapshot, deviceId, capabilities, connectionToken = null) {
         if (!deviceId || snapshot.incomplete || capabilities.compiledLayerCount !== 8) throw fail("Read a complete eight-layer profile before editing.");
         validateSnapshot(snapshot.document, capabilities);
         this.deviceId = deviceId;
+        this.connectionToken = connectionToken ?? null;
+        this.latestConnectionToken = this.connectionToken;
+        this.connectionChanged = false;
         this.id = randomUUID();
         this.capabilities = copy(capabilities);
         this.base = copy(snapshot);
@@ -32,9 +35,22 @@ class ProfileDraftSession {
     get document() {return copy(this.history[this.cursor]);}
     get current() {return {...copy(this.base), incomplete: false, document: this.document, fingerprint: fingerprint(this.history[this.cursor]), summary: summary(this.history[this.cursor])};}
     get dirty() {return fingerprint(this.history[this.cursor]) !== this.base.fingerprint;}
-    get stale() {return Boolean(this.needsRead || this.latest.fingerprint !== this.base.fingerprint);}
-    observe(snapshot, deviceId) {
+    get stale() {return Boolean(this.needsRead || this.connectionChanged || this.latest.fingerprint !== this.base.fingerprint);}
+    noteConnection(connectionToken) {
+        const token = connectionToken ?? null;
+        if (token !== this.connectionToken && token !== this.latestConnectionToken) {
+            this.connectionChanged = true;
+            this.needsRead = true;
+        }
+    }
+    observe(snapshot, deviceId, connectionToken = null) {
         if (!snapshot || deviceId !== this.deviceId) return;
+        const token = connectionToken ?? null;
+        this.latestConnectionToken = token;
+        if (token !== this.connectionToken) {
+            if (this.dirty) this.connectionChanged = true;
+            else {this.connectionToken = token; this.connectionChanged = false;}
+        }
         this.needsRead = false;
         if (snapshot.incomplete) {this.latest = copy(snapshot); return;}
         if (!this.dirty) {
@@ -51,6 +67,7 @@ class ProfileDraftSession {
         this.history = [copy(snapshot.document)]; this.cursor = 0;
         this.revision++; this.reviewedRevision = null;
         this.needsRead = false;
+        this.connectionChanged = false;
     }
     replace(document, revision) {
         this.assertRevision(revision);
@@ -105,9 +122,11 @@ class ProfileDraftSession {
         const target = this.document;
         if (this.latest.incomplete) {
             this.base = copy(this.latest); this.history = [target]; this.cursor = 0;
+            this.connectionToken = this.latestConnectionToken; this.connectionChanged = false;
             this.revision++; this.reviewedRevision = this.revision; return;
         }
         this.reset(this.latest);
+        this.connectionToken = this.latestConnectionToken;
         this.replace(target, this.revision);
         this.reviewedRevision = this.revision;
     }
@@ -115,6 +134,7 @@ class ProfileDraftSession {
         this.assertRevision(revision);
         if (!this.dirty || this.reviewedRevision !== revision) throw fail("Review the current draft before applying it.");
         if (!service.snapshot().connected || service.snapshot().selectedDeviceId !== this.deviceId) throw fail("Reconnect the keyboard this draft belongs to.");
+        if ((service.snapshot().connectionToken ?? null) !== this.connectionToken) throw fail("Review this draft against the connected keyboard before applying it.");
         try {
             const result = await service.restorePortableProfile(this.document, {expectedFingerprint: this.base.fingerprint, saveRecovery});
             if (result.fingerprint !== this.current.fingerprint) {this.needsRead = true; throw fail("The saved profile did not match the draft. Keep the recovery copy and read the keyboard again.");}
@@ -146,7 +166,7 @@ class ProfileDraftSession {
     }
     view(state) {
         const matching = state.selectedDeviceId === this.deviceId, connected = matching && state.connected;
-        return {id: this.id, revision: this.revision, dirty: this.dirty, stale: this.stale, connected, matching,
+        return {id: this.id, revision: this.revision, dirty: this.dirty, stale: this.stale, connectionChanged: this.connectionChanged, connected, matching,
             canUndo: this.cursor > 0, canRedo: this.cursor + 1 < this.history.length,
             reviewed: this.reviewedRevision === this.revision,
             changes: !this.dirty ? [] : this.base.incomplete ? [{area: "Recovery", label: "Complete profile", before: "Interrupted configuration; a full comparison is unavailable", after: `${this.current.summary.layers} layers, ${this.current.summary.behaviors} behaviours, ${this.current.summary.combos} combos, ${this.current.summary.macros} macros with content, lighting and settings`}] : profileReview(this.base, this.current)};

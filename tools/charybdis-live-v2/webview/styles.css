@@ -119,6 +119,8 @@ code { color: inherit; background: none; padding: 0; border-radius: 0; }
    stale panel is corrected where it is noticed. */
 .rail-mark .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rail-mark .btn { margin-left: auto; flex: none; }
+.rail-picker-label { display: block; margin-top: 12px; margin-bottom: 5px; font-size: 10px; color: var(--text-3); text-transform: uppercase; letter-spacing: .08em; }
+.rail-picker { width: 100%; font-size: 11px; }
 .rail-product { margin-top: 12px; font-size: 12.5px; font-weight: 520; }
 .rail-meta { margin-top: 3px; font-size: 11px; color: var(--text-3); font-family: var(--mono); }
 .rail-status { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }

@@ -24,11 +24,27 @@ const PORTABLE_MESSAGES = new Set([
 // A complete read of an eight-layer keyboard opens the draft, or refreshes the
 // one already open against what the keyboard now holds.
 function observePortable(session, state) {
+    if (session.draft && !session.draft.dirty && state.connected && state.selectedDeviceId !== session.draft.deviceId) {
+        session.draft = undefined;
+        session.resetDraftForms = true;
+    }
     const portable = session.service.portable;
     if (!portable || portable === session.observedPortable || portable.incomplete || !state.connected || state.capabilities?.compiledLayerCount !== 8) return;
-    if (!session.draft) session.draft = new ProfileDraftSession(portable, state.selectedDeviceId, state.capabilities);
-    else session.draft.observe(portable, state.selectedDeviceId);
+    if (!session.draft) {
+        session.draft = new ProfileDraftSession(portable, state.selectedDeviceId, state.capabilities, state.connectionToken);
+        session.resetDraftForms = true;
+    }
+    else session.draft.observe(portable, state.selectedDeviceId, state.connectionToken);
     session.observedPortable = portable;
+}
+
+function discardDraftForDevice(session, state, snapshot) {
+    session.draft = state.capabilities?.compiledLayerCount === 8
+        ? new ProfileDraftSession(snapshot, state.selectedDeviceId, state.capabilities, state.connectionToken)
+        : undefined;
+    session.portableReview = undefined;
+    session.portableLayers = undefined;
+    session.resetDraftForms = true;
 }
 
 // The model the webview renders. With a draft open, the editable surfaces come
@@ -36,10 +52,13 @@ function observePortable(session, state) {
 // own: the rail describes the keyboard, not the draft.
 function buildPanelModel(session, state) {
     observePortable(session, state);
+    if (session.draft && state.connected && state.selectedDeviceId === session.draft.deviceId) session.draft.noteConnection(state.connectionToken);
     const device = state.devices?.find((entry) => entry.id === state.selectedDeviceId);
     const busy = Boolean(state.busy || session.portableBusy || session.readBusy);
     const editing = session.draft ? session.draft.editingState(state) : state;
     const model = buildDeviceModel({...editing, busy: editing.busy || session.portableBusy || session.readBusy, device});
+    model.devices = (state.devices || []).map(({id, label}) => ({id, label}));
+    model.selectedDeviceId = state.selectedDeviceId || "";
     if (session.draft) {
         model.draft = {...session.draft.view(state), busy};
         if (model.draft.matching) {
@@ -54,7 +73,7 @@ function buildPanelModel(session, state) {
         });
         model.device = actual.device;
         model.diagnostics = actual.diagnostics;
-        if (model.draft.dirty) model.device.subtitle = "Showing your local draft · the keyboard still runs the last applied profile";
+        if (model.draft.dirty && model.draft.matching) model.device.subtitle = "Showing your local draft · the keyboard still runs the last applied profile";
     }
     model.portable = {
         available: Boolean(state.connected && [5, 8].includes(state.capabilities?.compiledLayerCount) && (state.capabilities?.supportedDomainMask & 15) === 15),
@@ -99,7 +118,7 @@ function routeMessage(session, message, state) {
         if (!session.draft) {
             throw new Error("This keyboard has no editable draft, so the change was not written. Read the keyboard again; if it stays read-only, update both halves to firmware with profile editing.");
         }
-        if (state.busy || !state.connected || state.selectedDeviceId !== session.draft.deviceId) {
+        if (state.busy || !state.connected || state.selectedDeviceId !== session.draft.deviceId || (state.connectionToken ?? null) !== session.draft.connectionToken) {
             throw new Error("Reconnect the keyboard this draft belongs to and wait for its current operation.");
         }
         session.acceptedEdit = session.draft.stage(message);
@@ -107,8 +126,12 @@ function routeMessage(session, message, state) {
     }
     if (DRAFT_CONTROLS.has(type)) return "draft";
     if (PORTABLE_MESSAGES.has(type)) return "portable";
-    if (type === "ready" || type === "refresh") {
+    if (type === "ready" || type === "refresh" || type === "selectDevice") {
         if (state.busy) return "none";
+        if (type === "selectDevice" && (!state.devices?.some((device) => device.id === message.deviceId) || !message.deviceId)) {
+            throw new Error("Choose a keyboard from the current device list.");
+        }
+        if (type === "selectDevice" && message.deviceId !== state.selectedDeviceId) session.resetDraftForms = true;
         session.readBusy = true;
         return "read";
     }
@@ -157,4 +180,4 @@ function applyLayerEdit(edit, message) {
 
 const layerEditDocument = (edit) => reorderLayers(edit.before.document, edit.order, edit.order.map((old) => edit.names[old]));
 
-module.exports = {DRAFT_CONTROLS, PORTABLE_MESSAGES, applyLayerEdit, buildPanelModel, layerEditDocument, observePortable, routeMessage, startLayerEdit, takeOutbox};
+module.exports = {DRAFT_CONTROLS, PORTABLE_MESSAGES, applyLayerEdit, buildPanelModel, discardDraftForDevice, layerEditDocument, observePortable, routeMessage, startLayerEdit, takeOutbox};

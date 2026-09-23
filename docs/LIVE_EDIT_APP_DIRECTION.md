@@ -51,6 +51,12 @@ Convergence requires the firmware's peer-known and peer-converged flags as well
 as matching generations. Read from keyboard is serialized across its full
 workflow, and compiled defaults are selected from fresh status rather than from
 an arbitrary committed-payload rejection.
+The rail shows a keyboard selector when several compatible Raw HID interfaces
+are present. Device choices keep session-stable identities across scans; a
+dirty draft remains bound to its original choice and cannot edit another
+keyboard until it is discarded or the original is selected again.
+A new connection also requires explicit draft review before Apply, even if the
+HID path is reused and readback matches the earlier profile.
 
 ## Eight configurable PD-mode slots
 

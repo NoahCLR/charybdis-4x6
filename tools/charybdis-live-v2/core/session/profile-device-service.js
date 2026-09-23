@@ -47,8 +47,12 @@ class ProfileDeviceService {
             : readCandidateStatus;
         this.devices = [];
         this.adapterIdsByPublicId = new Map();
+        this.publicIdsByAdapterIdentity = new Map();
+        this.nextPublicDeviceId = 1;
         this.connection = undefined;
         this.connectionPublicId = "";
+        this.connectionSequence = 0;
+        this.connectionToken = null;
         this.disposeConnectionListener = undefined;
         this.disconnecting = false;
         this.scanned = false;
@@ -81,7 +85,12 @@ class ProfileDeviceService {
             const descriptors = await this.coordinator.listDevices();
             this.adapterIdsByPublicId.clear();
             this.devices = descriptors.map((descriptor, index) => {
-                const id = `charybdis-${index + 1}`;
+                const identity = JSON.stringify([descriptor.id, cleanText(descriptor.serialNumber)]);
+                let id = this.publicIdsByAdapterIdentity.get(identity);
+                if (!id) {
+                    id = `charybdis-${this.nextPublicDeviceId++}`;
+                    this.publicIdsByAdapterIdentity.set(identity, id);
+                }
                 this.adapterIdsByPublicId.set(id, descriptor.id);
                 return publicDeviceDescriptor(id, descriptor, index);
             });
@@ -110,6 +119,7 @@ class ProfileDeviceService {
             this.connection = connection;
             this.requestIds = new ProfileRequestIdSequence(this.requestIdStart);
             this.connectionPublicId = String(publicDeviceId);
+            this.connectionToken = ++this.connectionSequence;
             this.phase = "connected";
             this.disposeConnectionListener = connection.onDisconnect((reason) => this.handleDisconnect(reason));
             this.addDiagnostic(`Connected to ${this.deviceLabel(this.connectionPublicId)}.`);
@@ -468,6 +478,7 @@ class ProfileDeviceService {
             connected: Boolean(this.connection?.connected),
             devices: this.devices.map((device) => ({...device})),
             selectedDeviceId: this.connectionPublicId,
+            connectionToken: this.connectionToken,
             capabilities: this.capabilities ? {...this.capabilities} : null,
             status: this.status ? {...this.status} : null,
             candidateStatus: this.candidateStatus ? cloneCandidateStatus(this.candidateStatus) : null,
@@ -544,6 +555,7 @@ class ProfileDeviceService {
         this.disposeConnectionListener = undefined;
         this.connection = undefined;
         this.connectionPublicId = "";
+        this.connectionToken = null;
         this.capabilities = undefined;
         this.status = undefined;
         this.candidateStatus = undefined;

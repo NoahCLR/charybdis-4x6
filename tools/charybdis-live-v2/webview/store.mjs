@@ -113,4 +113,4 @@ export const selectedPosition = () => positionAt(currentLayer(), state.selected)
 
 // Editing is only offered where the keyboard says it is possible; everywhere
 // else the control stays visible and disabled, with the reason.
-export const writable = () => Boolean(getModel()?.draft && !getModel()?.draft.busy && getModel()?.device?.connected);
+export const writable = () => Boolean(getModel()?.draft?.matching && !getModel()?.draft.stale && !getModel()?.draft.busy && getModel()?.device?.connected);

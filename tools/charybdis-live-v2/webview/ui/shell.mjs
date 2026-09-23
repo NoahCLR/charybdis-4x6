@@ -33,6 +33,11 @@ export function rail() {
     const device = model?.device || {};
     const health = device.health || {};
     const draft = model?.draft;
+    const devices = model?.devices || [];
+    const selector = devices.length > 1 ? `<label class="rail-picker-label" for="rail-device-picker">Keyboard</label>
+            <select class="input rail-picker" id="rail-device-picker" data-act="select-device" ${health.busy ? "disabled" : ""}>
+                ${devices.map((entry) => `<option value="${esc(entry.id)}" ${entry.id === model.selectedDeviceId ? "selected" : ""}>${esc(entry.label)} · ${esc(entry.id)}</option>`).join("")}
+            </select>` : "";
     const line = (tone, text, tip) =>
         `<div class="stat" data-tip="${esc(tip)}"><i class="dot ${tone}"></i> ${esc(text)}</div>`;
 
@@ -46,6 +51,7 @@ export function rail() {
             <div class="rail-mark"><span class="mark-glyph">C</span> <span class="nm">Charybdis Live</span>
                 <button class="btn tiny ghost" data-act="refresh" aria-label="Read keyboard" ${health.busy ? "disabled" : ""}
                     data-tip="Read the connected keyboard again while keeping your draft.">Read</button></div>
+            ${selector}
             <div class="rail-product">${esc(device.label || "No keyboard connected")}</div>
             <div class="rail-meta">${esc(device.summary || "—")}</div>
             <div class="rail-status">
@@ -81,6 +87,7 @@ export function rail() {
     }));
     node.querySelector('[data-act="dismiss"]')?.addEventListener("click", () => { state.notice = ""; state.error = ""; render(); });
     node.querySelector('[data-act="refresh"]').addEventListener("click", () => post({type: "refresh"}));
+    node.querySelector('[data-act="select-device"]')?.addEventListener("change", (event) => post({type: "selectDevice", deviceId: event.target.value}));
     node.querySelector('[data-act="undo"]').addEventListener("click", () => post({type: "undoProfileDraft"}));
     node.querySelector('[data-act="redo"]').addEventListener("click", () => post({type: "redoProfileDraft"}));
     return node;
@@ -116,10 +123,19 @@ export function commitBar() {
             <span class="sep"></span>
             <span class="note">the keyboard keeps running its saved profile until both halves confirm</span></div>`);
     }
+    if (!draft.matching) {
+        const node = el(`<div class="commit" style="border-color:var(--draft)">
+            <span class="n"><i class="dot draft"></i> <strong>Draft belongs to another keyboard</strong>
+            <span class="muted">${draft.changes.length} change${draft.changes.length === 1 ? "" : "s"} kept locally. Select that keyboard to continue${model?.device?.connected ? ", or discard the draft here" : ""}.</span></span>
+            <span class="sep"></span>
+            ${model?.device?.connected ? '<button class="btn ghost" data-act="discard">Discard draft</button>' : ""}</div>`);
+        node.querySelector('[data-act="discard"]')?.addEventListener("click", () => post({type: "discardProfileDraft"}));
+        return node;
+    }
     if (draft.stale) {
         const node = el(`<div class="commit" style="border-color:var(--draft)">
-            <span class="n"><i class="dot draft"></i> <strong>The keyboard changed</strong>
-            <span class="muted">since this draft began — your ${draft.changes.length} change${draft.changes.length === 1 ? "" : "s"} are kept</span></span>
+            <span class="n"><i class="dot draft"></i> <strong>${draft.connectionChanged ? "Keyboard connection changed" : "The keyboard changed"}</strong>
+            <span class="muted">${draft.connectionChanged ? "Review the current keyboard before continuing" : "since this draft began"} — your ${draft.changes.length} change${draft.changes.length === 1 ? "" : "s"} are kept</span></span>
             <span class="sep"></span>
             <button class="btn" data-act="rebase">Review against the keyboard</button>
             <button class="btn ghost" data-act="discard">Discard draft</button></div>`);
@@ -152,5 +168,7 @@ export function unavailable(model) {
     if (!model?.device?.connected) return "No keyboard is connected. Connect one and choose Read keyboard.";
     if (!model?.layers?.length) return "Nothing has been read from the keyboard yet. Choose Read keyboard.";
     if (!model?.draft) return "This keyboard's firmware cannot hold a complete eight-layer profile, so edits cannot be drafted here.";
+    if (!model.draft.matching) return "The local draft belongs to another keyboard. Select it again or discard the draft here.";
+    if (model.draft.stale) return "Review the draft against the current keyboard before editing further.";
     return "";
 }

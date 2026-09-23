@@ -72,7 +72,10 @@ function buildModel() {
         busy: false,
         capabilities,
         status: {committedGeneration: 42, committedDigest: 0x9ac31b70, activeGeneration: 42, peerGeneration: 42},
-        devices: [{id: deviceId, manufacturer: "Bastard Keyboards", product: "Charybdis 4x6"}],
+        devices: [
+            {id: deviceId, label: "Charybdis 4x6 · preview", manufacturer: "Bastard Keyboards", product: "Charybdis 4x6"},
+            ...(process.argv.includes("--multiple") ? [{id: "preview-second", label: "Charybdis 4x6 · second", manufacturer: "Bastard Keyboards", product: "Charybdis 4x6"}] : []),
+        ],
         baseRgb: {state: "read", effectId: 1, brightness: 180, hue: 140, saturation: 210, speed: 60},
     };
     // The host's own model builder, so the preview cannot drift from it. The

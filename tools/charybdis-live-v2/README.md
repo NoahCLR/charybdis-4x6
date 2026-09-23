@@ -91,6 +91,8 @@ To work on the interface without a keyboard, run `npm run preview`, serve this
 folder (`python3 -m http.server 8972`) and open `dev/index.html`. The preview
 stands in for the extension host: it answers the webview's `ready` with one
 fixture model and logs every edit the interface posts back.
+Use `npm run preview -- --multiple --vscode` to inspect the selector with two
+fixture keyboards in the VS Code themed preview.
 
 ## State of the build
 
@@ -124,6 +126,14 @@ both halves agree only after the firmware reports a known, converged peer;
 matching generation numbers alone are insufficient. A failed committed-profile
 read remains an error instead of being labelled as compiled defaults. Those
 defaults are shown only when fresh device status reports no committed profile.
+When more than one compatible keyboard is connected, the selector at the top
+left chooses which one to read and edit. Switching keeps a dirty draft attached
+to its original keyboard; the other keyboard stays read-only until you switch
+back or discard that draft. Device choices keep their identity across rescans
+within the panel, so replacing one keyboard cannot reuse its draft by list order.
+After a disconnect, a retained dirty draft requires **Review against the
+keyboard** before editing or applying, even if the HID path and saved profile
+look unchanged.
 
 ## One rule that differs from v1
 

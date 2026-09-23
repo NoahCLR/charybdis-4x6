@@ -196,6 +196,7 @@ test("service exposes opaque descriptors and performs only capability/status rea
 
     const connected = await service.connect(scanned.devices[0].id);
     assert.equal(connected.connected, true);
+    assert.equal(connected.connectionToken, 1);
     assert.equal(connected.capabilities.schema.major, 1);
     assert.equal(connected.status.activeKind, 0);
     assert.equal(connected.compatibility.compatible, true);
@@ -206,7 +207,25 @@ test("service exposes opaque descriptors and performs only capability/status rea
 
     const disconnected = await service.disconnect();
     assert.equal(disconnected.connected, false);
+    assert.equal(disconnected.connectionToken, null);
     assert.equal(disconnected.capabilities, null);
+    const reconnected = await service.connect(scanned.devices[0].id);
+    assert.equal(reconnected.connectionToken, 2, "the same HID path is still a new connection for draft safety");
+});
+
+test("rescans keep each interface ID and never give a replacement the old draft ID", async () => {
+    const {adapter, service} = serviceHarness();
+    const first = (await service.enumerate()).devices[0].id;
+    adapter.devices = [{id: "/native/second/path", product: "Charybdis 4x6", serialNumber: "SERIAL-2"}];
+    const second = (await service.enumerate()).devices[0].id;
+    assert.notEqual(second, first);
+    assert.equal((await service.connect(first)).connected, false, "a removed interface cannot be selected from the latest scan");
+    adapter.devices = [
+        {id: "/native/second/path", product: "Charybdis 4x6", serialNumber: "SERIAL-2"},
+        {id: "/native/raw/hid/path", product: "Charybdis 4x6", serialNumber: "SERIAL-1"},
+    ];
+    const rescanned = (await service.enumerate()).devices;
+    assert.deepEqual(rescanned.map((entry) => entry.id), [second, first], "enumeration order does not change identities");
 });
 
 test("compatibility reports schema and source-capacity blockers", async () => {
