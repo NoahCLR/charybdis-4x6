@@ -972,7 +972,7 @@ function retargetPrompt(behaviour) {
     const model = getModel();
     const {to, existing} = state.retarget;
     const name = (keycode) => `<b>${esc(actionLabel(model, keycode))}</b> <code class="dim">${esc(keycode)}</code>`;
-    const node = el(`<div class="scrim"><div class="sheet" role="alertdialog" aria-label="Key already has a behaviour" style="width:min(520px,100%)">
+    const node = el(`<div class="scrim"><div class="sheet" role="alertdialog" aria-modal="true" aria-label="Key already has a behaviour" style="width:min(520px,100%)">
         <div class="sheet-h"><h2>${esc(actionLabel(model, existing))} already has a behaviour</h2></div>
         <div class="sheet-b" style="padding:16px 18px"><p style="font-size:13px;line-height:1.55">
             You are moving the behaviour on ${name(behaviour.keycode)} to ${name(existing)}, which has its own.</p>

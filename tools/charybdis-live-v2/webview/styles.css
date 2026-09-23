@@ -255,7 +255,7 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 .layer-edit:hover { color: var(--text); border-color: var(--line-3); background: var(--surface-2); }
 .layer-edit[aria-expanded="true"] { color: var(--text); border-style: solid; background: var(--surface-3); }
 /* The row itself scrolls sideways, so the panel hangs off the wrapper. */
-.layerbar-wrap { position: relative; }
+.layerbar-wrap { position: relative; min-width: 0; }
 .layerpanel {
   position: absolute; z-index: 40; top: calc(100% - 2px); right: 24px; width: min(620px, calc(100% - 48px));
   padding: 14px; border: 1px solid var(--line-2); border-radius: 12px; background: var(--surface);
@@ -385,7 +385,10 @@ button.tier:hover { background: var(--surface-3); }
 .act.empty { border-style: dashed; color: var(--text-3); background: none; font-family: var(--sans); font-size: 11.5px; }
 /* ── workbench ───────────────────────────────────────────────────────── */
 .keys-pad { display: grid; gap: 18px; }
-.workbench-stack { display: grid; gap: 7px; min-width: 0; }
+/* The workbench column may shrink to the window: a grid item's automatic
+   minimum is its content, so without minmax(0, …) the layer bar's nowrap
+   chips would set the width of every tab and push the page sideways. */
+.workbench-stack { display: grid; grid-template-columns: minmax(0, 1fr); gap: 7px; min-width: 0; }
 .workbench-stack .layerbar {
   padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius);
   background: var(--surface-2);
@@ -449,7 +452,7 @@ button.tier:hover { background: var(--surface-3); }
 
 .beh-head { display: flex; align-items: flex-start; gap: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
 .beh-timing { display: grid; grid-template-columns: repeat(3, minmax(0, 150px)) auto; gap: 14px; align-items: end; padding: 13px 0 16px; }
-.bgrid { display: grid; gap: 6px; align-items: stretch; }
+.bgrid { display: grid; gap: 6px; align-items: stretch; overflow-x: auto; padding-bottom: 2px; }
 .bhead { display: flex; align-items: center; gap: 7px; padding: 0 2px 4px; font-size: 11.5px; color: var(--text-2); }
 .bhead .bn { font-family: var(--mono); font-size: 10px; color: var(--text-3); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; }
 .bhead .bx { margin-left: auto; color: var(--text-3); font-size: 11px; }

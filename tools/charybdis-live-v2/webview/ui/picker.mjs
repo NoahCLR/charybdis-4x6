@@ -91,7 +91,7 @@ export function pickerOverlay() {
     if (!picker) return null;
     const model = getModel();
     const value = expression();
-    const node = el(`<div class="scrim"><div class="sheet picker" style="width:min(1180px,100%)">
+    const node = el(`<div class="scrim"><div class="sheet picker" role="dialog" aria-modal="true" aria-label="Pick a keycode" style="width:min(1180px,100%)">
         <div class="sheet-h">
             <div><h2>Pick a keycode</h2>
                 <p class="note">${picker.mode === "list" ? "Choose one or more keys." : `For <b>${esc(picker.title)}</b> · ${esc(picker.context || "")}`}</p></div>

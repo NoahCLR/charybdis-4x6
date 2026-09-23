@@ -6,6 +6,7 @@
 
 import {el, esc} from "./lib/dom.mjs";
 import {captureContentScroll, restoreContentScroll} from "./lib/scroll.mjs";
+import {activateOnKey, captureFocus, focusDialog, restoreFocus, trapTab} from "./lib/focus.mjs";
 import {closeComboBuilder, getModel, post, render as rerender, resetDraftForms, setModel, setRenderer, state} from "./store.mjs";
 import {historyAction} from "./view/edits.mjs";
 import {bindLayerIndex, hideHover, mountHover} from "./ui/hover.mjs";
@@ -74,7 +75,7 @@ function reviewOverlay() {
     const draft = model?.draft;
     if (state.overlay !== "review" || !draft?.dirty) return null;
     const areas = [...new Set(draft.changes.map((change) => change.area))];
-    const node = el(`<div class="scrim"><div class="sheet">
+    const node = el(`<div class="scrim"><div class="sheet" role="dialog" aria-modal="true" aria-label="Review changes">
         <div class="sheet-h"><h2>Review ${draft.changes.length} change${draft.changes.length === 1 ? "" : "s"}</h2>
             <span class="right" style="margin-left:auto"><button class="btn ghost" data-act="close">Keep editing</button></span></div>
         <div class="sheet-b">
@@ -106,6 +107,7 @@ function reviewOverlay() {
 
 function render() {
     const scroll = captureContentScroll(root, renderedScreen, state.screen);
+    const focus = captureFocus(root);
     hideHover();
     const model = getModel();
     root.replaceChildren();
@@ -127,6 +129,8 @@ function render() {
     if (picker) root.appendChild(picker);
     const review = reviewOverlay();
     if (review) root.appendChild(review);
+    restoreFocus(root, focus);
+    focusDialog(root);
 }
 
 setRenderer(render);
@@ -181,6 +185,7 @@ function historyShortcut(event) {
 }
 
 addEventListener("keydown", (event) => {
+    if (trapTab(root, event) || activateOnKey(event)) return;
     if (historyShortcut(event) || keysShortcut(event)) return;
     if (event.key !== "Escape") return;
     hideHover();
