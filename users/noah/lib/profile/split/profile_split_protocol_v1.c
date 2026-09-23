@@ -35,6 +35,7 @@ enum {
     WIRE_BUSY_REASON      = 17u, // ACK/BUSY reuses the unused chunk bytes
     WIRE_BUSY_STORE_STATE = 18u,
     WIRE_BUSY_OWNER       = 19u,
+    WIRE_BUSY_ADMISSION   = 20u,
     WIRE_CRC              = 31u,
     WIRE_BIND_FORMAT      = 12u,
     WIRE_BIND_VIA_GEN     = 13u,
@@ -102,7 +103,7 @@ static bool transfer_shape_valid(const noah_profile_split_v1_frame_t *frame) {
     if (!descriptor_zero(&frame->descriptor) || frame->payload_length > NOAH_PROFILE_BLOB_V1_MAX_SIZE || frame->offset > frame->payload_length) {
         return false;
     }
-    if (busy_frame(frame) ? frame->busy_reason > NOAH_PROFILE_SPLIT_V1_BUSY_REASON_MAX : (frame->busy_reason || frame->busy_store_state || frame->busy_owner)) {
+    if (busy_frame(frame) ? frame->busy_reason > NOAH_PROFILE_SPLIT_V1_BUSY_REASON_MAX : (frame->busy_reason || frame->busy_store_state || frame->busy_owner || frame->busy_admission)) {
         return false;
     }
     if (frame->kind == NOAH_PROFILE_SPLIT_V1_PAYLOAD_CHUNK) {
@@ -138,7 +139,7 @@ static bool frame_shape_valid(const noah_profile_split_v1_frame_t *frame) {
     if (frame->kind == NOAH_PROFILE_SPLIT_V1_LOGICAL_BIND_REQUEST) {
         return logical_bind_request_shape_valid(frame);
     }
-    if (frame->kind != NOAH_PROFILE_SPLIT_V1_ACK && (frame->busy_reason || frame->busy_store_state || frame->busy_owner)) {
+    if (frame->kind != NOAH_PROFILE_SPLIT_V1_ACK && (frame->busy_reason || frame->busy_store_state || frame->busy_owner || frame->busy_admission)) {
         return false;
     }
     if (descriptor_kind(frame->kind)) {
@@ -191,6 +192,7 @@ bool noah_profile_split_v1_frame_encode(const noah_profile_split_v1_frame_t *fra
             out[WIRE_BUSY_REASON]      = frame->busy_reason;
             out[WIRE_BUSY_STORE_STATE] = frame->busy_store_state;
             out[WIRE_BUSY_OWNER]       = frame->busy_owner;
+            out[WIRE_BUSY_ADMISSION]   = frame->busy_admission;
         }
     }
     out[WIRE_CRC] = crc8(out, WIRE_CRC);
@@ -236,7 +238,7 @@ bool noah_profile_split_v1_frame_decode(const uint8_t *wire, uint8_t length, noa
         decoded.via_digest           = read_u32(&wire[WIRE_BIND_VIA_DIGEST]);
     } else {
         bool    busy = decoded.kind == NOAH_PROFILE_SPLIT_V1_ACK && decoded.status == NOAH_PROFILE_SPLIT_V1_STATUS_BUSY;
-        uint8_t used = busy ? 3u : wire[WIRE_CHUNK_LENGTH];
+        uint8_t used = busy ? 4u : wire[WIRE_CHUNK_LENGTH];
 
         if (wire[WIRE_FLAGS] != 0u || wire[WIRE_CHUNK_LENGTH] > NOAH_PROFILE_SPLIT_V1_CHUNK_MAX || (busy && wire[WIRE_CHUNK_LENGTH] != 0u) || !bytes_zero(&wire[WIRE_CHUNK + used], NOAH_PROFILE_SPLIT_V1_CHUNK_MAX - used)) {
             return false;
@@ -245,6 +247,7 @@ bool noah_profile_split_v1_frame_decode(const uint8_t *wire, uint8_t length, noa
             decoded.busy_reason      = wire[WIRE_BUSY_REASON];
             decoded.busy_store_state = wire[WIRE_BUSY_STORE_STATE];
             decoded.busy_owner       = wire[WIRE_BUSY_OWNER];
+            decoded.busy_admission   = wire[WIRE_BUSY_ADMISSION];
         }
         decoded.generation     = read_u32(&wire[WIRE_TRANSFER_GEN]);
         decoded.payload_digest = read_u32(&wire[WIRE_TRANSFER_DIGEST]);

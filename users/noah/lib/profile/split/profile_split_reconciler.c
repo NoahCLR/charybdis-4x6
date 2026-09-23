@@ -195,6 +195,7 @@ static noah_profile_split_v1_frame_t busy_reply(const noah_profile_split_reconci
     reply.busy_reason      = (uint8_t)reason;
     reply.busy_store_state = (uint8_t)noah_profile_peer_store_backend_state(reconciler->config.peer_store);
     reply.busy_owner       = (uint8_t)reconciler->transfer_owner;
+    reply.busy_admission   = (uint8_t)noah_profile_candidate_store_backend_admission_owner(reconciler->config.peer_store->backend);
     return reply;
 }
 
@@ -253,7 +254,7 @@ static bool encode_invalid_response(uint8_t response[NOAH_PROFILE_SPLIT_V1_FRAME
     return noah_profile_split_v1_frame_encode(&error, response);
 }
 
-static bool encode_busy_response(const noah_profile_split_v1_frame_t *request, noah_profile_split_v1_busy_reason_t reason, uint8_t response[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE]) {
+static bool encode_busy_response(const noah_profile_split_reconciler_t *reconciler, const noah_profile_split_v1_frame_t *request, noah_profile_split_v1_busy_reason_t reason, uint8_t response[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE]) {
     uint32_t generation;
     uint32_t digest;
     uint16_t offset;
@@ -268,7 +269,10 @@ static bool encode_busy_response(const noah_profile_split_v1_frame_t *request, n
             .payload_digest = digest,
             .offset         = offset,
             .payload_length = length,
-            .busy_reason    = (uint8_t)reason,
+            .busy_reason      = (uint8_t)reason,
+            .busy_store_state = reconciler->published_store_state,
+            .busy_owner       = reconciler->published_owner,
+            .busy_admission   = reconciler->published_admission,
         },
         response);
 }
@@ -364,14 +368,14 @@ bool noah_profile_split_reconciler_receive(noah_profile_split_reconciler_t *reco
         if (read_metadata_response(reconciler, response)) {
             return true;
         }
-        return encode_busy_response(&decoded, NOAH_PROFILE_SPLIT_V1_BUSY_ADMITTED, response);
+        return encode_busy_response(reconciler, &decoded, NOAH_PROFILE_SPLIT_V1_BUSY_ADMITTED, response);
     }
     if (read_cached_response(reconciler, request, response)) {
         return true;
     }
     // A full mailbox means this half has not yet processed an earlier request;
     // if the sender keeps seeing it, this half is not getting scan time.
-    return encode_busy_response(&decoded, publish_mailbox(reconciler, request) ? NOAH_PROFILE_SPLIT_V1_BUSY_ADMITTED : NOAH_PROFILE_SPLIT_V1_BUSY_MAILBOX_FULL, response);
+    return encode_busy_response(reconciler, &decoded, publish_mailbox(reconciler, request) ? NOAH_PROFILE_SPLIT_V1_BUSY_ADMITTED : NOAH_PROFILE_SPLIT_V1_BUSY_MAILBOX_FULL, response);
 }
 
 static void process_metadata(noah_profile_split_reconciler_t *reconciler, const noah_profile_split_v1_frame_t *request) {
@@ -593,7 +597,10 @@ static void process_mailbox(noah_profile_split_reconciler_t *reconciler, noah_pr
                            .payload_digest = request.kind == NOAH_PROFILE_SPLIT_V1_PREPARE_BEGIN || request.kind == NOAH_PROFILE_SPLIT_V1_PREPARE_DURABLE || request.kind == NOAH_PROFILE_SPLIT_V1_PREPARE_COMMIT || request.kind == NOAH_PROFILE_SPLIT_V1_ABORT ? request.descriptor.payload_digest : request.payload_digest,
                            .offset         = request.offset,
                            .payload_length = request.kind == NOAH_PROFILE_SPLIT_V1_PREPARE_BEGIN || request.kind == NOAH_PROFILE_SPLIT_V1_PREPARE_DURABLE || request.kind == NOAH_PROFILE_SPLIT_V1_PREPARE_COMMIT || request.kind == NOAH_PROFILE_SPLIT_V1_ABORT ? request.descriptor.payload_length : request.payload_length,
-                           .busy_reason    = NOAH_PROFILE_SPLIT_V1_BUSY_CONVERGENCE_ONLY,
+                           .busy_reason      = NOAH_PROFILE_SPLIT_V1_BUSY_CONVERGENCE_ONLY,
+                           .busy_store_state = (uint8_t)noah_profile_peer_store_backend_state(reconciler->config.peer_store),
+                           .busy_owner       = (uint8_t)reconciler->transfer_owner,
+                           .busy_admission   = (uint8_t)noah_profile_candidate_store_backend_admission_owner(reconciler->config.peer_store->backend),
                        });
         publish_authority(reconciler);
         return;
@@ -783,10 +790,12 @@ static bool rpc_exchange(noah_profile_split_reconciler_t *reconciler, const noah
         // Admission is the expected first answer to every new request; keep
         // the last BUSY that says why the peer is actually holding off.
         if (response->busy_reason != NOAH_PROFILE_SPLIT_V1_BUSY_ADMITTED) {
-            reconciler->last_busy_reason      = response->busy_reason;
-            reconciler->last_busy_store_state = response->busy_store_state;
-            reconciler->last_busy_owner       = response->busy_owner;
+            reconciler->last_busy_reason = response->busy_reason;
         }
+        // Every BUSY carries the peer's current store state and admission.
+        reconciler->last_busy_store_state = response->busy_store_state;
+        reconciler->last_busy_owner       = response->busy_owner;
+        reconciler->last_busy_admission   = response->busy_admission;
     } else {
         reconciler->busy_streak = 0u;
     }
@@ -1163,6 +1172,17 @@ static void push_abort(noah_profile_split_reconciler_t *reconciler, uint32_t now
         return;
     }
     if (!response_ack_matches(&response, &reconciler->transfer_descriptor)) {
+        // The receiver answers a storage error only when its own abort write
+        // failed; it has then rejected the copy and released its storage, so
+        // the cancel is done. Keeping the push would hold it open forever.
+        if (response.kind == NOAH_PROFILE_SPLIT_V1_ERROR && response.status == NOAH_PROFILE_SPLIT_V1_STATUS_STORAGE_ERROR && response.generation == reconciler->transfer_descriptor.generation && response.payload_digest == reconciler->transfer_descriptor.payload_digest) {
+            clear_prepared_push(reconciler);
+            reconciler->transfer_offset = 0u;
+            reconciler->state           = NOAH_PROFILE_SPLIT_RECONCILER_DISCOVER;
+            note_progress(reconciler, now);
+            publish_authority(reconciler);
+            return;
+        }
         reconciler->prepared_cancel_refused = true;
         handle_protocol_error(reconciler, &response, now);
         return;
@@ -1361,6 +1381,9 @@ bool noah_profile_split_reconciler_scan_mode(noah_profile_split_reconciler_t *re
         publish_authority(reconciler);
     }
     release_transient_busy_response(reconciler);
+    reconciler->published_store_state = (uint8_t)noah_profile_peer_store_backend_state(reconciler->config.peer_store);
+    reconciler->published_owner       = (uint8_t)reconciler->transfer_owner;
+    reconciler->published_admission   = (uint8_t)noah_profile_candidate_store_backend_admission_owner(reconciler->config.peer_store->backend);
     if (reconciler->observed_peer_activity_sequence != reconciler->peer_activity_sequence) {
         reconciler->observed_peer_activity_sequence = reconciler->peer_activity_sequence;
         reconciler->peer_activity_known             = true;
@@ -1528,6 +1551,12 @@ static bool prepared_push_begin(noah_profile_split_reconciler_t *reconciler, con
     reconciler->last_status                = NOAH_PROFILE_SPLIT_V1_STATUS_OK;
     reconciler->attempt_immediate          = true;
     reconciler->retry_ms                   = NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS;
+    // Busy details describe this copy only, never an earlier one.
+    reconciler->busy_streak                = 0u;
+    reconciler->last_busy_reason           = NOAH_PROFILE_SPLIT_V1_BUSY_UNSPECIFIED;
+    reconciler->last_busy_store_state      = 0u;
+    reconciler->last_busy_owner            = 0u;
+    reconciler->last_busy_admission        = 0u;
     reconciler->state                      = logical ? NOAH_PROFILE_SPLIT_RECONCILER_PUSH_BIND : NOAH_PROFILE_SPLIT_RECONCILER_PUSH_BEGIN;
     publish_authority(reconciler);
     return true;
@@ -1633,6 +1662,7 @@ bool noah_profile_split_reconciler_status(const noah_profile_split_reconciler_t 
         .last_busy_reason        = reconciler->last_busy_reason,
         .last_busy_store_state   = reconciler->last_busy_store_state,
         .last_busy_owner         = reconciler->last_busy_owner,
+        .last_busy_admission     = reconciler->last_busy_admission,
         .role_known              = reconciler->role_known,
         .master                  = reconciler->master,
         .mailbox_pending         = mailbox_pending(reconciler),

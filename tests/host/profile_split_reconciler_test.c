@@ -20,6 +20,8 @@ typedef struct {
     uint8_t  bytes[NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE];
     uint32_t reads;
     uint32_t writes;
+    uint32_t fail_reads;  // the next reads fail, as a flash read that errors would
+    uint32_t fail_writes; // likewise for writes
 } memory_t;
 
 typedef struct {
@@ -59,6 +61,10 @@ static bool memory_read(void *context, uint16_t address, uint8_t *target, uint16
     memory_t *memory = context;
 
     memory->reads++;
+    if (memory->fail_reads) {
+        memory->fail_reads--;
+        return false;
+    }
     if (!target || length == 0u || (uint32_t)address + length > sizeof(memory->bytes)) {
         return false;
     }
@@ -70,6 +76,10 @@ static bool memory_write(void *context, uint16_t address, const uint8_t *source,
     memory_t *memory = context;
 
     memory->writes++;
+    if (memory->fail_writes) {
+        memory->fail_writes--;
+        return false;
+    }
     if (!source || length == 0u || (uint32_t)address + length > sizeof(memory->bytes)) {
         return false;
     }
@@ -1099,6 +1109,106 @@ static void test_prepared_push_restarts_when_the_receiver_drops_its_lease(void) 
     assert(done && "the sender retried a chunk the receiver would never accept");
 }
 
+// A storage failure while the receiver checks or stores a copy must not
+// leave it unable to take the next one. In the field the other half refused
+// every later Apply until it was power cycled.
+static void run_receiver_recovers_after_storage_failure(noah_profile_peer_store_state_t failing_phase, bool fail_write) {
+    half_t                          left;
+    half_t                          right;
+    noah_profile_split_descriptor_t descriptor;
+    staged_source_t                 source = {.bytes = empty_profile, .length = sizeof(empty_profile)};
+    uint32_t                        now    = 100000u;
+    bool                            failed = false;
+    bool                            armed  = false;
+    bool                            ready  = false;
+
+    half_storage_init(&left);
+    half_storage_init(&right);
+    pair_init(&left, &right);
+    run_pair_until_converged(&left, &right, false);
+    descriptor = committed_descriptor(&right, 60u, 1u);
+    assert(noah_profile_split_reconciler_prepared_push_begin(&right.reconciler, &descriptor, &source, staged_read));
+    for (uint32_t scan = 0u; scan < MAX_SCANS && !failed; scan++, now += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS) {
+        assert_one_scan_budget(&right, true, now);
+        if (!armed && noah_profile_peer_store_backend_state(&left.peer_store) == failing_phase) {
+            armed = true;
+            if (fail_write)
+                left.memory.fail_writes = 1u;
+            else
+                left.memory.fail_reads = 1u;
+        }
+        assert_one_scan_budget(&left, false, now);
+        failed = right.reconciler.state == NOAH_PROFILE_SPLIT_RECONCILER_STOPPED;
+    }
+    assert(armed && failed && right.reconciler.last_status == NOAH_PROFILE_SPLIT_V1_STATUS_STORAGE_ERROR);
+    left.memory.fail_reads  = 0u;
+    left.memory.fail_writes = 0u;
+
+    // The host cancels, then applies the same profile again: the same copy.
+    assert(noah_profile_split_reconciler_prepared_push_cancel(&right.reconciler, &descriptor));
+    for (uint32_t scan = 0u; scan < MAX_SCANS && right.reconciler.prepared_push_active; scan++, now += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS) {
+        assert_one_scan_budget(&right, true, now);
+        assert_one_scan_budget(&left, false, now);
+    }
+    assert(!right.reconciler.prepared_push_active);
+    for (uint32_t scan = 0u; scan < 64u && !noah_profile_split_reconciler_prepared_push_begin(&right.reconciler, &descriptor, &source, staged_read); scan++, now += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS) {
+        assert_one_scan_budget(&right, true, now);
+        assert_one_scan_budget(&left, false, now);
+    }
+    assert(right.reconciler.prepared_push_active);
+    for (uint32_t scan = 0u; scan < MAX_SCANS && !ready; scan++, now += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS) {
+        assert_one_scan_budget(&right, true, now);
+        assert_one_scan_budget(&left, false, now);
+        ready = noah_profile_split_reconciler_prepared_push_ready(&right.reconciler, NULL);
+    }
+    if (!ready) fprintf(stderr, "after a failed %s while %s: receiver store %u admission %u prepare %u | sender state %u status %u\n", fail_write ? "write" : "read", failing_phase == NOAH_PROFILE_PEER_STORE_PREPARING ? "storing" : "checking", (unsigned)noah_profile_peer_store_backend_state(&left.peer_store), (unsigned)noah_profile_candidate_store_backend_admission_owner(&left.candidate_backend), (unsigned)left.store.prepare_active, (unsigned)right.reconciler.state, (unsigned)right.reconciler.last_status);
+    assert(ready && "the receiver never recovered from the storage failure");
+    assert(noah_profile_candidate_store_backend_admission_owner(&left.candidate_backend) == NOAH_PROFILE_STORAGE_ADMISSION_PEER);
+}
+
+// The cancel's own write on the receiver fails: the lease must still end.
+static void test_receiver_recovers_when_its_abort_write_fails(void) {
+    half_t                          left;
+    half_t                          right;
+    noah_profile_split_descriptor_t descriptor;
+    staged_source_t                 source = {.bytes = empty_profile, .length = sizeof(empty_profile)};
+    uint32_t                        now    = 100000u;
+    bool                            ready  = false;
+
+    half_storage_init(&left);
+    half_storage_init(&right);
+    pair_init(&left, &right);
+    run_pair_until_converged(&left, &right, false);
+    descriptor = committed_descriptor(&right, 70u, 1u);
+    now        = run_prepared_push_until_ready_at(&right, &left, &descriptor, &source, now);
+    assert(noah_profile_peer_store_backend_state(&left.peer_store) == NOAH_PROFILE_PEER_STORE_PREPARED);
+    left.memory.fail_writes = 1u;
+    assert(noah_profile_split_reconciler_prepared_push_cancel(&right.reconciler, &descriptor));
+    for (uint32_t scan = 0u; scan < MAX_SCANS && right.reconciler.prepared_push_active; scan++, now += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS) {
+        assert_one_scan_budget(&right, true, now);
+        assert_one_scan_budget(&left, false, now);
+    }
+    left.memory.fail_writes = 0u;
+    assert(noah_profile_candidate_store_backend_admission_owner(&left.candidate_backend) == NOAH_PROFILE_STORAGE_ADMISSION_NONE);
+    for (uint32_t scan = 0u; scan < 400u && !noah_profile_split_reconciler_prepared_push_begin(&right.reconciler, &descriptor, &source, staged_read); scan++, now += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS) {
+        assert_one_scan_budget(&right, true, now);
+        assert_one_scan_budget(&left, false, now);
+    }
+    for (uint32_t scan = 0u; scan < MAX_SCANS && !ready; scan++, now += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS) {
+        assert_one_scan_budget(&right, true, now);
+        assert_one_scan_budget(&left, false, now);
+        ready = noah_profile_split_reconciler_prepared_push_ready(&right.reconciler, NULL);
+    }
+    if (!ready) fprintf(stderr, "after failed abort write: receiver store %u admission %u prepare %u reconcile %u | sender active %u state %u status %u orphan %u busy %u reason %u\n", (unsigned)noah_profile_peer_store_backend_state(&left.peer_store), (unsigned)noah_profile_candidate_store_backend_admission_owner(&left.candidate_backend), (unsigned)left.store.prepare_active, (unsigned)left.store.reconciliation_required, (unsigned)right.reconciler.prepared_push_active, (unsigned)right.reconciler.state, (unsigned)right.reconciler.last_status, (unsigned)right.reconciler.orphan_pending, (unsigned)right.reconciler.busy_streak, (unsigned)right.reconciler.last_busy_reason);
+    assert(ready && "a failed abort write left the receiver unable to take the next copy");
+}
+
+static void test_receiver_recovers_after_a_storage_failure(void) {
+    run_receiver_recovers_after_storage_failure(NOAH_PROFILE_PEER_STORE_VALIDATING, false);
+    run_receiver_recovers_after_storage_failure(NOAH_PROFILE_PEER_STORE_PREPARING, true);
+    run_receiver_recovers_after_storage_failure(NOAH_PROFILE_PEER_STORE_PREPARING, false);
+}
+
 static void test_prepared_push_restarts_across_both_half_role_changes(void) {
     half_t                          left;
     half_t                          right;
@@ -1549,6 +1659,8 @@ int main(void) {
     test_prepared_push_survives_one_lost_exchange_anywhere();
     test_stale_receive_lease_expires_while_the_link_stays_busy();
     test_prepared_push_restarts_when_the_receiver_drops_its_lease();
+    test_receiver_recovers_after_a_storage_failure();
+    test_receiver_recovers_when_its_abort_write_fails();
     test_refresh_publishes_new_local_authority_during_backoff();
     test_idle_scans_do_not_republish_unchanged_metadata();
     test_converged_steady_state_cost_is_bounded_by_poll_deadline();

@@ -109,6 +109,11 @@ noah_profile_peer_store_result_t noah_profile_peer_store_backend_abort(noah_prof
     return NOAH_PROFILE_PEER_STORE_BUSY;
 }
 
+noah_profile_storage_admission_owner_t noah_profile_candidate_store_backend_admission_owner(const noah_profile_candidate_store_backend_t *backend) {
+    (void)backend;
+    return NOAH_PROFILE_STORAGE_ADMISSION_NONE;
+}
+
 noah_profile_peer_store_state_t noah_profile_peer_store_backend_state(const noah_profile_peer_store_backend_t *peer) {
     (void)peer;
     return NOAH_PROFILE_PEER_STORE_IDLE;

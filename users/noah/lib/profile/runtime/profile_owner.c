@@ -1123,6 +1123,7 @@ bool noah_profile_owner_peer_transfer(const noah_profile_owner_t *owner, noah_pr
         .busy_reason             = status.last_busy_reason,
         .busy_store_state        = status.last_busy_store_state,
         .busy_owner              = status.last_busy_owner,
+        .busy_admission          = status.last_busy_admission,
     };
     return true;
 }

@@ -39,8 +39,10 @@ metadata require OK. Acknowledgement accepts only OK or busy; error frames
 accept neither.
 
 A busy acknowledgement says why in the unused chunk bytes: byte 17 is the busy
-reason, 18 the receiver's store state and 19 its transfer owner, with the chunk
-length still zero (the values are listed with candidate status page 1 in
+reason, 18 the receiver's store state, 19 its transfer owner and 20 who holds
+its storage admission, with the chunk length still zero. A reply the split
+callback writes itself (admission, mailbox full) takes 18–20 from the
+receiver's last scan (the values are listed with candidate status page 1 in
 [Profile Wire](profile-wire-v1.md)). Every other frame keeps those bytes zero.
 Its offset is the receiver's progress only when the store holds the requested
 copy, and `0` otherwise: another copy's offset past the request's length
@@ -203,7 +205,16 @@ no transfer owns any more expires the same way.
 A sender whose chunk keeps meeting busy, after the admission reply, at another
 offset or all the way to the longest backoff, restarts at `PREPARE_BEGIN`. That
 is idempotent for a live lease, which resumes at the receiver's offset, and
-re-creates a dropped one, where retrying the chunk would never end. If both halves change
+re-creates a dropped one, where retrying the chunk would never end.
+
+A copy the receiver rejects always returns its storage admission. The store
+closes its own prepare when a write or read fails mid-copy, and an abort
+whose invalidating write fails closes it too; the peer store then had nothing
+left to abort, kept the `PEER` admission, and refused every later copy as
+"prepare in progress" until the half was power cycled. It now releases the
+admission whenever the rejected copy leaves no prepare open. A sender whose
+ABORT is answered with a correlated storage error treats the cancel as done,
+since the receiver has then rejected the copy and released its storage. If both halves change
 transport roles, an outbound prepared source retains its candidate correlation
 but restarts at `PREPARE_BEGIN` before resuming chunks or an authorized commit;
 it never assumes the new receiver retained volatile prepare state.

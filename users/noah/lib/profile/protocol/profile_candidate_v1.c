@@ -284,7 +284,8 @@ bool noah_profile_candidate_v1_handle_peer_status_get(const noah_profile_candida
     payload[18] = peer->busy_reason;
     payload[19] = peer->busy_store_state;
     payload[20] = peer->busy_owner;
-    // Bytes 21..24 are reserved and stay zero.
+    payload[21] = peer->busy_admission;
+    // Bytes 22..24 are reserved and stay zero.
     return true;
 }
 

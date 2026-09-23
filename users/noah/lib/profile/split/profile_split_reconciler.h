@@ -91,6 +91,7 @@ typedef struct {
     uint8_t                               last_busy_reason;
     uint8_t                               last_busy_store_state;
     uint8_t                               last_busy_owner;
+    uint8_t                               last_busy_admission;
     bool                                  role_known;
     bool                                  master;
     bool                                  mailbox_pending;
@@ -142,6 +143,12 @@ typedef struct {
     uint8_t                                last_busy_reason;
     uint8_t                                last_busy_store_state;
     uint8_t                                last_busy_owner;
+    uint8_t                                last_busy_admission;
+    // This half's store state, transfer owner and storage admission as of its
+    // last scan, for BUSY replies the split callback writes before any scan.
+    volatile uint8_t                       published_store_state;
+    volatile uint8_t                       published_owner;
+    volatile uint8_t                       published_admission;
     uint32_t                               prepared_via_generation;
     uint32_t                               prepared_via_digest;
     // While a prepared push is cancelled, when it is released without the

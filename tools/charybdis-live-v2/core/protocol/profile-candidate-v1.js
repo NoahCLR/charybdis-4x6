@@ -349,6 +349,8 @@ const CANDIDATE_PEER_FLAGS = Object.freeze({CLEANUP_PENDING: 1 << 0, MASTER: 1 <
 const PEER_BUSY_REASON_NAMES = Object.freeze(["UNSPECIFIED", "ADMITTED", "MAILBOX_FULL", "OTHER_COPY", "NO_LEASE", "STORE_WORKING", "PULLING", "CONVERGENCE_ONLY"]);
 const PEER_STORE_STATE_NAMES = Object.freeze(["UNINITIALIZED", "IDLE", "RECEIVING", "VALIDATING", "PREPARING", "PREPARED", "COMMITTING", "COMMITTED", "REJECTED", "RECONCILE_REQUIRED"]);
 const PEER_TRANSFER_OWNER_NAMES = Object.freeze(["NONE", "REMOTE_PUSH", "LOCAL_PULL"]);
+// noah_profile_storage_admission_owner_t: who holds the peer's storage.
+const PEER_ADMISSION_NAMES = Object.freeze(["NONE", "HOST", "PEER"]);
 
 function buildCandidatePeerStatusRequest(requestId) {
     return buildProfileGetRequest(PROFILE_CANDIDATE_V1.VALUE_STATUS, 1, assertU8(requestId, "Candidate peer status request id", {nonzero: true}));
@@ -371,11 +373,11 @@ function decodeCandidatePeerStatusResponse(response, request) {
     if ((flags & ~CANDIDATE_PEER_FLAGS.KNOWN_MASK) !== 0) {
         throw candidateProtocolError("INCOMPATIBLE_RESPONSE", "Candidate peer status contains unknown flag bits.");
     }
-    const [busyReason, busyStoreState, busyOwner] = payload.subarray(18, 21);
-    if (PEER_BUSY_REASON_NAMES[busyReason] === undefined || PEER_STORE_STATE_NAMES[busyStoreState] === undefined || PEER_TRANSFER_OWNER_NAMES[busyOwner] === undefined) {
+    const [busyReason, busyStoreState, busyOwner, busyAdmission] = payload.subarray(18, 22);
+    if (PEER_BUSY_REASON_NAMES[busyReason] === undefined || PEER_STORE_STATE_NAMES[busyStoreState] === undefined || PEER_TRANSFER_OWNER_NAMES[busyOwner] === undefined || PEER_ADMISSION_NAMES[busyAdmission] === undefined) {
         throw candidateProtocolError("INCOMPATIBLE_RESPONSE", "Unknown peer busy detail.");
     }
-    if (payload.subarray(21).some(Boolean)) {
+    if (payload.subarray(22).some(Boolean)) {
         throw candidateProtocolError("NONCANONICAL_RESPONSE", "Candidate peer status reserved bytes must be zero.");
     }
     return {
@@ -395,6 +397,7 @@ function decodeCandidatePeerStatusResponse(response, request) {
         busyReason: PEER_BUSY_REASON_NAMES[busyReason],
         busyStoreState: PEER_STORE_STATE_NAMES[busyStoreState],
         busyOwner: PEER_TRANSFER_OWNER_NAMES[busyOwner],
+        busyAdmission: PEER_ADMISSION_NAMES[busyAdmission],
     };
 }
 
@@ -564,6 +567,7 @@ module.exports = {
     PEER_BUSY_REASON_NAMES,
     PEER_STORE_STATE_NAMES,
     PEER_TRANSFER_OWNER_NAMES,
+    PEER_ADMISSION_NAMES,
     CANDIDATE_ADMISSION,
     CANDIDATE_ADMISSION_NAMES,
     CANDIDATE_ERROR,

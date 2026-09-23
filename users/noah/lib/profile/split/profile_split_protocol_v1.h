@@ -81,6 +81,7 @@ typedef struct {
     uint8_t                         busy_reason;
     uint8_t                         busy_store_state;
     uint8_t                         busy_owner;
+    uint8_t                         busy_admission; // noah_profile_storage_admission_owner_t
 } noah_profile_split_v1_frame_t;
 
 bool noah_profile_split_v1_frame_encode(const noah_profile_split_v1_frame_t *frame, uint8_t out[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE]);

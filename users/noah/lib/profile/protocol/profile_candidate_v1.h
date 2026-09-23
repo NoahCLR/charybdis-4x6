@@ -211,6 +211,7 @@ typedef struct {
     uint8_t                                busy_reason;
     uint8_t                                busy_store_state;
     uint8_t                                busy_owner;
+    uint8_t                                busy_admission; // noah_profile_storage_admission_owner_t
 } noah_profile_candidate_v1_peer_status_t;
 
 // Handles value 0x18 page 1 only, and returns false for anything else so the

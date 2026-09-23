@@ -515,6 +515,7 @@ static void test_peer_status_page(void) {
         .busy_reason             = 2u,
         .busy_store_state        = 3u,
         .busy_owner              = 1u,
+        .busy_admission          = 2u,
     };
     uint8_t frame[NOAH_PROFILE_WIRE_V1_REPORT_SIZE];
 
@@ -528,8 +529,8 @@ static void test_peer_status_page(void) {
     assert(frame[11] == 0x02u && frame[12] == 0x01u && frame[13] == 0x04u && frame[14] == 0x03u);
     assert(frame[15] == 0x08u && frame[18] == 0x05u && frame[19] == 0x0cu && frame[22] == 0x09u);
     // The peer's last BUSY: streak, reason, store state, transfer owner.
-    assert(frame[23] == 0x0eu && frame[24] == 0x0du && frame[25] == 2u && frame[26] == 3u && frame[27] == 1u);
-    for (uint8_t index = 28u; index < NOAH_PROFILE_WIRE_V1_REPORT_SIZE; index++) {
+    assert(frame[23] == 0x0eu && frame[24] == 0x0du && frame[25] == 2u && frame[26] == 3u && frame[27] == 1u && frame[28] == 2u);
+    for (uint8_t index = 29u; index < NOAH_PROFILE_WIRE_V1_REPORT_SIZE; index++) {
         assert(frame[index] == 0u);
     }
     load_fixture("operation-status-request", frame);

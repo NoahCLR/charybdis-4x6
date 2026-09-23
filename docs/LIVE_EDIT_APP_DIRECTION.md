@@ -1106,3 +1106,16 @@ store state and the busy streak. How the first attempt lost its lease is not
 proven; if a copy stalls again, those fields tell which side was waiting on
 what. See [profile split](architecture/profile-split-v1.md) and
 [Profile Wire](architecture/profile-wire-v1.md).
+
+The first test of that firmware showed the real trigger. The other half
+received the whole copy, then failed to store it with a storage error, and
+afterwards refused every Apply until it was power cycled, while typing kept
+working. When a flash write fails mid-copy the store closes its own prepare;
+the peer store then rejected the copy without releasing its `PEER` storage
+admission, so every later copy was refused as "prepare in progress". A
+rejected copy now always returns the admission. Host tests inject one failed
+read or write while the receiver checks or stores a copy, and a failed write
+in its abort; each left the receiver stuck before the fix. Why the flash write
+failed is still open. The busy details were also misleading: they kept the
+last informative reply across Applies. Every busy reply now carries the
+receiver's current store state and storage admission, and they reset per copy.

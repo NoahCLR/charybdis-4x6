@@ -60,9 +60,19 @@ static noah_profile_peer_store_result_t set_terminal(noah_profile_peer_store_bac
     return result;
 }
 
+// A copy that ends rejected gives its storage admission back. The store may
+// already have closed the prepare itself on an I/O error, or closed it when
+// an abort's own write failed; either way nothing is left to abort, but the
+// admission was still held, so every later copy met "prepare in progress"
+// until the half was power cycled.
 static noah_profile_peer_store_result_t abort_rejected(noah_profile_peer_store_backend_t *peer, noah_profile_peer_store_result_t result) {
-    if (peer->backend && peer->backend->store && peer->backend->store->prepare_active && peer->interface.abort(peer->interface.context) != NOAH_PROFILE_CANDIDATE_BACKEND_OK) {
+    noah_profile_store_t *store = peer->backend ? peer->backend->store : NULL;
+
+    if (store && store->prepare_active && peer->interface.abort(peer->interface.context) != NOAH_PROFILE_CANDIDATE_BACKEND_OK) {
         result = NOAH_PROFILE_PEER_STORE_STORAGE_ERROR;
+    }
+    if (store && !store->prepare_active) {
+        (void)noah_profile_candidate_store_backend_release_admission(peer->backend, NOAH_PROFILE_STORAGE_ADMISSION_PEER);
     }
     return set_terminal(peer, NOAH_PROFILE_PEER_STORE_REJECTED, result);
 }
@@ -354,7 +364,10 @@ noah_profile_peer_store_result_t noah_profile_peer_store_backend_step(noah_profi
         if (result == NOAH_PROFILE_CANDIDATE_BACKEND_OK) {
             return set_terminal(peer, NOAH_PROFILE_PEER_STORE_PREPARED, NOAH_PROFILE_PEER_STORE_OK);
         }
-        return set_terminal(peer, result == NOAH_PROFILE_CANDIDATE_BACKEND_DURABILITY_UNKNOWN ? NOAH_PROFILE_PEER_STORE_RECONCILE_REQUIRED : NOAH_PROFILE_PEER_STORE_REJECTED, result == NOAH_PROFILE_CANDIDATE_BACKEND_DURABILITY_UNKNOWN ? NOAH_PROFILE_PEER_STORE_DURABILITY_UNKNOWN : NOAH_PROFILE_PEER_STORE_STORAGE_ERROR);
+        if (result == NOAH_PROFILE_CANDIDATE_BACKEND_DURABILITY_UNKNOWN) {
+            return set_terminal(peer, NOAH_PROFILE_PEER_STORE_RECONCILE_REQUIRED, NOAH_PROFILE_PEER_STORE_DURABILITY_UNKNOWN);
+        }
+        return abort_rejected(peer, NOAH_PROFILE_PEER_STORE_STORAGE_ERROR);
     }
     if (peer->state != NOAH_PROFILE_PEER_STORE_COMMITTING) {
         return state_result(peer);
@@ -368,7 +381,7 @@ noah_profile_peer_store_result_t noah_profile_peer_store_backend_step(noah_profi
         return set_terminal(peer, NOAH_PROFILE_PEER_STORE_RECONCILE_REQUIRED, NOAH_PROFILE_PEER_STORE_DURABILITY_UNKNOWN);
     }
     if (result != NOAH_PROFILE_CANDIDATE_BACKEND_OK || !record_matches_descriptor(&peer->backend->committed_record, &peer->descriptor) || !validated_profile_matches_descriptor(&peer->backend->validated_profile, &peer->descriptor)) {
-        return set_terminal(peer, NOAH_PROFILE_PEER_STORE_REJECTED, result == NOAH_PROFILE_CANDIDATE_BACKEND_OK ? NOAH_PROFILE_PEER_STORE_CORRUPT : NOAH_PROFILE_PEER_STORE_STORAGE_ERROR);
+        return abort_rejected(peer, result == NOAH_PROFILE_CANDIDATE_BACKEND_OK ? NOAH_PROFILE_PEER_STORE_CORRUPT : NOAH_PROFILE_PEER_STORE_STORAGE_ERROR);
     }
     return set_terminal(peer, NOAH_PROFILE_PEER_STORE_COMMITTED, NOAH_PROFILE_PEER_STORE_OK);
 }
@@ -390,7 +403,7 @@ noah_profile_peer_store_result_t noah_profile_peer_store_backend_abort(noah_prof
         return state_result(peer);
     }
     if (peer->interface.abort(peer->interface.context) != NOAH_PROFILE_CANDIDATE_BACKEND_OK) {
-        return set_terminal(peer, NOAH_PROFILE_PEER_STORE_REJECTED, NOAH_PROFILE_PEER_STORE_STORAGE_ERROR);
+        return abort_rejected(peer, NOAH_PROFILE_PEER_STORE_STORAGE_ERROR);
     }
     memset(&peer->descriptor, 0, sizeof(peer->descriptor));
     memset(&peer->metadata, 0, sizeof(peer->metadata));
