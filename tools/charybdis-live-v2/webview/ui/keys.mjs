@@ -6,7 +6,7 @@ import {el, esc} from "../lib/dom.mjs";
 import {LED_INDEX} from "../view/geometry.mjs";
 import {actionLabel, behaviourFor, behaviourListeningTo, canonicalKeycode, behaviourGridSteps, behaviourGroups, behaviourTiers, comboEditInputs, comboGroups, combosAt, keyFace, keyMeaning, macroReach, pointingReach, pointingSlotFor, pointingVariant, reachKeys} from "../view/keyface.mjs";
 import {feedbackColours, layerColourRow, pdColourRow, stageEnabled} from "../view/lighting.mjs";
-import {currentLayer, getModel, layerName, layers, positionAt, post, render, selectedPosition, state, writable} from "../store.mjs";
+import {closeComboBuilder, currentLayer, getModel, layerName, layers, openComboBuilder, positionAt, post, render, selectedPosition, state, writable} from "../store.mjs";
 import * as edits from "../view/edits.mjs";
 import {board} from "./board.mjs";
 import {layerBar} from "./layerbar.mjs";
@@ -322,7 +322,7 @@ function tabKey(body, right) {
     node.querySelectorAll("[data-goto]").forEach((button) => button.addEventListener("click", () => {
         state.tab = button.dataset.goto;
         if (state.tab === "behaviours" && behaviour) state.behaviourRow = behaviour.keycode;
-        if (state.tab === "combos" && !combos.length) { state.comboOpen = true; state.comboEditId = null; }
+        if (state.tab === "combos" && !combos.length) openComboBuilder();
         render();
     }));
     body.replaceChildren(node);
@@ -572,10 +572,7 @@ function tabCombos(body, right) {
     right.replaceChildren();
     const toggle = el(`<button class="btn tiny" ${canEdit ? "" : "disabled"}>${state.comboOpen ? "Close builder" : "New combo"}</button>`);
     toggle.addEventListener("click", () => {
-        state.comboOpen = !state.comboOpen;
-        state.comboEditId = null;
-        state.comboInputs = []; state.comboInputCodes = {}; state.comboExtraInputs = [];
-        if (!state.comboOpen) state.comboPicking = false;
+        if (state.comboOpen) closeComboBuilder(); else openComboBuilder();
         render();
     });
     right.appendChild(toggle);
@@ -631,13 +628,7 @@ function tabCombos(body, right) {
 
     node.querySelectorAll("[data-edit]").forEach((button) => button.addEventListener("click", () => {
         const combo = combos.find((row) => String(row.id) === button.dataset.edit);
-        state.comboEditId = combo?.id ?? null;
-        state.comboOpen = true;
-        state.comboOutput = combo?.output || "";
-        const inputs = comboEditInputs(model, layers(), state.layer, combo);
-        state.comboInputs = inputs.positions;
-        state.comboInputCodes = inputs.codes;
-        state.comboExtraInputs = inputs.extras;
+        openComboBuilder(combo, comboEditInputs(model, layers(), state.layer, combo));
         render();
     }));
     const side = node.querySelector("#comboSide");
@@ -651,12 +642,13 @@ function comboBuilder(layer, canEdit, holdTerm) {
     const inputs = state.comboInputs.map((index) => positionAt(layer, index)).filter(Boolean);
     const editing = state.comboEditId !== null;
     const original = (model?.combos || []).find((combo) => combo.id === state.comboEditId);
+    const form = state.comboForm;
     const node = el(`<div class="card" style="background:var(--surface-2)">
         <div class="card-h" style="padding:11px 13px"><h3>${editing ? `Edit ${esc(original?.badge || "combo")}` : "New combo"}</h3>
             <span class="right">${editing ? `<button class="btn tiny ghost" data-act="delete" ${canEdit ? "" : "disabled"}>Delete</button>` : ""}</span></div>
         <div class="card-b" style="padding:13px;display:grid;gap:11px">
             <div class="field"><span>Sends</span>
-                <div class="input-row"><input class="input mono" data-output value="${esc(state.comboOutput)}" ${canEdit ? "" : "disabled"}>
+                <div class="input-row"><input class="input mono" data-output value="${esc(form.output)}" ${canEdit ? "" : "disabled"}>
                 <button class="btn" data-act="pickout" ${canEdit ? "" : "disabled"}>Pick…</button></div></div>
             <div class="field"><span>Inputs</span>
                 <div class="row" style="gap:6px;flex-wrap:wrap">
@@ -674,14 +666,14 @@ function comboBuilder(layer, canEdit, holdTerm) {
                 </div>
             </div>
             <label class="field"><span>Combo window</span>
-                <input class="input mono" data-term value="${esc(original?.termMs ?? "")}" placeholder="ms" ${canEdit ? "" : "disabled"}></label>
+                <input class="input mono" data-term value="${esc(form.termMs)}" placeholder="ms" ${canEdit ? "" : "disabled"}></label>
             <div class="row" style="gap:14px;flex-wrap:wrap">
-                <label class="sw"><input type="checkbox" data-musthold ${original?.mustHold ? "checked" : ""} ${canEdit ? "" : "disabled"}><span class="track"></span><span class="txt">Require hold</span></label>
-                <label class="sw"><input type="checkbox" data-musttap ${original?.mustTap ? "checked" : ""} ${canEdit ? "" : "disabled"}><span class="track"></span><span class="txt">Tap only</span></label>
-                <label class="sw"><input type="checkbox" data-ordered ${original?.ordered ? "checked" : ""} ${canEdit ? "" : "disabled"}><span class="track"></span><span class="txt">In order</span></label>
+                <label class="sw"><input type="checkbox" data-musthold ${form.mustHold ? "checked" : ""} ${canEdit ? "" : "disabled"}><span class="track"></span><span class="txt">Require hold</span></label>
+                <label class="sw"><input type="checkbox" data-musttap ${form.mustTap ? "checked" : ""} ${canEdit ? "" : "disabled"}><span class="track"></span><span class="txt">Tap only</span></label>
+                <label class="sw"><input type="checkbox" data-ordered ${form.ordered ? "checked" : ""} ${canEdit ? "" : "disabled"}><span class="track"></span><span class="txt">In order</span></label>
             </div>
             <div class="row" style="gap:8px">
-                <button class="btn primary" data-act="keep" ${canEdit ? "" : "disabled"}>Keep combo in draft</button>
+                <button class="btn primary" data-act="keep" ${canEdit && !state.comboAwaiting ? "" : "disabled"}>Keep combo in draft</button>
                 <button class="btn ghost" data-act="cancel">Cancel</button>
             </div>
             <p class="note">A combo needs its output and at least two inputs, so this form keeps its own state until you keep it.</p>
@@ -698,24 +690,32 @@ function comboBuilder(layer, canEdit, holdTerm) {
     node.querySelector('[data-act="pickboard"]')?.addEventListener("click", () => { state.comboPicking = !state.comboPicking; render(); });
     node.querySelector('[data-act="pickout"]')?.addEventListener("click", () => openPicker({
         title: "Combo output", context: editing ? original?.badge : "new combo",
-        seed: state.comboOutput ? [state.comboOutput] : [],
-        onPick: (expression) => { state.comboOutput = expression; state.picker = null; render(); },
+        seed: form.output ? [form.output] : [],
+        onPick: (expression) => { form.output = expression; state.picker = null; render(); },
     }));
-    node.querySelector('[data-act="cancel"]').addEventListener("click", () => {
-        state.comboOpen = false; state.comboPicking = false; state.comboEditId = null;
-        state.comboInputs = []; state.comboInputCodes = {}; state.comboExtraInputs = []; render();
+    // Typing and ticking land in state as they happen, so a board click that
+    // redraws the screen keeps them.
+    node.querySelector("[data-output]").addEventListener("input", (event) => { form.output = event.target.value; });
+    node.querySelector("[data-term]").addEventListener("input", (event) => { form.termMs = event.target.value; });
+    for (const field of ["mustHold", "mustTap", "ordered"]) {
+        node.querySelector(`[data-${field.toLowerCase()}]`).addEventListener("change", (event) => { form[field] = event.target.checked; });
+    }
+    node.querySelector('[data-act="cancel"]').addEventListener("click", () => { closeComboBuilder(); render(); });
+    // Keep and Delete close the builder once the host accepts them, so a
+    // second press cannot add the combo twice, and a refused combo keeps its
+    // fields for fixing.
+    node.querySelector('[data-act="delete"]')?.addEventListener("click", () => {
+        state.comboAwaiting = true;
+        post(edits.deleteCombo(state.comboEditId));
     });
-    node.querySelector('[data-act="delete"]')?.addEventListener("click", () => post(edits.deleteCombo(state.comboEditId)));
     node.querySelector('[data-act="keep"]')?.addEventListener("click", () => {
+        state.comboAwaiting = true;
         post(edits.comboMessage(editing ? state.comboEditId : null, {
-            output: node.querySelector("[data-output]").value,
+            ...form,
             inputs: [...inputs.map((position) => state.comboInputCodes[position.layoutIndex] ?? position.keycode), ...state.comboExtraInputs],
-            termMs: node.querySelector("[data-term]").value,
             holdTermMs: holdTerm(),
-            mustHold: node.querySelector("[data-musthold]").checked,
-            mustTap: node.querySelector("[data-musttap]").checked,
-            ordered: node.querySelector("[data-ordered]").checked,
         }));
+        render();
     });
     return node;
 }

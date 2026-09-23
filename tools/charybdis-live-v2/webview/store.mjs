@@ -27,7 +27,8 @@ export const state = {
     comboInputs: [],
     comboInputCodes: {},  // layoutIndex → the input name the keyboard stores, for a combo being edited
     comboExtraInputs: [], // inputs of the combo being edited that this layer cannot reach
-    comboOutput: "",
+    comboForm: {output: "", termMs: "", mustHold: false, mustTap: false, ordered: false}, // the builder's fields, kept across renders
+    comboAwaiting: false, // a Keep or Delete posted; the builder closes when the host accepts it
     comboEditId: null,
     placement: null,     // {keycode, label}: next board click places it on the current layer
     retarget: null,      // {from, to, existing}: a behaviour move waiting on overwrite / swap / cancel
@@ -62,6 +63,33 @@ export const state = {
     error: "",
     busyMessage: "",
 };
+
+// The combo builder, opened for a combo (or none, for a new one) and closed
+// again. Its fields live here rather than in the DOM, because a board click
+// while picking inputs redraws the whole screen.
+export function openComboBuilder(combo = null, inputs = {positions: [], codes: {}, extras: []}) {
+    Object.assign(state, {
+        comboOpen: true, comboPicking: false, comboAwaiting: false, comboEditId: combo?.id ?? null,
+        comboForm: {output: combo?.output || "", termMs: String(combo?.termMs ?? ""), mustHold: Boolean(combo?.mustHold), mustTap: Boolean(combo?.mustTap), ordered: Boolean(combo?.ordered)},
+        comboInputs: inputs.positions.slice(), comboInputCodes: {...inputs.codes}, comboExtraInputs: inputs.extras.slice(),
+    });
+}
+export function closeComboBuilder() {
+    openComboBuilder();
+    state.comboOpen = false;
+}
+
+// Undo, redo, discard and rebase replace the draft under the forms. Every form
+// that holds its own unstaged text starts again from the model, so nothing on
+// screen shows an edit the draft no longer has.
+export function resetDraftForms() {
+    state.macroDrafts = {};
+    state.macroSteps = {};
+    state.lastTake = null;
+    state.pdKind = null;
+    state.retarget = null;
+    closeComboBuilder();
+}
 
 let model = null;
 let renderer = () => {};

@@ -6,7 +6,7 @@
 
 import {el, esc} from "./lib/dom.mjs";
 import {captureContentScroll, restoreContentScroll} from "./lib/scroll.mjs";
-import {getModel, post, render as rerender, setModel, setRenderer, state} from "./store.mjs";
+import {closeComboBuilder, getModel, post, render as rerender, resetDraftForms, setModel, setRenderer, state} from "./store.mjs";
 import {historyAction} from "./view/edits.mjs";
 import {bindLayerIndex, hideHover, mountHover} from "./ui/hover.mjs";
 import {pickerOverlay} from "./ui/picker.mjs";
@@ -144,6 +144,15 @@ addEventListener("message", (event) => {
         state.error = failed ? message.notice : "";
         state.notice = failed ? "" : message.notice;
     }
+    if (message.resetDraftForms) resetDraftForms();
+    // A combo builder waiting on Keep or Delete closes when the host accepts
+    // the edit, and stays open with its fields when the host refuses it. A
+    // builder for a combo that no longer exists closes too.
+    if (state.comboAwaiting) {
+        if (/^Failed/.test(message.notice || "")) state.comboAwaiting = false;
+        else closeComboBuilder();
+    }
+    if (state.comboEditId !== null && !(message.model?.combos || []).some((combo) => combo.id === state.comboEditId)) closeComboBuilder();
     const layerCount = message.model?.layers?.length || 0;
     if (state.layer >= layerCount) state.layer = 0;
     const positions = message.model?.layers?.[state.layer]?.positions || [];
