@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {behaviourFor, comboEditInputs, behaviourListeningTo, canonicalKeycode, behaviourGridSteps, behaviourGroups, behaviourTiers, macroReach, pointingReach, reachablePositions, resolvedPositions, bindingKeycode, bindingsForSlot, comboGroups, combosForKey, keyFace, keyMeaning, macroKeycodes, pointingSlotFor, slotKeycodes} from "../webview/view/keyface.mjs";
+import {behaviourFor, comboEditInputs, comboReferenceLayer, behaviourListeningTo, canonicalKeycode, behaviourGridSteps, behaviourGroups, behaviourTiers, macroReach, pointingReach, reachablePositions, resolvedPositions, bindingKeycode, bindingsForSlot, comboGroups, combosForKey, keyFace, keyMeaning, macroKeycodes, pointingSlotFor, slotKeycodes} from "../webview/view/keyface.mjs";
 
 test("a key face uses the model's own resolution, and names the layer a dual-role key reaches", () => {
     assert.deepEqual(keyFace({keycode: "KC_TRANSPARENT", display: "▽"}), {main: "▽", sub: "", kind: "transparent"});
@@ -459,4 +459,27 @@ test("a picked key matches its behaviour row however its modifiers are spelled",
     assert.equal(behaviourListeningTo(model, "S(C(KC_ENT))")?.keycode, "LCTL(LSFT(KC_ENTER))", "nesting order and aliases");
     assert.equal(behaviourListeningTo(model, "LCS(KC_ENT)")?.keycode, "LCTL(LSFT(KC_ENTER))", "a combined wrapper");
     assert.equal(behaviourListeningTo(model, "C(KC_C)"), undefined, "a different modifier is a different key");
+});
+
+test("combos follow the keyboard's combo layer matching", () => {
+    const at = (layoutIndex, keycode) => ({layoutIndex, keycode, display: keycode});
+    const combo = {id: 1, badge: "C1", inputs: ["KC_Q", "KC_W"], output: "KC_ESC"};
+    const stack = [
+        {index: 0, name: "Base", positions: [at(13, "KC_Q"), at(14, "KC_W")]},
+        {index: 1, name: "Numbers", positions: [at(13, "KC_1"), at(14, "KC_2")]},
+    ];
+    const own = comboGroups({combos: [combo]}, stack, 1);
+    assert.equal(own.elsewhere.length, 1, "matched on its own keys, Numbers cannot fire a Q+W combo");
+
+    // "Combos on Numbers → Base": the keyboard matches Base's keycodes while Numbers is on top.
+    const settings = {configDefaults: [{id: "comboReferences", fields: [{macro: "comboReference1", value: "Layer 0"}]}]};
+    const referenced = comboGroups({...settings, combos: [combo]}, stack, 1);
+    assert.equal(referenced.onKeys.length, 1);
+    assert.deepEqual(referenced.onKeys[0].keys.map((key) => key.position.layoutIndex), [13, 14]);
+    assert.ok(referenced.onKeys[0].keys.every((key) => key.reference && key.layer.name === "Base"));
+    assert.equal(comboReferenceLayer({comboReadback: {layerReferences: [0, 0]}}, 1), 0, "the readback answers without settings");
+    assert.equal(comboReferenceLayer({}, 1), 1, "and each layer matches itself by default");
+
+    const edit = comboEditInputs({...settings}, stack, 1, combo);
+    assert.deepEqual(edit.codes, {13: "KC_Q", 14: "KC_W"}, "the builder opens with the keys the keyboard matches");
 });

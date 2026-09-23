@@ -125,3 +125,47 @@ test("the trackball LED is lit like any other: base effect, and an all-keys wash
     assert.deepEqual(held.colour, row.color, "a right-half overlay covers the trackball LED");
     assert.equal(held.source, "pointing");
 });
+
+// The fixture model with some rgb fields replaced and the rest (stages, base
+// effect) kept, which model({rgb}) does not do.
+const withRgb = (rgb) => { const m = model(); Object.assign(m.rgb, rgb); return m; };
+
+test("with the matrix off the keyboard is dark, whatever the layers hold", () => {
+    const m = withRgb({baseEffect: {state: "read", enabled: false, effectId: 0}});
+    assert.equal(keyLight(m, {index: 4}, position(13, "KC_UP")).source, "off", "an all-keys layer does not paint");
+    assert.equal(isOff(trackballLight(m, {index: 4}).colour), true);
+});
+
+test("the default layer's colour shows under a mapped-keys-only layer", () => {
+    const m = withRgb({layerColors: [
+        {layer: "Layer 0", layerId: 0, color: colour(0, 0, 80), mode: "ALL_KEYS"},
+        {layer: "Layer 1", layerId: 1, color: colour(85, 255, 200), mode: "KEYS_MAPPED_ON_THIS_LAYER_ONLY"},
+    ]});
+    const layer = {index: 1};
+    assert.deepEqual(keyLight(m, layer, position(13, "KC_1")).colour, colour(85, 255, 200), "the viewed layer wins on its own keys");
+    assert.deepEqual(keyLight(m, layer, position(14, "KC_TRANSPARENT")).colour, colour(0, 0, 80), "layer 0 paints the rest");
+    assert.deepEqual(trackballLight(m, layer).colour, colour(0, 0, 80), "and the trackball, since it is all keys");
+    // HSV(85, 255, 0) is solid to the firmware — it paints black, not through.
+    const black = withRgb({layerColors: [{layer: "Layer 2", layerId: 2, color: colour(85, 255, 0), mode: "ALL_KEYS"}]});
+    assert.deepEqual(keyLight(black, {index: 2}, position(13, "KC_1")).colour, colour(85, 255, 0));
+});
+
+test("LED group rows paint their LEDs, inheriting their stage colour when stored as HSV(0, 0, 0)", () => {
+    const m = withRgb({
+        layerColors: [{layer: "Layer 3", layerId: 3, color: colour(180, 255, 200), mode: "KEYS_MAPPED_ON_THIS_LAYER_ONLY"}],
+        // LED 6 is key 13; LED 9 is key 14; LED 56 is the trackball
+        layerLedGroups: [
+            {owner: "Layer 3", color: colour(0, 0, 0), ledIndices: [9]},
+            {owner: "RGB_LAYER_GROUP_ALL", color: colour(40, 255, 120), ledIndices: [56]},
+            {owner: "Layer 5", color: colour(10, 255, 255), ledIndices: [6]},
+        ],
+        pdModeLedGroups: [{owner: "RGB_PD_MODE_GROUP_ALL", color: colour(0, 0, 0), ledIndices: [6]}],
+    });
+    const layer = {index: 3};
+    assert.deepEqual(keyLight(m, layer, position(14, "KC_TRANSPARENT")).colour, colour(180, 255, 200), "inherits the layer colour on an unmapped key");
+    assert.deepEqual(trackballLight(m, layer).colour, colour(40, 255, 120), "a group can reach the trackball");
+    assert.deepEqual(keyLight(m, layer, position(13, "KC_UP")).colour, colour(180, 255, 200), "a row for an inactive layer does not paint");
+    const pdActive = {mode: "PD_MODE_DRAGSCROLL", color: colour(21, 255, 200), locality: "RGB_RIGHT_HALF"};
+    assert.deepEqual(keyLight(m, layer, position(13, "KC_UP"), {pdActive}).colour, colour(21, 255, 200),
+        "a pointing group row paints the mode colour on the left half too");
+});

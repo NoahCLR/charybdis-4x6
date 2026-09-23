@@ -81,7 +81,7 @@ export function screenLighting() {
         faces: !onGroups,
         picks: state.ledPicks,
         trackball: state.trackball,
-        pdActive: preview ? {color: preview.color, locality: preview.locality, triggerIndex: undefined} : null,
+        pdActive: preview ? {mode: preview.pointingMode, color: preview.color, locality: preview.locality, triggerIndex: undefined} : null,
         onKey: onGroups ? (index) => {
             state.ledPicks = state.ledPicks.includes(index)
                 ? state.ledPicks.filter((value) => value !== index) : [...state.ledPicks, index];

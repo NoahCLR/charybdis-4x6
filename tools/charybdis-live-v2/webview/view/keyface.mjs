@@ -271,14 +271,39 @@ function comboKeysAmong(positions, combo) {
  *
  * It has no branch case either: a behaviour fires a keycode, never a chord.
  */
+// Which layer's key assignments combos are matched against while `at` is the
+// top layer — the keyboard's Combo Layer Matching setting. The draft's settings
+// section is read first, so an edit there shows here before it is applied;
+// the combo readback is the keyboard's own answer when settings are absent.
+export function comboReferenceLayer(model, at) {
+    const section = (model?.configDefaults || []).find((row) => row.id === "comboReferences");
+    const field = section?.fields?.find((row) => row.macro === `comboReference${at}`);
+    const written = /^Layer (\d+)$/.exec(String(field?.value ?? ""));
+    if (written) return Number(written[1]);
+    const read = model?.comboReadback?.layerReferences?.[at];
+    return Number.isInteger(read) ? read : at;
+}
+
 export function comboGroups(model, stack, at) {
+    // QMK matches combos against the reference layer's raw keycodes whenever
+    // that layer is not the top one (process_combo.c: keymap_key_to_keycode on
+    // ref_layer, no transparency). Then there is exactly one way to press the
+    // combo, whatever else is held.
+    const reference = comboReferenceLayer(model, at);
+    const referenced = reference !== at && stack[reference] ? stack[reference] : null;
     // The activations do not depend on the combo, so each is resolved once and
     // every combo is tried against it. Resolving per combo instead re-walks the
     // whole board 64 times over, on every render.
-    const tries = activations(at).map((held) => {
-        const resolved = resolvedPositions(stack, at, held);
-        return {held, resolved, answering: new Map(resolved.map((entry) => [entry.position, entry]))};
-    });
+    const tries = referenced
+        ? [(() => {
+            const resolved = (referenced.positions || []).map((position) =>
+                ({position, layer: referenced, fellThrough: false, whileHeld: false, reference: true}));
+            return {held: [], resolved, answering: new Map(resolved.map((entry) => [entry.position, entry]))};
+        })()]
+        : activations(at).map((held) => {
+            const resolved = resolvedPositions(stack, at, held);
+            return {held, resolved, answering: new Map(resolved.map((entry) => [entry.position, entry]))};
+        });
 
     const onKeys = [], throughKeys = [], elsewhere = [];
     for (const combo of model?.combos || []) {

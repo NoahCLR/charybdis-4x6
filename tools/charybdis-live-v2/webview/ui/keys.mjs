@@ -806,7 +806,8 @@ const sourceLabel = (entry) =>
 const keysReach = (keys) => {
     const indexes = [...new Set(keys.map((entry) => entry.position.layoutIndex))];
     const sources = [...new Set(keys.filter((entry) => entry.fellThrough).map(sourceLabel))];
-    return `index ${indexes.join(", ")}${sources.length ? ` · on ${sources.join(", ")}` : ""}`;
+    const matched = [...new Set(keys.filter((entry) => entry.reference).map((entry) => esc(layerName(entry.layer))))];
+    return `index ${indexes.join(", ")}${sources.length ? ` · on ${sources.join(", ")}` : ""}${matched.length ? ` · matched on ${matched.join(", ")}` : ""}`;
 };
 // A behaviour that only answers through a transparent key still fires its
 // branches, so it belongs here — named with the layer that holds it, because
