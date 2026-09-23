@@ -90,7 +90,7 @@ function validateSnapshot(value, capabilities) {
     // Settings may be one version ahead of the document: v3 names the VIA
     // macros inside a schema-2 profile.
     const settingsVersion = settings.formatVersion ?? 1;
-    if (rgb.formatVersion !== value.version || !(settingsVersion === value.version || (value.version === 2 && settingsVersion === 3)) || domains[3].version !== settingsVersion) throw fail("Profile domain versions disagree.");
+    if (rgb.formatVersion !== value.version || !(settingsVersion === value.version || (value.version === 2 && settingsVersion >= 3)) || domains[3].version !== settingsVersion) throw fail("Profile domain versions disagree.");
     if (rgb.layerColors.length !== value.layers.length || rgb.layerColors.some(row => row.layerId >= 8)) throw fail("RGB does not cover all eight layers.");
     // A binding for an empty slot is allowed, because the keyboard allows it:
     // the mode keycodes are a fixed registry, and the runtime refuses to

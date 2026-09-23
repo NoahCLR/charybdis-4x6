@@ -1076,3 +1076,8 @@ not enforce the reserve, so a VIA edit can still bypass it; the app then shows
 what VIA left. Writing the cross-check found a decoder bug: a tap after
 another tap under a held key, such as `{+KC_LSFT}{KC_A}{KC_B}{-KC_LSFT}`,
 replayed the first tap at the release. The decoder now plays each tap once.
+
+Every macro name is guaranteed 20 characters. Settings version 4 limits a name
+to printable ASCII and sizes its ceiling for all 64 at full length, so the field
+no longer reports a budget shared with the other names; see
+[portable profile](architecture/portable-profile-v1.md#version-4-every-macro-name-gets-20-characters).

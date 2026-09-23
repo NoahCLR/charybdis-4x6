@@ -6,6 +6,7 @@ const {document: pdDocument} = require("../fixtures/pd-profile");
 const {fingerprint, validateSnapshot} = require("../../core/model/portable-profile");
 const {macroEditorView, editMacro, macroBudget, SLOT_RESERVE_TAPS} = require("../../core/model/macro-editor");
 const {decodeProfileBlob} = require("../../core/schema/profile-blob-v1");
+const {upgradeSettings} = require("../../core/schema/settings-domain-v1");
 const {buildDeviceModel} = require("../../core/session/device-model");
 const snapshot = value => ({document: value, fingerprint: fingerprint(value)});
 const settingsDomain = value => decodeProfileBlob(Buffer.from(value.profile, "base64")).domains.find(domain => domain.id === 0x40);
@@ -20,7 +21,7 @@ test("the 64 VIA macros populate the model, including empty slots and their name
     assert.equal(model.viaMacros[63].name, "New note");
     assert.match(model.viaMacros[63].payload, /KC_N/);
     assert.equal(model.macroEditing.writable, true);
-    assert.deepEqual(model.macroNameSpace, {used: 8, shared: 992, perName: 23});
+    assert.deepEqual(model.macroNameSpace, {perName: 20});
     // A named macro reads by its name wherever a key is labelled; the
     // numeric alias still resolves for slots the shipped catalog lacks.
     assert.equal(model.qmkKeycodeAliases["0x773F"], "VIA_MACRO_63");
@@ -31,14 +32,14 @@ test("the 64 VIA macros populate the model, including empty slots and their name
     assert.equal(macroEditorView({incomplete: true}), null);
 });
 
-test("naming a macro upgrades settings to v3 and changes nothing else", () => {
+test("naming a macro upgrades settings to v4 and changes nothing else", () => {
     const source = pdDocument(), current = snapshot(source);
     assert.equal(settingsDomain(source).version, 2, "the fixture is a keyboard's stored v2 profile");
     const named = editMacro(current, {keycode: "VIA_MACRO_3", name: "  Zoom mute ", expectedFingerprint: current.fingerprint});
     assert.deepEqual(named.macros, source.macros, "a rename leaves every macro's steps alone");
     const domain = settingsDomain(named);
-    assert.equal(domain.version, 3);
-    assert.equal(domain.payload[0], 3, "the payload repeats the envelope's version");
+    assert.equal(domain.version, 4);
+    assert.equal(domain.payload[0], 4, "the payload repeats the envelope's version");
     const settings = validateSnapshot(named).settings, before = validateSnapshot(source).settings;
     assert.equal(settings.macroNames[3], "Zoom mute", "names are trimmed");
     assert.deepEqual(settings.values, before.values);
@@ -58,14 +59,26 @@ test("naming a macro upgrades settings to v3 and changes nothing else", () => {
     assert.deepEqual(source, pdDocument(), "input snapshot is never mutated");
 });
 
-test("names respect their per-name limit and the space they share", () => {
+test("every one of the 64 names can be 20 plain characters at once", () => {
     let current = snapshot(pdDocument());
     const edit = (index, name) => editMacro(current, {keycode: `VIA_MACRO_${index}`, name, expectedFingerprint: current.fingerprint});
-    assert.throws(() => edit(0, "x".repeat(24)), /23 UTF-8 bytes/);
-    assert.throws(() => edit(0, "tab\there"), /control characters/);
-    assert.equal(validateSnapshot(edit(0, "é".repeat(11))).settings.macroNames[0], "é".repeat(11), "22 bytes of two-byte characters fit");
-    for (let index = 0; index < 43; index++) current = snapshot(edit(index, "x".repeat(23)));
-    assert.throws(() => edit(43, "x".repeat(23)), /share 992/, "all 64 cannot be full length");
+    assert.throws(() => edit(0, "x".repeat(21)), error => error.code === "MACRO_NAME_INVALID" && /20 plain characters/.test(error.message));
+    assert.throws(() => edit(0, "tab\there"), /plain characters/);
+    assert.throws(() => edit(0, "Café"), /plain characters/, "accents are not plain ASCII");
+    assert.equal(validateSnapshot(edit(0, " ~Copy URL!{} ")).settings.macroNames[0], "~Copy URL!{}", "punctuation is fine; ends are trimmed");
+    for (let index = 0; index < 64; index++) current = snapshot(edit(index, `${index}`.padEnd(20, "x")));
+    const settings = validateSnapshot(current.document).settings;
+    assert.equal(settings.macroNames.filter(name => name.length === 20).length, 64);
+    assert.equal(settingsDomain(current.document).payload.length, 312 + 64 * 21, "the v4 ceiling holds them all");
+});
+
+test("a stored v3 name v4 cannot hold keeps its plain characters, cut to 20", () => {
+    const v3 = upgradeFrom => ({...upgradeFrom, formatVersion: 3});
+    const base = validateSnapshot(pdDocument()).settings;
+    const names = Array(64).fill(""); names[1] = "📸 Screenshot"; names[2] = "Café mute"; names[3] = "x".repeat(23); names[4] = "Fine";
+    const upgraded = upgradeSettings(v3({...base, macros: undefined, macroNames: names}));
+    assert.equal(upgraded.formatVersion, 4);
+    assert.deepEqual(upgraded.macroNames.slice(0, 5), ["", "Screenshot", "Caf mute", "x".repeat(20), "Fine"]);
 });
 
 test("stale drafts, wrong slots and retired user macros are rejected before a write", () => {

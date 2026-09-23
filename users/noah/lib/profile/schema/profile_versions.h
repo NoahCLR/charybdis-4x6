@@ -7,10 +7,11 @@
 #    define NOAH_PROFILE_DOMAIN_COUNT 5u
 #    define NOAH_PROFILE_PD_COUNT 8u
 #    define NOAH_PROFILE_RGB_VERSION 2u
-// Settings v3 names the 64 VIA macros where v2 carried 16 user macros. v2
-// stays readable so a stored profile survives the firmware that writes v3.
-#    define NOAH_PROFILE_SETTINGS_VERSION 3u
-#    define NOAH_PROFILE_SETTINGS_VERSION_ACCEPTED(version) ((version) == 2u || (version) == 3u)
+// Settings v3 names the 64 VIA macros where v2 carried 16 user macros; v4
+// guarantees every name 20 ASCII characters. v2 and v3 stay readable so a
+// stored profile survives the firmware that writes v4.
+#    define NOAH_PROFILE_SETTINGS_VERSION 4u
+#    define NOAH_PROFILE_SETTINGS_VERSION_ACCEPTED(version) ((version) >= 2u && (version) <= 4u)
 #    define NOAH_PROFILE_LOGICAL_STORE_VERSION 3u
 #else
 #    define NOAH_PROFILE_SCHEMA_MAJOR 1u

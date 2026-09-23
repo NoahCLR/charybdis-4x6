@@ -1,8 +1,13 @@
 "use strict";
 // v1/v2 carry 16 user-macro IR records after the fixed part; v3 instead names
-// the 64 VIA macros (u8 length 0..23, then UTF-8), in the same 1,368 bytes.
-const SETTINGS = Object.freeze({COUNT: 28, LAYERS: 8, NAME_BYTES: 24, MACROS: 16, MACRO_NAMES: 64, MACRO_NAME_BYTES: 23, FIXED_SIZE: 312, MAX_SIZE: 1368});
-const CURRENT_VERSION = 3;
+// the 64 macros (u8 length 0..23, then UTF-8), in the same 1,368 bytes. v4
+// keeps those records but gives every name up to 20 printable ASCII
+// characters, and its ceiling holds all 64 at full length.
+const SETTINGS = Object.freeze({COUNT: 28, LAYERS: 8, NAME_BYTES: 24, MACROS: 16, MACRO_NAMES: 64, MACRO_NAME_BYTES: 23, MACRO_NAME_CHARS: 20,
+    FIXED_SIZE: 312, MAX_SIZE: 1368, V4_MAX_SIZE: 312 + 64 * 21});
+const CURRENT_VERSION = 4;
+const maxSize = version => version >= 4 ? SETTINGS.V4_MAX_SIZE : SETTINGS.MAX_SIZE;
+const asciiName = name => typeof name === "string" && /^[\x20-\x7e]*$/.test(name) && name.length <= SETTINGS.MACRO_NAME_CHARS;
 function validName(name, maxBytes) {
     return typeof name === "string" && !/[\u0000-\u001f\u007f]/u.test(name) && Buffer.byteLength(name) <= maxBytes && Buffer.from(name).toString() === name;
 }
@@ -51,7 +56,7 @@ function validateMacroIr(bytes) {
 }
 function encodeSettings(value, layers = 8) {
     const version = value?.formatVersion ?? 1;
-    if (![1, 2, 3].includes(version) || (version >= 2 && value?.values?.slice(10, 15).some(v => v !== 0))) throw fail("Unsupported settings format or retired PD settings.");
+    if (![1, 2, 3, 4].includes(version) || (version >= 2 && value?.values?.slice(10, 15).some(v => v !== 0))) throw fail("Unsupported settings format or retired PD settings.");
     if (!value || !Array.isArray(value.values) || value.values.length !== 28 || !value.values.every((v, id) => validSetting(id, v, layers)) || value.values[6] <= value.values[16]) throw fail("Invalid keyboard settings.");
     if (!Array.isArray(value.names) || value.names.length !== 8) throw fail("Missing layer names.");
     if (version >= 3 ? !Array.isArray(value.macroNames) || value.macroNames.length !== SETTINGS.MACRO_NAMES : !Array.isArray(value.macros) || value.macros.length !== 16) throw fail(version >= 3 ? "Missing macro names." : "Missing layer names or macros.");
@@ -63,12 +68,12 @@ function encodeSettings(value, layers = 8) {
     });
     if (version >= 3) {
         const records = value.macroNames.map(name => {
-            if (!validName(name, SETTINGS.MACRO_NAME_BYTES)) throw fail("Macro names must fit 23 UTF-8 bytes and contain no control characters.");
+            if (version >= 4 ? !asciiName(name) : !validName(name, SETTINGS.MACRO_NAME_BYTES)) throw fail(version >= 4 ? "A macro name is up to 20 plain characters: letters, digits, spaces and punctuation." : "Macro names must fit 23 UTF-8 bytes and contain no control characters.");
             const text = Buffer.from(name, "utf8");
             return Buffer.concat([Buffer.from([text.length]), text]);
         });
         const output = Buffer.concat([fixed, ...records]);
-        if (output.length > SETTINGS.MAX_SIZE) throw fail(`The macro names need ${output.length - SETTINGS.FIXED_SIZE - SETTINGS.MACRO_NAMES} bytes; they share ${SETTINGS.MAX_SIZE - SETTINGS.FIXED_SIZE - SETTINGS.MACRO_NAMES}. Shorten some names.`);
+        if (output.length > maxSize(version)) throw fail(`The macro names need ${output.length - SETTINGS.FIXED_SIZE - SETTINGS.MACRO_NAMES} bytes; they share ${SETTINGS.MAX_SIZE - SETTINGS.FIXED_SIZE - SETTINGS.MACRO_NAMES}. Shorten some names.`);
         return output;
     }
     const macros = value.macros.map(bytes => {validateMacroIr(bytes); const size = Buffer.alloc(2); size.writeUInt16LE(bytes.length); return Buffer.concat([size, bytes]);});
@@ -78,7 +83,7 @@ function encodeSettings(value, layers = 8) {
 }
 function decodeSettings(bytes, layers = 8) {
     const count = bytes?.[0] >= 3 ? SETTINGS.MACRO_NAMES : 16;
-    if (!Buffer.isBuffer(bytes) || bytes.length < SETTINGS.FIXED_SIZE + (count === 16 ? 32 : count) || bytes.length > 1368 || ![1, 2, 3].includes(bytes[0]) || !bytes.subarray(0, 8).equals(Buffer.from([bytes[0], 8, 28, count, 0, 0, 0, 0]))) throw fail("Unsupported settings format.");
+    if (!Buffer.isBuffer(bytes) || bytes.length < SETTINGS.FIXED_SIZE + (count === 16 ? 32 : count) || bytes.length > maxSize(bytes[0]) || ![1, 2, 3, 4].includes(bytes[0]) || !bytes.subarray(0, 8).equals(Buffer.from([bytes[0], 8, 28, count, 0, 0, 0, 0]))) throw fail("Unsupported settings format.");
     const values = Array.from({length: 28}, (_, id) => bytes.readUInt32LE(8 + id * 4));
     const names = Array.from({length: 8}, (_, id) => {
         const field = bytes.subarray(120 + id * 24, 144 + id * 24), end = field.indexOf(0);
@@ -92,14 +97,14 @@ function decodeSettings(bytes, layers = 8) {
         const macroNames = Array.from({length: SETTINGS.MACRO_NAMES}, () => {
             if (offset >= bytes.length) throw fail("Missing macro name.");
             const length = bytes[offset++];
-            if (length > SETTINGS.MACRO_NAME_BYTES || offset + length > bytes.length) throw fail("Invalid macro name length.");
+            if (length > (bytes[0] >= 4 ? SETTINGS.MACRO_NAME_CHARS : SETTINGS.MACRO_NAME_BYTES) || offset + length > bytes.length) throw fail("Invalid macro name length.");
             const raw = bytes.subarray(offset, offset + length), name = raw.toString("utf8");
             offset += length;
             if (!Buffer.from(name).equals(raw)) throw fail("Invalid macro name encoding.");
             return name;
         });
         if (offset !== bytes.length) throw fail("Unexpected settings data.");
-        const result = {values, names, macroNames, formatVersion: 3}; encodeSettings(result, layers); return result;
+        const result = {values, names, macroNames, formatVersion: bytes[0]}; encodeSettings(result, layers); return result;
     }
     const macros = Array.from({length: 16}, () => {
         if (offset + 2 > bytes.length) throw fail("Missing macro slot.");
@@ -110,15 +115,20 @@ function decodeSettings(bytes, layers = 8) {
     if (offset !== bytes.length) throw fail("Unexpected settings data.");
     const result = {values, names, macros, ...(bytes[0] === 2 ? {formatVersion: 2} : {})}; encodeSettings(result, layers); return result;
 }
-// The same settings as v3: the retired user macros go, and the 64 VIA macro
-// names start empty. Only a macro-name edit upgrades a profile; everything
-// else keeps the version it was read in.
+// The same settings as v4. From v1/v2 the retired user macros go and the 64
+// names start empty; from v3 each name keeps its printable ASCII characters,
+// cut to 20, so a name v4 cannot hold changes visibly in review rather than
+// failing the edit. Only a macro-name edit upgrades a profile; everything else
+// keeps the version it was read in.
 function upgradeSettings(value) {
-    if ((value?.formatVersion ?? 1) >= CURRENT_VERSION) return value;
+    const version = value?.formatVersion ?? 1;
+    if (version >= CURRENT_VERSION) return value;
     const {macros, ...rest} = value;
-    return {...rest, formatVersion: CURRENT_VERSION, macroNames: Array(SETTINGS.MACRO_NAMES).fill("")};
+    const macroNames = version >= 3 ? value.macroNames.map(name => name.replace(/[^\x20-\x7e]/g, "").trim().slice(0, SETTINGS.MACRO_NAME_CHARS).trim())
+        : Array(SETTINGS.MACRO_NAMES).fill("");
+    return {...rest, formatVersion: CURRENT_VERSION, macroNames};
 }
 function macroNamesOf(value) {
     return (value?.formatVersion ?? 1) >= 3 ? value.macroNames.slice() : Array(SETTINGS.MACRO_NAMES).fill("");
 }
-module.exports = {SETTINGS, CURRENT_VERSION, validSetting, validateMacroIr, encodeSettings, decodeSettings, upgradeSettings, macroNamesOf};
+module.exports = {SETTINGS, CURRENT_VERSION, maxSize, asciiName, validSetting, validateMacroIr, encodeSettings, decodeSettings, upgradeSettings, macroNamesOf};

@@ -99,6 +99,9 @@ function editor(model, slot, canEdit) {
         </div></div>`);
     const textarea = card.querySelector("textarea");
     const nameInput = card.querySelector("[data-name]");
+    nameInput?.addEventListener("input", () => {
+        card.querySelector("[data-name-count]").textContent = `${nameInput.value.length} / ${model.macroNameSpace.perName} characters`;
+    });
     nameInput?.addEventListener("change", () => post(edits.macroNameMessage(slot.keycode, nameInput.value, model?.macroEditing?.identity)));
     textarea.addEventListener("input", () => {
         state.macroDrafts = {...state.macroDrafts, [slot.keycode]: textarea.value};
@@ -126,17 +129,15 @@ function editor(model, slot, canEdit) {
     return wrap;
 }
 
-// Names share the space the retired user macros had, so the field says how
-// much of it is left. The host enforces the byte limits; the counter explains.
+// Every slot can hold a full-length name. The host enforces the rule; the
+// field stops at the limit and the counter says where it stands.
 function nameField(model, slot, canEdit) {
     const space = model?.macroNameSpace;
     if (!space) return "";
-    const own = new TextEncoder().encode(slot.name || "").length;
-    const left = space.shared - space.used;
     return `<label class="field"><span>Name</span>
-        <input class="input" data-name value="${esc(slot.name || "")}" placeholder="Macro ${esc(slot.keycode.split("_").at(-1))}" ${canEdit ? "" : "disabled"}
-            data-tip="Up to ${space.perName} bytes. All 64 names share ${space.shared} bytes; ${left} are free.">
-        <span class="note">${own} / ${space.perName} bytes · ${left} of ${space.shared} shared bytes free</span></label>`;
+        <input class="input" data-name maxlength="${esc(space.perName)}" value="${esc(slot.name || "")}" placeholder="Macro ${esc(slot.keycode.split("_").at(-1))}" ${canEdit ? "" : "disabled"}
+            data-tip="Up to ${esc(space.perName)} plain characters: letters, digits, spaces and punctuation.">
+        <span class="note" data-name-count>${esc((slot.name || "").length)} / ${esc(space.perName)} characters</span></label>`;
 }
 
 function stageMacro(model, slot, payload) {

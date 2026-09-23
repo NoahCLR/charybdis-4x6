@@ -2,12 +2,10 @@
 
 const {macroBankBytes, validateSnapshot} = require("./portable-profile");
 const {decodeProfileBlob, encodeProfileBlob} = require("../schema/profile-blob-v1");
-const {SETTINGS, encodeSettings, macroNamesOf, upgradeSettings} = require("../schema/settings-domain-v1");
+const {SETTINGS, asciiName, encodeSettings, macroNamesOf, upgradeSettings} = require("../schema/settings-domain-v1");
 const {macroKeycodes, encodeMacroPayload, decodeMacroPayload, macroProgramBytes, MACRO_PROGRAM_MAX} = require("../schema/macro-payload");
 const fail = (message, code = "MACRO_EDIT_CONFLICT") => Object.assign(new Error(message), {code});
 
-// The bytes all 64 names may share: the space the retired user macros had.
-const NAME_BYTES_SHARED = SETTINGS.MAX_SIZE - SETTINGS.FIXED_SIZE - SETTINGS.MACRO_NAMES;
 
 // Every empty slot keeps room for ten key taps (3 bytes each, the slot's end
 // marker already counted). When the free bytes cannot keep that for every
@@ -41,12 +39,13 @@ function macroEditorView(snapshot, capabilities) {
         viaMacros: slots.map(slot),
         macroBank: {capacity: budget.capacity, stored: budget.stored, free: budget.free, available: budget.available,
             slots: slots.length, reserveTaps: SLOT_RESERVE_TAPS, programMax: MACRO_PROGRAM_MAX},
-        names: {used: names.reduce((total, name) => total + Buffer.byteLength(name), 0), shared: NAME_BYTES_SHARED, perName: SETTINGS.MACRO_NAME_BYTES},
+        // Every slot can hold a full-length name, whatever the others hold.
+        names: {perName: SETTINGS.MACRO_NAME_CHARS},
         macroPayloadKeycodes: macroKeycodes()};
 }
 
-// A VIA macro's steps, its name, or both. A name lives in the profile's
-// settings domain, so naming a macro upgrades that domain to v3.
+// A macro's steps, its name, or both. A name lives in the profile's settings
+// domain, so naming a macro upgrades that domain to v4.
 function editMacro(snapshot, message, capabilities) {
     if (!snapshot?.document || !message.expectedFingerprint || message.expectedFingerprint !== snapshot.fingerprint) throw fail("The keyboard changed since this macro draft was opened. Read the keyboard and review the draft before saving again.");
     if (/^MACRO_\d+$/.test(message.keycode || "")) throw fail("User macros are retired; use a VIA macro.");
@@ -63,7 +62,8 @@ function editMacro(snapshot, message, capabilities) {
     }
     if (message.name !== undefined && message.name !== macroNamesOf(value.settings)[index]) {
         if (typeof message.name !== "string") throw fail("A macro name must be text.");
-        // Names live in settings v3, which only a schema-2 profile carries.
+        if (!asciiName(message.name.trim())) throw fail(`A macro name is up to ${SETTINGS.MACRO_NAME_CHARS} plain characters: letters, digits, spaces and punctuation.`, "MACRO_NAME_INVALID");
+        // Names live in settings v4, which only a schema-2 profile carries.
         if (value.document.version !== 2) throw fail("Naming macros needs the eight-slot pointing firmware (profile schema 2).");
         const settings = upgradeSettings(value.settings);
         settings.macroNames[index] = message.name.trim();

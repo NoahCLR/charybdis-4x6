@@ -259,3 +259,10 @@ half; fixed linked occupancy across the unique banks is 64,776 bytes. These are
 linked measurements, not runtime high-water. The reviewed stack paths pass; the
 largest main-process path is still 1,792 bytes and the settings readback path
 416 bytes.
+
+Settings version 4 then guarantees every macro name 20 ASCII characters, which
+grows the effective settings cache from 1,368 to 1,656 bytes. Fresh right and
+left pair ELFs each link 4,152 bytes of `.data` and 53,452 bytes of `.bss`:
+57,604 bytes, exactly 288 more, and 2,812 below the 60,416-byte tripwire. The
+boot core-memory span is 204,536 bytes per half and fixed linked occupancy
+65,064 bytes. The reviewed stack paths still pass at the same figures.

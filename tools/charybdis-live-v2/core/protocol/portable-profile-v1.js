@@ -3,7 +3,7 @@ const {isUnhandledEcho, orUnhandled} = require("./via-unhandled-v1");
 const {decodePdDomain} = require("../schema/pd-mode-domain-v1");
 const {buildProfileGetRequest, decodeProfileResponse, profileResponseMatcher} = require("./profile-wire-v1");
 const {crc32, fnv1a32} = require("../schema/profile-blob-v1");
-const {decodeSettings} = require("../schema/settings-domain-v1");
+const {SETTINGS, decodeSettings} = require("../schema/settings-domain-v1");
 const fail = message => Object.assign(new Error(message), {code: "PORTABLE_PROFILE_UNAVAILABLE"});
 async function page(connection, value, pageIndex, ids) {
     const request = buildProfileGetRequest(value, pageIndex, ids.next());
@@ -15,7 +15,7 @@ async function readSettings(connection, ids) {
     const before = await page(connection, 7, 0, ids);
     if (before.length !== 12 || before[0] !== 1 || before[1] !== 25) throw fail("Invalid settings metadata.");
     const length = before.readUInt16LE(2);
-    if (length < 344 || length > 1368) throw fail("Invalid settings capacity.");
+    if (length < 344 || length > SETTINGS.V4_MAX_SIZE) throw fail("Invalid settings capacity.");
     const chunks = [];
     for (let offset = 0; offset < length; offset += 25) {
         const bytes = await page(connection, 7, 1 + offset / 25, ids);

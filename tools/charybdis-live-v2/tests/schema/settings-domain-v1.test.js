@@ -14,3 +14,25 @@ test("settings reject invalid durations, names, padding and macro streams", () =
     assert.throws(() => validateMacroIr(Buffer.from([5, 17])), /length/);
     assert.throws(() => validateMacroIr(Buffer.from([2, 1])), /Truncated/);
 });
+test("v4 holds all 64 macro names at 20 plain characters, and v3 keeps its own ceiling", () => {
+    const {SETTINGS, CURRENT_VERSION} = require("../../core/schema/settings-domain-v1");
+    const {macros, ...base} = defaults();
+    const pd = {...base, values: base.values.map((v, id) => id >= 10 && id < 15 ? 0 : v)};
+    const full = {...pd, formatVersion: 4, macroNames: Array.from({length: 64}, (_, i) => `${i}`.padEnd(20, "~"))};
+    assert.equal(CURRENT_VERSION, 4);
+    const bytes = encodeSettings(full);
+    assert.equal(bytes.length, SETTINGS.V4_MAX_SIZE);
+    assert.equal(bytes.length, 1656);
+    assert.deepEqual(decodeSettings(bytes), full);
+    assert.throws(() => encodeSettings({...full, macroNames: full.macroNames.map((n, i) => i ? n : "é")}), /plain characters/);
+    assert.throws(() => encodeSettings({...full, macroNames: full.macroNames.map((n, i) => i ? n : "x".repeat(21))}), /plain characters/);
+    // A name byte v3 accepts is refused under a v4 header.
+    const mixed = encodeSettings({...pd, formatVersion: 3, macroNames: Array.from({length: 64}, (_, i) => i ? "" : "é")});
+    assert.equal(decodeSettings(mixed).macroNames[0], "é");
+    const relabelled = Buffer.from(mixed); relabelled[0] = 4;
+    assert.throws(() => decodeSettings(relabelled));
+    // 64 full-length names do not fit v3's 1,368 bytes.
+    assert.throws(() => encodeSettings({...full, formatVersion: 3}), /Shorten some names/);
+    const tooBig = Buffer.from(bytes); tooBig[0] = 3;
+    assert.throws(() => decodeSettings(tooBig), /Unsupported settings format/);
+});

@@ -118,7 +118,7 @@ static bool utf8_byte(noah_profile_settings_v1_validation_t *s, uint8_t b) {
 static bool macro_name_byte(noah_profile_settings_v1_validation_t *s, uint8_t b) {
     if (s->slot >= NOAH_SETTINGS_MACRO_NAMES) return false;
     if (!s->macro_offset) {
-        if (b > NOAH_SETTINGS_MACRO_NAME_MAX) return false;
+        if (b > (s->version >= 4u ? NOAH_SETTINGS_MACRO_NAME_ASCII_MAX : NOAH_SETTINGS_MACRO_NAME_MAX)) return false;
         s->macro_length   = b;
         s->utf8_remaining = 0;
         if (b)
@@ -127,7 +127,7 @@ static bool macro_name_byte(noah_profile_settings_v1_validation_t *s, uint8_t b)
             s->slot++;
         return true;
     }
-    if (!utf8_byte(s, b)) return false;
+    if (s->version >= 4u ? b < 0x20 || b > 0x7e : !utf8_byte(s, b)) return false;
     if (s->macro_offset++ == s->macro_length) {
         if (s->utf8_remaining) return false;
         s->slot++;
@@ -175,6 +175,8 @@ bool noah_profile_settings_v1_consume(noah_profile_settings_v1_validation_t *s, 
         static const uint8_t header[8] = {0, 8, 28, 0, 0, 0, 0, 0};
         if (!offset) {
             if (!NOAH_PROFILE_SETTINGS_VERSION_ACCEPTED(b) || (s->expected_version && b != s->expected_version)) return false;
+            // Each version keeps its own ceiling: v3's also bounds its names.
+            if (length > (b >= 4u ? NOAH_SETTINGS_V4_MAX_SIZE : NOAH_SETTINGS_V3_MAX_SIZE)) return false;
             s->version = b;
             return true;
         }

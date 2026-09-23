@@ -9,8 +9,10 @@
 //
 // After the fixed part, v1 and v2 carry 16 user-macro IR records (u16 length
 // plus instructions). v3 instead names the 64 VIA macros: 64 records of a u8
-// length (0..23) and that many UTF-8 bytes. The size ceiling is unchanged, so
-// the names share the space the user macros had.
+// length (0..23) and that many UTF-8 bytes, within v2's 1,368-byte ceiling, so
+// the names share the space the user macros had. v4 keeps v3's records but
+// limits each name to 20 printable ASCII bytes (0x20..0x7e), and its ceiling
+// holds all 64 at full length.
 enum {
     NOAH_SETTINGS_VERSION     = NOAH_PROFILE_SETTINGS_VERSION,
     NOAH_SETTINGS_COUNT       = 28,
@@ -20,8 +22,15 @@ enum {
     NOAH_SETTINGS_MACRO_BYTES = 1024,
     NOAH_SETTINGS_MACRO_NAMES = 64,
     NOAH_SETTINGS_MACRO_NAME_MAX = 23,
+    NOAH_SETTINGS_MACRO_NAME_ASCII_MAX = 20,
     NOAH_SETTINGS_FIXED_SIZE  = 8 + 28 * 4 + 8 * 24,
-    NOAH_SETTINGS_MAX_SIZE    = NOAH_SETTINGS_FIXED_SIZE + 16 * 2 + 1024,
+    NOAH_SETTINGS_V3_MAX_SIZE = NOAH_SETTINGS_FIXED_SIZE + 16 * 2 + 1024,
+    NOAH_SETTINGS_V4_MAX_SIZE = NOAH_SETTINGS_FIXED_SIZE + 64 * (1 + 20),
+#if NOAH_PROFILE_SETTINGS_VERSION >= 4u
+    NOAH_SETTINGS_MAX_SIZE = NOAH_SETTINGS_V4_MAX_SIZE,
+#else
+    NOAH_SETTINGS_MAX_SIZE = NOAH_SETTINGS_V3_MAX_SIZE,
+#endif
 };
 typedef enum {
     NOAH_SETTING_TAPPING_TERM,

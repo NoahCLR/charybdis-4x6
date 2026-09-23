@@ -29,14 +29,23 @@ const {document} = require(root + "/tests/fixtures/portable-profile");
 const {validateSnapshot} = require(root + "/core/model/portable-profile");
 fs.writeFileSync(process.argv[3], validateSnapshot(document()).profile);
 fs.writeFileSync(process.argv[3] + '.pd', validateSnapshot(require(root + '/tests/fixtures/pd-profile').document()).profile);
-// Settings v3 (named VIA macros) as the v2 app writes it. The v1 import
-// above stays the stored-v2 compatibility check.
+// Settings v4 as the v2 app writes it, at its worst case: all 64 macro names
+// at 20 characters. The v1 import above stays the stored-v2 compatibility
+// check; .pd3 is a stored v3 domain with a UTF-8 name, which v4 firmware
+// still reads.
 const v2 = process.argv[2] + "/tools/charybdis-live-v2";
 const {fingerprint, validateSnapshot: validateV2} = require(v2 + "/core/model/portable-profile");
 const {editMacro} = require(v2 + "/core/model/macro-editor");
+const {decodeProfileBlob, encodeProfileBlob} = require(v2 + "/core/schema/profile-blob-v1");
+const {encodeSettings} = require(v2 + "/core/schema/settings-domain-v1");
 let named = require(v2 + "/tests/fixtures/pd-profile").document();
-for (const [keycode, name] of [["VIA_MACRO_0", "Sign-off"], ["VIA_MACRO_63", "Édition ⌘"]]) named = editMacro({document: named, fingerprint: fingerprint(named)}, {keycode, name, expectedFingerprint: fingerprint(named)});
-fs.writeFileSync(process.argv[3] + '.pd3', validateV2(named).profile);
+for (let slot = 0; slot < 64; slot++) named = editMacro({document: named, fingerprint: fingerprint(named)}, {keycode: `VIA_MACRO_${slot}`, name: `Macro ${slot} name`.padEnd(20, "!"), expectedFingerprint: fingerprint(named)});
+fs.writeFileSync(process.argv[3] + '.pd4', validateV2(named).profile);
+const stored = validateV2(require(v2 + "/tests/fixtures/pd-profile").document());
+const {macros, ...rest} = stored.settings;
+const v3 = encodeSettings({...rest, formatVersion: 3, macroNames: Array.from({length: 64}, (_, i) => i === 63 ? "Édition ⌘" : i === 0 ? "Sign-off" : "")});
+const blob = decodeProfileBlob(stored.profile);
+fs.writeFileSync(process.argv[3] + '.pd3', encodeProfileBlob({schema: blob.schema, domains: blob.domains.map(d => d.id === 0x40 ? {...d, version: 3, payload: v3} : d)}));
 JS
 
 build_and_run() {
@@ -79,6 +88,7 @@ build_and_run() {
         "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" ${NOAH_WRITE_PD_FIXTURE:+--write-fixture}
         "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --import-profile "$BUILD_DIR/portable.bin.pd"
         "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --import-profile "$BUILD_DIR/portable.bin.pd3"
+        "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --import-profile "$BUILD_DIR/portable.bin.pd4"
         if [ -n "${NOAH_TEST_PD_IMPORT:-}" ]; then
             "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --import-profile "$NOAH_TEST_PD_IMPORT"
         fi

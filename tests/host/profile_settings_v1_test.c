@@ -7,7 +7,7 @@ static unsigned applied;
 void            noah_qmk_portable_apply(void) {
     applied++;
 }
-static uint8_t  bytes[NOAH_SETTINGS_FIXED_SIZE + 64 + 32];
+static uint8_t  bytes[NOAH_SETTINGS_V4_MAX_SIZE + 1];
 static uint16_t length;
 // A legacy domain carries 16 empty user-macro records; v3 carries 64 empty
 // VIA macro names in their place.
@@ -71,6 +71,46 @@ static void test_macro_names(void) {
     length--; // only 63 names
     assert(!valid());
 }
+// Every one of the 64 names at `size` bytes of `fill`.
+static void names_of(uint8_t version, uint8_t size, char fill) {
+    defaults_as(version);
+    length = NOAH_SETTINGS_FIXED_SIZE;
+    for (uint8_t slot = 0; slot < 64; slot++) {
+        bytes[length++] = size;
+        memset(bytes + length, fill, size);
+        length += size;
+    }
+}
+// v4 guarantees every name 20 printable ASCII characters, all 64 at once.
+static void test_macro_names_v4(void) {
+    defaults_as(4);
+    assert(valid() && valid_as(4) && !valid_as(3));
+    names_of(4, 20, 'A');
+    assert(length == NOAH_SETTINGS_V4_MAX_SIZE && length == 1656);
+    assert(valid());
+    bytes[NOAH_SETTINGS_FIXED_SIZE + 1] = '~';
+    bytes[NOAH_SETTINGS_FIXED_SIZE + 2] = ' ';
+    assert(valid());
+    bytes[NOAH_SETTINGS_FIXED_SIZE + 1] = 0x7f;
+    assert(!valid());
+    bytes[NOAH_SETTINGS_FIXED_SIZE + 1] = 0x1f;
+    assert(!valid());
+    // Text v3 accepts is not plain ASCII, so v4 refuses it.
+    names_of(4, 2, 'A');
+    bytes[NOAH_SETTINGS_FIXED_SIZE + 1] = 0xc3;
+    bytes[NOAH_SETTINGS_FIXED_SIZE + 2] = 0xa9;
+    assert(!valid());
+    bytes[0] = 3;
+    assert(valid());
+    names_of(4, 20, 'A');
+    bytes[NOAH_SETTINGS_FIXED_SIZE] = 21; // one name past 20
+    assert(!valid());
+    // v3 keeps its own 1,368-byte ceiling, which is also what bounds its names.
+    names_of(3, 20, 'A');
+    assert(!valid());
+    names_of(3, 15, 'A');
+    assert(length <= NOAH_SETTINGS_V3_MAX_SIZE && valid());
+}
 #endif
 int main(void) {
     defaults();
@@ -124,6 +164,7 @@ int main(void) {
     assert(applied == 1);
 #ifdef NOAH_PD_PROFILE_ENABLE
     test_macro_names();
+    test_macro_names_v4();
     // A v3 domain's names read back as stored.
     defaults_as(3);
     bytes[NOAH_SETTINGS_FIXED_SIZE + 5]  = 2;

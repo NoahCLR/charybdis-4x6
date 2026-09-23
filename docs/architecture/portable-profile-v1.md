@@ -102,6 +102,24 @@ values so every later custom keycode and the action ABI digest are unchanged.
 The app upgrades a profile to version 3 only when a macro is named; any other
 edit keeps the version it read, and a schema-1 profile cannot carry names.
 
+### Version 4: every macro name gets 20 characters
+
+Version 3's names share 992 bytes, so a name's real limit depended on the
+others. Version 4 keeps version 3's layout and makes the limit fixed: each of
+the 64 names is 0–20 bytes of printable ASCII (`0x20`–`0x7e`), and the ceiling
+rises to 1,656 bytes (312 + 64 × 21), so all 64 can be full length at once.
+Accents and emoji are not accepted; a guarantee for them would cost up to four
+bytes a character. Each version keeps its own ceiling: firmware refuses a
+version-3 domain over 1,368 bytes, since that ceiling is what bounds version 3's
+names.
+
+Firmware from 2026-09-23 writes version 4 and still reads versions 2 and 3.
+The app upgrades to version 4 when a macro is named. A stored version-3 name
+keeps its printable ASCII characters, trimmed and cut to 20, and review shows
+any name that changed. The effective settings cache grows to 1,656 bytes, 288
+bytes more static RAM per half; see
+[memory budgets](memory-budgets.md#retired-user-macros-and-streamed-settings-readback--2026-09-23).
+
 | Scalar ID | Meaning |
 | ---: | --- |
 | 0–3 | Tapping, tap/hold, long-hold and multi-tap timing (ms) |
