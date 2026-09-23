@@ -1,45 +1,26 @@
-const {decodePdDomain} = require("../schema/pd-mode-domain-v1");
 "use strict";
 
-const {readSettings, readSettingsLimits} = require("../protocol/portable-profile-v1");
+const {decodePdDomain} = require("../schema/pd-mode-domain-v1");
+const {readSettingsLimits} = require("../protocol/portable-profile-v1");
 const {readKeyboardOptions} = require("../protocol/keyboard-options-v1");
 const {decodeSettings} = require("../schema/settings-domain-v1");
 const {captureProfile, restoreProfile, validateSnapshot} = require("./portable-profile-session");
-const {settingsEditorView, editSettings} = require("../model/settings-editor");
-const {macroEditorView, editMacro} = require("../model/macro-editor");
-const {resolveNativeQmkExpression} = require("../schema/compiled-profile-v1");
-const {knownActionAbi} = require("./device-profile-view");
+const {settingsEditorView} = require("../model/settings-editor");
+const {macroEditorView} = require("../model/macro-editor");
 const {RAW_HID_REPORT_SIZE} = require("../transport/device-adapter");
 const {NodeHidDeviceAdapter} = require("../transport/node-hid-adapter");
 const {DeviceRequestCoordinator} = require("../transport/request-coordinator");
-const {CandidateUploadCoordinator} = require("./candidate-upload-coordinator");
-const {CHARYBDIS_4X6_LAYOUT_MATRIX, readViaKeycode, readViaLayout, synchronizeViaLayout, writeViaKeycode} = require("../protocol/via-layout-v1");
+const {readViaLayout} = require("../protocol/via-layout-v1");
 const keycodeCatalog = require("../data/keycode-catalog");
 const {readViaRgbMatrix} = require("../protocol/via-rgb-matrix-v1");
 const {readDeviceCombos} = require("../protocol/combo-readback-v1");
-const {editDeviceProfile, COMBO_EDITS, assertEffectiveCombos} = require("./device-profile-edits");
 const {readCommittedPayload, readCompiledPayload} = require("../protocol/profile-payload-v1");
-const {PROFILE_DOMAIN_IDS, decodeProfileBlob, encodeProfileBlob, fnv1a32} = require("../schema/profile-blob-v1");
+const {PROFILE_DOMAIN_IDS, decodeProfileBlob} = require("../schema/profile-blob-v1");
 const {decodeRgbDomainV1} = require("../schema/rgb-domain-v1");
 const {decodeComboDomainV1} = require("../schema/combo-domain-v1");
 const {decodeKeyBehaviorDomain} = require("../schema/key-behavior-domain-v1");
-const {
-    CANDIDATE_OPERATION,
-    CANDIDATE_STATE,
-    CANDIDATE_STATE_NAMES,
-    candidateMetadataForBlob,
-    readCandidateStatus,
-} = require("../protocol/profile-candidate-v1");
-const {
-    PROFILE_WIRE_KNOWN_MASKS,
-    PROFILE_WIRE_FEATURES,
-    PROFILE_WIRE_V1,
-    PROFILE_ACTIVE_KIND,
-    VIA_READS,
-    readProfileCapabilities,
-    readProfileStatus,
-    readViaIdentity,
-} = require("../protocol/profile-wire-v1");
+const {CANDIDATE_STATE_NAMES, readCandidateStatus} = require("../protocol/profile-candidate-v1");
+const {PROFILE_WIRE_KNOWN_MASKS, PROFILE_WIRE_FEATURES, PROFILE_WIRE_V1, VIA_READS, readProfileCapabilities, readProfileStatus, readViaIdentity} = require("../protocol/profile-wire-v1");
 
 const PROFILE_STUDIO_PROTOCOL = Object.freeze({major: 1, minor: 0});
 const PROFILE_STUDIO_SCHEMA = Object.freeze({major: 1, minor: 0});
@@ -61,15 +42,9 @@ class ProfileDeviceService {
         this.onChange = typeof options.onChange === "function" ? options.onChange : undefined;
         this.profileSummary = normalizeProfileSummary(options.profileSummary);
         this.requestIdStart = normalizeRequestId(options.requestIdStart === undefined ? 1 : options.requestIdStart);
-        this.createCandidateUploadCoordinator = typeof options.createCandidateUploadCoordinator === "function"
-            ? options.createCandidateUploadCoordinator
-            : (connection, coordinatorOptions) => new CandidateUploadCoordinator(connection, coordinatorOptions);
         this.readCandidateStatus = typeof options.readCandidateStatus === "function"
             ? options.readCandidateStatus
             : readCandidateStatus;
-        this.synchronizeViaLayout = typeof options.synchronizeViaLayout === "function"
-            ? options.synchronizeViaLayout
-            : synchronizeViaLayout;
         this.devices = [];
         this.adapterIdsByPublicId = new Map();
         this.connection = undefined;
@@ -235,63 +210,6 @@ class ProfileDeviceService {
     }
 
 // Applies layout edits to the keyboard and reads each one back.
-    //
-    // A keycode expression the vendored catalog cannot encode is refused, not
-    // approximated: writing a guessed value would silently change what the
-    // key does. Refusals are returned so the caller can report them.
-    async writeLayoutKeys(groups) {
-        if (!this.connection?.connected) {
-            throw new Error("Connect to a keyboard before changing its layout.");
-        }
-
-        const planned = [];
-        const rejected = [];
-        for (const group of Array.isArray(groups) ? groups : []) {
-            const layer = this.layerIndexFor(group.layer);
-            if (layer === undefined) {
-                for (const change of group.changes || []) {
-                    rejected.push({...change, reason: `unknown layer ${group.layer}`});
-                }
-                continue;
-            }
-            for (const change of group.changes || []) {
-                const position = CHARYBDIS_4X6_LAYOUT_MATRIX[change.layoutIndex];
-                const macro = /^(?:VIA_MACRO|MACRO)_\d+$/.test(change.keycode || "");
-                const keycode = keycodeCatalog.encode(change.keycode) ?? (macro && knownActionAbi(this.capabilities?.actionAbiDigest) ? resolveNativeQmkExpression(change.keycode, {}) : undefined);
-                if (!position || keycode === undefined) {
-                    rejected.push({...change, reason: position ? "keycode not in the vendored catalog" : "position outside the layout"});
-                    continue;
-                }
-                planned.push({layer, row: position[0], column: position[1], keycode, layoutIndex: change.layoutIndex, expression: change.keycode});
-            }
-        }
-
-        // runOperation reports through the snapshot and swallows the error
-        // into error state, so count outside it. A partial count after a
-        // failure is the truth: those keys really were written.
-        const outcome = {written: 0, rejected};
-        await this.runOperation("writing layout", async () => {
-            const connection = this.connection;
-            for (const entry of planned) {
-                await writeViaKeycode(connection, entry);
-                const readBack = await readViaKeycode(connection, entry);
-                if (readBack !== entry.keycode) {
-                    throw new Error(
-                        `The keyboard reported 0x${readBack.toString(16)} after writing ${entry.expression}; layout write aborted.`
-                    );
-                }
-                this.applyLayoutKey(entry, readBack);
-                outcome.written += 1;
-            }
-            this.addDiagnostic(
-                rejected.length
-                    ? `Wrote ${outcome.written} keys and refused ${rejected.length}.`
-                    : `Wrote ${outcome.written} keys to the keyboard.`
-            );
-        });
-        return outcome;
-    }
-
     layerIndexFor(name) {
         const match = String(name || "").match(/(\d+)/);
         if (!match) {
@@ -481,177 +399,8 @@ class ProfileDeviceService {
         return this.snapshot();
     }
 
-    async assertComboBase(digest) {
-        const fresh = await readDeviceCombos(this.connection, {nextRequestId: () => this.requestIds.next()});
-        if (fresh.digest !== digest) throw liveApplyError("PROFILE_EDIT_CONFLICT", "Combos changed since the last read. Read from keyboard before saving again.");
-    }
-
-    async saveProfileEdit(message) {
-        if (this.busy || this.savingEdit) throw new Error("Wait for the current keyboard operation to finish.");
-        if (!this.profileBytes || this.committed?.state !== "read" || this.committed.failures.length) throw new Error("Read a complete keyboard profile before saving changes.");
-        const expectedBase = {source: this.committed.source, generation: this.committed.generation, digest: this.committed.digest, originHalf: this.committed.originHalf};
-        if (optionsBaseChanged(message.expectedBase, expectedBase)) throw liveApplyError("PROFILE_EDIT_CONFLICT", "The keyboard changed since this draft was opened. Read from keyboard before saving again.");
-
-        const expectedCombosDigest = COMBO_EDITS.has(message.type) ? this.combos.digest : undefined;
-        this.savingEdit = true; this.emitChange();
-        try {
-            const base = decodeProfileBlob(this.profileBytes);
-            const settings = base.domains.find(domain => domain.id === PROFILE_DOMAIN_IDS.SETTINGS);
-            let expectedSettingsDigest;
-            if (settings) {
-                settings.payload = await readSettings(this.connection, this.requestIds);
-                expectedSettingsDigest = fnv1a32(settings.payload);
-            }
-            const next = editDeviceProfile(encodeProfileBlob(base), message, {capabilities: this.capabilities, combos: this.combos});
-            const result = await this.applyLiveProfile(next, {expectedBase, expectedCombosDigest, expectedSettingsDigest});
-            if (result.error || result.liveApply?.state !== "complete") throw new Error(result.error?.message || "The keyboard did not confirm the save.");
-            await this.readCommittedProfile();
-            if (!this.profileBytes?.equals(next) || this.committed?.source !== "committed") throw new Error("The saved profile did not match the readback. Read from keyboard before retrying.");
-            await this.readCombos();
-            assertEffectiveCombos(next, this.combos);
-            return this.snapshot();
-        } finally {this.savingEdit = false; this.emitChange();}
-    }
-
-    async applyLiveProfile(value, options = {}) {
-        const blob = copyBytes(value, "Live profile blob");
-        const layoutEntries = options.layoutEntries === undefined
-            ? null
-            : copyLayoutEntries(options.layoutEntries);
-        const compatibility = this.capabilities
-            ? evaluateProfileCompatibility(this.capabilities, this.profileSummary, this.viaIdentity)
-            : null;
-        const mutation = evaluateLiveMutationCompatibility(
-            this.capabilities,
-            compatibility,
-            Boolean(this.connection?.connected),
-            this.status
-        );
-        if (!mutation.available) {
-            this.setError(new Error(mutation.reasons[0] || "This keyboard is not ready for persistent live apply."));
-            this.emitChange();
-            return this.snapshot();
-        }
-        if (blob.length > this.capabilities.maxProfilePayload) {
-            this.setError(new Error(`Compiled live profile is ${blob.length} bytes; firmware accepts at most ${this.capabilities.maxProfilePayload}.`));
-            this.emitChange();
-            return this.snapshot();
-        }
-
-        let metadata;
-        try {
-            metadata = candidateMetadataForBlob(blob, {
-                actionAbiDigest: this.capabilities.actionAbiDigest,
-
-            });
-        } catch (error) {
-            this.setError(error);
-            this.liveApply = {...this.liveApply, state: "failed", error: publicError(error)};
-            this.emitChange();
-            return this.snapshot();
-        }
-
-        return this.runOperation("applying-live", async () => {
-            this.liveApply = {state: "uploading", progress: null, result: null, error: null};
-            const coordinator = this.createCandidateUploadCoordinator(this.connection, {
-                chunkSize: this.capabilities.candidateChunkMax,
-                requestIds: this.requestIds,
-                onProgress: (progress) => {
-                    this.liveApply = {...this.liveApply, state: progress.phase, progress: {...progress}};
-                    this.emitChange();
-                },
-            });
-            try {
-                this.status = await readProfileStatus(this.connection, {nextRequestId: () => this.requestIds.next()});
-                if (options.expectedBase) assertProfileBase(this.status, options.expectedBase);
-                if (options.expectedSettingsDigest !== undefined && fnv1a32(await readSettings(this.connection, this.requestIds)) !== options.expectedSettingsDigest) throw liveApplyError("PROFILE_EDIT_CONFLICT", "Keyboard settings changed while saving. Read the keyboard again.");
-                if (options.expectedCombosDigest !== undefined) await this.assertComboBase(options.expectedCombosDigest);
-                const currentMutation = evaluateLiveMutationCompatibility(
-                    this.capabilities,
-                    compatibility,
-                    Boolean(this.connection?.connected),
-                    this.status
-                );
-                if (!currentMutation.available) {
-                    throw liveApplyError("LIVE_APPLY_PEER_NOT_READY", currentMutation.reasons[0] || "The split keyboard is not ready for live apply.");
-                }
-
-                this.candidateStatus = await this.readCandidateStatus(this.connection, {
-                    nextRequestId: () => this.requestIds.next(),
-                });
-                let prepared;
-                if (candidateCanResumeCommit(this.candidateStatus, metadata.digest)) {
-                    prepared = {transactionId: this.candidateStatus.transactionId, metadata};
-                    this.liveApply = {
-                        ...this.liveApply,
-                        state: "resuming-commit",
-                        result: {transactionId: prepared.transactionId, digest: metadata.digest},
-                    };
-                    this.addDiagnostic(
-                        `Resuming matching candidate transaction ${prepared.transactionId} from ${candidateStateName(this.candidateStatus.state)}.`
-                    );
-                    this.emitChange();
-                } else if (this.candidateStatus.state === CANDIDATE_STATE.IDLE) {
-                    prepared = await coordinator.upload(blob, {metadata, ...(options.expectedBase ? {verifyBase: async () => {
-                        this.status = await readProfileStatus(this.connection, {nextRequestId: () => this.requestIds.next()});
-                        assertProfileBase(this.status, options.expectedBase);
-                        if (options.expectedSettingsDigest !== undefined && fnv1a32(await readSettings(this.connection, this.requestIds)) !== options.expectedSettingsDigest) throw liveApplyError("PROFILE_EDIT_CONFLICT", "Keyboard settings changed while saving. Read the keyboard again.");
-                if (options.expectedCombosDigest !== undefined) await this.assertComboBase(options.expectedCombosDigest);
-                    }} : {})});
-                } else {
-                    throw activeCandidateError(this.candidateStatus, metadata.digest);
-                }
-                this.liveApply = {...this.liveApply, state: "committing", result: {transactionId: prepared.transactionId, digest: prepared.metadata.digest}};
-                this.emitChange();
-                const committed = await coordinator.commit(prepared.transactionId, {digest: prepared.metadata.digest});
-                this.status = await readProfileStatus(this.connection, {nextRequestId: () => this.requestIds.next()});
-                this.candidateStatus = committed.status || await this.readCandidateStatus(this.connection, {
-                    nextRequestId: () => this.requestIds.next(),
-                });
-                assertAppliedStatus(this.status, prepared.metadata.digest);
-                let layoutResult = null;
-                if (layoutEntries) {
-                    this.liveApply = {
-                        ...this.liveApply,
-                        state: "reading-layout",
-                        progress: {phase: "reading-layout", completed: 0, total: layoutEntries.length, changed: 0},
-                    };
-                    this.emitChange();
-                    layoutResult = await this.synchronizeViaLayout(this.connection, layoutEntries, {
-                        onProgress: (progress) => {
-                            this.liveApply = {...this.liveApply, state: progress.phase, progress: {...progress}};
-                            this.emitChange();
-                        },
-                    });
-                }
-                this.lastRefreshedAt = new Date().toISOString();
-                this.liveApply = {
-                    state: "complete",
-                    progress: {...committed.progress},
-                    result: {
-                        transactionId: prepared.transactionId,
-                        digest: prepared.metadata.digest,
-                        byteLength: blob.length,
-                        ...(layoutResult ? {layout: {...layoutResult}} : {}),
-                    },
-                    error: null,
-                };
-                this.addDiagnostic(`Applied and persisted live profile ${hexDigest(prepared.metadata.digest)} (${blob.length} bytes).`);
-                if (layoutResult) {
-                    this.addDiagnostic(
-                        `Verified ${layoutResult.checkedKeys} VIA layout keys; changed ${layoutResult.changedKeys} on the connected half and queued split persistence.`
-                    );
-                }
-            } catch (error) {
-                this.liveApply = {...this.liveApply, state: "failed", error: publicError(error)};
-                await this.refreshStatus();
-                throw error;
-            }
-        });
-    }
-
     async readPortableProfile({forRestore = false} = {}) {
-        if (!this.connection?.connected || this.busy || this.savingEdit) throw new Error("Connect the keyboard and wait for the current operation to finish.");
+        if (!this.connection?.connected || this.busy) throw new Error("Connect the keyboard and wait for the current operation to finish.");
         let result;
         await this.runOperation("reading complete profile", async () => {
             result = await captureProfile(this.connection, this.requestIds, this.capabilities, message => {
@@ -669,7 +418,7 @@ class ProfileDeviceService {
     }
 
     async restorePortableProfile(document, options) {
-        if (!this.connection?.connected || this.busy || this.savingEdit) throw new Error("Connect the keyboard and wait for the current operation to finish.");
+        if (!this.connection?.connected || this.busy) throw new Error("Connect the keyboard and wait for the current operation to finish.");
         let result, started = false;
         await this.runOperation("restoring complete profile", async () => {
             const cachedBase = options?.expectedFingerprint && this.portable?.fingerprint === options.expectedFingerprint
@@ -709,16 +458,6 @@ class ProfileDeviceService {
         return result;
     }
 
-    async saveSettingsEdit(message, {saveRecovery} = {}) {
-        const document = editSettings(this.portable, message, this.capabilities);
-        return this.restorePortableProfile(document, {expectedFingerprint: message.expectedFingerprint, saveRecovery});
-    }
-
-    async saveMacroEdit(message, {saveRecovery} = {}) {
-        const document = editMacro(this.portable, message, this.capabilities);
-        return this.restorePortableProfile(document, {expectedFingerprint: message.expectedFingerprint, saveRecovery});
-    }
-
     async close() {
         this.disposeConnectionListener?.();
         this.disposeConnectionListener = undefined;
@@ -735,7 +474,7 @@ class ProfileDeviceService {
         return {
             phase: this.phase,
             scanned: this.scanned,
-            busy: this.busy || this.savingEdit,
+            busy: this.busy,
             connected: Boolean(this.connection?.connected),
             devices: this.devices.map((device) => ({...device})),
             selectedDeviceId: this.connectionPublicId,
@@ -1023,16 +762,6 @@ function evaluateLiveMutationCompatibility(capabilities, compatibility, connecte
     };
 }
 
-function copyBytes(value, label) {
-    if (!(value instanceof Uint8Array)) throw new TypeError(`${label} must be a Buffer or Uint8Array.`);
-    return Buffer.from(value);
-}
-
-function copyLayoutEntries(entries) {
-    if (!Array.isArray(entries)) throw new TypeError("Live layout entries must be an array.");
-    return entries.map((entry) => ({...entry}));
-}
-
 function cloneLiveApply(value) {
     return {
         state: value?.state || "idle",
@@ -1052,66 +781,6 @@ function cloneCandidateStatus(status) {
 
 function candidateStateName(state) {
     return CANDIDATE_STATE_NAMES[state] || `UNKNOWN_${state}`;
-}
-
-function candidateCanResumeCommit(status, digest) {
-    if (!status || (Number(status.digest) >>> 0) !== (Number(digest) >>> 0) || !status.transactionId) return false;
-    return [
-        CANDIDATE_STATE.VALIDATED,
-        CANDIDATE_STATE.PREPARING_PEER,
-        CANDIDATE_STATE.COMMITTING,
-        CANDIDATE_STATE.CONVERGING_PEER,
-        CANDIDATE_STATE.ACTIVATING,
-    ].includes(status.state)
-        || (status.state === CANDIDATE_STATE.IDLE && status.lastOperation === CANDIDATE_OPERATION.COMMIT);
-}
-
-function activeCandidateError(status, requestedDigest) {
-    const stateName = candidateStateName(status?.state);
-    const sameDigest = (Number(status?.digest) >>> 0) === (Number(requestedDigest) >>> 0);
-    const reason = sameDigest
-        ? `Its ${stateName} state cannot be resumed safely by Charybdis Live.`
-        : `Its digest ${hexDigest(status?.digest)} does not match the digest of the profile being applied, ${hexDigest(requestedDigest)}.`;
-    const error = liveApplyError(
-        "ACTIVE_CANDIDATE",
-        `Firmware already has candidate transaction ${status?.transactionId || 0} in ${stateName}. `
-            + reason + " "
-            + "Power-cycle both halves together to discard this pre-commit candidate, then reconnect and apply again."
-    );
-    error.status = cloneCandidateStatus(status);
-    return error;
-}
-
-function liveApplyError(code, message) {
-    const error = new Error(message);
-    error.code = code;
-    return error;
-}
-
-function hexDigest(value) {
-    return `0x${(Number(value) >>> 0).toString(16).padStart(8, "0")}`;
-}
-
-function assertProfileBase(status, base) {
-    const matches = base.source === "compiled"
-        ? status.committedGeneration === 0 && status.compiledDefaultDigest === base.digest
-        : status.committedGeneration === base.generation && status.committedDigest === base.digest && status.committedOriginHalf === base.originHalf;
-    if (!matches) throw liveApplyError("PROFILE_EDIT_CONFLICT", "The keyboard changed since this edit was loaded. Read from keyboard and make the edit again.");
-}
-
-function optionsBaseChanged(draft, current) {
-    return draft !== undefined && (!draft || ["source", "generation", "digest", "originHalf"].some(key => draft[key] !== current[key]));
-}
-
-function assertAppliedStatus(status, digest) {
-    const expected = Number(digest) >>> 0;
-    if (status?.activeKind !== PROFILE_ACTIVE_KIND.COMMITTED
-        || (Number(status?.activeDigest) >>> 0) !== expected
-        || (Number(status?.committedDigest) >>> 0) !== expected) {
-        const error = new Error(`Firmware completed the candidate transaction, but its active and committed status did not confirm ${hexDigest(expected)}.`);
-        error.code = "LIVE_APPLY_VERIFICATION_FAILED";
-        throw error;
-    }
 }
 
 module.exports = {

@@ -42,18 +42,6 @@ function buildViaGetKeycodeRequest(entry) {
     return report;
 }
 
-function buildViaSetKeycodeRequest(entry) {
-    const normalized = normalizeEntry(entry, {requireKeycode: true});
-    const report = Buffer.alloc(RAW_HID_REPORT_SIZE);
-    report[0] = VIA_LAYOUT_COMMANDS.SET_KEYCODE;
-    report[1] = normalized.layer;
-    report[2] = normalized.row;
-    report[3] = normalized.column;
-    report[4] = normalized.keycode >> 8;
-    report[5] = normalized.keycode & 0xff;
-    return report;
-}
-
 function viaKeycodeResponseMatcher(response, request) {
     const actual = normalizeRawHidReport(response, "VIA keycode response");
     const expected = normalizeRawHidReport(request, "VIA keycode request");
@@ -68,15 +56,6 @@ function decodeViaGetKeycodeResponse(response, request) {
     const report = handledResponse(response, request, VIA_LAYOUT_COMMANDS.GET_KEYCODE);
     assertZeroRange(report, 6, RAW_HID_REPORT_SIZE, "VIA get-keycode response");
     return (report[4] << 8) | report[5];
-}
-
-function decodeViaSetKeycodeResponse(response, request) {
-    const report = handledResponse(response, request, VIA_LAYOUT_COMMANDS.SET_KEYCODE);
-    const expected = normalizeRawHidReport(request, "VIA set-keycode request");
-    if (report[4] !== expected[4] || report[5] !== expected[5]) {
-        throw new ViaLayoutError("VIA_LAYOUT_CORRELATION_MISMATCH", "VIA set-keycode response did not echo the requested keycode.");
-    }
-    assertZeroRange(report, 6, RAW_HID_REPORT_SIZE, "VIA set-keycode response");
 }
 
 async function readViaKeycode(connection, entry, options = {}) {
@@ -115,39 +94,6 @@ async function readViaLayout(connection, options = {}) {
         layers.push({layer, positions});
     }
     return layers;
-}
-
-async function writeViaKeycode(connection, entry, options = {}) {
-    assertConnection(connection);
-    const request = buildViaSetKeycodeRequest(entry);
-    const response = await connection.request(request, requestOptions(options));
-    decodeViaSetKeycodeResponse(response, request);
-}
-
-async function synchronizeViaLayout(connection, entries, options = {}) {
-    assertConnection(connection);
-    if (!Array.isArray(entries)) throw new TypeError("VIA layout entries must be an array.");
-    const onProgress = typeof options.onProgress === "function" ? options.onProgress : () => {};
-    const changed = [];
-    for (const [index, entry] of entries.entries()) {
-        const current = await readViaKeycode(connection, entry, options);
-        if (current !== entry.keycode) changed.push({...entry, previousKeycode: current});
-        onProgress({phase: "reading-layout", completed: index + 1, total: entries.length, changed: changed.length});
-    }
-
-    for (const [index, entry] of changed.entries()) {
-        await writeViaKeycode(connection, entry, options);
-        const verified = await readViaKeycode(connection, entry, options);
-        if (verified !== entry.keycode) {
-            throw new ViaLayoutError(
-                "VIA_LAYOUT_VERIFICATION_FAILED",
-                `VIA readback for layer ${entry.layer}, row ${entry.row}, column ${entry.column} returned 0x${verified.toString(16).padStart(4, "0")} instead of 0x${entry.keycode.toString(16).padStart(4, "0")}.`,
-                {entry, actualKeycode: verified}
-            );
-        }
-        onProgress({phase: "writing-layout", completed: index + 1, total: changed.length, changed: changed.length});
-    }
-    return {checkedKeys: entries.length, changedKeys: changed.length, verifiedKeys: changed.length};
 }
 
 function normalizeEntry(entry, options = {}) {
@@ -205,12 +151,8 @@ module.exports = {
     VIA_LAYOUT_COMMANDS,
     ViaLayoutError,
     buildViaGetKeycodeRequest,
-    buildViaSetKeycodeRequest,
     decodeViaGetKeycodeResponse,
-    decodeViaSetKeycodeResponse,
     readViaKeycode,
     readViaLayout,
-    synchronizeViaLayout,
     viaKeycodeResponseMatcher,
-    writeViaKeycode,
 };

@@ -4,13 +4,7 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 
 const {FakeDeviceAdapter} = require("../../core/transport/fake-device-adapter");
-const {
-    CANDIDATE_ERROR,
-    CANDIDATE_OPERATION,
-    CANDIDATE_STATE,
-    candidateMetadataForBlob,
-} = require("../../core/protocol/profile-candidate-v1");
-const {encodeProfileBlob, PROFILE_DOMAIN_IDS} = require("../../core/schema/profile-blob-v1");
+const {CANDIDATE_ERROR, CANDIDATE_OPERATION, CANDIDATE_STATE} = require("../../core/protocol/profile-candidate-v1");
 const {
     ProfileRequestIdSequence,
     ProfileDeviceService,
@@ -64,13 +58,6 @@ function readPages(options = {}) {
         [`${PROFILE_WIRE_V1.VALUE_STATUS}:0`]: statusIdentity,
         [`${PROFILE_WIRE_V1.VALUE_STATUS}:1`]: Buffer.alloc(25),
     };
-}
-
-function liveProfileBlob() {
-    return encodeProfileBlob({domains: [
-        {id: PROFILE_DOMAIN_IDS.RGB, version: 1, payload: Buffer.alloc(0)},
-        {id: PROFILE_DOMAIN_IDS.KEY_BEHAVIORS, version: 1, payload: Buffer.alloc(0)},
-    ]});
 }
 
 function candidateStatus(overrides = {}) {
@@ -135,9 +122,7 @@ function serviceHarness(options = {}) {
             rgbStageGroupRows: 12,
             highestLedIndex: 57,
         },
-        createCandidateUploadCoordinator: options.createCandidateUploadCoordinator,
         readCandidateStatus: options.readCandidateStatus || (async () => candidateStatus(options.candidateStatus)),
-        synchronizeViaLayout: options.synchronizeViaLayout,
     });
     return {adapter, changes, service};
 }
@@ -251,169 +236,6 @@ test("persistent live apply requires a detected and converged second half", () =
     assert.match(unconverged.reasons.join("\n"), /have not established a converged profile state/);
 });
 
-test("service uploads, commits, and verifies a live profile before reporting success", async () => {
-    const blob = liveProfileBlob();
-    const metadata = candidateMetadataForBlob(blob, {actionAbiDigest: 0x12345678, requestedDomains: 3});
-    const digest = metadata.digest;
-    const calls = [];
-    const {adapter, service} = serviceHarness({
-        mutation: true,
-        activeKind: PROFILE_ACTIVE_KIND.COMMITTED,
-        activeDigest: digest,
-        committedDigest: digest,
-        createCandidateUploadCoordinator(connection, options) {
-            assert.equal(connection.connected, true);
-            return {
-                async upload(blob, uploadOptions) {
-                    calls.push({kind: "upload", blob: Buffer.from(blob), options: {...uploadOptions}});
-                    options.onProgress({phase: "writing", bytesSent: blob.length, totalBytes: blob.length});
-                    return {transactionId: 0x1234, metadata: uploadOptions.metadata, progress: {phase: "complete"}};
-                },
-                async commit(transactionId, commitOptions) {
-                    calls.push({kind: "commit", transactionId, options: {...commitOptions}});
-                    options.onProgress({phase: "committing", transactionId});
-                    return {progress: {phase: "complete", transactionId}, status: candidateStatus({
-                        state: CANDIDATE_STATE.IDLE,
-                        lastOperation: CANDIDATE_OPERATION.COMMIT,
-                        transactionId,
-                        digest,
-                    })};
-                },
-            };
-        },
-        async synchronizeViaLayout(connection, entries, options) {
-            assert.equal(connection.connected, true);
-            calls.push({kind: "layout", entries});
-            options.onProgress({phase: "reading-layout", completed: entries.length, total: entries.length, changed: 1});
-            options.onProgress({phase: "writing-layout", completed: 1, total: 1, changed: 1});
-            return {checkedKeys: entries.length, changedKeys: 1, verifiedKeys: 1};
-        },
-    });
-    const scanned = await service.enumerate();
-    const connected = await service.connect(scanned.devices[0].id);
-    assert.equal(connected.mutationCompatibility.available, true);
-
-    const layoutEntries = [{layer: 0, row: 0, column: 0, keycode: 4}];
-    const applied = await service.applyLiveProfile(blob, {layoutEntries});
-    assert.equal(applied.error, null);
-    assert.equal(applied.liveApply.state, "complete");
-    assert.deepEqual(applied.liveApply.result, {
-        transactionId: 0x1234,
-        digest,
-        byteLength: blob.length,
-        layout: {checkedKeys: 1, changedKeys: 1, verifiedKeys: 1},
-    });
-    assert.deepEqual(calls, [
-        {
-            kind: "upload",
-            blob,
-            options: {metadata},
-        },
-        {kind: "commit", transactionId: 0x1234, options: {digest}},
-        {kind: "layout", entries: layoutEntries},
-    ]);
-    assert.equal(adapter.lastConnection().writes.length, 10, "apply should recheck split readiness and verify both status pages after commit");
-});
-
-test("service resumes a matching candidate already preparing the peer", async () => {
-    const blob = liveProfileBlob();
-    const metadata = candidateMetadataForBlob(blob, {actionAbiDigest: 0x12345678, requestedDomains: 3});
-    const calls = [];
-    const {service} = serviceHarness({
-        mutation: true,
-        stateFlags: 0x35,
-        activeKind: PROFILE_ACTIVE_KIND.COMMITTED,
-        activeDigest: metadata.digest,
-        committedDigest: metadata.digest,
-        candidateStatus: candidateStatus({
-            state: CANDIDATE_STATE.PREPARING_PEER,
-            lastOperation: CANDIDATE_OPERATION.COMMIT,
-            transactionId: 1,
-            payloadLength: blob.length,
-            digest: metadata.digest,
-        }),
-        createCandidateUploadCoordinator() {
-            return {
-                async upload() {
-                    assert.fail("a matching prepared candidate must not be uploaded again");
-                },
-                async commit(transactionId, options) {
-                    calls.push({transactionId, options});
-                    return {progress: {phase: "complete"}, status: candidateStatus({
-                        state: CANDIDATE_STATE.IDLE,
-                        lastOperation: CANDIDATE_OPERATION.COMMIT,
-                        transactionId,
-                        digest: metadata.digest,
-                    })};
-                },
-            };
-        },
-    });
-    const scanned = await service.enumerate();
-    const connected = await service.connect(scanned.devices[0].id);
-    assert.equal(connected.candidateStatus.stateName, "PREPARING_PEER");
-    const applied = await service.applyLiveProfile(blob);
-    assert.equal(applied.error, null);
-    assert.equal(applied.liveApply.state, "complete");
-    assert.deepEqual(calls, [{transactionId: 1, options: {digest: metadata.digest}}]);
-    assert.ok(applied.diagnostics.some((entry) => entry.includes("Resuming matching candidate transaction 1 from PREPARING_PEER")));
-});
-
-test("service refuses to replace a nonmatching active candidate", async () => {
-    const blob = liveProfileBlob();
-    const metadata = candidateMetadataForBlob(blob, {actionAbiDigest: 0x12345678, requestedDomains: 3});
-    const {service} = serviceHarness({
-        mutation: true,
-        stateFlags: 0x35,
-        candidateStatus: candidateStatus({
-            state: CANDIDATE_STATE.PREPARING_PEER,
-            lastOperation: CANDIDATE_OPERATION.COMMIT,
-            transactionId: 7,
-            digest: metadata.digest ^ 0xffffffff,
-        }),
-        createCandidateUploadCoordinator() {
-            return {
-                async upload() {
-                    assert.fail("a nonmatching active candidate must not be overwritten");
-                },
-                async commit() {
-                    assert.fail("a nonmatching active candidate must not be committed");
-                },
-            };
-        },
-    });
-    const scanned = await service.enumerate();
-    await service.connect(scanned.devices[0].id);
-    const failed = await service.applyLiveProfile(blob);
-    assert.equal(failed.error.code, "ACTIVE_CANDIDATE");
-    assert.match(failed.error.message, /PREPARING_PEER/);
-    assert.match(failed.error.message, /Power-cycle both halves together/);
-});
-
-test("service fails closed when post-commit status does not confirm the digest", async () => {
-    const blob = liveProfileBlob();
-    const digest = candidateMetadataForBlob(blob, {actionAbiDigest: 0x12345678, requestedDomains: 3}).digest;
-    const {service} = serviceHarness({
-        mutation: true,
-        createCandidateUploadCoordinator() {
-            return {
-                async upload() {
-                    return {transactionId: 0x1234, metadata: {digest}, progress: {phase: "complete"}};
-                },
-                async commit() {
-                    return {progress: {phase: "complete"}};
-                },
-            };
-        },
-    });
-    const scanned = await service.enumerate();
-    await service.connect(scanned.devices[0].id);
-    const failed = await service.applyLiveProfile(blob);
-    assert.equal(failed.liveApply.state, "failed");
-    assert.equal(failed.liveApply.error.code, "LIVE_APPLY_VERIFICATION_FAILED");
-    assert.equal(failed.error.code, "LIVE_APPLY_VERIFICATION_FAILED");
-});
-
 test("request ids advance across refreshes and reject a delayed duplicate", async () => {
     const pages = readPages();
     let delayedResponse;
@@ -455,14 +277,4 @@ test("request id allocation wraps from 255 to 1 without emitting zero", () => {
     const ids = new ProfileRequestIdSequence(0xfe);
     assert.deepEqual([ids.next(), ids.next(), ids.next(), ids.next()], [0xfe, 0xff, 1, 2]);
     assert.throws(() => new ProfileRequestIdSequence(0), /1 through 255/);
-});
-
-test("a stale profile edit is refused before candidate upload", async () => {
-    let uploads = 0;
-    const {service} = serviceHarness({mutation: true, createCandidateUploadCoordinator() {return {upload() {uploads++;}};}});
-    const scanned = await service.enumerate();
-    await service.connect(scanned.devices[0].id);
-    const result = await service.applyLiveProfile(liveProfileBlob(), {expectedBase: {source: "compiled", digest: 1}});
-    assert.equal(result.error.code, "PROFILE_EDIT_CONFLICT");
-    assert.equal(uploads, 0);
 });

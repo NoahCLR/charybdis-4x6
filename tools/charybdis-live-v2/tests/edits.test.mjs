@@ -313,6 +313,14 @@ test("a macro payload is posted as the text the keyboard stores", () => {
         /macro command|}/i, "a payload the keyboard cannot parse is refused");
 });
 
+test("a macro left holding a key is refused, and macro keys land as the keyboard's own values", () => {
+    const draft = session();
+    assert.throws(() => stage(draft, edits.macroMessage("VIA_MACRO_0", "{+KC_A}", draft.current.fingerprint)), /Release/);
+    stage(draft, edits.layoutKeys("Layer 0", [{layoutIndex: 0, keycode: "VIA_MACRO_63"}, {layoutIndex: 1, keycode: "MACRO_15"}]));
+    assert.equal(draft.document.layers[0][slotOf(0)], 0x773f);
+    assert.equal(draft.document.layers[0][slotOf(1)], 0x7e4f);
+});
+
 test("a recorded take appends to what the payload held, with no pause before the first key", () => {
     let payload = "{KC_H}";
     payload = edits.recordedPayload(payload, {keycode: "KC_A", type: "keydown", gap: 900, captured: false, threshold: 30, round: 10});

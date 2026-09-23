@@ -7,7 +7,6 @@ const {decodeKeyBehaviorDomain} = require("../../core/schema/key-behavior-domain
 const {behaviorRowsForView, actionName} = require("../../core/session/device-profile-view");
 const {editDeviceProfile} = require("../../core/session/device-profile-edits");
 const {editKeyBehaviors} = require("../../core/session/key-behavior-edits");
-const {ProfileDeviceService} = require("../../core/session/profile-device-service");
 
 const payload = decodeProfileBlob(bytes).domains[1].payload;
 const original = decodeKeyBehaviorDomain(payload);
@@ -18,17 +17,6 @@ const form = () => ({keycode: "KC_A", tapHoldTerm: "", longerHoldTerm: "0", mult
         {tapCount: 4, tap: disabled(), hold: {helper: "REPEAT_WHILE_HELD", action: "KC_RIGHT", repeatHz: "25"}, longHold: disabled()}]});
 const edit = (message, caps = capabilities, input = payload) => editKeyBehaviors(input, message, caps);
 const rowFor = (input, name) => decodeKeyBehaviorDomain(input).rows.find(row => actionName(row.target) === name);
-
-test("a stale UI draft is refused before profile encoding or any upload", async () => {
-    const service = new ProfileDeviceService();
-    service.profileBytes = bytes;
-    service.committed = {state: "read", failures: [], source: "committed", generation: 12, digest: 42, originHalf: 1};
-    let uploads = 0;
-    service.applyLiveProfile = async () => {uploads++;};
-    const expectedBase = {...service.committed, generation: 11};
-    await assert.rejects(service.saveProfileEdit({type: "saveBehavior", behavior: form(), expectedBase}), error => error.code === "PROFILE_EDIT_CONFLICT");
-    assert.equal(uploads, 0);
-});
 
 test("every device behaviour survives the editor's sparse and disabled branches byte-for-byte", () => {
     for (const row of views) {
