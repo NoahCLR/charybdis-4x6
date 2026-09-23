@@ -409,7 +409,7 @@ class ProfileDeviceService {
             result.limits = await readSettingsLimits(this.connection, this.requestIds);
             result.options = await readKeyboardOptions(this.connection, this.requestIds);
             this.portable = result;
-            this.macroView = macroEditorView(result);
+            this.macroView = macroEditorView(result, this.capabilities);
             this.settingsView = settingsEditorView(result);
         });
         this.portableProgress = "";
@@ -442,7 +442,7 @@ class ProfileDeviceService {
             result.limits = limits;
             result.options = keyboardOptions;
             this.portable = result;
-            this.macroView = macroEditorView(result);
+            this.macroView = macroEditorView(result, this.capabilities);
             this.settingsView = settingsEditorView(result);
             if (result.performance) {
                 const seconds = (result.performance.elapsedMs / 1000).toFixed(1);

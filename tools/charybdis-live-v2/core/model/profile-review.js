@@ -29,7 +29,7 @@ function key(value) {
 function action(value) {
     if (!value || value.kind === 0) return "None";
     if (value.kind === 1) return key(value.operand);
-    const names = {2: "Momentary layer", 3: "Layer lock", 4: "Pointing mode", 5: "Pointing mode lock", 6: "VIA macro", 7: "User macro"};
+    const names = {2: "Momentary layer", 3: "Layer lock", 4: "Pointing mode", 5: "Pointing mode lock", 6: "Macro", 7: "User macro"};
     return `${names[value.kind] || "Action"} ${value.operand}`;
 }
 function behavior(row) {
@@ -79,8 +79,8 @@ function profileReview(before, after) {
     for (let i = 0; i < Math.max(a.combos.length, b.combos.length); i++) add("Combos", `Combo ${i + 1}`, combo(a.combos[i]), combo(b.combos[i]));
     const macrosA = macroEditorView(before), macrosB = macroEditorView(after);
     macrosA.viaMacros.forEach((slot, i) => {
-        add("Macros", `VIA macro ${i}`, slot.payload || "Empty", macrosB.viaMacros[i].payload || "Empty");
-        add("Macros", `VIA macro ${i} name`, slot.name || "No name", macrosB.viaMacros[i].name || "No name");
+        add("Macros", `Macro ${i}`, slot.payload || "Empty", macrosB.viaMacros[i].payload || "Empty");
+        add("Macros", `Macro ${i} name`, slot.name || "No name", macrosB.viaMacros[i].name || "No name");
     });
     const fields = (snapshot, settings) => settingsEditorView(snapshot).sections.flatMap(section => section.fields.map(field => {
         let value = field.value;

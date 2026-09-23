@@ -768,6 +768,11 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .mslot .v { font-size: 11.5px; }
 .mslot.filled { background: var(--surface-3); border-color: var(--line-2); }
 .mslot[aria-current="true"] { border-color: var(--line-3); background: var(--key-hi); }
+/* A slot with no room left in macro memory reads as closed, not as empty. */
+.mslot.out { opacity: .38; border-style: dashed; cursor: not-allowed; }
+.mslot.warn { border-color: var(--danger); }
+.mslot.warn .v { color: var(--danger); }
+.meter.over i { background: var(--danger); }
 .step { display: flex; align-items: center; gap: 9px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); }
 .step + .step { margin-top: 6px; }
 .step .grip { color: var(--text-3); font-size: 12px; cursor: grab; }

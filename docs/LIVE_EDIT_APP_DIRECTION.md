@@ -1056,3 +1056,23 @@ cache stays whole, because version-3 names fill the space the user macros had.
 The settings readback now streams from that cache instead of keeping a second
 copy, which saves 1,400 bytes of static RAM per half; see
 [memory budgets](architecture/memory-budgets.md#retired-user-macros-and-streamed-settings-readback--2026-09-23).
+
+### D-L26 — Macro slots share one visible memory, and every slot says what fits
+
+The interface calls them macro slots. Their two real limits are now shown and
+enforced instead of implied. All 64 slots share the keyboard's macro memory
+(7,191 bytes on the eight-layer geometry, where a key tap takes 3 bytes and a
+typed character 1). Each macro plays only if the firmware compiles it into at
+most 512 bytes (`MACRO_PAYLOAD_IR_MAX_BYTES`), about 170 key taps; a longer one
+was previously accepted and then silently never played. The app now computes
+that compiled size exactly (`macroProgramBytes`, checked against the firmware
+decoder by `run_macro_program_size_tests.sh`), refuses an edit past it, and
+marks a slot VIA wrote past it as too long.
+
+Every empty slot keeps room for ten key taps (30 bytes). When the free memory
+cannot keep that for every empty slot, the highest-numbered empty slots show
+as having no room and cannot be edited until space is freed. The firmware does
+not enforce the reserve, so a VIA edit can still bypass it; the app then shows
+what VIA left. Writing the cross-check found a decoder bug: a tap after
+another tap under a held key, such as `{+KC_LSFT}{KC_A}{KC_B}{-KC_LSFT}`,
+replayed the first tap at the release. The decoder now plays each tap once.

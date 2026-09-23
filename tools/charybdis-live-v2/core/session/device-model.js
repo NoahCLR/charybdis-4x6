@@ -29,7 +29,7 @@ function buildDeviceModel(state = {}) {
         for (const slot of state.macroView.viaMacros) {
             const native = keycodeCatalog.resolve(resolveNativeQmkExpression(slot.keycode, {})).name;
             // A named macro reads by its name everywhere a key is labelled.
-            const label = slot.name || `VIA macro ${slot.keycode.split("_").at(-1)}`;
+            const label = slot.name || `Macro ${slot.keycode.split("_").at(-1)}`;
             catalog.aliases[native] = slot.keycode;
             catalog.labels[native] = label;
             catalog.labels[slot.keycode] = label;
@@ -39,7 +39,7 @@ function buildDeviceModel(state = {}) {
     // where the vocabulary has none better than a bare user slot: LOCK_LAYER(2)
     // reads "Lock layer 2" instead of "User 30". A key the catalog already
     // names — MO(1) is "Layer hold 1" — or one an earlier pass named, such as
-    // "VIA macro 0", keeps that name, so one key reads the same on every
+    // "Macro 0", keeps that name, so one key reads the same on every
     // screen and in the picker whether or not a behaviour sits on it.
     if (state.committed?.state === "read" && state.committed.domains?.keyBehaviors) {
         const aliases = behaviorAliasesForView(state.committed.domains.keyBehaviors, state.capabilities);
@@ -95,6 +95,7 @@ function buildDeviceModel(state = {}) {
         comboReadback: state.combos ? {...state.combos, rows: undefined, writable: Boolean(state.capabilities?.supportedDomainMask & 4) && state.committed?.state === "read" && !state.busy} : {state: "unread"},
         viaMacros: state.macroView?.viaMacros || [],
         macroNameSpace: state.macroView?.names || null,
+        macroBank: state.macroView?.macroBank || null,
         macroEditing: {identity: state.macroView?.identity || "", writable: Boolean(state.macroView) && state.capabilities?.compiledLayerCount === 8 && !state.busy},
         behaviorTimingDefaults: state.settingsView?.timing || {},
         configDefaults: state.settingsView?.sections || [],

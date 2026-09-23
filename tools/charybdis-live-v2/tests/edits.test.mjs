@@ -323,7 +323,7 @@ test("a macro name is posted without its steps, and review shows the rename", ()
     const after = decoded(draft);
     assert.equal(after.settings.macroNames[5], "Sign-off");
     assert.equal(after.document.macros[5], before, "the steps are untouched");
-    assert.ok(draft.view({selectedDeviceId: "test-device", connected: true}).changes.some((change) => change.label === "VIA macro 5 name" && change.after === "Sign-off"));
+    assert.ok(draft.view({selectedDeviceId: "test-device", connected: true}).changes.some((change) => change.label === "Macro 5 name" && change.after === "Sign-off"));
 });
 
 test("a macro left holding a key is refused, and macro keys land as the keyboard's own values", () => {

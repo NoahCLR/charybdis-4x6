@@ -113,4 +113,54 @@ function decodeMacroPayload(bytes, kind) {
     return output;
 }
 
-module.exports = {macroKeycodes, parsePayload, encodeMacroPayload, decodeMacroPayload};
+// The keyboard plays a VIA macro only after compiling its stored bytes into a
+// program of at most this many bytes; a longer one is kept but never plays.
+const MACRO_PROGRAM_MAX = 512;
+
+// The program size the firmware's decoder (macro_payload_decode_qmk_stream)
+// produces for well-formed VIA macro bytes. It mirrors that decoder step for
+// step: text runs cost 2 bytes per 255 characters plus one per character; a
+// tap 3; a held key's press and release 2 each; a chord of held keys closed
+// around one tap becomes one tap list; a delay 3.
+function macroProgramBytes(bytes) {
+    if (!Buffer.isBuffer(bytes)) throw fail("Invalid macro bytes.");
+    let length = 0, chunk = 0, downs = [], tap = null, matched = 0;
+    const flush = () => {
+        length += 2 * downs.length + (tap === null ? 0 : 3) + 2 * matched;
+        downs = []; tap = null; matched = 0;
+    };
+    for (let index = 0; index < bytes.length;) {
+        const byte = bytes[index++];
+        if (byte !== 1) {
+            flush();
+            if (!chunk || chunk === 255) { length += 2; chunk = 0; }
+            length++; chunk++;
+            continue;
+        }
+        chunk = 0;
+        const op = bytes[index++];
+        if (op === 4) {
+            flush();
+            while (index < bytes.length && bytes[index] !== 124) index++;
+            index++; length += 3;
+            continue;
+        }
+        const key = bytes[index++];
+        if (op === 1) {
+            if (tap !== null) flush();
+            if (!downs.length) length += 3;
+            else { tap = key; matched = 0; }
+        } else if (op === 2) {
+            if (tap !== null) flush();
+            downs.push(key);
+        } else if (tap !== null && matched < downs.length && key === downs[downs.length - 1 - matched]) {
+            if (++matched === downs.length) { length += 3 + downs.length; downs = []; tap = null; matched = 0; }
+        } else {
+            flush(); length += 2;
+        }
+    }
+    flush();
+    return length;
+}
+
+module.exports = {macroKeycodes, parsePayload, encodeMacroPayload, decodeMacroPayload, macroProgramBytes, MACRO_PROGRAM_MAX};

@@ -4,7 +4,7 @@ const assert = require("node:assert/strict");
 const {document} = require("../fixtures/portable-profile");
 const {document: pdDocument} = require("../fixtures/pd-profile");
 const {fingerprint, validateSnapshot} = require("../../core/model/portable-profile");
-const {macroEditorView, editMacro} = require("../../core/model/macro-editor");
+const {macroEditorView, editMacro, macroBudget, SLOT_RESERVE_TAPS} = require("../../core/model/macro-editor");
 const {decodeProfileBlob} = require("../../core/schema/profile-blob-v1");
 const {buildDeviceModel} = require("../../core/session/device-model");
 const snapshot = value => ({document: value, fingerprint: fingerprint(value)});
@@ -25,7 +25,7 @@ test("the 64 VIA macros populate the model, including empty slots and their name
     // numeric alias still resolves for slots the shipped catalog lacks.
     assert.equal(model.qmkKeycodeAliases["0x773F"], "VIA_MACRO_63");
     assert.equal(model.qmkKeyLabels["0x773F"], "New note");
-    assert.equal(model.qmkKeyLabels.VIA_MACRO_0, "VIA macro 0");
+    assert.equal(model.qmkKeyLabels.VIA_MACRO_0, "Macro 0");
     assert.equal(model.hardcodedMacros, undefined, "user macros are retired");
     assert.equal(buildDeviceModel({macroView: view, capabilities: {compiledLayerCount: 8}, busy: true}).macroEditing.writable, false);
     assert.equal(macroEditorView({incomplete: true}), null);
@@ -77,4 +77,47 @@ test("stale drafts, wrong slots and retired user macros are rejected before a wr
     assert.throws(() => editMacro(current, {keycode: "VIA_MACRO_0", expectedFingerprint: current.fingerprint}), /steps, its name/);
     assert.throws(() => editMacro(current, {...message, payload: "x".repeat(7191)}), /bytes/);
     assert.throws(() => editMacro(current, {...message, name: "Too early"}), /schema 2/, "a schema-1 profile has no room for names");
+});
+
+test("every empty slot keeps room for ten key taps; the highest ones run out of room first", () => {
+    assert.equal(SLOT_RESERVE_TAPS, 10);
+    const empty = () => Buffer.alloc(0);
+    // 64 empty slots in 7,191 bytes: 65 bytes stored, all 64 keep 30 bytes.
+    let budget = macroBudget(Array.from({length: 64}, empty), 7191);
+    assert.equal(budget.stored, 65);
+    assert.equal(budget.available, 64);
+    assert.equal(budget.outOfRoom.size, 0);
+    // Fill slot 0 so exactly five empty slots keep their 30 bytes.
+    const slots = Array.from({length: 64}, empty);
+    slots[0] = Buffer.alloc(7191 - 65 - 5 * 30, 97);
+    budget = macroBudget(slots, 7191);
+    assert.equal(budget.free, 150);
+    assert.equal(budget.available, 6, "the full slot and five with room");
+    assert.deepEqual([...budget.outOfRoom].slice(0, 2), [6, 7]);
+    assert.equal(budget.outOfRoom.has(63), true);
+    assert.equal(budget.outOfRoom.has(5), false);
+    // One byte less free and the fifth empty slot runs out of room.
+    slots[0] = Buffer.alloc(slots[0].length + 1, 97);
+    assert.equal(macroBudget(slots, 7191).available, 5);
+});
+
+test("the model reports each macro's program size and the bank; an unplayable macro is refused", () => {
+    let current = snapshot(pdDocument());
+    current = snapshot(editMacro(current, {keycode: "VIA_MACRO_2", payload: "{KC_A}{KC_B}", expectedFingerprint: current.fingerprint}));
+    const view = macroEditorView(current, {viaMacroBytes: 7191});
+    const slot = view.viaMacros[2];
+    assert.equal(slot.program, 6);
+    assert.equal(slot.playable, true);
+    assert.equal(slot.available, true);
+    assert.equal(slot.roomTaps, Math.floor((512 - 6) / 3));
+    assert.equal(view.macroBank.capacity, 7191);
+    assert.equal(view.macroBank.programMax, 512);
+    assert.equal(view.macroBank.reserveTaps, 10);
+    assert.equal(view.macroBank.available, 64);
+    const model = buildDeviceModel({macroView: view, capabilities: {compiledLayerCount: 8, actionAbiDigest: 0x61072732}});
+    assert.deepEqual(model.macroBank, view.macroBank);
+    // 170 taps play; 171 would be kept but never play, so the edit is refused.
+    assert.doesNotThrow(() => editMacro(current, {keycode: "VIA_MACRO_2", payload: "{KC_A}".repeat(170), expectedFingerprint: current.fingerprint}));
+    assert.throws(() => editMacro(current, {keycode: "VIA_MACRO_2", payload: "{KC_A}".repeat(171), expectedFingerprint: current.fingerprint}),
+        error => error.code === "MACRO_TOO_LONG" && /513 bytes/.test(error.message));
 });

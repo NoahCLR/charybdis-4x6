@@ -143,6 +143,23 @@ static void test_decode_qmk_stream_rejects_unbalanced_key_downs(void) {
     CHECK(ir.length == 0u);
 }
 
+// A held modifier around two taps plays each tap once: the tap that follows
+// the first must not leave that first one pending for the release to replay.
+static void test_decode_qmk_stream_plays_each_tap_under_a_held_key_once(void) {
+    static const uint8_t held[] = {
+        SS_QMK_PREFIX, SS_DOWN_CODE, TEST_SEND_STRING_U8(X_LEFT_SHIFT), SS_QMK_PREFIX, SS_TAP_CODE, TEST_SEND_STRING_U8(X_A), SS_QMK_PREFIX, SS_TAP_CODE, TEST_SEND_STRING_U8(X_B), SS_QMK_PREFIX, SS_UP_CODE, TEST_SEND_STRING_U8(X_LEFT_SHIFT), 0,
+    };
+    static const uint8_t expected[] = {
+        MACRO_PAYLOAD_IR_OP_KEY_DOWN, TEST_SEND_STRING_U8(X_LEFT_SHIFT), MACRO_PAYLOAD_IR_OP_TAP_LIST, 1, TEST_SEND_STRING_U8(X_A), MACRO_PAYLOAD_IR_OP_TAP_LIST, 1, TEST_SEND_STRING_U8(X_B), MACRO_PAYLOAD_IR_OP_KEY_UP, TEST_SEND_STRING_U8(X_LEFT_SHIFT),
+    };
+    macro_payload_ir_t ir     = {0};
+    test_qmk_reader_t  reader = {.buffer = held};
+
+    CHECK(macro_payload_decode_qmk_stream(&ir, (uint16_t)sizeof(held), test_qmk_reader_read_byte, &reader));
+    CHECK(ir.length == sizeof(expected));
+    CHECK(memcmp(ir.bytes, expected, sizeof(expected)) == 0);
+}
+
 static void test_decode_qmk_stream_rejects_orphan_key_up(void) {
     static const uint8_t orphan[] = {SS_QMK_PREFIX, SS_UP_CODE, TEST_SEND_STRING_U8(X_LEFT_SHIFT), 0};
     macro_payload_ir_t   ir       = {0};
@@ -214,6 +231,7 @@ int main(void) {
     test_encode_and_decode_qmk_round_trip_through_ir();
     test_decode_qmk_stream_rejects_unbalanced_key_downs();
     test_decode_qmk_stream_rejects_orphan_key_up();
+    test_decode_qmk_stream_plays_each_tap_under_a_held_key_once();
     test_decode_qmk_stream_rejects_every_high_text_byte();
     test_decode_qmk_stream_keeps_high_command_operands();
 

@@ -1,5 +1,6 @@
-// Macros: the 64 VIA slots the keyboard reports, edited as the payload it
-// stores, each with an optional name kept in the keyboard's profile.
+// Macros: the keyboard's macro slots, edited as the payload it stores, each
+// with an optional name kept in the keyboard's profile. The slots share one
+// block of macro memory; the host says which still have room.
 //
 // The preview parses the payload for reading; the host parses it again for
 // real when the slot is staged, and says so if it disagrees.
@@ -19,12 +20,13 @@ const STEP_KINDS = [
 export function screenMacros() {
     const model = getModel();
     const bank = model?.viaMacros || [];
-    const canEdit = writable() && Boolean(model?.macroEditing?.writable);
+    const memory = model?.macroBank;
     const slot = bank.find((row) => row.keycode === state.macroSlot) || bank[0];
+    const canEdit = writable() && Boolean(model?.macroEditing?.writable) && slot?.available !== false;
 
     const main = el(`<div class="main">${topbar(
         "Macros",
-        `${bank.length} macro slots on the keyboard. Give one a name and it shows by that name on keys, in the picker and in the key card; the name is saved on the keyboard with everything else.`,
+        "Macro slots on the keyboard. Give one a name and it shows by that name on keys, in the picker and in the key card; the name is saved on the keyboard with everything else.",
         "",
     )}</div>`);
 
@@ -39,19 +41,21 @@ export function screenMacros() {
     }
 
     const filled = bank.filter((row) => !row.empty).length;
+    const available = memory?.available ?? bank.length;
     const grid = el(`<div class="card"><div class="card-h"><h3>Slots</h3>
-        <span class="right tag">${filled} of ${bank.length} filled</span></div>
-        <div class="card-b"><div class="macro-grid"></div>
-        <p class="note" style="margin-top:12px">Empty slots stay visible so you can see what the keyboard has room for.</p></div></div>`);
+        <span class="right tag" data-tip="${filled} filled">${available} of ${bank.length} available</span></div>
+        <div class="card-b"><div class="macro-grid"></div>${memoryMeter(memory)}</div></div>`);
     const cells = grid.querySelector(".macro-grid");
     bank.forEach((row, index) => {
         const {steps} = parseMacro(row.payload);
         const peek = macroPeek(row.payload, (name) => model?.qmkKeyLabels?.[name] || name);
-        const cell = el(`<button class="mslot ${row.empty ? "" : "filled"}" data-slot="${esc(row.keycode)}"
-            aria-current="${row.keycode === slot?.keycode}"
-            data-tip="${esc(row.keycode)} · ${row.empty ? "empty slot" : `${row.bytes} bytes · ${steps.length} steps · ${esc(row.payload)}`}">
+        const out = row.available === false;
+        const tip = out ? `Slot ${index} · no room: the free macro memory is kept for the lower empty slots. Shorten or clear a macro to open it.`
+            : row.empty ? `Slot ${index} · empty` : `Slot ${index} · ${steps.length} step${steps.length === 1 ? "" : "s"} · ${row.program} of ${memory?.programMax ?? 512} bytes to play · ${row.payload}`;
+        const cell = el(`<button class="mslot ${row.empty ? "" : "filled"} ${out ? "out" : ""} ${row.playable === false ? "warn" : ""}" data-slot="${esc(row.keycode)}"
+            aria-current="${row.keycode === slot?.keycode}" ${out ? "disabled" : ""} data-tip="${esc(tip)}">
             <span class="n">M${index}</span>
-            <span class="v">${row.name ? esc(row.name.length > 13 ? `${row.name.slice(0, 12)}…` : row.name) : row.empty ? "—" : esc(peek.length > 13 ? `${peek.slice(0, 12)}…` : peek)}</span></button>`);
+            <span class="v">${row.playable === false ? "too long" : row.name ? esc(row.name.length > 13 ? `${row.name.slice(0, 12)}…` : row.name) : row.empty ? (out ? "no room" : "—") : esc(peek.length > 13 ? `${peek.slice(0, 12)}…` : peek)}</span></button>`);
         cell.addEventListener("click", () => { state.macroSlot = row.keycode; render(); });
         cells.append(cell);
     });
@@ -59,6 +63,18 @@ export function screenMacros() {
     pad.appendChild(slot ? editor(model, slot, canEdit) : el(`<div class="empty-card"><p class="note">Pick a slot.</p></div>`));
     main.appendChild(content);
     return main;
+}
+
+// All slots share one block of macro memory. Each empty slot keeps room for
+// a few key taps; when that runs out the highest empty slots close.
+function memoryMeter(memory) {
+    if (!memory) return "";
+    const used = memory.stored, share = Math.min(100, (used / memory.capacity) * 100);
+    const closed = memory.slots - memory.available;
+    return `<div class="sect-h" style="margin-top:14px"><h4>Macro memory</h4>
+            <span class="right note">${used.toLocaleString("en-US")} of ${memory.capacity.toLocaleString("en-US")} bytes used</span></div>
+        <div class="meter"><i style="width:${share}%"></i></div>
+        <p class="note" style="margin-top:6px">A key tap takes 3 bytes, a typed character 1. Every empty slot keeps room for ${memory.reserveTaps} key taps${closed ? `; ${closed} slot${closed === 1 ? " has" : "s have"} no room left` : ""}.</p>`;
 }
 
 function editor(model, slot, canEdit) {
@@ -71,7 +87,7 @@ function editor(model, slot, canEdit) {
     const wrap = el(`<div class="stack"></div>`);
     const card = el(`<div class="card">
         <div class="card-h"><h3>${esc(slot.name || `Macro ${slot.keycode.split("_").at(-1)}`)}</h3>
-            <code class="dim">${esc(slot.keycode)}</code>
+            <span class="tag" data-tip="${esc(slot.keycode)}">Slot ${esc(slot.keycode.split("_").at(-1))}</span>
             <span class="right row" style="gap:8px">
                 <span class="chip"><i class="dot ${dirty ? "draft" : "on"}"></i>${dirty ? "edited here" : "as read"}</span>
                 <button class="btn tiny ghost" data-act="place" ${writable() ? "" : "disabled"}>Place on a key…</button></span></div>
@@ -98,6 +114,10 @@ function editor(model, slot, canEdit) {
     });
 
     const body = card.querySelector(".card-b");
+    // A macro the keyboard will not play says so first, above its steps.
+    const max = model?.macroBank?.programMax ?? 512;
+    if (slot.playable === false) body.prepend(el(`<div class="unavailable">This macro compiles to ${esc(slot.program)} bytes and the keyboard plays at most ${esc(max)}, so pressing it does nothing. Shorten it by about ${esc(Math.ceil((slot.program - max) / 3))} key taps.</div>`));
+    if (slot.available === false) body.prepend(el(`<div class="unavailable">This slot has no room: the free macro memory is kept for the lower empty slots, each with room for ${esc(model?.macroBank?.reserveTaps ?? 10)} key taps. Shorten or clear another macro to open it.</div>`));
     body.append(stepBuilder(model, slot, canEdit, textarea));
     body.append(preview(model, slot, steps, error, held, payload, canEdit));
     body.append(actions(model, slot, canEdit, dirty, payload));
@@ -186,8 +206,9 @@ function stepBuilder(model, slot, canEdit, textarea) {
 function preview(model, slot, steps, error, held, payload, canEdit) {
     const node = el(`<div>
         <div class="sect-h"><h4>Payload preview</h4>
-            <span class="right note">${payload.length} source chars · ${slot.bytes} bytes as read · ${steps.length} step${steps.length === 1 ? "" : "s"}</span></div>
+            <span class="right note">${steps.length} step${steps.length === 1 ? "" : "s"}</span></div>
     </div>`);
+    const max = model?.macroBank?.programMax ?? 512;
     if (error) node.append(el(`<div class="unavailable">${esc(error)} The keyboard would refuse this payload, so it cannot be staged until it reads cleanly.</div>`));
     if (!error && held.length) node.append(el(`<div class="unavailable">This macro never releases ${esc(held.join(", "))}. The keyboard would keep holding ${held.length === 1 ? "it" : "them"} after the macro ends.</div>`));
     if (!steps.length) node.append(el(`<p class="note">This slot is empty. Type a payload, add a step, or record one.</p>`));
@@ -214,8 +235,10 @@ function preview(model, slot, steps, error, held, payload, canEdit) {
         }));
         node.append(row);
     });
-    node.append(el(`<div class="meter" style="margin-top:10px"><i style="width:${Math.min(100, (slot.bytes / 128) * 100)}%"></i></div>`));
-    node.append(el(`<p class="note" style="margin-top:6px">The byte count is the keyboard's, from the last read; staging the slot updates it.</p>`));
+    // The keyboard compiles a macro before playing it, and plays only one
+    // that compiles to at most `max` bytes; the host refuses a longer edit.
+    node.append(el(`<div class="meter ${slot.playable === false ? "over" : ""}" style="margin-top:10px"><i style="width:${Math.min(100, ((slot.program ?? 0) / max) * 100)}%"></i></div>`));
+    node.append(el(`<p class="note" style="margin-top:6px">${esc(slot.program ?? 0)} of ${esc(max)} bytes the keyboard can play${slot.playable === false ? "" : ` · room for about ${esc(slot.roomTaps)} more key taps`}. Sizes follow the staged macro.</p>`));
     return node;
 }
 

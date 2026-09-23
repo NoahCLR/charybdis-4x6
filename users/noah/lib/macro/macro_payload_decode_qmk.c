@@ -174,7 +174,11 @@ bool macro_payload_decode_qmk_stream(macro_payload_ir_t *ir, uint16_t length, ma
                         ir->length = 0;
                         return false;
                     }
+                    // The flushed tap is written; left pending, a later
+                    // release would play it again.
                     pending_down_count = 0;
+                    pending_tap        = false;
+                    pending_tap_key    = 0;
                     matched_up_count   = 0;
                 }
 

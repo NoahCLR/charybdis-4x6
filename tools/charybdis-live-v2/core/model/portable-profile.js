@@ -44,6 +44,8 @@ function validateViaMacro(bytes) {
     }
     if (held.size) throw fail("A macro leaves keys pressed.");
 }
+// The macro bank a document's storage geometry has, when no keyboard says.
+const macroBankBytes = document => document.layers.length === 5 ? 7551 : 7191;
 function macroBank(slots, capacity) {
     const size = slots.reduce((total, bytes) => total + bytes.length + 1, 1);
     if (size > capacity) throw fail(`Macros need ${size} bytes; this keyboard has ${capacity}.`);
@@ -122,7 +124,7 @@ function validateSnapshot(value, capabilities) {
         return validateSnapshot(upgradeFiveLayerSnapshot(value), capabilities);
     }
     if (capabilities?.schema?.major === 2 && value.version === 1) return validateSnapshot(upgradePdSnapshot(value), capabilities);
-    const capacity = capabilities?.viaMacroBytes ?? (value.layers.length === 5 ? 7551 : 7191);
+    const capacity = capabilities?.viaMacroBytes ?? macroBankBytes(value);
     if (capabilities && (value.actionAbiDigest !== capabilities.actionAbiDigest || capabilities.compiledLayerCount !== value.layers.length || (capabilities.supportedDomainMask & (value.version === 2 ? 31 : 15)) !== (value.version === 2 ? 31 : 15))) throw fail("The connected firmware does not support this profile's action vocabulary or eight-layer storage.");
     const bank = macroBank(macros, capacity);
     return {document: value, profile, layout, macros: bank, settings, rgb, behaviors, combos,
@@ -217,4 +219,4 @@ function summary(document) {
         macros: value.document.macros.filter(Boolean).length + (value.settings.macros || []).filter(bytes => bytes.length).length,
         names: value.settings.names.map((name, index) => name || (index ? `Layer ${index}` : "Base"))};
 }
-module.exports = {upgradePdSnapshot, createSnapshot, validateSnapshot, materializeProfile, macroSlots, macroBank, validateViaMacro, fingerprint, reorderLayers, summary};
+module.exports = {upgradePdSnapshot, createSnapshot, validateSnapshot, materializeProfile, macroSlots, macroBank, macroBankBytes, validateViaMacro, fingerprint, reorderLayers, summary};

@@ -347,7 +347,7 @@ test("a behaviour on a key never renames what the vocabulary already names", () 
     const labels = buildDeviceModel({committed, macroView, capabilities: {actionAbiDigest: 0xdcb00959}}).qmkKeyLabels;
     const plain = buildDeviceModel({macroView, capabilities: {actionAbiDigest: 0xdcb00959}}).qmkKeyLabels;
     assert.equal(labels["MO(1)"], plain["MO(1)"], "MO(1) reads as it does with no behaviour on it, not \"Mo(1)\"");
-    assert.equal(labels.QK_MACRO_0, "VIA macro 0", "the macro screen's name, not \"Via macro 0\"");
+    assert.equal(labels.QK_MACRO_0, "Macro 0", "the macro screen's name");
     assert.equal(labels.QK_USER_30, "Lock layer 2", "a bare user slot takes the behaviour's name, read naturally");
     assert.equal(labels["LOCK_LAYER(2)"], "Lock layer 2");
 });
