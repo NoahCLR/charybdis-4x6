@@ -686,9 +686,13 @@ and error id without returning source strings from firmware.
 A candidate the keyboard is asked to save is also held to where its actions
 are placed, by the same rules compile-time validation applies to the authored
 profile (`noah_action_supported_at`): a behaviour's key, tap, press-and-hold
-and other holds, and a combo's output. A layer hold (`MO()`, `TT()`) needs a
-held key; `OSL()` is a key or a tap; `LT()` is only a key; `TG()`, `TO()` and
-`LOCK_LAYER()` go anywhere; `DF()`, `PDF()` and `LM()` go nowhere. A refused
+and other holds, and a combo's output. A layer hold (`MO()`, `TT()`) is a key
+or a press-and-hold branch; `OSL()` is a key or a tap; `LT()` is only a key;
+`TG()`, `TO()` and `LOCK_LAYER()` go anywhere; `DF()`, `PDF()` and `LM()` go
+nowhere. A held combo does hold its output (a modifier combo works), but
+layer holds, one-shots and layer-taps are not supported as combo outputs yet:
+the rule is inherited from `keymap.c` validation and a layer owned from a
+combo is untested. A refused
 behaviour action is an invalid cross-reference at its row, tap index and
 field; a refused combo output rejects the combo domain at its row. A committed
 record being adopted and the compiled defaults are not held to placement, so a

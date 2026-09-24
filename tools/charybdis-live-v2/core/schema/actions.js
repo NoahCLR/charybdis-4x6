@@ -91,7 +91,7 @@ function placementProblem(action, placement, {layerCount = 8} = {}) {
     switch (rule.kind) {
         case "unowned": return `${name} is a layer keycode this keyboard does not run through its layer tracking, so it cannot be saved here.`;
         case "hold": return placement === PLACEMENT.COMBO_OUTPUT
-            ? `${name} holds a layer, and a combo only taps. Use LOCK_LAYER, TG or TO for a combo.`
+            ? `${name} holds a layer, which a combo cannot do yet. Use LOCK_LAYER, TG or TO for a combo.`
             : `${name} holds a layer, so it only works as a key or a "Press and hold until release" branch.`;
         case "layerTap": return `${name} is a key of its own and cannot be sent by a behaviour or a combo.`;
         case "oneShot": return `${name} works as a key or a tap, not as ${placement === PLACEMENT.COMBO_OUTPUT ? "a combo output" : "a hold"}.`;

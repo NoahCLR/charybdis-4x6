@@ -195,7 +195,7 @@ function editCombos(bytes, message, context) {
         if (message.type === "saveCombo") rows[integer(message.id, rows.length - 1, "Combo index")] = row;
         else rows.push(row);
     }
-    // The keyboard refuses a combo table with an output it cannot tap, so every
+    // The keyboard refuses a combo table with an output it cannot run, so every
     // row is checked, not only the one being edited.
     rows.forEach((row, index) => {
         const problem = placementProblem(row.output, PLACEMENT.COMBO_OUTPUT, {layerCount: context.capabilities.compiledLayerCount ?? 8});

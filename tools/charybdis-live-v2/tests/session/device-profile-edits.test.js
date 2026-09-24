@@ -44,8 +44,8 @@ test("adding, editing and deleting combos preserves every untouched profile doma
     assert.deepEqual(rows[0].inputs.map(action => action.operand), context.combos.rows[0].inputs);
     assert.equal(rows[2].output.operand, 0x806);
     for (let id = 0; id < 2; id++) assert.deepEqual(decodeProfileBlob(added).domains[id].payload, decodeProfileBlob(bytes).domains[id].payload);
-    // A combo only taps, so a layer hold is refused as its output; a lock is not.
-    assert.throws(() => editDeviceProfile(added, {type: "saveCombo", id: 2, inputs: ["KC_C", "KC_D"], output: "MO(2)", termMs: "0"}, context), /Combo 3: MO\(2\) holds a layer/);
+    // A layer hold is not supported as a combo output yet; a lock is.
+    assert.throws(() => editDeviceProfile(added, {type: "saveCombo", id: 2, inputs: ["KC_C", "KC_D"], output: "MO(2)", termMs: "0"}, context), /Combo 3: MO\(2\) holds a layer, which a combo cannot do yet/);
     const edited = editDeviceProfile(added, {type: "saveCombo", id: 2, inputs: ["KC_C", "KC_D"], output: "LOCK_LAYER(2)", termMs: "0", mustHold: true}, context);
     assert.deepEqual(comboRows(edited)[2].output, {kind: 3, flags: 0, operand: 2});
     assert.equal(comboRows(edited)[2].mustHold, true);

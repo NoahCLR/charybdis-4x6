@@ -166,8 +166,9 @@ static inline bool noah_action_desc_is_layer_oneshot(noah_action_desc_t desc) {
     return desc.kind == NOAH_ACTION_KIND_LAYER_ONESHOT;
 }
 
-// Layer actions a combo output cannot carry: a combo only taps, and these need
-// a held key to own their layer.
+// Layer actions a combo output may not carry. A held combo does hold its output
+// (a modifier on a combo works), but a layer owned from a combo is untested, so
+// layer holds, one-shots and layer-taps stay refused there for now.
 static inline bool noah_action_desc_is_raw_qmk_layer_action(noah_action_desc_t desc) {
     return desc.kind == NOAH_ACTION_KIND_LAYER_HOLD || desc.kind == NOAH_ACTION_KIND_LAYER_TAP || desc.kind == NOAH_ACTION_KIND_LAYER_ONESHOT || desc.kind == NOAH_ACTION_KIND_UNSUPPORTED_LAYER_ACTION;
 }
@@ -235,7 +236,7 @@ typedef enum {
     NOAH_ACTION_PLACEMENT_BEHAVIOR_TAP,
     NOAH_ACTION_PLACEMENT_BEHAVIOR_HOLD_PRESS_AND_HOLD,
     NOAH_ACTION_PLACEMENT_BEHAVIOR_HOLD_OTHER,
-    NOAH_ACTION_PLACEMENT_COMBO_OUTPUT, // a combo only taps, so it cannot hold a layer
+    NOAH_ACTION_PLACEMENT_COMBO_OUTPUT, // layer holds are not supported from a combo yet
 } noah_action_placement_t;
 
 bool noah_action_supported_at(uint16_t action, noah_action_placement_t placement);

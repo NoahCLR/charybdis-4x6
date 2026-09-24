@@ -214,7 +214,7 @@ int main(void) {
     CHECK(strstr(log_buffer, "Unsupported keymaps[0][0][5]") == NULL);
     CHECK(strstr(log_buffer, "output[3]") == NULL);
     CHECK(strstr(log_buffer, "output[4]") == NULL);
-    // A combo only taps, so it cannot hold the layer OSL() owns while down.
+    // Layer holds and one-shots are not supported as combo outputs yet.
     CHECK(strstr(log_buffer, "Unsupported COMBOS(COMBO) output[5] raw layer action") != NULL);
     CHECK(strstr(log_buffer, "Unsupported COMBOS(COMBO) input[2] duplicate member keycode") != NULL);
     CHECK(strstr(log_buffer, "Unsupported COMBOS(COMBO) output[1] raw layer action") != NULL);
