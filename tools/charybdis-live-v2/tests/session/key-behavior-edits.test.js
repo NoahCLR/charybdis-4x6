@@ -4,7 +4,8 @@ const test = require("node:test");
 const {bytes, capabilities} = require("../fixtures/device-profile");
 const {decodeProfileBlob} = require("../../core/schema/profile-blob-v1");
 const {decodeKeyBehaviorDomain} = require("../../core/schema/key-behavior-domain-v1");
-const {behaviorRowsForView, actionName} = require("../../core/session/device-profile-view");
+const {behaviorRowsForView} = require("../../core/session/device-profile-view");
+const {actionName} = require("../../core/schema/actions");
 const {editDeviceProfile} = require("../../core/session/device-profile-edits");
 const {editKeyBehaviors} = require("../../core/session/key-behavior-edits");
 

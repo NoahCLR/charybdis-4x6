@@ -9,7 +9,7 @@
 // as `portable.layers`.
 
 import {el, esc} from "../lib/dom.mjs";
-import {getModel, layers, post, render, state} from "../store.mjs";
+import {getModel, layers, post, render, state, canEdit as canEditArea} from "../store.mjs";
 
 let dismiss = null;   // the outside-click listener for the open panel
 
@@ -20,7 +20,7 @@ export function attachLayersControl(bar) {
     const model = getModel();
     const portable = model?.portable || {};
     const busy = Boolean(portable.busy);
-    const canEdit = Boolean(portable.available && portable.eightLayers) && !busy;
+    const canEdit = canEditArea("layers");
 
     const trigger = el(`<button class="layer-edit" aria-expanded="${Boolean(state.layersOpen)}"
         data-tip="Rename layers and change which one wins.">Edit layers</button>`);

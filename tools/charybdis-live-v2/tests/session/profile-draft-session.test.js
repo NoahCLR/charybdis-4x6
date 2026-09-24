@@ -199,3 +199,13 @@ test("discarding the whole draft is a step undo takes back, and undo says what i
     draft.discard(draft.revision,groupOf(draft,"macro:0"));
     assert.match(draft.view({}).undoLabel,/^Discarded Macro 0/);
 });
+test("a revision is decoded once and its history entry cannot be edited in place", () => {
+    const {draft} = fixture();
+    stage(draft,{type:"updateLayoutKeys",layers:[{layer:"Layer 0",changes:[{layoutIndex:0,keycode:"KC_A"}]}]});
+    assert.equal(draft.current.decoded, draft.current.decoded, "the same decode serves every read of this revision");
+    assert.equal(draft.current.document, draft.current.decoded.document, "and belongs to the document it is handed with");
+    assert.throws(() => { "use strict"; draft.current.document.layers[0][0] = 5; }, TypeError, "history is frozen");
+    const copyOf = {...draft.current, document: structuredClone(draft.current.document)};
+    const {decodedOf} = require("../../core/model/portable-profile");
+    assert.notEqual(decodedOf(copyOf), draft.current.decoded, "a snapshot with another document is decoded afresh, never with a stale decode");
+});

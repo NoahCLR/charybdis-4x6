@@ -69,8 +69,29 @@ Every layer may also import from itself.
 - A new screen or component → `webview/ui/`
 - A rule about what something *means* (a colour, a key face, a locality) →
   `webview/view/`, with a test. These modules are pure on purpose.
+- The words for a value the keyboard stores (a hold helper, a locality, a
+  pointing axis, a stage) → `core/model/vocabulary.js`. It reaches the
+  interface as `model.vocabulary` (read it through `webview/view/vocabulary.mjs`);
+  never write an enum-to-words table in a screen. A new enum value without a
+  word fails `tests/model/vocabulary.test.js`.
+- Naming an action, its native keycode, decode limits, a "Layer n" reference →
+  `core/schema/actions.js`. The pointing-mode keycode registry and the key
+  layout are inert data in `core/data/`, readable from every layer; the
+  interface gets a slot's bindings as `pdModes[].binding`.
+- What a panel control does in order (read, apply, discard, rebase, import,
+  layers) → `core/session/panel-controls.js`. `extension.js` passes in only
+  what a host has: progress, the recovery file, a chosen profile file.
 
 ## Conventions
+
+- Decode a document once. A snapshot may carry its read-only `decoded` form;
+  take it with `decodedOf(snapshot)`, which decodes afresh when the snapshot's
+  document is not the one it was decoded from. Draft history entries are
+  frozen and decoded once each, so a model publish decodes nothing new.
+- A webview number that is also a wire number (pointing kinds, axes, buttons,
+  modifier bits) is pinned to its schema by `tests/enum-drift.test.mjs`.
+- Whether an area can be edited is `canEdit(area)` in `webview/store.mjs`,
+  nowhere else.
 
 - Every `core/` module gets a test in the matching `tests/` directory.
 - Every edit the webview posts is built by a pure function in

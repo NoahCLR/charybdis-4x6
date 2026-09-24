@@ -1,6 +1,6 @@
 "use strict";
 
-const {macroBankBytes, validateSnapshot} = require("./portable-profile");
+const {decodedOf, macroBankBytes, validateSnapshot} = require("./portable-profile");
 const {decodeProfileBlob, encodeProfileBlob} = require("../schema/profile-blob-v1");
 const {SETTINGS, asciiName, encodeSettings, macroNamesOf, upgradeSettings} = require("../schema/settings-domain-v1");
 const {macroKeycodes, encodeMacroPayload, decodeMacroPayload, macroProgramBytes, MACRO_PROGRAM_MAX} = require("../schema/macro-payload");
@@ -22,7 +22,7 @@ function macroBudget(slots, capacity) {
 
 function macroEditorView(snapshot, capabilities) {
     if (!snapshot?.document || snapshot.incomplete) return null;
-    const {document, settings} = validateSnapshot(snapshot.document);
+    const {document, settings} = decodedOf(snapshot);
     const names = macroNamesOf(settings);
     const slots = document.macros.map(value => Buffer.from(value, "base64"));
     const budget = macroBudget(slots, capabilities?.viaMacroBytes ?? macroBankBytes(document));

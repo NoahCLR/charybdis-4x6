@@ -1,33 +1,29 @@
 "use strict";
 
-const {validateSnapshot, fingerprint, summary} = require("../model/portable-profile");
+const {validateSnapshot, fingerprint, fingerprintOf, summaryOf} = require("../model/portable-profile");
 const {profileReview} = require("../model/profile-review");
 const {revertUnits} = require("../model/profile-revert");
-const {editSettings, settingsEditorView} = require("../model/settings-editor");
+const {baseLighting, editSettings, settingsEditorView} = require("../model/settings-editor");
 const {editMacro, macroEditorView} = require("../model/macro-editor");
 const {editDeviceProfile, RGB_EDITS, COMBO_EDITS, PD_EDITS} = require("./device-profile-edits");
 const {BEHAVIOR_EDITS} = require("./key-behavior-edits");
-const {actionName, knownActionAbi} = require("./device-profile-view");
+const {actionName, knownActionAbi, layerOfRef, nativeCode} = require("../schema/actions");
 const {resolveNativeQmkExpression} = require("../schema/compiled-profile-v1");
-const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../protocol/via-layout-v1");
+const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../data/charybdis-layout");
 const keycodes = require("../data/keycode-catalog");
 const {randomUUID} = require("node:crypto");
 const copy = value => JSON.parse(JSON.stringify(value));
+// History entries are frozen: they are handed out by reference, decoded once
+// and kept, so nothing may edit one in place.
+const freeze = value => {
+    if (value && typeof value === "object" && !Object.isFrozen(value)) {
+        Object.values(value).forEach(freeze);
+        Object.freeze(value);
+    }
+    return value;
+};
 const fail = text => Object.assign(new Error(text), {code: "PROFILE_DRAFT_CONFLICT"});
 
-// A matrix slot as a person finds it on the board: the half, then its row and
-// its column counted from the outer edge, or its place in the thumb cluster.
-const LAYOUT_INDEX = new Map(CHARYBDIS_4X6_LAYOUT_MATRIX.map(([row, column], layoutIndex) => [row * 6 + column, layoutIndex]));
-const THUMBS = (() => {
-    const names = new Map(), counts = {};
-    for (const [row, column] of CHARYBDIS_4X6_LAYOUT_MATRIX) {
-        if (row % 5 !== 4) continue;
-        const half = row < 5 ? "Left" : "Right";
-        names.set(row * 6 + column, `${half} thumb ${counts[half] = (counts[half] || 0) + 1}`);
-    }
-    return names;
-})();
-const positionName = slot => THUMBS.get(slot) || `${slot < 30 ? "Left" : "Right"} · row ${Math.floor(slot / 6) % 5 + 1}, column ${slot % 6 + 1}`;
 // What one staged message did, in the words a group of review items is
 // titled with. Only a group of two or more items shows it.
 const EDIT_LABELS = {
@@ -43,7 +39,7 @@ function editLabel(message, document) {
         const changes = groups.flatMap(group => (group.changes || []).map(change => ({...change, layer: group.layer})));
         const [first, second] = changes;
         const stored = change => {
-            const position = CHARYBDIS_4X6_LAYOUT_MATRIX[change.layoutIndex], layer = Number(/\d$/.exec(change.layer)?.[0]);
+            const position = CHARYBDIS_4X6_LAYOUT_MATRIX[change.layoutIndex], layer = layerOfRef(change.layer);
             return position && document.layers[layer]?.[position[0] * 6 + position[1]];
         };
         if (changes.length === 2 && first.layer === second.layer && keycodes.encode(first.keycode) === stored(second) && keycodes.encode(second.keycode) === stored(first)) return "Swapped two keys";
@@ -54,12 +50,9 @@ function editLabel(message, document) {
     return typeof label === "function" ? label(message) : label || "Edited the draft";
 }
 
-// Review items name what the model cannot: a key's place on the board and the
-// keycode a behaviour is listed under, so the review can say where a change
-// is and go there.
+// Review items name what the model cannot: the keycode a behaviour is listed
+// under, the name its edit messages use, so the review can go there.
 function placed(item) {
-    if (item.place?.kind === "key") return {...item, title: `${item.title} · ${positionName(item.place.slot)}`,
-        place: {kind: "key", layer: item.place.layer, layoutIndex: LAYOUT_INDEX.get(item.place.slot)}};
     if (item.place?.kind === "behaviour") return {...item, place: {kind: "behaviour", keycode: actionName(item.place.target)}};
     return item;
 }
@@ -77,7 +70,7 @@ class ProfileDraftSession {
         this.capabilities = copy(capabilities);
         this.base = copy(snapshot);
         this.latest = copy(snapshot);
-        this.history = [copy(snapshot.document)];
+        this.history = [freeze(copy(snapshot.document))];
         // Why each history entry exists, beside it: "edit" is one staged
         // message, the only kind that ties the units it changed together.
         this.origins = [null];
@@ -87,8 +80,30 @@ class ProfileDraftSession {
         this.reviewedRevision = null;
     }
     get document() {return copy(this.history[this.cursor]);}
-    get current() {return {...copy(this.base), incomplete: false, document: this.document, fingerprint: fingerprint(this.history[this.cursor]), summary: summary(this.history[this.cursor])};}
-    get dirty() {return fingerprint(this.history[this.cursor]) !== this.base.fingerprint;}
+    // A history entry decoded once: its validated form (read-only), its
+    // fingerprint and summary. Entries are never edited in place, so the
+    // answer is kept with the entry for as long as the entry exists.
+    decode(document) {
+        this.decodeCache ??= new WeakMap();
+        let known = this.decodeCache.get(document);
+        if (!known) {
+            const decoded = validateSnapshot(document);
+            known = {decoded, fingerprint: fingerprintOf(decoded), summary: summaryOf(decoded)};
+            this.decodeCache.set(document, known);
+        }
+        return known;
+    }
+    // The draft's revision as a snapshot: the base's keyboard facts with this
+    // revision's document, plus its decoded form for read-only consumers.
+    get current() {
+        const {decoded, fingerprint: print, summary: brief} = this.decode(this.history[this.cursor]);
+        return {...this.base, incomplete: false, document: this.history[this.cursor], fingerprint: print, summary: brief, decoded};
+    }
+    // The keyboard's side as a snapshot, decoded once too.
+    get baseSnapshot() {
+        return this.base.incomplete ? this.base : {...this.base, decoded: this.decode(this.base.document).decoded};
+    }
+    get dirty() {return this.decode(this.history[this.cursor]).fingerprint !== this.base.fingerprint;}
     get stale() {return Boolean(this.needsRead || this.connectionChanged || this.latest.fingerprint !== this.base.fingerprint);}
     noteConnection(connectionToken) {
         const token = connectionToken ?? null;
@@ -118,7 +133,7 @@ class ProfileDraftSession {
     }
     reset(snapshot) {
         this.base = copy(snapshot); this.latest = copy(snapshot);
-        this.history = [copy(snapshot.document)]; this.origins = [null]; this.labels = [null]; this.cursor = 0;
+        this.history = [freeze(copy(snapshot.document))]; this.origins = [null]; this.labels = [null]; this.cursor = 0;
         this.revision++; this.reviewedRevision = null;
         this.needsRead = false;
         this.connectionChanged = false;
@@ -126,11 +141,11 @@ class ProfileDraftSession {
     replace(document, revision, origin = "edit", label = null) {
         this.assertRevision(revision);
         const valid = validateSnapshot(document, this.capabilities).document;
-        if (fingerprint(valid) === this.current.fingerprint) return;
+        if (fingerprint(valid) === this.decode(this.history[this.cursor]).fingerprint) return;
         this.history = this.history.slice(0, this.cursor + 1);
         this.origins = this.origins.slice(0, this.cursor + 1);
         this.labels = this.labels.slice(0, this.cursor + 1);
-        this.history.push(copy(valid));
+        this.history.push(freeze(copy(valid)));
         this.origins.push(origin);
         this.labels.push(label);
         if (this.history.length > 101) {this.history.shift(); this.origins.shift(); this.labels.shift();}
@@ -152,7 +167,7 @@ class ProfileDraftSession {
             }).toString("base64")};
         }
         this.replace(document, message.draftRevision, "edit", editLabel(message, current.document));
-        return {message: copy(message), previousFingerprint: before, fingerprint: this.current.fingerprint};
+        return {message: copy(message), previousFingerprint: before, fingerprint: this.decode(this.history[this.cursor]).fingerprint};
     }
     editLayout(message) {
         if (message.adds?.length || message.deletes?.length) throw fail("Use Manage layers to name or reorder the eight available layers.");
@@ -160,13 +175,13 @@ class ProfileDraftSession {
         if (!Array.isArray(groups) || !groups.length) throw fail("Choose keys to change.");
         const document = this.document;
         for (const group of groups) {
-            const match = /^Layer ([0-7])$/.exec(group.layer);
-            if (!match || !Array.isArray(group.changes)) throw fail("Choose a layer reported by this keyboard.");
+            const layer = layerOfRef(group.layer);
+            if (!(layer < 8) || !Array.isArray(group.changes)) throw fail("Choose a layer reported by this keyboard.");
             for (const change of group.changes) {
                 const position = Number.isInteger(change.layoutIndex) && CHARYBDIS_4X6_LAYOUT_MATRIX[change.layoutIndex];
                 const code = keycodes.encode(change.keycode) ?? (knownActionAbi(this.capabilities.actionAbiDigest) ? resolveNativeQmkExpression(change.keycode, {}) : undefined);
                 if (!position || !Number.isInteger(code)) throw fail(`Cannot represent the key ${change.keycode} on this keyboard.`);
-                document.layers[Number(match[1])][position[0] * 6 + position[1]] = code;
+                document.layers[layer][position[0] * 6 + position[1]] = code;
             }
         }
         return document;
@@ -183,7 +198,7 @@ class ProfileDraftSession {
         const current = this.current;
         if (this.base.incomplete) return [{area: "Recovery", unit: null, title: "Complete profile", status: "changed", group: null, place: null,
             fields: [{label: "", before: "Interrupted configuration; a full comparison is unavailable", after: `${current.summary.layers} layers, ${current.summary.behaviors} behaviours, ${current.summary.combos} combos, ${current.summary.macros} macros with content, lighting and settings`}]}];
-        const rows = profileReview(this.base, current), shown = new Set(rows.map(row => row.unit));
+        const rows = profileReview(this.baseSnapshot, current), shown = new Set(rows.map(row => row.unit));
         const parent = new Map([...shown].map(unit => [unit, unit]));
         const find = unit => {while (parent.get(unit) !== unit) unit = parent.get(unit); return unit;};
         const steps = [];
@@ -215,7 +230,7 @@ class ProfileDraftSession {
         this.stepCache ??= new WeakMap();
         const entry = this.history[step], previous = this.history[step - 1], cached = this.stepCache.get(entry);
         if (cached?.previous === previous) return cached.units;
-        const snapshot = document => ({...this.base, incomplete: false, document, fingerprint: fingerprint(document)});
+        const snapshot = document => ({...this.base, incomplete: false, document, ...this.decode(document)});
         const units = [...new Set(profileReview(snapshot(previous), snapshot(entry)).map(row => row.unit))];
         this.stepCache.set(entry, {previous, units});
         return units;
@@ -233,7 +248,7 @@ class ProfileDraftSession {
         // Some bytes carry no row of their own, such as the settings format a
         // macro name upgraded. Once nothing described is left, the draft is
         // the keyboard's profile again, not an indescribable difference.
-        const left = profileReview(this.base, {...this.current, document, fingerprint: fingerprint(document)});
+        const left = profileReview(this.baseSnapshot, {...this.current, document, decoded: undefined, fingerprint: fingerprint(document)});
         if (left.every(row => row.unit === "profile")) document = copy(validateSnapshot(this.base.document, this.capabilities).document);
         this.replace(document, revision, "discard", items.length === 1 ? `Discarded ${items[0].title}` : `Discarded ${items.length} changes made together`);
         if (reviewed) this.reviewedRevision = this.revision;
@@ -250,12 +265,14 @@ class ProfileDraftSession {
     undo(revision) {this.assertRevision(revision); if (this.cursor) {this.cursor--; this.revision++; this.reviewedRevision = null;}}
     redo(revision) {this.assertRevision(revision); if (this.cursor + 1 < this.history.length) {this.cursor++; this.revision++; this.reviewedRevision = null;}}
     review(revision) {this.assertRevision(revision); this.reviewedRevision = this.revision;}
+    // Leaving the review un-reviews the draft, even one gone stale meanwhile.
+    closeReview(revision) {this.assertRevision(revision, {allowStale: true}); this.reviewedRevision = null;}
     rebase(revision) {
         this.assertRevision(revision, {allowStale: true});
         if (this.needsRead) throw fail("Read the latest keyboard state before reviewing this draft again.");
         const target = this.document;
         if (this.latest.incomplete) {
-            this.base = copy(this.latest); this.history = [target]; this.origins = [null]; this.labels = [null]; this.cursor = 0;
+            this.base = copy(this.latest); this.history = [freeze(target)]; this.origins = [null]; this.labels = [null]; this.cursor = 0;
             this.connectionToken = this.latestConnectionToken; this.connectionChanged = false;
             this.revision++; this.reviewedRevision = this.revision; return;
         }
@@ -279,20 +296,20 @@ class ProfileDraftSession {
             throw error;
         }
     }
-    identity() {return {source: "draft", generation: this.revision, digest: this.current.fingerprint, originHalf: this.deviceId};}
+    identity() {return {source: "draft", generation: this.revision, digest: this.decode(this.history[this.cursor]).fingerprint, originHalf: this.deviceId};}
     combos() {
-        const {combos, settings} = validateSnapshot(this.document);
-        const native = a => a.kind === 1 ? a.operand : resolveNativeQmkExpression(actionName(a), {});
+        const {combos, settings} = this.decode(this.history[this.cursor]).decoded;
+        const native = nativeCode;
         return {state: "read", enabled: Boolean(settings.values[20]), layerReferences: Array.from({length: 8}, (_, i) => (settings.values[27] >>> (4 * i)) & 15),
             holdTermMs: combos[0]?.holdTermMs || 0, rows: combos.map(row => ({...row, inputs: row.inputs.map(native), output: native(row.output)}))};
     }
     editingState(state) {
         if (state.selectedDeviceId !== this.deviceId) return state;
-        const current = this.current, value = validateSnapshot(current.document), values = value.settings.values;
+        const current = this.current, value = current.decoded, values = value.settings.values;
         const max = current.limits?.brightnessMax;
-        const brightness = (values[22] >>> 16) & 255;
-        const baseRgb = max === undefined ? state.baseRgb : {state: "read", effectId: values[21] & 255 ? (values[21] >>> 8) & 255 : 0,
-            brightness: max ? Math.min(255, Math.round(brightness * 255 / max)) : 0, hue: values[22] & 255, saturation: (values[22] >>> 8) & 255, speed: (values[21] >>> 16) & 255};
+        const lighting = baseLighting(values);
+        const baseRgb = max === undefined ? state.baseRgb : {state: "read", effectId: lighting.enabled ? lighting.effect : 0,
+            brightness: max ? Math.min(255, Math.round(lighting.brightness * 255 / max)) : 0, hue: lighting.hue, saturation: lighting.saturation, speed: lighting.speed};
         return {...state, busy: state.busy || this.stale || !state.connected,
             layout: {state: "read", layers: current.document.layers.map((values, layer) => ({layer, keys: CHARYBDIS_4X6_LAYOUT_MATRIX.map(([row, column], layoutIndex) => ({row, column, layoutIndex, keycode: values[row * 6 + column], resolved: keycodes.resolve(values[row * 6 + column])}))}))},
             committed: {...state.committed, state: "read", failures: [], domains: {rgb: value.rgb, keyBehaviors: value.behaviors, settings: value.settings, pdModes: value.pdModes}},

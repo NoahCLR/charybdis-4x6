@@ -612,12 +612,8 @@ export const pointingReach = (model, stack, at) => reachGroups(model, stack, at,
 export function pointingSlotFor(model, keycode) {
     const slots = model?.pdModes || [];
     const alias = model?.qmkKeycodeAliases?.[keycode] ?? keycode;
-    const name = String(alias || "").replace(/_LOCK$/, "");
-    const legacy = ["DRAGSCROLL", "VOLUME_MODE", "BRIGHTNESS_MODE", "ZOOM_MODE", "ARROW_MODE", "PINCH_MODE"];
-    const index = legacy.indexOf(name);
-    if (index >= 0) return slots.find((slot) => slot.id === index);
-    const numbered = /^PD_SLOT_(\d)$/.exec(name);
-    if (numbered) return slots.find((slot) => slot.id === Number(numbered[1]));
+    const named = slots.find((slot) => slot.binding && [slot.binding.hold, slot.binding.lock].includes(String(alias || "")));
+    if (named) return named;
     const value = typeof keycode === "number" ? keycode : /^0x[0-9a-f]+$/i.test(String(keycode)) ? Number(keycode) : NaN;
     return Number.isInteger(value) ? slots.find((slot) => slotKeycodes(slot).includes(value)) : undefined;
 }
@@ -635,12 +631,11 @@ export function pointingVariant(model, keycode) {
     return "hold";
 }
 
-// The two values a slot answers to: hold and toggle. Matching on the numbers
-// rather than on names matters for an empty slot, whose record carries no name
-// for the model to resolve — the keycode exists on the keyboard either way.
-export const slotKeycodes = (slot) => slot.id < 6
-    ? [0x7e50 + slot.id, 0x7e50 + slot.id + 6]
-    : [0x7ef0 + (slot.id - 6) * 2, 0x7ef0 + (slot.id - 6) * 2 + 1];
+// The two values a slot answers to: hold and toggle, as the host's binding
+// registry gives them. Matching on the numbers rather than on names matters
+// for an empty slot, whose record carries no name for the model to resolve —
+// the keycode exists on the keyboard either way.
+export const slotKeycodes = (slot) => slot.binding ? [slot.binding.holdCode, slot.binding.lockCode] : [];
 
 // What still reaches a pointing slot. The keyboard keeps its mode keycodes
 // whatever a slot holds, so a key bound to an empty slot is inert rather than
@@ -648,7 +643,7 @@ export const slotKeycodes = (slot) => slot.id < 6
 export function bindingsForSlot(model, slot) {
     if (!slot) return {keys: [], behaviours: [], layers: []};
     const values = new Set(slotKeycodes(slot));
-    const names = new Set([bindingKeycode(slot), `${bindingKeycode(slot)}_LOCK`]);
+    const names = new Set([slot.binding?.hold, slot.binding?.lock].filter(Boolean));
     for (const entry of model?.qmkKeycodes || []) {
         if (values.has(entry.keycode)) names.add(entry.value);
     }
@@ -666,6 +661,5 @@ export function bindingsForSlot(model, slot) {
     return {keys, behaviours, layers: [...layers]};
 }
 
-const LEGACY_BINDINGS = ["DRAGSCROLL", "VOLUME_MODE", "BRIGHTNESS_MODE", "ZOOM_MODE", "ARROW_MODE", "PINCH_MODE"];
-export const bindingKeycode = (slot) =>
-    slot.id < LEGACY_BINDINGS.length ? LEGACY_BINDINGS[slot.id] : `PD_SLOT_${slot.id}`;
+// The keycode name that holds a slot's mode.
+export const bindingKeycode = (slot) => slot.binding?.hold || "";

@@ -8,8 +8,9 @@
 // level the keyboard stores it, and every domain it touched is encoded again,
 // so the result passes the same validation as any other edit.
 
+const {actionLimitsFor} = require("../schema/actions");
 const {validateSnapshot} = require("./portable-profile");
-const {settingsEditorView} = require("./settings-editor");
+const {settingsEditorView, fieldMask} = require("./settings-editor");
 const {decodeProfileBlob, encodeProfileBlob, PROFILE_DOMAIN_IDS} = require("../schema/profile-blob-v1");
 const {decodeRgbDomainV1, encodeRgbDomainV1} = require("../schema/rgb-domain-v1");
 const {decodeKeyBehaviorDomain, encodeKeyBehaviorDomain} = require("../schema/key-behavior-domain-v1");
@@ -21,12 +22,6 @@ const copy = value => JSON.parse(JSON.stringify(value));
 const fail = text => Object.assign(new Error(text), {code: "PROFILE_REVERT_UNSUPPORTED"});
 const GROUP_TABLES = ["groups", "layerGroupRows", "pdModeGroupRows", "comboGroupRows", "keyGroupRows"];
 
-// Which bits of a settings word a field owns.
-function fieldMask(field) {
-    if (field.bitMask) return field.bitMask >>> 0;
-    if (field.shift === undefined) return 0xffffffff;
-    return (((1 << (field.width || 8)) - 1) << field.shift) >>> 0;
-}
 
 function revertUnits(before, after, units, capabilities) {
     const a = validateSnapshot(before.document, capabilities), b = validateSnapshot(after.document, capabilities);
@@ -34,7 +29,7 @@ function revertUnits(before, after, units, capabilities) {
     const document = copy(b.document);
     const blob = decodeProfileBlob(Buffer.from(document.profile, "base64"));
     const baseBlob = decodeProfileBlob(Buffer.from(a.document.profile, "base64"));
-    const actionOptions = {actionLimits: {maxPdModes: document.version === 2 ? 8 : 6}};
+    const actionOptions = actionLimitsFor(document.version);
     const rgbOptions = {maximumBrightness: after.limits?.brightnessMax ?? 255};
     // Each domain is decoded once, edited for every unit, and encoded once.
     const codecs = {

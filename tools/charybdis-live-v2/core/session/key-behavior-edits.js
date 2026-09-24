@@ -1,10 +1,11 @@
 "use strict";
 
+const {nativeCode} = require("../schema/actions");
 const keycodes = require("../data/keycode-catalog");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {decodeKeyBehaviorDomain, encodeKeyBehaviorDomain, KEY_BEHAVIOR_HOLD_MODES} = require("../schema/key-behavior-domain-v1");
 const {semanticActionForExpression, resolveNativeQmkExpression} = require("../schema/compiled-profile-v1");
-const {actionName, knownActionAbi} = require("./device-profile-view");
+const {actionName, knownActionAbi} = require("../schema/actions");
 
 const BEHAVIOR_EDITS = new Set(["saveBehavior", "addBehavior", "deleteBehavior", "retargetBehavior"]);
 const RETARGET_CONFLICTS = new Set(["overwrite", "swap"]);
@@ -25,7 +26,7 @@ function editKeyBehaviors(payload, message, capabilities = {}) {
     const {rows} = decodeKeyBehaviorDomain(payload, {actionLimits: {maxPdModes}});
     const knownAbi = knownActionAbi(capabilities.actionAbiDigest);
     const native = action => action.kind === ACTION.QMK_KEYCODE ? action.operand
-        : knownAbi ? resolveNativeQmkExpression(actionName(action), {}) : undefined;
+        : knownAbi ? nativeCode(action) : undefined;
     const equivalent = (left, right) => (left.kind === right.kind && left.operand === right.operand)
         || (native(left) !== undefined && native(left) === native(right));
     const encode = (rows) => encodeKeyBehaviorDomain({rows}, {

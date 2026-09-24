@@ -152,10 +152,14 @@ export function pickerOverlay() {
         if (event.target.closest('[data-act="clear"]')) { picker.keys = []; picker.mods = []; picker.layerTap = null; return render(); }
         const remove = event.target.closest("[data-remove]");
         if (remove) { picker.keys.splice(Number(remove.dataset.remove), 1); return render(); }
+        // The picker closes itself before handing the choice on, so every
+        // caller only says what the choice does.
         if (event.target.closest('[data-act="use"]')) {
             const chosen = expression();
-            if (chosen) picker.onPick?.(chosen);
-            return;
+            if (!chosen) return;
+            state.picker = null;
+            picker.onPick?.(chosen);
+            return render();
         }
         const pick = event.target.closest("[data-pick]");
         if (pick) {

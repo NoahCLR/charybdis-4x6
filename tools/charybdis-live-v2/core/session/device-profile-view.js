@@ -2,6 +2,8 @@
 
 // Presentation of validated device domains. Names here describe wire IDs;
 // configuration values and membership always come from the received domain.
+const {actionName, knownActionAbi, layerRef} = require("../schema/actions");
+const {VOCABULARY, branchName} = require("../model/vocabulary");
 const keycodes = require("../data/keycode-catalog");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {KEY_BEHAVIOR_HOLD_MODES} = require("../schema/key-behavior-domain-v1");
@@ -17,31 +19,12 @@ function enumName(values, value) {
     return entry[0];
 }
 
-function actionName(action) {
-    switch (action.kind) {
-        case ACTION.NONE: return "KC_NO";
-        case ACTION.QMK_KEYCODE: return keycodes.resolve(action.operand).name;
-        case ACTION.LAYER_MOMENTARY: return `MO(${action.operand})`;
-        case ACTION.LAYER_LOCK: return `LOCK_LAYER(${action.operand})`;
-        case ACTION.VIA_MACRO: return `VIA_MACRO_${action.operand}`;
-        case ACTION.HARDCODED_MACRO: return `MACRO_${action.operand}`;
-        case ACTION.PD_MODE_MOMENTARY:
-        case ACTION.PD_MODE_LOCK: {
-            if (action.operand >= 6) return `PD_SLOT_${action.operand}${action.kind === ACTION.PD_MODE_LOCK ? "_LOCK" : ""}`;
-            const mode = enumName(RGB_PD_MODE_IDS, action.operand).replace(/^PD_MODE_/, "");
-            return (mode === "DRAGSCROLL" ? mode : `${mode}_MODE`) + (action.kind === ACTION.PD_MODE_LOCK ? "_LOCK" : "");
-        }
-        default: throw new Error(`Unsupported device action kind ${action.kind}.`);
-    }
-}
-
 function behaviorRowsForView(domain) {
     const hold = (branch) => branch && ({
         helper: enumName(KEY_BEHAVIOR_HOLD_MODES, branch.mode),
         action: actionName(branch.action),
         repeatHz: String(branch.repeatHz),
     });
-    const branchNames = ["Single", "Double", "Triple", "Quadruple", "Quintuple"];
     return domain.rows.map((row) => ({
         keycode: actionName(row.target),
         tapHoldTerm: String(row.tapHoldTerm),
@@ -50,7 +33,7 @@ function behaviorRowsForView(domain) {
         keepsAutoMouseAnchored: row.keepsAutoMouseAnchored,
         steps: row.steps.map((step) => ({
             tapCount: step.tapIndex,
-            tapCountName: `${branchNames[step.tapIndex]} Tap Branch`,
+            tapCountName: branchName(step.tapIndex + 1),
             ...(step.tap ? {tap: {helper: "TAP_SENDS", action: actionName(step.tap)}} : {}),
             ...(step.hold ? {hold: hold(step.hold)} : {}),
             ...(step.longHold ? {longHold: hold(step.longHold)} : {}),
@@ -58,11 +41,6 @@ function behaviorRowsForView(domain) {
     }));
 }
 
-// The v1 native action ABI shared with the canonical compiler. Link semantic
-// targets to VIA keycodes only when the device advertises that exact ABI.
-// Unknown ABIs still have fully readable semantic rows in the behaviours view.
-const NATIVE_ACTION_ABI_V1 = 0xdcb00959;
-const knownActionAbi = value => [NATIVE_ACTION_ABI_V1, 0xeb80829c, 0x61072732].includes(value);
 function behaviorAliasesForView(domain, capabilities) {
     if (!knownActionAbi(capabilities?.actionAbiDigest)) return {};
     const aliases = {};
@@ -76,7 +54,7 @@ function behaviorAliasesForView(domain, capabilities) {
 }
 
 const colorForView = (color) => ({h: String(color.h), s: String(color.s), v: String(color.v)});
-const layerName = (id) => `Layer ${id}`;
+const layerName = layerRef;
 
 function rgbForView(domain) {
     const ledGroups = domain.groups.map((group) => ({
@@ -101,11 +79,9 @@ function rgbForView(domain) {
     const all = RGB_DOMAIN_V1.SELECTOR_ALL;
     return {
         stageEnableMask: domain.stageEnableMask,
-        stages: [
-            ["Layer colours", RGB_STAGE_BITS.LAYER], ["Auto-mouse fade", RGB_STAGE_BITS.AUTOMOUSE],
-            ["Pointing modes", RGB_STAGE_BITS.PD_MODE], ["Combo feedback", RGB_STAGE_BITS.COMBO],
-            ["Key behaviour feedback", RGB_STAGE_BITS.KEY_BEHAVIOR],
-        ].map(([label, bit]) => ({label, bit, enabled: Boolean(domain.stageEnableMask & bit)})),
+        // Stages by id and bit, in the vocabulary's words; the interface finds
+        // a stage by its id, never by what it is called.
+        stages: VOCABULARY.stages.filter((stage) => stage.bit).map(({id, label, bit}) => ({id, label, bit, enabled: Boolean(domain.stageEnableMask & bit)})),
         ledGroups,
         layerColors: domain.layerColors.map((row) => ({
             layer: layerName(row.layerId), layerId: row.layerId,
@@ -167,4 +143,4 @@ function combosForView(read, labels) {
     }));
 }
 
-module.exports = {knownActionAbi, actionName, NATIVE_ACTION_ABI_V1, baseRgbForView, behaviorAliasesForView, behaviorRowsForView, combosForView, rgbForView};
+module.exports = {baseRgbForView, behaviorAliasesForView, behaviorRowsForView, combosForView, rgbForView};

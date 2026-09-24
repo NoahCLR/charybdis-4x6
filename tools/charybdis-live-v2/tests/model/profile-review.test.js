@@ -154,3 +154,12 @@ test("a tier removed from a behaviour that stays is a removed field of a changed
     assert.equal(hold.after,null,"the draft side is absent, not the word none");
     assert.ok(hold.before);
 });
+test("an eight-direction mode reads as eight directions, and lists its diagonals", () => {
+    const base=pdDocument(), before=snapshot(base), slots=validateSnapshot(base).pdModes;
+    const directional=slots.findIndex(slot=>slot.kind===1);
+    const after=snapshot(withDomain(base,80,decodePdDomain,encodePdDomain,modes=>modes.map((mode,id)=>id===directional?{...mode,axis:3,thresholdX:mode.thresholdX||60,thresholdY:mode.thresholdY||60}:mode)));
+    const [item]=profileReview(before,after);
+    const axis=item.fields.find(field=>field.label==="Axes");
+    assert.equal(axis.after,"Eight directions","not undefined");
+    assert.ok(item.fields.some(field=>field.label==="Up-left"),"the diagonals it now reads are listed");
+});

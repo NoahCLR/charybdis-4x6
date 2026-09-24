@@ -8,7 +8,7 @@
 import {el, esc} from "../lib/dom.mjs";
 import {describeStep, macroMatches, macroPeek, parseMacro, serializeMacro, unreleased} from "../view/macro.mjs";
 import {macroPlacements} from "../view/keyface.mjs";
-import {getModel, layerName, layers, post, render, state, writable} from "../store.mjs";
+import {canEdit as canEditArea, getModel, layerName, layers, macroForm, post, render, setMacroForm, state, writable} from "../store.mjs";
 import * as edits from "../view/edits.mjs";
 import {layerSwatch} from "./layerbar.mjs";
 import {openPicker} from "./picker.mjs";
@@ -25,7 +25,7 @@ export function screenMacros() {
     const bank = model?.viaMacros || [];
     const memory = model?.macroBank;
     const slot = bank.find((row) => row.keycode === state.macroSlot) || bank[0];
-    const canEdit = writable() && Boolean(model?.macroEditing?.writable) && slot?.available !== false;
+    const canEdit = canEditArea("macros") && slot?.available !== false;
 
     const main = el(`<div class="main">${topbar(
         "Macros",
@@ -88,7 +88,7 @@ function memoryMeter(memory) {
 }
 
 function editor(model, slot, canEdit) {
-    const draft = state.macroDrafts?.[slot.keycode];
+    const draft = macroForm(slot.keycode).draft;
     const payload = draft ?? slot.payload ?? "";
     const {steps, error} = parseMacro(payload, {keys: model?.macroPayloadKeycodes});
     const held = unreleased(steps);
@@ -115,12 +115,11 @@ function editor(model, slot, canEdit) {
     });
     nameInput?.addEventListener("change", () => post(edits.macroNameMessage(slot.keycode, nameInput.value, model?.macroEditing?.identity)));
     textarea.addEventListener("input", () => {
-        state.macroDrafts = {...state.macroDrafts, [slot.keycode]: textarea.value};
-        state.macroCursors = {...state.macroCursors, [slot.keycode]: textarea.selectionStart};
+        setMacroForm(slot.keycode, {draft: textarea.value, cursor: textarea.selectionStart});
     });
     textarea.addEventListener("change", () => stageMacro(model, slot, textarea.value));
     for (const eventName of ["click", "keyup", "select"]) textarea.addEventListener(eventName, () => {
-        state.macroCursors = {...state.macroCursors, [slot.keycode]: textarea.selectionStart};
+        setMacroForm(slot.keycode, {cursor: textarea.selectionStart});
     });
     card.querySelectorAll("[data-goto-layer]").forEach((button) => button.addEventListener("click", () =>
         showOnLayer(slot.keycode, Number(button.dataset.gotoLayer))));
@@ -190,13 +189,13 @@ function showOnLayer(keycode, at) {
 function stageMacro(model, slot, payload) {
     const parsed = parseMacro(payload, {keys: model?.macroPayloadKeycodes});
     if (parsed.error || unreleased(parsed.steps).length) return false;
-    state.macroDrafts = {...state.macroDrafts, [slot.keycode]: payload};
+    setMacroForm(slot.keycode, {draft: payload});
     post(edits.macroMessage(slot.keycode, payload, model?.macroEditing?.identity));
     return true;
 }
 
 function stepBuilder(model, slot, canEdit, textarea) {
-    const stepDraft = state.macroSteps?.[slot.keycode] || {kind: "tap", value: ""};
+    const stepDraft = macroForm(slot.keycode).step || {kind: "tap", value: ""};
     const node = el(`<div class="card" style="background:var(--surface-2)">
         <div class="card-h" style="padding:10px 12px"><h3>Add a step</h3><span class="right note">inserted at the cursor</span></div>
         <div class="card-b" style="padding:12px;display:grid;grid-template-columns:160px minmax(0,1fr) auto;gap:8px;align-items:end">
@@ -218,7 +217,7 @@ function stepBuilder(model, slot, canEdit, textarea) {
         pick.style.display = mode === "text" || mode === "delay" ? "none" : "";
     };
     const remember = () => {
-        state.macroSteps = {...state.macroSteps, [slot.keycode]: {kind: kind.value, value: value.value}};
+        setMacroForm(slot.keycode, {step: {kind: kind.value, value: value.value}});
     };
     kind.addEventListener("change", () => { remember(); sync(); });
     value.addEventListener("input", remember);
@@ -227,8 +226,7 @@ function stepBuilder(model, slot, canEdit, textarea) {
         title: "Macro step keys", context: slot.keycode, mode: "list",
         seed: value.value.split(",").map((name) => name.trim()).filter(Boolean),
         onPick: (expression) => {
-            state.macroSteps = {...state.macroSteps, [slot.keycode]: {kind: kind.value, value: expression}};
-            state.picker = null;
+            setMacroForm(slot.keycode, {step: {kind: kind.value, value: expression}});
             render();
         },
     }));
@@ -242,9 +240,9 @@ function stepBuilder(model, slot, canEdit, textarea) {
             : kind.value === "release" ? `{-${keys}}`
             : `{${keys}}`;
         const cursor = Math.max(0, Math.min(textarea.value.length,
-            state.macroCursors?.[slot.keycode] ?? textarea.selectionStart ?? textarea.value.length));
+            macroForm(slot.keycode).cursor ?? textarea.selectionStart ?? textarea.value.length));
         textarea.value = `${textarea.value.slice(0, cursor)}${addition}${textarea.value.slice(cursor)}`;
-        state.macroCursors = {...state.macroCursors, [slot.keycode]: cursor + addition.length};
+        setMacroForm(slot.keycode, {cursor: cursor + addition.length});
         stageMacro(model, slot, textarea.value);
         render();
     });
@@ -300,9 +298,7 @@ function actions(model, slot, canEdit, dirty, payload) {
         <button class="btn ghost" data-act="clear" ${canEdit ? "" : "disabled"}>Clear payload</button>
     </div>`);
     node.querySelector('[data-act="discard"]').addEventListener("click", () => {
-        const drafts = {...state.macroDrafts};
-        delete drafts[slot.keycode];
-        state.macroDrafts = drafts;
+        setMacroForm(slot.keycode, {draft: undefined});
         render();
     });
     node.querySelector('[data-act="clear"]').addEventListener("click", () => {
@@ -369,7 +365,7 @@ function recorder(model, slot, canEdit, textarea) {
         document.removeEventListener("keyup", onRecordKey, true);
         state.recording = null;
         state.lastTake = null;
-        state.macroDrafts = {...state.macroDrafts, [slot.keycode]: take.before};
+        setMacroForm(slot.keycode, {draft: take.before});
         if (staged) stageMacro(model, slot, take.before);
         render();
     });
@@ -385,7 +381,7 @@ function recorder(model, slot, canEdit, textarea) {
 // that pauses for a recording — undo, the key shortcuts — resumes on Stop.
 function startRecording(slot, before) {
     state.lastTake = null;
-    state.macroDrafts = {...state.macroDrafts, [slot.keycode]: before};
+    setMacroForm(slot.keycode, {draft: before});
     state.recording = {slot: slot.keycode, before, last: Date.now(), captured: false};
     document.addEventListener("keydown", onRecordKey, true);
     document.addEventListener("keyup", onRecordKey, true);
@@ -400,7 +396,7 @@ function stopRecording(model = getModel(), slot = null) {
     state.recording = null;
     const target = slot || (model?.viaMacros || [])
         .find((candidate) => candidate.keycode === recordedSlot);
-    if (target) stageMacro(model, target, state.macroDrafts?.[target.keycode] ?? target.payload ?? "");
+    if (target) stageMacro(model, target, macroForm(target.keycode).draft ?? target.payload ?? "");
     render();
 }
 
@@ -415,12 +411,12 @@ function onRecordKey(event) {
     event.preventDefault();
     const now = Date.now();
     const gap = now - recording.last;
-    const current = state.macroDrafts?.[recording.slot] ?? "";
-    state.macroDrafts = {...state.macroDrafts, [recording.slot]: edits.recordedPayload(current, {
+    const current = macroForm(recording.slot).draft ?? "";
+    setMacroForm(recording.slot, {draft: edits.recordedPayload(current, {
         keycode, type: event.type, gap, captured: recording.captured,
         delays: state.recordDelays !== false, threshold: state.recordDelayThreshold, round: state.recordDelayRound,
         explicit: state.recordMode === "explicit",
-    })};
+    })});
     state.recording = {...recording, last: now, captured: true};
     render();
 }

@@ -58,7 +58,7 @@ export function placeState(place, layers = []) {
         case "pointing": return {screen: "pointing", pdSlot: place.slot, pdKind: null, pdButtons: null};
         case "lighting": return place.stage ? {screen: "lighting", stage: place.stage} : {screen: "lighting"};
         case "settings": return place.section
-            ? {screen: "settings", settingsSearch: "", settingsOpen: place.section, reveal: `.settings-group[data-section="${place.section}"]`}
+            ? {screen: "settings", settingsSearch: "", settingsOpen: [place.section], reveal: `.settings-group[data-section="${place.section}"]`}
             : {screen: "settings", settingsSearch: ""};
         case "layers": return {screen: "keys", layersOpen: true};
         default: return null;
@@ -76,7 +76,16 @@ export const stillShown = (change) => change.status !== "removed" || ["pointing"
 
 // What the draft changed, by where it is edited, so every editor can mark its
 // own changed things the way the review lists them.
+// Every screen asks for these on every render; the answer is kept with the
+// changes list, which only changes when a new model arrives.
+const marksCache = new WeakMap();
 export function draftMarks(changes = []) {
+    if (marksCache.has(changes)) return marksCache.get(changes);
+    const marks = computeMarks(changes);
+    marksCache.set(changes, marks);
+    return marks;
+}
+function computeMarks(changes) {
     const marks = {keys: new Map(), layers: new Set(), behaviours: new Set(), combos: new Set(), macros: new Set(),
         pointing: new Set(), lighting: new Set(), lightingLayers: new Set(), lightingSlots: new Set(), settings: new Set(), layerNames: false};
     for (const change of changes) {

@@ -9,12 +9,6 @@ export const DIRECTIONS = [["up", "Up"], ["left", "Left"], ["right", "Right"], [
 export const AXIS = {VERTICAL: 0, HORIZONTAL: 1, DOMINANT: 2, EIGHT: 3};
 // Eight directions add the diagonals, stored beside the straight directions.
 export const DIAGONALS = [["upLeft", "Up-left"], ["upRight", "Up-right"], ["downLeft", "Down-left"], ["downRight", "Down-right"]];
-// What moving toward a direction with no shortcut does, in every directional
-// mode. "Both" sends the two compass neighbours, 45 degrees either side, the
-// one the movement leans toward first: a diagonal's straight directions, a
-// straight direction's diagonals. Only eight
-// directions has those, so elsewhere it acts as "its neighbours take over".
-export const EMPTY_DIRECTION = [[0, "Its neighbours take over"], [1, "Send both neighbours"], [2, "Nothing"]];
 // The directions each axis setting reads. The keyboard refuses a mode that
 // keeps a shortcut or a threshold on an axis it does not read, so the form
 // draws only these and the record carries the others as zero.
@@ -27,15 +21,10 @@ export const AXIS_DIRECTIONS = {
 export const axisReads = (axis) => AXIS_DIRECTIONS[axis] || AXIS_DIRECTIONS[AXIS.DOMINANT];
 export const readsHorizontal = (axis) => axisReads(axis).includes("left");
 export const readsVertical = (axis) => axisReads(axis).includes("up");
-// Every scroll field the record holds.
-export const SCROLL_FIELDS = [
-    ["thresholdH", "Horizontal activation threshold"], ["thresholdV", "Vertical activation threshold"],
-    ["divisorH", "Movement per wheel step ↔"], ["divisorV", "Movement per wheel step ↕"],
-    ["intervalMs", "Minimum interval (ms)"], ["expireMs", "Gesture expiry (ms)"], ["lockMs", "Axis lock timeout (ms)"],
-    ["startNumerator", "Axis selection ratio · numerator"], ["startDenominator", "Axis selection ratio · denominator"],
-    ["sustainNumerator", "Axis retention ratio · numerator"], ["sustainDenominator", "Axis retention ratio · denominator"],
-    ["decayDivisor", "Cross-axis decay divisor"],
-];
+// Every scroll field the record holds, in its stored order; the words for
+// them come with the model (vocabulary.pointing.scrollFields).
+export const SCROLL_FIELDS = [["thresholdH"], ["thresholdV"], ["divisorH"], ["divisorV"], ["intervalMs"], ["expireMs"], ["lockMs"],
+    ["startNumerator"], ["startDenominator"], ["sustainNumerator"], ["sustainDenominator"], ["decayDivisor"]];
 
 // A pointing mode's pointer speed, as select options. The list is the app's
 // one DPI list, which arrives with the model (core/model/pointer-dpi.js); a

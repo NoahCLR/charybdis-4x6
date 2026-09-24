@@ -1280,3 +1280,28 @@ reads as a grid rather than as text that wraps wherever it lands.
   holding one carries the dot on its header. A pointing card anywhere shows
   its slot's light through the shared mark, so an off stage reads off there
   too.
+
+### D-L33 — One home for each rule the app needs twice
+
+An architecture review found the same knowledge kept in several places, and
+drifting: the review and the screens each wrote their own words for stored
+values (an eight-direction mode read `undefined` in the review, layer 0 was
+"Base" in one place and "Layer 0" in another, the behaviour grid mixed "Double
+Tap Branch" with "3 taps"), the pointing-mode keycode registry was written six
+times, a dirty draft was decoded 10–16 times per model publish, and the host
+sequenced apply and restore itself. Each rule now has one home:
+
+- Words: `core/model/vocabulary.js`, sent as `model.vocabulary`; stages are
+  found by id, never by label.
+- Actions, native keycodes, decode limits, layer references:
+  `core/schema/actions.js`; the pointing registry and key layout are data.
+- Decoding: once per draft revision, carried as `decoded` and taken through
+  `decodedOf`; history entries are frozen. A repeat publish decodes nothing.
+- Settings bits and base lighting: `fieldMask` and `baseLighting` in
+  `core/model/settings-editor.js`.
+- Panel sequencing: `core/session/panel-controls.js`, tested with a fake
+  service; `extension.js` supplies dialogs, files and progress.
+- Interface: `canEdit(area)` for permission, `view/reach-groups.mjs` and
+  `ui/groups.mjs` for the grouped lists, `slotLight` in `ui/marks.mjs`, one
+  form per macro slot and one `state.combo` for the builder; the picker closes
+  itself before handing on a choice.

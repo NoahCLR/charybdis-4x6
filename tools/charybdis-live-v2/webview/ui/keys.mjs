@@ -6,15 +6,17 @@ import {el, esc} from "../lib/dom.mjs";
 import {LED_INDEX} from "../view/geometry.mjs";
 import {actionLabel, behaviourFor, behaviourListeningTo, canonicalKeycode, behaviourGridSteps, behaviourGroups, behaviourRouteKeys, behaviourTiers, comboEditInputs, comboGroups, combosAt, keyFace, keyMeaning, macroReach, pointingReach, pointingSlotFor, pointingVariant, reachKeys} from "../view/keyface.mjs";
 import {feedbackColours, layerColourRow, pdColourRow, stageEnabled} from "../view/lighting.mjs";
-import {closeComboBuilder, currentLayer, getModel, layerName, layers, openComboBuilder, positionAt, post, render, selectedPosition, state, writable} from "../store.mjs";
+import {closeComboBuilder, currentLayer, getModel, layerName, layers, openComboBuilder, positionAt, post, render, selectedPosition, state, writable, canEdit as canEditArea} from "../store.mjs";
 import * as edits from "../view/edits.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
 import {board} from "./board.mjs";
 import {layerBar} from "./layerbar.mjs";
 import {attachLayersControl} from "./layers.mjs";
 import {openPicker} from "./picker.mjs";
-import {branchBadge, marked, tierDot} from "./marks.mjs";
-import {slotLight} from "./pointing.mjs";
+import {attachGroupToggles, attachReachRows, groupHeader, groupOpen, groupSection, reachAttrs, reachTable} from "./groups.mjs";
+import {inGroupOrder, reachEntries} from "../view/reach-groups.mjs";
+import {branchBadge, marked, slotLight, tierDot} from "./marks.mjs";
+import {branchName, helperWord, tierName, vocabulary, word} from "../view/vocabulary.mjs";
 import {topbar, unavailable} from "./shell.mjs";
 
 const TABS = [
@@ -25,14 +27,8 @@ const TABS = [
     {id: "pointing", label: "Pointing modes"},
 ];
 
-const HOLD_HELPERS = [
-    ["PRESS_AND_HOLD_UNTIL_RELEASE", "held until release"],
-    ["TAP_AT_HOLD_THRESHOLD", "tap at hold threshold"],
-    ["TAP_ON_RELEASE_AFTER_HOLD", "tap on release after hold"],
-    ["REPEAT_WHILE_HELD", "repeat while held"],
-];
-const helperLabel = (kind, helper) => kind === "tap" ? "tap sends"
-    : (HOLD_HELPERS.find(([name]) => name === helper) || [, String(helper || "").toLowerCase().replace(/_/g, " ")])[1];
+// How a tier runs, as the vocabulary words it.
+const helperLabel = (kind, helper) => helperWord(getModel(), kind, helper);
 
 const {TIER_FIELDS, DEFAULT_REPEAT_HZ} = edits;
 
@@ -66,24 +62,24 @@ export function screenKeys() {
             ? `lit ${esc(hsvLabel(row.color))} on ${row.mode === "ALL_KEYS" ? "every key" : "keys mapped here"}`
             : "no layer colour · the base effect shows through"}</span></div>`));
     if (state.placement) stage.appendChild(placementBar());
-    else if (state.comboPicking) stage.appendChild(pickBar());
+    else if (state.combo.picking) stage.appendChild(pickBar());
     // One indication at a time: while a combo is being built its inputs are
     // the keys in question, otherwise the keys that reach the picked row.
-    const building = state.comboPicking || (state.comboOpen && state.tab === "combos");
+    const building = state.combo.picking || (state.combo.open && state.tab === "combos");
     stage.appendChild(board(model, layer, {
         selected: state.selected,
         drafted: draftMarks(model?.draft?.changes).keys.get(layer.index),
-        reach: building ? state.comboInputs : reachHighlight(model),
-        picking: state.comboPicking || Boolean(state.placement),
+        reach: building ? state.combo.inputs : reachHighlight(model),
+        picking: state.combo.picking || Boolean(state.placement),
         onKey: (index) => {
             if (state.placement) {
                 const placement = state.placement;
                 state.placement = null;
                 state.selected = index;
                 if (writable()) post(edits.setKey(layer.name, index, placement.keycode));
-            } else if (state.comboPicking) {
-                state.comboInputs = state.comboInputs.includes(index)
-                    ? state.comboInputs.filter((value) => value !== index) : [...state.comboInputs, index];
+            } else if (state.combo.picking) {
+                state.combo.inputs = state.combo.inputs.includes(index)
+                    ? state.combo.inputs.filter((value) => value !== index) : [...state.combo.inputs, index];
             } else {
                 state.selected = index;
                 const behaviour = behaviourFor(model, keyMeaning(positionAt(layer, index)));
@@ -139,56 +135,17 @@ function legend(model) {
 
 function pickBar() {
     const layer = currentLayer();
-    const names = state.comboInputs.map((index) => keyFace(positionAt(layer, index)).main || "—");
+    const names = state.combo.inputs.map((index) => keyFace(positionAt(layer, index)).main || "—");
     const node = el(`<div class="pickbar">
         <span><b>Picking combo inputs</b> — click keys on the board</span>
         <span class="n">${esc(names.join(" + ") || "none yet")}</span>
         <span class="right" style="margin-left:auto;display:flex;gap:6px">
             <button class="btn tiny ghost" data-act="clear">Clear</button>
             <button class="btn tiny" data-act="done">Done</button></span></div>`);
-    node.querySelector('[data-act="clear"]').addEventListener("click", () => { state.comboInputs = []; state.comboExtraInputs = []; render(); });
-    node.querySelector('[data-act="done"]').addEventListener("click", () => { state.comboPicking = false; render(); });
+    node.querySelector('[data-act="clear"]').addEventListener("click", () => { state.combo.inputs = []; state.combo.extraInputs = []; render(); });
+    node.querySelector('[data-act="done"]').addEventListener("click", () => { state.combo.picking = false; render(); });
     return node;
 }
-
-// Every tab that answers "what does this layer reach" draws its groups the
-// same way: a counted header, the first open and the rest a click away. The
-// group a tab does not have simply has no rows.
-const GROUP_TITLES = {
-    here: "On this layer",
-    branches: "Through a behaviour on this layer",
-    combos: "Through a combo on this layer",
-    through: "Through a transparent key",
-    belowBranches: "Through a behaviour under a transparent key",
-    belowCombos: "Through a combo under a transparent key",
-    elsewhere: "Unreachable from this layer",
-};
-
-// The order every reach list reads in: the three this layer holds itself, then
-// the three it only reaches under a transparent key, then the rest of the board.
-// A tab lists the groups it has in any order and they come out in this one, so
-// the headers do not move between tabs.
-const GROUP_ORDER = ["here", "branches", "combos", "through", "belowBranches", "belowCombos", "elsewhere"];
-const inGroupOrder = (groups) =>
-    GROUP_ORDER.map((id) => groups.find((group) => group.id === id)).filter(Boolean);
-
-// A folded group holding something the draft changed says so on its header;
-// open, its rows carry their own marks.
-function groupHeader(tab, id, count, drafted = false) {
-    const open = state.groups[tab][id];
-    return `<button class="group-h" data-group-tab="${tab}" data-group="${id}" aria-expanded="${open}">
-        <span class="chev">${open ? "▾" : "▸"}</span><span class="ttl">${esc(GROUP_TITLES[id])}${drafted && !open ? draftDot("Holds a change in your draft") : ""}</span>
-        <span class="n">${count}</span></button>`;
-}
-
-const groupOpen = (tab, id) => state.groups[tab][id];
-
-const attachGroupToggles = (node) => node.querySelectorAll("[data-group-tab]").forEach((button) =>
-    button.addEventListener("click", () => {
-        const bag = state.groups[button.dataset.groupTab];
-        bag[button.dataset.group] = !bag[button.dataset.group];
-        render();
-    }));
 
 // The keys the board rings: the ones that reach whatever row is picked in the
 // open tab. A behaviour is found on the keys carrying it; anything a branch
@@ -198,9 +155,7 @@ function reachHighlight(model) {
     const found = (groups, picked) => {
         const [group, ...rest] = String(picked).split(":");
         const name = rest.join(":");
-        return ({here: groups.onKeys, branches: groups.fromBranches, combos: groups.fromCombos,
-            through: groups.throughKeys, belowBranches: groups.fromBranchesBelow, belowCombos: groups.fromCombosBelow}[group] || [])
-            .find((entry) => String(entry.name) === name);
+        return reachEntries(groups, group).find((entry) => String(entry.name) === name);
     };
     if (state.tab === "behaviours") return behaviourRouteKeys(model, stack, at, state.behaviourRow, behaviourRoute());
     const picked = state.reachRow[state.tab];
@@ -215,24 +170,6 @@ function reachHighlight(model) {
     if (state.tab === "pointing") return reachKeys(stack, at, found(pointingReach(model, stack, at), picked));
     return [];
 }
-
-// Rows across the tabs pick themselves the same way, and picking the same row
-// again lets go of it.
-const attachReachRows = (node, tab) => node.querySelectorAll("[data-reach]").forEach((row) =>
-    row.addEventListener("click", (event) => {
-        if (event.target.closest("button")) return;
-        const picked = row.dataset.reach;
-        state.reachRow[tab] = state.reachRow[tab] === picked ? null : picked;
-        render();
-    }));
-
-// One thing can be listed under several routes, so a pick names the route it
-// was made from — otherwise picking it in one group would ring the keys of all
-// of them.
-const reachAttrs = (tab, group, name) => {
-    const picked = `${group}:${name}`;
-    return ` data-reach="${esc(picked)}"${state.reachRow[tab] === picked ? ' data-picked="true"' : ""}`;
-};
 
 // A tab's own number is what this layer stores: a key here, a behaviour mapped
 // here firing it from a branch, or a combo chorded on keys here sending it —
@@ -326,7 +263,7 @@ function tabKey(body, right) {
                     <span class="rv">${combos.length ? esc(combos.map((combo) => `${combo.badge} → ${combo.outputDisplay || combo.output}`).join(" · ")) : "not part of a combo"}</span>
                     <span class="ra">${combos.length ? "Edit" : "New"}</span></button>
                 ${slot ? `<button class="reach" data-goto="pointing"><span class="rl">Pointing</span>
-                    <span class="rv">${esc(slot.name || `Slot ${slot.id + 1}`)}</span><span class="ra">Edit</span></button>` : ""}
+                    <span class="rv">${esc(slot.displayName || `Slot ${slot.id + 1}`)}</span><span class="ra">Edit</span></button>` : ""}
             </div>
         </section>
     </div>`);
@@ -486,7 +423,7 @@ function behaviourEditor(behaviour) {
         </div>
         <div class="beh-timing">
             <label class="field"><span>${marked(model, {kind: "tier", tier: "hold"}, "Tap / hold")}</span><input class="input mono" data-term="tapHoldTerm" value="${esc(zeroBlank(behaviour.tapHoldTerm))}" placeholder="default" ${canEdit ? "" : "disabled"}></label>
-            <label class="field"><span>${marked(model, {kind: "tier", tier: "long"}, "Long hold")}</span><input class="input mono" data-term="longerHoldTerm" value="${esc(zeroBlank(behaviour.longerHoldTerm))}" placeholder="default" ${canEdit ? "" : "disabled"}></label>
+            <label class="field"><span>${marked(model, {kind: "tier", tier: "long"}, tierName(model, "long"))}</span><input class="input mono" data-term="longerHoldTerm" value="${esc(zeroBlank(behaviour.longerHoldTerm))}" placeholder="default" ${canEdit ? "" : "disabled"}></label>
             <label class="field"><span>${marked(model, {kind: "branch", count: 2}, "Repeated taps")}</span><input class="input mono" data-term="multiTapTerm" value="${esc(zeroBlank(behaviour.multiTapTerm))}" placeholder="default" ${canEdit ? "" : "disabled"}></label>
             <label class="sw" data-tip="Treat this row as a mouse gesture, so pressing it keeps the pointer layer up instead of letting auto-mouse reset.">
                 <input type="checkbox" data-anchor ${behaviour.keepsAutoMouseAnchored ? "checked" : ""} ${canEdit ? "" : "disabled"}>
@@ -495,8 +432,8 @@ function behaviourEditor(behaviour) {
         <div class="bgrid" style="grid-template-columns:86px repeat(${steps.length}, minmax(150px, 1fr))">
             <span></span>
             ${steps.map((step) => `<div class="bhead">${branchBadge(model, step.tapCount + 1)}
-                <span>${esc(step.tapCountName || `${step.tapCount + 1} taps`)}</span></div>`).join("")}
-            ${[["tap", "Tap"], ["hold", "Hold"], ["long", "Long hold"]].map(([kind, name]) => `
+                <span>${esc(branchName(model, step.tapCount + 1))}</span></div>`).join("")}
+            ${["tap", "hold", "long"].map((kind) => [kind, tierName(model, kind)]).map(([kind, name]) => `
                 <div class="btier">${tierDot(model, kind)}${name}</div>
                 ${steps.map((step) => cellFor(step, kind)).join("")}`).join("")}
         </div>
@@ -533,7 +470,7 @@ function cellEditor(behaviour, step, kind) {
     const shown = branch || pending;
     const canEdit = writable();
     const node = el(`<div class="cell-editor">
-        <div class="ce-head"><span class="tag">${step.tapCount + 1}× branch</span><h4>${kind === "long" ? "Long hold" : kind[0].toUpperCase() + kind.slice(1)}</h4>
+        <div class="ce-head"><span class="tag">${esc(branchName(getModel(), step.tapCount + 1))}</span><h4>${esc(tierName(getModel(), kind))}</h4>
             <span class="note">${kind === "tap" ? "A tap tier fires on release, so it has no helper." : "Runs once this row's threshold passes."}</span>
             <span class="right"><button class="btn tiny ghost" data-act="close">Done</button></span></div>
         <div class="ce-body">
@@ -542,7 +479,7 @@ function cellEditor(behaviour, step, kind) {
                 <button class="btn" data-act="pick" ${canEdit ? "" : "disabled"}>Pick…</button></div></label>
             ${kind === "tap" ? "<span></span>" : `<label class="field"><span>How it runs</span>
                 <select class="input" data-helper ${canEdit ? "" : "disabled"}>
-                    ${HOLD_HELPERS.map(([value, text]) => `<option value="${value}" ${shown?.helper === value ? "selected" : ""}>${text}</option>`).join("")}
+                    ${vocabulary(getModel()).holdHelpers.map(([value, text]) => `<option value="${value}" ${shown?.helper === value ? "selected" : ""}>${text}</option>`).join("")}
                 </select></label>`}
             ${kind === "tap" ? "<span></span>" : `<label class="field" data-repeat-field ${shown?.helper === "REPEAT_WHILE_HELD" ? "" : "hidden"}><span>Repeat rate · Hz</span>
                 <input class="input mono" type="number" min="1" max="100" step="1" data-repeat value="${esc(Number(shown?.repeatHz) > 0 ? shown.repeatHz : DEFAULT_REPEAT_HZ)}" ${canEdit ? "" : "disabled"}></label>`}
@@ -560,11 +497,10 @@ function cellEditor(behaviour, step, kind) {
     };
     node.querySelector('[data-act="close"]').addEventListener("click", () => { state.cell = null; render(); });
     node.querySelector('[data-act="pick"]')?.addEventListener("click", () => openPicker({
-        title: `${kind === "tap" ? "Tap" : kind === "hold" ? "Hold" : "Long hold"} action`,
-        context: `${behaviour.keycode} · ${step.tapCount + 1}× branch`,
+        title: `${tierName(getModel(), kind)} action`,
+        context: `${behaviour.keycode} · ${branchName(getModel(), step.tapCount + 1)}`,
         seed: branch?.action ? [branch.action] : [],
         onPick: (expression) => {
-            state.picker = null;
             stage(expression);
             render();
         },
@@ -605,12 +541,12 @@ function tabCombos(body, right) {
     const model = getModel();
     const combos = model?.combos || [];
     const readback = model?.comboReadback || {};
-    const canEdit = writable() && readback.writable !== false;
+    const canEdit = canEditArea("combos");
 
     right.replaceChildren();
-    const toggle = el(`<button class="btn tiny" ${canEdit ? "" : "disabled"}>${state.comboOpen ? "Close builder" : "New combo"}</button>`);
+    const toggle = el(`<button class="btn tiny" ${canEdit ? "" : "disabled"}>${state.combo.open ? "Close builder" : "New combo"}</button>`);
     toggle.addEventListener("click", () => {
-        if (state.comboOpen) closeComboBuilder(); else openComboBuilder();
+        if (state.combo.open) closeComboBuilder(); else openComboBuilder();
         render();
     });
     right.appendChild(toggle);
@@ -651,7 +587,7 @@ function tabCombos(body, right) {
     }
     const row = (group, entry, reachedBy) => {
         const combo = entry.combo;
-        const requires = [combo.mustHold ? "hold" : "", combo.mustTap ? "tap only" : "", combo.ordered ? "in order" : ""].filter(Boolean).join(" · ") || "—";
+        const requires = ["mustHold", "mustTap", "ordered"].filter((flag) => combo[flag]).map((flag) => vocabulary(model).comboOptions[flag]).join(" · ") || "—";
         return `<tr${reachAttrs("combos", group, combo.id)}><td class="mono">${esc(combo.badge || "")}${changedCombos.has(combo.id) ? draftDot() : ""}</td>
             <td>${(combo.inputDisplays || combo.inputs || []).map((input) => `<span class="tok">${esc(input)}</span>`).join(" + ")}</td>
             <td class="mono">${esc(combo.outputDisplay || combo.output)}</td>
@@ -681,17 +617,17 @@ function tabCombos(body, right) {
         render();
     }));
     const side = node.querySelector("#comboSide");
-    side.appendChild(state.comboOpen ? comboBuilder(layer, canEdit, () => comboHoldTerm(model, node.querySelector("#comboHoldTerm")?.value)) : el(`<div class="empty-card">
+    side.appendChild(state.combo.open ? comboBuilder(layer, canEdit, () => comboHoldTerm(model, node.querySelector("#comboHoldTerm")?.value)) : el(`<div class="empty-card">
         <p class="note">Pick <b>New combo</b> to build one: choose what it sends, then click its input keys straight on the board.</p></div>`));
     body.replaceChildren(node);
 }
 
 function comboBuilder(layer, canEdit, holdTerm) {
     const model = getModel();
-    const inputs = state.comboInputs.map((index) => positionAt(layer, index)).filter(Boolean);
-    const editing = state.comboEditId !== null;
-    const original = (model?.combos || []).find((combo) => combo.id === state.comboEditId);
-    const form = state.comboForm;
+    const inputs = state.combo.inputs.map((index) => positionAt(layer, index)).filter(Boolean);
+    const editing = state.combo.editId !== null;
+    const original = (model?.combos || []).find((combo) => combo.id === state.combo.editId);
+    const form = state.combo.form;
     const node = el(`<div class="card" style="background:var(--surface-2)">
         <div class="card-h" style="padding:11px 13px"><h3>${editing ? `Edit ${esc(original?.badge || "combo")}` : "New combo"}</h3>
             <span class="right">${editing ? `<button class="btn tiny ghost" data-act="delete" ${canEdit ? "" : "disabled"}>Delete</button>` : ""}</span></div>
@@ -701,17 +637,17 @@ function comboBuilder(layer, canEdit, holdTerm) {
                 <button class="btn" data-act="pickout" ${canEdit ? "" : "disabled"}>Pick…</button></div></div>
             <div class="field"><span>Inputs</span>
                 <div class="row" style="gap:6px;flex-wrap:wrap">
-                    ${inputs.length ? inputs.map((position) => `<span class="chip"><span class="mono">${esc(state.comboInputCodes[position.layoutIndex]
-                        ? actionLabel(model, state.comboInputCodes[position.layoutIndex]) : keyFace(position).main || keyMeaning(position))}</span>
+                    ${inputs.length ? inputs.map((position) => `<span class="chip"><span class="mono">${esc(state.combo.inputCodes[position.layoutIndex]
+                        ? actionLabel(model, state.combo.inputCodes[position.layoutIndex]) : keyFace(position).main || keyMeaning(position))}</span>
                         <button data-remove="${position.layoutIndex}" style="color:var(--text-3)">✕</button></span>`).join("")
-                        : (state.comboExtraInputs.length ? "" : `<span class="note">no inputs yet</span>`)}
-                    ${state.comboExtraInputs.map((input) => `<span class="chip" data-tip="Not reachable from this layer, so it is not on the board. It stays an input unless you remove it.">
+                        : (state.combo.extraInputs.length ? "" : `<span class="note">no inputs yet</span>`)}
+                    ${state.combo.extraInputs.map((input) => `<span class="chip" data-tip="Not reachable from this layer, so it is not on the board. It stays an input unless you remove it.">
                         <span class="mono">${esc(actionLabel(model, input))}</span>
                         <button data-remove-extra="${esc(input)}" style="color:var(--text-3)">✕</button></span>`).join("")}
                 </div>
                 <div class="row" style="gap:6px;margin-top:4px">
-                    <button class="btn tiny ${state.comboPicking ? "primary" : ""}" data-act="pickboard" ${canEdit ? "" : "disabled"}
-                        data-tip="Switch the board into input-picking mode; click keys to add or remove them.">${state.comboPicking ? "Picking on board…" : "Pick on board"}</button>
+                    <button class="btn tiny ${state.combo.picking ? "primary" : ""}" data-act="pickboard" ${canEdit ? "" : "disabled"}
+                        data-tip="Switch the board into input-picking mode; click keys to add or remove them.">${state.combo.picking ? "Picking on board…" : "Pick on board"}</button>
                 </div>
             </div>
             <label class="field"><span>Combo window</span>
@@ -722,25 +658,25 @@ function comboBuilder(layer, canEdit, holdTerm) {
                 <label class="sw"><input type="checkbox" data-ordered ${form.ordered ? "checked" : ""} ${canEdit ? "" : "disabled"}><span class="track"></span><span class="txt">In order</span></label>
             </div>
             <div class="row" style="gap:8px">
-                <button class="btn primary" data-act="keep" ${canEdit && !state.comboAwaiting ? "" : "disabled"}>Keep combo in draft</button>
+                <button class="btn primary" data-act="keep" ${canEdit && !state.combo.awaiting ? "" : "disabled"}>Keep combo in draft</button>
                 <button class="btn ghost" data-act="cancel">Cancel</button>
             </div>
             <p class="note">A combo needs its output and at least two inputs, so this form keeps its own state until you keep it.</p>
         </div></div>`);
 
     node.querySelectorAll("[data-remove]").forEach((button) => button.addEventListener("click", () => {
-        state.comboInputs = state.comboInputs.filter((index) => index !== Number(button.dataset.remove));
+        state.combo.inputs = state.combo.inputs.filter((index) => index !== Number(button.dataset.remove));
         render();
     }));
     node.querySelectorAll("[data-remove-extra]").forEach((button) => button.addEventListener("click", () => {
-        state.comboExtraInputs = state.comboExtraInputs.filter((input) => input !== button.dataset.removeExtra);
+        state.combo.extraInputs = state.combo.extraInputs.filter((input) => input !== button.dataset.removeExtra);
         render();
     }));
-    node.querySelector('[data-act="pickboard"]')?.addEventListener("click", () => { state.comboPicking = !state.comboPicking; render(); });
+    node.querySelector('[data-act="pickboard"]')?.addEventListener("click", () => { state.combo.picking = !state.combo.picking; render(); });
     node.querySelector('[data-act="pickout"]')?.addEventListener("click", () => openPicker({
         title: "Combo output", context: editing ? original?.badge : "new combo",
         seed: form.output ? [form.output] : [],
-        onPick: (expression) => { form.output = expression; state.picker = null; render(); },
+        onPick: (expression) => { form.output = expression; },
     }));
     // Typing and ticking land in state as they happen, so a board click that
     // redraws the screen keeps them.
@@ -754,14 +690,14 @@ function comboBuilder(layer, canEdit, holdTerm) {
     // second press cannot add the combo twice, and a refused combo keeps its
     // fields for fixing.
     node.querySelector('[data-act="delete"]')?.addEventListener("click", () => {
-        state.comboAwaiting = true;
-        post(edits.deleteCombo(state.comboEditId));
+        state.combo.awaiting = true;
+        post(edits.deleteCombo(state.combo.editId));
     });
     node.querySelector('[data-act="keep"]')?.addEventListener("click", () => {
-        state.comboAwaiting = true;
-        post(edits.comboMessage(editing ? state.comboEditId : null, {
+        state.combo.awaiting = true;
+        post(edits.comboMessage(editing ? state.combo.editId : null, {
             ...form,
-            inputs: [...inputs.map((position) => state.comboInputCodes[position.layoutIndex] ?? position.keycode), ...state.comboExtraInputs],
+            inputs: [...inputs.map((position) => state.combo.inputCodes[position.layoutIndex] ?? position.keycode), ...state.combo.extraInputs],
             holdTermMs: holdTerm(),
         }));
         render();
@@ -806,9 +742,7 @@ function tabMacros(body, right) {
     ];
 
     // A folded group holding a changed macro says so on its header.
-    const macroIds = {here: reach.onKeys, through: reach.throughKeys, branches: reach.fromBranches, combos: reach.fromCombos,
-        belowBranches: reach.fromBranchesBelow, belowCombos: reach.fromCombosBelow};
-    for (const group of groups) group.drafted = (group.id === "elsewhere" ? reach.elsewhere : (macroIds[group.id] || []).map((entry) => entry.name))
+    for (const group of groups) group.drafted = (group.id === "elsewhere" ? reach.elsewhere : reachEntries(reach, group.id).map((entry) => entry.name))
         .some((keycode) => changedMacros.has(keycode));
     const node = reachTable("macros", groups, [["Slot", "24%"], ["Payload", "44%"], ["Reached by", "24%"], ["", "8%"]]);
     attachReachRows(node, "macros");
@@ -869,26 +803,6 @@ const reachLabel = (model, entry) => [
     entry.combos?.length ? comboReach(model, entry) : "",
 ].filter(Boolean).join(" · ");
 
-// A grouped table: the column header once, then a counted header row per
-// group. One table keeps the columns lined up across the groups being
-// compared, which is the point of showing them together. Each column is given
-// its width, so unfolding a group never re-sizes the ones already on screen.
-function reachTable(tab, groups, columns) {
-    const section = (group) => `<tbody class="rowgroup">
-        <tr><td colspan="${columns.length}" class="t-group">${groupHeader(tab, group.id, group.rows.length, group.drafted)}</td></tr>
-        ${groupOpen(tab, group.id)
-            ? (group.rows.length ? group.rows.join("")
-                : `<tr><td colspan="${columns.length}"><p class="note">${esc(group.empty)}</p></td></tr>`)
-            : ""}</tbody>`;
-    const node = el(`<div style="padding:2px 0"><table class="t fixed">
-        <colgroup>${columns.map(([, width]) => `<col style="width:${width}">`).join("")}</colgroup>
-        <thead><tr>${columns.map(([name]) => `<th>${esc(name)}</th>`).join("")}</tr></thead>
-        ${inGroupOrder(groups).map(section).join("")}
-    </table></div>`);
-    attachGroupToggles(node);
-    return node;
-}
-
 function tabPointing(body, right) {
     const model = getModel();
     const reach = pointingReach(model, layers(), state.layer);
@@ -906,14 +820,14 @@ function tabPointing(body, right) {
         return `<div class="pd-card"${reachAttrs("pointing", group, slot.id)}>
             <div class="row" style="gap:9px">
                 ${slotLight(model, slot).swatch("lg")}
-                <b>${esc(slot.name || `Slot ${slot.id + 1}`)}${variant ? ` · ${esc(variant)}` : ""}</b>${changedSlots.has(slot.id) ? draftDot() : ""}
+                <b>${esc(slot.displayName || `Slot ${slot.id + 1}`)}${variant ? ` · ${esc(variant)}` : ""}</b>${changedSlots.has(slot.id) ? draftDot() : ""}
                 <span class="tag">slot ${slot.id + 1}</span>
                 <button class="btn tiny ghost" data-editpd="${slot.id}" style="margin-left:auto">Edit</button></div>
             <div class="note">${slot.kind
                 ? `${slot.kind === 2 ? "Scrolling" : "Directional"}${slot.dpi ? ` · ${slot.dpi} DPI` : " · normal pointer speed"}`
                 : "Empty · the keyboard refuses to activate it, so these keys do nothing yet"}</div>
             <div class="note">${reachedBy}</div>
-            ${slot.kind ? `<div class="note">its colour paints ${esc(row?.locality || "its locality").toLowerCase().replace(/rgb_/, "").replace(/_/g, " ")} while the mode runs — not this key</div>` : ""}
+            ${slot.kind ? `<div class="note">its colour paints ${esc(row?.locality ? word(vocabulary(model).localities, row.locality).toLowerCase() : "its locality")} while the mode runs — not this key</div>` : ""}
         </div>`;
     };
     // Holding a mode and toggling it on are the same mode reached two ways, so
@@ -949,15 +863,9 @@ function tabPointing(body, right) {
         {id: "elsewhere", cards: reach.elsewhere.map((slotId) => card("elsewhere", slotId, "not reached from this layer")),
             empty: "Every configured mode is reached from this layer.", ids: reach.elsewhere},
     ];
-    const idsOf = {here: reach.onKeys, through: reach.throughKeys, branches: reach.fromBranches, combos: reach.fromCombos,
-        belowBranches: reach.fromBranchesBelow, belowCombos: reach.fromCombosBelow};
-    const holdsChange = (group) => (group.ids || (idsOf[group.id] || []).map((entry) => entry.name)).some((id) => changedSlots.has(Number(id)));
-    const section = (group) => `<div class="reach-group">
-        ${groupHeader("pointing", group.id, group.cards.length, holdsChange(group))}
-        ${groupOpen("pointing", group.id)
-            ? (group.cards.length ? `<div class="pd-reach">${group.cards.join("")}</div>`
-                : `<p class="note" style="padding:10px 2px">${esc(group.empty)}</p>`)
-            : ""}</div>`;
+    const holdsChange = (group) => (group.ids || reachEntries(reach, group.id).map((entry) => entry.name)).some((id) => changedSlots.has(Number(id)));
+    const section = (group) => groupSection("pointing", group.id, group.cards.length, holdsChange(group),
+        group.cards.length ? `<div class="pd-reach">${group.cards.join("")}</div>` : `<p class="note" style="padding:10px 2px">${esc(group.empty)}</p>`);
 
     const node = el(`<div class="stack" style="gap:10px;padding:2px 0">
         ${inGroupOrder(groups).map(section).join("")}</div>`);
@@ -983,7 +891,6 @@ function pickKeycodeFor(layoutIndex) {
         context: `index ${layoutIndex}`,
         seed: position ? [keyMeaning(position)] : [],
         onPick: (expression) => {
-            state.picker = null;
             post(edits.setKey(layer.name, layoutIndex, expression));
         },
     });
@@ -993,7 +900,7 @@ function pickKeycodeFor(layoutIndex) {
 // on any layer; Delete or Backspace makes it transparent. Text fields keep
 // their own copy, paste and delete.
 export function keysShortcut(event) {
-    if (state.screen !== "keys" || state.overlay || state.picker || state.retarget || state.recording || state.comboPicking) return false;
+    if (state.screen !== "keys" || state.overlay || state.picker || state.retarget || state.recording || state.combo.picking) return false;
     const action = edits.keyAction(event);
     if (!action) return false;
     if (event.target.closest?.("input, textarea, select, [contenteditable]")) return false;
@@ -1037,7 +944,7 @@ function cellShortcut(action) {
         if (branch) { state.keyClipboard = {keycode: branch.action, label: branch.action}; navigator.clipboard?.writeText(branch.action).catch(() => {}); render(); }
     } else if (state.keyClipboard && writable()) {
         const pending = state.cellHow?.cell === state.cell && state.cellHow.keycode === behaviour.keycode ? state.cellHow : null;
-        const how = branch || pending || {helper: HOLD_HELPERS[0][0]};
+        const how = branch || pending || {helper: vocabulary(getModel()).holdHelpers[0]?.[0]};
         const edit = edits.cellEdit(kind, {stored: Boolean(branch), action: state.keyClipboard.keycode, helper: how.helper, repeatHz: how.repeatHz});
         if (!edit.pending && edit.branch?.action !== branch?.action) { state.cellHow = null; change(edit.branch); }
     }
@@ -1053,7 +960,6 @@ function pickBehaviourKey(behaviour) {
         context: actionLabel(getModel(), behaviour.keycode),
         seed: [behaviour.keycode],
         onPick: (expression) => {
-            state.picker = null;
             const model = getModel();
             const to = canonicalKeycode(model, expression);
             if (!to || to === canonicalKeycode(model, behaviour.keycode)) { render(); return; }

@@ -6,7 +6,7 @@ const {decodeRgbDomainV1, encodeRgbDomainV1, RGB_LAYER_MODES, RGB_LOCALITIES, RG
 const keycodes = require("../data/keycode-catalog");
 const {semanticActionForExpression, resolveNativeQmkExpression} = require("../schema/compiled-profile-v1");
 const {encodeComboDomainV1, decodeComboDomainV1} = require("../schema/combo-domain-v1");
-const {actionName, knownActionAbi} = require("./device-profile-view");
+const {actionLimitsFor, actionName, keycodeAction, knownActionAbi, layerRef, nativeCode} = require("../schema/actions");
 const {BEHAVIOR_EDITS, editKeyBehaviors} = require("./key-behavior-edits");
 const COMBO_EDITS = new Set(["addCombo", "saveCombo", "deleteCombo", "updateComboHoldTerm"]);
 
@@ -53,6 +53,17 @@ function existing(rows, predicate, label) {
     return row;
 }
 
+// Every catalog name and alias by its keycode value, built once: a pointing
+// mode's shortcuts resolve through it on every save.
+let keycodeValueCache;
+const keycodeValues = () => {
+    if (!keycodeValueCache) {
+        keycodeValueCache = {};
+        for (const entry of keycodes.entries()) for (const name of [entry.name, ...entry.aliases]) keycodeValueCache[name] = entry.value;
+    }
+    return keycodeValueCache;
+};
+
 function editDeviceProfile(bytes, message, context = {}) {
     if (PD_EDITS.has(message.type)) {
         if (!(context.capabilities?.supportedDomainMask & 16)) throw invalid("PD editing needs firmware with eight configurable slots.");
@@ -66,8 +77,7 @@ function editDeviceProfile(bytes, message, context = {}) {
             if (slots[id].kind || !slots[source].kind || id === source) throw invalid("Choose a configured source and an empty destination slot.");
             slots[id] = {...slots[source], id};
         } else slots[id] = {...structuredClone(message.config), id};
-        const keyValues = {};
-        for (const entry of keycodes.entries()) for (const name of [entry.name, ...entry.aliases]) keyValues[name] = entry.value;
+        const keyValues = keycodeValues();
         const convertTap = tap => {
             if (!tap || typeof tap.keycode !== "string") return;
             const native = resolveNativeQmkExpression(tap.keycode, {qmkKeycodeValues: keyValues});
@@ -163,8 +173,8 @@ function editCombos(bytes, message, context) {
     if (read.noTimer || read.customTrigger || read.customRelease || read.customRepress) throw invalid("This firmware has custom combo hooks or disabled timing that the profile editor cannot replace.");
     const profile = decodeProfileBlob(bytes);
     let domain = profile.domains.find(row => row.id === PROFILE_DOMAIN_IDS.COMBOS);
-    const nativeAction = operand => ({kind: 1, operand});
-    const actionOptions = {actionLimits: {maxPdModes: profile.schema.major === 2 ? 8 : 6}};
+    const nativeAction = keycodeAction;
+    const actionOptions = actionLimitsFor(profile.schema.major);
     const rows = domain ? decodeComboDomainV1(domain.payload, actionOptions) : read.rows.map(row => ({...row, output: nativeAction(row.output), inputs: row.inputs.map(nativeAction)}));
     const expression = value => {
         const name = String(value).trim();
@@ -172,7 +182,7 @@ function editCombos(bytes, message, context) {
         const native = keycodes.encode(name);
         if (native !== undefined) return nativeAction(native);
         if (!knownActionAbi(context.capabilities.actionAbiDigest)) throw invalid("Named custom actions require a matching keyboard action vocabulary.");
-        return semanticActionForExpression(name, {layers: Array.from({length: read.layerReferences.length}, (_, id) => ({name: `Layer ${id}`}))});
+        return semanticActionForExpression(name, {layers: Array.from({length: read.layerReferences.length}, (_, id) => ({name: layerRef(id)}))});
     };
     if (message.type === "updateComboHoldTerm") {
         const holdTermMs = integer(message.holdTermMs, 65535, "Hold threshold");
@@ -196,8 +206,8 @@ function assertEffectiveCombos(bytes, read) {
     const domain = profile.domains.find(row => row.id === PROFILE_DOMAIN_IDS.COMBOS);
     if (!domain) return;
     if (read?.state !== "read") throw invalid("The profile was saved, but the running combos could not be verified. Read from keyboard before retrying.");
-    const native = action => action.kind === 1 ? action.operand : resolveNativeQmkExpression(actionName(action), {});
-    const expected = decodeComboDomainV1(domain.payload, {actionLimits: {maxPdModes: profile.schema.major === 2 ? 8 : 6}}).map(row => ({...row, inputs: row.inputs.map(native), output: native(row.output)}));
+    const native = nativeCode;
+    const expected = decodeComboDomainV1(domain.payload, actionLimitsFor(profile.schema.major)).map(row => ({...row, inputs: row.inputs.map(native), output: native(row.output)}));
     if (expected.length !== read.rows.length || expected.some((row, index) => { const actual = read.rows[index]; return ["id", "output", "termMs", "holdTermMs", "mustHold", "mustTap", "ordered"].some(key => row[key] !== actual[key]) || JSON.stringify(row.inputs) !== JSON.stringify(actual.inputs); })) throw invalid("The saved combo profile does not match the running combo table. Flash the current firmware pair and read from keyboard again.");
 }
 

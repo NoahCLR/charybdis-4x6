@@ -4,7 +4,8 @@
 import {css, isOff, label as hsvLabel} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {LED_INDEX, TRACKBALL_LED} from "../view/geometry.mjs";
-import {PD_MODE_IDS, STAGE_ORDER, baseColour, feedbackColours, layerColourRow, pdColourRow, stageEnabled} from "../view/lighting.mjs";
+import {PD_MODE_IDS, baseColour, feedbackColours, layerColourRow, pdColourRow, stageEnabled} from "../view/lighting.mjs";
+import {branchName, slotCalled, stageOrder, vocabulary, word} from "../view/vocabulary.mjs";
 import {currentLayer, getModel, layerName, layers, post, render, state, writable} from "../store.mjs";
 import * as edits from "../view/edits.mjs";
 import {board} from "./board.mjs";
@@ -14,37 +15,17 @@ import {topbar, unavailable} from "./shell.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
 import {marked} from "./marks.mjs";
 
-const TABS = [
-    {id: "base", label: "Base effect"},
-    {id: "layers", label: "Layer colours"},
-    {id: "auto", label: "Auto-mouse fade"},
-    {id: "pd", label: "Pointing modes"},
-    {id: "combo", label: "Combo feedback"},
-    {id: "key", label: "Key feedback"},
-    {id: "groups", label: "LED groups"},
-];
-
-const LOCALITIES = [
-    ["RGB_BOTH_HALVES", "Both halves"], ["RGB_LEFT_HALF", "Left half"], ["RGB_RIGHT_HALF", "Right half"],
-    ["RGB_KEY_HALF", "The half holding the trigger key"], ["RGB_KEYS_ONLY", "Only the trigger key"],
-];
-const FADE_MODES = [
-    ["FOLLOW_REAL_DESTINATION", "Follow the real destination"],
-    ["END_COLOR_WHERE_BASE_EFFECT_WOULD_SHOW", "End colour where the base effect would show"],
-    ["END_COLOR_ON_ALL_KEYS", "End colour on all keys"],
-];
-const TAP_COMMIT = [
-    ["KEY_FEEDBACK_TAP_COMMIT_OFF", "Off"],
-    ["KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS", "Non-base taps"],
-];
+// The stage tabs in paint order, as the vocabulary names them, then the LED
+// groups every stage can draw on.
+const tabs = (model) => [...stageOrder(model), {id: "groups", label: "LED groups"}];
+// The key-feedback colour rows, named as their feedback owners are.
 const SEMANTIC_ROWS = [
-    {id: "tapCommittedColor", label: "Tap committed"},
-    {id: "holdActiveColor", label: "Hold active"},
-    {id: "longHoldActiveColor", label: "Long hold active"},
+    {id: "tapCommittedColor", owner: "KEY_FEEDBACK_GROUP_TAP_COMMITTED"},
+    {id: "holdActiveColor", owner: "KEY_FEEDBACK_GROUP_HOLD_ACTIVE"},
+    {id: "longHoldActiveColor", owner: "KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE"},
 ];
 
-const stageBit = (model, id) => (model?.rgb?.stages || [])
-    .find((stage) => stage.label === STAGE_ORDER.find((entry) => entry.id === id)?.label)?.bit;
+const stageBit = (model, id) => (model?.rgb?.stages || []).find((stage) => stage.id === id)?.bit;
 
 export function screenLighting() {
     const model = getModel();
@@ -100,8 +81,8 @@ export function screenLighting() {
     const marks = draftMarks(model?.draft?.changes);
     const bench = el(`<div class="card bench">
         <div class="bench-tabs" role="tablist">
-            ${TABS.map((tab) => `<button role="tab" data-ltab="${tab.id}" aria-selected="${state.stage === tab.id}">
-                ${STAGE_ORDER.some((stage) => stage.id === tab.id) ? `<i class="stagedot ${stageEnabled(model, tab.id) ? "on" : ""}"></i>` : ""}${tab.label}${marks.lighting.has(tab.id) ? draftDot() : ""}</button>`).join("")}
+            ${tabs(model).map((tab) => `<button role="tab" data-ltab="${tab.id}" aria-selected="${state.stage === tab.id}">
+                ${stageOrder(model).some((stage) => stage.id === tab.id) ? `<i class="stagedot ${stageEnabled(model, tab.id) ? "on" : ""}"></i>` : ""}${tab.label}${marks.lighting.has(tab.id) ? draftDot() : ""}</button>`).join("")}
             <span class="bench-right" id="benchRight"></span>
         </div>
         <div class="bench-body" id="benchBody"></div>
@@ -123,8 +104,8 @@ export function screenLighting() {
     return main;
 }
 
-const slotName = (model, id) => (model?.pdModes || []).find((slot) => slot.id === id)?.name || `Slot ${id + 1}`;
-const localityLabel = (value) => (LOCALITIES.find(([id]) => id === value) || [, value])[1];
+const slotName = slotCalled;
+const localityLabel = (value) => word(vocabulary(getModel()).localities, value);
 
 function stageSwitch(model, id, bit) {
     const on = stageEnabled(model, id);
@@ -150,7 +131,7 @@ function paintOrder(model) {
         combo: () => model.rgb.comboFeedback?.color,
         key: () => feedbackColours(model).hold,
     };
-    STAGE_ORDER.forEach((stage, index) => {
+    stageOrder(model).forEach((stage, index) => {
         const on = stageEnabled(model, stage.id);
         const colour = swatchFor[stage.id]();
         const lit = on && colour && !isOff(colour);
@@ -205,7 +186,7 @@ function stageBody(body) {
             const lit = row && !isOff(row.color);
             const item = el(`<button class="rowitem ${index === state.layer ? "on" : ""}" data-layer="${index}">
                 <span class="t"><span class="swatch-lg ${lit ? "" : "swatch-off"}" style="width:11px;height:11px;border-radius:3px;display:inline-block;vertical-align:-1px;margin-right:7px;${lit ? `background:${css(row.color)}` : ""}"></span>${esc(layerName(layer))}${marks.lightingLayers.has(layer.index) ? draftDot() : ""}</span>
-                <span class="m mono">${esc(row ? hsvLabel(row.color) : "not reported")} · ${row?.mode === "ALL_KEYS" ? "all keys" : "mapped keys"}</span></button>`);
+                <span class="m mono">${esc(row ? hsvLabel(row.color) : "not reported")} · ${esc(word(vocabulary(model).paintModes, row?.mode).toLowerCase())}</span></button>`);
             item.addEventListener("click", () => { state.layer = index; render(); });
             list.append(item);
         });
@@ -221,8 +202,7 @@ function stageBody(body) {
         const where = section("Where it paints");
         const mode = el(`<label class="field"><span>Which keys light up</span>
             <select class="input" ${canEdit ? "" : "disabled"}>
-                <option value="KEYS_MAPPED_ON_THIS_LAYER_ONLY" ${row?.mode !== "ALL_KEYS" ? "selected" : ""}>Keys mapped on this layer only</option>
-                <option value="ALL_KEYS" ${row?.mode === "ALL_KEYS" ? "selected" : ""}>All keys</option>
+                ${vocabulary(model).paintModes.map(([id, text]) => `<option value="${id}" ${(row?.mode || "KEYS_MAPPED_ON_THIS_LAYER_ONLY") === id ? "selected" : ""}>${esc(text)}</option>`).join("")}
             </select></label>`);
         mode.querySelector("select").addEventListener("change", (event) =>
             post(edits.layerColour(row.layer, event.target.value, row.color)));
@@ -240,7 +220,7 @@ function stageBody(body) {
         node.className = "tab-grid three";
         const policy = section("Fade");
         const select = el(`<label class="field"><span>Fade mode</span><select class="input" ${canEdit ? "" : "disabled"}>
-            ${FADE_MODES.map(([id, text]) => `<option value="${id}" ${fade.mode === id ? "selected" : ""}>${text}</option>`).join("")}</select></label>`);
+            ${vocabulary(model).fadeModes.map(([id, text]) => `<option value="${id}" ${fade.mode === id ? "selected" : ""}>${text}</option>`).join("")}</select></label>`);
         select.querySelector("select").addEventListener("change", (event) =>
             post(edits.automouseFade(event.target.value, fade.end_color)));
         policy.append(stack(select, el(`<p class="note">Auto-mouse lighting fades toward this destination over the remaining timeout. The timings live in Settings → Auto-mouse.</p>`)));
@@ -264,7 +244,7 @@ function stageBody(body) {
             const row = pdColourRow(model, slot.id);
             const lit = row && !isOff(row.color);
             const item = el(`<button class="rowitem ${slot.id === state.pdSlot ? "on" : ""} ${slot.kind ? "" : "quiet"}" data-slot="${slot.id}">
-                <span class="t"><span class="swatch-lg ${lit ? "" : "swatch-off"}" style="width:11px;height:11px;border-radius:3px;display:inline-block;vertical-align:-1px;margin-right:7px;${lit ? `background:${css(row.color)}` : ""}"></span>${esc(slot.name || `Slot ${slot.id + 1}`)}${marks.lightingSlots.has(slot.id) ? draftDot() : ""}</span>
+                <span class="t"><span class="swatch-lg ${lit ? "" : "swatch-off"}" style="width:11px;height:11px;border-radius:3px;display:inline-block;vertical-align:-1px;margin-right:7px;${lit ? `background:${css(row.color)}` : ""}"></span>${esc(slot.displayName || `Slot ${slot.id + 1}`)}${marks.lightingSlots.has(slot.id) ? draftDot() : ""}</span>
                 <span class="m mono">${esc(row ? hsvLabel(row.color) : "not reported")} · ${esc(localityLabel(row?.locality).toLowerCase())}</span></button>`);
             item.addEventListener("click", () => { state.pdSlot = slot.id; render(); });
             list.append(item);
@@ -281,7 +261,7 @@ function stageBody(body) {
         const locality = el(`<label class="field"><span>Locality</span>
             <select class="input" ${canEdit ? "" : "disabled"}
                 data-tip="The overlay is not drawn on the key that binds the mode; it paints this region while the mode runs.">
-            ${LOCALITIES.map(([id, text]) => `<option value="${id}" ${row?.locality === id ? "selected" : ""}>${text}</option>`).join("")}</select></label>`);
+            ${vocabulary(model).localities.map(([id, text]) => `<option value="${id}" ${row?.locality === id ? "selected" : ""}>${text}</option>`).join("")}</select></label>`);
         locality.querySelector("select").addEventListener("change", (event) =>
             post(edits.pdModeColour(PD_MODE_IDS[state.pdSlot], event.target.value, row.color)));
         const previewSwitch = el(`<label class="sw"><input type="checkbox" ${state.pdPreview ? "checked" : ""}><span class="track"></span>
@@ -307,7 +287,7 @@ function stageBody(body) {
         }));
         const where = section("Where it paints");
         const locality = el(`<label class="field"><span>Locality</span><select class="input" ${canEdit ? "" : "disabled"}>
-            ${LOCALITIES.map(([id, text]) => `<option value="${id}" ${combo.locality === id ? "selected" : ""}>${text}</option>`).join("")}</select></label>`);
+            ${vocabulary(model).localities.map(([id, text]) => `<option value="${id}" ${combo.locality === id ? "selected" : ""}>${text}</option>`).join("")}</select></label>`);
         locality.querySelector("select").addEventListener("change", (event) =>
             post(edits.comboFeedback(event.target.value, combo.color)));
         where.append(stack(locality));
@@ -323,8 +303,8 @@ function stageBody(body) {
     if (state.stage === "key") {
         const feedback = model.rgb.keyBehaviorFeedback || {};
         const rows = [
-            ...SEMANTIC_ROWS.map((row) => ({...row, colour: feedback[row.id]})),
-            ...(feedback.tapBranchColors || []).map((colour, index) => ({id: `branch:${index}`, label: `Tap count ${index + 2}`, colour})),
+            ...SEMANTIC_ROWS.map((row) => ({...row, label: word(vocabulary(model).feedbackOwners, row.owner), colour: feedback[row.id]})),
+            ...(feedback.tapBranchColors || []).map((colour, index) => ({id: `branch:${index}`, label: branchName(model, index + 2), colour})),
         ];
         if (!rows.some((row) => row.id === state.feedbackRow)) state.feedbackRow = rows[0]?.id;
         const current = rows.find((row) => row.id === state.feedbackRow) || rows[0];
@@ -347,11 +327,11 @@ function stageBody(body) {
         }));
         const policy = section("Policy");
         const commit = el(`<label class="field"><span>Tap commit</span><select class="input" ${canEdit ? "" : "disabled"}>
-            ${TAP_COMMIT.map(([id, text]) => `<option value="${id}" ${feedback.tapCommitMode === id ? "selected" : ""}>${text}</option>`).join("")}</select></label>`);
+            ${vocabulary(model).tapCommit.map(([id, text]) => `<option value="${id}" ${feedback.tapCommitMode === id ? "selected" : ""}>${text}</option>`).join("")}</select></label>`);
         commit.querySelector("select").addEventListener("change", (event) =>
             post(edits.keyFeedback(model.rgb.keyBehaviorFeedback, null, null, {tapCommitMode: event.target.value})));
         const locality = el(`<label class="field"><span>Where</span><select class="input" ${canEdit ? "" : "disabled"}>
-            ${LOCALITIES.map(([id, text]) => `<option value="${id}" ${feedback.locality === id ? "selected" : ""}>${text}</option>`).join("")}</select></label>`);
+            ${vocabulary(model).localities.map(([id, text]) => `<option value="${id}" ${feedback.locality === id ? "selected" : ""}>${text}</option>`).join("")}</select></label>`);
         locality.querySelector("select").addEventListener("change", (event) =>
             post(edits.keyFeedback(model.rgb.keyBehaviorFeedback, null, null, {locality: event.target.value})));
         policy.append(stack(commit, locality, el(`<p class="note">The flash interval lives in Settings → Lighting feedback, because the keyboard stores it with its timing.</p>`)));
@@ -363,7 +343,7 @@ function stageBody(body) {
             <span class="chip">${dot(colours.tap)} tap branch</span>
             <span class="chip">${dot(colours.hold)} hold branch</span>
             <span class="chip">${dot(colours.long)} long hold branch</span>
-            ${(colours.branches || []).map((colour, index) => `<span class="chip">${dot(colour)} tap count ${index + 2}</span>`).join("")}</div>`));
+            ${(colours.branches || []).map((colour, index) => `<span class="chip">${dot(colour)} ${esc(branchName(model, index + 2).toLowerCase())}</span>`).join("")}</div>`));
         onBoard.append(el(`<p class="note">These are the colours a key wears on the board: a behaviour's tap, hold and long-hold dots, and the branch numbers in the behaviour grid.${stageEnabled(model, "key") ? "" : " The stage is off, so every one of them is drawn hollow."}</p>`));
         onBoard.append(groupRowsTable(model.rgb.keyBehaviorFeedbackLedGroups, "keyBehavior"));
         main.append(colour, policy, onBoard);
@@ -408,18 +388,11 @@ function groupRowsTable(rows, target) {
 // Who a row belongs to depends on its table: a layer, a pointing mode, a key
 // feedback state, or — for combo feedback — nobody, since every combo shares
 // one colour. The values are the names the host's RGB enums use.
-const KEY_FEEDBACK_OWNERS = [
-    ["KEY_FEEDBACK_GROUP_ALL", "Every feedback state"],
-    ["KEY_FEEDBACK_GROUP_TAP_BRANCH_PENDING", "Tap branch pending"],
-    ["KEY_FEEDBACK_GROUP_TAP_COMMITTED", "Tap committed"],
-    ["KEY_FEEDBACK_GROUP_HOLD_ACTIVE", "Hold active"],
-    ["KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE", "Long hold active"],
-];
 function rowOwners(model, target) {
     if (target === "layer") return [...layers().map((layer) => [`Layer ${layer.index}`, layerName(layer)]), ["RGB_LAYER_GROUP_ALL", "All layers"]];
     if (target === "pdMode") return [...(model.rgb.pdModeColors || []).map((row, index) =>
-        [row.pointingMode, (model.pdModes || []).find((slot) => slot.id === index)?.name || `Slot ${index + 1}`]), ["RGB_PD_MODE_GROUP_ALL", "All pointing modes"]];
-    if (target === "keyBehavior") return KEY_FEEDBACK_OWNERS;
+        [row.pointingMode, slotCalled(model, index)]), ["RGB_PD_MODE_GROUP_ALL", "All pointing modes"]];
+    if (target === "keyBehavior") return vocabulary(model).feedbackOwners;
     return [];
 }
 

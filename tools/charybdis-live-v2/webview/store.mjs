@@ -25,16 +25,16 @@ export const state = {
     cell: null,
     reveal: null,        // a selector the next render scrolls into view and marks, then forgets
     pickCombo: null,     // a combo id to pick in the Combos tab, wherever this layer lists it
-    settingsOpen: null,  // a settings section held open, one Show went to
+    settingsOpen: [],    // settings sections opened by hand or by a Show, so a render keeps them open
     cellHow: null,       // {cell, keycode, helper, repeatHz}: how the open empty cell runs, chosen before it sends anything
-    comboOpen: false,
-    comboPicking: false,
-    comboInputs: [],
-    comboInputCodes: {},  // layoutIndex → the input name the keyboard stores, for a combo being edited
-    comboExtraInputs: [], // inputs of the combo being edited that this layer cannot reach
-    comboForm: {output: "", termMs: "", mustHold: false, mustTap: false, ordered: false}, // the builder's fields, kept across renders
-    comboAwaiting: false, // a Keep or Delete posted; the builder closes when the host accepts it
-    comboEditId: null,
+    // The combo builder, opened and closed as one (openComboBuilder):
+    //   inputs      layout indexes picked on the current layer
+    //   inputCodes  layoutIndex → the input name the keyboard stores, for a combo being edited
+    //   extraInputs inputs of the combo being edited that this layer cannot reach
+    //   form        the builder's fields, kept across renders
+    //   awaiting    a Keep or Delete posted; the builder closes when the host accepts it
+    combo: {open: false, picking: false, inputs: [], inputCodes: {}, extraInputs: [],
+        form: {output: "", termMs: "", mustHold: false, mustTap: false, ordered: false}, awaiting: false, editId: null},
     placement: null,     // {keycode, label}: next board click places it on the current layer
     retarget: null,      // {from, to, existing}: a behaviour move waiting on overwrite / swap / cancel
     keyClipboard: null,  // {keycode, label}: the key ⌘C copied, for ⌘V onto the selected key
@@ -50,9 +50,7 @@ export const state = {
     feedbackRow: "hold",
     macroSlot: null,
     macroSearch: "",
-    macroDrafts: {},
-    macroSteps: {},
-    macroCursors: {},
+    macroForms: {},       // keycode → {draft, step, cursor}: one macro slot's unsaved text, the step being built, where it goes
     recording: null,     // {slot, before, last, captured} only while a take is being captured
     lastTake: null,      // {slot, before}: the finished take Clear take can undo
     recordDelays: true,
@@ -74,23 +72,31 @@ export const state = {
 // again. Its fields live here rather than in the DOM, because a board click
 // while picking inputs redraws the whole screen.
 export function openComboBuilder(combo = null, inputs = {positions: [], codes: {}, extras: []}) {
-    Object.assign(state, {
-        comboOpen: true, comboPicking: false, comboAwaiting: false, comboEditId: combo?.id ?? null,
-        comboForm: {output: combo?.output || "", termMs: String(combo?.termMs ?? ""), mustHold: Boolean(combo?.mustHold), mustTap: Boolean(combo?.mustTap), ordered: Boolean(combo?.ordered)},
-        comboInputs: inputs.positions.slice(), comboInputCodes: {...inputs.codes}, comboExtraInputs: inputs.extras.slice(),
-    });
+    state.combo = {
+        open: true, picking: false, awaiting: false, editId: combo?.id ?? null,
+        form: {output: combo?.output || "", termMs: String(combo?.termMs ?? ""), mustHold: Boolean(combo?.mustHold), mustTap: Boolean(combo?.mustTap), ordered: Boolean(combo?.ordered)},
+        inputs: inputs.positions.slice(), inputCodes: {...inputs.codes}, extraInputs: inputs.extras.slice(),
+    };
 }
 export function closeComboBuilder() {
     openComboBuilder();
-    state.comboOpen = false;
+    state.combo.open = false;
 }
 
 // Undo, redo, discard and rebase replace the draft under the forms. Every form
 // that holds its own unstaged text starts again from the model, so nothing on
 // screen shows an edit the draft no longer has.
+// One macro slot's editor state, and a change to part of it.
+export const macroForm = (keycode) => state.macroForms[keycode] || {};
+export function setMacroForm(keycode, fields) {
+    state.macroForms = {...state.macroForms, [keycode]: {...state.macroForms[keycode], ...fields}};
+}
+
 export function resetDraftForms() {
-    state.macroDrafts = {};
-    state.macroSteps = {};
+    // A take being recorded is typing in progress, not a stale form: its
+    // slot keeps the text it is building on.
+    const take = state.recording?.slot;
+    state.macroForms = take && state.macroForms[take] ? {[take]: {draft: state.macroForms[take].draft}} : {};
     state.lastTake = null;
     state.pdKind = null;
     state.pdButtons = null;
@@ -122,3 +128,20 @@ export const selectedPosition = () => positionAt(currentLayer(), state.selected)
 // Editing is only offered where the keyboard says it is possible; everywhere
 // else the control stays visible and disabled, with the reason.
 export const writable = () => Boolean(getModel()?.draft?.matching && !getModel()?.draft.stale && !getModel()?.draft.busy && getModel()?.device?.connected);
+
+// Whether an area can be edited now, decided in one place: every edit goes
+// into the draft, so the draft must be this keyboard's, current and idle, and
+// the area's own capability must hold. Exporting only reads the keyboard.
+const AREA_CAPABILITY = {
+    settings: (model) => Boolean(model?.settingsEditing?.writable),
+    macros: (model) => Boolean(model?.macroEditing?.writable),
+    pointing: (model) => Boolean(model?.pdModeEditing?.writable),
+    combos: (model) => model?.comboReadback?.writable !== false,
+    layers: (model) => Boolean(model?.portable?.available && model.portable.eightLayers && !model.portable.busy),
+    import: (model) => Boolean(model?.portable?.available && model.portable.eightLayers && !model.portable.busy),
+};
+export function canEdit(area) {
+    const model = getModel();
+    if (area === "export") return Boolean(model?.portable?.available && !model.portable.busy);
+    return writable() && (AREA_CAPABILITY[area] ? AREA_CAPABILITY[area](model) : true);
+}

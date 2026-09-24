@@ -8,7 +8,7 @@ import {el, esc} from "./lib/dom.mjs";
 import {css, isOff} from "./lib/colour.mjs";
 import {captureContentScroll, restoreContentScroll} from "./lib/scroll.mjs";
 import {activateOnKey, captureFocus, focusDialog, restoreFocus, trapTab} from "./lib/focus.mjs";
-import {closeComboBuilder, getModel, post, render as rerender, resetDraftForms, setModel, setRenderer, state} from "./store.mjs";
+import {closeComboBuilder, getModel, post, render as rerender, resetDraftForms, setModel, setRenderer, state, writable} from "./store.mjs";
 import {historyAction} from "./view/edits.mjs";
 import {FIELDS_SHOWN, discardLabel, placeState, reviewBlocks, statusSummary, stillShown} from "./view/review.mjs";
 import {bindLayerIndex, hideHover, mountHover} from "./ui/hover.mjs";
@@ -78,7 +78,7 @@ function reviewOverlay() {
     if (state.overlay !== "review" || !draft?.dirty) return null;
     // Discarding goes back to the keyboard's value; it waits while the draft
     // is out of step with the keyboard or busy, as editing does.
-    const canDiscard = !draft.stale && !draft.busy && draft.connected;
+    const canDiscard = writable();
     // A colour is shown as the keyboard would light it, beside its value; an
     // off colour is drawn off, as it is everywhere else.
     const swatch = (colour) => colour
@@ -252,11 +252,11 @@ addEventListener("message", (event) => {
     // A combo builder waiting on Keep or Delete closes when the host accepts
     // the edit, and stays open with its fields when the host refuses it. A
     // builder for a combo that no longer exists closes too.
-    if (state.comboAwaiting) {
-        if (/^Failed/.test(message.notice || "")) state.comboAwaiting = false;
+    if (state.combo.awaiting) {
+        if (/^Failed/.test(message.notice || "")) state.combo.awaiting = false;
         else closeComboBuilder();
     }
-    if (state.comboEditId !== null && !(message.model?.combos || []).some((combo) => combo.id === state.comboEditId)) closeComboBuilder();
+    if (state.combo.editId !== null && !(message.model?.combos || []).some((combo) => combo.id === state.combo.editId)) closeComboBuilder();
     const layerCount = message.model?.layers?.length || 0;
     if (state.layer >= layerCount) state.layer = 0;
     const positions = message.model?.layers?.[state.layer]?.positions || [];

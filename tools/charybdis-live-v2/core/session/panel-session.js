@@ -10,7 +10,7 @@
 
 const {summary, reorderLayers} = require("../model/portable-profile");
 const {ProfileDraftSession, DRAFT_EDITS} = require("./profile-draft-session");
-const {buildDeviceModel} = require("./device-model");
+const {buildDeviceModel, deviceSummary} = require("./device-model");
 
 const DRAFT_CONTROLS = new Set([
     "reviewProfileDraft", "undoProfileDraft", "redoProfileDraft", "discardProfileDraft", "discardProfileDraftChanges",
@@ -66,7 +66,7 @@ function buildPanelModel(session, state) {
             const names = session.draft.current.summary.names;
             model.layers?.forEach((layer, index) => {layer.displayName = names[index];});
         }
-        const actual = buildDeviceModel({
+        const actual = deviceSummary({
             capabilities: state.capabilities, status: state.status, layout: state.layout, committed: state.committed,
             baseRgb: state.baseRgb, combos: state.combos, macroView: state.macroView, settingsView: state.settingsView,
             busy, device,

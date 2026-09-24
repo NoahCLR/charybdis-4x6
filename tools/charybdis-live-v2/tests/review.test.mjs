@@ -46,7 +46,7 @@ test("Show goes to where each kind of item is edited", () => {
     assert.equal(combo.pickCombo, 3, "a combo is asked for by id, since its group depends on the layer");
     assert.equal(combo.reveal, '[data-reach][data-picked="true"]');
     const section = placeState({kind: "settings", section: "keyTiming"});
-    assert.equal(section.settingsOpen, "keyTiming", "a folded section opens");
+    assert.deepEqual(section.settingsOpen, ["keyTiming"], "a folded section opens");
     assert.equal(section.reveal, '.settings-group[data-section="keyTiming"]');
     assert.equal(placeState({kind: "settings"}).reveal, undefined, "settings with no section just open the screen");
 });

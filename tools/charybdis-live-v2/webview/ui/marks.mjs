@@ -9,9 +9,8 @@
 
 import {css, isOff} from "../lib/colour.mjs";
 import {esc} from "../lib/dom.mjs";
-import {feedbackColours, stageEnabled} from "../view/lighting.mjs";
+import {feedbackColours, pdColourRow, stageEnabled} from "../view/lighting.mjs";
 import {layerSwatch} from "./layerbar.mjs";
-import {slotLight} from "./pointing.mjs";
 
 // A branch's badge as the grid heads its column: from 2× on, tinted with the
 // tap-branch colour the keyboard shows while that branch is pending.
@@ -31,6 +30,15 @@ export function comboBadge(model, badge = "C") {
     const colour = model?.rgb?.comboFeedback?.color;
     const lit = stageEnabled(model, "combo") && colour && !isOff(colour);
     return `<i class="mk-badge" style="${lit ? `border-color:${css(colour)}` : ""}">${esc(badge)}</i>`;
+}
+
+// A pointing slot's light, as the keyboard would show it: a stage that is off
+// looks off. Every surface that shows a pointing mode draws it from here.
+export function slotLight(model, slot) {
+    const row = pdColourRow(model, slot.id);
+    const lit = Boolean(row && !isOff(row.color) && stageEnabled(model, "pd"));
+    return {row, lit, swatch: (klass = "") => `<span class="pd-swatch ${klass} ${lit ? "" : "swatch-off"}"
+        ${lit ? `style="background:${css(row.color)}"` : ""}></span>`};
 }
 
 // A mark as the host describes it: {kind: "tier", tier, branch?} · {kind:

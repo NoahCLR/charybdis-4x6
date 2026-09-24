@@ -7,50 +7,47 @@
 
 import {css, isOff} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
-import {AXIS, BUTTON, DIAGONALS, DIRECTIONS, EMPTY_DIRECTION, KIND, SCROLL_FIELDS, axisReads, dpiOptions, newMode, readConfig, readsHorizontal, readsVertical, settleButtons, startingRecord} from "../view/pointing-config.mjs";
+import {AXIS, BUTTON, DIAGONALS, DIRECTIONS, KIND, SCROLL_FIELDS, axisReads, dpiOptions, newMode, readConfig, readsHorizontal, readsVertical, settleButtons, startingRecord} from "../view/pointing-config.mjs";
 import {MODIFIER_BITS, keyName, modifierNames} from "../view/keyvalues.mjs";
 import {bindingsForSlot} from "../view/keyface.mjs";
 import {pdColourRow, stageEnabled} from "../view/lighting.mjs";
-import {getModel, post, render, state, writable} from "../store.mjs";
+import {getModel, post, render, state, writable, canEdit as canEditArea} from "../store.mjs";
 import * as edits from "../view/edits.mjs";
 import {openPicker} from "./picker.mjs";
+import {slotLight} from "./marks.mjs";
+import {vocabulary, word} from "../view/vocabulary.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
 import {topbar, unavailable} from "./shell.mjs";
 
 
-const AXES = [[2, "Dominant axis"], [3, "Eight directions"], [0, "Vertical only"], [1, "Horizontal only"]];
-const INVERT = [[0, "Neither axis"], [1, "Horizontal"], [2, "Vertical"], [3, "Both axes"]];
-const POINTER_LAYER = [[0, "Keep the pointer layer active"], [1, "Return to the typing layer"]];
-const BUTTON_KINDS = [[BUTTON.PASS_THROUGH, "Pass through"], [BUTTON.CONSUME, "Consume"], [BUTTON.TAP, "Tap a shortcut"], [BUTTON.HOLD_MODIFIERS, "Hold modifiers"]];
+// The words for movement, axes, buttons and scroll fields come with the
+// model (model.vocabulary.pointing), so this editor and the review agree.
+const words = (model) => vocabulary(model).pointing;
+// A scroll field's label; a field that shows its unit beside it drops the
+// "(ms)" its label carries elsewhere.
+const scrollLabel = (model, key, unit) => {
+    const label = word(words(model).scrollFields, key);
+    return unit ? label.replace(/\s*\(ms\)$/, "") : label;
+};
 const ARROWS = {up: "↑", left: "←", right: "→", down: "↓", upLeft: "↖", upRight: "↗", downLeft: "↙", downRight: "↘"};
 
 // The four scroll fields the Scrolling card shows itself. A field rendered
 // twice registers its reader twice, and the second input silently wins, so
 // Advanced shows only what the card above does not.
-const SCROLL_LEAD = [["divisorH", "Movement per step ↔"], ["divisorV", "Movement per step ↕"],
-    ["intervalMs", "Minimum interval", "ms"], ["lockMs", "Axis lock timeout", "ms"]];
+const SCROLL_LEAD = [["divisorH"], ["divisorV"], ["intervalMs", "ms"], ["lockMs", "ms"]];
 // The rest of the scroll record, as Advanced lays it out: single values, then
 // the two axis ratios, each as one numerator : denominator pair.
-const SCROLL_SINGLES = [["thresholdH", "Horizontal activation threshold"], ["thresholdV", "Vertical activation threshold"],
-    ["expireMs", "Gesture expiry", "ms"], ["decayDivisor", "Cross-axis decay divisor"]];
-const SCROLL_RATIOS = [["Axis selection ratio", "startNumerator", "startDenominator"],
-    ["Axis retention ratio", "sustainNumerator", "sustainDenominator"]];
-const BINDINGS = ["DRAGSCROLL", "VOLUME_MODE", "BRIGHTNESS_MODE", "ZOOM_MODE", "ARROW_MODE", "PINCH_MODE"];
-const bindingName = (slot) => slot.id < BINDINGS.length ? BINDINGS[slot.id] : `PD_SLOT_${slot.id}`;
-const axisLabel = (axis) => (AXES.find(([value]) => value === axis) || [, "Dominant axis"])[1];
+const SCROLL_SINGLES = [["thresholdH"], ["thresholdV"], ["expireMs", "ms"], ["decayDivisor"]];
+const SCROLL_RATIOS = [["startNumerator", "startDenominator"], ["sustainNumerator", "sustainDenominator"]];
+// A slot's binding keycodes come with the model (data/pd-bindings.js).
+const bindingName = (slot) => slot.binding?.hold || "";
+const axisLabel = (model, axis) => word(words(model).axes, axis);
 
-// A slot's light, as the keyboard would show it: a stage that is off looks off.
-export function slotLight(model, slot) {
-    const row = pdColourRow(model, slot.id);
-    const lit = Boolean(row && !isOff(row.color) && stageEnabled(model, "pd"));
-    return {row, lit, swatch: (klass = "") => `<span class="pd-swatch ${klass} ${lit ? "" : "swatch-off"}"
-        ${lit ? `style="background:${css(row.color)}"` : ""}></span>`};
-}
 
 export function screenPointing() {
     const model = getModel();
     const slots = model?.pdModes || [];
-    const canEdit = writable() && Boolean(model?.pdModeEditing?.writable);
+    const canEdit = canEditArea("pointing");
 
     const main = el(`<div class="main">${topbar(
         "Pointing modes",
@@ -76,7 +73,7 @@ export function screenPointing() {
         const card = el(`<button class="slotcard ${slot.kind ? "" : "empty"}" data-slot="${slot.id}" aria-current="${state.pdSlot === slot.id}">
             ${swatch()}
             <span class="nm">${slot.kind ? esc(slot.name) : "Empty slot"}</span><span class="no">${changedSlots.has(slot.id) ? draftDot("Changed in your draft", "lead") : ""}${slot.id + 1}</span>
-            <span class="meta">${slot.kind === KIND.SCROLLING ? "Scrolling" : slot.kind === KIND.DIRECTIONAL ? `Directional · ${esc(axisLabel(slot.axis))}` : "Available"}</span>
+            <span class="meta">${slot.kind === KIND.SCROLLING ? "Scrolling" : slot.kind === KIND.DIRECTIONAL ? `Directional · ${esc(axisLabel(model, slot.axis))}` : "Available"}</span>
             <span class="meta mono">${esc(bindingName(slot))}</span>
             ${inert ? `<span class="meta warn">${inert} key${inert === 1 ? " still reaches" : "s still reach"} it · inert</span>` : ""}</button>`);
         card.addEventListener("click", () => { state.pdSlot = slot.id; state.pdKind = null; state.pdButtons = null; render(); });
@@ -107,7 +104,7 @@ function emptySlot(model, slot, canEdit, slots) {
         <div class="card-h">${slotLight(model, slot).swatch("lg")}<h3>Slot ${slot.id + 1} is empty</h3>
             <span class="tag">${esc(bindingName(slot))}</span></div>
         <div class="card-b stack">
-        <p class="note" style="max-width:64ch">Nothing is stored here. Start a new mode, or copy a configured one and change what you need — its binding keycode is <code>${esc(bindingName(slot))}</code>, and <code>${esc(bindingName(slot))}_LOCK</code> toggles it.</p>
+        <p class="note" style="max-width:64ch">Nothing is stored here. Start a new mode, or copy a configured one and change what you need — its binding keycode is <code>${esc(bindingName(slot))}</code>, and <code>${esc(slot.binding?.lock || "")}</code> toggles it.</p>
         ${inertNote(model, slot)}
         <div class="row" style="gap:8px">
             <button class="btn primary" data-new="${KIND.DIRECTIONAL}" ${canEdit ? "" : "disabled"}
@@ -171,7 +168,6 @@ function editor(model, slot, canEdit, slots) {
                 seed: name ? [name] : [],
                 onPick: (expression) => {
                     input.value = expression;
-                    state.picker = null;
                     stageCurrent();
                     render();
                 },
@@ -202,7 +198,7 @@ function editor(model, slot, canEdit, slots) {
     const head = el(`<div class="card">
         <div class="card-h">
             ${light.swatch("lg")}
-            <h3>${esc(slot.name || `Slot ${slot.id + 1}`)}</h3><span class="tag">slot ${slot.id + 1} · ${esc(bindingName(slot))}</span>
+            <h3>${esc(slot.displayName || `Slot ${slot.id + 1}`)}</h3><span class="tag">slot ${slot.id + 1} · ${esc(bindingName(slot))}</span>
             <span class="right">
                 ${empties ? `<button class="btn tiny" data-act="duplicate" ${disabled}
                     data-tip="Copy this mode into the first empty slot.">Duplicate</button>` : ""}
@@ -215,7 +211,7 @@ function editor(model, slot, canEdit, slots) {
         <input class="input" value="${esc(slot.name)}" maxlength="23" ${disabled}></label>`);
     form.name = () => name.querySelector("input").value.trim();
     headBody.append(name);
-    headBody.append(select("Movement", [[KIND.DIRECTIONAL, "Directional keys / shortcuts"], [KIND.SCROLLING, "Scrolling"]], kind, "kind",
+    headBody.append(select("Movement", words(model).kinds.filter(([value]) => value), kind, "kind",
         // Switching movement only redraws the form for the other kind: its
         // fields start empty, so staging now would post an invalid record.
         // The slot is staged once a field of the new form is changed.
@@ -230,7 +226,7 @@ function editor(model, slot, canEdit, slots) {
         const card = el(`<div class="card">
             <div class="card-h"><h3>What each direction sends</h3><span class="right" data-axis></span></div>
             <div class="card-b stack"><div class="pd-cross ${slot.axis === AXIS.EIGHT ? "eight" : reads.length === 4 ? "" : reads.includes("up") ? "vertical" : "horizontal"}"></div></div></div>`);
-        card.querySelector("[data-axis]").append(select("Reads", AXES, slot.axis, "axis", {inline: true,
+        card.querySelector("[data-axis]").append(select("Reads", words(model).axes, slot.axis, "axis", {inline: true,
             tip: "Which movement this mode turns into keys. Switching to one axis empties the other axis's shortcuts."}));
         const cross = card.querySelector(".pd-cross");
         for (const [direction, label] of DIRECTIONS) {
@@ -251,7 +247,7 @@ function editor(model, slot, canEdit, slots) {
         }
         // Every directional mode: what moving toward a direction with no
         // shortcut does.
-        card.querySelector(".card-b").append(select("When a direction is empty", EMPTY_DIRECTION, slot.emptyDirection ?? 0, "emptyDirection",
+        card.querySelector(".card-b").append(select("When a direction is empty", words(model).emptyDirection, slot.emptyDirection ?? 0, "emptyDirection",
             {tip: "Moving toward a direction with no shortcut: its neighbours take over its share; both neighbours are sent (a diagonal's two straight directions, a straight direction's two diagonals, so in eight directions only); or the move does nothing."}));
         cross.append(el(`<div class="hub" aria-hidden="true"><svg viewBox="0 0 64 64">
             <circle cx="32" cy="32" r="22"/><circle cx="32" cy="32" r="3"/>
@@ -265,17 +261,17 @@ function editor(model, slot, canEdit, slots) {
             <div class="card-h"><h3>Scrolling</h3></div>
             <div class="card-b stack"><div class="pd-grid4"></div><div class="pd-split"></div></div></div>`);
         const steps = card.querySelector(".pd-grid4");
-        for (const [key, label, unit] of SCROLL_LEAD) steps.append(field(label, slot.scroll?.[key], `scroll:${key}`, {unit}));
+        for (const [key, unit] of SCROLL_LEAD) steps.append(field(scrollLabel(model, key, unit), slot.scroll?.[key], `scroll:${key}`, {unit}));
         const lower = card.querySelector(".pd-split");
-        lower.append(select("Reverse scrolling", INVERT, slot.scroll?.invert, "invert"));
-        lower.append(modifiers("Hold modifiers while scrolling", slot.heldModifiers, "heldModifiers"));
+        lower.append(select("Reverse scrolling", words(model).invert, slot.scroll?.invert, "invert"));
+        lower.append(modifiers(words(model).heldModifiers, slot.heldModifiers, "heldModifiers"));
         wrap.append(card);
     }
 
     // ── how it is reached ─────────────────────────────────────────────────
     const {row} = light;
     const lightText = row
-        ? `HSV(${[row.color.h, row.color.s, row.color.v].join(", ")}) · ${esc(String(row.locality).replace(/^RGB_/, "").toLowerCase().replace(/_/g, " "))}${stageEnabled(model, "pd") ? "" : " · stage off"}`
+        ? `HSV(${[row.color.h, row.color.s, row.color.v].join(", ")}) · ${esc(word(vocabulary(model).localities, row.locality).toLowerCase())}${stageEnabled(model, "pd") ? "" : " · stage off"}`
         : "no colour reported";
     const reach = el(`<div class="card">
         <div class="card-h"><h3>How it is reached</h3></div>
@@ -283,7 +279,7 @@ function editor(model, slot, canEdit, slots) {
             <span class="lbl">Keys</span>
             <div class="val">
                 <span class="act"><span class="k">${esc(bindingName(slot))}</span><span class="how">hold</span></span>
-                <span class="act"><span class="k">${esc(bindingName(slot))}_LOCK</span><span class="how">toggle</span></span>
+                <span class="act"><span class="k">${esc(slot.binding?.lock || "")}</span><span class="how">toggle</span></span>
                 <span class="note">${esc(placedOn(model, slot))}</span></div>
             <button class="btn tiny" data-act="place" ${disabled}>Place on a layer…</button>
             <span class="lbl">Light</span>
@@ -295,7 +291,7 @@ function editor(model, slot, canEdit, slots) {
         state.screen = "lighting"; state.stage = "pd"; render();
     });
     reach.querySelector('[data-act="place"]').addEventListener("click", () => {
-        state.placement = {keycode: bindingName(slot), label: slot.name || `Pointing slot ${slot.id + 1}`};
+        state.placement = {keycode: bindingName(slot), label: slot.displayName || `Slot ${slot.id + 1}`};
         state.screen = "keys";
         state.tab = "key";
         render();
@@ -314,7 +310,7 @@ function editor(model, slot, canEdit, slots) {
     };
 
     const behaviour = el(`<div class="pd-grid3"></div>`);
-    behaviour.append(select("After this mode ends", POINTER_LAYER, slot.pointerLayer, "pointerLayer"));
+    behaviour.append(select("After this mode ends", words(model).pointerLayer, slot.pointerLayer, "pointerLayer"));
     if (!scrolling) {
         // An axis the mode does not read has no threshold to set.
         if (readsHorizontal(slot.axis)) behaviour.append(field("Horizontal movement per tap", slot.thresholdX, "thresholdX"));
@@ -325,11 +321,12 @@ function editor(model, slot, canEdit, slots) {
     if (scrolling) {
         const tuning = el(`<div class="pd-grid3"></div>`);
         const drawn = new Set(SCROLL_LEAD.map(([key]) => key));
-        for (const [key, label, unit] of SCROLL_SINGLES) {
-            tuning.append(field(label, slot.scroll?.[key], `scroll:${key}`, {unit}));
+        for (const [key, unit] of SCROLL_SINGLES) {
+            tuning.append(field(scrollLabel(model, key, unit), slot.scroll?.[key], `scroll:${key}`, {unit}));
             drawn.add(key);
         }
-        for (const [label, top, bottom] of SCROLL_RATIOS) {
+        for (const [top, bottom] of SCROLL_RATIOS) {
+            const label = scrollLabel(model, top).replace(/\s*·\s*numerator$/, "");
             const pair = el(`<div class="field"><span>${esc(label)}</span><div class="pd-ratio"></div></div>`);
             const inputs = pair.querySelector(".pd-ratio");
             for (const [index, key] of [top, bottom].entries()) {
@@ -343,7 +340,8 @@ function editor(model, slot, canEdit, slots) {
             tuning.append(pair);
         }
         // Anything the record gains later is still drawn, once.
-        for (const [key, label] of SCROLL_FIELDS) {
+        for (const [key] of SCROLL_FIELDS) {
+            const label = scrollLabel(model, key);
             if (!drawn.has(key)) tuning.append(field(label, slot.scroll?.[key], `scroll:${key}`));
         }
         section("Scroll tuning").append(tuning);
@@ -357,7 +355,7 @@ function editor(model, slot, canEdit, slots) {
             <span class="h">Shortcut</span><span class="h">Held modifiers</span></div>`);
         (slot.buttons || []).forEach((stored, index) => {
             const button = unfinished[index] || stored;
-            const kindSelect = select(`Button ${index + 1}`, BUTTON_KINDS, button.kind, `button:${index}:kind`);
+            const kindSelect = select(`Button ${index + 1}`, words(model).buttons, button.kind, `button:${index}:kind`);
             kindSelect.querySelector("span").classList.add("sr");
             const tapping = button.kind === BUTTON.TAP, holding = button.kind === BUTTON.HOLD_MODIFIERS;
             const tap = tapping

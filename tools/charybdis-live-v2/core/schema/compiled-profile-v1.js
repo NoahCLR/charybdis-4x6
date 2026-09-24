@@ -3,8 +3,8 @@
 // Expressions as the keyboard's vocabulary spells them — KC_A, LT(1, KC_A),
 // DRAGSCROLL, VIA_MACRO_3 — resolved to profile actions and native keycodes.
 
+const {PD_BINDINGS, LEGACY_PD_SLOTS, pdBindingOfName} = require("../data/pd-bindings");
 const {PROFILE_ACTION_KINDS} = require("./profile-blob-v1");
-const {RGB_PD_MODE_IDS} = require("./rgb-domain-v1");
 
 const QMK_USER_BASE = 0x7e40;
 const QMK_MACRO_BASE = 0x7700;
@@ -20,24 +20,11 @@ const CHARYBDIS_KEYCODE_VALUES = Object.freeze({
     DRG_TOG: 0x7e07,
 });
 
-const PD_ACTIONS = Object.freeze({
-    DRAGSCROLL: {kind: PROFILE_ACTION_KINDS.PD_MODE_MOMENTARY, operand: RGB_PD_MODE_IDS.PD_MODE_DRAGSCROLL},
-    DRAGSCROLL_LOCK: {kind: PROFILE_ACTION_KINDS.PD_MODE_LOCK, operand: RGB_PD_MODE_IDS.PD_MODE_DRAGSCROLL},
-    VOLUME_MODE: {kind: PROFILE_ACTION_KINDS.PD_MODE_MOMENTARY, operand: RGB_PD_MODE_IDS.PD_MODE_VOLUME},
-    VOLUME_MODE_LOCK: {kind: PROFILE_ACTION_KINDS.PD_MODE_LOCK, operand: RGB_PD_MODE_IDS.PD_MODE_VOLUME},
-    BRIGHTNESS_MODE: {kind: PROFILE_ACTION_KINDS.PD_MODE_MOMENTARY, operand: RGB_PD_MODE_IDS.PD_MODE_BRIGHTNESS},
-    BRIGHTNESS_MODE_LOCK: {kind: PROFILE_ACTION_KINDS.PD_MODE_LOCK, operand: RGB_PD_MODE_IDS.PD_MODE_BRIGHTNESS},
-    ZOOM_MODE: {kind: PROFILE_ACTION_KINDS.PD_MODE_MOMENTARY, operand: RGB_PD_MODE_IDS.PD_MODE_ZOOM},
-    ZOOM_MODE_LOCK: {kind: PROFILE_ACTION_KINDS.PD_MODE_LOCK, operand: RGB_PD_MODE_IDS.PD_MODE_ZOOM},
-    ARROW_MODE: {kind: PROFILE_ACTION_KINDS.PD_MODE_MOMENTARY, operand: RGB_PD_MODE_IDS.PD_MODE_ARROW},
-    ARROW_MODE_LOCK: {kind: PROFILE_ACTION_KINDS.PD_MODE_LOCK, operand: RGB_PD_MODE_IDS.PD_MODE_ARROW},
-    PINCH_MODE: {kind: PROFILE_ACTION_KINDS.PD_MODE_MOMENTARY, operand: RGB_PD_MODE_IDS.PD_MODE_PINCH},
-    PD_SLOT_6: {kind: PROFILE_ACTION_KINDS.PD_MODE_MOMENTARY, operand: 6},
-    PD_SLOT_6_LOCK: {kind: PROFILE_ACTION_KINDS.PD_MODE_LOCK, operand: 6},
-    PD_SLOT_7: {kind: PROFILE_ACTION_KINDS.PD_MODE_MOMENTARY, operand: 7},
-    PD_SLOT_7_LOCK: {kind: PROFILE_ACTION_KINDS.PD_MODE_LOCK, operand: 7},
-    PINCH_MODE_LOCK: {kind: PROFILE_ACTION_KINDS.PD_MODE_LOCK, operand: RGB_PD_MODE_IDS.PD_MODE_PINCH},
-});
+// Every pointing-mode binding as the action a behaviour or combo stores.
+const PD_ACTIONS = Object.freeze(Object.fromEntries(PD_BINDINGS.flatMap(({slot, hold, lock}) => [
+    [hold, {kind: PROFILE_ACTION_KINDS.PD_MODE_MOMENTARY, operand: slot}],
+    [lock, {kind: PROFILE_ACTION_KINDS.PD_MODE_LOCK, operand: slot}],
+])));
 
 const MODIFIER_WRAPPERS = Object.freeze({
     C: 0x0100, LCTL: 0x0100,
@@ -107,13 +94,8 @@ function resolveNativeQmkExpression(value, model) {
     match = expression.match(/^MACRO_(\d+)$/);
     if (match && Number(match[1]) < HARDCODED_MACRO_SLOTS) return QMK_USER_BASE + Number(match[1]);
 
-    const extraPd = {PD_SLOT_6: 0x7ef0, PD_SLOT_6_LOCK: 0x7ef1, PD_SLOT_7: 0x7ef2, PD_SLOT_7_LOCK: 0x7ef3};
-    if (Object.hasOwn(extraPd, expression)) return extraPd[expression];
-    const pdModeNames = ["DRAGSCROLL", "VOLUME_MODE", "BRIGHTNESS_MODE", "ZOOM_MODE", "ARROW_MODE", "PINCH_MODE"];
-    const pdModeIndex = pdModeNames.indexOf(expression.replace(/_LOCK$/, ""));
-    if (pdModeIndex >= 0) {
-        return QMK_USER_BASE + HARDCODED_MACRO_SLOTS + pdModeIndex + (expression.endsWith("_LOCK") ? pdModeNames.length : 0);
-    }
+    const pd = pdBindingOfName(expression);
+    if (pd) return pd.locked ? PD_BINDINGS[pd.slot].lockCode : PD_BINDINGS[pd.slot].holdCode;
 
     const custom = localCustomKeycodeValues(model);
     if (Number.isInteger(custom[expression])) return custom[expression];
@@ -131,7 +113,7 @@ function resolveNativeQmkExpression(value, model) {
         const layer = layerIdOrUndefined(call.args[0], model);
         return layer === undefined || layer >= LOCK_LAYER_SLOTS
             ? undefined
-            : QMK_USER_BASE + HARDCODED_MACRO_SLOTS + (pdModeNames.length * 2) + layer;
+            : QMK_USER_BASE + HARDCODED_MACRO_SLOTS + (LEGACY_PD_SLOTS * 2) + layer;
     }
     // A modifier wrapper only applies to a basic or already-modified key
     // (QK_MODS, up to 0x1FFF). Anything above would OR the modifier bits into
@@ -161,8 +143,7 @@ function resolveNativeQmkExpression(value, model) {
 
 function localCustomKeycodeValues(model) {
     const layerCount = Array.isArray(model?.layers) ? model.layers.length : 0;
-    const pdModeCount = 6;
-    const first = QMK_USER_BASE + HARDCODED_MACRO_SLOTS + (pdModeCount * 2) + layerCount;
+    const first = QMK_USER_BASE + HARDCODED_MACRO_SLOTS + (LEGACY_PD_SLOTS * 2) + layerCount;
     return Object.fromEntries((model?.customKeycodes || []).map((name, index) => [name, first + index]));
 }
 

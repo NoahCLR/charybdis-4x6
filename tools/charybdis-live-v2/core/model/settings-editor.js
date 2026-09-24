@@ -1,9 +1,11 @@
 "use strict";
 
-const {validateSnapshot} = require("./portable-profile");
+const {layerOfRef} = require("../schema/actions");
+const {validateSnapshot, decodedOf} = require("./portable-profile");
 const {decodeProfileBlob, encodeProfileBlob} = require("../schema/profile-blob-v1");
 const {encodeSettings, validSetting} = require("../schema/settings-domain-v1");
 const {dpiChoices} = require("./pointer-dpi");
+const {layerName} = require("./vocabulary");
 const fail = message => Object.assign(new Error(message), {code: "INVALID_SETTINGS_EDIT"});
 const number = (macro, id, label, hint = "0–65535 ms", extra = {}) => ({macro, id, label, hint, kind: "number", validate: "nonnegative-int", ...extra});
 const toggle = (macro, id, label, hint) => ({macro, id, label, hint, kind: "toggle"});
@@ -80,17 +82,35 @@ const optionLabels = [
     ["swapEscapeCaps", "Swap Escape and Caps Lock"],
     ["autocorrect", "Autocorrect"],
 ];
+// Which bits of its settings word a field owns: one flag, a shifted byte or
+// nibble, or the whole word. Reading, writing and putting a field back to the
+// keyboard's value all go through this.
+function fieldMask(field) {
+    if (field.bitMask) return field.bitMask >>> 0;
+    if (field.shift === undefined) return 0xffffffff;
+    return (((1 << (field.width || 8)) - 1) << field.shift) >>> 0;
+}
 function settingValue(field, values) {
-    const value = values[field.id];
-    if (field.bitMask) return Number(Boolean(value & field.bitMask));
-    return field.shift === undefined ? value : (value >>> field.shift) & ((1 << (field.width || 8)) - 1);
+    const bits = (values[field.id] & fieldMask(field)) >>> 0;
+    if (field.bitMask) return Number(Boolean(bits));
+    return field.shift === undefined ? bits : bits >>> field.shift;
+}
+// The saved base lighting, read out of the two words that pack it by the same
+// field layout the Base Lighting section edits.
+const LIGHTING_FIELDS = {enabled: {id: 21, shift: 0}, effect: {id: 21, shift: 8}, speed: {id: 21, shift: 16}, leds: {id: 21, shift: 24},
+    hue: {id: 22, shift: 0}, saturation: {id: 22, shift: 8}, brightness: {id: 22, shift: 16}};
+const baseLighting = values => Object.fromEntries(Object.entries(LIGHTING_FIELDS).map(([name, field]) => [name, settingValue(field, values)]));
+// A field's value placed in its word, leaving every bit it does not own.
+function withSetting(field, word, number) {
+    const bits = field.bitMask ? (number ? field.bitMask : 0) : field.shift === undefined ? number : number << field.shift;
+    return ((word & ~fieldMask(field)) | (bits & fieldMask(field))) >>> 0;
 }
 function settingsSections(snapshot, settings) {
     const options = snapshot.options;
     const result = sections.map(section => ({...section, fields: section.fields.map(field => ({...field}))}));
     if ((settings.formatVersion ?? 1) >= 2) for (const section of result) section.fields = section.fields.filter(field => field.id < 10 || field.id > 14);
     const rgb = result.find(section => section.id === "rgbAppearance");
-    const currentEffect = (settings.values[21] >>> 8) & 255, currentFlags = settings.values[21] >>> 24;
+    const {effect: currentEffect, leds: currentFlags} = baseLighting(settings.values);
     const effects = options?.effects.map(effect => ({value: effect.id, label: effect.name.toLowerCase().replace(/_/g, " ").replace(/^./, c => c.toUpperCase())})) || [];
     if (!effects.some(effect => effect.value === currentEffect)) effects.push({value: currentEffect, label: `Current effect (${currentEffect})`});
     const ledNames = [[1, "Modifiers"], [2, "Underlighting"], [4, "Keys"], [8, "Indicators"]];
@@ -100,7 +120,7 @@ function settingsSections(snapshot, settings) {
     rgb.fields.splice(1, 0,
         {...byte("effectMode", 21, 8, "Lighting effect"), choices: effects, readOnly: !options, hint: options ? "Effects available on this keyboard. Layer colours can override the base effect." : "Update both halves to report the available lighting effects."},
         {...byte("effectLeds", 21, 24, "Apply base effect to"), choices: flags, readOnly: !options, hint: options ? "Choose which LED classes receive the base effect. Layer colours and feedback have their own policies." : "Update both halves to report the LED classes."});
-    const name = i => settings.names[i] || `Layer ${i}`;
+    const name = i => layerName(settings.names, i);
     result.push({id: "startupLayers", label: "Startup Layers", expanded: false, description: "Choose the layers active when the keyboard starts. Keep at least one selected; higher layers take priority.", fields:
         Array.from({length: 8}, (_, i) => ({...toggle(`startupLayer${i}`, 23, name(i), `Layer ${i}`), bitMask: 1 << i, governs: {kind: "layer", layer: i}}))});
     result.push({id: "comboReferences", label: "Combo Layer Matching", expanded: false, description: "Choose which layer supplies the key assignments used to match combos on each layer. Select the same layer to keep its combos independent.", fields:
@@ -112,7 +132,7 @@ function settingsSections(snapshot, settings) {
 
 function settingsEditorView(snapshot) {
     if (!snapshot?.document || snapshot.incomplete) return null;
-    const {settings} = validateSnapshot(snapshot.document);
+    const {settings} = decodedOf(snapshot);
     return {identity: snapshot.fingerprint,
         brightnessMax: snapshot.limits?.brightnessMax,
         sections: settingsSections(snapshot, settings).map(section => ({...section, fields: section.fields.map(field => {
@@ -141,10 +161,10 @@ function editSettings(snapshot, message, capabilities) {
             if (typeof input.enabled !== "boolean") throw fail(`${field.label} must be enabled or disabled.`);
             number = Number(input.enabled);
         } else {
-            const text = field.kind === "layer" ? /^Layer ([0-7])$/.exec(input.value)?.[1] : input.value;
+            const text = field.kind === "layer" ? (layer => layer < 8 ? String(layer) : undefined)(layerOfRef(input.value)) : input.value;
             if (typeof text !== "string" || !/^\d+$/.test(text)) throw fail(`${field.label} needs a whole number${field.kind === "layer" ? " identifying a layer" : ""}.`);
             number = Number(text);
-            if (field.macro === "brightness" && number !== ((value.settings.values[22] >>> 16) & 255)) {
+            if (field.macro === "brightness" && number !== baseLighting(value.settings.values).brightness) {
                 if (snapshot.limits?.brightnessMax === undefined) throw fail("Read the keyboard's brightness limit before changing brightness. Update both halves if this field is unavailable.");
                 if (number > snapshot.limits.brightnessMax) throw fail(`Brightness must be between 0 and ${snapshot.limits.brightnessMax}, the keyboard's reported limit.`);
             }
@@ -153,9 +173,7 @@ function editSettings(snapshot, message, capabilities) {
         const previous = settingValue(field, value.settings.values);
         if (field.readOnly && number !== previous) throw fail(`${field.label} cannot be changed with this firmware. ${field.hint || ""}`);
         if (field.macro === "effectMode" && number !== previous && !snapshot.options?.effects.some(effect => effect.id === number)) throw fail("Choose an effect reported by this keyboard.");
-        const mask = (1 << (field.width || 8)) - 1;
-        value.settings.values[field.id] = field.bitMask ? ((value.settings.values[field.id] & ~field.bitMask) | (number ? field.bitMask : 0)) >>> 0
-            : field.shift === undefined ? number : ((value.settings.values[field.id] & ~(mask << field.shift)) | (number << field.shift)) >>> 0;
+        value.settings.values[field.id] = withSetting(field, value.settings.values[field.id], number);
     }
     if (!value.settings.values[23]) throw fail("Keep at least one startup layer selected.");
     if (!value.settings.values.every((number, id) => validSetting(id, number))) throw fail("A setting is outside the keyboard's supported range.");
@@ -166,4 +184,4 @@ function editSettings(snapshot, message, capabilities) {
     return document;
 }
 
-module.exports = {settingsEditorView, editSettings};
+module.exports = {settingsEditorView, editSettings, fieldMask, baseLighting};

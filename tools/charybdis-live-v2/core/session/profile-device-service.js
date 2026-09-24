@@ -1,5 +1,8 @@
 "use strict";
 
+const {baseLighting} = require("../model/settings-editor");
+const {actionLimitsFor} = require("../schema/actions");
+const {layerName} = require("../model/vocabulary");
 const {decodePdDomain} = require("../schema/pd-mode-domain-v1");
 const {readSettingsLimits} = require("../protocol/portable-profile-v1");
 const {readKeyboardOptions} = require("../protocol/keyboard-options-v1");
@@ -290,13 +293,13 @@ class ProfileDeviceService {
                     if (domain.id === PROFILE_DOMAIN_IDS.RGB) {
                         domains.rgb = decodeRgbDomainV1(domain.payload);
                     } else if (domain.id === PROFILE_DOMAIN_IDS.KEY_BEHAVIORS) {
-                        domains.keyBehaviors = decodeKeyBehaviorDomain(domain.payload, {actionLimits: {maxPdModes: blob.schema.major === 2 ? 8 : 6}});
+                        domains.keyBehaviors = decodeKeyBehaviorDomain(domain.payload, actionLimitsFor(blob.schema.major));
                     } else if (domain.id === PROFILE_DOMAIN_IDS.PD_MODES) {
                         domains.pdModes = decodePdDomain(domain.payload);
                     } else if (domain.id === PROFILE_DOMAIN_IDS.SETTINGS) {
                         domains.settings = decodeSettings(domain.payload);
                     } else if (domain.id === PROFILE_DOMAIN_IDS.COMBOS) {
-                        domains.combos = decodeComboDomainV1(domain.payload, {actionLimits: {maxPdModes: blob.schema.major === 2 ? 8 : 6}});
+                        domains.combos = decodeComboDomainV1(domain.payload, actionLimitsFor(blob.schema.major));
                     }
                 } catch (error) {
                     failures.push({domainId: domain.id, message: error instanceof Error ? error.message : String(error)});
@@ -426,10 +429,11 @@ class ProfileDeviceService {
                 ? this.portable
                 : undefined;
             const limits = cachedBase?.limits || await readSettingsLimits(this.connection, this.requestIds);
-            const brightness = (validateSnapshot(document, this.capabilities).settings.values[22] >>> 16) & 255;
+            const lighting = baseLighting(validateSnapshot(document, this.capabilities).settings.values);
+            const brightness = lighting.brightness;
             if (limits && brightness > limits.brightnessMax) throw Object.assign(new Error(`This profile's brightness exceeds the keyboard's reported limit of ${limits.brightnessMax}. Lower the brightness before restoring it.`), {code: "SETTINGS_LIMIT_EXCEEDED"});
             const keyboardOptions = cachedBase?.options || await readKeyboardOptions(this.connection, this.requestIds);
-            const effect = (validateSnapshot(document, this.capabilities).settings.values[21] >>> 8) & 255;
+            const effect = lighting.effect;
             if (keyboardOptions && !keyboardOptions.effects.some(item => item.id === effect)) throw Object.assign(new Error("This profile uses a lighting effect unavailable on this keyboard."), {code: "SETTINGS_LIMIT_EXCEEDED"});
             started = true;
             result = await restoreProfile(this.connection, this.requestIds, this.capabilities, document, {...options,
@@ -496,7 +500,7 @@ class ProfileDeviceService {
                 Boolean(this.connection?.connected),
                 this.status
             ),
-            portableSummary: this.committed?.domains?.settings ? {names: this.committed.domains.settings.names.map((name, index) => name || (index ? `Layer ${index}` : "Base"))} : this.portable?.summary || null,
+            portableSummary: this.committed?.domains?.settings ? {names: this.committed.domains.settings.names.map((name, index, names) => layerName(names, index))} : this.portable?.summary || null,
             portableProgress: this.portableProgress || "",
             settingsView: this.settingsView ? JSON.parse(JSON.stringify(this.settingsView)) : null,
             macroView: this.macroView ? JSON.parse(JSON.stringify(this.macroView)) : null,

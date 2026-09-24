@@ -17,7 +17,8 @@ const vscode = require("vscode");
 
 const {upgradePdSnapshot, validateSnapshot} = require("./core/session/portable-profile-session");
 const {ProfileDeviceService} = require("./core/session/profile-device-service");
-const {applyLayerEdit, buildPanelModel, discardDraftForDevice, layerEditDocument, routeMessage, startLayerEdit, takeOutbox} = require("./core/session/panel-session");
+const {buildPanelModel, routeMessage, takeOutbox} = require("./core/session/panel-session");
+const {draftControl, portableControl, readKeyboard} = require("./core/session/panel-controls");
 const {getHtml} = require("./panel-html");
 
 const VIEW_TYPE = "charybdisLiveV2.panel";
@@ -85,74 +86,29 @@ async function handleMessage(panel, session, message) {
     }
 }
 
+// What only a host has, handed to core/session/panel-controls.js: progress,
+// the recovery copy on disk, and a profile file the person chose.
+function hostFor(session) {
+    return {
+        progress: (title, work) => vscode.window.withProgress({location: vscode.ProgressLocation.Notification, title}, work),
+        saveRecovery: (document) => saveRecoveryFile(session, document),
+        chooseProfile: async () => {
+            const files = await vscode.window.showOpenDialog({title: "Choose a keyboard profile", canSelectMany: false, filters: {"Charybdis profile": ["charybdis.json", "json"]}});
+            if (!files?.length) return undefined;
+            if ((await vscode.workspace.fs.stat(files[0])).size > 100000) throw new Error("This profile file is too large.");
+            return Buffer.from(await vscode.workspace.fs.readFile(files[0])).toString("utf8");
+        },
+    };
+}
+
 // Connect, learn what the keyboard is, and read what it is running.
 async function connectAndRead(panel, session, selectedDeviceId) {
     try {
-        await readKeyboard(panel, session, selectedDeviceId);
+        await readKeyboard(session, selectedDeviceId, hostFor(session));
     } finally {
         session.readBusy = false;
         publish(panel, session);
     }
-}
-
-async function readKeyboard(panel, session, selectedDeviceId) {
-    const service = session.service;
-    await service.enumerate();
-    const devices = service.snapshot().devices;
-    if (!devices.length) {
-        session.notice = "No Charybdis Raw HID interface found. Connect the keyboard and reload.";
-        return;
-    }
-
-    if (selectedDeviceId && !devices.some((device) => device.id === selectedDeviceId)) {
-        throw new Error("The selected keyboard is no longer available. Read the device list again.");
-    }
-    if (!service.snapshot().connected || (selectedDeviceId && service.snapshot().selectedDeviceId !== selectedDeviceId)) {
-        const deviceId = selectedDeviceId || devices[0].id;
-        await service.connect(deviceId);
-        const connected = service.snapshot();
-        if (!connected.connected || connected.selectedDeviceId !== deviceId) {
-            throw new Error(connected.error?.message || "Could not connect to the selected keyboard.");
-        }
-    }
-
-    await service.refresh();
-    await vscode.window.withProgress(
-        {location: vscode.ProgressLocation.Notification, title: "Reading layout from the keyboard"},
-        () => service.readLayout()
-    );
-
-    // A keyboard with no committed profile is a normal state, so a failure here
-    // must not discard the layout read that already succeeded.
-    try {
-        await vscode.window.withProgress(
-            {location: vscode.ProgressLocation.Notification, title: "Reading keyboard profile"},
-            () => service.readCommittedProfile()
-        );
-    } catch (error) {
-        const text = error instanceof Error ? error.message : String(error);
-        session.notice = `Read the layout. The committed profile could not be read: ${text}`;
-        return;
-    }
-
-    await service.readBaseRgb();
-    await service.readCombos();
-    let macroFailure = "";
-    if ((service.capabilities?.supportedDomainMask & 15) === 15) {
-        try {await service.readPortableProfile();}
-        catch (error) {macroFailure = " Macros and global settings could not be read: " + error.message;}
-    }
-    const state = service.snapshot();
-    if (state.error || state.committed?.state !== "read") {
-        session.notice = `The keyboard profile could not be read: ${state.error?.message || "no verified profile was returned"}.`;
-    } else {
-        const description = state.committed.source === "compiled"
-            ? "the keyboard's compiled defaults"
-            : `committed profile generation ${state.committed.generation}`;
-        const failures = state.committed.failures?.length || 0;
-        session.notice = `Read the layout and ${description}.` + (failures ? ` ${failures} domain(s) could not be decoded; see diagnostics.` : "");
-    }
-    if (macroFailure) session.notice += macroFailure;
 }
 
 module.exports = {activate, deactivate};
@@ -166,15 +122,13 @@ async function saveRecoveryFile(session, document) {
     return uri.fsPath;
 }
 
+// Exports are dialogs and files, so they stay here; everything else a
+// portable message does is core/session/panel-controls.js.
 async function portableMessage(panel, session, message) {
     session.portableBusy = true;
     try {
         const service = session.service;
-        if (message.type === "savePortableLayers" && message.names !== undefined) applyLayerEdit(session.portableLayers, message);
-        const saveRecovery = document => saveRecoveryFile(session, document);
-        if (message.type === "cancelPortableReview") {
-            session.portableReview = undefined; session.portableLayers = undefined;
-        } else if (message.type === "exportPdUpgrade") {
+        if (message.type === "exportPdUpgrade") {
             const snapshot = await service.readPortableProfile(), upgraded = upgradePdSnapshot(snapshot.document);
             const uri = await vscode.window.showSaveDialog({title: "Save original profile and PD upgrade", saveLabel: "Save both profiles", filters: {"Charybdis profile": ["charybdis.json"]}});
             if (uri) {
@@ -198,78 +152,15 @@ async function portableMessage(panel, session, message) {
                 await vscode.workspace.fs.writeFile(uri, Buffer.from(JSON.stringify(snapshot.document, null, 2) + "\n"));
                 session.notice = "Complete keyboard profile exported to " + uri.fsPath;
             }
-        } else if (message.type === "choosePortableProfile") {
-            const files = await vscode.window.showOpenDialog({title: "Choose a keyboard profile", canSelectMany: false, filters: {"Charybdis profile": ["charybdis.json", "json"]}});
-            if (files?.length) {
-                if ((await vscode.workspace.fs.stat(files[0])).size > 100000) throw new Error("This profile file is too large.");
-                const value = validateSnapshot(Buffer.from(await vscode.workspace.fs.readFile(files[0])).toString("utf8"), service.capabilities);
-                session.portableReview = {document: value.document, before: session.draft?.current || await service.readPortableProfile({forRestore: true}), revision: session.draft?.revision};
-                session.portableLayers = undefined;
-            }
-        } else if (message.type === "managePortableLayers") {
-            const before = session.draft?.current || await service.readPortableProfile();
-            session.portableReview = undefined;
-            session.portableLayers = startLayerEdit(before, session.draft?.revision);
-        } else if (message.type === "editPortableLayer") {
-            applyLayerEdit(session.portableLayers, message);
         } else {
-            const review = session.portableReview, draft = session.portableLayers;
-            const before = message.type === "savePortableLayers" ? draft?.before : review?.before;
-            if (!before) throw new Error("Review the profile before restoring it.");
-            const document = message.type === "savePortableLayers" ? layerEditDocument(draft) : review.document;
-            if (session.draft) {
-                session.draft.replace(document, message.type === "savePortableLayers" ? draft.revision : review.revision, "edit",
-                    message.type === "savePortableLayers" ? "Edited layers" : "Imported a profile");
-                session.portableReview = undefined; session.portableLayers = undefined;
-                session.resetDraftForms = true;
-                return;
-            }
-            await service.restorePortableProfile(document, {expectedFingerprint: before.fingerprint, saveRecovery});
-            session.portableReview = undefined; session.portableLayers = undefined;
-            await service.readLayout(); await service.readCommittedProfile(); await service.readCombos(); await service.readBaseRgb();
-            session.notice = "Complete profile saved to both halves and verified. " + (before.incomplete ? "Interrupted data retained for diagnosis: " : "Recovery copy: ") + session.lastRecovery.fsPath;
+            await portableControl(session, message, hostFor(session));
         }
     } finally {session.portableBusy = false; publish(panel, session);}
 }
 
 async function draftMessage(panel, session, message) {
-    const draft = session.draft, service = session.service;
-    if (!draft) throw new Error("Read a complete keyboard profile before editing.");
     session.portableBusy = true;
     try {
-        if (message.type === "reviewProfileDraft") draft.review(message.draftRevision);
-        else if (message.type === "closeProfileDraftReview") {draft.assertRevision(message.draftRevision, {allowStale: true}); draft.reviewedRevision = null;}
-        else if (message.type === "undoProfileDraft") {draft.undo(message.draftRevision); session.resetDraftForms = true;}
-        else if (message.type === "redoProfileDraft") {draft.redo(message.draftRevision); session.resetDraftForms = true;}
-        else if (message.type === "discardProfileDraftChanges") {draft.discard(message.draftRevision, message.group); session.resetDraftForms = true;}
-        else if (message.type === "discardProfileDraft" && !draft.stale && !draft.base.incomplete && service.snapshot().selectedDeviceId === draft.deviceId) {
-            // The draft's own keyboard, unchanged: discarding is an undoable step.
-            draft.discardAll(message.draftRevision);
-            session.resetDraftForms = true;
-            session.notice = "Draft discarded. Undo (⌘Z) brings it back.";
-        } else if (message.type === "discardProfileDraft") {
-            draft.assertRevision(message.draftRevision, {allowStale: true});
-            const state = service.snapshot();
-            if (!state.connected) throw new Error("Reconnect and read the keyboard before discarding its draft.");
-            const snapshot = state.capabilities?.compiledLayerCount === 8 ? await service.readPortableProfile() : undefined;
-            discardDraftForDevice(session, state, snapshot);
-            session.notice = state.capabilities?.compiledLayerCount === 8
-                ? "Draft discarded. Showing the saved keyboard configuration."
-                : "Draft discarded. This keyboard remains read-only.";
-        } else if (message.type === "rebaseProfileDraft") {
-            draft.assertRevision(message.draftRevision, {allowStale: true});
-            if (service.snapshot().selectedDeviceId !== draft.deviceId) throw new Error("Reconnect the keyboard this draft belongs to.");
-            const snapshot = await service.readPortableProfile({forRestore: true});
-            draft.observe(snapshot, draft.deviceId, service.snapshot().connectionToken);
-            draft.rebase(message.draftRevision);
-            session.resetDraftForms = true;
-            session.notice = "Review now compares your draft with the latest keyboard state. Apply will replace the differences shown.";
-        } else {
-            await vscode.window.withProgress({location: vscode.ProgressLocation.Notification, title: "Applying the complete profile to both halves"},
-                () => draft.apply(service, message.draftRevision, document => saveRecoveryFile(session, document)));
-            session.resetDraftForms = true;
-            await service.readLayout(); await service.readCommittedProfile(); await service.readCombos(); await service.readBaseRgb();
-            session.notice = "Complete profile applied to both halves and verified. Recovery copy: " + session.lastRecovery.fsPath;
-        }
+        await draftControl(session, message, hostFor(session));
     } finally {session.portableBusy = false; publish(panel, session);}
 }

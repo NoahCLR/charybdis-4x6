@@ -1,7 +1,8 @@
 "use strict";
 const assert = require("node:assert/strict");
 const test = require("node:test");
-const {actionName, behaviorAliasesForView, behaviorRowsForView, rgbForView} = require("../../core/session/device-profile-view");
+const {behaviorAliasesForView, behaviorRowsForView, rgbForView} = require("../../core/session/device-profile-view");
+const {actionName} = require("../../core/schema/actions");
 const {encodeKeyBehaviorDomain, decodeKeyBehaviorDomain} = require("../../core/schema/key-behavior-domain-v1");
 const {decodedDeviceProfile, capabilities} = require("../fixtures/device-profile");
 const keycodes = require("../../core/data/keycode-catalog");
@@ -34,7 +35,7 @@ test("decoded behaviors preserve sparse branches, all hold modes, anchors and ti
     assert.equal(view[0].steps[0].hold.repeatHz, "0");
     assert.equal(view[0].steps.length, 1);
     assert.equal(view[0].steps[0].tapCount, 4);
-    assert.equal(view[0].steps[0].tapCountName, "Quintuple Tap Branch");
+    assert.equal(view[0].steps[0].tapCountName, "Quintuple tap");
     assert.equal(view[0].steps[0].tap.action, "VIA_MACRO_0");
     assert.equal(view[0].steps[0].longHold.action, "MACRO_15");
 });

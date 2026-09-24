@@ -11,11 +11,11 @@ function model(overrides = {}) {
         rgb: {
             baseEffect: {state: "read", enabled: true, effectId: 1, previewColor: colour(140, 210, 180)},
             stages: [
-                {label: "Layer colours", enabled: true},
-                {label: "Auto-mouse fade", enabled: true},
-                {label: "Pointing modes", enabled: true},
-                {label: "Combo feedback", enabled: false},
-                {label: "Key behaviour feedback", enabled: true},
+                {id: "layers", label: "Layer colours", enabled: true},
+                {id: "auto", label: "Auto-mouse fade", enabled: true},
+                {id: "pd", label: "Pointing modes", enabled: true},
+                {id: "combo", label: "Combo feedback", enabled: false},
+                {id: "key", label: "Key feedback", enabled: true},
             ],
             layerColors: [
                 {layer: "Layer 0", layerId: 0, color: colour(0, 0, 0), mode: "ALL_KEYS"},
@@ -66,7 +66,7 @@ test("an all-keys layer paints transparent positions too", () => {
 test("a layer stored as black paints nothing, and a disabled stage paints nothing", () => {
     const m = model();
     assert.equal(keyLight(m, {index: 0}, position(13, "KC_A")).source, "base", "HSV value zero is not a colour");
-    const off = model({rgb: {...model().rgb, stages: [{label: "Layer colours", enabled: false}]}});
+    const off = model({rgb: {...model().rgb, stages: [{id: "layers", label: "Layer colours", enabled: false}]}});
     const light = keyLight(off, {index: 3}, position(13, "KC_UP"));
     assert.equal(light.source, "base", "with the stage off the layer colour is not painted");
 });
@@ -96,7 +96,7 @@ test("a pointing mode is an overlay on its locality, never on the key that binds
     const leftMapped = keyLight(m, {index: 3}, position(0, "DRAGSCROLL"), {pdActive: preview});
     assert.equal(leftMapped.source, "layer", "and there the layer still owns its own keys");
 
-    const stageOff = model({rgb: {...model().rgb, stages: [{label: "Pointing modes", enabled: false}]}});
+    const stageOff = model({rgb: {...model().rgb, stages: [{id: "pd", label: "Pointing modes", enabled: false}]}});
     assert.equal(keyLight(stageOff, {index: 3}, position(7, "KC_NO"), {pdActive: preview}).source, "base");
 });
 

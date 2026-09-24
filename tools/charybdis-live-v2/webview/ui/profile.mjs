@@ -8,7 +8,7 @@
 // in the file against what is on the keyboard before anything is written.
 
 import {el, esc} from "../lib/dom.mjs";
-import {getModel, post} from "../store.mjs";
+import {getModel, post, canEdit as canEditArea} from "../store.mjs";
 import {topbar} from "./shell.mjs";
 
 export function screenProfile() {
@@ -16,8 +16,8 @@ export function screenProfile() {
     const portable = model?.portable || {};
     const health = model?.device?.health || {};
     const busy = Boolean(portable.busy);
-    const canExport = portable.available && !busy;
-    const canImport = portable.available && portable.eightLayers && !busy;
+    const canExport = canEditArea("export");
+    const canImport = canEditArea("import");
 
     const main = el(`<div class="main">${topbar(
         "Profile & backups",

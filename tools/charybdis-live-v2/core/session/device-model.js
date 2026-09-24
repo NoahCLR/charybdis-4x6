@@ -9,8 +9,11 @@
 // An empty RGB tab is truthful; a tab populated from the authored source would
 // be a lie about what the keyboard is running.
 
+const {PD_BINDINGS} = require("../data/pd-bindings");
+const {VOCABULARY, slotName} = require("../model/vocabulary");
 const keycodeCatalog = require("../data/keycode-catalog");
-const {baseRgbForView, behaviorAliasesForView, behaviorRowsForView, combosForView, rgbForView, knownActionAbi} = require("./device-profile-view");
+const {baseRgbForView, behaviorAliasesForView, behaviorRowsForView, combosForView, rgbForView} = require("./device-profile-view");
+const {knownActionAbi, layerRef} = require("../schema/actions");
 const {resolveNativeQmkExpression} = require("../schema/compiled-profile-v1");
 const {dpiChoices} = require("../model/pointer-dpi");
 
@@ -61,9 +64,9 @@ function buildDeviceModel(state = {}) {
     // the slot is configured, which the label says.
     if (knownActionAbi(state.capabilities?.actionAbiDigest)) for (const slot of state.committed?.domains?.pdModes || []) {
         for (const locked of [false, true]) {
-            const name = slot.id < 6 ? ["DRAGSCROLL", "VOLUME_MODE", "BRIGHTNESS_MODE", "ZOOM_MODE", "ARROW_MODE", "PINCH_MODE"][slot.id] + (locked ? "_LOCK" : "") : `PD_SLOT_${slot.id}${locked ? "_LOCK" : ""}`;
-            const code = slot.id < 6 ? 0x7e50 + slot.id + (locked ? 6 : 0) : 0x7ef0 + (slot.id - 6) * 2 + Number(locked);
-            const title = slot.kind ? slot.name : `Slot ${slot.id + 1}`;
+            const binding = PD_BINDINGS[slot.id];
+            const name = locked ? binding.lock : binding.hold, code = locked ? binding.lockCode : binding.holdCode;
+            const title = slotName(slot);
             const label = `${title} · ${locked ? "toggle" : "hold"}${slot.kind ? "" : " (empty)"}`, native = keycodeCatalog.resolve(code).name;
             catalog.aliases[native] = name; catalog.labels[native] = label; catalog.labels[name] = label;
             const entry = catalog.entries.find(entry => entry.keycode === code);
@@ -72,11 +75,18 @@ function buildDeviceModel(state = {}) {
         }
     }
     return {
+        // The words for every value the keyboard stores, so the interface
+        // names things as the review does (model/vocabulary.js).
+        vocabulary: VOCABULARY,
         layers: layersFromDevice(state.layout, catalog.labels, catalog.aliases),
 
         // Read off the keyboard when the committed profile has been read;
         // empty rather than fabricated before that.
-        pdModes: state.committed?.domains?.pdModes || [],
+        // Each slot with the name a person reads for it, one rule for every
+        // surface (model/vocabulary.js slotName).
+        // and the keycodes that bind it (data/pd-bindings.js), so the interface
+        // names and finds a pointing-mode key without a registry of its own.
+        pdModes: (state.committed?.domains?.pdModes || []).map((slot) => ({...slot, displayName: slotName(slot), binding: PD_BINDINGS[slot.id]})),
         pdModeEditing: {writable: Boolean(state.capabilities?.supportedDomainMask & 16) && state.committed?.state === "read" && !state.committed.failures?.length && !state.busy,
             dpiChoices: dpiChoices({normalSpeed: true})},
         keyBehaviors: committedKeyBehaviors(state.committed),
@@ -121,7 +131,7 @@ function layersFromDevice(layout, labels, aliases = {}) {
         return [];
     }
     return layout.layers.map((entry) => ({
-        name: `Layer ${entry.layer}`,
+        name: layerRef(entry.layer),
         index: entry.layer,
         positions: entry.keys.map((key) => {
             const resolved = {...key.resolved, label: labels[key.resolved.name] || key.resolved.label};
@@ -316,4 +326,9 @@ function catalogViews() {
     return {aliases, entries, labels};
 }
 
-module.exports = {buildDeviceModel};
+// The keyboard's own header and diagnostics, without the rest of the model:
+// with a draft open the panel shows these from the keyboard and everything
+// else from the draft.
+const deviceSummary = (state = {}) => ({device: deviceHeader(state), diagnostics: diagnosticsFor(state)});
+
+module.exports = {buildDeviceModel, deviceSummary};

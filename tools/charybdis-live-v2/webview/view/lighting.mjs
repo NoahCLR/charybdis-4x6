@@ -9,16 +9,6 @@ import {LED_INDEX, TRACKBALL_LED, inLocality, trackballInLocality} from "./geome
 
 const OFF = {h: "0", s: "0", v: "0"};
 
-// The order the firmware paints in. Names match the stage labels the device
-// view produces; the base effect is read separately and has no stage bit.
-export const STAGE_ORDER = [
-    {id: "base", label: "Base effect"},
-    {id: "layers", label: "Layer colours"},
-    {id: "auto", label: "Auto-mouse fade"},
-    {id: "pd", label: "Pointing modes"},
-    {id: "combo", label: "Combo feedback"},
-    {id: "key", label: "Key behaviour feedback"},
-];
 
 export const PD_MODE_IDS = [
     "PD_MODE_DRAGSCROLL", "PD_MODE_VOLUME", "PD_MODE_BRIGHTNESS", "PD_MODE_ZOOM",
@@ -27,8 +17,8 @@ export const PD_MODE_IDS = [
 
 export function stageEnabled(model, id) {
     if (id === "base") return Boolean(model?.rgb?.baseEffect?.enabled);
-    const entry = STAGE_ORDER.find((stage) => stage.id === id);
-    const stage = (model?.rgb?.stages || []).find((row) => row.label === entry?.label);
+    // A stage is found by its id, never by what it is called.
+    const stage = (model?.rgb?.stages || []).find((row) => row.id === id);
     return Boolean(stage?.enabled);
 }
 

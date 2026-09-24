@@ -7,7 +7,7 @@
 
 import * as edits from "../view/edits.mjs";
 import {el, esc} from "../lib/dom.mjs";
-import {getModel, layers, post, render, state, writable} from "../store.mjs";
+import {getModel, layers, post, render, state, writable, canEdit as canEditArea} from "../store.mjs";
 import {topbar, unavailable} from "./shell.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
 import {marked} from "./marks.mjs";
@@ -15,7 +15,7 @@ import {marked} from "./marks.mjs";
 export function screenSettings() {
     const model = getModel();
     const sections = model?.configDefaults || [];
-    const canEdit = writable() && Boolean(model?.settingsEditing?.writable);
+    const canEdit = canEditArea("settings");
     const main = el(`<div class="main">${topbar(
         "Settings",
         "The keyboard's global policy: every value it stores that applies on all layers. Values this firmware cannot report stay read-only rather than disappearing.",
@@ -54,7 +54,10 @@ export function screenSettings() {
 }
 
 function sectionCard(model, section, fields, canEdit, searching) {
-    const open = searching || section.expanded !== false || state.settingsOpen === section.id;
+    // A folded section stays open once opened, by hand or by the review's
+    // Show, instead of folding again on the next render.
+    const opened = (state.settingsOpen || []).includes(section.id);
+    const open = searching || section.expanded !== false || opened;
     const node = el(`<details class="card settings-group" data-section="${esc(section.id)}" ${open ? "open" : ""}>
         <summary class="card-h" style="cursor:pointer;list-style:none"><h3>${esc(section.label)}${draftMarks(model?.draft?.changes).settings.has(section.id) ? draftDot() : ""}</h3>
             <span class="right tag">${section.fields.length} setting${section.fields.length === 1 ? "" : "s"}</span></summary>
@@ -62,6 +65,10 @@ function sectionCard(model, section, fields, canEdit, searching) {
         <div class="rows"></div>
     </details>`);
     const rows = node.querySelector(".rows");
+    if (section.expanded === false) node.addEventListener("toggle", () => {
+        const others = (state.settingsOpen || []).filter((id) => id !== section.id);
+        state.settingsOpen = node.open ? [...others, section.id] : others;
+    });
 
     // A section is saved whole: the core validates the complete set, so every
     // field travels together and one changed value cannot half-write a section.

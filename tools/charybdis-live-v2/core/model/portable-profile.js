@@ -1,10 +1,12 @@
-const {decodePdDomain, encodePdDomain} = require("../schema/pd-mode-domain-v1");
 "use strict";
+const {actionLimitsFor, keycodeAction, pdSlotOfCode} = require("../schema/actions");
+const {decodePdDomain, encodePdDomain} = require("../schema/pd-mode-domain-v1");
 const {decodeProfileBlob, encodeProfileBlob, crc32, fnv1a32} = require("../schema/profile-blob-v1");
 const {decodeRgbDomainV1, encodeRgbDomainV1} = require("../schema/rgb-domain-v1");
 const {decodeKeyBehaviorDomain, encodeKeyBehaviorDomain} = require("../schema/key-behavior-domain-v1");
 const {decodeComboDomainV1, encodeComboDomainV1} = require("../schema/combo-domain-v1");
 const {decodeSettings, encodeSettings} = require("../schema/settings-domain-v1");
+const {layerName} = require("./vocabulary");
 const fail = message => Object.assign(new Error(message), {code: "INVALID_PORTABLE_PROFILE"});
 const u16 = value => Number.isInteger(value) && value >= 0 && value <= 65535;
 function base64(value, max, label) {
@@ -62,7 +64,7 @@ function materializeProfile(active, defaults, combos, settings) {
         if (!domain) throw fail("The keyboard did not report every profile domain.");
         return domain;
     });
-    const rows = combos.rows.map(row => ({...row, inputs: row.inputs.map(operand => ({kind: 1, operand})), output: {kind: 1, operand: row.output}}));
+    const rows = combos.rows.map(row => ({...row, inputs: row.inputs.map(keycodeAction), output: keycodeAction(row.output)}));
     domains.push({id: 0x30, version: 1, payload: encodeComboDomainV1(rows)}, {id: 0x40, version: settings[0], payload: settings});
     return encodeProfileBlob({schema: live.schema, domains});
 }
@@ -84,7 +86,7 @@ function validateSnapshot(value, capabilities) {
     const macros = value.macros.map(slot => {const bytes = base64(slot, 8192, "macro"); validateViaMacro(bytes); return bytes;});
     const profile = base64(value.profile, value.version === 2 ? 5088 : 4064, "profile data"), decoded = decodeProfileBlob(profile), domains = decoded.domains;
     if (decoded.schema.major !== value.version || domains.map(d => d.id).join() !== (value.version === 2 ? "16,32,48,64,80" : "16,32,48,64")) throw fail("The profile is missing configuration. Partial profiles cannot be restored as a complete backup.");
-    const actionOptions = {actionLimits: {maxPdModes: value.version === 2 ? 8 : 6}};
+    const actionOptions = actionLimitsFor(value.version);
     const rgb = decodeRgbDomainV1(domains[0].payload), behaviors = decodeKeyBehaviorDomain(domains[1].payload, actionOptions), combos = decodeComboDomainV1(domains[2].payload, actionOptions), settings = decodeSettings(domains[3].payload);
     const pdModes = value.version === 2 ? decodePdDomain(domains[4].payload) : undefined;
     // Settings may be one version ahead of the document: v3 names the VIA
@@ -105,7 +107,7 @@ function validateSnapshot(value, capabilities) {
         danglingPdBindings.set(id, (danglingPdBindings.get(id) || 0) + 1);
         void source;
     };
-    const checkNativePd = (code, source) => checkPd(code >= 0x7e50 && code <= 0x7e5b ? (code - 0x7e50) % 6 : code >= 0x7ef0 && code <= 0x7ef3 ? 6 + Math.floor((code - 0x7ef0) / 2) : undefined, source);
+    const checkNativePd = (code, source) => checkPd(pdSlotOfCode(code), source);
     if (pdModes) value.layers.flat().forEach(code => checkNativePd(code, "layer"));
     const checkAction = action => {
         if ([4, 5].includes(action.kind)) checkPd(action.operand, "action");
@@ -156,11 +158,17 @@ function walkActions(value, action) {
     if (Number.isInteger(value.kind) && Number.isInteger(value.operand)) {action(value); return;}
     for (const child of Object.values(value)) if (Array.isArray(child)) child.forEach(v => walkActions(v, action)); else if (child && typeof child === "object") walkActions(child, action);
 }
-function fingerprint(document) {
-    const {profile, layout, macros} = validateSnapshot(document);
+// The fingerprint and summary of a document, from its decoded form when the
+// caller already has it, so a document decoded once is not decoded again.
+function fingerprintOf({document, profile, layout, macros}) {
     const bytes = Buffer.concat([profile, layout, macros, ...(document.pdModeSource ? [Buffer.from(document.pdModeSource.domain, "base64")] : [])]);
     return `${document.actionAbiDigest}:${crc32(bytes)}:${fnv1a32(bytes)}`;
 }
+const fingerprint = document => fingerprintOf(validateSnapshot(document));
+// A snapshot's decoded form: the one it carries when that belongs to its very
+// document (the draft decodes each revision once and hands it on), otherwise
+// decoded now. A copy with another document never reuses a stale decode.
+const decodedOf = snapshot => snapshot.decoded && snapshot.decoded.document === snapshot.document ? snapshot.decoded : validateSnapshot(snapshot.document);
 function reorderLayers(document, order, names) {
     if (document.layers?.length !== 8) throw fail("Layer ordering becomes available after the eight-layer update.");
     const validated = validateSnapshot(document), result = JSON.parse(JSON.stringify(document));
@@ -178,7 +186,7 @@ function reorderLayers(document, order, names) {
     }
     result.layers = order.map(old => document.layers[old].map(native));
     const {rgb, behaviors, combos, settings, pdModes} = validated;
-    const actionOptions = {actionLimits: {maxPdModes: pdModes ? 8 : 6}};
+    const actionOptions = actionLimitsFor(pdModes ? 2 : 1);
     const action = a => {if ([2, 3].includes(a.kind)) a.operand = remap[a.operand]; else if (a.kind === 1) a.operand = native(a.operand);};
     walkActions(behaviors, action); walkActions(combos, action);
     rgb.layerColors.forEach(row => {row.layerId = remap[row.layerId];}); rgb.layerColors.sort((a, b) => a.layerId - b.layerId);
@@ -213,10 +221,10 @@ function upgradeFiveLayerSnapshot(source) {
     ]}).toString("base64");
     return result;
 }
-function summary(document) {
-    const value = validateSnapshot(document);
+const summary = document => summaryOf(validateSnapshot(document));
+function summaryOf(value) {
     return {layers: value.document.layers.length, behaviors: value.behaviors.rows.length, combos: value.combos.length,
         macros: value.document.macros.filter(Boolean).length + (value.settings.macros || []).filter(bytes => bytes.length).length,
-        names: value.settings.names.map((name, index) => name || (index ? `Layer ${index}` : "Base"))};
+        names: value.settings.names.map((name, index) => layerName(value.settings.names, index))};
 }
-module.exports = {upgradePdSnapshot, createSnapshot, validateSnapshot, materializeProfile, macroSlots, macroBank, macroBankBytes, validateViaMacro, fingerprint, reorderLayers, summary};
+module.exports = {upgradePdSnapshot, createSnapshot, validateSnapshot, materializeProfile, macroSlots, macroBank, macroBankBytes, validateViaMacro, fingerprint, fingerprintOf, decodedOf, reorderLayers, summary, summaryOf};
