@@ -49,8 +49,8 @@ directory and the existing domain docs.
   the `TAPPING_TOGGLE`-th tap; `OSL(n)` holds like `MO(n)` and its tap arms
   `layer_ownership_oneshot_toggle(n)`, used up in the finalize hook; `TG(n)` is
   `LOCK_LAYER(n)`; `TO(n)` is `layer_ownership_goto(n)`); `DF()` and `LM()` are
-  not yet. A plain
-  `LT()` key with no authored row is still run by QMK itself. A new owned layer keycode is a
+  not yet. A plain `LT()` with no authored row keeps QMK's tap/hold decision;
+  only its hold (tap count 0) goes through layer ownership. A new owned layer keycode is a
   matcher in `lib/action/action_kind.c`, not a special case in a caller.
 - Do not treat split sync or RGB as owners. They mirror or render existing
   runtime truth.

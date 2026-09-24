@@ -3150,6 +3150,40 @@ static void test_oneshot_layer_serves_the_next_key(void) {
     test_assert_thumb_runtime_quiescent(oneshot_pos);
 }
 
+// A plain LT() with no authored row keeps QMK's tap/hold decision, which
+// arrives as the record's tap count. Its hold goes through layer ownership, so
+// releasing it no longer turns a locked layer off; its tap still goes to QMK.
+static void test_plain_layer_tap_hold_is_owned_and_its_tap_is_qmks(void) {
+    keypos_t lt_pos  = {.row = 2, .col = 5};
+    keypos_t tg_pos  = {.row = 2, .col = 6};
+    uint16_t keycode = LT(LAYER_NAV, KC_F);
+
+    test_reset_state();
+
+    CHECK(!key_runtime_integration_process_tap_record(keycode, lt_pos, true, 0u));
+    CHECK(test_layer_active(LAYER_NAV));
+    CHECK(!key_runtime_integration_process_tap_record(keycode, lt_pos, false, 0u));
+    CHECK(!test_layer_active(LAYER_NAV));
+
+    key_runtime_integration_process_record(TG(LAYER_NAV), tg_pos, true);
+    key_runtime_integration_process_record(TG(LAYER_NAV), tg_pos, false);
+    CHECK(test_layer_locked(LAYER_NAV));
+    CHECK(!key_runtime_integration_process_tap_record(keycode, lt_pos, true, 0u));
+    CHECK(!key_runtime_integration_process_tap_record(keycode, lt_pos, false, 0u));
+    CHECK(test_layer_locked(LAYER_NAV));
+    CHECK(test_layer_active(LAYER_NAV));
+
+    key_runtime_integration_process_record(TG(LAYER_NAV), tg_pos, true);
+    key_runtime_integration_process_record(TG(LAYER_NAV), tg_pos, false);
+    CHECK(!test_layer_active(LAYER_NAV));
+
+    CHECK(key_runtime_integration_process_tap_record(keycode, lt_pos, true, 1u));
+    CHECK(!test_layer_active(LAYER_NAV));
+    CHECK(key_runtime_integration_process_tap_record(keycode, lt_pos, false, 1u));
+    CHECK(!test_layer_active(LAYER_NAV));
+    test_assert_thumb_runtime_quiescent(lt_pos);
+}
+
 static void test_tap_toggle_taps_lock_and_holds_are_momentary(void) {
     keypos_t key_pos = {.row = 2, .col = 2};
     uint16_t keycode = TT(LAYER_NUM);
@@ -3185,6 +3219,7 @@ static void test_tap_toggle_taps_lock_and_holds_are_momentary(void) {
 }
 
 int main(void) {
+    test_plain_layer_tap_hold_is_owned_and_its_tap_is_qmks();
     test_oneshot_layer_serves_the_next_key();
     test_tap_toggle_taps_lock_and_holds_are_momentary();
     test_normal_press_and_matched_release_use_bounded_authored_lookups();

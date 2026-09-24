@@ -227,6 +227,12 @@ void key_runtime_integration_scan(void) {
 }
 
 bool key_runtime_integration_process_record(uint16_t keycode, keypos_t key_pos, bool pressed) {
+    return key_runtime_integration_process_tap_record(keycode, key_pos, pressed, 0u);
+}
+
+// QMK's tapping engine marks the records of a dual-role key it has resolved:
+// tap_count 0 is a hold, 1 and up a tap.
+bool key_runtime_integration_process_tap_record(uint16_t keycode, keypos_t key_pos, bool pressed, uint8_t tap_count) {
     keyrecord_t     record = key_runtime_integration_record(key_pos, pressed);
     bool            keep_processing;
     runtime_event_t event = {
@@ -238,6 +244,7 @@ bool key_runtime_integration_process_record(uint16_t keycode, keypos_t key_pos, 
             },
     };
 
+    record.tap.count = tap_count;
     key_runtime_core_trace_record_input_event(&event);
     if (!key_runtime_integration_userspace_feeds_core_key_events()) {
         key_runtime_integration_shadow_core_apply_event(&event, timer_read());

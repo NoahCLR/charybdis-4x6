@@ -60,3 +60,4 @@ void key_runtime_integration_scan(void);
 bool key_runtime_integration_apply_core_event(uint16_t *time, const runtime_event_t *event);
 bool key_runtime_integration_pre_userspace_record(uint16_t keycode, keyrecord_t *record);
 bool key_runtime_integration_process_record(uint16_t keycode, keypos_t key_pos, bool pressed);
+bool key_runtime_integration_process_tap_record(uint16_t keycode, keypos_t key_pos, bool pressed, uint8_t tap_count);

@@ -40,7 +40,10 @@ Plain keys without an authored row keep their normal QMK behavior, except the
 layer keys the runtime owns: `MO(layer)` holds its layer, `TT(layer)` holds it
 too and locks it on its `TAPPING_TOGGLE`-th tap (QMK's default, 5),
 `OSL(layer)` holds it too and on a tap turns it on for the next key press,
-`TG(layer)` is `LOCK_LAYER(layer)`, and `TO(layer)` locks that layer alone.
+`TG(layer)` is `LOCK_LAYER(layer)`, and `TO(layer)` locks that layer alone. A
+plain `LT(layer, kc)` keeps QMK's own tap/hold decision and `TAPPING_TERM`;
+only the layer its hold turns on is owned, so releasing it leaves a locked
+layer on.
 
 A one-shot layer follows QMK's rule for what uses it up: any key press except a
 modifier, a one-shot modifier, a mod-tap still held, or `OSL()` itself. The

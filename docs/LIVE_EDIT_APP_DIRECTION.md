@@ -1322,8 +1322,34 @@ keyboard reports that bit; older firmware keeps the old refusal.
 `TAPPING_TOGGLE`-th tap, so it needs no new action or capability bit. `OSL(n)`
 followed as its own kind: it holds like `MO(n)` and its tap arms a one-shot
 owner in `layer_ownership`, which the next qualifying press uses up. The app
-offers both only as keys, not inside a behaviour. `DF()` and `LM()` still
-bypass ownership, and so does a plain `LT()` key with no authored row, which
-QMK runs itself. They follow in order: plain `LT()`, then `LM()`, a decision
-on `DF()` (the firmware assumes layer 0 is the base), and a device-side check
-that refuses what remains when a profile is saved.
+offers both only as keys, not inside a behaviour.
+
+A plain `LT()` with no authored row followed without a second tap/hold
+decision: QMK's tapping engine still decides, and marks a hold with tap count
+0; only that hold goes through layer ownership, and a tap still reaches QMK.
+
+Still open, in the order they are taken:
+
+1. (Done: plain `LT()` holds.)
+2. No device-side check: the keymap and combo validation runs only in host
+   tests, so a profile written by the app or VIA can still put `DF()`/`LM()`
+   in a behaviour (a silent no-op) or any layer keycode on a combo; the app's
+   combo editor refuses none.
+3. Nothing is verified on hardware. The host harness feeds userspace directly
+   and bypasses QMK's tapping engine, which buffers `TT()`, `OSL()` and `LT()`
+   presses; split sync and the RGB lock indicator for `TG()`/`TO()` locks and
+   one-shot layers are also unchecked. The runtime times a press from when
+   QMK delivers it, so an authored `LT()` row's tap/hold term likely starts
+   only after QMK's own `TAPPING_TERM` (e.g. `LT(LAYER_NAV, KC_SLSH)`'s
+   100 ms); check that on hardware before relying on it.
+4. QMK-parity decisions: `TT()` counts taps within `CUSTOM_MULTI_TAP_TERM`
+   (QMK: `TAPPING_TERM`) and locks when that window closes rather than on the
+   last tap; a lone long press of `OSL()` does not arm it (QMK's does); tapping
+   an armed `OSL()` again cancels at any speed (QMK: only a quick double tap);
+   `ONESHOT_TIMEOUT` and `ONESHOT_TAP_TOGGLE` are silently ignored for
+   `OSL()`; a `TG()`/`TO()` of the pointer layer from a behaviour is not seen
+   by QMK's auto-mouse. `TO()` keeping held layers on is kept deliberately.
+5. `LM()` (a hold plus modifiers), then a decision on `DF()`: the firmware and
+   the app assume layer 0 is the base.
+6. App: `TT()`/`OSL()` inside a behaviour and as a behaviour row's key, and
+   `TG()`/`TO()`/`TT()`/`OSL()` in the picker's Layers section.
