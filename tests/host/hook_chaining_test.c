@@ -14,6 +14,7 @@ void           post_process_record_user(uint16_t keycode, keyrecord_t *record);
 void           matrix_scan_user(void);
 void           matrix_slave_scan_user(void);
 void           housekeeping_task_user(void);
+void           suspend_power_down_user(void);
 void           keyboard_post_init_user(void);
 layer_state_t  layer_state_set_user(layer_state_t state);
 report_mouse_t pointing_device_task_user(report_mouse_t mouse_report);
@@ -32,6 +33,7 @@ typedef struct {
     unsigned scan_calls;
     unsigned slave_scan_calls;
     unsigned housekeeping_calls;
+    unsigned suspend_power_down_calls;
     unsigned post_init_calls;
     unsigned layer_state_calls;
     unsigned pointing_task_calls;
@@ -79,6 +81,7 @@ typedef struct {
     unsigned                   scan_calls;
     unsigned                   slave_scan_calls;
     unsigned                   housekeeping_calls;
+    unsigned                   suspend_power_down_calls;
     unsigned                   post_init_calls;
     unsigned                   layer_state_calls;
     unsigned                   pointing_task_calls;
@@ -165,6 +168,10 @@ void noah_matrix_slave_scan_user(void) {
 
 void noah_housekeeping_task_user(void) {
     noah_hook_stub_state.housekeeping_calls++;
+}
+
+void noah_suspend_power_down_user(void) {
+    noah_hook_stub_state.suspend_power_down_calls++;
 }
 
 void noah_keyboard_post_init_user(void) {
@@ -268,6 +275,11 @@ void housekeeping_task_user(void) {
     noah_housekeeping_task_user();
 }
 
+void suspend_power_down_user(void) {
+    hook_override_state.suspend_power_down_calls++;
+    noah_suspend_power_down_user();
+}
+
 void keyboard_post_init_user(void) {
     hook_override_state.post_init_calls++;
     noah_keyboard_post_init_user();
@@ -366,6 +378,10 @@ static void test_weak_defaults_use_expected_shared_behavior(void) {
     housekeeping_task_user();
     CHECK(noah_hook_stub_state.housekeeping_calls == 1);
 
+    suspend_power_down_user();
+    CHECK(noah_hook_stub_state.suspend_power_down_calls == 1);
+    CHECK(noah_hook_stub_state.housekeeping_calls == 1);
+
     keyboard_post_init_user();
     CHECK(noah_hook_stub_state.post_init_calls == 1);
 
@@ -460,6 +476,10 @@ static void test_strong_overrides_can_chain_to_noah_helpers(void) {
     housekeeping_task_user();
     CHECK(hook_override_state.housekeeping_calls == 1);
     CHECK(noah_hook_stub_state.housekeeping_calls == 1);
+
+    suspend_power_down_user();
+    CHECK(hook_override_state.suspend_power_down_calls == 1);
+    CHECK(noah_hook_stub_state.suspend_power_down_calls == 1);
 
     keyboard_post_init_user();
     CHECK(hook_override_state.post_init_calls == 1);

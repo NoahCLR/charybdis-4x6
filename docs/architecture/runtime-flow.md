@@ -113,7 +113,13 @@ flowchart TD
     master_scan --> housekeeping["housekeeping_task_user"]
     housekeeping --> repeat["Held repeat tick"]
     housekeeping --> diag["Watchdog refresh and boot-indicator expiry"]
+    usb_suspend["host USB suspend: suspend_power_down_user"] --> diag
 ```
+
+While the host has USB suspended, QMK stays inside its suspend loop and never
+reaches `housekeeping_task()`. `noah_suspend_power_down_user()` keeps the
+750 ms restart watchdog fed from that loop; without it the master resets about
+750 ms after the host sleeps and shows the white boot indicator.
 
 Split RPC callbacks for the VIA mirror and durable VIA reconciliation only
 validate, queue, and return bounded responses. They never access EEPROM. The

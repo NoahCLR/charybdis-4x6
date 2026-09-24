@@ -46,6 +46,10 @@ __attribute__((weak)) void housekeeping_task_user(void) {
     noah_housekeeping_task_user();
 }
 
+__attribute__((weak)) void suspend_power_down_user(void) {
+    noah_suspend_power_down_user();
+}
+
 __attribute__((weak)) void keyboard_post_init_user(void) {
     noah_keyboard_post_init_user();
 }

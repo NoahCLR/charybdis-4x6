@@ -144,7 +144,9 @@ void noah_runtime_diag_scope_enter(noah_runtime_diag_stage_t stage) {
 
 void noah_runtime_diag_scope_leave(void) {}
 
-void noah_runtime_diag_heartbeat(void) {}
+void noah_runtime_diag_heartbeat(void) {
+    test_log_stage("runtime_diag_heartbeat");
+}
 
 static void test_eeconfig_init_order(void) {
     static const char *const expected[] = {
@@ -194,10 +196,23 @@ static void test_keyboard_post_init_order(void) {
 static void test_housekeeping_order(void) {
     static const char *const expected[] = {
         "held_repeat_tick",
+        "runtime_diag_heartbeat",
     };
 
     test_log_reset();
     noah_housekeeping_task_user();
+    test_expect_sequence(expected, ARRAY_SIZE(expected));
+}
+
+static void test_suspend_power_down_feeds_watchdog_only(void) {
+    // QMK's USB-suspend loop never reaches housekeeping_task(); the suspend
+    // hook must keep the restart watchdog fed without running key work.
+    static const char *const expected[] = {
+        "runtime_diag_heartbeat",
+    };
+
+    test_log_reset();
+    noah_suspend_power_down_user();
     test_expect_sequence(expected, ARRAY_SIZE(expected));
 }
 
@@ -206,6 +221,7 @@ int main(void) {
     test_matrix_scan_order();
     test_matrix_slave_scan_order();
     test_housekeeping_order();
+    test_suspend_power_down_feeds_watchdog_only();
     test_keyboard_post_init_order();
 
     puts("runtime_init_order host tests passed");
