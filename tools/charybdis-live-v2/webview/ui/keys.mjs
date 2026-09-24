@@ -976,6 +976,7 @@ export function keysShortcut(event) {
     if (!action) return false;
     if (event.target.closest?.("input, textarea, select, [contenteditable]")) return false;
     if (action === "copy" && String(getSelection?.() || "")) return false;
+    if (cellShortcut(action)) { event.preventDefault(); return true; }
     const layer = currentLayer();
     const position = positionAt(layer, state.selected);
     if (!position) return false;
@@ -992,6 +993,31 @@ export function keysShortcut(event) {
         render();
     } else if (state.keyClipboard) {
         store(edits.setKey(layer.name, position.layoutIndex, state.keyClipboard.keycode));
+    }
+    return true;
+}
+
+// With a behaviour cell open, the board shortcuts act on that cell rather than
+// on the key under it: Delete removes the tier, ⌘C copies what it sends, and
+// ⌘V makes it send the copied key, running as it already does or as chosen.
+function cellShortcut(action) {
+    if (state.tab !== "behaviours" || !state.cell) return false;
+    const behaviour = behaviourFor(getModel(), state.behaviourRow);
+    const [tapCount, kind] = state.cell.split("-");
+    const step = behaviour && behaviourGridSteps(behaviour, getModel()?.behaviorEditing?.maxTapStepsPerBehavior)
+        .find((row) => String(row.tapCount) === tapCount);
+    if (!step) return false;
+    const branch = step[TIER_FIELDS[kind]];
+    const change = (next) => saveBehaviour(document, behaviour, {tapCount: step.tapCount, kind, branch: next});
+    if (action === "clear") {
+        if (branch && writable()) change(null);
+    } else if (action === "copy") {
+        if (branch) { state.keyClipboard = {keycode: branch.action, label: branch.action}; navigator.clipboard?.writeText(branch.action).catch(() => {}); render(); }
+    } else if (state.keyClipboard && writable()) {
+        const pending = state.cellHow?.cell === state.cell && state.cellHow.keycode === behaviour.keycode ? state.cellHow : null;
+        const how = branch || pending || {helper: HOLD_HELPERS[0][0]};
+        const edit = edits.cellEdit(kind, {stored: Boolean(branch), action: state.keyClipboard.keycode, helper: how.helper, repeatHz: how.repeatHz});
+        if (!edit.pending && edit.branch?.action !== branch?.action) { state.cellHow = null; change(edit.branch); }
     }
     return true;
 }
