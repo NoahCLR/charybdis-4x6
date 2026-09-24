@@ -10,6 +10,7 @@ import {el, esc} from "../lib/dom.mjs";
 import {getModel, layers, post, render, state, writable} from "../store.mjs";
 import {topbar, unavailable} from "./shell.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
+import {marked} from "./marks.mjs";
 
 export function screenSettings() {
     const model = getModel();
@@ -80,7 +81,7 @@ function sectionCard(model, section, fields, canEdit, searching) {
 function fieldRow(field, canEdit, submit, hidden) {
     const editable = canEdit && !field.readOnly;
     const row = el(`<div class="setrow ${field.readOnly ? "ro" : ""}" ${hidden ? 'style="display:none"' : ""}>
-        <div><div class="nm">${esc(field.label)}</div>${field.hint ? `<div class="hint">${esc(field.hint)}</div>` : ""}</div>
+        <div><div class="nm">${marked(getModel(), field.governs, field.label)}</div>${field.hint ? `<div class="hint">${esc(field.hint)}</div>` : ""}</div>
         <div class="control"></div>
     </div>`);
     const control = row.querySelector(".control");

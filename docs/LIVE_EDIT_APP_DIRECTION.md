@@ -1220,3 +1220,27 @@ bring back ("Undo: Swapped two keys"), discards included. The commit bar has
 one way on, **Review and apply**, and says what the draft holds by what
 happened to it ("4 added · 10 changed · 1 removed"); the rail's change count
 opens the review too. Leaving the review by Esc is leaving it by Keep editing.
+
+### D-L31 — One mark per thing that has a colour
+
+Several things in this app have a colour of their own, and each has exactly
+one mark, drawn by `webview/ui/marks.mjs` wherever the thing is named:
+
+| Thing | Mark |
+| --- | --- |
+| A behaviour tier (tap, hold, long hold) | the dot the keyboard flashes when it resolves |
+| A tap count (2× and up) | its branch badge, in its tap-branch colour |
+| A layer | its layer colour |
+| A pointing mode | the light its slot paints |
+| A combo | its badge, in the combo feedback colour |
+| A lighting stage | its on/off dot |
+
+A thing is marked where it is the subject and where it is only referred to:
+a setting names what it governs (`governs` in `core/model/settings-editor.js`),
+so Behaviour tap / hold carries the hold dot, Long hold the long-hold dot and
+Repeated taps the 2× badge in Settings, in the behaviour editor's timing fields
+and in the review alike; a pointing mode's DPI carries its slot's light; a
+layer setting its layer's colour. The review carries the same marks on
+titles, labels and values (`labelMark`, `beforeMark`, `afterMark`,
+`titleMark`). A stage that is off draws its marks off. A colour is the
+keyboard's own, so a dark one reads dark; the marks do not lighten it.

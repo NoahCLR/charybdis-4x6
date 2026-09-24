@@ -9,7 +9,7 @@ test("unchanged snapshots have no review entries and layer renaming does not inv
     const names=["Base","Numbers","Symbols","Navigation","Mouse","Extra 1","Extra 2","Extra 3"];
     const after=snapshot(reorderLayers(before.document,[0,1,2,3,4,5,6,7],names));
     assert.deepEqual(profileReview(before,after),[{area:"Layers",unit:"layerName:4",title:"Layer 4",status:"changed",
-        fields:[{label:"Name",before:"Pointer",after:"Mouse"}],place:{kind:"layers"}}]);
+        fields:[{label:"Name",before:"Pointer",after:"Mouse"}],place:{kind:"layers"},titleMark:{kind:"layer",layer:4}}]);
 });
 test("review preserves untrusted names as text data", () => {
     const before=snapshot(document());
@@ -49,8 +49,8 @@ test("a behaviour lists only the fields that changed, in the editor's words", ()
     const after=snapshot(behaviours(base,rows=>rows.map(row=>JSON.stringify(row.target)===JSON.stringify(target)?{...row,tapHoldTerm:180}:row)));
     const [item]=profileReview(before,after);
     assert.equal(item.status,"changed");
-    assert.deepEqual(item.fields,[{label:"Tap / hold",before:`default · ${validateSnapshot(base).settings.values[1]} ms`,after:"180 ms"}],
-        "the tiers that did not change are not repeated");
+    assert.deepEqual(item.fields,[{label:"Tap / hold",before:`default · ${validateSnapshot(base).settings.values[1]} ms`,after:"180 ms",
+        labelMark:{kind:"tier",tier:"hold"}}], "the tiers that did not change are not repeated, and the timing is marked with the tier it decides");
 });
 test("a removed behaviour is marked removed and lists what it held, without its defaults", () => {
     const base=pdDocument(), before=snapshot(base), row=validateSnapshot(base).behaviors.rows[0];
@@ -105,15 +105,14 @@ test("a colour travels as a colour, and an off one says what off means there", (
 test("switching one lighting stage off names that stage, in the Lighting screen's words", () => {
     const base=pdDocument(), before=snapshot(base);
     const [item]=profileReview(before,snapshot(lighting(base,rgb=>({...rgb,stageEnableMask:rgb.stageEnableMask & ~4}))));
-    assert.deepEqual(item.fields,[{label:"Pointing modes",before:"on",after:"off"}]);
+    assert.deepEqual(item.fields,[{label:"Pointing modes",before:"on",after:"off",beforeMark:{kind:"stage",on:true},afterMark:{kind:"stage",on:false}}]);
 });
 test("a behaviour tier says which branch and tier it is, so it is coloured as the grid colours it", () => {
     const base=pdDocument(), before=snapshot(base);
     const row=validateSnapshot(base).behaviors.rows.find(entry=>entry.steps.some(step=>step.hold));
     const [item]=profileReview(before,snapshot(behaviours(base,rows=>rows.filter(entry=>entry!==row && JSON.stringify(entry.target)!==JSON.stringify(row.target)))));
     const hold=item.fields.find(field=>/× hold$/.test(field.label));
-    assert.equal(hold.tier.kind,"hold");
-    assert.equal(hold.tier.branch,Number(hold.label[0]));
+    assert.deepEqual(hold.labelMark,{kind:"tier",tier:"hold",branch:Number(hold.label[0])});
 });
 test("a pointing-mode action reads by its slot's name, and carries the slot for its colour", () => {
     const base=pdDocument(), before=snapshot(base), slots=validateSnapshot(base).pdModes;
@@ -122,5 +121,16 @@ test("a pointing-mode action reads by its slot's name, and carries the slot for 
         ?{...entry,steps:[{tapIndex:0,tap:{kind:4,flags:0,operand:0}}]}:entry)));
     const field=profileReview(before,after)[0].fields.find(entry=>entry.label==="1× tap");
     assert.equal(field.after,slots[0].name,"named as the Pointing modes screen names it");
-    assert.equal(field.afterPointingSlot,0);
+    assert.deepEqual(field.afterMark,{kind:"pointing",slot:0});
+});
+test("a setting is marked with what it governs, as the Settings screen marks it", () => {
+    const base=pdDocument(), before=snapshot(base);
+    const settings=require("../../core/schema/settings-domain-v1");
+    const after=snapshot(withDomain(base,64,payload=>settings.decodeSettings(payload),value=>settings.encodeSettings(value),
+        value=>({...value,values:value.values.map((v,i)=>i===1?175:i===2?450:i===5?3:v)})));
+    const items=profileReview(before,after);
+    const timing=items.find(entry=>entry.unit==="settings:keyTiming").fields;
+    assert.deepEqual(timing.map(field=>field.labelMark),[{kind:"tier",tier:"hold"},{kind:"tier",tier:"long"}]);
+    const layer=items.find(entry=>entry.unit==="settings:autoMouse").fields.find(field=>field.label==="Auto-mouse layer");
+    assert.deepEqual(layer.afterMark,{kind:"layer",layer:3},"a layer value carries the layer's colour");
 });

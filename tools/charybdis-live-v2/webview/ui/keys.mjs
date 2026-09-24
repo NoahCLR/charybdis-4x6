@@ -13,6 +13,7 @@ import {board} from "./board.mjs";
 import {layerBar} from "./layerbar.mjs";
 import {attachLayersControl} from "./layers.mjs";
 import {openPicker} from "./picker.mjs";
+import {branchBadge, marked, tierDot} from "./marks.mjs";
 import {topbar, unavailable} from "./shell.mjs";
 
 const TABS = [
@@ -441,21 +442,6 @@ function tabBehaviours(body, right) {
     body.replaceChildren(node);
 }
 
-// A branch's badge as the grid heads its column: from 2× on, tinted with the
-// tap-branch colour the keyboard shows while that branch is pending. The
-// review draws the same badge, so a colour means one thing everywhere.
-export function branchBadge(model, count) {
-    const colour = feedbackColours(model).branches[count - 2];
-    const lit = count > 1 && stageEnabled(model, "key") && colour && !isOff(colour);
-    return `<span class="bn" style="${lit ? `border-color:${css(colour)};color:${css(colour)}` : ""}">${count}×</span>`;
-}
-
-export function tierDot(model, kind) {
-    const colour = feedbackColours(model)[kind];
-    const lit = stageEnabled(model, "key") && !isOff(colour);
-    return `<i class="fbdot" style="${lit ? `background:${css(colour)}` : "background:none;border-style:dashed"}"></i>`;
-}
-
 // An empty timing field falls back to the keyboard's own default, which it
 // reports and Settings · Key Timing edits — so the note names both.
 function timingDefaultsNote(model) {
@@ -498,9 +484,9 @@ function behaviourEditor(behaviour) {
             </div>
         </div>
         <div class="beh-timing">
-            <label class="field"><span>Tap / hold</span><input class="input mono" data-term="tapHoldTerm" value="${esc(zeroBlank(behaviour.tapHoldTerm))}" placeholder="default" ${canEdit ? "" : "disabled"}></label>
-            <label class="field"><span>Long hold</span><input class="input mono" data-term="longerHoldTerm" value="${esc(zeroBlank(behaviour.longerHoldTerm))}" placeholder="default" ${canEdit ? "" : "disabled"}></label>
-            <label class="field"><span>Repeated taps</span><input class="input mono" data-term="multiTapTerm" value="${esc(zeroBlank(behaviour.multiTapTerm))}" placeholder="default" ${canEdit ? "" : "disabled"}></label>
+            <label class="field"><span>${marked(model, {kind: "tier", tier: "hold"}, "Tap / hold")}</span><input class="input mono" data-term="tapHoldTerm" value="${esc(zeroBlank(behaviour.tapHoldTerm))}" placeholder="default" ${canEdit ? "" : "disabled"}></label>
+            <label class="field"><span>${marked(model, {kind: "tier", tier: "long"}, "Long hold")}</span><input class="input mono" data-term="longerHoldTerm" value="${esc(zeroBlank(behaviour.longerHoldTerm))}" placeholder="default" ${canEdit ? "" : "disabled"}></label>
+            <label class="field"><span>${marked(model, {kind: "branch", count: 2}, "Repeated taps")}</span><input class="input mono" data-term="multiTapTerm" value="${esc(zeroBlank(behaviour.multiTapTerm))}" placeholder="default" ${canEdit ? "" : "disabled"}></label>
             <label class="sw" data-tip="Treat this row as a mouse gesture, so pressing it keeps the pointer layer up instead of letting auto-mouse reset.">
                 <input type="checkbox" data-anchor ${behaviour.keepsAutoMouseAnchored ? "checked" : ""} ${canEdit ? "" : "disabled"}>
                 <span class="track"></span><span class="txt">Keeps auto-mouse anchored</span></label>

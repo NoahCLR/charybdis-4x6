@@ -13,11 +13,12 @@ import {historyAction} from "./view/edits.mjs";
 import {FIELDS_SHOWN, discardLabel, placeState, reviewBlocks, statusSummary} from "./view/review.mjs";
 import {bindLayerIndex, hideHover, mountHover} from "./ui/hover.mjs";
 import {pickerOverlay} from "./ui/picker.mjs";
-import {branchBadge, keysShortcut, screenKeys, tierDot} from "./ui/keys.mjs";
+import {keysShortcut, screenKeys} from "./ui/keys.mjs";
+import {mark} from "./ui/marks.mjs";
 import {closeLayers} from "./ui/layers.mjs";
 import {screenLighting} from "./ui/lighting.mjs";
 import {screenSettings} from "./ui/settings.mjs";
-import {screenPointing, slotLight} from "./ui/pointing.mjs";
+import {screenPointing} from "./ui/pointing.mjs";
 import {screenMacros} from "./ui/macros.mjs";
 import {screenProfile} from "./ui/profile.mjs";
 import {commitBar, rail, topbar, unavailable} from "./ui/shell.mjs";
@@ -82,19 +83,21 @@ function reviewOverlay() {
     // off colour is drawn off, as it is everywhere else.
     const swatch = (colour) => colour
         ? `<i class="rv-swatch ${isOff(colour) ? "swatch-off" : ""}" style="${isOff(colour) ? "" : `background:${css(colour)}`}"></i>` : "";
-    // A pointing mode is drawn with the light it paints, as its slot card is.
-    const slotSwatch = (slot) => slot === undefined ? "" : slotLight(model, {id: slot}).swatch("rv-swatch");
-    const value = (text, klass, colour, slot) => text === null ? ""
-        : `<span class="rv-val">${swatch(colour)}${slotSwatch(slot)}<span class="${klass}">${esc(text)}</span></span>`;
-    // A behaviour tier is labelled as the grid heads it: the branch badge in
-    // its tap-branch colour, then the tier's own feedback dot.
+    // Everything with a colour of its own carries its mark, drawn as every
+    // editor draws it (ui/marks.mjs): a tier's dot, a branch badge, a layer's
+    // or pointing mode's light, a combo badge, a stage's on/off dot.
+    const value = (text, klass, colour, marker) => text === null ? ""
+        : `<span class="rv-val">${swatch(colour)}${mark(model, marker)}<span class="${klass}">${esc(text)}</span></span>`;
+    // A behaviour tier is labelled as the grid heads it: the branch badge,
+    // the tier's dot, then the tier's name.
     const TIER_NAMES = {tap: "tap", hold: "hold", long: "long hold"};
-    const fieldLabel = (entry) => entry.tier
-        ? `<span class="k tier">${branchBadge(model, entry.tier.branch)}${tierDot(model, entry.tier.kind)}${esc(TIER_NAMES[entry.tier.kind])}</span>`
-        : entry.label ? `<span class="k">${esc(entry.label)}</span>` : "";
+    const fieldLabel = (entry) => {
+        const text = entry.labelMark?.kind === "tier" && entry.labelMark.branch ? TIER_NAMES[entry.labelMark.tier] : entry.label;
+        return text ? `<span class="k mk">${mark(model, entry.labelMark)}<span>${esc(text)}</span></span>` : "";
+    };
     const field = (item, entry) => {
-        const before = value(entry.before, "del", entry.beforeColour, entry.beforePointingSlot);
-        const after = value(entry.after, "ins", entry.afterColour, entry.afterPointingSlot);
+        const before = value(entry.before, "del", entry.beforeColour, entry.beforeMark);
+        const after = value(entry.after, "ins", entry.afterColour, entry.afterMark);
         const shown = item.status === "changed" ? `${before}<span class="to">→</span>${after}` : item.status === "added" ? after : before;
         return `${fieldLabel(entry)}<span class="v ${entry.label ? "" : "wide"}">${shown}</span>`;
     };
@@ -104,7 +107,7 @@ function reviewOverlay() {
             ? `<details class="rv-more"><summary>Show all ${item.fields.length}</summary><div class="rv-fields">${rest.map((entry) => field(item, entry)).join("")}</div></details>` : ""}`;
     };
     const item = (entry, block, index, discard) => `<div class="rv-item">
-        <div class="rv-title">${entry.place?.kind === "pointing" ? slotSwatch(entry.place.slot) : ""}<span class="t">${esc(entry.title)}</span>
+        <div class="rv-title">${mark(model, entry.titleMark)}<span class="t">${esc(entry.title)}</span>
             ${entry.area !== block.area ? `<span class="tag">${esc(entry.area)}</span>` : ""}
             ${entry.status === "changed" ? "" : `<span class="rv-status ${esc(entry.status)}">${esc(entry.status)}</span>`}</div>
         ${fields(entry)}

@@ -6,6 +6,7 @@ import {el, esc} from "../lib/dom.mjs";
 import {actionLabel, behaviourFor, behaviourTiers, combosAt, keyFace, keyMeaning, macroKeycodes, pointingSlotFor} from "../view/keyface.mjs";
 import {feedbackColours, pdColourRow, stageEnabled} from "../view/lighting.mjs";
 import {getModel, positionAt} from "../store.mjs";
+import {tierDot} from "./marks.mjs";
 
 const tip = el(`<div class="tip" hidden></div>`);
 const card = el(`<div class="hovercard" hidden></div>`);
@@ -56,7 +57,6 @@ function place(node, rect, gap = 10, beside = false) {
     node.style.top = `${Math.max(10, Math.min(top, innerHeight - box.height - 10))}px`;
 }
 
-const dot = (colour, lit) => `<i class="fbdot" style="${lit && !isOff(colour) ? `background:${css(colour)}` : "background:none;border-style:dashed"}"></i>`;
 
 function keyCard(index) {
     const model = getModel();
@@ -76,7 +76,7 @@ function keyCard(index) {
         const branches = (behaviour.steps || []).map((step) => {
             const rows = [["tap", "Tap", step.tap], ["hold", "Hold", step.hold], ["long", "Long hold", step.longHold]]
                 .filter(([, , branch]) => branch)
-                .map(([kind, name, branch]) => `<div class="hc-act"><span class="hc-stage">${dot(colours[kind], lit)}${name}</span>
+                .map(([kind, name, branch]) => `<div class="hc-act"><span class="hc-stage">${tierDot(model, kind)}${name}</span>
                     <span><span class="hc-target">${esc(branch.action)}</span>
                     <span class="hc-life">${esc(helperText(kind, branch.helper))}</span></span></div>`).join("");
             const branchColour = colours.branches[step.tapCount - 1];

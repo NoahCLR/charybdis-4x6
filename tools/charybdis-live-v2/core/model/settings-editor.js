@@ -12,12 +12,16 @@ const byte = (macro, id, shift, label, hint) => number(macro, id, label, hint ||
 
 // These are editor definitions, not configuration defaults. Every value below
 // is supplied by the complete device snapshot; absent readback stays absent.
+//
+// `governs` names what a setting is about when that thing has a colour of its
+// own elsewhere — a behaviour tier, a tap-count branch, a pointing slot, a
+// layer — so every surface that shows the setting can mark it the same way.
 const sections = [
     {id: "keyTiming", label: "Key Timing", fields: [
         number("tappingTerm", 0, "Dual-role tap / hold", "Milliseconds before a dual-role key becomes a hold."),
-        number("tapHoldTerm", 1, "Behaviour tap / hold", "Used when a behaviour leaves its tap / hold timing empty."),
-        number("longerHoldTerm", 2, "Long hold", "Used when a behaviour leaves its long-hold timing empty."),
-        number("multiTapTerm", 3, "Repeated taps", "Maximum gap between repeated taps when a behaviour has no override."),
+        number("tapHoldTerm", 1, "Behaviour tap / hold", "Used when a behaviour leaves its tap / hold timing empty.", {governs: {kind: "tier", tier: "hold"}}),
+        number("longerHoldTerm", 2, "Long hold", "Used when a behaviour leaves its long-hold timing empty.", {governs: {kind: "tier", tier: "long"}}),
+        number("multiTapTerm", 3, "Repeated taps", "Maximum gap between repeated taps when a behaviour has no override.", {governs: {kind: "branch", count: 2}}),
         toggle("combosEnabled", 20, "Combos", "Individual combo timing is available in the keyboard view."),
     ]},
     {id: "normalPointerSpeed", label: "Pointer Speed", fields: [
@@ -31,9 +35,9 @@ const sections = [
         number("snipingDpi", 19, "Sniping DPI", "100–400: the steps this firmware stores. Lower DPI gives finer pointer control.", {choices: dpiChoices({accepts: v => validSetting(19, v)})}),
     ]},
     {id: "pointingModeSpeeds", label: "Pointing Mode Speeds", fields: [
-        number("dragscrollDpi", 10, "Drag-scroll DPI", "Trackball sensitivity while scrolling; this is an explicit DPI value.", {choices: dpiChoices(), open: true}),
+        number("dragscrollDpi", 10, "Drag-scroll DPI", "Trackball sensitivity while scrolling; this is an explicit DPI value.", {choices: dpiChoices(), open: true, governs: {kind: "pointing", slot: 0}}),
         ...["Volume", "Brightness", "Zoom", "Arrow"].map((name, i) => number(name.toLowerCase() + "Dpi", 11 + i, name + " mode DPI",
-            "Normal pointer speed keeps the normal pointer DPI.", {choices: dpiChoices({normalSpeed: true}), open: true})),
+            "Normal pointer speed keeps the normal pointer DPI.", {choices: dpiChoices({normalSpeed: true}), open: true, governs: {kind: "pointing", slot: i + 1}})),
     ]},
     {id: "sniping", label: "Sniping", fields: [
         toggle("autoSniping", 8, "Auto-sniping", "Use sniping speed while the selected layer is active."),
@@ -98,9 +102,9 @@ function settingsSections(snapshot, settings) {
         {...byte("effectLeds", 21, 24, "Apply base effect to"), choices: flags, readOnly: !options, hint: options ? "Choose which LED classes receive the base effect. Layer colours and feedback have their own policies." : "Update both halves to report the LED classes."});
     const name = i => settings.names[i] || `Layer ${i}`;
     result.push({id: "startupLayers", label: "Startup Layers", expanded: false, description: "Choose the layers active when the keyboard starts. Keep at least one selected; higher layers take priority.", fields:
-        Array.from({length: 8}, (_, i) => ({...toggle(`startupLayer${i}`, 23, name(i), `Layer ${i}`), bitMask: 1 << i}))});
+        Array.from({length: 8}, (_, i) => ({...toggle(`startupLayer${i}`, 23, name(i), `Layer ${i}`), bitMask: 1 << i, governs: {kind: "layer", layer: i}}))});
     result.push({id: "comboReferences", label: "Combo Layer Matching", expanded: false, description: "Choose which layer supplies the key assignments used to match combos on each layer. Select the same layer to keep its combos independent.", fields:
-        Array.from({length: 8}, (_, i) => ({...layer(`comboReference${i}`, 27, `Combos on ${name(i)}`), shift: i * 4, width: 4}))});
+        Array.from({length: 8}, (_, i) => ({...layer(`comboReference${i}`, 27, `Combos on ${name(i)}`), shift: i * 4, width: 4, governs: {kind: "layer", layer: i}}))});
     result.push({id: "keyboardOptions", label: "Key Options", expanded: false, description: options ? "Keyboard-wide remapping and typing options. These apply across all layers." : "Update both halves to report their supported key options.", fields:
         options ? optionLabels.map(([macro, label], i) => ({...toggle(macro, 24, label), bitMask: options.keymapMasks[i], readOnly: !(options.supportedKeymapOptions & (1 << i)), hint: options.supportedKeymapOptions & (1 << i) ? "" : "This option is not enabled in the running firmware."})) : []});
     return result;

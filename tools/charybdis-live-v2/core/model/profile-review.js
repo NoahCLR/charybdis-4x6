@@ -40,7 +40,11 @@ function action(value, names = {}) {
 // The names an action can be read by in one snapshot.
 const namesIn = (value, macros) => ({layers: value.settings.names, pointing: value.pdModes?.map(slot => slot.kind ? slot.name : null) || [],
     macros: macros?.viaMacros.map(slot => slot.name) || []});
-const pointingSlot = value => value && (value.kind === 4 || value.kind === 5) ? value.operand : undefined;
+// The mark an action carries: what it reaches, when that has a colour of its
+// own — a pointing mode's light, a layer's colour.
+const actionMark = value => !value ? undefined
+    : value.kind === 4 || value.kind === 5 ? {kind: "pointing", slot: value.operand}
+    : value.kind === 2 || value.kind === 3 ? {kind: "layer", layer: value.operand} : undefined;
 function pointingFields(slot) {
     const result = new Map([["Movement", ["Empty", "Directional keys / shortcuts", "Scrolling"][slot?.kind || 0]], ["Name", slot?.name || "Empty"]]);
     if (!slot?.kind) return result;
@@ -86,11 +90,12 @@ function behaviourFields(row, defaults, names) {
     if (!row) return new Map();
     // Compared by what is stored, shown with the default it stands for, so a
     // changed default in Settings does not read as a change to every row.
-    const timing = (value, fallback) => ({text: value ? `${value} ms` : `default · ${fallback} ms`, key: value});
+    // Each timing is marked with what it decides, as Settings marks its default.
+    const timing = (value, fallback, labelMark) => ({text: value ? `${value} ms` : `default · ${fallback} ms`, key: value, labelMark});
     const fields = new Map([
-        ["Tap / hold", timing(row.tapHoldTerm, defaults[1])],
-        ["Long hold", timing(row.longerHoldTerm, defaults[2])],
-        ["Repeated taps", timing(row.multiTapTerm, defaults[3])],
+        ["Tap / hold", timing(row.tapHoldTerm, defaults[1], {kind: "tier", tier: "hold"})],
+        ["Long hold", timing(row.longerHoldTerm, defaults[2], {kind: "tier", tier: "long"})],
+        ["Repeated taps", timing(row.multiTapTerm, defaults[3], {kind: "branch", count: 2})],
         ["Keeps auto-mouse anchored", row.keepsAutoMouseAnchored ? "yes" : "no"],
     ]);
     for (const step of row.steps) for (const [tier, name] of TIERS) {
@@ -101,7 +106,7 @@ function behaviourFields(row, defaults, names) {
         // tier it is, so the review can colour it as the grid does.
         const reaches = tier === "tap" ? branch : branch.action;
         fields.set(`${step.tapIndex + 1}× ${name}`, {text: `${action(reaches, names)}${how}`, key: `${action(reaches, names)}${how}`,
-            tier: {branch: step.tapIndex + 1, kind: tier === "longHold" ? "long" : tier}, pointingSlot: pointingSlot(reaches)});
+            labelMark: {kind: "tier", tier: tier === "longHold" ? "long" : tier, branch: step.tapIndex + 1}, mark: actionMark(reaches)});
     }
     return fields;
 }
@@ -121,7 +126,7 @@ function comboFields(row, names) {
     if (!row) return new Map();
     const options = [row.mustHold && "must be held", row.mustTap && "tap only", row.ordered && "keys in order"].filter(Boolean).join(", ");
     return new Map([["Keys", row.inputs.map(input => action(input, names)).join(" + ")],
-        ["Sends", {text: action(row.output, names), key: action(row.output, names), pointingSlot: pointingSlot(row.output)}], ["Window", `${row.termMs} ms`],
+        ["Sends", {text: action(row.output, names), key: action(row.output, names), mark: actionMark(row.output)}], ["Window", `${row.termMs} ms`],
         ["Hold threshold", `${row.holdTermMs} ms`], ["Options", options || "none"]]);
 }
 
@@ -144,15 +149,17 @@ function lightingRecords(value) {
     const r = value.rgb, records = new Map();
     const layerName = id => value.settings.names[id] || `Layer ${id}`;
     const slotName = id => value.pdModes?.[id]?.kind ? value.pdModes[id].name : id < 6 ? words(Object.keys(rgbEnums.RGB_PD_MODE_IDS)[id]) : `slot ${id + 1}`;
-    const record = (unit, title, stage, fields, where = {}) => records.set(unit, {title, stage, where, fields: new Map(fields)});
+    const record = (unit, title, stage, fields, where = {}, titleMark) => records.set(unit, {title, stage, where, titleMark, fields: new Map(fields)});
     // Each stage's switch sits on its own tab, so the stages record belongs
     // to no single one.
-    record("rgb:stages", "Feedback stages", null, Object.entries(rgbEnums.RGB_STAGE_BITS).map(([name, bit]) =>
-        [STAGE_NAMES[name] || words(name), r.stageEnableMask & bit ? "on" : "off"]));
+    record("rgb:stages", "Feedback stages", null, Object.entries(rgbEnums.RGB_STAGE_BITS).map(([name, bit]) => {
+        const on = Boolean(r.stageEnableMask & bit);
+        return [STAGE_NAMES[name] || words(name), {text: on ? "on" : "off", key: on, mark: {kind: "stage", on}}];
+    }));
     for (const row of r.layerColors) record(`rgb:layer:${row.layerId}`, `${layerName(row.layerId)} colour`, "layers",
-        [["Colour", colour(row.color, row.layerId === 0 ? "off · the base effect shows" : "off")], ["Paints", nameIn(PAINTS_NAMES, rgbEnums.RGB_LAYER_MODES, row.mode)]], {layer: row.layerId});
+        [["Colour", colour(row.color, row.layerId === 0 ? "off · the base effect shows" : "off")], ["Paints", nameIn(PAINTS_NAMES, rgbEnums.RGB_LAYER_MODES, row.mode)]], {layer: row.layerId}, {kind: "layer", layer: row.layerId});
     for (const row of r.pdModeColors) record(`rgb:pd:${row.pdModeId}`, `Pointing mode colour · ${slotName(row.pdModeId)}`, "pd",
-        [["Colour", colour(row.color)], ["Where", nameIn(LOCALITY_NAMES, rgbEnums.RGB_LOCALITIES, row.locality)]], {slot: row.pdModeId});
+        [["Colour", colour(row.color)], ["Where", nameIn(LOCALITY_NAMES, rgbEnums.RGB_LOCALITIES, row.locality)]], {slot: row.pdModeId}, {kind: "pointing", slot: row.pdModeId});
     record("rgb:automouse", "Auto-mouse fade", "auto", [["Fade", nameIn(FADE_NAMES, rgbEnums.RGB_AUTOMOUSE_MODES, r.automouseFade.mode)], ["End colour", colour(r.automouseFade.endColor)]]);
     record("rgb:combo", "Combo feedback", "combo", [["Colour", colour(r.comboFeedback.color)], ["Where", nameIn(LOCALITY_NAMES, rgbEnums.RGB_LOCALITIES, r.comboFeedback.locality)]]);
     const k = r.keyFeedback;
@@ -165,15 +172,18 @@ function lightingRecords(value) {
     // them, "Group 1 · 3 LEDs", and each row as who it paints for.
     const groups = new Map(r.groups.map(group => [group.id, group]));
     const fields = r.groups.map(group => [`group:${group.id}`, {label: `Group ${group.id}`, text: `LEDs ${group.leds.join(", ")}`, key: group.leds.join(",")}]);
-    for (const [table, owner] of [
-        ["layerGroupRows", row => row.selector === 255 ? "all layers" : layerName(row.selector)],
-        ["pdModeGroupRows", row => row.selector === 255 ? "all pointing modes" : slotName(row.selector)],
-        ["comboGroupRows", () => "combos"],
-        ["keyGroupRows", row => nameIn(SEMANTIC_NAMES, rgbEnums.RGB_KEY_SEMANTICS, row.semantic)],
+    const TIER_SEMANTICS = {KEY_FEEDBACK_GROUP_TAP_COMMITTED: "tap", KEY_FEEDBACK_GROUP_HOLD_ACTIVE: "hold", KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE: "long"};
+    for (const [table, owner, ownerMark] of [
+        ["layerGroupRows", row => row.selector === 255 ? "all layers" : layerName(row.selector), row => row.selector === 255 ? undefined : {kind: "layer", layer: row.selector}],
+        ["pdModeGroupRows", row => row.selector === 255 ? "all pointing modes" : slotName(row.selector), row => row.selector === 255 ? undefined : {kind: "pointing", slot: row.selector}],
+        ["comboGroupRows", () => "combos", () => ({kind: "combo"})],
+        ["keyGroupRows", row => nameIn(SEMANTIC_NAMES, rgbEnums.RGB_KEY_SEMANTICS, row.semantic),
+            row => (tier => tier && {kind: "tier", tier})(TIER_SEMANTICS[Object.entries(rgbEnums.RGB_KEY_SEMANTICS).find(([, id]) => id === row.semantic)?.[0]])],
     ]) r[table].forEach((row, i) => {
         const group = groups.get(row.groupId), leds = group ? `Group ${group.id} · ${group.leds.length} LED${group.leds.length === 1 ? "" : "s"}` : `Group ${row.groupId}`;
         const paint = colour(row.color, "inherits the stage colour");
-        fields.push([`${table}:${i}`, {label: `Override · ${owner(row)}`, text: `${leds} · ${paint.text}`, key: `${group?.leds.join(",")}|${paint.key}|${owner(row)}`, colour: paint.colour}]);
+        fields.push([`${table}:${i}`, {label: `Override · ${owner(row)}`, labelMark: ownerMark(row) || undefined, text: `${leds} · ${paint.text}`,
+            key: `${group?.leds.join(",")}|${paint.key}|${owner(row)}`, colour: paint.colour}]);
     });
     record("rgb:groups", "LED overrides", "groups", fields);
     return records;
@@ -185,7 +195,7 @@ function profileReview(before, after) {
     const a = validateSnapshot(before.document), b = validateSnapshot(after.document), items = [];
     // One item from its fields on each side; `exists` says whether the thing is
     // there at all, which decides added and removed.
-    const item = (area, unit, title, old, next, place, exists = [old.size > 0, next.size > 0]) => {
+    const item = (area, unit, title, old, next, place, exists = [old.size > 0, next.size > 0], titleMark) => {
         const [was, is] = exists;
         if (!was && !is) return;
         const status = was && is ? "changed" : is ? "added" : "removed";
@@ -195,17 +205,16 @@ function profileReview(before, after) {
             .map(id => {
                 const entry = {label: labelOf(id, next.get(id), old.get(id)),
                     before: status === "added" ? null : text(old.get(id)) ?? "none", after: status === "removed" ? null : text(next.get(id)) ?? "none"};
+                // A field carries its colour and the marks of what it is about,
+                // on the side that shows them.
                 const side = (value, name) => value && typeof value === "object" ? value[name] : undefined;
-                const tier = side(next.get(id), "tier") || side(old.get(id), "tier");
-                const was = side(old.get(id), "colour"), is = side(next.get(id), "colour");
-                const slotWas = side(old.get(id), "pointingSlot"), slotIs = side(next.get(id), "pointingSlot");
-                return {...entry, ...(tier ? {tier} : {}),
-                    ...(was && status !== "added" ? {beforeColour: was} : {}), ...(is && status !== "removed" ? {afterColour: is} : {}),
-                    ...(slotWas !== undefined && status !== "added" ? {beforePointingSlot: slotWas} : {}),
-                    ...(slotIs !== undefined && status !== "removed" ? {afterPointingSlot: slotIs} : {})};
+                const extra = {labelMark: side(next.get(id), "labelMark") || side(old.get(id), "labelMark"),
+                    beforeColour: status === "added" ? undefined : side(old.get(id), "colour"), afterColour: status === "removed" ? undefined : side(next.get(id), "colour"),
+                    beforeMark: status === "added" ? undefined : side(old.get(id), "mark"), afterMark: status === "removed" ? undefined : side(next.get(id), "mark")};
+                return {...entry, ...Object.fromEntries(Object.entries(extra).filter(([, value]) => value !== undefined))};
             });
         if (status === "changed" && !fields.length) return;
-        items.push({area, unit, title, status, fields, place});
+        items.push({area, unit, title, status, fields, place, ...(titleMark ? {titleMark} : {})});
     };
     const layerName = (value, i) => value.settings.names[i] || `Layer ${i}`;
     const macrosA = macroEditorView(before), macrosB = macroEditorView(after);
@@ -214,10 +223,11 @@ function profileReview(before, after) {
         if (code === b.document.layers[l][p]) return;
         // The position's name on the board comes from the layout, which the
         // session knows: the item carries the matrix slot for it.
-        item("Layout", `layout:${l}:${p}`, layerName(b, l), new Map([["", key(code)]]), new Map([["", key(b.document.layers[l][p])]]),
-            {kind: "key", layer: l, slot: p});
+        const values = code => ({text: key(code), key: code});
+        item("Layout", `layout:${l}:${p}`, layerName(b, l), new Map([["", values(code)]]), new Map([["", values(b.document.layers[l][p])]]),
+            {kind: "key", layer: l, slot: p}, undefined, {kind: "layer", layer: l});
     }));
-    a.settings.names.forEach((name, i) => item("Layers", `layerName:${i}`, `Layer ${i}`, new Map([["Name", name || `Layer ${i}`]]), new Map([["Name", b.settings.names[i] || `Layer ${i}`]]), {kind: "layers"}));
+    a.settings.names.forEach((name, i) => item("Layers", `layerName:${i}`, `Layer ${i}`, new Map([["Name", name || `Layer ${i}`]]), new Map([["Name", b.settings.names[i] || `Layer ${i}`]]), {kind: "layers"}, undefined, {kind: "layer", layer: i}));
     const targets = new Map([...a.behaviors.rows, ...b.behaviors.rows].map(row => [JSON.stringify(row.target), row.target]));
     for (const [id, target] of targets) {
         const old = a.behaviors.rows.find(row => JSON.stringify(row.target) === id), next = b.behaviors.rows.find(row => JSON.stringify(row.target) === id);
@@ -225,7 +235,8 @@ function profileReview(before, after) {
             {kind: "behaviour", target}, [Boolean(old), Boolean(next)]);
     }
     for (let i = 0; i < Math.max(a.combos.length, b.combos.length); i++) {
-        item("Combos", `combo:${i}`, `Combo ${i + 1}`, comboFields(a.combos[i], namesA), comboFields(b.combos[i], namesB), {kind: "combo", index: i});
+        item("Combos", `combo:${i}`, `Combo ${i + 1}`, comboFields(a.combos[i], namesA), comboFields(b.combos[i], namesB), {kind: "combo", index: i}, undefined,
+            {kind: "combo", badge: `C${i + 1}`});
     }
     macrosA.viaMacros.forEach((slot, i) => {
         const fields = (macro) => new Map([["Steps", macro.payload || "empty"], ["Name", macro.name || "no name"]]);
@@ -237,10 +248,11 @@ function profileReview(before, after) {
         fields: new Map(section.fields.map(field => {
             let value = field.value;
             if (field.kind === "toggle") value = field.enabled ? "on" : "off";
-            else if (field.kind === "layer") value = settings.names[Number(value.slice(6))] || value;
+            else if (field.kind === "layer") return [field.macro, {label: field.label, text: settings.names[Number(value.slice(6))] || value, key: field.value,
+                labelMark: field.governs, mark: {kind: "layer", layer: Number(value.slice(6))}}];
             else if (field.choices) value = field.choices.find(choice => typeof choice === "object" && String(choice.value) === field.value)?.label || value;
             const ms = /ms\b/.test(field.hint || "") || /\(ms\)/.test(field.label);
-            return [field.macro, {label: field.label.replace(/\s*\(ms\)$/, ""), text: ms && /^\d+$/.test(value) ? `${value} ms` : value, key: field.value}];
+            return [field.macro, {label: field.label.replace(/\s*\(ms\)$/, ""), text: ms && /^\d+$/.test(value) ? `${value} ms` : value, key: field.value, labelMark: field.governs}];
         }))}));
     const sectionsA = sections(before, a.settings);
     for (const section of sections(after, b.settings)) {
@@ -253,12 +265,12 @@ function profileReview(before, after) {
     for (let id = 0; id < 8; id++) {
         const old = a.pdModes?.[id], next = b.pdModes?.[id];
         item("Pointing modes", `pd:${id}`, `Slot ${id + 1}${(next?.name || old?.name) ? ` · ${next?.kind ? next.name : old?.name}` : ""}`,
-            pointingFields(old), pointingFields(next), {kind: "pointing", slot: id}, [Boolean(old?.kind), Boolean(next?.kind)]);
+            pointingFields(old), pointingFields(next), {kind: "pointing", slot: id}, [Boolean(old?.kind), Boolean(next?.kind)], {kind: "pointing", slot: id});
     }
     const lightA = lightingRecords(a), lightB = lightingRecords(b);
     for (const [unit, record] of lightB) {
         const old = lightA.get(unit);
-        item("Lighting", unit, record.title, old?.fields || new Map(), record.fields, {kind: "lighting", stage: record.stage, ...record.where}, [Boolean(old), true]);
+        item("Lighting", unit, record.title, old?.fields || new Map(), record.fields, {kind: "lighting", stage: record.stage, ...record.where}, [Boolean(old), true], record.titleMark);
     }
     for (const [unit, record] of lightA) if (!lightB.has(unit)) item("Lighting", unit, record.title, record.fields, new Map(), {kind: "lighting", stage: record.stage, ...record.where});
     // The items above describe the profile in words. If the stored bytes
