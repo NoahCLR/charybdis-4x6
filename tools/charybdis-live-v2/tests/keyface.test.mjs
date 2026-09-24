@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {behaviourFor, comboEditInputs, comboReferenceLayer, combosAt, behaviourListeningTo, canonicalKeycode, behaviourGridSteps, behaviourGroups, behaviourTiers, macroReach, pointingReach, reachablePositions, resolvedPositions, bindingKeycode, bindingsForSlot, comboGroups, combosForKey, keyFace, keyMeaning, macroKeycodes, macroPlacements, pointingSlotFor, slotKeycodes} from "../webview/view/keyface.mjs";
+import {behaviourFor, comboEditInputs, comboReferenceLayer, combosAt, behaviourListeningTo, canonicalKeycode, behaviourGridSteps, behaviourGroups, behaviourTiers, macroReach, pointingReach, reachablePositions, resolvedPositions, bindingKeycode, bindingsForSlot, comboGroups, combosForKey, keyFace, keyMeaning, macroKeycodes, macroPlacements, pointingSlotFor, reachKeys, slotKeycodes} from "../webview/view/keyface.mjs";
 
 test("a key face uses the model's own resolution, and names the layer a dual-role key reaches", () => {
     assert.deepEqual(keyFace({keycode: "KC_TRANSPARENT", display: "▽"}), {main: "▽", sub: "", kind: "transparent"});
@@ -215,6 +215,35 @@ test("behaviours group by how this layer reaches them", () => {
     assert.deepEqual(base.here.map((row) => row.keycode), ["KC_ESCAPE", "KC_1", "KC_9"]);
     assert.deepEqual(base.through, [], "nothing lies under the base layer");
     assert.deepEqual(base.elsewhere.map((row) => row.keycode), ["LEFT_THUMB"]);
+});
+
+test("a behaviour a combo sends is reached, though no key carries it", () => {
+    const at = (layoutIndex, keycode) => ({layoutIndex, keycode, display: keycode});
+    const model = {
+        qmkKeycodeAliases: {QK_USER_30: "LEFT_THUMB"},
+        keyBehaviors: [{keycode: "LEFT_THUMB", steps: []}, {keycode: "KC_9", steps: []}],
+        combos: [
+            {id: 0, badge: "C1", inputs: ["KC_J", "KC_K"], output: "QK_USER_30"},
+            {id: 1, badge: "C2", inputs: ["KC_K", "KC_L"], output: "QK_USER_30"},
+        ],
+    };
+    const stack = [
+        {index: 0, name: "Base", positions: [at(0, "KC_J"), at(1, "KC_K"), at(2, "KC_L")]},
+        {index: 1, name: "Numbers", positions: [at(0, "KC_TRANSPARENT"), at(1, "KC_K"), at(2, "KC_1")]},
+    ];
+
+    const base = behaviourGroups(model, stack, 0);
+    assert.deepEqual(base.here, [], "no key carries it");
+    assert.deepEqual(base.combos.map((entry) => [entry.row.keycode, entry.combos.map((route) => route.combo.badge)]),
+        [["LEFT_THUMB", ["C1", "C2"]]], "one row, naming every combo that sends it");
+    assert.deepEqual(reachKeys(stack, 0, {behaviours: [{keycode: "LEFT_THUMB"}], combos: base.combos[0].combos}).sort(), [0, 1, 2],
+        "the board rings the keys chorded for either combo");
+    assert.deepEqual(base.elsewhere.map((row) => row.keycode), ["KC_9"], "no longer called unreachable");
+
+    const above = behaviourGroups(model, stack, 1);
+    assert.deepEqual(above.combos, [], "C1 needs the transparent J, and C2 needs L, which Numbers covers");
+    assert.deepEqual(above.combosBelow.map((entry) => [entry.row.keycode, entry.combos.map((route) => route.combo.badge)]),
+        [["LEFT_THUMB", ["C1"]]]);
 });
 
 test("a macro fired from a behaviour branch is reached, though no key shows it", () => {
@@ -519,18 +548,78 @@ test("a key cap tells layer keys and mod-taps apart from plain keys", () => {
     assert.deepEqual(face("KC_A", "A"), {main: "A", sub: "", kind: "key"}, "a plain A has no second line");
 });
 
-test("a macro's layers are the ones with a key of their own that names it", () => {
+test("a combo reaches the macro it sends, and what a behaviour it sends reaches", () => {
+    // A combo's output runs through the same stages a key press does: it can
+    // fire a macro itself, or fire a behaviour whose branch plays one. Neither
+    // is on any key, so without this both read as unreachable.
     const at = (layoutIndex, keycode, semantic) => ({layoutIndex, keycode, semantic, display: keycode});
+    const model = {
+        viaMacros: [
+            {keycode: "VIA_MACRO_0", payload: "{KC_A}", empty: false},
+            {keycode: "VIA_MACRO_1", payload: "{KC_B}", empty: false},
+            {keycode: "VIA_MACRO_2", payload: "{KC_C}", empty: false},
+        ],
+        qmkKeycodeAliases: {QK_MACRO_0: "VIA_MACRO_0", QK_USER_30: "LEFT_THUMB"},
+        keyBehaviors: [{keycode: "LEFT_THUMB", steps: [{tapCount: 1, hold: {action: "VIA_MACRO_1"}}]}],
+        combos: [
+            {id: 0, badge: "C1", inputs: ["KC_J", "KC_K"], output: "QK_MACRO_0"},
+            {id: 1, badge: "C2", inputs: ["KC_J", "KC_L"], output: "QK_USER_30"},
+        ],
+    };
+    const stack = [
+        {index: 0, name: "Base", positions: [at(0, "KC_J"), at(1, "KC_K"), at(2, "KC_L")]},
+        {index: 1, name: "Numbers", positions: [at(0, "KC_TRANSPARENT"), at(1, "KC_K"), at(2, "KC_1")]},
+    ];
+
+    const base = macroReach(model, stack, 0);
+    assert.deepEqual(base.fromCombos.map((entry) => entry.name), ["VIA_MACRO_0", "VIA_MACRO_1"]);
+    assert.deepEqual(base.fromCombos[0].combos.map((route) => [route.combo.badge, route.via, route.action]),
+        [["C1", null, "VIA_MACRO_0"]], "sent by the combo itself, matched by meaning rather than the catalogue name");
+    assert.deepEqual(base.fromCombos[1].combos.map((route) => [route.combo.badge, route.via, route.action]),
+        [["C2", "LEFT_THUMB", "VIA_MACRO_1"]], "sent by a branch of the behaviour the combo fires");
+    assert.deepEqual(base.elsewhere, ["VIA_MACRO_2"], "a combo's macro is no longer called unreachable");
+    assert.deepEqual(reachKeys(stack, 0, base.fromCombos[0]).sort(), [0, 1], "the board rings the keys chorded to fire it");
+
+    const above = macroReach(model, stack, 1);
+    assert.deepEqual(above.fromCombos, [], "on Numbers C1 needs the transparent J, so it is not this layer's own");
+    assert.deepEqual(above.fromCombosBelow.map((entry) => entry.name), ["VIA_MACRO_0"]);
+    assert.deepEqual(above.elsewhere, ["VIA_MACRO_1", "VIA_MACRO_2"], "C2 needs L, and Numbers stores 1 there");
+});
+
+test("a combo reaches the pointing mode it sends", () => {
+    const model = {
+        pdModes: [{id: 0, name: "Dragscroll", kind: 2}],
+        qmkKeycodeAliases: {QK_USER_16: "DRAGSCROLL"},
+        combos: [{id: 0, badge: "C1", inputs: ["KC_J", "KC_K"], output: "QK_USER_16"}],
+    };
+    const stack = [{index: 0, name: "Base", positions: [{layoutIndex: 0, keycode: "KC_J"}, {layoutIndex: 1, keycode: "KC_K"}]}];
+    const reach = pointingReach(model, stack, 0);
+    assert.deepEqual(reach.fromCombos.map((entry) => entry.name), ["0"]);
+    assert.deepEqual(reach.elsewhere, []);
+});
+
+test("a macro's layers are the ones that hold a way to it themselves", () => {
+    const at = (layoutIndex, keycode, semantic) => ({layoutIndex, keycode, semantic, display: keycode});
+    const model = {
+        viaMacros: [1, 2, 3, 10].map((n) => ({keycode: `VIA_MACRO_${n}`, payload: "{KC_A}", empty: false})),
+        qmkKeycodeAliases: {QK_MACRO_3: "VIA_MACRO_3"},
+        keyBehaviors: [{keycode: "KC_ESCAPE", steps: [{tapCount: 1, tap: {action: "VIA_MACRO_2"}}]}],
+        combos: [{id: 0, badge: "C1", inputs: ["KC_B", "KC_C"], output: "QK_MACRO_3"}],
+    };
     const stack = [
         {index: 0, name: "Base", positions: [at(0, "QK_MACRO_1", "VIA_MACRO_1"), at(1, "KC_A"), at(2, "QK_MACRO_1", "VIA_MACRO_1")]},
-        {index: 1, name: "Numbers", positions: [at(0, "KC_TRANSPARENT"), at(1, "KC_B"), at(2, "KC_NO")]},
-        {index: 4, name: "Symbols", positions: [at(0, "KC_C"), at(1, "QK_MACRO_1", "VIA_MACRO_1"), at(2, "QK_MACRO_10", "VIA_MACRO_10")]},
+        {index: 1, name: "Numbers", positions: [at(0, "KC_TRANSPARENT"), at(1, "KC_ESCAPE"), at(2, "KC_NO")]},
+        {index: 4, name: "Symbols", positions: [at(0, "KC_B"), at(1, "QK_MACRO_1", "VIA_MACRO_1"), at(2, "KC_C")]},
     ];
-    assert.deepEqual(macroPlacements(stack, "VIA_MACRO_1").map((entry) => [entry.layer.name, entry.at, entry.positions]),
-        [["Base", 0, [0, 2]], ["Symbols", 2, [1]]],
-        "matched by meaning, with the stack position a screen selects and every key; a transparent key is not a place");
-    assert.deepEqual(macroPlacements(stack, "VIA_MACRO_10").map((entry) => entry.layer.name), ["Symbols"],
-        "VIA_MACRO_1 does not match VIA_MACRO_10");
-    assert.deepEqual(macroPlacements(stack, "VIA_MACRO_7"), [], "a macro on no key has no layers");
-    assert.deepEqual(macroPlacements(undefined, "VIA_MACRO_1"), []);
+    const summary = (keycode) => macroPlacements(model, stack, keycode)
+        .map((entry) => [entry.layer.name, entry.at, entry.routes.map((route) => [route.group, route.keys.sort()])]);
+
+    assert.deepEqual(summary("VIA_MACRO_1"), [["Base", 0, [["here", [0, 2]]]], ["Symbols", 2, [["here", [1]]]]],
+        "a key naming it, with the stack position a screen selects; Numbers only falls through to Base's");
+    assert.deepEqual(summary("VIA_MACRO_2"), [["Numbers", 1, [["branches", [1]]]]],
+        "a behaviour mapped there sends it, and the board rings the behaviour's key");
+    assert.deepEqual(summary("VIA_MACRO_3"), [["Symbols", 2, [["combos", [0, 2]]]]],
+        "a combo firing from that layer's keys sends it");
+    assert.deepEqual(summary("VIA_MACRO_10"), [], "VIA_MACRO_1 does not match VIA_MACRO_10");
+    assert.deepEqual(macroPlacements(model, undefined, "VIA_MACRO_1"), []);
 });

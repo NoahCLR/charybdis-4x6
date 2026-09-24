@@ -5,7 +5,7 @@
 
 const vscode = acquireVsCodeApi();
 
-const openGroups = () => ({here: true, branches: true, through: false, belowBranches: false, elsewhere: false});
+const openGroups = () => ({here: true, branches: true, combos: true, through: false, belowBranches: false, belowCombos: false, elsewhere: false});
 
 export const state = {
     screen: "keys",

@@ -151,29 +151,37 @@ function nameField(model, slot, canEdit) {
         <span class="note" data-name-count>${esc((slot.name || "").length)} / ${esc(space.perName)} characters</span></label>`;
 }
 
-// The layers whose keys carry this macro, each in its layer colour. A click
-// opens that layer in Keys with this macro picked in its Macros tab, so the
-// board rings its keys and the table marks its row.
+// The layers that set this macro off themselves — a key carrying it, a
+// behaviour mapped there whose branch plays it, or a combo on its keys — each
+// in its layer colour and naming how. A click opens that layer in Keys with
+// this macro picked in its Macros tab, on the row for the first of those
+// routes, so the board rings its keys and the table marks the row.
+const ROUTE_WORDS = {here: "key", branches: "behaviour", combos: "combo"};
+
 function placedOn(model, slot) {
-    const placements = macroPlacements(layers(), slot.keycode);
-    const chips = placements.map(({layer, at, positions}) => {
+    const chips = macroPlacements(model, layers(), slot.keycode).map(({layer, at, routes}) => {
         const swatch = layerSwatch(model, layer);
-        const keys = `${positions.length} key${positions.length === 1 ? "" : "s"}`;
+        const how = routes.map((route) => {
+            const count = route.keys.length;
+            return `${ROUTE_WORDS[route.group]}${route.group === "here" && count > 1 ? ` ×${count}` : ""}`;
+        }).join(" · ");
         return `<button class="layer-chip link" data-goto-layer="${at}"
-            data-tip="${esc(swatch.tip)} · ${keys} · show on the board">${swatch.html}
-            <span>${esc(layerName(layer))}</span><span class="idx">${layer.index}</span></button>`;
+            data-tip="${esc(swatch.tip)} · reached by ${esc(how)} · show on the board">${swatch.html}
+            <span>${esc(layerName(layer))}</span><span class="idx">${esc(how)}</span></button>`;
     }).join("");
     return `<div class="field"><span>On layers</span>
         ${chips ? `<div class="row" style="gap:6px;flex-wrap:wrap">${chips}</div>`
-            : `<span class="note">No key carries this macro. Place it on a key to use it.</span>`}</div>`;
+            : `<span class="note">No key, behaviour or combo sets this macro off. Place it on a key to use it.</span>`}</div>`;
 }
 
 function showOnLayer(keycode, at) {
-    const placement = macroPlacements(layers(), keycode).find((entry) => entry.at === at);
-    if (!placement) return;
-    Object.assign(state, {screen: "keys", tab: "macros", layer: at, selected: placement.positions[0], placement: null});
-    state.reachRow.macros = `here:${keycode}`;
-    state.groups.macros.here = true;
+    const placement = macroPlacements(getModel(), layers(), keycode).find((entry) => entry.at === at);
+    const route = placement?.routes[0];
+    if (!route) return;
+    Object.assign(state, {screen: "keys", tab: "macros", layer: at, placement: null});
+    if (route.keys.length) state.selected = route.keys[0];
+    state.reachRow.macros = `${route.group}:${keycode}`;
+    state.groups.macros[route.group] = true;
     render();
 }
 

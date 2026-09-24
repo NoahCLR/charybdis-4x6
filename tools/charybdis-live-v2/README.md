@@ -100,9 +100,9 @@ Every screen is drawn and wired to the host:
 
 | Surface | What it edits |
 | --- | --- |
-| Keys | Layout keys, key behaviours, combos, layer names and priority; reachable macros and pointing modes are shown in place |
+| Keys | Layout keys, key behaviours, combos, layer names and priority; reachable behaviours, macros and pointing modes are shown in place, whether a key, a behaviour branch or a combo reaches them |
 | Lighting | Six stages, the stage mask, layer and pointing-mode colours with their localities, combo and key feedback, auto-mouse fade, LED group rows and reusable groups |
-| Macros | Both banks: name, payload, insert-at-cursor step builder, reorder/remove controls, parsed preview, configurable recorder and placement; search by name, and the layers each macro sits on in their layer colour, each opening that layer in Keys with the macro picked |
+| Macros | Both banks: name, payload, insert-at-cursor step builder, reorder/remove controls, parsed preview, configurable recorder and placement; search by name, and the layers that set each macro off — by key, behaviour or combo — in their layer colour, each opening that layer in Keys with the macro picked |
 | Pointing modes | All eight slots: movement, speed, direction shortcuts, scroll tuning, buttons, bindings, placement, clear and duplicate |
 | Settings | Every section the keyboard reports, posted whole, read-only where the firmware cannot report |
 | Profile & backups | Export, import with review, upgrade export, recovery state |

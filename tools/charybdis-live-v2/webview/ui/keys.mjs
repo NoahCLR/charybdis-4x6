@@ -143,16 +143,18 @@ function pickBar() {
 const GROUP_TITLES = {
     here: "On this layer",
     branches: "Through a behaviour on this layer",
+    combos: "Through a combo on this layer",
     through: "Through a transparent key",
     belowBranches: "Through a behaviour under a transparent key",
+    belowCombos: "Through a combo under a transparent key",
     elsewhere: "Unreachable from this layer",
 };
 
-// The order every reach list reads in: the two this layer holds itself, then
-// the two it only reaches under a transparent key, then the rest of the board.
+// The order every reach list reads in: the three this layer holds itself, then
+// the three it only reaches under a transparent key, then the rest of the board.
 // A tab lists the groups it has in any order and they come out in this one, so
 // the headers do not move between tabs.
-const GROUP_ORDER = ["here", "branches", "through", "belowBranches", "elsewhere"];
+const GROUP_ORDER = ["here", "branches", "combos", "through", "belowBranches", "belowCombos", "elsewhere"];
 const inGroupOrder = (groups) =>
     GROUP_ORDER.map((id) => groups.find((group) => group.id === id)).filter(Boolean);
 
@@ -180,12 +182,16 @@ function reachHighlight(model) {
     const found = (groups, picked) => {
         const [group, ...rest] = String(picked).split(":");
         const name = rest.join(":");
-        return ({here: groups.onKeys, branches: groups.fromBranches,
-            through: groups.throughKeys, belowBranches: groups.fromBranchesBelow}[group] || [])
+        return ({here: groups.onKeys, branches: groups.fromBranches, combos: groups.fromCombos,
+            through: groups.throughKeys, belowBranches: groups.fromBranchesBelow, belowCombos: groups.fromCombosBelow}[group] || [])
             .find((entry) => String(entry.name) === name);
     };
     if (state.tab === "behaviours") {
-        return state.behaviourRow ? reachKeys(stack, at, {behaviours: [{keycode: state.behaviourRow}]}) : [];
+        if (!state.behaviourRow) return [];
+        const groups = behaviourGroups(model, stack, at);
+        const combos = [...groups.combos, ...groups.combosBelow]
+            .filter((entry) => entry.row.keycode === state.behaviourRow).flatMap((entry) => entry.combos);
+        return reachKeys(stack, at, {behaviours: [{keycode: state.behaviourRow}], combos});
     }
     const picked = state.reachRow[state.tab];
     if (!picked) return [];
@@ -218,18 +224,19 @@ const reachAttrs = (tab, group, name) => {
     return ` data-reach="${esc(picked)}"${state.reachRow[tab] === picked ? ' data-picked="true"' : ""}`;
 };
 
-// A tab's own number is what this layer stores: a key here, or a behaviour
-// mapped here firing it from a branch — the two groups it leads with. What the
-// stack lets it reach is in the tab, not in the count.
+// A tab's own number is what this layer stores: a key here, a behaviour mapped
+// here firing it from a branch, or a combo chorded on keys here sending it —
+// the three groups it leads with. What the stack lets it reach is in the tab,
+// not in the count.
 const storedCount = (reach) =>
-    new Set([...reach.onKeys, ...reach.fromBranches].map((entry) => entry.name)).size;
+    new Set([...reach.onKeys, ...reach.fromBranches, ...reach.fromCombos].map((entry) => entry.name)).size;
 
 function bench() {
     const model = getModel();
     const layer = currentLayer();
     const counts = {
         key: String(state.selected),
-        behaviours: String(behaviourGroups(model, layers(), state.layer).here.length),
+        behaviours: String((({here, combos}) => new Set([...here, ...combos.map((entry) => entry.row)]).size)(behaviourGroups(model, layers(), state.layer))),
         combos: String(comboGroups(model, layers(), state.layer).onKeys.length),
         macros: String(storedCount(macroReach(model, layers(), state.layer))),
         pointing: String(storedCount(pointingReach(model, layers(), state.layer))),
@@ -329,13 +336,22 @@ function tabKey(body, right) {
 }
 
 /* ── behaviours: tap count × tier, drawn as the grid it is ─────────────── */
+// The combos that send a behaviour, by badge and chord; one that needs a
+// transparent key names the layer answering for it. Plain text: the row
+// escapes its note.
+const comboNote = (entry) => entry.combos.map(({combo, keys}) => {
+    const sources = [...new Set(keys.filter((key) => key.fellThrough)
+        .map((key) => layerName(key.layer) + (key.whileHeld ? " when held" : "")))];
+    return `combo ${combo.badge} · ${(combo.inputDisplays || combo.inputs || []).join(" + ")}${sources.length ? ` · on ${sources.join(", ")}` : ""}`;
+}).join(", ");
 function tabBehaviours(body, right) {
     const model = getModel();
     const layer = currentLayer();
-    const {here, through, elsewhere} = behaviourGroups(model, layers(), state.layer);
+    const {here, through, combos, combosBelow, elsewhere} = behaviourGroups(model, layers(), state.layer);
     if (!state.behaviourRow || !behaviourFor(model, state.behaviourRow)) {
         state.behaviourRow = behaviourFor(model, keyMeaning(selectedPosition()))?.keycode
-            || here[0]?.keycode || through[0]?.row.keycode || elsewhere[0]?.keycode || null;
+            || here[0]?.keycode || combos[0]?.row.keycode || through[0]?.row.keycode
+            || combosBelow[0]?.row.keycode || elsewhere[0]?.keycode || null;
     }
     const behaviour = behaviourFor(model, state.behaviourRow);
 
@@ -362,8 +378,12 @@ function tabBehaviours(body, right) {
     const groups = [
         {id: "here", rows: here.map((row) => ({row, note: ""})),
             empty: "No key behaviour is placed on this layer."},
+        {id: "combos", rows: combos.map((entry) => ({row: entry.row, note: comboNote(entry)})),
+            empty: "No combo on this layer sends a behaviour."},
         {id: "through", rows: through.map((entry) => ({row: entry.row, note: `on ${sourceLabel(entry)}`})),
             empty: "No transparent key falls through to a behaviour."},
+        {id: "belowCombos", rows: combosBelow.map((entry) => ({row: entry.row, note: comboNote(entry)})),
+            empty: "No combo that needs a transparent key sends a behaviour."},
         {id: "elsewhere", rows: elsewhere.map((row) => ({row, note: "not on this layer"})),
             empty: "Every behaviour on the board is reached from this layer."},
     ];
@@ -745,8 +765,12 @@ function tabMacros(body, right) {
             empty: "No transparent key falls through to a macro key."},
         {id: "branches", rows: reach.fromBranches.map((entry) => row("branches", entry.name, reachLabel(model, entry))),
             empty: "No behaviour mapped on this layer sends a macro."},
+        {id: "combos", rows: reach.fromCombos.map((entry) => row("combos", entry.name, reachLabel(model, entry))),
+            empty: "No combo on this layer sends a macro."},
         {id: "belowBranches", rows: reach.fromBranchesBelow.map((entry) => row("belowBranches", entry.name, reachLabel(model, entry))),
             empty: "No behaviour under a transparent key sends a macro."},
+        {id: "belowCombos", rows: reach.fromCombosBelow.map((entry) => row("belowCombos", entry.name, reachLabel(model, entry))),
+            empty: "No combo that needs a transparent key sends a macro."},
         {id: "elsewhere", rows: reach.elsewhere.map((keycode) => row("elsewhere", keycode, "not reached from this layer")),
             empty: "Every stored macro is reached from this layer."},
     ];
@@ -788,6 +812,18 @@ const branchReach = (model, entry, showSends = true) => entry.behaviours.map((ro
         ? `sends ${esc(actionLabel(model, row.action))} · ${from}` : from;
 }).join(", ");
 
+// A combo is named by its badge and the keys chorded to fire it; one that
+// fires a behaviour says so, since its branch is what sends the thing, and one
+// that needs a transparent key names the layer answering for it.
+const comboReach = (model, entry, showSends = true) => entry.combos.map(({combo, via, action, keys}) => {
+    const inputs = (combo.inputDisplays || combo.inputs || []).join(" + ");
+    const sources = [...new Set(keys.filter((key) => key.fellThrough).map(sourceLabel))];
+    return `combo ${esc(combo.badge)} · ${esc(inputs)}`
+        + (via ? ` · through ${esc(actionLabel(model, via))}` : "")
+        + (showSends && action && String(entry.name) !== String(action) ? ` · sends ${esc(actionLabel(model, action))}` : "")
+        + (sources.length ? ` · on ${sources.join(", ")}` : "");
+}).join(", ");
+
 // Every way this layer reaches one thing, not only the way it was grouped by.
 // A macro can sit on a key here *and* be fired from a behaviour's branch; the
 // board rings both sets of keys, so the row has to name both or the two
@@ -795,6 +831,7 @@ const branchReach = (model, entry, showSends = true) => entry.behaviours.map((ro
 const reachLabel = (model, entry) => [
     entry.keys?.length ? keysReach(entry.keys) : "",
     entry.behaviours?.length ? branchReach(model, entry) : "",
+    entry.combos?.length ? comboReach(model, entry) : "",
 ].filter(Boolean).join(" · ");
 
 // A grouped table: the column header once, then a counted header row per
@@ -850,11 +887,13 @@ function tabPointing(body, right) {
         const variants = [...new Set([
             ...entry.keys.map((key) => pointingVariant(model, keyMeaning(key.position))),
             ...(entry.behaviours || []).map((row) => pointingVariant(model, row.action)),
+            ...(entry.combos || []).map((route) => pointingVariant(model, route.action)),
         ])];
         const only = variants.length === 1 ? variants[0] : "";
         return card(group, entry.name, [
             entry.keys.length ? keysReach(entry.keys) : "",
             entry.behaviours?.length ? branchReach(model, entry, !only) : "",
+            entry.combos?.length ? comboReach(model, entry, !only) : "",
         ].filter(Boolean).join(" · "), only);
     };
 
@@ -865,8 +904,12 @@ function tabPointing(body, right) {
             empty: "No transparent key falls through to a pointing-mode key."},
         {id: "branches", cards: reach.fromBranches.map(reachCard("branches")),
             empty: "No behaviour mapped on this layer sends a pointing mode."},
+        {id: "combos", cards: reach.fromCombos.map(reachCard("combos")),
+            empty: "No combo on this layer sends a pointing mode."},
         {id: "belowBranches", cards: reach.fromBranchesBelow.map(reachCard("belowBranches")),
             empty: "No behaviour under a transparent key sends a pointing mode."},
+        {id: "belowCombos", cards: reach.fromCombosBelow.map(reachCard("belowCombos")),
+            empty: "No combo that needs a transparent key sends a pointing mode."},
         {id: "elsewhere", cards: reach.elsewhere.map((slotId) => card("elsewhere", slotId, "not reached from this layer")),
             empty: "Every configured mode is reached from this layer."},
     ];

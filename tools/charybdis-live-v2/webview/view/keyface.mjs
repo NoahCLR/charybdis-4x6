@@ -174,6 +174,7 @@ const sourceRank = (entry) => Math.min(
     entry.layer ? entry.layer.index ?? 0 : Infinity,
     ...(entry.keys || []).filter((key) => key.fellThrough).map((key) => key.layer?.index ?? 0),
     ...(entry.behaviours || []).filter((row) => row.layer).map((row) => row.layer.index ?? 0),
+    ...(entry.combos || []).flatMap((route) => route.keys).filter((key) => key.fellThrough).map((key) => key.layer?.index ?? 0),
 );
 const downTheStack = (entries) => [...entries].sort((one, other) => sourceRank(one) - sourceRank(other));
 
@@ -182,11 +183,12 @@ const downTheStack = (entries) => [...entries].sort((one, other) => sourceRank(o
  *
  * The keys that name it, and — for anything a behaviour branch sends — the keys
  * carrying that behaviour, because those are the ones you actually reach it
- * through. A key answered from a layer below keeps its physical position, which
+ * through. For anything a combo sends, the keys you chord to fire it. A key answered from a layer below keeps its physical position, which
  * is what the board draws.
  */
 export function reachKeys(stack, at, entry) {
-    const indexes = new Set((entry?.keys || []).map((key) => key.position.layoutIndex));
+    const indexes = new Set([...(entry?.keys || []), ...(entry?.combos || []).flatMap((route) => route.keys)]
+        .map((key) => key.position.layoutIndex));
     const behaviours = new Set((entry?.behaviours || []).map((row) => row.keycode));
     if (behaviours.size) {
         for (const {position} of reachablePositions(stack, at)) {
@@ -202,8 +204,9 @@ export function reachKeys(stack, at, entry) {
  * A key stored on this layer reaches its behaviour directly. A transparent key
  * lets the layer underneath answer, so a behaviour stored below still fires
  * while this layer is active — that one is reached *through* the layer, and it
- * is worth naming which layer answers. Everything else the profile carries is
- * somewhere this layer never reaches.
+ * is worth naming which layer answers. A combo that sends a behaviour's
+ * keycode fires it too, with no key carrying it at all. Everything else the
+ * profile carries is somewhere this layer never reaches.
  */
 export function behaviourGroups(model, stack, at) {
     const here = [], through = [];
@@ -214,10 +217,26 @@ export function behaviourGroups(model, stack, at) {
         else if (!through.some((entry) => entry.row === row)) through.push({row, layer, whileHeld});
     }
 
-    // A behaviour reached both ways is listed under both, the same as anything
-    // else: the groups say how this layer gets at it, not which way won.
-    const reached = new Set([...here, ...through.map((entry) => entry.row)]);
-    return {here, through: downTheStack(through),
+    // A combo's output is processed like a key press, so a combo sending a
+    // behaviour's keycode fires it though no key carries it. A combo chorded on
+    // this layer's own keys is this layer's; one needing a transparent key is
+    // reached down the stack.
+    const combos = [], combosBelow = [];
+    const groupsOfCombos = comboGroups(model, stack, at);
+    for (const [entries, list] of [[groupsOfCombos.onKeys, combos], [groupsOfCombos.throughKeys, combosBelow]]) {
+        for (const {combo, keys} of entries) {
+            const row = behaviourFor(model, comboOutput(model, combo));
+            if (!row) continue;
+            const entry = list.find((candidate) => candidate.row === row);
+            if (entry) entry.combos.push({combo, keys});
+            else list.push({row, combos: [{combo, keys}]});
+        }
+    }
+
+    // A behaviour reached several ways is listed under each, the same as
+    // anything else: the groups say how this layer gets at it, not which way won.
+    const reached = new Set([...here, ...[...through, ...combos, ...combosBelow].map((entry) => entry.row)]);
+    return {here, through: downTheStack(through), combos, combosBelow: downTheStack(combosBelow),
         elsewhere: (model?.keyBehaviors || []).filter((row) => !reached.has(row))};
 }
 
@@ -299,7 +318,23 @@ export function comboReferenceLayer(model, at) {
     return Number.isInteger(read) ? read : at;
 }
 
+// Every reach list asks for the combos — the Combos tab, the board's badges,
+// and the macros and pointing modes a combo sends — and the Macros screen asks
+// for every layer at once. Enumerating activations is the costly part, so each
+// (model, stack, layer) is grouped once. The model is replaced, never mutated.
+const comboGroupsByModel = new WeakMap();
 export function comboGroups(model, stack, at) {
+    if (!model) return groupCombos(model, stack, at);
+    let perLayer = comboGroupsByModel.get(model);
+    if (!perLayer) comboGroupsByModel.set(model, perLayer = new Map());
+    const cached = perLayer.get(at);
+    if (cached?.stack === stack) return cached.groups;
+    const groups = groupCombos(model, stack, at);
+    perLayer.set(at, {stack, groups});
+    return groups;
+}
+
+function groupCombos(model, stack, at) {
     // QMK matches combos against the reference layer's raw keycodes whenever
     // that layer is not the top one (process_combo.c: keymap_key_to_keycode on
     // ref_layer, no transparency). Then there is exactly one way to press the
@@ -392,18 +427,31 @@ export const macroKeycodes = (keycode) =>
     [...String(keycode || "").matchAll(/\b((?:VIA_)?MACRO_\d+)\b/g)].map((match) => match[1]);
 
 /**
- * The layers a macro sits on: every layer with a key of its own that names
- * it, in stack order, with the keys that do. A transparent key is not the
- * macro's place on that layer — it belongs to the layer underneath, which is
- * listed for it — and a behaviour branch is not a place on the layout at all.
- * `at` is the layer's position in the stack, which is how a screen selects it.
+ * The layers a macro is set off from, in stack order: every layer that holds a
+ * way to it itself — a key naming it, a behaviour mapped there whose branch
+ * sends it, or a combo firing from its keys that sends it, directly or through
+ * a behaviour. Each route carries the group the Keys tab lists it under, so a
+ * screen can open that layer on the same row, and the keys the board rings.
+ * What a layer only reaches under a transparent key is the lower layer's route,
+ * listed for that layer, not repeated for every layer above it. `at` is the
+ * layer's position in the stack, which is how a screen selects it.
  */
-export const macroPlacements = (stack, keycode) => (stack || []).map((layer, at) => ({
-    layer, at,
-    positions: (layer.positions || [])
-        .filter((position) => macroKeycodes(keyMeaning(position)).includes(keycode))
-        .map((position) => position.layoutIndex),
-})).filter((entry) => entry.positions.length);
+export function macroPlacements(model, stack, keycode) {
+    return (stack || []).map((layer, at) => {
+        const reach = macroReach(model, stack, at);
+        const routes = [["here", reach.onKeys], ["branches", reach.fromBranches], ["combos", reach.fromCombos]]
+            .map(([group, entries]) => ({group, entry: entries.find((entry) => entry.name === keycode)}))
+            .filter((route) => route.entry)
+            .map((route) => ({...route, keys: reachKeys(stack, at, route.entry)}));
+        return {layer, at, routes};
+    }).filter((placement) => placement.routes.length);
+}
+
+// What a combo sends, by what it means: the combo reports the catalogue's name
+// for its output (`QK_MACRO_0`, `QK_USER_16`), and every domain it could reach
+// is keyed by the semantic one.
+export const comboOutput = (model, combo) =>
+    model?.qmkKeycodeAliases?.[combo?.output] ?? combo?.output ?? "";
 
 /**
  * How this layer reaches a set of things named by keycode — the one shape the
@@ -413,19 +461,25 @@ export const macroPlacements = (stack, keycode) => (stack || []).map((layer, at)
  *   through a behaviour  a branch of a behaviour mapped here sends it, which
  *                        no key cap can show
  *   through this layer   a transparent key lets a lower layer's key name it
+ *   through a combo      a combo firing from this layer's keys sends it —
+ *                        or sends a behaviour whose branch does, since a
+ *                        combo's output runs through the same stages a key
+ *                        press does
  *   through a behaviour  a transparent key lets a lower layer's behaviour
  *     below              answer, and one of its branches sends it
+ *   through a combo      a combo that needs a transparent key to fire sends
+ *     below              it, directly or through a behaviour
  *   elsewhere            the profile carries it, this layer reaches it no way
  *
- * The first two are what this layer itself holds, which is what a tab counts;
- * the next two it only reaches down the stack. `namesOf(keycode)` answers which
+ * The first three are what this layer itself holds, which is what a tab counts;
+ * the rest it only reaches down the stack. `namesOf(keycode)` answers which
  * of the things a keycode names, as stable string keys, and `all` is every name
  * worth reporting as unreached.
  */
 export function reachGroups(model, stack, at, namesOf, all) {
     const found = new Map();
     const reachOf = (name) => {
-        if (!found.has(name)) found.set(name, {directKeys: [], fellKeys: [], directRows: [], belowRows: []});
+        if (!found.has(name)) found.set(name, {directKeys: [], fellKeys: [], directRows: [], belowRows: [], directCombos: [], belowCombos: []});
         return found.get(name);
     };
 
@@ -456,19 +510,45 @@ export function reachGroups(model, stack, at, namesOf, all) {
         }
     }
 
+    // A combo's output is processed like a key press, so it reaches what it
+    // sends and, when that is a behaviour's keycode, what the behaviour's
+    // branches send. A combo firing from this layer's own keys is this layer's;
+    // one that needs a transparent key is reached down the stack.
+    const combos = comboGroups(model, stack, at);
+    for (const [entries, below] of [[combos.onKeys, false], [combos.throughKeys, true]]) {
+        for (const {combo, keys} of entries) {
+            const output = comboOutput(model, combo);
+            const sends = [{action: output, via: null}];
+            for (const step of behaviourFor(model, output)?.steps || []) {
+                for (const tier of [step.tap, step.hold, step.longHold]) {
+                    if (tier?.action) sends.push({action: tier.action, via: output});
+                }
+            }
+            for (const {action, via} of sends) {
+                for (const name of namesOf(action)) {
+                    const routes = reachOf(name)[below ? "belowCombos" : "directCombos"];
+                    if (!routes.some((route) => route.combo === combo && route.action === action)) routes.push({combo, via, action, keys});
+                }
+            }
+        }
+    }
+
     // One thing is often reached several ways, and the groups answer which way
     // rather than which way first — so it is listed under each route it has,
     // each entry carrying only that route. A macro sitting on a key here that a
     // behaviour here also fires is two answers, not one with a footnote.
-    const onKeys = [], fromBranches = [], throughKeys = [], fromBranchesBelow = [];
+    const onKeys = [], fromBranches = [], fromCombos = [], throughKeys = [], fromBranchesBelow = [], fromCombosBelow = [];
     for (const [name, reach] of found) {
-        if (reach.directKeys.length) onKeys.push({name, keys: reach.directKeys, behaviours: []});
-        if (reach.directRows.length) fromBranches.push({name, keys: [], behaviours: reach.directRows});
-        if (reach.fellKeys.length) throughKeys.push({name, keys: reach.fellKeys, behaviours: []});
-        if (reach.belowRows.length) fromBranchesBelow.push({name, keys: [], behaviours: reach.belowRows});
+        if (reach.directKeys.length) onKeys.push({name, keys: reach.directKeys, behaviours: [], combos: []});
+        if (reach.directRows.length) fromBranches.push({name, keys: [], behaviours: reach.directRows, combos: []});
+        if (reach.directCombos.length) fromCombos.push({name, keys: [], behaviours: [], combos: reach.directCombos});
+        if (reach.fellKeys.length) throughKeys.push({name, keys: reach.fellKeys, behaviours: [], combos: []});
+        if (reach.belowRows.length) fromBranchesBelow.push({name, keys: [], behaviours: reach.belowRows, combos: []});
+        if (reach.belowCombos.length) fromCombosBelow.push({name, keys: [], behaviours: [], combos: reach.belowCombos});
     }
-    return {onKeys, fromBranches,
+    return {onKeys, fromBranches, fromCombos,
         throughKeys: downTheStack(throughKeys), fromBranchesBelow: downTheStack(fromBranchesBelow),
+        fromCombosBelow: downTheStack(fromCombosBelow),
         elsewhere: all.filter((name) => !found.has(name))};
 }
 
