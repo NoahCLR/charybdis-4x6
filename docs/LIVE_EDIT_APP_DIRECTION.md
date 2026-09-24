@@ -1337,16 +1337,17 @@ Still open, in the order they are taken:
    placements first: the behaviour and combo editors check every row, since
    the keyboard checks the domain, and every upload (draft apply, import,
    layer edit) is checked before it starts, naming the misplaced action.)
-3. Nothing is verified on hardware. The host harness feeds userspace directly
-   and bypasses QMK's tapping engine, which buffers `TT()`, `OSL()` and `LT()`
-   presses; split sync and the RGB lock indicator for `TG()`/`TO()` locks and
-   one-shot layers are also unchecked. A layer hold from a combo is owned in
-   host tests; on hardware, check that releasing the combo still ends it
-   after the layer under the members changed (QMK resolves a release on the
-   layer it was pressed on). The runtime times a press from when
-   QMK delivers it, so an authored `LT()` row's tap/hold term likely starts
-   only after QMK's own `TAPPING_TERM` (e.g. `LT(LAYER_NAV, KC_SLSH)`'s
-   100 ms); check that on hardware before relying on it.
+3. (Done on hardware, 2026-09-24, firmware pair 16 from `c85c0774`: a
+   44-step check passed on both halves. It covered `TG`/`TO` locks surviving
+   `LT`/`MO` holds; `TO` keeping held layers; `TT` hold, 4-tap no-op, 5-tap
+   lock and unlock; `OSL` next key, modifiers, rolling, cancel, hold and the
+   steady RGB; unchanged home-row `LT` typing; an `MO` combo released key by
+   key after the layer changed; the other half and its RGB; a replug; the
+   app's placement refusals; and the reorder toggle both ways.) Still open
+   from this item: the runtime times a press from when QMK delivers it, so an
+   authored `LT()` row's tap/hold term likely starts only after QMK's own
+   `TAPPING_TERM` (e.g. `LT(LAYER_NAV, KC_SLSH)`'s 100 ms); the check did not
+   measure it.
 4. QMK-parity decisions: `TT()` counts taps within `CUSTOM_MULTI_TAP_TERM`
    (QMK: `TAPPING_TERM`) and locks when that window closes rather than on the
    last tap; a lone long press of `OSL()` does not arm it (QMK's does); tapping
