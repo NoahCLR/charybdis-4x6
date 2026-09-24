@@ -20,7 +20,7 @@ the keyboard rather than a client of the repository.
 The live app reads configuration from the keyboard without a firmware workspace
 at runtime. Layout, behaviours, combos and RGB have working editors and device
 save paths. Complete export/import includes both macro banks and global settings;
-eight-layer naming and reference-preserving reordering are implemented. The user
+eight-layer naming and reordering are implemented; by default a reorder renumbers every layer key to keep reaching the same layer, and "Keys follow their layers" turned off keeps the keys' numbers instead. The user
 reports that the new workflow appears to work on their keyboard. This is useful
 manual feedback, not completion of the hardware acceptance matrix.
 

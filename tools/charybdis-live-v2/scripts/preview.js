@@ -108,7 +108,7 @@ async function deviceModel() {
         const panel = {service};
         const model = buildPanelModel(panel, service.snapshot());
         if (panel.draft) panel.portableLayers = startLayerEdit(panel.draft.current, panel.draft.revision);
-        model.portable.layers = panel.portableLayers ? {key: panel.portableLayers.before.fingerprint, order: panel.portableLayers.order, names: panel.portableLayers.names} : null;
+        model.portable.layers = panel.portableLayers ? {key: panel.portableLayers.before.fingerprint, order: panel.portableLayers.order, names: panel.portableLayers.names, keysFollow: panel.portableLayers.keysFollow !== false} : null;
         return model;
     } finally {
         await service.close();

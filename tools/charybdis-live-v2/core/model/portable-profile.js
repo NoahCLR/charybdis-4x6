@@ -169,12 +169,19 @@ const fingerprint = document => fingerprintOf(validateSnapshot(document));
 // document (the draft decodes each revision once and hands it on), otherwise
 // decoded now. A copy with another document never reuses a stale decode.
 const decodedOf = snapshot => snapshot.decoded && snapshot.decoded.document === snapshot.document ? snapshot.decoded : validateSnapshot(snapshot.document);
-function reorderLayers(document, order, names) {
+// Moves each layer to its new place with everything it holds: its keys, name,
+// RGB colour and per-layer settings, and the settings that point at it (the
+// pointer and sniping layers). With keysFollow, the default, every layer key
+// (MO, LT, TG, TO, TT, OSL, DF, LM, LOCK_LAYER...) on a layer, in a behaviour
+// or on a combo is renumbered to reach the same layer; without it those keys
+// keep their numbers and reach whatever layer now sits there.
+function reorderLayers(document, order, names, {keysFollow = true} = {}) {
     if (document.layers?.length !== 8) throw fail("Layer ordering becomes available after the eight-layer update.");
     const validated = validateSnapshot(document), result = JSON.parse(JSON.stringify(document));
     if (!Array.isArray(order) || order.length !== 8 || order[0] !== 0 || new Set(order).size !== 8 || order.some(id => !Number.isInteger(id) || id < 0 || id >= 8)) throw fail("Keep Base first and include every layer once.");
     const remap = []; order.forEach((old, next) => {remap[old] = next;});
     function native(code) {
+        if (!keysFollow) return code;
         if (code >= 0x4000 && code <= 0x4fff) {const layer = (code >> 8) & 15; if (layer >= 8) throw fail("A key points outside the layer bank."); return (code & 0xf0ff) | (remap[layer] << 8);}
         for (const start of [0x5200, 0x5220, 0x5240, 0x5260, 0x5280, 0x52c0, 0x52e0, 0x7e5c]) {
             const width = start === 0x7e5c ? 8 : 32;
@@ -187,7 +194,7 @@ function reorderLayers(document, order, names) {
     result.layers = order.map(old => document.layers[old].map(native));
     const {rgb, behaviors, combos, settings, pdModes} = validated;
     const actionOptions = actionLimitsFor(pdModes ? 2 : 1);
-    const action = a => {if ([2, 3].includes(a.kind)) a.operand = remap[a.operand]; else if (a.kind === 1) a.operand = native(a.operand);};
+    const action = a => {if (!keysFollow) return; if ([2, 3].includes(a.kind)) a.operand = remap[a.operand]; else if (a.kind === 1) a.operand = native(a.operand);};
     walkActions(behaviors, action); walkActions(combos, action);
     rgb.layerColors.forEach(row => {row.layerId = remap[row.layerId];}); rgb.layerColors.sort((a, b) => a.layerId - b.layerId);
     rgb.layerGroupRows.forEach(row => {if (row.selector !== 255) row.selector = remap[row.selector];});

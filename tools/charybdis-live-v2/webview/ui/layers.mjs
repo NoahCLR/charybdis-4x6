@@ -6,7 +6,8 @@
 //
 // The order is the host's to hold. Moving a layer rewrites every key, behaviour
 // and setting that refers to it, so the edit is staged there and arrives back
-// as `portable.layers`.
+// as `portable.layers`. "Keys follow their layers" (on by default) decides
+// whether layer keys are renumbered with the move or keep their numbers.
 
 import {el, esc} from "../lib/dom.mjs";
 import {getModel, layers, post, render, state, canEdit as canEditArea} from "../store.mjs";
@@ -58,13 +59,20 @@ function editor(model, portable, busy) {
     // model counts the other way.
     const names = [...portable.layers.names];
     const order = [...portable.layers.order].reverse();
+    const follow = portable.layers.keysFollow !== false;
     const node = el(`<div class="stack" style="gap:10px">
         <div class="sect-h"><h4>Layers</h4><span class="note">higher layers win · base stays underneath</span></div>
         <div class="list"></div>
+        <label class="row" style="gap:8px;align-items:flex-start">
+            <input type="checkbox" id="layerKeysFollow" data-act="follow" ${follow ? "checked" : ""} ${busy ? "disabled" : ""}>
+            <span class="stack" style="gap:2px"><span>Keys follow their layers</span>
+                <span class="note">${follow
+                    ? "Layer keys (MO, LT, TG, TO, TT, OSL…) are renumbered with the move, so each still reaches the same layer."
+                    : "Layer keys keep their numbers: a key set to MO(1) reaches whatever layer is now 1. Names, colours and the pointer and sniping settings still move with their layer."}</span></span>
+        </label>
         <div class="row" style="gap:8px;align-items:center">
             <button class="btn primary" data-act="save" ${busy ? "disabled" : ""}>Keep layers in draft</button>
             <button class="btn ghost" data-act="cancel" ${busy ? "disabled" : ""}>Discard</button>
-            <span class="note" style="margin-left:auto">Moving a layer rewrites everything that refers to it.</span>
         </div></div>`);
 
     const list = node.querySelector(".list");
@@ -89,6 +97,9 @@ function editor(model, portable, busy) {
         node.querySelectorAll("[data-name]").forEach((input) => { names[Number(input.dataset.name)] = input.value.trim(); });
         return [...names];
     };
+    node.querySelector('[data-act="follow"]').addEventListener("change", (event) => post({
+        type: "editPortableLayer", keysFollow: event.target.checked, names: currentNames(),
+    }));
     node.querySelectorAll("[data-move]").forEach((button) => button.addEventListener("click", () => post({
         type: "editPortableLayer", id: Number(button.dataset.id), direction: Number(button.dataset.move), names: currentNames(),
     })));

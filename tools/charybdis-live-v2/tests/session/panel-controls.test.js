@@ -107,6 +107,31 @@ test("layer edits and imports are kept in the draft; without one they restore to
     assert.match(bare.notice, /Recovery copy: \/recovery\/1\.json/);
 });
 
+test("the layer panel's keys-follow toggle decides whether layer keys are renumbered", async () => {
+    // Base gets MO(4) and TG(1); layer 4 then moves down to 1, swapping past 3 and 2.
+    const moveLayer4Down = async (keysFollow) => {
+        const session = sessionWithDraft(), draft = session.draft;
+        stage(session, {type: "updateLayoutKeys", layers: [{layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "MO(4)"}, {layoutIndex: 1, keycode: "TG(1)"}]}]});
+        await portableControl(session, {type: "managePortableLayers"});
+        assert.equal(session.portableLayers.keysFollow, true, "on by default");
+        const layer4Name = session.portableLayers.names[4];
+        if (!keysFollow) {
+            await portableControl(session, {type: "editPortableLayer", keysFollow: false, names: session.portableLayers.names.map((name, id) => id === 2 ? "Typed" : name)});
+            assert.equal(session.portableLayers.keysFollow, false);
+            assert.equal(session.portableLayers.names[2], "Typed", "a name typed before the toggle is kept");
+        }
+        for (let step = 0; step < 3; step++) await portableControl(session, {type: "editPortableLayer", id: 4, direction: -1, names: session.portableLayers.names});
+        const before = draft.current.document;
+        await portableControl(session, {type: "savePortableLayers", names: session.portableLayers.names});
+        const after = draft.current.document;
+        assert.deepEqual(after.layers[1].slice(2), before.layers[4].slice(2), "layer 4 moved to 1 with its keys");
+        assert.equal(draft.current.summary.names[1], layer4Name, "its name moved with it");
+        return after.layers[0].slice(0, 2);
+    };
+    assert.deepEqual(await moveLayer4Down(true), [0x5221, 0x5262], "following: MO(4) becomes MO(1), TG(1) becomes TG(2)");
+    assert.deepEqual(await moveLayer4Down(false), [0x5224, 0x5261], "not following: both keep their numbers");
+});
+
 test("a re-read after a save follows the order the reads depend on", async () => {
     const service = fakeService();
     await rereadKeyboard(service);

@@ -85,7 +85,7 @@ function buildPanelModel(session, state) {
         busy,
         progress: state.portableProgress,
         review: session.portableReview ? {incoming: summary(session.portableReview.document), current: session.portableReview.before.summary} : null,
-        layers: session.portableLayers ? {key: session.portableLayers.before.fingerprint, order: session.portableLayers.order, names: session.portableLayers.names} : null,
+        layers: session.portableLayers ? {key: session.portableLayers.before.fingerprint, order: session.portableLayers.order, names: session.portableLayers.names, keysFollow: session.portableLayers.keysFollow !== false} : null,
     };
     if (!model.draft?.matching) model.layers?.forEach((layer, index) => {layer.displayName = state.portableSummary?.names[index] || layer.name;});
     return model;
@@ -142,8 +142,10 @@ function routeMessage(session, message, state) {
 
 // ── Edit layers: names and order, staged as one layer-reference rewrite ──
 
+// keysFollow: whether moving a layer renumbers the layer keys that reach it
+// (the default), or leaves them reaching whatever layer takes its place.
 function startLayerEdit(before, revision) {
-    return {before, revision, order: Array.from({length: 8}, (_, id) => id), names: [...before.summary.names]};
+    return {before, revision, order: Array.from({length: 8}, (_, id) => id), names: [...before.summary.names], keysFollow: true};
 }
 
 // Applies one message from the Edit layers panel to its local state. A name
@@ -151,9 +153,21 @@ function startLayerEdit(before, revision) {
 // before it is kept.
 function applyLayerEdit(edit, message) {
     if (!edit) throw new Error("Read the layers again before editing them.");
+    if (message.keysFollow !== undefined) {
+        if (typeof message.keysFollow !== "boolean") throw new Error("Read the layers again before editing them.");
+        edit.keysFollow = message.keysFollow;
+        if (message.type === "editPortableLayer" && message.id === undefined) {
+            // The form posts every name with the toggle, as with a move.
+            if (Array.isArray(message.names) && message.names.length === edit.names.length && message.names.every((name) => typeof name === "string")) {
+                reorderLayers(edit.before.document, edit.order, edit.order.map((old) => message.names[old]), {keysFollow: edit.keysFollow});
+                edit.names = [...message.names];
+            }
+            return edit;
+        }
+    }
     if (message.type === "savePortableLayers" && message.names !== undefined) {
         if (!Array.isArray(message.names) || message.names.length !== 8) throw new Error("Read the layers again before naming them.");
-        reorderLayers(edit.before.document, edit.order, edit.order.map((old) => message.names[old]));
+        reorderLayers(edit.before.document, edit.order, edit.order.map((old) => message.names[old]), {keysFollow: edit.keysFollow});
         edit.names = [...message.names];
         return edit;
     }
@@ -163,7 +177,7 @@ function applyLayerEdit(edit, message) {
         if (typeof message.name !== "string") throw new Error("Enter a layer name.");
         const names = [...edit.names];
         names[id] = message.name;
-        reorderLayers(edit.before.document, edit.order, edit.order.map((old) => names[old]));
+        reorderLayers(edit.before.document, edit.order, edit.order.map((old) => names[old]), {keysFollow: edit.keysFollow});
         edit.names = names;
         return edit;
     }
@@ -171,7 +185,7 @@ function applyLayerEdit(edit, message) {
     // from this state afterwards: dropping them here would quietly undo
     // whatever was typed before the move.
     if (Array.isArray(message.names) && message.names.length === edit.names.length && message.names.every((name) => typeof name === "string")) {
-        reorderLayers(edit.before.document, edit.order, edit.order.map((old) => message.names[old]));
+        reorderLayers(edit.before.document, edit.order, edit.order.map((old) => message.names[old]), {keysFollow: edit.keysFollow});
         edit.names = [...message.names];
     }
     const from = edit.order.indexOf(id), to = from + message.direction;
@@ -180,6 +194,6 @@ function applyLayerEdit(edit, message) {
     return edit;
 }
 
-const layerEditDocument = (edit) => reorderLayers(edit.before.document, edit.order, edit.order.map((old) => edit.names[old]));
+const layerEditDocument = (edit) => reorderLayers(edit.before.document, edit.order, edit.order.map((old) => edit.names[old]), {keysFollow: edit.keysFollow !== false});
 
 module.exports = {DRAFT_CONTROLS, PORTABLE_MESSAGES, applyLayerEdit, buildPanelModel, discardDraftForDevice, layerEditDocument, observePortable, routeMessage, startLayerEdit, takeOutbox};

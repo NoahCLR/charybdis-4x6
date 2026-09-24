@@ -56,6 +56,37 @@ test("owned layer keys follow their layers on a key, in a behaviour and on a com
     assert.equal(actual.combos[0].output.operand, 0x5281, "OSL(4) as a combo output becomes OSL(1)");
 });
 
+test("with keys not following, layers move but every layer key keeps its number", () => {
+    const {decodeComboDomainV1, encodeComboDomainV1} = require("../../core/schema/combo-domain-v1");
+    const source = document(), blob = decodeProfileBlob(Buffer.from(source.profile, "base64"));
+    source.layers[0].splice(10, 3, 0x5261, 0x5281, 0x4104);
+    const behaviors = decodeKeyBehaviorDomain(blob.domains[1].payload);
+    behaviors.rows = [{target: {kind: 2, operand: 1}, steps: [{tapIndex: 0, tap: {kind: 3, operand: 4}, hold: {mode: 1, repeatHz: 0, action: {kind: 2, operand: 1}}}]}];
+    blob.domains[1].payload = encodeKeyBehaviorDomain(behaviors);
+    const combos = decodeComboDomainV1(blob.domains[2].payload);
+    combos[0].output = {kind: 1, operand: 0x5284};
+    blob.domains[2].payload = encodeComboDomainV1(combos);
+    source.profile = encodeProfileBlob(blob).toString("base64");
+    const before = validateSnapshot(source);
+
+    const order = [0, 4, 2, 3, 1, 5, 6, 7];
+    const moved = reorderLayers(source, order, undefined, {keysFollow: false}), actual = validateSnapshot(moved);
+    // Each layer's own keys move with it, untouched...
+    order.forEach((old, next) => assert.deepEqual(moved.layers[next], source.layers[old], `layer ${old} lands at ${next} as it was`));
+    // ...and the layer keys on them, in behaviours and on combos keep their numbers.
+    assert.deepEqual(moved.layers[0].slice(10, 13), [0x5261, 0x5281, 0x4104]);
+    assert.deepEqual(actual.behaviors.rows[0].target, before.behaviors.rows[0].target);
+    assert.equal(actual.behaviors.rows[0].steps[0].tap.operand, 4);
+    assert.equal(actual.behaviors.rows[0].steps[0].hold.action.operand, 1);
+    assert.equal(actual.combos[0].output.operand, 0x5284);
+    // Names, colours and the pointer setting still follow their layer.
+    assert.equal(actual.settings.names[1], before.settings.names[4]);
+    assert.equal(actual.settings.values[5], order.indexOf(before.settings.values[5]));
+    assert.deepEqual(actual.rgb.layerColors.find(row => row.layerId === 1).color, before.rgb.layerColors.find(row => row.layerId === 4).color);
+    // The default still renumbers.
+    assert.equal(validateSnapshot(reorderLayers(source, order)).combos[0].output.operand, 0x5281);
+});
+
 test("partial, incompatible, over-capacity and malformed profiles fail before restore", () => {
     const source = document();
     assert.throws(() => validateSnapshot({...source, layers: source.layers.slice(0, 4)}), /matrix/);
