@@ -13,7 +13,7 @@ const {ProfileDraftSession, DRAFT_EDITS} = require("./profile-draft-session");
 const {buildDeviceModel} = require("./device-model");
 
 const DRAFT_CONTROLS = new Set([
-    "reviewProfileDraft", "undoProfileDraft", "redoProfileDraft", "discardProfileDraft",
+    "reviewProfileDraft", "undoProfileDraft", "redoProfileDraft", "discardProfileDraft", "discardProfileDraftChanges",
     "applyProfileDraft", "rebaseProfileDraft", "closeProfileDraftReview",
 ]);
 const PORTABLE_MESSAGES = new Set([

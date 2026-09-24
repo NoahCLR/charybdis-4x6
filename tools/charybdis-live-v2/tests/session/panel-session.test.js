@@ -53,6 +53,8 @@ test("every other message names the handler that answers it", () => {
     const id = session.draft.id;
     assert.equal(routeMessage(session, {type: "undoProfileDraft", draftId: id}, connected()), "draft");
     assert.equal(routeMessage(session, {type: "applyProfileDraft", draftId: id}, connected()), "draft");
+    assert.equal(routeMessage(session, {type: "discardProfileDraftChanges", draftId: id, group: 0}, connected()), "draft",
+        "discarding part of the draft is a draft control, never an apply");
     assert.equal(routeMessage(session, {type: "choosePortableProfile"}, connected()), "portable");
     assert.equal(routeMessage(session, {type: "refresh"}, connected()), "read");
     assert.equal(session.readBusy, true);

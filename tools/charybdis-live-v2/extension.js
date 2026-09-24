@@ -218,7 +218,8 @@ async function portableMessage(panel, session, message) {
             if (!before) throw new Error("Review the profile before restoring it.");
             const document = message.type === "savePortableLayers" ? layerEditDocument(draft) : review.document;
             if (session.draft) {
-                session.draft.replace(document, message.type === "savePortableLayers" ? draft.revision : review.revision);
+                session.draft.replace(document, message.type === "savePortableLayers" ? draft.revision : review.revision, "edit",
+                    message.type === "savePortableLayers" ? "Edited layers" : "Imported a profile");
                 session.portableReview = undefined; session.portableLayers = undefined;
                 session.resetDraftForms = true;
                 return;
@@ -240,7 +241,13 @@ async function draftMessage(panel, session, message) {
         else if (message.type === "closeProfileDraftReview") {draft.assertRevision(message.draftRevision, {allowStale: true}); draft.reviewedRevision = null;}
         else if (message.type === "undoProfileDraft") {draft.undo(message.draftRevision); session.resetDraftForms = true;}
         else if (message.type === "redoProfileDraft") {draft.redo(message.draftRevision); session.resetDraftForms = true;}
-        else if (message.type === "discardProfileDraft") {
+        else if (message.type === "discardProfileDraftChanges") {draft.discard(message.draftRevision, message.group); session.resetDraftForms = true;}
+        else if (message.type === "discardProfileDraft" && !draft.stale && !draft.base.incomplete && service.snapshot().selectedDeviceId === draft.deviceId) {
+            // The draft's own keyboard, unchanged: discarding is an undoable step.
+            draft.discardAll(message.draftRevision);
+            session.resetDraftForms = true;
+            session.notice = "Draft discarded. Undo (⌘Z) brings it back.";
+        } else if (message.type === "discardProfileDraft") {
             draft.assertRevision(message.draftRevision, {allowStale: true});
             const state = service.snapshot();
             if (!state.connected) throw new Error("Reconnect and read the keyboard before discarding its draft.");

@@ -3,6 +3,14 @@
 
 import {el, esc} from "../lib/dom.mjs";
 import {getModel, post, render, state} from "../store.mjs";
+import {statusSummary} from "../view/review.mjs";
+
+// The review opens at once; the host marks it reviewed when it answers.
+function openReview() {
+    state.overlay = "review";
+    post({type: "reviewProfileDraft"});
+    render();
+}
 
 const ICONS = {
     keys: '<svg viewBox="0 0 16 16"><rect x="1.5" y="3.5" width="13" height="9" rx="2"/><path d="M4 6.5h.01M6.5 6.5h.01M9 6.5h.01M11.5 6.5h.01M5 9.5h6"/></svg>',
@@ -62,9 +70,11 @@ export function rail() {
                     health.profile === "synced" ? "Both halves agree" : health.profile === "attention" ? "Halves need attention"
                         : health.profile === "unread" ? "Profile not read" : "Profile unavailable",
                     "The committed generation and digest each half reports.")}
-                ${line(draft?.dirty ? "draft" : "on",
-                    draft ? (draft.dirty ? `${draft.changes.length} change${draft.changes.length === 1 ? "" : "s"} in draft` : "Draft clean") : "No draft",
-                    "Edits waiting in this window. The keyboard still runs its saved profile.")}
+                ${draft?.dirty && draft.matching && !draft.stale
+                    ? `<button class="stat link" data-act="open-review" data-tip="Edits waiting in this window. The keyboard still runs its saved profile. Open the review to see them."><i class="dot draft"></i> ${draft.changes.length} change${draft.changes.length === 1 ? "" : "s"} in draft</button>`
+                    : line(draft?.dirty ? "draft" : "on",
+                        draft ? (draft.dirty ? `${draft.changes.length} change${draft.changes.length === 1 ? "" : "s"} in draft` : "Draft clean") : "No draft",
+                        "Edits waiting in this window. The keyboard still runs its saved profile.")}
                 ${health.restartNeeded
                     ? line("err", "Restart the keyboard",
                         "The other half did not confirm a cancelled save, so the keyboard refuses new saves. Unplug the USB cable (not the cable between the halves), wait a few seconds and plug it back in. Nothing was lost.")
@@ -78,9 +88,9 @@ export function rail() {
         <div class="rail-foot">
             <span class="note">Draft history</span>
             <button class="btn tiny ghost icon" data-act="undo" ${draft?.canUndo ? "" : "disabled"}
-                data-tip="Undo the last edit in the draft (⌘Z). The keyboard is not touched until you apply.">↺</button>
+                data-tip="${esc(draft?.undoLabel ? `Undo: ${draft.undoLabel} (⌘Z)` : "Undo the last edit in the draft (⌘Z). The keyboard is not touched until you apply.")}">↺</button>
             <button class="btn tiny ghost icon" data-act="redo" ${draft?.canRedo ? "" : "disabled"}
-                data-tip="Redo the edit you just undid (⇧⌘Z).">↻</button>
+                data-tip="${esc(draft?.redoLabel ? `Redo: ${draft.redoLabel} (⇧⌘Z)` : "Redo the edit you just undid (⇧⌘Z).")}">↻</button>
         </div>
     </aside>`);
 
@@ -91,6 +101,7 @@ export function rail() {
     node.querySelector('[data-act="dismiss"]')?.addEventListener("click", () => { state.notice = ""; state.error = ""; render(); });
     node.querySelector('[data-act="refresh"]').addEventListener("click", () => post({type: "refresh"}));
     node.querySelector('[data-act="select-device"]')?.addEventListener("change", (event) => post({type: "selectDevice", deviceId: event.target.value}));
+    node.querySelector('[data-act="open-review"]')?.addEventListener("click", openReview);
     node.querySelector('[data-act="undo"]').addEventListener("click", () => post({type: "undoProfileDraft"}));
     node.querySelector('[data-act="redo"]').addEventListener("click", () => post({type: "redoProfileDraft"}));
     return node;
@@ -195,20 +206,18 @@ export function commitBar() {
     }
     if (!draft.dirty) return null;
 
-    const areas = [...new Set(draft.changes.map((change) => change.area))];
+    // One way on: the review, where Apply lives. What the draft holds is said
+    // by what happened to it, which fits where a list of areas did not.
     const node = el(`<div class="commit">
         <span class="n"><i class="dot draft"></i> <strong>${draft.changes.length} change${draft.changes.length === 1 ? "" : "s"}</strong>
         <span class="muted">in your draft</span></span>
-        <span class="peek"><span class="note" style="white-space:nowrap">${esc(areas.join(" · ").toLowerCase())}</span></span>
+        <span class="peek"><span class="note" style="white-space:nowrap">${esc(statusSummary(draft.changes))}</span></span>
         <span class="sep"></span>
-        <button class="btn ghost tiny" data-act="discard">Discard</button>
-        <button class="btn" data-act="review">Review</button>
+        <button class="btn ghost tiny" data-act="discard"
+            data-tip="Put every change back to what the keyboard holds. Undo (⌘Z) brings them back.">Discard all</button>
         <button class="btn primary" data-act="review"
-            data-tip="Review the complete draft, then write it to both halves as one generation.">Apply to keyboard</button></div>`);
-    node.querySelectorAll('[data-act="review"]').forEach((button) => button.addEventListener("click", () => {
-        state.overlay = "review";
-        post({type: "reviewProfileDraft"});
-    }));
+            data-tip="See every change, then write the draft to both halves as one generation.">Review and apply</button></div>`);
+    node.querySelector('[data-act="review"]').addEventListener("click", openReview);
     node.querySelector('[data-act="discard"]').addEventListener("click", () => post({type: "discardProfileDraft"}));
     return node;
 }

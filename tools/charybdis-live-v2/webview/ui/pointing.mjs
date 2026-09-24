@@ -14,6 +14,7 @@ import {pdColourRow, stageEnabled} from "../view/lighting.mjs";
 import {getModel, post, render, state, writable} from "../store.mjs";
 import * as edits from "../view/edits.mjs";
 import {openPicker} from "./picker.mjs";
+import {draftDot, draftMarks} from "../view/review.mjs";
 import {topbar, unavailable} from "./shell.mjs";
 
 
@@ -39,7 +40,7 @@ const bindingName = (slot) => slot.id < BINDINGS.length ? BINDINGS[slot.id] : `P
 const axisLabel = (axis) => (AXES.find(([value]) => value === axis) || [, "Dominant axis"])[1];
 
 // A slot's light, as the keyboard would show it: a stage that is off looks off.
-function slotLight(model, slot) {
+export function slotLight(model, slot) {
     const row = pdColourRow(model, slot.id);
     const lit = Boolean(row && !isOff(row.color) && stageEnabled(model, "pd"));
     return {row, lit, swatch: (klass = "") => `<span class="pd-swatch ${klass} ${lit ? "" : "swatch-off"}"
@@ -68,12 +69,13 @@ export function screenPointing() {
     }
 
     const list = el(`<nav class="pd-slots" aria-label="Pointing slots"></nav>`);
+    const changedSlots = draftMarks(model?.draft?.changes).pointing;
     for (const slot of slots) {
         const {swatch} = slotLight(model, slot);
         const inert = !slot.kind ? bindingsForSlot(model, slot).keys.length : 0;
         const card = el(`<button class="slotcard ${slot.kind ? "" : "empty"}" data-slot="${slot.id}" aria-current="${state.pdSlot === slot.id}">
             ${swatch()}
-            <span class="nm">${slot.kind ? esc(slot.name) : "Empty slot"}</span><span class="no">${slot.id + 1}</span>
+            <span class="nm">${slot.kind ? esc(slot.name) : "Empty slot"}${changedSlots.has(slot.id) ? draftDot() : ""}</span><span class="no">${slot.id + 1}</span>
             <span class="meta">${slot.kind === KIND.SCROLLING ? "Scrolling" : slot.kind === KIND.DIRECTIONAL ? `Directional · ${esc(axisLabel(slot.axis))}` : "Available"}</span>
             <span class="meta mono">${esc(bindingName(slot))}</span>
             ${inert ? `<span class="meta warn">${inert} key${inert === 1 ? " still reaches" : "s still reach"} it · inert</span>` : ""}</button>`);

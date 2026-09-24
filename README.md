@@ -379,9 +379,17 @@ still supports the other settings. All section saves preserve unrelated values,
 including native option bits the editor does not expose. Lighting colour and
 effect changes now save correctly while lighting is switched off.
 On eight-layer firmware, all editors now share one complete profile draft.
-Use **Keep** on each edited card, then **Review changes** to compare the draft
-with the saved keyboard configuration. **Undo** and **Redo** step through kept
-edits; **Apply to keyboard** saves the complete draft with a recovery copy and
+Use **Keep** on each edited card, then **Review and apply** to compare the draft
+with the saved keyboard configuration. Everything the draft changed carries an
+amber dot where it is edited — the key on the board, the layer chip, the tab,
+the behaviour or combo row, the slot, the settings section — and a folded group
+holding a change says so on its header. The review lists each changed key, behaviour,
+combo, macro, settings section, pointing slot or lighting record once, with only
+the fields that changed. **Show** opens it where it is edited; **Discard** puts
+it back to what the keyboard holds, together with anything made in the same
+edit, such as both keys of a swap. **Discard all** puts the whole draft back as
+one more step. **Undo** and **Redo** step through kept edits and name the edit
+they take back or bring back, discards included; **Apply to keyboard** saves the complete draft with a recovery copy and
 verified readback. Imports and layer name/order changes enter the same draft.
 **Export profile** still backs up the saved keyboard configuration.
 

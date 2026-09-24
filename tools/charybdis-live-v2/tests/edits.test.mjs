@@ -237,7 +237,7 @@ test("a colour changed in Lighting is staged as the keyboard stores it", () => {
     stage(draft, edits.layerColour("Layer 3", "KEYS_MAPPED_ON_THIS_LAYER_ONLY", {h: 60, s: 255, v: 200}));
     const row = decoded(draft).rgb.layerColors.find((entry) => entry.layerId === 3);
     assert.deepEqual(row.color, {h: 60, s: 255, v: 200});
-    assert.ok(reviewAreas(draft).includes("RGB"));
+    assert.ok(reviewAreas(draft).includes("Lighting"));
     const tooBright = session();
     assert.throws(() => stage(tooBright, edits.layerColour("Layer 3", "KEYS_MAPPED_ON_THIS_LAYER_ONLY", {h: 60, s: 255, v: 201})),
         /Brightness must be between 0 and 200/);
@@ -333,7 +333,7 @@ test("a macro name is posted without its steps, and review shows the rename", ()
     const after = decoded(draft);
     assert.equal(after.settings.macroNames[5], "Sign-off");
     assert.equal(after.document.macros[5], before, "the steps are untouched");
-    assert.ok(draft.view({selectedDeviceId: "test-device", connected: true}).changes.some((change) => change.label === "Macro 5 name" && change.after === "Sign-off"));
+    assert.ok(draft.view({selectedDeviceId: "test-device", connected: true}).changes.some((change) => change.unit === "macro:5" && change.fields.some((field) => field.label === "Name" && field.after === "Sign-off")));
 });
 
 test("a macro left holding a key is refused, and macro keys land as the keyboard's own values", () => {

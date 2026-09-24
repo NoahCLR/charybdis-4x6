@@ -26,19 +26,21 @@ function key(value) {
     sharedLabels ??= labelsUsedTwice();
     return sharedLabels.has(label) && name !== label ? `${label} (${name})` : label;
 }
-function action(value) {
+// An action named as the editors name what it reaches: a layer, a pointing
+// mode or a macro by its own name in that snapshot, when it has one.
+function action(value, names = {}) {
     if (!value || value.kind === 0) return "None";
     if (value.kind === 1) return key(value.operand);
-    const names = {2: "Momentary layer", 3: "Layer lock", 4: "Pointing mode", 5: "Pointing mode lock", 6: "Macro", 7: "User macro"};
-    return `${names[value.kind] || "Action"} ${value.operand}`;
+    const id = value.operand;
+    if (value.kind === 2 || value.kind === 3) return `${names.layers?.[id] || `Layer ${id}`} layer${value.kind === 3 ? " lock" : ""}`;
+    if (value.kind === 4 || value.kind === 5) return `${names.pointing?.[id] || `Pointing slot ${id + 1}`}${value.kind === 5 ? " lock" : ""}`;
+    if (value.kind === 6) return `Macro ${id}${names.macros?.[id] ? ` · ${names.macros[id]}` : ""}`;
+    return `${value.kind === 7 ? "User macro" : "Action"} ${id}`;
 }
-function behavior(row) {
-    if (!row) return "None";
-    const hold = value => value ? `${named(KEY_BEHAVIOR_HOLD_MODES, value.mode)}: ${action(value.action)}${value.repeatHz ? ` (${value.repeatHz}/s)` : ""}` : "None";
-    return [`Tap/hold ${row.tapHoldTerm} ms; long hold ${row.longerHoldTerm} ms; repeat gap ${row.multiTapTerm} ms`,
-        `Keep auto-mouse anchored: ${row.keepsAutoMouseAnchored ? "yes" : "no"}`,
-        ...row.steps.map(step => `${step.tapIndex + 1} tap${step.tapIndex ? "s" : ""}: ${action(step.tap)}; hold ${hold(step.hold)}; long hold ${hold(step.longHold)}`)].join("\n");
-}
+// The names an action can be read by in one snapshot.
+const namesIn = (value, macros) => ({layers: value.settings.names, pointing: value.pdModes?.map(slot => slot.kind ? slot.name : null) || [],
+    macros: macros?.viaMacros.map(slot => slot.name) || []});
+const pointingSlot = value => value && (value.kind === 4 || value.kind === 5) ? value.operand : undefined;
 function pointingFields(slot) {
     const result = new Map([["Movement", ["Empty", "Directional keys / shortcuts", "Scrolling"][slot?.kind || 0]], ["Name", slot?.name || "Empty"]]);
     if (!slot?.kind) return result;
@@ -63,63 +65,209 @@ function pointingFields(slot) {
 
 const hsv = c => `HSV(${c.h}, ${c.s}, ${c.v})`;
 
+// ── what a review item is ───────────────────────────────────────────────
+//
+// The review lists items, one per thing a person edits: a key on a layer, a
+// layer's name, a behaviour, a combo, a macro, a settings section, a pointing
+// slot, one lighting record. An item is also the unit a discard puts back
+// (profile-revert.js), so it is the smallest part that is valid on its own.
+// Each carries whether it was added, changed or removed, only the fields that
+// differ (everything it holds, for an added or removed item), and where it
+// is edited, so the review can go there.
+
+// The words the editors use, so the review never names a thing differently.
+const HOW_IT_RUNS = {PRESS_AND_HOLD_UNTIL_RELEASE: "held until release", TAP_AT_HOLD_THRESHOLD: "tap at hold threshold",
+    TAP_ON_RELEASE_AFTER_HOLD: "tap on release after hold", REPEAT_WHILE_HELD: "repeat while held"};
+const TIERS = [["tap", "tap"], ["hold", "hold"], ["longHold", "long hold"]];
+
+// A behaviour as fields: its timing, the anchor, then every tier the grid
+// shows, named as the grid names it (1× tap, 2× hold).
+function behaviourFields(row, defaults, names) {
+    if (!row) return new Map();
+    // Compared by what is stored, shown with the default it stands for, so a
+    // changed default in Settings does not read as a change to every row.
+    const timing = (value, fallback) => ({text: value ? `${value} ms` : `default · ${fallback} ms`, key: value});
+    const fields = new Map([
+        ["Tap / hold", timing(row.tapHoldTerm, defaults[1])],
+        ["Long hold", timing(row.longerHoldTerm, defaults[2])],
+        ["Repeated taps", timing(row.multiTapTerm, defaults[3])],
+        ["Keeps auto-mouse anchored", row.keepsAutoMouseAnchored ? "yes" : "no"],
+    ]);
+    for (const step of row.steps) for (const [tier, name] of TIERS) {
+        const branch = step[tier];
+        if (!branch || (tier === "tap" && !branch.kind)) continue;
+        const how = tier === "tap" ? "" : ` · ${HOW_IT_RUNS[Object.entries(KEY_BEHAVIOR_HOLD_MODES).find(([, id]) => id === branch.mode)?.[0]] || "unknown"}${branch.repeatHz ? ` · ${branch.repeatHz} Hz` : ""}`;
+        // A tier is named as the grid names it, and carries which branch and
+        // tier it is, so the review can colour it as the grid does.
+        const reaches = tier === "tap" ? branch : branch.action;
+        fields.set(`${step.tapIndex + 1}× ${name}`, {text: `${action(reaches, names)}${how}`, key: `${action(reaches, names)}${how}`,
+            tier: {branch: step.tapIndex + 1, kind: tier === "longHold" ? "long" : tier}, pointingSlot: pointingSlot(reaches)});
+    }
+    return fields;
+}
+// Fields an added or removed thing is described by: what it holds, leaving
+// out values that only restate a default.
+const EMPTY = new Set(["no", "none", "no name", "empty"]);
+const holds = (label, value) => value !== undefined && !EMPTY.has(value) && !/^default · /.test(value) && !(label === "Movement" && value === "Empty");
+
+// A field is shown by its text and compared by its key; most fields are plain
+// text and are both. A field may also carry its own label, when the map key is
+// an id rather than words.
+const text = value => typeof value === "object" && value !== null ? value.text : value;
+const compared = value => typeof value === "object" && value !== null ? value.key : value;
+const labelOf = (id, ...values) => values.find(value => typeof value === "object" && value?.label)?.label ?? id;
+
+function comboFields(row, names) {
+    if (!row) return new Map();
+    const options = [row.mustHold && "must be held", row.mustTap && "tap only", row.ordered && "keys in order"].filter(Boolean).join(", ");
+    return new Map([["Keys", row.inputs.map(input => action(input, names)).join(" + ")],
+        ["Sends", {text: action(row.output, names), key: action(row.output, names), pointingSlot: pointingSlot(row.output)}], ["Window", `${row.termMs} ms`],
+        ["Hold threshold", `${row.holdTermMs} ms`], ["Options", options || "none"]]);
+}
+
+// Lighting in the words the Lighting screen uses, and every colour as a
+// colour: the review draws it as a swatch, and says what an off colour means
+// where it means something (a group row inherits its stage's colour).
+const STAGE_NAMES = {LAYER: "Layer colours", AUTOMOUSE: "Auto-mouse fade", PD_MODE: "Pointing modes", COMBO: "Combo feedback", KEY_BEHAVIOR: "Key feedback"};
+const LOCALITY_NAMES = {RGB_BOTH_HALVES: "both halves", RGB_LEFT_HALF: "left half", RGB_RIGHT_HALF: "right half",
+    RGB_KEY_HALF: "the half holding the trigger key", RGB_KEYS_ONLY: "only the trigger key"};
+const PAINTS_NAMES = {ALL_KEYS: "all keys", KEYS_MAPPED_ON_THIS_LAYER_ONLY: "keys mapped on this layer only"};
+const FADE_NAMES = {FOLLOW_REAL_DESTINATION: "follow the real destination", END_COLOR_WHERE_BASE_EFFECT_WOULD_SHOW: "end colour where the base effect would show",
+    END_COLOR_ON_ALL_KEYS: "end colour on all keys"};
+const TAP_COMMIT_NAMES = {KEY_FEEDBACK_TAP_COMMIT_OFF: "off", KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS: "non-base taps"};
+const SEMANTIC_NAMES = {KEY_FEEDBACK_GROUP_ALL: "every feedback state", KEY_FEEDBACK_GROUP_TAP_BRANCH_PENDING: "tap branch pending",
+    KEY_FEEDBACK_GROUP_TAP_COMMITTED: "tap committed", KEY_FEEDBACK_GROUP_HOLD_ACTIVE: "hold active", KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE: "long hold active"};
+const nameIn = (names, values, value) => names[Object.entries(values).find(([, id]) => id === value)?.[0]] ?? named(values, value);
+const colour = (value, off = "off") => ({text: value.v ? hsv(value) : off, key: hsv(value), colour: {h: value.h, s: value.s, v: value.v}});
+
+function lightingRecords(value) {
+    const r = value.rgb, records = new Map();
+    const layerName = id => value.settings.names[id] || `Layer ${id}`;
+    const slotName = id => value.pdModes?.[id]?.kind ? value.pdModes[id].name : id < 6 ? words(Object.keys(rgbEnums.RGB_PD_MODE_IDS)[id]) : `slot ${id + 1}`;
+    const record = (unit, title, stage, fields, where = {}) => records.set(unit, {title, stage, where, fields: new Map(fields)});
+    // Each stage's switch sits on its own tab, so the stages record belongs
+    // to no single one.
+    record("rgb:stages", "Feedback stages", null, Object.entries(rgbEnums.RGB_STAGE_BITS).map(([name, bit]) =>
+        [STAGE_NAMES[name] || words(name), r.stageEnableMask & bit ? "on" : "off"]));
+    for (const row of r.layerColors) record(`rgb:layer:${row.layerId}`, `${layerName(row.layerId)} colour`, "layers",
+        [["Colour", colour(row.color, row.layerId === 0 ? "off · the base effect shows" : "off")], ["Paints", nameIn(PAINTS_NAMES, rgbEnums.RGB_LAYER_MODES, row.mode)]], {layer: row.layerId});
+    for (const row of r.pdModeColors) record(`rgb:pd:${row.pdModeId}`, `Pointing mode colour · ${slotName(row.pdModeId)}`, "pd",
+        [["Colour", colour(row.color)], ["Where", nameIn(LOCALITY_NAMES, rgbEnums.RGB_LOCALITIES, row.locality)]], {slot: row.pdModeId});
+    record("rgb:automouse", "Auto-mouse fade", "auto", [["Fade", nameIn(FADE_NAMES, rgbEnums.RGB_AUTOMOUSE_MODES, r.automouseFade.mode)], ["End colour", colour(r.automouseFade.endColor)]]);
+    record("rgb:combo", "Combo feedback", "combo", [["Colour", colour(r.comboFeedback.color)], ["Where", nameIn(LOCALITY_NAMES, rgbEnums.RGB_LOCALITIES, r.comboFeedback.locality)]]);
+    const k = r.keyFeedback;
+    record("rgb:key", "Key feedback", "key", [...k.tapBranchColors.map((value, i) => [`${i + 2}× branch`, colour(value)]),
+        ["Tap committed", colour(k.tapCommittedColor)], ["Hold active", colour(k.holdActiveColor)], ["Long hold active", colour(k.longHoldActiveColor)],
+        ["Tap commit", nameIn(TAP_COMMIT_NAMES, rgbEnums.RGB_TAP_COMMIT_MODES, k.tapCommitMode)], ["Where", nameIn(LOCALITY_NAMES, rgbEnums.RGB_LOCALITIES, k.locality)]]);
+    // LED groups are one record with every row that paints them: rows name
+    // groups by id, so a row put back without its group could point at a
+    // group that no longer exists. Groups read as the Lighting screen shows
+    // them, "Group 1 · 3 LEDs", and each row as who it paints for.
+    const groups = new Map(r.groups.map(group => [group.id, group]));
+    const fields = r.groups.map(group => [`group:${group.id}`, {label: `Group ${group.id}`, text: `LEDs ${group.leds.join(", ")}`, key: group.leds.join(",")}]);
+    for (const [table, owner] of [
+        ["layerGroupRows", row => row.selector === 255 ? "all layers" : layerName(row.selector)],
+        ["pdModeGroupRows", row => row.selector === 255 ? "all pointing modes" : slotName(row.selector)],
+        ["comboGroupRows", () => "combos"],
+        ["keyGroupRows", row => nameIn(SEMANTIC_NAMES, rgbEnums.RGB_KEY_SEMANTICS, row.semantic)],
+    ]) r[table].forEach((row, i) => {
+        const group = groups.get(row.groupId), leds = group ? `Group ${group.id} · ${group.leds.length} LED${group.leds.length === 1 ? "" : "s"}` : `Group ${row.groupId}`;
+        const paint = colour(row.color, "inherits the stage colour");
+        fields.push([`${table}:${i}`, {label: `Override · ${owner(row)}`, text: `${leds} · ${paint.text}`, key: `${group?.leds.join(",")}|${paint.key}|${owner(row)}`, colour: paint.colour}]);
+    });
+    record("rgb:groups", "LED overrides", "groups", fields);
+    return records;
+}
+
 // Compare complete validated snapshots. The review describes final differences,
 // rather than a log that would still show edits the user has already undone.
 function profileReview(before, after) {
-    const a = validateSnapshot(before.document), b = validateSnapshot(after.document), changes = [];
-    const add = (area, label, old, next) => {if (old !== next) changes.push({area, label, before: String(old ?? "None"), after: String(next ?? "None")});};
-    const layer = (value, i) => value.settings.names[i] || `Layer ${i}`;
-    a.document.layers.forEach((keys, l) => keys.forEach((code, p) => {
-        if (code !== b.document.layers[l][p]) add("Layout", `${layer(b, l)} · row ${Math.floor(p / 6) + 1}, column ${p % 6 + 1}`, key(code), key(b.document.layers[l][p]));
-    }));
-    a.settings.names.forEach((name, i) => add("Layers", `Layer ${i} name`, name || `Layer ${i}`, b.settings.names[i] || `Layer ${i}`));
-    const targets = new Map([...a.behaviors.rows, ...b.behaviors.rows].map(row => [JSON.stringify(row.target), row.target]));
-    for (const [id, target] of targets) add("Behaviours", action(target), behavior(a.behaviors.rows.find(row => JSON.stringify(row.target) === id)), behavior(b.behaviors.rows.find(row => JSON.stringify(row.target) === id)));
-    const combo = row => row ? `${row.inputs.map(action).join(" + ")} → ${action(row.output)}\nWindow ${row.termMs} ms; hold ${row.holdTermMs} ms${row.mustHold ? "; require hold" : ""}${row.mustTap ? "; tap only" : ""}${row.ordered ? "; ordered" : ""}` : "None";
-    for (let i = 0; i < Math.max(a.combos.length, b.combos.length); i++) add("Combos", `Combo ${i + 1}`, combo(a.combos[i]), combo(b.combos[i]));
-    const macrosA = macroEditorView(before), macrosB = macroEditorView(after);
-    macrosA.viaMacros.forEach((slot, i) => {
-        add("Macros", `Macro ${i}`, slot.payload || "Empty", macrosB.viaMacros[i].payload || "Empty");
-        add("Macros", `Macro ${i} name`, slot.name || "No name", macrosB.viaMacros[i].name || "No name");
-    });
-    const fields = (snapshot, settings) => settingsEditorView(snapshot).sections.flatMap(section => section.fields.map(field => {
-        let value = field.value;
-        if (field.kind === "toggle") value = field.enabled ? "On" : "Off";
-        else if (field.kind === "layer") value = settings.names[Number(value.slice(6))] || value;
-        else if (field.choices) value = field.choices.find(choice => typeof choice === "object" && String(choice.value) === field.value)?.label || value;
-        return {...field, value, raw: field.value, section: section.label};
-    }));
-    const previous = fields(before, a.settings), next = fields(after, b.settings);
-    for (const field of next) {const old = previous.find(item => item.macro === field.macro); if (old?.raw !== field.raw) add("Defaults", `${field.section} · ${field.label}`, old?.value, field.value);}
-    const masks = after.options?.keymapMasks.reduce((mask, value) => mask | value, 0) || 0;
-    add("Defaults", "Other saved key options", `0x${(a.settings.values[24] & ~masks).toString(16)}`, `0x${(b.settings.values[24] & ~masks).toString(16)}`);
-    for (let id = 0; id < 8; id++) {
-        const old = pointingFields(a.pdModes?.[id]), next = pointingFields(b.pdModes?.[id]);
-        for (const label of new Set([...old.keys(), ...next.keys()])) add("Pointing modes", `Slot ${id + 1} · ${label}`, old.get(label), next.get(label));
-    }
-    const rgb = value => {
-        const r = value.rgb, result = new Map();
-        result.set("Enabled feedback", Object.entries(rgbEnums.RGB_STAGE_BITS).filter(([, bit]) => r.stageEnableMask & bit).map(([name]) => words(name)).join(", ") || "None");
-        for (const row of r.layerColors) result.set(`Layer ${row.layerId}`, `${hsv(row.color)} · ${named(rgbEnums.RGB_LAYER_MODES, row.mode)}`);
-        for (const row of r.pdModeColors) result.set(`Pointing · ${named(rgbEnums.RGB_PD_MODE_IDS, row.pdModeId)}`, `${hsv(row.color)} · ${named(rgbEnums.RGB_LOCALITIES, row.locality)}`);
-        result.set("Auto-mouse fade", `${named(rgbEnums.RGB_AUTOMOUSE_MODES, r.automouseFade.mode)} · ${hsv(r.automouseFade.endColor)}`);
-        result.set("Combo feedback", `${hsv(r.comboFeedback.color)} · ${named(rgbEnums.RGB_LOCALITIES, r.comboFeedback.locality)}`);
-        result.set("Key feedback", [r.keyFeedback.tapBranchColors.map(hsv).join(", "), hsv(r.keyFeedback.tapCommittedColor), hsv(r.keyFeedback.holdActiveColor), hsv(r.keyFeedback.longHoldActiveColor), named(rgbEnums.RGB_TAP_COMMIT_MODES, r.keyFeedback.tapCommitMode), named(rgbEnums.RGB_LOCALITIES, r.keyFeedback.locality)].join(" · "));
-        r.groups.forEach(group => result.set(`LED group ${group.id}`, group.leds.join(", ")));
-        for (const [table, label] of [["layerGroupRows", "Layer group"], ["pdModeGroupRows", "Pointing group"], ["comboGroupRows", "Combo group"], ["keyGroupRows", "Key feedback group"]]) r[table].forEach((row, i) => {
-            const owner = row.selector === 255 ? "All" : table === "layerGroupRows" ? `Layer ${row.selector}` : table === "pdModeGroupRows" ? named(rgbEnums.RGB_PD_MODE_IDS, row.selector) : table === "keyGroupRows" ? named(rgbEnums.RGB_KEY_SEMANTICS, row.semantic) : "";
-            result.set(`${label} assignment ${i + 1}`, `${owner} · LED group ${row.groupId} · ${hsv(row.color)}`);
-        });
-        return result;
+    const a = validateSnapshot(before.document), b = validateSnapshot(after.document), items = [];
+    // One item from its fields on each side; `exists` says whether the thing is
+    // there at all, which decides added and removed.
+    const item = (area, unit, title, old, next, place, exists = [old.size > 0, next.size > 0]) => {
+        const [was, is] = exists;
+        if (!was && !is) return;
+        const status = was && is ? "changed" : is ? "added" : "removed";
+        const ids = [...new Set([...old.keys(), ...next.keys()])];
+        const fields = ids.filter(id => status === "changed" ? compared(old.get(id)) !== compared(next.get(id))
+            : holds(id, text(status === "added" ? next.get(id) : old.get(id))))
+            .map(id => {
+                const entry = {label: labelOf(id, next.get(id), old.get(id)),
+                    before: status === "added" ? null : text(old.get(id)) ?? "none", after: status === "removed" ? null : text(next.get(id)) ?? "none"};
+                const side = (value, name) => value && typeof value === "object" ? value[name] : undefined;
+                const tier = side(next.get(id), "tier") || side(old.get(id), "tier");
+                const was = side(old.get(id), "colour"), is = side(next.get(id), "colour");
+                const slotWas = side(old.get(id), "pointingSlot"), slotIs = side(next.get(id), "pointingSlot");
+                return {...entry, ...(tier ? {tier} : {}),
+                    ...(was && status !== "added" ? {beforeColour: was} : {}), ...(is && status !== "removed" ? {afterColour: is} : {}),
+                    ...(slotWas !== undefined && status !== "added" ? {beforePointingSlot: slotWas} : {}),
+                    ...(slotIs !== undefined && status !== "removed" ? {afterPointingSlot: slotIs} : {})};
+            });
+        if (status === "changed" && !fields.length) return;
+        items.push({area, unit, title, status, fields, place});
     };
-    const rgbA = rgb(a), rgbB = rgb(b);
-    for (const label of new Set([...rgbA.keys(), ...rgbB.keys()])) add("RGB", label, rgbA.get(label), rgbB.get(label));
-    // The rows above describe the profile in words. If the stored bytes differ
-    // and none of them caught it, the review still must not read as empty:
-    // an apply always shows that something will change.
-    if (!changes.length && before.fingerprint !== after.fingerprint) {
-        changes.push({area: "Profile", label: "Stored profile", before: `fingerprint ${before.fingerprint}`, after: `fingerprint ${after.fingerprint} · a change this review cannot describe`});
+    const layerName = (value, i) => value.settings.names[i] || `Layer ${i}`;
+    const macrosA = macroEditorView(before), macrosB = macroEditorView(after);
+    const namesA = namesIn(a, macrosA), namesB = namesIn(b, macrosB);
+    a.document.layers.forEach((keys, l) => keys.forEach((code, p) => {
+        if (code === b.document.layers[l][p]) return;
+        // The position's name on the board comes from the layout, which the
+        // session knows: the item carries the matrix slot for it.
+        item("Layout", `layout:${l}:${p}`, layerName(b, l), new Map([["", key(code)]]), new Map([["", key(b.document.layers[l][p])]]),
+            {kind: "key", layer: l, slot: p});
+    }));
+    a.settings.names.forEach((name, i) => item("Layers", `layerName:${i}`, `Layer ${i}`, new Map([["Name", name || `Layer ${i}`]]), new Map([["Name", b.settings.names[i] || `Layer ${i}`]]), {kind: "layers"}));
+    const targets = new Map([...a.behaviors.rows, ...b.behaviors.rows].map(row => [JSON.stringify(row.target), row.target]));
+    for (const [id, target] of targets) {
+        const old = a.behaviors.rows.find(row => JSON.stringify(row.target) === id), next = b.behaviors.rows.find(row => JSON.stringify(row.target) === id);
+        item("Behaviours", `behavior:${id}`, action(target, next ? namesB : namesA), behaviourFields(old, a.settings.values, namesA), behaviourFields(next, b.settings.values, namesB),
+            {kind: "behaviour", target}, [Boolean(old), Boolean(next)]);
     }
-    return changes;
+    for (let i = 0; i < Math.max(a.combos.length, b.combos.length); i++) {
+        item("Combos", `combo:${i}`, `Combo ${i + 1}`, comboFields(a.combos[i], namesA), comboFields(b.combos[i], namesB), {kind: "combo", index: i});
+    }
+    macrosA.viaMacros.forEach((slot, i) => {
+        const fields = (macro) => new Map([["Steps", macro.payload || "empty"], ["Name", macro.name || "no name"]]);
+        const old = macrosA.viaMacros[i], next = macrosB.viaMacros[i], has = (macro) => Boolean(macro.payload || macro.name);
+        item("Macros", `macro:${i}`, `Macro ${i}${(next.name || old.name) ? ` · ${next.name || old.name}` : ""}`, fields(old), fields(next), {kind: "macro", index: i}, [has(old), has(next)]);
+    });
+    // Settings are saved a section at a time, so a section is one item.
+    const sections = (snapshot, settings) => settingsEditorView(snapshot).sections.map(section => ({id: section.id, label: section.label,
+        fields: new Map(section.fields.map(field => {
+            let value = field.value;
+            if (field.kind === "toggle") value = field.enabled ? "on" : "off";
+            else if (field.kind === "layer") value = settings.names[Number(value.slice(6))] || value;
+            else if (field.choices) value = field.choices.find(choice => typeof choice === "object" && String(choice.value) === field.value)?.label || value;
+            const ms = /ms\b/.test(field.hint || "") || /\(ms\)/.test(field.label);
+            return [field.macro, {label: field.label.replace(/\s*\(ms\)$/, ""), text: ms && /^\d+$/.test(value) ? `${value} ms` : value, key: field.value}];
+        }))}));
+    const sectionsA = sections(before, a.settings);
+    for (const section of sections(after, b.settings)) {
+        const old = sectionsA.find(entry => entry.id === section.id);
+        item("Settings", `settings:${section.id}`, section.label, old?.fields || new Map(), section.fields, {kind: "settings", section: section.id}, [true, true]);
+    }
+    const masks = after.options?.keymapMasks.reduce((mask, value) => mask | value, 0) || 0;
+    item("Settings", "settings:otherKeyOptions", "Other key options", new Map([["Stored bits", `0x${(a.settings.values[24] & ~masks).toString(16)}`]]),
+        new Map([["Stored bits", `0x${(b.settings.values[24] & ~masks).toString(16)}`]]), {kind: "settings"}, [true, true]);
+    for (let id = 0; id < 8; id++) {
+        const old = a.pdModes?.[id], next = b.pdModes?.[id];
+        item("Pointing modes", `pd:${id}`, `Slot ${id + 1}${(next?.name || old?.name) ? ` · ${next?.kind ? next.name : old?.name}` : ""}`,
+            pointingFields(old), pointingFields(next), {kind: "pointing", slot: id}, [Boolean(old?.kind), Boolean(next?.kind)]);
+    }
+    const lightA = lightingRecords(a), lightB = lightingRecords(b);
+    for (const [unit, record] of lightB) {
+        const old = lightA.get(unit);
+        item("Lighting", unit, record.title, old?.fields || new Map(), record.fields, {kind: "lighting", stage: record.stage, ...record.where}, [Boolean(old), true]);
+    }
+    for (const [unit, record] of lightA) if (!lightB.has(unit)) item("Lighting", unit, record.title, record.fields, new Map(), {kind: "lighting", stage: record.stage, ...record.where});
+    // The items above describe the profile in words. If the stored bytes
+    // differ and none of them caught it, the review still must not read as
+    // empty: an apply always shows that something will change.
+    if (!items.length && before.fingerprint !== after.fingerprint) {
+        items.push({area: "Profile", unit: "profile", title: "Stored profile", status: "changed", fields: [{label: "", before: `fingerprint ${before.fingerprint}`,
+            after: `fingerprint ${after.fingerprint} · a change this review cannot describe`}], place: null});
+    }
+    return items;
 }
 module.exports = {profileReview};

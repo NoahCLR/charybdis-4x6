@@ -10,7 +10,7 @@ import {el, esc} from "../lib/dom.mjs";
 import {hideHover} from "./hover.mjs";
 
 export function board(model, layer, options = {}) {
-    const {selected, mode = "light", picks = [], reach = [], pdActive = null,
+    const {selected, mode = "light", picks = [], reach = [], pdActive = null, drafted = null,
         faces = true, trackball = false, onKey, onOpen, onSwap, onTrackball} = options;
     const positions = layer?.positions || [];
     const feedbackOn = stageEnabled(model, "key");
@@ -101,6 +101,7 @@ export function board(model, layer, options = {}) {
             ${selected === index ? ring("kc-ring") : ""}
             ${reach.includes(index) ? `<rect class="kc-reach" x="${visual.x - 3}" y="${visual.y - 3}" width="${GEO.keyW + 6}" height="${GEO.keyH + 6}" rx="${GEO.radius + 2}"></rect>` : ""}
             ${marks}
+            ${drafted?.has(index) ? `<circle class="kc-draft" cx="${visual.x + GEO.keyW - 5.5}" cy="${visual.y + 5.5}" r="2.6"></circle>` : ""}
             ${sub ? `<line class="kc-sep" x1="${visual.x + 8}" y1="${rows.separatorY}" x2="${visual.x + GEO.keyW - 8}" y2="${rows.separatorY}" stroke="${text || "rgba(255,255,255,.9)"}" stroke-width="1"></line>` : ""}
             <text class="kc-label" x="${cx}" y="${rows.mainY}" font-size="${mainFit.size}"${squeeze(mainFit)}${text ? ` style="fill:${text}"` : ""}>${esc(main)}</text>
             ${sub ? `<text class="kc-sub" x="${cx}" y="${rows.subY}" font-size="${subFit.size}"${squeeze(subFit)}${text ? ` style="fill:${text}"` : ""}>${esc(sub)}</text>` : ""}

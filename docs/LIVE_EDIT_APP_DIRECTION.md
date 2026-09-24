@@ -31,7 +31,7 @@ manual feedback, not completion of the hardware acceptance matrix.
 | Macros | Builder, recorder and preview wired to both device banks; verified save and draft retention |
 | Global policy | Defaults panels cover all 28 portable scalars, including startup layers, combo matching and device-reported lighting/key options; unsupported firmware features stay read-only |
 | Backup and restore | Complete supported snapshots, review, recovery file and verified restore; interrupted restores can be retried |
-| Drafts and Apply | Eight-layer profiles share one draft, semantic change review, undo/redo and a coordinated verified Apply; unfinished forms stay local until kept |
+| Drafts and Apply | Eight-layer profiles share one draft, an item-by-item change review with discard by edit group and Show (D-L29), undo/redo and a coordinated verified Apply; unfinished forms stay local until kept |
 | Recovery and release readiness | Atomic logical Apply, differential transfer, reboot recovery fencing and verified recovery-base reuse are implemented; physical interruption acceptance, external VIA adoption, guided recovery, broad hardware acceptance and standalone packaging remain pending |
 
 Studio's existing Defaults controls now use complete-profile readback and the
@@ -1161,3 +1161,62 @@ empty diagonal sends its straight directions and an empty straight direction
 its two diagonals, the one the movement leans toward first. Modes without
 diagonals have no such neighbours, so there it acts as "its neighbours take
 over".
+
+### D-L29 — The review lists items, discarded in the groups their edits made
+
+The review lists one item per thing that differs from the keyboard: a key on
+a layer, a layer's name, a behaviour, a combo, a macro with its name, a
+settings section, a pointing slot, or one lighting record, with LED groups and
+the rows that paint them as one record because rows name groups by id. An
+item says whether it was added, changed or removed and lists only the fields
+that differ, in the editors' words (1× tap, held until release, default ·
+150 ms); an added or removed item lists what it holds, and a long one folds
+away behind "Show all". Fields compare what is stored, not what is shown, so
+a changed default or a renamed layer is one item where it was made, not a
+change to everything that uses it. Colour reads as in the editors: a lighting
+value is drawn as a swatch, a behaviour tier carries the grid's branch badge
+in its tap-branch colour and the tier's feedback dot, and a pointing mode —
+its slot, or an action that reaches it, named by the slot — carries the light
+its slot paints. A stage that is off draws all of these off. The draft's change count counts items.
+**Show** closes the review and opens the item where it is edited: the key
+selected on its layer, the behaviour or combo picked (in whichever group this
+layer lists it, opened if folded), the macro or pointing slot, the lighting
+stage, or the settings section opened. Where the editor lists many things,
+the item is scrolled to and marked for a moment. A removed item has no Show,
+since there is nothing left to open.
+
+An item is also the unit **Discard** puts back to what the keyboard holds, as
+one more undoable step. The items one staged message changed belong together,
+so a key swap, a moved behaviour or a reordered layer is one block with one
+Discard, titled by the edit that made it ("Swapped two keys", "Moved a
+behaviour"); a later edit that touches two groups joins them, and the block is
+titled by the first edit and a count. A group that spans areas is shown once,
+under the area it starts in. Only units the review still shows link: a unit
+edited back to the keyboard's value ties nothing. Rebases and discards carry
+no link, and neither do steps that fell out of the bounded history. A discard
+from a current review keeps it current, since what is left was part of what
+was reviewed; once nothing described is left, the draft is the keyboard's
+profile again, including bytes no item describes. A recovery review is
+discarded as a whole or not at all. See `core/model/profile-review.js`
+(items), `core/model/profile-revert.js` (restoring them),
+`ProfileDraftSession.changes()` (grouping, titles, board positions) and
+`webview/view/review.mjs` (blocks and Show).
+
+### D-L30 — The draft shows itself where it is edited
+
+Every editor marks what the draft changed with the draft's amber dot: a key
+on the board, a layer chip, a Keys or Lighting tab, a behaviour or combo row,
+a macro or pointing slot, a layer's or pointing mode's colour row, a settings
+section. A folded group holding a change carries the dot on its header, so a
+change is never hidden by the group it sits in. The marks come from the same
+review items the review lists (`draftMarks` in `webview/view/review.mjs`), so
+the two never disagree; a removed thing has nothing left to mark.
+
+**Discard all** is one more draft step, not a new draft: undo brings every
+change back, and the keyboard is not read again. It falls back to reading the
+keyboard only for a draft that is out of step with it, belongs to another
+keyboard, or is a recovery. Undo and Redo name the step they take back or
+bring back ("Undo: Swapped two keys"), discards included. The commit bar has
+one way on, **Review and apply**, and says what the draft holds by what
+happened to it ("4 added · 10 changed · 1 removed"); the rail's change count
+opens the review too. Leaving the review by Esc is leaving it by Keep editing.

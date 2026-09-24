@@ -28,8 +28,8 @@ test("one draft composes every editor without changing its device snapshot", () 
     stage(draft,{type:"updateLayerColor",layer:"Layer 0",h:"23",s:"255",v:"100",mode:"KEYS_MAPPED_ON_THIS_LAYER_ONLY"});
     stage(draft,{type:"saveCombo",id:0,inputs:["KC_A","KC_B"],output:"G(KC_N)",termMs:"60",holdTermMs:"200"});
     const view = draft.view({connected:true,selectedDeviceId:"board"});
-    assert.deepEqual(new Set(view.changes.map(c=>c.area)),new Set(["Layout","Macros","Defaults","Behaviours","RGB","Combos"]));
-    assert.match(view.changes.find(c=>c.area==="Combos").after,/Cmd\+N/);
+    assert.deepEqual(new Set(view.changes.map(c=>c.area)),new Set(["Layout","Macros","Settings","Behaviours","Lighting","Combos"]));
+    assert.match(view.changes.find(c=>c.area==="Combos").fields.find(f=>f.label==="Sends").after,/Cmd\+N/);
     assert.equal(JSON.stringify(snapshot),original);
     assert.equal(draft.base.fingerprint,snapshot.fingerprint);
     assert.equal(validateSnapshot(draft.document).settings.values[1],175);
@@ -68,7 +68,7 @@ test("external reads retain the draft and require an explicit new comparison", (
     draft.rebase(draft.revision);
     assert.equal(draft.stale,false); assert.equal(draft.base.fingerprint,external.current.fingerprint);
     assert.equal(draft.current.fingerprint,target);
-    assert.ok(draft.view({}).changes.some(c=>c.area==="Defaults" && c.before==="190" && c.after==="150"),"review reveals changes the draft would overwrite");
+    assert.ok(draft.view({}).changes.some(c=>c.area==="Settings" && c.fields.some(f=>f.before==="190" && f.after==="150")),"review reveals changes the draft would overwrite");
 });
 test("a reconnect requires review even when the HID path and profile are unchanged", async () => {
     const {snapshot, caps} = fixture();
@@ -105,7 +105,7 @@ test("interrupted apply retains the full target and can review against an incomp
     draft.observe({incomplete:true,fingerprint:"incomplete:device",document:{format:"charybdis-recovery-capture"}},"board");
     draft.rebase(draft.revision);
     assert.equal(draft.base.fingerprint,"incomplete:device"); assert.equal(draft.current.fingerprint,target);
-    assert.match(draft.view({}).changes[0].before,/Interrupted configuration/);
+    assert.match(draft.view({}).changes[0].fields[0].before,/Interrupted configuration/);
     await draft.apply({...service,restorePortableProfile:async(document,options)=>{assert.equal(options.expectedFingerprint,"incomplete:device");return draft.current;}},draft.revision,()=>"recovery");
     assert.equal(draft.dirty,false);
 });
@@ -115,4 +115,87 @@ test("layer reordering is undoable and updates layout and settings references to
     assert.equal(draft.current.summary.names[1],"Symbols");
     assert.equal(draft.document.layers[0][0],0x5222);
     draft.undo(draft.revision); assert.equal(draft.current.fingerprint,snapshot.fingerprint);
+});
+
+// ── discarding from the review ──────────────────────────────────────────
+
+const key = (layoutIndex, keycode, layer = "Layer 0") => ({type:"updateLayoutKeys",layers:[{layer,changes:[{layoutIndex,keycode}]}]});
+const groupOf = (draft, unit) => draft.changes().find(row => row.unit === unit)?.group;
+const unitsOf = (draft, group) => draft.changes().filter(row => row.group === group).map(row => row.unit).sort();
+test("rows are grouped by the edit that made them, and by any later edit that joins them", () => {
+    const {draft} = fixture();
+    stage(draft,{type:"updateLayoutKeys",layers:[{layer:"Layer 1",changes:[{layoutIndex:0,keycode:"KC_A"},{layoutIndex:1,keycode:"KC_B"}]}]});
+    stage(draft,key(2,"KC_C","Layer 1"));
+    stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_0",payload:"alone"});
+    assert.deepEqual(unitsOf(draft,groupOf(draft,"layout:1:0")),["layout:1:0","layout:1:1"],"one message is one group");
+    assert.notEqual(groupOf(draft,"layout:1:2"),groupOf(draft,"layout:1:0"),"a separate edit stays apart");
+    assert.notEqual(groupOf(draft,"macro:0"),groupOf(draft,"layout:1:0"));
+    stage(draft,{type:"updateLayoutKeys",layers:[{layer:"Layer 1",changes:[{layoutIndex:1,keycode:"KC_D"},{layoutIndex:2,keycode:"KC_E"}]}]});
+    assert.deepEqual(unitsOf(draft,groupOf(draft,"layout:1:0")),["layout:1:0","layout:1:1","layout:1:2"],"a later edit touching both joins them");
+});
+test("a unit edited back to the keyboard's value no longer ties anything together", () => {
+    const {draft,snapshot} = fixture();
+    const original = snapshot.document.layers[1][1];
+    stage(draft,{type:"updateLayoutKeys",layers:[{layer:"Layer 1",changes:[{layoutIndex:0,keycode:"KC_A"},{layoutIndex:1,keycode:"KC_B"}]}]});
+    stage(draft,{type:"updateLayoutKeys",layers:[{layer:"Layer 1",changes:[{layoutIndex:1,keycode:"KC_Z"},{layoutIndex:2,keycode:"KC_C"}]}]});
+    assert.equal(unitsOf(draft,groupOf(draft,"layout:1:0")).length,3);
+    draft.replace({...draft.document,layers:draft.document.layers.map((keys,l)=>l===1?keys.map((code,p)=>p===1?original:code):keys)},draft.revision);
+    assert.equal(groupOf(draft,"layout:1:1"),undefined,"the key is back");
+    assert.notEqual(groupOf(draft,"layout:1:0"),groupOf(draft,"layout:1:2"),"and the keys it linked are apart again");
+});
+test("discarding a group puts every row of it back, as one undoable step, and leaves the rest", () => {
+    const {draft,snapshot} = fixture();
+    stage(draft,{type:"updateLayoutKeys",layers:[{layer:"Layer 1",changes:[{layoutIndex:0,keycode:"KC_A"},{layoutIndex:1,keycode:"KC_B"}]}]});
+    stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_0",payload:"kept"});
+    const kept = draft.document.macros[0];
+    draft.discard(draft.revision,groupOf(draft,"layout:1:1"));
+    assert.deepEqual(draft.changes().map(row => row.unit),["macro:0"]);
+    assert.deepEqual(draft.document.layers,snapshot.document.layers);
+    assert.equal(draft.document.macros[0],kept);
+    draft.undo(draft.revision);
+    assert.deepEqual(draft.changes().map(row => row.unit).sort(),["layout:1:0","layout:1:1","macro:0"],"undo brings the group back");
+    assert.throws(()=>draft.discard(draft.revision,99),/no longer in the draft/);
+    assert.throws(()=>draft.discard(draft.revision - 1,0),/draft changed/);
+});
+test("a discard from a current review keeps it current, and discarding the last change leaves a clean draft", () => {
+    const {draft} = fixture();
+    stage(draft,key(0,"KC_A")); stage(draft,key(1,"KC_B"));
+    draft.review(draft.revision);
+    draft.discard(draft.revision,groupOf(draft,"layout:0:0"));
+    assert.equal(draft.view({}).reviewed,true,"what is left was part of what was reviewed");
+    draft.discard(draft.revision,groupOf(draft,"layout:0:1"));
+    assert.equal(draft.dirty,false);
+    stage(draft,key(0,"KC_A"));
+    draft.discard(draft.revision,groupOf(draft,"layout:0:0"));
+    assert.equal(draft.view({}).reviewed,false,"an unreviewed draft is not reviewed by a discard");
+});
+test("a macro name discarded back leaves no indescribable settings difference", () => {
+    const value = require("../fixtures/pd-profile").document();
+    const draft = new ProfileDraftSession({document:value,fingerprint:fingerprint(value),summary:summary(value),limits:{brightnessMax:200}}, "board", {compiledLayerCount:8,supportedDomainMask:31,actionAbiDigest:value.actionAbiDigest});
+    stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_3",name:"Hello",expectedFingerprint:draft.current.fingerprint});
+    draft.discard(draft.revision,groupOf(draft,"macro:3"));
+    assert.equal(draft.dirty,false,"the settings format the name upgraded goes back too");
+});
+test("a rebase does not tie together everything it carried over", () => {
+    const {draft,snapshot,caps} = fixture();
+    stage(draft,key(0,"KC_A")); stage(draft,key(1,"KC_B"));
+    const external = new ProfileDraftSession(snapshot,"board",caps);
+    stage(external,{type:"updateViaMacro",keycode:"VIA_MACRO_9",payload:"elsewhere"});
+    draft.observe(external.current,"board"); draft.rebase(draft.revision);
+    assert.notEqual(groupOf(draft,"layout:0:0"),groupOf(draft,"layout:0:1"));
+});
+test("discarding the whole draft is a step undo takes back, and undo says what it undoes", () => {
+    const {draft,snapshot} = fixture();
+    stage(draft,{type:"updateLayoutKeys",layers:[{layer:"Layer 1",changes:[{layoutIndex:0,keycode:"KC_A"},{layoutIndex:1,keycode:"KC_B"}]}]});
+    stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_0",payload:"kept"});
+    assert.equal(draft.view({}).undoLabel,"Edited a macro");
+    const target = draft.current.fingerprint;
+    draft.discardAll(draft.revision);
+    assert.equal(draft.dirty,false); assert.equal(draft.current.fingerprint,snapshot.fingerprint);
+    assert.equal(draft.view({}).undoLabel,"Discarded the draft (3 changes)");
+    draft.undo(draft.revision);
+    assert.equal(draft.current.fingerprint,target,"undo brings every change back");
+    assert.equal(draft.view({}).redoLabel,"Discarded the draft (3 changes)");
+    draft.discard(draft.revision,groupOf(draft,"macro:0"));
+    assert.match(draft.view({}).undoLabel,/^Discarded Macro 0/);
 });

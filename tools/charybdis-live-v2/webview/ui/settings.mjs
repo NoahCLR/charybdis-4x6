@@ -9,6 +9,7 @@ import * as edits from "../view/edits.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {getModel, layers, post, render, state, writable} from "../store.mjs";
 import {topbar, unavailable} from "./shell.mjs";
+import {draftDot, draftMarks} from "../view/review.mjs";
 
 export function screenSettings() {
     const model = getModel();
@@ -52,9 +53,9 @@ export function screenSettings() {
 }
 
 function sectionCard(model, section, fields, canEdit, searching) {
-    const open = searching || section.expanded !== false;
-    const node = el(`<details class="card settings-group" ${open ? "open" : ""}>
-        <summary class="card-h" style="cursor:pointer;list-style:none"><h3>${esc(section.label)}</h3>
+    const open = searching || section.expanded !== false || state.settingsOpen === section.id;
+    const node = el(`<details class="card settings-group" data-section="${esc(section.id)}" ${open ? "open" : ""}>
+        <summary class="card-h" style="cursor:pointer;list-style:none"><h3>${esc(section.label)}${draftMarks(model?.draft?.changes).settings.has(section.id) ? draftDot() : ""}</h3>
             <span class="right tag">${section.fields.length} setting${section.fields.length === 1 ? "" : "s"}</span></summary>
         ${section.description ? `<div class="card-b" style="padding-bottom:0"><p class="note">${esc(section.description)}</p></div>` : ""}
         <div class="rows"></div>

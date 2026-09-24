@@ -2,6 +2,7 @@
 
 const {validateSnapshot, fingerprint, summary} = require("../model/portable-profile");
 const {profileReview} = require("../model/profile-review");
+const {revertUnits} = require("../model/profile-revert");
 const {editSettings, settingsEditorView} = require("../model/settings-editor");
 const {editMacro, macroEditorView} = require("../model/macro-editor");
 const {editDeviceProfile, RGB_EDITS, COMBO_EDITS, PD_EDITS} = require("./device-profile-edits");
@@ -13,6 +14,55 @@ const keycodes = require("../data/keycode-catalog");
 const {randomUUID} = require("node:crypto");
 const copy = value => JSON.parse(JSON.stringify(value));
 const fail = text => Object.assign(new Error(text), {code: "PROFILE_DRAFT_CONFLICT"});
+
+// A matrix slot as a person finds it on the board: the half, then its row and
+// its column counted from the outer edge, or its place in the thumb cluster.
+const LAYOUT_INDEX = new Map(CHARYBDIS_4X6_LAYOUT_MATRIX.map(([row, column], layoutIndex) => [row * 6 + column, layoutIndex]));
+const THUMBS = (() => {
+    const names = new Map(), counts = {};
+    for (const [row, column] of CHARYBDIS_4X6_LAYOUT_MATRIX) {
+        if (row % 5 !== 4) continue;
+        const half = row < 5 ? "Left" : "Right";
+        names.set(row * 6 + column, `${half} thumb ${counts[half] = (counts[half] || 0) + 1}`);
+    }
+    return names;
+})();
+const positionName = slot => THUMBS.get(slot) || `${slot < 30 ? "Left" : "Right"} · row ${Math.floor(slot / 6) % 5 + 1}, column ${slot % 6 + 1}`;
+// What one staged message did, in the words a group of review items is
+// titled with. Only a group of two or more items shows it.
+const EDIT_LABELS = {
+    retargetBehavior: message => message.conflict === "swap" ? "Swapped two behaviours" : "Moved a behaviour",
+    saveBehavior: "Edited a behaviour", addBehavior: "Added a behaviour", deleteBehavior: "Removed a behaviour",
+    addCombo: "Added a combo", saveCombo: "Edited a combo", deleteCombo: "Removed a combo", updateComboHoldTerm: "Changed the combo hold threshold",
+    savePdMode: "Edited a pointing mode", clearPdMode: "Cleared a pointing mode", duplicatePdMode: "Duplicated a pointing mode",
+    updateConfigDefaults: "Saved a settings section", updateViaMacro: "Edited a macro", applyAllChanges: "Changed keys",
+};
+function editLabel(message, document) {
+    if (message.type === "updateLayoutKeys") {
+        const groups = message.layoutGroups || message.layers || [{layer: message.layer, changes: message.changes}];
+        const changes = groups.flatMap(group => (group.changes || []).map(change => ({...change, layer: group.layer})));
+        const [first, second] = changes;
+        const stored = change => {
+            const position = CHARYBDIS_4X6_LAYOUT_MATRIX[change.layoutIndex], layer = Number(/\d$/.exec(change.layer)?.[0]);
+            return position && document.layers[layer]?.[position[0] * 6 + position[1]];
+        };
+        if (changes.length === 2 && first.layer === second.layer && keycodes.encode(first.keycode) === stored(second) && keycodes.encode(second.keycode) === stored(first)) return "Swapped two keys";
+        return changes.length > 1 ? `Changed ${changes.length} keys at once` : "Changed a key";
+    }
+    if (RGB_EDITS.has(message.type)) return "Edited lighting";
+    const label = EDIT_LABELS[message.type];
+    return typeof label === "function" ? label(message) : label || "Edited the draft";
+}
+
+// Review items name what the model cannot: a key's place on the board and the
+// keycode a behaviour is listed under, so the review can say where a change
+// is and go there.
+function placed(item) {
+    if (item.place?.kind === "key") return {...item, title: `${item.title} · ${positionName(item.place.slot)}`,
+        place: {kind: "key", layer: item.place.layer, layoutIndex: LAYOUT_INDEX.get(item.place.slot)}};
+    if (item.place?.kind === "behaviour") return {...item, place: {kind: "behaviour", keycode: actionName(item.place.target)}};
+    return item;
+}
 const DRAFT_EDITS = new Set([...PD_EDITS, ...RGB_EDITS, ...COMBO_EDITS, ...BEHAVIOR_EDITS, "updateConfigDefaults", "updateViaMacro", "updateLayoutKeys", "applyAllChanges"]);
 
 class ProfileDraftSession {
@@ -28,6 +78,10 @@ class ProfileDraftSession {
         this.base = copy(snapshot);
         this.latest = copy(snapshot);
         this.history = [copy(snapshot.document)];
+        // Why each history entry exists, beside it: "edit" is one staged
+        // message, the only kind that ties the units it changed together.
+        this.origins = [null];
+        this.labels = [null];
         this.cursor = 0;
         this.revision = 1;
         this.reviewedRevision = null;
@@ -64,18 +118,22 @@ class ProfileDraftSession {
     }
     reset(snapshot) {
         this.base = copy(snapshot); this.latest = copy(snapshot);
-        this.history = [copy(snapshot.document)]; this.cursor = 0;
+        this.history = [copy(snapshot.document)]; this.origins = [null]; this.labels = [null]; this.cursor = 0;
         this.revision++; this.reviewedRevision = null;
         this.needsRead = false;
         this.connectionChanged = false;
     }
-    replace(document, revision) {
+    replace(document, revision, origin = "edit", label = null) {
         this.assertRevision(revision);
         const valid = validateSnapshot(document, this.capabilities).document;
         if (fingerprint(valid) === this.current.fingerprint) return;
         this.history = this.history.slice(0, this.cursor + 1);
+        this.origins = this.origins.slice(0, this.cursor + 1);
+        this.labels = this.labels.slice(0, this.cursor + 1);
         this.history.push(copy(valid));
-        if (this.history.length > 101) this.history.shift();
+        this.origins.push(origin);
+        this.labels.push(label);
+        if (this.history.length > 101) {this.history.shift(); this.origins.shift(); this.labels.shift();}
         this.cursor = this.history.length - 1;
         this.revision++; this.reviewedRevision = null;
     }
@@ -93,7 +151,7 @@ class ProfileDraftSession {
                 capabilities: this.capabilities, combos: this.combos(), maximumBrightness: current.limits?.brightnessMax,
             }).toString("base64")};
         }
-        this.replace(document, message.draftRevision);
+        this.replace(document, message.draftRevision, "edit", editLabel(message, current.document));
         return {message: copy(message), previousFingerprint: before, fingerprint: this.current.fingerprint};
     }
     editLayout(message) {
@@ -113,6 +171,82 @@ class ProfileDraftSession {
         }
         return document;
     }
+    // The review rows, each with the group it belongs to. Rows are grouped by
+    // the edits that made them: the units one staged message changed belong
+    // together (a swap, a moved behaviour, a reordered layer), and so does
+    // anything linked to them through a later edit. Only units the review
+    // still shows link; a unit edited back to the keyboard's value no longer
+    // ties anything. Steps from a rebase, a discard, or before the bounded
+    // history leave their units on their own.
+    changes() {
+        if (!this.dirty) return [];
+        const current = this.current;
+        if (this.base.incomplete) return [{area: "Recovery", unit: null, title: "Complete profile", status: "changed", group: null, place: null,
+            fields: [{label: "", before: "Interrupted configuration; a full comparison is unavailable", after: `${current.summary.layers} layers, ${current.summary.behaviors} behaviours, ${current.summary.combos} combos, ${current.summary.macros} macros with content, lighting and settings`}]}];
+        const rows = profileReview(this.base, current), shown = new Set(rows.map(row => row.unit));
+        const parent = new Map([...shown].map(unit => [unit, unit]));
+        const find = unit => {while (parent.get(unit) !== unit) unit = parent.get(unit); return unit;};
+        const steps = [];
+        for (let step = 1; step <= this.cursor; step++) {
+            if (this.origins[step] !== "edit") continue;
+            const touched = this.stepUnits(step).filter(unit => shown.has(unit));
+            for (const unit of touched.slice(1)) parent.set(find(unit), find(touched[0]));
+            if (touched.length) steps.push({label: this.labels[step], unit: touched[0]});
+        }
+        // A group is titled by the edits that made it, in the order they were
+        // made: one edit by its own words, several by the first and a count.
+        const titles = new Map();
+        for (const {label, unit} of steps) {
+            const root = find(unit), list = titles.get(root) || [];
+            if (label && !list.includes(label)) list.push(label);
+            titles.set(root, list);
+        }
+        const title = list => !list?.length ? null : list.length === 1 ? list[0] : `${list[0]} and ${list.length - 1} more edit${list.length === 2 ? "" : "s"}`;
+        const groups = new Map();
+        return rows.map(row => {
+            const root = find(row.unit);
+            if (!groups.has(root)) groups.set(root, groups.size);
+            return placed({...row, group: groups.get(root), groupTitle: title(titles.get(root))});
+        });
+    }
+    // The units one history step changed, remembered with the entry: history
+    // entries are never edited in place, so the answer never goes stale.
+    stepUnits(step) {
+        this.stepCache ??= new WeakMap();
+        const entry = this.history[step], previous = this.history[step - 1], cached = this.stepCache.get(entry);
+        if (cached?.previous === previous) return cached.units;
+        const snapshot = document => ({...this.base, incomplete: false, document, fingerprint: fingerprint(document)});
+        const units = [...new Set(profileReview(snapshot(previous), snapshot(entry)).map(row => row.unit))];
+        this.stepCache.set(entry, {previous, units});
+        return units;
+    }
+    // Discard one group of review rows: its units go back to what the keyboard
+    // holds, as one more undoable step. A review that was current stays
+    // current, since what is left is part of what was reviewed.
+    discard(revision, group) {
+        this.assertRevision(revision);
+        if (this.base.incomplete) throw fail("Review this recovery as a whole; its changes cannot be discarded one by one.");
+        const items = this.changes().filter(row => row.group === group), units = new Set(items.map(row => row.unit));
+        if (!units.size) throw fail("That change is no longer in the draft.");
+        const reviewed = this.reviewedRevision === revision;
+        let document = revertUnits(this.base, this.current, units, this.capabilities);
+        // Some bytes carry no row of their own, such as the settings format a
+        // macro name upgraded. Once nothing described is left, the draft is
+        // the keyboard's profile again, not an indescribable difference.
+        const left = profileReview(this.base, {...this.current, document, fingerprint: fingerprint(document)});
+        if (left.every(row => row.unit === "profile")) document = copy(validateSnapshot(this.base.document, this.capabilities).document);
+        this.replace(document, revision, "discard", items.length === 1 ? `Discarded ${items[0].title}` : `Discarded ${items.length} changes made together`);
+        if (reviewed) this.reviewedRevision = this.revision;
+    }
+    // Discard the whole draft as one more step, so undo brings it back: the
+    // keyboard is not read again, since nothing about it changed.
+    discardAll(revision) {
+        this.assertRevision(revision);
+        if (this.base.incomplete) throw fail("Read the keyboard again to discard a recovery draft.");
+        if (!this.dirty) return;
+        const count = this.changes().length;
+        this.replace(validateSnapshot(this.base.document, this.capabilities).document, revision, "discard", `Discarded the draft (${count} change${count === 1 ? "" : "s"})`);
+    }
     undo(revision) {this.assertRevision(revision); if (this.cursor) {this.cursor--; this.revision++; this.reviewedRevision = null;}}
     redo(revision) {this.assertRevision(revision); if (this.cursor + 1 < this.history.length) {this.cursor++; this.revision++; this.reviewedRevision = null;}}
     review(revision) {this.assertRevision(revision); this.reviewedRevision = this.revision;}
@@ -121,13 +255,13 @@ class ProfileDraftSession {
         if (this.needsRead) throw fail("Read the latest keyboard state before reviewing this draft again.");
         const target = this.document;
         if (this.latest.incomplete) {
-            this.base = copy(this.latest); this.history = [target]; this.cursor = 0;
+            this.base = copy(this.latest); this.history = [target]; this.origins = [null]; this.labels = [null]; this.cursor = 0;
             this.connectionToken = this.latestConnectionToken; this.connectionChanged = false;
             this.revision++; this.reviewedRevision = this.revision; return;
         }
         this.reset(this.latest);
         this.connectionToken = this.latestConnectionToken;
-        this.replace(target, this.revision);
+        this.replace(target, this.revision, "rebase");
         this.reviewedRevision = this.revision;
     }
     async apply(service, revision, saveRecovery) {
@@ -168,8 +302,12 @@ class ProfileDraftSession {
         const matching = state.selectedDeviceId === this.deviceId, connected = matching && state.connected;
         return {id: this.id, revision: this.revision, dirty: this.dirty, stale: this.stale, connectionChanged: this.connectionChanged, connected, matching,
             canUndo: this.cursor > 0, canRedo: this.cursor + 1 < this.history.length,
+            // What undo and redo would take back or bring back, in the words
+            // the step was recorded with.
+            undoLabel: this.cursor > 0 ? this.labels[this.cursor] : null,
+            redoLabel: this.cursor + 1 < this.history.length ? this.labels[this.cursor + 1] : null,
             reviewed: this.reviewedRevision === this.revision,
-            changes: !this.dirty ? [] : this.base.incomplete ? [{area: "Recovery", label: "Complete profile", before: "Interrupted configuration; a full comparison is unavailable", after: `${this.current.summary.layers} layers, ${this.current.summary.behaviors} behaviours, ${this.current.summary.combos} combos, ${this.current.summary.macros} macros with content, lighting and settings`}] : profileReview(this.base, this.current)};
+            changes: this.changes()};
     }
 }
 module.exports = {ProfileDraftSession, DRAFT_EDITS};

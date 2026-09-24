@@ -118,7 +118,10 @@ Colour on any screen comes from the model, never from a constant, and a stage
 that is switched off is drawn as off — hollow dots, plain badges, unlit keys.
 
 Every edit is kept in a local draft and reaches the keyboard only through
-review and apply. A keyboard the app cannot open a draft for — its profile
+review and apply. Review lists each changed thing once with the fields that
+changed, can open it where it is edited, and can discard part of the draft:
+things made by the same edit (a key swap, a moved behaviour) go back together,
+as one undoable step. A keyboard the app cannot open a draft for — its profile
 could not be read, or its firmware predates profile editing — is read-only:
 the host refuses any edit rather than writing it directly.
 

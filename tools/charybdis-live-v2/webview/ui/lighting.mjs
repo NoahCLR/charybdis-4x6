@@ -11,6 +11,7 @@ import {board} from "./board.mjs";
 import {colourEditor} from "./colour-editor.mjs";
 import {layerBar} from "./layerbar.mjs";
 import {topbar, unavailable} from "./shell.mjs";
+import {draftDot, draftMarks} from "../view/review.mjs";
 
 const TABS = [
     {id: "base", label: "Base effect"},
@@ -95,10 +96,11 @@ export function screenLighting() {
     stageWrap.querySelector('[data-act="trackball"]')?.addEventListener("click", () => { state.trackball = !state.trackball; render(); });
     pad.appendChild(stageWrap);
 
+    const marks = draftMarks(model?.draft?.changes);
     const bench = el(`<div class="card bench">
         <div class="bench-tabs" role="tablist">
             ${TABS.map((tab) => `<button role="tab" data-ltab="${tab.id}" aria-selected="${state.stage === tab.id}">
-                ${STAGE_ORDER.some((stage) => stage.id === tab.id) ? `<i class="stagedot ${stageEnabled(model, tab.id) ? "on" : ""}"></i>` : ""}${tab.label}</button>`).join("")}
+                ${STAGE_ORDER.some((stage) => stage.id === tab.id) ? `<i class="stagedot ${stageEnabled(model, tab.id) ? "on" : ""}"></i>` : ""}${tab.label}${marks.lighting.has(tab.id) ? draftDot() : ""}</button>`).join("")}
             <span class="bench-right" id="benchRight"></span>
         </div>
         <div class="bench-body" id="benchBody"></div>
@@ -165,6 +167,7 @@ function paintOrder(model) {
 function stageBody(body) {
     const model = getModel();
     const canEdit = writable();
+    const marks = draftMarks(model?.draft?.changes);
     const colourControl = (options) => colourEditor({maximumBrightness: model.rgb.maximumBrightness, ...options});
     const node = el(`<div></div>`);
     const stack = (...nodes) => { const box = el(`<div class="stack" style="gap:12px"></div>`); box.append(...nodes); return box; };
@@ -200,7 +203,7 @@ function stageBody(body) {
             const row = layerColourRow(model, layer.index);
             const lit = row && !isOff(row.color);
             const item = el(`<button class="rowitem ${index === state.layer ? "on" : ""}" data-layer="${index}">
-                <span class="t"><span class="swatch-lg ${lit ? "" : "swatch-off"}" style="width:11px;height:11px;border-radius:3px;display:inline-block;vertical-align:-1px;margin-right:7px;${lit ? `background:${css(row.color)}` : ""}"></span>${esc(layerName(layer))}</span>
+                <span class="t"><span class="swatch-lg ${lit ? "" : "swatch-off"}" style="width:11px;height:11px;border-radius:3px;display:inline-block;vertical-align:-1px;margin-right:7px;${lit ? `background:${css(row.color)}` : ""}"></span>${esc(layerName(layer))}${marks.lightingLayers.has(layer.index) ? draftDot() : ""}</span>
                 <span class="m mono">${esc(row ? hsvLabel(row.color) : "not reported")} · ${row?.mode === "ALL_KEYS" ? "all keys" : "mapped keys"}</span></button>`);
             item.addEventListener("click", () => { state.layer = index; render(); });
             list.append(item);
@@ -260,7 +263,7 @@ function stageBody(body) {
             const row = pdColourRow(model, slot.id);
             const lit = row && !isOff(row.color);
             const item = el(`<button class="rowitem ${slot.id === state.pdSlot ? "on" : ""} ${slot.kind ? "" : "quiet"}" data-slot="${slot.id}">
-                <span class="t"><span class="swatch-lg ${lit ? "" : "swatch-off"}" style="width:11px;height:11px;border-radius:3px;display:inline-block;vertical-align:-1px;margin-right:7px;${lit ? `background:${css(row.color)}` : ""}"></span>${esc(slot.name || `Slot ${slot.id + 1}`)}</span>
+                <span class="t"><span class="swatch-lg ${lit ? "" : "swatch-off"}" style="width:11px;height:11px;border-radius:3px;display:inline-block;vertical-align:-1px;margin-right:7px;${lit ? `background:${css(row.color)}` : ""}"></span>${esc(slot.name || `Slot ${slot.id + 1}`)}${marks.lightingSlots.has(slot.id) ? draftDot() : ""}</span>
                 <span class="m mono">${esc(row ? hsvLabel(row.color) : "not reported")} · ${esc(localityLabel(row?.locality).toLowerCase())}</span></button>`);
             item.addEventListener("click", () => { state.pdSlot = slot.id; render(); });
             list.append(item);

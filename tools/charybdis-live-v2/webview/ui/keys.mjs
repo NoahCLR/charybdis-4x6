@@ -8,6 +8,7 @@ import {actionLabel, behaviourFor, behaviourListeningTo, canonicalKeycode, behav
 import {feedbackColours, layerColourRow, pdColourRow, stageEnabled} from "../view/lighting.mjs";
 import {closeComboBuilder, currentLayer, getModel, layerName, layers, openComboBuilder, positionAt, post, render, selectedPosition, state, writable} from "../store.mjs";
 import * as edits from "../view/edits.mjs";
+import {draftDot, draftMarks} from "../view/review.mjs";
 import {board} from "./board.mjs";
 import {layerBar} from "./layerbar.mjs";
 import {attachLayersControl} from "./layers.mjs";
@@ -69,6 +70,7 @@ export function screenKeys() {
     const building = state.comboPicking || (state.comboOpen && state.tab === "combos");
     stage.appendChild(board(model, layer, {
         selected: state.selected,
+        drafted: draftMarks(model?.draft?.changes).keys.get(layer.index),
         reach: building ? state.comboInputs : reachHighlight(model),
         picking: state.comboPicking || Boolean(state.placement),
         onKey: (index) => {
@@ -127,6 +129,7 @@ function legend(model) {
         <span class="legend-item">${dot(colours.long)} long hold branch</span>
         <span class="legend-item"><i class="lbadge">C1</i> combo input</span>
         <span class="legend-item"><i class="lkey transparent"></i> transparent · falls through</span>
+        ${model?.draft?.dirty ? `<span class="legend-item">${draftDot()} changed in your draft</span>` : ""}
         <span class="legend-item dim">${writable() ? "double-click to pick a keycode" : "select a key to read it"}${writable() ? " · drag one key onto another to swap · ⌘C and ⌘V copy between keys · delete makes a key transparent" : " · ⌘C copies a key"}</span>
         ${state.keyClipboard ? `<span class="legend-item">copied <code class="n">${esc(state.keyClipboard.keycode)}</code></span>` : ""}
     </div>`);
@@ -167,10 +170,12 @@ const GROUP_ORDER = ["here", "branches", "combos", "through", "belowBranches", "
 const inGroupOrder = (groups) =>
     GROUP_ORDER.map((id) => groups.find((group) => group.id === id)).filter(Boolean);
 
-function groupHeader(tab, id, count) {
+// A folded group holding something the draft changed says so on its header;
+// open, its rows carry their own marks.
+function groupHeader(tab, id, count, drafted = false) {
     const open = state.groups[tab][id];
     return `<button class="group-h" data-group-tab="${tab}" data-group="${id}" aria-expanded="${open}">
-        <span class="chev">${open ? "▾" : "▸"}</span><span class="ttl">${esc(GROUP_TITLES[id])}</span>
+        <span class="chev">${open ? "▾" : "▸"}</span><span class="ttl">${esc(GROUP_TITLES[id])}${drafted && !open ? draftDot("Holds a change in your draft") : ""}</span>
         <span class="n">${count}</span></button>`;
 }
 
@@ -244,10 +249,14 @@ function bench() {
         macros: String(storedCount(macroReach(model, layers(), state.layer))),
         pointing: String(storedCount(pointingReach(model, layers(), state.layer))),
     };
+    // A tab whose list holds something the draft changed says so.
+    const marks = draftMarks(model?.draft?.changes);
+    const drafted = {key: Boolean(marks.keys.get(currentLayer()?.index)?.has(state.selected)), behaviours: marks.behaviours.size > 0,
+        combos: marks.combos.size > 0, macros: marks.macros.size > 0, pointing: marks.pointing.size > 0};
     const node = el(`<div class="card bench">
         <div class="bench-tabs" role="tablist">
             ${TABS.map((tab) => `<button role="tab" data-tab="${tab.id}" aria-selected="${state.tab === tab.id}">
-                ${tab.label} <span class="c">${esc(counts[tab.id])}</span></button>`).join("")}
+                ${tab.label} <span class="c">${esc(counts[tab.id])}</span>${drafted[tab.id] ? draftDot() : ""}</button>`).join("")}
             <span class="bench-right" id="benchRight"></span>
         </div>
         <div class="bench-body" id="benchBody"></div>
@@ -377,9 +386,10 @@ function tabBehaviours(body, right) {
     }
 
     const route = behaviourRoute();
+    const changed = draftMarks(model?.draft?.changes).behaviours;
     const item = (group, row, note) => `<button class="rowitem ${row.keycode === state.behaviourRow && (!route || route === group) ? "on" : ""} ${note ? "quiet" : ""}" data-row="${esc(row.keycode)}" data-route="${group}">
         <span class="t">${esc(actionLabel(model, row.keycode))}${actionLabel(model, row.keycode) === row.keycode ? ""
-            : ` <code class="dim">${esc(row.keycode)}</code>`}</span>
+            : ` <code class="dim">${esc(row.keycode)}</code>`}${changed.has(row.keycode) ? draftDot() : ""}</span>
         <span class="m">${behaviourTiers(row).map((tier) => tierDot(model, tier.kind)).join("")} ${row.steps.length} branch${row.steps.length === 1 ? "" : "es"}${note ? ` · ${esc(note)}` : ""}</span></button>`;
 
     // A selection made anywhere else — the board, the Key tab, a fresh
@@ -405,7 +415,7 @@ function tabBehaviours(body, right) {
     }
 
     const section = (group) => `<div class="rowgroup">
-        ${groupHeader("behaviours", group.id, group.rows.length)}
+        ${groupHeader("behaviours", group.id, group.rows.length, group.rows.some(({row}) => changed.has(row.keycode)))}
         ${groupOpen("behaviours", group.id)
             ? (group.rows.length ? group.rows.map((entry) => item(group.id, entry.row, entry.note)).join("")
                 : `<p class="note" style="padding:10px 12px">${esc(group.empty)}</p>`)
@@ -431,7 +441,16 @@ function tabBehaviours(body, right) {
     body.replaceChildren(node);
 }
 
-function tierDot(model, kind) {
+// A branch's badge as the grid heads its column: from 2× on, tinted with the
+// tap-branch colour the keyboard shows while that branch is pending. The
+// review draws the same badge, so a colour means one thing everywhere.
+export function branchBadge(model, count) {
+    const colour = feedbackColours(model).branches[count - 2];
+    const lit = count > 1 && stageEnabled(model, "key") && colour && !isOff(colour);
+    return `<span class="bn" style="${lit ? `border-color:${css(colour)};color:${css(colour)}` : ""}">${count}×</span>`;
+}
+
+export function tierDot(model, kind) {
     const colour = feedbackColours(model)[kind];
     const lit = stageEnabled(model, "key") && !isOff(colour);
     return `<i class="fbdot" style="${lit ? `background:${css(colour)}` : "background:none;border-style:dashed"}"></i>`;
@@ -452,7 +471,6 @@ function timingDefaultsNote(model) {
 function behaviourEditor(behaviour) {
     const model = getModel();
     const steps = behaviourGridSteps(behaviour, model?.behaviorEditing?.maxTapStepsPerBehavior);
-    const colours = feedbackColours(model);
     const canEdit = writable();
 
     const cellFor = (step, kind) => {
@@ -463,10 +481,6 @@ function behaviourEditor(behaviour) {
         return `<button class="bcell ${open ? "on" : ""}" data-cell="${id}">
             <span class="bk">${esc(branch.action)}</span>
             <span class="bl">${esc(helperLabel(kind, branch.helper))}</span></button>`;
-    };
-    const branchTint = (tapCount) => {
-        const colour = colours.branches[tapCount - 1];
-        return stageEnabled(model, "key") && colour && !isOff(colour) ? `border-color:${css(colour)};color:${css(colour)}` : "";
     };
 
     const node = el(`<div>
@@ -493,7 +507,7 @@ function behaviourEditor(behaviour) {
         </div>
         <div class="bgrid" style="grid-template-columns:86px repeat(${steps.length}, minmax(150px, 1fr))">
             <span></span>
-            ${steps.map((step) => `<div class="bhead"><span class="bn" style="${branchTint(step.tapCount)}">${step.tapCount + 1}×</span>
+            ${steps.map((step) => `<div class="bhead">${branchBadge(model, step.tapCount + 1)}
                 <span>${esc(step.tapCountName || `${step.tapCount + 1} taps`)}</span></div>`).join("")}
             ${[["tap", "Tap"], ["hold", "Hold"], ["long", "Long hold"]].map(([kind, name]) => `
                 <div class="btier">${tierDot(model, kind)}${name}</div>
@@ -637,10 +651,21 @@ function tabCombos(body, right) {
         post(edits.comboHoldTerm(comboHoldTerm(model, written), model.profileIdentity));
     });
     const groupsOf = comboGroups(model, layers(), state.layer);
+    const changedCombos = draftMarks(model?.draft?.changes).combos;
+    // A combo asked for by id is picked under the group that lists it on
+    // this layer, and that group opens so the row is there to see.
+    if (state.pickCombo !== null) {
+        const id = String(state.pickCombo);
+        const route = [["here", groupsOf.onKeys], ["through", groupsOf.throughKeys], ["elsewhere", groupsOf.elsewhere]]
+            .find(([, entries]) => entries.some((entry) => String(entry.combo.id) === id))?.[0];
+        state.pickCombo = null;
+        state.reachRow.combos = route ? `${route}:${id}` : null;
+        if (route) state.groups.combos[route] = true;
+    }
     const row = (group, entry, reachedBy) => {
         const combo = entry.combo;
         const requires = [combo.mustHold ? "hold" : "", combo.mustTap ? "tap only" : "", combo.ordered ? "in order" : ""].filter(Boolean).join(" · ") || "—";
-        return `<tr${reachAttrs("combos", group, combo.id)}><td class="mono">${esc(combo.badge || "")}</td>
+        return `<tr${reachAttrs("combos", group, combo.id)}><td class="mono">${esc(combo.badge || "")}${changedCombos.has(combo.id) ? draftDot() : ""}</td>
             <td>${(combo.inputDisplays || combo.inputs || []).map((input) => `<span class="tok">${esc(input)}</span>`).join(" + ")}</td>
             <td class="mono">${esc(combo.outputDisplay || combo.output)}</td>
             <td class="mono">${esc(combo.termMs ?? "")} ms</td>
@@ -649,11 +674,11 @@ function tabCombos(body, right) {
             <td style="text-align:right"><button class="btn tiny ghost" data-edit="${esc(String(combo.id))}" ${canEdit ? "" : "disabled"}>Edit</button></td></tr>`;
     };
     const comboGroupRows = [
-        {id: "here", rows: groupsOf.onKeys.map((entry) => row("here", entry, keysReach(entry.keys))),
+        {id: "here", rows: groupsOf.onKeys.map((entry) => row("here", entry, keysReach(entry.keys))), drafted: groupsOf.onKeys.some((entry) => changedCombos.has(entry.combo.id)),
             empty: readback.state === "read" ? "No combo has all of its inputs on this layer." : "Combos have not been read from this keyboard."},
-        {id: "through", rows: groupsOf.throughKeys.map((entry) => row("through", entry, keysReach(entry.keys))),
+        {id: "through", rows: groupsOf.throughKeys.map((entry) => row("through", entry, keysReach(entry.keys))), drafted: groupsOf.throughKeys.some((entry) => changedCombos.has(entry.combo.id)),
             empty: "No combo is completed by keys falling through."},
-        {id: "elsewhere", rows: groupsOf.elsewhere.map((entry) => row("elsewhere", entry,
+        {id: "elsewhere", drafted: groupsOf.elsewhere.some((entry) => changedCombos.has(entry.combo.id)), rows: groupsOf.elsewhere.map((entry) => row("elsewhere", entry,
             entry.inputs ? `${entry.covered} of ${entry.inputs} inputs, never at once` : "no inputs")),
             empty: "Every combo on the board fires from this layer."},
     ];
@@ -857,7 +882,7 @@ const reachLabel = (model, entry) => [
 // its width, so unfolding a group never re-sizes the ones already on screen.
 function reachTable(tab, groups, columns) {
     const section = (group) => `<tbody class="rowgroup">
-        <tr><td colspan="${columns.length}" class="t-group">${groupHeader(tab, group.id, group.rows.length)}</td></tr>
+        <tr><td colspan="${columns.length}" class="t-group">${groupHeader(tab, group.id, group.rows.length, group.drafted)}</td></tr>
         ${groupOpen(tab, group.id)
             ? (group.rows.length ? group.rows.join("")
                 : `<tr><td colspan="${columns.length}"><p class="note">${esc(group.empty)}</p></td></tr>`)

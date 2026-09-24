@@ -12,6 +12,7 @@ import {getModel, layerName, layers, post, render, state, writable} from "../sto
 import * as edits from "../view/edits.mjs";
 import {layerSwatch} from "./layerbar.mjs";
 import {openPicker} from "./picker.mjs";
+import {draftDot, draftMarks} from "../view/review.mjs";
 import {topbar, unavailable} from "./shell.mjs";
 
 const STEP_KINDS = [
@@ -53,6 +54,7 @@ export function screenMacros() {
     if (!bank.some((row) => macroMatches(row, query))) {
         cells.replaceWith(el(`<p class="note">No macro is named “${esc(query.trim())}”.</p>`));
     }
+    const changedMacros = draftMarks(model?.draft?.changes).macros;
     bank.forEach((row, index) => {
         if (!macroMatches(row, query)) return;
         const {steps} = parseMacro(row.payload);
@@ -62,7 +64,7 @@ export function screenMacros() {
             : row.empty ? `Slot ${index} · empty` : `Slot ${index} · ${steps.length} step${steps.length === 1 ? "" : "s"} · ${row.program} of ${memory?.programMax ?? 512} bytes to play · ${row.payload}`;
         const cell = el(`<button class="mslot ${row.empty ? "" : "filled"} ${out ? "out" : ""} ${row.playable === false ? "warn" : ""}" data-slot="${esc(row.keycode)}"
             aria-current="${row.keycode === slot?.keycode}" ${out ? "disabled" : ""} data-tip="${esc(tip)}">
-            <span class="n">M${index}</span>
+            <span class="n">M${index}${changedMacros.has(row.keycode) ? draftDot() : ""}</span>
             <span class="v">${row.playable === false ? "too long" : row.name ? esc(row.name.length > 13 ? `${row.name.slice(0, 12)}…` : row.name) : row.empty ? (out ? "no room" : "—") : esc(peek.length > 13 ? `${peek.slice(0, 12)}…` : peek)}</span></button>`);
         cell.addEventListener("click", () => { state.macroSlot = row.keycode; render(); });
         cells.append(cell);

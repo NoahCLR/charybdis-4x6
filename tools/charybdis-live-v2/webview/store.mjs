@@ -23,6 +23,9 @@ export const state = {
     // a row in a table can answer "where do I press for this".
     reachRow: {macros: null, combos: null, pointing: null},
     cell: null,
+    reveal: null,        // a selector the next render scrolls into view and marks, then forgets
+    pickCombo: null,     // a combo id to pick in the Combos tab, wherever this layer lists it
+    settingsOpen: null,  // a settings section held open, one Show went to
     cellHow: null,       // {cell, keycode, helper, repeatHz}: how the open empty cell runs, chosen before it sends anything
     comboOpen: false,
     comboPicking: false,

@@ -5,17 +5,19 @@
 // always what would be applied.
 
 import {el, esc} from "./lib/dom.mjs";
+import {css, isOff} from "./lib/colour.mjs";
 import {captureContentScroll, restoreContentScroll} from "./lib/scroll.mjs";
 import {activateOnKey, captureFocus, focusDialog, restoreFocus, trapTab} from "./lib/focus.mjs";
 import {closeComboBuilder, getModel, post, render as rerender, resetDraftForms, setModel, setRenderer, state} from "./store.mjs";
 import {historyAction} from "./view/edits.mjs";
+import {FIELDS_SHOWN, discardLabel, placeState, reviewBlocks, statusSummary} from "./view/review.mjs";
 import {bindLayerIndex, hideHover, mountHover} from "./ui/hover.mjs";
 import {pickerOverlay} from "./ui/picker.mjs";
-import {keysShortcut, screenKeys} from "./ui/keys.mjs";
+import {branchBadge, keysShortcut, screenKeys, tierDot} from "./ui/keys.mjs";
 import {closeLayers} from "./ui/layers.mjs";
 import {screenLighting} from "./ui/lighting.mjs";
 import {screenSettings} from "./ui/settings.mjs";
-import {screenPointing} from "./ui/pointing.mjs";
+import {screenPointing, slotLight} from "./ui/pointing.mjs";
 import {screenMacros} from "./ui/macros.mjs";
 import {screenProfile} from "./ui/profile.mjs";
 import {commitBar, rail, topbar, unavailable} from "./ui/shell.mjs";
@@ -73,32 +75,97 @@ function reviewOverlay() {
     const model = getModel();
     const draft = model?.draft;
     if (state.overlay !== "review" || !draft?.dirty) return null;
-    const areas = [...new Set(draft.changes.map((change) => change.area))];
+    // Discarding goes back to the keyboard's value; it waits while the draft
+    // is out of step with the keyboard or busy, as editing does.
+    const canDiscard = !draft.stale && !draft.busy && draft.connected;
+    // A colour is shown as the keyboard would light it, beside its value; an
+    // off colour is drawn off, as it is everywhere else.
+    const swatch = (colour) => colour
+        ? `<i class="rv-swatch ${isOff(colour) ? "swatch-off" : ""}" style="${isOff(colour) ? "" : `background:${css(colour)}`}"></i>` : "";
+    // A pointing mode is drawn with the light it paints, as its slot card is.
+    const slotSwatch = (slot) => slot === undefined ? "" : slotLight(model, {id: slot}).swatch("rv-swatch");
+    const value = (text, klass, colour, slot) => text === null ? ""
+        : `<span class="rv-val">${swatch(colour)}${slotSwatch(slot)}<span class="${klass}">${esc(text)}</span></span>`;
+    // A behaviour tier is labelled as the grid heads it: the branch badge in
+    // its tap-branch colour, then the tier's own feedback dot.
+    const TIER_NAMES = {tap: "tap", hold: "hold", long: "long hold"};
+    const fieldLabel = (entry) => entry.tier
+        ? `<span class="k tier">${branchBadge(model, entry.tier.branch)}${tierDot(model, entry.tier.kind)}${esc(TIER_NAMES[entry.tier.kind])}</span>`
+        : entry.label ? `<span class="k">${esc(entry.label)}</span>` : "";
+    const field = (item, entry) => {
+        const before = value(entry.before, "del", entry.beforeColour, entry.beforePointingSlot);
+        const after = value(entry.after, "ins", entry.afterColour, entry.afterPointingSlot);
+        const shown = item.status === "changed" ? `${before}<span class="to">→</span>${after}` : item.status === "added" ? after : before;
+        return `${fieldLabel(entry)}<span class="v ${entry.label ? "" : "wide"}">${shown}</span>`;
+    };
+    const fields = (item) => {
+        const head = item.fields.slice(0, FIELDS_SHOWN), rest = item.fields.slice(FIELDS_SHOWN);
+        return `<div class="rv-fields">${head.map((entry) => field(item, entry)).join("")}</div>${rest.length
+            ? `<details class="rv-more"><summary>Show all ${item.fields.length}</summary><div class="rv-fields">${rest.map((entry) => field(item, entry)).join("")}</div></details>` : ""}`;
+    };
+    const item = (entry, block, index, discard) => `<div class="rv-item">
+        <div class="rv-title">${entry.place?.kind === "pointing" ? slotSwatch(entry.place.slot) : ""}<span class="t">${esc(entry.title)}</span>
+            ${entry.area !== block.area ? `<span class="tag">${esc(entry.area)}</span>` : ""}
+            ${entry.status === "changed" ? "" : `<span class="rv-status ${esc(entry.status)}">${esc(entry.status)}</span>`}</div>
+        ${fields(entry)}
+        <div class="rv-actions">${discard}${entry.status !== "removed" && placeState(entry.place, model.layers) ? `<button class="btn tiny ghost" data-show="${index}"
+            data-tip="Close the review and open this where it is edited.">Show</button>` : ""}</div></div>`;
+    const discardable = draft.changes.every((change) => Number.isInteger(change.group));
+    const shown = [];
+    const sections = reviewBlocks(draft.changes).map(({area, blocks, count}) => `<section class="rv-sect">
+        <div class="sect-h"><h4>${esc(area)}</h4><span class="right tag">${count}</span></div>
+        ${blocks.map((block) => {
+            const grouped = block.items.length > 1;
+            const discard = discardable ? `<button class="btn tiny ghost" data-discard="${esc(block.group)}" ${canDiscard ? "" : "disabled"}
+                data-tip="${esc(grouped ? `Put these ${block.items.length} changes back to what the keyboard holds. They were made together, so they go back together.` : "Put this change back to what the keyboard holds.")}">${esc(discardLabel(block))}</button>` : "";
+            const items = block.items.map((entry) => item(entry, block, shown.push(entry) - 1, grouped ? "" : discard)).join("");
+            return grouped
+                ? `<div class="rv-block grouped"><div class="rv-group-h"><span>${esc(block.title || "Made together")}</span>
+                    <span class="note">${block.items.length} changes, discarded together</span><span class="right">${discard}</span></div>${items}</div>`
+                : `<div class="rv-block">${items}</div>`;
+        }).join("")}</section>`).join("");
+    const summary = statusSummary(draft.changes);
     const node = el(`<div class="scrim"><div class="sheet" role="dialog" aria-modal="true" aria-label="Review changes">
         <div class="sheet-h"><h2>Review ${draft.changes.length} change${draft.changes.length === 1 ? "" : "s"}</h2>
+            ${summary ? `<span class="note">${esc(summary)}</span>` : ""}
             <span class="right" style="margin-left:auto"><button class="btn ghost" data-act="close">Keep editing</button></span></div>
-        <div class="sheet-b">
-            ${areas.map((area) => `<div style="padding:14px 18px 4px">
-                <div class="sect-h"><h4>${esc(area)}</h4><span class="right tag">${draft.changes.filter((change) => change.area === area).length}</span></div>
-                <table class="t"><thead><tr><th style="width:38%">What changes</th><th style="width:31%">On the keyboard</th><th style="width:31%">In your draft</th></tr></thead>
-                <tbody>${draft.changes.filter((change) => change.area === area).map((change) => `<tr>
-                    <td>${esc(change.label)}</td>
-                    <td class="mono del">${esc(change.before)}</td>
-                    <td class="mono ins">${esc(change.after)}</td></tr>`).join("")}</tbody></table></div>`).join("")}
+        <div class="sheet-b rv">
+            ${sections}
             <div style="padding:14px 18px 18px"><div class="callout warn">Apply writes a recovery copy, stages the changed blocks on both halves, then publishes one generation. The keyboard keeps running its saved profile until both halves confirm. If it is interrupted, the recovery copy restores it.</div></div>
         </div>
         <div class="sheet-f"><span class="note">${esc(model?.device?.label || "")} · ${esc(model?.device?.summary || "")}</span>
             <span class="right"><button class="btn" data-act="close">Cancel</button>
                 <button class="btn primary" data-act="apply" ${draft.reviewed && draft.connected && !draft.stale ? "" : "disabled"}>Apply to keyboard</button></span></div>
     </div></div>`);
+    // Pointing at a group's Discard lights what it takes back.
+    node.querySelectorAll(".rv-block.grouped [data-discard]").forEach((button) => {
+        const block = button.closest(".rv-block");
+        button.addEventListener("mouseenter", () => block.classList.add("lit"));
+        button.addEventListener("mouseleave", () => block.classList.remove("lit"));
+    });
     node.addEventListener("click", (event) => {
+        const discard = event.target.closest("[data-discard]");
+        if (discard) {
+            post({type: "discardProfileDraftChanges", group: Number(discard.dataset.discard)});
+            return;
+        }
+        const show = event.target.closest("[data-show]");
+        if (show) {
+            Object.assign(state, placeState(shown[Number(show.dataset.show)].place, model.layers), {overlay: null});
+            post({type: "closeProfileDraftReview"});
+            rerender();
+            return;
+        }
+        // The sheet closes at once; the host's answer only refreshes what it says.
         if (event.target === node || event.target.closest('[data-act="close"]')) {
             state.overlay = null;
             post({type: "closeProfileDraftReview"});
+            rerender();
         }
         if (event.target.closest('[data-act="apply"]')) {
             state.overlay = null;
             post({type: "applyProfileDraft"});
+            rerender();
         }
     });
     return node;
@@ -130,6 +197,19 @@ function render() {
     if (review) root.appendChild(review);
     restoreFocus(root, focus);
     focusDialog(root);
+    reveal();
+}
+
+// A place asked for by a jump — the review's Show — is scrolled to and marked
+// for a moment, once, so the eye lands on it among its neighbours.
+function reveal() {
+    if (!state.reveal) return;
+    const target = root.querySelector(state.reveal);
+    state.reveal = null;
+    if (!target) return;
+    target.scrollIntoView({block: "center"});
+    target.classList.add("revealed");
+    setTimeout(() => target.classList.remove("revealed"), 1600);
 }
 
 setRenderer(render);
@@ -191,7 +271,12 @@ addEventListener("keydown", (event) => {
     if (state.picker) { state.picker = null; render(); return; }
     if (state.retarget) { state.retarget = null; render(); return; }
     if (state.layersOpen) { closeLayers(); render(); return; }
-    if (state.overlay) { state.overlay = null; render(); }
+    if (state.overlay) {
+        // Leaving the review by Esc is leaving it by Keep editing.
+        if (state.overlay === "review") post({type: "closeProfileDraftReview"});
+        state.overlay = null;
+        render();
+    }
 });
 
 render();

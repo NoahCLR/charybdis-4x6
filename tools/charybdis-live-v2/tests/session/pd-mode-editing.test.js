@@ -36,9 +36,12 @@ test("create, bind, edit RGB and macros, reorder, review and undo share a PD dra
     const reordered = reorderLayers(draft.document, [0, 2, 1, 3, 4, 5, 6, 7]);
     assert.deepEqual(validateSnapshot(reordered).pdModes, validateSnapshot(draft.document).pdModes);
     const view = draft.view({connected: true, selectedDeviceId: "board"});
-    assert(view.changes.some(change => change.area === "Pointing modes" && change.label === "Slot 8 · Name" && change.after === "History"));
-    assert(view.changes.some(change => change.label === "Slot 8 · Horizontal movement per tap" && change.after === "30"));
-    assert(view.changes.some(change => change.label === "Slot 8 · Left" && change.after.includes("Inherit modifiers")));
+    const slot = view.changes.find(change => change.area === "Pointing modes" && change.unit === "pd:7");
+    const field = label => slot.fields.find(entry => entry.label === label)?.after;
+    assert.equal(slot.status, "added"); assert.equal(slot.title, "Slot 8 · History");
+    assert.equal(field("Name"), "History");
+    assert.equal(field("Horizontal movement per tap"), 30);
+    assert.match(field("Left"), /Inherit modifiers/);
     const model = buildDeviceModel({...draft.editingState({connected: true, selectedDeviceId: "board", capabilities: caps}), capabilities: caps});
     assert.equal(model.pdModes[7].name, "History");
     assert(model.qmkKeycodes.some(key => key.value === "PD_SLOT_7" && key.keycode === 0x7ef2 && key.label === "History · hold"));
