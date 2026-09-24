@@ -36,6 +36,26 @@ test("behaviour targets and tap/hold branches follow their layers", () => {
     const row = validateSnapshot(reorderLayers(source, [0, 4, 2, 3, 1, 5, 6, 7])).behaviors.rows[0];
     assert.equal(row.target.operand, 4); assert.equal(row.steps[0].tap.operand, 1); assert.equal(row.steps[0].hold.action.operand, 4);
 });
+test("owned layer keys follow their layers on a key, in a behaviour and on a combo", () => {
+    const {decodeComboDomainV1, encodeComboDomainV1} = require("../../core/schema/combo-domain-v1");
+    const source = document(), blob = decodeProfileBlob(Buffer.from(source.profile, "base64"));
+    // Layer 1 moves to 4 and 4 to 1; TG, TO, OSL, TT and DF all carry the layer in the low bits.
+    source.layers[0].splice(10, 5, 0x5261, 0x5204, 0x5281, 0x52c4, 0x5241);
+    const behaviors = decodeKeyBehaviorDomain(blob.domains[1].payload);
+    behaviors.rows = [{target: {kind: 1, operand: 0x52c1}, steps: [{tapIndex: 0, tap: {kind: 1, operand: 0x5261}}]}];
+    blob.domains[1].payload = encodeKeyBehaviorDomain(behaviors);
+    const combos = decodeComboDomainV1(blob.domains[2].payload);
+    combos[0].output = {kind: 1, operand: 0x5284};
+    blob.domains[2].payload = encodeComboDomainV1(combos);
+    source.profile = encodeProfileBlob(blob).toString("base64");
+
+    const reordered = reorderLayers(source, [0, 4, 2, 3, 1, 5, 6, 7]), actual = validateSnapshot(reordered);
+    assert.deepEqual(reordered.layers[0].slice(10, 15), [0x5264, 0x5201, 0x5284, 0x52c1, 0x5244]);
+    assert.equal(actual.behaviors.rows[0].target.operand, 0x52c4, "TT(1) as a behaviour's key becomes TT(4)");
+    assert.equal(actual.behaviors.rows[0].steps[0].tap.operand, 0x5264, "TG(1) as a tap becomes TG(4)");
+    assert.equal(actual.combos[0].output.operand, 0x5281, "OSL(4) as a combo output becomes OSL(1)");
+});
+
 test("partial, incompatible, over-capacity and malformed profiles fail before restore", () => {
     const source = document();
     assert.throws(() => validateSnapshot({...source, layers: source.layers.slice(0, 4)}), /matrix/);
