@@ -8,7 +8,6 @@ export const DIRECTIONS = [["up", "Up"], ["left", "Left"], ["right", "Right"], [
 export const AXIS = {VERTICAL: 0, HORIZONTAL: 1, DOMINANT: 2, EIGHT: 3};
 // Eight directions add the diagonals, stored beside the straight directions.
 export const DIAGONALS = [["upLeft", "Up-left"], ["upRight", "Up-right"], ["downLeft", "Down-left"], ["downRight", "Down-right"]];
-// What an eight-direction mode does when a diagonal has no shortcut.
 // What moving toward a direction with no shortcut does, in every directional
 // mode. "Both" sends the two compass neighbours, 45 degrees either side, the
 // one the movement leans toward first: a diagonal's straight directions, a
@@ -61,6 +60,17 @@ export function startingRecord(slot, kind) {
     if (kind === KIND.SCROLLING && !SCROLL_FIELDS.some(([key]) => Number(slot.scroll?.[key]))) return {...slot, scroll: {...SCROLL_STARTER}};
     if (kind === KIND.DIRECTIONAL && !Number(slot.thresholdX) && !Number(slot.thresholdY)) return {...slot, thresholdX: 0, thresholdY: DIRECTIONAL_STARTER_THRESHOLD};
     return slot;
+}
+// A new mode for an empty slot, from the firmware's shipped tuning: a
+// directional mode reads the dominant axis at Volume's threshold with no
+// shortcuts yet, a scrolling mode starts from Dragscroll's record. It is named
+// after its slot and posted like any edit, so the keyboard stores a valid mode
+// straight away and every field can then be changed.
+export function newMode(slot, kind) {
+    const starter = kind === KIND.SCROLLING
+        ? {...slot, kind, axis: 0, thresholdX: 0, thresholdY: 0, heldModifiers: 0, scroll: {...SCROLL_STARTER}}
+        : {...slot, kind, axis: AXIS.DOMINANT, thresholdX: DIRECTIONAL_STARTER_THRESHOLD, thresholdY: DIRECTIONAL_STARTER_THRESHOLD, emptyDirection: 0};
+    return readConfig(starter, {kind: () => kind, name: () => `Mode ${slot.id + 1}`, dpi: () => "0"});
 }
 // Volume's vertical threshold, the firmware's shipped tuning for a directional
 // axis. An axis the stored record did not read has a zero threshold, which the

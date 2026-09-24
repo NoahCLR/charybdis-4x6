@@ -7,7 +7,7 @@
 
 import {css, isOff} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
-import {AXIS, DIAGONALS, DIRECTIONS, EMPTY_DIRECTION, KIND, SCROLL_FIELDS, axisReads, dpiOptions, readConfig, readsHorizontal, readsVertical, startingRecord} from "../view/pointing-config.mjs";
+import {AXIS, DIAGONALS, DIRECTIONS, EMPTY_DIRECTION, KIND, SCROLL_FIELDS, axisReads, dpiOptions, newMode, readConfig, readsHorizontal, readsVertical, startingRecord} from "../view/pointing-config.mjs";
 import {MODIFIER_BITS, keyName, modifierNames} from "../view/keyvalues.mjs";
 import {bindingsForSlot} from "../view/keyface.mjs";
 import {pdColourRow, stageEnabled} from "../view/lighting.mjs";
@@ -106,15 +106,22 @@ function emptySlot(model, slot, canEdit, slots) {
         <div class="card-h">${slotLight(model, slot).swatch("lg")}<h3>Slot ${slot.id + 1} is empty</h3>
             <span class="tag">${esc(bindingName(slot))}</span></div>
         <div class="card-b stack">
-        <p class="note" style="max-width:64ch">Nothing is stored here. Copy a configured mode and change what you need — its binding keycode is <code>${esc(bindingName(slot))}</code>, and <code>${esc(bindingName(slot))}_LOCK</code> toggles it.</p>
+        <p class="note" style="max-width:64ch">Nothing is stored here. Start a new mode, or copy a configured one and change what you need — its binding keycode is <code>${esc(bindingName(slot))}</code>, and <code>${esc(bindingName(slot))}_LOCK</code> toggles it.</p>
         ${inertNote(model, slot)}
+        <div class="row" style="gap:8px">
+            <button class="btn primary" data-new="${KIND.DIRECTIONAL}" ${canEdit ? "" : "disabled"}
+                data-tip="Arrow-style keys or shortcuts, starting on the dominant axis with no shortcuts set.">New directional mode</button>
+            <button class="btn" data-new="${KIND.SCROLLING}" ${canEdit ? "" : "disabled"}
+                data-tip="Scrolling, starting from Dragscroll's tuning.">New scrolling mode</button></div>
         ${sources.length ? `<div class="pd-copy">
             <label class="field"><span>Copy from</span><select class="input" data-source ${canEdit ? "" : "disabled"}>
                 ${sources.map((row) => `<option value="${row.id}">Slot ${row.id + 1} · ${esc(row.name)}</option>`).join("")}</select></label>
-            <button class="btn primary" data-act="duplicate" ${canEdit ? "" : "disabled"}>Duplicate into this slot</button></div>`
-            : `<p class="note">No configured slot to copy from yet.</p>`}
+            <button class="btn" data-act="duplicate" ${canEdit ? "" : "disabled"}>Duplicate into this slot</button></div>`
+            : ""}
         ${canEdit ? "" : `<div class="unavailable">${esc(unavailable(model) || "This firmware cannot store configurable pointing modes.")}</div>`}
     </div></div></div>`);
+    node.querySelectorAll("[data-new]").forEach((button) => button.addEventListener("click", () =>
+        post(edits.pdMode(slot.id, newMode(slot, Number(button.dataset.new)), model.profileIdentity))));
     node.querySelector('[data-act="duplicate"]')?.addEventListener("click", () =>
         post(edits.duplicatePdMode(slot.id, Number(node.querySelector("[data-source]").value), model.profileIdentity)));
     return node;

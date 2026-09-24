@@ -10,7 +10,7 @@ import {createRequire} from "node:module";
 import path from "node:path";
 import {fileURLToPath} from "node:url";
 import * as edits from "../webview/view/edits.mjs";
-import {AXIS, DIRECTIONAL_STARTER_THRESHOLD, KIND, SCROLL_STARTER, dpiOptions, readConfig, startingRecord} from "../webview/view/pointing-config.mjs";
+import {AXIS, DIRECTIONAL_STARTER_THRESHOLD, KIND, SCROLL_STARTER, dpiOptions, newMode, readConfig, startingRecord} from "../webview/view/pointing-config.mjs";
 
 const require = createRequire(import.meta.url);
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -459,6 +459,26 @@ test("clearing a slot leaves its button on the board, inert until it is configur
     const value = decoded(draft);
     assert.equal(value.pdModes[5].kind, 0, "the slot is empty");
     assert.ok(value.danglingPdBindings[5] > 0, "and what still reaches it is counted, not refused");
+});
+
+test("an empty slot can start a new mode of either kind, which the draft accepts as posted", () => {
+    const draft = session();
+    stage(draft, edits.clearPdMode(5, draft.identity()));
+    const empty = decoded(draft).pdModes[5];
+    stage(draft, edits.pdMode(5, newMode(empty, KIND.DIRECTIONAL), draft.identity()));
+    let slot = decoded(draft).pdModes[5];
+    assert.equal(slot.kind, KIND.DIRECTIONAL);
+    assert.equal(slot.name, "Mode 6");
+    assert.equal(slot.axis, AXIS.DOMINANT);
+    assert.equal(slot.thresholdX, DIRECTIONAL_STARTER_THRESHOLD);
+    assert.equal(slot.thresholdY, DIRECTIONAL_STARTER_THRESHOLD);
+    assert.ok(Object.values(slot.directions).every(tap => !tap.keycode), "no shortcuts yet");
+
+    stage(draft, edits.clearPdMode(5, draft.identity()));
+    stage(draft, edits.pdMode(5, newMode(decoded(draft).pdModes[5], KIND.SCROLLING), draft.identity()));
+    slot = decoded(draft).pdModes[5];
+    assert.equal(slot.kind, KIND.SCROLLING);
+    assert.equal(slot.scroll.divisorV, SCROLL_STARTER.divisorV);
 });
 
 test("duplicating needs a configured source and an empty destination", () => {
