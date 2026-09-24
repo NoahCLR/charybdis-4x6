@@ -23,6 +23,7 @@ export const state = {
     // a row in a table can answer "where do I press for this".
     reachRow: {macros: null, combos: null, pointing: null},
     cell: null,
+    cellHow: null,       // {cell, keycode, helper, repeatHz}: how the open empty cell runs, chosen before it sends anything
     comboOpen: false,
     comboPicking: false,
     comboInputs: [],

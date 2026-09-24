@@ -505,6 +505,7 @@ function behaviourEditor(behaviour) {
 
     node.querySelectorAll("[data-cell]").forEach((button) => button.addEventListener("click", () => {
         state.cell = state.cell === button.dataset.cell ? null : button.dataset.cell;
+        state.cellHow = null;
         render();
     }));
     if (state.cell) {
@@ -524,6 +525,11 @@ function behaviourEditor(behaviour) {
 
 function cellEditor(behaviour, step, kind) {
     const branch = step[TIER_FIELDS[kind]];
+    const cell = `${step.tapCount}-${kind}`;
+    // An empty cell shows the "how it runs" chosen for it so far, so the
+    // choice survives renders until an action carries it to the draft.
+    const pending = !branch && state.cellHow?.cell === cell && state.cellHow.keycode === behaviour.keycode ? state.cellHow : null;
+    const shown = branch || pending;
     const canEdit = writable();
     const node = el(`<div class="cell-editor">
         <div class="ce-head"><span class="tag">${step.tapCount + 1}× branch</span><h4>${kind === "long" ? "Long hold" : kind[0].toUpperCase() + kind.slice(1)}</h4>
@@ -535,10 +541,10 @@ function cellEditor(behaviour, step, kind) {
                 <button class="btn" data-act="pick" ${canEdit ? "" : "disabled"}>Pick…</button></div></label>
             ${kind === "tap" ? "<span></span>" : `<label class="field"><span>How it runs</span>
                 <select class="input" data-helper ${canEdit ? "" : "disabled"}>
-                    ${HOLD_HELPERS.map(([value, text]) => `<option value="${value}" ${branch?.helper === value ? "selected" : ""}>${text}</option>`).join("")}
+                    ${HOLD_HELPERS.map(([value, text]) => `<option value="${value}" ${shown?.helper === value ? "selected" : ""}>${text}</option>`).join("")}
                 </select></label>`}
-            ${kind === "tap" ? "<span></span>" : `<label class="field" data-repeat-field ${branch?.helper === "REPEAT_WHILE_HELD" ? "" : "hidden"}><span>Repeat rate · Hz</span>
-                <input class="input mono" type="number" min="1" max="100" step="1" data-repeat value="${esc(Number(branch?.repeatHz) > 0 ? branch.repeatHz : DEFAULT_REPEAT_HZ)}" ${canEdit ? "" : "disabled"}></label>`}
+            ${kind === "tap" ? "<span></span>" : `<label class="field" data-repeat-field ${shown?.helper === "REPEAT_WHILE_HELD" ? "" : "hidden"}><span>Repeat rate · Hz</span>
+                <input class="input mono" type="number" min="1" max="100" step="1" data-repeat value="${esc(Number(shown?.repeatHz) > 0 ? shown.repeatHz : DEFAULT_REPEAT_HZ)}" ${canEdit ? "" : "disabled"}></label>`}
             <div class="row" style="gap:8px;align-items:end">
                 ${branch ? `<button class="btn ghost" data-act="clear" ${canEdit ? "" : "disabled"}>Remove tier</button>` : ""}
                 <span class="note">Changes are kept in the draft automatically.</span>
@@ -546,11 +552,10 @@ function cellEditor(behaviour, step, kind) {
         </div>
     </div>`);
     const stage = (action = node.querySelector("[data-action]").value.trim()) => {
-        saveBehaviour(document, behaviour, {
-            tapCount: step.tapCount,
-            kind,
-            branch: edits.cellBranch(kind, {action, helper: node.querySelector("[data-helper]")?.value, repeatHz: node.querySelector("[data-repeat]")?.value}),
-        });
+        const edit = edits.cellEdit(kind, {stored: Boolean(branch), action,
+            helper: node.querySelector("[data-helper]")?.value, repeatHz: node.querySelector("[data-repeat]")?.value});
+        state.cellHow = edit.pending ? {cell, keycode: behaviour.keycode, ...edit.pending} : null;
+        if (!edit.pending) saveBehaviour(document, behaviour, {tapCount: step.tapCount, kind, branch: edit.branch});
     };
     node.querySelector('[data-act="close"]').addEventListener("click", () => { state.cell = null; render(); });
     node.querySelector('[data-act="pick"]')?.addEventListener("click", () => openPicker({

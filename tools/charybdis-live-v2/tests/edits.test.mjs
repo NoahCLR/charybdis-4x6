@@ -157,6 +157,16 @@ test("choosing repeat while held posts a rate the keyboard accepts", () => {
     assert.equal(row.steps[0].hold.repeatHz, Number(edits.DEFAULT_REPEAT_HZ));
 });
 
+test("how an empty cell runs is held until it sends something, then posted with it", () => {
+    assert.deepEqual(edits.cellEdit("hold", {stored: false, action: "", helper: "REPEAT_WHILE_HELD", repeatHz: "30"}),
+        {pending: {helper: "REPEAT_WHILE_HELD", repeatHz: "30"}}, "an empty cell posts nothing the keyboard would drop");
+    assert.deepEqual(edits.cellEdit("hold", {stored: false, action: "KC_RIGHT", helper: "REPEAT_WHILE_HELD", repeatHz: "30"}),
+        {branch: {helper: "REPEAT_WHILE_HELD", action: "KC_RIGHT", repeatHz: "30"}}, "the first action carries the held choice");
+    assert.deepEqual(edits.cellEdit("hold", {stored: true, action: " ", helper: "TAP_AT_HOLD_THRESHOLD"}),
+        {branch: null}, "emptying a stored cell still removes the tier");
+    assert.deepEqual(edits.cellEdit("tap", {stored: false, action: ""}), {pending: null}, "a tap tier has no helper to hold");
+});
+
 test("a behaviour row is added for a key without one, and deleted again", () => {
     const draft = session();
     const rows = () => decoded(draft).behaviors.rows.length;

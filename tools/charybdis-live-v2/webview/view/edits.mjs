@@ -42,6 +42,17 @@ export function cellBranch(kind, {action, helper, repeatHz}) {
     return {helper, action: sends, repeatHz: helper === "REPEAT_WHILE_HELD" ? String(repeatHz ?? "").trim() || DEFAULT_REPEAT_HZ : "0"};
 }
 
+// What one edit in the cell editor does. A cell that sends nothing has nothing
+// the keyboard can store, so choosing how it runs before what it sends is held
+// by the editor rather than posted; the choice then goes out with the first
+// action. A cell that already holds a branch posts every edit, and emptying it
+// removes the tier.
+export function cellEdit(kind, {stored, action, helper, repeatHz}) {
+    const branch = cellBranch(kind, {action, helper, repeatHz});
+    if (branch || stored) return {branch};
+    return {pending: kind === "tap" ? null : {helper, repeatHz}};
+}
+
 // One behaviour row, posted whole: the form is the row. `terms` are the
 // timing fields as typed (empty means the keyboard default, stored as 0),
 // `change` replaces one cell, and every other cell is carried as read.
