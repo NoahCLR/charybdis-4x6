@@ -48,8 +48,9 @@ selects one, and Enter on the selected key opens its picker.
 
 The layer stack is not one of those tabs, because
 it is not a property of the selected key: **Edit layers** sits after the last
-layer on the row above the board and drops open over it, so a layer is renamed
-and reordered where its keys are on screen. **Keys follow their layers** (on by
+layer on the row under the board and opens upward over it, its bottom edge at
+the row, so the draft bar at the window's foot never covers it; a layer is
+renamed and reordered where its keys are on screen. **Keys follow their layers** (on by
 default) renumbers every layer key (MO, LT, TG, TO, TT, OSL, LOCK_LAYER…) on
 layers, behaviours and combos so each still reaches the same layer; turned off,
 the layers move but those keys keep their numbers. Names, colours and the

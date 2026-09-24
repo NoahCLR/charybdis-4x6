@@ -51,7 +51,34 @@ export function attachLayersControl(bar) {
         panel.append(editor(model, portable, busy));
     }
     bar.append(panel);
+    // The row is measured once it is on screen; render attaches it afterwards.
+    requestAnimationFrame(() => placePanel(bar, panel));
     watchOutside(panel, trigger);
+}
+
+// The panel opens upward, its bottom edge at the row, so the draft bar at
+// the window's foot never covers it. The room is what the scrolling area
+// shows, not the window: the top bar sits above that area. When the panel is
+// taller than the room above, the area scrolls up by the shortfall (bringing
+// the row down) and whatever still does not fit scrolls inside the panel.
+// Only when the room above stays under a few rows does it open downward.
+function placePanel(bar, panel) {
+    if (!panel.isConnected) return;
+    const margin = 12;
+    const rowOf = () => (bar.querySelector(".layerbar") || bar).getBoundingClientRect();
+    let scroller = bar.parentElement;
+    while (scroller && !/(auto|scroll)/.test(getComputedStyle(scroller).overflowY)) scroller = scroller.parentElement;
+    const viewOf = () => scroller ? scroller.getBoundingClientRect() : {top: 0, bottom: window.innerHeight};
+    const roomAbove = () => rowOf().top - viewOf().top - margin;
+    const shortfall = panel.scrollHeight - roomAbove();
+    if (shortfall > 0 && scroller) scroller.scrollTop -= Math.min(shortfall, scroller.scrollTop);
+    const above = roomAbove();
+    const draftBar = document.querySelector(".commit")?.getBoundingClientRect();
+    const floor = draftBar && draftBar.height ? Math.min(viewOf().bottom, draftBar.top) : viewOf().bottom;
+    const below = floor - rowOf().bottom - margin;
+    const downward = above < 200 && below > above;
+    panel.classList.toggle("below", downward);
+    panel.style.maxHeight = `${Math.max(160, Math.floor(downward ? below : above))}px`;
 }
 
 function editor(model, portable, busy) {
@@ -63,16 +90,18 @@ function editor(model, portable, busy) {
     const node = el(`<div class="stack" style="gap:10px">
         <div class="sect-h"><h4>Layers</h4><span class="note">higher layers win · base stays underneath</span></div>
         <div class="list"></div>
-        <div class="stack" style="gap:4px">
-            <label class="sw"><input type="checkbox" id="layerKeysFollow" data-act="follow" ${follow ? "checked" : ""} ${busy ? "disabled" : ""}>
-                <span class="track"></span><span class="txt">Keys follow their layers</span></label>
-            <span class="note">${follow
-                ? "Layer keys (MO, LT, TG, TO, TT, OSL…) are renumbered with the move, so each still reaches the same layer."
-                : "Layer keys keep their numbers: a key set to MO(1) reaches whatever layer is now 1. Names, colours and the pointer and sniping settings still move with their layer."}</span>
-        </div>
-        <div class="row" style="gap:8px;align-items:center">
-            <button class="btn primary" data-act="save" ${busy ? "disabled" : ""}>Keep layers in draft</button>
-            <button class="btn ghost" data-act="cancel" ${busy ? "disabled" : ""}>Discard</button>
+        <div class="stack layerpanel-actions" style="gap:10px">
+            <div class="stack" style="gap:4px">
+                <label class="sw"><input type="checkbox" id="layerKeysFollow" data-act="follow" ${follow ? "checked" : ""} ${busy ? "disabled" : ""}>
+                    <span class="track"></span><span class="txt">Keys follow their layers</span></label>
+                <span class="note">${follow
+                    ? "Layer keys (MO, LT, TG, TO, TT, OSL…) are renumbered with the move, so each still reaches the same layer."
+                    : "Layer keys keep their numbers: a key set to MO(1) reaches whatever layer is now 1. Names, colours and the pointer and sniping settings still move with their layer."}</span>
+            </div>
+            <div class="row" style="gap:8px;align-items:center">
+                <button class="btn primary" data-act="save" ${busy ? "disabled" : ""}>Keep layers in draft</button>
+                <button class="btn ghost" data-act="cancel" ${busy ? "disabled" : ""}>Discard</button>
+            </div>
         </div></div>`);
 
     const list = node.querySelector(".list");
