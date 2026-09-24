@@ -96,6 +96,25 @@ typedef struct {
     uint32_t action_abi_digest;
 } noah_profile_validator_v1_declaration_t;
 
+typedef enum {
+    NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_KEY = 0u,
+    NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_TAP,
+    NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_HOLD_PRESS_AND_HOLD,
+    NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_HOLD_OTHER,
+    NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_COMBO_OUTPUT,
+} noah_profile_validator_v1_placement_t;
+
+// Checks the schema cannot make on its own, supplied by the firmware runtime.
+// Either hook may be NULL, which checks nothing.
+typedef struct {
+    bool (*combo_to_native)(const noah_profile_action_v1_t *action, uint16_t *native);
+    // Whether the keyboard can run an action where the profile places it. Only
+    // a candidate the keyboard is asked to save is held to it; a committed
+    // record and the compiled defaults are not, so a profile saved before a
+    // rule existed still loads.
+    bool (*placement_supported)(const noah_profile_action_v1_t *action, noah_profile_validator_v1_placement_t placement);
+} noah_profile_validator_v1_runtime_t;
+
 typedef struct {
     uint8_t  required_domain_mask;
     uint8_t  allowed_domain_mask;
@@ -110,7 +129,7 @@ typedef struct {
 
     // Optional firmware translation gate. Rejects native aliases of the same
     // combo input and actions the installed engine cannot execute.
-    bool (*combo_to_native)(const noah_profile_action_v1_t *action, uint16_t *native);
+    const noah_profile_validator_v1_runtime_t *runtime;
     noah_key_behavior_limits_v1_t behavior_limits;
     noah_profile_rgb_v1_limits_t  rgb_limits;
 } noah_profile_validator_v1_compatibility_t;

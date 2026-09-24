@@ -536,6 +536,57 @@ static void test_reboot_adopts_committed_profile_through_bounded_validator(void)
     assert(status.active.kind == NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE && status.active.generation == selected.generation);
 }
 
+static bool refuse_every_placement(const noah_profile_action_v1_t *action, noah_profile_validator_v1_placement_t placement) {
+    (void)action;
+    (void)placement;
+    return false;
+}
+
+// A staged candidate is validated with the candidate runtime, which adds the
+// placement check; adopting a committed record after reboot keeps the
+// compatibility's own, so a profile saved before a placement rule existed
+// still loads.
+static void test_only_staged_candidates_are_held_to_the_candidate_runtime(void) {
+    static const noah_profile_validator_v1_runtime_t candidate_runtime = {.placement_supported = refuse_every_placement};
+    noah_profile_store_t                    store;
+    noah_profile_store_t                    rebooted;
+    noah_profile_candidate_store_backend_t  backend;
+    noah_profile_candidate_store_backend_t  rebooted_backend;
+    noah_effective_profile_provider_t       provider;
+    noah_effective_profile_provider_t       rebooted_provider;
+    noah_profile_candidate_backend_t        interface;
+    noah_profile_candidate_v1_metadata_t    metadata = metadata_for(empty_profile, sizeof(empty_profile));
+    noah_profile_candidate_v1_error_t       error    = noah_profile_candidate_v1_no_error();
+    noah_profile_candidate_backend_result_t result;
+    noah_profile_store_record_t             selected;
+
+    memset(eeprom_bytes, 0xff, sizeof(eeprom_bytes));
+    init_store(&store);
+    init_backend(&backend, &store, &provider, init_provider(&provider));
+    noah_profile_candidate_store_backend_hold_candidates_to(&backend, &candidate_runtime);
+    interface = noah_profile_candidate_store_backend_interface(&backend);
+    assert(interface.begin(interface.context, &metadata) == NOAH_PROFILE_CANDIDATE_BACKEND_OK);
+    assert(interface.write(interface.context, 0u, empty_profile, sizeof(empty_profile)) == NOAH_PROFILE_CANDIDATE_BACKEND_OK);
+    result = interface.validation_begin(interface.context, &metadata, &error);
+    assert(backend.validator.compatibility.runtime == &candidate_runtime);
+    while (result == NOAH_PROFILE_CANDIDATE_BACKEND_IN_PROGRESS) {
+        result = interface.validation_step(interface.context, NOAH_PROFILE_CANDIDATE_SCAN_BYTE_BUDGET, &error);
+    }
+    assert(result == NOAH_PROFILE_CANDIDATE_BACKEND_VALID);
+    assert(noah_profile_candidate_store_backend_commit(&backend, NULL) == NOAH_PROFILE_CANDIDATE_BACKEND_OK);
+
+    noah_profile_store_init(&rebooted, store.io, store.compatibility);
+    assert(noah_profile_store_boot_select(&rebooted, &selected) == NOAH_PROFILE_STORE_OK);
+    init_backend(&rebooted_backend, &rebooted, &rebooted_provider, init_provider(&rebooted_provider));
+    noah_profile_candidate_store_backend_hold_candidates_to(&rebooted_backend, &candidate_runtime);
+    result = noah_profile_candidate_store_backend_adopt_committed_begin(&rebooted_backend, &selected, &error);
+    assert(rebooted_backend.validator.compatibility.runtime == NULL);
+    while (result == NOAH_PROFILE_CANDIDATE_BACKEND_IN_PROGRESS) {
+        result = noah_profile_candidate_store_backend_adopt_committed_step(&rebooted_backend, NOAH_PROFILE_CANDIDATE_SCAN_BYTE_BUDGET, &error);
+    }
+    assert(result == NOAH_PROFILE_CANDIDATE_BACKEND_VALID);
+}
+
 static void test_override_disabled_commit_activates_compiled_fallback(void) {
     noah_profile_store_t                   store;
     noah_profile_candidate_store_backend_t backend;
@@ -675,6 +726,7 @@ int main(void) {
     test_runtime_rollback_pins_store_target_until_active_backing_moves();
     test_scan_owner_composes_bounded_commit_and_safe_activation();
     test_reboot_adopts_committed_profile_through_bounded_validator();
+    test_only_staged_candidates_are_held_to_the_candidate_runtime();
     test_override_disabled_commit_activates_compiled_fallback();
     test_host_and_peer_share_one_explicit_admission_lease();
     test_owner_activation_api_checks_lease_and_exposes_exact_commit();

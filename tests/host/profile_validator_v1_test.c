@@ -347,6 +347,58 @@ static void test_stable_action_cross_references(const char *fixture_path) {
     expect_behavior_reference_failure(behavior, length, &compatible, NOAH_KEY_BEHAVIOR_FIELD_V1_TAP_ACTION);
 }
 
+static unsigned placement_seen[NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_COMBO_OUTPUT + 1u];
+static int      placement_refused = -1;
+
+static bool logging_placement(const noah_profile_action_v1_t *action, noah_profile_validator_v1_placement_t placement) {
+    (void)action;
+    placement_seen[placement]++;
+    return (int)placement != placement_refused;
+}
+
+static const noah_profile_validator_v1_runtime_t logging_runtime = {.placement_supported = logging_placement};
+
+static void reset_placement_log(int refused) {
+    memset(placement_seen, 0, sizeof(placement_seen));
+    placement_refused = refused;
+}
+
+// The keyboard's placement check sees every behaviour action with where it is
+// placed, and a refusal is reported at the action it refused, after the
+// domain decodes cleanly. Without a runtime nothing is checked.
+static void test_behavior_placement_hook(const char *fixture_path) {
+    uint8_t                                   full[TEST_BUFFER_SIZE];
+    uint8_t                                   behavior[TEST_BUFFER_SIZE];
+    size_t                                    full_length     = fixture_hex(fixture_path, "profile.full.hex", full, sizeof(full));
+    size_t                                    envelope_offset = fixture_ulong(fixture_path, "profile.behavior_envelope_offset", 10);
+    size_t                                    length          = behavior_only_blob(full, full_length, envelope_offset, behavior);
+    noah_profile_validator_v1_compatibility_t compatible      = compatibility();
+    noah_profile_validator_v1_declaration_t   declaration     = declaration_for(behavior, length, NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS);
+    noah_profile_validator_v1_error_t         error;
+
+    compatible.allowed_domain_mask  = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS;
+    compatible.required_domain_mask = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS;
+    compatible.runtime              = &logging_runtime;
+
+    reset_placement_log(-1);
+    expect_result(validate(behavior, length, &declaration, &compatible, &error), NOAH_PROFILE_VALIDATOR_V1_VALID);
+    assert(placement_seen[NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_KEY] == 2u);
+    assert(placement_seen[NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_TAP] == 2u);
+    assert(placement_seen[NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_HOLD_OTHER] == 2u);
+    assert(placement_seen[NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_COMBO_OUTPUT] == 0u);
+
+    reset_placement_log(NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_KEY);
+    expect_behavior_reference_failure(behavior, length, &compatible, NOAH_KEY_BEHAVIOR_FIELD_V1_TARGET);
+    reset_placement_log(NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_TAP);
+    expect_behavior_reference_failure(behavior, length, &compatible, NOAH_KEY_BEHAVIOR_FIELD_V1_TAP_ACTION);
+    reset_placement_log(NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_HOLD_OTHER);
+    expect_result(validate(behavior, length, &declaration, &compatible, &error), NOAH_PROFILE_VALIDATOR_V1_INVALID_REFERENCE);
+    assert(error.field_id == NOAH_KEY_BEHAVIOR_FIELD_V1_HOLD_ACTION || error.field_id == NOAH_KEY_BEHAVIOR_FIELD_V1_LONG_HOLD_ACTION);
+
+    compatible.runtime = &(const noah_profile_validator_v1_runtime_t){0};
+    expect_result(validate(behavior, length, &declaration, &compatible, &error), NOAH_PROFILE_VALIDATOR_V1_VALID);
+}
+
 static void test_read_failures(const char *fixture_path) {
     uint8_t                                   full[TEST_BUFFER_SIZE];
     size_t                                    length      = fixture_hex(fixture_path, "profile.full.hex", full, sizeof(full));
@@ -430,6 +482,18 @@ static void test_combo_domain(void) {
     memcpy(&bytes[32], &bytes[28], 4); // duplicate input
     declaration = declaration_for(bytes, sizeof(bytes), 4);
     expect_result(validate(bytes, sizeof(bytes), &declaration, &compatible, &error), NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN);
+    // A combo output the keyboard cannot run is refused; its inputs are keys
+    // and not asked about.
+    memcpy(&bytes[16], row, sizeof(row));
+    compatible.runtime = &logging_runtime;
+    reset_placement_log(-1);
+    declaration = declaration_for(bytes, sizeof(bytes), 4);
+    expect_result(validate(bytes, sizeof(bytes), &declaration, &compatible, &error), NOAH_PROFILE_VALIDATOR_V1_VALID);
+    assert(placement_seen[NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_COMBO_OUTPUT] == 32u);
+    reset_placement_log(NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_COMBO_OUTPUT);
+    expect_result(validate(bytes, sizeof(bytes), &declaration, &compatible, &error), NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN);
+    assert(error.domain_id == 0x30 && error.row_index == 0u);
+    compatible.runtime = NULL;
     // An explicitly empty table disables all combos; missing domain is fallback.
     bytes[10]   = 4;
     bytes[11]   = 0;
@@ -444,6 +508,7 @@ int main(int argc, char **argv) {
     test_identity_capacity_and_masks(argv[1]);
     test_blob_and_domain_rejections(argv[1]);
     test_stable_action_cross_references(argv[1]);
+    test_behavior_placement_hook(argv[1]);
     test_read_failures(argv[1]);
     test_combo_domain();
     puts("profile validator v1 host tests passed");

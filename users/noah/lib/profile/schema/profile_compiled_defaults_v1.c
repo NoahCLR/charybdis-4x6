@@ -801,6 +801,10 @@ noah_profile_reader_t noah_profile_compiled_v1_reader(const noah_profile_compile
 static bool combo_to_native(const noah_profile_action_v1_t *action, uint16_t *native) {
     return noah_profile_action_runtime_v1_to_native(action, native) == NOAH_PROFILE_ACTION_RUNTIME_V1_OK;
 }
+
+static const noah_profile_validator_v1_runtime_t compiled_runtime = {
+    .combo_to_native = combo_to_native,
+};
 #endif
 
 bool noah_profile_compiled_v1_compatibility(const noah_profile_compiled_v1_t *profile, noah_profile_validator_v1_compatibility_t *compatibility) {
@@ -813,7 +817,7 @@ bool noah_profile_compiled_v1_compatibility(const noah_profile_compiled_v1_t *pr
     result.allowed_domain_mask = profile->metadata.domain_mask;
 #ifdef COMBO_ENABLE
     result.allowed_domain_mask |= NOAH_PROFILE_VALIDATOR_V1_DOMAIN_COMBOS;
-    result.combo_to_native = combo_to_native;
+    result.runtime = &compiled_runtime;
 #endif
     result.required_domain_mask              = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_PD;
     result.logical_layer_count               = LAYER_COUNT;

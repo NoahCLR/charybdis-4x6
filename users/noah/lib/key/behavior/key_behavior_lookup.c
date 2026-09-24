@@ -134,18 +134,17 @@ static bool key_behavior_step_references_foreign_pd_mode(key_behavior_step_t ste
 }
 
 static bool key_behavior_keycode_supported(uint16_t keycode) {
-    return noah_action_desc_supported_as_behavior_keycode(noah_action_describe(keycode));
+    return noah_action_supported_at(keycode, NOAH_ACTION_PLACEMENT_KEY);
 }
 
 static bool key_behavior_action_supported(uint16_t action, hold_behavior_mode_t hold_mode) {
-    noah_action_desc_t         desc         = noah_action_describe(action);
-    noah_action_authored_use_t authored_use = NOAH_ACTION_AUTHORED_USE_TAP;
+    noah_action_placement_t placement = NOAH_ACTION_PLACEMENT_BEHAVIOR_TAP;
 
     if (hold_mode != HOLD_BEHAVIOR_NONE) {
-        authored_use = hold_mode == HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE ? NOAH_ACTION_AUTHORED_USE_HOLD_PRESS_AND_HOLD : NOAH_ACTION_AUTHORED_USE_HOLD_OTHER;
+        placement = hold_mode == HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE ? NOAH_ACTION_PLACEMENT_BEHAVIOR_HOLD_PRESS_AND_HOLD : NOAH_ACTION_PLACEMENT_BEHAVIOR_HOLD_OTHER;
     }
 
-    return noah_action_desc_supported_as_authored_action(desc, authored_use);
+    return noah_action_supported_at(action, placement);
 }
 
 static void key_behavior_log_invalid_keycode(uint8_t index, uint16_t keycode) {

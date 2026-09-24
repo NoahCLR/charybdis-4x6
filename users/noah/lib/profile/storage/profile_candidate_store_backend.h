@@ -21,6 +21,7 @@ typedef struct {
     noah_profile_store_t                     *store;
     noah_effective_profile_provider_t        *provider;
     noah_profile_validator_v1_compatibility_t compatibility;
+    const noah_profile_validator_v1_runtime_t *candidate_runtime;
     noah_profile_validator_v1_t               validator;
     noah_profile_validator_v1_profile_t       validated_profile;
     noah_profile_candidate_v1_metadata_t      metadata;
@@ -44,6 +45,12 @@ void noah_profile_candidate_store_backend_init(noah_profile_candidate_store_back
 // Returns callbacks for the scan-owned candidate transaction. The returned
 // interface borrows backend for its entire lifetime.
 noah_profile_candidate_backend_t noah_profile_candidate_store_backend_interface(noah_profile_candidate_store_backend_t *backend);
+
+// A staged candidate is validated with runtime in place of the
+// compatibility's own, so it is held to checks (such as where its actions are
+// placed) that a committed record being adopted is not. runtime must outlive
+// backend; NULL restores the compatibility's own.
+void noah_profile_candidate_store_backend_hold_candidates_to(noah_profile_candidate_store_backend_t *backend, const noah_profile_validator_v1_runtime_t *runtime);
 
 // Split reconciliation uses the same storage/validator/provider owner as host
 // candidates but supplies the sender's complete durable identity. This path

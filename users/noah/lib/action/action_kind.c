@@ -288,6 +288,25 @@ bool noah_action_kind_match_pd_mode_lock(uint16_t action, pd_mode_mask_t pd_mode
     return true;
 }
 
+bool noah_action_supported_at(uint16_t action, noah_action_placement_t placement) {
+    noah_action_desc_t desc = noah_action_describe(action);
+
+    switch (placement) {
+        case NOAH_ACTION_PLACEMENT_KEY:
+            return noah_action_desc_supported_as_behavior_keycode(desc);
+        case NOAH_ACTION_PLACEMENT_BEHAVIOR_TAP:
+            return noah_action_desc_supported_as_authored_action(desc, NOAH_ACTION_AUTHORED_USE_TAP);
+        case NOAH_ACTION_PLACEMENT_BEHAVIOR_HOLD_PRESS_AND_HOLD:
+            return noah_action_desc_supported_as_authored_action(desc, NOAH_ACTION_AUTHORED_USE_HOLD_PRESS_AND_HOLD);
+        case NOAH_ACTION_PLACEMENT_BEHAVIOR_HOLD_OTHER:
+            return noah_action_desc_supported_as_authored_action(desc, NOAH_ACTION_AUTHORED_USE_HOLD_OTHER);
+        case NOAH_ACTION_PLACEMENT_COMBO_OUTPUT:
+            return !noah_action_desc_is_raw_qmk_layer_action(desc);
+        default:
+            return false;
+    }
+}
+
 noah_action_desc_t noah_action_describe(uint16_t action) {
     const noah_action_kind_def_t *best_def  = NULL;
     noah_action_desc_t            best_desc = noah_action_desc_build(NOAH_ACTION_KIND_LITERAL, action, 0, 0);

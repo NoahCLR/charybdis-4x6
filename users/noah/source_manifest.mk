@@ -147,7 +147,8 @@ NOAH_AUTOMOUSE_SOURCES := \
 # Allocated only by explicit side-specific engineering builds. Keeping this
 # out of NOAH_COMMON_SOURCES preserves the reviewed normal-firmware footprint.
 NOAH_LIVE_PROFILE_OWNER_SOURCES := \
-    lib/profile/runtime/profile_owner.c
+    lib/profile/runtime/profile_owner.c \
+    lib/profile/runtime/profile_action_placement_v1.c
 
 NOAH_RGB_KEYMAP_SOURCES := \
     $(KEYMAP_PATH)/rgb_config.c

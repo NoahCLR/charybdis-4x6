@@ -47,12 +47,19 @@ test("behaviour creation, edit and deletion preserve unrelated rows and profile 
 test("simple additions and all hold modes produce canonical rows", () => {
     const next = edit({type: "addBehavior", behavior: {keycode: "KC_A", tapHoldTerm: "90", tap: {helper: "TAP_SENDS", action: "KC_TRNS"}}});
     assert.equal(rowFor(next, "KC_A").steps[0].tap.operand, 1);
-    for (const [helper, mode] of [["PRESS_AND_HOLD_UNTIL_RELEASE", 1], ["TAP_AT_HOLD_THRESHOLD", 2], ["TAP_ON_RELEASE_AFTER_HOLD", 4]]) {
-        const result = edit({type: "saveBehavior", behavior: {...form(), steps: [{tapCount: 2, hold: {helper, action: "MO(2)", repeatHz: "25"}, longHold: {helper, action: "LOCK_LAYER(3)"}}]}});
+    // A layer hold only works as "Press and hold until release"; the other hold
+    // modes carry a lock, as the keyboard requires.
+    for (const [helper, mode, action, kind] of [["PRESS_AND_HOLD_UNTIL_RELEASE", 1, "MO(2)", 2], ["TAP_AT_HOLD_THRESHOLD", 2, "LOCK_LAYER(2)", 3], ["TAP_ON_RELEASE_AFTER_HOLD", 4, "LOCK_LAYER(2)", 3]]) {
+        const result = edit({type: "saveBehavior", behavior: {...form(), steps: [{tapCount: 2, hold: {helper, action, repeatHz: "25"}, longHold: {helper, action: "LOCK_LAYER(3)"}}]}});
         const step = rowFor(result, "KC_A").steps[0];
-        assert.deepEqual(step.hold, {mode, repeatHz: 0, action: {kind: 2, flags: 0, operand: 2}});
+        assert.deepEqual(step.hold, {mode, repeatHz: 0, action: {kind, flags: 0, operand: 2}});
         assert.equal(step.longHold.action.kind, 3);
     }
+    for (const [field, helper] of [["tap", "TAP_SENDS"], ["hold", "TAP_AT_HOLD_THRESHOLD"], ["longHold", "TAP_ON_RELEASE_AFTER_HOLD"]]) {
+        assert.throws(() => edit({type: "saveBehavior", behavior: {...form(), steps: [{tapCount: 2, [field]: {helper, action: "MO(2)"}}]}}),
+            /The behaviour on KC_A: MO\(2\) holds a layer/, field);
+    }
+    assert.throws(() => edit({type: "saveBehavior", behavior: {...form(), steps: [{tapCount: 2, tap: {helper: "TAP_SENDS", action: "LT(1,KC_A)"}}]}}), /key of its own/);
 });
 
 test("native aliases update existing semantic targets without duplicating or renumbering them", () => {

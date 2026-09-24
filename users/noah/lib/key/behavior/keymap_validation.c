@@ -24,7 +24,7 @@ static uint8_t keymap_validation_error_count_add(uint8_t lhs, uint8_t rhs) {
 }
 
 static bool keymap_layer_action_supported(uint16_t keycode) {
-    return noah_action_desc_supported_as_behavior_keycode(noah_action_describe(keycode));
+    return noah_action_supported_at(keycode, NOAH_ACTION_PLACEMENT_KEY);
 }
 
 static void log_invalid_keymap_layer_action(uint8_t layer, uint8_t row, uint8_t col, uint16_t keycode) {
@@ -105,7 +105,7 @@ static uint8_t validate_combo_outputs(void) {
     for (uint8_t combo_index = 0; combo_index < noah_combo_output_count; combo_index++) {
         uint16_t keycode = noah_combo_output_keycodes[combo_index];
 
-        if (noah_action_desc_is_raw_qmk_layer_action(noah_action_describe(keycode))) {
+        if (!noah_action_supported_at(keycode, NOAH_ACTION_PLACEMENT_COMBO_OUTPUT)) {
             log_invalid_combo_output(combo_index, keycode);
             error_count = keymap_validation_error_count_increment(error_count);
         }

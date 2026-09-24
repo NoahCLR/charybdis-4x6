@@ -50,7 +50,10 @@ directory and the existing domain docs.
   `layer_ownership_oneshot_toggle(n)`, used up in the finalize hook; `TG(n)` is
   `LOCK_LAYER(n)`; `TO(n)` is `layer_ownership_goto(n)`); `DF()` and `LM()` are
   not yet. A plain `LT()` with no authored row keeps QMK's tap/hold decision;
-  only its hold (tap count 0) goes through layer ownership. A new owned layer keycode is a
+  only its hold (tap count 0) goes through layer ownership. Where an action may
+  be placed is one rule, `noah_action_supported_at()`: `keymap.c` validation
+  and the keyboard's check of a profile it is asked to save both ask it, and
+  the live app mirrors it in `placementProblem()`. A new owned layer keycode is a
   matcher in `lib/action/action_kind.c`, not a special case in a caller.
 - Do not treat split sync or RGB as owners. They mirror or render existing
   runtime truth.

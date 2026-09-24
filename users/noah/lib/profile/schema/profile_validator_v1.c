@@ -303,10 +303,27 @@ static noah_profile_validator_v1_result_t map_rgb_error(noah_profile_validator_v
 
 static bool action_reference_is_valid(const noah_profile_validator_v1_t *validator, const noah_profile_action_v1_t *action);
 
+static noah_profile_validator_v1_placement_t behavior_placement(const noah_key_behavior_domain_v1_action_event_t *event) {
+    switch (event->field_id) {
+        case NOAH_KEY_BEHAVIOR_FIELD_V1_TARGET:
+            return NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_KEY;
+        case NOAH_KEY_BEHAVIOR_FIELD_V1_TAP_ACTION:
+            return NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_TAP;
+        default:
+            return event->hold_mode == NOAH_KEY_BEHAVIOR_HOLD_V1_PRESS_AND_HOLD_UNTIL_RELEASE ? NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_HOLD_PRESS_AND_HOLD : NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_HOLD_OTHER;
+    }
+}
+
+static bool placement_is_supported(const noah_profile_validator_v1_t *validator, const noah_profile_action_v1_t *action, noah_profile_validator_v1_placement_t placement) {
+    const noah_profile_validator_v1_runtime_t *runtime = validator->compatibility.runtime;
+
+    return !(runtime && runtime->placement_supported) || runtime->placement_supported(action, placement);
+}
+
 static void record_action_reference(noah_profile_validator_v1_t *validator) {
     noah_key_behavior_domain_v1_action_event_t event;
 
-    if (validator->has_reference_error || !noah_key_behavior_domain_v1_validation_action_event(&validator->domain_validation.key_behaviors, &event) || action_reference_is_valid(validator, &event.action)) {
+    if (validator->has_reference_error || !noah_key_behavior_domain_v1_validation_action_event(&validator->domain_validation.key_behaviors, &event) || (action_reference_is_valid(validator, &event.action) && placement_is_supported(validator, &event.action, behavior_placement(&event)))) {
         return;
     }
     validator->has_reference_error    = true;
@@ -343,14 +360,15 @@ static noah_profile_validator_v1_result_t combo_decode_step(noah_profile_validat
     if (read_blob(validator, offset + 12u, &state->bytes[12], 16u, error) != NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS) return validator->terminal_result;
     noah_profile_combo_v1_row_t     row;
     noah_profile_action_v1_limits_t limits = noah_profile_action_v1_default_limits();
-    if (noah_profile_combo_v1_decode_row(state->bytes, &limits, &row) != NOAH_PROFILE_CODEC_V1_OK || !action_reference_is_valid(validator, &row.output)) goto invalid;
+    if (noah_profile_combo_v1_decode_row(state->bytes, &limits, &row) != NOAH_PROFILE_CODEC_V1_OK || !action_reference_is_valid(validator, &row.output) || !placement_is_supported(validator, &row.output, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_COMBO_OUTPUT)) goto invalid;
     for (uint8_t input = 0u; input < row.input_count; input++)
         if (!action_reference_is_valid(validator, &row.inputs[input])) goto invalid;
-    if (validator->compatibility.combo_to_native) {
+    if (validator->compatibility.runtime && validator->compatibility.runtime->combo_to_native) {
+        bool (*to_native)(const noah_profile_action_v1_t *, uint16_t *) = validator->compatibility.runtime->combo_to_native;
         uint16_t native[4], output;
-        if (!validator->compatibility.combo_to_native(&row.output, &output) || !output) goto invalid;
+        if (!to_native(&row.output, &output) || !output) goto invalid;
         for (uint8_t input = 0; input < row.input_count; input++) {
-            if (!validator->compatibility.combo_to_native(&row.inputs[input], &native[input]) || native[input] <= 1u) goto invalid;
+            if (!to_native(&row.inputs[input], &native[input]) || native[input] <= 1u) goto invalid;
             for (uint8_t prior = 0; prior < input; prior++)
                 if (native[prior] == native[input]) goto invalid;
         }

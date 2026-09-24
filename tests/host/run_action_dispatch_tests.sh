@@ -22,6 +22,8 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/action_dispatch_test.c" \
     "$ROOT/users/noah/lib/action/action_kind.c" \
+    "$ROOT/users/noah/lib/profile/runtime/profile_action_runtime_v1.c" \
+    "$ROOT/users/noah/lib/profile/runtime/profile_action_placement_v1.c" \
     "$ROOT/users/noah/lib/action/action_dispatch.c" \
     "$ROOT/users/noah/lib/state/modifiers/keyboard_mod_state.c" \
     "$ROOT/users/noah/lib/state/modifiers/keyboard_mod_policy.c" \

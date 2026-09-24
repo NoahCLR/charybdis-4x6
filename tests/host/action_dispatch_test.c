@@ -5,6 +5,8 @@
 
 #include "users/noah/lib/action/action_dispatch.h"
 #include "users/noah/lib/action/synthetic_record.h"
+#include "users/noah/lib/profile/runtime/profile_action_placement_v1.h"
+#include "users/noah/lib/profile/runtime/profile_action_runtime_v1.h"
 
 typedef struct {
     uint16_t keycode;
@@ -250,6 +252,10 @@ void tap_code16(uint16_t keycode) {
     literal_tap_call = test_current_tap_call(keycode);
     literal_tap_call_count++;
 }
+
+#define NOAH_PD_MODE_TEST_ROW(name, mode_keycode, handler, key_handler, reset, dpi, mode_traits, lifecycle) [PD_MODE_INDEX_##name] = {.mode_flag = PD_MODE_##name, .keycode = (mode_keycode), .lock_action = mode_keycode##_LOCK, .traits = (mode_traits)},
+const pd_mode_def_t pd_modes[PD_MODE_COUNT] = {NOAH_PD_MODE_LIST(NOAH_PD_MODE_TEST_ROW)};
+#undef NOAH_PD_MODE_TEST_ROW
 
 bool is_pd_mode_lock_action(uint16_t action) {
     return action == ARROW_MODE_LOCK;
@@ -609,7 +615,64 @@ static void test_literal_emit_can_suspend_and_restore_mods(void) {
     CHECK(send_keyboard_report_count == 2);
 }
 
+// Where an action may be placed: the one rule set compile-time validation and
+// the keyboard's check of a saved profile share.
+static void test_action_placement_rules(void) {
+    const uint16_t everywhere[] = {KC_A, G(KC_C), LOCK_LAYER(2), TG(2), TO(0)};
+    for (uint8_t i = 0; i < ARRAY_SIZE(everywhere); i++) {
+        CHECK(noah_action_supported_at(everywhere[i], NOAH_ACTION_PLACEMENT_KEY));
+        CHECK(noah_action_supported_at(everywhere[i], NOAH_ACTION_PLACEMENT_BEHAVIOR_TAP));
+        CHECK(noah_action_supported_at(everywhere[i], NOAH_ACTION_PLACEMENT_COMBO_OUTPUT));
+    }
+
+    // Layer holds need a held key: a behaviour hold or a key, never a tap or a
+    // combo output.
+    CHECK(noah_action_supported_at(MO(2), NOAH_ACTION_PLACEMENT_KEY));
+    CHECK(noah_action_supported_at(MO(2), NOAH_ACTION_PLACEMENT_BEHAVIOR_HOLD_PRESS_AND_HOLD));
+    CHECK(!noah_action_supported_at(MO(2), NOAH_ACTION_PLACEMENT_BEHAVIOR_HOLD_OTHER));
+    CHECK(!noah_action_supported_at(MO(2), NOAH_ACTION_PLACEMENT_BEHAVIOR_TAP));
+    CHECK(!noah_action_supported_at(MO(2), NOAH_ACTION_PLACEMENT_COMBO_OUTPUT));
+    CHECK(!noah_action_supported_at(TT(2), NOAH_ACTION_PLACEMENT_COMBO_OUTPUT));
+    CHECK(!noah_action_supported_at(LT(2, KC_A), NOAH_ACTION_PLACEMENT_COMBO_OUTPUT));
+    CHECK(noah_action_supported_at(OSL(2), NOAH_ACTION_PLACEMENT_BEHAVIOR_TAP));
+    CHECK(!noah_action_supported_at(OSL(2), NOAH_ACTION_PLACEMENT_COMBO_OUTPUT));
+
+    // Layer actions the runtime does not own are refused wherever they go.
+    const uint16_t unowned[] = {DF(1), LM(1, MOD_LSFT), TG(LAYER_COUNT), OSL(LAYER_COUNT)};
+    for (uint8_t i = 0; i < ARRAY_SIZE(unowned); i++) {
+        CHECK(!noah_action_supported_at(unowned[i], NOAH_ACTION_PLACEMENT_KEY));
+        CHECK(!noah_action_supported_at(unowned[i], NOAH_ACTION_PLACEMENT_BEHAVIOR_TAP));
+        CHECK(!noah_action_supported_at(unowned[i], NOAH_ACTION_PLACEMENT_BEHAVIOR_HOLD_PRESS_AND_HOLD));
+        CHECK(!noah_action_supported_at(unowned[i], NOAH_ACTION_PLACEMENT_COMBO_OUTPUT));
+    }
+}
+
+// The keyboard's check of a saved profile asks the same rules of a Profile
+// Wire action, placement for placement.
+static void test_saved_profile_placement_matches_the_rules(void) {
+    const noah_profile_action_v1_t key_a       = {.kind = NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, .operand = KC_A};
+    const noah_profile_action_v1_t hold        = {.kind = NOAH_PROFILE_ACTION_V1_LAYER_MOMENTARY, .operand = 2};
+    const noah_profile_action_v1_t lock        = {.kind = NOAH_PROFILE_ACTION_V1_LAYER_LOCK, .operand = 2};
+    const noah_profile_action_v1_t default_lay = {.kind = NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, .operand = DF(1)};
+    const noah_profile_action_v1_t oneshot     = {.kind = NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, .operand = OSL(2)};
+    const noah_profile_action_v1_t invalid     = {.kind = NOAH_PROFILE_ACTION_V1_LAYER_LOCK, .operand = LAYER_COUNT};
+
+    CHECK(noah_profile_action_placement_v1_supported(&key_a, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_COMBO_OUTPUT));
+    CHECK(noah_profile_action_placement_v1_supported(&hold, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_KEY));
+    CHECK(noah_profile_action_placement_v1_supported(&hold, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_HOLD_PRESS_AND_HOLD));
+    CHECK(!noah_profile_action_placement_v1_supported(&hold, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_HOLD_OTHER));
+    CHECK(!noah_profile_action_placement_v1_supported(&hold, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_TAP));
+    CHECK(!noah_profile_action_placement_v1_supported(&hold, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_COMBO_OUTPUT));
+    CHECK(noah_profile_action_placement_v1_supported(&lock, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_TAP));
+    CHECK(!noah_profile_action_placement_v1_supported(&default_lay, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_TAP));
+    CHECK(noah_profile_action_placement_v1_supported(&oneshot, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_TAP));
+    CHECK(!noah_profile_action_placement_v1_supported(&oneshot, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_COMBO_OUTPUT));
+    CHECK(!noah_profile_action_placement_v1_supported(&invalid, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_TAP));
+}
+
 int main(void) {
+    test_action_placement_rules();
+    test_saved_profile_placement_matches_the_rules();
     test_action_descriptor_classifies_common_actions();
     test_action_dispatch_keeps_runtime_default_policy();
     test_explicit_action_emit_can_skip_fallback_hold_settlement();

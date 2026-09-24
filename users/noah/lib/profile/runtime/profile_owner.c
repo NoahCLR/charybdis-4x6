@@ -4,6 +4,7 @@
 // ──────────────────────────────────────────────────────────────────────────
 
 #include "profile_owner.h"
+#include "profile_action_placement_v1.h"
 #include "effective_settings_runtime.h"
 
 #include <limits.h>
@@ -369,6 +370,13 @@ static bool initialize_runtime_graph(noah_profile_owner_t *owner) {
                                 .action_abi_digest       = owner->compiled.metadata.action_abi_digest,
                             });
     noah_profile_candidate_store_backend_init(candidate_backend(owner), &owner->store, &owner->provider, &owner->compatibility, owner->compiled.metadata.digest, owner->config.origin_half);
+    // A candidate the host asks the keyboard to save is also held to where its
+    // actions are placed; the compiled defaults and a committed record are not.
+    owner->candidate_runtime = (noah_profile_validator_v1_runtime_t){
+        .combo_to_native     = owner->compatibility.runtime ? owner->compatibility.runtime->combo_to_native : NULL,
+        .placement_supported = noah_profile_action_placement_v1_supported,
+    };
+    noah_profile_candidate_store_backend_hold_candidates_to(candidate_backend(owner), &owner->candidate_runtime);
     if (!candidate_backend(owner)->reuse_guard_installed) {
         return false;
     }

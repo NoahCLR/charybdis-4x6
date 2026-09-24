@@ -63,4 +63,40 @@ const TG_BASE = 0x5260, TO_BASE = 0x5200;
 const isLayerToggleCode = (code, layerCount) =>
     [TG_BASE, TO_BASE].includes(code & ~0x1f) && (code & 0x1f) < layerCount;
 
-module.exports = {isLayerToggleCode, KNOWN_ACTION_ABIS, NATIVE_ACTION_ABI_V1, knownActionAbi, actionName, nativeCode, keycodeAction, pdSlotOfCode, actionLimitsFor, layerRef, layerOfRef};
+// Where a stored action may be placed, as the keyboard checks a profile it is
+// asked to save (noah_action_supported_at in users/noah/lib/action). Only
+// layer keycodes are restricted: a layer hold needs a key held down, so it is a
+// key or a press-and-hold branch; OSL() is a key or a tap; TG(), TO() and
+// LOCK_LAYER() go anywhere; the layer keycodes the keyboard does not own go
+// nowhere. Returns what is wrong, or undefined.
+const PLACEMENT = Object.freeze({KEY: "key", TAP: "tap", HOLD_PRESS: "holdPress", HOLD_OTHER: "holdOther", COMBO_OUTPUT: "comboOutput"});
+
+function layerRuleOf(code, layerCount) {
+    const range = (base, span = 0x20) => code >= base && code < base + span;
+    const layer = code & 0x1f;
+    if (range(0x4000, 0x1000)) return ((code >> 8) & 0x0f) < layerCount ? {kind: "layerTap", places: [PLACEMENT.KEY]} : {kind: "unowned", places: []};
+    if (range(0x5000, 0x200) || range(0x5240) || range(0x52e0)) return {kind: "unowned", places: []};
+    if (!(range(0x5200) || range(0x5220) || range(0x5260) || range(0x5280) || range(0x52c0))) return undefined;
+    if (layer >= layerCount) return {kind: "unowned", places: []};
+    if (range(0x5220) || range(0x52c0)) return {kind: "hold", places: [PLACEMENT.KEY, PLACEMENT.HOLD_PRESS]};
+    if (range(0x5280)) return {kind: "oneShot", places: [PLACEMENT.KEY, PLACEMENT.TAP]};
+    return undefined;
+}
+
+function placementProblem(action, placement, {layerCount = 8} = {}) {
+    const code = action.kind === ACTION.LAYER_MOMENTARY ? 0x5220 | action.operand : nativeCode(action);
+    const rule = code === undefined ? undefined : layerRuleOf(code, layerCount);
+    if (!rule || rule.places.includes(placement)) return undefined;
+    const name = actionName(action);
+    switch (rule.kind) {
+        case "unowned": return `${name} is a layer keycode this keyboard does not run through its layer tracking, so it cannot be saved here.`;
+        case "hold": return placement === PLACEMENT.COMBO_OUTPUT
+            ? `${name} holds a layer, and a combo only taps. Use LOCK_LAYER, TG or TO for a combo.`
+            : `${name} holds a layer, so it only works as a key or a "Press and hold until release" branch.`;
+        case "layerTap": return `${name} is a key of its own and cannot be sent by a behaviour or a combo.`;
+        case "oneShot": return `${name} works as a key or a tap, not as ${placement === PLACEMENT.COMBO_OUTPUT ? "a combo output" : "a hold"}.`;
+        default: return undefined;
+    }
+}
+
+module.exports = {PLACEMENT, placementProblem, isLayerToggleCode, KNOWN_ACTION_ABIS, NATIVE_ACTION_ABI_V1, knownActionAbi, actionName, nativeCode, keycodeAction, pdSlotOfCode, actionLimitsFor, layerRef, layerOfRef};

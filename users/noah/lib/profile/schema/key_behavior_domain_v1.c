@@ -327,12 +327,13 @@ static noah_key_behavior_domain_v1_validation_result_t validation_read(noah_key_
     return NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_IN_PROGRESS;
 }
 
-static void publish_action_event(noah_key_behavior_domain_v1_validation_t *validation, const noah_profile_action_v1_t *action, size_t offset, uint8_t row_index, uint8_t step_index, uint8_t field_id) {
+static void publish_action_event(noah_key_behavior_domain_v1_validation_t *validation, const noah_profile_action_v1_t *action, size_t offset, uint8_t row_index, uint8_t step_index, uint8_t field_id, uint8_t hold_mode) {
     validation->action_event.action     = *action;
     validation->action_event.offset     = offset;
     validation->action_event.row_index  = row_index;
     validation->action_event.step_index = step_index;
     validation->action_event.field_id   = field_id;
+    validation->action_event.hold_mode  = hold_mode;
     validation->action_event_available  = true;
 }
 
@@ -526,7 +527,7 @@ noah_key_behavior_domain_v1_validation_result_t noah_key_behavior_domain_v1_vali
             if (validation->current_step_count > validation->candidate.limits.max_tap_steps_per_row) {
                 return validation_reject(validation, NOAH_PROFILE_CODEC_V1_CAPACITY_EXCEEDED, body_start + 11u, validation->row_index, UINT8_MAX, NOAH_KEY_BEHAVIOR_FIELD_V1_ROW_STEP_COUNT, error);
             }
-            publish_action_event(validation, &validation->current_target, body_start, validation->row_index, UINT8_MAX, NOAH_KEY_BEHAVIOR_FIELD_V1_TARGET);
+            publish_action_event(validation, &validation->current_target, body_start, validation->row_index, UINT8_MAX, NOAH_KEY_BEHAVIOR_FIELD_V1_TARGET, 0u);
             validation->branch_offset      = body_start + NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_FIXED_SIZE;
             validation->step_index         = 0u;
             validation->previous_tap_index = -1;
@@ -576,7 +577,7 @@ noah_key_behavior_domain_v1_validation_result_t noah_key_behavior_domain_v1_vali
             clear_error(&action_error);
             result = decode_action_bytes(bytes, action_offset, &validation->candidate.action_limits, false, validation->row_index, validation->step_index, NOAH_KEY_BEHAVIOR_FIELD_V1_TAP_ACTION, &action, &action_error);
             if (result != NOAH_PROFILE_CODEC_V1_OK) return validation_reject_error(validation, &action_error, error);
-            publish_action_event(validation, &action, action_offset, validation->row_index, validation->step_index, NOAH_KEY_BEHAVIOR_FIELD_V1_TAP_ACTION);
+            publish_action_event(validation, &action, action_offset, validation->row_index, validation->step_index, NOAH_KEY_BEHAVIOR_FIELD_V1_TAP_ACTION, 0u);
             validation->branch_offset += NOAH_PROFILE_BLOB_V1_ACTION_SIZE;
             return validation_advance_after_tap(validation, error);
         }
@@ -598,6 +599,7 @@ noah_key_behavior_domain_v1_validation_result_t noah_key_behavior_domain_v1_vali
             if ((bytes[0] == NOAH_KEY_BEHAVIOR_HOLD_V1_REPEAT_WHILE_HELD && (bytes[1] == 0u || bytes[1] > validation->candidate.limits.max_repeat_hz)) || (bytes[0] != NOAH_KEY_BEHAVIOR_HOLD_V1_REPEAT_WHILE_HELD && bytes[1] != 0u)) {
                 return validation_reject(validation, NOAH_PROFILE_CODEC_V1_INVALID_REPEAT_RATE, fields_offset + 1u, validation->row_index, validation->step_index, repeat_field, error);
             }
+            validation->current_hold_mode = bytes[0];
             validation->branch_offset += 2u;
             validation->phase = long_hold ? NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_PHASE_STEP_LONG_HOLD_ACTION : NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_PHASE_STEP_HOLD_ACTION;
             return NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_IN_PROGRESS;
@@ -619,7 +621,7 @@ noah_key_behavior_domain_v1_validation_result_t noah_key_behavior_domain_v1_vali
             clear_error(&action_error);
             result = decode_action_bytes(bytes, action_offset, &validation->candidate.action_limits, false, validation->row_index, validation->step_index, field, &action, &action_error);
             if (result != NOAH_PROFILE_CODEC_V1_OK) return validation_reject_error(validation, &action_error, error);
-            publish_action_event(validation, &action, action_offset, validation->row_index, validation->step_index, field);
+            publish_action_event(validation, &action, action_offset, validation->row_index, validation->step_index, field, validation->current_hold_mode);
             validation->branch_offset += NOAH_PROFILE_BLOB_V1_ACTION_SIZE;
             if (long_hold) return validation_finish_step(validation, error);
             return validation_advance_after_hold(validation, error);

@@ -1331,10 +1331,10 @@ decision: QMK's tapping engine still decides, and marks a hold with tap count
 Still open, in the order they are taken:
 
 1. (Done: plain `LT()` holds.)
-2. No device-side check: the keymap and combo validation runs only in host
-   tests, so a profile written by the app or VIA can still put `DF()`/`LM()`
-   in a behaviour (a silent no-op) or any layer keycode on a combo; the app's
-   combo editor refuses none.
+2. (Done: the keyboard holds a candidate it is asked to save to where its
+   actions are placed, by the rules `keymap.c` validation uses; a committed
+   record still loads. The app refuses the same placements first, for combos
+   and behaviours, checking every row since the keyboard checks the domain.)
 3. Nothing is verified on hardware. The host harness feeds userspace directly
    and bypasses QMK's tapping engine, which buffers `TT()`, `OSL()` and `LT()`
    presses; split sync and the RGB lock indicator for `TG()`/`TO()` locks and

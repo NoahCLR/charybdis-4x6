@@ -226,6 +226,19 @@ static inline bool noah_action_desc_consumes_direct_press(noah_action_desc_t des
 }
 
 noah_action_desc_t noah_action_describe(uint16_t action);
+
+// Where an action is placed. Compile-time validation of the authored profile
+// and the keyboard's check of a saved profile ask the same question here, so
+// the two cannot drift apart.
+typedef enum {
+    NOAH_ACTION_PLACEMENT_KEY = 0, // a keymap position, or the key a behaviour row listens on
+    NOAH_ACTION_PLACEMENT_BEHAVIOR_TAP,
+    NOAH_ACTION_PLACEMENT_BEHAVIOR_HOLD_PRESS_AND_HOLD,
+    NOAH_ACTION_PLACEMENT_BEHAVIOR_HOLD_OTHER,
+    NOAH_ACTION_PLACEMENT_COMBO_OUTPUT, // a combo only taps, so it cannot hold a layer
+} noah_action_placement_t;
+
+bool noah_action_supported_at(uint16_t action, noah_action_placement_t placement);
 void               noah_emit_action_tap(uint16_t action, noah_emit_policy_t policy);
 void               noah_emit_action_tap_at(keypos_t key_pos, uint16_t action, noah_emit_policy_t policy);
 void               noah_emit_synthetic_qmk_tap(uint16_t keycode, noah_emit_policy_t policy);

@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "users/noah/lib/profile/runtime/profile_action_placement_v1.h"
 #include "users/noah/lib/profile/runtime/profile_owner.h"
 #include "users/noah/lib/profile/storage/profile_checksum.h"
 
@@ -123,6 +124,14 @@ noah_profile_compiled_v1_result_t noah_profile_compiled_v1_open(noah_profile_com
 
 noah_profile_reader_t noah_profile_compiled_v1_reader(const noah_profile_compiled_v1_t *profile) {
     return (noah_profile_reader_t){.read = compiled_read, .context = (void *)profile, .length = sizeof(compiled_blob)};
+}
+
+// The placement rules are tested with the real action classification in the
+// action-dispatch runner; the owner only has to hand them to its candidates.
+bool noah_profile_action_placement_v1_supported(const noah_profile_action_v1_t *action, noah_profile_validator_v1_placement_t placement) {
+    (void)action;
+    (void)placement;
+    return true;
 }
 
 bool noah_profile_compiled_v1_compatibility(const noah_profile_compiled_v1_t *profile, noah_profile_validator_v1_compatibility_t *compatibility) {
@@ -309,6 +318,12 @@ static void boot_empty(noah_profile_owner_t *owner, memory_t *memory) {
     assert(memory->writes == writes_before_init && memory->largest_read <= NOAH_PROFILE_STORE_IO_CHUNK_MAX);
     assert(compiled_reads > compiled_before_init && key_installed && rgb_installed);
     assert(owner->descriptor_readable && !owner->committed_descriptor.has_profile);
+    // Candidates the host asks this owner to save are held to where their
+    // actions are placed; its own compatibility, used for the compiled
+    // defaults and committed records, is not.
+    assert(owner->staging.candidate_backend.candidate_runtime == &owner->candidate_runtime);
+    assert(owner->candidate_runtime.placement_supported == noah_profile_action_placement_v1_supported);
+    assert(!(owner->compatibility.runtime && owner->compatibility.runtime->placement_supported));
 }
 
 static void scan_pair(noah_profile_owner_t *master, noah_profile_owner_t *peer, uint32_t *now) {

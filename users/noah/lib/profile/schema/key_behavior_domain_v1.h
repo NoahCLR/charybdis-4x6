@@ -157,6 +157,7 @@ typedef struct {
     uint8_t                  row_index;
     uint8_t                  step_index;
     uint8_t                  field_id;
+    uint8_t                  hold_mode; // NOAH_KEY_BEHAVIOR_HOLD_V1_* for a hold or long-hold action, else 0
 } noah_key_behavior_domain_v1_action_event_t;
 
 // Caller-owned, payload-independent incremental validation state. Fields are
@@ -183,6 +184,7 @@ typedef struct {
     uint8_t                                        current_presence_mask;
     bool                                           have_previous_target;
     bool                                           action_event_available;
+    uint8_t                                        current_hold_mode;
 } noah_key_behavior_domain_v1_validation_t;
 
 noah_key_behavior_limits_v1_t noah_key_behavior_domain_v1_default_limits(void);

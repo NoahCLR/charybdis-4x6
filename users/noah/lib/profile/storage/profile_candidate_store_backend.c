@@ -199,8 +199,9 @@ static noah_profile_candidate_backend_result_t read_candidate(void *context, uin
 }
 
 static noah_profile_candidate_backend_result_t validation_begin(void *context, const noah_profile_candidate_v1_metadata_t *metadata, noah_profile_candidate_v1_error_t *error) {
-    noah_profile_candidate_store_backend_t *backend = context;
-    noah_profile_validator_v1_declaration_t declaration;
+    noah_profile_candidate_store_backend_t   *backend = context;
+    noah_profile_validator_v1_compatibility_t compatibility;
+    noah_profile_validator_v1_declaration_t   declaration;
     noah_profile_validator_v1_error_t       validator_error = noah_profile_validator_v1_no_error();
     noah_profile_validator_v1_result_t      result;
     uint16_t                                payload_start;
@@ -219,7 +220,11 @@ static noah_profile_candidate_backend_result_t validation_begin(void *context, c
         .digest            = metadata->digest,
         .action_abi_digest = metadata->action_abi_digest,
     };
-    result = noah_profile_validator_v1_begin(&backend->validator, &backend->staged_reader, payload_start, &declaration, &backend->compatibility, &validator_error);
+    compatibility = backend->compatibility;
+    if (backend->candidate_runtime) {
+        compatibility.runtime = backend->candidate_runtime;
+    }
+    result = noah_profile_validator_v1_begin(&backend->validator, &backend->staged_reader, payload_start, &declaration, &compatibility, &validator_error);
     if (result == NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS) {
         return NOAH_PROFILE_CANDIDATE_BACKEND_IN_PROGRESS;
     }
@@ -563,6 +568,12 @@ void noah_profile_candidate_store_backend_init(noah_profile_candidate_store_back
         .context = backend,
     };
     backend->reuse_guard_installed = store && provider && noah_profile_store_set_reuse_guard(store, &guard);
+}
+
+void noah_profile_candidate_store_backend_hold_candidates_to(noah_profile_candidate_store_backend_t *backend, const noah_profile_validator_v1_runtime_t *runtime) {
+    if (backend) {
+        backend->candidate_runtime = runtime;
+    }
 }
 
 noah_profile_candidate_backend_t noah_profile_candidate_store_backend_interface(noah_profile_candidate_store_backend_t *backend) {

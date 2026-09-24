@@ -5,7 +5,7 @@ const keycodes = require("../data/keycode-catalog");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {decodeKeyBehaviorDomain, encodeKeyBehaviorDomain, KEY_BEHAVIOR_HOLD_MODES} = require("../schema/key-behavior-domain-v1");
 const {semanticActionForExpression, resolveNativeQmkExpression} = require("../schema/compiled-profile-v1");
-const {actionName, isLayerToggleCode, knownActionAbi} = require("../schema/actions");
+const {PLACEMENT, actionName, isLayerToggleCode, knownActionAbi, placementProblem} = require("../schema/actions");
 const {PROFILE_WIRE_FEATURES} = require("../protocol/profile-wire-v1");
 
 const BEHAVIOR_EDITS = new Set(["saveBehavior", "addBehavior", "deleteBehavior", "retargetBehavior"]);
@@ -31,7 +31,24 @@ function editKeyBehaviors(payload, message, capabilities = {}) {
         : knownAbi ? nativeCode(action) : undefined;
     const equivalent = (left, right) => (left.kind === right.kind && left.operand === right.operand)
         || (native(left) !== undefined && native(left) === native(right));
-    const encode = (rows) => encodeKeyBehaviorDomain({rows}, {
+    // The keyboard refuses a profile whose actions sit where it cannot run
+    // them, so every row is checked, not only the one being edited.
+    const layerCount = capabilities.compiledLayerCount ?? 8;
+    const checkPlacements = (rows) => rows.forEach((row) => {
+        const where = `The behaviour on ${actionName(row.target)}`;
+        const check = (action, placement) => {
+            const problem = action && placementProblem(action, placement, {layerCount});
+            if (problem) throw invalid(`${where}: ${problem}`);
+        };
+        check(row.target, PLACEMENT.KEY);
+        for (const step of row.steps) {
+            check(step.tap, PLACEMENT.TAP);
+            for (const hold of [step.hold, step.longHold]) {
+                if (hold) check(hold.action, hold.mode === KEY_BEHAVIOR_HOLD_MODES.PRESS_AND_HOLD_UNTIL_RELEASE ? PLACEMENT.HOLD_PRESS : PLACEMENT.HOLD_OTHER);
+            }
+        }
+    });
+    const encode = (rows) => checkPlacements(rows) ?? encodeKeyBehaviorDomain({rows}, {
         limits: {maxRows: capabilities.maxBehaviorRows, maxPopulatedSteps: capabilities.maxPopulatedBehaviorSteps, maxTapStepsPerBehavior: capabilities.maxTapStepsPerBehavior},
         actionLimits: {maxPdModes, maxLogicalLayers: capabilities.compiledLayerCount, maxViaMacroSlots: capabilities.viaMacroSlots, maxHardcodedMacroSlots: capabilities.hardcodedMacroSlots},
     });

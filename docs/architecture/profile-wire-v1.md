@@ -683,6 +683,17 @@ Responses use stable error ids and include the transaction id when present:
 Structured validation details identify domain, table, row, tap index, field,
 and error id without returning source strings from firmware.
 
+A candidate the keyboard is asked to save is also held to where its actions
+are placed, by the same rules compile-time validation applies to the authored
+profile (`noah_action_supported_at`): a behaviour's key, tap, press-and-hold
+and other holds, and a combo's output. A layer hold (`MO()`, `TT()`) needs a
+held key; `OSL()` is a key or a tap; `LT()` is only a key; `TG()`, `TO()` and
+`LOCK_LAYER()` go anywhere; `DF()`, `PDF()` and `LM()` go nowhere. A refused
+behaviour action is an invalid cross-reference at its row, tap index and
+field; a refused combo output rejects the combo domain at its row. A committed
+record being adopted and the compiled defaults are not held to placement, so a
+profile saved before a rule existed still loads.
+
 ## Golden Fixtures Required Before Stage 02 Completion
 
 - empty header with zero domains;

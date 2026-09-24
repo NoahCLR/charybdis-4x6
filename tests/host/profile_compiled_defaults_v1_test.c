@@ -7,6 +7,7 @@
 
 #include "users/noah/lib/profile/schema/profile_compiled_defaults_v1.h"
 #include "users/noah/lib/profile/schema/profile_validator_v1.h"
+#include "users/noah/lib/profile/runtime/profile_action_placement_v1.h"
 #include "users/noah/lib/profile/runtime/profile_action_runtime_v1.h"
 #include "users/noah/lib/profile/runtime/effective_pd_runtime.h"
 #include "users/noah/lib/profile/storage/profile_checksum.h"
@@ -127,6 +128,43 @@ static noah_profile_validator_v1_compatibility_t compatibility(uint32_t action_a
     return value;
 }
 
+// Table lookups over the real pd_modes[], standing in for the pointing
+// registry so the placement check classifies pd-mode keys as the firmware does.
+bool is_pd_mode_lock_action(uint16_t action) {
+    for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
+        if (pd_modes[i].lock_action == action) return true;
+    }
+    return false;
+}
+
+pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
+    for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
+        if (pd_modes[i].keycode != KC_NO && pd_modes[i].keycode == keycode) return pd_modes[i].mode_flag;
+    }
+    return 0;
+}
+
+typedef struct {
+    unsigned layer_holds[NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_COMBO_OUTPUT + 1u];
+    unsigned refused;
+} placement_log_t;
+
+static placement_log_t placement_log;
+
+// The keyboard's check of a profile it is asked to save, logged: the real
+// authored profile must pass it, and every MO() hold must reach it as a
+// press-and-hold, the only place a momentary layer is allowed.
+static bool logged_placement(const noah_profile_action_v1_t *action, noah_profile_validator_v1_placement_t placement) {
+    bool supported = noah_profile_action_placement_v1_supported(action, placement);
+
+    if (action->kind == NOAH_PROFILE_ACTION_V1_LAYER_MOMENTARY) placement_log.layer_holds[placement]++;
+    if (!supported) {
+        placement_log.refused++;
+        fprintf(stderr, "placement refused: kind=%u operand=0x%04x placement=%u\n", (unsigned)action->kind, (unsigned)action->operand, (unsigned)placement);
+    }
+    return supported;
+}
+
 static void validate_whole_profile(const noah_profile_compiled_v1_t *profile) {
     noah_profile_reader_t                   reader        = noah_profile_compiled_v1_reader(profile);
     noah_profile_reader_t                   copied_reader = reader;
@@ -152,6 +190,27 @@ static void validate_whole_profile(const noah_profile_compiled_v1_t *profile) {
         fprintf(stderr, "validator failed: code=%u offset=%zu domain=%u table=%u row=%u step=%u field=%u detail=%u\n", (unsigned)result, error.byte_offset, error.domain_id, error.table_id, error.row_index, error.step_index, error.field_id, error.detail_code);
     }
     assert(result == NOAH_PROFILE_VALIDATOR_V1_VALID);
+
+    noah_profile_validator_v1_compatibility_t runtime_compatibility;
+    noah_profile_validator_v1_runtime_t       candidate_runtime;
+
+    assert(noah_profile_compiled_v1_compatibility(profile, &runtime_compatibility));
+    candidate_runtime = (noah_profile_validator_v1_runtime_t){
+        .combo_to_native     = runtime_compatibility.runtime ? runtime_compatibility.runtime->combo_to_native : NULL,
+        .placement_supported = logged_placement,
+    };
+    compatible.runtime = &candidate_runtime;
+    memset(&placement_log, 0, sizeof(placement_log));
+    copied_reader = reader;
+    result        = noah_profile_validator_v1_begin(&validator, &copied_reader, 0u, &declaration, &compatible, &error);
+    for (size_t steps = 0u; result == NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS && steps < 1000u; steps++) {
+        result = noah_profile_validator_v1_step(&validator, NOAH_PROFILE_VALIDATOR_V1_CHECKSUM_CHUNK_MAX, &error);
+    }
+    assert(result == NOAH_PROFILE_VALIDATOR_V1_VALID);
+    assert(placement_log.refused == 0u);
+    assert(placement_log.layer_holds[NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_HOLD_PRESS_AND_HOLD] > 0u);
+    assert(placement_log.layer_holds[NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_HOLD_OTHER] == 0u);
+    assert(placement_log.layer_holds[NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_TAP] == 0u);
 }
 
 static void test_real_authored_profile(void) {
@@ -186,7 +245,7 @@ static void test_real_authored_profile(void) {
 #endif
 #ifdef COMBO_ENABLE
     allowed_domains |= NOAH_PROFILE_VALIDATOR_V1_DOMAIN_COMBOS;
-    assert(runtime_compatibility.combo_to_native != NULL);
+    assert(runtime_compatibility.runtime != NULL && runtime_compatibility.runtime->combo_to_native != NULL);
 #endif
     assert(runtime_compatibility.allowed_domain_mask == allowed_domains);
     assert(runtime_compatibility.action_abi_digest == profile.metadata.action_abi_digest);
@@ -294,6 +353,14 @@ static void validate_portable_import(const noah_profile_compiled_v1_t *compiled,
     noah_profile_reader_t                     reader = noah_profile_reader_from_memory(output, length);
     noah_profile_validator_v1_compatibility_t compatible;
     assert(noah_profile_compiled_v1_compatibility(compiled, &compatible));
+    // The app's profile is a candidate, so it is held to where its actions are
+    // placed, as the keyboard holds it when asked to save it.
+    noah_profile_validator_v1_runtime_t candidate_runtime = {
+        .combo_to_native     = compatible.runtime ? compatible.runtime->combo_to_native : NULL,
+        .placement_supported = logged_placement,
+    };
+    compatible.runtime = &candidate_runtime;
+    memset(&placement_log, 0, sizeof(placement_log));
     noah_profile_validator_v1_declaration_t declaration = {
         .schema_major      = NOAH_PROFILE_BLOB_V1_SCHEMA_MAJOR,
         .schema_minor      = 0,
@@ -310,6 +377,7 @@ static void validate_portable_import(const noah_profile_compiled_v1_t *compiled,
         result = noah_profile_validator_v1_step(&validator, 20, &error);
     if (result != NOAH_PROFILE_VALIDATOR_V1_VALID) fprintf(stderr, "portable import failed: %u domain=%u field=%u byte=%zu\n", result, error.domain_id, error.field_id, error.byte_offset);
     assert(result == NOAH_PROFILE_VALIDATOR_V1_VALID);
+    assert(placement_log.refused == 0u);
     assert(validator.profile.domain_mask == NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS);
     assert(validator.profile.settings.length >= 344);
 #ifdef NOAH_PD_PROFILE_ENABLE
