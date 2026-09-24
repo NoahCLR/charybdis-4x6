@@ -3184,6 +3184,127 @@ static void test_plain_layer_tap_hold_is_owned_and_its_tap_is_qmks(void) {
     test_assert_thumb_runtime_quiescent(lt_pos);
 }
 
+// A layer key as a combo output, on the N+M combo for the duration of a test.
+typedef struct {
+    int16_t  index;
+    uint16_t original;
+    keypos_t n_pos;
+    keypos_t m_pos;
+} test_layer_combo_t;
+
+static test_layer_combo_t test_layer_combo_begin(uint16_t output) {
+    static const uint16_t keys[] = {KC_N, KC_M};
+    test_layer_combo_t    combo  = {
+            .index = test_find_combo_index_for_exact_keys(keys, ARRAY_SIZE(keys)),
+            .n_pos = test_find_keypos_on_layer(LAYER_BASE, KC_N),
+            .m_pos = test_find_keypos_on_layer(LAYER_BASE, KC_M),
+    };
+
+    CHECK(combo.index >= 0 && test_keypos_valid(combo.n_pos) && test_keypos_valid(combo.m_pos));
+    combo.original                   = key_combos[combo.index].keycode;
+    key_combos[combo.index].keycode = output;
+    return combo;
+}
+
+static void test_layer_combo_end(const test_layer_combo_t *combo) {
+    key_combos[combo->index].keycode = combo->original;
+}
+
+static void test_layer_combo_press(const test_layer_combo_t *combo) {
+    test_observe_combo_member(combo->n_pos, true);
+    test_observe_combo_member(combo->m_pos, true);
+    key_combos[combo->index].active = true;
+    CHECK(!test_process_combo_output(key_combos[combo->index].keycode, true));
+}
+
+// QMK releases a combo's output when its first member comes up.
+static void test_layer_combo_release(const test_layer_combo_t *combo, bool n_first) {
+    key_combos[combo->index].active = false;
+    test_observe_combo_member(n_first ? combo->n_pos : combo->m_pos, false);
+    CHECK(!test_process_combo_output(key_combos[combo->index].keycode, false));
+    test_observe_combo_member(n_first ? combo->m_pos : combo->n_pos, false);
+}
+
+// A layer hold from a combo is owned like one from a key: the layer is on
+// while the combo is held and off when it comes up, a locked layer survives
+// it, and a layer locked while the combo is held is left alone.
+static void test_combo_layer_hold_is_owned(void) {
+    keypos_t           tg_pos = {.row = 2, .col = 6};
+    test_layer_combo_t combo;
+
+    test_reset_state();
+    combo = test_layer_combo_begin(MO(LAYER_NAV));
+
+    test_layer_combo_press(&combo);
+    CHECK(test_layer_active(LAYER_NAV));
+    CHECK(noah_runtime_debug_slot_owner_keycode(combo.m_pos) == MO(LAYER_NAV) || noah_runtime_debug_slot_owner_keycode(combo.n_pos) == MO(LAYER_NAV));
+    key_runtime_integration_advance(&fake_time, 300u);
+    key_runtime_integration_scan();
+    CHECK(test_layer_active(LAYER_NAV));
+    test_layer_combo_release(&combo, true);
+    key_runtime_integration_scan();
+    CHECK(!test_layer_active(LAYER_NAV));
+    CHECK(noah_runtime_debug_active_slot_count() == 0u);
+
+    key_runtime_integration_process_record(TG(LAYER_NAV), tg_pos, true);
+    key_runtime_integration_process_record(TG(LAYER_NAV), tg_pos, false);
+    test_layer_combo_press(&combo);
+    test_layer_combo_release(&combo, false);
+    key_runtime_integration_scan();
+    CHECK(test_layer_locked(LAYER_NAV));
+    CHECK(test_layer_active(LAYER_NAV));
+    key_runtime_integration_process_record(TG(LAYER_NAV), tg_pos, true);
+    key_runtime_integration_process_record(TG(LAYER_NAV), tg_pos, false);
+    CHECK(!test_layer_active(LAYER_NAV));
+
+    test_layer_combo_press(&combo);
+    key_runtime_integration_process_record(TG(LAYER_SYM), tg_pos, true);
+    key_runtime_integration_process_record(TG(LAYER_SYM), tg_pos, false);
+    CHECK(test_layer_active(LAYER_NAV) && test_layer_locked(LAYER_SYM));
+    test_layer_combo_release(&combo, true);
+    key_runtime_integration_scan();
+    CHECK(!test_layer_active(LAYER_NAV));
+    CHECK(test_layer_locked(LAYER_SYM) && test_layer_active(LAYER_SYM));
+
+    test_layer_combo_end(&combo);
+    CHECK(noah_runtime_debug_active_slot_count() == 0u);
+    CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 0u);
+}
+
+// OSL() from a combo arms its one-shot for the next key; TT() from a combo
+// locks on its fifth quick combo tap.
+static void test_combo_oneshot_and_tap_toggle_are_owned(void) {
+    keypos_t           other_pos = {.row = 2, .col = 3};
+    test_layer_combo_t combo;
+
+    test_reset_state();
+    combo = test_layer_combo_begin(OSL(LAYER_NAV));
+    test_layer_combo_press(&combo);
+    test_layer_combo_release(&combo, true);
+    key_runtime_integration_advance(&fake_time, CUSTOM_MULTI_TAP_TERM + 1u);
+    key_runtime_integration_scan();
+    CHECK(layer_ownership_oneshot_layer() == LAYER_NAV);
+    CHECK(test_layer_active(LAYER_NAV));
+    key_runtime_integration_process_record(KC_A, other_pos, true);
+    key_runtime_integration_process_record(KC_A, other_pos, false);
+    CHECK(layer_ownership_oneshot_layer() == UINT8_MAX);
+    CHECK(!test_layer_active(LAYER_NAV));
+    test_layer_combo_end(&combo);
+
+    test_reset_state();
+    combo = test_layer_combo_begin(TT(LAYER_NAV));
+    for (uint8_t tap = 0u; tap < 5u; tap++) {
+        test_layer_combo_press(&combo);
+        CHECK(test_layer_active(LAYER_NAV));
+        test_layer_combo_release(&combo, tap % 2u == 0u);
+        key_runtime_integration_advance(&fake_time, 40u);
+    }
+    test_flush_pending_tap_branch();
+    CHECK(test_delayed_action_count == 1u && test_last_delayed_action == LOCK_LAYER(LAYER_NAV));
+    test_layer_combo_end(&combo);
+    CHECK(noah_runtime_debug_active_slot_count() == 0u);
+}
+
 static void test_tap_toggle_taps_lock_and_holds_are_momentary(void) {
     keypos_t key_pos = {.row = 2, .col = 2};
     uint16_t keycode = TT(LAYER_NUM);
@@ -3219,6 +3340,8 @@ static void test_tap_toggle_taps_lock_and_holds_are_momentary(void) {
 }
 
 int main(void) {
+    test_combo_layer_hold_is_owned();
+    test_combo_oneshot_and_tap_toggle_are_owned();
     test_plain_layer_tap_hold_is_owned_and_its_tap_is_qmks();
     test_oneshot_layer_serves_the_next_key();
     test_tap_toggle_taps_lock_and_holds_are_momentary();

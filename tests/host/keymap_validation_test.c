@@ -43,6 +43,7 @@ static const uint16_t combo_outputs[] = {
     TG(LAYER_NUM),
     TO(LAYER_BASE),
     OSL(LAYER_NUM),
+    LT(LAYER_NUM, KC_A),
 };
 
 static const uint16_t combo_keys_0[] = {
@@ -205,7 +206,7 @@ int main(void) {
     snprintf(combo_key_hex, sizeof(combo_key_hex), "0x%04X", (unsigned int)TEST_COMBO_KEY);
     snprintf(dead_key_hex, sizeof(dead_key_hex), "0x%04X", (unsigned int)TEST_DEAD_KEY);
 
-    CHECK(noah_keymap_validate() == 5u);
+    CHECK(noah_keymap_validate() == 4u);
 
     CHECK(strstr(log_buffer, "Unsupported keymaps[0][0][1] raw layer action") != NULL);
     CHECK(strstr(log_buffer, "Unsupported keymaps[0][0][2]") == NULL);
@@ -214,10 +215,12 @@ int main(void) {
     CHECK(strstr(log_buffer, "Unsupported keymaps[0][0][5]") == NULL);
     CHECK(strstr(log_buffer, "output[3]") == NULL);
     CHECK(strstr(log_buffer, "output[4]") == NULL);
-    // Layer holds and one-shots are not supported as combo outputs yet.
-    CHECK(strstr(log_buffer, "Unsupported COMBOS(COMBO) output[5] raw layer action") != NULL);
+    CHECK(strstr(log_buffer, "output[5]") == NULL);
+    // LT() keeps its own tap/hold decision, which a combo cannot give it.
+    CHECK(strstr(log_buffer, "Unsupported COMBOS(COMBO) output[6] raw layer action") != NULL);
     CHECK(strstr(log_buffer, "Unsupported COMBOS(COMBO) input[2] duplicate member keycode") != NULL);
-    CHECK(strstr(log_buffer, "Unsupported COMBOS(COMBO) output[1] raw layer action") != NULL);
+    // A combo holds its output, so a layer hold and a one-shot validate there.
+    CHECK(strstr(log_buffer, "output[1]") == NULL);
     CHECK(strstr(log_buffer, "Unreachable key_behaviors[2].keycode") != NULL);
     CHECK(strstr(log_buffer, dead_key_hex) != NULL);
     CHECK(strstr(log_buffer, combo_key_hex) == NULL);

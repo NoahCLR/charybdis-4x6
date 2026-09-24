@@ -59,7 +59,7 @@ test("simple additions and all hold modes produce canonical rows", () => {
         assert.throws(() => edit({type: "saveBehavior", behavior: {...form(), steps: [{tapCount: 2, [field]: {helper, action: "MO(2)"}}]}}),
             /The behaviour on KC_A: MO\(2\) holds a layer/, field);
     }
-    assert.throws(() => edit({type: "saveBehavior", behavior: {...form(), steps: [{tapCount: 2, tap: {helper: "TAP_SENDS", action: "LT(1,KC_A)"}}]}}), /key of its own/);
+    assert.throws(() => edit({type: "saveBehavior", behavior: {...form(), steps: [{tapCount: 2, tap: {helper: "TAP_SENDS", action: "LT(1,KC_A)"}}]}}), /makes its own tap\/hold decision/);
 });
 
 test("native aliases update existing semantic targets without duplicating or renumbering them", () => {

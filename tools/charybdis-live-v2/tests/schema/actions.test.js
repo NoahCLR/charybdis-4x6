@@ -35,9 +35,9 @@ test("placement follows the keyboard's rule: only layer keycodes are restricted"
     assert.equal(places({kind: 3, operand: 2}), "ok ok ok ok ok", "LOCK_LAYER goes anywhere");
     assert.equal(places(code(0x5262)), "ok ok ok ok ok", "TG goes anywhere");
     assert.equal(places(code(0x5200)), "ok ok ok ok ok", "TO goes anywhere");
-    assert.equal(places({kind: 2, operand: 2}), "ok - ok - -", "MO needs a held key");
-    assert.equal(places(code(0x52c2)), "ok - ok - -", "TT needs a held key");
-    assert.equal(places(code(0x5282)), "ok ok - - -", "OSL is a key or a tap");
+    assert.equal(places({kind: 2, operand: 2}), "ok - ok - ok", "MO needs a held key or a combo");
+    assert.equal(places(code(0x52c2)), "ok - ok - ok", "TT needs a held key or a combo");
+    assert.equal(places(code(0x5282)), "ok ok - - ok", "OSL is a key, a tap or a combo");
     assert.equal(places(code(0x4104)), "ok - - - -", "LT is a key of its own");
     for (const unowned of [0x5241, 0x52e1, 0x5022, 0x5268]) assert.equal(places(code(unowned)), "- - - - -", `0x${unowned.toString(16)} goes nowhere`);
 });

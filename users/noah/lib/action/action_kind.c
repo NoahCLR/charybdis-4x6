@@ -301,7 +301,7 @@ bool noah_action_supported_at(uint16_t action, noah_action_placement_t placement
         case NOAH_ACTION_PLACEMENT_BEHAVIOR_HOLD_OTHER:
             return noah_action_desc_supported_as_authored_action(desc, NOAH_ACTION_AUTHORED_USE_HOLD_OTHER);
         case NOAH_ACTION_PLACEMENT_COMBO_OUTPUT:
-            return !noah_action_desc_is_raw_qmk_layer_action(desc);
+            return noah_action_desc_supported_as_combo_output(desc);
         default:
             return false;
     }

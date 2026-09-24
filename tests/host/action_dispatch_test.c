@@ -302,7 +302,7 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(noah_action_desc_default_tap_action(layer_lock) == KC_NO);
 
     CHECK(momentary.kind == NOAH_ACTION_KIND_LAYER_HOLD);
-    CHECK(noah_action_desc_is_raw_qmk_layer_action(momentary));
+    CHECK(noah_action_desc_supported_as_combo_output(momentary));
     CHECK(momentary.layer == 3);
     CHECK(noah_action_desc_requires_per_key_hold(momentary));
     CHECK(noah_action_desc_supported_as_behavior_keycode(momentary));
@@ -323,7 +323,7 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(noah_action_desc_default_tap_action(momentary) == KC_NO);
 
     CHECK(layer_tap.kind == NOAH_ACTION_KIND_LAYER_TAP);
-    CHECK(noah_action_desc_is_raw_qmk_layer_action(layer_tap));
+    CHECK(!noah_action_desc_supported_as_combo_output(layer_tap));
     CHECK(layer_tap.layer == 4);
     CHECK(!noah_action_desc_is_owned_momentary_layer(layer_tap));
     CHECK(noah_action_desc_supported_as_behavior_keycode(layer_tap));
@@ -343,7 +343,7 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(noah_action_desc_default_tap_action(layer_tap) == KC_V);
 
     CHECK(raw_layer.kind == NOAH_ACTION_KIND_UNSUPPORTED_LAYER_ACTION);
-    CHECK(noah_action_desc_is_raw_qmk_layer_action(raw_layer));
+    CHECK(!noah_action_desc_supported_as_combo_output(raw_layer));
     CHECK(!noah_action_desc_is_owned_momentary_layer(raw_layer));
     CHECK(!noah_action_desc_is_layer_tap(raw_layer));
     CHECK(!noah_action_desc_supported_as_behavior_keycode(raw_layer));
@@ -365,7 +365,7 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(layer_toggle.kind == NOAH_ACTION_KIND_LAYER_LOCK);
     CHECK(layer_toggle.layer == 2);
     CHECK(layer_toggle.action == TG(2));
-    CHECK(!noah_action_desc_is_raw_qmk_layer_action(layer_toggle));
+    CHECK(noah_action_desc_supported_as_combo_output(layer_toggle));
     CHECK(noah_action_desc_consumes_direct_press(layer_toggle));
     CHECK(noah_action_desc_releases_momentary_layer_before_action(layer_toggle));
     CHECK(noah_action_desc_default_tap_action(layer_toggle) == KC_NO);
@@ -395,13 +395,13 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(noah_action_desc_supported_as_behavior_keycode(oneshot));
     CHECK(noah_action_desc_supported_as_authored_action(oneshot, NOAH_ACTION_AUTHORED_USE_TAP));
     CHECK(!noah_action_desc_supported_as_authored_action(oneshot, NOAH_ACTION_AUTHORED_USE_HOLD_OTHER));
-    CHECK(noah_action_desc_is_raw_qmk_layer_action(oneshot));
+    CHECK(noah_action_desc_supported_as_combo_output(oneshot));
     CHECK(noah_action_describe(OSL(LAYER_COUNT)).kind == NOAH_ACTION_KIND_UNSUPPORTED_LAYER_ACTION);
 
     CHECK(layer_jump.kind == NOAH_ACTION_KIND_LAYER_GOTO);
     CHECK(noah_action_desc_is_layer_goto(layer_jump));
     CHECK(layer_jump.layer == 5);
-    CHECK(!noah_action_desc_is_raw_qmk_layer_action(layer_jump));
+    CHECK(noah_action_desc_supported_as_combo_output(layer_jump));
     CHECK(noah_action_desc_has_capability(layer_jump, NOAH_ACTION_CAP_LAYER_AFFECTING));
     CHECK(noah_action_desc_is_press_only(layer_jump));
     CHECK(noah_action_desc_is_layer_action(layer_jump));
@@ -416,7 +416,7 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(noah_action_describe(TO(LAYER_COUNT)).kind == NOAH_ACTION_KIND_UNSUPPORTED_LAYER_ACTION);
 
     CHECK(qmk_behavior.kind == NOAH_ACTION_KIND_QMK_BEHAVIOR);
-    CHECK(!noah_action_desc_is_raw_qmk_layer_action(qmk_behavior));
+    CHECK(noah_action_desc_supported_as_combo_output(qmk_behavior));
     CHECK(noah_action_desc_supported_as_behavior_keycode(qmk_behavior));
     CHECK(noah_action_desc_supported_as_authored_action(qmk_behavior, NOAH_ACTION_AUTHORED_USE_TAP));
     CHECK(noah_action_desc_supported_as_authored_action(qmk_behavior, NOAH_ACTION_AUTHORED_USE_HOLD_PRESS_AND_HOLD));
@@ -489,7 +489,7 @@ static void test_action_descriptor_classifies_common_actions(void) {
 
     CHECK(literal.kind == NOAH_ACTION_KIND_LITERAL);
     CHECK(!noah_action_desc_is_layer_lock(literal));
-    CHECK(!noah_action_desc_is_raw_qmk_layer_action(literal));
+    CHECK(noah_action_desc_supported_as_combo_output(literal));
     CHECK(!noah_action_desc_is_macro(literal));
     CHECK(!noah_action_desc_is_keymap_custom(literal));
     CHECK(noah_action_desc_supported_as_behavior_keycode(literal));
@@ -625,17 +625,19 @@ static void test_action_placement_rules(void) {
         CHECK(noah_action_supported_at(everywhere[i], NOAH_ACTION_PLACEMENT_COMBO_OUTPUT));
     }
 
-    // Layer holds need a held key: a behaviour hold or a key, never a tap or a
-    // combo output.
+    // Layer holds need a held key: a key, a press-and-hold branch or a combo,
+    // never a tap or another hold mode.
     CHECK(noah_action_supported_at(MO(2), NOAH_ACTION_PLACEMENT_KEY));
     CHECK(noah_action_supported_at(MO(2), NOAH_ACTION_PLACEMENT_BEHAVIOR_HOLD_PRESS_AND_HOLD));
     CHECK(!noah_action_supported_at(MO(2), NOAH_ACTION_PLACEMENT_BEHAVIOR_HOLD_OTHER));
     CHECK(!noah_action_supported_at(MO(2), NOAH_ACTION_PLACEMENT_BEHAVIOR_TAP));
-    CHECK(!noah_action_supported_at(MO(2), NOAH_ACTION_PLACEMENT_COMBO_OUTPUT));
-    CHECK(!noah_action_supported_at(TT(2), NOAH_ACTION_PLACEMENT_COMBO_OUTPUT));
+    // A combo holds its output, so layer holds and one-shots work there; LT()
+    // keeps its own tap/hold decision and is a key only.
+    CHECK(noah_action_supported_at(MO(2), NOAH_ACTION_PLACEMENT_COMBO_OUTPUT));
+    CHECK(noah_action_supported_at(TT(2), NOAH_ACTION_PLACEMENT_COMBO_OUTPUT));
     CHECK(!noah_action_supported_at(LT(2, KC_A), NOAH_ACTION_PLACEMENT_COMBO_OUTPUT));
     CHECK(noah_action_supported_at(OSL(2), NOAH_ACTION_PLACEMENT_BEHAVIOR_TAP));
-    CHECK(!noah_action_supported_at(OSL(2), NOAH_ACTION_PLACEMENT_COMBO_OUTPUT));
+    CHECK(noah_action_supported_at(OSL(2), NOAH_ACTION_PLACEMENT_COMBO_OUTPUT));
 
     // Layer actions the runtime does not own are refused wherever they go.
     const uint16_t unowned[] = {DF(1), LM(1, MOD_LSFT), TG(LAYER_COUNT), OSL(LAYER_COUNT)};
@@ -662,11 +664,11 @@ static void test_saved_profile_placement_matches_the_rules(void) {
     CHECK(noah_profile_action_placement_v1_supported(&hold, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_HOLD_PRESS_AND_HOLD));
     CHECK(!noah_profile_action_placement_v1_supported(&hold, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_HOLD_OTHER));
     CHECK(!noah_profile_action_placement_v1_supported(&hold, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_TAP));
-    CHECK(!noah_profile_action_placement_v1_supported(&hold, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_COMBO_OUTPUT));
+    CHECK(noah_profile_action_placement_v1_supported(&hold, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_COMBO_OUTPUT));
     CHECK(noah_profile_action_placement_v1_supported(&lock, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_TAP));
     CHECK(!noah_profile_action_placement_v1_supported(&default_lay, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_TAP));
     CHECK(noah_profile_action_placement_v1_supported(&oneshot, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_TAP));
-    CHECK(!noah_profile_action_placement_v1_supported(&oneshot, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_COMBO_OUTPUT));
+    CHECK(noah_profile_action_placement_v1_supported(&oneshot, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_COMBO_OUTPUT));
     CHECK(!noah_profile_action_placement_v1_supported(&invalid, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_TAP));
 }
 

@@ -1338,7 +1338,10 @@ Still open, in the order they are taken:
 3. Nothing is verified on hardware. The host harness feeds userspace directly
    and bypasses QMK's tapping engine, which buffers `TT()`, `OSL()` and `LT()`
    presses; split sync and the RGB lock indicator for `TG()`/`TO()` locks and
-   one-shot layers are also unchecked. The runtime times a press from when
+   one-shot layers are also unchecked. A layer hold from a combo is owned in
+   host tests; on hardware, check that releasing the combo still ends it
+   after the layer under the members changed (QMK resolves a release on the
+   layer it was pressed on). The runtime times a press from when
    QMK delivers it, so an authored `LT()` row's tap/hold term likely starts
    only after QMK's own `TAPPING_TERM` (e.g. `LT(LAYER_NAV, KC_SLSH)`'s
    100 ms); check that on hardware before relying on it.

@@ -66,9 +66,10 @@ const isLayerToggleCode = (code, layerCount) =>
 // Where a stored action may be placed, as the keyboard checks a profile it is
 // asked to save (noah_action_supported_at in users/noah/lib/action). Only
 // layer keycodes are restricted: a layer hold needs a key held down, so it is a
-// key or a press-and-hold branch; OSL() is a key or a tap; TG(), TO() and
-// LOCK_LAYER() go anywhere; the layer keycodes the keyboard does not own go
-// nowhere. Returns what is wrong, or undefined.
+// key, a press-and-hold branch or a combo (a combo holds its output); OSL() is
+// a key, a tap or a combo; LT() is only a key; TG(), TO() and LOCK_LAYER() go
+// anywhere; the layer keycodes the keyboard does not own go nowhere. Returns
+// what is wrong, or undefined.
 const PLACEMENT = Object.freeze({KEY: "key", TAP: "tap", HOLD_PRESS: "holdPress", HOLD_OTHER: "holdOther", COMBO_OUTPUT: "comboOutput"});
 
 function layerRuleOf(code, layerCount) {
@@ -78,8 +79,8 @@ function layerRuleOf(code, layerCount) {
     if (range(0x5000, 0x200) || range(0x5240) || range(0x52e0)) return {kind: "unowned", places: []};
     if (!(range(0x5200) || range(0x5220) || range(0x5260) || range(0x5280) || range(0x52c0))) return undefined;
     if (layer >= layerCount) return {kind: "unowned", places: []};
-    if (range(0x5220) || range(0x52c0)) return {kind: "hold", places: [PLACEMENT.KEY, PLACEMENT.HOLD_PRESS]};
-    if (range(0x5280)) return {kind: "oneShot", places: [PLACEMENT.KEY, PLACEMENT.TAP]};
+    if (range(0x5220) || range(0x52c0)) return {kind: "hold", places: [PLACEMENT.KEY, PLACEMENT.HOLD_PRESS, PLACEMENT.COMBO_OUTPUT]};
+    if (range(0x5280)) return {kind: "oneShot", places: [PLACEMENT.KEY, PLACEMENT.TAP, PLACEMENT.COMBO_OUTPUT]};
     return undefined;
 }
 
@@ -90,11 +91,9 @@ function placementProblem(action, placement, {layerCount = 8} = {}) {
     const name = actionName(action);
     switch (rule.kind) {
         case "unowned": return `${name} is a layer keycode this keyboard does not run through its layer tracking, so it cannot be saved here.`;
-        case "hold": return placement === PLACEMENT.COMBO_OUTPUT
-            ? `${name} holds a layer, which a combo cannot do yet. Use LOCK_LAYER, TG or TO for a combo.`
-            : `${name} holds a layer, so it only works as a key or a "Press and hold until release" branch.`;
-        case "layerTap": return `${name} is a key of its own and cannot be sent by a behaviour or a combo.`;
-        case "oneShot": return `${name} works as a key or a tap, not as ${placement === PLACEMENT.COMBO_OUTPUT ? "a combo output" : "a hold"}.`;
+        case "hold": return `${name} holds a layer, so it only works as a key, a combo or a "Press and hold until release" branch.`;
+        case "layerTap": return `${name} makes its own tap/hold decision, so it only works as a key, not in a behaviour or a combo.`;
+        case "oneShot": return `${name} works as a key, a tap or a combo, not as a hold.`;
         default: return undefined;
     }
 }

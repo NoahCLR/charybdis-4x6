@@ -40,7 +40,7 @@ static void log_invalid_keymap_layer_action(uint8_t layer, uint8_t row, uint8_t 
 
 static void log_invalid_combo_output(uint8_t combo_index, uint16_t keycode) {
 #ifdef CONSOLE_ENABLE
-    uprintf("Unsupported COMBOS(COMBO) output[%u] raw layer action 0x%04X; layer holds, one-shots and layer-taps are not supported as combo outputs. Use LOCK_LAYER(...)/TG()/TO() for toggles or route the behavior through key_behaviors[]\n", (unsigned int)combo_index, (unsigned int)keycode);
+    uprintf("Unsupported COMBOS(COMBO) output[%u] raw layer action 0x%04X; LT() keeps its own tap/hold decision and is not supported as a combo output, nor are layer keycodes the runtime does not own. Use LOCK_LAYER(...)/TG()/TO() for toggles or route the behavior through key_behaviors[]\n", (unsigned int)combo_index, (unsigned int)keycode);
 #else
     (void)combo_index;
     (void)keycode;
