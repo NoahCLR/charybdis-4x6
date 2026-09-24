@@ -48,8 +48,11 @@ export function mark(model, value) {
     }
 }
 
-// A label with its mark in front, as a label reads everywhere.
-export const marked = (model, value, text) => {
+// A label with its mark in front, as a label reads everywhere. Where marked
+// and unmarked labels share a column, `slot` gives every one of them the same
+// mark slot, so their words start at one edge and the dots line up.
+export const marked = (model, value, text, {slot = false} = {}) => {
     const shown = mark(model, value);
+    if (slot) return `<span class="mk"><span class="mk-slot">${shown}</span><span>${esc(text)}</span></span>`;
     return shown ? `<span class="mk">${shown}<span>${esc(text)}</span></span>` : esc(text);
 };

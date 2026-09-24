@@ -10,11 +10,11 @@ import {captureContentScroll, restoreContentScroll} from "./lib/scroll.mjs";
 import {activateOnKey, captureFocus, focusDialog, restoreFocus, trapTab} from "./lib/focus.mjs";
 import {closeComboBuilder, getModel, post, render as rerender, resetDraftForms, setModel, setRenderer, state} from "./store.mjs";
 import {historyAction} from "./view/edits.mjs";
-import {FIELDS_SHOWN, discardLabel, placeState, reviewBlocks, statusSummary} from "./view/review.mjs";
+import {FIELDS_SHOWN, discardLabel, placeState, reviewBlocks, statusSummary, stillShown} from "./view/review.mjs";
 import {bindLayerIndex, hideHover, mountHover} from "./ui/hover.mjs";
 import {pickerOverlay} from "./ui/picker.mjs";
 import {keysShortcut, screenKeys} from "./ui/keys.mjs";
-import {mark} from "./ui/marks.mjs";
+import {mark, marked} from "./ui/marks.mjs";
 import {closeLayers} from "./ui/layers.mjs";
 import {screenLighting} from "./ui/lighting.mjs";
 import {screenSettings} from "./ui/settings.mjs";
@@ -91,42 +91,60 @@ function reviewOverlay() {
     // A behaviour tier is labelled as the grid heads it: the branch badge,
     // the tier's dot, then the tier's name.
     const TIER_NAMES = {tap: "tap", hold: "hold", long: "long hold"};
-    const fieldLabel = (entry) => {
+    // Within an item, marked and unmarked labels share one mark slot, so the
+    // words start at one edge and the tier dots line up in a column.
+    const fieldLabel = (entry, slot) => {
         const text = entry.labelMark?.kind === "tier" && entry.labelMark.branch ? TIER_NAMES[entry.labelMark.tier] : entry.label;
-        return text ? `<span class="k mk">${mark(model, entry.labelMark)}<span>${esc(text)}</span></span>` : "";
+        return text ? marked(model, entry.labelMark, text, {slot}) : "";
     };
-    const field = (item, entry) => {
-        const before = value(entry.before, "del", entry.beforeColour, entry.beforeMark);
-        const after = value(entry.after, "ins", entry.afterColour, entry.afterMark);
-        const shown = item.status === "changed" ? `${before}<span class="to">→</span>${after}` : item.status === "added" ? after : before;
-        return `${fieldLabel(entry)}<span class="v ${entry.label ? "" : "wide"}">${shown}</span>`;
-    };
+    // Every field is one row of the same three columns — what, on the
+    // keyboard, in your draft — so the two sides line up down the whole
+    // review. A side that has nothing (an added thing on the keyboard, a
+    // removed one in the draft) says so with a dash in its own column.
+    const nothing = `<span class="rv-none">—</span>`;
+    // Each field's own status sits in a narrow column before it, as a diff
+    // marks its lines: + a field the draft adds, − one it removes, nothing for
+    // one it changes. So a tier dropped from a behaviour that stays reads as
+    // removed, and a behaviour removed whole reads − on every line.
+    const SIGNS = {added: "+", removed: "−"};
+    const field = (slot) => (entry) => `<span class="rv-sign ${esc(entry.status || "")}" aria-label="${esc(entry.status || "")}">${SIGNS[entry.status] || ""}</span>
+        <span class="rv-k">${fieldLabel(entry, slot)}</span>
+        <span class="rv-v">${entry.before === null ? nothing : value(entry.before, "del", entry.beforeColour, entry.beforeMark)}</span>
+        <span class="rv-v">${entry.after === null ? nothing : value(entry.after, "ins", entry.afterColour, entry.afterMark)}</span>`;
     const fields = (item) => {
         const head = item.fields.slice(0, FIELDS_SHOWN), rest = item.fields.slice(FIELDS_SHOWN);
-        return `<div class="rv-fields">${head.map((entry) => field(item, entry)).join("")}</div>${rest.length
-            ? `<details class="rv-more"><summary>Show all ${item.fields.length}</summary><div class="rv-fields">${rest.map((entry) => field(item, entry)).join("")}</div></details>` : ""}`;
+        const row = field(item.fields.some((entry) => entry.labelMark));
+        return `<div class="rv-fields">${head.map(row).join("")}${rest.length
+            ? `<details class="rv-more"><summary>Show all ${item.fields.length}</summary><div class="rv-fields">${rest.map(row).join("")}</div></details>` : ""}</div>`;
     };
-    const item = (entry, block, index, discard) => `<div class="rv-item">
-        <div class="rv-title">${mark(model, entry.titleMark)}<span class="t">${esc(entry.title)}</span>
-            ${entry.area !== block.area ? `<span class="tag">${esc(entry.area)}</span>` : ""}
-            ${entry.status === "changed" ? "" : `<span class="rv-status ${esc(entry.status)}">${esc(entry.status)}</span>`}</div>
+    // An item is one row of the review's grid: a status gutter, the title,
+    // the fields, and two action slots that are always in the same place —
+    // Show, then Discard at the edge — whether or not an item has them.
+    const item = (entry, block, index, discard, titleSlot) => `<div class="rv-item">
+        <span class="rv-gutter"><span class="rv-status ${esc(entry.status)}">${esc(entry.status)}</span></span>
+        <div class="rv-title">${titleSlot ? `<span class="mk"><span class="mk-slot title">${mark(model, entry.titleMark)}</span><span class="t">${esc(entry.title)}</span></span>` : `<span class="t">${esc(entry.title)}</span>`}
+            ${entry.area !== block.area ? `<span class="rv-meta">${esc(entry.area)}</span>` : ""}</div>
         ${fields(entry)}
-        <div class="rv-actions">${entry.status !== "removed" && placeState(entry.place, model.layers) ? `<button class="btn tiny ghost" data-show="${index}"
-            data-tip="Close the review and open this where it is edited.">Show</button>` : ""}${discard}</div></div>`;
+        <span class="rv-act">${stillShown(entry) && placeState(entry.place, model.layers) ? `<button class="btn tiny ghost" data-show="${index}"
+            data-tip="Close the review and open this where it is edited.">Show</button>` : ""}</span>
+        <span class="rv-act">${discard}</span></div>`;
+    const columns = `<div class="rv-cols"><span></span><span>What changes</span>
+        <div class="rv-fields"><span></span><span></span><span>On the keyboard</span><span>In your draft</span></div><span></span><span></span></div>`;
     const discardable = draft.changes.every((change) => Number.isInteger(change.group));
     const shown = [];
     const sections = reviewBlocks(draft.changes).map(({area, blocks, count}) => `<section class="rv-sect">
         <div class="sect-h"><h4>${esc(area)}</h4><span class="right tag">${count}</span></div>
-        ${blocks.map((block) => {
+        ${columns}
+        ${((titleSlot) => blocks.map((block) => {
             const grouped = block.items.length > 1;
             const discard = discardable ? `<button class="btn tiny ghost" data-discard="${esc(block.group)}" ${canDiscard ? "" : "disabled"}
                 data-tip="${esc(grouped ? `Put these ${block.items.length} changes back to what the keyboard holds. They were made together, so they go back together.` : "Put this change back to what the keyboard holds.")}">${esc(discardLabel(block))}</button>` : "";
-            const items = block.items.map((entry) => item(entry, block, shown.push(entry) - 1, grouped ? "" : discard)).join("");
+            const items = block.items.map((entry) => item(entry, block, shown.push(entry) - 1, grouped ? "" : discard, titleSlot)).join("");
             return grouped
-                ? `<div class="rv-block grouped"><div class="rv-group-h"><span>${esc(block.title || "Made together")}</span>
-                    <span class="note">${block.items.length} changes, discarded together</span><span class="right">${discard}</span></div>${items}</div>`
+                ? `<div class="rv-block grouped"><div class="rv-group-h"><span class="rv-group-t"><span>${esc(block.title || "Made together")}</span>
+                    <span class="note">${block.items.length} changes, discarded together</span></span><span class="rv-act wide">${discard}</span></div>${items}</div>`
                 : `<div class="rv-block">${items}</div>`;
-        }).join("")}</section>`).join("");
+        }).join(""))(blocks.some((block) => block.items.some((entry) => entry.titleMark)))}</section>`).join("");
     const summary = statusSummary(draft.changes);
     const node = el(`<div class="scrim"><div class="sheet" role="dialog" aria-modal="true" aria-label="Review changes">
         <div class="sheet-h"><h2>Review ${draft.changes.length} change${draft.changes.length === 1 ? "" : "s"}</h2>

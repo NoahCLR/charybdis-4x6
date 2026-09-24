@@ -540,6 +540,9 @@ table.t.fixed { table-layout: fixed; }
 /* What the draft changed, marked where it is edited: the draft's own dot. */
 .draft-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--draft); margin-left: 6px; vertical-align: middle; flex: none; }
 .kc-draft { fill: var(--draft); stroke: rgba(0, 0, 0, .55); stroke-width: .8; pointer-events: none; }
+.draft-dot.corner { position: absolute; top: 6px; right: 6px; margin: 0; }
+.draft-dot.lead { margin: 0 6px 0 0; }
+.mslot, .slotcard { position: relative; }
 
 /* A place a jump landed on is marked for a moment, then fades. */
 .revealed, tr.revealed > td { background: color-mix(in srgb, var(--draft) 16%, transparent) !important; }
@@ -549,35 +552,62 @@ table.t.fixed { table-layout: fixed; }
    Items made together share a block and one Discard. */
 .rv-sect { padding: 14px 18px 4px; }
 .rv-block { border: 1px solid var(--line); border-radius: 9px; margin-bottom: 8px; background: var(--surface); overflow: hidden; }
-.rv-block.grouped { border-left: 3px solid var(--draft); }
+.rv-block.grouped { box-shadow: inset 3px 0 0 var(--draft); }
 .rv-block.grouped.lit { background: color-mix(in srgb, var(--draft) 7%, var(--surface)); }
 .rv-group-h { display: flex; align-items: center; gap: 10px; padding: 7px 12px; font-size: 12px; border-bottom: 1px solid var(--line); }
 .rv-group-h .right { margin-left: auto; }
-.rv-item { display: grid; grid-template-columns: minmax(150px, 30%) minmax(0, 1fr) auto; gap: 6px 14px; padding: 9px 12px; align-items: start; }
+/* One grid for the whole review. Items, group headers and each section's
+   column heads share these tracks, so status, titles, both sides and the
+   actions sit in the same place on every row. */
+.rv { --rv-cols: 70px minmax(150px, 22%) minmax(0, 1fr) 56px 78px; --rv-fields: 10px minmax(120px, 26%) minmax(0, 1fr) minmax(0, 1fr); }
+.rv-cols, .rv-item, .rv-group-h { display: grid; grid-template-columns: var(--rv-cols); column-gap: 12px; align-items: start; }
+.rv-cols { padding: 0 12px 6px; font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); font-weight: 600; }
+.rv-item { padding: 9px 12px; row-gap: 4px; }
 .rv-item + .rv-item { border-top: 1px solid var(--line); }
-.rv-title { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12.5px; min-width: 0; }
+.rv-gutter { display: flex; }
+.rv-title { display: grid; gap: 3px; font-size: 12.5px; min-width: 0; }
 .rv-title .t { overflow-wrap: anywhere; }
-.rv-status { font-size: 10.5px; padding: 1px 7px; border-radius: 5px; border: 1px solid var(--line); color: var(--text-2); }
+.rv-meta { font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); }
+.rv-status { font-size: 10.5px; padding: 1px 7px; border-radius: 5px; border: 1px solid var(--line); color: var(--text-3); white-space: nowrap; }
 .rv-status.added { color: var(--text); border-color: var(--text-2); }
 .rv-status.removed { color: var(--danger); border-color: currentColor; }
-.rv-fields { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 3px 12px; font-size: 12px; min-width: 0; }
-.rv-fields .k { color: var(--text-3); }
-.rv-fields .v { font-family: var(--mono); font-size: 11.5px; overflow-wrap: anywhere; }
-.rv-fields .v.wide { grid-column: 1 / -1; }
-.rv-fields .to { color: var(--text-3); margin: 0 6px; }
+.rv-fields { display: grid; grid-template-columns: var(--rv-fields); gap: 3px 12px; font-size: 12px; min-width: 0; }
+.rv-k { color: var(--text-3); min-width: 0; }
+.rv-v { font-family: var(--mono); font-size: 11.5px; overflow-wrap: anywhere; min-width: 0; }
+.rv-none { color: var(--text-3); }
+.rv-sign { font-family: var(--mono); font-size: 12px; font-weight: 700; line-height: 1.35; color: var(--text-3); }
+.rv-sign.added { color: var(--text); }
+.rv-sign.removed { color: var(--danger); }
+.rv-group-h { padding: 7px 12px; font-size: 12px; border-bottom: 1px solid var(--line); align-items: center; }
+.rv-group-t { grid-column: 1 / 4; display: flex; gap: 10px; align-items: baseline; min-width: 0; }
+.rv-act { display: flex; justify-content: flex-end; }
+.rv-act.wide { grid-column: 4 / 6; }
 .rv-val { display: inline-flex; align-items: center; gap: 6px; }
 .rv-swatch { width: 12px; height: 12px; border-radius: 4px; border: 1px solid var(--line-2); flex: none; display: inline-block; }
 /* Marks (ui/marks.mjs): one size wherever a label or value carries one. */
 .mk { display: inline-flex; align-items: center; gap: 6px; }
+.mk-slot { display: inline-flex; justify-content: flex-end; align-items: center; gap: 4px; width: 34px; flex: none; }
+.mk-slot.title { width: 20px; justify-content: flex-start; }
 .mk-swatch { width: 11px; height: 11px; border-radius: 3px; border: 1px solid var(--line-2); flex: none; display: inline-block; }
 .mk-badge { display: inline-grid; place-items: center; min-width: 18px; height: 13px; padding: 0 3px; border-radius: 3px; flex: none;
   border: 1.2px solid rgba(245,245,243,.7); background: rgba(8,8,10,.86); color: #f5f5f3;
   font-family: var(--mono); font-size: 7.5px; line-height: 1; font-weight: 700; font-style: normal; }
 .mk .bn, .rv-fields .bn { font-family: var(--mono); font-size: 10px; color: var(--text-3); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
-.rv-more { grid-column: 2; margin-top: 4px; }
-.rv-more summary { cursor: pointer; font-size: 11px; color: var(--text-3); }
+.rv-more { grid-column: 1 / -1; }
+.rv-more summary { cursor: pointer; font-size: 11px; color: var(--text-3); padding-top: 2px; }
 .rv-more .rv-fields { margin-top: 3px; }
-.rv-actions { display: flex; gap: 6px; justify-content: flex-end; white-space: nowrap; }
+/* Narrow: the same order, stacked, with the actions on the title's row. */
+@media (max-width: 760px) {
+  .rv-cols { display: none; }
+  .rv-item { grid-template-columns: 1fr auto auto; }
+  .rv-gutter { grid-column: 1 / -1; }
+  .rv-title { grid-column: 1; grid-row: 2; }
+  .rv-item > .rv-fields { grid-column: 1 / -1; grid-row: 3; }
+  .rv-item > .rv-act { grid-row: 2; }
+  .rv-group-h { grid-template-columns: 1fr auto; }
+  .rv-group-t { grid-column: 1; }
+  .rv-act.wide { grid-column: 2; }
+}
 table.t.fixed td { overflow-wrap: anywhere; }
 /* A row that can say where it is reached from picks itself, and the board
    rings those keys while it is picked. */

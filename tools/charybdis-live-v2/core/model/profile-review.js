@@ -105,7 +105,10 @@ function behaviourFields(row, defaults, names) {
         // A tier is named as the grid names it, and carries which branch and
         // tier it is, so the review can colour it as the grid does.
         const reaches = tier === "tap" ? branch : branch.action;
-        fields.set(`${step.tapIndex + 1}× ${name}`, {text: `${action(reaches, names)}${how}`, key: `${action(reaches, names)}${how}`,
+        // Compared by what is stored, so a renamed or cleared pointing mode
+        // or layer is a change where it was made, not to every behaviour
+        // that reaches it.
+        fields.set(`${step.tapIndex + 1}× ${name}`, {text: `${action(reaches, names)}${how}`, key: JSON.stringify([reaches, branch.mode, branch.repeatHz]),
             labelMark: {kind: "tier", tier: tier === "longHold" ? "long" : tier, branch: step.tapIndex + 1}, mark: actionMark(reaches)});
     }
     return fields;
@@ -125,8 +128,8 @@ const labelOf = (id, ...values) => values.find(value => typeof value === "object
 function comboFields(row, names) {
     if (!row) return new Map();
     const options = [row.mustHold && "must be held", row.mustTap && "tap only", row.ordered && "keys in order"].filter(Boolean).join(", ");
-    return new Map([["Keys", row.inputs.map(input => action(input, names)).join(" + ")],
-        ["Sends", {text: action(row.output, names), key: action(row.output, names), mark: actionMark(row.output)}], ["Window", `${row.termMs} ms`],
+    return new Map([["Keys", {text: row.inputs.map(input => action(input, names)).join(" + "), key: JSON.stringify(row.inputs)}],
+        ["Sends", {text: action(row.output, names), key: JSON.stringify(row.output), mark: actionMark(row.output)}], ["Window", `${row.termMs} ms`],
         ["Hold threshold", `${row.holdTermMs} ms`], ["Options", options || "none"]]);
 }
 
@@ -203,8 +206,13 @@ function profileReview(before, after) {
         const fields = ids.filter(id => status === "changed" ? compared(old.get(id)) !== compared(next.get(id))
             : holds(id, text(status === "added" ? next.get(id) : old.get(id))))
             .map(id => {
-                const entry = {label: labelOf(id, next.get(id), old.get(id)),
-                    before: status === "added" ? null : text(old.get(id)) ?? "none", after: status === "removed" ? null : text(next.get(id)) ?? "none"};
+                // A field has its own status: inside a changed behaviour a
+                // tier can be added or removed while the behaviour stays. A
+                // side a field is absent from is null, never a word that
+                // could read as a value.
+                const was = status !== "added" && old.has(id), is = status !== "removed" && next.has(id);
+                const entry = {label: labelOf(id, next.get(id), old.get(id)), status: was && is ? "changed" : is ? "added" : "removed",
+                    before: was ? text(old.get(id)) : null, after: is ? text(next.get(id)) : null};
                 // A field carries its colour and the marks of what it is about,
                 // on the side that shows them.
                 const side = (value, name) => value && typeof value === "object" ? value[name] : undefined;

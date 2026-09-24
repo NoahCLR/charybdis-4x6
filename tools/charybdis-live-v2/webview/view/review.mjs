@@ -70,14 +70,18 @@ export const FIELDS_SHOWN = 4;
 
 // ── marks in the editors ────────────────────────────────────────────────
 
+// A removed behaviour or combo is gone from its list; a cleared pointing slot
+// or emptied macro slot is still on screen, so it keeps its mark and its Show.
+export const stillShown = (change) => change.status !== "removed" || ["pointing", "macro"].includes(change.place?.kind);
+
 // What the draft changed, by where it is edited, so every editor can mark its
-// own changed things the way the review lists them. A removed thing has no
-// place left to mark.
+// own changed things the way the review lists them.
 export function draftMarks(changes = []) {
     const marks = {keys: new Map(), layers: new Set(), behaviours: new Set(), combos: new Set(), macros: new Set(),
         pointing: new Set(), lighting: new Set(), lightingLayers: new Set(), lightingSlots: new Set(), settings: new Set(), layerNames: false};
-    for (const {place, status} of changes) {
-        if (!place || status === "removed") continue;
+    for (const change of changes) {
+        const {place} = change;
+        if (!place || !stillShown(change)) continue;
         if (place.kind === "key") {
             if (!marks.keys.has(place.layer)) marks.keys.set(place.layer, new Set());
             marks.keys.get(place.layer).add(place.layoutIndex);
@@ -96,5 +100,7 @@ export function draftMarks(changes = []) {
     return marks;
 }
 
-// The mark itself, one look everywhere: the draft's dot, and a tip that says it.
-export const draftDot = (tip = "Changed in your draft") => `<i class="draft-dot" data-tip="${tip}" aria-label="${tip}"></i>`;
+// The mark itself, one look everywhere: the draft's dot, and a tip that says
+// it. In a row it follows the label; on a tile (a key, a macro slot, a
+// pointing slot card) it sits in the tile's top-right corner, as on the board.
+export const draftDot = (tip = "Changed in your draft", place = "") => `<i class="draft-dot ${place}" data-tip="${tip}" aria-label="${tip}"></i>`;

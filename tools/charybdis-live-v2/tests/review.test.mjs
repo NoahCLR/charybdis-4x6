@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {discardLabel, placeState, reviewBlocks, statusSummary} from "../webview/view/review.mjs";
+import {discardLabel, draftMarks, placeState, reviewBlocks, statusSummary, stillShown} from "../webview/view/review.mjs";
 
 const item = (area, title, group, extra = {}) => ({area, title, group, status: "changed", fields: [], ...extra});
 
@@ -49,4 +49,15 @@ test("Show goes to where each kind of item is edited", () => {
     assert.equal(section.settingsOpen, "keyTiming", "a folded section opens");
     assert.equal(section.reveal, '.settings-group[data-section="keyTiming"]');
     assert.equal(placeState({kind: "settings"}).reveal, undefined, "settings with no section just open the screen");
+});
+
+test("a removed thing keeps its mark and its Show only where it is still on screen", () => {
+    const removed = (place) => ({status: "removed", place});
+    assert.equal(stillShown(removed({kind: "pointing", slot: 4})), true, "a cleared slot is still a card");
+    assert.equal(stillShown(removed({kind: "macro", index: 2})), true, "an emptied macro is still a slot");
+    assert.equal(stillShown(removed({kind: "behaviour", keycode: "KC_2"})), false, "a removed behaviour has no row left");
+    assert.equal(stillShown(removed({kind: "combo", index: 1})), false);
+    const marks = draftMarks([removed({kind: "pointing", slot: 4}), removed({kind: "behaviour", keycode: "KC_2"})]);
+    assert.deepEqual([...marks.pointing], [4]);
+    assert.equal(marks.behaviours.size, 0);
 });

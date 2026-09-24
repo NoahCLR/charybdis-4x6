@@ -14,6 +14,7 @@ import {layerBar} from "./layerbar.mjs";
 import {attachLayersControl} from "./layers.mjs";
 import {openPicker} from "./picker.mjs";
 import {branchBadge, marked, tierDot} from "./marks.mjs";
+import {slotLight} from "./pointing.mjs";
 import {topbar, unavailable} from "./shell.mjs";
 
 const TABS = [
@@ -669,8 +670,8 @@ function tabCombos(body, right) {
             empty: "Every combo on the board fires from this layer."},
     ];
     const comboTable = reachTable("combos", comboGroupRows, [
-        ["Combo", "7%"], ["Inputs", "31%"], ["Sends", "13%"], ["Window", "8%"],
-        ["Requires", "12%"], ["Reached by", "21%"], ["", "8%"]]);
+        ["", "7%"], ["Inputs", "30%"], ["Sends", "13%"], ["Window", "10%"],
+        ["Requires", "12%"], ["Reached by", "20%"], ["", "8%"]]);
     attachReachRows(comboTable, "combos");
     node.querySelector("#comboTable").replaceWith(comboTable);
 
@@ -778,10 +779,11 @@ function tabMacros(body, right) {
     open.addEventListener("click", () => { state.screen = "macros"; render(); });
     right.appendChild(open);
 
+    const changedMacros = draftMarks(model?.draft?.changes).macros;
     const row = (group, keycode, reachedBy) => {
         const slot = slots.find((entry) => entry.keycode === keycode);
         return `<tr${reachAttrs("macros", group, keycode)}>
-            <td>${esc(actionLabel(model, keycode))} <code class="dim">${esc(keycode)}</code></td>
+            <td>${esc(actionLabel(model, keycode))} <code class="dim">${esc(keycode)}</code>${changedMacros.has(keycode) ? draftDot() : ""}</td>
             <td class="mono">${esc(slot?.payload || "—")}</td>
             <td class="muted">${reachedBy}</td>
             <td style="text-align:right">${slot ? `<button class="btn tiny ghost" data-editmacro="${esc(keycode)}">Edit</button>` : ""}</td></tr>`;
@@ -803,6 +805,11 @@ function tabMacros(body, right) {
             empty: "Every stored macro is reached from this layer."},
     ];
 
+    // A folded group holding a changed macro says so on its header.
+    const macroIds = {here: reach.onKeys, through: reach.throughKeys, branches: reach.fromBranches, combos: reach.fromCombos,
+        belowBranches: reach.fromBranchesBelow, belowCombos: reach.fromCombosBelow};
+    for (const group of groups) group.drafted = (group.id === "elsewhere" ? reach.elsewhere : (macroIds[group.id] || []).map((entry) => entry.name))
+        .some((keycode) => changedMacros.has(keycode));
     const node = reachTable("macros", groups, [["Slot", "24%"], ["Payload", "44%"], ["Reached by", "24%"], ["", "8%"]]);
     attachReachRows(node, "macros");
     node.querySelectorAll("[data-editmacro]").forEach((button) => button.addEventListener("click", () => {
@@ -890,15 +897,16 @@ function tabPointing(body, right) {
     open.addEventListener("click", () => { state.screen = "pointing"; render(); });
     right.appendChild(open);
 
+    const changedSlots = draftMarks(model?.draft?.changes).pointing;
     const card = (group, slotId, reachedBy, variant) => {
         const slot = (model?.pdModes || []).find((entry) => entry.id === Number(slotId));
         if (!slot) return "";
         const row = pdColourRow(model, slot.id);
-        const lit = slot.kind && row && !isOff(row.color);
+        // The slot's light as its card on the Pointing modes screen shows it.
         return `<div class="pd-card"${reachAttrs("pointing", group, slot.id)}>
             <div class="row" style="gap:9px">
-                <span class="swatch-lg ${lit ? "" : "swatch-off"}" style="width:16px;height:16px;border-radius:5px;${lit ? `background:${css(row.color)}` : ""}"></span>
-                <b>${esc(slot.name || `Slot ${slot.id + 1}`)}${variant ? ` · ${esc(variant)}` : ""}</b>
+                ${slotLight(model, slot).swatch("lg")}
+                <b>${esc(slot.name || `Slot ${slot.id + 1}`)}${variant ? ` · ${esc(variant)}` : ""}</b>${changedSlots.has(slot.id) ? draftDot() : ""}
                 <span class="tag">slot ${slot.id + 1}</span>
                 <button class="btn tiny ghost" data-editpd="${slot.id}" style="margin-left:auto">Edit</button></div>
             <div class="note">${slot.kind
@@ -939,10 +947,13 @@ function tabPointing(body, right) {
         {id: "belowCombos", cards: reach.fromCombosBelow.map(reachCard("belowCombos")),
             empty: "No combo that needs a transparent key sends a pointing mode."},
         {id: "elsewhere", cards: reach.elsewhere.map((slotId) => card("elsewhere", slotId, "not reached from this layer")),
-            empty: "Every configured mode is reached from this layer."},
+            empty: "Every configured mode is reached from this layer.", ids: reach.elsewhere},
     ];
+    const idsOf = {here: reach.onKeys, through: reach.throughKeys, branches: reach.fromBranches, combos: reach.fromCombos,
+        belowBranches: reach.fromBranchesBelow, belowCombos: reach.fromCombosBelow};
+    const holdsChange = (group) => (group.ids || (idsOf[group.id] || []).map((entry) => entry.name)).some((id) => changedSlots.has(Number(id)));
     const section = (group) => `<div class="reach-group">
-        ${groupHeader("pointing", group.id, group.cards.length)}
+        ${groupHeader("pointing", group.id, group.cards.length, holdsChange(group))}
         ${groupOpen("pointing", group.id)
             ? (group.cards.length ? `<div class="pd-reach">${group.cards.join("")}</div>`
                 : `<p class="note" style="padding:10px 2px">${esc(group.empty)}</p>`)

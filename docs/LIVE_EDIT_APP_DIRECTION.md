@@ -1244,3 +1244,39 @@ layer setting its layer's colour. The review carries the same marks on
 titles, labels and values (`labelMark`, `beforeMark`, `afterMark`,
 `titleMark`). A stage that is off draws its marks off. A colour is the
 keyboard's own, so a dark one reads dark; the marks do not lighten it.
+
+### D-L32 — Things sit in fixed places
+
+A repeated element sits in the same place every time it appears, so a screen
+reads as a grid rather than as text that wraps wherever it lands.
+
+- The review is one grid: a status gutter (changed, added or removed — every
+  item says which), the title with its area underneath when it sits outside
+  its section, the fields as sign · label · on the keyboard · in your draft,
+  then two action slots, Show and then Discard at the edge. A field has its
+  own status, marked as a diff marks a line: + a field the draft adds, − one
+  it removes, nothing for one it changes. So a tier dropped from a behaviour
+  that stays reads as a changed item with a − line, and a behaviour removed
+  whole reads as a removed item, − on every line. Group headers and each
+  section's column heads use the same tracks, so the two sides line up down
+  the whole review, and a side with nothing says so with a dash in its own
+  column rather than an arrow that wraps.
+- A destructive action is the last thing in its row: Discard, Discard both,
+  Discard all 3 share one right edge.
+- The draft's dot follows a row's label (a list row, a tab, a header). On a
+  tile it has one fixed spot: a key's and a macro slot's top-right corner, and
+  a pointing slot card's corner just before its number.
+- A removed thing keeps its mark and its Show only where it is still on
+  screen: a cleared pointing slot or an emptied macro slot, not a removed
+  behaviour or combo.
+- A table's owner, like an LED row's, reads by the name its dropdown offers,
+  with its mark, never an enum.
+- Where marked and unmarked labels share a column — a Settings section, an
+  item's fields in the review, a review section's titles — every label gets
+  the same mark slot, so the words start at one edge and the dots stand in a
+  column of their own (`marked(…, {slot: true})` in `webview/ui/marks.mjs`).
+- A tab carrying the draft's dot means something inside is marked: every
+  list the Keys tabs show marks its changed rows and cards, and a folded group
+  holding one carries the dot on its header. A pointing card anywhere shows
+  its slot's light through the shared mark, so an off stage reads off there
+  too.

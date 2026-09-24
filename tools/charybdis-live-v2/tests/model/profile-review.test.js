@@ -9,7 +9,7 @@ test("unchanged snapshots have no review entries and layer renaming does not inv
     const names=["Base","Numbers","Symbols","Navigation","Mouse","Extra 1","Extra 2","Extra 3"];
     const after=snapshot(reorderLayers(before.document,[0,1,2,3,4,5,6,7],names));
     assert.deepEqual(profileReview(before,after),[{area:"Layers",unit:"layerName:4",title:"Layer 4",status:"changed",
-        fields:[{label:"Name",before:"Pointer",after:"Mouse"}],place:{kind:"layers"},titleMark:{kind:"layer",layer:4}}]);
+        fields:[{label:"Name",status:"changed",before:"Pointer",after:"Mouse"}],place:{kind:"layers"},titleMark:{kind:"layer",layer:4}}]);
 });
 test("review preserves untrusted names as text data", () => {
     const before=snapshot(document());
@@ -49,7 +49,7 @@ test("a behaviour lists only the fields that changed, in the editor's words", ()
     const after=snapshot(behaviours(base,rows=>rows.map(row=>JSON.stringify(row.target)===JSON.stringify(target)?{...row,tapHoldTerm:180}:row)));
     const [item]=profileReview(before,after);
     assert.equal(item.status,"changed");
-    assert.deepEqual(item.fields,[{label:"Tap / hold",before:`default · ${validateSnapshot(base).settings.values[1]} ms`,after:"180 ms",
+    assert.deepEqual(item.fields,[{label:"Tap / hold",status:"changed",before:`default · ${validateSnapshot(base).settings.values[1]} ms`,after:"180 ms",
         labelMark:{kind:"tier",tier:"hold"}}], "the tiers that did not change are not repeated, and the timing is marked with the tier it decides");
 });
 test("a removed behaviour is marked removed and lists what it held, without its defaults", () => {
@@ -105,7 +105,7 @@ test("a colour travels as a colour, and an off one says what off means there", (
 test("switching one lighting stage off names that stage, in the Lighting screen's words", () => {
     const base=pdDocument(), before=snapshot(base);
     const [item]=profileReview(before,snapshot(lighting(base,rgb=>({...rgb,stageEnableMask:rgb.stageEnableMask & ~4}))));
-    assert.deepEqual(item.fields,[{label:"Pointing modes",before:"on",after:"off",beforeMark:{kind:"stage",on:true},afterMark:{kind:"stage",on:false}}]);
+    assert.deepEqual(item.fields,[{label:"Pointing modes",status:"changed",before:"on",after:"off",beforeMark:{kind:"stage",on:true},afterMark:{kind:"stage",on:false}}]);
 });
 test("a behaviour tier says which branch and tier it is, so it is coloured as the grid colours it", () => {
     const base=pdDocument(), before=snapshot(base);
@@ -133,4 +133,24 @@ test("a setting is marked with what it governs, as the Settings screen marks it"
     assert.deepEqual(timing.map(field=>field.labelMark),[{kind:"tier",tier:"hold"},{kind:"tier",tier:"long"}]);
     const layer=items.find(entry=>entry.unit==="settings:autoMouse").fields.find(field=>field.label==="Auto-mouse layer");
     assert.deepEqual(layer.afterMark,{kind:"layer",layer:3},"a layer value carries the layer's colour");
+});
+test("clearing a pointing mode is a change to the slot, not to every behaviour that reaches it", () => {
+    const base=pdDocument(), slots=validateSnapshot(base).pdModes;
+    const target=validateSnapshot(base).behaviors.rows[0].target;
+    const reaching=snapshot(behaviours(base,rows=>rows.map(entry=>JSON.stringify(entry.target)===JSON.stringify(target)
+        ?{...entry,steps:[{tapIndex:0,tap:{kind:5,flags:0,operand:4}}]}:entry)));
+    const cleared=snapshot(withDomain(reaching.document,80,decodePdDomain,encodePdDomain,modes=>modes.map((mode,id)=>id===4?{...slots[6],id:4}:mode)));
+    assert.deepEqual(profileReview(reaching,cleared).map(entry=>entry.unit),["pd:4"]);
+});
+test("a tier removed from a behaviour that stays is a removed field of a changed item, not a value called none", () => {
+    const base=pdDocument(), before=snapshot(base);
+    const row=validateSnapshot(base).behaviors.rows.find(entry=>entry.steps.some(step=>step.hold && step.tap));
+    const after=snapshot(behaviours(base,rows=>rows.map(entry=>JSON.stringify(entry.target)===JSON.stringify(row.target)
+        ?{...entry,steps:entry.steps.map(step=>step.hold && step.tap?{tapIndex:step.tapIndex,tap:step.tap}:step)}:entry)));
+    const [item]=profileReview(before,after);
+    assert.equal(item.status,"changed","the behaviour is still there");
+    const hold=item.fields.find(field=>/× hold$/.test(field.label));
+    assert.equal(hold.status,"removed");
+    assert.equal(hold.after,null,"the draft side is absent, not the word none");
+    assert.ok(hold.before);
 });

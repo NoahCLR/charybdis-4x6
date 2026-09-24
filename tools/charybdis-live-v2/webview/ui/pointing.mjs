@@ -75,7 +75,7 @@ export function screenPointing() {
         const inert = !slot.kind ? bindingsForSlot(model, slot).keys.length : 0;
         const card = el(`<button class="slotcard ${slot.kind ? "" : "empty"}" data-slot="${slot.id}" aria-current="${state.pdSlot === slot.id}">
             ${swatch()}
-            <span class="nm">${slot.kind ? esc(slot.name) : "Empty slot"}${changedSlots.has(slot.id) ? draftDot() : ""}</span><span class="no">${slot.id + 1}</span>
+            <span class="nm">${slot.kind ? esc(slot.name) : "Empty slot"}</span><span class="no">${changedSlots.has(slot.id) ? draftDot("Changed in your draft", "lead") : ""}${slot.id + 1}</span>
             <span class="meta">${slot.kind === KIND.SCROLLING ? "Scrolling" : slot.kind === KIND.DIRECTIONAL ? `Directional · ${esc(axisLabel(slot.axis))}` : "Available"}</span>
             <span class="meta mono">${esc(bindingName(slot))}</span>
             ${inert ? `<span class="meta warn">${inert} key${inert === 1 ? " still reaches" : "s still reach"} it · inert</span>` : ""}</button>`);

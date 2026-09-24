@@ -73,15 +73,15 @@ function sectionCard(model, section, fields, canEdit, searching) {
 
     for (const field of section.fields) {
         const hidden = !fields.includes(field);
-        rows.appendChild(fieldRow(field, canEdit, submit, hidden));
+        rows.appendChild(fieldRow(field, canEdit, submit, hidden, section.fields.some((entry) => entry.governs)));
     }
     return node;
 }
 
-function fieldRow(field, canEdit, submit, hidden) {
+function fieldRow(field, canEdit, submit, hidden, slot) {
     const editable = canEdit && !field.readOnly;
     const row = el(`<div class="setrow ${field.readOnly ? "ro" : ""}" ${hidden ? 'style="display:none"' : ""}>
-        <div><div class="nm">${marked(getModel(), field.governs, field.label)}</div>${field.hint ? `<div class="hint">${esc(field.hint)}</div>` : ""}</div>
+        <div><div class="nm">${marked(getModel(), field.governs, field.label, {slot})}</div>${field.hint ? `<div class="hint">${esc(field.hint)}</div>` : ""}</div>
         <div class="control"></div>
     </div>`);
     const control = row.querySelector(".control");

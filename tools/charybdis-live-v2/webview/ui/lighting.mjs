@@ -12,6 +12,7 @@ import {colourEditor} from "./colour-editor.mjs";
 import {layerBar} from "./layerbar.mjs";
 import {topbar, unavailable} from "./shell.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
+import {marked} from "./marks.mjs";
 
 const TABS = [
     {id: "base", label: "Base effect"},
@@ -228,7 +229,7 @@ function stageBody(body) {
         where.append(stack(mode, el(`<p class="note">Pass-through leaves whatever is underneath visible; transparent keys keep their ▽ on the board either way. The board above is already showing this.</p>`)));
         const overrides = section("LED overrides on this layer", `<span class="right"><button class="btn tiny ghost" data-act="groups">Edit groups</button></span>`);
         overrides.className = "span";
-        overrides.append(groupRowsTable(model.rgb.layerLedGroups, "layer", (owner) => owner));
+        overrides.append(groupRowsTable(model.rgb.layerLedGroups, "layer"));
         overrides.querySelector('[data-act="groups"]').addEventListener("click", () => { state.stage = "groups"; render(); });
         main.append(colour, where, overrides);
         node.append(list, main);
@@ -290,7 +291,7 @@ function stageBody(body) {
         const note = section("What this stage does");
         note.className = "span";
         note.append(el(`<p class="note" style="max-width:96ch">A pointing-mode colour is an overlay that exists only while the mode is held or toggled. It replaces whatever the layer paints inside its locality for as long as the mode runs — it is never painted on the key that binds it.</p>`));
-        note.append(groupRowsTable(model.rgb.pdModeLedGroups, "pdMode", (owner) => owner));
+        note.append(groupRowsTable(model.rgb.pdModeLedGroups, "pdMode"));
         main.append(colour, where, note);
         node.append(list, main);
     }
@@ -364,7 +365,7 @@ function stageBody(body) {
             <span class="chip">${dot(colours.long)} long hold branch</span>
             ${(colours.branches || []).map((colour, index) => `<span class="chip">${dot(colour)} tap count ${index + 2}</span>`).join("")}</div>`));
         onBoard.append(el(`<p class="note">These are the colours a key wears on the board: a behaviour's tap, hold and long-hold dots, and the branch numbers in the behaviour grid.${stageEnabled(model, "key") ? "" : " The stage is off, so every one of them is drawn hollow."}</p>`));
-        onBoard.append(groupRowsTable(model.rgb.keyBehaviorFeedbackLedGroups, "keyBehavior", (owner) => owner));
+        onBoard.append(groupRowsTable(model.rgb.keyBehaviorFeedbackLedGroups, "keyBehavior"));
         main.append(colour, policy, onBoard);
         node.append(list, main);
     }
@@ -377,11 +378,24 @@ function stageBody(body) {
     body.replaceChildren(node);
 }
 
-function groupRowsTable(rows, target, ownerLabel) {
+// A row's owner by the name its dropdown offers, with the owner's mark —
+// the layer's colour, the pointing mode's light, the feedback tier's dot —
+// as the review shows the same row.
+function ownerCell(model, target, owner) {
+    const name = rowOwners(model, target).find(([value]) => value === owner)?.[1] ?? owner ?? "—";
+    const layer = target === "layer" && /^Layer (\d+)$/.exec(owner || "");
+    const slot = target === "pdMode" ? (model.rgb.pdModeColors || []).findIndex((row) => row.pointingMode === owner) : -1;
+    const tier = target === "keyBehavior" && {KEY_FEEDBACK_GROUP_TAP_COMMITTED: "tap", KEY_FEEDBACK_GROUP_HOLD_ACTIVE: "hold", KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE: "long"}[owner];
+    const markOf = layer ? {kind: "layer", layer: Number(layer[1])} : slot >= 0 ? {kind: "pointing", slot} : tier ? {kind: "tier", tier} : null;
+    return marked(model, markOf, name);
+}
+
+function groupRowsTable(rows, target) {
+    const model = getModel();
     if (!rows?.length) return el(`<p class="note" style="margin-top:8px">No LED override rows in this table. Rows override the stage colour on the LEDs they name.</p>`);
     const node = el(`<table class="t" style="margin-top:8px"><thead><tr><th>Owner</th><th>LEDs</th><th>Colour</th><th></th></tr></thead>
         <tbody>${rows.map((row, index) => `<tr>
-            <td>${esc(ownerLabel(row.owner) || "—")}</td>
+            <td>${target === "combo" ? "All combos" : ownerCell(model, target, row.owner)}</td>
             <td class="mono">${esc(row.ledGroup)} · ${row.ledIndices.length} LED${row.ledIndices.length === 1 ? "" : "s"}</td>
             <td><span class="swatch-lg ${isOff(row.color) ? "swatch-off" : ""}" style="width:13px;height:13px;border-radius:4px;display:inline-block;vertical-align:-2px;${isOff(row.color) ? "" : `background:${css(row.color)}`}"></span>
                 <code class="dim" style="margin-left:6px">${esc(hsvLabel(row.color))}</code>${isOff(row.color) ? ` <span class="note">inherits the stage colour</span>` : ""}</td>
@@ -477,7 +491,7 @@ function groupTables(model, canEdit) {
         ["Rows in the key feedback table", model.rgb.keyBehaviorFeedbackLedGroups, "keyBehavior"],
     ]) {
         const box = el(`<div><div class="sect-h"><h4>${title}</h4><span class="right tag">${rows?.length || 0} rows</span></div></div>`);
-        box.append(groupRowsTable(rows, target, (owner) => owner));
+        box.append(groupRowsTable(rows, target));
         node.append(box);
     }
     return node;
