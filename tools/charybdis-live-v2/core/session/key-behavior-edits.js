@@ -5,7 +5,8 @@ const keycodes = require("../data/keycode-catalog");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {decodeKeyBehaviorDomain, encodeKeyBehaviorDomain, KEY_BEHAVIOR_HOLD_MODES} = require("../schema/key-behavior-domain-v1");
 const {semanticActionForExpression, resolveNativeQmkExpression} = require("../schema/compiled-profile-v1");
-const {actionName, knownActionAbi} = require("../schema/actions");
+const {actionName, isLayerToggleCode, knownActionAbi} = require("../schema/actions");
+const {PROFILE_WIRE_FEATURES} = require("../protocol/profile-wire-v1");
 
 const BEHAVIOR_EDITS = new Set(["saveBehavior", "addBehavior", "deleteBehavior", "retargetBehavior"]);
 const RETARGET_CONFLICTS = new Set(["overwrite", "swap"]);
@@ -25,6 +26,7 @@ function editKeyBehaviors(payload, message, capabilities = {}) {
     const maxPdModes = capabilities.supportedDomainMask & 16 ? 8 : 6;
     const {rows} = decodeKeyBehaviorDomain(payload, {actionLimits: {maxPdModes}});
     const knownAbi = knownActionAbi(capabilities.actionAbiDigest);
+    const ownsLayerToggles = Boolean(capabilities.featureFlags & PROFILE_WIRE_FEATURES.OWNED_LAYER_TOGGLES);
     const native = action => action.kind === ACTION.QMK_KEYCODE ? action.operand
         : knownAbi ? nativeCode(action) : undefined;
     const equivalent = (left, right) => (left.kind === right.kind && left.operand === right.operand)
@@ -40,7 +42,11 @@ function editKeyBehaviors(payload, message, capabilities = {}) {
         let result;
         const encoded = keycodes.encode(name);
         if (encoded !== undefined && !/^MO\s*\(/.test(name)) {
-            if (keycodes.resolve(encoded).kind === "layer") throw invalid("Use MO(layer) or LOCK_LAYER(layer) so the keyboard can track layer ownership.");
+            if (keycodes.resolve(encoded).kind === "layer" && !(ownsLayerToggles && isLayerToggleCode(encoded, capabilities.compiledLayerCount))) {
+                throw invalid(ownsLayerToggles
+                    ? "Use MO(layer), TG(layer), TO(layer) or LOCK_LAYER(layer) so the keyboard can track layer ownership."
+                    : "Use MO(layer) or LOCK_LAYER(layer) so the keyboard can track layer ownership.");
+            }
             result = {kind: ACTION.QMK_KEYCODE, operand: encoded};
         } else {
             result = semanticActionForExpression(name, {});

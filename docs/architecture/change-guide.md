@@ -44,7 +44,10 @@ directory and the existing domain docs.
 - Do not include `noah_keymap.h` from runtime modules or `noah_runtime.h` from
   keymap-owned translation units.
 - Do not add raw QMK layer-action outputs to authored data when they bypass the
-  userspace layer ownership model.
+  userspace layer ownership model. `MO()`, `LT()`, `TG()` and `TO()` are owned
+  (`TG(n)` is `LOCK_LAYER(n)`; `TO(n)` is `layer_ownership_goto(n)`); `DF()`,
+  `OSL()`, `TT()` and `LM()` are not yet. A new owned layer keycode is a
+  matcher in `lib/action/action_kind.c`, not a special case in a caller.
 - Do not treat split sync or RGB as owners. They mirror or render existing
   runtime truth.
 

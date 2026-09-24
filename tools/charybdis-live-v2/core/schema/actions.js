@@ -56,4 +56,11 @@ const layerOfRef = text => {
     return match ? Number(match[1]) : undefined;
 };
 
-module.exports = {KNOWN_ACTION_ABIS, NATIVE_ACTION_ABI_V1, knownActionAbi, actionName, nativeCode, keycodeAction, pdSlotOfCode, actionLimitsFor, layerRef, layerOfRef};
+// TG(n) and TO(n) on a layer the keyboard has. A keyboard that owns them
+// (Profile Wire feature bit 14) runs TG(n) as LOCK_LAYER(n) and TO(n) as "lock
+// only n"; every other QMK layer keycode bypasses its layer ownership.
+const TG_BASE = 0x5260, TO_BASE = 0x5200;
+const isLayerToggleCode = (code, layerCount) =>
+    [TG_BASE, TO_BASE].includes(code & ~0x1f) && (code & 0x1f) < layerCount;
+
+module.exports = {isLayerToggleCode, KNOWN_ACTION_ABIS, NATIVE_ACTION_ABI_V1, knownActionAbi, actionName, nativeCode, keycodeAction, pdSlotOfCode, actionLimitsFor, layerRef, layerOfRef};

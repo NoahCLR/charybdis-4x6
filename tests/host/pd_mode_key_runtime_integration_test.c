@@ -629,6 +629,11 @@ bool layer_ownership_toggle_lock_state(uint8_t layer) {
     return true;
 }
 
+bool layer_ownership_goto(uint8_t layer) {
+    (void)layer;
+    return true;
+}
+
 bool layer_ownership_momentary_release(keypos_t key_pos) {
     (void)key_pos;
     return true;

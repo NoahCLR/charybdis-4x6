@@ -160,6 +160,11 @@ bool layer_ownership_toggle_lock_state(uint8_t layer) {
     return true;
 }
 
+bool layer_ownership_goto(uint8_t layer) {
+    (void)layer;
+    return true;
+}
+
 void layer_ownership_momentary_press(keypos_t key_pos, uint8_t layer) {
     (void)key_pos;
     (void)layer;
@@ -258,6 +263,8 @@ static void test_action_descriptor_classifies_common_actions(void) {
     noah_action_desc_t layer_lock   = noah_action_describe(LOCK_LAYER(2));
     noah_action_desc_t momentary    = noah_action_describe(MO(3));
     noah_action_desc_t layer_tap    = noah_action_describe(LT(4, KC_V));
+    noah_action_desc_t raw_layer    = noah_action_describe(OSL(5));
+    noah_action_desc_t layer_toggle = noah_action_describe(TG(2));
     noah_action_desc_t layer_jump   = noah_action_describe(TO(5));
     noah_action_desc_t qmk_behavior = noah_action_describe(OSM(MOD_LSFT));
     noah_action_desc_t pd_key       = noah_action_describe(ARROW_MODE);
@@ -329,23 +336,51 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(noah_action_desc_source_layer(layer_tap) == 4);
     CHECK(noah_action_desc_default_tap_action(layer_tap) == KC_V);
 
-    CHECK(layer_jump.kind == NOAH_ACTION_KIND_UNSUPPORTED_LAYER_ACTION);
-    CHECK(noah_action_desc_is_raw_qmk_layer_action(layer_jump));
-    CHECK(!noah_action_desc_is_owned_momentary_layer(layer_jump));
-    CHECK(!noah_action_desc_is_layer_tap(layer_jump));
-    CHECK(!noah_action_desc_supported_as_behavior_keycode(layer_jump));
-    CHECK(!noah_action_desc_supported_as_authored_action(layer_jump, NOAH_ACTION_AUTHORED_USE_TAP));
-    CHECK(!noah_action_desc_supported_as_authored_action(layer_jump, NOAH_ACTION_AUTHORED_USE_HOLD_PRESS_AND_HOLD));
-    CHECK(!noah_action_desc_supported_as_authored_action(layer_jump, NOAH_ACTION_AUTHORED_USE_HOLD_OTHER));
-    CHECK(!noah_action_desc_uses_authored_layer_tap_contract(layer_jump));
-    CHECK(noah_action_desc_default_tap_uses_action_keycode(layer_jump));
-    CHECK(!noah_action_desc_is_pure_modifier_literal(layer_jump));
-    CHECK(!noah_action_desc_source_sets_momentary_layer_flag(layer_jump));
-    CHECK(!noah_action_desc_source_sets_layer_tap_flag(layer_jump));
-    CHECK(noah_action_desc_supports_fallback_hold(layer_jump));
-    CHECK(!noah_action_desc_source_layer_uses_desc_layer(layer_jump));
-    CHECK(noah_action_desc_source_layer(layer_jump) == UINT8_MAX);
-    CHECK(noah_action_desc_default_tap_action(layer_jump) == TO(5));
+    CHECK(raw_layer.kind == NOAH_ACTION_KIND_UNSUPPORTED_LAYER_ACTION);
+    CHECK(noah_action_desc_is_raw_qmk_layer_action(raw_layer));
+    CHECK(!noah_action_desc_is_owned_momentary_layer(raw_layer));
+    CHECK(!noah_action_desc_is_layer_tap(raw_layer));
+    CHECK(!noah_action_desc_supported_as_behavior_keycode(raw_layer));
+    CHECK(!noah_action_desc_supported_as_authored_action(raw_layer, NOAH_ACTION_AUTHORED_USE_TAP));
+    CHECK(!noah_action_desc_supported_as_authored_action(raw_layer, NOAH_ACTION_AUTHORED_USE_HOLD_PRESS_AND_HOLD));
+    CHECK(!noah_action_desc_supported_as_authored_action(raw_layer, NOAH_ACTION_AUTHORED_USE_HOLD_OTHER));
+    CHECK(!noah_action_desc_uses_authored_layer_tap_contract(raw_layer));
+    CHECK(noah_action_desc_default_tap_uses_action_keycode(raw_layer));
+    CHECK(!noah_action_desc_is_pure_modifier_literal(raw_layer));
+    CHECK(!noah_action_desc_source_sets_momentary_layer_flag(raw_layer));
+    CHECK(!noah_action_desc_source_sets_layer_tap_flag(raw_layer));
+    CHECK(noah_action_desc_supports_fallback_hold(raw_layer));
+    CHECK(!noah_action_desc_source_layer_uses_desc_layer(raw_layer));
+    CHECK(noah_action_desc_source_layer(raw_layer) == UINT8_MAX);
+    CHECK(noah_action_desc_default_tap_action(raw_layer) == OSL(5));
+
+    // TG() is the lock LOCK_LAYER() toggles; TO() is its own owned kind with
+    // the same authored reach.
+    CHECK(layer_toggle.kind == NOAH_ACTION_KIND_LAYER_LOCK);
+    CHECK(layer_toggle.layer == 2);
+    CHECK(layer_toggle.action == TG(2));
+    CHECK(!noah_action_desc_is_raw_qmk_layer_action(layer_toggle));
+    CHECK(noah_action_desc_consumes_direct_press(layer_toggle));
+    CHECK(noah_action_desc_releases_momentary_layer_before_action(layer_toggle));
+    CHECK(noah_action_desc_default_tap_action(layer_toggle) == KC_NO);
+    CHECK(noah_action_describe(TG(LAYER_COUNT)).kind == NOAH_ACTION_KIND_UNSUPPORTED_LAYER_ACTION);
+
+    CHECK(layer_jump.kind == NOAH_ACTION_KIND_LAYER_GOTO);
+    CHECK(noah_action_desc_is_layer_goto(layer_jump));
+    CHECK(layer_jump.layer == 5);
+    CHECK(!noah_action_desc_is_raw_qmk_layer_action(layer_jump));
+    CHECK(noah_action_desc_has_capability(layer_jump, NOAH_ACTION_CAP_LAYER_AFFECTING));
+    CHECK(noah_action_desc_is_press_only(layer_jump));
+    CHECK(noah_action_desc_is_layer_action(layer_jump));
+    CHECK(noah_action_desc_supported_as_behavior_keycode(layer_jump));
+    CHECK(noah_action_desc_supported_as_authored_action(layer_jump, NOAH_ACTION_AUTHORED_USE_TAP));
+    CHECK(noah_action_desc_supported_as_authored_action(layer_jump, NOAH_ACTION_AUTHORED_USE_HOLD_PRESS_AND_HOLD));
+    CHECK(noah_action_desc_supported_as_authored_action(layer_jump, NOAH_ACTION_AUTHORED_USE_HOLD_OTHER));
+    CHECK(noah_action_desc_consumes_direct_press(layer_jump));
+    CHECK(noah_action_desc_releases_momentary_layer_before_action(layer_jump));
+    CHECK(!noah_action_desc_supports_fallback_hold(layer_jump));
+    CHECK(noah_action_desc_default_tap_action(layer_jump) == KC_NO);
+    CHECK(noah_action_describe(TO(LAYER_COUNT)).kind == NOAH_ACTION_KIND_UNSUPPORTED_LAYER_ACTION);
 
     CHECK(qmk_behavior.kind == NOAH_ACTION_KIND_QMK_BEHAVIOR);
     CHECK(!noah_action_desc_is_raw_qmk_layer_action(qmk_behavior));

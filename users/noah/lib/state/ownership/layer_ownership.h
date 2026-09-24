@@ -27,6 +27,10 @@ typedef struct {
 bool layer_ownership_is_locked(uint8_t layer);
 bool layer_ownership_set_lock_state(uint8_t layer, bool locked);
 bool layer_ownership_toggle_lock_state(uint8_t layer);
+// TO(layer): lock only this layer. Other locks are released; held momentary
+// layers stay on until their keys are released. Layer 0 is the base and is
+// never locked, so layer_ownership_goto(0) releases every lock.
+bool layer_ownership_goto(uint8_t layer);
 
 void layer_ownership_momentary_press(keypos_t key_pos, uint8_t layer);
 bool layer_ownership_momentary_release(keypos_t key_pos);

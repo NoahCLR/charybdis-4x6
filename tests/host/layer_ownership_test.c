@@ -236,6 +236,75 @@ static void test_locking_another_layer_keeps_existing_locks_and_holds(void) {
     CHECK(layer_off_calls[2] == 1);
 }
 
+// TO(layer): only the target stays locked. Held momentary layers are not
+// locks, so they stay on until their keys are released.
+static void test_goto_locks_only_the_target_and_keeps_held_layers(void) {
+    keypos_t key_pos = test_keypos(2, 5);
+
+    test_reset_stubs();
+
+    CHECK(layer_ownership_set_lock_state(1, true));
+    CHECK(layer_ownership_set_lock_state(2, true));
+    layer_ownership_momentary_press(key_pos, 5);
+    CHECK(layer_state == (test_layer_mask(1) | test_layer_mask(2) | test_layer_mask(5)));
+
+    CHECK(layer_ownership_goto(3));
+    CHECK(!layer_ownership_is_locked(1));
+    CHECK(!layer_ownership_is_locked(2));
+    CHECK(layer_ownership_is_locked(3));
+    CHECK(layer_state == (test_layer_mask(3) | test_layer_mask(5)));
+    CHECK(layer_on_calls[3] == 1);
+
+    CHECK(layer_ownership_momentary_release(key_pos));
+    CHECK(layer_state == test_layer_mask(3));
+
+    // Going to a layer already locked on its own changes nothing.
+    CHECK(!layer_ownership_goto(3));
+    CHECK(layer_state == test_layer_mask(3));
+    CHECK(layer_on_calls[3] == 1);
+    CHECK(layer_off_calls[3] == 0);
+}
+
+static void test_goto_base_releases_every_lock(void) {
+    keypos_t key_pos = test_keypos(3, 1);
+
+    test_reset_stubs();
+
+    CHECK(layer_ownership_set_lock_state(2, true));
+    CHECK(layer_ownership_set_lock_state(4, true));
+    layer_ownership_momentary_press(key_pos, 4);
+
+    CHECK(layer_ownership_goto(0));
+    CHECK(!layer_ownership_is_locked(0));
+    CHECK(!layer_ownership_is_locked(2));
+    CHECK(!layer_ownership_is_locked(4));
+    CHECK(layer_state == test_layer_mask(4));
+
+    CHECK(layer_ownership_momentary_release(key_pos));
+    CHECK(layer_state == 0);
+    CHECK(!layer_ownership_goto(0));
+    CHECK(!layer_ownership_goto(LAYER_COUNT));
+}
+
+// The desync raw QMK toggles used to cause: a toggle is a lock, so a
+// momentary hold of the same layer no longer turns it off on release.
+static void test_toggled_layer_survives_a_momentary_hold_of_itself(void) {
+    keypos_t key_pos = test_keypos(0, 4);
+
+    test_reset_stubs();
+
+    CHECK(layer_ownership_toggle_lock_state(2));
+    layer_ownership_momentary_press(key_pos, 2);
+    CHECK(!layer_ownership_momentary_release(key_pos));
+    CHECK(layer_ownership_is_locked(2));
+    CHECK(layer_state == test_layer_mask(2));
+    CHECK(layer_off_calls[2] == 0);
+
+    CHECK(layer_ownership_toggle_lock_state(2));
+    CHECK(!layer_ownership_is_locked(2));
+    CHECK(layer_state == 0);
+}
+
 static void test_invalid_layer_requests_are_ignored(void) {
     keypos_t key_pos = test_keypos(4, 4);
 
@@ -258,6 +327,9 @@ int main(void) {
     test_multiple_locked_layers_can_coexist();
     test_locked_layer_stays_active_after_momentary_release();
     test_locking_another_layer_keeps_existing_locks_and_holds();
+    test_goto_locks_only_the_target_and_keeps_held_layers();
+    test_goto_base_releases_every_lock();
+    test_toggled_layer_survives_a_momentary_hold_of_itself();
     test_invalid_layer_requests_are_ignored();
 
     puts("layer_ownership host tests passed");

@@ -527,9 +527,14 @@ The helper vocabulary is:
 `action` can be a normal keycode, a modified keycode such as `S(KC_1)`, a VIA
 macro, a supported QMK behavior keycode such as `OSM()` or
 `MT()`, a generated pointing-mode lock such as `DRAGSCROLL_LOCK`, or a layer
-lock through `LOCK_LAYER(layer)`. For custom momentary layer holds, use
+lock through `LOCK_LAYER(layer)`. QMK's `TG(layer)` is the same lock as
+`LOCK_LAYER(layer)`, and `TO(layer)` locks that layer alone and releases every
+other lock (`TO(0)` returns to the base layer; layers held with `MO()` stay on
+until released). Both work the same on a plain key, in a behaviour and as a
+combo output. For custom momentary layer holds, use
 `PRESS_AND_HOLD_UNTIL_RELEASE(MO(layer))` so the userspace owns the layer
-state. Inside any helper, `KC_TRNS` means "use the lower active layer's
+state. `DF()`, `OSL()`, `TT()` and `LM()` still bypass the userspace layer
+ownership and are refused. Inside any helper, `KC_TRNS` means "use the lower active layer's
 matching tap, hold, or long-hold behavior here."
 
 The matching key-behavior RGB config in

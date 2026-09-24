@@ -145,6 +145,23 @@ bool layer_ownership_toggle_lock_state(uint8_t layer) {
     return layer_ownership_set_lock_state(layer, !layer_ownership_is_locked(layer));
 }
 
+bool layer_ownership_goto(uint8_t layer) {
+    if (layer >= LAYER_COUNT) {
+        return false;
+    }
+
+    // The target locks before the others release, so the keyboard never
+    // passes through the base layer on its way to the target.
+    bool changed = layer != 0u && layer_ownership_set_lock_state(layer, true);
+    for (uint8_t other = 0u; other < LAYER_COUNT; other++) {
+        if (other != layer || layer == 0u) {
+            changed |= layer_ownership_set_lock_state(other, false);
+        }
+    }
+
+    return changed;
+}
+
 void layer_ownership_momentary_press(keypos_t key_pos, uint8_t layer) {
     noah_layer_ownership_state_t *state = layer_ownership_state();
 

@@ -9,8 +9,10 @@
 // NOAH_KEYMAP_SAFE_RANGE are routed back through process_record_user().
 // Non-layer QMK behavior keycodes such as OSM()/MT() need explicit handling
 // too, because tap_code16/register_code16 only model plain key press/release.
-// Raw QMK layer actions are intentionally handled separately so they cannot
-// bypass the userspace layer ownership model.
+// QMK layer keycodes act through the userspace layer ownership model:
+// MO()/LT() as momentary holds, TG() as the same layer lock LOCK_LAYER() sets,
+// and TO() as "lock only this layer". The others (DF, OSL, TT, LM) are still
+// raw QMK layer actions and are refused so they cannot bypass ownership.
 //
 // Scope note: this module intentionally keeps authored tap actions on normal
 // QMK tap semantics. Ownership-aware literal keycode dispatch, including held
@@ -35,6 +37,19 @@ typedef struct {
 
 static inline bool noah_action_keycode_is_layer_lock(uint16_t action) {
     return action >= LAYER_LOCK_BASE && action < LAYER_LOCK_BASE + LAYER_COUNT;
+}
+
+// TG(n) toggles the lock LOCK_LAYER(n) toggles, so the two are one action.
+static inline bool noah_action_keycode_is_layer_toggle(uint16_t action) {
+    return IS_QK_TOGGLE_LAYER(action) && QK_TOGGLE_LAYER_GET_LAYER(action) < LAYER_COUNT;
+}
+
+static inline uint8_t noah_action_keycode_layer_lock_layer(uint16_t action) {
+    return noah_action_keycode_is_layer_toggle(action) ? (uint8_t)QK_TOGGLE_LAYER_GET_LAYER(action) : (uint8_t)(action - LAYER_LOCK_BASE);
+}
+
+static inline bool noah_action_keycode_is_layer_goto(uint16_t action) {
+    return IS_QK_TO(action) && QK_TO_GET_LAYER(action) < LAYER_COUNT;
 }
 
 static inline bool noah_action_keycode_is_owned_momentary_layer(uint16_t action) {
@@ -107,6 +122,10 @@ uint16_t noah_action_desc_default_tap_action(noah_action_desc_t desc);
 
 static inline bool noah_action_desc_is_layer_lock(noah_action_desc_t desc) {
     return desc.kind == NOAH_ACTION_KIND_LAYER_LOCK;
+}
+
+static inline bool noah_action_desc_is_layer_goto(noah_action_desc_t desc) {
+    return desc.kind == NOAH_ACTION_KIND_LAYER_GOTO;
 }
 
 static inline bool noah_action_desc_is_owned_momentary_layer(noah_action_desc_t desc) {

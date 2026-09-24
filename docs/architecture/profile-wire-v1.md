@@ -349,6 +349,9 @@ Capability feature bits are:
 | 9 | peer reconciliation |
 | 10 | action-ABI digest available |
 | 11 | compiled-profile digest available |
+| 12 | atomic logical apply |
+| 13 | legacy pointing-mode source (see [pd-mode-domain-v1.md](./pd-mode-domain-v1.md)) |
+| 14 | owned layer toggles: `TG()` and `TO()` act through userspace layer ownership wherever they are placed, so a host may offer them in behaviours |
 
 Supported-domain-mask bits 0–3 are RGB, key behaviors, combos and portable
 settings respectively. RGB and behavior domain bits must agree exactly with

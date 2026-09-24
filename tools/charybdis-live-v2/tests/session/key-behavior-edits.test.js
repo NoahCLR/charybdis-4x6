@@ -126,3 +126,19 @@ test("retargeting refuses a missing row, its own key and raw layer keycodes", ()
     assert.throws(() => edit({type: "retargetBehavior", keycode: first.keycode, target: first.keycode}), /already listens/);
     assert.throws(() => edit({type: "retargetBehavior", keycode: first.keycode, target: "TG(2)"}), /MO\(layer\)/);
 });
+
+test("a keyboard that owns TG and TO accepts them in behaviours; other layer keycodes stay refused", () => {
+    const owning = {...capabilities, featureFlags: (capabilities.featureFlags || 0) | (1 << 14)};
+    const save = (action, caps) => edit({type: "saveBehavior", behavior: {...form(), steps: [{tapCount: 0, tap: {helper: "TAP_SENDS", action}}]}}, caps);
+    const tapOf = (output) => rowFor(output, "KC_A").steps[0].tap;
+    for (const [name, code] of [["TG(2)", 0x5262], ["TO(0)", 0x5200]]) {
+        assert.throws(() => save(name, capabilities), /MO\(layer\)/, `${name} without the capability`);
+        const tap = tapOf(save(name, owning));
+        assert.deepEqual({kind: tap.kind, operand: tap.operand}, {kind: 1, operand: code}, name);
+    }
+    for (const name of ["OSL(2)", "DF(1)", `TG(${owning.compiledLayerCount})`]) {
+        assert.throws(() => save(name, owning), /TG\(layer\)/, name);
+    }
+    const [first] = views;
+    assert.doesNotThrow(() => edit({type: "retargetBehavior", keycode: first.keycode, target: "TG(2)"}, owning));
+});

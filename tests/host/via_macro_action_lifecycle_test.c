@@ -241,6 +241,11 @@ bool layer_ownership_toggle_lock_state(uint8_t layer) {
     return false;
 }
 
+bool layer_ownership_goto(uint8_t layer) {
+    (void)layer;
+    return false;
+}
+
 void split_runtime_sync(void) {}
 
 void split_runtime_sync_request(void) {}

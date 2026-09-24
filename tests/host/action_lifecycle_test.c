@@ -25,6 +25,7 @@ typedef struct {
 } test_call_t;
 
 static test_call_t layer_toggle_call;
+static test_call_t layer_goto_call;
 static test_call_t layer_press_call;
 static test_call_t layer_release_call;
 static test_call_t synthetic_tap_call;
@@ -84,6 +85,7 @@ static keypos_t test_keypos(uint8_t row, uint8_t col) {
 
 static void test_reset_stubs(void) {
     layer_toggle_call         = (test_call_t){0};
+    layer_goto_call           = (test_call_t){0};
     layer_press_call          = (test_call_t){0};
     layer_release_call        = (test_call_t){0};
     synthetic_tap_call        = (test_call_t){0};
@@ -166,6 +168,12 @@ bool pd_mode_handle_keycode_release_at(uint16_t keycode, keypos_t key_pos) {
 
 bool layer_ownership_toggle_lock_state(uint8_t layer) {
     layer_toggle_call.layer = layer;
+    return true;
+}
+
+bool layer_ownership_goto(uint8_t layer) {
+    layer_goto_call.layer   = layer;
+    layer_goto_call.pressed = true;
     return true;
 }
 
@@ -283,6 +291,42 @@ static void test_invalid_action_kind_is_rejected_consistently(void) {
     CHECK(noah_action_desc_default_tap_action(invalid) == KC_NO);
     CHECK(!noah_action_desc_has_dispatch_ops(invalid));
     CHECK(!noah_action_kind_dispatch_has_complete_ops(invalid.kind));
+}
+
+// TG() is the lock LOCK_LAYER() toggles, and TO() locks only its layer. Both
+// act through layer ownership on tap and press alike; a layer the keyboard
+// does not have stays a refused raw layer action.
+static void test_toggle_and_goto_layer_keycodes_act_through_layer_ownership(void) {
+    keypos_t key_pos = {.row = 1, .col = 2};
+
+    test_reset_stubs();
+    noah_action_tap(TG(3));
+    CHECK(layer_toggle_call.layer == 3);
+    CHECK(!layer_goto_call.pressed);
+    CHECK(tap_code16_call.keycode == KC_NO);
+
+    test_reset_stubs();
+    noah_action_press(key_pos, TG(2));
+    CHECK(layer_toggle_call.layer == 2);
+    CHECK(register_code16_call.keycode == KC_NO);
+
+    test_reset_stubs();
+    noah_action_tap(TO(5));
+    CHECK(layer_goto_call.pressed && layer_goto_call.layer == 5);
+    CHECK(layer_toggle_call.layer == 0);
+    CHECK(tap_code16_call.keycode == KC_NO);
+
+    test_reset_stubs();
+    noah_action_press(key_pos, TO(0));
+    CHECK(layer_goto_call.pressed && layer_goto_call.layer == 0);
+    CHECK(register_code16_call.keycode == KC_NO);
+
+    test_reset_stubs();
+    noah_action_tap(TG(LAYER_COUNT));
+    noah_action_tap(TO(LAYER_COUNT));
+    CHECK(layer_toggle_call.layer == 0);
+    CHECK(!layer_goto_call.pressed);
+    CHECK(tap_code16_call.keycode == KC_NO);
 }
 
 static void test_tap_handles_layer_lock_and_pd_lock(void) {
@@ -516,6 +560,7 @@ int main(void) {
     test_every_action_kind_has_metadata_and_dispatch_coverage();
     test_invalid_action_kind_is_rejected_consistently();
     test_tap_handles_layer_lock_and_pd_lock();
+    test_toggle_and_goto_layer_keycodes_act_through_layer_ownership();
     test_tap_at_preserves_pd_lock_origin_key_pos();
     test_tap_routes_macro_custom_qmk_and_plain_actions();
     test_tap_ignores_raw_layer_actions();

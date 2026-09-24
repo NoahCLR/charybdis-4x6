@@ -49,7 +49,7 @@ static const noah_action_kind_dispatch_ops_t noah_action_kind_dispatch_noop_ops 
 
 static void noah_action_log_unsupported_layer_action(noah_action_desc_t desc) {
 #ifdef CONSOLE_ENABLE
-    uprintf("Unsupported raw QMK layer action 0x%04X; use LOCK_LAYER(...) for persistent changes or PRESS_AND_HOLD_UNTIL_RELEASE(MO(layer)) for owned momentary holds\n", (unsigned int)desc.action);
+    uprintf("Unsupported raw QMK layer action 0x%04X; use LOCK_LAYER(...)/TG(...) or TO(...) for persistent changes or PRESS_AND_HOLD_UNTIL_RELEASE(MO(layer)) for owned momentary holds\n", (unsigned int)desc.action);
 #else
     (void)desc;
 #endif
@@ -101,6 +101,10 @@ static void noah_action_toggle_layer_lock(noah_action_desc_t desc) {
     (void)layer_ownership_toggle_lock_state(desc.layer);
 }
 
+static void noah_action_goto_layer(noah_action_desc_t desc) {
+    (void)layer_ownership_goto(desc.layer);
+}
+
 static void noah_action_toggle_pd_mode_lock(noah_action_desc_t desc, keypos_t key_pos) {
     const pd_mode_def_t *def = pd_mode_lock_action_lookup(desc.action);
     if (def) {
@@ -116,6 +120,16 @@ static void noah_action_tap_layer_lock(noah_action_desc_t desc, keypos_t key_pos
 static void noah_action_press_layer_lock(noah_action_desc_t desc, keypos_t key_pos) {
     (void)key_pos;
     noah_action_toggle_layer_lock(desc);
+}
+
+static void noah_action_tap_layer_goto(noah_action_desc_t desc, keypos_t key_pos) {
+    (void)key_pos;
+    noah_action_goto_layer(desc);
+}
+
+static void noah_action_press_layer_goto(noah_action_desc_t desc, keypos_t key_pos) {
+    (void)key_pos;
+    noah_action_goto_layer(desc);
 }
 
 static void noah_action_tap_pd_mode_lock(noah_action_desc_t desc, keypos_t key_pos) {

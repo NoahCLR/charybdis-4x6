@@ -20,7 +20,7 @@ enum {
     TEST_COMBO_KEY,
     TEST_DUP_COMBO_KEY,
     TEST_DEAD_KEY,
-    TEST_RAW_LAYER_ACTION = TO(LAYER_NUM),
+    TEST_RAW_LAYER_ACTION = OSL(LAYER_NUM),
 };
 
 static const uint16_t test_keymaps[LAYER_COUNT][MATRIX_ROWS][MATRIX_COLS] = {
@@ -28,6 +28,9 @@ static const uint16_t test_keymaps[LAYER_COUNT][MATRIX_ROWS][MATRIX_COLS] = {
         {
             [0][0] = TEST_PRESENT_KEY,
             [0][1] = TEST_RAW_LAYER_ACTION,
+            // TG() and TO() act through layer ownership, so they validate.
+            [0][2] = TG(LAYER_NUM),
+            [0][3] = TO(LAYER_SYM),
         },
 };
 
@@ -35,6 +38,8 @@ static const uint16_t combo_outputs[] = {
     TEST_COMBO_KEY,
     MO(LAYER_SYM),
     TEST_DUP_COMBO_KEY,
+    TG(LAYER_NUM),
+    TO(LAYER_BASE),
 };
 
 static const uint16_t combo_keys_0[] = {
@@ -105,6 +110,11 @@ bool is_pd_mode_lock_action(uint16_t action) {
 }
 
 bool layer_ownership_toggle_lock_state(uint8_t layer) {
+    (void)layer;
+    return true;
+}
+
+bool layer_ownership_goto(uint8_t layer) {
     (void)layer;
     return true;
 }
@@ -195,6 +205,10 @@ int main(void) {
     CHECK(noah_keymap_validate() == 4u);
 
     CHECK(strstr(log_buffer, "Unsupported keymaps[0][0][1] raw layer action") != NULL);
+    CHECK(strstr(log_buffer, "Unsupported keymaps[0][0][2]") == NULL);
+    CHECK(strstr(log_buffer, "Unsupported keymaps[0][0][3]") == NULL);
+    CHECK(strstr(log_buffer, "output[3]") == NULL);
+    CHECK(strstr(log_buffer, "output[4]") == NULL);
     CHECK(strstr(log_buffer, "Unsupported COMBOS(COMBO) input[2] duplicate member keycode") != NULL);
     CHECK(strstr(log_buffer, "Unsupported COMBOS(COMBO) output[1] raw layer action") != NULL);
     CHECK(strstr(log_buffer, "Unreachable key_behaviors[2].keycode") != NULL);

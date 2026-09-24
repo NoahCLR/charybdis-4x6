@@ -1305,3 +1305,21 @@ sequenced apply and restore itself. Each rule now has one home:
   `ui/groups.mjs` for the grouped lists, `slotLight` in `ui/marks.mjs`, one
   form per macro slot and one `state.combo` for the builder; the picker closes
   itself before handing on a choice.
+
+### D-L34 — Layer keycodes are owned in the firmware, and the app follows
+
+Behaviours refused `TG()`/`TO()` while combos accepted them, because the
+firmware ignored them inside a behaviour and let QMK run them everywhere else,
+behind its layer ownership: a toggled layer turned off when a `MO()` of it was
+released, and `TO()` left locks marked that QMK had cleared. The fix is at the
+root, not in the app. The firmware classifies `TG(n)` as `LOCK_LAYER(n)` and
+`TO(n)` as "lock only n" (`layer_ownership_goto`), so both act the same on a
+plain key, in a behaviour and as a combo output, and advertises it as Profile
+Wire feature bit 14. The app accepts `TG()`/`TO()` in behaviours only when a
+keyboard reports that bit; older firmware keeps the old refusal.
+
+`DF()`, `OSL()`, `TT()` and `LM()` still bypass ownership. They follow in
+order: `TT()` (a hold plus the `TAPPING_TOGGLE`-th tap as a lock), `OSL()` (a
+one-shot layer owner), then `LM()`, a decision on `DF()` (the firmware assumes
+layer 0 is the base), and a device-side check that refuses what remains when a
+profile is saved.

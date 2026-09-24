@@ -19,6 +19,7 @@ enum {
     TEST_MULTI_TAP_KEY       = SAFE_RANGE + 0x70,
     TEST_ALT_ACTION          = SAFE_RANGE + 0x71,
     TEST_FOREIGN_RELEASE_KEY = 0x0004u,
+    TEST_TOGGLE_TAP_KEY      = SAFE_RANGE + 0x72,
     TEST_NUM_LAYER           = 1,
     TEST_OTHER_LAYER         = 2,
 };
@@ -191,6 +192,19 @@ key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
                 {
                     .tap  = TAP_SENDS(LOCK_LAYER(TEST_OTHER_LAYER)),
                     .hold = PRESS_AND_HOLD_UNTIL_RELEASE(MO(TEST_OTHER_LAYER)),
+                },
+        };
+    }
+
+    if (keycode == TEST_TOGGLE_TAP_KEY) {
+        return (key_behavior_view_t){
+            .keycode       = keycode,
+            .handled       = true,
+            .tap_hold_term = 150,
+            .single =
+                {
+                    .tap  = TAP_SENDS(TG(TEST_OTHER_LAYER)),
+                    .hold = PRESS_AND_HOLD_UNTIL_RELEASE(MO(TEST_NUM_LAYER)),
                 },
         };
     }
@@ -473,10 +487,86 @@ static void test_double_tap_hold_with_prethreshold_scan_toggles_num_layer_only_o
     CHECK(!test_layer_active(TEST_NUM_LAYER));
 }
 
+// A plain key press and release, returning whether QMK would go on to
+// process either event itself.
+static bool test_plain_key_tap(uint16_t keycode, keypos_t key_pos) {
+    bool keep_press   = key_runtime_integration_process_record(keycode, key_pos, true);
+    bool keep_release = key_runtime_integration_process_record(keycode, key_pos, false);
+    fake_time         = (uint16_t)(fake_time + 20);
+    return keep_press || keep_release;
+}
+
+// TG() on a plain key is the same lock LOCK_LAYER() sets, so a momentary hold
+// of that layer no longer turns it off on release, and QMK never sees it.
+static void test_plain_toggle_key_is_a_layer_lock(void) {
+    keypos_t toggle_pos = test_keypos(1, 1);
+    keypos_t hold_pos   = test_keypos(1, 2);
+
+    test_reset_state();
+
+    CHECK(!test_plain_key_tap(TG(TEST_NUM_LAYER), toggle_pos));
+    CHECK(test_layer_locked(TEST_NUM_LAYER));
+    CHECK(test_layer_active(TEST_NUM_LAYER));
+
+    key_runtime_integration_process_record(MO(TEST_NUM_LAYER), hold_pos, true);
+    key_runtime_integration_process_record(MO(TEST_NUM_LAYER), hold_pos, false);
+    CHECK(test_layer_locked(TEST_NUM_LAYER));
+    CHECK(test_layer_active(TEST_NUM_LAYER));
+
+    CHECK(!test_plain_key_tap(LOCK_LAYER(TEST_NUM_LAYER), toggle_pos));
+    CHECK(!test_layer_locked(TEST_NUM_LAYER));
+    CHECK(!test_layer_active(TEST_NUM_LAYER));
+}
+
+// TO() keeps only its target locked; TO(0) returns to the base layer.
+static void test_plain_goto_key_locks_only_its_layer(void) {
+    keypos_t key_pos = test_keypos(2, 3);
+
+    test_reset_state();
+
+    CHECK(!test_plain_key_tap(TG(TEST_NUM_LAYER), key_pos));
+    CHECK(!test_plain_key_tap(TO(TEST_OTHER_LAYER), key_pos));
+    CHECK(!test_layer_locked(TEST_NUM_LAYER));
+    CHECK(!test_layer_active(TEST_NUM_LAYER));
+    CHECK(test_layer_locked(TEST_OTHER_LAYER));
+    CHECK(test_layer_active(TEST_OTHER_LAYER));
+
+    CHECK(!test_plain_key_tap(TO(0), key_pos));
+    CHECK(!test_layer_locked(TEST_OTHER_LAYER));
+    CHECK(layer_state == 0);
+}
+
+// TG() authored as a behaviour tap toggles the same lock.
+static void test_behavior_tap_toggles_layer_with_tg(void) {
+    keypos_t key_pos = test_keypos(3, 0);
+
+    test_reset_state();
+
+    const key_runtime_integration_step_t steps[] = {
+        KEY_RUNTIME_INTEGRATION_PRESS(TEST_TOGGLE_TAP_KEY, key_pos.row, key_pos.col),
+        KEY_RUNTIME_INTEGRATION_ADVANCE(30),
+        KEY_RUNTIME_INTEGRATION_RELEASE(TEST_TOGGLE_TAP_KEY, key_pos.row, key_pos.col),
+        KEY_RUNTIME_INTEGRATION_ADVANCE(200),
+        KEY_RUNTIME_INTEGRATION_SCAN(),
+    };
+
+    key_runtime_integration_run(&fake_time, steps, ARRAY_SIZE(steps));
+    CHECK(test_layer_locked(TEST_OTHER_LAYER));
+    CHECK(test_layer_active(TEST_OTHER_LAYER));
+
+    key_runtime_integration_run(&fake_time, steps, ARRAY_SIZE(steps));
+    CHECK(!test_layer_locked(TEST_OTHER_LAYER));
+    CHECK(!test_layer_active(TEST_OTHER_LAYER));
+}
+
 int main(void) {
     test_double_tap_hold_toggles_num_layer_lock_off_on_second_cycle();
     test_thumb_cycle_release_still_clears_slot_when_layer_change_resolves_to_other_keycode();
     test_double_tap_hold_with_prethreshold_scan_toggles_num_layer_only_once();
+
+    test_plain_toggle_key_is_a_layer_lock();
+    test_plain_goto_key_locks_only_its_layer();
+    test_behavior_tap_toggles_layer_with_tg();
 
     puts("key_runtime layer-lock integration tests passed");
     return 0;

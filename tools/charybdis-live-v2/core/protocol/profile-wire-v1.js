@@ -22,7 +22,7 @@ const PROFILE_WIRE_STATUS = Object.freeze({
 });
 
 const PROFILE_WIRE_KNOWN_MASKS = Object.freeze({
-    FEATURE_FLAGS: 0x00003fff,
+    FEATURE_FLAGS: 0x00007fff,
     REQUIRED_READ_FEATURES: 0x0000000f,
     STATE_FLAGS: 0x01ff,
     SUPPORTED_DOMAINS: 0x1f,
@@ -43,6 +43,8 @@ const PROFILE_WIRE_FEATURES = Object.freeze({
     COMPILED_PROFILE_HASH: 1 << 11,
     ATOMIC_LOGICAL_APPLY: 1 << 12,
     LEGACY_PD_SOURCE: 1 << 13,
+    // TG() and TO() act through the keyboard's layer ownership.
+    OWNED_LAYER_TOGGLES: 1 << 14,
 });
 
 const PROFILE_WIRE_DOMAINS = Object.freeze({

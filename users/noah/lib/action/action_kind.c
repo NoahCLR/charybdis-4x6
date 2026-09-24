@@ -169,11 +169,22 @@ bool noah_action_kind_match_literal(uint16_t action, pd_mode_mask_t pd_mode, noa
 bool noah_action_kind_match_layer_lock(uint16_t action, pd_mode_mask_t pd_mode, noah_action_desc_t *out) {
     (void)pd_mode;
 
-    if (!(out && noah_action_keycode_is_layer_lock(action))) {
+    if (!(out && (noah_action_keycode_is_layer_lock(action) || noah_action_keycode_is_layer_toggle(action)))) {
         return false;
     }
 
-    *out = noah_action_desc_build(NOAH_ACTION_KIND_LAYER_LOCK, action, (uint8_t)(action - LAYER_LOCK_BASE), 0);
+    *out = noah_action_desc_build(NOAH_ACTION_KIND_LAYER_LOCK, action, noah_action_keycode_layer_lock_layer(action), 0);
+    return true;
+}
+
+bool noah_action_kind_match_layer_goto(uint16_t action, pd_mode_mask_t pd_mode, noah_action_desc_t *out) {
+    (void)pd_mode;
+
+    if (!(out && noah_action_keycode_is_layer_goto(action))) {
+        return false;
+    }
+
+    *out = noah_action_desc_build(NOAH_ACTION_KIND_LAYER_GOTO, action, (uint8_t)QK_TO_GET_LAYER(action), 0);
     return true;
 }
 
