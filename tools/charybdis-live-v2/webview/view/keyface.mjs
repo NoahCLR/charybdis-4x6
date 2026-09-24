@@ -392,6 +392,20 @@ export const macroKeycodes = (keycode) =>
     [...String(keycode || "").matchAll(/\b((?:VIA_)?MACRO_\d+)\b/g)].map((match) => match[1]);
 
 /**
+ * The layers a macro sits on: every layer with a key of its own that names
+ * it, in stack order, with the keys that do. A transparent key is not the
+ * macro's place on that layer — it belongs to the layer underneath, which is
+ * listed for it — and a behaviour branch is not a place on the layout at all.
+ * `at` is the layer's position in the stack, which is how a screen selects it.
+ */
+export const macroPlacements = (stack, keycode) => (stack || []).map((layer, at) => ({
+    layer, at,
+    positions: (layer.positions || [])
+        .filter((position) => macroKeycodes(keyMeaning(position)).includes(keycode))
+        .map((position) => position.layoutIndex),
+})).filter((entry) => entry.positions.length);
+
+/**
  * How this layer reaches a set of things named by keycode — the one shape the
  * Macros and Pointing modes tabs both group by, so they cannot drift apart.
  *

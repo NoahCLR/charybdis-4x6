@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {behaviourFor, comboEditInputs, comboReferenceLayer, combosAt, behaviourListeningTo, canonicalKeycode, behaviourGridSteps, behaviourGroups, behaviourTiers, macroReach, pointingReach, reachablePositions, resolvedPositions, bindingKeycode, bindingsForSlot, comboGroups, combosForKey, keyFace, keyMeaning, macroKeycodes, pointingSlotFor, slotKeycodes} from "../webview/view/keyface.mjs";
+import {behaviourFor, comboEditInputs, comboReferenceLayer, combosAt, behaviourListeningTo, canonicalKeycode, behaviourGridSteps, behaviourGroups, behaviourTiers, macroReach, pointingReach, reachablePositions, resolvedPositions, bindingKeycode, bindingsForSlot, comboGroups, combosForKey, keyFace, keyMeaning, macroKeycodes, macroPlacements, pointingSlotFor, slotKeycodes} from "../webview/view/keyface.mjs";
 
 test("a key face uses the model's own resolution, and names the layer a dual-role key reaches", () => {
     assert.deepEqual(keyFace({keycode: "KC_TRANSPARENT", display: "▽"}), {main: "▽", sub: "", kind: "transparent"});
@@ -517,4 +517,20 @@ test("a key cap tells layer keys and mod-taps apart from plain keys", () => {
     assert.equal(face("MT(MOD_LCTL|MOD_LSFT|MOD_LGUI,KC_A)", "A").sub, "Ctrl+Shift+Cmd");
     assert.equal(face("MT(MOD_RALT,KC_B)", "B").sub, "RAlt");
     assert.deepEqual(face("KC_A", "A"), {main: "A", sub: "", kind: "key"}, "a plain A has no second line");
+});
+
+test("a macro's layers are the ones with a key of their own that names it", () => {
+    const at = (layoutIndex, keycode, semantic) => ({layoutIndex, keycode, semantic, display: keycode});
+    const stack = [
+        {index: 0, name: "Base", positions: [at(0, "QK_MACRO_1", "VIA_MACRO_1"), at(1, "KC_A"), at(2, "QK_MACRO_1", "VIA_MACRO_1")]},
+        {index: 1, name: "Numbers", positions: [at(0, "KC_TRANSPARENT"), at(1, "KC_B"), at(2, "KC_NO")]},
+        {index: 4, name: "Symbols", positions: [at(0, "KC_C"), at(1, "QK_MACRO_1", "VIA_MACRO_1"), at(2, "QK_MACRO_10", "VIA_MACRO_10")]},
+    ];
+    assert.deepEqual(macroPlacements(stack, "VIA_MACRO_1").map((entry) => [entry.layer.name, entry.at, entry.positions]),
+        [["Base", 0, [0, 2]], ["Symbols", 2, [1]]],
+        "matched by meaning, with the stack position a screen selects and every key; a transparent key is not a place");
+    assert.deepEqual(macroPlacements(stack, "VIA_MACRO_10").map((entry) => entry.layer.name), ["Symbols"],
+        "VIA_MACRO_1 does not match VIA_MACRO_10");
+    assert.deepEqual(macroPlacements(stack, "VIA_MACRO_7"), [], "a macro on no key has no layers");
+    assert.deepEqual(macroPlacements(undefined, "VIA_MACRO_1"), []);
 });

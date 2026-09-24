@@ -6,9 +6,11 @@
 // real when the slot is staged, and says so if it disagrees.
 
 import {el, esc} from "../lib/dom.mjs";
-import {describeStep, macroPeek, parseMacro, serializeMacro, unreleased} from "../view/macro.mjs";
-import {getModel, post, render, state, writable} from "../store.mjs";
+import {describeStep, macroMatches, macroPeek, parseMacro, serializeMacro, unreleased} from "../view/macro.mjs";
+import {macroPlacements} from "../view/keyface.mjs";
+import {getModel, layerName, layers, post, render, state, writable} from "../store.mjs";
 import * as edits from "../view/edits.mjs";
+import {layerSwatch} from "./layerbar.mjs";
 import {openPicker} from "./picker.mjs";
 import {topbar, unavailable} from "./shell.mjs";
 
@@ -27,8 +29,9 @@ export function screenMacros() {
     const main = el(`<div class="main">${topbar(
         "Macros",
         "Macro slots on the keyboard. Give one a name and it shows by that name on keys, in the picker and in the key card; the name is saved on the keyboard with everything else.",
-        "",
+        bank.length ? `<input class="input" id="macroSearch" type="search" placeholder="Search macros by name" style="width:220px" value="${esc(state.macroSearch || "")}">` : "",
     )}</div>`);
+    main.querySelector("#macroSearch")?.addEventListener("input", (event) => { state.macroSearch = event.target.value; render(); });
 
     const content = el(`<div class="content"><div class="pad" style="display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:20px;align-items:start"></div></div>`);
     const pad = content.firstElementChild;
@@ -46,7 +49,12 @@ export function screenMacros() {
         <span class="right tag" data-tip="${filled} filled">${available} of ${bank.length} available</span></div>
         <div class="card-b"><div class="macro-grid"></div>${memoryMeter(memory)}</div></div>`);
     const cells = grid.querySelector(".macro-grid");
+    const query = state.macroSearch || "";
+    if (!bank.some((row) => macroMatches(row, query))) {
+        cells.replaceWith(el(`<p class="note">No macro is named “${esc(query.trim())}”.</p>`));
+    }
     bank.forEach((row, index) => {
+        if (!macroMatches(row, query)) return;
         const {steps} = parseMacro(row.payload);
         const peek = macroPeek(row.payload, (name) => model?.qmkKeyLabels?.[name] || name);
         const out = row.available === false;
@@ -93,6 +101,7 @@ function editor(model, slot, canEdit) {
                 <button class="btn tiny ghost" data-act="place" ${writable() ? "" : "disabled"}>Place on a key…</button></span></div>
         <div class="card-b stack">
             ${nameField(model, slot, canEdit)}
+            ${placedOn(model, slot)}
             <label class="field"><span>Payload</span>
                 <textarea class="input mono" rows="3" style="height:auto;padding:9px 10px;resize:vertical" ${canEdit ? "" : "disabled"}
                     data-tip="Exactly as the keyboard stores it. Text is literal; {KC_A} taps, {+KC_A} presses, {-KC_A} releases, {120} waits. Use {{ and }} for literal braces.">${esc(payload)}</textarea></label>
@@ -111,6 +120,8 @@ function editor(model, slot, canEdit) {
     for (const eventName of ["click", "keyup", "select"]) textarea.addEventListener(eventName, () => {
         state.macroCursors = {...state.macroCursors, [slot.keycode]: textarea.selectionStart};
     });
+    card.querySelectorAll("[data-goto-layer]").forEach((button) => button.addEventListener("click", () =>
+        showOnLayer(slot.keycode, Number(button.dataset.gotoLayer))));
     card.querySelector('[data-act="place"]').addEventListener("click", () => {
         state.placement = {keycode: slot.keycode, label: slot.keycode};
         state.screen = "keys"; state.tab = "key"; render();
@@ -138,6 +149,32 @@ function nameField(model, slot, canEdit) {
         <input class="input" data-name maxlength="${esc(space.perName)}" value="${esc(slot.name || "")}" placeholder="Macro ${esc(slot.keycode.split("_").at(-1))}" ${canEdit ? "" : "disabled"}
             data-tip="Up to ${esc(space.perName)} plain characters: letters, digits, spaces and punctuation.">
         <span class="note" data-name-count>${esc((slot.name || "").length)} / ${esc(space.perName)} characters</span></label>`;
+}
+
+// The layers whose keys carry this macro, each in its layer colour. A click
+// opens that layer in Keys with this macro picked in its Macros tab, so the
+// board rings its keys and the table marks its row.
+function placedOn(model, slot) {
+    const placements = macroPlacements(layers(), slot.keycode);
+    const chips = placements.map(({layer, at, positions}) => {
+        const swatch = layerSwatch(model, layer);
+        const keys = `${positions.length} key${positions.length === 1 ? "" : "s"}`;
+        return `<button class="layer-chip link" data-goto-layer="${at}"
+            data-tip="${esc(swatch.tip)} · ${keys} · show on the board">${swatch.html}
+            <span>${esc(layerName(layer))}</span><span class="idx">${layer.index}</span></button>`;
+    }).join("");
+    return `<div class="field"><span>On layers</span>
+        ${chips ? `<div class="row" style="gap:6px;flex-wrap:wrap">${chips}</div>`
+            : `<span class="note">No key carries this macro. Place it on a key to use it.</span>`}</div>`;
+}
+
+function showOnLayer(keycode, at) {
+    const placement = macroPlacements(layers(), keycode).find((entry) => entry.at === at);
+    if (!placement) return;
+    Object.assign(state, {screen: "keys", tab: "macros", layer: at, selected: placement.positions[0], placement: null});
+    state.reachRow.macros = `here:${keycode}`;
+    state.groups.macros.here = true;
+    render();
 }
 
 function stageMacro(model, slot, payload) {

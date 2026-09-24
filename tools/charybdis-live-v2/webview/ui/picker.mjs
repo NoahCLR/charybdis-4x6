@@ -7,6 +7,7 @@ import {getModel, layerName, layers, post, render, state} from "../store.mjs";
 import {PICKER_BOARD} from "../view/picker-board.mjs";
 import {PICKER_MODIFIERS, pickerExpression} from "../view/edits.mjs";
 import {entriesForPickerSection, pickerSections} from "../view/picker-sections.mjs";
+import {macroMatches} from "../view/macro.mjs";
 
 const MODIFIERS = PICKER_MODIFIERS;
 
@@ -31,6 +32,14 @@ function keyButton(entry, picked) {
         <span class="l">${esc(entry.label || entry.value)}</span><span class="c">${esc(entry.value)}</span></button>`;
 }
 
+// A macro slot shows by its name when it has one, with its slot and size
+// underneath, so a named macro is recognisable wherever it is offered.
+function macroButton(slot, picked) {
+    return `<button class="pk ${slot.name ? "wide" : ""} ${picked ? "on" : ""}" data-pick="${esc(slot.keycode)}" data-tip="${esc(slot.keycode)}">
+        <span class="l">${esc(slot.name || slot.keycode.replace(/^VIA_MACRO_/, "M"))}</span>
+        <span class="c">${slot.name ? `M${esc(slot.keycode.split("_").at(-1))} · ` : ""}${slot.empty ? "empty" : `${slot.bytes} B`}</span></button>`;
+}
+
 function sectionBody(model) {
     const picker = state.picker;
     const catalogue = model?.qmkKeycodes || [];
@@ -38,10 +47,20 @@ function sectionBody(model) {
 
     if (picker.search) {
         const query = picker.search.toLowerCase();
-        const matches = catalogue.filter((entry) => entry.search?.includes(query) || entry.value.toLowerCase().includes(query)).slice(0, 64);
-        if (!matches.length) return `<p class="note" style="padding:18px">Nothing in the keyboard's catalogue matches “${esc(picker.search)}”.</p>`;
-        return `<div class="pk-body"><p class="note" style="margin-bottom:10px">${matches.length} matches</p>
-            <div class="pk-rows">${chunk(matches, 8).map((row) => `<div class="pk-row">${row.map((entry) => keyButton(entry, picked(entry.value))).join("")}</div>`).join("")}</div></div>`;
+        // A macro is searched by the name it was given, which the catalogue
+        // cannot know. A named one found here is not listed again under the
+        // catalogue's own name for the same slot, QK_MACRO_n.
+        const macros = (model?.viaMacros || []).filter((slot) => slot.name && macroMatches(slot, query));
+        const named = new Set(macros.flatMap((slot) => [slot.keycode, slot.keycode.replace(/^VIA_MACRO_/, "QK_MACRO_")]));
+        const matches = catalogue.filter((entry) => !named.has(entry.value)
+            && (entry.search?.includes(query) || entry.value.toLowerCase().includes(query))).slice(0, 64);
+        if (!matches.length && !macros.length) return `<p class="note" style="padding:18px">Nothing in the keyboard's catalogue or macros matches “${esc(picker.search)}”.</p>`;
+        const count = matches.length + macros.length;
+        return `<div class="pk-body"><p class="note" style="margin-bottom:10px">${count} match${count === 1 ? "" : "es"}</p>
+            ${macros.length ? `<div class="label" style="margin-bottom:6px">Macros</div>
+                <div class="pk-rows" style="margin-bottom:12px">${chunk(macros, 8).map((row) => `<div class="pk-row">${row.map((slot) => macroButton(slot, picked(slot.keycode))).join("")}</div>`).join("")}</div>` : ""}
+            ${matches.length ? `${macros.length ? `<div class="label" style="margin-bottom:6px">Keycodes</div>` : ""}
+                <div class="pk-rows">${chunk(matches, 8).map((row) => `<div class="pk-row">${row.map((entry) => keyButton(entry, picked(entry.value))).join("")}</div>`).join("")}</div>` : ""}</div>`;
     }
 
     const section = pickerSections().find((entry) => entry.id === picker.section) || pickerSections()[0];
@@ -76,9 +95,7 @@ function sectionBody(model) {
         const slots = model?.viaMacros || [];
         if (!slots.length) return `<p class="note" style="padding:18px">This keyboard has not reported its macros.</p>`;
         return `<div class="pk-body"><div class="pk-rows">${chunk(slots, 8).map((row) => `<div class="pk-row">${row.map((slot) =>
-            `<button class="pk ${slot.name ? "wide" : ""} ${picked(slot.keycode) ? "on" : ""}" data-pick="${esc(slot.keycode)}" data-tip="${esc(slot.keycode)}">
-                <span class="l">${esc(slot.name || slot.keycode.replace(/^VIA_MACRO_/, "M"))}</span>
-                <span class="c">${slot.name ? `M${esc(slot.keycode.split("_").at(-1))} · ` : ""}${slot.empty ? "empty" : `${slot.bytes} B`}</span></button>`).join("")}</div>`).join("")}</div></div>`;
+            macroButton(slot, picked(slot.keycode))).join("")}</div>`).join("")}</div></div>`;
     }
     const entries = entriesForPickerSection(catalogue, section);
     if (!entries.length) return `<p class="note" style="padding:18px">The keyboard's catalogue has nothing in this section.</p>`;

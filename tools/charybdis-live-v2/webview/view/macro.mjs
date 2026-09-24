@@ -105,3 +105,14 @@ export function unreleased(steps) {
     }
     return held;
 }
+
+// Whether a slot answers a search. A macro is found by the name it was given,
+// and by the slot it sits in as the screens label it — "M3", "Macro 3" or its
+// keycode — so an unnamed macro can still be found. Case is ignored.
+export function macroMatches(slot, query) {
+    const needle = String(query ?? "").trim().toLowerCase();
+    if (!needle) return true;
+    const number = String(slot?.keycode ?? "").split("_").at(-1);
+    return [slot?.name, `M${number}`, `Macro ${number}`, slot?.keycode]
+        .some((text) => String(text ?? "").toLowerCase().includes(needle));
+}

@@ -17,9 +17,9 @@ const ICONS = {
 export const SCREENS = [
     {group: "Configure", items: [
         {id: "keys", label: "Keys", icon: "keys"},
-        {id: "pointing", label: "Pointing modes", icon: "pointing"},
         {id: "lighting", label: "Lighting", icon: "lighting"},
         {id: "macros", label: "Macros", icon: "macros"},
+        {id: "pointing", label: "Pointing modes", icon: "pointing"},
         {id: "settings", label: "Settings", icon: "settings"},
     ]},
     {group: "Keyboard", items: [

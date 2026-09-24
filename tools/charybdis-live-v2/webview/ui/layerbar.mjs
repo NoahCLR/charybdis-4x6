@@ -6,14 +6,23 @@ import {el, esc} from "../lib/dom.mjs";
 import {getModel, layerName, layers, render, state} from "../store.mjs";
 import {layerColourRow, stageEnabled} from "../view/lighting.mjs";
 
+// A layer's swatch and how it is lit, the same wherever a layer is named: a
+// layer whose colour is off, or whose stage is off, shows as unlit.
+export function layerSwatch(model, layer) {
+    const row = layerColourRow(model, layer.index);
+    const lit = stageEnabled(model, "layers") && row && !isOff(row.color);
+    return {
+        html: `<span class="swatch ${lit ? "" : "swatch-off"}" style="${lit ? `background:${css(row.color)}` : ""}"></span>`,
+        tip: `${layerName(layer)} · ${lit ? hsvLabel(row.color) : "no layer colour"}`,
+    };
+}
+
 export function layerBar(trailing = "") {
     const model = getModel();
     const chips = layers().map((layer, index) => {
-        const row = layerColourRow(model, layer.index);
-        const lit = stageEnabled(model, "layers") && row && !isOff(row.color);
+        const swatch = layerSwatch(model, layer);
         return `<button class="layer-chip" data-layer="${index}" aria-pressed="${state.layer === index}"
-            data-tip="${esc(layerName(layer))} · ${lit ? esc(hsvLabel(row.color)) : "no layer colour"}">
-            <span class="swatch ${lit ? "" : "swatch-off"}" style="${lit ? `background:${css(row.color)}` : ""}"></span>
+            data-tip="${esc(swatch.tip)}">${swatch.html}
             <span>${esc(layerName(layer))}</span><span class="idx">${layer.index}</span></button>`;
     }).join("");
     const node = el(`<div class="layerbar-wrap"><div class="layerbar">${chips}${trailing}</div></div>`);

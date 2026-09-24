@@ -101,9 +101,9 @@ Every screen is drawn and wired to the host:
 | Surface | What it edits |
 | --- | --- |
 | Keys | Layout keys, key behaviours, combos, layer names and priority; reachable macros and pointing modes are shown in place |
-| Pointing modes | All eight slots: movement, speed, direction shortcuts, scroll tuning, buttons, bindings, placement, clear and duplicate |
 | Lighting | Six stages, the stage mask, layer and pointing-mode colours with their localities, combo and key feedback, auto-mouse fade, LED group rows and reusable groups |
-| Macros | Both banks: payload, insert-at-cursor step builder, reorder/remove controls, parsed preview, configurable recorder and placement |
+| Macros | Both banks: name, payload, insert-at-cursor step builder, reorder/remove controls, parsed preview, configurable recorder and placement; search by name, and the layers each macro sits on in their layer colour, each opening that layer in Keys with the macro picked |
+| Pointing modes | All eight slots: movement, speed, direction shortcuts, scroll tuning, buttons, bindings, placement, clear and duplicate |
 | Settings | Every section the keyboard reports, posted whole, read-only where the firmware cannot report |
 | Profile & backups | Export, import with review, upgrade export, recovery state |
 | Device | Read-only: connection, committed generation, what was read |
@@ -111,7 +111,8 @@ Every screen is drawn and wired to the host:
 The keycode picker leads with the ANSI board, then task-shaped Symbols,
 Navigation, Numpad, Layers, Pointing modes, Macros, Mouse, Media, Lighting,
 Magic and Custom sections. The complete QMK catalogue remains available under
-More keys, Other QMK and All keycodes, and search spans all of it.
+More keys, Other QMK and All keycodes, and search spans all of it — named
+macros included, found by the name they were given.
 
 Colour on any screen comes from the model, never from a constant, and a stage
 that is switched off is drawn as off — hollow dots, plain badges, unlit keys.

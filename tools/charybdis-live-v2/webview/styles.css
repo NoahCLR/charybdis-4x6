@@ -248,6 +248,8 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 .layer-chip[aria-pressed="true"] { background: var(--surface-3); border-color: var(--line-2); color: var(--text); font-weight: 520; }
 .layer-chip .swatch { width: 9px; height: 9px; border-radius: 3px; border: 1px solid rgba(255,255,255,.18); flex: none; }
 .layer-chip .idx { font-family: var(--mono); font-size: 10px; color: var(--text-3); }
+.layer-chip.link { border-color: var(--line-2); background: var(--surface-2); }
+.layer-chip.link:hover { border-color: var(--line-3); background: var(--surface-3); }
 .layer-chip.dirty::after { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--draft); }
 .layer-chip.staged { border-style: dashed; border-color: var(--draft); }
 .layer-edit {

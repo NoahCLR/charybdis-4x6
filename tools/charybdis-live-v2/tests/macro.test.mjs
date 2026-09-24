@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {describeStep, macroPeek, parseMacro, serializeMacro, unreleased} from "../webview/view/macro.mjs";
+import {describeStep, macroMatches, macroPeek, parseMacro, serializeMacro, unreleased} from "../webview/view/macro.mjs";
 
 test("a payload reads back as the steps the keyboard will play", () => {
     const {steps, error} = parseMacro("noah@xomnia.com{120}{KC_ENT}");
@@ -73,4 +73,17 @@ test("the preview refuses exactly what the host refuses", async () => {
         assert.equal(previewAccepts(payload), hostAccepts(payload), payload.length > 40 ? `${payload.slice(0, 40)}…` : payload);
     }
     assert.equal(parseMacro("{KC_NOT_A_KEY}").error, "", "without the host's key list, names are not judged");
+});
+
+test("a macro is found by its name, and by its slot when it has none", () => {
+    const named = {keycode: "VIA_MACRO_3", name: "Screenshot area"};
+    const unnamed = {keycode: "VIA_MACRO_12", name: ""};
+    assert.equal(macroMatches(named, "screen"), true, "part of the name, case ignored");
+    assert.equal(macroMatches(named, "  AREA "), true, "surrounding spaces are not part of the search");
+    assert.equal(macroMatches(named, "m3"), true, "the slot label the grid shows");
+    assert.equal(macroMatches(named, "copy"), false);
+    assert.equal(macroMatches(unnamed, "macro 12"), true, "the name the editor falls back to");
+    assert.equal(macroMatches(unnamed, "VIA_MACRO_12"), true, "and its keycode");
+    assert.equal(macroMatches(unnamed, "screen"), false);
+    assert.equal(macroMatches(unnamed, ""), true, "an empty search hides nothing");
 });
