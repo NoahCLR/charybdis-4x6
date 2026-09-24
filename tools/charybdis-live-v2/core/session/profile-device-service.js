@@ -1,6 +1,7 @@
 "use strict";
 
 const {baseLighting} = require("../model/settings-editor");
+const {profilePlacementProblem} = require("../model/profile-placement");
 const {actionLimitsFor} = require("../schema/actions");
 const {layerName} = require("../model/vocabulary");
 const {decodePdDomain} = require("../schema/pd-mode-domain-v1");
@@ -435,6 +436,10 @@ class ProfileDeviceService {
             const keyboardOptions = cachedBase?.options || await readKeyboardOptions(this.connection, this.requestIds);
             const effect = lighting.effect;
             if (keyboardOptions && !keyboardOptions.effects.some(item => item.id === effect)) throw Object.assign(new Error("This profile uses a lighting effect unavailable on this keyboard."), {code: "SETTINGS_LIMIT_EXCEEDED"});
+            // The keyboard refuses a profile whose actions sit where it cannot
+            // run them; say which one before anything is sent.
+            const misplaced = profilePlacementProblem(Buffer.from(document.profile, "base64"), {layerCount: this.capabilities?.compiledLayerCount ?? 8});
+            if (misplaced) throw Object.assign(new Error(`${misplaced} Fix it before saving this profile.`), {code: "PLACEMENT_REFUSED"});
             started = true;
             result = await restoreProfile(this.connection, this.requestIds, this.capabilities, document, {...options,
                 baseSnapshot: cachedBase,

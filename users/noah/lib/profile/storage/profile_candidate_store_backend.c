@@ -220,8 +220,11 @@ static noah_profile_candidate_backend_result_t validation_begin(void *context, c
         .digest            = metadata->digest,
         .action_abi_digest = metadata->action_abi_digest,
     };
+    // Only a candidate the host uploads is held to the candidate runtime. A
+    // peer candidate is the other half's committed record, checked when it was
+    // saved there, so a profile saved before a rule existed still syncs.
     compatibility = backend->compatibility;
-    if (backend->candidate_runtime) {
+    if (backend->candidate_runtime && backend->admission_owner == NOAH_PROFILE_STORAGE_ADMISSION_HOST) {
         compatibility.runtime = backend->candidate_runtime;
     }
     result = noah_profile_validator_v1_begin(&backend->validator, &backend->staged_reader, payload_start, &declaration, &compatibility, &validator_error);

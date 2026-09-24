@@ -6,7 +6,8 @@ const {decodeRgbDomainV1, encodeRgbDomainV1, RGB_LAYER_MODES, RGB_LOCALITIES, RG
 const keycodes = require("../data/keycode-catalog");
 const {semanticActionForExpression, resolveNativeQmkExpression} = require("../schema/compiled-profile-v1");
 const {encodeComboDomainV1, decodeComboDomainV1} = require("../schema/combo-domain-v1");
-const {PLACEMENT, actionLimitsFor, actionName, keycodeAction, knownActionAbi, layerRef, nativeCode, placementProblem} = require("../schema/actions");
+const {actionLimitsFor, actionName, keycodeAction, knownActionAbi, layerRef, nativeCode} = require("../schema/actions");
+const {comboPlacementProblem} = require("../model/profile-placement");
 const {BEHAVIOR_EDITS, editKeyBehaviors} = require("./key-behavior-edits");
 const COMBO_EDITS = new Set(["addCombo", "saveCombo", "deleteCombo", "updateComboHoldTerm"]);
 
@@ -197,10 +198,8 @@ function editCombos(bytes, message, context) {
     }
     // The keyboard refuses a combo table with an output it cannot run, so every
     // row is checked, not only the one being edited.
-    rows.forEach((row, index) => {
-        const problem = placementProblem(row.output, PLACEMENT.COMBO_OUTPUT, {layerCount: context.capabilities.compiledLayerCount ?? 8});
-        if (problem) throw invalid(`Combo ${index + 1}: ${problem}`);
-    });
+    const problem = comboPlacementProblem(rows, {layerCount: context.capabilities.compiledLayerCount ?? 8});
+    if (problem) throw invalid(problem);
     const payload = encodeComboDomainV1(rows, actionOptions);
     if (domain) domain.payload = payload;
     else profile.domains.push({id: PROFILE_DOMAIN_IDS.COMBOS, version: 1, payload});

@@ -1333,8 +1333,10 @@ Still open, in the order they are taken:
 1. (Done: plain `LT()` holds.)
 2. (Done: the keyboard holds a candidate it is asked to save to where its
    actions are placed, by the rules `keymap.c` validation uses; a committed
-   record still loads. The app refuses the same placements first, for combos
-   and behaviours, checking every row since the keyboard checks the domain.)
+   record still loads, and the halves still sync it. The app refuses the same
+   placements first: the behaviour and combo editors check every row, since
+   the keyboard checks the domain, and every upload (draft apply, import,
+   layer edit) is checked before it starts, naming the misplaced action.)
 3. Nothing is verified on hardware. The host harness feeds userspace directly
    and bypasses QMK's tapping engine, which buffers `TT()`, `OSL()` and `LT()`
    presses; split sync and the RGB lock indicator for `TG()`/`TO()` locks and

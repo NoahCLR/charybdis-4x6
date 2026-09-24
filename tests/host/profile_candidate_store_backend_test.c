@@ -542,10 +542,11 @@ static bool refuse_every_placement(const noah_profile_action_v1_t *action, noah_
     return false;
 }
 
-// A staged candidate is validated with the candidate runtime, which adds the
-// placement check; adopting a committed record after reboot keeps the
+// A host candidate is validated with the candidate runtime, which adds the
+// placement check; the other half's committed record arriving as a peer
+// candidate, and a committed record adopted after reboot, keep the
 // compatibility's own, so a profile saved before a placement rule existed
-// still loads.
+// still syncs and loads.
 static void test_only_staged_candidates_are_held_to_the_candidate_runtime(void) {
     static const noah_profile_validator_v1_runtime_t candidate_runtime = {.placement_supported = refuse_every_placement};
     noah_profile_store_t                    store;
@@ -569,6 +570,33 @@ static void test_only_staged_candidates_are_held_to_the_candidate_runtime(void) 
     assert(interface.write(interface.context, 0u, empty_profile, sizeof(empty_profile)) == NOAH_PROFILE_CANDIDATE_BACKEND_OK);
     result = interface.validation_begin(interface.context, &metadata, &error);
     assert(backend.validator.compatibility.runtime == &candidate_runtime);
+    while (result == NOAH_PROFILE_CANDIDATE_BACKEND_IN_PROGRESS) {
+        result = interface.validation_step(interface.context, NOAH_PROFILE_CANDIDATE_SCAN_BYTE_BUDGET, &error);
+    }
+    assert(result == NOAH_PROFILE_CANDIDATE_BACKEND_VALID);
+    assert(noah_profile_candidate_store_backend_commit(&backend, NULL) == NOAH_PROFILE_CANDIDATE_BACKEND_OK);
+    assert(noah_profile_candidate_store_backend_request_activation(&backend) == NOAH_PROFILE_CANDIDATE_BACKEND_OK);
+    assert(noah_effective_profile_provider_poll(&provider) == NOAH_EFFECTIVE_PROFILE_PUBLISHED);
+    assert(noah_profile_candidate_store_backend_release_admission(&backend, NOAH_PROFILE_STORAGE_ADMISSION_HOST));
+
+    // The other half's committed record, arriving as a peer candidate, keeps
+    // the compatibility's own runtime.
+    noah_profile_store_candidate_t peer = {
+        .schema_major            = metadata.schema_major,
+        .schema_minor            = metadata.schema_minor,
+        .domain_mask             = metadata.requested_domains,
+        .payload_length          = metadata.payload_length,
+        .generation              = 2u,
+        .origin_half             = 0u,
+        .payload_crc32           = metadata.crc32,
+        .payload_digest          = metadata.digest,
+        .compiled_default_digest = backend.compiled_default_digest,
+        .action_abi_digest       = metadata.action_abi_digest,
+    };
+    assert(noah_profile_candidate_store_backend_begin_exact(&backend, &metadata, &peer) == NOAH_PROFILE_STORE_OK);
+    assert(interface.write(interface.context, 0u, empty_profile, sizeof(empty_profile)) == NOAH_PROFILE_CANDIDATE_BACKEND_OK);
+    result = interface.validation_begin(interface.context, &metadata, &error);
+    assert(backend.validator.compatibility.runtime == NULL);
     while (result == NOAH_PROFILE_CANDIDATE_BACKEND_IN_PROGRESS) {
         result = interface.validation_step(interface.context, NOAH_PROFILE_CANDIDATE_SCAN_BYTE_BUDGET, &error);
     }

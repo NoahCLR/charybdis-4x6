@@ -143,6 +143,9 @@ bool     noah_action_desc_source_sets_momentary_layer_flag(noah_action_desc_t de
 bool     noah_action_desc_source_sets_layer_tap_flag(noah_action_desc_t desc);
 bool     noah_action_desc_supports_fallback_hold(noah_action_desc_t desc);
 bool     noah_action_desc_source_layer_uses_desc_layer(noah_action_desc_t desc);
+// The tap keeps the tapped key's own layer on (OSL() arming its one-shot), so
+// it goes before that key's layer release and the layer never drops between.
+bool     noah_action_desc_tap_keeps_layer(noah_action_desc_t desc);
 uint8_t  noah_action_desc_source_layer(noah_action_desc_t desc);
 uint16_t noah_action_desc_default_tap_action(noah_action_desc_t desc);
 

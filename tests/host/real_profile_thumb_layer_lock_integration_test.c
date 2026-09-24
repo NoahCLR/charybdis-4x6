@@ -497,7 +497,10 @@ void layer_on(uint8_t layer) {
     test_apply_layer_state(layer_state | ((layer_state_t)1u << layer));
 }
 
+static unsigned test_layer_off_calls[32];
+
 void layer_off(uint8_t layer) {
+    test_layer_off_calls[layer]++;
     test_apply_layer_state(layer_state & (layer_state_t) ~((layer_state_t)1u << layer));
 }
 
@@ -3305,6 +3308,31 @@ static void test_combo_oneshot_and_tap_toggle_are_owned(void) {
     CHECK(noah_runtime_debug_active_slot_count() == 0u);
 }
 
+// Fast typing: OSL() arms on its release, not after a multi-tap window, so a
+// key pressed right after it still lands on the one-shot layer.
+static void test_oneshot_layer_arms_on_release_for_fast_typing(void) {
+    keypos_t oneshot_pos = {.row = 2, .col = 2};
+    keypos_t other_pos   = {.row = 2, .col = 3};
+
+    test_reset_state();
+    key_runtime_integration_process_record(OSL(LAYER_NUM), oneshot_pos, true);
+    key_runtime_integration_advance(&fake_time, 20u);
+    test_layer_off_calls[LAYER_NUM] = 0u;
+    key_runtime_integration_process_record(OSL(LAYER_NUM), oneshot_pos, false);
+    CHECK(layer_ownership_oneshot_layer() == LAYER_NUM);
+    // The one-shot arms before the hold lets go, so the layer never drops.
+    CHECK(test_layer_off_calls[LAYER_NUM] == 0u);
+    key_runtime_integration_advance(&fake_time, 30u);
+    key_runtime_integration_process_record(KC_A, other_pos, true);
+    CHECK(layer_ownership_oneshot_layer() == UINT8_MAX);
+    CHECK(!test_layer_active(LAYER_NUM));
+    key_runtime_integration_process_record(KC_A, other_pos, false);
+    key_runtime_integration_advance(&fake_time, 200u);
+    key_runtime_integration_scan();
+    CHECK(!test_layer_active(LAYER_NUM));
+    CHECK(noah_runtime_debug_active_slot_count() == 0u);
+}
+
 static void test_tap_toggle_taps_lock_and_holds_are_momentary(void) {
     keypos_t key_pos = {.row = 2, .col = 2};
     uint16_t keycode = TT(LAYER_NUM);
@@ -3340,6 +3368,7 @@ static void test_tap_toggle_taps_lock_and_holds_are_momentary(void) {
 }
 
 int main(void) {
+    test_oneshot_layer_arms_on_release_for_fast_typing();
     test_combo_layer_hold_is_owned();
     test_combo_oneshot_and_tap_toggle_are_owned();
     test_plain_layer_tap_hold_is_owned_and_its_tap_is_qmks();

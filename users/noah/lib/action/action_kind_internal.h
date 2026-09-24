@@ -27,6 +27,7 @@ typedef enum {
     NOAH_ACTION_POLICY_DEFAULT_TAP_USES_ACTION_KEYCODE        = (1u << 6),
     NOAH_ACTION_POLICY_SUPPORTS_FALLBACK_HOLD                 = (1u << 7),
     NOAH_ACTION_POLICY_SOURCE_LAYER_USES_DESC_LAYER           = (1u << 8),
+    NOAH_ACTION_POLICY_TAP_KEEPS_LAYER                        = (1u << 9),
 } noah_action_policy_flag_t;
 
 typedef struct {

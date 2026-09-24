@@ -4,6 +4,7 @@
 
 #include "../reducer/state_query.h"
 
+#include "../../../action/action_dispatch.h"
 #include "../../../pointing/defs/pd_modes.h"
 
 static void key_runtime_core_release_effect_plan_push(key_runtime_core_release_effect_plan_t *plan, key_runtime_effect_t effect) {
@@ -257,7 +258,12 @@ bool key_runtime_core_plan_active_release_effects(keypos_t key_pos, uint16_t key
 
     contract = key_runtime_release_contract_for_interaction(resolution->interaction);
 
-    if (key_runtime_slot_interaction_is_momentary_layer(*resolution->interaction)) {
+    // A tap that keeps this key's own layer on (OSL() arming its one-shot)
+    // goes first, so the layer never drops between the release and the tap.
+    bool momentary_layer = key_runtime_slot_interaction_is_momentary_layer(*resolution->interaction);
+    bool tap_keeps_layer = momentary_layer && resolution->decision.outcome == KEY_RUNTIME_RELEASE_DECISION_OUTCOME_TAP && contract.tap.outcome == KEY_RUNTIME_RELEASE_TAP_OUTCOME_DISPATCH_ACTION && noah_action_desc_tap_keeps_layer(noah_action_describe(contract.tap.action));
+
+    if (momentary_layer && !tap_keeps_layer) {
         key_runtime_core_release_effect_plan_push_layer_release(out, key_pos);
     }
     if (resolution->decision.release_owned_state) {
@@ -286,6 +292,9 @@ bool key_runtime_core_plan_active_release_effects(keypos_t key_pos, uint16_t key
                 case KEY_RUNTIME_RELEASE_TAP_OUTCOME_DISPATCH_ACTION:
                     key_runtime_core_release_effect_plan_push_action_or_pd_mode_lock_tap(out, key_pos, contract.tap.action);
                     key_runtime_core_release_effect_plan_push_tap_commit_feedback_pulse(out, key_pos, contract.tap.action, resolution->interaction->selection.tap_count);
+                    if (tap_keeps_layer) {
+                        key_runtime_core_release_effect_plan_push_layer_release(out, key_pos);
+                    }
                     return true;
                 case KEY_RUNTIME_RELEASE_TAP_OUTCOME_NONE:
                 default:

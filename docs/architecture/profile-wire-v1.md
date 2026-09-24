@@ -692,9 +692,11 @@ branch; `OSL()` is a key, a tap or a combo; `LT()` is only a key, since its
 own tap/hold decision on top of a combo's is untested; `TG()`, `TO()` and
 `LOCK_LAYER()` go anywhere; `DF()`, `PDF()` and `LM()` go nowhere. A refused
 behaviour action is an invalid cross-reference at its row, tap index and
-field; a refused combo output rejects the combo domain at its row. A committed
-record being adopted and the compiled defaults are not held to placement, so a
-profile saved before a rule existed still loads.
+field; a refused combo output rejects the combo domain at its row. Only a
+candidate the host uploads is held to placement: a committed record being
+adopted, the other half's committed record arriving as a peer candidate, and
+the compiled defaults are not, so a profile saved before a rule existed still
+loads and still syncs between the halves.
 
 ## Golden Fixtures Required Before Stage 02 Completion
 

@@ -46,9 +46,10 @@ void noah_profile_candidate_store_backend_init(noah_profile_candidate_store_back
 // interface borrows backend for its entire lifetime.
 noah_profile_candidate_backend_t noah_profile_candidate_store_backend_interface(noah_profile_candidate_store_backend_t *backend);
 
-// A staged candidate is validated with runtime in place of the
+// A candidate the host uploads is validated with runtime in place of the
 // compatibility's own, so it is held to checks (such as where its actions are
-// placed) that a committed record being adopted is not. runtime must outlive
+// placed) that a committed record being adopted, or the other half's
+// committed record arriving as a peer candidate, is not. runtime must outlive
 // backend; NULL restores the compatibility's own.
 void noah_profile_candidate_store_backend_hold_candidates_to(noah_profile_candidate_store_backend_t *backend, const noah_profile_validator_v1_runtime_t *runtime);
 

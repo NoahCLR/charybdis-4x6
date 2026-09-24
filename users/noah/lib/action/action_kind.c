@@ -116,6 +116,10 @@ bool noah_action_desc_source_layer_uses_desc_layer(noah_action_desc_t desc) {
     return noah_action_desc_has_policy_flag(desc, NOAH_ACTION_POLICY_SOURCE_LAYER_USES_DESC_LAYER);
 }
 
+bool noah_action_desc_tap_keeps_layer(noah_action_desc_t desc) {
+    return noah_action_desc_has_policy_flag(desc, NOAH_ACTION_POLICY_TAP_KEEPS_LAYER);
+}
+
 uint8_t noah_action_desc_source_layer(noah_action_desc_t desc) {
     return noah_action_desc_source_layer_uses_desc_layer(desc) ? desc.layer : UINT8_MAX;
 }
