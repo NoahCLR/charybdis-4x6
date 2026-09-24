@@ -10,7 +10,7 @@ import {createRequire} from "node:module";
 import path from "node:path";
 import {fileURLToPath} from "node:url";
 import * as edits from "../webview/view/edits.mjs";
-import {AXIS, DIRECTIONAL_STARTER_THRESHOLD, KIND, SCROLL_STARTER, dpiOptions, newMode, readConfig, startingRecord} from "../webview/view/pointing-config.mjs";
+import {AXIS, BUTTON, DIRECTIONAL_STARTER_THRESHOLD, KIND, SCROLL_STARTER, dpiOptions, newMode, readConfig, settleButtons, startingRecord} from "../webview/view/pointing-config.mjs";
 
 const require = createRequire(import.meta.url);
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -373,6 +373,39 @@ test("a pointing slot is posted whole, with its shortcuts as names", () => {
     const after = decoded(draft).pdModes[1];
     assert.equal(after.thresholdY, 70, "the edited threshold reached the profile");
     assert.ok(after.directions.up.keycode > 0, "and the named shortcut became the keyboard's own value");
+});
+
+test("a mouse-button override is set up kind first, and reaches the keyboard once it is complete", () => {
+    const draft = session();
+    const slot = decoded(draft).pdModes.find((candidate) => candidate.kind && candidate.buttons?.length);
+    const base = {kind: slot.kind, name: slot.name, dpi: String(slot.dpi)};
+    const post = (values) => {
+        const settled = settleButtons(slot, readConfig(slot, formOf({...base, ...values})));
+        stage(draft, edits.pdMode(slot.id, settled.config, draft.identity()));
+        return settled.pending;
+    };
+    const stored = () => decoded(draft).pdModes[slot.id].buttons[0];
+    assert.equal(slot.buttons[0].kind, BUTTON.PASS_THROUGH, "the fixture's first button passes through");
+
+    const pending = post({"button:0:kind": BUTTON.TAP, "button:0:tap": "", name: "Renamed"});
+    assert.equal(pending[0].kind, BUTTON.TAP, "a tap with no shortcut yet is held by the editor");
+    assert.equal(stored().kind, BUTTON.PASS_THROUGH, "and the keyboard keeps the stored override meanwhile");
+    assert.equal(decoded(draft).pdModes[slot.id].name, "Renamed", "while the rest of the record still lands");
+
+    assert.deepEqual(post({"button:0:kind": BUTTON.TAP, "button:0:tap": "KC_C"}), {});
+    assert.equal(stored().kind, BUTTON.TAP);
+    assert.ok(stored().tap.keycode > 0, "the shortcut arrives with its kind");
+
+    assert.deepEqual(post({"button:0:kind": BUTTON.HOLD_MODIFIERS, "button:0:modifiers": 0}), {0: {kind: BUTTON.HOLD_MODIFIERS, modifiers: 0, tap: {keycode: "0", modifierPolicy: 0, mask: 0}}},
+        "holding no modifiers is not storable yet");
+    post({"button:0:kind": BUTTON.HOLD_MODIFIERS, "button:0:modifiers": 2 | 128});
+    assert.equal(stored().kind, BUTTON.HOLD_MODIFIERS);
+    assert.equal(stored().modifiers, 2 | 128, "the switches reach the keyboard as its modifier mask");
+    assert.equal(stored().tap.keycode, 0, "and the earlier shortcut is dropped rather than refused");
+
+    post({"button:0:kind": BUTTON.PASS_THROUGH, "button:0:tap": "KC_C"});
+    assert.deepEqual(stored(), {kind: BUTTON.PASS_THROUGH, modifiers: 0, tap: {keycode: 0, modifierPolicy: 0, mask: 0}},
+        "pass through carries nothing it does not read");
 });
 
 test("a pointing mode picks its speed from the model's DPI list, and keeps a stored speed outside it", () => {

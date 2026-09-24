@@ -31,8 +31,10 @@ toggle actions.
 modifier inheritance, scroll gesture ratios/timing and mouse-button overrides.
 Volume, brightness, zoom, arrow navigation, history shortcuts and
 modifier-assisted scrolling use the same facilities. Mouse buttons 1–3 can pass
-through, be consumed, tap a shortcut or hold modifiers. A slot with existing
-bindings must be unbound before clearing it.
+through, be consumed, tap a shortcut or hold modifiers. Choose what a button
+does first; its shortcut field or modifier switches then appear, and the
+override is staged once it has a shortcut or at least one modifier. A slot
+with existing bindings must be unbound before clearing it.
 
 Macro programs, recursive mode/layer actions and arbitrary scripts are not
 motion outputs. Ordinary pointer movement and auto-sniping remain outside the

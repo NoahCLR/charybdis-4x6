@@ -40,6 +40,7 @@ export const state = {
     layersAsked: false, // its stack is requested once per opening
     pdSlot: 0,
     pdKind: null,      // movement selection while the rebuilt form catches up: {slot, kind}
+    pdButtons: null,   // {slot, rows: {index: override}}: button overrides whose kind is chosen but not yet its shortcut or modifiers
     pdAdvanced: false,  // Advanced open on the pointing editor, whichever slot is shown
     applyDismissed: 0,  // the failed Apply (by id) the person closed, so it stays closed
     pdPreview: false,
@@ -89,6 +90,7 @@ export function resetDraftForms() {
     state.macroSteps = {};
     state.lastTake = null;
     state.pdKind = null;
+    state.pdButtons = null;
     state.retarget = null;
     closeComboBuilder();
 }

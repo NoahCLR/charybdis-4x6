@@ -7,7 +7,7 @@
 
 import {css, isOff} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
-import {AXIS, DIAGONALS, DIRECTIONS, EMPTY_DIRECTION, KIND, SCROLL_FIELDS, axisReads, dpiOptions, newMode, readConfig, readsHorizontal, readsVertical, startingRecord} from "../view/pointing-config.mjs";
+import {AXIS, BUTTON, DIAGONALS, DIRECTIONS, EMPTY_DIRECTION, KIND, SCROLL_FIELDS, axisReads, dpiOptions, newMode, readConfig, readsHorizontal, readsVertical, settleButtons, startingRecord} from "../view/pointing-config.mjs";
 import {MODIFIER_BITS, keyName, modifierNames} from "../view/keyvalues.mjs";
 import {bindingsForSlot} from "../view/keyface.mjs";
 import {pdColourRow, stageEnabled} from "../view/lighting.mjs";
@@ -20,8 +20,7 @@ import {topbar, unavailable} from "./shell.mjs";
 const AXES = [[2, "Dominant axis"], [3, "Eight directions"], [0, "Vertical only"], [1, "Horizontal only"]];
 const INVERT = [[0, "Neither axis"], [1, "Horizontal"], [2, "Vertical"], [3, "Both axes"]];
 const POINTER_LAYER = [[0, "Keep the pointer layer active"], [1, "Return to the typing layer"]];
-const BUTTON_KINDS = [[0, "Pass through"], [1, "Consume"], [2, "Tap a shortcut"], [3, "Hold modifiers"]];
-const BUTTON_TAP = 2;
+const BUTTON_KINDS = [[BUTTON.PASS_THROUGH, "Pass through"], [BUTTON.CONSUME, "Consume"], [BUTTON.TAP, "Tap a shortcut"], [BUTTON.HOLD_MODIFIERS, "Hold modifiers"]];
 const ARROWS = {up: "↑", left: "←", right: "→", down: "↓", upLeft: "↖", upRight: "↗", downLeft: "↙", downRight: "↘"};
 
 // The four scroll fields the Scrolling card shows itself. A field rendered
@@ -78,7 +77,7 @@ export function screenPointing() {
             <span class="meta">${slot.kind === KIND.SCROLLING ? "Scrolling" : slot.kind === KIND.DIRECTIONAL ? `Directional · ${esc(axisLabel(slot.axis))}` : "Available"}</span>
             <span class="meta mono">${esc(bindingName(slot))}</span>
             ${inert ? `<span class="meta warn">${inert} key${inert === 1 ? " still reaches" : "s still reach"} it · inert</span>` : ""}</button>`);
-        card.addEventListener("click", () => { state.pdSlot = slot.id; state.pdKind = null; render(); });
+        card.addEventListener("click", () => { state.pdSlot = slot.id; state.pdKind = null; state.pdButtons = null; render(); });
         list.append(card);
     }
     pad.appendChild(list);
@@ -157,7 +156,7 @@ function editor(model, slot, canEdit, slots) {
         return node;
     };
     const shortcut = (label, code, key, options = {}) => {
-        const name = keyName(model, code);
+        const name = options.name ?? keyName(model, code);
         const node = el(`<label class="field ${options.klass || ""}"><span>${options.labelHtml || esc(label)}</span>
             <div class="input-row"><input class="input mono" value="${esc(name)}" placeholder="nothing" ${disabled}>
             <button class="btn" data-pick ${disabled}>Pick…</button></div></label>`);
@@ -350,17 +349,28 @@ function editor(model, slot, canEdit, slots) {
 
     const buttons = section("Mouse button overrides");
     if ((slot.buttons || []).length) {
+        // An override still being set up is drawn as chosen, not as stored.
+        const unfinished = state.pdButtons?.slot === slot.id ? state.pdButtons.rows : {};
         const table = el(`<div class="pd-buttons"><span class="h">Button</span><span class="h">While this mode runs</span>
             <span class="h">Shortcut</span><span class="h">Held modifiers</span></div>`);
-        (slot.buttons || []).forEach((button, index) => {
+        (slot.buttons || []).forEach((stored, index) => {
+            const button = unfinished[index] || stored;
             const kindSelect = select(`Button ${index + 1}`, BUTTON_KINDS, button.kind, `button:${index}:kind`);
             kindSelect.querySelector("span").classList.add("sr");
-            const tap = shortcut(`Button ${index + 1} shortcut`, button.tap?.keycode, `button:${index}:tap`,
-                {klass: button.kind === BUTTON_TAP ? "" : "unread"});
-            tap.querySelector("span").classList.add("sr");
-            form[`button:${index}:modifiers`] = () => button.modifiers ?? 0;
+            const tapping = button.kind === BUTTON.TAP, holding = button.kind === BUTTON.HOLD_MODIFIERS;
+            const tap = tapping
+                ? shortcut(`Button ${index + 1} shortcut`, button.tap?.keycode, `button:${index}:tap`,
+                    typeof button.tap?.keycode === "string" ? {name: button.tap.keycode === "0" ? "" : button.tap.keycode} : {})
+                : el(`<span class="note blank">—</span>`);
+            tap.querySelector?.("span")?.classList.add("sr");
+            const held = holding ? modifierNames(button.modifiers).join(", ") || "choose at least one below" : "—";
             table.append(el(`<span class="n">${index + 1}</span>`), kindSelect, tap,
-                el(`<span class="note"><span class="narrow">Held modifiers: </span>${esc(modifierNames(button.modifiers).join(", ") || "none")}</span>`));
+                el(`<span class="note"><span class="narrow">Held modifiers: </span>${esc(held)}</span>`));
+            if (holding) {
+                const mods = modifiers(`Button ${index + 1} holds`, button.modifiers ?? 0, `button:${index}:modifiers`);
+                mods.classList.add("mods");
+                table.append(mods);
+            }
         });
         buttons.append(table);
     } else {
@@ -374,8 +384,12 @@ function editor(model, slot, canEdit, slots) {
     });
 
     stageCurrent = () => {
-        const config = readConfig(slot, form);
+        const {config, pending} = settleButtons(slot, readConfig(slot, form));
+        const holding = Object.keys(pending).length > 0, held = Boolean(state.pdButtons);
+        state.pdButtons = holding ? {slot: slot.id, rows: pending} : null;
         post(edits.pdMode(slot.id, config, model.profileIdentity));
+        // A new kind draws its own field, even when nothing new was stored.
+        if (holding || held) render();
     };
     wrap.addEventListener("change", (event) => {
         if (!event.target.matches("input, select")) return;
@@ -384,6 +398,7 @@ function editor(model, slot, canEdit, slots) {
 
     head.querySelector('[data-act="clear"]').addEventListener("click", () => {
         state.pdKind = null;
+        state.pdButtons = null;
         post(edits.clearPdMode(slot.id, model.profileIdentity));
     });
     head.querySelector('[data-act="duplicate"]')?.addEventListener("click", () => {

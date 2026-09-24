@@ -4,6 +4,7 @@
 // readConfig() returns against a real draft.
 
 export const KIND = {DIRECTIONAL: 1, SCROLLING: 2};
+export const BUTTON = {PASS_THROUGH: 0, CONSUME: 1, TAP: 2, HOLD_MODIFIERS: 3};
 export const DIRECTIONS = [["up", "Up"], ["left", "Left"], ["right", "Right"], ["down", "Down"]];
 export const AXIS = {VERTICAL: 0, HORIZONTAL: 1, DOMINANT: 2, EIGHT: 3};
 // Eight directions add the diagonals, stored beside the straight directions.
@@ -92,14 +93,10 @@ export function readConfig(slot, form) {
         name: form.name(),
         dpi: number(form.dpi(), slot.dpi),
         pointerLayer: form.pointerLayer ? form.pointerLayer() : slot.pointerLayer,
-        buttons: (slot.buttons || []).map((button, index) => ({
+        buttons: (slot.buttons || []).map((button, index) => buttonRecord({
             kind: form[`button:${index}:kind`] ? form[`button:${index}:kind`]() : button.kind,
             modifiers: form[`button:${index}:modifiers`] ? form[`button:${index}:modifiers`]() : button.modifiers,
-            tap: {
-                keycode: form[`button:${index}:tap`] ? form[`button:${index}:tap`]() || "0" : String(button.tap?.keycode ?? 0),
-                modifierPolicy: button.tap?.modifierPolicy ?? 0,
-                mask: button.tap?.mask ?? 0,
-            },
+            tap: {...button.tap, keycode: form[`button:${index}:tap`] ? form[`button:${index}:tap`]() : button.tap?.keycode},
         })),
     };
     if (kind === KIND.DIRECTIONAL) {
@@ -136,4 +133,39 @@ export function readConfig(slot, form) {
         config.scroll.invert = form.invert ? form.invert() : slot.scroll?.invert ?? 0;
     }
     return config;
+}
+
+// One mouse-button override as the keyboard stores it: a shortcut only when
+// it taps one, modifiers only when it holds them, and the rest zero, which
+// the keyboard requires. A shortcut left behind by an earlier kind is dropped
+// rather than refused.
+export function buttonRecord({kind, modifiers, tap}) {
+    return {
+        kind,
+        modifiers: kind === BUTTON.HOLD_MODIFIERS ? Number(modifiers) || 0 : 0,
+        tap: kind === BUTTON.TAP
+            ? {keycode: String(tap?.keycode ?? "").trim() || "0", modifierPolicy: tap?.modifierPolicy ?? 0, mask: tap?.mask ?? 0}
+            : {keycode: "0", modifierPolicy: 0, mask: 0},
+    };
+}
+// Whether the keyboard can store the override yet: tapping a shortcut needs
+// the shortcut, holding modifiers needs at least one.
+export function buttonReady(button) {
+    if (button.kind === BUTTON.TAP) return String(button.tap?.keycode ?? "0") !== "0";
+    if (button.kind === BUTTON.HOLD_MODIFIERS) return Number(button.modifiers) !== 0;
+    return true;
+}
+// A record read from the form, split into what can be posted now and the
+// button overrides still being set up. The kind and its field are chosen one
+// after the other, and the keyboard refuses either alone, so an unfinished
+// override posts as the slot stored it and is held by the editor until it is
+// complete; the rest of the record still reaches the draft.
+export function settleButtons(slot, config) {
+    const pending = {};
+    const buttons = config.buttons.map((button, index) => {
+        if (buttonReady(button)) return button;
+        pending[index] = button;
+        return buttonRecord(slot.buttons[index]);
+    });
+    return {config: {...config, buttons}, pending};
 }
