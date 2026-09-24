@@ -63,13 +63,13 @@ function editor(model, portable, busy) {
     const node = el(`<div class="stack" style="gap:10px">
         <div class="sect-h"><h4>Layers</h4><span class="note">higher layers win · base stays underneath</span></div>
         <div class="list"></div>
-        <label class="row" style="gap:8px;align-items:flex-start">
-            <input type="checkbox" id="layerKeysFollow" data-act="follow" ${follow ? "checked" : ""} ${busy ? "disabled" : ""}>
-            <span class="stack" style="gap:2px"><span>Keys follow their layers</span>
-                <span class="note">${follow
-                    ? "Layer keys (MO, LT, TG, TO, TT, OSL…) are renumbered with the move, so each still reaches the same layer."
-                    : "Layer keys keep their numbers: a key set to MO(1) reaches whatever layer is now 1. Names, colours and the pointer and sniping settings still move with their layer."}</span></span>
-        </label>
+        <div class="stack" style="gap:4px">
+            <label class="sw"><input type="checkbox" id="layerKeysFollow" data-act="follow" ${follow ? "checked" : ""} ${busy ? "disabled" : ""}>
+                <span class="track"></span><span class="txt">Keys follow their layers</span></label>
+            <span class="note">${follow
+                ? "Layer keys (MO, LT, TG, TO, TT, OSL…) are renumbered with the move, so each still reaches the same layer."
+                : "Layer keys keep their numbers: a key set to MO(1) reaches whatever layer is now 1. Names, colours and the pointer and sniping settings still move with their layer."}</span>
+        </div>
         <div class="row" style="gap:8px;align-items:center">
             <button class="btn primary" data-act="save" ${busy ? "disabled" : ""}>Keep layers in draft</button>
             <button class="btn ghost" data-act="cancel" ${busy ? "disabled" : ""}>Discard</button>
