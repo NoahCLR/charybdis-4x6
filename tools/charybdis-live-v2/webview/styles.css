@@ -320,8 +320,18 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
    reads apart from the selection ring drawn inside it. */
 .kc.dragging { cursor: grabbing; filter: drop-shadow(0 6px 10px rgba(0,0,0,.55)); }
 .kc.dragging .kc-rect { transition: none; }
-.kc.drop-target .kc-rect { stroke: var(--ring); stroke-width: 2.4; stroke-dasharray: 5 3.5; }
+/* The key a drag would swap with glows rather than taking a ring: every ring
+   already means something, and a key's lit stroke is inline, so a stroke
+   here would not show on a painted key anyway. */
+.kc.drop-target .kc-rect { filter: brightness(1.3) drop-shadow(0 0 5px var(--ring)); }
 .board [data-key] { touch-action: none; }
+/* A click focuses the key it selects, and the selection ring already says
+   which key that is, so the browser's own focus outline is not drawn for it.
+   Moving through the board from the keyboard still shows where focus is, as a
+   thin outline inset past the selection ring — outside the key it would run
+   under the neighbouring keys, which paint later. */
+.board [tabindex]:focus { outline: none; }
+.board [tabindex]:focus-visible { outline: 1.5px solid var(--text-2); outline-offset: -6px; }
 .sv-field, .hue-ramp { touch-action: none; cursor: crosshair; }
 /* Selected and reached must never read alike: the selection is a solid ring
    inside the key, what reaches the picked row a dotted one in the gap outside.
@@ -346,6 +356,7 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 .legend-item .lring { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
 .legend-item .lring.sel { border: 2px solid var(--ring); background: var(--key-hi); }
 .legend-item .lring.reach { border: 2px dotted var(--ring); }
+.legend-item .lring.input { border: 2px dashed var(--ring); }
 
 /* ── inspector ───────────────────────────────────────────────────────── */
 .inspector {

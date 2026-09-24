@@ -120,6 +120,7 @@ function legend(model) {
         <span class="legend-item">the board shows the light this layer paints</span>
         <span class="legend-item"><i class="lring sel"></i> selected key</span>
         <span class="legend-item"><i class="lring reach"></i> reaches the picked row</span>
+        <span class="legend-item"><i class="lring input"></i> picked as a combo input</span>
         <span class="legend-item">${dot(colours.tap)} tap branch</span>
         <span class="legend-item">${dot(colours.hold)} hold branch</span>
         <span class="legend-item">${dot(colours.long)} long hold branch</span>
