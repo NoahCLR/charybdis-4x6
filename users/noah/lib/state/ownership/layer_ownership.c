@@ -65,7 +65,7 @@ static int16_t layer_ownership_find_free_slot(void) {
 
 static bool layer_ownership_should_be_active(uint8_t layer) {
     noah_layer_ownership_state_t *state = layer_ownership_state();
-    return layer < LAYER_COUNT && (state->momentary_refcounts[layer] > 0 || (state->locked_mask & layer_ownership_mask_for_layer(layer)) != 0);
+    return layer < LAYER_COUNT && (state->momentary_refcounts[layer] > 0 || ((state->locked_mask | state->oneshot_mask) & layer_ownership_mask_for_layer(layer)) != 0);
 }
 
 static bool layer_ownership_apply_layer(uint8_t layer) {
@@ -159,7 +159,59 @@ bool layer_ownership_goto(uint8_t layer) {
         }
     }
 
+    return layer_ownership_oneshot_consume() || changed;
+}
+
+uint8_t layer_ownership_oneshot_layer(void) {
+    layer_state_t mask = layer_ownership_state()->oneshot_mask;
+
+    for (uint8_t layer = 0u; layer < LAYER_COUNT; layer++) {
+        if (mask & layer_ownership_mask_for_layer(layer)) {
+            return layer;
+        }
+    }
+
+    return UINT8_MAX;
+}
+
+static bool layer_ownership_oneshot_set(uint8_t layer, bool armed) {
+    noah_layer_ownership_state_t *state = layer_ownership_state();
+    layer_state_t                 mask  = layer_ownership_mask_for_layer(layer);
+
+    if (layer >= LAYER_COUNT || ((state->oneshot_mask & mask) != 0) == armed) {
+        return false;
+    }
+
+    state->oneshot_mask = armed ? mask : 0u;
+    noah_runtime_trace_emit(NOAH_TRACE_LAYER_OWNERSHIP, NOAH_TRACE_LAYER_OWNERSHIP_EVENT_ONESHOT, layer, armed ? 1u : 0u);
+    layer_ownership_apply_layer(layer);
+    key_runtime_core_layer_oneshot_set(layer, armed);
+    return true;
+}
+
+bool layer_ownership_oneshot_toggle(uint8_t layer) {
+    uint8_t armed = layer_ownership_oneshot_layer();
+
+    if (layer >= LAYER_COUNT) {
+        return false;
+    }
+    if (armed == layer) {
+        return layer_ownership_oneshot_set(layer, false);
+    }
+
+    // The new layer turns on before the replaced one turns off.
+    bool changed = layer_ownership_oneshot_set(layer, true);
+    if (armed != UINT8_MAX) {
+        layer_ownership_apply_layer(armed);
+        key_runtime_core_layer_oneshot_set(armed, false);
+    }
     return changed;
+}
+
+bool layer_ownership_oneshot_consume(void) {
+    uint8_t armed = layer_ownership_oneshot_layer();
+
+    return armed != UINT8_MAX && layer_ownership_oneshot_set(armed, false);
 }
 
 void layer_ownership_momentary_press(keypos_t key_pos, uint8_t layer) {
@@ -221,6 +273,7 @@ void layer_ownership_debug_snapshot(layer_ownership_debug_snapshot_t *out) {
     *out = (layer_ownership_debug_snapshot_t){
         .applied_layer_state = layer_state,
         .locked_mask         = state->locked_mask,
+        .oneshot_mask        = state->oneshot_mask,
     };
 
     memcpy(out->momentary_refcounts, state->momentary_refcounts, sizeof(state->momentary_refcounts));

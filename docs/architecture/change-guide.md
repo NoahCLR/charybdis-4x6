@@ -44,10 +44,12 @@ directory and the existing domain docs.
 - Do not include `noah_keymap.h` from runtime modules or `noah_runtime.h` from
   keymap-owned translation units.
 - Do not add raw QMK layer-action outputs to authored data when they bypass the
-  userspace layer ownership model. `MO()`, `LT()`, `TT()`, `TG()` and `TO()`
-  are owned (`TT(n)` is `MO(n)` plus a built-in `LOCK_LAYER(n)` on the
-  `TAPPING_TOGGLE`-th tap; `TG(n)` is `LOCK_LAYER(n)`; `TO(n)` is
-  `layer_ownership_goto(n)`); `DF()`, `OSL()` and `LM()` are not yet. A plain
+  userspace layer ownership model. `MO()`, `LT()`, `TT()`, `OSL()`, `TG()`
+  and `TO()` are owned (`TT(n)` is `MO(n)` plus a built-in `LOCK_LAYER(n)` on
+  the `TAPPING_TOGGLE`-th tap; `OSL(n)` holds like `MO(n)` and its tap arms
+  `layer_ownership_oneshot_toggle(n)`, used up in the finalize hook; `TG(n)` is
+  `LOCK_LAYER(n)`; `TO(n)` is `layer_ownership_goto(n)`); `DF()` and `LM()` are
+  not yet. A plain
   `LT()` key with no authored row is still run by QMK itself. A new owned layer keycode is a
   matcher in `lib/action/action_kind.c`, not a special case in a caller.
 - Do not treat split sync or RGB as owners. They mirror or render existing

@@ -222,6 +222,7 @@ _Static_assert(sizeof(lease_t) <= 16u, "lease_t must stay compact");
 typedef enum {
     PERSISTENT_INTENT_KIND_NONE = 0,
     PERSISTENT_INTENT_KIND_LAYER_LOCK,
+    PERSISTENT_INTENT_KIND_LAYER_ONESHOT,
     PERSISTENT_INTENT_KIND_PD_MODE_LOCK,
     PERSISTENT_INTENT_KIND_POINTER_TOGGLE,
 } persistent_intent_kind_t;

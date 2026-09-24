@@ -11,9 +11,10 @@
 // too, because tap_code16/register_code16 only model plain key press/release.
 // QMK layer keycodes act through the userspace layer ownership model:
 // MO()/LT() as momentary holds, TT() as a momentary hold whose
-// TAPPING_TOGGLE-th tap locks the layer, TG() as the same layer lock
-// LOCK_LAYER() sets, and TO() as "lock only this layer". The others (DF, OSL,
-// LM) are still raw QMK layer actions and are refused so they cannot bypass
+// TAPPING_TOGGLE-th tap locks the layer, OSL() as a momentary hold whose tap
+// turns the layer on for the next key, TG() as the same layer lock
+// LOCK_LAYER() sets, and TO() as "lock only this layer". The others (DF, LM)
+// are still raw QMK layer actions and are refused so they cannot bypass
 // ownership.
 //
 // Scope note: this module intentionally keeps authored tap actions on normal
@@ -60,12 +61,25 @@ static inline bool noah_action_keycode_is_layer_tap_toggle(uint16_t action) {
     return IS_QK_LAYER_TAP_TOGGLE(action) && QK_LAYER_TAP_TOGGLE_GET_LAYER(action) < LAYER_COUNT;
 }
 
+// OSL(n) holds its layer like MO(n) while it is down; its tap arms the layer
+// as a one-shot (LAYER_ONESHOT), so it is its own action kind.
+static inline bool noah_action_keycode_is_layer_oneshot(uint16_t action) {
+    return IS_QK_ONE_SHOT_LAYER(action) && QK_ONE_SHOT_LAYER_GET_LAYER(action) < LAYER_COUNT;
+}
+
+// Keys that hold their layer while they are down: MO(), TT() and OSL().
 static inline bool noah_action_keycode_is_owned_momentary_layer(uint16_t action) {
-    return IS_QK_MOMENTARY(action) || noah_action_keycode_is_layer_tap_toggle(action);
+    return IS_QK_MOMENTARY(action) || noah_action_keycode_is_layer_tap_toggle(action) || noah_action_keycode_is_layer_oneshot(action);
 }
 
 static inline uint8_t noah_action_keycode_momentary_layer(uint16_t action) {
-    return IS_QK_LAYER_TAP_TOGGLE(action) ? (uint8_t)QK_LAYER_TAP_TOGGLE_GET_LAYER(action) : (uint8_t)QK_MOMENTARY_GET_LAYER(action);
+    if (IS_QK_LAYER_TAP_TOGGLE(action)) {
+        return (uint8_t)QK_LAYER_TAP_TOGGLE_GET_LAYER(action);
+    }
+    if (IS_QK_ONE_SHOT_LAYER(action)) {
+        return (uint8_t)QK_ONE_SHOT_LAYER_GET_LAYER(action);
+    }
+    return (uint8_t)QK_MOMENTARY_GET_LAYER(action);
 }
 
 static inline bool noah_action_keycode_is_layer_tap(uint16_t action) {
@@ -148,8 +162,14 @@ static inline bool noah_action_desc_is_layer_tap(noah_action_desc_t desc) {
     return desc.kind == NOAH_ACTION_KIND_LAYER_TAP;
 }
 
+static inline bool noah_action_desc_is_layer_oneshot(noah_action_desc_t desc) {
+    return desc.kind == NOAH_ACTION_KIND_LAYER_ONESHOT;
+}
+
+// Layer actions a combo output cannot carry: a combo only taps, and these need
+// a held key to own their layer.
 static inline bool noah_action_desc_is_raw_qmk_layer_action(noah_action_desc_t desc) {
-    return desc.kind == NOAH_ACTION_KIND_LAYER_HOLD || desc.kind == NOAH_ACTION_KIND_LAYER_TAP || desc.kind == NOAH_ACTION_KIND_UNSUPPORTED_LAYER_ACTION;
+    return desc.kind == NOAH_ACTION_KIND_LAYER_HOLD || desc.kind == NOAH_ACTION_KIND_LAYER_TAP || desc.kind == NOAH_ACTION_KIND_LAYER_ONESHOT || desc.kind == NOAH_ACTION_KIND_UNSUPPORTED_LAYER_ACTION;
 }
 
 static inline bool noah_action_desc_is_macro(noah_action_desc_t desc) {

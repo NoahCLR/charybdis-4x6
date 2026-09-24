@@ -246,6 +246,15 @@ bool layer_ownership_goto(uint8_t layer) {
     return false;
 }
 
+bool is_oneshot_enabled(void) {
+    return true;
+}
+
+bool layer_ownership_oneshot_toggle(uint8_t layer) {
+    (void)layer;
+    return false;
+}
+
 void split_runtime_sync(void) {}
 
 void split_runtime_sync_request(void) {}

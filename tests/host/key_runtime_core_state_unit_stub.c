@@ -6,6 +6,11 @@ void key_runtime_core_layer_lock_set(uint8_t layer, bool locked) {
     (void)locked;
 }
 
+void key_runtime_core_layer_oneshot_set(uint8_t layer, bool active) {
+    (void)layer;
+    (void)active;
+}
+
 void key_runtime_core_observe_pd_mode_lock_state(pd_mode_mask_t mode, bool locked) {
     (void)mode;
     (void)locked;

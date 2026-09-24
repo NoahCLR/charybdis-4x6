@@ -20,6 +20,7 @@ typedef struct {
 typedef struct {
     layer_state_t                      applied_layer_state;
     layer_state_t                      locked_mask;
+    layer_state_t                      oneshot_mask;
     uint8_t                            momentary_refcounts[LAYER_COUNT];
     layer_ownership_binding_snapshot_t bindings[LAYER_OWNERSHIP_BINDING_CAPACITY];
 } layer_ownership_debug_snapshot_t;
@@ -31,6 +32,14 @@ bool layer_ownership_toggle_lock_state(uint8_t layer);
 // layers stay on until their keys are released. Layer 0 is the base and is
 // never locked, so layer_ownership_goto(0) releases every lock.
 bool layer_ownership_goto(uint8_t layer);
+
+// OSL(layer): a tap turns the layer on for the next key press. At most one
+// layer is one-shot at a time; arming another replaces it, and tapping the
+// armed layer's OSL() again cancels it. The next key that uses it calls
+// layer_ownership_oneshot_consume() once its own press has been processed.
+bool    layer_ownership_oneshot_toggle(uint8_t layer);
+bool    layer_ownership_oneshot_consume(void);
+uint8_t layer_ownership_oneshot_layer(void);
 
 void layer_ownership_momentary_press(keypos_t key_pos, uint8_t layer);
 bool layer_ownership_momentary_release(keypos_t key_pos);

@@ -704,6 +704,14 @@ bool layer_ownership_momentary_release(keypos_t key_pos) {
     return true;
 }
 
+uint8_t layer_ownership_oneshot_layer(void) {
+    return UINT8_MAX;
+}
+
+bool layer_ownership_oneshot_consume(void) {
+    return false;
+}
+
 void layer_ownership_debug_snapshot(layer_ownership_debug_snapshot_t *out) {
     if (!out) {
         return;

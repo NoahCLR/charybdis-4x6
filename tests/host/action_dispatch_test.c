@@ -263,7 +263,7 @@ static void test_action_descriptor_classifies_common_actions(void) {
     noah_action_desc_t layer_lock   = noah_action_describe(LOCK_LAYER(2));
     noah_action_desc_t momentary    = noah_action_describe(MO(3));
     noah_action_desc_t layer_tap    = noah_action_describe(LT(4, KC_V));
-    noah_action_desc_t raw_layer    = noah_action_describe(OSL(5));
+    noah_action_desc_t raw_layer    = noah_action_describe(DF(5));
     noah_action_desc_t layer_toggle = noah_action_describe(TG(2));
     noah_action_desc_t layer_jump   = noah_action_describe(TO(5));
     noah_action_desc_t qmk_behavior = noah_action_describe(OSM(MOD_LSFT));
@@ -352,7 +352,7 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(noah_action_desc_supports_fallback_hold(raw_layer));
     CHECK(!noah_action_desc_source_layer_uses_desc_layer(raw_layer));
     CHECK(noah_action_desc_source_layer(raw_layer) == UINT8_MAX);
-    CHECK(noah_action_desc_default_tap_action(raw_layer) == OSL(5));
+    CHECK(noah_action_desc_default_tap_action(raw_layer) == DF(5));
 
     // TG() is the lock LOCK_LAYER() toggles; TO() is its own owned kind with
     // the same authored reach.
@@ -374,6 +374,23 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(noah_action_desc_is_runtime_handled_keycode(tap_toggle));
     CHECK(noah_action_desc_source_layer(tap_toggle) == 3);
     CHECK(noah_action_describe(TT(LAYER_COUNT)).kind == NOAH_ACTION_KIND_UNSUPPORTED_LAYER_ACTION);
+
+    // OSL() holds its layer like MO() and taps itself: its default tap is the
+    // action that arms the one-shot. A combo cannot carry it.
+    noah_action_desc_t oneshot = noah_action_describe(OSL(4));
+    CHECK(oneshot.kind == NOAH_ACTION_KIND_LAYER_ONESHOT);
+    CHECK(noah_action_desc_is_layer_oneshot(oneshot));
+    CHECK(oneshot.layer == 4);
+    CHECK(noah_action_desc_is_momentary_layer_keycode(oneshot));
+    CHECK(noah_action_desc_is_runtime_handled_keycode(oneshot));
+    CHECK(noah_action_desc_requires_per_key_hold(oneshot));
+    CHECK(noah_action_desc_source_layer(oneshot) == 4);
+    CHECK(noah_action_desc_default_tap_action(oneshot) == OSL(4));
+    CHECK(noah_action_desc_supported_as_behavior_keycode(oneshot));
+    CHECK(noah_action_desc_supported_as_authored_action(oneshot, NOAH_ACTION_AUTHORED_USE_TAP));
+    CHECK(!noah_action_desc_supported_as_authored_action(oneshot, NOAH_ACTION_AUTHORED_USE_HOLD_OTHER));
+    CHECK(noah_action_desc_is_raw_qmk_layer_action(oneshot));
+    CHECK(noah_action_describe(OSL(LAYER_COUNT)).kind == NOAH_ACTION_KIND_UNSUPPORTED_LAYER_ACTION);
 
     CHECK(layer_jump.kind == NOAH_ACTION_KIND_LAYER_GOTO);
     CHECK(noah_action_desc_is_layer_goto(layer_jump));

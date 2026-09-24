@@ -246,6 +246,7 @@ uint8_t get_weak_mods(void);
 uint8_t get_oneshot_mods(void);
 uint8_t get_oneshot_locked_mods(void);
 bool    is_oneshot_layer_active(void);
+bool    is_oneshot_enabled(void);
 void    set_mods(uint8_t mods);
 void    set_weak_mods(uint8_t mods);
 void    set_oneshot_mods(uint8_t mods);

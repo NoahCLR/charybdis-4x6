@@ -150,7 +150,7 @@ static bool key_behavior_action_supported(uint16_t action, hold_behavior_mode_t 
 
 static void key_behavior_log_invalid_keycode(uint8_t index, uint16_t keycode) {
 #ifdef CONSOLE_ENABLE
-    uprintf("Unsupported key_behaviors[%u].keycode 0x%04X; layer keycodes other than MO(), LT(), TT(), TG() and TO() bypass the custom runtime\n", (unsigned int)index, (unsigned int)keycode);
+    uprintf("Unsupported key_behaviors[%u].keycode 0x%04X; layer keycodes other than MO(), LT(), TT(), OSL(), TG() and TO() bypass the custom runtime\n", (unsigned int)index, (unsigned int)keycode);
 #else
     (void)index;
     (void)keycode;
@@ -159,7 +159,7 @@ static void key_behavior_log_invalid_keycode(uint8_t index, uint16_t keycode) {
 
 static void key_behavior_log_invalid_action(uint8_t index, uint8_t tap_count, const char *field, uint16_t action, hold_behavior_mode_t hold_mode) {
 #ifdef CONSOLE_ENABLE
-    uprintf("Unsupported key_behaviors[%u].tap_counts[%u].%s action 0x%04X; layer actions are supported as TG()/TO()/LOCK_LAYER() or PRESS_AND_HOLD_UNTIL_RELEASE(MO(layer))\n", (unsigned int)index, (unsigned int)tap_count, field, (unsigned int)action);
+    uprintf("Unsupported key_behaviors[%u].tap_counts[%u].%s action 0x%04X; layer actions are supported as TG()/TO()/OSL()/LOCK_LAYER() taps or PRESS_AND_HOLD_UNTIL_RELEASE(MO(layer))\n", (unsigned int)index, (unsigned int)tap_count, field, (unsigned int)action);
 #else
     (void)index;
     (void)tap_count;

@@ -38,8 +38,17 @@ That makes patterns like these possible:
 
 Plain keys without an authored row keep their normal QMK behavior, except the
 layer keys the runtime owns: `MO(layer)` holds its layer, `TT(layer)` holds it
-too and locks it on its `TAPPING_TOGGLE`-th tap (QMK's default, 5), `TG(layer)`
-is `LOCK_LAYER(layer)`, and `TO(layer)` locks that layer alone.
+too and locks it on its `TAPPING_TOGGLE`-th tap (QMK's default, 5),
+`OSL(layer)` holds it too and on a tap turns it on for the next key press,
+`TG(layer)` is `LOCK_LAYER(layer)`, and `TO(layer)` locks that layer alone.
+
+A one-shot layer follows QMK's rule for what uses it up: any key press except a
+modifier, a one-shot modifier, a mod-tap still held, or `OSL()` itself. The
+layer turns off once that press has been processed, so the press itself still
+resolves on the one-shot layer. Tapping the armed `OSL()` again cancels it, and
+`TO()` releases it with the locks. `ONESHOT_TIMEOUT` and `ONESHOT_TAP_TOGGLE`
+apply to QMK's `OSM()` only; with one-shot keys turned off (Magic / VIA),
+`OSL()` is only a hold, as QMK's is.
 
 ## Timing Model
 

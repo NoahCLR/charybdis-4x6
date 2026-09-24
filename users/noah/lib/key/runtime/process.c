@@ -16,6 +16,7 @@
 #include "../../action/owned_keycode.h"
 #include "../../compat/qmk_combo_origin.h"
 #include "../../state/ownership/keyboard_mod_ownership.h"
+#include "../../state/ownership/layer_ownership.h"
 #include "../../state/modifiers/keyboard_mod_policy.h"
 #include "../../state/diagnostics/runtime_diag.h"
 #include "slot/origin_registry.h"
@@ -322,12 +323,35 @@ bool noah_process_record_user(uint16_t keycode, keyrecord_t *record) {
     return key_runtime_process_finish(&ctx, true);
 }
 
+// QMK's rule for what uses up a one-shot layer (process_record in action.c):
+// any press except a modifier, a one-shot modifier, a mod-tap still held, or
+// OSL() itself. It is released once that press has been processed, so the
+// press still resolved on the one-shot layer.
+static bool key_runtime_process_press_uses_oneshot_layer(uint16_t keycode, const keyrecord_t *record) {
+    if (IS_MODIFIER_KEYCODE(keycode) || IS_QK_ONE_SHOT_MOD(keycode) || IS_QK_ONE_SHOT_LAYER(keycode)) {
+        return false;
+    }
+
+    return !(IS_QK_MOD_TAP(keycode) && record->tap.count == 0u);
+}
+
+static void key_runtime_process_settle_oneshot_layer(uint16_t keycode, const keyrecord_t *record) {
+    if (!(record && record->event.pressed) || noah_synthetic_record_active() || !(record->event.type == KEY_EVENT || record->event.type == COMBO_EVENT)) {
+        return;
+    }
+
+    if (layer_ownership_oneshot_layer() != UINT8_MAX && key_runtime_process_press_uses_oneshot_layer(keycode, record)) {
+        (void)layer_ownership_oneshot_consume();
+    }
+}
+
 void noah_process_record_user_finalize(uint16_t keycode, keyrecord_t *record, bool keep_processing) {
     noah_runtime_diag_scope_enter(NOAH_RUNTIME_DIAG_STAGE_PROCESS_RECORD_FINALIZE);
     // Settle ownership before the mask restore below, which selects managed-only
     // modifiers from the same ledgers.
     key_runtime_process_settle_report_ownership(keycode, record, keep_processing);
     key_runtime_process_end_keyboard_event_mod_mask();
+    key_runtime_process_settle_oneshot_layer(keycode, record);
     key_runtime_trace_bool_result("process:return", keycode, record, keep_processing);
     noah_runtime_diag_scope_leave();
 }

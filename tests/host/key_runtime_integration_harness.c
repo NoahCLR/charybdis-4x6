@@ -13,6 +13,19 @@
 __attribute__((weak)) layer_state_t layer_state;
 __attribute__((weak)) layer_state_t default_layer_state;
 
+// Integration runners that link the real layer_ownership.c replace these.
+__attribute__((weak)) uint8_t layer_ownership_oneshot_layer(void) {
+    return UINT8_MAX;
+}
+
+__attribute__((weak)) bool layer_ownership_oneshot_consume(void) {
+    return false;
+}
+
+__attribute__((weak)) bool is_oneshot_enabled(void) {
+    return true;
+}
+
 __attribute__((weak)) uint16_t timer_read(void) {
     return 0u;
 }

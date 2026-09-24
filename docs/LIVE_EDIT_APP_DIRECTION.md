@@ -1319,10 +1319,11 @@ Wire feature bit 14. The app accepts `TG()`/`TO()` in behaviours only when a
 keyboard reports that bit; older firmware keeps the old refusal.
 
 `TT(n)` followed: it is `MO(n)` with a built-in `LOCK_LAYER(n)` on its
-`TAPPING_TOGGLE`-th tap, so it needs no new action or capability bit; the app
-still offers it only as a key, not inside a behaviour. `DF()`, `OSL()` and
-`LM()` still bypass ownership, and so does a plain `LT()` key with no authored
-row, which QMK runs itself. They follow in order: `OSL()` (a one-shot layer
-owner), plain `LT()`, then `LM()`, a decision on `DF()` (the firmware assumes
-layer 0 is the base), and a device-side check that refuses what remains when a
-profile is saved.
+`TAPPING_TOGGLE`-th tap, so it needs no new action or capability bit. `OSL(n)`
+followed as its own kind: it holds like `MO(n)` and its tap arms a one-shot
+owner in `layer_ownership`, which the next qualifying press uses up. The app
+offers both only as keys, not inside a behaviour. `DF()` and `LM()` still
+bypass ownership, and so does a plain `LT()` key with no authored row, which
+QMK runs itself. They follow in order: plain `LT()`, then `LM()`, a decision
+on `DF()` (the firmware assumes layer 0 is the base), and a device-side check
+that refuses what remains when a profile is saved.

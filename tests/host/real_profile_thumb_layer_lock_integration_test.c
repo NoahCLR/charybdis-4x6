@@ -3087,6 +3087,69 @@ static void test_tap_toggle_hold(uint16_t keycode, keypos_t key_pos) {
     test_flush_pending_tap_branch();
 }
 
+static bool test_oneshot_enabled = true;
+
+bool is_oneshot_enabled(void) {
+    return test_oneshot_enabled;
+}
+
+static void test_tap_key(uint16_t keycode, keypos_t key_pos) {
+    key_runtime_integration_process_record(keycode, key_pos, true);
+    key_runtime_integration_process_record(keycode, key_pos, false);
+    key_runtime_integration_advance(&fake_time, CUSTOM_MULTI_TAP_TERM + 1);
+    key_runtime_integration_scan();
+}
+
+// OSL(layer) on a plain key: a tap leaves the layer on for exactly the next
+// key; modifiers do not use it up; tapping it again cancels it; a hold with
+// another key pressed is a plain MO(); and with one-shots off a tap does
+// nothing, as in QMK.
+static void test_oneshot_layer_serves_the_next_key(void) {
+    keypos_t oneshot_pos = {.row = 2, .col = 2};
+    keypos_t other_pos   = {.row = 2, .col = 3};
+    keypos_t shift_pos   = {.row = 2, .col = 4};
+    uint16_t oneshot     = OSL(LAYER_NUM);
+
+    test_reset_state();
+
+    test_tap_key(oneshot, oneshot_pos);
+    CHECK(layer_ownership_oneshot_layer() == LAYER_NUM);
+    CHECK(test_layer_active(LAYER_NUM));
+    CHECK(!test_layer_locked(LAYER_NUM));
+
+    key_runtime_integration_process_record(KC_LEFT_SHIFT, shift_pos, true);
+    CHECK(test_layer_active(LAYER_NUM));
+    key_runtime_integration_process_record(KC_LEFT_SHIFT, shift_pos, false);
+
+    key_runtime_integration_process_record(KC_A, other_pos, true);
+    CHECK(layer_ownership_oneshot_layer() == UINT8_MAX);
+    CHECK(!test_layer_active(LAYER_NUM));
+    key_runtime_integration_process_record(KC_A, other_pos, false);
+
+    test_tap_key(oneshot, oneshot_pos);
+    test_tap_key(oneshot, oneshot_pos);
+    CHECK(layer_ownership_oneshot_layer() == UINT8_MAX);
+    CHECK(!test_layer_active(LAYER_NUM));
+
+    key_runtime_integration_process_record(oneshot, oneshot_pos, true);
+    CHECK(test_layer_active(LAYER_NUM));
+    key_runtime_integration_process_record(KC_A, other_pos, true);
+    key_runtime_integration_process_record(KC_A, other_pos, false);
+    CHECK(test_layer_active(LAYER_NUM));
+    key_runtime_integration_process_record(oneshot, oneshot_pos, false);
+    key_runtime_integration_advance(&fake_time, CUSTOM_MULTI_TAP_TERM + 1);
+    key_runtime_integration_scan();
+    CHECK(layer_ownership_oneshot_layer() == UINT8_MAX);
+    CHECK(!test_layer_active(LAYER_NUM));
+
+    test_oneshot_enabled = false;
+    test_tap_key(oneshot, oneshot_pos);
+    test_oneshot_enabled = true;
+    CHECK(layer_ownership_oneshot_layer() == UINT8_MAX);
+    CHECK(!test_layer_active(LAYER_NUM));
+    test_assert_thumb_runtime_quiescent(oneshot_pos);
+}
+
 static void test_tap_toggle_taps_lock_and_holds_are_momentary(void) {
     keypos_t key_pos = {.row = 2, .col = 2};
     uint16_t keycode = TT(LAYER_NUM);
@@ -3122,6 +3185,7 @@ static void test_tap_toggle_taps_lock_and_holds_are_momentary(void) {
 }
 
 int main(void) {
+    test_oneshot_layer_serves_the_next_key();
     test_tap_toggle_taps_lock_and_holds_are_momentary();
     test_normal_press_and_matched_release_use_bounded_authored_lookups();
     test_active_scan_visit_baseline_is_measured();

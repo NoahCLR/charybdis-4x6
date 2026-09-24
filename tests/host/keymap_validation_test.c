@@ -20,7 +20,7 @@ enum {
     TEST_COMBO_KEY,
     TEST_DUP_COMBO_KEY,
     TEST_DEAD_KEY,
-    TEST_RAW_LAYER_ACTION = OSL(LAYER_NUM),
+    TEST_RAW_LAYER_ACTION = DF(LAYER_NUM),
 };
 
 static const uint16_t test_keymaps[LAYER_COUNT][MATRIX_ROWS][MATRIX_COLS] = {
@@ -32,6 +32,7 @@ static const uint16_t test_keymaps[LAYER_COUNT][MATRIX_ROWS][MATRIX_COLS] = {
             [0][2] = TG(LAYER_NUM),
             [0][3] = TO(LAYER_SYM),
             [0][4] = TT(LAYER_NUM),
+            [0][5] = OSL(LAYER_SYM),
         },
 };
 
@@ -41,6 +42,7 @@ static const uint16_t combo_outputs[] = {
     TEST_DUP_COMBO_KEY,
     TG(LAYER_NUM),
     TO(LAYER_BASE),
+    OSL(LAYER_NUM),
 };
 
 static const uint16_t combo_keys_0[] = {
@@ -203,14 +205,17 @@ int main(void) {
     snprintf(combo_key_hex, sizeof(combo_key_hex), "0x%04X", (unsigned int)TEST_COMBO_KEY);
     snprintf(dead_key_hex, sizeof(dead_key_hex), "0x%04X", (unsigned int)TEST_DEAD_KEY);
 
-    CHECK(noah_keymap_validate() == 4u);
+    CHECK(noah_keymap_validate() == 5u);
 
     CHECK(strstr(log_buffer, "Unsupported keymaps[0][0][1] raw layer action") != NULL);
     CHECK(strstr(log_buffer, "Unsupported keymaps[0][0][2]") == NULL);
     CHECK(strstr(log_buffer, "Unsupported keymaps[0][0][3]") == NULL);
     CHECK(strstr(log_buffer, "Unsupported keymaps[0][0][4]") == NULL);
+    CHECK(strstr(log_buffer, "Unsupported keymaps[0][0][5]") == NULL);
     CHECK(strstr(log_buffer, "output[3]") == NULL);
     CHECK(strstr(log_buffer, "output[4]") == NULL);
+    // A combo only taps, so it cannot hold the layer OSL() owns while down.
+    CHECK(strstr(log_buffer, "Unsupported COMBOS(COMBO) output[5] raw layer action") != NULL);
     CHECK(strstr(log_buffer, "Unsupported COMBOS(COMBO) input[2] duplicate member keycode") != NULL);
     CHECK(strstr(log_buffer, "Unsupported COMBOS(COMBO) output[1] raw layer action") != NULL);
     CHECK(strstr(log_buffer, "Unreachable key_behaviors[2].keycode") != NULL);

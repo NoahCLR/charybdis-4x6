@@ -634,6 +634,23 @@ bool layer_ownership_goto(uint8_t layer) {
     return true;
 }
 
+bool is_oneshot_enabled(void) {
+    return true;
+}
+
+bool layer_ownership_oneshot_toggle(uint8_t layer) {
+    (void)layer;
+    return false;
+}
+
+bool layer_ownership_oneshot_consume(void) {
+    return false;
+}
+
+uint8_t layer_ownership_oneshot_layer(void) {
+    return UINT8_MAX;
+}
+
 bool layer_ownership_momentary_release(keypos_t key_pos) {
     (void)key_pos;
     return true;

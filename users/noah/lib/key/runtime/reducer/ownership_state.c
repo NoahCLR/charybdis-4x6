@@ -466,7 +466,7 @@ static bool key_runtime_core_repeat_lease_activate(key_runtime_core_state_t *sta
     return true;
 }
 
-static bool key_runtime_core_persistent_layer_lock_update(key_runtime_core_state_t *state, uint8_t layer, bool active) {
+static bool key_runtime_core_persistent_layer_intent_update(key_runtime_core_state_t *state, persistent_intent_kind_t kind, uint8_t layer, bool active) {
     persistent_intent_t *empty_slot = NULL;
 
     if (!(state && layer < 32u)) {
@@ -476,7 +476,7 @@ static bool key_runtime_core_persistent_layer_lock_update(key_runtime_core_state
     for (uint16_t index = 0; index < KEY_RUNTIME_CORE_PERSISTENT_INTENT_CAPACITY; index++) {
         persistent_intent_t *intent = &state->persistent_intents[index];
 
-        if (intent->active && intent->kind == PERSISTENT_INTENT_KIND_LAYER_LOCK && intent->data.layer == layer) {
+        if (intent->active && intent->kind == kind && intent->data.layer == layer) {
             if (active) {
                 return false;
             }
@@ -499,7 +499,7 @@ static bool key_runtime_core_persistent_layer_lock_update(key_runtime_core_state
 
     *empty_slot = (persistent_intent_t){
         .active     = true,
-        .kind       = PERSISTENT_INTENT_KIND_LAYER_LOCK,
+        .kind       = kind,
         .data.layer = layer,
     };
     state->persistent_intent_count++;
@@ -840,6 +840,9 @@ void key_runtime_core_shadow_projection_recompute(key_runtime_core_state_t *stat
         switch (intent->kind) {
             case PERSISTENT_INTENT_KIND_LAYER_LOCK:
                 projection.locked_layer_mask |= (layer_state_t)1u << intent->data.layer;
+                projection.layer_state |= (layer_state_t)1u << intent->data.layer;
+                break;
+            case PERSISTENT_INTENT_KIND_LAYER_ONESHOT:
                 projection.layer_state |= (layer_state_t)1u << intent->data.layer;
                 break;
             case PERSISTENT_INTENT_KIND_PD_MODE_LOCK:
@@ -1206,7 +1209,15 @@ const key_runtime_core_shadow_projection_t *key_runtime_core_shadow_projection(v
 void key_runtime_core_layer_lock_set(uint8_t layer, bool active) {
     key_runtime_core_state_t *state = key_runtime_core_state();
 
-    if (key_runtime_core_persistent_layer_lock_update(state, layer, active)) {
+    if (key_runtime_core_persistent_layer_intent_update(state, PERSISTENT_INTENT_KIND_LAYER_LOCK, layer, active)) {
+        key_runtime_core_shadow_projection_recompute(state);
+    }
+}
+
+void key_runtime_core_layer_oneshot_set(uint8_t layer, bool active) {
+    key_runtime_core_state_t *state = key_runtime_core_state();
+
+    if (key_runtime_core_persistent_layer_intent_update(state, PERSISTENT_INTENT_KIND_LAYER_ONESHOT, layer, active)) {
         key_runtime_core_shadow_projection_recompute(state);
     }
 }

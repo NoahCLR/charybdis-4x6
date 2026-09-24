@@ -177,6 +177,17 @@ bool noah_action_kind_match_layer_lock(uint16_t action, pd_mode_mask_t pd_mode, 
     return true;
 }
 
+bool noah_action_kind_match_layer_oneshot(uint16_t action, pd_mode_mask_t pd_mode, noah_action_desc_t *out) {
+    (void)pd_mode;
+
+    if (!(out && noah_action_keycode_is_layer_oneshot(action))) {
+        return false;
+    }
+
+    *out = noah_action_desc_build(NOAH_ACTION_KIND_LAYER_ONESHOT, action, (uint8_t)QK_ONE_SHOT_LAYER_GET_LAYER(action), 0);
+    return true;
+}
+
 bool noah_action_kind_match_layer_goto(uint16_t action, pd_mode_mask_t pd_mode, noah_action_desc_t *out) {
     (void)pd_mode;
 
@@ -191,7 +202,7 @@ bool noah_action_kind_match_layer_goto(uint16_t action, pd_mode_mask_t pd_mode, 
 bool noah_action_kind_match_layer_hold(uint16_t action, pd_mode_mask_t pd_mode, noah_action_desc_t *out) {
     (void)pd_mode;
 
-    if (!(out && noah_action_keycode_is_owned_momentary_layer(action))) {
+    if (!(out && (IS_QK_MOMENTARY(action) || noah_action_keycode_is_layer_tap_toggle(action)))) {
         return false;
     }
 

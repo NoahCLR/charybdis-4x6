@@ -22,6 +22,7 @@ typedef struct {
     layer_ownership_binding_snapshot_t bindings[LAYER_OWNERSHIP_BINDING_CAPACITY];
     uint8_t                            momentary_refcounts[LAYER_COUNT];
     layer_state_t                      locked_mask;
+    layer_state_t                      oneshot_mask;
 } noah_layer_ownership_state_t;
 
 typedef struct {

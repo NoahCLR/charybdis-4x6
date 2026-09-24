@@ -200,11 +200,11 @@ check_runtime_sealing_boundaries() {
             cd "$ROOT"
             # Intentional word splitting for repo-owned production path list.
             # shellcheck disable=SC2086
-            rg -n 'key_runtime_core_layer_lock_set[[:space:]]*\(' $REPO_OWNED_PRODUCTION_PATHS | grep -Ev "$layer_lock_core_bridge_allowlist" || true
+            rg -n 'key_runtime_core_layer_(lock|oneshot)_set[[:space:]]*\(' $REPO_OWNED_PRODUCTION_PATHS | grep -Ev "$layer_lock_core_bridge_allowlist" || true
         )
     )"
     if [ -n "$layer_lock_core_call_violations" ]; then
-        echo "repo-owned production code must update key-runtime layer-lock shadow state through layer_ownership.c" >&2
+        echo "repo-owned production code must update key-runtime layer-lock and one-shot shadow state through layer_ownership.c" >&2
         printf '%s\n' "$layer_lock_core_call_violations" >&2
         exit 1
     fi

@@ -26,6 +26,7 @@ typedef struct {
 
 static test_call_t layer_toggle_call;
 static test_call_t layer_goto_call;
+static test_call_t layer_oneshot_call;
 static test_call_t layer_press_call;
 static test_call_t layer_release_call;
 static test_call_t synthetic_tap_call;
@@ -86,6 +87,7 @@ static keypos_t test_keypos(uint8_t row, uint8_t col) {
 static void test_reset_stubs(void) {
     layer_toggle_call         = (test_call_t){0};
     layer_goto_call           = (test_call_t){0};
+    layer_oneshot_call        = (test_call_t){0};
     layer_press_call          = (test_call_t){0};
     layer_release_call        = (test_call_t){0};
     synthetic_tap_call        = (test_call_t){0};
@@ -174,6 +176,18 @@ bool layer_ownership_toggle_lock_state(uint8_t layer) {
 bool layer_ownership_goto(uint8_t layer) {
     layer_goto_call.layer   = layer;
     layer_goto_call.pressed = true;
+    return true;
+}
+
+static bool test_oneshot_enabled = true;
+
+bool is_oneshot_enabled(void) {
+    return test_oneshot_enabled;
+}
+
+bool layer_ownership_oneshot_toggle(uint8_t layer) {
+    layer_oneshot_call.layer   = layer;
+    layer_oneshot_call.pressed = true;
     return true;
 }
 
@@ -327,6 +341,29 @@ static void test_toggle_and_goto_layer_keycodes_act_through_layer_ownership(void
     CHECK(layer_toggle_call.layer == 0);
     CHECK(!layer_goto_call.pressed);
     CHECK(tap_code16_call.keycode == KC_NO);
+}
+
+// OSL() taps arm its one-shot through layer ownership and presses hold its
+// layer like MO(). With one-shots off (Magic / VIA), a tap does nothing, so
+// OSL() is only a hold, as QMK's is.
+static void test_oneshot_layer_taps_arm_and_presses_hold(void) {
+    keypos_t key_pos = {.row = 2, .col = 1};
+
+    test_reset_stubs();
+    noah_action_tap(OSL(3));
+    CHECK(layer_oneshot_call.pressed && layer_oneshot_call.layer == 3);
+    CHECK(tap_code16_call.keycode == KC_NO);
+
+    test_reset_stubs();
+    noah_action_press(key_pos, OSL(2));
+    CHECK(layer_press_call.layer == 2);
+    CHECK(!layer_oneshot_call.pressed);
+
+    test_reset_stubs();
+    test_oneshot_enabled = false;
+    noah_action_tap(OSL(3));
+    CHECK(!layer_oneshot_call.pressed);
+    test_oneshot_enabled = true;
 }
 
 static void test_tap_handles_layer_lock_and_pd_lock(void) {
@@ -560,6 +597,7 @@ int main(void) {
     test_every_action_kind_has_metadata_and_dispatch_coverage();
     test_invalid_action_kind_is_rejected_consistently();
     test_tap_handles_layer_lock_and_pd_lock();
+    test_oneshot_layer_taps_arm_and_presses_hold();
     test_toggle_and_goto_layer_keycodes_act_through_layer_ownership();
     test_tap_at_preserves_pd_lock_origin_key_pos();
     test_tap_routes_macro_custom_qmk_and_plain_actions();

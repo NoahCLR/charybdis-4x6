@@ -14,6 +14,7 @@
 #include "owned_keycode.h"
 #include "synthetic_record.h"
 #include "../pointing/policy/pointer_layer_policy.h"
+#include "../compat/qmk_oneshot_contract.h"
 #include "../state/ownership/layer_ownership.h"
 
 typedef void (*noah_action_tap_impl_t)(noah_action_desc_t desc, keypos_t key_pos);
@@ -49,7 +50,7 @@ static const noah_action_kind_dispatch_ops_t noah_action_kind_dispatch_noop_ops 
 
 static void noah_action_log_unsupported_layer_action(noah_action_desc_t desc) {
 #ifdef CONSOLE_ENABLE
-    uprintf("Unsupported raw QMK layer action 0x%04X; use LOCK_LAYER(...)/TG(...) or TO(...) for persistent changes or PRESS_AND_HOLD_UNTIL_RELEASE(MO(layer)) for owned momentary holds\n", (unsigned int)desc.action);
+    uprintf("Unsupported raw QMK layer action 0x%04X; use LOCK_LAYER(...)/TG(...)/TO(...) for persistent changes, OSL(...) for one-shots, or PRESS_AND_HOLD_UNTIL_RELEASE(MO(layer)) for owned momentary holds\n", (unsigned int)desc.action);
 #else
     (void)desc;
 #endif
@@ -130,6 +131,14 @@ static void noah_action_tap_layer_goto(noah_action_desc_t desc, keypos_t key_pos
 static void noah_action_press_layer_goto(noah_action_desc_t desc, keypos_t key_pos) {
     (void)key_pos;
     noah_action_goto_layer(desc);
+}
+
+// With one-shots off, OSL() is only a hold, as QMK's is.
+static void noah_action_tap_layer_oneshot(noah_action_desc_t desc, keypos_t key_pos) {
+    (void)key_pos;
+    if (noah_qmk_contract_oneshot_enabled()) {
+        (void)layer_ownership_oneshot_toggle(desc.layer);
+    }
 }
 
 static void noah_action_tap_pd_mode_lock(noah_action_desc_t desc, keypos_t key_pos) {
