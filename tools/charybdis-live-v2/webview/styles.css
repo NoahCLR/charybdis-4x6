@@ -323,7 +323,10 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 .kc.drop-target .kc-rect { stroke: var(--ring); stroke-width: 2.4; stroke-dasharray: 5 3.5; }
 .board [data-key] { touch-action: none; }
 .sv-field, .hue-ramp { touch-action: none; cursor: crosshair; }
-.kc-reach { fill: none; stroke: var(--ring); stroke-width: 2.2; opacity: .9; }
+/* Selected and reached must never read alike: the selection is a solid ring
+   inside the key, what reaches the picked row a dotted one in the gap outside.
+   Both are shapes, not hues — colour on the board belongs to the lighting. */
+.kc-reach { fill: none; stroke: var(--ring); stroke-width: 2.2; stroke-dasharray: 0 4.4; stroke-linecap: round; }
 .kc-badge { fill: var(--text-3); font-family: var(--mono); font-size: 9px; text-anchor: middle; }
 .kc-ball circle { transition: fill .12s ease, stroke .12s ease; }
 .kc-ball[data-trackball] { cursor: crosshair; }
@@ -340,6 +343,9 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 .legend-item { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-3); }
 .legend-item .m { width: 12px; height: 12px; border-radius: 3px; border: 1px solid var(--line-2); display: grid; place-items: center; }
 .legend-item .m i { width: 4px; height: 4px; border-radius: 50%; background: var(--text-2); display: block; }
+.legend-item .lring { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.legend-item .lring.sel { border: 2px solid var(--ring); background: var(--key-hi); }
+.legend-item .lring.reach { border: 2px dotted var(--ring); }
 
 /* ── inspector ───────────────────────────────────────────────────────── */
 .inspector {

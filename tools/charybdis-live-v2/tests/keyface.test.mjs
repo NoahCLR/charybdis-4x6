@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {behaviourFor, comboEditInputs, comboReferenceLayer, combosAt, behaviourListeningTo, canonicalKeycode, behaviourGridSteps, behaviourGroups, behaviourTiers, macroReach, pointingReach, reachablePositions, resolvedPositions, bindingKeycode, bindingsForSlot, comboGroups, combosForKey, keyFace, keyMeaning, macroKeycodes, macroPlacements, pointingSlotFor, reachKeys, slotKeycodes} from "../webview/view/keyface.mjs";
+import {behaviourFor, comboEditInputs, comboReferenceLayer, combosAt, behaviourListeningTo, canonicalKeycode, behaviourGridSteps, behaviourGroups, behaviourRouteKeys, behaviourTiers, macroReach, pointingReach, reachablePositions, resolvedPositions, bindingKeycode, bindingsForSlot, comboGroups, combosForKey, keyFace, keyMeaning, macroKeycodes, macroPlacements, pointingSlotFor, reachKeys, slotKeycodes} from "../webview/view/keyface.mjs";
 
 test("a key face uses the model's own resolution, and names the layer a dual-role key reaches", () => {
     assert.deepEqual(keyFace({keycode: "KC_TRANSPARENT", display: "▽"}), {main: "▽", sub: "", kind: "transparent"});
@@ -244,6 +244,32 @@ test("a behaviour a combo sends is reached, though no key carries it", () => {
     assert.deepEqual(above.combos, [], "C1 needs the transparent J, and C2 needs L, which Numbers covers");
     assert.deepEqual(above.combosBelow.map((entry) => [entry.row.keycode, entry.combos.map((route) => route.combo.badge)]),
         [["LEFT_THUMB", ["C1"]]]);
+});
+
+test("a behaviour picked under one route rings only that route's keys", () => {
+    // The Pointing layer case: KC_LEFT_GUI sits on Base's thumb, which the
+    // Pointing layer leaves transparent, and a combo chorded on two Pointing
+    // keys sends it too. Picked under the combo, the thumb is not the answer.
+    const at = (layoutIndex, keycode) => ({layoutIndex, keycode, display: keycode});
+    const model = {
+        keyBehaviors: [{keycode: "KC_LEFT_GUI", steps: []}],
+        combos: [{id: 5, badge: "C6", inputs: ["MS_BTN1", "VOLUME_MODE"], output: "KC_LEFT_GUI"}],
+    };
+    const stack = [
+        {index: 0, name: "Base", positions: [at(48, "KC_LEFT_GUI"), at(30, "KC_N"), at(31, "KC_M")]},
+        {index: 4, name: "Pointing", positions: [at(48, "KC_TRANSPARENT"), at(30, "VOLUME_MODE"), at(31, "MS_BTN1")]},
+    ];
+    const groups = behaviourGroups(model, stack, 1);
+    assert.deepEqual(groups.through.map((entry) => entry.row.keycode), ["KC_LEFT_GUI"], "listed under the transparent key");
+    assert.deepEqual(groups.combos.map((entry) => entry.row.keycode), ["KC_LEFT_GUI"], "and under the combo");
+    assert.deepEqual(groups.combosBelow, [], "the combo needs no transparent key");
+
+    const ring = (route) => behaviourRouteKeys(model, stack, 1, "KC_LEFT_GUI", route).sort((a, b) => a - b);
+    assert.deepEqual(ring("combos"), [30, 31], "the chord, not the thumb");
+    assert.deepEqual(ring("through"), [48], "the thumb that falls through to Base");
+    assert.deepEqual(ring("here"), [], "no key on Pointing carries it");
+    assert.deepEqual(ring(null), [30, 31, 48], "with no route, every way in");
+    assert.deepEqual(behaviourRouteKeys(model, stack, 1, null), []);
 });
 
 test("a macro fired from a behaviour branch is reached, though no key shows it", () => {

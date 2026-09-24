@@ -4,7 +4,7 @@
 import {css, isOff, label as hsvLabel} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {LED_INDEX} from "../view/geometry.mjs";
-import {actionLabel, behaviourFor, behaviourListeningTo, canonicalKeycode, behaviourGridSteps, behaviourGroups, behaviourTiers, comboEditInputs, comboGroups, combosAt, keyFace, keyMeaning, macroReach, pointingReach, pointingSlotFor, pointingVariant, reachKeys} from "../view/keyface.mjs";
+import {actionLabel, behaviourFor, behaviourListeningTo, canonicalKeycode, behaviourGridSteps, behaviourGroups, behaviourRouteKeys, behaviourTiers, comboEditInputs, comboGroups, combosAt, keyFace, keyMeaning, macroReach, pointingReach, pointingSlotFor, pointingVariant, reachKeys} from "../view/keyface.mjs";
 import {feedbackColours, layerColourRow, pdColourRow, stageEnabled} from "../view/lighting.mjs";
 import {closeComboBuilder, currentLayer, getModel, layerName, layers, openComboBuilder, positionAt, post, render, selectedPosition, state, writable} from "../store.mjs";
 import * as edits from "../view/edits.mjs";
@@ -81,7 +81,12 @@ export function screenKeys() {
             } else {
                 state.selected = index;
                 const behaviour = behaviourFor(model, keyMeaning(positionAt(layer, index)));
-                if (state.tab === "behaviours" && behaviour) { state.behaviourRow = behaviour.keycode; state.cell = null; }
+                // A behaviour picked on the board is the one this key carries.
+                if (state.tab === "behaviours" && behaviour) {
+                    state.behaviourRow = behaviour.keycode;
+                    state.behaviourRoute = {row: behaviour.keycode, group: "here"};
+                    state.cell = null;
+                }
             }
             render();
         },
@@ -113,6 +118,8 @@ function legend(model) {
     const dot = (colour) => `<i class="ldot" style="${on && !isOff(colour) ? `background:${css(colour)}` : "background:none;border-style:dashed"}"></i>`;
     return el(`<div class="board-legend">
         <span class="legend-item">the board shows the light this layer paints</span>
+        <span class="legend-item"><i class="lring sel"></i> selected key</span>
+        <span class="legend-item"><i class="lring reach"></i> reaches the picked row</span>
         <span class="legend-item">${dot(colours.tap)} tap branch</span>
         <span class="legend-item">${dot(colours.hold)} hold branch</span>
         <span class="legend-item">${dot(colours.long)} long hold branch</span>
@@ -186,13 +193,7 @@ function reachHighlight(model) {
             through: groups.throughKeys, belowBranches: groups.fromBranchesBelow, belowCombos: groups.fromCombosBelow}[group] || [])
             .find((entry) => String(entry.name) === name);
     };
-    if (state.tab === "behaviours") {
-        if (!state.behaviourRow) return [];
-        const groups = behaviourGroups(model, stack, at);
-        const combos = [...groups.combos, ...groups.combosBelow]
-            .filter((entry) => entry.row.keycode === state.behaviourRow).flatMap((entry) => entry.combos);
-        return reachKeys(stack, at, {behaviours: [{keycode: state.behaviourRow}], combos});
-    }
+    if (state.tab === "behaviours") return behaviourRouteKeys(model, stack, at, state.behaviourRow, behaviourRoute());
     const picked = state.reachRow[state.tab];
     if (!picked) return [];
     if (state.tab === "combos") {
@@ -336,6 +337,12 @@ function tabKey(body, right) {
 }
 
 /* ── behaviours: tap count × tier, drawn as the grid it is ─────────────── */
+// The group the picked behaviour was picked in, while it is still the picked
+// one. A behaviour selected any other way — a fresh one, a moved one, the Key
+// tab's link — has no route, and every way to it counts.
+const behaviourRoute = () =>
+    state.behaviourRoute?.row === state.behaviourRow ? state.behaviourRoute.group : null;
+
 // The combos that send a behaviour, by badge and chord; one that needs a
 // transparent key names the layer answering for it. Plain text: the row
 // escapes its note.
@@ -367,7 +374,8 @@ function tabBehaviours(body, right) {
         right.appendChild(add);
     }
 
-    const item = (row, note) => `<button class="rowitem ${row.keycode === state.behaviourRow ? "on" : ""} ${note ? "quiet" : ""}" data-row="${esc(row.keycode)}">
+    const route = behaviourRoute();
+    const item = (group, row, note) => `<button class="rowitem ${row.keycode === state.behaviourRow && (!route || route === group) ? "on" : ""} ${note ? "quiet" : ""}" data-row="${esc(row.keycode)}" data-route="${group}">
         <span class="t">${esc(actionLabel(model, row.keycode))}${actionLabel(model, row.keycode) === row.keycode ? ""
             : ` <code class="dim">${esc(row.keycode)}</code>`}</span>
         <span class="m">${behaviourTiers(row).map((tier) => tierDot(model, tier.kind)).join("")} ${row.steps.length} branch${row.steps.length === 1 ? "" : "es"}${note ? ` · ${esc(note)}` : ""}</span></button>`;
@@ -388,7 +396,8 @@ function tabBehaviours(body, right) {
             empty: "Every behaviour on the board is reached from this layer."},
     ];
     if (state.behaviourRow !== state.behaviourRowShown) {
-        const holding = groups.find((group) => group.rows.some((entry) => entry.row.keycode === state.behaviourRow));
+        const holding = groups.find((group) => group.id === route)
+            || groups.find((group) => group.rows.some((entry) => entry.row.keycode === state.behaviourRow));
         if (holding) state.groups.behaviours[holding.id] = true;
         state.behaviourRowShown = state.behaviourRow;
     }
@@ -396,7 +405,7 @@ function tabBehaviours(body, right) {
     const section = (group) => `<div class="rowgroup">
         ${groupHeader("behaviours", group.id, group.rows.length)}
         ${groupOpen("behaviours", group.id)
-            ? (group.rows.length ? group.rows.map((entry) => item(entry.row, entry.note)).join("")
+            ? (group.rows.length ? group.rows.map((entry) => item(group.id, entry.row, entry.note)).join("")
                 : `<p class="note" style="padding:10px 12px">${esc(group.empty)}</p>`)
             : ""}</div>`;
 
@@ -409,6 +418,7 @@ function tabBehaviours(body, right) {
     attachGroupToggles(node);
     node.querySelectorAll("[data-row]").forEach((button) => button.addEventListener("click", () => {
         state.behaviourRow = button.dataset.row;
+        state.behaviourRoute = {row: button.dataset.row, group: button.dataset.route};
         state.behaviourRowShown = button.dataset.row;
         state.cell = null;
         render();

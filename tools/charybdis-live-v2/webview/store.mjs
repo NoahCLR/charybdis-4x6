@@ -14,6 +14,7 @@ export const state = {
     tab: "key",
     behaviourRow: null,
     behaviourRowShown: null,
+    behaviourRoute: null, // {row, group}: the group the picked behaviour was picked in, so the board rings that route only
     // Every tab that answers "what does this layer reach" is grouped the same
     // way and opens the same way: what the layer holds itself, and the rest a
     // click away.

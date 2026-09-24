@@ -240,6 +240,31 @@ export function behaviourGroups(model, stack, at) {
         elsewhere: (model?.keyBehaviors || []).filter((row) => !reached.has(row))};
 }
 
+/**
+ * The keys the board rings for a behaviour picked under one of its routes.
+ *
+ * A behaviour reached several ways is listed under each group, and a pick
+ * names the group it was made in — as the macro and pointing lists do — so
+ * picking it under "through a combo" rings the chord, not also the transparent
+ * key that happens to fall through to it. With no route, every way this layer
+ * reaches it.
+ */
+export function behaviourRouteKeys(model, stack, at, keycode, route = null) {
+    if (!keycode) return [];
+    const carrying = reachablePositions(stack, at).filter(({position}) => keyMeaning(position) === keycode);
+    const groups = behaviourGroups(model, stack, at);
+    const chorded = (entries) => entries.filter((entry) => entry.row.keycode === keycode)
+        .flatMap((entry) => entry.combos).flatMap((combo) => combo.keys);
+    const keys = {
+        here: carrying.filter((entry) => !entry.fellThrough),
+        through: carrying.filter((entry) => entry.fellThrough),
+        combos: chorded(groups.combos),
+        belowCombos: chorded(groups.combosBelow),
+    };
+    const chosen = route ? keys[route] || [] : Object.values(keys).flat();
+    return [...new Set(chosen.map((entry) => entry.position.layoutIndex))];
+}
+
 // One dot per tier the behaviour uses anywhere, carrying how many branches use
 // it — the same shape the feedback stage flashes.
 export function behaviourTiers(behaviour) {
