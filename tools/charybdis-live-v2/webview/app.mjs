@@ -108,8 +108,8 @@ function reviewOverlay() {
             ${entry.area !== block.area ? `<span class="tag">${esc(entry.area)}</span>` : ""}
             ${entry.status === "changed" ? "" : `<span class="rv-status ${esc(entry.status)}">${esc(entry.status)}</span>`}</div>
         ${fields(entry)}
-        <div class="rv-actions">${discard}${entry.status !== "removed" && placeState(entry.place, model.layers) ? `<button class="btn tiny ghost" data-show="${index}"
-            data-tip="Close the review and open this where it is edited.">Show</button>` : ""}</div></div>`;
+        <div class="rv-actions">${entry.status !== "removed" && placeState(entry.place, model.layers) ? `<button class="btn tiny ghost" data-show="${index}"
+            data-tip="Close the review and open this where it is edited.">Show</button>` : ""}${discard}</div></div>`;
     const discardable = draft.changes.every((change) => Number.isInteger(change.group));
     const shown = [];
     const sections = reviewBlocks(draft.changes).map(({area, blocks, count}) => `<section class="rv-sect">
