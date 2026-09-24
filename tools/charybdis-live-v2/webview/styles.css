@@ -307,15 +307,12 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 .board.picking { box-shadow: inset 0 0 0 1px var(--line-2); }
 .kc.pickable { cursor: crosshair; }
 .kc.pickable .kc-rect { stroke-dasharray: 0; }
-.kc.input-on .kc-rect { fill: var(--key-hi); stroke: var(--text); stroke-width: 2; stroke-dasharray: 4 3; }
-.kc.input-on .kc-label { fill: var(--text); }
 .pickbar { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border: 1px solid var(--line-2);
   border-radius: 9px; background: var(--surface-2); font-size: 12px; }
 .pickbar .n { font-family: var(--mono); font-size: 11px; color: var(--text-2); }
 .kc.sel .kc-label { fill: var(--text); }
 .kc-mark { fill: var(--text-2); }
 .kc-ring { fill: none; stroke: var(--ring); stroke-width: 2.4; }
-.kc-inring { fill: none; stroke: var(--ring); stroke-width: 2; stroke-dasharray: 5 3.5; }
 /* Where the selected row is reached from. It rides outside the key edge so it
    reads apart from the selection ring drawn inside it. */
 .kc.dragging { cursor: grabbing; filter: drop-shadow(0 6px 10px rgba(0,0,0,.55)); }
@@ -333,8 +330,9 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 .board [tabindex]:focus { outline: none; }
 .board [tabindex]:focus-visible { outline: 1.5px solid var(--text-2); outline-offset: -6px; }
 .sv-field, .hue-ramp { touch-action: none; cursor: crosshair; }
-/* Selected and reached must never read alike: the selection is a solid ring
-   inside the key, what reaches the picked row a dotted one in the gap outside.
+/* Selected and indicated must never read alike: the selection is a solid ring
+   inside the key; the keys for the picked row, or the inputs of the combo
+   being built, a dotted one in the gap outside.
    Both are shapes, not hues — colour on the board belongs to the lighting. */
 .kc-reach { fill: none; stroke: var(--ring); stroke-width: 2.2; stroke-dasharray: 0 4.4; stroke-linecap: round; }
 .kc-badge { fill: var(--text-3); font-family: var(--mono); font-size: 9px; text-anchor: middle; }
@@ -343,20 +341,21 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 .kc-ball[data-trackball]:hover circle { stroke: var(--text); }
 .kc-dotn { font-family: var(--mono); font-size: 5.8px; font-weight: 700; text-anchor: middle; dominant-baseline: central; }
 .kc-badgetext { fill: #f5f5f3; font-family: var(--mono); font-weight: 700; text-anchor: middle; dominant-baseline: central; }
-.legend-item .ldot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; border: 1px solid rgba(255,255,255,.5); }
-.legend-item .lbadge { display: inline-grid; place-items: center; width: 17px; height: 11px; border-radius: 3px;
-  border: 1px solid rgba(245,245,243,.7); background: rgba(8,8,10,.86); color: #f5f5f3;
-  font-family: var(--mono); font-size: 7.5px; font-weight: 700; font-style: normal; }
+/* Every legend mark sits in the same 12px-high slot with the same stroke, so
+   the row reads as one scale: squares for key states, dots for branches, the
+   badge as wide as its text needs. */
+.legend-item .ldot { width: 9px; height: 9px; margin: 1.5px; border-radius: 50%; display: inline-block; flex: none; border: 1.5px solid rgba(255,255,255,.5); }
+.legend-item .lbadge { display: inline-grid; place-items: center; min-width: 18px; height: 12px; padding: 0 3px; border-radius: 3px; flex: none;
+  border: 1.5px solid rgba(245,245,243,.7); background: rgba(8,8,10,.86); color: #f5f5f3;
+  font-family: var(--mono); font-size: 7.5px; line-height: 1; font-weight: 700; font-style: normal; }
 .kc-led { opacity: .95; }
 .kc-glow { filter: blur(7px); opacity: .5; }
-.board-legend { display: flex; gap: 16px; padding: 8px 6px 4px; flex-wrap: wrap; }
-.legend-item { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-3); }
-.legend-item .m { width: 12px; height: 12px; border-radius: 3px; border: 1px solid var(--line-2); display: grid; place-items: center; }
-.legend-item .m i { width: 4px; height: 4px; border-radius: 50%; background: var(--text-2); display: block; }
-.legend-item .lring { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
-.legend-item .lring.sel { border: 2px solid var(--ring); background: var(--key-hi); }
-.legend-item .lring.reach { border: 2px dotted var(--ring); }
-.legend-item .lring.input { border: 2px dashed var(--ring); }
+.board-legend { display: flex; gap: 8px 18px; padding: 8px 6px 4px; flex-wrap: wrap; align-items: center; }
+.legend-item { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; line-height: 12px; color: var(--text-3); }
+.legend-item .lkey { width: 12px; height: 12px; border-radius: 3px; display: inline-block; flex: none; border: 1.5px solid var(--ring); }
+.legend-item .lkey.sel { background: var(--key-hi); }
+.legend-item .lkey.indicated { border-style: dotted; }
+.legend-item .lkey.transparent { border: 1.5px dashed var(--text-3); }
 
 /* ── inspector ───────────────────────────────────────────────────────── */
 .inspector {

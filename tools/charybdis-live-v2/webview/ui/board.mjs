@@ -10,7 +10,7 @@ import {el, esc} from "../lib/dom.mjs";
 import {hideHover} from "./hover.mjs";
 
 export function board(model, layer, options = {}) {
-    const {selected, mode = "light", picks = [], inputs = [], reach = [], pdActive = null,
+    const {selected, mode = "light", picks = [], reach = [], pdActive = null,
         faces = true, trackball = false, onKey, onOpen, onSwap, onTrackball} = options;
     const positions = layer?.positions || [];
     const feedbackOn = stageEnabled(model, "key");
@@ -80,7 +80,7 @@ export function board(model, layer, options = {}) {
             }).join("");
         }
 
-        // Selection and combo-input rings ride on top: the light owns the key
+        // The selection and indication rings ride on top: the light owns the key
         // face, so state is never told by recolouring it.
         const ring = (name) => `<rect class="${name}" x="${visual.x + 1.4}" y="${visual.y + 1.4}" width="${GEO.keyW - 2.8}" height="${GEO.keyH - 2.8}" rx="${GEO.radius - 1}"></rect>`;
         const main = mode === "leds" ? String(LED_INDEX[index] ?? index) : face.main;
@@ -98,7 +98,7 @@ export function board(model, layer, options = {}) {
         keys += `<g class="${classes}${selected === index ? " sel" : ""}" data-key="${index}" tabindex="0" role="button"
             aria-label="${esc(keyMeaning(position))} at index ${index}"${transform}>
             <rect class="kc-rect" x="${visual.x}" y="${visual.y}" width="${GEO.keyW}" height="${GEO.keyH}" rx="${GEO.radius}"${fill}></rect>
-            ${selected === index ? ring("kc-ring") : ""}${inputs.includes(index) ? ring("kc-inring") : ""}
+            ${selected === index ? ring("kc-ring") : ""}
             ${reach.includes(index) ? `<rect class="kc-reach" x="${visual.x - 3}" y="${visual.y - 3}" width="${GEO.keyW + 6}" height="${GEO.keyH + 6}" rx="${GEO.radius + 2}"></rect>` : ""}
             ${marks}
             ${sub ? `<line class="kc-sep" x1="${visual.x + 8}" y1="${rows.separatorY}" x2="${visual.x + GEO.keyW - 8}" y2="${rows.separatorY}" stroke="${text || "rgba(255,255,255,.9)"}" stroke-width="1"></line>` : ""}

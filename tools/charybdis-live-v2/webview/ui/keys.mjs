@@ -64,11 +64,13 @@ export function screenKeys() {
             : "no layer colour · the base effect shows through"}</span></div>`));
     if (state.placement) stage.appendChild(placementBar());
     else if (state.comboPicking) stage.appendChild(pickBar());
+    // One indication at a time: while a combo is being built its inputs are
+    // the keys in question, otherwise the keys that reach the picked row.
+    const building = state.comboPicking || (state.comboOpen && state.tab === "combos");
     stage.appendChild(board(model, layer, {
         selected: state.selected,
-        reach: reachHighlight(model),
+        reach: building ? state.comboInputs : reachHighlight(model),
         picking: state.comboPicking || Boolean(state.placement),
-        inputs: state.comboPicking || (state.comboOpen && state.tab === "combos") ? state.comboInputs : [],
         onKey: (index) => {
             if (state.placement) {
                 const placement = state.placement;
@@ -118,14 +120,13 @@ function legend(model) {
     const dot = (colour) => `<i class="ldot" style="${on && !isOff(colour) ? `background:${css(colour)}` : "background:none;border-style:dashed"}"></i>`;
     return el(`<div class="board-legend">
         <span class="legend-item">the board shows the light this layer paints</span>
-        <span class="legend-item"><i class="lring sel"></i> selected key</span>
-        <span class="legend-item"><i class="lring reach"></i> reaches the picked row</span>
-        <span class="legend-item"><i class="lring input"></i> picked as a combo input</span>
+        <span class="legend-item"><i class="lkey sel"></i> selected key</span>
+        <span class="legend-item"><i class="lkey indicated"></i> keys for the picked row or the combo being built</span>
         <span class="legend-item">${dot(colours.tap)} tap branch</span>
         <span class="legend-item">${dot(colours.hold)} hold branch</span>
         <span class="legend-item">${dot(colours.long)} long hold branch</span>
         <span class="legend-item"><i class="lbadge">C1</i> combo input</span>
-        <span class="legend-item"><span class="m" style="border-style:dashed"></span> transparent · falls through</span>
+        <span class="legend-item"><i class="lkey transparent"></i> transparent · falls through</span>
         <span class="legend-item dim">${writable() ? "double-click to pick a keycode" : "select a key to read it"}${writable() ? " · drag one key onto another to swap · ⌘C and ⌘V copy between keys · delete makes a key transparent" : " · ⌘C copies a key"}</span>
         ${state.keyClipboard ? `<span class="legend-item">copied <code class="n">${esc(state.keyClipboard.keycode)}</code></span>` : ""}
     </div>`);
