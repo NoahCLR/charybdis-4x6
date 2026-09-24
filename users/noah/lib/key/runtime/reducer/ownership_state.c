@@ -7,6 +7,7 @@
 #include "../../../pointing/defs/pd_modes.h"
 #include "../../../pointing/policy/pd_mode_policy.h"
 #include "../feedback.h"
+#include "../../../action/action_dispatch.h"
 
 static bool key_runtime_core_ownership_keypos_equal(keypos_t lhs, keypos_t rhs) {
     return lhs.row == rhs.row && lhs.col == rhs.col;
@@ -94,7 +95,7 @@ static uint8_t key_runtime_core_modifier_mask_for_keycode(uint16_t keycode) {
 }
 
 static bool key_runtime_core_keycode_owns_layer_on_press(uint16_t keycode) {
-    return IS_QK_MOMENTARY(keycode);
+    return noah_action_keycode_is_owned_momentary_layer(keycode);
 }
 
 static bool key_runtime_core_keycode_owns_layer_on_hold(uint16_t keycode) {
@@ -102,8 +103,8 @@ static bool key_runtime_core_keycode_owns_layer_on_hold(uint16_t keycode) {
 }
 
 static uint8_t key_runtime_core_layer_for_keycode(uint16_t keycode) {
-    if (IS_QK_MOMENTARY(keycode)) {
-        return QK_MOMENTARY_GET_LAYER(keycode);
+    if (noah_action_keycode_is_owned_momentary_layer(keycode)) {
+        return noah_action_keycode_momentary_layer(keycode);
     }
 
     if (IS_QK_LAYER_TAP(keycode)) {

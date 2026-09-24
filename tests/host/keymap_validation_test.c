@@ -31,6 +31,7 @@ static const uint16_t test_keymaps[LAYER_COUNT][MATRIX_ROWS][MATRIX_COLS] = {
             // TG() and TO() act through layer ownership, so they validate.
             [0][2] = TG(LAYER_NUM),
             [0][3] = TO(LAYER_SYM),
+            [0][4] = TT(LAYER_NUM),
         },
 };
 
@@ -207,6 +208,7 @@ int main(void) {
     CHECK(strstr(log_buffer, "Unsupported keymaps[0][0][1] raw layer action") != NULL);
     CHECK(strstr(log_buffer, "Unsupported keymaps[0][0][2]") == NULL);
     CHECK(strstr(log_buffer, "Unsupported keymaps[0][0][3]") == NULL);
+    CHECK(strstr(log_buffer, "Unsupported keymaps[0][0][4]") == NULL);
     CHECK(strstr(log_buffer, "output[3]") == NULL);
     CHECK(strstr(log_buffer, "output[4]") == NULL);
     CHECK(strstr(log_buffer, "Unsupported COMBOS(COMBO) input[2] duplicate member keycode") != NULL);

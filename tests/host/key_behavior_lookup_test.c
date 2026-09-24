@@ -169,6 +169,13 @@ const key_behavior_t key_behaviors[] = {
                 [1] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(TEST_OTHER_PD_MODE_KEY)},
             },
     },
+    {
+        .keycode = TT(5),
+        .tap_counts =
+            {
+                [0] = {.tap = TAP_SENDS(KC_A)},
+            },
+    },
 };
 
 const uint8_t key_behavior_count = ARRAY_SIZE(key_behaviors);
@@ -333,6 +340,47 @@ static void test_momentary_layer_stays_handled(void) {
     CHECK(behavior.handled);
     CHECK(behavior.is_momentary_layer);
     CHECK(!behavior.is_layer_tap);
+}
+
+// TT(n) holds its layer like MO(n), and its TAPPING_TOGGLE-th tap (QMK's
+// default, 5) sends LOCK_LAYER(n). Every other tap does nothing.
+static void test_tap_toggle_layer_holds_and_locks_on_its_toggle_tap(void) {
+    key_behavior_view_t behavior = key_behavior_lookup(TT(3));
+
+    CHECK(behavior.handled);
+    CHECK(behavior.is_momentary_layer);
+    CHECK(!behavior.is_layer_tap);
+    CHECK(behavior.has_multi_tap);
+    CHECK(behavior.authored_tap_depth == 5u);
+    CHECK(!key_behavior_step_present(behavior.single));
+    for (uint8_t tap_count = 2u; tap_count < 5u; tap_count++) {
+        CHECK(!key_behavior_step_present(key_behavior_view_step(&behavior, tap_count)));
+    }
+    key_behavior_step_t toggle = key_behavior_view_step(&behavior, 5u);
+    CHECK(toggle.tap.present && toggle.tap.action == LOCK_LAYER(3));
+    CHECK(!toggle.hold.present && !toggle.long_hold.present);
+    CHECK(!key_behavior_view_has_more_taps(&behavior, 5u));
+
+    handled_key_resolution_t resolution = handled_key_lookup(TT(3));
+    CHECK(handled_key_resolution_is_handled(resolution));
+    CHECK(resolution.layer == 3u);
+}
+
+// An authored row replaces TT()'s built-in taps; a layer the keyboard does not
+// have is not a momentary layer at all.
+static void test_tap_toggle_layer_defers_to_an_authored_row_and_the_layer_count(void) {
+    key_behavior_view_t authored = key_behavior_lookup(TT(5));
+
+    CHECK(authored.handled);
+    CHECK(authored.is_momentary_layer);
+    CHECK(authored.authored_tap_depth == 1u);
+    CHECK(authored.single.tap.action == KC_A);
+    CHECK(!key_behavior_step_present(key_behavior_view_step(&authored, 5u)));
+
+    key_behavior_view_t outside = key_behavior_lookup(TT(LAYER_COUNT));
+    CHECK(!outside.handled);
+    CHECK(!outside.is_momentary_layer);
+    CHECK(outside.authored_tap_depth == 0u);
 }
 
 static void test_plain_pd_mode_key_is_handled_without_authored_behavior(void) {
@@ -790,6 +838,8 @@ int main(void) {
     test_bare_lt_falls_back_to_qmk();
     test_authored_lt_uses_custom_runtime();
     test_momentary_layer_stays_handled();
+    test_tap_toggle_layer_holds_and_locks_on_its_toggle_tap();
+    test_tap_toggle_layer_defers_to_an_authored_row_and_the_layer_count();
     test_plain_pd_mode_key_is_handled_without_authored_behavior();
     test_handled_resolution_searches_authored_rows_once();
     test_pd_mode_lock_stays_out_of_handled_key_runtime();

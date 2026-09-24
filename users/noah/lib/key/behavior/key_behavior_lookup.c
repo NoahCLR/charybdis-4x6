@@ -10,7 +10,9 @@
 #    include "print.h"
 #endif
 
+#include "noah_keymap_ids.h"
 #include "../../action/action_dispatch.h"
+#include "../../compat/qmk_tapping_contract.h"
 #include "../../pointing/defs/pd_modes.h"
 #include "../../profile/runtime/effective_key_behavior_runtime.h"
 #include "key_behavior_lookup.h"
@@ -59,6 +61,26 @@ static const key_behavior_t *key_behavior_config_lookup(uint16_t keycode) {
     }
 
     return NULL;
+}
+
+_Static_assert(NOAH_QMK_TAPPING_TOGGLE <= KEY_BEHAVIOR_MAX_TAP_COUNT, "TT() locks on the TAPPING_TOGGLE-th tap; the runtime counts at most KEY_BEHAVIOR_MAX_TAP_COUNT taps");
+
+// A TT(n) key with no authored row holds its layer like MO(n), and its
+// TAPPING_TOGGLE-th tap sends LOCK_LAYER(n), so the lock is the same one TG(n)
+// and LOCK_LAYER(n) toggle. An authored row replaces this, as it would any
+// key's default taps.
+static uint8_t key_behavior_tap_toggle_depth(uint16_t keycode) {
+    return noah_action_keycode_is_layer_tap_toggle(keycode) ? (uint8_t)NOAH_QMK_TAPPING_TOGGLE : 0u;
+}
+
+static key_behavior_step_t key_behavior_tap_toggle_step(uint16_t keycode, uint8_t tap_count) {
+    if (tap_count == 0u || tap_count != key_behavior_tap_toggle_depth(keycode)) {
+        return key_behavior_step_none();
+    }
+
+    return (key_behavior_step_t){
+        .tap = TAP_SENDS(LOCK_LAYER(QK_LAYER_TAP_TOGGLE_GET_LAYER(keycode))),
+    };
 }
 
 static key_behavior_step_t key_behavior_step_lookup_in_config(const key_behavior_t *config, uint8_t tap_count) {
@@ -128,7 +150,7 @@ static bool key_behavior_action_supported(uint16_t action, hold_behavior_mode_t 
 
 static void key_behavior_log_invalid_keycode(uint8_t index, uint16_t keycode) {
 #ifdef CONSOLE_ENABLE
-    uprintf("Unsupported key_behaviors[%u].keycode 0x%04X; only MO(...) and LT(...) layer keycodes are supported in the custom runtime\n", (unsigned int)index, (unsigned int)keycode);
+    uprintf("Unsupported key_behaviors[%u].keycode 0x%04X; layer keycodes other than MO(), LT(), TT(), TG() and TO() bypass the custom runtime\n", (unsigned int)index, (unsigned int)keycode);
 #else
     (void)index;
     (void)keycode;
@@ -137,7 +159,7 @@ static void key_behavior_log_invalid_keycode(uint8_t index, uint16_t keycode) {
 
 static void key_behavior_log_invalid_action(uint8_t index, uint8_t tap_count, const char *field, uint16_t action, hold_behavior_mode_t hold_mode) {
 #ifdef CONSOLE_ENABLE
-    uprintf("Unsupported key_behaviors[%u].tap_counts[%u].%s action 0x%04X; raw QMK layer actions are only supported as PRESS_AND_HOLD_UNTIL_RELEASE(MO(layer))\n", (unsigned int)index, (unsigned int)tap_count, field, (unsigned int)action);
+    uprintf("Unsupported key_behaviors[%u].tap_counts[%u].%s action 0x%04X; layer actions are supported as TG()/TO()/LOCK_LAYER() or PRESS_AND_HOLD_UNTIL_RELEASE(MO(layer))\n", (unsigned int)index, (unsigned int)tap_count, field, (unsigned int)action);
 #else
     (void)index;
     (void)tap_count;
@@ -246,7 +268,7 @@ key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
 
     uint16_t longer_term = live_result == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK && live.longer_hold_term ? live.longer_hold_term : (config && config->longer_hold_term ? config->longer_hold_term : noah_setting(NOAH_SETTING_LONG_HOLD_TERM, CUSTOM_LONGER_HOLD_TERM));
     uint16_t multi_term  = live_result == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK && live.multi_tap_term ? live.multi_tap_term : (config && config->multi_tap_term ? config->multi_tap_term : noah_setting(NOAH_SETTING_MULTI_TAP_TERM, CUSTOM_MULTI_TAP_TERM));
-    uint8_t  tap_depth   = live_result == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK ? live.authored_tap_depth : key_behavior_authored_tap_depth_in_config(config);
+    uint8_t  tap_depth   = live_result == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK ? live.authored_tap_depth : (config ? key_behavior_authored_tap_depth_in_config(config) : key_behavior_tap_toggle_depth(keycode));
     return (key_behavior_view_t){
         .config             = config,
         .source_epoch       = live.epoch,
@@ -261,7 +283,7 @@ key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
         .tap_hold_term      = tap_term,
         .longer_hold_term   = longer_term,
         .multi_tap_term     = multi_term,
-        .single             = live_result == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK ? live.single : (config ? config->tap_counts[0] : key_behavior_step_none()),
+        .single             = live_result == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK ? live.single : (config ? config->tap_counts[0] : key_behavior_tap_toggle_step(keycode, 1u)),
     };
 }
 
@@ -274,7 +296,7 @@ key_behavior_step_t key_behavior_view_step(const key_behavior_view_t *behavior, 
     if (behavior->source_is_live) {
         return noah_effective_key_behavior_step(behavior->source_epoch, behavior->source_row, tap_count, &step) == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK ? step : key_behavior_step_none();
     }
-    return key_behavior_step_lookup_in_config(behavior->config, tap_count);
+    return behavior->config ? key_behavior_step_lookup_in_config(behavior->config, tap_count) : key_behavior_tap_toggle_step(behavior->keycode, tap_count);
 }
 
 bool key_behavior_view_has_more_taps(const key_behavior_view_t *behavior, uint8_t count) {

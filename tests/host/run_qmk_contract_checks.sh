@@ -59,7 +59,7 @@ run_variant() {
 run_variant normal
 run_variant extra_short -DEXTRA_SHORT_COMBOS
 
-PYTHONDONTWRITEBYTECODE=1 python3 - "$QMK_ROOT" <<'PY'
+PYTHONDONTWRITEBYTECODE=1 python3 - "$QMK_ROOT" "$ROOT" <<'PY'
 from pathlib import Path
 import re
 import sys
@@ -70,6 +70,8 @@ keyboard = (qmk / "quantum/keyboard.c").read_text(encoding="utf-8")
 auto_mouse = (qmk / "quantum/pointing_device/pointing_device_auto_mouse.c").read_text(encoding="utf-8")
 auto_mouse_header = (qmk / "quantum/pointing_device/pointing_device_auto_mouse.h").read_text(encoding="utf-8")
 usb_descriptor_header = (qmk / "tmk_core/protocol/usb_descriptor.h").read_text(encoding="utf-8")
+action_tapping_header = (qmk / "quantum/action_tapping.h").read_text(encoding="utf-8")
+tapping_contract = (Path(sys.argv[2]) / "users/noah/lib/compat/qmk_tapping_contract.h").read_text(encoding="utf-8")
 
 def body(source: str, signature: str) -> str:
     start = source.index(signature)
@@ -114,6 +116,11 @@ if "auto_mouse_get_time_elapsed_at(timer_read())" not in elapsed:
 
 if not re.search(r"^\s*#\s*define\s+RAW_EPSIZE\s+32\s*$", usb_descriptor_header, re.MULTILINE):
     raise SystemExit("QMK Raw HID endpoint size no longer matches Profile Wire's 32-byte report contract")
+
+qmk_toggle = re.search(r"^\s*#\s*define\s+TAPPING_TOGGLE\s+(\d+)\s*$", action_tapping_header, re.MULTILINE)
+our_toggle = re.search(r"^\s*#\s*define\s+NOAH_QMK_TAPPING_TOGGLE\s+(\d+)\s*$", tapping_contract, re.MULTILINE)
+if not (qmk_toggle and our_toggle and qmk_toggle.group(1) == our_toggle.group(1)):
+    raise SystemExit("QMK's TAPPING_TOGGLE default no longer matches compat/qmk_tapping_contract.h")
 PY
 
 echo "qmk contract checks passed"

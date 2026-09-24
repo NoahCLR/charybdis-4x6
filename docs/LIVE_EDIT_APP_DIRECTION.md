@@ -1318,8 +1318,11 @@ plain key, in a behaviour and as a combo output, and advertises it as Profile
 Wire feature bit 14. The app accepts `TG()`/`TO()` in behaviours only when a
 keyboard reports that bit; older firmware keeps the old refusal.
 
-`DF()`, `OSL()`, `TT()` and `LM()` still bypass ownership. They follow in
-order: `TT()` (a hold plus the `TAPPING_TOGGLE`-th tap as a lock), `OSL()` (a
-one-shot layer owner), then `LM()`, a decision on `DF()` (the firmware assumes
+`TT(n)` followed: it is `MO(n)` with a built-in `LOCK_LAYER(n)` on its
+`TAPPING_TOGGLE`-th tap, so it needs no new action or capability bit; the app
+still offers it only as a key, not inside a behaviour. `DF()`, `OSL()` and
+`LM()` still bypass ownership, and so does a plain `LT()` key with no authored
+row, which QMK runs itself. They follow in order: `OSL()` (a one-shot layer
+owner), plain `LT()`, then `LM()`, a decision on `DF()` (the firmware assumes
 layer 0 is the base), and a device-side check that refuses what remains when a
 profile is saved.

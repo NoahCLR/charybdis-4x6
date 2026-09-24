@@ -8,12 +8,13 @@
 #include "pd_mode_policy.h"
 #include "../defs/pd_modes.h"
 #include "pointer_layer_policy.h"
+#include "../../action/action_dispatch.h"
 #include "../../compat/qmk_auto_mouse_contract.h"
 #include "../../key/behavior/key_behavior_lookup.h"
 
 #ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
 static inline bool pointer_layer_policy_is_layer_hold_key(uint16_t keycode) {
-    return IS_QK_MOMENTARY(keycode) || IS_QK_LAYER_TAP(keycode);
+    return noah_action_keycode_is_owned_momentary_layer(keycode) || IS_QK_LAYER_TAP(keycode);
 }
 
 static inline bool pointer_layer_policy_is_mouse_button_action(uint16_t action) {

@@ -365,6 +365,16 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(noah_action_desc_default_tap_action(layer_toggle) == KC_NO);
     CHECK(noah_action_describe(TG(LAYER_COUNT)).kind == NOAH_ACTION_KIND_UNSUPPORTED_LAYER_ACTION);
 
+    // TT() holds its layer exactly as MO() does; its toggle tap is a built-in
+    // behaviour, not a different action.
+    noah_action_desc_t tap_toggle = noah_action_describe(TT(3));
+    CHECK(tap_toggle.kind == NOAH_ACTION_KIND_LAYER_HOLD);
+    CHECK(tap_toggle.layer == 3);
+    CHECK(noah_action_desc_is_momentary_layer_keycode(tap_toggle));
+    CHECK(noah_action_desc_is_runtime_handled_keycode(tap_toggle));
+    CHECK(noah_action_desc_source_layer(tap_toggle) == 3);
+    CHECK(noah_action_describe(TT(LAYER_COUNT)).kind == NOAH_ACTION_KIND_UNSUPPORTED_LAYER_ACTION);
+
     CHECK(layer_jump.kind == NOAH_ACTION_KIND_LAYER_GOTO);
     CHECK(noah_action_desc_is_layer_goto(layer_jump));
     CHECK(layer_jump.layer == 5);

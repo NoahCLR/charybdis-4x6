@@ -36,7 +36,10 @@ That makes patterns like these possible:
 - a pointer-mode key that stays simple by default or grows richer tap /
   double-tap behavior
 
-Plain keys without an authored row keep their normal QMK behavior.
+Plain keys without an authored row keep their normal QMK behavior, except the
+layer keys the runtime owns: `MO(layer)` holds its layer, `TT(layer)` holds it
+too and locks it on its `TAPPING_TOGGLE`-th tap (QMK's default, 5), `TG(layer)`
+is `LOCK_LAYER(layer)`, and `TO(layer)` locks that layer alone.
 
 ## Timing Model
 

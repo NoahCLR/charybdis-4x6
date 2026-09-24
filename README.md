@@ -533,8 +533,10 @@ other lock (`TO(0)` returns to the base layer; layers held with `MO()` stay on
 until released). Both work the same on a plain key, in a behaviour and as a
 combo output. For custom momentary layer holds, use
 `PRESS_AND_HOLD_UNTIL_RELEASE(MO(layer))` so the userspace owns the layer
-state. `DF()`, `OSL()`, `TT()` and `LM()` still bypass the userspace layer
-ownership and are refused. Inside any helper, `KC_TRNS` means "use the lower active layer's
+state. `TT(layer)` holds its layer like `MO(layer)`, and its
+`TAPPING_TOGGLE`-th tap (QMK's default, 5) sends `LOCK_LAYER(layer)`; an
+authored row on a `TT()` key replaces those taps. `DF()`, `OSL()` and `LM()`
+still bypass the userspace layer ownership and are refused. Inside any helper, `KC_TRNS` means "use the lower active layer's
 matching tap, hold, or long-hold behavior here."
 
 The matching key-behavior RGB config in

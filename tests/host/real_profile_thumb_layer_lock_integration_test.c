@@ -3063,7 +3063,66 @@ static void test_feedback_dirty_tracks_visible_deadline_change_once(void) {
     test_release_resolved(nav_left_pos);
 }
 
+// TT(layer) on a plain key: every press holds the layer like MO(layer), and
+// the TAPPING_TOGGLE-th tap (QMK's default, 5) sends LOCK_LAYER(layer). Four
+// taps send nothing. This runner records delayed taps instead of dispatching
+// them, so the recorded lock is handed to the real action dispatch here; a
+// held TT() then releases its hold but not the lock.
+static void test_tap_toggle_taps(uint16_t keycode, keypos_t key_pos, uint8_t taps) {
+    for (uint8_t tap = 0u; tap < taps; tap++) {
+        CHECK(!key_runtime_integration_process_record(keycode, key_pos, true));
+        CHECK(test_layer_active(LAYER_NUM));
+        CHECK(!key_runtime_integration_process_record(keycode, key_pos, false));
+        test_advance_thumb_multi_tap_gap();
+    }
+    test_flush_pending_tap_branch();
+}
+
+static void test_tap_toggle_hold(uint16_t keycode, keypos_t key_pos) {
+    CHECK(!key_runtime_integration_process_record(keycode, key_pos, true));
+    key_runtime_integration_advance(&fake_time, 400);
+    key_runtime_integration_scan();
+    CHECK(test_layer_active(LAYER_NUM));
+    CHECK(!key_runtime_integration_process_record(keycode, key_pos, false));
+    test_flush_pending_tap_branch();
+}
+
+static void test_tap_toggle_taps_lock_and_holds_are_momentary(void) {
+    keypos_t key_pos = {.row = 2, .col = 2};
+    uint16_t keycode = TT(LAYER_NUM);
+
+    test_reset_state();
+
+    test_tap_toggle_taps(keycode, key_pos, 4u);
+    CHECK(test_delayed_action_count == 0u);
+    CHECK(!test_layer_active(LAYER_NUM));
+
+    test_tap_toggle_taps(keycode, key_pos, 5u);
+    CHECK(test_delayed_action_count == 1u);
+    CHECK(test_last_delayed_action == LOCK_LAYER(LAYER_NUM));
+    noah_action_tap(test_last_delayed_action);
+    CHECK(test_layer_locked(LAYER_NUM));
+    CHECK(test_layer_active(LAYER_NUM));
+
+    test_tap_toggle_hold(keycode, key_pos);
+    CHECK(test_delayed_action_count == 1u);
+    CHECK(test_layer_locked(LAYER_NUM));
+    CHECK(test_layer_active(LAYER_NUM));
+
+    test_tap_toggle_taps(keycode, key_pos, 5u);
+    CHECK(test_delayed_action_count == 2u);
+    noah_action_tap(test_last_delayed_action);
+    CHECK(!test_layer_locked(LAYER_NUM));
+    CHECK(!test_layer_active(LAYER_NUM));
+
+    test_tap_toggle_hold(keycode, key_pos);
+    CHECK(test_delayed_action_count == 2u);
+    CHECK(!test_layer_active(LAYER_NUM));
+    test_assert_thumb_runtime_quiescent(key_pos);
+}
+
 int main(void) {
+    test_tap_toggle_taps_lock_and_holds_are_momentary();
     test_normal_press_and_matched_release_use_bounded_authored_lookups();
     test_active_scan_visit_baseline_is_measured();
     test_feedback_dirty_tracks_visible_deadline_change_once();

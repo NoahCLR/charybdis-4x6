@@ -195,7 +195,7 @@ bool noah_action_kind_match_layer_hold(uint16_t action, pd_mode_mask_t pd_mode, 
         return false;
     }
 
-    *out = noah_action_desc_build(NOAH_ACTION_KIND_LAYER_HOLD, action, QK_MOMENTARY_GET_LAYER(action), 0);
+    *out = noah_action_desc_build(NOAH_ACTION_KIND_LAYER_HOLD, action, noah_action_keycode_momentary_layer(action), 0);
     return true;
 }
 

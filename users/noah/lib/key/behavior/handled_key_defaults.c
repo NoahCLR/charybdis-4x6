@@ -32,11 +32,11 @@ __attribute__((weak)) bool key_behavior_view_has_more_taps(const key_behavior_vi
 }
 
 uint8_t behavior_get_layer(uint16_t keycode) {
-    return IS_QK_LAYER_TAP(keycode) ? QK_LAYER_TAP_GET_LAYER(keycode) : QK_MOMENTARY_GET_LAYER(keycode);
+    return IS_QK_LAYER_TAP(keycode) ? QK_LAYER_TAP_GET_LAYER(keycode) : noah_action_keycode_momentary_layer(keycode);
 }
 
 bool is_layer_key(uint16_t keycode) {
-    return IS_QK_MOMENTARY(keycode) || IS_QK_LAYER_TAP(keycode);
+    return noah_action_keycode_is_owned_momentary_layer(keycode) || IS_QK_LAYER_TAP(keycode);
 }
 
 pd_mode_mask_t handled_key_pd_mode_for_behavior(key_behavior_view_t behavior) {

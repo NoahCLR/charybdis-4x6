@@ -10,9 +10,11 @@
 // Non-layer QMK behavior keycodes such as OSM()/MT() need explicit handling
 // too, because tap_code16/register_code16 only model plain key press/release.
 // QMK layer keycodes act through the userspace layer ownership model:
-// MO()/LT() as momentary holds, TG() as the same layer lock LOCK_LAYER() sets,
-// and TO() as "lock only this layer". The others (DF, OSL, TT, LM) are still
-// raw QMK layer actions and are refused so they cannot bypass ownership.
+// MO()/LT() as momentary holds, TT() as a momentary hold whose
+// TAPPING_TOGGLE-th tap locks the layer, TG() as the same layer lock
+// LOCK_LAYER() sets, and TO() as "lock only this layer". The others (DF, OSL,
+// LM) are still raw QMK layer actions and are refused so they cannot bypass
+// ownership.
 //
 // Scope note: this module intentionally keeps authored tap actions on normal
 // QMK tap semantics. Ownership-aware literal keycode dispatch, including held
@@ -52,8 +54,18 @@ static inline bool noah_action_keycode_is_layer_goto(uint16_t action) {
     return IS_QK_TO(action) && QK_TO_GET_LAYER(action) < LAYER_COUNT;
 }
 
+// TT(n) holds its layer like MO(n); its lock on the TAPPING_TOGGLE-th tap is
+// a built-in behaviour (key_behavior_lookup.c), not a different action.
+static inline bool noah_action_keycode_is_layer_tap_toggle(uint16_t action) {
+    return IS_QK_LAYER_TAP_TOGGLE(action) && QK_LAYER_TAP_TOGGLE_GET_LAYER(action) < LAYER_COUNT;
+}
+
 static inline bool noah_action_keycode_is_owned_momentary_layer(uint16_t action) {
-    return IS_QK_MOMENTARY(action);
+    return IS_QK_MOMENTARY(action) || noah_action_keycode_is_layer_tap_toggle(action);
+}
+
+static inline uint8_t noah_action_keycode_momentary_layer(uint16_t action) {
+    return IS_QK_LAYER_TAP_TOGGLE(action) ? (uint8_t)QK_LAYER_TAP_TOGGLE_GET_LAYER(action) : (uint8_t)QK_MOMENTARY_GET_LAYER(action);
 }
 
 static inline bool noah_action_keycode_is_layer_tap(uint16_t action) {
