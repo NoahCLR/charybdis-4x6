@@ -53,7 +53,7 @@ tracked under "Current Product Status" in
 - `README.md` and the files under `docs/` are the main human-facing documentation set for this repo.
 - For doc fixes, doc updates, doc audits, or user-facing explanation work, check `README.md` and the relevant files under `docs/` first.
 - For refactors or runtime architecture work, read `docs/LIVE_EDIT_APP_DIRECTION.md` first. It carries the current direction, the decisions behind it, and what is deliberately left undesigned.
-- The durable specs live under `docs/architecture/`: the Profile Wire and split protocols, the authority state tables, the storage and resource baseline, the field classification, and the known-issue notes. Treat those as the contract; change them deliberately.
+- The durable specs live under `docs/architecture/`: the Profile Wire and split protocols, the authority state tables, the storage and resource baseline, the PD-mode domain, and the field classification. Treat those as the contract; change them deliberately.
 - This repo no longer keeps dated review folders or finding registers. Record decisions in the doc they govern, next to the thing they constrain.
 
 ## Repo Boundaries

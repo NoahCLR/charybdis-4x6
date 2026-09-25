@@ -17,8 +17,7 @@ set -eu
 #   sh tools/build-firmware-pair.sh [--no-owner|--snapshot-bridge|--pd-snapshot-bridge]
 #
 # --no-owner builds the comparison pair without the live-profile owner, for
-# A/B against ordinary behaviour while the pointing cadence regression in
-# docs/architecture/pointing-cadence-known-issue.md is unresolved.
+# A/B against ordinary behaviour.
 
 REPO_ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 QMK_ROOT="${QMK_ROOT:-$(CDPATH= cd -- "$REPO_ROOT/../bastardkb-qmk" && pwd)}"

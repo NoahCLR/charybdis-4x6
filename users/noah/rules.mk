@@ -82,8 +82,7 @@ endif
 #
 # NOAH_LIVE_PROFILE_OWNER=no builds an owner-free image from the same source.
 # That is the only remaining lever for comparing ordinary against live-profile
-# behaviour without changing branches, which matters while the pointing cadence
-# regression in docs/architecture/pointing-cadence-known-issue.md is unresolved.
+# behaviour without changing branches.
 NOAH_LIVE_PROFILE_OWNER ?= yes
 ifneq ($(strip $(NOAH_LIVE_PROFILE_OWNER)),no)
     ifneq ($(strip $(NOAH_LIVE_PROFILE_OWNER)),yes)

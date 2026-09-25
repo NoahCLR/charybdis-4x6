@@ -50,12 +50,6 @@ Remaining before calling the product complete:
 
 ## Open Issues
 
-- **R-21 — pointing cadence regression, unexplained.** Reported mouse rate
-  falls from ~450 Hz to ~300 Hz with the live-profile owner enabled, roughly
-  1.1 ms of added work per main-loop iteration. A static investigation
-  eliminated every candidate it found. With D-L08 this ships by default, so it
-  is felt in daily use. Details and the remaining measurement paths are in
-  [`architecture/pointing-cadence-known-issue.md`](architecture/pointing-cadence-known-issue.md).
 - **One-half power-cycle recovery transition.** On 2026-09-12, after one half
   lost power while the other stayed powered, the first complete read failed
   with VIA storage flags 7 (dirty, recovery required) before settling to clean
@@ -136,7 +130,7 @@ impossible. v2 then replaced the ported UI with its own.
 
 Durable specs live under `docs/architecture/`: the Profile Wire and split
 protocols, the authority state table, the storage and resource baseline, the
-field classification and the known-issue notes. The review folders, findings
+field classification and the domain contracts. The review folders, findings
 registers, prompts and review-process conventions were deleted: process
 history that did not describe how the thing works. A completed plan is folded
 into the spec it produced and deleted.
@@ -150,9 +144,8 @@ so the generic half-less build reports that at configure time and builds
 without the owner rather than failing (failing would break the plain
 `qmk compile` in the README). The firmware you flash is the side-specific pair
 from `tools/build-firmware-pair.sh`; a build that sets only
-`FORCE_MASTER`/`FORCE_SLAVE` silently omits the owner. The opt-out stays: it is
-the lever for comparing ordinary against live behaviour on identical source for
-R-21.
+`FORCE_MASTER`/`FORCE_SLAVE` silently omits the owner. The opt-out stays as the
+lever for comparing ordinary against live behaviour on identical source.
 
 ### D-L09 — The live app owns a canonical profile format, not `.c`
 

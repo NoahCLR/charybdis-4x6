@@ -282,8 +282,8 @@ on their keyboard. Physical bridge/export/upgrade/import, restoration onto
 firmware without authored behaviours or combos, reboot, power loss and USB-role
 changes still require a recorded acceptance matrix. The existing Studio macro
 builder now reads and edits both device banks through this complete-profile
-restore path. Defaults controls use that path too. The inherited pointing-cadence
-regression and physical acceptance remain separate product work.
+restore path. Defaults controls use that path too. Physical acceptance remains
+separate product work.
 
 
 ## Defaults editor

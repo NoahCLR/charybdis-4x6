@@ -34,9 +34,6 @@ This directory explains how the runtime is shaped and where changes belong.
   configurable PD slots: scope, factory presets, runtime publication rules,
   the schema-2 codec, validation, capacity evidence, storage/ABI contract, the
   verified legacy-backup migration path and the remaining hardware acceptance.
-- Use [pointing-cadence-known-issue.md](./pointing-cadence-known-issue.md)
-  before investigating pointing performance. It records what has already been
-  eliminated with evidence.
 - Use [device-resident-profile.md](./device-resident-profile.md) for the live
   app's authority, readback, device operations, and performance contracts.
 - Use

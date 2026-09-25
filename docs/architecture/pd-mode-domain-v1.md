@@ -394,5 +394,4 @@ profile digest and both-half state for each case:
    the old or new complete generation, with no mode, RGB or VIA mixture.
 6. Mixed-version halves, stale drafts and old clients refuse mutation without
    losing the prior configuration.
-7. Pointing cadence, save time and per-half memory and stack evidence, read
-   against the inherited [pointing-cadence issue](pointing-cadence-known-issue.md).
+7. Pointing cadence, save time and per-half memory and stack evidence.
