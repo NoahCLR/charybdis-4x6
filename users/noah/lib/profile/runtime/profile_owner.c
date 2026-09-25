@@ -78,12 +78,22 @@ static noah_profile_split_descriptor_t descriptor_from_candidate(const noah_prof
     };
 }
 
+static bool local_read(void *context, const noah_profile_split_descriptor_t *descriptor, uint16_t offset, uint8_t *bytes, uint8_t length);
+
 static bool host_staged_read(void *context, const noah_profile_split_descriptor_t *descriptor, uint16_t offset, uint8_t *bytes, uint8_t length) {
     noah_profile_owner_t          *owner = context;
     noah_profile_store_candidate_t candidate;
 
-    if (!owner || !descriptor || !owner->host_barrier_descriptor_known || !descriptor_equal(descriptor, &owner->host_barrier_descriptor) || !noah_profile_candidate_store_backend_staged_candidate(candidate_backend(owner), &candidate) ||
-        !descriptor_equal(descriptor, &(noah_profile_split_descriptor_t){
+    if (!owner || !descriptor || !owner->host_barrier_descriptor_known || !descriptor_equal(descriptor, &owner->host_barrier_descriptor)) {
+        return false;
+    }
+    if (!noah_profile_candidate_store_backend_staged_candidate(candidate_backend(owner), &candidate)) {
+        // After this half's commit marker the staged candidate is the
+        // committed record. A peer that lost its prepared copy, for example
+        // because it rebooted, is sent the copy again from that record.
+        return local_read(context, descriptor, offset, bytes, length);
+    }
+    if (!descriptor_equal(descriptor, &(noah_profile_split_descriptor_t){
                                           .generation              = candidate.generation,
                                           .payload_crc32           = candidate.payload_crc32,
                                           .payload_digest          = candidate.payload_digest,

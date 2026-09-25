@@ -224,7 +224,12 @@ that status. The owner then ends the host's Apply at once with candidate error
 `24` rather than waiting out its no-progress timeout. If both halves change
 transport roles, an outbound prepared source retains its candidate correlation
 but restarts at `PREPARE_BEGIN` before resuming chunks or an authorized commit;
-it never assumes the new receiver retained volatile prepare state.
+it never assumes the new receiver retained volatile prepare state. The same
+rebuild applies when an authorized commit meets a receiver that no longer holds
+the lease, typically because it rebooted while the link was down: a logical
+copy restarts at the VIA bind rather than `PREPARE_BEGIN`, and after its own
+commit marker the sender reads the copy from its committed record because the
+staged candidate no longer exists.
 
 The reconciler preserves `origin_half`; it never derives it from current USB
 role. On this `MASTER_RIGHT` board, upstream QMK falls back to

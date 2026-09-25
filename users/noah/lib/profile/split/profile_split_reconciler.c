@@ -1106,8 +1106,9 @@ static void push_commit(noah_profile_split_reconciler_t *reconciler, uint32_t no
             // correlated BUSY at a short offset proves the receiver no longer
             // holds the fully staged lease, so rebuild it before retrying the
             // already-authorized marker-last commit.
-            reconciler->transfer_offset = 0u;
-            reconciler->state           = NOAH_PROFILE_SPLIT_RECONCILER_PUSH_BEGIN;
+            reconciler->transfer_offset       = 0u;
+            reconciler->outbound_chunk_length = 0u;
+            reconciler->state                 = reconciler->prepared_logical ? NOAH_PROFILE_SPLIT_RECONCILER_PUSH_BIND : NOAH_PROFILE_SPLIT_RECONCILER_PUSH_BEGIN;
             note_progress(reconciler, now);
             publish_authority(reconciler);
             return;
