@@ -104,6 +104,16 @@ function resolve(value) {
             group: "modifiers", kind: "one-shot-mod", known: true,
         };
     }
+    // LM(layer, mods): a layer hold with its modifiers held too.
+    if (value >= 0x5000 && value <= 0x51ff) {
+        const layer = (value >> 5) & 0x0f;
+        const mods = modifiers(value & 0x1f);
+        if (mods.length) return {
+            value, name: `LM(${layer},${mods.map(mod => `MOD_${mod.name}`).join("|")})`,
+            label: `Layer ${layer} + ${mods.map(mod => mod.label).join("+")}`,
+            group: "layer", kind: "layer-mod", layer, known: true,
+        };
+    }
 
     return unknown(value);
 }
@@ -200,6 +210,13 @@ function encode(expression) {
     if (oneshot) {
         const bits = encodeModifiers(oneshot[1]);
         return bits === undefined ? undefined : 0x52a0 | bits;
+    }
+
+    const layerMod = text.match(/^LM\(\s*(\d+)\s*,\s*(.+)\s*\)$/);
+    if (layerMod) {
+        const layer = Number(layerMod[1]);
+        const bits = encodeModifiers(layerMod[2]);
+        return layer < 16 && bits ? 0x5000 | (layer << 5) | bits : undefined;
     }
 
     const layerTap = text.match(/^LT\(\s*(\d+)\s*,\s*([A-Za-z0-9_]+)\s*\)$/);

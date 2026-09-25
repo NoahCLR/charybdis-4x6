@@ -212,6 +212,9 @@ test("tap-hold and layer forms use their distinct QMK ranges", () => {
     }
     assert.equal(encode("MT(MOD_UNKNOWN,KC_A)"), undefined);
     assert.equal(encode("OSM(MOD_UNKNOWN)"), undefined);
+    assert.deepEqual([resolve(0x5022).name, resolve(0x5022).kind, resolve(0x5022).layer], ["LM(1,MOD_LSFT)", "layer-mod", 1]);
+    assert.equal(encode("LM(15, MOD_RSFT|MOD_RALT)"), 0x5000 | (15 << 5) | 0x16);
+    for (const form of ["LM(16,MOD_LSFT)", "LM(1,MOD_UNKNOWN)", "LM(1,KC_A)"]) assert.equal(encode(form), undefined, form);
     assert.equal(encode("LGUI(MO(1))"), undefined);
 });
 

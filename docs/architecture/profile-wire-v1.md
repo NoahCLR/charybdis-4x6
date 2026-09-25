@@ -351,7 +351,7 @@ Capability feature bits are:
 | 11 | compiled-profile digest available |
 | 12 | atomic logical apply |
 | 13 | legacy pointing-mode source (see [pd-mode-domain-v1.md](./pd-mode-domain-v1.md)) |
-| 14 | owned layer toggles: `TG()` and `TO()` act through userspace layer ownership wherever they are placed, so a host may offer them in behaviours |
+| 14 | owned layer keys: `TG()`, `TO()`, `TT()` and `OSL()` act through userspace layer ownership, so a host may offer them in behaviours and combos where the placement rules allow (`TT()` and `OSL()` joined the bit on the same unreleased branch; every flashed build that sets it has all four) |
 
 Supported-domain-mask bits 0–3 are RGB, key behaviors, combos and portable
 settings respectively. RGB and behavior domain bits must agree exactly with

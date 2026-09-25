@@ -1321,8 +1321,10 @@ keyboard reports that bit; older firmware keeps the old refusal.
 `TT(n)` followed: it is `MO(n)` with a built-in `LOCK_LAYER(n)` on its
 `TAPPING_TOGGLE`-th tap, so it needs no new action or capability bit. `OSL(n)`
 followed as its own kind: it holds like `MO(n)` and its tap arms a one-shot
-owner in `layer_ownership`, which the next qualifying press uses up. The app
-offers both only as keys, not inside a behaviour.
+owner in `layer_ownership`, which the next qualifying press uses up. Profile
+Wire feature bit 14 now means all four (`TG`, `TO`, `TT`, `OSL`) are owned, and
+the app offers each inside a behaviour where the keyboard places it: `OSL()` as
+a tap, `TT()` as a "Press and hold until release" branch.
 
 A plain `LT()` with no authored row followed without a second tap/hold
 decision: QMK's tapping engine still decides, and marks a hold with tap count
@@ -1364,5 +1366,6 @@ Still open, in the order they are taken:
    above Base and `TO(game)` switches to it while held layers still win. `PDF()`
    is now classified as a refused layer keycode too; it was passed to QMK as a
    plain key.)
-6. App: `TT()`/`OSL()` inside a behaviour and as a behaviour row's key, and
-   `TG()`/`TO()`/`TT()`/`OSL()` in the picker's Layers section.
+6. (Done: `TT()`/`OSL()` inside a behaviour and as a behaviour row's key, and
+   `LM()` named and encoded, so its refusal in a behaviour says why.) Still
+   open: `TG()`/`TO()`/`TT()`/`OSL()` in the picker's Layers section.

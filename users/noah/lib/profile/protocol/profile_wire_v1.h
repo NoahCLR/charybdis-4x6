@@ -53,8 +53,8 @@ enum {
     NOAH_PROFILE_FEATURE_COMPILED_PROFILE_HASH = 1u << 11,
     NOAH_PROFILE_FEATURE_ATOMIC_LOGICAL_APPLY  = 1u << 12,
     NOAH_PROFILE_FEATURE_LEGACY_PD_SOURCE      = 1u << 13,
-    // TG() and TO() act through userspace layer ownership wherever they are
-    // placed, so a host may offer them in behaviours and combos.
+    // TG(), TO(), TT() and OSL() act through userspace layer ownership, so a
+    // host may offer them in behaviours and combos where they can run.
     NOAH_PROFILE_FEATURE_OWNED_LAYER_TOGGLES   = 1u << 14,
 };
 

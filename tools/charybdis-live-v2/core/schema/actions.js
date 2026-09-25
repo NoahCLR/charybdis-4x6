@@ -56,12 +56,14 @@ const layerOfRef = text => {
     return match ? Number(match[1]) : undefined;
 };
 
-// TG(n) and TO(n) on a layer the keyboard has. A keyboard that owns them
-// (Profile Wire feature bit 14) runs TG(n) as LOCK_LAYER(n) and TO(n) as "lock
-// only n"; every other QMK layer keycode bypasses its layer ownership.
-const TG_BASE = 0x5260, TO_BASE = 0x5200;
-const isLayerToggleCode = (code, layerCount) =>
-    [TG_BASE, TO_BASE].includes(code & ~0x1f) && (code & 0x1f) < layerCount;
+// TG(n), TO(n), TT(n) and OSL(n) on a layer the keyboard has: the QMK layer
+// keycodes a keyboard reporting Profile Wire feature bit 14 runs through its
+// own layer ownership (TG as LOCK_LAYER, TO as "lock only n", TT as a hold
+// whose fifth tap locks, OSL as a one-shot). Where each may go is
+// placementProblem's to say.
+const OWNED_LAYER_BASES = Object.freeze([0x5200, 0x5260, 0x5280, 0x52c0]); // TO, TG, OSL, TT
+const isOwnedLayerCode = (code, layerCount) =>
+    OWNED_LAYER_BASES.includes(code & ~0x1f) && (code & 0x1f) < layerCount;
 
 // Where a stored action may be placed, as the keyboard checks a profile it is
 // asked to save (noah_action_supported_at in users/noah/lib/action). Only
@@ -100,4 +102,4 @@ function placementProblem(action, placement, {layerCount = 8} = {}) {
     }
 }
 
-module.exports = {PLACEMENT, placementProblem, isLayerToggleCode, KNOWN_ACTION_ABIS, NATIVE_ACTION_ABI_V1, knownActionAbi, actionName, nativeCode, keycodeAction, pdSlotOfCode, actionLimitsFor, layerRef, layerOfRef};
+module.exports = {PLACEMENT, placementProblem, isOwnedLayerCode, KNOWN_ACTION_ABIS, NATIVE_ACTION_ABI_V1, knownActionAbi, actionName, nativeCode, keycodeAction, pdSlotOfCode, actionLimitsFor, layerRef, layerOfRef};

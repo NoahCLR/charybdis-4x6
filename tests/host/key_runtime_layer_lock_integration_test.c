@@ -5,6 +5,7 @@
 
 #include "key_runtime_integration_harness.h"
 #include "users/noah/lib/action/action_dispatch.h"
+#include "users/noah/lib/action/action_lifecycle.h"
 #include "users/noah/lib/action/synthetic_record.h"
 #include "users/noah/lib/key/behavior/key_behavior_lookup.h"
 #include "users/noah/lib/key/runtime/delayed_action.h"
@@ -20,6 +21,7 @@ enum {
     TEST_ALT_ACTION          = SAFE_RANGE + 0x71,
     TEST_FOREIGN_RELEASE_KEY = 0x0004u,
     TEST_TOGGLE_TAP_KEY      = SAFE_RANGE + 0x72,
+    TEST_ONESHOT_HOLD_KEY    = SAFE_RANGE + 0x73,
     TEST_NUM_LAYER           = 1,
     TEST_OTHER_LAYER         = 2,
 };
@@ -27,6 +29,13 @@ enum {
 layer_state_t layer_state;
 
 static uint16_t fake_time;
+
+// The one layer action a press-and-hold branch holds (see held_action_register).
+static struct {
+    bool     active;
+    keypos_t key_pos;
+    uint16_t action;
+} test_held_layer;
 
 static void test_fail(const char *expr, const char *file, int line) {
     fprintf(stderr, "test failed: %s (%s:%d)\n", expr, file, line);
@@ -62,6 +71,7 @@ static bool test_layer_locked(uint8_t layer) {
 static void test_reset_state(void) {
     fake_time   = 1000;
     layer_state = 0;
+    test_held_layer.active = false;
     noah_runtime_reset_for_test();
 }
 
@@ -205,6 +215,19 @@ key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
                 {
                     .tap  = TAP_SENDS(TG(TEST_OTHER_LAYER)),
                     .hold = PRESS_AND_HOLD_UNTIL_RELEASE(MO(TEST_NUM_LAYER)),
+                },
+        };
+    }
+
+    if (keycode == TEST_ONESHOT_HOLD_KEY) {
+        return (key_behavior_view_t){
+            .keycode       = keycode,
+            .handled       = true,
+            .tap_hold_term = 150,
+            .single =
+                {
+                    .tap  = TAP_SENDS(OSL(TEST_OTHER_LAYER)),
+                    .hold = PRESS_AND_HOLD_UNTIL_RELEASE(TT(TEST_NUM_LAYER)),
                 },
         };
     }
@@ -397,19 +420,26 @@ void dispatch_delayed_action_at(keypos_t key_pos, uint16_t action, delayed_actio
     dispatch_delayed_action(action, mods);
 }
 
+// A held layer action runs through the action lifecycle as the firmware's
+// held-action owner does, so a press-and-hold branch really holds its layer.
 void held_action_register(keypos_t key_pos, uint16_t action) {
-    (void)key_pos;
-    (void)action;
-}
-
-void held_action_unregister(keypos_t key_pos, uint16_t action) {
-    (void)key_pos;
-    (void)action;
+    if (!noah_action_keycode_is_owned_momentary_layer(action)) return;
+    test_held_layer.active  = true;
+    test_held_layer.key_pos = key_pos;
+    test_held_layer.action  = action;
+    noah_action_press(key_pos, action);
 }
 
 bool held_action_release_owned_by_key(keypos_t key_pos) {
-    (void)key_pos;
-    return false;
+    if (!(test_held_layer.active && test_held_layer.key_pos.row == key_pos.row && test_held_layer.key_pos.col == key_pos.col)) return false;
+    test_held_layer.active = false;
+    noah_action_release(key_pos, test_held_layer.action);
+    return true;
+}
+
+void held_action_unregister(keypos_t key_pos, uint16_t action) {
+    (void)action;
+    (void)held_action_release_owned_by_key(key_pos);
 }
 
 bool held_modifier_release_owned_by_key(keypos_t key_pos) {
@@ -559,6 +589,47 @@ static void test_behavior_tap_toggles_layer_with_tg(void) {
     CHECK(!test_layer_active(TEST_OTHER_LAYER));
 }
 
+// OSL() as a behaviour tap arms the same one-shot a plain OSL() key does, and
+// TT() as a press-and-hold branch holds its layer like MO() until release.
+static void test_behavior_tap_arms_osl_and_hold_holds_tt(void) {
+    keypos_t key_pos = test_keypos(3, 1);
+
+    test_reset_state();
+
+    const key_runtime_integration_step_t tap[] = {
+        KEY_RUNTIME_INTEGRATION_PRESS(TEST_ONESHOT_HOLD_KEY, key_pos.row, key_pos.col),
+        KEY_RUNTIME_INTEGRATION_ADVANCE(30),
+        KEY_RUNTIME_INTEGRATION_RELEASE(TEST_ONESHOT_HOLD_KEY, key_pos.row, key_pos.col),
+        KEY_RUNTIME_INTEGRATION_ADVANCE(200),
+        KEY_RUNTIME_INTEGRATION_SCAN(),
+    };
+    key_runtime_integration_run(&fake_time, tap, ARRAY_SIZE(tap));
+    CHECK(layer_ownership_oneshot_layer() == TEST_OTHER_LAYER);
+    CHECK(test_layer_active(TEST_OTHER_LAYER));
+    CHECK(!test_layer_locked(TEST_OTHER_LAYER));
+    CHECK(layer_ownership_oneshot_consume());
+    CHECK(!test_layer_active(TEST_OTHER_LAYER));
+
+    const key_runtime_integration_step_t press[] = {
+        KEY_RUNTIME_INTEGRATION_PRESS(TEST_ONESHOT_HOLD_KEY, key_pos.row, key_pos.col),
+        KEY_RUNTIME_INTEGRATION_ADVANCE(200),
+        KEY_RUNTIME_INTEGRATION_SCAN(),
+    };
+    key_runtime_integration_run(&fake_time, press, ARRAY_SIZE(press));
+    CHECK(test_layer_active(TEST_NUM_LAYER));
+    CHECK(!test_layer_locked(TEST_NUM_LAYER));
+
+    const key_runtime_integration_step_t release[] = {
+        KEY_RUNTIME_INTEGRATION_RELEASE(TEST_ONESHOT_HOLD_KEY, key_pos.row, key_pos.col),
+        KEY_RUNTIME_INTEGRATION_ADVANCE(200),
+        KEY_RUNTIME_INTEGRATION_SCAN(),
+    };
+    key_runtime_integration_run(&fake_time, release, ARRAY_SIZE(release));
+    CHECK(!test_layer_active(TEST_NUM_LAYER));
+    CHECK(!test_layer_locked(TEST_NUM_LAYER));
+    CHECK(layer_ownership_oneshot_layer() == UINT8_MAX);
+}
+
 int main(void) {
     test_double_tap_hold_toggles_num_layer_lock_off_on_second_cycle();
     test_thumb_cycle_release_still_clears_slot_when_layer_change_resolves_to_other_keycode();
@@ -567,6 +638,7 @@ int main(void) {
     test_plain_toggle_key_is_a_layer_lock();
     test_plain_goto_key_locks_only_its_layer();
     test_behavior_tap_toggles_layer_with_tg();
+    test_behavior_tap_arms_osl_and_hold_holds_tt();
 
     puts("key_runtime layer-lock integration tests passed");
     return 0;

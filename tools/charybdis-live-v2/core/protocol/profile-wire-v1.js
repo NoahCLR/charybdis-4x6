@@ -43,7 +43,7 @@ const PROFILE_WIRE_FEATURES = Object.freeze({
     COMPILED_PROFILE_HASH: 1 << 11,
     ATOMIC_LOGICAL_APPLY: 1 << 12,
     LEGACY_PD_SOURCE: 1 << 13,
-    // TG() and TO() act through the keyboard's layer ownership.
+    // TG(), TO(), TT() and OSL() act through the keyboard's layer ownership.
     OWNED_LAYER_TOGGLES: 1 << 14,
 });
 

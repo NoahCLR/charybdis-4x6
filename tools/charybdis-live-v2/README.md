@@ -40,6 +40,11 @@ and the macros and pointing modes the layer reaches. A behaviour is tap count ×
 tier, so it is drawn as a grid. **Change key…** moves a behaviour to another
 key through the keycode picker; when that key already has one, you choose to
 overwrite it, swap the two, or cancel, and either is one undoable draft step.
+On a keyboard that owns its layer keys (Profile Wire feature bit 14), a
+behaviour takes QMK's layer keys where the keyboard can run them: `TG()`,
+`TO()` and `LOCK_LAYER()` anywhere, `OSL()` as a tap, `TT()` and `MO()` as a
+"Press and hold until release" branch; `LT()` and `LM()` stay keys and combos,
+and `DF()`/`PDF()` are refused.
 On the board, drag one key onto another to swap them, ⌘C and ⌘V copy a key
 onto the selected key, and Delete or Backspace makes it transparent. ⌘Z undoes
 and ⇧⌘Z or ⌘Y redoes the draft everywhere except inside a text field, which
