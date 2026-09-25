@@ -57,6 +57,20 @@ static void key_runtime_core_release_effect_plan_push_release_owned_state(key_ru
                                                     });
 }
 
+// A tap that keeps the tapped key's own layer on: OSL() arming its one-shot,
+// or a lock of the very layer the key holds (TT()'s last tap). The layer
+// itself shows the result, so such a tap needs no feedback window, and it goes
+// before the key's layer release so the layer never drops in between.
+static bool key_runtime_release_tap_keeps_own_layer(const key_runtime_slot_interaction_t *interaction, uint16_t action) {
+    noah_action_desc_t desc;
+
+    if (!(interaction && key_runtime_slot_interaction_is_momentary_layer(*interaction) && action != KC_NO)) {
+        return false;
+    }
+    desc = noah_action_describe(action);
+    return noah_action_desc_tap_keeps_layer(desc) || (noah_action_desc_is_layer_lock(desc) && desc.layer == interaction->layer);
+}
+
 static void key_runtime_core_release_effect_plan_push_layer_release(key_runtime_core_release_effect_plan_t *plan, keypos_t key_pos) {
     if (!plan) {
         return;
@@ -261,7 +275,7 @@ bool key_runtime_core_plan_active_release_effects(keypos_t key_pos, uint16_t key
     // A tap that keeps this key's own layer on (OSL() arming its one-shot)
     // goes first, so the layer never drops between the release and the tap.
     bool momentary_layer = key_runtime_slot_interaction_is_momentary_layer(*resolution->interaction);
-    bool tap_keeps_layer = momentary_layer && resolution->decision.outcome == KEY_RUNTIME_RELEASE_DECISION_OUTCOME_TAP && contract.tap.outcome == KEY_RUNTIME_RELEASE_TAP_OUTCOME_DISPATCH_ACTION && noah_action_desc_tap_keeps_layer(noah_action_describe(contract.tap.action));
+    bool tap_keeps_layer = resolution->decision.outcome == KEY_RUNTIME_RELEASE_DECISION_OUTCOME_TAP && contract.tap.outcome == KEY_RUNTIME_RELEASE_TAP_OUTCOME_DISPATCH_ACTION && key_runtime_release_tap_keeps_own_layer(resolution->interaction, contract.tap.action);
 
     if (momentary_layer && !tap_keeps_layer) {
         key_runtime_core_release_effect_plan_push_layer_release(out, key_pos);
@@ -353,7 +367,7 @@ bool key_runtime_core_resolve_pending_multi_tap_release(keypos_t key_pos, uint16
     // Preserving the chain gives every authored depth the same multi-tap window,
     // hold tiers included. The preserving release clears the hold bindings, so
     // nothing stays armed.
-    terminal_tap_only_feedback_window = !token->interaction.binding.has_more_taps && tap_action != KC_NO;
+    terminal_tap_only_feedback_window = !token->interaction.binding.has_more_taps && tap_action != KC_NO && !key_runtime_release_tap_keeps_own_layer(&token->interaction, tap_action);
     preserve_chain                    = preserve_chain_available && elapsed < token->interaction.binding.tap_hold_term && (token->interaction.binding.has_more_taps || terminal_tap_only_feedback_window);
     tap_branch_feedback_on_release    = series_tap_count > 1u && token->slot_phase != KEY_RUNTIME_SLOT_PHASE_RELEASE_HOLD_PENDING;
 
@@ -417,6 +431,7 @@ bool key_runtime_core_resolve_pending_multi_tap_release(keypos_t key_pos, uint16
                 .outcome             = KEY_RUNTIME_CORE_PENDING_MULTI_TAP_RELEASE_OUTCOME_DELAYED_ACTION,
                 .action              = tap_action,
                 .repeat_count        = tap_repeat_count,
+                .keeps_own_layer     = key_runtime_release_tap_keeps_own_layer(&token->interaction, tap_action),
                 .tap_branch_feedback = authored_branch,
                 .tap_commit_feedback = authored_tap_branch,
                 .tap_count           = series_tap_count,
@@ -468,7 +483,9 @@ bool key_runtime_core_plan_pending_multi_tap_release_effects(keypos_t key_pos, b
         return false;
     }
 
-    if (is_momentary_layer) {
+    bool release_layer_after = resolution->outcome == KEY_RUNTIME_CORE_PENDING_MULTI_TAP_RELEASE_OUTCOME_DELAYED_ACTION && resolution->keeps_own_layer;
+
+    if (is_momentary_layer && !release_layer_after) {
         key_runtime_core_release_effect_plan_push_layer_release(out, key_pos);
     }
 
@@ -485,6 +502,9 @@ bool key_runtime_core_plan_pending_multi_tap_release_effects(keypos_t key_pos, b
             }
             if (resolution->action_feedback) {
                 key_runtime_core_release_effect_plan_push_feedback_pulse(out, key_pos, resolution->action_feedback_kind);
+            }
+            if (is_momentary_layer && release_layer_after) {
+                key_runtime_core_release_effect_plan_push_layer_release(out, key_pos);
             }
             (void)key_runtime_core_reset_pending_multi_tap(key_pos);
             return true;

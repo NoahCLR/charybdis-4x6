@@ -1011,9 +1011,14 @@ void transaction_register_rpc(int8_t transaction_id, slave_callback_t callback) 
     (void)callback;
 }
 
+// Delayed taps are recorded, not dispatched, unless a test asks for the real
+// dispatch to follow what actually happens to its layers.
+static bool test_delayed_actions_dispatch;
+
 void dispatch_delayed_action(uint16_t action, delayed_action_mods_t mods) {
     test_delayed_action_count++;
     test_last_delayed_action = action;
+    if (test_delayed_actions_dispatch) noah_action_tap(action);
     if (test_delayed_action_count <= ARRAY_SIZE(test_delayed_actions)) {
         test_delayed_actions[test_delayed_action_count - 1u] = action;
     }
@@ -3343,10 +3348,23 @@ static void test_tap_toggle_taps_lock_and_holds_are_momentary(void) {
     CHECK(test_delayed_action_count == 0u);
     CHECK(!test_layer_active(LAYER_NUM));
 
-    test_tap_toggle_taps(keycode, key_pos, 5u);
+    // The fifth tap locks on its release, not when the multi-tap window
+    // closes, and the layer never drops between the hold letting go and the
+    // lock: the lock keeps the key's own layer on, so it needs no window.
+    test_delayed_actions_dispatch = true;
+    for (uint8_t tap = 0u; tap < 5u; tap++) {
+        key_runtime_integration_process_record(keycode, key_pos, true);
+        if (tap == 4u) test_layer_off_calls[LAYER_NUM] = 0u;
+        key_runtime_integration_process_record(keycode, key_pos, false);
+        if (tap < 4u) test_advance_thumb_multi_tap_gap();
+    }
+    test_delayed_actions_dispatch = false;
     CHECK(test_delayed_action_count == 1u);
     CHECK(test_last_delayed_action == LOCK_LAYER(LAYER_NUM));
-    noah_action_tap(test_last_delayed_action);
+    CHECK(test_layer_locked(LAYER_NUM));
+    CHECK(test_layer_off_calls[LAYER_NUM] == 0u);
+    test_flush_pending_tap_branch();
+    CHECK(test_delayed_action_count == 1u);
     CHECK(test_layer_locked(LAYER_NUM));
     CHECK(test_layer_active(LAYER_NUM));
 

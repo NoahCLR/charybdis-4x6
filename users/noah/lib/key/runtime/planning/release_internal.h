@@ -47,6 +47,7 @@ typedef struct {
     bool                                                 action_feedback;
     key_feedback_pulse_kind_t                            action_feedback_kind;
     uint8_t                                              tap_count;
+    bool                                                 keeps_own_layer; // the action keeps the key's own layer on
 } key_runtime_core_pending_multi_tap_release_resolution_t;
 
 typedef enum {
