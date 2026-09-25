@@ -1,8 +1,7 @@
 # Charybdis Live — Agent Instructions
 
-This app edits the **connected keyboard**. It is the app; v1 beside it is frozen
-and no longer maintained, and Profile Studio, frozen too, edits the `.c` files.
-Do not blur those lines.
+This app edits the **connected keyboard**. It is the only live app; Profile
+Studio, which is frozen, edits the `.c` files. Do not blur that line.
 
 Read [`docs/LIVE_EDIT_APP_DIRECTION.md`](../../docs/LIVE_EDIT_APP_DIRECTION.md)
 before changing anything here. It carries the goal, the decisions, and what is

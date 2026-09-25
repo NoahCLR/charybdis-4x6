@@ -27,8 +27,6 @@ and [`docs/architecture/device-resident-profile.md`](./docs/architecture/device-
   firmware repository; see its own
   [`AGENTS.md`](./tools/charybdis-live-v2/AGENTS.md) for the layer rules before
   adding files.
-- **`tools/charybdis-live/`** is the previous live app (v1). It is **frozen**
-  and unmaintained; do not add features to it (D-L21).
 - **`tools/charybdis-profile-studio/`** edits `keymap.c`, `config.h`, and
   `rgb_config.c`. It is **frozen** at its `refactor/aug` state. Bug fixes only.
   Do not add features to it, and do not give it device capabilities.

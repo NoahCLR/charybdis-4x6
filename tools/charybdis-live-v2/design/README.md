@@ -124,6 +124,5 @@ python3 -m http.server 8971            # from this directory
 
 ## Where the stills are
 
-The 20 rendered screens live beside the prototype that produced them, in
-`../../charybdis-live/design/renders/`. Regenerate them from this copy with the
-command above.
+The rendered stills are not checked in. Regenerate them into `renders/` with
+the command above.

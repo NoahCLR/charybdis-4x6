@@ -11,15 +11,6 @@
             ]
         },
         {
-            "name": "Run Charybdis Live",
-            "type": "extensionHost",
-            "request": "launch",
-            "args": [
-                "--extensionDevelopmentPath=${workspaceFolder}/tools/charybdis-live",
-                "${workspaceFolder}"
-            ]
-        },
-        {
             "name": "Run Charybdis Live v2",
             "type": "extensionHost",
             "request": "launch",

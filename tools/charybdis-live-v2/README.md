@@ -3,8 +3,7 @@
 Live firmware editor for the Charybdis. It talks to the connected keyboard over
 Raw HID and **never parses a firmware repository**.
 
-This is the app. `charybdis-live/` beside it is the previous interface, frozen
-and unmaintained; Profile Studio, also frozen, authors the `.c` files. The
+This is the app. Profile Studio, which is frozen, authors the `.c` files. The
 product direction lives in
 [`docs/LIVE_EDIT_APP_DIRECTION.md`](../../docs/LIVE_EDIT_APP_DIRECTION.md), and
 the interface direction with its clickable prototype lives in
@@ -92,14 +91,10 @@ window reload picks up every edit:
 ln -s "$PWD" ~/.vscode/extensions/noah.charybdis-live-v2-0.1.0   # then reload the window
 ```
 
-That gives a **Charybdis Live v2** button in the status bar, beside v1's. The
+That gives a **Charybdis Live v2** button in the status bar. The
 panel also opens from the command palette — **Charybdis: Open Charybdis Live
 v2** — and the repo's `.vscode/launch.json` has *Run Charybdis Live v2*, which
 launches an Extension Development Host with a debugger attached instead.
-
-Both apps can be installed at once; they own separate commands and panels. Only
-one may hold the keyboard's Raw HID interface at a time, so close one panel
-before reading from the other.
 
 To work on the interface without a keyboard, run `npm run preview`, serve this
 folder (`python3 -m http.server 8972`) and open `dev/index.html`. The preview
@@ -161,13 +156,13 @@ After a disconnect, a retained dirty draft requires **Review against the
 keyboard** before editing or applying, even if the HID path and saved profile
 look unchanged.
 
-## One rule that differs from v1
+## Cleared pointing slots
 
 A key bound to a **cleared pointing slot** is allowed. The keyboard keeps its
 mode keycodes in a fixed registry and its runtime refuses to activate a slot
 with an empty record, so such a key is inert, not invalid — it does nothing
-until the slot is configured again. v1 refused to clear a slot while anything
-still reached it; here the clear goes through, the validated profile counts what
+until the slot is configured again. The clear goes through even while something
+still reaches the slot, the validated profile counts what
 still points at the empty slot, and the Pointing modes screen and the hover card
 say the key does nothing for now.
 

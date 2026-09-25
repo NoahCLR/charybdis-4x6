@@ -289,145 +289,43 @@ keyboard is a separate app.
 
 ## Charybdis Live
 
-[Charybdis Live](./tools/charybdis-live/) edits the connected keyboard over Raw
-HID. It never parses this repository, so it does not need a firmware workspace
-open. Profile Studio owns `.c` authoring; this app owns the device.
+[Charybdis Live](./tools/charybdis-live-v2/) edits the connected keyboard over
+Raw HID. It never reads this repository, so it needs no firmware workspace: the
+keyboard is the source of truth and the app is its client. Profile Studio owns
+`.c` authoring; this app owns the device.
 
-From VS Code with this repo folder open:
-
-1. Run the VS Code task `Install Charybdis Live Extension`.
-2. Reload VS Code.
-3. Open it from the `$(radio-tower) Charybdis Live` status bar item, or run
-   `Charybdis: Open Charybdis Live` from the command palette.
-
-You can also install it from a shell:
+Install it by symlinking the folder into VS Code's extensions, then reload the
+window:
 
 ```sh
-cd tools/charybdis-live
-npm run install:local
+cd tools/charybdis-live-v2 && npm install
+ln -s "$PWD" ~/.vscode/extensions/noah.charybdis-live-v2-0.1.0
 ```
 
-Press `F5` with the `Run Charybdis Live` launch configuration to run it in an
-Extension Development Host instead.
+Open it from the **Charybdis Live v2** status bar item or `Charybdis: Open
+Charybdis Live v2`, or press `F5` with the `Run Charybdis Live v2` launch
+configuration for an Extension Development Host.
 
-It shows what the keyboard reports about itself — VIA and Profile Wire
-versions, schema, capacities, storage geometry, and committed profile status
-including whether both halves agree on a generation — and reads the live layout
-off the device and draws it on the real Charybdis geometry, resolving keycodes
-through a vendored catalog rather than the source files.
-
-It also reads the custom profile payload and displays its RGB configuration
-and key behaviours. When nothing is committed, it reads the flashed firmware's
-compiled defaults from the keyboard and labels them accordingly. Select a key
-in **Layout** to inspect and edit its timing, tap branches, hold modes and
-auto-mouse anchoring. **RGB** shows colours, LED groups, and
-enabled stages. A timing value of zero means the firmware default; the default
-duration is not reported. Unknown keycodes remain numeric instead of borrowing
-names from the source files.
-
-Layer previews respect the keyboard's mapped-keys-only RGB policy, including
-transparent keys. The app also reads the current base RGB effect over VIA:
-pass-through leaves that effect visible. The selected-layer preview composes
-base and selected layer colours, then their LED groups, using the last read.
-Solid colours and RGB off are shown; other effects are labelled as unavailable
-for simulation. Brightness is approximate and transient feedback is not shown.
-Use **Read from keyboard** after changing lighting on the board.
-Standard modifier shortcuts have readable labels; unknown
-custom key IDs remain complete and distinct.
-
-The combo editor beside the layout reads native definitions and timing from the keyboard
-over Profile Wire value `0x06`. It shows inputs, outputs, enabled state,
-tap/hold/order requirements and layer references. Stable combo badges appear
-on the selected-layer preview, including inherited inputs. Custom firmware
-trigger conditions are flagged but cannot be evaluated by this preview.
-Older firmware shows an explicit unsupported message: build and flash both
-halves with `sh tools/build-firmware-pair.sh`, then read again. No combo data
-is filled in from the repository.
-
-Layout, RGB and combo writes work through their Save/Apply controls. RGB and
-combo saves preserve untouched settings, reject stale reads, commit to both
-halves and verify the readback. Combo editing includes board input selection,
-per-row timing and requirements, deletion, and one shared hold threshold. The
-collapsed all-combos list under the layer overview includes every reported row.
-Modifier shortcuts such as Cmd+N use the same keycode conversion for layout
-and combo saves, including the picker's short spellings.
-Auto-mouse fade follows the underlying colours in its default mode; the chosen
-end colour is used only by the other two modes. The static preview does not
-animate timeout fades. Behaviour rows can be added, edited and deleted from
-the selected key in Layout, including tap branches, hold actions, timing,
-repeat rates and the auto-mouse anchor flag. Saves preserve other rows and
-domains and verify the committed payload. Unsaved behaviour edits stay with
-their row when switching views; a changed profile blocks a stale save and a
-failed save keeps the draft. The Macros view reuses Studio's slot browser,
-recorder, step builder and preview. It reads all 64 VIA and 16 user macro slots
-from the keyboard. Empty slots are editable, and **Clear** removes a macro’s
-contents from its local form. The existing **Defaults**
-panels now read and save key timing, combo enablement, normal/sniping and mode
-DPI, auto-sniping, auto-mouse activation and fade timing, base lighting and
-feedback flash timing. Each section keeps its draft across view changes,
-refreshes and failed saves; **Discard changes** reloads its last readback. A
-refresh that detects a changed profile keeps the draft but blocks a stale save.
-Applying creates a recovery copy and verifies the complete profile on both halves. Behaviour timing
-placeholders use the defaults read from the board.
-
-Defaults also includes lighting effects and LED selection, startup layers,
-keyboard-wide key options, and combo layer matching. The keyboard reports its
-brightness limit, available effects and supported key options; unsupported
-options stay read-only. Update both halves with the current firmware pair to
-enable these capability-dependent controls. Older complete-profile firmware
-still supports the other settings. All section saves preserve unrelated values,
-including native option bits the editor does not expose. Lighting colour and
-effect changes now save correctly while lighting is switched off.
-On eight-layer firmware, all editors now share one complete profile draft.
-Use **Keep** on each edited card, then **Review and apply** to compare the draft
-with the saved keyboard configuration. Everything the draft changed carries an
-amber dot where it is edited — the key on the board, the layer chip, the tab,
-the behaviour or combo row, the slot, the settings section — and a folded group
-holding a change says so on its header. The review lists each changed key, behaviour,
-combo, macro, settings section, pointing slot or lighting record once, with only
-the fields that changed. **Show** opens it where it is edited; **Discard** puts
-it back to what the keyboard holds, together with anything made in the same
-edit, such as both keys of a swap. **Discard all** puts the whole draft back as
-one more step. **Undo** and **Redo** step through kept edits and name the edit
-they take back or bring back, discards included; **Apply to keyboard** saves the complete draft with a recovery copy and
-verified readback. Imports and layer name/order changes enter the same draft.
-**Export profile** still backs up the saved keyboard configuration.
-
-Reading the keyboard again preserves your draft and unfinished forms. If another
-client changed the keyboard, **Review against keyboard** shows what applying
-your retained draft would replace. Drafts live in the current editor window;
-closing it loses unapplied changes. Current firmware stages VIA changes on the
-other half and durably prepares the custom profile on both halves before one
-custom marker decides the complete logical generation. Key output activates
-only after the VIA and custom identities converge, and boot recovery finishes a
-decided transaction before enabling the saved profile. Apply waits for held
-keys, locked layers and pointer modes to clear before the commit decision (the
-app says so; after 60 s the save is cancelled and nothing changes), then holds
-key input for the few moments while this half's keys and macros are rewritten
-and the new profile activates. If the app is closed in that window, the
-keyboard finishes the save on its own from the other half's copy within about
-15 seconds. If the cable between the halves comes out after the decision, the
-USB half keeps typing the old profile until the rewrite starts, and the save
-resumes by itself when the cable goes back in. If it comes out during the
-rewrite, the other half has already confirmed its copy, so the USB half
-finishes and switches to the new profile; the app says the other half is not
-connected instead of claiming it read both halves back. After power loss in the
-middle of a save, the USB half types nothing until its keys and macros are one
-complete version again, which may need the other half connected. It verifies and
-reuses the complete snapshot already loaded in the editor, checks the post-lease
-identity without rereading the whole macro bank, and transfers only changed VIA
-blocks to the peer staging copy and then to the USB half after the decision. The
-transaction and recovery contract is specified in
+It reads everything it edits from the keyboard — layout, key behaviours,
+combos, both macro banks, lighting, the eight pointing-mode slots, layers and
+settings — and shows compiled defaults only when the keyboard reports no
+committed profile. Every edit goes into one local draft with undo, redo and a
+history, and reaches the keyboard only through **Review and apply**. Apply
+saves a recovery copy, then commits the complete profile to both halves as one
+recovery-first logical transaction and verifies the readback. A save interrupted
+after the commit decision is finished by the keyboard itself; one interrupted
+before it leaves the saved profile unchanged. The transaction and
+recovery contract is specified in
 [`docs/architecture/logical-profile-transaction-v1.md`](docs/architecture/logical-profile-transaction-v1.md).
-Build and flash both halves to enable atomic complete-profile Apply. Physical
-power-loss acceptance across every decision boundary is still in progress, so
-keep the recovery file that Apply creates.
+Physical power-loss acceptance across every decision boundary is still in
+progress, so keep the recovery file that Apply creates.
 
-Readback requires the side-specific firmware pair,
-which carries the live-profile owner by default; the generic image does not.
-After updating the extension, reload VS Code and use **Read from keyboard**.
+Readback and Apply need the side-specific firmware pair from
+`sh tools/build-firmware-pair.sh`, which carries the live-profile owner; the
+generic image does not.
 
-The direction, the decisions behind the split, and what is deliberately left
+The app's own guide is [`tools/charybdis-live-v2/README.md`](./tools/charybdis-live-v2/README.md).
+The direction, the decisions behind it, and what is deliberately left
 undesigned are in
 [`docs/LIVE_EDIT_APP_DIRECTION.md`](./docs/LIVE_EDIT_APP_DIRECTION.md).
 

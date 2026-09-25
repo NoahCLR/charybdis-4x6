@@ -412,9 +412,9 @@ modules with pure, tested `view/` modules, every posted edit built by
 exist only as a reviewed draft; a keyboard the app cannot open a draft for is
 read-only, and the host refuses edits rather than writing them directly.
 
-`tools/charybdis-live/` (v1) is frozen and unmaintained, alongside Profile
-Studio. Neither gets features. Its `AGENTS.md` still states v1's rules, which v2
-inherited.
+The v1 app, `tools/charybdis-live/`, was frozen by this decision and then
+removed. The profiles it wrote remain a firmware compatibility check, frozen as
+`tests/fixtures/stored_profile_live_v1.fixture`.
 
 ## Delivery
 

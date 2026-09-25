@@ -24,15 +24,15 @@ noah_host_export_qmk_cpath "$ROOT"
 
 node - "$ROOT" "$BUILD_DIR/portable.bin" <<'JS'
 const fs = require("node:fs");
-const root = process.argv[2] + "/tools/charybdis-live";
-const {document} = require(root + "/tests/fixtures/portable-profile");
-const {validateSnapshot} = require(root + "/core/model/portable-profile");
-fs.writeFileSync(process.argv[3], validateSnapshot(document()).profile);
-fs.writeFileSync(process.argv[3] + '.pd', validateSnapshot(require(root + '/tests/fixtures/pd-profile').document()).profile);
+// Profiles the retired v1 app wrote (stored settings v2), frozen as hex.
+const frozen = Object.fromEntries(fs.readFileSync(process.argv[2] + "/tests/fixtures/stored_profile_live_v1.fixture", "utf8")
+    .split("\n").filter(line => line && !line.startsWith("#")).map(line => line.split("=")));
+fs.writeFileSync(process.argv[3], Buffer.from(frozen["profile.hex"], "hex"));
+fs.writeFileSync(process.argv[3] + '.pd', Buffer.from(frozen["pd_profile.hex"], "hex"));
 // Settings v4 as the v2 app writes it, at its worst case: all 64 macro names
-// at 20 characters. The v1 import above stays the stored-v2 compatibility
-// check; .pd3 is a stored v3 domain with a UTF-8 name, which v4 firmware
-// still reads.
+// at 20 characters. The frozen v1 import above stays the stored-v2
+// compatibility check; .pd3 is a stored v3 domain with a UTF-8 name, which v4
+// firmware still reads.
 const v2 = process.argv[2] + "/tools/charybdis-live-v2";
 const {fingerprint, validateSnapshot: validateV2} = require(v2 + "/core/model/portable-profile");
 const {editMacro} = require(v2 + "/core/model/macro-editor");
