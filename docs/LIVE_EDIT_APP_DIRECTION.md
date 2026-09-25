@@ -1264,7 +1264,13 @@ the two never disagree; a removed thing has nothing left to mark.
 change back, and the keyboard is not read again. It falls back to reading the
 keyboard only for a draft that is out of step with it, belongs to another
 keyboard, or is a recovery. Undo and Redo name the step they take back or
-bring back ("Undo: Swapped two keys"), discards included. The commit bar has
+bring back ("Undo: Swapped two keys"), discards included. **Draft history**
+in the rail opens a sheet drawn like the review but ordered by time: every step
+newest first, with when it was made, its name, and what it changed from the
+step before it rather than from the keyboard. A step that moved layers is one
+priority item, as in the review. Going to a step is several undos or redos at
+once; undone steps stay listed to redo until the next edit branches the
+history. The host sends the steps only while the sheet is open. The commit bar has
 one way on, **Review and apply**, and says what the draft holds by what
 happened to it ("4 added · 10 changed · 1 removed"); the rail's change count
 opens the review too. Leaving the review by Esc is leaving it by Keep editing.

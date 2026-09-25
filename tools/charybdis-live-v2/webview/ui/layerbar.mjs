@@ -1,5 +1,4 @@
-// The layer chips. Which layer you are looking at is a property of the
-// keyboard, not of a screen, so Keys and Lighting share one control.
+// The layer tabs, and the swatch a layer is shown with wherever it is named.
 
 import {css, isOff, label as hsvLabel} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
@@ -18,19 +17,43 @@ export function layerSwatch(model, layer) {
     };
 }
 
+// The layer tabs. Which layer you are looking at is a property of the
+// keyboard, not of a screen, so Keys and Lighting share one control, and it
+// sits on the board it chooses for: the picked layer's tab opens into it.
 export function layerBar(trailing = "") {
     const model = getModel();
     const drafted = draftMarks(model?.draft?.changes).layers;
-    const chips = layers().map((layer, index) => {
+    const tabs = layers().map((layer, index) => {
         const swatch = layerSwatch(model, layer);
-        return `<button class="layer-chip" data-layer="${index}" aria-pressed="${state.layer === index}"
+        return `<button class="layer-tab" role="tab" data-layer="${index}" aria-selected="${state.layer === index}"
             data-tip="${esc(swatch.tip)}${drafted.has(layer.index) ? " · changed in your draft" : ""}">${swatch.html}
             <span>${esc(layerName(layer))}</span><span class="idx">${layer.index}</span>${drafted.has(layer.index) ? '<i class="draft-dot"></i>' : ""}</button>`;
     }).join("");
-    const node = el(`<div class="layerbar-wrap"><div class="layerbar">${chips}${trailing}</div></div>`);
+    const node = el(`<div class="layerbar-wrap"><div class="layer-tabs" role="tablist" aria-label="Layers">${tabs}${trailing}</div></div>`);
     node.querySelectorAll("[data-layer]").forEach((button) => button.addEventListener("click", () => {
         state.layer = Number(button.dataset.layer);
         render();
     }));
+    keepInView(node.querySelector(".layer-tabs"));
     return node;
+}
+
+// A strip of tabs too long for its width scrolls sideways; every render
+// builds it afresh, so it brings its picked tab back into view once drawn,
+// and fades the edge that has more tabs beyond it.
+export function keepInView(strip) {
+    if (!strip) return;
+    const edges = () => {
+        strip.classList.toggle("more-left", strip.scrollLeft > 1);
+        strip.classList.toggle("more-right", strip.scrollLeft + strip.clientWidth < strip.scrollWidth - 1);
+    };
+    strip.addEventListener("scroll", edges, {passive: true});
+    requestAnimationFrame(() => {
+        const tab = strip.isConnected && strip.querySelector('[aria-selected="true"]');
+        if (!tab) return;
+        const left = tab.offsetLeft - 28, right = tab.offsetLeft + tab.offsetWidth + 28;
+        if (left < strip.scrollLeft) strip.scrollLeft = left;
+        else if (right > strip.scrollLeft + strip.clientWidth) strip.scrollLeft = right - strip.clientWidth;
+        edges();
+    });
 }

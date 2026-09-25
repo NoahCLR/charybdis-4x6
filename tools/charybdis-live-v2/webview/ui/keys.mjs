@@ -10,7 +10,7 @@ import {closeComboBuilder, currentLayer, getModel, layerName, layers, openComboB
 import * as edits from "../view/edits.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
 import {board} from "./board.mjs";
-import {layerBar} from "./layerbar.mjs";
+import {keepInView, layerBar} from "./layerbar.mjs";
 import {attachLayersControl} from "./layers.mjs";
 import {openPicker} from "./picker.mjs";
 import {attachGroupToggles, attachReachRows, groupHeader, groupOpen, groupSection, reachAttrs, reachTable} from "./groups.mjs";
@@ -53,20 +53,19 @@ export function screenKeys() {
     const content = el(`<div class="content"><div class="pad keys-pad"></div></div>`);
     const pad = content.firstElementChild;
 
+    // The layer tabs, the board they choose and how that layer is lit are one
+    // card; the legend reads under it.
     const stage = el(`<div class="stack" style="gap:10px"></div>`);
+    const card = el(`<div class="board-card"></div>`);
     const row = layerColourRow(model, layer.index);
     const lit = stageEnabled(model, "layers") && row && !isOff(row.color);
-    stage.appendChild(el(`<div class="stage-head">
-        <h2>${esc(layerName(layer))}</h2>
-        <span class="muted" style="font-size:12px">${lit
-            ? `lit ${esc(hsvLabel(row.color))} on ${row.mode === "ALL_KEYS" ? "every key" : "keys mapped here"}`
-            : "no layer colour · the base effect shows through"}</span></div>`));
-    if (state.placement) stage.appendChild(placementBar());
-    else if (state.combo.picking) stage.appendChild(pickBar());
+    card.append(bar);
+    if (state.placement) card.appendChild(placementBar());
+    else if (state.combo.picking) card.appendChild(pickBar());
     // One indication at a time: while a combo is being built its inputs are
     // the keys in question, otherwise the keys that reach the picked row.
     const building = state.combo.picking || (state.combo.open && state.tab === "combos");
-    stage.appendChild(board(model, layer, {
+    card.appendChild(board(model, layer, {
         selected: state.selected,
         drafted: draftMarks(model?.draft?.changes).keys.get(layer.index),
         reach: building ? state.combo.inputs : reachHighlight(model),
@@ -95,11 +94,11 @@ export function screenKeys() {
         onOpen: writable() ? (index) => pickKeycodeFor(index) : undefined,
         onSwap: writable() ? (from, to) => swapKeys(from, to) : undefined,
     }));
-    stage.appendChild(legend(model));
-    pad.appendChild(stage);
-    const workbench = el(`<div class="workbench-stack"></div>`);
-    workbench.append(bar, bench());
-    pad.appendChild(workbench);
+    card.appendChild(el(`<div class="board-foot">${lit
+        ? `lit ${esc(hsvLabel(row.color))} on ${row.mode === "ALL_KEYS" ? "every key" : "keys mapped here"}`
+        : "no layer colour · the base effect shows through"}</div>`));
+    stage.append(card, legend(model));
+    pad.append(stage, bench());
     main.appendChild(content);
     return main;
 }
@@ -193,9 +192,9 @@ function bench() {
     const drafted = {key: Boolean(marks.keys.get(currentLayer()?.index)?.has(state.selected)), behaviours: marks.behaviours.size > 0,
         combos: marks.combos.size > 0, macros: marks.macros.size > 0, pointing: marks.pointing.size > 0};
     const node = el(`<div class="card bench">
-        <div class="bench-tabs" role="tablist">
+        <div class="bench-tabs"><div class="bench-tablist" role="tablist">
             ${TABS.map((tab) => `<button role="tab" data-tab="${tab.id}" aria-selected="${state.tab === tab.id}">
-                ${tab.label} <span class="c">${esc(counts[tab.id])}</span>${drafted[tab.id] ? draftDot() : ""}</button>`).join("")}
+                ${tab.label} <span class="c">${esc(counts[tab.id])}</span>${drafted[tab.id] ? draftDot() : ""}</button>`).join("")}</div>
             <span class="bench-right" id="benchRight"></span>
         </div>
         <div class="bench-body" id="benchBody"></div>
@@ -205,13 +204,14 @@ function bench() {
         state.cell = null;
         render();
     }));
+    keepInView(node.querySelector(".bench-tablist"));
     const body = node.querySelector("#benchBody"), right = node.querySelector("#benchRight");
     ({key: tabKey, behaviours: tabBehaviours, combos: tabCombos, macros: tabMacros, pointing: tabPointing}[state.tab] || tabKey)(body, right);
     return node;
 }
 
 /* ── the selected key ──────────────────────────────────────────────────── */
-function tabKey(body, right) {
+function tabKey(body) {
     const model = getModel();
     const layer = currentLayer();
     const position = selectedPosition();
@@ -219,7 +219,6 @@ function tabKey(body, right) {
     const behaviour = behaviourFor(model, keyMeaning(position));
     const combos = position ? combosAt(model, layers(), state.layer, position.layoutIndex) : [];
     const slot = pointingSlotFor(model, keyMeaning(position));
-    right.innerHTML = `<span class="note">index ${position?.layoutIndex ?? "—"} · row ${position?.row ?? "—"} · col ${position?.column ?? "—"} · LED ${LED_INDEX[position?.layoutIndex] ?? "—"}</span>`;
 
     const node = el(`<div class="tab-grid three">
         <section>
@@ -231,6 +230,7 @@ function tabKey(body, right) {
                 <dt>Resolves to</dt><dd>${esc(face.main || "—")}${face.sub ? ` · ${esc(face.sub)}` : ""}</dd>
                 <dt>Stored</dt><dd>${esc(position?.keycode || "—")}</dd>
                 <dt>Matrix</dt><dd>row ${position?.row ?? "—"} · col ${position?.column ?? "—"}</dd>
+                <dt>Layout index</dt><dd>${position?.layoutIndex ?? "—"}</dd>
                 <dt>LED index</dt><dd>${LED_INDEX[position?.layoutIndex] ?? "—"}</dd>
             </dl>
             ${writable() ? "" : `<div class="unavailable" style="margin-top:12px">${esc(unavailable(model))}</div>`}

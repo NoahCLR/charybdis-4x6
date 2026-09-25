@@ -39,11 +39,12 @@ instead of unfolding five nested forms.
 
 ## Lighting has the same shape as Keys
 
-Layer chips choose what the board shows; the board is the composed result; the
-paint order sits beneath it as six numbered chips that double as a way into each
-stage; and the workbench tabs are the stages themselves — Base effect, Layer
-colours, Auto-mouse fade, Pointing modes, Combo feedback, Key feedback, LED
-groups. Each tab is a full-width surface with its list, its colour, where it
+Layer tabs on the board card choose what the board shows, as on Keys; the board
+is the composed result; and the workbench tabs are the stages themselves, in the
+order the firmware paints them — numbered 1 to 6, each in the colour it paints
+now and drawn off when its stage is off: Base effect, Layer colours, Auto-mouse
+fade, Pointing modes, Combo feedback, Key feedback — then, past a divider, LED
+groups, which every stage can draw on. Each tab is a full-width surface with its list, its colour, where it
 paints and what it does, and the stage's on/off switch sits in the tab bar. On
 the LED groups tab the board becomes the LED selector, because that is what that
 tab needs it to be.
@@ -64,7 +65,7 @@ unlit keys black.
 ## What changed against the current five tabs
 
 - One draft, one gate. Every "keep in draft" button is gone; edits stage as they
-  are made, undo and redo sit in the rail, and the floating commit bar is the
+  are made, undo, redo and the draft history sheet sit in the rail, and the floating commit bar is the
   only way changes leave the window. Forms that are only half-finished — the
   combo builder, a new layer, a macro step — still keep their own state.
 - Five tabs of nested `<details>` become six places in a rail, each with one

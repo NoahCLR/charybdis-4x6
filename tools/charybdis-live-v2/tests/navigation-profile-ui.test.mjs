@@ -13,15 +13,19 @@ test("the navigation rail stays label-only", () => {
     assert.doesNotMatch(shell, /layers\.length|macroSlots|configDefaults/);
 });
 
-test("layer selection sits directly above the section selectors on every layer-aware screen", () => {
-    const keys = read("keys.mjs");
-    assert.match(keys, /const workbench = el\(`<div class="workbench-stack"><\/div>`\);\s*workbench\.append\(bar, bench\(\)\);/);
-    assert.doesNotMatch(keys, /main\.appendChild\(bar\)/);
+test("layer tabs sit on the board they choose, on every layer-aware screen", () => {
+    for (const name of ["keys.mjs", "lighting.mjs"]) {
+        const screen = read(name);
+        assert.match(screen, /const card = el\(`<div class="board-card"><\/div>`\);/, `${name} draws the board as a card`);
+        assert.match(screen, /card\.append\((bar|layerBar\(\))\);[\s\S]*card\.appendChild\(board\(/, `${name} puts the layer tabs on it, above the board`);
+        assert.doesNotMatch(screen, /workbench-stack/, `${name} keeps no separate layer box over the workbench`);
+    }
+});
 
+test("Lighting's stage tabs are the paint order, with no second row of stages", () => {
     const lighting = read("lighting.mjs");
-    assert.match(lighting, /the board above shows this layer/);
-    assert.match(lighting, /const workbench = el\(`<div class="workbench-stack"><\/div>`\);\s*workbench\.append\(bar, bench\);/);
-    assert.doesNotMatch(lighting, /main\.appendChild\(layerBar/);
+    assert.doesNotMatch(lighting, /paintorder|pochip|the board above shows this layer/);
+    assert.match(lighting, /stages\.map\(stageTab\)/);
 });
 
 test("profile management leads with working import and export cards", () => {

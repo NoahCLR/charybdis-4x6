@@ -48,14 +48,18 @@ and `DF()`/`PDF()` are refused.
 On the board, drag one key onto another to swap them, ⌘C and ⌘V copy a key
 onto the selected key, and Delete or Backspace makes it transparent. ⌘Z undoes
 and ⇧⌘Z or ⌘Y redoes the draft everywhere except inside a text field, which
-keeps its own undo. Board keys work from the keyboard too: Space or Enter
+keeps its own undo. **Draft history** in the rail opens every step of the
+draft, newest first, each with when it was made and what it changed from the
+step before it (not from the keyboard, as the review compares); go straight
+back or forward to any of them. Board keys work from the keyboard too: Space or Enter
 selects one, and Enter on the selected key opens its picker.
 
 The layer stack is not one of those tabs, because
-it is not a property of the selected key: **Edit layers** sits after the last
-layer on the row under the board and opens upward over it, its bottom edge at
-the row, so the draft bar at the window's foot never covers it; a layer is
-renamed and reordered where its keys are on screen. **Keys follow their layers** (on by
+it is not a property of the selected key. The layers are tabs on the board
+card, the picked one opening into the board it shows, on Keys and on Lighting
+alike; **Edit layers** stays at the end of those tabs, outside what scrolls, and
+opens downward over the board, so a layer is renamed and reordered where its
+keys are on screen. **Keys follow their layers** (on by
 default) renumbers every layer key (MO, LT, TG, TO, TT, OSL, LOCK_LAYER…) on
 layers, behaviours and combos so each still reaches the same layer; turned off,
 the layers move but those keys keep their numbers. Names, colours and the

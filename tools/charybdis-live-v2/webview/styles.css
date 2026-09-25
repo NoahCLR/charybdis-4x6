@@ -147,7 +147,9 @@ code { color: inherit; background: none; padding: 0; border-radius: 0; }
 .nav-item[aria-current="true"] { background: var(--surface-3); color: var(--text); font-weight: 520; }
 .nav-item svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.4; opacity: .85; }
 .rail-foot { padding: 12px; border-top: 1px solid var(--line); display: flex; gap: 8px; align-items: center; }
-.rail-foot .note { margin-right: auto; }
+.rail-foot .rail-history { margin-right: auto; margin-left: -9px; color: var(--text-3); }
+.rail-foot .rail-history:hover { color: var(--text); }
+.rail-history .c { font-family: var(--mono); font-size: 10.5px; color: var(--text-3); margin-left: 5px; }
 
 /* ── main ────────────────────────────────────────────────────────────── */
 .main { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--bg); }
@@ -243,8 +245,37 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 .stack { display: grid; gap: 14px; }
 .hr { height: 1px; background: var(--line); margin: 14px -15px; }
 
-/* ── layer strip ─────────────────────────────────────────────────────── */
-.layerbar { display: flex; align-items: center; gap: 4px; padding: 10px 24px; border-bottom: 1px solid var(--line); background: var(--bg-deep); overflow-x: auto; }
+/* ── the board card: layer tabs, the board they choose, a caption ───── */
+/* The picked layer's tab is the board's own surface, so the tab and the board
+   read as one sheet; the strip's bottom line is drawn inside it, where the
+   picked tab can cover it. The strip scrolls sideways when it does not fit. */
+.board-card { position: relative; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); min-width: 0; }
+.board-card .board { border: 0; border-radius: 0; background: var(--surface); }
+.board-card > :last-child { border-radius: 0 0 13px 13px; }
+.board-card > .layerbar-wrap {
+  display: flex; align-items: flex-end; border-radius: 13px 13px 0 0; background: var(--surface-2); box-shadow: inset 0 -1px 0 var(--line);
+}
+.layer-tabs {
+  flex: 1; min-width: 0; display: flex; align-items: flex-end; gap: 2px; padding: 7px 10px 0; position: relative;
+  box-shadow: inset 0 -1px 0 var(--line); overflow-x: auto; scrollbar-width: none;
+}
+.layer-tabs::-webkit-scrollbar { display: none; }
+.layer-tabs > * { flex: none; }
+.layer-tab {
+  display: inline-flex; align-items: center; gap: 8px; height: 33px; padding: 0 13px 0 11px;
+  border: 1px solid transparent; border-bottom: 0; border-radius: 8px 8px 0 0;
+  color: var(--text-2); font-size: 12.5px; white-space: nowrap;
+}
+.layer-tab:hover { color: var(--text); background: var(--surface-3); }
+.layer-tab[aria-selected="true"] { background: var(--surface); border-color: var(--line); color: var(--text); font-weight: 520; }
+.layer-tab .swatch { width: 9px; height: 9px; border-radius: 3px; border: 1px solid rgba(255,255,255,.18); flex: none; }
+.layer-tab .idx { font-family: var(--mono); font-size: 10px; color: var(--text-3); }
+/* Edit layers stays in reach at the strip's end, outside what scrolls. */
+.layerbar-wrap > .layer-edit { flex: none; margin: 0 10px 4px 4px; }
+.board-foot { display: flex; align-items: center; gap: 10px; min-height: 34px; padding: 4px 14px 8px; font-size: 12px; color: var(--text-2); }
+.board-foot b { color: var(--text); font-weight: 560; }
+.board-foot .right { margin-left: auto; display: flex; gap: 6px; }
+/* A layer named elsewhere as a link to it (Macros) is a chip. */
 .layer-chip {
   display: inline-flex; align-items: center; gap: 8px; height: 28px; padding: 0 11px 0 9px;
   border-radius: 7px; border: 1px solid transparent; color: var(--text-2); font-size: 12.5px; white-space: nowrap;
@@ -263,18 +294,15 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 }
 .layer-edit:hover { color: var(--text); border-color: var(--line-3); background: var(--surface-2); }
 .layer-edit[aria-expanded="true"] { color: var(--text); border-style: solid; background: var(--surface-3); }
-/* The row itself scrolls sideways, so the panel hangs off the wrapper. It
-   opens upward, its bottom edge at the row, so the draft bar along the
-   window's foot never covers it. placePanel() in ui/layers.mjs first scrolls
-   the page to make room above, caps it to the room it has, and opens it
-   downward only when that room stays under a few rows. */
+/* The tabs scroll sideways, so the panel hangs off their wrapper and opens
+   downward over the board. placePanel() in ui/layers.mjs scrolls the page to
+   make room and caps it to the room above the draft bar. */
 .layerbar-wrap { position: relative; min-width: 0; }
 .layerpanel {
-  position: absolute; z-index: 40; bottom: calc(100% - 2px); right: 24px; width: min(620px, calc(100% - 48px));
+  position: absolute; z-index: 40; top: calc(100% + 4px); right: 12px; width: min(620px, calc(100% - 24px));
   padding: 14px; border: 1px solid var(--line-2); border-radius: 12px; background: var(--surface);
-  box-shadow: 0 -18px 44px rgba(0,0,0,.55); overflow-y: auto; overscroll-behavior: contain;
+  box-shadow: 0 18px 44px rgba(0,0,0,.55); overflow-y: auto; overscroll-behavior: contain;
 }
-.layerpanel.below { bottom: auto; top: calc(100% - 2px); box-shadow: 0 18px 44px rgba(0,0,0,.55); }
 .layerpanel .list-row { gap: 10px; }
 /* When the panel scrolls, the list scrolls under its toggle and buttons. */
 .layerpanel-actions { position: sticky; bottom: -14px; margin: 0 -14px -14px; padding: 10px 14px 14px;
@@ -289,9 +317,6 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
   position: relative; padding: 22px 24px 28px;
   display: flex; flex-direction: column; gap: 14px; min-width: 0;
 }
-.stage-head { display: flex; align-items: baseline; gap: 12px; }
-.stage-head h2 { font-size: 15px; }
-.stage-head .right { margin-left: auto; display: flex; gap: 6px; align-items: center; }
 .board {
   position: relative; border: 1px solid var(--line); border-radius: 14px;
   background:
@@ -418,29 +443,43 @@ button.tier:hover { background: var(--surface-3); }
 .act.empty { border-style: dashed; color: var(--text-3); background: none; font-family: var(--sans); font-size: 11.5px; }
 /* ── workbench ───────────────────────────────────────────────────────── */
 .keys-pad { display: grid; gap: 18px; }
-/* The workbench column may shrink to the window: a grid item's automatic
-   minimum is its content, so without minmax(0, …) the layer bar's nowrap
-   chips would set the width of every tab and push the page sideways. */
-.workbench-stack { display: grid; grid-template-columns: minmax(0, 1fr); gap: 7px; min-width: 0; }
-.workbench-stack .layerbar {
-  padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius);
-  background: var(--surface-2);
-}
+/* The pad's one column may shrink to the window: a grid item's automatic
+   minimum is its content, so without minmax(0, …) a strip of nowrap tabs
+   would set the width of the page and push it sideways. */
+.keys-pad { grid-template-columns: minmax(0, 1fr); }
 .bench { overflow: hidden; }
 /* A panel can be much narrower than a window. The strip scrolls sideways
    rather than clipping whatever sits at its right end. */
-.bench-tabs { display: flex; align-items: center; gap: 2px; padding: 8px 10px; border-bottom: 1px solid var(--line);
-  background: var(--surface-2); overflow-x: auto; scrollbar-width: thin; }
-.bench-tabs > * { flex: none; }
+/* The workbench's tabs are a level below the layer tabs: plain words with
+   the picked one underlined. */
+/* The tabs scroll sideways when the panel is narrow; what sits at the right
+   (a stage's switch, a tab's add button) stays put outside them. */
+.bench-tabs { display: flex; align-items: center; padding: 0 10px; border-bottom: 1px solid var(--line); background: var(--surface-2); }
+.bench-tablist { flex: 1; min-width: 0; display: flex; align-items: center; gap: 2px; position: relative; overflow-x: auto; scrollbar-width: none; }
+.bench-tablist::-webkit-scrollbar { display: none; }
+/* A strip with more tabs beyond an edge fades that edge (ui/layerbar.mjs). */
+.more-left { -webkit-mask-image: linear-gradient(to right, transparent, #000 28px); mask-image: linear-gradient(to right, transparent, #000 28px); }
+.more-right { -webkit-mask-image: linear-gradient(to left, transparent, #000 28px); mask-image: linear-gradient(to left, transparent, #000 28px); }
+.more-left.more-right { -webkit-mask-image: linear-gradient(to right, transparent, #000 28px, #000 calc(100% - 28px), transparent);
+  mask-image: linear-gradient(to right, transparent, #000 28px, #000 calc(100% - 28px), transparent); }
+.bench-tablist > * { flex: none; }
 .bench-tabs button[role="tab"] {
-  display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 13px;
-  border-radius: 7px; font-size: 13px; color: var(--text-2); font-weight: 480;
+  display: inline-flex; align-items: center; gap: 7px; height: 42px; padding: 0 11px;
+  font-size: 13px; color: var(--text-2); font-weight: 480; box-shadow: inset 0 -2px 0 transparent;
 }
-.bench-tabs button[role="tab"]:hover { background: var(--surface-3); color: var(--text); }
-.bench-tabs button[role="tab"][aria-selected="true"] { background: var(--bg); color: var(--text); font-weight: 560; box-shadow: inset 0 0 0 1px var(--line); }
+.bench-tabs button[role="tab"]:hover { color: var(--text); }
+.bench-tabs button[role="tab"][aria-selected="true"] { color: var(--text); font-weight: 560; box-shadow: inset 0 -2px 0 var(--text); }
+/* Lighting's stage tabs carry the paint order: a number, the colour the
+   stage paints now, and a stage that is off drawn dim. */
+.bench-tabs .n { font-family: var(--mono); font-size: 10px; color: var(--text-3); }
+.bench-tabs .swatch { width: 9px; height: 9px; border-radius: 3px; border: 1px solid rgba(255,255,255,.18); flex: none; }
+.bench-tabs button[role="tab"].off { color: var(--text-3); }
+.bench-tabs .tab-step { color: var(--text-3); font-size: 12px; padding: 0 1px; }
+.bench-tabs .tab-sep { width: 1px; height: 18px; background: var(--line-2); margin: 0 8px; }
 .bench-tabs .c { font-family: var(--mono); font-size: 10.5px; color: var(--text-3); }
 .bench-tabs button[role="tab"][aria-selected="true"] .c { color: var(--text-2); }
-.bench-right { margin-left: auto; display: flex; align-items: center; gap: 8px; padding-right: 4px; white-space: nowrap; }
+.bench-right { flex: none; margin-left: 12px; display: flex; align-items: center; gap: 8px; padding-right: 4px; white-space: nowrap; }
+.bench-right:empty { display: none; }
 .bench-body { padding: 16px 18px 20px; }
 .tab-grid { display: grid; gap: 26px; }
 .tab-grid.three { grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr) minmax(0, 1fr); }
@@ -677,6 +716,21 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* ── overlays ────────────────────────────────────────────────────────── */
+/* ── draft history: the review's grid, one section per step ──────────── */
+.hs-cols { position: sticky; top: 0; z-index: 1; background: var(--surface); padding: 12px 18px 0; border-bottom: 1px solid var(--line); }
+.hs-step { padding: 12px 18px 4px; }
+.hs-step + .hs-step { border-top: 1px solid var(--line); }
+.hs-head { display: flex; align-items: baseline; gap: 12px; padding: 0 0 8px; min-width: 0; }
+.hs-time { flex: none; width: 70px; font-family: var(--mono); font-size: 11px; color: var(--text-3); }
+.hs-label { font-size: 13px; font-weight: 560; overflow-wrap: anywhere; min-width: 0; }
+.hs-label .tag { margin-left: 6px; }
+.hs-go { margin-left: auto; flex: none; align-self: center; }
+.hs-here { display: inline-flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--text); }
+.hs-step.current .rv-block { box-shadow: inset 3px 0 0 var(--draft); }
+.hs-step.undone .hs-label, .hs-step.undone .rv-block { opacity: .55; }
+.hs-empty { margin: 0 0 10px; }
+.hs .hs-empty:only-child { padding: 18px; }
+
 .scrim { position: fixed; inset: 0; background: rgba(0,0,0,.55); backdrop-filter: blur(3px); z-index: 60; display: grid; place-items: center; padding: 40px; }
 :root[data-theme="light"] .scrim { background: rgba(0,0,0,.3); }
 .sheet { width: min(980px, 100%); max-height: 100%; display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--line-2); border-radius: 14px; box-shadow: var(--shadow); overflow: hidden; }
@@ -895,13 +949,6 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
   background: var(--surface-2); font-size: 12.5px; }
 .stagedot { width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--line-3); display: inline-block; }
 .stagedot.on { background: var(--text-2); border-color: var(--text-2); }
-.paintorder { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 2px 4px; }
-.pochip { display: inline-flex; align-items: center; gap: 7px; height: 26px; padding: 0 10px 0 7px;
-  border: 1px solid var(--line); border-radius: 7px; background: var(--surface); font-size: 11.5px; color: var(--text-2); }
-.pochip:hover { border-color: var(--line-2); color: var(--text); }
-.pochip.on { border-color: var(--line-3); color: var(--text); background: var(--surface-2); }
-.pochip.off { opacity: .55; }
-.pochip .n { font-family: var(--mono); font-size: 9.5px; color: var(--text-3); }
 .stagestrip { display: grid; grid-template-columns: repeat(6, minmax(0,1fr)); gap: 8px; }
 .stagecard {
   display: grid; grid-template-columns: 18px 1fr auto; gap: 8px 9px; align-items: center;

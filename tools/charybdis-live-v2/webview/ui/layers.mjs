@@ -1,8 +1,9 @@
 // The layer stack: what each layer is called, and which one wins.
 //
-// It hangs off the layer row rather than the workbench below, because it is not
-// a property of the selected key like the tabs there are — it is the row itself,
-// so the control sits after the last layer and drops open over the workbench.
+// It hangs off the layer tabs rather than the workbench below, because it is
+// not a property of the selected key like the tabs there are — it is the tabs
+// themselves, so the control sits after the last layer and drops open over
+// the board.
 //
 // The order is the host's to hold. Moving a layer rewrites every key, behaviour
 // and setting that refers to it, so the edit is staged there and arrives back
@@ -14,9 +15,9 @@ import {getModel, layers, post, render, state, canEdit as canEditArea} from "../
 
 let dismiss = null;   // the outside-click listener for the open panel
 
-// Adds the trigger to the layer row and, while it is open, the panel beneath
-// it. The panel is placed on the row's wrapper, not inside the row, which
-// scrolls sideways and would clip it.
+// Adds the trigger after the layer tabs and, while it is open, the panel
+// beneath them. Both sit on the tabs' wrapper, not inside the strip, which
+// scrolls sideways and would hide the one and clip the other.
 export function attachLayersControl(bar) {
     const model = getModel();
     const portable = model?.portable || {};
@@ -30,7 +31,7 @@ export function attachLayersControl(bar) {
         if (!state.layersOpen) state.layersAsked = false;
         render();
     });
-    bar.querySelector(".layerbar").append(trigger);
+    bar.append(trigger);
     if (!state.layersOpen) {
         closeDismiss();
         return;
@@ -56,29 +57,26 @@ export function attachLayersControl(bar) {
     watchOutside(panel, trigger);
 }
 
-// The panel opens upward, its bottom edge at the row, so the draft bar at
-// the window's foot never covers it. The room is what the scrolling area
-// shows, not the window: the top bar sits above that area. When the panel is
-// taller than the room above, the area scrolls up by the shortfall (bringing
-// the row down) and whatever still does not fit scrolls inside the panel.
-// Only when the room above stays under a few rows does it open downward.
+// The panel opens downward over the board, under the tabs. The room is what
+// the scrolling area shows above the draft bar at the window's foot, not the
+// window. When the panel is taller than the room below, the area scrolls up
+// (bringing the tabs toward the top) and whatever still does not fit scrolls
+// inside the panel.
 function placePanel(bar, panel) {
     if (!panel.isConnected) return;
     const margin = 12;
-    const rowOf = () => (bar.querySelector(".layerbar") || bar).getBoundingClientRect();
+    const rowOf = () => (bar.querySelector(".layer-tabs") || bar).getBoundingClientRect();
     let scroller = bar.parentElement;
     while (scroller && !/(auto|scroll)/.test(getComputedStyle(scroller).overflowY)) scroller = scroller.parentElement;
     const viewOf = () => scroller ? scroller.getBoundingClientRect() : {top: 0, bottom: window.innerHeight};
-    const roomAbove = () => rowOf().top - viewOf().top - margin;
-    const shortfall = panel.scrollHeight - roomAbove();
-    if (shortfall > 0 && scroller) scroller.scrollTop -= Math.min(shortfall, scroller.scrollTop);
-    const above = roomAbove();
-    const draftBar = document.querySelector(".commit")?.getBoundingClientRect();
-    const floor = draftBar && draftBar.height ? Math.min(viewOf().bottom, draftBar.top) : viewOf().bottom;
-    const below = floor - rowOf().bottom - margin;
-    const downward = above < 200 && below > above;
-    panel.classList.toggle("below", downward);
-    panel.style.maxHeight = `${Math.max(160, Math.floor(downward ? below : above))}px`;
+    const floor = () => {
+        const draftBar = document.querySelector(".commit")?.getBoundingClientRect();
+        return draftBar && draftBar.height ? Math.min(viewOf().bottom, draftBar.top) : viewOf().bottom;
+    };
+    const roomBelow = () => floor() - rowOf().bottom - margin;
+    const shortfall = panel.scrollHeight - roomBelow();
+    if (shortfall > 0 && scroller) scroller.scrollTop += Math.max(0, Math.min(shortfall, rowOf().top - viewOf().top - margin));
+    panel.style.maxHeight = `${Math.max(160, Math.floor(roomBelow()))}px`;
 }
 
 function editor(model, portable, busy) {

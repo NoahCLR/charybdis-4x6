@@ -49,6 +49,39 @@ test("undo, redo, branching and no-op edits maintain one bounded history", () =>
     for (let i=0;i<105;i++) stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_0",payload:String(i)});
     assert.equal(draft.history.length,101); assert.equal(draft.base.fingerprint,snapshot.fingerprint);
 });
+test("the history lists every step, when it was made, and what it changed from the step before", () => {
+    const {draft,snapshot} = fixture();
+    let clock = 1000; draft.now = () => clock;
+    clock = 2000; stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_0",payload:"one"});
+    const first = draft.current.fingerprint;
+    clock = 3000; stage(draft,settings(draft,"keyTiming",{tapHoldTerm:"175"}));
+    clock = 4000; stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_0",payload:"two"});
+    const steps = draft.steps();
+    assert.deepEqual(steps.map(entry=>entry.label),["Read from the keyboard","Edited a macro","Saved a settings section","Edited a macro"]);
+    assert.deepEqual(steps.slice(1).map(entry=>entry.at),[2000,3000,4000]);
+    assert.equal(steps[0].changes,null,"where the draft began has nothing before it");
+    assert.deepEqual(steps[3].changes.map(row=>row.unit),["macro:0"]);
+    const field = steps[3].changes[0].fields.find(entry=>entry.before!==null&&entry.after!==null);
+    assert.match(field.before,/one/,"the last step compares with the draft before it, not the keyboard");
+    assert.match(field.after,/two/);
+    assert.deepEqual(steps[2].changes.map(row=>row.area),["Settings"],"each step lists only what it changed");
+    assert.deepEqual(steps.map(entry=>entry.current),[false,false,false,true]);
+
+    draft.jump(draft.revision,1);
+    assert.equal(draft.current.fingerprint,first);
+    assert.deepEqual(draft.steps().map(entry=>entry.undone),[false,false,true,true],"the steps after it stay, to redo");
+    assert.equal(draft.view({}).redoLabel,"Saved a settings section");
+    draft.jump(draft.revision,0); assert.equal(draft.dirty,false); assert.equal(draft.current.fingerprint,snapshot.fingerprint);
+    const revision = draft.revision;
+    draft.jump(revision,0); assert.equal(draft.revision,revision,"jumping to where the draft stands is no step");
+    draft.jump(draft.revision,3); assert.equal(draft.view({}).canRedo,false);
+    assert.throws(()=>draft.jump(draft.revision,4),/no longer in the draft history/);
+    assert.throws(()=>draft.jump(draft.revision,"1"),/no longer in the draft history/);
+    assert.throws(()=>draft.jump(0,1),/draft changed/);
+    clock = 5000; stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_1",payload:"x"});
+    draft.jump(draft.revision,1); clock = 6000; stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_2",payload:"y"});
+    assert.deepEqual(draft.steps().map(entry=>entry.at).slice(1),[2000,6000],"a new edit after going back drops the undone steps and their times");
+});
 test("invalid edits and obsolete revisions cannot partially change the draft", () => {
     const {draft,snapshot} = fixture();
     assert.throws(()=>stage(draft,{type:"updateLayoutKeys",layers:[{layer:"Layer 0",changes:[{layoutIndex:0,keycode:"KC_A"},{layoutIndex:1,keycode:"NOT_A_KEY"}]}]}));
@@ -273,6 +306,15 @@ test("several swaps are one priority change: the net move of every layer they to
     layers(draft,[0,1,2,3,4,6,5,7]);
     assert.deepEqual(draft.changes().filter(row => row.unit === "layerOrder").length,1,"a separate swap joins the same item");
     assert.deepEqual(draft.changes()[0].fields.map(field => field.label),["Extra 1","Extra 2","Symbols","Pointer","Navigation"]);
+});
+test("a history step that moved layers is one priority item, and later steps compare layer with layer", () => {
+    const {draft} = fixture();
+    layers(draft); stage(draft,key(0,"KC_Q","Layer 2"));
+    const [, moved, keyed] = draft.steps();
+    assert.deepEqual(moved.changes.map(row=>row.unit),["layerOrder"],"the swap is not every key of both layers");
+    assert.deepEqual(keyed.changes.map(row=>row.unit),["layout:2:0"]);
+    draft.undo(draft.revision); draft.discard(draft.revision,groupOf(draft,"layerOrder"));
+    assert.deepEqual(draft.steps().at(-1).changes.map(row=>row.unit),["layerOrder"],"putting the order back is one item too");
 });
 test("swapping back leaves no layer order, and names alone never make one", () => {
     const {draft} = fixture();

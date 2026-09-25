@@ -89,6 +89,7 @@ async function draftControl(session, message, host = {}) {
         case "closeProfileDraftReview": draft.closeReview(revision); return;
         case "undoProfileDraft": draft.undo(revision); session.resetDraftForms = true; return;
         case "redoProfileDraft": draft.redo(revision); session.resetDraftForms = true; return;
+        case "jumpProfileDraft": draft.jump(revision, message.step); session.resetDraftForms = true; return;
         case "discardProfileDraftChanges": draft.discard(revision, message.group); session.resetDraftForms = true; return;
         case "discardProfileDraft": {
             // The draft's own keyboard, unchanged: discarding is an undoable

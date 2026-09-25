@@ -4,6 +4,7 @@
 import {el, esc} from "../lib/dom.mjs";
 import {getModel, post, render, state} from "../store.mjs";
 import {statusSummary} from "../view/review.mjs";
+import {openHistory} from "./history.mjs";
 
 // The review opens at once; the host marks it reviewed when it answers.
 function openReview() {
@@ -86,7 +87,8 @@ export function rail() {
         <nav class="rail-nav">${nav}</nav>
         ${railMessage()}
         <div class="rail-foot">
-            <span class="note">Draft history</span>
+            <button class="btn tiny ghost rail-history" data-act="history" ${draft ? "" : "disabled"}
+                data-tip="Every step of the draft, newest first, with what each one changed. Go back or forward to any of them.">Draft history${draft?.historyLength > 1 ? ` <span class="c">${draft.historyLength - 1}</span>` : ""}</button>
             <button class="btn tiny ghost icon" data-act="undo" ${draft?.canUndo ? "" : "disabled"}
                 data-tip="${esc(draft?.undoLabel ? `Undo: ${draft.undoLabel} (⌘Z)` : "Undo the last edit in the draft (⌘Z). The keyboard is not touched until you apply.")}">↺</button>
             <button class="btn tiny ghost icon" data-act="redo" ${draft?.canRedo ? "" : "disabled"}
@@ -102,6 +104,7 @@ export function rail() {
     node.querySelector('[data-act="refresh"]').addEventListener("click", () => post({type: "refresh"}));
     node.querySelector('[data-act="select-device"]')?.addEventListener("change", (event) => post({type: "selectDevice", deviceId: event.target.value}));
     node.querySelector('[data-act="open-review"]')?.addEventListener("click", openReview);
+    node.querySelector('[data-act="history"]').addEventListener("click", openHistory);
     node.querySelector('[data-act="undo"]').addEventListener("click", () => post({type: "undoProfileDraft"}));
     node.querySelector('[data-act="redo"]').addEventListener("click", () => post({type: "redoProfileDraft"}));
     return node;

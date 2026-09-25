@@ -14,7 +14,7 @@ const {ProfileDraftSession, DRAFT_EDITS} = require("./profile-draft-session");
 const {buildDeviceModel, deviceSummary} = require("./device-model");
 
 const DRAFT_CONTROLS = new Set([
-    "reviewProfileDraft", "undoProfileDraft", "redoProfileDraft", "discardProfileDraft", "discardProfileDraftChanges",
+    "reviewProfileDraft", "undoProfileDraft", "redoProfileDraft", "jumpProfileDraft", "discardProfileDraft", "discardProfileDraftChanges",
     "applyProfileDraft", "rebaseProfileDraft", "closeProfileDraftReview",
 ]);
 const PORTABLE_MESSAGES = new Set([
@@ -62,6 +62,7 @@ function buildPanelModel(session, state) {
     model.selectedDeviceId = state.selectedDeviceId || "";
     if (session.draft) {
         model.draft = {...session.draft.view(state), busy};
+        if (session.historyOpen) model.draft.steps = session.draft.steps();
         if (model.draft.matching) {
             model.profileIdentity = session.draft.identity();
             const names = session.draft.current.summary.names;
@@ -129,6 +130,12 @@ function takeOutbox(session) {
  */
 function routeMessage(session, message, state) {
     const type = message?.type;
+    // The draft history sheet is only a view: while it is open the model
+    // carries every step, and only then, since that is the whole history.
+    if (type === "openProfileDraftHistory" || type === "closeProfileDraftHistory") {
+        session.historyOpen = type === "openProfileDraftHistory";
+        return "none";
+    }
     if (session.portableBusy || session.readBusy) return "none";
     if (session.draft && (DRAFT_EDITS.has(type) || DRAFT_CONTROLS.has(type)) && message.draftId !== session.draft.id) {
         throw new Error("This edit belongs to an older draft. Read the keyboard before continuing.");

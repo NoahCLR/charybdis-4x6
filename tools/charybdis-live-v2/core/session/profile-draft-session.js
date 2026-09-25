@@ -90,12 +90,15 @@ class ProfileDraftSession {
         // message, the only kind that ties the units it changed together.
         this.origins = [null];
         this.labels = [null];
+        // When each entry was made, for the draft history.
+        this.times = [this.now()];
         // Which keyboard layer each slot of the entry holds (layer-order.js).
         this.orders = [IDENTITY];
         this.cursor = 0;
         this.revision = 1;
         this.reviewedRevision = null;
     }
+    now() {return Date.now();}
     get document() {return copy(this.history[this.cursor]);}
     get order() {return this.orders[this.cursor];}
     // A history entry decoded once: its validated form (read-only), its
@@ -151,7 +154,7 @@ class ProfileDraftSession {
     }
     reset(snapshot) {
         this.base = copy(snapshot); this.latest = copy(snapshot);
-        this.history = [freeze(copy(snapshot.document))]; this.origins = [null]; this.labels = [null]; this.orders = [IDENTITY]; this.cursor = 0;
+        this.history = [freeze(copy(snapshot.document))]; this.origins = [null]; this.labels = [null]; this.times = [this.now()]; this.orders = [IDENTITY]; this.cursor = 0;
         this.revision++; this.reviewedRevision = null;
         this.needsRead = false;
         this.connectionChanged = false;
@@ -164,12 +167,14 @@ class ProfileDraftSession {
         this.history = this.history.slice(0, this.cursor + 1);
         this.origins = this.origins.slice(0, this.cursor + 1);
         this.labels = this.labels.slice(0, this.cursor + 1);
+        this.times = this.times.slice(0, this.cursor + 1);
         this.orders = this.orders.slice(0, this.cursor + 1);
         this.history.push(freeze(copy(valid)));
         this.origins.push(origin);
         this.labels.push(label);
+        this.times.push(this.now());
         this.orders.push(Object.freeze([...order]));
-        if (this.history.length > 101) {this.history.shift(); this.origins.shift(); this.labels.shift(); this.orders.shift();}
+        if (this.history.length > 101) {this.history.shift(); this.origins.shift(); this.labels.shift(); this.times.shift(); this.orders.shift();}
         this.cursor = this.history.length - 1;
         this.revision++; this.reviewedRevision = null;
     }
@@ -287,6 +292,35 @@ class ProfileDraftSession {
         this.stepCache.set(entry, {previous, units});
         return units;
     }
+    // The draft history, oldest first: every entry with when it was made, in
+    // the words it was recorded with, and what it changed from the entry
+    // before it (not from the keyboard). A step that moved layers compares
+    // against the entry before it moved the same way, so a reorder is one
+    // item and everything else is compared layer with layer. The first
+    // entry has nothing before it: where the draft began, or the oldest one
+    // the bounded history still keeps.
+    steps() {
+        return this.history.map((entry, step) => ({
+            step, at: this.times[step], origin: this.origins[step],
+            label: this.labels[step] || (step ? "Reviewed against the keyboard" : "Read from the keyboard"),
+            current: step === this.cursor, undone: step > this.cursor,
+            changes: step ? this.stepReview(step) : null,
+        }));
+    }
+    stepReview(step) {
+        this.reviewCache ??= new WeakMap();
+        const entry = this.history[step], previous = this.history[step - 1], cached = this.reviewCache.get(entry);
+        const before = this.orders[step - 1], after = this.orders[step];
+        if (cached?.previous === previous && cached.before === before && cached.after === after) return cached.rows;
+        const snapshot = document => ({...this.base, incomplete: false, document, ...this.decode(document)});
+        const back = inverse(before), moved = Object.freeze(after.map(layer => back[layer]));
+        const now = snapshot(entry);
+        const rows = isIdentity(moved) ? profileReview(snapshot(previous), now)
+            : [layerOrderReview(now, moved), ...profileReview(snapshot(validateSnapshot(rearranged(previous, moved), this.capabilities).document), now)];
+        const shown = rows.map(placed);
+        this.reviewCache.set(entry, {previous, before, after, rows: shown});
+        return shown;
+    }
     // Discard one group of review rows: its units go back to what the keyboard
     // holds, as one more undoable step. A review that was current stays
     // current, since what is left is part of what was reviewed.
@@ -325,6 +359,12 @@ class ProfileDraftSession {
     }
     undo(revision) {this.assertRevision(revision); if (this.cursor) {this.cursor--; this.revision++; this.reviewedRevision = null;}}
     redo(revision) {this.assertRevision(revision); if (this.cursor + 1 < this.history.length) {this.cursor++; this.revision++; this.reviewedRevision = null;}}
+    // Several undos or redos at once: straight to one entry of the history.
+    jump(revision, step) {
+        this.assertRevision(revision);
+        if (!Number.isInteger(step) || step < 0 || step >= this.history.length) throw fail("That step is no longer in the draft history.");
+        if (step !== this.cursor) {this.cursor = step; this.revision++; this.reviewedRevision = null;}
+    }
     review(revision) {this.assertRevision(revision); this.reviewedRevision = this.revision;}
     // Leaving the review un-reviews the draft, even one gone stale meanwhile.
     closeReview(revision) {this.assertRevision(revision, {allowStale: true}); this.reviewedRevision = null;}
@@ -333,7 +373,7 @@ class ProfileDraftSession {
         if (this.needsRead) throw fail("Read the latest keyboard state before reviewing this draft again.");
         const target = this.document, order = this.order;
         if (this.latest.incomplete) {
-            this.base = copy(this.latest); this.history = [freeze(target)]; this.origins = [null]; this.labels = [null]; this.orders = [IDENTITY]; this.cursor = 0;
+            this.base = copy(this.latest); this.history = [freeze(target)]; this.origins = [null]; this.labels = [null]; this.times = [this.now()]; this.orders = [IDENTITY]; this.cursor = 0;
             this.connectionToken = this.latestConnectionToken; this.connectionChanged = false;
             this.revision++; this.reviewedRevision = this.revision; return;
         }
@@ -386,6 +426,9 @@ class ProfileDraftSession {
             // the step was recorded with.
             undoLabel: this.cursor > 0 ? this.labels[this.cursor] : null,
             redoLabel: this.cursor + 1 < this.history.length ? this.labels[this.cursor + 1] : null,
+            // How many steps the history holds; the steps themselves come
+            // only while the history sheet is open (steps()).
+            historyLength: this.history.length,
             reviewed: this.reviewedRevision === this.revision,
             changes: this.changes()};
     }

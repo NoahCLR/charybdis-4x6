@@ -48,10 +48,23 @@ test("draft edits are staged, and refused when stale, draftless or on the wrong 
     assert.throws(() => routeMessage(session, {type: "undoProfileDraft", draftId: "older"}, connected()), /older draft/, "draft controls are checked too");
 });
 
+test("the model carries the draft's steps only while the history sheet is open", () => {
+    const session = panelWithDraft();
+    assert.equal(buildPanelModel(session, connected()).draft.steps, undefined, "closed, the history stays in the host");
+    assert.equal(routeMessage(session, {type: "openProfileDraftHistory"}, connected()), "none");
+    const steps = buildPanelModel(session, connected()).draft.steps;
+    assert.deepEqual(steps.map((entry) => [entry.label, entry.current]), [["Read from the keyboard", true]]);
+    session.readBusy = true;
+    routeMessage(session, {type: "closeProfileDraftHistory"}, connected());
+    assert.equal(session.historyOpen, false, "closing is heard even while the keyboard is being read");
+});
+
 test("every other message names the handler that answers it", () => {
     const session = panelWithDraft();
     const id = session.draft.id;
     assert.equal(routeMessage(session, {type: "undoProfileDraft", draftId: id}, connected()), "draft");
+    assert.equal(routeMessage(session, {type: "jumpProfileDraft", draftId: id, step: 0}, connected()), "draft",
+        "going to a history entry is a draft control, like undo");
     assert.equal(routeMessage(session, {type: "applyProfileDraft", draftId: id}, connected()), "draft");
     assert.equal(routeMessage(session, {type: "discardProfileDraftChanges", draftId: id, group: 0}, connected()), "draft",
         "discarding part of the draft is a draft control, never an apply");

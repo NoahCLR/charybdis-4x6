@@ -5,16 +5,16 @@
 // always what would be applied.
 
 import {el, esc} from "./lib/dom.mjs";
-import {css, isOff} from "./lib/colour.mjs";
 import {captureContentScroll, restoreContentScroll} from "./lib/scroll.mjs";
 import {activateOnKey, captureFocus, focusDialog, restoreFocus, trapTab} from "./lib/focus.mjs";
 import {closeComboBuilder, getModel, post, render as rerender, resetDraftForms, setModel, setRenderer, state, writable} from "./store.mjs";
 import {historyAction} from "./view/edits.mjs";
-import {FIELDS_SHOWN, discardLabel, groupNote, placeState, reviewBlocks, statusSummary, stillShown} from "./view/review.mjs";
+import {discardLabel, groupNote, placeState, reviewBlocks, statusSummary, stillShown} from "./view/review.mjs";
 import {bindLayerIndex, hideHover, mountHover} from "./ui/hover.mjs";
 import {pickerOverlay} from "./ui/picker.mjs";
 import {keysShortcut, screenKeys} from "./ui/keys.mjs";
-import {mark, marked} from "./ui/marks.mjs";
+import {reviewColumns, reviewItem} from "./ui/review-items.mjs";
+import {historyOverlay} from "./ui/history.mjs";
 import {closeLayers} from "./ui/layers.mjs";
 import {screenLighting} from "./ui/lighting.mjs";
 import {screenSettings} from "./ui/settings.mjs";
@@ -79,57 +79,10 @@ function reviewOverlay() {
     // Discarding goes back to the keyboard's value; it waits while the draft
     // is out of step with the keyboard or busy, as editing does.
     const canDiscard = writable();
-    // A colour is shown as the keyboard would light it, beside its value; an
-    // off colour is drawn off, as it is everywhere else.
-    const swatch = (colour) => colour
-        ? `<i class="rv-swatch ${isOff(colour) ? "swatch-off" : ""}" style="${isOff(colour) ? "" : `background:${css(colour)}`}"></i>` : "";
-    // Everything with a colour of its own carries its mark, drawn as every
-    // editor draws it (ui/marks.mjs): a tier's dot, a branch badge, a layer's
-    // or pointing mode's light, a combo badge, a stage's on/off dot.
-    const value = (text, klass, colour, marker) => text === null ? ""
-        : `<span class="rv-val">${swatch(colour)}${mark(model, marker)}<span class="${klass}">${esc(text)}</span></span>`;
-    // A behaviour tier is labelled as the grid heads it: the branch badge,
-    // the tier's dot, then the tier's name.
-    const TIER_NAMES = {tap: "tap", hold: "hold", long: "long hold"};
-    // Within an item, marked and unmarked labels share one mark slot, so the
-    // words start at one edge and the tier dots line up in a column.
-    const fieldLabel = (entry, slot) => {
-        const text = entry.labelMark?.kind === "tier" && entry.labelMark.branch ? TIER_NAMES[entry.labelMark.tier] : entry.label;
-        return text ? marked(model, entry.labelMark, text, {slot}) : "";
-    };
-    // Every field is one row of the same three columns — what, on the
-    // keyboard, in your draft — so the two sides line up down the whole
-    // review. A side that has nothing (an added thing on the keyboard, a
-    // removed one in the draft) says so with a dash in its own column.
-    const nothing = `<span class="rv-none">—</span>`;
-    // Each field's own status sits in a narrow column before it, as a diff
-    // marks its lines: + a field the draft adds, − one it removes, nothing for
-    // one it changes. So a tier dropped from a behaviour that stays reads as
-    // removed, and a behaviour removed whole reads − on every line.
-    const SIGNS = {added: "+", removed: "−"};
-    const field = (slot) => (entry) => `<span class="rv-sign ${esc(entry.status || "")}" aria-label="${esc(entry.status || "")}">${SIGNS[entry.status] || ""}</span>
-        <span class="rv-k">${fieldLabel(entry, slot)}</span>
-        <span class="rv-v">${entry.before === null ? nothing : value(entry.before, "del", entry.beforeColour, entry.beforeMark)}</span>
-        <span class="rv-v">${entry.after === null ? nothing : value(entry.after, "ins", entry.afterColour, entry.afterMark)}</span>`;
-    const fields = (item) => {
-        const head = item.fields.slice(0, FIELDS_SHOWN), rest = item.fields.slice(FIELDS_SHOWN);
-        const row = field(item.fields.some((entry) => entry.labelMark));
-        return `<div class="rv-fields">${head.map(row).join("")}${rest.length
-            ? `<details class="rv-more"><summary>Show all ${item.fields.length}</summary><div class="rv-fields">${rest.map(row).join("")}</div></details>` : ""}</div>`;
-    };
-    // An item is one row of the review's grid: a status gutter, the title,
-    // the fields, and two action slots that are always in the same place —
-    // Show, then Discard at the edge — whether or not an item has them.
-    const item = (entry, index, discard, titleSlot) => `<div class="rv-item">
-        <span class="rv-gutter"><span class="rv-status ${esc(entry.status)}">${esc(entry.status)}</span></span>
-        <div class="rv-title">${titleSlot ? `<span class="mk"><span class="mk-slot title">${mark(model, entry.titleMark)}</span><span class="t">${esc(entry.title)}</span></span>` : `<span class="t">${esc(entry.title)}</span>`}
-            ${entry.note ? titleSlot ? `<span class="mk"><span class="mk-slot title"></span><span class="rv-note">${esc(entry.note)}</span></span>` : `<span class="rv-note">${esc(entry.note)}</span>` : ""}</div>
-        ${fields(entry)}
-        <span class="rv-act">${stillShown(entry) && placeState(entry.place, model.layers) ? `<button class="btn tiny ghost" data-show="${index}"
-            data-tip="Close the review and open this where it is edited.">Show</button>` : ""}</span>
-        <span class="rv-act">${discard}</span></div>`;
-    const columns = `<div class="rv-cols"><span></span><span>What changes</span>
-        <div class="rv-fields"><span></span><span></span><span>On the keyboard</span><span>In your draft</span></div><span></span><span></span></div>`;
+    const item = (entry, index, discard, titleSlot) => reviewItem(model, entry, {discard, titleSlot,
+        show: stillShown(entry) && placeState(entry.place, model.layers) ? `<button class="btn tiny ghost" data-show="${index}"
+            data-tip="Close the review and open this where it is edited.">Show</button>` : ""});
+    const columns = reviewColumns("What changes", "On the keyboard", "In your draft");
     const discardable = draft.changes.every((change) => Number.isInteger(change.group));
     const shown = [];
     const sections = reviewBlocks(draft.changes).map(({area, blocks, count}) => `<section class="rv-sect">
@@ -217,6 +170,8 @@ function render() {
     if (picker) root.appendChild(picker);
     const review = reviewOverlay();
     if (review) root.appendChild(review);
+    const history = historyOverlay();
+    if (history) root.appendChild(history);
     restoreFocus(root, focus);
     focusDialog(root);
     reveal();
@@ -265,6 +220,7 @@ addEventListener("message", (event) => {
         state.selected = positions[0]?.layoutIndex ?? 0;
     }
     if (state.overlay === "review" && !message.model?.draft?.dirty) state.overlay = null;
+    if (state.overlay === "history" && !message.model?.draft) { state.overlay = null; post({type: "closeProfileDraftHistory"}); }
     render();
 });
 
@@ -296,6 +252,7 @@ addEventListener("keydown", (event) => {
     if (state.overlay) {
         // Leaving the review by Esc is leaving it by Keep editing.
         if (state.overlay === "review") post({type: "closeProfileDraftReview"});
+        if (state.overlay === "history") post({type: "closeProfileDraftHistory"});
         state.overlay = null;
         render();
     }

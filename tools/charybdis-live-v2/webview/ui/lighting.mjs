@@ -1,5 +1,6 @@
-// Lighting: the same shape as Keys. The board is the constant, the paint order
-// sits under it, and each stage owns a full-width surface in the workbench.
+// Lighting: the same shape as Keys. The board is the constant, with the layer
+// tabs on it, and each stage owns a full-width surface in the workbench, whose
+// tabs are the stages in the order the firmware paints them.
 
 import {css, isOff, label as hsvLabel} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
@@ -10,14 +11,11 @@ import {currentLayer, getModel, layerName, layers, post, render, state, writable
 import * as edits from "../view/edits.mjs";
 import {board} from "./board.mjs";
 import {colourEditor} from "./colour-editor.mjs";
-import {layerBar} from "./layerbar.mjs";
+import {keepInView, layerBar} from "./layerbar.mjs";
 import {topbar, unavailable} from "./shell.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
 import {marked} from "./marks.mjs";
 
-// The stage tabs in paint order, as the vocabulary names them, then the LED
-// groups every stage can draw on.
-const tabs = (model) => [...stageOrder(model), {id: "groups", label: "LED groups"}];
 // The key-feedback colour rows, named as their feedback owners are.
 const SEMANTIC_ROWS = [
     {id: "tapCommittedColor", owner: "KEY_FEEDBACK_GROUP_TAP_COMMITTED"},
@@ -45,22 +43,13 @@ export function screenLighting() {
 
     const content = el(`<div class="content"><div class="pad keys-pad"></div></div>`);
     const pad = content.firstElementChild;
-    const stageWrap = el(`<div class="stack" style="gap:10px"></div>`);
+    // The layer tabs, the board they choose and what it is showing are one
+    // card, as on Keys; on LED groups the board is the LED selector instead.
+    const card = el(`<div class="board-card"></div>`);
     const preview = state.stage === "pd" && state.pdPreview && stageEnabled(model, "pd")
         ? pdColourRow(model, state.pdSlot) : null;
-    stageWrap.appendChild(el(`<div class="stage-head">
-        <h2>${onGroups ? "LED selector" : "Preview"}</h2>
-        <span class="muted" style="font-size:12px">${onGroups
-            ? `click physical LEDs to build a group · ${state.ledPicks.length} selected${state.trackball ? " + trackball" : ""}`
-            : `${esc(layerName(layer))} over the base effect${preview
-                ? ` · ${esc(slotName(model, state.pdSlot))} held, painting ${esc(localityLabel(preview.locality).toLowerCase())}`
-                : ""}`}</span>
-        ${onGroups ? `<span class="right row" style="gap:6px">
-            <button class="btn tiny ghost" data-act="clearleds">Clear selection</button>
-            <button class="btn tiny ${state.trackball ? "primary" : "ghost"}" data-act="trackball"
-                data-tip="Add or remove the trackball LED, index ${TRACKBALL_LED}, from this selection.">Trackball LED</button></span>` : ""}
-    </div>`));
-    stageWrap.appendChild(board(model, layer, {
+    card.append(layerBar());
+    card.appendChild(board(model, layer, {
         mode: onGroups ? "leds" : "light",
         faces: !onGroups,
         picks: state.ledPicks,
@@ -73,16 +62,39 @@ export function screenLighting() {
         } : undefined,
         onTrackball: onGroups ? () => { state.trackball = !state.trackball; render(); } : undefined,
     }));
-    stageWrap.appendChild(paintOrder(model));
-    stageWrap.querySelector('[data-act="clearleds"]')?.addEventListener("click", () => { state.ledPicks = []; render(); });
-    stageWrap.querySelector('[data-act="trackball"]')?.addEventListener("click", () => { state.trackball = !state.trackball; render(); });
-    pad.appendChild(stageWrap);
+    card.appendChild(el(`<div class="board-foot">
+        <b>${onGroups ? "LED selector" : "Preview"}</b>
+        <span>${onGroups
+            ? `click physical LEDs to build a group · ${state.ledPicks.length} selected${state.trackball ? " + trackball" : ""}`
+            : `${esc(layerName(layer))} over the base effect${preview
+                ? ` · ${esc(slotName(model, state.pdSlot))} held, painting ${esc(localityLabel(preview.locality).toLowerCase())}`
+                : ""}`}</span>
+        ${onGroups ? `<span class="right">
+            <button class="btn tiny ghost" data-act="clearleds">Clear selection</button>
+            <button class="btn tiny ${state.trackball ? "primary" : "ghost"}" data-act="trackball"
+                data-tip="Add or remove the trackball LED, index ${TRACKBALL_LED}, from this selection.">Trackball LED</button></span>` : ""}
+    </div>`));
+    card.querySelector('[data-act="clearleds"]')?.addEventListener("click", () => { state.ledPicks = []; render(); });
+    card.querySelector('[data-act="trackball"]')?.addEventListener("click", () => { state.trackball = !state.trackball; render(); });
+    pad.appendChild(card);
 
     const marks = draftMarks(model?.draft?.changes);
+    // The stage tabs are the paint order: numbered as the firmware paints
+    // them, each in the colour it paints now, a stage that is off drawn off.
+    // LED groups is no stage; every stage can draw on them.
+    const stages = stageOrder(model);
+    const stageTab = (stage, index) => {
+        const on = stageEnabled(model, stage.id), colour = stageColour(model, stage.id), lit = on && colour && !isOff(colour);
+        return `<button role="tab" class="${on ? "" : "off"}" data-ltab="${stage.id}" aria-selected="${state.stage === stage.id}"
+            data-tip="Painted ${index + 1} of ${stages.length}${on ? "" : " · this stage is off"}">
+            <span class="n">${index + 1}</span><i class="swatch ${lit ? "" : "swatch-off"}" style="${lit ? `background:${css(colour)}` : ""}"></i>
+            ${esc(stage.label)}${marks.lighting.has(stage.id) ? draftDot() : ""}</button>`;
+    };
     const bench = el(`<div class="card bench">
-        <div class="bench-tabs" role="tablist">
-            ${tabs(model).map((tab) => `<button role="tab" data-ltab="${tab.id}" aria-selected="${state.stage === tab.id}">
-                ${stageOrder(model).some((stage) => stage.id === tab.id) ? `<i class="stagedot ${stageEnabled(model, tab.id) ? "on" : ""}"></i>` : ""}${tab.label}${marks.lighting.has(tab.id) ? draftDot() : ""}</button>`).join("")}
+        <div class="bench-tabs"><div class="bench-tablist" role="tablist" aria-label="Lighting stages, in paint order">
+            ${stages.map(stageTab).join(`<span class="tab-step" aria-hidden="true">›</span>`)}
+            <span class="tab-sep" aria-hidden="true"></span>
+            <button role="tab" data-ltab="groups" aria-selected="${onGroups}">LED groups${marks.lighting.has("groups") ? draftDot() : ""}</button></div>
             <span class="bench-right" id="benchRight"></span>
         </div>
         <div class="bench-body" id="benchBody"></div>
@@ -95,10 +107,8 @@ export function screenLighting() {
     const bit = stageBit(model, state.stage);
     if (bit !== undefined) right.appendChild(stageSwitch(model, state.stage, bit));
     stageBody(bench.querySelector("#benchBody"));
-    const bar = layerBar(`<span class="note" style="margin-left:10px">the board above shows this layer</span>`);
-    const workbench = el(`<div class="workbench-stack"></div>`);
-    workbench.append(bar, bench);
-    pad.appendChild(workbench);
+    keepInView(bench.querySelector(".bench-tablist"));
+    pad.appendChild(bench);
 
     main.appendChild(content);
     return main;
@@ -119,30 +129,17 @@ function stageSwitch(model, id, bit) {
     return node;
 }
 
-// The order the firmware paints in, as a row under the board: it explains what
-// you are looking at, and doubles as a way into each stage.
-function paintOrder(model) {
-    const row = el(`<div class="paintorder"><span class="note">painted in order</span></div>`);
-    const swatchFor = {
+// The colour a stage paints now, for its tab: the layer shown, the pointing
+// mode picked, the hold colour for key feedback.
+function stageColour(model, id) {
+    return {
         base: () => baseColour(model),
         layers: () => layerColourRow(model, currentLayer()?.index)?.color,
         auto: () => model.rgb.automouseFade?.end_color,
         pd: () => pdColourRow(model, state.pdSlot)?.color,
         combo: () => model.rgb.comboFeedback?.color,
         key: () => feedbackColours(model).hold,
-    };
-    stageOrder(model).forEach((stage, index) => {
-        const on = stageEnabled(model, stage.id);
-        const colour = swatchFor[stage.id]();
-        const lit = on && colour && !isOff(colour);
-        const chip = el(`<button class="pochip ${state.stage === stage.id ? "on" : ""} ${on ? "" : "off"}" data-po="${stage.id}">
-            <span class="n">${index + 1}</span>
-            <span class="swatch-lg ${lit ? "" : "swatch-off"}" style="width:11px;height:11px;border-radius:3px;${lit ? `background:${css(colour)}` : ""}"></span>
-            <span>${stage.label}</span>${on ? "" : `<span class="note">off</span>`}</button>`);
-        chip.addEventListener("click", () => { state.stage = stage.id; render(); });
-        row.appendChild(chip);
-    });
-    return row;
+    }[id]?.();
 }
 
 /* ── the stage surfaces ────────────────────────────────────────────────── */
