@@ -547,7 +547,7 @@ peer is ready. Builds with the live-profile owner answer it; others answer
 | 0 | 1 | layout version, `1` |
 | 1 | 1 | peer phase |
 | 2 | 1 | the peer's last split status |
-| 3 | 1 | flags: bit 0 peer cleanup pending, bit 1 this half is transport master |
+| 3 | 1 | flags: bit 0 peer cleanup pending, bit 1 this half is transport master, bit 2 waiting for a safe boundary |
 | 4 | 2 | bytes of the profile transferred to the peer |
 | 6 | 2 | bytes to transfer |
 | 8 | 4 | split retries since boot |
@@ -558,6 +558,14 @@ peer is ready. Builds with the live-profile owner answer it; others answer
 | 20 | 1 | the peer's transfer owner in its last BUSY |
 | 21 | 1 | who held the peer's storage admission in its last BUSY: `0` none, `1` host, `2` peer |
 | 22 | 3 | reserved, zero |
+
+Flag bit 2 (added 2026-09-25) means the commit decision, or the VIA ACCEPT
+that follows it, is waiting for this half to go idle: no held key, pending
+tap, locked layer or pointer mode, one-shot, macro or combo. Input still works
+in this state, so the user can release or unlock what holds it. If it does not
+clear before the 60 s pre-decision no-progress timeout, the save is cancelled
+with `TIMEOUT` and nothing changes; after the decision the save simply waits. Hosts that predate the bit reject the page as
+incompatible; page 1 is advisory, so their Apply is unaffected.
 
 Busy reasons are `0` unspecified, `1` admitted (queued; the answer comes on a
 retry), `2` mailbox full (an earlier request is still unprocessed, which, if it

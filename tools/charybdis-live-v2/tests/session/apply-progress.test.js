@@ -71,4 +71,7 @@ test("a copy the other half keeps refusing says what it is waiting on", () => {
     const {peerReport} = require("../../core/session/portable-profile-session");
     assert.equal(peerReport({phaseName: "BEGINNING", transferOffset: 0, transferLength: 2520, busyStreak: 12, busyReason: "OTHER_COPY"}).detail, "Starting the copy · the other half still holds an earlier copy");
     assert.equal(peerReport({phaseName: "SENDING", transferOffset: 28, transferLength: 2520, busyStreak: 1, busyReason: "ADMITTED"}).detail, "Sending");
+    assert.match(peerReport({phaseName: "PREPARED", waitingSafeBoundary: true}).detail, /Release held keys/);
+    assert.match(failureReason({deviceError: {name: "TIMEOUT"}}, {waitingSafeBoundary: true}), /stayed locked.*Nothing changed/);
+    assert.equal(failureReason({deviceError: {name: "TIMEOUT"}}, {waitingSafeBoundary: false}), "The keyboard gave up waiting for this save.");
 });

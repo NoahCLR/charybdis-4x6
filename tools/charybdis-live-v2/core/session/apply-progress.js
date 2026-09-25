@@ -164,6 +164,8 @@ const PEER_BUSY_REASONS = Object.freeze({
 function failureReason(error, peer) {
     const device = error?.deviceError || error?.status?.error;
     if (device?.name && device.name !== "NONE") {
+        // The copy was ready; the save waited for this half to go idle.
+        if (device.name === "TIMEOUT" && peer?.waitingSafeBoundary) return "A key stayed held, or a layer or pointer mode stayed locked, so the keyboard did not save. Nothing changed.";
         // The copy to the other half stopped: its last answer says why.
         if (device.name === "PEER_TRANSFER_FAILED" && peer?.lastStatusName && PEER_REASONS[peer.lastStatusName]) return PEER_REASONS[peer.lastStatusName];
         const known = DEVICE_REASONS[device.name];

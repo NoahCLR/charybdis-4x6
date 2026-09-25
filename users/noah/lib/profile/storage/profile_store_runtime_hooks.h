@@ -8,3 +8,4 @@
 void noah_profile_store_runtime_init(void);
 void noah_profile_store_runtime_matrix_scan(void);
 bool noah_profile_store_runtime_matrix_scan_step(void);
+bool noah_profile_store_runtime_output_ready(void);

@@ -31,6 +31,10 @@
 #include "users/noah/lib/state/diagnostics/runtime_trace.h"
 #include "users/noah/noah_runtime.h"
 
+bool noah_profile_store_runtime_output_ready(void) {
+    return true;
+}
+
 enum {
     TEST_ACTION                = NOAH_KEYMAP_SAFE_RANGE + 0x10,
     TEST_SECOND_ACTION         = NOAH_KEYMAP_SAFE_RANGE + 0x11,

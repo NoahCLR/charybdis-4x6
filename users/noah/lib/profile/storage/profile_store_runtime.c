@@ -203,6 +203,16 @@ noah_profile_store_runtime_state_t noah_profile_store_runtime_state(void) {
     return runtime_state;
 }
 
+bool noah_profile_store_runtime_output_ready(void) {
+#ifdef NOAH_LIVE_PROFILE_OWNER_ENABLE
+    // A bank left mixed by a restart mid-save is fenced by the VIA layer until
+    // boot recovery makes it one generation; the owner fences a live Apply.
+    return noah_qmk_via_logical_boot_output_ready() && (!runtime_owner_initialized || runtime_integration_error || noah_profile_owner_output_ready(&runtime_owner));
+#else
+    return true;
+#endif
+}
+
 noah_profile_store_result_t noah_profile_store_runtime_discovery_result(void) {
     return discovery_result;
 }

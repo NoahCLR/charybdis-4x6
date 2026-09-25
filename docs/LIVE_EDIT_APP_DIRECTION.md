@@ -32,7 +32,7 @@ manual feedback, not completion of the hardware acceptance matrix.
 | Global policy | Defaults panels cover all 28 portable scalars, including startup layers, combo matching and device-reported lighting/key options; unsupported firmware features stay read-only |
 | Backup and restore | Complete supported snapshots, review, recovery file and verified restore; interrupted restores can be retried |
 | Drafts and Apply | Eight-layer profiles share one draft, an item-by-item change review with discard by edit group and Show (D-L29), undo/redo and a coordinated verified Apply; unfinished forms stay local until kept |
-| Recovery and release readiness | Atomic logical Apply, differential transfer, reboot recovery fencing and verified recovery-base reuse are implemented; physical interruption acceptance, external VIA adoption, guided recovery, broad hardware acceptance and standalone packaging remain pending |
+| Recovery and release readiness | Atomic logical Apply, differential transfer, reboot recovery fencing, firmware roll-forward when the app stops after the decision, resume after a lost or power-cycled peer link, and verified recovery-base reuse are implemented; physical interruption acceptance, external VIA adoption, guided recovery, broad hardware acceptance and standalone packaging remain pending |
 
 Studio's existing Defaults controls now use complete-profile readback and the
 verified restore path, including native options reported by firmware. Editing,

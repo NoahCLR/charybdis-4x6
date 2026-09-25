@@ -1,7 +1,7 @@
 "use strict";
 const {readViaStorage, readRegion, writeRegion, writeViaMacros, changedRanges, viaStorageDigest, VIA_STORAGE} = require("../protocol/via-storage-v1");
 const {readLegacyPdSource, readSettings, readStorageStatus, waitForStorage} = require("../protocol/portable-profile-v1");
-const {readProfileStatus, PROFILE_ACTIVE_KIND} = require("../protocol/profile-wire-v1");
+const {readProfileStatus, PROFILE_ACTIVE_KIND, PROFILE_STATE_FLAGS} = require("../protocol/profile-wire-v1");
 const {readCommittedPayload, readCompiledPayload} = require("../protocol/profile-payload-v1");
 const {readDeviceCombos} = require("../protocol/combo-readback-v1");
 const {candidateMetadataForBlob, readCandidatePeerStatus, readCandidateStatus, CANDIDATE_STATE} = require("../protocol/profile-candidate-v1");
@@ -140,6 +140,7 @@ const PEER_BUSY_DETAIL = Object.freeze({
 });
 function peerReport(peer) {
     if (!peer) return {detail: "Waiting for the other half"};
+    if (peer.waitingSafeBoundary) return {detail: "Release held keys and turn off locked layers or pointer modes to finish saving"};
     const busy = peer.busyStreak >= 3 ? ` · ${PEER_BUSY_DETAIL[peer.busyReason] || "the other half is busy"}` : "";
     const report = {detail: `${PEER_DETAIL[peer.phaseName] || "Waiting for the other half"}${busy}`};
     if (peer.phaseName === "SENDING" || peer.phaseName === "BEGINNING") Object.assign(report, {completed: peer.transferOffset, total: peer.transferLength});
@@ -260,10 +261,14 @@ async function restoreProfile(connection, ids, capabilities, document, {expected
             await verifyRanges(connection, readStored, VIA_STORAGE.MACRO_READ, target.macros, macroRanges, {verifyFinalByte: macroRanges.length > 0});
             const status = await readProfile(connection, options);
             const storageAfter = await readStorage(connection, ids);
-            if (status.activeKind !== PROFILE_ACTIVE_KIND.COMMITTED || status.activeDigest !== fnv1a32(target.profile) || status.committedDigest !== fnv1a32(target.profile) || !(status.stateFlags & 32) || status.conflictCount || !storage.ready || !storageAfter.ready || storage.generation !== targetStorageGeneration || storageAfter.generation !== targetStorageGeneration || storage.generation !== storageAfter.generation || storage.digest !== storageAfter.digest || storageAfter.digest !== expectedStorageDigest) throw fail("RESTORE_VERIFY_FAILED", "The keyboard did not confirm the imported profile on both halves.");
+            // The keyboard activates only after the other half confirmed its
+            // copy, so an active target is saved on both halves even when the
+            // cable between them came out after that confirmation.
+            const peerUnseen = !(status.stateFlags & PROFILE_STATE_FLAGS.PEER_CONVERGED);
+            if (status.activeKind !== PROFILE_ACTIVE_KIND.COMMITTED || status.activeDigest !== fnv1a32(target.profile) || status.committedDigest !== fnv1a32(target.profile) || status.conflictCount || !storage.ready || !storageAfter.ready || storage.generation !== targetStorageGeneration || storageAfter.generation !== targetStorageGeneration || storage.generation !== storageAfter.generation || storage.digest !== storageAfter.digest || storageAfter.digest !== expectedStorageDigest) throw fail("RESTORE_VERIFY_FAILED", "The keyboard did not confirm the imported profile on both halves.");
             const resultFingerprint = fingerprint(document);
             applyProgress.finish();
-            return {document, fingerprint: resultFingerprint, summary: summary(document), status, identity: snapshotIdentity(status, storageAfter, encodeSettings(target.settings)), recovery,
+            return {document, fingerprint: resultFingerprint, summary: summary(document), status, identity: snapshotIdentity(status, storageAfter, encodeSettings(target.settings)), recovery, peerUnseen,
                 performance: {elapsedMs: Date.now() - startedAt, baseSource: before === baseSnapshot ? "verified-cache" : "device-read", layoutBytes, macroBytes, viaConfigReports: 1, layoutReports: layoutRanges.reduce((sum, range) => sum + Math.ceil(range.bytes.length / 12), 0), macroReports: macroWriteNeeded ? macroRanges.reduce((sum, range) => sum + Math.ceil(range.bytes.length / 12), 0) : 0}};
         } catch (error) {
             let cancelled = false;
@@ -280,7 +285,10 @@ async function restoreProfile(connection, ids, capabilities, document, {expected
             if (!decisionObserved && (!commitRequested || cancelled)) {
                 throw Object.assign(fail("RESTORE_NOT_SAVED", `Nothing was saved: the keyboard kept the profile it had. ${error.message}${restart}`), {cause: error});
             }
-            throw Object.assign(fail("RESTORE_INCOMPLETE", `Restore was interrupted. Keep both halves connected. ${before.incomplete ? `Import your original complete backup again. Interrupted data was saved for diagnosis at ${recovery}.` : `Import the recovery file ${recovery}.`} ${error.message}${restart}`), {cause: error});
+            // After the decision the keyboard owns the outcome: once this app
+            // stops writing, it copies the other half's complete target itself.
+            const finishing = decisionObserved ? "The keyboard had already decided to save it and finishes from the other half's copy by itself, about 15 seconds after both halves are connected; read the keyboard again then. Only if it still shows the old profile: " : "";
+            throw Object.assign(fail("RESTORE_INCOMPLETE", `Restore was interrupted. Keep both halves connected. ${finishing}${before.incomplete ? `Import your original complete backup again. Interrupted data was saved for diagnosis at ${recovery}.` : `Import the recovery file ${recovery}.`} ${error.message}${restart}`), {cause: error});
         }
     }
 }

@@ -24,6 +24,9 @@ static uint16_t         macro_write_count;
 static uint16_t         rgb_invalidate_count;
 static uint16_t         macro_invalidate_count;
 static uint16_t         storage_changed_count;
+static bool             mirror_allowed;
+static bool             fake_master;
+static uint16_t         sent_count;
 
 static void test_fail(const char *expr, const char *file, int line) {
     fprintf(stderr, "test failed: %s (%s:%d)\n", expr, file, line);
@@ -44,6 +47,9 @@ static void test_reset(void) {
     rgb_invalidate_count   = 0u;
     macro_invalidate_count = 0u;
     storage_changed_count  = 0u;
+    mirror_allowed         = true;
+    fake_master            = false;
+    sent_count             = 0u;
     memset(keymap_sink, 0xA5, sizeof(keymap_sink));
     memset(macro_sink, 0x5A, sizeof(macro_sink));
     noah_qmk_via_split_mirror_init();
@@ -86,11 +92,16 @@ bool transaction_rpc_send(int8_t transaction_id, uint8_t size, const void *data)
     (void)size;
     (void)data;
     CHECK(transaction_id == PUT_VIA_KEYMAP_MIRROR);
+    sent_count++;
     return true;
 }
 
 bool is_keyboard_master(void) {
-    return false;
+    return fake_master;
+}
+
+bool noah_qmk_via_logical_mirror_allowed(void) {
+    return mirror_allowed;
 }
 
 void dynamic_keymap_set_keycode(uint8_t layer, uint8_t row, uint8_t column, uint16_t keycode) {
@@ -270,6 +281,27 @@ static void test_durable_only_commands_are_not_advertised_as_mirrored(void) {
     CHECK((effects & NOAH_QMK_VIA_COMMAND_EFFECT_SPLIT_MIRROR) == 0u);
 }
 
+static void test_logical_apply_keeps_ordinary_writes_off_the_peer(void) {
+    uint8_t temporary_macro_marker[] = {id_dynamic_keymap_macro_set_buffer, 0u, 1u, 1u, 1u};
+
+    test_reset();
+    fake_master = true;
+    mirror_allowed = false;
+    noah_qmk_via_split_mirror_command(temporary_macro_marker, sizeof(temporary_macro_marker));
+    CHECK(sent_count == 0u);
+    mirror_allowed = true;
+    noah_qmk_via_split_mirror_command(temporary_macro_marker, sizeof(temporary_macro_marker));
+    CHECK(sent_count == 1u);
+
+    fake_master = false;
+    mirror_enqueue_frame(temporary_macro_marker, sizeof(temporary_macro_marker));
+    mirror_allowed = false;
+    CHECK(!noah_qmk_via_split_mirror_matrix_scan_step());
+    mirror_allowed = true;
+    CHECK(!noah_qmk_via_split_mirror_matrix_scan_step());
+    CHECK(macro_write_count == 0u);
+}
+
 int main(void) {
     test_maximum_valid_payload_is_applied_by_real_receiver();
     test_callback_only_queues_and_scan_owns_storage();
@@ -278,6 +310,7 @@ int main(void) {
     test_wrapping_payload_sizes_are_rejected_without_touching_storage();
     test_every_classified_mirror_command_is_implemented();
     test_durable_only_commands_are_not_advertised_as_mirrored();
+    test_logical_apply_keeps_ordinary_writes_off_the_peer();
     puts("qmk via split mirror tests passed");
     return 0;
 }

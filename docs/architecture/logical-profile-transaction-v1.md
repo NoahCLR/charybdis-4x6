@@ -43,7 +43,14 @@ identities as if they had been stored with the profile.
 
 The effective-profile owner may publish a committed custom record only while
 the local VIA identity matches the record's bound VIA identity. A mismatch is a
-recovery state and blocks normal output until reconciliation completes.
+recovery state and blocks normal output until reconciliation completes. The VIA
+layer enforces this after a restart: output stays fenced while boot recovery
+has not yet matched the local bank to the committed record's bound identity
+(normally a fraction of a second, until the local digest completes), and while
+a bank that booted dirty from an interrupted write has not been made clean
+again. Both clear only from a complete generation, which may need the peer.
+Uninitialized metadata on a freshly flashed half, an ordinary VIA edit in
+progress, and owner error states do not fence output.
 
 ## Why The Peer Is The VIA Staging Copy
 
@@ -71,15 +78,48 @@ partially replaced bank.
 5. The custom candidate is validated and prepared on both halves with the exact
    target VIA identity. Both prepared markers become durable.
 6. The USB half writes its custom commit marker. This is the logical decision
-   point. Runtime activation remains blocked because its VIA store is still old.
+   point. The owner first waits for a safe behavior boundary, reporting the
+   wait as peer-status flag bit 2, so a held key or locked layer can still end
+   the Apply cleanly on the pre-decision timeout. The USB half keeps typing
+   the complete old generation through the decision: its VIA bank and active
+   custom profile are both still old. Runtime activation remains blocked
+   because its VIA store is still old.
 7. The peer commits the same custom record, accepts its staged VIA generation,
-   and becomes the complete new replica.
+   and becomes the complete new replica. The owner requests that VIA ACCEPT
+   only at a safe behavior boundary (flag bit 2 again while it waits) and
+   fences key output from the request until activation: from ACCEPT the USB
+   half's VIA bytes, custom behaviors, or both may belong to different
+   generations. Entering the fence at a safe boundary matters because
+   activation needs the same boundary and fenced keys could not release a
+   hold or unlock a layer. A press made during the fence also loses its
+   release. Boot, discovery and owner error states keep typing on the loaded
+   keymap, except while a restart left the local VIA bank suspect (see
+   Identity).
 8. After the decision is observable, the host waits for the peer VIA accept and
    writes only the changed VIA ranges to the USB half. A custom-only change uses
    one verified no-op keycode write to advance the bound VIA generation. The
    peer remains the complete recovery copy throughout this roll-forward.
-9. Once both halves report the same logical manifest and no transfer is pending,
-   the effective-profile owner activates at the existing safe behavior boundary.
+   Ordinary split VIA mirroring is suppressed during staging and roll-forward,
+   including mirror frames queued before staging began. A pause between local
+   VIA write chunks cannot publish an intermediate digest or consume the target
+   VIA generation. If no local VIA write arrives for
+   `VIA_SPLIT_SYNC_LOGICAL_ROLL_FORWARD_IDLE_MS` (15 s) after ACCEPT or the
+   last write, the USB half releases the hold itself, exactly as a reboot
+   would. Its partly written bank stays dirty, or stays at the old generation
+   if nothing was written, so ordinary reconciliation pulls the peer's complete
+   accepted copy over it. The discarded partial mutation is covered by that
+   pull. A late host write carries the same target bytes, so it only restarts
+   the pull, which then converges.
+9. The effective-profile owner activates at the existing safe behavior boundary
+   once the peer has confirmed the new generation and this half holds it
+   completely. The peer's confirmation is its durable custom commit, observed
+   by the USB half, and its acknowledged VIA ACCEPT; ACCEPT is sent only while
+   the peer is in sight. This half's part is its VIA bank clean at the target
+   generation and digest. The peer is not observed a second time, so a link
+   lost during roll-forward cannot hold activation; nothing activates on one
+   half before the other has confirmed it. Ordinary reconciliation compares
+   both halves again when the link returns, and a conflict there still ends
+   in the existing conflict states.
 
 ## Power-Loss Outcomes
 
@@ -94,6 +134,19 @@ partially replaced bank.
 An acknowledgement loss is resolved from markers and identities. A missing peer
 before the decision is a safe abort. A missing peer after the decision is an
 explicit recovery state because the only complete target VIA copy may be there.
+It resumes by itself when the link returns, with no restart: before ACCEPT
+the USB half keeps typing the old generation meanwhile. After the peer's
+acknowledged ACCEPT, the host finishes rewriting the USB half and it activates
+without the link (step 9). Output stays fenced across a lost link only when
+ACCEPT is requested in the instant before the USB half notices the link is
+gone (its acknowledgement then waits for the peer), or when the host also
+disappears mid-rewrite: no complete generation exists on the USB half, and
+the firmware roll-forward needs the peer's copy. Unplugging the link cable also powers the
+peer off. A peer that rebooted keeps its durable prepared custom record and
+staged VIA bank but not its volatile leases, so the USB half sends the custom
+copy again from its own committed record (logical copies rebind first) before
+the authorized commit, and the peer's ACCEPT matches the staged bank by its
+persisted generation and recomputed digest.
 
 ## External VIA Writers
 
@@ -116,8 +169,8 @@ also carries transaction, region, generation and digest correlation. Apply keeps
 the differential range selection, so ordinary edits still avoid transferring the
 unchanged macro capacity. Firmware holds ordinary full-store reconciliation after
 the decision while the connected host performs this differential roll-forward.
-If the host disappears, reboot recovery deliberately clears that volatile hold
-and can copy the peer's complete target.
+If the host disappears, the firmware roll-forward (step 8) or a reboot clears
+that volatile hold, and reconciliation copies the peer's complete target.
 
 ## Implementation Status
 
@@ -126,7 +179,12 @@ prepare, USB-side decision marker, peer commit, VIA roll-forward, activation
 gate, boot recovery fence, and app coordinator are implemented. Host tests cover
 prepared-marker reboot selection, incompatible firmware identities, predecision
 abort, decision ordering, role recovery, bound-record split transfer, staged VIA
-acceptance and reboot recovery. The firmware advertises atomic logical Apply as
+acceptance, reboot recovery, and the firmware roll-forward after the host goes
+quiet mid-write, never writes, or writes late during the pull; a lost peer link
+after the decision, with and without the peer rebooting, resuming on reconnect;
+ACCEPT waiting for a safe boundary while input still works; ACCEPT never sent
+to a peer known to be unreachable; and activation with the link lost during
+roll-forward. The firmware advertises atomic logical Apply as
 a required write capability, so the app refuses complete Apply on older images.
 
 Physical interruption tests at every durable boundary and external VIA-writer

@@ -108,7 +108,8 @@ test("a sent commit the keyboard then cancels is reported as not saved", async (
 });
 test("a sent commit the keyboard never confirms cancelling stays an interrupted restore with its recovery file", async () => {
     const f = fixture(); stalledCommit(f, {abortConfirmed: false});
-    await assert.rejects(restoreProfile({}, {}, capabilities, f.targetDocument, f.options), error => error.code === "RESTORE_INCOMPLETE" && error.message.includes("/recovery.json"));
+    await assert.rejects(restoreProfile({}, {}, capabilities, f.targetDocument, f.options), error => error.code === "RESTORE_INCOMPLETE" && error.message.includes("/recovery.json")
+        && !/finishes from the other half's copy/.test(error.message), "no decision was seen, so the keyboard may not finish it");
 });
 test("a peer that never confirmed the cancel adds restart guidance", async () => {
     const f = fixture(); stalledCommit(f, {abortConfirmed: true});
@@ -119,10 +120,23 @@ test("a peer that never confirmed the cancel adds restart guidance", async () =>
     await assert.rejects(restoreProfile({}, {}, capabilities, f.targetDocument, f.options), error => error.code === "RESTORE_NOT_SAVED" && !/Unplug/.test(error.message),
         "an unreadable status only loses the hint");
 });
+test("an active target with the other half out of sight is a completed save, reported as such", async () => {
+    const f = fixture();
+    const read = f.operations.readProfile;
+    f.operations.readProfile = async () => ({...await read(), stateFlags: 0});
+    const result = await restoreProfile({}, {}, capabilities, f.targetDocument, f.options);
+    assert.equal(result.peerUnseen, true, "the keyboard switched only after the other half confirmed");
+    f.operations.readProfile = read;
+    assert.equal((await restoreProfile({}, {}, capabilities, f.targetDocument, f.options)).peerUnseen, false);
+    // The other half being out of sight never excuses a wrong active profile.
+    f.operations.readProfile = async () => ({...await read(), stateFlags: 0, activeDigest: 1});
+    await assert.rejects(restoreProfile({}, {}, capabilities, f.targetDocument, f.options), /did not confirm the imported profile/);
+});
 test("a post-decision local-write interruption preserves the peer recovery copy", async () => {
     const f = fixture();
     f.operations.rollForwardLocal = async () => {f.events.push("local roll-forward"); throw Error("disconnected");};
-    await assert.rejects(restoreProfile({}, {}, capabilities, f.targetDocument, f.options), error => error.code === "RESTORE_INCOMPLETE" && error.message.includes("/recovery.json"));
+    await assert.rejects(restoreProfile({}, {}, capabilities, f.targetDocument, f.options), error => error.code === "RESTORE_INCOMPLETE" && error.message.includes("/recovery.json")
+        && /finishes from the other half's copy/.test(error.message), "after the decision the keyboard finishes the save itself");
     assert.equal(f.events.includes("via abort"), false);
     assert.deepEqual(f.events, ["backup", "stage", "via stage", "commit", "via accepted", "local roll-forward"]);
 });

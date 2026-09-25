@@ -67,7 +67,19 @@ test("apply writes a recovery copy through the host, then reads the keyboard aga
     assert.equal(h.saved.length, 1);
     assert.deepEqual(session.service.calls, ["restorePortableProfile", "readLayout", "readCommittedProfile", "readCombos", "readBaseRgb"]);
     assert.match(session.notice, /Recovery copy: \/recovery\/1\.json/);
+    assert.match(session.notice, /both halves and verified/);
     assert.equal(session.resetDraftForms, true);
+});
+
+test("an apply that finished with the other half unplugged says so instead of claiming a readback", async () => {
+    const session = sessionWithDraft(), draft = session.draft, h = host();
+    const restore = session.service.restorePortableProfile;
+    session.service.restorePortableProfile = async (doc, options) => ({...await restore(doc, options), peerUnseen: true});
+    stage(session, {type: "updateLayoutKeys", layers: [{layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "KC_A"}]}]});
+    draft.review(draft.revision);
+    await draftControl(session, {type: "applyProfileDraft", draftRevision: draft.revision}, h);
+    assert.match(session.notice, /other half confirmed its copy but is not connected now/);
+    assert.doesNotMatch(session.notice, /verified/);
 });
 
 test("discarding the draft of an unchanged keyboard is an undoable step, and leaving review un-reviews", async () => {

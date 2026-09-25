@@ -59,6 +59,10 @@ static uint16_t                              key_runtime_scenario_unregister_cod
 
 layer_state_t layer_state;
 
+bool noah_profile_store_runtime_output_ready(void) {
+    return true;
+}
+
 bool layer_state_cmp(layer_state_t state, uint8_t layer) {
     return layer < LAYER_COUNT && (state & ((layer_state_t)1u << layer)) != 0;
 }

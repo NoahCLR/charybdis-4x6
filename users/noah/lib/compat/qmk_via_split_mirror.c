@@ -133,6 +133,15 @@ bool noah_qmk_via_split_mirror_matrix_scan_step(void) {
     uint8_t frame[RPC_M2S_BUFFER_SIZE];
     uint8_t length = 0u;
 
+    if (!noah_qmk_via_logical_mirror_allowed()) {
+        // A normal VIA frame may have been queued just before the logical
+        // stage began. It cannot be replayed after the peer becomes the
+        // recovery bank, even if it was admitted earlier.
+        ATOMIC_BLOCK_RESTORESTATE {
+            noah_qmk_via_split_mirror_mailbox.pending = false;
+        }
+        return false;
+    }
     ATOMIC_BLOCK_RESTORESTATE {
         if (noah_qmk_via_split_mirror_mailbox.pending) {
             length = noah_qmk_via_split_mirror_mailbox.length;
@@ -148,7 +157,7 @@ bool noah_qmk_via_split_mirror_matrix_scan_step(void) {
 }
 
 void noah_qmk_via_split_mirror_command(const uint8_t *data, uint8_t length) {
-    if (!data || length == 0u || length > RPC_M2S_BUFFER_SIZE || !is_keyboard_master()) {
+    if (!data || length == 0u || length > RPC_M2S_BUFFER_SIZE || !is_keyboard_master() || !noah_qmk_via_logical_mirror_allowed()) {
         return;
     }
 

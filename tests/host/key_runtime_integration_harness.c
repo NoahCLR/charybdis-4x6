@@ -84,6 +84,12 @@ __attribute__((weak)) bool noah_pre_process_record_user(uint16_t keycode, keyrec
     return true;
 }
 
+bool key_runtime_integration_output_ready = true;
+
+__attribute__((weak)) bool noah_profile_store_runtime_output_ready(void) {
+    return key_runtime_integration_output_ready;
+}
+
 __attribute__((weak)) void noah_process_record_user_finalize(uint16_t keycode, keyrecord_t *record, bool keep_processing) {
     (void)keycode;
     (void)record;

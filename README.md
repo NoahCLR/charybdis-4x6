@@ -400,7 +400,20 @@ closing it loses unapplied changes. Current firmware stages VIA changes on the
 other half and durably prepares the custom profile on both halves before one
 custom marker decides the complete logical generation. Key output activates
 only after the VIA and custom identities converge, and boot recovery finishes a
-decided transaction before enabling the saved profile. Apply also verifies and
+decided transaction before enabling the saved profile. Apply waits for held
+keys, locked layers and pointer modes to clear before the commit decision (the
+app says so; after 60 s the save is cancelled and nothing changes), then holds
+key input for the few moments while this half's keys and macros are rewritten
+and the new profile activates. If the app is closed in that window, the
+keyboard finishes the save on its own from the other half's copy within about
+15 seconds. If the cable between the halves comes out after the decision, the
+USB half keeps typing the old profile until the rewrite starts, and the save
+resumes by itself when the cable goes back in. If it comes out during the
+rewrite, the other half has already confirmed its copy, so the USB half
+finishes and switches to the new profile; the app says the other half is not
+connected instead of claiming it read both halves back. After power loss in the
+middle of a save, the USB half types nothing until its keys and macros are one
+complete version again, which may need the other half connected. It verifies and
 reuses the complete snapshot already loaded in the editor, checks the post-lease
 identity without rereading the whole macro bank, and transfers only changed VIA
 blocks to the peer staging copy and then to the USB half after the decision. The

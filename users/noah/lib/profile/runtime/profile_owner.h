@@ -122,6 +122,8 @@ typedef struct {
     bool                                 host_barrier_started : 1;
     bool                                 host_barrier_local_published : 1;
     bool                                 host_barrier_peer_commit_authorized : 1;
+    bool                                 host_barrier_waiting_boundary : 1;
+    bool                                 host_barrier_peer_confirmed : 1;
     bool                                 host_cancel_pending : 1;
     bool                                 host_via_accept_requested : 1;
     bool                                 host_via_abort_requested : 1;
@@ -171,6 +173,9 @@ bool noah_profile_owner_scan(noah_profile_owner_t *owner, bool master, uint32_t 
 bool noah_profile_owner_receive(noah_profile_owner_t *owner, uint8_t *frame, size_t length);
 
 noah_profile_owner_state_t         noah_profile_owner_state(const noah_profile_owner_t *owner);
+// Key output is fenced only from the logical VIA ACCEPT request until
+// activation (or a post-commit authority failure). Every other state types.
+bool                               noah_profile_owner_output_ready(const noah_profile_owner_t *owner);
 noah_profile_store_result_t        noah_profile_owner_discovery_result(const noah_profile_owner_t *owner);
 const noah_profile_store_record_t *noah_profile_owner_committed(const noah_profile_owner_t *owner);
 

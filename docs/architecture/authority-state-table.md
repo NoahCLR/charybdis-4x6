@@ -147,7 +147,10 @@ The landed predicate freezes the following firmware reason bits:
 
 The predicate snapshot uses bounded generation publication so an extension-host
 status read cannot observe counts from two evaluations. A missing peer observer
-is intentionally unsafe. The predicate is installed by the gated D-021 owner
+is intentionally unsafe. One exception is bounded: while a host Apply is
+`ACTIVATING` the record this owner already saw the peer durably commit (and,
+for a logical record, whose VIA ACCEPT the peer acknowledged), the peer reason
+is satisfied by that confirmation instead of a second live observation. The predicate is installed by the gated D-021 owner
 together with the behavior and RGB invalidators and exact split peer observer.
 Ordinary firmware still allocates only the read-only shell. The D-022
 distributed barrier enforces postcommit authority in the gated owner. The

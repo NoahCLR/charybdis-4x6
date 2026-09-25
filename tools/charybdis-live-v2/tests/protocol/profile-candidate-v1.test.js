@@ -268,17 +268,20 @@ test("candidate status page 1 reports the copy to the other half, and older firm
     const reply = (options) => ({async request(actual) { return peerResponse(actual, options); }});
     const peer = await readCandidatePeerStatus(reply({payload: peerPayload()}), {nextRequestId: () => ids++});
     assert.deepEqual(peer, {phase: CANDIDATE_PEER_PHASE.SENDING, phaseName: "SENDING", lastStatus: 6, lastStatusName: "BUSY",
-        cleanupPending: true, master: true, transferOffset: 40, transferLength: 120, retryCount: 7, transportFailureCount: 2,
+        cleanupPending: true, master: true, waitingSafeBoundary: false, transferOffset: 40, transferLength: 120, retryCount: 7, transportFailureCount: 2,
         busyStreak: 0, busyReason: "UNSPECIFIED", busyStoreState: "UNINITIALIZED", busyOwner: "NONE", busyAdmission: "NONE"});
     assert.equal(buildCandidatePeerStatusRequest(0x51)[4], 1, "page 1");
     // Why the other half keeps saying BUSY: a stale earlier copy it is still receiving.
     const busy = peerPayload(); busy.writeUInt16LE(300, 16); busy[18] = 3; busy[19] = 2; busy[20] = 1; busy[21] = 2;
     assert.deepEqual(await readCandidatePeerStatus(reply({payload: busy}), {nextRequestId: () => ids++}).then(({busyStreak, busyReason, busyStoreState, busyOwner, busyAdmission}) => ({busyStreak, busyReason, busyStoreState, busyOwner, busyAdmission})),
         {busyStreak: 300, busyReason: "OTHER_COPY", busyStoreState: "RECEIVING", busyOwner: "REMOTE_PUSH", busyAdmission: "PEER"});
+    // The copy is ready and the decision waits for this half to go idle.
+    const waiting = peerPayload(); waiting[3] = 0x06;
+    assert.equal((await readCandidatePeerStatus(reply({payload: waiting}), {nextRequestId: () => ids++})).waitingSafeBoundary, true);
 
     assert.equal(await readCandidatePeerStatus(reply({status: 2}), {nextRequestId: () => ids++}), null, "UNKNOWN_PAGE is 'not reported'");
 
-    for (const [offset, value, pattern] of [[1, 10, /phase/], [2, 11, /peer status/], [3, 0x04, /flag/], [18, 8, /busy detail/], [19, 10, /busy detail/], [20, 3, /busy detail/], [21, 3, /busy detail/], [22, 1, /reserved/]]) {
+    for (const [offset, value, pattern] of [[1, 10, /phase/], [2, 11, /peer status/], [3, 0x08, /flag/], [18, 8, /busy detail/], [19, 10, /busy detail/], [20, 3, /busy detail/], [21, 3, /busy detail/], [22, 1, /reserved/]]) {
         const payload = peerPayload();
         payload[offset] = value;
         await assert.rejects(readCandidatePeerStatus(reply({payload}), {nextRequestId: () => ids++}), pattern);

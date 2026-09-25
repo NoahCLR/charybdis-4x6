@@ -18,6 +18,12 @@ const {applyLayerEdit, discardDraftForDevice, layerEditDocument, startLayerEdit}
 const {IDENTITY} = require("../model/layer-order");
 
 const run = (host, title, work) => host.progress ? host.progress(title, work) : work();
+// The other half confirmed its copy before the keyboard switched, but the
+// cable between the halves may have come out since; say so instead of
+// claiming a readback of both halves that did not happen.
+const savedNotice = (result, verb) => result?.peerUnseen
+    ? `Complete profile ${verb} both halves and active. The other half confirmed its copy but is not connected now; plug the cable between the halves back in.`
+    : `Complete profile ${verb} both halves and verified.`;
 
 // After the keyboard stores a new profile, everything the panel shows about
 // it is read again, in the order the reads depend on.
@@ -121,11 +127,11 @@ async function draftControl(session, message, host = {}) {
         }
         case "applyProfileDraft": {
             let recovery = "";
-            await run(host, "Applying the complete profile to both halves",
+            const result = await run(host, "Applying the complete profile to both halves",
                 () => draft.apply(service, revision, async (document) => (recovery = await host.saveRecovery(document))));
             session.resetDraftForms = true;
             await rereadKeyboard(service);
-            session.notice = "Complete profile applied to both halves and verified. Recovery copy: " + recovery;
+            session.notice = `${savedNotice(result, "applied to")} Recovery copy: ${recovery}`;
             return;
         }
         default: throw new Error("Unsupported draft control.");
@@ -193,11 +199,11 @@ async function portableControl(session, message, host = {}) {
                 return;
             }
             let recovery = "";
-            await service.restorePortableProfile(document, {expectedFingerprint: before.fingerprint,
+            const result = await service.restorePortableProfile(document, {expectedFingerprint: before.fingerprint,
                 saveRecovery: async (copy) => (recovery = await host.saveRecovery(copy))});
             session.portableReview = undefined; session.portableLayers = undefined;
             await rereadKeyboard(service);
-            session.notice = "Complete profile saved to both halves and verified. " + (before.incomplete ? "Interrupted data retained for diagnosis: " : "Recovery copy: ") + recovery;
+            session.notice = savedNotice(result, "saved to") + " " + (before.incomplete ? "Interrupted data retained for diagnosis: " : "Recovery copy: ") + recovery;
             return;
         }
         default: throw new Error("Unsupported portable control.");

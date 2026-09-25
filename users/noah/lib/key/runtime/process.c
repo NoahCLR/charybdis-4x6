@@ -19,6 +19,7 @@
 #include "../../state/ownership/layer_ownership.h"
 #include "../../state/modifiers/keyboard_mod_policy.h"
 #include "../../state/diagnostics/runtime_diag.h"
+#include "../../profile/storage/profile_store_runtime_hooks.h"
 #include "slot/origin_registry.h"
 
 #ifdef NOAH_HOST_TEST_ENV
@@ -283,7 +284,33 @@ static void key_runtime_process_settle_report_ownership(uint16_t keycode, keyrec
     keyboard_mod_ownership_track_report_keycode_event(keycode, record);
 }
 
+// Physical keys whose press the profile output fence dropped. Their release
+// is dropped too, even after the fence lifts, so no half event reaches QMK.
+static uint8_t key_runtime_fenced_presses[KEY_ORIGIN_BITMAP_SIZE];
+
+static bool key_runtime_process_output_fenced(const keyrecord_t *record) {
+    bool key_event = record->event.type == KEY_EVENT && key_origin_keypos_valid(record->event.key);
+
+    if (key_event && !record->event.pressed && key_origin_bitmap_has_keypos(key_runtime_fenced_presses, record->event.key)) {
+        key_origin_bitmap_remove_keypos(key_runtime_fenced_presses, record->event.key);
+        return true;
+    }
+    // QMK resolves a VIA key before reaching this hook. Once a logical
+    // decision is authorized, local VIA bytes may be only partly rolled
+    // forward; do not dispatch that mixed keymap to the host.
+    if (noah_profile_store_runtime_output_ready()) {
+        return false;
+    }
+    if (key_event && record->event.pressed) {
+        key_origin_bitmap_add_keypos(key_runtime_fenced_presses, record->event.key);
+    }
+    return true;
+}
+
 bool noah_pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
+    if (key_runtime_process_output_fenced(record)) {
+        return false;
+    }
     if (noah_synthetic_record_active()) {
         return true;
     }

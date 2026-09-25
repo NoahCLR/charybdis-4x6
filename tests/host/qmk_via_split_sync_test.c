@@ -54,6 +54,10 @@ static uint16_t peer_begin_count;
 // state momentarily dirty -- answers SNAPSHOT_REQUIRED without having lost its
 // session. Retrying clears it; renegotiating does not.
 static uint8_t          peer_transient_rejects;
+// A peer that answers metadata with the generation it accepted, as the real
+// receiver does after LOGICAL_STAGE_ACCEPT, instead of echoing the master.
+static bool             peer_tracks_accept;
+static uint32_t         peer_accepted_generation;
 static test_rpc_mode_t  rpc_mode;
 static slave_callback_t registered_callback;
 
@@ -120,6 +124,8 @@ static void test_reset(void) {
     peer_session_active       = false;
     peer_begin_count          = 0u;
     peer_transient_rejects    = 0u;
+    peer_tracks_accept        = false;
+    peer_accepted_generation  = 0u;
     rpc_mode                  = TEST_RPC_EQUAL;
     registered_callback       = NULL;
 }
@@ -274,7 +280,9 @@ bool transaction_rpc_exec(int8_t transaction_id, uint8_t request_size, const voi
         return false;
     }
 
-    if (request.kind == NOAH_QMK_VIA_SYNC_MESSAGE_METADATA) {
+    if (request.kind == NOAH_QMK_VIA_SYNC_MESSAGE_METADATA && peer_accepted_generation != 0u) {
+        response = (noah_qmk_via_sync_frame_t){.kind = NOAH_QMK_VIA_SYNC_MESSAGE_METADATA, .status = NOAH_QMK_VIA_SYNC_STATUS_OK, .generation = peer_accepted_generation, .digest = peer_digest()};
+    } else if (request.kind == NOAH_QMK_VIA_SYNC_MESSAGE_METADATA) {
         response = (noah_qmk_via_sync_frame_t){
             .kind       = NOAH_QMK_VIA_SYNC_MESSAGE_METADATA,
             .status     = rpc_mode == TEST_RPC_PEER_DIRTY ? NOAH_QMK_VIA_SYNC_STATUS_SNAPSHOT_REQUIRED : NOAH_QMK_VIA_SYNC_STATUS_OK,
@@ -309,6 +317,9 @@ bool transaction_rpc_exec(int8_t transaction_id, uint8_t request_size, const voi
         memcpy(&destination[request.offset], request.payload, request.payload_length);
         response = (noah_qmk_via_sync_frame_t){.kind = NOAH_QMK_VIA_SYNC_MESSAGE_ACK, .region = request.region, .generation = request.generation, .offset = request.offset + request.payload_length, .region_length = request.region_length, .digest = request.digest};
     } else if (request.kind == NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_VERIFY || request.kind == NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_ACCEPT || request.kind == NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_ABORT) {
+        if (request.kind == NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_ACCEPT && peer_tracks_accept) {
+            peer_accepted_generation = request.generation;
+        }
         response = (noah_qmk_via_sync_frame_t){.kind = NOAH_QMK_VIA_SYNC_MESSAGE_ACK, .generation = request.generation, .digest = request.digest};
     } else if (request.kind == NOAH_QMK_VIA_SYNC_MESSAGE_SNAPSHOT_COMMIT) {
         rpc_commit_count++;
@@ -598,6 +609,64 @@ static void test_dirty_reboot_pulls_clean_peer(void) {
     CHECK(!metadata.dirty);
 }
 
+static void test_boot_output_fence_covers_only_a_suspect_bank(void) {
+    // A write cut off by a restart leaves the bank possibly mixed: no output
+    // until reconciliation replaces it with the peer's complete copy.
+    test_reset();
+    user_eeconfig_word = noah_qmk_via_sync_metadata_encode((noah_qmk_via_sync_metadata_t){.generation = 5u, .dirty = true});
+    rpc_mode           = TEST_RPC_DISCONNECTED;
+    test_init_ready();
+    scan_many(0u, 20u);
+    CHECK(!noah_qmk_via_logical_boot_output_ready());
+    rpc_mode       = TEST_RPC_PEER_NEWER;
+    peer_keymap[0] = 0xB1u;
+    scan_many(2000u, 40u);
+    CHECK(local_keymap[0] == 0xB1u);
+    CHECK(noah_qmk_via_logical_boot_output_ready());
+
+    // A freshly flashed half has no metadata at all; it is not suspect, and
+    // it types even without its peer.
+    test_reset();
+    user_eeconfig_word = 0u;
+    rpc_mode           = TEST_RPC_DISCONNECTED;
+    test_init_ready();
+    scan_many(0u, 20u);
+    CHECK(!noah_qmk_via_sync_state_snapshot().initialized);
+    CHECK(noah_qmk_via_logical_boot_output_ready());
+
+    // An ordinary VIA edit is dirty only while it is being written; it never
+    // fences output, with or without the peer.
+    test_reset();
+    rpc_mode = TEST_RPC_DISCONNECTED;
+    test_init_ready();
+    scan_many(0u, 4u);
+    noah_qmk_via_split_sync_note_mutation(NOAH_QMK_VIA_COMMAND_EFFECT_SPLIT_MIRROR);
+    local_keymap[1] = 0xA5u;
+    CHECK(noah_qmk_via_sync_state_snapshot().metadata.dirty);
+    CHECK(noah_qmk_via_logical_boot_output_ready());
+    scan_many(10u, 8u);
+    CHECK(noah_qmk_via_logical_boot_output_ready());
+
+    // A clean bank whose identity differs from the committed record is held
+    // by boot recovery until the peer's matching copy arrives.
+    test_reset();
+    rpc_mode = TEST_RPC_DISCONNECTED;
+    noah_qmk_via_split_sync_init();
+    scan_many(0u, 4u);
+    CHECK(noah_qmk_via_logical_boot_recover(6u, UINT32_C(0x12345678)));
+    scan_many(10u, 20u);
+    CHECK(!noah_qmk_via_logical_boot_output_ready());
+
+    // The same recovery clears at once when the bank already matches.
+    test_reset();
+    user_eeconfig_word = noah_qmk_via_sync_metadata_encode((noah_qmk_via_sync_metadata_t){.generation = 6u});
+    rpc_mode           = TEST_RPC_DISCONNECTED;
+    noah_qmk_via_split_sync_init();
+    CHECK(noah_qmk_via_logical_boot_recover(6u, local_digest()));
+    scan_many(0u, 8u);
+    CHECK(noah_qmk_via_logical_boot_output_ready());
+}
+
 static void test_mutation_during_dirty_recovery_does_not_block_reconciliation(void) {
     test_reset();
     user_eeconfig_word = noah_qmk_via_sync_metadata_encode((noah_qmk_via_sync_metadata_t){.generation = 5u, .dirty = true});
@@ -773,6 +842,49 @@ static void test_logical_receiver_stays_dirty_until_decision_accept(void) {
     CHECK(rgb_invalidate_count == 1u && macro_invalidate_count == 1u);
 }
 
+static void test_logical_receiver_accepts_its_staged_bank_after_reboot(void) {
+    noah_qmk_via_sync_frame_t response;
+    uint32_t                  target_digest;
+
+    test_reset();
+    fake_master = false;
+    test_init_ready();
+    scan_many(0u, 2u);
+
+    peer_keymap[1] = 0x71u;
+    target_digest  = peer_digest();
+    CHECK(callback_exchange((noah_qmk_via_sync_frame_t){.kind = NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_BEGIN, .generation = 7u, .digest = target_digest}).status == NOAH_QMK_VIA_SYNC_STATUS_OK);
+    (void)callback_exchange((noah_qmk_via_sync_frame_t){.kind = NOAH_QMK_VIA_SYNC_MESSAGE_PUSH_CHUNK, .region = NOAH_QMK_VIA_SYNC_REGION_KEYMAP, .generation = 7u, .region_length = TEST_KEYMAP_SIZE, .digest = target_digest, .payload_length = TEST_KEYMAP_SIZE, .payload = {peer_keymap[0], peer_keymap[1], peer_keymap[2]}});
+    (void)callback_exchange((noah_qmk_via_sync_frame_t){.kind = NOAH_QMK_VIA_SYNC_MESSAGE_PUSH_CHUNK, .region = NOAH_QMK_VIA_SYNC_REGION_MACRO, .generation = 7u, .region_length = TEST_MACRO_SIZE, .digest = target_digest, .payload_length = TEST_MACRO_SIZE, .payload = {peer_macro[0], peer_macro[1]}});
+    (void)callback_exchange((noah_qmk_via_sync_frame_t){.kind = NOAH_QMK_VIA_SYNC_MESSAGE_PUSH_CHUNK, .region = NOAH_QMK_VIA_SYNC_REGION_VIA_CONFIG, .generation = 7u, .region_length = TEST_CONFIG_SIZE, .digest = target_digest, .payload_length = TEST_CONFIG_SIZE, .payload = {peer_config[0], peer_config[1]}});
+    (void)callback_exchange((noah_qmk_via_sync_frame_t){.kind = NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_VERIFY, .generation = 7u, .digest = target_digest});
+    scan_many(10u, 2u);
+    CHECK(callback_exchange((noah_qmk_via_sync_frame_t){.kind = NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_VERIFY, .generation = 7u, .digest = target_digest}).status == NOAH_QMK_VIA_SYNC_STATUS_OK);
+
+    // Unplugging the link cable powers this half off after the decision. It
+    // boots with the staged bank and dirty generation 7 still in EEPROM, but
+    // no volatile staging session, and its boot authority still unresolved.
+    noah_qmk_via_split_sync_init();
+    scan_many(100u, 8u);
+    CHECK(noah_qmk_via_sync_state_snapshot().metadata.generation == 7u);
+    CHECK(noah_qmk_via_sync_state_snapshot().metadata.dirty);
+    response = callback_exchange((noah_qmk_via_sync_frame_t){.kind = NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_ACCEPT, .generation = 7u, .digest = target_digest});
+    CHECK(response.status == NOAH_QMK_VIA_SYNC_STATUS_OK);
+    CHECK(!noah_qmk_via_sync_state_snapshot().metadata.dirty);
+    CHECK(!noah_qmk_via_sync_state_snapshot().recovery_required);
+    CHECK(noah_qmk_via_sync_state_snapshot().metadata.generation == 7u);
+    CHECK(memcmp(local_keymap, peer_keymap, sizeof(local_keymap)) == 0);
+
+    // A reboot that lost part of the staged bank cannot be accepted.
+    local_keymap[2] ^= 0xFFu;
+    user_eeconfig_word = noah_qmk_via_sync_metadata_encode((noah_qmk_via_sync_metadata_t){.generation = 8u, .dirty = true});
+    noah_qmk_via_split_sync_init();
+    scan_many(200u, 8u);
+    response = callback_exchange((noah_qmk_via_sync_frame_t){.kind = NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_ACCEPT, .generation = 8u, .digest = target_digest});
+    CHECK(response.status == NOAH_QMK_VIA_SYNC_STATUS_SNAPSHOT_REQUIRED);
+    CHECK(noah_qmk_via_sync_state_snapshot().metadata.dirty);
+}
+
 static void test_logical_master_queue_fences_reconciliation_until_accept(void) {
     noah_qmk_via_logical_status_t status;
     noah_qmk_via_sync_frame_t     begin = {
@@ -837,16 +949,149 @@ static void test_logical_master_queue_fences_reconciliation_until_accept(void) {
     scan_at(2002u);
     CHECK(rpc_count == 4u);
     CHECK(!noah_qmk_via_logical_converged(6u, begin.digest));
+    CHECK(!noah_qmk_via_logical_mirror_allowed());
 
+    // The host may pause after one VIA write. Finishing a digest of those
+    // partial bytes must not consume the transaction's sole generation step.
+    local_keymap[0] = peer_keymap[0];
+    noah_qmk_via_split_sync_note_mutation(NOAH_QMK_VIA_COMMAND_EFFECT_SPLIT_MIRROR);
+    scan_many(2003u, 10u);
+    CHECK(noah_qmk_via_sync_state_snapshot().metadata.generation == 5u);
+    CHECK(noah_qmk_via_sync_state_snapshot().metadata.dirty);
     memcpy(local_keymap, peer_keymap, sizeof(local_keymap));
     noah_qmk_via_split_sync_note_mutation(NOAH_QMK_VIA_COMMAND_EFFECT_SPLIT_MIRROR);
-    scan_many(2003u, 4u);
+    scan_many(2013u, 4u);
     CHECK(noah_qmk_via_sync_state_snapshot().metadata.generation == 6u);
     CHECK(!noah_qmk_via_sync_state_snapshot().metadata.dirty);
     CHECK(rpc_count == 5u);
     CHECK(noah_qmk_via_logical_converged(6u, begin.digest));
     CHECK(noah_qmk_via_logical_status(&status));
     CHECK(status.state == NOAH_QMK_VIA_LOGICAL_IDLE);
+    CHECK(noah_qmk_via_logical_mirror_allowed());
+}
+
+// Stages and accepts generation 6 whose target keymap starts 0x91 0x92 0x93,
+// leaving the master in ACCEPTED at `now` with the peer as the complete copy.
+static void accept_logical_target(uint32_t now) {
+    noah_qmk_via_logical_status_t status;
+    noah_qmk_via_sync_frame_t     frame = {.generation = 6u};
+
+    test_reset();
+    test_init_ready();
+    scan_many(0u, 2u);
+    peer_tracks_accept = true;
+    peer_keymap[0]     = 0x91u;
+    peer_keymap[1]     = 0x92u;
+    peer_keymap[2]     = 0x93u;
+    frame.digest       = peer_digest();
+    frame.kind         = NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_BEGIN;
+    CHECK(noah_qmk_via_logical_submit(42u, &frame));
+    scan_at(10u);
+    frame.kind = NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_VERIFY;
+    CHECK(noah_qmk_via_logical_submit(42u, &frame));
+    scan_at(11u);
+    frame.kind = NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_ACCEPT;
+    CHECK(noah_qmk_via_logical_submit(42u, &frame));
+    scan_at(now);
+    CHECK(noah_qmk_via_logical_status(&status));
+    CHECK(status.state == NOAH_QMK_VIA_LOGICAL_ACCEPTED);
+    CHECK(peer_accepted_generation == 6u);
+}
+
+static void check_rolled_forward_from_peer(void) {
+    noah_qmk_via_logical_status_t status;
+
+    CHECK(memcmp(local_keymap, peer_keymap, sizeof(local_keymap)) == 0);
+    CHECK(memcmp(local_config, peer_config, sizeof(local_config)) == 0);
+    CHECK(noah_qmk_via_sync_state_snapshot().metadata.generation == 6u);
+    CHECK(!noah_qmk_via_sync_state_snapshot().metadata.dirty);
+    CHECK(noah_qmk_via_logical_converged(6u, peer_digest()));
+    CHECK(noah_qmk_via_logical_status(&status));
+    CHECK(status.state == NOAH_QMK_VIA_LOGICAL_IDLE);
+}
+
+static void test_logical_roll_forward_finishes_when_host_stops_mid_write(void) {
+    accept_logical_target(1000u);
+
+    // The host wrote one changed byte and then disappeared.
+    local_keymap[0] = 0x91u;
+    noah_qmk_via_split_sync_note_mutation(NOAH_QMK_VIA_COMMAND_EFFECT_SPLIT_MIRROR);
+    scan_many(1001u, 10u);
+    scan_at(1000u + 14999u);
+    CHECK(!noah_qmk_via_logical_converged(6u, peer_digest()));
+    CHECK(noah_qmk_via_sync_state_snapshot().metadata.dirty);
+    CHECK(local_keymap[1] == 4u);
+
+    // Quiet for the idle window after that write: pull the peer's copy.
+    scan_many(1001u + 15000u, 64u);
+    check_rolled_forward_from_peer();
+}
+
+static void test_logical_roll_forward_finishes_when_host_never_writes(void) {
+    accept_logical_target(1000u);
+
+    scan_at(1000u + 14999u);
+    CHECK(!noah_qmk_via_logical_converged(6u, peer_digest()));
+    CHECK(noah_qmk_via_sync_state_snapshot().metadata.generation == 5u);
+    scan_many(1000u + 15000u, 64u);
+    check_rolled_forward_from_peer();
+}
+
+static void test_logical_roll_forward_survives_a_late_host_write(void) {
+    accept_logical_target(1000u);
+
+    // The firmware has started pulling when a slow host sends one more target
+    // byte. Both write the same target, so the pull restarts and converges.
+    scan_many(1000u + 15000u, 3u);
+    local_keymap[2] = peer_keymap[2];
+    fake_now        = 1000u + 15003u;
+    noah_qmk_via_split_sync_note_mutation(NOAH_QMK_VIA_COMMAND_EFFECT_SPLIT_MIRROR);
+    scan_many(1000u + 15003u, 128u);
+    check_rolled_forward_from_peer();
+}
+
+static void test_logical_convergence_trusts_the_accept_acknowledgement(void) {
+    accept_logical_target(1000u);
+
+    // The cable comes out after the peer acknowledged ACCEPT. The host still
+    // completes this half, and that alone converges the logical generation.
+    rpc_mode = TEST_RPC_DISCONNECTED;
+    memcpy(local_keymap, peer_keymap, sizeof(local_keymap));
+    fake_now = 1001u;
+    noah_qmk_via_split_sync_note_mutation(NOAH_QMK_VIA_COMMAND_EFFECT_SPLIT_MIRROR);
+    scan_many(1001u, 16u);
+    check_rolled_forward_from_peer();
+
+    // Before this half is complete, the acknowledgement alone is not enough.
+    accept_logical_target(1000u);
+    rpc_mode        = TEST_RPC_DISCONNECTED;
+    local_keymap[0] = peer_keymap[0];
+    fake_now        = 1001u;
+    noah_qmk_via_split_sync_note_mutation(NOAH_QMK_VIA_COMMAND_EFFECT_SPLIT_MIRROR);
+    scan_many(1001u, 16u);
+    CHECK(!noah_qmk_via_logical_converged(6u, peer_digest()));
+}
+
+static void test_logical_roll_forward_waits_while_host_keeps_writing(void) {
+    noah_qmk_via_logical_status_t status;
+
+    accept_logical_target(1000u);
+    for (uint8_t write = 0u; write < 3u; write++) {
+        uint32_t at = 1000u + 10000u * (write + 1u);
+
+        local_keymap[write] = peer_keymap[write];
+        fake_now            = at;
+        noah_qmk_via_split_sync_note_mutation(NOAH_QMK_VIA_COMMAND_EFFECT_SPLIT_MIRROR);
+        scan_many(at, write < 2u ? 4u : 1u);
+        if (write < 2u) {
+            CHECK(noah_qmk_via_logical_status(&status));
+            CHECK(status.state == NOAH_QMK_VIA_LOGICAL_ACCEPTED);
+            CHECK(noah_qmk_via_sync_state_snapshot().metadata.generation == 5u);
+        }
+    }
+    // The host's last write completed the target; no pull was needed.
+    scan_many(31001u, 8u);
+    check_rolled_forward_from_peer();
 }
 
 static void test_replacement_snapshot_restarts_in_progress_verification(void) {
@@ -931,6 +1176,7 @@ int main(void) {
     test_equal_generation_digest_conflict_makes_master_advance_and_push();
     test_role_change_forces_new_metadata_session();
     test_dirty_reboot_pulls_clean_peer();
+    test_boot_output_fence_covers_only_a_suspect_bank();
     test_mutation_during_dirty_recovery_does_not_block_reconciliation();
     test_two_dirty_halves_reseed_current_master_before_authority();
     test_failed_macro_reseed_keeps_generation_dirty_and_sends_nothing();
@@ -938,7 +1184,13 @@ int main(void) {
     test_receiver_validates_order_accepts_duplicate_and_acks_after_digest();
     test_receiver_digest_mismatch_never_publishes_clean_generation();
     test_logical_receiver_stays_dirty_until_decision_accept();
+    test_logical_receiver_accepts_its_staged_bank_after_reboot();
     test_logical_master_queue_fences_reconciliation_until_accept();
+    test_logical_roll_forward_finishes_when_host_stops_mid_write();
+    test_logical_roll_forward_finishes_when_host_never_writes();
+    test_logical_roll_forward_survives_a_late_host_write();
+    test_logical_convergence_trusts_the_accept_acknowledgement();
+    test_logical_roll_forward_waits_while_host_keeps_writing();
     test_replacement_snapshot_restarts_in_progress_verification();
     test_boot_fence_recovers_matching_staged_logical_bank();
 

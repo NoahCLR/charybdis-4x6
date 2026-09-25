@@ -118,7 +118,18 @@ static bool owner_peer_observer(void *context, uint8_t *unresolved_count) {
     noah_profile_owner_t                 *owner = context;
     noah_profile_split_authority_status_t authority;
 
-    if (!owner || !unresolved_count || !owner->descriptor_readable || !owner->split_initialized || !noah_profile_split_authority_status(&owner->reconciler.authority, &authority)) {
+    if (!owner || !unresolved_count || !owner->descriptor_readable || !owner->split_initialized) {
+        return false;
+    }
+    if (owner->host_barrier_peer_confirmed && owner->host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_ACTIVATING && owner->host_barrier_descriptor_known && descriptor_equal(&owner->committed_descriptor, &owner->host_barrier_descriptor)) {
+        // This Apply already saw the peer durably commit exactly this record
+        // (and, for a logical record, acknowledge its VIA ACCEPT) before the
+        // input fence began. Activating needs no second, live observation of
+        // the peer, so a link lost during roll-forward cannot hold it.
+        *unresolved_count = 0u;
+        return true;
+    }
+    if (!noah_profile_split_authority_status(&owner->reconciler.authority, &authority)) {
         return false;
     }
     *unresolved_count = !authority.transfer_pending && descriptor_equal(&authority.local, &owner->committed_descriptor) && descriptor_equal(&authority.peer, &owner->committed_descriptor) && (authority.state == NOAH_PROFILE_SPLIT_AUTHORITY_COMPILED_CONVERGED || authority.state == NOAH_PROFILE_SPLIT_AUTHORITY_COMMITTED_CONVERGED) ? 0u : 1u;
@@ -134,6 +145,8 @@ static void reset_host_barrier(noah_profile_owner_t *owner) {
     owner->host_barrier_started                = false;
     owner->host_barrier_local_published        = false;
     owner->host_barrier_peer_commit_authorized = false;
+    owner->host_barrier_waiting_boundary       = false;
+    owner->host_barrier_peer_confirmed         = false;
     owner->host_cancel_reason                  = NOAH_PROFILE_CANDIDATE_V1_ERROR_NONE;
     owner->host_cancel_pending                 = false;
     owner->host_barrier_progress_offset        = 0u;
@@ -791,8 +804,16 @@ static bool begin_or_advance_host_barrier(noah_profile_owner_t *owner) {
     if (!noah_profile_split_reconciler_prepared_push_ready(&owner->reconciler, &prepared)) {
         return false;
     }
+    owner->host_barrier_waiting_boundary = false;
     if (!descriptor_equal(&prepared, &owner->host_barrier_descriptor)) {
         fail_integration(owner);
+    } else if ((noah_profile_activation_policy_safe_boundary(&owner->activation_policy) &
+                ~NOAH_PROFILE_ACTIVATION_REASON_PEER) != 0u) {
+        // Waiting here, before anything is durable, lets a held key or locked
+        // layer end the Apply cleanly on timeout. The fence itself begins at
+        // ACCEPT, which waits for the same boundary.
+        owner->host_barrier_waiting_boundary = true;
+        return false;
     } else if (!noah_profile_candidate_transaction_authorize_commit(&owner->host_transaction)) {
         if (owner->host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_REJECTED && owner->host_transaction.status.error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_STORAGE_FAILURE) {
             return request_host_precommit_cancel(owner, NOAH_PROFILE_CANDIDATE_V1_ERROR_STORAGE_FAILURE);
@@ -828,6 +849,8 @@ static bool fail_host_postcommit_authority(noah_profile_owner_t *owner, noah_pro
 }
 
 static bool advance_host_postcommit_barrier(noah_profile_owner_t *owner) {
+    bool live_convergence;
+
     if (!owner || owner->host_transaction.status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_CONVERGING_PEER || !owner->host_barrier_descriptor_known) {
         return false;
     }
@@ -846,7 +869,8 @@ static bool advance_host_postcommit_barrier(noah_profile_owner_t *owner) {
         }
         return false;
     }
-    if (!host_barrier_exact_convergence(owner)) {
+    live_convergence = host_barrier_exact_convergence(owner);
+    if (!live_convergence) {
         noah_profile_split_authority_status_t  authority;
         noah_profile_split_reconciler_status_t reconciler;
 
@@ -866,10 +890,32 @@ static bool advance_host_postcommit_barrier(noah_profile_owner_t *owner) {
                 return fail_host_postcommit_authority(owner, NOAH_PROFILE_CANDIDATE_V1_ERROR_POSTCOMMIT_AUTHORITY_LOST, NOAH_PROFILE_OWNER_POSTCOMMIT_AUTHORITY_LOST);
             }
         }
-        return false;
+        // Once the peer has been seen holding exactly this commit, losing
+        // sight of it again (a lost link, a peer reboot) does not undo that
+        // confirmation. Conflicts above still end the Apply.
+        if (!owner->host_barrier_peer_confirmed) {
+            return false;
+        }
+    } else {
+        owner->host_barrier_peer_confirmed = true;
     }
     if (owner->store.committed.format_version == NOAH_PROFILE_LOGICAL_STORE_VERSION) {
         if (!owner->host_via_accept_requested) {
+            // ACCEPT lets the host start rewriting this half's VIA bank, and
+            // that starts the input fence. Until then this half still runs the
+            // complete old generation and keeps typing, even if the link to the
+            // peer is down, so ACCEPT is requested only while the peer is in
+            // sight and its acknowledgement can arrive. Enter the fence at a
+            // safe boundary so activation, which needs the same boundary, is
+            // never waiting on fenced keys.
+            if (!live_convergence) {
+                return false;
+            }
+            if ((noah_profile_activation_policy_safe_boundary(&owner->activation_policy) & ~NOAH_PROFILE_ACTIVATION_REASON_PEER) != 0u) {
+                owner->host_barrier_waiting_boundary = true;
+                return false;
+            }
+            owner->host_barrier_waiting_boundary = false;
             if (!owner->config.logical_via || !owner->config.logical_via->accept || !owner->config.logical_via->accept(owner->config.logical_via->context, owner->host_transaction.status.transaction_id, owner->store.committed.via_generation, owner->store.committed.via_digest)) {
                 return false;
             }
@@ -1034,6 +1080,26 @@ noah_profile_owner_state_t noah_profile_owner_state(const noah_profile_owner_t *
     return owner ? owner->state : NOAH_PROFILE_OWNER_UNINITIALIZED;
 }
 
+bool noah_profile_owner_output_ready(const noah_profile_owner_t *owner) {
+    // Only a decided logical Apply can leave the local VIA bank mixed, and only
+    // once ACCEPT lets it change: from then until activation this half's VIA
+    // bytes, custom behaviors, or both, may belong to different generations.
+    // Before ACCEPT, including across the commit decision and a lost peer
+    // link, this half still runs the complete old generation. Boot, discovery
+    // and error states keep typing on the loaded keymap.
+    if (!owner || !owner->host_via_accept_requested) {
+        return true;
+    }
+    switch (owner->host_transaction.status.state) {
+        case NOAH_PROFILE_CANDIDATE_V1_STATE_CONVERGING_PEER:
+        case NOAH_PROFILE_CANDIDATE_V1_STATE_ACTIVATING:
+        case NOAH_PROFILE_CANDIDATE_V1_STATE_AUTHORITY_FAILED:
+            return false;
+        default:
+            return true;
+    }
+}
+
 noah_profile_store_result_t noah_profile_owner_discovery_result(const noah_profile_owner_t *owner) {
     return owner ? owner->discovery_result : NOAH_PROFILE_STORE_INVALID_ARGUMENT;
 }
@@ -1143,7 +1209,7 @@ bool noah_profile_owner_peer_transfer(const noah_profile_owner_t *owner, noah_pr
     *peer = (noah_profile_candidate_v1_peer_status_t){
         .phase                   = peer_phase(&status),
         .last_status             = (uint8_t)status.last_status,
-        .flags                   = (uint8_t)((status.peer_cleanup_pending ? NOAH_PROFILE_CANDIDATE_V1_PEER_FLAG_CLEANUP_PENDING : 0u) | (status.master ? NOAH_PROFILE_CANDIDATE_V1_PEER_FLAG_MASTER : 0u)),
+        .flags                   = (uint8_t)((status.peer_cleanup_pending ? NOAH_PROFILE_CANDIDATE_V1_PEER_FLAG_CLEANUP_PENDING : 0u) | (status.master ? NOAH_PROFILE_CANDIDATE_V1_PEER_FLAG_MASTER : 0u) | (owner->host_barrier_waiting_boundary && (owner->host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_PREPARING_PEER || owner->host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_CONVERGING_PEER) ? NOAH_PROFILE_CANDIDATE_V1_PEER_FLAG_WAITING_SAFE_BOUNDARY : 0u)),
         .transfer_offset         = status.transfer_offset,
         .transfer_length         = status.transfer_length,
         .retry_count             = status.retry_count,

@@ -30,6 +30,12 @@
 #    ifndef VIA_SPLIT_SYNC_SESSION_REFRESH_MS
 #        define VIA_SPLIT_SYNC_SESSION_REFRESH_MS 1000u
 #    endif
+// After a logical decision the host writes the changed VIA ranges to this half
+// back to back. This long without one of those writes means the host is gone,
+// and the firmware finishes the roll-forward from the peer's complete copy.
+#    ifndef VIA_SPLIT_SYNC_LOGICAL_ROLL_FORWARD_IDLE_MS
+#        define VIA_SPLIT_SYNC_LOGICAL_ROLL_FORWARD_IDLE_MS 15000u
+#    endif
 
 _Static_assert(NOAH_QMK_VIA_SYNC_FRAME_SIZE <= RPC_M2S_BUFFER_SIZE, "VIA sync request frame exceeds QMK RPC buffer");
 _Static_assert(NOAH_QMK_VIA_SYNC_FRAME_SIZE <= RPC_S2M_BUFFER_SIZE, "VIA sync response frame exceeds QMK RPC buffer");
@@ -112,6 +118,8 @@ static bool                       noah_qmk_via_boot_authority_known;
 static bool                       noah_qmk_via_boot_recovery_active;
 static uint32_t                   noah_qmk_via_boot_generation;
 static uint32_t                   noah_qmk_via_boot_digest;
+static uint32_t                   noah_qmk_via_logical_roll_forward_at;
+static bool                       noah_qmk_via_boot_bank_suspect;
 
 static noah_qmk_via_receiver_t              noah_qmk_via_receiver;
 static uint8_t                              noah_qmk_via_receiver_epoch;
@@ -1106,6 +1114,13 @@ static bool noah_qmk_via_local_digest_tick(void) {
         noah_rgb_runtime_invalidate_layer_maps();
     }
     if (shared.pending_effects != NOAH_QMK_VIA_COMMAND_EFFECT_NONE) {
+        // A logical Apply writes its local VIA bank in several ordinary VIA
+        // commands. A digest calculated during a pause between those commands
+        // is not a new durable generation; the target digest is the boundary.
+        if (noah_qmk_via_logical.status.state == NOAH_QMK_VIA_LOGICAL_ACCEPTED &&
+            digest != noah_qmk_via_logical.status.digest) {
+            return true;
+        }
         mutation_completed = noah_qmk_via_sync_state_complete_mutation(true);
         ATOMIC_BLOCK_RESTORESTATE {
             if (noah_qmk_via_shared_state.digest_epoch == shared.digest_epoch) {
@@ -1143,11 +1158,20 @@ void noah_qmk_via_split_sync_init(void) {
     noah_qmk_via_boot_recovery_active     = false;
     noah_qmk_via_boot_generation          = 0u;
     noah_qmk_via_boot_digest              = 0u;
+    noah_qmk_via_logical_roll_forward_at  = 0u;
     noah_qmk_via_peer_generation          = 0u;
     noah_qmk_via_peer_digest              = 0u;
     noah_qmk_via_last_peer_ack_generation = 0u;
     noah_qmk_via_last_peer_ack_digest     = 0u;
     noah_qmk_via_sync_state_init();
+    {
+        noah_qmk_via_sync_state_snapshot_t state = noah_qmk_via_sync_state_snapshot();
+
+        // Dirty metadata that survived a restart means a write sequence was
+        // cut off, and the bank may mix two generations. Uninitialized
+        // metadata (a freshly flashed half) is not evidence of that.
+        noah_qmk_via_boot_bank_suspect = state.initialized && state.metadata.dirty;
+    }
     noah_qmk_via_local_digest_start();
     transaction_register_rpc(PUT_VIA_KEYMAP_SYNC, noah_qmk_via_split_sync_rpc);
 }
@@ -1162,6 +1186,9 @@ void noah_qmk_via_split_sync_note_mutation(uint8_t effects) {
     }
     ATOMIC_BLOCK_RESTORESTATE {
         noah_qmk_via_shared_state.pending_effects |= effects;
+    }
+    if (noah_qmk_via_logical.status.state == NOAH_QMK_VIA_LOGICAL_ACCEPTED) {
+        noah_qmk_via_logical_roll_forward_at = timer_read32();
     }
     noah_qmk_via_local_digest_start();
 }
@@ -1241,12 +1268,43 @@ static bool noah_qmk_via_logical_boot_recovery_tick(bool master) {
     return true;
 }
 
+// The host stopped rolling this half forward after the decision. The peer holds
+// the complete accepted target, so release the hold exactly as a reboot would:
+// the partly written local bank stays dirty (or stays at the old generation),
+// and ordinary reconciliation pulls the peer's copy over it. Discarding the
+// pending mutation is safe because that pull replaces every byte it covers.
+static bool noah_qmk_via_logical_roll_forward_tick(void) {
+    uint32_t now = timer_read32();
+
+    if (noah_qmk_via_logical.status.state != NOAH_QMK_VIA_LOGICAL_ACCEPTED || noah_qmk_via_logical.status.pending ||
+        !noah_qmk_via_time_reached(now, noah_qmk_via_logical_roll_forward_at + VIA_SPLIT_SYNC_LOGICAL_ROLL_FORWARD_IDLE_MS)) {
+        return false;
+    }
+    ATOMIC_BLOCK_RESTORESTATE {
+        noah_qmk_via_logical.status.state = NOAH_QMK_VIA_LOGICAL_IDLE;
+        noah_qmk_via_logical.status.operation_sequence++;
+        noah_qmk_via_shared_state.pending_effects = NOAH_QMK_VIA_COMMAND_EFFECT_NONE;
+    }
+    noah_qmk_via_tx_phase        = NOAH_QMK_VIA_TX_METADATA;
+    noah_qmk_via_next_attempt_at = 0u;
+    noah_qmk_via_retry_ms        = VIA_SPLIT_SYNC_RETRY_INITIAL_MS;
+    return true;
+}
+
 bool noah_qmk_via_split_sync_matrix_scan_step(void) {
     bool                        master = is_keyboard_master();
     noah_qmk_via_shared_state_t shared;
     uint32_t                    now;
 
     if (noah_qmk_via_receiver_verify_tick() || noah_qmk_via_local_digest_tick() || noah_qmk_via_slave_mailbox_tick()) {
+        return true;
+    }
+    if (noah_qmk_via_boot_bank_suspect && noah_qmk_via_local_state_is_clean(noah_qmk_via_sync_state_snapshot(), noah_qmk_via_shared_snapshot())) {
+        ATOMIC_BLOCK_RESTORESTATE {
+            noah_qmk_via_boot_bank_suspect = false;
+        }
+    }
+    if (master && noah_qmk_via_logical_roll_forward_tick()) {
         return true;
     }
     shared = noah_qmk_via_shared_snapshot();
@@ -1284,7 +1342,19 @@ bool noah_qmk_via_split_sync_matrix_scan_step(void) {
             } else if (noah_qmk_via_logical.request.kind == NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_VERIFY) {
                 noah_qmk_via_logical.status.state = NOAH_QMK_VIA_LOGICAL_STAGED;
             } else if (noah_qmk_via_logical.request.kind == NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_ACCEPT) {
-                noah_qmk_via_logical.status.state = NOAH_QMK_VIA_LOGICAL_ACCEPTED;
+                noah_qmk_via_logical.status.state    = NOAH_QMK_VIA_LOGICAL_ACCEPTED;
+                noah_qmk_via_logical_roll_forward_at = timer_read32();
+                // The peer persisted exactly this generation before it
+                // acknowledged ACCEPT. That acknowledgement is the peer's
+                // confirmation; convergence then waits only for this half,
+                // so a link lost during the local roll-forward cannot hold
+                // activation. A later metadata exchange still overrides it.
+                if (response.generation == noah_qmk_via_logical.request.generation && response.digest == noah_qmk_via_logical.request.digest) {
+                    noah_qmk_via_peer_generation          = response.generation;
+                    noah_qmk_via_peer_digest              = response.digest;
+                    noah_qmk_via_last_peer_ack_generation = response.generation;
+                    noah_qmk_via_last_peer_ack_digest     = response.digest;
+                }
             } else if (noah_qmk_via_logical.request.kind == NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_ABORT) {
                 noah_qmk_via_logical.status.state = NOAH_QMK_VIA_LOGICAL_ABORTED;
             }
@@ -1303,9 +1373,10 @@ bool noah_qmk_via_split_sync_matrix_scan_step(void) {
         if (!noah_qmk_via_local_state_is_clean(local, shared) || local.metadata.generation != noah_qmk_via_logical.status.generation || shared.digest != noah_qmk_via_logical.status.digest) {
             // The decision marker is durable and the peer owns the recovery
             // copy. Hold ordinary reconciliation while the host applies only
-            // its changed VIA ranges to this USB half. A reboot intentionally
-            // clears this volatile fence and boot recovery can pull the peer's
-            // complete copy if the host disappeared mid-roll-forward.
+            // its changed VIA ranges to this USB half. If the host goes quiet,
+            // noah_qmk_via_logical_roll_forward_tick() releases this hold and
+            // reconciliation pulls the peer's complete copy; a reboot clears
+            // it the same way.
             return false;
         }
         ATOMIC_BLOCK_RESTORESTATE {
@@ -1416,6 +1487,29 @@ bool noah_qmk_via_logical_converged(uint32_t generation, uint32_t digest) {
         return false;
     }
     return !is_keyboard_master() || (noah_qmk_via_peer_generation == generation && noah_qmk_via_peer_digest == digest && noah_qmk_via_last_peer_ack_generation == generation && noah_qmk_via_last_peer_ack_digest == digest);
+}
+
+bool noah_qmk_via_logical_boot_output_ready(void) {
+    bool ready;
+
+    ATOMIC_BLOCK_RESTORESTATE {
+        ready = !noah_qmk_via_boot_recovery_active && !noah_qmk_via_boot_bank_suspect;
+    }
+    return ready;
+}
+
+bool noah_qmk_via_logical_mirror_allowed(void) {
+    noah_qmk_via_logical_state_t state;
+    bool                       boot_known;
+    bool                       receiver_staging;
+
+    ATOMIC_BLOCK_RESTORESTATE {
+        state            = noah_qmk_via_logical.status.state;
+        boot_known       = noah_qmk_via_boot_authority_known;
+        receiver_staging = noah_qmk_via_receiver.logical_staging;
+    }
+    return boot_known && !receiver_staging && state != NOAH_QMK_VIA_LOGICAL_STAGING &&
+           state != NOAH_QMK_VIA_LOGICAL_STAGED && state != NOAH_QMK_VIA_LOGICAL_ACCEPTED;
 }
 
 void noah_qmk_via_split_sync_matrix_scan(void) {

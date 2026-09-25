@@ -343,7 +343,7 @@ const CANDIDATE_PEER_PHASE_NAMES = Object.freeze(Object.fromEntries(Object.entri
 const SPLIT_STATUS_NAMES = Object.freeze([
     "OK", "INVALID_FRAME", "INCOMPATIBLE", "STALE", "CONFLICT", "CORRUPT", "BUSY", "RANGE_ERROR", "DIGEST_MISMATCH", "STORAGE_ERROR", "VALIDATION_ERROR",
 ]);
-const CANDIDATE_PEER_FLAGS = Object.freeze({CLEANUP_PENDING: 1 << 0, MASTER: 1 << 1, KNOWN_MASK: 0x03});
+const CANDIDATE_PEER_FLAGS = Object.freeze({CLEANUP_PENDING: 1 << 0, MASTER: 1 << 1, WAITING_SAFE_BOUNDARY: 1 << 2, KNOWN_MASK: 0x07});
 // Why the other half last answered BUSY, and what it held then; these mirror
 // noah_profile_split_v1_busy_reason_t, noah_profile_peer_store_state_t and
 // noah_profile_split_transfer_owner_t.
@@ -388,6 +388,7 @@ function decodeCandidatePeerStatusResponse(response, request) {
         lastStatusName: SPLIT_STATUS_NAMES[lastStatus],
         cleanupPending: (flags & CANDIDATE_PEER_FLAGS.CLEANUP_PENDING) !== 0,
         master: (flags & CANDIDATE_PEER_FLAGS.MASTER) !== 0,
+        waitingSafeBoundary: (flags & CANDIDATE_PEER_FLAGS.WAITING_SAFE_BOUNDARY) !== 0,
         transferOffset: payload.readUInt16LE(4),
         transferLength: payload.readUInt16LE(6),
         retryCount: payload.readUInt32LE(8),

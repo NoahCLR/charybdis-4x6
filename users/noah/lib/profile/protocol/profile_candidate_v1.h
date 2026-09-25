@@ -197,7 +197,10 @@ typedef enum {
 enum {
     NOAH_PROFILE_CANDIDATE_V1_PEER_FLAG_CLEANUP_PENDING = 1u << 0,
     NOAH_PROFILE_CANDIDATE_V1_PEER_FLAG_MASTER          = 1u << 1,
-    NOAH_PROFILE_CANDIDATE_V1_PEER_FLAGS_KNOWN          = 0x03u,
+    // The commit decision, or the ACCEPT after it, waits for held keys,
+    // locked layers, one-shots or macros to finish on this half.
+    NOAH_PROFILE_CANDIDATE_V1_PEER_FLAG_WAITING_SAFE_BOUNDARY = 1u << 2,
+    NOAH_PROFILE_CANDIDATE_V1_PEER_FLAGS_KNOWN          = 0x07u,
 };
 
 typedef struct {

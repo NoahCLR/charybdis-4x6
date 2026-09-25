@@ -72,11 +72,18 @@ bool noah_qmk_via_logical_submit(uint16_t transaction_id, const noah_qmk_via_syn
 bool noah_qmk_via_logical_status(noah_qmk_via_logical_status_t *status);
 bool noah_qmk_via_logical_staged(uint16_t transaction_id, uint32_t generation, uint32_t digest);
 bool noah_qmk_via_logical_converged(uint32_t generation, uint32_t digest);
+// The ordinary VIA mirror must not touch the peer while it is the inactive
+// logical bank, including while the USB half rolls forward after ACCEPT.
+bool noah_qmk_via_logical_mirror_allowed(void);
 // Boot remains fenced until the profile owner identifies whether the selected
 // custom record binds a logical VIA generation. Recovery accepts an already
 // staged dirty bank only after its full canonical digest matches.
 void noah_qmk_via_logical_boot_release(void);
 bool noah_qmk_via_logical_boot_recover(uint32_t generation, uint32_t digest);
+// False while this half's VIA bank may hold a mixed generation after a
+// restart: boot recovery has not yet matched it to the committed record, or it
+// booted dirty from an interrupted write and has not been made clean again.
+bool noah_qmk_via_logical_boot_output_ready(void);
 #else
 static inline void noah_qmk_via_split_sync_init(void) {}
 static inline void noah_qmk_via_split_sync_matrix_scan(void) {}
@@ -111,7 +118,13 @@ static inline bool noah_qmk_via_logical_converged(uint32_t generation, uint32_t 
     (void)digest;
     return false;
 }
+static inline bool noah_qmk_via_logical_mirror_allowed(void) {
+    return true;
+}
 static inline void noah_qmk_via_logical_boot_release(void) {}
+static inline bool noah_qmk_via_logical_boot_output_ready(void) {
+    return true;
+}
 static inline bool noah_qmk_via_logical_boot_recover(uint32_t generation, uint32_t digest) {
     (void)generation;
     (void)digest;
