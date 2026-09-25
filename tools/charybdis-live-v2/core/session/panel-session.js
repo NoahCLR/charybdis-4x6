@@ -8,7 +8,8 @@
 // free of VS Code, so it is tested like the rest of core/; extension.js keeps
 // only dialogs, files and progress.
 
-const {summary, reorderLayers} = require("../model/portable-profile");
+const {fingerprint, summary, reorderLayers} = require("../model/portable-profile");
+const {profileReview} = require("../model/profile-review");
 const {ProfileDraftSession, DRAFT_EDITS} = require("./profile-draft-session");
 const {buildDeviceModel, deviceSummary} = require("./device-model");
 
@@ -84,11 +85,30 @@ function buildPanelModel(session, state) {
         pdUpgradeAvailable: Boolean(state.capabilities?.featureFlags & (1 << 13)),
         busy,
         progress: state.portableProgress,
-        review: session.portableReview ? {incoming: summary(session.portableReview.document), current: session.portableReview.before.summary} : null,
+        review: session.portableReview ? {incoming: summary(session.portableReview.document), current: session.portableReview.before.summary,
+            fileName: session.portableReview.fileName || null, differences: importDifferences(session)} : null,
         layers: session.portableLayers ? {key: session.portableLayers.before.fingerprint, order: session.portableLayers.order, names: session.portableLayers.names, keysFollow: session.portableLayers.keysFollow !== false} : null,
     };
     if (!model.draft?.matching) model.layers?.forEach((layer, index) => {layer.displayName = state.portableSummary?.names[index] || layer.name;});
     return model;
+}
+
+// A chosen profile file against what the keyboard holds, not the draft: that
+// is what applying it would write. Each difference is its unit, what happened
+// to it and where it is edited, for the import card to count by category;
+// its fields wait for the draft's own review. Nothing, when the keyboard holds an interrupted
+// configuration there is no comparing with. Kept with the review, for the
+// keyboard it was made against.
+function importDifferences(session) {
+    const review = session.portableReview, keyboard = session.draft ? session.draft.baseSnapshot : review.before;
+    if (!keyboard || keyboard.incomplete) return null;
+    if (review.differences?.against !== keyboard.fingerprint) {
+        const file = {...keyboard, document: review.document, decoded: undefined, fingerprint: fingerprint(review.document)};
+        const where = ({target, ...place}) => place;
+        review.differences = {against: keyboard.fingerprint, items: profileReview(keyboard, file).map((item) => ({unit: item.unit, title: item.title,
+            status: item.status, place: item.place ? where(item.place) : null}))};
+    }
+    return review.differences.items;
 }
 
 // What the next model carries once, then forgets.

@@ -305,4 +305,17 @@ function profileReview(before, after) {
     }
     return items;
 }
-module.exports = {profileReview};
+// A reorder as one item: which layers now win over which. Each layer that
+// moved is one field, named as the draft names it, in its light, with where it
+// sat on the keyboard and where it sits now, highest first as Edit layers
+// lists them. A rename made with it is its own item, so the layer is called
+// what it is called now; the rename says what it was.
+function layerOrderReview(after, order) {
+    const names = decodedOf(after).settings.names;
+    const moved = order.map((layer, slot) => slot).filter(slot => order[slot] !== slot).reverse();
+    const fields = moved.map(slot => ({label: layerCalled(names, slot), labelMark: {kind: "layer", layer: slot}, status: "changed",
+        before: String(order[slot]), after: `${slot} · ${slot > order[slot] ? "higher" : "lower"}`}));
+    return {area: "Layers", unit: "layerOrder", title: "Layer priority", note: "Higher layers win", status: "changed", fields,
+        place: {kind: "layers", layers: moved}};
+}
+module.exports = {layerOrderReview, profileReview};

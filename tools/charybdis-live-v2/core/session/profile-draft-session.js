@@ -1,7 +1,9 @@
 "use strict";
 
 const {validateSnapshot, fingerprint, fingerprintOf, summaryOf} = require("../model/portable-profile");
-const {profileReview} = require("../model/profile-review");
+const {layerOrderReview, profileReview} = require("../model/profile-review");
+const {IDENTITY, compose, inverse, isIdentity, layerUnit, rearranged} = require("../model/layer-order");
+const {layerName: layerCalled} = require("../model/vocabulary");
 const {revertUnits} = require("../model/profile-revert");
 const {baseLighting, editSettings, settingsEditorView} = require("../model/settings-editor");
 const {editMacro, macroEditorView} = require("../model/macro-editor");
@@ -50,6 +52,19 @@ function editLabel(message, document) {
     return typeof label === "function" ? label(message) : label || "Edited the draft";
 }
 
+// What one Edit layers save did: the order it changed and the names it
+// changed, each named as the layers were called before it.
+function layersLabel(step, before, after) {
+    const moved = step.map((from, slot) => slot).filter(slot => step[slot] !== slot);
+    const renamed = step.map((from, slot) => [from, slot]).filter(([from, slot]) => layerCalled(before, from) !== layerCalled(after, slot));
+    const parts = [];
+    if (moved.length === 2) parts.push(`Swapped ${layerCalled(before, moved[0])} and ${layerCalled(before, moved[1])}`);
+    else if (moved.length) parts.push("Reordered layers");
+    if (renamed.length === 1) parts.push(`Renamed ${layerCalled(before, renamed[0][0])} to ${layerCalled(after, renamed[0][1])}`);
+    else if (renamed.length) parts.push(`Renamed ${renamed.length} layers`);
+    return parts.map((part, index) => index ? part[0].toLowerCase() + part.slice(1) : part).join(", ") || "Edited layers";
+}
+
 // Review items name what the model cannot: the keycode a behaviour is listed
 // under, the name its edit messages use, so the review can go there.
 function placed(item) {
@@ -75,11 +90,14 @@ class ProfileDraftSession {
         // message, the only kind that ties the units it changed together.
         this.origins = [null];
         this.labels = [null];
+        // Which keyboard layer each slot of the entry holds (layer-order.js).
+        this.orders = [IDENTITY];
         this.cursor = 0;
         this.revision = 1;
         this.reviewedRevision = null;
     }
     get document() {return copy(this.history[this.cursor]);}
+    get order() {return this.orders[this.cursor];}
     // A history entry decoded once: its validated form (read-only), its
     // fingerprint and summary. Entries are never edited in place, so the
     // answer is kept with the entry for as long as the entry exists.
@@ -133,22 +151,25 @@ class ProfileDraftSession {
     }
     reset(snapshot) {
         this.base = copy(snapshot); this.latest = copy(snapshot);
-        this.history = [freeze(copy(snapshot.document))]; this.origins = [null]; this.labels = [null]; this.cursor = 0;
+        this.history = [freeze(copy(snapshot.document))]; this.origins = [null]; this.labels = [null]; this.orders = [IDENTITY]; this.cursor = 0;
         this.revision++; this.reviewedRevision = null;
         this.needsRead = false;
         this.connectionChanged = false;
     }
-    replace(document, revision, origin = "edit", label = null) {
+    // A new entry keeps the entry's layer order unless it says otherwise.
+    replace(document, revision, origin = "edit", label = null, order = this.order) {
         this.assertRevision(revision);
         const valid = validateSnapshot(document, this.capabilities).document;
         if (fingerprint(valid) === this.decode(this.history[this.cursor]).fingerprint) return;
         this.history = this.history.slice(0, this.cursor + 1);
         this.origins = this.origins.slice(0, this.cursor + 1);
         this.labels = this.labels.slice(0, this.cursor + 1);
+        this.orders = this.orders.slice(0, this.cursor + 1);
         this.history.push(freeze(copy(valid)));
         this.origins.push(origin);
         this.labels.push(label);
-        if (this.history.length > 101) {this.history.shift(); this.origins.shift(); this.labels.shift();}
+        this.orders.push(Object.freeze([...order]));
+        if (this.history.length > 101) {this.history.shift(); this.origins.shift(); this.labels.shift(); this.orders.shift();}
         this.cursor = this.history.length - 1;
         this.revision++; this.reviewedRevision = null;
     }
@@ -169,6 +190,13 @@ class ProfileDraftSession {
         this.replace(document, message.draftRevision, "edit", editLabel(message, current.document));
         return {message: copy(message), previousFingerprint: before, fingerprint: this.decode(this.history[this.cursor]).fingerprint};
     }
+    // An Edit layers save: its document, and the order it saved, which
+    // rearranges this revision. An order and each name are separate
+    // decisions, so the step links nothing in the review.
+    editLayers(document, revision, step) {
+        const before = this.current.decoded.settings.names, after = validateSnapshot(document, this.capabilities).settings.names;
+        this.replace(document, revision, "layers", layersLabel(step, before, after), compose(this.order, step));
+    }
     editLayout(message) {
         if (message.adds?.length || message.deletes?.length) throw fail("Use Manage layers to name or reorder the eight available layers.");
         const groups = message.layoutGroups || message.layers || [{layer: message.layer, changes: message.changes}];
@@ -186,25 +214,49 @@ class ProfileDraftSession {
         }
         return document;
     }
+    // The keyboard's profile rearranged into an order, with the order it
+    // stands for; the keyboard's own profile, and no order, when the order
+    // moves nothing, including a reorder nothing can tell apart.
+    referenceFor(order) {
+        const base = this.baseSnapshot;
+        if (this.base.incomplete || isIdentity(order)) return {snapshot: base, order: null};
+        this.referenceCache ??= new WeakMap();
+        const known = this.referenceCache.get(order);
+        if (known?.base === this.base) return known.reference;
+        const decoded = validateSnapshot(rearranged(this.base.document, order), this.capabilities), print = fingerprintOf(decoded);
+        const reference = print === this.base.fingerprint ? {snapshot: base, order: null}
+            : {snapshot: {...this.base, document: decoded.document, decoded, fingerprint: print, summary: summaryOf(decoded)}, order};
+        this.referenceCache.set(order, {base: this.base, reference});
+        return reference;
+    }
+    // What a document in an order differs from the keyboard by: the order,
+    // then everything else compared with the reference.
+    describe(document, order) {
+        const {snapshot, order: moved} = this.referenceFor(order);
+        const after = {...this.base, incomplete: false, document, ...this.decode(document)};
+        return [...(moved ? [layerOrderReview(after, moved)] : []), ...profileReview(snapshot, after)];
+    }
     // The review rows, each with the group it belongs to. Rows are grouped by
     // the edits that made them: the units one staged message changed belong
-    // together (a swap, a moved behaviour, a reordered layer), and so does
+    // together (a swap, a moved behaviour), and so does
     // anything linked to them through a later edit. Only units the review
     // still shows link; a unit edited back to the keyboard's value no longer
-    // ties anything. Steps from a rebase, a discard, or before the bounded
-    // history leave their units on their own.
+    // ties anything. Steps from a rebase, a discard, Edit layers, or before
+    // the bounded history leave their units on their own. Units link by the
+    // layer they belong to, not the slot, so a reorder between two edits
+    // never ties two different layers' keys.
     changes() {
         if (!this.dirty) return [];
         const current = this.current;
         if (this.base.incomplete) return [{area: "Recovery", unit: null, title: "Complete profile", status: "changed", group: null, place: null,
             fields: [{label: "", before: "Interrupted configuration; a full comparison is unavailable", after: `${current.summary.layers} layers, ${current.summary.behaviors} behaviours, ${current.summary.combos} combos, ${current.summary.macros} macros with content, lighting and settings`}]}];
-        const rows = profileReview(this.baseSnapshot, current), shown = new Set(rows.map(row => row.unit));
+        const rows = this.describe(current.document, this.order), shown = new Set(rows.map(row => layerUnit(row.unit, this.order)));
         const parent = new Map([...shown].map(unit => [unit, unit]));
         const find = unit => {while (parent.get(unit) !== unit) unit = parent.get(unit); return unit;};
         const steps = [];
         for (let step = 1; step <= this.cursor; step++) {
             if (this.origins[step] !== "edit") continue;
-            const touched = this.stepUnits(step).filter(unit => shown.has(unit));
+            const touched = this.stepUnits(step).map(unit => layerUnit(unit, this.orders[step])).filter(unit => shown.has(unit));
             for (const unit of touched.slice(1)) parent.set(find(unit), find(touched[0]));
             if (touched.length) steps.push({label: this.labels[step], unit: touched[0]});
         }
@@ -219,7 +271,7 @@ class ProfileDraftSession {
         const title = list => !list?.length ? null : list.length === 1 ? list[0] : `${list[0]} and ${list.length - 1} more edit${list.length === 2 ? "" : "s"}`;
         const groups = new Map();
         return rows.map(row => {
-            const root = find(row.unit);
+            const root = find(layerUnit(row.unit, this.order));
             if (!groups.has(root)) groups.set(root, groups.size);
             return placed({...row, group: groups.get(root), groupTitle: title(titles.get(root))});
         });
@@ -244,13 +296,22 @@ class ProfileDraftSession {
         const items = this.changes().filter(row => row.group === group), units = new Set(items.map(row => row.unit));
         if (!units.size) throw fail("That change is no longer in the draft.");
         const reviewed = this.reviewedRevision === revision;
-        let document = revertUnits(this.base, this.current, units, this.capabilities);
+        // The order goes back by moving the layers back, so everything else
+        // moves with its layer and stays; anything else goes back to the
+        // reference, so the order stays.
+        let document, order = this.order;
+        if (units.has("layerOrder")) {
+            if (units.size > 1) throw fail("Discard the layer order on its own.");
+            document = rearranged(this.current.document, inverse(order));
+            order = IDENTITY;
+        } else document = revertUnits(this.referenceFor(order).snapshot, this.current, units, this.capabilities);
         // Some bytes carry no row of their own, such as the settings format a
         // macro name upgraded. Once nothing described is left, the draft is
         // the keyboard's profile again, not an indescribable difference.
-        const left = profileReview(this.baseSnapshot, {...this.current, document, decoded: undefined, fingerprint: fingerprint(document)});
-        if (left.every(row => row.unit === "profile")) document = copy(validateSnapshot(this.base.document, this.capabilities).document);
-        this.replace(document, revision, "discard", items.length === 1 ? `Discarded ${items[0].title}` : `Discarded ${items.length} changes made together`);
+        const left = this.describe(validateSnapshot(document, this.capabilities).document, order);
+        if (left.every(row => row.unit === "profile")) {document = copy(validateSnapshot(this.base.document, this.capabilities).document); order = IDENTITY;}
+        const label = units.has("layerOrder") ? "Put the layer order back" : items.length === 1 ? `Discarded ${items[0].title}` : `Discarded ${items.length} changes made together`;
+        this.replace(document, revision, "discard", label, order);
         if (reviewed) this.reviewedRevision = this.revision;
     }
     // Discard the whole draft as one more step, so undo brings it back: the
@@ -260,7 +321,7 @@ class ProfileDraftSession {
         if (this.base.incomplete) throw fail("Read the keyboard again to discard a recovery draft.");
         if (!this.dirty) return;
         const count = this.changes().length;
-        this.replace(validateSnapshot(this.base.document, this.capabilities).document, revision, "discard", `Discarded the draft (${count} change${count === 1 ? "" : "s"})`);
+        this.replace(validateSnapshot(this.base.document, this.capabilities).document, revision, "discard", `Discarded the draft (${count} change${count === 1 ? "" : "s"})`, IDENTITY);
     }
     undo(revision) {this.assertRevision(revision); if (this.cursor) {this.cursor--; this.revision++; this.reviewedRevision = null;}}
     redo(revision) {this.assertRevision(revision); if (this.cursor + 1 < this.history.length) {this.cursor++; this.revision++; this.reviewedRevision = null;}}
@@ -270,15 +331,17 @@ class ProfileDraftSession {
     rebase(revision) {
         this.assertRevision(revision, {allowStale: true});
         if (this.needsRead) throw fail("Read the latest keyboard state before reviewing this draft again.");
-        const target = this.document;
+        const target = this.document, order = this.order;
         if (this.latest.incomplete) {
-            this.base = copy(this.latest); this.history = [freeze(target)]; this.origins = [null]; this.labels = [null]; this.cursor = 0;
+            this.base = copy(this.latest); this.history = [freeze(target)]; this.origins = [null]; this.labels = [null]; this.orders = [IDENTITY]; this.cursor = 0;
             this.connectionToken = this.latestConnectionToken; this.connectionChanged = false;
             this.revision++; this.reviewedRevision = this.revision; return;
         }
         this.reset(this.latest);
         this.connectionToken = this.latestConnectionToken;
-        this.replace(target, this.revision, "rebase");
+        // The order carries over: the reference and the items still describe
+        // the whole difference to the keyboard read now.
+        this.replace(target, this.revision, "rebase", null, order);
         this.reviewedRevision = this.revision;
     }
     async apply(service, revision, saveRecovery) {

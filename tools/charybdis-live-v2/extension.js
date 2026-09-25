@@ -96,7 +96,8 @@ function hostFor(session) {
             const files = await vscode.window.showOpenDialog({title: "Choose a keyboard profile", canSelectMany: false, filters: {"Charybdis profile": ["charybdis.json", "json"]}});
             if (!files?.length) return undefined;
             if ((await vscode.workspace.fs.stat(files[0])).size > 100000) throw new Error("This profile file is too large.");
-            return Buffer.from(await vscode.workspace.fs.readFile(files[0])).toString("utf8");
+            const name = files[0].path.split("/").pop();
+            return {text: Buffer.from(await vscode.workspace.fs.readFile(files[0])).toString("utf8"), name};
         },
     };
 }

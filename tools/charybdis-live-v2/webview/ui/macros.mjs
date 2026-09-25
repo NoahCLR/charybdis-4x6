@@ -29,7 +29,7 @@ export function screenMacros() {
 
     const main = el(`<div class="main">${topbar(
         "Macros",
-        "Macro slots on the keyboard. Give one a name and it shows by that name on keys, in the picker and in the key card; the name is saved on the keyboard with everything else.",
+        "Macro slots on the keyboard. A named macro shows by its name on keys, in the picker and in the key card.",
         bank.length ? `<input class="input" id="macroSearch" type="search" placeholder="Search macros by name" style="width:220px" value="${esc(state.macroSearch || "")}">` : "",
     )}</div>`);
     main.querySelector("#macroSearch")?.addEventListener("input", (event) => { state.macroSearch = event.target.value; render(); });

@@ -1,26 +1,49 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {discardLabel, draftMarks, placeState, reviewBlocks, statusSummary, stillShown} from "../webview/view/review.mjs";
+import {categorySummary, discardLabel, draftMarks, groupNote, placeState, reviewBlocks, statusSummary, stillShown} from "../webview/view/review.mjs";
 
 const item = (area, title, group, extra = {}) => ({area, title, group, status: "changed", fields: [], ...extra});
 
-test("items made together form one block under the area they start in, shown once", () => {
+test("every item sits under its own area; a group that spans areas shows its part in each", () => {
     const changes = [
         item("Behaviours", "Esc", 0, {groupTitle: "Moved a behaviour", status: "removed"}),
-        item("Behaviours", "Q", 0, {groupTitle: "Moved a behaviour", status: "added"}),
         item("Layout", "Base · Left · row 1, column 1", 0, {groupTitle: "Moved a behaviour"}),
+        item("Behaviours", "Q", 0, {groupTitle: "Moved a behaviour", status: "added"}),
         item("Layout", "Base · Left thumb 1", 1),
         item("Macros", "Macro 3", 2),
+        item("Lighting", "Navigation colour", 0, {groupTitle: "Moved a behaviour"}),
     ];
     const sections = reviewBlocks(changes);
-    assert.deepEqual(sections.map((section) => section.area), ["Layout", "Behaviours", "Macros"], "areas in rail order");
-    const behaviours = sections.find((section) => section.area === "Behaviours");
-    assert.equal(behaviours.blocks.length, 1);
-    assert.deepEqual(behaviours.blocks[0].items.map((entry) => entry.title), ["Esc", "Q", "Base · Left · row 1, column 1"],
-        "the group keeps its Layout item rather than splitting it off");
-    assert.equal(behaviours.blocks[0].title, "Moved a behaviour");
-    assert.equal(behaviours.count, 3);
-    assert.equal(sections.find((section) => section.area === "Layout").count, 1);
+    assert.deepEqual(sections.map((section) => section.area), ["Layout", "Behaviours", "Macros", "Lighting"], "areas in rail order");
+    const [layout, behaviours, , lighting] = sections;
+    assert.deepEqual(layout.blocks.map((block) => block.items.map((entry) => entry.title)),
+        [["Base · Left · row 1, column 1"], ["Base · Left thumb 1"]], "the group's key sits with the other keys, in host order");
+    assert.equal(layout.count, 2);
+    assert.deepEqual(behaviours.blocks[0].items.map((entry) => entry.title), ["Esc", "Q"], "a group's items in one area stay one block");
+    assert.equal(behaviours.count, 2);
+    for (const part of [layout.blocks[0], behaviours.blocks[0], lighting.blocks[0]]) {
+        assert.equal(part.group, 0);
+        assert.equal(part.title, "Moved a behaviour");
+        assert.equal(part.size, 4, "every part knows the whole group, for its Discard");
+    }
+    assert.deepEqual(behaviours.blocks[0].elsewhere, ["Layout", "Lighting"], "the other areas it reaches, in rail order");
+    assert.equal(layout.blocks[1].size, 1);
+    assert.deepEqual(layout.blocks[1].elsewhere, []);
+});
+
+test("a recovery item with no group is a block of its own", () => {
+    const sections = reviewBlocks([item("Recovery", "Complete profile", null), item("Recovery", "Other", null)]);
+    assert.deepEqual(sections[0].blocks.map((block) => block.size), [1, 1]);
+});
+
+test("a group's header says how much of it is here and where the rest is", () => {
+    const [layout, behaviours] = reviewBlocks([
+        item("Layout", "a", 0), item("Behaviours", "b", 0), item("Behaviours", "c", 0), item("Combos", "d", 0), item("Lighting", "e", 0),
+        item("Layout", "f", 1), item("Layout", "g", 1),
+    ]);
+    assert.equal(groupNote(layout.blocks[0]), "1 of 5 here, the rest in Behaviours, Combos and Lighting · discarded together");
+    assert.equal(groupNote(behaviours.blocks[0]), "2 of 5 here, the rest in Layout, Combos and Lighting · discarded together");
+    assert.equal(groupNote(layout.blocks[1]), "2 changes, discarded together");
 });
 
 test("the header counts items by what happened to them", () => {
@@ -29,9 +52,9 @@ test("the header counts items by what happened to them", () => {
 });
 
 test("a Discard says how much it takes back", () => {
-    assert.equal(discardLabel({items: [1]}), "Discard");
-    assert.equal(discardLabel({items: [1, 2]}), "Discard both");
-    assert.equal(discardLabel({items: [1, 2, 3]}), "Discard all 3");
+    assert.equal(discardLabel({size: 1, items: [1]}), "Discard");
+    assert.equal(discardLabel({size: 2, items: [1, 2]}), "Discard both");
+    assert.equal(discardLabel({size: 81, items: [1, 2, 3]}), "Discard all 81", "a part of a group names the whole group");
 });
 
 test("Show goes to where each kind of item is edited", () => {
@@ -60,4 +83,34 @@ test("a removed thing keeps its mark and its Show only where it is still on scre
     const marks = draftMarks([removed({kind: "pointing", slot: 4}), removed({kind: "behaviour", keycode: "KC_2"})]);
     assert.deepEqual([...marks.pointing], [4]);
     assert.equal(marks.behaviours.size, 0);
+});
+
+test("a reorder marks the layers it moved, not their keys", () => {
+    const marks = draftMarks([{status: "changed", place: {kind: "layers", layers: [2, 3]}}]);
+    assert.deepEqual([...marks.layers], [2, 3]);
+    assert.equal(marks.keys.size, 0);
+    assert.equal(marks.layerNames, true);
+});
+
+test("a profile file's differences are counted by what they configure, split as each screen is", () => {
+    const at = (place, extra = {}) => ({status: "changed", place, ...extra});
+    const stages = [{id: "base", label: "Base effect"}, {id: "layers", label: "Layer colours"}, {id: "key", label: "Key feedback"}];
+    const groups = categorySummary([
+        at({kind: "pointing", slot: 2}), at({kind: "settings", section: "sniping"}),
+        at({kind: "lighting", stage: "key"}), at({kind: "settings", section: "lightingFeedback"}), at({kind: "lighting", stage: "layers", layer: 3}),
+        at({kind: "lighting", stage: null}), at({kind: "settings", section: "rgbAppearance"}),
+        at({kind: "combo", index: 7}, {status: "removed"}), at({kind: "key", layer: 3}), at({kind: "key", layer: 0}), at({kind: "key", layer: 3}),
+        at({kind: "settings", section: "keyTiming"}), at({kind: "behaviour"}, {status: "added"}), at({kind: "layers"}, {unit: "layerName:2"}),
+        at({kind: "settings"}, {unit: "settings:otherKeyOptions"}), at({kind: "macro", index: 4}), at(null, {unit: "profile", title: "Stored profile"}),
+    ], {names: ["Base", "Numbers", "Symbols", "Navigation"], stages});
+    assert.deepEqual(groups.map((group) => [group.category, group.count]),
+        [["Keys", 8], ["Lighting", 5], ["Macros", 1], ["Pointing modes", 2], ["Other", 1]], "the rail's order");
+    const rows = (category) => groups.find((group) => group.category === category).rows.map((row) => `${row.label} ${row.count}`);
+    assert.deepEqual(rows("Keys"), ["Keys on Base 1", "Keys on Navigation 2", "Layer names 1", "Behaviours 1", "Key timing 1", "Combos 1", "Key options 1"],
+        "the board's keys by layer first, then the rest of the Keys screen");
+    assert.deepEqual(rows("Lighting"), ["Stages on or off 1", "Base effect 1", "Layer colours 1", "Key feedback 2"], "stages in paint order; a setting joins what it tunes");
+    assert.deepEqual(rows("Pointing modes"), ["Modes 1", "Sniping 1"]);
+    assert.deepEqual(rows("Other"), ["Stored profile 1"]);
+    assert.deepEqual(rows("Macros"), [], "a category that is its one row shows no rows");
+    assert.equal(groups[0].status, "1 added · 6 changed · 1 removed");
 });

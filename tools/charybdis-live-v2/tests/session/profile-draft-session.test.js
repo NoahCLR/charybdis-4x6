@@ -209,3 +209,110 @@ test("a revision is decoded once and its history entry cannot be edited in place
     const {decodedOf} = require("../../core/model/portable-profile");
     assert.notEqual(decodedOf(copyOf), draft.current.decoded, "a snapshot with another document is decoded afresh, never with a stale decode");
 });
+
+// ── layers compared by identity ─────────────────────────────────────────
+
+const SWAP = [0,1,3,2,4,5,6,7];
+// An Edit layers save: the step it rearranges the draft by, every layer
+// keeping its name unless `names` (by new slot) says otherwise.
+function layers(draft, step = SWAP, {names, keysFollow = true} = {}) {
+    const current = draft.current.summary.names;
+    draft.editLayers(reorderLayers(draft.document,step,names || step.map(slot => current[slot]),{keysFollow}),draft.revision,step);
+}
+const units = draft => draft.changes().map(row => row.unit).sort();
+test("a layer swap is one item, and nothing it moved is listed on its own", () => {
+    const {draft} = fixture();
+    layers(draft);
+    const rows = draft.changes();
+    assert.deepEqual(rows.map(row => row.unit),["layerOrder"]);
+    assert.equal(rows[0].title,"Layer priority");
+    assert.deepEqual(rows[0].fields.map(field => [field.label,field.before,field.after]),[["Symbols","2","3 · higher"],["Navigation","3","2 · lower"]],
+        "each layer that moved, highest first, by where it sat and sits");
+    assert.deepEqual(rows[0].fields.map(field => field.labelMark),[{kind:"layer",layer:3},{kind:"layer",layer:2}],"in its light");
+    assert.deepEqual(rows[0].place,{kind:"layers",layers:[3,2]});
+    assert.equal(draft.view({}).undoLabel,"Swapped Symbols and Navigation");
+});
+test("a key edited on a swapped layer is its own item, and each discard keeps the other", () => {
+    const {draft,snapshot} = fixture();
+    layers(draft);
+    stage(draft,key(0,"KC_Q","Layer 2"));
+    assert.deepEqual(units(draft),["layerOrder","layout:2:0"]);
+    assert.equal(draft.changes().find(row => row.unit === "layout:2:0").title,"Navigation · Left · row 1, column 1");
+    assert.notEqual(groupOf(draft,"layerOrder"),groupOf(draft,"layout:2:0"));
+    draft.discard(draft.revision,groupOf(draft,"layout:2:0"));
+    assert.deepEqual(units(draft),["layerOrder"],"the key goes back, the swap stays");
+    draft.undo(draft.revision);
+    draft.discard(draft.revision,groupOf(draft,"layerOrder"));
+    assert.deepEqual(units(draft),["layout:3:0"],"the order goes back, the key stays on Navigation");
+    assert.deepEqual(draft.current.summary.names,snapshot.summary.names);
+    assert.equal(draft.view({}).undoLabel,"Put the layer order back");
+});
+test("a swap and a rename are two items, and discarding one keeps the other", () => {
+    const {draft,snapshot} = fixture();
+    layers(draft,SWAP,{names:["Base","Numbers","Nav","Symbols","Pointer","Extra 1","Extra 2","Extra 3"]});
+    assert.deepEqual(units(draft),["layerName:2","layerOrder"]);
+    assert.equal(draft.view({}).undoLabel,"Swapped Symbols and Navigation, renamed Navigation to Nav");
+    assert.notEqual(groupOf(draft,"layerOrder"),groupOf(draft,"layerName:2"),"one save, two decisions");
+    assert.deepEqual(draft.changes().find(row => row.unit === "layerOrder").fields.map(field => field.label),["Symbols","Nav"],"the order names a layer as it is called now");
+    const rename = draft.changes().find(row => row.unit === "layerName:2");
+    assert.deepEqual([rename.fields[0].before,rename.fields[0].after],["Navigation","Nav"],"named against the layer it renames");
+    draft.discard(draft.revision,groupOf(draft,"layerName:2"));
+    assert.deepEqual(draft.current.summary.names.slice(2,4),["Navigation","Symbols"],"the name goes back where the layer now sits");
+    draft.undo(draft.revision);
+    draft.discard(draft.revision,groupOf(draft,"layerOrder"));
+    assert.deepEqual(draft.current.summary.names.slice(2,4),["Symbols","Nav"],"the rename moves back with its layer");
+    assert.deepEqual(units(draft),["layerName:3"]);
+    assert.notDeepEqual(draft.current.summary.names,snapshot.summary.names);
+});
+test("several swaps are one priority change: the net move of every layer they touched", () => {
+    const {draft} = fixture();
+    layers(draft); layers(draft,[0,1,2,4,3,5,6,7]);
+    const chained = draft.changes().find(row => row.unit === "layerOrder");
+    assert.deepEqual(chained.fields.map(field => [field.label,field.before,field.after]),
+        [["Symbols","2","4 · higher"],["Pointer","4","3 · lower"],["Navigation","3","2 · lower"]],"two swaps sharing a layer move three");
+    layers(draft,[0,1,2,3,4,6,5,7]);
+    assert.deepEqual(draft.changes().filter(row => row.unit === "layerOrder").length,1,"a separate swap joins the same item");
+    assert.deepEqual(draft.changes()[0].fields.map(field => field.label),["Extra 1","Extra 2","Symbols","Pointer","Navigation"]);
+});
+test("swapping back leaves no layer order, and names alone never make one", () => {
+    const {draft} = fixture();
+    layers(draft); layers(draft);
+    assert.equal(draft.dirty,false);
+    assert.deepEqual(draft.changes(),[]);
+    // The contents move, the names are swapped over: on names alone nothing changed.
+    layers(draft,SWAP,{names:["Base","Numbers","Symbols","Navigation","Pointer","Extra 1","Extra 2","Extra 3"]});
+    assert.deepEqual(units(draft),["layerName:2","layerName:3","layerOrder"]);
+});
+test("keys that keep their numbers through a reorder are listed as the changes they are", () => {
+    const {draft,snapshot} = fixture();
+    layers(draft,[0,2,1,3,4,5,6,7],{keysFollow:false});
+    assert.equal(draft.document.layers[0][0],snapshot.document.layers[0][0],"the key kept its number");
+    assert.ok(units(draft).includes("layerOrder"));
+    assert.ok(units(draft).includes("layout:0:0"),"and now reaches another layer, which the review says");
+});
+test("undo and redo carry the order; a rebase keeps it; an import and a whole discard start from the keyboard's", () => {
+    const {draft,snapshot,caps} = fixture();
+    layers(draft); stage(draft,key(0,"KC_Q","Layer 2"));
+    draft.undo(draft.revision); assert.deepEqual(units(draft),["layerOrder"]);
+    draft.undo(draft.revision); assert.deepEqual(units(draft),[]);
+    draft.redo(draft.revision); draft.redo(draft.revision); assert.deepEqual(units(draft),["layerOrder","layout:2:0"]);
+    const external = new ProfileDraftSession(snapshot,"board",caps);
+    stage(external,{type:"updateViaMacro",keycode:"VIA_MACRO_9",payload:"elsewhere"});
+    draft.observe(external.current,"board"); draft.rebase(draft.revision);
+    assert.deepEqual(units(draft),["layerOrder","layout:2:0","macro:9"]);
+    const imported = reorderLayers(snapshot.document,SWAP,SWAP.map(slot => snapshot.summary.names[slot]));
+    draft.replace(imported,draft.revision,"edit","Imported a profile",[0,1,2,3,4,5,6,7]);
+    assert.deepEqual(units(draft).filter(unit => unit.startsWith("layer")),["layerName:2","layerName:3"],"an import is compared slot by slot");
+    draft.undo(draft.revision); draft.discardAll(draft.revision);
+    assert.equal(draft.dirty,false); assert.deepEqual(draft.order,[0,1,2,3,4,5,6,7]);
+});
+test("edits link by the layer they touched, so a reorder between them ties nothing new", () => {
+    const {draft} = fixture();
+    const both = layer => ({type:"updateLayoutKeys",layers:[{layer,changes:[{layoutIndex:0,keycode:"KC_A"},{layoutIndex:1,keycode:"KC_B"}]}]});
+    stage(draft,both("Layer 2"));
+    layers(draft);
+    stage(draft,both("Layer 2"));
+    assert.equal(groupOf(draft,"layout:3:0"),groupOf(draft,"layout:3:1"),"Symbols' two keys, made together, moved together");
+    assert.equal(groupOf(draft,"layout:2:0"),groupOf(draft,"layout:2:1"));
+    assert.notEqual(groupOf(draft,"layout:3:0"),groupOf(draft,"layout:2:0"),"Navigation's keys are another edit");
+});

@@ -115,7 +115,7 @@ Every screen is drawn and wired to the host:
 | Macros | Both banks: name, payload, insert-at-cursor step builder, reorder/remove controls, parsed preview, configurable recorder and placement; search by name, and the layers that set each macro off — by key, behaviour or combo — in their layer colour, each opening that layer in Keys with the macro picked |
 | Pointing modes | All eight slots: movement, speed, direction shortcuts, scroll tuning, buttons, bindings, placement, clear and duplicate |
 | Settings | Every section the keyboard reports, posted whole, read-only where the firmware cannot report |
-| Profile & backups | Export, import with review, upgrade export, recovery state |
+| Profile & backups | Import (the file against the keyboard, counted by what it configures — keys, lighting, macros, pointing — before it becomes the draft), export, upgrade export, recovery state |
 | Device | Read-only: connection, committed generation, what was read |
 
 The keycode picker leads with the ANSI board, then task-shaped Symbols,
@@ -131,10 +131,13 @@ Colour on any screen comes from the model, never from a constant, and a stage
 that is switched off is drawn as off — hollow dots, plain badges, unlit keys.
 
 Every edit is kept in a local draft and reaches the keyboard only through
-review and apply. Review lists each changed thing once with the fields that
-changed, can open it where it is edited, and can discard part of the draft:
-things made by the same edit (a key swap, a moved behaviour) go back together,
-as one undoable step. A keyboard the app cannot open a draft for — its profile
+review and apply. Review lists each changed thing once, under the area it is
+edited in, with the fields that changed, can open it where it is edited, and
+can discard part of the draft: things made by the same edit (a key swap, a
+moved behaviour) go back together, as one undoable step. Layers are compared
+by which layer they are, not where they sit, so a reorder is one **Layer
+priority** item and a key edited or a layer renamed after it is its own item;
+each can be discarded without the other. A keyboard the app cannot open a draft for — its profile
 could not be read, or its firmware predates profile editing — is read-only:
 the host refuses any edit rather than writing it directly.
 

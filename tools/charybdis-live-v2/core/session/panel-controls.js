@@ -15,6 +15,7 @@
 
 const {validateSnapshot} = require("./portable-profile-session");
 const {applyLayerEdit, discardDraftForDevice, layerEditDocument, startLayerEdit} = require("./panel-session");
+const {IDENTITY} = require("../model/layer-order");
 
 const run = (host, title, work) => host.progress ? host.progress(title, work) : work();
 
@@ -141,10 +142,12 @@ async function portableControl(session, message, host = {}) {
             session.portableReview = undefined; session.portableLayers = undefined;
             return;
         case "choosePortableProfile": {
-            const text = await host.chooseProfile?.();
-            if (text === undefined) return;
-            const value = validateSnapshot(text, service.capabilities);
-            session.portableReview = {document: value.document, before: session.draft?.current || await service.readPortableProfile({forRestore: true}), revision: session.draft?.revision};
+            // The host answers with the file's text, and its name when it has one.
+            const chosen = await host.chooseProfile?.();
+            if (chosen === undefined) return;
+            const value = validateSnapshot(typeof chosen === "string" ? chosen : chosen.text, service.capabilities);
+            session.portableReview = {document: value.document, fileName: typeof chosen === "string" ? null : chosen.name || null,
+                before: session.draft?.current || await service.readPortableProfile({forRestore: true}), revision: session.draft?.revision};
             session.portableLayers = undefined;
             return;
         }
@@ -165,7 +168,10 @@ async function portableControl(session, message, host = {}) {
             if (!before) throw new Error("Review the profile before restoring it.");
             const document = layers ? layerEditDocument(edit) : review.document;
             if (session.draft) {
-                session.draft.replace(document, layers ? edit.revision : review.revision, "edit", layers ? "Edited layers" : "Imported a profile");
+                // An import has no layer order to keep: its layers are
+                // compared slot by slot with the keyboard's.
+                if (layers) session.draft.editLayers(document, edit.revision, edit.order);
+                else session.draft.replace(document, review.revision, "edit", "Imported a profile", IDENTITY);
                 session.portableReview = undefined; session.portableLayers = undefined;
                 session.resetDraftForms = true;
                 return;

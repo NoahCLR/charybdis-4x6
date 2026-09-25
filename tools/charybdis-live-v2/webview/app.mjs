@@ -10,7 +10,7 @@ import {captureContentScroll, restoreContentScroll} from "./lib/scroll.mjs";
 import {activateOnKey, captureFocus, focusDialog, restoreFocus, trapTab} from "./lib/focus.mjs";
 import {closeComboBuilder, getModel, post, render as rerender, resetDraftForms, setModel, setRenderer, state, writable} from "./store.mjs";
 import {historyAction} from "./view/edits.mjs";
-import {FIELDS_SHOWN, discardLabel, placeState, reviewBlocks, statusSummary, stillShown} from "./view/review.mjs";
+import {FIELDS_SHOWN, discardLabel, groupNote, placeState, reviewBlocks, statusSummary, stillShown} from "./view/review.mjs";
 import {bindLayerIndex, hideHover, mountHover} from "./ui/hover.mjs";
 import {pickerOverlay} from "./ui/picker.mjs";
 import {keysShortcut, screenKeys} from "./ui/keys.mjs";
@@ -120,10 +120,10 @@ function reviewOverlay() {
     // An item is one row of the review's grid: a status gutter, the title,
     // the fields, and two action slots that are always in the same place —
     // Show, then Discard at the edge — whether or not an item has them.
-    const item = (entry, block, index, discard, titleSlot) => `<div class="rv-item">
+    const item = (entry, index, discard, titleSlot) => `<div class="rv-item">
         <span class="rv-gutter"><span class="rv-status ${esc(entry.status)}">${esc(entry.status)}</span></span>
         <div class="rv-title">${titleSlot ? `<span class="mk"><span class="mk-slot title">${mark(model, entry.titleMark)}</span><span class="t">${esc(entry.title)}</span></span>` : `<span class="t">${esc(entry.title)}</span>`}
-            ${entry.area !== block.area ? `<span class="rv-meta">${esc(entry.area)}</span>` : ""}</div>
+            ${entry.note ? titleSlot ? `<span class="mk"><span class="mk-slot title"></span><span class="rv-note">${esc(entry.note)}</span></span>` : `<span class="rv-note">${esc(entry.note)}</span>` : ""}</div>
         ${fields(entry)}
         <span class="rv-act">${stillShown(entry) && placeState(entry.place, model.layers) ? `<button class="btn tiny ghost" data-show="${index}"
             data-tip="Close the review and open this where it is edited.">Show</button>` : ""}</span>
@@ -136,13 +136,13 @@ function reviewOverlay() {
         <div class="sect-h"><h4>${esc(area)}</h4><span class="right tag">${count}</span></div>
         ${columns}
         ${((titleSlot) => blocks.map((block) => {
-            const grouped = block.items.length > 1;
+            const grouped = block.size > 1;
             const discard = discardable ? `<button class="btn tiny ghost" data-discard="${esc(block.group)}" ${canDiscard ? "" : "disabled"}
-                data-tip="${esc(grouped ? `Put these ${block.items.length} changes back to what the keyboard holds. They were made together, so they go back together.` : "Put this change back to what the keyboard holds.")}">${esc(discardLabel(block))}</button>` : "";
-            const items = block.items.map((entry) => item(entry, block, shown.push(entry) - 1, grouped ? "" : discard, titleSlot)).join("");
+                data-tip="${esc(grouped ? `Put these ${block.size} changes back to what the keyboard holds. They were made together, so they go back together.` : "Put this change back to what the keyboard holds.")}">${esc(discardLabel(block))}</button>` : "";
+            const items = block.items.map((entry) => item(entry, shown.push(entry) - 1, grouped ? "" : discard, titleSlot)).join("");
             return grouped
-                ? `<div class="rv-block grouped"><div class="rv-group-h"><span class="rv-group-t"><span>${esc(block.title || "Made together")}</span>
-                    <span class="note">${block.items.length} changes, discarded together</span></span><span class="rv-act wide">${discard}</span></div>${items}</div>`
+                ? `<div class="rv-block grouped" data-group="${esc(block.group)}"><div class="rv-group-h"><span class="rv-group-t"><span>${esc(block.title || "Made together")}</span>
+                    <span class="note">${esc(groupNote(block))}</span></span><span class="rv-act wide">${discard}</span></div>${items}</div>`
                 : `<div class="rv-block">${items}</div>`;
         }).join(""))(blocks.some((block) => block.items.some((entry) => entry.titleMark)))}</section>`).join("");
     const summary = statusSummary(draft.changes);
@@ -158,11 +158,12 @@ function reviewOverlay() {
             <span class="right"><button class="btn" data-act="close">Cancel</button>
                 <button class="btn primary" data-act="apply" ${draft.reviewed && draft.connected && !draft.stale ? "" : "disabled"}>Apply to keyboard</button></span></div>
     </div></div>`);
-    // Pointing at a group's Discard lights what it takes back.
+    // Pointing at a group's Discard lights what it takes back, in every area
+    // the group reaches.
     node.querySelectorAll(".rv-block.grouped [data-discard]").forEach((button) => {
-        const block = button.closest(".rv-block");
-        button.addEventListener("mouseenter", () => block.classList.add("lit"));
-        button.addEventListener("mouseleave", () => block.classList.remove("lit"));
+        const parts = node.querySelectorAll(`.rv-block.grouped[data-group="${button.dataset.discard}"]`);
+        button.addEventListener("mouseenter", () => parts.forEach((part) => part.classList.add("lit")));
+        button.addEventListener("mouseleave", () => parts.forEach((part) => part.classList.remove("lit")));
     });
     node.addEventListener("click", (event) => {
         const discard = event.target.closest("[data-discard]");

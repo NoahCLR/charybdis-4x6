@@ -547,6 +547,23 @@ Export there, then install the regular eight-layer pair and import. Import
 expands the unused layers transparently and translates the three-position shift
 in user trigger IDs. No firmware is flashed automatically by the app.
 
+Before a chosen file becomes the draft or is restored, its card compares it
+with what the keyboard holds, not with the draft, since that is what applying
+it would write. It names the file and counts the differences, by what they
+configure rather than which screen stores them: Keys (keys on each layer,
+layer priority, layer names, startup layers, behaviours, key timing, combos,
+combo layer matching, key options), Lighting (stages on or off, base effect,
+each stage in paint order, LED groups), Macros, and Pointing modes (modes,
+pointer speed, mode speeds, sniping, auto-mouse). A Settings section is
+counted with what it tunes. Each category shows its total and how many were
+added, changed and removed. It names no single difference; that is the
+draft's review. A file identical to the
+keyboard says so and cannot be used. With a draft open, the card says how many draft changes the file
+replaces and that Undo brings them back. A file is compared slot by slot: it carries no layer
+order, so a file whose layers were reordered reads as the keys and names
+that differ. See `importDifferences` in `core/session/panel-session.js` and
+`categorySummary` in `webview/view/review.mjs`.
+
 Import validates and reviews before writing, saves a local recovery document,
 and checks the reviewed state again after acquiring the candidate lease. The
 custom profile commits first; VIA macro/layout writes follow with macro
@@ -1187,11 +1204,15 @@ since there is nothing left to open.
 
 An item is also the unit **Discard** puts back to what the keyboard holds, as
 one more undoable step. The items one staged message changed belong together,
-so a key swap, a moved behaviour or a reordered layer is one block with one
-Discard, titled by the edit that made it ("Swapped two keys", "Moved a
+so a key swap or a moved behaviour is one block with one Discard, titled by the edit that made it ("Swapped two keys", "Moved a
 behaviour"); a later edit that touches two groups joins them, and the block is
-titled by the first edit and a count. A group that spans areas is shown once,
-under the area it starts in. Only units the review still shows link: a unit
+titled by the first edit and a count. Every item is listed under its own
+area, so the review always reads by area in rail order. A group that spans
+areas, such as a moved behaviour and the key that reaches it, shows the part
+of it that lives in each area there. Every part
+carries the group's title, says how many of the group are here and which
+areas hold the rest, and has a Discard that takes back the whole group.
+Pointing at that Discard lights every part. Only units the review still shows link: a unit
 edited back to the keyboard's value ties nothing. Rebases and discards carry
 no link, and neither do steps that fell out of the bounded history. A discard
 from a current review keeps it current, since what is left was part of what
@@ -1201,6 +1222,33 @@ discarded as a whole or not at all. See `core/model/profile-review.js`
 (items), `core/model/profile-revert.js` (restoring them),
 `ProfileDraftSession.changes()` (grouping, titles, board positions) and
 `webview/view/review.mjs` (blocks and Show).
+
+**Layers are compared by identity, not by slot.** A layer is neither its name,
+which a rename changes, nor its slot, which a reorder changes. Beside every
+history entry the draft keeps which keyboard layer each slot now holds. Edit
+layers sets it from the order it saves; it is never inferred from names or
+contents, which would be fooled by two empty layers or by a swap that also
+swaps the names. The review compares the draft with the keyboard's profile
+rearranged into that order, with every layer reference following (the
+*reference*). So a reorder is one item, **Layer priority** ("Higher layers
+win"): one row per layer that moved, named as the draft names it, in its
+light, with its place on the keyboard and in the draft and whether it went
+higher or lower, highest first as Edit layers lists them. Several swaps are
+one item too, the net move of every layer they touched. Everything else is
+compared layer with layer: a key edited on a moved layer is a key on that layer, and a
+rename is that layer's name. With "Keys follow their layers" off, the keys,
+behaviours and combos that kept their numbers now reach a different layer, so
+they are listed as the changes they are. A reorder links nothing, not even to
+what the same save renamed, since an order and a name are separate decisions.
+Discarding the order moves the layers back with their references following
+and keeps every other change, renames included; any other Discard puts its
+item back to the reference, so the order stays. Undo and redo carry the order
+with their entry. A rebase keeps it, since the reference and the items still
+describe the whole difference to the new keyboard; an import, a discard of the
+whole draft and an apply start again from the keyboard's order. An order that
+moves nothing visible, such as swapping back, leaves no item. Group links are
+kept by layer, not by slot, so a later reorder does not tie two different
+layers' keys together. See `core/model/layer-order.js`.
 
 ### D-L30 — The draft shows itself where it is edited
 
