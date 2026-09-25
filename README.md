@@ -540,8 +540,11 @@ while down, and a tap turns it on for exactly the next key press (modifiers and
 `OSM()` do not use it up; as with QMK, a long press on its own also arms it
 and a quick second tap cancels it; with one-shot keys off it is only a hold). A plain `LT(layer, kc)` without an authored row keeps
 QMK's own tap/hold timing; only its hold goes through the userspace layer
-ownership, so releasing it no longer turns off a locked layer. `DF()` and
-`LM()` still bypass the userspace layer ownership and are refused. Inside any helper, `KC_TRNS` means "use the lower active layer's
+ownership, so releasing it no longer turns off a locked layer. `LM(layer,
+mods)` holds its layer and its modifiers from press to release. `DF()` and
+`PDF()` are refused: this firmware keeps layer 0 as the base. For a switchable
+base such as a game layer, order that layer just above Base and use
+`TO(layer)` to switch to it. Inside any helper, `KC_TRNS` means "use the lower active layer's
 matching tap, hold, or long-hold behavior here."
 
 The matching key-behavior RGB config in

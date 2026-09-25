@@ -27,6 +27,6 @@ test("a combo is checked by its output; layer holds and one-shots pass, LT does 
 test("an encoded profile is checked across its behaviours and combos", () => {
     assert.equal(profilePlacementProblem(bytes, options), undefined, "the device fixture passes");
     const blob = encodeProfileBlob({schema: {major: 2, minor: 0}, domains: [{id: PROFILE_DOMAIN_IDS.COMBOS, version: 1,
-        payload: encodeComboDomainV1([{inputs: [code(0x04), code(0x05)], output: code(0x5022), termMs: 0, holdTermMs: 0, mustHold: false, mustTap: false, ordered: false}], {actionLimits: {maxPdModes: 8}})}]});
+        payload: encodeComboDomainV1([{inputs: [code(0x04), code(0x05)], output: code(0x5241), termMs: 0, holdTermMs: 0, mustHold: false, mustTap: false, ordered: false}], {actionLimits: {maxPdModes: 8}})}]});
     assert.match(profilePlacementProblem(blob, options), /^Combo 1: /);
 });

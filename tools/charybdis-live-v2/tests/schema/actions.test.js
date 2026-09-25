@@ -39,5 +39,6 @@ test("placement follows the keyboard's rule: only layer keycodes are restricted"
     assert.equal(places(code(0x52c2)), "ok - ok - ok", "TT needs a held key or a combo");
     assert.equal(places(code(0x5282)), "ok ok - - ok", "OSL is a key, a tap or a combo");
     assert.equal(places(code(0x4104)), "ok - - - -", "LT is a key of its own");
-    for (const unowned of [0x5241, 0x52e1, 0x5022, 0x5268]) assert.equal(places(code(unowned)), "- - - - -", `0x${unowned.toString(16)} goes nowhere`);
+    assert.equal(places(code(0x5062)), "ok - - - ok", "LM(3, Shift) is a key or a combo");
+    for (const unowned of [0x5241, 0x52e1, 0x5102, 0x5268]) assert.equal(places(code(unowned)), "- - - - -", `0x${unowned.toString(16)} goes nowhere`);
 });

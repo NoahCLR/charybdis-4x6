@@ -3313,6 +3313,45 @@ static void test_combo_oneshot_and_tap_toggle_are_owned(void) {
     CHECK(noah_runtime_debug_active_slot_count() == 0u);
 }
 
+// LM(layer, mods): the layer and the modifiers are held from the press to the
+// release, a quick tap sends nothing, and a locked layer outlasts it. This
+// runner's stubs model only plain modifier keys, so the modifiers are checked
+// as the held mods-only keycode; owned_keycode_test proves that keycode holds
+// exactly those modifiers.
+static void test_layer_mod_holds_its_layer_and_modifiers(void) {
+    keypos_t lm_pos  = {.row = 2, .col = 5};
+    keypos_t tg_pos  = {.row = 2, .col = 6};
+    uint16_t keycode = LM(LAYER_NAV, MOD_LSFT);
+
+    test_reset_state();
+    CHECK(!key_runtime_integration_process_record(keycode, lm_pos, true));
+    CHECK(test_layer_active(LAYER_NAV));
+    CHECK(noah_runtime_debug_slot_held_action_keycode(lm_pos) == LSFT(KC_NO));
+    key_runtime_integration_advance(&fake_time, 400u);
+    key_runtime_integration_scan();
+    CHECK(test_layer_active(LAYER_NAV));
+    CHECK(noah_runtime_debug_slot_held_action_keycode(lm_pos) == LSFT(KC_NO));
+    CHECK(!key_runtime_integration_process_record(keycode, lm_pos, false));
+    CHECK(!test_layer_active(LAYER_NAV));
+    CHECK(noah_runtime_debug_slot_held_action_keycode(lm_pos) == KC_NO);
+
+    key_runtime_integration_process_record(keycode, lm_pos, true);
+    key_runtime_integration_process_record(keycode, lm_pos, false);
+    key_runtime_integration_advance(&fake_time, 300u);
+    key_runtime_integration_scan();
+    CHECK(test_tap_code16_count == 0u && test_delayed_action_count == 0u);
+    CHECK(!test_layer_active(LAYER_NAV));
+    CHECK(noah_runtime_debug_slot_held_action_keycode(lm_pos) == KC_NO);
+
+    key_runtime_integration_process_record(TG(LAYER_NAV), tg_pos, true);
+    key_runtime_integration_process_record(TG(LAYER_NAV), tg_pos, false);
+    key_runtime_integration_process_record(keycode, lm_pos, true);
+    key_runtime_integration_process_record(keycode, lm_pos, false);
+    CHECK(test_layer_locked(LAYER_NAV) && test_layer_active(LAYER_NAV));
+    CHECK(noah_runtime_debug_slot_held_action_keycode(lm_pos) == KC_NO);
+    test_assert_thumb_runtime_quiescent(lm_pos);
+}
+
 // As QMK's OSL(): a long press on its own still arms the one-shot, a quick
 // second tap cancels it, and a slow second tap keeps it on.
 static void test_oneshot_layer_long_press_and_second_taps_follow_qmk(void) {
@@ -3426,6 +3465,7 @@ static void test_tap_toggle_taps_lock_and_holds_are_momentary(void) {
 int main(void) {
     test_oneshot_layer_arms_on_release_for_fast_typing();
     test_oneshot_layer_long_press_and_second_taps_follow_qmk();
+    test_layer_mod_holds_its_layer_and_modifiers();
     test_combo_layer_hold_is_owned();
     test_combo_oneshot_and_tap_toggle_are_owned();
     test_plain_layer_tap_hold_is_owned_and_its_tap_is_qmks();

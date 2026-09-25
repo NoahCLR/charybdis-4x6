@@ -12,10 +12,10 @@
 // QMK layer keycodes act through the userspace layer ownership model:
 // MO()/LT() as momentary holds, TT() as a momentary hold whose
 // TAPPING_TOGGLE-th tap locks the layer, OSL() as a momentary hold whose tap
-// turns the layer on for the next key, TG() as the same layer lock
-// LOCK_LAYER() sets, and TO() as "lock only this layer". The others (DF, LM)
-// are still raw QMK layer actions and are refused so they cannot bypass
-// ownership.
+// turns the layer on for the next key, LM() as a momentary hold that also
+// holds its modifiers, TG() as the same layer lock LOCK_LAYER() sets, and TO()
+// as "lock only this layer". DF() and PDF() are still raw QMK layer actions
+// and are refused: this firmware keeps layer 0 as the base.
 //
 // Scope note: this module intentionally keeps authored tap actions on normal
 // QMK tap semantics. Ownership-aware literal keycode dispatch, including held
@@ -67,9 +67,20 @@ static inline bool noah_action_keycode_is_layer_oneshot(uint16_t action) {
     return IS_QK_ONE_SHOT_LAYER(action) && QK_ONE_SHOT_LAYER_GET_LAYER(action) < LAYER_COUNT;
 }
 
-// Keys that hold their layer while they are down: MO(), TT() and OSL().
+// LM(n, mods) holds its layer like MO(n) and its modifiers while it is down;
+// the modifiers are a built-in hold (handled_key_defaults.c), held through
+// modifier ownership as the mods-only keycode noah_action_keycode_layer_mod_mods.
+static inline bool noah_action_keycode_is_layer_mod(uint16_t action) {
+    return IS_QK_LAYER_MOD(action) && QK_LAYER_MOD_GET_LAYER(action) < LAYER_COUNT;
+}
+
+static inline uint16_t noah_action_keycode_layer_mod_mods(uint16_t action) {
+    return (uint16_t)(QK_LAYER_MOD_GET_MODS(action) << 8);
+}
+
+// Keys that hold their layer while they are down: MO(), TT(), OSL() and LM().
 static inline bool noah_action_keycode_is_owned_momentary_layer(uint16_t action) {
-    return IS_QK_MOMENTARY(action) || noah_action_keycode_is_layer_tap_toggle(action) || noah_action_keycode_is_layer_oneshot(action);
+    return IS_QK_MOMENTARY(action) || noah_action_keycode_is_layer_tap_toggle(action) || noah_action_keycode_is_layer_oneshot(action) || noah_action_keycode_is_layer_mod(action);
 }
 
 static inline uint8_t noah_action_keycode_momentary_layer(uint16_t action) {
@@ -79,6 +90,9 @@ static inline uint8_t noah_action_keycode_momentary_layer(uint16_t action) {
     if (IS_QK_ONE_SHOT_LAYER(action)) {
         return (uint8_t)QK_ONE_SHOT_LAYER_GET_LAYER(action);
     }
+    if (IS_QK_LAYER_MOD(action)) {
+        return (uint8_t)QK_LAYER_MOD_GET_LAYER(action);
+    }
     return (uint8_t)QK_MOMENTARY_GET_LAYER(action);
 }
 
@@ -87,7 +101,7 @@ static inline bool noah_action_keycode_is_layer_tap(uint16_t action) {
 }
 
 static inline bool noah_action_keycode_is_raw_qmk_layer_action(uint16_t action) {
-    return IS_QK_TO(action) || IS_QK_MOMENTARY(action) || IS_QK_DEF_LAYER(action) || IS_QK_TOGGLE_LAYER(action) || IS_QK_ONE_SHOT_LAYER(action) || IS_QK_LAYER_TAP_TOGGLE(action) || IS_QK_LAYER_MOD(action) || IS_QK_LAYER_TAP(action);
+    return IS_QK_TO(action) || IS_QK_MOMENTARY(action) || IS_QK_DEF_LAYER(action) || IS_QK_PERSISTENT_DEF_LAYER(action) || IS_QK_TOGGLE_LAYER(action) || IS_QK_ONE_SHOT_LAYER(action) || IS_QK_LAYER_TAP_TOGGLE(action) || IS_QK_LAYER_MOD(action) || IS_QK_LAYER_TAP(action);
 }
 
 static inline bool noah_action_keycode_is_macro(uint16_t action) {
@@ -163,6 +177,10 @@ static inline bool noah_action_desc_is_owned_momentary_layer(noah_action_desc_t 
 
 static inline bool noah_action_desc_is_layer_tap(noah_action_desc_t desc) {
     return desc.kind == NOAH_ACTION_KIND_LAYER_TAP;
+}
+
+static inline bool noah_action_desc_is_layer_mod(noah_action_desc_t desc) {
+    return desc.kind == NOAH_ACTION_KIND_LAYER_MOD;
 }
 
 static inline bool noah_action_desc_is_layer_oneshot(noah_action_desc_t desc) {

@@ -120,6 +120,16 @@ hold_behavior_t handled_key_hold_behavior(const handled_key_resolution_t *resolu
         };
     }
 
+    // LM(n, mods) holds its modifiers from the press, as QMK's LM() does; the
+    // layer is the key's own momentary hold.
+    if (resolution->tap_count == 1 && noah_action_keycode_is_layer_mod(resolution->keycode)) {
+        return (hold_behavior_t){
+            .present = true,
+            .action  = noah_action_keycode_layer_mod_mods(resolution->keycode),
+            .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
+        };
+    }
+
     if (handled_key_resolution_uses_deferred_stacked_pd_hold(resolution)) {
         // Keep stacked PD modes out of the immediate activation path while the
         // tap-count branch is unresolved.
@@ -163,6 +173,9 @@ uint8_t handled_key_tap_repeat_count_behavior(const handled_key_resolution_t *re
 
 key_runtime_slot_hold_strategy_t handled_key_hold_strategy_behavior(const handled_key_resolution_t *resolution) {
     if (resolution && resolution->tap_count == 1 && resolution->pd_mode != 0 && !handled_key_resolution_uses_deferred_stacked_pd_hold(resolution)) {
+        return KEY_RUNTIME_SLOT_HOLD_STRATEGY_IMPLICIT;
+    }
+    if (resolution && resolution->tap_count == 1 && !resolution->step.hold.present && noah_action_keycode_is_layer_mod(resolution->keycode)) {
         return KEY_RUNTIME_SLOT_HOLD_STRATEGY_IMPLICIT;
     }
 

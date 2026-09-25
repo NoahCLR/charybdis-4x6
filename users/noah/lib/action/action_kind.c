@@ -192,6 +192,17 @@ bool noah_action_kind_match_layer_oneshot(uint16_t action, pd_mode_mask_t pd_mod
     return true;
 }
 
+bool noah_action_kind_match_layer_mod(uint16_t action, pd_mode_mask_t pd_mode, noah_action_desc_t *out) {
+    (void)pd_mode;
+
+    if (!(out && noah_action_keycode_is_layer_mod(action))) {
+        return false;
+    }
+
+    *out = noah_action_desc_build(NOAH_ACTION_KIND_LAYER_MOD, action, (uint8_t)QK_LAYER_MOD_GET_LAYER(action), 0);
+    return true;
+}
+
 bool noah_action_kind_match_layer_goto(uint16_t action, pd_mode_mask_t pd_mode, noah_action_desc_t *out) {
     (void)pd_mode;
 

@@ -67,16 +67,17 @@ const isLayerToggleCode = (code, layerCount) =>
 // asked to save (noah_action_supported_at in users/noah/lib/action). Only
 // layer keycodes are restricted: a layer hold needs a key held down, so it is a
 // key, a press-and-hold branch or a combo (a combo holds its output); OSL() is
-// a key, a tap or a combo; LT() is only a key; TG(), TO() and LOCK_LAYER() go
-// anywhere; the layer keycodes the keyboard does not own go nowhere. Returns
-// what is wrong, or undefined.
+// a key, a tap or a combo; LM() is a key or a combo; LT() is only a key; TG(),
+// TO() and LOCK_LAYER() go anywhere; DF() and PDF(), which the keyboard does not
+// own, go nowhere. Returns what is wrong, or undefined.
 const PLACEMENT = Object.freeze({KEY: "key", TAP: "tap", HOLD_PRESS: "holdPress", HOLD_OTHER: "holdOther", COMBO_OUTPUT: "comboOutput"});
 
 function layerRuleOf(code, layerCount) {
     const range = (base, span = 0x20) => code >= base && code < base + span;
     const layer = code & 0x1f;
     if (range(0x4000, 0x1000)) return ((code >> 8) & 0x0f) < layerCount ? {kind: "layerTap", places: [PLACEMENT.KEY]} : {kind: "unowned", places: []};
-    if (range(0x5000, 0x200) || range(0x5240) || range(0x52e0)) return {kind: "unowned", places: []};
+    if (range(0x5000, 0x200)) return ((code >> 5) & 0x0f) < layerCount ? {kind: "layerMod", places: [PLACEMENT.KEY, PLACEMENT.COMBO_OUTPUT]} : {kind: "unowned", places: []};
+    if (range(0x5240) || range(0x52e0)) return {kind: "unowned", places: []};
     if (!(range(0x5200) || range(0x5220) || range(0x5260) || range(0x5280) || range(0x52c0))) return undefined;
     if (layer >= layerCount) return {kind: "unowned", places: []};
     if (range(0x5220) || range(0x52c0)) return {kind: "hold", places: [PLACEMENT.KEY, PLACEMENT.HOLD_PRESS, PLACEMENT.COMBO_OUTPUT]};
@@ -94,6 +95,7 @@ function placementProblem(action, placement, {layerCount = 8} = {}) {
         case "hold": return `${name} holds a layer, so it only works as a key, a combo or a "Press and hold until release" branch.`;
         case "layerTap": return `${name} makes its own tap/hold decision, so it only works as a key, not in a behaviour or a combo.`;
         case "oneShot": return `${name} works as a key, a tap or a combo, not as a hold.`;
+        case "layerMod": return `${name} holds a layer and its modifiers, so it only works as a key or a combo.`;
         default: return undefined;
     }
 }

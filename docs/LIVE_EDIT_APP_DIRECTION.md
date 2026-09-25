@@ -1356,7 +1356,13 @@ Still open, in the order they are taken:
    `CUSTOM_MULTI_TAP_TERM` (QMK: `TAPPING_TERM`), like every multi-tap key
    here; `TO()` keeps held layers on; a `TG()`/`TO()` of the pointer layer from
    a behaviour is not seen by QMK's auto-mouse.
-5. `LM()` (a hold plus modifiers), then a decision on `DF()`: the firmware and
-   the app assume layer 0 is the base.
+5. (Done: `LM(n, mods)` holds layer n like `MO(n)` and its modifiers from
+   the press, through modifier ownership; a key or a combo, not a behaviour
+   step. Decided: `DF()` and `PDF()` stay refused. Layer 0 is the base in the
+   firmware's lookup, the RGB base effect and the app, and making it movable
+   touches all three for a need `TO()` already covers: order a game layer just
+   above Base and `TO(game)` switches to it while held layers still win. `PDF()`
+   is now classified as a refused layer keycode too; it was passed to QMK as a
+   plain key.)
 6. App: `TT()`/`OSL()` inside a behaviour and as a behaviour row's key, and
    `TG()`/`TO()`/`TT()`/`OSL()` in the picker's Layers section.

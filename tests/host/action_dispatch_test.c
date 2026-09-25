@@ -398,6 +398,18 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(noah_action_desc_supported_as_combo_output(oneshot));
     CHECK(noah_action_describe(OSL(LAYER_COUNT)).kind == NOAH_ACTION_KIND_UNSUPPORTED_LAYER_ACTION);
 
+    // LM() holds its layer like MO(); its modifiers are the key's built-in hold.
+    noah_action_desc_t layer_mod = noah_action_describe(LM(3, MOD_LSFT | MOD_LGUI));
+    CHECK(layer_mod.kind == NOAH_ACTION_KIND_LAYER_MOD);
+    CHECK(noah_action_desc_is_layer_mod(layer_mod));
+    CHECK(layer_mod.layer == 3);
+    CHECK(noah_action_desc_is_momentary_layer_keycode(layer_mod));
+    CHECK(noah_action_desc_is_runtime_handled_keycode(layer_mod));
+    CHECK(noah_action_keycode_layer_mod_mods(LM(3, MOD_LSFT | MOD_LGUI)) == LSG(KC_NO));
+    // A right-hand modifier keeps its right-hand bit (0x10): 0x14 is right Alt.
+    CHECK(noah_action_keycode_layer_mod_mods(LM(3, 0x14u)) == 0x1400u);
+    CHECK(noah_action_describe(LM(LAYER_COUNT, MOD_LSFT)).kind == NOAH_ACTION_KIND_UNSUPPORTED_LAYER_ACTION);
+
     CHECK(layer_jump.kind == NOAH_ACTION_KIND_LAYER_GOTO);
     CHECK(noah_action_desc_is_layer_goto(layer_jump));
     CHECK(layer_jump.layer == 5);
@@ -640,7 +652,13 @@ static void test_action_placement_rules(void) {
     CHECK(noah_action_supported_at(OSL(2), NOAH_ACTION_PLACEMENT_COMBO_OUTPUT));
 
     // Layer actions the runtime does not own are refused wherever they go.
-    const uint16_t unowned[] = {DF(1), LM(1, MOD_LSFT), TG(LAYER_COUNT), OSL(LAYER_COUNT)};
+    // LM() holds a layer and its modifiers: a key or a combo, not a behaviour step.
+    CHECK(noah_action_supported_at(LM(1, MOD_LSFT), NOAH_ACTION_PLACEMENT_KEY));
+    CHECK(noah_action_supported_at(LM(1, MOD_LSFT), NOAH_ACTION_PLACEMENT_COMBO_OUTPUT));
+    CHECK(!noah_action_supported_at(LM(1, MOD_LSFT), NOAH_ACTION_PLACEMENT_BEHAVIOR_TAP));
+    CHECK(!noah_action_supported_at(LM(1, MOD_LSFT), NOAH_ACTION_PLACEMENT_BEHAVIOR_HOLD_PRESS_AND_HOLD));
+
+    const uint16_t unowned[] = {DF(1), PDF(1), LM(LAYER_COUNT, MOD_LSFT), TG(LAYER_COUNT), OSL(LAYER_COUNT)};
     for (uint8_t i = 0; i < ARRAY_SIZE(unowned); i++) {
         CHECK(!noah_action_supported_at(unowned[i], NOAH_ACTION_PLACEMENT_KEY));
         CHECK(!noah_action_supported_at(unowned[i], NOAH_ACTION_PLACEMENT_BEHAVIOR_TAP));

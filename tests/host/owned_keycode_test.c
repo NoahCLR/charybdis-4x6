@@ -183,6 +183,24 @@ static void test_modded_key_registers_mods_and_basic_key(void) {
     CHECK(unregister_mods_calls[0] == MOD_BIT(KC_LEFT_GUI));
 }
 
+// A mods-only keycode, as LM(layer, mods) holds its modifiers: the mods are
+// registered and no key is.
+static void test_mods_only_keycode_registers_only_its_mods(void) {
+    uint16_t keycode = (uint16_t)(QK_LSFT | QK_LGUI | KC_NO);
+
+    test_reset_stubs();
+
+    CHECK(owned_keycode_register(keycode));
+    CHECK(register_mods_count == 1);
+    CHECK(register_mods_calls[0] == (MOD_BIT(KC_LEFT_SHIFT) | MOD_BIT(KC_LEFT_GUI)));
+    CHECK(register_code_count == 0);
+
+    CHECK(owned_keycode_unregister(keycode));
+    CHECK(unregister_mods_count == 1);
+    CHECK(unregister_mods_calls[0] == (MOD_BIT(KC_LEFT_SHIFT) | MOD_BIT(KC_LEFT_GUI)));
+    CHECK(unregister_code_count == 0);
+}
+
 static void test_right_modded_key_uses_right_side_modifier_mask(void) {
     uint16_t keycode = (uint16_t)(QK_RMODS_MIN | QK_LSFT | KC_C);
 
@@ -583,6 +601,7 @@ int main(void) {
     test_plain_key_registers_and_unregisters_directly();
     test_plain_modifier_uses_mod_ownership();
     test_modded_key_registers_mods_and_basic_key();
+    test_mods_only_keycode_registers_only_its_mods();
     test_right_modded_key_uses_right_side_modifier_mask();
     test_non_8bit_non_modded_keycodes_are_rejected();
     test_tap_uses_standard_and_caps_delays();

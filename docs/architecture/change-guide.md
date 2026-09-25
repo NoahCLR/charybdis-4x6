@@ -44,12 +44,14 @@ directory and the existing domain docs.
 - Do not include `noah_keymap.h` from runtime modules or `noah_runtime.h` from
   keymap-owned translation units.
 - Do not add raw QMK layer-action outputs to authored data when they bypass the
-  userspace layer ownership model. `MO()`, `LT()`, `TT()`, `OSL()`, `TG()`
-  and `TO()` are owned (`TT(n)` is `MO(n)` plus a built-in `LOCK_LAYER(n)` on
-  the `TAPPING_TOGGLE`-th tap; `OSL(n)` holds like `MO(n)` and its tap arms
-  `layer_ownership_oneshot_toggle(n)`, used up in the finalize hook; `TG(n)` is
-  `LOCK_LAYER(n)`; `TO(n)` is `layer_ownership_goto(n)`); `DF()` and `LM()` are
-  not yet. A plain `LT()` with no authored row keeps QMK's tap/hold decision;
+  userspace layer ownership model. `MO()`, `LT()`, `TT()`, `OSL()`, `LM()`,
+  `TG()` and `TO()` are owned (`TT(n)` is `MO(n)` plus a built-in
+  `LOCK_LAYER(n)` on the `TAPPING_TOGGLE`-th tap; `OSL(n)` holds like `MO(n)`
+  and its tap arms `layer_ownership_oneshot_tap(n)`, used up in the finalize
+  hook; `LM(n, mods)` holds like `MO(n)` plus a built-in immediate hold of its
+  mods-only keycode; `TG(n)` is `LOCK_LAYER(n)`; `TO(n)` is
+  `layer_ownership_goto(n)`). `DF()` and `PDF()` stay refused: layer 0 is the
+  base throughout the firmware and the app. A plain `LT()` with no authored row keeps QMK's tap/hold decision;
   only its hold (tap count 0) goes through layer ownership. Where an action may
   be placed is one rule, `noah_action_supported_at()`: `keymap.c` validation
   and the keyboard's check of a profile it is asked to save both ask it, and

@@ -29,7 +29,7 @@ static bool keymap_layer_action_supported(uint16_t keycode) {
 
 static void log_invalid_keymap_layer_action(uint8_t layer, uint8_t row, uint8_t col, uint16_t keycode) {
 #ifdef CONSOLE_ENABLE
-    uprintf("Unsupported keymaps[%u][%u][%u] raw layer action 0x%04X; use MO()/LT() for momentary access or LOCK_LAYER(...)/TG()/TO() for persistent layer changes\n", (unsigned int)layer, (unsigned int)row, (unsigned int)col, (unsigned int)keycode);
+    uprintf("Unsupported keymaps[%u][%u][%u] raw layer action 0x%04X; use MO()/LT()/TT()/OSL()/LM() for momentary access or LOCK_LAYER(...)/TG()/TO() for persistent layer changes; DF()/PDF() are not supported, layer 0 stays the base\n", (unsigned int)layer, (unsigned int)row, (unsigned int)col, (unsigned int)keycode);
 #else
     (void)layer;
     (void)row;
