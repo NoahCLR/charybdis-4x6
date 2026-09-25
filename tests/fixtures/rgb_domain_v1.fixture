@@ -1,5 +1,5 @@
 # Shared Profile Wire RGB domain v1 golden vector.
-# Consumed by both the firmware C host suite and Profile Studio JavaScript.
+# Consumed by both the firmware C host suite and the Charybdis Live JavaScript suite.
 codec.compiled_stage_mask=31
 codec.logical_layer_count=3
 codec.maximum_brightness=200

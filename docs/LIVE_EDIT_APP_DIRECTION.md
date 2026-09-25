@@ -1,14 +1,11 @@
 # Live Edit App — Direction
 
-Founding document for the `feat/live-edit-app` branch. It replaces the review
-scaffolding as the thing that carries the direction.
-
-The end goal is unchanged. It lives in
-[`tooling/PROFILE_STUDIO_PRODUCT_GOAL.md`](tooling/PROFILE_STUDIO_PRODUCT_GOAL.md)
-(the product contract) and
-[`architecture/device-resident-profile.md`](architecture/device-resident-profile.md)
-(the technical authority). This document records how we get there and what we
-decided along the way.
+The current status of the live app and the decisions behind it. The end goal is
+the [product goal](PRODUCT_GOAL.md); the technical authority is
+[`architecture/device-resident-profile.md`](architecture/device-resident-profile.md).
+This document records how we get there and what we decided along the way.
+Verification logs, build numbers and the branch's setup history are in git, not
+here.
 
 ## The Direction In One Sentence
 
@@ -17,1270 +14,520 @@ the keyboard rather than a client of the repository.
 
 ## Current Product Status
 
-The live app reads configuration from the keyboard without a firmware workspace
-at runtime. Layout, behaviours, combos and RGB have working editors and device
-save paths. Complete export/import includes both macro banks and global settings;
-eight-layer naming and reordering are implemented; by default a reorder renumbers every layer key to keep reaching the same layer, and "Keys follow their layers" turned off keeps the keys' numbers instead. The user
-reports that the new workflow appears to work on their keyboard. This is useful
-manual feedback, not completion of the hardware acceptance matrix.
+The live app, [`tools/charybdis-live-v2/`](../tools/charybdis-live-v2/), reads
+everything it edits from the keyboard without a firmware workspace, keeps every
+change in one reviewed draft, and applies it to both halves as one atomic
+logical generation. The user reports that the workflow works on their keyboard;
+that is useful manual feedback, not completion of the hardware acceptance
+matrix.
 
 | Product surface | Current state |
 | --- | --- |
-| Layout and eight layers | Read/write; names and overlay order travel with complete profiles |
-| Key behaviours, combos and RGB | Read/write editors; custom-profile saves verify readback and both halves |
-| Macros | Builder, recorder and preview wired to both device banks; verified save and draft retention |
-| Global policy | Defaults panels cover all 28 portable scalars, including startup layers, combo matching and device-reported lighting/key options; unsupported firmware features stay read-only |
-| Backup and restore | Complete supported snapshots, review, recovery file and verified restore; interrupted restores can be retried |
-| Drafts and Apply | Eight-layer profiles share one draft, an item-by-item change review with discard by edit group and Show (D-L29), undo/redo and a coordinated verified Apply; unfinished forms stay local until kept |
-| Recovery and release readiness | Atomic logical Apply, differential transfer, reboot recovery fencing, firmware roll-forward when the app stops after the decision, resume after a lost or power-cycled peer link, and verified recovery-base reuse are implemented; physical interruption acceptance, external VIA adoption, guided recovery, broad hardware acceptance and standalone packaging remain pending |
-
-Studio's existing Defaults controls now use complete-profile readback and the
-verified restore path, including native options reported by firmware. Editing,
-undo/redo and change review now share a complete-profile draft. Apply binds VIA
-and custom storage to one durable logical generation and blocks activation while
-recovery is incomplete. Finish physical decision-boundary interruption tests,
-external VIA adoption, guided recovery, the inherited pointing cadence work,
-and blank-firmware restore acceptance before calling the product complete.
-
-The live shell presents connection, both-half convergence, draft state and
-recovery state as one compact health strip. Editors use a consistent
-keep-in-draft → review → apply vocabulary, and boolean policy controls render as
-switches. This is presentation over the same device-authoritative model; it does
-not add a second source of state.
-Convergence requires the firmware's peer-known and peer-converged flags as well
-as matching generations. Read from keyboard is serialized across its full
-workflow, and compiled defaults are selected from fresh status rather than from
-an arbitrary committed-payload rejection.
-The rail shows a keyboard selector when several compatible Raw HID interfaces
-are present. Device choices keep session-stable identities across scans; a
-dirty draft remains bound to its original choice and cannot edit another
-keyboard until it is discarded or the original is selected again.
-An open layer editor or import review closes on a keyboard switch; keeping an
-older review is also checked against the selected keyboard and draft identity.
-A new connection also requires explicit draft review before Apply, even if the
-HID path is reused and readback matches the earlier profile.
-
-## Eight configurable PD-mode slots
-
-Side-specific owner firmware now reads and writes eight device-owned pointing
-slots and eight RGB rows. The six original modes are authored records consumed
-by shared directional and scroll engines; two slots start empty. The live
-Pointing modes tab uses the shared keycode picker and keeps its normal flow to
-name, movement type, DPI and actions. Pointer policy, thresholds, scroll tuning,
-modifier policies and mouse-button overrides remain available under a collapsed
-Advanced section. Hold/toggle bindings, RGB, review, undo/redo and complete
-backups use the same slot identities.
-
-This is a schema and EEPROM geometry upgrade. Export a verified original and
-migrated profile through the old-geometry readback bridge before flashing the
-new pair. See [the migration plan](architecture/live-pd-modes-plan.md),
-[the domain contract](architecture/pd-mode-domain-v1.md) and
-[resource accounting](architecture/memory-budgets.md). Automated and local editor
-checks do not replace the pending two-half physical migration, interruption,
-cadence and high-water acceptance checks. No hardware has been flashed by this
-implementation work.
-
-## Why This Branch Exists
-
-Profile Studio was being asked to be two products at once: a `.c` authoring
-tool driven by parsing the repository, and a live device editor driven by what
-is committed on the keyboard. Those have different sources of truth, different
-data models, and different users. Serving both from one 14,539-line extension
-made each worse.
-
-So we split them:
-
-- **Profile Studio** returns to what it was at `refactor/aug` and freezes
-  there. It authors `keymap.c`, `config.h`, and `rgb_config.c`. It is the
-  `.c` tool.
-- **The live app** is new, owns live firmware editing, and never parses the
-  repository.
-
-This is not a change of direction. The product contract already said the VS
-Code extension "is the development shell for that product, not its final
-authority model" and required "a reusable application core that does not depend
-on parsing an open repository". This branch does that work first instead of
-last, because doing it later means doing every intervening feature twice.
-
-## What Already Exists
-
-The separation was closer than it looked:
-
-- `live-link/` is 6,433 lines across 14 modules with 3,666 lines of tests. It
-  has **zero `vscode` imports**, and its only external dependency is `node-hid`,
-  isolated behind a four-method adapter seam (`listDevices` / `connect`, then
-  `write` / `onReport` / `onDisconnect` / `close`). It does not exist on
-  `refactor/aug` at all.
-- The live-edit contamination of `extension.js` is **675 insertions and 20
-  deletions** against `refactor/aug`. Reverting it is surgical.
-- The firmware live-profile stack — Profile Wire, the dual-slot profile store,
-  the runtime owner, the split reconciler — is roughly 15,000 lines across 96
-  files and is exactly what the live app talks to over HID. None of it rolls
-  back.
-
-## Decisions
-
-### D-L01 — The branch keeps the firmware and rolls back only the studio shell
-
-Branched from `refactor/live_edit`. Only `extension.js`, `package.json`, and
-`README.md` in `tools/charybdis-profile-studio/` revert to their
-`refactor/aug` state. Reverting the whole directory would delete `live-link/`,
-which does not exist on that branch.
-
-### D-L02 — The live app is a second VS Code extension for now
-
-It ships as its own extension with its own activation, sharing nothing with
-Profile Studio at runtime. Because `live-link` has no `vscode` imports,
-repackaging later as a standalone desktop app is a shell and adapter swap
-rather than a rewrite.
-
-This defers the product goal's "no firmware workspace" requirement. The trigger
-to repackage is the first time a non-developer needs to run it.
-
-### D-L03 — `live-link/` moves into the live app as sole owner
-
-After the rollback, Profile Studio has no live features and no use for it. A
-shared package with one consumer is premature. Moved with `git mv` so history
-follows. Extract to a shared package only if Studio ever needs device access
-again.
-
-It landed as `live-link/` and was layered into `core/` by D-L10 below; the
-directory name in this decision is historical.
-
-### D-L04 — Profile Studio is frozen at `refactor/aug`
-
-Bug fixes only. It is not a development target. This is what makes forking
-presentation code between the two apps cheap: nobody fixes the same bug twice
-in a tool nobody is changing. Retirement stays open and does not need deciding.
-
-### D-L05 — The keycode catalog is vendored, not parsed
-
-A build step reads QMK's `*.hjson` keycode files once and emits a checked-in
-JSON catalog inside the live app, stamped with the QMK version it came from.
-
-This is required, not cosmetic. Today `compileViaLayout` needs
-`qmkKeycodeValues`, which Profile Studio builds by parsing the QMK checkout,
-and `decodeViaGetKeycodeResponse` returns a bare `uint16` with no mapping back
-to a name. The live app needs both directions and cannot depend on a firmware
-workspace for either. Vendoring also turns QMK version drift into a diffable
-file rather than silent behaviour change.
-
-### D-L06 — Port the whole UI, rebuild only the model source
-
-**Superseded in execution, and the correction matters.** This decision
-originally said to fork Studio's presentation — layout geometry, key faces,
-colour controls — and rebuild the rest. That was based on a wrong reading of
-where the reusable seam sits.
-
-Studio's webview does no file access at all. It is a pure renderer: the host
-posts a `model` object, the webview renders it, and edits come back as typed
-messages (`updateLayoutKeys`, `saveBehavior`, `addCombo`). The webview never
-knew the model came from parsed C. So the seam is the model, not the widgets,
-and the whole UI ports unchanged as long as something produces the same shape.
-
-Trying to lift "the presentation" out of 534 functions in one template literal
-is impossible; the model boundary one level up is free. The live app therefore
-takes Studio's UI verbatim into `webview/` and supplies the model from the
-keyboard via `core/session/device-model.js`.
-
-The cost is real and accepted: a large template literal now lives in an app
-otherwise organised into small modules. It is exempted from the layer rules by
-path, still tested for the two properties that matter — it cannot import
-device layers and cannot touch the filesystem — and gets decomposed tab by tab
-as each is rewired.
-
-The original text follows, kept because the reasoning it got wrong is worth
-remembering.
-
-### D-L06 (original) — Fork the presentation, rebuild the state
-
-The live app takes the expensive-to-rebuild visual work: the Charybdis layout
-geometry, key-face rendering, colour controls, layer tabs, and the CSS. It does
-not take the state layer.
-
-Profile Studio's model is C expression strings (`canonicalLayoutKeyExpression`,
-`authoredInternalKeyExpression`, `isLayoutKeyCallExpression`) resolved against a
-repo-parsed catalog. The live app's model is structured values read from the
-device. Carrying the state layer across would import an authority model built
-for the wrong source of truth.
-
-The live app's webview is written as real modules loaded through
-`webview.asWebviewUri()`, not as a template literal. No bundler required.
-
-### D-L07 — Specs are promoted, process is deleted
-
-Kept, as durable specs under `docs/architecture/`:
-
-- `profile-wire-v1.md` — the HID protocol the live app speaks
-- `profile-split-v1.md` — the split protocol
-- `authority-state-table.md` — source, device, and split authority; safe
-  activation
-- `storage-and-resource-baseline.md` — EEPROM maps, storage ceilings, and the measured resource baseline
-- `field-classification.md` — the field inventory the product goal cites
-- `pointing-cadence-known-issue.md` — the parked R-21 investigation
-
-Deleted: all 23 review folders, `Sol Findings/`, `prompts/`, and the review
-process conventions in `AGENTS.md`. Roughly 15,000 lines of process history,
-none of which describes how the thing works.
-
-### D-L08 — The live-profile owner is on by default
-
-The gate inverts: `NOAH_LIVE_PROFILE_OWNER=no` builds an owner-free image. The
-live app targets ordinary firmware rather than a special engineering artifact.
-
-One coupling surfaced while implementing this and is worth stating, because it
-changes what "ordinary firmware" means. The owner requires a provisioned
-`NOAH_PHYSICAL_HALF`, since durable profile origin identity is side-specific.
-The generic half-less convenience build therefore cannot carry the owner. It
-now reports that at configure time and builds without it, rather than failing.
-
-So the firmware you flash — the side-specific left/right pair — has the owner
-by default, and the single generic image does not. If that split is wrong, the
-alternative is to make the generic build an error, which would break the plain
-`qmk compile` documented in the root README.
-
-`tools/build-firmware-pair.sh`, and the `Build Firmware Pair (flashable)` task
-that runs it, exist because of this. A build path that sets only
-`FORCE_MASTER`/`FORCE_SLAVE` silently omits the owner, which is easy to miss:
-the firmware works, it just has no committed profile to read.
-
-The opt-out is kept deliberately. It is the only remaining lever for comparing
-ordinary against live behaviour on identical source, which matters for R-21
-(below), and it is the fallback if the regression proves intolerable in daily
-use.
-
-Static RAM for the current owner build is 55,796 B against the 57,344 B
-regression tripwire, so this needs no memory policy change.
-
-### D-L11 — Current state comes from the keyboard, including compiled defaults
-
-The app has zero reliance on the repository's C files. It parses none of them,
-reads no file at runtime, and `tests/layering.test.js` fails the build if a
-`core/` module so much as names one.
-
-A keyboard with nothing committed is still running something: the defaults its
-firmware was built with. Profile Wire value `0x05` serves those over the same
-page layout as the committed payload, so the app can show what the board
-actually does instead of an empty editor.
-
-That is not a source dependency. The bytes come from the device over HID. If
-the flashed firmware was built from different authored data than the repo
-currently holds, the app shows what is flashed, because that is what the
-keyboard reports. The compiled defaults are labelled as such in the UI and
-never presented as a committed generation; `generation 0` is reported as "no
-committed profile" rather than as a generation.
-
-Two pieces of data are shipped with the app rather than read from the device,
-because no device command exposes them:
-
-- the vendored QMK keycode catalog, since keycodes arrive as bare `uint16`
-  with no names;
-- the Charybdis layout matrix, since standard VIA has no query for which
-  physical position maps to which row and column.
-
-Both are keyboard-definition data of the kind VIA and Vial ship per board. No
-configuration flows from them; they only decode what the device sends.
-
-Readback must be tested through the extension's posted model and the rendered
-controls, not just the byte decoders. The initial readback implementation omitted
-the profile from the extension publication and forwarded wire-domain objects
-without adapting them to the UI. Passing codec tests did not prove display.
-`device-profile-view.js` now converts validated device domains into presentation
-fields. The separate behaviours view lists every returned row; RGB includes
-stage state and resolved group membership. Zero timing values remain visible,
-with the unreported firmware-default duration stated explicitly.
-
-Semantic target links to opaque VIA keycodes are enabled only for the known v1
-native action ABI advertised by the keyboard. An unfamiliar ABI keeps semantic
-rows inspectable without guessing native key identities. Source names and
-unreported policy values are never reconstructed from the repository. Recorded
-device bytes used by regression tests are test-only fixtures, not runtime data.
-
-Layer preview membership follows the firmware rule: both transparent and
-no-action keycodes are unmapped, regardless of their QMK alias spelling. The
-preview honours all-keys mode and disabled layer stages as well. Tests exercise
-the delivered key renderer, including unsaved edits whose numeric readback is
-stale. Standard modified keycodes decode structurally; complete numeric IDs
-remain for unnamed custom keys. Catalog generation honours QMK fragment resets
-and deletions, and every decoded uint16 must encode back to its original value.
-
-### D-L12 — RGB rule identity and preview appearance are separate
-
-Pass-through is a layer paint operation, not white, black, or a copy of a
-compiled default colour. The app reads current QMK RGB Matrix settings over
-standard VIA channel 3, GET `0x08`, values 1–4 (relative brightness, effect,
-speed, hue/saturation). These settings are outside custom-profile generation
-identity and remain separate in the session and presentation models.
-
-The read requires consecutive matching samples, up to four samples (16 GETs).
-This detects ordinary changes during readback; VIA offers no atomic snapshot.
-Unsupported, malformed, or unstable reads clear the previous base colour and
-leave custom-profile readback intact. Disconnect clears both.
-
-The board is explicitly a **selected-layer preview**. It assumes base plus
-the selected layer, paints their colours in layer order, then their applicable
-LED groups in reported order. All-keys/mapped-only membership, pass-through,
-owning-layer group inheritance and disabled layer stages follow the firmware
-rules. RGB Matrix off suppresses the full preview. Solid colour mode can be
-drawn from the read settings; unimplemented effects use labelled placeholders.
-Transparent-key identity is independent of inherited RGB fill.
-
-This is not rendered LED telemetry. VIA brightness is scaled to an unreported
-compiled ceiling; display intensity is approximate. Effect flags, idle/suspend,
-animation phase, active/locked layers and transient feedback are not supplied
-by these reads. Refresh is explicit through **Read from keyboard**. Exact live
-appearance remains a future device-frame readout, not host reconstruction of
-unreported state. No firmware or profile-format change is required for this
-settings-based preview.
-
-### D-L13 — Combo readback is device data, separate from persisted profiles
-
-Profile Wire GET value `0x06` exposes the native combo table the connected
-half runs, with effective per-combo timing and hold/tap/order rules, global
-enabled state, and layer-reference mapping. The bounded read supports up to
-32 rows of four inputs. A metadata digest and a repeated metadata read detect
-ordinary mid-read changes. Exact framing is in `architecture/profile-wire-v1.md`.
-This is an optional probe: old firmware returns VIA unhandled, and the app
-shows an update message without losing its other readback.
-
-This read does not introduce the reserved combo profile domain `0x30`, a
-generation, an EEPROM representation or a mutation route. Definitions are
-native numeric keycodes under the connected firmware's ABI. The app uses its
-vendored keycode vocabulary and already-validated semantic labels, never source
-files. Combo names are stable generated row labels. Firmware callback outputs
-and additional custom trigger/release hooks are explicitly identified as opaque.
-
-The initial readout listed every returned row in a Combos tab; D-L14 returns editing to the layout. Layout badges show where the selected
-layer over Layer 0 supplies all inputs, respecting reported reference layers
-and transparent keys; they do not claim to observe the active layer stack or
-evaluate arbitrary trigger predicates. No per-combo transient engine state is
-presented as configuration. Global disable suppresses preview badges.
-
-Readback was proven on the connected keyboard. D-L14 adds the combo domain and generation-bound persistence.
-
-### D-L09 — The live app owns a canonical profile format, not `.c`
-
-Backup, restore, sharing, and version control all go through a canonical
-profile format. `.c` import and export stay entirely in Profile Studio.
-
-**This amends the product contract.** `PROFILE_STUDIO_PRODUCT_GOAL.md` lists
-the C files as "an explicit import source" and "a canonical export target" of
-the control software. On this branch, that bridge lives in the authoring tool
-instead, and the live app's durable representation is the profile itself.
-Honouring it as written would drag C parsing, the repo dependency, and the
-`.c` serialiser back into the app the split exists to keep clean.
-
-## Known Issue Carried Onto This Branch
-
-**R-21 — pointing cadence regression, unexplained.** Reported mouse rate falls
-from ~450 Hz to ~300 Hz with the live-profile owner enabled, roughly 1.1 ms of
-added work per main-loop iteration. A full static investigation eliminated the
-pointing path, the poll throttle, split pointing, the split reconciler (by
-measurement), EEPROM read cost, macro reseeding, the split mirror step, and the
-layer key-LED map rebuild. Nothing found accounts for a millisecond.
-
-With D-L08 this ships by default, so it is now felt in daily use rather than
-only in an engineering build. Details, the full candidate inventory, and the
-remaining measurement paths are in
-[`architecture/pointing-cadence-known-issue.md`](architecture/pointing-cadence-known-issue.md).
-
-### D-L10 — The live app is layered, and the layering is enforced by review
-
-`core/` is split into `transport`, `schema`, `protocol`, `session`, and `data`,
-with imports pointing one way and `tests/` mirroring it. `media/` never imports
-`core/`; it renders snapshots the host posts, so the core stays runnable in a
-plain Node process and the UI stays replaceable.
-
-The structure exists because the thing being replaced was a 14,539-line file
-that grew one convenience at a time. The rules, and where new work belongs, are
-now in [`tools/charybdis-live-v2/AGENTS.md`](../tools/charybdis-live-v2/AGENTS.md)
-(see D-L21); there the webview's pure `view/` and `ui/` modules take the place
-of `media/`, and receive the model as a message the same way.
-
-D-L15 adds `core/model/` for the canonical portable document and layer-reference
-rewrites. Generation-bound behaviour drafts exist; the whole-profile draft
-coordinator remains pending.
-
-### D-L21 — Charybdis Live v2 is the app; v1 is frozen
-
-`tools/charybdis-live-v2/` is the live app and the only one developed. It keeps
-the core, the layering and the one rule (nothing reads the firmware
-repository), and replaces v1's ported Studio interface with its own: browser ES
-modules with pure, tested `view/` modules, every posted edit built by
-`webview/view/edits.mjs` and staged against a real draft in
-`tests/edits.test.mjs`, and a board that shows what the firmware does. Edits
-exist only as a reviewed draft; a keyboard the app cannot open a draft for is
-read-only, and the host refuses edits rather than writing them directly.
-
-The v1 app, `tools/charybdis-live/`, was frozen by this decision and then
-removed. The profiles it wrote remain a firmware compatibility check, frozen as
-`tests/fixtures/stored_profile_live_v1.fixture`.
-
-## Delivery
-
-Slices, each ending in something testable on the real keyboard. Protocol or UI
-infrastructure without a usable connected workflow is progress, but it is not a
-completed slice.
-
-1. **Restructure and scaffolding.** Branch, revert the studio, move
-   `live-link`, create the live extension, vendor the keycode catalog, promote
-   the specs, delete the process, invert the firmware gate. Proven by
-   connecting and displaying device identity, capabilities, schema, and status
-   through the Profile Wire reads that already work.
-2. **Device readback.** *Landed.* Profile Wire value `0x04` serves the
-   committed payload: page 0 metadata, pages 1..N raw bytes. Coherence is the
-   host's, by re-reading metadata after the chunks, since generation only
-   increases. The payload is verified against both the reported CRC and digest
-   before decoding, and a domain that fails to decode is reported without
-   discarding the rest of the profile. RGB and key behaviours now reach the UI
-   as the keyboard holds them.
-
-   `READ_SURFACE` remains capability and status reporting and is still not
-   this.
-3. **Generation-bound drafts and conflict-safe apply**, then read-after-write
-   verification and visible two-half convergence.
-4. **Backup, restore, reset, and recovery journeys** over the canonical profile
-   format.
-5. **Domain expansion** per the field classification.
-6. **Repackaging** so normal configuration needs no firmware workspace.
-7. **Acceptance**: compatibility, migration, performance, resource, and
-   real-hardware matrices before promotion. R-21 must be resolved here.
+| Layout and eight layers | Read/write; names and overlay order travel with complete profiles; a reorder renumbers layer keys by default ("Keys follow their layers") |
+| Key behaviours, combos and RGB | Read/write editors over the shared draft |
+| Macros | 64 named VIA macro slots with builder, recorder and preview; shared-memory and per-macro limits shown and enforced (D-L25, D-L26) |
+| Pointing modes | Eight device-owned slots and eight RGB rows; see [PD-mode domain v1](architecture/pd-mode-domain-v1.md) |
+| Global policy | Every portable setting, including startup layers, combo matching and device-reported lighting and key options; unsupported firmware features stay read-only |
+| Backup and restore | Complete snapshots, import review against the keyboard, recovery file and verified restore |
+| Drafts and Apply | One draft with item-by-item review, discard by edit group, Show, undo/redo and draft history; Apply shows its steps and says where a failure happened (D-L19, D-L23, D-L29, D-L30) |
+| Recovery | Atomic logical Apply, differential transfer, reboot recovery fencing, firmware roll-forward after the decision, resume after a lost or power-cycled peer link, bounded cancel (D-L20–D-L22, D-L27) |
+
+The rail's health strip shows connection, both-half convergence, draft state
+and recovery state. Convergence needs the firmware's peer-known and
+peer-converged flags, not just matching generations. With several compatible
+keyboards connected, a selector picks one; a dirty draft stays bound to its
+keyboard, and a reconnect requires an explicit review before Apply.
+
+Remaining before calling the product complete:
+
+- physical interruption acceptance at every durable boundary;
+- adoption or conflict reporting for writes by external VIA clients;
+- guided recovery;
+- broad hardware acceptance, including blank-firmware restore and the
+  [PD-mode hardware matrix](architecture/pd-mode-domain-v1.md#hardware-acceptance);
+- standalone packaging (D-L02);
+- the open issues below.
+
+## Open Issues
+
+- **R-21 — pointing cadence regression, unexplained.** Reported mouse rate
+  falls from ~450 Hz to ~300 Hz with the live-profile owner enabled, roughly
+  1.1 ms of added work per main-loop iteration. A static investigation
+  eliminated every candidate it found. With D-L08 this ships by default, so it
+  is felt in daily use. Details and the remaining measurement paths are in
+  [`architecture/pointing-cadence-known-issue.md`](architecture/pointing-cadence-known-issue.md).
+- **One-half power-cycle recovery transition.** On 2026-09-12, after one half
+  lost power while the other stayed powered, the first complete read failed
+  with VIA storage flags 7 (dirty, recovery required) before settling to clean
+  flags about 20 seconds later with the exact original profile. A full
+  two-half power cycle was clean. The dirty transition is unexplained; do not
+  suppress the readiness error without establishing its cause.
+- **Why a peer stops acknowledging a push** (D-L22) and **why a peer flash
+  write failed mid-copy** (D-L27) are both unknown. Both are now bounded and
+  reported; the status fields D-L27 added should identify the cause next time.
+- **`LT()` row tap/hold timing** (D-L34): the runtime times a press from when
+  QMK delivers it, so an authored `LT()` row's tap/hold term likely starts only
+  after QMK's own `TAPPING_TERM`. Not yet measured.
+
+## The Tools
+
+- **Charybdis Live** (`tools/charybdis-live-v2/`) is the app and the only one
+  developed (D-L35). Nothing in it reads the firmware repository.
+- **Profile Studio** (`tools/charybdis-profile-studio/`) authors `keymap.c`,
+  `config.h` and `rgb_config.c`. It is frozen (D-L04).
+- The first live app (v1, `tools/charybdis-live/`) ported Studio's interface
+  (D-L06). It was frozen by D-L35 and then removed; the profiles it wrote remain
+  a firmware compatibility check in
+  `tests/fixtures/stored_profile_live_v1.fixture`.
 
 ## Remaining Load-Bearing Contracts
 
-- **The canonical profile format is defined.** D-L15 and
+- **The canonical profile format.** D-L15 and
   [portable-profile-v1.md](architecture/portable-profile-v1.md) specify the
-  complete supported backup. Future schema migrations and the remaining
-  hardware acceptance must preserve that artifact.
+  complete supported backup. Future schema migrations and hardware acceptance
+  must preserve that artifact.
 - **One logical generation across two stores.** Standard VIA owns dynamic
-  layout and macros; the custom store owns RGB, behaviours, and policy. One
-  manifest must bind them, and a partial cross-store write must be refused
-  rather than reported as a complete commit. The contract needs freezing before
-  readback returns a generation identity.
-- **External VIA writes.** Another VIA client can change layout underneath the
-  app. Those changes are adopted into a new generation or surfaced as a
-  conflict; they must not silently escape profile identity.
+  layout and macros; the custom store owns everything else. D-L21 binds them;
+  a partial cross-store write must never be reported as a complete commit.
+- **External VIA writes.** Another VIA client can change the layout underneath
+  the app. Those changes must be adopted into a new generation or surfaced as a
+  conflict; they must not silently escape profile identity. Not yet built.
 
-### D-L14 — Save device edits as a complete, generation-bound profile
+## Decisions
 
-RGB edits now patch the verified device payload and retain every untouched
-profile domain. A save checks the original generation/digest/origin before
-staging and again after acquiring the candidate lease. Conflicts abort before
-chunks. The existing split commit barrier persists and activates the candidate
-on both halves; the app then reads the entire committed payload and requires
-byte equality. Combo edits additionally bind the native readout digest and
-verify that the running combo table matches the saved domain.
+Numbers are stable and cited from code and docs. D-L01 (branch from
+`refactor/live_edit`, revert only Studio's shell) and D-L03 (move `live-link/`
+into the live app, since layered into `core/` by D-L10) were branch setup and
+are complete. D-L16 wired Studio's macro UI into v1 and went with it (D-L35).
 
-Combos use optional canonical domain `0x30` v1 (specified in Profile Wire).
-Absent means compiled fallback; an explicit empty table means no combos. Both
-halves validate actions, references, duplicate native inputs and the shared hold
-threshold before persistence. QMK introspection, combo origin tracking and GET
-`0x06` all use the same effective native table. Publication is blocked by the
-existing strict idle boundary. At publication the combo invalidator copies at
-most 32 rows / 896 bytes once into owner-held native records; ordinary typing
-and readback perform zero profile-reader calls. This bounded cold copy is a
-specific exception to the metadata-only invalidation used by the other domains.
-A failed copy exposes no partial table and makes native readback unavailable.
-The validator state policy moves from 352 to 356 bytes for its optional native
-translation callback; the owner and provider state policies remain unchanged.
+### D-L02 — The live app is a VS Code extension for now
 
-QMK's hold/tap wait is global. All rows must carry the same threshold, and the
-UI edits it as one shared setting. The local compatibility header supplies the
-QMK hook configuration; no upstream source is changed. Custom trigger/release
-hooks, callback outputs and disabled combo timing are not editable through this
-format. Their readout remains available.
+It ships as its own extension, sharing nothing with Profile Studio at runtime.
+Its `core/` has no `vscode` imports, so repackaging as a standalone desktop app
+is a shell and adapter swap rather than a rewrite. This defers the product
+goal's "no firmware workspace" requirement; the trigger to repackage is the
+first time a non-developer needs to run it.
 
-Combo editing stays beside the physical layout, including input selection on
-the board. A collapsed all-combos list below the layer overview covers rows
-unreachable on the selected layer; there is no separate combo navigation tab.
-RGB stage toggles, colours, locality, fade policy, reusable LED membership and
-assignment creation/removal use the same save path. Auto-mouse's follow-real-
-destination mode deliberately ignores the end colour; its control is disabled
-and explained in that mode. The static preview does not animate timeout fades.
+### D-L04 — Profile Studio is frozen at `refactor/aug`
 
-Next: macro read/write, full backup/recovery and the remaining
-policy domains. This is not acceptance of the complete product; the known
-pointing-cadence and hardware acceptance work still apply.
+Bug fixes only; it is not a development target. That is what made forking
+presentation code between the apps cheap: nobody fixes the same bug twice in a
+tool nobody is changing. Retirement stays open and does not need deciding.
 
-Behaviour editing now uses that same generation-bound save path. The app patches
-only domain `0x20`, preserving other domains and untouched rows. Editor labels
-resolve through the shipped vocabulary and stable semantic action kinds;
-existing target/action identities survive equivalent aliases. Sparse tap
-branches, all four hold modes, repeat rates, zero/default timing and the anchor
-flag round-trip through the existing v1 codec. Firmware-advertised row, step
-and action-reference limits are checked before upload. New rows, replacements
-and deletion are available from the selected key in Layout. No firmware
-format or runtime change is needed. Changed-setting persistence across reboot
-and role changes remains part of the hardware acceptance matrix.
+### D-L05 — The keycode catalog is vendored, not parsed
 
-The behaviour editor keeps an ephemeral draft per device and row, pinned to
-the source/generation/digest/origin first edited. A failed save or model update
-does not silently discard or rebase it. The host checks the UI's expected base
-before encoding and retains the existing device checks around lease acquisition.
-Stale drafts are visible and save-disabled until explicitly discarded. This
-is bounded row editing, not the still-pending whole-profile draft coordinator.
+A build step (`npm run keycodes`) reads QMK's `*.hjson` keycode files once and
+emits a checked-in JSON catalog inside the live app, stamped with the QMK
+version it came from. Keycodes arrive from VIA as bare `uint16`, and the app
+needs both directions without a firmware workspace. Vendoring also turns QMK
+version drift into a diffable file rather than a silent behaviour change.
 
-Connected-device validation added an unused, action-free `KC_F24` row at
-generation 11 and deleted it at generation 12. Both saves converged on both
-halves; the restored 1,293-byte payload matched the original generation 10
-payload exactly. Browser checks separately cover row switching, failed-save
-draft retention, stale-draft blocking and explicit discard. Physical execution
-of changed actions and reboot/role-swap acceptance are still outstanding.
+### D-L06 — v1 ported Studio's whole UI and rebuilt only the model source
+
+*Superseded by D-L35.* Studio's webview does no file access: the host posts a
+`model`, the webview renders it, and edits come back as typed messages. The
+reusable seam was therefore the model, not the widgets, so v1 took Studio's UI
+verbatim and supplied the model from the keyboard. The original plan, forking
+the presentation and rebuilding the state, misread where that seam sits;
+lifting "the presentation" out of 534 functions in one template literal was
+impossible. v2 then replaced the ported UI with its own.
+
+### D-L07 — Specs are promoted, process is deleted
+
+Durable specs live under `docs/architecture/`: the Profile Wire and split
+protocols, the authority state table, the storage and resource baseline, the
+field classification and the known-issue notes. The review folders, findings
+registers, prompts and review-process conventions were deleted: process
+history that did not describe how the thing works. A completed plan is folded
+into the spec it produced and deleted.
+
+### D-L08 — The live-profile owner is on by default
+
+`NOAH_LIVE_PROFILE_OWNER=no` builds an owner-free image; the app targets
+ordinary firmware, not an engineering artifact. The owner needs a provisioned
+`NOAH_PHYSICAL_HALF`, since durable profile origin identity is side-specific,
+so the generic half-less build reports that at configure time and builds
+without the owner rather than failing (failing would break the plain
+`qmk compile` in the README). The firmware you flash is the side-specific pair
+from `tools/build-firmware-pair.sh`; a build that sets only
+`FORCE_MASTER`/`FORCE_SLAVE` silently omits the owner. The opt-out stays: it is
+the lever for comparing ordinary against live behaviour on identical source for
+R-21.
+
+### D-L09 — The live app owns a canonical profile format, not `.c`
+
+Backup, restore, sharing and version control go through the portable profile.
+`.c` import and export stay in Profile Studio. This amends the product goal,
+which listed the C files as an import source and export target of the control
+software; honouring that would drag C parsing and the repository dependency
+back into the app.
+
+### D-L10 — The live app is layered, and the layering is enforced
+
+`core/` is split into `transport`, `schema`, `protocol`, `model`, `session` and
+`data`, with imports pointing one way and `tests/` mirroring it. The webview
+never imports `core/`; it renders the model the host posts, so the core runs in
+plain Node and the UI stays replaceable. The rules and where new work belongs
+are in [`tools/charybdis-live-v2/AGENTS.md`](../tools/charybdis-live-v2/AGENTS.md).
+The structure exists because the thing it replaced was a 14,539-line file that
+grew one convenience at a time.
+
+### D-L11 — Current state comes from the keyboard, including compiled defaults
+
+The app parses no C file and reads no repository file at runtime;
+`tests/layering.test.js` fails if a `core/` module names one. A keyboard with
+nothing committed still runs its compiled defaults, which Profile Wire value
+`0x05` serves over the same page layout as the committed payload. If the
+flashed firmware was built from different data than the repository holds, the
+app shows what is flashed. Compiled defaults are labelled as such; generation 0
+reads as "no committed profile".
+
+Two pieces of keyboard-definition data ship with the app because no device
+command exposes them: the vendored keycode catalog and the Charybdis layout
+matrix. Neither carries configuration; they only decode what the device sends.
+
+Readback is tested through the posted model and rendered controls, not just
+the byte decoders: passing codec tests once coexisted with a profile that never
+reached the UI. Semantic links to native keycodes are enabled only for a known
+action ABI advertised by the keyboard. Layer preview membership follows the
+firmware: transparent and no-action keycodes are unmapped whatever their alias.
+Every decoded `uint16` must encode back to its original value.
+
+### D-L12 — RGB rule identity and preview appearance are separate
+
+Pass-through is a layer paint operation, not a colour. The app reads QMK RGB
+Matrix settings over standard VIA channel 3 (brightness, effect, speed,
+hue/saturation), outside custom-profile generation identity, requiring
+consecutive matching samples since VIA has no atomic snapshot. An unstable read
+clears the base colour and leaves custom-profile readback intact.
+
+The board is a **selected-layer preview**: base plus the selected layer, their
+colours in layer order, then their LED groups in reported order, following the
+firmware's membership, pass-through and inheritance rules. It is not LED
+telemetry: brightness is scaled to a ceiling, and effects, animation phase,
+active layers and transient feedback are not reported. Exact live appearance
+would need a future device-frame readout, not host reconstruction.
+
+### D-L13 — Combo readback is device data
+
+Profile Wire GET `0x06` exposes the native combo table the connected half runs,
+with effective per-combo timing and rules, global enable and layer-reference
+mapping: up to 32 rows of four inputs, with a metadata digest to detect
+mid-read changes. Old firmware returns VIA unhandled and the app shows an
+update message without losing its other readback. Combo names are stable
+generated labels; firmware callback outputs and custom trigger/release hooks are
+shown as opaque. Board badges show where the selected layer over layer 0
+supplies all inputs; they do not evaluate the active layer stack or arbitrary
+trigger predicates.
+
+### D-L14 — Device edits are saved as a complete, generation-bound profile
+
+A save patches the verified device payload, keeps every untouched domain, and
+checks the original generation, digest and origin before staging and again
+after acquiring the candidate lease; the app then requires byte-equal
+readback. Combos are optional canonical domain `0x30` v1: absent means compiled
+fallback, an explicit empty table means no combos. Both halves validate
+actions, references, duplicate inputs and the shared hold threshold before
+persistence. At publication the combo invalidator copies at most 32 rows /
+896 bytes once into owner-held native records, so typing and readback do no
+profile reads. QMK's hold/tap wait is global, so every row carries the same
+threshold and the UI edits it as one setting. Custom trigger/release hooks,
+callback outputs and disabled combo timing are not editable through this
+format.
+
+The per-domain save paths this introduced were replaced by the shared draft
+(D-L19) and atomic Apply (D-L21); the generation binding and readback rules
+stand.
 
 ### D-L15 — A portable profile is the complete effective configuration
 
-Export/import owns the whole keyboard snapshot. Flashed and committed domains
-are materialized into the same document from device reads. The file contains
-all matrix positions, all 64 VIA macros, all 16 user macro instruction streams,
-RGB, behaviours, effective combos, global settings and layer names. Missing
-and explicitly empty domains have different runtime meanings; complete files
-must carry all four domains and cannot fall back to destination authored data.
-The contract is in [portable-profile-v1.md](architecture/portable-profile-v1.md).
+Export and import own the whole keyboard snapshot. Flashed and committed
+domains are materialized into the same document from device reads: every
+matrix position, the VIA macros and their names (D-L25), RGB, behaviours,
+effective combos, pointing slots, global settings and layer names. Missing and
+explicitly empty domains mean different things; a complete file carries every
+domain and never falls back to destination authored data. The contract is in
+[portable-profile-v1.md](architecture/portable-profile-v1.md).
 
-The standard image reserves eight layers. Base stays at index zero; the app
+The standard image reserves eight layers; base stays at index zero and the app
 moves overlays and rewrites references together. The action ABI describes the
-engine vocabulary, independently of authored behaviour rows. Empty-profile and
-populated-profile builds must advertise the same ABI.
+engine vocabulary independently of authored rows, so empty and populated
+builds advertise the same ABI. A five-layer deployment migrates once through
+`tools/build-firmware-pair.sh --snapshot-bridge`: export there, install the
+eight-layer pair, import. No firmware is flashed by the app.
 
-A five-layer deployment needs a one-time snapshot bridge before changing its
-storage geometry. `tools/build-firmware-pair.sh --snapshot-bridge` keeps the
-five-layer addresses and deployed profile identity while exposing full readback.
-Export there, then install the regular eight-layer pair and import. Import
-expands the unused layers transparently and translates the three-position shift
-in user trigger IDs. No firmware is flashed automatically by the app.
+Before a file becomes the draft or is restored, its card compares it with what
+the keyboard holds, since that is what applying it would write, counting the
+differences by what they configure: Keys, Lighting, Macros and Pointing modes,
+each with added, changed and removed totals. It names no single difference;
+that is the draft's review. A file identical to the keyboard says so and cannot
+be used. A file carries no layer order, so it is compared slot by slot. See
+`importDifferences` in `core/session/panel-session.js` and `categorySummary`
+in `webview/view/review.mjs`.
 
-Before a chosen file becomes the draft or is restored, its card compares it
-with what the keyboard holds, not with the draft, since that is what applying
-it would write. It names the file and counts the differences, by what they
-configure rather than which screen stores them: Keys (keys on each layer,
-layer priority, layer names, startup layers, behaviours, key timing, combos,
-combo layer matching, key options), Lighting (stages on or off, base effect,
-each stage in paint order, LED groups), Macros, and Pointing modes (modes,
-pointer speed, mode speeds, sniping, auto-mouse). A Settings section is
-counted with what it tunes. Each category shows its total and how many were
-added, changed and removed. It names no single difference; that is the
-draft's review. A file identical to the
-keyboard says so and cannot be used. With a draft open, the card says how many draft changes the file
-replaces and that Undo brings them back. A file is compared slot by slot: it carries no layer
-order, so a file whose layers were reordered reads as the keys and names
-that differ. See `importDifferences` in `core/session/panel-session.js` and
-`categorySummary` in `webview/view/review.mjs`.
+### D-L17 — The keyboard reports its brightness limit
 
-Import validates and reviews before writing, saves a local recovery document,
-and checks the reviewed state again after acquiring the candidate lease. The
-custom profile commits first; VIA macro/layout writes follow with macro
-invalidation during transfer. Success requires exact whole-profile readback and
-both storage owners' split convergence. This remains a recoverable sequence
-across two durable owners, not one atomic transaction. Interrupted work retains
-its recovery file and reports incomplete restoration.
-
-Next: finish hardware acceptance of bridge/export/update/import, power loss and
-USB role changes. D-L16 wires the macro editor; global-policy controls and the
-inherited pointing-cadence regression remain work toward product acceptance.
-
-D-L15 verification: the app has 278 passing tests, including exact macro-write
-invalidation/retry, incomplete-restore recovery, legacy migration, layer-name
-retention and bridge-first guidance. The host suite passes, and the firmware
-validator accepts an app-generated complete populated payload when compiled
-with zero authored behaviours and combos. Both eight-layer and bridge pairs
-build. Both reviewed stack manifests and the memory gate pass; fresh accounting
-is in [memory-budgets.md](architecture/memory-budgets.md). A read-only check still
-found the connected board on five-layer firmware before handoff. The user has
-since reported that the new workflow appears to work and requested the commit.
-The individual migration, restore and persistence steps have not been recorded
-as a completed hardware matrix. A subsequent read-only probe found the HID
-interface but could not open it, so it did not establish a new layer count or
-generation. Next is recording bridge/export/update/import acceptance, then
-reboot, power-loss and USB-role checks.
-
-### D-L16 — Wire Studio's macro UI to the existing complete-profile writer
-
-The slot browser, payload editor, browser-event recorder, step builder and
-preview remain the existing Studio interface. The device model now supplies
-all 64 VIA and 16 user slots, including empty slots, from coherent complete
-readback. Both banks use the same editor; their existing key identities stay
-stable. The layout picker resolves those identities through the advertised
-action vocabulary, including slots beyond the vendored catalog's named macro
-range; the existing layout hover cards and overview show their device payloads.
-No source parser or new firmware command is involved.
-
-The host translates the existing text/command syntax into each bank's native
-bytes, validates supported keys, balanced holds, delays and storage capacity,
-and patches only the selected slot in the reviewed snapshot. Doubled braces
-represent literal braces in text. Apply uses the existing complete-profile
-restore path with recovery-file creation, stale-base checks, both-half
-convergence and exact readback. It therefore inherits the recoverable, non-atomic
-cross-store contract; a narrower macro-only writer is not introduced here.
-
-Drafts retain their original complete-profile fingerprint. Failed saves keep
-their contents; external changes block stale writes. A verified save advances
-other drafts from that exact base because the submitted edit changed only the
-selected macro. A per-slot Discard action restores the last readback. Editing
-requires the eight-layer complete-profile image; the five-layer bridge remains
-available for readback and export.
-
-Verification includes schema and model round trips, bank capacity and stale
-draft rejection, the real extension Apply-message/recovery/acknowledgement
-route, and browser checks of Cmd+N insertion, recording, clearing user macros,
-immediate discard, failed-save retention and preserving other drafts after a
-successful save. Browser writes use a simulated keyboard; physical macro
-execution remains part of hardware acceptance. Next: wire the existing Defaults
-controls to global settings and finish the recorded hardware matrix.
-
-The app has 293 passing tests for this checkpoint, and the full host suite
-passes. No firmware source or protocol contract changed in this wiring pass.
-
-
-### D-L17 — Device-backed Defaults and reported brightness limits
-
-The existing Defaults section cards now edit timing, combo enablement, normal
-and sniping DPI, mode overrides, auto-sniping, auto-mouse activation and fade
-timing, base HSV/speed/enablement/idle timeout, and feedback flash timing. The
-model supplies actual settings from the complete keyboard snapshot, including
-zeros, rather than build-time ladder parameters or authored defaults. Behaviour
-timing placeholders use the same readback. Auto-mouse timeout and fade delay
-share a section so the required ordering can be validated together.
-
-Each section patches only its scalar fields in the existing settings domain.
-Layer names, both macro banks and all other domains remain byte-for-byte intact.
-The existing complete-profile restore path owns recovery, stale-base checks,
-both-half convergence and exact readback. There is no new settings write command
-and the recoverable, non-atomic two-owner contract is unchanged.
-
-Section drafts retain their original full-profile fingerprint and survive view
-changes, failed writes and re-reads. Discard is per section. A verified section
-save advances other settings and macro drafts from that exact base; a verified
-macro save likewise advances settings drafts. External changes still block
-stale saves. This bounded coordination is not the unified whole-profile draft
-and Apply model.
-
-Brightness exposed a device constraint missing from readback: QMK clamps the
-saved value to its compiled maximum. GET value 0x08 page 1 now reports that limit
-from firmware. The app never infers it from source files or by writing temporary
-lighting values. Older firmware returns the existing unsupported-page status;
-the app leaves brightness read-only while keeping the other controls usable.
-New firmware enables a bounded brightness control. Complete-profile restores
-also reject brightness above a reported destination limit before staging.
-The wire addition is documented in portable-profile-v1.md; no profile document
-or settings payload version changes.
-
-The current RGB effect and LED flags, boot-layer mask, native keymap options and
-combo reference-layer map remain preserved and import/export-capable. Their
-dedicated controls are still pending; they must not be advertised as editable
-in Defaults. Build-time LED cadence and pointer ladder definitions are not
-portable settings and are not fabricated as device controls.
-
-Verification covers section round trips, unchanged-domain preservation, packed
-lighting channels, bounds and cross-field validation, stale drafts, recovery
-handoff, the extension acknowledgement route, and optional limits decoding.
-Browser checks with a simulated keyboard confirmed loaded fields and failed-save
-draft retention; they also caught the inherited C-identifier layer validator,
-which now accepts the keyboard's reported layer names. Remaining browser
-interactions were blocked by automatic approval review's usage limit. Actual
-hardware operation, persistence and interruption acceptance remain pending.
-Next: finish browser/hardware acceptance and the remaining native settings UI,
-then unified draft/review/Apply and guided recovery.
-
-D-L17 verification: `npm --prefix tools/charybdis-live run check` passes all
-306 app tests; `sh tests/host/run_all_host_tests.sh` and
-`sh tests/host/run_feature_gate_compile_tests.sh` pass. The required
-`qmk compile -kb bastardkb/charybdis/4x6 -km noah` passes, and
-`sh tools/build-firmware-pair.sh` builds both owner-enabled halves, including
-the optional limit page. The generated pair is build 9 in the branch's builds
-folder. No keyboard was flashed or configuration written during this pass.
+QMK clamps saved brightness to a compiled maximum, which readback did not
+expose. GET `0x08` page 1 now reports it. The app never infers it from source
+or by writing temporary values; older firmware's unsupported-page reply leaves
+brightness read-only. Restores reject brightness above the destination's
+reported limit before staging. Build-time LED cadence and pointer ladder
+definitions are not portable settings and are not fabricated as controls.
 
 ### D-L18 — Native settings use device-reported capabilities
 
-Defaults now adds startup-layer toggles, per-layer combo matching, keyboard-wide
-key options, named lighting effects and LED-class selection. Advanced sections
-start collapsed and retain their open state after a save. Startup layers require
-at least one selection and are validated after the whole section is patched,
-so changing from one startup layer to another works in one save. Packed RGB
-bytes, combo nibbles and unknown key-option bits survive unrelated edits.
+Optional GET `0x08` page 2 and pages 3 onward report QMK's enabled effect
+inventory, the supported key options with their native bit masks, and the LED
+classes present. The app decodes that over HID; older firmware leaves the
+dependent controls read-only, and malformed metadata is an error. Restore
+checks effect availability before staging. Packed RGB bytes, combo nibbles and
+unknown key-option bits survive unrelated edits.
 
-Optional GET 0x08 page 2 and bounded pages 3 onward report QMK's actual enabled
-effect inventory, supported semantic key options, their native bit masks and
-the LED classes present on this keyboard. The app decodes this metadata over
-HID and never reads firmware sources. Page 1 brightness metadata remains
-compatible. Older firmware's canonical unsupported-page reply leaves dependent
-controls read-only; malformed metadata is an error. Complete-profile restore
-checks advertised effect availability before staging, alongside brightness.
-The profile format and the recoverable, non-atomic two-owner save contract are
-unchanged. Native effect IDs still require compatible firmware; the metadata
-does not introduce cross-build effect-name migration.
+QMK ignores mode and HSV changes while RGB is disabled. The compat adapter
+temporarily enables lighting without saving, applies settings at the safe
+activation boundary, then restores and persists the requested on/off state, so
+lighting edits save correctly while lighting is off.
 
-QMK ignores mode and HSV changes while RGB is disabled. The compat adapter now
-temporarily enables lighting without saving, applies settings synchronously at
-the existing safe activation boundary, then restores and persists the requested
-on/off state. No renderer runs between these steps. Host tests model QMK's
-disabled setters and cover all four initial/final on/off combinations, actual
-QMK option masks, enabled-effect inventory, paging and C-to-app decoding.
+### D-L19 — One whole-profile draft and review
 
-Browser checks with a simulated keyboard cover supported and disabled key
-options, startup validation, retained section expansion, an unrelated timing
-draft surviving a verified startup-layer save, combo matching, and saved effect,
-LED selection and HSV while lighting is off. A two-window check caught the
-shared refresh handler clearing Defaults drafts; refresh now retains them and
-blocks stale saves after another editor changes the profile. A delivered-script
-regression test covers this reset boundary. Physical LED behaviour, reboot
-persistence and interruption acceptance still require testing on the keyboard.
-Next: unified whole-profile draft/review/Apply, guided recovery and the remaining
-hardware acceptance and pointing-cadence work.
+A complete device snapshot seeds one window-local draft. Every editor, import
+and layer edit updates it, with one undo history. Keep does not write HID.
+Apply requires the exact reviewed draft revision and the matching connected
+device; draft revisions are never device generations. Unfinished forms survive
+keeping another section and re-reading the device; undo, redo and review
+require them to be kept or discarded first. An external change preserves the
+draft and blocks a stale Apply; **Review against keyboard** compares it
+against a fresh read and never silently merges. An incomplete read is labelled
+as recovery, never as a complete backup. Export captures the saved keyboard,
+not unapplied changes. Closing the editor loses the draft.
 
-D-L18 verification: `npm --prefix tools/charybdis-live run check` passes 316
-app tests. `sh tests/host/run_qmk_portable_editor_tests.sh`,
-`sh tests/host/run_feature_gate_compile_tests.sh` and the complete
-`sh tests/host/run_all_host_tests.sh` pass. The required generic
-`qmk compile -kb bastardkb/charybdis/4x6 -km noah` and
-`sh tools/build-firmware-pair.sh` pass; normal flashable outputs are build 10.
-An instrumented left build with `NOAH_STACK_BUDGET_ENABLE=yes` passes
-`python3 tools/check_firmware_stack_budget.py` with both the baseline and
-live-profile-owner manifests. `sh tests/host/run_firmware_memory_budget_checks.sh`
-passes for both the instrumented and final normal left image. The normal left
-image remains at 55,684 bytes of static `.data + .bss`, below the 57,344-byte
-regression tripwire, with a 206,456-byte SRAM0–3 boot core-memory span. These are
-per-half linked measurements, not runtime high-water evidence. No firmware was
-flashed or physical keyboard configuration written; sibling folders received
-generated QMK build files and the numbered pair only.
+### D-L20 — Differential Apply
 
+The VIA macro bank is 7,191 bytes and a 32-byte Raw HID report carries 28 data
+bytes, so one complete macro read is 257 exchanges; the old path read the
+profile four times and rewrote the whole bank. Apply now verifies and reuses
+the snapshot already loaded as its recovery base, uses custom, VIA and settings
+identities for the compare-and-swap checks, writes only changed 28-byte blocks
+and reads those back exactly. Refresh and Export remain independent complete
+reads.
 
-### D-L19 — Shared whole-profile draft and review
-
-A complete eight-layer device snapshot seeds one window-local profile draft.
-Layout, behaviours, combos, RGB, both macro banks and Defaults use their existing
-validated editors to update that draft. Import and layer naming/reordering also
-replace the draft, preserving the same undo history. Keep does not write HID.
-Review lists semantic before/after values by domain, and Apply requires the exact
-reviewed draft revision and matching connected device. The header continues to
-report the actual device generation; draft revisions are never device generations.
-
-Unfinished forms survive keeping another section and re-reading the device.
-Undo/redo and review require those forms to be kept or discarded first. An
-external fingerprint change preserves the target and blocks a stale Apply.
-Review against keyboard explicitly compares that target against a fresh read;
-it does not silently merge external edits. Interrupted restore retains the target
-and requires another read/review before retrying. An incomplete read is labelled
-as recovery with no full semantic comparison, never as a complete backup.
-
-Apply uses the existing complete-profile restore with a recovery copy before
-writing and verified readback afterward. This does not change the wire or storage
-contracts and does not make VIA/custom-owner writes atomic. Export continues to
-capture the saved board, not unapplied window-local changes. Older firmware keeps
-its supported direct-save paths. Closing the editor still loses local drafts.
-
-Verification includes composed edits across all six editor areas, no-write staging,
-revision/device binding, undo/redo, stale reads, interrupted apply retention, text-only
-review rendering and browser interaction with the real extension and a simulated
-keyboard. Browser checks cover unfinished Defaults/RGB preservation, refresh,
-macro staging and combined review. Physical acceptance remains outstanding.
-
-Next: guided recovery and persisted draft recovery, the complete logical-generation
-contract, and physical reboot/interruption/blank-firmware acceptance.
-
-### D-L20 — Differential Apply and the logical transaction boundary
-
-The observed Apply delay comes primarily from redundant VIA transfers. The VIA
-macro bank is 7,191 bytes and a standard 32-byte Raw HID report carries 28 data
-bytes, so one complete macro read costs 257 request/response exchanges. The old
-restore path captured the complete profile three times, read the VIA regions a
-fourth time for verification, and rewrote the whole macro bank even when it was
-unchanged. A small edit could therefore exceed 1,100 VIA exchanges before
-candidate status polling and split work.
-
-Apply now verifies and reuses the complete snapshot already loaded in the editor
-as its recovery base, uses custom/VIA/settings identities for the preflight and
-post-lease compare-and-swap checks, writes only changed 28-byte layout and macro
-blocks, and reads those blocks back exactly. Stable final custom and VIA
-identities still have to prove both-half convergence. An unchanged macro bank
-sends no macro writes; a five-byte edit in one block sends one data write
-bracketed by the two macro-validity writes. Refresh and Export continue to
-perform an independent complete keyboard read.
-
-Hardware timing on 2026-09-14 measured the remaining path before recovery-base
-reuse. A layer-name-only Apply took 13.05 seconds and 1,402 Raw HID requests,
-despite writing zero VIA bytes. The complete safety capture cost 2.96 seconds;
-candidate upload and validation reached the commit barrier at 4.97 seconds; the
-two-half custom-profile commit then took 8.06 seconds and accounted for 717
-candidate-status reads. An exact restore repeated the same 13.05-second shape,
-and an independent final read proved the original fingerprint at generation 10.
-Recovery-base reuse reduced the same measured Apply to 10.14 seconds and 875
-requests. A detailed state trace then isolated 7.2–7.4 seconds in
-`PREPARING_PEER`, 0.23 seconds in local `COMMITTING`, and about 0.78 seconds in
-peer convergence and activation.
-
-The split delay was an unintended interaction between the scan-owned receiver
-mailbox and generic failure backoff. Every mutating split RPC first returns
-`BUSY` to acknowledge mailbox admission, then publishes its result from matrix
-scan context. The sender treated that expected first response like a transport
-failure and waited 50 ms for every 14-byte chunk. Expected admission now gets
-one bounded 5 ms acknowledgement retry; a peer that remains busy still enters
-the existing exponential 100–1000 ms backoff, and transport failures retain the
-original 50–1000 ms path. This changes scheduling only, keeps one operation per
-scan, and keeps the existing failure semantics.
-
-Physical timing after flashing both halves confirmed the change. The same
-layer-name-only Apply completed in 5.51 seconds and its exact restore in 4.92
-seconds. `PREPARING_PEER` fell from 7.2–7.4 seconds to 1.9–2.1 seconds; local
-commit remained about 0.2 seconds and convergence/activation about 0.7 seconds.
-An independent final read matched the exact pre-flash content fingerprint
-`3951067804:168945532:1805986991` at generation 3. This covers an uninterrupted
-save and restore; power-loss acceptance at the shortened acknowledgement timing
-still belongs with the logical-transaction interruption matrix.
-
-This optimization did not by itself turn the two-owner sequence into an atomic
-commit. The accepted firmware design was
-[`architecture/logical-profile-transaction-v1.md`](architecture/logical-profile-transaction-v1.md):
-stage target VIA bytes on the non-USB half, bind that identity into prepared
-custom records on both halves, use the USB-side custom marker as the logical
-decision, then roll the target VIA copy forward before activation. It avoids
-doubling QMK's EEPROM RAM cache and defines old-or-new behavior for each power
-loss boundary. D-L21 implements that contract; physical interruption acceptance
-remains.
-
-
-Hardware acceptance on 2026-09-12: the connected eight-layer keyboard reported
-37 behaviours, seven combos and 12 populated macros. Two complete reads matched;
-a same-half power cycle preserved the complete snapshot at generation 12.
-Moving USB to the left exposed no Raw HID interface, consistent with the normal
-pair's FORCE_SLAVE/usb_disconnect policy. USB role migration is not applicable
-to that pair and remains untested with role-switching firmware.
-
-Returning USB to the right initially produced a storage-recovery error. A
-follow-up status read was ready with no conflicts, and the full snapshot still
-matched the original. The cause of that temporary condition is not confirmed.
-Using the actual ProfileDraftSession and complete-profile Apply over HID, a
-single last-layer display-name change committed at generation 13; independent
-readback matched the target and both halves converged. Restoring the original
-snapshot committed at generation 14; independent readback exactly matched the
-original configuration and both halves converged without errors. Recovery copies
-and machine-readable evidence are held locally under backups/. This exercised
-the live service path, not the actual VS Code UI. No firmware was flashed.
-The connected firmware does not implement the optional settings-limit/options
-queries, so capability-dependent controls remain untested on hardware.
-
-Next hardware checks: reboot after this save/restore, representative runtime
-behaviour changes, and later explicitly approved interruption/blank-firmware
-recovery tests. Investigate transient reconnect readiness before presenting it
-as a persistent recovery requirement.
-
-Post-save/restore reboot on 2026-09-12: custom-profile generation 14 and its
-original digest remained converged. The first complete capture failed again.
-A diagnostic at 16:49:44 UTC observed VIA storage flags 7 (dirty, recovery
-required, digest valid), generation 9 on both sides, local digest 2839131957,
-peer digest 1961381780, and no acknowledgement. At 16:50:04 UTC it reported
-flags 4, matching digest 1961381780 and acknowledgement 9, with no errors or
-conflicts. The subsequent complete profile exactly matched the original backup.
-No host configuration writes occurred during these checks. This proves eventual
-recovery to the expected configuration; it does not prove clean startup or
-independent durable retention on each half. Clarify which halves lost power,
-then investigate the dirty/recovery transition before marking reboot acceptance
-fully passed. Do not suppress the readiness error without establishing its cause.
-
-Power-setup correction and separate test, 2026-09-12: the user clarified that
-only one half lost power during the preceding recovery observation; the other
-remained powered. It must not be treated as a simultaneous cold boot. The user
-then disconnected power from both halves and reconnected USB only to the right.
-The first diagnostic at 16:53:16 UTC reported clean VIA flags 4, generation 9,
-matching digests 1961381780, acknowledgement 9, and no errors/conflicts. The
-complete read at 16:53:30 UTC matched the original snapshot exactly; custom
-profile generation 14 remained converged. This full-power-cycle persistence
-check passed at observation, without host configuration writes. The earlier
-one-half power-cycle recovery transition remains an open issue; the passing
-cold-boot check does not explain or dismiss it. Next: representative runtime
-edit tests and investigation of the one-half reconnect path.
+Most of the remaining delay was split scheduling: every mutating split RPC
+first returns `BUSY` to acknowledge mailbox admission, and the sender treated
+that like a failure and waited 50 ms per 14-byte chunk. Expected admission now
+gets one bounded 5 ms retry; a peer that stays busy still enters the
+100–1000 ms backoff and transport failures keep the 50–1000 ms path. On
+hardware this took a layer-name-only Apply from 13.05 s to 5.51 s.
 
 ### D-L21 — Apply publishes one atomic logical generation
 
-Complete Apply now treats the custom Profile Wire record and standard VIA
-layout/macro store as one logical generation. The host acquires the candidate
-lease, binds the candidate to the next VIA generation and canonical digest, and
-sends only changed VIA ranges to the non-USB half. Firmware verifies that staged
-copy before it makes durable custom intent. Both custom slots reach a prepared
-marker before the USB-side marker becomes the decision record. The peer custom
-record commits next, its VIA copy is accepted, and ordinary split reconciliation
-is held while the host writes only the changed VIA ranges to the USB half. The
-peer remains the complete recovery copy until the USB-side VIA identity is
-verified. A reboot after a postdecision disconnect clears the volatile hold and
-recovers the complete target from the peer. Runtime activation waits for both
-custom and VIA convergence.
+Complete Apply treats the custom profile record and the standard VIA
+layout/macro store as one logical generation, per
+[logical-profile-transaction-v1.md](architecture/logical-profile-transaction-v1.md).
+The host binds the candidate to the next VIA generation and digest and sends
+only changed VIA ranges to the non-USB half, which verifies the staged copy
+before durable custom intent. Both custom slots reach a prepared marker before
+the USB-side marker becomes the decision record. The peer commits and accepts
+its VIA copy, then the host writes the changed ranges to the USB half as soon
+as the decision and peer accept are visible; the peer stays the complete
+recovery copy until the USB-side VIA identity is verified. Runtime activation
+waits for both custom and VIA convergence. A prepared marker without the USB
+decision is ignored at boot, so the previous generation remains authority;
+boot starts with VIA reconciliation fenced and recovers a decided target from
+the local stage or the peer.
 
-Storage format 2 keeps the existing 32-byte header and 4,064-byte payload. A
-distinct `NQ` header packs domain/origin/flags, stores the VIA binding, and still
-retains the compiled-default and action-ABI digests needed after firmware
-updates. Its custom payload digest is derived again during validation. Format-1
-`NP` records remain readable and migrate on the next complete Apply.
-
-Boot begins with VIA reconciliation fenced. A committed logical record supplies
-the required VIA generation and digest; firmware either adopts a matching local
-staged bank or asks the peer to accept and supply it. The effective profile does
-not activate until that recovery converges. A prepared marker without the USB
-decision is ignored by boot selection, so the previous committed generation
-remains authority.
-
-The app requires the new atomic capability for complete Apply. It keeps the
-recovery file, stale-base comparison, differential range selection and final
-exact readback. Deterministic predecision failures request both VIA-stage and
-custom-candidate aborts. Refresh and Export remain independent full reads.
-
-Host coverage exercises both header formats, incompatible compiled/action
-identities, durable prepare and reboot selection, abort and decision ordering,
-role recovery, bound-profile propagation, staged VIA fencing/acceptance and
-postdecision boot recovery. Remaining acceptance is physical power interruption
-at each durable boundary, the one-half reconnect case, external VIA-writer
-adoption, guided recovery, and blank-firmware restore.
-
-D-L21 verification: `sh tests/host/run_all_host_tests.sh` passes, including 343
-live-app tests. The side-specific `sh tools/build-firmware-pair.sh` build passes
-with the owner enabled on both halves. The linked left-half owner is exactly
-4,096 bytes, within its unchanged 4,096-byte engineering policy. The normal
-left image passes `sh tests/host/run_firmware_memory_budget_checks.sh` at 55,796
-bytes of SRAM0–3 `.data + .bss`, 1,548 bytes below the 57,344-byte regression
-tripwire, with a 206,344-byte linker/core-memory span at boot. The fresh
-instrumented owner build passes the reviewed-path stack manifest; its largest
-named main-process path is 1,824/1,920 bytes and its largest named split-slave
-path is 328/768 bytes. These are per-half linked results and reviewed-path
-estimates, not runtime high-water measurements. The build wrote generated QMK
-artifacts and numbered firmware pairs in sibling output directories; no sibling
-source was edited.
-
-First connected-hardware acceptance on 2026-09-15 exposed an orchestration gap:
-an unchanged Apply made both custom markers durable and accepted peer VIA
-generation 2, but the host waited about 16 seconds and timed out while ordinary
-reconciliation copied the complete 8 KiB-class VIA store back to USB. The board
-subsequently converged safely to custom generation 1 and VIA generation 2 with
-the exact original profile fingerprint; an independent complete read matched
-`3951067804:2420465131:3452861139` in 3.0 seconds, proving recovery but missing
-the latency contract. The follow-up path now starts USB roll-forward as soon as the durable
-decision and peer VIA accept are visible, sends only changed ranges (or one
-two-byte no-op for a custom-only generation), and does not issue an impossible
-postdecision abort if that write is interrupted. Host coverage includes fresh
-and resumed decision callbacks, peer-recovery preservation, and the firmware
-reconciliation fence. Side-specific pair 16 contains the fix; connected timing
-on that pair closes the original acceptance finding. An unchanged complete
-Apply finished in 6.76 seconds and an independent read matched the original
-fingerprint. A layer-7 key change transferred one 28-byte aligned range and
-finished in 7.16 seconds; restoring it finished in 6.65 seconds. Both saves
-converged immediately with no conflict or device error, and the final read
-matched the exact original fingerprint at custom and peer generation 3. A
-separate unchanged phase trace finished in 6.60 seconds at generation 4: profile
-upload and validation reached 2.01 seconds, peer VIA staging reached 2.56
-seconds, the durable decision became visible at 5.45 seconds, and final
-cross-half convergence completed at 6.58 seconds. This shows the remaining
-latency is validation and durable publication on the keyboard rather than a
-hidden host timeout or full-store copy.
+Storage format 2 keeps the 32-byte header and 4,064-byte payload; a distinct
+`NQ` header stores the VIA binding and still carries the compiled-default and
+action-ABI digests. Format-1 `NP` records stay readable and migrate on the next
+Apply. Schema 2 (PD slots) uses format 3 `NR`; see
+[PD-mode domain v1](architecture/pd-mode-domain-v1.md). The app requires the
+atomic capability for complete Apply and keeps the recovery file, stale-base
+check and exact final readback. On hardware an unchanged Apply takes about
+6.6 s, spent in keyboard-side validation and durable publication.
 
 ### D-L22 — A cancelled save ends in bounded time, and says why it ended
 
-On 2026-09-23 an Apply of a lighting-effect change stuck in `PREPARING_PEER`
-until the keyboard was unplugged. Read-only status reads while it was stuck
-showed the candidate frozen at operation sequence 750 with the host's own
-`ABORT` still in the mailbox, the peer still readable, both halves at committed
-generation 19 and VIA storage ready at generation 20. The peer had stopped
-acknowledging the push and then answered the cancel's split `ABORT` with
-`BUSY`. That `ABORT` was retried without limit, and the host timeout needs an
-empty mailbox, so nothing could end the transaction. A full power cycle
-recovered cleanly, as the authority table predicts before any marker. Why the
-peer stopped responding is still unknown: breathing was not active yet, since
-the effect only applies after commit.
-
-Firmware now bounds that `ABORT` (15 s). Past it the USB half releases its own
-side, reports *peer cleanup pending* as status flag bit 8, retries the `ABORT`
-in idle slots and starts no new save or split transfer until the peer
-acknowledges. The contract is in
+A peer that stopped acknowledging a push and then answered the cancel's split
+`ABORT` with `BUSY` once left an Apply stuck in `PREPARING_PEER` until
+unplugged, because that `ABORT` was retried without limit. Firmware now bounds
+it (15 s); past it the USB half releases its own side, reports *peer cleanup
+pending* as status flag bit 8, retries the `ABORT` in idle slots and starts no
+new save or split transfer until the peer acknowledges. See
 [the authority state table](architecture/authority-state-table.md#cancelled-prepare-peer)
-and [Profile Wire V1](architecture/profile-wire-v1.md). The frozen v1 app
-predates the flag and rejects status while it is set.
+and [Profile Wire V1](architecture/profile-wire-v1.md).
 
-The app no longer tells a user to import a recovery file after a save that
-never reached the commit decision. When the failure came before the commit was
-sent, or the keyboard confirmed the cancel by returning to idle (it refuses to
-once a marker exists), Apply reports `RESTORE_NOT_SAVED`: nothing was saved and
-the keyboard kept its profile. An unconfirmed cancel after the commit was sent
-stays `RESTORE_INCOMPLETE` with its recovery file. While cleanup is pending,
-the rail shows *Restart the keyboard* and the failure message says to unplug
-the USB cable rather than the cable between the halves.
-
-D-L22 verification: `sh tests/host/run_all_host_tests.sh` passes, including
-new reconciler tests for a silent and a permanently busy peer (both reproduce
-the unbounded retry against the previous firmware), an owner test of the
-field case, and 410 live-app tests. `sh tests/host/run_feature_gate_compile_tests.sh`,
-`qmk compile -kb bastardkb/charybdis/4x6 -km noah` and
-`sh tools/build-firmware-pair.sh` pass. The reconciler grows by 4 bytes on the
-32-bit target. The owner-enabled left image passes the memory gate at 58,708
-bytes of SRAM0–3 `.data + .bss`, 1,708 bytes below its 60,416-byte regression
-tripwire, with a 203,432-byte linker/core-memory span at boot; the owner stack
-manifest passes with its largest reviewed path at 1,272 bytes. These are
-per-half linked results and reviewed-path estimates, not runtime high-water
-measurements.
-
-Next: flash the pair and confirm a normal Apply still converges; capture the
-peer's own state the next time a push stops being acknowledged, so the cause,
-not just the wedge, can be fixed.
+Apply reports `RESTORE_NOT_SAVED` (nothing was saved, the keyboard kept its
+profile) when the failure came before the commit was sent or the keyboard
+confirmed the cancel by returning to idle. An unconfirmed cancel after the
+commit was sent stays `RESTORE_INCOMPLETE` with its recovery file. While cleanup
+is pending, the rail says *Restart the keyboard* and the message says to unplug
+the USB cable, not the cable between the halves.
 
 ### D-L23 — Apply shows its steps, and a failure says where, why and what was saved
 
-The commit bar showed a spinner and "Working" for the whole Apply. The step
-text existed, but it only reached the Profile screen, and each coordinator
-poll overwrote the step before it. A failure reached the panel as a code and
-message, with the step it happened in dropped along the way.
+`core/session/apply-progress.js` names the ten steps of an Apply and tracks
+them forward only: check the keyboard, save a recovery copy, send the profile,
+keyboard checks it, stage keys and macros on the other half, copy the profile
+to the other half, save it on this half, finish the other half, write keys and
+macros on this half, check both halves. `restoreProfile()` reports at each real
+boundary with byte counts. A failure keeps its step, a reason from the
+keyboard's own error (or the other half's last answer), and whether anything
+was saved. The commit bar keeps a failed Apply on screen until dismissed.
 
-`core/session/apply-progress.js` now names the ten steps of an Apply and
-tracks them forward only: check the keyboard, save a recovery copy, send the
-profile, keyboard checks it, stage keys and macros on the other half, copy
-the profile to the other half, save it on this half, finish the other half,
-write keys and macros on this half, check both halves. `restoreProfile()`
-reports into it at each real boundary, with byte counts where the transfer has
-them. A failure keeps the step it happened in, a reason from the keyboard's
-own error (or the other half's last answer), and whether anything was saved.
-The commit bar draws the steps while they run and keeps a failed Apply on
-screen until it is dismissed.
-
-Firmware adds candidate status page 1 (see
-[Profile Wire V1](architecture/profile-wire-v1.md#candidate-operation-status)):
-the peer phase, transferred bytes and the peer's last split status. The host
-reads it while the keyboard is `PREPARING_PEER` and counts its movement as
-progress, so a slow copy no longer runs into the stall window it used to wait
-out blind. Firmware without page 1 answers `UNKNOWN_PAGE` and keeps the old
-behaviour.
+Candidate status page 1 (see
+[Profile Wire V1](architecture/profile-wire-v1.md#candidate-operation-status))
+reports the peer phase, transferred bytes and the peer's last split status. The
+host counts its movement as progress while the keyboard is `PREPARING_PEER`, so
+a slow copy no longer runs into the stall window. Firmware without page 1
+answers `UNKNOWN_PAGE` and keeps the old behaviour.
 
 ### D-L24 — Directional modes can read eight directions
 
-A directional mode can now read eight directions: the four straight ones plus
-up-left, up-right, down-left and down-right, each with its own shortcut. The
-trackball's motion is classified into 45-degree wedges; a diagonal with no
-shortcut sends the nearer straight direction, both neighbours, or nothing, as
-the mode chooses. It is axis policy `3` in the unchanged 96-byte PD record,
-with the diagonals in bytes a directional record otherwise leaves zero (see
+A directional mode can read the four straight directions plus the four
+diagonals, each with its own shortcut, classified into 45-degree wedges; a
+diagonal with no shortcut sends the nearer straight direction, both neighbours
+or nothing, as the mode chooses. It is axis policy `3` in the unchanged 96-byte
+PD record, using bytes a directional record otherwise leaves zero (see
 [PD-mode domain v1](architecture/pd-mode-domain-v1.md)). Older firmware and
 apps reject axis `3`, so the domain version stays `1`. The C/JS differential
-corpus now loads the v2 app's codec, since v1 is frozen and would disagree.
+corpus uses the v2 app's codec.
 
 ### D-L25 — VIA macros have names; user macros are retired
 
 The 16 user macros are retired and the 64 VIA macros can be named. Names live
-in settings domain version 3, in the space the user macros had, so the
-worst-case profile does not grow; they are saved atomically with every Apply,
-copied to the other half and carried in backups. Firmware accepts stored
-version 2 and writes version 3. The `MACRO_n` keycodes keep their numbers
-(reserved, inert) so the action ABI digest and every later keycode are
-unchanged. The app labels a named macro by its name on keys, in the picker and
-in the key card. See
-[portable profile](architecture/portable-profile-v1.md#version-3-via-macro-names-instead-of-user-macros).
-
-The firmware's user-macro runtime is gone: `macro_dispatch`, the compiled
-`HARDCODED_MACROS` list, and the introspection and memory-gate requirements
-for them. `MACRO_n` keys and actions are consumed and do nothing, since tapped
-as keycodes they would read as modified basic keys. The effective settings
-cache stays whole, because version-3 names fill the space the user macros had.
-The settings readback now streams from that cache instead of keeping a second
-copy, which saves 1,400 bytes of static RAM per half; see
-[memory budgets](architecture/memory-budgets.md#retired-user-macros-and-streamed-settings-readback--2026-09-23).
+in the settings domain, in the space the user macros had, so the worst-case
+profile does not grow; they are saved atomically with every Apply, copied to
+the other half and carried in backups. The `MACRO_n` keycodes keep their
+numbers (reserved, inert) so the action ABI digest and every later keycode are
+unchanged; tapped as keycodes they would read as modified basic keys, so they
+are consumed and do nothing. The user-macro runtime, `HARDCODED_MACROS` and
+their introspection and memory-gate requirements are gone. Settings readback
+streams from the effective settings cache instead of a second copy, saving
+1,400 bytes of static RAM per half; see
+[memory budgets](architecture/memory-budgets.md#retired-user-macros-and-streamed-settings-readback--2026-09-23)
+and [portable profile](architecture/portable-profile-v1.md#version-3-via-macro-names-instead-of-user-macros).
 
 ### D-L26 — Macro slots share one visible memory, and every slot says what fits
 
-The interface calls them macro slots. Their two real limits are now shown and
-enforced instead of implied. All 64 slots share the keyboard's macro memory
-(7,191 bytes on the eight-layer geometry, where a key tap takes 3 bytes and a
-typed character 1). Each macro plays only if the firmware compiles it into at
-most 512 bytes (`MACRO_PAYLOAD_IR_MAX_BYTES`), about 170 key taps; a longer one
-was previously accepted and then silently never played. The app now computes
-that compiled size exactly (`macroProgramBytes`, checked against the firmware
-decoder by `run_macro_program_size_tests.sh`), refuses an edit past it, and
-marks a slot VIA wrote past it as too long.
+All 64 slots share the keyboard's macro memory (7,191 bytes on the eight-layer
+geometry; a key tap takes 3 bytes, a typed character 1). A macro plays only if
+the firmware compiles it into at most 512 bytes (`MACRO_PAYLOAD_IR_MAX_BYTES`),
+about 170 key taps; a longer one used to be accepted and then silently never
+played. The app computes that size exactly (`macroProgramBytes`, checked
+against the firmware decoder by `run_macro_program_size_tests.sh`), refuses an
+edit past it, and marks a slot VIA wrote past it as too long.
 
-Every empty slot keeps room for ten key taps (30 bytes). When the free memory
-cannot keep that for every empty slot, the highest-numbered empty slots show
-as having no room and cannot be edited until space is freed. The firmware does
-not enforce the reserve, so a VIA edit can still bypass it; the app then shows
-what VIA left. Writing the cross-check found a decoder bug: a tap after
-another tap under a held key, such as `{+KC_LSFT}{KC_A}{KC_B}{-KC_LSFT}`,
-replayed the first tap at the release. The decoder now plays each tap once.
-
-Every macro name is guaranteed 20 characters. Settings version 4 limits a name
-to printable ASCII and sizes its ceiling for all 64 at full length, so the field
-no longer reports a budget shared with the other names; see
+Every empty slot keeps room for ten key taps (30 bytes); when free memory
+cannot keep that for every empty slot, the highest-numbered empty slots show no
+room until space is freed. The firmware does not enforce the reserve, so the
+app shows what a VIA edit left. Settings version 4 guarantees every macro name
+20 printable ASCII characters; see
 [portable profile](architecture/portable-profile-v1.md#version-4-every-macro-name-gets-20-characters).
 
 ### D-L27 — A stale copy on the other half can no longer hold off every later one
 
-Apply stalled twice on 2026-09-23 while copying to the other half: first at the
-last 14-byte chunk, then, on the next try, at the very first request. A
-read-only monitor of candidate status page 1 showed the other half answering
-busy about once a second, with nothing copied. Two faults made that permanent
-until a power cycle:
+Apply stalled while copying to the other half, with the peer answering busy and
+nothing copied until a power cycle. The faults, each now fixed and tested:
 
 - The receiver timed its provisional lease from any frame on the link, so the
-  sender's metadata polls and its retries of the next copy, which the stale
-  lease answered busy, kept that lease alive while the halves stayed
-  connected. The lease is now timed by requests for its own copy only.
-- A sender whose chunk met busy retried that chunk forever, even when the
-  receiver no longer held the copy. It now restarts at `PREPARE_BEGIN`, which
-  resumes a live lease and re-creates a dropped one.
+  sender's polls kept a stale lease alive. It is now timed by requests for its
+  own copy only.
+- A sender whose chunk met busy retried that chunk forever. It now restarts at
+  `PREPARE_BEGIN`, which resumes a live lease and re-creates a dropped one.
+- A busy reply carried the stale copy's offset, which could be unencodable; it
+  now reports `0` for another copy.
+- A copy rejected after a failed flash write did not release the peer store's
+  `PEER` storage admission, so every later copy was refused. A rejected copy
+  now always returns it.
+- The trigger behind every stall: the store's shape check kept its own list of
+  settings versions and refused every stored copy carrying v4 after both
+  validators had passed it. There is now one list,
+  `NOAH_PROFILE_PD_SETTINGS_VERSION_ACCEPTED` in `profile_versions.h`.
 
-Writing the reproduction also found that a busy reply carried the stale copy's
-offset, which past the new copy's length could not be encoded and stopped the
-sender with an invalid frame; busy replies now report `0` for another copy.
-Busy replies also say why, and page 1 reports the last reason, the peer's
-store state and the busy streak. How the first attempt lost its lease is not
-proven; if a copy stalls again, those fields tell which side was waiting on
-what. See [profile split](architecture/profile-split-v1.md) and
+A failed store on the other half is now retried from the start up to two
+times, safe because nothing is durable before the commit is authorized; then
+the Apply ends with `PEER_TRANSFER_FAILED` and the app says the other half
+could not store the profile. Busy replies say why and carry the receiver's
+current store state and admission; page 1 reports the last reason and the busy
+streak. See [profile split](architecture/profile-split-v1.md) and
 [Profile Wire](architecture/profile-wire-v1.md).
-
-The first test of that firmware showed the real trigger. The other half
-received the whole copy, then failed to store it with a storage error, and
-afterwards refused every Apply until it was power cycled, while typing kept
-working. When a flash write fails mid-copy the store closes its own prepare;
-the peer store then rejected the copy without releasing its `PEER` storage
-admission, so every later copy was refused as "prepare in progress". A
-rejected copy now always returns the admission. Host tests inject one failed
-read or write while the receiver checks or stores a copy, and a failed write
-in its abort; each left the receiver stuck before the fix. Why the flash write
-failed is still open. The busy details were also misleading: they kept the
-last informative reply across Applies. Every busy reply now carries the
-receiver's current store state and storage admission, and they reset per copy.
-
-A failed store on the other half is now retried: the copy is sent again from
-the start up to two times, which is safe because nothing is durable before
-the commit is authorized. If it still fails, the Apply ends at once with
-candidate error `PEER_TRANSFER_FAILED`, and the app says the other half could
-not store the profile, instead of waiting out its timer and showing an
-unrelated digest message.
-
-The trigger behind every one of these stalls was settings version 4 itself.
-The store's shape check kept its own list of settings versions (2 and 3) and
-refused every stored copy that carried v4, after the validator on both halves
-had passed it; any profile with a named macro failed on the other half, every
-time. There is now one list, `NOAH_PROFILE_PD_SETTINGS_VERSION_ACCEPTED` in
-`profile_versions.h`, used by both, and a store test that stores settings v2,
-v3 and v4 and refuses the rest.
 
 ### D-L28 — Dominant axis and eight directions are one directional engine
 
-Eight-direction modes chose the wedge from whatever motion was still banked
-and banked it differently per direction, so a slightly off-diagonal move
-alternated diagonal and straight taps. Dominant axis chose its axis per report
-with no smoothing. Both now run one engine, with four or eight directions: a
-smoothed heading, measured against each axis's own threshold, picks a
-direction and holds it until the heading is clearly elsewhere, and only
-progress along the held direction counts. Zoom and Arrow, the dominant-axis
-presets, therefore no longer match the legacy handlers report for report; the
-parity test keeps covering the single-axis presets. See
-[PD-mode domain v1](architecture/pd-mode-domain-v1.md).
-
-Vertical-only and horizontal-only modes then joined the same engine: the axis
-policy only says which directions exist, and motion toward a missing one goes
-to the nearest existing one, which for a single axis is exactly counting that
+Eight-direction modes chose the wedge from whatever motion was still banked, so
+a slightly off-diagonal move alternated diagonal and straight taps; dominant
+axis chose its axis per report with no smoothing. All directional modes now run
+one engine with four or eight directions: a smoothed heading, measured against
+each axis's own threshold, picks a direction and holds it until the heading is
+clearly elsewhere, and only progress along the held direction counts. The axis
+policy only says which directions exist; motion toward a missing one goes to
+the nearest existing one, which for a single axis is exactly counting that
 axis. Counting in threshold X × threshold Y units keeps that exact, so the
-parity test still holds the single-axis presets (Volume, Brightness) to the
-legacy handlers report for report. "When a diagonal is empty" became "When a
-direction is empty" and applies to every directional mode (byte 86 for axes
-0–3).
-"Send both neighbours" means the two compass neighbours, 45° either side: an
-empty diagonal sends its straight directions and an empty straight direction
-its two diagonals, the one the movement leans toward first. Modes without
-diagonals have no such neighbours, so there it acts as "its neighbours take
-over".
+parity test holds the single-axis presets (Volume, Brightness) to the legacy
+handlers report for report; the dominant-axis presets no longer match them.
+
+"When a direction is empty" applies to every directional mode (byte 86 for
+axes 0–3). "Send both neighbours" means the two compass neighbours, 45° either
+side, the one the movement leans toward first; modes without diagonals have no
+such neighbours, so there it acts as "its neighbours take over". See
+[PD-mode domain v1](architecture/pd-mode-domain-v1.md).
 
 ### D-L29 — The review lists items, discarded in the groups their edits made
 
-The review lists one item per thing that differs from the keyboard: a key on
-a layer, a layer's name, a behaviour, a combo, a macro with its name, a
-settings section, a pointing slot, or one lighting record, with LED groups and
-the rows that paint them as one record because rows name groups by id. An
-item says whether it was added, changed or removed and lists only the fields
-that differ, in the editors' words (1× tap, held until release, default ·
-150 ms); an added or removed item lists what it holds, and a long one folds
-away behind "Show all". Fields compare what is stored, not what is shown, so
-a changed default or a renamed layer is one item where it was made, not a
-change to everything that uses it. Colour reads as in the editors: a lighting
-value is drawn as a swatch, a behaviour tier carries the grid's branch badge
-in its tap-branch colour and the tier's feedback dot, and a pointing mode —
-its slot, or an action that reaches it, named by the slot — carries the light
-its slot paints. A stage that is off draws all of these off. The draft's change count counts items.
-**Show** closes the review and opens the item where it is edited: the key
-selected on its layer, the behaviour or combo picked (in whichever group this
-layer lists it, opened if folded), the macro or pointing slot, the lighting
-stage, or the settings section opened. Where the editor lists many things,
-the item is scrolled to and marked for a moment. A removed item has no Show,
-since there is nothing left to open.
+The review lists one item per thing that differs from the keyboard: a key on a
+layer, a layer's name, a behaviour, a combo, a macro with its name, a settings
+section, a pointing slot, or one lighting record (LED groups and the rows that
+paint them are one record, since rows name groups by id). An item says whether
+it was added, changed or removed and lists only the fields that differ, in the
+editors' words. Fields compare what is stored, not what is shown, so a changed
+default or a renamed layer is one item where it was made. Colour reads as in
+the editors (D-L31). The draft's change count counts items. **Show** opens the
+item where it is edited; a removed item has no Show.
 
-An item is also the unit **Discard** puts back to what the keyboard holds, as
-one more undoable step. The items one staged message changed belong together,
-so a key swap or a moved behaviour is one block with one Discard, titled by the edit that made it ("Swapped two keys", "Moved a
-behaviour"); a later edit that touches two groups joins them, and the block is
-titled by the first edit and a count. Every item is listed under its own
-area, so the review always reads by area in rail order. A group that spans
-areas, such as a moved behaviour and the key that reaches it, shows the part
-of it that lives in each area there. Every part
-carries the group's title, says how many of the group are here and which
-areas hold the rest, and has a Discard that takes back the whole group.
-Pointing at that Discard lights every part. Only units the review still shows link: a unit
-edited back to the keyboard's value ties nothing. Rebases and discards carry
-no link, and neither do steps that fell out of the bounded history. A discard
-from a current review keeps it current, since what is left was part of what
-was reviewed; once nothing described is left, the draft is the keyboard's
-profile again, including bytes no item describes. A recovery review is
-discarded as a whole or not at all. See `core/model/profile-review.js`
-(items), `core/model/profile-revert.js` (restoring them),
-`ProfileDraftSession.changes()` (grouping, titles, board positions) and
-`webview/view/review.mjs` (blocks and Show).
+An item is also the unit **Discard** puts back, as one more undoable step. The
+items one staged edit changed belong together, so a key swap or a moved
+behaviour is one block with one Discard, titled by the edit that made it; a
+later edit touching two groups joins them. Every item is listed under its own
+area in rail order; a group spanning areas shows its part in each, and each
+part's Discard takes back the whole group. Rebases, discards and steps that
+fell out of the bounded history link nothing. A recovery review is discarded
+whole or not at all. See `core/model/profile-review.js`,
+`core/model/profile-revert.js`, `ProfileDraftSession.changes()` and
+`webview/view/review.mjs`.
 
-**Layers are compared by identity, not by slot.** A layer is neither its name,
-which a rename changes, nor its slot, which a reorder changes. Beside every
-history entry the draft keeps which keyboard layer each slot now holds. Edit
-layers sets it from the order it saves; it is never inferred from names or
-contents, which would be fooled by two empty layers or by a swap that also
-swaps the names. The review compares the draft with the keyboard's profile
-rearranged into that order, with every layer reference following (the
-*reference*). So a reorder is one item, **Layer priority** ("Higher layers
-win"): one row per layer that moved, named as the draft names it, in its
-light, with its place on the keyboard and in the draft and whether it went
-higher or lower, highest first as Edit layers lists them. Several swaps are
-one item too, the net move of every layer they touched. Everything else is
-compared layer with layer: a key edited on a moved layer is a key on that layer, and a
-rename is that layer's name. With "Keys follow their layers" off, the keys,
-behaviours and combos that kept their numbers now reach a different layer, so
-they are listed as the changes they are. A reorder links nothing, not even to
-what the same save renamed, since an order and a name are separate decisions.
-Discarding the order moves the layers back with their references following
-and keeps every other change, renames included; any other Discard puts its
-item back to the reference, so the order stays. Undo and redo carry the order
-with their entry. A rebase keeps it, since the reference and the items still
-describe the whole difference to the new keyboard; an import, a discard of the
-whole draft and an apply start again from the keyboard's order. An order that
-moves nothing visible, such as swapping back, leaves no item. Group links are
-kept by layer, not by slot, so a later reorder does not tie two different
-layers' keys together. See `core/model/layer-order.js`.
+**Layers are compared by identity, not by slot.** Beside every history entry
+the draft keeps which keyboard layer each slot now holds, set by Edit layers
+from the order it saves and never inferred from names or contents. The review
+compares the draft with the keyboard's profile rearranged into that order, with
+every layer reference following. So a reorder is one **Layer priority** item,
+one row per layer that moved; everything else is compared layer with layer.
+With "Keys follow their layers" off, keys that kept their numbers now reach a
+different layer and are listed as the changes they are. Discarding the order
+moves the layers back and keeps every other change; undo and redo carry the
+order with their entry; an import, a discard of the whole draft and an Apply
+start again from the keyboard's order. See `core/model/layer-order.js`.
 
 ### D-L30 — The draft shows itself where it is edited
 
-Every editor marks what the draft changed with the draft's amber dot: a key
-on the board, a layer chip, a Keys or Lighting tab, a behaviour or combo row,
-a macro or pointing slot, a layer's or pointing mode's colour row, a settings
-section. A folded group holding a change carries the dot on its header, so a
-change is never hidden by the group it sits in. The marks come from the same
-review items the review lists (`draftMarks` in `webview/view/review.mjs`), so
-the two never disagree; a removed thing has nothing left to mark.
+Every editor marks what the draft changed with the draft's amber dot: a key, a
+layer chip, a tab, a behaviour or combo row, a slot, a colour row, a settings
+section, and the header of a folded group holding a change. The marks come from
+the same review items (`draftMarks` in `webview/view/review.mjs`), so the two
+never disagree.
 
-**Discard all** is one more draft step, not a new draft: undo brings every
-change back, and the keyboard is not read again. It falls back to reading the
-keyboard only for a draft that is out of step with it, belongs to another
-keyboard, or is a recovery. Undo and Redo name the step they take back or
-bring back ("Undo: Swapped two keys"), discards included. **Draft history**
-in the rail opens a sheet drawn like the review but ordered by time: every step
-newest first, with when it was made, its name, and what it changed from the
-step before it rather than from the keyboard. A step that moved layers is one
-priority item, as in the review. Going to a step is several undos or redos at
-once; undone steps stay listed to redo until the next edit branches the
-history. The host sends the steps only while the sheet is open. The commit bar has
-one way on, **Review and apply**, and says what the draft holds by what
-happened to it ("4 added · 10 changed · 1 removed"); the rail's change count
-opens the review too. Leaving the review by Esc is leaving it by Keep editing.
+**Discard all** is one more draft step: undo brings every change back, and the
+keyboard is not read again, except for a draft out of step with it, bound to
+another keyboard, or a recovery. Undo and Redo name the step they take back or
+bring back. **Draft history** opens every step newest first, each with when it
+was made and what it changed from the step before (not from the keyboard, as
+the review compares); going to a step is several undos or redos at once. The
+host sends the steps only while the sheet is open. The commit bar has one way
+on, **Review and apply**, and says what the draft holds ("4 added · 10 changed
+· 1 removed").
 
 ### D-L31 — One mark per thing that has a colour
 
-Several things in this app have a colour of their own, and each has exactly
-one mark, drawn by `webview/ui/marks.mjs` wherever the thing is named:
+Each thing with a colour of its own has exactly one mark, drawn by
+`webview/ui/marks.mjs` wherever the thing is named:
 
 | Thing | Mark |
 | --- | --- |
@@ -1291,140 +538,87 @@ one mark, drawn by `webview/ui/marks.mjs` wherever the thing is named:
 | A combo | its badge, in the combo feedback colour |
 | A lighting stage | its on/off dot |
 
-A thing is marked where it is the subject and where it is only referred to:
-a setting names what it governs (`governs` in `core/model/settings-editor.js`),
-so Behaviour tap / hold carries the hold dot, Long hold the long-hold dot and
-Repeated taps the 2× badge in Settings, in the behaviour editor's timing fields
-and in the review alike; a pointing mode's DPI carries its slot's light; a
-layer setting its layer's colour. The review carries the same marks on
-titles, labels and values (`labelMark`, `beforeMark`, `afterMark`,
-`titleMark`). A stage that is off draws its marks off. A colour is the
-keyboard's own, so a dark one reads dark; the marks do not lighten it.
+A thing is marked where it is the subject and where it is only referred to: a
+setting names what it governs (`governs` in `core/model/settings-editor.js`),
+so its mark appears in Settings, in the editors' fields and in the review
+alike. A stage that is off draws its marks off. A colour is the keyboard's own,
+so a dark one reads dark.
 
 ### D-L32 — Things sit in fixed places
 
 A repeated element sits in the same place every time it appears, so a screen
 reads as a grid rather than as text that wraps wherever it lands.
 
-- The review is one grid: a status gutter (changed, added or removed — every
-  item says which), the title with its area underneath when it sits outside
-  its section, the fields as sign · label · on the keyboard · in your draft,
-  then two action slots, Show and then Discard at the edge. A field has its
-  own status, marked as a diff marks a line: + a field the draft adds, − one
-  it removes, nothing for one it changes. So a tier dropped from a behaviour
-  that stays reads as a changed item with a − line, and a behaviour removed
-  whole reads as a removed item, − on every line. Group headers and each
-  section's column heads use the same tracks, so the two sides line up down
-  the whole review, and a side with nothing says so with a dash in its own
-  column rather than an arrow that wraps.
-- A destructive action is the last thing in its row: Discard, Discard both,
-  Discard all 3 share one right edge.
-- The draft's dot follows a row's label (a list row, a tab, a header). On a
-  tile it has one fixed spot: a key's and a macro slot's top-right corner, and
-  a pointing slot card's corner just before its number.
-- A removed thing keeps its mark and its Show only where it is still on
-  screen: a cleared pointing slot or an emptied macro slot, not a removed
-  behaviour or combo.
-- A table's owner, like an LED row's, reads by the name its dropdown offers,
-  with its mark, never an enum.
-- Where marked and unmarked labels share a column — a Settings section, an
-  item's fields in the review, a review section's titles — every label gets
-  the same mark slot, so the words start at one edge and the dots stand in a
-  column of their own (`marked(…, {slot: true})` in `webview/ui/marks.mjs`).
-- A tab carrying the draft's dot means something inside is marked: every
-  list the Keys tabs show marks its changed rows and cards, and a folded group
-  holding one carries the dot on its header. A pointing card anywhere shows
-  its slot's light through the shared mark, so an off stage reads off there
-  too.
+- The review is one grid: a status gutter, the title with its area underneath
+  when outside its section, the fields as sign · label · on the keyboard · in
+  your draft, then Show and Discard at the edge. A field is marked as a diff
+  marks a line: + added, − removed, nothing for changed. A side with nothing
+  shows a dash in its own column.
+- A destructive action is the last thing in its row.
+- The draft's dot follows a row's label; on a tile it has one fixed spot.
+- A removed thing keeps its mark and Show only where it is still on screen (a
+  cleared pointing slot, an emptied macro slot).
+- A table's owner reads by the name its dropdown offers, with its mark, never
+  an enum.
+- Where marked and unmarked labels share a column, every label gets the same
+  mark slot (`marked(…, {slot: true})` in `webview/ui/marks.mjs`).
 
 ### D-L33 — One home for each rule the app needs twice
 
-An architecture review found the same knowledge kept in several places, and
-drifting: the review and the screens each wrote their own words for stored
-values (an eight-direction mode read `undefined` in the review, layer 0 was
-"Base" in one place and "Layer 0" in another, the behaviour grid mixed "Double
-Tap Branch" with "3 taps"), the pointing-mode keycode registry was written six
-times, a dirty draft was decoded 10–16 times per model publish, and the host
-sequenced apply and restore itself. Each rule now has one home:
+Knowledge kept in several places drifted: stored values had different words in
+the review and the screens, the pointing-mode keycode registry was written six
+times, a dirty draft was decoded 10–16 times per publish, and the host
+sequenced Apply itself. Each rule now has one home:
 
 - Words: `core/model/vocabulary.js`, sent as `model.vocabulary`; stages are
   found by id, never by label.
 - Actions, native keycodes, decode limits, layer references:
   `core/schema/actions.js`; the pointing registry and key layout are data.
 - Decoding: once per draft revision, carried as `decoded` and taken through
-  `decodedOf`; history entries are frozen. A repeat publish decodes nothing.
+  `decodedOf`; history entries are frozen.
 - Settings bits and base lighting: `fieldMask` and `baseLighting` in
   `core/model/settings-editor.js`.
 - Panel sequencing: `core/session/panel-controls.js`, tested with a fake
   service; `extension.js` supplies dialogs, files and progress.
 - Interface: `canEdit(area)` for permission, `view/reach-groups.mjs` and
-  `ui/groups.mjs` for the grouped lists, `slotLight` in `ui/marks.mjs`, one
-  form per macro slot and one `state.combo` for the builder; the picker closes
-  itself before handing on a choice.
+  `ui/groups.mjs` for grouped lists, `slotLight` in `ui/marks.mjs`, one form
+  per macro slot and one `state.combo` for the builder.
 
 ### D-L34 — Layer keycodes are owned in the firmware, and the app follows
 
-Behaviours refused `TG()`/`TO()` while combos accepted them, because the
-firmware ignored them inside a behaviour and let QMK run them everywhere else,
-behind its layer ownership: a toggled layer turned off when a `MO()` of it was
-released, and `TO()` left locks marked that QMK had cleared. The fix is at the
-root, not in the app. The firmware classifies `TG(n)` as `LOCK_LAYER(n)` and
-`TO(n)` as "lock only n" (`layer_ownership_goto`), so both act the same on a
-plain key, in a behaviour and as a combo output, and advertises it as Profile
-Wire feature bit 14. The app accepts `TG()`/`TO()` in behaviours only when a
-keyboard reports that bit; older firmware keeps the old refusal.
+QMK ran `TG()`/`TO()` behind the userspace's layer ownership, so a toggled
+layer turned off when an `MO()` of it was released and `TO()` left stale locks.
+The fix is in the firmware: `TG(n)` is `LOCK_LAYER(n)`, `TO(n)` is "lock only
+n" (`layer_ownership_goto`), `TT(n)` is `MO(n)` with a built-in
+`LOCK_LAYER(n)` on its `TAPPING_TOGGLE`-th tap, and `OSL(n)` holds like `MO(n)`
+while its tap arms a one-shot owner the next qualifying press uses up. All act
+the same on a plain key, in a behaviour and as a combo output. Profile Wire
+feature bit 14 advertises this; the app accepts them in behaviours only when a
+keyboard reports it: `OSL()` as a tap, `TT()` as a "Press and hold until
+release" branch. A plain `LT()` hold (tap count 0) goes through layer
+ownership; its tap still reaches QMK. `LM(n, mods)` holds layer n and its
+modifiers through modifier ownership, as a key or combo, not a behaviour step.
 
-`TT(n)` followed: it is `MO(n)` with a built-in `LOCK_LAYER(n)` on its
-`TAPPING_TOGGLE`-th tap, so it needs no new action or capability bit. `OSL(n)`
-followed as its own kind: it holds like `MO(n)` and its tap arms a one-shot
-owner in `layer_ownership`, which the next qualifying press uses up. Profile
-Wire feature bit 14 now means all four (`TG`, `TO`, `TT`, `OSL`) are owned, and
-the app offers each inside a behaviour where the keyboard places it: `OSL()` as
-a tap, `TT()` as a "Press and hold until release" branch.
+The keyboard refuses a candidate that places an action where `keymap.c`
+validation would, and the app refuses the same placements first, naming the
+misplaced action. `DF()` and `PDF()` stay refused: layer 0 is the base in the
+firmware's lookup, the RGB base effect and the app, and `TO()` already covers
+the need. Decided behaviour: `TT()`'s last tap locks on release; `OSL()`
+follows QMK (a lone long press arms it, a second tap within `TAPPING_TERM`
+cancels it); `ONESHOT_TIMEOUT` and `ONESHOT_TAP_TOGGLE` apply to `OSM()` only;
+`TT()` counts taps within `CUSTOM_MULTI_TAP_TERM` like every multi-tap key; a
+`TG()`/`TO()` of the pointer layer from a behaviour is not seen by QMK's
+auto-mouse. A 44-step hardware check passed on both halves on 2026-09-24; the
+`LT()` row timing question stays open (see Open Issues).
 
-A plain `LT()` with no authored row followed without a second tap/hold
-decision: QMK's tapping engine still decides, and marks a hold with tap count
-0; only that hold goes through layer ownership, and a tap still reaches QMK.
+### D-L35 — Charybdis Live v2 is the app
 
-Still open, in the order they are taken:
-
-1. (Done: plain `LT()` holds.)
-2. (Done: the keyboard holds a candidate it is asked to save to where its
-   actions are placed, by the rules `keymap.c` validation uses; a committed
-   record still loads, and the halves still sync it. The app refuses the same
-   placements first: the behaviour and combo editors check every row, since
-   the keyboard checks the domain, and every upload (draft apply, import,
-   layer edit) is checked before it starts, naming the misplaced action.)
-3. (Done on hardware, 2026-09-24, firmware pair 16 from `c85c0774`: a
-   44-step check passed on both halves. It covered `TG`/`TO` locks surviving
-   `LT`/`MO` holds; `TO` keeping held layers; `TT` hold, 4-tap no-op, 5-tap
-   lock and unlock; `OSL` next key, modifiers, rolling, cancel, hold and the
-   steady RGB; unchanged home-row `LT` typing; an `MO` combo released key by
-   key after the layer changed; the other half and its RGB; a replug; the
-   app's placement refusals; and the reorder toggle both ways.) Still open
-   from this item: the runtime times a press from when QMK delivers it, so an
-   authored `LT()` row's tap/hold term likely starts only after QMK's own
-   `TAPPING_TERM` (e.g. `LT(LAYER_NAV, KC_SLSH)`'s 100 ms); the check did not
-   measure it.
-4. (Decided: `TT()`'s last tap locks on its release, with no feedback window
-   and no layer drop; `OSL()` follows QMK: a lone long press arms it, a second
-   tap within `TAPPING_TERM` cancels it and a slower one keeps it on; a build
-   that sets `ONESHOT_TIMEOUT` or `ONESHOT_TAP_TOGGLE` prints that they apply
-   to `OSM()` only.) Kept as they are: `TT()` counts taps within
-   `CUSTOM_MULTI_TAP_TERM` (QMK: `TAPPING_TERM`), like every multi-tap key
-   here; `TO()` keeps held layers on; a `TG()`/`TO()` of the pointer layer from
-   a behaviour is not seen by QMK's auto-mouse.
-5. (Done: `LM(n, mods)` holds layer n like `MO(n)` and its modifiers from
-   the press, through modifier ownership; a key or a combo, not a behaviour
-   step. Decided: `DF()` and `PDF()` stay refused. Layer 0 is the base in the
-   firmware's lookup, the RGB base effect and the app, and making it movable
-   touches all three for a need `TO()` already covers: order a game layer just
-   above Base and `TO(game)` switches to it while held layers still win. `PDF()`
-   is now classified as a refused layer keycode too; it was passed to QMK as a
-   plain key.)
-6. (Done: `TT()`/`OSL()` inside a behaviour and as a behaviour row's key, and
-   `LM()` named and encoded, so its refusal in a behaviour says why. The
-   picker's Layers section adds Tap-toggle `TT()`, One-shot `OSL()` and Move
-   `TO()` on a keyboard that reports bit 14; `TG()` gets no button of its own,
-   since it is the Lock button's `LOCK_LAYER()`, and a key storing it lights
-   Lock.)
+*Numbered D-L21 when written, alongside the atomic-Apply decision.*
+`tools/charybdis-live-v2/` keeps v1's core, its layering and the one rule
+(nothing reads the firmware repository), and replaces v1's ported Studio
+interface with its own: browser ES modules with pure, tested `view/` modules,
+every posted edit built by `webview/view/edits.mjs` and staged against a real
+draft in `tests/edits.test.mjs`, and a board that shows what the firmware does.
+Edits exist only as a reviewed draft; a keyboard the app cannot open a draft for
+is read-only, and the host refuses edits rather than writing them directly. v1
+was frozen by this decision and has since been removed.

@@ -14,10 +14,9 @@ the live app becomes a client of the keyboard rather than a client of the
 repository.**
 
 Read [`docs/LIVE_EDIT_APP_DIRECTION.md`](./docs/LIVE_EDIT_APP_DIRECTION.md)
-before doing architecture work. It carries the decisions, the delivery slices,
-the known issue this branch inherits, and what is deliberately still
-undesigned. The end goal it serves is in
-[`docs/tooling/PROFILE_STUDIO_PRODUCT_GOAL.md`](./docs/tooling/PROFILE_STUDIO_PRODUCT_GOAL.md)
+before doing architecture work. It carries the current status, the open
+issues, and the decisions behind the app. The end goal it serves is in
+[`docs/PRODUCT_GOAL.md`](./docs/PRODUCT_GOAL.md)
 and [`docs/architecture/device-resident-profile.md`](./docs/architecture/device-resident-profile.md).
 
 ### The tools, and the line between them
@@ -31,7 +30,7 @@ and [`docs/architecture/device-resident-profile.md`](./docs/architecture/device-
   `rgb_config.c`. It is **frozen** at its `refactor/aug` state. Bug fixes only.
   Do not add features to it, and do not give it device capabilities.
 
-Work that blurs that line is the thing this branch exists to undo.
+Work that blurs that line is what the split between them exists to prevent.
 
 ### Where we are
 
@@ -80,7 +79,8 @@ Required verification workflow:
    - hooks / ownership: `sh tests/host/run_hook_chaining_tests.sh`, `sh tests/host/run_keyboard_mod_ownership_tests.sh`, `sh tests/host/run_owned_keycode_tests.sh`, `sh tests/host/run_held_action_tests.sh`, `sh tests/host/run_layer_ownership_tests.sh`
    - macro / VIA / QMK-contract work: `sh tests/host/run_qmk_contract_checks.sh`, `sh tests/host/run_action_lifecycle_tests.sh`, `sh tests/host/run_qmk_portable_profile_tests.sh`, `sh tests/host/run_macro_payload_tests.sh`, `sh tests/host/run_via_macro_defaults_tests.sh`, `sh tests/host/run_via_macro_action_lifecycle_tests.sh`
    - shared runtime / tracing: `sh tests/host/run_runtime_init_order_tests.sh`, `sh tests/host/run_runtime_debug_tests.sh`, `sh tests/host/run_runtime_trace_tests.sh`
-   - Profile Studio extension/UI: from `tools/charybdis-profile-studio/`, run `npm run check` and `npm run screenshots`
+   - Charybdis Live: from `tools/charybdis-live-v2/`, run `npm run check` (and `npm run keycodes -- --check` when the vendored keycode catalog could be affected)
+   - Profile Studio extension/UI (bug fixes only): from `tools/charybdis-profile-studio/`, run `npm run check` and `npm run screenshots`
      - For Profile Studio hover/tooltip changes, `npm run screenshots` is not enough because it captures resting page states. Generate a kept harness with `npm run screenshots -- --keep-harness`, serve that harness over localhost, then drive a real mouse move against the target with Chrome/CDP `Input.dispatchMouseEvent` or an equivalent browser action and capture the hover state. Do not rely on file URLs in the in-app browser or read-only DOM synthetic events for hover verification; they can be blocked or fail to create the actual tooltip state. Stop any temporary localhost server before handing work back.
      - When editing regex literals inside the generated Profile Studio client script returned by `getClientScript()`, remember the code lives inside an outer JavaScript template string. Escape regex backslashes for the generated script, for example `/\\b(?:VIA_MACRO|MACRO)_\\d+\\b/g`, otherwise hover-only checks can miss broken parsing that normal screenshots do not exercise.
 4. If authored keymap, combo, macro, or RGB data changed, also run:
@@ -124,12 +124,8 @@ Repo-specific guardrails:
 - Prefer small, local changes over generic runtime rewrites unless the task explicitly requires runtime architecture work.
 - If behavior, workflows, setup steps, or user-facing capabilities changed, update `README.md` and the relevant files under `docs/` in the same pass.
 - If any authored input to `tools/profile_introspect.py` changes, regenerate the introspection outputs in the same pass with `python3 tools/profile_introspect.py --write` and verify them with `python3 tools/profile_introspect.py --check`. Current authored inputs are `keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c`, `keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h`, `users/noah/config.h`, `keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c`, and the shared pd-mode manifest `users/noah/lib/pointing/defs/pd_mode_manifest.h`.
-- If architectural work lands, update the active open review folder's
-  `progress.md` in the same pass. If the related review thread is closed, open
-  the next sortable review folder and update that new folder instead.
-- Keep `progress.md` structured so it reads as clear history.
-- Always include next steps.
-- If the intended structure or tradeoffs changed, update `userspace-architecture-review.md` in the same pass.
+- If architectural work lands, record it in the doc it governs in the same pass: a new or amended decision in `docs/LIVE_EDIT_APP_DIRECTION.md` (keep "Current Product Status" and "Open Issues" current), or the matching spec under `docs/architecture/`.
+- Write decisions and contracts, not logs: verification runs, build numbers, test counts and dated progress notes belong in commit messages. When a plan is finished, fold what still constrains the code into the spec it produced and delete the plan (D-L07).
 
 ## RP2040 Resource Truth
 

@@ -9,9 +9,8 @@ authored choices, see [KEYMAP.md](./KEYMAP.md). For the shared tap / hold /
 multi-tap model, see [INTERACTION_MODEL.md](./INTERACTION_MODEL.md) and the
 top-level [README](../README.md).
 
-The [eight-slot live PD-mode migration plan](architecture/live-pd-modes-plan.md)
-describes the implemented configurable replacement and the remaining hardware
-acceptance checks. Side-specific schema-2 firmware exposes eight slots in
+The [PD-mode domain contract](architecture/pd-mode-domain-v1.md) specifies the
+eight configurable slots and the remaining hardware acceptance checks. Side-specific schema-2 firmware exposes eight slots in
 Charybdis Live → Pointing modes. The six defaults below are records in those
 slots, followed by two empty slots; their names do not select special code.
 

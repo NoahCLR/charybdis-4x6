@@ -1,18 +1,18 @@
-# Charybdis Profile Studio Product Goal
+# Product Goal
 
 ## Product Promise
 
-Charybdis Profile Studio is intended to become first-grade control software for
-this keyboard. A user connects the keyboard, sees the configuration that is
+Charybdis Live ([`tools/charybdis-live-v2/`](../tools/charybdis-live-v2/)) is
+intended to become first-grade control software for this keyboard. A user connects the keyboard, sees the configuration that is
 actually running, changes every supported behavior visually, and safely saves
 the result without editing C or reflashing firmware.
 
 This is more than a live-edit transport. The finished product must make the
 keyboard understandable, customizable, recoverable, and trustworthy during
-normal use. The current repository-backed VS Code extension is the development
-shell for that product, not its final authority model.
+normal use. The VS Code extension is the development shell for that product;
+its core does not depend on the repository or on VS Code.
 
-Profile Studio is user-space HID control software; it does not require a custom
+It is user-space HID control software; it does not require a custom
 kernel driver. Normal configuration uses the keyboard's VIA and Profile Wire
 HID interfaces. Firmware flashing remains a separate operation for changing
 executable capabilities.
@@ -60,7 +60,7 @@ must bind every participating domain to a complete logical generation and
 digest. The product must never claim an atomic profile commit when only one
 underlying store was updated.
 
-Writes made by another VIA client are external configuration changes. Studio
+Writes made by another VIA client are external configuration changes. The app
 must detect them and either adopt them into a new logical generation or present
 an explicit conflict. They must not silently escape profile identity.
 
@@ -73,13 +73,16 @@ that profile state has converged.
 The three C files remain valuable as:
 
 - compiled factory defaults and recovery input;
-- a reviewable, version-controlled representation;
-- an explicit import source;
-- a canonical export target.
+- a reviewable, version-controlled representation, authored with the separate,
+  frozen [Profile Studio](tooling/PROFILE_STUDIO.md).
 
-Opening Studio never requires those files and never silently changes them.
-Import from source, export to source, apply to keyboard, refresh from keyboard,
-restore backup, and reset are separate directional operations.
+The control software never reads or writes those files. Its backup, restore,
+sharing and version-control format is the portable profile
+([`portable-profile-v1.md`](architecture/portable-profile-v1.md)); `.c` import
+and export stay in Profile Studio (D-L09 in the
+[direction](LIVE_EDIT_APP_DIRECTION.md)).
+Apply to keyboard, refresh from keyboard, export, import or restore a backup,
+and reset are separate directional operations.
 
 Every current and future setting must be classified as one of:
 
@@ -92,7 +95,7 @@ Every current and future setting must be classified as one of:
 The UI must explain a non-live boundary instead of silently omitting the field
 or offering an operation the connected firmware cannot perform. The maintained
 field inventory is
-[`field-classification.md`](../architecture/field-classification.md).
+[`field-classification.md`](architecture/field-classification.md).
 
 ## Product Capabilities
 

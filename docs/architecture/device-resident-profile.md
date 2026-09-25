@@ -1,12 +1,12 @@
 # Device-Resident Profile Target
 
-This document defines the target ownership model for Charybdis Profile Studio
-and live editing. It supersedes the earlier project assumption that the three C
+This document defines the ownership model for live editing with Charybdis Live
+([`tools/charybdis-live-v2/`](../../tools/charybdis-live-v2/)). It supersedes the earlier project assumption that the three C
 authoring files must remain the only source of truth during a live editing
 session.
 
 This is the technical profile contract beneath the broader
-[`Charybdis Profile Studio Product Goal`](../tooling/PROFILE_STUDIO_PRODUCT_GOAL.md).
+[`Product Goal`](../PRODUCT_GOAL.md).
 The product target is first-grade keyboard control software, not only a working
 live-edit protocol.
 
@@ -19,7 +19,7 @@ the editable values represented by:
 - `keymap.c` layers, behaviors, combos, and macros;
 - `rgb_config.c` colors, feedback policy, and LED groups.
 
-Profile Studio connects to the keyboard, reads that logical profile, edits a
+The live app connects to the keyboard, reads that logical profile, edits a
 local draft based on its exact generation, commits a replacement safely to both
 halves, and reads it back for verification. Reflashing is required only when
 executable firmware capabilities change.
@@ -31,20 +31,21 @@ to reproduce the supported behavior.
 
 ## Authority Model
 
-When Profile Studio is connected, the active committed device generation is the
-live authority. The three C files remain:
+On a connected keyboard, the active committed device generation is the live
+authority. The three C files remain:
 
 - compiled factory defaults and the recovery fallback;
-- the human-reviewable and version-controlled representation;
-- an import source for intentionally replacing device state;
-- an export target for saving a device profile back to the repository.
+- the human-reviewable and version-controlled representation, authored with
+  the separate, frozen Profile Studio.
 
-Source import and source export are explicit operations. Merely opening Studio
-or connecting a keyboard must not silently overwrite either side.
+The live app never reads or writes them. Its durable representation is the
+portable profile; `.c` import and export stay in Profile Studio (D-L09 in the
+[direction](../LIVE_EDIT_APP_DIRECTION.md)). Connecting a keyboard never
+silently overwrites the keyboard or a draft.
 
 Every editor draft records the device generation and digest it was based on. A
 commit uses compare-and-swap semantics: if the device generation changed after
-the draft was opened, Studio refuses the write and asks the user to refresh or
+the draft was opened, the app refuses the write and asks the user to refresh or
 resolve the conflict.
 
 ## One Logical Profile, Initially More Than One Storage Adapter
@@ -56,9 +57,9 @@ QMK storage owners internally:
 - the versioned custom profile store for RGB, custom behaviors, and future
   profile-policy domains.
 
-This is an intentional migration boundary, not the final user model. Studio must
-read both stores into one generation-aware document and coordinate writes and
-verification across them. Replacing VIA storage with a duplicate custom keymap
+This is an intentional boundary, not the user model. The app reads both stores
+into one generation-aware document and coordinates writes and verification
+across them. Replacing VIA storage with a duplicate custom keymap
 format is not required for the device-first milestone and would reduce VIA
 interoperability.
 
@@ -86,8 +87,7 @@ matrix is recorded, Apply continues to create a recovery file.
 
 ## Required Device-First Operations
 
-Profile Studio must eventually expose these operations with unambiguous
-direction:
+The live app exposes these operations with unambiguous direction:
 
 - **Open from keyboard** — read the complete active logical profile and its
   identity;
@@ -97,13 +97,10 @@ direction:
   identity without changing the keyboard;
 - **Restore backup** — validate a backup against connected capabilities and
   apply it as a new device generation;
-- **Import from source** — intentionally create a draft from the three C files;
-- **Export to source** — write a canonical, reviewable C representation without
-  changing the keyboard;
 - **Reset to compiled defaults** — activate the firmware's compiled profile by
   an explicit durable operation.
 
-Writes made through another VIA client are treated as external changes. Studio
+Writes made through another VIA client are treated as external changes. The app
 must detect them and offer adoption or conflict resolution before applying a
 stale whole-profile draft.
 
@@ -131,15 +128,17 @@ physical capacity.
 
 ## Implementation Sequence
 
-Items 1 and 3–7 are implemented. The logical-generation manifest and
-cross-store commit/recovery ordering in item 2 are implemented; external VIA
-edit adoption remains. Item 8 is the active acceptance phase: prove reboot,
-reconnect, applicable USB/role configurations, interruption, two-half
-convergence, and polling/resource regressions before production promotion.
+The delivery slices are in the [product goal](../PRODUCT_GOAL.md#delivery-strategy)
+and their status in the [direction](../LIVE_EDIT_APP_DIRECTION.md#current-product-status).
+The logical-generation manifest and cross-store commit and recovery ordering
+are implemented; external VIA edit adoption remains. The active phase is
+acceptance: reboot, reconnect, applicable USB/role configurations,
+interruption, two-half convergence, and polling/resource regressions before
+production promotion.
 
 ## Completion Criterion
 
 The device-first goal is complete only when a user can connect a keyboard whose
 repository profile is unavailable or stale, read its complete supported
-configuration into Studio, edit it, commit it to both halves, reboot, reconnect,
+configuration into the live app, edit it, commit it to both halves, reboot, reconnect,
 and recover the same editable values without consulting the C files.

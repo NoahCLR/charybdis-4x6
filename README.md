@@ -91,18 +91,9 @@ Downgrading likewise requires restoring the original backup on the original
 firmware geometry. Keep the bridge paired with its matching authored source;
 using different compiled tuning cannot recover the original tuning.
 
-Implementation and automated verification are in place. Physical migration,
-power-interruption, pointing cadence and allocator/stack high-water acceptance
-remain release gates; this work does not flash a keyboard automatically. The
-[implementation plan](docs/architecture/live-pd-modes-plan.md) records progress.
-
-The first PD pair (`1_charybdis_right.uf2` / `1_charybdis_left.uf2`) produced
-startup freezes and repeated startup lighting on hardware before profile import.
-The corrected reader avoids repeatedly serializing the full default profile
-while warming the PD cache. The second pair fixed startup, but its settings
-validator still rejected settings-v2 imports. Use the corrected
-`3_charybdis_right.uf2` / `3_charybdis_left.uf2` pair (or a newer rebuild); the schema,
-storage geometry and exported `.pd8.charybdis.json` backup remain unchanged.
+Physical migration, power-interruption, pointing cadence and stack high-water
+acceptance remain release gates; see the
+[PD-mode domain contract](docs/architecture/pd-mode-domain-v1.md#hardware-acceptance).
 
 ## What This Userspace Is For
 
@@ -133,7 +124,7 @@ behavior:
   other surface you want
 - combos for simultaneous chords, including chords that emit a keycode handled
   by `key_behaviors[]`
-- VIA-editable macro slots alongside hardcoded source-owned macros
+- 64 VIA macro slots, each with a name, editable live or from source defaults
 - keys that do one thing on tap, another on hold, another on longer hold, and
   different things again on double-tap or higher tap counts
 - pointing-mode keys that can be simple momentary holds, locks, or richer
@@ -174,64 +165,24 @@ where these ideas live.
 
 ## Profile Studio
 
-If you are new to this userspace, start with Charybdis Profile Studio. It is
-the repo-local VS Code extension for editing the profile visually, so you can
-click through the layout, macros, RGB, and defaults before digging into the C
-model.
+Charybdis Profile Studio is the repo-local VS Code extension for editing the
+authored profile visually: click through the layout, macros, RGB and defaults
+before digging into the C model. It is frozen: bug fixes only, no new features
+and no device access. Editing the connected keyboard is
+[Charybdis Live](#charybdis-live)'s job.
 
-The current editor works directly on the selected profile's authored source
-files. For my current profile, those are:
+Studio works directly on the selected profile's authored source files, with no
+sidecar database. For my profile those are:
 
 - [`config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h)
 - [`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c)
 - [`rgb_config.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c)
 
-There is no sidecar profile database. Today, Studio parses these files, shows a
-VS Code webview, stages edits, and patches the same authored blocks when you
-apply changes. This source-driven workflow is the current implementation, not
-the final live-edit authority model.
-
-The target is a device-resident logical profile: when connected, Studio reads
-the complete supported configuration from the keyboard, edits a draft based on
-that exact generation, commits it to both halves, and verifies it by reading it
-back. The C files remain compiled defaults plus an explicit import/export and
-version-control representation; they are not required to open an existing
-keyboard configuration. See
+It parses them, stages edits in a webview, and patches the same authored blocks
+when you apply. On a keyboard, those files are compiled defaults; the profile
+committed on the keyboard is the source of truth (see
 [`device-resident-profile.md`](./docs/architecture/device-resident-profile.md)
-for the technical contract and
-[`PROFILE_STUDIO_PRODUCT_GOAL.md`](./docs/tooling/PROFILE_STUDIO_PRODUCT_GOAL.md)
-for the broader goal: first-grade keyboard control software that can inspect,
-customize, validate, persist, back up, restore, and recover the keyboard without
-requiring a firmware repository for normal use.
-
-The profile picker can also create, clone, rename, and delete Charybdis 4x6
-keymaps under `keyboards/bastardkb/charybdis/4x6/keymaps/<name>/` while keeping
-`qmk.json` build targets in sync. A generated profile gets a blank `keymap.c`
-authoring surface, compile-ready `config.h` and `rgb_config.c`, and a small
-`rules.mk` that points QMK at the shared `users/noah` runtime. It is registered
-in `qmk.json`, so you can build it with:
-
-```sh
-qmk compile -kb bastardkb/charybdis/4x6 -km <name>
-```
-
-For a read-only overview of my current config, start with the generated
-[`KEYMAP-OVERVIEW.md`](./docs/KEYMAP-OVERVIEW.md). The companion
-[`KEYMAP.md`](./docs/KEYMAP.md) explains the current profile choices in prose.
-Other profiles can generate their own overview with
-`python3 tools/profile_introspect.py --keymap <name> --write`; those reports
-default to `docs/profiles/<name>/KEYMAP-OVERVIEW.md`.
-Profile Studio also has a Profile overview row with a `Create overview doc`
-action for the active profile. It warns when Studio has unapplied edits because
-the overview is generated from source files on disk.
-The Firmware row's `Compile left + right` action opens the Charybdis Profile
-Studio output pane and streams QMK while it builds left and right UF2 files for
-the active profile. `Compile live-edit test` builds a separately named pair
-with the engineering live-profile owner and mutation route enabled.
-`Compile performance comparison` builds four diagnostic UF2 files from the
-same source tree: an ordinary left/right baseline and a live-profile
-engineering left/right pair. Flash and capture the ordinary baseline pair
-first, then flash the engineering pair for the comparison run.
+and [`PRODUCT_GOAL.md`](./docs/PRODUCT_GOAL.md)).
 
 Use Profile Studio when you want to:
 
@@ -241,25 +192,31 @@ Use Profile Studio when you want to:
 - append simple combos from physical key selections, or load an existing combo
   to edit its output and inputs
 - edit VIA macro slots with a macro builder and key-event recorder
-- choose layer and pointing-mode colors
-- build reusable LED groups by selecting LEDs on the board
+- choose layer and pointing-mode colors, and build reusable LED groups by
+  selecting LEDs on the board
 - edit auto-mouse fade settings, combo feedback, and key-behavior feedback
-- compile left and right firmware outputs for the selected profile
-- apply the complete authored RGB and `key_behaviors[]` surfaces live after the
-  engineering firmware pair is installed and the Live panel reports that the
-  second half is detected and converged
-- configure behavior-specific `config.h` defaults for key timing, normal
-  pointer speed, pointing modes, sniping, auto-mouse, base lighting, and
-  lighting feedback
+- configure `config.h` defaults for key timing, pointer speed, pointing modes,
+  sniping, auto-mouse, base lighting, and lighting feedback
+- compile left and right firmware for the selected profile (`Compile left +
+  right` in the Firmware row)
 
-Macro playback is scan-driven: long delays no longer pause normal keyboard,
-pointing, RGB, VIA, or split work. One macro runs at a time; a trigger received
-while one is active is consumed but not queued. Editing an active VIA slot takes
-effect on its next run, and reset cancels playback while releasing any keys the
-macro owns. Logical slots keep only validation metadata; one shared decoded
-program remains pinned for the active run, so the configured 80-slot capacity
-does not reserve a 512-byte program for every slot. See
-[KEYMAP.md](./docs/KEYMAP.md#macro-and-shortcut-surfaces) for the runtime details.
+The profile picker can also create, clone, rename, and delete Charybdis 4x6
+keymaps under `keyboards/bastardkb/charybdis/4x6/keymaps/<name>/` while keeping
+`qmk.json` build targets in sync. A generated profile gets a blank `keymap.c`,
+compile-ready `config.h` and `rgb_config.c`, and a small `rules.mk` that points
+QMK at the shared `users/noah` runtime:
+
+```sh
+qmk compile -kb bastardkb/charybdis/4x6 -km <name>
+```
+
+For a read-only overview of my current config, start with the generated
+[`KEYMAP-OVERVIEW.md`](./docs/KEYMAP-OVERVIEW.md); the companion
+[`KEYMAP.md`](./docs/KEYMAP.md) explains the profile choices in prose. Other
+profiles generate their own with
+`python3 tools/profile_introspect.py --keymap <name> --write`, by default into
+`docs/profiles/<name>/KEYMAP-OVERVIEW.md`, or with Studio's `Create overview
+doc` action.
 
 Screenshots:
 [`Layout`](./docs/media/profile-studio/studio-layout-tab.png),
@@ -267,25 +224,17 @@ Screenshots:
 [`RGB`](./docs/media/profile-studio/studio-rgb-tab.png), and
 [`Defaults`](./docs/media/profile-studio/studio-defaults-tab.png).
 
-From VS Code with this repo folder open:
-
-1. Run the VS Code task `Install Profile Studio Extension`.
-2. Reload VS Code.
-3. Open it from the `$(keyboard) Profile Studio` status bar item, or run
-   `Charybdis: Open Profile Studio` from the command palette.
-
-You can also install it from a shell:
+To install it, run the VS Code task `Install Profile Studio Extension` and
+reload VS Code, or from a shell:
 
 ```sh
 cd tools/charybdis-profile-studio
 npm run install:local
 ```
 
-The full Studio guide is
+Open it from the `$(keyboard) Profile Studio` status bar item or `Charybdis:
+Open Profile Studio`. The full guide is
 [`docs/tooling/PROFILE_STUDIO.md`](./docs/tooling/PROFILE_STUDIO.md).
-
-Profile Studio edits the authored source files. Live editing of the connected
-keyboard is a separate app.
 
 ## Charybdis Live
 
@@ -307,7 +256,7 @@ Charybdis Live v2`, or press `F5` with the `Run Charybdis Live v2` launch
 configuration for an Extension Development Host.
 
 It reads everything it edits from the keyboard — layout, key behaviours,
-combos, both macro banks, lighting, the eight pointing-mode slots, layers and
+combos, the named VIA macros, lighting, the eight pointing-mode slots, layers and
 settings — and shows compiled defaults only when the keyboard reports no
 committed profile. Every edit goes into one local draft with undo, redo and a
 history, and reaches the keyboard only through **Review and apply**. Apply
@@ -620,10 +569,9 @@ Use the docs based on what you want to change:
   longer-hold, and multi-tap semantics
 - [`docs/POINTER_MODES.md`](./docs/POINTER_MODES.md): what each trackball mode
   does once active
-- [`docs/architecture/live-pd-modes-plan.md`](./docs/architecture/live-pd-modes-plan.md):
-  migration plan and progress toward eight live-configurable PD slots and matching RGB settings
 - [`docs/architecture/pd-mode-domain-v1.md`](./docs/architecture/pd-mode-domain-v1.md):
-  eight-slot wire contract, schema/ABI migration and capacity checks
+  eight PD slots: scope, wire contract, schema/ABI migration, capacity and
+  remaining hardware acceptance
 - [`docs/RGB_CONFIG.md`](./docs/RGB_CONFIG.md): RGB authoring model, render
   order, LED groups, and auto-mouse fade
 - [`docs/ADDING_PD_MODE.md`](./docs/ADDING_PD_MODE.md): maintainer guide for
@@ -640,6 +588,10 @@ Use the docs based on what you want to change:
   exports back into source
 - [`docs/architecture/README.md`](./docs/architecture/README.md): maintainer
   entry point for runtime ownership and source boundaries
+- [`docs/LIVE_EDIT_APP_DIRECTION.md`](./docs/LIVE_EDIT_APP_DIRECTION.md): live
+  app status, open issues and the decisions behind it
+- [`docs/PRODUCT_GOAL.md`](./docs/PRODUCT_GOAL.md): what "first-grade control
+  software" means and when it is done
 
 ## AI Workflow Note
 
@@ -658,7 +610,7 @@ documentation.
 ### Complete keyboard profiles
 
 Charybdis Live's **Export profile** saves the configuration read from the
-keyboard: every layer and key position, behaviours, combos, both macro banks,
+keyboard: every layer and key position, behaviours, combos, named VIA macros,
 lighting and global settings. Flashed defaults and live edits become one
 portable file. **Import profile** shows a review, saves a recovery copy, restores
 both halves and verifies the complete readback. A failed or interrupted restore

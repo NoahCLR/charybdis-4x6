@@ -1,12 +1,10 @@
 # Live-Profile Field Classification
 
-This matrix classifies every surface currently parsed by Profile Studio. It is
-the starting scope boundary between live data, standard VIA state, compiled
-ceilings, and executable firmware.
+This matrix classifies every user-relevant value represented by the three
+authoring files. It is the scope boundary between live data, standard VIA
+state, compiled ceilings, and executable firmware.
 
-The first-grade product goal requires this to become a complete inventory of
-every user-relevant value represented by the three authoring files, including
-fields that Studio does not parse yet. A missing field is not implicitly out of
+The first-grade product goal requires this to be a complete inventory. A missing field is not implicitly out of
 scope: it must be added here and classified as live data, runtime-applicable
 policy, bounded structure, compiled capability/safety, or executable/source-only
 behavior. The UI must explain every intentional non-live boundary.
@@ -75,7 +73,8 @@ The [portable settings contract](portable-profile-v1.md) supplies a bounded
 runtime cache and QMK setters. It also includes debounce, activation delay,
 movement threshold, combo enable/reference policy, RGB speed/flags, persistent
 default-layer state and QMK keymap options. Combo timing is materialized in the
-combo domain. Both macro banks and eight user-facing layer names are portable.
+combo domain. The 64 VIA macros with their names and eight user-facing layer
+names are portable.
 
 ### Compiled Capability Or Feature Inclusion
 
@@ -121,7 +120,7 @@ These require source changes and a firmware build.
 
 ## Configurable PD Slots
 
-The [eight-slot migration plan](live-pd-modes-plan.md) covers configuration that
+The [PD-mode domain contract](pd-mode-domain-v1.md) covers configuration that
 formerly lived partly outside the authored profile files. Schema 2 carries
 eight stable PD identities. Retired settings scalars 10–14 are canonical zero;
 per-slot records are the single owner of mode DPI.

@@ -421,13 +421,16 @@ key." It is more opinionated than that.
 
 ## Macro And Shortcut Surfaces
 
-The current profile uses VIA defaults more than hardcoded firmware macros:
+The profile's macros are VIA macro slots:
 
-- all `MACRO_0` through `MACRO_15` hardcoded slots are currently empty
-- VIA exposes `VIA_MACRO_0` through `VIA_MACRO_63`
-- `VIA_MACRO_0` through `VIA_MACRO_10` currently have defaults
+- VIA exposes `VIA_MACRO_0` through `VIA_MACRO_63`, each of which can carry a
+  name
+- `VIA_MACRO_0` through `VIA_MACRO_11` currently have source defaults in
+  `VIA_MACROS(MACRO)`
+- the former hardcoded `MACRO_0` through `MACRO_15` are retired; their keys are
+  consumed and do nothing
 
-Hardcoded and VIA macros share one scan-driven playback engine. Starting a
+VIA macros play through one scan-driven engine. Starting a
 macro does not wait inside the triggering key event: delays, text, chords, and
 key holds advance through later matrix scans, so pointing, RGB, VIA, split, and
 normal key processing continue between macro operations. Playback has a

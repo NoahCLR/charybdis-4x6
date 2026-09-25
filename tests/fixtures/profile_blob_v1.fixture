@@ -1,5 +1,5 @@
 # Shared Profile Wire v1.0 blob/action golden vectors.
-# Consumed by both the firmware C host suite and Profile Studio JavaScript.
+# Consumed by both the firmware C host suite and the Charybdis Live JavaScript suite.
 blob.empty.hex=4e4c503101000001
 blob.empty.fnv1a32=2051f0aa
 blob.empty.crc32=85eade89

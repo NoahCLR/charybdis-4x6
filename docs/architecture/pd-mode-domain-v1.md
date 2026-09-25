@@ -3,8 +3,84 @@
 Implemented in schema-2 side-specific owner builds: domain codec, incremental
 validation, immutable effective cache, shared engines, persistence/split writers,
 portable migration and live editor. Legacy bridge builds retain schema 1.
-Hardware upgrade and physical release acceptance remain pending; see
-[the implementation plan](live-pd-modes-plan.md).
+Physical upgrade and release acceptance remain pending; see
+[Hardware acceptance](#hardware-acceptance).
+
+## Scope
+
+The keyboard owns eight pointing-mode slots, stable IDs `0..7` shown as slots
+1–8, and eight matching PD RGB rows keyed by the same IDs. The app reads, edits
+and saves them in the ordinary draft, review and logical Apply; reboot, backup
+and restore preserve them without the repository.
+
+- One mode is active at a time. Mode replacement, same-mode unlock and lock
+  exclusivity keep their pre-slot semantics.
+- Each slot has a momentary (hold) and a lock-toggle action. Tap, hold and
+  multi-tap gestures stay in key behaviors.
+- Normal cursor movement is the fallback outside the slot bank. Auto-sniping
+  stays a layer/CPI policy and uses no slot.
+- There are two engine families, **directional** (four or eight directions,
+  single axis or dominant axis; see D-L24 and D-L28 in the
+  [direction](../LIVE_EDIT_APP_DIRECTION.md)) and **scrolling**. Optional
+  modifier and mouse-button policies cover Arrow and Pinch. No behavior depends
+  on a slot's name.
+
+Out of scope: scripts or C hooks, macro programs as motion outputs, layer or
+mode changes emitted by motion, simultaneous modes, new gesture engines,
+foreground-app switching and volatile device preview.
+
+### Factory presets
+
+The authored factory records migrate the six pre-slot modes; two slots start
+disabled.
+
+| Slot | Name | Engine | Behavior preserved |
+| --- | --- | --- | --- |
+| 0 | Dragscroll | Scrolling | Local scroll algorithm, inversion, axis hysteresis, timing, CPI, lock-owned auto-mouse |
+| 1 | Volume | Directional, vertical | Volume down/up, threshold 60, inherited DPI, pointer-layer anchoring |
+| 2 | Brightness | Directional, vertical | Brightness down/up, threshold 60, inherited DPI, pointer-layer anchoring |
+| 3 | Zoom | Directional, vertical | Cmd-minus/Cmd-equals, threshold 80, DPI 400 |
+| 4 | Arrow | Directional, dominant axis | Arrows, X/Y thresholds 40/50, DPI 400, vertical Alt masking, BTN1 hold right Shift, BTN2 Cmd+C, BTN3 Cmd+V, typing-layer preference |
+| 5 | Pinch | Scrolling | Dragscroll's tuning plus owned left Cmd with managed-only modifier masking |
+| 6, 7 | Empty | Disabled | Inert actions; retained, editable RGB row |
+
+Dragscroll and Pinch run this repository's
+[`pd_mode_dragscroll.c`](../../users/noah/lib/pointing/modes/pd_mode_dragscroll.c),
+not the fork's native `DRAGSCROLL_MODE`; never activate both engines.
+
+### Slot operations and RGB identity
+
+- Slot order is fixed; renaming never changes an ID.
+- Create configures an empty slot. Duplicate copies into a chosen empty slot,
+  with its RGB row and slot-specific group assignments but not its activation
+  bindings.
+- Clearing a slot that keys still reach is allowed: the firmware refuses to
+  activate an empty record, so those keys are inert until the slot is
+  configured again, and the app says so.
+- A disabled slot keeps its RGB row but paints nothing. An "all modes" group
+  applies to any active configured slot.
+- Names, mode data and RGB share undo/redo, review, conflict detection, backup
+  and Apply. Colour lives only in the RGB domain.
+
+## Runtime and publication
+
+Engines and policies are compiled capabilities; profile data selects and
+configures them. Slot configuration is materialized once, immutably, when a
+generation is published. Transient accumulator, gesture and output-lease state
+stays separate from configuration and out of backups. A late release resolves
+against the activation that acquired its output, even after another slot
+became active.
+
+Pointing polls never decode EEPROM or allocate. A cache-copy failure exposes an
+unavailable state, never a partial table or a mix of generations. Publication
+uses the strict activation boundary: Apply waits for every active or locked
+mode, held button override and owned modifier to clear, with a reason the app
+shows, and never force-releases a user-owned key. Changing modes clears old
+motion debt and releases only the old mode's outputs. A host disconnect is not
+a mode exit; committed modes keep working without the app.
+
+Directional output ceilings (four taps per poll, 32 queued whole steps per
+accumulator) are firmware safety policy, not per-slot settings.
 
 ## Domain and record encoding
 
@@ -286,3 +362,37 @@ old-geometry readback bridge must match the source firmware's authored tuning.
 Action ABI alone cannot recover that tuning. The five-layer bridge can supply
 the same source domain before layer and action-reference migration. Hardware
 acceptance remains distinct from codec and runtime parity tests.
+
+## Compatibility
+
+| Combination | Required behavior |
+| --- | --- |
+| New app, old firmware | Existing supported editing continues; slot editing is visibly unavailable |
+| Old app, new firmware or profile | Incompatibility handling refuses destructive writes |
+| New firmware, old stored record | Recognized version or identity migration, or explicit recovery; never silent default replacement |
+| New app, old export | Migrates only with verified source PD data; otherwise keeps the file and names what is missing |
+| New app and firmware, new export | Exact eight-slot round trip including disabled slots, RGB and references |
+| Mismatched halves or unknown ABI | Apply refused before mutation; draft and recovery file kept |
+
+Never restore an eight-slot document into old firmware by dropping slots;
+downgrade restores the old backup.
+
+## Hardware acceptance
+
+Still to record on the physical keyboard, with firmware identity, app version,
+profile digest and both-half state for each case:
+
+1. The six migrated presets keep their movement feel, buttons, modifiers,
+   activation gestures, pointer-layer behavior and RGB locality.
+2. Both empty slots can be configured, bound, locked, unlocked and coloured;
+   slot 7 proves the upper-bound identity path.
+3. Complete backup and restore survive reboot, including restore onto firmware
+   with empty authored behaviors and combos.
+4. Held or locked modes make Apply wait with a useful reason; no modifier or
+   mouse button stays stuck.
+5. Power or link interruption on either side of the logical decision recovers
+   the old or new complete generation, with no mode, RGB or VIA mixture.
+6. Mixed-version halves, stale drafts and old clients refuse mutation without
+   losing the prior configuration.
+7. Pointing cadence, save time and per-half memory and stack evidence, read
+   against the inherited [pointing-cadence issue](pointing-cadence-known-issue.md).

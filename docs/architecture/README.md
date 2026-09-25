@@ -30,20 +30,17 @@ This directory explains how the runtime is shaped and where changes belong.
   EEPROM maps, storage ceilings, and the measured resource baseline.
 - Use [field-classification.md](./field-classification.md) for which settings
   are live-editable, structurally bounded, or compiled-only.
-- Use [live-pd-modes-plan.md](./live-pd-modes-plan.md) for implementation progress
-  on eight configurable PD slots and eight RGB configurations, and the remaining
-  physical upgrade/acceptance matrix.
-- Use [pd-mode-domain-v1.md](./pd-mode-domain-v1.md) for the implemented
-  schema-2 codec, validation, capacity evidence, storage/ABI contract and
-  verified legacy-backup migration path.
+- Use [pd-mode-domain-v1.md](./pd-mode-domain-v1.md) for the eight
+  configurable PD slots: scope, factory presets, runtime publication rules,
+  the schema-2 codec, validation, capacity evidence, storage/ABI contract, the
+  verified legacy-backup migration path and the remaining hardware acceptance.
 - Use [pointing-cadence-known-issue.md](./pointing-cadence-known-issue.md)
   before investigating pointing performance. It records what has already been
   eliminated with evidence.
-- Use [device-resident-profile.md](./device-resident-profile.md) for the target
-  Profile Studio authority, readback, source import/export, and performance
-  contracts. Current source-driven live apply is an interim implementation.
+- Use [device-resident-profile.md](./device-resident-profile.md) for the live
+  app's authority, readback, device operations, and performance contracts.
 - Use
-  [PROFILE_STUDIO_PRODUCT_GOAL.md](../tooling/PROFILE_STUDIO_PRODUCT_GOAL.md)
+  [PRODUCT_GOAL.md](../PRODUCT_GOAL.md)
   for the complete user experience and first-grade control-software completion
   bar that the device-profile architecture serves.
 
@@ -73,8 +70,8 @@ The main rule is:
 
 | Runtime fact | Owner | Readers or projections |
 | --- | --- | --- |
-| Compiled profile defaults and source export | keymap-owned files under `keyboards/.../keymaps/noah/` | firmware compilation, source import/export, validation, profile introspection |
-| Active committed live profile | target: generation-owned device profile; current milestone: VIA layout plus custom RGB/behavior profile assembled from source | effective behavior/RGB runtime, dynamic keymap, Profile Studio device snapshot |
+| Compiled profile defaults | keymap-owned files under `keyboards/.../keymaps/noah/` | firmware compilation, compiled-defaults readback, Profile Studio, validation, profile introspection |
+| Active committed live profile | one logical generation across VIA dynamic storage and the custom profile store | effective runtime views, dynamic keymap, Charybdis Live readback |
 | Action classification and dispatch semantics | `users/noah/lib/action/` | key behavior materialization, key runtime, macro dispatch, direct action taps |
 | QMK and fork compatibility assumptions | `users/noah/lib/compat/` | runtime entry flow, combo origin normalization, VIA split sync, QMK contract checks |
 | Authored key-behavior lookup and materialization | `users/noah/lib/key/behavior/` | key-runtime press planning and validation |
@@ -122,7 +119,7 @@ flowchart TD
 | Add or change a PD mode | `pointing/defs/`, `pointing/modes/`, `pointing/runtime/` | [Adding A Pointing-Device Mode](../ADDING_PD_MODE.md) |
 | Change RGB rendering | `rgb_config.c` for authored colors, `users/noah/lib/rgb/` for render logic | [RGB Configuration](../RGB_CONFIG.md) |
 | Change split mirroring | `users/noah/lib/split/runtime_sync.*` | [runtime-flow.md](./runtime-flow.md) |
-| Change hardcoded or VIA macro behavior | `keymap.c` macro tables or `users/noah/lib/macro/` | [change-guide.md](./change-guide.md) |
+| Change VIA macro behavior | `keymap.c` `VIA_MACROS(MACRO)` defaults or `users/noah/lib/macro/` | [change-guide.md](./change-guide.md) |
 | Change hook wiring | `users/noah/hooks.c`, `users/noah/runtime_init.c` | [Hook Overrides](../HOOK_OVERRIDES.md) |
 | Change target memory, EEPROM size, or stack policy | resource owner plus the matching budget tool | [memory-budgets.md](./memory-budgets.md), [change-guide.md](./change-guide.md) |
 
@@ -140,7 +137,7 @@ flowchart TD
 - [device-resident-profile.md](./device-resident-profile.md) defines the
   device-first live-profile target and the boundary between device authority and
   compiled/source representation.
-- [PROFILE_STUDIO_PRODUCT_GOAL.md](../tooling/PROFILE_STUDIO_PRODUCT_GOAL.md)
+- [PRODUCT_GOAL.md](../PRODUCT_GOAL.md)
   defines the finished configurator experience, complete product scope, and
   quality bar.
 
