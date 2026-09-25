@@ -189,17 +189,23 @@ static bool layer_ownership_oneshot_set(uint8_t layer, bool armed) {
     return true;
 }
 
-bool layer_ownership_oneshot_toggle(uint8_t layer) {
-    uint8_t armed = layer_ownership_oneshot_layer();
+bool layer_ownership_oneshot_tap(uint8_t layer, uint16_t now, uint16_t double_tap_ms) {
+    noah_layer_ownership_state_t *state = layer_ownership_state();
+    uint8_t                       armed = layer_ownership_oneshot_layer();
 
     if (layer >= LAYER_COUNT) {
         return false;
     }
     if (armed == layer) {
-        return layer_ownership_oneshot_set(layer, false);
+        if ((uint16_t)(now - state->oneshot_armed_at) < double_tap_ms) {
+            return layer_ownership_oneshot_set(layer, false);
+        }
+        state->oneshot_armed_at = now;
+        return false;
     }
 
     // The new layer turns on before the replaced one turns off.
+    state->oneshot_armed_at = now;
     bool changed = layer_ownership_oneshot_set(layer, true);
     if (armed != UINT8_MAX) {
         layer_ownership_apply_layer(armed);

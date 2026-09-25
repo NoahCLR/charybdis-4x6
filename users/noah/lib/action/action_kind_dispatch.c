@@ -15,6 +15,7 @@
 #include "synthetic_record.h"
 #include "../pointing/policy/pointer_layer_policy.h"
 #include "../compat/qmk_oneshot_contract.h"
+#include "../profile/runtime/effective_settings_runtime.h"
 #include "../state/ownership/layer_ownership.h"
 
 typedef void (*noah_action_tap_impl_t)(noah_action_desc_t desc, keypos_t key_pos);
@@ -133,11 +134,12 @@ static void noah_action_press_layer_goto(noah_action_desc_t desc, keypos_t key_p
     noah_action_goto_layer(desc);
 }
 
-// With one-shots off, OSL() is only a hold, as QMK's is.
+// With one-shots off, OSL() is only a hold, as QMK's is. A second tap counts
+// as QMK's double tap when it comes within TAPPING_TERM of the first.
 static void noah_action_tap_layer_oneshot(noah_action_desc_t desc, keypos_t key_pos) {
     (void)key_pos;
     if (noah_qmk_contract_oneshot_enabled()) {
-        (void)layer_ownership_oneshot_toggle(desc.layer);
+        (void)layer_ownership_oneshot_tap(desc.layer, timer_read(), (uint16_t)noah_setting(NOAH_SETTING_TAPPING_TERM, TAPPING_TERM));
     }
 }
 

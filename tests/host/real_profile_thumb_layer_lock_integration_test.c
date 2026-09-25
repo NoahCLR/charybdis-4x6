@@ -3313,6 +3313,44 @@ static void test_combo_oneshot_and_tap_toggle_are_owned(void) {
     CHECK(noah_runtime_debug_active_slot_count() == 0u);
 }
 
+// As QMK's OSL(): a long press on its own still arms the one-shot, a quick
+// second tap cancels it, and a slow second tap keeps it on.
+static void test_oneshot_layer_long_press_and_second_taps_follow_qmk(void) {
+    keypos_t oneshot_pos = {.row = 2, .col = 2};
+    keypos_t other_pos   = {.row = 2, .col = 3};
+    uint16_t oneshot     = OSL(LAYER_NUM);
+
+    test_reset_state();
+    key_runtime_integration_process_record(oneshot, oneshot_pos, true);
+    key_runtime_integration_advance(&fake_time, 600u);
+    key_runtime_integration_scan();
+    key_runtime_integration_process_record(oneshot, oneshot_pos, false);
+    CHECK(layer_ownership_oneshot_layer() == LAYER_NUM);
+    CHECK(test_layer_active(LAYER_NUM));
+    key_runtime_integration_process_record(KC_A, other_pos, true);
+    key_runtime_integration_process_record(KC_A, other_pos, false);
+    CHECK(!test_layer_active(LAYER_NUM));
+
+    // Slow: the second tap comes well after TAPPING_TERM, so it stays armed.
+    key_runtime_integration_process_record(oneshot, oneshot_pos, true);
+    key_runtime_integration_process_record(oneshot, oneshot_pos, false);
+    key_runtime_integration_advance(&fake_time, TAPPING_TERM + 100u);
+    key_runtime_integration_scan();
+    key_runtime_integration_process_record(oneshot, oneshot_pos, true);
+    key_runtime_integration_process_record(oneshot, oneshot_pos, false);
+    CHECK(layer_ownership_oneshot_layer() == LAYER_NUM);
+
+    // Quick: a second tap straight after cancels it.
+    key_runtime_integration_advance(&fake_time, 40u);
+    key_runtime_integration_process_record(oneshot, oneshot_pos, true);
+    key_runtime_integration_process_record(oneshot, oneshot_pos, false);
+    CHECK(layer_ownership_oneshot_layer() == UINT8_MAX);
+    CHECK(!test_layer_active(LAYER_NUM));
+    key_runtime_integration_advance(&fake_time, 300u);
+    key_runtime_integration_scan();
+    test_assert_thumb_runtime_quiescent(oneshot_pos);
+}
+
 // Fast typing: OSL() arms on its release, not after a multi-tap window, so a
 // key pressed right after it still lands on the one-shot layer.
 static void test_oneshot_layer_arms_on_release_for_fast_typing(void) {
@@ -3387,6 +3425,7 @@ static void test_tap_toggle_taps_lock_and_holds_are_momentary(void) {
 
 int main(void) {
     test_oneshot_layer_arms_on_release_for_fast_typing();
+    test_oneshot_layer_long_press_and_second_taps_follow_qmk();
     test_combo_layer_hold_is_owned();
     test_combo_oneshot_and_tap_toggle_are_owned();
     test_plain_layer_tap_hold_is_owned_and_its_tap_is_qmks();

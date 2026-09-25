@@ -34,10 +34,11 @@ bool layer_ownership_toggle_lock_state(uint8_t layer);
 bool layer_ownership_goto(uint8_t layer);
 
 // OSL(layer): a tap turns the layer on for the next key press. At most one
-// layer is one-shot at a time; arming another replaces it, and tapping the
-// armed layer's OSL() again cancels it. The next key that uses it calls
+// layer is one-shot at a time; arming another replaces it. Tapping the armed
+// layer again within double_tap_ms of arming it cancels it, as QMK's quick
+// double tap does; a later tap keeps it on. The next key that uses it calls
 // layer_ownership_oneshot_consume() once its own press has been processed.
-bool    layer_ownership_oneshot_toggle(uint8_t layer);
+bool    layer_ownership_oneshot_tap(uint8_t layer, uint16_t now, uint16_t double_tap_ms);
 bool    layer_ownership_oneshot_consume(void);
 uint8_t layer_ownership_oneshot_layer(void);
 

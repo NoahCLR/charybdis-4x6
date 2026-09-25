@@ -638,7 +638,9 @@ bool is_oneshot_enabled(void) {
     return true;
 }
 
-bool layer_ownership_oneshot_toggle(uint8_t layer) {
+bool layer_ownership_oneshot_tap(uint8_t layer, uint16_t now, uint16_t double_tap_ms) {
+    (void)now;
+    (void)double_tap_ms;
     (void)layer;
     return false;
 }

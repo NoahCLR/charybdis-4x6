@@ -12,6 +12,15 @@
 
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
+// Said at build time rather than silently ignored: someone coming from QMK
+// sets these expecting them to apply to OSL() too.
+#if defined(ONESHOT_TIMEOUT) && ONESHOT_TIMEOUT > 0
+#    pragma message "ONESHOT_TIMEOUT applies to OSM() only: OSL() is owned by userspace and has no timeout"
+#endif
+#if defined(ONESHOT_TAP_TOGGLE) && ONESHOT_TAP_TOGGLE > 1
+#    pragma message "ONESHOT_TAP_TOGGLE applies to OSM() only: OSL() is owned by userspace and does not lock on repeated taps"
+#endif
+
 static inline bool noah_qmk_contract_oneshot_enabled(void) {
 #ifdef NO_ACTION_ONESHOT
     return false;

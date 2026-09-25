@@ -1348,13 +1348,14 @@ Still open, in the order they are taken:
    authored `LT()` row's tap/hold term likely starts only after QMK's own
    `TAPPING_TERM` (e.g. `LT(LAYER_NAV, KC_SLSH)`'s 100 ms); the check did not
    measure it.
-4. QMK-parity decisions: `TT()` counts taps within `CUSTOM_MULTI_TAP_TERM`
-   (QMK: `TAPPING_TERM`) and locks when that window closes rather than on the
-   last tap; a lone long press of `OSL()` does not arm it (QMK's does); tapping
-   an armed `OSL()` again cancels at any speed (QMK: only a quick double tap);
-   `ONESHOT_TIMEOUT` and `ONESHOT_TAP_TOGGLE` are silently ignored for
-   `OSL()`; a `TG()`/`TO()` of the pointer layer from a behaviour is not seen
-   by QMK's auto-mouse. `TO()` keeping held layers on is kept deliberately.
+4. (Decided: `TT()`'s last tap locks on its release, with no feedback window
+   and no layer drop; `OSL()` follows QMK: a lone long press arms it, a second
+   tap within `TAPPING_TERM` cancels it and a slower one keeps it on; a build
+   that sets `ONESHOT_TIMEOUT` or `ONESHOT_TAP_TOGGLE` prints that they apply
+   to `OSM()` only.) Kept as they are: `TT()` counts taps within
+   `CUSTOM_MULTI_TAP_TERM` (QMK: `TAPPING_TERM`), like every multi-tap key
+   here; `TO()` keeps held layers on; a `TG()`/`TO()` of the pointer layer from
+   a behaviour is not seen by QMK's auto-mouse.
 5. `LM()` (a hold plus modifiers), then a decision on `DF()`: the firmware and
    the app assume layer 0 is the base.
 6. App: `TT()`/`OSL()` inside a behaviour and as a behaviour row's key, and

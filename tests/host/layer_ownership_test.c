@@ -305,13 +305,14 @@ static void test_toggled_layer_survives_a_momentary_hold_of_itself(void) {
     CHECK(layer_state == 0);
 }
 
-// OSL(layer): a tap arms the layer until the next key uses it. Tapping the
-// armed layer again cancels it; arming another layer replaces it.
-static void test_oneshot_arms_until_consumed_and_toggles_off(void) {
+// OSL(layer): a tap arms the layer until the next key uses it. A quick second
+// tap cancels it, as QMK's double tap does; a slow one keeps it on. Arming
+// another layer replaces it.
+static void test_oneshot_arms_until_consumed_and_quick_double_tap_cancels(void) {
     test_reset_stubs();
 
     CHECK(layer_ownership_oneshot_layer() == UINT8_MAX);
-    CHECK(layer_ownership_oneshot_toggle(3));
+    CHECK(layer_ownership_oneshot_tap(3, 1000u, 200u));
     CHECK(layer_ownership_oneshot_layer() == 3);
     CHECK(layer_state == test_layer_mask(3));
     CHECK(!layer_ownership_is_locked(3));
@@ -321,17 +322,23 @@ static void test_oneshot_arms_until_consumed_and_toggles_off(void) {
     CHECK(layer_state == 0);
     CHECK(!layer_ownership_oneshot_consume());
 
-    CHECK(layer_ownership_oneshot_toggle(3));
-    CHECK(layer_ownership_oneshot_toggle(3));
+    CHECK(layer_ownership_oneshot_tap(3, 2000u, 200u));
+    CHECK(layer_ownership_oneshot_tap(3, 2150u, 200u));
     CHECK(layer_ownership_oneshot_layer() == UINT8_MAX);
     CHECK(layer_state == 0);
 
-    CHECK(layer_ownership_oneshot_toggle(2));
-    CHECK(layer_ownership_oneshot_toggle(5));
+    CHECK(layer_ownership_oneshot_tap(3, 3000u, 200u));
+    CHECK(!layer_ownership_oneshot_tap(3, 3400u, 200u));
+    CHECK(layer_ownership_oneshot_layer() == 3);
+    CHECK(layer_ownership_oneshot_tap(3, 3500u, 200u));
+    CHECK(layer_ownership_oneshot_layer() == UINT8_MAX);
+
+    CHECK(layer_ownership_oneshot_tap(2, 4000u, 200u));
+    CHECK(layer_ownership_oneshot_tap(5, 4050u, 200u));
     CHECK(layer_ownership_oneshot_layer() == 5);
     CHECK(layer_state == test_layer_mask(5));
     CHECK(layer_off_calls[2] == 1);
-    CHECK(!layer_ownership_oneshot_toggle(LAYER_COUNT));
+    CHECK(!layer_ownership_oneshot_tap(LAYER_COUNT, 4100u, 200u));
 }
 
 // A one-shot is one more owner: using it up leaves a lock or a hold of the
@@ -342,13 +349,13 @@ static void test_oneshot_shares_its_layer_with_locks_holds_and_goto(void) {
     test_reset_stubs();
 
     CHECK(layer_ownership_set_lock_state(2, true));
-    CHECK(layer_ownership_oneshot_toggle(2));
+    CHECK(layer_ownership_oneshot_tap(2, 1000u, 200u));
     CHECK(layer_ownership_oneshot_consume());
     CHECK(layer_state == test_layer_mask(2));
     CHECK(layer_off_calls[2] == 0);
 
     layer_ownership_momentary_press(key_pos, 4);
-    CHECK(layer_ownership_oneshot_toggle(4));
+    CHECK(layer_ownership_oneshot_tap(4, 1000u, 200u));
     CHECK(!layer_ownership_momentary_release(key_pos));
     CHECK(layer_state_cmp(layer_state, 4));
 
@@ -382,7 +389,7 @@ int main(void) {
     test_goto_locks_only_the_target_and_keeps_held_layers();
     test_goto_base_releases_every_lock();
     test_toggled_layer_survives_a_momentary_hold_of_itself();
-    test_oneshot_arms_until_consumed_and_toggles_off();
+    test_oneshot_arms_until_consumed_and_quick_double_tap_cancels();
     test_oneshot_shares_its_layer_with_locks_holds_and_goto();
     test_invalid_layer_requests_are_ignored();
 

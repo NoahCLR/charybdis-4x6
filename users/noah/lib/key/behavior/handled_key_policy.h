@@ -80,6 +80,9 @@ static inline handled_key_behavior_contract_t handled_key_behavior_contract(key_
         .buffered_base_tap_dispatches_tap               = (flags & HANDLED_KEY_FLAG_FALLBACK_HOLD) != 0 && tap_action == KC_NO,
         .quick_release_of_immediate_hold_dispatches_tap = hold_registers_on_press(hold),
         .fallback_hold_suppresses_nonquick_release      = (flags & HANDLED_KEY_FLAG_FALLBACK_HOLD) != 0,
-        .nonquick_release_dispatches_tap                = (flags & HANDLED_KEY_FLAG_MOMENTARY_LAYER) == 0 && tap_action != KC_NO,
+        // A layer hold sends no tap when held past the tap term, except a tap
+        // that keeps the layer on (OSL() arming): QMK's OSL() also arms after
+        // a long press on its own.
+        .nonquick_release_dispatches_tap = tap_action != KC_NO && ((flags & HANDLED_KEY_FLAG_MOMENTARY_LAYER) == 0 || noah_action_desc_tap_keeps_layer(noah_action_describe(tap_action))),
     };
 }

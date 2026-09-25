@@ -329,7 +329,8 @@ static inline key_runtime_release_decision_t key_runtime_release_decide(const ke
         return key_runtime_release_decision_action(query, contract.hold.long_action);
     }
 
-    if (query->semantics.nonquick_release_dispatches_tap && contract.nonquick_release_dispatches_tap) {
+    // A layer hold that another key used is a hold, however long it lasted.
+    if (query->semantics.nonquick_release_dispatches_tap && contract.nonquick_release_dispatches_tap && !key_runtime_release_query_momentary_layer_tap_suppresses_quick_tap(query)) {
         return key_runtime_release_decision_tap(query);
     }
 

@@ -48,10 +48,17 @@ layer on.
 A one-shot layer follows QMK's rule for what uses it up: any key press except a
 modifier, a one-shot modifier, a mod-tap still held, or `OSL()` itself. The
 layer turns off once that press has been processed, so the press itself still
-resolves on the one-shot layer. Tapping the armed `OSL()` again cancels it, and
-`TO()` releases it with the locks. `ONESHOT_TIMEOUT` and `ONESHOT_TAP_TOGGLE`
-apply to QMK's `OSM()` only; with one-shot keys turned off (Magic / VIA),
-`OSL()` is only a hold, as QMK's is.
+resolves on the one-shot layer. As with QMK's `OSL()`, a long press on its own
+still arms it, a second tap within `TAPPING_TERM` cancels it, a slower second
+tap keeps it on, and a hold that another key used is only a hold. `TO()`
+releases it with the locks. `ONESHOT_TIMEOUT` and `ONESHOT_TAP_TOGGLE` apply to
+QMK's `OSM()` only, and a build that sets them says so; with one-shot keys
+turned off (Magic / VIA), `OSL()` is only a hold, as QMK's is.
+
+`TT(layer)`'s last tap locks the layer on its release. A tap that keeps the
+key's own layer on (that lock, or `OSL()` arming) skips the multi-tap
+feedback window other last taps get, because the layer itself shows the
+result, and the layer never drops between the release and the lock.
 
 ## Timing Model
 

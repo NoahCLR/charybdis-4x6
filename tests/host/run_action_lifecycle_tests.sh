@@ -29,3 +29,23 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -o "$BIN"
 
 "$BIN"
+
+# OSL() is owned by userspace, so QMK's one-shot timeout and tap-toggle apply
+# to OSM() only; a build that sets them says so rather than ignoring them.
+NOTICE="$(cc -std=c11 -fsyntax-only -Wno-error \
+    -DQMK_KEYBOARD_H='"qmk_stub.h"' -DONESHOT_TIMEOUT=3000 -DONESHOT_TAP_TOGGLE=2 \
+    -I"$ROOT" -I"$ROOT/users/noah" -I"$ROOT/tests/host/include" \
+    "$ROOT/users/noah/lib/action/action_kind_dispatch.c" 2>&1 || true)"
+for setting in ONESHOT_TIMEOUT ONESHOT_TAP_TOGGLE; do
+    if ! printf '%s\n' "$NOTICE" | grep -q "$setting applies to OSM() only"; then
+        echo "a build setting $setting did not say that it applies to OSM() only" >&2
+        exit 1
+    fi
+done
+QUIET="$(cc -std=c11 -fsyntax-only -DQMK_KEYBOARD_H='"qmk_stub.h"' \
+    -I"$ROOT" -I"$ROOT/users/noah" -I"$ROOT/tests/host/include" \
+    "$ROOT/users/noah/lib/action/action_kind_dispatch.c" 2>&1 || true)"
+if printf '%s\n' "$QUIET" | grep -q "applies to OSM() only"; then
+    echo "the one-shot notice appeared without either setting" >&2
+    exit 1
+fi
