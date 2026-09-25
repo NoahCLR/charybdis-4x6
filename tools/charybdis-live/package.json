@@ -1,7 +1,7 @@
 {
-  "name": "charybdis-live-v2",
-  "displayName": "Charybdis Live v2",
-  "description": "Live firmware editor for the Charybdis, second interface. Reuses the tested device core and rewrites the surface.",
+  "name": "charybdis-live",
+  "displayName": "Charybdis Live",
+  "description": "Live firmware editor for the Charybdis: edits the connected keyboard over Raw HID.",
   "version": "0.1.0",
   "publisher": "noah",
   "private": true,
@@ -18,8 +18,8 @@
   "contributes": {
     "commands": [
       {
-        "command": "charybdisLiveV2.open",
-        "title": "Open Charybdis Live v2",
+        "command": "charybdisLive.open",
+        "title": "Open Charybdis Live",
         "category": "Charybdis"
       }
     ]

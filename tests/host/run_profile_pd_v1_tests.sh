@@ -8,7 +8,7 @@ node - "$ROOT" "$BUILD_DIR/corpus.bin" <<'JS'
 const fs = require("node:fs");
 const root = process.argv[2];
 const fixture = require(root + "/tests/fixtures/pd_mode_domain_v1.json");
-const {decodePdDomain, encodePdDomain} = require(root + "/tools/charybdis-live-v2/core/schema/pd-mode-domain-v1");
+const {decodePdDomain, encodePdDomain} = require(root + "/tools/charybdis-live/core/schema/pd-mode-domain-v1");
 const golden = Buffer.from(fixture.hex, "hex");
 if (!encodePdDomain(fixture.slots).equals(golden)) throw new Error("PD fixture drift");
 const chunks = [];

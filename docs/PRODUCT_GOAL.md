@@ -2,7 +2,7 @@
 
 ## Product Promise
 
-Charybdis Live ([`tools/charybdis-live-v2/`](../tools/charybdis-live-v2/)) is
+Charybdis Live ([`tools/charybdis-live/`](../tools/charybdis-live/)) is
 intended to become first-grade control software for this keyboard. A user connects the keyboard, sees the configuration that is
 actually running, changes every supported behavior visually, and safely saves
 the result without editing C or reflashing firmware.

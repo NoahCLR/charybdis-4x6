@@ -16,7 +16,7 @@ for variant in normal features sanitized; do
     "$BUILD_DIR/test" "$BUILD_DIR/options.fixture"
     node - "$ROOT" "$BUILD_DIR/options.fixture" <<'JS'
 const assert = require("node:assert/strict"), fs = require("node:fs");
-const {readKeyboardOptions} = require(process.argv[2] + "/tools/charybdis-live-v2/core/protocol/keyboard-options-v1");
+const {readKeyboardOptions} = require(process.argv[2] + "/tools/charybdis-live/core/protocol/keyboard-options-v1");
 const fixture = fs.readFileSync(process.argv[3]), metadata = fixture.subarray(0,9), data = fixture.subarray(9);
 let id = 0;
 readKeyboardOptions({request: async request => {

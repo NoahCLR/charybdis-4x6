@@ -68,7 +68,7 @@
             "command": "npm",
             "args": [
                 "--prefix",
-                "${workspaceFolder}/tools/charybdis-live-v2",
+                "${workspaceFolder}/tools/charybdis-live",
                 "run",
                 "keycodes"
             ],

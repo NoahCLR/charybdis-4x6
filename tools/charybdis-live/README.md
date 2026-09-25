@@ -88,12 +88,11 @@ Code's extension directory, so the checkout *is* the installed extension and a
 window reload picks up every edit:
 
 ```sh
-ln -s "$PWD" ~/.vscode/extensions/noah.charybdis-live-v2-0.1.0   # then reload the window
+ln -s "$PWD" ~/.vscode/extensions/noah.charybdis-live-0.1.0   # then reload the window
 ```
 
-That gives a **Charybdis Live v2** button in the status bar. The
-panel also opens from the command palette — **Charybdis: Open Charybdis Live
-v2** — and the repo's `.vscode/launch.json` has *Run Charybdis Live v2*, which
+That gives a **Charybdis Live** button in the status bar. The
+panel also opens from the command palette — **Charybdis: Open Charybdis Live** — and the repo's `.vscode/launch.json` has *Run Charybdis Live*, which
 launches an Extension Development Host with a debugger attached instead.
 
 To work on the interface without a keyboard, run `npm run preview`, serve this

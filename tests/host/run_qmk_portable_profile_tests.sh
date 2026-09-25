@@ -20,8 +20,8 @@ for variant in normal sanitized; do
     # The app reads the firmware-produced pages and finds the macro's name.
     node - "$ROOT" "$BUILD_DIR/responses.fixture" <<'JS'
 const assert = require("node:assert/strict"), fs = require("node:fs");
-const {readSettings} = require(process.argv[2] + "/tools/charybdis-live-v2/core/protocol/portable-profile-v1");
-const {decodeSettings, macroNamesOf} = require(process.argv[2] + "/tools/charybdis-live-v2/core/schema/settings-domain-v1");
+const {readSettings} = require(process.argv[2] + "/tools/charybdis-live/core/protocol/portable-profile-v1");
+const {decodeSettings, macroNamesOf} = require(process.argv[2] + "/tools/charybdis-live/core/schema/settings-domain-v1");
 const fixture = fs.readFileSync(process.argv[3]), pages = fixture.length / 32;
 let id = 0;
 readSettings({request: async request => {

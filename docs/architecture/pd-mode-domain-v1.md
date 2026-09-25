@@ -207,7 +207,7 @@ replacement; this codec does not implement that lifecycle.
 Firmware implements whole-payload and single-record cold validators in
 `users/noah/lib/profile/schema/profile_pd_v1.c`; no cache, heap or pointing-path
 decode is introduced. The app codec lives in
-`tools/charybdis-live-v2/core/schema/pd-mode-domain-v1.js`. It rejects unknown
+`tools/charybdis-live/core/schema/pd-mode-domain-v1.js`. It rejects unknown
 object fields, coercion, explicit null values, truncation, trailing bytes,
 reserved data, incorrect ID order and noncanonical encodings.
 

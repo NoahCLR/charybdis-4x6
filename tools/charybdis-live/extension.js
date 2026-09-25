@@ -1,6 +1,6 @@
 "use strict";
 
-// Charybdis Live v2 — extension host.
+// Charybdis Live — extension host.
 //
 // Thin on purpose. It owns the VS Code surface (command, panel, message relay)
 // and nothing else. Device, protocol and profile decisions live in core/, which
@@ -21,17 +21,17 @@ const {buildPanelModel, routeMessage, takeOutbox} = require("./core/session/pane
 const {draftControl, portableControl, readKeyboard} = require("./core/session/panel-controls");
 const {getHtml} = require("./panel-html");
 
-const VIEW_TYPE = "charybdisLiveV2.panel";
+const VIEW_TYPE = "charybdisLive.panel";
 
 function activate(context) {
     context.subscriptions.push(
-        vscode.commands.registerCommand("charybdisLiveV2.open", () => openPanel(context))
+        vscode.commands.registerCommand("charybdisLive.open", () => openPanel(context))
     );
 
     const status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 2);
-    status.text = "$(radio-tower) Charybdis Live v2";
-    status.tooltip = "Open Charybdis Live v2 — edit the connected keyboard";
-    status.command = "charybdisLiveV2.open";
+    status.text = "$(radio-tower) Charybdis Live";
+    status.tooltip = "Open Charybdis Live — edit the connected keyboard";
+    status.command = "charybdisLive.open";
     status.show();
     context.subscriptions.push(status);
 }
@@ -39,7 +39,7 @@ function activate(context) {
 function deactivate() {}
 
 function openPanel(context) {
-    const panel = vscode.window.createWebviewPanel(VIEW_TYPE, "Charybdis Live v2", vscode.ViewColumn.One, {
+    const panel = vscode.window.createWebviewPanel(VIEW_TYPE, "Charybdis Live", vscode.ViewColumn.One, {
         enableScripts: true,
         retainContextWhenHidden: true,
         localResourceRoots: [vscode.Uri.joinPath(context.extensionUri, "webview")],

@@ -1,4 +1,4 @@
-// Charybdis Live v2 — the webview.
+// Charybdis Live — the webview.
 //
 // It renders the `model` the host posts and posts typed edits back. It holds
 // no device state of its own: the draft lives in the host, so what is drawn is

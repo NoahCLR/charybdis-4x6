@@ -2,7 +2,7 @@
 
 > Profile Studio edits the authored C profile. Editing the **connected
 > keyboard** is a separate app: see
-> [`tools/charybdis-live-v2/`](../../tools/charybdis-live-v2/) and
+> [`tools/charybdis-live/`](../../tools/charybdis-live/) and
 > [`LIVE_EDIT_APP_DIRECTION.md`](../LIVE_EDIT_APP_DIRECTION.md). Studio is
 > frozen; it is no longer a development target.
 

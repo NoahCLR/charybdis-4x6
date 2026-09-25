@@ -14,7 +14,7 @@ the keyboard rather than a client of the repository.
 
 ## Current Product Status
 
-The live app, [`tools/charybdis-live-v2/`](../tools/charybdis-live-v2/), reads
+The live app, [`tools/charybdis-live/`](../tools/charybdis-live/), reads
 everything it edits from the keyboard without a firmware workspace, keeps every
 change in one reviewed draft, and applies it to both halves as one atomic
 logical generation. The user reports that the workflow works on their keyboard;
@@ -65,7 +65,7 @@ Remaining before calling the product complete:
 
 ## The Tools
 
-- **Charybdis Live** (`tools/charybdis-live-v2/`) is the app and the only one
+- **Charybdis Live** (`tools/charybdis-live/`) is the app and the only one
   developed (D-L35). Nothing in it reads the firmware repository.
 - **Profile Studio** (`tools/charybdis-profile-studio/`) authors `keymap.c`,
   `config.h` and `rgb_config.c`. It is frozen (D-L04).
@@ -161,7 +161,7 @@ back into the app.
 `data`, with imports pointing one way and `tests/` mirroring it. The webview
 never imports `core/`; it renders the model the host posts, so the core runs in
 plain Node and the UI stays replaceable. The rules and where new work belongs
-are in [`tools/charybdis-live-v2/AGENTS.md`](../tools/charybdis-live-v2/AGENTS.md).
+are in [`tools/charybdis-live/AGENTS.md`](../tools/charybdis-live/AGENTS.md).
 The structure exists because the thing it replaced was a 14,539-line file that
 grew one convenience at a time.
 
@@ -606,8 +606,9 @@ auto-mouse. A 44-step hardware check passed on both halves on 2026-09-24; the
 
 ### D-L35 — Charybdis Live v2 is the app
 
-*Numbered D-L21 when written, alongside the atomic-Apply decision.*
-`tools/charybdis-live-v2/` keeps v1's core, its layering and the one rule
+*Numbered D-L21 when written, alongside the atomic-Apply decision.* v2 was
+built beside v1 as `tools/charybdis-live-v2/`, and took over the plain name
+`tools/charybdis-live/` once v1 was removed. It keeps v1's core, its layering and the one rule
 (nothing reads the firmware repository), and replaces v1's ported Studio
 interface with its own: browser ES modules with pure, tested `view/` modules,
 every posted edit built by `webview/view/edits.mjs` and staged against a real

@@ -22,7 +22,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -o "$BUILD_DIR/probe"
 node - "$ROOT" "$BUILD_DIR/probe" <<'JS'
 const assert = require("node:assert/strict"), {execFileSync} = require("node:child_process");
-const {encodeMacroPayload, macroProgramBytes, MACRO_PROGRAM_MAX} = require(process.argv[2] + "/tools/charybdis-live-v2/core/schema/macro-payload");
+const {encodeMacroPayload, macroProgramBytes, MACRO_PROGRAM_MAX} = require(process.argv[2] + "/tools/charybdis-live/core/schema/macro-payload");
 // Fixed edge cases, then seeded random macros built from every step kind.
 const payloads = ["", "a", "a".repeat(255), "a".repeat(256), "a".repeat(600), "{KC_A}", "{KC_A}".repeat(170), "{KC_A}".repeat(171),
     "{120}", "{0}", "{65535}", "a{KC_A}b", "{KC_LGUI,KC_N}", "{KC_LCTL,KC_LSFT,KC_4}", "{+KC_LSFT}{KC_A}{-KC_LSFT}",

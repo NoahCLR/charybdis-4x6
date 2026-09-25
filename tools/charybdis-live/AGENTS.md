@@ -161,7 +161,7 @@ el.value = "777"; el.dispatchEvent(new Event("change", {bubbles: true}));
 JSON.stringify(window.__posted).includes("777");
 ```
 
-Two failures this catches, both of which shipped into v2 unnoticed: a field with
+Two failures this catches, both of which once shipped unnoticed: a field with
 no listener at all, and a field rendered twice, where the second registration
 silently wins and edits to the visible one are dropped. Then add the payload to
 `tests/edits.test.mjs` so its shape is pinned for good.

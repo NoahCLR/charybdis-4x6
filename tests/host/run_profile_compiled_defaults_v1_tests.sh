@@ -29,19 +29,19 @@ const frozen = Object.fromEntries(fs.readFileSync(process.argv[2] + "/tests/fixt
     .split("\n").filter(line => line && !line.startsWith("#")).map(line => line.split("=")));
 fs.writeFileSync(process.argv[3], Buffer.from(frozen["profile.hex"], "hex"));
 fs.writeFileSync(process.argv[3] + '.pd', Buffer.from(frozen["pd_profile.hex"], "hex"));
-// Settings v4 as the v2 app writes it, at its worst case: all 64 macro names
+// Settings v4 as the live app writes it, at its worst case: all 64 macro names
 // at 20 characters. The frozen v1 import above stays the stored-v2
 // compatibility check; .pd3 is a stored v3 domain with a UTF-8 name, which v4
 // firmware still reads.
-const v2 = process.argv[2] + "/tools/charybdis-live-v2";
-const {fingerprint, validateSnapshot: validateV2} = require(v2 + "/core/model/portable-profile");
-const {editMacro} = require(v2 + "/core/model/macro-editor");
-const {decodeProfileBlob, encodeProfileBlob} = require(v2 + "/core/schema/profile-blob-v1");
-const {encodeSettings} = require(v2 + "/core/schema/settings-domain-v1");
-let named = require(v2 + "/tests/fixtures/pd-profile").document();
+const app = process.argv[2] + "/tools/charybdis-live";
+const {fingerprint, validateSnapshot} = require(app + "/core/model/portable-profile");
+const {editMacro} = require(app + "/core/model/macro-editor");
+const {decodeProfileBlob, encodeProfileBlob} = require(app + "/core/schema/profile-blob-v1");
+const {encodeSettings} = require(app + "/core/schema/settings-domain-v1");
+let named = require(app + "/tests/fixtures/pd-profile").document();
 for (let slot = 0; slot < 64; slot++) named = editMacro({document: named, fingerprint: fingerprint(named)}, {keycode: `VIA_MACRO_${slot}`, name: `Macro ${slot} name`.padEnd(20, "!"), expectedFingerprint: fingerprint(named)});
-fs.writeFileSync(process.argv[3] + '.pd4', validateV2(named).profile);
-const stored = validateV2(require(v2 + "/tests/fixtures/pd-profile").document());
+fs.writeFileSync(process.argv[3] + '.pd4', validateSnapshot(named).profile);
+const stored = validateSnapshot(require(app + "/tests/fixtures/pd-profile").document());
 const {macros, ...rest} = stored.settings;
 const v3 = encodeSettings({...rest, formatVersion: 3, macroNames: Array.from({length: 64}, (_, i) => i === 63 ? "Édition ⌘" : i === 0 ? "Sign-off" : "")});
 const blob = decodeProfileBlob(stored.profile);

@@ -238,7 +238,7 @@ Open Profile Studio`. The full guide is
 
 ## Charybdis Live
 
-[Charybdis Live](./tools/charybdis-live-v2/) edits the connected keyboard over
+[Charybdis Live](./tools/charybdis-live/) edits the connected keyboard over
 Raw HID. It never reads this repository, so it needs no firmware workspace: the
 keyboard is the source of truth and the app is its client. Profile Studio owns
 `.c` authoring; this app owns the device.
@@ -247,12 +247,12 @@ Install it by symlinking the folder into VS Code's extensions, then reload the
 window:
 
 ```sh
-cd tools/charybdis-live-v2 && npm install
-ln -s "$PWD" ~/.vscode/extensions/noah.charybdis-live-v2-0.1.0
+cd tools/charybdis-live && npm install
+ln -s "$PWD" ~/.vscode/extensions/noah.charybdis-live-0.1.0
 ```
 
-Open it from the **Charybdis Live v2** status bar item or `Charybdis: Open
-Charybdis Live v2`, or press `F5` with the `Run Charybdis Live v2` launch
+Open it from the **Charybdis Live** status bar item or `Charybdis: Open
+Charybdis Live`, or press `F5` with the `Run Charybdis Live` launch
 configuration for an Extension Development Host.
 
 It reads everything it edits from the keyboard — layout, key behaviours,
@@ -273,7 +273,7 @@ Readback and Apply need the side-specific firmware pair from
 `sh tools/build-firmware-pair.sh`, which carries the live-profile owner; the
 generic image does not.
 
-The app's own guide is [`tools/charybdis-live-v2/README.md`](./tools/charybdis-live-v2/README.md).
+The app's own guide is [`tools/charybdis-live/README.md`](./tools/charybdis-live/README.md).
 The direction, the decisions behind it, and what is deliberately left
 undesigned are in
 [`docs/LIVE_EDIT_APP_DIRECTION.md`](./docs/LIVE_EDIT_APP_DIRECTION.md).
