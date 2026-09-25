@@ -77,8 +77,12 @@ test("every other message names the handler that answers it", () => {
     session.readBusy = false;
     assert.equal(routeMessage(session, {type: "selectDevice", deviceId: "kb"}, connected()), "read");
     session.readBusy = false;
+    session.portableReview = {before: snapshot()};
+    session.portableLayers = startLayerEdit(snapshot(), session.draft.revision);
     assert.equal(routeMessage(session, {type: "selectDevice", deviceId: "other"}, connected({devices: [device, {id: "other"}]})), "read");
     assert.equal(session.resetDraftForms, true, "switching devices clears unfinished form text, but keeps the host draft");
+    assert.equal(session.portableReview, undefined, "a file review belongs to the previous keyboard");
+    assert.equal(session.portableLayers, undefined, "a layer editor belongs to the previous keyboard");
     session.readBusy = false;
     assert.throws(() => routeMessage(session, {type: "selectDevice", deviceId: "missing"}, connected()), /current device list/);
     assert.equal(routeMessage(session, {type: "refresh"}, connected({busy: true})), "none", "another device operation blocks readback");

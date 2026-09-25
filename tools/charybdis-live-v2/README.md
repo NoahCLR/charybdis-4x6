@@ -155,6 +155,8 @@ left chooses which one to read and edit. Switching keeps a dirty draft attached
 to its original keyboard; the other keyboard stays read-only until you switch
 back or discard that draft. Device choices keep their identity across rescans
 within the panel, so replacing one keyboard cannot reuse its draft by list order.
+Switching keyboards closes an open layer editor or import review; reopen it on
+the selected keyboard before keeping changes.
 After a disconnect, a retained dirty draft requires **Review against the
 keyboard** before editing or applying, even if the HID path and saved profile
 look unchanged.

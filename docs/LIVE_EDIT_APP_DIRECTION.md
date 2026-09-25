@@ -55,6 +55,8 @@ The rail shows a keyboard selector when several compatible Raw HID interfaces
 are present. Device choices keep session-stable identities across scans; a
 dirty draft remains bound to its original choice and cannot edit another
 keyboard until it is discarded or the original is selected again.
+An open layer editor or import review closes on a keyboard switch; keeping an
+older review is also checked against the selected keyboard and draft identity.
 A new connection also requires explicit draft review before Apply, even if the
 HID path is reused and readback matches the earlier profile.
 

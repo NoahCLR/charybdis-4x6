@@ -148,7 +148,8 @@ async function portableControl(session, message, host = {}) {
             if (chosen === undefined) return;
             const value = validateSnapshot(typeof chosen === "string" ? chosen : chosen.text, service.capabilities);
             session.portableReview = {document: value.document, fileName: typeof chosen === "string" ? null : chosen.name || null,
-                before: session.draft?.current || await service.readPortableProfile({forRestore: true}), revision: session.draft?.revision};
+                before: session.draft?.current || await service.readPortableProfile({forRestore: true}), revision: session.draft?.revision,
+                deviceId: service.snapshot().selectedDeviceId, draftId: session.draft?.id};
             session.portableLayers = undefined;
             return;
         }
@@ -156,6 +157,8 @@ async function portableControl(session, message, host = {}) {
             const before = session.draft?.current || await service.readPortableProfile();
             session.portableReview = undefined;
             session.portableLayers = startLayerEdit(before, session.draft?.revision);
+            session.portableLayers.deviceId = service.snapshot().selectedDeviceId;
+            session.portableLayers.draftId = session.draft?.id;
             return;
         }
         case "editPortableLayer":
@@ -167,6 +170,18 @@ async function portableControl(session, message, host = {}) {
             const review = session.portableReview, edit = session.portableLayers;
             const before = layers ? edit?.before : review?.before;
             if (!before) throw new Error("Review the profile before restoring it.");
+            const editorDeviceId = layers ? edit.deviceId : review.deviceId;
+            const selectedDeviceId = service.snapshot().selectedDeviceId;
+            if (editorDeviceId !== undefined && editorDeviceId !== selectedDeviceId) {
+                throw new Error("This profile review belongs to another keyboard. Open it again on the selected keyboard.");
+            }
+            if (session.draft && ((layers ? edit.revision : review.revision) !== session.draft.revision ||
+                (layers ? edit.draftId : review.draftId) !== session.draft.id)) {
+                throw new Error("This profile review belongs to an older draft. Open it again on the selected keyboard.");
+            }
+            if (session.draft && selectedDeviceId !== session.draft.deviceId) {
+                throw new Error("This profile review belongs to another keyboard. Open it again on the selected keyboard.");
+            }
             const document = layers ? layerEditDocument(edit) : review.document;
             if (session.draft) {
                 // An import has no layer order to keep: its layers are

@@ -118,6 +118,30 @@ test("layer edits and imports are kept in the draft; without one they restore to
     assert.match(bare.notice, /Recovery copy: \/recovery\/1\.json/);
 });
 
+test("a layer editor opened on one keyboard cannot replace another keyboard's draft", async () => {
+    const session = sessionWithDraft();
+    await portableControl(session, {type: "managePortableLayers"});
+    const oldEdit = session.portableLayers;
+    const firstDraft = session.draft;
+    const other = snapshot();
+    other.document.layers[0][0] = 5;
+    other.fingerprint = fingerprint(other.document);
+    session.draft = new ProfileDraftSession(other, "other", capabilities);
+    session.service.snapshot = () => ({connected: true, selectedDeviceId: "other", capabilities});
+    await assert.rejects(portableControl(session, {type: "savePortableLayers", names: oldEdit.names}), /another keyboard/);
+    assert.equal(session.draft.document.layers[0][0], 5);
+    assert.notEqual(session.draft.id, firstDraft.id);
+});
+
+test("a retained draft cannot save an editor after selecting another keyboard", async () => {
+    const session = sessionWithDraft();
+    await portableControl(session, {type: "managePortableLayers"});
+    const names = session.portableLayers.names;
+    session.service.snapshot = () => ({connected: true, selectedDeviceId: "other", capabilities});
+    await assert.rejects(portableControl(session, {type: "savePortableLayers", names}), /another keyboard/);
+    assert.equal(session.draft.revision, 1);
+});
+
 test("the layer panel's keys-follow toggle decides whether layer keys are renumbered", async () => {
     // Base gets MO(4) and TG(1); layer 4 then moves down to 1, swapping past 3 and 2.
     const moveLayer4Down = async (keysFollow) => {

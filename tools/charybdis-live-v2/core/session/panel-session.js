@@ -160,7 +160,11 @@ function routeMessage(session, message, state) {
         if (type === "selectDevice" && (!state.devices?.some((device) => device.id === message.deviceId) || !message.deviceId)) {
             throw new Error("Choose a keyboard from the current device list.");
         }
-        if (type === "selectDevice" && message.deviceId !== state.selectedDeviceId) session.resetDraftForms = true;
+        if (type === "selectDevice" && message.deviceId !== state.selectedDeviceId) {
+            session.portableReview = undefined;
+            session.portableLayers = undefined;
+            session.resetDraftForms = true;
+        }
         session.readBusy = true;
         return "read";
     }
