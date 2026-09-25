@@ -16,6 +16,12 @@ test("behaviour editing requires supported firmware and a complete idle read", (
     }
 });
 
+test("the picker offers TT, OSL and TO only when the keyboard owns its layer keys", () => {
+    assert.equal(buildDeviceModel({}).ownsLayerKeys, false);
+    assert.equal(buildDeviceModel({capabilities: {featureFlags: ~(1 << 14) & 0xffff}}).ownsLayerKeys, false);
+    assert.equal(buildDeviceModel({capabilities: {featureFlags: 1 << 14}}).ownsLayerKeys, true);
+});
+
 // The ported Studio UI renders whatever shape it is given, so these assertions
 // pin the contract between the device and that UI. Getting a field name wrong
 // here shows up as a silently empty tab, which is exactly the failure the port
@@ -24,7 +30,7 @@ test("behaviour editing requires supported firmware and a complete idle read", (
 const MODEL_FIELDS = [
     "layers", "keyBehaviors", "combos", "viaMacros", "macroNameSpace", "behaviorTimingDefaults",
     "configDefaults", "rgb", "qmkKeycodes", "qmkKeyLabels", "qmkKeycodeAliases",
-    "qmkKeycodeSource", "macroPayloadKeycodes", "diagnostics",
+    "qmkKeycodeSource", "macroPayloadKeycodes", "diagnostics", "ownsLayerKeys",
 ];
 
 function layoutWith(keys) {

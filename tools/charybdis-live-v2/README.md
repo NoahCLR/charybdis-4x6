@@ -122,7 +122,10 @@ The keycode picker leads with the ANSI board, then task-shaped Symbols,
 Navigation, Numpad, Layers, Pointing modes, Macros, Mouse, Media, Lighting,
 Magic and Custom sections. The complete QMK catalogue remains available under
 More keys, Other QMK and All keycodes, and search spans all of it — named
-macros included, found by the name they were given.
+macros included, found by the name they were given. Layers offers each layer
+as Hold (`MO`), Lock (`LOCK_LAYER`, the same lock as QMK's `TG`) and Tap-hold
+(`LT`); a keyboard that owns its layer keys adds Tap-toggle (`TT`), One-shot
+(`OSL`) and Move (`TO`).
 
 Colour on any screen comes from the model, never from a constant, and a stage
 that is switched off is drawn as off — hollow dots, plain badges, unlit keys.

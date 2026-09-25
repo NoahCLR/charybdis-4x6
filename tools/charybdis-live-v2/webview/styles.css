@@ -747,6 +747,8 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .pk.wide { min-width: 120px; }
 .pk-layers { display: grid; gap: 6px; }
 .pk-layer { display: grid; grid-template-columns: 16px 130px repeat(3, minmax(0, 150px)); gap: 8px; align-items: center; }
+.pk-layers.owned .pk-layer { grid-template-columns: 16px 130px repeat(6, minmax(0, 150px)); }
+.pk-layers.owned .pk.wide { min-width: 0; padding: 0 4px; }
 .pk-layer .nm { font-size: 12.5px; }
 .pkb { border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: var(--bg-deep); }
 .pkb svg { display: block; width: 100%; height: auto; }

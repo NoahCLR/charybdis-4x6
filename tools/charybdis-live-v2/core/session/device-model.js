@@ -16,6 +16,7 @@ const {baseRgbForView, behaviorAliasesForView, behaviorRowsForView, combosForVie
 const {knownActionAbi, layerRef} = require("../schema/actions");
 const {resolveNativeQmkExpression} = require("../schema/compiled-profile-v1");
 const {dpiChoices} = require("../model/pointer-dpi");
+const {PROFILE_WIRE_FEATURES} = require("../protocol/profile-wire-v1");
 
 const CATALOG_SOURCE = "vendored QMK keycode catalog";
 
@@ -112,6 +113,9 @@ function buildDeviceModel(state = {}) {
         settingsEditing: {identity: state.settingsView?.identity || "", writable: Boolean(state.settingsView) && state.capabilities?.compiledLayerCount === 8 && !state.busy},
         macroPayloadKeycodes: state.macroView?.macroPayloadKeycodes || [],
 
+        // TT(), OSL() and TO() are offered only by a keyboard that runs them
+        // through its own layer ownership (Profile Wire feature bit 14).
+        ownsLayerKeys: Boolean(state.capabilities?.featureFlags & PROFILE_WIRE_FEATURES.OWNED_LAYER_TOGGLES),
         qmkKeycodes: catalog.entries,
         qmkKeyLabels: catalog.labels,
         qmkKeycodeAliases: catalog.aliases,

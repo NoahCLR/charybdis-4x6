@@ -1367,5 +1367,8 @@ Still open, in the order they are taken:
    is now classified as a refused layer keycode too; it was passed to QMK as a
    plain key.)
 6. (Done: `TT()`/`OSL()` inside a behaviour and as a behaviour row's key, and
-   `LM()` named and encoded, so its refusal in a behaviour says why.) Still
-   open: `TG()`/`TO()`/`TT()`/`OSL()` in the picker's Layers section.
+   `LM()` named and encoded, so its refusal in a behaviour says why. The
+   picker's Layers section adds Tap-toggle `TT()`, One-shot `OSL()` and Move
+   `TO()` on a keyboard that reports bit 14; `TG()` gets no button of its own,
+   since it is the Lock button's `LOCK_LAYER()`, and a key storing it lights
+   Lock.)
