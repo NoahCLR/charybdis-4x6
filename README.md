@@ -261,10 +261,29 @@ settings — and shows compiled defaults only when the keyboard reports no
 committed profile. Every edit goes into one local draft with undo, redo and a
 history, and reaches the keyboard only through **Review and apply**. Apply
 saves a recovery copy, then commits the complete profile to both halves as one
-recovery-first logical transaction and verifies the readback. A save interrupted
-after the commit decision is finished by the keyboard itself; one interrupted
-before it leaves the saved profile unchanged. The transaction and
-recovery contract is specified in
+recovery-first logical transaction and verifies the readback.
+
+What to expect while it applies:
+
+- Apply waits for held keys, locked layers and pointer modes to clear before
+  the commit decision, and says so; after 60 s the save is cancelled and
+  nothing changes. Anything that fails before the decision leaves the saved
+  profile unchanged.
+- It then holds key input for the few moments while this half's keys and
+  macros are rewritten and the new profile activates. If the app is closed in
+  that window, the keyboard finishes the save on its own from the other half's
+  copy within about 15 seconds.
+- If the cable between the halves comes out after the decision, the USB half
+  keeps typing the old profile until the rewrite starts, and the save resumes
+  when the cable goes back in. If it comes out during the rewrite, the USB half
+  finishes and switches to the new profile, and the app says the other half is
+  not connected.
+- After power loss in the middle of a save, the USB half types nothing until
+  its keys and macros are one complete version again, which may need the other
+  half connected.
+
+Drafts live in the editor window; closing it loses unapplied changes. The
+transaction and recovery contract is specified in
 [`docs/architecture/logical-profile-transaction-v1.md`](docs/architecture/logical-profile-transaction-v1.md).
 Physical power-loss acceptance across every decision boundary is still in
 progress, so keep the recovery file that Apply creates.

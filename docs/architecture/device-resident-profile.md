@@ -87,7 +87,8 @@ matrix is recorded, Apply continues to create a recovery file.
 
 ## Required Device-First Operations
 
-The live app exposes these operations with unambiguous direction:
+The live app must expose these operations with unambiguous direction (reset
+to compiled defaults is not built yet):
 
 - **Open from keyboard** — read the complete active logical profile and its
   identity;

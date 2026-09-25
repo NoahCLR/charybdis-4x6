@@ -42,9 +42,12 @@ Remaining before calling the product complete:
 
 - physical interruption acceptance at every durable boundary;
 - adoption or conflict reporting for writes by external VIA clients;
-- guided recovery;
+- guided recovery, and an explicit reset to compiled defaults;
 - broad hardware acceptance, including blank-firmware restore and the
-  [PD-mode hardware matrix](architecture/pd-mode-domain-v1.md#hardware-acceptance);
+  [PD-mode hardware matrix](architecture/pd-mode-domain-v1.md#hardware-acceptance).
+  USB role migration is untested: on the normal pair the left half exposes no
+  Raw HID interface (`FORCE_SLAVE`/`usb_disconnect`), so it needs role-switching
+  firmware;
 - standalone packaging (D-L02);
 - the open issues below.
 
@@ -69,7 +72,7 @@ Remaining before calling the product complete:
   developed (D-L35). Nothing in it reads the firmware repository.
 - **Profile Studio** (`tools/charybdis-profile-studio/`) authors `keymap.c`,
   `config.h` and `rgb_config.c`. It is frozen (D-L04).
-- The first live app (v1, `tools/charybdis-live/`) ported Studio's interface
+- The first live app (v1, which lived at the same path) ported Studio's interface
   (D-L06). It was frozen by D-L35 and then removed; the profiles it wrote remain
   a firmware compatibility check in
   `tests/fixtures/stored_profile_live_v1.fixture`.
@@ -184,7 +187,9 @@ the byte decoders: passing codec tests once coexisted with a profile that never
 reached the UI. Semantic links to native keycodes are enabled only for a known
 action ABI advertised by the keyboard. Layer preview membership follows the
 firmware: transparent and no-action keycodes are unmapped whatever their alias.
-Every decoded `uint16` must encode back to its original value.
+Every decoded `uint16` must encode back to its original value. Zero timing
+values stay visible, with the unreported firmware default stated. Recorded
+device bytes are test-only fixtures, never runtime data.
 
 ### D-L12 — RGB rule identity and preview appearance are separate
 
@@ -221,7 +226,8 @@ after acquiring the candidate lease; the app then requires byte-equal
 readback. Combos are optional canonical domain `0x30` v1: absent means compiled
 fallback, an explicit empty table means no combos. Both halves validate
 actions, references, duplicate inputs and the shared hold threshold before
-persistence. At publication the combo invalidator copies at most 32 rows /
+persistence, and the app checks the firmware-advertised row, step and
+action-reference limits before upload. At publication the combo invalidator copies at most 32 rows /
 896 bytes once into owner-held native records, so typing and readback do no
 profile reads. QMK's hold/tap wait is global, so every row carries the same
 threshold and the UI edits it as one setting. Custom trigger/release hooks,
@@ -247,7 +253,8 @@ moves overlays and rewrites references together. The action ABI describes the
 engine vocabulary independently of authored rows, so empty and populated
 builds advertise the same ABI. A five-layer deployment migrates once through
 `tools/build-firmware-pair.sh --snapshot-bridge`: export there, install the
-eight-layer pair, import. No firmware is flashed by the app.
+eight-layer pair, import. The bridge is read-only: readback and export work,
+editing needs the eight-layer image. No firmware is flashed by the app.
 
 Before a file becomes the draft or is restored, its card compares it with what
 the keyboard holds, since that is what applying it would write, counting the
@@ -266,6 +273,8 @@ or by writing temporary values; older firmware's unsupported-page reply leaves
 brightness read-only. Restores reject brightness above the destination's
 reported limit before staging. Build-time LED cadence and pointer ladder
 definitions are not portable settings and are not fabricated as controls.
+Auto-mouse timeout and fade delay share one settings section so their required
+ordering is validated together.
 
 ### D-L18 — Native settings use device-reported capabilities
 
@@ -334,7 +343,10 @@ action-ABI digests. Format-1 `NP` records stay readable and migrate on the next
 Apply. Schema 2 (PD slots) uses format 3 `NR`; see
 [PD-mode domain v1](architecture/pd-mode-domain-v1.md). The app requires the
 atomic capability for complete Apply and keeps the recovery file, stale-base
-check and exact final readback. On hardware an unchanged Apply takes about
+check and exact final readback. A deterministic failure before the decision
+requests both the VIA-stage and the custom-candidate abort; once the decision
+is made the host never issues an abort, even if its USB-side write is
+interrupted, since the keyboard finishes the generation. On hardware an unchanged Apply takes about
 6.6 s, spent in keyboard-side validation and durable publication.
 
 ### D-L22 — A cancelled save ends in bounded time, and says why it ended
@@ -350,7 +362,8 @@ and [Profile Wire V1](architecture/profile-wire-v1.md).
 
 Apply reports `RESTORE_NOT_SAVED` (nothing was saved, the keyboard kept its
 profile) when the failure came before the commit was sent or the keyboard
-confirmed the cancel by returning to idle. An unconfirmed cancel after the
+confirmed the cancel by returning to idle, which it refuses to do once a marker
+exists. An unconfirmed cancel after the
 commit was sent stays `RESTORE_INCOMPLETE` with its recovery file. While cleanup
 is pending, the rail says *Restart the keyboard* and the message says to unplug
 the USB cable, not the cable between the halves.
@@ -411,7 +424,7 @@ edit past it, and marks a slot VIA wrote past it as too long.
 
 Every empty slot keeps room for ten key taps (30 bytes); when free memory
 cannot keep that for every empty slot, the highest-numbered empty slots show no
-room until space is freed. The firmware does not enforce the reserve, so the
+room and cannot be edited until space is freed. The firmware does not enforce the reserve, so the
 app shows what a VIA edit left. Settings version 4 guarantees every macro name
 20 printable ASCII characters; see
 [portable profile](architecture/portable-profile-v1.md#version-4-every-macro-name-gets-20-characters).
@@ -482,22 +495,27 @@ behaviour is one block with one Discard, titled by the edit that made it; a
 later edit touching two groups joins them. Every item is listed under its own
 area in rail order; a group spanning areas shows its part in each, and each
 part's Discard takes back the whole group. Rebases, discards and steps that
-fell out of the bounded history link nothing. A recovery review is discarded
-whole or not at all. See `core/model/profile-review.js`,
+fell out of the bounded history link nothing. A discard from a current review
+keeps it current; once nothing described is left, the draft is the keyboard's
+profile again, including bytes no item describes. A recovery review is
+discarded whole or not at all. See `core/model/profile-review.js`,
 `core/model/profile-revert.js`, `ProfileDraftSession.changes()` and
 `webview/view/review.mjs`.
 
 **Layers are compared by identity, not by slot.** Beside every history entry
 the draft keeps which keyboard layer each slot now holds, set by Edit layers
-from the order it saves and never inferred from names or contents. The review
+from the order it saves and never inferred from names or contents, which two
+empty layers or a swap that also swaps the names would fool. The review
 compares the draft with the keyboard's profile rearranged into that order, with
 every layer reference following. So a reorder is one **Layer priority** item,
 one row per layer that moved; everything else is compared layer with layer.
 With "Keys follow their layers" off, keys that kept their numbers now reach a
 different layer and are listed as the changes they are. Discarding the order
 moves the layers back and keeps every other change; undo and redo carry the
-order with their entry; an import, a discard of the whole draft and an Apply
-start again from the keyboard's order. See `core/model/layer-order.js`.
+order with their entry; a rebase keeps it; an import, a discard of the whole
+draft and an Apply start again from the keyboard's order. Group links are kept
+by layer, not by slot, so a later reorder does not tie two layers' keys
+together. See `core/model/layer-order.js`.
 
 ### D-L30 — The draft shows itself where it is edited
 
@@ -592,13 +610,15 @@ release" branch. A plain `LT()` hold (tap count 0) goes through layer
 ownership; its tap still reaches QMK. `LM(n, mods)` holds layer n and its
 modifiers through modifier ownership, as a key or combo, not a behaviour step.
 
-The keyboard refuses a candidate that places an action where `keymap.c`
-validation would, and the app refuses the same placements first, naming the
-misplaced action. `DF()` and `PDF()` stay refused: layer 0 is the base in the
+The keyboard holds a candidate it is asked to save to where its actions are
+placed, by the rules `keymap.c` validation uses; a committed record still loads,
+and the halves still sync it. The app refuses the same placements first, in the
+behaviour and combo editors and before every upload, naming the misplaced
+action. `DF()` and `PDF()` stay refused: layer 0 is the base in the
 firmware's lookup, the RGB base effect and the app, and `TO()` already covers
 the need. Decided behaviour: `TT()`'s last tap locks on release; `OSL()`
 follows QMK (a lone long press arms it, a second tap within `TAPPING_TERM`
-cancels it); `ONESHOT_TIMEOUT` and `ONESHOT_TAP_TOGGLE` apply to `OSM()` only;
+cancels it); `TO()` keeps held layers on; `ONESHOT_TIMEOUT` and `ONESHOT_TAP_TOGGLE` apply to `OSM()` only;
 `TT()` counts taps within `CUSTOM_MULTI_TAP_TERM` like every multi-tap key; a
 `TG()`/`TO()` of the pointer layer from a behaviour is not seen by QMK's
 auto-mouse. A 44-step hardware check passed on both halves on 2026-09-24; the
