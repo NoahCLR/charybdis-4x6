@@ -261,7 +261,9 @@ settings — and shows compiled defaults only when the keyboard reports no
 committed profile. Every edit goes into one local draft with undo, redo and a
 history, and reaches the keyboard only through **Review and apply**. Apply
 saves a recovery copy, then commits the complete profile to both halves as one
-recovery-first logical transaction and verifies the readback.
+recovery-first logical transaction and verifies the readback. The review shows
+layer warnings in orange and traps in red; Apply asks for confirmation when
+either is present in the profile that would be saved.
 
 What to expect while it applies:
 

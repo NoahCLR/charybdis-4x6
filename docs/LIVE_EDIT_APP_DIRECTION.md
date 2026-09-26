@@ -30,7 +30,7 @@ matrix.
 | Pointing modes | Eight device-owned slots and eight RGB rows; see [PD-mode domain v1](architecture/pd-mode-domain-v1.md) |
 | Global policy | Every other portable setting, including startup layers, combo matching and device-reported lighting and key options; unsupported firmware features stay read-only |
 | Backup and restore | Complete snapshots, import review against the keyboard, recovery file and verified restore |
-| Drafts and Apply | One draft with item-by-item review, discard by edit group, Show, undo/redo and draft history; the review checks which layers can be reached and asks before applying a lock with no way back (D-L36); Apply shows its steps and says where a failure happened (D-L19, D-L23, D-L29, D-L30) |
+| Drafts and Apply | One draft with item-by-item review, discard by edit group, Show, undo/redo and draft history; the review checks which layers can be reached and confirms active warnings and traps before Apply (D-L36); Apply shows its steps and says where a failure happened (D-L19, D-L23, D-L29, D-L30) |
 | Recovery | Atomic logical Apply, differential transfer, reboot recovery fencing, firmware roll-forward after the decision, resume after a lost or power-cycled peer link, bounded cancel (D-L20–D-L22, D-L27) |
 
 The rail's health strip shows connection, both-half convergence, draft state
@@ -670,10 +670,17 @@ out a person could find and never invents a trap.
 The draft reports its findings beside the keyboard's, both in the draft's
 layer order, so each is **new**, **on the keyboard** or **fixed** by the draft.
 The review lists them first, under Checks, each with the steps into it, the way
-out and Show. Only a trap asks for confirmation, and every trap the draft keeps
-asks, whether the draft made it or the keyboard already had it: Apply turns
-into "Apply anyway / Go back", and the host refuses an Apply of a draft with a
-trap unless the message confirms it. Warnings and notices never block.
+out and Show. Active warnings have orange backdrops and traps have red ones;
+fixed findings stay quiet. Every warning or trap the draft keeps asks for
+confirmation, whether the draft made it or the keyboard already had it: Apply
+turns into "Apply anyway / Go back", and the host refuses to start an Apply of
+such a draft unless the message confirms it. Notices and fixed findings do not
+ask. Confirmation is tied to the reviewed draft revision, so a changed draft
+must be reviewed and confirmed again. A new warning or trap points to a draft
+edit group only when its source is unambiguous: one group in the draft, or an
+unowned layer key changed at that exact position. The source group is marked
+in the review, and the check links to it. A check already on the keyboard has
+no draft source; checks with several plausible edits do not guess.
 
 Two firmware facts were settled on the way. QMK's auto-mouse kept a lock of its
 own on `TG()`/`TO()` of the pointer layer that `TO(0)` never released; the

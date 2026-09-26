@@ -83,10 +83,23 @@ test("a draft that can lock a layer with no way back applies only once the trap 
     assert.deepEqual(trap.path, ["Tap TG(1) on Base"]);
     draft.review(draft.revision);
     session.service.calls.length = 0;
-    await assert.rejects(draftControl(session, {type: "applyProfileDraft", draftRevision: draft.revision}, h), /Confirm it in the review/);
+    await assert.rejects(draftControl(session, {type: "applyProfileDraft", draftRevision: draft.revision}, h), /Confirm them in the review/);
     assert.deepEqual(session.service.calls, [], "nothing reaches the keyboard");
     assert.equal(h.saved.length, 0);
-    await draftControl(session, {type: "applyProfileDraft", draftRevision: draft.revision, confirmTrap: true}, h);
+    await draftControl(session, {type: "applyProfileDraft", draftRevision: draft.revision, confirmChecks: true}, h);
+    assert.equal(session.service.calls[0], "restorePortableProfile");
+});
+
+test("a draft with a warning requires confirmation before writing a recovery copy or HID", async () => {
+    const session = sessionWithDraft(), draft = session.draft, h = host();
+    stage(session, {type: "updateLayoutKeys", layers: [{layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "KC_A"}]}]});
+    draft.checks = () => [{level: "warning", status: "new", title: "Nothing reaches Number"}];
+    draft.review(draft.revision);
+    session.service.calls.length = 0;
+    await assert.rejects(draftControl(session, {type: "applyProfileDraft", draftRevision: draft.revision}, h), /Confirm them in the review/);
+    assert.deepEqual(session.service.calls, []);
+    assert.equal(h.saved.length, 0);
+    await draftControl(session, {type: "applyProfileDraft", draftRevision: draft.revision, confirmChecks: true}, h);
     assert.equal(session.service.calls[0], "restorePortableProfile");
 });
 

@@ -417,9 +417,9 @@ class ProfileDraftSession {
         this.checksCache.set(draft, {keyboard, order, checks});
         return checks;
     }
-    // Whether Apply has to be confirmed: the draft can lock a layer with no
-    // way back to Base, whether it made that trap or the keyboard has it.
-    hasTrap() {return this.checks().some(check => check.level === CHECK_LEVELS.TRAP && check.status !== "fixed");}
+    // Whether Apply has to be confirmed: active traps and warnings matter
+    // whether the draft introduced them or the keyboard already has them.
+    hasChecksToConfirm() {return this.checks().some(check => check.status !== "fixed" && [CHECK_LEVELS.TRAP, CHECK_LEVELS.WARNING].includes(check.level));}
     identity() {return {source: "draft", generation: this.revision, digest: this.decode(this.history[this.cursor]).fingerprint, originHalf: this.deviceId};}
     combos() {
         const {combos, settings} = this.decode(this.history[this.cursor]).decoded;

@@ -15,7 +15,7 @@ import {pickerOverlay} from "./ui/picker.mjs";
 import {keysShortcut, screenKeys} from "./ui/keys.mjs";
 import {reviewColumns, reviewItem} from "./ui/review-items.mjs";
 import {checksSection} from "./ui/checks.mjs";
-import {confirmText, trapsToConfirm} from "./view/checks.mjs";
+import {checkSourceGroup, checksToConfirm, confirmText} from "./view/checks.mjs";
 import {historyOverlay} from "./ui/history.mjs";
 import {closeLayers} from "./ui/layers.mjs";
 import {screenLighting} from "./ui/lighting.mjs";
@@ -84,7 +84,21 @@ function reviewOverlay() {
     // Discarding goes back to the keyboard's value; it waits while the draft
     // is out of step with the keyboard or busy, as editing does.
     const canDiscard = writable();
-    const item = (entry, index, discard, titleSlot) => reviewItem(model, entry, {discard, titleSlot,
+    const sourceByCheck = new Map(), sourceCounts = new Map();
+    for (const check of draft.checks) {
+        const group = checkSourceGroup(check, draft.changes);
+        if (group === null) continue;
+        sourceByCheck.set(check, group);
+        const count = sourceCounts.get(group) || {warning: 0, trap: 0};
+        count[check.level]++;
+        sourceCounts.set(group, count);
+    }
+    const sourceLabel = (group) => {
+        const count = sourceCounts.get(group);
+        if (!count) return "";
+        return `Source of ${[count.trap && `${count.trap} trap${count.trap === 1 ? "" : "s"}`, count.warning && `${count.warning} warning${count.warning === 1 ? "" : "s"}`].filter(Boolean).join(" and ")}`;
+    };
+    const item = (entry, index, discard, titleSlot, source) => reviewItem(model, entry, {discard, titleSlot, sourceLabel: source,
         show: stillShown(entry) && placeState(entry.place, model.layers) ? `<button class="btn tiny ghost" data-show="${index}"
             data-tip="Close the review and open this where it is edited.">Show</button>` : ""});
     const columns = reviewColumns("What changes", "On the keyboard", "In your draft");
@@ -95,22 +109,31 @@ function reviewOverlay() {
         ${columns}
         ${((titleSlot) => blocks.map((block) => {
             const grouped = block.size > 1;
+            const source = sourceCounts.get(block.group);
+            const sourceClass = source ? ` source-${source.trap ? "trap" : "warning"}` : "";
             const discard = discardable ? `<button class="btn tiny ghost" data-discard="${esc(block.group)}" ${canDiscard ? "" : "disabled"}
                 data-tip="${esc(grouped ? `Put these ${block.size} changes back to what the keyboard holds. They were made together, so they go back together.` : "Put this change back to what the keyboard holds.")}">${esc(discardLabel(block))}</button>` : "";
-            const items = block.items.map((entry) => item(entry, shown.push(entry) - 1, grouped ? "" : discard, titleSlot)).join("");
+            const items = block.items.map((entry, index) => item(entry, shown.push(entry) - 1, grouped ? "" : discard, titleSlot, index === 0 ? sourceLabel(block.group) : "")).join("");
             return grouped
-                ? `<div class="rv-block grouped" data-group="${esc(block.group)}"><div class="rv-group-h"><span class="rv-group-t"><span>${esc(block.title || "Made together")}</span>
+                ? `<div class="rv-block grouped${sourceClass}" data-group="${esc(block.group)}"><div class="rv-group-h"><span class="rv-group-t"><span>${esc(block.title || "Made together")}</span>
                     <span class="note">${esc(groupNote(block))}</span></span><span class="rv-act wide">${discard}</span></div>${items}</div>`
-                : `<div class="rv-block">${items}</div>`;
+                : `<div class="rv-block${sourceClass}" data-group="${esc(block.group)}">${items}</div>`;
         }).join(""))(blocks.some((block) => block.items.some((entry) => entry.titleMark)))}</section>`).join("");
     const summary = statusSummary(draft.changes);
     // Checks that point at a key or a combo open it as review items do.
     const checked = [];
     const checks = checksSection(draft.checks, (check) => check.status !== "fixed" && placeState(check.place, model.layers)
-        ? `<button class="btn tiny ghost" data-show-check="${checked.push(check) - 1}" data-tip="Close the review and open this where it is edited.">Show</button>` : "");
-    // A trap is applied only once it is confirmed here, for this revision.
-    const traps = trapsToConfirm(draft.checks);
-    const confirming = traps.length && state.confirmTrap === draft.revision;
+        ? `<button class="btn tiny ghost" data-show-check="${checked.push(check) - 1}" data-tip="Close the review and open this where it is edited.">Show</button>` : "",
+    (check) => {
+        const group = sourceByCheck.get(check);
+        if (group === undefined) return "";
+        const change = draft.changes.find((entry) => entry.group === group);
+        return `<button class="ck-source" data-check-source="${group}" type="button">From draft: ${esc(change.groupTitle || change.title)} ↓</button>`;
+    });
+    // Ask about active warnings and traps for this revision before writing.
+    const confirmChecks = checksToConfirm(draft.checks);
+    const confirming = confirmChecks.length && state.confirmChecks === draft.revision;
+    const hasTrap = confirmChecks.some((check) => check.level === "trap");
     const canApply = draft.reviewed && draft.connected && !draft.stale;
     const node = el(`<div class="scrim"><div class="sheet" role="dialog" aria-modal="true" aria-label="Review changes">
         <div class="sheet-h"><h2>Review ${draft.changes.length} change${draft.changes.length === 1 ? "" : "s"}</h2>
@@ -121,14 +144,14 @@ function reviewOverlay() {
             ${sections}
             <div style="padding:14px 18px 18px"><div class="callout warn">Apply writes a recovery copy, stages the changed blocks on both halves, then publishes one generation. The keyboard keeps running its saved profile until both halves confirm. If it is interrupted, the recovery copy restores it.</div></div>
         </div>
-        ${confirming ? `<div class="sheet-f ck-confirm" role="alertdialog" aria-label="Confirm the trap">
-            <span class="ck-confirm-t"><i class="dot err"></i>${esc(confirmText(traps))}</span>
+        ${confirming ? `<div class="sheet-f ck-confirm ${hasTrap ? "trap" : "warning"}" role="alertdialog" aria-label="Confirm layer checks">
+            <span class="ck-confirm-t"><i class="dot ${hasTrap ? "err" : "warn"}"></i>${esc(confirmText(confirmChecks))}</span>
             <span class="right"><button class="btn" data-act="unconfirm">Go back</button>
                 <button class="btn primary" data-act="apply-anyway" ${canApply ? "" : "disabled"}>Apply anyway</button></span></div>`
         : `<div class="sheet-f"><span class="note">${esc(model?.device?.label || "")} · ${esc(model?.device?.summary || "")}</span>
             <span class="right"><button class="btn" data-act="close">Cancel</button>
                 <button class="btn primary" data-act="apply" ${canApply ? "" : "disabled"}
-                    ${traps.length ? `data-tip="${esc(`${traps.length === 1 ? "A trap" : `${traps.length} traps`} will be asked about before anything is written.`)}"` : ""}>Apply to keyboard</button></span></div>`}
+                    ${confirmChecks.length ? `data-tip="${esc("Layer warnings and traps will be asked about before anything is written.")}"` : ""}>Apply to keyboard</button></span></div>`}
     </div></div>`);
     // Pointing at a group's Discard lights what it takes back, in every area
     // the group reaches.
@@ -145,20 +168,28 @@ function reviewOverlay() {
         }
         const showCheck = event.target.closest("[data-show-check]");
         if (showCheck) {
-            Object.assign(state, placeState(checked[Number(showCheck.dataset.showCheck)].place, model.layers), {overlay: null, confirmTrap: null});
+            Object.assign(state, placeState(checked[Number(showCheck.dataset.showCheck)].place, model.layers), {overlay: null, confirmChecks: null});
             post({type: "closeProfileDraftReview"});
             rerender();
             return;
         }
+        const source = event.target.closest("[data-check-source]");
+        if (source) {
+            const parts = node.querySelectorAll(`.rv-block[data-group="${source.dataset.checkSource}"]`);
+            parts[0]?.scrollIntoView({behavior: "smooth", block: "center"});
+            parts.forEach((part) => part.classList.add("source-focus"));
+            setTimeout(() => parts.forEach((part) => part.classList.remove("source-focus")), 2000);
+            return;
+        }
         if (event.target.closest('[data-act="unconfirm"]')) {
-            state.confirmTrap = null;
+            state.confirmChecks = null;
             rerender();
             return;
         }
         if (event.target.closest('[data-act="apply-anyway"]')) {
             state.overlay = null;
-            state.confirmTrap = null;
-            post({type: "applyProfileDraft", confirmTrap: true});
+            state.confirmChecks = null;
+            post({type: "applyProfileDraft", confirmChecks: true});
             rerender();
             return;
         }
@@ -172,13 +203,13 @@ function reviewOverlay() {
         // The sheet closes at once; the host's answer only refreshes what it says.
         if (event.target === node || event.target.closest('[data-act="close"]')) {
             state.overlay = null;
-            state.confirmTrap = null;
+            state.confirmChecks = null;
             post({type: "closeProfileDraftReview"});
             rerender();
         }
         if (event.target.closest('[data-act="apply"]')) {
-            if (traps.length) {
-                state.confirmTrap = draft.revision;
+            if (confirmChecks.length) {
+                state.confirmChecks = draft.revision;
                 rerender();
                 return;
             }

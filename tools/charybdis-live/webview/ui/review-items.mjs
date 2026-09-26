@@ -49,10 +49,11 @@ const fields = (model, item) => {
 // An item is one row of the grid: a status gutter, the title, the fields,
 // and two action slots that are always in the same place — Show, then
 // Discard at the edge — whether or not an item has them.
-export const reviewItem = (model, entry, {show = "", discard = "", titleSlot = false} = {}) => `<div class="rv-item">
+export const reviewItem = (model, entry, {show = "", discard = "", titleSlot = false, sourceLabel = ""} = {}) => `<div class="rv-item">
     <span class="rv-gutter"><span class="rv-status ${esc(entry.status)}">${esc(entry.status)}</span></span>
     <div class="rv-title">${titleSlot ? `<span class="mk"><span class="mk-slot title">${mark(model, entry.titleMark)}</span><span class="t">${esc(entry.title)}</span></span>` : `<span class="t">${esc(entry.title)}</span>`}
-        ${entry.note ? titleSlot ? `<span class="mk"><span class="mk-slot title"></span><span class="rv-note">${esc(entry.note)}</span></span>` : `<span class="rv-note">${esc(entry.note)}</span>` : ""}</div>
+        ${entry.note ? titleSlot ? `<span class="mk"><span class="mk-slot title"></span><span class="rv-note">${esc(entry.note)}</span></span>` : `<span class="rv-note">${esc(entry.note)}</span>` : ""}
+        ${sourceLabel ? `<span class="rv-source-label">${esc(sourceLabel)}</span>` : ""}</div>
     ${fields(model, entry)}
     <span class="rv-act">${show}</span>
     <span class="rv-act">${discard}</span></div>`;

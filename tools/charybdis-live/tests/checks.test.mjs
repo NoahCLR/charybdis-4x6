@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {checkGroups, checkTags, confirmText, trapsToConfirm} from "../webview/view/checks.mjs";
+import {checkGroups, checkSourceGroup, checkTags, checksToConfirm, confirmText} from "../webview/view/checks.mjs";
 
 const check = (level, status, title = `${level} ${status}`) => ({level, status, title, key: title});
 
@@ -18,17 +18,39 @@ test("what is already on the keyboard stays folded unless it holds a trap", () =
     assert.equal(checkGroups([check("warning", "existing"), check("trap", "existing")])[0].open, true);
 });
 
-test("every trap the draft keeps asks for confirmation, whoever made it; a fixed one does not", () => {
-    const checks = [check("trap", "new", "A"), check("trap", "existing", "B"), check("trap", "fixed", "C"), check("warning", "new", "D")];
-    assert.deepEqual(trapsToConfirm(checks).map((item) => item.title), ["A", "B"]);
-    assert.deepEqual(trapsToConfirm(), []);
+test("active traps and warnings ask for confirmation, including ones already on the keyboard", () => {
+    const checks = [check("trap", "new", "A"), check("trap", "existing", "B"), check("trap", "fixed", "C"),
+        check("warning", "new", "D"), check("warning", "existing", "E"), check("warning", "fixed", "F"), check("notice", "new", "G")];
+    assert.deepEqual(checksToConfirm(checks).map((item) => item.title), ["A", "B", "D", "E"]);
+    assert.deepEqual(checksToConfirm(), []);
 });
 
-test("the confirmation names one trap, or counts several", () => {
+test("a new warning names one draft group, but does not guess among several", () => {
+    const warning = {...check("warning", "new"), kind: "unreachable", place: {kind: "key", layer: 2}};
+    const order = {group: 3, unit: "layerOrder", title: "Layer priority"};
+    assert.equal(checkSourceGroup(warning, [order]), 3);
+    assert.equal(checkSourceGroup(warning, [order, {group: 3, unit: "layout:0:1"}]), 3, "one edit group may contain several rows");
+    assert.equal(checkSourceGroup(warning, [order, {group: 4, unit: "layout:0:1"}]), null);
+    assert.equal(checkSourceGroup({...warning, status: "existing"}, [order]), null);
+    assert.equal(checkSourceGroup({...warning, status: "fixed"}, [order]), null);
+    assert.equal(checkSourceGroup({...warning, level: "notice"}, [order]), null);
+    assert.equal(checkSourceGroup(warning, [{...order, group: null}]), null);
+});
+
+test("an unowned layer key points to its changed key even with other edit groups", () => {
+    const warning = {...check("warning", "new"), kind: "unowned", place: {kind: "key", layer: 3, layoutIndex: 12}};
+    const changes = [{group: 1, place: {kind: "key", layer: 3, layoutIndex: 12}}, {group: 2, unit: "layerOrder"}];
+    assert.equal(checkSourceGroup(warning, changes), 1);
+    assert.equal(checkSourceGroup({...warning, place: {kind: "key", layer: 3, layoutIndex: 13}}, changes), null);
+});
+
+test("the confirmation names one finding or counts traps and warnings together", () => {
     assert.equal(confirmText([]), "");
     assert.equal(confirmText([check("trap", "new", "Numbers can lock with no way back to Base")]),
-        "Numbers can lock with no way back to Base. Once locked, only unplugging the keyboard clears it.");
-    assert.match(confirmText([check("trap", "new"), check("trap", "existing")]), /^2 sets of layers can lock/);
+        "Numbers can lock with no way back to Base. A trapped layer can leave no way back to Base until you unplug the keyboard. Apply this profile anyway?");
+    assert.equal(confirmText([check("warning", "new", "Nothing reaches Number")]),
+        "Nothing reaches Number. Apply this profile with this warning?");
+    assert.match(confirmText([check("trap", "new"), check("warning", "existing")]), /^1 trap and 1 warning\./);
 });
 
 test("a check's tags say its level, and where it comes from unless it is new", () => {

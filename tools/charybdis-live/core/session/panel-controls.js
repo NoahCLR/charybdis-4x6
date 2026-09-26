@@ -126,9 +126,9 @@ async function draftControl(session, message, host = {}) {
             return;
         }
         case "applyProfileDraft": {
-            // A trap is applied only once the person has confirmed it in the
-            // review; the interface asks, and this holds it to asking.
-            if (draft.hasTrap() && message.confirmTrap !== true) throw new Error("This draft can lock a layer with no way back to Base. Confirm it in the review before applying.");
+            // The interface asks about active traps and warnings; the host
+            // enforces that decision before writing a recovery copy or HID.
+            if (draft.hasChecksToConfirm() && message.confirmChecks !== true) throw new Error("This draft has layer warnings or traps. Confirm them in the review before applying.");
             let recovery = "";
             const result = await run(host, "Applying the complete profile to both halves",
                 () => draft.apply(service, revision, async (document) => (recovery = await host.saveRecovery(document))));
