@@ -21,7 +21,7 @@
 //   the only finding that asks for a confirmation before Apply;
 // - layers nothing reaches, layer keys that reach a layer with no keys of its
 //   own, layer keys that hold or toggle Base (which is always on, so they do
-//   nothing), transparent keys on Base, a pointer layer that cannot work, and
+//   nothing), transparent and KC_NO keys on Base, a pointer layer that cannot work, and
 //   layer keys the keyboard does not run through its layer tracking.
 //
 // Holding keys is not limited by fingers or by which key is already down, and
@@ -330,13 +330,22 @@ function findings(facts, walked) {
             place: idlePlaces[0].place});
     }
 
-    const dead = facts.layers[0].map((_, position) => position).filter((position) => !resolve(facts, facts.always, position));
-    if (dead.length) {
-        results.push({kind: "deadBase", level: LEVELS.NOTICE, layers: [0], count: dead.length,
-            title: `${dead.length} key${dead.length === 1 ? "" : "s"} on the base layer (${layerName(facts.names, 0)}) ${dead.length === 1 ? "does" : "do"} nothing`,
+    const emptyBase = (code) => facts.layers[0].map((value, position) => value === code ? position : -1).filter(position => position >= 0);
+    const transparent = emptyBase(TRANSPARENT);
+    if (transparent.length) {
+        results.push({kind: "deadBase", level: LEVELS.NOTICE, layers: [0], count: transparent.length,
+            title: `${transparent.length} transparent key${transparent.length === 1 ? "" : "s"} on the base layer (${layerName(facts.names, 0)}) ${transparent.length === 1 ? "does" : "do"} nothing`,
             detail: `A transparent key on the base layer (${layerName(facts.names, 0)}) has no layer under it to answer, so it sends nothing unless a layer above covers it.`,
-            fix: `Give ${dead.length === 1 ? "it" : "them"} a keycode, or KC_NO to say so.`,
-            place: keyPlace(0, dead[0])});
+            fix: `Give ${transparent.length === 1 ? "it" : "them"} a keycode, or KC_NO to mark ${transparent.length === 1 ? "it" : "them"} intentionally empty.`,
+            place: keyPlace(0, transparent[0])});
+    }
+    const no = emptyBase(NOTHING);
+    if (no.length) {
+        results.push({kind: "noBase", level: LEVELS.NOTICE, layers: [0], count: no.length,
+            title: `${no.length} KC_NO key${no.length === 1 ? "" : "s"} on the base layer (${layerName(facts.names, 0)}) ${no.length === 1 ? "does" : "do"} nothing`,
+            detail: `KC_NO on the base layer (${layerName(facts.names, 0)}) explicitly sends nothing unless a layer above covers it.`,
+            fix: `Give ${no.length === 1 ? "it" : "them"} a keycode if ${no.length === 1 ? "it should" : "they should"} do something.`,
+            place: keyPlace(0, no[0])});
     }
 
     if (facts.pointer !== undefined) {

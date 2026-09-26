@@ -643,6 +643,10 @@ the overlays, with the highest-priority layer shown first and Base fixed at the
 bottom. Moving a layer updates the keys, behaviours, combos, RGB assignments and
 pointer settings that refer to it. There is no need to change the layer count
 or reflash for ordinary profile editing.
+**Make base** swaps an overlay with the base: transparent keys entering the base
+become `KC_NO`, `KC_NO` keys leaving it become transparent, and an uncoloured
+former base gets the saved base HSV as its own layer colour. The draft review
+counts transparent and `KC_NO` base keys in separate notices.
 
 For an existing five-layer keyboard, perform the one-time storage upgrade in
 this order. Do not flash the eight-layer image before saving the backup:

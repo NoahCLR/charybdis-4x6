@@ -26,6 +26,12 @@ The layer rules and where new work belongs are in [`AGENTS.md`](./AGENTS.md).
 The short version: nothing here may read the firmware repository, and the
 webview receives the model as a message rather than importing the core.
 
+In **Manage layers**, **Make base** swaps a layer with the current base. Empty
+keys entering the base become `KC_NO`; `KC_NO` keys leaving it become
+transparent. If the former base had no layer colour, it receives the saved
+base HSV as its own all-key colour, even when an animated base effect is
+selected. The review gives transparent and `KC_NO` base keys separate notices.
+
 ## The interface
 
 The board is the constant: it stays on screen, full width, painted with the

@@ -124,6 +124,39 @@ test("a new base trades roles with the old one: keys to either keep their number
     assert.equal(actual.settings.values[27] >>> 0, 0x76543210, "each layer's combos still read from the layer itself");
 });
 
+test("Make base gives the old uncoloured base its saved HSV and normalizes empty keys", () => {
+    const source = document(), blob = decodeProfileBlob(Buffer.from(source.profile, "base64"));
+    const saved = decodeSettings(blob.domains[3].payload);
+    saved.values[21] = (saved.values[21] & ~0xff00) | (2 << 8); // An animated effect still has saved HSV.
+    saved.values[22] = 27 | (180 << 8) | (100 << 16);
+    blob.domains[3].payload = encodeSettings(saved);
+    source.profile = encodeProfileBlob(blob).toString("base64");
+    source.layers[0].splice(0, 4, 0, 1, 4, 0);
+    source.layers[3].splice(0, 4, 1, 0, 5, 1);
+
+    const moved = reorderLayers(source, [3, 1, 2, 0, 4, 5, 6, 7]);
+    const rgb = validateSnapshot(moved).rgb;
+    assert.deepEqual(moved.layers[0].slice(0, 4), [0, 0, 5, 0], "transparent positions entering base become KC_NO");
+    assert.deepEqual(moved.layers[3].slice(0, 4), [1, 1, 4, 1], "KC_NO positions leaving base become transparent");
+    assert.deepEqual(rgb.layerColors[3], {layerId: 3, color: {h: 27, s: 180, v: 100}, mode: 0});
+    assert.deepEqual(rgb.layerColors[0].color, {h: 180, s: 255, v: 200}, "new base keeps its own lighting");
+});
+
+test("Make base keeps an existing old-base colour, while overlay reorders keep empty keys", () => {
+    const source = document(), blob = decodeProfileBlob(Buffer.from(source.profile, "base64"));
+    const rgb = validateSnapshot(source).rgb;
+    rgb.layerColors[0].color = {h: 0, s: 0, v: 120}; // White is a real colour.
+    blob.domains[0].payload = require("../../core/schema/rgb-domain-v1").encodeRgbDomainV1(rgb);
+    source.profile = encodeProfileBlob(blob).toString("base64");
+    source.layers[0][0] = 0;
+    source.layers[3][0] = 1;
+    const moved = reorderLayers(source, [3, 1, 2, 0, 4, 5, 6, 7]);
+    assert.deepEqual(validateSnapshot(moved).rgb.layerColors[3], {layerId: 3, color: {h: 0, s: 0, v: 120}, mode: 0});
+    const overlay = reorderLayers(source, [0, 3, 2, 1, 4, 5, 6, 7]);
+    assert.equal(overlay.layers[0][0], 0);
+    assert.equal(overlay.layers[1][0], 1);
+});
+
 test("partial, incompatible, over-capacity and malformed profiles fail before restore", () => {
     const source = document();
     assert.throws(() => validateSnapshot({...source, layers: source.layers.slice(0, 4)}), /matrix/);

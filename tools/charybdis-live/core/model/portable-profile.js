@@ -190,6 +190,9 @@ const decodedOf = snapshot => snapshot.decoded && snapshot.decoded.document === 
 // reach whatever took the old base's slot once it moved on, so the key that
 // switched back would switch somewhere else. Without keysFollow, only the
 // references to the other layers keep their numbers.
+// An empty key entering the base stops there; an intentionally empty key
+// leaving it falls through to the new base. An uncoloured old base also keeps
+// the saved base HSV as its own all-key colour after it becomes an overlay.
 function reorderLayers(document, order, names, {keysFollow = true} = {}) {
     if (document.layers?.length !== 8) throw fail("Layer ordering becomes available after the eight-layer update.");
     const validated = validateSnapshot(document), result = JSON.parse(JSON.stringify(document));
@@ -209,11 +212,23 @@ function reorderLayers(document, order, names, {keysFollow = true} = {}) {
         return code;
     }
     result.layers = order.map(old => document.layers[old].map(native));
+    if (order[0] !== 0) {
+        result.layers[0] = result.layers[0].map(code => code === 0x0001 ? 0x0000 : code);
+        result.layers[remap[0]] = result.layers[remap[0]].map(code => code === 0x0000 ? 0x0001 : code);
+    }
     const {rgb, behaviors, combos, settings, pdModes} = validated;
     const actionOptions = actionLimitsFor(pdModes ? 2 : 1);
     const action = a => {if (!renumbers) return; if ([2, 3].includes(a.kind)) a.operand = reach(a.operand); else if (a.kind === 1) a.operand = native(a.operand);};
     walkActions(behaviors, action); walkActions(combos, action);
     rgb.layerColors.forEach(row => {row.layerId = remap[row.layerId];}); rgb.layerColors.sort((a, b) => a.layerId - b.layerId);
+    if (order[0] !== 0) {
+        const oldBase = rgb.layerColors.find(row => row.layerId === remap[0]);
+        if (oldBase.color.s === 0 && oldBase.color.v === 0) {
+            const hsv = settings.values[22];
+            oldBase.color = {h: hsv & 0xff, s: (hsv >>> 8) & 0xff, v: (hsv >>> 16) & 0xff};
+            oldBase.mode = 0; // ALL_KEYS: the base effect covered the whole layer.
+        }
+    }
     rgb.layerGroupRows.forEach(row => {if (row.selector !== 255) row.selector = remap[row.selector];});
     settings.names = names || order.map(old => settings.names[old]);
     settings.values[5] = remap[settings.values[5]]; settings.values[9] = remap[settings.values[9]];

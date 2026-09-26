@@ -662,7 +662,7 @@ trackball waking the pointer layer (unless the sniping layer keeps it off). A
 **trap** is a set of locks it can reach from which Base cannot be reached once
 every key is let go. It also reports, as warnings and notices, a layer with
 keys that nothing reaches, a layer key onto a layer with no keys of its own,
-transparent keys on Base, a pointer layer that cannot work, and layer keys the
+transparent and `KC_NO` keys on Base in separate notices, a pointer layer that cannot work, and layer keys the
 keyboard leaves to QMK (`DF()`, `PDF()`, a layer past the bank). Holding is not
 limited by fingers and a one-shot counts as a hold, so the walk finds every way
 out a person could find and never invents a trap.
@@ -713,10 +713,15 @@ it moved on, so the toggle only decides for references to the other layers.
 Every other key, behaviour and combo reference follows its layer, as do
 names, colours, LED group rows, and the pointer, sniping and combo-reference
 settings, which name a layer by what it holds. The startup layers are slots and
-stay on the bottom one. The swap cannot fill in what the new base leaves
-transparent, which now has nothing under it, or reach the old base when the
+stay on the bottom one. On a base swap, transparent keys entering the base
+become `KC_NO`, and `KC_NO` keys leaving the base become transparent. A person
+can still deliberately place a transparent key on the base afterwards. If the
+old base had no layer colour, it receives the saved base HSV as its own
+all-keys layer colour, including when the selected base effect is animated;
+an existing layer colour stays as it was. The swap cannot make the new base's
+empty keys do something or reach the old base when the
 only keys that did sit on the old base itself; the review's checks (D-L36) name
-both, and count every layer key that holds or toggles the base, rather than
+both, count base `KC_NO` and transparent keys separately, and count every layer key that holds or toggles the base, rather than
 the reorder inventing a way back. The checks compare the
 draft with the keyboard as it is, matched layer with layer through the draft's
 order, so what a reorder makes or mends is reported as new or fixed. The

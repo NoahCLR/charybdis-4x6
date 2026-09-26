@@ -111,16 +111,21 @@ test("a layer key onto a layer with no keys of its own is a notice", () => {
     assert.match(finding.detail, /^Hold MO\(2\) on Base: Symbols holds only transparent keys and KC_NO/);
 });
 
-test("transparent keys on Base are counted, since nothing answers them", () => {
-    const [finding] = layerReach(profile({keys: {"0:3": TRNS, "0:4": TRNS}}));
-    assert.equal(finding.kind, "deadBase");
-    assert.equal(finding.count, 2);
-    assert.equal(finding.title, "2 keys on the base layer (Base) do nothing");
-    assert.match(finding.detail, /^A transparent key on the base layer \(Base\)/);
-    assert.deepEqual(finding.place, {kind: "key", layer: 0, layoutIndex: 3});
+test("transparent and KC_NO base keys have separate notices and counts", () => {
+    const findings = layerReach(profile({keys: {"0:3": TRNS, "0:4": TRNS, "0:5": NO}}));
+    const transparent = findings.find(check => check.kind === "deadBase");
+    const no = findings.find(check => check.kind === "noBase");
+    assert.equal(transparent.count, 2);
+    assert.equal(transparent.title, "2 transparent keys on the base layer (Base) do nothing");
+    assert.match(transparent.detail, /^A transparent key on the base layer \(Base\)/);
+    assert.deepEqual(transparent.place, {kind: "key", layer: 0, layoutIndex: 3});
+    assert.equal(no.count, 1);
+    assert.equal(no.title, "1 KC_NO key on the base layer (Base) does nothing");
+    assert.match(no.detail, /^KC_NO on the base layer \(Base\) explicitly sends nothing/);
+    assert.deepEqual(no.place, {kind: "key", layer: 0, layoutIndex: 5});
     const named = profile({keys: {"0:3": TRNS}});
     named.settings.names[0] = "Symbol";
-    assert.equal(layerReach(named).find((check) => check.kind === "deadBase").title, "1 key on the base layer (Symbol) does nothing");
+    assert.equal(layerReach(named).find((check) => check.kind === "deadBase").title, "1 transparent key on the base layer (Symbol) does nothing");
 });
 
 test("a pointer layer that is always on, or empty, cannot work", () => {

@@ -127,7 +127,7 @@ function editor(model, portable, busy) {
             <span class="note ${mapped ? "" : "dim"}">${mapped ? `${mapped} key${mapped === 1 ? "" : "s"}` : "nothing mapped"}</span>
             ${base ? `<span class="tag lp-base" data-tip="Always on, and what every transparent key falls through to.">base</span>`
                 : `<button class="btn tiny ghost" data-base="${layerId}" ${busy ? "disabled" : ""}
-                    data-tip="Put this layer at the bottom: always on, and what every transparent key falls through to. The current base takes its place.">Make base</button>`}</div>`);
+                    data-tip="Put this layer at the bottom. Its transparent keys become KC_NO; KC_NO on the former base becomes transparent. An uncoloured former base gets the saved base colour.">Make base</button>`}</div>`);
         list.append(row);
     });
 
