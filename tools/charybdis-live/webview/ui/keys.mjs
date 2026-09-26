@@ -95,9 +95,9 @@ export function screenKeys() {
         onOpen: writable() ? (index) => pickKeycodeFor(index) : undefined,
         onSwap: writable() ? (from, to) => swapKeys(from, to) : undefined,
     }));
-    card.appendChild(previewing() ? previewFoot(layer) : el(`<div class="board-foot">${lit
+    card.appendChild(previewing() ? previewFoot(layer) : el(`<div class="board-foot"><span class="board-foot-text">${lit
         ? `lit ${esc(hsvLabel(row.color))} on ${row.mode === "ALL_KEYS" ? "every key" : "keys mapped here"}`
-        : "no layer colour · the base effect shows through"}</div>`));
+        : "no layer colour · the base effect shows through"}</span></div>`));
     card.append(bar);
     stage.append(card, legend(model));
     pad.append(stage, bench());
@@ -106,15 +106,14 @@ export function screenKeys() {
 }
 
 // The caption while layers are previewed on together: which ones, in the
-// order they win, and the way back to one layer.
+// order they win. Clicking any tab goes back to one layer.
 export function previewFoot(layer, lead = "") {
     const under = [...heldLayers()].reverse().map((at) => layerName(layers()[at]));
-    const node = el(`<div class="board-foot">${lead}
-        <span><b>${esc(layerName(layer))}</b> on top of ${esc([...under, layerName(layers()[0])].join(", "))}
-            · keys seen through from below are frosted · edits go to ${esc(layerName(layer))}</span>
-        <span class="right"><button class="btn tiny ghost" data-act="onelayer">Show one layer</button></span></div>`);
-    node.querySelector('[data-act="onelayer"]').addEventListener("click", () => { showLayer(state.layer); render(); });
-    return node;
+    const text = `${layerName(layer)} on top of ${[...under, layerName(layers()[0])].join(", ")}`
+        + ` · keys seen through from below are frosted · edits go to ${layerName(layer)}`;
+    return el(`<div class="board-foot">${lead}
+        <span class="board-foot-text" data-tip="${esc(text)}"><b>${esc(layerName(layer))}</b> on top of ${esc([...under, layerName(layers()[0])].join(", "))}
+            · keys seen through from below are frosted · edits go to ${esc(layerName(layer))}</span></div>`);
 }
 
 function placementBar() {

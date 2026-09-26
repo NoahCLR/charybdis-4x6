@@ -66,7 +66,7 @@ export function screenLighting() {
     }));
     card.appendChild(el(`<div class="board-foot">
         <b>${onGroups ? "LED selector" : "Preview"}</b>
-        <span>${onGroups
+        <span class="board-foot-text">${onGroups
             ? `click physical LEDs to build a group · ${state.ledPicks.length} selected${state.trackball ? " + trackball" : ""}`
             : `${esc(layerName(layer))}${previewing() && !onGroups
                 ? ` with ${esc([...heldLayers()].reverse().map((at) => layerName(layers()[at])).join(", "))} on`
@@ -77,9 +77,8 @@ export function screenLighting() {
             <button class="btn tiny ghost" data-act="clearleds">Clear selection</button>
             <button class="btn tiny ${state.trackball ? "primary" : "ghost"}" data-act="trackball"
                 data-tip="Add or remove the trackball LED, index ${TRACKBALL_LED}, from this selection.">Trackball LED</button></span>`
-            : previewing() ? `<span class="right"><button class="btn tiny ghost" data-act="onelayer">Show one layer</button></span>` : ""}
+            : ""}
     </div>`));
-    card.querySelector('[data-act="onelayer"]')?.addEventListener("click", () => { showLayer(state.layer); render(); });
     card.querySelector('[data-act="clearleds"]')?.addEventListener("click", () => { state.ledPicks = []; render(); });
     card.querySelector('[data-act="trackball"]')?.addEventListener("click", () => { state.trackball = !state.trackball; render(); });
     card.append(layerBar());

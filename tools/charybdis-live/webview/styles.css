@@ -270,13 +270,23 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 }
 .layer-tab:hover { color: var(--text); background: var(--surface-3); }
 .layer-tab[aria-selected="true"] { background: var(--surface); border-color: var(--line); color: var(--text); font-weight: 520; }
-/* A layer previewed on under the picked one: lit, but not joined to the board. */
-.layer-tab.on { color: var(--text); background: var(--surface-3); }
+/* A layer previewed on under the picked one: tinted with its own light and
+   outlined, but not joined to the board. */
+.layer-tab.on {
+  color: var(--text);
+  background: color-mix(in srgb, var(--tab-tint, var(--text-3)) 16%, var(--surface-2));
+  border-color: color-mix(in srgb, var(--tab-tint, var(--text-3)) 60%, transparent);
+}
+.layer-tab.on:hover { background: color-mix(in srgb, var(--tab-tint, var(--text-3)) 24%, var(--surface-2)); }
 .layer-tab .swatch { width: 9px; height: 9px; border-radius: 3px; border: 1px solid rgba(255,255,255,.18); flex: none; }
 .layer-tab .idx { font-family: var(--mono); font-size: 10px; color: var(--text-3); }
 /* Rename & reorder stays in reach at the strip's end, outside what scrolls. */
 .layerbar-wrap > .layer-edit { flex: none; margin: 0 10px 0 10px; }
-.board-foot { display: flex; align-items: center; gap: 10px; min-height: 34px; padding: 4px 14px 8px; font-size: 12px; color: var(--text-2); }
+/* One line at a fixed height, so the board does not move when the caption
+   grows; a caption too long for the width ends in an ellipsis. */
+.board-foot { display: flex; align-items: center; gap: 10px; height: 34px; padding: 2px 14px 6px; font-size: 12px; color: var(--text-2); white-space: nowrap; }
+.board-foot > * { flex: none; }
+.board-foot > .board-foot-text { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .board-foot b { color: var(--text); font-weight: 560; }
 .board-foot .right { margin-left: auto; display: flex; gap: 6px; }
 /* A layer named elsewhere as a link to it (Macros) is a chip. */
