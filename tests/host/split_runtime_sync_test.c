@@ -17,6 +17,7 @@ static host_runtime_fixture_t runtime_fixture = HOST_RUNTIME_FIXTURE_INIT;
 
 static uint16_t          fake_auto_mouse_elapsed;
 static bool              fake_auto_mouse_active;
+static bool              fake_auto_mouse_enabled;
 static bool              fake_any_mode_locked;
 static pd_mode_mask_t    fake_pd_active_flags;
 static pd_mode_mask_t    fake_pd_locked_flags;
@@ -89,6 +90,7 @@ static void test_reset_stubs(void) {
     host_runtime_fixture_reset(&runtime_fixture);
     fake_auto_mouse_elapsed = 83u;
     fake_auto_mouse_active  = true;
+    fake_auto_mouse_enabled = true;
     fake_any_mode_locked    = false;
     fake_pd_active_flags    = PD_MODE_ZOOM;
     fake_pd_locked_flags    = 0;
@@ -198,6 +200,10 @@ uint16_t auto_mouse_get_time_elapsed_at(uint16_t now) {
 
 bool is_auto_mouse_active(void) {
     return fake_auto_mouse_active;
+}
+
+bool get_auto_mouse_enable(void) {
+    return fake_auto_mouse_enabled;
 }
 
 bool pd_any_local_mode_locked(void) {
@@ -539,6 +545,20 @@ static void test_locked_mode_suppresses_fade_progress(void) {
     fake_auto_mouse_active  = false;
     fake_any_mode_locked    = true;
     fake_auto_mouse_elapsed = (uint16_t)(AUTOMOUSE_RGB_DEAD_TIME + AUTOMOUSE_RGB_SYNC_STEP * 2u);
+
+    split_runtime_sync_init();
+
+    CHECK(rpc_last_base_packet.automouse_progress == 0u);
+}
+
+// Auto-mouse turned off sends no fade to the other half. QMK zeroes its timer
+// when disabled, which would otherwise read as a finished timeout and park the
+// slave's pointer layer at the fade destination.
+static void test_disabled_auto_mouse_publishes_no_fade_progress(void) {
+    test_reset_stubs();
+    fake_auto_mouse_enabled = false;
+    fake_auto_mouse_active  = false;
+    fake_auto_mouse_elapsed = AUTO_MOUSE_TIME;
 
     split_runtime_sync_init();
 
@@ -1366,6 +1386,7 @@ int main(void) {
     test_key_feedback_visibility_is_ignored_without_flashing_semantics();
     test_key_feedback_visibility_changes_when_flashing_semantics_are_present();
     test_locked_pd_mode_zeroes_automouse_progress();
+    test_disabled_auto_mouse_publishes_no_fade_progress();
     test_tick_sends_only_base_packet_when_only_automouse_changes();
     test_tick_sends_only_combo_packet_when_only_combo_feedback_changes();
     test_idle_combo_feedback_activation_sends_without_dirty_notification();

@@ -72,6 +72,7 @@ static uint8_t                fake_feedback_broad_owner_map[KEY_FEEDBACK_BROAD_O
 static uint8_t                fake_auto_mouse_layer   = LAYER_POINTER;
 static uint16_t               fake_auto_mouse_elapsed = 0;
 static bool                   fake_auto_mouse_active  = true;
+static bool                   fake_auto_mouse_enabled = true;
 static host_runtime_fixture_t runtime_fixture         = HOST_RUNTIME_FIXTURE_INIT;
 #define fake_is_master runtime_fixture.is_master
 static bool              fake_is_left        = true;
@@ -361,6 +362,7 @@ static void test_reset(void) {
     fake_auto_mouse_layer   = LAYER_POINTER;
     fake_auto_mouse_elapsed = 0;
     fake_auto_mouse_active  = true;
+    fake_auto_mouse_enabled = true;
     fake_is_left            = true;
     fake_pd_active_mode     = 0;
     fake_pd_locked_mode     = 0;
@@ -554,6 +556,10 @@ uint16_t auto_mouse_get_time_elapsed(void) {
 
 bool is_auto_mouse_active(void) {
     return fake_auto_mouse_active;
+}
+
+bool get_auto_mouse_enable(void) {
+    return fake_auto_mouse_enabled;
 }
 
 bool pd_any_local_mode_locked(void) {
@@ -1836,6 +1842,33 @@ static void test_automouse_uses_configured_target_layer(void) {
 #endif
 }
 
+// With auto-mouse turned off, a pointer layer held or locked by hand is just a
+// layer. QMK resets its activity timer to zero when auto-mouse is disabled, so
+// the elapsed time reads as a long-finished timeout; the fade must not treat
+// that as a parked fade and paint its destination over the layer's lighting.
+static void test_disabled_automouse_paints_plain_layer_lighting(void) {
+    test_reset();
+
+    test_keymap[LAYER_POINTER][0][0] = 0x0040u;
+    test_keymap[LAYER_POINTER][0][1] = 0x0041u;
+    layer_state                      = (layer_state_t)1u << LAYER_POINTER;
+    fake_auto_mouse_active           = false;
+    fake_auto_mouse_elapsed          = 0;
+    CHECK(render_output());
+    rgb_t plain[RGB_MATRIX_LED_COUNT];
+    memcpy(plain, led_output, sizeof(plain));
+
+    memset(led_output, 0, sizeof(led_output));
+    fake_auto_mouse_enabled = false;
+    fake_auto_mouse_elapsed = AUTO_MOUSE_TIME;
+    CHECK(render_output());
+
+    for (uint8_t led = 0; led < RGB_MATRIX_LED_COUNT; led++) {
+        check_led(led, plain[led]);
+    }
+    CHECK(automouse_rgb_current_progress() == 0u);
+}
+
 static void test_timeout_end_keeps_automouse_at_destination_on_master(void) {
     test_reset();
 
@@ -2419,6 +2452,7 @@ int main(int argc, char **argv) {
     test_slave_pointer_mode_overlay_uses_remote_display_state_and_trigger_half();
     test_slave_pointer_mode_overlay_uses_remote_trigger_keys();
     test_automouse_uses_configured_target_layer();
+    test_disabled_automouse_paints_plain_layer_lighting();
     test_timeout_end_keeps_automouse_at_destination_on_master();
     test_timeout_window_keeps_fading_after_auto_mouse_active_drops_on_master();
     test_timeout_end_keeps_automouse_at_destination_on_slave();

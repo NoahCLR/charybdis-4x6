@@ -115,6 +115,13 @@ static uint16_t split_runtime_sync_auto_mouse_elapsed(uint32_t now) {
     //
     // The lock check stays in the packet builder, where the sent value is
     // decided, rather than being duplicated here.
+    //
+    // Auto-mouse turned off is different: there is no fade to mirror, and QMK
+    // zeroes the timer when it is disabled, which would read as a finished
+    // timeout and park the slave's pointer layer at the fade destination.
+    if (!noah_qmk_contract_auto_mouse_enabled()) {
+        return 0u;
+    }
     return noah_qmk_contract_auto_mouse_elapsed_at(now);
 #    else
     (void)now;

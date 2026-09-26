@@ -19,9 +19,12 @@ uint16_t automouse_rgb_current_progress(void) {
     // Master derives progress from the real QMK timeout clock; the slave only
     // mirrors synced progress. Both halves then apply the same clamp/lock
     // rules before rendering.
+    // With auto-mouse off there is no fade: a pointer layer turned on by hand
+    // shows its own lighting. QMK zeroes the timer when auto-mouse is
+    // disabled, which would otherwise read as a finished timeout.
     uint16_t progress;
     if (is_keyboard_master()) {
-        progress = automouse_rgb_progress(noah_qmk_contract_auto_mouse_elapsed());
+        progress = noah_qmk_contract_auto_mouse_enabled() ? automouse_rgb_progress(noah_qmk_contract_auto_mouse_elapsed()) : 0u;
     } else {
         progress = split_runtime_sync_remote.automouse_progress;
     }

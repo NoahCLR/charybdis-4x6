@@ -9,6 +9,7 @@ uint8_t  get_auto_mouse_layer(void);
 uint16_t auto_mouse_get_time_elapsed_at(uint16_t now);
 uint16_t auto_mouse_get_time_elapsed(void);
 bool     is_auto_mouse_active(void);
+bool     get_auto_mouse_enable(void);
 void     set_auto_mouse_enable(bool enable);
 void     set_auto_mouse_layer(uint8_t layer);
 void     auto_mouse_layer_off(void);

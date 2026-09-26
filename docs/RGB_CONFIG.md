@@ -238,6 +238,10 @@ span animates. `AUTOMOUSE_RGB_DEAD_TIME` is configurable in the active keymap
 profile can trade off smoother animation against less flicker while the
 trackball is still actively being used.
 
+The fade only runs while auto-mouse itself is enabled (the Auto-mouse setting).
+With auto-mouse off, a pointer layer held or locked by hand is an ordinary
+layer: it shows its own layer lighting on both halves, and no fade plays.
+
 The configured destination is not a persistent board state. Once the automouse
 renderer stops, the next frame falls back to ordinary layer rendering and then
 later overlays such as pd-mode color or key feedback still paint on top.
