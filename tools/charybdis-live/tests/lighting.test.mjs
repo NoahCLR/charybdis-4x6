@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {isOff} from "../webview/lib/colour.mjs";
-import {baseColour, feedbackColours, keyLight, pdColourRow, stageEnabled, trackballLight} from "../webview/view/lighting.mjs";
+import {baseColour, feedbackColours, keyLight, pdColourRow, stageEnabled, stageIdle, stageInEffect, trackballLight} from "../webview/view/lighting.mjs";
 
 const colour = (h, s, v) => ({h: String(h), s: String(s), v: String(v)});
 const position = (layoutIndex, keycode) => ({layoutIndex, keycode});
@@ -44,6 +44,24 @@ test("stages report what the device said, and the base effect is its own read", 
     assert.equal(baseColour(unread), null, "an unread base effect has no colour to draw");
     const animated = model({rgb: {baseEffect: {state: "read", enabled: true, effectId: 3}}});
     assert.equal(baseColour(animated), null, "an animated effect has no single colour");
+});
+
+// The fade runs only while auto-mouse moves the layer, so with auto-mouse off
+// in the draft the stage paints nothing, whatever its stored switch says.
+test("the auto-mouse fade is in effect only while auto-mouse is on", () => {
+    const withAutoMouse = (enabled) => ({...model(), configDefaults: [
+        {id: "autoMouse", area: "Mouse", fields: [{macro: "autoMouse", kind: "toggle", value: enabled ? "1" : "0", enabled}]}]});
+    assert.equal(stageInEffect(withAutoMouse(true), "auto"), true);
+    assert.equal(stageIdle(withAutoMouse(true), "auto"), null);
+    const off = withAutoMouse(false);
+    assert.equal(stageEnabled(off, "auto"), true, "the stored switch is left as it is");
+    assert.equal(stageInEffect(off, "auto"), false);
+    assert.match(stageIdle(off, "auto"), /auto-mouse is off/i);
+    assert.equal(stageInEffect(off, "layers"), true, "other stages do not depend on auto-mouse");
+    const stored = model();
+    stored.rgb.stages = stored.rgb.stages.map((row) => row.id === "auto" ? {...row, enabled: false} : row);
+    assert.equal(stageIdle({...stored, configDefaults: off.configDefaults}, "auto"), null, "a stage switched off is off, not idle");
+    assert.equal(stageInEffect(model(), "auto"), true, "without settings readback nothing is claimed");
 });
 
 test("a mapped-keys-only layer paints its own keys and leaves the rest on the base", () => {

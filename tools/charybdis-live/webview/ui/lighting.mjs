@@ -5,7 +5,7 @@
 import {css, isOff, label as hsvLabel} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {LED_INDEX, TRACKBALL_LED} from "../view/geometry.mjs";
-import {PD_MODE_IDS, baseColour, feedbackColours, layerColourRow, pdColourRow, stageEnabled} from "../view/lighting.mjs";
+import {PD_MODE_IDS, baseColour, feedbackColours, layerColourRow, pdColourRow, stageEnabled, stageIdle, stageInEffect} from "../view/lighting.mjs";
 import {branchName, slotCalled, stageOrder, vocabulary, word} from "../view/vocabulary.mjs";
 import {currentLayer, getModel, layerName, layers, post, render, state, writable} from "../store.mjs";
 import * as edits from "../view/edits.mjs";
@@ -84,9 +84,10 @@ export function screenLighting() {
     // LED groups is no stage; every stage can draw on them.
     const stages = stageOrder(model);
     const stageTab = (stage, index) => {
-        const on = stageEnabled(model, stage.id), colour = stageColour(model, stage.id), lit = on && colour && !isOff(colour);
+        const on = stageInEffect(model, stage.id), colour = stageColour(model, stage.id), lit = on && colour && !isOff(colour);
+        const idle = stageIdle(model, stage.id);
         return `<button role="tab" class="${on ? "" : "off"}" data-ltab="${stage.id}" aria-selected="${state.stage === stage.id}"
-            data-tip="Painted ${index + 1} of ${stages.length}${on ? "" : " · this stage is off"}">
+            data-tip="Painted ${index + 1} of ${stages.length}${on ? "" : ` · ${esc(idle || "this stage is off")}`}">
             <span class="n">${index + 1}</span><i class="swatch ${lit ? "" : "swatch-off"}" style="${lit ? `background:${css(colour)}` : ""}"></i>
             ${esc(stage.label)}${marks.lighting.has(stage.id) ? draftDot() : ""}</button>`;
     };
@@ -215,8 +216,24 @@ function stageBody(body) {
     if (state.stage === "auto") {
         const fade = model.rgb.automouseFade || {};
         node.className = "tab-grid three";
+        // With auto-mouse off the fade never runs, so its controls are shown
+        // disabled rather than pretending to matter. Nothing is cleared: the
+        // stage switch and these values come back with auto-mouse.
+        const idle = stageIdle(model, "auto");
+        const editFade = canEdit && !idle;
+        if (idle) {
+            node.classList.add("idle");
+            const notice = el(`<div class="unavailable span"><span>${esc(idle)} A pointer layer turned on by hand shows its own layer lighting. The fade settings below are kept for when auto-mouse is back on.</span>
+                <button class="btn tiny" style="justify-self:start">Open Settings → Auto-mouse</button></div>`);
+            notice.querySelector("button").addEventListener("click", () => {
+                Object.assign(state, {screen: "settings", settingsSearch: "", settingsOpen: [...(state.settingsOpen || []).filter((id) => id !== "autoMouse"), "autoMouse"],
+                    reveal: '.settings-group[data-section="autoMouse"]'});
+                render();
+            });
+            node.append(notice);
+        }
         const policy = section("Fade");
-        const select = el(`<label class="field"><span>Fade mode</span><select class="input" ${canEdit ? "" : "disabled"}>
+        const select = el(`<label class="field"><span>Fade mode</span><select class="input" ${editFade ? "" : "disabled"}>
             ${vocabulary(model).fadeModes.map(([id, text]) => `<option value="${id}" ${fade.mode === id ? "selected" : ""}>${text}</option>`).join("")}</select></label>`);
         select.querySelector("select").addEventListener("change", (event) =>
             post(edits.automouseFade(event.target.value, fade.end_color)));
@@ -226,7 +243,7 @@ function stageBody(body) {
         endColour.append(unused
             ? el(`<div class="row" style="gap:10px;opacity:.5"><span class="swatch-lg ${isOff(fade.end_color) ? "swatch-off" : ""}" style="width:34px;height:34px;${isOff(fade.end_color) ? "" : `background:${css(fade.end_color)}`}"></span>
                 <div><div style="font-size:12.5px">Unused in this mode</div><div class="note mono">${esc(hsvLabel(fade.end_color))}</div></div></div>`)
-            : colourControl({colour: fade.end_color, canEdit, title: "Fade destination",
+            : colourControl({colour: fade.end_color, canEdit: editFade, title: "Fade destination",
                 onChange: (next) => post(edits.automouseFade(fade.mode, next))}));
         if (unused) endColour.append(el(`<p class="note" style="margin-top:10px">Follow-the-real-destination lands on whatever the board would show once the auto-mouse layer drops out, so the end colour is not read. It stays disabled rather than pretending to matter.</p>`));
         const note = section("What this stage does");

@@ -485,6 +485,9 @@ button.tier:hover { background: var(--surface-3); }
 .tab-grid.three { grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr) minmax(0, 1fr); }
 .tab-grid.two { grid-template-columns: minmax(320px, 0.9fr) minmax(0, 1.1fr); }
 .tab-grid .span { grid-column: 1 / -1; }
+/* A stage switched on that paints nothing (auto-mouse off): its controls stay
+   visible and kept, but read as not in play. */
+.tab-grid.idle > section { opacity: .5; }
 .tab-grid section { min-width: 0; }
 .tab-split { display: grid; grid-template-columns: 236px minmax(0, 1fr); gap: 20px; align-items: start; }
 .tab-split.builder { grid-template-columns: 330px minmax(0, 1fr); }

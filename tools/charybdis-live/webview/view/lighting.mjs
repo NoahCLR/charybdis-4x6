@@ -22,6 +22,20 @@ export function stageEnabled(model, id) {
     return Boolean(stage?.enabled);
 }
 
+// A stage switched on can still paint nothing. The auto-mouse fade runs only
+// while auto-mouse raises its layer: with auto-mouse off, a pointer layer
+// turned on by hand shows its own lighting. This answers why, or null; the
+// stored switch is left as it is, so turning auto-mouse back on restores it.
+// Without settings readback nothing is claimed.
+export function stageIdle(model, id) {
+    if (id !== "auto" || !stageEnabled(model, id)) return null;
+    const field = (model?.configDefaults || []).find((section) => section.id === "autoMouse")
+        ?.fields.find((entry) => entry.macro === "autoMouse");
+    return field && !field.enabled ? "Auto-mouse is off, so this stage paints nothing." : null;
+}
+
+export const stageInEffect = (model, id) => stageEnabled(model, id) && !stageIdle(model, id);
+
 // The base effect is a VIA read, not part of the profile. Only a solid colour
 // can be drawn honestly; any other effect has no single colour to show.
 export function baseColour(model) {
