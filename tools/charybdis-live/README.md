@@ -69,7 +69,7 @@ together. The board then shows what the keyboard would answer with, by the
 firmware's rule: the highest layer on wins, a transparent key is answered by the
 highest layer below it that is also on, and Base is always on. Keys answered from
 below are seen through the top layer's glass: frosted like a transparent key,
-their legend sharp, and marked with their layer's swatch (Base's go unmarked), and
+their legend sharp, in the light of the layer that answers, and
 on Lighting the board paints every layer on, lowest first, as the keyboard does.
 The highest layer keeps the tab joined to the board and every edit is stored on
 it; a key answered from below says so on the Key tab, and setting it overrides

@@ -96,6 +96,9 @@ function mappedOn(model, layer, l, position) {
  *   the layer LED group rows → a previewed pointing mode by locality → its
  *   LED group rows.
  *
+ * The answer says what painted the LED last: `source` is the stage ("off",
+ * "base", "layer" or "pointing") and, for a layer, `layer` is its id.
+ *
  * `options.held` names the layers previewed on as well (by layer id); they
  * paint in the same ascending pass, as rgb_layer_stage.c paints every active
  * layer.
@@ -108,23 +111,23 @@ function mappedOn(model, layer, l, position) {
 function ledLight(model, layer, led, position, options = {}) {
     if (matrixOff(model)) return {colour: OFF, source: "off"};
     const base = stageEnabled(model, "base") ? baseColour(model) : null;
-    let colour = base || OFF, source = base ? "base" : "off";
-    const paint = (next, from) => { colour = next; source = from; };
+    let colour = base || OFF, source = base ? "base" : "off", painter = null;
+    const paint = (next, from, by = null) => { colour = next; source = from; painter = by; };
 
     if (stageEnabled(model, "layers")) {
         const active = [...new Set([0, layer?.index ?? 0, ...(options.held || [])])].sort((a, b) => a - b);
         for (const l of active) {
             const row = layerColourRow(model, l);
             if (!row || !solid(row.color)) continue;
-            if (row.mode === "ALL_KEYS" || mappedOn(model, layer, l, position)) paint(row.color, "layer");
+            if (row.mode === "ALL_KEYS" || mappedOn(model, layer, l, position)) paint(row.color, "layer", l);
         }
         for (const group of model?.rgb?.layerLedGroups || []) {
             if (!(group.ledIndices || []).includes(led)) continue;
             const owners = group.owner === "RGB_LAYER_GROUP_ALL" ? active : active.filter((l) => group.owner === `Layer ${l}`);
             for (const l of owners) {
                 const row = layerColourRow(model, l);
-                if (!inherits(group.color)) paint(group.color, "layer");
-                else if (row && solid(row.color)) paint(row.color, "layer");
+                if (!inherits(group.color)) paint(group.color, "layer", l);
+                else if (row && solid(row.color)) paint(row.color, "layer", l);
             }
         }
     }
@@ -140,7 +143,7 @@ function ledLight(model, layer, led, position, options = {}) {
             paint(inherits(group.color) ? preview.color : group.color, "pointing");
         }
     }
-    return {colour, source};
+    return {colour, source, layer: painter};
 }
 
 export function keyLight(model, layer, position, options = {}) {
@@ -151,3 +154,10 @@ export function keyLight(model, layer, position, options = {}) {
 export function trackballLight(model, layer, options = {}) {
     return ledLight(model, layer, TRACKBALL_LED, undefined, options);
 }
+
+// Whether an LED's light is the viewed layer's own rather than seen through it
+// from beneath: that layer or a previewed pointing mode painted it last, or the
+// viewed layer is base, which nothing lies under — the base effect is the floor
+// base sits on, always on with it, not a layer below it.
+export const ownLight = (light, layerId = 0) =>
+    layerId === 0 || light?.source === "pointing" || (light?.source === "layer" && light.layer === layerId);

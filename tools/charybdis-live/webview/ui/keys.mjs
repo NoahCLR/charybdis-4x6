@@ -111,7 +111,7 @@ export function previewFoot(layer, lead = "") {
     const under = [...heldLayers()].reverse().map((at) => layerName(layers()[at]));
     const node = el(`<div class="board-foot">${lead}
         <span><b>${esc(layerName(layer))}</b> on top of ${esc([...under, layerName(layers()[0])].join(", "))}
-            · keys seen through from below are frosted, with their layer's swatch unless from ${esc(layerName(layers()[0]))} · edits go to ${esc(layerName(layer))}</span>
+            · keys seen through from below are frosted · edits go to ${esc(layerName(layer))}</span>
         <span class="right"><button class="btn tiny ghost" data-act="onelayer">Show one layer</button></span></div>`);
     node.querySelector('[data-act="onelayer"]').addEventListener("click", () => { showLayer(state.layer); render(); });
     return node;

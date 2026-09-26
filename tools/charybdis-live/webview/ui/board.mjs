@@ -6,15 +6,14 @@
 // shows what the keyboard would answer with instead of what this layer stores:
 // a transparent key shows the key of the highest layer below that is on. Its
 // cap is frosted like any transparent key's, since this layer is glass there
-// and the key is seen through it; its legend stays sharp, and a swatch in the
-// corner names the answering layer by its colour unless it is base, which
-// answers whatever nothing else does. Selection and edits still name this
-// layer's own position.
+// and the key is seen through it; its legend stays sharp, and the light it
+// shows is the answering layer's, so its colour names that layer. Selection and
+// edits still name this layer's own position.
 
 import {css, idealText, isOff} from "../lib/colour.mjs";
 import {GEO, LED_INDEX, TRACKBALL_LED, fitText, keyFaceRows, keyVisual} from "../view/geometry.mjs";
 import {behaviourFor, behaviourTiers, combosAt, keyFace, keyMeaning, resolvedPositions} from "../view/keyface.mjs";
-import {keyLight, layerColourRow, stageEnabled, tierColour, trackballLight} from "../view/lighting.mjs";
+import {keyLight, ownLight, stageEnabled, tierColour, trackballLight} from "../view/lighting.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {hideHover} from "./hover.mjs";
 
@@ -120,7 +119,6 @@ export function board(model, layer, options = {}) {
             ${selected === index ? ring("kc-ring") : ""}
             ${reach.includes(index) ? `<rect class="kc-reach" x="${visual.x - 3}" y="${visual.y - 3}" width="${GEO.keyW + 6}" height="${GEO.keyH + 6}" rx="${GEO.radius + 2}"></rect>` : ""}
             ${marks}
-            ${from && from.index !== 0 ? fromSwatch(model, from, visual, text) : ""}
             ${drafted?.has(index) ? `<circle class="kc-draft" cx="${visual.x + GEO.keyW - 5.5}" cy="${visual.y + 5.5}" r="2.6"></circle>` : ""}
             ${sub ? `<line class="kc-sep" x1="${visual.x + 8}" y1="${rows.separatorY}" x2="${visual.x + GEO.keyW - 8}" y2="${rows.separatorY}" stroke="${text || "rgba(255,255,255,.9)"}" stroke-width="1"></line>` : ""}
             <text class="kc-label" x="${cx}" y="${rows.mainY}" font-size="${mainFit.size}"${squeeze(mainFit)}${text ? ` style="fill:${text}"` : ""}>${esc(main)}</text>
@@ -207,34 +205,28 @@ function dragToSwap(node, group, index, onSwap) {
     group.addEventListener("pointercancel", reset);
 }
 
-// The answering layer's swatch in a seen-through key's corner, the swatch its
-// tab carries: lit in its colour, or an empty outline when it paints nothing.
-function fromSwatch(model, from, visual, text) {
-    const row = layerColourRow(model, from.index);
-    const lit = stageEnabled(model, "layers") && row && !isOff(row.color);
-    const edge = text || "rgba(255,255,255,.9)";
-    return `<rect class="kc-from" x="${visual.x + 5}" y="${visual.y + 5}" width="6" height="6" rx="1.8"
-        fill="${lit ? css(row.color) : "none"}" stroke="${edge}" stroke-width="${lit ? 0.9 : 1}"></rect>`;
-}
-
-// The trackball's own LED. In light mode it shows what it emits; in the LED
+// The trackball's own LED. In light mode it shows what it emits, by the rule
+// the keys follow: solid when its light is the viewed layer's own — an
+// all-keys colour or one of its LED groups, a previewed pointing mode, or
+// anything at all on base, which nothing lies under — and frosted when it is
+// seen through the viewed layer from underneath (view/lighting.mjs ownLight).
+// A mapped-keys-only layer never reaches it, since no key maps to it. In the LED
 // selector it shows its index and whether the pending group has picked it, the
 // same two things every key shows there.
 function trackballGlyph(model, layer, {mode, pdActive, held, trackball, clickable}) {
     const {x, y, r} = GEO.trackball;
     const light = trackballLight(model, layer, {pdActive, held});
     const paint = css(light.colour);
+    const glass = mode !== "leds" && !ownLight(light, layer?.index ?? 0);
     const picked = mode === "leds"
         ? `fill:${trackball ? "var(--key-hi)" : "var(--key)"};stroke:var(--text);stroke-width:${trackball ? 2 : 1}`
-        : `fill:${paint};stroke:rgba(255,255,255,.3)`;
-    const text = mode === "leds" ? "" : idealText(light.colour);
-    const markup = `<g class="kc kc-ball${trackball ? " sel" : ""}"${clickable ? ' data-trackball="1" tabindex="0" role="button"' : ""}
+        : `fill:${paint};stroke:${glass ? "none" : "rgba(255,255,255,.3)"}`;
+    const markup = `<g class="kc kc-ball${glass ? " glass" : ""}${trackball ? " sel" : ""}"${clickable ? ' data-trackball="1" tabindex="0" role="button"' : ""}
         aria-label="Trackball LED ${TRACKBALL_LED}">
         <circle cx="${x}" cy="${y}" r="${r}" style="${picked}"></circle>
-        ${mode === "leds" ? `<text class="kc-label sm" x="${x}" y="${y}">${TRACKBALL_LED}</text>` : ""}
-        <text x="${x}" y="${y + r + 12}" class="kc-badge">trackball</text></g>`;
+        ${mode === "leds" ? `<text class="kc-label sm" x="${x}" y="${y}">${TRACKBALL_LED}</text>` : ""}</g>`;
     return {
         markup,
-        glow: mode === "leds" ? "" : `<circle class="kc-glow" cx="${x}" cy="${y}" r="${r}" fill="${paint}"></circle>`,
+        glow: mode === "leds" ? "" : `<circle class="kc-glow${glass ? " kc-glow-trns" : ""}" cx="${x}" cy="${y}" r="${r}" fill="${paint}"></circle>`,
     };
 }

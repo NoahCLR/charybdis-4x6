@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {isOff} from "../webview/lib/colour.mjs";
-import {baseColour, feedbackColours, keyLight, pdColourRow, stageEnabled, stageIdle, stageInEffect, trackballLight} from "../webview/view/lighting.mjs";
+import {baseColour, feedbackColours, keyLight, ownLight, pdColourRow, stageEnabled, stageIdle, stageInEffect, trackballLight} from "../webview/view/lighting.mjs";
 
 const colour = (h, s, v) => ({h: String(h), s: String(s), v: String(v)});
 const position = (layoutIndex, keycode) => ({layoutIndex, keycode});
@@ -85,6 +85,28 @@ test("layers previewed on paint in the same ascending pass, under the viewed lay
     assert.deepEqual(keyLight(m, layer, position(13, "KC_UP"), {held: [1]}).colour, colour(180, 255, 200),
         "layer 3 still paints its own keys over layer 1");
     assert.deepEqual(trackballLight(m, layer, {held: [1]}).colour, colour(85, 255, 200), "an all-keys wash reaches the trackball LED");
+});
+
+test("the trackball LED says which layer painted it, so the board can tell its own from what shows through", () => {
+    const m = model();
+    assert.deepEqual(trackballLight(m, {index: 4}), {colour: colour(0, 0, 158), source: "layer", layer: 4},
+        "an all-keys layer paints the trackball itself");
+    assert.deepEqual(trackballLight(m, {index: 3}), {colour: colour(140, 210, 180), source: "base", layer: null},
+        "a mapped-keys-only layer never reaches it, so the base effect shows");
+    assert.equal(trackballLight(m, {index: 3}, {held: [4]}).layer, 4, "a lower layer on in a preview paints it from underneath");
+    const grouped = model({rgb: {...model().rgb, layerLedGroups: [{owner: "Layer 3", ledIndices: [56], color: colour(0, 0, 0)}]}});
+    const light = trackballLight(grouped, {index: 3});
+    assert.equal(light.source, "layer");
+    assert.equal(light.layer, 3, "a layer's LED group containing LED 56 paints it as that layer");
+});
+
+test("the trackball's light is the viewed layer's own unless it is seen through from beneath", () => {
+    const m = model();
+    assert.equal(ownLight(trackballLight(m, {index: 0}), 0), true, "on base the base effect is base's own floor, not something below");
+    assert.equal(ownLight(trackballLight(m, {index: 4}), 4), true, "an all-keys layer paints it itself");
+    assert.equal(ownLight(trackballLight(m, {index: 3}), 3), false, "above base, the base effect is seen through a mapped-keys-only layer");
+    assert.equal(ownLight(trackballLight(m, {index: 3}, {held: [4]}), 3), false, "a lower layer's paint is seen through too");
+    assert.equal(ownLight({source: "pointing", layer: null}, 3), true, "a previewed pointing mode is what is being shown");
 });
 
 test("an all-keys layer paints transparent positions too", () => {
