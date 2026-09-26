@@ -30,7 +30,7 @@ matrix.
 | Pointing modes | Eight device-owned slots and eight RGB rows; see [PD-mode domain v1](architecture/pd-mode-domain-v1.md) |
 | Global policy | Every other portable setting, including startup layers, combo matching and device-reported lighting and key options; unsupported firmware features stay read-only |
 | Backup and restore | Complete snapshots, import review against the keyboard, recovery file and verified restore |
-| Drafts and Apply | One draft with item-by-item review, discard by edit group, Show, undo/redo and draft history; Apply shows its steps and says where a failure happened (D-L19, D-L23, D-L29, D-L30) |
+| Drafts and Apply | One draft with item-by-item review, discard by edit group, Show, undo/redo and draft history; the review checks which layers can be reached and asks before applying a lock with no way back (D-L36); Apply shows its steps and says where a failure happened (D-L19, D-L23, D-L29, D-L30) |
 | Recovery | Atomic logical Apply, differential transfer, reboot recovery fencing, firmware roll-forward after the decision, resume after a lost or power-cycled peer link, bounded cancel (D-L20–D-L22, D-L27) |
 
 The rail's health strip shows connection, both-half convergence, draft state
@@ -643,3 +643,42 @@ draft in `tests/edits.test.mjs`, and a board that shows what the firmware does.
 Edits exist only as a reviewed draft; a keyboard the app cannot open a draft for
 is read-only, and the host refuses edits rather than writing them directly. v1
 was frozen by this decision and has since been removed.
+
+### D-L36 — The review checks what the layers let you reach
+
+A layer can lock with nothing left to release it: `TG(n)` on Base when layer n
+covers that key and has no `TG(n)`, `TO(0)` or `LOCK_LAYER(n)` of its own, a
+chain of locks where the second hides the first one's way out, `TT()`'s fifth
+tap, a behaviour branch or combo that locks. The firmware has no timeout and no
+"clear all" key, so only unplugging recovers it. The keyboard cannot refuse
+such a profile, and should not: the rules are the person's to break. The app
+says so before Apply instead.
+
+`core/model/layer-reach.js` walks every state a profile can reach from a
+keyboard at rest, a set of locked layers with any layers held on top, resolving
+every key as the firmware does and following each key's own layer action, its
+behaviour branches, the combos that match the highest layer on, and the
+trackball waking the pointer layer (unless the sniping layer keeps it off). A
+**trap** is a set of locks it can reach from which Base cannot be reached once
+every key is let go. It also reports, as warnings and notices, a layer with
+keys that nothing reaches, a layer key onto a layer with no keys of its own,
+transparent keys on Base, a pointer layer that cannot work, and layer keys the
+keyboard leaves to QMK (`DF()`, `PDF()`, a layer past the bank). Holding is not
+limited by fingers and a one-shot counts as a hold, so the walk finds every way
+out a person could find and never invents a trap.
+
+The draft reports its findings beside the keyboard's, both in the draft's
+layer order, so each is **new**, **on the keyboard** or **fixed** by the draft.
+The review lists them first, under Checks, each with the steps into it, the way
+out and Show. Only a trap asks for confirmation, and every trap the draft keeps
+asks, whether the draft made it or the keyboard already had it: Apply turns
+into "Apply anyway / Go back", and the host refuses an Apply of a draft with a
+trap unless the message confirms it. Warnings and notices never block.
+
+Two firmware facts were settled on the way. QMK's auto-mouse kept a lock of its
+own on `TG()`/`TO()` of the pointer layer that `TO(0)` never released; the
+runtime now takes those flips back and holds auto-mouse on for as long as the
+pointer layer is locked (`docs/POINTER_MODES.md`). And a layout key the keyboard
+does not own is refused where it is placed, since the keyboard's save check
+covers behaviours and combos only; one already on the keyboard is reported, not
+refused, so it never blocks an unrelated Apply.

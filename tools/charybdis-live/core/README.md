@@ -26,8 +26,10 @@ from an older request cannot satisfy a newer one.
 
 Every edit is staged in `session/profile-draft-session.js`: a complete
 portable profile (`model/portable-profile.js`) with undo and redo history, a
-review built by `model/profile-review.js`, and staleness checks on every
-message (draft id, revision, and the base the form was built from). The domain
+review built by `model/profile-review.js`, the checks of what the layers let
+you reach from `model/layer-reach.js` (a trap has to be confirmed before
+Apply), and staleness checks on every message (draft id, revision, and the base
+the form was built from). The domain
 edits themselves live in `session/device-profile-edits.js` and
 `session/key-behavior-edits.js`.
 

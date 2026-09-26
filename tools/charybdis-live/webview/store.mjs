@@ -66,6 +66,7 @@ export const state = {
     ledRow: {target: "layer", owner: "", source: ""}, // the LED group row being built, kept across renders
     settingsSearch: "",
     overlay: null,
+    confirmTrap: null, // the draft revision whose trap Apply is asking about
     picker: null,
     notice: "",
     error: "",

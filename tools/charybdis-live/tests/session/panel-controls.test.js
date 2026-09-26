@@ -71,6 +71,25 @@ test("apply writes a recovery copy through the host, then reads the keyboard aga
     assert.equal(session.resetDraftForms, true);
 });
 
+test("a draft that can lock a layer with no way back applies only once the trap is confirmed", async () => {
+    const session = sessionWithDraft(), draft = session.draft, h = host();
+    stage(session, {type: "updateLayoutKeys", layers: [
+        {layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "TG(1)"}]},
+        {layer: "Layer 1", changes: [{layoutIndex: 0, keycode: "KC_B"}]},
+    ]});
+    const trap = draft.view({}).checks.find((check) => check.level === "trap");
+    assert.equal(trap.status, "new");
+    assert.deepEqual(trap.layers, [1]);
+    assert.deepEqual(trap.path, ["Tap TG(1) on Base"]);
+    draft.review(draft.revision);
+    session.service.calls.length = 0;
+    await assert.rejects(draftControl(session, {type: "applyProfileDraft", draftRevision: draft.revision}, h), /Confirm it in the review/);
+    assert.deepEqual(session.service.calls, [], "nothing reaches the keyboard");
+    assert.equal(h.saved.length, 0);
+    await draftControl(session, {type: "applyProfileDraft", draftRevision: draft.revision, confirmTrap: true}, h);
+    assert.equal(session.service.calls[0], "restorePortableProfile");
+});
+
 test("an apply that finished with the other half unplugged says so instead of claiming a readback", async () => {
     const session = sessionWithDraft(), draft = session.draft, h = host();
     const restore = session.service.restorePortableProfile;

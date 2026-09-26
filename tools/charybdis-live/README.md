@@ -79,6 +79,17 @@ light, so the set reads from the tabs. The set holds across Keys and Lighting an
 when the keyboard or its layer order changes. It is a what-if: a set no key can
 actually hold together still previews.
 
+Before anything is applied, the review **checks** what the layers let you
+reach. A layer that can lock with no way back to Base — nothing on it, or on
+anything held over it, releases the lock or moves back — is a **trap**: the
+review shows the steps into it and the way out, and Apply asks "Apply anyway"
+before it writes. Every trap the draft keeps asks, including one already on the
+keyboard. The review also notes, without asking, a layer with keys nothing
+reaches, a layer key onto an empty layer, transparent keys on Base, a pointer
+layer that cannot work, and layer keys the keyboard leaves to QMK. Each check
+says whether the draft made it, the keyboard already has it, or the draft
+fixes it.
+
 Every colour on screen is a colour the keyboard emits; one amber signal marks
 work that has not reached the keyboard yet. Complete edits stage into one draft
 as they are made; incomplete builders such as a new combo keep their local form

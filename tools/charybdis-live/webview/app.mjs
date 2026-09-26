@@ -14,6 +14,8 @@ import {bindLayerIndex, hideHover, mountHover} from "./ui/hover.mjs";
 import {pickerOverlay} from "./ui/picker.mjs";
 import {keysShortcut, screenKeys} from "./ui/keys.mjs";
 import {reviewColumns, reviewItem} from "./ui/review-items.mjs";
+import {checksSection} from "./ui/checks.mjs";
+import {confirmText, trapsToConfirm} from "./view/checks.mjs";
 import {historyOverlay} from "./ui/history.mjs";
 import {closeLayers} from "./ui/layers.mjs";
 import {screenLighting} from "./ui/lighting.mjs";
@@ -102,17 +104,31 @@ function reviewOverlay() {
                 : `<div class="rv-block">${items}</div>`;
         }).join(""))(blocks.some((block) => block.items.some((entry) => entry.titleMark)))}</section>`).join("");
     const summary = statusSummary(draft.changes);
+    // Checks that point at a key or a combo open it as review items do.
+    const checked = [];
+    const checks = checksSection(draft.checks, (check) => check.status !== "fixed" && placeState(check.place, model.layers)
+        ? `<button class="btn tiny ghost" data-show-check="${checked.push(check) - 1}" data-tip="Close the review and open this where it is edited.">Show</button>` : "");
+    // A trap is applied only once it is confirmed here, for this revision.
+    const traps = trapsToConfirm(draft.checks);
+    const confirming = traps.length && state.confirmTrap === draft.revision;
+    const canApply = draft.reviewed && draft.connected && !draft.stale;
     const node = el(`<div class="scrim"><div class="sheet" role="dialog" aria-modal="true" aria-label="Review changes">
         <div class="sheet-h"><h2>Review ${draft.changes.length} change${draft.changes.length === 1 ? "" : "s"}</h2>
             ${summary ? `<span class="note">${esc(summary)}</span>` : ""}
             <span class="right" style="margin-left:auto"><button class="btn ghost" data-act="close">Keep editing</button></span></div>
         <div class="sheet-b rv">
+            ${checks}
             ${sections}
             <div style="padding:14px 18px 18px"><div class="callout warn">Apply writes a recovery copy, stages the changed blocks on both halves, then publishes one generation. The keyboard keeps running its saved profile until both halves confirm. If it is interrupted, the recovery copy restores it.</div></div>
         </div>
-        <div class="sheet-f"><span class="note">${esc(model?.device?.label || "")} · ${esc(model?.device?.summary || "")}</span>
+        ${confirming ? `<div class="sheet-f ck-confirm" role="alertdialog" aria-label="Confirm the trap">
+            <span class="ck-confirm-t"><i class="dot err"></i>${esc(confirmText(traps))}</span>
+            <span class="right"><button class="btn" data-act="unconfirm">Go back</button>
+                <button class="btn primary" data-act="apply-anyway" ${canApply ? "" : "disabled"}>Apply anyway</button></span></div>`
+        : `<div class="sheet-f"><span class="note">${esc(model?.device?.label || "")} · ${esc(model?.device?.summary || "")}</span>
             <span class="right"><button class="btn" data-act="close">Cancel</button>
-                <button class="btn primary" data-act="apply" ${draft.reviewed && draft.connected && !draft.stale ? "" : "disabled"}>Apply to keyboard</button></span></div>
+                <button class="btn primary" data-act="apply" ${canApply ? "" : "disabled"}
+                    ${traps.length ? `data-tip="${esc(`${traps.length === 1 ? "A trap" : `${traps.length} traps`} will be asked about before anything is written.`)}"` : ""}>Apply to keyboard</button></span></div>`}
     </div></div>`);
     // Pointing at a group's Discard lights what it takes back, in every area
     // the group reaches.
@@ -127,6 +143,25 @@ function reviewOverlay() {
             post({type: "discardProfileDraftChanges", group: Number(discard.dataset.discard)});
             return;
         }
+        const showCheck = event.target.closest("[data-show-check]");
+        if (showCheck) {
+            Object.assign(state, placeState(checked[Number(showCheck.dataset.showCheck)].place, model.layers), {overlay: null, confirmTrap: null});
+            post({type: "closeProfileDraftReview"});
+            rerender();
+            return;
+        }
+        if (event.target.closest('[data-act="unconfirm"]')) {
+            state.confirmTrap = null;
+            rerender();
+            return;
+        }
+        if (event.target.closest('[data-act="apply-anyway"]')) {
+            state.overlay = null;
+            state.confirmTrap = null;
+            post({type: "applyProfileDraft", confirmTrap: true});
+            rerender();
+            return;
+        }
         const show = event.target.closest("[data-show]");
         if (show) {
             Object.assign(state, placeState(shown[Number(show.dataset.show)].place, model.layers), {overlay: null});
@@ -137,10 +172,16 @@ function reviewOverlay() {
         // The sheet closes at once; the host's answer only refreshes what it says.
         if (event.target === node || event.target.closest('[data-act="close"]')) {
             state.overlay = null;
+            state.confirmTrap = null;
             post({type: "closeProfileDraftReview"});
             rerender();
         }
         if (event.target.closest('[data-act="apply"]')) {
+            if (traps.length) {
+                state.confirmTrap = draft.revision;
+                rerender();
+                return;
+            }
             state.overlay = null;
             post({type: "applyProfileDraft"});
             rerender();

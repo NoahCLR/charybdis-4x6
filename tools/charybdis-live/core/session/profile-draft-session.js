@@ -6,6 +6,7 @@ const {IDENTITY, compose, inverse, isIdentity, layerUnit, rearranged} = require(
 const {layerName: layerCalled} = require("../model/vocabulary");
 const {revertUnits} = require("../model/profile-revert");
 const {keyPlacementProblem} = require("../model/profile-placement");
+const {draftChecks, LEVELS: CHECK_LEVELS} = require("../model/layer-reach");
 const {baseLighting, editSettings, settingsEditorView} = require("../model/settings-editor");
 const {editMacro, macroEditorView} = require("../model/macro-editor");
 const {editDeviceProfile, RGB_EDITS, COMBO_EDITS, PD_EDITS} = require("./device-profile-edits");
@@ -402,6 +403,22 @@ class ProfileDraftSession {
             throw error;
         }
     }
+    // What the layer walk finds in this revision beside the keyboard, both in
+    // this revision's layer order (model/layer-reach.js), kept with the entry
+    // and the reference it was compared with.
+    checks() {
+        const draft = this.current.decoded;
+        const reference = this.base.incomplete ? undefined : this.referenceFor(this.order).snapshot.decoded;
+        this.checksCache ??= new WeakMap();
+        const known = this.checksCache.get(draft);
+        if (known && known.reference === reference) return known.checks;
+        const checks = draftChecks(reference, draft);
+        this.checksCache.set(draft, {reference, checks});
+        return checks;
+    }
+    // Whether Apply has to be confirmed: the draft can lock a layer with no
+    // way back to Base, whether it made that trap or the keyboard has it.
+    hasTrap() {return this.checks().some(check => check.level === CHECK_LEVELS.TRAP && check.status !== "fixed");}
     identity() {return {source: "draft", generation: this.revision, digest: this.decode(this.history[this.cursor]).fingerprint, originHalf: this.deviceId};}
     combos() {
         const {combos, settings} = this.decode(this.history[this.cursor]).decoded;
@@ -433,7 +450,8 @@ class ProfileDraftSession {
             // only while the history sheet is open (steps()).
             historyLength: this.history.length,
             reviewed: this.reviewedRevision === this.revision,
-            changes: this.changes()};
+            changes: this.changes(),
+            checks: this.checks()};
     }
 }
 module.exports = {ProfileDraftSession, DRAFT_EDITS};
