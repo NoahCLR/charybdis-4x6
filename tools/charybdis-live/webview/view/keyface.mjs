@@ -631,6 +631,42 @@ export function pointingVariant(model, keycode) {
     return "hold";
 }
 
+// A branch or combo action read as the pointing mode it sends: the slot, the
+// name it goes by, and whether the key holds the mode or toggles it on. Null
+// for any other action. An empty slot keeps its keycodes, so it still
+// resolves, marked empty.
+export function pointingAction(model, action) {
+    const slot = pointingSlotFor(model, action);
+    if (!slot) return null;
+    return {
+        slot,
+        name: slot.displayName || slot.name || `Slot ${slot.id + 1}`,
+        how: pointingVariant(model, action),
+        empty: !slot.kind,
+    };
+}
+
+// A branch or combo action read as the macro it plays: the slot and the name
+// it was given, or its number when it has none. Null for anything but a bare
+// macro keycode.
+export function macroAction(model, action) {
+    const [keycode] = macroKeycodes(action);
+    if (!keycode || keycode !== String(action).trim()) return null;
+    const slot = (model?.viaMacros || []).find((row) => row.keycode === keycode);
+    return {slot, keycode, name: slot?.name || `Macro ${keycode.split("_").at(-1)}`, empty: Boolean(slot?.empty)};
+}
+
+// An action that names something the person set up — a pointing mode or a
+// macro — as that thing: what kind it is, its name, and the tags that qualify
+// it. Null for a plain keycode, which reads as itself.
+export function namedAction(model, action) {
+    const pd = pointingAction(model, action);
+    if (pd) return {kind: "pointing", word: "pointing mode", name: pd.name, slot: pd.slot, tags: [pd.how, ...(pd.empty ? ["empty"] : [])]};
+    const macro = macroAction(model, action);
+    if (macro) return {kind: "macro", word: "macro", name: macro.name, slot: macro.slot, tags: macro.empty ? ["empty"] : []};
+    return null;
+}
+
 // The two values a slot answers to: hold and toggle, as the host's binding
 // registry gives them. Matching on the numbers rather than on names matters
 // for an empty slot, whose record carries no name for the model to resolve —

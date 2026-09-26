@@ -15,7 +15,7 @@ import {attachLayersControl} from "./layers.mjs";
 import {openPicker} from "./picker.mjs";
 import {attachGroupToggles, attachReachRows, groupHeader, groupOpen, groupSection, reachAttrs, reachTable} from "./groups.mjs";
 import {inGroupOrder, reachEntries} from "../view/reach-groups.mjs";
-import {branchBadge, marked, slotLight, tierDot} from "./marks.mjs";
+import {branchBadge, marked, sends, sendsKind, slotLight, tierDot} from "./marks.mjs";
 import {branchName, helperWord, tierName, vocabulary, word} from "../view/vocabulary.mjs";
 import {topbar, unavailable} from "./shell.mjs";
 
@@ -430,8 +430,8 @@ function behaviourEditor(behaviour) {
         const open = state.cell === id;
         if (!branch) return `<button class="bcell empty ${open ? "on" : ""}" data-cell="${id}"><span class="plus">+</span></button>`;
         return `<button class="bcell ${open ? "on" : ""}" data-cell="${id}">
-            <span class="bk">${esc(branch.action)}</span>
-            <span class="bl">${esc(helperLabel(kind, branch.helper))}</span></button>`;
+            <span class="bk"${sends(model, branch.action) ? ` data-tip="${esc(branch.action)}"` : ""}>${sends(model, branch.action) || esc(branch.action)}</span>
+            <span class="bl">${esc([sendsKind(model, branch.action), helperLabel(kind, branch.helper)].filter(Boolean).join(" · "))}</span></button>`;
     };
 
     const node = el(`<div>

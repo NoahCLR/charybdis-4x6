@@ -668,6 +668,11 @@ table.t.fixed { table-layout: fixed; }
 .mk { display: inline-flex; align-items: center; gap: 6px; }
 .mk-slot { display: inline-flex; justify-content: flex-end; align-items: center; gap: 4px; width: 34px; flex: none; }
 .mk-slot.title { width: 20px; justify-content: flex-start; }
+/* A branch that sends a pointing mode or a macro reads as that thing (ui/marks.mjs sends). */
+.sends { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; font-family: var(--sans); font-size: 11px; color: var(--text); font-weight: 520; vertical-align: middle; }
+.sends-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sends-tag { flex: none; font-family: var(--mono); font-size: 9px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--text-2); border: 1px solid var(--line-2); border-radius: 4px; padding: 0 4px; line-height: 14px; }
 .mk-swatch { width: 11px; height: 11px; border-radius: 3px; border: 1px solid var(--line-2); flex: none; display: inline-block; }
 .mk-badge { display: inline-grid; place-items: center; min-width: 18px; height: 13px; padding: 0 3px; border-radius: 3px; flex: none;
   border: 1.2px solid rgba(245,245,243,.7); background: rgba(8,8,10,.86); color: #f5f5f3;
@@ -799,6 +804,9 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .fbdot { width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--line-3); flex: none; display: inline-block; }
 .hc-target { font-family: var(--mono); font-size: 10.5px; color: var(--text); }
 .hc-life { color: var(--text-3); font-size: 10.5px; }
+/* Under a named action — a pointing mode or macro — its kind and how it runs
+   read as their own line. */
+.hc-life.hc-under { display: block; margin-top: 2px; }
 .hc-flow { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; font-size: 11px; }
 .hc-chip { border: 1px solid var(--line); border-radius: 5px; padding: 1px 6px; font-family: var(--mono); font-size: 10.5px; }
 .hc-chip.out { background: var(--surface-3); }
@@ -807,6 +815,9 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .hc-step .k { color: var(--text-3); text-transform: uppercase; font-size: 9.5px; letter-spacing: .06em; }
 .hc-step .v { font-family: var(--mono); }
 .hc-empty { font-size: 11px; color: var(--text-3); }
+/* In a layer preview: what the key seen through a transparent one does, set
+   apart as its own group under the viewed layer's key. */
+.hc-through { background: var(--surface-2); }
 
 /* ── picker ──────────────────────────────────────────────────────────── */
 .sheet.picker .sheet-b { padding: 0; }

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {createRequire} from "node:module";
-import {behaviourFor, comboEditInputs, comboReferenceLayer, combosAt, behaviourListeningTo, canonicalKeycode, behaviourGridSteps, behaviourGroups, behaviourRouteKeys, behaviourTiers, macroReach, pointingReach, reachablePositions, resolvedPositions, bindingKeycode, bindingsForSlot, comboGroups, combosForKey, keyFace, keyMeaning, macroKeycodes, macroPlacements, pointingSlotFor, reachKeys, slotKeycodes} from "../webview/view/keyface.mjs";
+import {behaviourFor, comboEditInputs, comboReferenceLayer, combosAt, behaviourListeningTo, canonicalKeycode, behaviourGridSteps, behaviourGroups, behaviourRouteKeys, behaviourTiers, macroReach, pointingReach, reachablePositions, resolvedPositions, bindingKeycode, bindingsForSlot, comboGroups, combosForKey, keyFace, keyMeaning, macroKeycodes, macroPlacements, macroAction, namedAction, pointingAction, pointingSlotFor, reachKeys, slotKeycodes} from "../webview/view/keyface.mjs";
 
 // Slots come from the host with their binding keycodes; the tests use the
 // host's own registry rather than a copy of it.
@@ -50,6 +50,38 @@ test("combos follow the device's own input positions before falling back to keyc
     assert.deepEqual(combosForKey(model, {layoutIndex: 27, keycode: "KC_D"}).map((c) => c.badge), ["C1"]);
     assert.deepEqual(combosForKey(model, {layoutIndex: 99, keycode: "KC_J"}).map((c) => c.badge), ["C2"]);
     assert.deepEqual(combosForKey(model, {layoutIndex: 99, keycode: "KC_Z"}), []);
+});
+
+test("a branch action that sends a pointing mode reads as the mode, held or toggled", () => {
+    const model = {pdModes: [{id: 0, displayName: "Dragscroll", kind: 2, binding: {hold: "DRAGSCROLL", lock: "DRAGSCROLL_LOCK", holdCode: 0x7e50, lockCode: 0x7e56}}, {id: 6, name: "", kind: 0, binding: {hold: "PD_SLOT_6", lock: "PD_SLOT_6_LOCK", holdCode: 0x7ef0, lockCode: 0x7ef1}}]};
+    const hold = pointingAction(model, "DRAGSCROLL");
+    assert.deepEqual([hold.slot.id, hold.name, hold.how, hold.empty], [0, "Dragscroll", "hold", false]);
+    assert.equal(pointingAction(model, "DRAGSCROLL_LOCK").how, "toggle");
+    const empty = pointingAction(model, "PD_SLOT_6");
+    assert.deepEqual([empty.name, empty.how, empty.empty], ["Slot 7", "hold", true], "an unnamed empty slot goes by its number");
+    assert.equal(pointingAction(model, "0x7EF1").how, "toggle", "the lock keycode as a raw value too");
+    assert.equal(pointingAction(model, "KC_A"), null);
+});
+
+test("a branch action that plays a macro reads as the macro by the name it was given", () => {
+    const model = {viaMacros: [{keycode: "VIA_MACRO_0", name: "Sign-off", empty: false}, {keycode: "VIA_MACRO_1", name: "", empty: true}]};
+    assert.equal(macroAction(model, "VIA_MACRO_0").name, "Sign-off");
+    const unnamed = macroAction(model, "VIA_MACRO_1");
+    assert.deepEqual([unnamed.name, unnamed.empty], ["Macro 1", true], "an unnamed macro goes by its number");
+    assert.equal(macroAction(model, "LSFT(VIA_MACRO_0)"), null, "only a bare macro keycode is the macro itself");
+    assert.equal(macroAction(model, "KC_A"), null);
+});
+
+test("pointing modes and macros read as what they are; plain keycodes read as themselves", () => {
+    const model = {
+        pdModes: [{id: 4, displayName: "Arrow", kind: 1, binding: {hold: "ARROW_MODE", lock: "ARROW_MODE_LOCK", holdCode: 0x7e54, lockCode: 0x7e5a}}],
+        viaMacros: [{keycode: "VIA_MACRO_2", name: "", empty: true}],
+    };
+    const pd = namedAction(model, "ARROW_MODE_LOCK");
+    assert.deepEqual([pd.kind, pd.word, pd.name, pd.tags], ["pointing", "pointing mode", "Arrow", ["toggle"]]);
+    const macro = namedAction(model, "VIA_MACRO_2");
+    assert.deepEqual([macro.kind, macro.word, macro.name, macro.tags], ["macro", "macro", "Macro 2", ["empty"]]);
+    assert.equal(namedAction(model, "KC_A"), null);
 });
 
 test("macro and pointing-mode keycodes resolve to the slots the keyboard reported", () => {

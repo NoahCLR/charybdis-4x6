@@ -9,6 +9,7 @@
 
 import {css, isOff} from "../lib/colour.mjs";
 import {esc} from "../lib/dom.mjs";
+import {namedAction} from "../view/keyface.mjs";
 import {feedbackColours, pdColourRow, stageEnabled} from "../view/lighting.mjs";
 import {layerSwatch} from "./layerbar.mjs";
 
@@ -40,6 +41,19 @@ export function slotLight(model, slot) {
     return {row, lit, swatch: (klass = "") => `<span class="pd-swatch ${klass} ${lit ? "" : "swatch-off"}"
         ${lit ? `style="background:${css(row.color)}"` : ""}></span>`};
 }
+
+// An action that names a pointing mode or a macro, as that thing: a pointing
+// mode's light, the name, and its tags (hold or toggle, empty). Empty for a
+// plain keycode, so the caller draws the keycode as it is. `sendsKind` is the
+// word the line describing the branch leads with, so the kind is said, not
+// only inferred from a swatch.
+export function sends(model, action) {
+    const named = namedAction(model, action);
+    if (!named) return "";
+    return `<span class="sends">${named.kind === "pointing" ? slotLight(model, named.slot).swatch("mk-swatch") : ""}`
+        + `<span class="sends-name">${esc(named.name)}</span>${named.tags.map((tag) => `<span class="sends-tag">${tag}</span>`).join("")}</span>`;
+}
+export const sendsKind = (model, action) => namedAction(model, action)?.word || "";
 
 // A mark as the host describes it: {kind: "tier", tier, branch?} · {kind:
 // "branch", count} · {kind: "layer", layer} · {kind: "pointing", slot} ·

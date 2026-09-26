@@ -2,10 +2,10 @@
 // without leaving the layer you are reading.
 
 import {el, esc} from "../lib/dom.mjs";
-import {actionLabel, behaviourFor, behaviourTiers, combosAt, keyFace, keyMeaning, macroKeycodes, pointingSlotFor} from "../view/keyface.mjs";
+import {actionLabel, behaviourFor, behaviourTiers, combosAt, keyFace, keyMeaning, macroKeycodes, pointingSlotFor, resolvedPositions} from "../view/keyface.mjs";
 import {pdColourRow, stageEnabled} from "../view/lighting.mjs";
-import {getModel, positionAt} from "../store.mjs";
-import {branchBadge, mark, tierDot} from "./marks.mjs";
+import {getModel, heldLayers, layerName, positionAt} from "../store.mjs";
+import {branchBadge, mark, sends, sendsKind, tierDot} from "./marks.mjs";
 import {helperWord, tierName, vocabulary, word} from "../view/vocabulary.mjs";
 
 const tip = el(`<div class="tip" hidden></div>`);
@@ -60,24 +60,51 @@ function place(node, rect, gap = 10, beside = false) {
 
 function keyCard(index) {
     const model = getModel();
-    const layer = (model?.layers || [])[state()] || model?.layers?.[0];
+    const stack = model?.layers || [];
+    const layer = stack[state()] || stack[0];
     const position = positionAt(layer, index);
     if (!position) return "";
     const face = keyFace(position);
+    const own = reachSections(model, layer, position, index);
+    if (!own.length) own.push(`<div class="hc-sect"><div class="hc-empty">No key behaviour, macro, combo or pointing mode on this key.</div></div>`);
+    return `<div class="hc-head"><div class="hc-title"><span class="t">${esc(face.main || "Unmapped")}</span>
+        <span class="hc-pill">index ${index}</span></div>
+        <code class="hc-code">${esc(position.keycode)}</code></div>${own.join("")}${seenThrough(model, stack, index)}`;
+}
+
+// In a layer preview, a key transparent on the viewed layer is answered by the
+// highest layer below that is on. The card still reads the viewed layer's own
+// key first, then what the answering key does, as the keyboard would run it.
+function seenThrough(model, stack, index) {
+    const held = heldLayers();
+    if (!held.length) return "";
+    const answer = resolvedPositions(stack, state(), held).find((entry) => entry.position.layoutIndex === index);
+    if (!answer?.fellThrough) return "";
+    const from = answer.layer, position = answer.position;
+    const sections = reachSections(model, from, position, index);
+    return `<div class="hc-through"><div class="hc-sect">
+            <div class="hc-h">Seen through from ${esc(layerName(from))}</div>
+            <div class="hc-title"><span class="t">${esc(keyFace(position).main || "Unmapped")}</span></div>
+            <code class="hc-code">${esc(position.keycode)}</code></div>
+        ${sections.length ? sections.join("") : `<div class="hc-sect"><div class="hc-empty">No key behaviour, macro, combo or pointing mode on that key.</div></div>`}</div>`;
+}
+
+// What one stored key reaches: its behaviour, macros, pointing mode and the
+// combos on its layer at this position. Empty when it reaches none of them.
+function reachSections(model, layer, position, index) {
     const behaviour = behaviourFor(model, keyMeaning(position));
     const combos = combosAt(model, model?.layers || [], layer?.index ?? 0, index);
     const macros = macroKeycodes(keyMeaning(position));
     const slot = pointingSlotFor(model, keyMeaning(position));
     const lit = stageEnabled(model, "key");
     const sections = [];
-
     if (behaviour) {
         const branches = (behaviour.steps || []).map((step) => {
             const rows = [["tap", tierName(model, "tap"), step.tap], ["hold", tierName(model, "hold"), step.hold], ["long", tierName(model, "long"), step.longHold]]
                 .filter(([, , branch]) => branch)
                 .map(([kind, name, branch]) => `<div class="hc-act"><span class="hc-stage">${tierDot(model, kind)}${name}</span>
-                    <span><span class="hc-target">${esc(branch.action)}</span>
-                    <span class="hc-life">${esc(helperText(kind, branch.helper))}</span></span></div>`).join("");
+                    <span>${sends(model, branch.action) || `<span class="hc-target">${esc(branch.action)}</span>`}
+                    <span class="hc-life${sendsKind(model, branch.action) ? " hc-under" : ""}">${esc(described(sendsKind(model, branch.action), helperText(kind, branch.helper)))}</span></span></div>`).join("");
             return `<div class="hc-branch">${branchBadge(model, step.tapCount + 1).replace('class="bn"', 'class="bn hc-n"')}<div>${rows}</div></div>`;
         }).join("");
         sections.push(`<div class="hc-sect"><div class="hc-h">Key behaviour</div>
@@ -111,15 +138,11 @@ function keyCard(index) {
             ${(combo.inputDisplays || combo.inputs || []).map((input) => `<span class="hc-chip">${esc(input)}</span>`).join('<span class="hc-life">+</span>')}
             <span class="hc-life">→</span><span class="hc-chip out">${esc(combo.outputDisplay || combo.output)}</span></div>`).join("")}</div>`);
     }
-    if (!behaviour && !combos.length && !macros.length && !slot) {
-        sections.unshift(`<div class="hc-sect"><div class="hc-empty">No key behaviour, macro, combo or pointing mode on this key.</div></div>`);
-    }
-    return `<div class="hc-head"><div class="hc-title"><span class="t">${esc(face.main || "Unmapped")}</span>
-        <span class="hc-pill">index ${index}</span></div>
-        <code class="hc-code">${esc(position.keycode)}</code></div>${sections.join("")}`;
+    return sections;
 }
 
 const helperText = (kind, helper) => helperWord(getModel(), kind, helper);
+const described = (what, how) => [what, how].filter(Boolean).join(" · ");
 
 const timing = (value) => Number(value) ? `${value} ms` : "keyboard default";
 
