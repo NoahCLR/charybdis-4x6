@@ -10,6 +10,7 @@ import {createRequire} from "node:module";
 import path from "node:path";
 import {fileURLToPath} from "node:url";
 import * as edits from "../webview/view/edits.mjs";
+import {shareHold} from "../webview/view/share.mjs";
 import {AXIS, BUTTON, DIRECTIONAL_STARTER_THRESHOLD, KIND, SCROLL_STARTER, dpiOptions, newMode, readConfig, settleButtons, startingRecord} from "../webview/view/pointing-config.mjs";
 
 const require = createRequire(import.meta.url);
@@ -544,6 +545,39 @@ test("a settings section is posted whole, and a partial section is refused", () 
     assert.equal(settingsEditorView(draft.current).timing.tappingTerm, "210");
     assert.throws(() => stage(draft, {...message, expectedFingerprint: draft.current.fingerprint, fields: message.fields.slice(0, 2)}),
         /complete settings section/i);
+});
+
+test("the auto-mouse fade is posted as a share, and a new timeout rescales it in the same step", () => {
+    const draft = session();
+    const sectionOf = (id) => settingsEditorView(draft.current).sections.find((row) => row.id === id);
+    const fade = () => sectionOf("automouseFade").fields[0];
+    stage(draft, edits.settingsSection(sectionOf("automouseFade"), () => "25", draft.current.fingerprint));
+    assert.equal(fade().value, "25");
+    assert.equal(Number(fade().ms), Math.round(Number(fade().whole) / 4), "a quarter of the timeout, stored in milliseconds");
+
+    const timeout = String(Number(fade().whole) * 2);
+    stage(draft, edits.settingsSection(sectionOf("autoMouse"), (field) => field.macro === "mouseTimeout" ? timeout : undefined, draft.current.fingerprint));
+    assert.equal(fade().value, "25", "the share holds across a new timeout");
+    assert.equal(fade().whole, timeout);
+    const last = draft.steps().at(-1).changes;
+    assert.deepEqual(last.map((change) => [change.unit, change.area]).sort(),
+        [["settings:autoMouse", "Mouse"], ["settings:automouseFade", "Lighting"]], "the step says it moved the fade too");
+    const place = last.find((change) => change.unit === "settings:automouseFade").place;
+    assert.deepEqual(place, {kind: "settings", section: "automouseFade", area: "Lighting", stage: "auto"});
+    const groups = draft.view({}).changes.filter((change) => ["settings:autoMouse", "settings:automouseFade"].includes(change.unit)).map((change) => change.group);
+    assert.equal(groups.length, 2);
+    assert.equal(new Set(groups).size, 1, "one Discard takes back the timeout and the fade it moved");
+});
+
+test("the fade slider previews exactly what the keyboard will store for every share", () => {
+    const draft = session();
+    const read = settingsEditorView(draft.current).sections.find((row) => row.id === "automouseFade");
+    for (let percent = 0; percent <= Number(read.fields[0].max); percent++) {
+        const staged = session();
+        stage(staged, edits.settingsSection(read, () => String(percent), staged.current.fingerprint));
+        const stored = settingsEditorView(staged.current).sections.find((row) => row.id === "automouseFade").fields[0].ms;
+        assert.equal(String(shareHold(read.fields[0], percent)), stored, `${percent}%`);
+    }
 });
 
 test("behaviour timing defaults follow the draft's Key Timing, and its undo", () => {

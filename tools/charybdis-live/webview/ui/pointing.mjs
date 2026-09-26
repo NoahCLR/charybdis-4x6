@@ -217,7 +217,7 @@ function editor(model, slot, canEdit, slots) {
         // The slot is staged once a field of the new form is changed.
         {onChange: (event) => { event.stopPropagation(); state.pdKind = {slot: slot.id, kind: Number(event.target.value)}; render(); }}));
     headBody.append(select("Pointer speed while active", dpiOptions(model.pdModeEditing?.dpiChoices, slot.dpi), slot.dpi ?? 0, "dpi",
-        {tip: "Sensor DPI while this mode runs. Normal pointer speed keeps the DPI set in Settings."}));
+        {tip: "Sensor DPI while this mode runs. Normal pointer speed keeps the DPI set in Mouse → Pointer Speed."}));
     wrap.append(head);
 
     // ── movement ──────────────────────────────────────────────────────────

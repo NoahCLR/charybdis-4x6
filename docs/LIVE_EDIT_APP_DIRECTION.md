@@ -26,8 +26,9 @@ matrix.
 | Layout and eight layers | Read/write; names and overlay order travel with complete profiles; a reorder renumbers layer keys by default ("Keys follow their layers") |
 | Key behaviours, combos and RGB | Read/write editors over the shared draft |
 | Macros | 64 named VIA macro slots with builder, recorder and preview; shared-memory and per-macro limits shown and enforced (D-L25, D-L26) |
+| Mouse | Pointer and sniping DPI, auto-sniping and auto-mouse: global-policy sections the core files under the Mouse area, so the rail, the review and import counts all place them there. The auto-mouse fade delay is a share of the timeout, edited on its lighting stage (D-L17) |
 | Pointing modes | Eight device-owned slots and eight RGB rows; see [PD-mode domain v1](architecture/pd-mode-domain-v1.md) |
-| Global policy | Every portable setting, including startup layers, combo matching and device-reported lighting and key options; unsupported firmware features stay read-only |
+| Global policy | Every other portable setting, including startup layers, combo matching and device-reported lighting and key options; unsupported firmware features stay read-only |
 | Backup and restore | Complete snapshots, import review against the keyboard, recovery file and verified restore |
 | Drafts and Apply | One draft with item-by-item review, discard by edit group, Show, undo/redo and draft history; Apply shows its steps and says where a failure happened (D-L19, D-L23, D-L29, D-L30) |
 | Recovery | Atomic logical Apply, differential transfer, reboot recovery fencing, firmware roll-forward after the decision, resume after a lost or power-cycled peer link, bounded cancel (D-L20–D-L22, D-L27) |
@@ -273,8 +274,14 @@ or by writing temporary values; older firmware's unsupported-page reply leaves
 brightness read-only. Restores reject brightness above the destination's
 reported limit before staging. Build-time LED cadence and pointer ladder
 definitions are not portable settings and are not fabricated as controls.
-Auto-mouse timeout and fade delay share one settings section so their required
-ordering is validated together.
+The auto-mouse fade delay (setting 16, the milliseconds the colour holds
+before it fades) must stay shorter than the timeout, and both halves refuse a
+profile where it is not. The app edits it on the Lighting auto-mouse stage as
+a whole percentage of the timeout, at most 99%, and still stores milliseconds.
+Saving a new timeout rescales the stored delay to its exact previous ratio in
+the same staged edit, so no edit can break the ordering and the review lists
+both. The ratio lives in the app, not the firmware: VIA does not edit these
+settings, and a storage change would cost a schema version and a reflash.
 
 ### D-L18 — Native settings use device-reported capabilities
 

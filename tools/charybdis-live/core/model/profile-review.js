@@ -267,9 +267,12 @@ function profileReview(before, after) {
         item("Macros", `macro:${i}`, `Macro ${i}${(next.name || old.name) ? ` · ${next.name || old.name}` : ""}`, fields(old), fields(next), {kind: "macro", index: i}, [has(old), has(next)]);
     });
     // Settings are saved a section at a time, so a section is one item.
-    const sections = (snapshot, settings) => settingsEditorView(snapshot).sections.map(section => ({id: section.id, label: section.label,
+    const sections = (snapshot, settings) => settingsEditorView(snapshot).sections.map(section => ({id: section.id, label: section.label, area: section.area, stage: section.stage,
         fields: new Map(section.fields.map(field => {
             let value = field.value;
+            // A share is compared by the milliseconds stored, so a timeout
+            // that rescales it shows here too, and read as both.
+            if (field.kind === "share") return [field.macro, {label: field.label, text: `${value}% · ${field.ms} ms`, key: field.ms, labelMark: field.governs}];
             if (field.kind === "toggle") value = field.enabled ? "on" : "off";
             else if (field.kind === "layer") return [field.macro, {label: field.label, text: settings.names[layerOfRef(value)] || value, key: field.value,
                 labelMark: field.governs, mark: {kind: "layer", layer: layerOfRef(value)}}];
@@ -280,7 +283,7 @@ function profileReview(before, after) {
     const sectionsA = sections(before, a.settings);
     for (const section of sections(after, b.settings)) {
         const old = sectionsA.find(entry => entry.id === section.id);
-        item("Settings", `settings:${section.id}`, section.label, old?.fields || new Map(), section.fields, {kind: "settings", section: section.id}, [true, true]);
+        item(section.area, `settings:${section.id}`, section.label, old?.fields || new Map(), section.fields, {kind: "settings", section: section.id, area: section.area, ...(section.stage ? {stage: section.stage} : {})}, [true, true]);
     }
     const masks = after.options?.keymapMasks.reduce((mask, value) => mask | value, 0) || 0;
     item("Settings", "settings:otherKeyOptions", "Other key options", new Map([["Stored bits", `0x${(a.settings.values[24] & ~masks).toString(16)}`]]),

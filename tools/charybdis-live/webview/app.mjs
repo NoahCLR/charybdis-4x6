@@ -18,6 +18,7 @@ import {historyOverlay} from "./ui/history.mjs";
 import {closeLayers} from "./ui/layers.mjs";
 import {screenLighting} from "./ui/lighting.mjs";
 import {screenSettings} from "./ui/settings.mjs";
+import {screenMouse} from "./ui/mouse.mjs";
 import {screenPointing} from "./ui/pointing.mjs";
 import {screenMacros} from "./ui/macros.mjs";
 import {screenProfile} from "./ui/profile.mjs";
@@ -31,6 +32,7 @@ const SCREENS = {
     lighting: screenLighting,
     settings: screenSettings,
     device: screenDevice,
+    mouse: screenMouse,
     pointing: screenPointing,
     macros: screenMacros,
     profile: screenProfile,

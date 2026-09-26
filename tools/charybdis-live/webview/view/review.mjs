@@ -8,7 +8,7 @@
 // item knows how to go to its editor.
 
 // The order areas are read in, as the rail lists the screens they live on.
-export const AREAS = ["Layout", "Layers", "Behaviours", "Combos", "Macros", "Pointing modes", "Lighting", "Settings", "Profile", "Recovery"];
+export const AREAS = ["Layout", "Layers", "Behaviours", "Combos", "Macros", "Mouse", "Pointing modes", "Lighting", "Settings", "Profile", "Recovery"];
 const rank = (area) => (AREAS.indexOf(area) + 1 || AREAS.length + 1);
 
 // Items by area, in rail order, and within an area as blocks in the order the
@@ -51,14 +51,14 @@ export function statusSummary(changes) {
 // A profile file's differences as counts, by what they configure rather than
 // by which screen stores them: the categories of the rail, each split the way
 // its screen is, and the Settings sections filed with what they tune (Key
-// Timing with keys, Sniping with pointing). `names` are the file's layer names;
+// Timing with keys, Lighting Feedback with lighting). A section edited on a
+// lighting stage counts with that stage. `names` are the file's layer names;
 // `stages` the lighting stages in paint order, as the vocabulary words them.
-export const CATEGORIES = ["Keys", "Lighting", "Macros", "Pointing modes", "Other"];
+export const CATEGORIES = ["Keys", "Lighting", "Macros", "Mouse", "Pointing modes", "Other"];
 const SECTIONS = {
     keyTiming: ["Keys", "Key timing", 31], startupLayers: ["Keys", "Startup layers", 22], comboReferences: ["Keys", "Combo layer matching", 41],
     keyboardOptions: ["Keys", "Key options", 50], rgbAppearance: ["Lighting", "Base effect", 1], lightingFeedback: ["Lighting", "Key feedback", 15],
-    normalPointerSpeed: ["Pointing modes", "Pointer speed", 1], pointingModeSpeeds: ["Pointing modes", "Mode speeds", 2],
-    sniping: ["Pointing modes", "Sniping", 3], autoMouse: ["Pointing modes", "Auto-mouse", 4],
+    normalPointerSpeed: ["Mouse", "Pointer speed", 1], sniping: ["Mouse", "Auto-sniping", 2], autoMouse: ["Mouse", "Auto-mouse", 3],
 };
 // Where one difference is counted: its category, its row's words, and the
 // row's place within the category.
@@ -70,16 +70,19 @@ function categoryOf(item, names, stages) {
         case "behaviour": return ["Keys", "Behaviours", 30];
         case "combo": return ["Keys", "Combos", 40];
         case "macro": return ["Macros", "Macros", 0];
-        case "pointing": return ["Pointing modes", "Modes", 0];
+        case "pointing": return ["Pointing modes", "Pointing modes", 0];
         case "lighting": {
             if (!place.stage) return ["Lighting", "Stages on or off", 0];
             if (place.stage === "groups") return ["Lighting", "LED groups", 20];
-            const index = stages.findIndex((stage) => stage.id === place.stage);
-            return ["Lighting", stages[index]?.label || place.stage, 10 + Math.max(index, 0)];
+            return stageRow(place.stage, stages);
         }
-        case "settings": return SECTIONS[place.section] || (item.unit === "settings:otherKeyOptions" ? SECTIONS.keyboardOptions : ["Other", item.title, 0]);
+        case "settings": return place.stage ? stageRow(place.stage, stages) : SECTIONS[place.section] || (item.unit === "settings:otherKeyOptions" ? SECTIONS.keyboardOptions : ["Other", item.title, 0]);
         default: return ["Other", item.title, 0];
     }
+}
+function stageRow(id, stages) {
+    const index = stages.findIndex((stage) => stage.id === id);
+    return ["Lighting", stages[index]?.label || id, 10 + Math.max(index, 0)];
 }
 export function categorySummary(items, {names = [], stages = []} = {}) {
     const categories = new Map();
@@ -128,9 +131,15 @@ export function placeState(place, layers = []) {
         case "macro": return {screen: "macros", macroSlot: `VIA_MACRO_${place.index}`};
         case "pointing": return {screen: "pointing", pdSlot: place.slot, pdKind: null, pdButtons: null};
         case "lighting": return place.stage ? {screen: "lighting", stage: place.stage} : {screen: "lighting"};
-        case "settings": return place.section
-            ? {screen: "settings", settingsSearch: "", settingsOpen: [place.section], reveal: `.settings-group[data-section="${place.section}"]`}
-            : {screen: "settings", settingsSearch: ""};
+        // A section is edited on the screen its area names: a lighting stage
+        // for a Lighting one, Mouse, or Settings.
+        case "settings": {
+            if (place.stage) return {screen: "lighting", stage: place.stage};
+            const screen = place.area === "Mouse" ? "mouse" : "settings";
+            return place.section
+                ? {screen, settingsSearch: "", settingsOpen: [place.section], reveal: `.settings-group[data-section="${place.section}"]`}
+                : {screen, settingsSearch: ""};
+        }
         case "layers": return {screen: "keys", layersOpen: true};
         default: return null;
     }
@@ -174,7 +183,10 @@ function computeMarks(changes) {
             if (place.stage) marks.lighting.add(place.stage);
             if (place.layer !== undefined) { marks.lightingLayers.add(place.layer); marks.layers.add(place.layer); }
             if (place.slot !== undefined) marks.lightingSlots.add(place.slot);
-        } else if (place.kind === "settings" && place.section) marks.settings.add(place.section);
+        } else if (place.kind === "settings" && place.section) {
+            marks.settings.add(place.section);
+            if (place.stage) marks.lighting.add(place.stage);
+        }
         else if (place.kind === "layers") {
             // A reorder marks the layers it moved, not every key they hold.
             marks.layerNames = true;

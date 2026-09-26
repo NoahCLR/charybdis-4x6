@@ -3,7 +3,9 @@
 // The sections, fields, hints and limits all come from the device snapshot, so
 // this screen renders what the firmware says it has rather than a list this
 // app decided on. A field the firmware cannot report stays visible and
-// read-only with its reason.
+// read-only with its reason. Each section names the screen it is edited on:
+// this one draws the Settings sections, and Mouse draws its own with the same
+// cards.
 
 import * as edits from "../view/edits.mjs";
 import {el, esc} from "../lib/dom.mjs";
@@ -12,9 +14,12 @@ import {topbar, unavailable} from "./shell.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
 import {marked} from "./marks.mjs";
 
+// The sections a screen draws, by the area the keyboard's model files them in.
+export const sectionsIn = (model, area) => (model?.configDefaults || []).filter((section) => section.area === area);
+
 export function screenSettings() {
     const model = getModel();
-    const sections = model?.configDefaults || [];
+    const sections = sectionsIn(model, "Settings");
     const canEdit = canEditArea("settings");
     const main = el(`<div class="main">${topbar(
         "Settings",
@@ -34,12 +39,20 @@ export function screenSettings() {
     }
 
     const query = (state.settingsSearch || "").trim().toLowerCase();
+    const matching = (section) => query ? section.fields.filter((field) => matches(field, query)) : section.fields;
     for (const section of sections) {
-        const fields = query
-            ? section.fields.filter((field) => `${field.label} ${field.hint || ""}`.toLowerCase().includes(query))
-            : section.fields;
+        const fields = matching(section);
         if (!fields.length) continue;
         pad.appendChild(sectionCard(model, section, fields, canEdit, Boolean(query)));
+    }
+    // A search for something that moved to Mouse says where it went.
+    const elsewhere = query ? sectionsIn(model, "Mouse").reduce((total, section) => total + matching(section).length, 0) : 0;
+    if (elsewhere) {
+        const note = el(`<div class="callout row" style="gap:10px;align-items:center">
+            <span>${elsewhere} matching setting${elsewhere === 1 ? " is" : "s are"} on the Mouse screen.</span>
+            <button class="btn tiny" data-act="mouse">Open Mouse</button></div>`);
+        note.querySelector('[data-act="mouse"]').addEventListener("click", () => { state.screen = "mouse"; render(); });
+        pad.appendChild(note);
     }
 
     main.appendChild(content);
@@ -53,7 +66,9 @@ export function screenSettings() {
     return main;
 }
 
-function sectionCard(model, section, fields, canEdit, searching) {
+const matches = (field, query) => `${field.label} ${field.hint || ""}`.toLowerCase().includes(query);
+
+export function sectionCard(model, section, fields, canEdit, searching = false) {
     // A folded section stays open once opened, by hand or by the review's
     // Show, instead of folding again on the next render.
     const opened = (state.settingsOpen || []).includes(section.id);

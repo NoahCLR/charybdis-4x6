@@ -134,6 +134,18 @@ test("a setting is marked with what it governs, as the Settings screen marks it"
     const layer=items.find(entry=>entry.unit==="settings:autoMouse").fields.find(field=>field.label==="Auto-mouse layer");
     assert.deepEqual(layer.afterMark,{kind:"layer",layer:3},"a layer value carries the layer's colour");
 });
+test("a settings section is listed under the screen it is edited on", () => {
+    const base=pdDocument(), before=snapshot(base);
+    const settings=require("../../core/schema/settings-domain-v1");
+    const after=snapshot(withDomain(base,64,payload=>settings.decodeSettings(payload),value=>settings.encodeSettings(value),
+        value=>({...value,values:value.values.map((v,i)=>i===1?175:i===5?3:v)})));
+    const items=profileReview(before,after);
+    const timing=items.find(entry=>entry.unit==="settings:keyTiming"), mouse=items.find(entry=>entry.unit==="settings:autoMouse");
+    assert.equal(timing.area,"Settings");
+    assert.deepEqual(timing.place,{kind:"settings",section:"keyTiming",area:"Settings"});
+    assert.equal(mouse.area,"Mouse","auto-mouse is edited on the Mouse screen");
+    assert.deepEqual(mouse.place,{kind:"settings",section:"autoMouse",area:"Mouse"});
+});
 test("clearing a pointing mode is a change to the slot, not to every behaviour that reaches it", () => {
     const base=pdDocument(), slots=validateSnapshot(base).pdModes;
     const target=validateSnapshot(base).behaviors.rows[0].target;

@@ -15,6 +15,7 @@ function openReview() {
 
 const ICONS = {
     keys: '<svg viewBox="0 0 16 16"><rect x="1.5" y="3.5" width="13" height="9" rx="2"/><path d="M4 6.5h.01M6.5 6.5h.01M9 6.5h.01M11.5 6.5h.01M5 9.5h6"/></svg>',
+    mouse: '<svg viewBox="0 0 16 16"><rect x="4" y="1.5" width="8" height="13" rx="4"/><path d="M8 1.5v4.5"/></svg>',
     pointing: '<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5"/><path d="M8 2.5v11M2.5 8h11"/></svg>',
     lighting: '<svg viewBox="0 0 16 16"><path d="M8 1.8v1.6M13 3l-1.1 1.1M14.2 8h-1.6M3 13l1.1-1.1M2 8h1.6M3 3l1.1 1.1"/><circle cx="8" cy="8.4" r="3.2"/></svg>',
     macros: '<svg viewBox="0 0 16 16"><path d="M2.5 4.5h11M2.5 8h7M2.5 11.5h9"/></svg>',
@@ -28,6 +29,7 @@ export const SCREENS = [
         {id: "keys", label: "Keys", icon: "keys"},
         {id: "lighting", label: "Lighting", icon: "lighting"},
         {id: "macros", label: "Macros", icon: "macros"},
+        {id: "mouse", label: "Mouse", icon: "mouse"},
         {id: "pointing", label: "Pointing modes", icon: "pointing"},
         {id: "settings", label: "Settings", icon: "settings"},
     ]},

@@ -18,7 +18,7 @@ test("Defaults and inherited behaviour timing come entirely from the complete ke
     const model = buildDeviceModel({settingsView: view, capabilities: {compiledLayerCount: 8}});
     assert.equal(model.configDefaults.length, 10);
     const fields = model.configDefaults.flatMap(section => section.fields);
-    assert.equal(fields.find(field => field.macro === "volumeDpi").value, "0");
+    assert.equal(fields.find(field => field.macro === "volumeDpi"), undefined, "a pointing mode's speed is set on its slot, not in settings");
     assert.equal(fields.find(field => field.macro === "mouseLayer").value, "Layer 4");
     assert.equal(fields.find(field => field.macro === "brightness").value, "200");
     assert.equal(model.behaviorTimingDefaults.tapHoldTerm, "150");
@@ -29,17 +29,47 @@ test("Defaults and inherited behaviour timing come entirely from the complete ke
     assert.deepEqual(buildDeviceModel().configDefaults, []);
 });
 
+test("every section names the screen it is edited on, and the pointer's own settings are Mouse", () => {
+    const areas = Object.fromEntries(settingsEditorView(snapshot()).sections.map(section => [section.id, section.area]));
+    assert.deepEqual(Object.keys(areas).filter(id => areas[id] === "Mouse"), ["normalPointerSpeed", "sniping", "autoMouse"]);
+    assert.deepEqual(Object.keys(areas).filter(id => areas[id] === "Lighting"), ["automouseFade"], "the fade is timed where it is coloured");
+    assert.ok(Object.values(areas).every(area => ["Mouse", "Lighting", "Settings"].includes(area)), "a section with no area of its own is a Settings one");
+});
+
 test("every unchanged section is a byte-exact round trip and edits preserve unrelated domains and banks", () => {
     const current = snapshot();
     for (const section of settingsEditorView(current).sections) assert.deepEqual(editSettings(current, message(current, section.id)), current.document);
-    const next = editSettings(current, message(current, "autoMouse", {mouseTimeout: "900", mouseFadeDelay: "300", mouseLayer: "Layer 7", autoMouse: false}));
+    const next = editSettings(current, message(current, "autoMouse", {mouseTimeout: "900", mouseLayer: "Layer 7", autoMouse: false}));
     const before = validateSnapshot(current.document), after = validateSnapshot(next);
     assert.deepEqual({...next, profile: current.document.profile}, current.document);
     assert.deepEqual(after.rgb, before.rgb); assert.deepEqual(after.behaviors, before.behaviors); assert.deepEqual(after.combos, before.combos);
     assert.deepEqual(after.settings.names, before.settings.names); assert.deepEqual(after.settings.macros, before.settings.macros);
     assert.deepEqual(after.settings.values.map((v, id) => [4,5,6,16].includes(id) ? before.settings.values[id] : v), before.settings.values);
-    assert.equal(after.settings.values[4], 0); assert.equal(after.settings.values[5], 7); assert.equal(after.settings.values[6], 900); assert.equal(after.settings.values[16], 300);
+    assert.equal(after.settings.values[4], 0); assert.equal(after.settings.values[5], 7); assert.equal(after.settings.values[6], 900);
+    assert.equal(after.settings.values[16], 300, "the fade keeps its third of the timeout: 400 of 1200 becomes 300 of 900");
     assert.deepEqual(current.document, document(), "source snapshot is not mutated");
+});
+
+test("the auto-mouse fade is a share of the timeout, so no edit can make it outlast the timeout", () => {
+    const current = snapshot(), view = settingsEditorView(current);
+    const field = view.sections.find(section => section.id === "automouseFade").fields[0];
+    assert.deepEqual([field.kind, field.value, field.ms, field.whole], ["share", "33", "400", "1200"], "400 ms of a 1200 ms timeout reads as 33%");
+    assert.equal(view.sections.find(section => section.id === "autoMouse").fields.some(entry => entry.id === 16), false, "the timeout's section no longer holds it");
+
+    const fade = percent => validateSnapshot(editSettings(current, message(current, "automouseFade", {mouseFadeHold: percent}))).settings.values;
+    assert.deepEqual(editSettings(current, message(current, "automouseFade")), current.document, "an unchanged share keeps its exact milliseconds");
+    assert.equal(fade("50")[16], 600);
+    assert.equal(fade("0")[16], 0, "0% fades across the whole timeout");
+    assert.equal(fade("99")[16], 1188);
+
+    const timeout = (ms, from = current) => validateSnapshot(editSettings(from, message(from, "autoMouse", {mouseTimeout: ms}))).settings.values;
+    assert.equal(timeout("3000")[16], 1000, "a longer timeout carries the share with it");
+    assert.equal(timeout("1")[16], 0, "even the shortest timeout leaves the fade shorter");
+    const nearlyAll = (() => {const document = editSettings(current, message(current, "automouseFade", {mouseFadeHold: "99"})); return {document, fingerprint: fingerprint(document)};})();
+    for (const ms of ["2", "7", "100", "65535"]) {
+        const values = timeout(ms, nearlyAll);
+        assert.ok(values[16] < values[6], `a 99% share of ${ms} ms still ends before the timeout`);
+    }
 });
 
 test("base lighting edits preserve the effect and flags while independently updating packed channels", () => {
@@ -54,7 +84,8 @@ test("base lighting edits preserve the effect and flags while independently upda
 test("invalid settings, incomplete sections and stale drafts fail before any device write", () => {
     const current = snapshot(), edit = (section, fields) => editSettings(current, message(current, section, fields));
     assert.throws(() => editSettings(current, {...message(current, "autoMouse"), expectedFingerprint: "old"}), /changed/);
-    assert.throws(() => edit("autoMouse", {mouseTimeout: "400", mouseFadeDelay: "400"}), /timeout.*longer/);
+    assert.throws(() => edit("autoMouse", {mouseTimeout: "0"}), /Timeout.*range/, "the fade needs a timeout to be a share of");
+    assert.throws(() => edit("automouseFade", {mouseFadeHold: "100"}), /range/, "a share is shorter than the whole");
     assert.throws(() => edit("autoMouse", {mouseDebounce: "256"}), /debounce.*range/);
     assert.throws(() => edit("autoMouse", {mouseLayer: "Layer 8"}), /layer/);
     assert.throws(() => edit("keyTiming", {combosEnabled: "false"}), /enabled or disabled/);
@@ -71,19 +102,15 @@ test("invalid settings, incomplete sections and stale drafts fail before any dev
 test("every DPI field offers the one list, limited only where the keyboard limits it", () => {
     const current = snapshot();
     const fields = settingsEditorView(current).sections.flatMap(section => section.fields).filter(field => /Dpi$/.test(field.macro));
-    assert.deepEqual(fields.map(field => field.macro), ["normalDpi", "snipingDpi", "dragscrollDpi", "volumeDpi", "brightnessDpi", "zoomDpi", "arrowDpi"]);
+    assert.deepEqual(fields.map(field => field.macro), ["normalDpi", "snipingDpi"], "a pointing mode's speed is set on its slot");
     for (const field of fields) {
         assert.ok(field.choices.every(choice => choice.value === 0 || POINTER_DPI.includes(choice.value)), `${field.macro} picks from the shared list`);
     }
     const values = macro => fields.find(field => field.macro === macro).choices.map(choice => choice.value);
     assert.deepEqual(values("normalDpi"), POINTER_DPI.filter(v => v >= 400 && v % 200 === 0), "the steps the firmware stores");
     assert.deepEqual(values("snipingDpi"), [100, 200, 300, 400], "the steps the firmware stores");
-    assert.deepEqual(values("dragscrollDpi"), [...POINTER_DPI]);
-    assert.deepEqual(values("volumeDpi"), [0, ...POINTER_DPI], "a mode can keep the normal pointer speed");
-
-    // The mode speeds take any stored value, so one outside the list saves.
-    const edit = fields => editSettings(current, message(current, "pointingModeSpeeds", fields));
-    assert.equal(validateSnapshot(edit({dragscrollDpi: "250", zoomDpi: "5000"})).settings.values[10], 250);
+    assert.throws(() => editSettings(current, {sectionId: "pointingModeSpeeds", expectedFingerprint: current.fingerprint, fields: []}),
+        /complete settings section/, "the old per-mode speeds are no longer a settings section");
     assert.throws(() => editSettings(current, message(current, "normalPointerSpeed", {snipingDpi: "500"})), /range/, "the keyboard refuses it");
 });
 
