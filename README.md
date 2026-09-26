@@ -258,8 +258,13 @@ configuration for an Extension Development Host.
 It reads everything it edits from the keyboard — layout, key behaviours,
 combos, the named VIA macros, lighting, the eight pointing-mode slots, layers and
 settings — and shows compiled defaults only when the keyboard reports no
-committed profile. Every edit goes into one local draft with undo, redo and a
-history, and reaches the keyboard only through **Review and apply**. Apply
+committed profile. While a read runs, all screen menus are disabled and a
+loading step replaces the screen. The Configure menus and board open when the
+complete profile is ready for editing. After a read fails, **Device** is
+available if the keyboard reported its capabilities; **Profile & backups**
+opens if it supports complete-profile backup, including the five-layer bridge.
+Every edit goes into one local draft with undo, redo and a history, and reaches
+the keyboard only through **Review and apply**. Apply
 saves a recovery copy, then commits the complete profile to both halves as one
 recovery-first logical transaction and verifies the readback. The review shows
 warnings in orange, traps and save blockers in red. It checks layer reachability,

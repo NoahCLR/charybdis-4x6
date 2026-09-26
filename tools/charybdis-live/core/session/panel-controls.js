@@ -42,8 +42,8 @@ async function readKeyboard(session, selectedDeviceId, host = {}) {
     await service.enumerate();
     const devices = service.snapshot().devices;
     if (!devices.length) {
-        session.notice = "No Charybdis Raw HID interface found. Connect the keyboard and reload.";
-        return;
+        session.notice = "No Charybdis Raw HID interface found. Connect the keyboard and choose Read keyboard again.";
+        return false;
     }
     if (selectedDeviceId && !devices.some((device) => device.id === selectedDeviceId)) {
         throw new Error("The selected keyboard is no longer available. Read the device list again.");
@@ -62,13 +62,13 @@ async function readKeyboard(session, selectedDeviceId, host = {}) {
         await run(host, "Reading keyboard profile", () => service.readCommittedProfile());
     } catch (error) {
         session.notice = `Read the layout. The committed profile could not be read: ${error instanceof Error ? error.message : String(error)}`;
-        return;
+        return false;
     }
     await service.readBaseRgb();
     await service.readCombos();
-    let macroFailure = "";
+    let macroFailure = "", portable;
     if ((service.capabilities?.supportedDomainMask & 15) === 15) {
-        try {await service.readPortableProfile();}
+        try {portable = await service.readPortableProfile();}
         catch (error) {macroFailure = " Macros and global settings could not be read: " + error.message;}
     }
     const state = service.snapshot();
@@ -82,6 +82,8 @@ async function readKeyboard(session, selectedDeviceId, host = {}) {
         session.notice = `Read the layout and ${description}.` + (failures ? ` ${failures} domain(s) could not be decoded; see diagnostics.` : "");
     }
     if (macroFailure) session.notice += macroFailure;
+    return Boolean(!state.error && state.committed?.state === "read" && state.layout?.state === "read"
+        && state.capabilities?.compiledLayerCount === 8 && portable && !portable.incomplete);
 }
 
 // The draft's own controls. Each leaves the session's outbox (notice, form

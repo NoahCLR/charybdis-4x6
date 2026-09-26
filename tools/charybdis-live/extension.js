@@ -105,7 +105,7 @@ function hostFor(session) {
 // Connect, learn what the keyboard is, and read what it is running.
 async function connectAndRead(panel, session, selectedDeviceId) {
     try {
-        await readKeyboard(session, selectedDeviceId, hostFor(session));
+        session.readReady = await readKeyboard(session, selectedDeviceId, hostFor(session));
     } finally {
         session.readBusy = false;
         publish(panel, session);

@@ -147,6 +147,8 @@ code { color: inherit; background: none; padding: 0; border-radius: 0; }
 }
 .nav-item:hover { background: var(--surface-2); color: var(--text); }
 .nav-item[aria-current="true"] { background: var(--surface-3); color: var(--text); font-weight: 520; }
+.nav-item:disabled, .nav-item:disabled:hover { color: var(--text-3); background: transparent; cursor: default; }
+.nav-item[aria-current="true"]:disabled { background: var(--surface-2); }
 .nav-item svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.4; opacity: .85; }
 .rail-foot { padding: 12px; border-top: 1px solid var(--line); display: flex; gap: 8px; align-items: center; }
 .rail-foot .rail-history { margin-right: auto; margin-left: -9px; color: var(--text-3); }
@@ -1133,6 +1135,13 @@ details > summary { list-style: none; }
 /* ── states the real app has and the prototype faked ───────────────────── */
 .screen-stub { display: grid; gap: 10px; padding: 26px; border: 1px dashed var(--line-2);
   border-radius: 12px; max-width: 70ch; }
+.read-placeholder { min-height: 320px; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 12px; padding: 32px; text-align: center; border: 1px solid var(--line-2);
+  border-radius: 12px; background: var(--surface-2); }
+.read-placeholder .spin { width: 24px; height: 24px; }
+.read-placeholder h2, .read-placeholder p { margin: 0; }
+.read-placeholder p { max-width: 52ch; color: var(--text-2); }
+.read-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 8px; }
 .busy-veil { position: absolute; inset: 0; background: color-mix(in srgb, var(--bg) 55%, transparent);
   display: grid; place-items: center; z-index: 30; }
 .unavailable { display: grid; gap: 8px; padding: 14px 16px; border: 1px solid var(--line);

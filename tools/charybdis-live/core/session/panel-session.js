@@ -91,6 +91,13 @@ function buildPanelModel(session, state) {
         layers: session.portableLayers ? {key: session.portableLayers.before.fingerprint, order: session.portableLayers.order, names: session.portableLayers.names, keysFollow: session.portableLayers.keysFollow !== false} : null,
     };
     if (!model.draft?.matching) model.layers?.forEach((layer, index) => {layer.displayName = state.portableSummary?.names[index] || layer.name;});
+    const editableDraft = Boolean(model.draft?.matching && !model.draft.stale && state.connected);
+    const readReady = (session.readReady ?? editableDraft) && editableDraft;
+    model.load = {
+        state: session.readBusy ? "loading" : readReady ? "ready" : "unavailable",
+        phase: state.phase || "idle",
+        progress: state.portableProgress || state.layout?.progress || state.committed?.progress || null,
+    };
     return model;
 }
 
@@ -166,6 +173,7 @@ function routeMessage(session, message, state) {
             session.resetDraftForms = true;
         }
         session.readBusy = true;
+        session.readReady = false;
         return "read";
     }
     return "none";

@@ -162,6 +162,22 @@ test("an in-flight read keeps the panel busy across service operation gaps", () 
     assert.equal(buildPanelModel(session, connected({busy: false})).device.health.busy, false);
 });
 
+test("configure screens stay gated until a complete editable read finishes", () => {
+    const session = {service: {portable: null}, readBusy: true, readReady: false};
+    const partial = connected({layout: {state: "read", layers: []}, committed: {state: "read"}});
+    assert.equal(buildPanelModel(session, partial).load.state, "loading", "layout and lighting alone do not expose the board");
+    session.readBusy = false;
+    assert.equal(buildPanelModel(session, partial).load.state, "unavailable", "a failed complete read remains gated");
+    session.service.portable = snapshot();
+    session.readReady = true;
+    assert.equal(buildPanelModel(session, partial).load.state, "ready", "the complete read opens the editable draft");
+    session.readBusy = true;
+    session.readReady = false;
+    assert.equal(buildPanelModel(session, partial).load.state, "loading", "refresh hides the old board across request gaps");
+    session.readBusy = false;
+    assert.equal(buildPanelModel(session, partial).load.state, "unavailable", "a failed refresh cannot reveal stale readback");
+});
+
 test("the model shows the draft's surfaces but the keyboard's own header", () => {
     const session = panelWithDraft();
     const draft = session.draft;

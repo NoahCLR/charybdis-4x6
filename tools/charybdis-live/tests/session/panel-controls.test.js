@@ -18,7 +18,8 @@ const device = {id: "kb", manufacturer: "Bastard Keyboards", product: "Charybdis
 function fakeService(extra = {}) {
     const calls = [];
     const record = (name, value) => async (...args) => { calls.push(name); return typeof value === "function" ? value(...args) : value; };
-    const state = {connected: true, busy: false, selectedDeviceId: "kb", devices: [device], capabilities, committed: {state: "read", source: "device", generation: 7, failures: []}};
+    const state = {connected: true, busy: false, selectedDeviceId: "kb", devices: [device], capabilities,
+        layout: {state: "read", layers: []}, committed: {state: "read", source: "device", generation: 7, failures: []}};
     const service = {
         calls, capabilities, portable: snapshot(),
         snapshot: () => state,
@@ -50,12 +51,15 @@ const stage = (session, change) => session.draft.stage({draftId: session.draft.i
 test("reading the keyboard connects, reads in dependency order and says what it read", async () => {
     const service = fakeService();
     const session = {service};
-    await readKeyboard(session, undefined, host());
+    assert.equal(await readKeyboard(session, undefined, host()), true);
     assert.deepEqual(service.calls, ["enumerate", "refresh", "readLayout", "readCommittedProfile", "readBaseRgb", "readCombos", "readPortableProfile"]);
     assert.match(session.notice, /committed profile generation 7/);
     const empty = {service: fakeService({snapshot: () => ({devices: []})})};
-    await readKeyboard(empty, undefined, host());
+    assert.equal(await readKeyboard(empty, undefined, host()), false);
     assert.match(empty.notice, /No Charybdis Raw HID interface/);
+    const failed = {service: fakeService({readPortableProfile: async () => {throw new Error("interrupted");}})};
+    assert.equal(await readKeyboard(failed, undefined, host()), false);
+    assert.match(failed.notice, /Macros and global settings could not be read/);
 });
 
 test("apply writes a recovery copy through the host, then reads the keyboard again", async () => {

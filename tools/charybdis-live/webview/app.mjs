@@ -9,6 +9,7 @@ import {captureContentScroll, restoreContentScroll} from "./lib/scroll.mjs";
 import {activateOnKey, captureFocus, focusDialog, restoreFocus, trapTab} from "./lib/focus.mjs";
 import {closeComboBuilder, getModel, layerName, post, render as rerender, resetDraftForms, setModel, setRenderer, state, writable} from "./store.mjs";
 import {historyAction} from "./view/edits.mjs";
+import {readScreen, screenAvailable} from "./view/readiness.mjs";
 import {discardLabel, groupNote, placeState, reviewBlocks, statusSummary, stillShown} from "./view/review.mjs";
 import {bindLayerIndex, hideHover, mountHover} from "./ui/hover.mjs";
 import {pickerOverlay} from "./ui/picker.mjs";
@@ -230,11 +231,8 @@ function render() {
     root.replaceChildren();
     const app = el(`<div class="app"></div>`);
     app.appendChild(rail());
-    const screen = (SCREENS[state.screen] || screenKeys)();
-    if (!model) {
-        screen.querySelector(".content")?.prepend(el(`<div class="pad"><div class="screen-stub">
-            <h3>Looking for a keyboard</h3><p class="note">Connect a Charybdis and this panel will read it.</p></div></div>`));
-    }
+    const read = screenAvailable(model, state.screen) ? null : readScreen(model, state.screen);
+    const screen = read ? readPlaceholder(read, model) : (SCREENS[state.screen] || screenKeys)();
     app.appendChild(screen);
     const bar = commitBar();
     if (bar) screen.appendChild(bar);
@@ -251,6 +249,26 @@ function render() {
     restoreFocus(root, focus);
     focusDialog(root);
     reveal();
+}
+
+function readPlaceholder(read, model) {
+    const loading = read.state === "loading";
+    const screenTitle = state.screen === "profile" ? "Profile & backups" : state.screen === "device" ? "Device" : "Keyboard";
+    const secondary = screenAvailable(model, "profile") && state.screen !== "profile"
+        ? {screen: "profile", label: "Profile & backups"}
+        : screenAvailable(model, "device") && state.screen !== "device"
+            ? {screen: "device", label: "Device details"} : null;
+    const screen = el(`<div class="main">${topbar(screenTitle, "The keyboard's current data appears here when this screen is available.")}
+        <div class="content"><div class="pad"><div class="read-placeholder" role="status" aria-live="polite">
+            ${loading ? '<span class="spin" aria-hidden="true"></span>' : '<i class="dot err" aria-hidden="true"></i>'}
+            <h2>${esc(read.title)}</h2><p>${esc(read.detail)}</p>
+            ${loading ? '<p class="note">The menus open when their keyboard data is ready.</p>'
+                : `<div class="read-actions"><button class="btn primary" data-act="retry">Read keyboard</button>
+                    ${secondary ? `<button class="btn ghost" data-act="secondary">${esc(secondary.label)}</button>` : ""}</div>`}
+        </div></div></div></div>`);
+    screen.querySelector('[data-act="retry"]')?.addEventListener("click", () => post({type: "refresh"}));
+    screen.querySelector('[data-act="secondary"]')?.addEventListener("click", () => {state.screen = secondary.screen; render();});
+    return screen;
 }
 
 // A place asked for by a jump — the review's Show — is scrolled to and marked

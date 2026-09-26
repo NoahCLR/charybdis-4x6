@@ -35,11 +35,18 @@ selected. The review gives transparent and `KC_NO` base keys separate notices.
 
 ## The interface
 
-The board is the constant: it stays on screen, full width, painted with the
-light the keyboard would actually show for that layer — the base effect, then
+After the complete keyboard read opens an editable draft, the board stays on
+screen, full width, painted with the light the keyboard would actually show for
+that layer — the base effect, then
 the layer's colour on the keys it owns — with the legends drawn on top in
 whichever of black or white stays readable, and the behaviour dots and combo
 badges on the key face in the feedback colours the keyboard flashes.
+During initial read, refresh or device selection, every screen menu is disabled
+and a loading step replaces the screen. Once the read finishes, Device opens
+if the keyboard reported its capabilities. Profile & backups opens when a
+connected keyboard supports complete-profile backup, including five-layer
+firmware that can be read and backed up. The Configure
+menus open only with an editable draft.
 
 Underneath it, one workbench whose tabs are the key, its behaviour, its combos,
 and the macros and pointing modes the layer reaches. A behaviour is tap count ×

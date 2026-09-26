@@ -4,6 +4,7 @@
 import {el, esc} from "../lib/dom.mjs";
 import {getModel, post, render, state} from "../store.mjs";
 import {statusSummary} from "../view/review.mjs";
+import {screenAvailable} from "../view/readiness.mjs";
 import {openHistory} from "./history.mjs";
 
 // The review opens at once; the host marks it reviewed when it answers.
@@ -53,7 +54,8 @@ export function rail() {
         `<div class="stat" data-tip="${esc(tip)}"><i class="dot ${tone}"></i> ${esc(text)}</div>`;
 
     const nav = SCREENS.map((group) => `<div class="rail-group">${group.group}</div>` + group.items.map((item) => `
-        <button class="nav-item" data-screen="${item.id}" aria-current="${state.screen === item.id}">
+        <button class="nav-item" data-screen="${item.id}" aria-current="${state.screen === item.id}"
+            ${screenAvailable(model, item.id) ? "" : "disabled"}>
             ${ICONS[item.icon]}<span>${item.label}</span>
         </button>`).join("")).join("");
 

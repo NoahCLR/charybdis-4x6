@@ -192,6 +192,15 @@ Every decoded `uint16` must encode back to its original value. Zero timing
 values stay visible, with the unreported firmware default stated. Recorded
 device bytes are test-only fixtures, never runtime data.
 
+The Configure screens reveal the keyboard only after the complete portable
+read has opened an editable draft. Layout, committed domains, VIA base RGB and
+the complete profile arrive in separate reads and are published separately for
+diagnostics, but their partial previews must stay behind one loading state.
+Every screen menu is disabled during that read. Afterwards, Configure requires
+an editable draft; Profile & backups requires complete-profile support (and
+remains available on the five-layer backup bridge); Device requires a connected
+keyboard that reported its capabilities.
+
 ### D-L12 — RGB rule identity and preview appearance are separate
 
 Pass-through is a layer paint operation, not a colour. The app reads QMK RGB
