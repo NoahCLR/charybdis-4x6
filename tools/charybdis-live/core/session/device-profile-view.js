@@ -134,7 +134,7 @@ function combosForView(read, labels) {
         return {name: key.name, label: labels[key.name] || key.label};
     };
     return read.rows.map(row => ({
-        id: row.id, badge: `C${row.id + 1}`,
+        id: row.id, badge: `C${row.id}`,
         inputs: row.inputs.map(value => resolve(value).name),
         inputDisplays: row.inputs.map(value => resolve(value).label),
         output: resolve(row.output).name,

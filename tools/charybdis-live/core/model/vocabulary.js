@@ -87,7 +87,7 @@ const word = (list, key) => (list.find(([id]) => id === key) || [, String(key ??
 // The names a person reads for a layer and a pointing slot that have none of
 // their own. Layer 0 is the base layer.
 const layerName = (names, index) => names?.[index] || (index ? `Layer ${index}` : "Base");
-const slotName = (slot, id = slot?.id) => (slot?.kind && slot.name) || `Slot ${id + 1}`;
+const slotName = (slot, id = slot?.id) => (slot?.kind && slot.name) || `Slot ${id}`;
 const branchName = (count) => VOCABULARY.branches[count - 1] || `${count} taps`;
 const modifierNames = (mask) => VOCABULARY.modifiers.filter(([bit]) => mask & bit).map(([, name]) => name);
 

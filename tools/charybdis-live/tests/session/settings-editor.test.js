@@ -66,6 +66,6 @@ test("a profile with a misplaced action is refused, naming it, before recovery o
     service.capabilities = {compiledLayerCount: 8, supportedDomainMask: 15, actionAbiDigest: document().actionAbiDigest};
     service.requestIds = {next: () => 1};
     service.connection = {connected: true, request: async () => {writes++; throw Error("must not reach the keyboard");}};
-    await assert.rejects(service.restorePortableProfile(target, {expectedFingerprint: base.fingerprint, saveRecovery: () => {throw Error("must not start restore");}}), /Combo 1: LT\(1,KC_A\) makes its own tap\/hold decision/);
+    await assert.rejects(service.restorePortableProfile(target, {expectedFingerprint: base.fingerprint, saveRecovery: () => {throw Error("must not start restore");}}), /Combo 0: LT\(1,KC_A\) makes its own tap\/hold decision/);
     assert.equal(writes, 0);
 });

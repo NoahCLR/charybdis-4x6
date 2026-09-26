@@ -300,7 +300,7 @@ function stageBody(body) {
             const row = pdColourRow(model, slot.id);
             const lit = row && !isOff(row.color);
             const item = el(`<button class="rowitem ${slot.id === state.pdSlot ? "on" : ""} ${slot.kind ? "" : "quiet"}" data-slot="${slot.id}">
-                <span class="t"><span class="swatch-lg ${lit ? "" : "swatch-off"}" style="width:11px;height:11px;border-radius:3px;display:inline-block;vertical-align:-1px;margin-right:7px;${lit ? `background:${css(row.color)}` : ""}"></span>${esc(slot.displayName || `Slot ${slot.id + 1}`)}${marks.lightingSlots.has(slot.id) ? draftDot() : ""}</span>
+                <span class="t"><span class="swatch-lg ${lit ? "" : "swatch-off"}" style="width:11px;height:11px;border-radius:3px;display:inline-block;vertical-align:-1px;margin-right:7px;${lit ? `background:${css(row.color)}` : ""}"></span>${esc(slot.displayName || `Slot ${slot.id}`)}${marks.lightingSlots.has(slot.id) ? draftDot() : ""}</span>
                 <span class="m mono">${esc(row ? hsvLabel(row.color) : "not reported")} · ${esc(localityLabel(row?.locality).toLowerCase())}</span></button>`);
             item.addEventListener("click", () => { state.pdSlot = slot.id; render(); });
             list.append(item);

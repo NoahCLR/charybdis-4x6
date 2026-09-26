@@ -18,7 +18,7 @@ test("combo snapshots publish readable native keys and clear stale rows after fa
     let state = await service.readCombos();
     const model = buildDeviceModel(state);
     assert.equal(model.combos.length, 2);
-    assert.equal(model.combos[0].badge, "C1");
+    assert.equal(model.combos[0].badge, "C0");
     assert.equal(model.combos[1].outputDisplay, "Cmd+A");
     assert.deepEqual(model.combos[1].inputDisplays, ["Cmd+C", "Cmd+V"]);
     assert.equal(model.comboReadback.enabled, true);

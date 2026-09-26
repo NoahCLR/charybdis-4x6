@@ -512,7 +512,7 @@ test("an empty slot can start a new mode of either kind, which the draft accepts
     stage(draft, edits.pdMode(5, newMode(empty, KIND.DIRECTIONAL), draft.identity()));
     let slot = decoded(draft).pdModes[5];
     assert.equal(slot.kind, KIND.DIRECTIONAL);
-    assert.equal(slot.name, "Mode 6");
+    assert.equal(slot.name, "Mode 5");
     assert.equal(slot.axis, AXIS.DOMINANT);
     assert.equal(slot.thresholdX, DIRECTIONAL_STARTER_THRESHOLD);
     assert.equal(slot.thresholdY, DIRECTIONAL_STARTER_THRESHOLD);

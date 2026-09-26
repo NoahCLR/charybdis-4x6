@@ -20,7 +20,7 @@ export const branchName = (model, count) => vocabulary(model).branches[count - 1
 export const stageOrder = (model) => vocabulary(model).stages;
 
 // A pointing slot's name as the host gives it.
-export const slotCalled = (model, id) => (model?.pdModes || []).find((slot) => slot.id === id)?.displayName || `Slot ${id + 1}`;
+export const slotCalled = (model, id) => (model?.pdModes || []).find((slot) => slot.id === id)?.displayName || `Slot ${id}`;
 
 // How a tier runs, in the editor's words: a tap tier only sends.
 export const helperWord = (model, kind, helper) => kind === "tap"

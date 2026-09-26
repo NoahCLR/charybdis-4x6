@@ -640,7 +640,7 @@ export function pointingAction(model, action) {
     if (!slot) return null;
     return {
         slot,
-        name: slot.displayName || slot.name || `Slot ${slot.id + 1}`,
+        name: slot.displayName || slot.name || `Slot ${slot.id}`,
         how: pointingVariant(model, action),
         empty: !slot.kind,
     };

@@ -63,11 +63,11 @@ test("a removed behaviour is marked removed and lists what it held, without its 
 });
 test("a new pointing mode is one added item, however many fields it sets", () => {
     const base=pdDocument(), before=snapshot(base), slots=validateSnapshot(base).pdModes;
-    const after=snapshot(withDomain(base,80,decodePdDomain,encodePdDomain,modes=>modes.map((mode,id)=>id===6?{...slots[0],id:6,name:"Mode 7"}:mode)));
+    const after=snapshot(withDomain(base,80,decodePdDomain,encodePdDomain,modes=>modes.map((mode,id)=>id===6?{...slots[0],id:6,name:"Mode 6"}:mode)));
     const items=profileReview(before,after);
     assert.equal(items.length,1);
     assert.equal(items[0].status,"added");
-    assert.equal(items[0].title,"Slot 7 · Mode 7");
+    assert.equal(items[0].title,"Slot 6 · Mode 6");
     assert.ok(items[0].fields.length>5,"it lists what it sets");
     assert.deepEqual(items[0].place,{kind:"pointing",slot:6});
 });

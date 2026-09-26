@@ -29,7 +29,7 @@ function behaviorPlacementProblem(rows, options) {
 function comboPlacementProblem(rows, options) {
     for (const [index, row] of rows.entries()) {
         const problem = placementProblem(row.output, PLACEMENT.COMBO_OUTPUT, options);
-        if (problem) return `Combo ${index + 1}: ${problem}`;
+        if (problem) return `Combo ${index}: ${problem}`;
     }
     return undefined;
 }

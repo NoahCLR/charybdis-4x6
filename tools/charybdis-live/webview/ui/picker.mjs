@@ -88,7 +88,7 @@ function sectionBody(model) {
             `<button class="pk wide ${on ? "on" : ""}" data-pick="${value}" data-tip="${esc(tip)}"><span class="l">${label}</span><span class="c">${value}</span></button>`;
         return `<div class="pk-body"><div class="pk-layers ${owned ? "owned" : ""}">${layers().map((layer) => `
             <div class="pk-layer">
-                <span></span><span class="nm">${esc(layerName(layer))}</span>
+                <span class="ix">${layer.index}</span><span class="nm">${esc(layerName(layer))}</span>
                 ${button(`MO(${layer.index})`, "Hold", "On while the key is down.")}
                 ${button(`LOCK_LAYER(${layer.index})`, "Lock", "Turns the layer on until pressed again. QMK's TG() is the same lock.", picked(`LOCK_LAYER(${layer.index})`) || picked(`TG(${layer.index})`))}
                 <button class="pk wide ${picker.layerTap === String(layer.index) ? "on" : ""}" data-lt="${layer.index}" data-tip="A tap sends a key, a hold holds the layer. Pick the tap key next."><span class="l">Tap-hold</span><span class="c">LT(${layer.index}, …)</span></button>
@@ -111,7 +111,7 @@ function sectionBody(model) {
             `<button class="pk wide ${picked(value) ? "on" : ""}" data-pick="${esc(value)}" data-tip="${esc(tip)}"><span class="l">${label}</span><span class="c">${esc(value)}</span></button>`;
         return `<div class="pk-body"><div class="pk-layers modes">${slots.map((slot) => `
             <div class="pk-layer ${slot.kind ? "" : "empty"}">
-                <span class="ix">${slot.id + 1}</span>
+                <span class="ix">${slot.id}</span>
                 <span class="nm"><span>${esc(slot.displayName)}</span><span class="sub">${esc(slot.kind ? word(kinds, slot.kind) : "Empty — does nothing yet")}</span></span>
                 ${button(slot.binding.hold, "Hold", "On while the key is down.")}
                 ${button(slot.binding.lock, "Toggle", "Turns the mode on until pressed again.")}

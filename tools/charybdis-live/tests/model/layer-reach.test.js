@@ -121,7 +121,7 @@ test("a combo whose inputs never occur together is a warning", () => {
     const combo = {inputs: [code(KC_A), code(KC_B)], output: code(KC_ESC)};
     const source = profile({combos: [combo]});
     source.document.layers[0].fill(NO);
-    assert.equal(layerReach(source).find(row => row.kind === "unreachableCombo")?.title, "Combo 1 cannot fire");
+    assert.equal(layerReach(source).find(row => row.kind === "unreachableCombo")?.title, "Combo 0 cannot fire");
 });
 
 test("the trackball wakes the pointer layer, which can carry the way out unless sniping keeps it off", () => {

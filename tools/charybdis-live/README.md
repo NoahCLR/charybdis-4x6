@@ -228,6 +228,7 @@ still points at the empty slot, and the Pointing modes screen and the hover card
 say the key does nothing for now.
 
 The same reasoning runs the other way, so the keycode picker offers **every**
-slot, configured or not, labelled `Slot 7 · hold (empty)` while the slot holds
-nothing. A board can be laid out before its modes are, and the key says `empty`
+slot, configured or not: its Pointing modes section lists the eight slots as
+rows, each with a Hold and a Toggle key, and marks an empty slot's row as doing
+nothing yet. Search finds the same keys as `Slot 6 · hold (empty)`. A board can be laid out before its modes are, and the key says `empty`
 on its second line until the slot is filled in.

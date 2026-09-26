@@ -137,7 +137,7 @@ function legend(model) {
         <span class="legend-item">${dot(colours.tap)} tap branch</span>
         <span class="legend-item">${dot(colours.hold)} hold branch</span>
         <span class="legend-item">${dot(colours.long)} long hold branch</span>
-        <span class="legend-item"><i class="lbadge">C1</i> combo input</span>
+        <span class="legend-item"><i class="lbadge">C0</i> combo input</span>
         <span class="legend-item"><i class="lkey transparent"></i> transparent · falls through</span>
         ${model?.draft?.dirty ? `<span class="legend-item">${draftDot()} changed in your draft</span>` : ""}
         <span class="legend-item dim">${writable() ? "double-click to pick a keycode" : "select a key to read it"}${writable() ? " · drag one key onto another to swap · ⌘C and ⌘V copy between keys · delete makes a key transparent" : " · ⌘C copies a key"}</span>
@@ -277,7 +277,7 @@ function tabKey(body) {
                     <span class="rv">${combos.length ? esc(combos.map((combo) => `${combo.badge} → ${combo.outputDisplay || combo.output}`).join(" · ")) : "not part of a combo"}</span>
                     <span class="ra">${combos.length ? "Edit" : "New"}</span></button>
                 ${slot ? `<button class="reach" data-goto="pointing"><span class="rl">Pointing</span>
-                    <span class="rv">${esc(slot.displayName || `Slot ${slot.id + 1}`)}</span><span class="ra">Edit</span></button>` : ""}
+                    <span class="rv">${esc(slot.displayName || `Slot ${slot.id}`)}</span><span class="ra">Edit</span></button>` : ""}
             </div>
         </section>
     </div>`);
@@ -846,8 +846,8 @@ function tabPointing(body, right) {
         return `<div class="pd-card"${reachAttrs("pointing", group, slot.id)}>
             <div class="row" style="gap:9px">
                 ${slotLight(model, slot).swatch("lg")}
-                <b>${esc(slot.displayName || `Slot ${slot.id + 1}`)}${variant ? ` · ${esc(variant)}` : ""}</b>${changedSlots.has(slot.id) ? draftDot() : ""}
-                <span class="tag">slot ${slot.id + 1}</span>
+                <b>${esc(slot.displayName || `Slot ${slot.id}`)}${variant ? ` · ${esc(variant)}` : ""}</b>${changedSlots.has(slot.id) ? draftDot() : ""}
+                <span class="tag">slot ${slot.id}</span>
                 <button class="btn tiny ghost" data-editpd="${slot.id}" style="margin-left:auto">Edit</button></div>
             <div class="note">${slot.kind
                 ? `${slot.kind === 2 ? "Scrolling" : "Directional"}${slot.dpi ? ` · ${slot.dpi} DPI` : " · normal pointer speed"}`

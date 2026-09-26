@@ -60,7 +60,7 @@ export function newMode(slot, kind) {
     const starter = kind === KIND.SCROLLING
         ? {...slot, kind, axis: 0, thresholdX: 0, thresholdY: 0, heldModifiers: 0, scroll: {...SCROLL_STARTER}}
         : {...slot, kind, axis: AXIS.DOMINANT, thresholdX: DIRECTIONAL_STARTER_THRESHOLD, thresholdY: DIRECTIONAL_STARTER_THRESHOLD, emptyDirection: 0};
-    return readConfig(starter, {kind: () => kind, name: () => `Mode ${slot.id + 1}`, dpi: () => "0"});
+    return readConfig(starter, {kind: () => kind, name: () => `Mode ${slot.id}`, dpi: () => "0"});
 }
 // Volume's vertical threshold, the firmware's shipped tuning for a directional
 // axis. An axis the stored record did not read has a zero threshold, which the

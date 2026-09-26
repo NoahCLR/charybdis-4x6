@@ -181,7 +181,7 @@ function offers(facts, active, cache) {
             if (!combo.inputs.length || !combo.inputs.every((code) => present.has(code))) continue;
             for (const effect of actionEffects(combo.output)) {
                 if (effect.kind === "unowned") continue;
-                found.push({...effect, from: {combo: combo.index}, how: `Press combo ${combo.index + 1} (${combo.inputs.map(codeName).join(" + ")}), which sends ${actionName(combo.output)}`});
+                found.push({...effect, from: {combo: combo.index}, how: `Press combo ${combo.index} (${combo.inputs.map(codeName).join(" + ")}), which sends ${actionName(combo.output)}`});
             }
         }
     }
@@ -329,7 +329,7 @@ function findings(facts, walked) {
         }
         for (const combo of facts.combos) if (!reachable.has(combo.index)) {
             results.push({kind: "unreachableCombo", level: LEVELS.WARNING, layers: [], identity: `${combo.index}:${combo.inputs.join(",")}`,
-                title: `Combo ${combo.index + 1} cannot fire`,
+                title: `Combo ${combo.index} cannot fire`,
                 detail: "No reachable layer combination produces all of this combo's input keys together. Transparent keys can supply inputs from below; they are included in this check.",
                 fix: "Place its inputs where one reachable layer combination can produce them, or change its input keys.",
                 place: {kind: "combo", index: combo.index}});
@@ -350,7 +350,7 @@ function findings(facts, walked) {
         }
     }
     for (const combo of facts.allCombos) {
-        if (idle(actionEffects(combo.output))) idlePlaces.push({name: `${actionName(combo.output)} on combo ${combo.index + 1}`, place: {kind: "combo", index: combo.index}});
+        if (idle(actionEffects(combo.output))) idlePlaces.push({name: `${actionName(combo.output)} on combo ${combo.index}`, place: {kind: "combo", index: combo.index}});
     }
     if (idlePlaces.length) {
         const count = idlePlaces.length;

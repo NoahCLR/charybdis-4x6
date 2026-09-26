@@ -21,14 +21,14 @@ test("a behaviour row is checked where each of its actions sits", () => {
 test("a combo is checked by its output; layer holds and one-shots pass, LT does not", () => {
     const combo = output => ({inputs: [code(0x04), code(0x05)], output, termMs: 0, holdTermMs: 0, mustHold: false, mustTap: false, ordered: false});
     assert.equal(comboPlacementProblem([combo(code(0x08)), combo({kind: 2, flags: 0, operand: 2}), combo(code(0x5282))], options), undefined);
-    assert.match(comboPlacementProblem([combo(code(0x08)), combo(code(0x4104))], options), /^Combo 2: LT\(1,KC_A\)/);
+    assert.match(comboPlacementProblem([combo(code(0x08)), combo(code(0x4104))], options), /^Combo 1: LT\(1,KC_A\)/);
 });
 
 test("an encoded profile is checked across its behaviours and combos", () => {
     assert.equal(profilePlacementProblem(bytes, options), undefined, "the device fixture passes");
     const blob = encodeProfileBlob({schema: {major: 2, minor: 0}, domains: [{id: PROFILE_DOMAIN_IDS.COMBOS, version: 1,
         payload: encodeComboDomainV1([{inputs: [code(0x04), code(0x05)], output: code(0x5241), termMs: 0, holdTermMs: 0, mustHold: false, mustTap: false, ordered: false}], {actionLimits: {maxPdModes: 8}})}]});
-    assert.match(profilePlacementProblem(blob, options), /^Combo 1: /);
+    assert.match(profilePlacementProblem(blob, options), /^Combo 0: /);
 });
 
 test("a layout key takes every layer key the keyboard owns, and refuses DF, PDF and layers past the bank", () => {

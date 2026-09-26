@@ -58,7 +58,7 @@ test("a branch action that sends a pointing mode reads as the mode, held or togg
     assert.deepEqual([hold.slot.id, hold.name, hold.how, hold.empty], [0, "Dragscroll", "hold", false]);
     assert.equal(pointingAction(model, "DRAGSCROLL_LOCK").how, "toggle");
     const empty = pointingAction(model, "PD_SLOT_6");
-    assert.deepEqual([empty.name, empty.how, empty.empty], ["Slot 7", "hold", true], "an unnamed empty slot goes by its number");
+    assert.deepEqual([empty.name, empty.how, empty.empty], ["Slot 6", "hold", true], "an unnamed empty slot goes by its number");
     assert.equal(pointingAction(model, "0x7EF1").how, "toggle", "the lock keycode as a raw value too");
     assert.equal(pointingAction(model, "KC_A"), null);
 });
@@ -97,8 +97,8 @@ test("macro and pointing-mode keycodes resolve to the slots the keyboard reporte
 test("a key for an empty pointing slot says so on its second line", () => {
     // The catalogue label carries "(empty)" so the picker can tell the two
     // apart; on the cap that belongs under the name, not inside it.
-    assert.deepEqual(keyFace({keycode: "0x7EF0", display: "Slot 7 · hold (empty)"}),
-        {main: "Slot 7 · hold", sub: "empty", kind: "key"});
+    assert.deepEqual(keyFace({keycode: "0x7EF0", display: "Slot 6 · hold (empty)"}),
+        {main: "Slot 6 · hold", sub: "empty", kind: "key"});
     assert.equal(keyFace({keycode: "QK_USER_16", display: "Dragscroll · hold"}).sub, "");
 });
 

@@ -73,7 +73,7 @@ export function screenPointing() {
         const inert = bindings ? bindings.keys.length + bindings.behaviours.length + bindings.combos.length : 0;
         const card = el(`<button class="slotcard ${slot.kind ? "" : "empty"}" data-slot="${slot.id}" aria-current="${state.pdSlot === slot.id}">
             ${swatch()}
-            <span class="nm">${slot.kind ? esc(slot.name) : "Empty slot"}</span><span class="no">${changedSlots.has(slot.id) ? draftDot("Changed in your draft", "lead") : ""}${slot.id + 1}</span>
+            <span class="nm">${slot.kind ? esc(slot.name) : "Empty slot"}</span><span class="no">${changedSlots.has(slot.id) ? draftDot("Changed in your draft", "lead") : ""}${slot.id}</span>
             <span class="meta">${slot.kind === KIND.SCROLLING ? "Scrolling" : slot.kind === KIND.DIRECTIONAL ? `Directional · ${esc(axisLabel(model, slot.axis))}` : "Available"}</span>
             <span class="meta mono">${esc(bindingName(slot))}</span>
             ${inert ? `<span class="meta warn">${inert} action${inert === 1 ? "" : "s"} reach it · inert</span>` : ""}</button>`);
@@ -103,7 +103,7 @@ function inertNote(model, slot) {
 function emptySlot(model, slot, canEdit, slots) {
     const sources = slots.filter((row) => row.kind);
     const node = el(`<div class="pd-editor stack"><div class="card">
-        <div class="card-h">${slotLight(model, slot).swatch("lg")}<h3>Slot ${slot.id + 1} is empty</h3>
+        <div class="card-h">${slotLight(model, slot).swatch("lg")}<h3>Slot ${slot.id} is empty</h3>
             <span class="tag">${esc(bindingName(slot))}</span></div>
         <div class="card-b stack">
         <p class="note" style="max-width:64ch">Nothing is stored here. Start a new mode, or copy a configured one and change what you need — its binding keycode is <code>${esc(bindingName(slot))}</code>, and <code>${esc(slot.binding?.lock || "")}</code> toggles it.</p>
@@ -115,7 +115,7 @@ function emptySlot(model, slot, canEdit, slots) {
                 data-tip="Scrolling, starting from Dragscroll's tuning.">New scrolling mode</button></div>
         ${sources.length ? `<div class="pd-copy">
             <label class="field"><span>Copy from</span><select class="input" data-source ${canEdit ? "" : "disabled"}>
-                ${sources.map((row) => `<option value="${row.id}">Slot ${row.id + 1} · ${esc(row.name)}</option>`).join("")}</select></label>
+                ${sources.map((row) => `<option value="${row.id}">Slot ${row.id} · ${esc(row.name)}</option>`).join("")}</select></label>
             <button class="btn" data-act="duplicate" ${canEdit ? "" : "disabled"}>Duplicate into this slot</button></div>`
             : ""}
         ${canEdit ? "" : `<div class="unavailable">${esc(unavailable(model) || "This firmware cannot store configurable pointing modes.")}</div>`}
@@ -166,7 +166,7 @@ function editor(model, slot, canEdit, slots) {
         node.querySelector("[data-pick]").addEventListener("click", (event) => {
             event.preventDefault();   // inside a <label>, a click would also focus the input
             openPicker({
-                title: label, context: `${slot.name} · slot ${slot.id + 1}`,
+                title: label, context: `${slot.name} · slot ${slot.id}`,
                 seed: name ? [name] : [],
                 onPick: (expression) => {
                     input.value = expression;
@@ -200,7 +200,7 @@ function editor(model, slot, canEdit, slots) {
     const head = el(`<div class="card">
         <div class="card-h">
             ${light.swatch("lg")}
-            <h3>${esc(slot.displayName || `Slot ${slot.id + 1}`)}</h3><span class="tag">slot ${slot.id + 1} · ${esc(bindingName(slot))}</span>
+            <h3>${esc(slot.displayName || `Slot ${slot.id}`)}</h3><span class="tag">slot ${slot.id} · ${esc(bindingName(slot))}</span>
             <span class="right">
                 ${empties ? `<button class="btn tiny" data-act="duplicate" ${disabled}
                     data-tip="Copy this mode into the first empty slot.">Duplicate</button>` : ""}
@@ -293,7 +293,7 @@ function editor(model, slot, canEdit, slots) {
         state.screen = "lighting"; state.stage = "pd"; render();
     });
     reach.querySelector('[data-act="place"]').addEventListener("click", () => {
-        state.placement = {keycode: bindingName(slot), label: slot.displayName || `Slot ${slot.id + 1}`};
+        state.placement = {keycode: bindingName(slot), label: slot.displayName || `Slot ${slot.id}`};
         state.screen = "keys";
         state.tab = "key";
         render();

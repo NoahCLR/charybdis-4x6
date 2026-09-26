@@ -917,6 +917,12 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .pk-layers.owned .pk-layer { grid-template-columns: 16px 130px repeat(6, minmax(0, 150px)); }
 .pk-layers.owned .pk.wide { min-width: 0; padding: 0 4px; }
 .pk-layer .nm { font-size: 12.5px; }
+.pk-layers.modes .pk-layer { grid-template-columns: 16px 220px repeat(2, minmax(0, 150px)); }
+.pk-layer .ix { font-family: var(--mono); font-size: 10.5px; color: var(--text-3); text-align: right; }
+.pk-layers.modes .nm { display: grid; gap: 1px; min-width: 0; }
+.pk-layers.modes .nm > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pk-layers.modes .nm .sub { font-size: 11px; color: var(--text-3); }
+.pk-layer.empty .nm > span:first-child { color: var(--text-2); }
 .pkb { border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: var(--bg-deep); }
 .pkb svg { display: block; width: 100%; height: auto; }
 .pkb-key rect { fill: var(--key); stroke: var(--line-2); stroke-width: 1; }

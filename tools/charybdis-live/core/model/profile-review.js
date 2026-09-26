@@ -258,8 +258,8 @@ function profileReview(before, after) {
             {kind: "behaviour", target}, [Boolean(old), Boolean(next)]);
     }
     for (let i = 0; i < Math.max(a.combos.length, b.combos.length); i++) {
-        item("Combos", `combo:${i}`, `Combo ${i + 1}`, comboFields(a.combos[i], namesA), comboFields(b.combos[i], namesB), {kind: "combo", index: i}, undefined,
-            {kind: "combo", badge: `C${i + 1}`});
+        item("Combos", `combo:${i}`, `Combo ${i}`, comboFields(a.combos[i], namesA), comboFields(b.combos[i], namesB), {kind: "combo", index: i}, undefined,
+            {kind: "combo", badge: `C${i}`});
     }
     macrosA.viaMacros.forEach((slot, i) => {
         const fields = (macro) => new Map([["Steps", macro.payload || "empty"], ["Name", macro.name || "no name"]]);
@@ -290,7 +290,7 @@ function profileReview(before, after) {
         new Map([["Stored bits", `0x${(b.settings.values[24] & ~masks).toString(16)}`]]), {kind: "settings"}, [true, true]);
     for (let id = 0; id < 8; id++) {
         const old = a.pdModes?.[id], next = b.pdModes?.[id];
-        item("Pointing modes", `pd:${id}`, `Slot ${id + 1}${(next?.name || old?.name) ? ` · ${next?.kind ? next.name : old?.name}` : ""}`,
+        item("Pointing modes", `pd:${id}`, `Slot ${id}${(next?.name || old?.name) ? ` · ${next?.kind ? next.name : old?.name}` : ""}`,
             pointingFields(old), pointingFields(next), {kind: "pointing", slot: id}, [Boolean(old?.kind), Boolean(next?.kind)], {kind: "pointing", slot: id});
     }
     const lightA = lightingRecords(a), lightB = lightingRecords(b);
