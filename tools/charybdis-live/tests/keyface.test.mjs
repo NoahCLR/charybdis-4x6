@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {createRequire} from "node:module";
-import {behaviourFor, comboEditInputs, comboReferenceLayer, combosAt, behaviourListeningTo, canonicalKeycode, behaviourGridSteps, behaviourGroups, behaviourRouteKeys, behaviourTiers, macroReach, pointingReach, reachablePositions, resolvedPositions, bindingKeycode, bindingsForSlot, comboGroups, combosForKey, keyFace, keyMeaning, macroKeycodes, macroPlacements, macroAction, namedAction, pointingAction, pointingSlotFor, reachKeys, slotKeycodes} from "../webview/view/keyface.mjs";
+import {behaviourFor, cellLabel, comboEditInputs, comboReferenceLayer, combosAt, behaviourListeningTo, canonicalKeycode, behaviourGridSteps, behaviourGroups, behaviourRouteKeys, behaviourTiers, macroReach, pointingReach, reachablePositions, resolvedPositions, bindingKeycode, bindingsForSlot, comboGroups, combosForKey, keyFace, keyMeaning, macroKeycodes, macroPlacements, macroAction, namedAction, pointingAction, pointingSlotFor, reachKeys, slotKeycodes} from "../webview/view/keyface.mjs";
 
 // Slots come from the host with their binding keycodes; the tests use the
 // host's own registry rather than a copy of it.
@@ -690,4 +690,14 @@ test("a macro's layers are the ones that hold a way to it themselves", () => {
         "a combo firing from that layer's keys sends it");
     assert.deepEqual(summary("VIA_MACRO_10"), [], "VIA_MACRO_1 does not match VIA_MACRO_10");
     assert.deepEqual(macroPlacements(model, undefined, "VIA_MACRO_1"), []);
+});
+
+test("a behaviour cell reads by the key's name, and by its keycode when it has none", () => {
+    const model = {qmkKeyLabels: {KC_HASH: "#", KC_F: "F"}, layers: [{index: 0, displayName: "Base"}, {index: 1, displayName: "Numbers"}]};
+    assert.equal(cellLabel(model, {action: "KC_HASH"}), "#");
+    assert.equal(cellLabel(model, {action: "LSFT(KC_ENTER)", label: "Shift+Enter"}), "Shift+Enter", "an expression takes the host's name");
+    assert.equal(cellLabel(model, {action: "MO(1)"}), "Hold Numbers", "a layer action names the layer, in the picker's words");
+    assert.equal(cellLabel(model, {action: "LOCK_LAYER(1)"}), "Lock Numbers");
+    assert.equal(cellLabel(model, {action: "LT(1, KC_F)"}), "F / Numbers");
+    assert.equal(cellLabel(model, {action: "QK_BOOT"}), "QK_BOOT", "no clean name: the keycode is the label");
 });

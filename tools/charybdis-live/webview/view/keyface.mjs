@@ -55,6 +55,25 @@ export const actionLabel = (model, name) => model?.qmkKeyLabels?.[name]
     || model?.qmkKeyLabels?.[model?.qmkKeycodeAliases?.[name]]
     || String(name ?? "");
 
+// What a behaviour cell reads as in the grid: the name a person knows the key
+// by, so it says "#" and "Shift+Enter" where the keyboard stores KC_HASH and
+// LSFT(KC_ENTER). A layer action names its layer in the picker's words. With
+// no clean name the keycode is the label. The cell editor keeps the keycode.
+const CELL_LAYER_WORDS = {MO: "Hold", LOCK_LAYER: "Lock", TG: "Lock", TT: "Tap-toggle", OSL: "One-shot", TO: "Move"};
+export function cellLabel(model, branch) {
+    const action = String(branch?.action ?? "");
+    const layer = (index) => {
+        const row = (model?.layers || [])[Number(index)];
+        return row?.displayName || row?.name || `Layer ${index}`;
+    };
+    const layerKey = /^(MO|LOCK_LAYER|TG|TT|OSL|TO)\(\s*(\d+)\s*\)$/.exec(action);
+    if (layerKey) return `${CELL_LAYER_WORDS[layerKey[1]]} ${layer(layerKey[2])}`;
+    const layerTap = /^LT\(\s*(\d+)\s*,\s*(.+?)\s*\)$/.exec(action);
+    if (layerTap) return `${actionLabel(model, layerTap[2])} / ${layer(layerTap[1])}`;
+    const named = actionLabel(model, action);
+    return named !== action ? named : branch?.label || action;
+}
+
 export const behaviourFor = (model, keycode) =>
     (model?.keyBehaviors || []).find((row) => row.keycode === keycode);
 

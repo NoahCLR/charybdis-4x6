@@ -15,6 +15,24 @@ test("every v1 semantic action has an explicit display, including unknown numeri
     assert.throws(() => actionName({kind: 8, operand: 0}), /Unsupported/);
 });
 
+test("a behaviour branch carries the readable name of the keycode it stores, when one exists", () => {
+    const branch = (operand) => ({mode: 1, repeatHz: 0, action: {kind: 1, operand}});
+    const domain = decodeKeyBehaviorDomain(encodeKeyBehaviorDomain({rows: [{
+        target: {kind: 1, operand: 4}, tapHoldTerm: 0, longerHoldTerm: 0, multiTapTerm: 0, keepsAutoMouseAnchored: false,
+        steps: [
+            {tapIndex: 0, tap: {kind: 1, operand: 0x0220}, hold: branch(0x0228), longHold: {mode: 1, repeatHz: 0, action: {kind: 2, operand: 3}}},
+            {tapIndex: 1, tap: {kind: 1, operand: 0xfffe}},
+        ],
+    }]}));
+    const [step, unknown] = behaviorRowsForView(domain)[0].steps;
+    assert.deepEqual([step.tap.action, step.tap.label], ["KC_HASH", "#"]);
+    assert.deepEqual([step.hold.action, step.hold.label], ["LSFT(KC_ENTER)", "Shift+Enter"]);
+    // A layer action is named from the profile's layers by the interface, and
+    // a keycode the catalogue knows only by itself has no second name.
+    assert.equal("label" in step.longHold, false);
+    assert.equal("label" in unknown.tap, false);
+});
+
 test("decoded behaviors preserve sparse branches, all hold modes, anchors and timing zeros", () => {
     const rows = [1, 2, 3, 4].map((mode) => ({
         target: {kind: 1, operand: mode + 3}, tapHoldTerm: 0, longerHoldTerm: 410, multiTapTerm: 190,

@@ -590,14 +590,15 @@ button.tier:hover { background: var(--surface-3); }
 .fbdot { width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--line-3); flex: none; display: inline-block; }
 .rowitem .fbdot, .reach .fbdot { margin-right: 3px; }
 .bcell {
-  display: grid; align-content: center; gap: 3px; min-height: 52px; padding: 8px 10px;
-  border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); text-align: left; width: 100%;
+  display: grid; align-content: center; justify-items: center; gap: 3px; min-height: 52px; padding: 8px 10px;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); text-align: center; width: 100%;
 }
 .bcell:hover { border-color: var(--line-3); background: var(--surface-3); }
 .bcell.on { border-color: var(--text); background: var(--surface-3); }
-.bcell .bk { font-family: var(--mono); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bcell .bk { max-width: 100%; font-family: var(--mono); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bcell .bk.named { font-family: inherit; font-size: 12.5px; }
 .bcell .bl { font-size: 10.5px; color: var(--text-3); }
-.bcell.empty { border-style: dashed; background: none; justify-items: center; }
+.bcell.empty { border-style: dashed; background: none; }
 .bcell.empty .plus { color: var(--text-3); font-size: 14px; }
 .cell-editor { margin-top: 14px; border: 1px solid var(--line-2); border-radius: 10px; background: var(--surface-2); overflow: hidden; }
 .ce-head { display: flex; align-items: center; gap: 10px; padding: 10px 13px; border-bottom: 1px solid var(--line); }

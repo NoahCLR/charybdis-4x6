@@ -4,7 +4,7 @@
 import {css, isOff, label as hsvLabel} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {LED_INDEX} from "../view/geometry.mjs";
-import {actionLabel, behaviourFor, behaviourListeningTo, resolvedPositions, canonicalKeycode, behaviourGridSteps, behaviourGroups, behaviourRouteKeys, behaviourTiers, comboEditInputs, comboGroups, combosAt, keyFace, keyMeaning, macroReach, pointingReach, pointingSlotFor, pointingVariant, reachKeys} from "../view/keyface.mjs";
+import {actionLabel, behaviourFor, cellLabel, behaviourListeningTo, resolvedPositions, canonicalKeycode, behaviourGridSteps, behaviourGroups, behaviourRouteKeys, behaviourTiers, comboEditInputs, comboGroups, combosAt, keyFace, keyMeaning, macroReach, pointingReach, pointingSlotFor, pointingVariant, reachKeys} from "../view/keyface.mjs";
 import {feedbackColours, layerColourRow, pdColourRow, stageEnabled} from "../view/lighting.mjs";
 import {closeComboBuilder, currentLayer, getModel, heldLayers, layerName, layers, openComboBuilder, positionAt, post, previewing, render, selectedPosition, showLayer, state, writable, canEdit as canEditArea} from "../store.mjs";
 import * as edits from "../view/edits.mjs";
@@ -428,8 +428,11 @@ function behaviourEditor(behaviour) {
         const id = `${step.tapCount}-${kind}`;
         const open = state.cell === id;
         if (!branch) return `<button class="bcell empty ${open ? "on" : ""}" data-cell="${id}"><span class="plus">+</span></button>`;
-        return `<button class="bcell ${open ? "on" : ""}" data-cell="${id}">
-            <span class="bk"${sends(model, branch.action) ? ` data-tip="${esc(branch.action)}"` : ""}>${sends(model, branch.action) || esc(branch.action)}</span>
+        // The grid reads by name; the keycode is on hover and in the editor.
+        const label = cellLabel(model, branch);
+        const named = Boolean(sends(model, branch.action)) || label !== branch.action;
+        return `<button class="bcell ${open ? "on" : ""}" data-cell="${id}"${named ? ` data-tip="${esc(branch.action)}"` : ""}>
+            <span class="bk ${named ? "named" : ""}">${sends(model, branch.action) || esc(label)}</span>
             <span class="bl">${esc([sendsKind(model, branch.action), helperLabel(kind, branch.helper)].filter(Boolean).join(" · "))}</span></button>`;
     };
 

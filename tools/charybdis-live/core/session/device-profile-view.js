@@ -19,11 +19,22 @@ function enumName(values, value) {
     return entry[0];
 }
 
+// A stored keycode's readable name ("#", "Shift+Enter"), for the behaviour
+// grid to show. Absent when the catalogue knows the keycode only by itself,
+// and for layer, pointing and macro actions, which the interface names from
+// the profile's own layers, slots and macros.
+function actionDisplay(action) {
+    if (action.kind !== ACTION.QMK_KEYCODE) return {};
+    const resolved = keycodes.resolve(action.operand);
+    return resolved.known && resolved.label !== resolved.name ? {label: resolved.label} : {};
+}
+
 function behaviorRowsForView(domain) {
     const hold = (branch) => branch && ({
         helper: enumName(KEY_BEHAVIOR_HOLD_MODES, branch.mode),
         action: actionName(branch.action),
         repeatHz: String(branch.repeatHz),
+        ...actionDisplay(branch.action),
     });
     return domain.rows.map((row) => ({
         keycode: actionName(row.target),
@@ -34,7 +45,7 @@ function behaviorRowsForView(domain) {
         steps: row.steps.map((step) => ({
             tapCount: step.tapIndex,
             tapCountName: branchName(step.tapIndex + 1),
-            ...(step.tap ? {tap: {helper: "TAP_SENDS", action: actionName(step.tap)}} : {}),
+            ...(step.tap ? {tap: {helper: "TAP_SENDS", action: actionName(step.tap), ...actionDisplay(step.tap)}} : {}),
             ...(step.hold ? {hold: hold(step.hold)} : {}),
             ...(step.longHold ? {longHold: hold(step.longHold)} : {}),
         })),
