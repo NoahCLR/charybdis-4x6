@@ -4,15 +4,17 @@
 //
 // With layers previewed on under it (`held`, positions in the stack), each key
 // shows what the keyboard would answer with instead of what this layer stores:
-// a transparent key shows the key of the highest layer below that is on,
-// dimmed, and tagged with that layer's number unless it is base, which answers
-// whatever nothing else does. Selection and edits still name this layer's own
-// position.
+// a transparent key shows the key of the highest layer below that is on. Its
+// cap is frosted like any transparent key's, since this layer is glass there
+// and the key is seen through it; its legend stays sharp, and a swatch in the
+// corner names the answering layer by its colour unless it is base, which
+// answers whatever nothing else does. Selection and edits still name this
+// layer's own position.
 
 import {css, idealText, isOff} from "../lib/colour.mjs";
 import {GEO, LED_INDEX, TRACKBALL_LED, fitText, keyFaceRows, keyVisual} from "../view/geometry.mjs";
 import {behaviourFor, behaviourTiers, combosAt, keyFace, keyMeaning, resolvedPositions} from "../view/keyface.mjs";
-import {keyLight, stageEnabled, tierColour, trackballLight} from "../view/lighting.mjs";
+import {keyLight, layerColourRow, stageEnabled, tierColour, trackballLight} from "../view/lighting.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {hideHover} from "./hover.mjs";
 
@@ -37,6 +39,7 @@ export function board(model, layer, options = {}) {
         const shown = answer?.position || position;
         const from = answer?.fellThrough ? answer.layer : null;
         const face = keyFace(shown);
+        const glass = face.kind === "transparent" || Boolean(from);
         const cx = visual.x + GEO.keyW / 2, cy = visual.y + GEO.keyH / 2;
         const transform = visual.angle ? ` transform="rotate(${visual.angle} ${cx} ${cy})"` : "";
         const classes = ["kc",
@@ -52,8 +55,8 @@ export function board(model, layer, options = {}) {
             const light = keyLight(model, layer, position, {pdActive, held: heldIds});
             text = idealText(light.colour);
             const paint = css(light.colour);
-            fill = ` style="fill:${paint};stroke:${face.kind === "transparent" ? "none" : "rgba(255,255,255,.3)"}"`;
-            glow += `<rect class="kc-glow${face.kind === "transparent" ? " kc-glow-trns" : ""}" x="${visual.x}" y="${visual.y}" width="${GEO.keyW}" height="${GEO.keyH}" rx="${GEO.radius}" fill="${paint}"${transform}></rect>`;
+            fill = ` style="fill:${paint};stroke:${glass ? "none" : "rgba(255,255,255,.3)"}"`;
+            glow += `<rect class="kc-glow${glass ? " kc-glow-trns" : ""}" x="${visual.x}" y="${visual.y}" width="${GEO.keyW}" height="${GEO.keyH}" rx="${GEO.radius}" fill="${paint}"${transform}></rect>`;
         }
 
         const showMarks = faces && mode !== "leds";
@@ -117,7 +120,7 @@ export function board(model, layer, options = {}) {
             ${selected === index ? ring("kc-ring") : ""}
             ${reach.includes(index) ? `<rect class="kc-reach" x="${visual.x - 3}" y="${visual.y - 3}" width="${GEO.keyW + 6}" height="${GEO.keyH + 6}" rx="${GEO.radius + 2}"></rect>` : ""}
             ${marks}
-            ${from && from.index !== 0 ? `<text class="kc-from" x="${visual.x + 6}" y="${visual.y + 7.5}"${text ? ` style="fill:${text}"` : ""}>${from.index}</text>` : ""}
+            ${from && from.index !== 0 ? fromSwatch(model, from, visual, text) : ""}
             ${drafted?.has(index) ? `<circle class="kc-draft" cx="${visual.x + GEO.keyW - 5.5}" cy="${visual.y + 5.5}" r="2.6"></circle>` : ""}
             ${sub ? `<line class="kc-sep" x1="${visual.x + 8}" y1="${rows.separatorY}" x2="${visual.x + GEO.keyW - 8}" y2="${rows.separatorY}" stroke="${text || "rgba(255,255,255,.9)"}" stroke-width="1"></line>` : ""}
             <text class="kc-label" x="${cx}" y="${rows.mainY}" font-size="${mainFit.size}"${squeeze(mainFit)}${text ? ` style="fill:${text}"` : ""}>${esc(main)}</text>
@@ -202,6 +205,16 @@ function dragToSwap(node, group, index, onSwap) {
         if (target) onSwap(index, Number(target.dataset.key));
     });
     group.addEventListener("pointercancel", reset);
+}
+
+// The answering layer's swatch in a seen-through key's corner, the swatch its
+// tab carries: lit in its colour, or an empty outline when it paints nothing.
+function fromSwatch(model, from, visual, text) {
+    const row = layerColourRow(model, from.index);
+    const lit = stageEnabled(model, "layers") && row && !isOff(row.color);
+    const edge = text || "rgba(255,255,255,.9)";
+    return `<rect class="kc-from" x="${visual.x + 5}" y="${visual.y + 5}" width="6" height="6" rx="1.8"
+        fill="${lit ? css(row.color) : "none"}" stroke="${edge}" stroke-width="${lit ? 0.9 : 1}"></rect>`;
 }
 
 // The trackball's own LED. In light mode it shows what it emits; in the LED
