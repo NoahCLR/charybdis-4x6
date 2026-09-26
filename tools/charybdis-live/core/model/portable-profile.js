@@ -177,18 +177,20 @@ const decodedOf = snapshot => snapshot.decoded && snapshot.decoded.document === 
 // keep their numbers and reach whatever layer now sits there.
 //
 // Any layer may be put at the bottom, which makes it the base: always on, and
-// what every transparent key falls through to. A layer key that reaches the base
-// reaches the bottom slot, whatever sits there, so TO(0) still goes home and a
-// key that reached the new base now goes home too; the old base keeps nothing
-// that reaches it. The startup layers are slots in the same way. The pointer and
-// sniping layers and the combo references name a layer by what it holds, so
-// they follow it.
+// what every transparent key falls through to. The new base and the old one
+// trade roles rather than follow: a layer key that reached the base still
+// reaches the bottom slot, so TO(0) still goes home, and one that reached the
+// new base now reaches the old base wherever it went, so the key that held
+// Numbers from Base holds Base from Numbers. Following would leave MO(0),
+// TG(0) and the like, which do nothing since the base is always on. The
+// startup layers are slots in the same way. The pointer and sniping layers and
+// the combo references name a layer by what it holds, so they follow it.
 function reorderLayers(document, order, names, {keysFollow = true} = {}) {
     if (document.layers?.length !== 8) throw fail("Layer ordering becomes available after the eight-layer update.");
     const validated = validateSnapshot(document), result = JSON.parse(JSON.stringify(document));
     if (!Array.isArray(order) || order.length !== 8 || new Set(order).size !== 8 || order.some(id => !Number.isInteger(id) || id < 0 || id >= 8)) throw fail("Include every layer once.");
     const remap = []; order.forEach((old, next) => {remap[old] = next;});
-    const reach = old => (old === 0 ? 0 : remap[old]);
+    const reach = old => (old === 0 ? 0 : old === order[0] ? remap[0] : remap[old]);
     function native(code) {
         if (!keysFollow) return code;
         if (code >= 0x4000 && code <= 0x4fff) {const layer = (code >> 8) & 15; if (layer >= 8) throw fail("A key points outside the layer bank."); return (code & 0xf0ff) | (reach(layer) << 8);}

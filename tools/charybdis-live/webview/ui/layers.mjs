@@ -100,7 +100,7 @@ function editor(model, portable, busy) {
                 <label class="sw"><input type="checkbox" id="layerKeysFollow" data-act="follow" ${follow ? "checked" : ""} ${busy ? "disabled" : ""}>
                     <span class="track"></span><span class="txt">Keys follow their layers</span></label>
                 <span class="note">${follow
-                    ? "Layer keys (MO, LT, TG, TO, TT, OSL…) are renumbered with the move, so each still reaches the same layer. A key that went to the base goes to the base, whichever layer that is."
+                    ? "Layer keys (MO, LT, TG, TO, TT, OSL…) are renumbered with the move, so each still reaches the same layer. Make base swaps the two roles: a key that reached the new base reaches the old one."
                     : "Layer keys keep their numbers: a key set to MO(1) reaches whatever layer is now 1. Names, colours and the pointer and sniping settings still move with their layer."}</span>
             </div>
             <div class="row" style="gap:8px;align-items:center">

@@ -64,13 +64,15 @@ base: always on, and what every transparent key falls through to. It is not
 dragged; **Make base** on another row swaps that layer into it, and the old
 base takes its place. **Keys follow their layers** (on by
 default) renumbers every layer key (MO, LT, TG, TO, TT, OSL, LOCK_LAYER…) on
-layers, behaviours and combos so each still reaches the same layer, except that
-a key that went to the base goes to the base, whichever layer that now is:
-`TO(0)` still goes home. Turned off, the layers move but those keys keep their
-numbers. Names, colours and the pointer and sniping settings move with their
-layer either way. After Make base, the review's checks say what it left behind:
-the old base, which nothing reaches unless you give it a key, and any
-transparent keys on the new base, which have nothing under them.
+layers, behaviours and combos so each still reaches the same layer. Make base is
+the exception: the two layers trade roles, so `TO(0)` still goes home and a key
+that reached the new base now reaches the old one — the key that held Numbers
+from Base holds Base from Numbers. Turned off, the layers move but those keys
+keep their numbers. Names, colours and the pointer and sniping settings move
+with their layer either way. After Make base, the review's checks say what it
+left behind: transparent keys on the new base, which have nothing under them,
+the old base if nothing reaches it, and any layer key that holds or toggles the
+base, which does nothing since the base is always on.
 
 **⌘-click** (Ctrl-click off a Mac) more layer tabs to preview them on
 together. The board then shows what the keyboard would answer with, by the

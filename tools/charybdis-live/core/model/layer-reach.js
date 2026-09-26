@@ -20,8 +20,9 @@
 // - traps: a set of locks you can get into and cannot get back to Base from,
 //   the only finding that asks for a confirmation before Apply;
 // - layers nothing reaches, layer keys that reach a layer with no keys of its
-//   own, transparent keys on Base, a pointer layer that cannot work, and layer
-//   keys the keyboard does not run through its layer tracking.
+//   own, layer keys that hold or toggle Base (which is always on, so they do
+//   nothing), transparent keys on Base, a pointer layer that cannot work, and
+//   layer keys the keyboard does not run through its layer tracking.
 //
 // Holding keys is not limited by fingers or by which key is already down, and
 // a one-shot counts as a hold, so the walk finds every way out a person could
@@ -131,7 +132,8 @@ function profileFacts(decoded) {
         output: combo.output})) : [];
     const pointer = values[SETTING.AUTO_MOUSE_ENABLED] ? values[SETTING.AUTO_MOUSE_LAYER] : undefined;
     const sniping = values[SETTING.AUTO_SNIPING_ENABLED] ? values[SETTING.AUTO_SNIPING_LAYER] : undefined;
-    return {names, layers, rows, combos, pointer, sniping,
+    const allCombos = (decoded.combos || []).map((combo, index) => ({index, output: combo.output}));
+    return {names, layers, rows, combos, allCombos, pointer, sniping,
         // Base is always on, and so are the default layers the keyboard keeps.
         always: 1 | (values[SETTING.DEFAULT_LAYERS] & 0xff),
         comboLayer: (layer) => (references >>> (layer * 4)) & 15};
@@ -301,6 +303,31 @@ function findings(facts, walked) {
             detail: `${effect.how}: ${layerName(facts.names, layer)} holds only transparent keys and KC_NO, so it adds nothing to the board.`,
             fix: `Give ${layerName(facts.names, layer)} keys, or take the layer key away.`,
             place: placeOf(effect.from)});
+    }
+
+    // Holding, toggling or locking a layer that is always on does nothing;
+    // only TO() means something there. Every key, branch and combo output is
+    // counted, reachable or not.
+    const idle = (effects) => effects.some((effect) => effect.kind !== "move" && effect.kind !== "unowned" && facts.always & bit(effect.layer));
+    const idlePlaces = [];
+    facts.layers.forEach((codes, layer) => codes.forEach((code, position) => {
+        if (idle(layerEffects(code))) idlePlaces.push({name: codeName(code), place: keyPlace(layer, position)});
+    }));
+    for (const [code, row] of facts.rows) for (const step of row.steps) {
+        for (const action of [step.tap, step.hold?.action, step.longHold?.action]) {
+            if (idle(actionEffects(action))) idlePlaces.push({name: `${actionName(action)} in the behaviour on ${codeName(code)}`, place: {kind: "behaviour", keycode: codeName(code)}});
+        }
+    }
+    for (const combo of facts.allCombos) {
+        if (idle(actionEffects(combo.output))) idlePlaces.push({name: `${actionName(combo.output)} on combo ${combo.index + 1}`, place: {kind: "combo", index: combo.index}});
+    }
+    if (idlePlaces.length) {
+        const count = idlePlaces.length;
+        results.push({kind: "idleLayerKey", level: LEVELS.NOTICE, layers: [0], count,
+            title: `${count} layer key${count === 1 ? "" : "s"} hold${count === 1 ? "s" : ""} or toggle${count === 1 ? "s" : ""} ${layerName(facts.names, 0)}, which is always on`,
+            detail: `${count > 3 ? `${idlePlaces.slice(0, 3).map((entry) => entry.name).join(", ")} and ${count - 3} more` : listed(idlePlaces.map((entry) => entry.name))}: ${layerName(facts.names, 0)} is always on, so holding, toggling or locking it does nothing. TO(0) is the one that means something there: it goes home.`,
+            fix: "Point them at another layer, use TO(0) to go home, or give the keys something else to do.",
+            place: idlePlaces[0].place});
     }
 
     const dead = facts.layers[0].map((_, position) => position).filter((position) => !resolve(facts, facts.always, position));

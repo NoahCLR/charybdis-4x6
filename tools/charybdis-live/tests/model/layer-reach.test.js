@@ -155,3 +155,17 @@ test("findings are matched layer with layer through the draft's order, so a reor
     const based = profile({keys: {"3:0": KC_B}});
     assert.deepEqual(draftChecks(profile(), based, [3, 1, 2, 0, 4, 5, 6, 7]).map((check) => [check.key, check.status]), [["unreachable:0", "new"]]);
 });
+
+test("layer keys that hold or toggle Base do nothing, and are counted wherever they sit; TO(0) is not one", () => {
+    const toggle = {target: code(KC_ESC), steps: [{tapIndex: 1, tap: {kind: 3, flags: 0, operand: 0}}]};
+    const combo = {inputs: [code(KC_A), code(KC_B)], output: code(MO(0))};
+    const [finding, ...rest] = layerReach(profile({keys: {"0:0": MO(0), "0:1": TO(0), "0:2": KC_ESC, "3:4": TG(0), "0:3": KC_B}, rows: [toggle], combos: [combo]}))
+        .filter((entry) => entry.kind === "idleLayerKey");
+    assert.equal(rest.length, 0);
+    assert.equal(finding.level, "notice");
+    assert.equal(finding.count, 4);
+    assert.equal(finding.title, "4 layer keys hold or toggle Base, which is always on");
+    assert.match(finding.detail, /^MO\(0\), TG\(0\), LOCK_LAYER\(0\) in the behaviour on KC_ESCAPE and 1 more: Base is always on/);
+    assert.deepEqual(finding.place, {kind: "key", layer: 0, layoutIndex: 0});
+    assert.deepEqual(kinds(profile({keys: {"0:0": TO(0)}})), []);
+});

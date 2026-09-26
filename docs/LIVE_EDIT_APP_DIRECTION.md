@@ -693,15 +693,21 @@ there with **Make base**, which swaps it with the current base, as one
 reorder; the base row itself is never dragged, so a drag never changes the base
 by accident.
 
-With keys following their layers, a layer key that reached the base reaches
-the bottom slot, whichever layer is there: `TO(0)` still goes home, and a key
-that reached the new base (`TO(Game)`) now goes home too. Every other key,
-behaviour and combo reference follows its layer, as do names, colours, LED
-group rows, and the pointer, sniping and combo-reference settings, which name
-a layer by what it holds. The startup layers are slots and stay on the bottom
-one. So after Make base nothing reaches the old base unless the person gives it
-a key; the review's checks (D-L36) say so, and name any transparent keys on the
-new base, rather than the reorder inventing a way back. The checks compare the
+With keys following their layers, the new base and the old one trade roles
+rather than follow: a layer key that reached the base still reaches the bottom
+slot, so `TO(0)` still goes home, and one that reached the new base now reaches
+the old base, wherever it went. The key that held Numbers from Base holds Base
+from Numbers, and `TO(Game)` becomes the key that switches back. Following them
+instead, as the first version did, turned `MO(n)`, `LT(n, …)`, `TT(n)` and
+`TG(n)` into `MO(0)` and the like, which do nothing because the base is always
+on. Every other key, behaviour and combo reference follows its layer, as do
+names, colours, LED group rows, and the pointer, sniping and combo-reference
+settings, which name a layer by what it holds. The startup layers are slots and
+stay on the bottom one. The swap cannot fill in what the new base leaves
+transparent, which now has nothing under it, or reach the old base when the
+only keys that did sit on the old base itself; the review's checks (D-L36) name
+both, and count every layer key that holds or toggles the base, rather than
+the reorder inventing a way back. The checks compare the
 draft with the keyboard as it is, matched layer with layer through the draft's
 order, so what a reorder makes or mends is reported as new or fixed. The
 review's Layer priority item names the new base first. See

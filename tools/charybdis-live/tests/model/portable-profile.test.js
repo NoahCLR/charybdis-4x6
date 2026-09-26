@@ -87,7 +87,7 @@ test("with keys not following, layers move but every layer key keeps its number"
     assert.equal(validateSnapshot(reorderLayers(source, order)).combos[0].output.operand, 0x5281);
 });
 
-test("any layer can be made the base: keys that went home still go home, and the rest follow their layers", () => {
+test("a new base trades roles with the old one: keys to either keep their numbers, the rest follow their layers", () => {
     const {decodeComboDomainV1, encodeComboDomainV1} = require("../../core/schema/combo-domain-v1");
     const source = document(), blob = decodeProfileBlob(Buffer.from(source.profile, "base64"));
     // TO(0), TO(3), TG(2) and MO(3) on the old base; LOCK_LAYER(0) and TT(3) as behaviour branches; TO(3) on a combo.
@@ -104,10 +104,14 @@ test("any layer can be made the base: keys that went home still go home, and the
     // Navigation (3) becomes the base; the old base takes slot 3.
     const order = [3, 1, 2, 0, 4, 5, 6, 7];
     const moved = reorderLayers(source, order), actual = validateSnapshot(moved);
-    assert.deepEqual(moved.layers[3].slice(10, 14), [0x5200, 0x5200, 0x5262, 0x5220], "TO(0) stays home, TO(3) now goes home, TG(2) and MO(3) follow");
+    assert.deepEqual(moved.layers[3].slice(10, 14), [0x5200, 0x5203, 0x5262, 0x5223], "TO(0) stays home, TO(3) and MO(3) now reach the old base, TG(2) follows");
     assert.equal(actual.behaviors.rows[0].steps[0].tap.operand, 0, "LOCK_LAYER(0) still names the base");
-    assert.equal(actual.behaviors.rows[0].steps[0].hold.action.operand, 0, "MO(3) held the new base");
-    assert.equal(actual.combos[0].output.operand, 0x5200);
+    assert.equal(actual.behaviors.rows[0].steps[0].hold.action.operand, 3, "MO(3) held the new base, so it holds the old one");
+    assert.equal(actual.combos[0].output.operand, 0x5203);
+    // Moved on past the swap, the old base is still what those keys reach.
+    const further = reorderLayers(source, [3, 1, 2, 4, 5, 6, 7, 0]);
+    assert.equal(further.layers[7][11], 0x5207, "TO(3) reaches the old base in slot 7");
+    assert.equal(further.layers[7][12], 0x5262, "TG(2) stays with Symbols");
     assert.equal(actual.settings.names[0], before.settings.names[3]);
     assert.equal(actual.settings.names[3], before.settings.names[0]);
     assert.deepEqual(actual.rgb.layerColors.find(row => row.layerId === 0).color, before.rgb.layerColors.find(row => row.layerId === 3).color, "the new base keeps its colour");
