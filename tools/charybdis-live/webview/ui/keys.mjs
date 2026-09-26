@@ -3,6 +3,7 @@
 
 import {css, isOff, label as hsvLabel} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
+import {scrollContentTo} from "../lib/scroll.mjs";
 import {LED_INDEX} from "../view/geometry.mjs";
 import {actionLabel, behaviourFor, cellLabel, behaviourListeningTo, resolvedPositions, canonicalKeycode, behaviourGridSteps, behaviourGroups, behaviourRouteKeys, behaviourTiers, comboEditInputs, comboGroups, combosAt, keyFace, keyMeaning, macroReach, pointingReach, pointingSlotFor, pointingVariant, reachKeys} from "../view/keyface.mjs";
 import {feedbackColours, layerColourRow, pdColourRow, stageEnabled} from "../view/lighting.mjs";
@@ -702,7 +703,12 @@ function comboBuilder(layer, canEdit, holdTerm) {
         state.combo.extraInputs = state.combo.extraInputs.filter((input) => input !== button.dataset.removeExtra);
         render();
     }));
-    node.querySelector('[data-act="pickboard"]')?.addEventListener("click", () => { state.combo.picking = !state.combo.picking; render(); });
+    node.querySelector('[data-act="pickboard"]')?.addEventListener("click", () => {
+        const starting = !state.combo.picking;
+        state.combo.picking = starting;
+        render();
+        if (starting) scrollContentTo(document, ".board-card");
+    });
     node.querySelector('[data-act="pickout"]')?.addEventListener("click", () => openPicker({
         title: "Combo output", context: editing ? original?.badge : "new combo",
         seed: form.output ? [form.output] : [],

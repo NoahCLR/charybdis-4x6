@@ -155,6 +155,23 @@ function comboFields(row, names) {
         ["Hold threshold", `${row.holdTermMs} ms`], ["Conditions", options || "none"]]);
 }
 
+// Combo IDs are packed positions, not stable identities. Recognize a single
+// removed row by its stored contents so the shifted suffix is not presented as
+// a series of edits. Ambiguous identical rows keep the positional review.
+function singleComboRemovalIndex(before, after) {
+    if (before.length !== after.length + 1) return null;
+    const contents = row => {
+        const {id, ...stored} = row;
+        return JSON.stringify(stored);
+    };
+    const old = before.map(contents), next = after.map(contents);
+    const matches = [];
+    for (let removed = 0; removed < old.length; removed++) {
+        if (old.every((value, index) => index === removed || value === next[index < removed ? index : index - 1])) matches.push(removed);
+    }
+    return matches.length === 1 ? matches[0] : null;
+}
+
 // Lighting in the words the Lighting screen uses, and every colour as a
 // colour: the review draws it as a swatch, and says what an off colour means
 // where it means something (a group row inherits its stage's colour).
@@ -257,9 +274,17 @@ function profileReview(before, after) {
         item("Behaviours", `behavior:${id}`, action(target, next ? namesB : namesA), behaviourFields(old, a.settings.values, namesA), behaviourFields(next, b.settings.values, namesB),
             {kind: "behaviour", target}, [Boolean(old), Boolean(next)]);
     }
-    for (let i = 0; i < Math.max(a.combos.length, b.combos.length); i++) {
-        item("Combos", `combo:${i}`, `Combo ${i}`, comboFields(a.combos[i], namesA), comboFields(b.combos[i], namesB), {kind: "combo", index: i}, undefined,
+    const removedCombo = singleComboRemovalIndex(a.combos, b.combos);
+    if (removedCombo !== null) {
+        const i = removedCombo;
+        item("Combos", `combo:${i}`, `Combo ${i}`, comboFields(a.combos[i], namesA), new Map(), {kind: "combo", index: i}, undefined,
             {kind: "combo", badge: `C${i}`});
+        if (i < b.combos.length) items.at(-1).note = "Later combos move up one number.";
+    } else {
+        for (let i = 0; i < Math.max(a.combos.length, b.combos.length); i++) {
+            item("Combos", `combo:${i}`, `Combo ${i}`, comboFields(a.combos[i], namesA), comboFields(b.combos[i], namesB), {kind: "combo", index: i}, undefined,
+                {kind: "combo", badge: `C${i}`});
+        }
     }
     macrosA.viaMacros.forEach((slot, i) => {
         const fields = (macro) => new Map([["Steps", macro.payload || "empty"], ["Name", macro.name || "no name"]]);
@@ -325,4 +350,4 @@ function layerOrderReview(after, order) {
     return {area: "Layers", unit: "layerOrder", title: "Layer priority", note: "Higher layers win", status: "changed", fields,
         place: {kind: "layers", layers: moved}};
 }
-module.exports = {layerOrderReview, profileReview};
+module.exports = {layerOrderReview, profileReview, singleComboRemovalIndex};

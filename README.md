@@ -271,6 +271,11 @@ warnings in orange, traps and save blockers in red. It checks layer reachability
 combos, inert pointing bindings, and macros the keyboard cannot play. Apply asks
 for confirmation when a warning or trap is present and stays disabled until
 destination save blockers are resolved.
+Removing one combo appears as one deletion in Review and Draft history; later
+combo numbers shift because the device stores them in a packed table.
+
+In **Keys → Combos**, **Pick on board** brings the board into view so its keys
+can be selected as combo inputs.
 
 After Apply completes, the editor stays visible while the app reads keys,
 profile domains, combos and base lighting back from the keyboard. The bottom

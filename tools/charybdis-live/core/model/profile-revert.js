@@ -17,6 +17,7 @@ const {decodeKeyBehaviorDomain, encodeKeyBehaviorDomain} = require("../schema/ke
 const {decodeComboDomainV1, encodeComboDomainV1} = require("../schema/combo-domain-v1");
 const {decodeSettings, encodeSettings, macroNamesOf} = require("../schema/settings-domain-v1");
 const {decodePdDomain, encodePdDomain} = require("../schema/pd-mode-domain-v1");
+const {singleComboRemovalIndex} = require("./profile-review");
 
 const copy = value => JSON.parse(JSON.stringify(value));
 const fail = text => Object.assign(new Error(text), {code: "PROFILE_REVERT_UNSUPPORTED"});
@@ -87,10 +88,12 @@ function revertUnits(before, after, units, capabilities) {
             const kept = behaviors.mine.filter(row => !same(row)), stored = behaviors.theirs.find(same);
             behaviors.mine = stored ? [...kept, stored] : kept;
         } else if (kind === "combo") {
-            // A combo is its position: removing one moves every later one up,
-            // and those moves are units of the same edit.
             const combos = domain(PROFILE_DOMAIN_IDS.COMBOS), index = Number(rest);
-            combos.mine[index] = combos.theirs[index];
+            // Restore a lone middle deletion by inserting the stored row;
+            // assigning it would overwrite the next combo in the packed table.
+            const removed = singleComboRemovalIndex(combos.theirs, combos.mine);
+            if (removed === index) combos.mine.splice(index, 0, combos.theirs[index]);
+            else combos.mine[index] = combos.theirs[index];
         } else if (kind === "pd") {
             const slots = domain(PROFILE_DOMAIN_IDS.PD_MODES);
             slots.mine[Number(rest)] = slots.theirs[Number(rest)];

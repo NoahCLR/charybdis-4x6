@@ -86,7 +86,8 @@ unlit keys black.
   expression, and OK / Cancel. List mode is used for combo inputs.
 - **The combo builder beside the board**, with inputs picked on the physical
   keyboard, per-combo window, hold and order requirements, and the shared hold
-  threshold shown as shared.
+  threshold shown as shared. Pick on board scrolls the board into view when
+  input picking starts.
 - **The LED group builder**, with the keyboard's own LED indices, the trackball
   LED, the rows already in each table, inline or reusable groups, and what each
   group is used by.

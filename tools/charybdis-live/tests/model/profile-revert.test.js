@@ -37,6 +37,25 @@ function edited() {
 }
 const describe = (items) => items.map((item) => JSON.stringify(item)).sort();
 
+test("discarding one middle combo deletion restores the full packed table", () => {
+    const seeded = new ProfileDraftSession(snapshotOf(pdDocument()), "board", capabilities);
+    for (let id = 0; id < 7; id++) seeded.stage({draftId: seeded.id, draftRevision: seeded.revision, type: "addCombo",
+        inputs: ["KC_A", `KC_${id + 1}`], output: `KC_${id + 1}`, termMs: "50", holdTermMs: "200"});
+    const draft = new ProfileDraftSession(snapshotOf(seeded.document), "board", capabilities);
+    draft.stage({draftId: draft.id, draftRevision: draft.revision, type: "saveCombo", id: 2,
+        inputs: ["KC_A", "KC_3"], output: "KC_Z", termMs: "50"});
+    draft.stage({draftId: draft.id, draftRevision: draft.revision, type: "deleteCombo", id: 2});
+    const rows = profileReview(draft.base, draft.current);
+    assert.deepEqual(rows.map(row => row.unit), ["combo:2"]);
+    assert.deepEqual(draft.changes().map(row => row.unit), ["combo:2"]);
+    assert.deepEqual(draft.steps().slice(-2).map(step => step.changes.map(row => row.unit)), [["combo:2"], ["combo:2"]]);
+    const restored = revertUnits(draft.base, draft.current, new Set([rows[0].unit]), capabilities);
+    assert.deepEqual(validateSnapshot(restored).combos, validateSnapshot(draft.base.document).combos);
+    assert.deepEqual(profileReview(draft.base, snapshotOf(restored)), []);
+    draft.discard(draft.revision, draft.changes()[0].group);
+    assert.deepEqual(draft.changes(), []);
+});
+
 test("each unit goes back to the keyboard's value, and nothing else moves", () => {
     const draft = edited(), base = draft.base, current = draft.current;
     const rows = profileReview(base, current);

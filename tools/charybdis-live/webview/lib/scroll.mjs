@@ -17,3 +17,14 @@ export function restoreContentScroll(root, scroll) {
     content.scrollTop = scroll.top;
     content.scrollLeft = scroll.left;
 }
+
+// A deliberate jump from an editor to something higher in the same scroller.
+// Measure both rectangles after the redraw; offsetTop may belong to a different
+// positioned ancestor and cannot tell us where the target is in `.content`.
+export function scrollContentTo(root, selector, margin = 20) {
+    const content = root.querySelector(".content");
+    const target = content?.querySelector(selector);
+    if (!target) return;
+    const top = content.scrollTop + target.getBoundingClientRect().top - content.getBoundingClientRect().top - margin;
+    content.scrollTo({top, left: content.scrollLeft, behavior: "smooth"});
+}

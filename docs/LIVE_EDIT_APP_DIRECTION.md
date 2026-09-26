@@ -542,6 +542,12 @@ default or a renamed layer is one item where it was made. Colour reads as in
 the editors (D-L31). The draft's change count counts items. **Show** opens the
 item where it is edited; a removed item has no Show.
 
+Combo numbers are packed positions. When the only net combo difference is one
+removed row, review and history show that removal as one item and explain that
+later combos move up one number. Discard reinserts the row at its former
+position. If another combo also changed, review keeps the positional differences
+visible rather than attributing them all to the deletion.
+
 An item is also the unit **Discard** puts back, as one more undoable step. The
 items one staged edit changed belong together, so a key swap or a moved
 behaviour is one block with one Discard, titled by the edit that made it; a

@@ -36,6 +36,7 @@ const {validateSnapshot} = require("../../core/model/portable-profile");
 const {decodeProfileBlob, encodeProfileBlob} = require("../../core/schema/profile-blob-v1");
 const {decodeKeyBehaviorDomain, encodeKeyBehaviorDomain} = require("../../core/schema/key-behavior-domain-v1");
 const {decodePdDomain, encodePdDomain} = require("../../core/schema/pd-mode-domain-v1");
+const {decodeComboDomainV1, encodeComboDomainV1} = require("../../core/schema/combo-domain-v1");
 // A copy of a document with one profile domain rewritten.
 function withDomain(value, id, decode, encode, change) {
     const blob=decodeProfileBlob(Buffer.from(value.profile,"base64")), domain=blob.domains.find(row=>row.id===id);
@@ -43,6 +44,23 @@ function withDomain(value, id, decode, encode, change) {
     return {...value,profile:encodeProfileBlob(blob).toString("base64")};
 }
 const behaviours = (value, change) => withDomain(value,32,payload=>decodeKeyBehaviorDomain(payload,{actionLimits:{maxPdModes:8}}).rows,rows=>encodeKeyBehaviorDomain({rows},{actionLimits:{maxPdModes:8}}),change);
+const combos = (value, change) => withDomain(value,48,decodeComboDomainV1,encodeComboDomainV1,change);
+const comboRows = () => Array.from({length:7}, (_, id) => ({inputs:[{kind:1,flags:0,operand:4+id},{kind:1,flags:0,operand:30+id}],
+    output:{kind:1,flags:0,operand:40+id},termMs:50,holdTermMs:200,mustHold:false,mustTap:false,ordered:false}));
+test("removing a middle combo is one review item, with its renumbering explained", () => {
+    const base=combos(pdDocument(),()=>comboRows()), before=snapshot(base);
+    const after=snapshot(combos(base,rows=>rows.filter((_,id)=>id!==2)));
+    const rows=profileReview(before,after);
+    assert.deepEqual(rows.map(row=>[row.unit,row.status]),[["combo:2","removed"]]);
+    assert.equal(rows[0].note,"Later combos move up one number.");
+    assert.ok(rows[0].fields.find(field=>field.label==="Sends").before);
+    assert.equal(rows[0].fields.find(field=>field.label==="Sends").after,null);
+});
+test("a deletion plus another combo edit keeps both changes visible", () => {
+    const base=combos(pdDocument(),()=>comboRows()), before=snapshot(base);
+    const after=snapshot(combos(base,rows=>rows.filter((_,id)=>id!==2).map((row,id)=>id===3?{...row,termMs:75}:row)));
+    assert.ok(profileReview(before,after).filter(row=>row.area==="Combos").length>1);
+});
 test("a behaviour lists only the fields that changed, in the editor's words", () => {
     const base=pdDocument(), before=snapshot(base);
     const target=validateSnapshot(base).behaviors.rows[0].target;

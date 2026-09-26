@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import {captureContentScroll, restoreContentScroll} from "../webview/lib/scroll.mjs";
+import {captureContentScroll, restoreContentScroll, scrollContentTo} from "../webview/lib/scroll.mjs";
 
 const rootWith = (content) => ({querySelector: (selector) => selector === ".content" ? content : null});
 
@@ -24,4 +24,14 @@ test("scroll preservation tolerates screens without a content container", () => 
     const root = rootWith(null);
     assert.equal(captureContentScroll(root, "keys", "keys"), null);
     assert.doesNotThrow(() => restoreContentScroll(root, {top: 10, left: 2}));
+});
+
+test("jumping from the combo builder places the board below the content edge", () => {
+    const calls = [];
+    const board = {getBoundingClientRect: () => ({top: -260})};
+    const content = {scrollTop: 900, scrollLeft: 12, getBoundingClientRect: () => ({top: 80}),
+        querySelector: (selector) => selector === ".board-card" ? board : null,
+        scrollTo: (options) => calls.push(options)};
+    scrollContentTo(rootWith(content), ".board-card");
+    assert.deepEqual(calls, [{top: 540, left: 12, behavior: "smooth"}]);
 });
