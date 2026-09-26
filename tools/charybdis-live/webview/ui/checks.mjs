@@ -10,7 +10,7 @@ function checkItem(check, show, source) {
     const path = check.path?.length
         ? `<ol class="ck-path">${check.path.map((step) => `<li>${esc(step)}</li>`).join("")}</ol>` : "";
     return `<div class="ck-item ${esc(check.level)}${check.status === "fixed" ? " fixed" : ""}">
-        <div class="ck-h"><span class="ck-level">${["trap", "blocker"].includes(check.level) ? '<i class="dot err"></i>' : ""}${checkTags(check).map(esc).join(" · ")}</span>
+        <div class="ck-h"><span class="ck-level">${checkTags(check).map((tag, index) => `<span>${index === 0 && ["trap", "blocker"].includes(check.level) ? '<i class="dot err"></i>' : ""}${esc(tag)}</span>`).join("")}</span>
             <span class="ck-t">${esc(check.title)}</span><span class="ck-act">${show(check)}</span></div>
         ${check.status === "fixed" ? "" : `<div class="ck-b"><p>${esc(check.detail)}</p>${path}<p class="ck-fix">${esc(check.fix)}</p>${source(check)}</div>`}
     </div>`;
