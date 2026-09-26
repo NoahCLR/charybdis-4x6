@@ -593,3 +593,18 @@ test("behaviour timing defaults follow the draft's Key Timing, and its undo", ()
     draft.undo(draft.revision);
     assert.equal(timing().tapHoldTerm, before, "and undo puts it back");
 });
+
+test("a saved combo keeps the stored order of its kept inputs; added ones follow as picked", () => {
+    // An input off the board is listed apart in the builder, yet keeps its place.
+    assert.deepEqual(edits.comboInputOrder(["KC_W", "KC_X", "KC_Q"], ["KC_Q", "KC_W", "KC_X"]), ["KC_W", "KC_X", "KC_Q"]);
+    assert.deepEqual(edits.comboInputOrder(["KC_W", "KC_Q"], ["KC_Q", "KC_E", "KC_W"]), ["KC_W", "KC_Q", "KC_E"], "an added input comes last");
+    assert.deepEqual(edits.comboInputOrder(["KC_Q"], ["KC_W", "KC_Q"]), ["KC_Q", "KC_W"], "a removed input picked again counts as added");
+    assert.deepEqual(edits.comboInputOrder([], ["KC_E", "KC_Q"]), ["KC_E", "KC_Q"], "a new combo keeps the order picked");
+});
+
+test("the combo hold threshold is the one stored on the combos, else the keyboard's tapping term", () => {
+    const model = {combos: [{holdTermMs: 240}], behaviorTimingDefaults: {tappingTerm: "200"}};
+    assert.equal(edits.comboHoldTermValue(model, " 275 "), "275", "a written value wins");
+    assert.equal(edits.comboHoldTermValue(model, ""), "240");
+    assert.equal(edits.comboHoldTermValue({...model, combos: []}, ""), "200", "no combos yet: the device's own tapping term");
+});

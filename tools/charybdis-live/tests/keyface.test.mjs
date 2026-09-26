@@ -701,3 +701,10 @@ test("a behaviour cell reads by the key's name, and by its keycode when it has n
     assert.equal(cellLabel(model, {action: "LT(1, KC_F)"}), "F / Numbers");
     assert.equal(cellLabel(model, {action: "QK_BOOT"}), "QK_BOOT", "no clean name: the keycode is the label");
 });
+
+test("the combo editor opens inputs in the order the combo stores them, not board order", () => {
+    // QMK's "keys in order" is the stored order, so an edit must not rearrange it.
+    const layer = {index: 0, name: "LAYER_BASE", positions: [{layoutIndex: 13, keycode: "KC_Q"}, {layoutIndex: 14, keycode: "KC_W"}]};
+    const opened = comboEditInputs({layers: [layer], combos: []}, [layer], 0, {id: 0, badge: "C0", inputs: ["KC_W", "KC_Q"], output: "KC_ESCAPE"});
+    assert.deepEqual(opened.positions.map((index) => opened.codes[index]), ["KC_W", "KC_Q"]);
+});

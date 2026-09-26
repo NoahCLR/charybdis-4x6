@@ -42,8 +42,14 @@ export function screenSettings() {
     const matching = (section) => query ? section.fields.filter((field) => matches(field, query)) : section.fields;
     for (const section of sections) {
         const fields = matching(section);
-        if (!fields.length) continue;
-        pad.appendChild(sectionCard(model, section, fields, canEdit, Boolean(query)));
+        const holdTerm = section.id === "comboSettings" && (!query || matches(COMBO_HOLD, query));
+        if (!fields.length && !holdTerm) continue;
+        const card = sectionCard(model, section, fields, canEdit, Boolean(query));
+        if (holdTerm) {
+            card.querySelector(".rows").appendChild(comboHoldRow(model));
+            card.querySelector(".card-h .tag").textContent = `${section.fields.length + 1} settings`;
+        }
+        pad.appendChild(card);
     }
     // A search for something that moved to Mouse says where it went.
     const elsewhere = query ? sectionsIn(model, "Mouse").reduce((total, section) => total + matching(section).length, 0) : 0;
@@ -64,6 +70,34 @@ export function screenSettings() {
         if (again) { again.focus(); again.setSelectionRange(again.value.length, again.value.length); }
     });
     return main;
+}
+
+// The combo hold threshold is global, so it is edited with the other combo
+// settings. The keyboard stores it with the combos rather than in the
+// settings domain — one value on every combo row, as QMK has it — so it saves
+// as a combo edit, and there is nothing to store it on until a combo exists.
+// QMK waits for it only on combos that must be held or are tap only — the
+// longer of it and the combo's own window — and every other combo ignores it.
+const COMBO_HOLD = {label: "Combo hold threshold", hint: "How long a combo that must be held, or is tap only, waits to tell a hold from a tap: this, or its combo window if that is longer. Other combos ignore it. 0 adds no wait beyond the window."};
+function comboHoldRow(model) {
+    const combos = model?.combos || [];
+    const stored = String(combos[0]?.holdTermMs ?? "");
+    const editable = canEditArea("combos") && combos.length > 0;
+    const row = el(`<div class="setrow">
+        <div><div class="nm">${esc(COMBO_HOLD.label)}</div>
+            <div class="hint">${esc(combos.length ? COMBO_HOLD.hint : "Stored with the combos, so it can be set once the keyboard has one.")}</div></div>
+        <div class="control"><div class="input-row"><input class="input mono" id="comboHoldTerm" value="${esc(stored)}" ${editable ? "" : "disabled"}></div></div>
+    </div>`);
+    // Posted on its own rather than riding along with whichever combo is saved
+    // next. The keyboard always stores a number, so an emptied field is put
+    // back rather than read as some default.
+    row.querySelector("input").addEventListener("change", (event) => {
+        const written = event.target.value.trim();
+        if (!written) { event.target.value = stored; return; }
+        if (written === stored) return;
+        post(edits.comboHoldTerm(written, model.profileIdentity));
+    });
+    return row;
 }
 
 const matches = (field, query) => `${field.label} ${field.hint || ""}`.toLowerCase().includes(query);

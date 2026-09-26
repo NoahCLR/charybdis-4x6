@@ -80,6 +80,9 @@ export function openComboBuilder(combo = null, inputs = {positions: [], codes: {
         open: true, picking: false, awaiting: false, editId: combo?.id ?? null,
         form: {output: combo?.output || "", termMs: String(combo?.termMs ?? ""), mustHold: Boolean(combo?.mustHold), mustTap: Boolean(combo?.mustTap), ordered: Boolean(combo?.ordered)},
         inputs: inputs.positions.slice(), inputCodes: {...inputs.codes}, extraInputs: inputs.extras.slice(),
+        // The combo's inputs in stored order; one removed here and picked
+        // again counts as added (edits.comboInputOrder).
+        storedOrder: (combo?.inputs || []).slice(),
     };
 }
 export function closeComboBuilder() {

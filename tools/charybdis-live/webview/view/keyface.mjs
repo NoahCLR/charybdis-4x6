@@ -464,6 +464,9 @@ export function comboEditInputs(model, stack, at, combo) {
         positions.push(position.layoutIndex);
         codes[position.layoutIndex] = input;
     }
+    // In stored order, not board order: QMK's "keys in order" is the order the
+    // combo lists its inputs, so the editor must not rearrange them.
+    positions.sort((left, right) => names.indexOf(codes[left]) - names.indexOf(codes[right]));
     return {positions, codes, extras: names.filter((name) => !used.has(name))};
 }
 

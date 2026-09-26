@@ -14,7 +14,7 @@ import {colourEditor} from "./colour-editor.mjs";
 import {keepInView, layerBar} from "./layerbar.mjs";
 import {topbar, unavailable} from "./shell.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
-import {marked} from "./marks.mjs";
+import {comboBadge, marked} from "./marks.mjs";
 import {sectionsIn} from "./settings.mjs";
 import {shareHold} from "../view/share.mjs";
 
@@ -348,9 +348,8 @@ function stageBody(body) {
             post(edits.comboFeedback(event.target.value, combo.color)));
         where.append(stack(locality));
         const onBoard = section("On the board");
-        const lit = stageEnabled(model, "combo") && !isOff(combo.color);
         onBoard.append(el(`<div class="row" style="gap:8px;flex-wrap:wrap;margin-bottom:10px">${(model.combos || []).slice(0, 8).map((row) =>
-            `<span class="chip"><i class="lbadge" style="${lit ? `border-color:${css(combo.color)}` : ""}">${esc(row.badge || "C")}</i>
+            `<span class="chip">${comboBadge(model, row.badge || "C")}
             ${esc((row.inputDisplays || row.inputs || []).join(" + "))}</span>`).join("") || `<span class="note">No combos are stored.</span>`}</div>`));
         onBoard.append(el(`<p class="note">While a combo's inputs are held, its keys wear this colour. The badges on the key faces take their outline from it, so an off stage shows plain badges.</p>`));
         node.append(colour, where, onBoard);

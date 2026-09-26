@@ -14,6 +14,14 @@ const COMBO_EDITS = new Set(["addCombo", "saveCombo", "deleteCombo", "updateComb
 const PD_EDITS = new Set(["savePdMode", "clearPdMode", "duplicatePdMode"]);
 const RGB_EDITS = new Set(["updateLayerColor", "updatePdModeColor", "updateAutomouseFade", "updateComboFeedback", "updateKeyBehaviorFeedback", "updateRgbStages", "saveRgbReusableLedGroup", "deleteRgbReusableLedGroup", "addRgbLedGroup", "deleteRgbLedGroup"]);
 const invalid = message => Object.assign(new Error(message), {code: "INVALID_PROFILE_EDIT"});
+// QMK fires a combo only when its keys land within the window, so a 0 ms
+// window never fires; the keyboard would store it, but nothing is gained.
+function comboWindow(value) {
+    const ms = integer(value, 65535, "Combo window");
+    if (ms === 0) throw invalid("Combo window must be at least 1 ms: a 0 ms combo never fires.");
+    return ms;
+}
+
 function integer(value, max, label) {
     if (typeof value === "string" && !/^\d+$/.test(value.trim())) throw invalid(`${label} must be a whole number.`);
     if (typeof value !== "string" && typeof value !== "number") throw invalid(`${label} must be a whole number.`);
@@ -192,7 +200,7 @@ function editCombos(bytes, message, context) {
         rows.splice(integer(message.id, rows.length - 1, "Combo index"), 1);
     } else {
         if (!Array.isArray(message.inputs)) throw invalid("Choose two to four combo input keys.");
-        const row = {inputs: message.inputs.map(expression), output: expression(message.output), termMs: integer(message.termMs, 65535, "Combo window"), holdTermMs: rows[0]?.holdTermMs ?? integer(message.holdTermMs, 65535, "Hold threshold"), mustHold: message.mustHold === true, mustTap: message.mustTap === true, ordered: message.ordered === true};
+        const row = {inputs: message.inputs.map(expression), output: expression(message.output), termMs: comboWindow(message.termMs), holdTermMs: rows[0]?.holdTermMs ?? integer(message.holdTermMs, 65535, "Hold threshold"), mustHold: message.mustHold === true, mustTap: message.mustTap === true, ordered: message.ordered === true};
         if (message.type === "saveCombo") rows[integer(message.id, rows.length - 1, "Combo index")] = row;
         else rows.push(row);
     }

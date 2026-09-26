@@ -16,7 +16,7 @@ test("Defaults and inherited behaviour timing come entirely from the complete ke
     const current = snapshot(), view = settingsEditorView(current);
     assert.equal(view.brightnessMax, 200);
     const model = buildDeviceModel({settingsView: view, capabilities: {compiledLayerCount: 8}});
-    assert.equal(model.configDefaults.length, 10);
+    assert.equal(model.configDefaults.length, 11, "Combos has a section of its own");
     const fields = model.configDefaults.flatMap(section => section.fields);
     assert.equal(fields.find(field => field.macro === "volumeDpi"), undefined, "a pointing mode's speed is set on its slot, not in settings");
     assert.equal(fields.find(field => field.macro === "mouseLayer").value, "Layer 4");
@@ -88,7 +88,7 @@ test("invalid settings, incomplete sections and stale drafts fail before any dev
     assert.throws(() => edit("automouseFade", {mouseFadeHold: "100"}), /range/, "a share is shorter than the whole");
     assert.throws(() => edit("autoMouse", {mouseDebounce: "256"}), /debounce.*range/);
     assert.throws(() => edit("autoMouse", {mouseLayer: "Layer 8"}), /layer/);
-    assert.throws(() => edit("keyTiming", {combosEnabled: "false"}), /enabled or disabled/);
+    assert.throws(() => edit("comboSettings", {combosEnabled: "false"}), /enabled or disabled/);
     for (const value of ["", "1.5", "Infinity", "-1", "65536", " 150 "]) assert.throws(() => edit("keyTiming", {tapHoldTerm: value}));
     assert.throws(() => edit("normalPointerSpeed", {normalDpi: "500"}), /range/);
     assert.throws(() => edit("lightingFeedback", {feedbackFlash: "0"}), /range/);

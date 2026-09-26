@@ -56,7 +56,7 @@ export function statusSummary(changes) {
 // `stages` the lighting stages in paint order, as the vocabulary words them.
 export const CATEGORIES = ["Keys", "Lighting", "Macros", "Mouse", "Pointing modes", "Other"];
 const SECTIONS = {
-    keyTiming: ["Keys", "Key timing", 31], startupLayers: ["Keys", "Startup layers", 22], comboReferences: ["Keys", "Combo layer matching", 41],
+    keyTiming: ["Keys", "Tap & hold timing", 31], startupLayers: ["Keys", "Startup layers", 22], comboSettings: ["Keys", "Combo settings", 40], comboReferences: ["Keys", "Combo layer matching", 41],
     keyboardOptions: ["Keys", "Key options", 50], rgbAppearance: ["Lighting", "Base effect", 1], lightingFeedback: ["Lighting", "Key feedback", 15],
     normalPointerSpeed: ["Mouse", "Pointer speed", 1], sniping: ["Mouse", "Auto-sniping", 2], autoMouse: ["Mouse", "Auto-mouse", 3],
 };

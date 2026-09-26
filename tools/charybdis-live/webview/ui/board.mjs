@@ -91,7 +91,7 @@ export function board(model, layer, options = {}) {
             let x = cx - (widths.reduce((sum, width) => sum + width, 0) + between) / 2;
             marks += combos.map((combo, order) => {
                 const width = widths[order];
-                const badge = `<rect x="${x}" y="${rows.comboY}" width="${width}" height="${rows.comboHeight}" rx="3.5" fill="rgba(8,8,10,.86)" stroke="${comboLit ? css(comboColour) : "rgba(245,245,243,.86)"}" stroke-width="${comboLit ? 1.2 : 0.8}"></rect>`
+                const badge = `<rect x="${x}" y="${rows.comboY}" width="${width}" height="${rows.comboHeight}" rx="${rows.comboHeight * 0.22}" fill="rgba(8,8,10,.86)" stroke="${comboLit ? css(comboColour) : "rgba(245,245,243,.7)"}" stroke-width="${rows.comboHeight * 0.08}"></rect>`
                     + `<text x="${x + width / 2}" y="${rows.comboY + rows.comboHeight / 2 + 0.1}" class="kc-badgetext" font-size="${fontSize}">${esc(combo.badge || "C")}</text>`;
                 x += width + gap;
                 return badge;

@@ -45,8 +45,10 @@ test("adding, editing and deleting combos preserves every untouched profile doma
     assert.equal(rows[2].output.operand, 0x806);
     for (let id = 0; id < 2; id++) assert.deepEqual(decodeProfileBlob(added).domains[id].payload, decodeProfileBlob(bytes).domains[id].payload);
     // A combo holds its output, so a layer hold works there; LT() does not.
-    assert.throws(() => editDeviceProfile(added, {type: "saveCombo", id: 2, inputs: ["KC_C", "KC_D"], output: "LT(1,KC_A)", termMs: "0"}, context), /Combo 2: LT\(1,KC_A\) makes its own tap\/hold decision/);
-    const edited = editDeviceProfile(added, {type: "saveCombo", id: 2, inputs: ["KC_C", "KC_D"], output: "MO(2)", termMs: "0", mustHold: true}, context);
+    assert.throws(() => editDeviceProfile(added, {type: "saveCombo", id: 2, inputs: ["KC_C", "KC_D"], output: "LT(1,KC_A)", termMs: "30"}, context), /Combo 2: LT\(1,KC_A\) makes its own tap\/hold decision/);
+    const edited = editDeviceProfile(added, {type: "saveCombo", id: 2, inputs: ["KC_C", "KC_D"], output: "MO(2)", termMs: "30", mustHold: true}, context);
+    // QMK never fires a combo with a 0 ms window, so none is stored.
+    assert.throws(() => editDeviceProfile(added, {type: "saveCombo", id: 2, inputs: ["KC_C", "KC_D"], output: "KC_E", termMs: "0"}, context), /at least 1 ms/);
     assert.deepEqual(comboRows(edited)[2].output, {kind: 2, flags: 0, operand: 2});
     assert.equal(comboRows(edited)[2].mustHold, true);
     const timed = editDeviceProfile(edited, {type: "updateComboHoldTerm", holdTermMs: 400}, context);

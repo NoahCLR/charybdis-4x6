@@ -5,7 +5,7 @@ import {el, esc} from "../lib/dom.mjs";
 import {actionLabel, behaviourFor, behaviourTiers, combosAt, keyFace, keyMeaning, macroKeycodes, pointingSlotFor, resolvedPositions} from "../view/keyface.mjs";
 import {pdColourRow, stageEnabled} from "../view/lighting.mjs";
 import {getModel, heldLayers, layerName, positionAt} from "../store.mjs";
-import {branchBadge, mark, sends, sendsKind, tierDot} from "./marks.mjs";
+import {branchBadge, comboBadge, mark, sends, sendsKind, tierDot} from "./marks.mjs";
 import {helperWord, tierName, vocabulary, word} from "../view/vocabulary.mjs";
 
 const tip = el(`<div class="tip" hidden></div>`);
@@ -134,7 +134,7 @@ function reachSections(model, layer, position, index) {
     }
     if (combos.length) {
         sections.push(`<div class="hc-sect"><div class="hc-h">Combos</div>${combos.map((combo) => `
-            <div class="hc-flow"><span class="hc-chip">${esc(combo.badge || "C")}</span>
+            <div class="hc-flow">${comboBadge(getModel(), combo.badge || "C")}
             ${(combo.inputDisplays || combo.inputs || []).map((input) => `<span class="hc-chip">${esc(input)}</span>`).join('<span class="hc-life">+</span>')}
             <span class="hc-life">→</span><span class="hc-chip out">${esc(combo.outputDisplay || combo.output)}</span></div>`).join("")}</div>`);
     }

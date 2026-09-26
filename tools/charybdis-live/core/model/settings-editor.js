@@ -27,12 +27,11 @@ const share = (macro, id, of, label, hint) => ({macro, id, of, label, hint, kind
 // own elsewhere — a behaviour tier, a tap-count branch, a pointing slot, a
 // layer — so every surface that shows the setting can mark it the same way.
 const sections = [
-    {id: "keyTiming", label: "Key Timing", fields: [
+    {id: "keyTiming", label: "Tap & Hold Timing", fields: [
         number("tappingTerm", 0, "Dual-role tap / hold", "Milliseconds before a dual-role key becomes a hold."),
         number("tapHoldTerm", 1, "Behaviour tap / hold", "Used when a behaviour leaves its tap / hold timing empty.", {governs: {kind: "tier", tier: "hold"}}),
         number("longerHoldTerm", 2, "Long hold", "Used when a behaviour leaves its long-hold timing empty.", {governs: {kind: "tier", tier: "long"}}),
         number("multiTapTerm", 3, "Repeated taps", "Maximum gap between repeated taps when a behaviour has no override.", {governs: {kind: "branch", count: 2}}),
-        toggle("combosEnabled", 20, "Combos", "Individual combo timing is available in the keyboard view."),
     ]},
     {id: "normalPointerSpeed", label: "Pointer Speed", area: "Mouse", fields: [
         // Every DPI field offers the one list in pointer-dpi.js. These two are
@@ -143,6 +142,11 @@ function settingsSections(snapshot, settings) {
     const name = i => layerName(settings.names, i);
     result.push({id: "startupLayers", area: "Settings", label: "Startup Layers", expanded: false, description: "Choose the layers active when the keyboard starts. Keep at least one selected; higher layers take priority.", fields:
         Array.from({length: 8}, (_, i) => ({...toggle(`startupLayer${i}`, 23, name(i), `Layer ${i}`), bitMask: 1 << i, governs: {kind: "layer", layer: i}}))});
+    // Combos get a section of their own beside their layer matching. The
+    // Settings screen adds the hold threshold to it, which the keyboard stores
+    // on the combos rather than here.
+    result.push({id: "comboSettings", area: "Settings", label: "Combos", fields:
+        [toggle("combosEnabled", 20, "Enabled", "Turn every combo on or off. Each combo's own window and conditions are set in Keys · Combos.")]});
     result.push({id: "comboReferences", area: "Settings", label: "Combo Layer Matching", expanded: false, description: "Choose which layer supplies the key assignments used to match combos on each layer. Select the same layer to keep its combos independent.", fields:
         Array.from({length: 8}, (_, i) => ({...layer(`comboReference${i}`, 27, `Combos on ${name(i)}`), shift: i * 4, width: 4, governs: {kind: "layer", layer: i}}))});
     result.push({id: "keyboardOptions", area: "Settings", label: "Key Options", expanded: false, description: options ? "Keyboard-wide remapping and typing options. These apply across all layers." : "Update both halves to report their supported key options.", fields:

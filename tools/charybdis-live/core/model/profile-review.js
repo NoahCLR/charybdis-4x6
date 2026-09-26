@@ -152,7 +152,7 @@ function comboFields(row, names) {
     const options = ["mustHold", "mustTap", "ordered"].filter(flag => row[flag]).map(flag => VOCABULARY.comboOptions[flag]).join(", ");
     return new Map([["Keys", {text: row.inputs.map(input => action(input, names)).join(" + "), key: JSON.stringify(row.inputs)}],
         ["Sends", {text: action(row.output, names), key: JSON.stringify(row.output), mark: actionMark(row.output)}], ["Window", `${row.termMs} ms`],
-        ["Hold threshold", `${row.holdTermMs} ms`], ["Options", options || "none"]]);
+        ["Hold threshold", `${row.holdTermMs} ms`], ["Conditions", options || "none"]]);
 }
 
 // Lighting in the words the Lighting screen uses, and every colour as a

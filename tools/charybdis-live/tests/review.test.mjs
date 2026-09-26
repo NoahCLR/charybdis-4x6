@@ -119,7 +119,7 @@ test("a profile file's differences are counted by what they configure, split as 
     assert.deepEqual(groups.map((group) => [group.category, group.count]),
         [["Keys", 8], ["Lighting", 6], ["Macros", 1], ["Mouse", 2], ["Pointing modes", 1], ["Other", 1]], "the rail's order");
     const rows = (category) => groups.find((group) => group.category === category).rows.map((row) => `${row.label} ${row.count}`);
-    assert.deepEqual(rows("Keys"), ["Keys on Base 1", "Keys on Navigation 2", "Layer names 1", "Behaviours 1", "Key timing 1", "Combos 1", "Key options 1"],
+    assert.deepEqual(rows("Keys"), ["Keys on Base 1", "Keys on Navigation 2", "Layer names 1", "Behaviours 1", "Tap & hold timing 1", "Combos 1", "Key options 1"],
         "the board's keys by layer first, then the rest of the Keys screen");
     assert.deepEqual(rows("Lighting"), ["Stages on or off 1", "Base effect 1", "Layer colours 1", "Auto-mouse fade 1", "Key feedback 2"],
         "stages in paint order; a setting joins what it tunes, and one timed on a stage counts with it");
