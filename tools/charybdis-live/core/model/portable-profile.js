@@ -175,32 +175,41 @@ const decodedOf = snapshot => snapshot.decoded && snapshot.decoded.document === 
 // (MO, LT, TG, TO, TT, OSL, DF, LM, LOCK_LAYER...) on a layer, in a behaviour
 // or on a combo is renumbered to reach the same layer; without it those keys
 // keep their numbers and reach whatever layer now sits there.
+//
+// Any layer may be put at the bottom, which makes it the base: always on, and
+// what every transparent key falls through to. A layer key that reaches the base
+// reaches the bottom slot, whatever sits there, so TO(0) still goes home and a
+// key that reached the new base now goes home too; the old base keeps nothing
+// that reaches it. The startup layers are slots in the same way. The pointer and
+// sniping layers and the combo references name a layer by what it holds, so
+// they follow it.
 function reorderLayers(document, order, names, {keysFollow = true} = {}) {
     if (document.layers?.length !== 8) throw fail("Layer ordering becomes available after the eight-layer update.");
     const validated = validateSnapshot(document), result = JSON.parse(JSON.stringify(document));
-    if (!Array.isArray(order) || order.length !== 8 || order[0] !== 0 || new Set(order).size !== 8 || order.some(id => !Number.isInteger(id) || id < 0 || id >= 8)) throw fail("Keep Base first and include every layer once.");
+    if (!Array.isArray(order) || order.length !== 8 || new Set(order).size !== 8 || order.some(id => !Number.isInteger(id) || id < 0 || id >= 8)) throw fail("Include every layer once.");
     const remap = []; order.forEach((old, next) => {remap[old] = next;});
+    const reach = old => (old === 0 ? 0 : remap[old]);
     function native(code) {
         if (!keysFollow) return code;
-        if (code >= 0x4000 && code <= 0x4fff) {const layer = (code >> 8) & 15; if (layer >= 8) throw fail("A key points outside the layer bank."); return (code & 0xf0ff) | (remap[layer] << 8);}
+        if (code >= 0x4000 && code <= 0x4fff) {const layer = (code >> 8) & 15; if (layer >= 8) throw fail("A key points outside the layer bank."); return (code & 0xf0ff) | (reach(layer) << 8);}
         for (const start of [0x5200, 0x5220, 0x5240, 0x5260, 0x5280, 0x52c0, 0x52e0, 0x7e5c]) {
             const width = start === 0x7e5c ? 8 : 32;
-            if (code >= start && code < start + width) {if (code - start >= 8) throw fail("A key points outside the layer bank."); return start + remap[code - start];}
+            if (code >= start && code < start + width) {if (code - start >= 8) throw fail("A key points outside the layer bank."); return start + reach(code - start);}
         }
         // Layer-mod stores a four-bit layer followed by five modifier bits.
-        if (code >= 0x5000 && code <= 0x51ff) {const layer = (code >> 5) & 15; if (layer >= 8) throw fail("Invalid layer-mod reference."); return (code & 0xfe1f) | remap[layer] << 5;}
+        if (code >= 0x5000 && code <= 0x51ff) {const layer = (code >> 5) & 15; if (layer >= 8) throw fail("Invalid layer-mod reference."); return (code & 0xfe1f) | reach(layer) << 5;}
         return code;
     }
     result.layers = order.map(old => document.layers[old].map(native));
     const {rgb, behaviors, combos, settings, pdModes} = validated;
     const actionOptions = actionLimitsFor(pdModes ? 2 : 1);
-    const action = a => {if (!keysFollow) return; if ([2, 3].includes(a.kind)) a.operand = remap[a.operand]; else if (a.kind === 1) a.operand = native(a.operand);};
+    const action = a => {if (!keysFollow) return; if ([2, 3].includes(a.kind)) a.operand = reach(a.operand); else if (a.kind === 1) a.operand = native(a.operand);};
     walkActions(behaviors, action); walkActions(combos, action);
     rgb.layerColors.forEach(row => {row.layerId = remap[row.layerId];}); rgb.layerColors.sort((a, b) => a.layerId - b.layerId);
     rgb.layerGroupRows.forEach(row => {if (row.selector !== 255) row.selector = remap[row.selector];});
     settings.names = names || order.map(old => settings.names[old]);
     settings.values[5] = remap[settings.values[5]]; settings.values[9] = remap[settings.values[9]];
-    settings.values[23] = remap.reduce((mask, next, old) => mask | ((settings.values[23] >> old) & 1) << next, 0);
+    settings.values[23] = remap.reduce((mask, next, old) => mask | ((settings.values[23] >> old) & 1) << reach(old), 0);
     const oldReferences = settings.values[27]; settings.values[27] = order.reduce((packed, old, next) => (packed | remap[(oldReferences >>> (old * 4)) & 15] << (next * 4)) >>> 0, 0);
     result.profile = encodeProfileBlob({schema: {major: document.version, minor: 0}, domains: [
         {id: 16, version: document.version, payload: encodeRgbDomainV1(rgb)}, {id: 32, version: 1, payload: encodeKeyBehaviorDomain(behaviors, actionOptions)},

@@ -312,12 +312,16 @@ function profileReview(before, after) {
 // moved is one field, named as the draft names it, in its light, with where it
 // sat on the keyboard and where it sits now, highest first as Rename & Reorder
 // lists them. A rename made with it is its own item, so the layer is called
-// what it is called now; the rename says what it was.
+// what it is called now; the rename says what it was. A new base is said
+// first, since it changes what every transparent key falls through to.
 function layerOrderReview(after, order) {
     const names = decodedOf(after).settings.names;
     const moved = order.map((layer, slot) => slot).filter(slot => order[slot] !== slot).reverse();
-    const fields = moved.map(slot => ({label: layerCalled(names, slot), labelMark: {kind: "layer", layer: slot}, status: "changed",
-        before: String(order[slot]), after: `${slot} · ${slot > order[slot] ? "higher" : "lower"}`}));
+    const where = slot => (slot === 0 ? "0 · the base" : order[slot] === 0 ? `${slot} · no longer the base` : `${slot} · ${slot > order[slot] ? "higher" : "lower"}`);
+    const fields = [
+        ...(order[0] !== 0 ? [{label: "Base layer", status: "changed", before: layerCalled(names, order.indexOf(0)), after: layerCalled(names, 0)}] : []),
+        ...moved.map(slot => ({label: layerCalled(names, slot), labelMark: {kind: "layer", layer: slot}, status: "changed", before: String(order[slot]), after: where(slot)})),
+    ];
     return {area: "Layers", unit: "layerOrder", title: "Layer priority", note: "Higher layers win", status: "changed", fields,
         place: {kind: "layers", layers: moved}};
 }

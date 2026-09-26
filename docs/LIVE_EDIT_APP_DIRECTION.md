@@ -682,3 +682,27 @@ pointer layer is locked (`docs/POINTER_MODES.md`). And a layout key the keyboard
 does not own is refused where it is placed, since the keyboard's save check
 covers behaviours and combos only; one already on the keyboard is reported, not
 refused, so it never blocks an unrelated Apply.
+
+### D-L37 — Any layer can be the base
+
+The base is a slot, not a layer: the bottom one, always on, what every
+transparent key falls through to, and what `TO(0)` returns to (layer 0 is the
+base in the firmware's lookup, in the RGB base effect and in layer ownership,
+so `DF()`/`PDF()` stay refused, D-L34). Rename & Reorder puts another layer
+there with **Make base**, which swaps it with the current base, as one
+reorder; the base row itself is never dragged, so a drag never changes the base
+by accident.
+
+With keys following their layers, a layer key that reached the base reaches
+the bottom slot, whichever layer is there: `TO(0)` still goes home, and a key
+that reached the new base (`TO(Game)`) now goes home too. Every other key,
+behaviour and combo reference follows its layer, as do names, colours, LED
+group rows, and the pointer, sniping and combo-reference settings, which name
+a layer by what it holds. The startup layers are slots and stay on the bottom
+one. So after Make base nothing reaches the old base unless the person gives it
+a key; the review's checks (D-L36) say so, and name any transparent keys on the
+new base, rather than the reorder inventing a way back. The checks compare the
+draft with the keyboard as it is, matched layer with layer through the draft's
+order, so what a reorder makes or mends is reported as new or fixed. The
+review's Layer priority item names the new base first. See
+`reorderLayers` in `core/model/portable-profile.js`.

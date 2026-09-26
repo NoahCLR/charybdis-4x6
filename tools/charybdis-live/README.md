@@ -58,11 +58,19 @@ it is not a property of the selected key. The layers are tabs along the foot
 of the board card, next to the workbench, the picked one opening into the board
 it shows, on Keys and on Lighting alike; **Rename & Reorder** stays at the end
 of those tabs, outside what scrolls, and opens upward over the board, so a layer
-is renamed and reordered where its keys are on screen. **Keys follow their layers** (on by
+is renamed and reordered where its keys are on screen. Drag a row by the grip
+on its left to move it, or focus the grip and press ↑ ↓. The bottom row is the
+base: always on, and what every transparent key falls through to. It is not
+dragged; **Make base** on another row swaps that layer into it, and the old
+base takes its place. **Keys follow their layers** (on by
 default) renumbers every layer key (MO, LT, TG, TO, TT, OSL, LOCK_LAYER…) on
-layers, behaviours and combos so each still reaches the same layer; turned off,
-the layers move but those keys keep their numbers. Names, colours and the
-pointer and sniping settings move with their layer either way.
+layers, behaviours and combos so each still reaches the same layer, except that
+a key that went to the base goes to the base, whichever layer that now is:
+`TO(0)` still goes home. Turned off, the layers move but those keys keep their
+numbers. Names, colours and the pointer and sniping settings move with their
+layer either way. After Make base, the review's checks say what it left behind:
+the old base, which nothing reaches unless you give it a key, and any
+transparent keys on the new base, which have nothing under them.
 
 **⌘-click** (Ctrl-click off a Mac) more layer tabs to preview them on
 together. The board then shows what the keyboard would answer with, by the

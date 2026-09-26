@@ -219,9 +219,17 @@ function applyLayerEdit(edit, message) {
         reorderLayers(edit.before.document, edit.order, edit.order.map((old) => message.names[old]), {keysFollow: edit.keysFollow});
         edit.names = [...message.names];
     }
-    const from = edit.order.indexOf(id), to = from + message.direction;
-    if (id === 0 || ![1, -1].includes(message.direction) || to < 1 || to > 7) throw new Error("Base stays at the bottom of the layer order.");
-    [edit.order[from], edit.order[to]] = [edit.order[to], edit.order[from]];
+    // The bottom slot is the base. A layer reaches it only through Make base,
+    // which swaps it with the layer there; a move or a drag stays above it.
+    const from = edit.order.indexOf(id);
+    if (message.makeBase === true) {
+        if (from < 1) throw new Error("That layer is already the base.");
+        [edit.order[0], edit.order[from]] = [edit.order[from], edit.order[0]];
+        return edit;
+    }
+    const to = Number.isInteger(message.to) ? message.to : Number.isInteger(message.direction) && [1, -1].includes(message.direction) ? from + message.direction : NaN;
+    if (from < 1 || !(to >= 1 && to <= 7)) throw new Error("The base stays at the bottom; use Make base to put another layer there.");
+    edit.order.splice(to, 0, ...edit.order.splice(from, 1));
     return edit;
 }
 

@@ -175,3 +175,14 @@ test("an eight-direction mode reads as eight directions, and lists its diagonals
     assert.equal(axis.after,"Eight directions","not undefined");
     assert.ok(item.fields.some(field=>field.label==="Up-left"),"the diagonals it now reads are listed");
 });
+
+test("a reorder that makes a new base names it first, and says which layer left the base", () => {
+    const {layerOrderReview} = require("../../core/model/profile-review");
+    const order = [3, 1, 2, 0, 4, 5, 6, 7];
+    const item = layerOrderReview(snapshot(reorderLayers(document(), order)), order);
+    assert.deepEqual(item.fields.map((field) => [field.label, field.before, field.after]), [
+        ["Base layer", "Base", "Navigation"],
+        ["Base", "0", "3 · no longer the base"],
+        ["Navigation", "3", "0 · the base"],
+    ]);
+});

@@ -9,6 +9,11 @@
 // and setting that refers to it, so the edit is staged there and arrives back
 // as `portable.layers`. "Keys follow their layers" (on by default) decides
 // whether layer keys are renumbered with the move or keep their numbers.
+//
+// A layer is moved by dragging its row by the grip on its left (or, focused
+// there, with the arrow keys). The bottom row is the base: always on, and what
+// every transparent key falls through to. It is not dragged; Make base on
+// another row swaps that layer into it.
 
 import {el, esc} from "../lib/dom.mjs";
 import {getModel, layers, post, render, state, canEdit as canEditArea} from "../store.mjs";
@@ -88,14 +93,14 @@ function editor(model, portable, busy) {
     const order = [...portable.layers.order].reverse();
     const follow = portable.layers.keysFollow !== false;
     const node = el(`<div class="layerpanel-body" style="gap:10px">
-        <div class="sect-h"><h4>Layers</h4><span class="note">higher layers win · base stays underneath</span></div>
+        <div class="sect-h"><h4>Layers</h4><span class="note">higher layers win · drag a row to move it</span></div>
         <div class="list"></div>
         <div class="stack layerpanel-actions" style="gap:10px">
             <div class="stack" style="gap:4px">
                 <label class="sw"><input type="checkbox" id="layerKeysFollow" data-act="follow" ${follow ? "checked" : ""} ${busy ? "disabled" : ""}>
                     <span class="track"></span><span class="txt">Keys follow their layers</span></label>
                 <span class="note">${follow
-                    ? "Layer keys (MO, LT, TG, TO, TT, OSL…) are renumbered with the move, so each still reaches the same layer."
+                    ? "Layer keys (MO, LT, TG, TO, TT, OSL…) are renumbered with the move, so each still reaches the same layer. A key that went to the base goes to the base, whichever layer that is."
                     : "Layer keys keep their numbers: a key set to MO(1) reaches whatever layer is now 1. Names, colours and the pointer and sniping settings still move with their layer."}</span>
             </div>
             <div class="row" style="gap:8px;align-items:center">
@@ -110,15 +115,19 @@ function editor(model, portable, busy) {
         const layer = layers().find((entry) => entry.index === layerId);
         const mapped = (layer?.positions || []).filter((key) =>
             key.keycode && !["KC_TRANSPARENT", "KC_TRNS", "KC_NO"].includes(key.keycode)).length;
-        const row = el(`<div class="list-row" style="grid-template-columns:24px minmax(0,1fr) 92px auto auto">
+        const base = position === 0;
+        const label = names[layerId] || (layerId ? `Layer ${layerId}` : "Base");
+        const row = el(`<div class="list-row lp-row${base ? " base" : ""}" data-row="${layerId}">
+            ${base ? `<span class="lp-grip-slot" aria-hidden="true"></span>`
+                : `<button class="lp-grip" data-grip="${layerId}" ${busy ? "disabled" : ""} aria-label="Move ${esc(label)}: drag, or press the up and down arrows"
+                    data-tip="Drag to move this layer, or focus it and press ↑ ↓.">${GRIP}</button>`}
             <span class="note mono">${layerId}</span>
             <input class="input" value="${esc(names[layerId])}" data-name="${layerId}" maxlength="23" ${busy ? "disabled" : ""}
                 aria-label="${layerId ? `Name for layer ${layerId}` : "Base layer name"}">
             <span class="note ${mapped ? "" : "dim"}">${mapped ? `${mapped} key${mapped === 1 ? "" : "s"}` : "nothing mapped"}</span>
-            ${layerId
-                ? `<button class="btn tiny ghost" data-move="1" data-id="${layerId}" ${position === 7 || busy ? "disabled" : ""}>Up</button>
-                   <button class="btn tiny ghost" data-move="-1" data-id="${layerId}" ${position === 1 || busy ? "disabled" : ""}>Down</button>`
-                : `<span class="tag" style="grid-column:span 2">base</span>`}</div>`);
+            ${base ? `<span class="tag lp-base" data-tip="Always on, and what every transparent key falls through to.">base</span>`
+                : `<button class="btn tiny ghost" data-base="${layerId}" ${busy ? "disabled" : ""}
+                    data-tip="Put this layer at the bottom: always on, and what every transparent key falls through to. The current base takes its place.">Make base</button>`}</div>`);
         list.append(row);
     });
 
@@ -129,9 +138,26 @@ function editor(model, portable, busy) {
     node.querySelector('[data-act="follow"]').addEventListener("change", (event) => post({
         type: "editPortableLayer", keysFollow: event.target.checked, names: currentNames(),
     }));
-    node.querySelectorAll("[data-move]").forEach((button) => button.addEventListener("click", () => post({
-        type: "editPortableLayer", id: Number(button.dataset.id), direction: Number(button.dataset.move), names: currentNames(),
-    })));
+    const move = (id, change) => post({type: "editPortableLayer", id, ...change, names: currentNames()});
+    node.querySelectorAll("[data-base]").forEach((button) => button.addEventListener("click", () => move(Number(button.dataset.base), {makeBase: true})));
+    node.querySelectorAll("[data-grip]").forEach((grip) => {
+        const id = Number(grip.dataset.grip);
+        grip.addEventListener("keydown", (event) => {
+            const direction = {ArrowUp: 1, ArrowDown: -1}[event.key];
+            const position = portable.layers.order.indexOf(id);
+            if (!direction || position + direction < 1 || position + direction > 7) return;
+            event.preventDefault();
+            state.layerGripFocus = id;
+            move(id, {direction});
+        });
+        grip.addEventListener("pointerdown", (event) => dragRow(event, list, id, (to) => move(id, {to})));
+    });
+    // The grip a key moved keeps the focus, so the arrows can carry on.
+    if (state.layerGripFocus !== undefined) {
+        const focused = state.layerGripFocus;
+        state.layerGripFocus = undefined;
+        requestAnimationFrame(() => list.querySelector(`[data-grip="${focused}"]`)?.focus());
+    }
     // Both close the panel here rather than waiting for the host's answer: the
     // row underneath shows the result, and a panel left open over it would only
     // hide what it changed.
@@ -146,6 +172,54 @@ function editor(model, portable, busy) {
         render();
     });
     return node;
+}
+
+// The classic grip: two columns of three dots.
+const GRIP = `<svg viewBox="0 0 10 16" aria-hidden="true">${[3, 8, 13].map((y) => `<circle cx="3" cy="${y}" r="1.3"/><circle cx="7" cy="${y}" r="1.3"/>`).join("")}</svg>`;
+
+// Drags a row by its grip. The row follows the pointer and the others make
+// room as it passes their middles; the base row stays put below them. On
+// release the row's place is posted as the slot it lands in: rows read top
+// down from the highest slot, 7, so the nth row above the base is slot 7 - n.
+function dragRow(event, list, id, drop) {
+    if (event.button !== 0) return;
+    const row = list.querySelector(`[data-row="${id}"]`);
+    const rows = () => [...list.querySelectorAll(".lp-row:not(.base)")];
+    const start = rows().indexOf(row);
+    if (!row || start < 0) return;
+    event.preventDefault();
+    const originY = event.clientY;
+    let moved = false;
+    row.classList.add("dragging");
+    list.classList.add("sorting");
+    const onMove = (next) => {
+        const dy = next.clientY - originY;
+        if (!moved && Math.abs(dy) < 3) return;
+        moved = true;
+        row.style.transform = "";
+        const others = rows().filter((other) => other !== row);
+        const before = others.find((other) => {
+            const box = other.getBoundingClientRect();
+            return next.clientY < box.top + box.height / 2;
+        });
+        list.insertBefore(row, before || list.querySelector(".lp-row.base"));
+        const box = row.getBoundingClientRect();
+        row.style.transform = `translateY(${Math.max(-box.height, Math.min(box.height, next.clientY - (box.top + box.height / 2)))}px)`;
+    };
+    const onUp = () => {
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onUp);
+        window.removeEventListener("pointercancel", onUp);
+        row.classList.remove("dragging");
+        list.classList.remove("sorting");
+        row.style.transform = "";
+        const index = rows().indexOf(row);
+        if (moved && index !== start) drop(7 - index);
+    };
+    // The window hears the pointer wherever it goes, off the grip included.
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
 }
 
 export function closeLayers() {

@@ -336,9 +336,11 @@ function findings(facts, walked) {
     return results;
 }
 
-// A finding's identity across two profiles in the same layer order: what kind
-// it is and which layers it is about.
-const findingKey = (finding) => `${finding.kind}:${finding.layers.join(",")}`;
+// A finding's identity across two profiles: what kind it is and which layers it
+// is about, named by the keyboard layer each slot holds (`order[slot]`, as
+// model/layer-order.js keeps it).
+const IDENTITY = Object.freeze([0, 1, 2, 3, 4, 5, 6, 7]);
+const findingKey = (finding, order = IDENTITY) => `${finding.kind}:${finding.layers.map((slot) => order[slot]).sort((a, b) => a - b).join(",")}`;
 
 // The findings for a validated profile.
 function layerReach(decoded) {
@@ -347,14 +349,18 @@ function layerReach(decoded) {
     return findings(facts, walk(facts));
 }
 
-// The findings for a draft beside its keyboard's, both in the draft's layer
-// order: each finding in the draft is new or already on the keyboard, and each
-// one the draft no longer has is fixed by it. Traps always ask to be confirmed.
-function draftChecks(reference, draft) {
-    const before = reference ? layerReach(reference) : [], after = layerReach(draft);
-    const known = new Set(before.map(findingKey)), still = new Set(after.map(findingKey));
+// The findings for a draft beside its keyboard's: each finding in the draft is
+// new or already on the keyboard, and each one the draft no longer has is fixed
+// by it. The keyboard is walked as it is, not rearranged into the draft's
+// order, since a reorder can make or mend a finding itself (a new base leaves
+// the old one unreached); `order` says which keyboard layer each draft slot
+// holds, so the two are matched layer with layer. Traps always ask to be
+// confirmed.
+function draftChecks(keyboard, draft, order = IDENTITY) {
+    const before = keyboard ? layerReach(keyboard) : [], after = layerReach(draft);
+    const known = new Set(before.map((finding) => findingKey(finding))), still = new Set(after.map((finding) => findingKey(finding, order)));
     return [
-        ...after.map((finding) => ({...finding, key: findingKey(finding), status: known.has(findingKey(finding)) ? "existing" : "new"})),
+        ...after.map((finding) => ({...finding, key: findingKey(finding, order), status: known.has(findingKey(finding, order)) ? "existing" : "new"})),
         ...before.filter((finding) => !still.has(findingKey(finding))).map((finding) => ({...finding, key: findingKey(finding), status: "fixed", place: undefined})),
     ];
 }

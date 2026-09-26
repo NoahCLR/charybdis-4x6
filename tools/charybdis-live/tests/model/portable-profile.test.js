@@ -87,12 +87,41 @@ test("with keys not following, layers move but every layer key keeps its number"
     assert.equal(validateSnapshot(reorderLayers(source, order)).combos[0].output.operand, 0x5281);
 });
 
+test("any layer can be made the base: keys that went home still go home, and the rest follow their layers", () => {
+    const {decodeComboDomainV1, encodeComboDomainV1} = require("../../core/schema/combo-domain-v1");
+    const source = document(), blob = decodeProfileBlob(Buffer.from(source.profile, "base64"));
+    // TO(0), TO(3), TG(2) and MO(3) on the old base; LOCK_LAYER(0) and TT(3) as behaviour branches; TO(3) on a combo.
+    source.layers[0].splice(10, 4, 0x5200, 0x5203, 0x5262, 0x5223);
+    const behaviors = decodeKeyBehaviorDomain(blob.domains[1].payload);
+    behaviors.rows = [{target: {kind: 1, operand: 0x04}, steps: [{tapIndex: 0, tap: {kind: 3, operand: 0}, hold: {mode: 1, repeatHz: 0, action: {kind: 2, operand: 3}}}]}];
+    blob.domains[1].payload = encodeKeyBehaviorDomain(behaviors);
+    const combos = decodeComboDomainV1(blob.domains[2].payload);
+    combos[0].output = {kind: 1, operand: 0x5203};
+    blob.domains[2].payload = encodeComboDomainV1(combos);
+    source.profile = encodeProfileBlob(blob).toString("base64");
+    const before = validateSnapshot(source);
+
+    // Navigation (3) becomes the base; the old base takes slot 3.
+    const order = [3, 1, 2, 0, 4, 5, 6, 7];
+    const moved = reorderLayers(source, order), actual = validateSnapshot(moved);
+    assert.deepEqual(moved.layers[3].slice(10, 14), [0x5200, 0x5200, 0x5262, 0x5220], "TO(0) stays home, TO(3) now goes home, TG(2) and MO(3) follow");
+    assert.equal(actual.behaviors.rows[0].steps[0].tap.operand, 0, "LOCK_LAYER(0) still names the base");
+    assert.equal(actual.behaviors.rows[0].steps[0].hold.action.operand, 0, "MO(3) held the new base");
+    assert.equal(actual.combos[0].output.operand, 0x5200);
+    assert.equal(actual.settings.names[0], before.settings.names[3]);
+    assert.equal(actual.settings.names[3], before.settings.names[0]);
+    assert.deepEqual(actual.rgb.layerColors.find(row => row.layerId === 0).color, before.rgb.layerColors.find(row => row.layerId === 3).color, "the new base keeps its colour");
+    assert.equal(actual.settings.values[23], 1, "the bottom slot is still the one that starts on");
+    assert.equal(actual.settings.values[5], order.indexOf(before.settings.values[5]), "the pointer layer follows what it holds");
+    assert.equal(actual.settings.values[27] >>> 0, 0x76543210, "each layer's combos still read from the layer itself");
+});
+
 test("partial, incompatible, over-capacity and malformed profiles fail before restore", () => {
     const source = document();
     assert.throws(() => validateSnapshot({...source, layers: source.layers.slice(0, 4)}), /matrix/);
     assert.throws(() => validateSnapshot({...source, profile: source.profile + "!"}), /profile data/);
     assert.throws(() => validateSnapshot(source, {compiledLayerCount: 8, supportedDomainMask: 15, actionAbiDigest: 1}), /vocabulary/);
-    assert.throws(() => reorderLayers(source, [1, 0, 2, 3, 4, 5, 6, 7]), /Base/);
+    assert.throws(() => reorderLayers(source, [1, 1, 2, 3, 4, 5, 6, 7]), /every layer once/);
 });
 module.exports = {settings, document};
 test("the five-layer bridge migrates custom triggers and adds transparent space", () => {

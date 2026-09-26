@@ -194,8 +194,8 @@ test("Rename & Reorder renames and reorders, keeps Base at the bottom, and carri
     applyLayerEdit(edit, {type: "editPortableLayer", id: 2, direction: 1, names: typed});
     assert.deepEqual(edit.order.slice(0, 4), [0, 1, 3, 2], "layer 2 moved up one place");
     assert.equal(edit.names[4], "Mouse", "a name typed before the move survives it");
-    assert.throws(() => applyLayerEdit(edit, {type: "editPortableLayer", id: 0, direction: 1}), /Base stays/);
-    assert.throws(() => applyLayerEdit(edit, {type: "editPortableLayer", id: 1, direction: -1}), /Base stays/);
+    assert.throws(() => applyLayerEdit(edit, {type: "editPortableLayer", id: 0, direction: 1}), /base stays at the bottom/);
+    assert.throws(() => applyLayerEdit(edit, {type: "editPortableLayer", id: 1, direction: -1}), /base stays at the bottom/);
     assert.throws(() => applyLayerEdit(edit, {type: "editPortableLayer", id: 9, name: "x"}), /Read the layers again/);
     assert.throws(() => applyLayerEdit(null, {type: "editPortableLayer", id: 1, name: "x"}), /Read the layers again/);
     assert.throws(() => applyLayerEdit(edit, {type: "savePortableLayers", names: ["only one"]}), /naming them/);
@@ -203,4 +203,23 @@ test("Rename & Reorder renames and reorders, keeps Base at the bottom, and carri
     const saved = validateSnapshot(layerEditDocument(edit));
     assert.equal(saved.settings.names[2], edit.names[3], "the document carries the new order");
     assert.equal(saved.settings.names[3], "Symbols+");
+});
+
+test("a layer is dragged to any place above the base, and Make base swaps it with the base", () => {
+    const edit = startLayerEdit(snapshot(), 3);
+    applyLayerEdit(edit, {type: "editPortableLayer", id: 1, to: 6});
+    assert.deepEqual(edit.order, [0, 2, 3, 4, 5, 6, 1, 7], "layer 1 lands in slot 6, the ones between shift down");
+    applyLayerEdit(edit, {type: "editPortableLayer", id: 7, to: 1});
+    assert.deepEqual(edit.order, [0, 7, 2, 3, 4, 5, 6, 1]);
+    assert.throws(() => applyLayerEdit(edit, {type: "editPortableLayer", id: 2, to: 0}), /Make base/);
+    assert.throws(() => applyLayerEdit(edit, {type: "editPortableLayer", id: 2, to: 8}), /Make base/);
+    assert.throws(() => applyLayerEdit(edit, {type: "editPortableLayer", id: 0, to: 3}), /base stays/);
+
+    applyLayerEdit(edit, {type: "editPortableLayer", id: 5, makeBase: true});
+    assert.deepEqual(edit.order, [5, 7, 2, 3, 4, 0, 6, 1], "layer 5 is the base, and the old base takes its slot");
+    assert.throws(() => applyLayerEdit(edit, {type: "editPortableLayer", id: 5, makeBase: true}), /already the base/);
+    assert.throws(() => applyLayerEdit(edit, {type: "editPortableLayer", id: 5, direction: 1}), /base stays/);
+    applyLayerEdit(edit, {type: "editPortableLayer", id: 0, direction: 1});
+    assert.deepEqual(edit.order, [5, 7, 2, 3, 4, 6, 0, 1], "the old base moves like any other layer now");
+    assert.equal(validateSnapshot(layerEditDocument(edit)).settings.names[0], edit.names[5]);
 });

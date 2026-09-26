@@ -144,3 +144,14 @@ test("a draft's findings are new, already on the keyboard, or fixed by the draft
 test("a profile without the eight-layer bank is not walked", () => {
     assert.deepEqual(layerReach({document: {layers: [[]]}}), []);
 });
+
+test("findings are matched layer with layer through the draft's order, so a reorder can make or mend one", () => {
+    // The keyboard has nothing reaching Extra 1 (5). The draft swaps 5 into slot 2.
+    const keyboard = profile({keys: {"5:0": KC_B}});
+    const draft = profile({keys: {"2:0": KC_B}});
+    const order = [0, 1, 5, 3, 4, 2, 6, 7];
+    assert.deepEqual(draftChecks(keyboard, draft, order).map((check) => [check.key, check.status]), [["unreachable:5", "existing"]]);
+    // Made the base, a layer leaves the old base with nothing reaching it: new.
+    const based = profile({keys: {"3:0": KC_B}});
+    assert.deepEqual(draftChecks(profile(), based, [3, 1, 2, 0, 4, 5, 6, 7]).map((check) => [check.key, check.status]), [["unreachable:0", "new"]]);
+});

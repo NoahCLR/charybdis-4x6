@@ -403,17 +403,18 @@ class ProfileDraftSession {
             throw error;
         }
     }
-    // What the layer walk finds in this revision beside the keyboard, both in
-    // this revision's layer order (model/layer-reach.js), kept with the entry
-    // and the reference it was compared with.
+    // What the layer walk finds in this revision beside the keyboard as it is,
+    // matched layer with layer through this revision's order
+    // (model/layer-reach.js), kept with the entry and the keyboard it was
+    // compared with.
     checks() {
-        const draft = this.current.decoded;
-        const reference = this.base.incomplete ? undefined : this.referenceFor(this.order).snapshot.decoded;
+        const draft = this.current.decoded, order = this.order;
+        const keyboard = this.base.incomplete ? undefined : this.baseSnapshot.decoded;
         this.checksCache ??= new WeakMap();
         const known = this.checksCache.get(draft);
-        if (known && known.reference === reference) return known.checks;
-        const checks = draftChecks(reference, draft);
-        this.checksCache.set(draft, {reference, checks});
+        if (known && known.keyboard === keyboard && known.order === order) return known.checks;
+        const checks = draftChecks(keyboard, draft, order);
+        this.checksCache.set(draft, {keyboard, order, checks});
         return checks;
     }
     // Whether Apply has to be confirmed: the draft can lock a layer with no
