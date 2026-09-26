@@ -106,3 +106,10 @@ test("a cleared slot keeps its bindings, because the keyboard keeps its keycodes
         "configuring the slot again makes the same button live");
     assert.equal(modelNow().qmkKeycodes.find(key => key.value === "PD_SLOT_7").label, "History · hold");
 });
+
+test("a layout key the keyboard would not own is refused at the edit", () => {
+    const {draft, stage} = fixture();
+    const before = draft.current.fingerprint;
+    assert.throws(() => stage({type: "updateLayoutKeys", layers: [{layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "DF(1)"}]}]}), /DF\(1\) is a layer keycode/);
+    assert.equal(draft.current.fingerprint, before);
+});

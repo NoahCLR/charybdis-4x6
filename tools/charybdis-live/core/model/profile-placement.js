@@ -6,7 +6,7 @@
 // encode, and an upload is checked before it starts, with a message naming the
 // row instead of the keyboard's bare rejection.
 
-const {PLACEMENT, actionLimitsFor, actionName, placementProblem} = require("../schema/actions");
+const {PLACEMENT, actionLimitsFor, actionName, keycodeAction, placementProblem} = require("../schema/actions");
 const {decodeProfileBlob, PROFILE_DOMAIN_IDS} = require("../schema/profile-blob-v1");
 const {decodeKeyBehaviorDomain, KEY_BEHAVIOR_HOLD_MODES} = require("../schema/key-behavior-domain-v1");
 const {decodeComboDomainV1} = require("../schema/combo-domain-v1");
@@ -32,6 +32,12 @@ function comboPlacementProblem(rows, options) {
     return undefined;
 }
 
+// Whether a native keycode can sit on a layout key. The keyboard's save check
+// covers behaviours and combos only; a layout key it does not own (DF(), PDF(),
+// a layer past the bank) would reach QMK's own layer code, so the editors
+// refuse to place one.
+const keyPlacementProblem = (code, options) => placementProblem(keycodeAction(code), PLACEMENT.KEY, options);
+
 // The first misplaced action in an encoded profile, or undefined.
 function profilePlacementProblem(bytes, options) {
     const profile = decodeProfileBlob(bytes);
@@ -44,4 +50,4 @@ function profilePlacementProblem(bytes, options) {
         || undefined;
 }
 
-module.exports = {behaviorPlacementProblem, comboPlacementProblem, profilePlacementProblem};
+module.exports = {behaviorPlacementProblem, comboPlacementProblem, keyPlacementProblem, profilePlacementProblem};

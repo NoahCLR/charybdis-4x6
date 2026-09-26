@@ -5,6 +5,7 @@ const {layerOrderReview, profileReview} = require("../model/profile-review");
 const {IDENTITY, compose, inverse, isIdentity, layerUnit, rearranged} = require("../model/layer-order");
 const {layerName: layerCalled} = require("../model/vocabulary");
 const {revertUnits} = require("../model/profile-revert");
+const {keyPlacementProblem} = require("../model/profile-placement");
 const {baseLighting, editSettings, settingsEditorView} = require("../model/settings-editor");
 const {editMacro, macroEditorView} = require("../model/macro-editor");
 const {editDeviceProfile, RGB_EDITS, COMBO_EDITS, PD_EDITS} = require("./device-profile-edits");
@@ -214,6 +215,8 @@ class ProfileDraftSession {
                 const position = Number.isInteger(change.layoutIndex) && CHARYBDIS_4X6_LAYOUT_MATRIX[change.layoutIndex];
                 const code = keycodes.encode(change.keycode) ?? (knownActionAbi(this.capabilities.actionAbiDigest) ? resolveNativeQmkExpression(change.keycode, {}) : undefined);
                 if (!position || !Number.isInteger(code)) throw fail(`Cannot represent the key ${change.keycode} on this keyboard.`);
+                const misplaced = keyPlacementProblem(code, {layerCount: 8});
+                if (misplaced) throw fail(misplaced);
                 document.layers[layer][position[0] * 6 + position[1]] = code;
             }
         }

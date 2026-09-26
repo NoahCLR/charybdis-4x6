@@ -1,7 +1,7 @@
 "use strict";
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const {behaviorPlacementProblem, comboPlacementProblem, profilePlacementProblem} = require("../../core/model/profile-placement");
+const {behaviorPlacementProblem, comboPlacementProblem, keyPlacementProblem, profilePlacementProblem} = require("../../core/model/profile-placement");
 const {encodeProfileBlob, PROFILE_DOMAIN_IDS} = require("../../core/schema/profile-blob-v1");
 const {encodeComboDomainV1} = require("../../core/schema/combo-domain-v1");
 const {bytes} = require("../fixtures/device-profile");
@@ -29,4 +29,11 @@ test("an encoded profile is checked across its behaviours and combos", () => {
     const blob = encodeProfileBlob({schema: {major: 2, minor: 0}, domains: [{id: PROFILE_DOMAIN_IDS.COMBOS, version: 1,
         payload: encodeComboDomainV1([{inputs: [code(0x04), code(0x05)], output: code(0x5241), termMs: 0, holdTermMs: 0, mustHold: false, mustTap: false, ordered: false}], {actionLimits: {maxPdModes: 8}})}]});
     assert.match(profilePlacementProblem(blob, options), /^Combo 1: /);
+});
+
+test("a layout key takes every layer key the keyboard owns, and refuses DF, PDF and layers past the bank", () => {
+    for (const owned of [0x04, 0x4104, 0x5022, 0x5202, 0x5222, 0x5262, 0x5282, 0x52c2, 0x7e5c]) assert.equal(keyPlacementProblem(owned, options), undefined, owned.toString(16));
+    assert.match(keyPlacementProblem(0x5241, options), /^DF\(1\) is a layer keycode this keyboard does not run/);
+    assert.match(keyPlacementProblem(0x52e1, options), /does not run through its layer tracking/);
+    assert.match(keyPlacementProblem(0x5209, options), /does not run through its layer tracking/);
 });
