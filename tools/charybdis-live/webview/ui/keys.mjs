@@ -13,7 +13,7 @@ import {board} from "./board.mjs";
 import {keepInView, layerBar} from "./layerbar.mjs";
 import {attachLayersControl} from "./layers.mjs";
 import {openPicker} from "./picker.mjs";
-import {attachGroupToggles, attachReachRows, groupHeader, groupOpen, groupSection, reachAttrs, reachTable} from "./groups.mjs";
+import {attachGroupToggles, attachReachRows, groupHeader, groupOpen, reachAttrs, reachTable} from "./groups.mjs";
 import {inGroupOrder, reachEntries} from "../view/reach-groups.mjs";
 import {branchBadge, marked, sends, sendsKind, slotLight, tierDot} from "./marks.mjs";
 import {branchName, helperWord, tierName, vocabulary, word} from "../view/vocabulary.mjs";
@@ -841,23 +841,21 @@ function tabPointing(body, right) {
     right.appendChild(open);
 
     const changedSlots = draftMarks(model?.draft?.changes).pointing;
+    // One row per slot, in the table every reach tab uses: the slot with its
+    // light, what the mode does, and how this layer reaches it.
     const card = (group, slotId, reachedBy, variant) => {
         const slot = (model?.pdModes || []).find((entry) => entry.id === Number(slotId));
         if (!slot) return "";
         const row = pdColourRow(model, slot.id);
-        // The slot's light as its card on the Pointing modes screen shows it.
-        return `<div class="pd-card"${reachAttrs("pointing", group, slot.id)}>
-            <div class="row" style="gap:9px">
-                ${slotLight(model, slot).swatch("lg")}
-                <b>${esc(slot.displayName || `Slot ${slot.id}`)}${variant ? ` · ${esc(variant)}` : ""}</b>${changedSlots.has(slot.id) ? draftDot() : ""}
-                <span class="tag">slot ${slot.id}</span>
-                <button class="btn tiny ghost" data-editpd="${slot.id}" style="margin-left:auto">Edit</button></div>
-            <div class="note">${slot.kind
+        const paints = slot.kind ? `Its colour paints ${row?.locality ? word(vocabulary(model).localities, row.locality).toLowerCase() : "its locality"} while the mode runs — not this key.` : "";
+        return `<tr${reachAttrs("pointing", group, slot.id)}>
+            <td><span${paints ? ` data-tip="${esc(paints)}"` : ""}>${slotLight(model, slot).swatch()}</span>
+                ${esc(slot.displayName || `Slot ${slot.id}`)}${variant ? ` · ${esc(variant)}` : ""} <code class="dim">slot ${slot.id}</code>${changedSlots.has(slot.id) ? draftDot() : ""}</td>
+            <td class="muted">${slot.kind
                 ? `${slot.kind === 2 ? "Scrolling" : "Directional"}${slot.dpi ? ` · ${slot.dpi} DPI` : " · normal pointer speed"}`
-                : "Empty · the keyboard refuses to activate it, so these keys do nothing yet"}</div>
-            <div class="note">${reachedBy}</div>
-            ${slot.kind ? `<div class="note">its colour paints ${esc(row?.locality ? word(vocabulary(model).localities, row.locality).toLowerCase() : "its locality")} while the mode runs — not this key</div>` : ""}
-        </div>`;
+                : "Empty · these keys do nothing yet"}</td>
+            <td class="muted">${reachedBy}</td>
+            <td style="text-align:right"><button class="btn tiny ghost" data-editpd="${slot.id}">Edit</button></td></tr>`;
     };
     // Holding a mode and toggling it on are the same mode reached two ways, so
     // the card is named for the one its route uses. A route that uses both
@@ -877,28 +875,25 @@ function tabPointing(body, right) {
     };
 
     const groups = [
-        {id: "here", cards: reach.onKeys.map(reachCard("here")),
+        {id: "here", rows: reach.onKeys.map(reachCard("here")),
             empty: "No pointing mode is placed on this layer."},
-        {id: "through", cards: reach.throughKeys.map(reachCard("through")),
+        {id: "through", rows: reach.throughKeys.map(reachCard("through")),
             empty: "No transparent key falls through to a pointing-mode key."},
-        {id: "branches", cards: reach.fromBranches.map(reachCard("branches")),
+        {id: "branches", rows: reach.fromBranches.map(reachCard("branches")),
             empty: "No behaviour mapped on this layer sends a pointing mode."},
-        {id: "combos", cards: reach.fromCombos.map(reachCard("combos")),
+        {id: "combos", rows: reach.fromCombos.map(reachCard("combos")),
             empty: "No combo on this layer sends a pointing mode."},
-        {id: "belowBranches", cards: reach.fromBranchesBelow.map(reachCard("belowBranches")),
+        {id: "belowBranches", rows: reach.fromBranchesBelow.map(reachCard("belowBranches")),
             empty: "No behaviour under a transparent key sends a pointing mode."},
-        {id: "belowCombos", cards: reach.fromCombosBelow.map(reachCard("belowCombos")),
+        {id: "belowCombos", rows: reach.fromCombosBelow.map(reachCard("belowCombos")),
             empty: "No combo that needs a transparent key sends a pointing mode."},
-        {id: "elsewhere", cards: reach.elsewhere.map((slotId) => card("elsewhere", slotId, "not reached from this layer")),
+        {id: "elsewhere", rows: reach.elsewhere.map((slotId) => card("elsewhere", slotId, "not reached from this layer")),
             empty: "Every configured mode is reached from this layer.", ids: reach.elsewhere},
     ];
-    const holdsChange = (group) => (group.ids || reachEntries(reach, group.id).map((entry) => entry.name)).some((id) => changedSlots.has(Number(id)));
-    const section = (group) => groupSection("pointing", group.id, group.cards.length, holdsChange(group),
-        group.cards.length ? `<div class="pd-reach">${group.cards.join("")}</div>` : `<p class="note" style="padding:10px 2px">${esc(group.empty)}</p>`);
-
-    const node = el(`<div class="stack" style="gap:10px;padding:2px 0">
-        ${inGroupOrder(groups).map(section).join("")}</div>`);
-    attachGroupToggles(node);
+    // A folded group holding a changed slot says so on its header.
+    for (const group of groups) group.drafted = (group.ids || reachEntries(reach, group.id).map((entry) => entry.name))
+        .some((id) => changedSlots.has(Number(id)));
+    const node = reachTable("pointing", groups, [["Slot", "30%"], ["Mode", "26%"], ["Reached by", "36%"], ["", "8%"]]);
     attachReachRows(node, "pointing");
     node.querySelectorAll("[data-editpd]").forEach((button) => button.addEventListener("click", () => {
         state.pdSlot = Number(button.dataset.editpd);

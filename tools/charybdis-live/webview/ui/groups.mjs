@@ -25,11 +25,6 @@ export const attachGroupToggles = (node) => node.querySelectorAll("[data-group-t
         render();
     }));
 
-// A group drawn as a block: its header, then its body when open.
-export const groupSection = (tab, id, count, drafted, body) => `<div class="reach-group">
-    ${groupHeader(tab, id, count, drafted)}
-    ${groupOpen(tab, id) ? body : ""}</div>`;
-
 // Rows across the tabs pick themselves the same way, and picking the same row
 // again lets go of it.
 export const attachReachRows = (node, tab) => node.querySelectorAll("[data-reach]").forEach((row) =>
