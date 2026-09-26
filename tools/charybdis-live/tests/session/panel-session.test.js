@@ -174,7 +174,7 @@ test("the model shows the draft's surfaces but the keyboard's own header", () =>
     assert.equal(model.layers[1].displayName, draft.current.summary.names[1]);
     assert.equal(model.portable.available, true);
     assert.equal(model.portable.pdUpgradeAvailable, true);
-    assert.equal(model.portable.layers, null, "the layer editor is closed until Rename & reorder opens it");
+    assert.equal(model.portable.layers, null, "the layer editor is closed until Rename & Reorder opens it");
 });
 
 test("the outbox is carried by one model, then forgotten", () => {
@@ -183,7 +183,7 @@ test("the outbox is carried by one model, then forgotten", () => {
     assert.deepEqual(takeOutbox(session), {notice: undefined, acceptedEdit: undefined, resetDraftForms: undefined});
 });
 
-test("Rename & reorder renames and reorders, keeps Base at the bottom, and carries names with a move", () => {
+test("Rename & Reorder renames and reorders, keeps Base at the bottom, and carries names with a move", () => {
     const before = snapshot();
     const edit = startLayerEdit(before, 3);
     assert.deepEqual(edit.order, [0, 1, 2, 3, 4, 5, 6, 7]);

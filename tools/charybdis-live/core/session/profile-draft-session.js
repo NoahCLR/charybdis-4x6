@@ -52,7 +52,7 @@ function editLabel(message, document) {
     return typeof label === "function" ? label(message) : label || "Edited the draft";
 }
 
-// What one Rename & reorder save did: the order it changed and the names it
+// What one Rename & Reorder save did: the order it changed and the names it
 // changed, each named as the layers were called before it.
 function layersLabel(step, before, after) {
     const moved = step.map((from, slot) => slot).filter(slot => step[slot] !== slot);
@@ -195,7 +195,7 @@ class ProfileDraftSession {
         this.replace(document, message.draftRevision, "edit", editLabel(message, current.document));
         return {message: copy(message), previousFingerprint: before, fingerprint: this.decode(this.history[this.cursor]).fingerprint};
     }
-    // An Rename & reorder save: its document, and the order it saved, which
+    // A Rename & Reorder save: its document, and the order it saved, which
     // rearranges this revision. An order and each name are separate
     // decisions, so the step links nothing in the review.
     editLayers(document, revision, step) {
@@ -246,7 +246,7 @@ class ProfileDraftSession {
     // together (a swap, a moved behaviour), and so does
     // anything linked to them through a later edit. Only units the review
     // still shows link; a unit edited back to the keyboard's value no longer
-    // ties anything. Steps from a rebase, a discard, Rename & reorder, or before
+    // ties anything. Steps from a rebase, a discard, Rename & Reorder, or before
     // the bounded history leave their units on their own. Units link by the
     // layer they belong to, not the slot, so a reorder between two edits
     // never ties two different layers' keys.

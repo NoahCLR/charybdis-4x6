@@ -56,7 +56,7 @@ selects one, and Enter on the selected key opens its picker.
 The layer stack is not one of those tabs, because
 it is not a property of the selected key. The layers are tabs along the foot
 of the board card, next to the workbench, the picked one opening into the board
-it shows, on Keys and on Lighting alike; **Rename & reorder** stays at the end
+it shows, on Keys and on Lighting alike; **Rename & Reorder** stays at the end
 of those tabs, outside what scrolls, and opens upward over the board, so a layer
 is renamed and reordered where its keys are on screen. **Keys follow their layers** (on by
 default) renumbers every layer key (MO, LT, TG, TO, TT, OSL, LOCK_LAYER…) on

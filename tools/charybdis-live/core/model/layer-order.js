@@ -5,7 +5,7 @@
 // A layer is neither its name, which a rename changes, nor its slot, which a
 // reorder changes. A draft keeps an order beside each history entry —
 // `order[slot]` is the keyboard layer that slot now holds — set from what
-// Rename & reorder saved, never inferred from names or contents. The keyboard's
+// Rename & Reorder saved, never inferred from names or contents. The keyboard's
 // profile rearranged into that order, every layer reference following, is the
 // *reference* the review compares the draft with: a reorder is then one item,
 // and everything else is compared layer with layer.

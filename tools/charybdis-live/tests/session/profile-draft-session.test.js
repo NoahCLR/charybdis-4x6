@@ -246,7 +246,7 @@ test("a revision is decoded once and its history entry cannot be edited in place
 // ── layers compared by identity ─────────────────────────────────────────
 
 const SWAP = [0,1,3,2,4,5,6,7];
-// A Rename & reorder save: the step it rearranges the draft by, every layer
+// A Rename & Reorder save: the step it rearranges the draft by, every layer
 // keeping its name unless `names` (by new slot) says otherwise.
 function layers(draft, step = SWAP, {names, keysFollow = true} = {}) {
     const current = draft.current.summary.names;

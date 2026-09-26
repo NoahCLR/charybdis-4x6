@@ -280,7 +280,7 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 .layer-tab.on:hover { background: color-mix(in srgb, var(--tab-tint, var(--text-3)) 24%, var(--surface-2)); }
 .layer-tab .swatch { width: 9px; height: 9px; border-radius: 3px; border: 1px solid rgba(255,255,255,.18); flex: none; }
 .layer-tab .idx { font-family: var(--mono); font-size: 10px; color: var(--text-3); }
-/* Rename & reorder stays in reach at the strip's end, outside what scrolls. */
+/* Rename & Reorder stays in reach at the strip's end, outside what scrolls. */
 .layerbar-wrap > .layer-edit { flex: none; margin: 0 10px 0 10px; }
 /* One line at a fixed height, so the board does not move when the caption
    grows; a caption too long for the width ends in an ellipsis. */
@@ -302,7 +302,7 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 .layer-chip.link:hover { border-color: var(--line-3); background: var(--surface-3); }
 .layer-chip.dirty::after { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--draft); }
 .layer-chip.staged { border-style: dashed; border-color: var(--draft); }
-/* Rename & reorder is a tab at the strip's end, set off from the layers by a
+/* Rename & Reorder is a tab at the strip's end, set off from the layers by a
    hairline: it opens onto the tabs themselves, not a layer. Open, it is the
    panel's own surface, joined to it as the picked layer's tab is to the board:
    it sits over the panel's bottom edge and covers it across its width. */
@@ -316,7 +316,7 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 .layer-edit:hover { color: var(--text); background: var(--surface-3); }
 .layer-edit[aria-expanded="true"] { color: var(--text); background: var(--surface); border-color: var(--line-2); }
 /* The tabs scroll sideways, so the panel hangs off their wrapper and opens
-   upward over the board, its right edge on Rename & reorder's and its bottom
+   upward over the board, its right edge on Rename & Reorder's and its bottom
    edge on the strip's top line, where the open button covers it. placePanel()
    in ui/layers.mjs scrolls the page to make room and caps it to the room below
    the top of the scrolling area. */

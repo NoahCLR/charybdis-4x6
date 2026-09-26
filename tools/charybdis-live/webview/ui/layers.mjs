@@ -27,7 +27,7 @@ export function attachLayersControl(bar) {
     const trigger = el(`<button class="layer-edit" aria-haspopup="dialog" aria-expanded="${Boolean(state.layersOpen)}"
         data-tip="Rename layers and change their order: a higher layer wins over the ones under it.">
         <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 13V3M2.5 5.5 5 3l2.5 2.5M11 3v10M8.5 10.5 11 13l2.5-2.5"/></svg>
-        <span>Rename &amp; reorder</span></button>`);
+        <span>Rename &amp; Reorder</span></button>`);
     trigger.addEventListener("click", () => {
         state.layersOpen = !state.layersOpen;
         if (!state.layersOpen) state.layersAsked = false;

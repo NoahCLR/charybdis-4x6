@@ -510,7 +510,7 @@ discarded whole or not at all. See `core/model/profile-review.js`,
 `webview/view/review.mjs`.
 
 **Layers are compared by identity, not by slot.** Beside every history entry
-the draft keeps which keyboard layer each slot now holds, set by Rename & reorder
+the draft keeps which keyboard layer each slot now holds, set by Rename & Reorder
 from the order it saves and never inferred from names or contents, which two
 empty layers or a swap that also swaps the names would fool. The review
 compares the draft with the keyboard's profile rearranged into that order, with

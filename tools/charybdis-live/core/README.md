@@ -15,7 +15,7 @@ pages, the layout, the committed profile, combos, macro banks, settings,
 keyboard options and the base RGB effect. It publishes a sanitized snapshot;
 `session/device-model.js` turns that into the `model` the webview renders, and
 `session/panel-session.js` adds the draft and the panel's own state to it,
-routes each message the webview posts, and runs the Rename & reorder panel — so
+routes each message the webview posts, and runs the Rename & Reorder panel — so
 `extension.js` keeps only VS Code's dialogs, files and progress.
 
 Custom Profile Wire pages use one monotonically increasing nonzero request-id
