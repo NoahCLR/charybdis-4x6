@@ -48,12 +48,8 @@ function sectionBody(model) {
 
     if (picker.search) {
         const query = picker.search.toLowerCase();
-        // A macro is searched by the name it was given, which the catalogue
-        // cannot know. A named one found here is not listed again under the
-        // catalogue's own name for the same slot, QK_MACRO_n.
-        const macros = (model?.viaMacros || []).filter((slot) => slot.name && macroMatches(slot, query));
-        const named = new Set(macros.flatMap((slot) => [slot.keycode, slot.keycode.replace(/^VIA_MACRO_/, "QK_MACRO_")]));
-        const matches = catalogue.filter((entry) => pickable(entry) && !named.has(entry.value)
+        const macros = (model?.viaMacros || []).filter((slot) => macroMatches(slot, query));
+        const matches = catalogue.filter((entry) => pickable(entry)
             && (entry.search?.includes(query) || entry.value.toLowerCase().includes(query))).slice(0, 64);
         if (!matches.length && !macros.length) return `<p class="note" style="padding:18px">Nothing in the keyboard's catalogue or macros matches “${esc(picker.search)}”.</p>`;
         const count = matches.length + macros.length;

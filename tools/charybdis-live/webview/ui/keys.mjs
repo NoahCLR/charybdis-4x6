@@ -5,8 +5,8 @@ import {css, isOff, label as hsvLabel} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {scrollContentTo} from "../lib/scroll.mjs";
 import {LED_INDEX} from "../view/geometry.mjs";
-import {actionLabel, behaviourFor, cellLabel, behaviourListeningTo, resolvedPositions, canonicalKeycode, behaviourGridSteps, behaviourGroups, behaviourRouteKeys, behaviourTiers, comboEditInputs, comboGroups, combosAt, keyFace, keyMeaning, macroReach, pointingReach, pointingSlotFor, pointingVariant, reachKeys} from "../view/keyface.mjs";
-import {feedbackColours, layerColourRow, pdColourRow, stageEnabled} from "../view/lighting.mjs";
+import {actionLabel, behaviourFor, cellLabel, behaviourListeningTo, resolvedPositions, canonicalKeycode, behaviourGridSteps, behaviourGroups, behaviourRouteKeys, behaviourTiers, comboEditInputs, comboGroups, combosAt, keyFace, keyMeaning, macroReach, pointingReach, pointingSlotFor, pointingVariant, reachKeys, visibleKeycode} from "../view/keyface.mjs";
+import {feedbackColours, layerColourRow, mappedKeyCount, pdColourRow, stageEnabled} from "../view/lighting.mjs";
 import {closeComboBuilder, currentLayer, getModel, heldLayers, layerName, layers, openComboBuilder, positionAt, post, previewing, render, selectedPosition, showLayer, state, writable, canEdit as canEditArea} from "../store.mjs";
 import * as edits from "../view/edits.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
@@ -185,10 +185,8 @@ function reachHighlight(model) {
     return [];
 }
 
-// A tab's own number is what this layer stores: a key here, a behaviour mapped
-// here firing it from a branch, or a combo chorded on keys here sending it —
-// the three groups it leads with. What the stack lets it reach is in the tab,
-// not in the count.
+// A tab's number counts what the selected layer stores, not the selected key
+// position or actions reached only through transparent keys on lower layers.
 const storedCount = (reach) =>
     new Set([...reach.onKeys, ...reach.fromBranches, ...reach.fromCombos].map((entry) => entry.name)).size;
 
@@ -196,7 +194,7 @@ function bench() {
     const model = getModel();
     const layer = currentLayer();
     const counts = {
-        key: String(state.selected),
+        key: String(mappedKeyCount(layer)),
         behaviours: String((({here, combos}) => new Set([...here, ...combos.map((entry) => entry.row)]).size)(behaviourGroups(model, layers(), state.layer))),
         combos: String(comboGroups(model, layers(), state.layer).onKeys.length),
         macros: String(storedCount(macroReach(model, layers(), state.layer))),
@@ -243,7 +241,7 @@ function tabKey(body) {
                 <button class="btn" data-act="pick" ${writable() ? "" : "disabled"}>Pick…</button></div></div>
             <dl class="kv" style="margin-top:12px">
                 <dt>Resolves to</dt><dd>${esc(face.main || "—")}${face.sub ? ` · ${esc(face.sub)}` : ""}</dd>
-                <dt>Stored</dt><dd>${esc(position?.keycode || "—")}</dd>
+                <dt>Stored</dt><dd>${esc(position ? visibleKeycode(model, position.keycode) : "—")}</dd>
                 <dt>Matrix</dt><dd>row ${position?.row ?? "—"} · col ${position?.column ?? "—"}</dd>
                 <dt>Layout index</dt><dd>${position?.layoutIndex ?? "—"}</dd>
                 <dt>LED index</dt><dd>${LED_INDEX[position?.layoutIndex] ?? "—"}</dd>
@@ -263,7 +261,7 @@ function tabKey(body) {
                     <span class="swatch-lg ${lit ? "" : "swatch-off"}" style="width:12px;height:12px;border-radius:4px;${lit ? `background:${css(row.color)}` : ""}"></span>
                     <span class="nm">${esc(layerName(other))}</span>
                     <span class="val ${through ? "dim" : ""}">${through ? "falls through" : esc(otherFace.main || "nothing")}</span>
-                    <code class="dim">${esc(there?.keycode || "")}</code></button>`;
+                    <code class="dim">${esc(visibleKeycode(model, there?.keycode))}</code></button>`;
             }).join("")}</div>
             <p class="note" style="margin-top:8px">Higher layers win, and only among the layers held at the time. A transparent key is answered by the highest layer below that is also held — ${esc(layerName(layers()[0]))} always is, so a layer in between answers only when you hold it too.</p>
         </section>
@@ -661,7 +659,7 @@ function comboBuilder(layer, canEdit, holdTerm) {
             <span class="right">${editing ? `<button class="btn tiny ghost" data-act="delete" ${canEdit ? "" : "disabled"}>Delete</button>` : ""}</span></div>
         <div class="card-b" style="padding:13px;display:grid;gap:11px">
             <div class="field"><span>Sends</span>
-                <div class="input-row"><input class="input mono" data-output value="${esc(form.output)}" ${canEdit ? "" : "disabled"}>
+                <div class="input-row"><input class="input mono" data-output value="${esc(visibleKeycode(model, form.output))}" ${canEdit ? "" : "disabled"}>
                 <button class="btn" data-act="pickout" ${canEdit ? "" : "disabled"}>Pick…</button></div></div>
             <div class="field"><span>Inputs</span>
                 <div class="row" style="gap:6px;flex-wrap:wrap">
@@ -969,7 +967,7 @@ export function keysShortcut(event) {
         if (keyFace(position).kind !== "transparent") store(edits.clearKey(layer.name, position.layoutIndex));
     } else if (action === "copy") {
         state.keyClipboard = {keycode: position.keycode, label: keyFace(position).main};
-        navigator.clipboard?.writeText(position.keycode).catch(() => {});
+        navigator.clipboard?.writeText(visibleKeycode(getModel(), position.keycode)).catch(() => {});
         render();
     } else if (state.keyClipboard) {
         store(edits.setKey(layer.name, position.layoutIndex, state.keyClipboard.keycode));

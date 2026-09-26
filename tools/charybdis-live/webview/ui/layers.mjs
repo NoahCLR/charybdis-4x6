@@ -16,6 +16,7 @@
 // another row swaps that layer into it.
 
 import {el, esc} from "../lib/dom.mjs";
+import {mappedKeyCount} from "../view/lighting.mjs";
 import {getModel, layers, post, render, state, canEdit as canEditArea} from "../store.mjs";
 
 let dismiss = null;   // the outside-click listener for the open panel
@@ -113,8 +114,7 @@ function editor(model, portable, busy) {
     order.forEach((layerId) => {
         const position = portable.layers.order.indexOf(layerId);
         const layer = layers().find((entry) => entry.index === layerId);
-        const mapped = (layer?.positions || []).filter((key) =>
-            key.keycode && !["KC_TRANSPARENT", "KC_TRNS", "KC_NO"].includes(key.keycode)).length;
+        const mapped = mappedKeyCount(layer);
         const base = position === 0;
         const label = names[layerId] || (layerId ? `Layer ${layerId}` : "Base");
         const row = el(`<div class="list-row lp-row${base ? " base" : ""}" data-row="${layerId}">

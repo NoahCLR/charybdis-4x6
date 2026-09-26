@@ -1,10 +1,18 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {isOff} from "../webview/lib/colour.mjs";
-import {baseColour, feedbackColours, keyLight, ownLight, pdColourRow, stageEnabled, stageIdle, stageInEffect, trackballLight} from "../webview/view/lighting.mjs";
+import {baseColour, feedbackColours, keyLight, mappedKeyCount, ownLight, pdColourRow, stageEnabled, stageIdle, stageInEffect, trackballLight} from "../webview/view/lighting.mjs";
 
 const colour = (h, s, v) => ({h: String(h), s: String(s), v: String(v)});
 const position = (layoutIndex, keycode) => ({layoutIndex, keycode});
+
+test("mapped-key count follows the selected layer, excluding transparent and disabled keys", () => {
+    const layer = {positions: [position(0, "KC_A"), position(1, "KC_B"), position(2, "KC_TRANSPARENT"),
+        position(3, "KC_TRNS"), position(4, "_______"), position(5, "KC_NO"), position(6, "XXXXXXX"), position(7, "")]};
+    assert.equal(mappedKeyCount(layer), 2);
+    assert.equal(mappedKeyCount({positions: [position(0, "KC_TRANSPARENT")]}), 0);
+    assert.equal(mappedKeyCount(null), 0);
+});
 
 function model(overrides = {}) {
     return {

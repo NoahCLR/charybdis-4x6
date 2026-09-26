@@ -151,6 +151,9 @@ retired user macros, the Charybdis drag scroll and unnamed `QK_KB` slots, and
 keycodes for QMK features the build does not include (MIDI, audio, RGBLight,
 Caps Word, Repeat…); see Open Issues. A key that already holds one still reads
 back by name.
+VIA macro slots appear as `VIA_MACRO_0`–`VIA_MACRO_63` throughout the app.
+Their QMK numeric identities still round-trip, but the picker does not offer
+duplicate `QK_MACRO_n` names from the first 32 slots.
 
 ### D-L06 — v1 ported Studio's whole UI and rebuilt only the model source
 
@@ -618,6 +621,9 @@ so a dark one reads dark.
 
 A repeated element sits in the same place every time it appears, so a screen
 reads as a grid rather than as text that wraps wherever it lands.
+The Keys workbench tabs count what the selected layer stores. The Key tab counts
+mapped keys, excluding transparent and disabled positions; its selected key's
+layout index belongs in the key details.
 
 - The review is one grid: a status gutter, the title with its area underneath
   when outside its section, the fields as sign · label · on the keyboard · in

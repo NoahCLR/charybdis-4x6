@@ -139,10 +139,10 @@ function applySteps(apply) {
         const current = step.state === "active";
         const counted = current && apply.bytes
             ? `<span class="ap-bar"><i style="width:${Math.round((apply.bytes.completed / apply.bytes.total) * 100)}%"></i></span>
-               <span class="ap-bytes">${apply.bytes.completed} / ${apply.bytes.total} bytes</span>` : "";
+               <span class="ap-bytes" style="min-width:${`${apply.bytes.total} / ${apply.bytes.total} bytes`.length}ch">${apply.bytes.completed} / ${apply.bytes.total} bytes</span>` : "";
         return `<li class="${step.state}"><span class="mark">${step.state === "active" ? spinner() : ""}</span>
             <span class="lbl">${esc(step.label)}</span>
-            ${current && (apply.detail || counted) ? `<span class="ap-detail">${esc(apply.detail)}${counted}</span>` : ""}</li>`;
+            ${current && (apply.detail || counted) ? `<span class="ap-detail"><span class="ap-text" title="${esc(apply.detail)}">${esc(apply.detail)}</span>${counted}</span>` : ""}</li>`;
     }).join("");
     return `<ol class="ap-steps">${rows}</ol>`;
 }

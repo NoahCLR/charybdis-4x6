@@ -1,12 +1,20 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {createRequire} from "node:module";
-import {behaviourFor, cellLabel, comboEditInputs, comboReferenceLayer, combosAt, behaviourListeningTo, canonicalKeycode, behaviourGridSteps, behaviourGroups, behaviourRouteKeys, behaviourTiers, macroReach, pointingReach, reachablePositions, resolvedPositions, bindingKeycode, bindingsForSlot, comboGroups, combosForKey, keyFace, keyMeaning, macroKeycodes, macroPlacements, macroAction, namedAction, pointingAction, pointingSlotFor, reachKeys, slotKeycodes} from "../webview/view/keyface.mjs";
+import {behaviourFor, cellLabel, comboEditInputs, comboReferenceLayer, combosAt, behaviourListeningTo, canonicalKeycode, behaviourGridSteps, behaviourGroups, behaviourRouteKeys, behaviourTiers, macroReach, pointingReach, reachablePositions, resolvedPositions, bindingKeycode, bindingsForSlot, comboGroups, combosForKey, keyFace, keyMeaning, macroKeycodes, macroPlacements, macroAction, namedAction, pointingAction, pointingSlotFor, reachKeys, slotKeycodes, visibleKeycode} from "../webview/view/keyface.mjs";
 
 // Slots come from the host with their binding keycodes; the tests use the
 // host's own registry rather than a copy of it.
 const {PD_BINDINGS} = createRequire(import.meta.url)("../core/data/pd-bindings.js");
 const slotWith = (fields) => ({...fields, binding: PD_BINDINGS[fields.id]});
+
+test("visible macro keycodes use the VIA slot name for both QMK's named and unnamed values", () => {
+    const model = {qmkKeycodeAliases: {QK_MACRO_9: "VIA_MACRO_9", "0x773F": "VIA_MACRO_63", QK_USER_16: "DRAGSCROLL"}};
+    assert.equal(visibleKeycode(model, "QK_MACRO_9"), "VIA_MACRO_9");
+    assert.equal(visibleKeycode(model, "0x773F"), "VIA_MACRO_63");
+    assert.equal(visibleKeycode(model, "QK_USER_16"), "QK_USER_16", "other stored identities keep their existing display");
+    assert.equal(visibleKeycode({}, "QK_MACRO_9"), "QK_MACRO_9", "an unadvertised alias is not invented");
+});
 
 test("a key face uses the model's own resolution, and names the layer a dual-role key reaches", () => {
     assert.deepEqual(keyFace({keycode: "KC_TRANSPARENT", display: "▽"}), {main: "▽", sub: "", kind: "transparent"});

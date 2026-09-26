@@ -65,7 +65,9 @@ export const tierColour = (model, kind) => feedbackColours(model)[kind] || OFF;
 // A key counts as mapped on a layer when it stores something of its own;
 // transparent and disabled positions keep the layer underneath.
 export const isMapped = (position) =>
-    Boolean(position) && !["KC_TRANSPARENT", "KC_TRNS", "_______", "KC_NO", "XXXXXXX"].includes(position.keycode);
+    Boolean(position?.keycode) && !["KC_TRANSPARENT", "KC_TRNS", "_______", "KC_NO", "XXXXXXX"].includes(position.keycode);
+
+export const mappedKeyCount = (layer) => (layer?.positions || []).filter(isMapped).length;
 
 // Two firmware rules for "no colour": a layer colour is skipped only when both
 // saturation and value are 0 (rgb_layer_stage.c), and a group row stored as

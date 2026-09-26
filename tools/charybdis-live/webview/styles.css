@@ -521,15 +521,15 @@ button.tier:hover { background: var(--surface-3); }
   height: 36px; margin-bottom: -1px; background: var(--surface); border-color: var(--line); color: var(--text); font-weight: 520;
 }
 .bench-tabs .tab-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-/* Count and draft marks reserve their own space, so changing either cannot
-   move a neighbouring tab or the label within this one. */
-.bench-tabs button[data-tab] { display: grid; grid-template-columns: minmax(0, 1fr) 3ch; gap: 8px; text-align: left; }
-.bench-tabs [data-tab="key"] { width: 88px; }
-.bench-tabs [data-tab="behaviours"] { width: 145px; }
-.bench-tabs [data-tab="combos"] { width: 116px; }
-.bench-tabs [data-tab="macros"] { width: 112px; }
-.bench-tabs [data-tab="pointing"] { width: 182px; }
-.bench-tabs [data-tab] .c { text-align: right; }
+/* Fixed tab widths keep neighbouring tabs in place. The count reserves three
+   digits after an 8px gap, leaving any spare room at the tab's end. */
+.bench-tabs button[data-tab] { display: grid; grid-template-columns: max-content 3ch; justify-content: start; gap: 8px; text-align: left; }
+.bench-tabs [data-tab="key"] { width: 80px; }
+.bench-tabs [data-tab="behaviours"] { width: 126px; }
+.bench-tabs [data-tab="combos"] { width: 108px; }
+.bench-tabs [data-tab="macros"] { width: 103px; }
+.bench-tabs [data-tab="pointing"] { width: 152px; }
+.bench-tabs [data-tab] .c { text-align: left; }
 .bench-tabs button[role="tab"] > .draft-dot { position: absolute; top: 4px; right: 4px; margin: 0; }
 /* Lighting's stage tabs carry the paint order: a number, the colour the
    stage paints now, and a stage that is off drawn dim. */
@@ -824,7 +824,8 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .ap-detail { grid-column: 2; display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 400; color: var(--text-2); }
 .ap-bar { width: 110px; height: 4px; border-radius: 2px; background: var(--surface); overflow: hidden; flex: none; }
 .ap-bar i { display: block; height: 100%; background: var(--text); }
-.ap-bytes { font-family: var(--mono); font-size: 10.5px; color: var(--text-3); }
+.ap-text { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ap-bytes { flex: none; white-space: nowrap; text-align: right; font-family: var(--mono); font-size: 10.5px; color: var(--text-3); }
 .ap-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .spin { width: 11px; height: 11px; flex: none; border-radius: 50%; border: 1.5px solid var(--line-3); border-top-color: var(--text); display: inline-block; animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }

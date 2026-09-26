@@ -14,6 +14,7 @@ const catalogue = [
     {value: "PD_SLOT_0", group: "Pointing modes"},
     {value: "QK_USER_0", group: "user"},
     {value: "QK_USER_20", group: "user"},
+    {value: "QK_MACRO_9", group: "macro"},
     {value: "QK_BOOT", group: "quantum"},
     {value: "QK_MOUSE_BUTTON_1", group: "mouse"},
     {value: "DPI_MOD", group: "kb"},
@@ -41,7 +42,8 @@ test("curated picker sections route representative keycodes", () => {
     assert.deepEqual(entriesForPickerSection(catalogue, section("mouse")).map((entry) => entry.value), ["QK_MOUSE_BUTTON_1", "DPI_MOD"]);
     assert.deepEqual(entriesForPickerSection(catalogue, section("custom")).map((entry) => entry.value), ["QK_USER_20"]);
     assert.deepEqual(entriesForPickerSection(catalogue, section("other")).map((entry) => entry.value), ["QK_BOOT"]);
-    assert.equal(entriesForPickerSection(catalogue, section("all")).length, catalogue.length - 4, "everything but the retired user macros, Charybdis drag scroll and its unnamed slot");
+    assert.equal(entriesForPickerSection(catalogue, section("all")).length, catalogue.length - 5, "macro slots appear only under their VIA names");
+    assert.equal(pickable({value: "QK_MACRO_9", group: "macro"}), false);
 });
 
 test("Charybdis's own drag scroll is offered nowhere; the DRAGSCROLL pointing mode is drag scroll", () => {

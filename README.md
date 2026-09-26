@@ -263,6 +263,8 @@ loading step replaces the screen. The Configure menus and board open when the
 complete profile is ready for editing. After a read fails, **Device** is
 available if the keyboard reported its capabilities; **Profile & backups**
 opens if it supports complete-profile backup, including the five-layer bridge.
+Macro keycodes are shown as `VIA_MACRO_0` through `VIA_MACRO_63` in the live
+editor, including slots whose QMK values have no named constant.
 Every edit goes into one local draft with undo, redo and a history, and reaches
 the keyboard only through **Review and apply**. Apply
 saves a recovery copy, then commits the complete profile to both halves as one
@@ -276,6 +278,8 @@ combo numbers shift because the device stores them in a packed table.
 
 In **Keys → Combos**, **Pick on board** brings the board into view so its keys
 can be selected as combo inputs.
+The **Key** tab count is the number of mapped keys on the selected layer;
+the selected key's layout index appears in its details.
 
 After Apply completes, the editor stays visible while the app reads keys,
 profile domains, combos and base lighting back from the keyboard. The bottom

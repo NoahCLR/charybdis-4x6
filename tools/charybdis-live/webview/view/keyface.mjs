@@ -47,6 +47,14 @@ const shortLayer = (name) => name.replace(/^LAYER_/, "").toLowerCase();
 // lookup from a key to what it reaches goes through this.
 export const keyMeaning = (position) => position?.semantic || position?.keycode || "";
 
+// Macro slots have one profile name across all 64 slots, even though QMK's
+// catalogue names only the first 32 native values. Keep position.keycode for
+// round-trip edits; use this when a screen prints that keycode to a person.
+export const visibleKeycode = (model, name) => {
+    const semantic = model?.qmkKeycodeAliases?.[name] || name || "";
+    return /^VIA_MACRO_(?:[0-9]|[1-5][0-9]|6[0-3])$/.test(semantic) ? semantic : name || "";
+};
+
 // How a keycode name is spoken in prose: the label the keyboard's own
 // vocabulary gives it, so a behaviour row, a reach line and the key cap all
 // call one key the same thing. Names the vocabulary does not cover — a device

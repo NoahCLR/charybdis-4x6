@@ -2,7 +2,7 @@
 // without leaving the layer you are reading.
 
 import {el, esc} from "../lib/dom.mjs";
-import {actionLabel, behaviourFor, behaviourTiers, combosAt, keyFace, keyMeaning, macroKeycodes, pointingSlotFor, resolvedPositions} from "../view/keyface.mjs";
+import {actionLabel, behaviourFor, behaviourTiers, combosAt, keyFace, keyMeaning, macroKeycodes, pointingSlotFor, resolvedPositions, visibleKeycode} from "../view/keyface.mjs";
 import {pdColourRow, stageEnabled} from "../view/lighting.mjs";
 import {getModel, heldLayers, layerName, positionAt} from "../store.mjs";
 import {branchBadge, comboBadge, mark, sends, sendsKind, tierDot} from "./marks.mjs";
@@ -69,7 +69,7 @@ function keyCard(index) {
     if (!own.length) own.push(`<div class="hc-sect"><div class="hc-empty">No key behaviour, macro, combo or pointing mode on this key.</div></div>`);
     return `<div class="hc-head"><div class="hc-title"><span class="t">${esc(face.main || "Unmapped")}</span>
         <span class="hc-pill">index ${index}</span></div>
-        <code class="hc-code">${esc(position.keycode)}</code></div>${own.join("")}${seenThrough(model, stack, index)}`;
+        <code class="hc-code">${esc(visibleKeycode(model, position.keycode))}</code></div>${own.join("")}${seenThrough(model, stack, index)}`;
 }
 
 // In a layer preview, a key transparent on the viewed layer is answered by the
@@ -85,7 +85,7 @@ function seenThrough(model, stack, index) {
     return `<div class="hc-through"><div class="hc-sect">
             <div class="hc-h">Seen through from ${esc(layerName(from))}</div>
             <div class="hc-title"><span class="t">${esc(keyFace(position).main || "Unmapped")}</span></div>
-            <code class="hc-code">${esc(position.keycode)}</code></div>
+            <code class="hc-code">${esc(visibleKeycode(model, position.keycode))}</code></div>
         ${sections.length ? sections.join("") : `<div class="hc-sect"><div class="hc-empty">No key behaviour, macro, combo or pointing mode on that key.</div></div>`}</div>`;
 }
 
