@@ -5,7 +5,7 @@
 // always what would be applied.
 
 import {el, esc} from "./lib/dom.mjs";
-import {captureContentScroll, restoreContentScroll} from "./lib/scroll.mjs";
+import {captureContentScroll, captureNestedScroll, limitBehaviourGroups, restoreContentScroll, restoreNestedScroll} from "./lib/scroll.mjs";
 import {activateOnKey, captureFocus, focusDialog, restoreFocus, trapTab} from "./lib/focus.mjs";
 import {closeComboBuilder, getModel, layerName, post, render as rerender, resetDraftForms, setModel, setRenderer, state, writable} from "./store.mjs";
 import {historyAction} from "./view/edits.mjs";
@@ -225,6 +225,7 @@ function reviewOverlay() {
 
 function render() {
     const scroll = captureContentScroll(root, renderedScreen, state.screen);
+    const nestedScroll = captureNestedScroll(root, renderedScreen, state.screen);
     const focus = captureFocus(root);
     hideHover();
     const model = getModel();
@@ -237,7 +238,9 @@ function render() {
     const bar = commitBar();
     if (bar) screen.appendChild(bar);
     root.appendChild(app);
+    limitBehaviourGroups(root);
     restoreContentScroll(root, scroll);
+    restoreNestedScroll(root, nestedScroll);
     renderedScreen = state.screen;
 
     const picker = pickerOverlay();
@@ -356,6 +359,7 @@ addEventListener("keydown", (event) => {
         render();
     }
 });
+addEventListener("resize", () => limitBehaviourGroups(root));
 
 render();
 post({type: "ready"});

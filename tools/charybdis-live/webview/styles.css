@@ -592,6 +592,8 @@ button.tier:hover { background: var(--surface-3); }
 .rowlist .group-h:hover { background: var(--surface-3); }
 .rowlist .group-h[aria-expanded="false"] { border-bottom: 0; }
 .rowlist .rowgroup + .rowgroup .group-h { border-top: 1px solid var(--line); }
+.behaviour-rail { height: 500px; overflow-y: auto; }
+.beh-rows.scroll { overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
 
 .beh-head { display: flex; align-items: flex-start; gap: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
 .beh-timing { display: grid; grid-template-columns: repeat(3, minmax(0, 150px)) auto; gap: 14px; align-items: end; padding: 13px 0 16px; }

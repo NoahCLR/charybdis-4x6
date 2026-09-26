@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import {captureContentScroll, restoreContentScroll, scrollContentTo} from "../webview/lib/scroll.mjs";
+import {captureContentScroll, captureNestedScroll, limitBehaviourGroups, restoreContentScroll, restoreNestedScroll, scrollContentTo} from "../webview/lib/scroll.mjs";
 
 const rootWith = (content) => ({querySelector: (selector) => selector === ".content" ? content : null});
 
@@ -34,4 +34,22 @@ test("jumping from the combo builder places the board below the content edge", (
         scrollTo: (options) => calls.push(options)};
     scrollContentTo(rootWith(content), ".board-card");
     assert.deepEqual(calls, [{top: 540, left: 12, behavior: "smooth"}]);
+});
+
+test("a long behaviour group shows five complete rows, including a taller note", () => {
+    const list = {children: [51, 53, 70, 54, 52, 58].map((height) => ({getBoundingClientRect: () => ({height})})), style: {}};
+    limitBehaviourGroups({querySelectorAll: () => [list]});
+    assert.equal(list.style.maxHeight, "280px");
+});
+
+test("behaviour group scroll survives a redraw and reveals a newly selected row", () => {
+    const before = {dataset: {scrollKey: "behaviours:0:here"}, scrollTop: 170};
+    const root = (list) => ({querySelectorAll: () => [list]});
+    const positions = captureNestedScroll(root(before), "keys", "keys");
+    const selected = {getBoundingClientRect: () => ({top: 330, bottom: 380})};
+    const after = {dataset: before.dataset, scrollTop: 0, hasAttribute: () => true,
+        querySelector: () => selected, getBoundingClientRect: () => ({top: 100, bottom: 350})};
+    restoreNestedScroll(root(after), positions);
+    assert.equal(after.scrollTop, 200, "the new row is brought into the five-row viewport");
+    assert.equal(captureNestedScroll(root(before), "keys", "lighting").size, 0);
 });

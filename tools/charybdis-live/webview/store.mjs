@@ -21,7 +21,7 @@ export const state = {
     // Every tab that answers "what does this layer reach" is grouped the same
     // way and opens the same way: what the layer holds itself, and the rest a
     // click away.
-    groups: {behaviours: openGroups(), macros: openGroups(), combos: openGroups(), pointing: openGroups()},
+    groups: {behaviours: {...openGroups(), branches: false, combos: false}, macros: openGroups(), combos: openGroups(), pointing: openGroups()},
     // The row picked in each tab. The board rings the keys that reach it, so
     // a row in a table can answer "where do I press for this".
     reachRow: {macros: null, combos: null, pointing: null},

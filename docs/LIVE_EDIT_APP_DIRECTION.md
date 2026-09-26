@@ -24,7 +24,7 @@ matrix.
 | Product surface | Current state |
 | --- | --- |
 | Layout and eight layers | Read/write; names and overlay order travel with complete profiles; a reorder renumbers layer keys by default ("Keys follow their layers") |
-| Key behaviours, combos and RGB | Read/write editors over the shared draft |
+| Key behaviours, combos and RGB | Read/write editors over the shared draft; the Behaviours rail keeps a fixed height, opens one reach section at a time and scrolls that section after five rows |
 | Macros | 64 named VIA macro slots with builder, recorder and preview; shared-memory and per-macro limits shown and enforced (D-L25, D-L26) |
 | Mouse | Pointer and sniping DPI, auto-sniping and auto-mouse: global-policy sections the core files under the Mouse area, so the rail, the review and import counts all place them there. The auto-mouse fade delay is a share of the timeout, edited on its lighting stage (D-L17) |
 | Pointing modes | Eight device-owned slots and eight RGB rows; see [PD-mode domain v1](architecture/pd-mode-domain-v1.md) |

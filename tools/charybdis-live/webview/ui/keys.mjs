@@ -15,7 +15,7 @@ import {keepInView, layerBar} from "./layerbar.mjs";
 import {attachLayersControl} from "./layers.mjs";
 import {openPicker} from "./picker.mjs";
 import {attachGroupToggles, attachReachRows, groupHeader, groupOpen, reachAttrs, reachTable} from "./groups.mjs";
-import {inGroupOrder, reachEntries} from "../view/reach-groups.mjs";
+import {inGroupOrder, reachEntries, singleOpenGroup} from "../view/reach-groups.mjs";
 import {branchBadge, comboBadge, marked, sends, sendsKind, slotLight, tierDot} from "./marks.mjs";
 import {branchName, helperWord, tierName, vocabulary, word} from "../view/vocabulary.mjs";
 import {topbar, unavailable} from "./shell.mjs";
@@ -372,27 +372,28 @@ function tabBehaviours(body, right) {
         {id: "elsewhere", rows: elsewhere.map((row) => ({row, note: "not on this layer"})),
             empty: "Every behaviour on the board is reached from this layer."},
     ];
-    if (state.behaviourRow !== state.behaviourRowShown) {
+    const selectionMoved = state.behaviourRow !== state.behaviourRowShown;
+    if (selectionMoved) {
         const holding = groups.find((group) => group.id === route)
             || groups.find((group) => group.rows.some((entry) => entry.row.keycode === state.behaviourRow));
-        if (holding) state.groups.behaviours[holding.id] = true;
+        if (holding) state.groups.behaviours = singleOpenGroup(state.groups.behaviours, holding.id);
         state.behaviourRowShown = state.behaviourRow;
     }
 
     const section = (group) => `<div class="rowgroup">
         ${groupHeader("behaviours", group.id, group.rows.length, group.rows.some(({row}) => changed.has(row.keycode)))}
         ${groupOpen("behaviours", group.id)
-            ? (group.rows.length ? group.rows.map((entry) => item(group.id, entry.row, entry.note)).join("")
+            ? (group.rows.length ? `<div class="beh-rows${group.rows.length > 5 ? " scroll" : ""}" data-scroll-key="behaviours:${state.layer}:${group.id}"${selectionMoved ? " data-reveal-selected" : ""}>${group.rows.map((entry) => item(group.id, entry.row, entry.note)).join("")}</div>`
                 : `<p class="note" style="padding:10px 12px">${esc(group.empty)}</p>`)
             : ""}</div>`;
 
     const node = el(`<div class="tab-split">
-        <aside class="rowlist">
+        <aside class="rowlist behaviour-rail" data-scroll-key="behaviours:${state.layer}:rail">
             ${inGroupOrder(groups).map(section).join("")}
         </aside>
         <div class="beh-main"></div>
     </div>`);
-    attachGroupToggles(node);
+    attachGroupToggles(node, "behaviours");
     node.querySelectorAll("[data-row]").forEach((button) => button.addEventListener("click", () => {
         state.behaviourRow = button.dataset.row;
         state.behaviourRoute = {row: button.dataset.row, group: button.dataset.route};

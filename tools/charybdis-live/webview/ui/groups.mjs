@@ -5,7 +5,7 @@
 import {el, esc} from "../lib/dom.mjs";
 import {render, state} from "../store.mjs";
 import {draftDot} from "../view/review.mjs";
-import {GROUP_TITLES, inGroupOrder} from "../view/reach-groups.mjs";
+import {GROUP_TITLES, inGroupOrder, singleOpenGroup} from "../view/reach-groups.mjs";
 
 // A folded group holding something the draft changed says so on its header;
 // open, its rows carry their own marks.
@@ -18,10 +18,12 @@ export function groupHeader(tab, id, count, drafted = false) {
 
 export const groupOpen = (tab, id) => state.groups[tab][id];
 
-export const attachGroupToggles = (node) => node.querySelectorAll("[data-group-tab]").forEach((button) =>
+export const attachGroupToggles = (node, exclusiveTab = null) => node.querySelectorAll("[data-group-tab]").forEach((button) =>
     button.addEventListener("click", () => {
-        const bag = state.groups[button.dataset.groupTab];
-        bag[button.dataset.group] = !bag[button.dataset.group];
+        const tab = button.dataset.groupTab;
+        const bag = state.groups[tab];
+        if (tab === exclusiveTab) state.groups[tab] = singleOpenGroup(bag, button.dataset.group, !bag[button.dataset.group]);
+        else bag[button.dataset.group] = !bag[button.dataset.group];
         render();
     }));
 

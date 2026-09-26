@@ -21,6 +21,10 @@ export const GROUP_TITLES = {
 export const GROUP_ORDER = ["here", "branches", "combos", "through", "belowBranches", "belowCombos", "elsewhere"];
 export const inGroupOrder = (groups) => GROUP_ORDER.map((id) => groups.find((group) => group.id === id)).filter(Boolean);
 
+// The Behaviours rail is an accordion: opening one route closes the others.
+export const singleOpenGroup = (groups, id, open = true) => Object.fromEntries(
+    Object.keys(groups).map((group) => [group, group === id && open]));
+
 // The reach list each group reads. `elsewhere` is a tab's own remainder.
 export const REACH_FIELDS = {here: "onKeys", branches: "fromBranches", combos: "fromCombos", through: "throughKeys",
     belowBranches: "fromBranchesBelow", belowCombos: "fromCombosBelow"};

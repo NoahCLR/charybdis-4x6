@@ -280,6 +280,9 @@ In **Keys → Combos**, **Pick on board** brings the board into view so its keys
 can be selected as combo inputs.
 The **Key** tab count is the number of mapped keys on the selected layer;
 the selected key's layout index appears in its details.
+In **Keys → Behaviours**, one reach section opens at a time. It shows up to
+five rows before its own list scrolls, and the rail keeps its height when
+switching layers.
 
 After Apply completes, the editor stays visible while the app reads keys,
 profile domains, combos and base lighting back from the keyboard. The bottom
