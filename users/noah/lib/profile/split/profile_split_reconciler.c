@@ -811,16 +811,7 @@ static void stop_with_status(noah_profile_split_reconciler_t *reconciler, noah_p
 
 static void handle_protocol_error(noah_profile_split_reconciler_t *reconciler, const noah_profile_split_v1_frame_t *response, uint32_t now) {
     if (!response || response->kind != NOAH_PROFILE_SPLIT_V1_ERROR) {
-        // A well-formed reply to some other request is what QMK's RPC returns
-        // when the peer skipped its callback: the response buffer still holds
-        // the previous answer. That is a lost exchange, so a prepared push
-        // retries in place exactly as it does after one.
-        noah_profile_split_reconciler_state_t interrupted = reconciler->state;
-
         transport_lost(reconciler, now);
-        if (0 && reconciler->prepared_push_active && interrupted >= NOAH_PROFILE_SPLIT_RECONCILER_PUSH_BIND && interrupted <= NOAH_PROFILE_SPLIT_RECONCILER_PUSH_COMMIT) {
-            reconciler->state = interrupted;
-        }
         return;
     }
     // The receiver could not store this copy, typically one failed flash

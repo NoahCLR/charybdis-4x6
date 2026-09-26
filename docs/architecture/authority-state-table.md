@@ -69,6 +69,22 @@ mailbox, never ran, so only a power cycle released the keyboard. A peer that
 never acknowledges still needs a restart, but the keyboard now says so instead
 of hanging.
 
+### Interrupted prepare, peer
+
+Only completion (both halves hold the exact copy), a cancel, or a terminal
+stop ends a prepared push. A reply the sender cannot use, such as a reply to
+an earlier request or a `STALE` error, drops it back to its metadata poll with
+the push still active. That poll then finds both halves on the old profile.
+It must resume the copy with `PREPARE_BEGIN`, which picks up at the receiver's
+offset, instead of reading the two halves as converged.
+
+This rule comes from a field wedge on 2026-09-26. QMK's split RPC returns the
+peer's previous response when the peer skips its callback. The sender took
+that stale, well-formed reply mid-copy as converged, polled metadata once a
+second, and never sent the next chunk. A converged push cannot be cancelled,
+so the owner's no-progress timeout could not end it, and the host's `ABORT`
+sat unprocessed in the candidate mailbox until a power cycle.
+
 ## User Operations
 
 | Operation | Source | USB half | Peer half | Required visible result |

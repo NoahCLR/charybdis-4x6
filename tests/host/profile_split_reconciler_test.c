@@ -777,8 +777,9 @@ static void test_prepared_push_pauses_before_commit_then_authorizes(void) {
 }
 
 // After the commit is authorized, a replayed reply must still end with the
-// peer holding the copy: the sender retries in place instead of reading the
-// peer from the metadata poll mid-commit.
+// peer holding the copy. The replayed PREPARE_DURABLE acknowledgement passes
+// for the commit's, so the sender reaches its metadata poll with the peer
+// still on the old profile and has to resume from there.
 static void test_authorized_commit_survives_one_replayed_reply(void) {
     for (uint32_t fault = 1u;; fault++) {
         half_t                          left;
@@ -1092,9 +1093,10 @@ static bool run_prepared_push_with_fault(uint32_t fault, bool replay, const noah
     return fired;
 }
 
-// A reply to an earlier request is a lost exchange, not a verdict. Parking
-// the push in the converged poll left byte 1050 of 2646 on a real keyboard
-// with the host's ABORT unprocessed until it was power-cycled.
+// A reply to an earlier request is a lost exchange, not a verdict. It sends
+// the sender to its metadata poll, where both halves still agree on the old
+// profile; reading that as converged parked the push at byte 1050 of 2646 on
+// a real keyboard, with the host's ABORT unprocessed until a power cycle.
 static void test_prepared_push_survives_one_replayed_reply_anywhere(void) {
     uint32_t fault = 1u;
 
