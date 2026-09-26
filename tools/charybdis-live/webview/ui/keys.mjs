@@ -208,7 +208,7 @@ function bench() {
     const node = el(`<div class="card bench">
         <div class="bench-tabs"><div class="bench-tablist" role="tablist">
             ${TABS.map((tab) => `<button role="tab" data-tab="${tab.id}" aria-selected="${state.tab === tab.id}">
-                ${tab.label} <span class="c">${esc(counts[tab.id])}</span>${drafted[tab.id] ? draftDot() : ""}</button>`).join("")}</div>
+                <span class="tab-label">${tab.label}</span><span class="c">${esc(counts[tab.id])}</span>${drafted[tab.id] ? draftDot() : ""}</button>`).join("")}</div>
             <span class="bench-right" id="benchRight"></span>
         </div>
         <div class="bench-body" id="benchBody"></div>

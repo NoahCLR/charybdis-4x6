@@ -95,13 +95,13 @@ export function screenLighting() {
         return `<button role="tab" class="${on ? "" : "off"}" data-ltab="${stage.id}" aria-selected="${state.stage === stage.id}"
             data-tip="Painted ${index + 1} of ${stages.length}${on ? "" : ` · ${esc(idle || "this stage is off")}`}">
             <span class="n">${index + 1}</span><i class="swatch ${lit ? "" : "swatch-off"}" style="${lit ? `background:${css(colour)}` : ""}"></i>
-            ${esc(stage.label)}${marks.lighting.has(stage.id) ? draftDot() : ""}</button>`;
+            <span class="tab-label">${esc(stage.label)}</span>${marks.lighting.has(stage.id) ? draftDot() : ""}</button>`;
     };
     const bench = el(`<div class="card bench">
         <div class="bench-tabs"><div class="bench-tablist" role="tablist" aria-label="Lighting stages, in paint order">
             ${stages.map(stageTab).join(`<span class="tab-step" aria-hidden="true">›</span>`)}
             <span class="tab-sep" aria-hidden="true"></span>
-            <button role="tab" data-ltab="groups" aria-selected="${onGroups}">LED groups${marks.lighting.has("groups") ? draftDot() : ""}</button></div>
+            <button role="tab" data-ltab="groups" aria-selected="${onGroups}"><span class="tab-label">LED groups</span>${marks.lighting.has("groups") ? draftDot() : ""}</button></div>
             <span class="bench-right" id="benchRight"></span>
         </div>
         <div class="bench-body" id="benchBody"></div>
