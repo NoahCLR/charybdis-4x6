@@ -352,6 +352,7 @@ Capability feature bits are:
 | 12 | atomic logical apply |
 | 13 | legacy pointing-mode source (see [pd-mode-domain-v1.md](./pd-mode-domain-v1.md)) |
 | 14 | owned layer keys: `TG()`, `TO()`, `TT()` and `OSL()` act through userspace layer ownership, so a host may offer them in behaviours and combos where the placement rules allow (`TT()` and `OSL()` joined the bit on the same unreleased branch; every flashed build that sets it has all four) |
+| 15 | behaviour QMK functions: a behaviour sends QMK and keyboard keycodes past the layer keycodes and below the user range (the Charybdis DPI and sniping keys, RGB Matrix, Magic, `QK_BOOT`…) as a synthetic QMK record, so they run as they do on a key; a host may offer them in a behaviour's target, tap and hold. Without it, the engine sends them as report keys, keeping only the low byte, and a host must refuse them there |
 
 Supported-domain-mask bits 0–3 are RGB, key behaviors, combos and portable
 settings respectively. RGB and behavior domain bits must agree exactly with

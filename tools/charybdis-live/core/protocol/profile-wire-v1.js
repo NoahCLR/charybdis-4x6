@@ -22,7 +22,7 @@ const PROFILE_WIRE_STATUS = Object.freeze({
 });
 
 const PROFILE_WIRE_KNOWN_MASKS = Object.freeze({
-    FEATURE_FLAGS: 0x00007fff,
+    FEATURE_FLAGS: 0x0000ffff,
     REQUIRED_READ_FEATURES: 0x0000000f,
     STATE_FLAGS: 0x01ff,
     SUPPORTED_DOMAINS: 0x1f,
@@ -45,6 +45,9 @@ const PROFILE_WIRE_FEATURES = Object.freeze({
     LEGACY_PD_SOURCE: 1 << 13,
     // TG(), TO(), TT() and OSL() act through the keyboard's layer ownership.
     OWNED_LAYER_TOGGLES: 1 << 14,
+    // Behaviours send QMK and keyboard functions (DPI_MOD, RGB Matrix…)
+    // through QMK's key processing, so they may sit in a behaviour.
+    BEHAVIOR_QMK_FUNCTIONS: 1 << 15,
 });
 
 const PROFILE_WIRE_DOMAINS = Object.freeze({

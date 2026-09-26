@@ -6,7 +6,7 @@
 // encode, and an upload is checked before it starts, with a message naming the
 // row instead of the keyboard's bare rejection.
 
-const {PLACEMENT, actionLimitsFor, actionName, keycodeAction, placementProblem} = require("../schema/actions");
+const {PLACEMENT, actionLimitsFor, actionName, behaviorEmitProblem, keycodeAction, placementProblem} = require("../schema/actions");
 const {decodeProfileBlob, PROFILE_DOMAIN_IDS} = require("../schema/profile-blob-v1");
 const {decodeKeyBehaviorDomain, KEY_BEHAVIOR_HOLD_MODES} = require("../schema/key-behavior-domain-v1");
 const {decodeComboDomainV1} = require("../schema/combo-domain-v1");
@@ -14,10 +14,12 @@ const {decodeComboDomainV1} = require("../schema/combo-domain-v1");
 function behaviorPlacementProblem(rows, options) {
     for (const row of rows) {
         const where = `The behaviour on ${actionName(row.target)}`;
-        const problem = placementProblem(row.target, PLACEMENT.KEY, options)
-            || row.steps.map(step => (step.tap && placementProblem(step.tap, PLACEMENT.TAP, options))
-                || [step.hold, step.longHold].map(hold => hold && placementProblem(hold.action,
-                    hold.mode === KEY_BEHAVIOR_HOLD_MODES.PRESS_AND_HOLD_UNTIL_RELEASE ? PLACEMENT.HOLD_PRESS : PLACEMENT.HOLD_OTHER, options)).find(Boolean))
+        // The target is sent too: a tap with no branch of its own sends the key.
+        const at = (action, placement) => placementProblem(action, placement, options) || behaviorEmitProblem(action, options);
+        const problem = at(row.target, PLACEMENT.KEY)
+            || row.steps.map(step => (step.tap && at(step.tap, PLACEMENT.TAP))
+                || [step.hold, step.longHold].map(hold => hold && at(hold.action,
+                    hold.mode === KEY_BEHAVIOR_HOLD_MODES.PRESS_AND_HOLD_UNTIL_RELEASE ? PLACEMENT.HOLD_PRESS : PLACEMENT.HOLD_OTHER)).find(Boolean))
                 .find(Boolean);
         if (problem) return `${where}: ${problem}`;
     }

@@ -46,6 +46,45 @@ test("catalog revisions reset only their fragment and remove deleted values", ()
     }
 });
 
+test("layout extras add shifted symbols and the keyboard header names its keycodes", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "live-keycode-spec-"));
+    try {
+        const dir = path.join(root, "data/constants/keycodes");
+        fs.mkdirSync(path.join(dir, "extras"), {recursive: true});
+        fs.writeFileSync(path.join(root, "version.txt"), "test");
+        fs.writeFileSync(path.join(dir, "keycodes_0.0.1_basic.hjson"), JSON.stringify({keycodes: {"0x001E": {key: "KC_1"}, "0x0034": {key: "KC_QUOTE"}}}));
+        fs.writeFileSync(path.join(dir, "keycodes_0.0.2_kb.hjson"), JSON.stringify({keycodes: {"0x7E00": {group: "kb", key: "QK_KB_0"}, "0x7E01": {group: "kb", key: "QK_KB_1"}, "0x7E02": {group: "kb", key: "QK_KB_2"}}}));
+        // A diagram's lone quote in a block comment must not unbalance parsing.
+        fs.writeFileSync(path.join(dir, "extras/keycodes_us_0.0.1.hjson"),
+            `{"aliases": {/* │ " │ */ "S(KC_1)": {"key": "KC_EXLM", "label": "!", "aliases": ["KC_EXCLAIM"]}, "S(KC_QUOTE)": {"key": "KC_DQUO", "label": "\\""}}}`);
+        const header = path.join(root, "keyboards/bastardkb/charybdis");
+        fs.mkdirSync(header, {recursive: true});
+        fs.writeFileSync(path.join(header, "charybdis.h"),
+            "enum charybdis_keycodes {\n    POINTER_DEFAULT_DPI_FORWARD = QK_KB_0,\n    DRAGSCROLL_MODE,\n};\n#define DPI_MOD POINTER_DEFAULT_DPI_FORWARD\n");
+        const built = buildCatalog(root);
+        const byValue = new Map(built.entries.map((entry) => [entry.value, entry]));
+        assert.deepEqual(byValue.get(0x021e), {value: 0x021e, name: "KC_EXLM", label: "!", group: "shifted", aliases: ["KC_EXCLAIM"]});
+        assert.equal(byValue.get(0x0234).label, "\"");
+        assert.deepEqual(byValue.get(0x7e00), {value: 0x7e00, name: "DPI_MOD", label: "Default DPI up", group: "kb", aliases: ["POINTER_DEFAULT_DPI_FORWARD", "QK_KB_0"]});
+        assert.deepEqual(byValue.get(0x7e01), {value: 0x7e01, name: "DRAGSCROLL_MODE", label: "Built-in drag scroll (hold)", group: "kb", aliases: ["QK_KB_1"]});
+        assert.equal(byValue.get(0x7e02).name, "QK_KB_2", "a slot the keyboard leaves undeclared keeps its generic name");
+        assert.ok(built.generatedFrom.includes("keyboards/bastardkb/charybdis/charybdis.h"));
+    } finally {
+        fs.rmSync(root, {recursive: true, force: true});
+    }
+});
+
+test("the Charybdis keycodes and US shifted symbols resolve by name and value", () => {
+    assert.equal(resolve(0x7e06).name, "DRGSCRL");
+    assert.equal(resolve(0x7e06).label, "Built-in drag scroll (hold)");
+    for (const name of ["DRGSCRL", "DRAGSCROLL_MODE", "QK_KB_6"]) assert.equal(encode(name), 0x7e06, name);
+    // QMK names a shifted US symbol, so Shift+9 reads back as "(" however it was written.
+    assert.equal(resolve(0x0226).name, "KC_LPRN");
+    assert.equal(resolve(0x0226).label, "(");
+    assert.equal(encode("LSFT(KC_9)"), encode("KC_LPRN"));
+    assert.equal(encode("KC_QUES"), 0x0238);
+});
+
 test("every entry can be rendered and written", () => {
     for (const entry of catalog.entries) {
         assert.ok(Number.isInteger(entry.value) && entry.value >= 0 && entry.value <= 0xffff, entry.name);
@@ -163,7 +202,7 @@ test("names and aliases resolve back to entries, and metadata is reported", () =
 
 test("shortcuts read from the keyboard include every modifier and basic key", () => {
     for (const [value, name, label] of [
-        [0x0226, "LSFT(KC_9)", "Shift+9"],
+        [0x0204, "LSFT(KC_A)", "Shift+A"],
         [0x0806, "LGUI(KC_C)", "Cmd+C"],
         [0x0a1d, "LSFT(LGUI(KC_Z))", "Shift+Cmd+Z"],
         [0x1104, "RCTL(KC_A)", "Right Ctrl+A"],

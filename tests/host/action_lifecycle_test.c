@@ -605,6 +605,48 @@ static void test_release_ignores_raw_layer_actions(void) {
     CHECK(synthetic_record_call.keycode == KC_NO);
 }
 
+// QMK and keyboard functions run only through QMK's key processing. Sent as a
+// report key they would keep just their low byte: QK_KB_0 (DPI_MOD) would send
+// nothing and QK_KB_6 a C. The engine sends them as synthetic QMK records.
+static void test_qmk_functions_dispatch_as_synthetic_qmk_records(void) {
+    keypos_t       key_pos     = test_keypos(2, 4);
+    const uint16_t functions[] = {QK_KB_0, QK_KB_6, QK_RGB_MATRIX_TOGGLE, QK_BOOTLOADER, QK_MAGIC_TOGGLE_NKRO, QK_SWAP_HANDS_TOGGLE};
+
+    for (size_t index = 0; index < ARRAY_SIZE(functions); index++) {
+        uint16_t keycode = functions[index];
+
+        CHECK(noah_action_keycode_is_qmk_function(keycode));
+        CHECK(noah_action_describe(keycode).kind == NOAH_ACTION_KIND_QMK_BEHAVIOR);
+
+        test_reset_stubs();
+        noah_action_tap(keycode);
+        CHECK(synthetic_qmk_tap_call.keycode == keycode);
+        CHECK(tap_code16_call.keycode == KC_NO);
+
+        test_reset_stubs();
+        noah_action_press(key_pos, keycode);
+        CHECK(synthetic_qmk_record_call.keycode == keycode);
+        CHECK(synthetic_qmk_record_call.pressed);
+        CHECK(owned_register_call.keycode == KC_NO);
+        CHECK(register_code16_call.keycode == KC_NO);
+
+        test_reset_stubs();
+        noah_action_release(key_pos, keycode);
+        CHECK(synthetic_qmk_record_call.keycode == keycode);
+        CHECK(!synthetic_qmk_record_call.pressed);
+        CHECK(unregister_code16_call.keycode == KC_NO);
+    }
+
+    // The range stops where other paths own the keycode: report and modified
+    // keys, layer keycodes, QMK macros and the user range.
+    const uint16_t not_functions[] = {KC_C, MS_BTN1, S(KC_1), QK_PERSISTENT_DEF_LAYER_MAX, QK_MACRO_0, QK_MACRO_31, QK_USER, TEST_CUSTOM_ACTION};
+    for (size_t index = 0; index < ARRAY_SIZE(not_functions); index++) {
+        CHECK(!noah_action_keycode_is_qmk_function(not_functions[index]));
+    }
+    CHECK(noah_action_describe(S(KC_1)).kind == NOAH_ACTION_KIND_LITERAL);
+    CHECK(noah_action_describe(QK_MACRO_0).kind == NOAH_ACTION_KIND_MACRO);
+}
+
 int main(void) {
     test_descriptor_classifies_dispatch_shapes();
     test_every_action_kind_has_metadata_and_dispatch_coverage();
@@ -619,6 +661,7 @@ int main(void) {
     test_press_ignores_raw_layer_actions_and_one_shot_actions();
     test_release_routes_press_only_pd_mode_momentary_qmk_custom_and_plain();
     test_release_ignores_raw_layer_actions();
+    test_qmk_functions_dispatch_as_synthetic_qmk_records();
 
     puts("action_lifecycle host tests passed");
     return 0;

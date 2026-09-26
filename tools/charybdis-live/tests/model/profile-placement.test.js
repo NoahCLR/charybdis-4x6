@@ -37,3 +37,25 @@ test("a layout key takes every layer key the keyboard owns, and refuses DF, PDF 
     assert.match(keyPlacementProblem(0x52e1, options), /does not run through its layer tracking/);
     assert.match(keyPlacementProblem(0x5209, options), /does not run through its layer tracking/);
 });
+
+// The behaviour engine sends a keycode no other path claims through tap_code16,
+// which keeps only modifier bits and the low byte: DRGSCRL (0x7E06) would reach
+// the host as C. Such keys stay placeable on a key or a combo, which run QMK's
+// full key handling.
+test("a behaviour refuses QMK and keyboard functions on a keyboard that would send them as an unrelated key", () => {
+    const hold = (operand, mode = 1) => ({hold: {mode, repeatHz: 0, action: code(operand)}});
+    for (const sendable of [0x04, 0x021e, 0x1f04, 0x00cd, 0x2104, 0x52a1, 0x7700, 0x7e50, 0x7e5f])
+        assert.equal(behaviorPlacementProblem([row(code(0x04), {tap: code(sendable)}), row(code(0x05), hold(sendable, 2))], options), undefined, sendable.toString(16));
+    for (const [operand, name] of [[0x7e06, "DRGSCRL"], [0x7e00, "DPI_MOD"], [0x7c00, "QK_BOOTLOADER"], [0x7820, "QK_UNDERGLOW_TOGGLE"], [0x7e08, "QK_KB_8"]]) {
+        assert.match(behaviorPlacementProblem([row(code(0x04), {tap: code(operand)})], options), new RegExp(`^The behaviour on KC_A: ${name} runs in QMK's own key handling`));
+        assert.match(behaviorPlacementProblem([row(code(0x04), hold(operand))], options), new RegExp(name));
+        assert.match(behaviorPlacementProblem([row(code(0x04), hold(operand, 2))], options), new RegExp(name));
+        assert.match(behaviorPlacementProblem([row(code(operand), {tap: code(0x05)})], options), new RegExp(`^The behaviour on ${name}:`), "a tap with no branch sends the target");
+        assert.equal(keyPlacementProblem(operand, options), undefined, `${name} on a key`);
+        // A keyboard reporting feature bit 15 sends them as QMK records instead.
+        const sending = {...options, behaviorQmkFunctions: true};
+        assert.equal(behaviorPlacementProblem([row(code(operand), {tap: code(operand)}), row(code(0x05), hold(operand, 2))], sending), undefined, `${name} with bit 15`);
+        const combo = {inputs: [code(0x04), code(0x05)], output: code(operand), termMs: 0, holdTermMs: 0, mustHold: false, mustTap: false, ordered: false};
+        assert.equal(comboPlacementProblem([combo], options), undefined, `${name} as a combo output`);
+    }
+});

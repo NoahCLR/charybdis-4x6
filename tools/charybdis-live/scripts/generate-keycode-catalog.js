@@ -17,6 +17,29 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const KEYCODE_DATA_RELATIVE_PATH = path.join("data", "constants", "keycodes");
+// The Charybdis keyboard code declares its own keycodes in C, from QK_KB_0 up;
+// QMK's data files only know them as generic keyboard slots.
+const KEYBOARD_KEYCODE_HEADER = path.join("keyboards", "bastardkb", "charybdis", "charybdis.h");
+const KEYBOARD_KEYCODE_ENUM = "charybdis_keycodes";
+// The header carries names, not words. A declared keycode missing here still
+// gets a label spelled from its name. The DPI keys step Charybdis's own DPI
+// (Shift reverses them), which is the default and sniping DPI the profile
+// settings show. Its drag scroll is the keyboard code's own, at a fixed
+// CHARYBDIS_DRAGSCROLL_DPI, and the Pointing modes settings do not reach it,
+// so it is named apart from the DRAGSCROLL pointing mode; the picker does not
+// offer it, but a key holding one must still read back truthfully.
+const KEYBOARD_KEYCODE_LABELS = Object.freeze({
+    POINTER_DEFAULT_DPI_FORWARD: "Default DPI up",
+    POINTER_DEFAULT_DPI_REVERSE: "Default DPI down",
+    POINTER_SNIPING_DPI_FORWARD: "Sniping DPI up",
+    POINTER_SNIPING_DPI_REVERSE: "Sniping DPI down",
+    SNIPING_MODE: "Sniping (hold)",
+    SNIPING_MODE_TOGGLE: "Sniping toggle",
+    DRAGSCROLL_MODE: "Built-in drag scroll (hold)",
+    DRAGSCROLL_MODE_TOGGLE: "Built-in drag scroll toggle",
+});
+// Wrappers the layout extras key their shifted symbols by, e.g. "S(KC_1)".
+const EXTRA_WRAPPERS = Object.freeze({S: 0x0200});
 const OUTPUT_RELATIVE_PATH = path.join("core", "data", "keycode-catalog.json");
 const CATALOG_FORMAT = "charybdis-keycode-catalog-v1";
 
@@ -68,7 +91,7 @@ function buildCatalog(qmkRoot) {
         const fragment = path.basename(file).replace(/_\d+\.\d+\.\d+/, "");
         if (!fragments.has(fragment)) fragments.set(fragment, new Map());
         const byValue = fragments.get(fragment);
-        const text = fs.readFileSync(file, "utf8");
+        const text = readHjson(file);
         const body = findSectionBody(text, "keycodes");
         if (/^\s*"!reset!"\s*:/.test(body)) byValue.clear();
         for (const match of body.matchAll(/"(0x[0-9a-f]+)"\s*:\s*"!delete!"/gi)) {
@@ -83,6 +106,14 @@ function buildCatalog(qmkRoot) {
     }
 
     const byValue = new Map([...fragments.values()].flatMap(fragment => [...fragment]));
+    for (const file of files) {
+        for (const entry of parseWrappedEntries(readHjson(file), byValue)) {
+            if (!byValue.has(entry.value)) byValue.set(entry.value, entry);
+        }
+    }
+    const header = path.join(qmkRoot, KEYBOARD_KEYCODE_HEADER);
+    const keyboardSources = fs.existsSync(header) ? [KEYBOARD_KEYCODE_HEADER.split(path.sep).join("/")] : [];
+    if (keyboardSources.length) nameKeyboardKeycodes(fs.readFileSync(header, "utf8"), byValue);
     const entries = Array.from(byValue.values()).sort((left, right) => left.value - right.value);
     const names = new Set();
     for (const entry of entries) {
@@ -93,10 +124,14 @@ function buildCatalog(qmkRoot) {
         format: CATALOG_FORMAT,
         qmkVersion: readQmkVersion(qmkRoot),
         source: path.relative(qmkRoot, keycodeDir),
-        generatedFrom: files.map((file) => path.basename(file)),
+        generatedFrom: [...files.map((file) => path.basename(file)), ...keyboardSources],
         entries,
     };
 }
+
+// Block comments can hold keyboard diagrams whose lone quotes would unbalance
+// the string-aware brace matching below, e.g. the US extras' │ " │ key.
+const readHjson = (file) => fs.readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
 
 // Entries live under "keycodes" and "aliases" maps whose own keys are the
 // numeric code, e.g. "0x0004": {"key": "KC_A", ...}.
@@ -131,6 +166,67 @@ function parseKeycodeEntries(text) {
     }
     return entries;
 }
+
+// Layout extras spell a shifted symbol as a wrapped basic keycode, for example
+// "S(KC_1)": {"key": "KC_EXLM"}. Its value is the wrapper's modifier bits over
+// the basic keycode, so a device reading back S(KC_1) finds KC_EXLM.
+function parseWrappedEntries(text, byValue) {
+    const byName = new Map([...byValue.values()].map((entry) => [entry.name, entry]));
+    const entries = [];
+    const body = findSectionBody(text, "aliases");
+    const pattern = /"([A-Z]+)\((KC_[A-Z0-9_]+)\)"\s*:\s*\{/g;
+    let match;
+    while ((match = pattern.exec(body)) !== null) {
+        const open = body.indexOf("{", match.index + match[0].length - 1);
+        const close = findMatching(body, open, "{", "}");
+        if (close === -1) break;
+        pattern.lastIndex = close + 1;
+        const wrapper = EXTRA_WRAPPERS[match[1]], base = byName.get(match[2]);
+        const record = body.slice(open + 1, close), name = stringField(record, "key");
+        if (wrapper === undefined || !base || !name) continue;
+        entries.push({
+            value: wrapper | base.value,
+            name,
+            label: stringField(record, "label") || name,
+            group: "shifted",
+            aliases: stringListField(record, "aliases").filter((alias) => !alias.startsWith("!")),
+        });
+    }
+    return entries;
+}
+
+// Names the keyboard's QK_KB slots from its C enum, e.g.
+// POINTER_DEFAULT_DPI_FORWARD = QK_KB_0, with the header's short #define
+// (DPI_MOD) as the name a keymap spells it by. The generic QK_KB_n stays an
+// alias so either spelling resolves.
+function nameKeyboardKeycodes(text, byValue) {
+    const body = new RegExp(`enum\\s+${KEYBOARD_KEYCODE_ENUM}\\s*\\{([^}]*)\\}`).exec(text)?.[1];
+    if (!body) throw new Error(`${KEYBOARD_KEYCODE_HEADER} no longer declares enum ${KEYBOARD_KEYCODE_ENUM}`);
+    const shortNames = new Map();
+    for (const define of text.matchAll(/^\s*#\s*define\s+([A-Z][A-Z0-9_]*)\s+([A-Z][A-Z0-9_]*)\s*$/gm)) {
+        if (!shortNames.has(define[2])) shortNames.set(define[2], define[1]);
+    }
+    const byName = new Map([...byValue.values()].map((entry) => [entry.name, entry]));
+    let next;
+    for (const member of body.split(",").map((part) => part.trim()).filter(Boolean)) {
+        const [, name, base] = /^([A-Z][A-Z0-9_]*)(?:\s*=\s*([A-Z][A-Z0-9_]*))?$/.exec(member) || [];
+        if (!name) throw new Error(`Unexpected ${KEYBOARD_KEYCODE_ENUM} member: ${member}`);
+        if (base) next = byName.get(base)?.value;
+        if (next === undefined) throw new Error(`${KEYBOARD_KEYCODE_ENUM} member ${name} has no known value`);
+        const slot = byValue.get(next);
+        if (!slot || slot.group !== "kb") throw new Error(`${name} is not a keyboard keycode slot`);
+        const shortName = shortNames.get(name);
+        byValue.set(next, {
+            ...slot,
+            name: shortName || name,
+            label: KEYBOARD_KEYCODE_LABELS[name] || spelledLabel(name),
+            aliases: [...new Set([...(shortName ? [name] : []), slot.name, ...slot.aliases])],
+        });
+        next += 1;
+    }
+}
+
+const spelledLabel = (name) => name.charAt(0) + name.slice(1).replace(/_/g, " ").toLowerCase();
 
 function shouldSkip(entry) {
     if (!entry.name || entry.name === "SAFE_RANGE") {

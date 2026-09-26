@@ -102,4 +102,18 @@ function placementProblem(action, placement, {layerCount = 8} = {}) {
     }
 }
 
-module.exports = {PLACEMENT, placementProblem, isOwnedLayerCode, KNOWN_ACTION_ABIS, NATIVE_ACTION_ABI_V1, knownActionAbi, actionName, nativeCode, keycodeAction, pdSlotOfCode, actionLimitsFor, layerRef, layerOfRef};
+// Whether a behaviour can send an action. QMK and keyboard functions past the
+// layer keycodes and below the user range (the Charybdis DPI and sniping keys,
+// RGB Matrix, Magic, QK_BOOT…) run only through QMK's key processing. A
+// keyboard reporting Profile Wire feature bit 15 sends them from a behaviour as
+// a synthetic QMK record, so they work there as on a key. An older one sends
+// them through tap_code16(), which keeps only the low byte (DRGSCRL, 0x7E06,
+// types C), so there they belong on a key or a combo only.
+const isQmkFunction = code => code > 0x52ff && code < 0x7e40 && !(code >= 0x7700 && code < 0x7780);
+function behaviorEmitProblem(action, {behaviorQmkFunctions = false} = {}) {
+    const code = nativeCode(action);
+    if (behaviorQmkFunctions || code === undefined || !isQmkFunction(code)) return undefined;
+    return `${actionName(action)} runs in QMK's own key handling, which this keyboard's behaviours do not reach yet, so it only works as a key or a combo here. A firmware update lets behaviours send it.`;
+}
+
+module.exports = {PLACEMENT, placementProblem, behaviorEmitProblem, isOwnedLayerCode, KNOWN_ACTION_ABIS, NATIVE_ACTION_ABI_V1, knownActionAbi, actionName, nativeCode, keycodeAction, pdSlotOfCode, actionLimitsFor, layerRef, layerOfRef};

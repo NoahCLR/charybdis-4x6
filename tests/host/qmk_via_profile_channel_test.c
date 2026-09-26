@@ -217,8 +217,9 @@ static void make_request(uint8_t frame[NOAH_PROFILE_WIRE_V1_REPORT_SIZE], uint8_
 }
 
 static uint32_t expected_feature_flags(void) {
-    // TG()/TO() ownership is a runtime fact, advertised in every build.
-    uint32_t flags = NOAH_PROFILE_FEATURE_READ_SURFACE | NOAH_PROFILE_FEATURE_STORAGE_LAYOUT | NOAH_PROFILE_FEATURE_OWNED_LAYER_TOGGLES;
+    // TG()/TO() ownership and behaviour QMK functions are runtime facts,
+    // advertised in every build.
+    uint32_t flags = NOAH_PROFILE_FEATURE_READ_SURFACE | NOAH_PROFILE_FEATURE_STORAGE_LAYOUT | NOAH_PROFILE_FEATURE_OWNED_LAYER_TOGGLES | NOAH_PROFILE_FEATURE_BEHAVIOR_QMK_FUNCTIONS;
 #ifdef SPLIT_KEYBOARD
     flags |= NOAH_PROFILE_FEATURE_SPLIT_KEYBOARD;
 #endif

@@ -56,6 +56,10 @@ enum {
     // TG(), TO(), TT() and OSL() act through userspace layer ownership, so a
     // host may offer them in behaviours and combos where they can run.
     NOAH_PROFILE_FEATURE_OWNED_LAYER_TOGGLES   = 1u << 14,
+    // Behaviours send QMK and keyboard functions (DPI_MOD, RGB Matrix, Magic,
+    // QK_BOOT…) through QMK's key processing, so a host may offer them in a
+    // behaviour's target, tap and hold.
+    NOAH_PROFILE_FEATURE_BEHAVIOR_QMK_FUNCTIONS = 1u << 15,
 };
 
 enum {

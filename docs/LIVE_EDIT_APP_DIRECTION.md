@@ -66,6 +66,11 @@ Remaining before calling the product complete:
 - **`LT()` row tap/hold timing** (D-L34): the runtime times a press from when
   QMK delivers it, so an authored `LT()` row's tap/hold term likely starts only
   after QMK's own `TAPPING_TERM`. Not yet measured.
+- **The picker's list of unbuilt QMK features is written by hand** (D-L05).
+  `webview/view/picker-sections.mjs` hides keycodes for features this build
+  does not include, matched against its rules files and QMK's defaults. It
+  drifts when a feature is enabled or disabled. The keyboard should report its
+  built features so the picker reads them from the device.
 
 ## The Tools
 
@@ -119,6 +124,33 @@ emits a checked-in JSON catalog inside the live app, stamped with the QMK
 version it came from. Keycodes arrive from VIA as bare `uint16`, and the app
 needs both directions without a firmware workspace. Vendoring also turns QMK
 version drift into a diffable file rather than a silent behaviour change.
+
+The same step also reads the layout extras' shifted US symbols (`S(KC_1)` is
+`KC_EXLM`) and the keyboard's own keycodes from `enum charybdis_keycodes` in
+`keyboards/bastardkb/charybdis/charybdis.h`. Those take their QK_KB slots under
+the header's short name (`DRGSCRL`), with the long name and `QK_KB_n` kept as
+aliases. The `QK_KB` range is fixed by QMK and the keyboard code, not by the
+userspace action ABI, so these keys need no matching vocabulary. Their drag
+scroll is the keyboard code's own, at a fixed `CHARYBDIS_DRAGSCROLL_DPI`, which
+the Pointing modes settings do not reach. Drag scroll is the `DRAGSCROLL`
+pointing mode, so the picker does not offer `DRGSCRL` or `DRG_TOG`; a key
+already holding one still reads back as "Built-in drag scroll".
+
+A name the catalog gives a key must be what the key does wherever it is
+placed. A key or a combo output runs QMK's full key handling, so any keycode
+works there. A behaviour sends QMK and keyboard functions (keycodes past the
+layer keycodes and below the user range: the DPI and sniping keys, RGB Matrix,
+Magic, `QK_BOOT`) as a synthetic QMK record, so they run as on a key, and says
+so with Profile Wire feature bit 15. Older firmware sent them through
+`tap_code16()`, which keeps only the low byte (`DPI_MOD` sent nothing), so
+against a keyboard without bit 15 the app refuses them in a behaviour's target,
+tap or hold (`behaviorEmitProblem` in `core/schema/actions.js`).
+
+The picker offers only what does something on this keyboard. It leaves out
+retired user macros, the Charybdis drag scroll and unnamed `QK_KB` slots, and
+keycodes for QMK features the build does not include (MIDI, audio, RGBLight,
+Caps Word, Repeat…); see Open Issues. A key that already holds one still reads
+back by name.
 
 ### D-L06 — v1 ported Studio's whole UI and rebuilt only the model source
 

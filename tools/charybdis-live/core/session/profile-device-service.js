@@ -438,7 +438,8 @@ class ProfileDeviceService {
             if (keyboardOptions && !keyboardOptions.effects.some(item => item.id === effect)) throw Object.assign(new Error("This profile uses a lighting effect unavailable on this keyboard."), {code: "SETTINGS_LIMIT_EXCEEDED"});
             // The keyboard refuses a profile whose actions sit where it cannot
             // run them; say which one before anything is sent.
-            const misplaced = profilePlacementProblem(Buffer.from(document.profile, "base64"), {layerCount: this.capabilities?.compiledLayerCount ?? 8});
+            const misplaced = profilePlacementProblem(Buffer.from(document.profile, "base64"), {layerCount: this.capabilities?.compiledLayerCount ?? 8,
+                behaviorQmkFunctions: Boolean(this.capabilities?.featureFlags & PROFILE_WIRE_FEATURES.BEHAVIOR_QMK_FUNCTIONS)});
             if (misplaced) throw Object.assign(new Error(`${misplaced} Fix it before saving this profile.`), {code: "PLACEMENT_REFUSED"});
             started = true;
             result = await restoreProfile(this.connection, this.requestIds, this.capabilities, document, {...options,

@@ -275,6 +275,10 @@ test("decoders reject unknown masks, active kinds, and invalid ranges", () => {
     const unknownFeature = capabilities.map((page) => Buffer.from(page));
     unknownFeature[0].writeUInt32LE(PROFILE_WIRE_KNOWN_MASKS.FEATURE_FLAGS + 1, 9);
     assert.throws(() => decodeCapabilityPages(unknownFeature), (error) => error.code === "INCOMPATIBLE_RESPONSE");
+    // Bit 15, behaviour QMK functions, is the highest known bit.
+    const functions = capabilities.map((page) => Buffer.from(page));
+    functions[0].writeUInt32LE(functions[0].readUInt32LE(9) | (1 << 15), 9);
+    assert.ok(decodeCapabilityPages(functions).featureFlags & (1 << 15));
     const unknownDomain = capabilities.map((page) => Buffer.from(page));
     unknownDomain[1][21] = 0x80;
     assert.throws(() => decodeCapabilityPages(unknownDomain), (error) => error.code === "INCOMPATIBLE_RESPONSE");

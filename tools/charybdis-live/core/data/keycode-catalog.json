@@ -37,7 +37,8 @@
     "keycodes_0.0.6_quantum.hjson",
     "keycodes_0.0.7.hjson",
     "keycodes_0.0.8.hjson",
-    "keycodes_0.0.8_lighting.hjson"
+    "keycodes_0.0.8_lighting.hjson",
+    "keyboards/bastardkb/charybdis/charybdis.h"
   ],
   "entries": [
     {
@@ -1865,6 +1866,190 @@
         "KC_RGUI",
         "KC_RCMD",
         "KC_RWIN"
+      ]
+    },
+    {
+      "value": 542,
+      "name": "KC_EXLM",
+      "label": "!",
+      "group": "shifted",
+      "aliases": [
+        "KC_EXCLAIM"
+      ]
+    },
+    {
+      "value": 543,
+      "name": "KC_AT",
+      "label": "@",
+      "group": "shifted",
+      "aliases": []
+    },
+    {
+      "value": 544,
+      "name": "KC_HASH",
+      "label": "#",
+      "group": "shifted",
+      "aliases": []
+    },
+    {
+      "value": 545,
+      "name": "KC_DLR",
+      "label": "$",
+      "group": "shifted",
+      "aliases": [
+        "KC_DOLLAR"
+      ]
+    },
+    {
+      "value": 546,
+      "name": "KC_PERC",
+      "label": "%",
+      "group": "shifted",
+      "aliases": [
+        "KC_PERCENT"
+      ]
+    },
+    {
+      "value": 547,
+      "name": "KC_CIRC",
+      "label": "^",
+      "group": "shifted",
+      "aliases": [
+        "KC_CIRCUMFLEX"
+      ]
+    },
+    {
+      "value": 548,
+      "name": "KC_AMPR",
+      "label": "&",
+      "group": "shifted",
+      "aliases": [
+        "KC_AMPERSAND"
+      ]
+    },
+    {
+      "value": 549,
+      "name": "KC_ASTR",
+      "label": "*",
+      "group": "shifted",
+      "aliases": [
+        "KC_ASTERISK"
+      ]
+    },
+    {
+      "value": 550,
+      "name": "KC_LPRN",
+      "label": "(",
+      "group": "shifted",
+      "aliases": [
+        "KC_LEFT_PAREN"
+      ]
+    },
+    {
+      "value": 551,
+      "name": "KC_RPRN",
+      "label": ")",
+      "group": "shifted",
+      "aliases": [
+        "KC_RIGHT_PAREN"
+      ]
+    },
+    {
+      "value": 557,
+      "name": "KC_UNDS",
+      "label": "_",
+      "group": "shifted",
+      "aliases": [
+        "KC_UNDERSCORE"
+      ]
+    },
+    {
+      "value": 558,
+      "name": "KC_PLUS",
+      "label": "+",
+      "group": "shifted",
+      "aliases": []
+    },
+    {
+      "value": 559,
+      "name": "KC_LCBR",
+      "label": "{",
+      "group": "shifted",
+      "aliases": [
+        "KC_LEFT_CURLY_BRACE"
+      ]
+    },
+    {
+      "value": 560,
+      "name": "KC_RCBR",
+      "label": "}",
+      "group": "shifted",
+      "aliases": [
+        "KC_RIGHT_CURLY_BRACE"
+      ]
+    },
+    {
+      "value": 561,
+      "name": "KC_PIPE",
+      "label": "|",
+      "group": "shifted",
+      "aliases": []
+    },
+    {
+      "value": 563,
+      "name": "KC_COLN",
+      "label": ":",
+      "group": "shifted",
+      "aliases": [
+        "KC_COLON"
+      ]
+    },
+    {
+      "value": 564,
+      "name": "KC_DQUO",
+      "label": "\"",
+      "group": "shifted",
+      "aliases": [
+        "KC_DOUBLE_QUOTE",
+        "KC_DQT"
+      ]
+    },
+    {
+      "value": 565,
+      "name": "KC_TILD",
+      "label": "~",
+      "group": "shifted",
+      "aliases": [
+        "KC_TILDE"
+      ]
+    },
+    {
+      "value": 566,
+      "name": "KC_LABK",
+      "label": "<",
+      "group": "shifted",
+      "aliases": [
+        "KC_LEFT_ANGLE_BRACKET",
+        "KC_LT"
+      ]
+    },
+    {
+      "value": 567,
+      "name": "KC_RABK",
+      "label": ">",
+      "group": "shifted",
+      "aliases": [
+        "KC_RIGHT_ANGLE_BRACKET",
+        "KC_GT"
+      ]
+    },
+    {
+      "value": 568,
+      "name": "KC_QUES",
+      "label": "?",
+      "group": "shifted",
+      "aliases": [
+        "KC_QUESTION"
       ]
     },
     {
@@ -5948,59 +6133,83 @@
     },
     {
       "value": 32256,
-      "name": "QK_KB_0",
-      "label": "Keyboard 0",
+      "name": "DPI_MOD",
+      "label": "Default DPI up",
       "group": "kb",
-      "aliases": []
+      "aliases": [
+        "POINTER_DEFAULT_DPI_FORWARD",
+        "QK_KB_0"
+      ]
     },
     {
       "value": 32257,
-      "name": "QK_KB_1",
-      "label": "Keyboard 1",
+      "name": "DPI_RMOD",
+      "label": "Default DPI down",
       "group": "kb",
-      "aliases": []
+      "aliases": [
+        "POINTER_DEFAULT_DPI_REVERSE",
+        "QK_KB_1"
+      ]
     },
     {
       "value": 32258,
-      "name": "QK_KB_2",
-      "label": "Keyboard 2",
+      "name": "S_D_MOD",
+      "label": "Sniping DPI up",
       "group": "kb",
-      "aliases": []
+      "aliases": [
+        "POINTER_SNIPING_DPI_FORWARD",
+        "QK_KB_2"
+      ]
     },
     {
       "value": 32259,
-      "name": "QK_KB_3",
-      "label": "Keyboard 3",
+      "name": "S_D_RMOD",
+      "label": "Sniping DPI down",
       "group": "kb",
-      "aliases": []
+      "aliases": [
+        "POINTER_SNIPING_DPI_REVERSE",
+        "QK_KB_3"
+      ]
     },
     {
       "value": 32260,
-      "name": "QK_KB_4",
-      "label": "Keyboard 4",
+      "name": "SNIPING",
+      "label": "Sniping (hold)",
       "group": "kb",
-      "aliases": []
+      "aliases": [
+        "SNIPING_MODE",
+        "QK_KB_4"
+      ]
     },
     {
       "value": 32261,
-      "name": "QK_KB_5",
-      "label": "Keyboard 5",
+      "name": "SNP_TOG",
+      "label": "Sniping toggle",
       "group": "kb",
-      "aliases": []
+      "aliases": [
+        "SNIPING_MODE_TOGGLE",
+        "QK_KB_5"
+      ]
     },
     {
       "value": 32262,
-      "name": "QK_KB_6",
-      "label": "Keyboard 6",
+      "name": "DRGSCRL",
+      "label": "Built-in drag scroll (hold)",
       "group": "kb",
-      "aliases": []
+      "aliases": [
+        "DRAGSCROLL_MODE",
+        "QK_KB_6"
+      ]
     },
     {
       "value": 32263,
-      "name": "QK_KB_7",
-      "label": "Keyboard 7",
+      "name": "DRG_TOG",
+      "label": "Built-in drag scroll toggle",
       "group": "kb",
-      "aliases": []
+      "aliases": [
+        "DRAGSCROLL_MODE_TOGGLE",
+        "QK_KB_7"
+      ]
     },
     {
       "value": 32264,

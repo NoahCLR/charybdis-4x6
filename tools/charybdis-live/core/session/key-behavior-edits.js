@@ -28,6 +28,7 @@ function editKeyBehaviors(payload, message, capabilities = {}) {
     const {rows} = decodeKeyBehaviorDomain(payload, {actionLimits: {maxPdModes}});
     const knownAbi = knownActionAbi(capabilities.actionAbiDigest);
     const ownsLayerKeys = Boolean(capabilities.featureFlags & PROFILE_WIRE_FEATURES.OWNED_LAYER_TOGGLES);
+    const behaviorQmkFunctions = Boolean(capabilities.featureFlags & PROFILE_WIRE_FEATURES.BEHAVIOR_QMK_FUNCTIONS);
     const native = action => action.kind === ACTION.QMK_KEYCODE ? action.operand
         : knownAbi ? nativeCode(action) : undefined;
     const equivalent = (left, right) => (left.kind === right.kind && left.operand === right.operand)
@@ -36,7 +37,7 @@ function editKeyBehaviors(payload, message, capabilities = {}) {
     // them, so every row is checked, not only the one being edited.
     const layerCount = capabilities.compiledLayerCount ?? 8;
     const checkPlacements = (rows) => {
-        const problem = behaviorPlacementProblem(rows, {layerCount});
+        const problem = behaviorPlacementProblem(rows, {layerCount, behaviorQmkFunctions});
         if (problem) throw invalid(problem);
     };
     const encode = (rows) => checkPlacements(rows) ?? encodeKeyBehaviorDomain({rows}, {

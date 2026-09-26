@@ -6,8 +6,9 @@ import {el, esc} from "../lib/dom.mjs";
 import {getModel, layerName, layers, post, render, state} from "../store.mjs";
 import {PICKER_BOARD} from "../view/picker-board.mjs";
 import {PICKER_MODIFIERS, pickerExpression} from "../view/edits.mjs";
-import {entriesForPickerSection, pickerSections} from "../view/picker-sections.mjs";
+import {entriesForPickerSection, pickable, pickerSections} from "../view/picker-sections.mjs";
 import {macroMatches} from "../view/macro.mjs";
+import {vocabulary, word} from "../view/vocabulary.mjs";
 
 const MODIFIERS = PICKER_MODIFIERS;
 
@@ -52,7 +53,7 @@ function sectionBody(model) {
         // catalogue's own name for the same slot, QK_MACRO_n.
         const macros = (model?.viaMacros || []).filter((slot) => slot.name && macroMatches(slot, query));
         const named = new Set(macros.flatMap((slot) => [slot.keycode, slot.keycode.replace(/^VIA_MACRO_/, "QK_MACRO_")]));
-        const matches = catalogue.filter((entry) => !named.has(entry.value)
+        const matches = catalogue.filter((entry) => pickable(entry) && !named.has(entry.value)
             && (entry.search?.includes(query) || entry.value.toLowerCase().includes(query))).slice(0, 64);
         if (!matches.length && !macros.length) return `<p class="note" style="padding:18px">Nothing in the keyboard's catalogue or macros matches “${esc(picker.search)}”.</p>`;
         const count = matches.length + macros.length;
@@ -99,6 +100,24 @@ function sectionBody(model) {
                 ? `Tap-hold on <b>${esc(layerTapName(picker.layerTap))}</b> is armed — now pick the tap key from any section.`
                 : `Hold reaches the layer while the key is down. Lock toggles it. Tap-hold asks for a tap key next.${owned ? " Tap-toggle and One-shot hold like Hold; Move switches to the layer alone." : ""}`}</p></div>`;
     }
+    if (section.kind === "modes") {
+        // One row per slot, laid out like the layers: the slot, what it does,
+        // then its two keycodes. An empty slot is still offered, since its
+        // keycodes are fixed; the row says it does nothing until configured.
+        const slots = model?.pdModes || [];
+        if (!slots.length) return `<p class="note" style="padding:18px">This keyboard has not reported its pointing modes.</p>`;
+        const kinds = vocabulary(model).pointing.kinds;
+        const button = (value, label, tip) =>
+            `<button class="pk wide ${picked(value) ? "on" : ""}" data-pick="${esc(value)}" data-tip="${esc(tip)}"><span class="l">${label}</span><span class="c">${esc(value)}</span></button>`;
+        return `<div class="pk-body"><div class="pk-layers modes">${slots.map((slot) => `
+            <div class="pk-layer ${slot.kind ? "" : "empty"}">
+                <span class="ix">${slot.id + 1}</span>
+                <span class="nm"><span>${esc(slot.displayName)}</span><span class="sub">${esc(slot.kind ? word(kinds, slot.kind) : "Empty — does nothing yet")}</span></span>
+                ${button(slot.binding.hold, "Hold", "On while the key is down.")}
+                ${button(slot.binding.lock, "Toggle", "Turns the mode on until pressed again.")}
+            </div>`).join("")}</div>
+            <p class="note" style="margin-top:12px">Hold re-reads the trackball while the key is down. Toggle keeps the mode on until the key is pressed again. A key for an empty slot does nothing until the slot is configured.</p></div>`;
+    }
     if (section.kind === "macros") {
         const slots = model?.viaMacros || [];
         if (!slots.length) return `<p class="note" style="padding:18px">This keyboard has not reported its macros.</p>`;
@@ -107,7 +126,7 @@ function sectionBody(model) {
     }
     const entries = entriesForPickerSection(catalogue, section);
     if (!entries.length) return `<p class="note" style="padding:18px">The keyboard's catalogue has nothing in this section.</p>`;
-    return `<div class="pk-body"><div class="pk-rows">${chunk(entries.slice(0, 160), 8).map((row) =>
+    return `<div class="pk-body"><div class="pk-rows">${chunk(entries, 8).map((row) =>
         `<div class="pk-row">${row.map((entry) => keyButton(entry, picked(entry.value))).join("")}</div>`).join("")}</div></div>`;
 }
 

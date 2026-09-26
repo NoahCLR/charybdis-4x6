@@ -108,8 +108,18 @@ static inline bool noah_action_keycode_is_macro(uint16_t action) {
     return (action >= MACRO_0 && action <= MACRO_15) || IS_QK_MACRO(action);
 }
 
+// QMK and keyboard functions past the layer keycodes and below the user range:
+// the Charybdis DPI and sniping keys, RGB Matrix, Magic, QK_BOOT and the like.
+// Only QMK's key processing runs them; tap_code16() and register_code16() keep
+// just the low byte, so DPI_MOD (QK_KB_0) would send nothing and QK_KB_6 a C.
+static inline bool noah_action_keycode_is_qmk_function(uint16_t action) {
+    return action > QK_PERSISTENT_DEF_LAYER_MAX && action < QK_USER && !IS_QK_MACRO(action);
+}
+
+// Keycodes whose behaviour QMK's own key processing owns, so the engine sends
+// them as a synthetic QMK record rather than as a report key.
 static inline bool noah_action_keycode_is_qmk_behavior(uint16_t action) {
-    return IS_QK_ONE_SHOT_MOD(action) || IS_QK_MOD_TAP(action);
+    return IS_QK_ONE_SHOT_MOD(action) || IS_QK_MOD_TAP(action) || noah_action_keycode_is_qmk_function(action);
 }
 
 typedef enum {
