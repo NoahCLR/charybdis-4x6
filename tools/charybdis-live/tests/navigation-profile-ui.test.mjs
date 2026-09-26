@@ -17,7 +17,7 @@ test("layer tabs sit on the board they choose, on every layer-aware screen", () 
     for (const name of ["keys.mjs", "lighting.mjs"]) {
         const screen = read(name);
         assert.match(screen, /const card = el\(`<div class="board-card"><\/div>`\);/, `${name} draws the board as a card`);
-        assert.match(screen, /card\.append\((bar|layerBar\(\))\);[\s\S]*card\.appendChild\(board\(/, `${name} puts the layer tabs on it, above the board`);
+        assert.match(screen, /card\.appendChild\(board\([\s\S]*card\.append\((bar|layerBar\(\))\);/, `${name} puts the layer tabs on it, under the board`);
         assert.doesNotMatch(screen, /workbench-stack/, `${name} keeps no separate layer box over the workbench`);
     }
 });

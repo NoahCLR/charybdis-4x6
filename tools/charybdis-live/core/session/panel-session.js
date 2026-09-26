@@ -171,7 +171,7 @@ function routeMessage(session, message, state) {
     return "none";
 }
 
-// ── Edit layers: names and order, staged as one layer-reference rewrite ──
+// ── Rename & reorder: names and order, staged as one layer-reference rewrite ──
 
 // keysFollow: whether moving a layer renumbers the layer keys that reach it
 // (the default), or leaves them reaching whatever layer takes its place.
@@ -179,7 +179,7 @@ function startLayerEdit(before, revision) {
     return {before, revision, order: Array.from({length: 8}, (_, id) => id), names: [...before.summary.names], keysFollow: true};
 }
 
-// Applies one message from the Edit layers panel to its local state. A name
+// Applies one message from the Rename & reorder panel to its local state. A name
 // is checked by rewriting the document with it, so an invalid one is refused
 // before it is kept.
 function applyLayerEdit(edit, message) {

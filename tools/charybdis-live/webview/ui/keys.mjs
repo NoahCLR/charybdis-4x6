@@ -53,13 +53,13 @@ export function screenKeys() {
     const content = el(`<div class="content"><div class="pad keys-pad"></div></div>`);
     const pad = content.firstElementChild;
 
-    // The layer tabs, the board they choose and how that layer is lit are one
-    // card; the legend reads under it.
+    // The board, how that layer is lit and the layer tabs under them are one
+    // card; the legend reads under it. The tabs sit at the card's foot, next to
+    // the workbench, so switching layers mid-edit is a short reach.
     const stage = el(`<div class="stack" style="gap:10px"></div>`);
     const card = el(`<div class="board-card"></div>`);
     const row = layerColourRow(model, layer.index);
     const lit = stageEnabled(model, "layers") && row && !isOff(row.color);
-    card.append(bar);
     if (state.placement) card.appendChild(placementBar());
     else if (state.combo.picking) card.appendChild(pickBar());
     // One indication at a time: while a combo is being built its inputs are
@@ -97,6 +97,7 @@ export function screenKeys() {
     card.appendChild(el(`<div class="board-foot">${lit
         ? `lit ${esc(hsvLabel(row.color))} on ${row.mode === "ALL_KEYS" ? "every key" : "keys mapped here"}`
         : "no layer colour · the base effect shows through"}</div>`));
+    card.append(bar);
     stage.append(card, legend(model));
     pad.append(stage, bench());
     main.appendChild(content);

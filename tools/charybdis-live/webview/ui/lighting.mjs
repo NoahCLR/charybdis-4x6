@@ -45,12 +45,11 @@ export function screenLighting() {
 
     const content = el(`<div class="content"><div class="pad keys-pad"></div></div>`);
     const pad = content.firstElementChild;
-    // The layer tabs, the board they choose and what it is showing are one
+    // The board, what it is showing and the layer tabs under them are one
     // card, as on Keys; on LED groups the board is the LED selector instead.
     const card = el(`<div class="board-card"></div>`);
     const preview = state.stage === "pd" && state.pdPreview && stageEnabled(model, "pd")
         ? pdColourRow(model, state.pdSlot) : null;
-    card.append(layerBar());
     card.appendChild(board(model, layer, {
         mode: onGroups ? "leds" : "light",
         faces: !onGroups,
@@ -78,6 +77,7 @@ export function screenLighting() {
     </div>`));
     card.querySelector('[data-act="clearleds"]')?.addEventListener("click", () => { state.ledPicks = []; render(); });
     card.querySelector('[data-act="trackball"]')?.addEventListener("click", () => { state.trackball = !state.trackball; render(); });
+    card.append(layerBar());
     pad.appendChild(card);
 
     const marks = draftMarks(model?.draft?.changes);

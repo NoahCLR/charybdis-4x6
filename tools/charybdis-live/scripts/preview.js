@@ -79,7 +79,7 @@ function buildModel() {
         baseRgb: {state: "read", effectId: 1, brightness: 180, hue: 140, saturation: 210, speed: 60},
     };
     // The host's own model builder, so the preview cannot drift from it. The
-    // layer editor is open so Edit layers has something to show.
+    // layer editor is open so Rename & reorder has something to show.
     const panel = {service: {portable: null}, draft: session, portableLayers: startLayerEdit(snapshot, session.revision)};
     const model = buildPanelModel(panel, state);
     return model;

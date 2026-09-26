@@ -245,33 +245,35 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 .stack { display: grid; gap: 14px; }
 .hr { height: 1px; background: var(--line); margin: 14px -15px; }
 
-/* ── the board card: layer tabs, the board they choose, a caption ───── */
-/* The picked layer's tab is the board's own surface, so the tab and the board
-   read as one sheet; the strip's bottom line is drawn inside it, where the
-   picked tab can cover it. The strip scrolls sideways when it does not fit. */
+/* ── the board card: the board, a caption, the layer tabs under them ── */
+/* The tabs hang from the card's foot, next to the workbench where edits
+   happen. The picked layer's tab is the board's own surface, so the tab and
+   the board read as one sheet; the strip's top line is drawn inside it, where
+   the picked tab can cover it. The strip scrolls sideways when it does not fit. */
 .board-card { position: relative; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); min-width: 0; }
 .board-card .board { border: 0; border-radius: 0; background: var(--surface); }
+.board-card > :first-child { border-radius: 13px 13px 0 0; }
 .board-card > :last-child { border-radius: 0 0 13px 13px; }
 .board-card > .layerbar-wrap {
-  display: flex; align-items: flex-end; border-radius: 13px 13px 0 0; background: var(--surface-2); box-shadow: inset 0 -1px 0 var(--line);
+  display: flex; align-items: flex-start; background: var(--surface-2); box-shadow: inset 0 1px 0 var(--line);
 }
 .layer-tabs {
-  flex: 1; min-width: 0; display: flex; align-items: flex-end; gap: 2px; padding: 7px 10px 0; position: relative;
-  box-shadow: inset 0 -1px 0 var(--line); overflow-x: auto; scrollbar-width: none;
+  flex: 1; min-width: 0; display: flex; align-items: flex-start; gap: 2px; padding: 0 10px 7px; position: relative;
+  box-shadow: inset 0 1px 0 var(--line); overflow-x: auto; scrollbar-width: none;
 }
 .layer-tabs::-webkit-scrollbar { display: none; }
 .layer-tabs > * { flex: none; }
 .layer-tab {
   display: inline-flex; align-items: center; gap: 8px; height: 33px; padding: 0 13px 0 11px;
-  border: 1px solid transparent; border-bottom: 0; border-radius: 8px 8px 0 0;
+  border: 1px solid transparent; border-top: 0; border-radius: 0 0 8px 8px;
   color: var(--text-2); font-size: 12.5px; white-space: nowrap;
 }
 .layer-tab:hover { color: var(--text); background: var(--surface-3); }
 .layer-tab[aria-selected="true"] { background: var(--surface); border-color: var(--line); color: var(--text); font-weight: 520; }
 .layer-tab .swatch { width: 9px; height: 9px; border-radius: 3px; border: 1px solid rgba(255,255,255,.18); flex: none; }
 .layer-tab .idx { font-family: var(--mono); font-size: 10px; color: var(--text-3); }
-/* Edit layers stays in reach at the strip's end, outside what scrolls. */
-.layerbar-wrap > .layer-edit { flex: none; margin: 0 10px 4px 4px; }
+/* Rename & reorder stays in reach at the strip's end, outside what scrolls. */
+.layerbar-wrap > .layer-edit { flex: none; margin: 0 10px 0 10px; }
 .board-foot { display: flex; align-items: center; gap: 10px; min-height: 34px; padding: 4px 14px 8px; font-size: 12px; color: var(--text-2); }
 .board-foot b { color: var(--text); font-weight: 560; }
 .board-foot .right { margin-left: auto; display: flex; gap: 6px; }
@@ -288,25 +290,40 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 .layer-chip.link:hover { border-color: var(--line-3); background: var(--surface-3); }
 .layer-chip.dirty::after { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--draft); }
 .layer-chip.staged { border-style: dashed; border-color: var(--draft); }
+/* Rename & reorder is a tab at the strip's end, set off from the layers by a
+   hairline: it opens onto the tabs themselves, not a layer. Open, it is the
+   panel's own surface, joined to it as the picked layer's tab is to the board:
+   it sits over the panel's bottom edge and covers it across its width. */
 .layer-edit {
-  display: inline-flex; align-items: center; height: 28px; padding: 0 10px; margin-left: 6px;
-  border-radius: 7px; border: 1px dashed var(--line-2); color: var(--text-3); font-size: 12px; white-space: nowrap;
+  position: relative; z-index: 41; display: inline-flex; align-items: center; gap: 7px; height: 33px; padding: 0 12px 0 11px;
+  border: 1px solid transparent; border-top: 0; border-radius: 0 0 8px 8px;
+  color: var(--text-2); font-size: 12.5px; white-space: nowrap;
 }
-.layer-edit:hover { color: var(--text); border-color: var(--line-3); background: var(--surface-2); }
-.layer-edit[aria-expanded="true"] { color: var(--text); border-style: solid; background: var(--surface-3); }
+.layer-edit::before { content: ""; position: absolute; left: -5px; top: 9px; bottom: 9px; width: 1px; background: var(--line); }
+.layer-edit svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 1.4; flex: none; }
+.layer-edit:hover { color: var(--text); background: var(--surface-3); }
+.layer-edit[aria-expanded="true"] { color: var(--text); background: var(--surface); border-color: var(--line-2); }
 /* The tabs scroll sideways, so the panel hangs off their wrapper and opens
-   downward over the board. placePanel() in ui/layers.mjs scrolls the page to
-   make room and caps it to the room above the draft bar. */
+   upward over the board, its right edge on Rename & reorder's and its bottom
+   edge on the strip's top line, where the open button covers it. placePanel()
+   in ui/layers.mjs scrolls the page to make room and caps it to the room below
+   the top of the scrolling area. */
 .layerbar-wrap { position: relative; min-width: 0; }
 .layerpanel {
-  position: absolute; z-index: 40; top: calc(100% + 4px); right: 12px; width: min(620px, calc(100% - 24px));
-  padding: 14px; border: 1px solid var(--line-2); border-radius: 12px; background: var(--surface);
-  box-shadow: 0 18px 44px rgba(0,0,0,.55); overflow-y: auto; overscroll-behavior: contain;
+  position: absolute; z-index: 40; bottom: calc(100% - 1px); right: 10px; width: min(620px, calc(100% - 20px));
+  padding: 14px; border: 1px solid var(--line-2); border-radius: 12px 12px 0 12px; background: var(--surface);
+  box-shadow: 0 18px 44px rgba(0,0,0,.55); display: flex; flex-direction: column; overflow: hidden;
 }
 .layerpanel .list-row { gap: 10px; }
-/* When the panel scrolls, the list scrolls under its toggle and buttons. */
-.layerpanel-actions { position: sticky; bottom: -14px; margin: 0 -14px -14px; padding: 10px 14px 14px;
-  background: var(--surface); border-top: 1px solid var(--line); }
+/* When the panel is capped, only the list scrolls: the heading and the toggle
+   and buttons stay put, and the scrollbar runs beside the rows, clear of the
+   corner the button joins. */
+.layerpanel-body { display: flex; flex-direction: column; min-height: 0; }
+.layerpanel-body > .list {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  scrollbar-width: thin; scrollbar-color: var(--line-2) transparent;
+}
+.layerpanel-actions { margin: 0 -14px -14px; padding: 10px 14px 14px; border-top: 1px solid var(--line); }
 .layerflow { display: flex; align-items: center; gap: 14px; padding: 11px 24px; border-bottom: 1px solid var(--line);
   background: var(--surface-2); }
 

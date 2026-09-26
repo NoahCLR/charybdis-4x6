@@ -310,7 +310,7 @@ function profileReview(before, after) {
 }
 // A reorder as one item: which layers now win over which. Each layer that
 // moved is one field, named as the draft names it, in its light, with where it
-// sat on the keyboard and where it sits now, highest first as Edit layers
+// sat on the keyboard and where it sits now, highest first as Rename & reorder
 // lists them. A rename made with it is its own item, so the layer is called
 // what it is called now; the rename says what it was.
 function layerOrderReview(after, order) {

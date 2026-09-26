@@ -2,8 +2,8 @@
 //
 // It hangs off the layer tabs rather than the workbench below, because it is
 // not a property of the selected key like the tabs there are — it is the tabs
-// themselves, so the control sits after the last layer and drops open over
-// the board.
+// themselves, so the control sits after the last layer and opens upward over
+// the board, since the tabs sit at the board's foot.
 //
 // The order is the host's to hold. Moving a layer rewrites every key, behaviour
 // and setting that refers to it, so the edit is staged there and arrives back
@@ -16,7 +16,7 @@ import {getModel, layers, post, render, state, canEdit as canEditArea} from "../
 let dismiss = null;   // the outside-click listener for the open panel
 
 // Adds the trigger after the layer tabs and, while it is open, the panel
-// beneath them. Both sit on the tabs' wrapper, not inside the strip, which
+// above them. Both sit on the tabs' wrapper, not inside the strip, which
 // scrolls sideways and would hide the one and clip the other.
 export function attachLayersControl(bar) {
     const model = getModel();
@@ -24,8 +24,10 @@ export function attachLayersControl(bar) {
     const busy = Boolean(portable.busy);
     const canEdit = canEditArea("layers");
 
-    const trigger = el(`<button class="layer-edit" aria-expanded="${Boolean(state.layersOpen)}"
-        data-tip="Rename layers and change which one wins.">Edit layers</button>`);
+    const trigger = el(`<button class="layer-edit" aria-haspopup="dialog" aria-expanded="${Boolean(state.layersOpen)}"
+        data-tip="Rename layers and change their order: a higher layer wins over the ones under it.">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 13V3M2.5 5.5 5 3l2.5 2.5M11 3v10M8.5 10.5 11 13l2.5-2.5"/></svg>
+        <span>Rename &amp; reorder</span></button>`);
     trigger.addEventListener("click", () => {
         state.layersOpen = !state.layersOpen;
         if (!state.layersOpen) state.layersAsked = false;
@@ -57,11 +59,11 @@ export function attachLayersControl(bar) {
     watchOutside(panel, trigger);
 }
 
-// The panel opens downward over the board, under the tabs. The room is what
-// the scrolling area shows above the draft bar at the window's foot, not the
-// window. When the panel is taller than the room below, the area scrolls up
-// (bringing the tabs toward the top) and whatever still does not fit scrolls
-// inside the panel.
+// The panel opens upward over the board, above the tabs. The room is what the
+// scrolling area shows above the tabs, not the window. When the panel is
+// taller than that, the area scrolls back up (bringing the tabs down toward
+// the draft bar at the window's foot) and whatever still does not fit scrolls
+// in the panel's list, under its heading and above its buttons.
 function placePanel(bar, panel) {
     if (!panel.isConnected) return;
     const margin = 12;
@@ -73,10 +75,10 @@ function placePanel(bar, panel) {
         const draftBar = document.querySelector(".commit")?.getBoundingClientRect();
         return draftBar && draftBar.height ? Math.min(viewOf().bottom, draftBar.top) : viewOf().bottom;
     };
-    const roomBelow = () => floor() - rowOf().bottom - margin;
-    const shortfall = panel.scrollHeight - roomBelow();
-    if (shortfall > 0 && scroller) scroller.scrollTop += Math.max(0, Math.min(shortfall, rowOf().top - viewOf().top - margin));
-    panel.style.maxHeight = `${Math.max(160, Math.floor(roomBelow()))}px`;
+    const roomAbove = () => rowOf().top - viewOf().top - margin;
+    const shortfall = panel.scrollHeight - roomAbove();
+    if (shortfall > 0 && scroller) scroller.scrollTop -= Math.max(0, Math.min(shortfall, floor() - rowOf().bottom - margin));
+    panel.style.maxHeight = `${Math.max(160, Math.floor(roomAbove()))}px`;
 }
 
 function editor(model, portable, busy) {
@@ -85,7 +87,7 @@ function editor(model, portable, busy) {
     const names = [...portable.layers.names];
     const order = [...portable.layers.order].reverse();
     const follow = portable.layers.keysFollow !== false;
-    const node = el(`<div class="stack" style="gap:10px">
+    const node = el(`<div class="layerpanel-body" style="gap:10px">
         <div class="sect-h"><h4>Layers</h4><span class="note">higher layers win · base stays underneath</span></div>
         <div class="list"></div>
         <div class="stack layerpanel-actions" style="gap:10px">
