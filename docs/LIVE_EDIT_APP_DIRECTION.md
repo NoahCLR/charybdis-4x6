@@ -728,8 +728,9 @@ it moved on, so the toggle only decides for references to the other layers.
 Every other key, behaviour and combo reference follows its layer, as do
 names, colours, LED group rows, and the pointer, sniping and combo-reference
 settings, which name a layer by what it holds. The startup layers are slots and
-stay on the bottom one. On a base swap, transparent keys entering the base
-become `KC_NO`, and `KC_NO` keys leaving the base become transparent. A person
+stay on the bottom one. On a base swap, transparent physical keys entering the
+base become `KC_NO`, and `KC_NO` physical keys leaving the base become
+transparent; unused matrix positions keep their stored values. A person
 can still deliberately place a transparent key on the base afterwards. If the
 old base had no layer colour, it receives the saved base HSV as its own
 all-keys layer colour, including when the selected base effect is animated;

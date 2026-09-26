@@ -7,6 +7,7 @@ const {createSnapshot, validateSnapshot, materializeProfile, reorderLayers, fing
 const {encodeSettings, decodeSettings} = require("../../core/schema/settings-domain-v1");
 const {decodeProfileBlob, encodeProfileBlob} = require("../../core/schema/profile-blob-v1");
 const {decodeKeyBehaviorDomain, encodeKeyBehaviorDomain} = require("../../core/schema/key-behavior-domain-v1");
+const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../../core/data/charybdis-layout");
 const {settings, document} = require("../fixtures/portable-profile");
 test("complete snapshots flatten effective domains and round-trip without destination defaults", () => {
     const source = document(), actual = validateSnapshot(JSON.stringify(source));
@@ -140,6 +141,26 @@ test("Make base gives the old uncoloured base its saved HSV and normalizes empty
     assert.deepEqual(moved.layers[3].slice(0, 4), [1, 1, 4, 1], "KC_NO positions leaving base become transparent");
     assert.deepEqual(rgb.layerColors[3], {layerId: 3, color: {h: 27, s: 180, v: 100}, mode: 0});
     assert.deepEqual(rgb.layerColors[0].color, {h: 180, s: 255, v: 200}, "new base keeps its own lighting");
+});
+
+test("Make base leaves unused matrix slots alone through a base swap and back", () => {
+    const source = document();
+    const physical = new Set(CHARYBDIS_4X6_LAYOUT_MATRIX.map(([row, column]) => row * 6 + column));
+    const unused = Array.from({length: 60}, (_, slot) => slot).filter(slot => !physical.has(slot));
+    assert.deepEqual(unused, [24, 54, 56, 58]);
+    source.layers[0] = source.layers[0].map((_, slot) => physical.has(slot) ? 4 : 0);
+    source.layers[2] = source.layers[2].map((_, slot) => physical.has(slot) ? 1 : 0);
+
+    const swap = [2, 1, 0, 3, 4, 5, 6, 7];
+    const moved = reorderLayers(source, swap);
+    assert.equal(moved.layers[0][0], 0, "a physical transparent key entering base becomes KC_NO");
+    assert.equal(moved.layers[2][0], 4, "a physical key leaving base keeps its assignment");
+    for (const slot of unused) {
+        assert.equal(moved.layers[0][slot], 0, `unused new-base slot ${slot} stays KC_NO`);
+        assert.equal(moved.layers[2][slot], 0, `unused old-base slot ${slot} stays KC_NO`);
+    }
+    const restored = reorderLayers(moved, swap);
+    assert.deepEqual(restored.layers, source.layers, "swapping back restores the original matrix");
 });
 
 test("Make base keeps an existing old-base colour, while overlay reorders keep empty keys", () => {

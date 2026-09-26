@@ -6,9 +6,11 @@ const {decodeRgbDomainV1, encodeRgbDomainV1} = require("../schema/rgb-domain-v1"
 const {decodeKeyBehaviorDomain, encodeKeyBehaviorDomain} = require("../schema/key-behavior-domain-v1");
 const {decodeComboDomainV1, encodeComboDomainV1} = require("../schema/combo-domain-v1");
 const {decodeSettings, encodeSettings} = require("../schema/settings-domain-v1");
+const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../data/charybdis-layout");
 const {layerName} = require("./vocabulary");
 const fail = message => Object.assign(new Error(message), {code: "INVALID_PORTABLE_PROFILE"});
 const u16 = value => Number.isInteger(value) && value >= 0 && value <= 65535;
+const PHYSICAL_MATRIX_SLOTS = new Set(CHARYBDIS_4X6_LAYOUT_MATRIX.map(([row, column]) => row * 6 + column));
 function base64(value, max, label) {
     if (typeof value !== "string" || value.length > Math.ceil(max / 3) * 4 || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value)) throw fail(`Invalid ${label}.`);
     const bytes = Buffer.from(value, "base64");
@@ -190,8 +192,9 @@ const decodedOf = snapshot => snapshot.decoded && snapshot.decoded.document === 
 // reach whatever took the old base's slot once it moved on, so the key that
 // switched back would switch somewhere else. Without keysFollow, only the
 // references to the other layers keep their numbers.
-// An empty key entering the base stops there; an intentionally empty key
-// leaving it falls through to the new base. An uncoloured old base also keeps
+// An empty physical key entering the base stops there; an intentionally empty
+// physical key leaving it falls through to the new base. The four unused matrix
+// slots keep their stored values. An uncoloured old base also keeps
 // the saved base HSV as its own all-key colour after it becomes an overlay.
 function reorderLayers(document, order, names, {keysFollow = true} = {}) {
     if (document.layers?.length !== 8) throw fail("Layer ordering becomes available after the eight-layer update.");
@@ -213,8 +216,8 @@ function reorderLayers(document, order, names, {keysFollow = true} = {}) {
     }
     result.layers = order.map(old => document.layers[old].map(native));
     if (order[0] !== 0) {
-        result.layers[0] = result.layers[0].map(code => code === 0x0001 ? 0x0000 : code);
-        result.layers[remap[0]] = result.layers[remap[0]].map(code => code === 0x0000 ? 0x0001 : code);
+        result.layers[0] = result.layers[0].map((code, slot) => PHYSICAL_MATRIX_SLOTS.has(slot) && code === 0x0001 ? 0x0000 : code);
+        result.layers[remap[0]] = result.layers[remap[0]].map((code, slot) => PHYSICAL_MATRIX_SLOTS.has(slot) && code === 0x0000 ? 0x0001 : code);
     }
     const {rgb, behaviors, combos, settings, pdModes} = validated;
     const actionOptions = actionLimitsFor(pdModes ? 2 : 1);
