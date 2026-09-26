@@ -89,6 +89,41 @@ test("a combo on the highest layer can release a lock, while combos are switched
     assert.equal(traps(profile({keys, combos: [combo], settings: {20: 0}})).length, 1);
 });
 
+test("a combo on the top layer uses keys inherited through transparency", () => {
+    const escape = {inputs: [code(KC_A), code(KC_B)], output: code(TO(0))};
+    const keys = {"0:0": TG(1), "0:2": KC_B, "1:0": NO, "1:1": KC_A};
+    assert.deepEqual(traps(profile({keys, combos: [escape]})), [], "the inherited KC_B lets the combo escape");
+    assert.deepEqual(traps(profile({keys, combos: [escape], settings: {20: 0}})).map(row => row.layers), [[1]]);
+
+    const entrance = {inputs: [code(KC_A), code(KC_B)], output: code(TG(2))};
+    const locked = profile({keys: {"0:0": MO(1), "0:2": KC_B, "1:1": KC_A, "2:0": NO}, combos: [entrance]});
+    locked.document.layers[0].fill(NO);
+    for (const [index, value] of [[0, MO(1)], [2, KC_B]]) {
+        const [row, column] = CHARYBDIS_4X6_LAYOUT_MATRIX[index];
+        locked.document.layers[0][row * 6 + column] = value;
+    }
+    assert.deepEqual(traps(locked).map(row => row.layers), [[2]], "the inherited input can also enter a trap");
+});
+
+test("a combo using another reference layer reads that layer's raw keys", () => {
+    const combo = {inputs: [code(KC_A), code(KC_B)], output: code(TO(0))};
+    const keys = {"0:0": TG(1), "1:0": NO, "2:1": KC_A, "2:2": KC_B};
+    const source = profile({keys, combos: [combo]});
+    source.document.layers[0].fill(NO);
+    const [row, column] = CHARYBDIS_4X6_LAYOUT_MATRIX[0];
+    source.document.layers[0][row * 6 + column] = TG(1);
+    assert.deepEqual(traps(source).map(row => row.layers), [[1]], "resolved keys on layer 1 cannot supply the combo");
+    source.settings.values[27] = 0x76543220;
+    assert.deepEqual(traps(source), [], "layer 1 can instead match the inactive layer 2's raw assignments");
+});
+
+test("a combo whose inputs never occur together is a warning", () => {
+    const combo = {inputs: [code(KC_A), code(KC_B)], output: code(KC_ESC)};
+    const source = profile({combos: [combo]});
+    source.document.layers[0].fill(NO);
+    assert.equal(layerReach(source).find(row => row.kind === "unreachableCombo")?.title, "Combo 1 cannot fire");
+});
+
 test("the trackball wakes the pointer layer, which can carry the way out unless sniping keeps it off", () => {
     const keys = {"0:0": TG(1), "1:0": KC_B, "4:3": TO(0)};
     assert.equal(traps(profile({keys})).length, 1, "auto-mouse is off");
@@ -148,6 +183,23 @@ test("a draft's findings are new, already on the keyboard, or fixed by the draft
     assert.deepEqual(checks.map((check) => [check.key, check.status]), [["unreachable:6", "new"], ["trap:1", "fixed"], ["unreachable:5", "fixed"]]);
     assert.deepEqual(draftChecks(keyboard, keyboard).map((check) => check.status), ["existing", "existing"]);
     assert.deepEqual(draftChecks(undefined, draft).map((check) => check.status), ["new"]);
+});
+
+test("a different unowned key on the same layer is new, and the old one is fixed", () => {
+    const before = profile({keys: {"0:0": DF(1)}});
+    const after = profile({keys: {"0:1": 0x52e2}});
+    assert.deepEqual(draftChecks(before, after).filter(row => row.kind === "unowned").map(row => row.status), ["new", "fixed"]);
+});
+
+test("the review discloses trapped states beyond the four named paths", () => {
+    const keys = {};
+    for (let layer = 1; layer <= 5; layer++) {
+        keys[`0:${layer - 1}`] = TG(layer);
+        keys[`${layer}:${layer - 1}`] = KC_B;
+    }
+    const found = traps(profile({keys}));
+    assert.equal(found.filter(row => row.kind === "trap").length, 4);
+    assert.ok(found.find(row => row.kind === "trapOverflow")?.count >= 1);
 });
 
 test("a profile without the eight-layer bank is not walked", () => {

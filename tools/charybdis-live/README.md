@@ -98,12 +98,18 @@ actually hold together still previews.
 Before anything is applied, the review **checks** what the layers let you
 reach. A layer that can lock with no way back to Base — nothing on it, or on
 anything held over it, releases the lock or moves back — is a **trap**: the
-review shows the steps into it and the way out. Active traps have red cards;
-warnings have orange cards. Apply asks "Apply anyway" before writing whenever
+review shows the steps into it and the way out. The first four trap states have
+paths; if more exist, their number is shown. Combos are checked against keys
+that occur together on a reachable stack, including keys inherited through
+transparent positions. Active traps have red cards; warnings have orange cards.
+Apply asks "Apply anyway" before writing whenever
 the draft has a trap or warning, including one already on the keyboard.
 Other checks cover a layer with keys nothing reaches, a layer key onto an empty
-layer, transparent keys on Base, a pointer layer that cannot work, and layer
-keys the keyboard leaves to QMK. Notices and checks fixed by the draft need no
+layer, transparent and `KC_NO` keys on Base, a pointer layer that cannot work,
+and layer keys the keyboard leaves to QMK. They also name combos that cannot
+fire, actions aimed at empty pointing slots, and macros too long to play.
+Brightness or lighting effects unsupported by the destination are blockers:
+Apply stays disabled until they are fixed. Notices and checks fixed by the draft need no
 confirmation. Each check says whether the draft made it, the keyboard already
 has it, or the draft fixes it. When a new warning or trap has a clear source in
 the draft, the check links to that change and the change is highlighted. If

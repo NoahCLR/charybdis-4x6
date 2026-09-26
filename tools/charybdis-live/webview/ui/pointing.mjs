@@ -69,13 +69,14 @@ export function screenPointing() {
     const changedSlots = draftMarks(model?.draft?.changes).pointing;
     for (const slot of slots) {
         const {swatch} = slotLight(model, slot);
-        const inert = !slot.kind ? bindingsForSlot(model, slot).keys.length : 0;
+        const bindings = !slot.kind ? bindingsForSlot(model, slot) : null;
+        const inert = bindings ? bindings.keys.length + bindings.behaviours.length + bindings.combos.length : 0;
         const card = el(`<button class="slotcard ${slot.kind ? "" : "empty"}" data-slot="${slot.id}" aria-current="${state.pdSlot === slot.id}">
             ${swatch()}
             <span class="nm">${slot.kind ? esc(slot.name) : "Empty slot"}</span><span class="no">${changedSlots.has(slot.id) ? draftDot("Changed in your draft", "lead") : ""}${slot.id + 1}</span>
             <span class="meta">${slot.kind === KIND.SCROLLING ? "Scrolling" : slot.kind === KIND.DIRECTIONAL ? `Directional · ${esc(axisLabel(model, slot.axis))}` : "Available"}</span>
             <span class="meta mono">${esc(bindingName(slot))}</span>
-            ${inert ? `<span class="meta warn">${inert} key${inert === 1 ? " still reaches" : "s still reach"} it · inert</span>` : ""}</button>`);
+            ${inert ? `<span class="meta warn">${inert} action${inert === 1 ? "" : "s"} reach it · inert</span>` : ""}</button>`);
         card.addEventListener("click", () => { state.pdSlot = slot.id; state.pdKind = null; state.pdButtons = null; render(); });
         list.append(card);
     }
@@ -90,11 +91,12 @@ export function screenPointing() {
 // A binding for an empty slot is allowed by the keyboard, so the interface
 // explains the consequence instead of the app refusing the edit.
 function inertNote(model, slot) {
-    const {keys, behaviours, layers} = bindingsForSlot(model, slot);
-    if (!keys.length && !behaviours.length) return "";
+    const {keys, behaviours, combos, layers} = bindingsForSlot(model, slot);
+    if (!keys.length && !behaviours.length && !combos.length) return "";
     const parts = [];
     if (keys.length) parts.push(`${keys.length} key${keys.length === 1 ? "" : "s"} on ${esc(layers.join(", "))}`);
     if (behaviours.length) parts.push(`${behaviours.length} behaviour${behaviours.length === 1 ? "" : "s"} (${esc(behaviours.map((row) => row.keycode).join(", "))})`);
+    if (combos.length) parts.push(`${combos.length} combo output${combos.length === 1 ? "" : "s"} (${esc(combos.map((row) => row.badge).join(", "))})`);
     return `<div class="unavailable">${parts.join(" and ")} still reach this slot. The keyboard refuses to activate an empty slot, so they do nothing until it is configured — they do not need to be removed first.</div>`;
 }
 

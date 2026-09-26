@@ -8,8 +8,8 @@
 // warnings ask for confirmation whether the draft made them or the keyboard
 // already has them.
 
-const LEVEL_RANK = {trap: 0, warning: 1, notice: 2};
-export const LEVEL_WORD = {trap: "Trap", warning: "Warning", notice: "Notice"};
+const LEVEL_RANK = {blocker: 0, trap: 1, warning: 2, notice: 3};
+export const LEVEL_WORD = {blocker: "Blocker", trap: "Trap", warning: "Warning", notice: "Notice"};
 export const STATUS_WORD = {new: "new", existing: "on the keyboard", fixed: "fixed"};
 
 const byLevel = (a, b) => (LEVEL_RANK[a.level] ?? 3) - (LEVEL_RANK[b.level] ?? 3);
@@ -21,7 +21,7 @@ export function checkGroups(checks = []) {
     const of = (status) => checks.filter((check) => check.status === status).sort(byLevel);
     return [
         {id: "new", title: "New in this draft", items: of("new"), open: true},
-        {id: "existing", title: "Already on the keyboard", items: of("existing"), open: of("existing").some((check) => check.level === "trap")},
+        {id: "existing", title: "Already on the keyboard", items: of("existing"), open: of("existing").some((check) => ["trap", "blocker"].includes(check.level))},
         {id: "fixed", title: "Fixed by this draft", items: of("fixed"), open: false},
     ].filter((group) => group.items.length);
 }
@@ -49,8 +49,9 @@ export function confirmText(checks) {
     if (!checks.length) return "";
     const traps = checks.filter((check) => check.level === "trap");
     const warnings = checks.filter((check) => check.level === "warning");
-    const count = (items, word) => `${items.length} ${word}${items.length === 1 ? "" : "s"}`;
-    const lead = checks.length === 1 ? checks[0].title : [traps.length && count(traps, "trap"), warnings.length && count(warnings, "warning")].filter(Boolean).join(" and ");
+    const count = (number, word) => `${number} ${word}${number === 1 ? "" : "s"}`;
+    const trapCount = traps.reduce((total, check) => total + (check.kind === "trapOverflow" ? check.count : 1), 0);
+    const lead = checks.length === 1 ? checks[0].title : [traps.length && count(trapCount, "trap"), warnings.length && count(warnings.length, "warning")].filter(Boolean).join(" and ");
     return traps.length ? `${lead}. A trapped layer can leave no way back to Base until you unplug the keyboard. Apply this profile anyway?`
         : `${lead}. Apply this profile with ${warnings.length === 1 ? "this warning" : "these warnings"}?`;
 }

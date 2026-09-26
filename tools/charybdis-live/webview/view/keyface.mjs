@@ -677,7 +677,7 @@ export const slotKeycodes = (slot) => slot.binding ? [slot.binding.holdCode, slo
 // whatever a slot holds, so a key bound to an empty slot is inert rather than
 // invalid — and the interface has to say which keys those are.
 export function bindingsForSlot(model, slot) {
-    if (!slot) return {keys: [], behaviours: [], layers: []};
+    if (!slot) return {keys: [], behaviours: [], combos: [], layers: []};
     const values = new Set(slotKeycodes(slot));
     const names = new Set([slot.binding?.hold, slot.binding?.lock].filter(Boolean));
     for (const entry of model?.qmkKeycodes || []) {
@@ -694,7 +694,8 @@ export function bindingsForSlot(model, slot) {
     }
     const behaviours = (model?.keyBehaviors || []).filter((row) => (row.steps || []).some((step) =>
         ["tap", "hold", "longHold"].some((tier) => names.has(step[tier]?.action))));
-    return {keys, behaviours, layers: [...layers]};
+    const combos = (model?.combos || []).filter((row) => names.has(row.output));
+    return {keys, behaviours, combos, layers: [...layers]};
 }
 
 // The keycode name that holds a slot's mode.

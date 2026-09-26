@@ -176,10 +176,14 @@ test("an empty slot's bindings are found by the keyboard's own values, not by a 
             {layoutIndex: 6, keycode: "KC_A", value: 0x0004},
         ]}],
         keyBehaviors: [{keycode: "LEFT_THUMB", steps: [{tapCount: 0, hold: {action: "QK_USER_32"}}]}],
+        combos: [{badge: "C1", output: "QK_USER_32"}],
     };
     const found = bindingsForSlot(model, slotWith({id: 6, kind: 0}));
     assert.equal(found.keys.length, 1, "the key bound to the empty slot is found");
     assert.deepEqual(found.behaviours.map((row) => row.keycode), ["LEFT_THUMB"]);
+    assert.deepEqual(found.combos.map((row) => row.badge), ["C1"], "a combo output to an empty slot is inert too");
+    assert.deepEqual(bindingsForSlot({combos: model.combos, qmkKeycodes: model.qmkKeycodes}, slotWith({id: 6, kind: 0})).combos.map((row) => row.badge), ["C1"],
+        "a combo-only binding is still shown for an empty slot");
 });
 
 test("the combo table and the board's badges count the same keys", () => {

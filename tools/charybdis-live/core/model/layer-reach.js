@@ -150,6 +150,16 @@ function resolve(facts, active, position) {
     return null;
 }
 
+// QMK uses the raw reference layer only when it differs from the highest
+// active layer. Otherwise combo inputs are the resolved keycodes, including
+// those inherited through transparent keys.
+function comboCodes(facts, active) {
+    const top = highest(active), reference = facts.comboLayer(top);
+    if (reference >= LAYERS) return new Set();
+    if (reference !== top) return new Set(facts.layers[reference]);
+    return new Set(facts.layers[0].map((_, position) => resolve(facts, active, position)?.code));
+}
+
 const highest = (mask) => 31 - Math.clz32(mask);
 
 // Everything that changes the layers from one state, each with where it came
@@ -166,8 +176,7 @@ function offers(facts, active, cache) {
         }
     });
     if (facts.combos.length) {
-        const reference = facts.comboLayer(highest(active));
-        const present = new Set(reference < LAYERS ? facts.layers[reference] : []);
+        const present = comboCodes(facts, active);
         for (const combo of facts.combos) {
             if (!combo.inputs.length || !combo.inputs.every((code) => present.has(code))) continue;
             for (const effect of actionEffects(combo.output)) {
@@ -263,7 +272,8 @@ function traps(facts, walked) {
             if (!known || depth(from) < depth(known.from)) found.set(locks, {from, effect});
         }
     }
-    return [...found].sort(([a], [b]) => layersIn(a).length - layersIn(b).length || a - b).slice(0, MAX_TRAPS).map(([locks, entry]) => {
+    const sorted = [...found].sort(([a], [b]) => layersIn(a).length - layersIn(b).length || a - b);
+    const named = sorted.slice(0, MAX_TRAPS).map(([locks, entry]) => {
         const top = highest(locks);
         const names = namesOf(facts, locks);
         const path = [...pathTo(parent, entry.from), entry.effect];
@@ -274,6 +284,12 @@ function traps(facts, walked) {
             fix: `Put TO(0) or TG(${top}) on ${layerName(facts.names, top)}, where it answers, or take away the lock.`,
             place: placeOf(entry.effect.from)};
     });
+    const omitted = sorted.length - named.length;
+    if (omitted) named.push({kind: "trapOverflow", level: LEVELS.TRAP, layers: [], count: omitted, identity: String(omitted),
+        title: `${omitted} more trapped layer state${omitted === 1 ? " is" : "s are"} possible`,
+        detail: `The review shows the first ${MAX_TRAPS} trapped states. ${omitted} more distinct locked-layer states also have no way back to ${layerName(facts.names, 0)}.`,
+        fix: "Remove the trapping locks or add a reachable way home to each affected layer."});
+    return named;
 }
 
 function findings(facts, walked) {
@@ -305,6 +321,21 @@ function findings(facts, walked) {
             place: placeOf(effect.from)});
     }
 
+    if (facts.combos.length) {
+        const reachable = new Set();
+        for (const active of walked.cache.keys()) {
+            const present = comboCodes(facts, active);
+            for (const combo of facts.combos) if (combo.inputs.every(code => present.has(code))) reachable.add(combo.index);
+        }
+        for (const combo of facts.combos) if (!reachable.has(combo.index)) {
+            results.push({kind: "unreachableCombo", level: LEVELS.WARNING, layers: [], identity: `${combo.index}:${combo.inputs.join(",")}`,
+                title: `Combo ${combo.index + 1} cannot fire`,
+                detail: "No reachable layer combination produces all of this combo's input keys together. Transparent keys can supply inputs from below; they are included in this check.",
+                fix: "Place its inputs where one reachable layer combination can produce them, or change its input keys.",
+                place: {kind: "combo", index: combo.index}});
+        }
+    }
+
     // Holding, toggling or locking a layer that is always on does nothing;
     // only TO() means something there. Every key, branch and combo output is
     // counted, reachable or not.
@@ -324,6 +355,7 @@ function findings(facts, walked) {
     if (idlePlaces.length) {
         const count = idlePlaces.length;
         results.push({kind: "idleLayerKey", level: LEVELS.NOTICE, layers: [0], count,
+            identity: idlePlaces.map(({name, place}) => `${name}:${JSON.stringify(place)}`).join("|"),
             title: `${count} layer key${count === 1 ? "" : "s"} hold${count === 1 ? "s" : ""} or toggle${count === 1 ? "s" : ""} ${layerName(facts.names, 0)}, which is always on`,
             detail: `${count > 3 ? `${idlePlaces.slice(0, 3).map((entry) => entry.name).join(", ")} and ${count - 3} more` : listed(idlePlaces.map((entry) => entry.name))}: ${layerName(facts.names, 0)} is always on, so holding, toggling or locking it does nothing. TO(0) is the one that means something there: it goes home.`,
             fix: "Point them at another layer, use TO(0) to go home, or give the keys something else to do.",
@@ -333,7 +365,7 @@ function findings(facts, walked) {
     const emptyBase = (code) => facts.layers[0].map((value, position) => value === code ? position : -1).filter(position => position >= 0);
     const transparent = emptyBase(TRANSPARENT);
     if (transparent.length) {
-        results.push({kind: "deadBase", level: LEVELS.NOTICE, layers: [0], count: transparent.length,
+        results.push({kind: "deadBase", level: LEVELS.NOTICE, layers: [0], count: transparent.length, identity: transparent.join(","),
             title: `${transparent.length} transparent key${transparent.length === 1 ? "" : "s"} on the base layer (${layerName(facts.names, 0)}) ${transparent.length === 1 ? "does" : "do"} nothing`,
             detail: `A transparent key on the base layer (${layerName(facts.names, 0)}) has no layer under it to answer, so it sends nothing unless a layer above covers it.`,
             fix: `Give ${transparent.length === 1 ? "it" : "them"} a keycode, or KC_NO to mark ${transparent.length === 1 ? "it" : "them"} intentionally empty.`,
@@ -341,7 +373,7 @@ function findings(facts, walked) {
     }
     const no = emptyBase(NOTHING);
     if (no.length) {
-        results.push({kind: "noBase", level: LEVELS.NOTICE, layers: [0], count: no.length,
+        results.push({kind: "noBase", level: LEVELS.NOTICE, layers: [0], count: no.length, identity: no.join(","),
             title: `${no.length} KC_NO key${no.length === 1 ? "" : "s"} on the base layer (${layerName(facts.names, 0)}) ${no.length === 1 ? "does" : "do"} nothing`,
             detail: `KC_NO on the base layer (${layerName(facts.names, 0)}) explicitly sends nothing unless a layer above covers it.`,
             fix: `Give ${no.length === 1 ? "it" : "them"} a keycode if ${no.length === 1 ? "it should" : "they should"} do something.`,
@@ -364,7 +396,7 @@ function findings(facts, walked) {
 
     facts.layers.forEach((codes, layer) => codes.forEach((code, position) => {
         if (!layerEffects(code).some((effect) => effect.kind === "unowned")) return;
-        results.push({kind: "unowned", level: LEVELS.WARNING, layers: [layer],
+        results.push({kind: "unowned", level: LEVELS.WARNING, layers: [layer], identity: `${position}:${code}`,
             title: `${codeName(code)} on ${layerName(facts.names, layer)} bypasses layer tracking`,
             detail: `The keyboard leaves ${codeName(code)} to QMK's own layer code, so it can change the default layer or turn on a layer no key releases.`,
             fix: "Replace it with TO(), TG() or MO().", place: keyPlace(layer, position)});
@@ -376,7 +408,7 @@ function findings(facts, walked) {
 // is about, named by the keyboard layer each slot holds (`order[slot]`, as
 // model/layer-order.js keeps it).
 const IDENTITY = Object.freeze([0, 1, 2, 3, 4, 5, 6, 7]);
-const findingKey = (finding, order = IDENTITY) => `${finding.kind}:${finding.layers.map((slot) => order[slot]).sort((a, b) => a - b).join(",")}`;
+const findingKey = (finding, order = IDENTITY) => `${finding.kind}:${finding.layers.map((slot) => order[slot]).sort((a, b) => a - b).join(",")}${finding.identity === undefined ? "" : `:${finding.identity}`}`;
 
 // The findings for a validated profile.
 function layerReach(decoded) {
@@ -392,8 +424,7 @@ function layerReach(decoded) {
 // the old one unreached); `order` says which keyboard layer each draft slot
 // holds, so the two are matched layer with layer. Traps always ask to be
 // confirmed.
-function draftChecks(keyboard, draft, order = IDENTITY) {
-    const before = keyboard ? layerReach(keyboard) : [], after = layerReach(draft);
+function compareFindings(before, after, order = IDENTITY) {
     const known = new Set(before.map((finding) => findingKey(finding))), still = new Set(after.map((finding) => findingKey(finding, order)));
     return [
         ...after.map((finding) => ({...finding, key: findingKey(finding, order), status: known.has(findingKey(finding, order)) ? "existing" : "new"})),
@@ -401,4 +432,8 @@ function draftChecks(keyboard, draft, order = IDENTITY) {
     ];
 }
 
-module.exports = {layerReach, draftChecks, findingKey, LEVELS};
+function draftChecks(keyboard, draft, order = IDENTITY) {
+    return compareFindings(keyboard ? layerReach(keyboard) : [], layerReach(draft), order);
+}
+
+module.exports = {layerReach, draftChecks, compareFindings, findingKey, LEVELS};

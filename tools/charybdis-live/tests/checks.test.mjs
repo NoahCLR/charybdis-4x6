@@ -5,9 +5,9 @@ import {checkGroups, checkSourceGroup, checkTags, checksToConfirm, confirmText} 
 const check = (level, status, title = `${level} ${status}`) => ({level, status, title, key: title});
 
 test("checks are grouped by where they come from, most serious first, and empty groups are left out", () => {
-    const groups = checkGroups([check("notice", "new"), check("trap", "new"), check("warning", "fixed"), check("warning", "new")]);
+    const groups = checkGroups([check("notice", "new"), check("trap", "new"), check("blocker", "new"), check("warning", "fixed"), check("warning", "new")]);
     assert.deepEqual(groups.map((group) => group.id), ["new", "fixed"]);
-    assert.deepEqual(groups[0].items.map((item) => item.level), ["trap", "warning", "notice"]);
+    assert.deepEqual(groups[0].items.map((item) => item.level), ["blocker", "trap", "warning", "notice"]);
     assert.equal(groups[0].open, true);
     assert.equal(groups[1].open, false);
     assert.deepEqual(checkGroups(), []);
@@ -16,6 +16,7 @@ test("checks are grouped by where they come from, most serious first, and empty 
 test("what is already on the keyboard stays folded unless it holds a trap", () => {
     assert.equal(checkGroups([check("warning", "existing")])[0].open, false);
     assert.equal(checkGroups([check("warning", "existing"), check("trap", "existing")])[0].open, true);
+    assert.equal(checkGroups([check("blocker", "existing")])[0].open, true);
 });
 
 test("active traps and warnings ask for confirmation, including ones already on the keyboard", () => {
@@ -23,6 +24,7 @@ test("active traps and warnings ask for confirmation, including ones already on 
         check("warning", "new", "D"), check("warning", "existing", "E"), check("warning", "fixed", "F"), check("notice", "new", "G")];
     assert.deepEqual(checksToConfirm(checks).map((item) => item.title), ["A", "B", "D", "E"]);
     assert.deepEqual(checksToConfirm(), []);
+    assert.deepEqual(checksToConfirm([check("blocker", "new")]), [], "a blocker cannot be confirmed away");
 });
 
 test("a new warning names one draft group, but does not guess among several", () => {
@@ -51,9 +53,11 @@ test("the confirmation names one finding or counts traps and warnings together",
     assert.equal(confirmText([check("warning", "new", "Nothing reaches Number")]),
         "Nothing reaches Number. Apply this profile with this warning?");
     assert.match(confirmText([check("trap", "new"), check("warning", "existing")]), /^1 trap and 1 warning\./);
+    assert.match(confirmText([check("trap", "new"), {...check("trap", "new"), kind: "trapOverflow", count: 6}]), /^7 traps\./);
 });
 
 test("a check's tags say its level, and where it comes from unless it is new", () => {
+    assert.deepEqual(checkTags(check("blocker", "new")), ["Blocker"]);
     assert.deepEqual(checkTags(check("trap", "new")), ["Trap"]);
     assert.deepEqual(checkTags(check("notice", "existing")), ["Notice", "on the keyboard"]);
     assert.deepEqual(checkTags(check("warning", "fixed")), ["Warning", "fixed"]);

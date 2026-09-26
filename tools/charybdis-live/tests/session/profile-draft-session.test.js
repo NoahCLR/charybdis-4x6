@@ -17,6 +17,19 @@ function settings(draft, id, updates) {
         fields:section.fields.map(field => field.kind === "toggle" ? {macro:field.macro, enabled:updates[field.macro] ?? field.enabled} : {macro:field.macro,value:updates[field.macro] ?? field.value})};
 }
 function stage(draft, edit) {return draft.stage({...edit,draftRevision:draft.revision});}
+test("review blockers stop Apply before a recovery copy or device write", async () => {
+    const {snapshot, caps} = fixture();
+    snapshot.limits.brightnessMax = 100;
+    const draft = new ProfileDraftSession(snapshot, "board", caps);
+    stage(draft, {type: "updateViaMacro", keycode: "VIA_MACRO_0", payload: "hello"});
+    draft.review(draft.revision);
+    assert.equal(draft.hasBlockers(), true);
+    assert.equal(draft.checks().find(row => row.kind === "brightnessBlocker")?.level, "blocker");
+    let wrote = false;
+    await assert.rejects(draft.apply({snapshot: () => ({connected: true, selectedDeviceId: "board"}),
+        restorePortableProfile: async () => {wrote = true;}}, draft.revision, async () => {wrote = true;}), /blockers/);
+    assert.equal(wrote, false);
+});
 test("one draft composes every editor without changing its device snapshot", () => {
     const {draft,snapshot} = fixture(), original = JSON.stringify(snapshot);
     stage(draft,{type:"updateLayoutKeys",layers:[{layer:"Layer 0",changes:[{layoutIndex:0,keycode:"KC_A"}]}]});

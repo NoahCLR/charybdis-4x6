@@ -30,7 +30,7 @@ matrix.
 | Pointing modes | Eight device-owned slots and eight RGB rows; see [PD-mode domain v1](architecture/pd-mode-domain-v1.md) |
 | Global policy | Every other portable setting, including startup layers, combo matching and device-reported lighting and key options; unsupported firmware features stay read-only |
 | Backup and restore | Complete snapshots, import review against the keyboard, recovery file and verified restore |
-| Drafts and Apply | One draft with item-by-item review, discard by edit group, Show, undo/redo and draft history; the review checks which layers can be reached and confirms active warnings and traps before Apply (D-L36); Apply shows its steps and says where a failure happened (D-L19, D-L23, D-L29, D-L30) |
+| Drafts and Apply | One draft with item-by-item review, discard by edit group, Show, undo/redo and draft history; the review checks reachable actions, confirms active warnings and traps, and blocks profiles the destination cannot save (D-L36); Apply shows its steps and says where a failure happened (D-L19, D-L23, D-L29, D-L30) |
 | Recovery | Atomic logical Apply, differential transfer, reboot recovery fencing, firmware roll-forward after the decision, resume after a lost or power-cycled peer link, bounded cancel (D-L20–D-L22, D-L27) |
 
 The rail's health strip shows connection, both-half convergence, draft state
@@ -644,7 +644,7 @@ Edits exist only as a reviewed draft; a keyboard the app cannot open a draft for
 is read-only, and the host refuses edits rather than writing them directly. v1
 was frozen by this decision and has since been removed.
 
-### D-L36 — The review checks what the layers let you reach
+### D-L36 — The review checks reachable actions and save blockers
 
 A layer can lock with nothing left to release it: `TG(n)` on Base when layer n
 covers that key and has no `TG(n)`, `TO(0)` or `LOCK_LAYER(n)` of its own, a
@@ -662,15 +662,30 @@ trackball waking the pointer layer (unless the sniping layer keeps it off). A
 **trap** is a set of locks it can reach from which Base cannot be reached once
 every key is let go. It also reports, as warnings and notices, a layer with
 keys that nothing reaches, a layer key onto a layer with no keys of its own,
-transparent and `KC_NO` keys on Base in separate notices, a pointer layer that cannot work, and layer keys the
-keyboard leaves to QMK (`DF()`, `PDF()`, a layer past the bank). Holding is not
-limited by fingers and a one-shot counts as a hold, so the walk finds every way
-out a person could find and never invents a trap.
+transparent and `KC_NO` keys on Base in separate notices, a pointer layer that
+cannot work, and layer keys the keyboard leaves to QMK (`DF()`, `PDF()`, a layer
+past the bank). A combo whose reference differs from the highest active layer
+uses the reference's raw keys; otherwise its inputs come from the resolved
+active stack, including keys inherited through transparency. A combo is warned
+about when no reachable stack can supply all its inputs. Holding is not limited
+by fingers and a one-shot counts as a hold. The first four trapped lock states
+have paths; any remainder is counted explicitly.
+
+`core/model/profile-checks.js` adds whole-profile findings for bindings that
+reach empty pointing slots (keys, behaviours and combo outputs), macros too long
+for the keyboard's playback engine, and destination brightness or lighting
+effects the keyboard would refuse. The latter are **blockers**: review shows
+them, disables Apply, and the host refuses Apply before writing a recovery copy.
+Other invalid data is still refused by its editor, profile decoder or save
+preflight rather than offered for confirmation.
 
 The draft reports its findings beside the keyboard's, both in the draft's
 layer order, so each is **new**, **on the keyboard** or **fixed** by the draft.
+Per-key findings include the key and code in their identity; grouped empty-key
+notices include their positions, so replacing one issue with another on the
+same layer does not call the new one existing.
 The review lists them first, under Checks, each with the steps into it, the way
-out and Show. Active warnings have orange backdrops and traps have red ones;
+out and Show. Active warnings have orange backdrops; traps and blockers are red;
 fixed findings stay quiet. Every warning or trap the draft keeps asks for
 confirmation, whether the draft made it or the keyboard already had it: Apply
 turns into "Apply anyway / Go back", and the host refuses to start an Apply of

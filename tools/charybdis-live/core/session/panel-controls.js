@@ -128,7 +128,8 @@ async function draftControl(session, message, host = {}) {
         case "applyProfileDraft": {
             // The interface asks about active traps and warnings; the host
             // enforces that decision before writing a recovery copy or HID.
-            if (draft.hasChecksToConfirm() && message.confirmChecks !== true) throw new Error("This draft has layer warnings or traps. Confirm them in the review before applying.");
+            if (draft.hasBlockers()) throw new Error("Resolve the blockers in Checks before applying this profile.");
+            if (draft.hasChecksToConfirm() && message.confirmChecks !== true) throw new Error("This draft has warnings or traps. Confirm them in the review before applying.");
             let recovery = "";
             const result = await run(host, "Applying the complete profile to both halves",
                 () => draft.apply(service, revision, async (document) => (recovery = await host.saveRecovery(document))));

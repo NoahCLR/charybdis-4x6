@@ -71,6 +71,19 @@ test("apply writes a recovery copy through the host, then reads the keyboard aga
     assert.equal(session.resetDraftForms, true);
 });
 
+test("a destination blocker refuses Apply before recovery or HID", async () => {
+    const service = fakeService(), h = host();
+    service.portable.limits.brightnessMax = 50;
+    const session = {service};
+    buildPanelModel(session, service.snapshot());
+    stage(session, {type: "updateViaMacro", keycode: "VIA_MACRO_0", payload: "hello"});
+    session.draft.review(session.draft.revision);
+    assert.equal(session.draft.hasBlockers(), true);
+    await assert.rejects(draftControl(session, {type: "applyProfileDraft", draftRevision: session.draft.revision, confirmChecks: true}, h), /blockers/);
+    assert.equal(h.saved.length, 0);
+    assert.deepEqual(service.calls, []);
+});
+
 test("a draft that can lock a layer with no way back applies only once the trap is confirmed", async () => {
     const session = sessionWithDraft(), draft = session.draft, h = host();
     stage(session, {type: "updateLayoutKeys", layers: [

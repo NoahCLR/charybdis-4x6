@@ -262,8 +262,10 @@ committed profile. Every edit goes into one local draft with undo, redo and a
 history, and reaches the keyboard only through **Review and apply**. Apply
 saves a recovery copy, then commits the complete profile to both halves as one
 recovery-first logical transaction and verifies the readback. The review shows
-layer warnings in orange and traps in red; Apply asks for confirmation when
-either is present in the profile that would be saved.
+warnings in orange, traps and save blockers in red. It checks layer reachability,
+combos, inert pointing bindings, and macros the keyboard cannot play. Apply asks
+for confirmation when a warning or trap is present and stays disabled until
+destination save blockers are resolved.
 
 What to expect while it applies:
 

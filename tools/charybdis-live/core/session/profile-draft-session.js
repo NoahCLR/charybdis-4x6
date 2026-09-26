@@ -6,7 +6,8 @@ const {IDENTITY, compose, inverse, isIdentity, layerUnit, rearranged} = require(
 const {layerName: layerCalled} = require("../model/vocabulary");
 const {revertUnits} = require("../model/profile-revert");
 const {keyPlacementProblem} = require("../model/profile-placement");
-const {draftChecks, LEVELS: CHECK_LEVELS} = require("../model/layer-reach");
+const {LEVELS: CHECK_LEVELS} = require("../model/layer-reach");
+const {draftProfileChecks} = require("../model/profile-checks");
 const {baseLighting, editSettings, settingsEditorView} = require("../model/settings-editor");
 const {editMacro, macroEditorView} = require("../model/macro-editor");
 const {editDeviceProfile, RGB_EDITS, COMBO_EDITS, PD_EDITS} = require("./device-profile-edits");
@@ -391,6 +392,7 @@ class ProfileDraftSession {
     async apply(service, revision, saveRecovery) {
         this.assertRevision(revision);
         if (!this.dirty || this.reviewedRevision !== revision) throw fail("Review the current draft before applying it.");
+        if (this.hasBlockers()) throw fail("Resolve the review's blockers before applying this profile.");
         if (!service.snapshot().connected || service.snapshot().selectedDeviceId !== this.deviceId) throw fail("Reconnect the keyboard this draft belongs to.");
         if ((service.snapshot().connectionToken ?? null) !== this.connectionToken) throw fail("Review this draft against the connected keyboard before applying it.");
         try {
@@ -413,13 +415,15 @@ class ProfileDraftSession {
         this.checksCache ??= new WeakMap();
         const known = this.checksCache.get(draft);
         if (known && known.keyboard === keyboard && known.order === order) return known.checks;
-        const checks = draftChecks(keyboard, draft, order);
+        const checks = draftProfileChecks(keyboard, draft, order, {brightnessMax: this.current.limits?.brightnessMax,
+            effects: this.current.options?.effects});
         this.checksCache.set(draft, {keyboard, order, checks});
         return checks;
     }
     // Whether Apply has to be confirmed: active traps and warnings matter
     // whether the draft introduced them or the keyboard already has them.
     hasChecksToConfirm() {return this.checks().some(check => check.status !== "fixed" && [CHECK_LEVELS.TRAP, CHECK_LEVELS.WARNING].includes(check.level));}
+    hasBlockers() {return this.checks().some(check => check.status !== "fixed" && check.level === "blocker");}
     identity() {return {source: "draft", generation: this.revision, digest: this.decode(this.history[this.cursor]).fingerprint, originHalf: this.deviceId};}
     combos() {
         const {combos, settings} = this.decode(this.history[this.cursor]).decoded;

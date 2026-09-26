@@ -90,7 +90,7 @@ function reviewOverlay() {
         if (group === null) continue;
         sourceByCheck.set(check, group);
         const count = sourceCounts.get(group) || {warning: 0, trap: 0};
-        count[check.level]++;
+        count[check.level] += check.kind === "trapOverflow" ? check.count : 1;
         sourceCounts.set(group, count);
     }
     const sourceLabel = (group) => {
@@ -134,7 +134,8 @@ function reviewOverlay() {
     const confirmChecks = checksToConfirm(draft.checks);
     const confirming = confirmChecks.length && state.confirmChecks === draft.revision;
     const hasTrap = confirmChecks.some((check) => check.level === "trap");
-    const canApply = draft.reviewed && draft.connected && !draft.stale;
+    const blockers = draft.checks.filter((check) => check.level === "blocker" && check.status !== "fixed");
+    const canApply = draft.reviewed && draft.connected && !draft.stale && !blockers.length;
     const node = el(`<div class="scrim"><div class="sheet" role="dialog" aria-modal="true" aria-label="Review changes">
         <div class="sheet-h"><h2>Review ${draft.changes.length} change${draft.changes.length === 1 ? "" : "s"}</h2>
             ${summary ? `<span class="note">${esc(summary)}</span>` : ""}
@@ -144,14 +145,14 @@ function reviewOverlay() {
             ${sections}
             <div style="padding:14px 18px 18px"><div class="callout warn">Apply writes a recovery copy, stages the changed blocks on both halves, then publishes one generation. The keyboard keeps running its saved profile until both halves confirm. If it is interrupted, the recovery copy restores it.</div></div>
         </div>
-        ${confirming ? `<div class="sheet-f ck-confirm ${hasTrap ? "trap" : "warning"}" role="alertdialog" aria-label="Confirm layer checks">
+        ${confirming ? `<div class="sheet-f ck-confirm ${hasTrap ? "trap" : "warning"}" role="alertdialog" aria-label="Confirm profile checks">
             <span class="ck-confirm-t"><i class="dot ${hasTrap ? "err" : "warn"}"></i>${esc(confirmText(confirmChecks))}</span>
             <span class="right"><button class="btn" data-act="unconfirm">Go back</button>
                 <button class="btn primary" data-act="apply-anyway" ${canApply ? "" : "disabled"}>Apply anyway</button></span></div>`
         : `<div class="sheet-f"><span class="note">${esc(model?.device?.label || "")} · ${esc(model?.device?.summary || "")}</span>
             <span class="right"><button class="btn" data-act="close">Cancel</button>
                 <button class="btn primary" data-act="apply" ${canApply ? "" : "disabled"}
-                    ${confirmChecks.length ? `data-tip="${esc("Layer warnings and traps will be asked about before anything is written.")}"` : ""}>Apply to keyboard</button></span></div>`}
+                    ${blockers.length ? `data-tip="${esc("Resolve the blockers in Checks before applying.")}"` : confirmChecks.length ? `data-tip="${esc("Warnings and traps will be asked about before anything is written.")}"` : ""}>Apply to keyboard</button></span></div>`}
     </div></div>`);
     // Pointing at a group's Discard lights what it takes back, in every area
     // the group reaches.
