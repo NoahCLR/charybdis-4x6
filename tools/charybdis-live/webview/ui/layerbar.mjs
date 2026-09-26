@@ -26,6 +26,7 @@ const ADD_KEY = /Mac|iPhone|iPad/.test(globalThis.navigator?.platform || "") ? "
 // sits on the board it chooses for: the picked layer's tab opens into it.
 // ⌘-click previews more layers on together (view/layer-set.mjs); the highest
 // keeps the tab that opens into the board, the others and base show as on.
+// ⌘-clicking base alone previews the picked layer over base.
 export function layerBar(trailing = "") {
     const model = getModel();
     const drafted = draftMarks(model?.draft?.changes).layers;
@@ -33,10 +34,13 @@ export function layerBar(trailing = "") {
     const tabs = layers().map((layer, index) => {
         const swatch = layerSwatch(model, layer);
         const on = held.has(index) || (index === 0 && previewing());
+        const baseOnly = held.size === 1 && held.has(0);
         const how = index === state.layer && previewing()
             ? " · on top, so it wins · edits go here"
-            : on ? (index === 0 ? " · always on" : ` · on in this preview · ${ADD_KEY}-click to turn off`)
-            : index === 0 ? "" : ` · ${ADD_KEY}-click to preview with the layers on`;
+            : index === 0 ? (baseOnly ? ` · on in this preview · ${ADD_KEY}-click to turn off`
+                : on ? " · always on" : state.layer > 0 ? ` · ${ADD_KEY}-click to preview under the picked layer` : "")
+            : on ? ` · on in this preview · ${ADD_KEY}-click to turn off`
+            : ` · ${ADD_KEY}-click to preview with the layers on`;
         // A layer on under the top one is tinted with its own light, so the
         // set reads at a glance without being mistaken for the picked tab.
         const tint = on && swatch.colour ? ` style="--tab-tint:${swatch.colour}"` : "";

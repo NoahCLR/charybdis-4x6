@@ -110,7 +110,7 @@ export function screenKeys() {
 // The caption while layers are previewed on together: which ones, in the
 // order they win. Clicking any tab goes back to one layer.
 export function previewFoot(layer, lead = "") {
-    const under = [...heldLayers()].reverse().map((at) => layerName(layers()[at]));
+    const under = heldLayers().filter((at) => at > 0).reverse().map((at) => layerName(layers()[at]));
     const text = `${layerName(layer)} on top of ${[...under, layerName(layers()[0])].join(", ")}`
         + ` · keys seen through from below are frosted · edits go to ${layerName(layer)}`;
     return el(`<div class="board-foot">${lead}

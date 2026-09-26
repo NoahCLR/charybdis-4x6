@@ -7,7 +7,7 @@ import {el, esc} from "../lib/dom.mjs";
 import {LED_INDEX, TRACKBALL_LED} from "../view/geometry.mjs";
 import {PD_MODE_IDS, baseColour, feedbackColours, layerColourRow, pdColourRow, stageEnabled, stageIdle, stageInEffect} from "../view/lighting.mjs";
 import {branchName, slotCalled, stageOrder, vocabulary, word} from "../view/vocabulary.mjs";
-import {canEdit as canEditArea, currentLayer, getModel, layerName, layers, post, render, state, writable, heldLayers, previewing, showLayer} from "../store.mjs";
+import {canEdit as canEditArea, currentLayer, getModel, layerName, layers, post, render, state, writable, heldLayers, showLayer} from "../store.mjs";
 import * as edits from "../view/edits.mjs";
 import {board} from "./board.mjs";
 import {colourEditor} from "./colour-editor.mjs";
@@ -68,8 +68,8 @@ export function screenLighting() {
         <b>${onGroups ? "LED selector" : "Preview"}</b>
         <span class="board-foot-text">${onGroups
             ? `click physical LEDs to build a group · ${state.ledPicks.length} selected${state.trackball ? " + trackball" : ""}`
-            : `${esc(layerName(layer))}${previewing() && !onGroups
-                ? ` with ${esc([...heldLayers()].reverse().map((at) => layerName(layers()[at])).join(", "))} on`
+            : `${esc(layerName(layer))}${heldLayers().some((at) => at > 0) && !onGroups
+                ? ` with ${esc(heldLayers().filter((at) => at > 0).reverse().map((at) => layerName(layers()[at])).join(", "))} on`
                 : ""} over the base effect${preview
                 ? ` · ${esc(slotName(model, state.pdSlot))} held, painting ${esc(localityLabel(preview.locality).toLowerCase())}`
                 : ""}`}</span>

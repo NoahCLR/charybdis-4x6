@@ -15,10 +15,20 @@ test("⌘-clicking a layer that is on removes it, and the next highest takes the
     assert.deepEqual(toggleLayer(2, [], 2), {top: 0, on: []}, "with nothing left, base is shown");
 });
 
-test("base is always on, so it is never toggled or listed", () => {
-    assert.deepEqual(toggleLayer(3, [1], 0), {top: 3, on: [1]});
+test("base is under every preview, so ⌘-clicking it alone previews the picked layer over base", () => {
+    assert.deepEqual(toggleLayer(3, [], 0), {top: 3, on: [0]}, "a layer over base alone");
+    assert.deepEqual(toggleLayer(3, [0], 0), {top: 3, on: []}, "and back to the plain single-layer view");
+    assert.deepEqual(toggleLayer(3, [1], 0), {top: 3, on: [1]}, "with other layers on, base stays on");
+    assert.deepEqual(toggleLayer(0, [], 0), {top: 0, on: []}, "base on its own has nothing to go under");
     assert.deepEqual(toggleLayer(0, [], 2), {top: 2, on: []}, "from base, a ⌘-click is the same as picking that layer");
-    assert.deepEqual(layersOn(3, [0, 1, 2], 8), [1, 2]);
+});
+
+test("a base listed on stays on as layers come and go above it", () => {
+    assert.deepEqual(toggleLayer(3, [0], 1), {top: 3, on: [0, 1]});
+    assert.deepEqual(toggleLayer(3, [0, 1], 1), {top: 3, on: [0]});
+    assert.deepEqual(toggleLayer(3, [0, 1], 3), {top: 1, on: [0]}, "the next layer down takes the top, still over base");
+    assert.deepEqual(toggleLayer(3, [0], 3), {top: 0, on: []}, "with nothing left, base is shown on its own");
+    assert.deepEqual(layersOn(3, [0, 1, 2], 8), [0, 1, 2]);
 });
 
 test("a remembered set keeps only layers under the top that still exist", () => {
