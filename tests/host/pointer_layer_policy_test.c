@@ -5,6 +5,7 @@
 
 #include "users/noah/lib/pointing/defs/pd_modes.h"
 #include "users/noah/lib/pointing/policy/pointer_layer_policy.h"
+#include "users/noah/lib/compat/qmk_tapping_contract.h"
 
 static bool           fake_auto_mouse_toggle;
 static int8_t         fake_auto_mouse_key_tracker;
@@ -13,6 +14,9 @@ static pd_mode_mask_t fake_active_modes;
 static uint8_t        auto_mouse_keyevent_calls;
 static bool           auto_mouse_keyevent_pressed[8];
 static uint16_t       fake_anchored_behavior_keycode;
+static bool           fake_auto_mouse_enabled;
+static layer_state_t  fake_locked_layers;
+static uint8_t        auto_mouse_toggle_calls;
 
 layer_state_t layer_state = 0;
 
@@ -36,6 +40,9 @@ static void test_reset_stubs(void) {
     auto_mouse_keyevent_calls      = 0;
     layer_state                    = 0;
     fake_anchored_behavior_keycode = KC_NO;
+    fake_auto_mouse_enabled        = true;
+    fake_locked_layers             = 0;
+    auto_mouse_toggle_calls        = 0;
 }
 
 bool layer_state_cmp(layer_state_t state, uint8_t layer) {
@@ -57,6 +64,20 @@ uint8_t get_auto_mouse_layer(void) {
 void auto_mouse_keyevent(bool pressed) {
     CHECK(auto_mouse_keyevent_calls < ARRAY_SIZE(auto_mouse_keyevent_pressed));
     auto_mouse_keyevent_pressed[auto_mouse_keyevent_calls++] = pressed;
+    fake_auto_mouse_key_tracker += pressed ? 1 : -1;
+}
+
+bool get_auto_mouse_enable(void) {
+    return fake_auto_mouse_enabled;
+}
+
+void auto_mouse_toggle(void) {
+    fake_auto_mouse_toggle = !fake_auto_mouse_toggle;
+    auto_mouse_toggle_calls++;
+}
+
+bool layer_ownership_is_locked(uint8_t layer) {
+    return (fake_locked_layers & ((layer_state_t)1u << layer)) != 0;
 }
 
 pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
@@ -293,6 +314,104 @@ static void test_debug_snapshot_reports_effective_anchor_inputs(void) {
     CHECK(snapshot.auto_mouse_layer == 4);
 }
 
+// Leaves the policy's own anchor released, whatever a test left locked.
+static void test_release_layer_lock_anchor(void) {
+    fake_locked_layers          = 0;
+    fake_auto_mouse_enabled     = true;
+    fake_auto_mouse_key_tracker = 1;
+    pointer_layer_policy_sync_layer_lock_anchor();
+    test_reset_stubs();
+}
+
+static void test_pointer_layer_lock_anchors_auto_mouse_once(void) {
+    test_reset_stubs();
+
+    fake_locked_layers = (layer_state_t)1u << 4;
+    pointer_layer_policy_sync_layer_lock_anchor();
+    pointer_layer_policy_sync_layer_lock_anchor();
+    CHECK(auto_mouse_keyevent_calls == 1);
+    CHECK(auto_mouse_keyevent_pressed[0]);
+    CHECK(fake_auto_mouse_key_tracker == 1);
+
+    fake_locked_layers = 0;
+    pointer_layer_policy_sync_layer_lock_anchor();
+    CHECK(auto_mouse_keyevent_calls == 2);
+    CHECK(!auto_mouse_keyevent_pressed[1]);
+    CHECK(fake_auto_mouse_key_tracker == 0);
+    CHECK(auto_mouse_toggle_calls == 0);
+}
+
+static void test_layer_lock_anchor_needs_the_auto_mouse_layer_and_auto_mouse_on(void) {
+    test_reset_stubs();
+
+    fake_locked_layers = (layer_state_t)1u << 2;
+    pointer_layer_policy_sync_layer_lock_anchor();
+    CHECK(auto_mouse_keyevent_calls == 0);
+
+    fake_locked_layers      = (layer_state_t)1u << 4;
+    fake_auto_mouse_enabled = false;
+    pointer_layer_policy_sync_layer_lock_anchor();
+    CHECK(auto_mouse_keyevent_calls == 0);
+    test_release_layer_lock_anchor();
+}
+
+// QMK zeroes its tracker when auto-mouse is switched off or retargeted; the
+// anchor does not take back a count that is no longer there.
+static void test_layer_lock_anchor_is_not_taken_back_after_qmk_reset(void) {
+    test_reset_stubs();
+
+    fake_locked_layers = (layer_state_t)1u << 4;
+    pointer_layer_policy_sync_layer_lock_anchor();
+    CHECK(fake_auto_mouse_key_tracker == 1);
+
+    fake_auto_mouse_key_tracker = 0;
+    fake_locked_layers          = 0;
+    pointer_layer_policy_sync_layer_lock_anchor();
+    CHECK(auto_mouse_keyevent_calls == 1);
+    CHECK(fake_auto_mouse_key_tracker == 0);
+}
+
+static void test_layer_change_syncs_the_layer_lock_anchor(void) {
+    test_reset_stubs();
+
+    fake_locked_layers = (layer_state_t)1u << 4;
+    CHECK(pointer_layer_policy_apply((layer_state_t)1u << 4) == ((layer_state_t)1u << 4));
+    CHECK(auto_mouse_keyevent_calls == 1);
+    CHECK(auto_mouse_keyevent_pressed[0]);
+    test_release_layer_lock_anchor();
+}
+
+static keyrecord_t test_record(bool pressed, uint8_t tap_count) {
+    keyrecord_t record = {.event = {.key = {.row = 0, .col = 0}, .pressed = pressed}};
+    record.tap.count   = tap_count;
+    return record;
+}
+
+static void test_take_back_undoes_qmks_toggle_on_its_layer_keys(void) {
+    keyrecord_t release = test_record(false, 0u);
+    keyrecord_t press   = test_record(true, 0u);
+    keyrecord_t locking = test_record(false, NOAH_QMK_TAPPING_TOGGLE);
+
+    test_reset_stubs();
+
+    pointer_layer_policy_take_back_qmk_toggle(TO(4), &release);
+    pointer_layer_policy_take_back_qmk_toggle(TG(4), &release);
+    pointer_layer_policy_take_back_qmk_toggle(TT(4), &locking);
+    CHECK(auto_mouse_toggle_calls == 3);
+
+    pointer_layer_policy_take_back_qmk_toggle(TO(4), &press);
+    pointer_layer_policy_take_back_qmk_toggle(TO(2), &release);
+    pointer_layer_policy_take_back_qmk_toggle(TG(0), &release);
+    pointer_layer_policy_take_back_qmk_toggle(TT(4), &release);
+    pointer_layer_policy_take_back_qmk_toggle(MO(4), &release);
+    pointer_layer_policy_take_back_qmk_toggle(KC_A, &release);
+    CHECK(auto_mouse_toggle_calls == 3);
+
+    fake_auto_mouse_enabled = false;
+    pointer_layer_policy_take_back_qmk_toggle(TO(4), &release);
+    CHECK(auto_mouse_toggle_calls == 3);
+}
+
 int main(void) {
     test_non_arrow_pd_mode_marks_layer_holds_as_mouse_records();
     test_arrow_mode_does_not_anchor_layer_hold_keys();
@@ -308,6 +427,11 @@ int main(void) {
     test_sniping_layer_strips_key_tracker_anchored_auto_mouse_layer();
     test_sniping_layer_blocks_anchored_auto_mouse_restore_when_pointer_missing();
     test_debug_snapshot_reports_effective_anchor_inputs();
+    test_pointer_layer_lock_anchors_auto_mouse_once();
+    test_layer_lock_anchor_needs_the_auto_mouse_layer_and_auto_mouse_on();
+    test_layer_lock_anchor_is_not_taken_back_after_qmk_reset();
+    test_layer_change_syncs_the_layer_lock_anchor();
+    test_take_back_undoes_qmks_toggle_on_its_layer_keys();
 
     puts("pointer_layer_policy host tests passed");
     return 0;

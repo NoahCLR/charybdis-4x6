@@ -193,6 +193,15 @@ void set_auto_mouse_enable(bool enable) {
     auto_mouse_enabled = enable;
 }
 
+bool get_auto_mouse_enable(void) {
+    return auto_mouse_enabled;
+}
+
+bool layer_ownership_is_locked(uint8_t layer) {
+    (void)layer;
+    return false;
+}
+
 void set_auto_mouse_layer(uint8_t layer) {
     auto_mouse_layer = layer;
 }

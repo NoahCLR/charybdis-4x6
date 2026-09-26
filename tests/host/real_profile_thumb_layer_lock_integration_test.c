@@ -879,6 +879,10 @@ void set_auto_mouse_enable(bool enable) {
     auto_mouse_enabled = enable;
 }
 
+bool get_auto_mouse_enable(void) {
+    return auto_mouse_enabled;
+}
+
 void set_auto_mouse_layer(uint8_t layer) {
     auto_mouse_layer_target = layer;
 }
@@ -3192,6 +3196,56 @@ static void test_plain_layer_tap_hold_is_owned_and_its_tap_is_qmks(void) {
     test_assert_thumb_runtime_quiescent(lt_pos);
 }
 
+// QMK's auto-mouse flips a toggle of its own on the release of TG() or TO()
+// of its layer. The runtime owns that lock, so the flip is taken back: TO(0)
+// after TO(pointer) leaves nothing holding the pointer layer.
+static void test_to_pointer_then_to_base_leaves_the_pointer_layer_free(void) {
+    keypos_t to_pos = {.row = 2, .col = 6};
+
+    test_reset_state();
+
+    key_runtime_integration_process_record(TO(LAYER_POINTER), to_pos, true);
+    key_runtime_integration_process_record(TO(LAYER_POINTER), to_pos, false);
+    CHECK(test_layer_locked(LAYER_POINTER));
+    CHECK(test_layer_active(LAYER_POINTER));
+    CHECK(!auto_mouse_toggled);
+    CHECK(auto_mouse_key_tracker == 1);
+
+    key_runtime_integration_process_record(TO(LAYER_BASE), to_pos, true);
+    key_runtime_integration_process_record(TO(LAYER_BASE), to_pos, false);
+    CHECK(!test_layer_locked(LAYER_POINTER));
+    CHECK(!auto_mouse_toggled);
+    CHECK(auto_mouse_key_tracker == 0);
+    CHECK(!is_auto_mouse_active());
+}
+
+// A lock on the pointer layer holds QMK's auto-mouse as a held mouse key does,
+// so the next ordinary key does not reset it off; unlocking lets it go.
+static void test_pointer_layer_lock_holds_auto_mouse_until_unlocked(void) {
+    keypos_t tg_pos = {.row = 2, .col = 6};
+    keypos_t a_pos  = {.row = 2, .col = 1};
+
+    test_reset_state();
+
+    key_runtime_integration_process_record(TG(LAYER_POINTER), tg_pos, true);
+    key_runtime_integration_process_record(TG(LAYER_POINTER), tg_pos, false);
+    CHECK(test_layer_locked(LAYER_POINTER));
+    CHECK(!auto_mouse_toggled);
+    CHECK(auto_mouse_key_tracker == 1);
+
+    key_runtime_integration_process_record(KC_A, a_pos, true);
+    key_runtime_integration_process_record(KC_A, a_pos, false);
+    CHECK(test_layer_active(LAYER_POINTER));
+    CHECK(auto_mouse_key_tracker == 1);
+
+    key_runtime_integration_process_record(TG(LAYER_POINTER), tg_pos, true);
+    key_runtime_integration_process_record(TG(LAYER_POINTER), tg_pos, false);
+    CHECK(!test_layer_locked(LAYER_POINTER));
+    CHECK(!test_layer_active(LAYER_POINTER));
+    CHECK(!auto_mouse_toggled);
+    CHECK(auto_mouse_key_tracker == 0);
+}
+
 // A layer key as a combo output, on the N+M combo for the duration of a test.
 typedef struct {
     int16_t  index;
@@ -3469,6 +3523,8 @@ int main(void) {
     test_combo_layer_hold_is_owned();
     test_combo_oneshot_and_tap_toggle_are_owned();
     test_plain_layer_tap_hold_is_owned_and_its_tap_is_qmks();
+    test_to_pointer_then_to_base_leaves_the_pointer_layer_free();
+    test_pointer_layer_lock_holds_auto_mouse_until_unlocked();
     test_oneshot_layer_serves_the_next_key();
     test_tap_toggle_taps_lock_and_holds_are_momentary();
     test_normal_press_and_matched_release_use_bounded_authored_lookups();

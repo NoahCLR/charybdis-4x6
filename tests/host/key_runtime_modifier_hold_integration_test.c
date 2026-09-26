@@ -174,6 +174,13 @@ void pointer_layer_policy_note_action(uint16_t action, bool pressed) {
     (void)pressed;
 }
 
+void pointer_layer_policy_sync_layer_lock_anchor(void) {}
+
+void pointer_layer_policy_take_back_qmk_toggle(uint16_t keycode, const keyrecord_t *record) {
+    (void)keycode;
+    (void)record;
+}
+
 key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
     return (key_behavior_view_t){
         .keycode            = keycode,

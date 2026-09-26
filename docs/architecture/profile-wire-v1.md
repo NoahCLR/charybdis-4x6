@@ -696,9 +696,10 @@ are placed, by the same rules compile-time validation applies to the authored
 profile (`noah_action_supported_at`): a behaviour's key, tap, press-and-hold
 and other holds, and a combo's output. A combo holds its output while it is
 held, so a layer hold (`MO()`, `TT()`) is a key, a combo or a press-and-hold
-branch; `OSL()` is a key, a tap or a combo; `LT()` is only a key, since its
-own tap/hold decision on top of a combo's is untested; `TG()`, `TO()` and
-`LOCK_LAYER()` go anywhere; `DF()`, `PDF()` and `LM()` go nowhere. A refused
+branch; `OSL()` is a key, a tap or a combo; `LM()`, which holds a layer and its
+modifiers, is a key or a combo; `LT()` is only a key, since its own tap/hold
+decision on top of a combo's is untested; `TG()`, `TO()` and `LOCK_LAYER()` go
+anywhere; `DF()` and `PDF()` go nowhere. A refused
 behaviour action is an invalid cross-reference at its row, tap index and
 field; a refused combo output rejects the combo domain at its row. Only a
 candidate the host uploads is held to placement: a committed record being

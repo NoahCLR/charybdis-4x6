@@ -59,6 +59,29 @@ run_variant() {
 run_variant normal
 run_variant extra_short -DEXTRA_SHORT_COMBOS
 
+# QMK's auto-mouse flips a toggle of its own on some layer keys; the runtime
+# takes each flip back through compat/qmk_auto_mouse_contract.h. Run QMK's own
+# process_auto_mouse against that contract so the two cannot drift.
+cc -std=gnu11 -Wall -Wextra -Werror -Wno-unused-parameter \
+    -DPOINTING_DEVICE_ENABLE \
+    -DPOINTING_DEVICE_AUTO_MOUSE_ENABLE \
+    -DAUTO_MOUSE_DELAY=200 \
+    -DQMK_KEYBOARD_H='"action.h"' \
+    -I"$ROOT" \
+    -I"$QMK_ROOT" \
+    -I"$QMK_ROOT/quantum" \
+    -I"$QMK_ROOT/quantum/keymap_extras" \
+    -I"$QMK_ROOT/quantum/send_string" \
+    -I"$QMK_ROOT/quantum/sequencer" \
+    -I"$QMK_ROOT/quantum/pointing_device" \
+    -I"$QMK_ROOT/quantum/logging" \
+    -I"$QMK_ROOT/tmk_core/protocol" \
+    -I"$QMK_ROOT/platforms" \
+    "$ROOT/tests/host/qmk_auto_mouse_toggle_contract_test.c" \
+    "$QMK_ROOT/quantum/pointing_device/pointing_device_auto_mouse.c" \
+    -o "$BUILD_DIR/qmk_auto_mouse_toggle_contract_test"
+"$BUILD_DIR/qmk_auto_mouse_toggle_contract_test"
+
 PYTHONDONTWRITEBYTECODE=1 python3 - "$QMK_ROOT" "$ROOT" <<'PY'
 from pathlib import Path
 import re

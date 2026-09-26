@@ -445,6 +445,13 @@ void pointer_layer_policy_note_action(uint16_t action, bool pressed) {
     (void)pressed;
 }
 
+void pointer_layer_policy_sync_layer_lock_anchor(void) {}
+
+void pointer_layer_policy_take_back_qmk_toggle(uint16_t keycode, const keyrecord_t *record) {
+    (void)keycode;
+    (void)record;
+}
+
 static void action_dispatch_at(keypos_t key_pos, uint16_t action) {
     noah_action_desc_t desc = noah_action_describe(action);
 

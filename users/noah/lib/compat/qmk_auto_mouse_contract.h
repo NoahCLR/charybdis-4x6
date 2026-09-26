@@ -12,6 +12,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "qmk_tapping_contract.h"
+
 #if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE)
 #    include "pointing_device_auto_mouse.h" // QMK (firmware fork)
 
@@ -65,6 +67,31 @@ static inline void noah_qmk_contract_auto_mouse_toggle(void) {
 static inline void noah_qmk_contract_auto_mouse_keyevent(bool pressed) {
     auto_mouse_keyevent(pressed);
 }
+
+// Whether QMK's process_auto_mouse flipped its own toggle for this record. It
+// runs before process_record_kb and flips it on the release of TG() or TO() of
+// its layer, and on the release of TT()'s TAPPING_TOGGLE-th tap of it.
+static inline bool noah_qmk_contract_auto_mouse_record_toggles(uint16_t keycode, const keyrecord_t *record) {
+    if (!record || record->event.pressed || !get_auto_mouse_enable()) {
+        return false;
+    }
+
+    uint8_t layer = get_auto_mouse_layer();
+
+    if (IS_QK_TO(keycode)) {
+        return QK_TO_GET_LAYER(keycode) == layer;
+    }
+    if (IS_QK_TOGGLE_LAYER(keycode)) {
+        return QK_TOGGLE_LAYER_GET_LAYER(keycode) == layer;
+    }
+#    if !defined(NO_ACTION_TAPPING) && NOAH_QMK_TAPPING_TOGGLE != 0
+    if (IS_QK_LAYER_TAP_TOGGLE(keycode)) {
+        return QK_LAYER_TAP_TOGGLE_GET_LAYER(keycode) == layer && record->tap.count == NOAH_QMK_TAPPING_TOGGLE;
+    }
+#    endif
+
+    return false;
+}
 #else
 static inline bool noah_qmk_contract_auto_mouse_toggle_enabled(void) {
     return false;
@@ -109,5 +136,11 @@ static inline void noah_qmk_contract_auto_mouse_toggle(void) {}
 
 static inline void noah_qmk_contract_auto_mouse_keyevent(bool pressed) {
     (void)pressed;
+}
+
+static inline bool noah_qmk_contract_auto_mouse_record_toggles(uint16_t keycode, const keyrecord_t *record) {
+    (void)keycode;
+    (void)record;
+    return false;
 }
 #endif

@@ -724,6 +724,10 @@ void set_auto_mouse_enable(bool enable) {
     auto_mouse_enabled = enable;
 }
 
+bool get_auto_mouse_enable(void) {
+    return auto_mouse_enabled;
+}
+
 void set_auto_mouse_layer(uint8_t layer) {
     auto_mouse_layer_target = layer;
 }

@@ -9,6 +9,7 @@
 #include "noah_keymap_ids.h"
 #include "../../pointing/defs/pd_modes.h"
 #include "../../pointing/runtime/pd_mode_keyboard_event_internal.h"
+#include "../../pointing/policy/pointer_layer_policy.h"
 #include "reducer/ownership_state.h"
 #include "reducer/runtime.h"
 #include "reducer/state_query.h"
@@ -335,6 +336,11 @@ bool noah_process_record_user(uint16_t keycode, keyrecord_t *record) {
     };
 
     noah_runtime_diag_scope_enter(NOAH_RUNTIME_DIAG_STAGE_PROCESS_RECORD);
+
+    // QMK's auto-mouse has already seen this record, synthetic or not; take
+    // back any lock it kept for itself before the runtime acts on the key.
+    pointer_layer_policy_take_back_qmk_toggle(keycode, record);
+    pointer_layer_policy_sync_layer_lock_anchor();
 
     noah_qmk_combo_origin_normalize_record(keycode, record);
 

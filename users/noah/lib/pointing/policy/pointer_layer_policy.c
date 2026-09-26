@@ -11,6 +11,7 @@
 #include "../../action/action_dispatch.h"
 #include "../../compat/qmk_auto_mouse_contract.h"
 #include "../../key/behavior/key_behavior_lookup.h"
+#include "../../state/ownership/layer_ownership.h"
 
 #ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
 static inline bool pointer_layer_policy_is_layer_hold_key(uint16_t keycode) {
@@ -71,7 +72,35 @@ void pointer_layer_policy_note_action(uint16_t action, bool pressed) {
     noah_qmk_contract_auto_mouse_keyevent(pressed);
 }
 
+// One count on QMK's key tracker while the auto-mouse layer is locked, so
+// neither QMK's timeout nor its reset on the next non-mouse key turns off a
+// layer the runtime still has locked. QMK zeroes the tracker when auto-mouse
+// is switched off or retargeted, so the count is only taken back while one is
+// there to take.
+static bool layer_lock_anchor_active;
+
+void pointer_layer_policy_sync_layer_lock_anchor(void) {
+    bool should_anchor = noah_qmk_contract_auto_mouse_enabled() && layer_ownership_is_locked(noah_qmk_contract_auto_mouse_layer());
+
+    if (should_anchor == layer_lock_anchor_active) {
+        return;
+    }
+
+    if (should_anchor || noah_qmk_contract_auto_mouse_key_tracker() > 0) {
+        noah_qmk_contract_auto_mouse_keyevent(should_anchor);
+    }
+    layer_lock_anchor_active = should_anchor;
+}
+
+void pointer_layer_policy_take_back_qmk_toggle(uint16_t keycode, const keyrecord_t *record) {
+    if (noah_qmk_contract_auto_mouse_record_toggles(keycode, record)) {
+        noah_qmk_contract_auto_mouse_toggle();
+    }
+}
+
 layer_state_t pointer_layer_policy_apply(layer_state_t state) {
+    pointer_layer_policy_sync_layer_lock_anchor();
+
     pd_mode_snapshot_t snapshot             = pd_mode_snapshot();
     bool               prefers_typing_layer = pd_mode_policy_snapshot_prefers_typing_layer(snapshot);
     bool               auto_mouse_anchored  = pointer_layer_policy_auto_mouse_anchored(snapshot);
@@ -138,6 +167,13 @@ bool pointer_layer_policy_is_mouse_action(uint16_t action) {
 void pointer_layer_policy_note_action(uint16_t action, bool pressed) {
     (void)action;
     (void)pressed;
+}
+
+void pointer_layer_policy_sync_layer_lock_anchor(void) {}
+
+void pointer_layer_policy_take_back_qmk_toggle(uint16_t keycode, const keyrecord_t *record) {
+    (void)keycode;
+    (void)record;
 }
 
 layer_state_t pointer_layer_policy_apply(layer_state_t state) {

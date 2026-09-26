@@ -256,6 +256,13 @@ void pointer_layer_policy_note_action(uint16_t action, bool pressed) {
     pointer_action_call_count++;
 }
 
+void pointer_layer_policy_sync_layer_lock_anchor(void) {}
+
+void pointer_layer_policy_take_back_qmk_toggle(uint16_t keycode, const keyrecord_t *record) {
+    (void)keycode;
+    (void)record;
+}
+
 void register_code16(uint16_t keycode) {
     register_code16_call.keycode = keycode;
 }

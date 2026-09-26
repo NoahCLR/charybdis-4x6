@@ -309,6 +309,13 @@ void pointer_layer_policy_note_action(uint16_t action, bool pressed) {
     (void)pressed;
 }
 
+void pointer_layer_policy_sync_layer_lock_anchor(void) {}
+
+void pointer_layer_policy_take_back_qmk_toggle(uint16_t keycode, const keyrecord_t *record) {
+    (void)keycode;
+    (void)record;
+}
+
 static void test_qmk_tap_command_uses_scan_driven_owned_lease(void) {
     test_reset_state();
     macro_buffer[0] = SS_QMK_PREFIX;
