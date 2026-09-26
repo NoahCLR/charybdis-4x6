@@ -18,6 +18,19 @@ export function restoreContentScroll(root, scroll) {
     content.scrollLeft = scroll.left;
 }
 
+// The common Keys floor keeps ordinary tabs level. If one editor grows beyond
+// it, carry that height into the next render before restoring the page scroll.
+export function captureKeysBenchHeight(root, previousScreen, nextScreen) {
+    if (previousScreen !== "keys" || nextScreen !== "keys") return 0;
+    return root.querySelector(".keys-pad .bench")?.getBoundingClientRect().height || 0;
+}
+
+export function restoreKeysBenchHeight(root, height) {
+    if (!height) return;
+    const bench = root.querySelector(".keys-pad .bench");
+    if (bench) bench.style.minHeight = `${height}px`;
+}
+
 // A behaviour group scrolls independently of the page. Measure the actual
 // first five rows because a long reach note can make one row taller.
 export function limitBehaviourGroups(root) {

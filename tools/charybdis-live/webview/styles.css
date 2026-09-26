@@ -500,6 +500,7 @@ button.tier:hover { background: var(--surface-3); }
    would set the width of the page and push it sideways. */
 .keys-pad { grid-template-columns: minmax(0, 1fr); }
 .bench { overflow: hidden; }
+.keys-pad .bench { min-height: 580px; }
 /* Like the layer tabs, the picked workbench tab joins the surface it opens.
    The strip scrolls when narrow; the stage switch stays outside it. */
 .bench-tabs { display: flex; align-items: flex-end; padding: 6px 10px 0; border-bottom: 1px solid var(--line); background: var(--surface-2); }

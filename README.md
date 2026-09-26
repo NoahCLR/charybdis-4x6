@@ -283,6 +283,9 @@ the selected key's layout index appears in its details.
 In **Keys → Behaviours**, one reach section opens at a time. It shows up to
 five rows before its own list scrolls, and the rail keeps its height when
 switching layers.
+Every Keys workbench tab is at least as tall as Behaviours, so switching tabs
+keeps the page at the same scroll position. If an editor grows taller, that
+height stays while switching tabs.
 
 After Apply completes, the editor stays visible while the app reads keys,
 profile domains, combos and base lighting back from the keyboard. The bottom

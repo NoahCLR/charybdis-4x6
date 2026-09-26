@@ -623,7 +623,9 @@ A repeated element sits in the same place every time it appears, so a screen
 reads as a grid rather than as text that wraps wherever it lands.
 The Keys workbench tabs count what the selected layer stores. The Key tab counts
 mapped keys, excluding transparent and disabled positions; its selected key's
-layout index belongs in the key details.
+layout index belongs in the key details. Every Keys tab is at least as tall as
+the Behaviours tab; a taller editor carries its height across tab changes, so
+changing tabs does not move the page's scroll position.
 
 - The review is one grid: a status gutter, the title with its area underneath
   when outside its section, the fields as sign · label · on the keyboard · in

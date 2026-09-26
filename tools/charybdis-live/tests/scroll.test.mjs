@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import {captureContentScroll, captureNestedScroll, limitBehaviourGroups, restoreContentScroll, restoreNestedScroll, scrollContentTo} from "../webview/lib/scroll.mjs";
+import {captureContentScroll, captureKeysBenchHeight, captureNestedScroll, limitBehaviourGroups, restoreContentScroll, restoreKeysBenchHeight, restoreNestedScroll, scrollContentTo} from "../webview/lib/scroll.mjs";
 
 const rootWith = (content) => ({querySelector: (selector) => selector === ".content" ? content : null});
 
@@ -13,6 +13,17 @@ test("rerendering a screen preserves its content scroll position", () => {
     const after = {scrollTop: 0, scrollLeft: 0};
     restoreContentScroll(rootWith(after), scroll);
     assert.deepEqual(after, {scrollTop: 840, scrollLeft: 36});
+});
+
+test("a taller Keys tab keeps enough page height when another tab is shown", () => {
+    const previous = {querySelector: (selector) => selector === ".keys-pad .bench"
+        ? {getBoundingClientRect: () => ({height: 820})} : null};
+    const height = captureKeysBenchHeight(previous, "keys", "keys");
+    const nextBench = {style: {minHeight: ""}};
+    restoreKeysBenchHeight({querySelector: () => nextBench}, height);
+    assert.equal(nextBench.style.minHeight, "820px");
+    assert.equal(captureKeysBenchHeight(previous, "keys", "lighting"), 0,
+        "leaving Keys starts the other screen at its own height");
 });
 
 test("navigating to another screen starts at the top", () => {
