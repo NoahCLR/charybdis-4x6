@@ -112,6 +112,10 @@ test("a new base trades roles with the old one: keys to either keep their number
     const further = reorderLayers(source, [3, 1, 2, 4, 5, 6, 7, 0]);
     assert.equal(further.layers[7][11], 0x5207, "TO(3) reaches the old base in slot 7");
     assert.equal(further.layers[7][12], 0x5262, "TG(2) stays with Symbols");
+    // Keys not following leaves the other layers' keys alone, never the swap.
+    const kept = reorderLayers(source, [3, 1, 4, 5, 6, 7, 2, 0], undefined, {keysFollow: false});
+    assert.deepEqual(kept.layers[7].slice(10, 14), [0x5200, 0x5207, 0x5262, 0x5227], "TO(3) and MO(3) still reach the old base; TG(2) keeps its number");
+    assert.deepEqual(validateSnapshot(kept).behaviors.rows[0].steps[0].hold.action.operand, 7);
     assert.equal(actual.settings.names[0], before.settings.names[3]);
     assert.equal(actual.settings.names[3], before.settings.names[0]);
     assert.deepEqual(actual.rgb.layerColors.find(row => row.layerId === 0).color, before.rgb.layerColors.find(row => row.layerId === 3).color, "the new base keeps its colour");

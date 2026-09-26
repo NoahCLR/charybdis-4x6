@@ -37,8 +37,16 @@ typedef struct {
     uint32_t exchanges;
     uint32_t drop_before_delivery_exchange;
     uint32_t drop_after_delivery_exchange;
-    bool     connected;
-    bool     corrupt_next_response;
+    // This exchange answers with the peer's previous reply, well formed, and
+    // never delivers the request: QMK's RPC does this when the peer skips its
+    // callback and the response buffer still holds the last answer.
+    uint32_t replay_previous_response_exchange;
+    // This exchange answers with `injected` and never delivers the request.
+    uint32_t                      inject_response_exchange;
+    noah_profile_split_v1_frame_t injected;
+    uint8_t                       previous_response[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE];
+    bool                          connected;
+    bool                          corrupt_next_response;
 } link_t;
 
 struct half {
@@ -192,9 +200,19 @@ static bool exchange(void *context, const uint8_t request[NOAH_PROFILE_SPLIT_V1_
         link->drop_before_delivery_exchange = 0u;
         return false;
     }
+    if (link->replay_previous_response_exchange == link->exchanges) {
+        link->replay_previous_response_exchange = 0u;
+        memcpy(response, link->previous_response, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE);
+        return true;
+    }
+    if (link->inject_response_exchange == link->exchanges) {
+        link->inject_response_exchange = 0u;
+        return noah_profile_split_v1_frame_encode(&link->injected, response);
+    }
     if (!link->connected || !link->peer || !noah_profile_split_reconciler_receive(&link->peer->reconciler, request, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE, response, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE)) {
         return false;
     }
+    memcpy(link->previous_response, response, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE);
     if (link->drop_after_delivery_exchange == link->exchanges) {
         link->drop_after_delivery_exchange = 0u;
         return false;
@@ -758,6 +776,45 @@ static void test_prepared_push_pauses_before_commit_then_authorizes(void) {
     assert(left.store.committed.payload_digest == descriptor.payload_digest);
 }
 
+// After the commit is authorized, a replayed reply must still end with the
+// peer holding the copy: the sender retries in place instead of reading the
+// peer from the metadata poll mid-commit.
+static void test_authorized_commit_survives_one_replayed_reply(void) {
+    for (uint32_t fault = 1u;; fault++) {
+        half_t                          left;
+        half_t                          right;
+        noah_profile_split_descriptor_t descriptor;
+        staged_source_t                 source = {.bytes = empty_profile, .length = sizeof(empty_profile)};
+        bool                            done   = false;
+
+        half_storage_init(&left);
+        half_storage_init(&right);
+        pair_init(&left, &right);
+        run_pair_until_converged(&left, &right, false);
+        descriptor = committed_descriptor(&right, 20u, 1u);
+        run_prepared_push_until_ready(&right, &left, &descriptor, &source);
+        right.link.replay_previous_response_exchange = right.link.exchanges + fault;
+        assert(noah_profile_split_reconciler_prepared_push_authorize_commit(&right.reconciler, &descriptor));
+        for (uint32_t scan = 0u; scan < MAX_SCANS && !done; scan++) {
+            uint32_t now = 21000u + scan * NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS;
+
+            assert_one_scan_budget(&right, true, now);
+            assert_one_scan_budget(&left, false, now);
+            done = left.store.committed.slot != NOAH_PROFILE_SLOT_NONE && !right.reconciler.prepared_push_active;
+        }
+        if (!done) {
+            fprintf(stderr, "authorized commit wedged: replayed reply at exchange %u; sender state %u, status %u, push active %u, peer committed %u\n", (unsigned)fault, (unsigned)right.reconciler.state,
+                    (unsigned)right.reconciler.last_status, (unsigned)right.reconciler.prepared_push_active, (unsigned)(left.store.committed.slot != NOAH_PROFILE_SLOT_NONE));
+            assert(!"one replayed reply wedged the authorized commit");
+        }
+        assert(left.store.committed.generation == descriptor.generation);
+        if (right.link.replay_previous_response_exchange != 0u) {
+            assert(fault > 2u);
+            return;
+        }
+    }
+}
+
 static void test_prepared_push_cancel_aborts_peer_lease(void) {
     half_t                          left;
     half_t                          right;
@@ -989,6 +1046,75 @@ static void test_prepared_push_survives_one_lost_exchange_anywhere(void) {
         }
     }
     assert(exchanges_clean > 2u * (sizeof(max_profile) / NOAH_PROFILE_SPLIT_V1_CHUNK_MAX));
+}
+
+// Sends a full-size prepared copy with one fault planted at exchange `fault`
+// (counted from the start of the copy) and reports whether the fault fired.
+// The copy must end on its own: at the barrier, or stopped with the
+// receiver's real verdict on this all-zero payload. A copy that parks while
+// the push is still active wedges Apply: the owner can no longer cancel it.
+static bool run_prepared_push_with_fault(uint32_t fault, bool replay, const noah_profile_split_v1_frame_t *injected) {
+    half_t                          left;
+    half_t                          right;
+    noah_profile_split_descriptor_t descriptor;
+    staged_source_t                 source   = {.bytes = max_profile, .length = sizeof(max_profile)};
+    uint32_t                        start_at = 100000u;
+    bool                            done     = false;
+    bool                            fired;
+
+    half_storage_init(&left);
+    half_storage_init(&right);
+    pair_init(&left, &right);
+    run_pair_until_converged(&left, &right, false);
+    descriptor                = committed_descriptor(&right, 32u, 1u);
+    descriptor.payload_length = sizeof(max_profile);
+    descriptor.payload_crc32  = payload_crc(max_profile, sizeof(max_profile));
+    descriptor.payload_digest = payload_digest(max_profile, sizeof(max_profile));
+    if (replay) {
+        right.link.replay_previous_response_exchange = right.link.exchanges + fault;
+    } else {
+        right.link.inject_response_exchange = right.link.exchanges + fault;
+        right.link.injected                 = *injected;
+    }
+    assert(noah_profile_split_reconciler_prepared_push_begin(&right.reconciler, &descriptor, &source, staged_read));
+    for (uint32_t scan = 0u; scan < MAX_SCANS * 2u && !done; scan++) {
+        uint32_t now = start_at + scan * NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS;
+        assert_one_scan_budget(&right, true, now);
+        assert_one_scan_budget(&left, false, now);
+        done = right.reconciler.state == NOAH_PROFILE_SPLIT_RECONCILER_STOPPED || noah_profile_split_reconciler_prepared_push_ready(&right.reconciler, NULL);
+    }
+    fired = (replay ? right.link.replay_previous_response_exchange : right.link.inject_response_exchange) == 0u;
+    if (!done || (right.reconciler.state == NOAH_PROFILE_SPLIT_RECONCILER_STOPPED && right.reconciler.last_status != NOAH_PROFILE_SPLIT_V1_STATUS_VALIDATION_ERROR)) {
+        fprintf(stderr, "copy wedged: %s at exchange %u; sender state %u, status %u, offset %u of %u, push active %u\n", replay ? "replayed reply" : "injected reply", (unsigned)fault,
+                (unsigned)right.reconciler.state, (unsigned)right.reconciler.last_status, (unsigned)right.reconciler.transfer_offset, (unsigned)descriptor.payload_length, (unsigned)right.reconciler.prepared_push_active);
+        assert(!"one stray reply wedged the copy");
+    }
+    return fired;
+}
+
+// A reply to an earlier request is a lost exchange, not a verdict. Parking
+// the push in the converged poll left byte 1050 of 2646 on a real keyboard
+// with the host's ABORT unprocessed until it was power-cycled.
+static void test_prepared_push_survives_one_replayed_reply_anywhere(void) {
+    uint32_t fault = 1u;
+
+    while (run_prepared_push_with_fault(fault, true, NULL)) {
+        fault++;
+    }
+    assert(fault > 2u * (sizeof(max_profile) / NOAH_PROFILE_SPLIT_V1_CHUNK_MAX));
+}
+
+// Whatever sends an active push back to the metadata poll, here a stray
+// STALE error that answers no request of this copy, both halves still hold
+// the old profile there. The push must resume rather than read that as
+// converged.
+static void test_prepared_push_resumes_from_the_metadata_poll(void) {
+    noah_profile_split_v1_frame_t stale = {.kind = NOAH_PROFILE_SPLIT_V1_ERROR, .status = NOAH_PROFILE_SPLIT_V1_STATUS_STALE};
+
+    for (uint32_t fault = 1u; fault <= 8u; fault++) {
+        assert(run_prepared_push_with_fault(fault, false, &stale));
+    }
+    assert(run_prepared_push_with_fault(60u, false, &stale));
 }
 
 // A receiver left holding a half-received lease, here because the sender
@@ -1660,6 +1786,7 @@ int main(void) {
     test_convergence_only_answers_inbound_prepare_busy_without_storage();
     test_prepared_push_collects_expected_mailbox_ack_without_failure_backoff();
     test_prepared_push_pauses_before_commit_then_authorizes();
+    test_authorized_commit_survives_one_replayed_reply();
     test_prepared_push_cancel_aborts_peer_lease();
     test_prepared_abort_is_bounded_when_peer_goes_silent();
     test_prepared_abort_is_bounded_when_peer_stays_busy();
@@ -1672,6 +1799,8 @@ int main(void) {
     test_cancel_refuses_matching_durable_peer();
     test_crossed_prepare_begin_loser_abort_does_not_deadlock();
     test_prepared_push_survives_one_lost_exchange_anywhere();
+    test_prepared_push_survives_one_replayed_reply_anywhere();
+    test_prepared_push_resumes_from_the_metadata_poll();
     test_stale_receive_lease_expires_while_the_link_stays_busy();
     test_prepared_push_restarts_when_the_receiver_drops_its_lease();
     test_receiver_recovers_after_a_storage_failure();

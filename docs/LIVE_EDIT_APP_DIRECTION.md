@@ -700,7 +700,10 @@ the old base, wherever it went. The key that held Numbers from Base holds Base
 from Numbers, and `TO(Game)` becomes the key that switches back. Following them
 instead, as the first version did, turned `MO(n)`, `LT(n, …)`, `TT(n)` and
 `TG(n)` into `MO(0)` and the like, which do nothing because the base is always
-on. Every other key, behaviour and combo reference follows its layer, as do
+on. The swap holds whether or not keys follow their layers: with the toggle off,
+a key that kept its number would reach whatever took the old base's slot once
+it moved on, so the toggle only decides for references to the other layers.
+Every other key, behaviour and combo reference follows its layer, as do
 names, colours, LED group rows, and the pointer, sniping and combo-reference
 settings, which name a layer by what it holds. The startup layers are slots and
 stay on the bottom one. The swap cannot fill in what the new base leaves

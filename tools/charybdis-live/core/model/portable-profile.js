@@ -185,14 +185,20 @@ const decodedOf = snapshot => snapshot.decoded && snapshot.decoded.document === 
 // TG(0) and the like, which do nothing since the base is always on. The
 // startup layers are slots in the same way. The pointer and sniping layers and
 // the combo references name a layer by what it holds, so they follow it.
+//
+// The swap is not keysFollow's to turn off: keys that kept their numbers would
+// reach whatever took the old base's slot once it moved on, so the key that
+// switched back would switch somewhere else. Without keysFollow, only the
+// references to the other layers keep their numbers.
 function reorderLayers(document, order, names, {keysFollow = true} = {}) {
     if (document.layers?.length !== 8) throw fail("Layer ordering becomes available after the eight-layer update.");
     const validated = validateSnapshot(document), result = JSON.parse(JSON.stringify(document));
     if (!Array.isArray(order) || order.length !== 8 || new Set(order).size !== 8 || order.some(id => !Number.isInteger(id) || id < 0 || id >= 8)) throw fail("Include every layer once.");
     const remap = []; order.forEach((old, next) => {remap[old] = next;});
-    const reach = old => (old === 0 ? 0 : old === order[0] ? remap[0] : remap[old]);
+    const reach = old => (old === 0 ? 0 : old === order[0] ? remap[0] : keysFollow ? remap[old] : old);
+    const renumbers = keysFollow || order[0] !== 0;
     function native(code) {
-        if (!keysFollow) return code;
+        if (!renumbers) return code;
         if (code >= 0x4000 && code <= 0x4fff) {const layer = (code >> 8) & 15; if (layer >= 8) throw fail("A key points outside the layer bank."); return (code & 0xf0ff) | (reach(layer) << 8);}
         for (const start of [0x5200, 0x5220, 0x5240, 0x5260, 0x5280, 0x52c0, 0x52e0, 0x7e5c]) {
             const width = start === 0x7e5c ? 8 : 32;
@@ -205,7 +211,7 @@ function reorderLayers(document, order, names, {keysFollow = true} = {}) {
     result.layers = order.map(old => document.layers[old].map(native));
     const {rgb, behaviors, combos, settings, pdModes} = validated;
     const actionOptions = actionLimitsFor(pdModes ? 2 : 1);
-    const action = a => {if (!keysFollow) return; if ([2, 3].includes(a.kind)) a.operand = reach(a.operand); else if (a.kind === 1) a.operand = native(a.operand);};
+    const action = a => {if (!renumbers) return; if ([2, 3].includes(a.kind)) a.operand = reach(a.operand); else if (a.kind === 1) a.operand = native(a.operand);};
     walkActions(behaviors, action); walkActions(combos, action);
     rgb.layerColors.forEach(row => {row.layerId = remap[row.layerId];}); rgb.layerColors.sort((a, b) => a.layerId - b.layerId);
     rgb.layerGroupRows.forEach(row => {if (row.selector !== 255) row.selector = remap[row.selector];});

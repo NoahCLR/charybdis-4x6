@@ -68,7 +68,7 @@ layers, behaviours and combos so each still reaches the same layer. Make base is
 the exception: the two layers trade roles, so `TO(0)` still goes home and a key
 that reached the new base now reaches the old one — the key that held Numbers
 from Base holds Base from Numbers. Turned off, the layers move but those keys
-keep their numbers. Names, colours and the pointer and sniping settings move
+keep their numbers — except the swap, which the toggle does not change. Names, colours and the pointer and sniping settings move
 with their layer either way. After Make base, the review's checks say what it
 left behind: transparent keys on the new base, which have nothing under them,
 the old base if nothing reaches it, and any layer key that holds or toggles the

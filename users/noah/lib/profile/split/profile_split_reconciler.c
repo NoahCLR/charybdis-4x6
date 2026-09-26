@@ -811,7 +811,16 @@ static void stop_with_status(noah_profile_split_reconciler_t *reconciler, noah_p
 
 static void handle_protocol_error(noah_profile_split_reconciler_t *reconciler, const noah_profile_split_v1_frame_t *response, uint32_t now) {
     if (!response || response->kind != NOAH_PROFILE_SPLIT_V1_ERROR) {
+        // A well-formed reply to some other request is what QMK's RPC returns
+        // when the peer skipped its callback: the response buffer still holds
+        // the previous answer. That is a lost exchange, so a prepared push
+        // retries in place exactly as it does after one.
+        noah_profile_split_reconciler_state_t interrupted = reconciler->state;
+
         transport_lost(reconciler, now);
+        if (0 && reconciler->prepared_push_active && interrupted >= NOAH_PROFILE_SPLIT_RECONCILER_PUSH_BIND && interrupted <= NOAH_PROFILE_SPLIT_RECONCILER_PUSH_COMMIT) {
+            reconciler->state = interrupted;
+        }
         return;
     }
     // The receiver could not store this copy, typically one failed flash
@@ -856,6 +865,16 @@ static void begin_authority_action(noah_profile_split_reconciler_t *reconciler, 
         case NOAH_PROFILE_SPLIT_AUTHORITY_COMMITTED_CONVERGED:
             if (reconciler->prepared_push_active && descriptor_equal(&reconciler->local_descriptor, &reconciler->transfer_descriptor) && descriptor_equal(&reconciler->peer_descriptor, &reconciler->transfer_descriptor)) {
                 clear_prepared_push(reconciler);
+            } else if (reconciler->prepared_push_active && !descriptor_equal(&reconciler->peer_descriptor, &reconciler->transfer_descriptor)) {
+                // Both halves still agree on the old profile and the peer does
+                // not hold this copy yet. Only a clear or a cancel ends a
+                // prepared push; parking it here leaves the host transaction
+                // unable to finish or cancel. Resume at the receiver's offset.
+                reconciler->transfer_offset       = 0u;
+                reconciler->outbound_chunk_length = 0u;
+                reconciler->state                 = reconciler->prepared_logical ? NOAH_PROFILE_SPLIT_RECONCILER_PUSH_BIND : NOAH_PROFILE_SPLIT_RECONCILER_PUSH_BEGIN;
+                publish_authority(reconciler);
+                break;
             }
             reconciler->state           = NOAH_PROFILE_SPLIT_RECONCILER_CONVERGED;
             reconciler->next_attempt_at = now + NOAH_PROFILE_SPLIT_POLL_MS;
