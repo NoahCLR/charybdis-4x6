@@ -2,7 +2,7 @@
 
 import {css, isOff, label as hsvLabel} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
-import {getModel, layerName, layers, render, state} from "../store.mjs";
+import {getModel, heldLayers, layerName, layers, previewing, render, showLayer, state, toggleLayerOn} from "../store.mjs";
 import {layerColourRow, stageEnabled} from "../view/lighting.mjs";
 import {draftMarks} from "../view/review.mjs";
 
@@ -17,21 +17,33 @@ export function layerSwatch(model, layer) {
     };
 }
 
+// ⌘ on a Mac, Ctrl elsewhere: the modifier a click adds a layer to the preview with.
+const ADD_KEY = /Mac|iPhone|iPad/.test(globalThis.navigator?.platform || "") ? "⌘" : "Ctrl";
+
 // The layer tabs. Which layer you are looking at is a property of the
 // keyboard, not of a screen, so Keys and Lighting share one control, and it
 // sits on the board it chooses for: the picked layer's tab opens into it.
+// ⌘-click previews more layers on together (view/layer-set.mjs); the highest
+// keeps the tab that opens into the board, the others and base show as on.
 export function layerBar(trailing = "") {
     const model = getModel();
     const drafted = draftMarks(model?.draft?.changes).layers;
+    const held = new Set(heldLayers());
     const tabs = layers().map((layer, index) => {
         const swatch = layerSwatch(model, layer);
-        return `<button class="layer-tab" role="tab" data-layer="${index}" aria-selected="${state.layer === index}"
-            data-tip="${esc(swatch.tip)}${drafted.has(layer.index) ? " · changed in your draft" : ""}">${swatch.html}
+        const on = held.has(index) || (index === 0 && previewing());
+        const how = index === state.layer && previewing()
+            ? " · on top, so it wins · edits go here"
+            : on ? (index === 0 ? " · always on" : ` · on in this preview · ${ADD_KEY}-click to turn off`)
+            : index === 0 ? "" : ` · ${ADD_KEY}-click to preview with the layers on`;
+        return `<button class="layer-tab${on ? " on" : ""}" role="tab" data-layer="${index}" aria-selected="${state.layer === index}"
+            data-tip="${esc(swatch.tip)}${drafted.has(layer.index) ? " · changed in your draft" : ""}${esc(how)}">${swatch.html}
             <span>${esc(layerName(layer))}</span><span class="idx">${layer.index}</span>${drafted.has(layer.index) ? '<i class="draft-dot"></i>' : ""}</button>`;
     }).join("");
     const node = el(`<div class="layerbar-wrap"><div class="layer-tabs" role="tablist" aria-label="Layers">${tabs}${trailing}</div></div>`);
-    node.querySelectorAll("[data-layer]").forEach((button) => button.addEventListener("click", () => {
-        state.layer = Number(button.dataset.layer);
+    node.querySelectorAll("[data-layer]").forEach((button) => button.addEventListener("click", (event) => {
+        if (event.metaKey || event.ctrlKey) toggleLayerOn(Number(button.dataset.layer));
+        else showLayer(Number(button.dataset.layer));
         render();
     }));
     keepInView(node.querySelector(".layer-tabs"));

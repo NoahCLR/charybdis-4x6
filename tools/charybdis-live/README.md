@@ -64,6 +64,19 @@ layers, behaviours and combos so each still reaches the same layer; turned off,
 the layers move but those keys keep their numbers. Names, colours and the
 pointer and sniping settings move with their layer either way.
 
+**⌘-click** (Ctrl-click off a Mac) more layer tabs to preview them on
+together. The board then shows what the keyboard would answer with, by the
+firmware's rule: the highest layer on wins, a transparent key is answered by the
+highest layer below it that is also on, and Base is always on. Keys answered from
+below are dimmed and tagged with their layer's number (Base's go untagged), and
+on Lighting the board paints every layer on, lowest first, as the keyboard does.
+The highest layer keeps the tab joined to the board and every edit is stored on
+it; a key answered from below says so on the Key tab, and setting it overrides
+that answer. ⌘-click a layer again to take it out, or click any tab or **Show
+one layer** to go back. The set holds across Keys and Lighting and is dropped
+when the keyboard or its layer order changes. It is a what-if: a set no key can
+actually hold together still previews.
+
 Every colour on screen is a colour the keyboard emits; one amber signal marks
 work that has not reached the keyboard yet. Complete edits stage into one draft
 as they are made; incomplete builders such as a new combo keep their local form

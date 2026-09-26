@@ -4,9 +4,9 @@
 import {css, isOff, label as hsvLabel} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {LED_INDEX} from "../view/geometry.mjs";
-import {actionLabel, behaviourFor, behaviourListeningTo, canonicalKeycode, behaviourGridSteps, behaviourGroups, behaviourRouteKeys, behaviourTiers, comboEditInputs, comboGroups, combosAt, keyFace, keyMeaning, macroReach, pointingReach, pointingSlotFor, pointingVariant, reachKeys} from "../view/keyface.mjs";
+import {actionLabel, behaviourFor, behaviourListeningTo, resolvedPositions, canonicalKeycode, behaviourGridSteps, behaviourGroups, behaviourRouteKeys, behaviourTiers, comboEditInputs, comboGroups, combosAt, keyFace, keyMeaning, macroReach, pointingReach, pointingSlotFor, pointingVariant, reachKeys} from "../view/keyface.mjs";
 import {feedbackColours, layerColourRow, pdColourRow, stageEnabled} from "../view/lighting.mjs";
-import {closeComboBuilder, currentLayer, getModel, layerName, layers, openComboBuilder, positionAt, post, render, selectedPosition, state, writable, canEdit as canEditArea} from "../store.mjs";
+import {closeComboBuilder, currentLayer, getModel, heldLayers, layerName, layers, openComboBuilder, positionAt, post, previewing, render, selectedPosition, showLayer, state, writable, canEdit as canEditArea} from "../store.mjs";
 import * as edits from "../view/edits.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
 import {board} from "./board.mjs";
@@ -70,6 +70,7 @@ export function screenKeys() {
         drafted: draftMarks(model?.draft?.changes).keys.get(layer.index),
         reach: building ? state.combo.inputs : reachHighlight(model),
         picking: state.combo.picking || Boolean(state.placement),
+        held: heldLayers(),
         onKey: (index) => {
             if (state.placement) {
                 const placement = state.placement;
@@ -94,7 +95,7 @@ export function screenKeys() {
         onOpen: writable() ? (index) => pickKeycodeFor(index) : undefined,
         onSwap: writable() ? (from, to) => swapKeys(from, to) : undefined,
     }));
-    card.appendChild(el(`<div class="board-foot">${lit
+    card.appendChild(previewing() ? previewFoot(layer) : el(`<div class="board-foot">${lit
         ? `lit ${esc(hsvLabel(row.color))} on ${row.mode === "ALL_KEYS" ? "every key" : "keys mapped here"}`
         : "no layer colour · the base effect shows through"}</div>`));
     card.append(bar);
@@ -102,6 +103,18 @@ export function screenKeys() {
     pad.append(stage, bench());
     main.appendChild(content);
     return main;
+}
+
+// The caption while layers are previewed on together: which ones, in the
+// order they win, and the way back to one layer.
+export function previewFoot(layer, lead = "") {
+    const under = [...heldLayers()].reverse().map((at) => layerName(layers()[at]));
+    const node = el(`<div class="board-foot">${lead}
+        <span><b>${esc(layerName(layer))}</b> on top of ${esc([...under, layerName(layers()[0])].join(", "))}
+            · keys from lower layers are dimmed, tagged unless from ${esc(layerName(layers()[0]))} · edits go to ${esc(layerName(layer))}</span>
+        <span class="right"><button class="btn tiny ghost" data-act="onelayer">Show one layer</button></span></div>`);
+    node.querySelector('[data-act="onelayer"]').addEventListener("click", () => { showLayer(state.layer); render(); });
+    return node;
 }
 
 function placementBar() {
@@ -234,6 +247,7 @@ function tabKey(body) {
                 <dt>Layout index</dt><dd>${position?.layoutIndex ?? "—"}</dd>
                 <dt>LED index</dt><dd>${LED_INDEX[position?.layoutIndex] ?? "—"}</dd>
             </dl>
+            ${answeredBelow(layer, position)}
             ${writable() ? "" : `<div class="unavailable" style="margin-top:12px">${esc(unavailable(model))}</div>`}
         </section>
         <section>
@@ -275,7 +289,7 @@ function tabKey(body) {
         post(edits.setKey(layer.name, position.layoutIndex, written));
     });
     node.querySelectorAll("[data-golayer]").forEach((button) => button.addEventListener("click", () => {
-        state.layer = Number(button.dataset.golayer);
+        showLayer(Number(button.dataset.golayer));
         render();
     }));
     node.querySelectorAll("[data-goto]").forEach((button) => button.addEventListener("click", () => {
@@ -285,6 +299,18 @@ function tabKey(body) {
         render();
     }));
     body.replaceChildren(node);
+}
+
+// In a layer preview, the selected key may be answered by a layer below: say
+// so, and that what is set here is stored on this layer and wins over it.
+function answeredBelow(layer, position) {
+    if (!previewing() || !position) return "";
+    const answer = resolvedPositions(layers(), state.layer, heldLayers())
+        .find((entry) => entry.position.layoutIndex === position.layoutIndex);
+    if (!answer?.fellThrough) return "";
+    return `<p class="note" style="margin-top:12px">In this preview <b>${esc(layerName(answer.layer))}</b> answers here
+        with ${esc(keyFace(answer.position).main || answer.position.keycode)}, through a transparent key. A keycode set here
+        is stored on ${esc(layerName(layer))} and wins over it.</p>`;
 }
 
 /* ── behaviours: tap count × tier, drawn as the grid it is ─────────────── */

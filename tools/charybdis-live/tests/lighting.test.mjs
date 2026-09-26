@@ -75,6 +75,18 @@ test("a mapped-keys-only layer paints its own keys and leaves the rest on the ba
     assert.equal(through.source, "base");
 });
 
+test("layers previewed on paint in the same ascending pass, under the viewed layer", () => {
+    const m = model();
+    m.rgb.layerColors = [...m.rgb.layerColors, {layer: "Layer 1", layerId: 1, color: colour(85, 255, 200), mode: "ALL_KEYS"}];
+    const layer = {index: 3};
+    assert.equal(keyLight(m, layer, position(14, "KC_TRANSPARENT")).source, "base", "alone, layer 3 leaves an unmapped key on the base");
+    assert.deepEqual(keyLight(m, layer, position(14, "KC_TRANSPARENT"), {held: [1]}).colour, colour(85, 255, 200),
+        "with layer 1 on, its all-keys wash shows under layer 3's unmapped key");
+    assert.deepEqual(keyLight(m, layer, position(13, "KC_UP"), {held: [1]}).colour, colour(180, 255, 200),
+        "layer 3 still paints its own keys over layer 1");
+    assert.deepEqual(trackballLight(m, layer, {held: [1]}).colour, colour(85, 255, 200), "an all-keys wash reaches the trackball LED");
+});
+
 test("an all-keys layer paints transparent positions too", () => {
     const light = keyLight(model(), {index: 4}, position(14, "KC_TRANSPARENT"));
     assert.deepEqual(light.colour, colour(0, 0, 158));

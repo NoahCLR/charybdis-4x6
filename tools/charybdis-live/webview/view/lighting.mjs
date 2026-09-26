@@ -96,6 +96,10 @@ function mappedOn(model, layer, l, position) {
  *   the layer LED group rows → a previewed pointing mode by locality → its
  *   LED group rows.
  *
+ * `options.held` names the layers previewed on as well (by layer id); they
+ * paint in the same ascending pass, as rgb_layer_stage.c paints every active
+ * layer.
+ *
  * `position` is the key over this LED, or undefined for the trackball LED,
  * which no key maps to: an all-keys wash reaches it, a mapped-keys layer never
  * does. A pointing-mode colour is an overlay that exists only while its mode
@@ -108,7 +112,7 @@ function ledLight(model, layer, led, position, options = {}) {
     const paint = (next, from) => { colour = next; source = from; };
 
     if (stageEnabled(model, "layers")) {
-        const active = [...new Set([0, layer?.index ?? 0])].sort((a, b) => a - b);
+        const active = [...new Set([0, layer?.index ?? 0, ...(options.held || [])])].sort((a, b) => a - b);
         for (const l of active) {
             const row = layerColourRow(model, l);
             if (!row || !solid(row.color)) continue;

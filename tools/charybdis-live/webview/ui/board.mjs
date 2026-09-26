@@ -1,18 +1,30 @@
 // The board: the one constant surface. It paints the light the keyboard would
 // show for this layer, draws the legend on top in whichever of black or white
 // stays readable, and marks what each key reaches.
+//
+// With layers previewed on under it (`held`, positions in the stack), each key
+// shows what the keyboard would answer with instead of what this layer stores:
+// a transparent key shows the key of the highest layer below that is on,
+// dimmed, and tagged with that layer's number unless it is base, which answers
+// whatever nothing else does. Selection and edits still name this layer's own
+// position.
 
 import {css, idealText, isOff} from "../lib/colour.mjs";
 import {GEO, LED_INDEX, TRACKBALL_LED, fitText, keyFaceRows, keyVisual} from "../view/geometry.mjs";
-import {behaviourFor, behaviourTiers, combosAt, keyFace, keyMeaning} from "../view/keyface.mjs";
+import {behaviourFor, behaviourTiers, combosAt, keyFace, keyMeaning, resolvedPositions} from "../view/keyface.mjs";
 import {keyLight, stageEnabled, tierColour, trackballLight} from "../view/lighting.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {hideHover} from "./hover.mjs";
 
 export function board(model, layer, options = {}) {
     const {selected, mode = "light", picks = [], reach = [], pdActive = null, drafted = null,
-        faces = true, trackball = false, onKey, onOpen, onSwap, onTrackball} = options;
+        faces = true, trackball = false, held = [], onKey, onOpen, onSwap, onTrackball} = options;
     const positions = layer?.positions || [];
+    const stack = model?.layers || [];
+    const heldIds = held.map((at) => stack[at]?.index).filter((id) => id !== undefined);
+    const answering = held.length && mode !== "leds"
+        ? new Map(resolvedPositions(stack, stack.indexOf(layer), held).map((entry) => [entry.position.layoutIndex, entry]))
+        : null;
     const feedbackOn = stageEnabled(model, "key");
     const comboColour = model?.rgb?.comboFeedback?.color;
     const comboLit = stageEnabled(model, "combo") && comboColour && !isOff(comboColour);
@@ -21,27 +33,31 @@ export function board(model, layer, options = {}) {
     for (const position of positions) {
         const index = position.layoutIndex;
         const visual = keyVisual(index);
-        const face = keyFace(position);
+        const answer = answering?.get(index);
+        const shown = answer?.position || position;
+        const from = answer?.fellThrough ? answer.layer : null;
+        const face = keyFace(shown);
         const cx = visual.x + GEO.keyW / 2, cy = visual.y + GEO.keyH / 2;
         const transform = visual.angle ? ` transform="rotate(${visual.angle} ${cx} ${cy})"` : "";
         const classes = ["kc",
             face.kind === "transparent" ? "kc-trns" : "",
             face.kind === "disabled" ? "kc-none" : "",
+            from ? "kc-under" : "",
             options.picking ? "pickable" : ""].filter(Boolean).join(" ");
 
         let fill = "", text = "";
         if (mode === "leds") {
             fill = picks.includes(index) ? ` style="fill:var(--key-hi);stroke:var(--text);stroke-width:2"` : "";
         } else {
-            const light = keyLight(model, layer, position, {pdActive});
+            const light = keyLight(model, layer, position, {pdActive, held: heldIds});
             text = idealText(light.colour);
             const paint = css(light.colour);
-            fill = ` style="fill:${paint};stroke:rgba(255,255,255,${face.kind === "transparent" ? ".16" : ".3"})"`;
-            glow += `<rect class="kc-glow" x="${visual.x}" y="${visual.y}" width="${GEO.keyW}" height="${GEO.keyH}" rx="${GEO.radius}" fill="${paint}"${transform}></rect>`;
+            fill = ` style="fill:${paint};stroke:${face.kind === "transparent" ? "none" : "rgba(255,255,255,.3)"}"`;
+            glow += `<rect class="kc-glow${face.kind === "transparent" ? " kc-glow-trns" : ""}" x="${visual.x}" y="${visual.y}" width="${GEO.keyW}" height="${GEO.keyH}" rx="${GEO.radius}" fill="${paint}"${transform}></rect>`;
         }
 
         const showMarks = faces && mode !== "leds";
-        const tiers = showMarks ? behaviourTiers(behaviourFor(model, keyMeaning(position))) : [];
+        const tiers = showMarks ? behaviourTiers(behaviourFor(model, keyMeaning(shown))) : [];
         const combos = showMarks ? combosAt(model, model?.layers || [], layer?.index ?? 0, index) : [];
         const sub = mode === "leds" ? "" : face.sub;
         const rows = keyFaceRows(visual.y,
@@ -96,11 +112,12 @@ export function board(model, layer, options = {}) {
         const squeeze = (fit) => fit.squeeze ? ` textLength="${fit.squeeze}" lengthAdjust="spacingAndGlyphs"` : "";
 
         keys += `<g class="${classes}${selected === index ? " sel" : ""}" data-key="${index}" tabindex="0" role="button"
-            aria-label="${esc(keyMeaning(position))} at index ${index}"${transform}>
+            aria-label="${esc(keyMeaning(shown))} at index ${index}${from ? `, from ${esc(from.displayName || from.name || `layer ${from.index}`)}` : ""}"${transform}>
             <rect class="kc-rect" x="${visual.x}" y="${visual.y}" width="${GEO.keyW}" height="${GEO.keyH}" rx="${GEO.radius}"${fill}></rect>
             ${selected === index ? ring("kc-ring") : ""}
             ${reach.includes(index) ? `<rect class="kc-reach" x="${visual.x - 3}" y="${visual.y - 3}" width="${GEO.keyW + 6}" height="${GEO.keyH + 6}" rx="${GEO.radius + 2}"></rect>` : ""}
             ${marks}
+            ${from && from.index !== 0 ? `<text class="kc-from" x="${visual.x + 6}" y="${visual.y + 7.5}"${text ? ` style="fill:${text}"` : ""}>${from.index}</text>` : ""}
             ${drafted?.has(index) ? `<circle class="kc-draft" cx="${visual.x + GEO.keyW - 5.5}" cy="${visual.y + 5.5}" r="2.6"></circle>` : ""}
             ${sub ? `<line class="kc-sep" x1="${visual.x + 8}" y1="${rows.separatorY}" x2="${visual.x + GEO.keyW - 8}" y2="${rows.separatorY}" stroke="${text || "rgba(255,255,255,.9)"}" stroke-width="1"></line>` : ""}
             <text class="kc-label" x="${cx}" y="${rows.mainY}" font-size="${mainFit.size}"${squeeze(mainFit)}${text ? ` style="fill:${text}"` : ""}>${esc(main)}</text>
@@ -111,7 +128,7 @@ export function board(model, layer, options = {}) {
     // The trackball LED is index 56 and belongs to no key, but it is lit like
     // every other LED, so it is drawn with the light it emits rather than as an
     // outline of where the ball sits.
-    const ball = trackballGlyph(model, layer, {mode, pdActive, trackball, clickable: Boolean(onTrackball)});
+    const ball = trackballGlyph(model, layer, {mode, pdActive, held: heldIds, trackball, clickable: Boolean(onTrackball)});
     if (ball.glow) glow += ball.glow;
     const node = el(`<div class="board ${options.picking ? "picking" : ""}">
         <svg viewBox="${GEO.viewBox}" xmlns="http://www.w3.org/2000/svg">${glow}${ball.markup}${keys}</svg></div>`);
@@ -190,9 +207,9 @@ function dragToSwap(node, group, index, onSwap) {
 // The trackball's own LED. In light mode it shows what it emits; in the LED
 // selector it shows its index and whether the pending group has picked it, the
 // same two things every key shows there.
-function trackballGlyph(model, layer, {mode, pdActive, trackball, clickable}) {
+function trackballGlyph(model, layer, {mode, pdActive, held, trackball, clickable}) {
     const {x, y, r} = GEO.trackball;
-    const light = trackballLight(model, layer, {pdActive});
+    const light = trackballLight(model, layer, {pdActive, held});
     const paint = css(light.colour);
     const picked = mode === "leds"
         ? `fill:${trackball ? "var(--key-hi)" : "var(--key)"};stroke:var(--text);stroke-width:${trackball ? 2 : 1}`

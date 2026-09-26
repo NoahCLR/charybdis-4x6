@@ -7,7 +7,7 @@ import {el, esc} from "../lib/dom.mjs";
 import {LED_INDEX, TRACKBALL_LED} from "../view/geometry.mjs";
 import {PD_MODE_IDS, baseColour, feedbackColours, layerColourRow, pdColourRow, stageEnabled, stageIdle, stageInEffect} from "../view/lighting.mjs";
 import {branchName, slotCalled, stageOrder, vocabulary, word} from "../view/vocabulary.mjs";
-import {canEdit as canEditArea, currentLayer, getModel, layerName, layers, post, render, state, writable} from "../store.mjs";
+import {canEdit as canEditArea, currentLayer, getModel, layerName, layers, post, render, state, writable, heldLayers, previewing, showLayer} from "../store.mjs";
 import * as edits from "../view/edits.mjs";
 import {board} from "./board.mjs";
 import {colourEditor} from "./colour-editor.mjs";
@@ -53,6 +53,7 @@ export function screenLighting() {
     card.appendChild(board(model, layer, {
         mode: onGroups ? "leds" : "light",
         faces: !onGroups,
+        held: onGroups ? [] : heldLayers(),
         picks: state.ledPicks,
         trackball: state.trackball,
         pdActive: preview ? {mode: preview.pointingMode, color: preview.color, locality: preview.locality, triggerIndex: undefined} : null,
@@ -67,14 +68,18 @@ export function screenLighting() {
         <b>${onGroups ? "LED selector" : "Preview"}</b>
         <span>${onGroups
             ? `click physical LEDs to build a group · ${state.ledPicks.length} selected${state.trackball ? " + trackball" : ""}`
-            : `${esc(layerName(layer))} over the base effect${preview
+            : `${esc(layerName(layer))}${previewing() && !onGroups
+                ? ` with ${esc([...heldLayers()].reverse().map((at) => layerName(layers()[at])).join(", "))} on`
+                : ""} over the base effect${preview
                 ? ` · ${esc(slotName(model, state.pdSlot))} held, painting ${esc(localityLabel(preview.locality).toLowerCase())}`
                 : ""}`}</span>
         ${onGroups ? `<span class="right">
             <button class="btn tiny ghost" data-act="clearleds">Clear selection</button>
             <button class="btn tiny ${state.trackball ? "primary" : "ghost"}" data-act="trackball"
-                data-tip="Add or remove the trackball LED, index ${TRACKBALL_LED}, from this selection.">Trackball LED</button></span>` : ""}
+                data-tip="Add or remove the trackball LED, index ${TRACKBALL_LED}, from this selection.">Trackball LED</button></span>`
+            : previewing() ? `<span class="right"><button class="btn tiny ghost" data-act="onelayer">Show one layer</button></span>` : ""}
     </div>`));
+    card.querySelector('[data-act="onelayer"]')?.addEventListener("click", () => { showLayer(state.layer); render(); });
     card.querySelector('[data-act="clearleds"]')?.addEventListener("click", () => { state.ledPicks = []; render(); });
     card.querySelector('[data-act="trackball"]')?.addEventListener("click", () => { state.trackball = !state.trackball; render(); });
     card.append(layerBar());
@@ -229,7 +234,7 @@ function stageBody(body) {
             const item = el(`<button class="rowitem ${index === state.layer ? "on" : ""}" data-layer="${index}">
                 <span class="t"><span class="swatch-lg ${lit ? "" : "swatch-off"}" style="width:11px;height:11px;border-radius:3px;display:inline-block;vertical-align:-1px;margin-right:7px;${lit ? `background:${css(row.color)}` : ""}"></span>${esc(layerName(layer))}${marks.lightingLayers.has(layer.index) ? draftDot() : ""}</span>
                 <span class="m mono">${esc(row ? hsvLabel(row.color) : "not reported")} · ${esc(word(vocabulary(model).paintModes, row?.mode).toLowerCase())}</span></button>`);
-            item.addEventListener("click", () => { state.layer = index; render(); });
+            item.addEventListener("click", () => { showLayer(index); render(); });
             list.append(item);
         });
         const layer = currentLayer();

@@ -3,6 +3,8 @@
 // the host, which answers with a new model. The draft lives on that side too,
 // so what is drawn is always what would be applied.
 
+import {layersOn, toggleLayer} from "./view/layer-set.mjs";
+
 const vscode = acquireVsCodeApi();
 
 const openGroups = () => ({here: true, branches: true, combos: true, through: false, belowBranches: false, belowCombos: false, elsewhere: false});
@@ -10,6 +12,7 @@ const openGroups = () => ({here: true, branches: true, combos: true, through: fa
 export const state = {
     screen: "keys",
     layer: 0,
+    layersOn: [],       // layers previewed on with `layer`, which is the highest of them (view/layer-set.mjs)
     selected: 0,
     tab: "key",
     behaviourRow: null,
@@ -119,6 +122,20 @@ export function post(message) {
 
 export const layers = () => getModel()?.layers || [];
 export const currentLayer = () => layers()[state.layer] || layers()[0];
+// The layers previewed on under the current one, and whether any are: the board
+// then shows what the keyboard answers with, not what the layer stores.
+export const heldLayers = () => layersOn(state.layer, state.layersOn, layers().length);
+export const previewing = () => heldLayers().length > 0;
+// A plain pick shows one layer; ⌘-click adds or removes one from the preview.
+export function showLayer(index) {
+    state.layer = index;
+    state.layersOn = [];
+}
+export function toggleLayerOn(index) {
+    const next = toggleLayer(state.layer, heldLayers(), index);
+    state.layer = next.top;
+    state.layersOn = next.on;
+}
 export const layerName = (layer) => layer?.displayName || layer?.name || "";
 export const positionAt = (layer, index) =>
     (layer?.positions || []).find((position) => position.layoutIndex === index);

@@ -7,7 +7,7 @@
 import {el, esc} from "./lib/dom.mjs";
 import {captureContentScroll, restoreContentScroll} from "./lib/scroll.mjs";
 import {activateOnKey, captureFocus, focusDialog, restoreFocus, trapTab} from "./lib/focus.mjs";
-import {closeComboBuilder, getModel, post, render as rerender, resetDraftForms, setModel, setRenderer, state, writable} from "./store.mjs";
+import {closeComboBuilder, getModel, layerName, post, render as rerender, resetDraftForms, setModel, setRenderer, state, writable} from "./store.mjs";
 import {historyAction} from "./view/edits.mjs";
 import {discardLabel, groupNote, placeState, reviewBlocks, statusSummary, stillShown} from "./view/review.mjs";
 import {bindLayerIndex, hideHover, mountHover} from "./ui/hover.mjs";
@@ -25,6 +25,7 @@ import {screenProfile} from "./ui/profile.mjs";
 import {commitBar, rail, topbar, unavailable} from "./ui/shell.mjs";
 
 const root = document.getElementById("root");
+let lastStackKey = null;   // the keyboard and layer stack the previewed layer set was picked on
 let renderedScreen = null;
 
 const SCREENS = {
@@ -217,6 +218,11 @@ addEventListener("message", (event) => {
     if (state.combo.editId !== null && !(message.model?.combos || []).some((combo) => combo.id === state.combo.editId)) closeComboBuilder();
     const layerCount = message.model?.layers?.length || 0;
     if (state.layer >= layerCount) state.layer = 0;
+    // A previewed set names layers by their place in the stack, so it is
+    // dropped when the keyboard or the order under it changes.
+    const stackKey = `${message.model?.device?.label || ""}|${message.model?.device?.connected ? 1 : 0}|${(message.model?.layers || []).map(layerName).join("\u0001")}`;
+    if (stackKey !== lastStackKey) state.layersOn = [];
+    lastStackKey = stackKey;
     const positions = message.model?.layers?.[state.layer]?.positions || [];
     if (!positions.some((position) => position.layoutIndex === state.selected)) {
         state.selected = positions[0]?.layoutIndex ?? 0;

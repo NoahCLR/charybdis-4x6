@@ -270,6 +270,8 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 }
 .layer-tab:hover { color: var(--text); background: var(--surface-3); }
 .layer-tab[aria-selected="true"] { background: var(--surface); border-color: var(--line); color: var(--text); font-weight: 520; }
+/* A layer previewed on under the picked one: lit, but not joined to the board. */
+.layer-tab.on { color: var(--text); background: var(--surface-3); }
 .layer-tab .swatch { width: 9px; height: 9px; border-radius: 3px; border: 1px solid rgba(255,255,255,.18); flex: none; }
 .layer-tab .idx { font-family: var(--mono); font-size: 10px; color: var(--text-3); }
 /* Rename & reorder stays in reach at the strip's end, outside what scrolls. */
@@ -356,7 +358,13 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 /* The rule is what makes a tap legend and a hold legend read as one key. */
 .kc-sep { opacity: .42; }
 .kc-trns .kc-label { fill: var(--text-3); }
-.kc-trns .kc-rect { fill: transparent; stroke: var(--line); stroke-dasharray: 3 3; }
+/* In a layer preview, a key answered by a layer below: dimmed, tagged with it. */
+.kc-under .kc-label, .kc-under .kc-sub, .kc-under .kc-sep { opacity: .55; }
+.kc-from { font-family: var(--mono); font-size: 6px; font-weight: 600; fill: var(--text); opacity: .75; dominant-baseline: middle; }
+/* A transparent key is frosted glass: its light, faded and blurred, with no
+   edge of its own. Only the cap blurs; the ▽ and any ring stay sharp. */
+.kc-trns .kc-rect { fill-opacity: .42; stroke: none; filter: blur(1.8px); }
+.kc-glow.kc-glow-trns { opacity: .28; }
 .kc-none .kc-rect { fill: transparent; stroke: var(--line); }
 .kc.sel .kc-rect { stroke: var(--text); stroke-width: 2; fill: var(--key-hi); }
 .board.picking { box-shadow: inset 0 0 0 1px var(--line-2); }
@@ -410,7 +418,7 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 .legend-item .lkey { width: 12px; height: 12px; border-radius: 3px; display: inline-block; flex: none; border: 1.5px solid var(--ring); }
 .legend-item .lkey.sel { background: var(--key-hi); }
 .legend-item .lkey.indicated { border-style: dotted; }
-.legend-item .lkey.transparent { border: 1.5px dashed var(--text-3); }
+.legend-item .lkey.transparent { border: 0; background: var(--text-3); opacity: .5; filter: blur(.8px); }
 
 /* ── inspector ───────────────────────────────────────────────────────── */
 .inspector {
