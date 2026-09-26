@@ -29,7 +29,7 @@ export function screenProfile() {
     const content = el(`<div class="content"><div class="pad" style="max-width:960px;display:grid;gap:14px"></div></div>`);
     const pad = content.firstElementChild;
 
-    if (portable.progress) pad.appendChild(el(`<div class="notice"><span class="spin"></span><span>${esc(portable.progress)}</span></div>`));
+    if (portable.progress) pad.appendChild(el(`<div class="profile-progress"><span class="spin"></span><span>${esc(portable.progress)}</span></div>`));
     if (!portable.available) {
         pad.appendChild(el(`<div class="unavailable">${esc(portable.legacy
             ? "This keyboard runs the five-layer firmware. Install the backup bridge, export your profile there, then install the eight-layer update."

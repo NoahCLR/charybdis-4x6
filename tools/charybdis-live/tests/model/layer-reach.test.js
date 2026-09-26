@@ -115,8 +115,12 @@ test("transparent keys on Base are counted, since nothing answers them", () => {
     const [finding] = layerReach(profile({keys: {"0:3": TRNS, "0:4": TRNS}}));
     assert.equal(finding.kind, "deadBase");
     assert.equal(finding.count, 2);
-    assert.equal(finding.title, "2 keys on Base do nothing");
+    assert.equal(finding.title, "2 keys on the base layer (Base) do nothing");
+    assert.match(finding.detail, /^A transparent key on the base layer \(Base\)/);
     assert.deepEqual(finding.place, {kind: "key", layer: 0, layoutIndex: 3});
+    const named = profile({keys: {"0:3": TRNS}});
+    named.settings.names[0] = "Symbol";
+    assert.equal(layerReach(named).find((check) => check.kind === "deadBase").title, "1 key on the base layer (Symbol) does nothing");
 });
 
 test("a pointer layer that is always on, or empty, cannot work", () => {

@@ -333,8 +333,8 @@ function findings(facts, walked) {
     const dead = facts.layers[0].map((_, position) => position).filter((position) => !resolve(facts, facts.always, position));
     if (dead.length) {
         results.push({kind: "deadBase", level: LEVELS.NOTICE, layers: [0], count: dead.length,
-            title: `${dead.length} key${dead.length === 1 ? "" : "s"} on ${layerName(facts.names, 0)} ${dead.length === 1 ? "does" : "do"} nothing`,
-            detail: `A transparent key on ${layerName(facts.names, 0)} has no layer under it to answer, so it sends nothing unless a layer above covers it.`,
+            title: `${dead.length} key${dead.length === 1 ? "" : "s"} on the base layer (${layerName(facts.names, 0)}) ${dead.length === 1 ? "does" : "do"} nothing`,
+            detail: `A transparent key on the base layer (${layerName(facts.names, 0)}) has no layer under it to answer, so it sends nothing unless a layer above covers it.`,
             fix: `Give ${dead.length === 1 ? "it" : "them"} a keycode, or KC_NO to say so.`,
             place: keyPlace(0, dead[0])});
     }

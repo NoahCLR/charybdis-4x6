@@ -1040,8 +1040,8 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .step .grip { color: var(--text-3); font-size: 12px; cursor: grab; }
 .step .kind { font-size: 10px; letter-spacing: .07em; text-transform: uppercase; color: var(--text-3); width: 54px; }
 .tok { display: inline-flex; align-items: center; height: 22px; padding: 0 7px; border-radius: 5px; background: var(--surface-3); border: 1px solid var(--line); font-family: var(--mono); font-size: 11px; }
-/* Progress inside a screen (Profile & backups); messages live in the rail. */
-.notice { display: flex; align-items: center; gap: 10px; margin: 16px 24px -4px; padding: 10px 13px;
+/* Progress inside Profile & backups; messages live in the rail. */
+.profile-progress { display: flex; align-items: center; gap: 10px; margin: 16px 24px -4px; padding: 10px 13px;
   border: 1px solid var(--line-2); border-left: 2px solid var(--text-2); border-radius: 0 9px 9px 0;
   background: var(--surface-2); font-size: 12.5px; }
 .stagedot { width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--line-3); display: inline-block; }
