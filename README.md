@@ -272,6 +272,10 @@ combos, inert pointing bindings, and macros the keyboard cannot play. Apply asks
 for confirmation when a warning or trap is present and stays disabled until
 destination save blockers are resolved.
 
+After Apply completes, the editor stays visible while the app reads keys,
+profile domains, combos and base lighting back from the keyboard. The bottom
+bar names each read and shows its progress; editing resumes when it finishes.
+
 What to expect while it applies:
 
 - Apply waits for held keys, locked layers and pointer modes to clear before

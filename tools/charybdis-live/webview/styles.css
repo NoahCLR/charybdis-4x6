@@ -783,6 +783,12 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .commit .peek { display: flex; gap: 6px; overflow: hidden; max-width: 320px; }
 .commit .sep { width: 1px; height: 20px; background: var(--line); }
 .commit.applying { border-color: var(--line-3); }
+.commit.readback { display: grid; grid-template-columns: 14px minmax(0, 1fr); column-gap: 10px; row-gap: 4px;
+  width: min(510px, calc(100% - 48px)); padding: 12px 15px; }
+.commit.readback .spin { grid-row: 1 / 4; align-self: center; }
+.commit.readback strong { font-size: 13px; }
+.readback-detail { font-size: 12px; color: var(--text-2); }
+.readback-note { font-size: 11px; color: var(--text-3); }
 .commit .progress { width: 160px; height: 4px; border-radius: 2px; background: var(--surface); overflow: hidden; }
 .commit .progress i { display: block; height: 100%; background: var(--text); }
 /* An Apply's steps. The bar grows upward into a column while it runs, and
@@ -808,7 +814,7 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .ap-bar i { display: block; height: 100%; background: var(--text); }
 .ap-bytes { font-family: var(--mono); font-size: 10.5px; color: var(--text-3); }
 .ap-actions { display: flex; justify-content: flex-end; gap: 8px; }
-.spin { width: 11px; height: 11px; border-radius: 50%; border: 1.5px solid var(--line-3); border-top-color: var(--text); display: inline-block; animation: spin .8s linear infinite; }
+.spin { width: 11px; height: 11px; flex: none; border-radius: 50%; border: 1.5px solid var(--line-3); border-top-color: var(--text); display: inline-block; animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* ── overlays ────────────────────────────────────────────────────────── */

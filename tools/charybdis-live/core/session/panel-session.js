@@ -79,6 +79,11 @@ function buildPanelModel(session, state) {
     }
     // The last Apply's steps: live while it runs, kept when it failed.
     model.apply = state.liveApply && state.liveApply.state !== "idle" ? state.liveApply : null;
+    model.postApplyRead = session.postApplyReadStep ? {
+        step: session.postApplyReadStep,
+        progress: session.postApplyReadStep === "layout" ? state.layout?.progress
+            : session.postApplyReadStep === "profile" ? state.committed?.progress : null,
+    } : null;
     model.portable = {
         available: Boolean(state.connected && [5, 8].includes(state.capabilities?.compiledLayerCount) && (state.capabilities?.supportedDomainMask & 15) === 15),
         eightLayers: state.capabilities?.compiledLayerCount === 8,

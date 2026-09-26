@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {configureReady, readScreen, screenAvailable} from "../webview/view/readiness.mjs";
+import {configureReady, postApplyReadText, readScreen, screenAvailable} from "../webview/view/readiness.mjs";
 
 test("loading names the active read and never claims the board is ready", () => {
     assert.deepEqual(readScreen(null), {state: "loading", title: "Reading your keyboard", detail: "Looking for a keyboard"});
@@ -40,4 +40,12 @@ test("rail screens follow the read and the capability each screen needs", () => 
     assert.equal(screenAvailable(failedCapture, "profile"), true, "a connected device can retry profile export after capture failed");
     const ready = {...failedCapture, load: {state: "ready"}};
     for (const screen of ["keys", "lighting", "profile", "device"]) assert.equal(screenAvailable(ready, screen), true, screen);
+});
+
+test("post-Apply readback names the current data instead of a generic operation", () => {
+    assert.equal(postApplyReadText(null), "Confirming the completed save");
+    assert.equal(postApplyReadText({step: "layout", progress: {done: 12, total: 56}}), "Reading keys and layers · 12 of 56");
+    assert.equal(postApplyReadText({step: "profile"}), "Reading saved lighting, behaviours and settings");
+    assert.equal(postApplyReadText({step: "combos"}), "Checking active combos");
+    assert.equal(postApplyReadText({step: "baseRgb"}), "Checking base lighting");
 });

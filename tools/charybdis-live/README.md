@@ -127,6 +127,8 @@ Every colour on screen is a colour the keyboard emits; one amber signal marks
 work that has not reached the keyboard yet. Complete edits stage into one draft
 as they are made; incomplete builders such as a new combo keep their local form
 until it is valid. The floating bar is the only way changes leave the window.
+After Apply completes, it reports the keys, profile, combos and base lighting
+being read back, while the editor stays visible and temporarily busy.
 
 ## Commands
 

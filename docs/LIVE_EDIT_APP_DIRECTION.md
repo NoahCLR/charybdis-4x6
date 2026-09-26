@@ -394,6 +394,11 @@ macros on this half, check both halves. `restoreProfile()` reports at each real
 boundary with byte counts. A failure keeps its step, a reason from the
 keyboard's own error (or the other half's last answer), and whether anything
 was saved. The commit bar keeps a failed Apply on screen until dismissed.
+After a successful Apply, the app reads layout, committed domains, combos and
+VIA base lighting again. The editor and rail stay visible but busy; the commit
+bar names the current read and its page progress until editing resumes. This
+readback is separate from the ten transaction steps and does not claim another
+two-half verification.
 
 Candidate status page 1 (see
 [Profile Wire V1](architecture/profile-wire-v1.md#candidate-operation-status))

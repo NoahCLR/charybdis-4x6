@@ -162,6 +162,16 @@ test("an in-flight read keeps the panel busy across service operation gaps", () 
     assert.equal(buildPanelModel(session, connected({busy: false})).device.health.busy, false);
 });
 
+test("post-Apply readback keeps the editor visible and reports the current read", () => {
+    const session = panelWithDraft();
+    session.postApplyReadStep = "layout";
+    const model = buildPanelModel(session, connected({busy: true, layout: {state: "reading", progress: {done: 12, total: 56}}}));
+    assert.equal(model.load.state, "ready", "the completed editable read stays visible during Apply readback");
+    assert.deepEqual(model.postApplyRead, {step: "layout", progress: {done: 12, total: 56}});
+    session.postApplyReadStep = "combos";
+    assert.deepEqual(buildPanelModel(session, connected({busy: true})).postApplyRead, {step: "combos", progress: null});
+});
+
 test("configure screens stay gated until a complete editable read finishes", () => {
     const session = {service: {portable: null}, readBusy: true, readReady: false};
     const partial = connected({layout: {state: "read", layers: []}, committed: {state: "read"}});

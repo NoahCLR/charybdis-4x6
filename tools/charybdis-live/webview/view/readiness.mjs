@@ -10,6 +10,20 @@ const PHASES = {
     "reading complete profile": "Reading the complete profile",
 };
 
+const POST_APPLY_READ = {
+    layout: "Reading keys and layers",
+    profile: "Reading saved lighting, behaviours and settings",
+    combos: "Checking active combos",
+    baseRgb: "Checking base lighting",
+};
+
+export function postApplyReadText(read) {
+    const label = POST_APPLY_READ[read?.step] || "Confirming the completed save";
+    const progress = read?.progress;
+    return Number.isInteger(progress?.done) && Number.isInteger(progress?.total) && progress.total > 0
+        ? `${label} · ${progress.done} of ${progress.total}` : label;
+}
+
 export const configureReady = (model) => model?.load?.state === "ready";
 
 export function screenAvailable(model, screen) {

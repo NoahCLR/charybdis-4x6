@@ -4,7 +4,7 @@
 import {el, esc} from "../lib/dom.mjs";
 import {getModel, post, render, state} from "../store.mjs";
 import {statusSummary} from "../view/review.mjs";
-import {screenAvailable} from "../view/readiness.mjs";
+import {postApplyReadText, screenAvailable} from "../view/readiness.mjs";
 import {openHistory} from "./history.mjs";
 
 // The review opens at once; the host marks it reviewed when it answers.
@@ -140,11 +140,18 @@ function applySteps(apply) {
         const counted = current && apply.bytes
             ? `<span class="ap-bar"><i style="width:${Math.round((apply.bytes.completed / apply.bytes.total) * 100)}%"></i></span>
                <span class="ap-bytes">${apply.bytes.completed} / ${apply.bytes.total} bytes</span>` : "";
-        return `<li class="${step.state}"><span class="mark">${step.state === "active" ? '<span class="spin"></span>' : ""}</span>
+        return `<li class="${step.state}"><span class="mark">${step.state === "active" ? spinner() : ""}</span>
             <span class="lbl">${esc(step.label)}</span>
             ${current && (apply.detail || counted) ? `<span class="ap-detail">${esc(apply.detail)}${counted}</span>` : ""}</li>`;
     }).join("");
     return `<ol class="ap-steps">${rows}</ol>`;
+}
+
+// The host republishes the panel for every read page. Start each replacement
+// at the same document-time phase so the spinner keeps rotating smoothly.
+function spinner() {
+    const time = document.timeline?.currentTime ?? performance.now();
+    return `<span class="spin" aria-hidden="true" style="animation-delay:-${Math.round(time % 800)}ms"></span>`;
 }
 
 const SAVED_VERDICT = {
@@ -166,6 +173,12 @@ export function commitBar() {
             ${applySteps(apply)}
             <div class="note">The keyboard keeps running its saved profile until both halves confirm.</div></div>`);
     }
+    if (draft.busy && apply?.state === "done") {
+        return el(`<div class="commit applying readback" role="status" aria-live="polite">
+            ${spinner()}<strong>Applied — reading back the keyboard</strong>
+            <span class="readback-detail">${esc(postApplyReadText(model.postApplyRead))}</span>
+            <span class="readback-note">Editing resumes when this read finishes.</span></div>`);
+    }
     // A failed Apply stays on screen until it is dismissed, so where it
     // stopped and why can be read after the fact.
     if (!draft.busy && apply?.state === "failed" && state.applyDismissed !== apply.id) {
@@ -186,7 +199,7 @@ export function commitBar() {
 
     if (draft.busy) {
         return el(`<div class="commit applying">
-            <span class="n"><span class="spin"></span> <strong>Working</strong>
+            <span class="n">${spinner()} <strong>Working with the keyboard</strong>
             <span class="muted">${esc(model?.device?.health?.phase || "talking to the keyboard")}</span></span>
             <span class="sep"></span>
             <span class="note">the keyboard keeps running its saved profile until both halves confirm</span></div>`);

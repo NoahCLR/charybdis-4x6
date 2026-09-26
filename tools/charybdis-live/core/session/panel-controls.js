@@ -27,10 +27,14 @@ const savedNotice = (result, verb) => result?.peerUnseen
 
 // After the keyboard stores a new profile, everything the panel shows about
 // it is read again, in the order the reads depend on.
-async function rereadKeyboard(service) {
+async function rereadKeyboard(service, onStep = () => {}) {
+    onStep("layout");
     await service.readLayout();
+    onStep("profile");
     await service.readCommittedProfile();
+    onStep("combos");
     await service.readCombos();
+    onStep("baseRgb");
     await service.readBaseRgb();
 }
 
@@ -136,7 +140,14 @@ async function draftControl(session, message, host = {}) {
             const result = await run(host, "Applying the complete profile to both halves",
                 () => draft.apply(service, revision, async (document) => (recovery = await host.saveRecovery(document))));
             session.resetDraftForms = true;
-            await rereadKeyboard(service);
+            try {
+                await rereadKeyboard(service, (step) => {
+                    session.postApplyReadStep = step;
+                    service.emitChange?.();
+                });
+            } finally {
+                session.postApplyReadStep = undefined;
+            }
             session.notice = `${savedNotice(result, "applied to")} Recovery copy: ${recovery}`;
             return;
         }
