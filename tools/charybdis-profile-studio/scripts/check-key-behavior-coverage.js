@@ -318,7 +318,15 @@ const appendedCheck = `
     for (const combo of model.combos || []) {
         const canonicalInputs = combo.inputs.map((input) => canonicalKeyExpression(input, aliases));
         const found = (model.layers || []).some((layer) => {
-            const keys = new Set((layer.positions || []).map((position) => canonicalKeyExpression(position.keycode, aliases)));
+            // A transparent overlay position supplies its base-layer key.
+            // The captured live profile has a pointer combo using base slash.
+            const base = model.layers[0];
+            const keys = new Set((layer.positions || []).map((position) => {
+                const value = ["_______", "KC_TRNS", "KC_TRANSPARENT"].includes(position.keycode)
+                    ? base.positions.find(p => p.layoutIndex === position.layoutIndex)?.keycode
+                    : position.keycode;
+                return canonicalKeyExpression(value || "KC_NO", aliases);
+            }));
             return canonicalInputs.every((input) => keys.has(input));
         });
         if (!found) {

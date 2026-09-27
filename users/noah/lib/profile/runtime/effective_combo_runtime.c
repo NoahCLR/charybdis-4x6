@@ -73,15 +73,18 @@ combo_t *noah_effective_combo_get(uint16_t index) {
     if (index >= noah_effective_combo_count()) return NULL;
     return installed && installed->live ? &installed->rows[index] : &key_combos[index];
 }
+// Without a stored table the keymap's combos run with their authored windows:
+// COMBO follows COMBO_TERM, COMBO_WINDOW carries its own.
 uint16_t noah_effective_combo_term(uint16_t index) {
-    return installed && installed->valid && installed->live && index < installed->count ? installed->terms[index] : COMBO_TERM;
+    if (installed && installed->valid && installed->live) return index < installed->count ? installed->terms[index] : COMBO_TERM;
+    return index < noah_combo_count && noah_combo_terms[index] ? noah_combo_terms[index] : COMBO_TERM;
 }
 uint16_t noah_effective_combo_default_term(void) {
     return installed && installed->valid && installed->live ? installed->default_term : COMBO_TERM;
 }
 bool noah_effective_combo_follows_default(uint16_t index) {
     if (installed && installed->valid && installed->live) return index < installed->count && (installed->follows_default >> index & 1u);
-    return index < noah_effective_combo_count();
+    return index < noah_effective_combo_count() && !noah_combo_terms[index];
 }
 // A version 2 table stores the threshold even with no rows; a version 1 table
 // without rows has none, and QMK's own default stands.

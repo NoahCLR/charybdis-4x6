@@ -10,6 +10,11 @@
 static const uint16_t compiled_keys[]  = {7, 9, COMBO_END};
 combo_t               key_combos[]     = {{.keys = compiled_keys, .keycode = 41}};
 const uint8_t         noah_combo_count = 1;
+#ifndef COMPILED_WINDOW
+#    define COMPILED_WINDOW 0
+#endif
+// COMBO leaves a compiled combo's window zero; COMBO_WINDOW gives it one.
+const uint16_t  noah_combo_terms[] = {COMPILED_WINDOW};
 static unsigned       reads;
 static bool           fail_read;
 static uint8_t        bytes[912];
@@ -60,9 +65,9 @@ int main(int argc, char **argv) {
     noah_effective_combo_runtime_init(&runtime);
     assert(noah_effective_combo_runtime_install(&runtime));
     assert(combo_count() == 1 && combo_get(0) == &key_combos[0]);
-    assert(get_combo_term(0, combo_get(0)) == COMBO_TERM);
-    // Compiled combos all follow QMK's COMBO_TERM.
-    assert(noah_effective_combo_default_term() == COMBO_TERM && noah_effective_combo_follows_default(0) && !noah_effective_combo_follows_default(1));
+    assert(get_combo_term(0, combo_get(0)) == (COMPILED_WINDOW ? COMPILED_WINDOW : COMBO_TERM));
+    // A compiled combo follows QMK's COMBO_TERM unless the keymap gave it a window.
+    assert(noah_effective_combo_default_term() == COMBO_TERM && noah_effective_combo_follows_default(0) == !COMPILED_WINDOW && !noah_effective_combo_follows_default(1));
     noah_effective_profile_snapshot_t view = {.reader = {.read = read_bytes, .length = sizeof(bytes)}, .profile = {.domain_mask = 4, .combos = {.row_count = 2, .version = 1}}};
     noah_effective_combo_runtime_invalidate(&runtime, 1, view.identity, view.identity, &view);
     assert(reads == 3 && combo_count() == 2 && noah_effective_combo_valid());

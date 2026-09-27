@@ -32,8 +32,10 @@ foreground-app switching and volatile device preview.
 
 ### Factory presets
 
-The authored factory records migrate the six pre-slot modes; two slots start
-disabled.
+The original factory records migrated the six pre-slot modes with two disabled
+slots. The current authored profile also configures slot 6 as horizontal Undo /
+Redo; slot 7 remains disabled. Slot contents are profile data, not part of the
+keycode allocation.
 
 | Slot | Name | Engine | Behavior preserved |
 | --- | --- | --- | --- |

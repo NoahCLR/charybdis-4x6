@@ -169,7 +169,8 @@ These use the existing Profile Wire custom GET envelope and request ID.
 
 GET value `0x07` reads the effective settings domain with its scalars overlaid
 by their live QMK owners. With no profile settings live it returns the current
-version with every macro unnamed. Page 0's 12-byte payload is version `1`,
+version named by the keymap: `layer_names[]` and the name in each
+`VIA_MACROS` row. Page 0's 12-byte payload is version `1`,
 chunk size `25`, uint16 length, CRC32, and FNV-1a digest of the bytes as they
 are at that moment. Pages 1 onward return successive 25-byte chunks with an
 exact short final chunk, streamed from the live domain rather than a snapshot.

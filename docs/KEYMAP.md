@@ -47,6 +47,10 @@ The keymap currently sets:
 Those settings live in
 [`config.h`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h).
 
+Function and Game have green and cyan layer colours. Extra remains available.
+Slot 6 is the horizontal Undo / Redo pointing mode at 100 DPI, with a threshold
+of 40 and Cmd+Z / Shift+Cmd+Z outputs.
+
 ## Timing Defaults
 
 The keymap currently sets these defaults in
@@ -57,6 +61,11 @@ The keymap currently sets these defaults in
 - `CUSTOM_LONGER_HOLD_TERM = 400`
 - `CUSTOM_MULTI_TAP_TERM = 150`
 - `COMBO_TERM = 50`
+
+Eight of the ten compiled combos follow `COMBO_TERM`; the two four-key Cmd+N
+chords are `COMBO_WINDOW` rows with their own 100 ms window. The combo hold
+threshold is `TAPPING_TERM`. The two-button mouse chord emits mouse button 6,
+while Pinch + mouse button 3 emits Click Spam.
 
 There are also current per-key exceptions:
 
@@ -72,15 +81,15 @@ lot of the profile's structure:
 - `LT(LAYER_SYM, KC_J)` puts symbol access on the right home row
 - `LT(LAYER_SYM, KC_Z)` adds a second symbol entry point on the lower left
 - `LT(LAYER_NAV, KC_SLSH)` gives a second nav entry point on the lower right
-- `LEFT_THUMB` and `RIGHT_THUMB` are custom keymap-local keys, not plain QMK
-  mod-taps
+- `VIA_MACRO_18` and `VIA_MACRO_19` are empty macro slots named Left Thumb
+  and Right Thumb, with their actions supplied by behaviour rows
 - `KC_RIGHT_ALT` is a profile-specific dual-use key: tap toggles
   `PD_SLOT_4_LOCK`, hold stays normal right `Alt`
 
 The current combo set is intentionally small:
 
 - `KC_D` + `LT(LAYER_NAV, KC_F)` -> `KC_TAB`
-- `MS_BTN1` + `MS_BTN2` -> `CLICK_SPAM`
+- `PD_SLOT_5` + `MS_BTN3` -> `CLICK_SPAM`
 - `KC_N` + `KC_M` -> `KC_LEFT_GUI`
 - `PD_SLOT_1` + `MS_BTN1` -> `KC_LEFT_GUI`
 
@@ -153,32 +162,20 @@ The base-layer punctuation keys follow the same pattern on hold:
 
 ### Thumbs
 
-`LEFT_THUMB` and `RIGHT_THUMB` are the most obviously custom keys in the
-profile.
+The empty macro slots `VIA_MACRO_18` (Left Thumb) and `VIA_MACRO_19`
+(Right Thumb) carry the thumb behaviours. Their names are authored in the
+`VIA_MACROS` table; their macro payloads are empty.
 
-`LEFT_THUMB` currently does this:
+Left Thumb selects a layer by tap count: single for Symbol, double for Number,
+triple for Function (`LAYER_EXTRA_1`), and quadruple for Game (`LAYER_EXTRA_2`).
+A tap locks that layer; holding the last press holds it only until release.
 
-- hold -> `MO(LAYER_SYM)`
-- single tap -> `LOCK_LAYER(LAYER_SYM)`
-- double tap -> play/pause
-- double-tap longer hold -> `LOCK_LAYER(LAYER_NUM)`
-- triple tap -> next track
-- triple-tap longer hold -> keep next-track held
-- quadruple tap -> previous track
-- quadruple-tap longer hold -> keep previous-track held
+Right Thumb taps to lock Navigation and holds to keep Navigation active.
+Double tap plays/pauses, double-tap hold releases Escape, and double-tap longer
+hold locks Number. Triple and quadruple taps send next and previous track;
+their longer holds keep the corresponding media key held.
 
-`RIGHT_THUMB` mirrors the same media pattern, but its base layer action is nav:
-
-- hold -> `MO(LAYER_NAV)`
-- single tap -> `LOCK_LAYER(LAYER_NAV)`
-- double tap -> play/pause
-- double-tap longer hold -> `LOCK_LAYER(LAYER_NUM)`
-- triple tap -> next track
-- triple-tap longer hold -> keep next-track held
-- quadruple tap -> previous track
-- quadruple-tap longer hold -> keep previous-track held
-
-Both thumbs currently keep the default `150 ms` tap-hold term.
+Both thumbs use a 150 ms tap-hold term.
 
 ### Slash / Nav Key
 
@@ -198,7 +195,8 @@ These are small profile-specific quality-of-life keys:
 - `KC_ESC`: tap `Esc`, double tap `~`, long hold `Alt+Cmd+Esc`
 - `KC_ENT`: hold `Shift+Enter`
 - `KC_LEFT_SHIFT`: tap `Caps Lock`, hold normal left `Shift`
-- `KC_RIGHT_ALT`: tap `PD_SLOT_4_LOCK`, hold normal right `Alt`
+- `KC_RIGHT_ALT`: tap `PD_SLOT_4_LOCK`, hold normal right `Alt`,
+  double-tap hold activates slot 6 (Undo / Redo)
 - `KC_LEFT_GUI`: single tap or hold normal left `Cmd`, double-tap hold
   `Left Alt`, triple tap one-shot `Shift`
 
@@ -241,7 +239,7 @@ does not appear directly in `keymaps[][]`.
 
 The current authored path is:
 
-- `MS_BTN1` + `MS_BTN2` combo -> `CLICK_SPAM`
+- `PD_SLOT_5` + `MS_BTN3` combo -> `CLICK_SPAM`
 - `CLICK_SPAM` hold -> `REPEAT_WHILE_HELD(MS_BTN1, 100)`
 
 So pressing both primary mouse buttons together on `LAYER_NAV` or
@@ -425,7 +423,7 @@ The profile's macros are VIA macro slots:
 
 - VIA exposes `VIA_MACRO_0` through `VIA_MACRO_63`, each of which can carry a
   name
-- `VIA_MACRO_0` through `VIA_MACRO_11` currently have source defaults in
+- `VIA_MACRO_0` through `VIA_MACRO_10` currently have source defaults in
   `VIA_MACROS(MACRO)`
 - the former hardcoded `MACRO_0` through `MACRO_15` are retired; their keys are
   consumed and do nothing

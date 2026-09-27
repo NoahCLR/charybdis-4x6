@@ -5,6 +5,7 @@
 #include "users/noah/lib/compat/qmk_portable_profile.h"
 #include "users/noah/lib/profile/runtime/effective_settings_runtime.h"
 #include "users/noah/lib/profile/storage/profile_checksum.h"
+#include "users/noah/noah_keymap_ids.h"
 
 // The QMK and Charybdis state the readback overlays, as live values that
 // start where the stored settings below put them.
@@ -104,6 +105,10 @@ void noah_qmk_portable_apply_lighting(uint32_t mode, uint32_t color) {
     (void)color;
 }
 
+// The keymap's names, at both length limits.
+const char via_macro_names[VIA_MACRO_SLOT_COUNT][NOAH_MACRO_NAME_SIZE] = {[5] = "Drag Screenshot", [63] = "Twenty characters!!!"};
+const char layer_names[LAYER_COUNT][NOAH_LAYER_NAME_SIZE]              = {"Base", [7] = "Twenty-three bytes long"};
+
 static uint8_t frame[32];
 static void    get(uint8_t page) {
     memset(frame, 0, sizeof(frame));
@@ -151,9 +156,12 @@ int main(int argc, char **argv) {
     frame[31] = 1;
     assert(noah_qmk_portable_profile_get(frame, sizeof(frame)) && frame[5] == 1);
 
-    // No profile settings are live: the current version, every macro unnamed.
-    length = read_all(bytes, NULL);
-    assert(length == NOAH_SETTINGS_FIXED_SIZE + NOAH_SETTINGS_MACRO_NAMES);
+    // No profile settings are live: the current version, named by the keymap.
+    FILE *named = argc > 2 ? fopen(argv[2], "wb") : NULL;
+    assert(argc < 3 || named);
+    length = read_all(bytes, named);
+    if (named) assert(fclose(named) == 0);
+    assert(length == NOAH_SETTINGS_FIXED_SIZE + NOAH_SETTINGS_MACRO_NAMES + 15 + 20);
     const uint8_t header[8] = {NOAH_SETTINGS_VERSION, 8, NOAH_SETTINGS_COUNT, NOAH_SETTINGS_MACRO_NAMES, 0, 0, 0, 0};
     assert(!memcmp(bytes, header, 8));
     assert(u32(bytes + 8 + NOAH_SETTING_TAPPING_TERM * 4) == TAPPING_TERM);
@@ -161,8 +169,20 @@ int main(int argc, char **argv) {
     assert(get_tapping_term(0, &record) == TAPPING_TERM && get_quick_tap_term(0, &record) == TAPPING_TERM);
     assert(u32(bytes + 8 + NOAH_SETTING_AUTO_MOUSE_TIMEOUT * 4) == 1200);
     assert(u32(bytes + 8 + NOAH_SETTING_DRAGSCROLL_DPI * 4) == 0);
-    for (uint16_t i = 8 + NOAH_SETTINGS_COUNT * 4; i < length; i++)
-        assert(bytes[i] == 0);
+    // Each layer name is zero padded to its field; the longest keeps its terminator.
+    uint8_t expected[NOAH_SETTINGS_MAX_SIZE] = {0};
+    uint8_t *names_at = expected + 8 + NOAH_SETTINGS_COUNT * 4;
+    memcpy(names_at, "Base", 4);
+    memcpy(names_at + 7 * NOAH_SETTINGS_NAME_BYTES, "Twenty-three bytes long", 23);
+    uint8_t *macro = expected + NOAH_SETTINGS_FIXED_SIZE;
+    for (uint8_t slot = 0; slot < NOAH_SETTINGS_MACRO_NAMES; slot++) {
+        uint8_t name_length = (uint8_t)strlen(via_macro_names[slot]);
+        *macro++ = name_length;
+        memcpy(macro, via_macro_names[slot], name_length);
+        macro += name_length;
+    }
+    assert(macro - expected == length);
+    assert(!memcmp(bytes + 8 + NOAH_SETTINGS_COUNT * 4, names_at, length - (8 + NOAH_SETTINGS_COUNT * 4)));
 
     // A live v3 domain reads back as stored, with its values overlaid by the
     // live QMK owners, and without a second copy held for the read.

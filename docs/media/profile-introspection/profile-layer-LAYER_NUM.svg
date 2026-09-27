@@ -58,9 +58,7 @@
   </g>
   <g transform="rotate(0 1057.0 201.0)">
     <rect x="1028.0" y="172.0" width="58" height="58" rx="7" fill="#00ff00" stroke="#00e300" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="1057.0" y="198.6" fill="#f7f7f4" fill-opacity="0.56" font-size="7.4" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="650">_</text>
-    <text x="1057.0" y="211.0" fill="#f7f7f4" fill-opacity="1.00" font-size="9.1" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">-</text>
-    <circle cx="1057.0" cy="179.5" r="3.8" fill="#ff6c00" stroke="#f7f7f4" stroke-width="1.1"/>
+    <text x="1057.0" y="201.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">MINUS</text>
   </g>
   <g transform="rotate(0 65.0 265.0)">
     <rect x="36.0" y="236.0" width="58" height="58" rx="7" fill="#777777" stroke="#b8bab5" stroke-width="1.5" filter="url(#shadow)"/>
@@ -92,15 +90,15 @@
   </g>
   <g transform="rotate(0 793.0 225.0)">
     <rect x="764.0" y="196.0" width="58" height="58" rx="7" fill="#00ff00" stroke="#00e300" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="793.0" y="225.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">P7</text>
+    <text x="793.0" y="225.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">KP_7</text>
   </g>
   <g transform="rotate(0 859.0 201.0)">
     <rect x="830.0" y="172.0" width="58" height="58" rx="7" fill="#00ff00" stroke="#00e300" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="859.0" y="201.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">P8</text>
+    <text x="859.0" y="201.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">KP_8</text>
   </g>
   <g transform="rotate(0 925.0 225.0)">
     <rect x="896.0" y="196.0" width="58" height="58" rx="7" fill="#00ff00" stroke="#00e300" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="925.0" y="225.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">P9</text>
+    <text x="925.0" y="225.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">KP_9</text>
   </g>
   <g transform="rotate(0 991.0 265.0)">
     <rect x="962.0" y="236.0" width="58" height="58" rx="7" fill="#777777" stroke="#b8bab5" stroke-width="1.5" filter="url(#shadow)"/>
@@ -108,7 +106,7 @@
   </g>
   <g transform="rotate(0 1057.0 265.0)">
     <rect x="1028.0" y="236.0" width="58" height="58" rx="7" fill="#00ff00" stroke="#00e300" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="1057.0" y="265.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">P+</text>
+    <text x="1057.0" y="265.0" fill="#f7f7f4" fill-opacity="1.00" font-size="11.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">KP_PLUS</text>
   </g>
   <g transform="rotate(0 65.0 329.0)">
     <rect x="36.0" y="300.0" width="58" height="58" rx="7" fill="#00ff00" stroke="#00e300" stroke-width="1.5" filter="url(#shadow)"/>
@@ -141,15 +139,15 @@
   </g>
   <g transform="rotate(0 793.0 289.0)">
     <rect x="764.0" y="260.0" width="58" height="58" rx="7" fill="#00ff00" stroke="#00e300" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="793.0" y="289.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">P4</text>
+    <text x="793.0" y="289.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">KP_4</text>
   </g>
   <g transform="rotate(0 859.0 265.0)">
     <rect x="830.0" y="236.0" width="58" height="58" rx="7" fill="#00ff00" stroke="#00e300" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="859.0" y="265.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">P5</text>
+    <text x="859.0" y="265.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">KP_5</text>
   </g>
   <g transform="rotate(0 925.0 289.0)">
     <rect x="896.0" y="260.0" width="58" height="58" rx="7" fill="#00ff00" stroke="#00e300" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="925.0" y="289.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">P6</text>
+    <text x="925.0" y="289.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">KP_6</text>
   </g>
   <g transform="rotate(0 991.0 329.0)">
     <rect x="962.0" y="300.0" width="58" height="58" rx="7" fill="#777777" stroke="#b8bab5" stroke-width="1.5" filter="url(#shadow)"/>
@@ -157,12 +155,13 @@
   </g>
   <g transform="rotate(0 1057.0 329.0)">
     <rect x="1028.0" y="300.0" width="58" height="58" rx="7" fill="#00ff00" stroke="#00e300" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="1057.0" y="329.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">=</text>
+    <text x="1057.0" y="329.0" fill="#f7f7f4" fill-opacity="1.00" font-size="11.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600" textLength="48.0" lengthAdjust="spacingAndGlyphs">KP_EQUAL</text>
   </g>
   <g transform="rotate(0 65.0 393.0)">
     <rect x="36.0" y="364.0" width="58" height="58" rx="7" fill="#00ff00" stroke="#00e300" stroke-width="1.5" filter="url(#shadow)"/>
     <text x="65.0" y="400.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">RALT</text>
-    <circle cx="65.0" cy="371.5" r="3.8" fill="#ffffff" stroke="#f7f7f4" stroke-width="1.1"/>
+    <circle cx="60.2" cy="371.5" r="3.8" fill="#ffffff" stroke="#f7f7f4" stroke-width="1.1"/>
+    <circle cx="69.8" cy="371.5" r="3.8" fill="#ff6c00" stroke="#f7f7f4" stroke-width="1.1"/>
   </g>
   <g transform="rotate(0 131.0 393.0)">
     <rect x="102.0" y="364.0" width="58" height="58" rx="7" fill="#777777" stroke="#b8bab5" stroke-width="1.5" filter="url(#shadow)"/>
@@ -190,15 +189,15 @@
   </g>
   <g transform="rotate(0 793.0 353.0)">
     <rect x="764.0" y="324.0" width="58" height="58" rx="7" fill="#00ff00" stroke="#00e300" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="793.0" y="353.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">P1</text>
+    <text x="793.0" y="353.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">KP_1</text>
   </g>
   <g transform="rotate(0 859.0 329.0)">
     <rect x="830.0" y="300.0" width="58" height="58" rx="7" fill="#00ff00" stroke="#00e300" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="859.0" y="329.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">P2</text>
+    <text x="859.0" y="329.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">KP_2</text>
   </g>
   <g transform="rotate(0 925.0 353.0)">
     <rect x="896.0" y="324.0" width="58" height="58" rx="7" fill="#00ff00" stroke="#00e300" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="925.0" y="353.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">P3</text>
+    <text x="925.0" y="353.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">KP_3</text>
   </g>
   <g transform="rotate(0 991.0 393.0)">
     <rect x="962.0" y="364.0" width="58" height="58" rx="7" fill="#00ff00" stroke="#00e300" stroke-width="1.5" filter="url(#shadow)"/>
@@ -230,7 +229,7 @@
   </g>
   <g transform="rotate(-10 677.0 433.0)">
     <rect x="648.0" y="404.0" width="58" height="58" rx="7" fill="#00ff00" stroke="#00e300" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="677.0" y="433.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">P0</text>
+    <text x="677.0" y="433.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">KP_0</text>
   </g>
   <g transform="rotate(9 427.0 515.0)">
     <rect x="398.0" y="486.0" width="58" height="58" rx="7" fill="#777777" stroke="#b8bab5" stroke-width="1.5" filter="url(#shadow)"/>

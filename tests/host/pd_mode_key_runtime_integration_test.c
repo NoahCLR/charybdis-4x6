@@ -1987,9 +1987,11 @@ static void test_gui_double_tap_hold_with_authored_pd_hold_keeps_processed_child
 static void test_last_slot_hold_lock_dpi_and_disabled_slot(void) {
     keypos_t pos = test_keypos(0, 0);
     test_reset_state();
+    // The last slot starts disabled: its lock leaves the current one alone.
+    CHECK(noah_pd_defaults[7].kind == 0);
     action_dispatch(PD_SLOT_1_LOCK);
     CHECK(pd_mode_local_locked_snapshot() == PD_MODE_VOLUME);
-    action_dispatch(PD_SLOT_6_LOCK);
+    action_dispatch(PD_SLOT_7_LOCK);
     CHECK(pd_mode_local_locked_snapshot() == PD_MODE_VOLUME);
     action_dispatch(PD_SLOT_1_LOCK);
     CHECK(pd_mode_local_active_snapshot() == 0);

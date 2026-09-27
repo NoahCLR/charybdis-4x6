@@ -1,5 +1,9 @@
 # VIA To QMK Workflow
 
+> **Deprecated.** The script is no longer maintained or checked. It predates
+> macro names in `VIA_MACROS` rows and `COMBO_WINDOW` combos and cannot write
+> them. Edit the keyboard with Charybdis Live instead.
+
 This doc explains the VIA bridge script in
 [`tools/via_to_qmk_layout.py`](../../tools/via_to_qmk_layout.py).
 

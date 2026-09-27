@@ -58,7 +58,7 @@ from a knockoff seller.
 
 The live editor now has **Pointing modes** with eight slots and eight matching
 RGB configurations. Dragscroll, Volume, Brightness, Zoom, Arrow and Pinch occupy
-the first six slots; the remaining two start empty. Create directional key or
+the first six slots; slot 6 provides Undo / Redo and slot 7 starts empty. Create directional key or
 shortcut actions with the shared keycode picker, duplicate a mode, or configure
 scrolling with optional held modifiers. The everyday flow shows name, movement,
 DPI and actions; pointer policy, thresholds, timing, modifier rules and mouse
@@ -326,6 +326,13 @@ The next sections explain the keymap and RGB models that Profile Studio edits.
 
 ## The Keymap Model
 
+The authored defaults live in the four keymap files. `keymap.c` holds the
+layouts and layer names, each macro's name beside its payload, the combos with
+any window of their own (`COMBO_WINDOW`), and the behaviours; `config.h` the
+timing and policy values; `pd_config.c` the pointing modes; `rgb_config.c` the
+lighting, including LED groups kept for later. A keyboard with nothing stored
+reports exactly these; a stored profile keeps its own.
+
 [`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c) is the
 main profile file. It is where you make the board yours.
 
@@ -358,7 +365,7 @@ Combos can enter that same table too. If a combo emits a keycode that has a
 `key_behaviors[]` row, the chord can reuse the same tap, hold, longer-hold, and
 multi-tap behavior as a physical key.
 
-Here is the shape of one authored row, based on the `RIGHT_THUMB` row in
+Here is the shape of one authored row, based on the `VIA_MACRO_19` (Right Thumb) row in
 [`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c#L456).
 The lines between the keycode and `.tap_counts` are optional row-local
 settings, shown here at their default values: three timing overrides and one
@@ -367,7 +374,7 @@ vocabulary; the list below shows the other helpers you can use.
 
 ```c
 {
-    .keycode = RIGHT_THUMB,
+    .keycode = VIA_MACRO_19,
     .tap_hold_term = 150,
     .longer_hold_term = 400,
     .multi_tap_term = 150,
@@ -394,7 +401,7 @@ vocabulary; the list below shows the other helpers you can use.
 },
 ```
 
-In that example, `RIGHT_THUMB` can be placed directly on a layer or emitted by a
+In that example, `VIA_MACRO_19` can be placed directly on a layer or emitted by a
 combo. Either way, the behavior row is the same.
 
 The double-tap `.hold` uses the release-based helper because that branch also

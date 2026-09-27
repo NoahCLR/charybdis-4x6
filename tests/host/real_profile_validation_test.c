@@ -7,6 +7,7 @@
 
 #include "print.h"
 #include "users/noah/lib/action/synthetic_record.h"
+#include "users/noah/lib/macro/macro_payload.h"
 #include "users/noah/lib/action/owned_keycode.h"
 #include "users/noah/noah_keymap.h"
 #include "users/noah/noah_runtime.h"
@@ -195,7 +196,56 @@ uint16_t keycode_at_keymap_location(uint8_t layer_num, uint8_t row, uint8_t colu
     return keymaps[layer_num][row][column];
 }
 
+// Optional evidence export uses the real C layout and macro encoder, not a
+// source parser. The host LAYOUT stub stores its 56 arguments in row order.
+static void export_authored_via(void) {
+    const char *path = getenv("NOAH_AUTHORED_VIA_DUMP");
+    if (!path) return;
+    FILE *file = fopen(path, "wb");
+    CHECK(file != NULL);
+    for (uint8_t layer = 0; layer < LAYER_COUNT; layer++) {
+        for (uint8_t key = 0; key < 56; key++) {
+            uint16_t value = keymaps[layer][key / MATRIX_COLS][key % MATRIX_COLS];
+            CHECK(fputc(value >> 8, file) != EOF);
+            CHECK(fputc(value & 255, file) != EOF);
+        }
+    }
+    for (uint8_t slot = 0; slot < VIA_MACRO_SLOT_COUNT; slot++) {
+        uint8_t bytes[2048];
+        uint16_t length;
+        CHECK(macro_payload_encode(via_macro_payloads[slot], bytes, sizeof(bytes), &length));
+        CHECK(fwrite(bytes, 1, length, file) == length);
+        CHECK(fputc(0, file) != EOF);
+    }
+    CHECK(fclose(file) == 0);
+}
+
+// The names settings v4 can hold: a macro name is printable ASCII, a layer
+// name UTF-8 without control characters, each ending before its field does.
+static void check_authored_names(void) {
+    for (uint8_t slot = 0; slot < VIA_MACRO_SLOT_COUNT; slot++) {
+        const char *name = via_macro_names[slot];
+        CHECK(memchr(name, '\0', NOAH_MACRO_NAME_SIZE) != NULL);
+        for (const char *c = name; *c; c++)
+            CHECK(*c >= 0x20 && *c <= 0x7e);
+    }
+    for (uint8_t layer = 0; layer < LAYER_COUNT; layer++) {
+        const unsigned char *name = (const unsigned char *)layer_names[layer];
+        CHECK(memchr(name, '\0', NOAH_LAYER_NAME_SIZE) != NULL);
+        for (size_t i = 0; name[i];) {
+            unsigned char lead = name[i];
+            size_t        extra = lead < 0x80 ? 0 : lead >= 0xc2 && lead <= 0xdf ? 1 : lead >= 0xe0 && lead <= 0xef ? 2 : lead >= 0xf0 && lead <= 0xf4 ? 3 : SIZE_MAX;
+            CHECK(extra != SIZE_MAX && lead >= 0x20 && lead != 0x7f);
+            for (size_t k = 1; k <= extra; k++)
+                CHECK((name[i + k] & 0xc0) == 0x80);
+            i += extra + 1;
+        }
+    }
+}
+
 int main(void) {
+    export_authored_via();
+    check_authored_names();
 #if defined(RGB_MATRIX_ENABLE) && defined(POINTING_DEVICE_ENABLE) && defined(RGB_PD_MODE_FEEDBACK_ENABLE)
     CHECK(pd_mode_color_count == PD_MODE_COUNT);
 #endif

@@ -285,7 +285,8 @@ digest covers bytes 0..13 and the rows, row bytes 6..7 repeat the hold
 threshold on every row, and flag bit 3 is reserved. A row that follows the
 default reports the default as its window. With the live owner, a row follows
 the default exactly when its stored window is zero (domain `0x30` version 2);
-compiled combos all follow `COMBO_TERM`. Without the owner a per-combo term hook
+a compiled combo follows `COMBO_TERM` unless its keymap row is a
+`COMBO_WINDOW` with a window of its own. Without the owner a per-combo term hook
 is the user's own, so its rows never report following. Firmware built without
 combos reports zero for both values. Firmware whose readout is version 2
 accepts combo domain `0x30` version 2; the client writes version 2 only then.

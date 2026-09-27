@@ -9,7 +9,7 @@
   </defs>
   <rect width="1120" height="620" fill="#2f2f2f"/>
   <text x="32" y="40" fill="#f5f5f3" font-size="26" font-family="Helvetica, Arial, sans-serif" font-weight="700">LAYER_EXTRA_2</text>
-  <text x="32" y="68" fill="#cfcfcb" font-size="14" font-family="Helvetica, Arial, sans-serif">RGB matrix KEYS_MAPPED_ON_THIS_LAYER_ONLY • authored HSV(0, 0, 0)</text>
+  <text x="32" y="68" fill="#cfcfcb" font-size="14" font-family="Helvetica, Arial, sans-serif">RGB matrix KEYS_MAPPED_ON_THIS_LAYER_ONLY • authored HSV(140, 255, 200)</text>
   <g transform="rotate(0 65.0 201.0)">
     <rect x="36.0" y="172.0" width="58" height="58" rx="7" fill="#777777" stroke="#b8bab5" stroke-width="1.5" filter="url(#shadow)"/>
     <text x="65.0" y="201.0" fill="#ffffff" fill-opacity="0.72" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">TRNS</text>
@@ -67,20 +67,20 @@
     <text x="131.0" y="265.0" fill="#ffffff" fill-opacity="0.72" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">TRNS</text>
   </g>
   <g transform="rotate(0 197.0 225.0)">
-    <rect x="168.0" y="196.0" width="58" height="58" rx="7" fill="#777777" stroke="#b8bab5" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="197.0" y="225.0" fill="#ffffff" fill-opacity="0.72" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">TRNS</text>
+    <rect x="168.0" y="196.0" width="58" height="58" rx="7" fill="#00b4ff" stroke="#0098e3" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="197.0" y="225.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">Q</text>
   </g>
   <g transform="rotate(0 263.0 201.0)">
-    <rect x="234.0" y="172.0" width="58" height="58" rx="7" fill="#777777" stroke="#b8bab5" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="263.0" y="201.0" fill="#ffffff" fill-opacity="0.72" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">TRNS</text>
+    <rect x="234.0" y="172.0" width="58" height="58" rx="7" fill="#00b4ff" stroke="#0098e3" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="263.0" y="201.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">W</text>
   </g>
   <g transform="rotate(0 329.0 225.0)">
-    <rect x="300.0" y="196.0" width="58" height="58" rx="7" fill="#777777" stroke="#b8bab5" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="329.0" y="225.0" fill="#ffffff" fill-opacity="0.72" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">TRNS</text>
+    <rect x="300.0" y="196.0" width="58" height="58" rx="7" fill="#00b4ff" stroke="#0098e3" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="329.0" y="225.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">E</text>
   </g>
   <g transform="rotate(0 395.0 225.0)">
-    <rect x="366.0" y="196.0" width="58" height="58" rx="7" fill="#777777" stroke="#b8bab5" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="395.0" y="225.0" fill="#ffffff" fill-opacity="0.72" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">TRNS</text>
+    <rect x="366.0" y="196.0" width="58" height="58" rx="7" fill="#00b4ff" stroke="#0098e3" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="395.0" y="225.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">R</text>
   </g>
   <g transform="rotate(0 727.0 225.0)">
     <rect x="698.0" y="196.0" width="58" height="58" rx="7" fill="#777777" stroke="#b8bab5" stroke-width="1.5" filter="url(#shadow)"/>
@@ -115,16 +115,16 @@
     <text x="131.0" y="329.0" fill="#ffffff" fill-opacity="0.72" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">TRNS</text>
   </g>
   <g transform="rotate(0 197.0 289.0)">
-    <rect x="168.0" y="260.0" width="58" height="58" rx="7" fill="#777777" stroke="#b8bab5" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="197.0" y="289.0" fill="#ffffff" fill-opacity="0.72" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">TRNS</text>
+    <rect x="168.0" y="260.0" width="58" height="58" rx="7" fill="#00b4ff" stroke="#0098e3" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="197.0" y="289.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">A</text>
   </g>
   <g transform="rotate(0 263.0 265.0)">
-    <rect x="234.0" y="236.0" width="58" height="58" rx="7" fill="#777777" stroke="#b8bab5" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="263.0" y="265.0" fill="#ffffff" fill-opacity="0.72" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">TRNS</text>
+    <rect x="234.0" y="236.0" width="58" height="58" rx="7" fill="#00b4ff" stroke="#0098e3" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="263.0" y="265.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">S</text>
   </g>
   <g transform="rotate(0 329.0 289.0)">
-    <rect x="300.0" y="260.0" width="58" height="58" rx="7" fill="#777777" stroke="#b8bab5" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="329.0" y="289.0" fill="#ffffff" fill-opacity="0.72" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">TRNS</text>
+    <rect x="300.0" y="260.0" width="58" height="58" rx="7" fill="#00b4ff" stroke="#0098e3" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="329.0" y="289.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">D</text>
   </g>
   <g transform="rotate(0 395.0 289.0)">
     <rect x="366.0" y="260.0" width="58" height="58" rx="7" fill="#777777" stroke="#b8bab5" stroke-width="1.5" filter="url(#shadow)"/>

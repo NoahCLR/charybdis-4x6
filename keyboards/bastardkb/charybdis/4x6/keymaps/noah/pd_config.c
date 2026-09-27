@@ -29,5 +29,7 @@ const noah_pd_config_t noah_pd_defaults[8] = {
      .directions={{KC_LEFT,0,0}, {KC_RIGHT,0,0}, {KC_UP,1,0x44}, {KC_DOWN,1,0x44}},
      .buttons={{3,0x20,{0}}, {2,0,{G(KC_C),2,0}}, {2,0,{G(KC_V),2,0}}}},
     {.id=5, .name="Pinch", .kind=2, .dpi=CHARYBDIS_DRAGSCROLL_DPI, .held_modifiers=0x08, SCROLL_TUNING},
-    {.id=6}, {.id=7},
+    {.id=6, .name="Undo / Redo", .kind=1, .axis=1, .dpi=100, .threshold_x=40,
+     .directions={{G(KC_Z),0,0}, {S(G(KC_Z)),0,0}}},
+    {.id=7},
 };

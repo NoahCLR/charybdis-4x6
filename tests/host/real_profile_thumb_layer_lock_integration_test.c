@@ -1139,22 +1139,37 @@ void split_runtime_sync(void) {}
 
 void split_runtime_sync_request(void) {}
 
-static void test_left_thumb_double_tap_hold_toggles_num_layer(void) {
-    keypos_t key_pos      = test_left_thumb_pos();
-    uint16_t base_keycode = test_keycode_at(LAYER_BASE, key_pos);
+static void test_left_thumb_layer_branches(void) {
+    test_delayed_actions_dispatch = true;
+    keypos_t key_pos = test_left_thumb_pos();
+    const uint8_t layers[] = {LAYER_SYM, LAYER_NUM, LAYER_EXTRA_1, LAYER_EXTRA_2};
+    for (uint8_t branch = 0; branch < 4; branch++) {
+        test_reset_state();
+        for (uint8_t tap = 0; tap <= branch; tap++) {
+            test_run_quick_tap(key_pos);
+            if (tap < branch) test_advance_thumb_multi_tap_gap();
+        }
+        key_runtime_integration_advance(&fake_time, CUSTOM_MULTI_TAP_TERM + 1);
+        key_runtime_integration_scan();
+        CHECK(test_layer_locked(layers[branch]));
+        CHECK(test_layer_active(layers[branch]));
+        test_assert_thumb_runtime_quiescent(key_pos);
 
-    test_reset_state();
-
-    CHECK(test_resolve_keycode(key_pos) == base_keycode);
-    test_run_double_tap_hold_cycle(key_pos, 401);
-    CHECK(test_layer_locked(LAYER_NUM));
-    CHECK(test_layer_active(LAYER_NUM));
-    CHECK(test_resolve_keycode(key_pos) == base_keycode);
-
-    key_runtime_integration_advance(&fake_time, 40);
-    test_run_double_tap_hold_cycle(key_pos, 401);
-    CHECK(!test_layer_locked(LAYER_NUM));
-    CHECK(!test_layer_active(LAYER_NUM));
+        test_reset_state();
+        for (uint8_t tap = 0; tap < branch; tap++) {
+            test_run_quick_tap(key_pos);
+            test_advance_thumb_multi_tap_gap();
+        }
+        test_press_resolved(key_pos);
+        key_runtime_integration_advance(&fake_time, CUSTOM_LONGER_HOLD_TERM + 1);
+        key_runtime_integration_scan();
+        CHECK(test_layer_active(layers[branch]));
+        CHECK(!test_layer_locked(layers[branch]));
+        test_release_resolved(key_pos);
+        CHECK(!test_layer_active(layers[branch]));
+        test_assert_thumb_runtime_quiescent(key_pos);
+    }
+    test_delayed_actions_dispatch = false;
 }
 
 static void test_right_thumb_double_tap_hold_toggles_num_layer(void) {
@@ -1190,8 +1205,8 @@ static void test_thumb_double_tap_hold_with_intermediate_scan_toggles_num_layer_
     CHECK(!test_layer_active(LAYER_NUM));
 }
 
-static void test_left_thumb_double_tap_hold_escape_feedback_sequence(void) {
-    keypos_t key_pos      = test_left_thumb_pos();
+static void test_right_thumb_double_tap_hold_escape_feedback_sequence(void) {
+    keypos_t key_pos      = test_right_thumb_pos();
     uint16_t base_keycode = test_keycode_at(LAYER_BASE, key_pos);
 
     test_reset_state();
@@ -1226,8 +1241,8 @@ static void test_left_thumb_double_tap_hold_escape_feedback_sequence(void) {
     test_assert_thumb_runtime_quiescent(key_pos);
 }
 
-static void test_left_thumb_double_tap_hold_escape_release_crossing_threshold_pulses_branch(void) {
-    keypos_t key_pos      = test_left_thumb_pos();
+static void test_right_thumb_double_tap_hold_escape_release_crossing_threshold_pulses_branch(void) {
+    keypos_t key_pos      = test_right_thumb_pos();
     uint16_t base_keycode = test_keycode_at(LAYER_BASE, key_pos);
 
     test_reset_state();
@@ -1256,8 +1271,8 @@ static void test_left_thumb_double_tap_hold_escape_release_crossing_threshold_pu
 
 // Held past the hold threshold, the branch is entered and hold feedback owns the
 // key; the later release only fires the action it was already showing.
-static void test_left_thumb_double_tap_hold_escape_release_after_handover_keeps_hold_feedback_pulse(void) {
-    keypos_t key_pos      = test_left_thumb_pos();
+static void test_right_thumb_double_tap_hold_escape_release_after_handover_keeps_hold_feedback_pulse(void) {
+    keypos_t key_pos      = test_right_thumb_pos();
     uint16_t base_keycode = test_keycode_at(LAYER_BASE, key_pos);
 
     test_reset_state();
@@ -1287,8 +1302,8 @@ static void test_left_thumb_double_tap_hold_escape_release_after_handover_keeps_
     test_assert_thumb_runtime_quiescent(key_pos);
 }
 
-static void test_left_thumb_double_tap_long_hold_num_feedback_replaces_branch(void) {
-    keypos_t key_pos             = test_left_thumb_pos();
+static void test_right_thumb_double_tap_long_hold_num_feedback_replaces_branch(void) {
+    keypos_t key_pos             = test_right_thumb_pos();
     uint16_t base_keycode        = test_keycode_at(LAYER_BASE, key_pos);
     uint16_t branch_scan_elapsed = (uint16_t)(CUSTOM_TAP_HOLD_TERM + 100u);
 
@@ -1632,8 +1647,8 @@ static void test_pointer_drag_window_tap_falls_through_to_the_base_layer_key(voi
 // that produced it -- those never reach QMK's auto-mouse stage.
 static void test_click_spam_combo_output_keeps_the_pointer_layer_anchored(void) {
     static const uint16_t click_spam_combo_keys[] = {
-        MS_BTN1,
-        MS_BTN2,
+        PD_SLOT_5,
+        MS_BTN3,
     };
 
     keyrecord_t record      = {.event = MAKE_COMBOEVENT(true)};
@@ -1652,8 +1667,8 @@ static void test_click_spam_combo_output_keeps_the_pointer_layer_anchored(void) 
 
 static void test_click_spam_combo_uses_authored_combo_owner(void) {
     static const uint16_t click_spam_combo_keys[] = {
-        MS_BTN1,
-        MS_BTN2,
+        PD_SLOT_5,
+        MS_BTN3,
     };
 
     uint8_t  bitmap[KEY_ORIGIN_BITMAP_SIZE];
@@ -1666,13 +1681,13 @@ static void test_click_spam_combo_uses_authored_combo_owner(void) {
     test_reset_state();
     layer_state = noah_layer_state_set_user(test_layer_mask(LAYER_BASE) | test_layer_mask(LAYER_POINTER));
 
-    btn1_pos = test_find_keypos_on_layer(LAYER_POINTER, MS_BTN1);
-    btn2_pos = test_find_keypos_on_layer(LAYER_POINTER, MS_BTN2);
+    btn1_pos = test_find_keypos_on_layer(LAYER_POINTER, PD_SLOT_5);
+    btn2_pos = test_find_keypos_on_layer(LAYER_POINTER, MS_BTN3);
 
     CHECK(test_keypos_valid(btn1_pos));
     CHECK(test_keypos_valid(btn2_pos));
-    CHECK(test_resolve_keycode(btn1_pos) == MS_BTN1);
-    CHECK(test_resolve_keycode(btn2_pos) == MS_BTN2);
+    CHECK(test_resolve_keycode(btn1_pos) == PD_SLOT_5);
+    CHECK(test_resolve_keycode(btn2_pos) == MS_BTN3);
 
     combo_index = test_find_combo_index_for_exact_keys(click_spam_combo_keys, ARRAY_SIZE(click_spam_combo_keys));
     CHECK(combo_index >= 0);
@@ -2194,6 +2209,10 @@ static void test_gui_double_tap_hold_with_right_alt_arrow_mode_lock_stays_usable
         }
 
         test_release_resolved(right_alt_pos);
+        // A double-tap branch now exists, so the single tap waits for its window.
+        test_delayed_actions_dispatch = true;
+        test_flush_pending_tap_branch();
+        test_delayed_actions_dispatch = false;
         CHECK(pd_mode_local_active_snapshot() == PD_MODE_ARROW);
         CHECK(pd_mode_local_locked_snapshot() == PD_MODE_ARROW);
         CHECK(noah_runtime_debug_slot_owner_keycode(right_alt_pos) == KC_NO);
@@ -3533,13 +3552,13 @@ int main(void) {
     test_active_scan_visit_baseline_is_measured();
     test_feedback_dirty_tracks_visible_deadline_change_once();
     test_feedback_dirty_tracks_pending_tap_window();
-    test_left_thumb_double_tap_hold_toggles_num_layer();
+    test_left_thumb_layer_branches();
     test_right_thumb_double_tap_hold_toggles_num_layer();
     test_thumb_double_tap_hold_with_intermediate_scan_toggles_num_layer_once_per_cycle();
-    test_left_thumb_double_tap_hold_escape_feedback_sequence();
-    test_left_thumb_double_tap_hold_escape_release_crossing_threshold_pulses_branch();
-    test_left_thumb_double_tap_hold_escape_release_after_handover_keeps_hold_feedback_pulse();
-    test_left_thumb_double_tap_long_hold_num_feedback_replaces_branch();
+    test_right_thumb_double_tap_hold_escape_feedback_sequence();
+    test_right_thumb_double_tap_hold_escape_release_crossing_threshold_pulses_branch();
+    test_right_thumb_double_tap_hold_escape_release_after_handover_keeps_hold_feedback_pulse();
+    test_right_thumb_double_tap_long_hold_num_feedback_replaces_branch();
     test_left_and_right_thumb_single_taps_keep_independent_pending_chains();
     test_number_key_hold_only_tap_feedback_stays_quiet();
     test_number_key_hold_only_repeated_taps_do_not_enter_branch_feedback();

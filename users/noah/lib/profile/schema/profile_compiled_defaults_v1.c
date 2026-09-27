@@ -17,6 +17,8 @@
 
 #if defined(RGB_MATRIX_ENABLE)
 extern const layer_color_config_t     layer_colors[LAYER_COUNT];
+extern const rgb_led_group_t *const   saved_led_groups;
+extern const uint8_t                  saved_led_group_count;
 extern const layer_led_group_t *const layer_led_groups;
 extern const uint8_t                  layer_led_group_count;
 
@@ -350,7 +352,7 @@ static uint16_t rgb_stage_mask(void) {
 }
 
 static uint8_t rgb_group_row_count(void) {
-    uint16_t count = layer_led_group_count;
+    uint16_t count = saved_led_group_count + layer_led_group_count;
 #    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_PD_MODE_FEEDBACK_ENABLE)
     count += pd_mode_led_group_count;
 #    endif
@@ -363,7 +365,10 @@ static uint8_t rgb_group_row_count(void) {
     return count <= UINT8_MAX ? (uint8_t)count : UINT8_MAX;
 }
 
+// Saved groups come first; they are groups only, painted by no stage row.
 static const rgb_led_group_t *rgb_group_row_at(uint8_t index) {
+    if (index < saved_led_group_count) return &saved_led_groups[index];
+    index = (uint8_t)(index - saved_led_group_count);
     if (index < layer_led_group_count) return &layer_led_groups[index].led_group;
     index = (uint8_t)(index - layer_led_group_count);
 #    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_PD_MODE_FEEDBACK_ENABLE)

@@ -58,9 +58,7 @@
   </g>
   <g transform="rotate(0 1057.0 201.0)">
     <rect x="1028.0" y="172.0" width="58" height="58" rx="7" fill="#0006ff" stroke="#0000e3" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="1057.0" y="198.6" fill="#f7f7f4" fill-opacity="0.56" font-size="7.4" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="650">_</text>
-    <text x="1057.0" y="211.0" fill="#f7f7f4" fill-opacity="1.00" font-size="9.1" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">-</text>
-    <circle cx="1057.0" cy="179.5" r="3.8" fill="#ff6c00" stroke="#f7f7f4" stroke-width="1.1"/>
+    <text x="1057.0" y="201.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">MINUS</text>
   </g>
   <g transform="rotate(0 65.0 265.0)">
     <rect x="36.0" y="236.0" width="58" height="58" rx="7" fill="#777777" stroke="#b8bab5" stroke-width="1.5" filter="url(#shadow)"/>
@@ -104,13 +102,11 @@
   </g>
   <g transform="rotate(0 991.0 265.0)">
     <rect x="962.0" y="236.0" width="58" height="58" rx="7" fill="#0006ff" stroke="#0000e3" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="991.0" y="262.6" fill="#f7f7f4" fill-opacity="0.56" font-size="7.4" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="650">&quot;</text>
-    <text x="991.0" y="275.0" fill="#f7f7f4" fill-opacity="1.00" font-size="9.1" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">'</text>
-    <circle cx="991.0" cy="243.5" r="3.8" fill="#ff6c00" stroke="#f7f7f4" stroke-width="1.1"/>
+    <text x="991.0" y="265.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">QUOTE</text>
   </g>
   <g transform="rotate(0 1057.0 265.0)">
     <rect x="1028.0" y="236.0" width="58" height="58" rx="7" fill="#0006ff" stroke="#0000e3" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="1057.0" y="265.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">P+</text>
+    <text x="1057.0" y="265.0" fill="#f7f7f4" fill-opacity="1.00" font-size="11.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">KP_PLUS</text>
   </g>
   <g transform="rotate(0 65.0 329.0)">
     <rect x="36.0" y="300.0" width="58" height="58" rx="7" fill="#0006ff" stroke="#0000e3" stroke-width="1.5" filter="url(#shadow)"/>
@@ -140,8 +136,8 @@
     <text x="395.0" y="289.0" fill="#ffffff" fill-opacity="0.72" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">TRNS</text>
   </g>
   <g transform="rotate(0 727.0 289.0)">
-    <rect x="698.0" y="260.0" width="58" height="58" rx="7" fill="#0006ff" stroke="#0000e3" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="727.0" y="289.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">VIA11</text>
+    <rect x="698.0" y="260.0" width="58" height="58" rx="7" fill="#777777" stroke="#b8bab5" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="727.0" y="289.0" fill="#ffffff" fill-opacity="0.72" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">TRNS</text>
   </g>
   <g transform="rotate(0 793.0 289.0)">
     <rect x="764.0" y="260.0" width="58" height="58" rx="7" fill="#777777" stroke="#b8bab5" stroke-width="1.5" filter="url(#shadow)"/>
@@ -149,15 +145,11 @@
   </g>
   <g transform="rotate(0 859.0 265.0)">
     <rect x="830.0" y="236.0" width="58" height="58" rx="7" fill="#0006ff" stroke="#0000e3" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="859.0" y="262.6" fill="#f7f7f4" fill-opacity="0.56" font-size="7.4" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="650">{</text>
-    <text x="859.0" y="275.0" fill="#f7f7f4" fill-opacity="1.00" font-size="9.1" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">[</text>
-    <circle cx="859.0" cy="243.5" r="3.8" fill="#ff6c00" stroke="#f7f7f4" stroke-width="1.1"/>
+    <text x="859.0" y="265.0" fill="#f7f7f4" fill-opacity="1.00" font-size="7.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600" textLength="48.0" lengthAdjust="spacingAndGlyphs">LEFT_BRACKET</text>
   </g>
   <g transform="rotate(0 925.0 289.0)">
     <rect x="896.0" y="260.0" width="58" height="58" rx="7" fill="#0006ff" stroke="#0000e3" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="925.0" y="286.6" fill="#f7f7f4" fill-opacity="0.56" font-size="7.4" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="650">}</text>
-    <text x="925.0" y="299.0" fill="#f7f7f4" fill-opacity="1.00" font-size="9.1" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">]</text>
-    <circle cx="925.0" cy="267.5" r="3.8" fill="#ff6c00" stroke="#f7f7f4" stroke-width="1.1"/>
+    <text x="925.0" y="289.0" fill="#f7f7f4" fill-opacity="1.00" font-size="7.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600" textLength="48.0" lengthAdjust="spacingAndGlyphs">RIGHT_BRACKET</text>
   </g>
   <g transform="rotate(0 991.0 329.0)">
     <rect x="962.0" y="300.0" width="58" height="58" rx="7" fill="#0006ff" stroke="#0000e3" stroke-width="1.5" filter="url(#shadow)"/>
@@ -165,7 +157,7 @@
   </g>
   <g transform="rotate(0 1057.0 329.0)">
     <rect x="1028.0" y="300.0" width="58" height="58" rx="7" fill="#0006ff" stroke="#0000e3" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="1057.0" y="329.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">=</text>
+    <text x="1057.0" y="329.0" fill="#f7f7f4" fill-opacity="1.00" font-size="11.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600" textLength="48.0" lengthAdjust="spacingAndGlyphs">KP_EQUAL</text>
   </g>
   <g transform="rotate(0 65.0 393.0)">
     <rect x="36.0" y="364.0" width="58" height="58" rx="7" fill="#0006ff" stroke="#0000e3" stroke-width="1.5" filter="url(#shadow)"/>
@@ -192,8 +184,8 @@
     <text x="395.0" y="353.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">VIA9</text>
   </g>
   <g transform="rotate(0 727.0 353.0)">
-    <rect x="698.0" y="324.0" width="58" height="58" rx="7" fill="#0006ff" stroke="#0000e3" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="727.0" y="353.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">P-</text>
+    <rect x="698.0" y="324.0" width="58" height="58" rx="7" fill="#777777" stroke="#b8bab5" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="727.0" y="353.0" fill="#ffffff" fill-opacity="0.72" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">TRNS</text>
   </g>
   <g transform="rotate(0 793.0 353.0)">
     <rect x="764.0" y="324.0" width="58" height="58" rx="7" fill="#777777" stroke="#b8bab5" stroke-width="1.5" filter="url(#shadow)"/>
@@ -228,8 +220,8 @@
     <text x="497.0" y="441.0" fill="#ffffff" fill-opacity="0.72" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">TRNS</text>
   </g>
   <g transform="rotate(-17 605.0 441.0)">
-    <rect x="576.0" y="412.0" width="58" height="58" rx="7" fill="#0006ff" stroke="#0000e3" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="605.0" y="441.0" fill="#f7f7f4" fill-opacity="1.00" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">P.</text>
+    <rect x="576.0" y="412.0" width="58" height="58" rx="7" fill="#777777" stroke="#b8bab5" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="605.0" y="441.0" fill="#ffffff" fill-opacity="0.72" font-size="12.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">TRNS</text>
   </g>
   <g transform="rotate(-10 677.0 433.0)">
     <rect x="648.0" y="404.0" width="58" height="58" rx="7" fill="#777777" stroke="#b8bab5" stroke-width="1.5" filter="url(#shadow)"/>

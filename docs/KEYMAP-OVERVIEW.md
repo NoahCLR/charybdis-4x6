@@ -41,7 +41,7 @@ Timing legend for the layer-local behavior tables:
 - RGB matrix render mode: `ALL_KEYS`
 - Authored layer color: `HSV(0, 0, 0)`
 - Preview color: <img alt="LAYER_BASE preview color" src="media/profile-introspection/profile-color-swatch-ff0000.svg" width="96" height="28" />
-- Combo badges on this layer: `C1`, `C2`, `C3`
+- Combo badges on this layer: `C1`, `C2`, `C3`, `C4`
 
 ![LAYER_BASE](media/profile-introspection/profile-layer-LAYER_BASE.svg)
 
@@ -61,25 +61,22 @@ Timing legend for the layer-local behavior tables:
 | `8` | `8` (`KC_8`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_ASTR)` | `-` | `tap_hold(150)` |
 | `9` | `9` (`KC_9`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_LPRN)` | `-` | `tap_hold(150)` |
 | `0` | `0` (`KC_0`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_RPRN)` | `-` | `tap_hold(150)` |
-| `-` | `-` (`KC_MINS`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_UNDS)` | `-` | `tap_hold(150)` |
-| `\` | `\` (`KC_BSLS`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_PIPE)` | `-` | `tap_hold(150)` |
 | `LSFT` | `LSFT` (`KC_LEFT_SHIFT`) | `single` | `TAP_SENDS(KC_CAPS)` | `-` | `-` | `release before tap_hold(150); otherwise normal hold` |
-| `;` | `;` (`KC_SCLN`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_COLN)` | `-` | `tap_hold(150)` |
-| `'` | `'` (`KC_QUOT`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_DQUO)` | `-` | `tap_hold(150)` |
 | `,` | `,` (`KC_COMM`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_LABK)` | `-` | `tap_hold(150)` |
 | `.` | `.` (`KC_DOT`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_RABK)` | `-` | `tap_hold(150)` |
 | `LT[NAV]/SLSH` | `LT[NAV]/SLSH` (`LT(LAYER_NAV,KC_SLSH)`) | `double` | `-` | `TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_NAV))` | `-` | `tap_hold=100, multi_tap(150)` |
-| `RALT` | `RALT` (`KC_RIGHT_ALT`) | `single` | `TAP_SENDS(PD_SLOT_4_LOCK)` | `-` | `-` | `release before tap_hold(150); otherwise normal hold` |
+| `RALT` | `RALT` (`KC_RIGHT_ALT`) | `single` | `TAP_SENDS(PD_SLOT_4_LOCK)` | `-` | `-` | `multi_tap(150)` |
+| `RALT` | `RALT` (`KC_RIGHT_ALT`) | `double` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(PD_SLOT_6)` | `-` | `tap_hold(150), multi_tap(150)` |
 | `LGUI` | `LGUI` (`KC_LEFT_GUI`) | `double` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_LEFT_ALT)` | `-` | `tap_hold(150), multi_tap(150)` |
 | `LGUI` | `LGUI` (`KC_LEFT_GUI`) | `triple` | `TAP_SENDS(OSM(MOD_LSFT))` | `-` | `-` | `multi_tap(150)` |
-| `LTHUMB` | `LTHUMB` (`LEFT_THUMB`) | `single` | `TAP_SENDS(LOCK_LAYER(LAYER_SYM))` | `PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_SYM))` | `-` | `tap_hold=150, multi_tap(150)` |
-| `LTHUMB` | `LTHUMB` (`LEFT_THUMB`) | `double` | `TAP_SENDS(KC_MPLY)` | `TAP_ON_RELEASE_AFTER_HOLD(KC_ESCAPE)` | `TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_NUM))` | `tap_hold=150, long_hold(400), multi_tap(150)` |
-| `LTHUMB` | `LTHUMB` (`LEFT_THUMB`) | `triple` | `TAP_SENDS(KC_MNXT)` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_MNXT)` | `tap_hold=150, long_hold(400), multi_tap(150)` |
-| `LTHUMB` | `LTHUMB` (`LEFT_THUMB`) | `quadruple` | `TAP_SENDS(KC_MPRV)` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_MPRV)` | `tap_hold=150, long_hold(400), multi_tap(150)` |
-| `RTHUMB` | `RTHUMB` (`RIGHT_THUMB`) | `single` | `TAP_SENDS(LOCK_LAYER(LAYER_NAV))` | `PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_NAV))` | `-` | `tap_hold=150, multi_tap(150)` |
-| `RTHUMB` | `RTHUMB` (`RIGHT_THUMB`) | `double` | `TAP_SENDS(KC_MPLY)` | `TAP_ON_RELEASE_AFTER_HOLD(KC_ESCAPE)` | `TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_NUM))` | `tap_hold=150, long_hold(400), multi_tap(150)` |
-| `RTHUMB` | `RTHUMB` (`RIGHT_THUMB`) | `triple` | `TAP_SENDS(KC_MNXT)` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_MNXT)` | `tap_hold=150, long_hold(400), multi_tap(150)` |
-| `RTHUMB` | `RTHUMB` (`RIGHT_THUMB`) | `quadruple` | `TAP_SENDS(KC_MPRV)` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_MPRV)` | `tap_hold=150, long_hold(400), multi_tap(150)` |
+| `VIA18` | `VIA18` (`VIA_MACRO_18`) | `single` | `TAP_SENDS(LOCK_LAYER(LAYER_SYM))` | `PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_SYM))` | `-` | `tap_hold=150, multi_tap(150)` |
+| `VIA18` | `VIA18` (`VIA_MACRO_18`) | `double` | `TAP_SENDS(LOCK_LAYER(LAYER_NUM))` | `PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_NUM))` | `-` | `tap_hold=150, multi_tap(150)` |
+| `VIA18` | `VIA18` (`VIA_MACRO_18`) | `triple` | `TAP_SENDS(LOCK_LAYER(LAYER_EXTRA_1))` | `PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_EXTRA_1))` | `-` | `tap_hold=150, multi_tap(150)` |
+| `VIA18` | `VIA18` (`VIA_MACRO_18`) | `quadruple` | `TAP_SENDS(LOCK_LAYER(LAYER_EXTRA_2))` | `PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_EXTRA_2))` | `-` | `tap_hold=150, multi_tap(150)` |
+| `VIA19` | `VIA19` (`VIA_MACRO_19`) | `single` | `TAP_SENDS(LOCK_LAYER(LAYER_NAV))` | `PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_NAV))` | `-` | `tap_hold=150, multi_tap(150)` |
+| `VIA19` | `VIA19` (`VIA_MACRO_19`) | `double` | `TAP_SENDS(KC_MPLY)` | `TAP_ON_RELEASE_AFTER_HOLD(KC_ESCAPE)` | `TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_NUM))` | `tap_hold=150, long_hold(400), multi_tap(150)` |
+| `VIA19` | `VIA19` (`VIA_MACRO_19`) | `triple` | `TAP_SENDS(KC_MNXT)` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_MNXT)` | `tap_hold=150, long_hold(400), multi_tap(150)` |
+| `VIA19` | `VIA19` (`VIA_MACRO_19`) | `quadruple` | `TAP_SENDS(KC_MPRV)` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_MPRV)` | `tap_hold=150, long_hold(400), multi_tap(150)` |
 | `ENT` | `ENT` (`KC_ENT`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(S(KC_ENT))` | `-` | `tap_hold(150)` |
 
 #### PD Modes Reachable On This Layer
@@ -87,14 +84,16 @@ Timing legend for the layer-local behavior tables:
 | Reachable Via | Mode Keycode | Pointing Mode | Locality | Authored HSV | Preview Color |
 | --- | --- | --- | --- | --- | --- |
 | `RALT` via `single tap` -> `PD_SLOT_4_LOCK` | `PD_SLOT_4` | `PD_MODE_ARROW` | `RGB_RIGHT_HALF` | `HSV(127, 255, 200)` | <img alt="PD_MODE_ARROW color" src="media/profile-introspection/profile-color-swatch-00fffc.svg" width="96" height="28" /> |
+| `RALT` via `double hold` -> `PD_SLOT_6` | `PD_SLOT_6` | `PD_MODE_SLOT_6` | `RGB_KEY_HALF` | `HSV(19, 255, 200)` | <img alt="PD_MODE_SLOT_6 color" src="media/profile-introspection/profile-color-swatch-ff7200.svg" width="96" height="28" /> |
 
 #### Combos Available On This Layer
 
 | Combo | Inputs On This Layer | Output |
 | --- | --- | --- |
 | `C1` | `D` + `LT[NAV]/F` | `TAB` (`KC_TAB`) |
-| `C2` | `N` + `M` | `LGUI` (`KC_LEFT_GUI`) |
-| `C3` | `N` + `M` + `,` | `G(T)` (`G(KC_T)`) |
+| `C2` | `N` + `M` | `LGUI` (`KC_LGUI`) |
+| `C3` | `M` + `,` + `.` + `LT[NAV]/SLSH` | `G(N)` (`G(KC_N)`) |
+| `C4` | `M` + `,` + `.` | `G(T)` (`G(KC_T)`) |
 
 ### `LAYER_NUM`
 
@@ -110,9 +109,9 @@ Timing legend for the layer-local behavior tables:
 | --- | --- | --- | --- | --- | --- | --- |
 | `ESC` | `ESC` (`KC_ESC`) | `single` | `-` | `-` | `TAP_AT_HOLD_THRESHOLD(LAG(KC_ESC))` | `tap_hold(150), long_hold(400), multi_tap(150)` |
 | `ESC` | `ESC` (`KC_ESC`) | `double` | `TAP_SENDS(S(KC_GRV))` | `-` | `-` | `multi_tap(150)` |
-| `-` | `-` (`KC_MINS`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_UNDS)` | `-` | `tap_hold(150)` |
 | `LSFT` | `LSFT` (`KC_LEFT_SHIFT`) | `single` | `TAP_SENDS(KC_CAPS)` | `-` | `-` | `release before tap_hold(150); otherwise normal hold` |
-| `RALT` | `RALT` (`KC_RIGHT_ALT`) | `single` | `TAP_SENDS(PD_SLOT_4_LOCK)` | `-` | `-` | `release before tap_hold(150); otherwise normal hold` |
+| `RALT` | `RALT` (`KC_RIGHT_ALT`) | `single` | `TAP_SENDS(PD_SLOT_4_LOCK)` | `-` | `-` | `multi_tap(150)` |
+| `RALT` | `RALT` (`KC_RIGHT_ALT`) | `double` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(PD_SLOT_6)` | `-` | `tap_hold(150), multi_tap(150)` |
 | `,` | `,` (`KC_COMM`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_LABK)` | `-` | `tap_hold(150)` |
 | `.` | `.` (`KC_DOT`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_RABK)` | `-` | `tap_hold(150)` |
 
@@ -121,6 +120,7 @@ Timing legend for the layer-local behavior tables:
 | Reachable Via | Mode Keycode | Pointing Mode | Locality | Authored HSV | Preview Color |
 | --- | --- | --- | --- | --- | --- |
 | `RALT` via `single tap` -> `PD_SLOT_4_LOCK` | `PD_SLOT_4` | `PD_MODE_ARROW` | `RGB_RIGHT_HALF` | `HSV(127, 255, 200)` | <img alt="PD_MODE_ARROW color" src="media/profile-introspection/profile-color-swatch-00fffc.svg" width="96" height="28" /> |
+| `RALT` via `double hold` -> `PD_SLOT_6` | `PD_SLOT_6` | `PD_MODE_SLOT_6` | `RGB_KEY_HALF` | `HSV(19, 255, 200)` | <img alt="PD_MODE_SLOT_6 color" src="media/profile-introspection/profile-color-swatch-ff7200.svg" width="96" height="28" /> |
 
 #### Combos Available On This Layer
 
@@ -140,11 +140,7 @@ No authored combos resolve entirely from keys on this layer.
 | --- | --- | --- | --- | --- | --- | --- |
 | `ESC x2` | `ESC` (`KC_ESC`) | `single` | `-` | `-` | `TAP_AT_HOLD_THRESHOLD(LAG(KC_ESC))` | `tap_hold(150), long_hold(400), multi_tap(150)` |
 | `ESC x2` | `ESC` (`KC_ESC`) | `double` | `TAP_SENDS(S(KC_GRV))` | `-` | `-` | `multi_tap(150)` |
-| `-` | `-` (`KC_MINS`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_UNDS)` | `-` | `tap_hold(150)` |
-| `'` | `'` (`KC_QUOT`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_DQUO)` | `-` | `tap_hold(150)` |
 | `LSFT` | `LSFT` (`KC_LEFT_SHIFT`) | `single` | `TAP_SENDS(KC_CAPS)` | `-` | `-` | `release before tap_hold(150); otherwise normal hold` |
-| `[` | `[` (`KC_LBRC`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_LCBR)` | `-` | `tap_hold(150)` |
-| `]` | `]` (`KC_RBRC`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_RCBR)` | `-` | `tap_hold(150)` |
 
 #### PD Modes Reachable On This Layer
 
@@ -159,7 +155,7 @@ No authored combos resolve entirely from keys on this layer.
 - RGB matrix render mode: `KEYS_MAPPED_ON_THIS_LAYER_ONLY`
 - Authored layer color: `HSV(180, 255, 200)`
 - Preview color: <img alt="LAYER_NAV preview color" src="media/profile-introspection/profile-color-swatch-3c00ff.svg" width="96" height="28" />
-- Combo badges on this layer: `C1`, `C2`
+- Combo badges on this layer: `C1`, `C2`, `C3`
 
 ![LAYER_NAV](media/profile-introspection/profile-layer-LAYER_NAV.svg)
 
@@ -185,15 +181,16 @@ No authored combos resolve entirely from keys on this layer.
 
 | Combo | Inputs On This Layer | Output |
 | --- | --- | --- |
-| `C1` | `MS_BTN1` + `MS_BTN2` | `CLICK_SPAM` |
-| `C2` | `G(C) x2` + `G(V) x2` | `G(A)` (`G(KC_A)`) |
+| `C1` | `G(C) x2` + `G(V) x2` | `G(A)` (`G(KC_A)`) |
+| `C2` | `MS_BTN1` + `MS_BTN2` + `PD_SLOT_0` | `G(T)` (`G(KC_T)`) |
+| `C3` | `MS_BTN1` + `MS_BTN2` | `MS_BTN6` |
 
 ### `LAYER_POINTER`
 
 - RGB matrix render mode: `KEYS_MAPPED_ON_THIS_LAYER_ONLY`
 - Authored layer color: `HSV(0, 0, 150)`
 - Preview color: <img alt="LAYER_POINTER preview color" src="media/profile-introspection/profile-color-swatch-ffffff.svg" width="96" height="28" />
-- Combo badges on this layer: `C1`, `C2`, `C3`
+- Combo badges on this layer: `C1`, `C2`, `C3`, `C4`
 
 ![LAYER_POINTER](media/profile-introspection/profile-layer-LAYER_POINTER.svg)
 
@@ -225,15 +222,16 @@ No authored combos resolve entirely from keys on this layer.
 
 | Combo | Inputs On This Layer | Output |
 | --- | --- | --- |
-| `C1` | `MS_BTN1` + `MS_BTN2` | `CLICK_SPAM` |
-| `C2` | `PD_SLOT_1` + `MS_BTN1` + `MS_BTN2` | `G(T)` (`G(KC_T)`) |
-| `C3` | `MS_BTN1` + `PD_SLOT_1` | `LGUI` (`KC_LGUI`) |
+| `C1` | `PD_SLOT_5` + `MS_BTN3` | `CLICK_SPAM` |
+| `C2` | `MS_BTN1` + `PD_SLOT_1` | `LGUI` (`KC_LGUI`) |
+| `C3` | `MS_BTN1` + `MS_BTN2` + `PD_SLOT_0` | `G(T)` (`G(KC_T)`) |
+| `C4` | `MS_BTN1` + `MS_BTN2` | `MS_BTN6` |
 
 ### `LAYER_EXTRA_1`
 
 - RGB matrix render mode: `KEYS_MAPPED_ON_THIS_LAYER_ONLY`
-- Authored layer color: `HSV(0, 0, 0)`
-- Preview color: no override
+- Authored layer color: `HSV(96, 255, 200)`
+- Preview color: <img alt="LAYER_EXTRA_1 preview color" src="media/profile-introspection/profile-color-swatch-00ff42.svg" width="96" height="28" />
 
 ![LAYER_EXTRA_1](media/profile-introspection/profile-layer-LAYER_EXTRA_1.svg)
 
@@ -252,8 +250,8 @@ No authored combos resolve entirely from keys on this layer.
 ### `LAYER_EXTRA_2`
 
 - RGB matrix render mode: `KEYS_MAPPED_ON_THIS_LAYER_ONLY`
-- Authored layer color: `HSV(0, 0, 0)`
-- Preview color: no override
+- Authored layer color: `HSV(140, 255, 200)`
+- Preview color: <img alt="LAYER_EXTRA_2 preview color" src="media/profile-introspection/profile-color-swatch-00b4ff.svg" width="96" height="28" />
 
 ![LAYER_EXTRA_2](media/profile-introspection/profile-layer-LAYER_EXTRA_2.svg)
 
@@ -304,8 +302,8 @@ Key-local PD RGB localities are gated by `RGB_PD_MODE_ACTIVE_HALF_ENABLE` in [us
 
 | Pointing Mode | Locality | Authored HSV | Preview Color |
 | --- | --- | --- | --- |
-| `PD_MODE_SLOT_6` | `RGB_RIGHT_HALF` | `HSV(0, 0, 0)` | <img alt="PD_MODE_SLOT_6 color" src="media/profile-introspection/profile-color-swatch-000000.svg" width="96" height="28" /> |
-| `PD_MODE_SLOT_7` | `RGB_RIGHT_HALF` | `HSV(0, 0, 0)` | <img alt="PD_MODE_SLOT_7 color" src="media/profile-introspection/profile-color-swatch-000000.svg" width="96" height="28" /> |
+| `PD_MODE_SLOT_6` | `RGB_KEY_HALF` | `HSV(19, 255, 200)` | <img alt="PD_MODE_SLOT_6 color" src="media/profile-introspection/profile-color-swatch-ff7200.svg" width="96" height="28" /> |
+| `PD_MODE_SLOT_7` | `RGB_RIGHT_HALF` | `HSV(200, 193, 108)` | <img alt="PD_MODE_SLOT_7 color" src="media/profile-introspection/profile-color-swatch-c63dff.svg" width="96" height="28" /> |
 | `PD_MODE_DRAGSCROLL` | `RGB_RIGHT_HALF` | `HSV(21, 255, 200)` | <img alt="PD_MODE_DRAGSCROLL color" src="media/profile-introspection/profile-color-swatch-ff7e00.svg" width="96" height="28" /> |
 | `PD_MODE_VOLUME` | `RGB_RIGHT_HALF` | `HSV(43, 255, 200)` | <img alt="PD_MODE_VOLUME color" src="media/profile-introspection/profile-color-swatch-fcff00.svg" width="96" height="28" /> |
 | `PD_MODE_BRIGHTNESS` | `RGB_RIGHT_HALF` | `HSV(213, 255, 200)` | <img alt="PD_MODE_BRIGHTNESS color" src="media/profile-introspection/profile-color-swatch-ff00fc.svg" width="96" height="28" /> |
@@ -333,9 +331,9 @@ Current authored auto-mouse fade mode: `FOLLOW_REAL_DESTINATION`.
 | `END_COLOR_WHERE_BASE_EFFECT_WOULD_SHOW` | Keep the real destination where layers still paint, but use `end_color` where the base RGB effect would otherwise show through. |
 | `END_COLOR_ON_ALL_KEYS` | Use `end_color` as the fade destination on every key while the automouse renderer is active. |
 
-Authored `end_color`: `HSV(0, 255, 200)`.
+Authored `end_color`: `HSV(167, 255, 199)`.
 
-Preview color: <img alt="Auto-mouse end color" src="media/profile-introspection/profile-color-swatch-ff0000.svg" width="96" height="28" />
+Preview color: <img alt="Auto-mouse end color" src="media/profile-introspection/profile-color-swatch-0012ff.svg" width="96" height="28" />
 
 `end_color` is only visible in the two `END_COLOR_*` modes above; `FOLLOW_REAL_DESTINATION` ignores it and lands on the real rendered board state instead.
 
@@ -406,20 +404,21 @@ Authored key-feedback LED groups repaint after the feedback locality render insi
 
 ### VIA Macros
 
-| Slot | Payload | Usage |
-| --- | --- | --- |
-| `VIA_MACRO_0` | `{KC_LGUI,KC_SPC}` | `LAYER_NAV @ VIA0` |
-| `VIA_MACRO_1` | `{KC_LALT,KC_SPC}` | `LAYER_NAV @ VIA1` |
-| `VIA_MACRO_2` | `{KC_LALT,KC_LGUI,KC_SPC}` | `LAYER_NAV @ VIA2` |
-| `VIA_MACRO_3` | `{KC_LCTL,KC_LALT,KC_LGUI,KC_C}` | `LAYER_SYM @ VIA3` |
-| `VIA_MACRO_4` | `{KC_LCTL,KC_LALT,KC_LGUI,KC_X}` | `LAYER_SYM @ VIA4` |
-| `VIA_MACRO_5` | `{KC_LCTL,KC_LGUI,KC_SPC}` | `LAYER_SYM @ VIA5` |
-| `VIA_MACRO_6` | `{KC_LALT,KC_LGUI,KC_8}` | `PD_SLOT_5 double tap` |
-| `VIA_MACRO_7` | `{KC_LCTL,KC_LALT,KC_LGUI,KC_V}` | `LAYER_NAV @ VIA7`, `G(KC_V) double tap` |
-| `VIA_MACRO_8` | `{KC_LSFT,KC_LGUI,KC_V}` | `LAYER_SYM @ VIA8` |
-| `VIA_MACRO_9` | `{KC_LSFT,KC_LGUI,KC_P}` | `LAYER_SYM @ VIA9` |
-| `VIA_MACRO_10` | `{KC_LGUI,KC_A}{50}{KC_LGUI,KC_C}` | `G(KC_C) double tap` |
-| `VIA_MACRO_11` | `{KC_LGUI,KC_LSFT,KC_DOT}` | `LAYER_SYM @ VIA11` |
+| Slot | Name | Payload | Usage |
+| --- | --- | --- | --- |
+| `VIA_MACRO_0` | Spotlight | `{KC_LGUI,KC_SPC}` | `LAYER_NAV @ VIA0` |
+| `VIA_MACRO_1` | AI Chat | `{KC_LALT,KC_SPC}` | `LAYER_NAV @ VIA1` |
+| `VIA_MACRO_2` | Warp Terminal | `{KC_LALT,KC_LGUI,KC_SPC}` | `LAYER_NAV @ VIA2` |
+| `VIA_MACRO_3` | OCR Copy | `{KC_LCTL,KC_LALT,KC_LGUI,KC_C}` | `LAYER_SYM @ VIA3` |
+| `VIA_MACRO_4` | Drag Screenshot | `{KC_LCTL,KC_LALT,KC_LGUI,KC_X}` | `LAYER_SYM @ VIA4` |
+| `VIA_MACRO_5` | Emoji | `{KC_LCTL,KC_LGUI,KC_SPC}` | `LAYER_SYM @ VIA5` |
+| `VIA_MACRO_6` | Zoom Screen | `{KC_LALT,KC_LGUI,KC_8}` | `PD_SLOT_5 double tap` |
+| `VIA_MACRO_7` | Clipboard History | `{KC_LCTL,KC_LALT,KC_LGUI,KC_V}` | `LAYER_NAV @ VIA7`, `G(KC_V) double tap` |
+| `VIA_MACRO_8` | VS Code Preview MD | `{KC_LSFT,KC_LGUI,KC_V}` | `LAYER_SYM @ VIA8` |
+| `VIA_MACRO_9` | VS Code Run Task | `{KC_LSFT,KC_LGUI,KC_P}` | `LAYER_SYM @ VIA9` |
+| `VIA_MACRO_10` | Select All + Copy | `{KC_LGUI,KC_A}{50}{KC_LGUI,KC_C}` | `G(KC_C) double tap` |
+| `VIA_MACRO_18` | Left Thumb | - | `LAYER_BASE @ VIA18` |
+| `VIA_MACRO_19` | Right Thumb | - | `LAYER_BASE @ VIA19` |
 
 ## Reference
 
@@ -452,8 +451,8 @@ Authored key-feedback LED groups repaint after the feedback locality render insi
 | `LAYER_SYM` | `KEYS_MAPPED_ON_THIS_LAYER_ONLY` | `HSV(169, 255, 200)` | <img alt="LAYER_SYM preview color" src="media/profile-introspection/profile-color-swatch-0006ff.svg" width="96" height="28" /> |
 | `LAYER_NAV` | `KEYS_MAPPED_ON_THIS_LAYER_ONLY` | `HSV(180, 255, 200)` | <img alt="LAYER_NAV preview color" src="media/profile-introspection/profile-color-swatch-3c00ff.svg" width="96" height="28" /> |
 | `LAYER_POINTER` | `KEYS_MAPPED_ON_THIS_LAYER_ONLY` | `HSV(0, 0, 150)` | <img alt="LAYER_POINTER preview color" src="media/profile-introspection/profile-color-swatch-ffffff.svg" width="96" height="28" /> |
-| `LAYER_EXTRA_1` | `KEYS_MAPPED_ON_THIS_LAYER_ONLY` | `HSV(0, 0, 0)` | no override |
-| `LAYER_EXTRA_2` | `KEYS_MAPPED_ON_THIS_LAYER_ONLY` | `HSV(0, 0, 0)` | no override |
+| `LAYER_EXTRA_1` | `KEYS_MAPPED_ON_THIS_LAYER_ONLY` | `HSV(96, 255, 200)` | <img alt="LAYER_EXTRA_1 preview color" src="media/profile-introspection/profile-color-swatch-00ff42.svg" width="96" height="28" /> |
+| `LAYER_EXTRA_2` | `KEYS_MAPPED_ON_THIS_LAYER_ONLY` | `HSV(140, 255, 200)` | <img alt="LAYER_EXTRA_2 preview color" src="media/profile-introspection/profile-color-swatch-00b4ff.svg" width="96" height="28" /> |
 | `LAYER_EXTRA_3` | `KEYS_MAPPED_ON_THIS_LAYER_ONLY` | `HSV(0, 0, 0)` | no override |
 
 ### Layer LED Groups
@@ -478,10 +477,10 @@ Reusable groups define physical LED sets once near the LED map in `rgb_config.c`
 | `layer_count` | `8` |
 | `layout_key_count` | `56` |
 | `key_behavior_count` | `37` |
-| `key_behavior_step_count` | `48` |
-| `combo_count` | `7` |
+| `key_behavior_step_count` | `49` |
+| `combo_count` | `10` |
 | `via_macro_count` | `64` |
-| `via_macro_non_empty_count` | `12` |
+| `via_macro_non_empty_count` | `13` |
 | `keymap_custom_keycode_count` | `4` |
 | `pd_mode_count` | `8` |
 | `pd_mode_color_count` | `8` |

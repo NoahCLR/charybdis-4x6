@@ -108,6 +108,21 @@ static uint32_t setting_default(uint8_t id) {
 static bool external_setting(uint8_t id) {
     return (id >= NOAH_SETTING_AUTO_MOUSE_ENABLED && id <= NOAH_SETTING_AUTO_MOUSE_DEBOUNCE) || (id >= NOAH_SETTING_DEFAULT_DPI && id <= NOAH_SETTING_KEYMAP_OPTIONS);
 }
+// The keymap's names fill a settings domain that no profile has stored.
+_Static_assert(LAYER_COUNT == NOAH_SETTINGS_LAYERS, "Settings name every one of the eight layers");
+_Static_assert(NOAH_LAYER_NAME_SIZE == NOAH_SETTINGS_NAME_BYTES, "A layer name fills one settings name field");
+_Static_assert(VIA_MACRO_SLOT_COUNT == NOAH_SETTINGS_MACRO_NAMES, "Settings name every VIA macro");
+_Static_assert(NOAH_MACRO_NAME_SIZE == NOAH_SETTINGS_MACRO_NAME_ASCII_MAX + 1u, "A macro name is at most 20 characters");
+enum { LAYER_NAMES_OFFSET = 8u + NOAH_SETTINGS_COUNT * 4u };
+static uint8_t name_length(const char *name, uint8_t max) {
+    uint8_t length = 0;
+    while (length < max && name[length])
+        length++;
+    return length;
+}
+static uint8_t macro_name_length(uint8_t slot) {
+    return name_length(via_macro_names[slot], NOAH_SETTINGS_MACRO_NAME_ASCII_MAX);
+}
 // Settings readback streams from the effective settings rather than keeping
 // a second copy. Page 0 describes the bytes as they are now; a change between
 // pages shows up as the digest mismatch the reader already checks for.
@@ -115,27 +130,48 @@ static uint16_t settings_length(void) {
     uint16_t length = noah_effective_settings_length();
     if (length) return length;
 #if NOAH_PROFILE_SETTINGS_VERSION >= 3u
-    return NOAH_SETTINGS_FIXED_SIZE + NOAH_SETTINGS_MACRO_NAMES;
+    length = NOAH_SETTINGS_FIXED_SIZE + NOAH_SETTINGS_MACRO_NAMES;
+    for (uint8_t slot = 0; slot < NOAH_SETTINGS_MACRO_NAMES; slot++)
+        length += macro_name_length(slot);
+    return length;
 #else
     return NOAH_SETTINGS_FIXED_SIZE + NOAH_SETTINGS_MACROS * 2u;
 #endif
 }
 static uint8_t settings_byte(uint16_t offset) {
-    if (offset >= 8u && offset < 8u + NOAH_SETTINGS_COUNT * 4u) {
+    if (offset >= 8u && offset < LAYER_NAMES_OFFSET) {
         uint8_t  id    = (offset - 8u) / 4u;
         uint32_t value = setting_default(id);
         if (!external_setting(id)) value = noah_setting(id, value);
         return value >> (8u * ((offset - 8u) % 4u));
     }
     if (noah_effective_settings_length()) return noah_effective_settings_byte(offset);
-    // No profile settings are live: the current version with every macro
-    // unnamed (v3), or every user macro empty (v1).
+    // No profile settings are live: the current version with the keymap's
+    // layer and macro names (v3), or its layer names and every user macro
+    // empty (v1).
 #if NOAH_PROFILE_SETTINGS_VERSION >= 3u
     const uint8_t header[8] = {NOAH_SETTINGS_VERSION, 8, NOAH_SETTINGS_COUNT, NOAH_SETTINGS_MACRO_NAMES, 0, 0, 0, 0};
 #else
     const uint8_t header[8] = {NOAH_SETTINGS_VERSION, 8, NOAH_SETTINGS_COUNT, NOAH_SETTINGS_MACROS, 0, 0, 0, 0};
 #endif
-    return offset < 8u ? header[offset] : 0u;
+    if (offset < 8u) return header[offset];
+    if (offset < NOAH_SETTINGS_FIXED_SIZE) {
+        offset -= LAYER_NAMES_OFFSET;
+        const char *name = layer_names[offset / NOAH_SETTINGS_NAME_BYTES];
+        uint8_t     byte = offset % NOAH_SETTINGS_NAME_BYTES;
+        // Zero padded after the name, whatever the array holds there.
+        return byte < name_length(name, NOAH_SETTINGS_NAME_BYTES - 1u) ? (uint8_t)name[byte] : 0u;
+    }
+#if NOAH_PROFILE_SETTINGS_VERSION >= 3u
+    offset -= NOAH_SETTINGS_FIXED_SIZE;
+    for (uint8_t slot = 0; slot < NOAH_SETTINGS_MACRO_NAMES; slot++) {
+        uint8_t length = macro_name_length(slot);
+        if (offset == 0u) return length;
+        if (offset <= length) return (uint8_t)via_macro_names[slot][offset - 1u];
+        offset -= length + 1u;
+    }
+#endif
+    return 0u;
 }
 #ifndef NOAH_PD_PROFILE_ENABLE
 // The bridge's legacy pointing source is encoded once, at page 0.

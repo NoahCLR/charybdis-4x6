@@ -25,6 +25,11 @@ _Static_assert(LAYER_COUNT == DYNAMIC_KEYMAP_LAYER_COUNT, "LAYER_COUNT and DYNAM
 #endif
 
 #define VIA_MACRO_SLOT_COUNT 64
+// The names Charybdis Live shows until a layer or macro is renamed there:
+// a layer name holds 23 UTF-8 bytes, a macro name 20 printable ASCII
+// characters, each followed by its terminator.
+#define NOAH_LAYER_NAME_SIZE 24
+#define NOAH_MACRO_NAME_SIZE 21
 #ifdef VIA_ENABLE
 _Static_assert(VIA_MACRO_SLOT_COUNT == DYNAMIC_KEYMAP_MACRO_COUNT, "VIA_MACRO_SLOT_COUNT and DYNAMIC_KEYMAP_MACRO_COUNT are out of sync");
 #endif
@@ -161,9 +166,13 @@ _Static_assert(PD_SLOT_6 == 0x7ef0, "PD extension ABI changed");
 #define NOAH_KEYMAP_SAFE_RANGE CUSTOM_KEYCODES_END
 
 extern const char *const via_macro_payloads[VIA_MACRO_SLOT_COUNT];
+extern const char        via_macro_names[VIA_MACRO_SLOT_COUNT][NOAH_MACRO_NAME_SIZE];
+extern const char        layer_names[LAYER_COUNT][NOAH_LAYER_NAME_SIZE];
 #ifdef COMBO_ENABLE
 extern combo_t       key_combos[];
 extern const uint8_t noah_combo_count;
+// Each combo's own window in ms; zero follows COMBO_TERM.
+extern const uint16_t noah_combo_terms[];
 #endif
 extern const uint16_t *const  noah_combo_output_keycodes;
 extern const uint8_t          noah_combo_output_count;

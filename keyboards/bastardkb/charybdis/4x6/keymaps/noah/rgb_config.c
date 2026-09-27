@@ -98,11 +98,19 @@ const layer_color_config_t layer_colors[LAYER_COUNT] = {
             .color = HSV(0, 0, 150),
             .mode  = KEYS_MAPPED_ON_THIS_LAYER_ONLY,
         },
-    [LAYER_EXTRA_1] = {.color = HSV(0, 0, 0), .mode = KEYS_MAPPED_ON_THIS_LAYER_ONLY},
-    [LAYER_EXTRA_2] = {.color = HSV(0, 0, 0), .mode = KEYS_MAPPED_ON_THIS_LAYER_ONLY},
+    [LAYER_EXTRA_1] = {.color = HSV(96, 255, 200), .mode = KEYS_MAPPED_ON_THIS_LAYER_ONLY},
+    [LAYER_EXTRA_2] = {.color = HSV(140, 255, 200), .mode = KEYS_MAPPED_ON_THIS_LAYER_ONLY},
     [LAYER_EXTRA_3] = {.color = HSV(0, 0, 0), .mode = KEYS_MAPPED_ON_THIS_LAYER_ONLY},
 
 };
+
+// ─── Saved LED Groups ───────────────────────────────────────────────────────
+//
+// LED groups Charybdis Live keeps for later without painting them anywhere.
+// A group used by a table below is saved with it and need not be listed here.
+static const rgb_led_group_t saved_led_groups_data[] = RGB_SAVED_LED_GROUP_TABLE(
+    RGB_LED_GROUP(54, 56),
+);
 
 // ─── Layer LED Groups ───────────────────────────────────────────────────────
 //
@@ -145,7 +153,7 @@ static const layer_led_group_t layer_led_groups_data[] = RGB_LED_GROUP_TABLE(
 #    ifdef RGB_AUTOMOUSE_GRADIENT_ENABLE
 const automouse_fade_end_config_t automouse_fade_end_config = {
     .mode      = FOLLOW_REAL_DESTINATION,
-    .end_color = HSV(0, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+    .end_color = HSV(167, 255, 199),
 };
 #    endif // RGB_AUTOMOUSE_GRADIENT_ENABLE
 
@@ -167,8 +175,8 @@ const automouse_fade_end_config_t automouse_fade_end_config = {
 // { .pointing_mode = ..., .color = HSV(hue, sat, val), .locality = ... }
 #    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_PD_MODE_FEEDBACK_ENABLE)
 const pd_mode_color_t pd_mode_colors[] = {
-    {.pointing_mode = PD_MODE_SLOT_6, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
-    {.pointing_mode = PD_MODE_SLOT_7, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
+    {.pointing_mode = PD_MODE_SLOT_6, .color = HSV(19, 255, 200), .locality = RGB_KEY_HALF},
+    {.pointing_mode = PD_MODE_SLOT_7, .color = HSV(200, 193, 108), .locality = RGB_RIGHT_HALF},
     {
         .pointing_mode = PD_MODE_DRAGSCROLL,
         .color         = HSV(21, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),

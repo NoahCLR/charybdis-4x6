@@ -16,24 +16,31 @@ for variant in normal sanitized; do
         "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
         "$ROOT/users/noah/lib/profile/storage/profile_checksum.c" \
         -o "$BUILD_DIR/test"
-    "$BUILD_DIR/test" "$BUILD_DIR/responses.fixture"
-    # The app reads the firmware-produced pages and finds the macro's name.
-    node - "$ROOT" "$BUILD_DIR/responses.fixture" <<'JS'
+    "$BUILD_DIR/test" "$BUILD_DIR/responses.fixture" "$BUILD_DIR/named.fixture"
+    # The app reads the firmware-produced pages and finds the macro's name,
+    # and with nothing stored, the keymap's layer and macro names.
+    node - "$ROOT" "$BUILD_DIR/responses.fixture" "$BUILD_DIR/named.fixture" <<'JS'
 const assert = require("node:assert/strict"), fs = require("node:fs");
 const {readSettings} = require(process.argv[2] + "/tools/charybdis-live/core/protocol/portable-profile-v1");
 const {decodeSettings, macroNamesOf} = require(process.argv[2] + "/tools/charybdis-live/core/schema/settings-domain-v1");
-const fixture = fs.readFileSync(process.argv[3]), pages = fixture.length / 32;
-let id = 0;
-readSettings({request: async request => {
-    assert.ok(request[4] < pages);
-    const response = Buffer.from(fixture.subarray(request[4] * 32, request[4] * 32 + 32));
-    request.copy(response, 0, 0, 5);
-    return response;
-}}, {next: () => ++id}).then(bytes => {
-    const names = macroNamesOf(decodeSettings(bytes));
-    assert.equal(names[5], "Screenshot");
-    assert.equal(names.filter(Boolean).length, 1);
-    console.log("app reads the firmware's streamed settings and its macro names");
-}).catch(error => {console.error(error); process.exitCode = 1;});
+function read(path) {
+    const fixture = fs.readFileSync(path), pages = fixture.length / 32;
+    let id = 0;
+    return readSettings({request: async request => {
+        assert.ok(request[4] < pages);
+        const response = Buffer.from(fixture.subarray(request[4] * 32, request[4] * 32 + 32));
+        request.copy(response, 0, 0, 5);
+        return response;
+    }}, {next: () => ++id}).then(decodeSettings);
+}
+(async () => {
+    const stored = macroNamesOf(await read(process.argv[3]));
+    assert.equal(stored[5], "Screenshot");
+    assert.equal(stored.filter(Boolean).length, 1);
+    const authored = await read(process.argv[4]);
+    assert.deepEqual(macroNamesOf(authored).filter(Boolean), ["Drag Screenshot", "Twenty characters!!!"]);
+    assert.deepEqual([authored.names[0], authored.names[1], authored.names[7]], ["Base", "", "Twenty-three bytes long"]);
+    console.log("app reads the firmware's streamed settings and its macro and layer names");
+})().catch(error => {console.error(error); process.exitCode = 1;});
 JS
 done

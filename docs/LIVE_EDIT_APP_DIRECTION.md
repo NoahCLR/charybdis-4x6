@@ -216,6 +216,13 @@ flashed firmware was built from different data than the repository holds, the
 app shows what is flashed. Compiled defaults are labelled as such; generation 0
 reads as "no committed profile".
 
+Compiled defaults are authored data in the keymap files: layer names beside the
+layouts, each macro's name beside its payload, a combo's own window on its row
+(`COMBO_WINDOW`), and LED groups kept for later in `rgb_config.c`. Userspace
+only serves them. With nothing stored, the settings readback reports those
+names and the combos run with those windows; saved LED groups ride in the
+compiled RGB domain. A stored profile keeps its own.
+
 Two pieces of keyboard-definition data ship with the app because no device
 command exposes them: the vendored keycode catalog and the Charybdis layout
 matrix. Neither carries configuration; they only decode what the device sends.

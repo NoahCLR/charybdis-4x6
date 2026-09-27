@@ -27,4 +27,5 @@ build_and_run() {
     "$BUILD_DIR/test_$name" "$ROOT/tests/fixtures/combo_domain_v1.fixture"
 }
 build_and_run normal
+build_and_run windowed -DCOMPILED_WINDOW=80
 build_and_run sanitized -fsanitize=address,undefined -fno-omit-frame-pointer

@@ -12,7 +12,9 @@ top-level [README](../README.md).
 The [PD-mode domain contract](architecture/pd-mode-domain-v1.md) specifies the
 eight configurable slots and the remaining hardware acceptance checks. Side-specific schema-2 firmware exposes eight slots in
 Charybdis Live → Pointing modes. The six defaults below are records in those
-slots, followed by two empty slots; their names do not select special code.
+slots, followed by Undo / Redo in slot 6 and an empty slot 7; their names do not
+select special code. Undo / Redo uses horizontal motion at 100 DPI and a
+threshold of 40 to send Cmd+Z or Shift+Cmd+Z. Right Alt double-tap hold activates it.
 The `PD_SLOT_n` keycodes select slots, while the named behavior in this
 document describes the shipped factory profile. Editing a slot can change
 that behavior without changing its keycode.

@@ -13,6 +13,7 @@
 #define RGB_LED_GROUP(...) {.leds = {__VA_ARGS__}, .count = (uint8_t)ARRAY_SIZE(((const uint8_t[]){__VA_ARGS__}))}
 #define _RGB_LED_GROUP_TABLE_END {.led_group = {.count = 0}}
 #define RGB_LED_GROUP_TABLE(...) {__VA_ARGS__ _RGB_LED_GROUP_TABLE_END}
+#define RGB_SAVED_LED_GROUP_TABLE(...) {__VA_ARGS__{.count = 0}}
 
 #define EXPORT_LAYER_LED_GROUPS(groups_)                              \
     const layer_led_group_t *const layer_led_groups      = (groups_); \
@@ -29,6 +30,10 @@
 #define EXPORT_KEY_BEHAVIOR_FEEDBACK_LED_GROUPS(groups_)                                              \
     const key_behavior_feedback_led_group_t *const key_behavior_feedback_led_groups      = (groups_); \
     const uint8_t                                  key_behavior_feedback_led_group_count = (uint8_t)(sizeof(groups_) / sizeof((groups_)[0]))
+
+#define EXPORT_SAVED_LED_GROUP_TABLE(groups_)                       \
+    const rgb_led_group_t *const saved_led_groups      = (groups_); \
+    const uint8_t                saved_led_group_count = (uint8_t)(ARRAY_SIZE(groups_) - 1u)
 
 #define EXPORT_LAYER_LED_GROUP_TABLE(groups_)                         \
     const layer_led_group_t *const layer_led_groups      = (groups_); \
@@ -66,9 +71,10 @@
 #    define _RGB_KEY_BEHAVIOR_FEEDBACK_LED_GROUP_DATA()
 #endif
 
-#define MATERIALIZE_RGB_CONFIG()                \
-    _RGB_PD_MODE_COLOR_COUNT_DATA()             \
-    _RGB_PD_MODE_LED_GROUP_DATA()               \
-    _RGB_COMBO_FEEDBACK_LED_GROUP_DATA()        \
-    _RGB_KEY_BEHAVIOR_FEEDBACK_LED_GROUP_DATA() \
+#define MATERIALIZE_RGB_CONFIG()                         \
+    _RGB_PD_MODE_COLOR_COUNT_DATA()                      \
+    _RGB_PD_MODE_LED_GROUP_DATA()                        \
+    _RGB_COMBO_FEEDBACK_LED_GROUP_DATA()                 \
+    _RGB_KEY_BEHAVIOR_FEEDBACK_LED_GROUP_DATA()          \
+    EXPORT_SAVED_LED_GROUP_TABLE(saved_led_groups_data); \
     EXPORT_LAYER_LED_GROUP_TABLE(layer_led_groups_data)

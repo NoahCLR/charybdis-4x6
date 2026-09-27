@@ -453,6 +453,7 @@ class MacroSlot:
     kind: str
     slot: int
     keycode: str
+    name: str
     payload: str
     empty: bool
 
@@ -461,6 +462,7 @@ class MacroSlot:
 class Combo:
     output: str
     inputs: list[str]
+    window_ms: int | None = None
 
 
 def die(message: str) -> NoReturn:
@@ -653,6 +655,10 @@ def parse_designated_fields(body: str) -> dict[str, str]:
 
 
 def parse_macro_table(text: str, macro_name: str, invocation_name: str) -> list[list[str]]:
+    return [args for _, args in parse_macro_rows(text, macro_name, (invocation_name,))]
+
+
+def parse_macro_rows(text: str, macro_name: str, invocation_names: tuple[str, ...]) -> list[tuple[str, list[str]]]:
     lines = text.splitlines()
     start_index: int | None = None
     buffer: list[str] = []
@@ -674,18 +680,18 @@ def parse_macro_table(text: str, macro_name: str, invocation_name: str) -> list[
     joined = joined.split(")", 1)[1]
     body = joined.replace("\\\n", "\n")
 
-    rows: list[list[str]] = []
+    rows: list[tuple[str, list[str]]] = []
     search = 0
-    token = f"{invocation_name}("
+    token = re.compile(r"\b(" + "|".join(re.escape(name) for name in invocation_names) + r")\(")
 
     while True:
-        start = body.find(token, search)
-        if start == -1:
+        match = token.search(body, search)
+        if match is None:
             break
-        args_start = start + len(invocation_name)
+        args_start = match.end() - 1
         args_end = find_matching(body, args_start, "(", ")")
         inner = body[args_start + 1 : args_end]
-        rows.append([normalize_expr(part) for part in split_top_level(inner)])
+        rows.append((match.group(1), [normalize_expr(part) for part in split_top_level(inner)]))
         search = args_end + 1
 
     return rows
@@ -1511,9 +1517,13 @@ def finalize_layer_colors(layer_colors: list[dict[str, object]], rgb_default_col
 def parse_macro_slots(rows: list[list[str]], kind: str) -> list[MacroSlot]:
     slots: list[MacroSlot] = []
     for row in rows:
-        if len(row) != 2:
-            die(f"expected 2 arguments in {kind} macro row, got: {row!r}")
-        keycode, payload = row
+        if len(row) != 3:
+            die(f"expected 3 arguments in {kind} macro row, got: {row!r}")
+        keycode, name, payload = row
+        normalized_name = name.strip()
+        if not (normalized_name.startswith('"') and normalized_name.endswith('"')):
+            die(f"expected a string name in {kind} macro row, got: {row!r}")
+        normalized_name = normalized_name[1:-1]
         normalized_payload = payload.strip()
         if normalized_payload.startswith('"') and normalized_payload.endswith('"'):
             normalized_payload = normalized_payload[1:-1]
@@ -1525,8 +1535,9 @@ def parse_macro_slots(rows: list[list[str]], kind: str) -> list[MacroSlot]:
                 kind=kind,
                 slot=int(slot_match.group(1)),
                 keycode=keycode,
+                name=normalized_name,
                 payload=normalized_payload,
-                empty=normalized_payload == "",
+                empty=normalized_payload == "" and normalized_name == "",
             )
         )
     return slots
@@ -1633,15 +1644,16 @@ def parse_behavior_action(value: str | None) -> BehaviorAction | None:
 
 def parse_combos(text: str) -> list[Combo]:
     combos: list[Combo] = []
-    for row in parse_macro_table(text, "COMBOS", "COMBO"):
-        if len(row) != 2:
-            die(f"unexpected combo row: {row!r}")
-        output, inputs_expr = row
+    for kind, row in parse_macro_rows(text, "COMBOS", ("COMBO", "COMBO_WINDOW")):
+        if len(row) != (3 if kind == "COMBO_WINDOW" else 2):
+            die(f"unexpected {kind} row: {row!r}")
+        output, inputs_expr = row[:2]
+        window_ms = int(row[2], 10) if kind == "COMBO_WINDOW" else None
         normalized_inputs = inputs_expr.strip()
         if normalized_inputs.startswith("(") and normalized_inputs.endswith(")"):
             normalized_inputs = normalized_inputs[1:-1]
         inputs = [normalize_expr(item) for item in split_top_level(normalized_inputs)]
-        combos.append(Combo(output=output, inputs=inputs))
+        combos.append(Combo(output=output, inputs=inputs, window_ms=window_ms))
     return combos
 
 
@@ -3709,12 +3721,13 @@ def render_combo_section(profile: dict[str, object]) -> str:
     lines = [
         "## Combos",
         "",
-        "| Inputs | Output |",
-        "| --- | --- |",
+        "| Inputs | Output | Window |",
+        "| --- | --- | --- |",
     ]
     for combo in profile["combos"]:
         inputs = ", ".join(f"`{item}`" for item in combo["inputs"])
-        lines.append(f"| {inputs} | `{combo['output']}` |")
+        window = f"{combo['window_ms']} ms" if combo["window_ms"] else "`COMBO_TERM`"
+        lines.append(f"| {inputs} | `{combo['output']}` | {window} |")
 
     lines.extend(["", "### Combo Graph", "", "```mermaid", "flowchart LR"])
     for index, combo in enumerate(profile["combos"]):
@@ -3745,12 +3758,13 @@ def render_macro_section(profile: dict[str, object]) -> str:
     if via_slots:
         lines.extend(
             [
-                "| Slot | Payload | Usage |",
-                "| --- | --- | --- |",
+                "| Slot | Name | Payload | Usage |",
+                "| --- | --- | --- | --- |",
             ]
         )
         for slot in via_slots:
-            lines.append(f"| `{slot['keycode']}` | `{slot['payload']}` | {format_usages(slot['usages'])} |")
+            payload = f"`{slot['payload']}`" if slot["payload"] else "-"
+            lines.append(f"| `{slot['keycode']}` | {slot['name'] or '-'} | {payload} | {format_usages(slot['usages'])} |")
     else:
         lines.append("No filled VIA macro slots.")
 
