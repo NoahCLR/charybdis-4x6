@@ -393,6 +393,30 @@ peer acknowledges the retried ABORT, the keyboard starts no new save or split
 transfer; a peer that never does needs a restart. A decoder that predates the
 bit rejects the status while it is set, as it rejects any unknown flag.
 
+### Payload Readback — GET Values `0x04` And `0x05`
+
+GET `0x04` reads the committed payload and `0x05` the compiled defaults the
+firmware was built with, through the envelope above. Page 0 is metadata; page
+`n` from 1 carries payload bytes `(n - 1) × 25` onward, at most 25, with the
+payload length byte giving the count. A page past the end answers status `2`;
+status `3` means nothing is committed, or the compiled defaults cannot be
+opened. Page 0's 25-byte payload, little-endian:
+
+| Offset | Size | Field |
+| ---: | ---: | --- |
+| 0 | 1 | layout version `1` |
+| 1 | 1 | page payload size `25` |
+| 2 | 2 | payload length |
+| 4 | 4 | generation; `0` for the compiled defaults |
+| 8 | 4 | FNV-1a payload digest |
+| 12 | 4 | CRC32 of the payload |
+| 16 | 1 | schema major |
+| 17 | 1 | schema minor |
+| 18 | 1 | domain mask |
+| 19 | 1 | origin half; committed record only |
+| 20 | 1 | record flags; committed record only |
+| 21 | 4 | reserved, zero |
+
 ### Candidate Mutation Envelope
 
 Candidate staging mutations use VIA custom set command `0x07`; durable commit
@@ -407,10 +431,12 @@ uses VIA custom save command `0x09`. Both use custom channel `0x00` and an exact
 | `0x13` | durably commit and request safe activation |
 | `0x14` | abort candidate |
 
-The preview, rollback, and committed-blob read values remain reserved as
-`0x15`, `0x16`, and `0x17`. A firmware build must not route these mutation
-frames or advertise candidate-write capability merely because the standalone
-codec and coordinator are compiled.
+Custom set values `0x15`, `0x16`, `0x17` and `0x1A` belong to the logical VIA
+staging channel, specified in
+[Logical Profile Transaction V1](logical-profile-transaction-v1.md#cancellation-and-lease-ownership);
+the complete map is under Value Ids below. A firmware build must not route
+candidate mutation frames or advertise candidate-write capability merely
+because the standalone codec and coordinator are compiled.
 
 All mutation requests use this correlation header (byte 0 is `0x07` except
 for commit, which uses `0x09`):
@@ -645,20 +671,34 @@ begin, chunk, validate, commit, abort, acknowledgement, and operation-status
 reports live in `tests/fixtures/profile_candidate_v1.fixture` and are consumed
 by the standalone firmware C codec/coordinator suite.
 
-Initial value ids:
+### Value Ids
 
-| VIA command | Value id | Operation |
-| --- | ---: | --- |
-| custom get | `0x01` | capabilities page |
-| custom get | `0x02` | profile status page |
-| custom set | `0x10` | candidate begin |
-| custom set | `0x11` | candidate chunk |
-| custom set | `0x12` | candidate validate/prepare |
-| custom save | `0x13` | candidate commit |
-| custom set | `0x14` | candidate abort |
-| custom set | `0x15` | RGB preview chunk/control |
-| custom set | `0x16` | RGB preview rollback |
-| custom get | `0x17` | committed-profile read chunk |
+Every value this firmware routes on custom channel `0x00`. A value missing
+from a build (a diagnostic, bridge or read-only image) falls through to QMK's
+unhandled reply.
+
+| VIA command | Value id | Operation | Specified in |
+| --- | ---: | --- | --- |
+| custom get | `0x01` | capabilities page | this document |
+| custom get | `0x02` | profile status page | this document |
+| custom get | `0x03` | cadence recorder, diagnostic builds only | `runtime_diag.h` |
+| custom get | `0x04` | committed payload read | Payload Readback, above |
+| custom get | `0x05` | compiled payload read | Payload Readback, above |
+| custom get | `0x06` | native combo readback | this document |
+| custom get | `0x07` | effective settings readback | [Portable Profile V1](portable-profile-v1.md) |
+| custom get | `0x08` | VIA storage status and editor pages | [Portable Profile V1](portable-profile-v1.md) |
+| custom get | `0x09` | legacy PD source, readback bridge only | [PD-mode domain v1](pd-mode-domain-v1.md) |
+| custom set | `0x10` | candidate begin | this document |
+| custom set | `0x11` | candidate chunk | this document |
+| custom set | `0x12` | candidate validate/prepare | this document |
+| custom save | `0x13` | candidate commit | this document |
+| custom set | `0x14` | candidate abort | this document |
+| custom set | `0x15` | logical VIA staging begin | [Logical Profile Transaction V1](logical-profile-transaction-v1.md) |
+| custom set | `0x16` | logical VIA staging chunk | [Logical Profile Transaction V1](logical-profile-transaction-v1.md) |
+| custom set | `0x17` | logical VIA staging verify | [Logical Profile Transaction V1](logical-profile-transaction-v1.md) |
+| custom get | `0x18` | candidate operation status | this document |
+| custom get | `0x19` | logical VIA staging status | [Logical Profile Transaction V1](logical-profile-transaction-v1.md) |
+| custom set | `0x1A` | logical VIA staging abort: always refused, unsupported | [Logical Profile Transaction V1](logical-profile-transaction-v1.md) |
 
 Every mutating operation includes a nonzero transaction id. Candidate begin
 declares schema, length, CRC, digest, and requested domain mask. Chunks include
