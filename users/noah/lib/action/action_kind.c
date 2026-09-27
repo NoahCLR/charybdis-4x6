@@ -269,6 +269,17 @@ bool noah_action_kind_match_qmk_behavior(uint16_t action, pd_mode_mask_t pd_mode
     return true;
 }
 
+bool noah_action_kind_match_qmk_function(uint16_t action, pd_mode_mask_t pd_mode, noah_action_desc_t *out) {
+    (void)pd_mode;
+
+    if (!(out && noah_action_keycode_is_qmk_function(action))) {
+        return false;
+    }
+
+    *out = noah_action_desc_build(NOAH_ACTION_KIND_QMK_FUNCTION, action, 0, 0);
+    return true;
+}
+
 bool noah_action_kind_match_keymap_custom(uint16_t action, pd_mode_mask_t pd_mode, noah_action_desc_t *out) {
     (void)pd_mode;
 

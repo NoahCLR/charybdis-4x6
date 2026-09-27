@@ -239,6 +239,13 @@ static void test_non_8bit_non_modded_keycodes_are_rejected(void) {
     CHECK(mod_unregister_count == 0);
     owned_keycode_debug_snapshot(KC_C, &snapshot);
     CHECK(snapshot.unsupported_count == 2);
+
+    // A held QMK function (SNIPING is QK_KB_4) is no report key, so the held
+    // action presses it through its action kind instead of leasing a usage.
+    CHECK(!owned_keycode_is_supported(QK_KB_4));
+    CHECK(!owned_keycode_is_supported(QK_RGB_MATRIX_TOGGLE));
+    CHECK(owned_keycode_is_supported(KC_C));
+    CHECK(owned_keycode_is_supported(S(KC_1)));
 }
 
 static void test_tap_uses_standard_and_caps_delays(void) {

@@ -141,7 +141,9 @@ placed. A key or a combo output runs QMK's full key handling, so any keycode
 works there. A behaviour sends QMK and keyboard functions (keycodes past the
 layer keycodes and below the user range: the DPI and sniping keys, RGB Matrix,
 Magic, `QK_BOOT`) as a synthetic QMK record, so they run as on a key, and says
-so with Profile Wire feature bit 15. Older firmware sent them through
+so with Profile Wire feature bit 15. A key whose own keycode is one keeps a
+plain key's fallback hold: with only a double-tap branch on `SNIPING`, holding
+it still holds sniping, as with no behaviour at all. Older firmware sent them through
 `tap_code16()`, which keeps only the low byte (`DPI_MOD` sent nothing), so
 against a keyboard without bit 15 the app refuses them in a behaviour's target,
 tap or hold (`behaviorEmitProblem` in `core/schema/actions.js`).

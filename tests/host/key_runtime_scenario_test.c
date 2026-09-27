@@ -3,6 +3,7 @@
 #include <stdlib.h>
 
 #include "key_runtime_scenario_harness.h"
+#include "users/noah/lib/action/action_dispatch.h"
 #include "users/noah/lib/action/owned_keycode.h"
 #include "users/noah/lib/key/runtime/reducer/runtime.h"
 #include "users/noah/lib/state/diagnostics/runtime_debug.h"
@@ -24,6 +25,8 @@ enum {
     TEST_MULTI_TAP_KEY_TWO = SAFE_RANGE + 0x7A,
     TEST_TAP_ACTION_TWO    = SAFE_RANGE + 0x7B,
     TEST_ALT_ACTION_TWO    = SAFE_RANGE + 0x7C,
+    // Charybdis's SNIPING_MODE: a QMK function only QMK's key processing runs.
+    TEST_SNIPING_KEY       = QK_KB_4,
     TEST_NUM_LAYER         = 1,
     TEST_OTHER_LAYER       = 2,
 };
@@ -824,7 +827,111 @@ static void test_managed_basic_key_suppresses_overlapping_physical_defaults(void
     CHECK(key_runtime_scenario_unregister_code_count() == 1u);
 }
 
+// A QMK function the engine sends through QMK, keyed by its own keycode, with
+// only a double-tap branch: the single press is the key's own.
+static void test_configure_qmk_function_double_tap_key(void) {
+    static const key_runtime_scenario_multi_tap_entry_t entries[] = {
+        {
+            .tap_count = 2,
+            .step =
+                {
+                    .tap = TAP_SENDS(TEST_ALT_ACTION),
+                },
+        },
+    };
+
+    key_behavior_view_t behavior = test_pressable_handled_key(TEST_SNIPING_KEY);
+
+    behavior.has_multi_tap      = true;
+    behavior.authored_tap_depth = (uint8_t)entries[ARRAY_SIZE(entries) - 1u].tap_count;
+    key_runtime_scenario_add_pending_multi_tap_behavior(behavior, entries, ARRAY_SIZE(entries));
+}
+
+static uint8_t test_effects_with_action(key_runtime_effect_kind_t kind, uint16_t action) {
+    uint8_t count = 0;
+
+    for (uint8_t index = 0; index < key_runtime_scenario_effect_count(); index++) {
+        const key_runtime_scenario_effect_t *effect = key_runtime_scenario_effect_at(index);
+
+        if (effect->kind != kind) {
+            continue;
+        }
+        if ((kind == KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER || kind == KEY_RUNTIME_EFFECT_HELD_ACTION_UNREGISTER) ? effect->data.held_action.action == action
+            : kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION                                                         ? effect->data.delayed_action.action == action
+                                                                                                                 : effect->data.action == action) {
+            count++;
+        }
+    }
+    return count;
+}
+
+// A branch on SNIPING must not take its single hold away: a key holding a QMK
+// function keeps a plain key's fallback hold, so holding it holds sniping for
+// as long as the key is down, as it does with no behaviour at all.
+static void test_qmk_function_key_with_only_a_double_tap_branch_still_holds(void) {
+    static const key_runtime_scenario_step_t hold[] = {
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_SNIPING_KEY, 3, 2),
+        KEY_RUNTIME_SCENARIO_ADVANCE(151),
+        KEY_RUNTIME_SCENARIO_SCAN(),
+    };
+    static const key_runtime_scenario_step_t release[] = {
+        KEY_RUNTIME_SCENARIO_ADVANCE(400),
+        KEY_RUNTIME_SCENARIO_RELEASE(TEST_SNIPING_KEY, 3, 2),
+        KEY_RUNTIME_SCENARIO_ADVANCE(200),
+        KEY_RUNTIME_SCENARIO_SCAN(),
+    };
+
+    CHECK(noah_action_desc_supports_fallback_hold(noah_action_describe(TEST_SNIPING_KEY)));
+
+    key_runtime_scenario_reset();
+    test_configure_qmk_function_double_tap_key();
+    key_runtime_scenario_run(hold, ARRAY_SIZE(hold));
+    CHECK(test_effects_with_action(KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER, TEST_SNIPING_KEY) == 1);
+    CHECK(key_runtime_scenario_slot_held_action_keycode(test_keypos(3, 2)) == TEST_SNIPING_KEY);
+
+    key_runtime_scenario_run(release, ARRAY_SIZE(release));
+    // The release lets go of what the key holds, which releases SNIPING.
+    bool released = false;
+    for (uint8_t index = 0; index < key_runtime_scenario_effect_count(); index++) {
+        const key_runtime_scenario_effect_t *effect = key_runtime_scenario_effect_at(index);
+        released |= effect->kind == KEY_RUNTIME_EFFECT_RELEASE_OWNED_STATE_BY_KEY && effect->data.key_pos.row == 3 && effect->data.key_pos.col == 2;
+    }
+    CHECK(released);
+    CHECK(test_effects_with_action(KEY_RUNTIME_EFFECT_DISPATCH_ACTION, TEST_SNIPING_KEY) == 0);
+    CHECK(test_effects_with_action(KEY_RUNTIME_EFFECT_DELAYED_ACTION, TEST_SNIPING_KEY) == 0);
+    CHECK(test_effects_with_action(KEY_RUNTIME_EFFECT_DELAYED_ACTION, TEST_ALT_ACTION) == 0);
+}
+
+static void test_qmk_function_key_with_only_a_double_tap_branch_taps_and_double_taps(void) {
+    static const key_runtime_scenario_step_t tap[] = {
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_SNIPING_KEY, 3, 2),
+        KEY_RUNTIME_SCENARIO_RELEASE(TEST_SNIPING_KEY, 3, 2),
+        KEY_RUNTIME_SCENARIO_ADVANCE(121),
+        KEY_RUNTIME_SCENARIO_SCAN(),
+    };
+    static const key_runtime_scenario_step_t double_tap[] = {
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_SNIPING_KEY, 3, 2), KEY_RUNTIME_SCENARIO_RELEASE(TEST_SNIPING_KEY, 3, 2), KEY_RUNTIME_SCENARIO_ADVANCE(40),
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_SNIPING_KEY, 3, 2), KEY_RUNTIME_SCENARIO_RELEASE(TEST_SNIPING_KEY, 3, 2), KEY_RUNTIME_SCENARIO_ADVANCE(121),
+        KEY_RUNTIME_SCENARIO_SCAN(),
+    };
+
+    key_runtime_scenario_reset();
+    test_configure_qmk_function_double_tap_key();
+    key_runtime_scenario_run(tap, ARRAY_SIZE(tap));
+    CHECK(test_effects_with_action(KEY_RUNTIME_EFFECT_DELAYED_ACTION, TEST_SNIPING_KEY) + test_effects_with_action(KEY_RUNTIME_EFFECT_DISPATCH_ACTION, TEST_SNIPING_KEY) == 1);
+    CHECK(test_effects_with_action(KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER, TEST_SNIPING_KEY) == 0);
+
+    key_runtime_scenario_reset();
+    test_configure_qmk_function_double_tap_key();
+    key_runtime_scenario_run(double_tap, ARRAY_SIZE(double_tap));
+    CHECK(test_effects_with_action(KEY_RUNTIME_EFFECT_DELAYED_ACTION, TEST_ALT_ACTION) + test_effects_with_action(KEY_RUNTIME_EFFECT_DISPATCH_ACTION, TEST_ALT_ACTION) == 1);
+    CHECK(test_effects_with_action(KEY_RUNTIME_EFFECT_DELAYED_ACTION, TEST_SNIPING_KEY) + test_effects_with_action(KEY_RUNTIME_EFFECT_DISPATCH_ACTION, TEST_SNIPING_KEY) == 0);
+    CHECK(test_effects_with_action(KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER, TEST_SNIPING_KEY) == 0);
+}
+
 int main(void) {
+    test_qmk_function_key_with_only_a_double_tap_branch_still_holds();
+    test_qmk_function_key_with_only_a_double_tap_branch_taps_and_double_taps();
     test_single_tap_waits_for_multi_tap_timeout_before_dispatching();
     test_base_tap_commit_feedback_can_be_suppressed();
     test_non_base_tap_commit_feedback_still_pulses();

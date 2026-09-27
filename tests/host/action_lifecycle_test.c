@@ -616,7 +616,10 @@ static void test_qmk_functions_dispatch_as_synthetic_qmk_records(void) {
         uint16_t keycode = functions[index];
 
         CHECK(noah_action_keycode_is_qmk_function(keycode));
-        CHECK(noah_action_describe(keycode).kind == NOAH_ACTION_KIND_QMK_BEHAVIOR);
+        CHECK(noah_action_describe(keycode).kind == NOAH_ACTION_KIND_QMK_FUNCTION);
+        // A key holding one keeps a plain key's fallback hold: with no hold
+        // branch, holding SNIPING holds sniping.
+        CHECK(noah_action_desc_supports_fallback_hold(noah_action_describe(keycode)));
 
         test_reset_stubs();
         noah_action_tap(keycode);
@@ -645,6 +648,11 @@ static void test_qmk_functions_dispatch_as_synthetic_qmk_records(void) {
     }
     CHECK(noah_action_describe(S(KC_1)).kind == NOAH_ACTION_KIND_LITERAL);
     CHECK(noah_action_describe(QK_MACRO_0).kind == NOAH_ACTION_KIND_MACRO);
+    // Mod-tap and one-shot make their own tap/hold decision, so they keep no
+    // fallback hold.
+    CHECK(noah_action_describe(MT(MOD_LCTL, KC_A)).kind == NOAH_ACTION_KIND_QMK_BEHAVIOR);
+    CHECK(!noah_action_desc_supports_fallback_hold(noah_action_describe(MT(MOD_LCTL, KC_A))));
+    CHECK(!noah_action_desc_supports_fallback_hold(noah_action_describe(OSM(MOD_LSFT))));
 }
 
 int main(void) {
