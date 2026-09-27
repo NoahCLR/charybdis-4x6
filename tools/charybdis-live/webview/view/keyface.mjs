@@ -226,16 +226,95 @@ const downTheStack = (entries) => [...entries].sort((one, other) => sourceRank(o
  * through. For anything a combo sends, the keys you chord to fire it. A key answered from a layer below keeps its physical position, which
  * is what the board draws.
  */
-export function reachKeys(stack, at, entry) {
+export function reachKeys(stack, at, entry, held = null) {
     const indexes = new Set([...(entry?.keys || []), ...(entry?.combos || []).flatMap((route) => route.keys)]
         .map((key) => key.position.layoutIndex));
     const behaviours = new Set((entry?.behaviours || []).map((row) => row.keycode));
     if (behaviours.size) {
-        for (const {position} of reachablePositions(stack, at)) {
+        for (const {position} of held === null ? reachablePositions(stack, at) : resolvedPositions(stack, at, held)) {
             if (behaviours.has(keyMeaning(position))) indexes.add(position.layoutIndex);
         }
     }
     return [...indexes];
+}
+
+// The view is one actual activation: the selected layer plus the layers the
+// user has previewed under it. Keep it separate from the layer reach lists,
+// which deliberately include every *possible* activation of that layer.
+function comboAnswerEntries(model, stack, at, held) {
+    const reference = comboReferenceLayer(model, at);
+    const referenced = reference !== at && stack[reference];
+    return referenced
+        ? (referenced.positions || []).map((position) =>
+            ({position, layer: referenced, fellThrough: false, whileHeld: false, reference: true}))
+        : resolvedPositions(stack, at, held);
+}
+
+export function combosInView(model, stack, at, held = []) {
+    const resolved = comboAnswerEntries(model, stack, at, held);
+    const answering = new Map(resolved.map((entry) => [entry.position, entry]));
+    return (model?.combos || []).flatMap((combo) => {
+        const found = comboKeysAmong(resolved.map((entry) => entry.position), combo);
+        return (combo.inputs || []).length && found.covered >= combo.inputs.length
+            ? [{combo, keys: found.keys.map((position) => answering.get(position))}] : [];
+    });
+}
+
+export function behavioursInView(model, stack, at, held = []) {
+    const found = new Map();
+    const add = (row) => {
+        if (!found.has(row.keycode)) found.set(row.keycode, {row, keys: [], combos: []});
+        return found.get(row.keycode);
+    };
+    for (const key of resolvedPositions(stack, at, held)) {
+        const row = behaviourFor(model, keyMeaning(key.position));
+        if (row) add(row).keys.push(key);
+    }
+    for (const route of combosInView(model, stack, at, held)) {
+        const row = behaviourFor(model, comboOutput(model, route.combo));
+        if (row) add(row).combos.push(route);
+    }
+    return [...found.values()];
+}
+
+// Macros and pointing modes share the same view routes: a visible key, a
+// behaviour on a visible key, or a combo that fires under this exact stack.
+export function reachInView(model, stack, at, held, namesOf) {
+    const found = new Map();
+    const add = (name) => {
+        if (!found.has(name)) found.set(name, {name, keys: [], behaviours: [], combos: []});
+        return found.get(name);
+    };
+    const branchActions = (row, record) => {
+        for (const step of row.steps || []) for (const tier of [step.tap, step.hold, step.longHold]) {
+            if (tier?.action) record(tier.action);
+        }
+    };
+    for (const key of resolvedPositions(stack, at, held)) {
+        for (const name of namesOf(keyMeaning(key.position))) add(name).keys.push(key);
+        const row = behaviourFor(model, keyMeaning(key.position));
+        if (row) branchActions(row, (action) => {
+            for (const name of namesOf(action)) {
+                const entry = add(name);
+                if (!entry.behaviours.some((item) => item.keycode === row.keycode && item.action === action))
+                    entry.behaviours.push({keycode: row.keycode, action, layer: key.fellThrough ? key.layer : null, whileHeld: key.whileHeld});
+            }
+        });
+    }
+    for (const {combo, keys} of combosInView(model, stack, at, held)) {
+        const output = comboOutput(model, combo);
+        const sent = (action, via = null) => {
+            for (const name of namesOf(action)) {
+                const entry = add(name);
+                if (!entry.combos.some((item) => item.combo === combo && item.action === action))
+                    entry.combos.push({combo, keys, via, action});
+            }
+        };
+        sent(output);
+        const row = behaviourFor(model, output);
+        if (row) branchActions(row, (action) => sent(action, output));
+    }
+    return [...found.values()];
 }
 
 /**
@@ -289,13 +368,15 @@ export function behaviourGroups(model, stack, at) {
  * key that happens to fall through to it. With no route, every way this layer
  * reaches it.
  */
-export function behaviourRouteKeys(model, stack, at, keycode, route = null) {
+export function behaviourRouteKeys(model, stack, at, keycode, route = null, held = []) {
     if (!keycode) return [];
     const carrying = reachablePositions(stack, at).filter(({position}) => keyMeaning(position) === keycode);
     const groups = behaviourGroups(model, stack, at);
     const chorded = (entries) => entries.filter((entry) => entry.row.keycode === keycode)
         .flatMap((entry) => entry.combos).flatMap((combo) => combo.keys);
     const keys = {
+        view: behavioursInView(model, stack, at, held).filter((entry) => entry.row.keycode === keycode)
+            .flatMap((entry) => [...entry.keys, ...entry.combos.flatMap((combo) => combo.keys)]),
         here: carrying.filter((entry) => !entry.fellThrough),
         through: carrying.filter((entry) => entry.fellThrough),
         combos: chorded(groups.combos),
@@ -484,11 +565,8 @@ export const combosAt = (model, stack, at, layoutIndex) => combosOnLayer(model, 
 // default layer when nothing else is previewed on. Keyed by layout index; a
 // position nothing answers is absent.
 export function comboAnswers(model, stack, at, held = []) {
-    const reference = comboReferenceLayer(model, at);
-    const positions = reference !== at && stack[reference]
-        ? stack[reference].positions || []
-        : resolvedPositions(stack, at, held).map((entry) => entry.position);
-    return new Map(positions.map((position) => [position.layoutIndex, position]));
+    return new Map(comboAnswerEntries(model, stack, at, held)
+        .map(({position}) => [position.layoutIndex, position]));
 }
 
 // The board keys that press one of the builder's inputs from this view. An

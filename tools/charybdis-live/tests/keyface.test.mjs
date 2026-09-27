@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import keyNames from "../core/model/key-names.js";
 import test from "node:test";
 import {createRequire} from "node:module";
-import {behaviourFor, cellLabel, comboAnswers, comboInputKeys, comboInputShown, combosOnKey, comboReferenceLayer, combosAt, behaviourListeningTo, canonicalKeycode, behaviourGridSteps, behaviourGroups, behaviourRouteKeys, behaviourTiers, macroReach, pointingReach, reachablePositions, resolvedPositions, bindingKeycode, bindingsForSlot, comboGroups, combosForKey, keyFace, keyMeaning, keyName, layerOfKeycode, macroKeycodes, macroPlacements, macroAction, namedAction, pointingAction, pointingSlotFor, reachKeys, slotKeycodes, toggleComboInput, visibleKeycode} from "../webview/view/keyface.mjs";
+import {behaviourFor, cellLabel, comboAnswers, comboInputKeys, comboInputShown, combosOnKey, comboReferenceLayer, combosAt, behaviourListeningTo, canonicalKeycode, behaviourGridSteps, behaviourGroups, behavioursInView, behaviourRouteKeys, behaviourTiers, macroReach, pointingReach, reachInView, reachablePositions, resolvedPositions, bindingKeycode, bindingsForSlot, comboGroups, combosInView, combosForKey, keyFace, keyMeaning, keyName, layerOfKeycode, macroKeycodes, macroPlacements, macroAction, namedAction, pointingAction, pointingSlotFor, reachKeys, slotKeycodes, toggleComboInput, visibleKeycode} from "../webview/view/keyface.mjs";
 
 // Slots come from the host with their binding keycodes; the tests use the
 // host's own registry rather than a copy of it.
@@ -266,6 +266,58 @@ test("behaviours group by how this layer reaches them", () => {
     assert.deepEqual(base.here.map((row) => row.keycode), ["KC_ESCAPE", "KC_1", "KC_9"]);
     assert.deepEqual(base.through, [], "nothing lies under the base layer");
     assert.deepEqual(base.elsewhere.map((row) => row.keycode), ["LEFT_THUMB"]);
+});
+
+test("the view follows the exact previewed stack while the layer groups stay strict", () => {
+    const at = (layoutIndex, keycode) => ({layoutIndex, keycode, display: keycode});
+    const stack = [
+        {index: 0, name: "Base", positions: [at(0, "KC_A"), at(1, "KC_B"), at(2, "VIA_MACRO_0")]},
+        {index: 1, name: "Numbers", positions: [at(0, "KC_C"), at(1, "KC_TRANSPARENT"), at(2, "KC_NO")]},
+        {index: 2, name: "Symbols", positions: [at(0, "KC_TRANSPARENT"), at(1, "KC_TRANSPARENT"), at(2, "KC_TRANSPARENT")]},
+    ];
+    const model = {
+        keyBehaviors: [
+            {keycode: "KC_B", steps: [{tapCount: 0, tap: {action: "VIA_MACRO_1"}}]},
+            {keycode: "KC_C", steps: [{tapCount: 0, hold: {action: "ARROW_MODE"}}]},
+        ],
+        combos: [
+            {id: 1, inputs: ["KC_A", "KC_B"], output: "VIA_MACRO_2"},
+            {id: 2, inputs: ["KC_C", "KC_B"], output: "VIA_MACRO_3"},
+        ],
+        pdModes: [{id: 4, kind: 1, binding: {hold: "ARROW_MODE", lock: "ARROW_MODE_LOCK"}}],
+    };
+    const macroNames = (held) => reachInView(model, stack, 2, held, macroKeycodes).map((entry) => entry.name);
+    assert.deepEqual(behaviourGroups(model, stack, 2).here, [], "nothing is stored on Symbols");
+    assert.deepEqual(behavioursInView(model, stack, 2, []).map((entry) => entry.row.keycode), ["KC_B"]);
+    assert.deepEqual(behavioursInView(model, stack, 2, [1]).map((entry) => entry.row.keycode), ["KC_C", "KC_B"]);
+    assert.deepEqual(combosInView(model, stack, 2, []).map((entry) => entry.combo.id), [1]);
+    assert.deepEqual(combosInView(model, stack, 2, [1]).map((entry) => entry.combo.id), [2],
+        "a combo's inputs must coexist in this activation");
+    assert.deepEqual(macroNames([]), ["VIA_MACRO_1", "VIA_MACRO_0", "VIA_MACRO_2"]);
+    assert.deepEqual(macroNames([1]), ["VIA_MACRO_1", "VIA_MACRO_3"]);
+    const modes = (held) => reachInView(model, stack, 2, held,
+        (keycode) => { const slot = pointingSlotFor(model, keycode); return slot ? [String(slot.id)] : []; });
+    assert.deepEqual(modes([]), []);
+    assert.deepEqual(modes([1]).map((entry) => entry.name), ["4"], "a visible behaviour's branch reaches the mode");
+    const branch = reachInView(model, stack, 2, [1], macroKeycodes).find((entry) => entry.name === "VIA_MACRO_1");
+    assert.deepEqual(reachKeys(stack, 2, branch, [1]), [1], "the view route rings only visible source keys");
+    assert.deepEqual(behaviourRouteKeys(model, stack, 2, "KC_C", "view", [1]), [0]);
+    assert.deepEqual(behaviourRouteKeys(model, stack, 2, "KC_C", "view", []), []);
+});
+
+test("view combos follow the keyboard's reference layer", () => {
+    const at = (layoutIndex, keycode) => ({layoutIndex, keycode});
+    const stack = [
+        {index: 0, name: "Base", positions: [at(0, "KC_A"), at(1, "KC_B")]},
+        {index: 1, name: "Numbers", positions: [at(0, "KC_C"), at(1, "KC_D")]},
+    ];
+    const model = {
+        comboReadback: {layerReferences: [0, 0]},
+        combos: [{id: 7, inputs: ["KC_A", "KC_B"], output: "KC_TAB"}],
+    };
+    const inView = combosInView(model, stack, 1, []);
+    assert.deepEqual(inView.map((entry) => entry.combo.id), [7]);
+    assert.ok(inView[0].keys.every((key) => key.reference && key.layer.name === "Base"));
 });
 
 test("a behaviour a combo sends is reached, though no key carries it", () => {

@@ -24,7 +24,7 @@ matrix.
 | Product surface | Current state |
 | --- | --- |
 | Layout and eight layers | Read/write; names and overlay order travel with complete profiles; a reorder renumbers layer keys by default ("Keys follow their layers") |
-| Key behaviours, combos and RGB | Read/write editors over the shared draft; the Behaviours rail keeps a fixed height, opens one reach section at a time and scrolls that section after five rows |
+| Key behaviours, combos and RGB | Read/write editors over the shared draft; matching Keys reach sections share open state across tabs, open independently, and use the page scrollbar |
 | Macros | 64 named VIA macro slots with builder, recorder and preview; shared-memory and per-macro limits shown and enforced (D-L25, D-L26) |
 | Mouse | Pointer and sniping DPI, auto-sniping and auto-mouse: global-policy sections the core files under the Mouse area, so the rail, the review and import counts all place them there. The auto-mouse fade delay is a share of the timeout, edited on its lighting stage (D-L17) |
 | Pointing modes | Eight device-owned slots and eight RGB rows; see [PD-mode domain v1](architecture/pd-mode-domain-v1.md) |
@@ -628,6 +628,21 @@ mapped keys, excluding transparent and disabled positions; its selected key's
 layout index belongs in the key details. Every Keys tab is at least as tall as
 the Behaviours tab; a taller editor carries its height across tab changes, so
 changing tabs does not move the page's scroll position.
+The Behaviours, Combos, Macros and Pointing modes reach lists lead with **On
+this view**, calculated for the selected layer plus exactly the lower layers
+currently previewed on. **On this layer** means a key stored on the selected
+layer, and the other route groups describe ways it can reach an item under
+different activations. The view can therefore overlap those groups; it is the
+current activation, not another storage location. A combo in the view requires
+all inputs in that activation and uses the configured Combo Layer Matching
+reference when one is set. Tab counts still count the selected layer's stored
+routes.
+
+The reach sections have one open state by section identity across those four
+tabs. Opening one does not close another. A section unique to one tab keeps its
+own state; sections absent from another tab retain their state until shown
+again. The Behaviours rail grows with its rows, so the Keys content pane is its
+only vertical scroller.
 
 - The review is one grid: a status gutter, the title with its area underneath
   when outside its section, the fields as sign · label · on the keyboard · in

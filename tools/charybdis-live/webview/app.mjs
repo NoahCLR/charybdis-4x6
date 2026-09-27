@@ -5,7 +5,7 @@
 // always what would be applied.
 
 import {el, esc} from "./lib/dom.mjs";
-import {captureContentScroll, captureKeysBenchHeight, captureNestedScroll, limitBehaviourGroups, restoreContentScroll, restoreKeysBenchHeight, restoreNestedScroll} from "./lib/scroll.mjs";
+import {captureContentScroll, captureKeysBenchHeight, revealSelectedContentRow, restoreContentScroll, restoreKeysBenchHeight} from "./lib/scroll.mjs";
 import {activateOnKey, captureFocus, focusDialog, restoreFocus, trapTab} from "./lib/focus.mjs";
 import {closeComboBuilder, getModel, layerName, post, render as rerender, resetDraftForms, setModel, setRenderer, state, writable} from "./store.mjs";
 import {historyAction} from "./view/edits.mjs";
@@ -225,8 +225,8 @@ function reviewOverlay() {
 
 function render() {
     const scroll = captureContentScroll(root, renderedScreen, state.screen);
-    const benchHeight = captureKeysBenchHeight(root, renderedScreen, state.screen);
-    const nestedScroll = captureNestedScroll(root, renderedScreen, state.screen);
+    const benchHeight = captureKeysBenchHeight(root, renderedScreen, state.screen, state.resetBenchHeight);
+    state.resetBenchHeight = false;
     const focus = captureFocus(root);
     hideHover();
     const model = getModel();
@@ -240,9 +240,8 @@ function render() {
     if (bar) screen.appendChild(bar);
     root.appendChild(app);
     restoreKeysBenchHeight(root, benchHeight);
-    limitBehaviourGroups(root);
     restoreContentScroll(root, scroll);
-    restoreNestedScroll(root, nestedScroll);
+    revealSelectedContentRow(root);
     renderedScreen = state.screen;
 
     const picker = pickerOverlay();
@@ -363,7 +362,6 @@ addEventListener("keydown", (event) => {
 });
 addEventListener("resize", () => {
     root.querySelector(".keys-pad .bench")?.style.removeProperty("min-height");
-    limitBehaviourGroups(root);
 });
 
 render();

@@ -8,6 +8,7 @@
 import {el, esc} from "../lib/dom.mjs";
 import {describeStep, macroMatches, macroPeek, parseMacro, serializeMacro, unreleased} from "../view/macro.mjs";
 import {macroPlacements} from "../view/keyface.mjs";
+import {setReachGroupOpen} from "../view/reach-groups.mjs";
 import {canEdit as canEditArea, getModel, layerName, layers, macroForm, post, render, setMacroForm, state, writable} from "../store.mjs";
 import * as edits from "../view/edits.mjs";
 import {layerSwatch} from "./layerbar.mjs";
@@ -182,7 +183,7 @@ function showOnLayer(keycode, at) {
     Object.assign(state, {screen: "keys", tab: "macros", layer: at, placement: null});
     if (route.keys.length) state.selected = route.keys[0];
     state.reachRow.macros = `${route.group}:${keycode}`;
-    state.groups.macros[route.group] = true;
+    state.reachGroups = setReachGroupOpen(state.reachGroups, route.group, true);
     render();
 }
 

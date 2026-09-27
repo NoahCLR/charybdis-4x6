@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import {captureContentScroll, captureKeysBenchHeight, captureNestedScroll, limitBehaviourGroups, restoreContentScroll, restoreKeysBenchHeight, restoreNestedScroll, scrollContentTo} from "../webview/lib/scroll.mjs";
+import {captureContentScroll, captureKeysBenchHeight, revealSelectedContentRow, restoreContentScroll, restoreKeysBenchHeight, scrollContentTo} from "../webview/lib/scroll.mjs";
 
 const rootWith = (content) => ({querySelector: (selector) => selector === ".content" ? content : null});
 
@@ -24,6 +24,8 @@ test("a taller Keys tab keeps enough page height when another tab is shown", () 
     assert.equal(nextBench.style.minHeight, "820px");
     assert.equal(captureKeysBenchHeight(previous, "keys", "lighting"), 0,
         "leaving Keys starts the other screen at its own height");
+    assert.equal(captureKeysBenchHeight(previous, "keys", "keys", true), 0,
+        "an explicit section toggle lets a collapsed workbench shrink");
 });
 
 test("navigating to another screen starts at the top", () => {
@@ -47,20 +49,14 @@ test("jumping from the combo builder places the board below the content edge", (
     assert.deepEqual(calls, [{top: 540, left: 12, behavior: "smooth"}]);
 });
 
-test("a long behaviour group shows five complete rows, including a taller note", () => {
-    const list = {children: [51, 53, 70, 54, 52, 58].map((height) => ({getBoundingClientRect: () => ({height})})), style: {}};
-    limitBehaviourGroups({querySelectorAll: () => [list]});
-    assert.equal(list.style.maxHeight, "280px");
-});
-
-test("behaviour group scroll survives a redraw and reveals a newly selected row", () => {
-    const before = {dataset: {scrollKey: "behaviours:0:here"}, scrollTop: 170};
-    const root = (list) => ({querySelectorAll: () => [list]});
-    const positions = captureNestedScroll(root(before), "keys", "keys");
+test("a newly selected behaviour is revealed in the outer content scroller", () => {
     const selected = {getBoundingClientRect: () => ({top: 330, bottom: 380})};
-    const after = {dataset: before.dataset, scrollTop: 0, hasAttribute: () => true,
-        querySelector: () => selected, getBoundingClientRect: () => ({top: 100, bottom: 350})};
-    restoreNestedScroll(root(after), positions);
-    assert.equal(after.scrollTop, 200, "the new row is brought into the five-row viewport");
-    assert.equal(captureNestedScroll(root(before), "keys", "lighting").size, 0);
+    const content = {scrollTop: 170, querySelector: () => selected,
+        getBoundingClientRect: () => ({top: 100, bottom: 350})};
+    revealSelectedContentRow(rootWith(content));
+    assert.equal(content.scrollTop, 212);
+    selected.getBoundingClientRect = () => ({top: 90, bottom: 120});
+    revealSelectedContentRow(rootWith(content));
+    assert.equal(content.scrollTop, 190, "a selection above the viewport also uses the same scroller");
+    assert.doesNotThrow(() => revealSelectedContentRow(rootWith(null)));
 });

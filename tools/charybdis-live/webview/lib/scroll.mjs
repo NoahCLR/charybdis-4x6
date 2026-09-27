@@ -20,8 +20,8 @@ export function restoreContentScroll(root, scroll) {
 
 // The common Keys floor keeps ordinary tabs level. If one editor grows beyond
 // it, carry that height into the next render before restoring the page scroll.
-export function captureKeysBenchHeight(root, previousScreen, nextScreen) {
-    if (previousScreen !== "keys" || nextScreen !== "keys") return 0;
+export function captureKeysBenchHeight(root, previousScreen, nextScreen, reset = false) {
+    if (previousScreen !== "keys" || nextScreen !== "keys" || reset) return 0;
     return root.querySelector(".keys-pad .bench")?.getBoundingClientRect().height || 0;
 }
 
@@ -31,32 +31,16 @@ export function restoreKeysBenchHeight(root, height) {
     if (bench) bench.style.minHeight = `${height}px`;
 }
 
-// A behaviour group scrolls independently of the page. Measure the actual
-// first five rows because a long reach note can make one row taller.
-export function limitBehaviourGroups(root) {
-    root.querySelectorAll(".beh-rows.scroll").forEach((list) => {
-        const rows = [...list.children].slice(0, 5);
-        list.style.maxHeight = `${rows.reduce((height, row) => height + row.getBoundingClientRect().height, 0)}px`;
-    });
-}
-
-export function captureNestedScroll(root, previousScreen, nextScreen) {
-    if (previousScreen !== nextScreen) return new Map();
-    return new Map([...root.querySelectorAll("[data-scroll-key]")]
-        .map((list) => [list.dataset.scrollKey, list.scrollTop]));
-}
-
-export function restoreNestedScroll(root, positions) {
-    root.querySelectorAll("[data-scroll-key]").forEach((list) => {
-        list.scrollTop = positions.get(list.dataset.scrollKey) ?? 0;
-        if (!list.hasAttribute("data-reveal-selected")) return;
-        const selected = list.querySelector(".rowitem.on");
-        if (!selected) return;
-        const bounds = list.getBoundingClientRect();
-        const row = selected.getBoundingClientRect();
-        if (row.top < bounds.top) list.scrollTop += row.top - bounds.top;
-        else if (row.bottom > bounds.bottom) list.scrollTop += row.bottom - bounds.bottom;
-    });
+// A behaviour selected from elsewhere may sit below the visible part of the
+// one content scroller. Reveal it there, without creating another scrollbar.
+export function revealSelectedContentRow(root, margin = 12) {
+    const content = root.querySelector(".content");
+    const selected = content?.querySelector("[data-reveal-selected] .rowitem.on");
+    if (!selected) return;
+    const bounds = content.getBoundingClientRect();
+    const row = selected.getBoundingClientRect();
+    if (row.top < bounds.top + margin) content.scrollTop += row.top - bounds.top - margin;
+    else if (row.bottom > bounds.bottom - margin) content.scrollTop += row.bottom - bounds.bottom + margin;
 }
 
 // A deliberate jump from an editor to something higher in the same scroller.

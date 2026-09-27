@@ -5,7 +5,7 @@ import {css, isOff, label as hsvLabel} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {scrollContentTo} from "../lib/scroll.mjs";
 import {LED_INDEX} from "../view/geometry.mjs";
-import {actionLabel, behaviourFor, cellLabel, behaviourListeningTo, resolvedPositions, canonicalKeycode, behaviourGridSteps, behaviourGroups, behaviourRouteKeys, behaviourTiers, comboAnswers, comboGroups, comboInputKeys, comboInputShown, combosOnKey, combosAt, keyFace, keyMeaning, keyName, macroReach, pointingReach, pointingSlotFor, pointingVariant, reachKeys, toggleComboInput, visibleKeycode} from "../view/keyface.mjs";
+import {actionLabel, behaviourFor, cellLabel, behaviourListeningTo, resolvedPositions, canonicalKeycode, behaviourGridSteps, behaviourGroups, behavioursInView, behaviourRouteKeys, behaviourTiers, comboAnswers, comboGroups, combosInView, comboInputKeys, comboInputShown, combosOnKey, combosAt, keyFace, keyMeaning, keyName, macroKeycodes, macroReach, pointingReach, pointingSlotFor, pointingVariant, reachInView, reachKeys, toggleComboInput, visibleKeycode} from "../view/keyface.mjs";
 import {feedbackColours, layerColourRow, mappedKeyCount, pdColourRow, stageEnabled} from "../view/lighting.mjs";
 import {closeComboBuilder, currentLayer, getModel, heldLayers, layerName, layers, openComboBuilder, positionAt, post, previewing, render, selectedPosition, showLayer, state, writable, canEdit as canEditArea} from "../store.mjs";
 import * as edits from "../view/edits.mjs";
@@ -15,7 +15,7 @@ import {keepInView, layerBar} from "./layerbar.mjs";
 import {attachLayersControl} from "./layers.mjs";
 import {openPicker} from "./picker.mjs";
 import {attachGroupToggles, attachReachRows, groupHeader, groupOpen, reachAttrs, reachTable} from "./groups.mjs";
-import {inGroupOrder, reachEntries, singleOpenGroup} from "../view/reach-groups.mjs";
+import {inGroupOrder, reachEntries, setReachGroupOpen} from "../view/reach-groups.mjs";
 import {branchBadge, comboBadge, keyNameMarked, marked, sends, sendsKind, slotLight, tierDot} from "./marks.mjs";
 import {branchName, helperWord, tierName, vocabulary, word} from "../view/vocabulary.mjs";
 import {topbar, unavailable} from "./shell.mjs";
@@ -87,11 +87,13 @@ export function screenKeys() {
                 if (answer) state.combo.labels[answer.keycode] = answer.editLabel || answer.display || answer.keycode;
             } else {
                 state.selected = index;
-                const behaviour = behaviourFor(model, keyMeaning(positionAt(layer, index)));
+                const shown = resolvedPositions(layers(), state.layer, heldLayers())
+                    .find((entry) => entry.position.layoutIndex === index)?.position;
+                const behaviour = behaviourFor(model, keyMeaning(shown));
                 // A behaviour picked on the board is the one this key carries.
                 if (state.tab === "behaviours" && behaviour) {
                     state.behaviourRow = behaviour.keycode;
-                    state.behaviourRoute = {row: behaviour.keycode, group: "here"};
+                    state.behaviourRoute = {row: behaviour.keycode, group: "view"};
                     state.cell = null;
                 }
             }
@@ -173,17 +175,23 @@ function reachHighlight(model) {
         const name = rest.join(":");
         return reachEntries(groups, group).find((entry) => String(entry.name) === name);
     };
-    if (state.tab === "behaviours") return behaviourRouteKeys(model, stack, at, state.behaviourRow, behaviourRoute());
+    if (state.tab === "behaviours") return behaviourRouteKeys(model, stack, at, state.behaviourRow, behaviourRoute(), heldLayers());
     const picked = state.reachRow[state.tab];
     if (!picked) return [];
     if (state.tab === "combos") {
+        if (picked.startsWith("view:")) {
+            const entry = combosInView(model, stack, at, heldLayers()).find((row) => picked === `view:${row.combo.id}`);
+            return entry?.keys.map((key) => key.position.layoutIndex) || [];
+        }
         const groups = comboGroups(model, stack, at);
         const entry = [groups.onKeys, groups.throughKeys, groups.elsewhere].flat()
             .find((row) => picked.endsWith(`:${row.combo.id}`));
         return reachKeys(stack, at, entry);
     }
-    if (state.tab === "macros") return reachKeys(stack, at, found(macroReach(model, stack, at), picked));
-    if (state.tab === "pointing") return reachKeys(stack, at, found(pointingReach(model, stack, at), picked));
+    if (state.tab === "macros") return reachKeys(stack, at, found(picked.startsWith("view:") ? {inView: macroView(model)} : macroReach(model, stack, at), picked),
+        picked.startsWith("view:") ? heldLayers() : null);
+    if (state.tab === "pointing") return reachKeys(stack, at, found(picked.startsWith("view:") ? {inView: pointingView(model)} : pointingReach(model, stack, at), picked),
+        picked.startsWith("view:") ? heldLayers() : null);
     return [];
 }
 
@@ -191,6 +199,9 @@ function reachHighlight(model) {
 // position or actions reached only through transparent keys on lower layers.
 const storedCount = (reach) =>
     new Set([...reach.onKeys, ...reach.fromBranches, ...reach.fromCombos].map((entry) => entry.name)).size;
+const macroView = (model) => reachInView(model, layers(), state.layer, heldLayers(), macroKeycodes);
+const pointingView = (model) => reachInView(model, layers(), state.layer, heldLayers(),
+    (keycode) => { const slot = pointingSlotFor(model, keycode); return slot ? [String(slot.id)] : []; });
 
 function bench() {
     const model = getModel();
@@ -328,13 +339,22 @@ const comboNote = (entry) => entry.combos.map(({combo, keys}) => {
         .map((key) => layerName(key.layer) + (key.whileHeld ? " when held" : "")))];
     return `combo ${combo.badge} · ${(combo.inputDisplays || combo.inputs || []).join(" + ")}${sources.length ? ` · on ${sources.join(", ")}` : ""}`;
 }).join(", ");
+const viewBehaviourNote = (entry) => {
+    const indexes = [...new Set(entry.keys.map((key) => key.position.layoutIndex))];
+    const sources = [...new Set(entry.keys.filter((key) => key.fellThrough).map((key) => layerName(key.layer)))];
+    return [indexes.length ? `index ${indexes.join(", ")}${sources.length ? ` · on ${sources.join(", ")}` : ""}` : "",
+        entry.combos.length ? comboNote(entry) : ""].filter(Boolean).join(" · ");
+};
 function tabBehaviours(body, right) {
     const model = getModel();
     const layer = currentLayer();
     const {here, through, combos, combosBelow, elsewhere} = behaviourGroups(model, layers(), state.layer);
+    const inView = behavioursInView(model, layers(), state.layer, heldLayers());
     if (!state.behaviourRow || !behaviourFor(model, state.behaviourRow)) {
-        state.behaviourRow = behaviourFor(model, keyMeaning(selectedPosition()))?.keycode
-            || here[0]?.keycode || combos[0]?.row.keycode || through[0]?.row.keycode
+        const shown = resolvedPositions(layers(), state.layer, heldLayers())
+            .find((entry) => entry.position.layoutIndex === state.selected)?.position;
+        state.behaviourRow = behaviourFor(model, keyMeaning(shown))?.keycode
+            || inView[0]?.row.keycode || here[0]?.keycode || combos[0]?.row.keycode || through[0]?.row.keycode
             || combosBelow[0]?.row.keycode || elsewhere[0]?.keycode || null;
     }
     const behaviour = behaviourFor(model, state.behaviourRow);
@@ -362,6 +382,8 @@ function tabBehaviours(body, right) {
     // behaviour — can land in a closed group, so the group holding it opens
     // once when the selection moves there. Closing it again then sticks.
     const groups = [
+        {id: "view", rows: inView.map((entry) => ({row: entry.row, note: viewBehaviourNote(entry)})),
+            empty: "No behaviour is reached by the layers in this view."},
         {id: "here", rows: here.map((row) => ({row, note: ""})),
             empty: "No key behaviour is placed on this layer."},
         {id: "combos", rows: combos.map((entry) => ({row: entry.row, note: comboNote(entry)})),
@@ -377,24 +399,24 @@ function tabBehaviours(body, right) {
     if (selectionMoved) {
         const holding = groups.find((group) => group.id === route)
             || groups.find((group) => group.rows.some((entry) => entry.row.keycode === state.behaviourRow));
-        if (holding) state.groups.behaviours = singleOpenGroup(state.groups.behaviours, holding.id);
+        if (holding) state.reachGroups = setReachGroupOpen(state.reachGroups, holding.id, true);
         state.behaviourRowShown = state.behaviourRow;
     }
 
     const section = (group) => `<div class="rowgroup">
         ${groupHeader("behaviours", group.id, group.rows.length, group.rows.some(({row}) => changed.has(row.keycode)))}
         ${groupOpen("behaviours", group.id)
-            ? (group.rows.length ? `<div class="beh-rows${group.rows.length > 5 ? " scroll" : ""}" data-scroll-key="behaviours:${state.layer}:${group.id}"${selectionMoved ? " data-reveal-selected" : ""}>${group.rows.map((entry) => item(group.id, entry.row, entry.note)).join("")}</div>`
+            ? (group.rows.length ? `<div class="beh-rows"${selectionMoved ? " data-reveal-selected" : ""}>${group.rows.map((entry) => item(group.id, entry.row, entry.note)).join("")}</div>`
                 : `<p class="note" style="padding:10px 12px">${esc(group.empty)}</p>`)
             : ""}</div>`;
 
     const node = el(`<div class="tab-split">
-        <aside class="rowlist behaviour-rail" data-scroll-key="behaviours:${state.layer}:rail">
+        <aside class="rowlist behaviour-rail">
             ${inGroupOrder(groups).map(section).join("")}
         </aside>
         <div class="beh-main"></div>
     </div>`);
-    attachGroupToggles(node, "behaviours");
+    attachGroupToggles(node);
     node.querySelectorAll("[data-row]").forEach((button) => button.addEventListener("click", () => {
         state.behaviourRow = button.dataset.row;
         state.behaviourRoute = {row: button.dataset.row, group: button.dataset.route};
@@ -576,28 +598,25 @@ function tabCombos(body, right) {
     });
     right.appendChild(toggle);
 
-    const layer = currentLayer();
     const node = el(`<div class="tab-split wide">
         <div>
-            <div class="row" style="gap:16px;padding:0 0 12px">
-                <span class="note" style="margin-left:auto">${combos.length} combo${combos.length === 1 ? "" : "s"} read from the keyboard${readback.enabled === false ? " · combos are disabled on the keyboard" : ""}</span>
-            </div>
             <div id="comboTable"></div>
         </div>
         <div id="comboSide"></div>
     </div>`);
 
     const groupsOf = comboGroups(model, layers(), state.layer);
+    const inView = combosInView(model, layers(), state.layer, heldLayers());
     const changedCombos = draftMarks(model?.draft?.changes).combos;
     // A combo asked for by id is picked under the group that lists it on
     // this layer, and that group opens so the row is there to see.
     if (state.pickCombo !== null) {
         const id = String(state.pickCombo);
-        const route = [["here", groupsOf.onKeys], ["through", groupsOf.throughKeys], ["elsewhere", groupsOf.elsewhere]]
+        const route = [["view", inView], ["here", groupsOf.onKeys], ["through", groupsOf.throughKeys], ["elsewhere", groupsOf.elsewhere]]
             .find(([, entries]) => entries.some((entry) => String(entry.combo.id) === id))?.[0];
         state.pickCombo = null;
         state.reachRow.combos = route ? `${route}:${id}` : null;
-        if (route) state.groups.combos[route] = true;
+        if (route) state.reachGroups = setReachGroupOpen(state.reachGroups, route, true);
     }
     const row = (group, entry, reachedBy) => {
         const combo = entry.combo;
@@ -626,6 +645,9 @@ function tabCombos(body, right) {
             }),
             drafted: onKey.combos.some((combo) => changedCombos.has(combo.id)),
             empty: onKey.position ? "No combo takes this key as an input." : "Every layer in view is transparent at the selected key."},
+        {id: "view", rows: inView.map((entry) => row("view", entry, keysReach(entry.keys))),
+            drafted: inView.some((entry) => changedCombos.has(entry.combo.id)),
+            empty: "No combo fires with the layers in this view."},
         {id: "here", rows: groupsOf.onKeys.map((entry) => row("here", entry, reachedBy("here", entry))), drafted: groupsOf.onKeys.some((entry) => changedCombos.has(entry.combo.id)),
             empty: readback.state === "read" ? "No combo has all of its inputs on this layer." : "Combos have not been read from this keyboard."},
         {id: "through", rows: groupsOf.throughKeys.map((entry) => row("through", entry, reachedBy("through", entry))), drafted: groupsOf.throughKeys.some((entry) => changedCombos.has(entry.combo.id)),
@@ -762,6 +784,7 @@ function tabMacros(body, right) {
     const model = getModel();
     const slots = model?.viaMacros || [];
     const reach = macroReach(model, layers(), state.layer);
+    reach.inView = macroView(model);
     right.replaceChildren();
     const open = el(`<button class="btn tiny ghost">Open the Macros view</button>`);
     open.addEventListener("click", () => { state.screen = "macros"; render(); });
@@ -777,6 +800,8 @@ function tabMacros(body, right) {
             <td style="text-align:right">${slot ? `<button class="btn tiny ghost" data-editmacro="${esc(keycode)}">Edit</button>` : ""}</td></tr>`;
     };
     const groups = [
+        {id: "view", rows: reach.inView.map((entry) => row("view", entry.name, reachLabel(model, entry))),
+            empty: "No macro is reached by the layers in this view."},
         {id: "here", rows: reach.onKeys.map((entry) => row("here", entry.name, reachLabel(model, entry))),
             empty: "No macro keycode is placed on this layer."},
         {id: "through", rows: reach.throughKeys.map((entry) => row("through", entry.name, reachLabel(model, entry))),
@@ -864,6 +889,7 @@ const reachLabel = (model, entry) => [
 function tabPointing(body, right) {
     const model = getModel();
     const reach = pointingReach(model, layers(), state.layer);
+    reach.inView = pointingView(model);
     right.replaceChildren();
     const open = el(`<button class="btn tiny ghost">Open the Pointing modes view</button>`);
     open.addEventListener("click", () => { state.screen = "pointing"; render(); });
@@ -907,6 +933,8 @@ function tabPointing(body, right) {
     };
 
     const groups = [
+        {id: "view", rows: reach.inView.map(reachCard("view")),
+            empty: "No pointing mode is reached by the layers in this view."},
         {id: "here", rows: reach.onKeys.map(reachCard("here")),
             empty: "No pointing mode is placed on this layer."},
         {id: "through", rows: reach.throughKeys.map(reachCard("through")),

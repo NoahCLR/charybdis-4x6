@@ -4,10 +4,9 @@
 // so what is drawn is always what would be applied.
 
 import {layersOn, toggleLayer} from "./view/layer-set.mjs";
+import {initialReachGroups} from "./view/reach-groups.mjs";
 
 const vscode = acquireVsCodeApi();
-
-const openGroups = () => ({here: true, branches: true, combos: true, through: false, belowBranches: false, belowCombos: false, elsewhere: false});
 
 export const state = {
     screen: "keys",
@@ -18,10 +17,9 @@ export const state = {
     behaviourRow: null,
     behaviourRowShown: null,
     behaviourRoute: null, // {row, group}: the group the picked behaviour was picked in, so the board rings that route only
-    // Every tab that answers "what does this layer reach" is grouped the same
-    // way and opens the same way: what the layer holds itself, and the rest a
-    // click away.
-    groups: {behaviours: {...openGroups(), branches: false, combos: false}, macros: openGroups(), combos: {key: true, ...openGroups()}, pointing: openGroups()},
+    // A route has one open state across the Keys tabs that show it.
+    reachGroups: initialReachGroups(),
+    resetBenchHeight: false, // an explicit reach-section toggle lets the workbench shrink
     // The row picked in each tab. The board rings the keys that reach it, so
     // a row in a table can answer "where do I press for this".
     reachRow: {macros: null, combos: null, pointing: null},

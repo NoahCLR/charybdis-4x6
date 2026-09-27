@@ -280,9 +280,16 @@ In **Keys → Combos**, **Pick on board** brings the board into view so its keys
 can be selected as combo inputs.
 The **Key** tab count is the number of mapped keys on the selected layer;
 the selected key's layout index appears in its details.
-In **Keys → Behaviours**, one reach section opens at a time. It shows up to
-five rows before its own list scrolls, and the rail keeps its height when
-switching layers.
+In **Keys → Behaviours**, reach sections open independently. Matching sections
+share their expanded or collapsed state across the Behaviours, Combos, Macros
+and Pointing modes tabs. The full list scrolls with the Keys page rather than
+inside the rail.
+The Behaviours, Combos, Macros and Pointing modes tabs start with **On this
+view**: what the board reaches with the selected layer and any layers previewed
+under it. **On this layer** stays tied to keys stored on the selected layer;
+the tab counts use that layer too. Use ⌘-click on layer tabs to change the
+composed view. Combo rows use the keyboard's Combo Layer Matching reference
+when one is configured.
 Every Keys workbench tab is at least as tall as Behaviours, so switching tabs
 keeps the page at the same scroll position. If an editor grows taller, that
 height stays while switching tabs.

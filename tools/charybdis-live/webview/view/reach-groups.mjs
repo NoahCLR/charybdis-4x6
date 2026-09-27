@@ -10,6 +10,7 @@ export const GROUP_TITLES = {
     // The Combos tab's one cut across the others: what the selected key takes
     // part in, in the view the board shows.
     key: "On the selected key in this view",
+    view: "On this view",
     here: "On this layer",
     branches: "Through a behaviour on this layer",
     combos: "Through a combo on this layer",
@@ -21,14 +22,17 @@ export const GROUP_TITLES = {
 
 // A tab lists the groups it has in any order and they come out in this one,
 // so the headers do not move between tabs.
-export const GROUP_ORDER = ["key", "here", "branches", "combos", "through", "belowBranches", "belowCombos", "elsewhere"];
+export const GROUP_ORDER = ["key", "view", "here", "branches", "combos", "through", "belowBranches", "belowCombos", "elsewhere"];
 export const inGroupOrder = (groups) => GROUP_ORDER.map((id) => groups.find((group) => group.id === id)).filter(Boolean);
 
-// The Behaviours rail is an accordion: opening one route closes the others.
-export const singleOpenGroup = (groups, id, open = true) => Object.fromEntries(
-    Object.keys(groups).map((group) => [group, group === id && open]));
+// The same section means the same thing in each Keys tab. Keep one open state
+// by section id, including ids that only some tabs show. No section closes
+// another when it opens.
+export const initialReachGroups = () => Object.fromEntries(
+    GROUP_ORDER.map((id) => [id, id === "key" || id === "view"]));
+export const setReachGroupOpen = (groups, id, open) => ({...groups, [id]: open});
 
 // The reach list each group reads. `elsewhere` is a tab's own remainder.
-export const REACH_FIELDS = {here: "onKeys", branches: "fromBranches", combos: "fromCombos", through: "throughKeys",
+export const REACH_FIELDS = {view: "inView", here: "onKeys", branches: "fromBranches", combos: "fromCombos", through: "throughKeys",
     belowBranches: "fromBranchesBelow", belowCombos: "fromCombosBelow"};
 export const reachEntries = (reach, group) => reach?.[REACH_FIELDS[group]] || [];

@@ -1,30 +1,29 @@
-// The grouped lists the Keys tabs share: a counted header per group, the
-// first open and the rest a click away, and rows that pick themselves.
+// The grouped lists the Keys tabs share: a counted header per group, shared
+// independent open state, and rows that pick themselves.
 // Titles and order come from view/reach-groups.mjs.
 
 import {el, esc} from "../lib/dom.mjs";
 import {render, state} from "../store.mjs";
 import {draftDot} from "../view/review.mjs";
-import {GROUP_TITLES, inGroupOrder, singleOpenGroup} from "../view/reach-groups.mjs";
+import {GROUP_TITLES, inGroupOrder, setReachGroupOpen} from "../view/reach-groups.mjs";
 
 // A folded group holding something the draft changed says so on its header;
 // open, its rows carry their own marks.
 // A group whose rows depend on a choice elsewhere names it after the title.
 export function groupHeader(tab, id, count, drafted = false, detail = "") {
-    const open = state.groups[tab][id];
+    const open = state.reachGroups[id];
     return `<button class="group-h" data-group-tab="${tab}" data-group="${id}" aria-expanded="${open}">
-        <span class="chev">${open ? "▾" : "▸"}</span><span class="ttl">${esc(GROUP_TITLES[id])}${detail ? ` <span class="mono dim">· ${esc(detail)}</span>` : ""}${drafted && !open ? draftDot("Holds a change in your draft") : ""}</span>
+        <span class="chev" aria-hidden="true">${open ? "−" : "+"}</span><span class="ttl">${esc(GROUP_TITLES[id])}${detail ? ` <span class="mono dim">· ${esc(detail)}</span>` : ""}${drafted && !open ? draftDot("Holds a change in your draft") : ""}</span>
         <span class="n">${count}</span></button>`;
 }
 
-export const groupOpen = (tab, id) => state.groups[tab][id];
+export const groupOpen = (tab, id) => state.reachGroups[id];
 
-export const attachGroupToggles = (node, exclusiveTab = null) => node.querySelectorAll("[data-group-tab]").forEach((button) =>
+export const attachGroupToggles = (node) => node.querySelectorAll("[data-group-tab]").forEach((button) =>
     button.addEventListener("click", () => {
-        const tab = button.dataset.groupTab;
-        const bag = state.groups[tab];
-        if (tab === exclusiveTab) state.groups[tab] = singleOpenGroup(bag, button.dataset.group, !bag[button.dataset.group]);
-        else bag[button.dataset.group] = !bag[button.dataset.group];
+        const id = button.dataset.group;
+        state.reachGroups = setReachGroupOpen(state.reachGroups, id, !state.reachGroups[id]);
+        state.resetBenchHeight = true;
         render();
     }));
 
