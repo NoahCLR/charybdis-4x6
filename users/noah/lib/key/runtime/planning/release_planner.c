@@ -384,7 +384,7 @@ bool key_runtime_core_resolve_pending_multi_tap_release(keypos_t key_pos, uint16
     switch (decision.outcome) {
         case KEY_RUNTIME_RELEASE_DECISION_OUTCOME_ACTION: {
             uint16_t                  held_lifecycle_action = key_runtime_core_pending_multi_tap_release_held_lifecycle_action(token, decision.action, elapsed);
-            key_feedback_pulse_kind_t action_feedback_kind;
+            key_feedback_pulse_kind_t action_feedback_kind = KEY_FEEDBACK_PULSE_HOLD;
             bool                      action_feedback = series_tap_count > 1u && key_runtime_core_release_hold_action_feedback_kind(token, decision.action, elapsed, &action_feedback_kind);
 
             if (held_lifecycle_action != KC_NO) {
