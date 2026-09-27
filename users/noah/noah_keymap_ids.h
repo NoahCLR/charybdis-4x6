@@ -109,11 +109,11 @@ _Static_assert((QK_MACRO_0 + VIA_MACRO_SLOT_COUNT - 1) <= QK_MACRO_MAX, "VIA mac
 // identities keep their values, so stored profiles and the action ABI stay
 // valid, but the keys do nothing. Name and edit VIA macros instead.
 // VIA macros use the VIA_MACRO_0–63 aliases.
-// Plain pointing-device mode keycodes work as default momentary holds.
+// PD_SLOT_n keycodes address configurable pointing slots as momentary holds.
 // Add a key_behaviors[] row when you want those keys to grow explicit tap,
 // hold, longer-hold, or multi-tap behavior on top of that default.
 // Use the generated *_LOCK keycode for a persistent toggle inside tap/hold rows.
-// Each pd mode gets an explicit generated lock keycode, so mode identity no
+// Each slot gets an explicit generated lock keycode, so mode identity no
 // longer depends on contiguous enum math.
 // LAYER_LOCK_BASE reserves LAYER_COUNT keycodes for layer locking via
 // actions authored in key_behaviors[]. Use the LOCK_LAYER(n) macro there.

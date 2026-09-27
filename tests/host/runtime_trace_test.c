@@ -354,7 +354,7 @@ static void test_pd_mode_and_split_sync_events_share_one_trace_buffer(void) {
 
     test_reset_stubs();
 
-    CHECK(pd_mode_handle_keycode_press(VOLUME_MODE));
+    CHECK(pd_mode_handle_keycode_press(PD_SLOT_1));
     CHECK(pd_mode_toggle_lock_state(PD_MODE_VOLUME));
     CHECK(pd_mode_toggle_lock_state(PD_MODE_VOLUME));
     pd_mode_apply_remote_snapshot(PD_MODE_ARROW, PD_MODE_ARROW);

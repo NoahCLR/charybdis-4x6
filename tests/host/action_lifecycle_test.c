@@ -55,8 +55,8 @@ static bool owned_unregister_result;
 
 static const pd_mode_def_t test_pd_mode_def = {
     .mode_flag   = PD_MODE_ARROW,
-    .keycode     = ARROW_MODE,
-    .lock_action = ARROW_MODE_LOCK,
+    .keycode     = PD_SLOT_4,
+    .lock_action = PD_SLOT_4_LOCK,
 };
 
 void split_runtime_sync(void);
@@ -111,15 +111,15 @@ static void test_reset_stubs(void) {
 }
 
 bool is_pd_mode_lock_action(uint16_t action) {
-    return action == ARROW_MODE_LOCK;
+    return action == PD_SLOT_4_LOCK;
 }
 
 pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
-    return keycode == ARROW_MODE ? PD_MODE_ARROW : 0;
+    return keycode == PD_SLOT_4 ? PD_MODE_ARROW : 0;
 }
 
 const pd_mode_def_t *pd_mode_lock_action_lookup(uint16_t action) {
-    return action == ARROW_MODE_LOCK ? &test_pd_mode_def : NULL;
+    return action == PD_SLOT_4_LOCK ? &test_pd_mode_def : NULL;
 }
 
 bool pd_mode_toggle_lock_state(pd_mode_mask_t mode) {
@@ -137,7 +137,7 @@ bool pd_mode_toggle_lock_state_at(pd_mode_mask_t mode, keypos_t key_pos) {
 }
 
 bool pd_mode_handle_keycode_press(uint16_t keycode) {
-    if (keycode == ARROW_MODE) {
+    if (keycode == PD_SLOT_4) {
         pd_press_calls++;
         return pd_press_result;
     }
@@ -150,7 +150,7 @@ bool pd_mode_handle_keycode_press_at(uint16_t keycode, keypos_t key_pos) {
 }
 
 bool pd_mode_handle_keycode_release(uint16_t keycode) {
-    if (keycode == ARROW_MODE) {
+    if (keycode == PD_SLOT_4) {
         pd_release_calls++;
         return pd_release_result;
     }
@@ -264,7 +264,7 @@ static void test_descriptor_classifies_dispatch_shapes(void) {
     test_reset_stubs();
 
     CHECK(noah_action_desc_is_press_only(noah_action_describe(LOCK_LAYER(3))));
-    CHECK(noah_action_desc_is_press_only(noah_action_describe(ARROW_MODE_LOCK)));
+    CHECK(noah_action_desc_is_press_only(noah_action_describe(PD_SLOT_4_LOCK)));
     CHECK(noah_action_desc_is_press_only(noah_action_describe(MACRO_0)));
     CHECK(noah_action_desc_consumes_direct_press(noah_action_describe(VIA_MACRO_6)));
     CHECK(noah_action_desc_requires_per_key_hold(noah_action_describe(MO(2))));
@@ -379,7 +379,7 @@ static void test_tap_handles_layer_lock_and_pd_lock(void) {
     test_reset_stubs();
     pd_toggle_result = true;
 
-    noah_action_tap(ARROW_MODE_LOCK);
+    noah_action_tap(PD_SLOT_4_LOCK);
     CHECK(pd_toggle_calls == 1);
     CHECK(pd_toggle_key_pos.row == MATRIX_ROWS);
     CHECK(pd_toggle_key_pos.col == MATRIX_COLS);
@@ -389,7 +389,7 @@ static void test_tap_handles_layer_lock_and_pd_lock(void) {
     test_reset_stubs();
     pd_toggle_result = false;
 
-    noah_action_tap(ARROW_MODE_LOCK);
+    noah_action_tap(PD_SLOT_4_LOCK);
     CHECK(pd_toggle_calls == 1);
     CHECK(split_sync_calls == 0);
 }
@@ -400,7 +400,7 @@ static void test_tap_at_preserves_pd_lock_origin_key_pos(void) {
     test_reset_stubs();
     pd_toggle_result = true;
 
-    noah_action_tap_at(key_pos, ARROW_MODE_LOCK);
+    noah_action_tap_at(key_pos, PD_SLOT_4_LOCK);
     CHECK(pd_toggle_calls == 1);
     CHECK(pd_toggle_key_pos.row == key_pos.row);
     CHECK(pd_toggle_key_pos.col == key_pos.col);
@@ -460,7 +460,7 @@ static void test_press_routes_pd_mode_momentary_qmk_custom_and_plain(void) {
     test_reset_stubs();
     pd_press_result = true;
 
-    noah_action_press(key_pos, ARROW_MODE);
+    noah_action_press(key_pos, PD_SLOT_4);
     CHECK(pd_press_calls == 1);
     CHECK(pd_press_key_pos.row == key_pos.row);
     CHECK(pd_press_key_pos.col == key_pos.col);
@@ -535,7 +535,7 @@ static void test_release_routes_press_only_pd_mode_momentary_qmk_custom_and_plai
     test_reset_stubs();
     pd_release_result = true;
 
-    noah_action_release(key_pos, ARROW_MODE);
+    noah_action_release(key_pos, PD_SLOT_4);
     CHECK(pd_release_calls == 1);
     CHECK(pd_release_key_pos.row == key_pos.row);
     CHECK(pd_release_key_pos.col == key_pos.col);

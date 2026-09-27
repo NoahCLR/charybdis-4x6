@@ -1,9 +1,9 @@
 "use strict";
 
 // Expressions as the keyboard's vocabulary spells them — KC_A, LT(1, KC_A),
-// DRAGSCROLL, VIA_MACRO_3 — resolved to profile actions and native keycodes.
+// PD_SLOT_0, VIA_MACRO_3 — resolved to profile actions and native keycodes.
 
-const {PD_BINDINGS, LEGACY_PD_SLOTS, pdBindingOfName} = require("../data/pd-bindings");
+const {PD_BINDINGS, DEPLOYED_PD_SLOTS, FORMER_NAMES, pdBindingOfName} = require("../data/pd-bindings");
 const {PROFILE_ACTION_KINDS} = require("./profile-blob-v1");
 
 const QMK_USER_BASE = 0x7e40;
@@ -21,10 +21,17 @@ const CHARYBDIS_KEYCODE_VALUES = Object.freeze({
 });
 
 // Every pointing-mode binding as the action a behaviour or combo stores.
-const PD_ACTIONS = Object.freeze(Object.fromEntries(PD_BINDINGS.flatMap(({slot, hold, lock}) => [
-    [hold, {kind: PROFILE_ACTION_KINDS.PD_MODE_MOMENTARY, operand: slot}],
-    [lock, {kind: PROFILE_ACTION_KINDS.PD_MODE_LOCK, operand: slot}],
-])));
+const PD_ACTIONS = Object.freeze(Object.fromEntries(PD_BINDINGS.flatMap(({slot, hold, lock}) => {
+    const entries = [
+        [hold, {kind: PROFILE_ACTION_KINDS.PD_MODE_MOMENTARY, operand: slot}],
+        [lock, {kind: PROFILE_ACTION_KINDS.PD_MODE_LOCK, operand: slot}],
+    ];
+    if (FORMER_NAMES[slot]) entries.push(
+        [FORMER_NAMES[slot], {kind: PROFILE_ACTION_KINDS.PD_MODE_MOMENTARY, operand: slot}],
+        [`${FORMER_NAMES[slot]}_LOCK`, {kind: PROFILE_ACTION_KINDS.PD_MODE_LOCK, operand: slot}],
+    );
+    return entries;
+})));
 
 const MODIFIER_WRAPPERS = Object.freeze({
     C: 0x0100, LCTL: 0x0100,
@@ -113,7 +120,7 @@ function resolveNativeQmkExpression(value, model) {
         const layer = layerIdOrUndefined(call.args[0], model);
         return layer === undefined || layer >= LOCK_LAYER_SLOTS
             ? undefined
-            : QMK_USER_BASE + HARDCODED_MACRO_SLOTS + (LEGACY_PD_SLOTS * 2) + layer;
+            : QMK_USER_BASE + HARDCODED_MACRO_SLOTS + (DEPLOYED_PD_SLOTS * 2) + layer;
     }
     // A modifier wrapper only applies to a basic or already-modified key
     // (QK_MODS, up to 0x1FFF). Anything above would OR the modifier bits into
@@ -143,7 +150,7 @@ function resolveNativeQmkExpression(value, model) {
 
 function localCustomKeycodeValues(model) {
     const layerCount = Array.isArray(model?.layers) ? model.layers.length : 0;
-    const first = QMK_USER_BASE + HARDCODED_MACRO_SLOTS + (LEGACY_PD_SLOTS * 2) + layerCount;
+    const first = QMK_USER_BASE + HARDCODED_MACRO_SLOTS + (DEPLOYED_PD_SLOTS * 2) + layerCount;
     return Object.fromEntries((model?.customKeycodes || []).map((name, index) => [name, first + index]));
 }
 

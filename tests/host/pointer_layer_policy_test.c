@@ -82,9 +82,9 @@ bool layer_ownership_is_locked(uint8_t layer) {
 
 pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
     switch (keycode) {
-        case VOLUME_MODE:
+        case PD_SLOT_1:
             return PD_MODE_VOLUME;
-        case ARROW_MODE:
+        case PD_SLOT_4:
             return PD_MODE_ARROW;
         default:
             return 0;
@@ -168,8 +168,8 @@ static void test_arrow_mode_does_not_anchor_layer_hold_keys(void) {
 static void test_non_arrow_pd_mode_keys_and_dpi_keys_count_as_mouse_records(void) {
     test_reset_stubs();
 
-    CHECK(pointer_layer_policy_is_mouse_record(VOLUME_MODE));
-    CHECK(!pointer_layer_policy_is_mouse_record(ARROW_MODE));
+    CHECK(pointer_layer_policy_is_mouse_record(PD_SLOT_1));
+    CHECK(!pointer_layer_policy_is_mouse_record(PD_SLOT_4));
     CHECK(pointer_layer_policy_is_mouse_record(DPI_MOD));
     CHECK(pointer_layer_policy_is_mouse_record(DPI_RMOD));
     CHECK(pointer_layer_policy_is_mouse_record(S_D_MOD));

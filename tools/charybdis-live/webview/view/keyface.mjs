@@ -63,7 +63,7 @@ const shortLayer = (name) => name.replace(/^LAYER_/, "").toLowerCase();
 
 // A position carries two names: the one the keyboard stores (`QK_USER_16`, or
 // bare hex for a value the shipped vocabulary never named) and the one the rest
-// of the profile uses (`DRAGSCROLL`, `VIA_MACRO_0`, `LEFT_THUMB`). Behaviour
+// of the profile uses (`PD_SLOT_0`, `VIA_MACRO_0`, `LEFT_THUMB`). Behaviour
 // rows, macro slots and pointing slots are all keyed by the second, so every
 // lookup from a key to what it reaches goes through this.
 export const keyMeaning = (position) => position?.semantic || position?.keycode || "";

@@ -144,7 +144,7 @@ test("a pointing mode is an overlay on its locality, never on the key that binds
     assert.deepEqual(row.color, colour(21, 255, 200));
     const preview = {color: row.color, locality: row.locality, triggerIndex: 0};
 
-    const bindingKey = keyLight(m, {index: 3}, position(0, "DRAGSCROLL"));
+    const bindingKey = keyLight(m, {index: 3}, position(0, "PD_SLOT_0"));
     assert.notDeepEqual(bindingKey.colour, row.color, "binding a mode does not colour its key");
 
     const right = keyLight(m, {index: 3}, position(7, "KC_TRANSPARENT"), {pdActive: preview});
@@ -153,7 +153,7 @@ test("a pointing mode is an overlay on its locality, never on the key that binds
 
     const left = keyLight(m, {index: 3}, position(0, "KC_TRANSPARENT"), {pdActive: preview});
     assert.equal(left.source, "base", "the left half is outside this locality");
-    const leftMapped = keyLight(m, {index: 3}, position(0, "DRAGSCROLL"), {pdActive: preview});
+    const leftMapped = keyLight(m, {index: 3}, position(0, "PD_SLOT_0"), {pdActive: preview});
     assert.equal(leftMapped.source, "layer", "and there the layer still owns its own keys");
 
     const stageOff = model({rgb: {...model().rgb, stages: [{id: "pd", label: "Pointing modes", enabled: false}]}});

@@ -118,17 +118,18 @@ behavior:
   tap/hold keys using the same behavior table as the rest of the board
 
 You can also make the trackball change roles instead of only moving the cursor.
-The current profile includes:
+The current profile assigns these behaviors to slot keycodes. The slot number
+stays fixed when a mode is renamed or reconfigured in Charybdis Live:
 
-- `DRAGSCROLL`: ball motion becomes scrolling, as either a momentary hold or a
+- `PD_SLOT_0` (Dragscroll): ball motion becomes scrolling, as either a momentary hold or a
   lock
-- `PINCH_MODE`: command-modified scrolling for pinch-style zoom on macOS; in my
+- `PD_SLOT_5` (Pinch): command-modified scrolling for pinch-style zoom on macOS; in my
   setup this expects third-party software such as
   [BetterMouse](https://better-mouse.com/) to translate that gesture
-- `ZOOM_MODE`: explicit keyboard zoom using `Cmd+=` and `Cmd+-`
-- `ARROW_MODE`: dominant ball motion sends arrow-key taps instead of cursor
+- `PD_SLOT_3` (Zoom): explicit keyboard zoom using `Cmd+=` and `Cmd+-`
+- `PD_SLOT_4` (Arrow): dominant ball motion sends arrow-key taps instead of cursor
   movement
-- `VOLUME_MODE` and `BRIGHTNESS_MODE`: vertical ball motion changes system
+- `PD_SLOT_1` (Volume) and `PD_SLOT_2` (Brightness): vertical ball motion changes system
   volume or display brightness
 - `CLICK_SPAM`: not a pointing mode, but a mouse-button combo output that uses
   the behavior table to repeat left-click while held
@@ -429,7 +430,7 @@ The helper vocabulary is:
 
 `action` can be a normal keycode, a modified keycode such as `S(KC_1)`, a VIA
 macro, a supported QMK behavior keycode such as `OSM()` or
-`MT()`, a generated pointing-mode lock such as `DRAGSCROLL_LOCK`, or a layer
+`MT()`, a generated pointing-mode lock such as `PD_SLOT_0_LOCK`, or a layer
 lock through `LOCK_LAYER(layer)`. QMK's `TG(layer)` is the same lock as
 `LOCK_LAYER(layer)`, and `TO(layer)` locks that layer alone and releases every
 other lock (`TO(0)` returns to the base layer; layers held with `MO()` stay on

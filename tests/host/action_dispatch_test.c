@@ -270,11 +270,11 @@ const pd_mode_def_t pd_modes[PD_MODE_COUNT] = {NOAH_PD_MODE_LIST(NOAH_PD_MODE_TE
 #undef NOAH_PD_MODE_TEST_ROW
 
 bool is_pd_mode_lock_action(uint16_t action) {
-    return action == ARROW_MODE_LOCK;
+    return action == PD_SLOT_4_LOCK;
 }
 
 pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
-    return keycode == ARROW_MODE ? PD_MODE_ARROW : 0;
+    return keycode == PD_SLOT_4 ? PD_MODE_ARROW : 0;
 }
 
 static void test_action_descriptor_classifies_common_actions(void) {
@@ -285,8 +285,8 @@ static void test_action_descriptor_classifies_common_actions(void) {
     noah_action_desc_t layer_toggle = noah_action_describe(TG(2));
     noah_action_desc_t layer_jump   = noah_action_describe(TO(5));
     noah_action_desc_t qmk_behavior = noah_action_describe(OSM(MOD_LSFT));
-    noah_action_desc_t pd_key       = noah_action_describe(ARROW_MODE);
-    noah_action_desc_t pd_lock      = noah_action_describe(ARROW_MODE_LOCK);
+    noah_action_desc_t pd_key       = noah_action_describe(PD_SLOT_4);
+    noah_action_desc_t pd_lock      = noah_action_describe(PD_SLOT_4_LOCK);
     noah_action_desc_t macro_action = noah_action_describe(MACRO_0);
     noah_action_desc_t custom       = noah_action_describe(NOAH_KEYMAP_SAFE_RANGE + 1);
     noah_action_desc_t literal      = noah_action_describe(KC_C);

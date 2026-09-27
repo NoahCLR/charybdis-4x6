@@ -650,12 +650,12 @@ const KEYMAPS = {
   3: [_,_,_,"VIA_MACRO_7",_,_,_,_,_,_,_,_,
       _,"G(KC_Q)","G(KC_W)","G(KC_A)",_,_,"VIA_MACRO_2","G(KC_C)","KC_UP","G(KC_V)",_,_,
       "KC_LSFT","LSG(KC_Z)",_,"G(KC_C)",_,_,"VIA_MACRO_1","KC_LEFT","KC_DOWN","KC_RGHT",_,_,
-      "KC_LALT","G(KC_Z)","G(KC_X)","G(KC_V)",_,_,"VIA_MACRO_0","MS_BTN1","MS_BTN2","DRAGSCROLL",_,_,
+      "KC_LALT","G(KC_Z)","G(KC_X)","G(KC_V)",_,_,"VIA_MACRO_0","MS_BTN1","MS_BTN2","PD_SLOT_0",_,_,
       _,_,_,_,_,_,_,_],
   4: [_,_,_,_,_,_,_,_,_,_,_,_,
       _,_,_,_,_,_,_,_,_,_,_,_,
-      _,_,_,_,_,_,"BRIGHTNESS_MODE","PINCH_MODE","MS_BTN3","DRAG_WINDOW",_,_,
-      _,_,_,_,_,_,"VOLUME_MODE","MS_BTN1","MS_BTN2","DRAGSCROLL",_,_,
+      _,_,_,_,_,_,"PD_SLOT_2","PD_SLOT_5","MS_BTN3","DRAG_WINDOW",_,_,
+      _,_,_,_,_,_,"PD_SLOT_1","MS_BTN1","MS_BTN2","PD_SLOT_0",_,_,
       _,"LT(1,KC_SPC)",_,_,_,_,_,_],
   5: Array(56).fill(_), 6: Array(56).fill(_), 7: Array(56).fill(_)
 };
@@ -670,12 +670,12 @@ const LAYERS = [
   {i:7, name:"Extra 3",    hsv:[0,0,0],     rule:"KEYS_MAPPED_ON_THIS_LAYER_ONLY", pass:true}
 ];
 const PD_MODES = [
-  {id:0, name:"Dragscroll", kind:2, hsv:[21,255,200],  dpi:100,  bind:"DRAGSCROLL",       on:"Pointer · thumb, Navigation · ;", invert:"Vertical", locality:"Right half"},
-  {id:1, name:"Volume",     kind:1, hsv:[43,255,200],  dpi:0,    locality:"Right half", bind:"VOLUME_MODE",      on:"Pointer · N",  axis:"Vertical only"},
-  {id:2, name:"Brightness", kind:1, hsv:[213,255,200], dpi:0,    locality:"Right half", bind:"BRIGHTNESS_MODE",  on:"Pointer · H",  axis:"Vertical only"},
-  {id:3, name:"Zoom",       kind:1, hsv:[70,255,200],  dpi:0,    locality:"Right half", bind:"ZOOM_MODE",        on:"behaviour · double-tap hold", axis:"Dominant axis"},
-  {id:4, name:"Arrow",      kind:1, hsv:[127,255,200], dpi:400,  locality:"Right half", bind:"ARROW_MODE",       on:"not placed",   axis:"Dominant axis"},
-  {id:5, name:"Pinch",      kind:1, hsv:[55,255,200],  dpi:0,    locality:"Right half", bind:"PINCH_MODE",       on:"Pointer · J",  axis:"Dominant axis"},
+  {id:0, name:"Dragscroll", kind:2, hsv:[21,255,200],  dpi:100,  bind:"PD_SLOT_0",       on:"Pointer · thumb, Navigation · ;", invert:"Vertical", locality:"Right half"},
+  {id:1, name:"Volume",     kind:1, hsv:[43,255,200],  dpi:0,    locality:"Right half", bind:"PD_SLOT_1",      on:"Pointer · N",  axis:"Vertical only"},
+  {id:2, name:"Brightness", kind:1, hsv:[213,255,200], dpi:0,    locality:"Right half", bind:"PD_SLOT_2",  on:"Pointer · H",  axis:"Vertical only"},
+  {id:3, name:"Zoom",       kind:1, hsv:[70,255,200],  dpi:0,    locality:"Right half", bind:"PD_SLOT_3",        on:"behaviour · double-tap hold", axis:"Dominant axis"},
+  {id:4, name:"Arrow",      kind:1, hsv:[127,255,200], dpi:400,  locality:"Right half", bind:"PD_SLOT_4",       on:"not placed",   axis:"Dominant axis"},
+  {id:5, name:"Pinch",      kind:1, hsv:[55,255,200],  dpi:0,    locality:"Right half", bind:"PD_SLOT_5",       on:"Pointer · J",  axis:"Dominant axis"},
   {id:6, name:"",           kind:0, hsv:[0,0,0],       dpi:0,    locality:"Right half", bind:"PD_SLOT_6", on:"—"},
   {id:7, name:"",           kind:0, hsv:[0,0,0],       dpi:0,    locality:"Right half", bind:"PD_SLOT_7", on:"—"}
 ];
@@ -703,9 +703,9 @@ const BEHAVIOURS = {
     {n:3, tap:["KC_MNXT","tap sends"], long:["KC_MNXT","held until release"]},
     {n:4, tap:["KC_MPRV","tap sends"], long:["KC_MPRV","held until release"]}
   ]},
-  DRAGSCROLL: { key:"DRAGSCROLL", title:"Dragscroll", tapHold:0, multiTap:0, anchor:false, branches:[
+  PD_SLOT_0: { key:"PD_SLOT_0", title:"Dragscroll", tapHold:0, multiTap:0, anchor:false, branches:[
     {n:1, tap:["KC_TRNS","tap sends"]},
-    {n:2, hold:["DRAGSCROLL_LOCK","tap at hold threshold"]}
+    {n:2, hold:["PD_SLOT_0_LOCK","tap at hold threshold"]}
   ]},
   DRAG_WINDOW: { key:"DRAG_WINDOW", title:"Drag window", tapHold:100, multiTap:100, anchor:true, branches:[
     {n:1, tap:["KC_TRNS","tap sends"], hold:["MS_BTN6","held until release"]}
@@ -972,8 +972,8 @@ const KEY_LABELS = {
   KC_PPLS:"+", KC_PMNS:"−", KC_PEQL:"=", KC_PDOT:".", KC_UP:"↑", KC_DOWN:"↓", KC_LEFT:"←", KC_RGHT:"→",
   KC_MPLY:"Play", KC_MNXT:"Next", KC_MPRV:"Prev", KC_MUTE:"Mute", KC_TRNS:"▽",
   MS_BTN1:"LMB", MS_BTN2:"RMB", MS_BTN3:"MMB", MS_BTN6:"Btn6",
-  DRAGSCROLL:"Drag", DRAG_WINDOW:"Window", VOLUME_MODE:"Volume", BRIGHTNESS_MODE:"Bright",
-  ZOOM_MODE:"Zoom", ARROW_MODE:"Arrow", PINCH_MODE:"Pinch", CLICK_SPAM:"Spam",
+  PD_SLOT_0:"Drag", DRAG_WINDOW:"Window", PD_SLOT_1:"Volume", PD_SLOT_2:"Bright",
+  PD_SLOT_3:"Zoom", PD_SLOT_4:"Arrow", PD_SLOT_5:"Pinch", CLICK_SPAM:"Spam",
   LEFT_THUMB:"L thumb", RIGHT_THUMB:"R thumb", DPI_MOD:"DPI +", DPI_RMOD:"DPI −",
   S_D_MOD:"Snipe +", S_D_RMOD:"Snipe −"
 };
@@ -986,7 +986,7 @@ function keyFace(code) {
   if ((m = code.match(/^VIA_MACRO_(\d+)$/))) return {main: "M" + m[1], sub:"macro", kind:"macro"};
   if ((m = code.match(/^G\((\w+)\)$/))) return {main: "⌘" + face(m[1]), sub:"", kind:"mod"};
   if ((m = code.match(/^LSG\((\w+)\)$/))) return {main: "⇧⌘" + face(m[1]), sub:"", kind:"mod"};
-  if (BEHAVIOURS[code] || /MODE$|^DRAGSCROLL$|^DRAG_WINDOW$/.test(code)) return {main: face(code), sub:"", kind:"device"};
+  if (BEHAVIOURS[code] || /^PD_SLOT_[0-7]$|^DRAG_WINDOW$/.test(code)) return {main: face(code), sub:"", kind:"device"};
   return {main: face(code), sub:"", kind:"plain"};
 }
 function face(code) {

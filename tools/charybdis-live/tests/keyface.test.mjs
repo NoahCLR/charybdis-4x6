@@ -10,7 +10,7 @@ const {PD_BINDINGS} = createRequire(import.meta.url)("../core/data/pd-bindings.j
 const slotWith = (fields) => ({...fields, binding: PD_BINDINGS[fields.id]});
 
 test("visible macro keycodes use the VIA slot name for both QMK's named and unnamed values", () => {
-    const model = {qmkKeycodeAliases: {QK_MACRO_9: "VIA_MACRO_9", "0x773F": "VIA_MACRO_63", QK_USER_16: "DRAGSCROLL"}};
+    const model = {qmkKeycodeAliases: {QK_MACRO_9: "VIA_MACRO_9", "0x773F": "VIA_MACRO_63", QK_USER_16: "PD_SLOT_0"}};
     assert.equal(visibleKeycode(model, "QK_MACRO_9"), "VIA_MACRO_9");
     assert.equal(visibleKeycode(model, "0x773F"), "VIA_MACRO_63");
     assert.equal(visibleKeycode(model, "QK_USER_16"), "QK_USER_16", "other stored identities keep their existing display");
@@ -62,10 +62,10 @@ test("combos follow the device's own input positions before falling back to keyc
 });
 
 test("a branch action that sends a pointing mode reads as the mode, held or toggled", () => {
-    const model = {pdModes: [{id: 0, displayName: "Dragscroll", kind: 2, binding: {hold: "DRAGSCROLL", lock: "DRAGSCROLL_LOCK", holdCode: 0x7e50, lockCode: 0x7e56}}, {id: 6, name: "", kind: 0, binding: {hold: "PD_SLOT_6", lock: "PD_SLOT_6_LOCK", holdCode: 0x7ef0, lockCode: 0x7ef1}}]};
-    const hold = pointingAction(model, "DRAGSCROLL");
+    const model = {pdModes: [{id: 0, displayName: "Dragscroll", kind: 2, binding: {hold: "PD_SLOT_0", lock: "PD_SLOT_0_LOCK", holdCode: 0x7e50, lockCode: 0x7e56}}, {id: 6, name: "", kind: 0, binding: {hold: "PD_SLOT_6", lock: "PD_SLOT_6_LOCK", holdCode: 0x7ef0, lockCode: 0x7ef1}}]};
+    const hold = pointingAction(model, "PD_SLOT_0");
     assert.deepEqual([hold.slot.id, hold.name, hold.how, hold.empty], [0, "Dragscroll", "hold", false]);
-    assert.equal(pointingAction(model, "DRAGSCROLL_LOCK").how, "toggle");
+    assert.equal(pointingAction(model, "PD_SLOT_0_LOCK").how, "toggle");
     const empty = pointingAction(model, "PD_SLOT_6");
     assert.deepEqual([empty.name, empty.how, empty.empty], ["Slot 6", "hold", true], "an unnamed empty slot goes by its number");
     assert.equal(pointingAction(model, "0x7EF1").how, "toggle", "the lock keycode as a raw value too");
@@ -83,10 +83,10 @@ test("a branch action that plays a macro reads as the macro by the name it was g
 
 test("pointing modes and macros read as what they are; plain keycodes read as themselves", () => {
     const model = {
-        pdModes: [{id: 4, displayName: "Arrow", kind: 1, binding: {hold: "ARROW_MODE", lock: "ARROW_MODE_LOCK", holdCode: 0x7e54, lockCode: 0x7e5a}}],
+        pdModes: [{id: 4, displayName: "Arrow", kind: 1, binding: {hold: "PD_SLOT_4", lock: "PD_SLOT_4_LOCK", holdCode: 0x7e54, lockCode: 0x7e5a}}],
         viaMacros: [{keycode: "VIA_MACRO_2", name: "", empty: true}],
     };
-    const pd = namedAction(model, "ARROW_MODE_LOCK");
+    const pd = namedAction(model, "PD_SLOT_4_LOCK");
     assert.deepEqual([pd.kind, pd.word, pd.name, pd.tags], ["pointing", "pointing mode", "Arrow", ["toggle"]]);
     const macro = namedAction(model, "VIA_MACRO_2");
     assert.deepEqual([macro.kind, macro.word, macro.name, macro.tags], ["macro", "macro", "Macro 2", ["empty"]]);
@@ -96,9 +96,9 @@ test("pointing modes and macros read as what they are; plain keycodes read as th
 test("macro and pointing-mode keycodes resolve to the slots the keyboard reported", () => {
     assert.deepEqual(macroKeycodes("VIA_MACRO_11"), ["VIA_MACRO_11"]);
     assert.deepEqual(macroKeycodes("KC_A"), []);
-    const model = {pdModes: [{id: 0, name: "Dragscroll", kind: 2, binding: {hold: "DRAGSCROLL", lock: "DRAGSCROLL_LOCK", holdCode: 0x7e50, lockCode: 0x7e56}}, {id: 6, name: "", kind: 0, binding: {hold: "PD_SLOT_6", lock: "PD_SLOT_6_LOCK", holdCode: 0x7ef0, lockCode: 0x7ef1}}]};
-    assert.equal(pointingSlotFor(model, "DRAGSCROLL").name, "Dragscroll");
-    assert.equal(pointingSlotFor(model, "DRAGSCROLL_LOCK").name, "Dragscroll", "the lock keycode reaches the same slot");
+    const model = {pdModes: [{id: 0, name: "Dragscroll", kind: 2, binding: {hold: "PD_SLOT_0", lock: "PD_SLOT_0_LOCK", holdCode: 0x7e50, lockCode: 0x7e56}}, {id: 6, name: "", kind: 0, binding: {hold: "PD_SLOT_6", lock: "PD_SLOT_6_LOCK", holdCode: 0x7ef0, lockCode: 0x7ef1}}]};
+    assert.equal(pointingSlotFor(model, "PD_SLOT_0").name, "Dragscroll");
+    assert.equal(pointingSlotFor(model, "PD_SLOT_0_LOCK").name, "Dragscroll", "the lock keycode reaches the same slot");
     assert.equal(pointingSlotFor(model, "PD_SLOT_6").id, 6);
     assert.equal(pointingSlotFor(model, "KC_A"), undefined);
 });
@@ -116,17 +116,17 @@ test("what a key reaches is looked up by what its value means", () => {
     // plain user keycodes; every domain that refers back to them uses the
     // semantic name. A lookup that matched the stored name would find nothing.
     const model = {
-        keyBehaviors: [{keycode: "DRAGSCROLL", steps: [{tapCount: 1, hold: {action: "KC_ESC"}}]}],
+        keyBehaviors: [{keycode: "PD_SLOT_0", steps: [{tapCount: 1, hold: {action: "KC_ESC"}}]}],
         combos: [{badge: "C1", inputs: ["VIA_MACRO_0", "KC_F"], output: "KC_ESC"}],
-        pdModes: [{id: 0, name: "Dragscroll", kind: 2, binding: {hold: "DRAGSCROLL", lock: "DRAGSCROLL_LOCK", holdCode: 0x7e50, lockCode: 0x7e56}}],
+        pdModes: [{id: 0, name: "Dragscroll", kind: 2, binding: {hold: "PD_SLOT_0", lock: "PD_SLOT_0_LOCK", holdCode: 0x7e50, lockCode: 0x7e56}}],
     };
-    const pointingKey = {layoutIndex: 3, keycode: "QK_USER_16", semantic: "DRAGSCROLL"};
+    const pointingKey = {layoutIndex: 3, keycode: "QK_USER_16", semantic: "PD_SLOT_0"};
     const macroKey = {layoutIndex: 4, keycode: "QK_MACRO_0", semantic: "VIA_MACRO_0"};
 
-    assert.equal(keyMeaning(pointingKey), "DRAGSCROLL");
+    assert.equal(keyMeaning(pointingKey), "PD_SLOT_0");
     assert.equal(keyMeaning({keycode: "KC_A"}), "KC_A", "an ordinary key means itself");
     assert.equal(keyMeaning(undefined), "");
-    assert.equal(behaviourFor(model, keyMeaning(pointingKey)).keycode, "DRAGSCROLL");
+    assert.equal(behaviourFor(model, keyMeaning(pointingKey)).keycode, "PD_SLOT_0");
     assert.deepEqual(macroKeycodes(keyMeaning(macroKey)), ["VIA_MACRO_0"]);
     assert.equal(pointingSlotFor(model, keyMeaning(pointingKey)).name, "Dragscroll");
     assert.deepEqual(combosForKey(model, macroKey).map((combo) => combo.badge), ["C1"],
@@ -139,8 +139,8 @@ test("a pointing key is recognised as the keyboard names it, not only as the app
     // vocabulary never named. Both must reach the slot, or a bound key would
     // read as an ordinary key on the board and in the hover card.
     const model = {
-        pdModes: [{id: 0, name: "Dragscroll", kind: 2, binding: {hold: "DRAGSCROLL", lock: "DRAGSCROLL_LOCK", holdCode: 0x7e50, lockCode: 0x7e56}}, {id: 6, name: "", kind: 0, binding: {hold: "PD_SLOT_6", lock: "PD_SLOT_6_LOCK", holdCode: 0x7ef0, lockCode: 0x7ef1}}],
-        qmkKeycodeAliases: {QK_USER_16: "DRAGSCROLL", QK_USER_22: "DRAGSCROLL_LOCK", "0x7EF0": "PD_SLOT_6"},
+        pdModes: [{id: 0, name: "Dragscroll", kind: 2, binding: {hold: "PD_SLOT_0", lock: "PD_SLOT_0_LOCK", holdCode: 0x7e50, lockCode: 0x7e56}}, {id: 6, name: "", kind: 0, binding: {hold: "PD_SLOT_6", lock: "PD_SLOT_6_LOCK", holdCode: 0x7ef0, lockCode: 0x7ef1}}],
+        qmkKeycodeAliases: {QK_USER_16: "PD_SLOT_0", QK_USER_22: "PD_SLOT_0_LOCK", "0x7EF0": "PD_SLOT_6"},
     };
     assert.equal(pointingSlotFor(model, "QK_USER_16").name, "Dragscroll");
     assert.equal(pointingSlotFor(model, "QK_USER_22").name, "Dragscroll");
@@ -155,12 +155,12 @@ test("what still reaches a pointing slot is listed, so an inert key can be named
     const model = {
         layers: [
             {name: "Layer 0", displayName: "Base", positions: [
-                {layoutIndex: 3, keycode: "DRAGSCROLL"}, {layoutIndex: 4, keycode: "KC_A"}]},
+                {layoutIndex: 3, keycode: "PD_SLOT_0"}, {layoutIndex: 4, keycode: "KC_A"}]},
             {name: "Layer 3", displayName: "Navigation", positions: [
-                {layoutIndex: 3, keycode: "DRAGSCROLL_LOCK"}]},
+                {layoutIndex: 3, keycode: "PD_SLOT_0_LOCK"}]},
         ],
         keyBehaviors: [
-            {keycode: "LEFT_THUMB", steps: [{tapCount: 1, hold: {action: "DRAGSCROLL"}}]},
+            {keycode: "LEFT_THUMB", steps: [{tapCount: 1, hold: {action: "PD_SLOT_0"}}]},
             {keycode: "RIGHT_THUMB", steps: [{tapCount: 0, tap: {action: "KC_ESC"}}]},
         ],
     };
@@ -278,13 +278,13 @@ test("the view follows the exact previewed stack while the layer groups stay str
     const model = {
         keyBehaviors: [
             {keycode: "KC_B", steps: [{tapCount: 0, tap: {action: "VIA_MACRO_1"}}]},
-            {keycode: "KC_C", steps: [{tapCount: 0, hold: {action: "ARROW_MODE"}}]},
+            {keycode: "KC_C", steps: [{tapCount: 0, hold: {action: "PD_SLOT_4"}}]},
         ],
         combos: [
             {id: 1, inputs: ["KC_A", "KC_B"], output: "VIA_MACRO_2"},
             {id: 2, inputs: ["KC_C", "KC_B"], output: "VIA_MACRO_3"},
         ],
-        pdModes: [{id: 4, kind: 1, binding: {hold: "ARROW_MODE", lock: "ARROW_MODE_LOCK"}}],
+        pdModes: [{id: 4, kind: 1, binding: {hold: "PD_SLOT_4", lock: "PD_SLOT_4_LOCK"}}],
     };
     const macroNames = (held) => reachInView(model, stack, 2, held, macroKeycodes).map((entry) => entry.name);
     assert.deepEqual(behaviourGroups(model, stack, 2).here, [], "nothing is stored on Symbols");
@@ -356,11 +356,11 @@ test("a behaviour picked under one route rings only that route's keys", () => {
     const at = (layoutIndex, keycode) => ({layoutIndex, keycode, display: keycode});
     const model = {
         keyBehaviors: [{keycode: "KC_LEFT_GUI", steps: []}],
-        combos: [{id: 5, badge: "C6", inputs: ["MS_BTN1", "VOLUME_MODE"], output: "KC_LEFT_GUI"}],
+        combos: [{id: 5, badge: "C6", inputs: ["MS_BTN1", "PD_SLOT_1"], output: "KC_LEFT_GUI"}],
     };
     const stack = [
         {index: 0, name: "Base", positions: [at(48, "KC_LEFT_GUI"), at(30, "KC_N"), at(31, "KC_M")]},
-        {index: 4, name: "Pointing", positions: [at(48, "KC_TRANSPARENT"), at(30, "VOLUME_MODE"), at(31, "MS_BTN1")]},
+        {index: 4, name: "Pointing", positions: [at(48, "KC_TRANSPARENT"), at(30, "PD_SLOT_1"), at(31, "MS_BTN1")]},
     ];
     const groups = behaviourGroups(model, stack, 1);
     assert.deepEqual(groups.through.map((entry) => entry.row.keycode), ["KC_LEFT_GUI"], "listed under the transparent key");
@@ -447,8 +447,8 @@ test("a transparent key can be answered by any layer below that is held with thi
     assert.deepEqual(reachable.filter((entry) => entry.position.layoutIndex === 1)
         .map((entry) => [entry.position.keycode, entry.whileHeld]),
         [["KC_NO", true], ["KC_RIGHT_ALT", false]]);
-    const model = {keyBehaviors: [{keycode: "KC_RIGHT_ALT", steps: [{tapCount: 0, hold: {action: "ARROW_MODE"}}]}],
-        pdModes: [{id: 4, name: "Arrow", kind: 1, binding: {hold: "ARROW_MODE", lock: "ARROW_MODE_LOCK", holdCode: 0x7e54, lockCode: 0x7e5a}}]};
+    const model = {keyBehaviors: [{keycode: "KC_RIGHT_ALT", steps: [{tapCount: 0, hold: {action: "PD_SLOT_4"}}]}],
+        pdModes: [{id: 4, name: "Arrow", kind: 1, binding: {hold: "PD_SLOT_4", lock: "PD_SLOT_4_LOCK", holdCode: 0x7e54, lockCode: 0x7e5a}}]};
     assert.deepEqual(pointingReach(model, stack, 2).fromBranchesBelow.map((entry) => entry.name), ["4"],
         "so the behaviour on Base is reached, and the mode its branch sends with it");
 });
@@ -544,30 +544,30 @@ test("a branch keeps which of a pointing mode's two keycodes it sends", () => {
     // slot is right for saying which mode is reached, but the row has to keep
     // the difference or holding and toggling read the same.
     const model = {
-        pdModes: [{id: 0, name: "Dragscroll", kind: 2, binding: {hold: "DRAGSCROLL", lock: "DRAGSCROLL_LOCK", holdCode: 0x7e50, lockCode: 0x7e56}}],
+        pdModes: [{id: 0, name: "Dragscroll", kind: 2, binding: {hold: "PD_SLOT_0", lock: "PD_SLOT_0_LOCK", holdCode: 0x7e50, lockCode: 0x7e56}}],
         qmkKeycodeAliases: {},
-        keyBehaviors: [{keycode: "DRAGSCROLL", steps: [{tapCount: 0, hold: {action: "DRAGSCROLL_LOCK"}}]}],
+        keyBehaviors: [{keycode: "PD_SLOT_0", steps: [{tapCount: 0, hold: {action: "PD_SLOT_0_LOCK"}}]}],
     };
-    const stack = [{index: 0, name: "Base", positions: [{layoutIndex: 50, keycode: "DRAGSCROLL", display: "Dragscroll · hold"}]}];
+    const stack = [{index: 0, name: "Base", positions: [{layoutIndex: 50, keycode: "PD_SLOT_0", display: "Dragscroll · hold"}]}];
     const reach = pointingReach(model, stack, 0);
 
     assert.deepEqual(reach.onKeys.map((entry) => entry.name), ["0"], "the key holds the mode");
     assert.deepEqual(reach.fromBranches.map((entry) => entry.name), ["0"], "and its own behaviour toggles it");
     assert.deepEqual(reach.fromBranches[0].behaviours,
-        [{keycode: "DRAGSCROLL", action: "DRAGSCROLL_LOCK", layer: null, whileHeld: false}],
+        [{keycode: "PD_SLOT_0", action: "PD_SLOT_0_LOCK", layer: null, whileHeld: false}],
         "so the branch keeps the toggle keycode, not just the slot it lands on");
 });
 
 test("a picked key finds the behaviour it would collide with, whatever its spelling", () => {
     const model = {
         qmkKeycodeAliases: {KC_ENT: "KC_ENTER", KC_ENTER: "KC_ENTER", KC_SLSH: "KC_SLASH", KC_SLASH: "KC_SLASH"},
-        keyBehaviors: [{keycode: "KC_ENTER"}, {keycode: "LT(3,KC_SLASH)"}, {keycode: "DRAGSCROLL"}],
+        keyBehaviors: [{keycode: "KC_ENTER"}, {keycode: "LT(3,KC_SLASH)"}, {keycode: "PD_SLOT_0"}],
     };
     assert.equal(canonicalKeycode(model, "KC_ENT"), "KC_ENTER");
     assert.equal(canonicalKeycode(model, "LT(3, KC_SLSH)"), "LT(3,KC_SLASH)");
     assert.equal(behaviourListeningTo(model, "KC_ENT").keycode, "KC_ENTER");
     assert.equal(behaviourListeningTo(model, "LT(3, KC_SLSH)").keycode, "LT(3,KC_SLASH)");
-    assert.equal(behaviourListeningTo(model, "DRAGSCROLL").keycode, "DRAGSCROLL");
+    assert.equal(behaviourListeningTo(model, "PD_SLOT_0").keycode, "PD_SLOT_0");
     assert.equal(behaviourListeningTo(model, "KC_A"), undefined);
 });
 
@@ -785,8 +785,8 @@ test("a combo reaches the macro it sends, and what a behaviour it sends reaches"
 
 test("a combo reaches the pointing mode it sends", () => {
     const model = {
-        pdModes: [{id: 0, name: "Dragscroll", kind: 2, binding: {hold: "DRAGSCROLL", lock: "DRAGSCROLL_LOCK", holdCode: 0x7e50, lockCode: 0x7e56}}],
-        qmkKeycodeAliases: {QK_USER_16: "DRAGSCROLL"},
+        pdModes: [{id: 0, name: "Dragscroll", kind: 2, binding: {hold: "PD_SLOT_0", lock: "PD_SLOT_0_LOCK", holdCode: 0x7e50, lockCode: 0x7e56}}],
+        qmkKeycodeAliases: {QK_USER_16: "PD_SLOT_0"},
         combos: [{id: 0, badge: "C1", inputs: ["KC_J", "KC_K"], output: "QK_USER_16"}],
     };
     const stack = [{index: 0, name: "Base", positions: [{layoutIndex: 0, keycode: "KC_J"}, {layoutIndex: 1, keycode: "KC_K"}]}];

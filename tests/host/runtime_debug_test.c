@@ -545,22 +545,22 @@ const pd_mode_def_t pd_modes[PD_MODE_COUNT] = {
     [PD_MODE_INDEX_DRAGSCROLL] =
         {
             .mode_flag   = PD_MODE_DRAGSCROLL,
-            .keycode     = DRAGSCROLL,
-            .lock_action = DRAGSCROLL_LOCK,
+            .keycode     = PD_SLOT_0,
+            .lock_action = PD_SLOT_0_LOCK,
             .traits      = PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED | PD_MODE_TRAIT_LOCK_OWNS_AUTO_MOUSE_TOGGLE,
         },
     [PD_MODE_INDEX_VOLUME] =
         {
             .mode_flag   = PD_MODE_VOLUME,
-            .keycode     = VOLUME_MODE,
-            .lock_action = VOLUME_MODE_LOCK,
+            .keycode     = PD_SLOT_1,
+            .lock_action = PD_SLOT_1_LOCK,
             .traits      = PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED,
         },
     [PD_MODE_INDEX_ARROW] =
         {
             .mode_flag   = PD_MODE_ARROW,
-            .keycode     = ARROW_MODE,
-            .lock_action = ARROW_MODE_LOCK,
+            .keycode     = PD_SLOT_4,
+            .lock_action = PD_SLOT_4_LOCK,
             .traits      = PD_MODE_TRAIT_PREFER_TYPING_LAYER,
         },
 };
@@ -602,15 +602,15 @@ bool is_keyboard_master(void) {
 }
 
 pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
-    if (keycode == DRAGSCROLL) {
+    if (keycode == PD_SLOT_0) {
         return PD_MODE_DRAGSCROLL;
     }
 
-    if (keycode == VOLUME_MODE) {
+    if (keycode == PD_SLOT_1) {
         return PD_MODE_VOLUME;
     }
 
-    if (keycode == ARROW_MODE) {
+    if (keycode == PD_SLOT_4) {
         return PD_MODE_ARROW;
     }
 
@@ -2622,7 +2622,7 @@ static void test_key_runtime_core_pd_mode_press_creates_active_mode_and_pointer_
     test_reset_stubs();
     noah_runtime_reset_for_test();
 
-    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, VOLUME_MODE, key_pos, fake_time);
+    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, PD_SLOT_1, key_pos, fake_time);
 
     shadow = key_runtime_core_shadow_projection();
     CHECK(shadow != NULL);
@@ -2640,7 +2640,7 @@ static void test_key_runtime_core_pd_mode_press_creates_active_mode_and_pointer_
     CHECK(snapshot.core_lease_count == 2u);
 
     fake_time = (uint16_t)(fake_time + 10u);
-    CHECK(!test_process_record(VOLUME_MODE, key_pos, false));
+    CHECK(!test_process_record(PD_SLOT_1, key_pos, false));
     shadow = key_runtime_core_shadow_projection();
     CHECK(shadow->pd_mode_local_active == 0);
     CHECK(!shadow->pointer_anchor_active);
@@ -2654,7 +2654,7 @@ static void test_key_runtime_core_arrow_mode_prefers_typing_without_pointer_anch
     test_reset_stubs();
     noah_runtime_reset_for_test();
 
-    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, ARROW_MODE, key_pos, fake_time);
+    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, PD_SLOT_4, key_pos, fake_time);
 
     shadow = key_runtime_core_shadow_projection();
     CHECK(shadow != NULL);
@@ -2722,13 +2722,13 @@ static void test_key_runtime_core_activating_new_pd_mode_clears_foreign_mode_lea
     test_reset_stubs();
     noah_runtime_reset_for_test();
 
-    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, VOLUME_MODE, volume_pos, fake_time);
+    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, PD_SLOT_1, volume_pos, fake_time);
     shadow = key_runtime_core_shadow_projection();
     CHECK(shadow != NULL);
     CHECK(shadow->pd_mode_local_active == PD_MODE_VOLUME);
     CHECK(shadow->pointer_anchor_active);
 
-    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, ARROW_MODE, arrow_pos, fake_time);
+    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, PD_SLOT_4, arrow_pos, fake_time);
     shadow = key_runtime_core_shadow_projection();
     CHECK(shadow->pd_mode_local_active == PD_MODE_ARROW);
     CHECK(!shadow->pointer_anchor_active);
@@ -2739,7 +2739,7 @@ static void test_key_runtime_core_activating_new_pd_mode_clears_foreign_mode_lea
     CHECK(snapshot.core_lease_count == 1u);
 
     fake_time = (uint16_t)(fake_time + 5u);
-    CHECK(!test_process_record(VOLUME_MODE, volume_pos, false));
+    CHECK(!test_process_record(PD_SLOT_1, volume_pos, false));
     shadow = key_runtime_core_shadow_projection();
     CHECK(shadow->pd_mode_local_active == PD_MODE_ARROW);
     CHECK(shadow->pointer_prefers_typing_layer);

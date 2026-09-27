@@ -279,7 +279,7 @@ for a single tap on a multi-tap row is therefore *your press duration + 151*.
 
 Eleven authored rows carry a multi-tap branch, so every single tap on them waits
 that window: `KC_ESC`, `KC_LEFT_GUI`, `LT(LAYER_NAV,KC_SLSH)`, `G(KC_C)`,
-`G(KC_V)`, `MS_BTN3`, `PINCH_MODE`, `VOLUME_MODE`, `DRAGSCROLL`, `LEFT_THUMB`,
+`G(KC_V)`, `MS_BTN3`, `PD_SLOT_5`, `PD_SLOT_1`, `PD_SLOT_0`, `LEFT_THUMB`,
 `RIGHT_THUMB`. A row with only `tap_counts[0]` has no window and fires
 immediately.
 

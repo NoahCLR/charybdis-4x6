@@ -59,7 +59,7 @@ const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
 };
 
 const pd_mode_def_t pd_modes[PD_MODE_COUNT] = {
-    [PD_MODE_INDEX_DRAGSCROLL] = {.mode_flag = PD_MODE_DRAGSCROLL, .keycode = DRAGSCROLL}, [PD_MODE_INDEX_VOLUME] = {.mode_flag = PD_MODE_VOLUME, .keycode = VOLUME_MODE}, [PD_MODE_INDEX_BRIGHTNESS] = {.mode_flag = PD_MODE_BRIGHTNESS, .keycode = BRIGHTNESS_MODE}, [PD_MODE_INDEX_ZOOM] = {.mode_flag = PD_MODE_ZOOM, .keycode = ZOOM_MODE}, [PD_MODE_INDEX_ARROW] = {.mode_flag = PD_MODE_ARROW, .keycode = ARROW_MODE}, [PD_MODE_INDEX_PINCH] = {.mode_flag = PD_MODE_PINCH, .keycode = PINCH_MODE},
+    [PD_MODE_INDEX_DRAGSCROLL] = {.mode_flag = PD_MODE_DRAGSCROLL, .keycode = PD_SLOT_0}, [PD_MODE_INDEX_VOLUME] = {.mode_flag = PD_MODE_VOLUME, .keycode = PD_SLOT_1}, [PD_MODE_INDEX_BRIGHTNESS] = {.mode_flag = PD_MODE_BRIGHTNESS, .keycode = PD_SLOT_2}, [PD_MODE_INDEX_ZOOM] = {.mode_flag = PD_MODE_ZOOM, .keycode = PD_SLOT_3}, [PD_MODE_INDEX_ARROW] = {.mode_flag = PD_MODE_ARROW, .keycode = PD_SLOT_4}, [PD_MODE_INDEX_PINCH] = {.mode_flag = PD_MODE_PINCH, .keycode = PD_SLOT_5},
 };
 
 static void test_fail(const char *expr, const char *file, int line) {

@@ -281,7 +281,7 @@ Use rows like:
 { .pointing_mode = PD_MODE_ZOOM, .color = HSV(70, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .locality = RGB_KEYS_ONLY },
 ```
 
-Use this table when you want `ARROW_MODE`, `VOLUME_MODE`, `PINCH_MODE`, and the
+Use this table when you want `PD_SLOT_4`, `PD_SLOT_1`, `PD_SLOT_5`, and the
 other pd modes to have distinct overlay colors and placement.
 
 ### `pd_mode_led_groups`

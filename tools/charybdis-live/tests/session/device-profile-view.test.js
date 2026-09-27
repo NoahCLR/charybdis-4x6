@@ -9,8 +9,8 @@ const keycodes = require("../../core/data/keycode-catalog");
 
 test("every v1 semantic action has an explicit display, including unknown numeric keycodes", () => {
     const cases = [[0, 0, "KC_NO"], [1, 4, "KC_A"], [1, 0xfffe, "0xFFFE"], [2, 0, "MO(0)"],
-        [3, 4, "LOCK_LAYER(4)"], [4, 0, "DRAGSCROLL"], [4, 5, "PINCH_MODE"],
-        [5, 0, "DRAGSCROLL_LOCK"], [5, 2, "BRIGHTNESS_MODE_LOCK"], [6, 0, "VIA_MACRO_0"], [7, 15, "MACRO_15"]];
+        [3, 4, "LOCK_LAYER(4)"], [4, 0, "PD_SLOT_0"], [4, 5, "PD_SLOT_5"],
+        [5, 0, "PD_SLOT_0_LOCK"], [5, 2, "PD_SLOT_2_LOCK"], [6, 0, "VIA_MACRO_0"], [7, 15, "MACRO_15"]];
     for (const [kind, operand, name] of cases) assert.equal(actionName({kind, flags: 0, operand}), name);
     assert.throws(() => actionName({kind: 8, operand: 0}), /Unsupported/);
 });

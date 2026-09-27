@@ -456,8 +456,18 @@ const QMK_KEY_LABELS = {
     KC_ASTR: "*",
     KC_LPRN: "(",
     KC_RPRN: ")",
-    DRAGSCROLL: "Dragscroll",
-    DRAGSCROLL_LOCK: "Dragscroll Lock",
+    PD_SLOT_0: "Dragscroll",
+    PD_SLOT_0_LOCK: "Dragscroll Lock",
+    PD_SLOT_1: "Volume",
+    PD_SLOT_1_LOCK: "Volume Lock",
+    PD_SLOT_2: "Brightness",
+    PD_SLOT_2_LOCK: "Brightness Lock",
+    PD_SLOT_3: "Zoom",
+    PD_SLOT_3_LOCK: "Zoom Lock",
+    PD_SLOT_4: "Arrow",
+    PD_SLOT_4_LOCK: "Arrow Lock",
+    PD_SLOT_5: "Pinch",
+    PD_SLOT_5_LOCK: "Pinch Lock",
 };
 const SHIFTED_KEY_OUTPUT_LABELS = {
     KC_GRV: "~",
@@ -11534,17 +11544,19 @@ function getClientScript() {
     }
 
     function looksLikePdMode(keycode) {
-        return /(^|_)MODE(_LOCK)?$/.test(keycode) || keycode === "DRAGSCROLL" || keycode === "DRAGSCROLL_LOCK";
+        return /^PD_SLOT_[0-7](_LOCK)?$/.test(keycode) || /(^|_)MODE(_LOCK)?$/.test(keycode) || keycode === "DRAGSCROLL" || keycode === "DRAGSCROLL_LOCK";
     }
 
     function pdModeNameForKeycode(keycode) {
+        const slot = /^PD_SLOT_([0-7])(_LOCK)?$/.exec(keycode || "");
+        if (slot) return ["PD_MODE_DRAGSCROLL", "PD_MODE_VOLUME", "PD_MODE_BRIGHTNESS", "PD_MODE_ZOOM", "PD_MODE_ARROW", "PD_MODE_PINCH", "PD_MODE_SLOT_6", "PD_MODE_SLOT_7"][Number(slot[1])];
         if (keycode === "DRAGSCROLL" || keycode === "DRAGSCROLL_LOCK") return "PD_MODE_DRAGSCROLL";
         const base = keycode.replace(/_MODE_LOCK$/, "").replace(/_MODE$/, "").replace(/_LOCK$/, "");
         return "PD_MODE_" + base;
     }
 
     function isPdModeLockKeycode(keycode) {
-        return /_MODE_LOCK$/.test(keycode || "") || keycode === "DRAGSCROLL_LOCK";
+        return /_LOCK$/.test(keycode || "");
     }
 
     function colorForPdMode(mode) {

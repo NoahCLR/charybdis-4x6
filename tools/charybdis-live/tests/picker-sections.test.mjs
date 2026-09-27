@@ -46,7 +46,7 @@ test("curated picker sections route representative keycodes", () => {
     assert.equal(pickable({value: "QK_MACRO_9", group: "macro"}), false);
 });
 
-test("Charybdis's own drag scroll is offered nowhere; the DRAGSCROLL pointing mode is drag scroll", () => {
+test("Charybdis's own drag scroll is offered nowhere; the PD_SLOT_0 pointing mode is drag scroll", () => {
     for (const section of pickerSections()) {
         const offered = entriesForPickerSection(catalogue, section).map((entry) => entry.value);
         assert.ok(!offered.includes("DRGSCRL") && !offered.includes("DRG_TOG"), section.id);

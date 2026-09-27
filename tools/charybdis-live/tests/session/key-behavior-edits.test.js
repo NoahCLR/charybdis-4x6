@@ -63,11 +63,11 @@ test("simple additions and all hold modes produce canonical rows", () => {
 });
 
 test("native aliases update existing semantic targets without duplicating or renumbering them", () => {
-    const row = views.find(row => row.keycode === "DRAGSCROLL");
+    const row = views.find(row => row.keycode === "PD_SLOT_0");
     const result = edit({type: "saveBehavior", behavior: {...row, keycode: "QK_USER_16", tapHoldTerm: "125"}});
     assert.equal(decodeKeyBehaviorDomain(result).rowCount, original.rowCount);
-    assert.equal(rowFor(result, "DRAGSCROLL").target.kind, 4);
-    assert.equal(rowFor(result, "DRAGSCROLL").tapHoldTerm, 125);
+    assert.equal(rowFor(result, "PD_SLOT_0").target.kind, 4);
+    assert.equal(rowFor(result, "PD_SLOT_0").tapHoldTerm, 125);
     assert.throws(() => edit({type: "addBehavior", behavior: {...form(), keycode: "QK_USER_16"}}), /already/);
     const anchored = views.find(row => row.keepsAutoMouseAnchored);
     const {keepsAutoMouseAnchored, ...withoutFlag} = anchored;

@@ -213,7 +213,7 @@
   </g>
   <g transform="rotate(0 925.0 353.0)">
     <rect x="896.0" y="324.0" width="58" height="58" rx="7" fill="#3c00ff" stroke="#2000e3" stroke-width="1.5" filter="url(#shadow)"/>
-    <text x="925.0" y="360.0" fill="#f7f7f4" fill-opacity="1.00" font-size="8.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600" textLength="48.0" lengthAdjust="spacingAndGlyphs">DRAGSCROLL</text>
+    <text x="925.0" y="360.0" fill="#f7f7f4" fill-opacity="1.00" font-size="8.0" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600">PD_SLOT_0</text>
     <circle cx="920.2" cy="331.5" r="3.8" fill="#ffffff" stroke="#f7f7f4" stroke-width="1.1"/>
     <circle cx="929.8" cy="331.5" r="3.8" fill="#ff6c00" stroke="#f7f7f4" stroke-width="1.1"/>
   </g>

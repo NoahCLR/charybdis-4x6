@@ -132,7 +132,7 @@ the header's short name (`DRGSCRL`), with the long name and `QK_KB_n` kept as
 aliases. The `QK_KB` range is fixed by QMK and the keyboard code, not by the
 userspace action ABI, so these keys need no matching vocabulary. Their drag
 scroll is the keyboard code's own, at a fixed `CHARYBDIS_DRAGSCROLL_DPI`, which
-the Pointing modes settings do not reach. Drag scroll is the `DRAGSCROLL`
+the Pointing modes settings do not reach. Drag scroll is the `PD_SLOT_0`
 pointing mode, so the picker does not offer `DRGSCRL` or `DRG_TOG`; a key
 already holding one still reads back as "Built-in drag scroll".
 
@@ -903,3 +903,15 @@ are still needed; flashing the schema-2 pair does not migrate an old committed
 profile in place. Historical profile readers and portable migration remain for
 files that already carry the required source evidence. The active pointing
 contract is [PD-mode domain v1](architecture/pd-mode-domain-v1.md).
+
+### D-L41 — Pointing keycodes name slots, not factory presets
+
+The eight configurable pointing modes use one keycode vocabulary:
+`PD_SLOT_n` for hold and `PD_SLOT_n_LOCK` for toggle. The original six
+factory preset names are no longer firmware keycode symbols. Slot assignment
+is stable, and the first six keycodes keep their deployed numeric values;
+the schema-2 firmware, stored profiles and action ABI do not change when
+the symbols change. Charybdis Live reads each slot's current name and behavior
+from the device and keeps former preset expressions as import aliases for
+older portable files. See the [PD-mode domain contract](architecture/pd-mode-domain-v1.md)
+for the fixed native values.

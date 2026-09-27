@@ -13,6 +13,9 @@ The [PD-mode domain contract](architecture/pd-mode-domain-v1.md) specifies the
 eight configurable slots and the remaining hardware acceptance checks. Side-specific schema-2 firmware exposes eight slots in
 Charybdis Live → Pointing modes. The six defaults below are records in those
 slots, followed by two empty slots; their names do not select special code.
+The `PD_SLOT_n` keycodes select slots, while the named behavior in this
+document describes the shipped factory profile. Editing a slot can change
+that behavior without changing its keycode.
 
 Use an empty slot to create directional key/shortcut actions or a scrolling
 mode, or duplicate an existing slot. The normal path is name, movement type,
@@ -62,7 +65,7 @@ One important non-rule:
 
 ### Bounded discrete output
 
-`ARROW_MODE`, `ZOOM_MODE`, `VOLUME_MODE`, and `BRIGHTNESS_MODE` convert motion
+In the factory profile, `PD_SLOT_4`, `PD_SLOT_3`, `PD_SLOT_1`, and `PD_SLOT_2` convert motion
 to synthetic key taps. They share one overload policy:
 
 - one successful pointing poll emits at most four taps
@@ -74,7 +77,7 @@ to synthetic key taps. They share one overload policy:
 - reversing direction or leaving the mode clears obsolete retained work
 
 At the configured limits, a saturated backlog drains in no more than eight
-successful polls. `DRAGSCROLL` and `PINCH_MODE` produce wheel reports through a
+successful polls. `PD_SLOT_0` and `PD_SLOT_5` produce wheel reports through a
 different gesture handler and do not use this tap backlog.
 
 ## Pointer-Layer Policy
@@ -82,13 +85,15 @@ different gesture handler and do not use this tap backlog.
 The shared pointer-layer policy is separate from the raw mode handlers, but it
 changes how the modes feel in practice.
 
-- non-arrow modes can keep the configured auto-mouse layer anchored while
-  active or locked
-- when `ARROW_MODE` is not active, the auto-mouse layer is allowed to overlap
+- modes configured to keep auto mouse anchored can keep the configured
+  auto-mouse layer anchored while active or locked
+- when no active mode is configured to prefer the typing layer, the auto-mouse
+  layer is allowed to overlap
   other active keyboard layers instead of being forced off underneath them,
   except for the configured auto-sniping layer, which keeps precedence over a
   separate auto-mouse layer
-- `ARROW_MODE` prefers staying on the current typing or navigation surface
+- a mode configured to prefer the typing layer, such as the factory Arrow
+  record in `PD_SLOT_4`, stays on the current typing or navigation surface
   instead of forcing the pointer layer back underneath it
 - this policy follows pd-mode state itself, so it behaves the same whether the
   mode was entered by a plain mode key, an authored `key_behaviors[]` row, or
@@ -120,18 +125,18 @@ locks keep using that toggle.
 
 ## Mode Reference
 
-| Mode | Raw behavior | Notable side effects |
+| Factory slot | Raw behavior | Notable side effects |
 | --- | --- | --- |
-| `DRAGSCROLL` | trackball motion becomes scrolling instead of cursor movement | uses the local dragscroll handler while active |
-| `PINCH_MODE` | same scroll path as `DRAGSCROLL`, but with an owned real left `Cmd` hold | uses the local dragscroll handler and holds left `Cmd` while active |
-| `ZOOM_MODE` | vertical trackball motion sends `Cmd+=` / `Cmd+-` taps | no dragscroll; explicit keyboard zoom |
-| `ARROW_MODE` | dominant trackball motion emits arrow key taps instead of moving the cursor | repurposes mouse buttons for selection/copy/paste |
-| `VOLUME_MODE` | vertical trackball motion changes system volume in steps | no extra side effects |
-| `BRIGHTNESS_MODE` | vertical trackball motion changes display brightness in steps | no extra side effects |
+| `PD_SLOT_0` | trackball motion becomes scrolling instead of cursor movement | uses the local dragscroll handler while active |
+| `PD_SLOT_5` | same scroll path as `PD_SLOT_0`, but with an owned real left `Cmd` hold | uses the local dragscroll handler and holds left `Cmd` while active |
+| `PD_SLOT_3` | vertical trackball motion sends `Cmd+=` / `Cmd+-` taps | no dragscroll; explicit keyboard zoom |
+| `PD_SLOT_4` | dominant trackball motion emits arrow key taps instead of moving the cursor | repurposes mouse buttons for selection/copy/paste |
+| `PD_SLOT_1` | vertical trackball motion changes system volume in steps | no extra side effects |
+| `PD_SLOT_2` | vertical trackball motion changes display brightness in steps | no extra side effects |
 
-## DRAGSCROLL
+## Dragscroll (`PD_SLOT_0`)
 
-`DRAGSCROLL` is the basic scroll mode.
+`PD_SLOT_0` is the basic scroll mode.
 
 While active:
 
@@ -148,26 +153,26 @@ While active:
 
 This is the base mode that scroll-like modes build on.
 
-## PINCH_MODE
+## Pinch (`PD_SLOT_5`)
 
-`PINCH_MODE` is the scroll-with-modifier mode.
+`PD_SLOT_5` is the scroll-with-modifier mode.
 
 While active:
 
 - the cursor stays frozen
-- the same local dragscroll handler as `DRAGSCROLL` is active
+- the same local dragscroll handler as `PD_SLOT_0` is active
 - left `Cmd` is held through the same owned real-mod path as other runtime modifiers
 - the ball is effectively producing command-scroll input
 
 On macOS, [BetterMouse](https://better-mouse.com/) can turn that
 command-scroll path into pinch-style zoom. That BetterMouse dependency applies
-to `PINCH_MODE`, not to `ZOOM_MODE`.
+to `PD_SLOT_5`, not to `PD_SLOT_3`.
 
-Without BetterMouse, `PINCH_MODE` is still just command-modified scrolling.
+Without BetterMouse, `PD_SLOT_5` is still just command-modified scrolling.
 
-## ZOOM_MODE
+## Zoom (`PD_SLOT_3`)
 
-`ZOOM_MODE` is the explicit keyboard-zoom mode.
+`PD_SLOT_3` is the explicit keyboard-zoom mode.
 
 While active:
 
@@ -179,9 +184,9 @@ While active:
 This mode does not depend on BetterMouse. It is direct key-based zoom, not
 scroll-based pinch emulation.
 
-## ARROW_MODE
+## Arrow (`PD_SLOT_4`)
 
-`ARROW_MODE` turns the trackball into directional navigation.
+`PD_SLOT_4` turns the trackball into directional navigation.
 
 While active:
 
@@ -201,12 +206,12 @@ It also remaps mouse buttons while active:
 - `MS_BTN2`: copy
 - `MS_BTN3`: paste
 
-This makes `ARROW_MODE` more than a motion remap; it becomes a small editing
+This makes `PD_SLOT_4` more than a motion remap; it becomes a small editing
 tool with supporting button behavior.
 
-## VOLUME_MODE
+## Volume (`PD_SLOT_1`)
 
-`VOLUME_MODE` turns vertical motion into audio volume changes.
+`PD_SLOT_1` turns vertical motion into audio volume changes.
 
 While active:
 
@@ -216,9 +221,9 @@ While active:
 - motion is accumulated and emitted in discrete steps
 - large motion follows the shared bounded discrete-output policy
 
-## BRIGHTNESS_MODE
+## Brightness (`PD_SLOT_2`)
 
-`BRIGHTNESS_MODE` turns vertical motion into display brightness changes.
+`PD_SLOT_2` turns vertical motion into display brightness changes.
 
 While active:
 

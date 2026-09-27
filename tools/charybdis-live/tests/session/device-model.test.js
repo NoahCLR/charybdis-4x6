@@ -44,7 +44,7 @@ test("device shortcut labels stay complete and semantic names require the advert
         committed: decodedDeviceProfile(), capabilities: {actionAbiDigest: 0xdcb00959},
     };
     const model = buildDeviceModel(state);
-    assert.deepEqual(model.layers[0].positions.map(key => key.display), ["Cmd+C", "Shift+Cmd+Z", "Dragscroll", "Lock Layer 5", "Lock Layer 6"],
+    assert.deepEqual(model.layers[0].positions.map(key => key.display), ["Cmd+C", "Shift+Cmd+Z", "Pd slot 0", "Lock Layer 5", "Lock Layer 6"],
         "a layer lock is a user slot under the native ABI, named by what it does to which layer");
     assert.equal(model.layers[0].positions[2].keycode, "QK_USER_16", "the editable identity still encodes to the original numeric value");
     assert.equal(buildDeviceModel({...state, capabilities: {}}).layers[0].positions[2].display, "User 16");
@@ -63,7 +63,7 @@ test("a position carries what its value means, not only what the keyboard calls 
         macroView: {viaMacros: [{keycode: "VIA_MACRO_0", kind: "via", name: "Sign-off"}]},
     });
     assert.deepEqual(model.layers[0].positions.map((key) => [key.keycode, key.semantic]), [
-        ["QK_USER_16", "DRAGSCROLL"], ["QK_MACRO_0", "VIA_MACRO_0"], ["KC_A", "KC_A"]]);
+        ["QK_USER_16", "PD_SLOT_0"], ["QK_MACRO_0", "VIA_MACRO_0"], ["KC_A", "KC_A"]]);
     assert.equal(model.qmkKeyLabels.QK_MACRO_0, "Sign-off", "a named macro is labelled by its name");
 });
 

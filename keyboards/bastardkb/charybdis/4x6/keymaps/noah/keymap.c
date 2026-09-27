@@ -134,7 +134,7 @@ enum keymap_custom_keycodes {
 //
 // Valid combo outputs include plain keycodes, hardcoded macros (MACRO_n),
 // VIA macros (VIA_MACRO_n), LOCK_LAYER(...), explicit pd-mode lock keycodes
-// such as ARROW_MODE_LOCK, and keycodes that also have rows in key_behaviors[].
+// such as PD_SLOT_4_LOCK, and keycodes that also have rows in key_behaviors[].
 //
 // If a combo emits a keycode that also has a row in key_behaviors[],
 // that emitted key can reuse the same custom behavior handling.
@@ -159,12 +159,12 @@ enum keymap_custom_keycodes {
     COMBO(CLICK_SPAM, (MS_BTN1, MS_BTN2))            \
     COMBO(KC_LEFT_GUI, (KC_N, KC_M))                 \
     COMBO(G(KC_T), (KC_N, KC_M, KC_COMM))            \
-    COMBO(G(KC_T), (VOLUME_MODE, MS_BTN1, MS_BTN2))  \
-    COMBO(KC_LGUI, (MS_BTN1, VOLUME_MODE))           \
+    COMBO(G(KC_T), (PD_SLOT_1, MS_BTN1, MS_BTN2))    \
+    COMBO(KC_LGUI, (MS_BTN1, PD_SLOT_1))             \
     COMBO(G(KC_A), (G(KC_C), G(KC_V)))               \
     /* COMBO(VIA_MACRO_0, (KC_U, KC_I)) */           \
     /* COMBO(LOCK_LAYER(LAYER_NAV), (KC_J, KC_K)) */ \
-    /* COMBO(ARROW_MODE_LOCK, (KC_M, KC_COMM)) */    \
+    /* COMBO(PD_SLOT_4_LOCK, (KC_M, KC_COMM)) */     \
     /* COMBO(..., (...)) */                          \
     /* ... */
 
@@ -370,7 +370,7 @@ const key_behavior_t
             // ─── Editing / System Keys ───────────────────────────────────────────────────────
             {.keycode = KC_ESC, .tap_counts = {[0] = {.long_hold = TAP_AT_HOLD_THRESHOLD(LAG(KC_ESC))}, [1] = {.tap = TAP_SENDS(S(KC_GRV))}}},
             {.keycode = KC_LEFT_SHIFT, .tap_counts = {[0] = {.tap = TAP_SENDS(KC_CAPS)}}},
-            {.keycode = KC_RIGHT_ALT, .tap_counts = {[0] = {.tap = TAP_SENDS(ARROW_MODE_LOCK)}}},
+            {.keycode = KC_RIGHT_ALT, .tap_counts = {[0] = {.tap = TAP_SENDS(PD_SLOT_4_LOCK)}}},
             {.keycode = KC_ENT, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(S(KC_ENT))}}},
             {.keycode = KC_LEFT_GUI, .tap_counts = {[1] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_LEFT_ALT)}, [2] = {.tap = TAP_SENDS(OSM(MOD_LSFT))}}},
 
@@ -387,24 +387,24 @@ const key_behavior_t
             {.keycode = MS_BTN3, .multi_tap_term = 100, .tap_hold_term = 100, .tap_counts = {[1] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(MS_BTN7)}}},
 
             // ─── Pointer-Mode Keys ──────────────────────────────────────────────────────────
-            {.keycode = BRIGHTNESS_MODE, .tap_counts = {[0] = {.tap = TAP_SENDS(KC_TRNS)}}},
+            {.keycode = PD_SLOT_2, .tap_counts = {[0] = {.tap = TAP_SENDS(KC_TRNS)}}},
             {
-                .keycode = PINCH_MODE,
+                .keycode = PD_SLOT_5,
                 .tap_counts =
                     {
                         [0] = {.tap = TAP_SENDS(KC_TRNS)},
-                        [1] = {.tap = TAP_SENDS(VIA_MACRO_6), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(ZOOM_MODE)},
+                        [1] = {.tap = TAP_SENDS(VIA_MACRO_6), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(PD_SLOT_3)},
                     },
             },
-            {.keycode = VOLUME_MODE, .tap_counts = {[0] = {.tap = TAP_SENDS(KC_TRNS)}, [1] = {.tap = TAP_SENDS(KC_MUTE)}}},
+            {.keycode = PD_SLOT_1, .tap_counts = {[0] = {.tap = TAP_SENDS(KC_TRNS)}, [1] = {.tap = TAP_SENDS(KC_MUTE)}}},
 
             // Dragscroll: single tap '.', hold = momentary, double-tap hold = lock.
             {
-                .keycode = DRAGSCROLL,
+                .keycode = PD_SLOT_0,
                 .tap_counts =
                     {
                         [0] = {.tap = TAP_SENDS(KC_TRNS)},
-                        [1] = {.hold = TAP_AT_HOLD_THRESHOLD(DRAGSCROLL_LOCK)},
+                        [1] = {.hold = TAP_AT_HOLD_THRESHOLD(PD_SLOT_0_LOCK)},
                     },
             },
 
@@ -526,7 +526,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
             KC_LEFT_SHIFT,         LSG(KC_Z),           _______,           G(KC_C),           _______,           _______,          VIA_MACRO_1,           KC_LEFT,           KC_DOWN,           KC_RGHT,           _______,           _______,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-              KC_LEFT_ALT,           G(KC_Z),           G(KC_X),           G(KC_V),           _______,           _______,          VIA_MACRO_0,           MS_BTN1,           MS_BTN2,        DRAGSCROLL,           _______,           _______,
+              KC_LEFT_ALT,           G(KC_Z),           G(KC_X),           G(KC_V),           _______,           _______,          VIA_MACRO_0,           MS_BTN1,           MS_BTN2,         PD_SLOT_0,           _______,           _______,
   // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
                                                                            _______,           _______,           _______,              _______,           _______,
                                                                                               _______,           _______,              _______
@@ -539,9 +539,9 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
                   _______,           _______,           _______,           _______,           _______,           _______,              _______,           _______,           _______,           _______,           _______,           _______,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                  _______,           _______,           _______,           _______,           _______,           _______,      BRIGHTNESS_MODE,        PINCH_MODE,           MS_BTN3,       DRAG_WINDOW,           _______,           _______,
+                  _______,           _______,           _______,           _______,           _______,           _______,            PD_SLOT_2,         PD_SLOT_5,           MS_BTN3,       DRAG_WINDOW,           _______,           _______,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                  _______,           _______,           _______,           _______,           _______,           _______,          VOLUME_MODE,           MS_BTN1,           MS_BTN2,        DRAGSCROLL,           _______,           _______,
+                  _______,           _______,           _______,           _______,           _______,           _______,            PD_SLOT_1,           MS_BTN1,           MS_BTN2,         PD_SLOT_0,           _______,           _______,
   // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
                                                                          _______,  LT(LAYER_NUM,KC_SPC),         _______,              _______,           _______,
                                                                                               _______,           _______,              _______

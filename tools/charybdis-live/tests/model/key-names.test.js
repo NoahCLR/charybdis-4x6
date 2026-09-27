@@ -6,13 +6,13 @@ const {decodedDeviceProfile} = require("../fixtures/device-profile");
 const keycodes = require("../../core/data/keycode-catalog");
 const {PD_BINDINGS} = require("../../core/data/pd-bindings");
 
-const DRAGSCROLL = PD_BINDINGS[0].holdCode;
+const PD_SLOT_0 = PD_BINDINGS[0].holdCode;
 
 test("semantic target aliases link the native ABI and stay absent for an unknown one", () => {
     const behaviors = decodedDeviceProfile().domains.keyBehaviors.rows;
     const {aliases} = profileKeyNames({behaviors, actionsKnown: true});
-    assert.equal(aliases[keycodes.resolve(DRAGSCROLL).name], "DRAGSCROLL");
-    assert.equal(aliases[keycodes.resolve(0x7e55).name], "PINCH_MODE");
+    assert.equal(aliases[keycodes.resolve(PD_SLOT_0).name], "PD_SLOT_0");
+    assert.equal(aliases[keycodes.resolve(0x7e55).name], "PD_SLOT_5");
     assert.deepEqual(profileKeyNames({behaviors, actionsKnown: false}).aliases, {});
 });
 
@@ -22,14 +22,14 @@ test("a key reads by the profile's name for it, under every name it is known by"
         macros: [{keycode: "VIA_MACRO_0", name: "Copy line"}, {keycode: "VIA_MACRO_1", name: ""}],
         pdModes: [{id: 0, kind: 2, name: "Dragscroll"}, {id: 1, kind: 0, name: ""}],
     });
-    assert.equal(keyLabel(names, DRAGSCROLL), "Dragscroll · hold", "not the catalogue's bare user slot");
-    assert.equal(names.labels.DRAGSCROLL, "Dragscroll · hold");
+    assert.equal(keyLabel(names, PD_SLOT_0), "Dragscroll · hold", "not the catalogue's bare user slot");
+    assert.equal(names.labels.PD_SLOT_0, "Dragscroll · hold");
     assert.equal(keyLabel(names, PD_BINDINGS[1].holdCode), "Slot 1 · hold (empty)", "an empty slot says so");
     assert.equal(keyLabel(names, PD_BINDINGS[0].lockCode), "Dragscroll · toggle");
     assert.equal(names.labels.VIA_MACRO_0, "Copy line");
     assert.equal(names.labels.VIA_MACRO_1, "Macro 1", "an unnamed macro reads by its number");
     assert.equal(keyLabel(names, 0x04), "A", "the rest reads as the catalogue names it");
-    assert.equal(keyLabel(profileKeyNames(), DRAGSCROLL), keycodes.resolve(DRAGSCROLL).label, "no profile, no renaming");
+    assert.equal(keyLabel(profileKeyNames(), PD_SLOT_0), keycodes.resolve(PD_SLOT_0).label, "no profile, no renaming");
 });
 
 test("a key's name is added only where it tells two alike labels apart", () => {

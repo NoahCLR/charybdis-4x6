@@ -36,8 +36,8 @@ trackball control get packed into the right side and the thumbs.
 | `LAYER_BASE` | default typing layer | QWERTY, home-row layer access, custom thumbs, number-row symbol holds, signature `Esc`, `Enter`, `Shift`, and `Right Alt` behaviors |
 | `LAYER_NUM` | right-hand numpad layer | numpad on the right half, `MO(LAYER_NAV)` retained on the left side for fast access back into navigation |
 | `LAYER_SYM` | symbols and DPI layer | DPI controls on the left, bracket and quote families on the right, and a lower-left shortcut cluster anchored by five VIA macros |
-| `LAYER_NAV` | navigation, media, system control, mouse buttons | arrow cluster, media, volume, brightness, direct macOS shortcuts, mouse buttons, `DRAGSCROLL`, and current auto-sniping |
-| `LAYER_POINTER` | auto-mouse pointer surface | `BRIGHTNESS_MODE`, `PINCH_MODE`, `VOLUME_MODE`, `DRAGSCROLL`, mouse buttons, and `LT(LAYER_NUM, KC_SPC)` on the thumb cluster |
+| `LAYER_NAV` | navigation, media, system control, mouse buttons | arrow cluster, media, volume, brightness, direct macOS shortcuts, mouse buttons, `PD_SLOT_0`, and current auto-sniping |
+| `LAYER_POINTER` | auto-mouse pointer surface | `PD_SLOT_2`, `PD_SLOT_5`, `PD_SLOT_1`, `PD_SLOT_0`, mouse buttons, and `LT(LAYER_NUM, KC_SPC)` on the thumb cluster |
 
 The keymap currently sets:
 
@@ -75,14 +75,14 @@ lot of the profile's structure:
 - `LEFT_THUMB` and `RIGHT_THUMB` are custom keymap-local keys, not plain QMK
   mod-taps
 - `KC_RIGHT_ALT` is a profile-specific dual-use key: tap toggles
-  `ARROW_MODE_LOCK`, hold stays normal right `Alt`
+  `PD_SLOT_4_LOCK`, hold stays normal right `Alt`
 
 The current combo set is intentionally small:
 
 - `KC_D` + `LT(LAYER_NAV, KC_F)` -> `KC_TAB`
 - `MS_BTN1` + `MS_BTN2` -> `CLICK_SPAM`
 - `KC_N` + `KC_M` -> `KC_LEFT_GUI`
-- `VOLUME_MODE` + `MS_BTN1` -> `KC_LEFT_GUI`
+- `PD_SLOT_1` + `MS_BTN1` -> `KC_LEFT_GUI`
 
 That keeps the layout readable while still giving one easy chorded `Tab`, one
 pointer-specific utility chord, and two right-side paths to the authored
@@ -198,7 +198,7 @@ These are small profile-specific quality-of-life keys:
 - `KC_ESC`: tap `Esc`, double tap `~`, long hold `Alt+Cmd+Esc`
 - `KC_ENT`: hold `Shift+Enter`
 - `KC_LEFT_SHIFT`: tap `Caps Lock`, hold normal left `Shift`
-- `KC_RIGHT_ALT`: tap `ARROW_MODE_LOCK`, hold normal right `Alt`
+- `KC_RIGHT_ALT`: tap `PD_SLOT_4_LOCK`, hold normal right `Alt`
 - `KC_LEFT_GUI`: single tap or hold normal left `Cmd`, double-tap hold
   `Left Alt`, triple tap one-shot `Shift`
 
@@ -209,7 +209,7 @@ that the double-tap branch won.
 
 `KC_RIGHT_ALT` is a good example of the profile using a plain key's default held
 path while still stealing its tap for something more specialized. That matters
-for `ARROW_MODE`, because the mode emits real arrow taps. Holding `Right Alt`
+for `PD_SLOT_4`, because the mode emits real arrow taps. Holding `Right Alt`
 while using horizontal arrow-mode motion still gives the usual
 `Option+Left` / `Option+Right` word-jump behavior. Vertical arrow-mode taps
 intentionally mask `Alt` so up/down stays plain.
@@ -351,7 +351,7 @@ This is the densest current layer. It combines:
 - an arrow cluster
 - direct macOS shortcuts
 - `MS_BTN1` and `MS_BTN2`
-- `DRAGSCROLL`
+- `PD_SLOT_0`
 - four VIA macros
 
 It is also the current auto-sniping layer, so entering nav changes both keys
@@ -364,10 +364,10 @@ This is the current auto-mouse layer and trackball-mode surface.
 It is intentionally sparse. Most of the layer is transparent, but the right
 side becomes a focused cluster for:
 
-- `BRIGHTNESS_MODE`
-- `PINCH_MODE`
-- `VOLUME_MODE`
-- `DRAGSCROLL`
+- `PD_SLOT_2`
+- `PD_SLOT_5`
+- `PD_SLOT_1`
+- `PD_SLOT_0`
 - `MS_BTN1`
 - `MS_BTN2`
 - `MS_BTN3`, which also carries the resize drag described above
@@ -384,30 +384,30 @@ The current profile uses several different pointing paths, not one single
 
 - `LAYER_POINTER` is the auto-mouse layer
 - `LAYER_NAV` is the auto-sniping layer
-- `KC_RIGHT_ALT` on base is the dedicated `ARROW_MODE` lock tap
-- `DRAGSCROLL` is available directly on both `LAYER_NAV` and `LAYER_POINTER`
+- `KC_RIGHT_ALT` on base is the dedicated `PD_SLOT_4` lock tap
+- `PD_SLOT_0` is available directly on both `LAYER_NAV` and `LAYER_POINTER`
 
 The currently placed mode keys behave like this:
 
-- `VOLUME_MODE`: single tap `N`, quick double tap `Mute`, hold for volume control
-- `BRIGHTNESS_MODE`: single tap `H`, hold for brightness control
-- `PINCH_MODE`: single tap `J`, hold for pinch, second quick tap sends `VIA_MACRO_6`, second hold enters `ZOOM_MODE`
-- `DRAGSCROLL`: single tap `.`, hold for momentary scrolling, double-tap hold locks
+- `PD_SLOT_1`: single tap `N`, quick double tap `Mute`, hold for volume control
+- `PD_SLOT_2`: single tap `H`, hold for brightness control
+- `PD_SLOT_5`: single tap `J`, hold for pinch, second quick tap sends `VIA_MACRO_6`, second hold enters `PD_SLOT_3`
+- `PD_SLOT_0`: single tap `.`, hold for momentary scrolling, double-tap hold locks
 
-Because `PINCH_MODE` can branch into `ZOOM_MODE` on the second hold, its first
+Because `PD_SLOT_5` can branch into `PD_SLOT_3` on the second hold, its first
 pinch hold is resolved at the normal hold threshold instead of starting the
 Pinch lifecycle immediately during the tap-count window.
 
-For the current macOS setup, `PINCH_MODE` is meant to be used with
+For the current macOS setup, `PD_SLOT_5` is meant to be used with
 [BetterMouse](https://better-mouse.com/), which turns the command-scroll path
-into pinch-style zoom. `ZOOM_MODE` is the fallback explicit zoom path that does
+into pinch-style zoom. `PD_SLOT_3` is the fallback explicit zoom path that does
 not depend on BetterMouse.
 
 One important current detail:
 
-- there is no plain `ARROW_MODE` key physically placed in `keymaps[][]` right
+- there is no plain `PD_SLOT_4` key physically placed in `keymaps[][]` right
   now
-- there is also no dedicated `key_behaviors[]` row for `ARROW_MODE` in the
+- there is also no dedicated `key_behaviors[]` row for `PD_SLOT_4` in the
   current profile
 - arrow mode is exposed through the `KC_RIGHT_ALT` tap lock action instead
 - because arrow mode emits real arrow taps, it can still be combined with held

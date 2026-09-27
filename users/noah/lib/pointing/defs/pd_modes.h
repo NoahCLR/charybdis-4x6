@@ -15,7 +15,7 @@
 
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
-#include "noah_keymap_ids.h" // VOLUME_MODE, BRIGHTNESS_MODE, etc.
+#include "noah_keymap_ids.h" // PD_SLOT_1, PD_SLOT_2, etc.
 #include "pd_mode_flags.h"   // PD_MODE_* constants, state queries
 
 #if defined(POINTING_DEVICE_ENABLE)

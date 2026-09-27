@@ -66,7 +66,7 @@ test("a modifier around a macro or pointing key is refused, not stored as anothe
     // the picker builds Cmd + VIA macro 3 as G(VIA_MACRO_3)
     const picked = edits.pickerExpression({keys: ["VIA_MACRO_3"], mods: ["Cmd"]});
     assert.equal(picked, "G(VIA_MACRO_3)");
-    for (const keycode of [picked, "C(DRAGSCROLL)", "LOCK_LAYER(8)", "LT(60, 0x00)"]) {
+    for (const keycode of [picked, "C(PD_SLOT_0)", "LOCK_LAYER(8)", "LT(60, 0x00)"]) {
         assert.throws(() => stage(draft, edits.setKey("Layer 0", 3, keycode)), /Cannot represent/, keycode);
     }
     assert.deepEqual(draft.document.layers[0], before);

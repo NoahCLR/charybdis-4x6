@@ -55,7 +55,7 @@ exact inverses of their decoders and enforce the firmware's limits. The RGB
 byte contract is frozen in [`schema/rgb-domain-v1.md`](./schema/rgb-domain-v1.md);
 its firmware counterpart is `users/noah/lib/profile/schema/profile_rgb_v1.c`.
 `schema/compiled-profile-v1.js` resolves expressions in the keyboard's
-vocabulary (`KC_A`, `LT(1, KC_A)`, `DRAGSCROLL`, `VIA_MACRO_3`) to actions and
+vocabulary (`KC_A`, `LT(1, KC_A)`, `PD_SLOT_0`, `VIA_MACRO_3`) to actions and
 native keycodes, refusing any whose bits would land on another keycode.
 
 ## Adapter contract

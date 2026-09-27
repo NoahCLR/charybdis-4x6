@@ -69,7 +69,7 @@ Timing legend for the layer-local behavior tables:
 | `,` | `,` (`KC_COMM`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_LABK)` | `-` | `tap_hold(150)` |
 | `.` | `.` (`KC_DOT`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_RABK)` | `-` | `tap_hold(150)` |
 | `LT[NAV]/SLSH` | `LT[NAV]/SLSH` (`LT(LAYER_NAV,KC_SLSH)`) | `double` | `-` | `TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_NAV))` | `-` | `tap_hold=100, multi_tap(150)` |
-| `RALT` | `RALT` (`KC_RIGHT_ALT`) | `single` | `TAP_SENDS(ARROW_MODE_LOCK)` | `-` | `-` | `release before tap_hold(150); otherwise normal hold` |
+| `RALT` | `RALT` (`KC_RIGHT_ALT`) | `single` | `TAP_SENDS(PD_SLOT_4_LOCK)` | `-` | `-` | `release before tap_hold(150); otherwise normal hold` |
 | `LGUI` | `LGUI` (`KC_LEFT_GUI`) | `double` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_LEFT_ALT)` | `-` | `tap_hold(150), multi_tap(150)` |
 | `LGUI` | `LGUI` (`KC_LEFT_GUI`) | `triple` | `TAP_SENDS(OSM(MOD_LSFT))` | `-` | `-` | `multi_tap(150)` |
 | `LTHUMB` | `LTHUMB` (`LEFT_THUMB`) | `single` | `TAP_SENDS(LOCK_LAYER(LAYER_SYM))` | `PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_SYM))` | `-` | `tap_hold=150, multi_tap(150)` |
@@ -86,7 +86,7 @@ Timing legend for the layer-local behavior tables:
 
 | Reachable Via | Mode Keycode | Pointing Mode | Locality | Authored HSV | Preview Color |
 | --- | --- | --- | --- | --- | --- |
-| `RALT` via `single tap` -> `ARROW_MODE_LOCK` | `ARROW` (`ARROW_MODE`) | `PD_MODE_ARROW` | `RGB_RIGHT_HALF` | `HSV(127, 255, 200)` | <img alt="PD_MODE_ARROW color" src="media/profile-introspection/profile-color-swatch-00fffc.svg" width="96" height="28" /> |
+| `RALT` via `single tap` -> `PD_SLOT_4_LOCK` | `PD_SLOT_4` | `PD_MODE_ARROW` | `RGB_RIGHT_HALF` | `HSV(127, 255, 200)` | <img alt="PD_MODE_ARROW color" src="media/profile-introspection/profile-color-swatch-00fffc.svg" width="96" height="28" /> |
 
 #### Combos Available On This Layer
 
@@ -112,7 +112,7 @@ Timing legend for the layer-local behavior tables:
 | `ESC` | `ESC` (`KC_ESC`) | `double` | `TAP_SENDS(S(KC_GRV))` | `-` | `-` | `multi_tap(150)` |
 | `-` | `-` (`KC_MINS`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_UNDS)` | `-` | `tap_hold(150)` |
 | `LSFT` | `LSFT` (`KC_LEFT_SHIFT`) | `single` | `TAP_SENDS(KC_CAPS)` | `-` | `-` | `release before tap_hold(150); otherwise normal hold` |
-| `RALT` | `RALT` (`KC_RIGHT_ALT`) | `single` | `TAP_SENDS(ARROW_MODE_LOCK)` | `-` | `-` | `release before tap_hold(150); otherwise normal hold` |
+| `RALT` | `RALT` (`KC_RIGHT_ALT`) | `single` | `TAP_SENDS(PD_SLOT_4_LOCK)` | `-` | `-` | `release before tap_hold(150); otherwise normal hold` |
 | `,` | `,` (`KC_COMM`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_LABK)` | `-` | `tap_hold(150)` |
 | `.` | `.` (`KC_DOT`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_RABK)` | `-` | `tap_hold(150)` |
 
@@ -120,7 +120,7 @@ Timing legend for the layer-local behavior tables:
 
 | Reachable Via | Mode Keycode | Pointing Mode | Locality | Authored HSV | Preview Color |
 | --- | --- | --- | --- | --- | --- |
-| `RALT` via `single tap` -> `ARROW_MODE_LOCK` | `ARROW` (`ARROW_MODE`) | `PD_MODE_ARROW` | `RGB_RIGHT_HALF` | `HSV(127, 255, 200)` | <img alt="PD_MODE_ARROW color" src="media/profile-introspection/profile-color-swatch-00fffc.svg" width="96" height="28" /> |
+| `RALT` via `single tap` -> `PD_SLOT_4_LOCK` | `PD_SLOT_4` | `PD_MODE_ARROW` | `RGB_RIGHT_HALF` | `HSV(127, 255, 200)` | <img alt="PD_MODE_ARROW color" src="media/profile-introspection/profile-color-swatch-00fffc.svg" width="96" height="28" /> |
 
 #### Combos Available On This Layer
 
@@ -172,14 +172,14 @@ No authored combos resolve entirely from keys on this layer.
 | `LSFT` | `LSFT` (`KC_LEFT_SHIFT`) | `single` | `TAP_SENDS(KC_CAPS)` | `-` | `-` | `release before tap_hold(150); otherwise normal hold` |
 | `LEFT` | `LEFT` (`KC_LEFT`) | `single` | `-` | `TAP_ON_RELEASE_AFTER_HOLD(A(KC_LEFT))` | `TAP_AT_HOLD_THRESHOLD(G(KC_LEFT))` | `tap_hold(150), long_hold(400)` |
 | `RIGHT` | `RIGHT` (`KC_RIGHT`) | `single` | `-` | `TAP_ON_RELEASE_AFTER_HOLD(A(KC_RIGHT))` | `TAP_AT_HOLD_THRESHOLD(G(KC_RIGHT))` | `tap_hold(150), long_hold(400)` |
-| `DRAGSCROLL` | `DRAGSCROLL` | `single` | `TAP_SENDS(KC_TRNS)` | `-` | `-` | `multi_tap(150)` |
-| `DRAGSCROLL` | `DRAGSCROLL` | `double` | `-` | `TAP_AT_HOLD_THRESHOLD(DRAGSCROLL_LOCK)` | `-` | `tap_hold(150), multi_tap(150)` |
+| `PD_SLOT_0` | `PD_SLOT_0` | `single` | `TAP_SENDS(KC_TRNS)` | `-` | `-` | `multi_tap(150)` |
+| `PD_SLOT_0` | `PD_SLOT_0` | `double` | `-` | `TAP_AT_HOLD_THRESHOLD(PD_SLOT_0_LOCK)` | `-` | `tap_hold(150), multi_tap(150)` |
 
 #### PD Modes Reachable On This Layer
 
 | Reachable Via | Mode Keycode | Pointing Mode | Locality | Authored HSV | Preview Color |
 | --- | --- | --- | --- | --- | --- |
-| `DRAGSCROLL` directly on layer; `DRAGSCROLL` via `double hold` -> `DRAGSCROLL_LOCK` | `DRAGSCROLL` | `PD_MODE_DRAGSCROLL` | `RGB_RIGHT_HALF` | `HSV(21, 255, 200)` | <img alt="PD_MODE_DRAGSCROLL color" src="media/profile-introspection/profile-color-swatch-ff7e00.svg" width="96" height="28" /> |
+| `PD_SLOT_0` directly on layer; `PD_SLOT_0` via `double hold` -> `PD_SLOT_0_LOCK` | `PD_SLOT_0` | `PD_MODE_DRAGSCROLL` | `RGB_RIGHT_HALF` | `HSV(21, 255, 200)` | <img alt="PD_MODE_DRAGSCROLL color" src="media/profile-introspection/profile-color-swatch-ff7e00.svg" width="96" height="28" /> |
 
 #### Combos Available On This Layer
 
@@ -201,33 +201,33 @@ No authored combos resolve entirely from keys on this layer.
 
 | Key On Layer | Behavior Keycode | Tap Count | Tap | Hold | Long Hold | Timing |
 | --- | --- | --- | --- | --- | --- | --- |
-| `BRIGHTNESS` | `BRIGHTNESS` (`BRIGHTNESS_MODE`) | `single` | `TAP_SENDS(KC_TRNS)` | `-` | `-` | `release before tap_hold(150); otherwise normal hold` |
-| `PINCH` | `PINCH` (`PINCH_MODE`) | `single` | `TAP_SENDS(KC_TRNS)` | `-` | `-` | `multi_tap(150)` |
-| `PINCH` | `PINCH` (`PINCH_MODE`) | `double` | `TAP_SENDS(VIA_MACRO_6)` | `PRESS_AND_HOLD_UNTIL_RELEASE(ZOOM_MODE)` | `-` | `tap_hold(150), multi_tap(150)` |
+| `PD_SLOT_2` | `PD_SLOT_2` | `single` | `TAP_SENDS(KC_TRNS)` | `-` | `-` | `release before tap_hold(150); otherwise normal hold` |
+| `PD_SLOT_5` | `PD_SLOT_5` | `single` | `TAP_SENDS(KC_TRNS)` | `-` | `-` | `multi_tap(150)` |
+| `PD_SLOT_5` | `PD_SLOT_5` | `double` | `TAP_SENDS(VIA_MACRO_6)` | `PRESS_AND_HOLD_UNTIL_RELEASE(PD_SLOT_3)` | `-` | `tap_hold(150), multi_tap(150)` |
 | `MS_BTN3` | `MS_BTN3` | `double` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(MS_BTN7)` | `-` | `tap_hold=100, multi_tap=100` |
 | `DRAG_WINDOW` | `DRAG_WINDOW` | `single` | `TAP_SENDS(KC_TRNS)` | `PRESS_AND_HOLD_UNTIL_RELEASE(MS_BTN6)` | `-` | `tap_hold=100` |
-| `VOLUME` | `VOLUME` (`VOLUME_MODE`) | `single` | `TAP_SENDS(KC_TRNS)` | `-` | `-` | `multi_tap(150)` |
-| `VOLUME` | `VOLUME` (`VOLUME_MODE`) | `double` | `TAP_SENDS(KC_MUTE)` | `-` | `-` | `multi_tap(150)` |
-| `DRAGSCROLL` | `DRAGSCROLL` | `single` | `TAP_SENDS(KC_TRNS)` | `-` | `-` | `multi_tap(150)` |
-| `DRAGSCROLL` | `DRAGSCROLL` | `double` | `-` | `TAP_AT_HOLD_THRESHOLD(DRAGSCROLL_LOCK)` | `-` | `tap_hold(150), multi_tap(150)` |
+| `PD_SLOT_1` | `PD_SLOT_1` | `single` | `TAP_SENDS(KC_TRNS)` | `-` | `-` | `multi_tap(150)` |
+| `PD_SLOT_1` | `PD_SLOT_1` | `double` | `TAP_SENDS(KC_MUTE)` | `-` | `-` | `multi_tap(150)` |
+| `PD_SLOT_0` | `PD_SLOT_0` | `single` | `TAP_SENDS(KC_TRNS)` | `-` | `-` | `multi_tap(150)` |
+| `PD_SLOT_0` | `PD_SLOT_0` | `double` | `-` | `TAP_AT_HOLD_THRESHOLD(PD_SLOT_0_LOCK)` | `-` | `tap_hold(150), multi_tap(150)` |
 
 #### PD Modes Reachable On This Layer
 
 | Reachable Via | Mode Keycode | Pointing Mode | Locality | Authored HSV | Preview Color |
 | --- | --- | --- | --- | --- | --- |
-| `DRAGSCROLL` directly on layer; `DRAGSCROLL` via `double hold` -> `DRAGSCROLL_LOCK` | `DRAGSCROLL` | `PD_MODE_DRAGSCROLL` | `RGB_RIGHT_HALF` | `HSV(21, 255, 200)` | <img alt="PD_MODE_DRAGSCROLL color" src="media/profile-introspection/profile-color-swatch-ff7e00.svg" width="96" height="28" /> |
-| `VOLUME` directly on layer | `VOLUME` (`VOLUME_MODE`) | `PD_MODE_VOLUME` | `RGB_RIGHT_HALF` | `HSV(43, 255, 200)` | <img alt="PD_MODE_VOLUME color" src="media/profile-introspection/profile-color-swatch-fcff00.svg" width="96" height="28" /> |
-| `BRIGHTNESS` directly on layer | `BRIGHTNESS` (`BRIGHTNESS_MODE`) | `PD_MODE_BRIGHTNESS` | `RGB_RIGHT_HALF` | `HSV(213, 255, 200)` | <img alt="PD_MODE_BRIGHTNESS color" src="media/profile-introspection/profile-color-swatch-ff00fc.svg" width="96" height="28" /> |
-| `PINCH` via `double hold` -> `ZOOM` (`ZOOM_MODE`) | `ZOOM` (`ZOOM_MODE`) | `PD_MODE_ZOOM` | `RGB_RIGHT_HALF` | `HSV(70, 255, 200)` | <img alt="PD_MODE_ZOOM color" src="media/profile-introspection/profile-color-swatch-5aff00.svg" width="96" height="28" /> |
-| `PINCH` directly on layer | `PINCH` (`PINCH_MODE`) | `PD_MODE_PINCH` | `RGB_RIGHT_HALF` | `HSV(55, 255, 200)` | <img alt="PD_MODE_PINCH color" src="media/profile-introspection/profile-color-swatch-b4ff00.svg" width="96" height="28" /> |
+| `PD_SLOT_0` directly on layer; `PD_SLOT_0` via `double hold` -> `PD_SLOT_0_LOCK` | `PD_SLOT_0` | `PD_MODE_DRAGSCROLL` | `RGB_RIGHT_HALF` | `HSV(21, 255, 200)` | <img alt="PD_MODE_DRAGSCROLL color" src="media/profile-introspection/profile-color-swatch-ff7e00.svg" width="96" height="28" /> |
+| `PD_SLOT_1` directly on layer | `PD_SLOT_1` | `PD_MODE_VOLUME` | `RGB_RIGHT_HALF` | `HSV(43, 255, 200)` | <img alt="PD_MODE_VOLUME color" src="media/profile-introspection/profile-color-swatch-fcff00.svg" width="96" height="28" /> |
+| `PD_SLOT_2` directly on layer | `PD_SLOT_2` | `PD_MODE_BRIGHTNESS` | `RGB_RIGHT_HALF` | `HSV(213, 255, 200)` | <img alt="PD_MODE_BRIGHTNESS color" src="media/profile-introspection/profile-color-swatch-ff00fc.svg" width="96" height="28" /> |
+| `PD_SLOT_5` via `double hold` -> `PD_SLOT_3` | `PD_SLOT_3` | `PD_MODE_ZOOM` | `RGB_RIGHT_HALF` | `HSV(70, 255, 200)` | <img alt="PD_MODE_ZOOM color" src="media/profile-introspection/profile-color-swatch-5aff00.svg" width="96" height="28" /> |
+| `PD_SLOT_5` directly on layer | `PD_SLOT_5` | `PD_MODE_PINCH` | `RGB_RIGHT_HALF` | `HSV(55, 255, 200)` | <img alt="PD_MODE_PINCH color" src="media/profile-introspection/profile-color-swatch-b4ff00.svg" width="96" height="28" /> |
 
 #### Combos Available On This Layer
 
 | Combo | Inputs On This Layer | Output |
 | --- | --- | --- |
 | `C1` | `MS_BTN1` + `MS_BTN2` | `CLICK_SPAM` |
-| `C2` | `VOLUME` + `MS_BTN1` + `MS_BTN2` | `G(T)` (`G(KC_T)`) |
-| `C3` | `MS_BTN1` + `VOLUME` | `LGUI` (`KC_LGUI`) |
+| `C2` | `PD_SLOT_1` + `MS_BTN1` + `MS_BTN2` | `G(T)` (`G(KC_T)`) |
+| `C3` | `MS_BTN1` + `PD_SLOT_1` | `LGUI` (`KC_LGUI`) |
 
 ### `LAYER_EXTRA_1`
 
@@ -414,7 +414,7 @@ Authored key-feedback LED groups repaint after the feedback locality render insi
 | `VIA_MACRO_3` | `{KC_LCTL,KC_LALT,KC_LGUI,KC_C}` | `LAYER_SYM @ VIA3` |
 | `VIA_MACRO_4` | `{KC_LCTL,KC_LALT,KC_LGUI,KC_X}` | `LAYER_SYM @ VIA4` |
 | `VIA_MACRO_5` | `{KC_LCTL,KC_LGUI,KC_SPC}` | `LAYER_SYM @ VIA5` |
-| `VIA_MACRO_6` | `{KC_LALT,KC_LGUI,KC_8}` | `PINCH_MODE double tap` |
+| `VIA_MACRO_6` | `{KC_LALT,KC_LGUI,KC_8}` | `PD_SLOT_5 double tap` |
 | `VIA_MACRO_7` | `{KC_LCTL,KC_LALT,KC_LGUI,KC_V}` | `LAYER_NAV @ VIA7`, `G(KC_V) double tap` |
 | `VIA_MACRO_8` | `{KC_LSFT,KC_LGUI,KC_V}` | `LAYER_SYM @ VIA8` |
 | `VIA_MACRO_9` | `{KC_LSFT,KC_LGUI,KC_P}` | `LAYER_SYM @ VIA9` |

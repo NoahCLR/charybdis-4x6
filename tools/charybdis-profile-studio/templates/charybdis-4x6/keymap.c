@@ -171,7 +171,7 @@ enum keymap_custom_keycodes {
 //
 // Valid combo outputs include plain keycodes, hardcoded macros (MACRO_n),
 // VIA macros (VIA_MACRO_n), LOCK_LAYER(...), explicit pd-mode lock keycodes
-// such as ARROW_MODE_LOCK, and keycodes that also have rows in key_behaviors[].
+// such as PD_SLOT_4_LOCK, and keycodes that also have rows in key_behaviors[].
 //
 // If a combo emits a keycode that also has a row in key_behaviors[],
 // that emitted key can reuse the same custom behavior handling.
@@ -198,7 +198,7 @@ enum keymap_custom_keycodes {
     /* COMBO(MACRO_0, (KC_Q, KC_W)) */               \
     /* COMBO(VIA_MACRO_0, (KC_U, KC_I)) */           \
     /* COMBO(LOCK_LAYER(LAYER_NAV), (KC_J, KC_K)) */ \
-    /* COMBO(ARROW_MODE_LOCK, (KC_M, KC_COMM)) */    \
+    /* COMBO(PD_SLOT_4_LOCK, (KC_M, KC_COMM)) */     \
     /* COMBO(..., (...)) */                          \
     /* ... */
 // clang-format on

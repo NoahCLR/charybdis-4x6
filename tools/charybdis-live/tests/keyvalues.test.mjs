@@ -6,12 +6,12 @@ const model = {qmkKeycodes: [
     {keycode: 0x0004, value: "KC_A"},
     {keycode: 0x0006, value: "KC_C"},
     {keycode: 0x00a9, value: "KC_VOLU"},
-    {keycode: 0x7e50, value: "DRAGSCROLL"},
+    {keycode: 0x7e50, value: "PD_SLOT_0"},
 ]};
 
 test("a stored number is named from the keyboard's own catalogue", () => {
     assert.equal(keyName(model, 0x00a9), "KC_VOLU");
-    assert.equal(keyName(model, 0x7e50), "DRAGSCROLL");
+    assert.equal(keyName(model, 0x7e50), "PD_SLOT_0");
     assert.equal(keyName(model, 0), "", "zero means no shortcut, not a keycode");
 });
 

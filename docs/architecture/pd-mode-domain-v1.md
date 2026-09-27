@@ -354,6 +354,17 @@ boundary against the full golden serialization. No watchdog timeout is relaxed.
 
 Existing native IDs are fixed by executable assertions:
 
+The canonical keycode vocabulary is `PD_SLOT_n` for a momentary hold and
+`PD_SLOT_n_LOCK` for its persistent toggle, for `n = 0..7`. The first six
+hold values remain `0x7e50 + n`, and their lock values remain `0x7e56 + n`.
+The extension pair values are interleaved: slot 6 is `0x7ef0/0x7ef1` and
+slot 7 is `0x7ef2/0x7ef3`. A slot keycode selects its numbered slot; the
+mode's name and behavior come from the active profile. Former names such as
+`DRAGSCROLL` and `VOLUME_MODE` identify factory presets only and remain
+compatibility aliases for older portable profile expressions. They are not firmware
+keycode symbols. Renaming the symbols does not change the numeric action ABI,
+stored bindings, or the behavior of an already running schema-2 profile.
+
 | Native action | Deployed eight-layer value |
 | --- | --- |
 | Macro 0–15 | `0x7e40..0x7e4f` |

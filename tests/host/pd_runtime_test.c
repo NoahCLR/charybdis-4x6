@@ -412,7 +412,7 @@ static void test_pointing_device_task_dispatches_active_local_mode_and_tracks_la
     report_mouse_t input = {.x = 10, .y = 20, .h = 30, .v = 40, .buttons = 0};
     report_mouse_t output;
 
-    CHECK(pd_mode_handle_keycode_press(VOLUME_MODE));
+    CHECK(pd_mode_handle_keycode_press(PD_SLOT_1));
     output = noah_pointing_device_task_user(input);
 
     CHECK(report_mouse_equal(output, (report_mouse_t){.x = 13, .y = 20, .h = 30, .v = 40, .buttons = 1}));
@@ -420,7 +420,7 @@ static void test_pointing_device_task_dispatches_active_local_mode_and_tracks_la
     CHECK(brightness_handler_calls == 0);
     CHECK(pd_mode_local_active(PD_MODE_VOLUME));
 
-    CHECK(pd_mode_handle_keycode_press(BRIGHTNESS_MODE));
+    CHECK(pd_mode_handle_keycode_press(PD_SLOT_2));
     output = noah_pointing_device_task_user(input);
 
     CHECK(report_mouse_equal(output, (report_mouse_t){.x = 10, .y = 15, .h = 30, .v = 40, .buttons = 2}));
@@ -433,7 +433,7 @@ static void test_pointing_device_task_dispatches_active_local_mode_and_tracks_la
 static void test_pointing_device_task_dispatches_zero_report_to_active_mode(void) {
     test_reset_stubs();
 
-    CHECK(pd_mode_handle_keycode_press(VOLUME_MODE));
+    CHECK(pd_mode_handle_keycode_press(PD_SLOT_1));
     report_mouse_t output = noah_pointing_device_task_user((report_mouse_t){0});
 
     CHECK(report_mouse_equal(output, (report_mouse_t){.x = 3, .buttons = 1}));
@@ -494,7 +494,7 @@ static void test_pointing_device_task_keeps_small_motion_in_active_local_mode(vo
     fake_timer_ms            = 300000u;
     fake_last_input_idle_ms  = 5000u;
     fake_last_matrix_idle_ms = 300000u;
-    CHECK(pd_mode_handle_keycode_press(VOLUME_MODE));
+    CHECK(pd_mode_handle_keycode_press(PD_SLOT_1));
 
     report_mouse_t input = {.x = 1, .y = 0, .h = 0, .v = 0, .buttons = 0};
 
@@ -548,7 +548,7 @@ static void test_pointing_device_task_recent_matrix_activity_delays_arm_window(v
 static void test_layer_state_set_restores_active_mode_dpi_and_pointer_layer_after_sniping_drops(void) {
     test_reset_stubs();
 
-    CHECK(pd_mode_handle_keycode_press(VOLUME_MODE));
+    CHECK(pd_mode_handle_keycode_press(PD_SLOT_1));
     pd_mode_service_active_dpi_sync();
     current_cpi   = 0;
     cpi_set_count = 0;
@@ -569,7 +569,7 @@ static void test_layer_state_set_restores_active_mode_dpi_and_pointer_layer_afte
 static void test_layer_state_set_strips_pointer_layer_for_arrow_mode(void) {
     test_reset_stubs();
 
-    CHECK(pd_mode_handle_keycode_press(ARROW_MODE));
+    CHECK(pd_mode_handle_keycode_press(PD_SLOT_4));
     pd_mode_service_active_dpi_sync();
     current_cpi   = 0;
     cpi_set_count = 0;
@@ -606,17 +606,17 @@ static void test_is_mouse_record_user_delegates_pointer_layer_policy(void) {
 
     keyrecord_t record = {0};
 
-    CHECK(pd_mode_handle_keycode_press(VOLUME_MODE));
+    CHECK(pd_mode_handle_keycode_press(PD_SLOT_1));
     CHECK(noah_is_mouse_record_user(MO(1), &record));
-    CHECK(noah_is_mouse_record_user(VOLUME_MODE, &record));
+    CHECK(noah_is_mouse_record_user(PD_SLOT_1, &record));
     CHECK(noah_is_mouse_record_user(DPI_MOD, &record));
-    CHECK(!noah_is_mouse_record_user(ARROW_MODE, &record));
+    CHECK(!noah_is_mouse_record_user(PD_SLOT_4, &record));
     CHECK(!noah_is_mouse_record_user(KC_C, &record));
 
     test_reset_stubs();
-    CHECK(pd_mode_handle_keycode_press(ARROW_MODE));
+    CHECK(pd_mode_handle_keycode_press(PD_SLOT_4));
     CHECK(!noah_is_mouse_record_user(MO(1), &record));
-    CHECK(!noah_is_mouse_record_user(ARROW_MODE, &record));
+    CHECK(!noah_is_mouse_record_user(PD_SLOT_4, &record));
 }
 
 int main(void) {

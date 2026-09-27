@@ -11,7 +11,7 @@ const reject = (fn, code) => assert.throws(fn, error => error.code === code);
 test("deployed native PD, layer-lock and custom identities stay stable during expansion", () => {
     const {resolveNativeQmkExpression} = require("../../core/schema/compiled-profile-v1");
     const model = {layers: Array.from({length: 8}, (_, id) => ({id})), customKeycodes: ["RIGHT_THUMB", "LEFT_THUMB", "CLICK_SPAM", "DRAG_WINDOW"]};
-    const names = ["DRAGSCROLL", "VOLUME_MODE", "BRIGHTNESS_MODE", "ZOOM_MODE", "ARROW_MODE", "PINCH_MODE"];
+    const names = ["PD_SLOT_0", "PD_SLOT_1", "PD_SLOT_2", "PD_SLOT_3", "PD_SLOT_4", "PD_SLOT_5"];
     names.forEach((name, id) => {
         assert.equal(resolveNativeQmkExpression(name, model), 0x7e50 + id);
         assert.equal(resolveNativeQmkExpression(name + "_LOCK", model), 0x7e56 + id);

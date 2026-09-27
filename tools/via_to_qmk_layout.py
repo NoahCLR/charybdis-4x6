@@ -200,7 +200,7 @@ for i in range(VIA_MACRO_COUNT):
 for i in range(HARDCODED_MACRO_COUNT):
     REPLACEMENTS[f"CUSTOM({VIA_CUSTOM_BASE + i})"] = f"MACRO_{i}"
 
-# The pointing-device mode keys follow at positions 16–21 → CUSTOM(80)–CUSTOM(85).
+# The first six pointing-slot hold keys follow at positions 16–21 → CUSTOM(80)–CUSTOM(85).
 # PD-mode and layer-lock action keycodes live above that range in
 # noah_keymap_ids.h, but this script does not map them because VIA exports the
 # direct layout keycodes that appear on layers, not the derived lock actions

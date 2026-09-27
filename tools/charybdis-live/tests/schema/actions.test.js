@@ -6,7 +6,7 @@ const {PROFILE_ACTION_KINDS: ACTION} = require("../../core/schema/profile-blob-v
 test("an action has one name and one native keycode", () => {
     assert.equal(actionName({kind: ACTION.QMK_KEYCODE, operand: 0x04}), "KC_A");
     assert.equal(actionName({kind: ACTION.LAYER_MOMENTARY, operand: 2}), "MO(2)");
-    assert.equal(actionName({kind: ACTION.PD_MODE_MOMENTARY, operand: 0}), "DRAGSCROLL");
+    assert.equal(actionName({kind: ACTION.PD_MODE_MOMENTARY, operand: 0}), "PD_SLOT_0");
     assert.equal(actionName({kind: ACTION.PD_MODE_LOCK, operand: 7}), "PD_SLOT_7_LOCK");
     assert.equal(nativeCode({kind: ACTION.QMK_KEYCODE, operand: 0x04}), 0x04);
     assert.equal(nativeCode({kind: ACTION.PD_MODE_LOCK, operand: 0}), 0x7e56);

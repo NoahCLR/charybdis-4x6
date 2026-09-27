@@ -38,7 +38,7 @@
 #if defined(PD_MODE_KEY_RUNTIME_TEST_LEGACY_PINCH_IMPLICIT)
 #    define TEST_PINCH_SINGLE_STEP {.tap = TAP_SENDS(KC_TRNS)}
 #else
-#    define TEST_PINCH_SINGLE_STEP {.tap = TAP_SENDS(KC_TRNS), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(PINCH_MODE)}
+#    define TEST_PINCH_SINGLE_STEP {.tap = TAP_SENDS(KC_TRNS), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(PD_SLOT_5)}
 #endif
 
 enum {
@@ -79,7 +79,7 @@ const key_behavior_t key_behaviors[] = {
         .multi_tap_term = TEST_PD_MULTI_TAP_TERM,
         .tap_counts[0] =
             {
-                .tap = TAP_SENDS(ARROW_MODE_LOCK),
+                .tap = TAP_SENDS(PD_SLOT_4_LOCK),
             },
     },
     {
@@ -105,7 +105,7 @@ const key_behavior_t key_behaviors[] = {
         .multi_tap_term = TEST_PD_MULTI_TAP_TERM,
         .tap_counts[0] =
             {
-                .hold = PRESS_AND_HOLD_UNTIL_RELEASE(VOLUME_MODE),
+                .hold = PRESS_AND_HOLD_UNTIL_RELEASE(PD_SLOT_1),
             },
     },
     {
@@ -128,23 +128,23 @@ const key_behavior_t key_behaviors[] = {
             },
     },
     {
-        .keycode        = VOLUME_MODE,
+        .keycode        = PD_SLOT_1,
         .tap_hold_term  = TEST_PD_TAP_HOLD_TERM,
         .multi_tap_term = TEST_PD_MULTI_TAP_TERM,
         .tap_counts[1] =
             {
-                .tap  = TAP_SENDS(VOLUME_MODE_LOCK),
-                .hold = PRESS_AND_HOLD_UNTIL_RELEASE(BRIGHTNESS_MODE),
+                .tap  = TAP_SENDS(PD_SLOT_1_LOCK),
+                .hold = PRESS_AND_HOLD_UNTIL_RELEASE(PD_SLOT_2),
             },
     },
     {
-        .keycode        = PINCH_MODE,
+        .keycode        = PD_SLOT_5,
         .tap_hold_term  = TEST_PD_TAP_HOLD_TERM,
         .multi_tap_term = TEST_PD_MULTI_TAP_TERM,
         .tap_counts =
             {
                 [0] = TEST_PINCH_SINGLE_STEP,
-                [1] = {.tap = TAP_SENDS(TEST_PINCH_ZOOM_TAP), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(ZOOM_MODE)},
+                [1] = {.tap = TAP_SENDS(TEST_PINCH_ZOOM_TAP), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(PD_SLOT_3)},
             },
     },
     // The factory row: a single press falls back to holding the button itself.
@@ -252,7 +252,7 @@ static void test_set_keymap_key(uint8_t layer, keypos_t key_pos, uint16_t keycod
 }
 
 static void test_configure_pinch_transparent_profile_path(keypos_t key_pos) {
-    test_set_keymap_key(TEST_LAYER_POINTER, key_pos, PINCH_MODE);
+    test_set_keymap_key(TEST_LAYER_POINTER, key_pos, PD_SLOT_5);
     test_set_keymap_key(TEST_LAYER_BASE, key_pos, LT(TEST_LAYER_SYM, KC_J));
     layer_state = test_layer_mask(TEST_LAYER_BASE) | test_layer_mask(TEST_LAYER_POINTER);
 }
@@ -901,26 +901,26 @@ static void test_assert_no_pd_owner_invariant(void) {
 static void test_authored_single_press_preserves_default_pd_mode_hold(void) {
     keypos_t                             key_pos       = test_keypos(1, 2);
     const key_runtime_integration_step_t press_steps[] = {
-        KEY_RUNTIME_INTEGRATION_PRESS(VOLUME_MODE, 1, 2),
+        KEY_RUNTIME_INTEGRATION_PRESS(PD_SLOT_1, 1, 2),
     };
     const key_runtime_integration_step_t release_steps[] = {
         KEY_RUNTIME_INTEGRATION_ADVANCE(10),
-        KEY_RUNTIME_INTEGRATION_RELEASE(VOLUME_MODE, 1, 2),
+        KEY_RUNTIME_INTEGRATION_RELEASE(PD_SLOT_1, 1, 2),
         KEY_RUNTIME_INTEGRATION_SCAN(),
     };
 
     test_reset_state();
 
-    CHECK(key_behavior_lookup(VOLUME_MODE).config != NULL);
-    CHECK(pd_mode_for_keycode(VOLUME_MODE) == PD_MODE_VOLUME);
+    CHECK(key_behavior_lookup(PD_SLOT_1).config != NULL);
+    CHECK(pd_mode_for_keycode(PD_SLOT_1) == PD_MODE_VOLUME);
     CHECK(pd_mode_local_active_snapshot() == 0);
 
     key_runtime_integration_run(&fake_time, press_steps, ARRAY_SIZE(press_steps));
     CHECK(pd_mode_local_active_snapshot() == PD_MODE_VOLUME);
     CHECK(pd_mode_local_active(PD_MODE_VOLUME));
     CHECK(pd_mode_local_locked_snapshot() == 0);
-    CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == VOLUME_MODE);
-    CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == VOLUME_MODE);
+    CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == PD_SLOT_1);
+    CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == PD_SLOT_1);
     CHECK(split_sync_count == 0);
 
     key_runtime_integration_run(&fake_time, release_steps, ARRAY_SIZE(release_steps));
@@ -938,13 +938,13 @@ static void test_authored_single_press_preserves_default_pd_mode_hold(void) {
 static void test_authored_single_press_pd_mode_hold_dispatches_plain_taps_immediately(void) {
     keypos_t                             key_pos              = test_keypos(1, 2);
     const key_runtime_integration_step_t hold_and_tap_steps[] = {
-        KEY_RUNTIME_INTEGRATION_PRESS(VOLUME_MODE, 1, 2),
+        KEY_RUNTIME_INTEGRATION_PRESS(PD_SLOT_1, 1, 2),
         KEY_RUNTIME_INTEGRATION_ADVANCE(10),
         KEY_RUNTIME_INTEGRATION_PRESS(TEST_HANDLED_TAP_KEY, 1, 3),
         KEY_RUNTIME_INTEGRATION_RELEASE(TEST_HANDLED_TAP_KEY, 1, 3),
     };
     const key_runtime_integration_step_t release_steps[] = {
-        KEY_RUNTIME_INTEGRATION_RELEASE(VOLUME_MODE, 1, 2),
+        KEY_RUNTIME_INTEGRATION_RELEASE(PD_SLOT_1, 1, 2),
     };
 
     test_reset_state();
@@ -952,8 +952,8 @@ static void test_authored_single_press_pd_mode_hold_dispatches_plain_taps_immedi
     key_runtime_integration_run(&fake_time, hold_and_tap_steps, ARRAY_SIZE(hold_and_tap_steps));
     CHECK(pd_mode_local_active_snapshot() == PD_MODE_VOLUME);
     CHECK(pd_mode_local_active(PD_MODE_VOLUME));
-    CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == VOLUME_MODE);
-    CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == VOLUME_MODE);
+    CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == PD_SLOT_1);
+    CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == PD_SLOT_1);
     CHECK(tap_code16_count == 1);
     CHECK(last_tap_code16 == KC_J);
     CHECK(delayed_action_count == 0);
@@ -1071,13 +1071,13 @@ static void test_authored_layer_hold_dispatches_authored_plain_tap_immediately(v
 static void test_interrupted_locked_pd_mode_press_unlocks_on_press_and_releases_momentary_hold(void) {
     keypos_t                             key_pos               = test_keypos(1, 2);
     const key_runtime_integration_step_t press_and_interrupt[] = {
-        KEY_RUNTIME_INTEGRATION_PRESS(VOLUME_MODE, 1, 2),
+        KEY_RUNTIME_INTEGRATION_PRESS(PD_SLOT_1, 1, 2),
         KEY_RUNTIME_INTEGRATION_ADVANCE(10),
         KEY_RUNTIME_INTEGRATION_PRESS(KC_J, 1, 3),
         KEY_RUNTIME_INTEGRATION_RELEASE(KC_J, 1, 3),
     };
     const key_runtime_integration_step_t release_steps[] = {
-        KEY_RUNTIME_INTEGRATION_RELEASE(VOLUME_MODE, 1, 2),
+        KEY_RUNTIME_INTEGRATION_RELEASE(PD_SLOT_1, 1, 2),
     };
 
     test_reset_state();
@@ -1091,8 +1091,8 @@ static void test_interrupted_locked_pd_mode_press_unlocks_on_press_and_releases_
     CHECK(pd_mode_local_active_snapshot() == PD_MODE_VOLUME);
     CHECK(pd_mode_local_locked_snapshot() == 0);
     CHECK(!pd_mode_local_locked(PD_MODE_VOLUME));
-    CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == VOLUME_MODE);
-    CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == VOLUME_MODE);
+    CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == PD_SLOT_1);
+    CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == PD_SLOT_1);
     EXPECT_VOLUME_RESETS(1);
 
     key_runtime_integration_run(&fake_time, release_steps, ARRAY_SIZE(release_steps));
@@ -1109,18 +1109,18 @@ static void test_authored_pd_mode_hold_dispatches_authored_tap_key_immediately(v
     keypos_t                             hold_pos     = test_keypos(1, 2);
     keypos_t                             child_pos    = test_keypos(3, 5);
     const key_runtime_integration_step_t hold_steps[] = {
-        KEY_RUNTIME_INTEGRATION_PRESS(VOLUME_MODE, 1, 2),
+        KEY_RUNTIME_INTEGRATION_PRESS(PD_SLOT_1, 1, 2),
         KEY_RUNTIME_INTEGRATION_ADVANCE(10),
         KEY_RUNTIME_INTEGRATION_PRESS(KC_RIGHT_ALT, 3, 5),
         KEY_RUNTIME_INTEGRATION_RELEASE(KC_RIGHT_ALT, 3, 5),
     };
     const key_runtime_integration_step_t release_steps[] = {
-        KEY_RUNTIME_INTEGRATION_RELEASE(VOLUME_MODE, 1, 2),
+        KEY_RUNTIME_INTEGRATION_RELEASE(PD_SLOT_1, 1, 2),
     };
 
     test_reset_state();
 
-    CHECK(key_behavior_lookup(VOLUME_MODE).config != NULL);
+    CHECK(key_behavior_lookup(PD_SLOT_1).config != NULL);
     CHECK(key_behavior_lookup(KC_RIGHT_ALT).config != NULL);
 
     key_runtime_integration_run(&fake_time, hold_steps, ARRAY_SIZE(hold_steps));
@@ -1142,10 +1142,10 @@ static void test_authored_layer_hold_releases_authored_pd_mode_child_cleanly(voi
         KEY_RUNTIME_INTEGRATION_PRESS(TEST_LAYER_HOLD_KEY, 1, 4),
         KEY_RUNTIME_INTEGRATION_ADVANCE(TEST_PD_TAP_HOLD_TERM + 1),
         KEY_RUNTIME_INTEGRATION_SCAN(),
-        KEY_RUNTIME_INTEGRATION_PRESS(VOLUME_MODE, 1, 2),
+        KEY_RUNTIME_INTEGRATION_PRESS(PD_SLOT_1, 1, 2),
     };
     const key_runtime_integration_step_t child_release_steps[] = {
-        KEY_RUNTIME_INTEGRATION_RELEASE(VOLUME_MODE, 1, 2),
+        KEY_RUNTIME_INTEGRATION_RELEASE(PD_SLOT_1, 1, 2),
     };
     const key_runtime_integration_step_t parent_release_steps[] = {
         KEY_RUNTIME_INTEGRATION_RELEASE(TEST_LAYER_HOLD_KEY, 1, 4),
@@ -1154,13 +1154,13 @@ static void test_authored_layer_hold_releases_authored_pd_mode_child_cleanly(voi
     test_reset_state();
 
     CHECK(key_behavior_lookup(TEST_LAYER_HOLD_KEY).config != NULL);
-    CHECK(key_behavior_lookup(VOLUME_MODE).config != NULL);
+    CHECK(key_behavior_lookup(PD_SLOT_1).config != NULL);
 
     key_runtime_integration_run(&fake_time, hold_steps, ARRAY_SIZE(hold_steps));
     CHECK(noah_runtime_debug_active_slot_count() == 2);
     CHECK(noah_runtime_debug_slot_owner_keycode(hold_pos) == TEST_LAYER_HOLD_KEY);
-    CHECK(noah_runtime_debug_slot_owner_keycode(child_pos) == VOLUME_MODE);
-    CHECK(noah_runtime_debug_slot_held_action_keycode(child_pos) == VOLUME_MODE);
+    CHECK(noah_runtime_debug_slot_owner_keycode(child_pos) == PD_SLOT_1);
+    CHECK(noah_runtime_debug_slot_held_action_keycode(child_pos) == PD_SLOT_1);
 
     key_runtime_integration_run(&fake_time, child_release_steps, ARRAY_SIZE(child_release_steps));
     CHECK(noah_runtime_debug_active_slot_count() == 1);
@@ -1176,26 +1176,26 @@ static void test_authored_pd_mode_hold_releases_authored_pd_mode_child_cleanly(v
     keypos_t                             hold_pos     = test_keypos(1, 2);
     keypos_t                             child_pos    = test_keypos(2, 4);
     const key_runtime_integration_step_t hold_steps[] = {
-        KEY_RUNTIME_INTEGRATION_PRESS(VOLUME_MODE, 1, 2), KEY_RUNTIME_INTEGRATION_ADVANCE(10), KEY_RUNTIME_INTEGRATION_PRESS(PINCH_MODE, 2, 4), KEY_RUNTIME_INTEGRATION_ADVANCE(TEST_PD_TAP_HOLD_TERM + 1), KEY_RUNTIME_INTEGRATION_SCAN(),
+        KEY_RUNTIME_INTEGRATION_PRESS(PD_SLOT_1, 1, 2), KEY_RUNTIME_INTEGRATION_ADVANCE(10), KEY_RUNTIME_INTEGRATION_PRESS(PD_SLOT_5, 2, 4), KEY_RUNTIME_INTEGRATION_ADVANCE(TEST_PD_TAP_HOLD_TERM + 1), KEY_RUNTIME_INTEGRATION_SCAN(),
     };
     const key_runtime_integration_step_t child_release_steps[] = {
-        KEY_RUNTIME_INTEGRATION_RELEASE(PINCH_MODE, 2, 4),
+        KEY_RUNTIME_INTEGRATION_RELEASE(PD_SLOT_5, 2, 4),
     };
     const key_runtime_integration_step_t parent_release_steps[] = {
-        KEY_RUNTIME_INTEGRATION_RELEASE(VOLUME_MODE, 1, 2),
+        KEY_RUNTIME_INTEGRATION_RELEASE(PD_SLOT_1, 1, 2),
     };
 
     test_reset_state();
     test_configure_pinch_transparent_profile_path(child_pos);
 
-    CHECK(key_behavior_lookup(VOLUME_MODE).config != NULL);
-    CHECK(key_behavior_lookup(PINCH_MODE).config != NULL);
+    CHECK(key_behavior_lookup(PD_SLOT_1).config != NULL);
+    CHECK(key_behavior_lookup(PD_SLOT_5).config != NULL);
 
     key_runtime_integration_run(&fake_time, hold_steps, ARRAY_SIZE(hold_steps));
     CHECK(noah_runtime_debug_active_slot_count() == 2);
-    CHECK(noah_runtime_debug_slot_owner_keycode(hold_pos) == VOLUME_MODE);
-    CHECK(noah_runtime_debug_slot_owner_keycode(child_pos) == PINCH_MODE);
-    CHECK(noah_runtime_debug_slot_held_action_keycode(child_pos) == PINCH_MODE);
+    CHECK(noah_runtime_debug_slot_owner_keycode(hold_pos) == PD_SLOT_1);
+    CHECK(noah_runtime_debug_slot_owner_keycode(child_pos) == PD_SLOT_5);
+    CHECK(noah_runtime_debug_slot_held_action_keycode(child_pos) == PD_SLOT_5);
 
     key_runtime_integration_run(&fake_time, child_release_steps, ARRAY_SIZE(child_release_steps));
     CHECK(noah_runtime_debug_active_slot_count() == 1);
@@ -1223,7 +1223,7 @@ static void test_authored_hold_action_activates_pd_mode_while_held(void) {
     CHECK(pd_mode_local_active(PD_MODE_VOLUME));
     CHECK(pd_mode_local_locked_snapshot() == 0);
     CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == TEST_PD_HOLD_KEY);
-    CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == VOLUME_MODE);
+    CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == PD_SLOT_1);
 
     key_runtime_integration_run(&fake_time, &scenario[3], 2);
     CHECK(pd_mode_local_active_snapshot() == 0);
@@ -1236,13 +1236,13 @@ static void test_authored_hold_action_activates_pd_mode_while_held(void) {
 
 static void test_authored_double_tap_lock_locks_pd_mode(void) {
     const key_runtime_integration_step_t setup[] = {
-        KEY_RUNTIME_INTEGRATION_PRESS(VOLUME_MODE, 1, 2),
-        KEY_RUNTIME_INTEGRATION_RELEASE(VOLUME_MODE, 1, 2),
+        KEY_RUNTIME_INTEGRATION_PRESS(PD_SLOT_1, 1, 2),
+        KEY_RUNTIME_INTEGRATION_RELEASE(PD_SLOT_1, 1, 2),
         KEY_RUNTIME_INTEGRATION_ADVANCE(20),
-        KEY_RUNTIME_INTEGRATION_PRESS(VOLUME_MODE, 1, 2),
+        KEY_RUNTIME_INTEGRATION_PRESS(PD_SLOT_1, 1, 2),
     };
     const key_runtime_integration_step_t release[] = {
-        KEY_RUNTIME_INTEGRATION_RELEASE(VOLUME_MODE, 1, 2),
+        KEY_RUNTIME_INTEGRATION_RELEASE(PD_SLOT_1, 1, 2),
     };
     keypos_t key_pos = test_keypos(1, 2);
 
@@ -1262,7 +1262,7 @@ static void test_authored_double_tap_lock_locks_pd_mode(void) {
 static void test_authored_second_press_hold_branches_into_other_pd_mode(void) {
     keypos_t                             key_pos    = test_keypos(1, 2);
     const key_runtime_integration_step_t scenario[] = {
-        KEY_RUNTIME_INTEGRATION_PRESS(VOLUME_MODE, 1, 2), KEY_RUNTIME_INTEGRATION_RELEASE(VOLUME_MODE, 1, 2), KEY_RUNTIME_INTEGRATION_ADVANCE(20), KEY_RUNTIME_INTEGRATION_PRESS(VOLUME_MODE, 1, 2), KEY_RUNTIME_INTEGRATION_ADVANCE(TEST_PD_TAP_HOLD_TERM + 1), KEY_RUNTIME_INTEGRATION_SCAN(), KEY_RUNTIME_INTEGRATION_RELEASE(VOLUME_MODE, 1, 2), KEY_RUNTIME_INTEGRATION_SCAN(),
+        KEY_RUNTIME_INTEGRATION_PRESS(PD_SLOT_1, 1, 2), KEY_RUNTIME_INTEGRATION_RELEASE(PD_SLOT_1, 1, 2), KEY_RUNTIME_INTEGRATION_ADVANCE(20), KEY_RUNTIME_INTEGRATION_PRESS(PD_SLOT_1, 1, 2), KEY_RUNTIME_INTEGRATION_ADVANCE(TEST_PD_TAP_HOLD_TERM + 1), KEY_RUNTIME_INTEGRATION_SCAN(), KEY_RUNTIME_INTEGRATION_RELEASE(PD_SLOT_1, 1, 2), KEY_RUNTIME_INTEGRATION_SCAN(),
     };
 
     test_reset_state();
@@ -1273,8 +1273,8 @@ static void test_authored_second_press_hold_branches_into_other_pd_mode(void) {
     CHECK(pd_mode_local_active(PD_MODE_BRIGHTNESS));
     CHECK(pd_mode_local_locked_snapshot() == 0);
     CHECK(!pd_mode_local_active(PD_MODE_VOLUME));
-    CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == VOLUME_MODE);
-    CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == BRIGHTNESS_MODE);
+    CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == PD_SLOT_1);
+    CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == PD_SLOT_2);
     EXPECT_VOLUME_RESETS(1);
 
     key_runtime_integration_run(&fake_time, &scenario[6], 2);
@@ -1300,7 +1300,7 @@ static void test_right_alt_single_tap_locks_arrow_mode_without_leaking_ralt_stat
 
     CHECK(!key_runtime_integration_process_record(KC_RIGHT_ALT, right_alt_pos, true));
     CHECK(noah_runtime_debug_slot_owner_keycode(right_alt_pos) == KC_RIGHT_ALT);
-    CHECK(noah_runtime_debug_slot_tap_action(right_alt_pos) == ARROW_MODE_LOCK);
+    CHECK(noah_runtime_debug_slot_tap_action(right_alt_pos) == PD_SLOT_4_LOCK);
     CHECK(noah_runtime_debug_slot_held_action_keycode(right_alt_pos) == KC_NO);
 
     CHECK(!key_runtime_integration_process_record(KC_RIGHT_ALT, right_alt_pos, false));
@@ -1345,7 +1345,7 @@ static void test_direct_pd_lock_press_uses_physical_trigger_half(void) {
 
     test_reset_state();
 
-    CHECK(!key_runtime_integration_process_record(ARROW_MODE_LOCK, left_pos, true));
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_4_LOCK, left_pos, true));
     CHECK(pd_mode_local_active_snapshot() == PD_MODE_ARROW);
     CHECK(pd_mode_local_locked_snapshot() == PD_MODE_ARROW);
     CHECK(pd_mode_local_owner_sides_snapshot() == SPLIT_SIDE_MASK_LEFT);
@@ -1365,7 +1365,7 @@ static void test_gui_double_tap_hold_with_right_alt_lock_child_keeps_runtime_qui
 
         CHECK(!key_runtime_integration_process_record(KC_RIGHT_ALT, right_alt_pos, true));
         CHECK(noah_runtime_debug_slot_owner_keycode(right_alt_pos) == KC_RIGHT_ALT);
-        CHECK(noah_runtime_debug_slot_tap_action(right_alt_pos) == ARROW_MODE_LOCK);
+        CHECK(noah_runtime_debug_slot_tap_action(right_alt_pos) == PD_SLOT_4_LOCK);
         CHECK(noah_runtime_debug_slot_held_action_keycode(right_alt_pos) == KC_NO);
         CHECK(noah_runtime_debug_deferred_release_count() == 0);
 
@@ -1417,12 +1417,12 @@ static void test_dragscroll_child_overlap_stays_quiescent(uint16_t parent_keycod
             key_runtime_integration_scan();
         }
 
-        CHECK(!key_runtime_integration_process_record(DRAGSCROLL, child_pos, true));
+        CHECK(!key_runtime_integration_process_record(PD_SLOT_0, child_pos, true));
         CHECK(pd_mode_local_active_snapshot() == PD_MODE_DRAGSCROLL);
         CHECK(pd_mode_local_active(PD_MODE_DRAGSCROLL));
         CHECK(pd_mode_local_locked_snapshot() == 0);
-        CHECK(noah_runtime_debug_slot_owner_keycode(child_pos) == DRAGSCROLL);
-        CHECK(noah_runtime_debug_slot_held_action_keycode(child_pos) == DRAGSCROLL);
+        CHECK(noah_runtime_debug_slot_owner_keycode(child_pos) == PD_SLOT_0);
+        CHECK(noah_runtime_debug_slot_held_action_keycode(child_pos) == PD_SLOT_0);
         CHECK(noah_runtime_debug_deferred_release_count() == 0);
 #ifdef NOAH_PD_PROFILE_ENABLE
         CHECK(reset_dragscroll_count == 1); // Entry clears the shared scroll accumulator.
@@ -1433,8 +1433,8 @@ static void test_dragscroll_child_overlap_stays_quiescent(uint16_t parent_keycod
         key_runtime_integration_advance(&fake_time, TEST_PD_TAP_HOLD_TERM + 1);
         key_runtime_integration_scan();
         CHECK(pd_mode_local_active(PD_MODE_DRAGSCROLL));
-        CHECK(noah_runtime_debug_slot_owner_keycode(child_pos) == DRAGSCROLL);
-        CHECK(noah_runtime_debug_slot_held_action_keycode(child_pos) == DRAGSCROLL);
+        CHECK(noah_runtime_debug_slot_owner_keycode(child_pos) == PD_SLOT_0);
+        CHECK(noah_runtime_debug_slot_held_action_keycode(child_pos) == PD_SLOT_0);
         CHECK(noah_runtime_debug_deferred_release_count() == 0);
 
         if (release_parent_first) {
@@ -1443,7 +1443,7 @@ static void test_dragscroll_child_overlap_stays_quiescent(uint16_t parent_keycod
             CHECK(pd_mode_local_active(PD_MODE_DRAGSCROLL));
         }
 
-        CHECK(!key_runtime_integration_process_record(DRAGSCROLL, child_pos, false));
+        CHECK(!key_runtime_integration_process_record(PD_SLOT_0, child_pos, false));
         CHECK(noah_runtime_debug_slot_owner_keycode(child_pos) == KC_NO);
         CHECK(noah_runtime_debug_slot_held_action_keycode(child_pos) == KC_NO);
 
@@ -1477,11 +1477,11 @@ static void test_authored_layer_hold_with_dragscroll_child_stays_quiescent(void)
 static void test_pinch_single_tap_defers_mode_owned_gui_from_delayed_replay(void) {
     keypos_t                             key_pos       = test_keypos(2, 4);
     const key_runtime_integration_step_t press_steps[] = {
-        KEY_RUNTIME_INTEGRATION_PRESS(PINCH_MODE, 2, 4),
+        KEY_RUNTIME_INTEGRATION_PRESS(PD_SLOT_5, 2, 4),
     };
     const key_runtime_integration_step_t release_steps[] = {
         KEY_RUNTIME_INTEGRATION_ADVANCE(10),
-        KEY_RUNTIME_INTEGRATION_RELEASE(PINCH_MODE, 2, 4),
+        KEY_RUNTIME_INTEGRATION_RELEASE(PD_SLOT_5, 2, 4),
     };
     const key_runtime_integration_step_t flush_steps[] = {
         KEY_RUNTIME_INTEGRATION_ADVANCE(TEST_PD_MULTI_TAP_TERM + 1),
@@ -1492,13 +1492,13 @@ static void test_pinch_single_tap_defers_mode_owned_gui_from_delayed_replay(void
     test_configure_pinch_transparent_profile_path(key_pos);
     fake_mods = MOD_BIT(KC_LEFT_SHIFT);
 
-    CHECK(key_behavior_lookup(PINCH_MODE).config != NULL);
-    CHECK(pd_mode_for_keycode(PINCH_MODE) == PD_MODE_PINCH);
+    CHECK(key_behavior_lookup(PD_SLOT_5).config != NULL);
+    CHECK(pd_mode_for_keycode(PD_SLOT_5) == PD_MODE_PINCH);
 
     key_runtime_integration_run(&fake_time, press_steps, ARRAY_SIZE(press_steps));
     CHECK(!pd_mode_local_active(PD_MODE_PINCH));
     CHECK(fake_mods == MOD_BIT(KC_LEFT_SHIFT));
-    CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == PINCH_MODE);
+    CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == PD_SLOT_5);
     CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == KC_NO);
 
     key_runtime_integration_run(&fake_time, release_steps, ARRAY_SIZE(release_steps));
@@ -1517,11 +1517,11 @@ static void test_pinch_single_tap_defers_mode_owned_gui_from_delayed_replay(void
 static void test_pinch_single_tap_preserves_physically_held_gui_on_delayed_replay(void) {
     keypos_t                             key_pos       = test_keypos(2, 4);
     const key_runtime_integration_step_t press_steps[] = {
-        KEY_RUNTIME_INTEGRATION_PRESS(PINCH_MODE, 2, 4),
+        KEY_RUNTIME_INTEGRATION_PRESS(PD_SLOT_5, 2, 4),
     };
     const key_runtime_integration_step_t release_steps[] = {
         KEY_RUNTIME_INTEGRATION_ADVANCE(10),
-        KEY_RUNTIME_INTEGRATION_RELEASE(PINCH_MODE, 2, 4),
+        KEY_RUNTIME_INTEGRATION_RELEASE(PD_SLOT_5, 2, 4),
     };
     const key_runtime_integration_step_t flush_steps[] = {
         KEY_RUNTIME_INTEGRATION_ADVANCE(TEST_PD_MULTI_TAP_TERM + 1),
@@ -1544,7 +1544,7 @@ static void test_pinch_single_tap_preserves_physically_held_gui_on_delayed_repla
     key_runtime_integration_run(&fake_time, press_steps, ARRAY_SIZE(press_steps));
     CHECK(!pd_mode_local_active(PD_MODE_PINCH));
     CHECK(fake_mods == (MOD_BIT(KC_LEFT_SHIFT) | MOD_BIT(KC_LEFT_GUI)));
-    CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == PINCH_MODE);
+    CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == PD_SLOT_5);
 
     key_runtime_integration_run(&fake_time, release_steps, ARRAY_SIZE(release_steps));
     CHECK(!pd_mode_local_active(PD_MODE_PINCH));
@@ -1568,7 +1568,7 @@ static void test_pinch_masks_mode_owned_gui_during_concurrent_plain_key_processi
     test_configure_pinch_transparent_profile_path(pinch_key_pos);
     fake_mods = MOD_BIT(KC_LEFT_SHIFT);
 
-    CHECK(!key_runtime_integration_process_record(PINCH_MODE, pinch_key_pos, true));
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_5, pinch_key_pos, true));
     key_runtime_integration_advance(&fake_time, TEST_PD_TAP_HOLD_TERM + 1);
     key_runtime_integration_scan();
     test_flush_pending_tap_branch();
@@ -1582,7 +1582,7 @@ static void test_pinch_masks_mode_owned_gui_during_concurrent_plain_key_processi
     noah_post_process_record_user(KC_C, &plain_press);
     CHECK(fake_mods == (MOD_BIT(KC_LEFT_SHIFT) | MOD_BIT(KC_LEFT_GUI)));
 
-    CHECK(!key_runtime_integration_process_record(PINCH_MODE, pinch_key_pos, false));
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_5, pinch_key_pos, false));
     CHECK(!pd_mode_local_active(PD_MODE_PINCH));
 }
 
@@ -1597,7 +1597,7 @@ static void test_pinch_keeps_physically_held_gui_visible_during_concurrent_plain
     test_configure_pinch_transparent_profile_path(pinch_key_pos);
     fake_mods = MOD_BIT(KC_LEFT_SHIFT);
 
-    CHECK(!key_runtime_integration_process_record(PINCH_MODE, pinch_key_pos, true));
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_5, pinch_key_pos, true));
     key_runtime_integration_advance(&fake_time, TEST_PD_TAP_HOLD_TERM + 1);
     key_runtime_integration_scan();
     CHECK(pd_mode_local_active(PD_MODE_PINCH));
@@ -1613,7 +1613,7 @@ static void test_pinch_keeps_physically_held_gui_visible_during_concurrent_plain
     noah_post_process_record_user(KC_C, &plain_press);
     CHECK(fake_mods == (MOD_BIT(KC_LEFT_SHIFT) | MOD_BIT(KC_LEFT_GUI)));
 
-    CHECK(!key_runtime_integration_process_record(PINCH_MODE, pinch_key_pos, false));
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_5, pinch_key_pos, false));
     CHECK(!pd_mode_local_active(PD_MODE_PINCH));
 }
 
@@ -1624,21 +1624,21 @@ static void test_pinch_double_tap_hold_zoom_branch_keeps_projection_coherent(voi
     test_reset_state();
     test_configure_pinch_transparent_profile_path(key_pos);
 
-    CHECK(!key_runtime_integration_process_record(PINCH_MODE, key_pos, true));
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_5, key_pos, true));
     key_runtime_integration_advance(&fake_time, 10);
-    CHECK(!key_runtime_integration_process_record(PINCH_MODE, key_pos, false));
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_5, key_pos, false));
     CHECK(pd_mode_local_active_snapshot() == 0);
     CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 1);
 
     key_runtime_integration_advance(&fake_time, 20);
-    CHECK(!key_runtime_integration_process_record(PINCH_MODE, key_pos, true));
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_5, key_pos, true));
     key_runtime_integration_advance(&fake_time, TEST_PD_TAP_HOLD_TERM + 1);
     key_runtime_integration_scan();
     test_flush_pending_tap_branch();
 
     CHECK(pd_mode_local_active_snapshot() == PD_MODE_ZOOM);
-    CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == PINCH_MODE);
-    CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == ZOOM_MODE);
+    CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == PD_SLOT_5);
+    CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == PD_SLOT_3);
     CHECK(fake_managed_mods == 0);
     CHECK((fake_mods & MOD_BIT(KC_LEFT_GUI)) == 0);
 
@@ -1646,7 +1646,7 @@ static void test_pinch_double_tap_hold_zoom_branch_keeps_projection_coherent(voi
     CHECK(snapshot.core_shadow_pd_mode_local_active == PD_MODE_ZOOM);
     CHECK(snapshot.core_shadow_pointer_pd_mode_anchor_active);
 
-    CHECK(!key_runtime_integration_process_record(PINCH_MODE, key_pos, false));
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_5, key_pos, false));
     key_runtime_integration_scan();
 
     CHECK(pd_mode_local_active_snapshot() == 0);
@@ -1671,36 +1671,36 @@ static void test_volume_pinch_zoom_volume_alternation_keeps_projection_coherent(
     test_reset_state();
     test_configure_pinch_transparent_profile_path(pinch_pos);
 
-    CHECK(!key_runtime_integration_process_record(VOLUME_MODE, volume_pos, true));
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_1, volume_pos, true));
     CHECK(pd_mode_local_active_snapshot() == PD_MODE_VOLUME);
     snapshot = key_runtime_core_projection_snapshot_capture();
     CHECK(snapshot.core_shadow_pd_mode_local_active == PD_MODE_VOLUME);
 
     key_runtime_integration_advance(&fake_time, 10);
-    CHECK(!key_runtime_integration_process_record(VOLUME_MODE, volume_pos, false));
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_1, volume_pos, false));
     key_runtime_integration_scan();
     CHECK(pd_mode_local_active_snapshot() == 0);
     snapshot = key_runtime_core_projection_snapshot_capture();
     CHECK(snapshot.core_shadow_pd_mode_local_active == 0);
 
     key_runtime_integration_advance(&fake_time, 20);
-    CHECK(!key_runtime_integration_process_record(PINCH_MODE, pinch_pos, true));
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_5, pinch_pos, true));
     key_runtime_integration_advance(&fake_time, 10);
-    CHECK(!key_runtime_integration_process_record(PINCH_MODE, pinch_pos, false));
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_5, pinch_pos, false));
     CHECK(pd_mode_local_active_snapshot() == 0);
 
     key_runtime_integration_advance(&fake_time, 20);
-    CHECK(!key_runtime_integration_process_record(PINCH_MODE, pinch_pos, true));
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_5, pinch_pos, true));
     key_runtime_integration_advance(&fake_time, TEST_PD_TAP_HOLD_TERM + 1);
     key_runtime_integration_scan();
     test_flush_pending_tap_branch();
     CHECK(pd_mode_local_active_snapshot() == PD_MODE_ZOOM);
-    CHECK(noah_runtime_debug_slot_owner_keycode(pinch_pos) == PINCH_MODE);
-    CHECK(noah_runtime_debug_slot_held_action_keycode(pinch_pos) == ZOOM_MODE);
+    CHECK(noah_runtime_debug_slot_owner_keycode(pinch_pos) == PD_SLOT_5);
+    CHECK(noah_runtime_debug_slot_held_action_keycode(pinch_pos) == PD_SLOT_3);
     snapshot = key_runtime_core_projection_snapshot_capture();
     CHECK(snapshot.core_shadow_pd_mode_local_active == PD_MODE_ZOOM);
 
-    CHECK(!key_runtime_integration_process_record(PINCH_MODE, pinch_pos, false));
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_5, pinch_pos, false));
     key_runtime_integration_scan();
     CHECK(pd_mode_local_active_snapshot() == 0);
     CHECK(noah_runtime_debug_slot_owner_keycode(pinch_pos) == KC_NO);
@@ -1708,12 +1708,12 @@ static void test_volume_pinch_zoom_volume_alternation_keeps_projection_coherent(
     CHECK(snapshot.core_shadow_pd_mode_local_active == 0);
 
     key_runtime_integration_advance(&fake_time, 20);
-    CHECK(!key_runtime_integration_process_record(VOLUME_MODE, volume_pos, true));
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_1, volume_pos, true));
     CHECK(pd_mode_local_active_snapshot() == PD_MODE_VOLUME);
     snapshot = key_runtime_core_projection_snapshot_capture();
     CHECK(snapshot.core_shadow_pd_mode_local_active == PD_MODE_VOLUME);
 
-    CHECK(!key_runtime_integration_process_record(VOLUME_MODE, volume_pos, false));
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_1, volume_pos, false));
     key_runtime_integration_scan();
     CHECK(pd_mode_local_active_snapshot() == 0);
     CHECK(noah_runtime_debug_active_slot_count() == 0);
@@ -1733,9 +1733,9 @@ static void test_pinch_double_tap_salvos_stay_quiescent(void) {
     test_configure_pinch_transparent_profile_path(pinch_pos);
 
     for (uint8_t salvo = 0; salvo < 4; salvo++) {
-        CHECK(!key_runtime_integration_process_record(PINCH_MODE, pinch_pos, true));
+        CHECK(!key_runtime_integration_process_record(PD_SLOT_5, pinch_pos, true));
         key_runtime_integration_advance(&fake_time, 10);
-        CHECK(!key_runtime_integration_process_record(PINCH_MODE, pinch_pos, false));
+        CHECK(!key_runtime_integration_process_record(PD_SLOT_5, pinch_pos, false));
         key_runtime_integration_scan();
 
         CHECK(pd_mode_local_active_snapshot() == 0);
@@ -1746,9 +1746,9 @@ static void test_pinch_double_tap_salvos_stay_quiescent(void) {
         CHECK(snapshot.core_shadow_pd_mode_local_active == 0);
 
         key_runtime_integration_advance(&fake_time, 20);
-        CHECK(!key_runtime_integration_process_record(PINCH_MODE, pinch_pos, true));
+        CHECK(!key_runtime_integration_process_record(PD_SLOT_5, pinch_pos, true));
         key_runtime_integration_advance(&fake_time, 10);
-        CHECK(!key_runtime_integration_process_record(PINCH_MODE, pinch_pos, false));
+        CHECK(!key_runtime_integration_process_record(PD_SLOT_5, pinch_pos, false));
         key_runtime_integration_scan();
 
         CHECK(pd_mode_local_active_snapshot() == 0);
@@ -1783,24 +1783,24 @@ static void test_legacy_pinch_preempted_by_volume_clears_stale_pinch_owner(void)
     test_reset_state();
     test_configure_pinch_transparent_profile_path(pinch_pos);
 
-    CHECK(!key_runtime_integration_process_record(PINCH_MODE, pinch_pos, true));
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_5, pinch_pos, true));
     test_assert_no_pd_owner_invariant();
     key_runtime_integration_advance(&fake_time, TEST_PD_TAP_HOLD_TERM + 1);
     key_runtime_integration_scan();
-    test_assert_active_pd_owner_invariant(pinch_pos, PINCH_MODE, PINCH_MODE, PD_MODE_PINCH, true);
+    test_assert_active_pd_owner_invariant(pinch_pos, PD_SLOT_5, PD_SLOT_5, PD_MODE_PINCH, true);
 
     key_runtime_integration_advance(&fake_time, 10);
-    CHECK(!key_runtime_integration_process_record(VOLUME_MODE, volume_pos, true));
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_1, volume_pos, true));
 
-    test_assert_active_pd_owner_invariant(volume_pos, VOLUME_MODE, VOLUME_MODE, PD_MODE_VOLUME, false);
-    CHECK(noah_runtime_debug_slot_owner_keycode(pinch_pos) == PINCH_MODE);
+    test_assert_active_pd_owner_invariant(volume_pos, PD_SLOT_1, PD_SLOT_1, PD_MODE_VOLUME, false);
+    CHECK(noah_runtime_debug_slot_owner_keycode(pinch_pos) == PD_SLOT_5);
     CHECK(noah_runtime_debug_slot_held_action_keycode(pinch_pos) == KC_NO);
     CHECK((fake_mods & MOD_BIT(KC_LEFT_GUI)) == 0);
 
-    CHECK(!key_runtime_integration_process_record(PINCH_MODE, pinch_pos, false));
-    test_assert_active_pd_owner_invariant(volume_pos, VOLUME_MODE, VOLUME_MODE, PD_MODE_VOLUME, false);
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_5, pinch_pos, false));
+    test_assert_active_pd_owner_invariant(volume_pos, PD_SLOT_1, PD_SLOT_1, PD_MODE_VOLUME, false);
 
-    CHECK(!key_runtime_integration_process_record(VOLUME_MODE, volume_pos, false));
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_1, volume_pos, false));
     key_runtime_integration_scan();
     test_assert_no_pd_owner_invariant();
 }
@@ -1812,23 +1812,23 @@ static void test_legacy_volume_preempted_by_pinch_clears_stale_volume_owner(void
     test_reset_state();
     test_configure_pinch_transparent_profile_path(pinch_pos);
 
-    CHECK(!key_runtime_integration_process_record(VOLUME_MODE, volume_pos, true));
-    test_assert_active_pd_owner_invariant(volume_pos, VOLUME_MODE, VOLUME_MODE, PD_MODE_VOLUME, false);
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_1, volume_pos, true));
+    test_assert_active_pd_owner_invariant(volume_pos, PD_SLOT_1, PD_SLOT_1, PD_MODE_VOLUME, false);
 
     key_runtime_integration_advance(&fake_time, 10);
-    CHECK(!key_runtime_integration_process_record(PINCH_MODE, pinch_pos, true));
-    test_assert_active_pd_owner_invariant(volume_pos, VOLUME_MODE, VOLUME_MODE, PD_MODE_VOLUME, false);
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_5, pinch_pos, true));
+    test_assert_active_pd_owner_invariant(volume_pos, PD_SLOT_1, PD_SLOT_1, PD_MODE_VOLUME, false);
     key_runtime_integration_advance(&fake_time, TEST_PD_TAP_HOLD_TERM + 1);
     key_runtime_integration_scan();
 
-    test_assert_active_pd_owner_invariant(pinch_pos, PINCH_MODE, PINCH_MODE, PD_MODE_PINCH, true);
-    CHECK(noah_runtime_debug_slot_owner_keycode(volume_pos) == VOLUME_MODE);
+    test_assert_active_pd_owner_invariant(pinch_pos, PD_SLOT_5, PD_SLOT_5, PD_MODE_PINCH, true);
+    CHECK(noah_runtime_debug_slot_owner_keycode(volume_pos) == PD_SLOT_1);
     CHECK(noah_runtime_debug_slot_held_action_keycode(volume_pos) == KC_NO);
 
-    CHECK(!key_runtime_integration_process_record(VOLUME_MODE, volume_pos, false));
-    test_assert_active_pd_owner_invariant(pinch_pos, PINCH_MODE, PINCH_MODE, PD_MODE_PINCH, true);
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_1, volume_pos, false));
+    test_assert_active_pd_owner_invariant(pinch_pos, PD_SLOT_5, PD_SLOT_5, PD_MODE_PINCH, true);
 
-    CHECK(!key_runtime_integration_process_record(PINCH_MODE, pinch_pos, false));
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_5, pinch_pos, false));
     key_runtime_integration_scan();
     test_assert_no_pd_owner_invariant();
 }
@@ -1840,21 +1840,21 @@ static void test_legacy_pinch_double_tap_salvos_leave_no_pd_owner(void) {
     test_configure_pinch_transparent_profile_path(pinch_pos);
 
     for (uint8_t salvo = 0; salvo < 4; salvo++) {
-        CHECK(!key_runtime_integration_process_record(PINCH_MODE, pinch_pos, true));
+        CHECK(!key_runtime_integration_process_record(PD_SLOT_5, pinch_pos, true));
         test_assert_no_pd_owner_invariant();
 
         key_runtime_integration_advance(&fake_time, 10);
-        CHECK(!key_runtime_integration_process_record(PINCH_MODE, pinch_pos, false));
+        CHECK(!key_runtime_integration_process_record(PD_SLOT_5, pinch_pos, false));
         key_runtime_integration_scan();
         test_assert_no_pd_owner_invariant();
         CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 1);
 
         key_runtime_integration_advance(&fake_time, 20);
-        CHECK(!key_runtime_integration_process_record(PINCH_MODE, pinch_pos, true));
+        CHECK(!key_runtime_integration_process_record(PD_SLOT_5, pinch_pos, true));
         test_assert_no_pd_owner_invariant();
 
         key_runtime_integration_advance(&fake_time, 10);
-        CHECK(!key_runtime_integration_process_record(PINCH_MODE, pinch_pos, false));
+        CHECK(!key_runtime_integration_process_record(PD_SLOT_5, pinch_pos, false));
         key_runtime_integration_scan();
         test_assert_no_pd_owner_invariant();
         CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 1);
@@ -1878,22 +1878,22 @@ static void test_legacy_pinch_double_tap_hold_zoom_branch_keeps_single_owner(voi
     test_reset_state();
     test_configure_pinch_transparent_profile_path(pinch_pos);
 
-    CHECK(!key_runtime_integration_process_record(PINCH_MODE, pinch_pos, true));
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_5, pinch_pos, true));
     test_assert_no_pd_owner_invariant();
     key_runtime_integration_advance(&fake_time, 10);
-    CHECK(!key_runtime_integration_process_record(PINCH_MODE, pinch_pos, false));
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_5, pinch_pos, false));
     test_assert_no_pd_owner_invariant();
 
     key_runtime_integration_advance(&fake_time, 20);
-    CHECK(!key_runtime_integration_process_record(PINCH_MODE, pinch_pos, true));
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_5, pinch_pos, true));
     test_assert_no_pd_owner_invariant();
 
     key_runtime_integration_advance(&fake_time, TEST_PD_TAP_HOLD_TERM + 1);
     key_runtime_integration_scan();
     test_flush_pending_tap_branch();
-    test_assert_active_pd_owner_invariant(pinch_pos, PINCH_MODE, ZOOM_MODE, PD_MODE_ZOOM, false);
+    test_assert_active_pd_owner_invariant(pinch_pos, PD_SLOT_5, PD_SLOT_3, PD_MODE_ZOOM, false);
 
-    CHECK(!key_runtime_integration_process_record(PINCH_MODE, pinch_pos, false));
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_5, pinch_pos, false));
     key_runtime_integration_scan();
     test_assert_no_pd_owner_invariant();
 }
@@ -1904,27 +1904,27 @@ static void test_legacy_stacked_pinch_duplicate_press_keeps_owner_token_coherent
     test_reset_state();
     test_configure_pinch_transparent_profile_path(pinch_pos);
 
-    CHECK(!key_runtime_integration_process_record(PINCH_MODE, pinch_pos, true));
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_5, pinch_pos, true));
     test_assert_no_pd_owner_invariant();
 
     key_runtime_integration_advance(&fake_time, 5);
-    CHECK(!key_runtime_integration_process_record(PINCH_MODE, pinch_pos, true));
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_5, pinch_pos, true));
     test_assert_no_pd_owner_invariant();
 
     key_runtime_integration_advance(&fake_time, 5);
-    CHECK(!key_runtime_integration_process_record(PINCH_MODE, pinch_pos, false));
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_5, pinch_pos, false));
     key_runtime_integration_scan();
     test_assert_no_pd_owner_invariant();
     CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 1);
 
     key_runtime_integration_advance(&fake_time, 20);
-    CHECK(!key_runtime_integration_process_record(PINCH_MODE, pinch_pos, true));
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_5, pinch_pos, true));
     key_runtime_integration_advance(&fake_time, TEST_PD_TAP_HOLD_TERM + 1);
     key_runtime_integration_scan();
     test_flush_pending_tap_branch();
-    test_assert_active_pd_owner_invariant(pinch_pos, PINCH_MODE, ZOOM_MODE, PD_MODE_ZOOM, false);
+    test_assert_active_pd_owner_invariant(pinch_pos, PD_SLOT_5, PD_SLOT_3, PD_MODE_ZOOM, false);
 
-    CHECK(!key_runtime_integration_process_record(PINCH_MODE, pinch_pos, false));
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_5, pinch_pos, false));
     key_runtime_integration_scan();
     test_assert_no_pd_owner_invariant();
 }
@@ -1947,7 +1947,7 @@ static void test_gui_double_tap_hold_with_authored_pd_hold_keeps_processed_child
         CHECK(pd_mode_local_active_snapshot() == PD_MODE_VOLUME);
         CHECK(pd_mode_local_active(PD_MODE_VOLUME));
         CHECK(noah_runtime_debug_slot_owner_keycode(hold_pos) == TEST_PD_HOLD_KEY);
-        CHECK(noah_runtime_debug_slot_held_action_keycode(hold_pos) == VOLUME_MODE);
+        CHECK(noah_runtime_debug_slot_held_action_keycode(hold_pos) == PD_SLOT_1);
 
         CHECK(!key_runtime_integration_process_record(TEST_HANDLED_TAP_KEY, child_pos, true));
 
@@ -1987,11 +1987,11 @@ static void test_gui_double_tap_hold_with_authored_pd_hold_keeps_processed_child
 static void test_last_slot_hold_lock_dpi_and_disabled_slot(void) {
     keypos_t pos = test_keypos(0, 0);
     test_reset_state();
-    action_dispatch(VOLUME_MODE_LOCK);
+    action_dispatch(PD_SLOT_1_LOCK);
     CHECK(pd_mode_local_locked_snapshot() == PD_MODE_VOLUME);
     action_dispatch(PD_SLOT_6_LOCK);
     CHECK(pd_mode_local_locked_snapshot() == PD_MODE_VOLUME);
-    action_dispatch(VOLUME_MODE_LOCK);
+    action_dispatch(PD_SLOT_1_LOCK);
     CHECK(pd_mode_local_active_snapshot() == 0);
     noah_pd_config_t last = noah_pd_defaults[1];
     last.id = 7; last.dpi = 1200;
@@ -2019,7 +2019,7 @@ static void test_last_slot_hold_lock_dpi_and_disabled_slot(void) {
 // after the release nothing the behavior would have started may remain.
 
 static void test_lock_arrow(void) {
-    action_dispatch(ARROW_MODE_LOCK);
+    action_dispatch(PD_SLOT_4_LOCK);
     CHECK(pd_mode_local_locked_snapshot() == PD_MODE_ARROW);
 }
 
@@ -2114,7 +2114,7 @@ static void test_button_release_follows_its_press_across_mode_changes(void) {
     test_reset_state();
     test_lock_arrow();
     CHECK(!key_runtime_integration_process_record(MS_BTN1, pos, true));
-    action_dispatch(ARROW_MODE_LOCK);
+    action_dispatch(PD_SLOT_4_LOCK);
     CHECK(pd_mode_local_locked_snapshot() == 0);
     test_hold_consumed_button(MS_BTN1, pos, TEST_PD_TAP_HOLD_TERM + 40u);
     test_release_and_settle(MS_BTN1, pos);
@@ -2131,7 +2131,7 @@ static void test_button_release_follows_its_press_across_mode_changes(void) {
     test_lock_arrow();
     test_release_and_settle(MS_BTN1, pos);
     test_assert_button_quiescent(pos);
-    action_dispatch(ARROW_MODE_LOCK);
+    action_dispatch(PD_SLOT_4_LOCK);
     CHECK(pd_mode_local_active_snapshot() == 0 && pd_mode_local_locked_snapshot() == 0);
 }
 
@@ -2152,7 +2152,7 @@ static void test_consumed_button_is_an_ordinary_interrupting_press(void) {
     test_assert_button_quiescent(key_pos);
 
     // Unlocked with nothing held, the buttons are ordinary again.
-    action_dispatch(ARROW_MODE_LOCK);
+    action_dispatch(PD_SLOT_4_LOCK);
     CHECK(pd_mode_local_active_snapshot() == 0 && pd_mode_local_locked_snapshot() == 0);
     CHECK(!key_runtime_integration_process_record(MS_BTN1, button_pos, true));
     CHECK(!key_runtime_integration_process_record(MS_BTN1, button_pos, false));
@@ -2169,7 +2169,7 @@ static void test_configured_consume_button_runs_nothing(void) {
     test_reset_state();
     configured_pd_bytes[8 + 96 + 52] = 1u; // Volume consumes button 1.
     publish_configured_pd();
-    action_dispatch(VOLUME_MODE_LOCK);
+    action_dispatch(PD_SLOT_1_LOCK);
     CHECK(pd_mode_local_locked_snapshot() == PD_MODE_VOLUME);
     CHECK(!key_runtime_integration_process_record(MS_BTN1, pos, true));
     test_hold_consumed_button(MS_BTN1, pos, TEST_PD_TAP_HOLD_TERM + 40u);

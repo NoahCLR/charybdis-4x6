@@ -20,8 +20,9 @@ enum {
 
 // Migration tripwire: adding PD slots must not renumber deployed native keys.
 _Static_assert(MACRO_0 == 0x7e40 && MACRO_15 == 0x7e4f, "preserve macro identities");
-_Static_assert(DRAGSCROLL == 0x7e50 && VOLUME_MODE == 0x7e51 && BRIGHTNESS_MODE == 0x7e52 && ZOOM_MODE == 0x7e53 && ARROW_MODE == 0x7e54 && PINCH_MODE == 0x7e55, "preserve PD momentary identities");
-_Static_assert(DRAGSCROLL_LOCK == 0x7e56 && VOLUME_MODE_LOCK == 0x7e57 && BRIGHTNESS_MODE_LOCK == 0x7e58 && ZOOM_MODE_LOCK == 0x7e59 && ARROW_MODE_LOCK == 0x7e5a && PINCH_MODE_LOCK == 0x7e5b, "preserve PD lock identities");
+_Static_assert(PD_SLOT_0 == 0x7e50 && PD_SLOT_1 == 0x7e51 && PD_SLOT_2 == 0x7e52 && PD_SLOT_3 == 0x7e53 && PD_SLOT_4 == 0x7e54 && PD_SLOT_5 == 0x7e55, "preserve PD momentary identities");
+_Static_assert(PD_SLOT_0_LOCK == 0x7e56 && PD_SLOT_1_LOCK == 0x7e57 && PD_SLOT_2_LOCK == 0x7e58 && PD_SLOT_3_LOCK == 0x7e59 && PD_SLOT_4_LOCK == 0x7e5a && PD_SLOT_5_LOCK == 0x7e5b, "preserve PD lock identities");
+_Static_assert(PD_SLOT_6 == 0x7ef0 && PD_SLOT_6_LOCK == 0x7ef1 && PD_SLOT_7 == 0x7ef2 && PD_SLOT_7_LOCK == 0x7ef3, "preserve PD extension identities");
 _Static_assert(LAYER_LOCK_BASE == 0x7e5c, "preserve layer lock identities");
 _Static_assert(NOAH_KEYMAP_SAFE_RANGE == 0x7e5c + LAYER_COUNT, "preserve authored custom trigger identities");
 

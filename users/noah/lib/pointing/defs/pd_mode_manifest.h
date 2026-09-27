@@ -15,12 +15,12 @@ enum {
 
 // The first six keycodes and their lock partners retain deployed numeric values.
 #define NOAH_PD_MODE_BASE_LIST(PDM) \
-    PDM(DRAGSCROLL, DRAGSCROLL) \
-    PDM(VOLUME, VOLUME_MODE) \
-    PDM(BRIGHTNESS, BRIGHTNESS_MODE) \
-    PDM(ZOOM, ZOOM_MODE) \
-    PDM(ARROW, ARROW_MODE) \
-    PDM(PINCH, PINCH_MODE)
+    PDM(DRAGSCROLL, PD_SLOT_0) \
+    PDM(VOLUME, PD_SLOT_1) \
+    PDM(BRIGHTNESS, PD_SLOT_2) \
+    PDM(ZOOM, PD_SLOT_3) \
+    PDM(ARROW, PD_SLOT_4) \
+    PDM(PINCH, PD_SLOT_5)
 
 #define NOAH_PD_MODE_LIST(PDM) \
     NOAH_PD_MODE_BASE_LIST(PDM) \

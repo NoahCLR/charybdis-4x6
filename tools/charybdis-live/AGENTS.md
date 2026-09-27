@@ -114,7 +114,7 @@ Every layer may also import from itself.
 - Look a key up by what its value means, never by what the keyboard calls it.
   A position carries both: `keycode` is the stored name (`QK_USER_16`, or bare
   hex where the vocabulary names nothing) and `semantic` is the name every other
-  domain uses (`DRAGSCROLL`, `VIA_MACRO_0`, `LEFT_THUMB`). Behaviour rows, macro
+  domain uses (`PD_SLOT_0`, `VIA_MACRO_0`, `LEFT_THUMB`). Behaviour rows, macro
   slots and pointing slots are keyed by the second, so a lookup goes through
   `keyMeaning(position)`; matching on `position.keycode` silently finds nothing.
 - Colour comes from the model, never from a constant. If a surface shows a hue,

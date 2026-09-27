@@ -258,9 +258,10 @@ const appendedCheck = `
         "Profile Studio layout key hover tooltips should show key-specific behavior rows, direct macros, combo behavior, lifecycle text, RGB action colors, and macro previews"
     );
     assert(
-        displayKeyExpression("DRAGSCROLL") === "Dragscroll" &&
-        displayKeyExpression("DRAGSCROLL_LOCK") === "Dragscroll Lock",
-        "Profile Studio should render dragscroll keycodes with friendly labels"
+        displayKeyExpression("PD_SLOT_0") === "Dragscroll" &&
+        displayKeyExpression("PD_SLOT_0_LOCK") === "Dragscroll Lock" &&
+        displayKeyExpression("PD_SLOT_5") === "Pinch",
+        "Profile Studio should render pointing slot keycodes with factory labels"
     );
 
     const model = await buildModel(${JSON.stringify(repoRoot)});

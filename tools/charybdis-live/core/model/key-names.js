@@ -34,7 +34,7 @@ function semanticLabel(semantic) {
  * What one profile renames, over the catalogue.
  *
  *   labels    keycode name → label, under the stored name and the profile's own
- *   aliases   stored name → the profile's name for it (QK_USER_16 → DRAGSCROLL)
+ *   aliases   stored name → the profile's name for it (QK_USER_16 → PD_SLOT_0)
  *   pointing  every pointing-mode keycode, {name, native, code, label}
  *
  * `layers` holds the layer names, which every layer key reads by. Only a

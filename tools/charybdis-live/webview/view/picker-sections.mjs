@@ -20,7 +20,7 @@ const RETIRED = /^QK_USER_(?:[0-9]|1[0-5])$/;
 // Macro slots are offered by their VIA_MACRO_n names in the Macros section.
 const NATIVE_MACRO = /^QK_MACRO_\d+$/;
 // Charybdis's own drag scroll ignores the pointing-mode settings; drag scroll
-// is the DRAGSCROLL pointing mode. A key already holding one still reads back
+// is the factory dragscroll pointing slot. A key already holding one still reads back
 // by name, but the picker does not offer it.
 const UNSUPPORTED = new Set(["DRGSCRL", "DRG_TOG"]);
 // Keycodes for QMK features this firmware does not build, so they do nothing
