@@ -2,10 +2,10 @@
 // without leaving the layer you are reading.
 
 import {el, esc} from "../lib/dom.mjs";
-import {actionLabel, behaviourFor, behaviourTiers, combosAt, keyFace, keyMeaning, macroKeycodes, pointingSlotFor, resolvedPositions, visibleKeycode} from "../view/keyface.mjs";
+import {actionLabel, behaviourFor, behaviourTiers, combosAt, keyMeaning, keyName, macroKeycodes, pointingSlotFor, resolvedPositions, visibleKeycode} from "../view/keyface.mjs";
 import {pdColourRow, stageEnabled} from "../view/lighting.mjs";
 import {getModel, heldLayers, layerName, positionAt} from "../store.mjs";
-import {branchBadge, comboBadge, mark, sends, sendsKind, tierDot} from "./marks.mjs";
+import {branchBadge, comboBadge, keyNameMarked, mark, marked, sends, sendsKind, tierDot} from "./marks.mjs";
 import {helperWord, tierName, vocabulary, word} from "../view/vocabulary.mjs";
 
 const tip = el(`<div class="tip" hidden></div>`);
@@ -64,10 +64,9 @@ function keyCard(index) {
     const layer = stack[state()] || stack[0];
     const position = positionAt(layer, index);
     if (!position) return "";
-    const face = keyFace(position);
     const own = reachSections(model, layer, position, index);
     if (!own.length) own.push(`<div class="hc-sect"><div class="hc-empty">No key behaviour, macro, combo or pointing mode on this key.</div></div>`);
-    return `<div class="hc-head"><div class="hc-title"><span class="t">${esc(face.main || "Unmapped")}</span>
+    return `<div class="hc-head"><div class="hc-title"><span class="t">${keyNameMarked(model, keyName(position), keyMeaning(position))}</span>
         <span class="hc-pill">index ${index}</span></div>
         <code class="hc-code">${esc(visibleKeycode(model, position.keycode))}</code></div>${own.join("")}${seenThrough(model, stack, index)}`;
 }
@@ -83,8 +82,8 @@ function seenThrough(model, stack, index) {
     const from = answer.layer, position = answer.position;
     const sections = reachSections(model, from, position, index);
     return `<div class="hc-through"><div class="hc-sect">
-            <div class="hc-h">Seen through from ${esc(layerName(from))}</div>
-            <div class="hc-title"><span class="t">${esc(keyFace(position).main || "Unmapped")}</span></div>
+            <div class="hc-h">Seen through from ${marked(model, {kind: "layer", layer: from.index}, layerName(from))}</div>
+            <div class="hc-title"><span class="t">${keyNameMarked(model, keyName(position), keyMeaning(position))}</span></div>
             <code class="hc-code">${esc(visibleKeycode(model, position.keycode))}</code></div>
         ${sections.length ? sections.join("") : `<div class="hc-sect"><div class="hc-empty">No key behaviour, macro, combo or pointing mode on that key.</div></div>`}</div>`;
 }
@@ -108,7 +107,7 @@ function reachSections(model, layer, position, index) {
             return `<div class="hc-branch">${branchBadge(model, step.tapCount + 1).replace('class="bn"', 'class="bn hc-n"')}<div>${rows}</div></div>`;
         }).join("");
         sections.push(`<div class="hc-sect"><div class="hc-h">Key behaviour</div>
-            <div class="hc-sub">${esc(actionLabel(model, behaviour.keycode))} · ${behaviour.steps.length} branch${behaviour.steps.length === 1 ? "" : "es"} · tap/hold ${timing(behaviour.tapHoldTerm)}${behaviour.keepsAutoMouseAnchored ? " · keeps auto-mouse anchored" : ""}</div>
+            <div class="hc-sub">${keyNameMarked(model, actionLabel(model, behaviour.keycode), behaviour.keycode)} · ${behaviour.steps.length} branch${behaviour.steps.length === 1 ? "" : "es"} · tap/hold ${timing(behaviour.tapHoldTerm)}${behaviour.keepsAutoMouseAnchored ? " · keeps auto-mouse anchored" : ""}</div>
             ${branches}
             <div class="hc-sub" style="margin:7px 0 0">${lit
                 ? "The dot beside each tier is the colour the keyboard flashes on this key when that tier resolves."
@@ -135,7 +134,7 @@ function reachSections(model, layer, position, index) {
     if (combos.length) {
         sections.push(`<div class="hc-sect"><div class="hc-h">Combos</div>${combos.map((combo) => `
             <div class="hc-flow">${comboBadge(getModel(), combo.badge || "C")}
-            ${(combo.inputDisplays || combo.inputs || []).map((input) => `<span class="hc-chip">${esc(input)}</span>`).join('<span class="hc-life">+</span>')}
+            ${(combo.inputs || []).map((input, at) => `<span class="hc-chip">${keyNameMarked(model, combo.inputDisplays?.[at] ?? input, input)}</span>`).join('<span class="hc-life">+</span>')}
             <span class="hc-life">→</span><span class="hc-chip out">${esc(combo.outputDisplay || combo.output)}</span></div>`).join("")}</div>`);
     }
     return sections;

@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
+import keyNames from "../core/model/key-names.js";
 import test from "node:test";
 import {createRequire} from "node:module";
-import {behaviourFor, cellLabel, comboEditInputs, comboReferenceLayer, combosAt, behaviourListeningTo, canonicalKeycode, behaviourGridSteps, behaviourGroups, behaviourRouteKeys, behaviourTiers, macroReach, pointingReach, reachablePositions, resolvedPositions, bindingKeycode, bindingsForSlot, comboGroups, combosForKey, keyFace, keyMeaning, macroKeycodes, macroPlacements, macroAction, namedAction, pointingAction, pointingSlotFor, reachKeys, slotKeycodes, visibleKeycode} from "../webview/view/keyface.mjs";
+import {behaviourFor, cellLabel, comboAnswers, comboInputKeys, comboInputShown, combosOnKey, comboReferenceLayer, combosAt, behaviourListeningTo, canonicalKeycode, behaviourGridSteps, behaviourGroups, behaviourRouteKeys, behaviourTiers, macroReach, pointingReach, reachablePositions, resolvedPositions, bindingKeycode, bindingsForSlot, comboGroups, combosForKey, keyFace, keyMeaning, keyName, layerOfKeycode, macroKeycodes, macroPlacements, macroAction, namedAction, pointingAction, pointingSlotFor, reachKeys, slotKeycodes, toggleComboInput, visibleKeycode} from "../webview/view/keyface.mjs";
 
 // Slots come from the host with their binding keycodes; the tests use the
 // host's own registry rather than a copy of it.
@@ -518,21 +519,89 @@ test("a picked key finds the behaviour it would collide with, whatever its spell
     assert.equal(behaviourListeningTo(model, "KC_A"), undefined);
 });
 
-test("an existing combo opens with its inputs on the board, and keeps the ones this layer cannot reach", () => {
+test("the combo builder picks the key that answers, and rings its inputs by name on every layer", () => {
     const layer = (index, keycodes) => ({index, positions: keycodes.map((keycode, layoutIndex) => ({layoutIndex, keycode, display: keycode}))});
     const stack = [
         layer(0, ["KC_A", "KC_B", "KC_C", "KC_D"]),
-        layer(1, ["KC_TRANSPARENT", "KC_BTN1", "KC_BTN2", "KC_X"]),
+        layer(1, ["KC_TRANSPARENT", "KC_BTN1", "KC_COMMA", "KC_TRANSPARENT"]),
+        layer(2, ["KC_TRANSPARENT", "KC_TRANSPARENT", "KC_X", "KC_NO"]),
     ];
-    const onLayer = {badge: "C1", inputs: ["KC_BTN1", "KC_BTN2"], output: "KC_ESC"};
-    assert.deepEqual(comboEditInputs({}, stack, 1, onLayer),
-        {positions: [1, 2], codes: {1: "KC_BTN1", 2: "KC_BTN2"}, extras: []});
-    const through = {badge: "C2", inputs: ["KC_A", "KC_BTN1"], output: "KC_TAB"};
-    assert.deepEqual(comboEditInputs({}, stack, 1, through),
-        {positions: [0, 1], codes: {0: "KC_A", 1: "KC_BTN1"}, extras: []}, "a key falling through keeps the name it resolves to");
-    const partly = {badge: "C3", inputs: ["KC_BTN1", "KC_F13"], output: "KC_TAB"};
-    assert.deepEqual(comboEditInputs({}, stack, 1, partly),
-        {positions: [1], codes: {1: "KC_BTN1"}, extras: ["KC_F13"]});
+    // A transparent key picks what shows through it: the default layer on its
+    // own, the highest layer previewed on that is not transparent otherwise.
+    assert.equal(comboAnswers({}, stack, 1).get(0).keycode, "KC_A");
+    assert.equal(comboAnswers({}, stack, 2).get(1).keycode, "KC_B", "a layer not previewed on neither answers nor blocks");
+    assert.equal(comboAnswers({}, stack, 2, [1]).get(1).keycode, "KC_BTN1");
+    assert.deepEqual(toggleComboInput([], comboAnswers({}, stack, 2).get(0)), ["KC_A"], "never the raw transparent keycode");
+
+    // Picked on one layer, an input stays that key after the board moves on:
+    // Numbers' comma sits where Base has C, and the builder keeps the comma.
+    let inputs = toggleComboInput([], comboAnswers({}, stack, 1).get(1));
+    inputs = toggleComboInput(inputs, comboAnswers({}, stack, 0).get(3));
+    assert.deepEqual(inputs, ["KC_BTN1", "KC_D"]);
+    assert.deepEqual(comboInputKeys({}, stack, 0, [], ["KC_COMMA", "KC_A"]), [0],
+        "Base rings its own A, not the position Numbers holds the comma at");
+    assert.deepEqual(comboInputKeys({}, stack, 1, [], ["KC_COMMA", "KC_A"]), [0, 2]);
+    assert.equal(comboInputShown({}, stack, 0, [], "KC_COMMA"), false, "an input no key here presses is kept, not rung");
+    assert.equal(comboInputShown({}, stack, 1, [], "KC_COMMA"), true);
+
+    assert.deepEqual(toggleComboInput(["KC_A"], comboAnswers({}, stack, 2).get(3)), ["KC_A"], "a disabled key is not an input");
+});
+
+test("a key's name outside a cap is the host's whole name, not the cap's short legend", () => {
+    assert.equal(keyName({keycode: "LT(3,KC_F)", display: "F", editLabel: "F / Navigation", layerLabel: "Navigation"}), "F / Navigation",
+        "a layer-tap is a layer key too, which its cap's top line alone does not say");
+    assert.equal(keyName({keycode: "KC_A", display: "A", editLabel: "A"}), "A");
+    assert.equal(keyName({keycode: "KC_TRANSPARENT", display: "▽", editLabel: "Transparent"}), "Transparent");
+    assert.equal(keyName({keycode: "KC_NO", display: "", editLabel: "N/A"}), "Unmapped");
+});
+
+test("a layer key knows the layer it acts on, however the keyboard stores it", () => {
+    const model = {qmkKeycodeAliases: {QK_USER_31: "LOCK_LAYER(3)", KC_ENT: "KC_ENTER"}};
+    assert.equal(layerOfKeycode(model, "MO(3)"), 3);
+    assert.equal(layerOfKeycode(model, "LT(2,KC_J)"), 2);
+    assert.equal(layerOfKeycode(model, "LT(2, KC_J)"), 2, "however the expression is spaced");
+    assert.equal(layerOfKeycode(model, "QK_USER_31"), 3, "a layer lock stored as a user slot");
+    assert.equal(layerOfKeycode(model, "KC_ENT"), null);
+    assert.equal(layerOfKeycode(model, "LGUI(KC_3)"), null, "a number inside a keycode is not a layer");
+});
+
+test("a layer-tap cap names its layer on the second line, as the host names it", () => {
+    assert.deepEqual(keyFace({keycode: "LT(3,KC_SLASH)", display: "/", layerLabel: "Navigation"}), {main: "/", sub: "Navigation", kind: "layer"});
+    assert.deepEqual(keyFace({keycode: "MO(3)", display: "Navigation", layerLabel: "Navigation"}), {main: "Navigation", sub: "momentary", kind: "layer"});
+});
+
+test("the selected key lists the combos it is an input of, as the layers in view answer it", () => {
+    const layer = (index, keycodes) => ({index, positions: keycodes.map((keycode, layoutIndex) => ({layoutIndex, keycode, display: keycode}))});
+    const stack = [
+        layer(0, ["KC_A", "KC_B", "KC_C"]),
+        layer(1, ["KC_TRANSPARENT", "KC_COMMA", "KC_TRANSPARENT"]),
+        layer(2, ["KC_TRANSPARENT", "KC_TRANSPARENT", "KC_TRANSPARENT"]),
+    ];
+    const combos = [
+        {id: 0, badge: "C0", inputs: ["KC_A", "KC_B"]},
+        {id: 1, badge: "C1", inputs: ["KC_COMMA", "KC_A"]},
+        {id: 2, badge: "C2", inputs: ["KC_C", "KC_B"]},
+    ];
+    const ids = (answer) => answer.combos.map((combo) => combo.id);
+    assert.deepEqual(ids(combosOnKey({combos}, stack, 0, [], 0)), [0, 1]);
+    assert.deepEqual(ids(combosOnKey({combos}, stack, 1, [], 1)), [1], "the layer's own key");
+    assert.deepEqual(ids(combosOnKey({combos}, stack, 2, [], 1)), [0, 2], "on its own, a transparent key shows the default layer's");
+    const previewed = combosOnKey({combos}, stack, 2, [1], 1);
+    assert.equal(previewed.position.keycode, "KC_COMMA");
+    assert.deepEqual(ids(previewed), [1], "with a layer previewed on, the highest one that is not transparent");
+    const nothing = combosOnKey({combos}, [layer(0, ["KC_TRANSPARENT"])], 0, [], 0);
+    assert.equal(nothing.position, null);
+    assert.deepEqual(nothing.combos, [], "a key nothing answers takes part in nothing");
+});
+
+test("builder inputs keep the combo's stored order; a removed one picked again comes last", () => {
+    // QMK's "keys in order" is the stored order, so an edit must not rearrange it.
+    const at = (layoutIndex, keycode) => ({layoutIndex, keycode});
+    assert.deepEqual(toggleComboInput(["KC_W", "KC_Q"], at(3, "KC_E")), ["KC_W", "KC_Q", "KC_E"], "an added input comes last");
+    assert.deepEqual(toggleComboInput(["KC_W", "KC_Q"], at(1, "KC_W")), ["KC_Q"], "clicking an input's key takes it out");
+    assert.deepEqual(toggleComboInput(["KC_Q"], at(1, "KC_W")), ["KC_Q", "KC_W"], "a removed input picked again counts as added");
+    const semantic = {layoutIndex: 5, keycode: "QK_USER_17", semantic: "VOLUME"};
+    assert.deepEqual(toggleComboInput(["VOLUME"], semantic), [], "an input stored by its meaning matches its key");
 });
 
 test("an input placed on two keys rings both, and still counts as one input", () => {
@@ -551,9 +620,9 @@ test("an input placed on two keys rings both, and still counts as one input", ()
     assert.deepEqual(partial.onKeys, [], "two copies of one input do not complete a two-input combo");
     assert.equal(partial.elsewhere[0].covered, 1);
 
-    const edit = comboEditInputs({}, [layer], 0, combo);
-    assert.deepEqual(edit, {positions: [3, 4], codes: {3: "G(KC_C)", 4: "G(KC_V)"}, extras: []},
-        "the builder still holds one key per input, so saving does not duplicate inputs");
+    assert.deepEqual(comboInputKeys({}, [layer], 0, [], combo.inputs), [3, 4, 19, 21], "the builder rings both");
+    assert.deepEqual(toggleComboInput(combo.inputs, layer.positions[2]), ["G(KC_V)"],
+        "and either key is the one input, so picking cannot duplicate it");
 });
 
 test("a picked key matches its behaviour row however its modifiers are spelled", () => {
@@ -585,8 +654,8 @@ test("combos follow the keyboard's combo layer matching", () => {
     assert.equal(comboReferenceLayer({comboReadback: {layerReferences: [0, 0]}}, 1), 0, "the readback answers without settings");
     assert.equal(comboReferenceLayer({}, 1), 1, "and each layer matches itself by default");
 
-    const edit = comboEditInputs({...settings}, stack, 1, combo);
-    assert.deepEqual(edit.codes, {13: "KC_Q", 14: "KC_W"}, "the builder opens with the keys the keyboard matches");
+    assert.deepEqual(comboInputKeys({...settings}, stack, 1, [], combo.inputs), [13, 14], "the builder rings the keys the keyboard matches");
+    assert.equal(comboAnswers({...settings}, stack, 1).get(13).keycode, "KC_Q", "and picks the keycode it matches, not Numbers' own");
 });
 
 test("a key carries the badges of combos its own keycode fires on this layer, like behaviour dots", () => {
@@ -700,19 +769,15 @@ test("a macro's layers are the ones that hold a way to it themselves", () => {
     assert.deepEqual(macroPlacements(model, undefined, "VIA_MACRO_1"), []);
 });
 
-test("a behaviour cell reads by the key's name, and by its keycode when it has none", () => {
-    const model = {qmkKeyLabels: {KC_HASH: "#", KC_F: "F"}, layers: [{index: 0, displayName: "Base"}, {index: 1, displayName: "Numbers"}]};
+test("a behaviour cell reads by the host's name for its key, and by its keycode when it has none", () => {
+    // The host names every keycode, layer keys by their layer's name
+    // (core/model/key-names.js); the cell never composes a name itself.
+    const names = keyNames.profileKeyNames({layers: ["Base", "Numbers"], actionsKnown: true});
+    const model = {qmkKeyLabels: {KC_HASH: "#", KC_F: "F", ...names.labels, "LT(1,KC_F)": keyNames.keyLabel(names, 0x4109)}};
     assert.equal(cellLabel(model, {action: "KC_HASH"}), "#");
     assert.equal(cellLabel(model, {action: "LSFT(KC_ENTER)", label: "Shift+Enter"}), "Shift+Enter", "an expression takes the host's name");
     assert.equal(cellLabel(model, {action: "MO(1)"}), "Hold Numbers", "a layer action names the layer, in the picker's words");
     assert.equal(cellLabel(model, {action: "LOCK_LAYER(1)"}), "Lock Numbers");
-    assert.equal(cellLabel(model, {action: "LT(1, KC_F)"}), "F / Numbers");
+    assert.equal(cellLabel(model, {action: "LT(1,KC_F)"}), "F / Numbers");
     assert.equal(cellLabel(model, {action: "QK_BOOT"}), "QK_BOOT", "no clean name: the keycode is the label");
-});
-
-test("the combo editor opens inputs in the order the combo stores them, not board order", () => {
-    // QMK's "keys in order" is the stored order, so an edit must not rearrange it.
-    const layer = {index: 0, name: "LAYER_BASE", positions: [{layoutIndex: 13, keycode: "KC_Q"}, {layoutIndex: 14, keycode: "KC_W"}]};
-    const opened = comboEditInputs({layers: [layer], combos: []}, [layer], 0, {id: 0, badge: "C0", inputs: ["KC_W", "KC_Q"], output: "KC_ESCAPE"});
-    assert.deepEqual(opened.positions.map((index) => opened.codes[index]), ["KC_W", "KC_Q"]);
 });

@@ -44,7 +44,8 @@ test("device shortcut labels stay complete and semantic names require the advert
         committed: decodedDeviceProfile(), capabilities: {actionAbiDigest: 0xdcb00959},
     };
     const model = buildDeviceModel(state);
-    assert.deepEqual(model.layers[0].positions.map(key => key.display), ["Cmd+C", "Shift+Cmd+Z", "Dragscroll", "0x7E61", "0x7E62"]);
+    assert.deepEqual(model.layers[0].positions.map(key => key.display), ["Cmd+C", "Shift+Cmd+Z", "Dragscroll", "Lock Layer 5", "Lock Layer 6"],
+        "a layer lock is a user slot under the native ABI, named by what it does to which layer");
     assert.equal(model.layers[0].positions[2].keycode, "QK_USER_16", "the editable identity still encodes to the original numeric value");
     assert.equal(buildDeviceModel({...state, capabilities: {}}).layers[0].positions[2].display, "User 16");
 });
@@ -122,8 +123,9 @@ test("device layers become the layer model the UI keys on", () => {
     assert.equal(model.layers[0].positions[1].display, "▽");
 });
 
-test("layer and tap-hold keys show their target without losing the expression", () => {
+test("layer and tap-hold keys name their layer without losing the expression", () => {
     const model = buildDeviceModel({
+        committed: {state: "read", domains: {settings: {names: ["Base", "Numbers", "Symbols"]}}},
         layout: layoutWith([
             {layoutIndex: 0, row: 0, column: 0, keycode: 0x5222, resolved: {name: "MO(2)", label: "Layer hold 2", kind: "layer", layer: 2, known: true}},
             {layoutIndex: 1, row: 0, column: 1, keycode: 0x4105, resolved: {name: "LT(1,KC_B)", label: "B / layer 1", kind: "layer-tap", tap: "KC_B", layer: 1, known: true}},
@@ -131,9 +133,13 @@ test("layer and tap-hold keys show their target without losing the expression", 
     });
 
     const [momentary, layerTap] = model.layers[0].positions;
-    assert.equal(momentary.display, "L2");
-    assert.equal(momentary.keycode, "MO(2)");
+    assert.equal(momentary.display, "Symbols", "the cap names the layer, not its number");
+    assert.equal(momentary.editLabel, "Hold Symbols");
+    assert.equal(momentary.keycode, "MO(2)", "the raw keycode keeps the number");
     assert.equal(layerTap.display, "B");
+    assert.equal(layerTap.layerLabel, "Numbers");
+    assert.equal(layerTap.editLabel, "B / Numbers");
+    assert.equal(model.qmkKeyLabels["LT(1,KC_B)"], "B / Numbers", "any keycode on the board can be named by keycode");
     assert.equal(layerTap.keycode, "LT(1,KC_B)");
 });
 
@@ -354,6 +360,6 @@ test("a behaviour on a key never renames what the vocabulary already names", () 
     const plain = buildDeviceModel({macroView, capabilities: {actionAbiDigest: 0xdcb00959}}).qmkKeyLabels;
     assert.equal(labels["MO(1)"], plain["MO(1)"], "MO(1) reads as it does with no behaviour on it, not \"Mo(1)\"");
     assert.equal(labels.QK_MACRO_0, "Macro 0", "the macro screen's name");
-    assert.equal(labels.QK_USER_30, "Lock layer 2", "a bare user slot takes the behaviour's name, read naturally");
-    assert.equal(labels["LOCK_LAYER(2)"], "Lock layer 2");
+    assert.equal(labels.QK_USER_30, "Lock Layer 2", "a bare user slot reads by what it does to which layer");
+    assert.equal(labels["LOCK_LAYER(2)"], "Lock Layer 2");
 });

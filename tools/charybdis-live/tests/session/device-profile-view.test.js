@@ -1,7 +1,7 @@
 "use strict";
 const assert = require("node:assert/strict");
 const test = require("node:test");
-const {behaviorAliasesForView, behaviorRowsForView, rgbForView} = require("../../core/session/device-profile-view");
+const {behaviorRowsForView, rgbForView} = require("../../core/session/device-profile-view");
 const {actionName} = require("../../core/schema/actions");
 const {encodeKeyBehaviorDomain, decodeKeyBehaviorDomain} = require("../../core/schema/key-behavior-domain-v1");
 const {decodedDeviceProfile, capabilities} = require("../fixtures/device-profile");
@@ -88,12 +88,4 @@ test("RGB selectors and disabled stages are displayed without inventing enabled 
     assert.deepEqual(view.layerLedGroups.map(r => r.owner), ["Layer 0", "RGB_LAYER_GROUP_ALL"]);
     assert.equal(view.pdModeLedGroups[0].owner, "PD_MODE_DRAGSCROLL");
     assert.equal(view.keyBehaviorFeedbackLedGroups[0].owner, "KEY_FEEDBACK_GROUP_TAP_BRANCH_PENDING");
-});
-
-test("semantic target aliases link the advertised native ABI and stay absent for an unknown ABI", () => {
-    const domain = decodedDeviceProfile().domains.keyBehaviors;
-    const aliases = behaviorAliasesForView(domain, capabilities);
-    assert.equal(aliases[keycodes.resolve(0x7e50).name], "DRAGSCROLL");
-    assert.equal(aliases[keycodes.resolve(0x7e55).name], "PINCH_MODE");
-    assert.deepEqual(behaviorAliasesForView(domain, {actionAbiDigest: 0}), {});
 });

@@ -87,7 +87,16 @@ unlit keys black.
 - **The combo builder beside the board**, with inputs picked on the physical
   keyboard, per-combo window, hold and order requirements, and the shared hold
   threshold shown as shared. Pick on board scrolls the board into view when
-  input picking starts.
+  input picking starts. Inputs are held by the keycode the combo stores, never
+  by board position: a click takes the key that answers there — through a
+  transparent key, the highest layer previewed on that is not transparent, else
+  the default layer; under Combo Layer Matching, the reference layer's key — so
+  picks from several layers keep their own keys, and every layer rings the keys
+  that press the inputs from there. The Combos tab leads with **On the selected
+  key in this view**: every combo taking as an input the key that answers at
+  the selected position under the layers in view (⌘-clicked ones included), by
+  the same rule as picking; each row keeps the "reached by" of the group that
+  lists it.
 - **The LED group builder**, with the keyboard's own LED indices, the trackball
   LED, the rows already in each table, inline or reusable groups, and what each
   group is used by.

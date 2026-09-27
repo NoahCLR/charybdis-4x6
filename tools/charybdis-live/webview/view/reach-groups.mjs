@@ -7,6 +7,9 @@
 // order them, and say which list each reads.
 
 export const GROUP_TITLES = {
+    // The Combos tab's one cut across the others: what the selected key takes
+    // part in, in the view the board shows.
+    key: "On the selected key in this view",
     here: "On this layer",
     branches: "Through a behaviour on this layer",
     combos: "Through a combo on this layer",
@@ -18,7 +21,7 @@ export const GROUP_TITLES = {
 
 // A tab lists the groups it has in any order and they come out in this one,
 // so the headers do not move between tabs.
-export const GROUP_ORDER = ["here", "branches", "combos", "through", "belowBranches", "belowCombos", "elsewhere"];
+export const GROUP_ORDER = ["key", "here", "branches", "combos", "through", "belowBranches", "belowCombos", "elsewhere"];
 export const inGroupOrder = (groups) => GROUP_ORDER.map((id) => groups.find((group) => group.id === id)).filter(Boolean);
 
 // The Behaviours rail is an accordion: opening one route closes the others.

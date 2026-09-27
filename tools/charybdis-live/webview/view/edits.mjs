@@ -91,12 +91,6 @@ export function comboMessage(id, {output, inputs, termMs, holdTermMs, mustHold, 
     const payload = {output: String(output ?? "").trim(), inputs, termMs, holdTermMs, mustHold: Boolean(mustHold), mustTap: Boolean(mustTap), ordered: Boolean(ordered)};
     return id === null || id === undefined ? {type: "addCombo", ...payload} : {type: "saveCombo", id, ...payload};
 }
-// A combo's inputs as saved. The builder keeps inputs on the board and inputs
-// off it apart, so it cannot say their order itself: the inputs it kept stay in
-// the order the combo stored them, and the ones added follow in the order
-// picked. `stored` holds the names still kept from the combo being edited.
-export const comboInputOrder = (stored, names) =>
-    [...stored.filter((name) => names.includes(name)), ...names.filter((name) => !stored.includes(name))];
 export const deleteCombo = (id) => ({type: "deleteCombo", id});
 export const comboHoldTerm = (holdTermMs, identity) => ({type: "updateComboHoldTerm", holdTermMs, expectedBase: identity});
 // QMK keeps one hold threshold for every combo, stored on each combo row. A

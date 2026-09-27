@@ -12,74 +12,44 @@
 const {PD_BINDINGS} = require("../data/pd-bindings");
 const {VOCABULARY, slotName} = require("../model/vocabulary");
 const keycodeCatalog = require("../data/keycode-catalog");
-const {baseRgbForView, behaviorAliasesForView, behaviorRowsForView, combosForView, rgbForView} = require("./device-profile-view");
-const {knownActionAbi, layerRef} = require("../schema/actions");
-const {resolveNativeQmkExpression} = require("../schema/compiled-profile-v1");
+const {baseRgbForView, behaviorRowsForView, combosForView, rgbForView} = require("./device-profile-view");
+const {keyLabel, profileKeyNames} = require("../model/key-names");
+const {layerName} = require("../model/vocabulary");
+const {knownActionAbi, layerRef, nativeCode} = require("../schema/actions");
 const {dpiChoices} = require("../model/pointer-dpi");
 const {PROFILE_WIRE_FEATURES} = require("../protocol/profile-wire-v1");
 
 const CATALOG_SOURCE = "vendored QMK keycode catalog";
 
-// LEFT_THUMB → "Left thumb", LOCK_LAYER(2) → "Lock layer 2".
-function semanticLabel(semantic) {
-    const [, name, args] = /^([A-Z][A-Z0-9_]*)(?:\((.*)\))?$/.exec(semantic) || [, semantic, undefined];
-    const words = name.replace(/_/g, " ").toLowerCase();
-    return words.charAt(0).toUpperCase() + words.slice(1) + (args === undefined ? "" : ` ${args.replace(/\s+/g, "")}`);
-}
-
 function buildDeviceModel(state = {}) {
     const catalog = catalogViews();
-    if (state.macroView && knownActionAbi(state.capabilities?.actionAbiDigest)) {
-        for (const slot of state.macroView.viaMacros) {
-            const native = keycodeCatalog.resolve(resolveNativeQmkExpression(slot.keycode, {})).name;
-            // A named macro reads by its name everywhere a key is labelled.
-            const label = slot.name || `Macro ${slot.keycode.split("_").at(-1)}`;
-            catalog.aliases[native] = slot.keycode;
-            catalog.labels[native] = label;
-            catalog.labels[slot.keycode] = label;
-        }
+    // What this profile calls its keys, laid over the catalogue: one rule for
+    // the screens and the review (model/key-names.js).
+    const names = profileKeyNames({
+        layers: state.committed?.domains?.settings?.names,
+        actionsKnown: knownActionAbi(state.capabilities?.actionAbiDigest),
+        macros: state.macroView?.viaMacros,
+        behaviors: state.committed?.state === "read" ? state.committed.domains?.keyBehaviors?.rows : [],
+        pdModes: state.committed?.domains?.pdModes,
+    });
+    Object.assign(catalog.aliases, names.aliases);
+    Object.assign(catalog.labels, names.labels);
+    for (const entry of catalog.entries) if (names.labels[entry.key] !== undefined) entry.label = names.labels[entry.key];
+    // A pointing-mode keycode is offered in the picker under its slot.
+    for (const {name, native, code, label} of names.pointing) {
+        const entry = catalog.entries.find(entry => entry.keycode === code);
+        const presentation = {value: name, key: name, label, group: "Pointing modes", aliases: [native], keycode: code, searchTerms: [name, label], search: `${name} ${label}`.toLowerCase(), searchCompact: `${name}${label}`.toLowerCase()};
+        if (entry) Object.assign(entry, presentation); else catalog.entries.push(presentation);
     }
-    // A behaviour row keyed by a semantic target gives its keycode a name only
-    // where the vocabulary has none better than a bare user slot: LOCK_LAYER(2)
-    // reads "Lock layer 2" instead of "User 30". A key the catalog already
-    // names — MO(1) is "Layer hold 1" — or one an earlier pass named, such as
-    // "Macro 0", keeps that name, so one key reads the same on every
-    // screen and in the picker whether or not a behaviour sits on it.
-    if (state.committed?.state === "read" && state.committed.domains?.keyBehaviors) {
-        const aliases = behaviorAliasesForView(state.committed.domains.keyBehaviors, state.capabilities);
-        Object.assign(catalog.aliases, aliases);
-        for (const [key, semantic] of Object.entries(aliases)) {
-            const vocabulary = keycodeCatalog.resolve(resolveNativeQmkExpression(semantic, {}));
-            const generic = !vocabulary.known || vocabulary.group === "user";
-            if (!generic || (catalog.labels[key] !== undefined && catalog.labels[key] !== vocabulary.label)) continue;
-            const label = semanticLabel(semantic);
-            catalog.labels[key] = label;
-            catalog.labels[semantic] = label;
-            const entry = catalog.entries.find(entry => entry.key === key);
-            if (entry) entry.label = label;
-        }
-    }
-    // Every slot gets its keycodes, configured or not: the firmware's mode
-    // keycodes are a fixed registry, so a key may be placed for a slot that is
-    // still empty, and stays put when a slot is cleared. It does nothing until
-    // the slot is configured, which the label says.
-    if (knownActionAbi(state.capabilities?.actionAbiDigest)) for (const slot of state.committed?.domains?.pdModes || []) {
-        for (const locked of [false, true]) {
-            const binding = PD_BINDINGS[slot.id];
-            const name = locked ? binding.lock : binding.hold, code = locked ? binding.lockCode : binding.holdCode;
-            const title = slotName(slot);
-            const label = `${title} · ${locked ? "toggle" : "hold"}${slot.kind ? "" : " (empty)"}`, native = keycodeCatalog.resolve(code).name;
-            catalog.aliases[native] = name; catalog.labels[native] = label; catalog.labels[name] = label;
-            const entry = catalog.entries.find(entry => entry.keycode === code);
-            const presentation = {value: name, key: name, label, group: "Pointing modes", aliases: [native], keycode: code, searchTerms: [name, label], search: `${name} ${label}`.toLowerCase(), searchCompact: `${name}${label}`.toLowerCase()};
-            if (entry) Object.assign(entry, presentation); else catalog.entries.push(presentation);
-        }
-    }
+    // Every keycode the profile holds is in the table by its name here, so the
+    // interface names any of them by keycode and never composes a name itself:
+    // a layer-tap cannot be listed ahead of time, one per layer and tap key.
+    for (const value of profileKeycodes(state)) catalog.labels[keycodeCatalog.resolve(value).name] = keyLabel(names, value);
     return {
         // The words for every value the keyboard stores, so the interface
         // names things as the review does (model/vocabulary.js).
         vocabulary: VOCABULARY,
-        layers: layersFromDevice(state.layout, catalog.labels, catalog.aliases),
+        layers: layersFromDevice(state.layout, catalog.labels, catalog.aliases, names.layers),
 
         // Read off the keyboard when the committed profile has been read;
         // empty rather than fabricated before that.
@@ -130,7 +100,7 @@ function buildDeviceModel(state = {}) {
 
 // The UI keys layers by name and the device only knows indexes, so synthesise
 // stable names. They are display strings, not identifiers from source.
-function layersFromDevice(layout, labels, aliases = {}) {
+function layersFromDevice(layout, labels, aliases = {}, layerNames = []) {
     if (!layout || layout.state !== "read" || !Array.isArray(layout.layers)) {
         return [];
     }
@@ -142,6 +112,8 @@ function layersFromDevice(layout, labels, aliases = {}) {
             // A dual-role key shows what it taps, named the way that keycode is
             // named everywhere else: `/`, not `SLASH`.
             if (resolved.tap && labels[resolved.tap]) resolved.tapLabel = labels[resolved.tap];
+            // A layer key names its layer on the cap by the layer's name.
+            if (resolved.layer !== undefined) resolved.layerLabel = layerName(layerNames, resolved.layer);
             return {
                 layoutIndex: key.layoutIndex,
                 keycode: key.resolved.name,
@@ -153,6 +125,7 @@ function layersFromDevice(layout, labels, aliases = {}) {
                 semantic: aliases[key.resolved.name] || key.resolved.name,
                 display: displayFor(resolved),
                 editLabel: resolved.label,
+                ...(resolved.layerLabel ? {layerLabel: resolved.layerLabel} : {}),
                 row: key.row,
                 column: key.column,
                 value: key.keycode,
@@ -171,7 +144,7 @@ function displayFor(resolved) {
         return "";
     }
     if (resolved.kind === "layer") {
-        return `L${resolved.layer}`;
+        return resolved.layerLabel;
     }
     if (resolved.kind === "layer-tap" || resolved.kind === "mod-tap") {
         return resolved.tapLabel || trim(resolved.tap);
@@ -184,6 +157,21 @@ function displayFor(resolved) {
 function trim(name) {
     const stripped = String(name || "").replace(/^KC_/, "");
     return stripped.length <= 5 ? stripped : stripped.slice(0, 5);
+}
+
+// Every keycode value the profile stores: on its layers, in its behaviours and
+// in its combos.
+function profileKeycodes(state) {
+    const values = [];
+    if (state.layout?.state === "read") for (const layer of state.layout.layers || []) for (const key of layer.keys) values.push(key.keycode);
+    const behaviors = state.committed?.state === "read" ? state.committed.domains?.keyBehaviors?.rows || [] : [];
+    if (knownActionAbi(state.capabilities?.actionAbiDigest)) for (const row of behaviors) {
+        for (const action of [row.target, ...row.steps.flatMap((step) => [step.tap, step.hold?.action, step.longHold?.action])]) {
+            if (action) values.push(nativeCode(action));
+        }
+    }
+    if (state.combos?.state === "read") for (const row of state.combos.rows) values.push(...row.inputs, row.output);
+    return values.filter((value) => Number.isInteger(value));
 }
 
 // The decoded domains reach the UI only once the whole payload verified, so a

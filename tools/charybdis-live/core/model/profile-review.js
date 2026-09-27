@@ -1,61 +1,47 @@
 "use strict";
 
 const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../data/charybdis-layout");
-const {layerOfRef} = require("../schema/actions");
+const {layerOfRef, nativeCode} = require("../schema/actions");
+const {keyLabel, keyLabelWithName, profileKeyNames} = require("./key-names");
 const {decodedOf} = require("./portable-profile");
 const {settingsEditorView} = require("./settings-editor");
 const {macroEditorView} = require("./macro-editor");
-const keycodes = require("../data/keycode-catalog");
 const rgbEnums = require("../schema/rgb-domain-v1");
 const {KEY_BEHAVIOR_HOLD_MODES} = require("../schema/key-behavior-domain-v1");
 const {VOCABULARY, word, layerName: layerCalled, slotName, modifierNames} = require("./vocabulary");
 
 const words = text => String(text).replace(/^(RGB_|KEY_FEEDBACK_|PD_MODE_)/, "").replace(/_/g, " ").toLowerCase();
 const named = (values, value) => words(Object.entries(values).find(([, id]) => id === value)?.[0] ?? value);
-// A label is what a person reads, but many keycodes share one: KC_1 and KC_KP_1
-// are both "1". Where a label is shared, the review adds the keycode name, so
-// changing one for the other is never a row whose two sides look the same.
-let sharedLabels;
-function labelsUsedTwice() {
-    const seen = new Set(), shared = new Set();
-    for (let value = 0; value <= 0xffff; value++) {
-        const {label} = keycodes.resolve(value);
-        if (seen.has(label)) shared.add(label); else seen.add(label);
-    }
-    return shared;
-}
-function key(value) {
-    const {label, name} = keycodes.resolve(value);
-    sharedLabels ??= labelsUsedTwice();
-    return sharedLabels.has(label) && name !== label ? `${label} (${name})` : label;
-}
 // An action named as the editors name what it reaches: a layer, a pointing
 // mode or a macro by its own name in that snapshot, when it has one.
-function action(value, names = {}) {
+// A key, a layer key, a pointing mode and a macro read by the one name the
+// screens give their keycode (model/key-names.js); `withName` adds the stored
+// name, for a row whose two sides would otherwise read alike.
+function action(value, names = {}, withName = false) {
     if (!value || value.kind === 0) return "None";
-    if (value.kind === 1) return key(value.operand);
     const id = value.operand;
-    if (value.kind === 2 || value.kind === 3) return `${layerCalled(names.layers, id)} layer${value.kind === 3 ? " lock" : ""}`;
-    if (value.kind === 4 || value.kind === 5) return `${names.pointing?.[id] || slotName(null, id)}${value.kind === 5 ? " lock" : ""}`;
-    if (value.kind === 6) return `Macro ${id}${names.macros?.[id] ? ` · ${names.macros[id]}` : ""}`;
+    const code = value.kind === 7 ? undefined : nativeCode(value);
+    if (code !== undefined) return (withName ? keyLabelWithName : keyLabel)(names.keys, code);
     return `${value.kind === 7 ? "User macro" : "Action"} ${id}`;
 }
+// An action as a field: shown by its name, compared by what is stored.
+const actionField = (value, names, extra = {}) => ({text: action(value, names), detail: action(value, names, true), key: JSON.stringify(value), ...extra});
 // The names an action can be read by in one snapshot.
-const namesIn = (value, macros) => ({layers: value.settings.names, pointing: value.pdModes?.map(slot => slot.kind ? slot.name : null) || [],
-    macros: macros?.viaMacros.map(slot => slot.name) || []});
+const namesIn = (value, macros) => ({layers: value.settings.names,
+    keys: profileKeyNames({actionsKnown: true, layers: value.settings.names, macros: macros?.viaMacros, behaviors: value.behaviors.rows, pdModes: value.pdModes})});
 // The mark an action carries: what it reaches, when that has a colour of its
 // own — a pointing mode's light, a layer's colour.
 const actionMark = value => !value ? undefined
     : value.kind === 4 || value.kind === 5 ? {kind: "pointing", slot: value.operand}
     : value.kind === 2 || value.kind === 3 ? {kind: "layer", layer: value.operand} : undefined;
 // A pointing slot as fields, in the Pointing modes editor's words.
-function pointingFields(slot) {
+function pointingFields(slot, names) {
     const P = VOCABULARY.pointing;
     const result = new Map([["Movement", word(P.kinds, slot?.kind || 0)], ["Name", slot?.name || "Empty"]]);
     if (!slot?.kind) return result;
     const mods = mask => modifierNames(mask).join(" + ") || "None";
     const tap = output => !output?.keycode ? "None"
-        : `${key(output.keycode)} · ${output.modifierPolicy === 1 ? `${word(P.modifierPolicy, 1)} ${mods(output.mask)}` : word(P.modifierPolicy, output.modifierPolicy)}`;
+        : `${keyLabel(names.keys, output.keycode)} · ${output.modifierPolicy === 1 ? `${word(P.modifierPolicy, 1)} ${mods(output.mask)}` : word(P.modifierPolicy, output.modifierPolicy)}`;
     result.set("DPI", slot.dpi || "Normal pointer speed");
     result.set("Pointer layer", word(P.pointerLayer, slot.pointerLayer));
     if (slot.kind === 1) {
@@ -130,7 +116,7 @@ function behaviourFields(row, defaults, names) {
         // Compared by what is stored, so a renamed or cleared pointing mode
         // or layer is a change where it was made, not to every behaviour
         // that reaches it.
-        fields.set(`${step.tapIndex + 1}× ${VOCABULARY.tiers[name].toLowerCase()}`, {text: `${action(reaches, names)}${how}`, key: JSON.stringify([reaches, branch.mode, branch.repeatHz]),
+        fields.set(`${step.tapIndex + 1}× ${VOCABULARY.tiers[name].toLowerCase()}`, {text: `${action(reaches, names)}${how}`, detail: `${action(reaches, names, true)}${how}`, key: JSON.stringify([reaches, branch.mode, branch.repeatHz]),
             labelMark: {kind: "tier", tier: name, branch: step.tapIndex + 1}, mark: actionMark(reaches)});
     }
     return fields;
@@ -144,14 +130,16 @@ const holds = (label, value) => value !== undefined && !EMPTY.has(value) && !/^d
 // text and are both. A field may also carry its own label, when the map key is
 // an id rather than words.
 const text = value => typeof value === "object" && value !== null ? value.text : value;
+const detail = value => typeof value === "object" && value !== null ? value.detail ?? value.text : value;
 const compared = value => typeof value === "object" && value !== null ? value.key : value;
 const labelOf = (id, ...values) => values.find(value => typeof value === "object" && value?.label)?.label ?? id;
 
 function comboFields(row, names) {
     if (!row) return new Map();
     const options = ["mustHold", "mustTap", "ordered"].filter(flag => row[flag]).map(flag => VOCABULARY.comboOptions[flag]).join(", ");
-    return new Map([["Keys", {text: row.inputs.map(input => action(input, names)).join(" + "), key: JSON.stringify(row.inputs)}],
-        ["Sends", {text: action(row.output, names), key: JSON.stringify(row.output), mark: actionMark(row.output)}], ["Window", `${row.termMs} ms`],
+    return new Map([["Keys", {text: row.inputs.map(input => action(input, names)).join(" + "),
+        detail: row.inputs.map(input => action(input, names, true)).join(" + "), key: JSON.stringify(row.inputs)}],
+        ["Sends", actionField(row.output, names, {mark: actionMark(row.output)})], ["Window", `${row.termMs} ms`],
         ["Hold threshold", `${row.holdTermMs} ms`], ["Conditions", options || "none"]]);
 }
 
@@ -245,8 +233,12 @@ function profileReview(before, after) {
                 // side a field is absent from is null, never a word that
                 // could read as a value.
                 const was = status !== "added" && old.has(id), is = status !== "removed" && next.has(id);
+                // Two stored values can share a name (KC_1 and KC_KP_1 are
+                // both "1"); then both sides add what they are stored as.
+                const alike = was && is && text(old.get(id)) === text(next.get(id));
+                const shown = alike ? detail : text;
                 const entry = {label: labelOf(id, next.get(id), old.get(id)), status: was && is ? "changed" : is ? "added" : "removed",
-                    before: was ? text(old.get(id)) : null, after: is ? text(next.get(id)) : null};
+                    before: was ? shown(old.get(id)) : null, after: is ? shown(next.get(id)) : null};
                 // A field carries its colour and the marks of what it is about,
                 // on the side that shows them.
                 const side = (value, name) => value && typeof value === "object" ? value[name] : undefined;
@@ -263,8 +255,10 @@ function profileReview(before, after) {
     const namesA = namesIn(a, macrosA), namesB = namesIn(b, macrosB);
     a.document.layers.forEach((keys, l) => keys.forEach((code, p) => {
         if (code === b.document.layers[l][p]) return;
-        const values = code => ({text: key(code), key: code});
-        item("Layout", `layout:${l}:${p}`, `${layerName(b, l)} · ${positionName(p)}`, new Map([["", values(code)]]), new Map([["", values(b.document.layers[l][p])]]),
+        // Each side reads by its own snapshot's names: a renamed macro is
+        // its old name on the keyboard and its new one in the draft.
+        const values = (code, names) => ({text: keyLabel(names.keys, code), detail: keyLabelWithName(names.keys, code), key: code});
+        item("Layout", `layout:${l}:${p}`, `${layerName(b, l)} · ${positionName(p)}`, new Map([["", values(code, namesA)]]), new Map([["", values(b.document.layers[l][p], namesB)]]),
             {kind: "key", layer: l, layoutIndex: LAYOUT_INDEX.get(p)}, undefined, {kind: "layer", layer: l});
     }));
     a.settings.names.forEach((name, i) => item("Layers", `layerName:${i}`, `Layer ${i}`, new Map([["Name", layerCalled(a.settings.names, i)]]), new Map([["Name", layerCalled(b.settings.names, i)]]), {kind: "layers"}, undefined, {kind: "layer", layer: i}));
@@ -316,7 +310,7 @@ function profileReview(before, after) {
     for (let id = 0; id < 8; id++) {
         const old = a.pdModes?.[id], next = b.pdModes?.[id];
         item("Pointing modes", `pd:${id}`, `Slot ${id}${(next?.name || old?.name) ? ` · ${next?.kind ? next.name : old?.name}` : ""}`,
-            pointingFields(old), pointingFields(next), {kind: "pointing", slot: id}, [Boolean(old?.kind), Boolean(next?.kind)], {kind: "pointing", slot: id});
+            pointingFields(old, namesA), pointingFields(next, namesB), {kind: "pointing", slot: id}, [Boolean(old?.kind), Boolean(next?.kind)], {kind: "pointing", slot: id});
     }
     const lightA = lightingRecords(a), lightB = lightingRecords(b);
     for (const [unit, record] of lightB) {

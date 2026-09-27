@@ -718,7 +718,7 @@ const COMBOS = [
 ];
 const SETTINGS = [
   {g:"Key timing", rows:[
-    ["Dual-role tap / hold","Milliseconds before a dual-role key becomes a hold.","200","ms"],
+    ["Dual-role tap / hold","How long LT(), MT(), TT(), OSL() and OSM() keys wait before a press counts as a hold (QMK's tapping term). LT() behaviours with empty tap / hold timing use it too; other behaviours use Behaviour tap / hold.","200","ms"],
     ["Behaviour tap / hold","Used when a behaviour leaves its tap / hold timing empty.","150","ms"],
     ["Long hold","Used when a behaviour leaves its long-hold timing empty.","400","ms"],
     ["Repeated taps","Maximum gap between repeated taps when a behaviour has no override.","150","ms"],

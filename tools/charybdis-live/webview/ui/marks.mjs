@@ -9,7 +9,7 @@
 
 import {css, isOff} from "../lib/colour.mjs";
 import {esc} from "../lib/dom.mjs";
-import {namedAction} from "../view/keyface.mjs";
+import {layerOfKeycode, namedAction} from "../view/keyface.mjs";
 import {feedbackColours, pdColourRow, stageEnabled} from "../view/lighting.mjs";
 import {layerSwatch} from "./layerbar.mjs";
 
@@ -68,6 +68,18 @@ export function mark(model, value) {
         case "stage": return `<i class="stagedot ${value.on ? "on" : ""}"></i>`;
         default: return "";
     }
+}
+
+// A key's name with the layer it acts on marked where the name says it:
+// "F / ■ Navigation", "Hold ■ Navigation". Every key name ends in its layer's
+// name (core/model/key-names.js); one that does not is left as it is.
+export function keyNameMarked(model, text, keycode) {
+    const at = layerOfKeycode(model, keycode);
+    const layer = at === null ? null : model?.layers?.[at];
+    const name = layer ? layer.displayName || layer.name : "";
+    const label = String(text ?? "");
+    if (!name || !label.endsWith(name)) return esc(label);
+    return `${esc(label.slice(0, -name.length))}${marked(model, {kind: "layer", layer: layer.index}, name)}`;
 }
 
 // A label with its mark in front, as a label reads everywhere. Where marked

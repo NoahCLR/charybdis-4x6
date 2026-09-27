@@ -17,6 +17,14 @@ test("review preserves untrusted names as text data", () => {
     const after=snapshot(reorderLayers(before.document,[0,1,2,3,4,5,6,7],names));
     assert.equal(profileReview(before,after)[0].fields[0].after,names[0]);
 });
+test("a combo's keys read as the screens read them, with no stored name where nothing reads alike", () => {
+    const {pdModes:slots,settings}=validateSnapshot(pdDocument());
+    const base=combos(pdDocument(),()=>comboRows()), before=snapshot(base);
+    // LT(3,KC_SLASH) and a pointing-mode key: once "/ / layer 3 (LT(3,KC_SLASH))" and "User 16".
+    const after=snapshot(combos(base,rows=>rows.map((row,id)=>id===0?{...row,inputs:[{kind:1,flags:0,operand:0x4338},{kind:1,flags:0,operand:0x7e50}]}:row)));
+    const keys=profileReview(before,after).find(row=>row.unit==="combo:0").fields.find(field=>field.label==="Keys");
+    assert.equal(keys.after,`/ / ${settings.names[3]} + ${slots[0].name} · hold`,"a layer by its name");
+});
 test("a key changed for another with the same label is still a visible change", () => {
     const before=snapshot(document()), changed=structuredClone(before.document);
     changed.layers[1][7]=0x1e; const base=snapshot(changed);
@@ -138,7 +146,7 @@ test("a pointing-mode action reads by its slot's name, and carries the slot for 
     const after=snapshot(behaviours(base,rows=>rows.map(entry=>JSON.stringify(entry.target)===JSON.stringify(target)
         ?{...entry,steps:[{tapIndex:0,tap:{kind:4,flags:0,operand:0}}]}:entry)));
     const field=profileReview(before,after)[0].fields.find(entry=>entry.label==="1× tap");
-    assert.equal(field.after,slots[0].name,"named as the Pointing modes screen names it");
+    assert.equal(field.after,`${slots[0].name} · hold`,"named as the screens name its keycode (model/key-names.js)");
     assert.deepEqual(field.afterMark,{kind:"pointing",slot:0});
 });
 test("a setting is marked with what it governs, as the Settings screen marks it", () => {

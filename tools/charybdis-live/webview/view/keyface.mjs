@@ -19,15 +19,35 @@ export function keyFace(position) {
     // what is true of the key rather than of its label.
     const emptySlot = /^(.+) \(empty\)$/.exec(position.display || "");
     if (emptySlot) return {main: emptySlot[1], sub: "empty", kind: "key"};
-    // Every layer keycode reads "L1" on the cap, so the second line says what
-    // it does to that layer; a mod-tap reads as its tap key, so the second
+    // A layer keycode's cap names its layer, so the second line says what it
+    // does to that layer; a layer-tap's second line names its layer; a mod-tap reads as its tap key, so the second
     // line names the modifier its hold sends — otherwise MT(Shift, A) and a
     // plain A, or MO(1) and TG(1), would be indistinguishable on the board.
     return {
         main: position.display || keycode,
-        sub: layerTap ? shortLayer(layerTap[1]) : layerKey ? LAYER_VERBS[layerKey[1]] : modTap ? modTapHold(modTap[1]) : "",
+        sub: layerTap ? position.layerLabel || shortLayer(layerTap[1]) : layerKey ? LAYER_VERBS[layerKey[1]] : modTap ? modTapHold(modTap[1]) : "",
         kind: layerTap || layerKey ? "layer" : "key",
     };
+}
+
+// The layer a keycode acts on, as its place in the stack: MO(3), LOCK_LAYER(3)
+// and LT(3,KC_F) all name layer 3. A stored name the host knows by a semantic
+// one (QK_USER_31 → LOCK_LAYER(3)) is read by that. Null for any other key.
+const LAYER_KEYCODE = /^(?:MO|TG|TT|OSL|TO|DF|PDF|LOCK_LAYER)\(\s*(\d+)\s*\)$|^LT\(\s*(\d+)\s*,/;
+export function layerOfKeycode(model, keycode) {
+    const name = model?.qmkKeycodeAliases?.[keycode] ?? keycode;
+    const match = LAYER_KEYCODE.exec(String(name ?? ""));
+    return match ? Number(match[1] ?? match[2]) : null;
+}
+
+// A key by its whole name, for anything that is not a key cap. A cap shows what
+// fits — "F" over "Navigation" — and the name is the host's for the keycode,
+// "F / Navigation" (core/model/key-names.js).
+export function keyName(position) {
+    const face = keyFace(position);
+    if (face.kind === "transparent") return "Transparent";
+    if (face.kind === "disabled" || face.kind === "none") return "Unmapped";
+    return position.editLabel || face.main || position.keycode || "";
 }
 
 const LAYER_VERBS = {MO: "momentary", TO: "move", TG: "toggle", OSL: "one-shot", DF: "default", PDF: "default", TT: "tap-toggle"};
@@ -38,6 +58,7 @@ const modTapHold = (mods) => mods.split("|").map((mod) => {
     return match ? `${match[1] === "R" ? "R" : ""}${MOD_WORDS[match[2]]}` : mod.trim();
 }).join("+");
 
+// Only for a position the host has not named: the layer the keycode holds.
 const shortLayer = (name) => name.replace(/^LAYER_/, "").toLowerCase();
 
 // A position carries two names: the one the keyboard stores (`QK_USER_16`, or
@@ -64,20 +85,12 @@ export const actionLabel = (model, name) => model?.qmkKeyLabels?.[name]
     || String(name ?? "");
 
 // What a behaviour cell reads as in the grid: the name a person knows the key
-// by, so it says "#" and "Shift+Enter" where the keyboard stores KC_HASH and
-// LSFT(KC_ENTER). A layer action names its layer in the picker's words. With
-// no clean name the keycode is the label. The cell editor keeps the keycode.
-const CELL_LAYER_WORDS = {MO: "Hold", LOCK_LAYER: "Lock", TG: "Lock", TT: "Tap-toggle", OSL: "One-shot", TO: "Move"};
+// by, so it says "#", "Shift+Enter" and "Hold Numbers" where the keyboard
+// stores KC_HASH, LSFT(KC_ENTER) and MO(1). Every name comes from the host
+// (core/model/key-names.js); with none, the keycode is the label. The cell
+// editor keeps the keycode.
 export function cellLabel(model, branch) {
     const action = String(branch?.action ?? "");
-    const layer = (index) => {
-        const row = (model?.layers || [])[Number(index)];
-        return row?.displayName || row?.name || `Layer ${index}`;
-    };
-    const layerKey = /^(MO|LOCK_LAYER|TG|TT|OSL|TO)\(\s*(\d+)\s*\)$/.exec(action);
-    if (layerKey) return `${CELL_LAYER_WORDS[layerKey[1]]} ${layer(layerKey[2])}`;
-    const layerTap = /^LT\(\s*(\d+)\s*,\s*(.+?)\s*\)$/.exec(action);
-    if (layerTap) return `${actionLabel(model, layerTap[2])} / ${layer(layerTap[1])}`;
     const named = actionLabel(model, action);
     return named !== action ? named : branch?.label || action;
 }
@@ -320,7 +333,10 @@ export function behaviourGridSteps(behaviour, advertisedMaximum = 5) {
 // layer" goes through here, or the board's badges and the combo table disagree.
 const comboTouches = (combo, position) => Array.isArray(combo?.inputPositions) && combo.inputPositions.length
     ? combo.inputPositions.includes(position.layoutIndex)
-    : (combo?.inputs || []).some((input) => input === position.keycode || input === keyMeaning(position));
+    : (combo?.inputs || []).some((input) => inputOn(input, position));
+// Whether a key presses the input a combo stores by this name: by the keycode
+// it stores, or by what that keycode means.
+const inputOn = (name, position) => name === position.keycode || name === keyMeaning(position);
 
 // The matching rule alone, for one key, with no layer in view. Screens ask
 // combosAt(), which applies it the way the keyboard does on the layer shown.
@@ -339,7 +355,7 @@ function comboKeysAmong(positions, combo) {
     for (const position of positions) {
         if (!comboTouches(combo, position)) continue;
         keys.push(position);
-        covered.add(inputs.find((name) => name === position.keycode || name === keyMeaning(position)) ?? position.keycode);
+        covered.add(inputs.find((name) => inputOn(name, position)) ?? position.keycode);
     }
     return {keys, covered: covered.size};
 }
@@ -456,26 +472,57 @@ export function combosOnLayer(model, stack, at) {
 }
 export const combosAt = (model, stack, at, layoutIndex) => combosOnLayer(model, stack, at).get(layoutIndex) || [];
 
-// What the combo builder starts from when an existing combo is opened: the
-// board positions its inputs sit on from this layer, each with the input name
-// the keyboard stores, and any input this layer cannot reach, which is kept
-// rather than silently dropped on save.
-export function comboEditInputs(model, stack, at, combo) {
-    const groups = comboGroups({...model, combos: [combo]}, stack, at);
-    const entry = groups.onKeys[0] || groups.throughKeys[0] || groups.elsewhere[0];
-    const names = combo?.inputs || [];
-    const positions = [], codes = {}, used = new Set();
-    for (const {position} of entry?.keys || []) {
-        const input = names.find((name) => !used.has(name) && (name === position.keycode || name === keyMeaning(position)));
-        if (input === undefined || positions.includes(position.layoutIndex)) continue;
-        used.add(input);
-        positions.push(position.layoutIndex);
-        codes[position.layoutIndex] = input;
-    }
-    // In stored order, not board order: QMK's "keys in order" is the order the
-    // combo lists its inputs, so the editor must not rearrange them.
-    positions.sort((left, right) => names.indexOf(codes[left]) - names.indexOf(codes[right]));
-    return {positions, codes, extras: names.filter((name) => !used.has(name))};
+// The combo builder holds its inputs by the names the combo stores, in stored
+// order, never by board position: a combo fires on keycodes, and one position
+// carries a different key on every layer. The board is only where they are
+// picked and shown.
+//
+// What the combo engine sees at each position while `at` is on top and `held`
+// are previewed on under it. Under Combo Layer Matching that is the reference
+// layer's raw keycode, as groupCombos matches it; otherwise the key that
+// answers — the highest active layer that is not transparent, which is the
+// default layer when nothing else is previewed on. Keyed by layout index; a
+// position nothing answers is absent.
+export function comboAnswers(model, stack, at, held = []) {
+    const reference = comboReferenceLayer(model, at);
+    const positions = reference !== at && stack[reference]
+        ? stack[reference].positions || []
+        : resolvedPositions(stack, at, held).map((entry) => entry.position);
+    return new Map(positions.map((position) => [position.layoutIndex, position]));
+}
+
+// The board keys that press one of the builder's inputs from this view. An
+// input placed on two keys rings both; one no key here presses rings nothing,
+// and stays an input.
+export function comboInputKeys(model, stack, at, held, inputs) {
+    return [...comboAnswers(model, stack, at, held)]
+        .filter(([, position]) => inputs.some((name) => inputOn(name, position)))
+        .map(([layoutIndex]) => layoutIndex);
+}
+
+// Whether a builder input is pressed by any key in this view.
+export const comboInputShown = (model, stack, at, held, name) =>
+    [...comboAnswers(model, stack, at, held).values()].some((position) => inputOn(name, position));
+
+// The combos that take the key at this position as an input, in the view the
+// board shows: `at` on top with `held` previewed on under it, so a transparent
+// key asks about what shows through it, as picking it would (comboAnswers).
+// `position` is that key, or null where nothing answers.
+export function combosOnKey(model, stack, at, held, layoutIndex) {
+    const position = comboAnswers(model, stack, at, held).get(layoutIndex) || null;
+    return {position, combos: combosForKey(model, position)};
+}
+
+// A board click while picking, given the key that answers there: the input it
+// presses leaves the combo if the combo has it, and otherwise joins at the end
+// under the keycode the keyboard stores for that key. One removed and picked
+// again therefore counts as added. A position nothing answers, or a disabled
+// key, is not an input.
+export function toggleComboInput(inputs, position) {
+    if (!position || keyFace(position).kind === "disabled") return inputs;
+    return inputs.some((name) => inputOn(name, position))
+        ? inputs.filter((name) => !inputOn(name, position))
+        : [...inputs, position.keycode];
 }
 
 export const macroKeycodes = (keycode) =>

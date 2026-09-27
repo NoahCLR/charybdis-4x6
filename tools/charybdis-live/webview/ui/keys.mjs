@@ -5,7 +5,7 @@ import {css, isOff, label as hsvLabel} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {scrollContentTo} from "../lib/scroll.mjs";
 import {LED_INDEX} from "../view/geometry.mjs";
-import {actionLabel, behaviourFor, cellLabel, behaviourListeningTo, resolvedPositions, canonicalKeycode, behaviourGridSteps, behaviourGroups, behaviourRouteKeys, behaviourTiers, comboEditInputs, comboGroups, combosAt, keyFace, keyMeaning, macroReach, pointingReach, pointingSlotFor, pointingVariant, reachKeys, visibleKeycode} from "../view/keyface.mjs";
+import {actionLabel, behaviourFor, cellLabel, behaviourListeningTo, resolvedPositions, canonicalKeycode, behaviourGridSteps, behaviourGroups, behaviourRouteKeys, behaviourTiers, comboAnswers, comboGroups, comboInputKeys, comboInputShown, combosOnKey, combosAt, keyFace, keyMeaning, keyName, macroReach, pointingReach, pointingSlotFor, pointingVariant, reachKeys, toggleComboInput, visibleKeycode} from "../view/keyface.mjs";
 import {feedbackColours, layerColourRow, mappedKeyCount, pdColourRow, stageEnabled} from "../view/lighting.mjs";
 import {closeComboBuilder, currentLayer, getModel, heldLayers, layerName, layers, openComboBuilder, positionAt, post, previewing, render, selectedPosition, showLayer, state, writable, canEdit as canEditArea} from "../store.mjs";
 import * as edits from "../view/edits.mjs";
@@ -16,7 +16,7 @@ import {attachLayersControl} from "./layers.mjs";
 import {openPicker} from "./picker.mjs";
 import {attachGroupToggles, attachReachRows, groupHeader, groupOpen, reachAttrs, reachTable} from "./groups.mjs";
 import {inGroupOrder, reachEntries, singleOpenGroup} from "../view/reach-groups.mjs";
-import {branchBadge, comboBadge, marked, sends, sendsKind, slotLight, tierDot} from "./marks.mjs";
+import {branchBadge, comboBadge, keyNameMarked, marked, sends, sendsKind, slotLight, tierDot} from "./marks.mjs";
 import {branchName, helperWord, tierName, vocabulary, word} from "../view/vocabulary.mjs";
 import {topbar, unavailable} from "./shell.mjs";
 
@@ -69,7 +69,7 @@ export function screenKeys() {
     card.appendChild(board(model, layer, {
         selected: state.selected,
         drafted: draftMarks(model?.draft?.changes).keys.get(layer.index),
-        reach: building ? state.combo.inputs : reachHighlight(model),
+        reach: building ? comboInputKeys(model, layers(), state.layer, heldLayers(), state.combo.inputs) : reachHighlight(model),
         picking: state.combo.picking || Boolean(state.placement),
         held: heldLayers(),
         onKey: (index) => {
@@ -79,9 +79,12 @@ export function screenKeys() {
                 state.selected = index;
                 if (writable()) post(edits.setKey(layer.name, index, placement.keycode));
             } else if (state.combo.picking) {
-                if (state.combo.inputs.includes(index)) forgetComboInput(comboInputName(layer, index));
-                state.combo.inputs = state.combo.inputs.includes(index)
-                    ? state.combo.inputs.filter((value) => value !== index) : [...state.combo.inputs, index];
+                // The key the keyboard would answer with here, taken now: a
+                // transparent key picks what shows through it, and switching
+                // layers afterwards leaves this input as it is.
+                const answer = comboAnswers(model, layers(), state.layer, heldLayers()).get(index);
+                state.combo.inputs = toggleComboInput(state.combo.inputs, answer);
+                if (answer) state.combo.labels[answer.keycode] = answer.editLabel || answer.display || answer.keycode;
             } else {
                 state.selected = index;
                 const behaviour = behaviourFor(model, keyMeaning(positionAt(layer, index)));
@@ -148,15 +151,14 @@ function legend(model) {
 }
 
 function pickBar() {
-    const layer = currentLayer();
-    const names = state.combo.inputs.map((index) => keyFace(positionAt(layer, index)).main || "—");
+    const names = state.combo.inputs.map((name) => comboInputLabel(getModel(), name));
     const node = el(`<div class="pickbar">
         <span><b>Picking combo inputs</b> — click keys on the board</span>
         <span class="n">${esc(names.join(" + ") || "none yet")}</span>
         <span class="right" style="margin-left:auto;display:flex;gap:6px">
             <button class="btn tiny ghost" data-act="clear">Clear</button>
             <button class="btn tiny" data-act="done">Done</button></span></div>`);
-    node.querySelector('[data-act="clear"]').addEventListener("click", () => { state.combo.inputs = []; state.combo.extraInputs = []; state.combo.storedOrder = []; render(); });
+    node.querySelector('[data-act="clear"]').addEventListener("click", () => { state.combo.inputs = []; render(); });
     node.querySelector('[data-act="done"]').addEventListener("click", () => { state.combo.picking = false; render(); });
     return node;
 }
@@ -228,7 +230,6 @@ function tabKey(body) {
     const model = getModel();
     const layer = currentLayer();
     const position = selectedPosition();
-    const face = keyFace(position);
     const behaviour = behaviourFor(model, keyMeaning(position));
     const combos = position ? combosAt(model, layers(), state.layer, position.layoutIndex) : [];
     const slot = pointingSlotFor(model, keyMeaning(position));
@@ -240,7 +241,7 @@ function tabKey(body) {
                 <div class="input-row"><input class="input mono" id="keycodeField" value="${esc(keyMeaning(position))}" ${writable() ? "" : "disabled"}>
                 <button class="btn" data-act="pick" ${writable() ? "" : "disabled"}>Pick…</button></div></div>
             <dl class="kv" style="margin-top:12px">
-                <dt>Resolves to</dt><dd>${esc(face.main || "—")}${face.sub ? ` · ${esc(face.sub)}` : ""}</dd>
+                <dt>Resolves to</dt><dd>${esc(position ? keyName(position) : "—")}</dd>
                 <dt>Stored</dt><dd>${esc(position ? visibleKeycode(model, position.keycode) : "—")}</dd>
                 <dt>Matrix</dt><dd>row ${position?.row ?? "—"} · col ${position?.column ?? "—"}</dd>
                 <dt>Layout index</dt><dd>${position?.layoutIndex ?? "—"}</dd>
@@ -308,7 +309,7 @@ function answeredBelow(layer, position) {
         .find((entry) => entry.position.layoutIndex === position.layoutIndex);
     if (!answer?.fellThrough) return "";
     return `<p class="note" style="margin-top:12px">In this preview <b>${esc(layerName(answer.layer))}</b> answers here
-        with ${esc(keyFace(answer.position).main || answer.position.keycode)}, through a transparent key. A keycode set here
+        with ${esc(keyName(answer.position))}, through a transparent key. A keycode set here
         is stored on ${esc(layerName(layer))} and wins over it.</p>`;
 }
 
@@ -341,7 +342,7 @@ function tabBehaviours(body, right) {
     right.replaceChildren();
     const selectedCode = keyMeaning(selectedPosition());
     if (writable() && selectedCode && !behaviourFor(model, selectedCode)) {
-        const add = el(`<button class="btn tiny" data-tip="Give the selected key a behaviour: taps, holds, long holds and repeated-tap branches.">+ Behaviour on ${esc(keyFace(selectedPosition()).main || selectedCode)}</button>`);
+        const add = el(`<button class="btn tiny" data-tip="Give the selected key a behaviour: taps, holds, long holds and repeated-tap branches.">+ Behaviour on ${esc(keyName(selectedPosition()) || selectedCode)}</button>`);
         add.addEventListener("click", () => {
             state.behaviourRow = selectedCode;
             state.cell = null;
@@ -602,19 +603,34 @@ function tabCombos(body, right) {
         const combo = entry.combo;
         const requires = ["mustHold", "mustTap", "ordered"].filter((flag) => combo[flag]).map((flag) => vocabulary(model).comboOptions[flag]).join(" · ") || "—";
         return `<tr${reachAttrs("combos", group, combo.id)} data-combo="${esc(String(combo.id))}"><td>${comboBadge(model, combo.badge)}${changedCombos.has(combo.id) ? draftDot() : ""}</td>
-            <td>${(combo.inputDisplays || combo.inputs || []).map((input) => `<span class="tok">${esc(input)}</span>`).join(" + ")}</td>
+            <td>${(combo.inputs || []).map((input, at) => `<span class="tok">${keyNameMarked(model, combo.inputDisplays?.[at] ?? input, input)}</span>`).join(" + ")}</td>
             <td class="mono">${esc(combo.outputDisplay || combo.output)}</td>
             <td class="mono">${esc(combo.termMs ?? "")} ms</td>
             <td class="muted">${esc(requires)}</td>
             <td class="muted">${reachedBy}</td></tr>`;
     };
+    const reachedBy = (group, entry) => group !== "elsewhere" ? keysReach(entry.keys)
+        : entry.inputs ? `${entry.covered} of ${entry.inputs} inputs, never at once` : "no inputs";
+    // The selected key as the layers in view answer it, and every combo that
+    // takes it as an input. Each row still says how this layer reaches that
+    // combo, from the group that lists it.
+    const onKey = combosOnKey(model, layers(), state.layer, heldLayers(), state.selected);
+    const listed = [["here", groupsOf.onKeys], ["through", groupsOf.throughKeys], ["elsewhere", groupsOf.elsewhere]]
+        .flatMap(([group, entries]) => entries.map((entry) => [entry.combo.id, {group, entry}]));
+    const routes = new Map(listed);
     const comboGroupRows = [
-        {id: "here", rows: groupsOf.onKeys.map((entry) => row("here", entry, keysReach(entry.keys))), drafted: groupsOf.onKeys.some((entry) => changedCombos.has(entry.combo.id)),
+        {id: "key", detail: onKey.position ? onKey.position.editLabel || onKey.position.display || onKey.position.keycode : "nothing answers here",
+            rows: onKey.combos.map((combo) => {
+                const route = routes.get(combo.id);
+                return route ? row("key", route.entry, reachedBy(route.group, route.entry)) : row("key", {combo}, "—");
+            }),
+            drafted: onKey.combos.some((combo) => changedCombos.has(combo.id)),
+            empty: onKey.position ? "No combo takes this key as an input." : "Every layer in view is transparent at the selected key."},
+        {id: "here", rows: groupsOf.onKeys.map((entry) => row("here", entry, reachedBy("here", entry))), drafted: groupsOf.onKeys.some((entry) => changedCombos.has(entry.combo.id)),
             empty: readback.state === "read" ? "No combo has all of its inputs on this layer." : "Combos have not been read from this keyboard."},
-        {id: "through", rows: groupsOf.throughKeys.map((entry) => row("through", entry, keysReach(entry.keys))), drafted: groupsOf.throughKeys.some((entry) => changedCombos.has(entry.combo.id)),
+        {id: "through", rows: groupsOf.throughKeys.map((entry) => row("through", entry, reachedBy("through", entry))), drafted: groupsOf.throughKeys.some((entry) => changedCombos.has(entry.combo.id)),
             empty: "No combo is completed by keys falling through."},
-        {id: "elsewhere", drafted: groupsOf.elsewhere.some((entry) => changedCombos.has(entry.combo.id)), rows: groupsOf.elsewhere.map((entry) => row("elsewhere", entry,
-            entry.inputs ? `${entry.covered} of ${entry.inputs} inputs, never at once` : "no inputs")),
+        {id: "elsewhere", drafted: groupsOf.elsewhere.some((entry) => changedCombos.has(entry.combo.id)), rows: groupsOf.elsewhere.map((entry) => row("elsewhere", entry, reachedBy("elsewhere", entry))),
             empty: "Every combo on the board fires from this layer."},
     ];
     const comboTable = reachTable("combos", comboGroupRows, [
@@ -633,25 +649,24 @@ function tabCombos(body, right) {
             if (editing) closeComboBuilder();
         } else {
             state.reachRow.combos = tr.dataset.reach;
-            if (canEdit && combo && !editing) openComboBuilder(combo, comboEditInputs(model, layers(), state.layer, combo));
+            if (canEdit && combo && !editing) openComboBuilder(combo);
         }
         render();
     }));
     const side = node.querySelector("#comboSide");
-    side.appendChild(state.combo.open ? comboBuilder(layer, canEdit, () => edits.comboHoldTermValue(model)) : el(`<div class="empty-card">
+    side.appendChild(state.combo.open ? comboBuilder(canEdit, () => edits.comboHoldTermValue(model)) : el(`<div class="empty-card">
         <p class="note">Pick <b>New combo</b> to build one: choose what it sends, then click its input keys straight on the board.</p></div>`));
     body.replaceChildren(node);
 }
 
-// A builder input by the name the combo stores for it: the name it was read
-// with, or the key's keycode when it was picked on the board.
 const sentence = (text) => text.charAt(0).toUpperCase() + text.slice(1);
-const comboInputName = (layer, index) => state.combo.inputCodes[index] ?? positionAt(layer, index)?.keycode;
-const forgetComboInput = (name) => { state.combo.storedOrder = state.combo.storedOrder.filter((stored) => stored !== name); };
+// A builder input by the name the host gave its key, as the combo table and
+// the review read it (core/model/key-names.js).
+const comboInputLabel = (model, name) => state.combo.labels[name] ?? actionLabel(model, name);
 
-function comboBuilder(layer, canEdit, holdTerm) {
+function comboBuilder(canEdit, holdTerm) {
     const model = getModel();
-    const inputs = state.combo.inputs.map((index) => positionAt(layer, index)).filter(Boolean);
+    const shown = (name) => comboInputShown(model, layers(), state.layer, heldLayers(), name);
     const editing = state.combo.editId !== null;
     const original = (model?.combos || []).find((combo) => combo.id === state.combo.editId);
     const form = state.combo.form;
@@ -664,13 +679,11 @@ function comboBuilder(layer, canEdit, holdTerm) {
                 <button class="btn" data-act="pickout" ${canEdit ? "" : "disabled"}>Pick…</button></div></div>
             <div class="field"><span>Inputs</span>
                 <div class="row" style="gap:6px;flex-wrap:wrap">
-                    ${inputs.length ? inputs.map((position) => `<span class="chip"><span class="mono">${esc(state.combo.inputCodes[position.layoutIndex]
-                        ? actionLabel(model, state.combo.inputCodes[position.layoutIndex]) : keyFace(position).main || keyMeaning(position))}</span>
-                        <button data-remove="${position.layoutIndex}" style="color:var(--text-3)">✕</button></span>`).join("")
-                        : (state.combo.extraInputs.length ? "" : `<span class="note">no inputs yet</span>`)}
-                    ${state.combo.extraInputs.map((input) => `<span class="chip" data-tip="Not reachable from this layer, so it is not on the board. It stays an input unless you remove it.">
-                        <span class="mono">${esc(actionLabel(model, input))}</span>
-                        <button data-remove-extra="${esc(input)}" style="color:var(--text-3)">✕</button></span>`).join("")}
+                    ${state.combo.inputs.length ? state.combo.inputs.map((input) => `<span class="chip"${shown(input) ? ""
+                        : ` data-tip="No key on the board presses this from here, so nothing rings for it. It stays an input unless you remove it."`}>
+                        <span class="mono">${keyNameMarked(model, comboInputLabel(model, input), input)}</span>
+                        <button data-remove="${esc(input)}" style="color:var(--text-3)">✕</button></span>`).join("")
+                        : `<span class="note">no inputs yet</span>`}
                 </div>
                 <div class="row" style="gap:6px;margin-top:4px">
                     <button class="btn tiny ${state.combo.picking ? "primary" : ""}" data-act="pickboard" ${canEdit ? "" : "disabled"}
@@ -693,13 +706,7 @@ function comboBuilder(layer, canEdit, holdTerm) {
         </div></div>`);
 
     node.querySelectorAll("[data-remove]").forEach((button) => button.addEventListener("click", () => {
-        forgetComboInput(comboInputName(layer, Number(button.dataset.remove)));
-        state.combo.inputs = state.combo.inputs.filter((index) => index !== Number(button.dataset.remove));
-        render();
-    }));
-    node.querySelectorAll("[data-remove-extra]").forEach((button) => button.addEventListener("click", () => {
-        forgetComboInput(button.dataset.removeExtra);
-        state.combo.extraInputs = state.combo.extraInputs.filter((input) => input !== button.dataset.removeExtra);
+        state.combo.inputs = state.combo.inputs.filter((input) => input !== button.dataset.remove);
         render();
     }));
     node.querySelector('[data-act="pickboard"]')?.addEventListener("click", () => {
@@ -742,8 +749,7 @@ function comboBuilder(layer, canEdit, holdTerm) {
         state.combo.awaiting = true;
         post(edits.comboMessage(editing ? state.combo.editId : null, {
             ...form,
-            inputs: edits.comboInputOrder(state.combo.storedOrder,
-                [...inputs.map((position) => comboInputName(layer, position.layoutIndex)), ...state.combo.extraInputs]),
+            inputs: state.combo.inputs.slice(),
             holdTermMs: holdTerm(),
         }));
         render();
@@ -967,7 +973,7 @@ export function keysShortcut(event) {
     if (action === "clear") {
         if (keyFace(position).kind !== "transparent") store(edits.clearKey(layer.name, position.layoutIndex));
     } else if (action === "copy") {
-        state.keyClipboard = {keycode: position.keycode, label: keyFace(position).main};
+        state.keyClipboard = {keycode: position.keycode, label: keyName(position)};
         navigator.clipboard?.writeText(visibleKeycode(getModel(), position.keycode)).catch(() => {});
         render();
     } else if (state.keyClipboard) {

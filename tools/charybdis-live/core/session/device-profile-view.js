@@ -2,12 +2,11 @@
 
 // Presentation of validated device domains. Names here describe wire IDs;
 // configuration values and membership always come from the received domain.
-const {actionName, knownActionAbi, layerRef} = require("../schema/actions");
+const {actionName, layerRef} = require("../schema/actions");
 const {VOCABULARY, branchName} = require("../model/vocabulary");
 const keycodes = require("../data/keycode-catalog");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {KEY_BEHAVIOR_HOLD_MODES} = require("../schema/key-behavior-domain-v1");
-const {resolveNativeQmkExpression} = require("../schema/compiled-profile-v1");
 const {
     RGB_AUTOMOUSE_MODES, RGB_DOMAIN_V1, RGB_KEY_SEMANTICS, RGB_LAYER_MODES,
     RGB_LOCALITIES, RGB_PD_MODE_IDS, RGB_STAGE_BITS, RGB_TAP_COMMIT_MODES,
@@ -50,18 +49,6 @@ function behaviorRowsForView(domain) {
             ...(step.longHold ? {longHold: hold(step.longHold)} : {}),
         })),
     }));
-}
-
-function behaviorAliasesForView(domain, capabilities) {
-    if (!knownActionAbi(capabilities?.actionAbiDigest)) return {};
-    const aliases = {};
-    for (const row of domain.rows) {
-        if (row.target.kind === ACTION.QMK_KEYCODE) continue;
-        const name = actionName(row.target);
-        const value = resolveNativeQmkExpression(name, {});
-        if (value !== undefined) aliases[keycodes.resolve(value).name] = name;
-    }
-    return aliases;
 }
 
 const colorForView = (color) => ({h: String(color.h), s: String(color.s), v: String(color.v)});
@@ -154,4 +141,4 @@ function combosForView(read, labels) {
     }));
 }
 
-module.exports = {baseRgbForView, behaviorAliasesForView, behaviorRowsForView, combosForView, rgbForView};
+module.exports = {baseRgbForView, behaviorRowsForView, combosForView, rgbForView};

@@ -21,7 +21,7 @@ export const state = {
     // Every tab that answers "what does this layer reach" is grouped the same
     // way and opens the same way: what the layer holds itself, and the rest a
     // click away.
-    groups: {behaviours: {...openGroups(), branches: false, combos: false}, macros: openGroups(), combos: openGroups(), pointing: openGroups()},
+    groups: {behaviours: {...openGroups(), branches: false, combos: false}, macros: openGroups(), combos: {key: true, ...openGroups()}, pointing: openGroups()},
     // The row picked in each tab. The board rings the keys that reach it, so
     // a row in a table can answer "where do I press for this".
     reachRow: {macros: null, combos: null, pointing: null},
@@ -31,12 +31,14 @@ export const state = {
     settingsOpen: [],    // settings sections opened by hand or by a Show, so a render keeps them open
     cellHow: null,       // {cell, keycode, helper, repeatHz}: how the open empty cell runs, chosen before it sends anything
     // The combo builder, opened and closed as one (openComboBuilder):
-    //   inputs      layout indexes picked on the current layer
-    //   inputCodes  layoutIndex → the input name the keyboard stores, for a combo being edited
-    //   extraInputs inputs of the combo being edited that this layer cannot reach
+    //   inputs      the input names the combo stores, in stored order — never
+    //               board positions, which mean another key on every layer
+    //               (view/keyface.mjs: toggleComboInput)
+    //   labels      input name → the host's name for that key, as the combo
+    //               table and the review read it; the interface never names a key itself
     //   form        the builder's fields, kept across renders
     //   awaiting    a Keep or Delete posted; the builder closes when the host accepts it
-    combo: {open: false, picking: false, inputs: [], inputCodes: {}, extraInputs: [],
+    combo: {open: false, picking: false, inputs: [], labels: {},
         form: {output: "", termMs: "", mustHold: false, mustTap: false, ordered: false}, awaiting: false, editId: null},
     placement: null,     // {keycode, label}: next board click places it on the current layer
     retarget: null,      // {from, to, existing}: a behaviour move waiting on overwrite / swap / cancel
@@ -75,14 +77,12 @@ export const state = {
 // The combo builder, opened for a combo (or none, for a new one) and closed
 // again. Its fields live here rather than in the DOM, because a board click
 // while picking inputs redraws the whole screen.
-export function openComboBuilder(combo = null, inputs = {positions: [], codes: {}, extras: []}) {
+export function openComboBuilder(combo = null) {
     state.combo = {
         open: true, picking: false, awaiting: false, editId: combo?.id ?? null,
         form: {output: combo?.output || "", termMs: String(combo?.termMs ?? ""), mustHold: Boolean(combo?.mustHold), mustTap: Boolean(combo?.mustTap), ordered: Boolean(combo?.ordered)},
-        inputs: inputs.positions.slice(), inputCodes: {...inputs.codes}, extraInputs: inputs.extras.slice(),
-        // The combo's inputs in stored order; one removed here and picked
-        // again counts as added (edits.comboInputOrder).
-        storedOrder: (combo?.inputs || []).slice(),
+        inputs: (combo?.inputs || []).slice(),
+        labels: Object.fromEntries((combo?.inputs || []).map((input, index) => [input, combo.inputDisplays?.[index] ?? input])),
     };
 }
 export function closeComboBuilder() {

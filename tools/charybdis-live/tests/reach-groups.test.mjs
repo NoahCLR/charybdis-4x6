@@ -6,6 +6,7 @@ test("every reach group has a title and a place in the one order", () => {
     assert.deepEqual(Object.keys(GROUP_TITLES).sort(), [...GROUP_ORDER].sort());
     assert.deepEqual(inGroupOrder([{id: "elsewhere"}, {id: "here"}, {id: "through"}]).map((group) => group.id), ["here", "through", "elsewhere"],
         "a tab's groups come out in the shared order whatever order it lists them in");
+    assert.equal(GROUP_ORDER[0], "key", "the selected key's combos lead, above what the layer reaches");
 });
 
 test("a group reads its own reach list, and a missing one reads as empty", () => {

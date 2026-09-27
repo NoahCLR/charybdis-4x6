@@ -9,10 +9,11 @@ import {GROUP_TITLES, inGroupOrder, singleOpenGroup} from "../view/reach-groups.
 
 // A folded group holding something the draft changed says so on its header;
 // open, its rows carry their own marks.
-export function groupHeader(tab, id, count, drafted = false) {
+// A group whose rows depend on a choice elsewhere names it after the title.
+export function groupHeader(tab, id, count, drafted = false, detail = "") {
     const open = state.groups[tab][id];
     return `<button class="group-h" data-group-tab="${tab}" data-group="${id}" aria-expanded="${open}">
-        <span class="chev">${open ? "▾" : "▸"}</span><span class="ttl">${esc(GROUP_TITLES[id])}${drafted && !open ? draftDot("Holds a change in your draft") : ""}</span>
+        <span class="chev">${open ? "▾" : "▸"}</span><span class="ttl">${esc(GROUP_TITLES[id])}${detail ? ` <span class="mono dim">· ${esc(detail)}</span>` : ""}${drafted && !open ? draftDot("Holds a change in your draft") : ""}</span>
         <span class="n">${count}</span></button>`;
 }
 
@@ -51,7 +52,7 @@ export const reachAttrs = (tab, group, name) => {
 // its width, so unfolding a group never re-sizes the ones already on screen.
 export function reachTable(tab, groups, columns) {
     const section = (group) => `<tbody class="rowgroup">
-        <tr><td colspan="${columns.length}" class="t-group">${groupHeader(tab, group.id, group.rows.length, group.drafted)}</td></tr>
+        <tr><td colspan="${columns.length}" class="t-group">${groupHeader(tab, group.id, group.rows.length, group.drafted, group.detail)}</td></tr>
         ${groupOpen(tab, group.id)
             ? (group.rows.length ? group.rows.join("")
                 : `<tr><td colspan="${columns.length}"><p class="note">${esc(group.empty)}</p></td></tr>`)

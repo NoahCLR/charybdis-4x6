@@ -652,6 +652,17 @@ sequenced Apply itself. Each rule now has one home:
 
 - Words: `core/model/vocabulary.js`, sent as `model.vocabulary`; stages are
   found by id, never by label.
+- Key names: `core/model/key-names.js`. The catalogue names what QMK ships;
+  the profile names its macros, pointing-mode keys and bare user slots. The
+  screens' `qmkKeyLabels` and the review are both built from it, each from
+  its own snapshot, so a key reads the same in the combo table, the picker and
+  the review. The webview never names a keycode: a form that shows keys, such
+  as the combo builder, carries the host's label with each one. The stored name
+  (`KC_KP_1`) is added only when a review row's two sides would read alike.
+  A layer is always named by its name, in the picker's verbs: `MO(3)` reads
+  "Hold Navigation", `LT(3,KC_SLASH)` "/ / Navigation", and a layer key's cap
+  shows the layer's name. Only a raw keycode, where one is shown, keeps the
+  number.
 - Actions, native keycodes, decode limits, layer references:
   `core/schema/actions.js`; the pointing registry and key layout are data.
 - Decoding: once per draft revision, carried as `decoded` and taken through
