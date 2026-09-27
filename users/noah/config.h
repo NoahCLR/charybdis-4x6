@@ -194,14 +194,15 @@
 #    define DYNAMIC_KEYMAP_LAYER_COUNT LAYER_COUNT
 #    define DYNAMIC_KEYMAP_MACRO_COUNT 64
 // RP2040 wear-leveling exposes half of this backing region as logical EEPROM.
-// Keep the logical EEPROM at 16 KiB. VIA owns the lower 8 KiB; the upper
-// 8 KiB is reserved as two last-known-good live-profile slots. The storage
+// Firmware uses 18 KiB of logical EEPROM. VIA owns the lower 8 KiB; the upper
+// 10 KiB holds two last-known-good live-profile slots. The storage
 // layout contract validates these exact inclusive address ranges without
 // reading or writing them.
 #    if defined(MCU_RP)
 #        ifdef NOAH_PD_PROFILE_ENABLE
 #            define WEAR_LEVELING_BACKING_SIZE 36864
 #        else
+// Host schema-1 compatibility fixtures only; rules.mk rejects old firmware.
 #            define WEAR_LEVELING_BACKING_SIZE 32768
 #        endif
 #    endif

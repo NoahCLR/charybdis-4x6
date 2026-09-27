@@ -126,7 +126,6 @@ NOAH_COMMON_SOURCES := \
     lib/rgb/core/rgb_validation.c
 
 NOAH_POINTING_SOURCES := \
-    lib/pointing/modes/pd_mode_configured.c \
     lib/pointing/runtime/pd_runtime.c \
     lib/pointing/runtime/pd_mode_snapshot.c \
     lib/pointing/runtime/pd_mode_key_runtime_bridge.c \
@@ -134,12 +133,10 @@ NOAH_POINTING_SOURCES := \
     lib/pointing/runtime/pd_mode_registry.c \
     lib/pointing/runtime/pd_mode_lifecycle.c \
     lib/pointing/policy/pointer_layer_policy.c \
-    lib/pointing/modes/pd_mode_dragscroll.c \
-    lib/pointing/modes/pd_mode_pinch.c \
-    lib/pointing/modes/pd_mode_volume.c \
-    lib/pointing/modes/pd_mode_brightness.c \
-    lib/pointing/modes/pd_mode_zoom.c \
-    lib/pointing/modes/pd_mode_arrow.c
+    lib/pointing/modes/pd_mode_dragscroll.c
+
+NOAH_POINTING_CONFIGURED_SOURCES := \
+    lib/pointing/modes/pd_mode_configured.c
 
 NOAH_AUTOMOUSE_SOURCES := \
     lib/rgb/automouse/rgb_automouse.c

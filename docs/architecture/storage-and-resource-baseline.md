@@ -175,9 +175,9 @@ writers bind it to the same logical VIA generation as format 2.
 
 The lower 8 KiB VIA allocation is unchanged. Slot A is `0x2000..0x33ff`, slot B
 `0x3400..0x47ff`, each with a 32-byte header. Logical EEPROM is 18 KiB and
-wear-level backing is 36 KiB. Geometry changes the flash base; migrate via a
-verified complete backup and restore, never in-place reinterpretation. Builds
-with `NOAH_PD_PROFILE=no` retain the 16 KiB map above as a readback bridge.
+wear-level backing is 36 KiB. Geometry changes the flash base; never interpret
+old-geometry contents in place. The old readback bridge build is retired;
+existing backups and old firmware must be retained outside this build.
 See [the domain contract](pd-mode-domain-v1.md) and the deliberately revised
 feature-specific policy in [memory budgets](memory-budgets.md).
 
@@ -246,9 +246,7 @@ main-process path and 328/768 bytes for the largest named split-slave path. The
 memory figures are linked values per half; the stack figures cover the manifest
 paths only and are not runtime high-water evidence.
 
-The temporary snapshot bridge retains the five-layer keymap at
-`0x0029–0x0280` and 7,551-byte macro bank at `0x0281–0x1FFF`. Its VIA
-reconciliation metadata remains schema 1; the eight-layer image uses schema 2.
-Export before changing geometry. See [portable-profile-v1.md](portable-profile-v1.md)
-for the migration, effective settings cache and recovery sequence. Neither
-variant increases the 16 KiB logical EEPROM or its wear-level cache.
+All current builds use eight-layer VIA geometry, schema-2 reconciliation
+metadata, and an 18 KiB logical EEPROM with two 5 KiB profile slots. The old
+five-layer snapshot bridge is retired. Existing portable files remain subject
+to the source-evidence rules in [portable-profile-v1.md](portable-profile-v1.md).

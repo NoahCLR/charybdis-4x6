@@ -1,4 +1,5 @@
-// Shared legacy defaults: handlers and migration readback must use the same values.
+// Compiled factory slot defaults. These values are encoded into the effective
+// eight-slot cache when the firmware has no live profile owner.
 #pragma once
 
 #ifndef VOLUME_THRESHOLD

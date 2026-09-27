@@ -6,7 +6,6 @@
 
 #include "noah_keymap_ids.h"
 #include "../defs/pd_mode_manifest.h"
-#include "../defs/pd_mode_defaults.h"
 #include "pd_mode_internal.h"
 #include "pd_mode_buffered_tap_internal.h"
 #include "pd_mode_keyboard_event_internal.h"
@@ -73,14 +72,9 @@ static const pd_mode_lifecycle_hooks_t pd_mode_auto_mouse_lock_toggle_hooks = {
 #    define PD_MODE_LIFECYCLE_AUTO_MOUSE_LOCK NULL
 #endif
 
-#define PD_MODE_LIFECYCLE_PINCH (&pd_mode_pinch_lifecycle_hooks)
-
-// Per-mode pointer DPI overrides. Override any of these in config.h.
-// 0 = no override: normal pointer DPI is used while that mode is active.
-// Dragscroll and pinch are excluded — the shared dragscroll handler manages
-// their CPI through pd_mode_apply_active_dpi().
-
-#define NOAH_PD_MODE_REGISTRY_ROW(name, keycode, handler, key_handler, reset, dpi, traits, lifecycle) {PD_MODE_##name, keycode, keycode##_LOCK, handler, key_handler, reset, dpi, traits, lifecycle},
+// The manifest fixes deployed action identities. Motion and policy are read
+// from the effective slot; the registry has no per-preset callbacks.
+#define NOAH_PD_MODE_REGISTRY_ROW(name, mode_keycode) {.mode_flag = PD_MODE_##name, .keycode = mode_keycode, .lock_action = mode_keycode##_LOCK},
 const pd_mode_def_t pd_modes[PD_MODE_COUNT] = {NOAH_PD_MODE_LIST(NOAH_PD_MODE_REGISTRY_ROW)};
 #undef NOAH_PD_MODE_REGISTRY_ROW
 

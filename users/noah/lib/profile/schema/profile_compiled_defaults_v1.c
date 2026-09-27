@@ -646,13 +646,7 @@ static noah_profile_compiled_v1_result_t action_abi_digest(uint32_t *digest, uin
     if (*row_visits > NOAH_PROFILE_COMPILED_V1_ACTION_ABI_ROW_VISITS_MAX) {
         return fail(error, NOAH_PROFILE_COMPILED_V1_CAPACITY_EXCEEDED, NOAH_PROFILE_COMPILED_V1_SURFACE_ACTION_ABI, UINT8_MAX, UINT8_MAX);
     }
-#ifdef NOAH_LEGACY_SNAPSHOT_BRIDGE
-    // The bridge retains the deployed five-layer vocabulary and slot identities
-    // so existing committed records remain discoverable before exporting.
-    *digest = UINT32_C(0xdcb00959);
-#else
     *digest = sink.digest;
-#endif
     return NOAH_PROFILE_COMPILED_V1_OK;
 }
 

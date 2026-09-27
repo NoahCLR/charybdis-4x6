@@ -234,8 +234,7 @@ read has opened an editable draft. Layout, committed domains, VIA base RGB and
 the complete profile arrive in separate reads and are published separately for
 diagnostics, but their partial previews must stay behind one loading state.
 Every screen menu is disabled during that read. Afterwards, Configure requires
-an editable draft; Profile & backups requires complete-profile support (and
-remains available on the five-layer backup bridge); Device requires a connected
+an editable draft; Profile & backups requires complete-profile support; Device requires a connected
 keyboard that reported its capabilities.
 
 ### D-L12 — RGB rule identity and preview appearance are separate
@@ -307,10 +306,10 @@ domain and never falls back to destination authored data. The contract is in
 The standard image reserves eight layers; base stays at index zero and the app
 moves overlays and rewrites references together. The action ABI describes the
 engine vocabulary independently of authored rows, so empty and populated
-builds advertise the same ABI. A five-layer deployment migrates once through
-`tools/build-firmware-pair.sh --snapshot-bridge`: export there, install the
-eight-layer pair, import. The bridge is read-only: readback and export work,
-editing needs the eight-layer image. No firmware is flashed by the app.
+builds advertise the same ABI. The old five-layer snapshot bridge is retired
+(D-L40). Old portable snapshots remain importable only when they carry the
+source evidence required by the current schema. No firmware is flashed by the
+app.
 
 Before a file becomes the draft or is restored, its card compares it with what
 the keyboard holds, since that is what applying it would write, counting the
@@ -541,9 +540,9 @@ each axis's own threshold, picks a direction and holds it until the heading is
 clearly elsewhere, and only progress along the held direction counts. The axis
 policy only says which directions exist; motion toward a missing one goes to
 the nearest existing one, which for a single axis is exactly counting that
-axis. Counting in threshold X × threshold Y units keeps that exact, so the
-parity test holds the single-axis presets (Volume, Brightness) to the legacy
-handlers report for report; the dominant-axis presets no longer match them.
+axis. Counting in threshold X × threshold Y units keeps the single-axis
+presets (Volume, Brightness) on their threshold counts. The dominant-axis
+presets use the current smoothed-heading behavior.
 
 "When a direction is empty" applies to every directional mode (byte 86 for
 axes 0–3). "Send both neighbours" means the two compass neighbours, 45° either
@@ -887,3 +886,20 @@ frames the keyboard admits count as the candidate's progress, so a long
 staging keeps its 15-second lease while status polls alone do not. After the
 decision nothing cancels, whatever the host saw. See
 [Logical Profile Transaction V1](architecture/logical-profile-transaction-v1.md#cancellation-and-lease-ownership).
+
+### D-L40 — Firmware builds use only the eight-slot pointing engine
+
+The per-preset Volume, Brightness, Zoom, Arrow and Pinch C handlers and the
+old-geometry firmware bridge builds are retired. Every firmware build uses the
+schema-2 eight-slot engine. The ordinary side-specific pair owns a live profile;
+an owner-free generic or comparison image warms the same engine from validated
+compiled slot records. The mode registry keeps deployed hold and lock keycode
+identities, but no per-preset callbacks. `NOAH_PD_PROFILE=no` and the five-layer
+snapshot-bridge option are rejected instead of quietly producing old firmware.
+
+This removes the in-repository extraction path for an already deployed old
+storage geometry. Retain old firmware and backups outside this build if they
+are still needed; flashing the schema-2 pair does not migrate an old committed
+profile in place. Historical profile readers and portable migration remain for
+files that already carry the required source evidence. The active pointing
+contract is [PD-mode domain v1](architecture/pd-mode-domain-v1.md).

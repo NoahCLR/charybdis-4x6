@@ -9,6 +9,8 @@
 #include "users/noah/lib/action/owned_keycode.h"
 #include "users/noah/lib/key/runtime/trace.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
+#include "users/noah/lib/pointing/modes/pd_mode_configured.h"
+#include "users/noah/lib/profile/runtime/effective_pd_runtime.h"
 #include "users/noah/lib/key/runtime/trace/core_trace.h"
 #include "users/noah/lib/state/modifiers/keyboard_mod_state.h"
 #include "users/noah/lib/state/ownership/layer_ownership.h"
@@ -23,6 +25,13 @@ static bool     fake_sniping_enabled;
 static uint16_t fake_default_dpi;
 static uint16_t fake_sniping_dpi;
 static uint16_t fake_last_cpi;
+
+static const uint8_t trace_pd_record[96] = {[1] = 1};
+const uint8_t *noah_effective_pd_for_mask(uint8_t mode) { return mode && !(mode & (mode - 1u)) ? trace_pd_record : NULL; }
+void noah_pd_engine_enter(const uint8_t *record) { (void)record; }
+void noah_pd_engine_exit(void) {}
+uint8_t noah_pd_engine_masked_mods(const uint8_t *record) { (void)record; return 0; }
+bool noah_pd_engine_key(uint16_t keycode, keyrecord_t *record) { (void)keycode; (void)record; return false; }
 
 static uint8_t                          rpc_register_count;
 static int8_t                           rpc_registered_ids[4];

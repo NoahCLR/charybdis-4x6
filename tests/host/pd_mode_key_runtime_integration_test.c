@@ -798,9 +798,8 @@ report_mouse_t handle_arrow_mode(report_mouse_t mouse_report) {
     return mouse_report;
 }
 
-// Mirrors the legacy handler in pd_mode_arrow.c: it takes every press and
-// release of buttons 1-3, including the release of a press it did not take,
-// and sends copy and paste. Its Shift lease goes through the faked ledger.
+// Historical key-event fake for the action lifecycle scenarios below. The
+// configured firmware routes button overrides through the shared engine.
 bool handle_arrow_mode_key(uint16_t keycode, keyrecord_t *record) {
     if (keycode < QK_MOUSE_BUTTON_1 || keycode > QK_MOUSE_BUTTON_1 + 2u) {
         return false;

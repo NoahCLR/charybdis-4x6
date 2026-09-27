@@ -5,7 +5,8 @@
 // two cannot drift (the store once refused v4 after the validator passed it).
 #define NOAH_PROFILE_PD_SETTINGS_VERSION_ACCEPTED(version) ((version) >= 2u && (version) <= 4u)
 
-// The bridge build retains the deployed six-mode schema and EEPROM geometry.
+// Schema-1 constants remain for codec compatibility tests. Firmware builds
+// always define NOAH_PD_PROFILE_ENABLE and cannot select the old geometry.
 #ifdef NOAH_PD_PROFILE_ENABLE
 #    define NOAH_PROFILE_SCHEMA_MAJOR 2u
 #    define NOAH_PROFILE_PAYLOAD_MAX 5088u

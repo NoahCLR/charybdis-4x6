@@ -33,7 +33,7 @@ static size_t behavior_visits;
 
 void noah_compiled_defaults_test_behavior_visit(void) { behavior_visits++; }
 
-#define NOAH_PD_MODE_TEST_ROW(name, mode_keycode, handler, key_handler, reset, dpi, mode_traits, lifecycle) [PD_MODE_INDEX_##name] = {.mode_flag = PD_MODE_##name, .keycode = (mode_keycode), .lock_action = mode_keycode##_LOCK, .traits = (mode_traits)},
+#define NOAH_PD_MODE_TEST_ROW(name, mode_keycode) [PD_MODE_INDEX_##name] = {.mode_flag = PD_MODE_##name, .keycode = (mode_keycode), .lock_action = mode_keycode##_LOCK},
 const pd_mode_def_t pd_modes[PD_MODE_COUNT] = {NOAH_PD_MODE_LIST(NOAH_PD_MODE_TEST_ROW)};
 #undef NOAH_PD_MODE_TEST_ROW
 
@@ -108,9 +108,7 @@ static void assert_golden(const noah_profile_compiled_v1_t *profile) {
     assert(profile->metadata.crc32 == fixture_u32("profile.crc32", 16));
     assert(profile->metadata.digest == fixture_u32("profile.fnv1a32", 16));
     assert(profile->metadata.action_abi_digest == fixture_u32("profile.action_abi", 16));
-#ifndef NOAH_LEGACY_SNAPSHOT_BRIDGE
     assert(profile->metadata.action_abi_row_visits == fixture_u32("profile.action_abi_row_visits", 10));
-#endif
 }
 
 static noah_profile_validator_v1_compatibility_t compatibility(uint32_t action_abi_digest) {

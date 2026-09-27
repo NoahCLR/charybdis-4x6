@@ -16,6 +16,8 @@
 #include "users/noah/lib/key/runtime/feedback.h"
 #include "users/noah/lib/key/runtime/slot/origin_registry.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
+#include "users/noah/lib/pointing/modes/pd_mode_configured.h"
+#include "users/noah/lib/profile/runtime/effective_pd_runtime.h"
 #include "users/noah/lib/key/runtime/projection/projection.h"
 #include "users/noah/lib/key/runtime/reducer/runtime.h"
 #include "users/noah/lib/key/runtime/trace/core_trace.h"
@@ -833,41 +835,31 @@ void pointing_device_set_cpi(uint16_t cpi) {
     current_cpi = cpi;
 }
 
-report_mouse_t handle_volume_mode(report_mouse_t mouse_report) {
-    return mouse_report;
+static const uint8_t test_pd_records[8][96] = {
+    [0] = {[0] = 0, [1] = 2, [4] = 100},
+    [1] = {[0] = 1, [1] = 1},
+    [2] = {[0] = 2, [1] = 1},
+    [3] = {[0] = 3, [1] = 1},
+    [4] = {[0] = 4, [1] = 1, [2] = 1},
+    [5] = {[0] = 5, [1] = 2, [6] = 8},
+};
+static const uint8_t *active_pd_record;
+
+const uint8_t *noah_effective_pd_for_mask(uint8_t mode) {
+    for (uint8_t slot = 0; slot < 6; slot++) {
+        if (mode == (uint8_t)(1u << slot)) return test_pd_records[slot];
+    }
+    return NULL;
 }
 
-report_mouse_t handle_dragscroll_mode(report_mouse_t mouse_report) {
-    return mouse_report;
+void noah_pd_engine_exit(void) {
+    if (active_pd_record && active_pd_record[0] == 0) reset_dragscroll_count++;
+    active_pd_record = NULL;
 }
-
-report_mouse_t handle_brightness_mode(report_mouse_t mouse_report) {
-    return mouse_report;
-}
-
-report_mouse_t handle_zoom_mode(report_mouse_t mouse_report) {
-    return mouse_report;
-}
-
-report_mouse_t handle_arrow_mode(report_mouse_t mouse_report) {
-    return mouse_report;
-}
-
-bool handle_arrow_mode_key(uint16_t keycode, keyrecord_t *record) {
-    (void)keycode;
-    (void)record;
-    return false;
-}
-
-void reset_volume_mode(void) {}
-
-void reset_dragscroll_mode(void) {
-    reset_dragscroll_count++;
-}
-
-void reset_brightness_mode(void) {}
-void reset_zoom_mode(void) {}
-void reset_arrow_mode(void) {}
+void noah_pd_engine_enter(const uint8_t *record) { active_pd_record = record; }
+report_mouse_t noah_pd_engine_motion(report_mouse_t report) { return report; }
+bool noah_pd_engine_key(uint16_t keycode, keyrecord_t *record) { (void)keycode; (void)record; return false; }
+uint8_t noah_pd_engine_masked_mods(const uint8_t *record) { (void)record; return 0; }
 
 bool is_keyboard_master(void) {
     return true;

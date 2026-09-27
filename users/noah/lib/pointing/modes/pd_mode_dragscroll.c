@@ -78,7 +78,6 @@ static void dragscroll_accumulate(int32_t *buffer, int32_t delta) {
 }
 
 // The configured engine supplies an immutable, validated slot for one poll.
-// Legacy callers retain their compiled tuning through the same algorithm.
 #ifdef NOAH_PD_PROFILE_ENABLE
 static const uint8_t *configured_scroll;
 static uint16_t scroll_u16(uint8_t offset, uint16_t fallback) {

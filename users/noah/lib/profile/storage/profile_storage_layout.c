@@ -23,7 +23,7 @@
 #    define NOAH_PROFILE_STORAGE_COMPILED_VIA_MACRO_START ((uint32_t)VIA_EEPROM_CONFIG_END + NOAH_PROFILE_STORAGE_COMPILED_KEYMAP_SIZE + NOAH_PROFILE_STORAGE_ENCODER_SIZE)
 #    define NOAH_PROFILE_STORAGE_COMPILED_VIA_MACRO_SIZE ((uint32_t)DYNAMIC_KEYMAP_EEPROM_MAX_ADDR - NOAH_PROFILE_STORAGE_COMPILED_VIA_MACRO_START + 1u)
 
-_Static_assert(TOTAL_EEPROM_BYTE_COUNT == NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE, "target logical EEPROM no longer matches the accepted 16 KiB profile partition");
+_Static_assert(TOTAL_EEPROM_BYTE_COUNT == NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE, "target logical EEPROM no longer matches the accepted 18 KiB profile partition");
 _Static_assert(VIA_EEPROM_CONFIG_END == NOAH_PROFILE_STORAGE_DYNAMIC_KEYMAP_START_ADDR, "VIA config end moved the accepted dynamic-keymap start");
 _Static_assert(NOAH_PROFILE_STORAGE_COMPILED_KEYMAP_SIZE == NOAH_PROFILE_STORAGE_DYNAMIC_KEYMAP_SIZE, "compiled dynamic keymap no longer occupies the accepted 960-byte region");
 _Static_assert(NOAH_PROFILE_STORAGE_COMPILED_VIA_MACRO_START == NOAH_PROFILE_STORAGE_VIA_MACRO_START_ADDR, "compiled VIA macro start no longer matches the accepted address map");

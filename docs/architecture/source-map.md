@@ -57,7 +57,7 @@ source trace because they rewrite or verify human-facing firmware docs.
 | `key/runtime/trace/` and top-level `trace.*` | Runtime tracing | Diagnostic only | Runtime events, transition plans, projection snapshots | Trace entries and optional console output | `run_runtime_trace_tests.sh`, key-runtime trace variants | [KEY_RUNTIME](../KEY_RUNTIME.md) |
 | `macro/` | VIA macro defaults, payload parser, compact slot metadata, one pinned shared IR, and scan-driven playback | Macro payload validation and one-active execution lifecycle | `VIA_MACRO_n`, payload strings, VIA EEPROM, matrix scans | Lease-backed macro output, bounded cleanup, VIA default seeding | macro payload/engine/provider/defaults/VIA lifecycle tests | [KEYMAP](../KEYMAP.md), [runtime-flow](./runtime-flow.md), [VIA_TO_QMK](../tooling/VIA_TO_QMK.md) |
 | `pointing/defs/` | PD mode manifest and generated keycodes | Authored PD identity | PD mode manifest macros | Mode ids, flags, keycodes, lock keycodes | PD mode and profile validation tests | [ADDING_PD_MODE](../ADDING_PD_MODE.md), [POINTER_MODES](../POINTER_MODES.md) |
-| `pointing/modes/` | Individual trackball mode handlers | Mode behavior only | Mouse reports and mode lifecycle callbacks | Transformed mouse reports, mode-specific reset/DPI behavior | `run_pd_mode_handlers_tests.sh`, `run_pd_mode_tests.sh` | [POINTER_MODES](../POINTER_MODES.md) |
+| `pointing/modes/` | Configured directional engine and shared dragscroll algorithm | Validated effective slot records | Mouse reports and mode lifecycle transitions | Transformed reports and bounded synthetic actions | `run_pd_mode_handlers_tests.sh`, `run_pd_mode_tests.sh` | [POINTER_MODES](../POINTER_MODES.md) |
 | `pointing/policy/` | Pointer layer and PD policy rules | Policy helper | Layer state, keycodes, PD traits | Pointer layer activation, mouse-record classification | `run_pointer_layer_policy_tests.sh`, PD/key-runtime integration tests | [POINTER_MODES](../POINTER_MODES.md) |
 | `pointing/runtime/` | PD mode state, snapshots, lifecycle, key bridge | Authoritative PD state | PD key events, key-runtime effects, pointer reports, split snapshots | Local/display/remote PD state, active handler routing, DPI sync | PD runtime/mode/bridge integration tests | [ADDING_PD_MODE](../ADDING_PD_MODE.md), [runtime-flow](./runtime-flow.md) |
 | `profile/runtime/` | Effective-profile publication, semantic-action translation, generation-owned behavior/RGB views, activation safety, and the gated single-owner composition | Pending/active profile generation plus activation wait evidence; complete owner only in a side-specific engineering artifact | Compiled/validated snapshots, candidate and peer leases, authoritative runtime activity, provisional/durable split convergence | Incremental boot/adoption, distributed prepare/commit fencing, coherent generation publication, behavior/RGB view swaps, bounded host/split scheduling, stale-token refusal | `run_profile_owner_tests.sh`, `run_profile_owner_via_integration_tests.sh`, effective-provider/RGB/activation tests, feature and engineering stack gates | active live-edit architecture review |
@@ -176,10 +176,9 @@ semantics without taking another platform timer sample.
 
 - Definitions: `defs/pd_mode_flags.h`, `defs/pd_mode_manifest.h`,
   `defs/pd_modes.h`
-- Mode handlers: `modes/pd_mode_arrow.c`, `modes/pd_mode_brightness.c`,
+- Shared engines: `modes/pd_mode_configured.c/h`,
   `modes/pd_mode_dragscroll.c`, `modes/pd_mode_handler_common.h`,
-  `modes/pd_mode_handlers.h`, `modes/pd_mode_pinch.c`,
-  `modes/pd_mode_volume.c`, `modes/pd_mode_zoom.c`
+  `modes/pd_mode_handlers.h`
 - Policy: `policy/pd_mode_policy.h`, `policy/pointer_layer_policy.c/h`
 - Runtime: `runtime/pd_runtime.c`, `runtime/pd_mode_state.c`,
   `runtime/pd_mode_snapshot.c`, `runtime/pd_mode_registry.c`,

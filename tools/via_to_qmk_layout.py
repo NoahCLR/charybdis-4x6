@@ -72,7 +72,7 @@ CHARYBDIS_UPSTREAM_KEYCODES = [
     "DRG_TOG",
 ]
 
-_PD_MODE_MANIFEST_ENTRY_PATTERN = re.compile(r"^\s*PDM\(\s*[A-Z_][A-Z0-9_]*\s*,\s*([A-Z_][A-Z0-9_]*)\s*,")
+_PD_MODE_MANIFEST_ENTRY_PATTERN = re.compile(r"^\s*PDM\(\s*[A-Z_][A-Z0-9_]*\s*,\s*([A-Z_][A-Z0-9_]*)\s*\)")
 
 
 def load_pd_mode_keycodes() -> list[str]:
@@ -675,14 +675,9 @@ def render_all_layers(via_json_path: Path, indent="  "):
     all_tokens = [via_layer_to_layout_tokens(layer) for layer in via_layers]
 
     blocks = []
-    # The one-time snapshot bridge keeps the old five-layer storage bank.
-    # Preserve its guards when regenerating this profile's standard layout.
-    bridge = "NOAH_LEGACY_SNAPSHOT_BRIDGE" in KEYMAP_FILE.with_name("config.h").read_text()
     for idx, tokens in enumerate(all_tokens):
         name = layer_name_for_index(idx)
         block = render_layer(name, tokens, indent)
-        if bridge and idx >= 5:
-            block = "#ifndef NOAH_LEGACY_SNAPSHOT_BRIDGE\n" + block + "\n#endif"
         blocks.append(block)
     return "\n\n".join(blocks)
 

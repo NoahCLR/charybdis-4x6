@@ -140,21 +140,19 @@ enum custom_keycodes {
     MACRO_13,
     MACRO_14,
     MACRO_15,
-#define NOAH_PD_MODE_KEYCODE(name, keycode, handler, key_handler, reset, dpi, traits, lifecycle) keycode,
-    NOAH_PD_MODE_LEGACY_LIST(NOAH_PD_MODE_KEYCODE)
+#define NOAH_PD_MODE_KEYCODE(name, keycode) keycode,
+    NOAH_PD_MODE_BASE_LIST(NOAH_PD_MODE_KEYCODE)
 #undef NOAH_PD_MODE_KEYCODE
-#define NOAH_PD_MODE_LOCK_KEYCODE(name, keycode, handler, key_handler, reset, dpi, traits, lifecycle) keycode##_LOCK,
-        NOAH_PD_MODE_LEGACY_LIST(NOAH_PD_MODE_LOCK_KEYCODE)
+#define NOAH_PD_MODE_LOCK_KEYCODE(name, keycode) keycode##_LOCK,
+        NOAH_PD_MODE_BASE_LIST(NOAH_PD_MODE_LOCK_KEYCODE)
 #undef NOAH_PD_MODE_LOCK_KEYCODE
             LAYER_LOCK_BASE,
     CUSTOM_KEYCODES_END = LAYER_LOCK_BASE + LAYER_COUNT,
 };
 
-#ifdef NOAH_PD_PROFILE_ENABLE
 // Appended identities must never shift deployed layer or authored keycodes.
 enum { PD_SLOT_6 = SAFE_RANGE + 0xb0, PD_SLOT_6_LOCK, PD_SLOT_7, PD_SLOT_7_LOCK };
 _Static_assert(PD_SLOT_6 == 0x7ef0, "PD extension ABI changed");
-#endif
 
 #define PD_MODE_KEYCODE_COUNT PD_MODE_COUNT
 #define PD_MODE_LOCK_KEYCODE_COUNT PD_MODE_COUNT

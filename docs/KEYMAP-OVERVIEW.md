@@ -431,7 +431,7 @@ Authored key-feedback LED groups repaint after the feedback locality render insi
 | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) | layer enum, timing, RGB defaults, and keymap-facing feature config |
 | [users/noah/config.h](../users/noah/config.h) | shared userspace config consumed by this profile report, including split, RGB Matrix, pointing, dragscroll, and VIA layer-count defaults |
 | [rgb_config.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c) | reusable LED groups, layer colors, layer LED groups, pd-mode colors and LED groups, auto-mouse fade config, combo feedback color and LED groups, key-behavior feedback colors and LED groups |
-| [pd_mode_manifest.h](../users/noah/lib/pointing/defs/pd_mode_manifest.h) | shared pointing-mode identities, generated mode/lock keycodes, traits, DPI hooks, and lifecycle hook selections |
+| [pd_mode_manifest.h](../users/noah/lib/pointing/defs/pd_mode_manifest.h) | stable pointing-slot identities and generated mode/lock keycodes |
 
 ### Shared Keycode Surfaces
 
@@ -537,12 +537,12 @@ These values come from the keymap config and the shared userspace config. When t
 | `VIA_FIRMWARE_VERSION` | `0x00010000u` | [users/noah/config.h](../users/noah/config.h) |
 | `DYNAMIC_KEYMAP_LAYER_COUNT` | `LAYER_COUNT` | [users/noah/config.h](../users/noah/config.h) |
 | `DYNAMIC_KEYMAP_MACRO_COUNT` | `64` | [users/noah/config.h](../users/noah/config.h) |
-| `WEAR_LEVELING_BACKING_SIZE` | `32768` | [users/noah/config.h](../users/noah/config.h) |
+| `WEAR_LEVELING_BACKING_SIZE` | `36864` | [users/noah/config.h](../users/noah/config.h) |
 | `DYNAMIC_KEYMAP_EEPROM_MAX_ADDR` | `0x1FFFu` | [users/noah/config.h](../users/noah/config.h) |
 | `NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR` | `0x2000u` | [users/noah/config.h](../users/noah/config.h) |
-| `NOAH_PROFILE_STORAGE_SLOT_A_END_ADDR` | `0x2FFFu` | [users/noah/config.h](../users/noah/config.h) |
-| `NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR` | `0x3000u` | [users/noah/config.h](../users/noah/config.h) |
-| `NOAH_PROFILE_STORAGE_SLOT_B_END_ADDR` | `0x3FFFu` | [users/noah/config.h](../users/noah/config.h) |
+| `NOAH_PROFILE_STORAGE_SLOT_A_END_ADDR` | `0x33FFu` | [users/noah/config.h](../users/noah/config.h) |
+| `NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR` | `0x3400u` | [users/noah/config.h](../users/noah/config.h) |
+| `NOAH_PROFILE_STORAGE_SLOT_B_END_ADDR` | `0x47FFu` | [users/noah/config.h](../users/noah/config.h) |
 | `NOAH_LAYER_BANK_COUNT` | `8` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
 | `TAPPING_TERM` | `200` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
 | `COMBO_TERM` | `50` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |

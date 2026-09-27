@@ -12,13 +12,8 @@
 
 // ─── Layers ────────────────────────────────────────────────────────────────
 //
-// The standard image reserves eight layers. The temporary export bridge
-// retains the deployed five-layer storage geometry.
-#ifdef NOAH_LEGACY_SNAPSHOT_BRIDGE
-#    define NOAH_LAYER_BANK_COUNT 5
-#else
-#    define NOAH_LAYER_BANK_COUNT 8
-#endif
+// Every image reserves eight logical layers.
+#define NOAH_LAYER_BANK_COUNT 8
 #ifndef __ASSEMBLER__
 enum charybdis_keymap_layers {
     LAYER_BASE = 0, // Default QWERTY typing layer

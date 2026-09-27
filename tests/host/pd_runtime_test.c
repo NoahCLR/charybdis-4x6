@@ -5,8 +5,18 @@
 
 #include "users/noah/noah_runtime.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
+#include "users/noah/lib/pointing/modes/pd_mode_configured.h"
+#include "users/noah/lib/pointing/modes/pd_mode_handlers.h"
+#include "users/noah/lib/profile/runtime/effective_pd_runtime.h"
 #include "users/noah/lib/state/ownership/keyboard_mod_ownership.h"
 #include "host_runtime_reset_fixture.h"
+
+// Local dispatch fakes let this test observe the configured slot selection.
+report_mouse_t handle_volume_mode(report_mouse_t mouse_report);
+report_mouse_t handle_brightness_mode(report_mouse_t mouse_report);
+report_mouse_t handle_zoom_mode(report_mouse_t mouse_report);
+report_mouse_t handle_arrow_mode(report_mouse_t mouse_report);
+void reset_volume_mode(void);
 
 static host_runtime_fixture_t runtime_fixture = HOST_RUNTIME_FIXTURE_INIT;
 HOST_RUNTIME_FIXTURE_DEFINE_RESET_QMK_STUBS(runtime_fixture)
@@ -261,6 +271,44 @@ void keyboard_mod_ownership_unregister(uint16_t keycode) {
 
 uint8_t keyboard_mod_ownership_managed_only_mask(uint8_t mods) {
     return mods;
+}
+
+// Dispatch-test records model the published eight-slot cache. The motion
+// stubs below let this test observe which slot the shared engine selected.
+static const uint8_t test_pd_records[8][96] = {
+    [0] = {[0] = 0, [1] = 2, [4] = 100},
+    [1] = {[0] = 1, [1] = 1, [4] = 120, [5] = 5},
+    [2] = {[0] = 2, [1] = 1, [4] = 220, [5] = 5},
+    [3] = {[0] = 3, [1] = 1, [4] = 64, [5] = 6},
+    [4] = {[0] = 4, [1] = 1, [2] = 1, [4] = 164, [5] = 6},
+    [5] = {[0] = 5, [1] = 2, [4] = 100},
+};
+static const uint8_t *active_pd_record;
+
+const uint8_t *noah_effective_pd_for_mask(uint8_t mode) {
+    for (uint8_t slot = 0; slot < 6; slot++) {
+        if (mode == (uint8_t)(1u << slot)) return test_pd_records[slot];
+    }
+    return NULL;
+}
+
+void noah_pd_engine_enter(const uint8_t *record) { active_pd_record = record; }
+void noah_pd_engine_exit(void) {
+    if (active_pd_record && active_pd_record[0] == 1) reset_volume_mode();
+    active_pd_record = NULL;
+}
+uint8_t noah_pd_engine_masked_mods(const uint8_t *record) { (void)record; return 0; }
+bool noah_pd_engine_key(uint16_t keycode, keyrecord_t *record) { (void)keycode; (void)record; return false; }
+report_mouse_t noah_pd_engine_motion(report_mouse_t report) {
+    if (!active_pd_record) return report;
+    switch (active_pd_record[0]) {
+        case 0: case 5: return handle_dragscroll_mode(report);
+        case 1: return handle_volume_mode(report);
+        case 2: return handle_brightness_mode(report);
+        case 3: return handle_zoom_mode(report);
+        case 4: return handle_arrow_mode(report);
+        default: return report;
+    }
 }
 
 report_mouse_t handle_volume_mode(report_mouse_t mouse_report) {

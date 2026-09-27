@@ -22,6 +22,7 @@ compile_layout() {
     shift 2
 
     cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
+        -DNOAH_PD_PROFILE_ENABLE \
         -DVIA_ENABLE \
         -DMCU_RP \
         -DRGB_MATRIX_ENABLE \
@@ -38,7 +39,7 @@ compile_layout() {
         "$@"
 }
 
-compile_layout 16384u 41u \
+compile_layout 18432u 41u \
     "$ROOT/tests/host/profile_storage_layout_test.c" \
     "$ROOT/users/noah/lib/profile/storage/profile_storage_layout.c" \
     -o "$BIN"
@@ -59,6 +60,6 @@ expect_contract_compile_failure() {
 }
 
 expect_contract_compile_failure "logical EEPROM size drift" 8192u 41u
-expect_contract_compile_failure "VIA config boundary drift" 16384u 40u
+expect_contract_compile_failure "VIA config boundary drift" 18432u 40u
 
 echo "profile storage layout compile guards passed"

@@ -1,8 +1,9 @@
 # PD-mode domain v1
 
-Implemented in schema-2 side-specific owner builds: domain codec, incremental
-validation, immutable effective cache, shared engines, persistence/split writers,
-portable migration and live editor. Legacy bridge builds retain schema 1.
+Implemented in schema-2 builds: domain codec, incremental validation, immutable
+effective cache, shared engines, persistence/split writers, portable profiles
+and live editor. Side-specific builds own committed profiles; the generic build
+loads the eight compiled factory slots without a profile owner.
 Physical upgrade and release acceptance remain pending; see
 [Hardware acceptance](#hardware-acceptance).
 
@@ -70,6 +71,14 @@ generation is published. Transient accumulator, gesture and output-lease state
 stays separate from configuration and out of backups. A late release resolves
 against the activation that acquired its output, even after another slot
 became active.
+
+Every build links the configured directional engine and shared dragscroll
+algorithm. The mode registry retains the eight stable native hold/lock
+identities but no per-preset motion, key, reset, DPI or lifecycle callbacks.
+The old per-preset handlers and readback-bridge build options are retired.
+Factory-only builds encode and validate their compiled slot records at startup;
+owner builds warm the cache from their published generation and fail closed if
+that read fails.
 
 Pointing polls never decode EEPROM or allocate. A cache-copy failure exposes an
 unavailable state, never a partial table or a mix of generations. Publication
@@ -353,18 +362,18 @@ Existing native IDs are fixed by executable assertions:
 | Layer lock 0–7 | `0x7e5c..0x7e63` |
 | Right thumb, left thumb, click spam, drag window | `0x7e64..0x7e67` |
 
-The five-layer bridge has a different custom-action base, `0x7e61`; it retains
-its own ABI and requires explicit translation when supported. New
+Historical five-layer profiles used a different custom-action base, `0x7e61`;
+portable import requires explicit translation when supported. New
 hold-6/lock-6/hold-7/lock-7 values are `0x7ef0..0x7ef3`, within QMK's user range
 and unused by current authored actions. These are allocated explicitly and excluded from generic custom-action
 dispatch; enum expansion preserves all old values. A final ABI digest comes from the actual
 integrated vocabulary, never a guessed constant.
 
-Old backups lack compiled thresholds and modifier/scroll policies. The
-old-geometry readback bridge must match the source firmware's authored tuning.
-Action ABI alone cannot recover that tuning. The five-layer bridge can supply
-the same source domain before layer and action-reference migration. Hardware
-acceptance remains distinct from codec and runtime parity tests.
+Old backups lack compiled thresholds and modifier/scroll policies. Action ABI
+alone cannot recover that tuning. The retired bridge once supplied the source
+domain; this repository no longer builds it. Only backups that already carry
+verified source PD data can migrate through the current portable importer.
+Hardware acceptance remains distinct from codec and runtime parity tests.
 
 ## Compatibility
 

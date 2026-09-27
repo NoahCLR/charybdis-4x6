@@ -2,6 +2,7 @@
 
 #if defined(NOAH_PD_PROFILE_ENABLE) && defined(POINTING_DEVICE_ENABLE)
 #include "pd_mode_handler_common.h"
+#include "pd_mode_handlers.h"
 #include "../../state/ownership/keyboard_mod_ownership.h"
 #include "../../state/modifiers/keyboard_mod_policy.h"
 #include "../../profile/schema/profile_pd_v1.h"

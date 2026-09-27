@@ -19,6 +19,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
     -DNOAH_RUNTIME_TRACE_ENABLE \
     -DPOINTING_DEVICE_ENABLE \
+    -DNOAH_PD_PROFILE_ENABLE \
     -DSPLIT_TRANSACTION_IDS_USER \
     -I"$ROOT" \
     -I"$ROOT/users/noah" \
@@ -31,12 +32,6 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/pointing/runtime/pd_mode_lifecycle.c" \
     "$ROOT/users/noah/lib/pointing/runtime/pd_mode_key_runtime_bridge.c" \
     "$ROOT/users/noah/lib/pointing/runtime/pd_mode_state.c" \
-    "$ROOT/users/noah/lib/pointing/modes/pd_mode_dragscroll.c" \
-    "$ROOT/users/noah/lib/pointing/modes/pd_mode_pinch.c" \
-    "$ROOT/users/noah/lib/pointing/modes/pd_mode_volume.c" \
-    "$ROOT/users/noah/lib/pointing/modes/pd_mode_brightness.c" \
-    "$ROOT/users/noah/lib/pointing/modes/pd_mode_zoom.c" \
-    "$ROOT/users/noah/lib/pointing/modes/pd_mode_arrow.c" \
     "$ROOT/users/noah/lib/state/ownership/layer_ownership.c" \
     "$ROOT/users/noah/lib/state/diagnostics/runtime_diag.c" \
     "$ROOT/users/noah/lib/state/shared/runtime_shared_state.c" \

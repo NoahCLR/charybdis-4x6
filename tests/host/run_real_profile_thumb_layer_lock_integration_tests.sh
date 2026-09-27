@@ -25,6 +25,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DNOAH_RUNTIME_TRACE_ENABLE \
     -DNOAH_RUNTIME_TRACE_CAPACITY=8191u \
     -DPOINTING_DEVICE_ENABLE \
+    -DNOAH_PD_PROFILE_ENABLE \
     -DRGB_MATRIX_ENABLE \
     -DRGB_MATRIX_WS2812 \
     -DSPLIT_TRANSACTION_IDS_USER \
@@ -78,7 +79,6 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/pointing/runtime/pd_runtime.c" \
     "$ROOT/users/noah/lib/pointing/runtime/pd_mode_key_runtime_bridge.c" \
     "$ROOT/users/noah/lib/pointing/runtime/pd_mode_state.c" \
-    "$ROOT/users/noah/lib/pointing/modes/pd_mode_pinch.c" \
     "$ROOT/users/noah/lib/pointing/policy/pointer_layer_policy.c" \
     "$ROOT/users/noah/lib/state/ownership/layer_ownership.c" \
     "$ROOT/users/noah/lib/state/modifiers/keyboard_mod_policy.c" \

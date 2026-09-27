@@ -23,6 +23,7 @@
 #include "lib/compat/qmk_via_split_sync.h"
 #include "lib/compat/qmk_via_sync_state.h"
 #include "lib/profile/storage/profile_store_runtime_hooks.h"
+#include "lib/profile/runtime/effective_pd_runtime.h"
 #include "lib/rgb/core/rgb_runtime.h"
 #include "lib/state/diagnostics/runtime_diag.h"
 #include "lib/state/shared/runtime_reset.h"
@@ -33,6 +34,12 @@ typedef void (*noah_runtime_init_stage_fn_t)(void);
 static void noah_runtime_init_finalize_via_sync_defaults(void) {
     noah_qmk_via_sync_state_reset_after_defaults(noah_via_macro_defaults_last_seed_succeeded());
 }
+
+#if defined(NOAH_PD_PROFILE_ENABLE) && !defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)
+static void noah_runtime_init_compiled_pd(void) {
+    noah_effective_pd_load_compiled_defaults(noah_pd_defaults);
+}
+#endif
 
 void noah_eeconfig_init_user(void) {
     static const noah_runtime_init_stage_fn_t stages[] = {
@@ -84,7 +91,11 @@ void noah_suspend_power_down_user(void) {
 
 void noah_keyboard_post_init_user(void) {
     static const noah_runtime_init_stage_fn_t stages[] = {
-        noah_runtime_shared_state_post_init, key_origin_registry_init, noah_qmk_combo_origin_init, macro_payload_engine_init, noah_via_macro_defaults_keyboard_post_init, noah_profile_store_runtime_init, noah_rgb_runtime_post_init, split_runtime_sync_init, noah_qmk_via_split_sync_init, noah_qmk_via_split_mirror_init, noah_qmk_durable_io_init,
+        noah_runtime_shared_state_post_init, key_origin_registry_init, noah_qmk_combo_origin_init, macro_payload_engine_init, noah_via_macro_defaults_keyboard_post_init, noah_profile_store_runtime_init,
+#if defined(NOAH_PD_PROFILE_ENABLE) && !defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)
+        noah_runtime_init_compiled_pd,
+#endif
+        noah_rgb_runtime_post_init, split_runtime_sync_init, noah_qmk_via_split_sync_init, noah_qmk_via_split_mirror_init, noah_qmk_durable_io_init,
     };
 
     noah_runtime_diag_post_init();

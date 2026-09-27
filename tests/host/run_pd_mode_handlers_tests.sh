@@ -17,30 +17,13 @@ cleanup() {
 
 trap cleanup EXIT INT TERM
 
-cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-variable -pedantic \
-    -DQMK_KEYBOARD_H='"qmk_stub.h"' \
-    -DPOINTING_DEVICE_ENABLE \
-    -I"$ROOT" \
-    -I"$ROOT/users/noah" \
-    -I"$ROOT/tests/host/include" \
-    -include "$ROOT/tests/host/include/noah_compile_config_no_automouse.h" \
-    "$ROOT/tests/host/pd_mode_handlers_test.c" \
-    "$ROOT/users/noah/lib/pointing/modes/pd_mode_dragscroll.c" \
-    "$ROOT/users/noah/lib/pointing/modes/pd_mode_volume.c" \
-    "$ROOT/users/noah/lib/pointing/modes/pd_mode_brightness.c" \
-    "$ROOT/users/noah/lib/pointing/modes/pd_mode_zoom.c" \
-    "$ROOT/users/noah/lib/pointing/modes/pd_mode_arrow.c" \
-    "$ROOT/users/noah/lib/state/modifiers/keyboard_mod_state.c" \
-    -o "$BIN"
-
-"$BIN"
-# Run the same legacy expectations plus configured-engine parity and ownership.
 python3 - "$ROOT" "$BUILD_DIR/pd_mode_engine_fixture.h" <<'PYFIX'
 import json, sys
 from pathlib import Path
 fixture=json.loads(Path(sys.argv[1], 'tests/fixtures/pd_mode_domain_v1.json').read_text())
 Path(sys.argv[2]).write_text('static const unsigned char pd_engine_fixture[] = {' + ','.join(str(b) for b in bytes.fromhex(fixture['hex'])) + '};\n')
 PYFIX
+
 cc -DNOAH_PD_PROFILE_ENABLE -I"$BUILD_DIR" -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-variable -pedantic \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
     -DPOINTING_DEVICE_ENABLE \
@@ -53,10 +36,6 @@ cc -DNOAH_PD_PROFILE_ENABLE -I"$BUILD_DIR" -std=c11 -Wall -Wextra -Werror -Wno-u
     "$ROOT/users/noah/lib/profile/schema/profile_pd_v1.c" \
     "$ROOT/users/noah/lib/pointing/modes/pd_mode_configured.c" \
     "$ROOT/users/noah/lib/pointing/modes/pd_mode_dragscroll.c" \
-    "$ROOT/users/noah/lib/pointing/modes/pd_mode_volume.c" \
-    "$ROOT/users/noah/lib/pointing/modes/pd_mode_brightness.c" \
-    "$ROOT/users/noah/lib/pointing/modes/pd_mode_zoom.c" \
-    "$ROOT/users/noah/lib/pointing/modes/pd_mode_arrow.c" \
     "$ROOT/users/noah/lib/state/modifiers/keyboard_mod_state.c" \
     -o "$BIN"
 
@@ -67,6 +46,7 @@ expect_config_compile_failure() {
     shift
 
     if cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-variable -pedantic \
+        -DNOAH_PD_PROFILE_ENABLE \
         -DQMK_KEYBOARD_H='"qmk_stub.h"' \
         -DPOINTING_DEVICE_ENABLE \
         -I"$ROOT" \
@@ -74,7 +54,7 @@ expect_config_compile_failure() {
         -I"$ROOT/tests/host/include" \
         -include "$ROOT/tests/host/include/noah_compile_config_no_automouse.h" \
         "$@" \
-        -c "$ROOT/users/noah/lib/pointing/modes/pd_mode_volume.c" \
+        -c "$ROOT/users/noah/lib/pointing/modes/pd_mode_configured.c" \
         -o "$CONFIG_PROBE_OBJECT" >"$CONFIG_PROBE_LOG" 2>&1; then
         echo "expected pd-mode config compile failure: $label" >&2
         exit 1
@@ -86,7 +66,5 @@ expect_config_compile_failure "tap budget exceeds uint8_t" -DNOAH_PD_MODE_MAX_TA
 expect_config_compile_failure "zero backlog cap" -DNOAH_PD_MODE_MAX_BACKLOG_TAPS=0
 expect_config_compile_failure "backlog cap exceeds diagnostics" -DNOAH_PD_MODE_MAX_BACKLOG_TAPS=65536
 expect_config_compile_failure "tap budget exceeds backlog cap" -DNOAH_PD_MODE_MAX_TAPS_PER_TICK=33
-expect_config_compile_failure "zero axis threshold" -DVOLUME_THRESHOLD=0
-expect_config_compile_failure "threshold and backlog exceed accumulator" -DVOLUME_THRESHOLD=65535 -DNOAH_PD_MODE_MAX_BACKLOG_TAPS=65535
 
 echo "pd_mode_handlers config guards passed"

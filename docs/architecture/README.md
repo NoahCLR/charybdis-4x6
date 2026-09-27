@@ -113,7 +113,7 @@ flowchart TD
 | Change authored key behavior | `keymap.c` `key_behaviors[]` | [change-guide.md](./change-guide.md), [Interaction Model](../INTERACTION_MODEL.md) |
 | Change release or multi-tap semantics | `key/runtime/planning/` and reducer tests | [runtime-flow.md](./runtime-flow.md), [Key Runtime](../KEY_RUNTIME.md) |
 | Change modifier handling | `state/modifiers/` or `state/ownership/keyboard_mod_ownership.*` | [change-guide.md](./change-guide.md) |
-| Add or change a PD mode | `pointing/defs/`, `pointing/modes/`, `pointing/runtime/` | [Adding A Pointing-Device Mode](../ADDING_PD_MODE.md) |
+| Configure a PD slot | Charybdis Live or factory `pd_config.c` | [Adding a Pointing Mode](../ADDING_PD_MODE.md) |
 | Change RGB rendering | `rgb_config.c` for authored colors, `users/noah/lib/rgb/` for render logic | [RGB Configuration](../RGB_CONFIG.md) |
 | Change split mirroring | `users/noah/lib/split/runtime_sync.*` | [runtime-flow.md](./runtime-flow.md) |
 | Change VIA macro behavior | `keymap.c` `VIA_MACROS(MACRO)` defaults or `users/noah/lib/macro/` | [change-guide.md](./change-guide.md) |

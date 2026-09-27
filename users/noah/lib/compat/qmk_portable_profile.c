@@ -18,16 +18,9 @@
 // Cold readback workspace, never used by key events or RGB rendering.
 void noah_qmk_portable_storage_init(void) {
     uint32_t word = eeconfig_read_user();
-#    if defined(NOAH_LEGACY_SNAPSHOT_BRIDGE) || defined(NOAH_PD_READBACK_BRIDGE)
-    noah_qmk_via_sync_metadata_t metadata;
-    // Keep recognized five-layer data across a build-date change. Dirty
-    // storage remains marked for recovery; never erase the recovery source.
-    if (noah_qmk_via_sync_metadata_decode(word, &metadata)) via_eeprom_set_valid(true);
-#    else
     // Geometry changed from five to eight. Never interpret the old macro
     // prefix as keycodes even when both builds happen on the same date.
     if ((word >> 28) != NOAH_QMK_VIA_SYNC_METADATA_SCHEMA) via_eeprom_set_valid(false);
-#    endif
 }
 // The dual-role setting is QMK's tapping term. Quick tap follows it, as it
 // does by default, so a second press within the term still auto-repeats.

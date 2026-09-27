@@ -67,6 +67,20 @@ static noah_profile_validator_v1_result_t validate(void) {
 
 int main(int argc, char **argv) {
     test_candidate_capacity();
+    noah_pd_config_t factory[NOAH_PROFILE_PD_V1_SLOT_COUNT] = {0};
+    for (uint8_t slot = 0; slot < NOAH_PROFILE_PD_V1_SLOT_COUNT; slot++) factory[slot].id = slot;
+    factory[0].kind = 1;
+    memcpy(factory[0].name, "Factory", sizeof("Factory"));
+    factory[0].threshold_y = 60;
+    factory[0].directions[2].keycode = 4;
+    factory[0].directions[3].keycode = 5;
+    noah_effective_pd_load_compiled_defaults(factory);
+    assert(noah_effective_pd_ready());
+    assert(noah_effective_pd_for_mask(1)[34] == 60);
+    assert(!noah_effective_pd_for_mask(2));
+    factory[0].threshold_y = 0;
+    noah_effective_pd_load_compiled_defaults(factory);
+    assert(!noah_effective_pd_ready());
     assert(argc == 2);
     FILE *file = fopen(argv[1], "rb");
     assert(file);

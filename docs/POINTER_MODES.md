@@ -38,8 +38,9 @@ with existing bindings must be unbound before clearing it.
 Macro programs, recursive mode/layer actions and arbitrary scripts are not
 motion outputs. Ordinary pointer movement and auto-sniping remain outside the
 slot bank. Dragscroll and Pinch use this repository's scroll implementation.
-Legacy/generic firmware retains the fixed six-mode system; installing the new
-pair requires the backup/migration procedure in the root README.
+All current firmware builds use the eight-slot engine. The generic build runs
+the compiled factory slots without a live profile owner; the side-specific pair
+supports editing and saving them from Charybdis Live.
 
 ## Shared Rules
 

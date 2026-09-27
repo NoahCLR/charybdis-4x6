@@ -7,8 +7,6 @@ ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 . "$ROOT/tests/host/noah_host_qmk_env.sh"
 noah_host_export_qmk_cpath "$ROOT"
 BUILD_DIR="$(mktemp -d)"
-BIN="$BUILD_DIR/pd_mode_key_runtime_integration_test"
-LEGACY_BIN="$BUILD_DIR/pd_mode_key_runtime_legacy_pinch_integration_test"
 
 cleanup() {
     rm -rf "$BUILD_DIR"
@@ -78,7 +76,6 @@ compile_test() {
     "$ROOT/users/noah/lib/pointing/runtime/pd_runtime.c" \
     "$ROOT/users/noah/lib/pointing/runtime/pd_mode_key_runtime_bridge.c" \
     "$ROOT/users/noah/lib/pointing/runtime/pd_mode_state.c" \
-    "$ROOT/users/noah/lib/pointing/modes/pd_mode_pinch.c" \
     "$ROOT/users/noah/lib/pointing/policy/pointer_layer_policy.c" \
     "$ROOT/users/noah/lib/state/diagnostics/runtime_diag.c" \
     "$ROOT/users/noah/lib/state/modifiers/keyboard_mod_policy.c" \
@@ -87,12 +84,6 @@ compile_test() {
     "$ROOT/users/noah/lib/split/runtime_sync_dirty.c" \
     -o "$bin"
 }
-
-compile_test "$BIN"
-"$BIN"
-
-compile_test "$LEGACY_BIN" -DPD_MODE_KEY_RUNTIME_TEST_LEGACY_PINCH_IMPLICIT
-"$LEGACY_BIN"
 
 compile_test "$BUILD_DIR/configured" -DNOAH_PD_PROFILE_ENABLE \
     "$ROOT/keyboards/bastardkb/charybdis/4x6/keymaps/noah/pd_config.c" \

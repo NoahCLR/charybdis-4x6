@@ -66,30 +66,17 @@ buttons are under **Advanced**. Keep changes in the shared draft, bind its
 hold/toggle action, set RGB, then review and Apply. See
 [Pointer modes](docs/POINTER_MODES.md).
 
-**Upgrade existing keyboards through verified backup and restore.** The new
-firmware changes EEPROM geometry; flashing it directly can lose the old profile.
+All current builds use the eight-slot engine and schema-2 EEPROM geometry. Use
+`sh tools/build-firmware-pair.sh` for the flashable side-specific pair. The
+right build uses `NOAH_PHYSICAL_HALF=right` and `FORCE_MASTER=yes`; the left uses
+`NOAH_PHYSICAL_HALF=left` and `FORCE_SLAVE=yes`. A plain `qmk compile` produces
+an eight-slot factory-only image without the live profile owner.
 
-1. Export your complete current profile and retain the original firmware pair.
-2. Build an old-geometry readback bridge with `NOAH_PD_PROFILE=no` for each
-   physical half, using the same authored configuration as the old firmware.
-   It retains the old ABI/geometry and reports compiled PD tuning. For a
-   five-layer source, also use `NOAH_LEGACY_SNAPSHOT_BRIDGE=yes`.
-3. On that bridge, choose **Export PD upgrade** in Charybdis Live. It saves and
-   verifies the original and a sibling `.pd8.charybdis.json` profile. Do not
-   proceed without both files. Missing source tuning is rejected, never guessed.
-4. Build the new side-specific pair (default `NOAH_PD_PROFILE=yes`), install it
-   on both halves, import the `.pd8.charybdis.json` file, review and Apply.
-   Read back and export again, then check all six original modes and both halves.
-
-Use `sh tools/build-firmware-pair.sh --pd-snapshot-bridge` for the eight-layer
-readback bridge and `sh tools/build-firmware-pair.sh` for the new pair.
-Alternatively, add `-e NOAH_PD_PROFILE=no` to each side-specific `qmk compile`
-command for the bridge. The new right build uses `-e NOAH_PHYSICAL_HALF=right -e FORCE_MASTER=yes`;
-the left uses `-e NOAH_PHYSICAL_HALF=left -e FORCE_SLAVE=yes`. A generic build
-without a provisioned half does not include the live profile owner.
-Downgrading likewise requires restoring the original backup on the original
-firmware geometry. Keep the bridge paired with its matching authored source;
-using different compiled tuning cannot recover the original tuning.
+The old five-layer and six-mode readback bridges are retired. This repository
+no longer provides a firmware path for extracting and migrating a profile from
+an old-geometry keyboard. Keep any old firmware and backups you already have;
+flashing schema-2 firmware over that geometry does not preserve its committed
+profile. Existing schema-2 backups still restore through the live app.
 
 Physical migration, power-interruption, pointing cadence and stack high-water
 acceptance remain release gates; see the
@@ -262,7 +249,7 @@ committed profile. While a read runs, all screen menus are disabled and a
 loading step replaces the screen. The Configure menus and board open when the
 complete profile is ready for editing. After a read fails, **Device** is
 available if the keyboard reported its capabilities; **Profile & backups**
-opens if it supports complete-profile backup, including the five-layer bridge.
+opens if the connected keyboard supports complete-profile backup.
 Macro keycodes are shown as `VIA_MACRO_0` through `VIA_MACRO_63` in the live
 editor, including slots whose QMK values have no named constant.
 Every edit goes into one local draft with undo, redo and a history, and reaches
@@ -683,19 +670,10 @@ become `KC_NO`, `KC_NO` keys leaving it become transparent, and an uncoloured
 former base gets the saved base HSV as its own layer colour. The draft review
 counts transparent and `KC_NO` base keys in separate notices.
 
-For an existing five-layer keyboard, perform the one-time storage upgrade in
-this order. Do not flash the eight-layer image before saving the backup:
-
-1. Build `sh tools/build-firmware-pair.sh --snapshot-bridge` and flash both
-   `_snapshot_bridge` images. This keeps the five-layer storage layout and
-   existing committed-profile identity.
-2. Install the updated Live extension, reload it and choose **Export profile**.
-3. Build `sh tools/build-firmware-pair.sh` and flash the regular eight-layer pair.
-4. Choose **Import profile** and restore the file. Extra layers start transparent;
-   the app translates existing user trigger IDs automatically.
-
-The bridge and regular firmware share the same engines. Executable custom
-combo hooks and unsupported macro content cannot be represented as profile
-data; export reports these explicitly instead of producing an incomplete file.
+Old five-layer firmware is no longer built here. Its storage geometry is
+incompatible with current firmware, so retain the old pair and its backups if
+you still use it. Executable custom combo hooks and unsupported macro content
+cannot be represented as profile data; export reports these explicitly instead
+of producing an incomplete file.
 The [portable profile contract](docs/architecture/portable-profile-v1.md) records
 format limits, compatibility, restore ordering and remaining hardware checks.

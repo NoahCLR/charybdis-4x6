@@ -38,10 +38,6 @@ endif
 SRC += $(NOAH_COMMON_SOURCES)
 SRC += $(NOAH_PROFILE_KEYMAP_SOURCES)
 
-ifeq ($(strip $(POINTING_DEVICE_ENABLE)), yes)
-    SRC += $(NOAH_POINTING_SOURCES)
-endif
-
 ifeq ($(strip $(RGB_MATRIX_ENABLE)), yes)
     SRC += $(NOAH_AUTOMOUSE_SOURCES)
     SRC += $(NOAH_RGB_KEYMAP_SOURCES)
@@ -133,27 +129,19 @@ ifneq ($(strip $(NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS)),)
     OPT_DEFS += -DNOAH_PROFILE_PERFORMANCE_DIAGNOSTICS_ENABLE
 endif
 
-# One-time readback bridge for a deployed five-layer board. It deliberately
-# preserves its VIA addresses and legacy profile compatibility identity.
-ifeq ($(strip $(NOAH_LEGACY_SNAPSHOT_BRIDGE)),yes)
-    OPT_DEFS += -DNOAH_LEGACY_SNAPSHOT_BRIDGE
-endif
-
-# The old-geometry readback bridge is built with NOAH_PD_PROFILE=no. Never flash
-# the new geometry before exporting and verifying the original + upgraded files.
-NOAH_PD_PROFILE ?= yes
-ifneq ($(filter $(strip $(NOAH_PD_PROFILE)),yes no),$(strip $(NOAH_PD_PROFILE)))
-    $(error NOAH_PD_PROFILE must be `yes` or `no`)
-endif
-ifeq ($(strip $(NOAH_PD_PROFILE)),no)
-    OPT_DEFS += -DNOAH_PD_READBACK_BRIDGE
-endif
-ifeq ($(strip $(NOAH_PD_PROFILE)),yes)
-    ifneq ($(strip $(NOAH_LEGACY_SNAPSHOT_BRIDGE)),yes)
-        ifneq ($(strip $(NOAH_PHYSICAL_HALF)),)
-            ifeq ($(strip $(NOAH_LIVE_PROFILE_MUTATION)),yes)
-                OPT_DEFS += -DNOAH_PD_PROFILE_ENABLE
-            endif
-        endif
+# All firmware uses the eight-slot profile engine. The old storage-geometry
+# readback bridges and their per-mode handlers are retired.
+ifneq ($(strip $(NOAH_PD_PROFILE)),)
+    ifneq ($(strip $(NOAH_PD_PROFILE)),yes)
+        $(error NOAH_PD_PROFILE=no is retired; build the eight-slot firmware)
     endif
+endif
+ifneq ($(strip $(NOAH_LEGACY_SNAPSHOT_BRIDGE)),)
+    $(error NOAH_LEGACY_SNAPSHOT_BRIDGE is retired)
+endif
+OPT_DEFS += -DNOAH_PD_PROFILE_ENABLE
+
+ifeq ($(strip $(POINTING_DEVICE_ENABLE)),yes)
+    SRC += $(NOAH_POINTING_SOURCES)
+    SRC += $(NOAH_POINTING_CONFIGURED_SOURCES)
 endif

@@ -5,6 +5,18 @@ static bool ready;
 
 bool noah_effective_pd_ready(void) { return ready; }
 
+void noah_effective_pd_load_compiled_defaults(const noah_pd_config_t defaults[NOAH_PROFILE_PD_V1_SLOT_COUNT]) {
+    static const uint8_t header[NOAH_PROFILE_PD_V1_HEADER_SIZE] = {1u, 8u, 96u};
+
+    ready = false;
+    if (!defaults) return;
+    for (size_t i = 0; i < sizeof(header); i++) records[i] = header[i];
+    for (uint8_t slot = 0; slot < NOAH_PROFILE_PD_V1_SLOT_COUNT; slot++) {
+        noah_profile_pd_v1_encode_record(&defaults[slot], records + NOAH_PROFILE_PD_V1_HEADER_SIZE + (size_t)slot * NOAH_PROFILE_PD_V1_RECORD_SIZE);
+    }
+    ready = noah_profile_pd_v1_validate(records, sizeof(records), NULL) == NOAH_PROFILE_PD_V1_OK;
+}
+
 const uint8_t *noah_effective_pd_record(uint8_t slot) {
     return ready && slot < 8 ? records + 8 + (size_t)slot * 96 : NULL;
 }

@@ -60,7 +60,7 @@ build_and_run() {
         -DRGB_MATRIX_WS2812 \
         -DVIA_ENABLE \
         -DMCU_RP \
-        -DTOTAL_EEPROM_BYTE_COUNT=0x4000u \
+        -DTOTAL_EEPROM_BYTE_COUNT=0x4800u \
         -DQMK_STUB_SUPPRESS_LAYER_COUNT \
         -DQMK_KEYBOARD_H='"noah_real_profile_keyboard.h"' \
         -I"$ROOT" \
@@ -94,28 +94,22 @@ build_and_run() {
         if [ -n "${NOAH_TEST_PD_IMPORT:-}" ]; then
             "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --import-profile "$NOAH_TEST_PD_IMPORT"
         fi
-    elif [ "$name" = bridge ]; then
-        "$bin" "$ROOT/tests/fixtures/compiled_profile_v1.fixture"
     elif [ "$name" = empty ]; then
-        "$bin" "$ROOT/tests/fixtures/compiled_profile_eight_v1.fixture" --empty-profile "$BUILD_DIR/portable.bin"
-    else
-        "$bin" "$ROOT/tests/fixtures/compiled_profile_eight_v1.fixture" ${NOAH_WRITE_COMPILED_FIXTURE:+--write-fixture}
+        "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --empty-profile "$BUILD_DIR/portable.bin.pd"
     fi
 }
 
 build_and_run configured -DNOAH_PD_PROFILE_ENABLE -DNOAH_PORTABLE_PROFILE_ENABLE
 build_and_run configured_sanitized -DNOAH_PD_PROFILE_ENABLE -DNOAH_PORTABLE_PROFILE_ENABLE -fsanitize=address,undefined -fno-omit-frame-pointer
-build_and_run normal
-build_and_run bridge -DNOAH_LEGACY_SNAPSHOT_BRIDGE
-build_and_run empty -DNOAH_KEYMAP_EMPTY_KEY_BEHAVIORS -DNOAH_KEYMAP_EMPTY_COMBOS -DNOAH_PORTABLE_PROFILE_ENABLE
-build_and_run sanitized -fsanitize=address,undefined -fno-omit-frame-pointer
+build_and_run empty -DNOAH_PD_PROFILE_ENABLE -DNOAH_KEYMAP_EMPTY_KEY_BEHAVIORS -DNOAH_KEYMAP_EMPTY_COMBOS -DNOAH_PORTABLE_PROFILE_ENABLE
 
 # Keep the materializer available when RGB is compiled out: that variant emits
 # the canonical key-behavior domain alone and must remain warning-clean.
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
+    -DNOAH_PD_PROFILE_ENABLE \
     -DVIA_ENABLE \
     -DMCU_RP \
-    -DTOTAL_EEPROM_BYTE_COUNT=0x4000u \
+    -DTOTAL_EEPROM_BYTE_COUNT=0x4800u \
     -DQMK_STUB_SUPPRESS_LAYER_COUNT \
     -DQMK_KEYBOARD_H='"noah_real_profile_keyboard.h"' \
     -I"$ROOT" \

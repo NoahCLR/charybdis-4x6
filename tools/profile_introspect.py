@@ -746,6 +746,13 @@ def parse_config_layers(text: str) -> list[str]:
 
 
 def parse_config_macros(text: str) -> dict[str, str]:
+    # Every supported firmware build defines NOAH_PD_PROFILE_ENABLE. Keep the
+    # schema-2 side of these host-fixture compatibility branches when showing
+    # the configuration that actually runs on the keyboard.
+    pd_branch = re.compile(
+        r"(?ms)^[ \t]*#[ \t]*ifdef NOAH_PD_PROFILE_ENABLE[ \t]*\n(?P<active>.*?)^[ \t]*#[ \t]*else[ \t]*\n.*?^[ \t]*#[ \t]*endif[ \t]*$"
+    )
+    text = pd_branch.sub(lambda match: match.group("active"), text)
     values: dict[str, str] = {}
     pattern = re.compile(
         r"^\s*#\s*define\s+(?P<name>[A-Za-z_][A-Za-z0-9_]*)(?P<params>\([^)\n]*\))?(?:[ \t]+(?P<value>[^\n]+?))?[ \t]*$",
@@ -951,19 +958,16 @@ def parse_pd_mode_colors(raw_text: str, known_values: dict[str, str]) -> list[di
 
 def parse_pd_mode_manifest(text: str) -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
-    for row in parse_macro_table(text, "NOAH_PD_MODE_LEGACY_LIST", "PDM") + parse_macro_table(text, "NOAH_PD_MODE_LIST", "PDM"):
-        if len(row) != 8:
+    for row in parse_macro_table(text, "NOAH_PD_MODE_BASE_LIST", "PDM") + parse_macro_table(text, "NOAH_PD_MODE_LIST", "PDM"):
+        if len(row) != 2:
             die(f"unexpected pd mode manifest row: {row!r}")
-        name, mode_keycode, _pointer_handler, _key_handler, _reset_fn, dpi_override, traits, lifecycle = row
+        name, mode_keycode = row
         rows.append(
             {
                 "name": name,
                 "pointing_mode": f"PD_MODE_{name}",
                 "mode_keycode": mode_keycode,
                 "lock_keycode": f"{mode_keycode}_LOCK",
-                "dpi_override": dpi_override,
-                "traits": traits,
-                "lifecycle": lifecycle,
             }
         )
     return rows
@@ -2184,7 +2188,7 @@ def render_reference_section(profile: dict[str, object]) -> str:
         f"| {config_link} | layer enum, timing, RGB defaults, and keymap-facing feature config |",
         f"| {user_config_link} | shared userspace config consumed by this profile report, including split, RGB Matrix, pointing, dragscroll, and VIA layer-count defaults |",
         f"| {rgb_link} | {', '.join(rgb_authored_surfaces)} |",
-        f"| {pd_manifest_link} | shared pointing-mode identities, generated mode/lock keycodes, traits, DPI hooks, and lifecycle hook selections |",
+        f"| {pd_manifest_link} | stable pointing-slot identities and generated mode/lock keycodes |",
         "",
         "### Shared Keycode Surfaces",
         "",
