@@ -67,7 +67,11 @@ Default timing lives in the active keymap
 [`config.h`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h).
 That keymap chooses:
 
-- `TAPPING_TERM` for built-in QMK dual-role keys such as `LT()` and `MT()`
+- `TAPPING_TERM` for QMK's dual-role keys: `LT()`, `MT()`, `TT()`, `OSL()`
+  and `OSM()`. QMK's tapping engine resolves their tap or hold before the
+  runtime sees the press. With a live profile the dual-role setting replaces
+  it through `get_tapping_term()` and `get_quick_tap_term()`, so the edited
+  term reaches QMK itself, not only the runtime (D-L38)
 - `CUSTOM_TAP_HOLD_TERM`
 - `CUSTOM_LONGER_HOLD_TERM`
 - `CUSTOM_MULTI_TAP_TERM`

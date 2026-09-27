@@ -226,6 +226,8 @@ struct rgb_matrix_limits_t rgb_matrix_get_limits(uint8_t iter);
 uint32_t                   eeconfig_read_user(void);
 void                       eeconfig_update_user(uint32_t value);
 bool                       process_record_user(uint16_t keycode, keyrecord_t *record);
+uint16_t                   get_tapping_term(uint16_t keycode, keyrecord_t *record);
+uint16_t                   get_quick_tap_term(uint16_t keycode, keyrecord_t *record);
 bool                       process_record(keyrecord_t *record);
 typedef uint16_t           action_t;
 action_t                   action_for_keycode(uint16_t keycode);

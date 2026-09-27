@@ -1,6 +1,7 @@
 #include QMK_KEYBOARD_H
 #include "qmk_portable_profile.h"
 #include "qmk_portable_editor.h"
+#include "qmk_live_tapping_config.h"
 #ifdef NOAH_PORTABLE_PROFILE_ENABLE
 #    include <string.h>
 #    include "eeconfig.h"
@@ -27,6 +28,16 @@ void noah_qmk_portable_storage_init(void) {
     // prefix as keycodes even when both builds happen on the same date.
     if ((word >> 28) != NOAH_QMK_VIA_SYNC_METADATA_SCHEMA) via_eeprom_set_valid(false);
 #    endif
+}
+// The dual-role setting is QMK's tapping term. Quick tap follows it, as it
+// does by default, so a second press within the term still auto-repeats.
+uint16_t get_tapping_term(uint16_t keycode, keyrecord_t *record) {
+    (void)keycode;
+    (void)record;
+    return noah_setting(NOAH_SETTING_TAPPING_TERM, TAPPING_TERM);
+}
+uint16_t get_quick_tap_term(uint16_t keycode, keyrecord_t *record) {
+    return get_tapping_term(keycode, record);
 }
 static void u16(uint8_t *p, uint16_t v) {
     p[0] = v;

@@ -12,6 +12,7 @@
 #pragma once
 
 #include "lib/compat/qmk_live_combo_config.h"
+#include "lib/compat/qmk_live_tapping_config.h"
 
 // ─── Split keyboard sync ───────────────────────────────────────────────────
 //

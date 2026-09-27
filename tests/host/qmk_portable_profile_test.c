@@ -157,6 +157,8 @@ int main(int argc, char **argv) {
     const uint8_t header[8] = {NOAH_SETTINGS_VERSION, 8, NOAH_SETTINGS_COUNT, NOAH_SETTINGS_MACRO_NAMES, 0, 0, 0, 0};
     assert(!memcmp(bytes, header, 8));
     assert(u32(bytes + 8 + NOAH_SETTING_TAPPING_TERM * 4) == TAPPING_TERM);
+    keyrecord_t record = {0};
+    assert(get_tapping_term(0, &record) == TAPPING_TERM && get_quick_tap_term(0, &record) == TAPPING_TERM);
     assert(u32(bytes + 8 + NOAH_SETTING_AUTO_MOUSE_TIMEOUT * 4) == 1200);
     assert(u32(bytes + 8 + NOAH_SETTING_DRAGSCROLL_DPI * 4) == 0);
     for (uint16_t i = 8 + NOAH_SETTINGS_COUNT * 4; i < length; i++)
@@ -188,6 +190,8 @@ int main(int argc, char **argv) {
     if (responses) assert(fclose(responses) == 0);
     assert(length == names);
     assert(u32(bytes + 8 + NOAH_SETTING_TAPPING_TERM * 4) == 180);
+    // QMK's own dual-role keys resolve on the live term.
+    assert(get_tapping_term(0, &record) == 180 && get_quick_tap_term(0, &record) == 180);
     assert(u32(bytes + 8 + NOAH_SETTING_AUTO_MOUSE_TIMEOUT * 4) == 900);
     assert(!memcmp(bytes + NOAH_SETTINGS_FIXED_SIZE, stored + NOAH_SETTINGS_FIXED_SIZE, names - NOAH_SETTINGS_FIXED_SIZE));
     assert(!memcmp(bytes + 8 + NOAH_SETTINGS_COUNT * 4, stored + 8 + NOAH_SETTINGS_COUNT * 4, NOAH_SETTINGS_FIXED_SIZE - 8 - NOAH_SETTINGS_COUNT * 4));

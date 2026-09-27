@@ -36,7 +36,9 @@ enum charybdis_keymap_layers {
 
 // ─── Timing ────────────────────────────────────────────────────────────────
 
-// QMK built-in dual-role keys (LT, MT) use TAPPING_TERM.
+// QMK's dual-role keys (LT, MT, TT, OSL, OSM) use TAPPING_TERM. It is the
+// default for the live profile's dual-role setting, which replaces it once
+// a profile's settings are live (users/noah/lib/compat/qmk_live_tapping_config.h).
 #define TAPPING_TERM 200
 
 // Max gap between consecutive taps to register as a multi-tap combo.

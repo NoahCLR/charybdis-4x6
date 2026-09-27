@@ -65,7 +65,7 @@ Remaining before calling the product complete:
   reported; the status fields D-L27 added should identify the cause next time.
 - **`LT()` row tap/hold timing** (D-L34): the runtime times a press from when
   QMK delivers it, so an authored `LT()` row's tap/hold term likely starts only
-  after QMK's own `TAPPING_TERM`. Not yet measured.
+  after QMK's own tapping term (the dual-role setting, D-L38). Not yet measured.
 - **The picker's list of unbuilt QMK features is written by hand** (D-L05).
   `webview/view/picker-sections.mjs` hides keycodes for features this build
   does not include, matched against its rules files and QMK's defaults. It
@@ -691,7 +691,7 @@ cancels it); `TO()` keeps held layers on; `ONESHOT_TIMEOUT` and `ONESHOT_TAP_TOG
 `TT()` counts taps within `CUSTOM_MULTI_TAP_TERM` like every multi-tap key; a
 `TG()`/`TO()` of the pointer layer from a behaviour is not seen by QMK's
 auto-mouse. A 44-step hardware check passed on both halves on 2026-09-24; the
-`LT()` row timing question stays open (see Open Issues).
+`LT()` row timing question stays open (see Open Issues). D-L38 makes the dual-role setting drive QMK's own tapping term.
 
 ### D-L35 — Charybdis Live v2 is the app
 
@@ -805,3 +805,19 @@ draft with the keyboard as it is, matched layer with layer through the draft's
 order, so what a reorder makes or mends is reported as new or fixed. The
 review's Layer priority item names the new base first. See
 `reorderLayers` in `core/model/portable-profile.js`.
+
+### D-L38 — The dual-role setting is QMK's tapping term
+
+The "Dual-role tap / hold" setting (settings id 0) only reached the runtime:
+`LT()` behaviour rows left on the default, the `OSL()` double tap and the
+runtime's hold bookkeeping. QMK's tapping engine, which decides tap or hold for
+every `LT()`, `MT()`, `TT()`, `OSL()` and `OSM()` key before the runtime sees
+it, kept the compiled `TAPPING_TERM`, so editing the setting changed almost
+nothing a person could feel. With a portable profile the firmware now enables
+`TAPPING_TERM_PER_KEY` and `QUICK_TAP_TERM_PER_KEY`
+(`users/noah/lib/compat/qmk_live_tapping_config.h`) and answers both hooks with
+the setting (`qmk_portable_profile.c`); the compiled `TAPPING_TERM` is its
+default and applies until settings are live. Quick tap follows the tapping term
+as it does in QMK by default. The one term is global: the app offers no
+per-key tapping term, and a behaviour row's own tap / hold timing still governs
+that row in the runtime.
