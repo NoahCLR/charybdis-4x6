@@ -152,6 +152,7 @@ static void reset_host_barrier(noah_profile_owner_t *owner) {
     owner->host_barrier_progress_offset        = 0u;
     owner->host_via_accept_requested           = false;
     owner->host_via_abort_requested            = false;
+    owner->host_via_progress                   = false;
 }
 
 static bool host_session_cleanup_needed(const noah_profile_owner_t *owner) {
@@ -163,25 +164,12 @@ static bool peer_can_supersede_host(const noah_profile_owner_t *owner, const noa
 }
 
 static bool supersede_host_precommit(noah_profile_owner_t *owner) {
-    noah_profile_split_authority_status_t  authority;
-    noah_profile_candidate_expire_result_t result;
+    noah_profile_split_authority_status_t authority;
 
     if (!owner || !owner->split_initialized || noah_profile_candidate_store_backend_admission_owner(candidate_backend(owner)) != NOAH_PROFILE_STORAGE_ADMISSION_HOST || !host_state_is_precommit(owner->host_transaction.status.state) || !noah_profile_split_authority_status(&owner->reconciler.authority, &authority) || !peer_can_supersede_host(owner, &authority.peer)) {
         return false;
     }
-    if (owner->host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_PREPARING_PEER && owner->host_barrier_started) {
-        return request_host_precommit_cancel(owner, NOAH_PROFILE_CANDIDATE_V1_ERROR_PEER_SUPERSEDED);
-    }
-    result = noah_profile_candidate_transaction_supersede_precommit(&owner->host_transaction);
-    if (result == NOAH_PROFILE_CANDIDATE_EXPIRE_DONE) {
-        owner->host_activity_known = false;
-        return true;
-    }
-    if (result == NOAH_PROFILE_CANDIDATE_EXPIRE_BACKEND_ERROR) {
-        owner->state = NOAH_PROFILE_OWNER_STORAGE_ERROR;
-        return true;
-    }
-    return false;
+    return request_host_precommit_cancel(owner, NOAH_PROFILE_CANDIDATE_V1_ERROR_PEER_SUPERSEDED);
 }
 
 static bool record_payload_start(noah_profile_slot_t slot, uint16_t *address) {
@@ -695,6 +683,16 @@ static bool request_host_precommit_cancel(noah_profile_owner_t *owner, noah_prof
     if (reason == NOAH_PROFILE_CANDIDATE_V1_ERROR_NONE && !host_mailbox_is_matching_abort(owner)) {
         return false;
     }
+    if (!host_state_is_precommit(owner->host_transaction.status.state)) {
+        return false;
+    }
+    // Every cancel before the decision ends the candidate's VIA staging with
+    // it, whatever ended the candidate: the host's abort, its lease, the peer
+    // superseding it, or a failed copy. The VIA layer's cancel is idempotent
+    // and succeeds when nothing was staged, so a candidate that never reached
+    // VIA staging is released just the same. Its peer ABORT may wait for the
+    // link; the custom candidate is released meanwhile, and the old VIA bank
+    // on this half was never touched.
     if (owner->store.prepare_active && owner->store.candidate.format_version == NOAH_PROFILE_LOGICAL_STORE_VERSION && !owner->host_via_abort_requested) {
         if (!owner->config.logical_via || !owner->config.logical_via->abort || !owner->config.logical_via->abort(owner->config.logical_via->context, owner->host_transaction.status.transaction_id, owner->store.candidate.via_generation, owner->store.candidate.via_digest)) {
             return false;
@@ -947,20 +945,17 @@ static bool scan_running(noah_profile_owner_t *owner, bool master, uint32_t now_
     }
 
     host_timeout_ms = owner->host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_PREPARING_PEER && owner->host_barrier_started ? NOAH_PROFILE_OWNER_HOST_BARRIER_NO_PROGRESS_MS : NOAH_PROFILE_OWNER_HOST_TIMEOUT_MS;
-    if (!activating_boot && !owner->host_cancel_pending && admission == NOAH_PROFILE_STORAGE_ADMISSION_HOST && owner->host_activity_known && !owner->host_transaction.mailbox.pending && elapsed_at_least(now_ms, owner->host_last_activity_at, host_timeout_ms)) {
-        if (owner->host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_PREPARING_PEER && owner->host_barrier_started) {
-            return request_host_precommit_cancel(owner, NOAH_PROFILE_CANDIDATE_V1_ERROR_TIMEOUT);
+    if (!activating_boot && owner->host_via_progress) {
+        owner->host_via_progress = false;
+        if (host_state_is_precommit(owner->host_transaction.status.state)) {
+            owner->host_last_activity_at = now_ms;
+            owner->host_activity_known   = true;
         }
-        noah_profile_candidate_expire_result_t expired = noah_profile_candidate_transaction_expire_precommit(&owner->host_transaction);
-
-        if (expired == NOAH_PROFILE_CANDIDATE_EXPIRE_DONE) {
-            owner->host_activity_known = false;
-            return true;
-        }
-        if (expired == NOAH_PROFILE_CANDIDATE_EXPIRE_BACKEND_ERROR) {
-            owner->state = NOAH_PROFILE_OWNER_STORAGE_ERROR;
-            return true;
-        }
+    }
+    // Only the decision is exempt from the lease: from COMMITTING on nothing
+    // expires, and the peer keeps the target recovery copy.
+    if (!activating_boot && !owner->host_cancel_pending && admission == NOAH_PROFILE_STORAGE_ADMISSION_HOST && owner->host_activity_known && !owner->host_transaction.mailbox.pending && elapsed_at_least(now_ms, owner->host_last_activity_at, host_timeout_ms) && host_state_is_precommit(owner->host_transaction.status.state) && request_host_precommit_cancel(owner, NOAH_PROFILE_CANDIDATE_V1_ERROR_TIMEOUT)) {
+        return true;
     }
 
     for (uint8_t visited = 0u; visited < OWNER_SCHEDULE_COUNT; visited++) {
@@ -974,8 +969,10 @@ static bool scan_running(noah_profile_owner_t *owner, bool master, uint32_t now_
             } else if (admission != NOAH_PROFILE_STORAGE_ADMISSION_PEER) {
                 if (owner->host_cancel_pending) {
                     worked = false;
+                } else if (host_mailbox_is_matching_abort(owner) && host_state_is_precommit(owner->host_transaction.status.state)) {
+                    worked = request_host_precommit_cancel(owner, NOAH_PROFILE_CANDIDATE_V1_ERROR_NONE);
                 } else if (owner->host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_PREPARING_PEER && owner->host_transaction.mailbox.pending) {
-                    worked = host_mailbox_is_matching_abort(owner) ? request_host_precommit_cancel(owner, NOAH_PROFILE_CANDIDATE_V1_ERROR_NONE) : noah_profile_candidate_transaction_scan(&owner->host_transaction);
+                    worked = noah_profile_candidate_transaction_scan(&owner->host_transaction);
                 } else if (owner->host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_PREPARING_PEER) {
                     worked = begin_or_advance_host_barrier(owner);
                 } else if (owner->host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_CONVERGING_PEER && owner->host_transaction.mailbox.pending) {
@@ -1074,6 +1071,30 @@ bool noah_profile_owner_scan(noah_profile_owner_t *owner, bool master, uint32_t 
 
 bool noah_profile_owner_receive(noah_profile_owner_t *owner, uint8_t *frame, size_t length) {
     return owner && (owner->state == NOAH_PROFILE_OWNER_READY_COMPILED || owner->state == NOAH_PROFILE_OWNER_READY_VALIDATED) && noah_profile_candidate_transaction_receive(&owner->host_transaction, frame, length);
+}
+
+bool noah_profile_owner_logical_via_admit(const noah_profile_owner_t *owner, uint16_t transaction_id, uint32_t generation, uint32_t digest) {
+    const noah_profile_candidate_transaction_t *host;
+    const noah_profile_candidate_v1_operation_t queued = owner && owner->host_transaction.mailbox.pending ? owner->host_transaction.mailbox.command.operation : NOAH_PROFILE_CANDIDATE_V1_OPERATION_NONE;
+
+    if (!owner || transaction_id == 0u || (owner->state != NOAH_PROFILE_OWNER_READY_COMPILED && owner->state != NOAH_PROFILE_OWNER_READY_VALIDATED) || owner->host_cancel_pending) {
+        return false;
+    }
+    host = &owner->host_transaction;
+    if (!host->has_candidate || host->status.transaction_id != transaction_id || !owner->store.prepare_active || owner->store.candidate.format_version != NOAH_PROFILE_LOGICAL_STORE_VERSION || owner->store.candidate.via_generation != generation || owner->store.candidate.via_digest != digest) {
+        return false;
+    }
+    // A queued COMMIT fixes the staged bytes and a queued ABORT ends them.
+    if (queued == NOAH_PROFILE_CANDIDATE_V1_OPERATION_COMMIT || queued == NOAH_PROFILE_CANDIDATE_V1_OPERATION_ABORT) {
+        return false;
+    }
+    return host->status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_RECEIVING || host->status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_COMPLETE || host->status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATING || host->status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATED;
+}
+
+void noah_profile_owner_logical_via_progress(noah_profile_owner_t *owner) {
+    if (owner) {
+        owner->host_via_progress = true;
+    }
 }
 
 noah_profile_owner_state_t noah_profile_owner_state(const noah_profile_owner_t *owner) {

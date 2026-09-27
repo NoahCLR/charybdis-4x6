@@ -1526,6 +1526,199 @@ static void test_output_fence_covers_only_the_accepted_roll_forward(void) {
     assert(noah_profile_owner_output_ready(&owner));
 }
 
+// Boots an empty pair and validates logical candidate 201 bound to VIA
+// generation 6, so its VIA staging would now be live on the USB half.
+static void validate_logical_candidate(noah_profile_owner_t *left, memory_t *left_memory, noah_profile_owner_t *right, memory_t *right_memory, split_link_t *left_link, split_link_t *right_link, uint32_t *now) {
+    uint8_t frame[32];
+
+    memset(left_memory, 0, sizeof(*left_memory));
+    memset(right_memory, 0, sizeof(*right_memory));
+    memset(left_memory->bytes, 0xff, sizeof(left_memory->bytes));
+    memset(right_memory->bytes, 0xff, sizeof(right_memory->bytes));
+    logical_via_ready        = true;
+    logical_via_converged    = false;
+    activation_block_reason  = 0u;
+    logical_via_accept_count = 0u;
+    logical_via_abort_count  = 0u;
+    boot_empty_pair(left, left_memory, right, right_memory, left_link, right_link, now);
+    logical_begin_frame(frame, 201u, 6u, UINT32_C(0xabcdef01));
+    send_and_scan_pair(left, right, frame, now);
+    chunk_frame(frame, 201u);
+    send_and_scan_pair(left, right, frame, now);
+    simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_VALIDATE, 201u);
+    send_and_scan_pair(left, right, frame, now);
+    for (uint32_t guard = 0u; guard < 64u && left->host_transaction.status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATED; guard++)
+        scan_pair(left, right, now);
+    assert(left->host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATED);
+}
+
+// The host stages VIA bytes while its candidate is VALIDATED, before COMMIT.
+// Whatever then ends the candidate must end that staging too, or the VIA
+// layer keeps holding reconciliation and refusing the next Apply.
+static void test_every_precommit_cancel_ends_the_via_staging(void) {
+    noah_profile_owner_t left;
+    noah_profile_owner_t right;
+    memory_t             left_memory;
+    memory_t             right_memory;
+    split_link_t         left_link  = {.peer = &right};
+    split_link_t         right_link = {.peer = &left};
+    uint8_t              frame[32];
+    uint32_t             now = 250000u;
+
+    // The host went away: the lease expires.
+    validate_logical_candidate(&left, &left_memory, &right, &right_memory, &left_link, &right_link, &now);
+    now = left.host_last_activity_at + NOAH_PROFILE_OWNER_HOST_TIMEOUT_MS;
+    for (uint32_t guard = 0u; guard < 8u; guard++)
+        scan_pair(&left, &right, &now);
+    assert(left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE);
+    assert(left.host_transaction.status.error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_TIMEOUT);
+    assert(logical_via_abort_count == 1u);
+    assert(noah_profile_candidate_store_backend_admission_owner(&left.staging.candidate_backend) == NOAH_PROFILE_STORAGE_ADMISSION_NONE);
+
+    // The host cancels its own candidate before COMMIT, and repeats the
+    // cancel as if its acknowledgement was lost: one VIA cancel, one outcome.
+    validate_logical_candidate(&left, &left_memory, &right, &right_memory, &left_link, &right_link, &now);
+    simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_ABORT, 201u);
+    send_and_scan_pair(&left, &right, frame, &now);
+    assert(left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE);
+    assert(left.host_transaction.status.error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_NONE);
+    assert(logical_via_abort_count == 1u);
+    simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_ABORT, 201u);
+    send_and_scan_pair(&left, &right, frame, &now);
+    assert(left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE);
+    assert(left.host_transaction.status.error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_NONE);
+    assert(logical_via_abort_count == 1u);
+    assert(left.state == NOAH_PROFILE_OWNER_READY_COMPILED);
+
+    // Still receiving: the cancel covers staging begun alongside the upload.
+    validate_logical_candidate(&left, &left_memory, &right, &right_memory, &left_link, &right_link, &now);
+    simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_ABORT, 201u);
+    send_and_scan_pair(&left, &right, frame, &now);
+    logical_via_abort_count = 0u;
+    logical_begin_frame(frame, 202u, 6u, UINT32_C(0xabcdef01));
+    send_and_scan_pair(&left, &right, frame, &now);
+    assert(left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_RECEIVING);
+    simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_ABORT, 202u);
+    send_and_scan_pair(&left, &right, frame, &now);
+    assert(left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE);
+    assert(logical_via_abort_count == 1u);
+
+    // A candidate that binds no VIA identity has no staging to end.
+    logical_via_abort_count = 0u;
+    begin_frame(frame, 203u);
+    send_and_scan_pair(&left, &right, frame, &now);
+    now = left.host_last_activity_at + NOAH_PROFILE_OWNER_HOST_TIMEOUT_MS;
+    for (uint32_t guard = 0u; guard < 8u; guard++)
+        scan_pair(&left, &right, &now);
+    assert(left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE);
+    assert(logical_via_abort_count == 0u);
+}
+
+static void test_logical_via_admission_follows_the_candidate(void) {
+    noah_profile_owner_t left;
+    noah_profile_owner_t right;
+    memory_t             left_memory;
+    memory_t             right_memory;
+    split_link_t         left_link  = {.peer = &right};
+    split_link_t         right_link = {.peer = &left};
+    uint8_t              frame[32];
+    uint32_t             now = 250000u;
+
+    validate_logical_candidate(&left, &left_memory, &right, &right_memory, &left_link, &right_link, &now);
+    assert(noah_profile_owner_logical_via_admit(&left, 201u, 6u, UINT32_C(0xabcdef01)));
+    assert(!noah_profile_owner_logical_via_admit(&left, 202u, 6u, UINT32_C(0xabcdef01)));
+    assert(!noah_profile_owner_logical_via_admit(&left, 201u, 7u, UINT32_C(0xabcdef01)));
+    assert(!noah_profile_owner_logical_via_admit(&left, 201u, 6u, UINT32_C(0xabcdef02)));
+    assert(!noah_profile_owner_logical_via_admit(&right, 201u, 6u, UINT32_C(0xabcdef01)));
+
+    // A queued COMMIT fixes the staged bytes; they stay fixed from then on.
+    simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT, 201u);
+    assert(noah_profile_owner_receive(&left, frame, sizeof(frame)));
+    assert(!noah_profile_owner_logical_via_admit(&left, 201u, 6u, UINT32_C(0xabcdef01)));
+    for (uint32_t guard = 0u; guard < 4u; guard++)
+        scan_pair(&left, &right, &now);
+    assert(left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_PREPARING_PEER);
+    assert(!noah_profile_owner_logical_via_admit(&left, 201u, 6u, UINT32_C(0xabcdef01)));
+
+    // A queued ABORT ends them, and so does an idle owner.
+    validate_logical_candidate(&left, &left_memory, &right, &right_memory, &left_link, &right_link, &now);
+    simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_ABORT, 201u);
+    assert(noah_profile_owner_receive(&left, frame, sizeof(frame)));
+    assert(!noah_profile_owner_logical_via_admit(&left, 201u, 6u, UINT32_C(0xabcdef01)));
+    for (uint32_t guard = 0u; guard < 4u; guard++)
+        scan_pair(&left, &right, &now);
+    assert(left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE);
+    assert(!noah_profile_owner_logical_via_admit(&left, 201u, 6u, UINT32_C(0xabcdef01)));
+
+    // A legacy candidate binds no VIA identity to stage against.
+    begin_frame(frame, 204u);
+    send_and_scan_pair(&left, &right, frame, &now);
+    assert(left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_RECEIVING);
+    assert(!noah_profile_owner_logical_via_admit(&left, 204u, 0u, 0u));
+}
+
+// Staging a large macro bank can take longer than the candidate's 15-second
+// lease; each admitted staging frame is the candidate's progress. Polling
+// status alone is not, so abandoned work still expires.
+static void test_logical_via_progress_renews_the_candidate_lease(void) {
+    noah_profile_owner_t left;
+    noah_profile_owner_t right;
+    memory_t             left_memory;
+    memory_t             right_memory;
+    split_link_t         left_link  = {.peer = &right};
+    split_link_t         right_link = {.peer = &left};
+    uint32_t             now        = 250000u;
+    uint32_t             last_progress;
+
+    validate_logical_candidate(&left, &left_memory, &right, &right_memory, &left_link, &right_link, &now);
+    for (uint32_t step = 0u; step < 6u; step++) {
+        now += NOAH_PROFILE_OWNER_HOST_TIMEOUT_MS / 2u;
+        noah_profile_owner_logical_via_progress(&left);
+        scan_pair(&left, &right, &now);
+        assert(left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATED);
+    }
+    assert(logical_via_abort_count == 0u);
+    last_progress = left.host_last_activity_at;
+    now           = last_progress + NOAH_PROFILE_OWNER_HOST_TIMEOUT_MS - 1u;
+    scan_pair(&left, &right, &now);
+    assert(left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATED);
+    now = last_progress + NOAH_PROFILE_OWNER_HOST_TIMEOUT_MS;
+    for (uint32_t guard = 0u; guard < 8u; guard++)
+        scan_pair(&left, &right, &now);
+    assert(left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE);
+    assert(logical_via_abort_count == 1u);
+
+    // Progress reported after the candidate is gone revives nothing.
+    noah_profile_owner_logical_via_progress(&left);
+    scan_pair(&left, &right, &now);
+    assert(!left.host_activity_known && !left.host_via_progress);
+}
+
+// Once the USB half's commit marker is durable the peer holds the target
+// recovery copy. Neither a host cancel nor an expired lease may end it, even
+// when the host never observed the decision.
+static void test_decided_logical_commit_never_cancels_its_via_staging(void) {
+    noah_profile_owner_t left;
+    noah_profile_owner_t right;
+    memory_t             left_memory;
+    memory_t             right_memory;
+    split_link_t         left_link  = {.peer = &right};
+    split_link_t         right_link = {.peer = &left};
+    uint8_t              frame[32];
+    uint32_t             now = 250000u;
+
+    decide_logical_commit(&left, &left_memory, &right, &right_memory, &left_link, &right_link, 205u, &now);
+    assert(!noah_profile_owner_logical_via_admit(&left, 205u, 6u, UINT32_C(0xabcdef01)));
+    simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_ABORT, 205u);
+    send_and_scan_pair(&left, &right, frame, &now);
+    assert(left.host_transaction.status.error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_INVALID_STATE);
+    assert(left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_CONVERGING_PEER);
+    now += NOAH_PROFILE_OWNER_HOST_BARRIER_NO_PROGRESS_MS;
+    noah_profile_owner_logical_via_progress(&left);
+    assert(logical_via_abort_count == 0u);
+    finish_after_reconnect(&left, &right, &now);
+}
+
 int main(void) {
     test_output_fence_covers_only_the_accepted_roll_forward();
     test_partial_runtime_install_rolls_back();
@@ -1549,6 +1742,10 @@ int main(void) {
     test_unexpected_newer_postcommit_authority_never_activates();
     test_boot_reconciles_different_generations_before_activation();
     test_peer_authority_supersedes_only_precommit_host_generation();
+    test_every_precommit_cancel_ends_the_via_staging();
+    test_logical_via_admission_follows_the_candidate();
+    test_logical_via_progress_renews_the_candidate_lease();
+    test_decided_logical_commit_never_cancels_its_via_staging();
     puts("profile owner host tests passed");
     return 0;
 }

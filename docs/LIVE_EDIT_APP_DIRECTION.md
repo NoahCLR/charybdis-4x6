@@ -31,7 +31,7 @@ matrix.
 | Global policy | Every other portable setting, including startup layers, combo matching and device-reported lighting and key options; unsupported firmware features stay read-only |
 | Backup and restore | Complete snapshots, import review against the keyboard, recovery file and verified restore |
 | Drafts and Apply | One draft with item-by-item review, discard by edit group, Show, undo/redo and draft history; the review checks reachable actions, confirms active warnings and traps, and blocks profiles the destination cannot save (D-L36); Apply shows its steps and says where a failure happened (D-L19, D-L23, D-L29, D-L30) |
-| Recovery | Atomic logical Apply, differential transfer, reboot recovery fencing, firmware roll-forward after the decision, resume after a lost or power-cycled peer link, bounded cancel (D-L20–D-L22, D-L27) |
+| Recovery | Atomic logical Apply, differential transfer, reboot recovery fencing, firmware roll-forward after the decision, resume after a lost or power-cycled peer link, bounded cancel owned by the keyboard (D-L20–D-L22, D-L27, D-L39) |
 
 The rail's health strip shows connection, both-half convergence, draft state
 and recovery state. Convergence needs the firmware's peer-known and
@@ -366,6 +366,13 @@ identities for the compare-and-swap checks, writes only changed 28-byte blocks
 and reads those back exactly. Refresh and Export remain independent complete
 reads.
 
+"Changed" means changed from the bank the keyboard holds, not from one rebuilt
+from the document: a valid bank may keep stale bytes after its 64th macro,
+which a document cannot carry. A capture keeps the exact layout and macro
+bytes it read, and an Apply result the target it proved; a cached snapshot
+without them is read again. See
+[Portable Profile V1](architecture/portable-profile-v1.md#portable-document).
+
 Most of the remaining delay was split scheduling: every mutating split RPC
 first returns `BUSY` to acknowledge mailbox admission, and the sender treated
 that like a failure and waited 50 ms per 14-byte chunk. Expected admission now
@@ -396,10 +403,10 @@ action-ABI digests. Format-1 `NP` records stay readable and migrate on the next
 Apply. Schema 2 (PD slots) uses format 3 `NR`; see
 [PD-mode domain v1](architecture/pd-mode-domain-v1.md). The app requires the
 atomic capability for complete Apply and keeps the recovery file, stale-base
-check and exact final readback. A deterministic failure before the decision
-requests both the VIA-stage and the custom-candidate abort; once the decision
-is made the host never issues an abort, even if its USB-side write is
-interrupted, since the keyboard finishes the generation. On hardware an unchanged Apply takes about
+check and exact final readback. A failure the app sees before the decision
+requests the custom-candidate abort, which the keyboard carries out for both
+stores (D-L39); once the decision is made the keyboard refuses it, even if the
+host never saw the decision, and finishes the generation. On hardware an unchanged Apply takes about
 6.6 s, spent in keyboard-side validation and durable publication.
 
 ### D-L22 — A cancelled save ends in bounded time, and says why it ended
@@ -847,3 +854,27 @@ default and applies until settings are live. Quick tap follows the tapping term
 as it does in QMK by default. The one term is global: the app offers no
 per-key tapping term, and a behaviour row's own tap / hold timing still governs
 that row in the runtime.
+
+### D-L39 — Only the keyboard ends a staging, together with its candidate
+
+The app used to cancel a failed Apply by sending the VIA-stage abort and then
+the custom-candidate abort. After a commit whose decision the app had not seen
+(a status read failed after the marker became durable), the VIA channel
+accepted that abort while the custom transaction refused its own, and the
+owner's later VIA ACCEPT was refused: the other half's staged copy, then the
+only complete target, was discarded. Conversely, a candidate that expired
+before COMMIT released its lease without ending its VIA staging, which kept
+reconciliation held and refused the next Apply until a restart.
+
+The logical VIA staging now belongs to the owner's candidate. The host may
+begin, fill and verify only the staging bound to the live candidate's
+transaction and VIA identity, and only until COMMIT; the host's VIA abort is
+refused. Every cancel before the decision (host abort, lease expiry,
+supersession, a failed copy) ends both stores, through one idempotent VIA
+cancel that also succeeds when nothing was staged. It does not wait for an
+absent peer: the candidate is released at once, the old USB-side bank was
+never touched, and the peer's ABORT completes when the link returns. Staging
+frames the keyboard admits count as the candidate's progress, so a long
+staging keeps its 15-second lease while status polls alone do not. After the
+decision nothing cancels, whatever the host saw. See
+[Logical Profile Transaction V1](architecture/logical-profile-transaction-v1.md#cancellation-and-lease-ownership).

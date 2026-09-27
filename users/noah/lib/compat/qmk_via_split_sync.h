@@ -65,10 +65,18 @@ void noah_qmk_via_split_sync_note_mutation(uint8_t effects);
 // the local digest so nothing advertises a stale one.
 void                                     noah_qmk_via_split_sync_note_local_storage_changed(void);
 noah_qmk_via_split_sync_debug_snapshot_t noah_qmk_via_split_sync_debug_snapshot(void);
-// Callback-safe admission of one logical VIA staging frame. The actual split
-// RPC runs from matrix-scan context. A queued frame must reach a terminal
-// operation_sequence before the next frame is submitted.
+// Callback-safe admission of one logical VIA staging frame: BEGIN, CHUNK and
+// VERIFY from the host, ACCEPT from the profile owner. The actual split RPC
+// runs from matrix-scan context. A queued frame must reach a terminal
+// operation_sequence before the next frame is submitted. Chunks are admitted
+// only while STAGING, so VERIFY fixes the staged bytes.
 bool noah_qmk_via_logical_submit(uint16_t transaction_id, const noah_qmk_via_sync_frame_t *request);
+// The profile owner's cancellation of a staging it has not decided. True once
+// nothing of that identity is left live: its ABORT is queued (replacing a
+// queued BEGIN, CHUNK or VERIFY, whose outcome the ABORT covers), already
+// queued, or there was nothing staged. False only for an identity already
+// accepted or accepting, which no pre-decision cancel may touch. Idempotent.
+bool noah_qmk_via_logical_cancel(uint16_t transaction_id, uint32_t generation, uint32_t digest);
 bool noah_qmk_via_logical_status(noah_qmk_via_logical_status_t *status);
 bool noah_qmk_via_logical_staged(uint16_t transaction_id, uint32_t generation, uint32_t digest);
 bool noah_qmk_via_logical_converged(uint32_t generation, uint32_t digest);
@@ -102,6 +110,12 @@ static inline bool noah_qmk_via_logical_submit(uint16_t transaction_id, const no
     (void)transaction_id;
     (void)request;
     return false;
+}
+static inline bool noah_qmk_via_logical_cancel(uint16_t transaction_id, uint32_t generation, uint32_t digest) {
+    (void)transaction_id;
+    (void)generation;
+    (void)digest;
+    return true;
 }
 static inline bool noah_qmk_via_logical_status(noah_qmk_via_logical_status_t *status) {
     (void)status;

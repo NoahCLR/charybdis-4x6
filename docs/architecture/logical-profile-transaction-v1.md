@@ -70,9 +70,11 @@ partially replaced bank.
 
 1. The host captures the complete old profile and saves its recovery file.
 2. Firmware acquires the custom candidate lease on the USB half.
-3. The host streams target VIA regions through the candidate channel. The USB
-   half relays them to the peer only; ordinary VIA write-through and
-   reconciliation are fenced for this transaction.
+3. The host streams target VIA regions through the logical staging channel.
+   The USB half admits them only for the live candidate's transaction and
+   bound VIA identity, before COMMIT, and relays them to the peer only;
+   ordinary VIA write-through and reconciliation are fenced for this
+   transaction. See Cancellation And Lease Ownership.
 4. The peer computes the canonical VIA digest. A mismatch aborts before durable
    transaction intent exists, and the old USB-side VIA copy restores the peer.
 5. The custom candidate is validated and prepared on both halves with the exact
@@ -148,6 +150,56 @@ copy again from its own committed record (logical copies rebind first) before
 the authorized commit, and the peer's ACCEPT matches the staged bank by its
 persisted generation and recomputed digest.
 
+## Cancellation And Lease Ownership
+
+The VIA staging belongs to the custom candidate it is bound to, and only the
+profile owner ends it: ACCEPT after the decision, a cancel before it. The host
+has no abort of its own. A host whose status read failed after the marker
+became durable cannot tell a decided save from an undecided one, and a host
+abort admitted then would discard the peer's staged copy, the only complete
+target, while the custom transaction refused its own cancel.
+
+The logical staging channel (custom set `0x07`, channel `0x00`) takes these
+host values:
+
+| Value | Host operation | Admitted when |
+| ---: | --- | --- |
+| `0x15` | BEGIN staging | the candidate with this transaction id binds this VIA generation and digest, and is receiving, complete, validating or validated with no COMMIT or ABORT queued; no other staging is live |
+| `0x16` | CHUNK | as BEGIN, and the staging is still STAGING: VERIFY fixes the staged bytes |
+| `0x17` | VERIFY | as BEGIN |
+| `0x19` | status (custom get) | always |
+| `0x1A` | ABORT | never: answered admission `3` (unsupported), error invalid state |
+
+A frame for any other transaction or identity, or after COMMIT, is answered
+admission `3` with error wrong transaction and never reaches the VIA layer, so
+a staging cannot outlive its candidate or change after the decision. Busy
+(admission `2`) means the VIA layer still has a frame queued, or a cancelled
+staging's peer ABORT is still waiting for the link; the host retries.
+
+Every cancel before the decision ends both stores: the host's candidate abort,
+the 15-second lease, peer supersession, a failed copy to the peer, and a
+storage failure all take the owner's one cancel path. The VIA cancel is
+idempotent. It queues the peer ABORT, replacing a queued BEGIN, CHUNK or VERIFY
+whose outcome it covers; it succeeds when that ABORT is already queued or when
+nothing of that identity is staged, so a candidate that never reached staging
+is released just the same; and it refuses only an identity already accepted
+or accepting. A peer that answers the ABORT holding no such staging (it
+restarted, or BEGIN never reached it) completes the abort as well. The owner
+requests it once per cancel, so a repeated host abort or a lost acknowledgement
+changes nothing.
+
+Cancel is bounded without the peer. The custom candidate is released at once;
+this half's VIA bank was never written, so the old generation stays complete
+here. The peer ABORT stays queued, holding reconciliation and refusing a new
+BEGIN, until the link returns; then it completes, the peer's partly staged
+bank is dirty, and ordinary reconciliation copies this half's bank back.
+
+A staging frame the owner admitted and the VIA layer queued is the candidate's
+progress: the next owner scan counts it as host activity, so a staging longer
+than the 15-second lease keeps its candidate. Status polls on either channel
+are not progress, so abandoned staging still expires with its candidate. From
+COMMITTING on nothing expires or cancels.
+
 ## External VIA Writers
 
 Ordinary VIA writes remain supported outside a logical transaction. Firmware
@@ -184,7 +236,12 @@ quiet mid-write, never writes, or writes late during the pull; a lost peer link
 after the decision, with and without the peer rebooting, resuming on reconnect;
 ACCEPT waiting for a safe boundary while input still works; ACCEPT never sent
 to a peer known to be unreachable; and activation with the link lost during
-roll-forward. The firmware advertises atomic logical Apply as
+roll-forward. Cancellation ownership is covered by the owner, VIA-sync and
+channel tests and by `run_profile_owner_via_integration_tests.sh`, which runs
+the real owner, staging handler and VIA split sync together: an unobserved
+decision rolling forward despite host aborts, a pre-decision cancel ending both
+stores once, an abandoned staging expiring with its candidate, staging progress
+renewing the lease while polls do not, and cleanup waiting for an absent peer. The firmware advertises atomic logical Apply as
 a required write capability, so the app refuses complete Apply on older images.
 
 Physical interruption tests at every durable boundary and external VIA-writer

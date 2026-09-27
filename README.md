@@ -303,7 +303,9 @@ What to expect while it applies:
 - Apply waits for held keys, locked layers and pointer modes to clear before
   the commit decision, and says so; after 60 s the save is cancelled and
   nothing changes. Anything that fails before the decision leaves the saved
-  profile unchanged.
+  profile unchanged. A save the app abandoned before the decision is cancelled
+  by the keyboard within about 15 seconds, and the next save can start once
+  both halves are connected.
 - It then holds key input for the few moments while this half's keys and
   macros are rewritten and the new profile activates. If the app is closed in
   that window, the keyboard finishes the save on its own from the other half's

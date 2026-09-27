@@ -16,8 +16,21 @@ const statusKey = s => JSON.stringify([s.activeKind, s.activeDigest, s.activeGen
 const identityStatusKey = s => JSON.stringify([s.activeKind, s.activeDigest, s.activeGeneration, s.activeOriginHalf, s.committedDigest, s.committedGeneration, s.stateFlags & ~4]);
 const identityKey = identity => JSON.stringify(identity);
 const snapshotIdentity = (profile, storage, settings) => ({profile: identityStatusKey(profile), storageGeneration: storage.generation, storageDigest: storage.digest, settingsCrc: crc32(settings), settingsDigest: fnv1a32(settings)});
+// The bytes the keyboard's VIA bank holds, which differential transfer must
+// compare with. A document keeps only the 64 macro streams, and a valid bank
+// may hold stale bytes after them (a writer that shortened the macros need not
+// clear the rest); rebuilding the bank from the document would read those as
+// zeros, send no write for them, and fail the whole-bank digest. So a capture
+// keeps what it read beside the identity it verified, and an Apply result
+// keeps the target it proved the keyboard holds.
+const heldStorage = (layout, macros) => ({layout: Buffer.from(layout), macros: Buffer.from(macros)});
+const hasStorage = (snapshot, capabilities) => snapshot?.storage?.layout?.length === 960 && snapshot.storage.macros?.length === capabilities.viaMacroBytes;
 function capturedBase(before, capabilities) {
-    if (!before.incomplete) return validateSnapshot(before.document, capabilities);
+    if (!before.incomplete) {
+        const base = validateSnapshot(before.document, capabilities);
+        if (!hasStorage(before, capabilities)) throw fail("BASE_STORAGE_UNAVAILABLE", "The keyboard read did not include its stored keys and macros. Read the keyboard again before saving.");
+        return {...base, layout: before.storage.layout, macros: before.storage.macros};
+    }
     const decode = field => Buffer.from(before.document[field], "base64");
     const base = {profile: decode("profile"), layout: decode("layout"), macros: decode("macros")};
     if (base.layout.length !== 960 || base.macros.length !== capabilities.viaMacroBytes || base.profile.length < 1) throw fail("INVALID_RECOVERY_CAPTURE", "The interrupted recovery capture is malformed.");
@@ -56,7 +69,7 @@ async function captureProfile(connection, ids, capabilities, onProgress = () => 
     const document = createSnapshot({profile, via, actionAbiDigest: capabilities.actionAbiDigest});
     if (pdSource) document.pdModeSource = {version: 1, actionAbiDigest: capabilities.actionAbiDigest, compiledDefaultDigest: capabilities.compiledDefaultDigest, domain: pdSource.toString("base64")};
     validateSnapshot(document, capabilities);
-    return {document, fingerprint: fingerprint(document), summary: summary(document), status: after, identity: snapshotIdentity(after, storageAfter, settings)};
+    return {document, fingerprint: fingerprint(document), summary: summary(document), status: after, identity: snapshotIdentity(after, storageAfter, settings), storage: heldStorage(via.layout, via.macros)};
 }
 async function readIdentity(connection, ids, {allowCandidate = true} = {}) {
     const options = {nextRequestId: () => ids.next()};
@@ -205,7 +218,9 @@ async function restoreProfile(connection, ids, capabilities, document, {expected
         const rollForwardLocal = operations.rollForwardLocal || rollForwardLocalStorage;
         if (typeof saveRecovery !== "function") throw fail("RECOVERY_REQUIRED", "Save a recovery copy before restoring this keyboard.");
         let before;
-        if (baseSnapshot?.document && baseSnapshot.identity && (!expectedFingerprint || baseSnapshot.fingerprint === expectedFingerprint)) {
+        // A reviewed snapshot is reused only with the exact bank it was read
+        // from; one without it (an older cache) is read again instead.
+        if (baseSnapshot?.document && baseSnapshot.identity && (baseSnapshot.incomplete || hasStorage(baseSnapshot, capabilities)) && (!expectedFingerprint || baseSnapshot.fingerprint === expectedFingerprint)) {
             if (!baseSnapshot.incomplete) validateSnapshot(baseSnapshot.document, capabilities);
             applyProgress.report("check", {detail: "Comparing with the reviewed profile"});
             const liveIdentity = await currentIdentity(connection, ids, {allowCandidate: false});
@@ -268,14 +283,17 @@ async function restoreProfile(connection, ids, capabilities, document, {expected
             if (status.activeKind !== PROFILE_ACTIVE_KIND.COMMITTED || status.activeDigest !== fnv1a32(target.profile) || status.committedDigest !== fnv1a32(target.profile) || status.conflictCount || !storage.ready || !storageAfter.ready || storage.generation !== targetStorageGeneration || storageAfter.generation !== targetStorageGeneration || storage.generation !== storageAfter.generation || storage.digest !== storageAfter.digest || storageAfter.digest !== expectedStorageDigest) throw fail("RESTORE_VERIFY_FAILED", "The keyboard did not confirm the imported profile on both halves.");
             const resultFingerprint = fingerprint(document);
             applyProgress.finish();
-            return {document, fingerprint: resultFingerprint, summary: summary(document), status, identity: snapshotIdentity(status, storageAfter, encodeSettings(target.settings)), recovery, peerUnseen,
+            // Both halves were just proved to hold the whole target bank.
+            return {document, fingerprint: resultFingerprint, summary: summary(document), status, identity: snapshotIdentity(status, storageAfter, encodeSettings(target.settings)), storage: heldStorage(target.layout, target.macros), recovery, peerUnseen,
                 performance: {elapsedMs: Date.now() - startedAt, baseSource: before === baseSnapshot ? "verified-cache" : "device-read", layoutBytes, macroBytes, viaConfigReports: 1, layoutReports: layoutRanges.reduce((sum, range) => sum + Math.ceil(range.bytes.length / 12), 0), macroReports: macroWriteNeeded ? macroRanges.reduce((sum, range) => sum + Math.ceil(range.bytes.length / 12), 0) : 0}};
         } catch (error) {
             let cancelled = false;
             if (prepared && !decisionObserved) {
-                try { await viaCoordinator.abort({transactionId: prepared.transactionId, generation: targetStorageGeneration, digest: expectedStorageDigest}); } catch {}
                 // The keyboard returns to idle on ABORT only while no commit
                 // marker exists, so a completed abort proves nothing was saved.
+                // It cancels the other half's staged keys and macros with it;
+                // this app never cancels them itself, because a decision it
+                // failed to see may already make them the recovery copy.
                 try { await coordinator.abort(prepared.transactionId); cancelled = true; } catch {}
             }
             if (!mutated) throw error;

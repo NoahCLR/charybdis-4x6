@@ -42,7 +42,7 @@ static bool runtime_logical_via_accept(void *context, uint16_t transaction_id, u
 
 static bool runtime_logical_via_abort(void *context, uint16_t transaction_id, uint32_t generation, uint32_t digest) {
     (void)context;
-    return noah_qmk_via_logical_profile_abort(transaction_id, generation, digest);
+    return noah_qmk_via_logical_cancel(transaction_id, generation, digest);
 }
 
 static bool runtime_logical_via_converged(void *context, uint32_t generation, uint32_t digest) {
@@ -342,5 +342,24 @@ bool noah_profile_store_runtime_candidate_receive(uint8_t *frame, size_t length)
     (void)frame;
     (void)length;
     return false;
+#endif
+}
+
+bool noah_profile_store_runtime_logical_via_admit(uint16_t transaction_id, uint32_t generation, uint32_t digest) {
+#if defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)
+    return runtime_owner_initialized && !runtime_integration_error && noah_profile_owner_logical_via_admit(&runtime_owner, transaction_id, generation, digest);
+#else
+    (void)transaction_id;
+    (void)generation;
+    (void)digest;
+    return false;
+#endif
+}
+
+void noah_profile_store_runtime_logical_via_progress(void) {
+#if defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)
+    if (runtime_owner_initialized && !runtime_integration_error) {
+        noah_profile_owner_logical_via_progress(&runtime_owner);
+    }
 #endif
 }

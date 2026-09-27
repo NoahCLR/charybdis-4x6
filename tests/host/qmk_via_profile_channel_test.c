@@ -46,6 +46,17 @@ bool noah_qmk_via_logical_status(noah_qmk_via_logical_status_t *status) {
     *status = (noah_qmk_via_logical_status_t){0};
     return true;
 }
+
+// Staging admission belongs to the owner; qmk_via_logical_profile_test.c
+// covers it. This channel test only routes frames.
+bool noah_profile_store_runtime_logical_via_admit(uint16_t transaction_id, uint32_t generation, uint32_t digest) {
+    (void)transaction_id;
+    (void)generation;
+    (void)digest;
+    return true;
+}
+
+void noah_profile_store_runtime_logical_via_progress(void) {}
 #endif
 
 #ifdef NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS_ENABLE

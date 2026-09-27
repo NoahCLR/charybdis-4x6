@@ -10,7 +10,6 @@ const LOGICAL_VIA_STAGE_V1 = Object.freeze({
     VALUE_CHUNK: 0x16,
     VALUE_VERIFY: 0x17,
     VALUE_STATUS: 0x19,
-    VALUE_ABORT: 0x1a,
     CHUNK_MAX: 12,
     STATUS_LAYOUT_VERSION: 1,
     STATUS_PAYLOAD_SIZE: 18,
@@ -55,10 +54,6 @@ function buildLogicalViaBeginRequest(transactionId, generation, digest) {
 
 function buildLogicalViaVerifyRequest(transactionId, generation, digest) {
     return identityRequest(LOGICAL_VIA_STAGE_V1.VALUE_VERIFY, transactionId, generation, digest);
-}
-
-function buildLogicalViaAbortRequest(transactionId, generation, digest) {
-    return identityRequest(LOGICAL_VIA_STAGE_V1.VALUE_ABORT, transactionId, generation, digest);
 }
 
 function buildLogicalViaChunkRequest(transactionId, {region, offset, regionLength, bytes, generation, digest}) {
@@ -120,4 +115,4 @@ async function readLogicalViaStatus(connection, options = {}) {
     return decodeLogicalViaStatus(response, request);
 }
 
-module.exports = {ADMISSION, LOGICAL_VIA_STAGE_V1, LOGICAL_VIA_STATE, LogicalViaStageError, buildLogicalViaAbortRequest, buildLogicalViaBeginRequest, buildLogicalViaChunkRequest, buildLogicalViaStatusRequest, buildLogicalViaVerifyRequest, decodeLogicalViaAcknowledgement, decodeLogicalViaStatus, mutationMatcher, readLogicalViaStatus, sendLogicalViaMutation};
+module.exports = {ADMISSION, LOGICAL_VIA_STAGE_V1, LOGICAL_VIA_STATE, LogicalViaStageError, buildLogicalViaBeginRequest, buildLogicalViaChunkRequest, buildLogicalViaStatusRequest, buildLogicalViaVerifyRequest, decodeLogicalViaAcknowledgement, decodeLogicalViaStatus, mutationMatcher, readLogicalViaStatus, sendLogicalViaMutation};

@@ -22,9 +22,11 @@ enum {
 #if defined(VIA_ENABLE) && defined(SPLIT_TRANSACTION_IDS_USER)
 // Handles the logical VIA staging values only. Mutation requests are admitted
 // into the split-sync mailbox and do no EEPROM or split I/O in callback context.
+// The host may begin, fill and verify the staging bound to the owner's live
+// candidate; ABORT (0x1A) is refused as unsupported, since only the owner
+// cancels a staging, together with its candidate.
 bool noah_qmk_via_logical_profile_handle(uint8_t *data, uint8_t length);
 bool noah_qmk_via_logical_profile_accept(uint16_t transaction_id, uint32_t generation, uint32_t digest);
-bool noah_qmk_via_logical_profile_abort(uint16_t transaction_id, uint32_t generation, uint32_t digest);
 #else
 static inline bool noah_qmk_via_logical_profile_handle(uint8_t *data, uint8_t length) {
     (void)data;
@@ -32,12 +34,6 @@ static inline bool noah_qmk_via_logical_profile_handle(uint8_t *data, uint8_t le
     return false;
 }
 static inline bool noah_qmk_via_logical_profile_accept(uint16_t transaction_id, uint32_t generation, uint32_t digest) {
-    (void)transaction_id;
-    (void)generation;
-    (void)digest;
-    return false;
-}
-static inline bool noah_qmk_via_logical_profile_abort(uint16_t transaction_id, uint32_t generation, uint32_t digest) {
     (void)transaction_id;
     (void)generation;
     (void)digest;

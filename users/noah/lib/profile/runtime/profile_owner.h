@@ -127,6 +127,7 @@ typedef struct {
     bool                                 host_cancel_pending : 1;
     bool                                 host_via_accept_requested : 1;
     bool                                 host_via_abort_requested : 1;
+    bool                                 host_via_progress : 1;
     bool                                 boot_via_resolution_known : 1;
 } noah_profile_owner_t;
 
@@ -171,6 +172,17 @@ bool noah_profile_owner_scan(noah_profile_owner_t *owner, bool master, uint32_t 
 // Callback-side candidate admission remains a bounded decode/mailbox copy.
 // Advertising or routing this surface is a separate capability decision.
 bool noah_profile_owner_receive(noah_profile_owner_t *owner, uint8_t *frame, size_t length);
+
+// Host logical VIA staging belongs to the host candidate. It is admitted only
+// for that candidate's transaction id and bound VIA identity, and only while
+// the candidate is still being received or validated: from COMMIT on the
+// staged bytes are fixed, and only this owner ends the staging (ACCEPT after
+// the decision, a coordinated cancel before it). An admitted frame the VIA
+// layer queued is reported as progress, which the next scan counts as host
+// activity, so a long staging keeps its candidate's lease while status polls
+// alone do not.
+bool noah_profile_owner_logical_via_admit(const noah_profile_owner_t *owner, uint16_t transaction_id, uint32_t generation, uint32_t digest);
+void noah_profile_owner_logical_via_progress(noah_profile_owner_t *owner);
 
 noah_profile_owner_state_t         noah_profile_owner_state(const noah_profile_owner_t *owner);
 // Key output is fenced only from the logical VIA ACCEPT request until

@@ -58,6 +58,9 @@ static uint8_t          peer_transient_rejects;
 // receiver does after LOGICAL_STAGE_ACCEPT, instead of echoing the master.
 static bool             peer_tracks_accept;
 static uint32_t         peer_accepted_generation;
+// A peer that restarted, or never saw BEGIN, holds no staging to abort.
+static bool             peer_forgot_staging;
+static uint16_t         peer_abort_count;
 static test_rpc_mode_t  rpc_mode;
 static slave_callback_t registered_callback;
 
@@ -126,6 +129,8 @@ static void test_reset(void) {
     peer_transient_rejects    = 0u;
     peer_tracks_accept        = false;
     peer_accepted_generation  = 0u;
+    peer_forgot_staging       = false;
+    peer_abort_count          = 0u;
     rpc_mode                  = TEST_RPC_EQUAL;
     registered_callback       = NULL;
 }
@@ -320,7 +325,14 @@ bool transaction_rpc_exec(int8_t transaction_id, uint8_t request_size, const voi
         if (request.kind == NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_ACCEPT && peer_tracks_accept) {
             peer_accepted_generation = request.generation;
         }
+        if (request.kind == NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_ABORT) {
+            peer_abort_count++;
+        }
         response = (noah_qmk_via_sync_frame_t){.kind = NOAH_QMK_VIA_SYNC_MESSAGE_ACK, .generation = request.generation, .digest = request.digest};
+        if (request.kind == NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_ABORT && peer_forgot_staging) {
+            // Same reply the real receiver gives for a staging it does not hold.
+            response = (noah_qmk_via_sync_frame_t){.kind = NOAH_QMK_VIA_SYNC_MESSAGE_ERROR, .status = NOAH_QMK_VIA_SYNC_STATUS_SNAPSHOT_REQUIRED, .generation = request.generation, .digest = request.digest};
+        }
     } else if (request.kind == NOAH_QMK_VIA_SYNC_MESSAGE_SNAPSHOT_COMMIT) {
         rpc_commit_count++;
         response = (noah_qmk_via_sync_frame_t){.kind = NOAH_QMK_VIA_SYNC_MESSAGE_ACK, .status = rpc_commit_count == 1u ? NOAH_QMK_VIA_SYNC_STATUS_BUSY : NOAH_QMK_VIA_SYNC_STATUS_OK, .generation = request.generation, .digest = request.digest};
@@ -1164,6 +1176,124 @@ static void test_boot_fence_recovers_matching_staged_logical_bank(void) {
     CHECK(response.status == NOAH_QMK_VIA_SYNC_STATUS_OK);
 }
 
+// Stages generation 6 for transaction 41 up to `state` (STAGING after BEGIN,
+// STAGED after one chunk and VERIFY), with the master fenced for it.
+static noah_qmk_via_sync_frame_t stage_logical_target(noah_qmk_via_logical_state_t state) {
+    noah_qmk_via_logical_status_t status;
+    noah_qmk_via_sync_frame_t     frame = {.generation = 6u};
+    noah_qmk_via_sync_frame_t     chunk = {.kind = NOAH_QMK_VIA_SYNC_MESSAGE_PUSH_CHUNK, .region = NOAH_QMK_VIA_SYNC_REGION_KEYMAP, .generation = 6u, .region_length = TEST_KEYMAP_SIZE, .payload_length = TEST_KEYMAP_SIZE, .payload = {0x91u, 0x92u, 0x93u}};
+
+    test_reset();
+    test_init_ready();
+    scan_many(0u, 2u);
+    frame.digest = chunk.digest = test_digest_parts(peer_config, chunk.payload, peer_macro);
+    frame.kind                  = NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_BEGIN;
+    CHECK(noah_qmk_via_logical_submit(41u, &frame));
+    scan_at(10u);
+    if (state == NOAH_QMK_VIA_LOGICAL_STAGED) {
+        CHECK(noah_qmk_via_logical_submit(41u, &chunk));
+        scan_at(11u);
+        frame.kind = NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_VERIFY;
+        CHECK(noah_qmk_via_logical_submit(41u, &frame));
+        scan_at(12u);
+    }
+    CHECK(noah_qmk_via_logical_status(&status));
+    CHECK(status.state == state && !status.pending);
+    return frame;
+}
+
+// Only the owner ends a staging. A host ABORT used to be admitted here and
+// left the owner's ACCEPT refused after a decision the host had not seen.
+static void test_logical_staging_ends_only_by_owner_cancel(void) {
+    noah_qmk_via_logical_status_t status;
+    noah_qmk_via_sync_frame_t     identity = stage_logical_target(NOAH_QMK_VIA_LOGICAL_STAGED);
+    noah_qmk_via_sync_frame_t     abort    = {.kind = NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_ABORT, .generation = identity.generation, .digest = identity.digest};
+    noah_qmk_via_sync_frame_t     chunk    = {.kind = NOAH_QMK_VIA_SYNC_MESSAGE_PUSH_CHUNK, .region = NOAH_QMK_VIA_SYNC_REGION_KEYMAP, .generation = identity.generation, .region_length = TEST_KEYMAP_SIZE, .digest = identity.digest, .payload_length = 1u, .payload = {0x99u}};
+    uint16_t                      sequence;
+
+    CHECK(!noah_qmk_via_logical_submit(41u, &abort));
+    // VERIFY fixed the staged bytes: a chunk now would change what ACCEPT
+    // later accepts under the verified digest.
+    CHECK(!noah_qmk_via_logical_submit(41u, &chunk));
+    CHECK(noah_qmk_via_logical_status(&status));
+    CHECK(status.state == NOAH_QMK_VIA_LOGICAL_STAGED && !status.pending);
+    sequence = status.operation_sequence;
+
+    // Another identity is not this staging's to cancel.
+    CHECK(noah_qmk_via_logical_cancel(42u, identity.generation, identity.digest));
+    CHECK(noah_qmk_via_logical_cancel(41u, identity.generation + 1u, identity.digest));
+    CHECK(noah_qmk_via_logical_status(&status));
+    CHECK(status.state == NOAH_QMK_VIA_LOGICAL_STAGED && !status.pending);
+
+    CHECK(noah_qmk_via_logical_cancel(41u, identity.generation, identity.digest));
+    CHECK(noah_qmk_via_logical_cancel(41u, identity.generation, identity.digest));
+    scan_at(20u);
+    scan_at(21u);
+    CHECK(peer_abort_count == 1u);
+    CHECK(noah_qmk_via_logical_status(&status));
+    CHECK(status.state == NOAH_QMK_VIA_LOGICAL_ABORTED && !status.pending && status.operation_sequence == (uint16_t)(sequence + 1u));
+    CHECK(noah_qmk_via_logical_mirror_allowed());
+    // Nothing of it is left to cancel again, and nothing of it can be accepted.
+    CHECK(noah_qmk_via_logical_cancel(41u, identity.generation, identity.digest));
+    CHECK(noah_qmk_via_logical_status(&status));
+    CHECK(!status.pending && peer_abort_count == 1u);
+    identity.kind = NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_ACCEPT;
+    CHECK(!noah_qmk_via_logical_submit(41u, &identity));
+    identity.kind = NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_BEGIN;
+    CHECK(noah_qmk_via_logical_submit(43u, &identity));
+}
+
+// A cancel must not wait behind a queued frame the peer will never answer:
+// it replaces it, and completes whenever the link returns.
+static void test_logical_cancel_supersedes_a_queued_frame_and_waits_for_the_peer(void) {
+    noah_qmk_via_logical_status_t status;
+    noah_qmk_via_sync_frame_t     identity = stage_logical_target(NOAH_QMK_VIA_LOGICAL_STAGING);
+    noah_qmk_via_sync_frame_t     chunk    = {.kind = NOAH_QMK_VIA_SYNC_MESSAGE_PUSH_CHUNK, .region = NOAH_QMK_VIA_SYNC_REGION_KEYMAP, .generation = identity.generation, .region_length = TEST_KEYMAP_SIZE, .digest = identity.digest, .payload_length = 1u, .payload = {0x91u}};
+
+    rpc_mode = TEST_RPC_DISCONNECTED;
+    CHECK(noah_qmk_via_logical_submit(41u, &chunk));
+    scan_many(20u, 20u);
+    CHECK(noah_qmk_via_logical_status(&status));
+    CHECK(status.state == NOAH_QMK_VIA_LOGICAL_STAGING && status.pending);
+
+    CHECK(noah_qmk_via_logical_cancel(41u, identity.generation, identity.digest));
+    scan_many(100000u, 100u);
+    CHECK(noah_qmk_via_logical_status(&status));
+    CHECK(status.state == NOAH_QMK_VIA_LOGICAL_STAGING && status.pending);
+    CHECK(!noah_qmk_via_logical_mirror_allowed());
+    identity.kind = NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_BEGIN;
+    CHECK(!noah_qmk_via_logical_submit(42u, &identity));
+
+    // The peer restarted meanwhile and holds no staging: it has nothing to
+    // discard either, which completes the cancel rather than failing it.
+    rpc_mode            = TEST_RPC_EQUAL;
+    peer_forgot_staging = true;
+    scan_at(200000u);
+    CHECK(noah_qmk_via_logical_status(&status));
+    CHECK(status.state == NOAH_QMK_VIA_LOGICAL_ABORTED && !status.pending);
+    CHECK(status.last_status == NOAH_QMK_VIA_SYNC_STATUS_SNAPSHOT_REQUIRED);
+    CHECK(peer_abort_count == 1u);
+    CHECK(noah_qmk_via_logical_mirror_allowed());
+    CHECK(noah_qmk_via_logical_submit(42u, &identity));
+}
+
+// After the decision the staging is the recovery copy: no cancel touches it,
+// whether its ACCEPT is still queued or already acknowledged.
+static void test_logical_cancel_never_touches_an_accepted_identity(void) {
+    noah_qmk_via_logical_status_t status;
+    noah_qmk_via_sync_frame_t     identity = stage_logical_target(NOAH_QMK_VIA_LOGICAL_STAGED);
+
+    identity.kind = NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_ACCEPT;
+    CHECK(noah_qmk_via_logical_submit(41u, &identity));
+    CHECK(!noah_qmk_via_logical_cancel(41u, identity.generation, identity.digest));
+    scan_at(20u);
+    CHECK(noah_qmk_via_logical_status(&status));
+    CHECK(status.state == NOAH_QMK_VIA_LOGICAL_ACCEPTED);
+    CHECK(!noah_qmk_via_logical_cancel(41u, identity.generation, identity.digest));
+    CHECK(noah_qmk_via_logical_status(&status));
+    CHECK(status.state == NOAH_QMK_VIA_LOGICAL_ACCEPTED && !status.pending && peer_abort_count == 0u);
+}
+
 int main(void) {
     test_receiver_returns_structured_error_for_corrupt_frame();
     test_equal_boot_handshake_and_periodic_refresh();
@@ -1193,6 +1323,9 @@ int main(void) {
     test_logical_roll_forward_waits_while_host_keeps_writing();
     test_replacement_snapshot_restarts_in_progress_verification();
     test_boot_fence_recovers_matching_staged_logical_bank();
+    test_logical_staging_ends_only_by_owner_cancel();
+    test_logical_cancel_supersedes_a_queued_frame_and_waits_for_the_peer();
+    test_logical_cancel_never_touches_an_accepted_identity();
 
     puts("qmk_via_split_sync host tests passed");
     return 0;

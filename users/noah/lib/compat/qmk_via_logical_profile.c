@@ -10,6 +10,7 @@
 
 #    include "../profile/protocol/profile_candidate_v1.h"
 #    include "../profile/protocol/profile_wire_v1.h"
+#    include "../profile/storage/profile_store_runtime_hooks.h"
 #    include "qmk_via_storage_regions.h"
 
 enum {
@@ -154,10 +155,22 @@ bool noah_qmk_via_logical_profile_handle(uint8_t *data, uint8_t length) {
         acknowledge(data, NOAH_PROFILE_CANDIDATE_V1_ADMISSION_MALFORMED, NOAH_PROFILE_CANDIDATE_V1_ERROR_MALFORMED_FRAME, error_offset);
         return true;
     }
+    // Only the owner ends a staging: it cancels it together with the custom
+    // candidate before the decision, and accepts it after. A host abort
+    // could otherwise discard the recovery copy of a decided save.
+    if (request.kind == NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_ABORT) {
+        acknowledge(data, NOAH_PROFILE_CANDIDATE_V1_ADMISSION_UNSUPPORTED, NOAH_PROFILE_CANDIDATE_V1_ERROR_INVALID_STATE, 0xffu);
+        return true;
+    }
+    if (!noah_profile_store_runtime_logical_via_admit(transaction_id, request.generation, request.digest)) {
+        acknowledge(data, NOAH_PROFILE_CANDIDATE_V1_ADMISSION_UNSUPPORTED, NOAH_PROFILE_CANDIDATE_V1_ERROR_WRONG_TRANSACTION, 0xffu);
+        return true;
+    }
     if (!noah_qmk_via_logical_submit(transaction_id, &request)) {
         acknowledge(data, NOAH_PROFILE_CANDIDATE_V1_ADMISSION_BUSY, NOAH_PROFILE_CANDIDATE_V1_ERROR_MAILBOX_BUSY, 0xffu);
         return true;
     }
+    noah_profile_store_runtime_logical_via_progress();
     acknowledge(data, NOAH_PROFILE_CANDIDATE_V1_ADMISSION_QUEUED, NOAH_PROFILE_CANDIDATE_V1_ERROR_NONE, 0xffu);
     return true;
 }
@@ -165,15 +178,6 @@ bool noah_qmk_via_logical_profile_handle(uint8_t *data, uint8_t length) {
 bool noah_qmk_via_logical_profile_accept(uint16_t transaction_id, uint32_t generation, uint32_t digest) {
     noah_qmk_via_sync_frame_t request = {
         .kind       = NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_ACCEPT,
-        .generation = generation,
-        .digest     = digest,
-    };
-    return noah_qmk_via_logical_submit(transaction_id, &request);
-}
-
-bool noah_qmk_via_logical_profile_abort(uint16_t transaction_id, uint32_t generation, uint32_t digest) {
-    noah_qmk_via_sync_frame_t request = {
-        .kind       = NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_ABORT,
         .generation = generation,
         .digest     = digest,
     };

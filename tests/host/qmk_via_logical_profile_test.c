@@ -11,6 +11,12 @@ static noah_qmk_via_logical_status_t fake_status;
 static bool                          submit_result;
 static uint16_t                      submitted_transaction;
 static noah_qmk_via_sync_frame_t     submitted_request;
+static uint16_t                      submit_count;
+static bool                          admit_result;
+static uint16_t                      admitted_transaction;
+static uint32_t                      admitted_generation;
+static uint32_t                      admitted_digest;
+static uint16_t                      progress_count;
 
 uint16_t noah_qmk_via_storage_region_size(noah_qmk_via_sync_region_t region) {
     switch (region) {
@@ -26,6 +32,7 @@ uint16_t noah_qmk_via_storage_region_size(noah_qmk_via_sync_region_t region) {
 }
 
 bool noah_qmk_via_logical_submit(uint16_t transaction_id, const noah_qmk_via_sync_frame_t *request) {
+    submit_count++;
     submitted_transaction = transaction_id;
     submitted_request     = *request;
     return submit_result;
@@ -36,11 +43,28 @@ bool noah_qmk_via_logical_status(noah_qmk_via_logical_status_t *status) {
     return true;
 }
 
+bool noah_profile_store_runtime_logical_via_admit(uint16_t transaction_id, uint32_t generation, uint32_t digest) {
+    admitted_transaction = transaction_id;
+    admitted_generation  = generation;
+    admitted_digest      = digest;
+    return admit_result;
+}
+
+void noah_profile_store_runtime_logical_via_progress(void) {
+    progress_count++;
+}
+
 static void reset(void) {
     fake_status           = (noah_qmk_via_logical_status_t){0};
     submit_result         = true;
     submitted_transaction = 0u;
     submitted_request     = (noah_qmk_via_sync_frame_t){0};
+    submit_count          = 0u;
+    admit_result          = true;
+    admitted_transaction  = 0u;
+    admitted_generation   = 0u;
+    admitted_digest       = 0u;
+    progress_count        = 0u;
 }
 
 static void mutation_header(uint8_t frame[32], uint8_t value, uint16_t transaction_id) {
@@ -70,6 +94,8 @@ static void test_begin_is_queued_without_io(void) {
     assert(submitted_transaction == 0x1234u);
     assert(submitted_request.kind == NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_BEGIN);
     assert(submitted_request.generation == 9u && submitted_request.digest == UINT32_C(0x89abcdef));
+    assert(admitted_transaction == 0x1234u && admitted_generation == 9u && admitted_digest == UINT32_C(0x89abcdef));
+    assert(progress_count == 1u);
 }
 
 static void test_sparse_chunk_preserves_identity(void) {
@@ -118,9 +144,39 @@ static void test_busy_and_malformed_are_explicit(void) {
     write_u32(&frame[9], 2u);
     assert(noah_qmk_via_logical_profile_handle(frame, sizeof(frame)));
     assert(frame[5] == NOAH_PROFILE_CANDIDATE_V1_ADMISSION_BUSY && frame[6] == NOAH_PROFILE_CANDIDATE_V1_ERROR_MAILBOX_BUSY);
+    assert(progress_count == 0u);
     mutation_header(frame, NOAH_QMK_VIA_LOGICAL_VALUE_BEGIN, 0u);
     assert(noah_qmk_via_logical_profile_handle(frame, sizeof(frame)));
     assert(frame[5] == NOAH_PROFILE_CANDIDATE_V1_ADMISSION_MALFORMED);
+}
+
+// Only the owner ends a staging. A host ABORT could otherwise discard the
+// peer's recovery copy after the custom decision the host has not seen yet.
+static void test_host_abort_is_refused_without_touching_staging(void) {
+    uint8_t frame[32];
+    reset();
+    mutation_header(frame, NOAH_QMK_VIA_LOGICAL_VALUE_ABORT, 41u);
+    write_u32(&frame[5], 6u);
+    write_u32(&frame[9], UINT32_C(0x01020304));
+    assert(noah_qmk_via_logical_profile_handle(frame, sizeof(frame)));
+    assert(frame[5] == NOAH_PROFILE_CANDIDATE_V1_ADMISSION_UNSUPPORTED && frame[6] == NOAH_PROFILE_CANDIDATE_V1_ERROR_INVALID_STATE && frame[7] == 0xffu);
+    assert(submit_count == 0u && admitted_transaction == 0u && progress_count == 0u);
+}
+
+// Staging the owner does not bind to its live, undecided candidate never
+// reaches the VIA layer, so it can neither outlive its candidate nor change
+// bytes a commit has already fixed.
+static void test_unbound_staging_is_refused_before_the_via_layer(void) {
+    uint8_t frame[32];
+    reset();
+    admit_result = false;
+    mutation_header(frame, NOAH_QMK_VIA_LOGICAL_VALUE_VERIFY, 41u);
+    write_u32(&frame[5], 6u);
+    write_u32(&frame[9], UINT32_C(0x01020304));
+    assert(noah_qmk_via_logical_profile_handle(frame, sizeof(frame)));
+    assert(frame[5] == NOAH_PROFILE_CANDIDATE_V1_ADMISSION_UNSUPPORTED && frame[6] == NOAH_PROFILE_CANDIDATE_V1_ERROR_WRONG_TRANSACTION);
+    assert(admitted_transaction == 41u && admitted_generation == 6u && admitted_digest == UINT32_C(0x01020304));
+    assert(submit_count == 0u && progress_count == 0u);
 }
 
 static void test_internal_accept_is_not_a_host_command(void) {
@@ -134,6 +190,8 @@ int main(void) {
     test_sparse_chunk_preserves_identity();
     test_status_is_canonical();
     test_busy_and_malformed_are_explicit();
+    test_host_abort_is_refused_without_touching_staging();
+    test_unbound_staging_is_refused_before_the_via_layer();
     test_internal_accept_is_not_a_host_command();
     puts("qmk VIA logical-profile channel tests passed");
     return 0;

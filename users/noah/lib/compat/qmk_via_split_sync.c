@@ -1335,7 +1335,12 @@ bool noah_qmk_via_split_sync_matrix_scan_step(void) {
             noah_qmk_via_logical.status.pending     = false;
             noah_qmk_via_logical.status.last_status = response.status;
             noah_qmk_via_logical.status.operation_sequence++;
-            if (response.kind != NOAH_QMK_VIA_SYNC_MESSAGE_ACK || response.status != NOAH_QMK_VIA_SYNC_STATUS_OK) {
+            if (noah_qmk_via_logical.request.kind == NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_ABORT) {
+                // A peer that answers it holds no staging of this identity
+                // (it restarted, or BEGIN never reached it) has nothing to
+                // discard either; the abort is complete in both cases.
+                noah_qmk_via_logical.status.state = NOAH_QMK_VIA_LOGICAL_ABORTED;
+            } else if (response.kind != NOAH_QMK_VIA_SYNC_MESSAGE_ACK || response.status != NOAH_QMK_VIA_SYNC_STATUS_OK) {
                 noah_qmk_via_logical.status.state = NOAH_QMK_VIA_LOGICAL_ERROR;
             } else if (noah_qmk_via_logical.request.kind == NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_BEGIN) {
                 noah_qmk_via_logical.status.state = NOAH_QMK_VIA_LOGICAL_STAGING;
@@ -1355,8 +1360,6 @@ bool noah_qmk_via_split_sync_matrix_scan_step(void) {
                     noah_qmk_via_last_peer_ack_generation = response.generation;
                     noah_qmk_via_last_peer_ack_digest     = response.digest;
                 }
-            } else if (noah_qmk_via_logical.request.kind == NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_ABORT) {
-                noah_qmk_via_logical.status.state = NOAH_QMK_VIA_LOGICAL_ABORTED;
             }
         }
         return true;
@@ -1430,24 +1433,24 @@ bool noah_qmk_via_split_sync_matrix_scan_step(void) {
 
 bool noah_qmk_via_logical_submit(uint16_t transaction_id, const noah_qmk_via_sync_frame_t *request) {
     bool begin;
-    bool terminal;
+    bool live;
 
     if (transaction_id == 0u || !request || !is_keyboard_master()) {
         return false;
     }
-    begin    = request->kind == NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_BEGIN;
-    terminal = request->kind == NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_ACCEPT || request->kind == NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_ABORT;
-    if (!begin && request->kind != NOAH_QMK_VIA_SYNC_MESSAGE_PUSH_CHUNK && request->kind != NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_VERIFY && !terminal) {
+    begin = request->kind == NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_BEGIN;
+    if (!begin && request->kind != NOAH_QMK_VIA_SYNC_MESSAGE_PUSH_CHUNK && request->kind != NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_VERIFY && request->kind != NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_ACCEPT) {
         return false;
     }
     ATOMIC_BLOCK_RESTORESTATE {
+        live = noah_qmk_via_logical.status.state == NOAH_QMK_VIA_LOGICAL_STAGING || noah_qmk_via_logical.status.state == NOAH_QMK_VIA_LOGICAL_STAGED;
         if (noah_qmk_via_logical.status.pending) {
             transaction_id = 0u;
         } else if (begin) {
-            if (noah_qmk_via_logical.status.state == NOAH_QMK_VIA_LOGICAL_STAGING || noah_qmk_via_logical.status.state == NOAH_QMK_VIA_LOGICAL_STAGED) {
+            if (live) {
                 transaction_id = 0u;
             }
-        } else if ((noah_qmk_via_logical.status.state != NOAH_QMK_VIA_LOGICAL_STAGING && noah_qmk_via_logical.status.state != NOAH_QMK_VIA_LOGICAL_STAGED) || noah_qmk_via_logical.status.transaction_id != transaction_id || noah_qmk_via_logical.status.generation != request->generation || noah_qmk_via_logical.status.digest != request->digest) {
+        } else if (!live || noah_qmk_via_logical.status.transaction_id != transaction_id || noah_qmk_via_logical.status.generation != request->generation || noah_qmk_via_logical.status.digest != request->digest || (request->kind == NOAH_QMK_VIA_SYNC_MESSAGE_PUSH_CHUNK && noah_qmk_via_logical.status.state != NOAH_QMK_VIA_LOGICAL_STAGING)) {
             transaction_id = 0u;
         }
         if (transaction_id != 0u) {
@@ -1463,6 +1466,28 @@ bool noah_qmk_via_logical_submit(uint16_t transaction_id, const noah_qmk_via_syn
         }
     }
     return transaction_id != 0u;
+}
+
+bool noah_qmk_via_logical_cancel(uint16_t transaction_id, uint32_t generation, uint32_t digest) {
+    bool cancelled = true;
+    bool mine;
+
+    if (transaction_id == 0u) {
+        return false;
+    }
+    ATOMIC_BLOCK_RESTORESTATE {
+        mine = noah_qmk_via_logical.status.transaction_id == transaction_id && noah_qmk_via_logical.status.generation == generation && noah_qmk_via_logical.status.digest == digest;
+        if (mine && (noah_qmk_via_logical.status.state == NOAH_QMK_VIA_LOGICAL_ACCEPTED || (noah_qmk_via_logical.status.pending && noah_qmk_via_logical.request.kind == NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_ACCEPT))) {
+            cancelled = false;
+        } else if (mine && (noah_qmk_via_logical.status.state == NOAH_QMK_VIA_LOGICAL_STAGING || noah_qmk_via_logical.status.state == NOAH_QMK_VIA_LOGICAL_STAGED) && !(noah_qmk_via_logical.status.pending && noah_qmk_via_logical.request.kind == NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_ABORT)) {
+            // A queued frame that never reached the peer, or whose reply was
+            // lost, is superseded: the peer discards whatever of it arrived.
+            noah_qmk_via_logical.request            = (noah_qmk_via_sync_frame_t){.kind = NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_ABORT, .generation = generation, .digest = digest};
+            noah_qmk_via_logical.status.pending     = true;
+            noah_qmk_via_logical.status.last_status = NOAH_QMK_VIA_SYNC_STATUS_BUSY;
+        }
+    }
+    return cancelled;
 }
 
 bool noah_qmk_via_logical_status(noah_qmk_via_logical_status_t *status) {

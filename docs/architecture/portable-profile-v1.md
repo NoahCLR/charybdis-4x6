@@ -51,6 +51,17 @@ instructions. Held keys must balance. The bank is reconstructed with zero
 padding and a final zero validity byte. Both macro banks are independent:
 64 VIA slots and 16 user macro slots retain their existing key identities.
 
+The reconstructed bank is the document's, not necessarily the keyboard's. A
+valid bank may hold nonzero bytes after its 64th terminator, for instance after
+a writer shortened the macros without clearing the rest; the document cannot
+carry them and export stays canonical. Differential transfer therefore never
+compares against a bank rebuilt from a document. A capture keeps the exact
+layout and macro bytes it read, beside the storage identity it verified, and an
+Apply compares staging and local roll-forward against those. Its result keeps
+the target bank, which it has just proved both halves hold. A reviewed snapshot
+without those bytes is not reused: Apply reads the keyboard again. The
+interrupted-capture path already carries the raw bank it read.
+
 ## Settings domain `0x40`, version 1
 
 Capability domain-mask bit 3 advertises this domain and the full readback

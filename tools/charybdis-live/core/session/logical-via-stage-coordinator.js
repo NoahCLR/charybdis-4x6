@@ -1,7 +1,7 @@
 "use strict";
 
 const {changedRanges} = require("../protocol/via-storage-v1");
-const {LOGICAL_VIA_STAGE_V1, LOGICAL_VIA_STATE, buildLogicalViaAbortRequest, buildLogicalViaBeginRequest, buildLogicalViaChunkRequest, buildLogicalViaVerifyRequest, readLogicalViaStatus, sendLogicalViaMutation} = require("../protocol/logical-via-stage-v1");
+const {LOGICAL_VIA_STAGE_V1, LOGICAL_VIA_STATE, buildLogicalViaBeginRequest, buildLogicalViaChunkRequest, buildLogicalViaVerifyRequest, readLogicalViaStatus, sendLogicalViaMutation} = require("../protocol/logical-via-stage-v1");
 
 const REGIONS = Object.freeze({CONFIG: 1, KEYMAP: 2, MACRO: 4});
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -21,6 +21,9 @@ class LogicalViaStageCoordinator {
         do {
             const status = await readLogicalViaStatus(this.connection, {nextRequestId: () => this.requestIds.next()});
             if (status.state === LOGICAL_VIA_STATE.ERROR) throw Object.assign(new Error(`Peer VIA staging failed with status ${status.lastStatus}.`), {code: "LOGICAL_VIA_STAGE_FAILED", status});
+            // The keyboard ends a staging only together with its profile
+            // candidate, e.g. when the candidate's lease ran out.
+            if (status.transactionId === transactionId && !status.pending && status.state === LOGICAL_VIA_STATE.ABORTED) throw Object.assign(new Error("The keyboard cancelled this save before it was committed."), {code: "LOGICAL_VIA_STAGE_CANCELLED", status});
             if (status.transactionId === transactionId && !status.pending && status.operationSequence !== operationSequence && acceptedStates.includes(status.state)) return status;
             await delay(this.pollMs);
         } while (Date.now() < deadline);
@@ -68,10 +71,6 @@ class LogicalViaStageCoordinator {
             await delay(this.pollMs);
         } while (Date.now() < deadline);
         throw Object.assign(new Error("Timed out waiting for the staged VIA profile to become the recovery authority."), {code: "LOGICAL_VIA_ACCEPT_TIMEOUT"});
-    }
-
-    async abort({transactionId, generation, digest}) {
-        return this.operation(buildLogicalViaAbortRequest(transactionId, generation, digest), transactionId, [LOGICAL_VIA_STATE.ABORTED]);
     }
 }
 

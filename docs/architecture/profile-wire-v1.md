@@ -478,7 +478,12 @@ generation and digest before retrying.
 Abort is idempotent before durable commit; retrying a successful or no-op abort
 never repeats storage work.
 The device owner expires ordinary host staging after 15 seconds without
-processed precommit work. Once a peer-required candidate enters its distributed
+processed precommit work; for a candidate bound to a VIA identity, each
+logical VIA staging frame the owner admits counts as that work. Every
+precommit cancel of such a candidate also ends its VIA staging, and the host
+cannot end that staging itself; see
+[Logical Profile Transaction V1](logical-profile-transaction-v1.md#cancellation-and-lease-ownership).
+Once a peer-required candidate enters its distributed
 prepare, it uses a separate 60-second no-progress window; only acknowledged
 split payload progress refreshes that window, not BUSY replies or retries. A
 matching host abort or barrier timeout cancels and confirms the peer's

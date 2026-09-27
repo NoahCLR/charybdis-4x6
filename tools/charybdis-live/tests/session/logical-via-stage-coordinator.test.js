@@ -15,7 +15,6 @@ class Harness {
         this.transactionId = request.readUInt16LE(3);
         if (request[2] === LOGICAL_VIA_STAGE_V1.VALUE_BEGIN) { this.generation = request.readUInt32LE(5); this.digest = request.readUInt32LE(9); this.state = LOGICAL_VIA_STATE.STAGING; }
         if (request[2] === LOGICAL_VIA_STAGE_V1.VALUE_VERIFY) this.state = LOGICAL_VIA_STATE.STAGED;
-        if (request[2] === LOGICAL_VIA_STAGE_V1.VALUE_ABORT) this.state = LOGICAL_VIA_STATE.ABORTED;
         this.sequence = (this.sequence + 1) & 0xffff; // u16, as the firmware counts
         const response = Buffer.from(request); response.fill(0, 5); response[7] = 0xff;
         assert.equal(options.matchResponse(response), true); return response;
@@ -62,4 +61,23 @@ test("the u16 operation counter may wrap to zero mid-transaction", async () => {
     await coordinator.stage({transactionId: 9, generation: 1, digest: 2, current, target});
     assert.equal(connection.state, LOGICAL_VIA_STATE.STAGED, "a wrapped counter is a new operation, not a stall");
     assert.ok(connection.sequence < 0xfffe);
+});
+
+// The keyboard cancels a staging only with its candidate, e.g. when the
+// candidate's lease ran out while a chunk waited for the other half.
+test("a staging the keyboard cancelled fails at once instead of timing out", async () => {
+    const connection = new Harness(); let id = 0;
+    const original = connection.request.bind(connection);
+    connection.request = async (...args) => {
+        const response = await original(...args);
+        if (args[0][2] === LOGICAL_VIA_STAGE_V1.VALUE_CHUNK) connection.state = LOGICAL_VIA_STATE.ABORTED;
+        return response;
+    };
+    const coordinator = new LogicalViaStageCoordinator(connection, {requestIds: {next: () => ++id}, pollMs: 0, timeoutMs: 60000});
+    const current = {layout: Buffer.alloc(24), macros: Buffer.alloc(24)};
+    const target = {layout: Buffer.from(current.layout), macros: Buffer.from(current.macros)};
+    const started = Date.now();
+    await assert.rejects(coordinator.stage({transactionId: 5, generation: 6, digest: 7, current, target}), error => error.code === "LOGICAL_VIA_STAGE_CANCELLED");
+    assert.ok(Date.now() - started < 5000);
+    assert.equal(typeof coordinator.abort, "undefined", "only the keyboard ends a staging");
 });

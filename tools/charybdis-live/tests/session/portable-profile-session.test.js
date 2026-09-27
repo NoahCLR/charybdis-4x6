@@ -3,13 +3,17 @@ const {test} = require("node:test");
 const assert = require("node:assert/strict");
 const {captureProfile, restoreProfile, fingerprint, summary, validateSnapshot} = require("../../core/session/portable-profile-session");
 const {document} = require("../fixtures/portable-profile");
-const {viaStorageDigest} = require("../../core/protocol/via-storage-v1");
+const pd = require("../fixtures/pd-profile");
+const {changedRanges, viaStorageDigest} = require("../../core/protocol/via-storage-v1");
+const {decodeProfileBlob, encodeProfileBlob, fnv1a32} = require("../../core/schema/profile-blob-v1");
+const {encodeSettings} = require("../../core/schema/settings-domain-v1");
 const capabilities = {compiledLayerCount: 8, supportedDomainMask: 15, featureFlags: 1 << 12, actionAbiDigest: 0xeb80829c, candidateChunkMax: 20, viaMacroBytes: 7191};
 function fixture() {
     const source = document(), targetDocument = structuredClone(source), events = [];
     targetDocument.layers[0][0] ^= 1; targetDocument.macros[0] = Buffer.from("hello").toString("base64");
     const target = validateSnapshot(targetDocument), identity = {profile: "base", storageGeneration: 4, storageDigest: 5, settingsCrc: 6, settingsDigest: 7};
-    const capture = async () => ({document: source, fingerprint: fingerprint(source), summary: summary(source), identity});
+    const held = validateSnapshot(source), storage = {layout: held.layout, macros: held.macros};
+    const capture = async () => ({document: source, fingerprint: fingerprint(source), summary: summary(source), identity, storage});
     const storageDigest = viaStorageDigest(target);
     const operations = {capture, readIdentity: async () => identity, readCandidate: async () => ({state: 0}),
         createCoordinator: () => ({upload: async (bytes, options) => {events.push("stage"); await options.verifyBase(); return {transactionId: 1, metadata: {digest: 42}};}, commit: async (id, options) => {events.push("commit"); await options.afterDecision();}}),
@@ -20,7 +24,7 @@ function fixture() {
         readStored: async (connection, command, length, options = {}) => (command === 0x12 ? target.layout : target.macros).subarray(options.startOffset || 0, (options.startOffset || 0) + length),
         readProfile: async () => ({activeKind: 1, activeDigest: require("../../core/schema/profile-blob-v1").fnv1a32(target.profile), committedDigest: require("../../core/schema/profile-blob-v1").fnv1a32(target.profile), stateFlags: 32, conflictCount: 0})};
     const options = {operations, expectedFingerprint: fingerprint(source), saveRecovery: async backup => {assert.equal(fingerprint(backup), fingerprint(source)); events.push("backup"); return "/recovery.json";}};
-    return {source, targetDocument, target, identity, events, operations, options};
+    return {source, targetDocument, target, identity, storage, events, operations, options};
 }
 test("restore saves recovery first, restores both stores, then verifies complete readback", async () => {
     const f = fixture(), views = [];
@@ -39,7 +43,7 @@ test("restore verifies and reuses the reviewed snapshot without rereading its co
     let captures = 0, identityReads = 0;
     f.operations.capture = async () => {captures++; throw Error("must not capture");};
     f.operations.readIdentity = async () => {identityReads++; return f.identity;};
-    f.options.baseSnapshot = {document: f.source, fingerprint: fingerprint(f.source), summary: summary(f.source), identity: f.identity};
+    f.options.baseSnapshot = {document: f.source, fingerprint: fingerprint(f.source), summary: summary(f.source), identity: f.identity, storage: f.storage};
     const result = await restoreProfile({}, {}, capabilities, f.targetDocument, f.options);
     assert.equal(captures, 0);
     assert.equal(identityReads, 2);
@@ -48,7 +52,7 @@ test("restore verifies and reuses the reviewed snapshot without rereading its co
 });
 test("a changed device identity rejects a cached recovery base before saving or staging", async () => {
     const f = fixture();
-    f.options.baseSnapshot = {document: f.source, fingerprint: fingerprint(f.source), summary: summary(f.source), identity: f.identity};
+    f.options.baseSnapshot = {document: f.source, fingerprint: fingerprint(f.source), summary: summary(f.source), identity: f.identity, storage: f.storage};
     f.operations.readIdentity = async () => ({...f.identity, storageGeneration: f.identity.storageGeneration + 1});
     await assert.rejects(restoreProfile({}, {}, capabilities, f.targetDocument, f.options), /changed/);
     assert.deepEqual(f.events, []);
@@ -96,7 +100,7 @@ test("a failure carries the step it happened in, why, and what was saved", async
 
     const early = fixture();
     early.operations.readIdentity = async () => ({...early.identity, storageDigest: 99});
-    early.options.baseSnapshot = {document: early.source, fingerprint: fingerprint(early.source), summary: summary(early.source), identity: early.identity};
+    early.options.baseSnapshot = {document: early.source, fingerprint: fingerprint(early.source), summary: summary(early.source), identity: early.identity, storage: early.storage};
     await assert.rejects(restoreProfile({}, {}, capabilities, early.targetDocument, early.options), error => error.code === "PROFILE_CHANGED"
         && error.step === "check" && error.saved === "none", "a refusal before the upload changed nothing");
 });
@@ -104,7 +108,7 @@ test("a sent commit the keyboard then cancels is reported as not saved", async (
     const f = fixture(); stalledCommit(f, {abortConfirmed: true});
     await assert.rejects(restoreProfile({}, {}, capabilities, f.targetDocument, f.options), error => error.code === "RESTORE_NOT_SAVED"
         && /Nothing was saved/.test(error.message) && /no observable progress/.test(error.message) && !/Unplug/.test(error.message));
-    assert.deepEqual(f.events, ["backup", "stage", "via stage", "commit", "via abort", "abort"]);
+    assert.deepEqual(f.events, ["backup", "stage", "via stage", "commit", "abort"], "the keyboard cancels the staged keys and macros with the candidate");
 });
 test("a sent commit the keyboard never confirms cancelling stays an interrupted restore with its recovery file", async () => {
     const f = fixture(); stalledCommit(f, {abortConfirmed: false});
@@ -137,7 +141,6 @@ test("a post-decision local-write interruption preserves the peer recovery copy"
     f.operations.rollForwardLocal = async () => {f.events.push("local roll-forward"); throw Error("disconnected");};
     await assert.rejects(restoreProfile({}, {}, capabilities, f.targetDocument, f.options), error => error.code === "RESTORE_INCOMPLETE" && error.message.includes("/recovery.json")
         && /finishes from the other half's copy/.test(error.message), "after the decision the keyboard finishes the save itself");
-    assert.equal(f.events.includes("via abort"), false);
     assert.deepEqual(f.events, ["backup", "stage", "via stage", "commit", "via accepted", "local roll-forward"]);
 });
 test("mismatching final hardware readback fails verification", async () => {
@@ -165,4 +168,113 @@ test("recovery retries allow an incomplete base and prove the repaired target", 
 test("older firmware is rejected before any device read or write", async () => {
     const connection = {request: () => {throw Error("must not access device");}};
     await assert.rejects(captureProfile(connection, {}, {compiledLayerCount: 5}), error => error.code === "FIRMWARE_UPDATE_REQUIRED");
+});
+// The commit marker became durable, then a status read failed before the app
+// saw CONVERGING_PEER. The app asks the keyboard to cancel, which the keyboard
+// refuses after its decision; it never cancels the other half's staged keys
+// and macros itself, which are then the recovery copy the keyboard finishes from.
+test("an unobserved decision is left to the keyboard to finish", async () => {
+    const f = fixture();
+    let durable = false;
+    f.operations.createCoordinator = () => ({
+        upload: async (bytes, options) => {await options.verifyBase(); return {transactionId: 1, metadata: {digest: 42}};},
+        commit: async () => {durable = true; throw Object.assign(Error("Candidate status could not be decoded."), {code: "TRANSPORT_OUTCOME_AMBIGUOUS"});},
+        abort: async () => {assert.equal(durable, true); f.events.push("abort refused"); throw Object.assign(Error("invalid state"), {code: "ABORT_FAILED"});},
+    });
+    await assert.rejects(restoreProfile({}, {}, capabilities, f.targetDocument, f.options), error => error.code === "RESTORE_INCOMPLETE" && error.message.includes("/recovery.json"));
+    assert.deepEqual(f.events, ["backup", "via stage", "abort refused"]);
+});
+
+// A valid bank whose bytes after the 64th macro are not zero, as a writer
+// that shortened the macros leaves it. The document cannot carry those bytes.
+function tailedBank(source) {
+    const held = validateSnapshot(source), macros = Buffer.from(held.macros);
+    macros[macros.length - 20] = 0x41;
+    return {layout: Buffer.from(held.layout), macros};
+}
+function withSetting(source) {
+    const result = structuredClone(source), decoded = validateSnapshot(source);
+    decoded.settings.values[0] += 1;
+    const blob = decodeProfileBlob(decoded.profile);
+    result.profile = encodeProfileBlob({schema: blob.schema, domains: blob.domains.map(domain => domain.id === 64 ? {...domain, payload: encodeSettings(decoded.settings)} : domain)}).toString("base64");
+    return result;
+}
+const EDITS = {
+    "layout-only": source => {const result = structuredClone(source); result.layers[0][0] ^= 1; return result;},
+    "custom-only": withSetting,
+    "imported macro": source => ({...JSON.parse(JSON.stringify(source)), macros: source.macros.map((slot, index) => index === 3 ? Buffer.from("imported").toString("base64") : slot)}),
+};
+const FIXTURES = {
+    legacy: {document, capabilities},
+    "schema-2": {document: pd.document, capabilities: {...capabilities, actionAbiDigest: pd.document().actionAbiDigest, supportedDomainMask: 31}},
+};
+// Both banks start as the keyboard holds them; the fakes apply exactly the
+// ranges the session hands over, the way the staging coordinator and the
+// local VIA writes compare them, and report the whole-bank digest.
+function transfer(fixtureName, editName, {cached = false} = {}) {
+    const {document: make, capabilities: caps} = FIXTURES[fixtureName];
+    const source = make(), targetDocument = EDITS[editName](source), target = validateSnapshot(targetDocument, caps);
+    const raw = tailedBank(source), peer = {layout: Buffer.from(raw.layout), macros: Buffer.from(raw.macros)}, local = {layout: Buffer.from(raw.layout), macros: Buffer.from(raw.macros)};
+    const identity = {profile: "base", storageGeneration: 4, storageDigest: viaStorageDigest(raw), settingsCrc: 6, settingsDigest: 7};
+    const events = [], digest = viaStorageDigest(target);
+    const apply = (bank, ranges, region) => ranges.forEach(range => range.bytes.copy(bank[region], range.offset));
+    const snapshot = {document: source, fingerprint: fingerprint(source), summary: summary(source), identity, storage: raw};
+    const operations = {
+        capture: async () => {events.push("capture"); return snapshot;}, readIdentity: async () => identity, readCandidate: async () => ({state: 0}),
+        createCoordinator: () => ({upload: async (bytes, options) => {await options.verifyBase(); return {transactionId: 1, metadata: {digest: 42}};}, commit: async (id, options) => {await options.afterDecision();}}),
+        createViaCoordinator: () => ({
+            stage: async ({target: staged, current}) => {for (const region of ["layout", "macros"]) apply(peer, changedRanges(current[region], staged[region]), region);},
+            waitUntilAccepted: async () => {},
+        }),
+        rollForwardLocal: async (connection, staged, base, layoutRanges) => {
+            apply(local, layoutRanges, "layout");
+            apply(local, changedRanges(base.macros, staged.macros, {end: staged.macros.length - 1}), "macros");
+            events.push("local");
+        },
+        waitStorage: async () => ({ready: true, generation: 5, digest: viaStorageDigest(local)}),
+        readStorage: async () => ({ready: true, generation: 5, digest: viaStorageDigest(peer) === viaStorageDigest(local) ? viaStorageDigest(local) : 0}),
+        readStored: async (connection, command, length, options = {}) => (command === 0x12 ? local.layout : local.macros).subarray(options.startOffset || 0, (options.startOffset || 0) + length),
+        readProfile: async () => ({activeKind: 1, activeDigest: fnv1a32(target.profile), committedDigest: fnv1a32(target.profile), stateFlags: 32, conflictCount: 0}),
+    };
+    const options = {operations, expectedFingerprint: fingerprint(source), saveRecovery: async () => "/recovery.json", ...(cached ? {baseSnapshot: snapshot} : {})};
+    return {caps, targetDocument, target, raw, peer, local, digest, events, options, snapshot};
+}
+for (const fixtureName of Object.keys(FIXTURES)) {
+    for (const editName of Object.keys(EDITS)) {
+        for (const cached of [false, true]) {
+            test(`a ${editName} ${fixtureName} Apply from a ${cached ? "cached" : "fresh"} read clears stale bytes after the macros`, async () => {
+                const t = transfer(fixtureName, editName, {cached});
+                const result = await restoreProfile({}, {}, t.caps, t.targetDocument, t.options);
+                assert.equal(t.events.includes("capture"), !cached);
+                for (const bank of [t.peer, t.local]) {
+                    assert.ok(bank.layout.equals(t.target.layout) && bank.macros.equals(t.target.macros), "the stored bank is exactly the target");
+                    assert.equal(viaStorageDigest(bank), t.digest);
+                }
+                const stale = changedRanges(t.raw.macros, t.target.macros, {end: t.target.macros.length - 1});
+                assert.ok(stale.some(range => range.offset <= t.raw.macros.length - 20 && range.offset + range.bytes.length > t.raw.macros.length - 20), "the stale bytes are written");
+                assert.equal(result.performance.macroBytes, stale.reduce((sum, range) => sum + range.bytes.length, 0), "and nothing that already matches");
+                assert.ok(result.storage.macros.equals(t.target.macros), "the result keeps the bank it proved, for the next Apply");
+                assert.equal(result.document.macros.length, 64, "the document stays canonical");
+            });
+        }
+    }
+}
+test("a cached read of the same keyboard without its stored bank is read again", async () => {
+    const t = transfer("legacy", "layout-only", {cached: true});
+    t.options.baseSnapshot = {...t.snapshot, storage: undefined};
+    await restoreProfile({}, {}, t.caps, t.targetDocument, t.options);
+    assert.deepEqual(t.events, ["capture", "local"]);
+    assert.ok(t.peer.macros.equals(t.target.macros));
+});
+test("a cached bank for a keyboard that changed since is never compared against", async () => {
+    const t = transfer("legacy", "layout-only", {cached: true});
+    t.options.operations.readIdentity = async () => ({...t.snapshot.identity, storageDigest: t.snapshot.identity.storageDigest + 1});
+    await assert.rejects(restoreProfile({}, {}, t.caps, t.targetDocument, t.options), error => error.code === "PROFILE_CHANGED");
+    assert.ok(t.peer.macros.equals(t.raw.macros) && t.local.macros.equals(t.raw.macros), "nothing was written");
+});
+test("a read that lost its stored bank refuses before anything is sent", async () => {
+    const t = transfer("legacy", "layout-only");
+    t.options.operations.capture = async () => ({...t.snapshot, storage: undefined});
+    await assert.rejects(restoreProfile({}, {}, t.caps, t.targetDocument, t.options), error => error.code === "BASE_STORAGE_UNAVAILABLE" && error.saved === "none");
+    assert.ok(t.peer.macros.equals(t.raw.macros));
 });
