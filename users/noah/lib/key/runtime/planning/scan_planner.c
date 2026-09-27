@@ -315,6 +315,9 @@ void key_runtime_core_plan_fallback_hold_activation(key_runtime_core_state_t *st
     }
 
     token_key_pos = key_runtime_core_scan_press_token_key_pos(state, token);
+    if (key_runtime_core_press_offered_to_mode(token_key_pos)) {
+        return;
+    }
     key_runtime_core_effect_plan_push_held_action(plan, KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER, token_key_pos, token->resolved_keycode);
 }
 

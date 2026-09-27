@@ -264,6 +264,16 @@ bool owned_keycode_tap(uint16_t keycode) {
     return true;
 }
 
+void owned_keycode_tap_literal(uint16_t keycode) {
+    if (owned_keycode_is_supported(keycode)) {
+        (void)owned_keycode_tap(keycode);
+        return;
+    }
+    pointer_layer_policy_note_action(keycode, true);
+    tap_code16(keycode);
+    pointer_layer_policy_note_action(keycode, false);
+}
+
 void owned_keycode_track_physical_event(uint16_t keycode, keyrecord_t *record) {
     owned_keycode_lease_t components;
     uint8_t              *physical;

@@ -813,6 +813,61 @@ void key_runtime_core_observe_process_record_event(uint16_t keycode, keyrecord_t
     }
 }
 
+void key_runtime_core_offer_press_to_mode(keypos_t key_pos) {
+    key_runtime_core_state_t *state = key_runtime_core_state();
+
+    if (state && key_runtime_core_keypos_valid(key_pos)) {
+        key_origin_bitmap_add_keypos(state->pd_intercepted_bitmap, key_pos);
+    }
+}
+
+bool key_runtime_core_press_offered_to_mode(keypos_t key_pos) {
+    key_runtime_core_state_t *state = key_runtime_core_state();
+
+    return state && key_runtime_core_keypos_valid(key_pos) && key_origin_bitmap_has_keypos(state->pd_intercepted_bitmap, key_pos);
+}
+
+void key_runtime_core_end_mode_offer(keypos_t key_pos, bool consumed) {
+    key_runtime_core_state_t *state = key_runtime_core_state();
+    press_token_t            *token;
+    tap_series_t             *series;
+
+    if (!(state && key_runtime_core_keypos_valid(key_pos))) {
+        return;
+    }
+    if (!consumed) {
+        key_origin_bitmap_remove_keypos(state->pd_intercepted_bitmap, key_pos);
+        return;
+    }
+    token = key_runtime_core_press_token_state(state, key_pos);
+    if (!(token && token->active)) {
+        return;
+    }
+    key_runtime_core_release_leases_for_token(state, token->token_id);
+    // Reaching a mode takes another key's press, which already flushed any
+    // series this key had pending, so the series here counts only this press.
+    series = key_runtime_core_tap_series_state(state, key_pos);
+    if (series && series->active) {
+        key_runtime_core_tap_series_clear(state, series);
+    }
+    token->handled_key                 = false;
+    token->tap_outcome_available       = false;
+    token->pd_mode_was_locked_on_press = false;
+    token->interaction                 = key_runtime_slot_interaction_default();
+    token->slot_phase                  = KEY_RUNTIME_SLOT_PHASE_IDLE;
+    key_runtime_core_shadow_projection_recompute(state);
+}
+
+bool key_runtime_core_take_intercepted_release(keypos_t key_pos) {
+    key_runtime_core_state_t *state = key_runtime_core_state();
+
+    if (!(state && key_runtime_core_keypos_valid(key_pos) && key_origin_bitmap_has_keypos(state->pd_intercepted_bitmap, key_pos))) {
+        return false;
+    }
+    key_origin_bitmap_remove_keypos(state->pd_intercepted_bitmap, key_pos);
+    return true;
+}
+
 void key_runtime_core_observe_scan_cycle(uint16_t now) {
     key_runtime_core_apply_event(&(runtime_event_t){.kind = RUNTIME_EVENT_KIND_SCAN}, now);
 }

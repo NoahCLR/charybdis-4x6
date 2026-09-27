@@ -43,6 +43,13 @@ bool     owned_keycode_is_supported(uint16_t keycode);
 bool     owned_keycode_register(uint16_t keycode);
 bool     owned_keycode_unregister(uint16_t keycode);
 bool     owned_keycode_tap(uint16_t keycode);
+// Every literal tap goes through here, so it can never release a usage another
+// owner (a physical key, a behavior hold, a macro) still holds: QMK's own
+// tap_code16() ends with an unregister that clears the usage whoever holds it.
+// A usage already held stays held and gets no new edge; its tap changes nothing
+// in the report, as a second physical key on the same usage would not either.
+// A keycode the ledger cannot represent keeps QMK's own tap.
+void     owned_keycode_tap_literal(uint16_t keycode);
 void     owned_keycode_track_physical_event(uint16_t keycode, keyrecord_t *record);
 bool     owned_keycode_should_suppress_default(uint16_t keycode, keyrecord_t *record);
 uint16_t owned_keycode_managed_usage_count(void);

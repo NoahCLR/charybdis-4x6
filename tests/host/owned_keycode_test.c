@@ -33,6 +33,8 @@ static uint8_t unregister_code_seq[16];
 static uint8_t register_mods_seq[16];
 static uint8_t unregister_mods_seq[16];
 static uint8_t fake_report_mods;
+static uint16_t tap_code16_calls[4];
+static uint8_t  tap_code16_count;
 
 static void test_fail(const char *expr, const char *file, int line) {
     fprintf(stderr, "test failed: %s (%s:%d)\n", expr, file, line);
@@ -60,6 +62,7 @@ static void test_reset_stubs(void) {
     can_unregister_mods       = true;
     call_sequence             = 0;
     fake_report_mods          = 0;
+    tap_code16_count          = 0;
 }
 
 static keyrecord_t test_record(bool pressed) {
@@ -119,6 +122,11 @@ void unregister_code(uint8_t keycode) {
     CHECK(unregister_code_count < ARRAY_SIZE(unregister_code_calls));
     unregister_code_seq[unregister_code_count]     = call_sequence++;
     unregister_code_calls[unregister_code_count++] = keycode;
+}
+
+void tap_code16(uint16_t keycode) {
+    CHECK(tap_code16_count < ARRAY_SIZE(tap_code16_calls));
+    tap_code16_calls[tap_code16_count++] = keycode;
 }
 
 void wait_ms(uint16_t ms) {
@@ -611,6 +619,56 @@ static void test_system_usage_shares_two_managed_owners(void) {
     CHECK(unregister_code_calls[0] == KC_SYSTEM_POWER);
 }
 
+// QMK's tap_code16() ends with an unregister that clears the usage whoever
+// holds it. Literal taps go through the ledger instead, so a usage another
+// owner holds stays down and its tap changes nothing in the report.
+static void test_literal_tap_never_releases_another_owners_usage(void) {
+    owned_keycode_lease_t          hold    = {0};
+    keyrecord_t                    press   = test_record(true);
+    keyrecord_t                    release = test_record(false);
+    owned_keycode_debug_snapshot_t snapshot;
+
+    test_reset_stubs();
+    owned_keycode_tap_literal(KC_A);
+    CHECK(register_code_count == 1 && unregister_code_count == 1 && tap_code16_count == 0);
+
+    // A behavior or macro holds A.
+    test_reset_stubs();
+    CHECK(owned_keycode_acquire(KC_A, &hold));
+    owned_keycode_tap_literal(KC_A);
+    owned_keycode_tap_literal(S(KC_A));
+    CHECK(register_code_count == 1 && unregister_code_count == 0 && tap_code16_count == 0);
+    CHECK(register_mods_count == 1 && register_mods_calls[0] == MOD_BIT(KC_LEFT_SHIFT) && unregister_mods_count == 1);
+    owned_keycode_debug_snapshot(KC_A, &snapshot);
+    CHECK(snapshot.managed_count == 1);
+    CHECK(owned_keycode_release(&hold));
+    CHECK(unregister_code_count == 1);
+
+    // A physical key holds A.
+    test_reset_stubs();
+    owned_keycode_track_physical_event(KC_A, &press);
+    owned_keycode_tap_literal(KC_A);
+    CHECK(register_code_count == 0 && unregister_code_count == 0);
+    owned_keycode_track_physical_event(KC_A, &release);
+    owned_keycode_debug_snapshot(KC_A, &snapshot);
+    CHECK(snapshot.physical_count == 0 && snapshot.managed_count == 0 && snapshot.underflow_count == 0);
+
+    // A held mouse button keeps its drag, and pointer policy sees no edge.
+    test_reset_stubs();
+    CHECK(owned_keycode_acquire(MS_BTN1, &hold));
+    pointer_action_call_count = 0;
+    owned_keycode_tap_literal(MS_BTN1);
+    CHECK(register_code_count == 1 && unregister_code_count == 0 && pointer_action_call_count == 0);
+    CHECK(owned_keycode_release(&hold));
+}
+
+static void test_literal_tap_keeps_qmk_for_keycodes_the_ledger_cannot_hold(void) {
+    test_reset_stubs();
+    owned_keycode_tap_literal(QK_BOOT);
+    CHECK(tap_code16_count == 1 && tap_code16_calls[0] == QK_BOOT);
+    CHECK(register_code_count == 0 && unregister_code_count == 0);
+}
+
 int main(void) {
     test_plain_key_registers_and_unregisters_directly();
     test_plain_modifier_uses_mod_ownership();
@@ -640,6 +698,8 @@ int main(void) {
     test_legacy_modded_register_matches_lease_report_order();
     test_basic_saturation_unwinds_the_mods_it_already_registered();
     test_system_usage_shares_two_managed_owners();
+    test_literal_tap_never_releases_another_owners_usage();
+    test_literal_tap_keeps_qmk_for_keycodes_the_ledger_cannot_hold();
 
     puts("owned_keycode host tests passed");
     return 0;

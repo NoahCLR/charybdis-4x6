@@ -27,6 +27,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/key_runtime_integration_harness.c" \
     "$ROOT/tests/host/key_runtime_physical_ownership_integration_test.c" \
+    "$ROOT/users/noah/lib/compat/qmk_mod_contract.c" \
     $PHYSICAL_OWNERSHIP_SUPPORT_SOURCES \
     -o "$BIN"
 

@@ -13,7 +13,6 @@
 
 #include "owned_keycode.h"
 #include "synthetic_record.h"
-#include "../pointing/policy/pointer_layer_policy.h"
 #include "../compat/qmk_oneshot_contract.h"
 #include "../profile/runtime/effective_settings_runtime.h"
 #include "../state/ownership/layer_ownership.h"
@@ -59,9 +58,7 @@ static void noah_action_log_unsupported_layer_action(noah_action_desc_t desc) {
 
 static void noah_action_tap_literal(noah_action_desc_t desc, keypos_t key_pos) {
     (void)key_pos;
-    pointer_layer_policy_note_action(desc.action, true);
-    tap_code16(desc.action);
-    pointer_layer_policy_note_action(desc.action, false);
+    owned_keycode_tap_literal(desc.action);
 }
 
 static void noah_action_press_literal(noah_action_desc_t desc, keypos_t key_pos) {

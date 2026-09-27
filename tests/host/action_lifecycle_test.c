@@ -33,14 +33,11 @@ static test_call_t synthetic_tap_call;
 static test_call_t synthetic_qmk_tap_call;
 static test_call_t synthetic_record_call;
 static test_call_t synthetic_qmk_record_call;
-static test_call_t tap_code16_call;
+static test_call_t literal_tap_call;
 static test_call_t register_code16_call;
 static test_call_t unregister_code16_call;
 static test_call_t owned_register_call;
 static test_call_t owned_unregister_call;
-static test_call_t pointer_action_call_1;
-static test_call_t pointer_action_call_2;
-static uint8_t     pointer_action_call_count;
 
 static uint8_t  pd_toggle_calls;
 static uint8_t  pd_press_calls;
@@ -94,14 +91,11 @@ static void test_reset_stubs(void) {
     synthetic_qmk_tap_call    = (test_call_t){0};
     synthetic_record_call     = (test_call_t){0};
     synthetic_qmk_record_call = (test_call_t){0};
-    tap_code16_call           = (test_call_t){0};
+    literal_tap_call          = (test_call_t){0};
     register_code16_call      = (test_call_t){0};
     unregister_code16_call    = (test_call_t){0};
     owned_register_call       = (test_call_t){0};
     owned_unregister_call     = (test_call_t){0};
-    pointer_action_call_1     = (test_call_t){0};
-    pointer_action_call_2     = (test_call_t){0};
-    pointer_action_call_count = 0;
     pd_toggle_calls           = 0;
     pd_press_calls            = 0;
     pd_release_calls          = 0;
@@ -245,15 +239,10 @@ bool owned_keycode_unregister(uint16_t keycode) {
     return owned_unregister_result;
 }
 
-void tap_code16(uint16_t keycode) {
-    tap_code16_call.keycode = keycode;
-}
-
-void pointer_layer_policy_note_action(uint16_t action, bool pressed) {
-    test_call_t *call = pointer_action_call_count == 0 ? &pointer_action_call_1 : &pointer_action_call_2;
-    call->keycode     = action;
-    call->pressed     = pressed;
-    pointer_action_call_count++;
+// A literal tap goes through the ownership ledger, never straight to QMK's
+// tap_code16(); owned_keycode_test.c covers what the ledger then sends.
+void owned_keycode_tap_literal(uint16_t keycode) {
+    literal_tap_call.keycode = keycode;
 }
 
 void pointer_layer_policy_sync_layer_lock_anchor(void) {}
@@ -330,7 +319,7 @@ static void test_toggle_and_goto_layer_keycodes_act_through_layer_ownership(void
     noah_action_tap(TG(3));
     CHECK(layer_toggle_call.layer == 3);
     CHECK(!layer_goto_call.pressed);
-    CHECK(tap_code16_call.keycode == KC_NO);
+    CHECK(literal_tap_call.keycode == KC_NO);
 
     test_reset_stubs();
     noah_action_press(key_pos, TG(2));
@@ -341,7 +330,7 @@ static void test_toggle_and_goto_layer_keycodes_act_through_layer_ownership(void
     noah_action_tap(TO(5));
     CHECK(layer_goto_call.pressed && layer_goto_call.layer == 5);
     CHECK(layer_toggle_call.layer == 0);
-    CHECK(tap_code16_call.keycode == KC_NO);
+    CHECK(literal_tap_call.keycode == KC_NO);
 
     test_reset_stubs();
     noah_action_press(key_pos, TO(0));
@@ -353,7 +342,7 @@ static void test_toggle_and_goto_layer_keycodes_act_through_layer_ownership(void
     noah_action_tap(TO(LAYER_COUNT));
     CHECK(layer_toggle_call.layer == 0);
     CHECK(!layer_goto_call.pressed);
-    CHECK(tap_code16_call.keycode == KC_NO);
+    CHECK(literal_tap_call.keycode == KC_NO);
 }
 
 // OSL() taps arm its one-shot through layer ownership and presses hold its
@@ -365,7 +354,7 @@ static void test_oneshot_layer_taps_arm_and_presses_hold(void) {
     test_reset_stubs();
     noah_action_tap(OSL(3));
     CHECK(layer_oneshot_call.pressed && layer_oneshot_call.layer == 3);
-    CHECK(tap_code16_call.keycode == KC_NO);
+    CHECK(literal_tap_call.keycode == KC_NO);
 
     test_reset_stubs();
     noah_action_press(key_pos, OSL(2));
@@ -385,7 +374,7 @@ static void test_tap_handles_layer_lock_and_pd_lock(void) {
     noah_action_tap(LOCK_LAYER(4));
     CHECK(layer_toggle_call.layer == 4);
     CHECK(split_sync_calls == 0);
-    CHECK(tap_code16_call.keycode == KC_NO);
+    CHECK(literal_tap_call.keycode == KC_NO);
 
     test_reset_stubs();
     pd_toggle_result = true;
@@ -395,7 +384,7 @@ static void test_tap_handles_layer_lock_and_pd_lock(void) {
     CHECK(pd_toggle_key_pos.row == MATRIX_ROWS);
     CHECK(pd_toggle_key_pos.col == MATRIX_COLS);
     CHECK(split_sync_calls == 1);
-    CHECK(tap_code16_call.keycode == KC_NO);
+    CHECK(literal_tap_call.keycode == KC_NO);
 
     test_reset_stubs();
     pd_toggle_result = false;
@@ -428,7 +417,7 @@ static void test_tap_routes_macro_custom_qmk_and_plain_actions(void) {
     noah_action_tap(MACRO_0);
     noah_action_tap(MACRO_15);
     noah_action_press(key_pos, MACRO_7);
-    CHECK(tap_code16_call.keycode == KC_NO);
+    CHECK(literal_tap_call.keycode == KC_NO);
     CHECK(register_code16_call.keycode == KC_NO);
     CHECK(synthetic_tap_call.keycode == KC_NO);
     CHECK(synthetic_record_call.keycode == KC_NO);
@@ -437,35 +426,30 @@ static void test_tap_routes_macro_custom_qmk_and_plain_actions(void) {
 
     noah_action_tap(TEST_CUSTOM_ACTION);
     CHECK(synthetic_tap_call.keycode == TEST_CUSTOM_ACTION);
-    CHECK(tap_code16_call.keycode == KC_NO);
+    CHECK(literal_tap_call.keycode == KC_NO);
 
     test_reset_stubs();
 
     noah_action_tap(TEST_QMK_BEHAVIOR_ACTION);
     CHECK(synthetic_qmk_tap_call.keycode == TEST_QMK_BEHAVIOR_ACTION);
-    CHECK(tap_code16_call.keycode == KC_NO);
+    CHECK(literal_tap_call.keycode == KC_NO);
 
     test_reset_stubs();
 
     noah_action_tap(KC_C);
-    CHECK(tap_code16_call.keycode == KC_C);
+    CHECK(literal_tap_call.keycode == KC_C);
 
     test_reset_stubs();
 
     noah_action_tap(MS_BTN1);
-    CHECK(tap_code16_call.keycode == MS_BTN1);
-    CHECK(pointer_action_call_count == 2);
-    CHECK(pointer_action_call_1.keycode == MS_BTN1);
-    CHECK(pointer_action_call_1.pressed);
-    CHECK(pointer_action_call_2.keycode == MS_BTN1);
-    CHECK(!pointer_action_call_2.pressed);
+    CHECK(literal_tap_call.keycode == MS_BTN1);
 }
 
 static void test_tap_ignores_raw_layer_actions(void) {
     test_reset_stubs();
 
     noah_action_tap(TEST_RAW_LAYER_ACTION);
-    CHECK(tap_code16_call.keycode == KC_NO);
+    CHECK(literal_tap_call.keycode == KC_NO);
     CHECK(synthetic_tap_call.keycode == KC_NO);
     CHECK(synthetic_qmk_tap_call.keycode == KC_NO);
 }
@@ -624,7 +608,7 @@ static void test_qmk_functions_dispatch_as_synthetic_qmk_records(void) {
         test_reset_stubs();
         noah_action_tap(keycode);
         CHECK(synthetic_qmk_tap_call.keycode == keycode);
-        CHECK(tap_code16_call.keycode == KC_NO);
+        CHECK(literal_tap_call.keycode == KC_NO);
 
         test_reset_stubs();
         noah_action_press(key_pos, keycode);

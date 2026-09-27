@@ -76,6 +76,19 @@ static inline uint16_t pgm_read_word(const void *addr_) {
 #ifndef MOD_LGUI
 #    define MOD_LGUI 0x08u
 #endif
+// Right-hand modifiers set bit 4, as in QMK's modifiers.h.
+#ifndef MOD_RCTL
+#    define MOD_RCTL 0x11u
+#endif
+#ifndef MOD_RSFT
+#    define MOD_RSFT 0x12u
+#endif
+#ifndef MOD_RALT
+#    define MOD_RALT 0x14u
+#endif
+#ifndef MOD_RGUI
+#    define MOD_RGUI 0x18u
+#endif
 
 #ifndef IS_MOUSEKEY_BUTTON
 #    define IS_MOUSEKEY_BUTTON(keycode_) ((keycode_) >= QK_MOUSE_BUTTON_1 && (keycode_) <= QK_MOUSE_BUTTON_8)

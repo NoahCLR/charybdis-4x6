@@ -164,6 +164,11 @@ bool owned_keycode_unregister(uint16_t keycode) {
     return true;
 }
 
+// The ledger is faked here, so a literal tap is recorded as QMK's tap.
+void owned_keycode_tap_literal(uint16_t keycode) {
+    tap_code16(keycode);
+}
+
 void send_char_with_delay(char ascii_code, uint8_t interval) {
     test_log_call(TEST_CALL_SEND_CHAR, (uint8_t)ascii_code, interval);
 }

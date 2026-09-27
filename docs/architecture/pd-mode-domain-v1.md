@@ -199,8 +199,11 @@ A button record is `kind:u8, modifiers:u8, tap:4 bytes`. Pass-through `0` and
 consume `1` require five zero payload bytes. Tap `2` requires modifiers zero
 and a nonempty valid tap. Hold-modifiers `3` requires a nonzero modifier mask
 and zero tap bytes. Both engine families can use these button records.
-Late releases must follow the owner that acquired the output across mode
-replacement; this codec does not implement that lifecycle.
+A button press a mode consumes never reaches the button's own behavior, and
+its release goes to the mode that took the press, even after another mode
+replaced it; the release of a press the mode did not take stays with the
+behavior. The key runtime owns that routing; see
+[Runtime Flow](runtime-flow.md#key-press-flow).
 
 ## Validation and evidence
 

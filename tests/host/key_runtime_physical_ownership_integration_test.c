@@ -7,6 +7,8 @@
 #include "users/noah/lib/action/action_dispatch.h"
 #include "users/noah/lib/action/action_lifecycle.h"
 #include "users/noah/lib/action/owned_keycode.h"
+#include "users/noah/lib/compat/qmk_mod_contract.h"
+#include "users/noah/lib/state/modifiers/keyboard_mod_policy.h"
 #include "users/noah/lib/key/behavior/key_behavior_lookup.h"
 #include "users/noah/lib/key/runtime/delayed_action.h"
 #include "users/noah/lib/state/ownership/keyboard_mod_ownership.h"
@@ -462,11 +464,143 @@ static void test_consumed_handled_modifier_does_not_block_managed_teardown(void)
     CHECK(test_report_mod_refcount_total() == 0);
 }
 
+// QMK resolves a mod-tap before userspace sees it: tap_count 0 is a hold, whose
+// default action then registers the modifier through the linked register_mods()
+// override, exactly as the fork's action.c does. A mode that owns the same
+// modifier (Pinch's Cmd) masks only its own, so the user's held mod-tap must
+// still reach a concurrent key.
+static void test_mod_tap_hold(uint16_t keycode, keypos_t key_pos, bool pressed) {
+    CHECK(key_runtime_integration_process_tap_record(keycode, key_pos, pressed, 0u));
+}
+
+static void test_qmk_mod_tap_default(uint16_t keycode, bool pressed) {
+    uint8_t mods = (uint8_t)QK_MOD_TAP_GET_MODS(keycode);
+
+    mods = (mods & 0x10u) ? (uint8_t)((mods & 0x0Fu) << 4u) : (uint8_t)(mods & 0x0Fu);
+    if (pressed) {
+        register_mods(mods);
+    } else {
+        unregister_mods(mods);
+    }
+}
+
+// The modifier bits a concurrent key would carry while the mode masks `mods`.
+static uint8_t test_mods_for_concurrent_key(uint8_t mods) {
+    uint8_t mask = keyboard_mod_policy_managed_only_mask(mods);
+    uint8_t seen;
+
+    (void)keyboard_mod_policy_begin_real_mod_mask(mask);
+    seen = get_mods();
+    keyboard_mod_policy_end_real_mod_mask(mask);
+    return seen;
+}
+
+static void test_assert_mods_balanced(void) {
+    keyboard_mod_ownership_debug_snapshot_t snapshot = {0};
+
+    keyboard_mod_ownership_debug_snapshot(&snapshot);
+    for (uint8_t index = 0; index < KEYBOARD_MOD_OWNERSHIP_MOD_COUNT; index++) {
+        CHECK(snapshot.physical_refcounts[index] == 0);
+        CHECK(snapshot.managed_refcounts[index] == 0);
+        CHECK(snapshot.report_refcounts[index] == 0);
+    }
+    CHECK(get_mods() == 0);
+}
+
+static void test_held_mod_tap_is_not_masked_as_mode_owned(void) {
+    const uint16_t gui_tap = MT(MOD_LGUI, KC_A);
+    keypos_t       mt_pos  = test_keypos(4, 0);
+    uint8_t        gui     = MOD_BIT(KC_LEFT_GUI);
+
+    // A direct Cmd hold was already excluded; the mod-tap hold now matches it.
+    test_reset_state();
+    CHECK(key_runtime_integration_process_record(KC_LEFT_GUI, mt_pos, true));
+    add_mods(gui);
+    keyboard_mod_ownership_register(KC_LEFT_GUI);
+    CHECK(test_mods_for_concurrent_key(gui) == gui);
+
+    // Mod-tap held first, then the mode takes its Cmd; then the other order.
+    for (uint8_t order = 0; order < 2u; order++) {
+        test_reset_state();
+        if (order == 1u) keyboard_mod_ownership_register(KC_LEFT_GUI);
+        test_mod_tap_hold(gui_tap, mt_pos, true);
+        test_qmk_mod_tap_default(gui_tap, true);
+        if (order == 0u) keyboard_mod_ownership_register(KC_LEFT_GUI);
+        CHECK(keyboard_mod_policy_managed_only_mask(gui) == 0);
+        CHECK(test_mods_for_concurrent_key(gui) == gui);
+
+        // Releasing the mod-tap while the mode still holds Cmd: Cmd stays in
+        // the report for the mode, and is masked again as the mode's alone.
+        test_mod_tap_hold(gui_tap, mt_pos, false);
+        test_qmk_mod_tap_default(gui_tap, false);
+        CHECK((get_mods() & gui) != 0);
+        CHECK(test_mods_for_concurrent_key(gui) == 0);
+        keyboard_mod_ownership_unregister(KC_LEFT_GUI);
+        test_assert_mods_balanced();
+    }
+
+    // The mode replaced by another that owns Cmd too: the hold stays unmasked.
+    test_reset_state();
+    test_mod_tap_hold(gui_tap, mt_pos, true);
+    test_qmk_mod_tap_default(gui_tap, true);
+    keyboard_mod_ownership_register(KC_LEFT_GUI);
+    keyboard_mod_ownership_unregister(KC_LEFT_GUI);
+    keyboard_mod_ownership_register(KC_LEFT_GUI);
+    CHECK(test_mods_for_concurrent_key(gui) == gui);
+    keyboard_mod_ownership_unregister(KC_LEFT_GUI);
+    test_mod_tap_hold(gui_tap, mt_pos, false);
+    test_qmk_mod_tap_default(gui_tap, false);
+    test_assert_mods_balanced();
+}
+
+// A tapped mod-tap never held its modifier: the mode's Cmd is still masked.
+static void test_tapped_mod_tap_is_not_a_held_modifier(void) {
+    const uint16_t gui_tap = MT(MOD_LGUI, KC_A);
+    keypos_t       mt_pos  = test_keypos(4, 0);
+    uint8_t        gui     = MOD_BIT(KC_LEFT_GUI);
+
+    test_reset_state();
+    keyboard_mod_ownership_register(KC_LEFT_GUI);
+    CHECK(key_runtime_integration_process_tap_record(gui_tap, mt_pos, true, 1u));
+    CHECK(test_mods_for_concurrent_key(gui) == 0);
+    CHECK(key_runtime_integration_process_tap_record(gui_tap, mt_pos, false, 1u));
+    CHECK(test_mods_for_concurrent_key(gui) == 0);
+    keyboard_mod_ownership_unregister(KC_LEFT_GUI);
+    test_assert_mods_balanced();
+}
+
+// Right-hand and multi-modifier mod-taps count each modifier they hold.
+static void test_mod_tap_hold_counts_each_modifier_it_holds(void) {
+    const uint16_t right_shift = MT(MOD_RSFT, KC_B);
+    const uint16_t ctrl_shift  = MT(MOD_LCTL | MOD_LSFT, KC_C);
+    keypos_t       right_pos   = test_keypos(4, 1);
+    keypos_t       left_pos    = test_keypos(4, 2);
+    uint8_t        managed     = MOD_BIT(KC_RIGHT_SHIFT) | MOD_BIT(KC_LEFT_CTRL) | MOD_BIT(KC_LEFT_SHIFT) | MOD_BIT(KC_LEFT_GUI);
+
+    test_reset_state();
+    keyboard_mod_ownership_register_mods(managed);
+    test_mod_tap_hold(right_shift, right_pos, true);
+    test_qmk_mod_tap_default(right_shift, true);
+    test_mod_tap_hold(ctrl_shift, left_pos, true);
+    test_qmk_mod_tap_default(ctrl_shift, true);
+    CHECK(keyboard_mod_policy_managed_only_mask(managed) == MOD_BIT(KC_LEFT_GUI));
+    test_mod_tap_hold(ctrl_shift, left_pos, false);
+    test_qmk_mod_tap_default(ctrl_shift, false);
+    CHECK(keyboard_mod_policy_managed_only_mask(managed) == (uint8_t)(managed & ~MOD_BIT(KC_RIGHT_SHIFT)));
+    test_mod_tap_hold(right_shift, right_pos, false);
+    test_qmk_mod_tap_default(right_shift, false);
+    keyboard_mod_ownership_unregister_mods(managed);
+    test_assert_mods_balanced();
+}
+
 int main(void) {
     test_handled_same_basic_hold_registers_base_key(TEST_SHIFTED_SYMBOL_KEY, KC_1);
     test_handled_same_basic_hold_registers_base_key(TEST_SHIFT_ENTER_KEY, KC_ENT);
     test_default_processed_key_still_blocks_managed_double_register();
     test_consumed_handled_modifier_does_not_block_managed_teardown();
+    test_held_mod_tap_is_not_masked_as_mode_owned();
+    test_tapped_mod_tap_is_not_a_held_modifier();
+    test_mod_tap_hold_counts_each_modifier_it_holds();
 
     puts("key_runtime physical-ownership integration tests passed");
     return 0;

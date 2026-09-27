@@ -18,6 +18,7 @@
 #include "users/noah/lib/key/runtime/delayed_action.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
 #include "users/noah/lib/key/runtime/projection/projection.h"
+#include "users/noah/lib/key/runtime/reducer/ownership_state.h"
 #include "users/noah/lib/key/runtime/reducer/runtime.h"
 #include "users/noah/lib/key/runtime/reducer/state_query.h"
 #include "users/noah/lib/state/diagnostics/runtime_debug.h"
@@ -146,6 +147,10 @@ const key_behavior_t key_behaviors[] = {
                 [1] = {.tap = TAP_SENDS(TEST_PINCH_ZOOM_TAP), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(ZOOM_MODE)},
             },
     },
+    // The factory row: a single press falls back to holding the button itself.
+    {.keycode = MS_BTN3, .multi_tap_term = 100, .tap_hold_term = 100, .tap_counts = {[1] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(MS_BTN7)}}},
+    {.keycode = MS_BTN1, .tap_hold_term = TEST_PD_TAP_HOLD_TERM, .multi_tap_term = TEST_PD_MULTI_TAP_TERM, .tap_counts[0] = {.tap = TAP_SENDS(KC_A), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_LEFT_ALT)}},
+    {.keycode = MS_BTN2, .tap_hold_term = TEST_PD_TAP_HOLD_TERM, .multi_tap_term = TEST_PD_MULTI_TAP_TERM, .tap_counts[0] = {.hold = REPEAT_WHILE_HELD(KC_B, 20)}},
 };
 const uint8_t key_behavior_count = ARRAY_SIZE(key_behaviors);
 
@@ -474,6 +479,11 @@ bool owned_keycode_unregister(uint16_t keycode) {
     return false;
 }
 
+// The ledger is faked here, so a literal tap is recorded as QMK's tap.
+void owned_keycode_tap_literal(uint16_t keycode) {
+    tap_code16(keycode);
+}
+
 bool owned_keycode_is_supported(uint16_t keycode) {
     (void)keycode;
     return false;
@@ -522,6 +532,11 @@ void noah_dispatch_synthetic_qmk_record(uint16_t keycode, bool pressed, uint8_t 
 }
 
 void keyboard_mod_ownership_track_report_keycode_event(uint16_t keycode, keyrecord_t *record) {
+    (void)keycode;
+    (void)record;
+}
+
+void keyboard_mod_ownership_track_mod_tap_hold_event(uint16_t keycode, keyrecord_t *record) {
     (void)keycode;
     (void)record;
 }
@@ -579,34 +594,14 @@ void keyboard_mod_ownership_unregister_mods(uint8_t mods) {
 }
 
 void keyboard_mod_ownership_register(uint16_t keycode) {
-    switch (keycode) {
-        case KC_LEFT_GUI:
-            keyboard_mod_ownership_register_mods(MOD_BIT(KC_LEFT_GUI));
-            break;
-        case KC_LEFT_ALT:
-            keyboard_mod_ownership_register_mods(MOD_BIT(KC_LEFT_ALT));
-            break;
-        case KC_RIGHT_ALT:
-            keyboard_mod_ownership_register_mods(MOD_BIT(KC_RIGHT_ALT));
-            break;
-        default:
-            break;
+    if (IS_MODIFIER_KEYCODE(keycode)) {
+        keyboard_mod_ownership_register_mods(MOD_BIT(keycode));
     }
 }
 
 void keyboard_mod_ownership_unregister(uint16_t keycode) {
-    switch (keycode) {
-        case KC_LEFT_GUI:
-            keyboard_mod_ownership_unregister_mods(MOD_BIT(KC_LEFT_GUI));
-            break;
-        case KC_LEFT_ALT:
-            keyboard_mod_ownership_unregister_mods(MOD_BIT(KC_LEFT_ALT));
-            break;
-        case KC_RIGHT_ALT:
-            keyboard_mod_ownership_unregister_mods(MOD_BIT(KC_RIGHT_ALT));
-            break;
-        default:
-            break;
+    if (IS_MODIFIER_KEYCODE(keycode)) {
+        keyboard_mod_ownership_unregister_mods(MOD_BIT(keycode));
     }
 }
 
@@ -803,10 +798,20 @@ report_mouse_t handle_arrow_mode(report_mouse_t mouse_report) {
     return mouse_report;
 }
 
+// Mirrors the legacy handler in pd_mode_arrow.c: it takes every press and
+// release of buttons 1-3, including the release of a press it did not take,
+// and sends copy and paste. Its Shift lease goes through the faked ledger.
 bool handle_arrow_mode_key(uint16_t keycode, keyrecord_t *record) {
-    (void)keycode;
-    (void)record;
-    return false;
+    if (keycode < QK_MOUSE_BUTTON_1 || keycode > QK_MOUSE_BUTTON_1 + 2u) {
+        return false;
+    }
+    if (record->event.pressed && keycode == MS_BTN2) {
+        noah_emit_literal_tap(G(KC_C), NOAH_EMIT_POLICY_SETTLE_FALLBACK_HOLDS_AND_PRESERVE_MODS);
+    }
+    if (record->event.pressed && keycode == MS_BTN3) {
+        noah_emit_literal_tap(G(KC_V), NOAH_EMIT_POLICY_SETTLE_FALLBACK_HOLDS_AND_PRESERVE_MODS);
+    }
+    return true;
 }
 
 void reset_volume_mode(void) {
@@ -2008,7 +2013,181 @@ static void test_last_slot_hold_lock_dpi_and_disabled_slot(void) {
 }
 #endif
 
+// ── Mouse buttons a pointing mode consumes ─────────────────────────────────
+//
+// Arrow overrides all three buttons: button 1 holds Shift, 2 taps copy and 3
+// taps paste. A consumed press never reaches the button's own behavior, so
+// after the release nothing the behavior would have started may remain.
+
+static void test_lock_arrow(void) {
+    action_dispatch(ARROW_MODE_LOCK);
+    CHECK(pd_mode_local_locked_snapshot() == PD_MODE_ARROW);
+}
+
+static void test_assert_button_quiescent(keypos_t pos) {
+    CHECK(noah_runtime_debug_active_slot_count() == 0);
+    CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 0);
+    CHECK(noah_runtime_debug_deferred_release_count() == 0);
+    CHECK(noah_runtime_debug_slot_owner_keycode(pos) == KC_NO);
+    CHECK(noah_runtime_debug_slot_held_action_keycode(pos) == KC_NO);
+    CHECK(!noah_runtime_debug_slot_has_pending_multi_tap(pos));
+    CHECK(!key_runtime_core_repeat_active_at(pos));
+    CHECK(!noah_runtime_debug_pending_fallback_slot_key_pos(&(keypos_t){0}));
+    CHECK(fake_mods == 0 && fake_managed_mods == 0);
+    CHECK(!key_runtime_core_take_intercepted_release(pos));
+#ifdef NOAH_PD_PROFILE_ENABLE
+    CHECK(!noah_pd_engine_pending_release());
+#endif
+}
+
+// While consumed, a held button holds nothing of its own at any point.
+static void test_hold_consumed_button(uint16_t button, keypos_t pos, uint16_t held_ms) {
+    for (uint16_t elapsed = 0; elapsed < held_ms; elapsed += 20u) {
+        key_runtime_integration_advance(&fake_time, 20u);
+        key_runtime_integration_scan();
+        CHECK(noah_runtime_debug_slot_held_action_keycode(pos) == KC_NO);
+        CHECK(!key_runtime_core_repeat_active_at(pos));
+        CHECK((fake_mods & MOD_BIT(KC_LEFT_ALT)) == 0);
+    }
+    (void)button;
+}
+
+static void test_release_and_settle(uint16_t button, keypos_t pos) {
+    CHECK(!key_runtime_integration_process_record(button, pos, false));
+    key_runtime_integration_advance(&fake_time, 1000u);
+    key_runtime_integration_scan();
+}
+
+static void test_factory_arrow_paste_button_never_holds_itself(void) {
+    const uint16_t durations[] = {40u, 101u, 1000u};
+
+    for (uint8_t index = 0; index < ARRAY_SIZE(durations); index++) {
+        keypos_t pos = test_keypos(4, 2);
+
+        test_reset_state();
+        test_lock_arrow();
+        CHECK(!key_runtime_integration_process_record(MS_BTN3, pos, true));
+        CHECK(tap_code16_count == 1u && last_tap_code16 == G(KC_V));
+        test_hold_consumed_button(MS_BTN3, pos, durations[index]);
+        test_release_and_settle(MS_BTN3, pos);
+        CHECK(tap_code16_count == 1u);
+        test_assert_button_quiescent(pos);
+    }
+}
+
+// A tap/hold and a repeating behavior on buttons Arrow consumes: neither the
+// tap, the hold, nor the repeat runs, and each button's override still does.
+static void test_consumed_buttons_run_no_authored_behavior(void) {
+    keypos_t shift_pos = test_keypos(4, 0);
+    keypos_t copy_pos  = test_keypos(4, 1);
+
+    test_reset_state();
+    test_lock_arrow();
+    CHECK(!key_runtime_integration_process_record(MS_BTN1, shift_pos, true));
+#ifdef NOAH_PD_PROFILE_ENABLE
+    CHECK((fake_mods & MOD_BIT(KC_RIGHT_SHIFT)) != 0);
+#endif
+    test_hold_consumed_button(MS_BTN1, shift_pos, TEST_PD_TAP_HOLD_TERM + 40u);
+    test_release_and_settle(MS_BTN1, shift_pos);
+    CHECK(tap_code16_count == 0u);
+    test_assert_button_quiescent(shift_pos);
+
+    CHECK(!key_runtime_integration_process_record(MS_BTN2, copy_pos, true));
+    CHECK(tap_code16_count == 1u && last_tap_code16 == G(KC_C));
+    test_hold_consumed_button(MS_BTN2, copy_pos, TEST_PD_TAP_HOLD_TERM + 200u);
+    test_release_and_settle(MS_BTN2, copy_pos);
+    CHECK(tap_code16_count == 1u);
+    test_assert_button_quiescent(copy_pos);
+
+    // Short presses resolve the same way as long ones.
+    CHECK(!key_runtime_integration_process_record(MS_BTN1, shift_pos, true));
+    test_release_and_settle(MS_BTN1, shift_pos);
+    CHECK(tap_code16_count == 1u);
+    test_assert_button_quiescent(shift_pos);
+}
+
+// A release goes to whoever took the press, across a change of mode.
+static void test_button_release_follows_its_press_across_mode_changes(void) {
+    keypos_t pos = test_keypos(4, 0);
+
+    // Consumed by Arrow, released after Arrow was unlocked: the mode's Shift
+    // ends, and the button's own behavior still never runs.
+    test_reset_state();
+    test_lock_arrow();
+    CHECK(!key_runtime_integration_process_record(MS_BTN1, pos, true));
+    action_dispatch(ARROW_MODE_LOCK);
+    CHECK(pd_mode_local_locked_snapshot() == 0);
+    test_hold_consumed_button(MS_BTN1, pos, TEST_PD_TAP_HOLD_TERM + 40u);
+    test_release_and_settle(MS_BTN1, pos);
+    CHECK(tap_code16_count == 0u);
+    test_assert_button_quiescent(pos);
+
+    // Pressed before Arrow, released under it: the behavior took the press,
+    // so its Alt hold ends on the release instead of the mode swallowing it.
+    test_reset_state();
+    CHECK(!key_runtime_integration_process_record(MS_BTN1, pos, true));
+    key_runtime_integration_advance(&fake_time, TEST_PD_TAP_HOLD_TERM + 1u);
+    key_runtime_integration_scan();
+    CHECK(noah_runtime_debug_slot_held_action_keycode(pos) == KC_LEFT_ALT);
+    test_lock_arrow();
+    test_release_and_settle(MS_BTN1, pos);
+    test_assert_button_quiescent(pos);
+    action_dispatch(ARROW_MODE_LOCK);
+    CHECK(pd_mode_local_active_snapshot() == 0 && pd_mode_local_locked_snapshot() == 0);
+}
+
+// Another key pressed while a consumed button is held behaves as usual.
+static void test_consumed_button_is_an_ordinary_interrupting_press(void) {
+    keypos_t button_pos = test_keypos(4, 2);
+    keypos_t key_pos    = test_keypos(1, 1);
+
+    test_reset_state();
+    test_lock_arrow();
+    CHECK(!key_runtime_integration_process_record(MS_BTN3, button_pos, true));
+    CHECK(!key_runtime_integration_process_record(TEST_HANDLED_TAP_KEY, key_pos, true));
+    CHECK(!key_runtime_integration_process_record(TEST_HANDLED_TAP_KEY, key_pos, false));
+    test_hold_consumed_button(MS_BTN3, button_pos, 200u);
+    CHECK(tap_code16_count == 2u && last_tap_code16 == KC_J);
+    test_release_and_settle(MS_BTN3, button_pos);
+    test_assert_button_quiescent(button_pos);
+    test_assert_button_quiescent(key_pos);
+
+    // Unlocked with nothing held, the buttons are ordinary again.
+    action_dispatch(ARROW_MODE_LOCK);
+    CHECK(pd_mode_local_active_snapshot() == 0 && pd_mode_local_locked_snapshot() == 0);
+    CHECK(!key_runtime_integration_process_record(MS_BTN1, button_pos, true));
+    CHECK(!key_runtime_integration_process_record(MS_BTN1, button_pos, false));
+    key_runtime_integration_advance(&fake_time, TEST_PD_MULTI_TAP_TERM + 1u);
+    key_runtime_integration_scan();
+    CHECK(last_tap_code16 == KC_A);
+}
+
+#ifdef NOAH_PD_PROFILE_ENABLE
+// A slot may simply consume a button; its behavior must not run either.
+static void test_configured_consume_button_runs_nothing(void) {
+    keypos_t pos = test_keypos(4, 0);
+
+    test_reset_state();
+    configured_pd_bytes[8 + 96 + 52] = 1u; // Volume consumes button 1.
+    publish_configured_pd();
+    action_dispatch(VOLUME_MODE_LOCK);
+    CHECK(pd_mode_local_locked_snapshot() == PD_MODE_VOLUME);
+    CHECK(!key_runtime_integration_process_record(MS_BTN1, pos, true));
+    test_hold_consumed_button(MS_BTN1, pos, TEST_PD_TAP_HOLD_TERM + 40u);
+    test_release_and_settle(MS_BTN1, pos);
+    CHECK(tap_code16_count == 0u);
+    test_assert_button_quiescent(pos);
+}
+#endif
+
 int main(void) {
+    test_factory_arrow_paste_button_never_holds_itself();
+    test_consumed_buttons_run_no_authored_behavior();
+    test_button_release_follows_its_press_across_mode_changes();
+    test_consumed_button_is_an_ordinary_interrupting_press();
+#ifdef NOAH_PD_PROFILE_ENABLE
+    test_configured_consume_button_runs_nothing();
+#endif
 #ifdef NOAH_PD_PROFILE_ENABLE
     test_last_slot_hold_lock_dpi_and_disabled_slot();
 #endif

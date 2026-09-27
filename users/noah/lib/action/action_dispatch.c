@@ -5,6 +5,7 @@
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
 #include "action_lifecycle.h"
+#include "owned_keycode.h"
 #include "synthetic_record.h"
 #include "../key/runtime/api.h"
 #include "../state/modifiers/keyboard_mod_policy.h"
@@ -73,7 +74,7 @@ void noah_emit_synthetic_qmk_tap_with_masked_keyboard_mods(uint16_t keycode, uin
 }
 
 void noah_emit_literal_tap(uint16_t keycode, noah_emit_policy_t policy) {
-    noah_emit_run(keycode, tap_code16, policy);
+    noah_emit_run(keycode, owned_keycode_tap_literal, policy);
 }
 
 void action_dispatch(uint16_t action) {

@@ -40,7 +40,7 @@ flowchart TD
     process_user --> normalize["Compatibility: combo origin normalizes event key"]
     normalize --> observe["Authoritative: reducer observes physical event"]
     observe --> preflight["Planned: preflight interrupts or suppresses aggregate-owned defaults"]
-    preflight --> pd_handler["PD key handler intercepts active mode keys"]
+    preflight --> pd_handler["PD key handler is offered the press; a consumed press becomes inert"]
     pd_handler --> lookup["key/behavior handled_key_lookup"]
     lookup --> press_plan["Planned: reducer press effect plan"]
     press_plan --> transition["Transition plan transport"]
@@ -60,7 +60,28 @@ register the usage at all. A press userspace consumes owns nothing in the
 report, so it must not stop a managed owner of the same usage from registering
 it, or stop the last managed modifier release from clearing the report bit.
 Pre-process still tracks which physical modifier keys are down, which is the
-separate question masking policy asks.
+separate question masking policy asks. A QMK mod-tap is a physically held
+modifier too, once QMK has resolved it as a hold: pre-process runs before QMK's
+tapping engine and cannot see that, so the finalize step counts it, from the
+record with tap count 0 that QMK's default action took. Its modifiers are also
+managed owners, because QMK registers them through `register_mods()`, so
+teardown is unchanged. A tapped mod-tap never held a modifier.
+
+The active pointing mode is offered a press before the key's behavior. While
+offered, the press is not a behavior press yet, so an output the mode emits
+cannot settle that key's pending fallback hold. If the mode consumes it, the
+reducer's token for it becomes an ordinary non-handled press
+(`key_runtime_core_end_mode_offer()`): the key stays physically down, and
+other keys still saw it interrupt them, but its own tap, hold, repeat and
+multi-tap never run, and it owns no lease. Its release goes to the mode
+before preflight, whichever mode is active by then, and finalizes the token.
+The release of a press the mode did not take is never offered to the mode; it
+stays with the behavior that owns what that press started.
+
+Literal taps go through the ownership ledger (`owned_keycode_tap_literal()`),
+never straight to QMK's `tap_code16()`, whose final unregister would clear a
+usage another owner still holds. A usage already held stays held and its tap
+changes nothing in the report.
 
 The reducer owns active press identity by physical `keypos_t`. Layer changes or
 transparent resolution do not move that identity. If a runtime-handled pd-mode

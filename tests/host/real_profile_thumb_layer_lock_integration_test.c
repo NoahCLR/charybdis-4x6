@@ -646,6 +646,11 @@ bool owned_keycode_unregister(uint16_t keycode) {
     return true;
 }
 
+// The ledger is faked here, so a literal tap is recorded as QMK's tap.
+void owned_keycode_tap_literal(uint16_t keycode) {
+    tap_code16(keycode);
+}
+
 void owned_keycode_track_physical_event(uint16_t keycode, keyrecord_t *record) {
     (void)keycode;
     (void)record;
@@ -664,6 +669,11 @@ bool keyboard_mod_ownership_should_suppress_default(uint16_t keycode, keyrecord_
 }
 
 void keyboard_mod_ownership_track_report_keycode_event(uint16_t keycode, keyrecord_t *record) {
+    (void)keycode;
+    (void)record;
+}
+
+void keyboard_mod_ownership_track_mod_tap_hold_event(uint16_t keycode, keyrecord_t *record) {
     (void)keycode;
     (void)record;
 }

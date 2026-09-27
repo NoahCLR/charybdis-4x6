@@ -119,6 +119,36 @@ void keyboard_mod_ownership_track_report_keycode_event(uint16_t keycode, keyreco
     }
 }
 
+void keyboard_mod_ownership_track_mod_tap_hold_event(uint16_t keycode, keyrecord_t *record) {
+#ifndef NO_ACTION_TAPPING
+    noah_keyboard_mod_ownership_state_t *state = keyboard_mod_ownership_state();
+    uint8_t                              mods;
+
+    if (!IS_QK_MOD_TAP(keycode) || !record || IS_NOEVENT(record->event) || record->tap.count != 0u) {
+        return;
+    }
+    // QMK's five-bit mod-tap mods: bit 4 selects the right-hand modifiers.
+    mods = (uint8_t)QK_MOD_TAP_GET_MODS(keycode);
+    mods = (mods & 0x10u) ? (uint8_t)((mods & 0x0Fu) << 4u) : (uint8_t)(mods & 0x0Fu);
+    for (uint8_t i = 0; i < ARRAY_SIZE(keyboard_mod_ownership_mod_masks); i++) {
+        if (!(mods & keyboard_mod_ownership_mod_masks[i])) {
+            continue;
+        }
+        if (record->event.pressed) {
+            if (state->physical_refcounts[i] < UINT8_MAX) {
+                state->physical_refcounts[i]++;
+            }
+        } else if (state->physical_refcounts[i] > 0) {
+            state->physical_refcounts[i]--;
+        }
+    }
+    keyboard_mod_ownership_validate_state("track_mod_tap_hold_event");
+#else
+    (void)keycode;
+    (void)record;
+#endif
+}
+
 bool keyboard_mod_ownership_should_suppress_default(uint16_t keycode, keyrecord_t *record) {
     noah_keyboard_mod_ownership_state_t *state = keyboard_mod_ownership_state();
     int8_t                               index = keyboard_mod_ownership_index_for_keycode(keycode);

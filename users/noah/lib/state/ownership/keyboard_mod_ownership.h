@@ -13,6 +13,13 @@
 // has not taken it out, which is what teardown needs: a handled key whose press
 // userspace consumed is physically down but owns nothing in the report.
 //
+// A QMK mod-tap is both. Once QMK resolves it as a hold, its default action
+// registers the modifiers through register_mods(), a managed owner for
+// teardown, and the key is a physically held modifier for masking: a mode
+// that masks its own modifiers must leave that one alone. Only the hold QMK
+// resolved counts; a tapped mod-tap never held a modifier, and a pending one
+// has not reached userspace yet.
+//
 // keyboard_mod_ownership_register_mods() returns whether it actually put a new
 // modifier bit into the host report, so a caller can tell a fresh modifier from
 // one an earlier owner already has down.
@@ -34,6 +41,9 @@ typedef struct {
 
 void    keyboard_mod_ownership_track_physical_keycode_event(uint16_t keycode, keyrecord_t *record);
 void    keyboard_mod_ownership_track_report_keycode_event(uint16_t keycode, keyrecord_t *record);
+// Called once QMK's default action has run for the record, from the same
+// finalize step that settles report ownership.
+void    keyboard_mod_ownership_track_mod_tap_hold_event(uint16_t keycode, keyrecord_t *record);
 bool    keyboard_mod_ownership_should_suppress_default(uint16_t keycode, keyrecord_t *record);
 bool    keyboard_mod_ownership_can_register_mods(uint8_t mods);
 bool    keyboard_mod_ownership_can_unregister_mods(uint8_t mods);

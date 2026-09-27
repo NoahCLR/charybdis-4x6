@@ -393,6 +393,13 @@ void unregister_code(uint8_t keycode) {
     key_runtime_scenario_unregister_code_count_value++;
 }
 
+// Literal taps reach QMK's tap only for keycodes the ownership ledger cannot
+// hold, which no scenario here sends.
+void tap_code16(uint16_t keycode) {
+    fprintf(stderr, "unexpected QMK tap_code16(0x%04x)\n", (unsigned int)keycode);
+    exit(1);
+}
+
 void wait_ms(uint16_t ms) {
     (void)ms;
 }
@@ -402,6 +409,11 @@ bool noah_synthetic_record_active(void) {
 }
 
 void keyboard_mod_ownership_track_report_keycode_event(uint16_t keycode, keyrecord_t *record) {
+    (void)keycode;
+    (void)record;
+}
+
+void keyboard_mod_ownership_track_mod_tap_hold_event(uint16_t keycode, keyrecord_t *record) {
     (void)keycode;
     (void)record;
 }

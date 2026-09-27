@@ -135,8 +135,39 @@ static key_runtime_process_stage_outcome_t key_runtime_process_stage_release_slo
     return KEY_RUNTIME_PROCESS_NEXT;
 }
 
+// A release goes to whoever took its press. A press a pointing mode consumed
+// never reached the key's behavior, so its release goes to the mode even if
+// another mode is active by then, and before preflight, which could otherwise
+// drop it and leave the mode waiting for it. The reducer's token for it is
+// ordinary and non-handled, so finalizing it here retires everything it owns.
+static key_runtime_process_stage_outcome_t key_runtime_process_stage_pd_mode_release(key_runtime_process_ctx_t *ctx) {
+    if (ctx->record->event.pressed || ctx->record->event.type != KEY_EVENT || !key_runtime_core_take_intercepted_release(ctx->record->event.key)) {
+        return KEY_RUNTIME_PROCESS_NEXT;
+    }
+
+    (void)pd_mode_handle_key_event(ctx->keycode, ctx->record);
+    (void)key_runtime_core_finalize_non_handled_release(ctx->record->event.key);
+    key_runtime_trace_message("process:pd_mode_key_release", "release of a press an active pd mode consumed");
+    return KEY_RUNTIME_PROCESS_RETURN_FALSE;
+}
+
+// Only presses are offered to the active mode; the release of a press it did
+// not take stays with the key's behavior, which owns what that press started.
 static key_runtime_process_stage_outcome_t key_runtime_process_stage_pd_mode(key_runtime_process_ctx_t *ctx) {
-    if (!pd_mode_handle_key_event(ctx->runtime_keycode, ctx->record)) {
+    bool key_event = ctx->record->event.type == KEY_EVENT;
+    bool consumed;
+
+    if (!ctx->record->event.pressed) {
+        return KEY_RUNTIME_PROCESS_NEXT;
+    }
+    if (key_event) {
+        key_runtime_core_offer_press_to_mode(ctx->record->event.key);
+    }
+    consumed = pd_mode_handle_key_event(ctx->runtime_keycode, ctx->record);
+    if (key_event) {
+        key_runtime_core_end_mode_offer(ctx->record->event.key, consumed);
+    }
+    if (!consumed) {
         return KEY_RUNTIME_PROCESS_NEXT;
     }
 
@@ -283,6 +314,7 @@ static void key_runtime_process_settle_report_ownership(uint16_t keycode, keyrec
 
     owned_keycode_track_physical_event(keycode, record);
     keyboard_mod_ownership_track_report_keycode_event(keycode, record);
+    keyboard_mod_ownership_track_mod_tap_hold_event(keycode, record);
 }
 
 // Physical keys whose press the profile output fence dropped. Their release
@@ -327,7 +359,7 @@ bool noah_pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
 
 bool noah_process_record_user(uint16_t keycode, keyrecord_t *record) {
     static const key_runtime_process_stage_entry_t stages[] = {
-        {.name = "synthetic_passthrough", .handler = key_runtime_process_stage_synthetic_passthrough}, {.name = "preflight", .handler = key_runtime_process_stage_preflight}, {.name = "release_slot_keycode", .handler = key_runtime_process_stage_release_slot_keycode}, {.name = "pd_mode", .handler = key_runtime_process_stage_pd_mode}, {.name = "handled_key", .handler = key_runtime_process_stage_handled_key}, {.name = "non_handled_release_cleanup", .handler = key_runtime_process_stage_non_handled_release_cleanup}, {.name = "layer_tap_hold", .handler = key_runtime_process_stage_layer_tap_hold}, {.name = "direct_action", .handler = key_runtime_process_stage_direct_action}, {.name = "retired_macro", .handler = key_runtime_process_stage_retired_macro},
+        {.name = "synthetic_passthrough", .handler = key_runtime_process_stage_synthetic_passthrough}, {.name = "pd_mode_release", .handler = key_runtime_process_stage_pd_mode_release}, {.name = "preflight", .handler = key_runtime_process_stage_preflight}, {.name = "release_slot_keycode", .handler = key_runtime_process_stage_release_slot_keycode}, {.name = "pd_mode", .handler = key_runtime_process_stage_pd_mode}, {.name = "handled_key", .handler = key_runtime_process_stage_handled_key}, {.name = "non_handled_release_cleanup", .handler = key_runtime_process_stage_non_handled_release_cleanup}, {.name = "layer_tap_hold", .handler = key_runtime_process_stage_layer_tap_hold}, {.name = "direct_action", .handler = key_runtime_process_stage_direct_action}, {.name = "retired_macro", .handler = key_runtime_process_stage_retired_macro},
     };
     key_runtime_process_ctx_t ctx = {
         .keycode         = keycode,
