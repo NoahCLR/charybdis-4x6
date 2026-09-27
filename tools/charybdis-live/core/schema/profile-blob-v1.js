@@ -23,7 +23,9 @@ const PROFILE_DOMAIN_IDS = Object.freeze({
 const PROFILE_DOMAIN_VERSIONS = Object.freeze({
     [PROFILE_DOMAIN_IDS.RGB]: 1,
     [PROFILE_DOMAIN_IDS.KEY_BEHAVIORS]: 1,
-    [PROFILE_DOMAIN_IDS.COMBOS]: 1,
+    // v2 stores the default window and hold threshold once; either schema's
+    // keyboard reads v1 as well.
+    [PROFILE_DOMAIN_IDS.COMBOS]: [1, 2],
     [PROFILE_DOMAIN_IDS.SETTINGS]: 1,
 });
 

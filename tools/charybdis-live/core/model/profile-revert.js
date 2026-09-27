@@ -3,8 +3,8 @@
 // Put chosen units of a draft back to what the keyboard holds.
 //
 // A unit is what a review item is (profile-review.js): a key, a layer name,
-// a behaviour, a combo, a macro with its name, one settings section, a
-// pointing slot, or one lighting record. Each is copied from `before` into `after` at the
+// a behaviour, a combo, the combo timing, a macro with its name, one settings
+// section, a pointing slot, or one lighting record. Each is copied from `before` into `after` at the
 // level the keyboard stores it, and every domain it touched is encoded again,
 // so the result passes the same validation as any other edit.
 
@@ -14,7 +14,7 @@ const {settingsEditorView, fieldMask} = require("./settings-editor");
 const {decodeProfileBlob, encodeProfileBlob, PROFILE_DOMAIN_IDS} = require("../schema/profile-blob-v1");
 const {decodeRgbDomainV1, encodeRgbDomainV1} = require("../schema/rgb-domain-v1");
 const {decodeKeyBehaviorDomain, encodeKeyBehaviorDomain} = require("../schema/key-behavior-domain-v1");
-const {decodeComboDomainV1, encodeComboDomainV1} = require("../schema/combo-domain-v1");
+const {decodeComboDomain, encodeComboDomain} = require("../schema/combo-domain-v1");
 const {decodeSettings, encodeSettings, macroNamesOf} = require("../schema/settings-domain-v1");
 const {decodePdDomain, encodePdDomain} = require("../schema/pd-mode-domain-v1");
 const {singleComboRemovalIndex} = require("./profile-review");
@@ -36,7 +36,7 @@ function revertUnits(before, after, units, capabilities) {
     const codecs = {
         [PROFILE_DOMAIN_IDS.RGB]: [payload => decodeRgbDomainV1(payload, rgbOptions), value => encodeRgbDomainV1(value, rgbOptions)],
         [PROFILE_DOMAIN_IDS.KEY_BEHAVIORS]: [payload => decodeKeyBehaviorDomain(payload, actionOptions).rows, rows => encodeKeyBehaviorDomain({rows}, actionOptions)],
-        [PROFILE_DOMAIN_IDS.COMBOS]: [payload => decodeComboDomainV1(payload, actionOptions), rows => encodeComboDomainV1(rows, actionOptions)],
+        [PROFILE_DOMAIN_IDS.COMBOS]: [(payload, version) => decodeComboDomain(payload, version, actionOptions), table => encodeComboDomain({...table, rows: table.rows.filter(Boolean)}, actionOptions)],
         [PROFILE_DOMAIN_IDS.SETTINGS]: [payload => decodeSettings(payload), value => encodeSettings(value)],
         [PROFILE_DOMAIN_IDS.PD_MODES]: [payload => decodePdDomain(payload), slots => encodePdDomain(slots)],
     };
@@ -46,7 +46,7 @@ function revertUnits(before, after, units, capabilities) {
             const [decode] = codecs[id];
             const mine = blob.domains.find(row => row.id === id), theirs = baseBlob.domains.find(row => row.id === id);
             if (!mine || !theirs) throw fail("This change cannot be discarded on its own.");
-            open.set(id, {mine: decode(mine.payload), theirs: decode(theirs.payload)});
+            open.set(id, {mine: decode(mine.payload, mine.version), theirs: decode(theirs.payload, theirs.version)});
         }
         return open.get(id);
     };
@@ -91,9 +91,16 @@ function revertUnits(before, after, units, capabilities) {
             const combos = domain(PROFILE_DOMAIN_IDS.COMBOS), index = Number(rest);
             // Restore a lone middle deletion by inserting the stored row;
             // assigning it would overwrite the next combo in the packed table.
-            const removed = singleComboRemovalIndex(combos.theirs, combos.mine);
-            if (removed === index) combos.mine.splice(index, 0, combos.theirs[index]);
-            else combos.mine[index] = combos.theirs[index];
+            const removed = singleComboRemovalIndex(combos.theirs.rows, combos.mine.rows);
+            if (removed === index) combos.mine.rows.splice(index, 0, combos.theirs.rows[index]);
+            else combos.mine.rows[index] = combos.theirs.rows[index];
+        } else if (kind === "comboTiming") {
+            // The default window and hold threshold, which every combo shares.
+            // A table in the other format has no default to take back alone.
+            const combos = domain(PROFILE_DOMAIN_IDS.COMBOS);
+            if (combos.mine.version !== combos.theirs.version) throw fail("This combo timing change cannot be discarded on its own.");
+            combos.mine.defaultTermMs = combos.theirs.defaultTermMs;
+            combos.mine.holdTermMs = combos.theirs.holdTermMs;
         } else if (kind === "pd") {
             const slots = domain(PROFILE_DOMAIN_IDS.PD_MODES);
             slots.mine[Number(rest)] = slots.theirs[Number(rest)];
@@ -116,7 +123,7 @@ function revertUnits(before, after, units, capabilities) {
 
     for (const [id, {mine}] of open) {
         const row = blob.domains.find(entry => entry.id === id);
-        row.payload = codecs[id][1](id === PROFILE_DOMAIN_IDS.COMBOS ? mine.filter(Boolean) : mine);
+        row.payload = codecs[id][1](mine);
     }
     if (open.size) document.profile = encodeProfileBlob(blob).toString("base64");
     return document;

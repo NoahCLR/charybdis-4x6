@@ -262,7 +262,7 @@ static noah_profile_validator_v1_result_t domain_header_step(noah_profile_valida
     if (domain_mask == 0u || (domain_mask & validator->compatibility.allowed_domain_mask) == 0u) {
         return reject(validator, NOAH_PROFILE_VALIDATOR_V1_UNSUPPORTED_DOMAIN, validator->blob_offset, validator->domain_index, header[0], NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U16, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_DETAIL_BLOB, NOAH_PROFILE_CODEC_V1_UNKNOWN_DOMAIN, error);
     }
-    if ((header[0] == NOAH_PROFILE_DOMAIN_V1_PD && header[1] != 1u) || (header[0] == NOAH_PROFILE_DOMAIN_V1_SETTINGS && !NOAH_PROFILE_SETTINGS_VERSION_ACCEPTED(header[1])) || (header[0] == NOAH_PROFILE_DOMAIN_V1_COMBOS && header[1] != 1u) || (header[0] == NOAH_PROFILE_DOMAIN_V1_RGB && header[1] != NOAH_PROFILE_DOMAIN_V1_RGB_VERSION) || (header[0] == NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIORS && header[1] != NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIOR_VERSION)) {
+    if ((header[0] == NOAH_PROFILE_DOMAIN_V1_PD && header[1] != 1u) || (header[0] == NOAH_PROFILE_DOMAIN_V1_SETTINGS && !NOAH_PROFILE_SETTINGS_VERSION_ACCEPTED(header[1])) || (header[0] == NOAH_PROFILE_DOMAIN_V1_COMBOS && !NOAH_PROFILE_COMBO_VERSION_ACCEPTED(header[1])) || (header[0] == NOAH_PROFILE_DOMAIN_V1_RGB && header[1] != NOAH_PROFILE_DOMAIN_V1_RGB_VERSION) || (header[0] == NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIORS && header[1] != NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIOR_VERSION)) {
         return reject(validator, NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN, validator->blob_offset + 1u, validator->domain_index, header[0], NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U16, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_DETAIL_BLOB, NOAH_PROFILE_CODEC_V1_UNKNOWN_DOMAIN_VERSION, error);
     }
     if (validator->domain_index != 0u && header[0] == validator->previous_domain_id) {
@@ -279,6 +279,7 @@ static noah_profile_validator_v1_result_t domain_header_step(noah_profile_valida
     memset(&validator->domain_validation, 0, sizeof(validator->domain_validation));
     // The payload's own version byte must repeat the envelope's.
     if (header[0] == NOAH_PROFILE_DOMAIN_V1_SETTINGS) validator->domain_validation.settings.expected_version = header[1];
+    if (header[0] == NOAH_PROFILE_DOMAIN_V1_COMBOS) validator->domain_validation.combos.version = header[1];
     validator->phase = NOAH_PROFILE_VALIDATOR_V1_PHASE_DOMAIN_DECODE;
     return NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;
 }
@@ -337,12 +338,15 @@ static noah_profile_validator_v1_result_t combo_decode_step(noah_profile_validat
     noah_profile_combo_v1_validation_t *state  = &validator->domain_validation.combos;
     noah_profile_combo_v1_view_t       *view   = &validator->profile.combos;
     size_t                              offset = validator->domain_payload_offset;
+    uint8_t                             header = NOAH_PROFILE_COMBO_HEADER_SIZE(state->version);
     if (state->phase == 0u) {
-        if (validator->domain_payload_length < 4u || read_blob(validator, offset, state->bytes, 4u, error) != NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS) goto invalid;
-        view->row_count      = state->bytes[0];
+        noah_profile_combo_v1_header_t decoded;
+        if (validator->domain_payload_length < header || read_blob(validator, offset, state->bytes, header, error) != NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS) goto invalid;
+        if (noah_profile_combo_v1_decode_header(state->bytes, state->version, validator->domain_payload_length, &decoded) != NOAH_PROFILE_CODEC_V1_OK) goto invalid;
+        view->row_count      = decoded.row_count;
         view->payload_offset = (uint16_t)offset;
-        if (view->row_count > 32u || state->bytes[1] || state->bytes[2] || state->bytes[3] || validator->domain_payload_length != 4u + (uint16_t)view->row_count * 28u) goto invalid;
-        state->phase = 1u;
+        view->version        = state->version;
+        state->phase         = 1u;
         return NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;
     }
     if (state->row_index == view->row_count) {
@@ -351,7 +355,7 @@ static noah_profile_validator_v1_result_t combo_decode_step(noah_profile_validat
         validator->phase = NOAH_PROFILE_VALIDATOR_V1_PHASE_DOMAIN_HEADER;
         return NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;
     }
-    offset += 4u + (size_t)state->row_index * 28u;
+    offset += header + (size_t)state->row_index * 28u;
     if (state->phase == 1u) {
         if (read_blob(validator, offset, state->bytes, 12u, error) != NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS) return validator->terminal_result;
         state->phase = 2u;
@@ -360,7 +364,7 @@ static noah_profile_validator_v1_result_t combo_decode_step(noah_profile_validat
     if (read_blob(validator, offset + 12u, &state->bytes[12], 16u, error) != NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS) return validator->terminal_result;
     noah_profile_combo_v1_row_t     row;
     noah_profile_action_v1_limits_t limits = noah_profile_action_v1_default_limits();
-    if (noah_profile_combo_v1_decode_row(state->bytes, &limits, &row) != NOAH_PROFILE_CODEC_V1_OK || !action_reference_is_valid(validator, &row.output) || !placement_is_supported(validator, &row.output, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_COMBO_OUTPUT)) goto invalid;
+    if (noah_profile_combo_v1_decode_row(state->bytes, state->version, &limits, &row) != NOAH_PROFILE_CODEC_V1_OK || !action_reference_is_valid(validator, &row.output) || !placement_is_supported(validator, &row.output, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_COMBO_OUTPUT)) goto invalid;
     for (uint8_t input = 0u; input < row.input_count; input++)
         if (!action_reference_is_valid(validator, &row.inputs[input])) goto invalid;
     if (validator->compatibility.runtime && validator->compatibility.runtime->combo_to_native) {
@@ -373,7 +377,8 @@ static noah_profile_validator_v1_result_t combo_decode_step(noah_profile_validat
                 if (native[prior] == native[input]) goto invalid;
         }
     }
-    if (state->row_index && row.hold_term_ms != state->hold_term_ms) goto invalid;
+    // Version 1 repeats QMK's one hold threshold: a later row cannot store another.
+    if (state->version == 1u && state->row_index && row.hold_term_ms != state->hold_term_ms) goto invalid;
     state->hold_term_ms = row.hold_term_ms;
     state->row_index++;
     state->phase = 1u;

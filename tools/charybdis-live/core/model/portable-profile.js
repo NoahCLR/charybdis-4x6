@@ -4,7 +4,7 @@ const {decodePdDomain, encodePdDomain} = require("../schema/pd-mode-domain-v1");
 const {decodeProfileBlob, encodeProfileBlob, crc32, fnv1a32} = require("../schema/profile-blob-v1");
 const {decodeRgbDomainV1, encodeRgbDomainV1} = require("../schema/rgb-domain-v1");
 const {decodeKeyBehaviorDomain, encodeKeyBehaviorDomain} = require("../schema/key-behavior-domain-v1");
-const {decodeComboDomainV1, encodeComboDomainV1} = require("../schema/combo-domain-v1");
+const {decodeComboDomain, encodeComboDomain} = require("../schema/combo-domain-v1");
 const {decodeSettings, encodeSettings} = require("../schema/settings-domain-v1");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../data/charybdis-layout");
 const {layerName} = require("./vocabulary");
@@ -66,9 +66,18 @@ function materializeProfile(active, defaults, combos, settings) {
         if (!domain) throw fail("The keyboard did not report every profile domain.");
         return domain;
     });
-    const rows = combos.rows.map(row => ({...row, inputs: row.inputs.map(keycodeAction), output: keycodeAction(row.output)}));
-    domains.push({id: 0x30, version: 1, payload: encodeComboDomainV1(rows)}, {id: 0x40, version: settings[0], payload: settings});
+    const table = comboTableOf(combos);
+    domains.push({id: 0x30, version: table.version, payload: encodeComboDomain(table)}, {id: 0x40, version: settings[0], payload: settings});
     return encodeProfileBlob({schema: live.schema, domains});
+}
+// The combo table the keyboard runs, in the format it reads: version 2 keeps
+// which combos follow the default window, version 1 has only their windows.
+// Firmware built without combos reports no default, and stores none.
+function comboTableOf(combos) {
+    const version = combos.version === 2 && combos.defaultTermMs ? 2 : 1;
+    return {version, defaultTermMs: version === 2 ? combos.defaultTermMs : null, holdTermMs: combos.holdTermMs,
+        rows: combos.rows.map(row => ({inputs: row.inputs.map(keycodeAction), output: keycodeAction(row.output),
+            termMs: version === 2 && row.followsDefault ? null : row.termMs, mustHold: row.mustHold, mustTap: row.mustTap, ordered: row.ordered}))};
 }
 function createSnapshot({profile, via, actionAbiDigest}) {
     const document = {format: "charybdis-profile", version: decodeProfileBlob(profile).schema.major, keyboard: "charybdis-4x6", actionAbiDigest,
@@ -89,7 +98,7 @@ function validateSnapshot(value, capabilities) {
     const profile = base64(value.profile, value.version === 2 ? 5088 : 4064, "profile data"), decoded = decodeProfileBlob(profile), domains = decoded.domains;
     if (decoded.schema.major !== value.version || domains.map(d => d.id).join() !== (value.version === 2 ? "16,32,48,64,80" : "16,32,48,64")) throw fail("The profile is missing configuration. Partial profiles cannot be restored as a complete backup.");
     const actionOptions = actionLimitsFor(value.version);
-    const rgb = decodeRgbDomainV1(domains[0].payload), behaviors = decodeKeyBehaviorDomain(domains[1].payload, actionOptions), combos = decodeComboDomainV1(domains[2].payload, actionOptions), settings = decodeSettings(domains[3].payload);
+    const rgb = decodeRgbDomainV1(domains[0].payload), behaviors = decodeKeyBehaviorDomain(domains[1].payload, actionOptions), combos = decodeComboDomain(domains[2].payload, domains[2].version, actionOptions), settings = decodeSettings(domains[3].payload);
     const pdModes = value.version === 2 ? decodePdDomain(domains[4].payload) : undefined;
     // Settings may be one version ahead of the document: v3 names the VIA
     // macros inside a schema-2 profile.
@@ -146,7 +155,7 @@ function upgradePdSnapshot(source) {
     const settings = value.settings; settings.formatVersion = 2; settings.values.fill(0, 10, 15);
     const profile = encodeProfileBlob({schema: {major: 2, minor: 0}, domains: [
         {id: 16, version: 2, payload: encodeRgbDomainV1(rgb)}, {id: 32, version: 1, payload: encodeKeyBehaviorDomain(value.behaviors)},
-        {id: 48, version: 1, payload: encodeComboDomainV1(value.combos)}, {id: 64, version: 2, payload: encodeSettings(settings)},
+        {id: 48, version: value.combos.version, payload: encodeComboDomain(value.combos)}, {id: 64, version: 2, payload: encodeSettings(settings)},
         {id: 80, version: 1, payload: encodePdDomain(slots)},
     ]});
     const result = {...source, version: 2, actionAbiDigest: 0x61072732, profile: profile.toString("base64")};
@@ -239,7 +248,7 @@ function reorderLayers(document, order, names, {keysFollow = true} = {}) {
     const oldReferences = settings.values[27]; settings.values[27] = order.reduce((packed, old, next) => (packed | remap[(oldReferences >>> (old * 4)) & 15] << (next * 4)) >>> 0, 0);
     result.profile = encodeProfileBlob({schema: {major: document.version, minor: 0}, domains: [
         {id: 16, version: document.version, payload: encodeRgbDomainV1(rgb)}, {id: 32, version: 1, payload: encodeKeyBehaviorDomain(behaviors, actionOptions)},
-        {id: 48, version: 1, payload: encodeComboDomainV1(combos, actionOptions)}, {id: 64, version: settings.formatVersion ?? document.version, payload: encodeSettings(settings)},
+        {id: 48, version: combos.version, payload: encodeComboDomain(combos, actionOptions)}, {id: 64, version: settings.formatVersion ?? document.version, payload: encodeSettings(settings)},
         ...(pdModes ? [{id: 80, version: 1, payload: encodePdDomain(pdModes)}] : []),
     ]}).toString("base64");
     validateSnapshot(result); return result;
@@ -259,14 +268,14 @@ function upgradeFiveLayerSnapshot(source) {
     result.actionAbiDigest = 0xeb80829c;
     result.profile = encodeProfileBlob({domains: [
         {id:16,version:1,payload:encodeRgbDomainV1(value.rgb)}, {id:32,version:1,payload:encodeKeyBehaviorDomain(value.behaviors)},
-        {id:48,version:1,payload:encodeComboDomainV1(value.combos)}, {id:64,version:1,payload:encodeSettings(value.settings)},
+        {id:48,version:value.combos.version,payload:encodeComboDomain(value.combos)}, {id:64,version:1,payload:encodeSettings(value.settings)},
     ]}).toString("base64");
     return result;
 }
 const summary = document => summaryOf(validateSnapshot(document));
 function summaryOf(value) {
-    return {layers: value.document.layers.length, behaviors: value.behaviors.rows.length, combos: value.combos.length,
+    return {layers: value.document.layers.length, behaviors: value.behaviors.rows.length, combos: value.combos.rows.length,
         macros: value.document.macros.filter(Boolean).length + (value.settings.macros || []).filter(bytes => bytes.length).length,
         names: value.settings.names.map((name, index) => layerName(value.settings.names, index))};
 }
-module.exports = {upgradePdSnapshot, createSnapshot, validateSnapshot, materializeProfile, macroSlots, macroBank, macroBankBytes, validateViaMacro, fingerprint, fingerprintOf, decodedOf, reorderLayers, summary, summaryOf};
+module.exports = {comboTableOf, upgradePdSnapshot, createSnapshot, validateSnapshot, materializeProfile, macroSlots, macroBank, macroBankBytes, validateViaMacro, fingerprint, fingerprintOf, decodedOf, reorderLayers, summary, summaryOf};

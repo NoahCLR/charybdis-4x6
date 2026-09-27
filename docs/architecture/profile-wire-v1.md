@@ -255,15 +255,17 @@ Every successful page has exactly 25 payload bytes. Metadata is page 0:
 
 | Offset | Size | Field |
 | ---: | ---: | --- |
-| 0 | 1 | readout version, `1` |
+| 0 | 1 | readout version, `2` (older firmware: `1`) |
 | 1 | 1 | row count, `0..32` |
 | 2 | 1 | maximum inputs per row, `4` |
 | 3 | 1 | layer count, `1..8` |
 | 4 | 1 | current global combo enable state, `0` or `1` |
 | 5 | 1 | flags: bit 0 no timer, 1 strict timer, 2 custom trigger hook, 3 custom release hook, 4 custom repress hook, 5 fixed reference layer |
 | 6 | 8 | input reference layer for each layer; unused entries zero |
-| 14 | 4 | FNV-1a 32-bit digest of metadata bytes 0..13 followed by all complete row payloads in order |
-| 18 | 7 | reserved, zero |
+| 14 | 4 | FNV-1a 32-bit digest of metadata bytes 0..13, then 18..24, then all complete row payloads in order |
+| 18 | 2 | default combo window in milliseconds: the window of every row that follows it |
+| 20 | 2 | combo hold threshold in milliseconds |
+| 22 | 3 | reserved, zero |
 
 Page `n+1` contains row `n`:
 
@@ -273,10 +275,20 @@ Page `n+1` contains row `n`:
 | 1 | 1 | input count, `2..4` |
 | 2 | 2 | native output keycode; zero means a firmware callback |
 | 4 | 2 | combo window in milliseconds, including per-combo hook result |
-| 6 | 2 | combo hold threshold in milliseconds |
-| 8 | 1 | flags: bit 0 must hold, 1 must tap, 2 press in order |
+| 6 | 2 | reserved, zero |
+| 8 | 1 | flags: bit 0 must hold, 1 must tap, 2 press in order, 3 follows the default window |
 | 9 | 8 | up to four native input keycodes in declared order; unused entries zero |
 | 17 | 8 | reserved, zero |
+
+Version 1 has no default window: metadata bytes 18..24 are reserved, the
+digest covers bytes 0..13 and the rows, row bytes 6..7 repeat the hold
+threshold on every row, and flag bit 3 is reserved. A row that follows the
+default reports the default as its window. With the live owner, a row follows
+the default exactly when its stored window is zero (domain `0x30` version 2);
+compiled combos all follow `COMBO_TERM`. Without the owner a per-combo term hook
+is the user's own, so its rows never report following. Firmware built without
+combos reports zero for both values. Firmware whose readout is version 2
+accepts combo domain `0x30` version 2; the client writes version 2 only then.
 
 Inputs are distinct nonzero keycodes. Timing zero is preserved verbatim. Input
 order matters when the order flag is set. Native codes use the connected
@@ -767,37 +779,59 @@ loads and still syncs between the halves.
 - canonical C/JavaScript byte-for-byte round trips.
 
 
-## Combo Domain `0x30`, Version 1
+## Combo Domain `0x30`, Versions 1 And 2
 
 Capability `supported_domain_mask` bit 2 advertises combo overrides. Profiles
-without this domain use compiled combos. The four-byte payload header contains
-row count (0..32) followed by three zero bytes. Zero rows explicitly disable
-all definitions. Each row is exactly 28 bytes, in priority/index order:
+without this domain use compiled combos. Zero rows explicitly disable all
+definitions. Firmware accepts both versions; clients write version 2 to
+firmware whose combo readout is version 2, and keep version 1 otherwise.
+
+QMK keeps two values for every combo: `COMBO_TERM`, the window a combo without
+its own uses, and `COMBO_HOLD_TERM`, the one hold/tap wait. Version 2 stores
+both once, in an eight-byte header, so they exist with or without rows:
+
+| Offset | Bytes | Field |
+| ---: | ---: | --- |
+| 0 | 1 | row count, 0..32 |
+| 1 | 3 | reserved, zero |
+| 4 | 2 | default combo window in ms, `1..65535`, little endian |
+| 6 | 2 | combo hold threshold in ms, little endian |
+
+Version 1 has a four-byte header — row count and three zero bytes — no
+default window, and repeats the hold threshold on every row; every row must
+carry the same threshold. Firmware running a version 1 table uses the compiled
+`COMBO_TERM` as its default, which no row follows, and `TAPPING_TERM` as its
+threshold while it has no rows.
+
+Each row is exactly 28 bytes, in priority/index order:
 
 | Offset | Bytes | Field |
 | ---: | ---: | --- |
 | 0 | 1 | input count, 2..4 |
 | 1 | 1 | flags: bit 0 must hold, bit 1 tap only, bit 2 ordered |
-| 2 | 2 | combo window in ms, little endian |
-| 4 | 2 | shared hold threshold in ms, little endian |
+| 2 | 2 | combo window in ms, little endian; version 2: `0` follows the default window |
+| 4 | 2 | version 1: shared hold threshold in ms, little endian; version 2: reserved, zero |
 | 6 | 2 | reserved, zero |
 | 8 | 4 | output semantic action |
 | 12 | 16 | four semantic input slots; unused slots zero |
 
-Hold and tap-only flags are mutually exclusive. Every row must carry the same
-hold threshold because QMK exposes one global hold/tap wait. Input actions must
-be distinct, including after native translation; no-action/transparent inputs
-and callback/no-action outputs are rejected. Semantic references must exist in
-the compiled action ABI. Unknown flags, trailing bytes and nonzero unused slots
-are rejected. Incremental validation reads each row in 12- and 16-byte steps,
-preserving the one-read / 20-byte scan bound.
+A row that follows the default changes with it; a row with its own window keeps
+it, even when it equals the default. A zero default is rejected because every
+row following it would never fire. Hold and tap-only flags are mutually
+exclusive. Input actions must be distinct, including after native translation;
+no-action/transparent inputs and callback/no-action outputs are rejected.
+Semantic references must exist in the compiled action ABI. Unknown versions,
+unknown flags, trailing bytes and nonzero reserved fields are rejected.
+Incremental validation reads the header in one step and each row in 12- and
+16-byte steps, preserving the one-read / 20-byte scan bound.
 
 The existing candidate/commit/split protocol carries this domain with the rest
 of the profile. There is no new mutation on GET value `0x06`. The owner publishes
-the native table at the strict idle boundary; QMK, origin tracking and readback
-use that same table. A cold publication copies at most 896 bytes; key processing
-and combo readback use RAM only. A failed copy makes combo readback unavailable
-and exposes zero definitions rather than a partially decoded table.
+the native table at the strict idle boundary, resolving every window that
+follows the default then; QMK, origin tracking and readback use that same table.
+A cold publication reads the header and copies at most 896 bytes of rows; key
+processing and combo readback use RAM only. A failed copy makes combo readback
+unavailable and exposes zero definitions rather than a partially decoded table.
 
 ## Portable Settings And Complete Readback
 

@@ -590,7 +590,7 @@ static void test_combo_read_route_without_combo_feature(void) {
     via_custom_value_command_kb(frame, sizeof(frame));
     assert(frame[0] == id_custom_get_value && frame[3] == 17u);
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK && frame[6] == 25u);
-    assert(frame[7] == 1u && frame[8] == 0u && frame[9] == 4u && frame[11] == 0u);
+    assert(frame[7] == 2u && frame[8] == 0u && frame[9] == 4u && frame[11] == 0u);
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_COMBOS, 18u, 1u);
     via_custom_value_command_kb(frame, sizeof(frame));
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_UNKNOWN_PAGE && frame[6] == 0u);

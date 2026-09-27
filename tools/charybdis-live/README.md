@@ -175,7 +175,7 @@ Every screen is drawn and wired to the host:
 | Macros | Both banks: name, payload, insert-at-cursor step builder, reorder/remove controls, parsed preview, configurable recorder and placement; search by name, and the layers that set each macro off — by key, behaviour or combo — in their layer colour, each opening that layer in Keys with the macro picked |
 | Mouse | Pointer speed, sniping and auto-mouse — the Settings sections the keyboard's model files under Mouse, drawn with the same cards and posted whole |
 | Pointing modes | All eight slots: movement, speed, direction shortcuts, scroll tuning, buttons, bindings, placement, clear and duplicate |
-| Settings | Every other section the keyboard reports, posted whole, read-only where the firmware cannot report; the Combos section also carries the combo hold threshold, which the keyboard stores on its combos |
+| Settings | Every other section the keyboard reports, posted whole, read-only where the firmware cannot report; the Combos section also carries the default combo window and the combo hold threshold, which the keyboard stores with its combos |
 | Profile & backups | Import (the file against the keyboard, counted by what it configures — keys, lighting, macros, mouse, pointing — before it becomes the draft), export, upgrade export, recovery state |
 | Device | Read-only: connection, committed generation, what was read |
 

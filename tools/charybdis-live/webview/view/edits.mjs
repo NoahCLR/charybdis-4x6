@@ -87,18 +87,24 @@ export function saveBehaviour(behaviour, {terms = {}, anchored, change} = {}, id
 
 // ── combos ──────────────────────────────────────────────────────────────
 
-export function comboMessage(id, {output, inputs, termMs, holdTermMs, mustHold, mustTap, ordered}) {
-    const payload = {output: String(output ?? "").trim(), inputs, termMs, holdTermMs, mustHold: Boolean(mustHold), mustTap: Boolean(mustTap), ordered: Boolean(ordered)};
+// A combo follows the default window unless it has its own: followsDefault,
+// or an empty window, says it follows.
+export function comboMessage(id, {output, inputs, termMs, followsDefault, holdTermMs, mustHold, mustTap, ordered}) {
+    const payload = {output: String(output ?? "").trim(), inputs, termMs, followsDefault: Boolean(followsDefault), holdTermMs, mustHold: Boolean(mustHold), mustTap: Boolean(mustTap), ordered: Boolean(ordered)};
     return id === null || id === undefined ? {type: "addCombo", ...payload} : {type: "saveCombo", id, ...payload};
 }
 export const deleteCombo = (id) => ({type: "deleteCombo", id});
 export const comboHoldTerm = (holdTermMs, identity) => ({type: "updateComboHoldTerm", holdTermMs, expectedBase: identity});
-// QMK keeps one hold threshold for every combo, stored on each combo row. A
-// first combo has none to share, so it starts from the keyboard's tapping term,
-// which is QMK's own default for COMBO_HOLD_TERM and the value this firmware
-// runs while it has no combos.
-export const comboHoldTermValue = (model, written) => String(written || model?.combos?.[0]?.holdTermMs
-    || model?.behaviorTimingDefaults?.tappingTerm || "").trim();
+export const comboDefaultTerm = (defaultTermMs, identity) => ({type: "updateComboDefaultTerm", defaultTermMs, expectedBase: identity});
+// QMK keeps one hold threshold for every combo. A keyboard that stores it
+// once always has one; an older one stores it on each combo, so a first combo
+// there starts from the keyboard's tapping term, which is QMK's own default
+// for COMBO_HOLD_TERM and the value that firmware runs while it has none.
+export const comboHoldTermValue = (model, written) => String(String(written ?? "").trim() || (model?.comboReadback?.holdTermMs
+    ?? model?.behaviorTimingDefaults?.tappingTerm ?? "")).trim();
+// The window a new combo, or one that follows the default, runs with; empty
+// on a keyboard that has no default.
+export const comboDefaultTermValue = (model) => String(model?.comboReadback?.defaultTermMs ?? "");
 
 // ── lighting ────────────────────────────────────────────────────────────
 

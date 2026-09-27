@@ -44,7 +44,7 @@ const {validateSnapshot} = require("../../core/model/portable-profile");
 const {decodeProfileBlob, encodeProfileBlob} = require("../../core/schema/profile-blob-v1");
 const {decodeKeyBehaviorDomain, encodeKeyBehaviorDomain} = require("../../core/schema/key-behavior-domain-v1");
 const {decodePdDomain, encodePdDomain} = require("../../core/schema/pd-mode-domain-v1");
-const {decodeComboDomainV1, encodeComboDomainV1} = require("../../core/schema/combo-domain-v1");
+const {decodeComboDomain, encodeComboDomain} = require("../../core/schema/combo-domain-v1");
 // A copy of a document with one profile domain rewritten.
 function withDomain(value, id, decode, encode, change) {
     const blob=decodeProfileBlob(Buffer.from(value.profile,"base64")), domain=blob.domains.find(row=>row.id===id);
@@ -52,9 +52,25 @@ function withDomain(value, id, decode, encode, change) {
     return {...value,profile:encodeProfileBlob(blob).toString("base64")};
 }
 const behaviours = (value, change) => withDomain(value,32,payload=>decodeKeyBehaviorDomain(payload,{actionLimits:{maxPdModes:8}}).rows,rows=>encodeKeyBehaviorDomain({rows},{actionLimits:{maxPdModes:8}}),change);
-const combos = (value, change) => withDomain(value,48,decodeComboDomainV1,encodeComboDomainV1,change);
+// The rows of the stored table, with its default window and hold threshold kept.
+const combos = (value, change, timing = {}) => withDomain(value,48,payload=>decodeComboDomain(payload,2),table=>encodeComboDomain({...table,...timing}),table=>({...table,rows:change(table.rows)}));
 const comboRows = () => Array.from({length:7}, (_, id) => ({inputs:[{kind:1,flags:0,operand:4+id},{kind:1,flags:0,operand:30+id}],
-    output:{kind:1,flags:0,operand:40+id},termMs:50,holdTermMs:200,mustHold:false,mustTap:false,ordered:false}));
+    output:{kind:1,flags:0,operand:40+id},termMs:50,mustHold:false,mustTap:false,ordered:false}));
+test("a changed default window is one Combo timing change, and the combos that follow it do not change", () => {
+    const base=combos(pdDocument(),()=>comboRows().map((row,id)=>id<2?{...row,termMs:null}:row)), before=snapshot(base);
+    const after=snapshot(combos(base,rows=>rows,{defaultTermMs:70,holdTermMs:250}));
+    const items=profileReview(before,after);
+    assert.deepEqual(items.map(row=>row.unit),["comboTiming"]);
+    assert.deepEqual(items[0].fields.map(field=>[field.label,field.before,field.after]),[["Default window","50 ms","70 ms"],["Hold threshold","200 ms","250 ms"]]);
+    assert.deepEqual(items[0].place,{kind:"settings",section:"comboSettings",area:"Settings"});
+    // A combo moving between its own window and the default is its change.
+    const own=snapshot(combos(base,rows=>rows.map((row,id)=>id===0?{...row,termMs:50}:row)));
+    const window=profileReview(before,own).find(row=>row.unit==="combo:0").fields;
+    assert.deepEqual(window.map(field=>[field.label,field.before,field.after]),[["Window","default · 50 ms","50 ms"]]);
+    // An added combo that follows the default does not restate it.
+    const added=snapshot(combos(base,rows=>[...rows,{...rows[0],inputs:[{kind:1,flags:0,operand:20},{kind:1,flags:0,operand:21}]}]));
+    assert.ok(!profileReview(before,added).find(row=>row.unit==="combo:7").fields.some(field=>field.label==="Window"));
+});
 test("removing a middle combo is one review item, with its renumbering explained", () => {
     const base=combos(pdDocument(),()=>comboRows()), before=snapshot(base);
     const after=snapshot(combos(base,rows=>rows.filter((_,id)=>id!==2)));

@@ -170,7 +170,7 @@ profile data.
 Side-specific PD-enabled owner builds select schema 2, format-3 `NR` and a
 5,088-byte payload ceiling. Identity byte 2 uses domain bits 0–4, origin bit 5,
 override bit 6 and reserved bit 7; CRC and markers retain `NQ` offsets. Format 3
-accepts RGB/settings v2 and key-behavior/combo/PD v1. Host candidate and split
+accepts RGB/settings v2, key-behavior/PD v1 and combo v1–v2. Host candidate and split
 writers bind it to the same logical VIA generation as format 2.
 
 The lower 8 KiB VIA allocation is unchanged. Slot A is `0x2000..0x33ff`, slot B

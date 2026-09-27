@@ -3,7 +3,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const {behaviorPlacementProblem, comboPlacementProblem, keyPlacementProblem, profilePlacementProblem} = require("../../core/model/profile-placement");
 const {encodeProfileBlob, PROFILE_DOMAIN_IDS} = require("../../core/schema/profile-blob-v1");
-const {encodeComboDomainV1} = require("../../core/schema/combo-domain-v1");
+const {encodeComboDomain} = require("../../core/schema/combo-domain-v1");
 const {bytes} = require("../fixtures/device-profile");
 
 const code = operand => ({kind: 1, flags: 0, operand});
@@ -27,7 +27,7 @@ test("a combo is checked by its output; layer holds and one-shots pass, LT does 
 test("an encoded profile is checked across its behaviours and combos", () => {
     assert.equal(profilePlacementProblem(bytes, options), undefined, "the device fixture passes");
     const blob = encodeProfileBlob({schema: {major: 2, minor: 0}, domains: [{id: PROFILE_DOMAIN_IDS.COMBOS, version: 1,
-        payload: encodeComboDomainV1([{inputs: [code(0x04), code(0x05)], output: code(0x5241), termMs: 0, holdTermMs: 0, mustHold: false, mustTap: false, ordered: false}], {actionLimits: {maxPdModes: 8}})}]});
+        payload: encodeComboDomain({version: 1, defaultTermMs: null, holdTermMs: 0, rows: [{inputs: [code(0x04), code(0x05)], output: code(0x5241), termMs: 0, mustHold: false, mustTap: false, ordered: false}]}, {actionLimits: {maxPdModes: 8}})}]});
     assert.match(profilePlacementProblem(blob, options), /^Combo 0: /);
 });
 

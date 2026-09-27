@@ -54,12 +54,12 @@ test("a restore that starts re-reads the keyboard's status, even when it fails",
 
 test("a profile with a misplaced action is refused, naming it, before recovery or any write", async () => {
     const {decodeProfileBlob, encodeProfileBlob, PROFILE_DOMAIN_IDS} = require("../../core/schema/profile-blob-v1");
-    const {encodeComboDomainV1} = require("../../core/schema/combo-domain-v1");
+    const {encodeComboDomain} = require("../../core/schema/combo-domain-v1");
     const service = new ProfileDeviceService();
     const base = {document: document(), fingerprint: fingerprint(document()), limits: {brightnessMax: 255}, options: require("../fixtures/keyboard-options").options()};
     const blob = decodeProfileBlob(Buffer.from(base.document.profile, "base64"));
     const code = operand => ({kind: 1, flags: 0, operand});
-    const combos = {id: PROFILE_DOMAIN_IDS.COMBOS, version: 1, payload: encodeComboDomainV1([{inputs: [code(0x04), code(0x05)], output: code(0x4104), termMs: 0, holdTermMs: 0, mustHold: false, mustTap: false, ordered: false}], {actionLimits: {maxPdModes: blob.schema.major === 2 ? 8 : 6}})};
+    const combos = {id: PROFILE_DOMAIN_IDS.COMBOS, version: 1, payload: encodeComboDomain({version: 1, defaultTermMs: null, holdTermMs: 0, rows: [{inputs: [code(0x04), code(0x05)], output: code(0x4104), termMs: 0, mustHold: false, mustTap: false, ordered: false}]}, {actionLimits: {maxPdModes: blob.schema.major === 2 ? 8 : 6}})};
     const target = {...base.document, profile: encodeProfileBlob({...blob, domains: [...blob.domains.filter(domain => domain.id !== PROFILE_DOMAIN_IDS.COMBOS), combos]}).toString("base64")};
     let writes = 0;
     service.portable = base;

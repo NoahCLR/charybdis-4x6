@@ -41,7 +41,8 @@ enum charybdis_keymap_layers {
 // a profile's settings are live (users/noah/lib/compat/qmk_live_tapping_config.h).
 #define TAPPING_TERM 200
 
-// Max gap between consecutive taps to register as a multi-tap combo.
+// How close together a combo's keys must be pressed. The compiled combos use
+// it, and it is the default window of a live profile until one is stored.
 #define COMBO_TERM 50
 
 // Custom key behavior system (process_record_user / matrix_scan_user).

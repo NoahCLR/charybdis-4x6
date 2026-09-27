@@ -30,18 +30,22 @@ test("LED membership edits preserve references and refuse deleting an assigned g
     assert.throws(() => editDeviceProfile(bytes, {type: "saveRgbReusableLedGroup", group: {originalName: "Group 0", ledIndices: [58]}}));
 });
 
-const {decodeComboDomainV1} = require("../../core/schema/combo-domain-v1");
+const {decodeComboDomain} = require("../../core/schema/combo-domain-v1");
 const {decodeComboPages} = require("../../core/protocol/combo-readback-v1");
 const {fixturePages} = require("../fixtures/device-combos");
 const {assertEffectiveCombos} = require("../../core/session/device-profile-edits");
+const readOf = pages => ({state: "read", ...decodeComboPages(pages[0], pages.slice(1))});
 const pages = fixturePages();
-const context = {capabilities: {supportedDomainMask: 7, actionAbiDigest: 0xdcb00959}, combos: {state: "read", ...decodeComboPages(pages[0], pages.slice(1))}};
-const comboRows = bytes => decodeComboDomainV1(decodeProfileBlob(bytes).domains.find(row => row.id === 0x30).payload);
+const context = {capabilities: {supportedDomainMask: 7, actionAbiDigest: 0xdcb00959}, combos: readOf(pages)};
+const comboTable = bytes => {const domain = decodeProfileBlob(bytes).domains.find(row => row.id === 0x30); return decodeComboDomain(domain.payload, domain.version);};
+const comboRows = bytes => comboTable(bytes).rows;
 test("adding, editing and deleting combos preserves every untouched profile domain and combo", () => {
     const added = editDeviceProfile(bytes, {type: "addCombo", inputs: ["KC_A", "KC_B"], output: "LGUI(KC_C)", termMs: "25", ordered: true}, context);
     const rows = comboRows(added);
     assert.equal(rows.length, 3);
     assert.deepEqual(rows[0].inputs.map(action => action.operand), context.combos.rows[0].inputs);
+    // The keyboard's combos keep following its default; the new one has its own.
+    assert.deepEqual(rows.map(row => row.termMs), [null, null, 25]);
     assert.equal(rows[2].output.operand, 0x806);
     for (let id = 0; id < 2; id++) assert.deepEqual(decodeProfileBlob(added).domains[id].payload, decodeProfileBlob(bytes).domains[id].payload);
     // A combo holds its output, so a layer hold works there; LT() does not.
@@ -52,12 +56,42 @@ test("adding, editing and deleting combos preserves every untouched profile doma
     assert.deepEqual(comboRows(edited)[2].output, {kind: 2, flags: 0, operand: 2});
     assert.equal(comboRows(edited)[2].mustHold, true);
     const timed = editDeviceProfile(edited, {type: "updateComboHoldTerm", holdTermMs: 400}, context);
-    assert.deepEqual(comboRows(timed).map(row => row.holdTermMs), [400, 400, 400]);
+    assert.equal(comboTable(timed).holdTermMs, 400);
     const removed = editDeviceProfile(timed, {type: "deleteCombo", id: 1}, context);
     assert.equal(comboRows(removed).length, 2);
     assert.equal(comboRows(removed)[1].output.kind, 2);
     const rgbChanged = editDeviceProfile(removed, {type: "updateRgbStages", stageEnableMask: 0});
     assert.deepEqual(comboRows(rgbChanged), comboRows(removed));
+});
+test("a combo follows the default window until it has its own, and the default is one edit", () => {
+    const added = editDeviceProfile(bytes, {type: "addCombo", inputs: ["KC_A", "KC_B"], output: "KC_C", termMs: ""}, context);
+    assert.equal(comboRows(added)[2].termMs, null);
+    const custom = editDeviceProfile(added, {type: "saveCombo", id: 2, inputs: ["KC_A", "KC_B"], output: "KC_C", termMs: "80"}, context);
+    assert.equal(comboRows(custom)[2].termMs, 80);
+    const back = editDeviceProfile(custom, {type: "saveCombo", id: 2, inputs: ["KC_A", "KC_B"], output: "KC_C", termMs: "80", followsDefault: true}, context);
+    assert.equal(comboRows(back)[2].termMs, null);
+    const retimed = editDeviceProfile(custom, {type: "updateComboDefaultTerm", defaultTermMs: "70"}, context);
+    assert.equal(comboTable(retimed).defaultTermMs, 70);
+    // Only the combos that follow the default move with it.
+    assert.deepEqual(comboRows(retimed).map(row => row.termMs), [null, null, 80]);
+    for (const defaultTermMs of ["0", "", "abc", 65536]) assert.throws(() => editDeviceProfile(custom, {type: "updateComboDefaultTerm", defaultTermMs}, context));
+    // With every combo deleted, both combo-wide values stay stored.
+    let empty = retimed;
+    for (let id = 2; id >= 0; id--) empty = editDeviceProfile(empty, {type: "deleteCombo", id}, context);
+    assert.deepEqual(comboTable(empty), {version: 2, defaultTermMs: 70, holdTermMs: 200, rows: []});
+    assert.equal(comboTable(editDeviceProfile(empty, {type: "updateComboHoldTerm", holdTermMs: 250}, context)).holdTermMs, 250);
+});
+test("a keyboard without a stored default keeps every window explicit until a combo edit can upgrade it", () => {
+    const old = {...context, combos: readOf(fixturePages(1))};
+    const added = editDeviceProfile(bytes, {type: "addCombo", inputs: ["KC_A", "KC_B"], output: "KC_C", termMs: "30"}, old);
+    assert.equal(comboTable(added).version, 1);
+    assert.deepEqual(comboRows(added).map(row => row.termMs), [50, 50, 30]);
+    assert.throws(() => editDeviceProfile(bytes, {type: "addCombo", inputs: ["KC_A", "KC_B"], output: "KC_C", termMs: ""}, old), /enter one/);
+    assert.throws(() => editDeviceProfile(bytes, {type: "updateComboDefaultTerm", defaultTermMs: 70}, old), /no default combo window/);
+    // A table from before the default, on a keyboard that stores one, takes
+    // the keyboard's default and keeps its own windows.
+    const upgraded = editDeviceProfile(added, {type: "deleteCombo", id: 0}, {...context, comboDefaults: {defaultTermMs: 60, holdTermMs: 150}});
+    assert.deepEqual(comboTable(upgraded), {...comboTable(added), version: 2, defaultTermMs: 60, rows: comboRows(added).slice(1).map((row, id) => ({...row, id}))});
 });
 test("Cmd+N from the combo picker saves and verifies as a standard modified key", () => {
     const message = {type: "saveCombo", id: 0, inputs: ["G(KC_C)", "G(KC_V)"], output: "G(KC_N)", termMs: "50"};
@@ -66,9 +100,11 @@ test("Cmd+N from the combo picker saves and verifies as a standard modified key"
     const row = comboRows(edited)[0];
     assert.deepEqual(row.output, {kind: 1, flags: 0, operand: 0x0811});
     assert.deepEqual(row.inputs.map(action => action.operand), [0x0806, 0x0819]);
-    const read = {...context.combos, rows: context.combos.rows.map((row, id) => id ? row : {...row, inputs: [0x0806, 0x0819], output: 0x0811, termMs: 50, mustHold: false, mustTap: false, ordered: false})};
+    const read = {...context.combos, rows: context.combos.rows.map((row, id) => id ? row : {...row, inputs: [0x0806, 0x0819], output: 0x0811, termMs: 50, followsDefault: false, mustHold: false, mustTap: false, ordered: false})};
     assert.doesNotThrow(() => assertEffectiveCombos(edited, read));
-    assert.deepEqual(comboRows(edited)[1], comboRows(editDeviceProfile(bytes, {type: "updateComboHoldTerm", holdTermMs: row.holdTermMs}, context))[1]);
+    // A window equal to the default is still its own: it does not follow a changed default.
+    assert.throws(() => assertEffectiveCombos(edited, context.combos), /running combo/);
+    assert.deepEqual(comboRows(edited)[1], comboRows(editDeviceProfile(bytes, {type: "updateComboHoldTerm", holdTermMs: 200}, context))[1]);
     for (const original of decodeProfileBlob(bytes).domains) {
         assert.deepEqual(decodeProfileBlob(edited).domains.find(domain => domain.id === original.id).payload, original.payload);
     }
@@ -87,7 +123,10 @@ test("save verification requires the running combo table to match the saved doma
     const next = editDeviceProfile(bytes, {type: "updateComboHoldTerm", holdTermMs: 300}, context);
     assert.throws(() => assertEffectiveCombos(next, context.combos), /running combo/);
     assert.throws(() => assertEffectiveCombos(next, null), /could not be verified/);
-    assert.doesNotThrow(() => assertEffectiveCombos(next, {...context.combos, rows: context.combos.rows.map(row => ({...row, holdTermMs: 300}))}));
+    assert.doesNotThrow(() => assertEffectiveCombos(next, {...context.combos, holdTermMs: 300}));
+    const retimed = editDeviceProfile(bytes, {type: "updateComboDefaultTerm", defaultTermMs: 70}, context);
+    assert.throws(() => assertEffectiveCombos(retimed, context.combos), /running combo/);
+    assert.doesNotThrow(() => assertEffectiveCombos(retimed, {...context.combos, defaultTermMs: 70, rows: context.combos.rows.map(row => ({...row, termMs: 70}))}));
 });
 
 test("auto-mouse save encodes all three policies exactly and keeps the chosen end colour", () => {

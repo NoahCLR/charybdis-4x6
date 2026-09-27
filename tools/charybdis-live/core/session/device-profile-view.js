@@ -137,7 +137,7 @@ function combosForView(read, labels) {
         inputDisplays: row.inputs.map(value => resolve(value).label),
         output: resolve(row.output).name,
         outputDisplay: row.output === 0 ? "Firmware callback" : resolve(row.output).label,
-        termMs: row.termMs, holdTermMs: row.holdTermMs, mustHold: row.mustHold, mustTap: row.mustTap, ordered: row.ordered,
+        termMs: row.termMs, followsDefault: Boolean(row.followsDefault), mustHold: row.mustHold, mustTap: row.mustTap, ordered: row.ordered,
     }));
 }
 

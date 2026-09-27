@@ -46,7 +46,7 @@ static bool profile_view_valid(const noah_profile_validator_v1_profile_t *profil
 #ifdef NOAH_PD_PROFILE_ENABLE
     if ((profile->domain_mask & NOAH_PROFILE_VALIDATOR_V1_DOMAIN_PD) && (profile->pd.length != NOAH_PROFILE_PD_V1_SIZE || !range_contained(base_offset, profile->byte_length, base_offset + profile->pd.offset, profile->pd.length))) return false;
 #endif
-    if ((profile->domain_mask & NOAH_PROFILE_VALIDATOR_V1_DOMAIN_COMBOS) && (profile->combos.row_count > 32u || !range_contained(base_offset, profile->byte_length, base_offset + profile->combos.payload_offset, 4u + (size_t)profile->combos.row_count * 28u))) return false;
+    if ((profile->domain_mask & NOAH_PROFILE_VALIDATOR_V1_DOMAIN_COMBOS) && (profile->combos.row_count > 32u || !NOAH_PROFILE_COMBO_VERSION_ACCEPTED(profile->combos.version) || !range_contained(base_offset, profile->byte_length, base_offset + profile->combos.payload_offset, NOAH_PROFILE_COMBO_HEADER_SIZE(profile->combos.version) + (size_t)profile->combos.row_count * 28u))) return false;
     return true;
 }
 

@@ -32,6 +32,19 @@ bool get_combo_must_press_in_order(uint16_t index, combo_t *combo);
 #        ifndef COMBO_HOLD_TERM
 #            define COMBO_HOLD_TERM TAPPING_TERM
 #        endif
+// The window a combo without its own follows. Only the live owner stores
+// windows per combo; without it a per-combo hook is the user's own, so its
+// rows are reported as explicit.
+#        ifdef NOAH_LIVE_PROFILE_OWNER_ENABLE
+#            define NOAH_COMBO_READBACK_DEFAULT_TERM noah_effective_combo_default_term()
+#            define NOAH_COMBO_READBACK_FOLLOWS_DEFAULT(index) noah_effective_combo_follows_default(index)
+#        elif defined(COMBO_TERM_PER_COMBO)
+#            define NOAH_COMBO_READBACK_DEFAULT_TERM COMBO_TERM
+#            define NOAH_COMBO_READBACK_FOLLOWS_DEFAULT(index) false
+#        else
+#            define NOAH_COMBO_READBACK_DEFAULT_TERM COMBO_TERM
+#            define NOAH_COMBO_READBACK_FOLLOWS_DEFAULT(index) true
+#        endif
 #    endif
 
 #    ifdef COMBO_ENABLE
@@ -54,7 +67,7 @@ static bool combo_row(uint8_t index, uint8_t out[25]) {
 #        else
     write_u16(&out[4], COMBO_TERM);
 #        endif
-    write_u16(&out[6], COMBO_HOLD_TERM);
+    if (NOAH_COMBO_READBACK_FOLLOWS_DEFAULT(index)) out[8] |= 8u;
 #        if !defined(COMBO_NO_TIMER)
 #            ifdef COMBO_MUST_HOLD_PER_COMBO
     if (get_combo_must_hold(index, combo)) out[8] |= 1u;
@@ -91,7 +104,7 @@ static bool combo_metadata(uint8_t out[25]) {
     uint8_t row[25];
     memset(out, 0, 25u);
     if (LAYER_COUNT < 1u || LAYER_COUNT > 8u) return false;
-    out[0] = 1u;
+    out[0] = 2u;
     out[2] = NOAH_PROFILE_WIRE_V1_MAX_KEYS_PER_COMBO;
     out[3] = LAYER_COUNT;
 #    ifdef COMBO_ENABLE
@@ -128,8 +141,11 @@ static bool combo_metadata(uint8_t out[25]) {
         if (reference >= LAYER_COUNT) return false;
         out[6u + layer] = reference;
     }
+    write_u16(&out[18], NOAH_COMBO_READBACK_DEFAULT_TERM);
+    write_u16(&out[20], COMBO_HOLD_TERM);
 #    endif
     uint32_t digest = noah_profile_fnv1a_update(NOAH_PROFILE_FNV1A_INITIAL, out, 14u);
+    digest          = noah_profile_fnv1a_update(digest, &out[18], 7u);
     for (uint8_t index = 0u; index < out[1]; index++) {
         if (!combo_row(index, row)) return false;
         digest = noah_profile_fnv1a_update(digest, row, sizeof(row));

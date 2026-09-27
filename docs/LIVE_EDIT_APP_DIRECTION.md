@@ -258,7 +258,8 @@ would need a future device-frame readout, not host reconstruction.
 Profile Wire GET `0x06` exposes the native combo table the connected half runs,
 with effective per-combo timing and rules, global enable and layer-reference
 mapping: up to 32 rows of four inputs, with a metadata digest to detect
-mid-read changes. Old firmware returns VIA unhandled and the app shows an
+mid-read changes. Readout version 2 also reports the default window, the hold
+threshold and which combos follow the default. Old firmware returns VIA unhandled and the app shows an
 update message without losing its other readback. Combo names are stable
 generated labels; firmware callback outputs and custom trigger/release hooks are
 shown as opaque. Board badges show where the selected layer over layer 0
@@ -276,8 +277,16 @@ actions, references, duplicate inputs and the shared hold threshold before
 persistence, and the app checks the firmware-advertised row, step and
 action-reference limits before upload. At publication the combo invalidator copies at most 32 rows /
 896 bytes once into owner-held native records, so typing and readback do no
-profile reads. QMK's hold/tap wait is global, so every row carries the same
-threshold and the UI edits it as one setting. Custom trigger/release hooks,
+profile reads. Combo timing follows QMK: every combo has its own window or
+follows one default window (`COMBO_TERM`), and the hold/tap wait
+(`COMBO_HOLD_TERM`) is one value for all combos. Domain `0x30` version 2
+stores the default window and the hold threshold once, so both exist without
+combos and are edited in Settings · Combos. A new combo starts on the default,
+shown filled in; typing a window makes it the combo's own, and Use default
+makes it follow again. Review compares a following combo as following, so a
+changed default is one Combo timing change. Version 1 — every window explicit,
+the threshold repeated on each row — is still read; a draft holding it takes
+the keyboard's default on its first combo edit. Custom trigger/release hooks,
 callback outputs and disabled combo timing are not editable through this
 format.
 

@@ -143,8 +143,8 @@ function settingsSections(snapshot, settings) {
     result.push({id: "startupLayers", area: "Settings", label: "Startup Layers", expanded: false, description: "Choose the layers active when the keyboard starts. Keep at least one selected; higher layers take priority.", fields:
         Array.from({length: 8}, (_, i) => ({...toggle(`startupLayer${i}`, 23, name(i), `Layer ${i}`), bitMask: 1 << i, governs: {kind: "layer", layer: i}}))});
     // Combos get a section of their own beside their layer matching. The
-    // Settings screen adds the hold threshold to it, which the keyboard stores
-    // on the combos rather than here.
+    // Settings screen adds the default window and hold threshold to it, which
+    // the keyboard stores with the combos rather than here.
     result.push({id: "comboSettings", area: "Settings", label: "Combos", fields:
         [toggle("combosEnabled", 20, "Enabled", "Turn every combo on or off. Each combo's own window and conditions are set in Keys · Combos.")]});
     result.push({id: "comboReferences", area: "Settings", label: "Combo Layer Matching", expanded: false, description: "Choose which layer supplies the key assignments used to match combos on each layer. Select the same layer to keep its combos independent.", fields:

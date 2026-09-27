@@ -21,7 +21,7 @@ function profile({keys = {}, fill = {}, rows = [], combos = [], settings = {}} =
     values[23] = 1; values[27] = 0x76543210; values[20] = 1;
     for (const [id, value] of Object.entries(settings)) values[id] = value;
     return {document: {layers}, settings: {values, names: ["Base", "Numbers", "Symbols", "Navigation", "Pointer", "Extra 1", "Extra 2", "Extra 3"]},
-        behaviors: {rows}, combos};
+        behaviors: {rows}, combos: {version: 2, defaultTermMs: 50, holdTermMs: 200, rows: combos}};
 }
 const traps = (value) => layerReach(value).filter((finding) => finding.level === LEVELS.TRAP);
 const kinds = (value) => layerReach(value).map((finding) => finding.kind);

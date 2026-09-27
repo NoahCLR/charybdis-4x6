@@ -21,7 +21,7 @@ const {readDeviceCombos} = require("../protocol/combo-readback-v1");
 const {readCommittedPayload, readCompiledPayload} = require("../protocol/profile-payload-v1");
 const {PROFILE_DOMAIN_IDS, decodeProfileBlob} = require("../schema/profile-blob-v1");
 const {decodeRgbDomainV1} = require("../schema/rgb-domain-v1");
-const {decodeComboDomainV1} = require("../schema/combo-domain-v1");
+const {decodeComboDomain} = require("../schema/combo-domain-v1");
 const {decodeKeyBehaviorDomain} = require("../schema/key-behavior-domain-v1");
 const {CANDIDATE_STATE_NAMES, readCandidateStatus} = require("../protocol/profile-candidate-v1");
 const {PROFILE_ACTIVE_KIND, PROFILE_STATE_FLAGS, PROFILE_WIRE_KNOWN_MASKS, PROFILE_WIRE_FEATURES, PROFILE_WIRE_V1, VIA_READS, readProfileCapabilities, readProfileStatus, readViaIdentity} = require("../protocol/profile-wire-v1");
@@ -300,7 +300,7 @@ class ProfileDeviceService {
                     } else if (domain.id === PROFILE_DOMAIN_IDS.SETTINGS) {
                         domains.settings = decodeSettings(domain.payload);
                     } else if (domain.id === PROFILE_DOMAIN_IDS.COMBOS) {
-                        domains.combos = decodeComboDomainV1(domain.payload, actionLimitsFor(blob.schema.major));
+                        domains.combos = decodeComboDomain(domain.payload, domain.version, actionLimitsFor(blob.schema.major));
                     }
                 } catch (error) {
                     failures.push({domainId: domain.id, message: error instanceof Error ? error.message : String(error)});

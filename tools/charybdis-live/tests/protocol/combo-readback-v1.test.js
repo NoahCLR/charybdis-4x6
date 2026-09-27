@@ -18,12 +18,28 @@ test("the firmware fixture decodes native inputs, output and timing without a re
         assert.equal(options.matchResponse(stale, request), false);
         return response;
     }});
-    assert.deepEqual(actual.rows[0], {id: 0, inputs: [7, 0x4109], output: 0x2b, termMs: 50, holdTermMs: 200, mustHold: false, mustTap: false, ordered: false});
+    assert.deepEqual(actual.rows[0], {id: 0, inputs: [7, 0x4109], output: 0x2b, termMs: 50, followsDefault: true, mustHold: false, mustTap: false, ordered: false});
+    assert.equal(actual.version, 2);
+    assert.equal(actual.defaultTermMs, 50);
+    assert.equal(actual.holdTermMs, 200);
     assert.deepEqual(actual.rows[1].inputs, [0x0806, 0x0819]);
     assert.equal(actual.rows[1].output, 0x0804);
     assert.deepEqual(actual.layerReferences, [0, 1, 2, 3, 4]);
     assert.deepEqual(requests.map(request => request[4]), [0, 1, 2, 0]);
     assert.equal(new Set(requests.map(request => request[3])).size, 4);
+});
+
+test("older firmware's readback repeats the hold threshold on every row and has no default", () => {
+    const actual = decode(fixturePages(1));
+    assert.equal(actual.version, 1);
+    assert.equal(actual.defaultTermMs, null);
+    assert.equal(actual.holdTermMs, 200);
+    assert.deepEqual(actual.rows[0], {id: 0, inputs: [7, 0x4109], output: 0x2b, termMs: 50, followsDefault: false, mustHold: false, mustTap: false, ordered: false});
+    const split = fixturePages(1); split[2].writeUInt16LE(199, 6);
+    assert.throws(() => decode(rehash(split)), {code: "COMBO_MALFORMED"});
+    // Version 1 has no follow-the-default flag.
+    const flagged = fixturePages(1); flagged[1][8] = 8;
+    assert.throws(() => decode(rehash(flagged)), {code: "COMBO_MALFORMED"});
 });
 
 test("combo policy flags, callback output, timing zeros and a disabled empty table survive decoding", () => {
@@ -33,19 +49,23 @@ test("combo policy flags, callback output, timing zeros and a disabled empty tab
     const actual = decode(rehash(pages));
     assert.equal(actual.enabled, false);
     for (const key of ["noTimer", "strictTimer", "customTrigger", "customRelease", "customRepress", "fixedReference"]) assert.equal(actual[key], true);
-    assert.deepEqual(actual.rows[0], {id: 0, inputs: [7, 0x4109], output: 0, termMs: 0, holdTermMs: 0, mustHold: true, mustTap: true, ordered: true});
+    assert.deepEqual(actual.rows[0], {id: 0, inputs: [7, 0x4109], output: 0, termMs: 0, followsDefault: false, mustHold: true, mustTap: true, ordered: true});
     pages[0][1] = 0;
     assert.deepEqual(decode(rehash([pages[0]])).rows, []);
+    // Firmware without combos reports no default and no threshold.
+    const none = fixturePages(); none[0][1] = 0; none[0].fill(0, 18, 22);
+    assert.equal(decode(rehash([none[0]])).defaultTermMs, 0);
 });
 
 test("malformed limits, row shape, duplicates and reserved bytes are rejected before display", () => {
     for (const mutate of [
         pages => {pages[0][1] = 33;}, pages => {pages[0][2] = 5;}, pages => {pages[0][3] = 0;},
         pages => {pages[0][4] = 2;}, pages => {pages[0][5] = 64;}, pages => {pages[0][6] = 5;},
-        pages => {pages[0][13] = 1;}, pages => {pages[0][24] = 1;}, pages => {pages.pop();},
+        pages => {pages[0][13] = 1;}, pages => {pages[0][22] = 1;}, pages => {pages[0][24] = 1;}, pages => {pages.pop();},
         pages => {pages[0][5] = 32;},
         pages => {pages[1][0] = 1;}, pages => {pages[1][1] = 1;}, pages => {pages[1][1] = 5;},
-        pages => {pages[1][8] = 8;}, pages => {pages[1][13] = 1;}, pages => {pages[1][24] = 1;},
+        pages => {pages[1][8] = 16;}, pages => {pages[1][6] = 1;}, pages => {pages[1][13] = 1;}, pages => {pages[1][24] = 1;},
+        pages => {pages[1][4] = 51;},
         pages => {pages[1].writeUInt16LE(7, 11);}, pages => {pages[1].writeUInt16LE(0, 9);},
     ]) {
         const pages = fixturePages(); mutate(pages);
@@ -54,7 +74,7 @@ test("malformed limits, row shape, duplicates and reserved bytes are rejected be
     const corrupt = fixturePages(); corrupt[1][2]++;
     assert.throws(() => decode(corrupt), {code: "COMBO_CORRUPT"});
     assert.throws(() => decodeComboPages(Buffer.alloc(24), []), {code: "COMBO_MALFORMED"});
-    const version = fixturePages(); version[0][0] = 2;
+    const version = fixturePages(); version[0][0] = 3;
     assert.throws(() => decode(version), {code: "COMBO_INCOMPATIBLE"});
 });
 

@@ -45,7 +45,9 @@ int main(int argc, char **argv) {
     uint8_t report[32], original[32];
     read_page(0, report);
     assert(report[5] == 0 && report[6] == 25);
-    assert(report[7] == 1 && report[8] == 2 && report[9] == 4 && report[10] == LAYER_COUNT && report[11] == 1);
+    assert(report[7] == 2 && report[8] == 2 && report[9] == 4 && report[10] == LAYER_COUNT && report[11] == 1);
+    // Version 2 reports the combo-wide default window and hold threshold once.
+    assert(report[25] == COMBO_TERM && report[26] == 0 && report[27] == (uint8_t)TAPPING_TERM && report[28] == (uint8_t)(TAPPING_TERM >> 8u));
 #ifdef COMBO_ONLY_FROM_LAYER
     assert(report[12] & 32u);
     for (uint8_t layer = 0u; layer < LAYER_COUNT; layer++)
@@ -55,7 +57,10 @@ int main(int argc, char **argv) {
     read_page(1, report);
     assert(report[5] == 0 && report[7] == 0 && report[8] == 2);
     assert(report[9] == 0x2b && report[10] == 0 && report[16] == 7 && report[18] == 9 && report[19] == 0x41);
+    assert(report[13] == 0 && report[14] == 0); // no per-row hold threshold
 #ifdef COMBO_TERM_PER_COMBO
+    // Without the live owner a per-combo hook is the user's own: its windows
+    // are explicit, never following the default.
     assert(report[11] == 75);
 #    ifdef COMBO_NO_TIMER
     assert(report[15] == 0);
@@ -65,7 +70,7 @@ int main(int argc, char **argv) {
     read_page(2, report);
     assert(report[11] == 0 && report[15] == 6);
 #else
-    assert(report[11] == COMBO_TERM && report[15] == 0);
+    assert(report[11] == COMBO_TERM && report[15] == 8);
 #endif
     // This independent byte fixture is consumed by both firmware and host.
     if (argc > 1) {

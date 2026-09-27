@@ -34,10 +34,11 @@ export const state = {
     //               (view/keyface.mjs: toggleComboInput)
     //   labels      input name → the host's name for that key, as the combo
     //               table and the review read it; the interface never names a key itself
-    //   form        the builder's fields, kept across renders
+    //   form        the builder's fields, kept across renders; followsDefault
+    //               says the window is the keyboard's default, not the combo's own
     //   awaiting    a Keep or Delete posted; the builder closes when the host accepts it
     combo: {open: false, picking: false, inputs: [], labels: {},
-        form: {output: "", termMs: "", mustHold: false, mustTap: false, ordered: false}, awaiting: false, editId: null},
+        form: {output: "", termMs: "", followsDefault: false, mustHold: false, mustTap: false, ordered: false}, awaiting: false, editId: null},
     placement: null,     // {keycode, label}: next board click places it on the current layer
     retarget: null,      // {from, to, existing}: a behaviour move waiting on overwrite / swap / cancel
     keyClipboard: null,  // {keycode, label}: the key ⌘C copied, for ⌘V onto the selected key
@@ -74,11 +75,15 @@ export const state = {
 
 // The combo builder, opened for a combo (or none, for a new one) and closed
 // again. Its fields live here rather than in the DOM, because a board click
-// while picking inputs redraws the whole screen.
-export function openComboBuilder(combo = null) {
+// while picking inputs redraws the whole screen. A new combo starts on the
+// keyboard's default window, filled in; on a keyboard without one it starts
+// empty.
+export function openComboBuilder(combo = null, defaultTermMs = "") {
+    const follows = combo ? Boolean(combo.followsDefault) : defaultTermMs !== "";
     state.combo = {
         open: true, picking: false, awaiting: false, editId: combo?.id ?? null,
-        form: {output: combo?.output || "", termMs: String(combo?.termMs ?? ""), mustHold: Boolean(combo?.mustHold), mustTap: Boolean(combo?.mustTap), ordered: Boolean(combo?.ordered)},
+        form: {output: combo?.output || "", termMs: String(combo?.termMs ?? defaultTermMs), followsDefault: follows,
+            mustHold: Boolean(combo?.mustHold), mustTap: Boolean(combo?.mustTap), ordered: Boolean(combo?.ordered)},
         inputs: (combo?.inputs || []).slice(),
         labels: Object.fromEntries((combo?.inputs || []).map((input, index) => [input, combo.inputDisplays?.[index] ?? input])),
     };

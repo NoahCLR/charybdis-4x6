@@ -134,14 +134,20 @@ const detail = value => typeof value === "object" && value !== null ? value.deta
 const compared = value => typeof value === "object" && value !== null ? value.key : value;
 const labelOf = (id, ...values) => values.find(value => typeof value === "object" && value?.label)?.label ?? id;
 
-function comboFields(row, names) {
+// A combo that follows the default window is compared as following it, so a
+// changed default is one Combo timing change rather than one per combo.
+function comboFields(row, table, names) {
     if (!row) return new Map();
     const options = ["mustHold", "mustTap", "ordered"].filter(flag => row[flag]).map(flag => VOCABULARY.comboOptions[flag]).join(", ");
+    const window = row.termMs === null ? {text: `default · ${table.defaultTermMs} ms`, key: "default"} : {text: `${row.termMs} ms`, key: row.termMs};
     return new Map([["Keys", {text: row.inputs.map(input => action(input, names)).join(" + "),
         detail: row.inputs.map(input => action(input, names, true)).join(" + "), key: JSON.stringify(row.inputs)}],
-        ["Sends", actionField(row.output, names, {mark: actionMark(row.output)})], ["Window", `${row.termMs} ms`],
-        ["Hold threshold", `${row.holdTermMs} ms`], ["Conditions", options || "none"]]);
+        ["Sends", actionField(row.output, names, {mark: actionMark(row.output)})], ["Window", window], ["Conditions", options || "none"]]);
 }
+// The two values every combo shares. A version 1 table has no default window,
+// and without combos no hold threshold either.
+const comboTimingFields = table => new Map([["Default window", table.defaultTermMs === null ? "none" : `${table.defaultTermMs} ms`],
+    ["Hold threshold", table.holdTermMs === null ? "none" : `${table.holdTermMs} ms`]]);
 
 // Combo IDs are packed positions, not stable identities. Recognize a single
 // removed row by its stored contents so the shifted suffix is not presented as
@@ -268,18 +274,20 @@ function profileReview(before, after) {
         item("Behaviours", `behavior:${id}`, action(target, next ? namesB : namesA), behaviourFields(old, a.settings.values, namesA), behaviourFields(next, b.settings.values, namesB),
             {kind: "behaviour", target}, [Boolean(old), Boolean(next)]);
     }
-    const removedCombo = singleComboRemovalIndex(a.combos, b.combos);
+    const combosA = a.combos.rows, combosB = b.combos.rows;
+    const removedCombo = singleComboRemovalIndex(combosA, combosB);
     if (removedCombo !== null) {
         const i = removedCombo;
-        item("Combos", `combo:${i}`, `Combo ${i}`, comboFields(a.combos[i], namesA), new Map(), {kind: "combo", index: i}, undefined,
+        item("Combos", `combo:${i}`, `Combo ${i}`, comboFields(combosA[i], a.combos, namesA), new Map(), {kind: "combo", index: i}, undefined,
             {kind: "combo", badge: `C${i}`});
-        if (i < b.combos.length) items.at(-1).note = "Later combos move up one number.";
+        if (i < combosB.length) items.at(-1).note = "Later combos move up one number.";
     } else {
-        for (let i = 0; i < Math.max(a.combos.length, b.combos.length); i++) {
-            item("Combos", `combo:${i}`, `Combo ${i}`, comboFields(a.combos[i], namesA), comboFields(b.combos[i], namesB), {kind: "combo", index: i}, undefined,
+        for (let i = 0; i < Math.max(combosA.length, combosB.length); i++) {
+            item("Combos", `combo:${i}`, `Combo ${i}`, comboFields(combosA[i], a.combos, namesA), comboFields(combosB[i], b.combos, namesB), {kind: "combo", index: i}, undefined,
                 {kind: "combo", badge: `C${i}`});
         }
     }
+    item("Settings", "comboTiming", "Combo timing", comboTimingFields(a.combos), comboTimingFields(b.combos), {kind: "settings", section: "comboSettings", area: "Settings"}, [true, true]);
     macrosA.viaMacros.forEach((slot, i) => {
         const fields = (macro) => new Map([["Steps", macro.payload || "empty"], ["Name", macro.name || "no name"]]);
         const old = macrosA.viaMacros[i], next = macrosB.viaMacros[i], has = (macro) => Boolean(macro.payload || macro.name);

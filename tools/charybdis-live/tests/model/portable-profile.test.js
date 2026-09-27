@@ -11,15 +11,17 @@ const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../../core/data/charybdis-layout"
 const {settings, document} = require("../fixtures/portable-profile");
 test("complete snapshots flatten effective domains and round-trip without destination defaults", () => {
     const source = document(), actual = validateSnapshot(JSON.stringify(source));
-    assert.equal(actual.behaviors.rows.length, 37); assert.equal(actual.combos.length, 1);
+    assert.equal(actual.behaviors.rows.length, 37); assert.equal(actual.combos.rows.length, 1);
+    // The keyboard stores a default window, and its combo follows it.
+    assert.deepEqual([actual.combos.version, actual.combos.defaultTermMs, actual.combos.holdTermMs, actual.combos.rows[0].termMs], [2, 50, 200, null]);
     assert.equal(actual.settings.names[3], "Navigation"); assert.equal(actual.layout.length, 960);
     assert.equal(fingerprint(JSON.parse(JSON.stringify(source))), fingerprint(source));
 });
 test("empty domains are explicit and replace flashed behaviours and combos", () => {
     const source = document(), blob = decodeProfileBlob(Buffer.from(source.profile, "base64"));
-    blob.domains[1].payload = encodeKeyBehaviorDomain({rows: []}); blob.domains[2].payload = Buffer.from([0, 0, 0, 0]);
+    blob.domains[1].payload = encodeKeyBehaviorDomain({rows: []}); blob.domains[2].payload = Buffer.from([0, 0, 0, 0, 50, 0, 200, 0]);
     source.profile = encodeProfileBlob(blob).toString("base64");
-    assert.equal(validateSnapshot(source).behaviors.rows.length, 0); assert.equal(validateSnapshot(source).combos.length, 0);
+    assert.equal(validateSnapshot(source).behaviors.rows.length, 0); assert.equal(validateSnapshot(source).combos.rows.length, 0);
 });
 test("reorder moves matrix data, RGB, pointer policy and every layer action reference together", () => {
     const source = document(), reordered = reorderLayers(source, [0, 4, 2, 3, 1, 5, 6, 7]);
@@ -38,35 +40,35 @@ test("behaviour targets and tap/hold branches follow their layers", () => {
     assert.equal(row.target.operand, 4); assert.equal(row.steps[0].tap.operand, 1); assert.equal(row.steps[0].hold.action.operand, 4);
 });
 test("owned layer keys follow their layers on a key, in a behaviour and on a combo", () => {
-    const {decodeComboDomainV1, encodeComboDomainV1} = require("../../core/schema/combo-domain-v1");
+    const {decodeComboDomain, encodeComboDomain} = require("../../core/schema/combo-domain-v1");
     const source = document(), blob = decodeProfileBlob(Buffer.from(source.profile, "base64"));
     // Layer 1 moves to 4 and 4 to 1; TG, TO, OSL, TT and DF all carry the layer in the low bits.
     source.layers[0].splice(10, 5, 0x5261, 0x5204, 0x5281, 0x52c4, 0x5241);
     const behaviors = decodeKeyBehaviorDomain(blob.domains[1].payload);
     behaviors.rows = [{target: {kind: 1, operand: 0x52c1}, steps: [{tapIndex: 0, tap: {kind: 1, operand: 0x5261}}]}];
     blob.domains[1].payload = encodeKeyBehaviorDomain(behaviors);
-    const combos = decodeComboDomainV1(blob.domains[2].payload);
-    combos[0].output = {kind: 1, operand: 0x5284};
-    blob.domains[2].payload = encodeComboDomainV1(combos);
+    const combos = decodeComboDomain(blob.domains[2].payload, blob.domains[2].version);
+    combos.rows[0].output = {kind: 1, operand: 0x5284};
+    blob.domains[2].payload = encodeComboDomain(combos);
     source.profile = encodeProfileBlob(blob).toString("base64");
 
     const reordered = reorderLayers(source, [0, 4, 2, 3, 1, 5, 6, 7]), actual = validateSnapshot(reordered);
     assert.deepEqual(reordered.layers[0].slice(10, 15), [0x5264, 0x5201, 0x5284, 0x52c1, 0x5244]);
     assert.equal(actual.behaviors.rows[0].target.operand, 0x52c4, "TT(1) as a behaviour's key becomes TT(4)");
     assert.equal(actual.behaviors.rows[0].steps[0].tap.operand, 0x5264, "TG(1) as a tap becomes TG(4)");
-    assert.equal(actual.combos[0].output.operand, 0x5281, "OSL(4) as a combo output becomes OSL(1)");
+    assert.equal(actual.combos.rows[0].output.operand, 0x5281, "OSL(4) as a combo output becomes OSL(1)");
 });
 
 test("with keys not following, layers move but every layer key keeps its number", () => {
-    const {decodeComboDomainV1, encodeComboDomainV1} = require("../../core/schema/combo-domain-v1");
+    const {decodeComboDomain, encodeComboDomain} = require("../../core/schema/combo-domain-v1");
     const source = document(), blob = decodeProfileBlob(Buffer.from(source.profile, "base64"));
     source.layers[0].splice(10, 3, 0x5261, 0x5281, 0x4104);
     const behaviors = decodeKeyBehaviorDomain(blob.domains[1].payload);
     behaviors.rows = [{target: {kind: 2, operand: 1}, steps: [{tapIndex: 0, tap: {kind: 3, operand: 4}, hold: {mode: 1, repeatHz: 0, action: {kind: 2, operand: 1}}}]}];
     blob.domains[1].payload = encodeKeyBehaviorDomain(behaviors);
-    const combos = decodeComboDomainV1(blob.domains[2].payload);
-    combos[0].output = {kind: 1, operand: 0x5284};
-    blob.domains[2].payload = encodeComboDomainV1(combos);
+    const combos = decodeComboDomain(blob.domains[2].payload, blob.domains[2].version);
+    combos.rows[0].output = {kind: 1, operand: 0x5284};
+    blob.domains[2].payload = encodeComboDomain(combos);
     source.profile = encodeProfileBlob(blob).toString("base64");
     const before = validateSnapshot(source);
 
@@ -79,26 +81,26 @@ test("with keys not following, layers move but every layer key keeps its number"
     assert.deepEqual(actual.behaviors.rows[0].target, before.behaviors.rows[0].target);
     assert.equal(actual.behaviors.rows[0].steps[0].tap.operand, 4);
     assert.equal(actual.behaviors.rows[0].steps[0].hold.action.operand, 1);
-    assert.equal(actual.combos[0].output.operand, 0x5284);
+    assert.equal(actual.combos.rows[0].output.operand, 0x5284);
     // Names, colours and the pointer setting still follow their layer.
     assert.equal(actual.settings.names[1], before.settings.names[4]);
     assert.equal(actual.settings.values[5], order.indexOf(before.settings.values[5]));
     assert.deepEqual(actual.rgb.layerColors.find(row => row.layerId === 1).color, before.rgb.layerColors.find(row => row.layerId === 4).color);
     // The default still renumbers.
-    assert.equal(validateSnapshot(reorderLayers(source, order)).combos[0].output.operand, 0x5281);
+    assert.equal(validateSnapshot(reorderLayers(source, order)).combos.rows[0].output.operand, 0x5281);
 });
 
 test("a new base trades roles with the old one: keys to either keep their numbers, the rest follow their layers", () => {
-    const {decodeComboDomainV1, encodeComboDomainV1} = require("../../core/schema/combo-domain-v1");
+    const {decodeComboDomain, encodeComboDomain} = require("../../core/schema/combo-domain-v1");
     const source = document(), blob = decodeProfileBlob(Buffer.from(source.profile, "base64"));
     // TO(0), TO(3), TG(2) and MO(3) on the old base; LOCK_LAYER(0) and TT(3) as behaviour branches; TO(3) on a combo.
     source.layers[0].splice(10, 4, 0x5200, 0x5203, 0x5262, 0x5223);
     const behaviors = decodeKeyBehaviorDomain(blob.domains[1].payload);
     behaviors.rows = [{target: {kind: 1, operand: 0x04}, steps: [{tapIndex: 0, tap: {kind: 3, operand: 0}, hold: {mode: 1, repeatHz: 0, action: {kind: 2, operand: 3}}}]}];
     blob.domains[1].payload = encodeKeyBehaviorDomain(behaviors);
-    const combos = decodeComboDomainV1(blob.domains[2].payload);
-    combos[0].output = {kind: 1, operand: 0x5203};
-    blob.domains[2].payload = encodeComboDomainV1(combos);
+    const combos = decodeComboDomain(blob.domains[2].payload, blob.domains[2].version);
+    combos.rows[0].output = {kind: 1, operand: 0x5203};
+    blob.domains[2].payload = encodeComboDomain(combos);
     source.profile = encodeProfileBlob(blob).toString("base64");
     const before = validateSnapshot(source);
 
@@ -108,7 +110,7 @@ test("a new base trades roles with the old one: keys to either keep their number
     assert.deepEqual(moved.layers[3].slice(10, 14), [0x5200, 0x5203, 0x5262, 0x5223], "TO(0) stays home, TO(3) and MO(3) now reach the old base, TG(2) follows");
     assert.equal(actual.behaviors.rows[0].steps[0].tap.operand, 0, "LOCK_LAYER(0) still names the base");
     assert.equal(actual.behaviors.rows[0].steps[0].hold.action.operand, 3, "MO(3) held the new base, so it holds the old one");
-    assert.equal(actual.combos[0].output.operand, 0x5203);
+    assert.equal(actual.combos.rows[0].output.operand, 0x5203);
     // Moved on past the swap, the old base is still what those keys reach.
     const further = reorderLayers(source, [3, 1, 2, 4, 5, 6, 7, 0]);
     assert.equal(further.layers[7][11], 0x5207, "TO(3) reaches the old base in slot 7");
@@ -189,13 +191,15 @@ module.exports = {settings, document};
 test("the five-layer bridge migrates custom triggers and adds transparent space", () => {
     const fixture = fs.readFileSync(path.resolve(__dirname, "../../../../tests/fixtures/compiled_profile_v1.fixture"), "utf8");
     const bytes = Buffer.from(fixture.match(/^profile.full.hex=(.+)$/m)[1], "hex");
-    const profile = materializeProfile(bytes, bytes, {rows: [{id: 0, inputs: [0x7e61, 4], output: 0x7e62, termMs: 50, holdTermMs: 200}]}, encodeSettings(settings()));
+    const profile = materializeProfile(bytes, bytes, {version: 1, defaultTermMs: null, holdTermMs: 200, rows: [{id: 0, inputs: [0x7e61, 4], output: 0x7e62, termMs: 50, followsDefault: false}]}, encodeSettings(settings()));
     const layout = Buffer.alloc(600); layout.writeUInt16BE(0x7e61, 0); layout.writeUInt16BE(0x7e60, 2);
     const source = createSnapshot({profile, actionAbiDigest: 0xdcb00959, via: {layers: 5, layout, macros: Buffer.alloc(7551), macroSlots: 64}});
     const result = validateSnapshot(source, {compiledLayerCount: 8, supportedDomainMask: 15, actionAbiDigest: 0xeb80829c});
     assert.deepEqual(result.document.layers[0].slice(0, 2), [0x7e64, 0x7e60]);
     assert.equal(result.document.layers.length, 8); assert.ok(result.document.layers.slice(5).flat().every(code => code === 1));
-    assert.equal(result.combos[0].inputs[0].operand, 0x7e64); assert.equal(result.combos[0].output.operand, 0x7e65);
+    assert.equal(result.combos.rows[0].inputs[0].operand, 0x7e64); assert.equal(result.combos.rows[0].output.operand, 0x7e65);
+    // Firmware without a stored default keeps every window explicit.
+    assert.deepEqual([result.combos.version, result.combos.defaultTermMs, result.combos.holdTermMs, result.combos.rows[0].termMs], [1, null, 200, 50]);
     assert.equal(result.rgb.layerColors.length, 8); assert.equal(result.behaviors.rows.length, 37);
     assert.equal(source.layers.length, 5);
     source.layers[0][0] = 0x7fff;

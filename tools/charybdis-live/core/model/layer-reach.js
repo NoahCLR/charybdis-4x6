@@ -127,12 +127,12 @@ function profileFacts(decoded) {
         if (Number.isInteger(code) && !rows.has(code)) rows.set(code, row);
     }
     const references = values[SETTING.COMBO_REFERENCES] >>> 0;
-    const combos = values[SETTING.COMBOS_ENABLED] ? (decoded.combos || []).map((combo, index) => ({index,
+    const combos = values[SETTING.COMBOS_ENABLED] ? (decoded.combos?.rows || []).map((combo, index) => ({index,
         inputs: combo.inputs.map((input) => (input.kind === ACTION.QMK_KEYCODE ? input.operand : nativeCode(input))),
         output: combo.output})) : [];
     const pointer = values[SETTING.AUTO_MOUSE_ENABLED] ? values[SETTING.AUTO_MOUSE_LAYER] : undefined;
     const sniping = values[SETTING.AUTO_SNIPING_ENABLED] ? values[SETTING.AUTO_SNIPING_LAYER] : undefined;
-    const allCombos = (decoded.combos || []).map((combo, index) => ({index, output: combo.output}));
+    const allCombos = (decoded.combos?.rows || []).map((combo, index) => ({index, output: combo.output}));
     return {names, layers, rows, combos, allCombos, pointer, sniping,
         // Base is always on, and so are the default layers the keyboard keeps.
         always: 1 | (values[SETTING.DEFAULT_LAYERS] & 0xff),

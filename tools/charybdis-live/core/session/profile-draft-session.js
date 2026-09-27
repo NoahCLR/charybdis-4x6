@@ -13,6 +13,7 @@ const {editMacro, macroEditorView} = require("../model/macro-editor");
 const {editDeviceProfile, RGB_EDITS, COMBO_EDITS, PD_EDITS} = require("./device-profile-edits");
 const {BEHAVIOR_EDITS} = require("./key-behavior-edits");
 const {actionName, knownActionAbi, layerOfRef, nativeCode} = require("../schema/actions");
+const {effectiveComboTerm} = require("../schema/combo-domain-v1");
 const {resolveNativeQmkExpression} = require("../schema/compiled-profile-v1");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../data/charybdis-layout");
 const keycodes = require("../data/keycode-catalog");
@@ -34,7 +35,7 @@ const fail = text => Object.assign(new Error(text), {code: "PROFILE_DRAFT_CONFLI
 const EDIT_LABELS = {
     retargetBehavior: message => message.conflict === "swap" ? "Swapped two behaviours" : "Moved a behaviour",
     saveBehavior: "Edited a behaviour", addBehavior: "Added a behaviour", deleteBehavior: "Removed a behaviour",
-    addCombo: "Added a combo", saveCombo: "Edited a combo", deleteCombo: "Removed a combo", updateComboHoldTerm: "Changed the combo hold threshold",
+    addCombo: "Added a combo", saveCombo: "Edited a combo", deleteCombo: "Removed a combo", updateComboHoldTerm: "Changed the combo hold threshold", updateComboDefaultTerm: "Changed the default combo window",
     savePdMode: "Edited a pointing mode", clearPdMode: "Cleared a pointing mode", duplicatePdMode: "Duplicated a pointing mode",
     updateConfigDefaults: "Saved a settings section", updateViaMacro: "Edited a macro", applyAllChanges: "Changed keys",
 };
@@ -192,7 +193,7 @@ class ProfileDraftSession {
             if (!DRAFT_EDITS.has(message.type)) throw fail("Unsupported draft edit.");
             if (message.expectedBase && ["source", "generation", "digest", "originHalf"].some(key => message.expectedBase[key] !== this.identity()[key])) throw fail("This form belongs to an older draft. Reload it before keeping changes.");
             document = {...current.document, profile: editDeviceProfile(Buffer.from(current.document.profile, "base64"), message, {
-                capabilities: this.capabilities, combos: this.combos(), maximumBrightness: current.limits?.brightnessMax,
+                capabilities: this.capabilities, combos: this.combos(), comboDefaults: this.comboDefaults(), maximumBrightness: current.limits?.brightnessMax,
             }).toString("base64")};
         }
         this.replace(document, message.draftRevision, "edit", editLabel(message, current.document));
@@ -425,11 +426,21 @@ class ProfileDraftSession {
     hasChecksToConfirm() {return this.checks().some(check => check.status !== "fixed" && [CHECK_LEVELS.TRAP, CHECK_LEVELS.WARNING].includes(check.level));}
     hasBlockers() {return this.checks().some(check => check.status !== "fixed" && check.level === "blocker");}
     identity() {return {source: "draft", generation: this.revision, digest: this.decode(this.history[this.cursor]).fingerprint, originHalf: this.deviceId};}
+    // The draft's combos as the keyboard would report them: every window as
+    // it resolves, and whether it follows the default.
     combos() {
         const {combos, settings} = this.decode(this.history[this.cursor]).decoded;
         const native = nativeCode;
         return {state: "read", enabled: Boolean(settings.values[20]), layerReferences: Array.from({length: 8}, (_, i) => (settings.values[27] >>> (4 * i)) & 15),
-            holdTermMs: combos[0]?.holdTermMs || 0, rows: combos.map(row => ({...row, inputs: row.inputs.map(native), output: native(row.output)}))};
+            version: combos.version, defaultTermMs: combos.defaultTermMs, holdTermMs: combos.holdTermMs,
+            rows: combos.rows.map(row => ({...row, termMs: effectiveComboTerm(combos, row), followsDefault: row.termMs === null, inputs: row.inputs.map(native), output: native(row.output)}))};
+    }
+    // The keyboard's default window and hold threshold, when it stores them. A
+    // draft from an older backup, whose table has neither, takes them on its
+    // first combo edit (device-profile-edits.js).
+    comboDefaults() {
+        const base = this.base.incomplete ? undefined : this.baseSnapshot.decoded.combos;
+        return base?.version === 2 ? {defaultTermMs: base.defaultTermMs, holdTermMs: base.holdTermMs} : null;
     }
     editingState(state) {
         if (state.selectedDeviceId !== this.deviceId) return state;

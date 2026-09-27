@@ -85,8 +85,9 @@ unlit keys black.
   pointing modes, both macro banks, every QMK section, search, the live
   expression, and OK / Cancel. List mode is used for combo inputs.
 - **The combo builder beside the board**, with inputs picked on the physical
-  keyboard, per-combo window, hold and order requirements, and the shared hold
-  threshold shown as shared. Pick on board scrolls the board into view when
+  keyboard, per-combo window — the default filled in and tagged, or the
+  combo's own with Use default beside it — hold and order requirements, and
+  the shared hold threshold shown as shared. Pick on board scrolls the board into view when
   input picking starts. Inputs are held by the keycode the combo stores, never
   by board position: a click takes the key that answers there — through a
   transparent key, the highest layer previewed on that is not transparent, else

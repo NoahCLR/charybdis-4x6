@@ -32,13 +32,23 @@ void noah_effective_combo_runtime_invalidate(void *context, uint32_t publication
         return;
     }
     runtime->live = true;
-    if (view->profile.combos.row_count > 32u) return;
-    for (uint8_t index = 0; index < view->profile.combos.row_count; index++) {
+    const noah_profile_combo_v1_view_t *combos = &view->profile.combos;
+    noah_profile_combo_v1_header_t      header;
+    if (combos->row_count > 32u || !noah_profile_combo_v1_read_header(&view->reader, view->base_offset, combos, &header)) return;
+    // Version 1 has no stored default and repeats the hold threshold on each
+    // row; its windows are all explicit.
+    runtime->default_term = combos->version >= 2u ? header.default_term_ms : COMBO_TERM;
+    runtime->hold_term    = combos->version >= 2u ? header.hold_term_ms : TAPPING_TERM;
+    for (uint8_t index = 0; index < combos->row_count; index++) {
         noah_profile_combo_v1_row_t row;
-        if (!noah_profile_combo_v1_read_row(&view->reader, view->base_offset, &view->profile.combos, index, &row)) return;
-        if (index && row.hold_term_ms != runtime->hold_term) return;
-        runtime->hold_term        = row.hold_term_ms;
-        runtime->terms[index]     = row.term_ms;
+        if (!noah_profile_combo_v1_read_row(&view->reader, view->base_offset, combos, index, &row)) return;
+        if (combos->version == 1u) {
+            if (index && row.hold_term_ms != runtime->hold_term) return;
+            runtime->hold_term = row.hold_term_ms;
+        }
+        bool follows = combos->version >= 2u && row.term_ms == 0u;
+        if (follows) runtime->follows_default |= (uint32_t)1u << index;
+        runtime->terms[index]     = follows ? runtime->default_term : row.term_ms;
         runtime->flags[index]     = row.flags;
         runtime->rows[index].keys = runtime->inputs[index];
         if (noah_profile_action_runtime_v1_to_native(&row.output, &runtime->rows[index].keycode) != NOAH_PROFILE_ACTION_RUNTIME_V1_OK || !runtime->rows[index].keycode) return;
@@ -66,8 +76,17 @@ combo_t *noah_effective_combo_get(uint16_t index) {
 uint16_t noah_effective_combo_term(uint16_t index) {
     return installed && installed->valid && installed->live && index < installed->count ? installed->terms[index] : COMBO_TERM;
 }
+uint16_t noah_effective_combo_default_term(void) {
+    return installed && installed->valid && installed->live ? installed->default_term : COMBO_TERM;
+}
+bool noah_effective_combo_follows_default(uint16_t index) {
+    if (installed && installed->valid && installed->live) return index < installed->count && (installed->follows_default >> index & 1u);
+    return index < noah_effective_combo_count();
+}
+// A version 2 table stores the threshold even with no rows; a version 1 table
+// without rows has none, and QMK's own default stands.
 uint16_t noah_effective_combo_hold_term(void) {
-    return installed && installed->valid && installed->live && installed->count ? installed->hold_term : TAPPING_TERM;
+    return installed && installed->valid && installed->live ? installed->hold_term : TAPPING_TERM;
 }
 uint8_t noah_effective_combo_flags(uint16_t index) {
     if (installed && installed->valid && installed->live && index < installed->count) return installed->flags[index];

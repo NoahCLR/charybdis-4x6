@@ -197,38 +197,45 @@ test("a behaviour moves to another key, and overwrites or swaps with one already
 
 // ── combos ──────────────────────────────────────────────────────────────
 
-test("the first combo on a keyboard with none carries a hold threshold the device reported", () => {
+test("a keyboard that stores the combo timing keeps it without combos, and a new combo follows the default", () => {
     const draft = session();
-    stage(draft, edits.comboMessage(null, {inputs: ["KC_D", "KC_F"], output: "KC_ESCAPE", termMs: "50", holdTermMs: "200"}));
+    assert.deepEqual([decoded(draft).combos.defaultTermMs, decoded(draft).combos.holdTermMs, decoded(draft).combos.rows.length], [50, 200, 0]);
+    stage(draft, edits.comboMessage(null, {inputs: ["KC_D", "KC_F"], output: "KC_ESCAPE", termMs: ""}));
     const combos = decoded(draft).combos;
-    assert.equal(combos.length, 1);
-    assert.equal(combos[0].holdTermMs, 200);
-    const fresh = session();
-    assert.throws(() => stage(fresh, edits.comboMessage(null, {inputs: ["KC_J", "KC_K"], output: "KC_TAB", termMs: "50"})),
-        /Hold threshold/, "an absent threshold is refused, so the interface must send one");
+    assert.equal(combos.rows.length, 1);
+    assert.equal(combos.rows[0].termMs, null, "an empty window follows the default");
+    assert.equal(combos.holdTermMs, 200);
+    stage(draft, edits.comboMessage(0, {inputs: ["KC_D", "KC_F"], output: "KC_ESCAPE", termMs: "65"}));
+    assert.equal(decoded(draft).combos.rows[0].termMs, 65);
+    stage(draft, edits.comboMessage(0, {inputs: ["KC_D", "KC_F"], output: "KC_ESCAPE", termMs: "65", followsDefault: true}));
+    assert.equal(decoded(draft).combos.rows[0].termMs, null, "Use default drops the combo's own window");
 });
 
-test("the shared hold threshold is its own message, and reaches every combo", () => {
+test("the default window and the hold threshold are each their own message, set with or without combos", () => {
     const draft = session();
-    for (const [inputs, output] of [[["KC_D", "KC_F"], "KC_ESCAPE"], [["KC_J", "KC_K"], "KC_TAB"]]) {
-        stage(draft, edits.comboMessage(null, {inputs, output, termMs: "50", holdTermMs: "200"}));
-    }
     stage(draft, edits.comboHoldTerm("275"));
-    assert.deepEqual(decoded(draft).combos.map((row) => row.holdTermMs), [275, 275],
-        "QMK keeps one threshold for all combos, so the edit lands on every row");
+    stage(draft, edits.comboDefaultTerm("70"));
+    assert.deepEqual([decoded(draft).combos.defaultTermMs, decoded(draft).combos.holdTermMs], [70, 275]);
+    for (const [inputs, output] of [[["KC_D", "KC_F"], "KC_ESCAPE"], [["KC_J", "KC_K"], "KC_TAB"]]) {
+        stage(draft, edits.comboMessage(null, {inputs, output, termMs: ""}));
+    }
+    stage(draft, edits.comboDefaultTerm("45"));
+    assert.deepEqual(draft.combos().rows.map((row) => [row.termMs, row.followsDefault]), [[45, true], [45, true]],
+        "the combos that follow the default run with its new value");
+    assert.throws(() => stage(draft, edits.comboDefaultTerm("0")), /at least 1 ms/);
 });
 
 test("a combo is edited and deleted by the id the interface holds", () => {
     const draft = session();
     stage(draft, edits.comboMessage(null, {inputs: ["KC_D", "KC_F"], output: "KC_ESCAPE", termMs: "50", holdTermMs: "200"}));
     stage(draft, edits.comboMessage(0, {inputs: ["KC_D", "KC_F"], output: " KC_TAB ", termMs: "40", holdTermMs: "200", mustHold: true, ordered: true}));
-    const saved = decoded(draft).combos[0];
+    const saved = decoded(draft).combos.rows[0];
     assert.equal(saved.termMs, 40);
     assert.equal(saved.output.operand, 0x2b, "the output is trimmed and encoded");
     assert.equal(saved.mustHold, true);
     assert.equal(saved.ordered, true);
     stage(draft, edits.deleteCombo(0));
-    assert.deepEqual(decoded(draft).combos, []);
+    assert.deepEqual(decoded(draft).combos.rows, []);
 });
 
 // ── lighting ────────────────────────────────────────────────────────────
@@ -594,9 +601,12 @@ test("behaviour timing defaults follow the draft's Key Timing, and its undo", ()
     assert.equal(timing().tapHoldTerm, before, "and undo puts it back");
 });
 
-test("the combo hold threshold is the one stored on the combos, else the keyboard's tapping term", () => {
-    const model = {combos: [{holdTermMs: 240}], behaviorTimingDefaults: {tappingTerm: "200"}};
+test("the combo hold threshold is the one the keyboard stores, else its tapping term", () => {
+    const model = {comboReadback: {holdTermMs: 240, defaultTermMs: 50}, behaviorTimingDefaults: {tappingTerm: "200"}};
     assert.equal(edits.comboHoldTermValue(model, " 275 "), "275", "a written value wins");
     assert.equal(edits.comboHoldTermValue(model, ""), "240");
-    assert.equal(edits.comboHoldTermValue({...model, combos: []}, ""), "200", "no combos yet: the device's own tapping term");
+    assert.equal(edits.comboHoldTermValue({...model, comboReadback: {holdTermMs: null}}, ""), "200", "an older keyboard without combos: its own tapping term");
+    assert.equal(edits.comboHoldTermValue({...model, comboReadback: {holdTermMs: 0}}, ""), "0", "0 is a threshold, not a missing one");
+    assert.equal(edits.comboDefaultTermValue(model), "50");
+    assert.equal(edits.comboDefaultTermValue({comboReadback: {defaultTermMs: null}}), "", "an older keyboard has no default");
 });

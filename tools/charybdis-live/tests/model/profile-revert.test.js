@@ -25,6 +25,7 @@ function edited() {
     stage(settings("keyTiming", {tapHoldTerm: "175", multiTapTerm: "190"}));
     stage({type: "retargetBehavior", keycode: "KC_ESCAPE", target: "KC_Q", expectedBase: draft.identity()});
     stage({type: "addCombo", inputs: ["KC_A", "KC_B"], output: "KC_C", termMs: "50", holdTermMs: "200"});
+    stage({type: "updateComboDefaultTerm", defaultTermMs: "70"});
     stage({type: "updateLayerColor", layer: "Layer 2", mode: "ALL_KEYS", h: "20", s: "200", v: "100"});
     stage({type: "updateRgbStages", stageEnableMask: validateSnapshot(draft.document).rgb.stageEnableMask ^ 1});
     stage({type: "addRgbLedGroup", group: {target: "layer", owner: "Layer 3", ledIndices: [1, 2, 3], h: "0", s: "0", v: "0"}});
@@ -63,6 +64,7 @@ test("each unit goes back to the keyboard's value, and nothing else moves", () =
     for (const kind of ["layout", "macro", "settings", "behavior", "combo", "rgb", "pd"]) {
         assert.ok(units.some((unit) => unit.startsWith(`${kind}:`)), `the fixture edits a ${kind} unit`);
     }
+    assert.ok(units.includes("comboTiming"), "the fixture edits the combo timing");
     for (const unit of units) {
         const document = revertUnits(base, current, new Set([unit]), capabilities);
         const left = profileReview(base, {...current, document, fingerprint: fingerprint(document)});

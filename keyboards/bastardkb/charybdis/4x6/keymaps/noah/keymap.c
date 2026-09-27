@@ -151,8 +151,9 @@ enum keymap_custom_keycodes {
 // reconciliation boundary; delayed legitimate outputs retain their exact
 // physical footprint through QMK's final legal buffered-output opportunity.
 //
-// Combo timing is tuned in config.h via COMBO_TERM.
-// Current default: COMBO_TERM = 50 ms.
+// Combo timing is tuned in config.h via COMBO_TERM (currently 50 ms). A live
+// profile stores its own default window and hold threshold, set in Charybdis
+// Live.
 #define COMBOS(COMBO)                                \
     COMBO(KC_TAB, (KC_D, LT(LAYER_NAV, KC_F)))       \
     COMBO(CLICK_SPAM, (MS_BTN1, MS_BTN2))            \

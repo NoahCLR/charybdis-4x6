@@ -306,7 +306,7 @@ function tabKey(body) {
     node.querySelectorAll("[data-goto]").forEach((button) => button.addEventListener("click", () => {
         state.tab = button.dataset.goto;
         if (state.tab === "behaviours" && behaviour) state.behaviourRow = behaviour.keycode;
-        if (state.tab === "combos" && !combos.length) openComboBuilder();
+        if (state.tab === "combos" && !combos.length) openComboBuilder(null, edits.comboDefaultTermValue(getModel()));
         render();
     }));
     body.replaceChildren(node);
@@ -593,7 +593,7 @@ function tabCombos(body, right) {
     right.replaceChildren();
     const toggle = el(`<button class="btn tiny" ${canEdit ? "" : "disabled"}>${state.combo.open ? "Close builder" : "New combo"}</button>`);
     toggle.addEventListener("click", () => {
-        if (state.combo.open) closeComboBuilder(); else openComboBuilder();
+        if (state.combo.open) closeComboBuilder(); else openComboBuilder(null, edits.comboDefaultTermValue(model));
         render();
     });
     right.appendChild(toggle);
@@ -624,7 +624,7 @@ function tabCombos(body, right) {
         return `<tr${reachAttrs("combos", group, combo.id)} data-combo="${esc(String(combo.id))}"><td>${comboBadge(model, combo.badge)}${changedCombos.has(combo.id) ? draftDot() : ""}</td>
             <td>${(combo.inputs || []).map((input, at) => `<span class="tok">${keyNameMarked(model, combo.inputDisplays?.[at] ?? input, input)}</span>`).join(" + ")}</td>
             <td class="mono">${esc(combo.outputDisplay || combo.output)}</td>
-            <td class="mono">${esc(combo.termMs ?? "")} ms</td>
+            <td class="mono">${esc(combo.termMs ?? "")} ms${combo.followsDefault ? ` <span class="tag" data-tip="Follows the default combo window (Settings · Combos), so it changes with it.">default</span>` : ""}</td>
             <td class="muted">${esc(requires)}</td>
             <td class="muted">${reachedBy}</td></tr>`;
     };
@@ -692,6 +692,9 @@ function comboBuilder(canEdit, holdTerm) {
     const editing = state.combo.editId !== null;
     const original = (model?.combos || []).find((combo) => combo.id === state.combo.editId);
     const form = state.combo.form;
+    // The keyboard's default window; empty on a keyboard that has none, where
+    // every combo keeps its own.
+    const fallback = edits.comboDefaultTermValue(model);
     const node = el(`<div class="card" style="background:var(--surface-2)">
         <div class="card-h" style="padding:11px 13px"><h3>${editing ? `Edit ${esc(original?.badge || "combo")}` : "New combo"}</h3>
             <span class="right">${editing ? `<button class="btn tiny ghost" data-act="delete" ${canEdit ? "" : "disabled"}>Delete</button>` : ""}</span></div>
@@ -712,8 +715,10 @@ function comboBuilder(canEdit, holdTerm) {
                         data-tip="Switch the board into input-picking mode; click keys to add or remove them.">${state.combo.picking ? "Picking on board…" : "Pick on board"}</button>
                 </div>
             </div>
-            <label class="field" data-tip="How close together its keys must be pressed, from the first to the last."><span>Combo window · ms</span>
-                <input class="input mono" data-term value="${esc(form.termMs)}" placeholder="ms" ${canEdit ? "" : "disabled"}></label>
+            <label class="field" data-tip="How close together its keys must be pressed, from the first to the last."><span>Combo window · ms${fallback ? ` <span class="tag" data-termtag>${form.followsDefault ? "default" : "custom"}</span>` : ""}</span>
+                <div class="input-row"><input class="input mono" data-term value="${esc(form.followsDefault && fallback ? fallback : form.termMs)}" placeholder="${fallback ? `${esc(fallback)} · default` : "ms"}" ${canEdit ? "" : "disabled"}>
+                ${fallback ? `<button class="btn tiny ghost" data-act="usedefault" ${canEdit ? "" : "disabled"} ${form.followsDefault ? "hidden" : ""}
+                    data-tip="Follow the default combo window (Settings · Combos) again, so this combo changes with it.">Use default · ${esc(fallback)} ms</button>` : ""}</div></label>
             <div class="row" style="gap:14px;flex-wrap:wrap">
                 ${[["mustHold", "Fires only once its keys are held past the combo hold threshold (Settings · Combos). Released sooner, the keys type themselves."],
                    ["mustTap", "Fires only if its keys are released before the combo hold threshold. Held longer, the keys type themselves."],
@@ -745,7 +750,26 @@ function comboBuilder(canEdit, holdTerm) {
     // Typing and ticking land in state as they happen, so a board click that
     // redraws the screen keeps them.
     node.querySelector("[data-output]").addEventListener("input", (event) => { form.output = event.target.value; });
-    node.querySelector("[data-term]").addEventListener("input", (event) => { form.termMs = event.target.value; });
+    // Typing a window gives the combo its own; emptying the field, or Use
+    // default, has it follow the keyboard's default again. The tag and the
+    // button change in place, so typing keeps its focus.
+    const followed = (follows) => {
+        form.followsDefault = follows;
+        const tag = node.querySelector("[data-termtag]");
+        if (tag) tag.textContent = follows ? "default" : "custom";
+        const button = node.querySelector('[data-act="usedefault"]');
+        if (button) button.hidden = follows;
+    };
+    node.querySelector("[data-term]").addEventListener("input", (event) => {
+        form.termMs = event.target.value;
+        if (fallback) followed(event.target.value.trim() === "");
+    });
+    node.querySelector('[data-act="usedefault"]')?.addEventListener("click", (event) => {
+        event.preventDefault();
+        form.termMs = fallback;
+        node.querySelector("[data-term]").value = fallback;
+        followed(true);
+    });
     // A combo cannot both need a hold and refuse one — the keyboard rejects it,
     // and QMK would never fire it — so turning one on turns the other off.
     const opposite = {mustHold: "mustTap", mustTap: "mustHold"};
