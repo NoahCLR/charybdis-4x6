@@ -217,7 +217,7 @@ supported stable PD id exactly once, and tap-branch colors match the compiled
 tap count. Identity tables sort by id; renderer group rows and tap-branch
 colors preserve authored order. The full validation and canonicalization
 contract is mirrored in
-`tools/charybdis-live/core/schema/rgb-domain-v1.md`.
+[RGB domain v1](rgb-domain-v1.md).
 
 ## Digests And Checksums
 

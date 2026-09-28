@@ -1,7 +1,7 @@
 # Firmware independence and Live integration
 
-Firmware builds and its full host suite require no Charybdis Live checkout,
-including the retained in-tree app. There is no Live-root selector or fallback
+Firmware builds and its full host suite require no Charybdis Live checkout.
+The former in-tree app has been removed. There is no Live-root selector or fallback
 in firmware runners. The five C test runners use firmware-owned fixtures; PD,
 macro-size and populated profile regression vectors live under
 `tests/fixtures/client-regression/`, with producer revision and checksum records.
@@ -21,6 +21,5 @@ optional cross-repository integration gate.
 
 Firmware diagnostics owns its Node dependency in `tools/package.json` and its
 lockfile. Use `npm ci --prefix tools` for hardware diagnostics; neither firmware
-compilation nor its C host tests need that native HID installation. The old app
-source remains pending cleanup, but no firmware test or diagnostic tool resolves
-code or dependencies through it.
+compilation nor its C host tests need that native HID installation. No firmware
+test or diagnostic tool resolves code or dependencies through the app.

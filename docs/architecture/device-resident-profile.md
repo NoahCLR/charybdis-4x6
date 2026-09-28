@@ -1,7 +1,8 @@
 # Device-Resident Profile Target
 
 This document defines the ownership model for live editing with Charybdis Live
-([`tools/charybdis-live/`](../../tools/charybdis-live/)). It supersedes the earlier project assumption that the three C
+(the independent app repository in the
+[local workspace map](../../README.md#local-repositories-and-worktrees)). It supersedes the earlier project assumption that the three C
 authoring files must remain the only source of truth during a live editing
 session.
 

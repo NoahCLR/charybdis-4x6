@@ -21,7 +21,7 @@ The payload starts with this fixed 16-byte header:
 | 4 | 1 | reusable group count, `0..16` |
 | 5 | 1 | layer-color count, `1..8` when compiled |
 | 6 | 1 | layer-group row count |
-| 7 | 1 | PD-color count, `0..6` |
+| 7 | 1 | PD-color count, `0..8` |
 | 8 | 1 | PD-group row count |
 | 9 | 1 | combo-group row count |
 | 10 | 1 | tap-branch color count, exactly the compiled count and at most `4` |
@@ -80,9 +80,9 @@ follow the real destination, `1` use the end color only where the base effect
 would show, and `2` use the end color on all keys. Tap-commit policy is `0`
 off or `1` commit non-base taps.
 
-PD ids come from the stable manifest registry: `0` drag-scroll, `1` volume,
-`2` brightness, `3` zoom, `4` arrow, and `5` pinch. A compiled PD stage stores
-each firmware-supported id exactly once.
+PD ids address the eight device-owned slots `0..7`; their names and behaviors
+come from the [PD-mode domain](pd-mode-domain-v1.md), not from the RGB id.
+A compiled PD stage stores each firmware-supported id exactly once.
 
 Layer and PD group selectors use `0xff` for all; other values are validated
 layer or stable PD ids. Key-feedback group semantics are `0` tap branch
@@ -112,7 +112,7 @@ remain ordered data.
 
 ## Validation boundary
 
-`rgb-domain-v1.js` and the firmware `profile_rgb_v1.c` reader-backed decoder
+Live's `core/schema/rgb-domain-v1.js` and the firmware `profile_rgb_v1.c` reader-backed decoder
 perform matching strict validation for versions, reserved fields, compiled
 feature inclusion, complete surfaces, capacities, stable ids, enums,
 selectors, references, geometry, brightness, canonical ordering, and exact
@@ -131,9 +131,6 @@ validation or accessor read is at most the fixed 11-byte key-feedback record.
 It exposes record-at-a-time accessors for every section and never materializes
 the payload, dictionary, or renderer tables in RAM.
 
-## Intentional deferrals
-
-- no extension command, webview, or UI changes;
-- no HID candidate transport or device writes;
-- no effective RGB provider or runtime activation;
-- no preview/rollback, persistence, split reconciliation, or source pull;
+This document governs the byte format. Transport and activation are specified
+by [Profile Wire](profile-wire-v1.md) and the
+[logical transaction contract](logical-profile-transaction-v1.md).

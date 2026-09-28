@@ -24,8 +24,9 @@ also discovers QMK through a sibling named `bastardkb-qmk` or `qmk_firmware`.
 
 Firmware agents own this checkout's C code, tests and firmware documentation.
 Live agents own the independent app checkout and its documentation; read its
-`AGENTS.md` and `README.md` there. The retained `tools/charybdis-live/` copy is
-not an active development target. Inspecting another checkout is allowed;
+`AGENTS.md` and `README.md` there. The former `tools/charybdis-live/` copy has
+been removed; its source history remains in Git. Inspecting another checkout
+is allowed;
 editing it requires that scope in the task. Coordinate shared QMK build output
 and keyboard access with other agents. Firmware tests and builds require no
 Live checkout; Live owns the optional cross-repository integration tests.
@@ -265,8 +266,8 @@ keyboard is the source of truth and the app is its client. Profile Studio owns
 `.c` authoring; this app owns the device.
 
 The active VS Code installation uses the independent sibling `charybdis-live`
-repository. The in-tree copy remains pending cleanup. For a new installation,
-symlink the sibling folder into VS Code's extensions, then reload the window:
+repository. For a new installation, symlink the sibling folder into VS Code's
+extensions, then reload the window:
 
 ```sh
 cd ../charybdis-live && npm ci
@@ -358,7 +359,8 @@ generic image does not.
 
 The app's current guide is `README.md` in the independent Live checkout listed
 under [local repositories](#local-repositories-and-worktrees); its `docs/`
-directory owns app development guidance. The retained in-tree guide is historical.
+directory owns app development guidance. Earlier in-tree guides remain in Git
+history.
 The direction, the decisions behind it, and what is deliberately left
 undesigned are in
 [`docs/LIVE_EDIT_APP_DIRECTION.md`](./docs/LIVE_EDIT_APP_DIRECTION.md).

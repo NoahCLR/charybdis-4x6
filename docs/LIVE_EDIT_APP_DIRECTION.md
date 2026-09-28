@@ -1,6 +1,9 @@
 # Live Edit App — Direction
 
-The current status of the live app and the decisions behind it. The end goal is
+Firmware-facing product context and the decisions behind live editing.
+Current app UI status and app implementation decisions are maintained in the
+independent Live repository; firmware contracts remain under
+`docs/architecture/` here. The end goal is
 the [product goal](PRODUCT_GOAL.md); the technical authority is
 [`architecture/device-resident-profile.md`](architecture/device-resident-profile.md).
 This document records how we get there and what we decided along the way.
@@ -14,7 +17,7 @@ the keyboard rather than a client of the repository.
 
 ## Current Product Status
 
-The live app, [`tools/charybdis-live/`](../tools/charybdis-live/), reads
+The live app in the independent `charybdis-live` repository reads
 everything it edits from the keyboard without a firmware workspace, keeps every
 change in one reviewed draft, and applies it to both halves as one atomic
 logical generation. The user reports that the workflow works on their keyboard;
@@ -82,8 +85,9 @@ Remaining before calling the product complete:
 
 ## The Tools
 
-- **Charybdis Live** (`tools/charybdis-live/`) is the app and the only one
-  developed (D-L35). Nothing in it reads the firmware repository.
+- **Charybdis Live** is developed in its independent repository (D-L35); see
+  the [local workspace map](../README.md#local-repositories-and-worktrees). Its
+  runtime never reads firmware source. Developer integration tests may do so.
 - **Profile Studio** (`tools/charybdis-profile-studio/`) authors `keymap.c`,
   `config.h` and `rgb_config.c`. It is frozen (D-L04).
 - The first live app (v1, which lived at the same path) ported Studio's interface
@@ -210,7 +214,7 @@ back into the app.
 `data`, with imports pointing one way and `tests/` mirroring it. The webview
 never imports `core/`; it renders the model the host posts, so the core runs in
 plain Node and the UI stays replaceable. The rules and where new work belongs
-are in [`tools/charybdis-live/AGENTS.md`](../tools/charybdis-live/AGENTS.md).
+are in `AGENTS.md` in the independent Live repository.
 The structure exists because the thing it replaced was a 14,539-line file that
 grew one convenience at a time.
 
@@ -992,5 +996,5 @@ stays removed until it is accepted on hardware and measured again.
 
 The app owns cross-repository codec comparisons. Firmware host tests retain
 regression vectors locally and never import app code; diagnostics installs its
-own dependencies. The retained in-tree app is not part of firmware's build or
-test surface. See [the independence contract](architecture/live-compatibility.md).
+own dependencies. The in-tree app has been removed; firmware retains its source
+history in Git. See [the independence contract](architecture/live-compatibility.md).
