@@ -8,8 +8,8 @@ combos and holds, mouse buttons and pointing modes, lighting wake/sleep and
 feedback, and Charybdis Live's durable apply/recovery contract.
 
 Activity coalescing is on in the default build (stage 1 below); bounded
-transaction diagnostics stay opt-in. Physical measurement and acceptance of
-coalescing remain pending. The runtime
+transaction diagnostics stay opt-in. Coalescing is accepted on hardware; its
+measurement remains pending. The runtime
 RPC replacement and asynchronous stages remain unimplemented behind their
 measurement gates. See `docs/architecture/split-activity-sync.md` for the current
 contract. This document is not a hardware performance result. After completion, fold durable contracts into
@@ -17,7 +17,8 @@ contract. This document is not a hardware performance result. After completion, 
 this plan under D-L07. Do not treat proposals here as accepted wire contracts.
 
 User evidence: the OS reports approximately 400 mouse reports/s with both halves
-connected, and the right half's mouse is faster with the left disconnected.
+connected, and the right half's mouse felt faster with the left disconnected;
+that disconnected state is not a dependable measurement (stage 0).
 The disconnected rate and interval distribution have not been supplied.
 
 Source basis:
@@ -193,8 +194,11 @@ Neither earns a calculated report-rate improvement in this plan.
 ### 0. Establish attribution with bounded measurement
 
 1. Hold baud, profile, firmware feature set, DPI, lighting and app state fixed.
-   Measure connected motion, connected idle, disconnected motion, and motion
-   while typing on the left. Record the disconnected report rate.
+   Measure connected idle, connected motion, and motion while typing on the
+   left. Not with the left half disconnected: the master then keeps probing
+   and waiting on transport timeouts, so the reading includes stalls a
+   connected keyboard never has. Instead the capture tool estimates the
+   ceiling as pointing polls with measured split transaction time removed.
 2. Count transactions by ID, payload bytes, failures/retries, and elapsed time
    for the complete split scan. Add sensor/USB spans only if needed to explain
    remaining time. Instrument in the actual PIO/serial path; do not time only
@@ -263,10 +267,10 @@ Status: the hook is fork commit `6889960271` on `sol`, and coalescing is the
 default build; `NOAH_SPLIT_ACTIVITY_COALESCE=no` builds the comparison pair.
 It was made the default after daily use on hardware, with Applies saving on
 both halves and no split transport failure across three Applies at 230,400.
-Still to measure: the mouse report rate with coalescing at 230,400 (about
-600 Hz was seen with 460,800, against about 400 Hz originally). Still to
-accept: RGB wake/sleep and timeout boundaries, left keys, chords, holds,
-pointing modes, peer reboot, and error behaviour.
+Hardware acceptance is settled: daily use shows no regression in lighting
+wake/sleep, left keys, chords, holds, pointing modes or reconnects. Still to
+measure: the mouse report rate with coalescing at 230,400 (about 600 Hz was
+seen with 460,800, against about 400 Hz originally).
 
 ### 2. Reduce custom snapshot handshake overhead
 
@@ -299,6 +303,35 @@ real protocol code or a faithful instrumented transport fixture.
 Exit: one confirmed exchange per runtime domain; measured gap reduction during
 feedback transitions; no mode/lighting/recovery regression. Do not optimize away
 heartbeats just because a static snapshot appears unchanged.
+
+Candidate, to decide with the recorder's per-id counts: the runtime syncs
+send every change at once, so several changes within one 32 ms lighting frame
+spend four-transaction RPCs on states the slave never draws. The activity
+pattern fits: the first change at once, then at most one send per frame with
+the latest value, and the final state always delivered. Feedback would appear
+no later, since the first change is immediate. Worth building only if typing
+or pointing shows such bursts. The activity interval (32 ms) is its own
+constant, equal to the frame period but governing sleep timing; revisit it if
+`RGB_MATRIX_LED_FLUSH_LIMIT` changes.
+
+### Failed transactions: what they cost
+
+A failed attempt waits the full `SERIAL_USART_TIMEOUT` (5 ms). While the
+link counts as connected, `transaction_handler_master` tries each handler up
+to 10 times with growing waits, so one failed scan stalls the loop for about
+54 ms. QMK declares the peer disconnected after `SPLIT_MAX_CONNECTION_ERRORS`
+(10) failed scans in a row, about 0.5 s of near-frozen reporting, and then
+retries once every `SPLIT_CONNECTION_CHECK_TIMEOUT` (500 ms), each retry a
+5 ms gap. It reconnects on the first retry that succeeds.
+
+Deciding later that the peer is gone would lengthen the expensive phase, not
+help. The candidates are making failure cheap: a short timeout for the
+reconnection retry only, since a live peer answers well within a millisecond,
+and a bound on total retry time per scan. Both are fork changes, and the same
+retry path carries a busy peer, for example one writing flash during Apply,
+without dropping the link, so neither is safe to guess. Decide from the
+baseline capture: failures and the longest span per transaction id show how
+often, and how long, the connected keyboard stalls on retries.
 
 ### 3. Bound remaining report stalls if necessary
 

@@ -55,8 +55,8 @@ class SplitTransportBuildTest(unittest.TestCase):
                         self.assertEqual(f"-D{flag}" in result.stdout.split(), enabled)
 
     def test_pair_flags_and_artifact_names(self):
-        for baud, owner, activity, diagnostic in (("", True, "", ""), ("", True, "yes", ""), ("", True, "no", ""), ("", True, "", "yes"), ("", False, "no", "yes"), ("460800", True, "yes", "")):
-            with self.subTest(baud=baud, owner=owner, activity=activity, diagnostic=diagnostic), tempfile.TemporaryDirectory() as directory:
+        for baud, owner, activity, diagnostic, cadence in (("", True, "", "", ""), ("", True, "yes", "", ""), ("", True, "no", "", ""), ("", True, "", "yes", ""), ("", True, "", "yes", "yes"), ("", False, "no", "yes", "yes"), ("460800", True, "yes", "", "")):
+            with self.subTest(baud=baud, owner=owner, activity=activity, diagnostic=diagnostic, cadence=cadence), tempfile.TemporaryDirectory() as directory:
                 workspace = Path(directory)
                 qmk = workspace / "qmk checkout"
                 qmk.mkdir()
@@ -74,7 +74,8 @@ class SplitTransportBuildTest(unittest.TestCase):
                 mock.chmod(0o755)
                 log = workspace / "calls.jsonl"
                 env = dict(os.environ, QMK_ROOT=str(qmk), BUILD_ROOT=str(workspace / "output"),
-                           NOAH_SPLIT_BAUD=baud, NOAH_SPLIT_ACTIVITY_COALESCE=activity, NOAH_SPLIT_DIAGNOSTICS=diagnostic, PAIR_TEST_LOG=str(log),
+                           NOAH_SPLIT_BAUD=baud, NOAH_SPLIT_ACTIVITY_COALESCE=activity, NOAH_SPLIT_DIAGNOSTICS=diagnostic,
+                           NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS=cadence, PAIR_TEST_LOG=str(log),
                            PATH=f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
                 command = ["sh", str(ROOT / "tools/build-firmware-pair.sh")]
                 if not owner:
@@ -98,8 +99,9 @@ class SplitTransportBuildTest(unittest.TestCase):
                     self.assertFalse("NOAH_SPLIT_ACTIVITY_COALESCE=yes" in call)
                     self.assertEqual("NOAH_SPLIT_ACTIVITY_COALESCE=no" in call, activity == "no")
                     self.assertEqual("NOAH_SPLIT_DIAGNOSTICS=yes" in call, diagnostic == "yes")
+                    self.assertEqual("NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS=yes" in call, cadence == "yes")
                 suffix = "" if owner else "_no_owner"
-                suffix += ("_no_activity" if activity == "no" else "") + ("_diagnostic" if diagnostic else "")
+                suffix += ("_no_activity" if activity == "no" else "") + ("_diagnostic" if diagnostic else "") + ("_cadence" if cadence else "")
                 artifacts = sorted(path.name for path in (workspace / "output").rglob("*.uf2"))
                 self.assertEqual(artifacts, [f"1_charybdis_{half}{suffix}.uf2" for half in ("left", "right")])
                 self.assertEqual("WITHOUT the live-profile owner" in result.stdout, not owner)

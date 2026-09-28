@@ -706,15 +706,15 @@ format limits, compatibility, restore ordering and remaining hardware checks.
 The firmware coalesces split activity messages by default: it sends fewer
 repeated lighting-activity messages to the other half while still reading its
 keys on every scan. The split link always runs at QMK's default 230,400 baud; a
-faster link garbled split messages and was removed (D-L43). Physical RGB/timing
-acceptance is still open.
+faster link garbled split messages and was removed (D-L43).
 
 ```sh
 NOAH_SPLIT_ACTIVITY_COALESCE=no sh tools/build-firmware-pair.sh
 ```
 
 builds the uncoalesced comparison pair, with `_no_activity` in its artifact
-names. Add `NOAH_SPLIT_DIAGNOSTICS=yes` for the ten-second transaction recorder
-(`_diagnostic`), then run `node tools/capture-split-diagnostics.cjs` after
-flashing. Build with Homebrew Python 3.12+ on PATH for the profile tooling.
+names. For a measurement pair add `NOAH_SPLIT_DIAGNOSTICS=yes` (the ten-second
+transaction recorder, `_diagnostic`) and `NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS=yes`
+(the pointing-cadence recorder, `_cadence`), then run
+`node tools/capture-split-diagnostics.cjs` after flashing; it reads both. Build with Homebrew Python 3.12+ on PATH for the profile tooling.
 See [the activity contract and measurement protocol](docs/architecture/split-activity-sync.md).

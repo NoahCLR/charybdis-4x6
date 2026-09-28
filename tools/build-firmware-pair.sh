@@ -54,6 +54,13 @@ case "${NOAH_SPLIT_DIAGNOSTICS:-}" in
     yes) TRANSPORT_ARGS="$TRANSPORT_ARGS -e NOAH_SPLIT_DIAGNOSTICS=yes"; SUFFIX="${SUFFIX}_diagnostic" ;;
     *) echo "NOAH_SPLIT_DIAGNOSTICS must be yes or no" >&2; exit 1 ;;
 esac
+# The pointing-cadence recorder, read with the split recorder by
+# tools/capture-split-diagnostics.cjs.
+case "${NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS:-}" in
+    ""|no) ;;
+    yes) TRANSPORT_ARGS="$TRANSPORT_ARGS -e NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS=yes"; SUFFIX="${SUFFIX}_cadence" ;;
+    *) echo "NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS must be yes or no" >&2; exit 1 ;;
+esac
 
 branch=$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD)
 destdir="$BUILD_ROOT/$branch"

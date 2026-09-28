@@ -6,4 +6,25 @@ assert.deepEqual(decode(0,p),{transactionCount:8,armed:false,frozen:true,duratio
 p[4]=2;p[8]=1;p.writeUInt32LE(400,9);p.writeUInt32LE(1,13);p.writeUInt32LE(5600,17);p.writeUInt32LE(250000,21);p.writeUInt32LE(5000,25);
 assert.deepEqual(decode(2,p),{id:1,attempts:400,failures:1,attemptedBytes:5600,totalUs:250000,maxUs:5000});
 p[5]=3;assert.throws(()=>decode(2,p));p[5]=0;p[8]=2;assert.throws(()=>decode(2,p));assert.throws(()=>decode(2,[]));
+
+const {decodeCadence, summarizeCadence} = require('../../tools/capture-split-diagnostics.cjs');
+const c = Buffer.alloc(32);
+c[0]=7;c[2]=3;c[3]=1;c[6]=25;c[7]=1;c[8]=31;c[9]=12;c.writeUInt32LE(40,10);c.writeUInt32LE(1000000,14);
+[1000,1250,1500,2000,5000].forEach((us,b)=>c.writeUInt16LE(us,18+b*2));c[28]=1;
+const meta = decodeCadence(0,c);
+assert.deepEqual(meta,{pages:31,completed:12,sequence:40,windowUs:1000000,bucketUpperUs:[1000,1250,1500,2000,5000],started:true});
+const w = Buffer.alloc(32);
+w[0]=7;w[2]=3;w[3]=1;w[4]=3;w[6]=25;w.writeUInt32LE(40,7);w[11]=2;w.writeUInt32LE(4200,12);w.writeUInt16LE(900,16);w.writeUInt16LE(450,18);
+[10,400,30,5,4,1].forEach((n,b)=>w.writeUInt16LE(n,20+b*2));
+assert.deepEqual(decodeCadence(3,w),{sequence:40,index:2,maxPointingGapUs:4200,matrixScans:900,pointingPolls:450,histogram:[10,400,30,5,4,1]});
+w[11]=0xff;assert.deepEqual(decodeCadence(3,w),{sequence:40,index:null});
+w[11]=5;assert.throws(()=>decodeCadence(3,w));w[11]=2;w[5]=3;assert.throws(()=>decodeCadence(3,w));w[5]=0;c[7]=2;assert.throws(()=>decodeCadence(0,c));
+const win = (polls,gap) => ({pointingPolls:polls,matrixScans:polls*2,maxPointingGapUs:gap,histogram:[0,polls,0,0,0,0]});
+const summary = summarizeCadence(meta,[win(1,1),win(400,3000),win(500,2000),win(450,9000)],3500);
+assert.equal(summary.windows,2);assert.deepEqual(summary.pointingPollsPerSecond,{mean:475,min:450,max:500});
+assert.equal(summary.maxPointingGapUs,9000);assert.equal(summary.gapHistogram['<1250us'],950);assert.equal(summary.gapHistogram['>=5000us'],0);
+const {estimateCeiling} = require('../../tools/capture-split-diagnostics.cjs');
+const ceiling = estimateCeiling({durationUs:10000000},[{totalUs:2500000},{totalUs:500000}],summary);
+assert.ok(Math.abs(ceiling.splitShare-0.3)<1e-9);assert.ok(Math.abs(ceiling.pointingPollsPerSecond-475/0.7)<1e-9);
+assert.equal(estimateCeiling({durationUs:10000000},[],{unavailable:'x'}),null);
 console.log('split diagnostic tool decoding tests passed');

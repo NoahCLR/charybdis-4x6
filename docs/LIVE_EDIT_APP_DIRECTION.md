@@ -968,8 +968,9 @@ translation.
 ### D-L43 — Split activity optimization, at QMK's default baud
 
 Activity timestamp coalescing is on in the default build, which needs the fork's
-activity hook (`sol` at `6889960271` or later); physical latency and RGB acceptance
-are still open, and `NOAH_SPLIT_ACTIVITY_COALESCE=no` builds without it. The master keeps per-scan left-key acquisition and all existing runtime
+activity hook (`sol` at `6889960271` or later). It is accepted on hardware; its
+effect on the report rate is still to be measured, and
+`NOAH_SPLIT_ACTIVITY_COALESCE=no` builds without it. The master keeps per-scan left-key acquisition and all existing runtime
 and durable split protocols. A narrow QMK hook admits the latest timestamp snapshot
 using the shortest enabled RGB idle timeout and updates successful state only
 after a successful send. An independently gated, bounded recorder provides

@@ -1,8 +1,9 @@
 # Split activity admission and measurement
 
 Activity coalescing is on in the default build. `NOAH_SPLIT_ACTIVITY_COALESCE=no`
-builds the uncoalesced comparison firmware. Physical acceptance is still open;
-see the [optimization handoff](../plans/split-transport-optimization.md).
+builds the uncoalesced comparison firmware. It is accepted on hardware in daily
+use; its measured effect on the report rate is still open, see the
+[optimization handoff](../plans/split-transport-optimization.md).
 The split link runs at QMK's default 230,400 baud, with no speed selector; see
 D-L43 for why 460,800 was removed.
 
@@ -42,9 +43,10 @@ a new runtime protocol or a storage migration.
   packets and durable profile reconciliation retain their existing rules.
 
 Future activity consumers must be included in the timeout/admission contract
-before enabling coalescing with them. Physical sleep/wake, short live timeout
-changes, reconnects, error rates, and latency still require acceptance; host tests
-exercise policy equivalence under their simulated delivery assumptions.
+before enabling coalescing with them. Host tests exercise policy equivalence under
+their simulated delivery assumptions; hardware use has shown no sleep/wake,
+reconnect or lighting regression. Latency and error rates are measured with the
+recorders below.
 
 ## Ten-second transaction recorder
 
@@ -82,8 +84,20 @@ then reads frozen pages as JSON. It uses the existing Charybdis Live node-hid
 installation but is a separate engineering tool. Close competing app/VIA
 connections. Select `--path` if more than one matching keyboard is attached.
 Capture baseline and optimized firmware with the same profile, cable,
-lighting and motion workload. Physical USB report cadence must be measured
-separately; this recorder cannot establish p99 report gaps by itself.
+lighting and motion workload.
+
+The same run reads the pointing-cadence recorder (custom value `0x03`) when
+the firmware is built with `NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS=yes`. It keeps
+one-second windows since boot, unarmed; the tool summarises the complete
+windows inside the capture: pointing polls per second, matrix scans per
+second, the longest gap between pointing polls, and a gap histogram. Pointing
+polls are pointing-task runs, an upper bound on USB mouse reports; the host's
+own report cadence is still the final word. The tool also estimates a ceiling:
+the poll rate with measured split transaction time removed. It excludes
+userspace packet building and ignores the 1000/s USB cap, so it compares
+builds rather than predicting a rate. A capture with the left half
+disconnected is not a substitute: the master keeps probing and waiting on
+transport timeouts.
 
 ## Remaining work
 
