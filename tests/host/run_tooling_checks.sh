@@ -21,8 +21,6 @@ trap cleanup EXIT
 export PYTHONDONTWRITEBYTECODE=1
 export PYTHONPYCACHEPREFIX="$PYTHON_CACHE"
 
-npm --prefix "$REPO_ROOT/tools/charybdis-profile-studio" run check
-
 "$PYTHON" -m py_compile "$REPO_ROOT/tools/profile_introspect.py"
 
 "$PYTHON" "$REPO_ROOT/tools/profile_introspect.py" --check

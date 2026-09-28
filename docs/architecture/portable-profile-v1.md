@@ -316,7 +316,7 @@ checks exercise naming, moving, saving and reviewing an import. Both standard
 and bridge pairs build. The user reports that the new workflow appears to work
 on their keyboard. Physical bridge/export/upgrade/import, restoration onto
 firmware without authored behaviours or combos, reboot, power loss and USB-role
-changes still require a recorded acceptance matrix. The existing Studio macro
+changes still require a recorded acceptance matrix. The live app macro
 builder now reads and edits both device banks through this complete-profile
 restore path. Defaults controls use that path too. Physical acceptance remains
 separate product work.
@@ -324,7 +324,7 @@ separate product work.
 
 ## Defaults editor
 
-Studio's existing section controls receive effective scalar values from the
+The live app's section controls receive effective scalar values from the
 complete snapshot. Section saves preserve both macro banks, layer names and
 all unedited profile bytes, use the complete-profile recovery/restore path, and
 acknowledge only verified readback. Drafts are keyed by device and section and

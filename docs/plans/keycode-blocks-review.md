@@ -123,9 +123,6 @@ publishing and reading back.
   `noah_keymap_ids.h` and `pd-mode-domain-v1.md`.
 - **M2 — `profile_introspect.py` needed Python 3.12** — fixed; `--check` passes on
   3.9 and 3.14.
-- **M3 — Profile Studio misreads the new `keymap.c`** (macro names read as
-  payloads, `COMBO_WINDOW` rows skipped, macro write-back fails) — deferred:
-  Profile Studio is deprecated, and the user chose not to adapt it.
 - **M4 — the layout read warned about keys the app names** — fixed:
   `unnamedKeyCount` counts the blocks as named on the known ABI.
 - **M5 — saved LED groups counted toward the 32 stage-row limit** — fixed: saved

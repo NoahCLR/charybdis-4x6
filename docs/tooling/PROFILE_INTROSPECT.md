@@ -106,9 +106,6 @@ python3 tools/profile_introspect.py --keymap <name> --write
 python3 tools/profile_introspect.py --keymap <name> --check
 ```
 
-Profile Studio's Profile overview row has a `Create overview doc` button that
-runs the same write action for the currently selected profile.
-
 Target a profile directory directly, with explicit output paths:
 
 ```sh

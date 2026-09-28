@@ -4,8 +4,8 @@
 
 | State | Identity | Authority |
 | --- | --- | --- |
-| Studio draft | device base generation/digest plus optional imported source revision | none until an explicit device apply or source export |
-| Source files | canonical digest plus file revision | compiled-default and explicit import/export representation |
+| Live draft | device base generation/digest | none until an explicit device apply |
+| Source files | canonical digest plus file revision | compiled-default representation |
 | Compiled defaults | canonical digest and action-ABI digest | recovery fallback |
 | Device commit | `{counter, origin_half}` plus canonical digest | deployed runtime authority |
 | RGB preview | transaction id, base generation, digest | volatile overlay only |
@@ -21,7 +21,7 @@ draft changes never manufacture device generations.
 - Equal counter and origin but different digest is corruption; stop and expose
   conflict.
 - Equal counter with different origins is a disconnected concurrent commit;
-  stop and require explicit Studio resolution.
+  stop and require explicit user resolution.
 - Reset commits an override-disabled record with a new generation.
 - Applying an unchanged canonical payload is a no-op.
 
@@ -93,30 +93,17 @@ sat unprocessed in the candidate mailbox until a power cycle.
 | Refresh from keyboard | unchanged | reread complete supported profile | prove matching peer or expose drift | draft refreshed or local-draft conflict shown |
 | Save desktop backup | unchanged | read exact logical profile or use a verified draft | prove matching peer or label backup as unresolved | named portable backup with schema and compatibility identity |
 | Restore desktop backup | unchanged | validate and apply as a new generation | prepare then converge | backup restored and exact result read back |
-| Import source | read | unchanged | unchanged | source-derived draft; device unchanged |
-| Export draft to source | write | unchanged | unchanged | source updated; device unchanged |
 | Preview live RGB | unchanged | volatile preview | mirror preview or show peer pending | preview active; never persisted |
 | Roll back preview | unchanged | committed profile | committed profile | preview cleared |
 | Apply draft to keyboard | unchanged | compare base generation, validate, then commit | prepare then converge | device persisted and exact payload read back |
-| Explicit source + device sync | validate proposed source export, then write | prepare before source write, commit after it | prepare/commit with USB half | synchronized or explicit partial outcome |
 | Reset device | unchanged | commit override-disabled generation | converge reset generation | compiled defaults active; source unchanged |
 | Reconcile external VIA change | unchanged | detect changed VIA digest and refuse stale logical generation | prove peer VIA state or expose drift | adopted new logical generation or explicit conflict; never silent divergence |
 
-## Compound Apply Ordering
+## Source and device separation
 
-An explicit compound source-and-device synchronization uses:
-
-1. parse proposed source and build a canonical candidate;
-2. validate locally against connected capabilities;
-3. send and prepare the complete candidate on the device without activation;
-4. write source files;
-5. commit the prepared device candidate;
-6. reread USB and peer status before reporting synchronization.
-
-If source writing fails, Studio aborts the prepared device candidate. If source
-succeeds and device commit fails, Studio reports `source updated but device
-failed` and offers Retry Deploy. If the acknowledgement is lost, Studio queries
-generation and digest before deciding whether the commit failed.
+Authored C files are edited and compiled independently. The live app neither
+writes those files nor combines source writes with a device transaction. Its
+Apply ordering follows the [logical transaction contract](logical-profile-transaction-v1.md).
 
 ## RGB Preview Rules
 
@@ -174,7 +161,7 @@ separate engineering-mutation gate now couples routing with the complete,
 truthful write/commit/activation/peer capability set for hardware testing;
 resource policy and the hardware matrix still block ordinary exposure.
 
-## Connection Status Shown By Studio
+## Connection Status Shown By the Live Client
 
 At minimum:
 
@@ -185,4 +172,4 @@ At minimum:
 - safe-boundary wait reasons;
 - persistence and peer-convergence state;
 - last protocol, storage, validation, and split error;
-- explicit partial result for the last source/device operation.
+- explicit outcome for the last device operation.

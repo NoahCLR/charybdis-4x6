@@ -19,8 +19,7 @@ repository to discover its other checkouts; do not assume the main checkout
 contains another agent's branch. Relative sibling paths below describe the main
 workspace layout and may not hold in a worktree. Select QMK explicitly with
 `QMK_ROOT` for host tests and `QMK_HOME` for the QMK CLI, and set `QMK_USERSPACE`
-to the firmware worktree being built. The legacy Profile Studio tooling check
-also discovers QMK through a sibling named `bastardkb-qmk` or `qmk_firmware`.
+to the firmware worktree being built.
 
 Firmware agents own this checkout's C code, tests and firmware documentation.
 Live agents own the independent app checkout and its documentation; read its
@@ -45,7 +44,7 @@ scattered runtime rewrites.
 > **Opinionated userspace warning:** This repo depends on QMK, but it is not a
 > standard copy-paste QMK keymap. I have interpreted some QMK surfaces
 > differently and shaped them into a Charybdis-specific userspace with its own
-> runtime, data tables, RGB language, split sync, and Profile Studio workflow.
+> runtime, data tables, RGB language, and split sync.
 > If you are looking for small snippets to drop into a normal keymap, this is
 > probably not the easiest place to start. It is more useful as an example of a
 > very opinionated firmware model.
@@ -185,85 +184,22 @@ locking a different pointing mode clears the previous mode lock too.
 Those are capabilities, not a fixed layout prescription. `keymap.c` decides
 where these ideas live.
 
-## Profile Studio
+## Authored firmware profiles
 
-Charybdis Profile Studio is the repo-local VS Code extension for editing the
-authored profile visually: click through the layout, macros, RGB and defaults
-before digging into the C model. It is frozen: bug fixes only, no new features
-and no device access. Editing the connected keyboard is
-[Charybdis Live](#charybdis-live)'s job.
-
-Studio works directly on the selected profile's authored source files, with no
-sidecar database. For my profile those are:
-
-- [`config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h)
-- [`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c)
-- [`rgb_config.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c)
-
-It parses them, stages edits in a webview, and patches the same authored blocks
-when you apply. On a keyboard, those files are compiled defaults; the profile
-committed on the keyboard is the source of truth (see
-[`device-resident-profile.md`](./docs/architecture/device-resident-profile.md)
-and [`PRODUCT_GOAL.md`](./docs/PRODUCT_GOAL.md)).
-
-Use Profile Studio when you want to:
-
-- click keys on a visual Charybdis layout and edit layer slots
-- add or remove layers through the supported source patches
-- edit selected-key behavior rows and combo-output behavior rows
-- append simple combos from physical key selections, or load an existing combo
-  to edit its output and inputs
-- edit VIA macro slots with a macro builder and key-event recorder
-- choose layer and pointing-mode colors, and build reusable LED groups by
-  selecting LEDs on the board
-- edit auto-mouse fade settings, combo feedback, and key-behavior feedback
-- configure `config.h` defaults for key timing, pointer speed, pointing modes,
-  sniping, auto-mouse, base lighting, and lighting feedback
-- compile left and right firmware for the selected profile (`Compile left +
-  right` in the Firmware row)
-
-The profile picker can also create, clone, rename, and delete Charybdis 4x6
-keymaps under `keyboards/bastardkb/charybdis/4x6/keymaps/<name>/` while keeping
-`qmk.json` build targets in sync. A generated profile gets a blank `keymap.c`,
-compile-ready `config.h` and `rgb_config.c`, and a small `rules.mk` that points
-QMK at the shared `users/noah` runtime:
-
-```sh
-qmk compile -kb bastardkb/charybdis/4x6 -km <name>
-```
-
-For a read-only overview of my current config, start with the generated
-[`KEYMAP-OVERVIEW.md`](./docs/KEYMAP-OVERVIEW.md); the companion
-[`KEYMAP.md`](./docs/KEYMAP.md) explains the profile choices in prose. Other
-profiles generate their own with
-`python3 tools/profile_introspect.py --keymap <name> --write`, by default into
-`docs/profiles/<name>/KEYMAP-OVERVIEW.md`, or with Studio's `Create overview
-doc` action.
-
-Screenshots:
-[`Layout`](./docs/media/profile-studio/studio-layout-tab.png),
-[`Macros`](./docs/media/profile-studio/studio-macros-tab.png),
-[`RGB`](./docs/media/profile-studio/studio-rgb-tab.png), and
-[`Defaults`](./docs/media/profile-studio/studio-defaults-tab.png).
-
-To install it, run the VS Code task `Install Profile Studio Extension` and
-reload VS Code, or from a shell:
-
-```sh
-cd tools/charybdis-profile-studio
-npm run install:local
-```
-
-Open it from the `$(keyboard) Profile Studio` status bar item or `Charybdis:
-Open Profile Studio`. The full guide is
-[`docs/tooling/PROFILE_STUDIO.md`](./docs/tooling/PROFILE_STUDIO.md).
+Edit compiled defaults directly in `keymap.c`, `config.h`, and `rgb_config.c`
+under `keyboards/bastardkb/charybdis/4x6/keymaps/<name>/`. Validate authored
+changes with the firmware host tests and regenerate their read-only overview
+with `python3 tools/profile_introspect.py --keymap <name> --write`.
+For the default profile, see [KEYMAP-OVERVIEW.md](docs/KEYMAP-OVERVIEW.md) and
+[KEYMAP.md](docs/KEYMAP.md). On a connected keyboard, the committed device
+profile is the source of truth; edit it with Charybdis Live.
 
 ## Charybdis Live
 
 Charybdis Live edits the connected keyboard over
 Raw HID. Its runtime never reads this repository, so it needs no firmware workspace: the
-keyboard is the source of truth and the app is its client. Profile Studio owns
-`.c` authoring; this app owns the device.
+keyboard is the source of truth and the app is its client. Authored C files
+remain the firmware's compiled defaults.
 
 The active VS Code installation uses the independent sibling `charybdis-live`
 repository. For a new installation, symlink the sibling folder into VS Code's
@@ -365,7 +301,7 @@ The direction, the decisions behind it, and what is deliberately left
 undesigned are in
 [`docs/LIVE_EDIT_APP_DIRECTION.md`](./docs/LIVE_EDIT_APP_DIRECTION.md).
 
-The next sections explain the keymap and RGB models that Profile Studio edits.
+The next sections explain the authored keymap and RGB models.
 
 ## The Keymap Model
 
@@ -682,8 +618,6 @@ Use the docs based on what you want to change:
   handled-key runtime and ownership model
 - [`docs/HOOK_OVERRIDES.md`](./docs/HOOK_OVERRIDES.md): how to override QMK
   hooks without dropping shared userspace behavior
-- [`docs/tooling/PROFILE_STUDIO.md`](./docs/tooling/PROFILE_STUDIO.md):
-  Profile Studio workflow
 - [`docs/tooling/PROFILE_INTROSPECT.md`](./docs/tooling/PROFILE_INTROSPECT.md):
   generated profile docs workflow
 - [`docs/tooling/VIA_TO_QMK.md`](./docs/tooling/VIA_TO_QMK.md): round-trip VIA

@@ -27,11 +27,8 @@ and [`docs/architecture/device-resident-profile.md`](./docs/architecture/device-
   `tools/charybdis-live/` source lives in Git history, not this checkout.
   The app runtime must never read firmware source; developer inspection and
   Live-owned integration tests may read explicitly selected firmware checkouts.
-- **`tools/charybdis-profile-studio/`** edits `keymap.c`, `config.h`, and
-  `rgb_config.c`. It is **frozen** at its `refactor/aug` state. Bug fixes only.
-  Do not add features to it, and do not give it device capabilities.
-
-Work that blurs that line is what the split between them exists to prevent.
+- Authored C profiles remain firmware source, edited directly and checked by
+  firmware validation and introspection tools.
 
 ### Where we are
 
@@ -83,9 +80,6 @@ Required verification workflow:
    - macro / VIA / QMK-contract work: `sh tests/host/run_qmk_contract_checks.sh`, `sh tests/host/run_action_lifecycle_tests.sh`, `sh tests/host/run_qmk_portable_profile_tests.sh`, `sh tests/host/run_macro_payload_tests.sh`, `sh tests/host/run_via_macro_defaults_tests.sh`, `sh tests/host/run_via_macro_action_lifecycle_tests.sh`
    - shared runtime / tracing: `sh tests/host/run_runtime_init_order_tests.sh`, `sh tests/host/run_runtime_debug_tests.sh`, `sh tests/host/run_runtime_trace_tests.sh`
    - Charybdis Live lives in its independent repository and owns its checks; firmware checks must not invoke an app checkout.
-   - Profile Studio extension/UI (bug fixes only): from `tools/charybdis-profile-studio/`, run `npm run check` and `npm run screenshots`
-     - For Profile Studio hover/tooltip changes, `npm run screenshots` is not enough because it captures resting page states. Generate a kept harness with `npm run screenshots -- --keep-harness`, serve that harness over localhost, then drive a real mouse move against the target with Chrome/CDP `Input.dispatchMouseEvent` or an equivalent browser action and capture the hover state. Do not rely on file URLs in the in-app browser or read-only DOM synthetic events for hover verification; they can be blocked or fail to create the actual tooltip state. Stop any temporary localhost server before handing work back.
-     - When editing regex literals inside the generated Profile Studio client script returned by `getClientScript()`, remember the code lives inside an outer JavaScript template string. Escape regex backslashes for the generated script, for example `/\\b(?:VIA_MACRO|MACRO)_\\d+\\b/g`, otherwise hover-only checks can miss broken parsing that normal screenshots do not exercise.
 4. If authored keymap, combo, macro, or RGB data changed, also run:
    `sh tests/host/run_real_profile_validation_tests.sh`
 5. If runtime wiring, source lists, compat surfaces, or header boundaries changed, also run:

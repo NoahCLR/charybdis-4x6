@@ -205,7 +205,7 @@ COMMITTING on nothing expires or cancels.
 Ordinary VIA writes remain supported outside a logical transaction. Firmware
 first converges VIA storage on both halves, then adopts its new VIA identity as
 a new logical manifest generation bound to the unchanged custom digest. Until
-adoption finishes, Studio reports an external-change transition and refuses a
+adoption finishes, the live client reports an external-change transition and refuses a
 stale Apply.
 
 ## Performance Contract

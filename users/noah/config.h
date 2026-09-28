@@ -189,7 +189,7 @@
 #ifdef VIA_ENABLE
 // Profile Wire v1-capable firmware. Standard VIA reports this numeric value in
 // big-endian byte order while the custom Profile Wire capability page encodes
-// the same uint32 value little-endian; Studio compares the decoded values.
+// the same uint32 value little-endian; clients compare the decoded values.
 #    define VIA_FIRMWARE_VERSION 0x00010000u
 #    define DYNAMIC_KEYMAP_LAYER_COUNT LAYER_COUNT
 #    define DYNAMIC_KEYMAP_MACRO_COUNT 64

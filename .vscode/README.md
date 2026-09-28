@@ -18,12 +18,10 @@ working directory explicitly to this firmware repository.
   another firmware build. Regenerate after changing compile-time configuration.
 - **Run all firmware host tests** is the default test task.
 - Layout overview and source formatting remain available through **Tasks: Run
-  Task**. Profile Studio launch/install entries and the deprecated VIA-to-source
-  sync task are removed; their source remains in the repo.
+  Task**.
 
 Charybdis Live launch/check/catalog tasks belong to the sibling `charybdis-live`
-repo. The older copy under `tools/` remains pending firmware-repo cleanup and
-is no longer a VS Code launch target here. The shared status bar has **Build
+repo. The shared status bar has **Build
 Firmware**, **Build with DB** and **Format Repo** buttons. The installed Live
 extension supplies the fourth button, **Charybdis Live**, and must point to the
 independent repo. Test tasks remain available without status-bar buttons.

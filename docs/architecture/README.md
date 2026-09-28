@@ -72,7 +72,7 @@ The main rule is:
 
 | Runtime fact | Owner | Readers or projections |
 | --- | --- | --- |
-| Compiled profile defaults | keymap-owned files under `keyboards/.../keymaps/noah/` | firmware compilation, compiled-defaults readback, Profile Studio, validation, profile introspection |
+| Compiled profile defaults | keymap-owned files under `keyboards/.../keymaps/noah/` | firmware compilation, compiled-defaults readback, validation, profile introspection |
 | Active committed live profile | one logical generation across VIA dynamic storage and the custom profile store | effective runtime views, dynamic keymap, Charybdis Live readback |
 | Action classification and dispatch semantics | `users/noah/lib/action/` | key behavior materialization, key runtime, macro dispatch, direct action taps |
 | QMK and fork compatibility assumptions | `users/noah/lib/compat/` | runtime entry flow, combo origin normalization, VIA split sync, QMK contract checks |

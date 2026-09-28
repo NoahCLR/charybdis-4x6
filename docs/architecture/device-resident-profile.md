@@ -36,11 +36,11 @@ On a connected keyboard, the active committed device generation is the live
 authority. The three C files remain:
 
 - compiled factory defaults and the recovery fallback;
-- the human-reviewable and version-controlled representation, authored with
-  the separate, frozen Profile Studio.
+- the human-reviewable and version-controlled representation, edited directly
+  in the firmware repository.
 
 The live app never reads or writes them. Its durable representation is the
-portable profile; `.c` import and export stay in Profile Studio (D-L09 in the
+portable profile; `.c` import and export are outside the app (D-L09 in the
 [direction](../LIVE_EDIT_APP_DIRECTION.md)). Connecting a keyboard never
 silently overwrites the keyboard or a draft.
 

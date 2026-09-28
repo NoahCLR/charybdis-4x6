@@ -375,8 +375,8 @@ their schema feature bits. Candidate chunk capacity is
 zero exactly when candidate writes are absent and otherwise is `1..20`.
 Commit and runtime activation require candidate writes. RGB preview also
 requires the RGB domain. Peer reconciliation requires both split-keyboard and
-persistent-commit support. Studio rejects inconsistent combinations before it
-offers a live operation.
+persistent-commit support. The live client rejects inconsistent combinations
+before it offers a live operation.
 
 Status also uses two pages. Page 0 reports state flags and source, compiled,
 active, pending, and committed digests. Page 1 reports active, committed, and
@@ -513,7 +513,7 @@ the prior generation remains active meanwhile. A duplicate commit for the same
 transaction is a no-op while commit/activation is progressing and after final
 success. Once durable commit has entered activation, abort cannot undo it.
 Failure while completing or confirming the final marker is reported as
-durability unknown, not as a safe failure: Studio must reconcile committed
+durability unknown, not as a safe failure: the live client must reconcile committed
 generation and digest before retrying.
 
 Abort is idempotent before durable commit; retrying a successful or no-op abort
