@@ -60,6 +60,51 @@ bool pointer_layer_policy_is_mouse_record(uint16_t keycode) {
     return false;
 }
 
+// QMK resolves a record's keycode, process_auto_mouse() then turns its layer
+// off for a non-mouse press, and the default handler looks the action up a
+// second time. A press resolved from the auto-mouse layer would run the key
+// beneath it while every hook before that saw the auto-mouse layer's key. It
+// counts as a mouse key for its own record instead, so both lookups agree,
+// and settles as soon as the record is processed with the reset QMK skipped.
+static bool deferred_reset_pending;
+
+void pointer_layer_policy_settle_record(void) {
+    if (!deferred_reset_pending) {
+        return;
+    }
+    deferred_reset_pending = false;
+
+    // QMK zeroes the tracker if auto-mouse was reset or retargeted meanwhile.
+    if (noah_qmk_contract_auto_mouse_key_tracker() > 0) {
+        noah_qmk_contract_auto_mouse_keyevent(false);
+    }
+    if (!noah_qmk_contract_auto_mouse_active()) {
+        noah_qmk_contract_auto_mouse_reset_trigger(true);
+    }
+}
+
+bool pointer_layer_policy_is_mouse_key_record(uint16_t keycode, const keyrecord_t *record) {
+    // Synthetic records the runtime dispatches mid-record sit off the matrix.
+    bool physical = record && record->event.type == KEY_EVENT && record->event.key.row < MATRIX_ROWS && record->event.key.col < MATRIX_COLS;
+
+    // A physical record that stopped before process_record_user() never settled.
+    if (physical) {
+        pointer_layer_policy_settle_record();
+    }
+
+    // QMK asks is_mouse_record_kb() before its own IS_MOUSEKEY() test.
+    if (IS_MOUSEKEY(keycode) || pointer_layer_policy_is_mouse_record(keycode)) {
+        return true;
+    }
+
+    if (!(physical && record->event.pressed) || noah_qmk_contract_record_source_layer(record) != noah_qmk_contract_auto_mouse_layer()) {
+        return false;
+    }
+
+    deferred_reset_pending = true;
+    return true;
+}
+
 bool pointer_layer_policy_is_mouse_action(uint16_t action) {
     return pointer_layer_policy_is_mouse_button_action(action);
 }
@@ -158,6 +203,14 @@ bool pointer_layer_policy_is_mouse_record(uint16_t keycode) {
     (void)keycode;
     return false;
 }
+
+bool pointer_layer_policy_is_mouse_key_record(uint16_t keycode, const keyrecord_t *record) {
+    (void)keycode;
+    (void)record;
+    return false;
+}
+
+void pointer_layer_policy_settle_record(void) {}
 
 bool pointer_layer_policy_is_mouse_action(uint16_t action) {
     (void)action;

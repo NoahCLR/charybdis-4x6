@@ -441,6 +441,9 @@ void noah_process_record_user_finalize(uint16_t keycode, keyrecord_t *record, bo
     key_runtime_process_settle_report_ownership(keycode, record, keep_processing);
     key_runtime_process_end_keyboard_event_mod_mask();
     key_runtime_process_settle_oneshot_layer(keycode, record);
+    if (!noah_synthetic_record_active()) {
+        pointer_layer_policy_settle_record();
+    }
     key_runtime_trace_bool_result("process:return", keycode, record, keep_processing);
     noah_runtime_diag_scope_leave();
 }

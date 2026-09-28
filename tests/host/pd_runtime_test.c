@@ -230,6 +230,15 @@ void auto_mouse_keyevent(bool pressed) {
     auto_mouse_keyevent_calls++;
 }
 
+void auto_mouse_reset_trigger(bool pressed) {
+    (void)pressed;
+}
+
+uint8_t read_source_layers_cache(keypos_t key) {
+    (void)key;
+    return 0;
+}
+
 bool key_behavior_keeps_auto_mouse_anchored(uint16_t keycode) {
     (void)keycode;
     return false;

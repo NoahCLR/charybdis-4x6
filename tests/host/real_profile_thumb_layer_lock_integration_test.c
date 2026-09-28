@@ -126,7 +126,14 @@ static uint8_t test_highest_active_layer(void) {
     return LAYER_BASE;
 }
 
+// A key a test puts on the Pointing layer in place of the profile's.
+static uint16_t test_pointer_key_override = KC_NO;
+static keypos_t test_pointer_key_override_pos;
+
 static uint16_t test_keycode_at(uint8_t layer_num, keypos_t key_pos) {
+    if (test_pointer_key_override != KC_NO && layer_num == LAYER_POINTER && key_pos.row == test_pointer_key_override_pos.row && key_pos.col == test_pointer_key_override_pos.col) {
+        return test_pointer_key_override;
+    }
     return keymaps[layer_num][key_pos.row][key_pos.col];
 }
 
@@ -174,6 +181,16 @@ static int16_t test_find_free_held_action_slot(void) {
     return -1;
 }
 
+static uint8_t test_resolve_layer(keypos_t key_pos) {
+    for (int8_t layer = (int8_t)test_highest_active_layer(); layer >= 0; layer--) {
+        if (test_layer_active((uint8_t)layer) && test_keycode_at((uint8_t)layer, key_pos) != KC_TRNS) {
+            return (uint8_t)layer;
+        }
+    }
+
+    return LAYER_BASE;
+}
+
 static uint16_t test_resolve_keycode(keypos_t key_pos) {
     uint8_t highest = test_highest_active_layer();
 
@@ -185,6 +202,12 @@ static uint16_t test_resolve_keycode(keypos_t key_pos) {
     }
 
     return KC_NO;
+}
+
+// Records are processed straight after QMK resolves them, so the layer it
+// stored for this press is the one resolving it now.
+uint8_t read_source_layers_cache(keypos_t key) {
+    return test_resolve_layer(key);
 }
 
 static uint16_t test_cached_press_keycode(keypos_t key_pos) {
@@ -401,6 +424,7 @@ static void test_reset_state(void) {
     auto_mouse_key_tracker     = 0;
     auto_mouse_layer_target    = LAYER_POINTER;
     auto_mouse_layer_off_count = 0;
+    test_pointer_key_override  = KC_NO;
     reset_dragscroll_count     = 0;
     memset(test_pressed_keycodes, 0, sizeof(test_pressed_keycodes));
     memset(test_held_actions, 0, sizeof(test_held_actions));
@@ -507,7 +531,7 @@ void layer_off(uint8_t layer) {
 }
 
 uint16_t keycode_at_keymap_location(uint8_t layer_num, uint8_t row, uint8_t column) {
-    return keymaps[layer_num][row][column];
+    return test_keycode_at(layer_num, (keypos_t){.row = row, .col = column});
 }
 
 uint8_t get_mods(void) {
@@ -916,7 +940,7 @@ void auto_mouse_layer_off(void) {
     }
 }
 
-static void test_auto_mouse_reset_trigger(bool pressed) {
+void auto_mouse_reset_trigger(bool pressed) {
     if (!pressed) {
         return;
     }
@@ -998,7 +1022,7 @@ bool key_runtime_integration_pre_userspace_record(uint16_t keycode, keyrecord_t 
         if (IS_MOUSEKEY_BUTTON(keycode) || noah_is_mouse_record_user(keycode, record)) {
             auto_mouse_keyevent(record->event.pressed);
         } else if (!is_auto_mouse_active()) {
-            test_auto_mouse_reset_trigger(record->event.pressed);
+            auto_mouse_reset_trigger(record->event.pressed);
         }
     }
 
@@ -3240,6 +3264,49 @@ static void test_to_pointer_then_to_base_leaves_the_pointer_layer_free(void) {
     CHECK(!is_auto_mouse_active());
 }
 
+// QMK resolves a Pointing key, then auto-mouse turns Pointing off for a
+// non-mouse press, then QMK's default handler looks the action up again. With
+// KC_J on Pointing over LT(NAV, F) that handler ran the Navigation hold while
+// the runtime saw KC_J, and nothing released the layer. The Pointing key now
+// keeps its layer through its own record and closes it straight after.
+static void test_pointer_layer_key_runs_as_itself_then_closes_the_layer(void) {
+    keypos_t f_pos = test_find_keypos_on_layer(LAYER_BASE, LT(LAYER_NAV, KC_F));
+
+    test_reset_state();
+    test_pointer_key_override     = KC_J;
+    test_pointer_key_override_pos = f_pos;
+    layer_on(LAYER_POINTER);
+    CHECK(test_resolve_keycode(f_pos) == KC_J);
+
+    keyrecord_t press = {.event = {.type = KEY_EVENT, .key = f_pos, .pressed = true}};
+    CHECK(key_runtime_integration_pre_userspace_record(KC_J, &press));
+    CHECK(noah_pre_process_record_user(KC_J, &press));
+    CHECK(noah_process_record_user(KC_J, &press));
+    // QMK's default handler looks the action up now.
+    CHECK(test_resolve_keycode(f_pos) == KC_J);
+    noah_post_process_record_user(KC_J, &press);
+
+    CHECK(!test_layer_active(LAYER_POINTER));
+    CHECK(!test_layer_active(LAYER_NAV));
+    CHECK(auto_mouse_key_tracker == 0);
+
+    CHECK(key_runtime_integration_process_record(KC_J, f_pos, false));
+    CHECK(!test_layer_active(LAYER_NAV));
+    CHECK(auto_mouse_key_tracker == 0);
+    test_assert_thumb_runtime_quiescent(f_pos);
+
+    // A position Pointing leaves transparent still closes it before its key.
+    keypos_t d_pos = test_find_keypos_on_layer(LAYER_BASE, KC_D);
+    layer_on(LAYER_POINTER);
+    press = (keyrecord_t){.event = {.type = KEY_EVENT, .key = d_pos, .pressed = true}};
+    CHECK(key_runtime_integration_pre_userspace_record(KC_D, &press));
+    CHECK(!test_layer_active(LAYER_POINTER));
+    CHECK(noah_process_record_user(KC_D, &press));
+    noah_post_process_record_user(KC_D, &press);
+    CHECK(key_runtime_integration_process_record(KC_D, d_pos, false));
+    CHECK(auto_mouse_key_tracker == 0);
+}
+
 // A lock on the pointer layer holds QMK's auto-mouse as a held mouse key does,
 // so the next ordinary key does not reset it off; unlocking lets it go.
 static void test_pointer_layer_lock_holds_auto_mouse_until_unlocked(void) {
@@ -3545,6 +3612,7 @@ int main(void) {
     test_combo_oneshot_and_tap_toggle_are_owned();
     test_plain_layer_tap_hold_is_owned_and_its_tap_is_qmks();
     test_to_pointer_then_to_base_leaves_the_pointer_layer_free();
+    test_pointer_layer_key_runs_as_itself_then_closes_the_layer();
     test_pointer_layer_lock_holds_auto_mouse_until_unlocked();
     test_oneshot_layer_serves_the_next_key();
     test_tap_toggle_taps_lock_and_holds_are_momentary();

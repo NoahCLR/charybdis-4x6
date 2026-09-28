@@ -17,6 +17,8 @@ static uint16_t       fake_anchored_behavior_keycode;
 static bool           fake_auto_mouse_enabled;
 static layer_state_t  fake_locked_layers;
 static uint8_t        auto_mouse_toggle_calls;
+static uint8_t        fake_source_layer;
+static uint8_t        auto_mouse_reset_presses;
 
 layer_state_t layer_state = 0;
 
@@ -33,6 +35,7 @@ static void test_fail(const char *expr, const char *file, int line) {
     } while (0)
 
 static void test_reset_stubs(void) {
+    pointer_layer_policy_settle_record();
     fake_auto_mouse_toggle         = false;
     fake_auto_mouse_key_tracker    = 0;
     fake_auto_mouse_layer          = 4;
@@ -43,6 +46,8 @@ static void test_reset_stubs(void) {
     fake_auto_mouse_enabled        = true;
     fake_locked_layers             = 0;
     auto_mouse_toggle_calls        = 0;
+    fake_source_layer              = 0;
+    auto_mouse_reset_presses       = 0;
 }
 
 bool layer_state_cmp(layer_state_t state, uint8_t layer) {
@@ -65,6 +70,23 @@ void auto_mouse_keyevent(bool pressed) {
     CHECK(auto_mouse_keyevent_calls < ARRAY_SIZE(auto_mouse_keyevent_pressed));
     auto_mouse_keyevent_pressed[auto_mouse_keyevent_calls++] = pressed;
     fake_auto_mouse_key_tracker += pressed ? 1 : -1;
+}
+
+bool is_auto_mouse_active(void) {
+    return fake_auto_mouse_toggle || fake_auto_mouse_key_tracker != 0;
+}
+
+void auto_mouse_reset_trigger(bool pressed) {
+    if (pressed) {
+        auto_mouse_reset_presses++;
+        fake_auto_mouse_toggle      = false;
+        fake_auto_mouse_key_tracker = 0;
+    }
+}
+
+uint8_t read_source_layers_cache(keypos_t key) {
+    (void)key;
+    return fake_source_layer;
 }
 
 bool get_auto_mouse_enable(void) {
@@ -188,6 +210,103 @@ static void test_authored_anchor_row_counts_as_a_mouse_record(void) {
 
     CHECK(pointer_layer_policy_is_mouse_record(KC_C));
     CHECK(!pointer_layer_policy_is_mouse_record(KC_D));
+}
+
+// process_auto_mouse()'s default branch, which asks is_mouse_record().
+static void test_auto_mouse_key_record(uint16_t keycode, uint8_t row, bool pressed) {
+    keyrecord_t record = {
+        .event =
+            {
+                .type    = KEY_EVENT,
+                .key     = {.row = row, .col = 1},
+                .pressed = pressed,
+            },
+    };
+
+    if (pointer_layer_policy_is_mouse_key_record(keycode, &record)) {
+        auto_mouse_keyevent(pressed);
+    } else if (!is_auto_mouse_active()) {
+        auto_mouse_reset_trigger(pressed);
+    }
+}
+
+// A key resolved from the auto-mouse layer keeps that layer through its own
+// record, so QMK's action lookup agrees with the keycode every hook saw, then
+// gets the reset QMK would have given it on the press.
+static void test_auto_mouse_layer_key_resets_after_its_record(void) {
+    test_reset_stubs();
+    fake_source_layer = fake_auto_mouse_layer;
+
+    test_auto_mouse_key_record(KC_J, 1, true);
+    CHECK(fake_auto_mouse_key_tracker == 1);
+    CHECK(auto_mouse_reset_presses == 0);
+
+    pointer_layer_policy_settle_record();
+    CHECK(fake_auto_mouse_key_tracker == 0);
+    CHECK(auto_mouse_reset_presses == 1);
+
+    pointer_layer_policy_settle_record();
+    CHECK(auto_mouse_reset_presses == 1);
+
+    // Its release is an ordinary non-mouse release.
+    test_auto_mouse_key_record(KC_J, 1, false);
+    CHECK(fake_auto_mouse_key_tracker == 0);
+    CHECK(auto_mouse_reset_presses == 1);
+}
+
+static void test_other_layer_key_resets_in_its_record(void) {
+    test_reset_stubs();
+    fake_source_layer = 0;
+
+    test_auto_mouse_key_record(KC_J, 1, true);
+    CHECK(auto_mouse_reset_presses == 1);
+    pointer_layer_policy_settle_record();
+    CHECK(auto_mouse_reset_presses == 1);
+}
+
+// An anchored key keeps the layer as before: nothing to settle.
+static void test_anchored_auto_mouse_layer_key_keeps_the_layer(void) {
+    test_reset_stubs();
+    fake_source_layer              = fake_auto_mouse_layer;
+    fake_anchored_behavior_keycode = KC_J;
+
+    test_auto_mouse_key_record(KC_J, 1, true);
+    pointer_layer_policy_settle_record();
+    CHECK(fake_auto_mouse_key_tracker == 1);
+    CHECK(auto_mouse_reset_presses == 0);
+    test_auto_mouse_key_record(KC_J, 1, false);
+    CHECK(fake_auto_mouse_key_tracker == 0);
+}
+
+// QMK resets only a layer nothing else holds; the settle asks after the key
+// ran, so a key that locked the layer, or a held mouse key, keeps it.
+static void test_settle_keeps_a_layer_something_else_holds(void) {
+    test_reset_stubs();
+    fake_source_layer = fake_auto_mouse_layer;
+
+    test_auto_mouse_key_record(MS_BTN1, 2, true);
+    test_auto_mouse_key_record(KC_J, 1, true);
+    CHECK(fake_auto_mouse_key_tracker == 2);
+    pointer_layer_policy_settle_record();
+    CHECK(fake_auto_mouse_key_tracker == 1);
+    CHECK(auto_mouse_reset_presses == 0);
+}
+
+// A record that stopped before process_record_user() is settled by the next
+// physical record, and a synthetic record in the middle of one is not.
+static void test_unsettled_press_settles_on_next_physical_record(void) {
+    test_reset_stubs();
+    fake_source_layer = fake_auto_mouse_layer;
+
+    test_auto_mouse_key_record(KC_J, 1, true);
+    test_auto_mouse_key_record(KC_K, UINT8_MAX, true);
+    CHECK(auto_mouse_reset_presses == 0);
+    CHECK(fake_auto_mouse_key_tracker == 1);
+
+    fake_source_layer = 0;
+    test_auto_mouse_key_record(KC_K, 2, true);
+    CHECK(fake_auto_mouse_key_tracker == 0);
+    CHECK(auto_mouse_reset_presses >= 1);
 }
 
 static void test_mouse_button_actions_notify_auto_mouse(void) {
@@ -413,6 +532,11 @@ static void test_take_back_undoes_qmks_toggle_on_its_layer_keys(void) {
 }
 
 int main(void) {
+    test_auto_mouse_layer_key_resets_after_its_record();
+    test_other_layer_key_resets_in_its_record();
+    test_anchored_auto_mouse_layer_key_keeps_the_layer();
+    test_settle_keeps_a_layer_something_else_holds();
+    test_unsettled_press_settles_on_next_physical_record();
     test_non_arrow_pd_mode_marks_layer_holds_as_mouse_records();
     test_arrow_mode_does_not_anchor_layer_hold_keys();
     test_non_arrow_pd_mode_keys_and_dpi_keys_count_as_mouse_records();

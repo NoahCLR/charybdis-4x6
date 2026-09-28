@@ -68,6 +68,23 @@ static inline void noah_qmk_contract_auto_mouse_keyevent(bool pressed) {
     auto_mouse_keyevent(pressed);
 }
 
+// What process_auto_mouse does for a non-mouse key record while auto-mouse is
+// not active: on a press, turn its layer off and clear its state; on either
+// edge, restart the delay before movement can bring the layer back.
+static inline void noah_qmk_contract_auto_mouse_reset_trigger(bool pressed) {
+    auto_mouse_reset_trigger(pressed);
+}
+
+// The layer QMK resolved this record's keycode from. process_record_quantum()
+// stores it in the source-layer cache before any process_* hook runs, and a
+// release reads the entry its press stored.
+#    if defined(STRICT_LAYER_RELEASE) || defined(NO_ACTION_LAYER)
+#        error "auto-mouse pointer policy needs QMK's source-layer cache"
+#    endif
+static inline uint8_t noah_qmk_contract_record_source_layer(const keyrecord_t *record) {
+    return read_source_layers_cache(record->event.key);
+}
+
 // Whether QMK's process_auto_mouse flipped its own toggle for this record. It
 // runs before process_record_kb and flips it on the release of TG() or TO() of
 // its layer, and on the release of TT()'s TAPPING_TOGGLE-th tap of it.

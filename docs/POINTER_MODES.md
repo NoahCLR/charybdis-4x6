@@ -112,6 +112,20 @@ pointer layer down on the press otherwise, and a `TAP_SENDS(KC_TRNS)` tier on
 such a key then has no layer left to fall through from, so its tap sends
 nothing at all.
 
+A key that is not anchored still closes the auto-mouse layer, but only once
+its own press has been processed. QMK resolves a record's keycode, then
+`process_auto_mouse` turns its layer off, then the default handler looks the
+action up again; a key taken from the auto-mouse layer would run the key
+beneath it while every hook before that saw the auto-mouse layer's key. With
+`KC_J` on the Pointing layer over `LT(NAV, KC_F)`, that handler held Navigation
+while the runtime saw `KC_J`, and nothing released it. So a press resolved
+from the auto-mouse layer counts as a mouse key for its own record, and
+`pointer_layer_policy_settle_record()` applies QMK's reset right after, unless
+something else — a held mouse key, a lock — now holds the layer. Positions the
+layer leaves transparent resolve from a lower layer and close it before their
+key, as QMK does. Layer keys on the auto-mouse layer follow QMK's own rules
+and never reach this question.
+
 A lock on the auto-mouse layer is the runtime's own lock, like any other
 layer's (`TG()`, `LOCK_LAYER()`, `TO()`, `TT()`'s locking tap, from a key, a
 behaviour or a combo). While it lasts it holds QMK's auto-mouse on the way a

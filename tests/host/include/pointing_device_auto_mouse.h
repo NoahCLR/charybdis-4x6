@@ -15,3 +15,4 @@ void     set_auto_mouse_layer(uint8_t layer);
 void     auto_mouse_layer_off(void);
 void     auto_mouse_toggle(void);
 void     auto_mouse_keyevent(bool pressed);
+void     auto_mouse_reset_trigger(bool pressed);

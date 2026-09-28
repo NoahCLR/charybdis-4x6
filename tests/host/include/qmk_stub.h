@@ -90,6 +90,9 @@ static inline uint16_t pgm_read_word(const void *addr_) {
 #    define MOD_RGUI 0x18u
 #endif
 
+#ifndef IS_MOUSEKEY
+#    define IS_MOUSEKEY(keycode_) ((keycode_) >= QK_MOUSE_CURSOR_UP && (keycode_) <= QK_MOUSE_ACCELERATION_2)
+#endif
 #ifndef IS_MOUSEKEY_BUTTON
 #    define IS_MOUSEKEY_BUTTON(keycode_) ((keycode_) >= QK_MOUSE_BUTTON_1 && (keycode_) <= QK_MOUSE_BUTTON_8)
 #endif
@@ -255,6 +258,7 @@ uint8_t              get_highest_layer(layer_state_t state);
 uint8_t              combo_ref_from_layer(uint8_t layer);
 uint16_t             keymap_key_to_keycode(uint8_t layer, keypos_t key);
 uint16_t             get_record_keycode(keyrecord_t *record, bool update_layer_cache);
+uint8_t              read_source_layers_cache(keypos_t key);
 
 uint8_t get_mods(void);
 uint8_t get_weak_mods(void);

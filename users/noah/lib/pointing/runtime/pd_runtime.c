@@ -80,8 +80,7 @@ void noah_pointing_device_init_user(void) {
 
 #if defined(POINTING_DEVICE_ENABLE) && defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE)
 bool noah_is_mouse_record_user(uint16_t keycode, keyrecord_t *record) {
-    (void)record;
-    return pointer_layer_policy_is_mouse_record(keycode);
+    return pointer_layer_policy_is_mouse_key_record(keycode, record);
 }
 #else
 bool noah_is_mouse_record_user(uint16_t keycode, keyrecord_t *record) {

@@ -750,6 +750,15 @@ void auto_mouse_keyevent(bool pressed) {
     auto_mouse_key_tracker += pressed ? 1 : -1;
 }
 
+void auto_mouse_reset_trigger(bool pressed) {
+    (void)pressed;
+}
+
+uint8_t read_source_layers_cache(keypos_t key) {
+    (void)key;
+    return 0;
+}
+
 bool charybdis_get_pointer_dragscroll_enabled(void) {
     return dragscroll_enabled;
 }
