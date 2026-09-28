@@ -276,7 +276,7 @@ void noah_rgb_runtime_post_init(void) {
 }
 
 #ifdef RGB_MATRIX_ENABLE
-bool noah_rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
+static bool rgb_runtime_render_range(uint8_t led_min, uint8_t led_max) {
     bool painted = false;
 
     if (rgb_runtime_range_starts_frame(led_min, led_max)) {
@@ -325,6 +325,15 @@ bool noah_rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) 
         return true;
     }
 #    endif
+    return painted;
+}
+
+bool noah_rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
+    bool painted;
+
+    noah_runtime_diag_scope_enter(NOAH_RUNTIME_DIAG_STAGE_RGB_RENDER);
+    painted = rgb_runtime_render_range(led_min, led_max);
+    noah_runtime_diag_scope_leave();
     return painted;
 }
 #else

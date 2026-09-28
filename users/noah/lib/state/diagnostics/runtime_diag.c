@@ -39,7 +39,8 @@ static noah_runtime_diag_state_t noah_runtime_diag_state;
 
 #if defined(NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS_ENABLE) || defined(NOAH_RUNTIME_DIAG_TEST_BACKEND)
 enum {
-    NOAH_RUNTIME_CADENCE_WINDOW_US = 1000000u,
+    NOAH_RUNTIME_CADENCE_WINDOW_US   = 1000000u,
+    NOAH_RUNTIME_CADENCE_SCOPE_DEPTH = 4u,
 };
 
 typedef struct {
@@ -49,16 +50,42 @@ typedef struct {
     uint16_t gap_histogram[NOAH_RUNTIME_CADENCE_HISTOGRAM_BUCKETS];
 } noah_runtime_cadence_window_t;
 
+// A completed window's stage times as sent: total in stage units and the
+// longest single loop in us, both saturating.
 typedef struct {
-    noah_runtime_cadence_window_t completed[NOAH_RUNTIME_CADENCE_WINDOW_COUNT];
-    noah_runtime_cadence_window_t current;
-    uint32_t                      window_started_at;
-    uint32_t                      last_pointing_poll_at;
-    uint32_t                      sequence;
-    uint8_t                       next_window;
-    uint8_t                       completed_count;
-    bool                          started;
-    bool                          last_pointing_poll_known;
+    uint16_t total_units;
+    uint16_t max_loop_us;
+} noah_runtime_cadence_stage_record_t;
+
+typedef struct {
+    uint32_t total_us[NOAH_RUNTIME_CADENCE_TIMED_STAGES];
+    uint32_t max_loop_us[NOAH_RUNTIME_CADENCE_TIMED_STAGES];
+} noah_runtime_cadence_stage_window_t;
+
+// The running loop. stack[0] is the top-level stage; scopes nest above it.
+// depth counts scopes past the stack's capacity so their leaves still pair,
+// and their time goes to the deepest scope kept.
+typedef struct {
+    uint32_t loop_us[NOAH_RUNTIME_CADENCE_TIMED_STAGES];
+    uint32_t last_at;
+    uint8_t  stack[NOAH_RUNTIME_CADENCE_SCOPE_DEPTH];
+    uint8_t  depth;
+    bool     timing;
+} noah_runtime_cadence_loop_t;
+
+typedef struct {
+    noah_runtime_cadence_window_t       completed[NOAH_RUNTIME_CADENCE_WINDOW_COUNT];
+    noah_runtime_cadence_stage_record_t completed_stages[NOAH_RUNTIME_CADENCE_WINDOW_COUNT][NOAH_RUNTIME_CADENCE_TIMED_STAGES];
+    noah_runtime_cadence_window_t       current;
+    noah_runtime_cadence_stage_window_t current_stages;
+    noah_runtime_cadence_loop_t         loop;
+    uint32_t                            window_started_at;
+    uint32_t                            last_pointing_poll_at;
+    uint32_t                            sequence;
+    uint8_t                             next_window;
+    uint8_t                             completed_count;
+    bool                                started;
+    bool                                last_pointing_poll_known;
 } noah_runtime_cadence_state_t;
 
 static noah_runtime_cadence_state_t noah_runtime_cadence_state;
@@ -68,6 +95,8 @@ static const uint16_t noah_runtime_cadence_histogram_upper_us[NOAH_RUNTIME_CADEN
 };
 
 _Static_assert(sizeof(noah_runtime_cadence_window_t) == 20u, "cadence window wire representation drifted");
+_Static_assert(NOAH_RUNTIME_CADENCE_WIRE_PAGES <= UINT8_MAX, "cadence page index overflow");
+_Static_assert(5u + NOAH_RUNTIME_CADENCE_STAGES_PER_PAGE * 4u <= NOAH_RUNTIME_CADENCE_WIRE_PAYLOAD_SIZE, "cadence stage page overflow");
 #endif
 
 #if defined(NOAH_RUNTIME_DIAG_TEST_BACKEND)
@@ -107,13 +136,24 @@ static void noah_runtime_cadence_increment_u16(uint16_t *value) {
     }
 }
 
+static uint16_t noah_runtime_cadence_saturate_u16(uint32_t value) {
+    return value > UINT16_MAX ? UINT16_MAX : (uint16_t)value;
+}
+
 static void noah_runtime_cadence_store_current(void) {
-    noah_runtime_cadence_state.completed[noah_runtime_cadence_state.next_window] = noah_runtime_cadence_state.current;
-    noah_runtime_cadence_state.next_window                                       = (uint8_t)((noah_runtime_cadence_state.next_window + 1u) % NOAH_RUNTIME_CADENCE_WINDOW_COUNT);
+    uint8_t slot = noah_runtime_cadence_state.next_window;
+
+    noah_runtime_cadence_state.completed[slot] = noah_runtime_cadence_state.current;
+    for (uint8_t stage = 0u; stage < NOAH_RUNTIME_CADENCE_TIMED_STAGES; stage++) {
+        noah_runtime_cadence_state.completed_stages[slot][stage].total_units = noah_runtime_cadence_saturate_u16(noah_runtime_cadence_state.current_stages.total_us[stage] >> NOAH_RUNTIME_CADENCE_STAGE_TOTAL_UNIT_SHIFT);
+        noah_runtime_cadence_state.completed_stages[slot][stage].max_loop_us = noah_runtime_cadence_saturate_u16(noah_runtime_cadence_state.current_stages.max_loop_us[stage]);
+    }
+    noah_runtime_cadence_state.next_window = (uint8_t)((slot + 1u) % NOAH_RUNTIME_CADENCE_WINDOW_COUNT);
     if (noah_runtime_cadence_state.completed_count < NOAH_RUNTIME_CADENCE_WINDOW_COUNT) {
         noah_runtime_cadence_state.completed_count++;
     }
     memset(&noah_runtime_cadence_state.current, 0, sizeof(noah_runtime_cadence_state.current));
+    memset(&noah_runtime_cadence_state.current_stages, 0, sizeof(noah_runtime_cadence_state.current_stages));
     noah_runtime_cadence_state.sequence++;
 }
 
@@ -166,6 +206,89 @@ void noah_runtime_cadence_note_pointing_poll(void) {
     noah_runtime_cadence_state.last_pointing_poll_known = true;
 }
 
+static uint8_t noah_runtime_cadence_stage_slot(noah_runtime_diag_stage_t stage) {
+    return (uint8_t)(stage - 1u);
+}
+
+static bool noah_runtime_cadence_stage_timed(noah_runtime_diag_stage_t stage) {
+    return stage > NOAH_RUNTIME_DIAG_STAGE_IDLE && stage < NOAH_RUNTIME_DIAG_STAGE_COUNT;
+}
+
+// Charges the time since the last boundary to the innermost stage kept.
+static uint32_t noah_runtime_cadence_charge(void) {
+    noah_runtime_cadence_loop_t *loop = &noah_runtime_cadence_state.loop;
+    uint32_t                     now  = noah_runtime_cadence_realtime_counter();
+
+    if (loop->timing && loop->depth > 0u) {
+        uint8_t top = loop->depth < NOAH_RUNTIME_CADENCE_SCOPE_DEPTH ? loop->depth : NOAH_RUNTIME_CADENCE_SCOPE_DEPTH;
+
+        loop->loop_us[noah_runtime_cadence_stage_slot((noah_runtime_diag_stage_t)loop->stack[top - 1u])] += now - loop->last_at;
+    }
+    loop->last_at = now;
+    return now;
+}
+
+static void noah_runtime_cadence_set_stage(noah_runtime_diag_stage_t stage) {
+    noah_runtime_cadence_state.loop.stack[0] = (uint8_t)stage;
+    noah_runtime_cadence_state.loop.depth    = 1u;
+}
+
+void noah_runtime_cadence_loop_begin(void) {
+    noah_runtime_cadence_loop_t *loop = &noah_runtime_cadence_state.loop;
+    uint32_t                     now  = noah_runtime_cadence_charge();
+
+    noah_runtime_cadence_advance(now);
+    if (loop->timing) {
+        for (uint8_t stage = 0u; stage < NOAH_RUNTIME_CADENCE_TIMED_STAGES; stage++) {
+            noah_runtime_cadence_state.current_stages.total_us[stage] += loop->loop_us[stage];
+            if (loop->loop_us[stage] > noah_runtime_cadence_state.current_stages.max_loop_us[stage]) {
+                noah_runtime_cadence_state.current_stages.max_loop_us[stage] = loop->loop_us[stage];
+            }
+        }
+    }
+    memset(loop->loop_us, 0, sizeof(loop->loop_us));
+    loop->timing = true;
+    noah_runtime_cadence_set_stage(NOAH_RUNTIME_DIAG_STAGE_MATRIX_SCAN);
+}
+
+void noah_runtime_cadence_stage(noah_runtime_diag_stage_t stage) {
+    if (!noah_runtime_cadence_stage_timed(stage)) {
+        return;
+    }
+    noah_runtime_cadence_charge();
+    noah_runtime_cadence_set_stage(stage);
+}
+
+static void noah_runtime_cadence_scope_enter(noah_runtime_diag_stage_t stage) {
+    noah_runtime_cadence_loop_t *loop = &noah_runtime_cadence_state.loop;
+
+    if (!noah_runtime_cadence_stage_timed(stage) || loop->depth == 0u || loop->depth == UINT8_MAX) {
+        return;
+    }
+    noah_runtime_cadence_charge();
+    if (loop->depth < NOAH_RUNTIME_CADENCE_SCOPE_DEPTH) {
+        loop->stack[loop->depth] = (uint8_t)stage;
+    }
+    loop->depth++;
+}
+
+static void noah_runtime_cadence_scope_leave(void) {
+    noah_runtime_cadence_loop_t *loop = &noah_runtime_cadence_state.loop;
+
+    if (loop->depth <= 1u) {
+        return;
+    }
+    noah_runtime_cadence_charge();
+    loop->depth--;
+}
+
+// Ring slot of the window at logical_index, oldest first.
+static uint8_t noah_runtime_cadence_stored_index(uint8_t logical_index) {
+    uint8_t oldest = (uint8_t)((noah_runtime_cadence_state.next_window + NOAH_RUNTIME_CADENCE_WINDOW_COUNT - noah_runtime_cadence_state.completed_count) % NOAH_RUNTIME_CADENCE_WINDOW_COUNT);
+
+    return (uint8_t)((oldest + logical_index) % NOAH_RUNTIME_CADENCE_WINDOW_COUNT);
+}
+
 bool noah_runtime_cadence_wire_page(uint8_t page, uint8_t payload[NOAH_RUNTIME_CADENCE_WIRE_PAYLOAD_SIZE]) {
     uint32_t sequence;
 
@@ -175,7 +298,7 @@ bool noah_runtime_cadence_wire_page(uint8_t page, uint8_t payload[NOAH_RUNTIME_C
     memset(payload, 0, NOAH_RUNTIME_CADENCE_WIRE_PAYLOAD_SIZE);
     sequence = noah_runtime_cadence_state.sequence;
     if (page == 0u) {
-        payload[0] = 1u;
+        payload[0] = NOAH_RUNTIME_CADENCE_WIRE_FORMAT;
         payload[1] = NOAH_RUNTIME_CADENCE_WIRE_PAGES;
         payload[2] = noah_runtime_cadence_state.completed_count;
         noah_runtime_cadence_write_u32(&payload[3], sequence);
@@ -184,16 +307,33 @@ bool noah_runtime_cadence_wire_page(uint8_t page, uint8_t payload[NOAH_RUNTIME_C
             noah_runtime_cadence_write_u16(&payload[11u + bucket * 2u], noah_runtime_cadence_histogram_upper_us[bucket]);
         }
         payload[21] = noah_runtime_cadence_state.started ? 1u : 0u;
+        payload[22] = NOAH_RUNTIME_CADENCE_TIMED_STAGES;
+        payload[23] = NOAH_RUNTIME_CADENCE_STAGES_PER_PAGE;
+        payload[24] = NOAH_RUNTIME_CADENCE_STAGE_TOTAL_UNIT_SHIFT;
         return true;
     }
 
     noah_runtime_cadence_write_u32(payload, sequence);
     payload[4] = 0xffu;
+    if (page >= NOAH_RUNTIME_CADENCE_FIRST_STAGE_PAGE) {
+        uint8_t stage_page    = (uint8_t)(page - NOAH_RUNTIME_CADENCE_FIRST_STAGE_PAGE);
+        uint8_t logical_index = (uint8_t)(stage_page / NOAH_RUNTIME_CADENCE_STAGE_PAGES_PER_WINDOW);
+        uint8_t first_stage   = (uint8_t)((stage_page % NOAH_RUNTIME_CADENCE_STAGE_PAGES_PER_WINDOW) * NOAH_RUNTIME_CADENCE_STAGES_PER_PAGE);
+
+        if (logical_index < noah_runtime_cadence_state.completed_count) {
+            const noah_runtime_cadence_stage_record_t *stages = noah_runtime_cadence_state.completed_stages[noah_runtime_cadence_stored_index(logical_index)];
+
+            payload[4] = logical_index;
+            for (uint8_t slot = 0u; slot < NOAH_RUNTIME_CADENCE_STAGES_PER_PAGE && first_stage + slot < NOAH_RUNTIME_CADENCE_TIMED_STAGES; slot++) {
+                noah_runtime_cadence_write_u16(&payload[5u + slot * 4u], stages[first_stage + slot].total_units);
+                noah_runtime_cadence_write_u16(&payload[7u + slot * 4u], stages[first_stage + slot].max_loop_us);
+            }
+        }
+        return true;
+    }
     if ((uint8_t)(page - 1u) < noah_runtime_cadence_state.completed_count) {
         uint8_t                              logical_index = (uint8_t)(page - 1u);
-        uint8_t                              oldest        = (uint8_t)((noah_runtime_cadence_state.next_window + NOAH_RUNTIME_CADENCE_WINDOW_COUNT - noah_runtime_cadence_state.completed_count) % NOAH_RUNTIME_CADENCE_WINDOW_COUNT);
-        uint8_t                              stored        = (uint8_t)((oldest + logical_index) % NOAH_RUNTIME_CADENCE_WINDOW_COUNT);
-        const noah_runtime_cadence_window_t *window        = &noah_runtime_cadence_state.completed[stored];
+        const noah_runtime_cadence_window_t *window        = &noah_runtime_cadence_state.completed[noah_runtime_cadence_stored_index(logical_index)];
 
         payload[4] = logical_index;
         noah_runtime_cadence_write_u32(&payload[5], window->max_pointing_gap_us);
@@ -277,10 +417,18 @@ void noah_runtime_diag_post_init(void) {
 }
 
 void noah_runtime_diag_scope_enter(noah_runtime_diag_stage_t stage) {
+#if defined(NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS_ENABLE) || defined(NOAH_RUNTIME_DIAG_TEST_BACKEND)
+    noah_runtime_cadence_scope_enter(stage);
+#else
     (void)stage;
+#endif
 }
 
-void noah_runtime_diag_scope_leave(void) {}
+void noah_runtime_diag_scope_leave(void) {
+#if defined(NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS_ENABLE) || defined(NOAH_RUNTIME_DIAG_TEST_BACKEND)
+    noah_runtime_cadence_scope_leave();
+#endif
+}
 
 void noah_runtime_diag_heartbeat(void) {
     noah_runtime_diag_refresh_indicator();

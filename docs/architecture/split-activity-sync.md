@@ -90,11 +90,44 @@ lighting and motion workload.
 
 The same run reads the pointing-cadence recorder (custom value `0x03`) when
 the firmware is built with `NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS=yes`. It keeps
-one-second windows since boot, unarmed; the tool summarises the complete
-windows inside the capture: pointing polls per second, matrix scans per
-second, the longest gap between pointing polls, and a gap histogram. Pointing
+one-second windows since boot, unarmed. The tool reads the recorder's window
+count just before arming and just after the capture, and summarises the windows
+wholly between them: pointing polls per second, matrix scans per second, the
+longest gap between pointing polls, and a gap histogram. Pointing
 polls are pointing-task runs, an upper bound on USB mouse reports; the host's
-own report cadence is still the final word. The tool also estimates a ceiling:
+own report cadence is still the final word.
+
+The recorder also times each stage of the master's loop, exclusively: a
+nested stage's time is not also counted in the stage it interrupts. Per
+stage the tool reports its share of wall time, its mean per matrix scan (one
+per loop) and its longest single loop, which attributes long poll gaps. The
+stages, in wire order:
+
+| Stage | From → to |
+| --- | --- |
+| `matrixScan` | `keyboard_task` entry → `matrix_scan_user`: local matrix, debounce, QMK's split transactions |
+| `durableIo` | VIA macro defaults and the durable I/O scan (profile and VIA sync RPCs) |
+| `keyRuntime` | combo origins, key runtime scan, macro engine |
+| `splitSync` | runtime split sync RPCs |
+| `qmkTasks` | `matrix_scan_user` return → pointing hook: key event dispatch, `quantum_task`, `rgb_matrix_task` (effect and LED flush), the keyboard's pointing code |
+| `processRecord` | `process_record_user` and its finalize, wherever they run |
+| `rgbRender` | our render in `rgb_matrix_indicators_advanced_user` |
+| `sensorRead` | the pointing driver's report read |
+| `pointingTask` | `pointing_device_task_user` |
+| `pointingReport` | pointing hook return → `keyboard_task` end: auto-mouse, USB mouse report, mousekey and LED tasks |
+| `outsideKeyboardTask` | between `keyboard_task` calls: USB events, raw HID and VIA, deferred executors, housekeeping |
+
+`matrixScan` includes the split recorder's transactions; subtract its share
+for the local scan. The shares sum to about 1 (`coverage`). On a loop where
+the pointing task does not run, its stages are counted in `qmkTasks`. The
+loop and sensor boundaries come from `lib/compat/qmk_loop_stages.c`, which
+replaces QMK's weak `protocol_keyboard_task` and times the pointing driver's
+`get_report` through a copy of its driver table; the noah hooks mark the rest.
+Stage timing adds about a dozen counter reads per loop: compare poll rates with
+a format 1 recorder build to see its cost. The wire layout is specified in
+`runtime_diag.h`.
+
+The tool also estimates a ceiling:
 the poll rate with measured split transaction time removed. It excludes
 userspace packet building and ignores the 1000/s USB cap, so it compares
 builds rather than predicting a rate. A capture with the left half

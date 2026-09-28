@@ -19,6 +19,7 @@
 #include "lib/macro/via_macro_defaults.h"
 #include "lib/compat/qmk_combo_origin.h"
 #include "lib/compat/qmk_durable_io.h"
+#include "lib/compat/qmk_loop_stages.h"
 #include "lib/compat/qmk_via_split_mirror.h"
 #include "lib/compat/qmk_via_split_sync.h"
 #include "lib/compat/qmk_via_sync_state.h"
@@ -57,16 +58,20 @@ void noah_matrix_scan_user(void) {
 #if defined(NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS_ENABLE)
     noah_runtime_cadence_note_matrix_scan();
 #endif
+    noah_runtime_diag_stage_mark(NOAH_RUNTIME_DIAG_STAGE_DURABLE_IO);
     noah_via_macro_defaults_matrix_scan();
     noah_qmk_durable_io_matrix_scan();
 
+    noah_runtime_diag_stage_mark(NOAH_RUNTIME_DIAG_STAGE_KEY_RUNTIME);
     noah_qmk_combo_origin_scan();
 
     noah_key_runtime_scan();
 
     macro_payload_engine_scan();
 
+    noah_runtime_diag_stage_mark(NOAH_RUNTIME_DIAG_STAGE_SPLIT_SYNC);
     split_runtime_sync_tick();
+    noah_runtime_diag_stage_mark(NOAH_RUNTIME_DIAG_STAGE_QMK_TASKS);
 }
 
 void noah_matrix_slave_scan_user(void) {
@@ -96,6 +101,9 @@ void noah_keyboard_post_init_user(void) {
         noah_runtime_init_compiled_pd,
 #endif
         noah_rgb_runtime_post_init, split_runtime_sync_init, noah_qmk_via_split_sync_init, noah_qmk_via_split_mirror_init, noah_qmk_durable_io_init,
+#if defined(NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS_ENABLE)
+        noah_qmk_loop_stages_init,
+#endif
     };
 
     noah_runtime_diag_post_init();

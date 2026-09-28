@@ -715,6 +715,6 @@ NOAH_SPLIT_ACTIVITY_COALESCE=no sh tools/build-firmware-pair.sh
 builds the uncoalesced comparison pair, with `_no_activity` in its artifact
 names. For a measurement pair add `NOAH_SPLIT_DIAGNOSTICS=yes` (the ten-second
 transaction recorder, `_diagnostic`) and `NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS=yes`
-(the pointing-cadence recorder, `_cadence`), then run
+(the pointing-cadence recorder with per-stage loop timing, `_cadence`), then run
 `node tools/capture-split-diagnostics.cjs` after flashing; it reads both. Build with Homebrew Python 3.12+ on PATH for the profile tooling.
 See [the activity contract and measurement protocol](docs/architecture/split-activity-sync.md).

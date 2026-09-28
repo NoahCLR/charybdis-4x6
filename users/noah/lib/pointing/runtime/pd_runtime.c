@@ -96,6 +96,7 @@ report_mouse_t noah_pointing_device_task_user(report_mouse_t mouse_report) {
 #if defined(NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS_ENABLE)
     noah_runtime_cadence_note_pointing_poll();
 #endif
+    noah_runtime_diag_stage_mark(NOAH_RUNTIME_DIAG_STAGE_POINTING_TASK);
 
 #ifdef POINTING_DEVICE_ENABLE
     // QMK's auto-mouse runs right after this task: a layer locked since the
@@ -138,6 +139,7 @@ report_mouse_t noah_pointing_device_task_user(report_mouse_t mouse_report) {
 #endif
 
 done:
+    noah_runtime_diag_stage_mark(NOAH_RUNTIME_DIAG_STAGE_POINTING_REPORT);
     return output;
 }
 

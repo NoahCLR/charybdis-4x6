@@ -92,6 +92,9 @@ source trace because they rewrite or verify human-facing firmware docs.
   `qmk_via_contract.c`, `qmk_via_playback_contract.h`,
   `qmk_via_storage_contract.h`, `qmk_via_storage_regions.c/h`
 - Split helpers: `split_half.h`, `split_role.c`
+- Diagnostic probes, empty unless their flag is set: `qmk_split_diagnostics.c/h`
+  (split transaction recorder) and `qmk_loop_stages.c/h` (the loop and sensor
+  boundaries the cadence recorder's stage timing needs)
 
 Combo-origin pending entries are bounded compatibility candidates, not runtime
 press ownership. Each is keyed by combo index and physical completion

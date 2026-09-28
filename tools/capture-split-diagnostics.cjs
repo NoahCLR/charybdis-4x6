@@ -17,32 +17,76 @@ function decode(page, response) {
 // Pointing-cadence recorder (value 0x03, NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS
 // builds): rolling one-second windows kept since boot, no arming. It is read
 // with VIA's id_custom_get_value (0x08), unlike the split recorder above,
-// which reads with 7 and arms with 8.
+// which reads with 7 and arms with 8. Format 2 adds per-window loop stage
+// times after the window pages; format 1 firmware has none. Wire layout:
+// users/noah/lib/state/diagnostics/runtime_diag.h.
 const VIA_CUSTOM_GET = 8;
-function decodeCadence(page, response) {
+// Firmware stage order (noah_runtime_diag_stage_t, less IDLE).
+const STAGE_NAMES = ['matrixScan', 'durableIo', 'keyRuntime', 'splitSync', 'qmkTasks', 'processRecord', 'rgbRender', 'sensorRead', 'pointingTask', 'pointingReport', 'outsideKeyboardTask'];
+function decodeCadence(page, response, metadata = null) {
     const data = Buffer.from(response);
     if (data.length !== 32 || data[0] !== VIA_CUSTOM_GET || data[1] !== 0 || data[2] !== 3 || data[3] !== 1 || data[4] !== page || data[5] !== 0 || data[6] !== 25) {
         throw new Error(`Invalid/unavailable cadence page ${page}: ${data.toString('hex')}`);
     }
     const payload = data.subarray(7);
     if (page === 0) {
-        if (payload[0] !== 1) throw new Error(`Unknown cadence format ${payload[0]}`);
+        const format = payload[0];
+        if (format !== 1 && format !== 2) throw new Error(`Unknown cadence format ${format}`);
         const bucketUpperUs = [];
         for (let b = 0; b < 5; ++b) bucketUpperUs.push(payload.readUInt16LE(11 + b * 2));
-        return {pages: payload[1], completed: payload[2], sequence: payload.readUInt32LE(3), windowUs: payload.readUInt32LE(7), bucketUpperUs, started: !!payload[21]};
+        const stageCount = format === 2 ? payload[22] : 0;
+        const stagesPerPage = format === 2 ? payload[23] : 0;
+        const stagePagesPerWindow = stageCount ? Math.ceil(stageCount / stagesPerPage) : 0;
+        return {format, pages: payload[1], windowCount: (payload[1] - 1) / (1 + stagePagesPerWindow), completed: payload[2], sequence: payload.readUInt32LE(3), windowUs: payload.readUInt32LE(7), bucketUpperUs, started: !!payload[21], stageCount, stagesPerPage, stagePagesPerWindow, stageUnitUs: format === 2 ? 2 ** payload[24] : 0};
     }
     const index = payload[4];
     if (index === 0xff) return {sequence: payload.readUInt32LE(0), index: null};
+    if (metadata && page > metadata.windowCount) {
+        const stagePage = page - 1 - metadata.windowCount;
+        if (index !== Math.floor(stagePage / metadata.stagePagesPerWindow)) throw new Error('Cadence stage page identity mismatch');
+        const first = (stagePage % metadata.stagePagesPerWindow) * metadata.stagesPerPage;
+        const stages = [];
+        for (let slot = 0; slot < metadata.stagesPerPage && first + slot < metadata.stageCount; ++slot) {
+            stages.push({stage: first + slot, totalUs: payload.readUInt16LE(5 + slot * 4) * metadata.stageUnitUs, maxLoopUs: payload.readUInt16LE(7 + slot * 4)});
+        }
+        return {sequence: payload.readUInt32LE(0), index, stages};
+    }
     if (index !== page - 1) throw new Error('Cadence page identity mismatch');
     const histogram = [];
     for (let b = 0; b < 6; ++b) histogram.push(payload.readUInt16LE(13 + b * 2));
     return {sequence: payload.readUInt32LE(0), index, maxPointingGapUs: payload.readUInt32LE(5), matrixScans: payload.readUInt16LE(9), pointingPolls: payload.readUInt16LE(11), histogram};
 }
 
-// The windows inside a capture that ended just before this read: the last
-// complete ones, leaving out the window that may straddle the capture start.
-function summarizeCadence(metadata, windows, captureMs) {
-    const inside = windows.slice(-Math.max(1, Math.floor(captureMs / 1000) - 1));
+// Windows are numbered from boot: the one at index i of a read at sequence S
+// is S - completed + i. A capture from sequence `before` to `after` fully
+// contains windows before + 1 .. after - 1; window `before` was already
+// running when it started.
+function captureWindowIds(before, after) {
+    const ids = [];
+    for (let id = before + 1; id < after; ++id) ids.push(id);
+    return ids;
+}
+
+// Per stage over the capture's windows: share of wall time, mean per matrix
+// scan (one per loop), and the longest single loop. Stage times are exclusive,
+// so the shares sum to about 1; `coverage` reports that sum.
+function summarizeStages(metadata, windows) {
+    if (!metadata.stageCount) return null;
+    const spanUs = windows.length * metadata.windowUs;
+    const scans = windows.reduce((a, w) => a + w.matrixScans, 0);
+    const stages = {};
+    let coverage = 0;
+    for (let stage = 0; stage < metadata.stageCount; ++stage) {
+        const entries = windows.map(w => w.stages[stage]);
+        const totalUs = entries.reduce((a, e) => a + e.totalUs, 0);
+        coverage += totalUs / spanUs;
+        stages[STAGE_NAMES[stage] || `stage${stage}`] = {share: totalUs / spanUs, meanPerScanUs: scans ? totalUs / scans : null, maxLoopUs: Math.max(...entries.map(e => e.maxLoopUs))};
+    }
+    return {stages, coverage};
+}
+
+// The windows inside the capture, as selected by captureWindowIds.
+function summarizeCadence(metadata, inside) {
     const polls = inside.map(w => w.pointingPolls);
     const histogram = [0, 0, 0, 0, 0, 0];
     for (const w of inside) w.histogram.forEach((count, b) => { histogram[b] += count; });
@@ -53,6 +97,7 @@ function summarizeCadence(metadata, windows, captureMs) {
         matrixScansPerSecond: inside.reduce((a, w) => a + w.matrixScans, 0) / inside.length,
         maxPointingGapUs: Math.max(...inside.map(w => w.maxPointingGapUs)),
         gapHistogram: Object.fromEntries(labels.map((label, b) => [label, histogram[b]])),
+        ...summarizeStages(metadata, inside),
     };
 }
 
@@ -88,25 +133,45 @@ async function main(argv = process.argv.slice(2)) {
         if (response.length !== 32 || !response.subarray(0, 5).equals(report.subarray(0, 5)) || response[5] !== 0) throw new Error(`Diagnostic request rejected/timed out: ${response.toString('hex')}`);
         return response;
     }
-    // Windows roll every second; retry if one rolled while its pages were read.
-    function readCadence() {
+    const readCadenceMetadata = () => decodeCadence(0, exchange(VIA_CUSTOM_GET, 0, 3));
+    // Windows roll every second, shifting indices; retry if one rolled while
+    // its pages were read. The ids stay fixed.
+    function readCadence(ids) {
         for (let attempt = 0; attempt < 3; ++attempt) {
-            const metadata = decodeCadence(0, exchange(VIA_CUSTOM_GET, 0, 3));
-            const windows = [];
-            let consistent = true;
-            for (let p = 1; p <= metadata.completed; ++p) {
-                const w = decodeCadence(p, exchange(VIA_CUSTOM_GET, p, 3));
-                if (w.sequence !== metadata.sequence) { consistent = false; break; }
-                if (w.index !== null) windows.push(w);
+            const metadata = readCadenceMetadata();
+            const read = page => {
+                const entry = decodeCadence(page, exchange(VIA_CUSTOM_GET, page, 3), metadata);
+                if (entry.sequence !== metadata.sequence) throw new Error('rolled');
+                if (entry.index === null) throw new Error('Cadence window missing');
+                return entry;
+            };
+            try {
+                const windows = ids.map(id => {
+                    const index = id - (metadata.sequence - metadata.completed);
+                    if (index < 0 || index >= metadata.completed) throw new Error(`Cadence window ${id} is no longer kept`);
+                    const window = read(1 + index);
+                    window.stages = [];
+                    for (let k = 0; k < metadata.stagePagesPerWindow; ++k) window.stages.push(...read(1 + metadata.windowCount + index * metadata.stagePagesPerWindow + k).stages);
+                    return window;
+                });
+                return summarizeCadence(metadata, windows);
+            } catch (e) {
+                if (e.message !== 'rolled') throw e;
             }
-            if (consistent && windows.length) return summarizeCadence(metadata, windows, 10500);
         }
         throw new Error('Cadence windows kept rolling during readback');
     }
     try {
+        let cadenceBefore = null;
+        try {
+            cadenceBefore = readCadenceMetadata();
+        } catch (e) {
+            cadenceBefore = {unavailable: e.message};
+        }
         exchange(8, 0);
         console.error('Capture armed. Move the trackball for ten seconds; no diagnostic requests will be sent during capture.');
         await new Promise(resolve => setTimeout(resolve, 10500));
+        const cadenceAfter = cadenceBefore.unavailable ? null : readCadenceMetadata();
         const metadata = decode(0, exchange(7, 0));
         if (!metadata.frozen || metadata.armed) throw new Error('Capture has not frozen');
         const transactions = [];
@@ -116,13 +181,16 @@ async function main(argv = process.argv.slice(2)) {
         }
         let cadence = null;
         try {
-            cadence = readCadence();
+            if (cadenceBefore.unavailable) throw new Error(cadenceBefore.unavailable);
+            const ids = captureWindowIds(cadenceBefore.sequence, cadenceAfter.sequence);
+            if (!ids.length) throw new Error('No complete cadence window inside the capture');
+            cadence = readCadence(ids);
         } catch (e) {
             cadence = {unavailable: `${e.message} (build with NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS=yes)`};
         }
         const ceiling = estimateCeiling(metadata, transactions, cadence);
-        console.log(JSON.stringify({metadata, transactions, cadence, ceiling, note: 'attemptedBytes includes nominal complete frames for failed attempts; it is not a physical byte count. Times are measured transaction spans, not CPU utilization. Pointing polls are pointing-task runs, an upper bound on USB mouse reports. The ceiling is an estimate: polls with split transaction time removed.'}, null, 2));
+        console.log(JSON.stringify({metadata, transactions, cadence, ceiling, note: 'attemptedBytes includes nominal complete frames for failed attempts; it is not a physical byte count. Times are measured transaction spans, not CPU utilization. Pointing polls are pointing-task runs, an upper bound on USB mouse reports. The ceiling is an estimate: polls with split transaction time removed. Stage times are exclusive wall time per loop stage; matrixScan includes the split transactions above.'}, null, 2));
     } finally { handle.close(); }
 }
 if (require.main === module) main().catch(e => { console.error(e.message); process.exitCode = 1; });
-module.exports = {decode, decodeCadence, summarizeCadence, estimateCeiling};
+module.exports = {decode, decodeCadence, captureWindowIds, summarizeStages, summarizeCadence, estimateCeiling};

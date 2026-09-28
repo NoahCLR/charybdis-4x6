@@ -238,14 +238,37 @@ run 6–9/s at 2.1–2.4 ms each, about 2% of the loop.
 What follows from it:
 
 - No loop is shorter than 1.5 ms and four fifths of it is not split work, so
-  the report rate is bounded by the master's own per-loop work: lighting,
-  userspace runtime, sensor read, USB. That is not measured yet and is the next
-  measurement: time the runtime's existing diagnostic stages (RGB render, key
-  runtime, split sync, pointing task) under the cadence flag.
-- Gaps of 5 ms or more are the hitches. The likely main source is RPCs with
-  32-byte frames (VIA sync, profile reconciliation), about 3.8 ms of link time
-  each; typing adds runtime work, feedback syncs and more failed transactions.
-  Attribute them with the stage timing before changing anything.
+  the report rate is bounded by the master's own per-loop work.
+- Gaps of 5 ms or more are the hitches; RPCs landing in one loop are the
+  likely source.
+
+Stage timing, same day and workloads, `diagnostic_cadence` pair with the
+cadence recorder's per-stage timing (stages in
+`docs/architecture/split-activity-sync.md`). Share of the idle loop, which is
+about 2.0 ms:
+
+| Stage | Share | Per loop | Longest loop |
+| --- | ---: | ---: | ---: |
+| Local matrix scan (matrix stage less split transactions) | ~18% | ~355 µs | |
+| Split transactions | 19% | ~390 µs | |
+| Durable I/O scan | 12% | 249 µs | 4.5 ms |
+| Runtime split sync | 15% | 295 µs | 6.5 ms |
+| Sensor read | 11% | 223 µs | 0.3 ms |
+| Lighting (our render and QMK's task) | ~14% | ~290 µs | 1.0 ms |
+| Report, LED, VIA, housekeeping, rest | ~13% | ~260 µs | |
+
+Motion and typing have the same shape. The timing itself costs 8–10% of the
+poll rate (497/448/406 against 538/497/436), so read shares, not rates.
+
+The baselines are complete; no further baseline is needed. What they decide:
+
+- The largest cost we own is CPU, not link: the durable I/O scan and the runtime
+  split sync spend about 27% of every loop, idle included, while their RPCs are
+  about 2%. Both do per-loop work whether or not anything changed (split sync
+  rebuilds its base and combo packets every tick). Making them change-driven
+  is the next optimization, verified with one capture after the change.
+- Their RPCs are also where the hitches are (longest loops 6.5 and 4.5 ms).
+- The local matrix scan (~355 µs) is the next largest; check its I/O delay.
 - The frame-aware coalescing candidate below is not indicated: no bursts.
 - Stage 2 is worth about 1% of the loop at these rates.
 

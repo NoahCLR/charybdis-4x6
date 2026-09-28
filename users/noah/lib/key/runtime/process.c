@@ -435,7 +435,7 @@ static void key_runtime_process_settle_oneshot_layer(uint16_t keycode, const key
 }
 
 void noah_process_record_user_finalize(uint16_t keycode, keyrecord_t *record, bool keep_processing) {
-    noah_runtime_diag_scope_enter(NOAH_RUNTIME_DIAG_STAGE_PROCESS_RECORD_FINALIZE);
+    noah_runtime_diag_scope_enter(NOAH_RUNTIME_DIAG_STAGE_PROCESS_RECORD);
     // Settle ownership before the mask restore below, which selects managed-only
     // modifiers from the same ledgers.
     key_runtime_process_settle_report_ownership(keycode, record, keep_processing);
