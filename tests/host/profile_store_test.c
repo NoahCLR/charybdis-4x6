@@ -853,6 +853,32 @@ static void test_pd_store_accepts_every_settings_version_the_validator_does(void
     }
 }
 
+// Combo versions too: the keyboard's combo domain became v2 (one default
+// window), the validator passed it, and this check refused every copy to the
+// other half until it used the validator's rule.
+static void test_pd_store_accepts_every_combo_version_the_validator_does(void) {
+    for (uint8_t version = 0u; version <= 3u; version++) {
+        uint8_t                        payload[33];
+        uint16_t                       length = pd_payload(payload, 1u << 2u);
+        noah_profile_store_t           store;
+        noah_profile_store_candidate_t candidate;
+        noah_profile_store_record_t    record;
+
+        CHECK(payload[8] == 0x30u);
+        payload[9] = version;
+        candidate  = pd_candidate(payload, length, 1u << 2u, 1u, 0u, 0u);
+        reset_eeprom(&eeprom);
+        initialize_pd_store(&store);
+        noah_profile_store_result_t result = commit_pd(&store, payload, &candidate);
+        CHECK((result == NOAH_PROFILE_STORE_OK) == NOAH_PROFILE_COMBO_VERSION_ACCEPTED(version));
+        CHECK(NOAH_PROFILE_COMBO_VERSION_ACCEPTED(version) == (version == 1u || version == 2u));
+        if (result != NOAH_PROFILE_STORE_OK) continue;
+        // ...and a stored v2 table is selected again at boot.
+        noah_profile_store_init(&store, io_for(&eeprom), pd_compatibility());
+        CHECK(noah_profile_store_boot_select(&store, &record) == NOAH_PROFILE_STORE_OK && record.generation == 1u);
+    }
+}
+
 static void test_pd_header_all_identity_bits_and_boot_paths(void) {
     for (uint8_t origin = 0u; origin < 2u; origin++) {
         for (uint8_t flags = 0u; flags < 2u; flags++) {
@@ -932,7 +958,8 @@ static void test_pd_header_rejects_bad_contracts_before_writing(void) {
         reset_eeprom(&eeprom);
         initialize_pd_store(&store);
         length = pd_payload(payload, 31u);
-        payload[9u + 5u * domain] = domain == 0u || domain == 3u ? 1u : 2u;
+        // A version each domain does not have (combos have 1 and 2).
+        payload[9u + 5u * domain] = domain == 0u || domain == 3u ? 1u : domain == 2u ? 3u : 2u;
         candidate = pd_candidate(payload, length, 31u, 1u, 0u, 1u);
         CHECK(commit_pd(&store, payload, &candidate) == NOAH_PROFILE_STORE_INVALID_PAYLOAD);
         CHECK(noah_profile_store_boot_select(&store, &record) == NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE);
@@ -1002,6 +1029,7 @@ static void test_pd_header_power_loss_keeps_complete_generation(void) {
 
 int main(void) {
     test_pd_store_accepts_every_settings_version_the_validator_does();
+    test_pd_store_accepts_every_combo_version_the_validator_does();
     test_pd_header_all_identity_bits_and_boot_paths();
     test_pd_header_rejects_bad_contracts_before_writing();
     test_pd_header_power_loss_keeps_complete_generation();

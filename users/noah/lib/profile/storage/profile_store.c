@@ -77,6 +77,7 @@ static uint8_t format_domain_mask(uint8_t version) {
 }
 
 static bool domain_version_valid(uint8_t format, uint8_t id, uint8_t version) {
+    if (id == DOMAIN_ID_COMBOS) return NOAH_PROFILE_COMBO_VERSION_ACCEPTED(version);
     if (format == NOAH_PROFILE_STORE_FORMAT_VERSION_PD) {
         if (id == DOMAIN_ID_RGB) return version == 2u;
         // The validator's own rule, so a settings version it accepts can

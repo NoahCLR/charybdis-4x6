@@ -5,6 +5,11 @@
 // two cannot drift (the store once refused v4 after the validator passed it).
 #define NOAH_PROFILE_PD_SETTINGS_VERSION_ACCEPTED(version) ((version) >= 2u && (version) <= 5u)
 
+// Combo-domain versions, on the same terms: v1 stores every window, v2 one
+// default window and hold threshold. The store once refused v2 after the
+// validator passed it, failing every copy to the other half.
+#define NOAH_PROFILE_COMBO_VERSION_ACCEPTED(version) ((version) == 1u || (version) == 2u)
+
 // Schema-1 constants remain for codec compatibility tests. Firmware builds
 // always define NOAH_PD_PROFILE_ENABLE and cannot select the old geometry.
 #ifdef NOAH_PD_PROFILE_ENABLE

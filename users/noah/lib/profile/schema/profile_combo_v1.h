@@ -2,6 +2,7 @@
 
 #include "profile_blob_v1.h"
 #include "profile_reader.h"
+#include "profile_versions.h"
 
 // Domain 0x30. Version 1 repeats QMK's one hold threshold on every row and
 // stores every combo window explicitly. Version 2 keeps both combo-wide
@@ -15,7 +16,6 @@ enum {
     NOAH_PROFILE_COMBO_V1_MAX_INPUTS  = 4u,
     NOAH_PROFILE_COMBO_VERSION        = 2u,
 };
-#define NOAH_PROFILE_COMBO_VERSION_ACCEPTED(version) ((version) == 1u || (version) == 2u)
 #define NOAH_PROFILE_COMBO_HEADER_SIZE(version) ((version) >= 2u ? NOAH_PROFILE_COMBO_V2_HEADER_SIZE : NOAH_PROFILE_COMBO_V1_HEADER_SIZE)
 // Payload offset is relative to the enclosing bounded 4,064-byte blob.
 typedef struct {
