@@ -1,18 +1,26 @@
-# Live compatibility runner contract
+# Firmware independence and Live integration
 
-The five cross-language host runners (portable editor, portable profile, macro
-program size, compiled defaults v1, and PD v1) import app code from the canonical
-`CHARYBDIS_LIVE_ROOT` exported by `tests/host/noah_host_live_env.sh`.
-An explicit missing/empty path fails. When unset, the firmware suite temporarily
-uses `tools/charybdis-live` until extraction cleanup; source remains in place.
+Firmware builds and its full host suite require no Charybdis Live checkout,
+including the retained in-tree app. There is no Live-root selector or fallback
+in firmware runners. The five C test runners use firmware-owned fixtures; PD,
+macro-size and populated profile regression vectors live under
+`tests/fixtures/client-regression/`, with producer revision and checksum records.
+Portable editor/profile C tests assert their own emitted page contract.
+`run_firmware_client_independence_tests.sh` guards this boundary and fixture
+integrity. Firmware tooling checks no longer run the app's suite.
 
-The independent Live repository owns `scripts/check-compatibility.js`, invoked
-through `npm run test:compat`. It requires explicit firmware, Live, QMK and
-report paths, validates checkout roots and bridge-aware runners, and records
-starting revisions/dirty states and sequential runner results in JSON. It sets
-QMK_ROOT and QMK_HOME for the selected QMK tree and stops on first failure.
-Before merging wire/schema or cross-language codec changes, run this bridge
-against the working copies under review. Freeze checkouts during the run. For
-reproducible CI, use clean, pinned revisions and retain the report and logs.
-Ordinary UI changes require only Live's independent suite. Neither this bridge
-nor its fixture tests replace full firmware tests or hardware acceptance.
+Live owns `tests/integration/` and its `npm run test:compat` command. Those five
+runners compile probes from an explicitly selected firmware checkout and compare
+them with the selected Live codecs. Their build recipes must follow firmware
+source/build changes. Firmware does not invoke or require these runners, even
+for its ordinary full-suite CI. Protocol changes should document the changed
+contract and retained compatibility; Live tests that contract before merging
+its corresponding implementation. A firmware-only developer can complete the
+firmware gates without installing Live. Joint work runs both suites and Live's
+optional cross-repository integration gate.
+
+Firmware diagnostics owns its Node dependency in `tools/package.json` and its
+lockfile. Use `npm ci --prefix tools` for hardware diagnostics; neither firmware
+compilation nor its C host tests need that native HID installation. The old app
+source remains pending cleanup, but no firmware test or diagnostic tool resolves
+code or dependencies through it.

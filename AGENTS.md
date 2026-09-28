@@ -80,7 +80,7 @@ Required verification workflow:
    - hooks / ownership: `sh tests/host/run_hook_chaining_tests.sh`, `sh tests/host/run_keyboard_mod_ownership_tests.sh`, `sh tests/host/run_owned_keycode_tests.sh`, `sh tests/host/run_held_action_tests.sh`, `sh tests/host/run_layer_ownership_tests.sh`
    - macro / VIA / QMK-contract work: `sh tests/host/run_qmk_contract_checks.sh`, `sh tests/host/run_action_lifecycle_tests.sh`, `sh tests/host/run_qmk_portable_profile_tests.sh`, `sh tests/host/run_macro_payload_tests.sh`, `sh tests/host/run_via_macro_defaults_tests.sh`, `sh tests/host/run_via_macro_action_lifecycle_tests.sh`
    - shared runtime / tracing: `sh tests/host/run_runtime_init_order_tests.sh`, `sh tests/host/run_runtime_debug_tests.sh`, `sh tests/host/run_runtime_trace_tests.sh`
-   - Charybdis Live: from `tools/charybdis-live/`, run `npm run check` (and `npm run keycodes -- --check` when the vendored keycode catalog could be affected)
+   - Charybdis Live lives in its independent repository and owns its checks; firmware checks must not invoke the retained in-tree copy.
    - Profile Studio extension/UI (bug fixes only): from `tools/charybdis-profile-studio/`, run `npm run check` and `npm run screenshots`
      - For Profile Studio hover/tooltip changes, `npm run screenshots` is not enough because it captures resting page states. Generate a kept harness with `npm run screenshots -- --keep-harness`, serve that harness over localhost, then drive a real mouse move against the target with Chrome/CDP `Input.dispatchMouseEvent` or an equivalent browser action and capture the hover state. Do not rely on file URLs in the in-app browser or read-only DOM synthetic events for hover verification; they can be blocked or fail to create the actual tooltip state. Stop any temporary localhost server before handing work back.
      - When editing regex literals inside the generated Profile Studio client script returned by `getClientScript()`, remember the code lives inside an outer JavaScript template string. Escape regex backslashes for the generated script, for example `/\\b(?:VIA_MACRO|MACRO)_\\d+\\b/g`, otherwise hover-only checks can miss broken parsing that normal screenshots do not exercise.
@@ -154,11 +154,14 @@ Repo-specific guardrails:
   runtime high-water evidence. Preserve conservative designs when useful, but
   do not justify them with policy values presented as hardware capacity.
 
-## Independent Live compatibility
+## Independent firmware development
 
-Before merging protocol/schema or cross-language codec changes, run the sibling
-Live repo's `npm run test:compat -- --firmware PATH --live PATH --qmk PATH
---report NEW_FILE.json` with all paths explicit. Its `docs/COMPATIBILITY.md`
-describes the report and prerequisites. The five host runners honor
-`CHARYBDIS_LIVE_ROOT`; the ordinary firmware suite retains its in-tree default
-until cleanup. An invalid explicit Live root must fail, never fall back.
+Firmware builds and the full host suite must work without any Live checkout.
+Never import app modules in firmware tests or resolve diagnostics dependencies
+through the app. Firmware owns its regression fixtures and C contracts; see
+[the independence contract](docs/architecture/live-compatibility.md).
+Live owns its optional cross-repository integration command and runners. Joint
+protocol work runs that gate from Live with explicit checkout paths; firmware's
+required gates remain independent. No Live repository is required to finish a
+firmware-only task. Install firmware diagnostics dependencies with
+`npm ci --prefix tools` when using hardware diagnostics.

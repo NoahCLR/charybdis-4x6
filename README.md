@@ -730,7 +730,9 @@ See [the activity contract](docs/architecture/split-activity-sync.md), and follo
 [the capture procedure](measurements/pointing-cadence/README.md) so captures
 compare; recorded sets live under [`measurements/`](measurements/README.md).
 
-For cross-repository protocol validation, use the independent Live repo's
-`npm run test:compat -- --firmware PATH --live PATH --qmk PATH --report NEW_FILE.json`.
-The [compatibility contract](docs/architecture/live-compatibility.md) explains
-how the selected app participates in firmware host tests.
+Firmware builds and host tests do not require the Live app. The independent Live
+repo owns the optional `npm run test:compat` integration gate for joint protocol
+work. See [the independence contract](docs/architecture/live-compatibility.md).
+Install this repo's diagnostics dependencies with `npm ci --prefix tools` before
+using `tools/capture-split-diagnostics.cjs`; its HID dependency is independent
+of Live.

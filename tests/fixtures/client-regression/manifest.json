@@ -1,0 +1,46 @@
+{
+  "format": 1,
+  "source": {
+    "repository": "charybdis-live (local repository; no remote configured)",
+    "revision": "ecb7de018711c5a7ac9350a641de8de433b4061f"
+  },
+  "files": [
+    {
+      "path": "macro-corpus.json.gz",
+      "sha256": "5d8747b818b75f8e8c3fb9117d79cb7c98a9cf60c73afedff3d04e4d3df81a34"
+    },
+    {
+      "path": "portable.bin.fixture",
+      "sha256": "6b0d57294641ff9d7649e61e21e8d3e368b3b435336a76a86fa999db3a9e0070"
+    },
+    {
+      "path": "portable.bin.pd",
+      "sha256": "1e2358ddfa2a04b0bbdd94aea29373960bbde6e1b778e1d661b92fc878654963"
+    },
+    {
+      "path": "portable.bin.pd3",
+      "sha256": "340a5341b0221e3f34c3bafbf55620c8fcde1ca3342a38721a3e67fa9ac402cb"
+    },
+    {
+      "path": "portable.bin.pd4",
+      "sha256": "4bc5ca323206f49670eecef23b58c77aa5e570c21a08d8e8d9ed2b823d6c6b9e"
+    },
+    {
+      "path": "portable.bin.pd5",
+      "sha256": "a81297b49b79803d07fbb2d55c4b955305984168aa0549136d78fe50b1bd2a55"
+    },
+    {
+      "path": "pd-corpus.bin.gz",
+      "sha256": "bf7c37a2e8b956053c652fb63b4d5c931425eda595fe8b995bf50c44ee6b0da2"
+    }
+  ],
+  "generationRecipe": {
+    "repository": "https://github.com/NoahCLR/charybdis-4x6",
+    "revision": "d843443f",
+    "paths": [
+      "tests/host/run_macro_program_size_tests.sh",
+      "tests/host/run_profile_pd_v1_tests.sh",
+      "tests/host/run_profile_compiled_defaults_v1_tests.sh"
+    ]
+  }
+}

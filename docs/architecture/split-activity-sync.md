@@ -84,8 +84,8 @@ VIA custom channel 0, value `0x0A`, diagnostic builds only:
   CRC). Attempted bytes include each frame's CRC byte. Remaining bytes zero.
 
 `node tools/capture-split-diagnostics.cjs` arms, waits without device requests,
-then reads frozen pages as JSON. It uses the existing Charybdis Live node-hid
-installation but is a separate engineering tool. Close competing app/VIA
+then reads frozen pages as JSON. It uses the firmware tools' own node-hid
+installation (`npm ci --prefix tools`) and is a separate engineering tool. Close competing app/VIA
 connections. Select `--path` if more than one matching keyboard is attached.
 Capture with the procedure in
 [`measurements/pointing-cadence/`](../../measurements/pointing-cadence/README.md),

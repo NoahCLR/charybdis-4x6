@@ -987,3 +987,10 @@ flickered, because QMK's lighting sync carries no checksum. Setting
 first, and new measurements. The split frame CRC
 ([plan](plans/split-sync-checksums.md)) is now in the default build; 460,800
 stays removed until it is accepted on hardware and measured again.
+
+### Firmware tests are independent of the Live repository
+
+The app owns cross-repository codec comparisons. Firmware host tests retain
+regression vectors locally and never import app code; diagnostics installs its
+own dependencies. The retained in-tree app is not part of firmware's build or
+test surface. See [the independence contract](architecture/live-compatibility.md).

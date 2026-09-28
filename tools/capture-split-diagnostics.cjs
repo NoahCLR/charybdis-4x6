@@ -1,8 +1,6 @@
 #!/usr/bin/env node
 'use strict';
-// Engineering tool, separate from Charybdis Live. Requires its node-hid install.
-const {createRequire} = require('node:module');
-const path = require('node:path');
+// Engineering tool. Install its own dependencies with npm ci --prefix tools.
 
 // Format 2 adds each transaction's CRC failures: writes the slave dropped and
 // reported, and reads the master rejected (zero without the frame CRC).
@@ -123,8 +121,7 @@ async function main(argv = process.argv.slice(2)) {
         return;
     }
     if (argv.length && !(argv.length === 2 && argv[0] === '--path')) throw new Error('Expected --path HID_PATH or --help');
-    const requireLive = createRequire(path.resolve(__dirname, 'charybdis-live/package.json'));
-    const hid = requireLive('node-hid');
+    const hid = require('node-hid');
     const devices = hid.devices().filter(d => d.vendorId === 0xa8f8 && d.productId === 0x1833 && d.usagePage === 0xff60 && d.usage === 0x61);
     const device = argv.length ? devices.find(d => d.path === argv[1]) : devices.length === 1 ? devices[0] : null;
     if (!device) throw new Error(`Found ${devices.length} matching interfaces; select exactly one with --path. ${devices.map(d => d.path).join(', ')}`);

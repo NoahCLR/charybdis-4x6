@@ -3,8 +3,6 @@
 set -eu
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
-. "$ROOT/tests/host/noah_host_live_env.sh"
-noah_host_export_live_root "$ROOT"
 KEYMAP_PATH="$ROOT/keyboards/bastardkb/charybdis/4x6/keymaps/noah"
 BUILD_DIR="$(mktemp -d)"
 CONFIG="$BUILD_DIR/compile_config.h"
@@ -23,38 +21,10 @@ noah_host_export_qmk_cpath "$ROOT"
     printf '#include "%s/users/noah/config.h"\n' "$ROOT"
     printf '#include "%s/config.h"\n' "$KEYMAP_PATH"
 } >"$CONFIG"
-
-node - "$ROOT" "$BUILD_DIR/portable.bin" <<'JS'
-const fs = require("node:fs");
-// Profiles the retired v1 app wrote (stored settings v2), frozen as hex.
-const frozen = Object.fromEntries(fs.readFileSync(process.argv[2] + "/tests/fixtures/stored_profile_live_v1.fixture", "utf8")
-    .split("\n").filter(line => line && !line.startsWith("#")).map(line => line.split("=")));
-fs.writeFileSync(process.argv[3], Buffer.from(frozen["profile.hex"], "hex"));
-fs.writeFileSync(process.argv[3] + '.pd', Buffer.from(frozen["pd_profile.hex"], "hex"));
-// Settings v4 as the live app writes it, at its worst case: all 64 macro names
-// at 20 characters. The frozen v1 import above stays the stored-v2
-// compatibility check; .pd3 is a stored v3 domain with a UTF-8 name, which v4
-// firmware still reads.
-const app = process.env.CHARYBDIS_LIVE_ROOT;
-const {fingerprint, validateSnapshot} = require(app + "/core/model/portable-profile");
-const {editMacro} = require(app + "/core/model/macro-editor");
-const {decodeProfileBlob, encodeProfileBlob} = require(app + "/core/schema/profile-blob-v1");
-const {encodeSettings} = require(app + "/core/schema/settings-domain-v1");
-let named = require(app + "/tests/fixtures/pd-profile").document();
-for (let slot = 0; slot < 64; slot++) named = editMacro({document: named, fingerprint: fingerprint(named)}, {keycode: `VIA_MACRO_${slot}`, name: `Macro ${slot} name`.padEnd(20, "!"), expectedFingerprint: fingerprint(named)});
-fs.writeFileSync(process.argv[3] + '.pd4', validateSnapshot(named).profile);
-// Settings v5 at its worst case: every macro and every custom key named at 20
-// characters, as the live app writes it.
-const {editCustomKey} = require(app + "/core/model/custom-key-editor");
-const keyboard = {actionAbiDigest: named.actionAbiDigest, compiledLayerCount: 8, supportedDomainMask: 31};
-for (let slot = 0; slot < 64; slot++) named = editCustomKey({document: named, fingerprint: fingerprint(named)}, {keycode: `CUSTOM_KEY_${slot}`, name: `Custom key ${slot}`.padEnd(20, "?"), expectedFingerprint: fingerprint(named)}, keyboard);
-fs.writeFileSync(process.argv[3] + '.pd5', validateSnapshot(named).profile);
-const stored = validateSnapshot(require(app + "/tests/fixtures/pd-profile").document());
-const {macros, ...rest} = stored.settings;
-const v3 = encodeSettings({...rest, formatVersion: 3, macroNames: Array.from({length: 64}, (_, i) => i === 63 ? "Édition ⌘" : i === 0 ? "Sign-off" : "")});
-const blob = decodeProfileBlob(stored.profile);
-fs.writeFileSync(process.argv[3] + '.pd3', encodeProfileBlob({schema: blob.schema, domains: blob.domains.map(d => d.id === 0x40 ? {...d, version: 3, payload: v3} : d)}));
-JS
+cp "$ROOT/tests/fixtures/client-regression/portable.bin.fixture" "$BUILD_DIR/portable.bin"
+for suffix in .pd .pd3 .pd4 .pd5; do
+    cp "$ROOT/tests/fixtures/client-regression/portable.bin$suffix" "$BUILD_DIR/portable.bin$suffix"
+done
 
 build_and_run() {
     name="$1"
