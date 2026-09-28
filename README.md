@@ -11,7 +11,8 @@ to its independent sibling repository.
 On Noah's machine, the main checkouts are:
 
 - Firmware: `/Users/noah/dev/charybdis/charybdis-4x6`.
-- Ark: `/Users/noah/dev/charybdis/charybdis-ark`.
+- Ark: [NoahCLR/charybdis-ark](https://github.com/NoahCLR/charybdis-ark)
+  (`/Users/noah/dev/charybdis/charybdis-ark` locally).
 - Upstream QMK build dependency: `/Users/noah/dev/charybdis/bastardkb-qmk`.
 
 Use the worktree assigned to your task. Run `git worktree list` in the relevant
