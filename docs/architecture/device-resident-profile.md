@@ -6,8 +6,8 @@ This document defines the ownership model for live editing with Charybdis Live
 authoring files must remain the only source of truth during a live editing
 session.
 
-This is the technical profile contract beneath the broader
-[`Product Goal`](../PRODUCT_GOAL.md).
+This is the technical profile contract beneath the broader product goal,
+which Charybdis Live owns in its `docs/PRODUCT_GOAL.md`.
 The product target is first-grade keyboard control software, not only a working
 live-edit protocol.
 
@@ -40,8 +40,8 @@ authority. The three C files remain:
   in the firmware repository.
 
 The live app never reads or writes them. Its durable representation is the
-portable profile; `.c` import and export are outside the app (D-L09 in the
-[direction](../LIVE_EDIT_APP_DIRECTION.md)). Connecting a keyboard never
+portable profile; `.c` import and export are outside the app (D-L09, an app
+decision in Live's direction). Connecting a keyboard never
 silently overwrites the keyboard or a draft.
 
 Every editor draft records the device generation and digest it was based on. A
@@ -130,8 +130,9 @@ physical capacity.
 
 ## Implementation Sequence
 
-The delivery slices are in the [product goal](../PRODUCT_GOAL.md#delivery-strategy)
-and their status in the [direction](../LIVE_EDIT_APP_DIRECTION.md#current-product-status).
+The delivery slices are in Live's product goal and the product's status in
+Live's direction; the firmware's status is in the
+[firmware direction](../LIVE_EDIT_APP_DIRECTION.md#current-firmware-status).
 The logical-generation manifest and cross-store commit and recovery ordering
 are implemented; external VIA edit adoption remains. The active phase is
 acceptance: reboot, reconnect, applicable USB/role configurations,

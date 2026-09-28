@@ -14,10 +14,11 @@ the live app becomes a client of the keyboard rather than a client of the
 repository.**
 
 Read [`docs/LIVE_EDIT_APP_DIRECTION.md`](./docs/LIVE_EDIT_APP_DIRECTION.md)
-before doing architecture work. It carries the current status, the open
-issues, and the decisions behind the app. The end goal it serves is in
-[`docs/PRODUCT_GOAL.md`](./docs/PRODUCT_GOAL.md)
-and [`docs/architecture/device-resident-profile.md`](./docs/architecture/device-resident-profile.md).
+before doing architecture work. It carries the firmware's status, open issues
+and decisions, and says who owns what. The technical authority is
+[`docs/architecture/device-resident-profile.md`](./docs/architecture/device-resident-profile.md).
+The product goal, the app's status and the app's decisions belong to the
+Charybdis Live repository; no firmware task needs them.
 
 ### The tools, and the line between them
 
@@ -34,10 +35,9 @@ and [`docs/architecture/device-resident-profile.md`](./docs/architecture/device-
 
 The live app reads everything it edits from the keyboard, keeps every change in
 one reviewed draft with undo and redo, and applies it to both halves through a
-recovery-first logical transaction; complete profiles back up and restore. What
-remains before calling it complete — physical interruption acceptance, external
-VIA adoption, guided recovery, broad hardware acceptance and packaging — is
-tracked under "Current Product Status" in
+recovery-first logical transaction; complete profiles back up and restore. The
+firmware's remaining work — physical interruption acceptance, external VIA
+adoption and broad hardware acceptance — is under "Current Firmware Status" in
 [`docs/LIVE_EDIT_APP_DIRECTION.md`](./docs/LIVE_EDIT_APP_DIRECTION.md).
 
 ## Start Here
@@ -121,7 +121,7 @@ Repo-specific guardrails:
 - Prefer small, local changes over generic runtime rewrites unless the task explicitly requires runtime architecture work.
 - If behavior, workflows, setup steps, or user-facing capabilities changed, update `README.md` and the relevant files under `docs/` in the same pass.
 - If any authored input to `tools/profile_introspect.py` changes, regenerate the introspection outputs in the same pass with `python3 tools/profile_introspect.py --write` and verify them with `python3 tools/profile_introspect.py --check`. Current authored inputs are `keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c`, `keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h`, `users/noah/config.h`, `keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c`, and the shared pd-mode manifest `users/noah/lib/pointing/defs/pd_mode_manifest.h`.
-- If architectural work lands, record it in the doc it governs in the same pass: a new or amended decision in `docs/LIVE_EDIT_APP_DIRECTION.md` (keep "Current Product Status" and "Open Issues" current), or the matching spec under `docs/architecture/`.
+- If architectural work lands, record it in the doc it governs in the same pass: a new or amended firmware decision in `docs/LIVE_EDIT_APP_DIRECTION.md` (numbered from D-F01; keep "Current Firmware Status" and "Open Issues" current), or the matching spec under `docs/architecture/`. App decisions and app status belong to Live; a D-L heading here marked as an app decision is only a pointer.
 - Write decisions and contracts, not logs: verification runs, build numbers, test counts and dated progress notes belong in commit messages. When a plan is finished, fold what still constrains the code into the spec it produced and delete the plan (D-L07).
 
 ## RP2040 Resource Truth

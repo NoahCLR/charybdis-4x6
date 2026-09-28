@@ -41,10 +41,9 @@ and hardware acceptance checks.
   verified legacy-backup migration path and the remaining hardware acceptance.
 - Use [device-resident-profile.md](./device-resident-profile.md) for the live
   app's authority, readback, device operations, and performance contracts.
-- Use
-  [PRODUCT_GOAL.md](../PRODUCT_GOAL.md)
-  for the complete user experience and first-grade control-software completion
-  bar that the device-profile architecture serves.
+- The complete user experience and first-grade control-software completion
+  bar that the device-profile architecture serves are in Charybdis Live's
+  `docs/PRODUCT_GOAL.md`.
 
 The source trace covers:
 
@@ -139,9 +138,6 @@ flowchart TD
 - [device-resident-profile.md](./device-resident-profile.md) defines the
   device-first live-profile target and the boundary between device authority and
   compiled/source representation.
-- [PRODUCT_GOAL.md](../PRODUCT_GOAL.md)
-  defines the finished configurator experience, complete product scope, and
-  quality bar.
 
 ## Architecture Rules
 

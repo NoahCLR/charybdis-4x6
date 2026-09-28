@@ -624,10 +624,9 @@ Use the docs based on what you want to change:
   exports back into source
 - [`docs/architecture/README.md`](./docs/architecture/README.md): maintainer
   entry point for runtime ownership and source boundaries
-- [`docs/LIVE_EDIT_APP_DIRECTION.md`](./docs/LIVE_EDIT_APP_DIRECTION.md): live
-  app status, open issues and the decisions behind it
-- [`docs/PRODUCT_GOAL.md`](./docs/PRODUCT_GOAL.md): what "first-grade control
-  software" means and when it is done
+- [`docs/LIVE_EDIT_APP_DIRECTION.md`](./docs/LIVE_EDIT_APP_DIRECTION.md): the
+  firmware side of live editing: status, open issues and firmware decisions. The
+  product goal, app status and app decisions are in the Charybdis Live repository.
 
 ## AI Workflow Note
 
