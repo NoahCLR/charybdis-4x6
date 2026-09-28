@@ -38,6 +38,8 @@ NOAH_COMMON_SOURCES := \
     lib/profile/storage/profile_peer_store_backend.c \
     lib/profile/protocol/profile_wire_v1.c \
     lib/compat/qmk_durable_io.c \
+    lib/compat/qmk_split_activity.c \
+    lib/compat/qmk_split_diagnostics.c \
     lib/compat/qmk_profile_eeprom.c \
     lib/compat/qmk_physical_half.c \
     lib/compat/qmk_profile_split_transport.c \

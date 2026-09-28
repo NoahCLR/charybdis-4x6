@@ -12,6 +12,7 @@ ifeq ($(strip $(NOAH_PROFILE_VALIDATION_RESULT)),failed)
 endif
 
 include $(USER_PATH)/source_manifest.mk
+include $(USER_PATH)/lib/compat/qmk_split_transport.mk
 
 # VIA support: enables runtime key remapping via the VIA desktop app.
 VIA_ENABLE = yes

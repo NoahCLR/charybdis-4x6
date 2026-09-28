@@ -962,3 +962,14 @@ the profile; the app translates an older backup key by key on import. See
 [PD-mode domain](architecture/pd-mode-domain-v1.md) for the blocks and
 [portable profile](architecture/portable-profile-v1.md) for version 5 and the
 translation.
+
+### D-L43 — Split activity optimization is measured independently of baud
+
+Activity timestamp coalescing is opt-in until physical latency and RGB acceptance
+passes. The master keeps per-scan left-key acquisition and all existing runtime
+and durable split protocols. A narrow QMK hook admits the latest timestamp snapshot
+using the shortest enabled RGB idle timeout and updates successful state only
+after a successful send. An independently gated, bounded recorder provides
+transaction attribution without streaming during capture. See
+[split activity sync](architecture/split-activity-sync.md). Runtime RPC replacement
+and asynchronous scheduling remain behind the handoff's hardware measurement gates.

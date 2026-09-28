@@ -9,6 +9,11 @@ The root `README.md` stays focused on user-facing setup and profile behavior.
 The generated `docs/KEYMAP-OVERVIEW.md` shows the current authored profile.
 This directory explains how the runtime is shaped and where changes belong.
 
+The [split activity sync contract](split-activity-sync.md) covers the implemented
+opt-in activity policy and diagnostics. The [split transport optimization handoff](../plans/split-transport-optimization.md)
+contains the traffic analysis, savings model, remaining implementation stages,
+and hardware acceptance checks.
+
 ## How To Use This Pack
 
 - Start with this file when you need the ownership model.

@@ -242,6 +242,9 @@ truth; it consumes snapshots and authored color tables.
 
 ## Split Sync Flow
 
+QMK activity timestamp traffic has an opt-in admission policy, separate from
+these runtime snapshot domains; see [split activity sync](split-activity-sync.md).
+
 ```mermaid
 flowchart TD
     master["Master half"] --> now["Sample one 32-bit now"]

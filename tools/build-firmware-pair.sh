@@ -18,6 +18,8 @@ set -eu
 #
 # --no-owner builds the comparison pair without the live-profile owner, for
 # A/B against ordinary behaviour.
+# NOAH_SPLIT_BAUD=230400 or 460800 selects matching split speeds for both
+# halves and labels the artifacts. Unset retains QMK's ordinary default.
 
 REPO_ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 QMK_ROOT="${QMK_ROOT:-$(CDPATH= cd -- "$REPO_ROOT/../bastardkb-qmk" && pwd)}"
@@ -26,6 +28,7 @@ ARTIFACT="$QMK_ROOT/bastardkb_charybdis_4x6_noah.uf2"
 
 OWNER_ARGS=""
 SUFFIX=""
+TRANSPORT_ARGS=""
 if [ "${1:-}" = "--no-owner" ]; then
     OWNER_ARGS="-e NOAH_LIVE_PROFILE_OWNER=no -e NOAH_LIVE_PROFILE_MUTATION=no"
     SUFFIX="_no_owner"
@@ -34,6 +37,29 @@ elif [ $# -gt 0 ]; then
     echo "Usage: sh tools/build-firmware-pair.sh [--no-owner]" >&2
     exit 1
 fi
+
+case "${NOAH_SPLIT_BAUD:-}" in
+    "") ;;
+    230400|460800)
+        TRANSPORT_ARGS="-e NOAH_SPLIT_BAUD=$NOAH_SPLIT_BAUD"
+        SUFFIX="${SUFFIX}_baud${NOAH_SPLIT_BAUD}"
+        ;;
+    *)
+        echo "NOAH_SPLIT_BAUD must be 230400 or 460800" >&2
+        exit 1
+        ;;
+esac
+
+case "${NOAH_SPLIT_ACTIVITY_COALESCE:-}" in
+    ""|no) ;;
+    yes) TRANSPORT_ARGS="$TRANSPORT_ARGS -e NOAH_SPLIT_ACTIVITY_COALESCE=yes"; SUFFIX="${SUFFIX}_activity" ;;
+    *) echo "NOAH_SPLIT_ACTIVITY_COALESCE must be yes or no" >&2; exit 1 ;;
+esac
+case "${NOAH_SPLIT_DIAGNOSTICS:-}" in
+    ""|no) ;;
+    yes) TRANSPORT_ARGS="$TRANSPORT_ARGS -e NOAH_SPLIT_DIAGNOSTICS=yes"; SUFFIX="${SUFFIX}_diagnostic" ;;
+    *) echo "NOAH_SPLIT_DIAGNOSTICS must be yes or no" >&2; exit 1 ;;
+esac
 
 branch=$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD)
 destdir="$BUILD_ROOT/$branch"
@@ -57,7 +83,7 @@ build_half() {
     # second half links the first half's translation units.
     rm -f "$QMK_ROOT/.build/obj_bastardkb_charybdis_4x6_noah"/*.o 2>/dev/null || true
     ( cd "$QMK_ROOT" && qmk compile -kb bastardkb/charybdis/4x6 -km noah \
-        -e "$role=yes" -e "NOAH_PHYSICAL_HALF=$half" $OWNER_ARGS )
+        -e "$role=yes" -e "NOAH_PHYSICAL_HALF=$half" $OWNER_ARGS $TRANSPORT_ARGS )
     if [ ! -f "$ARTIFACT" ]; then
         echo "Expected firmware not found: $ARTIFACT" >&2
         exit 1
@@ -70,9 +96,12 @@ build_half FORCE_MASTER right "${n}_charybdis_right${SUFFIX}"
 build_half FORCE_SLAVE left "${n}_charybdis_left${SUFFIX}"
 
 echo
-if [ -n "$SUFFIX" ]; then
+if [ -n "$OWNER_ARGS" ]; then
     echo "Built the eight-PD-slot factory-only comparison pair WITHOUT the live-profile owner."
 else
     echo "Built the eight-PD-slot pair."
+fi
+if [ -n "${NOAH_SPLIT_BAUD:-}" ]; then
+    echo "Split transport: $NOAH_SPLIT_BAUD baud. Flash BOTH matching halves; mixed speeds cannot communicate."
 fi
 echo "Flash the right half to the master side and the left half to the slave side."

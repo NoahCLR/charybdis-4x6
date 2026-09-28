@@ -703,6 +703,7 @@ unhandled reply.
 | custom get | `0x07` | effective settings readback | [Portable Profile V1](portable-profile-v1.md) |
 | custom get | `0x08` | VIA storage status and editor pages | [Portable Profile V1](portable-profile-v1.md) |
 | custom get | `0x09` | legacy PD source, readback bridge only | [PD-mode domain v1](pd-mode-domain-v1.md) |
+| custom get/set | `0x0A` | bounded split transaction capture, diagnostic builds only | [Split activity sync](split-activity-sync.md) |
 | custom set | `0x10` | candidate begin | this document |
 | custom set | `0x11` | candidate chunk | this document |
 | custom set | `0x12` | candidate validate/prepare | this document |

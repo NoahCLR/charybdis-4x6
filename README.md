@@ -698,3 +698,23 @@ cannot be represented as profile data; export reports these explicitly instead
 of producing an incomplete file.
 The [portable profile contract](docs/architecture/portable-profile-v1.md) records
 format limits, compatibility, restore ordering and remaining hardware checks.
+
+## Split transport comparison builds
+
+The activity-sync optimization is available for hardware comparison at the
+existing baud rate. It reduces repeated lighting-activity messages while retaining
+per-scan key acquisition. Physical RGB/timing acceptance is pending.
+
+```sh
+QMK_HOME=/Users/noah/dev/charybdis/bastardkb-qmk-split-optimize \
+QMK_ROOT=/Users/noah/dev/charybdis/bastardkb-qmk-split-optimize \
+NOAH_SPLIT_ACTIVITY_COALESCE=yes sh tools/build-firmware-pair.sh
+```
+
+Use the matching QMK branch with the activity-policy hook. Add
+`NOAH_SPLIT_DIAGNOSTICS=yes` for the ten-second transaction recorder, then run
+`node tools/capture-split-diagnostics.cjs` after flashing. A baseline diagnostic
+pair omits `NOAH_SPLIT_ACTIVITY_COALESCE`. Build with Homebrew Python 3.12+ on PATH
+for this branch's profile tooling. Artifact names distinguish activity and
+instrumented variants; `NOAH_SPLIT_BAUD=460800` remains a separate paired test.
+See [the activity contract and measurement protocol](docs/architecture/split-activity-sync.md).
