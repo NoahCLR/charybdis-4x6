@@ -12,11 +12,12 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class SplitTransportBuildTest(unittest.TestCase):
-    def test_make_selection(self):
+    def test_split_speed_is_not_selectable(self):
+        # The link runs at QMK's default speed; 460,800 baud garbled it (D-L43).
         with tempfile.TemporaryDirectory() as directory:
             probe = Path(directory) / "probe.mk"
             probe.write_text("all:\n\t@echo $(OPT_DEFS)\n")
-            for baud in ("", "230400", "460800", "115200", "230400 460800", "bad"):
+            for baud in ("", "230400", "460800"):
                 with self.subTest(baud=baud):
                     result = subprocess.run(
                         ["make", "--no-print-directory", "-f",
@@ -24,12 +25,12 @@ class SplitTransportBuildTest(unittest.TestCase):
                          "-f", str(probe), f"NOAH_SPLIT_BAUD={baud}"],
                         capture_output=True, text=True,
                     )
-                    if baud in ("", "230400", "460800"):
-                        self.assertEqual(result.returncode, 0, result.stderr)
-                        expected = f"-DSERIAL_USART_SPEED={baud}" if baud else ""
-                        self.assertEqual(result.stdout.strip(), expected)
-                    else:
+                    if baud:
                         self.assertNotEqual(result.returncode, 0)
+                        self.assertIn("NOAH_SPLIT_BAUD was removed", result.stderr)
+                    else:
+                        self.assertEqual(result.returncode, 0, result.stderr)
+                        self.assertNotIn("SERIAL_USART_SPEED", result.stdout)
 
     def test_feature_selection(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -51,8 +52,8 @@ class SplitTransportBuildTest(unittest.TestCase):
                         self.assertEqual(result.stdout.strip(), f"-D{flag}" if value == "yes" else "")
 
     def test_pair_flags_and_artifact_names(self):
-        for baud, owner, activity, diagnostic in (("", True, "", ""), ("230400", True, "yes", ""), ("230400", True, "", "yes"), ("230400", True, "yes", "yes"), ("460800", False, "yes", "yes")):
-            with self.subTest(baud=baud, owner=owner), tempfile.TemporaryDirectory() as directory:
+        for baud, owner, activity, diagnostic in (("", True, "", ""), ("", True, "yes", ""), ("", True, "", "yes"), ("", False, "yes", "yes"), ("460800", True, "yes", "")):
+            with self.subTest(baud=baud, owner=owner, activity=activity, diagnostic=diagnostic), tempfile.TemporaryDirectory() as directory:
                 workspace = Path(directory)
                 qmk = workspace / "qmk checkout"
                 qmk.mkdir()
@@ -76,17 +77,23 @@ class SplitTransportBuildTest(unittest.TestCase):
                 if not owner:
                     command.append("--no-owner")
                 result = subprocess.run(command, env=env, capture_output=True, text=True)
+                if baud:
+                    # A leftover speed setting fails before anything is built.
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn("NOAH_SPLIT_BAUD was removed", result.stderr)
+                    self.assertFalse(log.exists())
+                    continue
                 self.assertEqual(result.returncode, 0, result.stderr)
                 calls = [json.loads(line) for line in log.read_text().splitlines()]
                 self.assertEqual(len(calls), 2)
                 for call, half, role in zip(calls, ("right", "left"), ("MASTER", "SLAVE")):
                     self.assertIn(f"NOAH_PHYSICAL_HALF={half}", call)
                     self.assertIn(f"FORCE_{role}=yes", call)
-                    self.assertEqual(f"NOAH_SPLIT_BAUD={baud}" in call, bool(baud))
+                    self.assertFalse(any("NOAH_SPLIT_BAUD" in argument for argument in call))
                     self.assertEqual("NOAH_LIVE_PROFILE_OWNER=no" in call, not owner)
                     self.assertEqual("NOAH_SPLIT_ACTIVITY_COALESCE=yes" in call, activity == "yes")
                     self.assertEqual("NOAH_SPLIT_DIAGNOSTICS=yes" in call, diagnostic == "yes")
-                suffix = ("" if owner else "_no_owner") + (f"_baud{baud}" if baud else "")
+                suffix = "" if owner else "_no_owner"
                 suffix += ("_activity" if activity else "") + ("_diagnostic" if diagnostic else "")
                 artifacts = sorted(path.name for path in (workspace / "output").rglob("*.uf2"))
                 self.assertEqual(artifacts, [f"1_charybdis_{half}{suffix}.uf2" for half in ("left", "right")])

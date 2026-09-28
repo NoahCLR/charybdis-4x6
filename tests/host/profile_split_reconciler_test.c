@@ -1060,8 +1060,8 @@ static void test_prepared_push_survives_one_lost_exchange_anywhere(void) {
 
 // The wire garbles a request: the peer cannot decode it, answers
 // INVALID_FRAME and acts on nothing. That is a lost exchange like a garbled
-// reply, and the copy carries on; on hardware at 460,800 baud one garbled
-// request anywhere in the copy used to end the whole Apply.
+// reply, and the copy carries on; on hardware one garbled request anywhere
+// in the copy used to end the whole Apply.
 static void test_prepared_push_survives_one_garbled_request_anywhere(void) {
     uint32_t exchanges_clean = 0u;
 

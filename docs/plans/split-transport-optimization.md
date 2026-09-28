@@ -28,10 +28,9 @@ Source basis:
   sibling path is not valid relative to this T3 worktree.
 - Right is the USB master and sensor half. Mouse motion is read locally; it does
   not need to cross the split link.
-- Paired baud selection is implemented in
-  `users/noah/lib/compat/qmk_split_transport.mk` and
-  `tools/build-firmware-pair.sh`, with build-contract tests. Measure baud and
-  activity coalescing independently to attribute their contributions.
+- The split link stays at 230,400 baud. A paired 460,800 option was built,
+  measured and removed (D-L43): it garbled split messages. Setting
+  `NOAH_SPLIT_BAUD` now fails the build.
 - QMK has pre-existing dirty/untracked submodule/module state. Preserve it.
   Implement required fork work on an isolated branch/worktree, with ownership
   explicit, rather than modifying unrelated work.
@@ -117,42 +116,13 @@ scenario, not a prediction guarantee or lower bound. Eliminated turnarounds
 could increase gains; changed scheduling or another bottleneck could reduce them.
 Do not present 224 ms/s as 22.4% CPU utilization recovered.
 
-### A combined with 460,800 baud
+### A combined with 460,800 baud — rejected
 
-Coalescing removes activity transactions first; doubling baud then halves the
-serialization time of the remaining bytes. Do not double the 518 Hz estimate:
-the rest of the loop includes CPU work and waits that may not scale with baud.
-
-Remaining steady activity cost is `31.25 * 0.303819444 = 9.494 ms/s`, compared
-with 243.056 ms/s in the original 400/s workload: **233.561 ms/s saved**, or
-**96.094% of that activity serialization cost**. This is only 9.494 ms/s more
-activity saving than coalescing alone. The additional benefit of faster baud
-primarily comes from other split traffic and baud-dependent turnaround.
-
-Let S be the original nominal serialization milliseconds per loop for all
-non-activity traffic, averaged over the same workload. With all other costs
-held constant, the combined illustrative throughput is:
-
-```
-F = (1000 - 31.25 * 0.607638889 / 2) / (1.892361111 - S / 2)
-```
-
-| Original non-activity serialization S per loop | Combined illustrative rate |
-| --- | ---: |
-| 0 ms (credit only activity bytes) | 523 Hz |
-| 0.130208 ms (credit one 3-byte matrix checksum poll per loop) | 542 Hz |
-| 0.25 ms | 560 Hz |
-| 0.50 ms | 603 Hz |
-| 1.00 ms | 711 Hz |
-
-These are sensitivity scenarios, not a measured range or guarantee. Periodic
-traffic does not necessarily scale with loop rate; use measured counts and a
-separate per-second term when fitting a real model. No reduction in CPU work,
-USB waiting, or scheduling is assumed. Turnaround savings remain unquantified.
-For perspective, the 77-byte durable RPC still needs **1.671 ms** serialization
-at 460,800 baud, so these changes alone do not guarantee uninterrupted 1 kHz
-reporting during saves. Phase B's 4-byte saving becomes 86.806 us per update at
-the faster baud; credit it only at its actual update rate, not every mouse poll.
+Built and measured on 2026-09-28 with coalescing: profile copies logged roughly
+20–30 split transport failures per Apply at 460,800 against none at 230,400, and
+the other half's lighting flickered because QMK's lighting sync has no checksum.
+The option is removed (D-L43). Revisit only after the unprotected syncs carry
+checksums, and measure again.
 
 ### B. Runtime RPC overhead
 
@@ -369,7 +339,7 @@ QMK_ROOT=/Users/noah/dev/charybdis/bastardkb-qmk sh tools/build-firmware-pair.sh
 
 Set `QMK_USERSPACE` to this worktree and use the correct QMK checkout. Build the
 side-specific owner-enabled pair for hardware acceptance; the generic build
-alone is factory-only. Do not mix baud experiments with optimization acceptance.
+alone is factory-only.
 If authored config changes, regenerate/check introspection as AGENTS.md requires.
 If memory/stack paths change, run the corresponding firmware budget gates and
 collect proportional hardware high-water evidence.

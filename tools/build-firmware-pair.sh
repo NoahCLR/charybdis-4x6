@@ -18,8 +18,8 @@ set -eu
 #
 # --no-owner builds the comparison pair without the live-profile owner, for
 # A/B against ordinary behaviour.
-# NOAH_SPLIT_BAUD=230400 or 460800 selects matching split speeds for both
-# halves and labels the artifacts. Unset retains QMK's ordinary default.
+# The split link always runs at QMK's default speed; the faster one garbled
+# split messages (D-L43), so NOAH_SPLIT_BAUD is refused rather than ignored.
 
 REPO_ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 QMK_ROOT="${QMK_ROOT:-$(CDPATH= cd -- "$REPO_ROOT/../bastardkb-qmk" && pwd)}"
@@ -38,17 +38,10 @@ elif [ $# -gt 0 ]; then
     exit 1
 fi
 
-case "${NOAH_SPLIT_BAUD:-}" in
-    "") ;;
-    230400|460800)
-        TRANSPORT_ARGS="-e NOAH_SPLIT_BAUD=$NOAH_SPLIT_BAUD"
-        SUFFIX="${SUFFIX}_baud${NOAH_SPLIT_BAUD}"
-        ;;
-    *)
-        echo "NOAH_SPLIT_BAUD must be 230400 or 460800" >&2
-        exit 1
-        ;;
-esac
+if [ -n "${NOAH_SPLIT_BAUD:-}" ]; then
+    echo "NOAH_SPLIT_BAUD was removed: the split link stays at QMK's default speed (D-L43)" >&2
+    exit 1
+fi
 
 case "${NOAH_SPLIT_ACTIVITY_COALESCE:-}" in
     ""|no) ;;
@@ -100,8 +93,5 @@ if [ -n "$OWNER_ARGS" ]; then
     echo "Built the eight-PD-slot factory-only comparison pair WITHOUT the live-profile owner."
 else
     echo "Built the eight-PD-slot pair."
-fi
-if [ -n "${NOAH_SPLIT_BAUD:-}" ]; then
-    echo "Split transport: $NOAH_SPLIT_BAUD baud. Flash BOTH matching halves; mixed speeds cannot communicate."
 fi
 echo "Flash the right half to the master side and the left half to the slave side."

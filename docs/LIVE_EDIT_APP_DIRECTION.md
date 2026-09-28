@@ -965,7 +965,7 @@ the profile; the app translates an older backup key by key on import. See
 [portable profile](architecture/portable-profile-v1.md) for version 5 and the
 translation.
 
-### D-L43 — Split activity optimization is measured independently of baud
+### D-L43 — Split activity optimization, at QMK's default baud
 
 Activity timestamp coalescing is opt-in until physical latency and RGB acceptance
 passes. The master keeps per-scan left-key acquisition and all existing runtime
@@ -975,3 +975,11 @@ after a successful send. An independently gated, bounded recorder provides
 transaction attribution without streaming during capture. See
 [split activity sync](architecture/split-activity-sync.md). Runtime RPC replacement
 and asynchronous scheduling remain behind the handoff's hardware measurement gates.
+
+The split link stays at QMK's default 230,400 baud. 460,800 was built as a paired
+option and removed after hardware comparison on 2026-09-28: with the same code and
+coalescing, profile copies logged roughly 20–30 split transport failures per Apply
+at 460,800 and none across three Applies at 230,400, and the other half's lighting
+flickered, because QMK's lighting sync carries no checksum. Setting
+`NOAH_SPLIT_BAUD` now fails the build. A faster link needs checksummed syncs
+first, and new measurements.

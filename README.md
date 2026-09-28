@@ -701,8 +701,9 @@ format limits, compatibility, restore ordering and remaining hardware checks.
 
 ## Split transport comparison builds
 
-The activity-sync optimization is available for hardware comparison at the
-existing baud rate. It reduces repeated lighting-activity messages while retaining
+The activity-sync optimization is available for hardware comparison. The split
+link always runs at QMK's default 230,400 baud; a faster link garbled split
+messages and was removed (D-L43). It reduces repeated lighting-activity messages while retaining
 per-scan key acquisition. Physical RGB/timing acceptance is pending.
 
 ```sh
@@ -716,5 +717,5 @@ Use the matching QMK branch with the activity-policy hook. Add
 `node tools/capture-split-diagnostics.cjs` after flashing. A baseline diagnostic
 pair omits `NOAH_SPLIT_ACTIVITY_COALESCE`. Build with Homebrew Python 3.12+ on PATH
 for this branch's profile tooling. Artifact names distinguish activity and
-instrumented variants; `NOAH_SPLIT_BAUD=460800` remains a separate paired test.
+instrumented variants.
 See [the activity contract and measurement protocol](docs/architecture/split-activity-sync.md).

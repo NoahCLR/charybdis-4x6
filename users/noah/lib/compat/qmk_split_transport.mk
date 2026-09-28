@@ -1,13 +1,8 @@
-# Optional paired-firmware experiment. Leave QMK's transport default alone
-# unless explicitly selected; both halves must use the same baud rate.
+# The split link runs at QMK's default speed. A faster link was tried and
+# rejected: at 460,800 baud it garbled split messages (D-L43), so there is no
+# speed selector, and an old build command that still sets one fails.
 ifneq ($(strip $(NOAH_SPLIT_BAUD)),)
-    ifeq ($(filter $(strip $(NOAH_SPLIT_BAUD)),230400 460800),)
-        $(error NOAH_SPLIT_BAUD must be 230400 or 460800)
-    endif
-    ifneq ($(words $(NOAH_SPLIT_BAUD)),1)
-        $(error NOAH_SPLIT_BAUD must be a single baud rate)
-    endif
-    OPT_DEFS += -DSERIAL_USART_SPEED=$(strip $(NOAH_SPLIT_BAUD))
+    $(error NOAH_SPLIT_BAUD was removed: the split link stays at QMK's default speed (D-L43))
 endif
 
 # Enabled explicitly for A/B until physical timing and RGB acceptance pass.

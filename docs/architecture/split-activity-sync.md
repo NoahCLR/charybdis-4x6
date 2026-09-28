@@ -2,8 +2,8 @@
 
 Activity coalescing is an opt-in firmware build feature pending physical
 acceptance. Enable `NOAH_SPLIT_ACTIVITY_COALESCE=yes` on the flashable pair.
-Default baud remains QMK's 230,400. `NOAH_SPLIT_BAUD=230400` or `460800` is a
-separate paired experiment; never use different speeds on the two halves.
+The split link runs at QMK's default 230,400 baud, with no speed selector; see
+D-L43 for why 460,800 was removed.
 
 ## Ownership and compatibility
 
@@ -81,7 +81,7 @@ VIA custom channel 0, value `0x0A`, diagnostic builds only:
 then reads frozen pages as JSON. It uses the existing Charybdis Live node-hid
 installation but is a separate engineering tool. Close competing app/VIA
 connections. Select `--path` if more than one matching keyboard is attached.
-Capture baseline and optimized firmware with the same profile, cable, baud,
+Capture baseline and optimized firmware with the same profile, cable,
 lighting and motion workload. Physical USB report cadence must be measured
 separately; this recorder cannot establish p99 report gaps by itself.
 
